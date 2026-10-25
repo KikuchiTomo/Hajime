@@ -30,6 +30,19 @@ enum UIStrings {
         static let dictionaryTab = "ユーザー辞書"
         static let appearanceTab = "見た目"
         static let usageTab = "使い方の記録"
+        static let appsTab = "アプリ"
+        static let escapeSwitchesToDirect = "日本語のモードで Escape を押したら英数にする(Vim など)"
+        static let bundlePrefix = "アプリの ID(前方一致)"
+        static let profile = "扱い"
+        static let appsNote = "アプリの ID はバンドル ID です(例: com.microsoft.VSCode)．上にある規則ほど優先します．エディタとターミナルでは記号と空白を半角のまま入れ，ターミナルでは行の頭のコマンドを英字のまま流します．"
+
+        static func label(for profile: AppProfile) -> String {
+            switch profile {
+            case .standard: "ふつう"
+            case .programming: "エディタ(記号を半角)"
+            case .terminal: "ターミナル(記号を半角，コマンドを英字で)"
+            }
+        }
         static let recordsUsage = "使い方を記録する"
         static let usageNote = "確定した回数や選び直した回数だけを，この Mac の中に記録します．入力した文字は記録せず，どこにも送りません．"
         static let firstCandidateRate = "選び直さずに確定した割合"

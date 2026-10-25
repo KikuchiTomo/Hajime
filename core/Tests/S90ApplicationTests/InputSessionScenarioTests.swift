@@ -842,3 +842,25 @@ struct UsageScenarioTests {
         ])
     }
 }
+
+@MainActor
+@Suite("Escape で英数に戻す(R-06)")
+struct EscapeToDirectTests {
+    @Test("設定を入れると，組み立てていないときの Escape で英数に切り替え，Escape はアプリに渡す")
+    func switches() {
+        var settings = Settings()
+        settings.escapeSwitchesToDirect = true
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        let result = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(result.handled == false)
+        #expect(result.actions.contains(.selectMode(.direct)))
+        #expect(session.mode == .direct)
+    }
+
+    @Test("既定では Escape で英数に切り替えない")
+    func defaultOff() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(session.mode == .japanese)
+    }
+}
