@@ -1,10 +1,14 @@
 # 入口はすべてここ．中身はまだ検査だけ(core と apps を作ったら build と test を足す)
 PYTHON ?= python3 -I
 
-.PHONY: setup check test tokens build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models setup check test tokens build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
 
 setup:
 	mise install
+
+# Zenzai のモデルを取得してハッシュを確かめる(docs/dev/adr/0006-zenzai.md)
+fetch-models:
+	tools/models/fetch_zenzai.sh
 
 check:
 	$(PYTHON) tools/check/check_skills.py

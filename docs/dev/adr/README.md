@@ -13,3 +13,4 @@
 | [0003](0003-windows-out-of-process-engine.md) | Windows では変換を別のプロセスで行う | 採用 |
 | [0004](0004-docs-site.md) | ドキュメントサイトは Starlight で作る | 提案 |
 | [0005](0005-candidate-presentation.md) | 候補の出し方は一覧と文節格子の 2 つにし，文節が 2 つ以上なら文節格子にする | 採用 |
+| [0006](0006-zenzai.md) | かな漢字変換に Zenzai を使う | 採用 |
