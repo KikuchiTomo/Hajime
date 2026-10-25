@@ -557,3 +557,49 @@ struct ReadingCorrectionScenarioTests {
         #expect(marked == "よう")
     }
 }
+
+@MainActor
+@Suite("ライブ変換の時機")
+struct LiveConversionTimingTests {
+    private func session() -> (InputSession, FakeConverter) {
+        let converter = FakeConverter([
+            "らい": [("雷", nil)],
+            "らいぶ": [("ライブ", nil)],
+            "きょうはらい": [("今日は雷", nil)],
+        ])
+        converter.trailingWords["雷"] = .init(readingCount: 2, textCount: 1)
+        converter.trailingWords["今日は雷"] = .init(readingCount: 2, textCount: 1)
+        return (InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings()), converter)
+    }
+
+    private func marked(_ actions: [ClientAction]) -> String? {
+        actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+    }
+
+    @Test("打っている途中の短い語はかなのまま見せ，打鍵が止まったら変換して見せる")
+    func holdsShortWord() {
+        let (session, _) = session()
+        var shown: String?
+        for key in "kyouharai" { shown = marked(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) ?? shown }
+        #expect(shown == "今日はらい")
+        #expect(session.awaitsSettle)
+        #expect(marked(session.settle(context: InputContext())) == "今日は雷")
+        #expect(!session.awaitsSettle)
+    }
+
+    @Test("読みが短いあいだは，打鍵が止まるまでかなのまま")
+    func shortReading() {
+        let (session, _) = session()
+        var shown: String?
+        for key in "rai" { shown = marked(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) ?? shown }
+        #expect(shown == "らい")
+    }
+
+    @Test("Enter では変換して確定する")
+    func enterCommitsConversion() {
+        let (session, _) = session()
+        for key in "kyouharai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        let committed = session.handle(KeyEvent(.enter), context: InputContext()).actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }
+        #expect(committed == ["今日は雷"])
+    }
+}

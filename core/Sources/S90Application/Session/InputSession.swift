@@ -27,6 +27,8 @@ public final class InputSession {
     private let corrector: EnglishWordCorrector
     /// 日本語の打ち間違いを直す前の読み．Esc で戻せるように覚えておく
     private var typedBeforeCorrection: Composition?
+    /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
+    private var isSettled = false
 
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading) {
         self.converter = converter
@@ -71,6 +73,18 @@ public final class InputSession {
         commitAll()
     }
 
+    /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ
+    public var awaitsSettle: Bool {
+        isComposing && phase == .composing && !isSettled && settings.current.liveConversion
+    }
+
+    /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
+    public func settle(context: InputContext) -> [ClientAction] {
+        guard awaitsSettle else { return [] }
+        isSettled = true
+        return render(context: context)
+    }
+
     // MARK: - 英数モード
 
     private func handleDirect(_ event: KeyEvent, context: InputContext) -> KeyResult {
@@ -91,6 +105,7 @@ public final class InputSession {
     // MARK: - 日本語モード
 
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        isSettled = false
         if event.modifiers.contains(.control) {
             return handleControl(event, context: context)
         }
@@ -392,6 +407,7 @@ public final class InputSession {
                 let following = corrector.followingReading(in: composition).conversionReading
                 return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + following, readingCount: whole, origin: .correction)
             }
+            // Enter は区切りなので，かなのまま見せていた語も変換して確定する
             if settings.current.liveConversion, composition.pending.isEmpty || composition.pending == "n",
                 let live = liveCandidate() {
                 return live
@@ -523,9 +539,11 @@ public final class InputSession {
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
         let reading = composition.kana
-        let live = bestWholeCandidate(for: reading)
+        let shown = bestWholeCandidate(for: reading).map {
+            LiveConversionRule().display(of: $0, reading: reading, settled: isSettled)
+        }
         return MarkedText([
-            .init(live?.text ?? reading, style: .converted),
+            .init(shown ?? reading, style: .converted),
             .init(composition.pending, style: .reading),
         ])
     }
