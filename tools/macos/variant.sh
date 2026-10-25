@@ -71,10 +71,18 @@ signing_identity() {
       return 1
     fi
   fi
+  if [ -d "$_vs_installed" ] && [ -d "$(container_path)" ]; then
+    # 証明書で署名されていない版(アドホック署名)が入っていて，それが作った置き場所がある
+    echo "入っている「${app_name}」はアドホック署名で，そのデータの置き場所 $(container_path) があります．" >&2
+    echo "証明書で署名すると起動の途中で止まるおそれがあるので，入れるのをやめます．" >&2
+    echo "アドホック署名のまま入れ直すなら S90_SIGN_IDENTITY=- を付け，証明書で署名した版に替えるなら，" >&2
+    echo "学習データと設定を消してよければ Finder でその置き場所をゴミ箱に入れてから入れ直してください" >&2
+    return 1
+  fi
   if [ -d "$(container_path)" ]; then
     echo "前の「${app_name}」のデータの置き場所 $(container_path) が残っていて，それを作った署名が分かりません．" >&2
-    echo "違うチームで署名すると起動の途中で止まるので，入れるのをやめます．前と同じ証明書を S90_SIGN_IDENTITY で指定するか，" >&2
-    echo "学習データと設定を消してよければ，Finder でその置き場所をゴミ箱に入れてから入れ直してください" >&2
+    echo "違うチームで署名すると起動の途中で止まるので，入れるのをやめます．前と同じ証明書を S90_SIGN_IDENTITY で指定するか" >&2
+    echo "(前がアドホック署名なら S90_SIGN_IDENTITY=-)，学習データと設定を消してよければ Finder でその置き場所をゴミ箱に入れてから入れ直してください" >&2
     return 1
   fi
   code_signing_identities | awk -F '\t' '$2 ~ /^Apple Development/ { print $1; exit }'

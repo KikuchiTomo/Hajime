@@ -15,7 +15,12 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 
 . "$root/tools/macos/variant.sh"
 variant Release
-installer_identity=${S90_INSTALLER_IDENTITY:-$(identities basic | awk -F '\t' '$2 ~ /^Developer ID Installer/ { print $1; exit }')}
+# productbuild の --sign は証明書の名前(Common Name)を受け取る(man productbuild)．同じ名前が 2 つあると選べないので止める
+installer_identity=${S90_INSTALLER_IDENTITY:-$(identities basic | awk -F '\t' '$2 ~ /^Developer ID Installer/ { print $2; exit }')}
+if [ -n "$installer_identity" ] && [ "$(identities basic | awk -F '\t' -v name="$installer_identity" '$2 == name' | wc -l | tr -d ' ')" -gt 1 ]; then
+  echo "「${installer_identity}」という名前の証明書が 2 つあり，.pkg の署名に使う証明書を選べません．古い方をキーチェーンから外してください" >&2
+  exit 1
+fi
 notary_profile=${S90_NOTARY_PROFILE:-}
 if [ -n "${S90_APP_IDENTITY:-}" ]; then
   app_identity=$S90_APP_IDENTITY
