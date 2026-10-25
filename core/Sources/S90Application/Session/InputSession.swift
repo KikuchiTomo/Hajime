@@ -136,6 +136,11 @@ public final class InputSession {
             return result
         }
         switch event.key {
+        case .kana where event.modifiers.contains(.option):
+            // Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英語 → ローマ字)
+            let styles = InputStyle.allCases
+            let current = styles.firstIndex(of: settings.current.inputStyle) ?? 0
+            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(styles[(current + 1) % styles.count])])
         case .kana:
             return KeyResult(handled: true, actions: modeIndicator(.japanese))
         case .eisu:

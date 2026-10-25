@@ -48,7 +48,7 @@ private final class Harness {
             case .hideCandidates:
                 panel = nil
                 lattice = nil
-            case .showModeIndicator, .selectMode: break
+            case .showModeIndicator, .selectMode, .selectInputStyle: break
             }
         }
     }
@@ -862,5 +862,18 @@ struct EscapeToDirectTests {
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
         _ = session.handle(KeyEvent(.escape), context: InputContext())
         #expect(session.mode == .japanese)
+    }
+}
+
+@MainActor
+@Suite("入力方式の切り替え")
+struct InputStyleSwitchTests {
+    @Test("Option+かな で入力方式を順に切り替える")
+    func cycles() {
+        var settings = Settings()
+        settings.inputStyle = .english
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        let actions = session.handle(KeyEvent(.kana, modifiers: .option), context: InputContext()).actions
+        #expect(actions.contains(.selectInputStyle(.romaji)))
     }
 }

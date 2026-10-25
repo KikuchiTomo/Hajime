@@ -1,5 +1,6 @@
 import AppKit
 import InputMethodKit
+import os
 import S90Application
 import S90Domain
 
@@ -8,9 +9,10 @@ import S90Domain
 final class ClientActionPresenter {
     private let candidatePanel: CandidatePanelController
     private let modeIndicator: ModeIndicatorController
-    private let settings: any SettingsReading
+    private let settings: any SettingsStoring
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, settings: any SettingsReading) {
+    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, settings: any SettingsStoring) {
         self.candidatePanel = candidatePanel
         self.modeIndicator = modeIndicator
         self.settings = settings
@@ -34,6 +36,12 @@ final class ClientActionPresenter {
                 modeIndicator.show(mode, caret: caretRect(of: client), theme: settings.current.theme)
             case .selectMode(let mode):
                 client.selectMode(mode == .japanese ? AppIdentity.japaneseModeID : AppIdentity.directModeID)
+            case .selectInputStyle(let style):
+                do {
+                    try settings.update { $0.inputStyle = style }
+                } catch {
+                    logger.error("入力方式を保存できませんでした: \(String(describing: error), privacy: .public)")
+                }
             }
         }
     }
