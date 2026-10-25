@@ -45,7 +45,10 @@ enum Evaluation {
 
     /// 打っている途中の表示を評価する．読みを 1 文字ずつ増やし，各時点で見せる文字が
     /// 最後の変換結果の先頭と食い違った回数(誤った途中表示．「らい」で「雷」など)を数える．かなのまま見せた時点は誤りに数えない
+    /// 打っている途中の表示を数える．途中の表示のうち，最後に確定する文と食い違う漢字やカタカナを見せたものを誤りとする．
+    /// 末尾がかなのまま食い違うのは，続きを打てば直るので誤りにしない
     static func live(cases: [EvaluationCase], engine: AzooKeyConverterEngine) {
+        let rule = LiveConversionRule()
         var steps = 0, wrong = 0, converted = 0
         for item in cases {
             let session = newSession(engine, context: item.leftContext)
@@ -53,12 +56,13 @@ enum Evaluation {
             var mistakes: [String] = []
             for length in 1..<item.reading.count {
                 let prefix = String(item.reading.prefix(length))
-                let shown = best(session, prefix)
+                let candidate = session.candidates(for: prefix).first { $0.readingCount == prefix.count }
+                let shown = candidate.map { rule.display(of: $0, reading: prefix, settled: false) } ?? prefix
                 steps += 1
                 if shown == prefix { continue }
                 converted += 1
-                // 最後の文字は次の文字で変わりうるので，それより前で比べる
-                if !final.hasPrefix(String(shown.dropLast())) {
+                let common = zip(shown, final).prefix { $0 == $1 }.count
+                if shown.dropFirst(common).contains(where: { !isHiragana($0) }) {
                     wrong += 1
                     mistakes.append("\(prefix)→\(shown)")
                 }
@@ -66,6 +70,10 @@ enum Evaluation {
             if !mistakes.isEmpty { print("\(item.reading) → \(final)  誤った途中表示: \(mistakes.joined(separator: " "))") }
         }
         print("途中の時点: \(steps)  変換して見せた: \(converted)  誤った途中表示: \(wrong)")
+    }
+
+    private static func isHiragana(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { (0x3041...0x309F).contains($0.value) }
     }
 
     private static func newSession(_ engine: AzooKeyConverterEngine, context: String?) -> any KanaKanjiConverting {
