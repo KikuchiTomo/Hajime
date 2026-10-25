@@ -10,11 +10,11 @@ private func compose(_ keys: String) -> Composition {
 @Suite("ローマ字の組み立て")
 struct CompositionTests {
     @Test("よく使う綴り", arguments: [
-        ("konnichiha", "こんにちは"),
         ("konnnitiha", "こんにちは"),
-        ("onna", "おんな"),
+        ("hunniki", "ふんいき"),
+        ("onnna", "おんな"),
         ("kanji", "かんじ"),
-        ("shinnyuu", "しんにゅう"),
+        ("shinnnyuu", "しんにゅう"),
         ("gakkou", "がっこう"),
         ("matcha", "まっちゃ"),
         ("kyou", "きょう"),
@@ -22,12 +22,19 @@ struct CompositionTests {
         ("fami", "ふぁみ"),
         ("ltu", "っ"),
         ("n'a", "んあ"),
-        ("minna", "みんな"),
-        ("tannin", "たんにん"),
+        ("minnna", "みんな"),
+        ("tannnin", "たんにん"),
         ("henkann", "へんかん"),
     ])
     func spelling(keys: String, expected: String) {
         #expect(compose(keys).conversionReading == expected)
+    }
+
+    @Test("nn は必ず ん．次の母音と組ませない")
+    func doubleNIsAlwaysNasal() {
+        #expect(compose("onna").conversionReading == "おんあ")
+        #expect(compose("konnichiha").conversionReading == "こんいちは")
+        #expect(compose("hunniki").displayReading == "ふんいき")
     }
 
     @Test("末尾の n は表示では n のまま，変換では ん")

@@ -51,11 +51,24 @@ struct TypoCorrectionRuleTests {
     }
 
     @Test("R-02: 読めない並びは補正の対象")
-    func candidateKeys() {
+    func tails() {
         let rule = TypoCorrectionRule(level: .standard)
-        #expect(rule.candidateKeys(in: compose("python")) == "python")
-        #expect(rule.candidateKeys(in: compose("sakana")) == nil)
-        #expect(rule.candidateKeys(in: compose("pyt")) == nil)
+        #expect(rule.tails(in: compose("python")).map(\.keys) == ["python"])
+        #expect(rule.tails(in: compose("sakana")).isEmpty)
+        #expect(rule.tails(in: compose("pyt")).isEmpty)
+    }
+
+    @Test("R-02: 打ちかけのローマ字(まだかなでない文字)は読めない並びに数えない")
+    func pendingIsNotInvalid() {
+        let rule = TypoCorrectionRule(level: .standard)
+        #expect(rule.tails(in: compose("konob")).isEmpty)
+        #expect(rule.tails(in: compose("hunnik")).isEmpty)
+    }
+
+    @Test("R-02: 文の途中に打った英単語も，区切りから末尾までの部分として見つける")
+    func tailsInSentence() {
+        let tails = TypoCorrectionRule(level: .standard).tails(in: compose("konobanopython"))
+        #expect(tails.contains { $0.keys == "python" && $0.kanaStart == 4 })
     }
 
     @Test("R-02: 綴りの誤りは近い単語に直す")
@@ -74,7 +87,7 @@ struct TypoCorrectionRuleTests {
 
     @Test("切る設定では何もしない")
     func off() {
-        #expect(TypoCorrectionRule(level: .off).candidateKeys(in: compose("python")) == nil)
+        #expect(TypoCorrectionRule(level: .off).tails(in: compose("python")).isEmpty)
     }
 
     @Test("入れ替えは 1 回と数える")
