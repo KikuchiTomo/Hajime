@@ -8,18 +8,23 @@ public enum CandidateOrigin: Sendable, Equatable {
     case asTyped
     /// 文字の種類の変換(R-03)
     case variant(ScriptVariant)
+    /// 文全体の候補から切り出した文節．学習には使わない
+    case sentencePart
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．
+/// score はエンジンが付けた対数尤度で，大きいほどよい．エンジン以外の候補は 0
 public struct Candidate: Sendable, Equatable {
     public var text: String
     public var readingCount: Int
     public var origin: CandidateOrigin
+    public var score: Double
 
-    public init(text: String, readingCount: Int, origin: CandidateOrigin) {
+    public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0) {
         self.text = text
         self.readingCount = readingCount
         self.origin = origin
+        self.score = score
     }
 }
 

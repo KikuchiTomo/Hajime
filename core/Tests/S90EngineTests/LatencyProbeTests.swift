@@ -5,10 +5,17 @@ import S90Engine
 import S90TestSupport
 import Testing
 
-@Suite("1 キーあたりの処理時間")
+#if DEBUG
+private let isReleaseBuild = false
+#else
+private let isReleaseBuild = true
+#endif
+
+/// 時間はデバッグビルドでは何倍にもなるので，Release でだけ測る(swift test -c release)
+@Suite("1 キーあたりの処理時間", .serialized)
 @MainActor
 struct LatencyProbeTests {
-    @Test("ライブ変換を含めて 1 キーの処理を測る")
+    @Test("ライブ変換を含めて 1 キーの処理を測る", .enabled(if: isReleaseBuild))
     func perKey() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-latency-\(UUID().uuidString)")
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency")

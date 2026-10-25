@@ -14,6 +14,7 @@ private final class Harness {
     private(set) var committed = ""
     private(set) var marked = MarkedText.empty
     private(set) var panel: CandidatePanel?
+    private(set) var lattice: LatticePanel?
     private(set) var lastResult = KeyResult.passThrough
 
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings) {
@@ -34,7 +35,10 @@ private final class Harness {
             case .commit(let text): committed += text
             case .setMarkedText(let text): marked = text
             case .showCandidates(let value): panel = value
-            case .hideCandidates: panel = nil
+            case .showLattice(let value): lattice = value
+            case .hideCandidates:
+                panel = nil
+                lattice = nil
             case .showModeIndicator, .selectMode: break
             }
         }
@@ -240,5 +244,94 @@ struct InputSessionScenarioTests {
         harness.press(.character("å"), .option)
         #expect(harness.committed == "か")
         #expect(!harness.lastResult.handled)
+    }
+
+    // MARK: - 文節格子
+
+    private func latticeConverter() -> FakeConverter {
+        FakeConverter(
+            ["きょうはあめ": [("今日は雨", nil)], "あめ": [("雨", nil)], "きょう": [("今日", nil)], "はあめ": [("は雨", nil)]],
+            clauses: [
+                "きょうはあめ": [("今日は", 4), ("京は", 4)],
+                "あめ": [("雨", 2), ("飴", 2)],
+                "はあめ": [("は雨", 3)],
+            ]
+        )
+    }
+
+    @Test("文節が 2 つ以上あれば，Space で文節格子を出す")
+    func latticeAppears() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.panel == nil)
+        #expect(harness.lattice?.columns.map(\.text) == ["今日は", "雨"])
+        #expect(harness.lattice?.columns.first?.isFocused == true)
+        #expect(harness.marked.segments.map(\.style) == [.focused, .converted])
+    }
+
+    @Test("文節格子: →で文節を移り，↓で候補を変え，Enter で全体を確定する")
+    func latticeNavigation() {
+        let converter = latticeConverter()
+        let harness = Harness(converter: converter)
+        harness.type("kyouhaame")
+        harness.press(.space)
+        harness.press(.right)
+        harness.press(.down)
+        #expect(harness.marked.text == "今日は飴")
+        harness.press(.enter)
+        #expect(harness.committed == "今日は飴")
+        #expect(converter.committed.count == 2)
+    }
+
+    @Test("文節格子: 番号で選ぶと次の文節に進み，最後の文節で確定する")
+    func latticeNumbers() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        harness.type("2")
+        #expect(harness.lattice?.columns[1].isFocused == true)
+        harness.type("1")
+        #expect(harness.committed == "京は雨")
+    }
+
+    @Test("文節格子: Shift+← で文節を縮め，後ろを分け直す")
+    func latticeResize() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        harness.press(.left, .shift)
+        #expect(harness.lattice?.columns.map(\.text) == ["今日", "は雨"])
+    }
+
+    @Test("確信度の高い文節は，注目していなければ候補の列を畳む")
+    func latticeConfidence() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        // 「あめ」は雨と飴の点数の差が十分あるので畳む(Fake の点数は 1 つ下がるごとに 3)
+        #expect(harness.lattice?.columns[1].showsAlternatives == false)
+        #expect(harness.lattice?.columns[0].showsAlternatives == true)
+    }
+
+    @Test("一覧の設定なら文節が多くても一覧を出す")
+    func listSetting() {
+        var settings = DefaultSettings.settings
+        settings.candidatePresentation = .list
+        let harness = Harness(converter: latticeConverter(), settings: settings)
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.lattice == nil)
+        #expect(harness.panel != nil)
+    }
+
+    @Test("文節格子で Escape を押すと読みに戻る")
+    func latticeEscape() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        harness.press(.escape)
+        #expect(harness.lattice == nil)
+        #expect(harness.committed.isEmpty)
     }
 }

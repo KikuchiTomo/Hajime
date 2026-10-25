@@ -6,6 +6,7 @@ public struct Settings: Sendable, Equatable, Codable {
     public var showsVariantRow: Bool
     public var theme: ThemePreference
     public var candidateFontSize: Double
+    public var candidatePresentation: CandidatePresentation
     /// アプリの識別子(macOS はバンドル ID)の前方一致からプロファイルを決める規則．先にあるものを優先する
     public var profileRules: [ProfileRule]
 
@@ -16,6 +17,7 @@ public struct Settings: Sendable, Equatable, Codable {
         showsVariantRow: Bool,
         theme: ThemePreference,
         candidateFontSize: Double,
+        candidatePresentation: CandidatePresentation,
         profileRules: [ProfileRule]
     ) {
         self.liveConversion = liveConversion
@@ -24,7 +26,26 @@ public struct Settings: Sendable, Equatable, Codable {
         self.showsVariantRow = showsVariantRow
         self.theme = theme
         self.candidateFontSize = candidateFontSize
+        self.candidatePresentation = candidatePresentation
         self.profileRules = profileRules
+    }
+
+    // 項目を足しても古い設定ファイルを読めるよう，無い項目は既定値で埋める
+    private enum CodingKeys: String, CodingKey {
+        case liveConversion, yenKey, typoCorrection, showsVariantRow, theme, candidateFontSize, candidatePresentation, profileRules
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = DefaultSettings.settings
+        liveConversion = try container.decodeIfPresent(Bool.self, forKey: .liveConversion) ?? defaults.liveConversion
+        yenKey = try container.decodeIfPresent(YenKeyPolicy.self, forKey: .yenKey) ?? defaults.yenKey
+        typoCorrection = try container.decodeIfPresent(TypoCorrectionLevel.self, forKey: .typoCorrection) ?? defaults.typoCorrection
+        showsVariantRow = try container.decodeIfPresent(Bool.self, forKey: .showsVariantRow) ?? defaults.showsVariantRow
+        theme = try container.decodeIfPresent(ThemePreference.self, forKey: .theme) ?? defaults.theme
+        candidateFontSize = try container.decodeIfPresent(Double.self, forKey: .candidateFontSize) ?? defaults.candidateFontSize
+        candidatePresentation = try container.decodeIfPresent(CandidatePresentation.self, forKey: .candidatePresentation) ?? defaults.candidatePresentation
+        profileRules = try container.decodeIfPresent([ProfileRule].self, forKey: .profileRules) ?? defaults.profileRules
     }
 
     public func profile(forApplication identifier: String?) -> AppProfile {

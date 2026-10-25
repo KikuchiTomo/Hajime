@@ -65,12 +65,17 @@ public final class AzooKeyConverterEngine {
 /// 入力欄ひとつぶんの変換の状態．
 @MainActor
 final class AzooKeyConverterSession: KanaKanjiConverting {
+    private struct Result {
+        var all: [S90Domain.Candidate]
+        var clauses: [S90Domain.Candidate]
+    }
+
     private let engine: AzooKeyConverterEngine
     private let sessionID: KanaKanjiConverter.ConversionSessionID
-    /// 直前に返した候補．Candidate の id はこの配列の位置
-    private var lastCandidates: [KanaKanjiConverterModule.Candidate] = []
-    private var lastReading = ""
-    private var lastResult: [S90Domain.Candidate] = []
+    /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
+    private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
+    private var nextID = 0
+    private var cache: [String: Result] = [:]
 
     init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID) {
         self.engine = engine
@@ -82,51 +87,64 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     }
 
     func candidates(for reading: String) -> [S90Domain.Candidate] {
-        guard !reading.isEmpty else { return [] }
-        // 同じ読みで続けて呼ばれることが多い(ライブ変換の表示と候補一覧)ので，直前の結果を使い回す
-        if reading == lastReading { return lastResult }
-        var composing = ComposingText()
-        composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        let options = engine.options
-        guard let result = engine.withSession(sessionID, { $0.requestCandidates(composing, options: options) }) else {
-            return []
-        }
-        var seen = Set<String>()
-        var engineCandidates: [KanaKanjiConverterModule.Candidate] = []
-        for candidate in result.mainResults + result.firstClauseResults where seen.insert(candidate.text).inserted {
-            engineCandidates.append(candidate)
-        }
-        lastCandidates = engineCandidates
-        lastReading = reading
-        lastResult = engineCandidates.enumerated().map { index, candidate in
-            S90Domain.Candidate(
-                text: candidate.text,
-                readingCount: Self.readingCount(candidate.composingCount, readingLength: reading.count),
-                origin: .engine(id: index)
-            )
-        }
-        return lastResult
+        request(reading)?.all ?? []
+    }
+
+    func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
+        request(reading)?.clauses ?? []
     }
 
     func didCommit(_ candidate: S90Domain.Candidate) {
-        guard case .engine(let id) = candidate.origin, lastCandidates.indices.contains(id) else { return }
-        let engineCandidate = lastCandidates[id]
+        guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else { return }
         _ = engine.withSession(sessionID) { converter in
             converter.setCompletedData(engineCandidate)
             converter.updateLearningData(engineCandidate)
         }
-        clearCache()
+        // 確定すると学習で順位が変わるので，同じ読みでも求め直す
+        cache = [:]
     }
 
     func endComposition() {
         _ = engine.withSession(sessionID) { $0.stopComposition() }
-        clearCache()
+        engineCandidates = [:]
+        cache = [:]
     }
 
-    private func clearCache() {
-        lastCandidates = []
-        lastReading = ""
-        lastResult = []
+    private func request(_ reading: String) -> Result? {
+        guard !reading.isEmpty else { return nil }
+        // ライブ変換の表示と候補一覧で同じ読みを続けて求めることが多いので，結果を使い回す
+        if let cached = cache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        let options = engine.options
+        guard let result = engine.withSession(sessionID, { $0.requestCandidates(composing, options: options) }) else {
+            return nil
+        }
+        var seen = Set<String>()
+        var all: [S90Domain.Candidate] = []
+        for candidate in result.mainResults + result.firstClauseResults where seen.insert(candidate.text).inserted {
+            all.append(register(candidate, readingLength: reading.count))
+        }
+        var clauseSeen = Set<String>()
+        var clauses: [S90Domain.Candidate] = []
+        for candidate in result.firstClauseResults where clauseSeen.insert(candidate.text).inserted {
+            clauses.append(register(candidate, readingLength: reading.count))
+        }
+        let value = Result(all: all, clauses: clauses)
+        cache[reading] = value
+        return value
+    }
+
+    private func register(_ candidate: KanaKanjiConverterModule.Candidate, readingLength: Int) -> S90Domain.Candidate {
+        let id = nextID
+        nextID += 1
+        engineCandidates[id] = candidate
+        return S90Domain.Candidate(
+            text: candidate.text,
+            readingCount: Self.readingCount(candidate.composingCount, readingLength: readingLength),
+            origin: .engine(id: id),
+            score: Double(candidate.value)
+        )
     }
 
     /// 入力を .direct で渡しているので，入力の数と読みの文字数は同じになる

@@ -2,27 +2,19 @@ import S90Domain
 
 /// 入力欄ひとつぶんの入力の状態を進める．キーを受け取り，画面への操作(ClientAction)の列を返す．
 ///
-/// 状態は 3 つある．
+/// 状態は 4 つある．
 /// - 何も組み立てていない
 /// - 読みを組み立てている(ライブ変換の結果か読みを表示する)
-/// - 候補を選んでいる(候補ウィンドウを出す)
+/// - 候補を一覧から選んでいる(候補ウィンドウを出す)
+/// - 文節格子で文節ごとに候補を選んでいる(格子のウィンドウを出す)
 @MainActor
 public final class InputSession {
     private enum Phase: Equatable {
         case composing
-        case selecting(Selection)
+        case selecting(CandidateSelection)
+        case lattice(SegmentLattice)
     }
 
-    fileprivate struct Selection: Equatable {
-        var candidates: [Candidate]
-        var annotations: [String?]
-        var focus: Focus
-
-        enum Focus: Equatable {
-            case candidate(Int)
-            case variant(ScriptVariant)
-        }
-    }
 
     private let converter: any KanaKanjiConverting
     private let lexicon: any EnglishLexicon
@@ -101,6 +93,9 @@ public final class InputSession {
         if event.modifiers.contains(.control) {
             return handleControl(event, context: context)
         }
+        if case .lattice(var lattice) = phase, let result = handleLattice(event, lattice: &lattice, context: context) {
+            return result
+        }
         switch event.key {
         case .kana:
             return KeyResult(handled: true, actions: [.showModeIndicator(.japanese)])
@@ -157,7 +152,7 @@ public final class InputSession {
             // 候補を選んでいるときの番号キーは，その候補を確定する
             return KeyResult(handled: true, actions: commitAll())
         }
-        if case .selecting = phase {
+        if phase != .composing {
             // 候補を選んでいる途中で打ち始めたら，選んでいる候補を確定して続ける
             actions += commitAll()
         }
@@ -184,10 +179,8 @@ public final class InputSession {
         if !isComposing {
             return KeyResult(handled: true, actions: [.commit(text)])
         }
-        var actions: [ClientAction] = []
-        if case .selecting = phase {
-            actions += commitAll()
-            return KeyResult(handled: true, actions: actions + [.commit(text)])
+        if phase != .composing {
+            return KeyResult(handled: true, actions: commitAll() + [.commit(text)])
         }
         composition.insertLiteral(text, rawKey: rawKey)
         updateCorrection()
@@ -204,19 +197,36 @@ public final class InputSession {
                 correctionDismissed = true
                 return KeyResult(handled: true, actions: render(context: context))
             }
-            phase = .selecting(makeSelection(focus: .candidate(0)))
+            enterConversion()
         case .selecting(var selection):
             selection.moveCandidate(by: 1)
             phase = .selecting(selection)
+        case .lattice:
+            break
         }
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 変換を始める．設定と文節の数から，一覧か文節格子かを決める
+    private func enterConversion() {
+        let presentation = settings.current.candidatePresentation
+        if presentation != .list, correction == nil {
+            let lattice = LatticeBuilder(converter: converter).build(reading: composition.conversionReading)
+            if presentation == .lattice || lattice.segments.count >= 2 {
+                phase = .lattice(lattice)
+                return
+            }
+        }
+        phase = .selecting(makeSelection(focus: .candidate(0)))
     }
 
     private func handleVertical(forward: Bool, context: InputContext) -> KeyResult {
         guard isComposing else { return .passThrough }
         switch phase {
         case .composing:
-            phase = .selecting(makeSelection(focus: .candidate(0)))
+            enterConversion()
+        case .lattice:
+            break
         case .selecting(var selection):
             switch selection.focus {
             case .variant:
@@ -251,7 +261,7 @@ public final class InputSession {
 
     private func handleBackspace(context: InputContext) -> KeyResult {
         guard isComposing else { return .passThrough }
-        if case .selecting = phase {
+        if phase != .composing {
             // 候補を選んでいる途中の Backspace は，読みの組み立てに戻るだけ
             phase = .composing
             return KeyResult(handled: true, actions: render(context: context))
@@ -266,7 +276,7 @@ public final class InputSession {
 
     private func handleEscape(context: InputContext) -> KeyResult {
         guard isComposing else { return .passThrough }
-        if case .selecting = phase {
+        if phase != .composing {
             phase = .composing
             return KeyResult(handled: true, actions: render(context: context))
         }
@@ -289,6 +299,12 @@ public final class InputSession {
     /// 組み立て中の文字を，今の表示のとおりに確定する
     private func commitAll() -> [ClientAction] {
         guard isComposing else { return [] }
+        if case .lattice(let lattice) = phase {
+            for segment in lattice.segments where isEngine(segment.selected) {
+                converter.didCommit(segment.selected)
+            }
+            return [.commit(lattice.text)] + reset()
+        }
         var actions: [ClientAction] = []
         while isComposing {
             let candidate = currentCandidate()
@@ -331,6 +347,8 @@ public final class InputSession {
                     return Candidate(text: text, readingCount: whole, origin: .variant(variant))
                 }
             }
+        case .lattice(let lattice):
+            return Candidate(text: lattice.text, readingCount: whole, origin: .variant(.hiragana))
         case .composing:
             if let correction {
                 return Candidate(text: correction, readingCount: whole, origin: .correction)
@@ -350,7 +368,7 @@ public final class InputSession {
         return converter.candidates(for: reading).first { $0.readingCount == reading.count }
     }
 
-    private func makeSelection(focus: Selection.Focus) -> Selection {
+    private func makeSelection(focus: CandidateSelection.Focus) -> CandidateSelection {
         var candidates: [Candidate] = []
         var annotations: [String?] = []
         let whole = composition.conversionReading.count
@@ -359,7 +377,7 @@ public final class InputSession {
                 Candidate(text: correction, readingCount: whole, origin: .correction),
                 Candidate(text: composition.displayReading, readingCount: whole, origin: .asTyped),
             ]
-            annotations += [nil, Self.asTypedNote]
+            annotations += [nil, PanelBuilder.asTypedNote]
         }
         for candidate in converter.candidates(for: composition.conversionReading)
         where !candidates.contains(where: { $0.text == candidate.text }) {
@@ -370,7 +388,7 @@ public final class InputSession {
             candidates.append(Candidate(text: composition.conversionReading, readingCount: whole, origin: .variant(.hiragana)))
             annotations.append(nil)
         }
-        return Selection(candidates: candidates, annotations: annotations, focus: focus)
+        return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
     private func updateCorrection() {
@@ -385,8 +403,6 @@ public final class InputSession {
 
     // MARK: - 表示
 
-    private static let asTypedNote = "入力のまま"
-    private static let correctionNote = "Space 入力のままに戻す"
 
     private func render(context: InputContext) -> [ClientAction] {
         guard isComposing else { return reset() }
@@ -397,8 +413,54 @@ public final class InputSession {
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
-            return [.setMarkedText(marked), .showCandidates(panel(for: selection))]
+            return [.setMarkedText(marked), .showCandidates(PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow))]
+        case .lattice(let lattice):
+            let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
+                .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
+            })
+            return [.setMarkedText(marked), .showLattice(PanelBuilder.latticePanel(for: lattice))]
         }
+    }
+
+
+    private func isEngine(_ candidate: Candidate) -> Bool {
+        if case .engine = candidate.origin { true } else { false }
+    }
+
+    // MARK: - 文節格子
+
+    /// 文節格子のときのキー．nil を返したキーは，ふつうの処理に回す
+    private func handleLattice(_ event: KeyEvent, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
+        let builder = LatticeBuilder(converter: converter)
+        switch event.key {
+        case .left, .right:
+            let forward = event.key == .right
+            if event.modifiers.contains(.shift) {
+                // Shift+←→ で注目している文節の区切りを動かす
+                let length = lattice.focused.readingLength + (forward ? 1 : -1)
+                lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
+            } else {
+                lattice.moveFocus(by: forward ? 1 : -1)
+            }
+        case .tab:
+            lattice.moveFocus(by: event.modifiers.contains(.shift) ? -1 : 1)
+        case .up:
+            lattice.moveSelection(by: -1)
+        case .down, .space:
+            lattice.moveSelection(by: 1)
+        case .character(let character):
+            guard let number = numberKey(character), lattice.select(number: number) else { return nil }
+            // 番号で選んだら次の文節に進む．最後の文節なら確定する
+            if lattice.focusedIndex == lattice.segments.count - 1 {
+                phase = .lattice(lattice)
+                return KeyResult(handled: true, actions: commitAll())
+            }
+            lattice.moveFocus(by: 1)
+        default:
+            return nil
+        }
+        phase = .lattice(lattice)
+        return KeyResult(handled: true, actions: render(context: context))
     }
 
     private func composingMarkedText() -> MarkedText {
@@ -417,39 +479,6 @@ public final class InputSession {
         ])
     }
 
-    private func panel(for selection: Selection) -> CandidatePanel {
-        let showsVariants = settings.current.showsVariantRow
-        let variants = showsVariants
-            ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
-            : []
-        let perPage = DefaultSettings.candidatesPerPage
-        let focusedIndex: Int
-        let selectedVariant: Int?
-        switch selection.focus {
-        case .candidate(let index):
-            focusedIndex = index
-            selectedVariant = nil
-        case .variant(let variant):
-            focusedIndex = 0
-            selectedVariant = ScriptVariant.allCases.firstIndex(of: variant)
-        }
-        let pageStart = focusedIndex / perPage * perPage
-        let pageEnd = min(pageStart + perPage, selection.candidates.count)
-        let entries = (pageStart..<pageEnd).map {
-            CandidatePanel.Entry(text: selection.candidates[$0].text, annotation: selection.annotations[$0])
-        }
-        let isCorrected = selection.candidates.first?.origin == .correction
-        return CandidatePanel(
-            variants: variants,
-            selectedVariant: selectedVariant,
-            entries: entries,
-            selectedEntry: selectedVariant == nil ? focusedIndex - pageStart : nil,
-            focus: selectedVariant == nil ? .candidate : .variants,
-            position: focusedIndex + 1,
-            total: selection.candidates.count,
-            note: isCorrected ? Self.correctionNote : nil
-        )
-    }
 }
 
 extension InputSession {
@@ -459,13 +488,3 @@ extension InputSession {
     }
 }
 
-private extension InputSession.Selection {
-    mutating func moveCandidate(by offset: Int) {
-        guard case .candidate(let index) = focus, !candidates.isEmpty else {
-            focus = .candidate(0)
-            return
-        }
-        let count = candidates.count
-        focus = .candidate(((index + offset) % count + count) % count)
-    }
-}

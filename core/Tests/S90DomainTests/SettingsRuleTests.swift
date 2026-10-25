@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import S90Domain
 
@@ -105,5 +106,17 @@ struct PanelPlacementTests {
     func rightEdge() {
         let origin = PanelPlacement.origin(caret: Rect(x: 950, y: 500, width: 2, height: 20), size: size, screen: screen)
         #expect(origin.x == 800)
+    }
+}
+
+@Suite("設定の読み込み")
+struct SettingsDecodingTests {
+    @Test("古い設定ファイルに無い項目は既定値で埋める")
+    func missingKeys() throws {
+        let json = #"{"liveConversion": false}"#
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(settings.liveConversion == false)
+        #expect(settings.candidatePresentation == DefaultSettings.settings.candidatePresentation)
+        #expect(settings.yenKey == DefaultSettings.settings.yenKey)
     }
 }

@@ -5,11 +5,21 @@ import S90Domain
 @MainActor
 public final class FakeConverter: KanaKanjiConverting {
     public var table: [String: [(text: String, readingCount: Int?)]]
+    /// 文節格子のための，読みの先頭の文節の候補．点数は並び順から付ける(先が高い)
+    public var clauseTable: [String: [(text: String, readingCount: Int)]]
     public private(set) var committed: [Candidate] = []
     public private(set) var endCount = 0
 
-    public init(_ table: [String: [(text: String, readingCount: Int?)]] = [:]) {
+    public init(_ table: [String: [(text: String, readingCount: Int?)]] = [:], clauses: [String: [(text: String, readingCount: Int)]] = [:]) {
         self.table = table
+        self.clauseTable = clauses
+    }
+
+    public func clauseCandidates(for reading: String) -> [Candidate] {
+        guard !reading.isEmpty else { return [] }
+        return (clauseTable[reading] ?? []).enumerated().map { index, entry in
+            Candidate(text: entry.text, readingCount: entry.readingCount, origin: .engine(id: 1000 + index), score: -Double(index) * 3)
+        }
     }
 
     public func candidates(for reading: String) -> [Candidate] {

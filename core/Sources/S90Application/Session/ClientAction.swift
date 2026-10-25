@@ -7,6 +7,8 @@ public enum ClientAction: Sendable, Equatable {
     /// 変換中の文字を表示する(空なら消す)
     case setMarkedText(MarkedText)
     case showCandidates(CandidatePanel)
+    /// 文節格子を出す．hideCandidates で一覧と一緒に消える
+    case showLattice(LatticePanel)
     case hideCandidates
     /// 入力モードを切り替えたことを知らせる札を出す
     case showModeIndicator(InputMode)
@@ -67,12 +69,22 @@ public struct CandidatePanel: Sendable, Equatable {
     public struct Variant: Sendable, Equatable {
         public var label: String
         public var isAvailable: Bool
+
+        public init(label: String, isAvailable: Bool) {
+            self.label = label
+            self.isAvailable = isAvailable
+        }
     }
 
     public struct Entry: Sendable, Equatable {
         public var text: String
         /// 「入力のまま」などの添え書き
         public var annotation: String?
+
+        public init(text: String, annotation: String?) {
+            self.text = text
+            self.annotation = annotation
+        }
     }
 
     public enum Focus: Sendable, Equatable {
@@ -93,4 +105,43 @@ public struct CandidatePanel: Sendable, Equatable {
     public var total: Int
     /// 補正の直後など，足元に出す案内
     public var note: String?
+
+    public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: String?) {
+        self.variants = variants
+        self.selectedVariant = selectedVariant
+        self.entries = entries
+        self.selectedEntry = selectedEntry
+        self.focus = focus
+        self.position = position
+        self.total = total
+        self.note = note
+    }
+}
+
+/// 文節格子に出す内容．列が文節で，各列の下にその文節の候補を並べる
+public struct LatticePanel: Sendable, Equatable {
+    public struct Column: Sendable, Equatable {
+        /// 今選んでいる候補
+        public var text: String
+        /// 列に並べる候補(今のページ)
+        public var alternatives: [String]
+        public var selectedAlternative: Int
+        public var isFocused: Bool
+        /// 候補の列を見せるか．確信度の高い文節では畳む
+        public var showsAlternatives: Bool
+
+        public init(text: String, alternatives: [String], selectedAlternative: Int, isFocused: Bool, showsAlternatives: Bool) {
+            self.text = text
+            self.alternatives = alternatives
+            self.selectedAlternative = selectedAlternative
+            self.isFocused = isFocused
+            self.showsAlternatives = showsAlternatives
+        }
+    }
+
+    public var columns: [Column]
+
+    public init(columns: [Column]) {
+        self.columns = columns
+    }
 }
