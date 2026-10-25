@@ -11,12 +11,12 @@ variant "${1:-Release}"
 
 # 署名に使う証明書(決め方は variant.sh の signing_identity)．
 # アドホック署名のままだと Gatekeeper に拒まれ，入力ソースとして選べないことがある
-identity=$(signing_identity)
+identity=$(signing_identity) || exit 1
 if [ -z "$identity" ]; then
   echo "Apple Development の証明書が見つからないので，アドホック署名にします(入力ソースとして選べないことがあります)"
   identity="-"
 fi
-echo "署名: $identity"
+echo "署名: $(identity_name "$identity") $identity"
 
 # Zenzai のモデルを取得してハッシュを確かめる(取得済みなら確かめるだけ)．アプリに入れて Zenzai を有効にするため
 "$root/tools/models/fetch_zenzai.sh"

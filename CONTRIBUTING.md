@@ -36,9 +36,11 @@ main には直接 push できません．決まりの詳細は [docs/dev/REPOSIT
 - 2 回目からは `make dev-macos` で入れ直すだけでよい．古いプロセスは止まり，次にキーを打ったときに新しい版が動く
 - 試し終わったら `make uninstall-dev-macos` で消す．学習データと設定も消すときは `make uninstall-dev-macos PURGE=--purge`
 
-署名には Apple Development の証明書を使います(`security find-identity -v -p codesigning` で確かめられます)．証明書が複数あるときは `S90_SIGN_IDENTITY="Apple Development: 名前 (ID)" make dev-macos` のように選びます．証明書が無いとアドホック署名になり，入力ソースとして選べないことがあります．
+署名の証明書は，すでに入っている版と同じチームのものを選びます．macOS はアプリのデータの置き場所(コンテナ)を最初に作ったアプリの署名のチームに結び付けていて，違うチームで署名した版を入れると起動の途中で止まり，入力できなくなるためです．入っている版が無ければ Apple Development の最初の証明書を使います(`security find-identity -v -p codesigning` で確かめられます)．別の証明書を使うときは `S90_SIGN_IDENTITY="Apple Development: 名前 (ID)" make dev-macos` のように選びます．同じチームの証明書がキーチェーンに無いときは，入れるのをやめます．
 
-見た目だけを確かめるときは，開発版のアプリを `--render-snapshots` 付きで起動すると，候補ウィンドウの画像を書き出します(`design/mockups/` の画像はこれで作っています)．
+見た目だけを確かめるときは，Debug でビルドした「s90.tokyo IME Debug」(`apps/macos/build/Build/Products/Debug/`)を `--render-snapshots` 付きで起動すると，候補ウィンドウと設定の画面の画像を書き出します(`design/mockups/` の画像はこれで作っています)．Debug は開発版と別のバンドル ID なので，入れた開発版のデータには触れません．
+
+開発版のバンドル ID は 2026-10-26 に `tokyo.s90.inputmethod.S90IME.dev` から `.develop` に変えました．前の開発版を入れていた場合は，システム設定 > キーボード > 入力ソース で前の「s90.tokyo IME Dev」を外し，新しく足し直してください．前の開発版の学習データと設定(`~/Library/Containers/tokyo.s90.inputmethod.S90IME.dev`)は使わないので，Finder で消してかまいません．
 
 ## PR のタイトルとコミット
 

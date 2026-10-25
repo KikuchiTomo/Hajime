@@ -1382,4 +1382,13 @@ struct TerminalUnknownLineTests {
         for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
         #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("ls ")))
     }
+
+    @Test("行の頭の記号のあとの Shift+Tab は補完ではないので，続くコマンドの名前を見分ける")
+    func shiftTabAfterPrefix() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.character("(")), context: terminal)
+        _ = session.handle(KeyEvent(.tab, modifiers: .shift), context: terminal)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
+    }
 }
