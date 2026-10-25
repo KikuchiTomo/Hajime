@@ -54,6 +54,8 @@ public struct Settings: Sendable, Equatable {
     public var showsModeIndicator = true
 
     // MARK: アプリごと
+    /// 組み立てていないときの Escape で英数に切り替える(Vim のノーマルモードに戻るとき．R-06)
+    public var escapeSwitchesToDirect = false
     /// アプリの識別子(macOS はバンドル ID)の前方一致からプロファイルを決める規則．先にあるものを優先する
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
@@ -71,7 +73,7 @@ extension Settings: Codable {
         case typoCorrection, candidatePresentation, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
         case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
-        case profileRules
+        case escapeSwitchesToDirect, profileRules
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -105,6 +107,7 @@ extension Settings: Codable {
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
         read(.showsModeIndicator, into: \.showsModeIndicator)
+        read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         read(.profileRules, into: \.profileRules)
         self = settings
     }
@@ -133,11 +136,12 @@ extension Settings: Codable {
         try container.encode(theme, forKey: .theme)
         try container.encode(candidateFontSize, forKey: .candidateFontSize)
         try container.encode(showsModeIndicator, forKey: .showsModeIndicator)
+        try container.encode(escapeSwitchesToDirect, forKey: .escapeSwitchesToDirect)
         try container.encode(profileRules, forKey: .profileRules)
     }
 }
 
-public struct ProfileRule: Sendable, Equatable, Codable {
+public struct ProfileRule: Sendable, Equatable, Codable, Hashable {
     public var applicationPrefix: String
     public var profile: AppProfile
 

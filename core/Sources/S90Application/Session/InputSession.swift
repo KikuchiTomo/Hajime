@@ -136,6 +136,11 @@ public final class InputSession {
             return result
         }
         switch event.key {
+        case .kana where event.modifiers.contains(.option):
+            // Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英語 → ローマ字)
+            let styles = InputStyle.allCases
+            let current = styles.firstIndex(of: settings.current.inputStyle) ?? 0
+            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(styles[(current + 1) % styles.count])])
         case .kana:
             return KeyResult(handled: true, actions: modeIndicator(.japanese))
         case .eisu:
@@ -437,7 +442,12 @@ public final class InputSession {
     }
 
     private func handleEscape(context: InputContext) -> KeyResult {
-        guard isComposing else { return .passThrough }
+        guard isComposing else {
+            // Vim のノーマルモードに戻る Escape で英数にする(設定)．Escape そのものはアプリに渡す
+            guard settings.current.escapeSwitchesToDirect else { return .passThrough }
+            mode = .direct
+            return KeyResult(handled: false, actions: [.selectMode(.direct)] + modeIndicator(.direct))
+        }
         if phase != .composing {
             phase = .composing
             if let typed = typedBeforeCorrection {

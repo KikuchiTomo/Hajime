@@ -48,7 +48,7 @@ private final class Harness {
             case .hideCandidates:
                 panel = nil
                 lattice = nil
-            case .showModeIndicator, .selectMode: break
+            case .showModeIndicator, .selectMode, .selectInputStyle: break
             }
         }
     }
@@ -840,5 +840,40 @@ struct UsageScenarioTests {
             .conversionOpened,
             .committed(changedSegments: 1, viaConversion: true),
         ])
+    }
+}
+
+@MainActor
+@Suite("Escape で英数に戻す(R-06)")
+struct EscapeToDirectTests {
+    @Test("設定を入れると，組み立てていないときの Escape で英数に切り替え，Escape はアプリに渡す")
+    func switches() {
+        var settings = Settings()
+        settings.escapeSwitchesToDirect = true
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        let result = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(result.handled == false)
+        #expect(result.actions.contains(.selectMode(.direct)))
+        #expect(session.mode == .direct)
+    }
+
+    @Test("既定では Escape で英数に切り替えない")
+    func defaultOff() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(session.mode == .japanese)
+    }
+}
+
+@MainActor
+@Suite("入力方式の切り替え")
+struct InputStyleSwitchTests {
+    @Test("Option+かな で入力方式を順に切り替える")
+    func cycles() {
+        var settings = Settings()
+        settings.inputStyle = .english
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        let actions = session.handle(KeyEvent(.kana, modifiers: .option), context: InputContext()).actions
+        #expect(actions.contains(.selectInputStyle(.romaji)))
     }
 }

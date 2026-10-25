@@ -14,6 +14,8 @@ public enum ClientAction: Sendable, Equatable {
     case showModeIndicator(InputMode)
     /// OS の入力メニューの表示を，このモードに合わせる
     case selectMode(InputMode)
+    /// 入力方式を切り替える(設定に保存する)．R-05
+    case selectInputStyle(InputStyle)
 }
 
 /// 処理の結果．handled が false なら，キーは入力先のアプリにそのまま渡る

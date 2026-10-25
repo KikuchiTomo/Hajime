@@ -11,6 +11,7 @@ struct SettingsView: View {
             InputTab(model: model).tabItem { Text(UIStrings.Settings.inputTab) }
             ConversionTab(model: model).tabItem { Text(UIStrings.Settings.conversionTab) }
             DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
+            AppsTab(model: model).tabItem { Text(UIStrings.Settings.appsTab) }
             AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
             UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
         }
@@ -141,6 +142,50 @@ private struct AppearanceTab: View {
         }
         .formStyle(.grouped)
     }
+}
+
+/// アプリごとのプロファイル(R-06，R-07)．バンドル ID の前方一致で決める
+private struct AppsTab: View {
+    @ObservedObject var model: SettingsModel
+    @State private var prefix = ""
+    @State private var profile = AppProfile.programming
+    @State private var selection = Set<ProfileRule>()
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Toggle(UIStrings.Settings.escapeSwitchesToDirect, isOn: model.binding(\.escapeSwitchesToDirect))
+            HStack {
+                TextField(UIStrings.Settings.bundlePrefix, text: $prefix)
+                Picker("", selection: $profile) {
+                    ForEach(AppProfile.allCases, id: \.self) { Text(UIStrings.Settings.label(for: $0)).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                Button(UIStrings.Settings.add) {
+                    model.addProfileRule(prefix: prefix, profile: profile)
+                    prefix = ""
+                }
+                .disabled(prefix.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Table(model.settings.profileRules, selection: $selection) {
+                TableColumn(UIStrings.Settings.bundlePrefix, value: \.applicationPrefix)
+                TableColumn(UIStrings.Settings.profile) { Text(UIStrings.Settings.label(for: $0.profile)) }
+            }
+            HStack {
+                Button(UIStrings.Settings.remove) {
+                    model.update { $0.profileRules.removeAll { selection.contains($0) } }
+                    selection = []
+                }
+                .disabled(selection.isEmpty)
+                Spacer()
+            }
+            Text(UIStrings.Settings.appsNote).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+extension ProfileRule: Identifiable {
+    public var id: Self { self }
 }
 
 /// 使い方の記録．回数だけを端末の中に持つ
