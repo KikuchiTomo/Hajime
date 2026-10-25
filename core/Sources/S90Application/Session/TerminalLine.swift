@@ -99,7 +99,7 @@ final class TerminalLine {
     /// 確定した文字を行の長さに数える
     private func didCommit(_ actions: [ClientAction]) {
         for action in actions {
-            if case .commit(let text) = action { state.didCommitText(length: text.count) }
+            if case .commit(let text) = action { state.didCommitText(text) }
         }
     }
 

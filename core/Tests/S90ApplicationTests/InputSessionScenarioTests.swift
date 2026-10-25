@@ -1346,11 +1346,21 @@ struct TerminalUnknownLineTests {
 
     @Test("行の頭の空白や「(」「\\」のあとのコマンドの名前は，コマンドとして見分ける")
     func commandAfterLeadingSymbols() {
-        for prefix in [KeyEvent(.space), KeyEvent(.character("(")), KeyEvent(.character("\\"))] {
+        for prefix in [KeyEvent(.space), KeyEvent(.character("(")), KeyEvent(.character("\\")), KeyEvent(.yen)] {
             let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
             _ = session.handle(prefix, context: terminal)
             for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
             #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")), "\(prefix.key)")
+        }
+    }
+
+    @Test("行の頭の @ や * のあとは，コマンドの名前でも日本語の文として打てる(「@claude これ見て」)")
+    func textAfterAtSign() {
+        for prefix in ["@", "*"] as [Character] {
+            let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+            _ = session.handle(KeyEvent(.character(prefix)), context: terminal)
+            for key in "claude" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+            #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("claude ")), "\(prefix)")
         }
     }
 }

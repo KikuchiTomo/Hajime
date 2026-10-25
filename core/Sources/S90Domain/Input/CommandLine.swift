@@ -45,11 +45,14 @@ public struct CommandLineState: Sendable, Equatable {
         defer { lastPassed = character }
         switch region {
         case .lineStart:
-            // 英数で行の頭に英字や数字を打ったら，もう行の頭ではない．日本語のモードでは英字と数字は組み立てに回るので，
-            // ここに来るのは英数で打ったものだけ．行の頭の空白や「(」「\」などの記号はコマンドの前に付くことがあるので行の頭のまま
-            if character.isLetter || character.isNumber { region = .text }
-            // 行の頭の # はシェルのコメント．行の終わりまで日本語を打てる
-            if character == "#" { region = .comment }
+            // 行の頭の # はシェルのコメント．行の終わりまで日本語を打てる．
+            // 空白・「(」「{」「\」「!」「`」「$」はコマンドの前に付くことがあるので行の頭のまま(「(cd …」「\git …」)．
+            // それ以外(英数で打った英字や数字，「@」「*」「"」など)のあとは，コマンドではなく文として扱う(「@claude これ見て」)
+            if character == "#" {
+                region = .comment
+            } else if !Self.commandPrefixes.contains(character) {
+                region = .text
+            }
         case .command:
             if character == "\"" || character == "'" { region = .quoted(character) }
             // 「foo#bar」や「$#」は引数の一部なので，語の頭(直前が空白)の # だけをコメントにする
@@ -61,11 +64,17 @@ public struct CommandLineState: Sendable, Equatable {
         }
     }
 
-    /// 日本語を確定した．行の頭なら，その行はコマンドではない
-    public mutating func didCommitText(length committed: Int) {
-        length += committed
-        if region == .lineStart { region = .text }
+    /// 文字を確定した．行の頭なら，その行はコマンドではない．
+    /// ただし ¥ キーで入れた「\」のようにコマンドの前に付く 1 文字は，流したときと同じく行の頭のまま
+    public mutating func didCommitText(_ text: String) {
+        length += text.count
+        guard region == .lineStart else { return }
+        if text.count == 1, let character = text.first, Self.commandPrefixes.contains(character) { return }
+        region = .text
     }
+
+    /// 行の頭に付いても，そのあとにコマンドの名前が来うる文字
+    static let commandPrefixes: Set<Character> = [" ", "\t", "(", "{", "\\", "!", "`", "$"]
 
     /// 組み立てていないときに Backspace で 1 文字消した．行の頭まで戻ったら行の頭に戻す
     public mutating func didDeleteBackward() {

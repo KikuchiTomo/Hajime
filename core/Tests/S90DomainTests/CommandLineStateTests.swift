@@ -166,17 +166,34 @@ struct CommandLineUnknownTests {
 
 @Suite("ターミナルの行の頭の文字")
 struct CommandLineStartTests {
-    @Test("行の頭の # はコメント，英字は文の行，空白と記号は行の頭のまま")
-    func lineStartCharacters() {
-        var comment = CommandLineState()
-        comment.didPass("#")
-        #expect(comment.region == .comment)
-        var text = CommandLineState()
-        text.didPass("l")
-        #expect(text.region == .text)
-        var space = CommandLineState()
-        space.didPass(" ")
-        space.didPass("(")
-        #expect(space.region == .lineStart)
+    @Test("行の頭の # はコメント")
+    func comment() {
+        var state = CommandLineState()
+        state.didPass("#")
+        #expect(state.region == .comment)
+    }
+
+    @Test("行の頭の英字・数字・@・*・引用符のあとは文の行", arguments: ["l", "3", "@", "*", "\"", "'", ">", "/"] as [Character])
+    func text(character: Character) {
+        var state = CommandLineState()
+        state.didPass(character)
+        #expect(state.region == .text)
+    }
+
+    @Test("行の頭の空白・(・{・\\・!・`・$ のあとは行の頭のまま", arguments: [" ", "(", "{", "\\", "!", "`", "$"] as [Character])
+    func prefix(character: Character) {
+        var state = CommandLineState()
+        state.didPass(character)
+        #expect(state.region == .lineStart)
+    }
+
+    @Test("¥ キーで確定した「\\」も行の頭のまま．ほかの確定は文の行")
+    func committedPrefix() {
+        var backslash = CommandLineState()
+        backslash.didCommitText("\\")
+        #expect(backslash.region == .lineStart)
+        var word = CommandLineState()
+        word.didCommitText("か")
+        #expect(word.region == .text)
     }
 }
