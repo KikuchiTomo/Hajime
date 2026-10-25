@@ -89,3 +89,9 @@ SOFTWARE.
 ## Anthropic Agent Skills
 
 `.claude/skills/skill-creator`, `.claude/skills/frontend-design` and `.claude/skills/webapp-testing` are from https://github.com/anthropics/skills and are licensed under the Apache License 2.0. See `LICENSE.txt` in each directory.
+
+## zenz-v3.2-small (Zenzai model)
+
+https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
+
+The model file `ggml-model-Q5_K_M.gguf` is not stored in this repository. It is downloaded by `tools/models/fetch_zenzai.sh`, verified by SHA-256, and bundled into the application. It is licensed under the Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
