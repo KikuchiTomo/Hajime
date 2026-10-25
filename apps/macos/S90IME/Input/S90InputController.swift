@@ -22,7 +22,8 @@ final class S90InputController: IMKInputController {
             guard let root = CompositionRoot.installed else {
                 preconditionFailure("main.swift で CompositionRoot を組み立ててからサーバーを作る")
             }
-            return (root, root.makeSession(), root.makePresenter(), InputMenuBuilder(settings: root.settings))
+            let menu = InputMenuBuilder(settings: root.settings, openSettings: { root.settingsWindow.show() })
+            return (root, root.makeSession(), root.makePresenter(), menu)
         }
         self.root = root
         self.session = session

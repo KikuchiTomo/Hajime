@@ -36,9 +36,31 @@ struct ProfileTests {
 
     @Test("R-06: プログラミングでは括弧を半角のまま，句読点は全角")
     func symbols() {
-        #expect(SymbolTable.text(for: "(", profile: .programming) == "(")
-        #expect(SymbolTable.text(for: "(", profile: .standard) == "（")
-        #expect(SymbolTable.text(for: ",", profile: .programming) == "、")
+        let settings = Settings()
+        #expect(SymbolTable.text(for: "(", profile: .programming, settings: settings) == "(")
+        #expect(SymbolTable.text(for: "(", profile: .standard, settings: settings) == "（")
+        #expect(SymbolTable.text(for: ",", profile: .programming, settings: settings) == "、")
+    }
+
+    @Test("句読点・括弧・スラッシュは設定の文字にする")
+    func symbolSettings() {
+        var settings = Settings()
+        settings.punctuation = .commaPeriod
+        settings.brackets = .square
+        settings.slash = .slash
+        #expect(SymbolTable.text(for: ",", profile: .standard, settings: settings) == "，")
+        #expect(SymbolTable.text(for: ".", profile: .standard, settings: settings) == "．")
+        #expect(SymbolTable.text(for: "[", profile: .standard, settings: settings) == "［")
+        #expect(SymbolTable.text(for: "/", profile: .standard, settings: settings) == "／")
+        #expect(SymbolTable.text(for: "[", profile: .programming, settings: settings) == "[")
+    }
+
+    @Test("ユーザー辞書の語は，読みがひらがなで，長さが上限以内のときだけ使える")
+    func userDictionaryEntry() {
+        #expect(UserDictionaryEntry(reading: "えすきゅーじゅう", word: "s90").isValid)
+        #expect(!UserDictionaryEntry(reading: "S90", word: "s90").isValid)
+        #expect(!UserDictionaryEntry(reading: "", word: "s90").isValid)
+        #expect(!UserDictionaryEntry(reading: "あ", word: String(repeating: "a", count: 65)).isValid)
     }
 }
 
@@ -131,6 +153,25 @@ struct SettingsDecodingTests {
         #expect(settings.liveConversion == false)
         #expect(settings.candidatePresentation == DefaultSettings.settings.candidatePresentation)
         #expect(settings.yenKey == DefaultSettings.settings.yenKey)
+    }
+
+    @Test("読めない値の項目だけを既定値にし，ほかの項目は読む")
+    func invalidValue() throws {
+        let json = #"{"liveConversion": false, "punctuation": "unknown", "spaceWidth": "fullwidth"}"#
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(settings.liveConversion == false)
+        #expect(settings.punctuation == .toutenKuten)
+        #expect(settings.spaceWidth == .fullwidth)
+    }
+
+    @Test("書き出した設定を読み戻すと同じになる")
+    func roundTrip() throws {
+        var settings = Settings()
+        settings.learning = .readOnly
+        settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅーじゅう", word: "s90")]
+        settings.numberWidth = .fullwidth
+        let decoded = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings))
+        #expect(decoded == settings)
     }
 }
 

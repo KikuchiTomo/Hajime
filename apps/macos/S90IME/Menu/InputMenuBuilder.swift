@@ -7,15 +7,21 @@ import S90Domain
 @MainActor
 final class InputMenuBuilder: NSObject {
     private let settings: any SettingsStoring
+    private let openSettings: () -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(settings: any SettingsStoring) {
+    init(settings: any SettingsStoring, openSettings: @escaping () -> Void) {
         self.settings = settings
+        self.openSettings = openSettings
     }
 
     func makeMenu() -> NSMenu {
         let current = settings.current
         let menu = NSMenu()
+        let open = NSMenuItem(title: UIStrings.Menu.openSettings, action: #selector(showSettings), keyEquivalent: "")
+        open.target = self
+        menu.addItem(open)
+        menu.addItem(.separator())
         menu.addItem(toggle(UIStrings.Menu.liveConversion, isOn: current.liveConversion, action: #selector(toggleLiveConversion)))
         menu.addItem(toggle(UIStrings.Menu.variantRow, isOn: current.showsVariantRow, action: #selector(toggleVariantRow)))
         menu.addItem(choices(UIStrings.Menu.presentation, CandidatePresentation.allCases, selected: current.candidatePresentation,
@@ -61,6 +67,7 @@ final class InputMenuBuilder: NSObject {
         }
     }
 
+    @objc private func showSettings() { openSettings() }
     @objc private func toggleLiveConversion() { update { $0.liveConversion.toggle() } }
     @objc private func toggleVariantRow() { update { $0.showsVariantRow.toggle() } }
 

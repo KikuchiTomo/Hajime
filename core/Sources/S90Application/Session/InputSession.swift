@@ -78,6 +78,11 @@ public final class InputSession {
         isComposing && phase == .composing && !isSettled && settings.current.liveConversion
     }
 
+    /// 入力位置の近くにモードを出す操作．設定で切っていれば出さない
+    private func modeIndicator(_ mode: InputMode) -> [ClientAction] {
+        settings.current.showsModeIndicator ? [.showModeIndicator(mode)] : []
+    }
+
     /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
     public func settle(context: InputContext) -> [ClientAction] {
         guard awaitsSettle else { return [] }
@@ -94,9 +99,9 @@ public final class InputSession {
             return KeyResult(handled: true, actions: [.commit(text)])
         case .kana:
             mode = .japanese
-            return KeyResult(handled: true, actions: [.selectMode(.japanese), .showModeIndicator(.japanese)])
+            return KeyResult(handled: true, actions: [.selectMode(.japanese)] + modeIndicator(.japanese))
         case .eisu:
-            return KeyResult(handled: true, actions: [.showModeIndicator(.direct)])
+            return KeyResult(handled: true, actions: modeIndicator(.direct))
         default:
             return .passThrough
         }
@@ -114,11 +119,11 @@ public final class InputSession {
         }
         switch event.key {
         case .kana:
-            return KeyResult(handled: true, actions: [.showModeIndicator(.japanese)])
+            return KeyResult(handled: true, actions: modeIndicator(.japanese))
         case .eisu:
             var actions = commitAll()
             mode = .direct
-            actions += [.selectMode(.direct), .showModeIndicator(.direct)]
+            actions += [.selectMode(.direct)] + modeIndicator(.direct)
             return KeyResult(handled: true, actions: actions)
         case .yen:
             let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
@@ -126,7 +131,7 @@ public final class InputSession {
         case .character(let character):
             return insertCharacter(character, context: context)
         case .space:
-            return handleSpace(context: context)
+            return handleSpace(shift: event.modifiers.contains(.shift), context: context)
         case .enter:
             guard isComposing else { return .passThrough }
             return KeyResult(handled: true, actions: commitAll())
@@ -189,15 +194,22 @@ public final class InputSession {
             }
         } else if character.isASCII && (character.isLetter || character.isNumber) {
             corrector.commit(into: &composition)
-            composition.insertLiteral(String(character), rawKey: character)
+            let text = character.isNumber && settings.current.numberWidth == .fullwidth
+                ? KanaWidth.fullwidthASCII(from: String(character))
+                : String(character)
+            composition.insertLiteral(text, rawKey: character)
         } else {
-            let text = SymbolTable.text(for: character, profile: context.profile)
+            let text = SymbolTable.text(for: character, profile: context.profile, settings: settings.current)
             if !isComposing && text == String(character) {
                 // 半角のままの記号は，組み立てを始めずにアプリへ渡す(プログラミング中に Enter を要求しない)
                 return KeyResult(handled: false, actions: actions)
             }
             corrector.commit(into: &composition)
             composition.insertLiteral(text, rawKey: nil)
+            if settings.current.punctuationCommits, SymbolTable.isPunctuation(text, settings: settings.current) {
+                // 句読点を打ったら，その句読点まで確定する(設定)
+                return KeyResult(handled: true, actions: actions + commitAll())
+            }
         }
         updateCorrection()
         return KeyResult(handled: true, actions: actions + render(context: context))
@@ -216,8 +228,13 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
-    private func handleSpace(context: InputContext) -> KeyResult {
-        guard isComposing else { return .passThrough }
+    private func handleSpace(shift: Bool, context: InputContext) -> KeyResult {
+        guard isComposing else {
+            // 空白の幅は設定に従い，Shift+Space で逆の幅にする．プログラミング用のアプリでは常に半角
+            let fullwidth = (settings.current.spaceWidth == .fullwidth) != shift
+            guard fullwidth, !context.profile.prefersHalfwidthSymbols else { return .passThrough }
+            return KeyResult(handled: true, actions: [.commit(Self.fullwidthSpace)])
+        }
         switch phase {
         case .composing:
             if corrector.dismiss() {
@@ -550,10 +567,11 @@ public final class InputSession {
 }
 
 extension InputSession {
+    fileprivate static let fullwidthSpace = "\u{3000}"
     fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
 
     fileprivate func numberKey(_ character: Character) -> Int? {
-        guard let value = character.wholeNumberValue, (1...DefaultSettings.candidatesPerPage).contains(value) else { return nil }
+        guard settings.current.numberKeySelection, let value = character.wholeNumberValue, (1...DefaultSettings.candidatesPerPage).contains(value) else { return nil }
         return value
     }
 }
