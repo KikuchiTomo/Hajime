@@ -46,9 +46,9 @@ final class TerminalLine {
 
     /// キーを処理したあとに呼ぶ．確定した文字(どの入力方式のものも)を数えてから，アプリに渡ったキーを数える
     func didHandle(_ event: KeyEvent, result: KeyResult) {
-        for action in result.actions {
-            if case .commit(let text) = action { state.didCommitText(length: text.count) }
-        }
+        didCommit(result.actions)
+        // Command 付きのキーはアプリのショートカットで，行に文字を入れない(Cmd+K で "k" を数えない)
+        guard !event.modifiers.contains(.command) else { return }
         if result.actions.contains(.selectMode(.direct)) {
             // 英数にしたあとは Vim のコマンドなどを打つことが多く，行の頭の判断と関係なくなるので行を終える
             state.endLine()
@@ -72,6 +72,13 @@ final class TerminalLine {
             state.didPass(character)
         default:
             break
+        }
+    }
+
+    /// 確定した文字を行の長さに数える．キーを伴わない確定(入力欄の切り替えなど)のときも使う
+    func didCommit(_ actions: [ClientAction]) {
+        for action in actions {
+            if case .commit(let text) = action { state.didCommitText(length: text.count) }
         }
     }
 

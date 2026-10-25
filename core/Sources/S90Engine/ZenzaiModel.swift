@@ -42,7 +42,7 @@ public struct ZenzaiModel: Sendable, Equatable {
         return ZenzaiModel(url: url)
     }
 
-    /// 決まった大きさより 1 バイト多くまでだけを読む．確かめたあとでファイルが差し替えられても，読み続けて止まらないようにする
+    /// 決まった大きさを超えたら読むのをやめる．確かめたあとでファイルが差し替えられても，読み続けて止まらないようにする
     private static func sha256(of url: URL, maximumBytes: Int) throws(VerificationError) -> String {
         #if canImport(CryptoKit)
         guard let handle = try? FileHandle(forReadingFrom: url) else { throw .fileNotFound }
@@ -50,8 +50,9 @@ public struct ZenzaiModel: Sendable, Equatable {
         var hasher = SHA256()
         var total = 0
         // 70MB ほどあるので，一度に読まずに区切って読む
-        while let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+        while let chunk = try? handle.read(upToCount: min(1 << 20, maximumBytes + 1 - total)), !chunk.isEmpty {
             total += chunk.count
+            // 上限を超えたことだけが分かる．ファイルの本当の大きさは分からないので，読んだ量を入れる
             guard total <= maximumBytes else { throw .sizeMismatch(actual: total) }
             hasher.update(data: chunk)
         }

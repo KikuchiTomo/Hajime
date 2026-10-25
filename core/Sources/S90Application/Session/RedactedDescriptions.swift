@@ -59,3 +59,8 @@ extension LatticePanel.Column: CustomStringConvertible, CustomDebugStringConvert
     public var description: String { "Column(length: \(text.count), alternatives: \(alternatives.count))" }
     public var debugDescription: String { description }
 }
+
+extension EnglishWordCorrector.Correction: CustomStringConvertible, CustomDebugStringConvertible {
+    var description: String { "Correction(keysLength: \(keys.count), wordLength: \(word.count))" }
+    var debugDescription: String { description }
+}

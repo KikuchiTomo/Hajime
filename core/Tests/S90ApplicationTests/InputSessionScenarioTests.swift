@@ -1205,5 +1205,22 @@ struct FourthReviewRegressionTests {
     func redacted() {
         #expect(!String(describing: InputContext(precedingText: "秘密")).contains("秘密"))
         #expect(!String(describing: MarkedText.Segment("秘密", style: .reading)).contains("秘密"))
+        #expect(!String(describing: CandidatePanel.Entry(text: "秘密", annotation: nil)).contains("秘密"))
+        #expect(!String(describing: LatticePanel.Column(text: "秘密", isFocused: false, isUncertain: false)).contains("秘密"))
+        let segment = SegmentLattice.Segment(readingStart: 0, readingLength: 2, candidates: [Candidate(text: "秘密", readingCount: 2, origin: .combined)], isConfident: true)
+        #expect(!String(describing: segment).contains("秘密"))
+        #expect(!String(describing: ReadingCorrection(keys: "himitsu", reading: "ヒミツ", score: 0, cost: 0)).contains("ヒミツ"))
+    }
+
+    @Test("ターミナル: Command 付きのキーは行に数えない(Cmd+K のあとも行の長さが変わらない)")
+    func commandKeyNotCounted() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        _ = session.handle(KeyEvent(.character("k"), modifiers: .command), context: terminal)
+        _ = session.handle(KeyEvent(.character("\""), modifiers: [.command, .shift]), context: terminal)
+        for _ in 0..<3 { _ = session.handle(KeyEvent(.backspace), context: terminal) }
+        // 行は空なので行の頭に戻り，次の a は組み立てる
+        #expect(session.handle(KeyEvent(.character("a")), context: terminal).handled)
     }
 }

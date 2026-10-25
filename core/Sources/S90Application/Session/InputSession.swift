@@ -97,7 +97,7 @@ public final class InputSession {
         terminal.endLine()
         // 確定した読みはその行に入るので，行の頭ではなくなる
         let actions = commitAll()
-        terminal.didHandle(KeyEvent(.escape), result: KeyResult(handled: true, actions: actions))
+        terminal.didCommit(actions)
         return actions
     }
 
