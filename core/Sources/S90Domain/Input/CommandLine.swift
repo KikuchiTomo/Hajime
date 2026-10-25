@@ -73,8 +73,11 @@ public struct CommandLineState: Sendable, Equatable {
         region = .text
     }
 
-    /// 行の頭に付いても，そのあとにコマンドの名前が来うる文字
-    static let commandPrefixes: Set<Character> = [" ", "\t", "(", "{", "\\", "!", "`", "$"]
+    /// 行の頭に付いても，そのあとにコマンドの名前が来うる文字．
+    /// 空白(字下げ)，「(」(サブシェル「(cd …)」)，「{」(まとまり「{ …; }」)，「\\」(エイリアスを避ける「\\git」)，
+    /// 「!」(Claude Code のシェルモード「!git status」)，「$」(「$(…)」)．
+    /// 「`」は対話型のツールへの指示をインラインのコードで始めることが多い(「`git rebase` のやり方」)ので入れない
+    static let commandPrefixes: Set<Character> = [" ", "(", "{", "\\", "!", "$"]
 
     /// 組み立てていないときに Backspace で 1 文字消した．行の頭まで戻ったら行の頭に戻す
     public mutating func didDeleteBackward() {

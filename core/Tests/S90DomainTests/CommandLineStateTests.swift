@@ -173,14 +173,14 @@ struct CommandLineStartTests {
         #expect(state.region == .comment)
     }
 
-    @Test("行の頭の英字・数字・@・*・引用符のあとは文の行", arguments: ["l", "3", "@", "*", "\"", "'", ">", "/"] as [Character])
+    @Test("行の頭の英字・数字・@・*・引用符のあとは文の行", arguments: ["l", "3", "@", "*", "\"", "'", ">", "/", "`"] as [Character])
     func text(character: Character) {
         var state = CommandLineState()
         state.didPass(character)
         #expect(state.region == .text)
     }
 
-    @Test("行の頭の空白・(・{・\\・!・`・$ のあとは行の頭のまま", arguments: [" ", "(", "{", "\\", "!", "`", "$"] as [Character])
+    @Test("行の頭の空白・(・{・\\・!・$ のあとは行の頭のまま", arguments: [" ", "(", "{", "\\", "!", "$"] as [Character])
     func prefix(character: Character) {
         var state = CommandLineState()
         state.didPass(character)
