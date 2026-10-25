@@ -1,6 +1,34 @@
+# 依存の更新の提案．更新の PR はスカッシュマージで入れ，PR のタイトルがそのままコミットになる
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    # 公開されてすぐの版は避ける(乗っ取られた版を掴まないため)
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: [dependencies, github_actions]
+
+  - package-ecosystem: swift
+    directory: /core
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: [dependencies, swift]
