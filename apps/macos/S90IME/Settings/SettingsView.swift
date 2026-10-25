@@ -39,6 +39,9 @@ private struct InputTab: View {
 
     var body: some View {
         Form {
+            Section(UIStrings.Settings.inputStyleSection) {
+                ChoicePicker(title: UIStrings.Menu.inputStyle, selection: model.binding(\.inputStyle), label: UIStrings.Menu.label(for:))
+            }
             Section(UIStrings.Settings.characters) {
                 ChoicePicker(title: UIStrings.Settings.punctuation, selection: model.binding(\.punctuation), label: UIStrings.Settings.label(for:))
                 ChoicePicker(title: UIStrings.Settings.brackets, selection: model.binding(\.brackets), label: UIStrings.Settings.label(for:))

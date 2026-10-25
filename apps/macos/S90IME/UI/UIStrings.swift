@@ -29,6 +29,7 @@ enum UIStrings {
         static let conversionTab = "変換"
         static let dictionaryTab = "ユーザー辞書"
         static let appearanceTab = "見た目"
+        static let inputStyleSection = "入力方式"
         static let characters = "入れる文字"
         static let punctuation = "句読点"
         static let brackets = "[ ] で入れる括弧"
@@ -86,6 +87,15 @@ enum UIStrings {
 
     enum Menu {
         static let openSettings = "設定を開く…"
+        static let inputStyle = "入力方式"
+
+        static func label(for style: InputStyle) -> String {
+            switch style {
+            case .romaji: "ローマ字入力"
+            case .kana: "かな入力(JIS かな配列)"
+            case .english: "英語のまま入力(Tab で日本語)"
+            }
+        }
         static let liveConversion = "ライブ変換"
         static let variantRow = "候補の上に種類の行を出す"
         static let typoCorrection = "タイプミスの補正"

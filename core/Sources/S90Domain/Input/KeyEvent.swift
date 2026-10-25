@@ -32,10 +32,14 @@ public struct KeyEvent: Sendable, Equatable {
 
     public var key: Key
     public var modifiers: Modifiers
+    /// 押したキーの JIS キーボードでの刻印(「q」「1」「@」など)．かな入力でかなを引くのに使う(KanaLayout)．
+    /// 配列によらず位置で決まるので，アダプタが分かるときだけ入れる
+    public var keyLabel: String?
 
-    public init(_ key: Key, modifiers: Modifiers = []) {
+    public init(_ key: Key, modifiers: Modifiers = [], keyLabel: String? = nil) {
         self.key = key
         self.modifiers = modifiers
+        self.keyLabel = keyLabel
     }
 }
 

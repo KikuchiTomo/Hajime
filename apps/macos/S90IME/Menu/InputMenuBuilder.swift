@@ -22,6 +22,8 @@ final class InputMenuBuilder: NSObject {
         open.target = self
         menu.addItem(open)
         menu.addItem(.separator())
+        menu.addItem(choices(UIStrings.Menu.inputStyle, InputStyle.allCases, selected: current.inputStyle,
+                             label: UIStrings.Menu.label(for:), action: #selector(selectInputStyle)))
         menu.addItem(toggle(UIStrings.Menu.liveConversion, isOn: current.liveConversion, action: #selector(toggleLiveConversion)))
         menu.addItem(toggle(UIStrings.Menu.variantRow, isOn: current.showsVariantRow, action: #selector(toggleVariantRow)))
         menu.addItem(choices(UIStrings.Menu.presentation, CandidatePresentation.allCases, selected: current.candidatePresentation,
@@ -70,6 +72,11 @@ final class InputMenuBuilder: NSObject {
     @objc private func showSettings() { openSettings() }
     @objc private func toggleLiveConversion() { update { $0.liveConversion.toggle() } }
     @objc private func toggleVariantRow() { update { $0.showsVariantRow.toggle() } }
+
+    @objc private func selectInputStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let value = InputStyle(rawValue: raw) else { return }
+        update { $0.inputStyle = value }
+    }
 
     @objc private func selectTypoCorrection(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let value = TypoCorrectionLevel(rawValue: raw) else { return }
