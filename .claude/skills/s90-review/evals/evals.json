@@ -1,0 +1,11 @@
+{
+  "skill_name": "s90-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "今のブランチをレビューして",
+      "expected_output": "差分を集め，セキュリティから順に観点ごとに見て，check_layers.py などを実行し，決まった出力の形で深刻さつきの指摘を出す",
+      "files": []
+    }
+  ]
+}

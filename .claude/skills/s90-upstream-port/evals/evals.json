@@ -1,0 +1,17 @@
+{
+  "skill_name": "s90-upstream-port",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "azooKey-Desktop のターミナルでの候補ウィンドウの位置の補正を持ってきて",
+      "expected_output": "判断と OS の API 呼び出しを分け，判断を core にテストつきで書き直す．元のファイルとコミットを先頭のコメントに書く",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "AzooKeyKanaKanjiConverter を最新にして",
+      "expected_output": "fork に upstream を merge し，Package.swift の revision を上げ，アダプタで型の変更を吸収し，テスト結果の変化を PR に書く",
+      "files": []
+    }
+  ]
+}

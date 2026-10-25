@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./secrets/**)",
+      "Read(./.env)",
+      "Read(**/*.p12)",
+      "Read(**/*.pfx)",
+      "Bash(git push --force:*)"
+    ]
+  }
+}
