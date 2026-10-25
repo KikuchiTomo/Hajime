@@ -75,6 +75,9 @@ extension Settings: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+/// 読めない要素を読み飛ばすための型．どんな値でも読める
+private struct Skipped: Decodable {}
+
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case inputStyle, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits
@@ -93,8 +96,21 @@ extension Settings: Codable {
                 settings[keyPath: keyPath] = value
             }
         }
+        /// 一覧は 1 つずつ読み，読めないものだけを飛ばす．1 つの崩れた語で辞書全体を失わないため
+        func readList<Element: Decodable>(_ key: CodingKeys, into keyPath: WritableKeyPath<Settings, [Element]>) {
+            guard var list = try? container.nestedUnkeyedContainer(forKey: key) else { return }
+            var values: [Element] = []
+            while !list.isAtEnd {
+                if let value = try? list.decode(Element.self) {
+                    values.append(value)
+                } else if (try? list.decode(Skipped.self)) == nil {
+                    break
+                }
+            }
+            settings[keyPath: keyPath] = values
+        }
         read(.inputStyle, into: \.inputStyle)
-        read(.customRomaji, into: \.customRomaji)
+        readList(.customRomaji, into: \.customRomaji)
         read(.liveConversion, into: \.liveConversion)
         read(.yenKey, into: \.yenKey)
         read(.punctuation, into: \.punctuation)
@@ -111,13 +127,13 @@ extension Settings: Codable {
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
         read(.learning, into: \.learning)
-        read(.userDictionary, into: \.userDictionary)
+        readList(.userDictionary, into: \.userDictionary)
         read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
         read(.showsModeIndicator, into: \.showsModeIndicator)
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
-        read(.profileRules, into: \.profileRules)
+        readList(.profileRules, into: \.profileRules)
         self = settings
     }
 

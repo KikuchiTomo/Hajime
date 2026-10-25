@@ -1,4 +1,5 @@
 import Foundation
+import os
 import S90Application
 import S90Domain
 
@@ -17,13 +18,24 @@ public final class FileSettingsStore: SettingsStoring, SettingsObserving {
     /// 読めなかったファイルは脇に置き，既定値で上書きして利用者の設定とユーザー辞書を消さないようにする
     public init(fileURL: URL) {
         self.fileURL = fileURL
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            self.current = DefaultSettings.settings
+            return
+        }
         do {
-            self.current = try JSONDecoder().decode(Settings.self, from: ProtectedFile.read(from: fileURL, maximumBytes: DefaultSettings.maximumSettingsFileBytes))
+            let data = try ProtectedFile.read(from: fileURL, maximumBytes: DefaultSettings.maximumSettingsFileBytes)
+            self.current = try JSONDecoder().decode(Settings.self, from: data)
         } catch {
-            if FileManager.default.fileExists(atPath: fileURL.path) { ProtectedFile.setAside(fileURL) }
+            // ファイルはあるが読めない．脇に置いたことを記録し，設定の画面で一度知らせる(ファイルの中身はログに出さない)
+            self.setAsideFile = ProtectedFile.setAside(fileURL)
+            Logger(subsystem: "tokyo.s90.ime", category: "settings")
+                .notice("読めなかった設定のファイルを脇に置きました: \(self.setAsideFile?.lastPathComponent ?? "-", privacy: .public)")
             self.current = DefaultSettings.settings
         }
     }
+
+    /// 起動したときに読めず，脇に置いた設定のファイル．無ければ nil
+    public private(set) var setAsideFile: URL?
 
     public func update(_ change: (inout Settings) -> Void) throws {
         var next = current

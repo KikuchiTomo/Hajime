@@ -75,6 +75,11 @@ public struct CommandLineState: Sendable, Equatable {
     }
 }
 
+extension CommandLineState: CustomStringConvertible {
+    // 最後に流した文字は入力内容なので，ログには領域と長さだけを出す
+    public var description: String { "CommandLineState(region: \(region), length: \(length))" }
+}
+
 /// よく使うコマンドの名前．行の頭でこれを打って Space を押すと，コマンドの行とみなす
 public enum CommandNames {
     public static func contains(_ word: String) -> Bool {

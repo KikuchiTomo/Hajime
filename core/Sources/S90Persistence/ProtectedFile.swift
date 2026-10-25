@@ -23,17 +23,28 @@ enum ProtectedFile {
         }
     }
 
-    /// 大きさの上限を確かめてから読む
+    /// 大きさの上限を確かめながら読む．上限より 1 バイト多くまでだけを読み，超えていれば断る．
+    /// ファイルの属性の大きさで確かめると，シンボリックリンクではリンク自体の大きさが返り，上限をすり抜けるため
     static func read(from url: URL, maximumBytes: Int) throws -> Data {
-        let size = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
-        guard size <= maximumBytes else { throw CocoaError(.fileReadTooLarge) }
-        return try Data(contentsOf: url)
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
+        guard data.count <= maximumBytes else { throw TooLarge(maximumBytes: maximumBytes) }
+        return data
     }
 
-    /// 読めなかったファイルを脇に置く．既定値で始めたあとで上書きして，利用者の設定を消さないため
-    static func setAside(_ url: URL) {
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
+    struct TooLarge: Error, Equatable {
+        var maximumBytes: Int
+    }
+
+    /// 読めなかったファイルを脇に置き，置いた場所を返す．既定値で始めたあとで上書きして，利用者の設定を消さないため
+    static func setAside(_ url: URL) -> URL? {
         let aside = url.deletingLastPathComponent().appendingPathComponent("\(url.lastPathComponent).unreadable-\(UUID().uuidString)")
-        try? FileManager.default.moveItem(at: url, to: aside)
+        do {
+            try FileManager.default.moveItem(at: url, to: aside)
+            return aside
+        } catch {
+            return nil
+        }
     }
 }

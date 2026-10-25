@@ -79,3 +79,34 @@ struct FileSettingsStoreTests {
         #expect(received?.liveConversion == false)
     }
 }
+
+@Suite("設定の読み込みの強さ")
+@MainActor
+struct SettingsRobustnessTests {
+    @Test("ユーザー辞書の崩れた語だけを飛ばし，ほかの語は残す")
+    func lossyDictionary() throws {
+        let json = #"{"userDictionary": [{"reading": "あ", "word": "亜"}, {"reading": 1}, {"reading": "い", "word": "井"}]}"#
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(settings.userDictionary.map(\.word) == ["亜", "井"])
+    }
+
+    @Test("シンボリックリンクの先が上限を超えるファイルは読まない")
+    func symlinkSize() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-link-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let target = directory.appendingPathComponent("big.txt")
+        try Data(count: DefaultSettings.maximumUserDictionaryFileBytes + 10).write(to: target)
+        let link = directory.appendingPathComponent("link.txt")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        #expect(throws: UserDictionaryFile.FileError.self) { try UserDictionaryFile.read(from: link) }
+    }
+
+    @Test("読めなかったファイルを脇に置いたことを知らせる")
+    func reportsSetAside() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("s90-aside-\(UUID().uuidString)/settings.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{".utf8).write(to: url)
+        #expect(FileSettingsStore(fileURL: url).setAsideFile != nil)
+        #expect(FileSettingsStore(fileURL: url).setAsideFile == nil)
+    }
+}

@@ -15,6 +15,12 @@ final class SettingsWindowController {
         model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
     }
 
+    /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
+    func noteSetAsideFile(_ url: URL?) {
+        guard let url else { return }
+        model.message = UIStrings.Settings.setAside(url.lastPathComponent)
+    }
+
     func show() {
         model.refreshUsage()
         let window = window ?? makeWindow()
@@ -64,12 +70,16 @@ final class SettingsModel: ObservableObject {
         Binding(get: { self.settings[keyPath: keyPath] }, set: { value in self.update { $0[keyPath: keyPath] = value } })
     }
 
-    func update(_ change: (inout S90Domain.Settings) -> Void) {
+    /// 設定を変えて保存する．保存できなければ知らせて false を返す
+    @discardableResult
+    func update(_ change: (inout S90Domain.Settings) -> Void) -> Bool {
         do {
             try store.update(change)
+            return true
         } catch {
             logger.error("設定を保存できませんでした: \(String(describing: error), privacy: .public)")
             message = UIStrings.Settings.saveFailed
+            return false
         }
     }
 
@@ -117,11 +127,10 @@ final class SettingsModel: ObservableObject {
             message = UIStrings.Settings.invalidRomaji
             return false
         }
-        update { current in
+        return update { current in
             current.customRomaji.removeAll { $0.keys == rule.keys }
             current.customRomaji.append(rule)
         }
-        return true
     }
 
     // MARK: ユーザー辞書
@@ -130,8 +139,8 @@ final class SettingsModel: ObservableObject {
         var entries = settings.userDictionary
         switch UserDictionaryEditing.add(reading: reading, word: word, to: &entries) {
         case .added:
-            update { $0.userDictionary = entries }
-            return true
+            // 保存できなければ false を返し，打った語を入力欄に残す
+            return update { $0.userDictionary = entries }
         case .alreadyRegistered:
             return true
         case .invalid:
@@ -155,8 +164,9 @@ final class SettingsModel: ObservableObject {
         do {
             var entries = settings.userDictionary
             let added = UserDictionaryEditing.merge(try UserDictionaryFile.read(from: url), into: &entries)
-            update { $0.userDictionary = entries }
-            message = UIStrings.Settings.imported(added)
+            if update({ $0.userDictionary = entries }) {
+                message = UIStrings.Settings.imported(added)
+            }
         } catch {
             message = UIStrings.Settings.importFailed
         }

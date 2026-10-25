@@ -909,7 +909,7 @@ struct ReviewRegressionTests {
         #expect(committed(session.handle(KeyEvent(.enter), context: InputContext()).actions) == "hello")
     }
 
-    @Test("EN 入力の Escape: 打っている途中なら英字を確定して Escape もアプリに渡し，組み立てていなければ設定どおり英数にする")
+    @Test("EN 入力の Escape: 英数にする設定なら，打っている途中でも 1 回で英字を確定して英数にし，Escape もアプリに渡す")
     func englishEscape() {
         var settings = english()
         settings.escapeSwitchesToDirect = true
@@ -918,9 +918,70 @@ struct ReviewRegressionTests {
         let first = session.handle(KeyEvent(.escape), context: InputContext())
         #expect(committed(first.actions) == "vim")
         #expect(first.handled == false)
-        let second = session.handle(KeyEvent(.escape), context: InputContext())
-        #expect(second.handled == false)
         #expect(session.mode == .direct)
+    }
+
+    @Test("EN 入力の Escape: 設定が無ければ英字を確定して Escape をアプリに渡し，日本語のまま")
+    func englishEscapeWithoutSetting() {
+        let (session, _) = session(english())
+        for key in "vim" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        let result = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(committed(result.actions) == "vim")
+        #expect(result.handled == false)
+        #expect(session.mode == .japanese)
+    }
+
+    @Test("ターミナルで読みを組み立てている途中の Ctrl+C は行を終えない(シェルに届かないため)")
+    func terminalControlCWhileComposing() {
+        let (session, _) = session()
+        let terminal = InputContext(profile: .terminal)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        for key in "commit -m \"" { _ = session.handle(key == " " ? KeyEvent(.space) : KeyEvent(.character(key)), context: terminal) }
+        for key in "aiu" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.character("c"), modifiers: .control), context: terminal)
+        _ = session.handle(KeyEvent(.escape), context: terminal)
+        _ = session.handle(KeyEvent(.escape), context: terminal)
+        // まだ引用符の中なので，閉じる引用符はアプリに渡り，コマンドの行に戻る
+        #expect(session.handle(KeyEvent(.character("\"")), context: terminal).handled == false)
+        #expect(session.handle(KeyEvent(.character("x")), context: terminal).handled == false)
+    }
+
+    @Test("ターミナルで組み立てずに流した空白と記号も行の長さに数える")
+    func terminalCountsPassedKeys() {
+        let (session, _) = session()
+        let terminal = InputContext(profile: .terminal)
+        for key in "aiu" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.enter), context: terminal)
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        for key in "eo" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.enter), context: terminal)
+        // 画面の上は「あいう えお」の 6 文字．5 回消してもまだ行の途中なので，ls はコマンドにならない
+        for _ in 0..<5 { _ = session.handle(KeyEvent(.backspace), context: terminal) }
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(committed(session.handle(KeyEvent(.space), context: terminal).actions) != "ls ")
+    }
+
+    @Test("EN 入力の Enter で行が終わり，次の行の頭のコマンドを見分ける")
+    func terminalEnglishEnter() {
+        let (session, _) = session(english())
+        let terminal = InputContext(profile: .terminal)
+        for key in "hello" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.enter), context: terminal)
+        #expect(session.handle(KeyEvent(.enter), context: terminal).handled == false)
+    }
+
+    @Test("かな入力: 選べる数を超える番号キーはかなにする")
+    func kanaNumberOutOfRange() {
+        var settings = Settings()
+        settings.inputStyle = .kana
+        settings.candidatePresentation = .list
+        let (session, _) = session(settings, converter: FakeConverter(["た": [("田", nil), ("た", nil)]]))
+        _ = session.handle(KeyEvent(.character("q"), keyLabel: "q"), context: InputContext())
+        _ = session.handle(KeyEvent(.space), context: InputContext())
+        let result = session.handle(KeyEvent(.character("9"), keyLabel: "9"), context: InputContext())
+        #expect(committed(result.actions) == "田")
+        #expect(marked(result.actions) == "よ")
     }
 
     @Test("EN 入力の途中で Control の組み合わせを押すと，英字を確定してからアプリに渡す")
@@ -937,9 +998,11 @@ struct ReviewRegressionTests {
         let (session, store) = session()
         for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
         store.current.inputStyle = .english
-        let result = session.handle(KeyEvent(.character("x")), context: InputContext())
+        // 次のキー(ここでは Backspace)は確定だけに使い，確定した文字に効かせない
+        let result = session.handle(KeyEvent(.backspace), context: InputContext())
         #expect(committed(result.actions) == "か")
-        #expect(marked(result.actions) == "x")
+        #expect(result.handled)
+        #expect(marked(session.handle(KeyEvent(.character("x")), context: InputContext()).actions) == "x")
     }
 
     @Test("ターミナルの Ctrl+C で行が終わり，次の行は日本語を打てる")

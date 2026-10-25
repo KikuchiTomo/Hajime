@@ -94,6 +94,7 @@ enum UIStrings {
         static let appearance = "見た目"
         static let restoreDefaults = "設定を既定に戻す(ユーザー辞書は残す)"
         static let saveFailed = "設定を保存できませんでした"
+        static func setAside(_ name: String) -> String { "前の設定のファイルを読めなかったので，既定の設定で始めました．前のファイルは同じ場所に \(name) として残してあります" }
         static let learningReset = "学習した内容を消しました"
         static let dictionaryFull = "ユーザー辞書がいっぱいです(10,000 語まで)"
         static let invalidEntry = "読みはひらがなで，語と合わせて長すぎないようにしてください"
