@@ -45,8 +45,11 @@ public struct CommandLineState: Sendable, Equatable {
         defer { lastPassed = character }
         switch region {
         case .lineStart:
-            // 行の頭で組み立てずに流れた文字(英数で打った文字や半角の記号)があれば，もう行の頭ではない
-            region = .text
+            // 英数で行の頭に英字や数字を打ったら，もう行の頭ではない．日本語のモードでは英字と数字は組み立てに回るので，
+            // ここに来るのは英数で打ったものだけ．行の頭の空白や「(」「\」などの記号はコマンドの前に付くことがあるので行の頭のまま
+            if character.isLetter || character.isNumber { region = .text }
+            // 行の頭の # はシェルのコメント．行の終わりまで日本語を打てる
+            if character == "#" { region = .comment }
         case .command:
             if character == "\"" || character == "'" { region = .quoted(character) }
             // 「foo#bar」や「$#」は引数の一部なので，語の頭(直前が空白)の # だけをコメントにする
@@ -70,7 +73,7 @@ public struct CommandLineState: Sendable, Equatable {
         if length == 0 { endLine() }
     }
 
-    /// 行の中身が分からなくなった(入力欄を離れたとき)．
+    /// 行の中身が分からなくなった(入力欄を離れたとき，Option+文字のあと)．
     /// 何も入れていない行の頭ならそのまま．そうでなければ，コマンドの名前を見分けず英字も流さない「文の行」として扱う．
     /// 分からないときに日本語を打てなくなるより，ふつうに日本語を打てるほうへ倒すため．何度呼んでも同じ結果になる
     public mutating func becomeUnknown() {

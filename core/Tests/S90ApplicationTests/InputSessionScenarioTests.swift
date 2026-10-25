@@ -1339,9 +1339,18 @@ struct TerminalUnknownLineTests {
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
         _ = session.setMode(.direct)
         for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
-        _ = session.handle(KeyEvent(.yen), context: terminal)
         _ = session.setMode(.japanese)
         for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
         #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
+    }
+
+    @Test("行の頭の空白や「(」「\\」のあとのコマンドの名前は，コマンドとして見分ける")
+    func commandAfterLeadingSymbols() {
+        for prefix in [KeyEvent(.space), KeyEvent(.character("(")), KeyEvent(.character("\\"))] {
+            let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+            _ = session.handle(prefix, context: terminal)
+            for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+            #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")), "\(prefix.key)")
+        }
     }
 }

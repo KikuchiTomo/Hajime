@@ -163,3 +163,20 @@ struct CommandLineUnknownTests {
         #expect(quoted.region == .quoted("'"))
     }
 }
+
+@Suite("ターミナルの行の頭の文字")
+struct CommandLineStartTests {
+    @Test("行の頭の # はコメント，英字は文の行，空白と記号は行の頭のまま")
+    func lineStartCharacters() {
+        var comment = CommandLineState()
+        comment.didPass("#")
+        #expect(comment.region == .comment)
+        var text = CommandLineState()
+        text.didPass("l")
+        #expect(text.region == .text)
+        var space = CommandLineState()
+        space.didPass(" ")
+        space.didPass("(")
+        #expect(space.region == .lineStart)
+    }
+}
