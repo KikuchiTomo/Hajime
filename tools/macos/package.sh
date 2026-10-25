@@ -17,9 +17,17 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 variant Release
 # productbuild の --sign は証明書の名前(Common Name)を受け取る(man productbuild)．同じ名前が 2 つあると選べないので止める
 installer_identity=${S90_INSTALLER_IDENTITY:-$(identities basic | awk -F '\t' '$2 ~ /^Developer ID Installer/ { print $2; exit }')}
-if [ -n "$installer_identity" ] && [ "$(identities basic | awk -F '\t' -v name="$installer_identity" '$2 == name' | wc -l | tr -d ' ')" -gt 1 ]; then
-  echo "「${installer_identity}」という名前の証明書が 2 つあり，.pkg の署名に使う証明書を選べません．古い方をキーチェーンから外してください" >&2
-  exit 1
+if [ -n "$installer_identity" ]; then
+  # 同じ証明書が 2 つのキーチェーンに出ることがあるので，SHA-1 で重ねずに数える
+  installer_count=$(identities basic | awk -F '\t' -v name="$installer_identity" '$2 == name { print $1 }' | sort -u | wc -l | tr -d ' ')
+  if [ "$installer_count" -eq 0 ]; then
+    echo "「${installer_identity}」という名前の証明書がありません．証明書の名前をそのまま指定してください(security find-identity -v -p basic で確かめられます)" >&2
+    exit 1
+  fi
+  if [ "$installer_count" -gt 1 ]; then
+    echo "「${installer_identity}」という名前の証明書が 2 つあり，.pkg の署名に使う証明書を選べません．古い方をキーチェーンから外してください" >&2
+    exit 1
+  fi
 fi
 notary_profile=${S90_NOTARY_PROFILE:-}
 if [ -n "${S90_APP_IDENTITY:-}" ]; then

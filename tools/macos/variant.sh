@@ -57,6 +57,7 @@ signing_identity() {
     return
   fi
   _vs_installed="$destination/$app_name.app"
+  _vs_team=""
   if [ -d "$_vs_installed" ]; then
     _vs_team=$(codesign -dvv "$_vs_installed" 2>&1 | sed -n 's/^TeamIdentifier=//p')
     if [ -n "$_vs_team" ] && [ "$_vs_team" != "not set" ]; then
@@ -67,16 +68,22 @@ signing_identity() {
         fi
       done
       echo "入っている「${app_name}」はチーム ${_vs_team} の証明書で署名されていますが，その証明書がキーチェーンにありません．" >&2
-      echo "違うチームで署名すると起動の途中で止まるので，入れるのをやめます．S90_SIGN_IDENTITY で証明書を指定してください" >&2
+      echo "違うチームで署名すると起動の途中で止まるので，入れるのをやめます．チーム ${_vs_team} の証明書を S90_SIGN_IDENTITY で指定するか，" >&2
+      echo "アプリを消して(make uninstall-macos か make uninstall-dev-macos)から，Finder でデータの置き場所 $(container_path) をゴミ箱に入れて入れ直してください" >&2
       return 1
     fi
   fi
   if [ -d "$_vs_installed" ] && [ -d "$(container_path)" ]; then
-    # 証明書で署名されていない版(アドホック署名)が入っていて，それが作った置き場所がある
-    echo "入っている「${app_name}」はアドホック署名で，そのデータの置き場所 $(container_path) があります．" >&2
+    # 証明書で署名されていない版が入っていて，それが作った置き場所がある
+    if [ "${_vs_team:-}" = "not set" ]; then
+      echo "入っている「${app_name}」はアドホック署名で，そのデータの置き場所 $(container_path) があります．" >&2
+    else
+      echo "入っている「${app_name}」の署名が読めず，そのデータの置き場所 $(container_path) があります．" >&2
+    fi
     echo "証明書で署名すると起動の途中で止まるおそれがあるので，入れるのをやめます．" >&2
-    echo "アドホック署名のまま入れ直すなら S90_SIGN_IDENTITY=- を付け，証明書で署名した版に替えるなら，" >&2
-    echo "学習データと設定を消してよければ Finder でその置き場所をゴミ箱に入れてから入れ直してください" >&2
+    echo "アドホック署名のまま入れ直すなら S90_SIGN_IDENTITY=- を付けてください．証明書で署名した版に替えるなら，" >&2
+    echo "学習データと設定を消してよければ，先にアプリを消して(make uninstall-macos か make uninstall-dev-macos)から，" >&2
+    echo "Finder でその置き場所をゴミ箱に入れて入れ直してください(アプリが動いたままだと置き場所を作り直すため)" >&2
     return 1
   fi
   if [ -d "$(container_path)" ]; then
