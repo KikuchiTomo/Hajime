@@ -12,8 +12,10 @@ public enum CandidateOrigin: Sendable, Equatable {
     case sentencePart
     /// 複数の候補をつないだもの(文節格子の全体など)
     case combined
-    /// 読みから引いた記号(SymbolDictionary)
+    /// 読みから引いた記号(SymbolDictionary)と日付(DateExpressions)
     case symbol
+    /// 利用者が登録した語
+    case userDictionary
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．

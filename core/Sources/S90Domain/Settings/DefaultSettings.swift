@@ -1,18 +1,10 @@
 /// 設定の既定値と，コードの中で使う上限などの値の置き場所(docs/dev/GUIDELINES.md)．
 public enum DefaultSettings {
-    public static let settings = Settings(
-        liveConversion: true,
-        yenKey: .alwaysBackslash,
-        typoCorrection: .standard,
-        showsVariantRow: true,
-        theme: .automatic,
-        candidateFontSize: 15,
-        candidatePresentation: .automatic,
-        profileRules: terminalRules + programmingRules
-    )
+    /// 既定の設定．項目ごとの既定値は Settings に書いてある
+    public static let settings = Settings()
 
     // R-06，R-07: 既定でプロファイルを割り当てるアプリ
-    static let terminalRules: [ProfileRule] = [
+    public static let terminalRules: [ProfileRule] = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
         "com.mitchellh.ghostty",
@@ -23,7 +15,7 @@ public enum DefaultSettings {
         "com.github.wez.wezterm",
     ].map { ProfileRule(applicationPrefix: $0, profile: .terminal) }
 
-    static let programmingRules: [ProfileRule] = [
+    public static let programmingRules: [ProfileRule] = [
         "com.microsoft.VSCode",
         "com.todesktop.230313mzl4w4u92", // Cursor
         "com.jetbrains.",
@@ -78,5 +70,13 @@ public enum DefaultSettings {
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)
     public static let maximumLeftContextLength = 40
     /// 設定ファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)
-    public static let maximumSettingsFileBytes = 256 * 1024
+    public static let maximumSettingsFileBytes = 2 * 1024 * 1024
+    /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
+    public static let maximumUserDictionaryEntries = 10_000
+    public static let maximumUserDictionaryReadingLength = 32
+    public static let maximumUserDictionaryWordLength = 64
+    /// 取り込むユーザー辞書のファイルの大きさの上限
+    public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
+    /// ユーザー辞書の語の点数(対数尤度)．辞書の一般的な語より少し上に出る値(azooKey-Desktop と同じ)
+    public static let userDictionaryWordCost: Float = -5
 }

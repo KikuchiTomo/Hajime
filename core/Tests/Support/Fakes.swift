@@ -72,3 +72,13 @@ public final class FakeSettings: SettingsStoring {
 
     public func update(_ change: (inout Settings) -> Void) throws { change(&current) }
 }
+
+/// 決まった日付を返す暦．2026 年 10 月 26 日(月) 14:05 を今日とし，ずらした日は日だけを足す(月をまたがない範囲で使う)
+@MainActor
+public final class FakeCalendar: CalendarReading {
+    public init() {}
+    public func now() -> CalendarDate { CalendarDate(year: 2026, month: 10, day: 26, weekday: 2, hour: 14, minute: 5) }
+    public func day(offsetFromToday offset: Int) -> CalendarDate {
+        CalendarDate(year: 2026, month: 10, day: 26 + offset, weekday: (2 + offset - 1) % 7 + 1)
+    }
+}
