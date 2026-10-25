@@ -11,10 +11,13 @@ struct LatticeBuilder {
 
     func build(reading: String) -> SegmentLattice {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }?.text
-        return SegmentLattice(segments: segments(of: reading, from: 0, sentence: sentence))
+        var lattice = SegmentLattice(segments: segments(of: reading, from: 0, sentence: sentence))
+        lattice.focusedIndex = lattice.initialFocus
+        return lattice
     }
 
-    /// index の文節の長さを length に変え，それより後ろを分け直す(Shift+←→)
+    /// index の文節の長さを length に変え，それより後ろを分け直す(Shift+←→)．
+    /// 分け直したあとも読みの範囲が同じ文節は，利用者が選び直したものを残す(人が決めた文節は書き換えない)
     func resize(_ lattice: SegmentLattice, segmentAt index: Int, to length: Int, reading: String) -> SegmentLattice {
         let segment = lattice.segments[index]
         let available = reading.count - segment.readingStart
@@ -24,7 +27,10 @@ struct LatticeBuilder {
         var segments = Array(lattice.segments.prefix(index))
         segments.append(makeSegment(start: segment.readingStart, length: length, rest: rest, preferred: nil))
         // 区切りを変えた後ろは，その読みだけで求め直す
-        segments += self.segments(of: reading, from: segment.readingStart + length, sentence: nil)
+        let decided = lattice.segments.dropFirst(index + 1).filter(\.isDecided)
+        segments += self.segments(of: reading, from: segment.readingStart + length, sentence: nil).map { rebuilt in
+            decided.first { $0.readingStart == rebuilt.readingStart && $0.readingLength == rebuilt.readingLength } ?? rebuilt
+        }
         return SegmentLattice(segments: segments, focusedIndex: index)
     }
 
@@ -62,11 +68,22 @@ struct LatticeBuilder {
             append(pool.first { $0.text == preferred } ?? Candidate(text: preferred, readingCount: length, origin: .sentencePart))
         }
         pool.forEach(append)
-        // ひらがなとカタカナは，エンジンが出さなくても選べるようにする
-        append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
-        append(Candidate(text: KanaWidth.katakana(from: slice), readingCount: length, origin: .variant(.katakana)))
+        if candidates.isEmpty {
+            append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
+        }
         let engineCandidates = candidates.filter(\.isFromEngine)
         let confident = SegmentLattice.isConfident(best: engineCandidates.first, second: engineCandidates.dropFirst().first)
-        return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates, isConfident: confident)
+        return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
+                                      variants: Self.variants(of: slice), isConfident: confident)
+    }
+
+    /// 上の枝に出す字種．エンジンが出さなくても選べるようにする
+    static func variants(of slice: String) -> [Candidate] {
+        let katakana = KanaWidth.katakana(from: slice)
+        return [
+            Candidate(text: slice, readingCount: slice.count, origin: .variant(.hiragana)),
+            Candidate(text: katakana, readingCount: slice.count, origin: .variant(.katakana)),
+            Candidate(text: KanaWidth.halfwidthKatakana(from: katakana), readingCount: slice.count, origin: .variant(.halfwidthKatakana)),
+        ]
     }
 }

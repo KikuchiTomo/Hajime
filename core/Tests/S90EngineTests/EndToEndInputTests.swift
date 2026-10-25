@@ -63,7 +63,9 @@ struct EndToEndInputTests {
         }
         let columns = try #require(lattice?.columns)
         #expect(columns.count >= 2)
-        #expect(columns.allSatisfy { !$0.alternatives.isEmpty })
+        // 注目している文節だけが枝(候補)を持つ
+        #expect(columns.filter(\.isFocused).count == 1)
+        #expect(columns.allSatisfy { $0.isFocused == !$0.alternatives.isEmpty })
         for action in session.handle(KeyEvent(.enter), context: InputContext()).actions {
             if case .commit(let text) = action { committed += text }
         }

@@ -4,6 +4,15 @@ import S90TestSupport
 import Testing
 
 /// キーの列を流し込み，画面への操作を確かめる．要件(R-xx)の受け入れ条件はここで確かめる
+extension Settings {
+    /// 候補を一覧で出す設定．一覧の動きを確かめるテストで使う
+    static var listPresentation: Settings {
+        var settings = DefaultSettings.settings
+        settings.candidatePresentation = .list
+        return settings
+    }
+}
+
 @MainActor
 private final class Harness {
     let converter: FakeConverter
@@ -75,7 +84,7 @@ struct InputSessionScenarioTests {
 
     @Test("Space で候補を選び，番号キーで確定する")
     func selectCandidate() {
-        let harness = Harness(converter: FakeConverter(["きしゃ": [("記者", nil), ("汽車", nil), ("帰社", nil)]]))
+        let harness = Harness(converter: FakeConverter(["きしゃ": [("記者", nil), ("汽車", nil), ("帰社", nil)]]), settings: .listPresentation)
         harness.type("kisha")
         harness.press(.space)
         #expect(harness.panel?.entries.map(\.text) == ["記者", "汽車", "帰社"])
@@ -94,7 +103,7 @@ struct InputSessionScenarioTests {
             "きょうはあめ": [("今日は", 4)],
             "あめ": [("雨", nil)],
         ])
-        let harness = Harness(converter: converter)
+        let harness = Harness(converter: converter, settings: .listPresentation)
         harness.type("kyouhaame")
         harness.press(.space)
         harness.press(.enter)
@@ -104,7 +113,7 @@ struct InputSessionScenarioTests {
 
     @Test("R-03: 候補の先頭で上キーを押すと種類の行に移り，左右で選ぶ")
     func variantRow() {
-        let harness = Harness(converter: FakeConverter(["とうきょう": [("東京", nil)]]))
+        let harness = Harness(converter: FakeConverter(["とうきょう": [("東京", nil)]]), settings: .listPresentation)
         harness.type("toukyou")
         harness.press(.space)
         harness.press(.up)
@@ -314,10 +323,11 @@ struct InputSessionScenarioTests {
         #expect(!harness.lastResult.handled)
     }
 
-    // MARK: - 文節格子
+    // MARK: - 分岐図
 
+    /// 「今日は / 雨」の 2 文節．「今日は」と「京は」は点数が近いので，最初の文節が迷う文節になる
     private func latticeConverter() -> FakeConverter {
-        FakeConverter(
+        let converter = FakeConverter(
             ["きょうはあめ": [("今日は雨", nil)], "あめ": [("雨", nil)], "きょう": [("今日", nil)], "はあめ": [("は雨", nil)]],
             clauses: [
                 "きょうはあめ": [("今日は", 4), ("京は", 4)],
@@ -325,20 +335,42 @@ struct InputSessionScenarioTests {
                 "はあめ": [("は雨", 3)],
             ]
         )
+        converter.clauseScoreStep["きょうはあめ"] = 1
+        return converter
     }
 
-    @Test("文節が 2 つ以上あれば，Space で文節格子を出す")
+    @Test("Space で分岐図を出し，入力位置にいちばん近い迷う文節に注目する")
     func latticeAppears() {
         let harness = Harness(converter: latticeConverter())
         harness.type("kyouhaame")
         harness.press(.space)
         #expect(harness.panel == nil)
         #expect(harness.lattice?.columns.map(\.text) == ["今日は", "雨"])
+        #expect(harness.lattice?.columns.map(\.isUncertain) == [true, false])
         #expect(harness.lattice?.columns.first?.isFocused == true)
         #expect(harness.marked.segments.map(\.style) == [.focused, .converted])
     }
 
-    @Test("文節格子: →で文節を移り，↓で候補を変え，Enter で全体を確定する")
+    @Test("迷う文節が無ければ，最後の文節に注目する")
+    func latticeFocusWithoutUncertainty() {
+        let converter = latticeConverter()
+        converter.clauseScoreStep = [:]
+        let harness = Harness(converter: converter)
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+    }
+
+    @Test("分岐図は文節が 1 つでも出す")
+    func latticeSingleSegment() {
+        let harness = Harness(converter: FakeConverter(["あめ": [("雨", nil), ("飴", nil)]], clauses: ["あめ": [("雨", 2), ("飴", 2)]]))
+        harness.type("ame")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["雨"])
+        #expect(harness.lattice?.columns.first?.alternatives == ["雨", "飴"])
+    }
+
+    @Test("分岐図: →で文節を移り，↓で候補を変え，Enter で全体を確定する")
     func latticeNavigation() {
         let converter = latticeConverter()
         let harness = Harness(converter: converter)
@@ -347,23 +379,53 @@ struct InputSessionScenarioTests {
         harness.press(.right)
         harness.press(.down)
         #expect(harness.marked.text == "今日は飴")
+        #expect(harness.lattice?.columns[1].isDecided == true)
         harness.press(.enter)
         #expect(harness.committed == "今日は飴")
         #expect(converter.committed.count == 2)
     }
 
-    @Test("文節格子: 番号で選ぶと次の文節に進み，最後の文節で確定する")
+    @Test("分岐図: ↑で上の枝の字種(そのまま・カタカナ・半角カタカナ)を選び，上の端で止まる")
+    func latticeVariants() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.lattice?.columns[0].variants == ["きょうは", "キョウハ", "ｷｮｳﾊ"])
+        harness.press(.up)
+        #expect(harness.marked.text == "きょうは雨")
+        #expect(harness.lattice?.columns[0].selectedVariant == 0)
+        #expect(harness.lattice?.columns[0].selectedAlternative == nil)
+        harness.press(.up)
+        harness.press(.up)
+        harness.press(.up)
+        #expect(harness.marked.text == "ｷｮｳﾊ雨")
+        // ↓で幹に戻る
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.marked.text == "今日は雨")
+    }
+
+    @Test("分岐図: 番号で選ぶと，選んでいない迷う文節が残っていなければ確定する")
     func latticeNumbers() {
         let harness = Harness(converter: latticeConverter())
         harness.type("kyouhaame")
         harness.press(.space)
         harness.type("2")
-        #expect(harness.lattice?.columns[1].isFocused == true)
-        harness.type("1")
         #expect(harness.committed == "京は雨")
     }
 
-    @Test("文節格子: Shift+← で文節を縮め，後ろを分け直す")
+    @Test("分岐図: Tab は迷う文節だけを渡り歩く")
+    func latticeTab() {
+        let harness = Harness(converter: latticeConverter())
+        harness.type("kyouhaame")
+        harness.press(.space)
+        harness.press(.right)
+        harness.press(.tab)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
+    }
+
+    @Test("分岐図: Shift+← で文節を縮め，後ろを分け直す")
     func latticeResize() {
         let harness = Harness(converter: latticeConverter())
         harness.type("kyouhaame")
@@ -372,14 +434,15 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.text) == ["今日", "は雨"])
     }
 
-    @Test("確信度の高い文節は，注目していなければ候補の列を畳む")
-    func latticeConfidence() {
+    @Test("注目していない迷う文節には，次の候補を 1 つだけ添える")
+    func latticePreview() {
         let harness = Harness(converter: latticeConverter())
         harness.type("kyouhaame")
         harness.press(.space)
-        // 「あめ」は雨と飴の点数の差が十分あるので畳む(Fake の点数は 1 つ下がるごとに 3)
-        #expect(harness.lattice?.columns[1].showsAlternatives == false)
-        #expect(harness.lattice?.columns[0].showsAlternatives == true)
+        harness.press(.right)
+        #expect(harness.lattice?.columns[0].preview == "京は")
+        #expect(harness.lattice?.columns[0].alternatives.isEmpty == true)
+        #expect(harness.lattice?.columns[1].preview == nil)
     }
 
     @Test("一覧の設定なら文節が多くても一覧を出す")

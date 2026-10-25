@@ -133,3 +133,12 @@ struct SettingsDecodingTests {
         #expect(settings.yenKey == DefaultSettings.settings.yenKey)
     }
 }
+
+@Suite("候補の出し方の設定")
+struct CandidatePresentationTests {
+    @Test("古い版が保存した文節格子(lattice)は，分岐図として読む")
+    func legacyLattice() throws {
+        let decoded = try JSONDecoder().decode([CandidatePresentation].self, from: Data(#"["lattice","list"]"#.utf8))
+        #expect(decoded == [CandidatePresentation.automatic, .list])
+    }
+}

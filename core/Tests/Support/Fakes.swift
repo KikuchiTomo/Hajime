@@ -7,6 +7,8 @@ public final class FakeConverter: KanaKanjiConverting {
     public var table: [String: [(text: String, readingCount: Int?)]]
     /// 文節格子のための，読みの先頭の文節の候補．点数は並び順から付ける(先が高い)
     public var clauseTable: [String: [(text: String, readingCount: Int)]]
+    /// 文節の候補の点数が 1 つ下がるごとにいくつ下がるか．既定の 3 は確信度が高い差．読みごとに変えられる
+    public var clauseScoreStep: [String: Double] = [:]
     public private(set) var committed: [Candidate] = []
     public private(set) var endCount = 0
     /// 読みごとの点数(読みとしてのもっともらしさ)．無い読みは 0
@@ -20,7 +22,7 @@ public final class FakeConverter: KanaKanjiConverting {
     public func clauseCandidates(for reading: String) -> [Candidate] {
         guard !reading.isEmpty else { return [] }
         return (clauseTable[reading] ?? []).enumerated().map { index, entry in
-            Candidate(text: entry.text, readingCount: entry.readingCount, origin: .engine(id: 1000 + index), score: -Double(index) * 3)
+            Candidate(text: entry.text, readingCount: entry.readingCount, origin: .engine(id: 1000 + index), score: -Double(index) * (clauseScoreStep[reading] ?? 3))
         }
     }
 

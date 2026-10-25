@@ -3,7 +3,7 @@ import S90Application
 import S90Domain
 import S90Engine
 
-/// ローマ字の行を打つと，ライブ変換・候補の一覧・文節格子の結果を出す
+/// ローマ字の行を打つと，ライブ変換・候補の一覧・分岐図の結果を出す
 @MainActor
 enum Interactive {
     static func run(engine: AzooKeyConverterEngine) {
@@ -19,7 +19,7 @@ enum Interactive {
             print("s90> ", terminator: "")
             guard let line = readLine(), !line.isEmpty else { break }
             let list = session(.list)
-            let lattice = session(.lattice)
+            let lattice = session(.automatic)
             var marked = MarkedText.empty
             for character in line {
                 marked = markedText(in: list.handle(KeyEvent(.character(character)), context: InputContext())) ?? marked
@@ -34,10 +34,16 @@ enum Interactive {
             }
             for action in lattice.handle(KeyEvent(.space), context: InputContext()).actions {
                 guard case .showLattice(let grid) = action else { continue }
-                print("  文節格子:   \(grid.columns.map(\.text).joined(separator: " | "))")
-                for (index, column) in grid.columns.enumerated() {
-                    let mark = column.showsAlternatives ? "候補を見せる" : "確信度が高いので畳む"
-                    print("    \(index + 1). \(column.alternatives.joined(separator: " / "))  (\(mark))")
+                // 幹(文)を ─ でつなぎ，迷う文節に ⑂ を付ける．注目している文節の枝を下に並べる
+                let trunk = grid.columns.map { ($0.isFocused ? "[\($0.text)]" : $0.text) + ($0.isUncertain ? "⑂" : "") }
+                print("  分岐図:     \(trunk.joined(separator: " ─ "))")
+                for column in grid.columns {
+                    if column.isFocused {
+                        print("    ↑ 字種: \(column.variants.joined(separator: " / "))")
+                        print("    ↓ 候補: \(column.alternatives.enumerated().map { "\($0.offset + 1) \($0.element)" }.joined(separator: "  "))")
+                    } else if let preview = column.preview {
+                        print("    \(column.text) の次の候補: \(preview)")
+                    }
                 }
             }
         }

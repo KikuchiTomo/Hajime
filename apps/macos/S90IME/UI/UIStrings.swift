@@ -8,8 +8,9 @@ enum UIStrings {
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "種類 \(index) / \(total)" }
     }
 
-    enum Lattice {
-        static let hint = "← → 文節　↑ ↓ 候補　⇧← → 区切り"
+    enum Branch {
+        static let hint = "↓ 候補　↑ 字種　← → 文節　Tab 迷う文節　⇧← → 区切り"
+        static func position(_ first: Int, _ total: Int) -> String { "候補 \(first)〜 / \(total)" }
     }
 
     enum ModeIndicator {
@@ -31,9 +32,8 @@ enum UIStrings {
 
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {
-            case .automatic: "自動(文節が 2 つ以上なら文節格子)"
+            case .automatic: "分岐図(英単語の補正のときは一覧)"
             case .list: "一覧"
-            case .lattice: "文節格子"
             }
         }
 

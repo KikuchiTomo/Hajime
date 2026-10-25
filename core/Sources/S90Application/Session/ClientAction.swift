@@ -118,30 +118,49 @@ public struct CandidatePanel: Sendable, Equatable {
     }
 }
 
-/// 文節格子に出す内容．列が文節で，各列の下にその文節の候補を並べる
+/// 分岐図に出す内容(ADR 0007)．文を 1 本の幹として文節を横に並べ，
+/// 注目している文節から下へ変換の候補の枝，上へ字種の枝を伸ばす．迷う文節には次の候補を 1 つだけ薄く添える
 public struct LatticePanel: Sendable, Equatable {
     public struct Column: Sendable, Equatable {
-        /// 今選んでいる候補
+        /// 幹に出す，今選んでいるもの
         public var text: String
-        /// 列に並べる候補(今のページ)
+        /// 下の枝に並べる変換の候補(今のページ)．注目していない文節では空
         public var alternatives: [String]
-        public var selectedAlternative: Int
+        /// 下の枝で選んでいる位置．上の枝(字種)を選んでいるときは nil
+        public var selectedAlternative: Int?
+        /// 上の枝に並べる字種．幹に近い順．注目していない文節では空
+        public var variants: [String]
+        public var selectedVariant: Int?
         public var isFocused: Bool
-        /// 候補の列を見せるか．確信度の高い文節では畳む
-        public var showsAlternatives: Bool
+        /// 迷う文節か(第 1 候補と 2 番目の差が小さい)
+        public var isUncertain: Bool
+        /// 利用者が選び直した文節か
+        public var isDecided: Bool
+        /// 注目していない迷う文節に薄く添える，次の候補
+        public var preview: String?
 
-        public init(text: String, alternatives: [String], selectedAlternative: Int, isFocused: Bool, showsAlternatives: Bool) {
+        public init(text: String, alternatives: [String] = [], selectedAlternative: Int? = nil, variants: [String] = [], selectedVariant: Int? = nil,
+                    isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil) {
             self.text = text
             self.alternatives = alternatives
             self.selectedAlternative = selectedAlternative
+            self.variants = variants
+            self.selectedVariant = selectedVariant
             self.isFocused = isFocused
-            self.showsAlternatives = showsAlternatives
+            self.isUncertain = isUncertain
+            self.isDecided = isDecided
+            self.preview = preview
         }
     }
 
     public var columns: [Column]
+    /// 注目している文節の候補のうち，今のページの先頭が何番目か(1 から)と全体の数
+    public var position: Int
+    public var total: Int
 
-    public init(columns: [Column]) {
+    public init(columns: [Column], position: Int = 1, total: Int = 0) {
         self.columns = columns
+        self.position = position
+        self.total = total
     }
 }
