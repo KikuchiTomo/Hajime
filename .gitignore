@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+!core/.swiftpm/configuration/
+xcuserdata/
+
+# Rust
+target/
+
+# Node(ドキュメントサイト)
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# スキルの評価の作業ディレクトリ
+.claude/skills/*-workspace/
+
+# 秘密
+secrets/
+*.p12
+*.pfx
+*.pem
+.env

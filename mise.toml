@@ -1,0 +1,5 @@
+# 開発に使うツールの版．Swift と Xcode は mise では入れない(macOS は Xcode，Windows は公式のインストーラー)
+[tools]
+python = "3.12"
+rust = "1.90"
+xcodegen = "2.44"
