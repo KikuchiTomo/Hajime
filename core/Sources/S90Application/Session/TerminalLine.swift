@@ -2,12 +2,13 @@ import S90Domain
 
 /// ターミナルでのキーの扱いを決める(R-07)．行の状態は CommandLineState が持つ．
 ///
-/// 入口は 3 つ．
+/// 入口は 4 つ．
 /// - `decide`: InputSession がキーを処理する前．コマンドの行で英字を流すか，コマンドの名前を確定するかを決める．
 ///   状態を変えるのは，コマンドの名前を確定してコマンドの行に入るときだけ
 /// - `didHandle`: キーを処理したあと．確定した文字とアプリに渡ったキー(Enter・Backspace など)を行の状態に数える．
 ///   確定したかアプリに渡ったかは処理の結果でしか分からないので，キーによる変化はここにまとめる
 /// - `didLeave`: キーを伴わずに入力欄を離れたとき．確定した文字を数え，行の中身を分からないものとして扱う
+/// - `endLine`: キーを伴わずに英数に切り替わったとき(OS の入力メニューから)
 @MainActor
 final class TerminalLine {
     enum Decision: Equatable {
@@ -58,6 +59,8 @@ final class TerminalLine {
         if event.modifiers.contains(.option), !result.handled, case .character = event.key {
             // Option+文字は，ターミナルの設定によって特殊な文字が入るか(å など)，メタキーとしてカーソルを動かすかが変わる．
             // どちらか分からないので，行の中身を分からないものとして扱う
+            // 何も入れていない行の頭でも，å などが入ったかもしれないので文の行にする(分からないときは日本語へ倒す)
+            state.didInsertUnknownText()
             state.becomeUnknown()
             return
         }

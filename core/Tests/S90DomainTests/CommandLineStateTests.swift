@@ -123,3 +123,43 @@ struct KanaLayoutSettingsTests {
         #expect(KanaLayout.text(forKey: "e", shift: true, settings: settings) == "ぃ")
     }
 }
+
+@Suite("ターミナルの行の中身が分からなくなったとき")
+struct CommandLineUnknownTests {
+    @Test("何も入れていない行の頭は行の頭のまま．何度呼んでも同じ")
+    func emptyLineStart() {
+        var state = CommandLineState()
+        state.becomeUnknown()
+        state.becomeUnknown()
+        #expect(state.region == .lineStart)
+    }
+
+    @Test("コマンドの行・引用符の中は文の行にする")
+    func commandBecomesText() {
+        var command = CommandLineState()
+        _ = command.didTypeFirstWord("ls")
+        command.becomeUnknown()
+        #expect(command.region == .text)
+        var quoted = CommandLineState()
+        _ = quoted.didTypeFirstWord("git")
+        quoted.didPass("\"")
+        quoted.becomeUnknown()
+        #expect(quoted.region == .text)
+    }
+
+    @Test("中身の分からない文字: 行の頭なら文の行，コマンドの行と引用符の中ならそのまま")
+    func unknownText() {
+        var start = CommandLineState()
+        start.didInsertUnknownText()
+        #expect(start.region == .text)
+        var command = CommandLineState()
+        _ = command.didTypeFirstWord("ls")
+        command.didInsertUnknownText()
+        #expect(command.region == .command)
+        var quoted = CommandLineState()
+        _ = quoted.didTypeFirstWord("git")
+        quoted.didPass("'")
+        quoted.didInsertUnknownText()
+        #expect(quoted.region == .quoted("'"))
+    }
+}

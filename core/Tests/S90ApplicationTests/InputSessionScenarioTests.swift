@@ -1256,3 +1256,72 @@ struct FourthReviewRegressionTests {
         #expect(session.handle(KeyEvent(.character("a")), context: terminal).handled)
     }
 }
+
+@MainActor
+@Suite("6 回目のレビューで足したターミナルのテスト")
+struct SixthReviewTerminalTests {
+    private let terminal = InputContext(profile: .terminal)
+
+    private func commandSession() -> InputSession {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        return session
+    }
+
+    private func passes(_ session: InputSession) -> Bool {
+        !session.handle(KeyEvent(.character("a")), context: terminal).handled
+    }
+
+    @Test("コマンドの行で Option+文字を押すと，英字を流さない文の行になる")
+    func optionInCommandLine() {
+        let session = commandSession()
+        _ = session.handle(KeyEvent(.character("ƒ"), modifiers: .option), context: terminal)
+        #expect(!passes(session))
+    }
+
+    @Test("コマンドの行で入力欄を離れると，英字を流さない文の行になる")
+    func leaveCommandLine() {
+        let session = commandSession()
+        _ = session.deactivate()
+        #expect(!passes(session))
+    }
+
+    @Test("何も打っていない行で入力欄を 2 回離れても，ls と Space でコマンドの行に入れる")
+    func leaveEmptyLineTwice() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.deactivate()
+        _ = session.deactivate()
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        let actions = session.handle(KeyEvent(.space), context: terminal).actions
+        #expect(actions.contains(.commit("ls ")))
+    }
+
+    @Test("コマンドの行で Cmd+V を押しても，英字を流し続ける")
+    func pasteInCommandLine() {
+        let session = commandSession()
+        _ = session.handle(KeyEvent(.character("v"), modifiers: .command), context: terminal)
+        #expect(passes(session))
+    }
+
+    @Test("ログに出す表示は，入力した文字を持つほかの型でも中身を含めない")
+    func redactedMore() {
+        var composition = Composition()
+        for key in "himitsu" { composition.insertRomaji(key) }
+        var settings = Settings()
+        settings.userDictionary = [UserDictionaryEntry(reading: "ひみつ", word: "秘密")]
+        let candidate = Candidate(text: "秘密", readingCount: 3, origin: .combined)
+        let values: [Any] = [
+            ClientAction.commit("秘密"),
+            CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: "秘密", annotation: nil)], selectedEntry: nil,
+                           focus: .candidate, position: 1, total: 1, note: nil),
+            LatticePanel(columns: [.init(text: "秘密", isFocused: true, isUncertain: false)]),
+            candidate, KeyEvent(.character("h")), settings, UserDictionaryEntry(reading: "ひみつ", word: "秘密"),
+            RomajiTable.standard(adding: [RomajiRule(keys: "hm", kana: "秘密")]),
+        ]
+        for value in values {
+            let shown = String(reflecting: value)
+            #expect(!shown.contains("秘密") && !shown.contains("ひみつ"), "\(type(of: value))")
+        }
+    }
+}

@@ -55,3 +55,9 @@ extension RomajiRule: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "RomajiRule(keysLength: \(keys.count), kanaLength: \(kana.count))" }
     public var debugDescription: String { description }
 }
+
+extension RomajiTable: CustomStringConvertible, CustomDebugStringConvertible {
+    // 利用者が足した綴りを含むので，ログには件数だけを出す
+    public var description: String { "RomajiTable(entries: \(entries.count))" }
+    public var debugDescription: String { description }
+}

@@ -88,7 +88,7 @@ public final class InputSession {
         let actions = commitAll()
         mode = newMode
         // 英数にしたあとは行の頭の判断と関係なくなるので行を終える(キーで英数にしたときは TerminalLine.didHandle が終える)
-        terminal.endLine()
+        if newMode == .direct { terminal.endLine() }
         return actions
     }
 

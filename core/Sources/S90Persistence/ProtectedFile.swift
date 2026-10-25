@@ -26,12 +26,18 @@ enum ProtectedFile {
     /// 大きさの上限を確かめながら読む．上限より 1 バイト多くまでだけを読み，超えていれば断る．
     /// ファイルの属性の大きさで確かめると，シンボリックリンクではリンク自体の大きさが返り，上限をすり抜けるため
     static func read(from url: URL, maximumBytes: Int) throws -> Data {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
+        // FIFO などを開いて止まらないよう，待たない開き方で開き，ふつうのファイルだけを読む(ZenzaiModel と同じ)
+        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
+        guard descriptor >= 0 else { throw CocoaError(.fileReadNoSuchFile) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var status = stat()
+        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw NotRegularFile() }
         let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
         guard data.count <= maximumBytes else { throw TooLarge(maximumBytes: maximumBytes) }
         return data
     }
+
+    struct NotRegularFile: Error, Equatable {}
 
     struct TooLarge: Error, Equatable {
         var maximumBytes: Int

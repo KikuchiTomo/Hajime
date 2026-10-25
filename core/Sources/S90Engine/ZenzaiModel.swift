@@ -32,7 +32,7 @@ public struct ZenzaiModel: Sendable, Equatable {
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
         // 先に開いてから，開いたものがふつうのファイルかと大きさを確かめる．確かめてから開くまでのあいだに
         // FIFO や /dev/zero への差し替えが起きても止まらないようにするため．O_NONBLOCK で開くので，FIFO でも開く時点で止まらない
-        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK)
+        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
         guard descriptor >= 0 else { throw .fileNotFound }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var status = stat()
