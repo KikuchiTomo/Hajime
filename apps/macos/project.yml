@@ -1,0 +1,57 @@
+# Xcode のプロジェクトはこのファイルから作る(xcodegen generate)．.xcodeproj はコミットしない
+name: S90IME
+options:
+  bundleIdPrefix: tokyo.s90
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+packages:
+  S90Core:
+    path: ../../core
+targets:
+  S90IME:
+    type: application
+    platform: macOS
+    sources:
+      - path: S90IME
+        excludes:
+          - "Info.plist"
+          - "S90IME.entitlements"
+          - "Resources/Fonts"
+      # フォントはディレクトリごと Contents/Resources/Fonts に置く(FontRegistry が読む)
+      - path: S90IME/Resources/Fonts
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: S90Core
+        product: S90Domain
+      - package: S90Core
+        product: S90Application
+      - package: S90Core
+        product: S90Engine
+      - package: S90Core
+        product: S90Persistence
+    settings:
+      base:
+        PRODUCT_NAME: "s90.tokyo IME"
+        # InputMethodKit に並行性の注釈が無いため，このターゲットだけ Swift 5 の言語モードにする．
+        # 判断を持つ core は Swift 6 の厳格な検査のまま(docs/dev/GUIDELINES.md)
+        SWIFT_VERSION: "5.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        PRODUCT_MODULE_NAME: S90IME
+        # 入力メソッドのバンドル ID には inputmethod を含める決まりがある
+        PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME
+        INFOPLIST_FILE: S90IME/Info.plist
+        CODE_SIGN_ENTITLEMENTS: S90IME/S90IME.entitlements
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- サンドボックスの中で動かす．通信の権限は付けない(docs/dev/SECURITY-MODEL.md) -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.temporary-exception.mach-register.global-name</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)_Connection</string>
+</dict>
+</plist>
