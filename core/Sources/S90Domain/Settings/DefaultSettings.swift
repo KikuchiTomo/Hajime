@@ -74,7 +74,11 @@ public enum DefaultSettings {
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)
     public static let maximumLeftContextLength = 40
     /// 設定ファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)
-    public static let maximumSettingsFileBytes = 2 * 1024 * 1024
+    /// ユーザー辞書の語を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても収まる大きさ．
+    /// 1 語は UTF-8 で最大 32×3 + 64×4 = 352 バイト，JSON の囲みと字下げで 100 バイトほど足すので，約 4.5MB．余裕を見て倍にする
+    public static let maximumSettingsFileBytes = 9 * 1024 * 1024
+    /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
+    public static let maximumUsageFileBytes = 16 * 1024
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
     public static let maximumUserDictionaryEntries = 10_000
     public static let maximumUserDictionaryReadingLength = 32

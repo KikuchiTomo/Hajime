@@ -1,7 +1,7 @@
 /// 利用者が変えられる設定．項目の既定値はここに書き，DefaultSettings.settings はそれをそのまま使う．
 ///
 /// 項目は Google 日本語入力・ATOK・macOS の日本語入力・Microsoft IME の設定を調べ，
-/// 日本語の入力に効くものを選んだ(docs/user/settings.md に，入れなかった項目とその理由がある)
+/// 日本語の入力に効くものを選んだ(docs/user/reference/settings.md に，入れなかった項目とその理由がある)
 public struct Settings: Sendable, Equatable {
     // MARK: 入力
     /// 入力方式(R-05)
@@ -65,6 +65,12 @@ public struct Settings: Sendable, Equatable {
         guard let identifier else { return .standard }
         return profileRules.first { identifier.hasPrefix($0.applicationPrefix) }?.profile ?? .standard
     }
+}
+
+extension Settings: CustomStringConvertible, CustomDebugStringConvertible {
+    // ユーザー辞書の語を含むので，ログには語の数だけを出す(docs/dev/SECURITY-MODEL.md)
+    public var description: String { "Settings(userDictionary: \(userDictionary.count) 語)" }
+    public var debugDescription: String { description }
 }
 
 extension Settings: Codable {

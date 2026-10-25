@@ -90,3 +90,46 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
             && reading.unicodeScalars.allSatisfy { (0x3041...0x3096).contains($0.value) || $0 == "ー" }
     }
 }
+
+extension UserDictionaryEntry: CustomStringConvertible, CustomDebugStringConvertible {
+    // 登録した語は入力内容と同じに扱うので，ログには長さだけを出す(docs/dev/SECURITY-MODEL.md)
+    public var description: String { "UserDictionaryEntry(readingLength: \(reading.count), wordLength: \(word.count))" }
+    public var debugDescription: String { description }
+}
+
+/// ユーザー辞書を編集する規則．macOS と Windows の設定の画面が共通に使う
+public enum UserDictionaryEditing {
+    public enum AddResult: Equatable {
+        case added
+        case alreadyRegistered
+        case invalid
+        case full
+    }
+
+    /// 前後の空白を除いて 1 語を足す
+    public static func add(reading: String, word: String, to entries: inout [UserDictionaryEntry]) -> AddResult {
+        let entry = UserDictionaryEntry(reading: reading.trimmed, word: word.trimmed)
+        guard entry.isValid else { return .invalid }
+        guard !entries.contains(entry) else { return .alreadyRegistered }
+        guard entries.count < DefaultSettings.maximumUserDictionaryEntries else { return .full }
+        entries.append(entry)
+        return .added
+    }
+
+    /// 取り込んだ語を足す．形の誤った語・登録済みの語・上限を超えた語は足さない．足した数を返す
+    public static func merge(_ imported: [UserDictionaryEntry], into entries: inout [UserDictionaryEntry]) -> Int {
+        var seen = Set(entries)
+        var added = 0
+        for entry in imported where entry.isValid && entries.count < DefaultSettings.maximumUserDictionaryEntries && seen.insert(entry).inserted {
+            entries.append(entry)
+            added += 1
+        }
+        return added
+    }
+}
+
+extension String {
+    fileprivate var trimmed: String {
+        String(drop { $0 == " " || $0 == "\u{3000}" || $0 == "\t" }.reversed().drop { $0 == " " || $0 == "\u{3000}" || $0 == "\t" }.reversed())
+    }
+}

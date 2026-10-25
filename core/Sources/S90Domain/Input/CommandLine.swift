@@ -17,6 +17,10 @@ public struct CommandLineState: Sendable, Equatable {
     }
 
     public private(set) var region: Region = .lineStart
+    /// この行に入れた文字数．Backspace で行の頭まで戻ったかを知るのに使う
+    private var length = 0
+    /// 最後にそのまま流した文字．# が語の頭にあるか(コメントか)を決めるのに使う
+    private var lastPassed: Character?
 
     public init() {}
 
@@ -30,15 +34,20 @@ public struct CommandLineState: Sendable, Equatable {
             return false
         }
         region = .command
+        length = keys.count + 1
+        lastPassed = " "
         return true
     }
 
-    /// 組み立てずにアプリへ流した文字．引用符と # で領域が変わる
+    /// 組み立てずにアプリへ流した文字(空白を含む)．引用符と語の頭の # で領域が変わる
     public mutating func didPass(_ character: Character) {
+        length += 1
+        defer { lastPassed = character }
         switch region {
         case .command:
             if character == "\"" || character == "'" { region = .quoted(character) }
-            if character == "#" { region = .comment }
+            // 「foo#bar」や「$#」は引数の一部なので，語の頭(直前が空白)の # だけをコメントにする
+            if character == "#", lastPassed == " " { region = .comment }
         case .quoted(let quote):
             if character == quote { region = .command }
         case .lineStart, .comment, .text:
@@ -47,13 +56,22 @@ public struct CommandLineState: Sendable, Equatable {
     }
 
     /// 日本語を確定した．行の頭なら，その行はコマンドではない
-    public mutating func didCommitText() {
+    public mutating func didCommitText(length committed: Int) {
+        length += committed
         if region == .lineStart { region = .text }
     }
 
-    /// Enter・Ctrl+C などで行が終わった
+    /// 組み立てていないときに Backspace で 1 文字消した．行の頭まで戻ったら行の頭に戻す
+    public mutating func didDeleteBackward() {
+        length = max(length - 1, 0)
+        if length == 0 { endLine() }
+    }
+
+    /// Enter・Ctrl+C・Ctrl+U・履歴の呼び出し・モードの切り替えなどで行が終わった(または行が分からなくなった)
     public mutating func endLine() {
         region = .lineStart
+        length = 0
+        lastPassed = nil
     }
 }
 

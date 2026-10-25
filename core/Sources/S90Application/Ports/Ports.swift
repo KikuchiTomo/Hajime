@@ -42,6 +42,12 @@ public protocol SettingsStoring: SettingsReading {
     func update(_ change: (inout Settings) -> Void) throws
 }
 
+/// 設定が変わったことを知らせるポート．エンジンや設定の画面を新しい設定に合わせるのに使う
+@MainActor
+public protocol SettingsObserving: AnyObject {
+    func observe(_ handler: @escaping (Settings) -> Void)
+}
+
 /// 今の日時と，今日からずらした日を返すポート．日付の候補(DateExpressions)に使う
 @MainActor
 public protocol CalendarReading: AnyObject {
@@ -53,4 +59,11 @@ public protocol CalendarReading: AnyObject {
 @MainActor
 public protocol UsageRecording: AnyObject {
     func record(_ event: UsageEvent)
+}
+
+/// 記録した回数を読むポート(設定の画面で見せる)
+@MainActor
+public protocol UsageReading: AnyObject {
+    var counts: UsageCounts { get }
+    func reset()
 }

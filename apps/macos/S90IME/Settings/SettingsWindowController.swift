@@ -1,5 +1,6 @@
 import AppKit
 import os
+import S90Application
 import S90Domain
 import S90Persistence
 import SwiftUI
@@ -10,7 +11,7 @@ final class SettingsWindowController {
     private let model: SettingsModel
     private var window: NSWindow?
 
-    init(settings: FileSettingsStore, usage: FileUsageStore, resetLearning: @escaping () -> Void) {
+    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, resetLearning: @escaping () -> Void) {
         model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
     }
 
@@ -44,12 +45,12 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var settings: S90Domain.Settings
     @Published var message: String?
     @Published private(set) var usageCounts: UsageCounts
-    private let store: FileSettingsStore
-    private let usage: FileUsageStore?
+    private let store: any SettingsStoring & SettingsObserving
+    private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(store: FileSettingsStore, usage: FileUsageStore?, resetLearning: @escaping () -> Void) {
+    init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, resetLearning: @escaping () -> Void) {
         self.store = store
         self.usage = usage
         self.settings = store.current
@@ -111,15 +112,19 @@ final class SettingsModel: ObservableObject {
     // MARK: ユーザー辞書
 
     func addEntry(reading: String, word: String) -> Bool {
-        let entry = UserDictionaryEntry(reading: reading.trimmingCharacters(in: .whitespaces), word: word.trimmingCharacters(in: .whitespaces))
-        guard entry.isValid, settings.userDictionary.count < DefaultSettings.maximumUserDictionaryEntries else {
+        var entries = settings.userDictionary
+        switch UserDictionaryEditing.add(reading: reading, word: word, to: &entries) {
+        case .added:
+            update { $0.userDictionary = entries }
+            return true
+        case .alreadyRegistered:
+            return true
+        case .invalid:
             message = UIStrings.Settings.invalidEntry
-            return false
+        case .full:
+            message = UIStrings.Settings.dictionaryFull
         }
-        update { current in
-            if !current.userDictionary.contains(entry) { current.userDictionary.append(entry) }
-        }
-        return true
+        return false
     }
 
     func removeEntries(_ entries: Set<UserDictionaryEntry>) {
@@ -133,14 +138,10 @@ final class SettingsModel: ObservableObject {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let entries = try UserDictionaryFile.read(from: url)
-            update { current in
-                var seen = Set(current.userDictionary)
-                for entry in entries where current.userDictionary.count < DefaultSettings.maximumUserDictionaryEntries && seen.insert(entry).inserted {
-                    current.userDictionary.append(entry)
-                }
-            }
-            message = UIStrings.Settings.imported(entries.count)
+            var entries = settings.userDictionary
+            let added = UserDictionaryEditing.merge(try UserDictionaryFile.read(from: url), into: &entries)
+            update { $0.userDictionary = entries }
+            message = UIStrings.Settings.imported(added)
         } catch {
             message = UIStrings.Settings.importFailed
         }

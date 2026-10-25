@@ -23,6 +23,19 @@ public enum KanaLayout {
         return shift ? (entry.shifted ?? entry.normal) : entry.normal
     }
 
+    /// 設定に合わせた文字．句読点・中黒・括弧は，ローマ字入力と同じく設定の文字にする
+    public static func text(forKey key: String, shift: Bool, settings: Settings) -> String? {
+        guard let kana = kana(forKey: key, shift: shift) else { return nil }
+        switch kana {
+        case "、": return settings.punctuation.comma
+        case "。": return settings.punctuation.period
+        case "・": return settings.slash.text
+        case "「": return settings.brackets.open
+        case "」": return settings.brackets.close
+        default: return kana
+        }
+    }
+
     /// 濁点(゛)・半濁点(゜)を前のかなと合わせる．合わせられなければ nil
     public static func combine(_ base: Character, with mark: Character) -> Character? {
         switch mark {

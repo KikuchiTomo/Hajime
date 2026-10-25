@@ -39,6 +39,10 @@ final class ClientActionPresenter {
             case .selectInputStyle(let style):
                 do {
                     try settings.update { $0.inputStyle = style }
+                    // 切り替えたことを入力位置の近くに出す
+                    if settings.current.showsModeIndicator {
+                        modeIndicator.show(style, caret: caretRect(of: client), theme: settings.current.theme)
+                    }
                 } catch {
                     logger.error("入力方式を保存できませんでした: \(String(describing: error), privacy: .public)")
                 }

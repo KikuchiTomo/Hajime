@@ -5,7 +5,7 @@ import S90Domain
 /// Space・Enter・記号は英語の入力と同じに動く(打った英字を確定し，キーはアプリに渡す)．
 /// 日本語にするのは Tab を押したときだけ(Q-02)．英語を打つ人の手の流れを変えないため
 @MainActor
-final class EnglishInput {
+final class EnglishInput: InputStyleHandling {
     private let converter: any KanaKanjiConverting
     private(set) var typed = ""
 
@@ -60,5 +60,30 @@ final class EnglishInput {
         let panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: suggestion.text, annotation: nil)],
                                    selectedEntry: nil, focus: .candidate, position: 1, total: 1, note: PanelBuilder.englishInputNote)
         return [.setMarkedText(marked), .showCandidates(panel)]
+    }
+
+    func interpret(_ event: KeyEvent, state: InputStyleState) -> InputStyleInterpretation? {
+        switch event.key {
+        case .character(let character) where character.isASCII && character.isLetter:
+            append(character)
+            return .handled(KeyResult(handled: true, actions: render()))
+        case .tab:
+            guard isComposing else { return .handled(.passThrough) }
+            return .handled(KeyResult(handled: true, actions: commitSuggestion()))
+        case .backspace:
+            guard isComposing else { return .handled(.passThrough) }
+            deleteBackward()
+            return .handled(KeyResult(handled: true, actions: render()))
+        case .escape:
+            // 組み立てていなければふつうの処理(Escape で英数にする設定)に回す．
+            // 打っている途中なら英字を確定し，Escape もアプリに渡す(Vim のノーマルモードに 1 回で戻れる)
+            guard isComposing else { return nil }
+            return .handled(KeyResult(handled: false, actions: commitTyped()))
+        case .eisu, .kana, .yen:
+            return nil
+        default:
+            // Space・Enter・数字・記号・矢印は，打った英字を確定してからアプリに渡す(英語の入力と同じ動き)
+            return .handled(KeyResult(handled: false, actions: commitTyped()))
+        }
     }
 }

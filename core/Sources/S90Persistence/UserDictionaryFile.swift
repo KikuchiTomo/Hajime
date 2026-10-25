@@ -13,9 +13,18 @@ public enum UserDictionaryFile {
     public static func read(from url: URL) throws -> [UserDictionaryEntry] {
         let size = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
         guard size <= DefaultSettings.maximumUserDictionaryFileBytes else { throw FileError.fileTooLarge(bytes: size) }
-        let data = try Data(contentsOf: url)
-        guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else { throw FileError.notText }
+        guard let text = decode(try Data(contentsOf: url)) else { throw FileError.notText }
         return parse(text)
+    }
+
+    /// UTF-8 か，BOM の付いた UTF-16(Windows の辞書ツールが書き出す形)だけを読む．
+    /// BOM の無い UTF-16 はほとんどどんなバイト列でも読めてしまい，Shift_JIS などを文字化けしたまま読むため
+    static func decode(_ data: Data) -> String? {
+        let bytes = [UInt8](data.prefix(2))
+        if bytes == [0xFF, 0xFE] || bytes == [0xFE, 0xFF] {
+            return String(data: data, encoding: .utf16)
+        }
+        return String(data: data, encoding: .utf8)
     }
 
     public static func parse(_ text: String) -> [UserDictionaryEntry] {

@@ -8,8 +8,8 @@ public final class SystemCalendar: CalendarReading {
     private let calendar = Calendar(identifier: .gregorian)
     private let clock: () -> Date
 
-    /// - Parameter clock: 今の日時．テストでは決まった日時を渡す
-    public init(clock: @escaping () -> Date = Date.init) {
+    /// - Parameter clock: 今の日時．組み立ての場所が OS の時計を渡し，テストでは決まった日時を渡す
+    public init(clock: @escaping () -> Date) {
         self.clock = clock
     }
 

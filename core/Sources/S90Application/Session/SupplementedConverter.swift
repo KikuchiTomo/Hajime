@@ -2,7 +2,9 @@ import S90Domain
 
 /// 変換エンジンの候補に，エンジンが出さない候補を足す．
 ///
-/// - ユーザー辞書の語: 読みが一致すれば先頭に置く．登録した語は選びたい語なので
+/// - ユーザー辞書の語: 読みが一致すれば先頭に置く．登録した語は選びたい語なので．
+///   エンジンにもユーザー辞書を渡している(文の中の語として使うため)が，エンジンは辞書の語の続きになる読みしか
+///   たどらないので，辞書に無い読みの語は出ない．読み全体が一致する語はここで確実に出す(同じ語は重ねない)
 /// - 記号(SymbolDictionary): 「やじるし」→「→」など
 /// - 日付と時刻(DateExpressions): 「きょう」→「2026/10/26」など
 ///
@@ -13,6 +15,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let base: any KanaKanjiConverting
     private let settings: any SettingsReading
     private let calendar: any CalendarReading
+    /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
+    private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [String]]) = ([], [:])
 
     public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading) {
         self.base = base
@@ -38,7 +42,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private func supplement(_ candidates: [Candidate], reading: String) -> [Candidate] {
         let current = settings.current
         var result = candidates
-        let userWords = current.userDictionary.filter { $0.reading == reading && $0.isValid }.map(\.word)
+        let userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         insert(userWords, into: &result, at: 0, reading: reading, origin: .userDictionary)
         var extra: [String] = []
         if current.symbolConversion { extra += SymbolDictionary.symbols(for: reading) }
@@ -47,6 +51,14 @@ public final class SupplementedConverter: KanaKanjiConverting {
         }
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
         return result
+    }
+
+    private func userDictionaryWords(for reading: String, in entries: [UserDictionaryEntry]) -> [String] {
+        // 設定を写しても配列の中身は共有されるので，変わっていなければ比べるのはすぐ済む
+        if dictionaryIndex.source != entries {
+            dictionaryIndex = (entries, Dictionary(grouping: entries.filter(\.isValid), by: \.reading).mapValues { $0.map(\.word) })
+        }
+        return dictionaryIndex.words[reading] ?? []
     }
 
     private func insert(_ texts: [String], into candidates: inout [Candidate], at position: Int, reading: String, origin: CandidateOrigin) {

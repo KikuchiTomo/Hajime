@@ -25,10 +25,14 @@ public final class InputSession {
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
-    /// EN 入力(R-05)．入力方式が英語のときだけ使う
+    /// EN 入力(R-05)．入力方式が英語のときだけ使う．英字を持つので，確定のときに InputSession からも触る
     private let english: EnglishInput
-    /// ターミナルで打っている行の状態(R-07)
-    private var commandLine = CommandLineState()
+    /// ローマ字入力以外の入力方式の解釈．ローマ字入力は共通の処理が受け持つ
+    private let styleHandlers: [InputStyle: any InputStyleHandling]
+    /// ターミナルで打っている行(R-07)
+    private let terminal = TerminalLine()
+    /// 前のキーのときの入力方式．メニューなどで変わったら，組み立て中の文字を確定する
+    private var lastInputStyle: InputStyle?
     /// 日本語の打ち間違いを直す前の読み．Esc で戻せるように覚えておく
     private var typedBeforeCorrection: Composition?
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
@@ -44,6 +48,7 @@ public final class InputSession {
         self.usage = usage
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
         self.english = EnglishInput(converter: converter)
+        self.styleHandlers = [.english: english, .kana: KanaInput()]
     }
 
     public var isComposing: Bool { !composition.isEmpty || english.isComposing }
@@ -74,17 +79,21 @@ public final class InputSession {
         guard newMode != mode else { return [] }
         let actions = commitAll()
         mode = newMode
+        // 英数で打った分は行の状態に数えられないので，ターミナルの行は分からなくなる
+        terminal.endLine()
         return actions
     }
 
     /// 入力欄からフォーカスが外れた．組み立て中の文字は確定する
     public func deactivate() -> [ClientAction] {
-        commitAll()
+        terminal.endLine()
+        return commitAll()
     }
 
-    /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ
+    /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ．
+    /// EN 入力の英字は変換して見せないので待たない
     public var awaitsSettle: Bool {
-        isComposing && phase == .composing && !isSettled && settings.current.liveConversion
+        !composition.isEmpty && phase == .composing && !isSettled && settings.current.liveConversion
     }
 
     /// 入力位置の近くにモードを出す操作．設定で切っていれば出さない
@@ -102,7 +111,12 @@ public final class InputSession {
     // MARK: - 英数モード
 
     private func handleDirect(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        if event.key == .enter { terminal.endLine() }
         switch event.key {
+        case .kana where event.modifiers.contains(.option):
+            // 英数のときも，Option+かな は日本語に戻して入力方式を切り替える
+            mode = .japanese
+            return KeyResult(handled: true, actions: [.selectMode(.japanese), .selectInputStyle(nextInputStyle())])
         case .yen:
             let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
             return KeyResult(handled: true, actions: [.commit(text)])
@@ -118,34 +132,44 @@ public final class InputSession {
 
     // MARK: - 日本語モード
 
+    /// 日本語モードのキー．次の順に回し，前の段で扱ったキーは後ろに回さない．
+    /// 1. 入力方式が前のキーから変わっていたら，組み立て中の文字を確定する
+    /// 2. ターミナルの行(Enter・Ctrl+C などで行を終える判断は，ほかの処理より先に要る)
+    /// 3. Control の組み合わせ(R-03)
+    /// 4. 分岐図の操作
+    /// 5. 入力方式ごとの処理(EN 入力・かな入力)
+    /// 6. ローマ字入力と共通の処理
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
         isSettled = false
+        let styleChange = adoptInputStyle()
+        let result = routeJapanese(event, context: context)
+        return KeyResult(handled: result.handled, actions: styleChange + result.actions)
+    }
+
+    private func routeJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        if context.profile == .terminal, let result = applyTerminal(event) {
+            return result
+        }
         if event.modifiers.contains(.control) {
             return handleControl(event, context: context)
         }
         if case .lattice(var lattice) = phase, let result = handleLattice(event, lattice: &lattice, context: context) {
             return result
         }
-        if context.profile == .terminal, let result = handleTerminal(event, context: context) {
-            return result
-        }
-        if settings.current.inputStyle == .english, let result = handleEnglish(event) {
-            return result
-        }
-        if settings.current.inputStyle == .kana, let result = handleKana(event, context: context) {
+        if let result = applyInputStyle(event, context: context) {
             return result
         }
         switch event.key {
         case .kana where event.modifiers.contains(.option):
             // Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英語 → ローマ字)
-            let styles = InputStyle.allCases
-            let current = styles.firstIndex(of: settings.current.inputStyle) ?? 0
-            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(styles[(current + 1) % styles.count])])
+            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(nextInputStyle())])
         case .kana:
             return KeyResult(handled: true, actions: modeIndicator(.japanese))
         case .eisu:
             var actions = commitAll()
             mode = .direct
+            // 英数で打った分は行の状態に数えられないので，ターミナルの行は分からなくなる
+            terminal.endLine()
             actions += [.selectMode(.direct)] + modeIndicator(.direct)
             return KeyResult(handled: true, actions: actions)
         case .yen:
@@ -175,81 +199,63 @@ public final class InputSession {
 
     // MARK: - ターミナル(R-07)
 
-    /// ターミナルのキー．nil を返したキーは，ふつうの処理に回す
-    private func handleTerminal(_ event: KeyEvent, context: InputContext) -> KeyResult? {
-        switch event.key {
-        case .enter where !isComposing:
-            commandLine.endLine()
+    /// ターミナルの行の判断に従う．ふつうの処理に回すときは nil
+    private func applyTerminal(_ event: KeyEvent) -> KeyResult? {
+        let composingKeys = phase == .composing && !composition.isEmpty ? composition.rawKeys : nil
+        switch terminal.decide(event, isComposing: isComposing, composingKeys: composingKeys) {
+        case .continue:
             return nil
-        case .space where phase == .composing && !composition.isEmpty:
-            // 行の頭でコマンドの名前を打って Space を押したら，打ったとおりの英字で確定してコマンドの行に入る
-            guard let keys = composition.rawKeys, commandLine.didTypeFirstWord(keys) else { return nil }
-            reset()
-            return KeyResult(handled: true, actions: [.commit(keys + " "), .setMarkedText(.empty), .hideCandidates])
-        case .character(let character) where commandLine.passesThrough && !isComposing && !event.modifiers.contains(.control):
-            // コマンドの行では英字も記号もそのまま流す
-            commandLine.didPass(character)
+        case .passThrough:
             return .passThrough
-        case .character(let character) where isComposing && commandLine.region == .quoted(character):
-            // 引用符の中の日本語は，閉じる引用符で確定し，引用符はそのまま流す
-            commandLine.didPass(character)
+        case .commitCommand(let keys):
+            // 打ったとおりの英字で確定する．確定した文字は日本語ではないので，行の状態に日本語として数えない
+            return KeyResult(handled: true, actions: [.commit(keys + " ")] + reset())
+        case .commitAndPass:
             return KeyResult(handled: false, actions: commitAll())
-        case .character(let character) where !isComposing && (character == "\"" || character == "'"):
-            // 引用符を閉じたらコマンドの行に戻る
-            commandLine.didPass(character)
-            return .passThrough
-        case .character(let character) where event.modifiers.contains(.control) && (character == "c" || character == "u"):
-            // Ctrl+C・Ctrl+U は行を捨てる
-            commandLine.endLine()
-            return nil
-        default:
-            return nil
         }
     }
 
     // MARK: - 入力方式(R-05)
 
-    /// EN 入力のキー．nil を返したキー(モードの切り替えなど)は，ふつうの処理に回す
-    private func handleEnglish(_ event: KeyEvent) -> KeyResult? {
-        switch event.key {
-        case .character(let character) where character.isASCII && character.isLetter:
-            english.append(character)
-            return KeyResult(handled: true, actions: english.render())
-        case .tab:
-            guard english.isComposing else { return .passThrough }
-            return KeyResult(handled: true, actions: english.commitSuggestion())
-        case .backspace:
-            guard english.isComposing else { return .passThrough }
-            english.deleteBackward()
-            return KeyResult(handled: true, actions: english.render())
-        case .escape:
-            guard english.isComposing else { return .passThrough }
-            return KeyResult(handled: true, actions: english.commitTyped())
-        case .eisu, .kana, .yen:
-            return nil
-        default:
-            // Space・Enter・数字・記号・矢印は，打った英字を確定してからアプリに渡す(英語の入力と同じ動き)
-            return KeyResult(handled: false, actions: english.commitTyped())
-        }
+    /// 入力方式がメニューや設定の画面で変わっていたら，前の方式で組み立てていた文字を確定する
+    private func adoptInputStyle() -> [ClientAction] {
+        let current = settings.current.inputStyle
+        defer { lastInputStyle = current }
+        guard let last = lastInputStyle, last != current else { return [] }
+        return commitAll()
     }
 
-    /// かな入力のキー．かなに当たらないキーは nil を返し，ふつうの処理に回す
-    private func handleKana(_ event: KeyEvent, context: InputContext) -> KeyResult? {
-        guard !event.modifiers.contains(.option) else { return nil }
-        let kana: String? = switch event.key {
-        case .character: event.keyLabel.flatMap { KanaLayout.kana(forKey: $0, shift: event.modifiers.contains(.shift)) }
-        case .yen: KanaLayout.kana(forKey: "¥", shift: false)
-        default: nil
+    private func nextInputStyle() -> InputStyle {
+        let styles = InputStyle.allCases
+        let current = styles.firstIndex(of: settings.current.inputStyle) ?? 0
+        return styles[(current + 1) % styles.count]
+    }
+
+    /// 入力方式ごとの解釈に従う．ふつうの処理に回すときは nil
+    private func applyInputStyle(_ event: KeyEvent, context: InputContext) -> KeyResult? {
+        let style = settings.current.inputStyle
+        guard let handler = styleHandlers[style] else { return nil }
+        let state = InputStyleState(settings: settings.current, isSelectingCandidates: phase != .composing)
+        switch handler.interpret(event, state: state) {
+        case nil:
+            return nil
+        case .handled(let result):
+            return result
+        case .insertKana(let kana):
+            var actions: [ClientAction] = []
+            if phase != .composing { actions += commitAll() }
+            if !isComposing { converter.setLeftContext(context.precedingText) }
+            composition.insertKana(kana)
+            if settings.current.punctuationCommits, SymbolTable.isPunctuation(kana, settings: settings.current) {
+                return KeyResult(handled: true, actions: actions + commitAll())
+            }
+            return KeyResult(handled: true, actions: actions + render(context: context))
         }
-        guard let kana else { return nil }
-        var actions: [ClientAction] = []
-        if phase != .composing { actions += commitAll() }
-        if !isComposing { converter.setLeftContext(context.precedingText) }
-        composition.insertKana(kana)
-        return KeyResult(handled: true, actions: actions + render(context: context))
     }
 
     private func handleControl(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        // EN 入力の英字は，確定してからキーをアプリに渡す(Ctrl+A などで英字が残らないように)
+        if english.isComposing { return KeyResult(handled: false, actions: english.commitTyped()) }
         // macOS の日本語入力と同じ割り当て(R-03)
         guard !composition.isEmpty, case .character(let character) = event.key else { return .passThrough }
         let variant: ScriptVariant? = switch character.lowercased() {
@@ -476,13 +482,22 @@ public final class InputSession {
 
     /// 組み立て中の文字を，今の表示のとおりに確定する
     private func commitAll() -> [ClientAction] {
-        if english.isComposing { return english.commitTyped() }
-        guard isComposing else { return [] }
+        // EN 入力の英字と読みが両方あれば(入力方式を途中で変えたとき)，打った順に英字から確定する
+        let englishActions = english.commitTyped()
+        guard !composition.isEmpty else { return englishActions }
+        return englishActions + commitComposition()
+    }
+
+    /// 組み立て中の読みを，今の表示のとおりに確定する
+    private func commitComposition() -> [ClientAction] {
         if case .lattice(let lattice) = phase {
             for segment in lattice.segments where segment.selected.isFromEngine {
                 converter.didCommit(segment.selected)
             }
-            usage?.record(.committed(changedSegments: lattice.segments.filter(\.isDecided).count, viaConversion: true))
+            // 選び直した文節は，確定したときに第 1 候補でないもので数える(触って元に戻したものは数えない)
+            let changed = lattice.segments.filter { $0.choice != .candidate(0) }.count
+            usage?.record(.committed(changedSegments: changed, viaConversion: true))
+            terminal.didCommitText(length: lattice.text.count)
             return [.commit(lattice.text)] + reset()
         }
         if case .selecting(let selection) = phase {
@@ -492,12 +507,13 @@ public final class InputSession {
             usage?.record(.committed(changedSegments: 0, viaConversion: false))
         }
         var actions: [ClientAction] = []
-        while isComposing {
+        while !composition.isEmpty {
             let candidate = currentCandidate()
             if candidate.isFromEngine {
                 converter.didCommit(candidate)
             }
             actions.append(.commit(candidate.text))
+            terminal.didCommitText(length: candidate.text.count)
             if candidate.readingCount >= composition.conversionReading.count {
                 break
             }
@@ -510,7 +526,6 @@ public final class InputSession {
     }
 
     private func reset() -> [ClientAction] {
-        if !composition.isEmpty { commandLine.didCommitText() }
         composition = Composition()
         typedBeforeCorrection = nil
         phase = .composing
@@ -604,6 +619,7 @@ public final class InputSession {
     // MARK: - 表示
 
     private func render(context: InputContext) -> [ClientAction] {
+        if composition.isEmpty && english.isComposing { return english.render() }
         guard isComposing else { return reset() }
         switch phase {
         case .composing:

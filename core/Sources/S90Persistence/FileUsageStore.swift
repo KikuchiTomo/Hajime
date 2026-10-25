@@ -4,7 +4,7 @@ import S90Domain
 
 /// 使い方の記録(回数だけ)を JSON のファイルに保存する．ファイルは本人だけが読み書きでき，端末の外には出さない
 @MainActor
-public final class FileUsageStore: UsageRecording {
+public final class FileUsageStore: UsageRecording, UsageReading {
     private let fileURL: URL
     private let isEnabled: () -> Bool
     public private(set) var counts: UsageCounts
@@ -38,23 +38,10 @@ public final class FileUsageStore: UsageRecording {
     }
 
     private func save() throws {
-        let directory = fileURL.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        let data = try JSONEncoder().encode(counts)
-        let temporary = directory.appendingPathComponent(".\(fileURL.lastPathComponent).\(UUID().uuidString)")
-        guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: temporary)
-        } else {
-            try FileManager.default.moveItem(at: temporary, to: fileURL)
-        }
+        try ProtectedFile.write(JSONEncoder().encode(counts), to: fileURL)
     }
 
     private static func load(from url: URL) throws -> UsageCounts {
-        let size = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
-        guard size <= DefaultSettings.maximumSettingsFileBytes else { throw CocoaError(.fileReadTooLarge) }
-        return try JSONDecoder().decode(UsageCounts.self, from: Data(contentsOf: url))
+        try JSONDecoder().decode(UsageCounts.self, from: ProtectedFile.read(from: url, maximumBytes: DefaultSettings.maximumUsageFileBytes))
     }
 }

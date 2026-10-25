@@ -3,7 +3,7 @@ import SwiftUI
 
 /// 設定の画面．項目は Google 日本語入力・ATOK などの設定を調べて選んだ(docs/user/settings.md)
 struct SettingsView: View {
-    static let size = NSSize(width: 620, height: 520)
+    static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel
 
     var body: some View {
@@ -127,13 +127,23 @@ private struct DictionaryTab: View {
 
 private struct AppearanceTab: View {
     @ObservedObject var model: SettingsModel
+    /// 動かしているあいだの値．手を離したときだけ保存し，1 段ごとに設定のファイルを書き直さない
+    @State private var fontSize: Double?
 
     var body: some View {
         Form {
             Section(UIStrings.Settings.appearance) {
                 ChoicePicker(title: UIStrings.Menu.theme, selection: model.binding(\.theme), label: UIStrings.Menu.label(for:))
-                Slider(value: model.binding(\.candidateFontSize), in: Double(DesignTokens.Size.Candidate.fontSizeMin)...Double(DesignTokens.Size.Candidate.fontSizeMax), step: 1) {
-                    Text(UIStrings.Settings.fontSize(Int(model.settings.candidateFontSize)))
+                Slider(
+                    value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { fontSize = $0 }),
+                    in: Double(DesignTokens.Size.Candidate.fontSizeMin)...Double(DesignTokens.Size.Candidate.fontSizeMax),
+                    step: 1
+                ) {
+                    Text(UIStrings.Settings.fontSize(Int(fontSize ?? model.settings.candidateFontSize)))
+                } onEditingChanged: { editing in
+                    guard !editing, let value = fontSize else { return }
+                    model.update { $0.candidateFontSize = value }
+                    fontSize = nil
                 }
             }
             Section {
