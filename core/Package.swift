@@ -35,7 +35,7 @@ let package = Package(
         .testTarget(name: "S90DomainTests", dependencies: ["S90Domain"]),
         .testTarget(name: "S90ApplicationTests", dependencies: ["S90Domain", "S90Application", "S90TestSupport"]),
         .testTarget(name: "S90PersistenceTests", dependencies: ["S90Domain", "S90Persistence"]),
-        .testTarget(name: "S90EngineTests", dependencies: ["S90Domain", "S90Engine"]),
+        .testTarget(name: "S90EngineTests", dependencies: ["S90Domain", "S90Application", "S90Engine", "S90TestSupport"]),
     ],
     swiftLanguageModes: [.v6]
 )
