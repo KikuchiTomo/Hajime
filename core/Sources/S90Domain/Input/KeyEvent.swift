@@ -18,6 +18,8 @@ public struct KeyEvent: Sendable, Equatable {
         case kana
         /// JIS キーボードの ¥ キー(R-04)．何を入れるかは YenKeyPolicy が決める
         case yen
+        /// ファンクションキー(F1〜F12 の番号)．F6〜F10 で字種を変える(R-03)
+        case function(Int)
     }
 
     public struct Modifiers: OptionSet, Sendable, Hashable {

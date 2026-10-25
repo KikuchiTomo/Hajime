@@ -6,6 +6,8 @@ public struct Settings: Sendable, Equatable {
     // MARK: 入力
     /// 入力方式(R-05)
     public var inputStyle = InputStyle.romaji
+    /// 利用者が足したローマ字の綴り．標準の表に重ねる
+    public var customRomaji: [RomajiRule] = []
     /// ライブ変換(R-01)
     public var liveConversion = true
     /// JIS キーボードの ¥ キーで入れる文字(R-04)
@@ -75,7 +77,7 @@ extension Settings: CustomStringConvertible, CustomDebugStringConvertible {
 
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
-        case inputStyle, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits
+        case inputStyle, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits
         case typoCorrection, candidatePresentation, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
         case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -92,6 +94,7 @@ extension Settings: Codable {
             }
         }
         read(.inputStyle, into: \.inputStyle)
+        read(.customRomaji, into: \.customRomaji)
         read(.liveConversion, into: \.liveConversion)
         read(.yenKey, into: \.yenKey)
         read(.punctuation, into: \.punctuation)
@@ -121,6 +124,7 @@ extension Settings: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(inputStyle, forKey: .inputStyle)
+        try container.encode(customRomaji, forKey: .customRomaji)
         try container.encode(liveConversion, forKey: .liveConversion)
         try container.encode(yenKey, forKey: .yenKey)
         try container.encode(punctuation, forKey: .punctuation)

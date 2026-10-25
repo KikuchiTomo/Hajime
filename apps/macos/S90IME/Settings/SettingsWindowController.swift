@@ -109,6 +109,21 @@ final class SettingsModel: ObservableObject {
         }
     }
 
+    // MARK: ローマ字
+
+    func addRomajiRule(keys: String, kana: String) -> Bool {
+        let rule = RomajiRule(keys: keys.trimmingCharacters(in: .whitespaces).lowercased(), kana: kana.trimmingCharacters(in: .whitespaces))
+        guard rule.isValid, settings.customRomaji.count < DefaultSettings.maximumRomajiRules else {
+            message = UIStrings.Settings.invalidRomaji
+            return false
+        }
+        update { current in
+            current.customRomaji.removeAll { $0.keys == rule.keys }
+            current.customRomaji.append(rule)
+        }
+        return true
+    }
+
     // MARK: ユーザー辞書
 
     func addEntry(reading: String, word: String) -> Bool {

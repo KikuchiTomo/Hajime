@@ -12,6 +12,7 @@ struct SettingsView: View {
             ConversionTab(model: model).tabItem { Text(UIStrings.Settings.conversionTab) }
             DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
             AppsTab(model: model).tabItem { Text(UIStrings.Settings.appsTab) }
+            RomajiTab(model: model).tabItem { Text(UIStrings.Settings.romajiTab) }
             AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
             UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
         }
@@ -192,6 +193,47 @@ private struct AppsTab: View {
             Text(UIStrings.Settings.appsNote).font(.caption).foregroundStyle(.secondary)
         }
     }
+}
+
+/// 利用者が足すローマ字の綴り．標準の表に重ね，同じ綴りは利用者のものを使う
+private struct RomajiTab: View {
+    @ObservedObject var model: SettingsModel
+    @State private var keys = ""
+    @State private var kana = ""
+    @State private var selection = Set<RomajiRule>()
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                TextField(UIStrings.Settings.romajiKeys, text: $keys)
+                TextField(UIStrings.Settings.romajiKana, text: $kana)
+                Button(UIStrings.Settings.add) {
+                    if model.addRomajiRule(keys: keys, kana: kana) {
+                        keys = ""
+                        kana = ""
+                    }
+                }
+                .disabled(keys.isEmpty || kana.isEmpty)
+            }
+            Table(model.settings.customRomaji, selection: $selection) {
+                TableColumn(UIStrings.Settings.romajiKeys, value: \.keys)
+                TableColumn(UIStrings.Settings.romajiKana, value: \.kana)
+            }
+            HStack {
+                Button(UIStrings.Settings.remove) {
+                    model.update { $0.customRomaji.removeAll { selection.contains($0) } }
+                    selection = []
+                }
+                .disabled(selection.isEmpty)
+                Spacer()
+            }
+            Text(UIStrings.Settings.romajiNote).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+extension RomajiRule: Identifiable {
+    public var id: Self { self }
 }
 
 extension ProfileRule: Identifiable {

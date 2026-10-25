@@ -1000,3 +1000,36 @@ struct ReviewRegressionTests {
         #expect(recorder.events.last == .committed(changedSegments: 0, viaConversion: true))
     }
 }
+
+@MainActor
+@Suite("F6〜F10 と利用者のローマ字")
+struct FunctionKeyAndRomajiTests {
+    private func marked(_ actions: [ClientAction]) -> String? {
+        actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+    }
+
+    @Test("F7 でカタカナ，F8 で半角カタカナ，F10 で半角英数にする")
+    func functionKeys() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "tokyo" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        #expect(marked(session.handle(KeyEvent(.function(7)), context: InputContext()).actions) == "トキョ")
+        #expect(marked(session.handle(KeyEvent(.function(8)), context: InputContext()).actions) == "ﾄｷｮ")
+        #expect(marked(session.handle(KeyEvent(.function(10)), context: InputContext()).actions) == "tokyo")
+    }
+
+    @Test("組み立てていないときの F キーはアプリに渡す")
+    func passThrough() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        #expect(session.handle(KeyEvent(.function(7)), context: InputContext()).handled == false)
+    }
+
+    @Test("利用者が足した綴りで読みを組み立てる")
+    func customRomaji() {
+        var settings = Settings()
+        settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "INVALID", kana: "x")]
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        var shown: String?
+        for key in "wyika" { shown = marked(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) ?? shown }
+        #expect(shown == "ゐか")
+    }
+}

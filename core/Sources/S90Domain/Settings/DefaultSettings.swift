@@ -57,6 +57,10 @@ public enum DefaultSettings {
     public static let liveConversionSettleDelay = 0.4
     /// EN 入力で日本語の候補を出し始める英字の数．短い英単語(an，to など)に候補を出さない
     public static let minimumEnglishInputSuggestionLength = 4
+    /// 利用者が足すローマ字の綴りとかなの長さの上限(ATOK と同じ)と，足せる数
+    public static let maximumRomajiKeysLength = 4
+    public static let maximumRomajiKanaLength = 6
+    public static let maximumRomajiRules = 500
     /// 使い方の記録を，何回ごとにファイルへ書くか
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか

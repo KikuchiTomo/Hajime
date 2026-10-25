@@ -22,6 +22,8 @@ public final class InputSession {
 
     public private(set) var mode: InputMode = .japanese
     private var composition = Composition()
+    /// ローマ字の表．利用者が足した綴りが変わったときだけ作り直す
+    private var romajiTable: (rules: [RomajiRule], table: RomajiTable) = ([], .standard)
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
@@ -194,6 +196,9 @@ public final class InputSession {
             return handleHorizontal(forward: event.key == .right)
         case .tab:
             return isComposing ? KeyResult(handled: true) : .passThrough
+        case .function(let number):
+            guard !composition.isEmpty, let variant = Self.functionKeyVariants[number] else { return .passThrough }
+            return selectVariant(variant, context: context)
         }
     }
 
@@ -266,9 +271,14 @@ public final class InputSession {
         case ":", "'": .halfwidthRoman
         default: nil
         }
-        guard let variant, variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
-        let selection = makeSelection(focus: .variant(variant))
-        phase = .selecting(selection)
+        guard let variant else { return KeyResult(handled: true) }
+        return selectVariant(variant, context: context)
+    }
+
+    /// 読み全体を字種に変えて選ぶ(Ctrl+J/K/;/L/: と F6〜F10)
+    private func selectVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
+        guard variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
+        phase = .selecting(makeSelection(focus: .variant(variant)))
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -283,6 +293,7 @@ public final class InputSession {
             actions += commitAll()
         }
         if !isComposing {
+            composition = newComposition()
             // 打ち始めに，入力位置の前の文字列を変換の手がかりとして渡す(「AAA」+「まで」)
             converter.setLeftContext(context.precedingText)
         }
@@ -380,7 +391,7 @@ public final class InputSession {
         guard let correction = rule.correction(among: converter.typoCorrections(forKeys: keys), reading: composition.conversionReading)
         else { return }
         // 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ
-        var corrected = Composition()
+        var corrected = newComposition()
         let resolver = NasalReadingResolver(converter: converter)
         for key in correction.keys {
             corrected.insertRomaji(key)
@@ -525,8 +536,15 @@ public final class InputSession {
         return actions + reset()
     }
 
+    /// 空の読み．利用者が足したローマ字の綴りを使う
+    private func newComposition() -> Composition {
+        let rules = settings.current.customRomaji
+        if rules != romajiTable.rules { romajiTable = (rules, RomajiTable.standard(adding: rules)) }
+        return Composition(table: romajiTable.table)
+    }
+
     private func reset() -> [ClientAction] {
-        composition = Composition()
+        composition = newComposition()
         typedBeforeCorrection = nil
         phase = .composing
         corrector.reset()
@@ -703,6 +721,10 @@ public final class InputSession {
 
 extension InputSession {
     fileprivate static let fullwidthSpace = "\u{3000}"
+    /// F6〜F10 で選ぶ字種(Windows・ATOK・macOS の日本語入力と同じ割り当て)
+    fileprivate static let functionKeyVariants: [Int: ScriptVariant] = [
+        6: .hiragana, 7: .katakana, 8: .halfwidthKatakana, 9: .fullwidthRoman, 10: .halfwidthRoman,
+    ]
     fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
 
     fileprivate func numberKey(_ character: Character) -> Int? {
