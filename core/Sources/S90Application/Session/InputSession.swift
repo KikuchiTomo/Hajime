@@ -164,6 +164,7 @@ public final class InputSession {
             || (character == "'" && composition.pending == "n")
         if isRomaji {
             composition.insertRomaji(character)
+            NasalReadingResolver(converter: converter).resolve(&composition)
             if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
@@ -277,6 +278,7 @@ public final class InputSession {
         if composition.isEmpty {
             return KeyResult(handled: true, actions: reset())
         }
+        NasalReadingResolver(converter: converter).resolve(&composition)
         updateCorrection()
         return KeyResult(handled: true, actions: render(context: context))
     }

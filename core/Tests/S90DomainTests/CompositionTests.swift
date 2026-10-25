@@ -83,6 +83,63 @@ struct CompositionTests {
     }
 }
 
+@Suite("nn のあとの母音の読み")
+struct NasalAmbiguityTests {
+    private func compose(_ keys: String) -> Composition {
+        var composition = Composition()
+        for key in keys { composition.insertRomaji(key) }
+        return composition
+    }
+
+    @Test("nn のあとの母音の位置を記録する")
+    func records() {
+        let composition = compose("onna")
+        #expect(composition.nasalAmbiguities.map(\.kanaIndex) == [2])
+        #expect(composition.conversionReading == "おんあ")
+    }
+
+    @Test("ん+な行 に切り替えられる")
+    func switchToNaRow() {
+        var composition = compose("onna")
+        composition.setNasalReading(at: 0, usesNaRow: true)
+        #expect(composition.conversionReading == "おんな")
+        composition.setNasalReading(at: 0, usesNaRow: false)
+        #expect(composition.conversionReading == "おんあ")
+    }
+
+    @Test("nny は や と にゃ を切り替え，後ろの位置をずらす")
+    func yRow() {
+        var composition = compose("konnyakuminna")
+        #expect(composition.nasalAmbiguities.map(\.kanaIndex) == [2, 6])
+        composition.setNasalReading(at: 0, usesNaRow: true)
+        #expect(composition.conversionReading == "こんにゃくみんあ")
+        #expect(composition.nasalAmbiguities.map(\.kanaIndex) == [2, 7])
+        composition.setNasalReading(at: 1, usesNaRow: true)
+        #expect(composition.conversionReading == "こんにゃくみんな")
+    }
+
+    @Test("nnn は に が確かなので記録しない")
+    func tripleN() {
+        #expect(compose("konnnitiha").nasalAmbiguities.isEmpty)
+    }
+
+    @Test("n のあとの子音は記録しない")
+    func consonant() {
+        #expect(compose("kannji").nasalAmbiguities.isEmpty)
+    }
+
+    @Test("消したり確定したりすると，位置を外すかずらす")
+    func deleteAndDrop() {
+        var composition = compose("hannei")
+        composition.deleteBackward()
+        composition.deleteBackward()
+        #expect(composition.nasalAmbiguities.isEmpty)
+        var dropped = compose("kyouhaonna")
+        dropped.dropReadingPrefix(4)
+        #expect(dropped.nasalAmbiguities.map(\.kanaIndex) == [2])
+    }
+}
+
 @Suite("文字の種類")
 struct ScriptVariantTests {
     @Test("R-03: 5 つの種類に変える")

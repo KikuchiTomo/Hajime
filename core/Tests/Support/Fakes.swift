@@ -9,6 +9,8 @@ public final class FakeConverter: KanaKanjiConverting {
     public var clauseTable: [String: [(text: String, readingCount: Int)]]
     public private(set) var committed: [Candidate] = []
     public private(set) var endCount = 0
+    /// 読みごとの点数(読みとしてのもっともらしさ)．無い読みは 0
+    public var scores: [String: Double] = [:]
 
     public init(_ table: [String: [(text: String, readingCount: Int?)]] = [:], clauses: [String: [(text: String, readingCount: Int)]] = [:]) {
         self.table = table
@@ -26,10 +28,11 @@ public final class FakeConverter: KanaKanjiConverting {
         // 本物と同じく，空の読みには空の配列を返す
         guard !reading.isEmpty else { return [] }
         return (table[reading] ?? []).enumerated().map { index, entry in
-            Candidate(text: entry.text, readingCount: entry.readingCount ?? reading.count, origin: .engine(id: index))
+            Candidate(text: entry.text, readingCount: entry.readingCount ?? reading.count, origin: .engine(id: index), score: scores[reading] ?? 0)
         }
     }
 
+    public func plausibility(of reading: String) -> Double { scores[reading] ?? (table[reading] == nil ? -.infinity : 0) }
     public private(set) var leftContext: String?
     public func setLeftContext(_ text: String?) { leftContext = text }
     public func didCommit(_ candidate: Candidate) { committed.append(candidate) }
