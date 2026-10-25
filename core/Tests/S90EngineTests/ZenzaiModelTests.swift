@@ -64,4 +64,24 @@ struct ZenzaiModelTests {
             }
         }
     }
+
+    @Test("ハッシュは決まった大きさを超えたら読むのをやめる")
+    func stopsReadingAtLimit() throws {
+        let url = try write("abcdef")
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        #expect(throws: ZenzaiModel.VerificationError.sizeMismatch(actual: 4)) {
+            try ZenzaiModel.sha256(of: handle, maximumBytes: 3)
+        }
+    }
+
+    @Test("FIFO は開く時点で止まらずに使わない")
+    func fifo() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("s90-zenzai-fifo-\(UUID().uuidString)")
+        #expect(mkfifo(url.path, 0o600) == 0)
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(throws: ZenzaiModel.VerificationError.fileNotFound) {
+            try ZenzaiModel.verified(at: url, expectedSize: 3, expectedSHA256: abcSHA256)
+        }
+    }
 }

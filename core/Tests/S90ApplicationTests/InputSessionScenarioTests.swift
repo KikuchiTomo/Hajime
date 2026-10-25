@@ -1210,6 +1210,38 @@ struct FourthReviewRegressionTests {
         let segment = SegmentLattice.Segment(readingStart: 0, readingLength: 2, candidates: [Candidate(text: "秘密", readingCount: 2, origin: .combined)], isConfident: true)
         #expect(!String(describing: segment).contains("秘密"))
         #expect(!String(describing: ReadingCorrection(keys: "himitsu", reading: "ヒミツ", score: 0, cost: 0)).contains("ヒミツ"))
+        // debugDescription(String(reflecting:))でも中身を出さない
+        var composition = Composition()
+        for key in "himitsu" { composition.insertRomaji(key) }
+        let values: [Any] = [
+            InputContext(precedingText: "秘密"), MarkedText.Segment("秘密", style: .reading), segment,
+            ReadingCorrection(keys: "himitsu", reading: "ヒミツ", score: 0, cost: 0), RomajiRule(keys: "hm", kana: "秘密"),
+        ] + composition.tails()
+        for value in values {
+            let shown = String(reflecting: value)
+            #expect(!shown.contains("秘密") && !shown.contains("ヒミツ") && !shown.contains("himitsu"), "\(type(of: value))")
+        }
+    }
+
+    @Test("入力欄を離れる処理を 2 回呼んでも，確定した読みのある行はコマンドの行にしない")
+    func deactivateTwice() {
+        #expect(!isCommandAfter { session in
+            _ = session.deactivate()
+            _ = session.deactivate()
+        })
+    }
+
+    @Test("ターミナル: Cmd+Backspace で行を消したら行の頭に戻り，Cmd+V で貼り付けたら文の行にする")
+    func commandBackspaceAndPaste() {
+        let afterClear = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ls" { _ = afterClear.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = afterClear.handle(KeyEvent(.space), context: terminal)
+        _ = afterClear.handle(KeyEvent(.backspace, modifiers: .command), context: terminal)
+        #expect(afterClear.handle(KeyEvent(.character("a")), context: terminal).handled)
+        let afterPaste = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = afterPaste.handle(KeyEvent(.character("v"), modifiers: .command), context: terminal)
+        for key in "ls" { _ = afterPaste.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(committed(afterPaste.handle(KeyEvent(.space), context: terminal).actions) != "ls ")
     }
 
     @Test("ターミナル: Command 付きのキーは行に数えない(Cmd+K のあとも行の長さが変わらない)")

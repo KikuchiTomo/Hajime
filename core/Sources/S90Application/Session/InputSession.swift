@@ -93,11 +93,10 @@ public final class InputSession {
     }
 
     /// 入力欄からフォーカスが外れた．組み立て中の文字は確定する
+    /// OS が commitComposition と deactivateServer の両方で呼ぶことがあるので，何度呼んでも同じ結果になるようにする
     public func deactivate() -> [ClientAction] {
-        terminal.endLine()
-        // 確定した読みはその行に入るので，行の頭ではなくなる
         let actions = commitAll()
-        terminal.didCommit(actions)
+        terminal.didLeave(committing: actions)
         return actions
     }
 
@@ -158,16 +157,13 @@ public final class InputSession {
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
         isSettled = false
         let styleChange = adoptInputStyle()
-        let result: KeyResult
         if !styleChange.isEmpty, !Self.continuesAfterStyleChange(event) {
-            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定する．Backspace・Escape・Enter・矢印などは
-            // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字のキーは新しい方式で続けて打つ
-            result = KeyResult(handled: true, actions: styleChange)
-        } else {
-            let routed = routeJapanese(event, context: context)
-            result = KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
+            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定する．Backspace・Escape・Enter・Space・矢印などは
+            // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字・¥・英数・かなは新しい方式で続けて処理する
+            return KeyResult(handled: true, actions: styleChange)
         }
-        return result
+        let routed = routeJapanese(event, context: context)
+        return KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
     }
 
     /// 入力方式が変わった直後でも，そのまま新しい方式で処理するキー．

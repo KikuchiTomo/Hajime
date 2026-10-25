@@ -30,23 +30,22 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
-        // シンボリックリンクはたどった先で確かめる．リンクの先が /dev/zero のような終わりの無いものだと，
-        // ハッシュの計算が終わらないので，ふつうのファイルだけを受け入れる
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path),
-            attributes[.type] as? FileAttributeType == .typeRegular,
-            let size = (attributes[.size] as? NSNumber)?.intValue else {
-            throw .fileNotFound
-        }
+        // 先に開いてから，開いたものがふつうのファイルかと大きさを確かめる．確かめてから開くまでのあいだに
+        // FIFO や /dev/zero への差し替えが起きても止まらないようにするため．O_NONBLOCK で開くので，FIFO でも開く時点で止まらない
+        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK)
+        guard descriptor >= 0 else { throw .fileNotFound }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var status = stat()
+        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .fileNotFound }
+        let size = Int(status.st_size)
         guard size == expectedSize else { throw .sizeMismatch(actual: size) }
-        guard try sha256(of: url, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
+        guard try sha256(of: handle, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
         return ZenzaiModel(url: url)
     }
 
-    /// 決まった大きさを超えたら読むのをやめる．確かめたあとでファイルが差し替えられても，読み続けて止まらないようにする
-    private static func sha256(of url: URL, maximumBytes: Int) throws(VerificationError) -> String {
+    /// 決まった大きさを超えたら読むのをやめる．開いたあとでファイルが伸びても，読み続けて止まらないようにする
+    static func sha256(of handle: FileHandle, maximumBytes: Int) throws(VerificationError) -> String {
         #if canImport(CryptoKit)
-        guard let handle = try? FileHandle(forReadingFrom: url) else { throw .fileNotFound }
-        defer { try? handle.close() }
         var hasher = SHA256()
         var total = 0
         // 70MB ほどあるので，一度に読まずに区切って読む

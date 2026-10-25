@@ -49,3 +49,9 @@ public struct RomajiRule: Sendable, Equatable, Codable, Hashable {
             && (1...DefaultSettings.maximumRomajiKanaLength).contains(kana.count)
     }
 }
+
+extension RomajiRule: CustomStringConvertible, CustomDebugStringConvertible {
+    // 利用者が足した綴りは設定の中身なので，ログには長さだけを出す
+    public var description: String { "RomajiRule(keysLength: \(keys.count), kanaLength: \(kana.count))" }
+    public var debugDescription: String { description }
+}

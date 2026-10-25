@@ -67,6 +67,20 @@ public struct CommandLineState: Sendable, Equatable {
         if length == 0 { endLine() }
     }
 
+    /// 行の中身が分からなくなった(入力欄を離れた，貼り付けた，Option をメタキーとして押したなど)．
+    /// 何も入れていない行の頭ならそのまま．そうでなければ，コマンドの名前を見分けず英字も流さない「文の行」として扱う．
+    /// 分からないときに日本語を打てなくなるより，ふつうに日本語を打てるほうへ倒すため．何度呼んでも同じ結果になる
+    public mutating func becomeUnknown() {
+        guard !(region == .lineStart && length == 0) else { return }
+        region = .text
+    }
+
+    /// 中身の分からない文字が入った(貼り付けなど)．行の頭なら文の行にし，コマンドの行や引用符の中ならそのまま続ける
+    public mutating func didInsertUnknownText() {
+        length += 1
+        if region == .lineStart { region = .text }
+    }
+
     /// Enter・Ctrl+C・Ctrl+U・履歴の呼び出し・モードの切り替えなどで行が終わった(または行が分からなくなった)
     public mutating func endLine() {
         region = .lineStart
