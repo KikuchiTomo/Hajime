@@ -82,8 +82,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         self.sessionID = sessionID
     }
 
-    isolated deinit {
-        engine.removeSession(sessionID)
+    deinit {
+        // deinit はどのスレッドで動くか決まっていないので，エンジンへの操作はメインアクターに頼む．
+        // isolated deinit は Swift 6.2 からで，CI の Swift 6.1 では使えない
+        let engine = engine
+        let sessionID = sessionID
+        Task { @MainActor in engine.removeSession(sessionID) }
     }
 
     func candidates(for reading: String) -> [S90Domain.Candidate] {
