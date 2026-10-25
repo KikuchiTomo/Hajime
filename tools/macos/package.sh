@@ -5,20 +5,22 @@
 # 出力:   apps/macos/build/dist/s90.tokyo-IME-<版>.pkg
 #
 # 署名と公証は，使える証明書と設定があるときだけ行う．
-#   S90_APP_IDENTITY        アプリの署名．無ければ Developer ID Application，それも無ければ Apple Development の証明書
+#   S90_APP_IDENTITY        アプリの署名．無ければ install.sh と同じ決め方(入っている版の証明書，無ければ Apple Development)
 #   S90_INSTALLER_IDENTITY  .pkg の署名．無ければ Developer ID Installer の証明書．どちらも無ければ署名しない
 #   S90_NOTARY_PROFILE      公証に使う notarytool のキーチェーンのプロファイル名．無ければ公証しない
 #                           (作り方: xcrun notarytool store-credentials <名前>)
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
-app_name="s90.tokyo IME"
-bundle_id="tokyo.s90.inputmethod.S90IME"
 
+. "$root/tools/macos/variant.sh"
+variant Release
 find_identity() {
   security find-identity -v -p "$1" | awk -F '"' -v kind="$2" '$0 ~ kind { print $2; exit }'
 }
-app_identity=${S90_APP_IDENTITY:-$(find_identity codesigning "Developer ID Application")}
-app_identity=${app_identity:-$(find_identity codesigning "Apple Development")}
+# アプリの署名は，指定が無ければ install.sh と同じ決め方(すでに入っている版の証明書)にする．
+# 違うチームの証明書で署名すると，入れたときに起動の途中で止まるため(variant.sh)．
+# ほかの人に配るときは S90_APP_IDENTITY に Developer ID Application の証明書を指定する
+app_identity=${S90_APP_IDENTITY:-$(signing_identity)}
 installer_identity=${S90_INSTALLER_IDENTITY:-$(find_identity basic "Developer ID Installer")}
 notary_profile=${S90_NOTARY_PROFILE:-}
 

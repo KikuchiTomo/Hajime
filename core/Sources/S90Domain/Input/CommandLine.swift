@@ -93,7 +93,13 @@ public struct CommandLineState: Sendable, Equatable {
         region = .text
     }
 
-    /// 中身の分からない文字が入った(貼り付け，Option+文字で å などが入ったかメタキーとして動いたか分からないとき)．
+    /// Tab でシェルの補完をした．何も入れていない行の頭なら補完ではないので行の頭のまま．そうでなければ中身の分からない文字が入った
+    public mutating func didCompleteWithTab() {
+        guard !(region == .lineStart && length == 0) else { return }
+        didInsertUnknownText()
+    }
+
+    /// 中身の分からない文字が入った(貼り付け，Tab の補完，Option+文字で å などが入ったかメタキーとして動いたか分からないとき)．
     /// 行の頭なら文の行にし，コマンドの行や引用符の中ならそのまま続ける
     public mutating func didInsertUnknownText() {
         length += 1
