@@ -5,7 +5,8 @@ import AppKit
 let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 let font = NSFont(name: "BIZUDGothic-Regular", size: 12) ?? NSFont.systemFont(ofSize: 12, weight: .bold)
 
-func representation(label: String, pixels: Int) -> NSBitmapImageRep {
+/// dashed が真なら点線の枠にする(開発版の印．本番のアイコンと見分けるため)
+func representation(label: String, pixels: Int, dashed: Bool) -> NSBitmapImageRep {
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8, samplesPerPixel: 4,
         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
@@ -18,6 +19,9 @@ func representation(label: String, pixels: Int) -> NSBitmapImageRep {
     // 1 ドットの枠．角は丸めない
     let frame = NSBezierPath(rect: NSRect(x: 1.5, y: 1.5, width: 13, height: 13))
     frame.lineWidth = 1
+    if dashed {
+        frame.setLineDash([2, 1], count: 2, phase: 0)
+    }
     frame.stroke()
     let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
     let size = label.size(withAttributes: attributes)
@@ -27,8 +31,10 @@ func representation(label: String, pixels: Int) -> NSBitmapImageRep {
 }
 
 for (name, label) in [("main", "あ"), ("en", "A")] {
-    let reps = [representation(label: label, pixels: 16), representation(label: label, pixels: 32)]
-    let data = NSBitmapImageRep.tiffRepresentationOfImageReps(in: reps, using: .lzw, factor: 0)!
-    try data.write(to: output.appendingPathComponent("\(name).tiff"))
-    print("wrote \(name).tiff")
+    for (suffix, dashed) in [("", false), ("-dev", true)] {
+        let reps = [16, 32].map { representation(label: label, pixels: $0, dashed: dashed) }
+        let data = NSBitmapImageRep.tiffRepresentationOfImageReps(in: reps, using: .lzw, factor: 0)!
+        try data.write(to: output.appendingPathComponent("\(name)\(suffix).tiff"))
+        print("wrote \(name)\(suffix).tiff")
+    }
 }

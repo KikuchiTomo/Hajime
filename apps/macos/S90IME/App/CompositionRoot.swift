@@ -51,10 +51,12 @@ final class CompositionRoot {
     }
 }
 
+/// 本番と開発版(Debug)で変わる値．どちらも Info.plist から読む(apps/macos/project.yml の configs)
 enum AppIdentity {
-    static let supportDirectoryName = "tokyo.s90.ime"
-    static let japaneseModeID = "tokyo.s90.inputmethod.S90IME.Japanese"
-    static let directModeID = "tokyo.s90.inputmethod.S90IME.Roman"
+    static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "tokyo.s90.inputmethod.S90IME"
+    static let supportDirectoryName = Bundle.main.infoDictionary?["S90SupportDirectoryName"] as? String ?? "tokyo.s90.ime"
+    static let japaneseModeID = bundleIdentifier + ".Japanese"
+    static let directModeID = bundleIdentifier + ".Roman"
     /// Info.plist の ComponentInputModeDict のキー．OS は setValue でこの値を渡してくる
     static let japaneseModeKey = "com.apple.inputmethod.Japanese"
     static let directModeKey = "com.apple.inputmethod.Roman"

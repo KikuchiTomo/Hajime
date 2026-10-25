@@ -2,7 +2,7 @@ import AppKit
 import InputMethodKit
 import os
 
-private let logger = Logger(subsystem: "tokyo.s90.inputmethod.S90IME", category: "app")
+private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "app")
 
 #if DEBUG
 MainActor.assumeIsolated { SnapshotRenderer.runIfRequested() }
