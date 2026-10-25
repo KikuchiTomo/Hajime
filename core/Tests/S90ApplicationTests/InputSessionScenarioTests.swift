@@ -1364,11 +1364,31 @@ struct TerminalUnknownLineTests {
         }
     }
 
-    @Test("行の頭で Tab の補完をしたあとは，コマンドの名前を見分けない(何が入ったか分からないため)")
-    func tabCompletion() {
+    @Test("何も入れていない行の頭の Tab と Shift+Tab のあとも，コマンドの名前を見分ける")
+    func tabAtEmptyLineStart() {
+        for tab in [KeyEvent(.tab), KeyEvent(.tab, modifiers: .shift)] {
+            let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+            _ = session.handle(tab, context: terminal)
+            for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+            #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")), "\(tab.modifiers)")
+        }
+    }
+
+    @Test("行の頭の記号のあとで Tab の補完をしたら，何が入ったか分からないのでコマンドの名前を見分けない")
+    func tabCompletionAfterPrefix() {
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.character("(")), context: terminal)
         _ = session.handle(KeyEvent(.tab), context: terminal)
         for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
         #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("ls ")))
+    }
+
+    @Test("行の頭の記号のあとの Shift+Tab は補完ではないので，続くコマンドの名前を見分ける")
+    func shiftTabAfterPrefix() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.character("(")), context: terminal)
+        _ = session.handle(KeyEvent(.tab, modifiers: .shift), context: terminal)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
     }
 }

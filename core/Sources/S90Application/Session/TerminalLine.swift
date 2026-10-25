@@ -81,9 +81,10 @@ final class TerminalLine {
             state.endLine()
         case .backspace:
             state.didDeleteBackward()
-        case .tab:
-            // シェルの補完で何が入ったかは分からない
-            state.didInsertUnknownText()
+        case .tab where !event.modifiers.contains(.shift):
+            // シェルの補完で何が入ったかは分からない．ただし何も入れていない行の頭の Tab は補完ではない
+            // (タブ文字が入るか何も起きない)ので，行の頭のままにする．Shift+Tab は補完ではない(Claude Code のモードの切り替えなど)
+            state.didCompleteWithTab()
         case .space:
             state.didPass(" ")
         case .character(let character):

@@ -9,14 +9,15 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 . "$root/tools/macos/variant.sh"
 variant "${1:-Release}"
 
-# 署名に使う証明書．S90_SIGN_IDENTITY で選べる．指定が無ければ Apple Development の最初の証明書を使う．
+# 署名に使う証明書(決め方は variant.sh の signing_identity)．
 # アドホック署名のままだと Gatekeeper に拒まれ，入力ソースとして選べないことがある
-identity=${S90_SIGN_IDENTITY:-$(security find-identity -v -p codesigning | awk -F '"' '/Apple Development/ { print $2; exit }')}
+identity=$(signing_identity) || exit 1
 if [ -z "$identity" ]; then
   echo "Apple Development の証明書が見つからないので，アドホック署名にします(入力ソースとして選べないことがあります)"
   identity="-"
 fi
-echo "署名: $identity"
+identity_label=$(identity_name "$identity")
+echo "署名: ${identity_label:-$identity}"
 
 # Zenzai のモデルを取得してハッシュを確かめる(取得済みなら確かめるだけ)．アプリに入れて Zenzai を有効にするため
 "$root/tools/models/fetch_zenzai.sh"

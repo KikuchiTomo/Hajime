@@ -85,14 +85,17 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
       # Dev と Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる．
       # 入れるのは Dev(最適化あり)．Debug は Xcode で動きを追うときと，見た目の画像を書き出すときに使う
+      # Dev と Debug はバンドル ID を分ける．macOS はアプリのデータの置き場所(コンテナ)を最初に作ったアプリの署名に結び付け，
+      # 署名が違うアプリが同じ置き場所を使おうとすると，起動の途中で止める．Debug(画像の書き出しに使う．アドホック署名)と
+      # 入れる開発版(証明書で署名)が同じ ID だと，入れた開発版が止まって入力できなくなる．開発版の ID は前に使っていた .dev から変えた
       configs:
         Dev:
           PRODUCT_NAME: "s90.tokyo IME Dev"
-          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.dev
-          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.dev
+          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.develop
+          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.develop
           S90_ICON_SUFFIX: "-dev"
         Debug:
-          PRODUCT_NAME: "s90.tokyo IME Dev"
-          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.dev
-          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.dev
+          PRODUCT_NAME: "s90.tokyo IME Debug"
+          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.debug
+          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.debug
           S90_ICON_SUFFIX: "-dev"
