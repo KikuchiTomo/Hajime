@@ -26,7 +26,8 @@ struct LatencyProbeTests {
         // 辞書を読み込ませるための 1 回目は数えない
         _ = session.handle(KeyEvent(.character("a")), context: InputContext())
         _ = session.handle(KeyEvent(.escape), context: InputContext())
-        let keys = Array("watashihaashitatoukyoudekaigininisshusekishimasu")
+        // nn のあとの母音を含む語(反映・皆・女)も入れ，読みを選ぶための変換の手間も測る
+        let keys = Array("watashihaashitatoukyoudekaigininisshusekishimasuminnnanoikenwohanneisuru")
         let clock = ContinuousClock()
         var durations: [Duration] = []
         // 1 回目は辞書のページを読み込むので，2 回目の文を測る(ふだん使っている状態に近い)
