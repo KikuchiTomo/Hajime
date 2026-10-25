@@ -18,9 +18,12 @@ echo "消しました: $destination/$app_name.app"
 
 if [ "$purge" = "--purge" ]; then
   # 別のアプリのデータの置き場所は macOS が守っていて，ターミナルからは消せないことがある
-  if rm -rf "$(container_path)"; then
+  if [ ! -d "$(container_path)" ]; then
+    echo "学習データと設定の置き場所はありませんでした: $(container_path)"
+  elif rm -rf "$(container_path)"; then
     echo "学習データと設定も消しました: $(container_path)"
   else
     echo "学習データと設定の置き場所 $(container_path) を消し切れませんでした(一部は消えたかもしれません)．残りを Finder でゴミ箱に入れてください" >&2
+    exit 1
   fi
 fi
