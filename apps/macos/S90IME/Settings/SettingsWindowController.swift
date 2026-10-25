@@ -10,11 +10,12 @@ final class SettingsWindowController {
     private let model: SettingsModel
     private var window: NSWindow?
 
-    init(settings: FileSettingsStore, resetLearning: @escaping () -> Void) {
-        model = SettingsModel(store: settings, resetLearning: resetLearning)
+    init(settings: FileSettingsStore, usage: FileUsageStore, resetLearning: @escaping () -> Void) {
+        model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
     }
 
     func show() {
+        model.refreshUsage()
         let window = window ?? makeWindow()
         self.window = window
         // 入力メソッドは前面のアプリにならないので，開くときだけ前に出す
@@ -42,13 +43,17 @@ final class SettingsWindowController {
 final class SettingsModel: ObservableObject {
     @Published private(set) var settings: S90Domain.Settings
     @Published var message: String?
+    @Published private(set) var usageCounts: UsageCounts
     private let store: FileSettingsStore
+    private let usage: FileUsageStore?
     private let resetLearningAction: () -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(store: FileSettingsStore, resetLearning: @escaping () -> Void) {
+    init(store: FileSettingsStore, usage: FileUsageStore?, resetLearning: @escaping () -> Void) {
         self.store = store
+        self.usage = usage
         self.settings = store.current
+        self.usageCounts = usage?.counts ?? UsageCounts()
         self.resetLearningAction = resetLearning
         // 入力メニューから変えたときも画面に映す
         store.observe { [weak self] in self?.settings = $0 }
@@ -65,6 +70,16 @@ final class SettingsModel: ObservableObject {
             logger.error("設定を保存できませんでした: \(String(describing: error), privacy: .public)")
             message = UIStrings.Settings.saveFailed
         }
+    }
+
+    /// 画面を開いたときに，使い方の記録を読み直す
+    func refreshUsage() {
+        usageCounts = usage?.counts ?? UsageCounts()
+    }
+
+    func resetUsage() {
+        usage?.reset()
+        refreshUsage()
     }
 
     func resetLearning() {

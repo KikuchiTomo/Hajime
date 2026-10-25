@@ -77,6 +77,7 @@ final class S90InputController: IMKInputController {
         }
         presenter.hideWindows()
         root.engine.flushLearning()
+        root.usage.flush()
         super.deactivateServer(sender)
     }
 

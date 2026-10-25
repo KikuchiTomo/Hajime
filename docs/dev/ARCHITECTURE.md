@@ -47,11 +47,17 @@ S90Engine ──────────┤
 S90Persistence ─────┘
 ```
 
-- **S90Domain**: 入力の状態(`InputState`)，抽象化したキー(`KeyEvent`)，入力方式(`InputMethodKind`: ローマ字・かな・EN)，種類の変換(`ScriptVariant`: ひらがな・カタカナ・半角カタカナ・全角英数・半角英数)，¥ キーの割り当て(`YenKeyPolicy`)，アプリのプロファイル(`AppProfile`)，補正の判定規則．OS の API も変換エンジンも知らない
-- **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)，`LiveConversionPolicy`，`TypoCorrectionService`，`ProfileResolver`．外部とは `Ports/` の protocol 越しにだけ話す
-  - ポートの例: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsStore`，`UserDictionaryStore`，`LearningStore`，`Clock`
-- **S90Engine**: `AzooKeyConverterAdapter` が `KanaKanjiConverting` を実装する．azooKey の型はこのモジュールの外に出さない
-- **S90Persistence**: ファイルに保存する実装．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
+- **S90Domain**: 値と規則だけを置く．OS の API も変換エンジンも知らない
+  - 入力: 抽象化したキー(`KeyEvent`)，入力モードとアプリのプロファイル(`InputMode`，`AppProfile`)，候補(`Candidate`)，ライブ変換の見せ方(`LiveConversionRule`)，ターミナルの行の状態(`CommandLineState`)，使い方の回数(`UsageCounts`)
+  - 読み: ローマ字とかなの組み立て(`Composition`，`RomajiTable`，`KanaLayout`)
+  - 分岐図: 文節と枝(`SegmentLattice`)
+  - 補正: 英単語(`TypoCorrectionRule`)と日本語の打ち間違い(`ReadingCorrectionRule`)の判定
+  - 記号と日付: `SymbolDictionary`，`SymbolSequence`，`DateExpressions`
+  - 設定: `Settings` と既定値・上限(`DefaultSettings`)，記号の表(`SymbolTable`)，字種(`ScriptVariant`)
+- **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)と，その部品(`EnglishWordCorrector`，`EnglishInput`，`NasalReadingResolver`，`LatticeBuilder`，`PanelBuilder`)．エンジンにない候補を足す `SupplementedConverter`．外部とは `Ports/` の protocol 越しにだけ話す
+  - ポート: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsReading`・`SettingsStoring`，`CalendarReading`，`UsageRecording`
+- **S90Engine**: `AzooKeyConverterEngine` と `AzooKeyConverterSession` が `KanaKanjiConverting` を実装する．Zenzai のモデルの確認(`ZenzaiModel`)もここ．azooKey の型はこのモジュールの外に出さない
+- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`)．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
 
 ## キー入力から画面までの流れ
 
@@ -63,7 +69,7 @@ OS のキーイベント
   → (アダプタ) OS の API で反映         apps/macos: IMKTextInput，apps/windows: ITfComposition
 ```
 
-`InputSession` は同期的に結果を返します．今の変換エンジン(Zenzai を使わない azooKey)は 1 キーあたり p95 で 30ms ほどで終わるので，変換もこの中で行っています(R-01 の計測)．Zenzai のような重い変換を入れるときは，読みだけを先に返して結果を後から送る形に変え，ADR を足します．
+`InputSession` は同期的に結果を返します．Zenzai を使っても 1 キーあたり p95 で 40ms ほどで終わるので，変換もこの中で行っています(R-01 の計測)．打鍵が止まったときの表示の切り替え(`settle`)だけは，アダプタのタイマーから呼びます．
 
 分岐図(ADR 0007)の文節と枝は `LatticeBuilder` が作り，候補ウィンドウに出す内容は `PanelBuilder` が組み立てます．`InputSession` はキーと状態の移り変わりだけを受け持ちます．
 
@@ -83,7 +89,7 @@ OS のキーイベント
 
 - 色・寸法・動きの長さ: `design/tokens/` が唯一の置き場所．Swift・Rust・CSS(ドキュメントサイト)向けのコードは `tools/tokens` が生成する
 - 既定の設定値: `core/Sources/S90Domain/Settings/DefaultSettings.swift` に集める．アプリごとの既定プロファイルも同じ場所に置く
-- 文言: macOS は `Localizable.xcstrings`，Windows は `apps/windows/resources/strings/<言語>.toml`．キーは両方で同じ名前にする
+- 文言: macOS は今は `apps/macos/S90IME/UI/UIStrings.swift` に集める(多言語にするときに `Localizable.xcstrings` に移す)．Windows は `apps/windows/resources/strings/<言語>.toml`
 
 ## ディレクトリ
 

@@ -12,6 +12,7 @@ struct SettingsView: View {
             ConversionTab(model: model).tabItem { Text(UIStrings.Settings.conversionTab) }
             DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
             AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
+            UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
         }
         .padding()
         .frame(width: Self.size.width, height: Self.size.height)
@@ -136,6 +137,33 @@ private struct AppearanceTab: View {
             }
             Section {
                 Button(UIStrings.Settings.restoreDefaults) { model.restoreDefaults() }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// 使い方の記録．回数だけを端末の中に持つ
+private struct UsageTab: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        let counts = model.usageCounts
+        Form {
+            Section {
+                Toggle(UIStrings.Settings.recordsUsage, isOn: model.binding(\.recordsUsage))
+                Text(UIStrings.Settings.usageNote).font(.caption).foregroundStyle(.secondary)
+            }
+            Section(UIStrings.Settings.usageTab) {
+                LabeledContent(UIStrings.Settings.firstCandidateRate, value: counts.firstCandidateRate.map { "\(Int(($0 * 100).rounded()))%" } ?? "-")
+                LabeledContent(UIStrings.Settings.commits, value: "\(counts.commits)")
+                LabeledContent(UIStrings.Settings.conversionsOpened, value: "\(counts.conversionsOpened)")
+                LabeledContent(UIStrings.Settings.segmentsChanged, value: "\(counts.segmentsChanged)")
+                LabeledContent(UIStrings.Settings.readingCorrections, value: "\(counts.readingCorrections) / \(counts.readingCorrectionsUndone)")
+                LabeledContent(UIStrings.Settings.englishCorrections, value: "\(counts.englishCorrections) / \(counts.englishCorrectionsUndone)")
+            }
+            Section {
+                Button(UIStrings.Settings.resetUsage, role: .destructive) { model.resetUsage() }
             }
         }
         .formStyle(.grouped)

@@ -34,10 +34,14 @@ public final class InputSession {
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
     private var isSettled = false
 
-    public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading) {
+    /// 使い方の記録(回数だけ)．記録しないときは nil
+    private let usage: (any UsageRecording)?
+
+    public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         self.settings = settings
+        self.usage = usage
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
         self.english = EnglishInput(converter: converter)
     }
@@ -328,6 +332,7 @@ public final class InputSession {
         switch phase {
         case .composing:
             if corrector.dismiss() {
+                usage?.record(.englishCorrectionUndone)
                 // 補正の直後の Space は，補正を取り消す(R-02，Q-01)
                 return KeyResult(handled: true, actions: render(context: context))
             }
@@ -344,6 +349,7 @@ public final class InputSession {
     /// 変換を始める．設定が一覧でなければ分岐図にする．
     /// 英単語を補正しているときは，補正と入力のままを並べて比べられるよう一覧にする
     private func enterConversion() {
+        usage?.record(.conversionOpened)
         correctReading()
         if settings.current.candidatePresentation != .list, corrector.active == nil {
             phase = .lattice(LatticeBuilder(converter: converter).build(reading: composition.conversionReading))
@@ -372,6 +378,7 @@ public final class InputSession {
         guard !corrected.isEmpty, corrected.conversionReading != composition.conversionReading else { return }
         typedBeforeCorrection = composition
         composition = corrected
+        usage?.record(.readingCorrected)
     }
 
     private func handleVertical(forward: Bool, context: InputContext) -> KeyResult {
@@ -437,6 +444,7 @@ public final class InputSession {
                 // 打ち間違いを直していたら，打ったままの読みに戻す
                 composition = typed
                 typedBeforeCorrection = nil
+                usage?.record(.readingCorrectionUndone)
             }
             return KeyResult(handled: true, actions: render(context: context))
         }
@@ -464,7 +472,14 @@ public final class InputSession {
             for segment in lattice.segments where segment.selected.isFromEngine {
                 converter.didCommit(segment.selected)
             }
+            usage?.record(.committed(changedSegments: lattice.segments.filter(\.isDecided).count, viaConversion: true))
             return [.commit(lattice.text)] + reset()
+        }
+        if case .selecting(let selection) = phase {
+            let changed = selection.focus == .candidate(0) ? 0 : 1
+            usage?.record(.committed(changedSegments: changed, viaConversion: true))
+        } else {
+            usage?.record(.committed(changedSegments: 0, viaConversion: false))
         }
         var actions: [ClientAction] = []
         while isComposing {
@@ -564,7 +579,9 @@ public final class InputSession {
     }
 
     private func updateCorrection() {
+        let before = corrector.active
         corrector.update(for: composition)
+        if before == nil, corrector.active != nil { usage?.record(.englishCorrected) }
     }
 
     /// 読みの先頭から kanaStart 文字目までを，ライブ変換の設定に従って表示する文字にする
