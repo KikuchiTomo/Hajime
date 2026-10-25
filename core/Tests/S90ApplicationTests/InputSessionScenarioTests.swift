@@ -1258,8 +1258,8 @@ struct FourthReviewRegressionTests {
 }
 
 @MainActor
-@Suite("6 回目のレビューで足したターミナルのテスト")
-struct SixthReviewTerminalTests {
+@Suite("ターミナルの行が分からなくなるとき")
+struct TerminalUnknownLineTests {
     private let terminal = InputContext(profile: .terminal)
 
     private func commandSession() -> InputSession {
@@ -1323,5 +1323,25 @@ struct SixthReviewTerminalTests {
             let shown = String(reflecting: value)
             #expect(!shown.contains("秘密") && !shown.contains("ひみつ"), "\(type(of: value))")
         }
+    }
+
+    @Test("メニューで英数にすると行が終わり，日本語に戻すと行の頭からコマンドを見分ける")
+    func setModeEndsLine() {
+        let session = commandSession()
+        _ = session.setMode(.direct)
+        _ = session.setMode(.japanese)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
+    }
+
+    @Test("英数で行の頭から打ってから日本語に戻すと，文の行のまま")
+    func directTypingThenJapanese() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.setMode(.direct)
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.yen), context: terminal)
+        _ = session.setMode(.japanese)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
     }
 }

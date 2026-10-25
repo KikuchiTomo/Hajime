@@ -28,7 +28,7 @@ enum ProtectedFile {
     static func read(from url: URL, maximumBytes: Int) throws -> Data {
         // FIFO などを開いて止まらないよう，待たない開き方で開き，ふつうのファイルだけを読む(ZenzaiModel と同じ)
         let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
-        guard descriptor >= 0 else { throw CocoaError(.fileReadNoSuchFile) }
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var status = stat()
         guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw NotRegularFile() }

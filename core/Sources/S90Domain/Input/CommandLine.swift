@@ -44,13 +44,16 @@ public struct CommandLineState: Sendable, Equatable {
         length += 1
         defer { lastPassed = character }
         switch region {
+        case .lineStart:
+            // 行の頭で組み立てずに流れた文字(英数で打った文字や半角の記号)があれば，もう行の頭ではない
+            region = .text
         case .command:
             if character == "\"" || character == "'" { region = .quoted(character) }
             // 「foo#bar」や「$#」は引数の一部なので，語の頭(直前が空白)の # だけをコメントにする
             if character == "#", lastPassed == " " { region = .comment }
         case .quoted(let quote):
             if character == quote { region = .command }
-        case .lineStart, .comment, .text:
+        case .comment, .text:
             break
         }
     }
@@ -67,7 +70,7 @@ public struct CommandLineState: Sendable, Equatable {
         if length == 0 { endLine() }
     }
 
-    /// 行の中身が分からなくなった(入力欄を離れた，貼り付けた，Option をメタキーとして押したなど)．
+    /// 行の中身が分からなくなった(入力欄を離れたとき)．
     /// 何も入れていない行の頭ならそのまま．そうでなければ，コマンドの名前を見分けず英字も流さない「文の行」として扱う．
     /// 分からないときに日本語を打てなくなるより，ふつうに日本語を打てるほうへ倒すため．何度呼んでも同じ結果になる
     public mutating func becomeUnknown() {
@@ -75,7 +78,8 @@ public struct CommandLineState: Sendable, Equatable {
         region = .text
     }
 
-    /// 中身の分からない文字が入った(貼り付けなど)．行の頭なら文の行にし，コマンドの行や引用符の中ならそのまま続ける
+    /// 中身の分からない文字が入った(貼り付け，Option+文字で å などが入ったかメタキーとして動いたか分からないとき)．
+    /// 行の頭なら文の行にし，コマンドの行や引用符の中ならそのまま続ける
     public mutating func didInsertUnknownText() {
         length += 1
         if region == .lineStart { region = .text }
