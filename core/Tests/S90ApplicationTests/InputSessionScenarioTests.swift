@@ -503,3 +503,57 @@ struct SymbolScenarioTests {
         #expect(texts.firstIndex(of: "→") == 2)
     }
 }
+
+@MainActor
+@Suite("日本語の打ち間違い")
+struct ReadingCorrectionScenarioTests {
+    private func typed(_ keys: String, corrections: [ReadingCorrection]) -> (InputSession, () -> (marked: String, note: String?)) {
+        let converter = FakeConverter()
+        converter.corrections[keys] = corrections
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings())
+        var marked = ""
+        var note: String?
+        let record = { (actions: [ClientAction]) in
+            for action in actions {
+                if case .setMarkedText(let text) = action { marked = text.text }
+                if case .showLattice(let panel) = action { note = panel.note }
+            }
+        }
+        for key in keys { record(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) }
+        return (session, { (marked, note) })
+    }
+
+    @Test("Space で変換するとき，十分にもっともらしい読みに直し，Esc で打ったままに戻す")
+    func correctAndUndo() {
+        let (session, state) = typed("you", corrections: [
+            ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -5, cost: 2),
+            ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0),
+        ])
+        #expect(state().marked == "よう")
+        var marked = ""
+        var note: String?
+        for action in session.handle(KeyEvent(.space), context: InputContext()).actions {
+            if case .setMarkedText(let text) = action { marked = text.text }
+            if case .showLattice(let panel) = action { note = panel.note }
+        }
+        #expect(marked == "よい")
+        #expect(note != nil)
+        for action in session.handle(KeyEvent(.escape), context: InputContext()).actions {
+            if case .setMarkedText(let text) = action { marked = text.text }
+        }
+        #expect(marked == "よう")
+    }
+
+    @Test("差が小さければ直さない")
+    func smallMargin() {
+        let (session, _) = typed("you", corrections: [
+            ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -8, cost: 2),
+            ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0),
+        ])
+        var marked = ""
+        for action in session.handle(KeyEvent(.space), context: InputContext()).actions {
+            if case .setMarkedText(let text) = action { marked = text.text }
+        }
+        #expect(marked == "よう")
+    }
+}

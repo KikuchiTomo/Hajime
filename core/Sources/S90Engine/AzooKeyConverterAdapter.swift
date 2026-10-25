@@ -153,6 +153,22 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         return score
     }
 
+    func typoCorrections(forKeys keys: String) -> [ReadingCorrection] {
+        guard engine.usesZenzai, !keys.isEmpty else { return [] }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(keys, inputStyle: .roman2kana)
+        let options = engine.options(leftContext: leftContext)
+        let config = ExperimentalTypoCorrectionConfig(
+            beamSize: DefaultSettings.typoCorrectionBeamSize, topK: DefaultSettings.typoCorrectionTopK, nBest: DefaultSettings.typoCorrectionCandidateCount)
+        let corrections = engine.withSession(sessionID) { converter in
+            converter.experimentalRequestTypoCorrection(
+                leftSideContext: leftContext ?? "", composingText: composing, options: options, inputStyle: .roman2kana, config: config)
+        } ?? []
+        return corrections.map {
+            ReadingCorrection(keys: $0.correctedInput, reading: $0.convertedText, score: Double($0.score), cost: Double($0.channelCost))
+        }
+    }
+
     func setLeftContext(_ text: String?) {
         guard text != leftContext else { return }
         leftContext = text

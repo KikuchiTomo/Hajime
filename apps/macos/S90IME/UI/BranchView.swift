@@ -61,7 +61,7 @@ final class BranchView: NSView {
         let previewRows = panel.columns.contains { $0.preview != nil } ? 1 : 0
         let upperRows = column?.variants.count ?? 0
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
-        let footer = textWidth(UIStrings.Branch.hint, font: labelFont) + textWidth(UIStrings.Branch.position(panel.position, panel.total), font: labelFont) + Size.paddingX * 3
+        let footer = textWidth(panel.note ?? UIStrings.Branch.hint, font: labelFont) + textWidth(UIStrings.Branch.position(panel.position, panel.total), font: labelFont) + Size.paddingX * 3
         let width = max(Size.minWidth, trunkRight + inset, branchRight + inset, footer + inset * 2)
         let trunkY = inset + CGFloat(upperRows) * rowHeight
         let height = trunkY + rowHeight + CGFloat(lowerRows) * rowHeight + Size.frameWidth + labelRowHeight + inset
@@ -100,7 +100,12 @@ final class BranchView: NSView {
         BevelDrawing.drawSeparator(y: footerY, from: inset - Size.paddingX, to: body.maxX - inset + Size.paddingX, theme: theme)
         let footer = NSRect(x: inset, y: footerY + Size.frameWidth, width: body.width - inset * 2, height: labelRowHeight)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
-        drawText(UIStrings.Branch.hint, attributes: muted, x: footer.minX, in: footer)
+        if let note = panel.note {
+            // 打ち間違いを直したことなど，IME が変えたことを知らせる
+            drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: footer.minX, in: footer)
+        } else {
+            drawText(UIStrings.Branch.hint, attributes: muted, x: footer.minX, in: footer)
+        }
         let position = UIStrings.Branch.position(panel.position, panel.total)
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
     }
