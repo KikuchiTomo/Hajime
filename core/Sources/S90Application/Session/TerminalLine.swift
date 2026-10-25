@@ -81,6 +81,9 @@ final class TerminalLine {
             state.endLine()
         case .backspace:
             state.didDeleteBackward()
+        case .tab:
+            // シェルの補完で何が入ったかは分からない
+            state.didInsertUnknownText()
         case .space:
             state.didPass(" ")
         case .character(let character):
@@ -99,7 +102,7 @@ final class TerminalLine {
     /// 確定した文字を行の長さに数える
     private func didCommit(_ actions: [ClientAction]) {
         for action in actions {
-            if case .commit(let text) = action { state.didCommitText(length: text.count) }
+            if case .commit(let text) = action { state.didCommitText(text) }
         }
     }
 

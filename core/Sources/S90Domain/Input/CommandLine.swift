@@ -45,8 +45,14 @@ public struct CommandLineState: Sendable, Equatable {
         defer { lastPassed = character }
         switch region {
         case .lineStart:
-            // 行の頭で組み立てずに流れた文字(英数で打った文字や半角の記号)があれば，もう行の頭ではない
-            region = .text
+            // 行の頭の # はシェルのコメント．行の終わりまで日本語を打てる．
+            // 空白・「(」「{」「\」「!」「`」「$」はコマンドの前に付くことがあるので行の頭のまま(「(cd …」「\git …」)．
+            // それ以外(英数で打った英字や数字，「@」「*」「"」など)のあとは，コマンドではなく文として扱う(「@claude これ見て」)
+            if character == "#" {
+                region = .comment
+            } else if !Self.commandPrefixes.contains(character) {
+                region = .text
+            }
         case .command:
             if character == "\"" || character == "'" { region = .quoted(character) }
             // 「foo#bar」や「$#」は引数の一部なので，語の頭(直前が空白)の # だけをコメントにする
@@ -58,11 +64,20 @@ public struct CommandLineState: Sendable, Equatable {
         }
     }
 
-    /// 日本語を確定した．行の頭なら，その行はコマンドではない
-    public mutating func didCommitText(length committed: Int) {
-        length += committed
-        if region == .lineStart { region = .text }
+    /// 文字を確定した．行の頭なら，その行はコマンドではない．
+    /// ただし ¥ キーで入れた「\」のようにコマンドの前に付く 1 文字は，流したときと同じく行の頭のまま
+    public mutating func didCommitText(_ text: String) {
+        length += text.count
+        guard region == .lineStart else { return }
+        if text.count == 1, let character = text.first, Self.commandPrefixes.contains(character) { return }
+        region = .text
     }
+
+    /// 行の頭に付いても，そのあとにコマンドの名前が来うる文字．
+    /// 空白(字下げ)，「(」(サブシェル「(cd …)」)，「{」(まとまり「{ …; }」)，「\\」(エイリアスを避ける「\\git」)，
+    /// 「!」(Claude Code のシェルモード「!git status」)，「$」(「$(…)」)．
+    /// 「`」は対話型のツールへの指示をインラインのコードで始めることが多い(「`git rebase` のやり方」)ので入れない
+    static let commandPrefixes: Set<Character> = [" ", "(", "{", "\\", "!", "$"]
 
     /// 組み立てていないときに Backspace で 1 文字消した．行の頭まで戻ったら行の頭に戻す
     public mutating func didDeleteBackward() {
@@ -70,7 +85,7 @@ public struct CommandLineState: Sendable, Equatable {
         if length == 0 { endLine() }
     }
 
-    /// 行の中身が分からなくなった(入力欄を離れたとき)．
+    /// 行の中身が分からなくなった(入力欄を離れたとき，Option+文字のあと)．
     /// 何も入れていない行の頭ならそのまま．そうでなければ，コマンドの名前を見分けず英字も流さない「文の行」として扱う．
     /// 分からないときに日本語を打てなくなるより，ふつうに日本語を打てるほうへ倒すため．何度呼んでも同じ結果になる
     public mutating func becomeUnknown() {

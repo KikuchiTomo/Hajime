@@ -1339,9 +1339,36 @@ struct TerminalUnknownLineTests {
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
         _ = session.setMode(.direct)
         for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
-        _ = session.handle(KeyEvent(.yen), context: terminal)
         _ = session.setMode(.japanese)
         for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
         #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
+    }
+
+    @Test("行の頭の空白や「(」「\\」(¥ キーを含む)のあとのコマンドの名前は，コマンドとして見分ける")
+    func commandAfterLeadingSymbols() {
+        for prefix in [KeyEvent(.space), KeyEvent(.character("(")), KeyEvent(.character("\\")), KeyEvent(.yen)] {
+            let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+            _ = session.handle(prefix, context: terminal)
+            for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+            #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")), "\(prefix.key)")
+        }
+    }
+
+    @Test("行の頭の @・*・引用符・` のあとは，コマンドの名前でも日本語の文として打てる(「@claude これ見て」「`git rebase` のやり方」)")
+    func textAfterAtSign() {
+        for prefix in ["@", "*", "\"", "'", "`"] as [Character] {
+            let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+            _ = session.handle(KeyEvent(.character(prefix)), context: terminal)
+            for key in "claude" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+            #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("claude ")), "\(prefix)")
+        }
+    }
+
+    @Test("行の頭で Tab の補完をしたあとは，コマンドの名前を見分けない(何が入ったか分からないため)")
+    func tabCompletion() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.tab), context: terminal)
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("ls ")))
     }
 }
