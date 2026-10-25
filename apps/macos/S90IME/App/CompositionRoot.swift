@@ -1,4 +1,5 @@
 import AppKit
+import os
 import S90Application
 import S90Domain
 import S90Engine
@@ -36,10 +37,27 @@ final class CompositionRoot {
         let settings = FileSettingsStore(fileURL: support.appendingPathComponent("settings.json"))
         let engine = try AzooKeyConverterEngine(
             memoryDirectory: support.appendingPathComponent("memory", isDirectory: true),
-            versionString: AppIdentity.versionString
+            versionString: AppIdentity.versionString,
+            zenzai: loadZenzaiModel()
         )
+        // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
+        engine.warmUp()
         FontRegistry.registerBundledFonts()
         installed = CompositionRoot(settings: settings, engine: engine)
+    }
+
+    /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
+    private static func loadZenzaiModel() -> ZenzaiModel? {
+        guard let url = Bundle.main.resourceURL?
+            .appendingPathComponent("Zenzai", isDirectory: true)
+            .appendingPathComponent(ZenzaiModel.fileName) else { return nil }
+        do {
+            return try ZenzaiModel.verified(at: url)
+        } catch {
+            Logger(subsystem: AppIdentity.bundleIdentifier, category: "zenzai")
+                .notice("Zenzai を使いません: \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     func makeSession() -> InputSession {

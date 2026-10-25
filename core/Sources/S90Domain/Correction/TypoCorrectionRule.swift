@@ -6,14 +6,23 @@ public struct TypoCorrectionRule: Sendable {
         self.level = level
     }
 
-    /// 補正の対象として調べる並び．ローマ字として読めない並びがあり，英字だけを打ったときに限る
-    public func candidateKeys(in composition: Composition) -> String? {
-        guard level != .off,
-            composition.containsInvalidRomaji,
-            let keys = composition.rawKeys,
-            keys.count >= DefaultSettings.minimumCorrectionLength,
-            keys.allSatisfy({ $0.isASCII && $0.isLetter }) else { return nil }
-        return keys
+    /// 補正の対象として調べる部分．文の途中に打った英単語も見つけられるよう，区切りから末尾までの部分を長い順に返す．
+    ///
+    /// 次の条件をすべて満たす部分に限る．
+    /// - ローマ字として読めない並びを含み，英字だけを打った部分
+    /// - ローマ字として読めない文字で始まるか(「このばーじょんの」+「python」)，読みの先頭から始まる(「pthon」)．
+    ///   「nopython」のように前の日本語を英単語に飲み込まないため．
+    ///   ただし「このrepository」のように，かなになる綴りで始まる文の途中の英単語は見つけられない
+    /// - 打ちかけのローマ字が残っていない(末尾の「n」は除く)．打っている途中の単語を補正しないため
+    public func tails(in composition: Composition) -> [Composition.Tail] {
+        guard level != .off, composition.pending.isEmpty || composition.pending == "n" else { return [] }
+        return composition.tails().filter { tail in
+            tail.containsInvalidRomaji
+                && (tail.startsWithUnconvertible || tail.startsFreeRegion)
+                && tail.keys.count >= DefaultSettings.minimumCorrectionLength
+                && tail.keys.count <= DefaultSettings.maximumCorrectionLength
+                && tail.keys.allSatisfy { $0.isASCII && $0.isLetter }
+        }
     }
 
     /// keys が英単語ならそのまま，綴りの誤りなら近い単語を補正の結果として返す

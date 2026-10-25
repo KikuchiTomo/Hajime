@@ -25,9 +25,12 @@ public struct InputContext: Sendable, Equatable {
     public var profile: AppProfile
     /// パスワード欄などで，変換も学習もしないとき
     public var isSecure: Bool
+    /// 入力位置の前にある文字列(左の文脈)．打ち始めのときだけアダプタが入れる．文脈を使う変換(Zenzai)の手がかり
+    public var precedingText: String?
 
-    public init(profile: AppProfile = .standard, isSecure: Bool = false) {
+    public init(profile: AppProfile = .standard, isSecure: Bool = false, precedingText: String? = nil) {
         self.profile = profile
         self.isSecure = isSecure
+        self.precedingText = precedingText
     }
 }

@@ -12,11 +12,22 @@ final class InputContextProvider {
         self.settings = settings
     }
 
-    func context(for client: any IMKTextInput) -> InputContext {
-        InputContext(
+    /// - Parameter includePrecedingText: 入力位置の前の文字列を読むか．打ち始めのときだけ読む(毎キー問い合わせないため)
+    func context(for client: any IMKTextInput, includePrecedingText: Bool) -> InputContext {
+        // パスワード欄などで Secure Input が有効なら，変換も学習もしない．前の文字列も読まない
+        let isSecure = IsSecureEventInputEnabled()
+        return InputContext(
             profile: settings.current.profile(forApplication: client.bundleIdentifier()),
-            // パスワード欄などで Secure Input が有効なら，変換も学習もしない
-            isSecure: IsSecureEventInputEnabled()
+            isSecure: isSecure,
+            precedingText: includePrecedingText && !isSecure ? precedingText(of: client) : nil
         )
+    }
+
+    /// 入力位置の前にある文字列．アプリが教えないときは nil．中身はログに出さない
+    private func precedingText(of client: any IMKTextInput) -> String? {
+        let selection = client.selectedRange()
+        guard selection.location != NSNotFound, selection.location > 0 else { return nil }
+        let length = min(selection.location, DefaultSettings.maximumLeftContextLength)
+        return client.attributedSubstring(from: NSRange(location: selection.location - length, length: length))?.string
     }
 }

@@ -13,7 +13,7 @@ if [ -d "$destination/$app_name.app" ]; then
   swift "$root/tools/macos/input_source.swift" disable "$destination/$app_name.app"
 fi
 pkill -x "$app_name" 2>/dev/null || true
-rm -rf "$destination/$app_name.app"
+sudo rm -rf "$destination/$app_name.app"
 echo "消しました: $destination/$app_name.app"
 
 if [ "$purge" = "--purge" ]; then

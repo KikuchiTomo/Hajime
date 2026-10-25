@@ -1,5 +1,6 @@
 # install.sh と uninstall.sh で共有する，本番と開発版の名前．apps/macos/project.yml の configs と合わせる
-destination="$HOME/Library/Input Methods"
+# 全ユーザー共通の置き場所に入れる．配布物(.pkg)と azooKey と同じ場所で，手元で入力ソースとして選べることを確かめた場所
+destination="/Library/Input Methods"
 
 variant() {
   configuration=$1

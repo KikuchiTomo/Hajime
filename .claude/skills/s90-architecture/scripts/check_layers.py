@@ -23,6 +23,8 @@ ALLOWED: dict[str, set[str]] = {
         "KanaKanjiConverterModule",
         "KanaKanjiConverterModuleWithDefaultDictionary",
         "SwiftUtils",
+        # Zenzai のモデルのハッシュを確かめるため(OS の標準のライブラリ)
+        "CryptoKit",
     },
     "S90Persistence": {"Foundation", "S90Domain", "S90Application"},
     "S90IPC": {"Foundation", "S90Domain", "S90Application"},

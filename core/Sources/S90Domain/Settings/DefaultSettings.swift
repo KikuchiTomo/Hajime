@@ -41,6 +41,8 @@ public enum DefaultSettings {
     public static let engineCandidateCount = 20
     /// タイプミスの補正を試す最短の長さ．短い並びは英単語と偶然一致しやすい
     public static let minimumCorrectionLength = 4
+    /// タイプミスの補正を試す最長の長さ．長い並びを英単語の辞書に問い合わせる手間を抑える
+    public static let maximumCorrectionLength = 24
     /// 綴りの補正で許す編集距離
     public static let maximumCorrectionDistance = 2
     /// 文節格子で，第 1 候補と 2 番目の点数の差がこれより小さい文節は確信度が低いとみなし，候補の列を見せる．
@@ -48,6 +50,10 @@ public enum DefaultSettings {
     public static let latticeConfidenceGap: Double = 2.0
     /// 文節格子の列ごとに見せる候補の数
     public static let latticeCandidatesPerSegment = 5
+    /// Zenzai が 1 回の変換で推論する回数の上限．小さいほど速く，大きいほど精度がよい(azooKey の既定は 10)
+    public static let zenzaiInferenceLimit = 10
+    /// Zenzai に渡す左の文脈の最大の長さ(文字数)
+    public static let maximumLeftContextLength = 40
     /// 設定ファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)
     public static let maximumSettingsFileBytes = 256 * 1024
 }
