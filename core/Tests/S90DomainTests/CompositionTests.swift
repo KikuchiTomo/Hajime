@@ -12,6 +12,7 @@ struct CompositionTests {
     @Test("よく使う綴り", arguments: [
         ("konnnitiha", "こんにちは"),
         ("hunniki", "ふんいき"),
+        ("hannei", "はんえい"),
         ("onnna", "おんな"),
         ("kanji", "かんじ"),
         ("shinnnyuu", "しんにゅう"),

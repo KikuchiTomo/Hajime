@@ -25,6 +25,11 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     /// ファイルを確かめてから作る．大きさとハッシュのどちらかが違えば使わない
     public static func verified(at url: URL) throws(VerificationError) -> ZenzaiModel {
+        try verified(at: url, expectedSize: expectedSize, expectedSHA256: expectedSHA256)
+    }
+
+    /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
+    static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
             let size = (attributes[.size] as? NSNumber)?.intValue else {
             throw .fileNotFound

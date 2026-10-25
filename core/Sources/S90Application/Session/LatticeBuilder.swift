@@ -65,7 +65,7 @@ struct LatticeBuilder {
         // ひらがなとカタカナは，エンジンが出さなくても選べるようにする
         append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
         append(Candidate(text: KanaWidth.katakana(from: slice), readingCount: length, origin: .variant(.katakana)))
-        let engineCandidates = candidates.filter { if case .engine = $0.origin { true } else { false } }
+        let engineCandidates = candidates.filter(\.isFromEngine)
         let confident = SegmentLattice.isConfident(best: engineCandidates.first, second: engineCandidates.dropFirst().first)
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates, isConfident: confident)
     }

@@ -12,7 +12,7 @@ s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs
 - 受け入れ条件
   - ローマ字・かな入力のどちらでも動く
   - 1 キーの処理(ライブ変換を含む)は，p95 で 50ms 以内．打鍵の間隔(速い人で 170ms 前後)より十分に短くする
-    - 2026-10-25 の計測: p50 20ms，p95 29ms(Apple Silicon，Release，30 字ほどの文．`core/Tests/S90EngineTests/LatencyProbeTests.swift`)
+    - 2026-10-26 の計測(Apple Silicon，Release，30 字ほどの文．`core/Tests/S90EngineTests/LatencyProbeTests.swift`): Zenzai なしで p50 18ms，p95 30ms．Zenzai ありで p50 20ms，p95 34ms
     - Zenzai のような重い変換を入れて間に合わなくなったら，読みのまま表示して結果が出たら置き換える形にする
   - 句読点・Enter・Space で，表示中の結果を確定または候補選択に移れる
   - アプリごとの設定(R-06)でライブ変換を切れる

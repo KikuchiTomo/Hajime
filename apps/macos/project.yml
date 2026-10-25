@@ -38,8 +38,11 @@ targets:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/en.lproj/InfoPlist.strings
       - name: Zenzai のモデルを入れる
         path: ../../tools/macos/copy_zenzai_model.sh
-        # モデルはリポジトリの外にあり，無いこともあるので，スクリプトの読み書きの範囲を制限しない
-        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/../../tools/macos/copy_zenzai_model.sh
+          - $(SRCROOT)/../../../models/zenz-v3.2-small-Q5_K_M.gguf
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-small-Q5_K_M.gguf
     dependencies:
       - package: S90Core
         product: S90Domain
@@ -73,8 +76,6 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
-        # Zenzai のモデルをリポジトリの外から読むため，ビルドのスクリプトのサンドボックスを外す
-        ENABLE_USER_SCRIPT_SANDBOXING: NO
         COMBINE_HIDPI_IMAGES: YES
       # Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる
       configs:

@@ -10,6 +10,8 @@ public enum CandidateOrigin: Sendable, Equatable {
     case variant(ScriptVariant)
     /// 文全体の候補から切り出した文節．学習には使わない
     case sentencePart
+    /// 複数の候補をつないだもの(文節格子の全体など)
+    case combined
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．
@@ -25,6 +27,11 @@ public struct Candidate: Sendable, Equatable {
         self.readingCount = readingCount
         self.origin = origin
         self.score = score
+    }
+
+    /// 変換エンジンが出した候補か．確定したときに学習に使うのはこれだけ
+    public var isFromEngine: Bool {
+        if case .engine = origin { true } else { false }
     }
 }
 
