@@ -56,6 +56,13 @@ public enum DefaultSettings {
     /// 直した読みが打ったままの読みより，対数確率でいくつ以上よければ直すか．
     /// 「こんにちは」を「こんいちば」にするような誤った訂正(差 1.9)を避け，「ようですね」→「よいですね」(差 3.6)は直す
     public static let readingCorrectionMargin = 3.0
+    /// ライブ変換で，読みがこの文字数に満たないあいだは，打鍵が止まるまでかなのまま見せる
+    public static let liveConversionMinimumLength = 3
+    /// ライブ変換で，末尾の語の読みがこの文字数以下なら，打鍵が止まるまでかなのまま見せる(「らい」→「雷」を出さない)．
+    /// 評価用の文で途中表示の誤りが 50 から 23 に減り，変換して見せた時点は 197 から 169 に減った
+    public static let liveConversionHeldWordLength = 3
+    /// 打鍵が止まったとみなすまでの時間(秒)．止まったら変換した文を見せる
+    public static let liveConversionSettleDelay = 0.4
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
     public static let symbolCandidateOffset = 3
     /// 文節格子の列ごとに見せる候補の数

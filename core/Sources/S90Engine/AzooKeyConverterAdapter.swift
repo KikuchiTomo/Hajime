@@ -226,7 +226,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
             text: candidate.text,
             readingCount: Self.readingCount(candidate.composingCount, readingLength: readingLength),
             origin: .engine(id: id),
-            score: Double(candidate.value)
+            score: Double(candidate.value),
+            trailingWord: candidate.data.last.map { .init(readingCount: $0.ruby.count, textCount: $0.word.count) }
         )
     }
 
