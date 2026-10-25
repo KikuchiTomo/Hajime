@@ -18,6 +18,8 @@ final class InputMenuBuilder: NSObject {
         let menu = NSMenu()
         menu.addItem(toggle(UIStrings.Menu.liveConversion, isOn: current.liveConversion, action: #selector(toggleLiveConversion)))
         menu.addItem(toggle(UIStrings.Menu.variantRow, isOn: current.showsVariantRow, action: #selector(toggleVariantRow)))
+        menu.addItem(choices(UIStrings.Menu.presentation, CandidatePresentation.allCases, selected: current.candidatePresentation,
+                             label: UIStrings.Menu.label(for:), action: #selector(selectPresentation)))
         menu.addItem(.separator())
         menu.addItem(choices(UIStrings.Menu.typoCorrection, TypoCorrectionLevel.allCases, selected: current.typoCorrection,
                              label: UIStrings.Menu.label(for:), action: #selector(selectTypoCorrection)))
@@ -70,6 +72,11 @@ final class InputMenuBuilder: NSObject {
     @objc private func selectYenKey(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let value = YenKeyPolicy(rawValue: raw) else { return }
         update { $0.yenKey = value }
+    }
+
+    @objc private func selectPresentation(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let value = CandidatePresentation(rawValue: raw) else { return }
+        update { $0.candidatePresentation = value }
     }
 
     @objc private func selectTheme(_ sender: NSMenuItem) {

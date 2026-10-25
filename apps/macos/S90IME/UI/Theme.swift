@@ -67,6 +67,15 @@ struct ResolvedTheme {
         )
     }
 
+    /// 区画を分ける線の色．desk は暗い面なので光の縁の色，native は OS の区切り線の色
+    var separator: NSColor {
+        switch kind {
+        case .platinum: bevelShadow
+        case .desk: bevelLight
+        case .native: .separatorColor
+        }
+    }
+
     var hasBevel: Bool { kind != .native }
     var hasDropShadow: Bool { kind == .desk }
     var cornerRadius: CGFloat { kind == .native ? DesignTokens.Size.Candidate.cornerRadiusNative : 0 }

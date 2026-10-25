@@ -8,6 +8,10 @@ enum UIStrings {
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "種類 \(index) / \(total)" }
     }
 
+    enum Lattice {
+        static let hint = "← → 文節　↑ ↓ 候補　⇧← → 区切り"
+    }
+
     enum ModeIndicator {
         static func label(for mode: InputMode) -> String {
             switch mode {
@@ -23,6 +27,15 @@ enum UIStrings {
         static let typoCorrection = "タイプミスの補正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "外観"
+        static let presentation = "候補の出し方"
+
+        static func label(for presentation: CandidatePresentation) -> String {
+            switch presentation {
+            case .automatic: "自動(文節が 2 つ以上なら文節格子)"
+            case .list: "一覧"
+            case .lattice: "文節格子"
+            }
+        }
 
         static func label(for level: TypoCorrectionLevel) -> String {
             switch level {

@@ -9,7 +9,7 @@ final class CandidateView: NSView {
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
     /// 第 1 候補と選んでいる候補以外の濃さ．出した直後は薄くし，すぐに濃くする(ephemeral adaptation)．
-    /// 位置は動かさない．reports/IME候補提示の木構造と認知科学.md の提案による
+    /// 位置は動かさない．docs/dev/research/candidate-presentation.md の提案による
     var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
 
     override var isFlipped: Bool { true }
@@ -47,11 +47,7 @@ final class CandidateView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let panel else { return }
         let body = NSRect(x: 0, y: 0, width: bounds.width - dropShadowOffset, height: bounds.height - dropShadowOffset)
-        // isFlipped なので，影は右と下(y が大きい側)に出す
-        if theme.hasDropShadow {
-            theme.frame.setFill()
-            body.offsetBy(dx: dropShadowOffset, dy: dropShadowOffset).fill()
-        }
+        BevelDrawing.drawDropShadow(for: body, theme: theme)
         BevelDrawing.drawPanel(in: body, theme: theme)
         let content = body.insetBy(dx: inset, dy: inset)
         var y = content.minY

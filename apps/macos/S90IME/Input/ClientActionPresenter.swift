@@ -26,6 +26,8 @@ final class ClientActionPresenter {
                 client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: Self.noReplacement)
             case .showCandidates(let panel):
                 candidatePanel.show(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
+            case .showLattice(let panel):
+                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
             case .hideCandidates:
                 candidatePanel.hide()
             case .showModeIndicator(let mode):

@@ -29,17 +29,16 @@ enum BevelDrawing {
         NSRect(x: inner.maxX - bevel, y: inner.minY, width: bevel, height: inner.height).fill()
     }
 
-    /// ぼかしの無い影(desk だけ)
+    /// ぼかしの無い影(desk だけ)．上下が反転した(isFlipped の)ビューで，右と下に出す
     static func drawDropShadow(for rect: NSRect, theme: ResolvedTheme) {
         guard theme.hasDropShadow else { return }
         let offset = DesignTokens.Size.Candidate.shadowOffset
         theme.frame.setFill()
-        rect.offsetBy(dx: offset, dy: -offset).fill()
+        rect.offsetBy(dx: offset, dy: offset).fill()
     }
 
     static func drawSeparator(y: CGFloat, from minX: CGFloat, to maxX: CGFloat, theme: ResolvedTheme) {
-        (theme.kind == .desk ? theme.bevelLight : theme.bevelShadow).setFill()
-        if theme.kind == .native { NSColor.separatorColor.setFill() }
+        theme.separator.setFill()
         NSRect(x: minX, y: y, width: maxX - minX, height: DesignTokens.Size.Candidate.frameWidth).fill()
     }
 }

@@ -2,11 +2,12 @@ import AppKit
 import S90Application
 import S90Domain
 
-/// 候補ウィンドウを出し入れする．ウィンドウはアプリ全体で 1 つだけ使い回す．
+/// 候補ウィンドウ(一覧と文節格子)を出し入れする．ウィンドウはアプリ全体で 1 つだけ使い回す．
 @MainActor
 final class CandidatePanelController {
     private let window: NSPanel
     private let view = CandidateView()
+    private let latticeView = LatticeView()
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
 
@@ -15,18 +16,33 @@ final class CandidatePanelController {
     }
 
     func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemePreference, fontSize: Double) {
-        let wasVisible = window.isVisible
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.panel = panel
-        let size = view.fittingSize(for: panel)
-        let origin = FloatingPanel.origin(for: size, caret: caret)
-        window.setFrame(NSRect(origin: origin, size: size), display: true)
+        present(view, size: view.fittingSize(for: panel), caret: caret)
+        announceSelection(panel)
+    }
+
+    func showLattice(_ panel: LatticePanel, caret: NSRect, theme: ThemePreference, fontSize: Double) {
+        latticeView.theme = ResolvedTheme.resolve(theme)
+        latticeView.fontSize = CGFloat(fontSize)
+        latticeView.panel = panel
+        present(latticeView, size: latticeView.fittingSize(for: panel), caret: caret)
+        if let focused = panel.columns.first(where: \.isFocused) {
+            announce(focused.text)
+        }
+    }
+
+    private func present(_ content: NSView, size: NSSize, caret: NSRect) {
+        let wasVisible = window.isVisible && window.contentView === content
+        if window.contentView !== content {
+            window.contentView = content
+        }
+        window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
         if !wasVisible {
             startRestFadeIn()
             window.orderFrontRegardless()
         }
-        announceSelection(panel)
     }
 
     func hide() {
@@ -41,10 +57,10 @@ final class CandidatePanelController {
     private func startRestFadeIn() {
         fadeTimer?.invalidate()
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            view.restOpacity = 1
+            setRestOpacity(1)
             return
         }
-        view.restOpacity = 0
+        setRestOpacity(0)
         let duration = DesignTokens.Motion.CandidateRest.fadeIn / 1000
         let start = Date()
         fadeTimer = Timer.scheduledTimer(withTimeInterval: Self.frameInterval, repeats: true) { [weak self] _ in
@@ -56,21 +72,29 @@ final class CandidatePanelController {
 
     private func stepFade(start: Date, duration: TimeInterval) {
         let progress = min(Date().timeIntervalSince(start) / duration, 1)
-        view.restOpacity = CGFloat(progress)
+        setRestOpacity(CGFloat(progress))
         if progress >= 1 {
             fadeTimer?.invalidate()
             fadeTimer = nil
         }
     }
 
+    private func setRestOpacity(_ value: CGFloat) {
+        view.restOpacity = value
+        latticeView.restOpacity = value
+    }
+
     /// VoiceOver が動いているときだけ，選んでいる候補を読み上げる
     private func announceSelection(_ panel: CandidatePanel) {
-        guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         let text: String? = switch panel.focus {
         case .candidate: panel.selectedEntry.flatMap { panel.entries.indices.contains($0) ? panel.entries[$0].text : nil }
         case .variants: panel.selectedVariant.flatMap { panel.variants.indices.contains($0) ? panel.variants[$0].label : nil }
         }
-        guard let text, text != lastAnnounced else { return }
+        announce(text)
+    }
+
+    private func announce(_ text: String?) {
+        guard NSWorkspace.shared.isVoiceOverEnabled, let text, text != lastAnnounced else { return }
         lastAnnounced = text
         NSAccessibility.post(element: window, notification: .announcementRequested, userInfo: [
             .announcement: text,

@@ -4,6 +4,10 @@ import os
 
 private let logger = Logger(subsystem: "tokyo.s90.inputmethod.S90IME", category: "app")
 
+#if DEBUG
+MainActor.assumeIsolated { SnapshotRenderer.runIfRequested() }
+#endif
+
 MainActor.assumeIsolated {
     do {
         try CompositionRoot.install()
