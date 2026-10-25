@@ -23,6 +23,10 @@ test:
 build-macos:
 	cd apps/macos && xcodegen generate --quiet && xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration Release -derivedDataPath build build -quiet
 
+# 配布物(.pkg)を作る．署名と公証は使える証明書と設定があるときだけ(tools/macos/package.sh)
+package-macos:
+	tools/macos/package.sh
+
 # 本番を入れる
 install-macos:
 	tools/macos/install.sh Release
