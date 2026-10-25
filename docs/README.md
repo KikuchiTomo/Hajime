@@ -16,6 +16,7 @@ docs/
 │   ├── SECURITY-MODEL.md 守るものと決まり
 │   ├── DESIGN-SYSTEM.md  見た目の決まり
 │   ├── UPSTREAM.md       azooKey の fork との付き合い方
+│   ├── research/         設計の根拠にした調査(候補の出し方など)
 │   └── adr/              設計の判断の記録
 ├── specs/                要件(REQUIREMENTS.md)と機能ごとの仕様
 └── site/PLAN.md          ドキュメントサイトの計画
