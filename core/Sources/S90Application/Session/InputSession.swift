@@ -27,6 +27,8 @@ public final class InputSession {
     private let corrector: EnglishWordCorrector
     /// EN 入力(R-05)．入力方式が英語のときだけ使う
     private let english: EnglishInput
+    /// ターミナルで打っている行の状態(R-07)
+    private var commandLine = CommandLineState()
     /// 日本語の打ち間違いを直す前の読み．Esc で戻せるように覚えておく
     private var typedBeforeCorrection: Composition?
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
@@ -120,6 +122,9 @@ public final class InputSession {
         if case .lattice(var lattice) = phase, let result = handleLattice(event, lattice: &lattice, context: context) {
             return result
         }
+        if context.profile == .terminal, let result = handleTerminal(event, context: context) {
+            return result
+        }
         if settings.current.inputStyle == .english, let result = handleEnglish(event) {
             return result
         }
@@ -156,6 +161,40 @@ public final class InputSession {
             return handleHorizontal(forward: event.key == .right)
         case .tab:
             return isComposing ? KeyResult(handled: true) : .passThrough
+        }
+    }
+
+    // MARK: - ターミナル(R-07)
+
+    /// ターミナルのキー．nil を返したキーは，ふつうの処理に回す
+    private func handleTerminal(_ event: KeyEvent, context: InputContext) -> KeyResult? {
+        switch event.key {
+        case .enter where !isComposing:
+            commandLine.endLine()
+            return nil
+        case .space where phase == .composing && !composition.isEmpty:
+            // 行の頭でコマンドの名前を打って Space を押したら，打ったとおりの英字で確定してコマンドの行に入る
+            guard let keys = composition.rawKeys, commandLine.didTypeFirstWord(keys) else { return nil }
+            reset()
+            return KeyResult(handled: true, actions: [.commit(keys + " "), .setMarkedText(.empty), .hideCandidates])
+        case .character(let character) where commandLine.passesThrough && !isComposing && !event.modifiers.contains(.control):
+            // コマンドの行では英字も記号もそのまま流す
+            commandLine.didPass(character)
+            return .passThrough
+        case .character(let character) where isComposing && commandLine.region == .quoted(character):
+            // 引用符の中の日本語は，閉じる引用符で確定し，引用符はそのまま流す
+            commandLine.didPass(character)
+            return KeyResult(handled: false, actions: commitAll())
+        case .character(let character) where !isComposing && (character == "\"" || character == "'"):
+            // 引用符を閉じたらコマンドの行に戻る
+            commandLine.didPass(character)
+            return .passThrough
+        case .character(let character) where event.modifiers.contains(.control) && (character == "c" || character == "u"):
+            // Ctrl+C・Ctrl+U は行を捨てる
+            commandLine.endLine()
+            return nil
+        default:
+            return nil
         }
     }
 
@@ -446,6 +485,7 @@ public final class InputSession {
     }
 
     private func reset() -> [ClientAction] {
+        if !composition.isEmpty { commandLine.didCommitText() }
         composition = Composition()
         typedBeforeCorrection = nil
         phase = .composing

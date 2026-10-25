@@ -758,3 +758,59 @@ struct InputStyleScenarioTests {
         #expect(actions(session(.english), "string".map { KeyEvent(.character($0)) }).panel == nil)
     }
 }
+
+@MainActor
+@Suite("ターミナルでのコマンドの入力(R-07)")
+struct TerminalScenarioTests {
+    private let terminal = InputContext(profile: .terminal)
+
+    private func type(_ session: InputSession, _ text: String) -> (committed: String, passed: String, marked: String) {
+        var committed = "", passed = "", marked = ""
+        for character in text {
+            let event = character == " " ? KeyEvent(.space) : KeyEvent(.character(character))
+            let result = session.handle(event, context: terminal)
+            for action in result.actions {
+                if case .commit(let value) = action { committed += value }
+                if case .setMarkedText(let value) = action { marked = value.text }
+            }
+            if !result.handled { passed.append(character) }
+        }
+        return (committed, passed, marked)
+    }
+
+    private func makeSession() -> InputSession {
+        InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+    }
+
+    @Test("行の頭でコマンドの名前を打って Space を押すと英字で確定し，その行の残りは英字のまま流す")
+    func command() {
+        let session = makeSession()
+        let result = type(session, "git status")
+        #expect(result.committed == "git ")
+        #expect(result.passed == "status")
+    }
+
+    @Test("引用符の中は日本語を打て，閉じる引用符で確定する")
+    func quoted() {
+        let session = makeSession()
+        let result = type(session, "git commit -m \"nihongo\"")
+        #expect(result.committed == "git にほんご")
+        #expect(result.passed.hasSuffix("\""))
+    }
+
+    @Test("コマンドの名前で始まらない行は，ふつうに日本語を打てる")
+    func text() {
+        let session = makeSession()
+        let result = type(session, "kyouha")
+        #expect(result.marked == "きょうは")
+        #expect(result.passed.isEmpty)
+    }
+
+    @Test("Enter で行が終わると，次の行はまた行の頭から")
+    func newLine() {
+        let session = makeSession()
+        _ = type(session, "ls ")
+        _ = session.handle(KeyEvent(.enter), context: terminal)
+        #expect(type(session, "aiueo").marked == "あいうえお")
+    }
+}
