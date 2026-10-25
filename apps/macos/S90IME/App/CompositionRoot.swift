@@ -16,15 +16,17 @@ final class CompositionRoot {
 
     let settings: FileSettingsStore
     let engine: AzooKeyConverterEngine
+    let usage: FileUsageStore
     let lexicon: SpellCheckerLexicon
     let candidatePanel: CandidatePanelController
     let modeIndicator: ModeIndicatorController
     let contextProvider: InputContextProvider
     let calendar = SystemCalendar()
 
-    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine) {
+    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore) {
         self.settings = settings
         self.engine = engine
+        self.usage = usage
         self.lexicon = SpellCheckerLexicon()
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
@@ -46,7 +48,8 @@ final class CompositionRoot {
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
         FontRegistry.registerBundledFonts()
-        installed = CompositionRoot(settings: settings, engine: engine)
+        let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
+        installed = CompositionRoot(settings: settings, engine: engine, usage: usage)
     }
 
     /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
@@ -64,11 +67,11 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar), lexicon: lexicon, settings: settings)
+        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar), lexicon: lexicon, settings: settings, usage: usage)
     }
 
     /// 設定の画面．開くたびに作らず使い回す
-    private(set) lazy var settingsWindow = SettingsWindowController(settings: settings, resetLearning: { [engine] in engine.resetLearning() })
+    private(set) lazy var settingsWindow = SettingsWindowController(settings: settings, usage: usage, resetLearning: { [engine] in engine.resetLearning() })
 
     func makePresenter() -> ClientActionPresenter {
         ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, settings: settings)

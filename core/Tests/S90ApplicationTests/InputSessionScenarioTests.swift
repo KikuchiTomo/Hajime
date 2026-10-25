@@ -814,3 +814,31 @@ struct TerminalScenarioTests {
         #expect(type(session, "aiueo").marked == "あいうえお")
     }
 }
+
+@MainActor
+private final class RecordingUsage: UsageRecording {
+    var events: [UsageEvent] = []
+    func record(_ event: UsageEvent) { events.append(event) }
+}
+
+@MainActor
+@Suite("使い方の記録")
+struct UsageScenarioTests {
+    @Test("ライブ変換のまま確定，候補を開いて選び直して確定，を記録する")
+    func records() {
+        let usage = RecordingUsage()
+        let converter = FakeConverter(["あめ": [("雨", nil)]], clauses: ["あめ": [("雨", 2), ("飴", 2)]])
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), usage: usage)
+        for key in "ame" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        _ = session.handle(KeyEvent(.enter), context: InputContext())
+        for key in "ame" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        _ = session.handle(KeyEvent(.space), context: InputContext())
+        _ = session.handle(KeyEvent(.down), context: InputContext())
+        _ = session.handle(KeyEvent(.enter), context: InputContext())
+        #expect(usage.events == [
+            .committed(changedSegments: 0, viaConversion: false),
+            .conversionOpened,
+            .committed(changedSegments: 1, viaConversion: true),
+        ])
+    }
+}

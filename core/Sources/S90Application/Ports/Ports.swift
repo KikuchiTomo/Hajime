@@ -48,3 +48,9 @@ public protocol CalendarReading: AnyObject {
     func now() -> CalendarDate
     func day(offsetFromToday offset: Int) -> CalendarDate
 }
+
+/// 使い方の記録を受け取るポート．回数だけを数え，入力した文字列は渡さない
+@MainActor
+public protocol UsageRecording: AnyObject {
+    func record(_ event: UsageEvent)
+}

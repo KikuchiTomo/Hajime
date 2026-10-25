@@ -211,3 +211,18 @@ struct ReadingCorrectionRuleTests {
         #expect(ReadingCorrectionRule(level: .standard).correction(among: [fixed, other], reading: "よう") == fixed)
     }
 }
+
+@Suite("使い方の記録")
+struct UsageCountsTests {
+    @Test("候補を開かずに確定したものと，開いて選び直さなかったものを，第 1 候補のまま確定した割合に数える")
+    func firstCandidateRate() {
+        var counts = UsageCounts()
+        #expect(counts.firstCandidateRate == nil)
+        counts.record(.committed(changedSegments: 0, viaConversion: false))
+        counts.record(.committed(changedSegments: 0, viaConversion: true))
+        counts.record(.committed(changedSegments: 2, viaConversion: true))
+        counts.record(.committed(changedSegments: 0, viaConversion: false))
+        #expect(counts.firstCandidateRate == 0.75)
+        #expect(counts.segmentsChanged == 2)
+    }
+}

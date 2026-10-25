@@ -57,6 +57,8 @@ public enum DefaultSettings {
     public static let liveConversionSettleDelay = 0.4
     /// EN 入力で日本語の候補を出し始める英字の数．短い英単語(an，to など)に候補を出さない
     public static let minimumEnglishInputSuggestionLength = 4
+    /// 使い方の記録を，何回ごとにファイルへ書くか
+    public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
     public static let symbolCandidateOffset = 3
     /// 文節格子の列ごとに見せる候補の数

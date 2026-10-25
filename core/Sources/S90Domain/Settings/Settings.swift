@@ -44,6 +44,8 @@ public struct Settings: Sendable, Equatable {
     public var learning = LearningMode.enabled
     /// 利用者が登録した語
     public var userDictionary: [UserDictionaryEntry] = []
+    /// 使い方を記録する(回数だけを端末の中に)
+    public var recordsUsage = true
 
     // MARK: 見た目
     public var theme = ThemePreference.automatic
@@ -67,7 +69,7 @@ extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case inputStyle, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits
         case typoCorrection, candidatePresentation, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
-        case learning, userDictionary
+        case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case profileRules
     }
@@ -99,6 +101,7 @@ extension Settings: Codable {
         read(.emojiConversion, into: \.emojiConversion)
         read(.learning, into: \.learning)
         read(.userDictionary, into: \.userDictionary)
+        read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
         read(.showsModeIndicator, into: \.showsModeIndicator)
@@ -126,6 +129,7 @@ extension Settings: Codable {
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
+        try container.encode(recordsUsage, forKey: .recordsUsage)
         try container.encode(theme, forKey: .theme)
         try container.encode(candidateFontSize, forKey: .candidateFontSize)
         try container.encode(showsModeIndicator, forKey: .showsModeIndicator)

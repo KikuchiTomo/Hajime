@@ -35,7 +35,7 @@ enum SnapshotRenderer {
     /// 設定の画面(入力のタブ)．設定は一時ディレクトリに置き，利用者の設定に触れない
     private static func settingsView() -> NSView {
         let store = FileSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshot-settings.json"))
-        let view = NSHostingView(rootView: SettingsView(model: SettingsModel(store: store, resetLearning: {})))
+        let view = NSHostingView(rootView: SettingsView(model: SettingsModel(store: store, usage: nil, resetLearning: {})))
         view.frame = NSRect(origin: .zero, size: SettingsView.size)
         view.layoutSubtreeIfNeeded()
         return view
