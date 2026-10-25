@@ -23,6 +23,7 @@ public final class SymbolSupplementedConverter: KanaKanjiConverting {
     }
 
     public func plausibility(of reading: String) -> Double { base.plausibility(of: reading) }
+    public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { base.typoCorrections(forKeys: keys) }
     public func setLeftContext(_ text: String?) { base.setLeftContext(text) }
     public func didCommit(_ candidate: Candidate) { base.didCommit(candidate) }
     public func endComposition() { base.endComposition() }

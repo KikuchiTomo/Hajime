@@ -37,6 +37,7 @@ enum Interactive {
                 // 幹(文)を ─ でつなぎ，迷う文節に ⑂ を付ける．注目している文節の枝を下に並べる
                 let trunk = grid.columns.map { ($0.isFocused ? "[\($0.text)]" : $0.text) + ($0.isUncertain ? "⑂" : "") }
                 print("  分岐図:     \(trunk.joined(separator: " ─ "))")
+                if let note = grid.note { print("    \(note)") }
                 for column in grid.columns {
                     if column.isFocused {
                         print("    ↑ 字種: \(column.variants.joined(separator: " / "))")

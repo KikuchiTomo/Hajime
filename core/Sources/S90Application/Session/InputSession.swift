@@ -25,6 +25,8 @@ public final class InputSession {
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
+    /// 日本語の打ち間違いを直す前の読み．Esc で戻せるように覚えておく
+    private var typedBeforeCorrection: Composition?
 
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading) {
         self.converter = converter
@@ -220,11 +222,34 @@ public final class InputSession {
     /// 変換を始める．設定が一覧でなければ分岐図にする．
     /// 英単語を補正しているときは，補正と入力のままを並べて比べられるよう一覧にする
     private func enterConversion() {
+        correctReading()
         if settings.current.candidatePresentation != .list, corrector.active == nil {
             phase = .lattice(LatticeBuilder(converter: converter).build(reading: composition.conversionReading))
             return
         }
         phase = .selecting(makeSelection(focus: .candidate(0)))
+    }
+
+    /// 日本語の打ち間違いを直す(「ようですね」→「よいですね」)．変換を始めるときだけ行う．
+    /// 打ち間違いを探すのは重いので打鍵ごとにはせず，直したことは画面に出して Esc で戻せるようにする
+    private func correctReading() {
+        typedBeforeCorrection = nil
+        guard corrector.active == nil, let keys = composition.rawKeys, !keys.isEmpty,
+            keys.allSatisfy({ ($0.isASCII && $0.isLetter && $0.isLowercase) || $0 == "-" }),
+            composition.pending.isEmpty || composition.pending == "n" else { return }
+        let rule = ReadingCorrectionRule(level: settings.current.typoCorrection)
+        guard let correction = rule.correction(among: converter.typoCorrections(forKeys: keys), reading: composition.conversionReading)
+        else { return }
+        // 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ
+        var corrected = Composition()
+        let resolver = NasalReadingResolver(converter: converter)
+        for key in correction.keys {
+            corrected.insertRomaji(key)
+            resolver.resolve(&corrected)
+        }
+        guard !corrected.isEmpty, corrected.conversionReading != composition.conversionReading else { return }
+        typedBeforeCorrection = composition
+        composition = corrected
     }
 
     private func handleVertical(forward: Bool, context: InputContext) -> KeyResult {
@@ -286,6 +311,11 @@ public final class InputSession {
         guard isComposing else { return .passThrough }
         if phase != .composing {
             phase = .composing
+            if let typed = typedBeforeCorrection {
+                // 打ち間違いを直していたら，打ったままの読みに戻す
+                composition = typed
+                typedBeforeCorrection = nil
+            }
             return KeyResult(handled: true, actions: render(context: context))
         }
         return KeyResult(handled: true, actions: reset())
@@ -333,6 +363,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         composition = Composition()
+        typedBeforeCorrection = nil
         phase = .composing
         corrector.reset()
         converter.endComposition()
@@ -429,12 +460,16 @@ public final class InputSession {
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
-            return [.setMarkedText(marked), .showCandidates(PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow))]
+            var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow)
+            if typedBeforeCorrection != nil { panel.note = PanelBuilder.readingCorrectionNote }
+            return [.setMarkedText(marked), .showCandidates(panel)]
         case .lattice(let lattice):
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
                 .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
             })
-            return [.setMarkedText(marked), .showLattice(PanelBuilder.latticePanel(for: lattice))]
+            var panel = PanelBuilder.latticePanel(for: lattice)
+            if typedBeforeCorrection != nil { panel.note = PanelBuilder.readingCorrectionNote }
+            return [.setMarkedText(marked), .showLattice(panel)]
         }
     }
 

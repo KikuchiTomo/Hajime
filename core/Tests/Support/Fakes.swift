@@ -35,6 +35,9 @@ public final class FakeConverter: KanaKanjiConverting {
     }
 
     public func plausibility(of reading: String) -> Double { scores[reading] ?? (table[reading] == nil ? -.infinity : 0) }
+    /// 打ったキーごとの，打ち間違いを直した読みの候補
+    public var corrections: [String: [ReadingCorrection]] = [:]
+    public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { corrections[keys] ?? [] }
     public private(set) var leftContext: String?
     public func setLeftContext(_ text: String?) { leftContext = text }
     public func didCommit(_ candidate: Candidate) { committed.append(candidate) }
