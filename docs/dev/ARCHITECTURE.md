@@ -54,10 +54,12 @@ S90Persistence ─────┘
   - 補正: 英単語(`TypoCorrectionRule`)と日本語の打ち間違い(`ReadingCorrectionRule`)の判定
   - 記号と日付: `SymbolDictionary`，`SymbolSequence`，`DateExpressions`
   - 設定: `Settings` と既定値・上限(`DefaultSettings`)，記号の表(`SymbolTable`)，字種(`ScriptVariant`)
-- **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)と，その部品(`EnglishWordCorrector`，`EnglishInput`，`NasalReadingResolver`，`LatticeBuilder`，`PanelBuilder`)．エンジンにない候補を足す `SupplementedConverter`．外部とは `Ports/` の protocol 越しにだけ話す
-  - ポート: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsReading`・`SettingsStoring`，`CalendarReading`，`UsageRecording`
+- **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)と，その部品．エンジンにない候補を足す `SupplementedConverter`．外部とは `Ports/` の protocol 越しにだけ話す
+  - 部品: 英単語の補正(`EnglishWordCorrector`)，「nn」の読み(`NasalReadingResolver`)，分岐図(`LatticeBuilder`，`PanelBuilder`)，ターミナルの行(`TerminalLine`)
+  - 入力方式: ローマ字入力は `InputSession` の共通の処理が受け持つ．ほかの方式は `InputStyleHandling` を実装して足す(`EnglishInput`，`KanaInput`)
+  - ポート: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsReading`・`SettingsStoring`・`SettingsObserving`，`CalendarReading`，`UsageRecording`・`UsageReading`
 - **S90Engine**: `AzooKeyConverterEngine` と `AzooKeyConverterSession` が `KanaKanjiConverting` を実装する．Zenzai のモデルの確認(`ZenzaiModel`)もここ．azooKey の型はこのモジュールの外に出さない
-- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`)．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
+- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`)．本人だけが読み書きできるファイルの読み書きは `ProtectedFile` にまとめる．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
 
 ## キー入力から画面までの流れ
 

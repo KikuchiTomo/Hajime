@@ -20,6 +20,14 @@ enum UIStrings {
             case .direct: "A"
             }
         }
+
+        static func label(for style: InputStyle) -> String {
+            switch style {
+            case .romaji: "ローマ字"
+            case .kana: "かな"
+            case .english: "EN"
+            }
+        }
     }
 
     enum Settings {
@@ -82,6 +90,7 @@ enum UIStrings {
         static let restoreDefaults = "設定を既定に戻す(ユーザー辞書は残す)"
         static let saveFailed = "設定を保存できませんでした"
         static let learningReset = "学習した内容を消しました"
+        static let dictionaryFull = "ユーザー辞書がいっぱいです(10,000 語まで)"
         static let invalidEntry = "読みはひらがなで，語と合わせて長すぎないようにしてください"
         static let importFailed = "取り込めませんでした．大きすぎるか，テキストのファイルではありません"
         static let exportFailed = "書き出せませんでした"

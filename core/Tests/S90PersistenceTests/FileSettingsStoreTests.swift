@@ -44,4 +44,38 @@ struct FileSettingsStoreTests {
         try Data(repeating: 0x20, count: DefaultSettings.maximumSettingsFileBytes + 1).write(to: url)
         #expect(FileSettingsStore(fileURL: url).current == DefaultSettings.settings)
     }
+
+    @Test("読めないファイルは脇に置き，既定値で上書きして消さない")
+    func unreadableFileIsKept() throws {
+        let url = temporaryFile()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("壊れた設定".utf8).write(to: url)
+        let store = FileSettingsStore(fileURL: url)
+        #expect(store.current == DefaultSettings.settings)
+        let kept = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path).filter { $0.contains("unreadable") }
+        #expect(kept.count == 1)
+    }
+
+    @Test("ユーザー辞書を上限いっぱいに登録しても，保存して読み直せる")
+    func largestDictionary() throws {
+        let url = temporaryFile()
+        let store = FileSettingsStore(fileURL: url)
+        let reading = String(repeating: "あ", count: DefaultSettings.maximumUserDictionaryReadingLength - 5)
+        let word = String(repeating: "𠀋", count: DefaultSettings.maximumUserDictionaryWordLength)
+        try store.update { settings in
+            settings.userDictionary = (0..<DefaultSettings.maximumUserDictionaryEntries).map {
+                UserDictionaryEntry(reading: reading + String(String($0).map { "あいうえおかきくけこ".map { $0 }[Int(String($0))!] }), word: word)
+            }
+        }
+        #expect(FileSettingsStore(fileURL: url).current.userDictionary.count == DefaultSettings.maximumUserDictionaryEntries)
+    }
+
+    @Test("変更を知らせる")
+    func observe() throws {
+        let store = FileSettingsStore(fileURL: temporaryFile())
+        var received: Settings?
+        store.observe { received = $0 }
+        try store.update { $0.liveConversion = false }
+        #expect(received?.liveConversion == false)
+    }
 }

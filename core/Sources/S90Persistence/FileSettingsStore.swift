@@ -4,7 +4,7 @@ import S90Domain
 
 /// 設定を JSON のファイルに保存する．ファイルは本人だけが読み書きできる権限で作る(docs/dev/SECURITY-MODEL.md)．
 @MainActor
-public final class FileSettingsStore: SettingsStoring {
+public final class FileSettingsStore: SettingsStoring, SettingsObserving {
     public enum StoreError: Error, Equatable {
         case fileTooLarge(bytes: Int)
     }
@@ -13,17 +13,28 @@ public final class FileSettingsStore: SettingsStoring {
     public private(set) var current: Settings
     private var observers: [(Settings) -> Void] = []
 
-    /// 読めないファイル・壊れたファイルのときは既定値で始める．入力を止めないため
+    /// 読めないファイル・壊れたファイルのときは既定値で始める．入力を止めないため．
+    /// 読めなかったファイルは脇に置き，既定値で上書きして利用者の設定とユーザー辞書を消さないようにする
     public init(fileURL: URL) {
         self.fileURL = fileURL
-        self.current = (try? Self.load(from: fileURL)) ?? DefaultSettings.settings
+        do {
+            self.current = try JSONDecoder().decode(Settings.self, from: ProtectedFile.read(from: fileURL, maximumBytes: DefaultSettings.maximumSettingsFileBytes))
+        } catch {
+            if FileManager.default.fileExists(atPath: fileURL.path) { ProtectedFile.setAside(fileURL) }
+            self.current = DefaultSettings.settings
+        }
     }
 
     public func update(_ change: (inout Settings) -> Void) throws {
         var next = current
         change(&next)
         guard next != current else { return }
-        try save(next)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(next)
+        // 上限を超えるファイルは次に読めないので，書く前に断る
+        guard data.count <= DefaultSettings.maximumSettingsFileBytes else { throw StoreError.fileTooLarge(bytes: data.count) }
+        try ProtectedFile.write(data, to: fileURL)
         current = next
         observers.forEach { $0(next) }
     }
@@ -31,33 +42,5 @@ public final class FileSettingsStore: SettingsStoring {
     /// 設定が変わるたびに呼ばれる処理を足す．エンジンや設定の画面を新しい設定に合わせるのに使う
     public func observe(_ handler: @escaping (Settings) -> Void) {
         observers.append(handler)
-    }
-
-    private func save(_ settings: Settings) throws {
-        let directory = fileURL.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(settings)
-        // 権限を付けた一時ファイルに書いてから置き換える．途中で落ちても設定が壊れず，
-        // 作ってから権限を変えるあいだにほかのユーザーに読まれることもない
-        let temporary = directory.appendingPathComponent(".\(fileURL.lastPathComponent).\(UUID().uuidString)")
-        guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: temporary)
-        } else {
-            try FileManager.default.moveItem(at: temporary, to: fileURL)
-        }
-    }
-
-    private static func load(from url: URL) throws -> Settings {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
-        guard size <= DefaultSettings.maximumSettingsFileBytes else {
-            throw StoreError.fileTooLarge(bytes: size)
-        }
-        return try JSONDecoder().decode(Settings.self, from: Data(contentsOf: url))
     }
 }

@@ -877,3 +877,126 @@ struct InputStyleSwitchTests {
         #expect(actions.contains(.selectInputStyle(.romaji)))
     }
 }
+
+@MainActor
+@Suite("レビューで見つけた不具合の再発防止")
+struct ReviewRegressionTests {
+    private func session(_ settings: Settings = Settings(), converter: FakeConverter = FakeConverter()) -> (InputSession, FakeSettings) {
+        let store = FakeSettings(settings)
+        return (InputSession(converter: converter, lexicon: FakeLexicon(), settings: store), store)
+    }
+
+    private func marked(_ actions: [ClientAction]) -> String? {
+        actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+    }
+
+    private func committed(_ actions: [ClientAction]) -> String {
+        actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }.joined()
+    }
+
+    private func english() -> Settings {
+        var settings = Settings()
+        settings.inputStyle = .english
+        return settings
+    }
+
+    @Test("EN 入力では打鍵が止まっても英字を消さない")
+    func englishSettle() {
+        let (session, _) = session(english())
+        for key in "hello" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        #expect(!session.awaitsSettle)
+        #expect(session.settle(context: InputContext()).isEmpty)
+        #expect(committed(session.handle(KeyEvent(.enter), context: InputContext()).actions) == "hello")
+    }
+
+    @Test("EN 入力の Escape: 打っている途中なら英字を確定して Escape もアプリに渡し，組み立てていなければ設定どおり英数にする")
+    func englishEscape() {
+        var settings = english()
+        settings.escapeSwitchesToDirect = true
+        let (session, _) = session(settings)
+        for key in "vim" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        let first = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(committed(first.actions) == "vim")
+        #expect(first.handled == false)
+        let second = session.handle(KeyEvent(.escape), context: InputContext())
+        #expect(second.handled == false)
+        #expect(session.mode == .direct)
+    }
+
+    @Test("EN 入力の途中で Control の組み合わせを押すと，英字を確定してからアプリに渡す")
+    func englishControl() {
+        let (session, _) = session(english())
+        for key in "abc" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        let result = session.handle(KeyEvent(.character("a"), modifiers: .control), context: InputContext())
+        #expect(committed(result.actions) == "abc")
+        #expect(result.handled == false)
+    }
+
+    @Test("組み立てている途中に入力方式が変わったら，前の方式の文字を確定する")
+    func styleChangedWhileComposing() {
+        let (session, store) = session()
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        store.current.inputStyle = .english
+        let result = session.handle(KeyEvent(.character("x")), context: InputContext())
+        #expect(committed(result.actions) == "か")
+        #expect(marked(result.actions) == "x")
+    }
+
+    @Test("ターミナルの Ctrl+C で行が終わり，次の行は日本語を打てる")
+    func terminalControlC() {
+        let (session, _) = session()
+        let terminal = InputContext(profile: .terminal)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        _ = session.handle(KeyEvent(.character("c"), modifiers: .control), context: terminal)
+        var shown: String?
+        for key in "aiu" { shown = marked(session.handle(KeyEvent(.character(key)), context: terminal).actions) ?? shown }
+        #expect(shown == "あいう")
+    }
+
+    @Test("ターミナルで英数に切り替えたり履歴を呼んだりすると，行が終わる")
+    func terminalLineEnds() {
+        let terminal = InputContext(profile: .terminal)
+        for reset in [KeyEvent(.eisu), KeyEvent(.up)] {
+            let (session, _) = session()
+            for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+            _ = session.handle(KeyEvent(.space), context: terminal)
+            _ = session.handle(reset, context: terminal)
+            if reset.key == .eisu { _ = session.handle(KeyEvent(.kana), context: terminal) }
+            var shown: String?
+            for key in "ka" { shown = marked(session.handle(KeyEvent(.character(key)), context: terminal).actions) ?? shown }
+            #expect(shown == "か", "\(reset.key)")
+        }
+    }
+
+    @Test("かな入力: Shift のかな，¥ キーの長音，一覧での番号キー")
+    func kanaKeys() {
+        var settings = Settings()
+        settings.inputStyle = .kana
+        settings.candidatePresentation = .list
+        let (session, _) = session(settings, converter: FakeConverter(["ぁー": [("ァー", nil), ("ぁー", nil)]]))
+        _ = session.handle(KeyEvent(.character("#"), modifiers: .shift, keyLabel: "3"), context: InputContext())
+        let shown = marked(session.handle(KeyEvent(.yen), context: InputContext()).actions)
+        #expect(shown == "ぁー")
+        _ = session.handle(KeyEvent(.space), context: InputContext())
+        let result = session.handle(KeyEvent(.character("2"), keyLabel: "2"), context: InputContext())
+        #expect(committed(result.actions) == "ぁー")
+    }
+
+    @Test("分岐図で触って元に戻した文節は，選び直しに数えない")
+    func usageRevert() {
+        final class Recorder: UsageRecording {
+            var events: [UsageEvent] = []
+            func record(_ event: UsageEvent) { events.append(event) }
+        }
+        let recorder = Recorder()
+        let converter = FakeConverter(["あめ": [("雨", nil)]], clauses: ["あめ": [("雨", 2), ("飴", 2)]])
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), usage: recorder)
+        for key in "ame" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        _ = session.handle(KeyEvent(.space), context: InputContext())
+        _ = session.handle(KeyEvent(.down), context: InputContext())
+        _ = session.handle(KeyEvent(.up), context: InputContext())
+        _ = session.handle(KeyEvent(.enter), context: InputContext())
+        #expect(recorder.events.last == .committed(changedSegments: 0, viaConversion: true))
+    }
+}

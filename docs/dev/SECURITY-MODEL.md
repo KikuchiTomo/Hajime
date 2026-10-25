@@ -57,7 +57,9 @@
 - テーマは値(色・寸法)だけのファイルにし，コードや任意のパスを含めない
 - 使い方の記録(`FileUsageStore`)は回数だけを持ち，入力した文字列・読み・候補を含めない．`UsageEvent` に文字列の値を足さない
 - ユーザー辞書の取り込み(`UserDictionaryFile`)は 4MB までのテキストだけを読み，読みがひらがなで長さが上限以内の行だけを使う．登録できる語は 10,000 語まで
-- パーサにはファズテストを用意する(`core/Tests/Fuzz/`)
+- パーサにはファズテストを用意する(`core/Tests/S90PersistenceTests/FuzzTests.swift`)
+- 読めなかった設定のファイルは脇に置き(`settings.json.unreadable-*`)，既定値で上書きしない．書く前にも大きさの上限を確かめる
+- `Settings` と `UserDictionaryEntry` のログに出す表示(`description`)は中身を伏せる
 
 ### Windows のプロセス間通信
 

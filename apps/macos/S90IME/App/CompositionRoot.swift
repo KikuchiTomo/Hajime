@@ -21,7 +21,7 @@ final class CompositionRoot {
     let candidatePanel: CandidatePanelController
     let modeIndicator: ModeIndicatorController
     let contextProvider: InputContextProvider
-    let calendar = SystemCalendar()
+    let calendar = SystemCalendar(clock: { Date() })
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore) {
         self.settings = settings

@@ -79,6 +79,10 @@ enum DesignTokens {
             static let lineWidthSelected: CGFloat = 2
             static let underlineOffset: CGFloat = 2
         }
+        enum Settings {
+            static let windowWidth: CGFloat = 620
+            static let windowHeight: CGFloat = 520
+        }
     }
     enum Motion {
         enum ModeIndicator {

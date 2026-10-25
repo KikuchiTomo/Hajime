@@ -13,8 +13,16 @@ final class ModeIndicatorController {
     }
 
     func show(_ mode: InputMode, caret: NSRect, theme: ThemePreference) {
+        show(label: UIStrings.ModeIndicator.label(for: mode), caret: caret, theme: theme)
+    }
+
+    func show(_ style: InputStyle, caret: NSRect, theme: ThemePreference) {
+        show(label: UIStrings.ModeIndicator.label(for: style), caret: caret, theme: theme)
+    }
+
+    private func show(label: String, caret: NSRect, theme: ThemePreference) {
         view.theme = ResolvedTheme.resolve(theme)
-        view.label = UIStrings.ModeIndicator.label(for: mode)
+        view.label = label
         let size = view.fittingSize
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
         window.alphaValue = 1

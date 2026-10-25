@@ -1,0 +1,43 @@
+import S90Domain
+
+/// 入力方式ごとのキーの解釈(R-05)．ローマ字入力は InputSession の共通の処理がそのまま受け持ち，
+/// ほかの方式はこれを実装して InputSession に足す(docs/dev/ARCHITECTURE.md)
+@MainActor
+protocol InputStyleHandling: AnyObject {
+    /// キーを解釈する．nil ならローマ字入力と共通の処理に回す
+    func interpret(_ event: KeyEvent, state: InputStyleState) -> InputStyleInterpretation?
+}
+
+/// 解釈に要る入力の状態
+struct InputStyleState {
+    var settings: Settings
+    /// 候補を選んでいるか(分岐図か一覧を出しているか)
+    var isSelectingCandidates: Bool
+}
+
+enum InputStyleInterpretation: Equatable {
+    /// 方式の側で処理し終えた．結果をそのまま返す
+    case handled(KeyResult)
+    /// この文字を読みに足す(かな入力)．読みの組み立てと表示は InputSession が行う
+    case insertKana(String)
+}
+
+/// かな入力(JIS かな配列)．キーの刻印からかなを引く．状態は持たない
+@MainActor
+final class KanaInput: InputStyleHandling {
+    func interpret(_ event: KeyEvent, state: InputStyleState) -> InputStyleInterpretation? {
+        guard !event.modifiers.contains(.option) else { return nil }
+        if case .character(let character) = event.key, state.isSelectingCandidates, state.settings.numberKeySelection,
+            let digit = character.wholeNumberValue, (1...DefaultSettings.candidatesPerPage).contains(digit) {
+            // 候補を選んでいるときの番号キーは，ローマ字入力と同じく候補を選ぶ
+            return nil
+        }
+        let shift = event.modifiers.contains(.shift)
+        let kana: String? = switch event.key {
+        case .character: event.keyLabel.flatMap { KanaLayout.text(forKey: $0, shift: shift, settings: state.settings) }
+        case .yen: KanaLayout.text(forKey: "¥", shift: false, settings: state.settings)
+        default: nil
+        }
+        return kana.map(InputStyleInterpretation.insertKana)
+    }
+}

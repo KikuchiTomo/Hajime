@@ -14,7 +14,6 @@ public final class AzooKeyConverterEngine {
     private let zenzai: ZenzaiModel?
     /// 変換に効く設定(学習・日付・絵文字)．apply(_:) で入れ替える
     private var learningType: LearningType = .inputAndOutput
-    private var specialCandidateProviders: [any SpecialCandidateProvider] = KanaKanjiConverter.defaultSpecialCandidateProviders
     /// 絵文字の辞書は読み込みが重いので，一度だけ作って使い回す
     private lazy var emojiReplacer = TextReplacer.withDefaultEmojiDictionary()
     private var usesEmoji = true
@@ -68,10 +67,6 @@ public final class AzooKeyConverterEngine {
         case .readOnly: .onlyOutput
         case .disabled: .nothing
         }
-        // 日付と時刻(「きょう」「いま」)の候補は Calendar と TimeExpression が出す
-        specialCandidateProviders = KanaKanjiConverter.defaultSpecialCandidateProviders.filter { provider in
-            settings.dateConversion || !(provider is CalendarSpecialCandidateProvider || provider is TimeExpressionSpecialCandidateProvider)
-        }
         usesEmoji = settings.emojiConversion
         let entries = settings.userDictionary.filter(\.isValid).prefix(DefaultSettings.maximumUserDictionaryEntries)
         if Array(entries) != userDictionary {
@@ -120,7 +115,9 @@ public final class AzooKeyConverterEngine {
             memoryDirectoryURL: memoryDirectory,
             sharedContainerURL: memoryDirectory,
             textReplacer: usesEmoji ? emojiReplacer : .empty,
-            specialCandidateProviders: specialCandidateProviders,
+            // 和暦と西暦の読み替え(「れいわ8ねん」→「2026年」)や数の桁区切りは azooKey が出す．
+            // 「きょう」→ 日付の候補は SupplementedConverter が出す(設定の dateConversion)
+            specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
             zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext) : .off,
             metadata: .init(versionString: versionString)
         )
