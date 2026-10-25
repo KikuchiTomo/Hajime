@@ -21,11 +21,13 @@ struct InputStyleState {
     var selectableCount: Int
 }
 
-enum InputStyleInterpretation: Equatable, CustomStringConvertible {
+enum InputStyleInterpretation: Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     /// 方式の側で処理し終えた．結果をそのまま返す
     case handled(KeyResult)
     /// この文字を読みに足す(かな入力)．読みの組み立てと表示は InputSession が行う
     case insertKana(String)
+
+    var debugDescription: String { description }
 
     // かなは入力内容なので，ログには長さだけを出す
     var description: String {
@@ -47,7 +49,7 @@ final class KanaInput: InputStyleHandling {
     func interpret(_ event: KeyEvent, state: InputStyleState) -> InputStyleInterpretation? {
         guard !event.modifiers.contains(.option) else { return nil }
         if case .character(let character) = event.key, state.settings.numberKeySelection,
-            let digit = character.wholeNumberValue, (1...state.selectableCount).contains(digit) {
+            let digit = character.wholeNumberValue, digit >= 1, digit <= state.selectableCount {
             // 候補を選んでいるときの番号キーは，ローマ字入力と同じく候補を選ぶ．選べる数を超える番号はかなにする
             return nil
         }

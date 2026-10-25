@@ -72,7 +72,7 @@ public final class InputSession {
         switch mode {
         case .direct:
             let result = handleDirect(event, context: context)
-            if context.profile == .terminal { terminal.didHandle(event, passedToApp: !result.handled) }
+            if context.profile == .terminal { terminal.didHandle(event, result: result) }
             return result
         case .japanese: return handleJapanese(event, context: context)
         }
@@ -83,7 +83,7 @@ public final class InputSession {
         guard newMode != mode else { return [] }
         let actions = commitAll()
         mode = newMode
-        // 英数で打った分は行の状態に数えられないので，ターミナルの行は分からなくなる
+        // 英数にしたあとは行の頭の判断と関係なくなるので行を終える(キーで英数にしたときは TerminalLine.didHandle が終える)
         terminal.endLine()
         return actions
     }
@@ -142,7 +142,8 @@ public final class InputSession {
 
     /// 日本語モードのキー．次の順に回し，前の段で扱ったキーは後ろに回さない．
     /// 1. 入力方式が前のキーから変わっていたら，組み立て中の文字を確定する
-    /// 2. ターミナルの行(Enter・Ctrl+C などで行を終える判断は，ほかの処理より先に要る)
+    /// 2. ターミナルの行(コマンドの行で英字をそのまま流す判断は，ほかの処理より先に要る．
+    ///    行の長さと行の終わりは，処理の結果を見て TerminalLine.didHandle で数える)
     /// 3. Control の組み合わせ(R-03)
     /// 4. 分岐図の操作
     /// 5. 入力方式ごとの処理(EN 入力・かな入力)
@@ -150,14 +151,23 @@ public final class InputSession {
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
         isSettled = false
         let styleChange = adoptInputStyle()
-        if !styleChange.isEmpty {
-            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定するだけにする．
-            // このキー(Backspace や Escape など)を新しい方式で解釈すると，確定した文字に効いて意味が変わるため
-            return KeyResult(handled: true, actions: styleChange)
+        let result: KeyResult
+        if !styleChange.isEmpty, !Self.continuesAfterStyleChange(event) {
+            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定する．Backspace・Escape・Enter・矢印などは
+            // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字のキーは新しい方式で続けて打つ
+            result = KeyResult(handled: true, actions: styleChange)
+        } else {
+            let routed = routeJapanese(event, context: context)
+            result = KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
         }
-        let result = routeJapanese(event, context: context)
-        if context.profile == .terminal { terminal.didHandle(event, passedToApp: !result.handled) }
+        if context.profile == .terminal { terminal.didHandle(event, result: result) }
         return result
+    }
+
+    /// 入力方式が変わった直後でも，そのまま新しい方式で打ち続けるキー(修飾なしの文字)
+    private static func continuesAfterStyleChange(_ event: KeyEvent) -> Bool {
+        guard case .character = event.key else { return false }
+        return !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
     }
 
     private func routeJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
@@ -186,8 +196,6 @@ public final class InputSession {
         case .eisu:
             var actions = commitAll()
             mode = .direct
-            // 英数で打った分は行の状態に数えられないので，ターミナルの行は分からなくなる
-            terminal.endLine()
             actions += [.selectMode(.direct)] + modeIndicator(.direct)
             return KeyResult(handled: true, actions: actions)
         case .yen:
@@ -537,7 +545,6 @@ public final class InputSession {
             // 選び直した文節は，確定したときに第 1 候補でないもので数える(触って元に戻したものは数えない)
             let changed = lattice.segments.filter { $0.choice != .candidate(0) }.count
             usage?.record(.committed(changedSegments: changed, viaConversion: true))
-            terminal.didCommitText(length: lattice.text.count)
             return [.commit(lattice.text)] + reset()
         }
         if case .selecting(let selection) = phase {
@@ -553,7 +560,6 @@ public final class InputSession {
                 converter.didCommit(candidate)
             }
             actions.append(.commit(candidate.text))
-            terminal.didCommitText(length: candidate.text.count)
             if candidate.readingCount >= composition.conversionReading.count {
                 break
             }

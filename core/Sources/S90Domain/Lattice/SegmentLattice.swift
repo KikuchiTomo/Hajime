@@ -118,6 +118,12 @@ public struct SegmentLattice: Sendable, Equatable {
     }
 }
 
+extension SegmentLattice: CustomStringConvertible, CustomDebugStringConvertible {
+    // 候補は入力内容なので，ログには文節の数だけを出す
+    public var description: String { "SegmentLattice(segments: \(segments.count), focused: \(focusedIndex))" }
+    public var debugDescription: String { description }
+}
+
 /// 候補の出し方
 public enum CandidatePresentation: String, Sendable, Equatable, CaseIterable {
     /// 分岐図．英単語を補正しているときだけ一覧

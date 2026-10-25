@@ -156,7 +156,7 @@ private struct AppearanceTab: View {
         fontSize = value
         saveTask?.cancel()
         saveTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(DesignTokens.Motion.Settings.saveDelay))
+            try? await Task.sleep(for: .seconds(DefaultSettings.settingsSaveDelay))
             guard !Task.isCancelled else { return }
             model.update { $0.candidateFontSize = value }
             fontSize = nil
@@ -182,8 +182,7 @@ private struct AppsTab: View {
                 .labelsHidden()
                 .fixedSize()
                 Button(UIStrings.Settings.add) {
-                    model.addProfileRule(prefix: prefix, profile: profile)
-                    prefix = ""
+                    if model.addProfileRule(prefix: prefix, profile: profile) { prefix = "" }
                 }
                 .disabled(prefix.trimmingCharacters(in: .whitespaces).isEmpty)
             }

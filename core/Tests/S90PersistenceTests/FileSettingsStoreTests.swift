@@ -94,17 +94,21 @@ struct SettingsRobustnessTests {
     func symlinkSize() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-link-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("big.txt")
         try Data(count: DefaultSettings.maximumUserDictionaryFileBytes + 10).write(to: target)
         let link = directory.appendingPathComponent("link.txt")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
-        #expect(throws: UserDictionaryFile.FileError.self) { try UserDictionaryFile.read(from: link) }
+        #expect(throws: UserDictionaryFile.FileError.fileTooLarge(maximumBytes: DefaultSettings.maximumUserDictionaryFileBytes)) {
+            try UserDictionaryFile.read(from: link)
+        }
     }
 
     @Test("読めなかったファイルを脇に置いたことを知らせる")
     func reportsSetAside() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("s90-aside-\(UUID().uuidString)/settings.json")
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         try Data("{".utf8).write(to: url)
         #expect(FileSettingsStore(fileURL: url).setAsideFile != nil)
         #expect(FileSettingsStore(fileURL: url).setAsideFile == nil)

@@ -33,8 +33,8 @@ public struct CommandLineState: Sendable, Equatable {
             if region == .lineStart { region = .text }
             return false
         }
+        // 行の長さは，確定した「名前 + 空白」を didCommitText で数える
         region = .command
-        length = keys.count + 1
         lastPassed = " "
         return true
     }
@@ -75,9 +75,10 @@ public struct CommandLineState: Sendable, Equatable {
     }
 }
 
-extension CommandLineState: CustomStringConvertible {
+extension CommandLineState: CustomStringConvertible, CustomDebugStringConvertible {
     // 最後に流した文字は入力内容なので，ログには領域と長さだけを出す
     public var description: String { "CommandLineState(region: \(region), length: \(length))" }
+    public var debugDescription: String { description }
 }
 
 /// よく使うコマンドの名前．行の頭でこれを打って Space を押すと，コマンドの行とみなす

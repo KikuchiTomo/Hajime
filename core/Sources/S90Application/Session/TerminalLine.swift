@@ -3,9 +3,10 @@ import S90Domain
 /// ターミナルでのキーの扱いを決める(R-07)．行の状態は CommandLineState が持つ．
 ///
 /// キーごとに 2 回呼ぶ．
-/// - `decide`: InputSession がキーを処理する前．コマンドの行で英字を流すか，コマンドの名前を確定するかを決める
-/// - `didHandle`: 処理したあと．アプリに渡った文字と Enter・Backspace などを行の状態に数える．
-///   アプリに渡ったかは処理の結果でしか分からないので，状態を変えるのはここにまとめる
+/// - `decide`: InputSession がキーを処理する前．コマンドの行で英字を流すか，コマンドの名前を確定するかを決める．
+///   状態を変えるのは，コマンドの名前を確定してコマンドの行に入るときだけ
+/// - `didHandle`: 処理したあと．確定した文字・アプリに渡ったキー(Enter・Backspace など)を行の状態に数える．
+///   確定したかアプリに渡ったかは処理の結果でしか分からないので，数えるのはここにまとめる
 @MainActor
 final class TerminalLine {
     enum Decision: Equatable {
@@ -43,9 +44,17 @@ final class TerminalLine {
         }
     }
 
-    /// キーを処理したあとに呼ぶ．passedToApp はキーがアプリに渡ったか
-    func didHandle(_ event: KeyEvent, passedToApp: Bool) {
-        guard passedToApp else { return }
+    /// キーを処理したあとに呼ぶ．確定した文字(どの入力方式のものも)を数えてから，アプリに渡ったキーを数える
+    func didHandle(_ event: KeyEvent, result: KeyResult) {
+        for action in result.actions {
+            if case .commit(let text) = action { state.didCommitText(length: text.count) }
+        }
+        if result.actions.contains(.selectMode(.direct)) {
+            // 英数にしたあとは Vim のコマンドなどを打つことが多く，行の頭の判断と関係なくなるので行を終える
+            state.endLine()
+            return
+        }
+        guard !result.handled else { return }
         if event.modifiers.contains(.control) {
             // Ctrl+C・Ctrl+U がシェルに届いたら行を捨てる
             if case .character(let character) = event.key, ["c", "u"].contains(character.lowercased()) { state.endLine() }
@@ -66,11 +75,11 @@ final class TerminalLine {
         }
     }
 
-    func didCommitText(length: Int) { state.didCommitText(length: length) }
     func endLine() { state.endLine() }
 }
 
-extension TerminalLine.Decision: CustomStringConvertible {
+extension TerminalLine.Decision: CustomStringConvertible, CustomDebugStringConvertible {
+    var debugDescription: String { description }
     // 確定するコマンドは打った文字なので，ログには長さだけを出す
     var description: String {
         switch self {

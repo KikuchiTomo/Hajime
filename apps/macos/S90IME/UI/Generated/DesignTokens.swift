@@ -95,8 +95,5 @@ enum DesignTokens {
         enum CandidateRest {
             static let fadeIn: Double = 250
         }
-        enum Settings {
-            static let saveDelay: Double = 400
-        }
     }
 }

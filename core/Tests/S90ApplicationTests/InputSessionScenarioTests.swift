@@ -967,7 +967,7 @@ struct ReviewRegressionTests {
         let (session, _) = session(english())
         let terminal = InputContext(profile: .terminal)
         for key in "hello" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
-        _ = session.handle(KeyEvent(.enter), context: terminal)
+        // 英字を確定して Enter をアプリに渡す
         #expect(session.handle(KeyEvent(.enter), context: terminal).handled == false)
     }
 
@@ -1094,5 +1094,71 @@ struct FunctionKeyAndRomajiTests {
         var shown: String?
         for key in "wyika" { shown = marked(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) ?? shown }
         #expect(shown == "ゐか")
+    }
+}
+
+@MainActor
+@Suite("3 回目のレビューで見つけた不具合の再発防止")
+struct ThirdReviewRegressionTests {
+    private func committed(_ actions: [ClientAction]) -> String {
+        actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }.joined()
+    }
+
+    private func marked(_ actions: [ClientAction]) -> String? {
+        actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+    }
+
+    @Test("かな入力: 組み立てていないとき・組み立て中の数字の段のキーはかなにする(落ちない)")
+    func kanaNumberRow() {
+        var settings = Settings()
+        settings.inputStyle = .kana
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        _ = session.handle(KeyEvent(.character("1"), keyLabel: "1"), context: InputContext())
+        let result = session.handle(KeyEvent(.character("3"), keyLabel: "3"), context: InputContext())
+        #expect(marked(result.actions) == "ぬあ")
+    }
+
+    @Test("入力方式を変えた直後の文字のキーは，前の方式の文字を確定してから新しい方式で打つ")
+    func characterAfterStyleChange() {
+        let store = FakeSettings()
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: store)
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        store.current.inputStyle = .english
+        let result = session.handle(KeyEvent(.character("x")), context: InputContext())
+        #expect(committed(result.actions) == "か")
+        #expect(marked(result.actions) == "x")
+    }
+
+    @Test("ターミナル: EN 入力で確定した英字も行の長さに数え，行の途中のコマンドの名前をコマンドにしない")
+    func englishCommitCounted() {
+        let store = FakeSettings()
+        store.current.inputStyle = .english
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: store)
+        let terminal = InputContext(profile: .terminal)
+        for key in "hello" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        store.current.inputStyle = .romaji
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(committed(session.handle(KeyEvent(.space), context: terminal).actions) != "ls ")
+    }
+
+    @Test("ターミナル: EN 入力の Enter で行が終わり，次の行の頭の ls はコマンドになる")
+    func englishEnterEndsLine() {
+        let store = FakeSettings()
+        store.current.inputStyle = .english
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: store)
+        let terminal = InputContext(profile: .terminal)
+        for key in "hello" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.enter), context: terminal)
+        store.current.inputStyle = .romaji
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(committed(session.handle(KeyEvent(.space), context: terminal).actions) == "ls ")
+    }
+
+    @Test("ログに出す表示は入力した文字を含めない")
+    func redacted() {
+        let actions: [ClientAction] = [.commit("秘密"), .setMarkedText(MarkedText([.init("秘密", style: .reading)]))]
+        #expect(!String(describing: actions).contains("秘密"))
+        #expect(!String(reflecting: KeyResult(handled: true, actions: actions)).contains("秘密"))
     }
 }

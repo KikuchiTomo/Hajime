@@ -30,7 +30,10 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+        // シンボリックリンクはたどった先で確かめる．リンクの先が /dev/zero のような終わりの無いものだと，
+        // ハッシュの計算が終わらないので，ふつうのファイルだけを受け入れる
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path),
+            attributes[.type] as? FileAttributeType == .typeRegular,
             let size = (attributes[.size] as? NSNumber)?.intValue else {
             throw .fileNotFound
         }

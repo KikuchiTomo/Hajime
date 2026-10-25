@@ -110,10 +110,11 @@ final class SettingsModel: ObservableObject {
     // MARK: アプリごとのプロファイル
 
     /// 先頭に足す．先にある規則を優先するので，利用者が足した規則が既定の規則より効く
-    func addProfileRule(prefix: String, profile: AppProfile) {
+    /// 保存できたら true．できなければ入力欄を残す
+    func addProfileRule(prefix: String, profile: AppProfile) -> Bool {
         let trimmed = prefix.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        update { current in
+        guard !trimmed.isEmpty else { return false }
+        return update { current in
             current.profileRules.removeAll { $0.applicationPrefix == trimmed }
             current.profileRules.insert(ProfileRule(applicationPrefix: trimmed, profile: profile), at: 0)
         }
