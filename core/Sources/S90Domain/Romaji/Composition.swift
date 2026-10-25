@@ -219,6 +219,19 @@ public struct Composition: Sendable, Equatable {
         }
     }
 
+    /// かな入力のかなを足す(R-05)．濁点・半濁点は前のかなと合わせる．打ったキーはローマ字ではないので覚えない
+    public mutating func insertKana(_ text: String) {
+        flushPending()
+        nasalWatchIndex = nil
+        rawKeys = nil
+        if text.count == 1, let mark = text.first, let last = kana.last, let combined = KanaLayout.combine(last, with: mark) {
+            kana.removeLast()
+            kana.append(combined)
+            return
+        }
+        kana.append(text)
+    }
+
     public mutating func deleteBackward() {
         rawKeys = nil
         nasalWatchIndex = nil

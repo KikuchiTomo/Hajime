@@ -1,3 +1,13 @@
+/// 入力方式(R-05)
+public enum InputStyle: String, Sendable, Equatable, Codable, CaseIterable {
+    /// ローマ字入力
+    case romaji
+    /// JIS かな配列のかな入力
+    case kana
+    /// 英語のまま入力し，ローマ字として読める並びには日本語の候補を出す(EN 入力)．Tab で日本語にする
+    case english
+}
+
 /// 句読点の組み合わせ
 public enum PunctuationStyle: String, Sendable, Equatable, Codable, CaseIterable {
     /// 、。

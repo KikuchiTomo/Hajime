@@ -699,3 +699,62 @@ struct InputSettingsScenarioTests {
         #expect(!actions.contains(.showModeIndicator(.direct)))
     }
 }
+
+@MainActor
+@Suite("入力方式")
+struct InputStyleScenarioTests {
+    private func session(_ style: InputStyle, converter: FakeConverter = FakeConverter()) -> InputSession {
+        var settings = Settings()
+        settings.inputStyle = style
+        return InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(settings))
+    }
+
+    private func actions(_ session: InputSession, _ events: [KeyEvent]) -> (committed: String, marked: String, panel: CandidatePanel?, handled: Bool) {
+        var committed = "", marked = "", panel: CandidatePanel?, handled = false
+        for event in events {
+            let result = session.handle(event, context: InputContext())
+            handled = result.handled
+            for action in result.actions {
+                switch action {
+                case .commit(let text): committed += text
+                case .setMarkedText(let text): marked = text.text
+                case .showCandidates(let value): panel = value
+                case .hideCandidates: panel = nil
+                default: break
+                }
+            }
+        }
+        return (committed, marked, panel, handled)
+    }
+
+    @Test("かな入力: キーの刻印からかなを入れ，濁点を合わせる")
+    func kana() {
+        // 「t」は か，「@」は 濁点，「e」は い
+        let events = [KeyEvent(.character("t"), keyLabel: "t"), KeyEvent(.character("@"), keyLabel: "@"), KeyEvent(.character("e"), keyLabel: "e")]
+        #expect(actions(session(.kana), events).marked == "がい")
+    }
+
+    @Test("EN 入力: 英字のまま見せ，ローマ字として読めれば日本語の候補を添え，Tab で日本語にする")
+    func englishTab() {
+        let converter = FakeConverter(["こんにちは": [("こんにちは", nil)]])
+        let session = session(.english, converter: converter)
+        let typed = actions(session, "konnnitiha".map { KeyEvent(.character($0)) })
+        #expect(typed.marked == "konnnitiha")
+        #expect(typed.panel?.entries.first?.text == "こんにちは")
+        #expect(actions(session, [KeyEvent(.tab)]).committed == "こんにちは")
+    }
+
+    @Test("EN 入力: Space は英字のまま確定してアプリに渡す")
+    func englishSpace() {
+        let session = session(.english)
+        _ = actions(session, "hello".map { KeyEvent(.character($0)) })
+        let result = actions(session, [KeyEvent(.space)])
+        #expect(result.committed == "hello")
+        #expect(result.handled == false)
+    }
+
+    @Test("EN 入力: ローマ字として読めない英単語には候補を出さない")
+    func englishNoSuggestion() {
+        #expect(actions(session(.english), "string".map { KeyEvent(.character($0)) }).panel == nil)
+    }
+}

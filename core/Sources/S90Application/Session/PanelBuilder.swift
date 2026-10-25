@@ -5,6 +5,7 @@ import S90Domain
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let correctionNote = "Space 入力のままに戻す"
+    static let englishInputNote = "Tab 日本語にする"
     static let readingCorrectionNote = "打ち間違いを直しました　Esc 打ったままに戻す"
 
     static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool) -> CandidatePanel {

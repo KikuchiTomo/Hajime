@@ -25,6 +25,8 @@ public final class InputSession {
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
+    /// EN 入力(R-05)．入力方式が英語のときだけ使う
+    private let english: EnglishInput
     /// 日本語の打ち間違いを直す前の読み．Esc で戻せるように覚えておく
     private var typedBeforeCorrection: Composition?
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
@@ -35,9 +37,10 @@ public final class InputSession {
         self.lexicon = lexicon
         self.settings = settings
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
+        self.english = EnglishInput(converter: converter)
     }
 
-    public var isComposing: Bool { !composition.isEmpty }
+    public var isComposing: Bool { !composition.isEmpty || english.isComposing }
 
     // MARK: - 外からの操作
 
@@ -117,6 +120,12 @@ public final class InputSession {
         if case .lattice(var lattice) = phase, let result = handleLattice(event, lattice: &lattice, context: context) {
             return result
         }
+        if settings.current.inputStyle == .english, let result = handleEnglish(event) {
+            return result
+        }
+        if settings.current.inputStyle == .kana, let result = handleKana(event, context: context) {
+            return result
+        }
         switch event.key {
         case .kana:
             return KeyResult(handled: true, actions: modeIndicator(.japanese))
@@ -150,9 +159,51 @@ public final class InputSession {
         }
     }
 
+    // MARK: - 入力方式(R-05)
+
+    /// EN 入力のキー．nil を返したキー(モードの切り替えなど)は，ふつうの処理に回す
+    private func handleEnglish(_ event: KeyEvent) -> KeyResult? {
+        switch event.key {
+        case .character(let character) where character.isASCII && character.isLetter:
+            english.append(character)
+            return KeyResult(handled: true, actions: english.render())
+        case .tab:
+            guard english.isComposing else { return .passThrough }
+            return KeyResult(handled: true, actions: english.commitSuggestion())
+        case .backspace:
+            guard english.isComposing else { return .passThrough }
+            english.deleteBackward()
+            return KeyResult(handled: true, actions: english.render())
+        case .escape:
+            guard english.isComposing else { return .passThrough }
+            return KeyResult(handled: true, actions: english.commitTyped())
+        case .eisu, .kana, .yen:
+            return nil
+        default:
+            // Space・Enter・数字・記号・矢印は，打った英字を確定してからアプリに渡す(英語の入力と同じ動き)
+            return KeyResult(handled: false, actions: english.commitTyped())
+        }
+    }
+
+    /// かな入力のキー．かなに当たらないキーは nil を返し，ふつうの処理に回す
+    private func handleKana(_ event: KeyEvent, context: InputContext) -> KeyResult? {
+        guard !event.modifiers.contains(.option) else { return nil }
+        let kana: String? = switch event.key {
+        case .character: event.keyLabel.flatMap { KanaLayout.kana(forKey: $0, shift: event.modifiers.contains(.shift)) }
+        case .yen: KanaLayout.kana(forKey: "¥", shift: false)
+        default: nil
+        }
+        guard let kana else { return nil }
+        var actions: [ClientAction] = []
+        if phase != .composing { actions += commitAll() }
+        if !isComposing { converter.setLeftContext(context.precedingText) }
+        composition.insertKana(kana)
+        return KeyResult(handled: true, actions: actions + render(context: context))
+    }
+
     private func handleControl(_ event: KeyEvent, context: InputContext) -> KeyResult {
         // macOS の日本語入力と同じ割り当て(R-03)
-        guard isComposing, case .character(let character) = event.key else { return .passThrough }
+        guard !composition.isEmpty, case .character(let character) = event.key else { return .passThrough }
         let variant: ScriptVariant? = switch character.lowercased() {
         case "j": .hiragana
         case "k": .katakana
@@ -368,6 +419,7 @@ public final class InputSession {
 
     /// 組み立て中の文字を，今の表示のとおりに確定する
     private func commitAll() -> [ClientAction] {
+        if english.isComposing { return english.commitTyped() }
         guard isComposing else { return [] }
         if case .lattice(let lattice) = phase {
             for segment in lattice.segments where segment.selected.isFromEngine {

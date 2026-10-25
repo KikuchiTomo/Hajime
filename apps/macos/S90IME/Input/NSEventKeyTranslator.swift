@@ -38,8 +38,31 @@ enum NSEventKeyTranslator {
         case KeyCode.jisYen: .yen
         default: character(from: event, modifiers: modifiers).map(KeyEvent.Key.character)
         }
-        return key.map { KeyEvent($0, modifiers: modifiers) }
+        return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode]) }
     }
+
+    /// 仮想キーコードから，JIS キーボードのその位置の刻印を引く．かな入力でかなを引くのに使う(KanaLayout)．
+    /// 仮想キーコードはキーの位置で決まり，配列の設定(US・JIS)によらない
+    private static let jisLabels: [UInt16: String] = {
+        var labels: [UInt16: String] = [:]
+        let letters: [(UInt16, String)] = [
+            (0x00, "a"), (0x01, "s"), (0x02, "d"), (0x03, "f"), (0x04, "h"), (0x05, "g"), (0x06, "z"), (0x07, "x"),
+            (0x08, "c"), (0x09, "v"), (0x0B, "b"), (0x0C, "q"), (0x0D, "w"), (0x0E, "e"), (0x0F, "r"), (0x10, "y"),
+            (0x11, "t"), (0x1F, "o"), (0x20, "u"), (0x22, "i"), (0x23, "p"), (0x25, "l"), (0x26, "j"), (0x28, "k"),
+            (0x2D, "n"), (0x2E, "m"),
+        ]
+        let digits: [(UInt16, String)] = [
+            (0x12, "1"), (0x13, "2"), (0x14, "3"), (0x15, "4"), (0x17, "5"), (0x16, "6"), (0x1A, "7"), (0x1C, "8"),
+            (0x19, "9"), (0x1D, "0"),
+        ]
+        // 記号のキーは，US 配列の名前のキーコードが JIS キーボードでは別の刻印の位置に当たる
+        let symbols: [(UInt16, String)] = [
+            (0x1B, "-"), (0x18, "^"), (0x21, "@"), (0x1E, "["), (0x29, ";"), (0x27, ":"), (0x2A, "]"),
+            (0x2B, ","), (0x2F, "."), (0x2C, "/"), (0x5E, "_"),
+        ]
+        for (code, label) in letters + digits + symbols { labels[code] = label }
+        return labels
+    }()
 
     private static func character(from event: NSEvent, modifiers: KeyEvent.Modifiers) -> Character? {
         // Control を押しているときは，Control で変わる前の文字で判断する(Control+K など)

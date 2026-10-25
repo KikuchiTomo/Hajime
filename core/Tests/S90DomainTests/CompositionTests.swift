@@ -208,3 +208,22 @@ struct SymbolDictionaryTests {
         #expect(SymbolDictionary.symbols(for: reading).contains(symbol))
     }
 }
+
+@Suite("かな入力")
+struct KanaInputTests {
+    @Test("JIS かな配列のキーの刻印からかなを引く", arguments: [("q", false, "た"), ("3", false, "あ"), ("3", true, "ぁ"), ("z", true, "っ"), (",", true, "、"), ("_", false, "ろ"), ("¥", false, "ー")])
+    func layout(key: String, shift: Bool, kana: String) {
+        #expect(KanaLayout.kana(forKey: key, shift: shift) == kana)
+    }
+
+    @Test("濁点と半濁点は前のかなと合わせる")
+    func voicedMarks() {
+        var composition = Composition()
+        composition.insertKana("か")
+        composition.insertKana("゛")
+        composition.insertKana("は")
+        composition.insertKana("゜")
+        composition.insertKana("゛")
+        #expect(composition.conversionReading == "がぱ゛")
+    }
+}
