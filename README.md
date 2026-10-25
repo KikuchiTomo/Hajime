@@ -6,13 +6,13 @@ macOS と Windows で使える日本語入力システムです．かな漢字�
 
 ## macOS に入れる
 
-Xcode 26 と XcodeGen(`brew install xcodegen`)が要ります．
+Xcode 26，XcodeGen(`brew install xcodegen`)と，署名に使う Apple Development の証明書が要ります．
 
 ```sh
 make install-macos
 ```
 
-入れたあと，システム設定 > キーボード > 入力ソース に「s90.tokyo IME」が出ます．出ないときは一度ログアウトしてください．
+初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース の「+」から「s90.tokyo IME」を足してください．開発中に試す方法は [CONTRIBUTING.md](CONTRIBUTING.md) にあります．
 
 ## 目指していること
 

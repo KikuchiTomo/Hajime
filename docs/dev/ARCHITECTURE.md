@@ -34,7 +34,8 @@ core/Sources/
 ├── S90Engine/        変換のポートの実装．AzooKeyKanaKanjiConverter のアダプタ
 ├── S90Persistence/   設定・ユーザー辞書・学習データの保存のポートの実装
 ├── S90IPC/           Windows のエンジンとの通信のメッセージ型(protocol/ から生成)
-└── s90-engine-host/  Windows 用のエンジンのプロセス(composition root のひとつ)
+├── s90-engine-host/  Windows 用のエンジンのプロセス(composition root のひとつ)
+└── s90-playground/   入れずにターミナルで変換を試す道具(make try．composition root のひとつ)
 ```
 
 依存の向きは外側から内側だけです．

@@ -16,7 +16,7 @@
 			<key>com.apple.inputmethod.Roman</key>
 			<dict>
 				<key>TISInputSourceID</key>
-				<string>tokyo.s90.inputmethod.S90IME.Roman</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER).Roman</string>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<false/>
 				<key>tsInputModeScriptKey</key>
@@ -32,13 +32,13 @@
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
 				<key>tsInputModePaletteIconFileKey</key>
-				<string>en.tiff</string>
+				<string>en$(S90_ICON_SUFFIX).tiff</string>
 				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>en.tiff</string>
+				<string>en$(S90_ICON_SUFFIX).tiff</string>
 				<key>tsInputModeMenuIconFileKey</key>
-				<string>en.tiff</string>
+				<string>en$(S90_ICON_SUFFIX).tiff</string>
 				<key>tsInputMethodAlternateIconFileKey</key>
-				<string>en.tiff</string>
+				<string>en$(S90_ICON_SUFFIX).tiff</string>
 				<key>TISIntendedLanguage</key>
 				<string>en</string>
 				<key>TISIconIsTemplate</key>
@@ -51,7 +51,7 @@
 				<key>tsInputModeKeyEquivalentKey</key>
 				<string>J</string>
 				<key>TISInputSourceID</key>
-				<string>tokyo.s90.inputmethod.S90IME.Japanese</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER).Japanese</string>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
 				<key>tsInputModeScriptKey</key>
@@ -63,13 +63,13 @@
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
 				<key>tsInputModePaletteIconFileKey</key>
-				<string>main.tiff</string>
+				<string>main$(S90_ICON_SUFFIX).tiff</string>
 				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>main.tiff</string>
+				<string>main$(S90_ICON_SUFFIX).tiff</string>
 				<key>tsInputModeMenuIconFileKey</key>
-				<string>main.tiff</string>
+				<string>main$(S90_ICON_SUFFIX).tiff</string>
 				<key>tsInputMethodAlternateIconFileKey</key>
-				<string>main.tiff</string>
+				<string>main$(S90_ICON_SUFFIX).tiff</string>
 				<key>TISIntendedLanguage</key>
 				<string>ja</string>
 				<key>TISIconIsTemplate</key>
@@ -79,12 +79,16 @@
 	</dict>
 	<key>TISIntendedLanguage</key>
 	<string>ja</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>s90.tokyo IME</string>
+	<string>$(PRODUCT_NAME)</string>
+	<key>S90SupportDirectoryName</key>
+	<string>$(S90_SUPPORT_DIRECTORY)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundlePackageType</key>
@@ -112,6 +116,6 @@
 		<string>Kana</string>
 	</array>
 	<key>tsInputMethodIconFileKey</key>
-	<string>main.tiff</string>
+	<string>main$(S90_ICON_SUFFIX).tiff</string>
 </dict>
 </plist>

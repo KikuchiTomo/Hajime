@@ -7,7 +7,7 @@ import S90Domain
 @MainActor
 final class InputMenuBuilder: NSObject {
     private let settings: any SettingsStoring
-    private let logger = Logger(subsystem: "tokyo.s90.inputmethod.S90IME", category: "settings")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
     init(settings: any SettingsStoring) {
         self.settings = settings
