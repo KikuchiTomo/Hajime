@@ -12,7 +12,7 @@ make package-macos
 
 `.pkg` には 2 つの作り方があります．
 
-- **手元に入れる .pkg**(`S90_NOTARY_PROFILE` が無いとき): アプリは `make install-macos` と同じ決め方の証明書で署名します(入っている版と同じチームの証明書．同じチームの証明書が無ければ作るのをやめる)．.pkg は署名しません
+- **手元に入れる .pkg**(`S90_NOTARY_PROFILE` が無いとき): アプリは `make install-macos` と同じ決め方の証明書で署名します(入っている版と同じチームの証明書．同じチームの証明書が無いときや，前の版のデータの置き場所だけが残っているときは作るのをやめる)．.pkg はキーチェーンに Developer ID Installer があれば署名します
 - **ほかの人に配る .pkg**(`S90_NOTARY_PROFILE` があるとき): アプリを Developer ID Application で署名し，時刻印を付けて公証を受けます．.pkg も Developer ID Installer で署名します．Developer ID Application の証明書でなければ作るのをやめます
 
 | 使うもの | 指定 | 指定が無いとき |

@@ -15,7 +15,7 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 
 . "$root/tools/macos/variant.sh"
 variant Release
-installer_identity=${S90_INSTALLER_IDENTITY:-$(security find-identity -v -p basic | awk -F '"' '/Developer ID Installer/ { print $2; exit }')}
+installer_identity=${S90_INSTALLER_IDENTITY:-$(identities basic | awk -F '\t' '$2 ~ /^Developer ID Installer/ { print $1; exit }')}
 notary_profile=${S90_NOTARY_PROFILE:-}
 if [ -n "${S90_APP_IDENTITY:-}" ]; then
   app_identity=$S90_APP_IDENTITY

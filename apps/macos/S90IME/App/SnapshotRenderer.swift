@@ -8,7 +8,7 @@ import SwiftUI
 /// 候補ウィンドウの見た目を画像に書き出す(デバッグビルドだけ)．
 /// 入力メソッドとして動かさずに描画を確かめ，PR に貼るスクリーンショットを作るため．
 ///
-/// 使い方: "s90.tokyo IME.app/Contents/MacOS/s90.tokyo IME" --render-snapshots
+/// 使い方: Debug でビルドした "s90.tokyo IME Debug.app/Contents/MacOS/s90.tokyo IME Debug" --render-snapshots
 /// サンドボックスの中で動くので，書き出し先はサンドボックスの一時ディレクトリになる．場所は標準出力に出す
 @MainActor
 enum SnapshotRenderer {

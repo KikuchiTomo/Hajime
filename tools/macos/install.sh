@@ -16,7 +16,8 @@ if [ -z "$identity" ]; then
   echo "Apple Development の証明書が見つからないので，アドホック署名にします(入力ソースとして選べないことがあります)"
   identity="-"
 fi
-echo "署名: $(identity_name "$identity") $identity"
+identity_label=$(identity_name "$identity")
+echo "署名: ${identity_label:-$identity}"
 
 # Zenzai のモデルを取得してハッシュを確かめる(取得済みなら確かめるだけ)．アプリに入れて Zenzai を有効にするため
 "$root/tools/models/fetch_zenzai.sh"

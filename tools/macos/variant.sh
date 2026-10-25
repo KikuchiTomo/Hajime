@@ -12,52 +12,70 @@ variant() {
   esac
 }
 
-# コード署名に使える証明書の一覧．1 行に「SHA-1<タブ>名前」
-code_signing_identities() {
-  security find-identity -v -p codesigning | sed -n 's/^ *[0-9]*) \([0-9A-F]\{40\}\) "\(.*\)"$/\1	\2/p'
+# 下の関数は変数の名前に _vs_ を付け，呼び出し側の変数を上書きしないようにする(sh の関数の変数は外と共有されるため)
+
+# 証明書の一覧．1 行に「SHA-1<タブ>名前」．引数は security find-identity の種類(codesigning か basic)
+identities() {
+  security find-identity -v -p "${1:-codesigning}" | sed -n 's/^ *[0-9]*) \([0-9A-F]\{40\}\) "\(.*\)"$/\1	\2/p'
 }
 
-# 証明書(SHA-1)の名前
+code_signing_identities() {
+  identities codesigning
+}
+
+# 証明書(SHA-1)の名前．見つからなければ空
 identity_name() {
-  code_signing_identities | awk -F '\t' -v hash="$1" '$1 == hash { print $2; exit }'
+  identities basic | awk -F '\t' -v hash="$1" '$1 == hash { print $2; exit }'
 }
 
 # 証明書(SHA-1)のチーム ID．証明書の組織単位(OU)に入っている．名前の括弧の中はチーム ID ではない
 identity_team() {
-  name=$(identity_name "$1")
-  security find-certificate -a -Z -p -c "$name" 2>/dev/null | awk -v hash="$1" '
+  _vs_name=$(identity_name "$1")
+  security find-certificate -a -Z -p -c "$_vs_name" 2>/dev/null | awk -v hash="$1" '
     /^SHA-1 hash: / { keep = ($3 == hash) }
     keep { print }
   ' | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU *= *\([A-Z0-9]*\).*/\1/p'
+}
+
+# 前の版が作ったデータの置き場所(コンテナ)．アプリを消してもここは残る
+container_path() {
+  printf '%s\n' "$HOME/Library/Containers/$bundle_id"
 }
 
 # 署名に使う証明書(SHA-1)を決める．install.sh と package.sh で同じ決め方にする．
 # macOS はアプリのデータの置き場所(コンテナ)を最初に作ったアプリの署名(チーム)に結び付けていて，
 # 違うチームの証明書で署名した版を入れると，起動の途中で止まって入力できなくなる(2026-10-26 に確かめた)．
 #   1. S90_SIGN_IDENTITY があればそれ(名前か SHA-1)
-#   2. 入っている版があれば，それと同じチームの証明書．キーチェーンに無ければ止める(止まる版を入れないため)
-#   3. 入っている版が無いか，証明書で署名されていなければ，Apple Development の最初の証明書
-# 名前ではなく SHA-1 で返す．同じ名前の証明書が 2 つあるときに codesign が選べなくなるため
+#   2. 入っている版が証明書で署名されていれば，それと同じチームの証明書．キーチェーンに無ければ止める
+#   3. 入っている版が無いか証明書で署名されておらず，前の版のデータの置き場所が残っていれば止める
+#      (置き場所を作った署名が分からず，違うチームで入れると止まるため)
+#   4. どちらも無ければ(初めて入れるとき)，Apple Development の最初の証明書
+# 名前ではなく SHA-1 で返す．同じ名前の証明書が 2 つあるときに codesign が選べなくなるため．必ず $(...) の中で呼ぶ
 signing_identity() {
   if [ -n "${S90_SIGN_IDENTITY:-}" ]; then
     printf '%s\n' "$S90_SIGN_IDENTITY"
     return
   fi
-  installed="$destination/$app_name.app"
-  if [ -d "$installed" ]; then
-    team=$(codesign -dvv "$installed" 2>&1 | sed -n 's/^TeamIdentifier=//p')
-    if [ -n "$team" ] && [ "$team" != "not set" ]; then
-      for hash in $(code_signing_identities | cut -f1); do
-        if [ "$(identity_team "$hash")" = "$team" ]; then
-          printf '%s\n' "$hash"
+  _vs_installed="$destination/$app_name.app"
+  if [ -d "$_vs_installed" ]; then
+    _vs_team=$(codesign -dvv "$_vs_installed" 2>&1 | sed -n 's/^TeamIdentifier=//p')
+    if [ -n "$_vs_team" ] && [ "$_vs_team" != "not set" ]; then
+      for _vs_hash in $(code_signing_identities | cut -f1); do
+        if [ "$(identity_team "$_vs_hash")" = "$_vs_team" ]; then
+          printf '%s\n' "$_vs_hash"
           return
         fi
       done
-      echo "入っている「${app_name}」はチーム ${team} の証明書で署名されていますが，その証明書がキーチェーンにありません．" >&2
+      echo "入っている「${app_name}」はチーム ${_vs_team} の証明書で署名されていますが，その証明書がキーチェーンにありません．" >&2
       echo "違うチームで署名すると起動の途中で止まるので，入れるのをやめます．S90_SIGN_IDENTITY で証明書を指定してください" >&2
       return 1
     fi
-    echo "入っている「${app_name}」は証明書で署名されていないので，Apple Development の最初の証明書を使います" >&2
+  fi
+  if [ -d "$(container_path)" ]; then
+    echo "前の「${app_name}」のデータの置き場所 $(container_path) が残っていて，それを作った署名が分かりません．" >&2
+    echo "違うチームで署名すると起動の途中で止まるので，入れるのをやめます．前と同じ証明書を S90_SIGN_IDENTITY で指定するか，" >&2
+    echo "学習データと設定を消してよければ，Finder でその置き場所をゴミ箱に入れてから入れ直してください" >&2
+    return 1
   fi
   code_signing_identities | awk -F '\t' '$2 ~ /^Apple Development/ { print $1; exit }'
 }

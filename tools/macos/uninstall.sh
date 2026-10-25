@@ -17,6 +17,10 @@ sudo rm -rf "$destination/$app_name.app"
 echo "消しました: $destination/$app_name.app"
 
 if [ "$purge" = "--purge" ]; then
-  rm -rf "$HOME/Library/Containers/$bundle_id"
-  echo "学習データと設定も消しました: ~/Library/Containers/$bundle_id"
+  # 別のアプリのデータの置き場所は macOS が守っていて，ターミナルからは消せないことがある
+  if rm -rf "$(container_path)" 2>/dev/null; then
+    echo "学習データと設定も消しました: $(container_path)"
+  else
+    echo "学習データと設定の置き場所 $(container_path) は消せませんでした．Finder でゴミ箱に入れてください" >&2
+  fi
 fi
