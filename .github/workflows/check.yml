@@ -17,3 +17,14 @@ jobs:
         with:
           persist-credentials: false
       - run: make check PYTHON="python3 -I"
+
+  core-test:
+    # core のテスト．変換エンジンの辞書を取得するので数分かかる
+    runs-on: macos-15
+    steps:
+      # actions/checkout v5.0.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      - run: swift test --package-path core
