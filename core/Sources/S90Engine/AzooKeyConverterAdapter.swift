@@ -11,11 +11,13 @@ public final class AzooKeyConverterEngine {
     private let converter: KanaKanjiConverter
     private let memoryDirectory: URL
     private let versionString: String
+    private let zenzai: ZenzaiModel?
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
     ///   - versionString: エンジンに渡すアプリの版の文字列
-    public init(memoryDirectory: URL, versionString: String) throws {
+    ///   - zenzai: 確かめ済みの Zenzai のモデル．nil なら Zenzai を使わない
+    public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil) throws {
         try FileManager.default.createDirectory(
             at: memoryDirectory,
             withIntermediateDirectories: true,
@@ -23,12 +25,22 @@ public final class AzooKeyConverterEngine {
         )
         self.memoryDirectory = memoryDirectory
         self.versionString = versionString
+        self.zenzai = zenzai
         self.converter = KanaKanjiConverter.withDefaultDictionary()
     }
 
     public func makeSession() -> any KanaKanjiConverting {
         AzooKeyConverterSession(engine: self, sessionID: converter.createSession())
     }
+
+    /// 最初の変換で Zenzai のモデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
+    public func warmUp() {
+        let session = makeSession()
+        _ = session.candidates(for: Self.warmUpReading)
+        session.endComposition()
+    }
+
+    private static let warmUpReading = "きょうはいいてんきです"
 
     /// 学習データをファイルに書き出す．入力欄からフォーカスが外れたときなどに呼ぶ
     public func flushLearning() {
@@ -43,7 +55,22 @@ public final class AzooKeyConverterEngine {
         converter.removeSession(id)
     }
 
-    fileprivate var options: ConvertRequestOptions {
+    public var usesZenzai: Bool { zenzai != nil }
+
+    private func zenzaiMode(leftContext: String?) -> ConvertRequestOptions.ZenzaiMode {
+        guard let zenzai else { return .off }
+        return .on(
+            weight: zenzai.url,
+            inferenceLimit: DefaultSettings.zenzaiInferenceLimit,
+            personalizationMode: nil,
+            versionDependentMode: .v3(.init(
+                leftSideContext: leftContext,
+                maxLeftSideContextLength: DefaultSettings.maximumLeftContextLength
+            ))
+        )
+    }
+
+    fileprivate func options(leftContext: String?) -> ConvertRequestOptions {
         ConvertRequestOptions(
             N_best: DefaultSettings.engineCandidateCount,
             requireJapanesePrediction: .disabled,
@@ -57,6 +84,7 @@ public final class AzooKeyConverterEngine {
             sharedContainerURL: memoryDirectory,
             textReplacer: .withDefaultEmojiDictionary(),
             specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
+            zenzaiMode: zenzaiMode(leftContext: leftContext),
             metadata: .init(versionString: versionString)
         )
     }
@@ -76,6 +104,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
     private var cache: [String: Result] = [:]
+    /// 入力位置の前にある文字列(左の文脈)．Zenzai が変換の手がかりに使う
+    private var leftContext: String?
 
     init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID) {
         self.engine = engine
@@ -96,6 +126,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
         request(reading)?.clauses ?? []
+    }
+
+    func setLeftContext(_ text: String?) {
+        guard text != leftContext else { return }
+        leftContext = text
+        cache = [:]
     }
 
     func didCommit(_ candidate: S90Domain.Candidate) {
@@ -120,7 +156,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         if let cached = cache[reading] { return cached }
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        let options = engine.options
+        let options = engine.options(leftContext: leftContext)
         guard let result = engine.withSession(sessionID, { $0.requestCandidates(composing, options: options) }) else {
             return nil
         }

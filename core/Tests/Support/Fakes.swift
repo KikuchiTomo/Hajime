@@ -30,6 +30,8 @@ public final class FakeConverter: KanaKanjiConverting {
         }
     }
 
+    public private(set) var leftContext: String?
+    public func setLeftContext(_ text: String?) { leftContext = text }
     public func didCommit(_ candidate: Candidate) { committed.append(candidate) }
     public func endComposition() { endCount += 1 }
 }

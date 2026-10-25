@@ -18,7 +18,10 @@ struct LatencyProbeTests {
     @Test("ライブ変換を含めて 1 キーの処理を測る", .enabled(if: isReleaseBuild))
     func perKey() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-latency-\(UUID().uuidString)")
-        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency")
+        // 環境変数 S90_ZENZAI_MODEL にモデルの場所があれば，Zenzai ありで測る
+        let zenzai = try ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai)
+        engine.warmUp()
         let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings())
         // 辞書を読み込ませるための 1 回目は数えない
         _ = session.handle(KeyEvent(.character("a")), context: InputContext())
@@ -36,7 +39,7 @@ struct LatencyProbeTests {
         }
         let sorted = durations.sorted()
         let p50 = sorted[sorted.count / 2], p95 = sorted[sorted.count * 95 / 100], worst = sorted.last!
-        print("S90_LATENCY p50=\(p50) p95=\(p95) max=\(worst) keys=\(keys.count)")
+        print("S90_LATENCY zenzai=\(engine.usesZenzai) p50=\(p50) p95=\(p95) max=\(worst) keys=\(keys.count)")
         // R-01 の受け入れ条件．デバッグビルドでは遅くなるので，CI では Release で測る
         #expect(p95 < .milliseconds(50))
     }

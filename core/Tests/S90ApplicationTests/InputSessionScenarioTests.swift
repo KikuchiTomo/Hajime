@@ -144,6 +144,50 @@ struct InputSessionScenarioTests {
         #expect(!harness.marked.segments.contains { $0.style == .correction })
     }
 
+    @Test("R-02: 文の途中に打った英単語も補正する")
+    func correctWordInSentence() {
+        let harness = Harness(converter: FakeConverter(["このばーじょんの": [("このバージョンの", nil)]]), lexicon: FakeLexicon(words: ["python"]))
+        harness.type("konoba-jonnnopython")
+        #expect(harness.marked.segments == [.init("このバージョンの", style: .converted), .init("python", style: .correction)])
+    }
+
+    @Test("R-02: 補正した英単語のあとは Enter を押さずに続けて日本語を打てる")
+    func continueAfterCorrection() {
+        let converter = FakeConverter([
+            "このばーじょんの": [("このバージョンの", nil)],
+            "このばーじょんのpythonは": [("このバージョンのpythonは", nil)],
+        ])
+        let harness = Harness(converter: converter, lexicon: FakeLexicon(words: ["python"]))
+        harness.type("konoba-jonnnopythonha")
+        #expect(harness.marked.text == "このバージョンのpythonは")
+        harness.press(.enter)
+        #expect(harness.committed == "このバージョンのpythonは")
+    }
+
+    @Test("R-02: 綴りの誤りの補正で，前の日本語まで英単語に飲み込まない")
+    func misspellingDoesNotSwallowJapanese() {
+        let lexicon = FakeLexicon(suggestions: ["nopthon": ["python"], "pthon": ["python"]])
+        let harness = Harness(converter: FakeConverter(["この": [("この", nil)]]), lexicon: lexicon)
+        harness.type("konopthon")
+        #expect(harness.marked.segments == [.init("この", style: .converted), .init("python", style: .correction)])
+    }
+
+    @Test("R-02: 確定させた英単語の後ろの日本語は補正しない")
+    func noCorrectionAfterFrozenWord() {
+        let lexicon = FakeLexicon(words: ["python", "kodo"])
+        let harness = Harness(lexicon: lexicon)
+        harness.type("pythonnokodo")
+        #expect(harness.marked.text.hasPrefix("python"))
+        #expect(!harness.marked.segments.contains { $0.style == .correction })
+    }
+
+    @Test("R-02: 次のキーで別の英単語になるときは英単語のまま続ける")
+    func extendCorrectedWord() {
+        let harness = Harness(lexicon: FakeLexicon(words: ["python", "pythons"]))
+        harness.type("pythons")
+        #expect(harness.marked.segments == [.init("pythons", style: .correction)])
+    }
+
     @Test("R-02: 綴りの誤りを補正し，Enter で補正した単語を確定する")
     func correctMisspelling() {
         let harness = Harness(lexicon: FakeLexicon(suggestions: ["pthon": ["python"]]))
@@ -199,6 +243,15 @@ struct InputSessionScenarioTests {
         harness.press(.eisu)
         #expect(harness.committed == "あいう")
         #expect(harness.session.mode == .direct)
+    }
+
+    @Test("打ち始めに入力位置の前の文字列を変換の手がかりとして渡す")
+    func leftContext() {
+        let converter = FakeConverter()
+        let harness = Harness(converter: converter)
+        harness.context = InputContext(precedingText: "AAA")
+        harness.type("made")
+        #expect(converter.leftContext == "AAA")
     }
 
     @Test("Escape で組み立て中の文字を消す")
