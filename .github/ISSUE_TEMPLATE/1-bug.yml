@@ -1,0 +1,60 @@
+name: 不具合
+description: 思ったとおりに動かないことを報告する
+labels: ["type: fix"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        入力した文章そのものは，再現に要る部分だけを書いてください．パスワードや個人の情報は書かないでください．
+        脆弱性は [非公開の報告](https://github.com/KikuchiTomo/s90.tokyo-IME/security/advisories/new) から送ってください．
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 起きたこと
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待したこと
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現の手順
+      description: "打ったキーの並びがわかると調べやすくなります(例: kyouha と打って Space)"
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [macOS, Windows]
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS の版
+      placeholder: macOS 26.3
+  - type: input
+    id: version
+    attributes:
+      label: s90.tokyo IME の版かコミット
+  - type: input
+    id: app
+    attributes:
+      label: 入力していたアプリ
+      placeholder: テキストエディット，VS Code，ターミナル など
+  - type: checkboxes
+    id: settings
+    attributes:
+      label: 関係しそうな設定
+      options:
+        - label: ライブ変換を切っている
+        - label: 候補の出し方を変えている
+        - label: タイプミスの補正を変えている

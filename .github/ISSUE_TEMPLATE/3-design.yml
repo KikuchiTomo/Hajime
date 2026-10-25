@@ -1,0 +1,29 @@
+name: 見た目の提案
+description: 候補ウィンドウ・テーマ・アイコンなど見た目の変更を提案する
+labels: ["scope: design"]
+body:
+  - type: textarea
+    id: target
+    attributes:
+      label: 変えたいところ
+      description: 候補ウィンドウ，文節格子，モードの札，テーマ(platinum・desk・native)など
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: 理由
+      description: 読みにくい，見分けにくい，など．docs/dev/DESIGN-SYSTEM.md の方針との関係があれば書いてください
+    validations:
+      required: true
+  - type: textarea
+    id: mockup
+    attributes:
+      label: 見本
+      description: スクリーンショットや画像を貼ってください
+  - type: checkboxes
+    id: accessibility
+    attributes:
+      label: アクセシビリティ
+      options:
+        - label: コントラストや読み上げに関わる
