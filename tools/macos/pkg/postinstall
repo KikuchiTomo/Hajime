@@ -1,0 +1,4 @@
+#!/bin/sh
+# 入れ替えたあと，動いている古い版を止める．次にキーを打ったとき OS が新しい版を起こす
+pkill -x "s90.tokyo IME" 2>/dev/null || true
+exit 0
