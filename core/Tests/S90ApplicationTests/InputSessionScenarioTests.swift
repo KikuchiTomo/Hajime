@@ -496,11 +496,40 @@ struct SymbolScenarioTests {
 
     @Test("読みから引いた記号を，第 1 候補を変えずに候補へ足す")
     func supplement() {
-        let converter = SymbolSupplementedConverter(FakeConverter(["やじるし": [("矢印", nil), ("やじるし", nil)]]))
+        let converter = SupplementedConverter(FakeConverter(["やじるし": [("矢印", nil), ("やじるし", nil)]]), settings: FakeSettings(), calendar: FakeCalendar())
         let texts = converter.candidates(for: "やじるし").map(\.text)
         #expect(texts.first == "矢印")
         #expect(texts.contains("→"))
         #expect(texts.firstIndex(of: "→") == 2)
+    }
+
+    @Test("記号の変換を切ると記号を足さない")
+    func symbolOff() {
+        var settings = Settings()
+        settings.symbolConversion = false
+        let converter = SupplementedConverter(FakeConverter(["やじるし": [("矢印", nil)]]), settings: FakeSettings(settings), calendar: FakeCalendar())
+        #expect(converter.candidates(for: "やじるし").map(\.text) == ["矢印"])
+    }
+
+    @Test("「きょう」「あした」「いま」を日付と時刻の候補にする")
+    func dates() {
+        let converter = SupplementedConverter(FakeConverter(["きょう": [("今日", nil)]]), settings: FakeSettings(), calendar: FakeCalendar())
+        let today = converter.candidates(for: "きょう").map(\.text)
+        #expect(today.first == "今日")
+        #expect(today.contains("2026/10/26"))
+        #expect(today.contains("10月26日(月)"))
+        #expect(today.contains("令和8年10月26日"))
+        #expect(converter.candidates(for: "あした").map(\.text).contains("2026-10-27"))
+        #expect(converter.candidates(for: "いま").map(\.text).contains("14:05"))
+        #expect(converter.candidates(for: "ことし").map(\.text).contains("令和8年"))
+    }
+
+    @Test("ユーザー辞書の語は読みが一致すれば先頭に置く")
+    func userDictionary() {
+        var settings = Settings()
+        settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "s90")]
+        let converter = SupplementedConverter(FakeConverter(["えすきゅー": [("SQ", nil)]]), settings: FakeSettings(settings), calendar: FakeCalendar())
+        #expect(converter.candidates(for: "えすきゅー").map(\.text) == ["s90", "SQ"])
     }
 }
 
@@ -601,5 +630,72 @@ struct LiveConversionTimingTests {
         for key in "kyouharai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
         let committed = session.handle(KeyEvent(.enter), context: InputContext()).actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }
         #expect(committed == ["今日は雷"])
+    }
+}
+
+@MainActor
+@Suite("入力の設定")
+struct InputSettingsScenarioTests {
+    private func run(_ keys: [KeyEvent], settings: Settings, context: InputContext = InputContext()) -> (committed: String, marked: String, handled: Bool) {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        var committed = "", marked = "", handled = false
+        for key in keys {
+            let result = session.handle(key, context: context)
+            handled = result.handled
+            for action in result.actions {
+                if case .commit(let text) = action { committed += text }
+                if case .setMarkedText(let text) = action { marked = text.text }
+            }
+        }
+        return (committed, marked, handled)
+    }
+
+    private func keys(_ text: String) -> [KeyEvent] { text.map { KeyEvent(.character($0)) } }
+
+    @Test("空白は既定で半角(アプリに任せる)．全角の設定なら全角，Shift+Space で逆")
+    func spaceWidth() {
+        var settings = Settings()
+        #expect(run([KeyEvent(.space)], settings: settings).handled == false)
+        #expect(run([KeyEvent(.space, modifiers: .shift)], settings: settings).committed == "\u{3000}")
+        settings.spaceWidth = .fullwidth
+        #expect(run([KeyEvent(.space)], settings: settings).committed == "\u{3000}")
+        #expect(run([KeyEvent(.space, modifiers: .shift)], settings: settings).handled == false)
+    }
+
+    @Test("数字を全角にする設定")
+    func numberWidth() {
+        var settings = Settings()
+        settings.numberWidth = .fullwidth
+        #expect(run(keys("3"), settings: settings).marked == "３")
+    }
+
+    @Test("句読点を打ったら確定する設定")
+    func punctuationCommits() {
+        var settings = Settings()
+        settings.punctuationCommits = true
+        #expect(run(keys("ka,"), settings: settings).committed == "か、")
+    }
+
+    @Test("番号キーで候補を選ばない設定")
+    func numberKeySelection() {
+        var settings = Settings()
+        settings.numberKeySelection = false
+        settings.candidatePresentation = .list
+        let session = InputSession(converter: FakeConverter(["きしゃ": [("記者", nil), ("汽車", nil)]]), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        for key in keys("kisha") { _ = session.handle(key, context: InputContext()) }
+        _ = session.handle(KeyEvent(.space), context: InputContext())
+        let result = session.handle(KeyEvent(.character("2")), context: InputContext())
+        // 番号では選ばず，選んでいた候補を確定して数字を打ち始める
+        let committed = result.actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }
+        #expect(committed == ["記者"])
+    }
+
+    @Test("モードの表示を切る設定")
+    func modeIndicator() {
+        var settings = Settings()
+        settings.showsModeIndicator = false
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        let actions = session.handle(KeyEvent(.eisu), context: InputContext()).actions
+        #expect(!actions.contains(.showModeIndicator(.direct)))
     }
 }

@@ -2,6 +2,8 @@
 import AppKit
 import S90Application
 import S90Domain
+import S90Persistence
+import SwiftUI
 
 /// 候補ウィンドウの見た目を画像に書き出す(デバッグビルドだけ)．
 /// 入力メソッドとして動かさずに描画を確かめ，PR に貼るスクリーンショットを作るため．
@@ -26,7 +28,17 @@ enum SnapshotRenderer {
             render(previewView(theme: theme, appearance: appearance), name: "branch-preview-\(theme.rawValue)", to: output, appearance: appearance)
             render(correctionView(theme: theme, appearance: appearance), name: "correction-\(theme.rawValue)", to: output, appearance: appearance)
         }
+        render(settingsView(), name: "settings", to: output, appearance: NSAppearance(named: .aqua))
         exit(0)
+    }
+
+    /// 設定の画面(入力のタブ)．設定は一時ディレクトリに置き，利用者の設定に触れない
+    private static func settingsView() -> NSView {
+        let store = FileSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshot-settings.json"))
+        let view = NSHostingView(rootView: SettingsView(model: SettingsModel(store: store, resetLearning: {})))
+        view.frame = NSRect(origin: .zero, size: SettingsView.size)
+        view.layoutSubtreeIfNeeded()
+        return view
     }
 
     private static func listView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {

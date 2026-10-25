@@ -12,6 +12,13 @@ public final class AzooKeyConverterEngine {
     private let memoryDirectory: URL
     private let versionString: String
     private let zenzai: ZenzaiModel?
+    /// 変換に効く設定(学習・日付・絵文字)．apply(_:) で入れ替える
+    private var learningType: LearningType = .inputAndOutput
+    private var specialCandidateProviders: [any SpecialCandidateProvider] = KanaKanjiConverter.defaultSpecialCandidateProviders
+    /// 絵文字の辞書は読み込みが重いので，一度だけ作って使い回す
+    private lazy var emojiReplacer = TextReplacer.withDefaultEmojiDictionary()
+    private var usesEmoji = true
+    private var userDictionary: [UserDictionaryEntry] = []
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
@@ -45,7 +52,36 @@ public final class AzooKeyConverterEngine {
 
     /// 学習データをファイルに書き出す．入力欄からフォーカスが外れたときなどに呼ぶ
     public func flushLearning() {
+        guard learningType == .inputAndOutput else { return }
         converter.commitUpdateLearningData()
+    }
+
+    /// 学んだことをすべて消す
+    public func resetLearning() {
+        converter.resetMemory()
+    }
+
+    /// 変換に効く設定を入れる．設定が変わるたびに呼ぶ
+    public func apply(_ settings: Settings) {
+        learningType = switch settings.learning {
+        case .enabled: .inputAndOutput
+        case .readOnly: .onlyOutput
+        case .disabled: .nothing
+        }
+        // 日付と時刻(「きょう」「いま」)の候補は Calendar と TimeExpression が出す
+        specialCandidateProviders = KanaKanjiConverter.defaultSpecialCandidateProviders.filter { provider in
+            settings.dateConversion || !(provider is CalendarSpecialCandidateProvider || provider is TimeExpressionSpecialCandidateProvider)
+        }
+        usesEmoji = settings.emojiConversion
+        let entries = settings.userDictionary.filter(\.isValid).prefix(DefaultSettings.maximumUserDictionaryEntries)
+        if Array(entries) != userDictionary {
+            userDictionary = Array(entries)
+            converter.importDynamicUserDictionary(userDictionary.map {
+                // 品詞は固有名詞として登録する(azooKey-Desktop と同じ)
+                DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.reading), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid,
+                               value: DefaultSettings.userDictionaryWordCost)
+            })
+        }
     }
 
     fileprivate func withSession<Result>(_ id: KanaKanjiConverter.ConversionSessionID, _ body: (KanaKanjiConverter) -> Result) -> Result? {
@@ -80,11 +116,11 @@ public final class AzooKeyConverterEngine {
             englishCandidateInRoman2KanaInput: false,
             fullWidthRomanCandidate: false,
             halfWidthKanaCandidate: false,
-            learningType: .inputAndOutput,
+            learningType: learningType,
             memoryDirectoryURL: memoryDirectory,
             sharedContainerURL: memoryDirectory,
-            textReplacer: .withDefaultEmojiDictionary(),
-            specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
+            textReplacer: usesEmoji ? emojiReplacer : .empty,
+            specialCandidateProviders: specialCandidateProviders,
             zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext) : .off,
             metadata: .init(versionString: versionString)
         )

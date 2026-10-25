@@ -2,6 +2,7 @@ import Foundation
 import S90Application
 import S90Domain
 import S90Engine
+import S90Persistence
 
 /// ローマ字の行を打つと，ライブ変換・候補の一覧・分岐図の結果を出す
 @MainActor
@@ -11,7 +12,8 @@ enum Interactive {
         func session(_ presentation: CandidatePresentation) -> InputSession {
             var settings = DefaultSettings.settings
             settings.candidatePresentation = presentation
-            return InputSession(converter: SymbolSupplementedConverter(engine.makeSession()), lexicon: lexicon, settings: StaticSettings(settings))
+            let store = StaticSettings(settings)
+            return InputSession(converter: SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar()), lexicon: lexicon, settings: store)
         }
 
         print("ローマ字を打って Enter．空の行で終わります．例: kyouhaiitenkidesune / pthon / konnnitiha")
