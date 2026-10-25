@@ -1,0 +1,26 @@
+name: 機能の提案
+description: 新しい機能や，今の動きの変更を提案する
+labels: ["type: feat"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 困っていること
+      description: どんな場面で何に困るかを書いてください．解決策より先に困りごとを知りたいです
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案
+  - type: input
+    id: requirement
+    attributes:
+      label: 関係する要件
+      description: docs/specs/REQUIREMENTS.md の R-xx があれば書いてください
+      placeholder: R-02
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 範囲
+      options: [入力の処理(core), macOS, Windows, 見た目, 文書, わからない]

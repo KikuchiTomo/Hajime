@@ -1,0 +1,27 @@
+name: pr-title
+
+# スカッシュマージでは PR のタイトルがそのまま main のコミットになるので，
+# タイトルが Conventional Commits の形(種類とスコープ)になっているかを確かめる(docs/dev/REPOSITORY.md)
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: タイトルの形を確かめる
+        env:
+          # タイトルは利用者が書いた文字列なので，シェルに直接埋め込まず環境変数で渡す
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|refactor|perf|test|build|ci|chore|revert|style)\([a-z0-9][a-z0-9-]*\)!?: .+'
+          if printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "ok"
+          else
+            echo "PR のタイトルは「種類(スコープ): 内容」の形にしてください．例: feat(core): ¥ キーに割り当てる文字を変える"
+            exit 1
+          fi

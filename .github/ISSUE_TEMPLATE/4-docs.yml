@@ -1,0 +1,17 @@
+name: 文書の誤りや不足
+description: ドキュメントの誤り・わかりにくいところ・足りないところを知らせる
+labels: ["type: docs"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: 文書
+      placeholder: docs/dev/ARCHITECTURE.md
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 内容
+    validations:
+      required: true

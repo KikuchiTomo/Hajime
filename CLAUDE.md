@@ -28,4 +28,5 @@ s90.tokyo IME は azooKey をもとにした macOS / Windows 向けの日本語�
 - 具象の組み立ては composition root だけ．シングルトンを作らない
 - 依存を増やす前に相談する．追加するときは版を固定する
 - 変更後は `make check` と `make test` を通す
+- main へは PR のスカッシュマージだけで入れる．PR のタイトルが main のコミットになるので，`種類(スコープ): 内容` の形で日本語 1 行にする(`docs/dev/REPOSITORY.md`)
 - azooKey の fork は `../upstream/` にある．このリポジトリには入れない
