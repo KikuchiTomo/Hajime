@@ -215,15 +215,12 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
-    /// 変換を始める．設定と文節の数から，一覧か文節格子かを決める
+    /// 変換を始める．設定が一覧でなければ分岐図にする．
+    /// 英単語を補正しているときは，補正と入力のままを並べて比べられるよう一覧にする
     private func enterConversion() {
-        let presentation = settings.current.candidatePresentation
-        if presentation != .list, corrector.active == nil {
-            let lattice = LatticeBuilder(converter: converter).build(reading: composition.conversionReading)
-            if presentation == .lattice || lattice.segments.count >= 2 {
-                phase = .lattice(lattice)
-                return
-            }
+        if settings.current.candidatePresentation != .list, corrector.active == nil {
+            phase = .lattice(LatticeBuilder(converter: converter).build(reading: composition.conversionReading))
+            return
         }
         phase = .selecting(makeSelection(focus: .candidate(0)))
     }
@@ -439,9 +436,10 @@ public final class InputSession {
         }
     }
 
-    // MARK: - 文節格子
+    // MARK: - 分岐図
 
-    /// 文節格子のときのキー．nil を返したキーは，ふつうの処理に回す
+    /// 分岐図のときのキー．nil を返したキーは，ふつうの処理に回す．
+    /// ↓ と Space は下の枝(変換の候補)へ，↑ は上の枝(字種)へ．Tab は迷う文節だけを渡り歩く(ADR 0007)
     private func handleLattice(_ event: KeyEvent, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         let builder = LatticeBuilder(converter: converter)
         switch event.key {
@@ -455,19 +453,19 @@ public final class InputSession {
                 lattice.moveFocus(by: forward ? 1 : -1)
             }
         case .tab:
-            lattice.moveFocus(by: event.modifiers.contains(.shift) ? -1 : 1)
+            lattice.moveToUncertain(forward: !event.modifiers.contains(.shift))
         case .up:
             lattice.moveSelection(by: -1)
         case .down, .space:
             lattice.moveSelection(by: 1)
         case .character(let character):
             guard let number = numberKey(character), lattice.select(number: number) else { return nil }
-            // 番号で選んだら次の文節に進む．最後の文節なら確定する
-            if lattice.focusedIndex == lattice.segments.count - 1 {
+            // 番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)
+            guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
                 phase = .lattice(lattice)
                 return KeyResult(handled: true, actions: commitAll())
             }
-            lattice.moveFocus(by: 1)
+            lattice.focusedIndex = next
         default:
             return nil
         }

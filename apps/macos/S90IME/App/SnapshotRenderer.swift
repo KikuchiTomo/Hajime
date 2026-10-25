@@ -22,7 +22,8 @@ enum SnapshotRenderer {
         for theme in [ThemePreference.platinum, .desk, .native] {
             let appearance = NSAppearance(named: theme == .desk ? .darkAqua : .aqua)
             render(listView(theme: theme, appearance: appearance), name: "list-\(theme.rawValue)", to: output, appearance: appearance)
-            render(latticeView(theme: theme, appearance: appearance), name: "lattice-\(theme.rawValue)", to: output, appearance: appearance)
+            render(latticeView(theme: theme, appearance: appearance), name: "branch-\(theme.rawValue)", to: output, appearance: appearance)
+            render(previewView(theme: theme, appearance: appearance), name: "branch-preview-\(theme.rawValue)", to: output, appearance: appearance)
             render(correctionView(theme: theme, appearance: appearance), name: "correction-\(theme.rawValue)", to: output, appearance: appearance)
         }
         exit(0)
@@ -57,12 +58,29 @@ enum SnapshotRenderer {
     }
 
     private static func latticeView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
-        let view = LatticeView()
+        let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         let panel = LatticePanel(columns: [
-            .init(text: "私の名前は", alternatives: ["私の名前は", "わたしの名前は", "ワタシの名前は"], selectedAlternative: 0, isFocused: false, showsAlternatives: false),
-            .init(text: "中のです", alternatives: ["中のです", "なかのです", "中野です", "仲のです"], selectedAlternative: 0, isFocused: true, showsAlternatives: true),
-        ])
+            .init(text: "私の", isFocused: false, isUncertain: false),
+            .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),
+            .init(text: "中のです", alternatives: ["中のです", "中野です", "仲のです", "なかのです", "那珂のです"], selectedAlternative: 1,
+                  variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true),
+        ], position: 1, total: 8)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return view
+    }
+
+    /// 迷う文節が 2 つあり，注目していない方に次の候補を添えた分岐図
+    private static func previewView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        let panel = LatticePanel(columns: [
+            .init(text: "Cloudflareで", isFocused: false, isUncertain: false),
+            .init(text: "撮った", isFocused: false, isUncertain: true, preview: "取った"),
+            .init(text: "ドメイン", alternatives: ["ドメイン", "どめいん"], selectedAlternative: 0,
+                  variants: ["どめいん", "ドメイン", "ﾄﾞﾒｲﾝ"], isFocused: true, isUncertain: true),
+        ], position: 1, total: 2)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return view

@@ -65,7 +65,7 @@ OS のキーイベント
 
 `InputSession` は同期的に結果を返します．今の変換エンジン(Zenzai を使わない azooKey)は 1 キーあたり p95 で 30ms ほどで終わるので，変換もこの中で行っています(R-01 の計測)．Zenzai のような重い変換を入れるときは，読みだけを先に返して結果を後から送る形に変え，ADR を足します．
 
-文節格子(ADR 0005)は `LatticeBuilder` が作り，候補ウィンドウに出す内容は `PanelBuilder` が組み立てます．`InputSession` はキーと状態の移り変わりだけを受け持ちます．
+分岐図(ADR 0007)の文節と枝は `LatticeBuilder` が作り，候補ウィンドウに出す内容は `PanelBuilder` が組み立てます．`InputSession` はキーと状態の移り変わりだけを受け持ちます．
 
 アダプタは `ClientAction` を OS の操作に置き換えるだけで，判断をしません．macOS と Windows で動きが食い違うのを防ぐためです．
 

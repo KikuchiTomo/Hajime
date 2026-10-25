@@ -1,27 +1,58 @@
-/// 文節格子．変換結果を文節ごとの列に分け，列ごとに候補を持つ．
+/// 文節格子．変換結果を文節ごとに分け，文節ごとに候補を持つ．
 ///
-/// 音声認識の訂正 UI(Parakeet，Speech Repair)を日本語の文節に当てはめたもの．
-/// 確信度の低い文節だけ下に候補の列を見せ，誤りのある文節を一度に見つけられるようにする．
-/// 根拠と採否は docs/dev/research/candidate-presentation.md の「文節格子」．
+/// 文は 1 本の幹で，迷う文節で枝分かれする(分岐図．ADR 0007)．
+/// 文節ごとに，下へ伸びる変換の候補(candidates)と，上へ伸びる字種(variants: そのまま・カタカナ・半角カタカナ)を持つ．
+/// 上下のキーの向きと枝の向きを合わせるのは，押すキーと選ぶものの位置が対応しているほど速く誤りなく選べるため
+/// (刺激と反応の適合性．docs/dev/research/candidate-presentation.md)．
 public struct SegmentLattice: Sendable, Equatable {
     public struct Segment: Sendable, Equatable {
+        /// 文節の中で選んでいるもの
+        public enum Choice: Sendable, Equatable {
+            /// 変換の候補(下の枝)．0 は幹にある第 1 候補
+            case candidate(Int)
+            /// 字種(上の枝)．0 が幹にいちばん近い
+            case variant(Int)
+        }
+
         /// 読みの中での位置(文字数)
         public var readingStart: Int
         public var readingLength: Int
         public var candidates: [Candidate]
-        public var selectedIndex: Int
-        /// 第 1 候補が 2 番目より十分よいか．低ければ候補の列を常に見せる
+        public var variants: [Candidate]
+        public var choice: Choice
+        /// 第 1 候補が 2 番目より十分よいか．低ければ枝を見せる
         public var isConfident: Bool
+        /// 利用者が選び直したか．選び直した文節は，あとで区切りを動かしても変えない(ADR 0007)
+        public var isDecided: Bool
 
-        public init(readingStart: Int, readingLength: Int, candidates: [Candidate], selectedIndex: Int = 0, isConfident: Bool) {
+        public init(readingStart: Int, readingLength: Int, candidates: [Candidate], variants: [Candidate] = [], choice: Choice = .candidate(0), isConfident: Bool, isDecided: Bool = false) {
             self.readingStart = readingStart
             self.readingLength = readingLength
             self.candidates = candidates
-            self.selectedIndex = selectedIndex
+            self.variants = variants
+            self.choice = choice
             self.isConfident = isConfident
+            self.isDecided = isDecided
         }
 
-        public var selected: Candidate { candidates[selectedIndex] }
+        public var selected: Candidate {
+            switch choice {
+            case .candidate(let index): candidates[index]
+            case .variant(let index): variants[index]
+            }
+        }
+
+        /// 上下の軸での位置．上の枝は負，幹は 0，下の枝は正
+        var axisPosition: Int {
+            switch choice {
+            case .candidate(let index): index
+            case .variant(let index): -(index + 1)
+            }
+        }
+
+        mutating func setAxisPosition(_ position: Int) {
+            choice = position >= 0 ? .candidate(position) : .variant(-position - 1)
+        }
     }
 
     public var segments: [Segment]
@@ -39,19 +70,43 @@ public struct SegmentLattice: Sendable, Equatable {
         focusedIndex = min(max(focusedIndex + offset, 0), segments.count - 1)
     }
 
-    /// 注目している文節の候補を送る(端では反対の端に戻る)
-    public mutating func moveSelection(by offset: Int) {
-        let count = segments[focusedIndex].candidates.count
-        guard count > 0 else { return }
-        let next = segments[focusedIndex].selectedIndex + offset
-        segments[focusedIndex].selectedIndex = ((next % count) + count) % count
+    /// 迷う文節(確信度の低い文節)へ注目を移す．端を越えたら反対の端から探す．迷う文節が無ければ動かない
+    public mutating func moveToUncertain(forward: Bool) {
+        let count = segments.count
+        for step in 1...count {
+            let index = ((focusedIndex + (forward ? step : -step)) % count + count) % count
+            if !segments[index].isConfident {
+                focusedIndex = index
+                return
+            }
+        }
     }
 
-    /// 注目している文節の候補を番号で選ぶ．範囲の外なら false
+    /// 入力位置にいちばん近い迷う文節．無ければ最後の文節．
+    /// 打ち間違いの多くは打った直後に気づかれるので，入力位置の近くから確かめられるようにする(ADR 0007)
+    public var initialFocus: Int {
+        segments.lastIndex { !$0.isConfident } ?? segments.count - 1
+    }
+
+    /// 注目している文節を上下に送る．下は変換の候補，上は字種．
+    /// 下の端では幹に戻り(Space を押し続けると候補を一周する)，上の端では止まる
+    public mutating func moveSelection(by offset: Int) {
+        var segment = segments[focusedIndex]
+        guard !segment.candidates.isEmpty else { return }
+        var next = segment.axisPosition + offset
+        if next >= segment.candidates.count { next = 0 }
+        next = max(next, -segment.variants.count)
+        segment.setAxisPosition(next)
+        segment.isDecided = segment.isDecided || offset != 0
+        segments[focusedIndex] = segment
+    }
+
+    /// 注目している文節の変換の候補を番号で選ぶ．範囲の外なら false
     public mutating func select(number: Int) -> Bool {
         let index = number - 1
         guard segments[focusedIndex].candidates.indices.contains(index) else { return false }
-        segments[focusedIndex].selectedIndex = index
+        segments[focusedIndex].choice = .candidate(index)
+        segments[focusedIndex].isDecided = true
         return true
     }
 
@@ -64,9 +119,16 @@ public struct SegmentLattice: Sendable, Equatable {
 }
 
 /// 候補の出し方
-public enum CandidatePresentation: String, Sendable, Equatable, Codable, CaseIterable {
-    /// 文節が 2 つ以上なら文節格子，1 つなら一覧
+public enum CandidatePresentation: String, Sendable, Equatable, CaseIterable {
+    /// 分岐図．英単語を補正しているときだけ一覧
     case automatic
     case list
-    case lattice
+}
+
+extension CandidatePresentation: Codable {
+    /// 古い版が保存した「文節格子(lattice)」など，今は無い値は分岐図として読む
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = CandidatePresentation(rawValue: raw) ?? .automatic
+    }
 }

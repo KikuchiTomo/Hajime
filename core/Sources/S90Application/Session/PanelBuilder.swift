@@ -41,20 +41,35 @@ enum PanelBuilder {
 
     static func latticePanel(for lattice: SegmentLattice) -> LatticePanel {
         let perSegment = DefaultSettings.latticeCandidatesPerSegment
-        let columns = lattice.segments.enumerated().map { index, segment in
-            // 選んでいる候補が見えるよう，候補の列は選んでいる位置を含む範囲を切り出す
-            let pageStart = segment.selectedIndex / perSegment * perSegment
+        var position = 1
+        var total = 0
+        let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in
+            let selectedCandidate: Int? = if case .candidate(let value) = segment.choice { value } else { nil }
+            let selectedVariant: Int? = if case .variant(let value) = segment.choice { value } else { nil }
+            guard index == lattice.focusedIndex else {
+                // 注目していない文節は幹だけ．迷う文節には次の候補を 1 つ添え，見るだけで気づけるようにする
+                let preview = segment.isConfident || segment.isDecided
+                    ? nil
+                    : segment.candidates.first { $0.text != segment.selected.text }?.text
+                return LatticePanel.Column(text: segment.selected.text, isFocused: false, isUncertain: !segment.isConfident,
+                                           isDecided: segment.isDecided, preview: preview)
+            }
+            // 選んでいる候補が見えるよう，下の枝は選んでいる位置を含むページを切り出す
+            let pageStart = (selectedCandidate ?? 0) / perSegment * perSegment
             let page = segment.candidates[pageStart..<min(pageStart + perSegment, segment.candidates.count)]
-            let isFocused = index == lattice.focusedIndex
+            position = pageStart + 1
+            total = segment.candidates.count
             return LatticePanel.Column(
                 text: segment.selected.text,
                 alternatives: page.map(\.text),
-                selectedAlternative: segment.selectedIndex - pageStart,
-                isFocused: isFocused,
-                // 確信度の高い文節は候補の列を畳み，見るだけの手間を減らす
-                showsAlternatives: isFocused || !segment.isConfident
+                selectedAlternative: selectedCandidate.map { $0 - pageStart },
+                variants: segment.variants.map(\.text),
+                selectedVariant: selectedVariant,
+                isFocused: true,
+                isUncertain: !segment.isConfident,
+                isDecided: segment.isDecided
             )
         }
-        return LatticePanel(columns: columns)
+        return LatticePanel(columns: columns, position: position, total: total)
     }
 }

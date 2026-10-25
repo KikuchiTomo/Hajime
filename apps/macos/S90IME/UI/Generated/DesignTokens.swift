@@ -71,6 +71,14 @@ enum DesignTokens {
             static let paddingX: CGFloat = 10
             static let paddingY: CGFloat = 3
         }
+        enum Branch {
+            static let trunkGap: CGFloat = 10
+            static let branchIndent: CGFloat = 14
+            static let branchStemX: CGFloat = 5
+            static let lineWidth: CGFloat = 1
+            static let lineWidthSelected: CGFloat = 2
+            static let underlineOffset: CGFloat = 2
+        }
     }
     enum Motion {
         enum ModeIndicator {

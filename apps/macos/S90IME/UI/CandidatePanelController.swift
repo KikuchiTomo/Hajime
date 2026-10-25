@@ -2,12 +2,12 @@ import AppKit
 import S90Application
 import S90Domain
 
-/// 候補ウィンドウ(一覧と文節格子)を出し入れする．ウィンドウはアプリ全体で 1 つだけ使い回す．
+/// 候補ウィンドウ(一覧と分岐図)を出し入れする．ウィンドウはアプリ全体で 1 つだけ使い回す．
 @MainActor
 final class CandidatePanelController {
     private let window: NSPanel
     private let view = CandidateView()
-    private let latticeView = LatticeView()
+    private let branchView = BranchView()
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
 
@@ -24,10 +24,10 @@ final class CandidatePanelController {
     }
 
     func showLattice(_ panel: LatticePanel, caret: NSRect, theme: ThemePreference, fontSize: Double) {
-        latticeView.theme = ResolvedTheme.resolve(theme)
-        latticeView.fontSize = CGFloat(fontSize)
-        latticeView.panel = panel
-        present(latticeView, size: latticeView.fittingSize(for: panel), caret: caret)
+        branchView.theme = ResolvedTheme.resolve(theme)
+        branchView.fontSize = CGFloat(fontSize)
+        branchView.panel = panel
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret)
         if let focused = panel.columns.first(where: \.isFocused) {
             announce(focused.text)
         }
@@ -81,7 +81,7 @@ final class CandidatePanelController {
 
     private func setRestOpacity(_ value: CGFloat) {
         view.restOpacity = value
-        latticeView.restOpacity = value
+        branchView.restOpacity = value
     }
 
     /// VoiceOver が動いているときだけ，選んでいる候補を読み上げる
