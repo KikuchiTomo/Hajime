@@ -38,17 +38,21 @@ public struct ZenzaiModel: Sendable, Equatable {
             throw .fileNotFound
         }
         guard size == expectedSize else { throw .sizeMismatch(actual: size) }
-        guard try sha256(of: url) == expectedSHA256 else { throw .hashMismatch }
+        guard try sha256(of: url, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
         return ZenzaiModel(url: url)
     }
 
-    private static func sha256(of url: URL) throws(VerificationError) -> String {
+    /// 決まった大きさより 1 バイト多くまでだけを読む．確かめたあとでファイルが差し替えられても，読み続けて止まらないようにする
+    private static func sha256(of url: URL, maximumBytes: Int) throws(VerificationError) -> String {
         #if canImport(CryptoKit)
         guard let handle = try? FileHandle(forReadingFrom: url) else { throw .fileNotFound }
         defer { try? handle.close() }
         var hasher = SHA256()
+        var total = 0
         // 70MB ほどあるので，一度に読まずに区切って読む
         while let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            total += chunk.count
+            guard total <= maximumBytes else { throw .sizeMismatch(actual: total) }
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()

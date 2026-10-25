@@ -1162,3 +1162,48 @@ struct ThirdReviewRegressionTests {
         #expect(!String(reflecting: KeyResult(handled: true, actions: actions)).contains("秘密"))
     }
 }
+
+@MainActor
+@Suite("4 回目のレビューで見つけた不具合の再発防止")
+struct FourthReviewRegressionTests {
+    private let terminal = InputContext(profile: .terminal)
+
+    private func committed(_ actions: [ClientAction]) -> String {
+        actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }.joined()
+    }
+
+    private func isCommandAfter(_ interrupt: (InputSession) -> Void) -> Bool {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        interrupt(session)
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        return committed(session.handle(KeyEvent(.space), context: terminal).actions) == "ls "
+    }
+
+    @Test("ターミナル: Command・Option のキーや入力欄の切り替えで確定した読みも行に数える")
+    func commitsOutsideNormalPath() {
+        #expect(!isCommandAfter { _ = $0.handle(KeyEvent(.character("v"), modifiers: .command), context: terminal) })
+        #expect(!isCommandAfter { _ = $0.handle(KeyEvent(.character("å"), modifiers: .option), context: terminal) })
+        #expect(!isCommandAfter { _ = $0.deactivate() })
+    }
+
+    @Test("入力方式を変えた直後の ¥ キーは確定してから入れ，英数キーは英数にする")
+    func yenAndEisuAfterStyleChange() {
+        let store = FakeSettings()
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: store)
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        store.current.inputStyle = .english
+        let yen = session.handle(KeyEvent(.yen), context: InputContext())
+        #expect(committed(yen.actions) == "か\\")
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        store.current.inputStyle = .romaji
+        _ = session.handle(KeyEvent(.eisu), context: InputContext())
+        #expect(session.mode == .direct)
+    }
+
+    @Test("ログに出す表示は，入力位置の前の文字列や文節の中身を含めない")
+    func redacted() {
+        #expect(!String(describing: InputContext(precedingText: "秘密")).contains("秘密"))
+        #expect(!String(describing: MarkedText.Segment("秘密", style: .reading)).contains("秘密"))
+    }
+}

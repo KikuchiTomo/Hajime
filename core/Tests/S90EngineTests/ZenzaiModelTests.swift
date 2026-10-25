@@ -43,4 +43,25 @@ struct ZenzaiModelTests {
             try ZenzaiModel.verified(at: url, expectedSize: 3, expectedSHA256: abcSHA256)
         }
     }
+
+    @Test("シンボリックリンクはたどった先がふつうのファイルなら使う")
+    func symlinkToFile() throws {
+        let target = try write("abc")
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent("s90-zenzai-link-\(UUID().uuidString).gguf")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer { try? FileManager.default.removeItem(at: link) }
+        #expect(try ZenzaiModel.verified(at: link, expectedSize: 3, expectedSHA256: abcSHA256).url == link)
+    }
+
+    @Test("リンクの先が /dev/zero やディレクトリなら使わない(読み続けて止まらない)")
+    func symlinkToSpecialFile() throws {
+        for destination in [URL(fileURLWithPath: "/dev/zero"), FileManager.default.temporaryDirectory] {
+            let link = FileManager.default.temporaryDirectory.appendingPathComponent("s90-zenzai-link-\(UUID().uuidString).gguf")
+            try FileManager.default.createSymbolicLink(at: link, withDestinationURL: destination)
+            defer { try? FileManager.default.removeItem(at: link) }
+            #expect(throws: ZenzaiModel.VerificationError.fileNotFound) {
+                try ZenzaiModel.verified(at: link, expectedSize: 3, expectedSHA256: abcSHA256)
+            }
+        }
+    }
 }
