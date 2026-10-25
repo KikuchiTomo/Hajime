@@ -55,6 +55,10 @@ public final class InputSession {
             // ショートカットはアプリに任せる．組み立て中の文字は先に確定する
             return KeyResult(handled: false, actions: commitAll())
         }
+        if event.modifiers.contains(.option), case .character = event.key {
+            // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
+            return KeyResult(handled: false, actions: commitAll())
+        }
         switch mode {
         case .direct: return handleDirect(event, context: context)
         case .japanese: return handleJapanese(event, context: context)

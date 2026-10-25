@@ -232,4 +232,13 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "あい")
         #expect(!harness.lastResult.handled)
     }
+
+    @Test("Option との組み合わせはアプリに渡す")
+    func option() {
+        let harness = Harness()
+        harness.type("ka")
+        harness.press(.character("å"), .option)
+        #expect(harness.committed == "か")
+        #expect(!harness.lastResult.handled)
+    }
 }
