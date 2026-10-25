@@ -44,3 +44,23 @@ extension LatticePanel: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "LatticePanel(columns: \(columns.count))" }
     public var debugDescription: String { description }
 }
+
+extension MarkedText.Segment: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "Segment(length: \(text.count), style: \(style))" }
+    public var debugDescription: String { description }
+}
+
+extension CandidatePanel.Entry: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "Entry(length: \(text.count))" }
+    public var debugDescription: String { description }
+}
+
+extension LatticePanel.Column: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "Column(length: \(text.count), alternatives: \(alternatives.count))" }
+    public var debugDescription: String { description }
+}
+
+extension EnglishWordCorrector.Correction: CustomStringConvertible, CustomDebugStringConvertible {
+    var description: String { "Correction(keysLength: \(keys.count), wordLength: \(word.count))" }
+    var debugDescription: String { description }
+}

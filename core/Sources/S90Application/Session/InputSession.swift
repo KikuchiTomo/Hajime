@@ -61,6 +61,13 @@ public final class InputSession {
             // パスワード欄では何もしない(docs/dev/SECURITY-MODEL.md)
             return .passThrough
         }
+        let result = route(event, context: context)
+        // ターミナルの行には，どの経路で確定した文字もアプリに渡ったキーも，ここで 1 か所で数える
+        if context.profile == .terminal { terminal.didHandle(event, result: result) }
+        return result
+    }
+
+    private func route(_ event: KeyEvent, context: InputContext) -> KeyResult {
         if event.modifiers.contains(.command) {
             // ショートカットはアプリに任せる．組み立て中の文字は先に確定する
             return KeyResult(handled: false, actions: commitAll())
@@ -70,10 +77,7 @@ public final class InputSession {
             return KeyResult(handled: false, actions: commitAll())
         }
         switch mode {
-        case .direct:
-            let result = handleDirect(event, context: context)
-            if context.profile == .terminal { terminal.didHandle(event, result: result) }
-            return result
+        case .direct: return handleDirect(event, context: context)
         case .japanese: return handleJapanese(event, context: context)
         }
     }
@@ -84,14 +88,16 @@ public final class InputSession {
         let actions = commitAll()
         mode = newMode
         // 英数にしたあとは行の頭の判断と関係なくなるので行を終える(キーで英数にしたときは TerminalLine.didHandle が終える)
-        terminal.endLine()
+        if newMode == .direct { terminal.endLine() }
         return actions
     }
 
     /// 入力欄からフォーカスが外れた．組み立て中の文字は確定する
+    /// OS が commitComposition と deactivateServer の両方で呼ぶことがあるので，何度呼んでも同じ結果になるようにする
     public func deactivate() -> [ClientAction] {
-        terminal.endLine()
-        return commitAll()
+        let actions = commitAll()
+        terminal.didLeave(committing: actions)
+        return actions
     }
 
     /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ．
@@ -151,23 +157,24 @@ public final class InputSession {
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
         isSettled = false
         let styleChange = adoptInputStyle()
-        let result: KeyResult
         if !styleChange.isEmpty, !Self.continuesAfterStyleChange(event) {
-            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定する．Backspace・Escape・Enter・矢印などは
-            // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字のキーは新しい方式で続けて打つ
-            result = KeyResult(handled: true, actions: styleChange)
-        } else {
-            let routed = routeJapanese(event, context: context)
-            result = KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
+            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定する．Backspace・Escape・Enter・Space・矢印などは
+            // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字・¥・英数・かなは新しい方式で続けて処理する
+            return KeyResult(handled: true, actions: styleChange)
         }
-        if context.profile == .terminal { terminal.didHandle(event, result: result) }
-        return result
+        let routed = routeJapanese(event, context: context)
+        return KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
     }
 
-    /// 入力方式が変わった直後でも，そのまま新しい方式で打ち続けるキー(修飾なしの文字)
+    /// 入力方式が変わった直後でも，そのまま新しい方式で処理するキー．
+    /// 文字・¥・英数・かなは，確定した文字に効かないので続けて処理する．
+    /// Space は前の方式の文字を変換するつもりで押したことが多く，新しい方式で空白を入れると意図と違うので，確定だけにする
     private static func continuesAfterStyleChange(_ event: KeyEvent) -> Bool {
-        guard case .character = event.key else { return false }
-        return !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
+        switch event.key {
+        case .character: !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
+        case .yen, .eisu, .kana: true
+        default: false
+        }
     }
 
     private func routeJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
@@ -237,7 +244,7 @@ public final class InputSession {
         case .passThrough:
             return .passThrough
         case .commitCommand(let keys):
-            // 打ったとおりの英字で確定する．確定した文字は日本語ではないので，行の状態に日本語として数えない
+            // 打ったとおりの英字で確定する．確定した名前と空白は TerminalLine.didHandle で行の長さに数える
             return KeyResult(handled: true, actions: [.commit(keys + " ")] + reset())
         case .commitAndPass:
             return KeyResult(handled: false, actions: commitAll())

@@ -2,11 +2,13 @@ import S90Domain
 
 /// ターミナルでのキーの扱いを決める(R-07)．行の状態は CommandLineState が持つ．
 ///
-/// キーごとに 2 回呼ぶ．
+/// 入口は 4 つ．
 /// - `decide`: InputSession がキーを処理する前．コマンドの行で英字を流すか，コマンドの名前を確定するかを決める．
 ///   状態を変えるのは，コマンドの名前を確定してコマンドの行に入るときだけ
-/// - `didHandle`: 処理したあと．確定した文字・アプリに渡ったキー(Enter・Backspace など)を行の状態に数える．
-///   確定したかアプリに渡ったかは処理の結果でしか分からないので，数えるのはここにまとめる
+/// - `didHandle`: キーを処理したあと．確定した文字とアプリに渡ったキー(Enter・Backspace など)を行の状態に数える．
+///   確定したかアプリに渡ったかは処理の結果でしか分からないので，キーによる変化はここにまとめる
+/// - `didLeave`: キーを伴わずに入力欄を離れたとき．確定した文字を数え，行の中身を分からないものとして扱う
+/// - `endLine`: キーを伴わずに英数に切り替わったとき(OS の入力メニューから)
 @MainActor
 final class TerminalLine {
     enum Decision: Equatable {
@@ -46,8 +48,21 @@ final class TerminalLine {
 
     /// キーを処理したあとに呼ぶ．確定した文字(どの入力方式のものも)を数えてから，アプリに渡ったキーを数える
     func didHandle(_ event: KeyEvent, result: KeyResult) {
-        for action in result.actions {
-            if case .commit(let text) = action { state.didCommitText(length: text.count) }
+        didCommit(result.actions)
+        if event.modifiers.contains(.command) {
+            // Command 付きのキーはアプリのショートカットで，ふつうは行に文字を入れない(Cmd+K で "k" を数えない)．
+            // ただし Cmd+Backspace は行の頭まで消し，Cmd+V は中身の分からない文字を貼り付ける
+            if !result.handled, event.key == .backspace { state.endLine() }
+            if !result.handled, case .character(let character) = event.key, character.lowercased() == "v" { state.didInsertUnknownText() }
+            return
+        }
+        if event.modifiers.contains(.option), !result.handled, case .character = event.key {
+            // Option+文字は，ターミナルの設定によって特殊な文字が入るか(å など)，メタキーとしてカーソルを動かすかが変わる．
+            // どちらか分からないので，行の中身を分からないものとして扱う
+            // 何も入れていない行の頭でも，å などが入ったかもしれないので文の行にする(分からないときは日本語へ倒す)
+            state.didInsertUnknownText()
+            state.becomeUnknown()
+            return
         }
         if result.actions.contains(.selectMode(.direct)) {
             // 英数にしたあとは Vim のコマンドなどを打つことが多く，行の頭の判断と関係なくなるので行を終える
@@ -72,6 +87,19 @@ final class TerminalLine {
             state.didPass(character)
         default:
             break
+        }
+    }
+
+    /// 入力欄を離れた．確定した文字を数え，行の中身を分からないものとして扱う(何度呼んでも同じ結果になる)
+    func didLeave(committing actions: [ClientAction]) {
+        didCommit(actions)
+        state.becomeUnknown()
+    }
+
+    /// 確定した文字を行の長さに数える
+    private func didCommit(_ actions: [ClientAction]) {
+        for action in actions {
+            if case .commit(let text) = action { state.didCommitText(length: text.count) }
         }
     }
 

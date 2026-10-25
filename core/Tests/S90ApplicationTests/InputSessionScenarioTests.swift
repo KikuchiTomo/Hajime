@@ -1162,3 +1162,186 @@ struct ThirdReviewRegressionTests {
         #expect(!String(reflecting: KeyResult(handled: true, actions: actions)).contains("秘密"))
     }
 }
+
+@MainActor
+@Suite("4 回目のレビューで見つけた不具合の再発防止")
+struct FourthReviewRegressionTests {
+    private let terminal = InputContext(profile: .terminal)
+
+    private func committed(_ actions: [ClientAction]) -> String {
+        actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }.joined()
+    }
+
+    private func isCommandAfter(_ interrupt: (InputSession) -> Void) -> Bool {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        interrupt(session)
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        return committed(session.handle(KeyEvent(.space), context: terminal).actions) == "ls "
+    }
+
+    @Test("ターミナル: Command・Option のキーや入力欄の切り替えで確定した読みも行に数える")
+    func commitsOutsideNormalPath() {
+        #expect(!isCommandAfter { _ = $0.handle(KeyEvent(.character("v"), modifiers: .command), context: terminal) })
+        #expect(!isCommandAfter { _ = $0.handle(KeyEvent(.character("å"), modifiers: .option), context: terminal) })
+        #expect(!isCommandAfter { _ = $0.deactivate() })
+    }
+
+    @Test("入力方式を変えた直後の ¥ キーは確定してから入れ，英数キーは英数にする")
+    func yenAndEisuAfterStyleChange() {
+        let store = FakeSettings()
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: store)
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        store.current.inputStyle = .english
+        let yen = session.handle(KeyEvent(.yen), context: InputContext())
+        #expect(committed(yen.actions) == "か\\")
+        for key in "ka" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        store.current.inputStyle = .romaji
+        _ = session.handle(KeyEvent(.eisu), context: InputContext())
+        #expect(session.mode == .direct)
+    }
+
+    @Test("ログに出す表示は，入力位置の前の文字列や文節の中身を含めない")
+    func redacted() {
+        #expect(!String(describing: InputContext(precedingText: "秘密")).contains("秘密"))
+        #expect(!String(describing: MarkedText.Segment("秘密", style: .reading)).contains("秘密"))
+        #expect(!String(describing: CandidatePanel.Entry(text: "秘密", annotation: nil)).contains("秘密"))
+        #expect(!String(describing: LatticePanel.Column(text: "秘密", isFocused: false, isUncertain: false)).contains("秘密"))
+        let segment = SegmentLattice.Segment(readingStart: 0, readingLength: 2, candidates: [Candidate(text: "秘密", readingCount: 2, origin: .combined)], isConfident: true)
+        #expect(!String(describing: segment).contains("秘密"))
+        #expect(!String(describing: ReadingCorrection(keys: "himitsu", reading: "ヒミツ", score: 0, cost: 0)).contains("ヒミツ"))
+        // debugDescription(String(reflecting:))でも中身を出さない
+        var composition = Composition()
+        for key in "himitsu" { composition.insertRomaji(key) }
+        let values: [Any] = [
+            InputContext(precedingText: "秘密"), MarkedText.Segment("秘密", style: .reading), segment,
+            ReadingCorrection(keys: "himitsu", reading: "ヒミツ", score: 0, cost: 0), RomajiRule(keys: "hm", kana: "秘密"),
+        ] + composition.tails()
+        for value in values {
+            let shown = String(reflecting: value)
+            #expect(!shown.contains("秘密") && !shown.contains("ヒミツ") && !shown.contains("himitsu"), "\(type(of: value))")
+        }
+    }
+
+    @Test("入力欄を離れる処理を 2 回呼んでも，確定した読みのある行はコマンドの行にしない")
+    func deactivateTwice() {
+        #expect(!isCommandAfter { session in
+            _ = session.deactivate()
+            _ = session.deactivate()
+        })
+    }
+
+    @Test("ターミナル: Cmd+Backspace で行を消したら行の頭に戻り，Cmd+V で貼り付けたら文の行にする")
+    func commandBackspaceAndPaste() {
+        let afterClear = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ls" { _ = afterClear.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = afterClear.handle(KeyEvent(.space), context: terminal)
+        _ = afterClear.handle(KeyEvent(.backspace, modifiers: .command), context: terminal)
+        #expect(afterClear.handle(KeyEvent(.character("a")), context: terminal).handled)
+        let afterPaste = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = afterPaste.handle(KeyEvent(.character("v"), modifiers: .command), context: terminal)
+        for key in "ls" { _ = afterPaste.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(committed(afterPaste.handle(KeyEvent(.space), context: terminal).actions) != "ls ")
+    }
+
+    @Test("ターミナル: Command 付きのキーは行に数えない(Cmd+K のあとも行の長さが変わらない)")
+    func commandKeyNotCounted() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        _ = session.handle(KeyEvent(.character("k"), modifiers: .command), context: terminal)
+        _ = session.handle(KeyEvent(.character("\""), modifiers: [.command, .shift]), context: terminal)
+        for _ in 0..<3 { _ = session.handle(KeyEvent(.backspace), context: terminal) }
+        // 行は空なので行の頭に戻り，次の a は組み立てる
+        #expect(session.handle(KeyEvent(.character("a")), context: terminal).handled)
+    }
+}
+
+@MainActor
+@Suite("ターミナルの行が分からなくなるとき")
+struct TerminalUnknownLineTests {
+    private let terminal = InputContext(profile: .terminal)
+
+    private func commandSession() -> InputSession {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.space), context: terminal)
+        return session
+    }
+
+    private func passes(_ session: InputSession) -> Bool {
+        !session.handle(KeyEvent(.character("a")), context: terminal).handled
+    }
+
+    @Test("コマンドの行で Option+文字を押すと，英字を流さない文の行になる")
+    func optionInCommandLine() {
+        let session = commandSession()
+        _ = session.handle(KeyEvent(.character("ƒ"), modifiers: .option), context: terminal)
+        #expect(!passes(session))
+    }
+
+    @Test("コマンドの行で入力欄を離れると，英字を流さない文の行になる")
+    func leaveCommandLine() {
+        let session = commandSession()
+        _ = session.deactivate()
+        #expect(!passes(session))
+    }
+
+    @Test("何も打っていない行で入力欄を 2 回離れても，ls と Space でコマンドの行に入れる")
+    func leaveEmptyLineTwice() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.deactivate()
+        _ = session.deactivate()
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        let actions = session.handle(KeyEvent(.space), context: terminal).actions
+        #expect(actions.contains(.commit("ls ")))
+    }
+
+    @Test("コマンドの行で Cmd+V を押しても，英字を流し続ける")
+    func pasteInCommandLine() {
+        let session = commandSession()
+        _ = session.handle(KeyEvent(.character("v"), modifiers: .command), context: terminal)
+        #expect(passes(session))
+    }
+
+    @Test("ログに出す表示は，入力した文字を持つほかの型でも中身を含めない")
+    func redactedMore() {
+        var composition = Composition()
+        for key in "himitsu" { composition.insertRomaji(key) }
+        var settings = Settings()
+        settings.userDictionary = [UserDictionaryEntry(reading: "ひみつ", word: "秘密")]
+        let candidate = Candidate(text: "秘密", readingCount: 3, origin: .combined)
+        let values: [Any] = [
+            ClientAction.commit("秘密"),
+            CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: "秘密", annotation: nil)], selectedEntry: nil,
+                           focus: .candidate, position: 1, total: 1, note: nil),
+            LatticePanel(columns: [.init(text: "秘密", isFocused: true, isUncertain: false)]),
+            candidate, KeyEvent(.character("h")), settings, UserDictionaryEntry(reading: "ひみつ", word: "秘密"),
+            RomajiTable.standard(adding: [RomajiRule(keys: "hm", kana: "秘密")]),
+        ]
+        for value in values {
+            let shown = String(reflecting: value)
+            #expect(!shown.contains("秘密") && !shown.contains("ひみつ"), "\(type(of: value))")
+        }
+    }
+
+    @Test("メニューで英数にすると行が終わり，日本語に戻すと行の頭からコマンドを見分ける")
+    func setModeEndsLine() {
+        let session = commandSession()
+        _ = session.setMode(.direct)
+        _ = session.setMode(.japanese)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
+    }
+
+    @Test("英数で行の頭から打ってから日本語に戻すと，文の行のまま")
+    func directTypingThenJapanese() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.setMode(.direct)
+        for key in "ls" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        _ = session.handle(KeyEvent(.yen), context: terminal)
+        _ = session.setMode(.japanese)
+        for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
+        #expect(!session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
+    }
+}

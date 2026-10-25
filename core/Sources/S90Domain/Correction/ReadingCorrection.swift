@@ -39,3 +39,9 @@ public struct ReadingCorrectionRule: Sendable {
         return best.score - typedScore >= DefaultSettings.readingCorrectionMargin ? best : nil
     }
 }
+
+extension ReadingCorrection: CustomStringConvertible, CustomDebugStringConvertible {
+    // 打ったキーと読みは入力内容なので，ログには長さと点数だけを出す
+    public var description: String { "ReadingCorrection(keysLength: \(keys.count), readingLength: \(reading.count), score: \(score))" }
+    public var debugDescription: String { description }
+}

@@ -340,3 +340,14 @@ extension Composition: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "Composition(length: \(displayReading.count))" }
     public var debugDescription: String { description }
 }
+
+extension Composition.Tail: CustomStringConvertible, CustomDebugStringConvertible {
+    // 打ったキーは入力内容なので，ログには長さと位置だけを出す
+    public var description: String { "Tail(keysLength: \(keys.count), rawStart: \(rawStart), kanaStart: \(kanaStart))" }
+    public var debugDescription: String { description }
+}
+
+extension Composition.NasalAmbiguity: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "NasalAmbiguity(kanaIndex: \(kanaIndex), usesNaRow: \(usesNaRow))" }
+    public var debugDescription: String { description }
+}

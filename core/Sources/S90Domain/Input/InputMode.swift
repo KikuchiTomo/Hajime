@@ -34,3 +34,11 @@ public struct InputContext: Sendable, Equatable {
         self.precedingText = precedingText
     }
 }
+
+extension InputContext: CustomStringConvertible, CustomDebugStringConvertible {
+    // 入力位置の前の文字列は入力内容なので，ログには長さだけを出す
+    public var description: String {
+        "InputContext(profile: \(profile), isSecure: \(isSecure), precedingTextLength: \(precedingText?.count ?? 0))"
+    }
+    public var debugDescription: String { description }
+}

@@ -114,3 +114,20 @@ struct SettingsRobustnessTests {
         #expect(FileSettingsStore(fileURL: url).setAsideFile == nil)
     }
 }
+
+@Suite("FIFO を読もうとして止まらない")
+@MainActor
+struct ProtectedFileFIFOTests {
+    @Test("設定のファイルとユーザー辞書の取り込みで，FIFO は読まずに断る")
+    func fifo() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-fifo-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let settings = directory.appendingPathComponent("settings.json")
+        #expect(mkfifo(settings.path, 0o600) == 0)
+        #expect(FileSettingsStore(fileURL: settings).current == DefaultSettings.settings)
+        let dictionary = directory.appendingPathComponent("dictionary.txt")
+        #expect(mkfifo(dictionary.path, 0o600) == 0)
+        #expect(throws: (any Error).self) { try UserDictionaryFile.read(from: dictionary) }
+    }
+}

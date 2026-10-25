@@ -43,4 +43,45 @@ struct ZenzaiModelTests {
             try ZenzaiModel.verified(at: url, expectedSize: 3, expectedSHA256: abcSHA256)
         }
     }
+
+    @Test("シンボリックリンクはたどった先がふつうのファイルなら使う")
+    func symlinkToFile() throws {
+        let target = try write("abc")
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent("s90-zenzai-link-\(UUID().uuidString).gguf")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer { try? FileManager.default.removeItem(at: link) }
+        #expect(try ZenzaiModel.verified(at: link, expectedSize: 3, expectedSHA256: abcSHA256).url == link)
+    }
+
+    @Test("リンクの先が /dev/zero やディレクトリなら使わない(読み続けて止まらない)")
+    func symlinkToSpecialFile() throws {
+        for destination in [URL(fileURLWithPath: "/dev/zero"), FileManager.default.temporaryDirectory] {
+            let link = FileManager.default.temporaryDirectory.appendingPathComponent("s90-zenzai-link-\(UUID().uuidString).gguf")
+            try FileManager.default.createSymbolicLink(at: link, withDestinationURL: destination)
+            defer { try? FileManager.default.removeItem(at: link) }
+            #expect(throws: ZenzaiModel.VerificationError.fileNotFound) {
+                try ZenzaiModel.verified(at: link, expectedSize: 3, expectedSHA256: abcSHA256)
+            }
+        }
+    }
+
+    @Test("ハッシュは決まった大きさを超えたら読むのをやめる")
+    func stopsReadingAtLimit() throws {
+        let url = try write("abcdef")
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        #expect(throws: ZenzaiModel.VerificationError.sizeMismatch(actual: 4)) {
+            try ZenzaiModel.sha256(of: handle, maximumBytes: 3)
+        }
+    }
+
+    @Test("FIFO は開く時点で止まらずに使わない")
+    func fifo() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("s90-zenzai-fifo-\(UUID().uuidString)")
+        #expect(mkfifo(url.path, 0o600) == 0)
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(throws: ZenzaiModel.VerificationError.fileNotFound) {
+            try ZenzaiModel.verified(at: url, expectedSize: 3, expectedSHA256: abcSHA256)
+        }
+    }
 }

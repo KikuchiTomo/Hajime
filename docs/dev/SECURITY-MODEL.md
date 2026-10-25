@@ -59,7 +59,7 @@
 - ユーザー辞書の取り込み(`UserDictionaryFile`)は 4MB までのテキストだけを読み，読みがひらがなで長さが上限以内の行だけを使う．登録できる語は 10,000 語まで
 - パーサにはファズテストを用意する(`core/Tests/S90PersistenceTests/FuzzTests.swift`)
 - 読めなかった設定のファイルは脇に置き(`settings.json.unreadable-*`)，既定値で上書きしない．脇に置いたことは，設定の画面を最初に開いたときに知らせる．書く前にも大きさの上限を確かめる
-- `Settings` と `UserDictionaryEntry` のログに出す表示(`description`)は中身を伏せる
+- 入力した文字・読み・候補・設定の中身を持つ型は，ログに出す表示(`description` と `debugDescription`)で中身を伏せ，長さと数だけを出す(`RedactedDescriptions.swift` など)．`dump()` と `Mirror` は中身をそのまま出すので，入力内容を持つ値に使わない
 
 ### Windows のプロセス間通信
 
