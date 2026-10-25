@@ -31,6 +31,8 @@ let package = Package(
             ]
         ),
         .target(name: "S90Persistence", dependencies: ["S90Domain", "S90Application"]),
+        // 入れずに変換を試す道具(make try)
+        .executableTarget(name: "s90-playground", dependencies: ["S90Domain", "S90Application", "S90Engine"]),
         .target(name: "S90TestSupport", dependencies: ["S90Domain", "S90Application"], path: "Tests/Support"),
         .testTarget(name: "S90DomainTests", dependencies: ["S90Domain"]),
         .testTarget(name: "S90ApplicationTests", dependencies: ["S90Domain", "S90Application", "S90TestSupport"]),

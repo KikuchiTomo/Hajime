@@ -26,6 +26,7 @@ ALLOWED: dict[str, set[str]] = {
     },
     "S90Persistence": {"Foundation", "S90Domain", "S90Application"},
     "S90IPC": {"Foundation", "S90Domain", "S90Application"},
+    "s90-playground": {"Foundation", "S90Domain", "S90Application", "S90Engine"},
     "s90-engine-host": {
         "Foundation",
         "S90Domain",
