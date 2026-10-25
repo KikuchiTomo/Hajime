@@ -1,56 +1,131 @@
-/// 利用者が変えられる設定．既定値は DefaultSettings にまとめる．
-public struct Settings: Sendable, Equatable, Codable {
-    public var liveConversion: Bool
-    public var yenKey: YenKeyPolicy
-    public var typoCorrection: TypoCorrectionLevel
-    public var showsVariantRow: Bool
-    public var theme: ThemePreference
-    public var candidateFontSize: Double
-    public var candidatePresentation: CandidatePresentation
+/// 利用者が変えられる設定．項目の既定値はここに書き，DefaultSettings.settings はそれをそのまま使う．
+///
+/// 項目は Google 日本語入力・ATOK・macOS の日本語入力・Microsoft IME の設定を調べ，
+/// 日本語の入力に効くものを選んだ(docs/user/settings.md に，入れなかった項目とその理由がある)
+public struct Settings: Sendable, Equatable {
+    // MARK: 入力
+    /// ライブ変換(R-01)
+    public var liveConversion = true
+    /// JIS キーボードの ¥ キーで入れる文字(R-04)
+    public var yenKey = YenKeyPolicy.alwaysBackslash
+    /// 句読点の組み合わせ
+    public var punctuation = PunctuationStyle.toutenKuten
+    /// [ ] で入れる括弧
+    public var brackets = BracketStyle.corner
+    /// / で入れる文字
+    public var slash = SlashStyle.nakaguro
+    /// 日本語のモードで Space を押したときの空白の幅．Shift+Space で逆の幅になる
+    public var spaceWidth = CharacterWidth.halfwidth
+    /// 日本語のモードで打った数字の幅
+    public var numberWidth = CharacterWidth.halfwidth
+    /// 句読点を打ったら，その句読点まで確定する
+    public var punctuationCommits = false
+
+    // MARK: 変換
+    /// 補正の強さ(R-02)
+    public var typoCorrection = TypoCorrectionLevel.standard
+    /// 候補の出し方(ADR 0007)
+    public var candidatePresentation = CandidatePresentation.automatic
+    /// 一覧の上に字種の行を出す(R-03)
+    public var showsVariantRow = true
+    /// 番号キーで候補を選ぶ
+    public var numberKeySelection = true
+    /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
+    public var dateConversion = true
+    /// 「やじるし」などの読みから記号の候補を出す
+    public var symbolConversion = true
+    /// 読みから絵文字の候補を出す
+    public var emojiConversion = true
+
+    // MARK: 辞書と学習
+    /// 確定した候補から学ぶか
+    public var learning = LearningMode.enabled
+    /// 利用者が登録した語
+    public var userDictionary: [UserDictionaryEntry] = []
+
+    // MARK: 見た目
+    public var theme = ThemePreference.automatic
+    public var candidateFontSize = 15.0
+    /// 日本語と英数を切り替えたときに，入力位置の近くにモードを出す
+    public var showsModeIndicator = true
+
+    // MARK: アプリごと
     /// アプリの識別子(macOS はバンドル ID)の前方一致からプロファイルを決める規則．先にあるものを優先する
-    public var profileRules: [ProfileRule]
+    public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
-    public init(
-        liveConversion: Bool,
-        yenKey: YenKeyPolicy,
-        typoCorrection: TypoCorrectionLevel,
-        showsVariantRow: Bool,
-        theme: ThemePreference,
-        candidateFontSize: Double,
-        candidatePresentation: CandidatePresentation,
-        profileRules: [ProfileRule]
-    ) {
-        self.liveConversion = liveConversion
-        self.yenKey = yenKey
-        self.typoCorrection = typoCorrection
-        self.showsVariantRow = showsVariantRow
-        self.theme = theme
-        self.candidateFontSize = candidateFontSize
-        self.candidatePresentation = candidatePresentation
-        self.profileRules = profileRules
-    }
-
-    // 項目を足しても古い設定ファイルを読めるよう，無い項目は既定値で埋める
-    private enum CodingKeys: String, CodingKey {
-        case liveConversion, yenKey, typoCorrection, showsVariantRow, theme, candidateFontSize, candidatePresentation, profileRules
-    }
-
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let defaults = DefaultSettings.settings
-        liveConversion = try container.decodeIfPresent(Bool.self, forKey: .liveConversion) ?? defaults.liveConversion
-        yenKey = try container.decodeIfPresent(YenKeyPolicy.self, forKey: .yenKey) ?? defaults.yenKey
-        typoCorrection = try container.decodeIfPresent(TypoCorrectionLevel.self, forKey: .typoCorrection) ?? defaults.typoCorrection
-        showsVariantRow = try container.decodeIfPresent(Bool.self, forKey: .showsVariantRow) ?? defaults.showsVariantRow
-        theme = try container.decodeIfPresent(ThemePreference.self, forKey: .theme) ?? defaults.theme
-        candidateFontSize = try container.decodeIfPresent(Double.self, forKey: .candidateFontSize) ?? defaults.candidateFontSize
-        candidatePresentation = try container.decodeIfPresent(CandidatePresentation.self, forKey: .candidatePresentation) ?? defaults.candidatePresentation
-        profileRules = try container.decodeIfPresent([ProfileRule].self, forKey: .profileRules) ?? defaults.profileRules
-    }
+    public init() {}
 
     public func profile(forApplication identifier: String?) -> AppProfile {
         guard let identifier else { return .standard }
         return profileRules.first { identifier.hasPrefix($0.applicationPrefix) }?.profile ?? .standard
+    }
+}
+
+extension Settings: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits
+        case typoCorrection, candidatePresentation, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
+        case learning, userDictionary
+        case theme, candidateFontSize, showsModeIndicator
+        case profileRules
+    }
+
+    /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var settings = Settings()
+        func read<Value: Decodable>(_ key: CodingKeys, into keyPath: WritableKeyPath<Settings, Value>) {
+            if let value = try? container.decodeIfPresent(Value.self, forKey: key) {
+                settings[keyPath: keyPath] = value
+            }
+        }
+        read(.liveConversion, into: \.liveConversion)
+        read(.yenKey, into: \.yenKey)
+        read(.punctuation, into: \.punctuation)
+        read(.brackets, into: \.brackets)
+        read(.slash, into: \.slash)
+        read(.spaceWidth, into: \.spaceWidth)
+        read(.numberWidth, into: \.numberWidth)
+        read(.punctuationCommits, into: \.punctuationCommits)
+        read(.typoCorrection, into: \.typoCorrection)
+        read(.candidatePresentation, into: \.candidatePresentation)
+        read(.showsVariantRow, into: \.showsVariantRow)
+        read(.numberKeySelection, into: \.numberKeySelection)
+        read(.dateConversion, into: \.dateConversion)
+        read(.symbolConversion, into: \.symbolConversion)
+        read(.emojiConversion, into: \.emojiConversion)
+        read(.learning, into: \.learning)
+        read(.userDictionary, into: \.userDictionary)
+        read(.theme, into: \.theme)
+        read(.candidateFontSize, into: \.candidateFontSize)
+        read(.showsModeIndicator, into: \.showsModeIndicator)
+        read(.profileRules, into: \.profileRules)
+        self = settings
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(liveConversion, forKey: .liveConversion)
+        try container.encode(yenKey, forKey: .yenKey)
+        try container.encode(punctuation, forKey: .punctuation)
+        try container.encode(brackets, forKey: .brackets)
+        try container.encode(slash, forKey: .slash)
+        try container.encode(spaceWidth, forKey: .spaceWidth)
+        try container.encode(numberWidth, forKey: .numberWidth)
+        try container.encode(punctuationCommits, forKey: .punctuationCommits)
+        try container.encode(typoCorrection, forKey: .typoCorrection)
+        try container.encode(candidatePresentation, forKey: .candidatePresentation)
+        try container.encode(showsVariantRow, forKey: .showsVariantRow)
+        try container.encode(numberKeySelection, forKey: .numberKeySelection)
+        try container.encode(dateConversion, forKey: .dateConversion)
+        try container.encode(symbolConversion, forKey: .symbolConversion)
+        try container.encode(emojiConversion, forKey: .emojiConversion)
+        try container.encode(learning, forKey: .learning)
+        try container.encode(userDictionary, forKey: .userDictionary)
+        try container.encode(theme, forKey: .theme)
+        try container.encode(candidateFontSize, forKey: .candidateFontSize)
+        try container.encode(showsModeIndicator, forKey: .showsModeIndicator)
+        try container.encode(profileRules, forKey: .profileRules)
     }
 }
 

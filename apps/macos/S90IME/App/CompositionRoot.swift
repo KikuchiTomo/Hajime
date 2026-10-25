@@ -20,6 +20,7 @@ final class CompositionRoot {
     let candidatePanel: CandidatePanelController
     let modeIndicator: ModeIndicatorController
     let contextProvider: InputContextProvider
+    let calendar = SystemCalendar()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine) {
         self.settings = settings
@@ -40,6 +41,8 @@ final class CompositionRoot {
             versionString: AppIdentity.versionString,
             zenzai: loadZenzaiModel()
         )
+        engine.apply(settings.current)
+        settings.observe { [weak engine] in engine?.apply($0) }
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
         FontRegistry.registerBundledFonts()
@@ -61,8 +64,11 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SymbolSupplementedConverter(engine.makeSession()), lexicon: lexicon, settings: settings)
+        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar), lexicon: lexicon, settings: settings)
     }
+
+    /// 設定の画面．開くたびに作らず使い回す
+    private(set) lazy var settingsWindow = SettingsWindowController(settings: settings, resetLearning: { [engine] in engine.resetLearning() })
 
     func makePresenter() -> ClientActionPresenter {
         ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, settings: settings)

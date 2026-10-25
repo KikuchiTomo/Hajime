@@ -41,3 +41,10 @@ public protocol SettingsReading: AnyObject {
 public protocol SettingsStoring: SettingsReading {
     func update(_ change: (inout Settings) -> Void) throws
 }
+
+/// 今の日時と，今日からずらした日を返すポート．日付の候補(DateExpressions)に使う
+@MainActor
+public protocol CalendarReading: AnyObject {
+    func now() -> CalendarDate
+    func day(offsetFromToday offset: Int) -> CalendarDate
+}

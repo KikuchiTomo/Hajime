@@ -38,7 +38,7 @@ let package = Package(
         // 入れずに変換を試す道具(make try)
         .executableTarget(
             name: "s90-playground",
-            dependencies: ["S90Domain", "S90Application", "S90Engine"],
+            dependencies: ["S90Domain", "S90Application", "S90Engine", "S90Persistence"],
             swiftSettings: [.interoperabilityMode(.Cxx)]
         ),
         .target(name: "S90TestSupport", dependencies: ["S90Domain", "S90Application"], path: "Tests/Support"),

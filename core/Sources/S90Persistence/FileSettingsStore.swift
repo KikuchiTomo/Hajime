@@ -11,6 +11,7 @@ public final class FileSettingsStore: SettingsStoring {
 
     private let fileURL: URL
     public private(set) var current: Settings
+    private var observers: [(Settings) -> Void] = []
 
     /// 読めないファイル・壊れたファイルのときは既定値で始める．入力を止めないため
     public init(fileURL: URL) {
@@ -21,8 +22,15 @@ public final class FileSettingsStore: SettingsStoring {
     public func update(_ change: (inout Settings) -> Void) throws {
         var next = current
         change(&next)
+        guard next != current else { return }
         try save(next)
         current = next
+        observers.forEach { $0(next) }
+    }
+
+    /// 設定が変わるたびに呼ばれる処理を足す．エンジンや設定の画面を新しい設定に合わせるのに使う
+    public func observe(_ handler: @escaping (Settings) -> Void) {
+        observers.append(handler)
     }
 
     private func save(_ settings: Settings) throws {
