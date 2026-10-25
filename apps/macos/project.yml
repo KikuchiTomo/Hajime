@@ -1,5 +1,11 @@
 # Xcode のプロジェクトはこのファイルから作る(xcodegen generate)．.xcodeproj はコミットしない
 name: S90IME
+# Dev は開発版を入れるための構成．最適化はリリースと同じにする．
+# Debug の構成ではエンジンと Zenzai(llama.cpp)が最適化なしでビルドされ，1 キーに数秒かかって入力できなくなるため
+configs:
+  Debug: debug
+  Release: release
+  Dev: release
 options:
   bundleIdPrefix: tokyo.s90
   deploymentTarget:
@@ -77,8 +83,14 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         COMBINE_HIDPI_IMAGES: YES
-      # Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる
+      # Dev と Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる．
+      # 入れるのは Dev(最適化あり)．Debug は Xcode で動きを追うときと，見た目の画像を書き出すときに使う
       configs:
+        Dev:
+          PRODUCT_NAME: "s90.tokyo IME Dev"
+          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.dev
+          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.dev
+          S90_ICON_SUFFIX: "-dev"
         Debug:
           PRODUCT_NAME: "s90.tokyo IME Dev"
           PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.dev
