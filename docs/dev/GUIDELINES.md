@@ -53,6 +53,7 @@
 
 ## コミットと PR
 
-- コミットは Conventional Commits．日本語で 1 行．スコープを必ず付ける(`core`，`macos`，`windows`，`protocol`，`design`，`docs`，`skills`，`ci`，`repo`)
+- main へはスカッシュマージだけで入れる．PR のタイトルがそのまま main のコミットになる(`docs/dev/REPOSITORY.md`)
+- PR のタイトルとコミットは Conventional Commits．日本語で 1 行．スコープを必ず付ける(`core`，`macos`，`windows`，`protocol`，`design`，`docs`，`adr`，`skills`，`ci`，`repo`，`deps`)
 - PR は `.github/PULL_REQUEST_TEMPLATE.md` に従う．要件の ID(R-xx)と ADR があれば書く
 - 設計の判断を変える PR には ADR を足す(`docs/dev/adr/README.md`)
