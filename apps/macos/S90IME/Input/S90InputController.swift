@@ -37,7 +37,8 @@ final class S90InputController: IMKInputController {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, let client = sender as? any IMKTextInput,
             let key = NSEventKeyTranslator.translate(event) else { return false }
-        let result = session.handle(key, context: root.contextProvider.context(for: client))
+        let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
+        let result = session.handle(key, context: context)
         presenter.apply(result.actions, to: client)
         return result.handled
     }

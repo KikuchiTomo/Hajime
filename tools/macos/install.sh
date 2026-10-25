@@ -18,6 +18,9 @@ if [ -z "$identity" ]; then
 fi
 echo "署名: $identity"
 
+# Zenzai のモデルを取得してハッシュを確かめる(取得済みなら確かめるだけ)．アプリに入れて Zenzai を有効にするため
+"$root/tools/models/fetch_zenzai.sh"
+
 cd "$root/apps/macos"
 xcodegen generate --quiet
 xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -derivedDataPath build build -quiet
@@ -31,9 +34,11 @@ fi
 
 # 動いている古い版を止めてから入れ替える．次にキーを打ったとき OS が新しい版を起こす
 pkill -x "$app_name" 2>/dev/null || true
-mkdir -p "$destination"
-rm -rf "$destination/$app_name.app"
-cp -R "$built" "$destination/"
+# 置き場所は管理者の権限が要るので sudo を使う(パスワードを聞かれる)
+sudo mkdir -p "$destination"
+sudo rm -rf "$destination/$app_name.app"
+sudo cp -R "$built" "$destination/"
+sudo chown -R root:wheel "$destination/$app_name.app"
 swift "$root/tools/macos/input_source.swift" enable "$destination/$app_name.app"
 echo "入れました: $destination/$app_name.app"
 echo "初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース で「${app_name}」を足してください"
