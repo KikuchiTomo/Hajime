@@ -23,23 +23,14 @@ public final class InputSession {
     public private(set) var mode: InputMode = .japanese
     private var composition = Composition()
     private var phase: Phase = .composing
-    /// 補正した結果．補正が無いか，取り消したときは nil
-    private var correction: Correction?
-    /// 利用者が Space で取り消した補正の位置．同じ位置では補正し直さない(Q-01)
-    private var dismissedCorrectionStart: Int?
-
-    /// 補正の状態．rawStart 番目から打った keys(読みでは kanaStart 文字目から)を word に直している
-    private struct Correction: Equatable {
-        var rawStart: Int
-        var kanaStart: Int
-        var keys: String
-        var word: String
-    }
+    /// 英単語の補正(R-02)
+    private let corrector: EnglishWordCorrector
 
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading) {
         self.converter = converter
         self.lexicon = lexicon
         self.settings = settings
+        self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
     }
 
     public var isComposing: Bool { !composition.isEmpty }
@@ -173,11 +164,11 @@ public final class InputSession {
             || (character == "'" && composition.pending == "n")
         if isRomaji {
             composition.insertRomaji(character)
-            if keepOrFreezeCorrection() {
+            if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
         } else if character.isASCII && (character.isLetter || character.isNumber) {
-            freezeCorrection()
+            corrector.commit(into: &composition)
             composition.insertLiteral(String(character), rawKey: character)
         } else {
             let text = SymbolTable.text(for: character, profile: context.profile)
@@ -185,7 +176,7 @@ public final class InputSession {
                 // 半角のままの記号は，組み立てを始めずにアプリへ渡す(プログラミング中に Enter を要求しない)
                 return KeyResult(handled: false, actions: actions)
             }
-            freezeCorrection()
+            corrector.commit(into: &composition)
             composition.insertLiteral(text, rawKey: nil)
         }
         updateCorrection()
@@ -199,7 +190,7 @@ public final class InputSession {
         if phase != .composing {
             return KeyResult(handled: true, actions: commitAll() + [.commit(text)])
         }
-        freezeCorrection()
+        corrector.commit(into: &composition)
         composition.insertLiteral(text, rawKey: rawKey)
         updateCorrection()
         return KeyResult(handled: true, actions: render(context: context))
@@ -209,10 +200,8 @@ public final class InputSession {
         guard isComposing else { return .passThrough }
         switch phase {
         case .composing:
-            if let current = correction {
+            if corrector.dismiss() {
                 // 補正の直後の Space は，補正を取り消す(R-02，Q-01)
-                dismissedCorrectionStart = current.kanaStart
-                correction = nil
                 return KeyResult(handled: true, actions: render(context: context))
             }
             enterConversion()
@@ -228,7 +217,7 @@ public final class InputSession {
     /// 変換を始める．設定と文節の数から，一覧か文節格子かを決める
     private func enterConversion() {
         let presentation = settings.current.candidatePresentation
-        if presentation != .list, correction == nil {
+        if presentation != .list, corrector.active == nil {
             let lattice = LatticeBuilder(converter: converter).build(reading: composition.conversionReading)
             if presentation == .lattice || lattice.segments.count >= 2 {
                 phase = .lattice(lattice)
@@ -318,7 +307,7 @@ public final class InputSession {
     private func commitAll() -> [ClientAction] {
         guard isComposing else { return [] }
         if case .lattice(let lattice) = phase {
-            for segment in lattice.segments where isEngine(segment.selected) {
+            for segment in lattice.segments where segment.selected.isFromEngine {
                 converter.didCommit(segment.selected)
             }
             return [.commit(lattice.text)] + reset()
@@ -326,7 +315,7 @@ public final class InputSession {
         var actions: [ClientAction] = []
         while isComposing {
             let candidate = currentCandidate()
-            if case .engine = candidate.origin {
+            if candidate.isFromEngine {
                 converter.didCommit(candidate)
             }
             actions.append(.commit(candidate.text))
@@ -336,7 +325,7 @@ public final class InputSession {
             // 読みの先頭だけの候補を確定したときは，残りを続けて確定する
             composition.dropReadingPrefix(candidate.readingCount)
             phase = .composing
-            correction = nil
+            corrector.reset()
         }
         return actions + reset()
     }
@@ -344,8 +333,7 @@ public final class InputSession {
     private func reset() -> [ClientAction] {
         composition = Composition()
         phase = .composing
-        correction = nil
-        dismissedCorrectionStart = nil
+        corrector.reset()
         converter.endComposition()
         return [.setMarkedText(.empty), .hideCandidates]
     }
@@ -366,11 +354,11 @@ public final class InputSession {
                 }
             }
         case .lattice(let lattice):
-            return Candidate(text: lattice.text, readingCount: whole, origin: .variant(.hiragana))
+            return Candidate(text: lattice.text, readingCount: whole, origin: .combined)
         case .composing:
-            if let correction {
-                let after = reading(afterCorrection: correction).conversionReading
-                return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + after, readingCount: whole, origin: .correction)
+            if let correction = corrector.active {
+                let following = corrector.followingReading(in: composition).conversionReading
+                return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + following, readingCount: whole, origin: .correction)
             }
             if settings.current.liveConversion, composition.pending.isEmpty || composition.pending == "n",
                 let live = liveCandidate() {
@@ -383,7 +371,12 @@ public final class InputSession {
     // MARK: - 候補
 
     private func liveCandidate() -> Candidate? {
-        let reading = composition.conversionReading
+        bestWholeCandidate(for: composition.conversionReading)
+    }
+
+    /// 読み全体に対応する候補のうち，いちばんよいもの．ライブ変換で見せる文字はすべてここから取る
+    private func bestWholeCandidate(for reading: String) -> Candidate? {
+        guard !reading.isEmpty else { return nil }
         return converter.candidates(for: reading).first { $0.readingCount == reading.count }
     }
 
@@ -391,12 +384,12 @@ public final class InputSession {
         var candidates: [Candidate] = []
         var annotations: [String?] = []
         let whole = composition.conversionReading.count
-        if let correction {
+        if let correction = corrector.active {
             let prefix = livePrefix(upTo: correction.kanaStart)
             let typed = String(composition.displayReading.dropFirst(correction.kanaStart))
-            let after = reading(afterCorrection: correction).conversionReading
+            let following = corrector.followingReading(in: composition).conversionReading
             candidates += [
-                Candidate(text: prefix + correction.word + after, readingCount: whole, origin: .correction),
+                Candidate(text: prefix + correction.word + following, readingCount: whole, origin: .correction),
                 Candidate(text: prefix + typed, readingCount: whole, origin: .asTyped),
             ]
             annotations += [nil, PanelBuilder.asTypedNote]
@@ -413,73 +406,15 @@ public final class InputSession {
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
-    /// 読みの末尾に打った英単語を探して補正する．文の途中の英単語(「このばーじょんの」+「python」)も対象にする
     private func updateCorrection() {
-        let rule = TypoCorrectionRule(level: settings.current.typoCorrection)
-        let tails = rule.tails(in: composition).filter { $0.kanaStart != dismissedCorrectionStart }
-        // 1. 英単語そのものを，長い部分から探す
-        if let tail = tails.first(where: { lexicon.isWord($0.keys) }),
-            let word = rule.correction(for: tail.keys, isWord: true, suggestions: []) {
-            correction = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word)
-            return
-        }
-        // 2. 綴りの誤りは，いちばん短い部分だけで探す
-        if let tail = tails.last,
-            let word = rule.correction(for: tail.keys, isWord: false, suggestions: lexicon.suggestions(for: tail.keys)) {
-            correction = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word)
-            return
-        }
-        correction = nil
-    }
-
-    /// 補正した英単語のあとに打ったキーを，日本語として読んだもの
-    private func reading(afterCorrection correction: Correction) -> Composition {
-        var after = Composition()
-        for key in afterKeys(correction) { after.insertRomaji(key) }
-        return after
-    }
-
-    private func afterKeys(_ correction: Correction) -> String {
-        String((composition.rawKeys ?? "").dropFirst(correction.rawStart + correction.keys.count))
-    }
-
-    /// 補正した英単語のあとにローマ字を打ったときの扱いを決める．true なら補正をそのまま保つ(補正を求め直さない)．
-    /// - あとのキーがかなになり切った(「python」+「ha」→ は): 英単語を確定させ，続きを日本語として読む
-    /// - あとのキーがまだかなになっていない(「python」+「h」): 補正を保って次のキーを待つ
-    /// - あとのキーが英字として残った(「python」+「s」の先): 補正を求め直す(「pythons」になるかもしれない)
-    private func keepOrFreezeCorrection() -> Bool {
-        guard let current = correction else { return false }
-        let after = reading(afterCorrection: current)
-        if after.kana.contains(where: { $0.isASCII && $0.isLetter }) {
-            return false
-        }
-        if after.pending.isEmpty, !after.kana.isEmpty {
-            composition.freeze(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: current.keys, as: current.word, replaying: afterKeys(current))
-            correction = nil
-            dismissedCorrectionStart = nil
-            return false
-        }
-        // 「s」のように英単語の続きかもしれないキーは，英単語として読めるならそちらを優先する
-        let extended = current.keys + afterKeys(current)
-        if lexicon.isWord(extended) {
-            correction = Correction(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: extended, word: extended)
-        }
-        return true
-    }
-
-    /// 記号や数字を打つ前に，補正した英単語を確定させる(「python」+「,」→「python、」)
-    private func freezeCorrection() {
-        guard let current = correction else { return }
-        composition.freeze(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: current.keys, as: current.word, replaying: afterKeys(current))
-        correction = nil
-        dismissedCorrectionStart = nil
+        corrector.update(for: composition)
     }
 
     /// 読みの先頭から kanaStart 文字目までを，ライブ変換の設定に従って表示する文字にする
     private func livePrefix(upTo kanaStart: Int) -> String {
         let prefix = String(composition.kana.prefix(kanaStart))
-        guard settings.current.liveConversion, !prefix.isEmpty else { return prefix }
-        return converter.candidates(for: prefix).first { $0.readingCount == prefix.count }?.text ?? prefix
+        guard settings.current.liveConversion else { return prefix }
+        return bestWholeCandidate(for: prefix)?.text ?? prefix
     }
 
     // MARK: - 表示
@@ -500,10 +435,6 @@ public final class InputSession {
             })
             return [.setMarkedText(marked), .showLattice(PanelBuilder.latticePanel(for: lattice))]
         }
-    }
-
-    private func isEngine(_ candidate: Candidate) -> Bool {
-        if case .engine = candidate.origin { true } else { false }
     }
 
     // MARK: - 文節格子
@@ -543,11 +474,11 @@ public final class InputSession {
     }
 
     private func composingMarkedText() -> MarkedText {
-        if let correction {
+        if let correction = corrector.active {
             return MarkedText([
                 .init(livePrefix(upTo: correction.kanaStart), style: .converted),
                 .init(correction.word, style: .correction),
-                .init(reading(afterCorrection: correction).displayReading, style: .reading),
+                .init(corrector.followingReading(in: composition).displayReading, style: .reading),
             ])
         }
         guard settings.current.liveConversion else {
@@ -555,13 +486,12 @@ public final class InputSession {
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
         let reading = composition.kana
-        let live = reading.isEmpty ? nil : converter.candidates(for: reading).first { $0.readingCount == reading.count }
+        let live = bestWholeCandidate(for: reading)
         return MarkedText([
             .init(live?.text ?? reading, style: .converted),
             .init(composition.pending, style: .reading),
         ])
     }
-
 }
 
 extension InputSession {
