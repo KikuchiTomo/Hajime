@@ -142,3 +142,31 @@ struct CandidatePresentationTests {
         #expect(decoded == [CandidatePresentation.automatic, .list])
     }
 }
+
+@Suite("日本語の打ち間違いを直すかの判定")
+struct ReadingCorrectionRuleTests {
+    private let typed = ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0)
+    private let fixed = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -5, cost: 2)
+
+    @Test("十分にもっともらしければ直す")
+    func corrects() {
+        #expect(ReadingCorrectionRule(level: .standard).correction(among: [fixed, typed], reading: "よう") == fixed)
+    }
+
+    @Test("控えめ・切るの設定では直さない")
+    func levels() {
+        #expect(ReadingCorrectionRule(level: .conservative).correction(among: [fixed, typed], reading: "よう") == nil)
+        #expect(ReadingCorrectionRule(level: .off).correction(among: [fixed, typed], reading: "よう") == nil)
+    }
+
+    @Test("打ったままの読みがこちらの読みと違えば直さない(nn の読み方の違いなど)")
+    func differentReading() {
+        #expect(ReadingCorrectionRule(level: .standard).correction(among: [fixed, typed], reading: "よー") == nil)
+    }
+
+    @Test("打ったままの読みが候補に無ければ，最後の候補より下とみなす")
+    func typedMissing() {
+        let other = ReadingCorrection(keys: "yoe", reading: "ヨエ", score: -9, cost: 2)
+        #expect(ReadingCorrectionRule(level: .standard).correction(among: [fixed, other], reading: "よう") == fixed)
+    }
+}

@@ -25,6 +25,10 @@ public final class InputSession {
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
+    /// 日本語の打ち間違いを直す前の読み．Esc で戻せるように覚えておく
+    private var typedBeforeCorrection: Composition?
+    /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
+    private var isSettled = false
 
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading) {
         self.converter = converter
@@ -69,6 +73,18 @@ public final class InputSession {
         commitAll()
     }
 
+    /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ
+    public var awaitsSettle: Bool {
+        isComposing && phase == .composing && !isSettled && settings.current.liveConversion
+    }
+
+    /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
+    public func settle(context: InputContext) -> [ClientAction] {
+        guard awaitsSettle else { return [] }
+        isSettled = true
+        return render(context: context)
+    }
+
     // MARK: - 英数モード
 
     private func handleDirect(_ event: KeyEvent, context: InputContext) -> KeyResult {
@@ -89,6 +105,7 @@ public final class InputSession {
     // MARK: - 日本語モード
 
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        isSettled = false
         if event.modifiers.contains(.control) {
             return handleControl(event, context: context)
         }
@@ -162,6 +179,8 @@ public final class InputSession {
         let isRomaji = (character.isASCII && character.isLetter && character.isLowercase)
             || character == "-"
             || (character == "'" && composition.pending == "n")
+            // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
+            || (composition.pending == "z" && Self.zSymbolKeys.contains(character))
         if isRomaji {
             composition.insertRomaji(character)
             NasalReadingResolver(converter: converter).resolve(&composition)
@@ -218,11 +237,34 @@ public final class InputSession {
     /// 変換を始める．設定が一覧でなければ分岐図にする．
     /// 英単語を補正しているときは，補正と入力のままを並べて比べられるよう一覧にする
     private func enterConversion() {
+        correctReading()
         if settings.current.candidatePresentation != .list, corrector.active == nil {
             phase = .lattice(LatticeBuilder(converter: converter).build(reading: composition.conversionReading))
             return
         }
         phase = .selecting(makeSelection(focus: .candidate(0)))
+    }
+
+    /// 日本語の打ち間違いを直す(「ようですね」→「よいですね」)．変換を始めるときだけ行う．
+    /// 打ち間違いを探すのは重いので打鍵ごとにはせず，直したことは画面に出して Esc で戻せるようにする
+    private func correctReading() {
+        typedBeforeCorrection = nil
+        guard corrector.active == nil, let keys = composition.rawKeys, !keys.isEmpty,
+            keys.allSatisfy({ ($0.isASCII && $0.isLetter && $0.isLowercase) || $0 == "-" }),
+            composition.pending.isEmpty || composition.pending == "n" else { return }
+        let rule = ReadingCorrectionRule(level: settings.current.typoCorrection)
+        guard let correction = rule.correction(among: converter.typoCorrections(forKeys: keys), reading: composition.conversionReading)
+        else { return }
+        // 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ
+        var corrected = Composition()
+        let resolver = NasalReadingResolver(converter: converter)
+        for key in correction.keys {
+            corrected.insertRomaji(key)
+            resolver.resolve(&corrected)
+        }
+        guard !corrected.isEmpty, corrected.conversionReading != composition.conversionReading else { return }
+        typedBeforeCorrection = composition
+        composition = corrected
     }
 
     private func handleVertical(forward: Bool, context: InputContext) -> KeyResult {
@@ -284,6 +326,11 @@ public final class InputSession {
         guard isComposing else { return .passThrough }
         if phase != .composing {
             phase = .composing
+            if let typed = typedBeforeCorrection {
+                // 打ち間違いを直していたら，打ったままの読みに戻す
+                composition = typed
+                typedBeforeCorrection = nil
+            }
             return KeyResult(handled: true, actions: render(context: context))
         }
         return KeyResult(handled: true, actions: reset())
@@ -331,6 +378,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         composition = Composition()
+        typedBeforeCorrection = nil
         phase = .composing
         corrector.reset()
         converter.endComposition()
@@ -359,6 +407,7 @@ public final class InputSession {
                 let following = corrector.followingReading(in: composition).conversionReading
                 return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + following, readingCount: whole, origin: .correction)
             }
+            // Enter は区切りなので，かなのまま見せていた語も変換して確定する
             if settings.current.liveConversion, composition.pending.isEmpty || composition.pending == "n",
                 let live = liveCandidate() {
                 return live
@@ -427,12 +476,16 @@ public final class InputSession {
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
-            return [.setMarkedText(marked), .showCandidates(PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow))]
+            var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow)
+            if typedBeforeCorrection != nil { panel.note = PanelBuilder.readingCorrectionNote }
+            return [.setMarkedText(marked), .showCandidates(panel)]
         case .lattice(let lattice):
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
                 .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
             })
-            return [.setMarkedText(marked), .showLattice(PanelBuilder.latticePanel(for: lattice))]
+            var panel = PanelBuilder.latticePanel(for: lattice)
+            if typedBeforeCorrection != nil { panel.note = PanelBuilder.readingCorrectionNote }
+            return [.setMarkedText(marked), .showLattice(panel)]
         }
     }
 
@@ -486,15 +539,19 @@ public final class InputSession {
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
         let reading = composition.kana
-        let live = bestWholeCandidate(for: reading)
+        let shown = bestWholeCandidate(for: reading).map {
+            LiveConversionRule().display(of: $0, reading: reading, settled: isSettled)
+        }
         return MarkedText([
-            .init(live?.text ?? reading, style: .converted),
+            .init(shown ?? reading, style: .converted),
             .init(composition.pending, style: .reading),
         ])
     }
 }
 
 extension InputSession {
+    fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
+
     fileprivate func numberKey(_ character: Character) -> Int? {
         guard let value = character.wholeNumberValue, (1...DefaultSettings.candidatesPerPage).contains(value) else { return nil }
         return value

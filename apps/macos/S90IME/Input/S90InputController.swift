@@ -14,6 +14,8 @@ final class S90InputController: IMKInputController {
     private let session: InputSession
     private let presenter: ClientActionPresenter
     private let menuBuilder: InputMenuBuilder
+    /// 打鍵が止まったことを知らせるタイマー(ライブ変換で，かなのまま見せていた語を変換して見せる)
+    private var settleTimer: Timer?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let (root, session, presenter, menuBuilder) = MainActor.assumeIsolated {
@@ -40,7 +42,21 @@ final class S90InputController: IMKInputController {
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
         let result = session.handle(key, context: context)
         presenter.apply(result.actions, to: client)
+        scheduleSettle(client: client, context: context)
         return result.handled
+    }
+
+    @MainActor
+    private func scheduleSettle(client: any IMKTextInput, context: InputContext) {
+        settleTimer?.invalidate()
+        settleTimer = nil
+        guard session.awaitsSettle else { return }
+        settleTimer = Timer.scheduledTimer(withTimeInterval: DefaultSettings.liveConversionSettleDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.presenter.apply(self.session.settle(context: context), to: client)
+            }
+        }
     }
 
     @MainActor
@@ -53,6 +69,8 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func deactivateServer(_ sender: Any!) {
+        settleTimer?.invalidate()
+        settleTimer = nil
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
         }

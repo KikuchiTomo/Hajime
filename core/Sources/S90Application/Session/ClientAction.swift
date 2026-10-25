@@ -157,10 +157,13 @@ public struct LatticePanel: Sendable, Equatable {
     /// 注目している文節の候補のうち，今のページの先頭が何番目か(1 から)と全体の数
     public var position: Int
     public var total: Int
+    /// 説明の行に出す知らせ(打ち間違いを直したことなど)
+    public var note: String?
 
-    public init(columns: [Column], position: Int = 1, total: Int = 0) {
+    public init(columns: [Column], position: Int = 1, total: Int = 0, note: String? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
+        self.note = note
     }
 }

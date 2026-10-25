@@ -98,7 +98,19 @@ public struct Composition: Sendable, Equatable {
         pending.append(lowered)
         resolvePending()
         if let watch { noteNasalAmbiguity(at: watch) }
+        mergeSymbolSequence()
         if pending.isEmpty { recordBoundary() }
+    }
+
+    /// 続けて打った記号を 1 つにまとめる(「ー＞」→「→」)．規則は SymbolSequence
+    private mutating func mergeSymbolSequence() {
+        guard pending.isEmpty, let match = SymbolSequence.match(suffixOf: kana) else { return }
+        kana.removeLast(match.length)
+        kana.append(match.symbol)
+        // まとめた記号の途中を指す記録は使えないので外す
+        boundaries = boundaries.filter { $0.kanaCount <= kana.count }
+        nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
+        frozenKanaEnd = min(frozenKanaEnd, kana.count)
     }
 
     /// 「nn」の直後にかなになった文字が母音(や行を含む)なら，両方の読みを持てるように記録する
@@ -198,6 +210,7 @@ public struct Composition: Sendable, Equatable {
         flushPending()
         nasalWatchIndex = nil
         kana.append(text)
+        mergeSymbolSequence()
         if let rawKey {
             rawKeys?.append(rawKey)
             recordBoundary()

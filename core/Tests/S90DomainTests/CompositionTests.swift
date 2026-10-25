@@ -164,3 +164,47 @@ struct ScriptVariantTests {
         #expect(ScriptVariant.halfwidthRoman.apply(to: composition) == nil)
     }
 }
+
+@Suite("記号の入力")
+struct SymbolInputTests {
+    @Test("z と組み合わせて記号を入れる", arguments: [("zh", "←"), ("zj", "↓"), ("zk", "↑"), ("zl", "→"), ("z-", "〜"), ("z.", "…"), ("z,", "‥"), ("z/", "・"), ("z[", "『"), ("z]", "』")])
+    func zCombination(keys: String, expected: String) {
+        #expect(compose(keys).conversionReading == expected)
+    }
+
+    @Test("z のあとに母音を打てば，ざ行のまま")
+    func zStillRomaji() {
+        #expect(compose("zazu").conversionReading == "ざず")
+    }
+
+    @Test("続けて打った記号を 1 つにまとめる", arguments: [("ー＞", "→"), ("＜ー", "←"), ("＝＞", "⇒"), ("＜＝", "⇐"), ("＜ー＞", "↔"), ("＜＝＞", "⇔")])
+    func sequence(typed: String, expected: String) {
+        var composition = Composition()
+        composition.insertRomaji("a")
+        for character in typed {
+            if character == "ー" {
+                composition.insertRomaji("-")
+            } else {
+                composition.insertLiteral(String(character))
+            }
+        }
+        #expect(composition.conversionReading == "あ" + expected)
+    }
+
+    @Test("まとめた記号は Backspace 1 回で消える")
+    func deleteMerged() {
+        var composition = Composition()
+        composition.insertRomaji("-")
+        composition.insertLiteral("＞")
+        composition.deleteBackward()
+        #expect(composition.isEmpty)
+    }
+}
+
+@Suite("読みから引く記号")
+struct SymbolDictionaryTests {
+    @Test("矢印・図形・単位などを引ける", arguments: [("やじるし", "→"), ("ほし", "★"), ("こめ", "※"), ("まるいち", "①"), ("ど", "℃"), ("むげんだい", "∞")])
+    func lookup(reading: String, symbol: String) {
+        #expect(SymbolDictionary.symbols(for: reading).contains(symbol))
+    }
+}

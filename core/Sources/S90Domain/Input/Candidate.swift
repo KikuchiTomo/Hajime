@@ -12,21 +12,37 @@ public enum CandidateOrigin: Sendable, Equatable {
     case sentencePart
     /// 複数の候補をつないだもの(文節格子の全体など)
     case combined
+    /// 読みから引いた記号(SymbolDictionary)
+    case symbol
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．
 /// score はエンジンが付けた対数尤度で，大きいほどよい．エンジン以外の候補は 0
 public struct Candidate: Sendable, Equatable {
+    /// 候補の末尾の語．読みの何文字ぶんが，候補の何文字になったか
+    public struct TrailingWord: Sendable, Equatable {
+        public var readingCount: Int
+        public var textCount: Int
+
+        public init(readingCount: Int, textCount: Int) {
+            self.readingCount = readingCount
+            self.textCount = textCount
+        }
+    }
+
     public var text: String
     public var readingCount: Int
     public var origin: CandidateOrigin
     public var score: Double
+    /// 末尾の語(エンジンが語の区切りを教えるときだけ)．打っている途中の語をかなのまま見せるのに使う
+    public var trailingWord: TrailingWord?
 
-    public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0) {
+    public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0, trailingWord: TrailingWord? = nil) {
         self.text = text
         self.readingCount = readingCount
         self.origin = origin
         self.score = score
+        self.trailingWord = trailingWord
     }
 
     /// 変換エンジンが出した候補か．確定したときに学習に使うのはこれだけ

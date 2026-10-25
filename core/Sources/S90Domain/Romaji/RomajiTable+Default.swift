@@ -70,6 +70,9 @@ extension RomajiTable {
             "xwa": "ゎ", "lwa": "ゎ", "xka": "ゕ", "xke": "ゖ",
             "n'": "ん", "xn": "ん",
             "-": "ー",
+            // z と組み合わせて記号を入れる(Google 日本語入力・macOS の日本語入力と同じ)
+            "zh": "←", "zj": "↓", "zk": "↑", "zl": "→",
+            "z-": "〜", "z.": "…", "z,": "‥", "z/": "・", "z[": "『", "z]": "』",
         ]
         table.merge(extra) { _, new in new }
         return table
