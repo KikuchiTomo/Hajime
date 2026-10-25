@@ -70,4 +70,18 @@ struct EndToEndInputTests {
         #expect(committed == columns.map(\.text).joined())
         print("S90_LATTICE", columns.map { "\($0.text)[\($0.alternatives.prefix(3).joined(separator: ","))]" }.joined(separator: " | "))
     }
+
+    @Test("nn のあとの母音は，語によって読みを選ぶ", arguments: [
+        ("onna", "女"),
+        ("hannei", "反映"),
+        ("konnichiha", "こんにちは"),
+        ("konnnitiha", "こんにちは"),
+        ("tannin", "担任"),
+        ("sennen", "1000円|千円|専念|千年"),
+    ])
+    func nasalReading(keys: String, expected: String) throws {
+        let committed = try run(keys).committed
+        print("S90_NASAL \(keys) → \(committed)")
+        #expect(expected.split(separator: "|").contains { String($0) == committed })
+    }
 }

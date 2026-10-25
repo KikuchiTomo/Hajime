@@ -16,6 +16,34 @@ public struct Composition: Sendable, Equatable {
     /// 確定させた英単語の終わり(かなの文字数)．ここより前は英単語を探さない．
     /// 確定させた英単語そのものを「読めない並び」と数えて，後ろの日本語まで補正しないため
     private var frozenKanaEnd = 0
+    /// 「nn」のあとの母音の位置．語によって「ん+あ行」(hannei → はんえい)か「ん+な行」(onna → おんな)かが
+    /// 変わるので，どちらの読みにも切り替えられるようにしておく．どちらにするかは変換の点数で決める(NasalReadingResolver)
+    public private(set) var nasalAmbiguities: [NasalAmbiguity] = []
+    /// 直前に「nn」を「ん」にした位置．次にかなになった文字が母音なら，そこを nasalAmbiguities に加える
+    private var nasalWatchIndex: Int?
+
+    /// 「nn」のあとの母音 1 つぶん．kanaIndex は読みの中の位置
+    public struct NasalAmbiguity: Sendable, Equatable {
+        public var kanaIndex: Int
+        /// 「ん+あ行」の形(「え」)と「ん+な行」の形(「ね」)
+        public var vowelForm: String
+        public var naRowForm: String
+        public var usesNaRow: Bool
+        /// 前に読みを比べたとき，母音のあとに何文字あったか．比べ直すかどうかを決めるのに使う
+        public var evaluatedFollowingCount: Int?
+
+        public var currentForm: String { usesNaRow ? naRowForm : vowelForm }
+        /// 読みの中で，この母音のあとに続く文字数
+        public func followingCount(in reading: String) -> Int {
+            reading.count - kanaIndex - currentForm.count
+        }
+    }
+
+    /// あ行・や行の文字と，前に「n」を足したときの文字
+    private static let naRowForms: [(vowel: String, naRow: String)] = [
+        ("あ", "な"), ("い", "に"), ("う", "ぬ"), ("え", "ね"), ("お", "の"),
+        ("や", "にゃ"), ("ゆ", "にゅ"), ("よ", "にょ"),
+    ]
 
     public struct Boundary: Sendable, Equatable {
         public var rawCount: Int
@@ -61,12 +89,57 @@ public struct Composition: Sendable, Equatable {
         if pending == "n" && lowered == "n" {
             kana.append("ん")
             pending = ""
+            nasalWatchIndex = kana.count
             recordBoundary()
             return
         }
+        let watch = nasalWatchIndex
+        nasalWatchIndex = nil
         pending.append(lowered)
         resolvePending()
+        if let watch { noteNasalAmbiguity(at: watch) }
         if pending.isEmpty { recordBoundary() }
+    }
+
+    /// 「nn」の直後にかなになった文字が母音(や行を含む)なら，両方の読みを持てるように記録する
+    private mutating func noteNasalAmbiguity(at index: Int) {
+        let characters = Array(kana)
+        guard characters.count > index else {
+            // 「nny」の「y」のように，まだかなになっていない．次のキーまで見張る
+            if !pending.isEmpty { nasalWatchIndex = index }
+            return
+        }
+        let following = String(characters[index...])
+        guard let form = Self.naRowForms.first(where: { following.hasPrefix($0.vowel) }) else { return }
+        nasalAmbiguities.append(NasalAmbiguity(kanaIndex: index, vowelForm: form.vowel, naRowForm: form.naRow, usesNaRow: false, evaluatedFollowingCount: nil))
+    }
+
+    /// 読みを比べたことを記録する
+    public mutating func markNasalEvaluated(at position: Int, followingCount: Int) {
+        guard nasalAmbiguities.indices.contains(position) else { return }
+        nasalAmbiguities[position].evaluatedFollowingCount = followingCount
+    }
+
+    /// 「nn」のあとの母音を「ん+あ行」と「ん+な行」のどちらで読むかを切り替える
+    public mutating func setNasalReading(at position: Int, usesNaRow: Bool) {
+        guard nasalAmbiguities.indices.contains(position), nasalAmbiguities[position].usesNaRow != usesNaRow else { return }
+        let ambiguity = nasalAmbiguities[position]
+        let old = ambiguity.currentForm
+        nasalAmbiguities[position].usesNaRow = usesNaRow
+        let new = nasalAmbiguities[position].currentForm
+        var characters = Array(kana)
+        characters.replaceSubrange(ambiguity.kanaIndex..<(ambiguity.kanaIndex + old.count), with: Array(new))
+        kana = String(characters)
+        // 文字数が変わる(「や」→「にゃ」)ときは，後ろの位置をずらす
+        let delta = new.count - old.count
+        guard delta != 0 else { return }
+        for i in nasalAmbiguities.indices where nasalAmbiguities[i].kanaIndex > ambiguity.kanaIndex {
+            nasalAmbiguities[i].kanaIndex += delta
+        }
+        for i in boundaries.indices where boundaries[i].kanaCount > ambiguity.kanaIndex {
+            boundaries[i].kanaCount += delta
+        }
+        if frozenKanaEnd > ambiguity.kanaIndex { frozenKanaEnd += delta }
     }
 
     /// 区切りから末尾までの部分を，長いもの(前の区切り)から順に返す．打ったキーと読みの対応が外れていたら空
@@ -105,6 +178,8 @@ public struct Composition: Sendable, Equatable {
         kana = String(kana.prefix(kanaStart)) + word
         pending = ""
         rawKeys = prefixKeys + keys
+        nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex < kanaStart }
+        nasalWatchIndex = nil
         frozenKanaEnd = kana.count
         recordBoundary()
         for key in after {
@@ -121,6 +196,7 @@ public struct Composition: Sendable, Equatable {
     /// ローマ字にせずそのまま足す文字(大文字の英字・数字・記号)．組み立て中のローマ字は先に確定させる
     public mutating func insertLiteral(_ text: String, rawKey: Character? = nil) {
         flushPending()
+        nasalWatchIndex = nil
         kana.append(text)
         if let rawKey {
             rawKeys?.append(rawKey)
@@ -132,11 +208,15 @@ public struct Composition: Sendable, Equatable {
 
     public mutating func deleteBackward() {
         rawKeys = nil
+        nasalWatchIndex = nil
         if !pending.isEmpty {
             pending.removeLast()
         } else if !kana.isEmpty {
             kana.removeLast()
         }
+        // 消した文字にかかっていた「nn」の読みの記録は外す．残った分は，あとの文字が変わったので比べ直す
+        nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
+        for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingCount = nil }
         if isEmpty {
             containsInvalidRomaji = false
             rawKeys = ""
@@ -155,10 +235,17 @@ public struct Composition: Sendable, Equatable {
         }
         if readingCount <= kana.count {
             kana = String(kana.dropFirst(readingCount))
+            nasalAmbiguities = nasalAmbiguities.compactMap { ambiguity in
+                guard ambiguity.kanaIndex >= readingCount else { return nil }
+                var shifted = ambiguity
+                shifted.kanaIndex -= readingCount
+                return shifted
+            }
         } else {
             // 末尾の「ん」まで確定した場合は，ローマ字の残りも消える
             kana = ""
             pending = ""
+            nasalAmbiguities = []
         }
         rawKeys = nil
         containsInvalidRomaji = false
@@ -218,6 +305,7 @@ public struct Composition: Sendable, Equatable {
     public static func == (lhs: Composition, rhs: Composition) -> Bool {
         lhs.kana == rhs.kana && lhs.pending == rhs.pending && lhs.rawKeys == rhs.rawKeys
             && lhs.containsInvalidRomaji == rhs.containsInvalidRomaji && lhs.boundaries == rhs.boundaries
+            && lhs.nasalAmbiguities == rhs.nasalAmbiguities
     }
 }
 

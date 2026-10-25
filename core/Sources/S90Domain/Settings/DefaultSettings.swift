@@ -50,6 +50,12 @@ public enum DefaultSettings {
     public static let latticeConfidenceGap: Double = 2.0
     /// 文節格子の列ごとに見せる候補の数
     public static let latticeCandidatesPerSegment = 5
+    /// 「nn」のあとの母音の読みを選び直す数．1 キーごとに変換にかけるので小さく保つ
+    public static let maximumNasalAmbiguities = 2
+    /// 「nn」のあとの母音の読みを比べるときに見る，前後の文字数
+    public static let nasalContextLength = 3
+    /// 「nn」のあとの母音の読みを比べ直す時点(母音のあとの文字数)．比べるたびに変換を 2 回するので少なく保つ
+    public static let nasalEvaluationPoints: Set<Int> = [0, 1, 2, 3]
     /// Zenzai が 1 回の変換で推論する回数の上限．小さいほど速く，大きいほど精度がよい(azooKey の既定は 10)
     public static let zenzaiInferenceLimit = 10
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)

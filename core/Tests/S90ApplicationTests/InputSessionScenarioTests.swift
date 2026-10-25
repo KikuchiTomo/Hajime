@@ -254,6 +254,21 @@ struct InputSessionScenarioTests {
         #expect(converter.leftContext == "AAA")
     }
 
+    @Test("nn のあとの母音は，変換の点数が高い読みを選ぶ(onna → 女，hannei → 反映)")
+    func nasalReading() {
+        let converter = FakeConverter([
+            "おんな": [("女", nil)], "おんあ": [("温亜", nil)],
+            "はんえい": [("反映", nil)], "はんねい": [("反寧", nil)],
+        ])
+        converter.scores = ["おんな": -10, "おんあ": -30, "はんえい": -12, "はんねい": -25]
+        let harness = Harness(converter: converter)
+        harness.type("onna")
+        #expect(harness.marked.text == "女")
+        harness.press(.enter)
+        harness.type("hannei")
+        #expect(harness.marked.text == "反映")
+    }
+
     @Test("Escape で組み立て中の文字を消す")
     func escape() {
         let harness = Harness()

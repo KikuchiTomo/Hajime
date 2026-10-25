@@ -10,6 +10,9 @@ public protocol KanaKanjiConverting: AnyObject {
     func candidates(for reading: String) -> [Candidate]
     /// 読みの先頭の文節の候補だけを，よさそうな順に返す(文節格子に使う)
     func clauseCandidates(for reading: String) -> [Candidate]
+    /// 読みとしてのもっともらしさ(大きいほどよい)．候補を作らずに点数だけを求める軽い変換で計る．
+    /// 「nn」のあとの母音をどう読むかを比べるのに使う(NasalReadingResolver)
+    func plausibility(of reading: String) -> Double
     /// 入力位置の前にある文字列(左の文脈)を伝える．文脈を使えるエンジン(Zenzai)が変換の手がかりにする
     func setLeftContext(_ text: String?)
     /// 候補を確定したことを伝える．学習に使う

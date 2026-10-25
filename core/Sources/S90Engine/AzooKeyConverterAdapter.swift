@@ -30,7 +30,8 @@ public final class AzooKeyConverterEngine {
     }
 
     public func makeSession() -> any KanaKanjiConverting {
-        AzooKeyConverterSession(engine: self, sessionID: converter.createSession())
+        // 読みのもっともらしさを測る変換は，表示する変換と状態を混ぜないよう別のセッションで行う
+        AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession())
     }
 
     /// 最初の変換で Zenzai のモデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
@@ -70,9 +71,9 @@ public final class AzooKeyConverterEngine {
         )
     }
 
-    fileprivate func options(leftContext: String?) -> ConvertRequestOptions {
+    fileprivate func options(leftContext: String?, usesZenzai: Bool = true, candidateCount: Int = DefaultSettings.engineCandidateCount) -> ConvertRequestOptions {
         ConvertRequestOptions(
-            N_best: DefaultSettings.engineCandidateCount,
+            N_best: candidateCount,
             requireJapanesePrediction: .disabled,
             requireEnglishPrediction: .disabled,
             keyboardLanguage: .ja_JP,
@@ -84,7 +85,7 @@ public final class AzooKeyConverterEngine {
             sharedContainerURL: memoryDirectory,
             textReplacer: .withDefaultEmojiDictionary(),
             specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
-            zenzaiMode: zenzaiMode(leftContext: leftContext),
+            zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext) : .off,
             metadata: .init(versionString: versionString)
         )
     }
@@ -100,6 +101,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     private let engine: AzooKeyConverterEngine
     private let sessionID: KanaKanjiConverter.ConversionSessionID
+    private let scoringSessionID: KanaKanjiConverter.ConversionSessionID
+    private var plausibilityCache: [String: Double] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
@@ -107,17 +110,18 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     /// 入力位置の前にある文字列(左の文脈)．Zenzai が変換の手がかりに使う
     private var leftContext: String?
 
-    init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID) {
+    init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID, scoringSessionID: KanaKanjiConverter.ConversionSessionID) {
         self.engine = engine
         self.sessionID = sessionID
+        self.scoringSessionID = scoringSessionID
     }
 
     deinit {
         // deinit はどのスレッドで動くか決まっていないので，エンジンへの操作はメインアクターに頼む．
         // isolated deinit は Swift 6.2 からで，CI の Swift 6.1 では使えない
         let engine = engine
-        let sessionID = sessionID
-        Task { @MainActor in engine.removeSession(sessionID) }
+        let sessionIDs = [sessionID, scoringSessionID]
+        Task { @MainActor in sessionIDs.forEach(engine.removeSession) }
     }
 
     func candidates(for reading: String) -> [S90Domain.Candidate] {
@@ -126,6 +130,27 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
         request(reading)?.clauses ?? []
+    }
+
+    func plausibility(of reading: String) -> Double {
+        guard !reading.isEmpty else { return -.infinity }
+        if let cached = plausibilityCache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        // 点数だけを使うので，Zenzai・絵文字・特別な候補・打ち間違いの補正を使わず，候補も 1 つだけ求める
+        var options = engine.options(leftContext: nil, usesZenzai: false, candidateCount: 1)
+        options.textReplacer = .empty
+        options.specialCandidateProviders = []
+        options.typoCorrectionMode = .disabled
+        options.learningType = .nothing
+        let best = engine.withSession(scoringSessionID) { converter in
+            converter.requestCandidates(composing, options: options).mainResults
+                .first { Self.readingCount($0.composingCount, readingLength: reading.count) == reading.count }
+                .map { Double($0.value) }
+        }
+        let score = (best ?? nil) ?? -.infinity
+        plausibilityCache[reading] = score
+        return score
     }
 
     func setLeftContext(_ text: String?) {
@@ -146,6 +171,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func endComposition() {
         _ = engine.withSession(sessionID) { $0.stopComposition() }
+        _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
+        plausibilityCache = [:]
         engineCandidates = [:]
         cache = [:]
     }
