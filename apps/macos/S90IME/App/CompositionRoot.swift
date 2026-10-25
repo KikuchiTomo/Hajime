@@ -61,7 +61,7 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: settings)
+        InputSession(converter: SymbolSupplementedConverter(engine.makeSession()), lexicon: lexicon, settings: settings)
     }
 
     func makePresenter() -> ClientActionPresenter {

@@ -11,7 +11,7 @@ enum Interactive {
         func session(_ presentation: CandidatePresentation) -> InputSession {
             var settings = DefaultSettings.settings
             settings.candidatePresentation = presentation
-            return InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: StaticSettings(settings))
+            return InputSession(converter: SymbolSupplementedConverter(engine.makeSession()), lexicon: lexicon, settings: StaticSettings(settings))
         }
 
         print("ローマ字を打って Enter．空の行で終わります．例: kyouhaiitenkidesune / pthon / konnnitiha")

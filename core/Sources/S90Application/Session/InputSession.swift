@@ -162,6 +162,8 @@ public final class InputSession {
         let isRomaji = (character.isASCII && character.isLetter && character.isLowercase)
             || character == "-"
             || (character == "'" && composition.pending == "n")
+            // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
+            || (composition.pending == "z" && Self.zSymbolKeys.contains(character))
         if isRomaji {
             composition.insertRomaji(character)
             NasalReadingResolver(converter: converter).resolve(&composition)
@@ -495,6 +497,8 @@ public final class InputSession {
 }
 
 extension InputSession {
+    fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
+
     fileprivate func numberKey(_ character: Character) -> Int? {
         guard let value = character.wholeNumberValue, (1...DefaultSettings.candidatesPerPage).contains(value) else { return nil }
         return value

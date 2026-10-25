@@ -48,6 +48,8 @@ public enum DefaultSettings {
     /// 文節格子で，第 1 候補と 2 番目の点数の差がこれより小さい文節は確信度が低いとみなし，候補の列を見せる．
     /// 点数は azooKey の対数尤度．値は試験的に決めたもので，利用の記録を見て調整する
     public static let latticeConfidenceGap: Double = 2.0
+    /// 読みから引いた記号を，候補の上から何番目に差し込むか
+    public static let symbolCandidateOffset = 3
     /// 文節格子の列ごとに見せる候補の数
     public static let latticeCandidatesPerSegment = 5
     /// 「nn」のあとの母音の読みを選び直す数．1 キーごとに変換にかけるので小さく保つ

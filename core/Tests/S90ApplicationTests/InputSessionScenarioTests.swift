@@ -466,3 +466,40 @@ struct InputSessionScenarioTests {
         #expect(harness.committed.isEmpty)
     }
 }
+
+@MainActor
+@Suite("記号")
+struct SymbolScenarioTests {
+    @Test("「->」と打つとライブ変換の表示が「→」になる")
+    func arrowSequence() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        var marked = ""
+        for key in "a->" {
+            for action in session.handle(KeyEvent(.character(key)), context: InputContext()).actions {
+                if case .setMarkedText(let text) = action { marked = text.text }
+            }
+        }
+        #expect(marked == "あ→")
+    }
+
+    @Test("z と記号のキーで記号を入れる")
+    func zSymbol() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        var marked = ""
+        for key in "z." {
+            for action in session.handle(KeyEvent(.character(key)), context: InputContext()).actions {
+                if case .setMarkedText(let text) = action { marked = text.text }
+            }
+        }
+        #expect(marked == "…")
+    }
+
+    @Test("読みから引いた記号を，第 1 候補を変えずに候補へ足す")
+    func supplement() {
+        let converter = SymbolSupplementedConverter(FakeConverter(["やじるし": [("矢印", nil), ("やじるし", nil)]]))
+        let texts = converter.candidates(for: "やじるし").map(\.text)
+        #expect(texts.first == "矢印")
+        #expect(texts.contains("→"))
+        #expect(texts.firstIndex(of: "→") == 2)
+    }
+}
