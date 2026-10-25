@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>s90.tokyo IME</title>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="14.0"/>
+        </allowed-os-versions>
+    </volume-check>
+    <pkg-ref id="tokyo.s90.inputmethod.S90IME"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="tokyo.s90.inputmethod.S90IME"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="tokyo.s90.inputmethod.S90IME" visible="false">
+        <pkg-ref id="tokyo.s90.inputmethod.S90IME"/>
+    </choice>
+    <pkg-ref id="tokyo.s90.inputmethod.S90IME" version="@VERSION@" onConclusion="RequireLogout">component.pkg</pkg-ref>
+</installer-gui-script>
