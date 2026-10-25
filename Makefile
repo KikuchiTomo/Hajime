@@ -36,11 +36,11 @@ uninstall-macos:
 
 # 開発版(s90.tokyo IME Dev)を入れる．本番と並べて試せる．何度でも入れ直せる
 dev-macos:
-	tools/macos/install.sh Debug
+	tools/macos/install.sh Dev
 
 # 開発版を消す．学習データと設定も消すときは make uninstall-dev-macos PURGE=--purge
 uninstall-dev-macos:
-	tools/macos/uninstall.sh Debug $(PURGE)
+	tools/macos/uninstall.sh Dev $(PURGE)
 
 # 入力メソッドとして入れずに，ターミナルで変換を試す
 try:

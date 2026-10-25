@@ -1,12 +1,12 @@
 #!/bin/sh
 # 入れた入力メソッドを止めて消す．
 #
-# 使い方: tools/macos/uninstall.sh [Release|Debug] [--purge]
+# 使い方: tools/macos/uninstall.sh [Release|Dev] [--purge]
 #   --purge: 学習データと設定(サンドボックスのコンテナ)も消す
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 . "$root/tools/macos/variant.sh"
-variant "${1:-Debug}"
+variant "${1:-Dev}"
 purge=${2:-}
 
 if [ -d "$destination/$app_name.app" ]; then
