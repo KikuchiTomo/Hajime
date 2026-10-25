@@ -71,7 +71,11 @@ final class CompositionRoot {
     }
 
     /// 設定の画面．開くたびに作らず使い回す
-    private(set) lazy var settingsWindow = SettingsWindowController(settings: settings, usage: usage, resetLearning: { [engine] in engine.resetLearning() })
+    private(set) lazy var settingsWindow: SettingsWindowController = {
+        let controller = SettingsWindowController(settings: settings, usage: usage, resetLearning: { [engine] in engine.resetLearning() })
+        controller.noteSetAsideFile(settings.setAsideFile)
+        return controller
+    }()
 
     func makePresenter() -> ClientActionPresenter {
         ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, settings: settings)

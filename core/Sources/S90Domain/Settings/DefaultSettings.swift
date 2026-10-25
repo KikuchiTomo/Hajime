@@ -53,10 +53,16 @@ public enum DefaultSettings {
     /// ライブ変換で，末尾の語の読みがこの文字数以下なら，打鍵が止まるまでかなのまま見せる(「らい」→「雷」を出さない)．
     /// 評価用の文で途中表示の誤りが 50 から 23 に減り，変換して見せた時点は 197 から 169 に減った
     public static let liveConversionHeldWordLength = 3
+    /// 設定の画面のスライダーを動かしてから保存するまで待つ時間(秒)．1 段ごとに設定のファイルを書き直さないため
+    public static let settingsSaveDelay = 0.4
     /// 打鍵が止まったとみなすまでの時間(秒)．止まったら変換した文を見せる
     public static let liveConversionSettleDelay = 0.4
     /// EN 入力で日本語の候補を出し始める英字の数．短い英単語(an，to など)に候補を出さない
     public static let minimumEnglishInputSuggestionLength = 4
+    /// 利用者が足すローマ字の綴りとかなの長さの上限(ATOK と同じ)と，足せる数
+    public static let maximumRomajiKeysLength = 4
+    public static let maximumRomajiKanaLength = 6
+    public static let maximumRomajiRules = 500
     /// 使い方の記録を，何回ごとにファイルへ書くか
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
@@ -73,9 +79,9 @@ public enum DefaultSettings {
     public static let zenzaiInferenceLimit = 10
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)
     public static let maximumLeftContextLength = 40
-    /// 設定ファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)
-    /// ユーザー辞書の語を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても収まる大きさ．
-    /// 1 語は UTF-8 で最大 32×3 + 64×4 = 352 バイト，JSON の囲みと字下げで 100 バイトほど足すので，約 4.5MB．余裕を見て倍にする
+    /// 設定のファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)．ユーザー辞書を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても，
+    /// ふつうの文字なら 1 語 450 バイトほどで約 4.5MB に収まるので，余裕を見て倍にした．
+    /// 結合文字を重ねた語のように 1 字が何バイトにもなる場合は超えうるが，書く前に大きさを確かめて断るので，ファイルは壊れない
     public static let maximumSettingsFileBytes = 9 * 1024 * 1024
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024

@@ -36,6 +36,8 @@ final class EnglishInput: InputStyleHandling {
             ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
     }
 
+    func commit() -> [ClientAction] { commitTyped() }
+
     /// 打った英字のまま確定する
     func commitTyped() -> [ClientAction] {
         guard isComposing else { return [] }

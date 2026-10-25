@@ -18,6 +18,8 @@ enum NSEventKeyTranslator {
         static let jisEisu: UInt16 = 102
         static let jisKana: UInt16 = 104
         static let jisYen: UInt16 = 93
+        /// F6〜F10
+        static let functionKeys: [UInt16: Int] = [97: 6, 98: 7, 100: 8, 101: 9, 109: 10]
     }
 
     static func translate(_ event: NSEvent) -> KeyEvent? {
@@ -36,6 +38,7 @@ enum NSEventKeyTranslator {
         case KeyCode.jisEisu: .eisu
         case KeyCode.jisKana: .kana
         case KeyCode.jisYen: .yen
+        case let code where KeyCode.functionKeys[code] != nil: KeyCode.functionKeys[code].map(KeyEvent.Key.function)
         default: character(from: event, modifiers: modifiers).map(KeyEvent.Key.character)
         }
         return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode]) }

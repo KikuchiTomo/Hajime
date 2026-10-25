@@ -5,15 +5,19 @@ import S90Domain
 /// Google 日本語入力と ATOK が書き出す形(3 列目以降の品詞やコメントは読まない)
 public enum UserDictionaryFile {
     public enum FileError: Error, Equatable {
-        case fileTooLarge(bytes: Int)
+        case fileTooLarge(maximumBytes: Int)
         case notText
     }
 
     /// 外から来るファイルなので，大きさに上限を設け，読みと語の形を確かめた行だけを使う(docs/dev/SECURITY-MODEL.md)
     public static func read(from url: URL) throws -> [UserDictionaryEntry] {
-        let size = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
-        guard size <= DefaultSettings.maximumUserDictionaryFileBytes else { throw FileError.fileTooLarge(bytes: size) }
-        guard let text = decode(try Data(contentsOf: url)) else { throw FileError.notText }
+        let data: Data
+        do {
+            data = try ProtectedFile.read(from: url, maximumBytes: DefaultSettings.maximumUserDictionaryFileBytes)
+        } catch let error as ProtectedFile.TooLarge {
+            throw FileError.fileTooLarge(maximumBytes: error.maximumBytes)
+        }
+        guard let text = decode(data) else { throw FileError.notText }
         return parse(text)
     }
 

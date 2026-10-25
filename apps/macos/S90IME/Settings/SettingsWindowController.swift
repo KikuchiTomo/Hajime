@@ -15,6 +15,12 @@ final class SettingsWindowController {
         model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
     }
 
+    /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
+    func noteSetAsideFile(_ url: URL?) {
+        guard let url else { return }
+        model.message = UIStrings.Settings.setAside(url.lastPathComponent)
+    }
+
     func show() {
         model.refreshUsage()
         let window = window ?? makeWindow()
@@ -64,12 +70,16 @@ final class SettingsModel: ObservableObject {
         Binding(get: { self.settings[keyPath: keyPath] }, set: { value in self.update { $0[keyPath: keyPath] = value } })
     }
 
-    func update(_ change: (inout S90Domain.Settings) -> Void) {
+    /// 設定を変えて保存する．保存できなければ知らせて false を返す
+    @discardableResult
+    func update(_ change: (inout S90Domain.Settings) -> Void) -> Bool {
         do {
             try store.update(change)
+            return true
         } catch {
             logger.error("設定を保存できませんでした: \(String(describing: error), privacy: .public)")
             message = UIStrings.Settings.saveFailed
+            return false
         }
     }
 
@@ -100,12 +110,27 @@ final class SettingsModel: ObservableObject {
     // MARK: アプリごとのプロファイル
 
     /// 先頭に足す．先にある規則を優先するので，利用者が足した規則が既定の規則より効く
-    func addProfileRule(prefix: String, profile: AppProfile) {
+    /// 保存できたら true．できなければ入力欄を残す
+    func addProfileRule(prefix: String, profile: AppProfile) -> Bool {
         let trimmed = prefix.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        update { current in
+        guard !trimmed.isEmpty else { return false }
+        return update { current in
             current.profileRules.removeAll { $0.applicationPrefix == trimmed }
             current.profileRules.insert(ProfileRule(applicationPrefix: trimmed, profile: profile), at: 0)
+        }
+    }
+
+    // MARK: ローマ字
+
+    func addRomajiRule(keys: String, kana: String) -> Bool {
+        let rule = RomajiRule(keys: keys.trimmingCharacters(in: .whitespaces).lowercased(), kana: kana.trimmingCharacters(in: .whitespaces))
+        guard rule.isValid, settings.customRomaji.count < DefaultSettings.maximumRomajiRules else {
+            message = UIStrings.Settings.invalidRomaji
+            return false
+        }
+        return update { current in
+            current.customRomaji.removeAll { $0.keys == rule.keys }
+            current.customRomaji.append(rule)
         }
     }
 
@@ -115,8 +140,8 @@ final class SettingsModel: ObservableObject {
         var entries = settings.userDictionary
         switch UserDictionaryEditing.add(reading: reading, word: word, to: &entries) {
         case .added:
-            update { $0.userDictionary = entries }
-            return true
+            // 保存できなければ false を返し，打った語を入力欄に残す
+            return update { $0.userDictionary = entries }
         case .alreadyRegistered:
             return true
         case .invalid:
@@ -140,8 +165,9 @@ final class SettingsModel: ObservableObject {
         do {
             var entries = settings.userDictionary
             let added = UserDictionaryEditing.merge(try UserDictionaryFile.read(from: url), into: &entries)
-            update { $0.userDictionary = entries }
-            message = UIStrings.Settings.imported(added)
+            if update({ $0.userDictionary = entries }) {
+                message = UIStrings.Settings.imported(added)
+            }
         } catch {
             message = UIStrings.Settings.importFailed
         }

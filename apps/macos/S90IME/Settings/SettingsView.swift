@@ -1,7 +1,7 @@
 import S90Domain
 import SwiftUI
 
-/// 設定の画面．項目は Google 日本語入力・ATOK などの設定を調べて選んだ(docs/user/settings.md)
+/// 設定の画面．項目は Google 日本語入力・ATOK などの設定を調べて選んだ(docs/user/reference/settings.md)
 struct SettingsView: View {
     static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel
@@ -12,6 +12,7 @@ struct SettingsView: View {
             ConversionTab(model: model).tabItem { Text(UIStrings.Settings.conversionTab) }
             DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
             AppsTab(model: model).tabItem { Text(UIStrings.Settings.appsTab) }
+            RomajiTab(model: model).tabItem { Text(UIStrings.Settings.romajiTab) }
             AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
             UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
         }
@@ -127,23 +128,21 @@ private struct DictionaryTab: View {
 
 private struct AppearanceTab: View {
     @ObservedObject var model: SettingsModel
-    /// 動かしているあいだの値．手を離したときだけ保存し，1 段ごとに設定のファイルを書き直さない
+    /// 動かしているあいだの値．少し待ってから保存し，1 段ごとに設定のファイルを書き直さない．
+    /// キーボードや VoiceOver で動かしたときも保存されるよう，手を離したかどうかには頼らない
     @State private var fontSize: Double?
+    @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
         Form {
             Section(UIStrings.Settings.appearance) {
                 ChoicePicker(title: UIStrings.Menu.theme, selection: model.binding(\.theme), label: UIStrings.Menu.label(for:))
                 Slider(
-                    value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { fontSize = $0 }),
+                    value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { scheduleSave($0) }),
                     in: Double(DesignTokens.Size.Candidate.fontSizeMin)...Double(DesignTokens.Size.Candidate.fontSizeMax),
                     step: 1
                 ) {
                     Text(UIStrings.Settings.fontSize(Int(fontSize ?? model.settings.candidateFontSize)))
-                } onEditingChanged: { editing in
-                    guard !editing, let value = fontSize else { return }
-                    model.update { $0.candidateFontSize = value }
-                    fontSize = nil
                 }
             }
             Section {
@@ -151,6 +150,17 @@ private struct AppearanceTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func scheduleSave(_ value: Double) {
+        fontSize = value
+        saveTask?.cancel()
+        saveTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(DefaultSettings.settingsSaveDelay))
+            guard !Task.isCancelled else { return }
+            model.update { $0.candidateFontSize = value }
+            fontSize = nil
+        }
     }
 }
 
@@ -172,8 +182,7 @@ private struct AppsTab: View {
                 .labelsHidden()
                 .fixedSize()
                 Button(UIStrings.Settings.add) {
-                    model.addProfileRule(prefix: prefix, profile: profile)
-                    prefix = ""
+                    if model.addProfileRule(prefix: prefix, profile: profile) { prefix = "" }
                 }
                 .disabled(prefix.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -192,6 +201,47 @@ private struct AppsTab: View {
             Text(UIStrings.Settings.appsNote).font(.caption).foregroundStyle(.secondary)
         }
     }
+}
+
+/// 利用者が足すローマ字の綴り．標準の表に重ね，同じ綴りは利用者のものを使う
+private struct RomajiTab: View {
+    @ObservedObject var model: SettingsModel
+    @State private var keys = ""
+    @State private var kana = ""
+    @State private var selection = Set<RomajiRule>()
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                TextField(UIStrings.Settings.romajiKeys, text: $keys)
+                TextField(UIStrings.Settings.romajiKana, text: $kana)
+                Button(UIStrings.Settings.add) {
+                    if model.addRomajiRule(keys: keys, kana: kana) {
+                        keys = ""
+                        kana = ""
+                    }
+                }
+                .disabled(keys.isEmpty || kana.isEmpty)
+            }
+            Table(model.settings.customRomaji, selection: $selection) {
+                TableColumn(UIStrings.Settings.romajiKeys, value: \.keys)
+                TableColumn(UIStrings.Settings.romajiKana, value: \.kana)
+            }
+            HStack {
+                Button(UIStrings.Settings.remove) {
+                    model.update { $0.customRomaji.removeAll { selection.contains($0) } }
+                    selection = []
+                }
+                .disabled(selection.isEmpty)
+                Spacer()
+            }
+            Text(UIStrings.Settings.romajiNote).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+extension RomajiRule: Identifiable {
+    public var id: Self { self }
 }
 
 extension ProfileRule: Identifiable {

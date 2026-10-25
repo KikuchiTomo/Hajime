@@ -22,13 +22,15 @@ public final class InputSession {
 
     public private(set) var mode: InputMode = .japanese
     private var composition = Composition()
+    /// ローマ字の表．利用者が足した綴りが変わったときだけ作り直す
+    private var romajiTable: (rules: [RomajiRule], table: RomajiTable) = ([], .standard)
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
-    /// EN 入力(R-05)．入力方式が英語のときだけ使う．英字を持つので，確定のときに InputSession からも触る
-    private let english: EnglishInput
-    /// ローマ字入力以外の入力方式の解釈．ローマ字入力は共通の処理が受け持つ
+    /// ローマ字入力以外の入力方式．ローマ字入力は共通の処理が受け持つ
     private let styleHandlers: [InputStyle: any InputStyleHandling]
+    /// 方式の側で文字を組み立てているもの(入力方式を途中で変えたときは，前の方式のものが残っていることがある)
+    private var composingStyles: [any InputStyleHandling] { styleHandlers.values.filter(\.isComposing) }
     /// ターミナルで打っている行(R-07)
     private let terminal = TerminalLine()
     /// 前のキーのときの入力方式．メニューなどで変わったら，組み立て中の文字を確定する
@@ -47,11 +49,10 @@ public final class InputSession {
         self.settings = settings
         self.usage = usage
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
-        self.english = EnglishInput(converter: converter)
-        self.styleHandlers = [.english: english, .kana: KanaInput()]
+        self.styleHandlers = [.english: EnglishInput(converter: converter), .kana: KanaInput()]
     }
 
-    public var isComposing: Bool { !composition.isEmpty || english.isComposing }
+    public var isComposing: Bool { !composition.isEmpty || !composingStyles.isEmpty }
 
     // MARK: - 外からの操作
 
@@ -69,7 +70,10 @@ public final class InputSession {
             return KeyResult(handled: false, actions: commitAll())
         }
         switch mode {
-        case .direct: return handleDirect(event, context: context)
+        case .direct:
+            let result = handleDirect(event, context: context)
+            if context.profile == .terminal { terminal.didHandle(event, result: result) }
+            return result
         case .japanese: return handleJapanese(event, context: context)
         }
     }
@@ -79,7 +83,7 @@ public final class InputSession {
         guard newMode != mode else { return [] }
         let actions = commitAll()
         mode = newMode
-        // 英数で打った分は行の状態に数えられないので，ターミナルの行は分からなくなる
+        // 英数にしたあとは行の頭の判断と関係なくなるので行を終える(キーで英数にしたときは TerminalLine.didHandle が終える)
         terminal.endLine()
         return actions
     }
@@ -94,6 +98,11 @@ public final class InputSession {
     /// EN 入力の英字は変換して見せないので待たない
     public var awaitsSettle: Bool {
         !composition.isEmpty && phase == .composing && !isSettled && settings.current.liveConversion
+    }
+
+    private func switchToDirectPassingEscape(actions: [ClientAction]) -> KeyResult {
+        mode = .direct
+        return KeyResult(handled: false, actions: actions + [.selectMode(.direct)] + modeIndicator(.direct))
     }
 
     /// 入力位置の近くにモードを出す操作．設定で切っていれば出さない
@@ -111,7 +120,6 @@ public final class InputSession {
     // MARK: - 英数モード
 
     private func handleDirect(_ event: KeyEvent, context: InputContext) -> KeyResult {
-        if event.key == .enter { terminal.endLine() }
         switch event.key {
         case .kana where event.modifiers.contains(.option):
             // 英数のときも，Option+かな は日本語に戻して入力方式を切り替える
@@ -134,7 +142,8 @@ public final class InputSession {
 
     /// 日本語モードのキー．次の順に回し，前の段で扱ったキーは後ろに回さない．
     /// 1. 入力方式が前のキーから変わっていたら，組み立て中の文字を確定する
-    /// 2. ターミナルの行(Enter・Ctrl+C などで行を終える判断は，ほかの処理より先に要る)
+    /// 2. ターミナルの行(コマンドの行で英字をそのまま流す判断は，ほかの処理より先に要る．
+    ///    行の長さと行の終わりは，処理の結果を見て TerminalLine.didHandle で数える)
     /// 3. Control の組み合わせ(R-03)
     /// 4. 分岐図の操作
     /// 5. 入力方式ごとの処理(EN 入力・かな入力)
@@ -142,8 +151,23 @@ public final class InputSession {
     private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
         isSettled = false
         let styleChange = adoptInputStyle()
-        let result = routeJapanese(event, context: context)
-        return KeyResult(handled: result.handled, actions: styleChange + result.actions)
+        let result: KeyResult
+        if !styleChange.isEmpty, !Self.continuesAfterStyleChange(event) {
+            // メニューなどで入力方式が変わっていたら，前の方式の文字を確定する．Backspace・Escape・Enter・矢印などは
+            // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字のキーは新しい方式で続けて打つ
+            result = KeyResult(handled: true, actions: styleChange)
+        } else {
+            let routed = routeJapanese(event, context: context)
+            result = KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
+        }
+        if context.profile == .terminal { terminal.didHandle(event, result: result) }
+        return result
+    }
+
+    /// 入力方式が変わった直後でも，そのまま新しい方式で打ち続けるキー(修飾なしの文字)
+    private static func continuesAfterStyleChange(_ event: KeyEvent) -> Bool {
+        guard case .character = event.key else { return false }
+        return !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
     }
 
     private func routeJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
@@ -155,6 +179,10 @@ public final class InputSession {
         }
         if case .lattice(var lattice) = phase, let result = handleLattice(event, lattice: &lattice, context: context) {
             return result
+        }
+        if event.key == .escape, settings.current.escapeSwitchesToDirect, composition.isEmpty, !composingStyles.isEmpty {
+            // EN 入力の英字を確定し，英数にして Escape をアプリに渡す(Vim のノーマルモードに 1 回で戻る)
+            return switchToDirectPassingEscape(actions: commitAll())
         }
         if let result = applyInputStyle(event, context: context) {
             return result
@@ -168,8 +196,6 @@ public final class InputSession {
         case .eisu:
             var actions = commitAll()
             mode = .direct
-            // 英数で打った分は行の状態に数えられないので，ターミナルの行は分からなくなる
-            terminal.endLine()
             actions += [.selectMode(.direct)] + modeIndicator(.direct)
             return KeyResult(handled: true, actions: actions)
         case .yen:
@@ -194,6 +220,9 @@ public final class InputSession {
             return handleHorizontal(forward: event.key == .right)
         case .tab:
             return isComposing ? KeyResult(handled: true) : .passThrough
+        case .function(let number):
+            guard !composition.isEmpty, let variant = Self.functionKeyVariants[number] else { return .passThrough }
+            return selectVariant(variant, context: context)
         }
     }
 
@@ -225,6 +254,20 @@ public final class InputSession {
         return commitAll()
     }
 
+    /// 番号キーで選べる候補の数(分岐図なら注目している文節のページ，一覧ならそのページ)
+    private var selectableCount: Int {
+        switch phase {
+        case .composing:
+            return 0
+        case .lattice(let lattice):
+            return min(lattice.focused.candidates.count, DefaultSettings.latticeCandidatesPerSegment)
+        case .selecting(let selection):
+            guard case .candidate(let index) = selection.focus else { return 0 }
+            let pageStart = index / DefaultSettings.candidatesPerPage * DefaultSettings.candidatesPerPage
+            return min(selection.candidates.count - pageStart, DefaultSettings.candidatesPerPage)
+        }
+    }
+
     private func nextInputStyle() -> InputStyle {
         let styles = InputStyle.allCases
         let current = styles.firstIndex(of: settings.current.inputStyle) ?? 0
@@ -235,7 +278,7 @@ public final class InputSession {
     private func applyInputStyle(_ event: KeyEvent, context: InputContext) -> KeyResult? {
         let style = settings.current.inputStyle
         guard let handler = styleHandlers[style] else { return nil }
-        let state = InputStyleState(settings: settings.current, isSelectingCandidates: phase != .composing)
+        let state = InputStyleState(settings: settings.current, selectableCount: selectableCount)
         switch handler.interpret(event, state: state) {
         case nil:
             return nil
@@ -255,7 +298,7 @@ public final class InputSession {
 
     private func handleControl(_ event: KeyEvent, context: InputContext) -> KeyResult {
         // EN 入力の英字は，確定してからキーをアプリに渡す(Ctrl+A などで英字が残らないように)
-        if english.isComposing { return KeyResult(handled: false, actions: english.commitTyped()) }
+        if !composingStyles.isEmpty { return KeyResult(handled: false, actions: commitAll()) }
         // macOS の日本語入力と同じ割り当て(R-03)
         guard !composition.isEmpty, case .character(let character) = event.key else { return .passThrough }
         let variant: ScriptVariant? = switch character.lowercased() {
@@ -266,9 +309,14 @@ public final class InputSession {
         case ":", "'": .halfwidthRoman
         default: nil
         }
-        guard let variant, variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
-        let selection = makeSelection(focus: .variant(variant))
-        phase = .selecting(selection)
+        guard let variant else { return KeyResult(handled: true) }
+        return selectVariant(variant, context: context)
+    }
+
+    /// 読み全体を字種に変えて選ぶ(Ctrl+J/K/;/L/: と F6〜F10)
+    private func selectVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
+        guard variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
+        phase = .selecting(makeSelection(focus: .variant(variant)))
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -283,6 +331,7 @@ public final class InputSession {
             actions += commitAll()
         }
         if !isComposing {
+            composition = newComposition()
             // 打ち始めに，入力位置の前の文字列を変換の手がかりとして渡す(「AAA」+「まで」)
             converter.setLeftContext(context.precedingText)
         }
@@ -380,7 +429,7 @@ public final class InputSession {
         guard let correction = rule.correction(among: converter.typoCorrections(forKeys: keys), reading: composition.conversionReading)
         else { return }
         // 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ
-        var corrected = Composition()
+        var corrected = newComposition()
         let resolver = NasalReadingResolver(converter: converter)
         for key in correction.keys {
             corrected.insertRomaji(key)
@@ -451,8 +500,7 @@ public final class InputSession {
         guard isComposing else {
             // Vim のノーマルモードに戻る Escape で英数にする(設定)．Escape そのものはアプリに渡す
             guard settings.current.escapeSwitchesToDirect else { return .passThrough }
-            mode = .direct
-            return KeyResult(handled: false, actions: [.selectMode(.direct)] + modeIndicator(.direct))
+            return switchToDirectPassingEscape(actions: [])
         }
         if phase != .composing {
             phase = .composing
@@ -483,9 +531,9 @@ public final class InputSession {
     /// 組み立て中の文字を，今の表示のとおりに確定する
     private func commitAll() -> [ClientAction] {
         // EN 入力の英字と読みが両方あれば(入力方式を途中で変えたとき)，打った順に英字から確定する
-        let englishActions = english.commitTyped()
-        guard !composition.isEmpty else { return englishActions }
-        return englishActions + commitComposition()
+        let styleActions = composingStyles.flatMap { $0.commit() }
+        guard !composition.isEmpty else { return styleActions }
+        return styleActions + commitComposition()
     }
 
     /// 組み立て中の読みを，今の表示のとおりに確定する
@@ -497,7 +545,6 @@ public final class InputSession {
             // 選び直した文節は，確定したときに第 1 候補でないもので数える(触って元に戻したものは数えない)
             let changed = lattice.segments.filter { $0.choice != .candidate(0) }.count
             usage?.record(.committed(changedSegments: changed, viaConversion: true))
-            terminal.didCommitText(length: lattice.text.count)
             return [.commit(lattice.text)] + reset()
         }
         if case .selecting(let selection) = phase {
@@ -513,7 +560,6 @@ public final class InputSession {
                 converter.didCommit(candidate)
             }
             actions.append(.commit(candidate.text))
-            terminal.didCommitText(length: candidate.text.count)
             if candidate.readingCount >= composition.conversionReading.count {
                 break
             }
@@ -525,8 +571,15 @@ public final class InputSession {
         return actions + reset()
     }
 
+    /// 空の読み．利用者が足したローマ字の綴りを使う
+    private func newComposition() -> Composition {
+        let rules = settings.current.customRomaji
+        if rules != romajiTable.rules { romajiTable = (rules, RomajiTable.standard(adding: rules)) }
+        return Composition(table: romajiTable.table)
+    }
+
     private func reset() -> [ClientAction] {
-        composition = Composition()
+        composition = newComposition()
         typedBeforeCorrection = nil
         phase = .composing
         corrector.reset()
@@ -619,7 +672,7 @@ public final class InputSession {
     // MARK: - 表示
 
     private func render(context: InputContext) -> [ClientAction] {
-        if composition.isEmpty && english.isComposing { return english.render() }
+        if composition.isEmpty, let style = composingStyles.first { return style.render() }
         guard isComposing else { return reset() }
         switch phase {
         case .composing:
@@ -703,6 +756,10 @@ public final class InputSession {
 
 extension InputSession {
     fileprivate static let fullwidthSpace = "\u{3000}"
+    /// F6〜F10 で選ぶ字種(Windows・ATOK・macOS の日本語入力と同じ割り当て)
+    fileprivate static let functionKeyVariants: [Int: ScriptVariant] = [
+        6: .hiragana, 7: .katakana, 8: .halfwidthKatakana, 9: .fullwidthRoman, 10: .halfwidthRoman,
+    ]
     fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
 
     fileprivate func numberKey(_ character: Character) -> Int? {

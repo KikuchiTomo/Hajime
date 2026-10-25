@@ -30,7 +30,7 @@ macOS 向けの日本語入力システムです．かな漢字変換は [azooKe
 
 ## まだできないこと
 
-Windows 版，キー割り当ての編集，ローマ字テーブルの編集はまだありません．作る予定の一覧は [docs/specs/REQUIREMENTS.md](docs/specs/REQUIREMENTS.md) にあります．
+Windows 版はまだありません．キーの割り当てを変える設定は入れない方針です(理由は docs/user/reference/settings.md)．作る予定の一覧は [docs/specs/REQUIREMENTS.md](docs/specs/REQUIREMENTS.md) にあります．
 
 ## 入力した内容の扱い
 
