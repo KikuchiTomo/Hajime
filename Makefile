@@ -1,7 +1,7 @@
 # 入口はすべてここ．中身はまだ検査だけ(core と apps を作ったら build と test を足す)
 PYTHON ?= python3 -I
 
-.PHONY: fetch-models setup check test tokens build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models setup check test tokens protocol build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
 
 setup:
 	mise install
@@ -14,6 +14,7 @@ check:
 	$(PYTHON) tools/check/check_skills.py
 	$(PYTHON) .claude/skills/s90-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
+	$(PYTHON) tools/protocol/generate.py --check
 
 test:
 	swift test --package-path core
@@ -49,3 +50,7 @@ try:
 tokens:
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/tokens/generate_swift.py
+
+# Windows のプロセス間のメッセージの型を protocol/schema.json から作り直す(ADR 0010)
+protocol:
+	$(PYTHON) tools/protocol/generate.py

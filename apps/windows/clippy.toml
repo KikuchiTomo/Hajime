@@ -1,0 +1,3 @@
+# unwrap と expect はテストの中だけで許す(.claude/skills/s90-windows/SKILL.md)
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
