@@ -47,7 +47,9 @@
     { "id": 33, "body": { "type": "exportProfileRules", "path": "C:\\rules.csv" } },
     { "id": 34, "body": { "type": "importRuleList", "list": "symbolReadings", "path": "C:\\symbol-readings.tsv" } },
     { "id": 35, "body": { "type": "exportRuleList", "list": "correctionRules", "path": "C:\\replacements.tsv" } },
-    { "id": 36, "body": { "type": "readSymbolDefaults" } }
+    { "id": 36, "body": { "type": "readSymbolDefaults" } },
+    { "id": 37, "body": { "type": "importUserDictionary", "path": "C:\\user-dictionary.txt" } },
+    { "id": 38, "body": { "type": "exportUserDictionary", "path": "C:\\user-dictionary.txt" } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },

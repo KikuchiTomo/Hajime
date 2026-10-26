@@ -231,14 +231,8 @@ final class SettingsModel: ObservableObject {
         panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            var entries = settings.userDictionary
-            let added = UserDictionaryEditing.merge(try UserDictionaryFile.read(from: url), into: &entries)
-            if update({ $0.userDictionary = entries }) {
-                message = UIStrings.Settings.imported(added)
-            }
-        } catch {
-            message = UIStrings.Settings.importFailed
+        runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+            UIStrings.Settings.imported(try await files.importUserDictionary(from: url.path).added)
         }
     }
 
@@ -246,10 +240,9 @@ final class SettingsModel: ObservableObject {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = UIStrings.Settings.exportFileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try UserDictionaryFile.write(settings.userDictionary, to: url)
-        } catch {
-            message = UIStrings.Settings.exportFailed
+        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+            try await files.exportUserDictionary(to: url.path)
+            return nil
         }
     }
 

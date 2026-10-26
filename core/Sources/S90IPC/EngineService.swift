@@ -192,7 +192,7 @@ public final class EngineService {
             return .symbolDefaults(sequences: Self.symbolDefaults(.sequence), readings: Self.symbolDefaults(.reading))
         case .readSync, .setSyncFolder, .setSyncEnabled, .setSyncScope, .setSyncLocalField, .syncNow:
             return syncResponse(for: request) ?? .error(code: .malformed)
-        case .importDictionary, .removeDictionary, .exportSettings, .importSettings, .importProfileRules, .exportProfileRules,
+        case .importDictionary, .removeDictionary, .importUserDictionary, .exportUserDictionary, .exportSettings, .importSettings, .importProfileRules, .exportProfileRules,
              .importRuleList, .exportRuleList:
             // ファイルの読み書きは reply で受ける(時間がかかるので，答えるのを待つ形にする)
             return .error(code: .malformed)

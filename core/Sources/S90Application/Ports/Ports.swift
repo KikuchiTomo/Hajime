@@ -251,6 +251,9 @@ public protocol SettingsFileHandling: AnyObject {
     func importDictionary(from path: String, replacing id: String?) async throws(SettingsFileFailure) -> ImportedDictionary
     /// 辞書を一覧と索引から消す
     func removeDictionary(id: String) throws(SettingsFileFailure)
+    /// ユーザー辞書を「読み<タブ>語」の行のファイルから取り込む．新しく足した語と，読めなかった行の数を返す
+    func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int)
+    func exportUserDictionary(to path: String) async throws(SettingsFileFailure)
     /// すべての設定を JSON のファイルに書き出す
     func exportSettings(to path: String) async throws(SettingsFileFailure)
     /// 読み込んだ設定ですべてを置き換える

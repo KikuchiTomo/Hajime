@@ -114,6 +114,20 @@ struct SettingsFilesTests {
         #expect(try String(contentsOf: exported, encoding: .utf8) == "teh\tthe\nadn\tand\n")
     }
 
+    @Test("ユーザー辞書を取り込み，すでにある語は足さず，形の誤った行を数える．書き出すと同じ語が読める")
+    func userDictionary() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try settings.update { $0.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "s90")] }
+        let path = try file("user.txt", "! コメント\nえすきゅー\ts90\nでんあつ\t電圧\nabc\t形が誤り\n1 列だけ\n")
+        let counts = try await files.importUserDictionary(from: path)
+        #expect(counts.added == 1)
+        #expect(counts.skipped == 2)
+        #expect(settings.current.userDictionary.map(\.word).contains("電圧"))
+        let exported = root.appendingPathComponent("out.txt")
+        try await files.exportUserDictionary(to: exported.path)
+        #expect(try UserDictionaryFile.read(from: exported) == settings.current.userDictionary)
+    }
+
     @Test("書き出し先がフォルダなら writeFailed")
     func writeFailure() async throws {
         defer { try? FileManager.default.removeItem(at: root) }

@@ -48,6 +48,22 @@ public final class SettingsFiles: SettingsFileHandling {
         dictionaries.remove(dictionary)
     }
 
+    // MARK: ユーザー辞書
+
+    public func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int) {
+        let source = try Self.url(path)
+        let file = try await Self.read { try UserDictionaryFile.readCounting(from: source) }
+        var added = 0
+        try apply { added = UserDictionaryEditing.merge(file.entries, into: &$0.userDictionary) }
+        return (added, file.skipped)
+    }
+
+    public func exportUserDictionary(to path: String) async throws(SettingsFileFailure) {
+        let destination = try Self.url(path)
+        let entries = settings.current.userDictionary
+        try await Self.write { try UserDictionaryFile.write(entries, to: destination) }
+    }
+
     // MARK: バックアップ
 
     public func exportSettings(to path: String) async throws(SettingsFileFailure) {
@@ -142,7 +158,7 @@ public final class SettingsFiles: SettingsFileHandling {
         switch error {
         case is ProtectedFile.TooLarge,
              DictionaryFileReader.FileError.fileTooLarge, SettingsTransfer.TransferError.fileTooLarge,
-             ProfileRuleFile.FileError.fileTooLarge, RuleListFile.FileError.fileTooLarge:
+             ProfileRuleFile.FileError.fileTooLarge, RuleListFile.FileError.fileTooLarge, UserDictionaryFile.FileError.fileTooLarge:
             return .tooLarge
         case DictionaryFileReader.FileError.empty:
             return .empty

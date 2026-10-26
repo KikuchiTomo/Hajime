@@ -531,6 +531,12 @@ pub enum RequestBody {
         path: String,
     },
     ReadSymbolDefaults,
+    ImportUserDictionary {
+        path: String,
+    },
+    ExportUserDictionary {
+        path: String,
+    },
 }
 
 impl fmt::Debug for RequestBody {
@@ -635,6 +641,14 @@ impl fmt::Debug for RequestBody {
                 .field("path", &REDACTED)
                 .finish(),
             Self::ReadSymbolDefaults => f.write_str("ReadSymbolDefaults"),
+            Self::ImportUserDictionary { .. } => f
+                .debug_struct("ImportUserDictionary")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ExportUserDictionary { .. } => f
+                .debug_struct("ExportUserDictionary")
+                .field("path", &REDACTED)
+                .finish(),
         }
     }
 }

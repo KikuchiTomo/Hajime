@@ -53,6 +53,13 @@ extension EngineService {
                 try files.removeDictionary(id: id)
                 return .done
             }
+        case .importUserDictionary(let path):
+            return { files throws(SettingsFileFailure) in Self.imported(try await files.importUserDictionary(from: path)) }
+        case .exportUserDictionary(let path):
+            return { files throws(SettingsFileFailure) in
+                try await files.exportUserDictionary(to: path)
+                return .done
+            }
         case .exportSettings(let path):
             return { files throws(SettingsFileFailure) in
                 try await files.exportSettings(to: path)

@@ -598,6 +598,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case importRuleList(list: WireRuleList, path: String)
     case exportRuleList(list: WireRuleList, path: String)
     case readSymbolDefaults
+    case importUserDictionary(path: String)
+    case exportUserDictionary(path: String)
 
     private enum CodingKeys: String, CodingKey {
         case type, protocolVersion, session, input, context, mode, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list
@@ -659,6 +661,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .exportRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
         case "readSymbolDefaults":
             self = .readSymbolDefaults
+        case "importUserDictionary":
+            self = try .importUserDictionary(path: container.decode(String.self, forKey: .path))
+        case "exportUserDictionary":
+            self = try .exportUserDictionary(path: container.decode(String.self, forKey: .path))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -750,6 +756,12 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode(path, forKey: .path)
         case .readSymbolDefaults:
             try container.encode("readSymbolDefaults", forKey: .type)
+        case .importUserDictionary(let path):
+            try container.encode("importUserDictionary", forKey: .type)
+            try container.encode(path, forKey: .path)
+        case .exportUserDictionary(let path):
+            try container.encode("exportUserDictionary", forKey: .type)
+            try container.encode(path, forKey: .path)
         }
     }
 }
@@ -783,6 +795,8 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .importRuleList: "WireRequestBody.importRuleList"
         case .exportRuleList: "WireRequestBody.exportRuleList"
         case .readSymbolDefaults: "WireRequestBody.readSymbolDefaults"
+        case .importUserDictionary: "WireRequestBody.importUserDictionary"
+        case .exportUserDictionary: "WireRequestBody.exportUserDictionary"
         }
     }
     public var debugDescription: String { description }

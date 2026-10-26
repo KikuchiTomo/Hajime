@@ -717,6 +717,24 @@
         },
         {
           "name": "readSymbolDefaults"
+        },
+        {
+          "name": "importUserDictionary",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "exportUserDictionary",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
         }
       ]
     },

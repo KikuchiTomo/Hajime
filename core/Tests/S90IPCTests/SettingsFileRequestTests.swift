@@ -41,6 +41,11 @@ struct SettingsFileRequestTests {
             return ImportedDictionary(id: "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", name: "電気", wordCount: 3)
         }
         func removeDictionary(id: String) throws(SettingsFileFailure) { calls.append("removeDictionary \(id)") }
+        func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int) {
+            calls.append("importUserDictionary \(path)")
+            return (4, 2)
+        }
+        func exportUserDictionary(to path: String) async throws(SettingsFileFailure) { calls.append("exportUserDictionary \(path)") }
         func exportSettings(to path: String) async throws(SettingsFileFailure) { calls.append("exportSettings \(path)") }
         func importSettings(from path: String) async throws(SettingsFileFailure) { calls.append("importSettings \(path)") }
         func importProfileRules(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int) {
@@ -134,6 +139,8 @@ struct SettingsFileRequestTests {
         #expect(await answer(.importSettings(path: "/d/s.json"), from: id) == .done)
         #expect(await answer(.exportProfileRules(path: "/d/r.csv"), from: id) == .done)
         #expect(await answer(.removeDictionary(id: "x"), from: id) == .done)
+        #expect(await answer(.importUserDictionary(path: "/d/u.txt"), from: id) == .imported(added: 4, skipped: 2))
+        #expect(await answer(.exportUserDictionary(path: "/d/u.txt"), from: id) == .done)
         #expect(files.calls.contains("importRuleList symbolReadings /d/s.tsv"))
         #expect(files.calls.contains("exportRuleList romaji /d/r.tsv"))
     }

@@ -11,6 +11,11 @@ public enum UserDictionaryFile {
 
     /// 外から来るファイルなので，大きさに上限を設け，読みと語の形を確かめた行だけを使う(docs/dev/SECURITY-MODEL.md)
     public static func read(from url: URL) throws -> [UserDictionaryEntry] {
+        try readCounting(from: url).entries
+    }
+
+    /// 読めた語と，形の誤った行(コメントと空の行を除く)の数
+    public static func readCounting(from url: URL) throws -> (entries: [UserDictionaryEntry], skipped: Int) {
         let data: Data
         do {
             data = try ProtectedFile.read(from: url, maximumBytes: DefaultSettings.maximumUserDictionaryFileBytes)
@@ -18,7 +23,8 @@ public enum UserDictionaryFile {
             throw FileError.fileTooLarge(maximumBytes: error.maximumBytes)
         }
         guard let text = decode(data) else { throw FileError.notText }
-        return parse(text)
+        let entries = parse(text)
+        return (entries, max(entryLines(text).count - entries.count, 0))
     }
 
     /// UTF-8 か，BOM の付いた UTF-16(Windows の辞書ツールが書き出す形)だけを読む．
@@ -32,13 +38,17 @@ public enum UserDictionaryFile {
     }
 
     public static func parse(_ text: String) -> [UserDictionaryEntry] {
-        text.split(whereSeparator: \.isNewline).compactMap { line in
-            guard !line.hasPrefix("!"), !line.hasPrefix("#") else { return nil }
+        entryLines(text).compactMap { line in
             let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard columns.count >= 2 else { return nil }
             let entry = UserDictionaryEntry(reading: String(columns[0]), word: String(columns[1]))
             return entry.isValid ? entry : nil
         }
+    }
+
+    /// 語として読む行(「!」「#」で始まる行と空の行を除く)
+    private static func entryLines(_ text: String) -> [Substring] {
+        text.split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("!") && !$0.hasPrefix("#") }
     }
 
     public static func write(_ entries: [UserDictionaryEntry], to url: URL) throws {
