@@ -8,7 +8,7 @@ updates:
       day: monday
       time: "09:00"
       timezone: Asia/Tokyo
-    # 公開されてすぐの版は避ける(乗っ取られた版を掴まないため)
+    # 公開されてすぐのバージョンは避ける(乗っ取られたバージョンを掴まないため)
     cooldown:
       default-days: 7
     groups:

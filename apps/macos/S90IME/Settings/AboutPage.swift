@@ -23,7 +23,7 @@ struct BackupPage: View {
     }
 }
 
-/// 情報．版と，利用しているソフトウェア・モデル・データの謝辞(THIRD_PARTY_NOTICES.md)
+/// 情報．バージョンと，利用しているソフトウェア・モデル・データの謝辞(THIRD_PARTY_NOTICES.md)
 struct AboutPage: View {
     @ObservedObject var model: SettingsModel
 

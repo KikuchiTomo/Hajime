@@ -37,7 +37,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         }
     }
 
-    /// 古い版の Mac が同期のファイルのこのまとまりに書く項目．取り込むと新しい項目に移し替える(LegacyKeySettings)
+    /// 古いバージョンの Mac が同期のファイルのこのまとまりに書く項目．取り込むと新しい項目に移し替える(LegacyKeySettings)
     public var legacyFieldNames: [String] {
         switch self {
         case .keyboard: [LegacyKeySettings.modeKeysField]

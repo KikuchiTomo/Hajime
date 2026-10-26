@@ -36,7 +36,7 @@ if [ "$identity" != "-" ]; then
   codesign --force --deep --options runtime --timestamp=none --entitlements "$entitlements" --sign "$identity" "$built"
 fi
 
-# 動いている古い版を止めてから入れ替える．次にキーを打ったとき OS が新しい版を起こす
+# 動いている古いバージョンを止めてから入れ替える．次にキーを打ったとき OS が新しいバージョンを起こす
 pkill -x "$app_name" 2>/dev/null || true
 # 置き場所は管理者の権限が要るので sudo を使う(パスワードを聞かれる)
 sudo mkdir -p "$destination"
@@ -49,4 +49,4 @@ swift "$root/tools/macos/input_source.swift" enable "$destination/$app_name.app"
 killall TextInputMenuAgent 2>/dev/null || true
 echo "入れました: $destination/$app_name.app"
 echo "初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース で「${S90_NAME:-$display_name}」を足してください"
-echo "2 回目からは入れ直すだけで，次にキーを打ったときに新しい版が動きます"
+echo "2 回目からは入れ直すだけで，次にキーを打ったときに新しいバージョンが動きます"

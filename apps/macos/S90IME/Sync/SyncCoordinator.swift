@@ -148,7 +148,7 @@ final class SyncCoordinator: ObservableObject {
                 dictionaries.reload(dictionary)
             }
             if !outcome.computedRevisions.isEmpty {
-                // 同期を入れる前に取り込んだ辞書に版を書き戻す．設定が変わるので，次の同期で索引を書き出す
+                // 同期を入れる前に取り込んだ辞書にバージョンを書き戻す．設定が変わるので，次の同期で索引を書き出す
                 try? settings.update { current in
                     for index in current.importedDictionaries.indices where current.importedDictionaries[index].revision == nil {
                         current.importedDictionaries[index].revision = outcome.computedRevisions[current.importedDictionaries[index].id]

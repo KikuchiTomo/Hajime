@@ -1,8 +1,8 @@
 import Foundation
 
-/// 版 2 までのキーの設定(conversionKeys と modeKeys)を，キー設定の表(keymap)に移し替える(R-17)．
+/// バージョン 2 までのキーの設定(conversionKeys と modeKeys)を，キー設定の表(keymap)に移し替える(R-17)．
 ///
-/// 古い版の設定のファイルを読むとき(SettingsSchema の版 2 → 3)と，古い版の Mac が書いた同期のファイルの値を取り込むとき
+/// 古いバージョンの設定のファイルを読むとき(SettingsSchema のバージョン 2 → 3)と，古いバージョンの Mac が書いた同期のファイルの値を取り込むとき
 /// (SettingsCoding.settings(from:))に使う．古い項目を見つけたら，今の表(無ければ既定の表)の該当する行をその値で置き換え，古い項目は消す
 public enum LegacyKeySettings {
     public static let conversionKeysField = "conversionKeys"
@@ -25,7 +25,7 @@ public enum LegacyKeySettings {
 
     // MARK: 変換中のキー(conversionKeys)
 
-    /// 版 2 の KeyBindings の形．{"commands": {"nextSegment": [{"key": {"right": {}}, "shift": false, ...}]}}
+    /// バージョン 2 の KeyBindings の形．{"commands": {"nextSegment": [{"key": {"right": {}}, "shift": false, ...}]}}
     private struct OldBindings: Decodable {
         var commands: [String: [OldStroke]]
     }
@@ -56,7 +56,7 @@ public enum LegacyKeySettings {
         }
     }
 
-    /// 版 2 の操作と，表で置き換える状態とコマンド
+    /// バージョン 2 の操作と，表で置き換える状態とコマンド
     private static let oldCommands: [String: (KeymapState, KeymapCommand)] = [
         "openSettings": (.anywhere, .openSettings),
         "toggleLiveConversion": (.anywhere, .toggleLiveConversion),
@@ -75,7 +75,7 @@ public enum LegacyKeySettings {
         "splitSegment": (.converting, .splitSegment),
     ]
 
-    /// 版 2 の既定の割り当て．既定から変えていない操作は，今の表の行をそのまま使う
+    /// バージョン 2 の既定の割り当て．既定から変えていない操作は，今の表の行をそのまま使う
     private static let oldDefaults: [String: [KeyStroke]] = [
         "openSettings": [KeyStroke(.character(","), control: true, option: true)],
         "toggleLiveConversion": [KeyStroke(.character("l"), control: true, option: true)],
@@ -105,7 +105,7 @@ public enum LegacyKeySettings {
                 guard state != .anywhere, entry.state == .anywhere, entry.command == command else { return [entry] }
                 return KeymapState.concrete.filter { $0 != state && command.states.contains($0) }.map { KeymapEntry($0, entry.stroke, command) }
             }
-            // 版 2 では，同じキーは 1 つの操作にしか割り当てられない．表でも同じ状態の同じキーの行は置き換える
+            // バージョン 2 では，同じキーは 1 つの操作にしか割り当てられない．表でも同じ状態の同じキーの行は置き換える
             replace(in: &keymap, with: strokes.map { KeymapEntry(state, $0, command) }) { entry in
                 entry.state == state && (entry.command == command || strokes.contains(entry.stroke))
             }
@@ -126,13 +126,13 @@ public enum LegacyKeySettings {
         "eisu": .eisu, "kana": .kana, "hankakuZenkaku": .hankakuZenkaku, "henkan": .henkan, "muhenkan": .muhenkan,
     ]
 
-    /// 版 2 の値と，表のコマンド．使わない(none)は nil
+    /// バージョン 2 の値と，表のコマンド．使わない(none)は nil
     private static let modeCommands: [String: KeymapCommand?] = ["toggle": .toggleMode, "japanese": .japaneseMode, "direct": .directMode, "none": nil]
 
-    /// 版 2 の既定．既定から変えていないキーは，今の表の行をそのまま使う
+    /// バージョン 2 の既定．既定から変えていないキーは，今の表の行をそのまま使う
     private static let oldModeDefaults = ["eisu": "direct", "kana": "japanese", "hankakuZenkaku": "toggle", "henkan": "none", "muhenkan": "none"]
 
-    /// 切り替え・日本語・英数 はそのキーの いつでも の行にする．版 2 では切り替えのキーがほかの働きより先に効いたので，
+    /// 切り替え・日本語・英数 はそのキーの いつでも の行にする．バージョン 2 では切り替えのキーがほかの働きより先に効いたので，
     /// そのキーのほかの行は消す．使わない ならそのキーの切り替えの行を消す(変換・無変換はふつうの働きの行が残る)
     private static func apply(_ assignments: [String: String], to keymap: inout Keymap) {
         for (name, action) in assignments.sorted(by: { $0.key < $1.key }) where oldModeDefaults[name] != action {

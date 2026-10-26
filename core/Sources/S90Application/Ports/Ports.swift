@@ -170,7 +170,7 @@ public struct SyncState: Sendable, Equatable, Codable {
         case isEnabled, folderBookmark, folderName, scopes, localFields, ledger
     }
 
-    /// 項目を足しても前の版で書いたファイルを読めるよう，無い項目は既定のままにする(読めないとフォルダの選択まで失うため)
+    /// 項目を足しても前のバージョンで書いたファイルを読めるよう，無い項目は既定のままにする(読めないとフォルダの選択まで失うため)
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false

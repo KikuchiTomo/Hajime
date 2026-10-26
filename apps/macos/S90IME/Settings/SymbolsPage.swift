@@ -3,7 +3,7 @@ import S90Persistence
 import SwiftUI
 
 /// 記号の決まり(項目 47)．既定の決まりを一覧にし，書き換え・無効化・追加・既定に戻すができる．
-/// 既定の決まりは変えず，変えた分だけを設定に重ねるので，版が上がって既定が増えても変更は残る
+/// 既定の決まりは変えず，変えた分だけを設定に重ねるので，バージョンが上がって既定が増えても変更は残る
 struct SymbolsPage: View {
     @ObservedObject var model: SettingsModel
 

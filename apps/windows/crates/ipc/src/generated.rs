@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// 通信の形式の版．DLL とエンジンの版が違えば接続を断る
+/// 通信の形式のバージョン．DLL とエンジンのバージョンが違えば接続を断る
 pub const PROTOCOL_VERSION: u32 = 1;
 /// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)
 pub const MAXIMUM_MESSAGE_BYTES: usize = 262144;

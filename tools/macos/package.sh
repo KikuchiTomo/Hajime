@@ -2,11 +2,11 @@
 # 配布物(.pkg)を作る．Zenzai のモデルを入れた本番のアプリを /Library/Input Methods に入れる .pkg になる．
 #
 # 使い方: tools/macos/package.sh
-# 出力:   apps/macos/build/dist/s90.tokyo-IME-<版>.pkg
+# 出力:   apps/macos/build/dist/s90.tokyo-IME-<バージョン>.pkg
 #
 # 署名と公証は，使える証明書と設定があるときだけ行う．
 #   S90_APP_IDENTITY        アプリの署名(名前か SHA-1)．無ければ，公証するときは Developer ID Application，
-#                           しないときは make install-macos と同じ決め方(入っている版と同じチームの証明書．variant.sh)
+#                           しないときは make install-macos と同じ決め方(入っているバージョンと同じチームの証明書．variant.sh)
 #   S90_INSTALLER_IDENTITY  .pkg の署名．無ければ Developer ID Installer の証明書．どちらも無ければ署名しない
 #   S90_NOTARY_PROFILE      公証に使う notarytool のキーチェーンのプロファイル名．無ければ公証しない(手元に入れる .pkg)
 #                           (作り方: xcrun notarytool store-credentials <名前>)
@@ -36,7 +36,7 @@ elif [ -n "$notary_profile" ]; then
   # ほかの人に配る .pkg．公証には Developer ID の署名が要る
   app_identity=$(code_signing_identities | awk -F '\t' '$2 ~ /^Developer ID Application/ { print $1; exit }')
 else
-  # 手元に入れる .pkg．入っている版と違うチームで署名すると起動の途中で止まるので，同じチームの証明書にする
+  # 手元に入れる .pkg．入っているバージョンと違うチームで署名すると起動の途中で止まるので，同じチームの証明書にする
   app_identity=$(signing_identity) || exit 1
 fi
 app_identity_name=$(identity_name "$app_identity")

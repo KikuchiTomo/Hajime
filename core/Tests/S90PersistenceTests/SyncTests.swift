@@ -8,9 +8,9 @@ private func fixture(_ name: String) throws -> Data {
     try Data(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/\(name)"))
 }
 
-@Suite("設定の形式の版(TODO 49)")
+@Suite("設定の形式のバージョン(TODO 49)")
 struct SettingsSchemaTests {
-    @Test("版を書いていない古い設定のファイル(版 1)を読め，今の版で書き戻す")
+    @Test("バージョンを書いていない古い設定のファイル(バージョン 1)を読め，今のバージョンで書き戻す")
     func readsVersion1() throws {
         let settings = try SettingsCoding.decode(fixture("settings-v1.json"))
         #expect(settings.inputStyle == .kana)
@@ -26,7 +26,7 @@ struct SettingsSchemaTests {
         #expect(written[SettingsSchema.versionKey] == .number(Double(SettingsSchema.currentVersion)))
     }
 
-    @Test("新しい版で書いた設定を開いて保存しても，知らない項目と版を失わない")
+    @Test("新しいバージョンで書いた設定を開いて保存しても，知らない項目とバージョンを失わない")
     func keepsUnknownFields() throws {
         let settings = try SettingsCoding.decode(fixture("settings-v9.json"))
         #expect(settings.schemaVersion == 9)
@@ -39,7 +39,7 @@ struct SettingsSchemaTests {
         #expect(again.liveConversion == false)
     }
 
-    @Test("移し替えは古い版から順に当て，今より新しい版には当てない")
+    @Test("移し替えは古いバージョンから順に当て，今より新しいバージョンには当てない")
     func migrate() {
         var old: [String: JSONValue] = ["inputStyle": .string("kana")]
         SettingsSchema.migrate(&old)
@@ -118,7 +118,7 @@ struct SyncMergeTests {
         #expect(ledger.groupModifiedAt[.input] == t1)
     }
 
-    @Test("この Mac だけの項目を書く前の版の同期の状態のファイルも読め，フォルダの選択を失わない")
+    @Test("この Mac だけの項目を書く前のバージョンの同期の状態のファイルも読め，フォルダの選択を失わない")
     func readsOldSyncState() throws {
         let old = #"{"isEnabled":true,"folderName":"Dropbox","scopes":{},"ledger":{"groupModifiedAt":{},"dictionaryAddedAt":{},"dictionaryTombstones":{}}}"#
         let state = try SyncCoding.decoder.decode(SyncState.self, from: Data(old.utf8))

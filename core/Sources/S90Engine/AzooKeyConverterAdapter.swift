@@ -23,7 +23,7 @@ public final class AzooKeyConverterEngine {
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
-    ///   - versionString: エンジンに渡すアプリの版の文字列
+    ///   - versionString: エンジンに渡すアプリのバージョンの文字列
     ///   - zenzai: 確かめ済みの Zenzai のモデル．nil なら Zenzai を使わない
     public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil) throws {
         try FileManager.default.createDirectory(

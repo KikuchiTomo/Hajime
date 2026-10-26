@@ -6,7 +6,7 @@ import CryptoKit
 /// Zenzai(文脈を見るニューラルかな漢字変換)のモデルのファイル．
 ///
 /// 外から取得するファイルなので，SHA-256 がリポジトリに書いた値と一致したものだけを使う(docs/dev/SECURITY-MODEL.md)．
-/// 値を変えるときは docs/dev/adr/0006-zenzai.md の手順で，取得元と版を確かめてから書き換える．
+/// 値を変えるときは docs/dev/adr/0006-zenzai.md の手順で，取得元とバージョンを確かめてから書き換える．
 public struct ZenzaiModel: Sendable, Equatable {
     public enum VerificationError: Error, Equatable {
         case fileNotFound
