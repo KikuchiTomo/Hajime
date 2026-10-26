@@ -53,6 +53,7 @@ S90Persistence ─────┘
   - 分岐図: 文節と枝(`SegmentLattice`)
   - 補正: 英単語(`TypoCorrectionRule`)と日本語の打ち間違い(`ReadingCorrectionRule`)の判定，英字で打った語を英語にするか日本語にするか(`WordLanguageJudge`)
   - 記号と日付: `SymbolDictionary`，`SymbolSequence`，`DateExpressions`
+  - 中身の確かめ: SHA-256(`SHA256Digest`．CryptoKit の無い Windows で，Zenzai のモデルや取り込んだ辞書の索引を確かめる)
   - 設定: `Settings` と既定値・上限(`DefaultSettings`)，記号の表(`SymbolTable`)，字種(`ScriptVariant`)，キー設定の表(`Keymap`・`KeymapCommand`・`KeymapPreset`．ADR 0009)
 - **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)と，その部品．エンジンにない候補を足す `SupplementedConverter`．外部とは `Ports/` の protocol 越しにだけ話す
   - 部品: 英単語の補正(`EnglishWordCorrector`)，語の英語・日本語の見分け(`WordLanguageClassifier`．設定の画面で試す `WordLanguagePreview`)，「nn」の読み(`NasalReadingResolver`)，分岐図(`LatticeBuilder`，`PanelBuilder`)，ターミナルの行(`TerminalLine`)
