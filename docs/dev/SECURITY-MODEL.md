@@ -48,8 +48,8 @@
 
 - 保存先
   - macOS: `~/Library/Application Support/tokyo.s90.ime/`
-  - Windows: `%LOCALAPPDATA%\s90.tokyo\IME\`(ローミングしない)
-- ファイルは本人だけが読み書きできる権限で作る(macOS は 0600，Windows は所有者だけの ACL)
+  - Windows: 設定(`settings.json`．macOS と同じ形式)は `%APPDATA%\s90.tokyo\IME\`，学習データ・使い方の記録・取り込んだ辞書は `%LOCALAPPDATA%\s90.tokyo\IME\`(ローミングしない)
+- ファイルは本人だけが読み書きできる権限で作る(macOS は 0600．Windows はユーザーのプロファイルの ACL を受け継ぎ，本人・SYSTEM・Administrators だけが読める)
 - 学習データとユーザー辞書は，設定画面から消せて，書き出せるようにする
 
 ### 同期のフォルダ
@@ -57,7 +57,7 @@
 - 利用者が選んだフォルダだけを読み書きする(サンドボックスの `files.user-selected.read-write`)．選んだフォルダはセキュリティスコープ付きのブックマークで覚え，同期のたびに開いて閉じる
 - 同期のファイル(`s90-sync.json`)には設定とユーザー辞書が入る．入力した文字そのものは入れない．中身はログに出さない(失敗したときは理由の型だけを記録する)
 - 読むときは大きさの上限(`maximumSyncFileBytes`)を確かめ，ふつうのファイルだけを読む(ProtectedFile)．読めないファイルは上書きせずに同期を止め，ほかの Mac の設定を消さない
-- 取り込んだ辞書の索引は `s90-dictionaries/<UUID>-<SHA-256>.tsv` として運ぶ(DictionaryFileSync)．設定の中の辞書の id は UUID の形，版は 64 桁の 16 進だけを受け付け，ほかの形の辞書は設定を読むときに捨てる(フォルダの外のパスを差し込ませない)．運ぶときは一時ファイルに少しずつ写しながら SHA-256 を求め，版と合うときだけ置き換える．大きさの上限は `maximumSyncedDictionaryBytes`．索引から引いた語は取り込むときと同じ確かめ(DictionaryWord.isValid)をしてから使う．フォルダから消すのはこの形の名前のファイルだけで，利用者が置いたほかのファイルには触れない
+- 取り込んだ辞書の索引は `s90-dictionaries/<UUID>-<SHA-256>.tsv` として運ぶ(DictionaryFileSync)．設定の中の辞書の id は UUID の形，バージョンは 64 桁の 16 進だけを受け付け，ほかの形の辞書は設定を読むときに捨てる(フォルダの外のパスを差し込ませない)．運ぶときは一時ファイルに少しずつ写しながら SHA-256 を求め，バージョンと合うときだけ置き換える．大きさの上限は `maximumSyncedDictionaryBytes`．索引から引いた語は取り込むときと同じ確かめ(DictionaryWord.isValid)をしてから使う．フォルダから消すのはこの形の名前のファイルだけで，利用者が置いたほかのファイルには触れない
 - このアプリは通信しない．フォルダをほかの Mac に運ぶのは Dropbox などのアプリで，将来 API で読み書きする実装を足すときは通信の決まりに従う
 
 ### 外から来るファイル
@@ -75,9 +75,16 @@
 ### Windows のプロセス間通信
 
 - 名前付きパイプはユーザーごと・セッションごとの名前にし，ACL で本人の SID だけを許可する
+  - 名前は `\\.\pipe\s90.tokyo-ime.<ユーザーの SID>.<セッションの番号>.engine`(DLL がつなぐ)と `.ui`(候補ウィンドウがつなぐ)
+  - DACL は `D:P(A;;GA;;;<本人の SID>)(A;;GRGW;;;AC)`．ストアのアプリ(AppContainer)に読み込まれた DLL もつなげるよう ALL APPLICATION PACKAGES を足す．AppContainer のプロセスは本人の SID の項目も満たさないとつなげないので，ほかのユーザーのアプリはつなげない
+  - 整合性レベルの低いプロセスから書けるよう，SACL に `S:(ML;;NW;;;LW)` を付ける
+  - 最初のインスタンスは `FILE_FLAG_FIRST_PIPE_INSTANCE` で作り，同じ名前が先に取られていたら起動をやめる(なりすましを防ぐ)
+  - クライアントは `SECURITY_IDENTIFICATION` で開き，エンジンがクライアントになりすませないようにする
 - `PIPE_REJECT_REMOTE_CLIENTS` を付け，ネットワーク越しの接続を受けない
 - メッセージには長さの上限を設け，超えたら接続を切る．形式は `protocol/` の定義だけを受け付ける
-- 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)
+- 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` のときだけ受ける
+- 1 つの接続が作れるセッションの数と，全体のセッションの数に上限を設ける．ほかの接続のセッションは使えない(`EngineService`)
+- DLL は入力位置の前の文字列を読まない(Windows では文脈を使う変換をまだ使わないため)
 
 ### 入力先のアプリを壊さない
 

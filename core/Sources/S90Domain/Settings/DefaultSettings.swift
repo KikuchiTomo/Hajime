@@ -33,6 +33,8 @@ public enum DefaultSettings {
     public static let engineCandidateCount = 20
     /// 打っているあいだに出す候補(変換と予測)の数
     public static let suggestionCount = 5
+    /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
+    public static let headWordAlternativeCount = 8
     /// 打っているあいだの候補を出し始める読みの長さ(1 文字では候補が多すぎて役に立たない)
     public static let minimumSuggestionReading = 2
     /// タイプミスの補正を試す最短の長さ．短い並びは英単語と偶然一致しやすい
@@ -47,6 +49,16 @@ public enum DefaultSettings {
     /// 英単語の後ろの日本語のもっともらしさからこれを引いたものが，全体を日本語として読んだときより大きければ英単語にする．
     /// 「gitwotukau」(ぎとぉつかう -52 に対し，を使う -16)は英単語にし，「kitte」(切手 -13 に対し，て -9)は日本語のままにする
     public static let wordReadAsRomajiCost = 15.0
+    /// 英字入力(自動)で，英語の辞書にない語を日本語にする読みのもっともらしさ(1 文字あたりの対数尤度)の下限．
+    /// 日本語の語は -2.7(きょう)〜 -7.1(きて)，ローマ字として読めても日本語でない並びは -8.8(て)〜 -14 だった
+    public static let minimumJapanesePlausibilityPerCharacter = -7.5
+    /// 英語か日本語かを決めておく語と決まりの数の上限と，語の長さの上限
+    public static let maximumWordLanguageEntries = 2_000
+    public static let maximumWordLanguageWordLength = 32
+    /// 英語か日本語かを調べた結果を覚えておく語の数
+    public static let maximumWordLanguageCache = 256
+    /// 設定の画面の「試す」で見分ける語の数の上限
+    public static let maximumWordLanguagePreviewWords = 20
     /// 綴りの補正で許す編集距離
     public static let maximumCorrectionDistance = 2
     /// 文節格子で，第 1 候補と 2 番目の点数の差がこれより小さい文節は確信度が低いとみなし，候補の列を見せる．

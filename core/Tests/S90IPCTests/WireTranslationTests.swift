@@ -84,14 +84,11 @@ struct WireTranslationTests {
     func consumedKeys() {
         let keymap = KeymapPreset.standard.keymap
         let direct = WireSessionState(mode: .direct, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil)
-        // 英数のときも，日本語にするキーは受け取る
         #expect(direct.consumedKeys.contains(WireKeyChord(key: .kana, modifiers: noModifiers)))
         #expect(direct.consumedKeys.contains(WireKeyChord(key: .yen, modifiers: noModifiers)))
-        // 英数のときの Space はアプリのもの
         #expect(!direct.consumedKeys.contains(WireKeyChord(key: .space, modifiers: noModifiers)))
         let idle = WireSessionState(mode: .japanese, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil)
         #expect(idle.consumedKeys.contains(WireKeyChord(key: .space, modifiers: noModifiers)))
-        // 組み立て中はすべて受け取るので，表は送らない
         let composing = WireSessionState(mode: .japanese, isComposing: true, keymap: keymap, wakeAfterMilliseconds: 300)
         #expect(composing.consumedKeys.isEmpty)
         #expect(composing.wakeAfterMilliseconds == 300)

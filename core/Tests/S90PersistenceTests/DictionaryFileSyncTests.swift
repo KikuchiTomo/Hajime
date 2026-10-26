@@ -1,3 +1,4 @@
+#if canImport(CryptoKit)
 import Foundation
 @testable import S90Domain
 @testable import S90Persistence
@@ -60,7 +61,7 @@ struct DictionaryFileSyncTests {
         #expect(!FileManager.default.fileExists(atPath: folders.macB.appendingPathComponent(dictionary.indexFileName).path))
     }
 
-    @Test("取り込み直す前の版と消した辞書の索引をフォルダから消し，利用者が置いたほかのファイルには触れない")
+    @Test("取り込み直す前のバージョンと消した辞書の索引をフォルダから消し，利用者が置いたほかのファイルには触れない")
     func removesStaleFiles() throws {
         let folders = try Folders()
         defer { try? FileManager.default.removeItem(at: folders.root) }
@@ -77,7 +78,7 @@ struct DictionaryFileSyncTests {
         #expect(names == [DictionaryFileSync.remoteFileName(id: id, revision: try #require(new.revision)), "memo.tsv"].sorted())
     }
 
-    @Test("版の無い辞書(同期を入れる前に取り込んだもの)は，この Mac の索引から版を求めて返す")
+    @Test("バージョンの無い辞書(同期を入れる前に取り込んだもの)は，この Mac の索引からバージョンを求めて返す")
     func computesMissingRevision() throws {
         let folders = try Folders()
         defer { try? FileManager.default.removeItem(at: folders.root) }
@@ -96,3 +97,4 @@ struct DictionaryFileSyncTests {
         #expect(!DictionaryFileSync.isIndexFileName("\(id)-\(String(repeating: "G", count: 64)).tsv"))
     }
 }
+#endif

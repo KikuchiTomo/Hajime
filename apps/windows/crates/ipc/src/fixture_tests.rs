@@ -1,6 +1,3 @@
-//! protocol/fixtures/messages.json を読み，読み戻して同じ JSON になることを確かめる．
-//! Swift の側(core/Tests/S90IPCTests)も同じファイルで確かめるので，両方の言語で形が食い違わない
-
 use crate::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;

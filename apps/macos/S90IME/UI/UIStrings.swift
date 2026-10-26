@@ -58,7 +58,7 @@ enum UIStrings {
                 KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
                 KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
             ] + length + [
-                KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "語ごと"),
+                KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
                 KeyHint(key: first(.splitSegment), label: "区切る"),
             ]).filter { !$0.key.isEmpty }
         }
@@ -113,6 +113,10 @@ enum UIStrings {
             case .directMode: "英数入力に切り替え"
             case .toggleMode: "日本語と英数の切り替え"
             case .nextInputStyle: "入力方式の切り替え"
+            case .romajiStyle: Choice.label(for: .romaji)
+            case .kanaStyle: Choice.label(for: .kana)
+            case .englishStyle: Choice.label(for: .english)
+            case .englishAutoStyle: Choice.label(for: .englishAuto)
             case .cancelAndDirectMode: "取り消して英数入力に"
             case .insertSpace: "空白を入力"
             case .insertAlternateSpace: "逆の幅の空白を入力"
@@ -143,8 +147,8 @@ enum UIStrings {
             case .previousUncertainSegment: "前の迷う文節"
             case .extendSegment: "文節を長く"
             case .shrinkSegment: "文節を短く"
-            case .extendSegmentToWord: "文節を語ごとに長く"
-            case .shrinkSegmentToWord: "文節を語ごとに短く"
+            case .extendSegmentToWord: "文節を単語ごとに長く"
+            case .shrinkSegmentToWord: "文節を単語ごとに短く"
             case .splitSegment: "文節を区切る"
             case .commit: "確定"
             case .commitFirstSegment: "先頭の文節だけ確定"
@@ -161,7 +165,7 @@ enum UIStrings {
         /// コマンドの説明(選ぶときの補足)．名前で分かるものは nil
         static func help(for command: KeymapCommand) -> String? {
             switch command {
-            case .nextInputStyle: "ローマ字入力・かな入力・英字入力を順に切り替えます"
+            case .nextInputStyle: "ローマ字入力・かな入力・英字入力・英字入力(自動)を順に切り替えます"
             case .insertSpace: "幅は「スペース幅」の設定に従います。組み立て中の文字は確定してから入れます"
             case .insertAlternateSpace: "「スペース幅」の設定と逆の幅の空白を入れます"
             case .convert: "英単語を直した直後は、直す前に戻します"
@@ -172,14 +176,16 @@ enum UIStrings {
             case .nextCandidate: "入力中に押すと変換を始めます"
             case .previousCandidate: "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"
             case .nextUncertainSegment, .previousUncertainSegment: "確信の低い文節だけを渡り歩きます"
-            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の語の切れ目まで動かします"
+            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の単語の切れ目まで動かします"
             case .splitSegment: "区切れる位置に番号を出し、数字で区切ります"
             case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
             case .cancel: "変換中は読みに戻し、直した読みは打ったままに戻します。入力中は読みを消します"
             case .backToReading: "変換をやめて読みに戻ります"
             case .forgetCandidate: "選んでいる候補を学習から消します"
-            case .forgetLastCommit: "最後に確定した語の学習を取り消します。入力した文字は消しません"
+            case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は消しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
+            case .englishAutoStyle: "英語で打ちながら，日本語にできる語を自動で日本語にします"
+            case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
                  .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
                  .previousCandidatePage, .firstCandidate, .lastCandidate, .nextSegment, .previousSegment, .firstSegment, .lastSegment,
@@ -265,6 +271,7 @@ enum UIStrings {
             case .romaji: "ローマ字"
             case .kana: "かな"
             case .english: "英"
+            case .englishAuto: "英自動"
             }
         }
     }
@@ -387,6 +394,7 @@ enum UIStrings {
     }
 
     enum Menu {
+        static let inputStyle = "入力方式"
         static let openSettings = "設定を開く…"
         static let liveConversion = "ライブ変換"
     }
@@ -396,12 +404,16 @@ enum UIStrings {
         static let inputStyle = "入力方式"
         static let keyboardLayout = "キー配列"
         static let keyboardLayoutNote = "ローマ字入力と英字入力で使用します。"
+        static let englishInputLiveConversion = "英字入力のライブ変換"
+        static let englishInputLiveConversionNote = "オンにすると、英語の辞書にない語をローマ字として日本語にして見せます。Esc で英字に戻せます。"
+        static let englishAutoNote = "英語で打ちながら、日本語にできる語は自動で日本語にします。見分け方は「英語と日本語」で変えられます。"
 
         static func label(for style: InputStyle) -> String {
             switch style {
             case .romaji: "ローマ字入力"
             case .kana: "かな入力"
             case .english: "英字入力"
+            case .englishAuto: "英字入力(自動)"
             }
         }
 
@@ -504,21 +516,58 @@ enum UIStrings {
         static let handwritingPrompt = "ここに文字を書いてください"
         static let misreadings = "読み違いの候補"
 
+        // 英語と日本語
+        static let languagePage = "英語と日本語"
+        static let languageJudging = "見分け方"
+        static let usesContext = "前の語で見分ける"
+        static let usesContextNote = "make・shine のように英語にも日本語にも読める語を、前が英語なら英語、日本語なら日本語にします。"
+        static let avoidsOffensive = "不適切な変換を避ける"
+        static let englishWords = "いつも英語にする語"
+        static let japaneseWords = "いつも日本語にする語"
+        static let wordPlaceholder = "英字で打つ語"
+        static let languageRules = "見分け方の決まり"
+        static let languageRuleWord = "語"
+        static let languageRuleContext = "前"
+        static let languageRuleResult = "結果"
+        static let tryLanguage = "試す"
+        static let tryPlaceholder = "英字で打つ文(空白で区切る)"
+        static let tryPreceding = "前の文字列"
+        static let invalidWord = "語は 32 文字までの英字にしてください"
+        static let alreadyListed = "もう一覧にあります"
+        static let englishWordsEmpty = "いつも英語にする語はありません"
+        static let japaneseWordsEmpty = "いつも日本語にする語はありません"
+        static let languageNote = "英字入力(自動)と、ローマ字入力で英語にも読める語に使います。試した結果を右クリックすると一覧に足せます。"
+
+        static func label(for language: WordLanguage) -> String {
+            switch language {
+            case .english: "英語"
+            case .japanese: "日本語"
+            }
+        }
+
+        static func label(for context: WordLanguageContext) -> String {
+            switch context {
+            case .sentenceStart: "文の頭"
+            case .afterEnglish: "英語"
+            case .afterJapanese: "日本語"
+            }
+        }
+
         // 補正
         static let correctionPage = "補正"
         static let correctionKinds = "直すもの"
         static let correctsEnglish = "英単語"
         static let correctsJapanese = "日本語の打ち間違い"
         static let correctsRepeatedKeys = "同じキーの重なり"
-        static let exceptions = "直さない語"
+        static let exceptions = "直さない語句"
         static let exceptionPlaceholder = "英字か読み"
         static let rules = "置き換え"
         static let typed = "打った英字"
-        static let replacement = "置き換える語"
-        static let invalidRule = "打った英字は 2〜24 文字の英字、置き換える語は 64 文字までにしてください"
-        static let invalidException = "直さない語は 64 文字までにしてください"
+        static let replacement = "置き換える語句"
+        static let invalidRule = "打った英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください"
+        static let invalidException = "直さない語句は 64 文字までにしてください"
         static let rulesEmpty = "置き換えはありません"
-        static let exceptionsEmpty = "直さない語はありません"
+        static let exceptionsEmpty = "直さない語句はありません"
 
         // 記号
         static let symbolsPage = "記号"
@@ -661,8 +710,7 @@ extension UIStrings {
         static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
         static let unreadable = "同期のファイルを読めないため、同期を止めています"
-        static let items = "項目"
-        static let localOnly = "この Mac だけ"
+        static let items = "項目ごとに選ぶ"
 
         /// 項目(Settings の CodingKeys の名前)の表示名
         static func label(forField name: String) -> String {
@@ -670,7 +718,8 @@ extension UIStrings {
         }
 
         private static let fieldLabels: [String: String] = [
-            "inputStyle": "入力方式", "customRomaji": "ローマ字の追加", "liveConversion": "ライブ変換", "yenKey": "¥ キー",
+            "inputStyle": "入力方式", "customRomaji": "ローマ字の追加", "liveConversion": "ライブ変換",
+            "englishInputLiveConversion": "英字入力のライブ変換", "wordLanguage": "英語と日本語", "yenKey": "¥ キー",
             "punctuation": "句読点", "brackets": "括弧", "slash": "スラッシュ", "spaceWidth": "スペース幅", "numberWidth": "数字幅",
             "alphabetWidth": "英字幅", "shiftStartsAlphabet": "Shift で英字", "punctuationCommits": "句読点で確定",
             "keypadDirect": "テンキーの数字を半角で確定",

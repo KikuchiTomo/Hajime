@@ -615,6 +615,23 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
     }
 
+    @Test("文節の先頭の語の候補に残りをつないだものも候補に出す(ごくでしょうが → 語句でしょうが)")
+    func headWordAlternatives() {
+        let converter = FakeConverter(["ごくでしょうが": [("極でしょうが", nil)], "ごく": [("極", nil), ("語句", nil), ("獄", nil)]])
+        converter.words["ごくでしょうが"] = [
+            Candidate.Word(text: "極", readingCount: 2), Candidate.Word(text: "でしょう", readingCount: 4), Candidate.Word(text: "が", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ]
+        let harness = Harness(converter: converter)
+        harness.type("gokudesyouga")
+        harness.press(.space)
+        let alternatives = harness.lattice?.columns.first?.alternatives ?? []
+        #expect(alternatives.prefix(3) == ["極でしょうが", "語句でしょうが", "獄でしょうが"])
+        // 先頭の「極でしょうが」は幹と同じ．↓ 1 回で次の候補
+        harness.press(.down)
+        harness.press(.enter)
+        #expect(harness.committed == "語句でしょうが")
+    }
+
     @Test("分岐図: Shift+← で文節を縮め，後ろを分け直す")
     func latticeResize() {
         let harness = Harness(converter: latticeConverter())
@@ -1432,13 +1449,15 @@ struct EscapeToDirectTests {
 @MainActor
 @Suite("入力方式の切り替え")
 struct InputStyleSwitchTests {
-    @Test("Option+かな で入力方式を順に切り替える")
-    func cycles() {
+    @Test("Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英字 → 英字(自動) → ローマ字)", arguments: [
+        (InputStyle.english, InputStyle.englishAuto), (.englishAuto, .romaji), (.romaji, .kana),
+    ])
+    func cycles(current: InputStyle, next: InputStyle) {
         var settings = Settings()
-        settings.inputStyle = .english
+        settings.inputStyle = current
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
         let actions = session.handle(KeyEvent(.kana, modifiers: .option), context: InputContext()).actions
-        #expect(actions.contains(.selectInputStyle(.romaji)))
+        #expect(actions.contains(.selectInputStyle(next)))
     }
 }
 

@@ -15,7 +15,7 @@ Windows の TSF の DLL・候補ウィンドウと `s90-engine-host` のあい�
    - Swift: `core/Sources/S90IPC/Generated/WireMessages.swift`(名前の前に `Wire` を付ける．core の `KeyEvent` などとぶつけないため)
    - Rust: `apps/windows/crates/ipc/src/generated.rs`
 3. 足した型や種類を `fixtures/messages.json` に足す
-4. 互換のない変更(名前を変える・必須の項目を足す)では `version` を 1 つ上げる．DLL とエンジンの版が違えば接続を断る
+4. 互換のない変更(名前を変える・必須の項目を足す)では `version` を 1 つ上げる．DLL とエンジンのバージョンが違えば接続を断る
 
 生成物は手で直さない．`make check` が定義と合っているかを確かめる．
 

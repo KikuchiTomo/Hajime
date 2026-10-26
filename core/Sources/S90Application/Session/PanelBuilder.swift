@@ -7,6 +7,8 @@ enum PanelBuilder {
     static let splitNote = "数字で区切る位置を選ぶ　Esc でやめる"
     static let correctedNote = "修正"
     static let englishInputNote = "Tab 日本語にする"
+    /// 英字入力で日本語にして見せているときの案内
+    static let englishInputJapaneseNote = "Esc 英字に戻す　Tab 変換"
     /// 選んでいる候補を学習から消したときの案内
     static let candidateForgottenNote = "学習から消しました"
     /// 最後に確定した語の学習を取り消したときの案内

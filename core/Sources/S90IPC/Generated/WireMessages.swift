@@ -1,14 +1,8 @@
-// このファイルは tools/protocol/generate.py が protocol/schema.json から作る．手で直さない．
-// swiftformat:disable all
-
-/// 通信の形式の版．DLL とエンジンの版が違えば接続を断る
 public enum WireProtocol {
     public static let version: UInt32 = 1
-    /// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)
     public static let maximumMessageBytes = 262144
 }
 
-/// 入力のモード．日本語か英数か
 public enum WireInputMode: String, Sendable, Equatable, Codable, CaseIterable {
     case japanese
     case direct
@@ -19,7 +13,6 @@ extension WireInputMode: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 押していた修飾キー．Windows の Alt は core の option にあたる
 public struct WireModifiers: Sendable, Equatable, Codable {
     public var shift: Bool
     public var control: Bool
@@ -37,9 +30,7 @@ extension WireModifiers: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 押したキー．core の KeyEvent.Key と 1 対 1 に対応する
 public enum WireKey: Sendable, Equatable, Codable {
-    /// 配列に従って入力された文字(Shift を含む)
     case character(text: String)
     case space
     case enter
@@ -58,7 +49,6 @@ public enum WireKey: Sendable, Equatable, Codable {
     case eisu
     case kana
     case yen
-    /// ファンクションキー(F1〜F24 の番号)
     case function(number: UInt8)
     case hankakuZenkaku
     case henkan
@@ -204,11 +194,9 @@ extension WireKey: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// キーの入力ひとつ
 public struct WireKeyInput: Sendable, Equatable, Codable {
     public var key: WireKey
     public var modifiers: WireModifiers
-    /// 押したキーの JIS キーボードでの刻印(かな入力に使う)
     public var keyLabel: String?
     public var isKeypad: Bool
 
@@ -225,7 +213,6 @@ extension WireKeyInput: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// キーと修飾キーの組み合わせ．DLL が OnTestKeyDown で使う表の 1 行
 public struct WireKeyChord: Sendable, Equatable, Codable {
     public var key: WireKey
     public var modifiers: WireModifiers
@@ -241,7 +228,6 @@ extension WireKeyChord: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 画面の座標(物理ピクセル)の四角．候補ウィンドウを出す位置に使う
 public struct WireRect: Sendable, Equatable, Codable {
     public var x: Int32
     public var y: Int32
@@ -261,15 +247,10 @@ extension WireRect: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 入力先の情報．DLL がキーごとに作って送る
 public struct WireFieldContext: Sendable, Equatable, Codable {
-    /// 入力先のアプリの実行ファイルの名前(小文字)．アプリごとの設定を選ぶのに使う
     public var applicationId: String?
-    /// パスワード欄など(InputScope)．true なら変換も学習もしない
     public var isSecure: Bool
-    /// 入力位置の前の文字列．打ち始めのときだけ入れる
     public var precedingText: String?
-    /// 入力位置の四角．分からなければ省く
     public var caret: WireRect?
 
     public init(applicationId: String? = nil, isSecure: Bool, precedingText: String? = nil, caret: WireRect? = nil) {
@@ -285,14 +266,10 @@ extension WireFieldContext: CustomStringConvertible, CustomDebugStringConvertibl
     public var debugDescription: String { description }
 }
 
-/// DLL が持つ状態の写し．OnTestKeyDown をエンジンに問い合わせずに答えるのに使う
 public struct WireSessionState: Sendable, Equatable, Codable {
     public var mode: WireInputMode
-    /// 文字を組み立てているか．組み立て中は修飾キーだけの押下を除くすべてのキーを受け取る
     public var isComposing: Bool
-    /// 組み立てていないときに受け取るキー(キー設定の表で今の状態に割り当てたもの)．日本語のモードでは修飾キーなしの文字も受け取る
     public var consumedKeys: [WireKeyChord]
-    /// この時間だけ打鍵が止まったら wake を送る(ライブ変換・打ち間違いの見直し)．待たなくてよければ省く
     public var wakeAfterMilliseconds: UInt32?
 
     public init(mode: WireInputMode, isComposing: Bool, consumedKeys: [WireKeyChord], wakeAfterMilliseconds: UInt32? = nil) {
@@ -308,7 +285,6 @@ extension WireSessionState: CustomStringConvertible, CustomDebugStringConvertibl
     public var debugDescription: String { description }
 }
 
-/// 組み立て中の文字の区間の見せ方
 public enum WireTextStyle: String, Sendable, Equatable, Codable, CaseIterable {
     case reading
     case converted
@@ -336,13 +312,9 @@ extension WireTextSegment: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
-/// DLL が入力欄に行う操作
 public enum WireEditOperation: Sendable, Equatable, Codable {
-    /// 文字を確定して入力欄に入れる
     case commit(text: String)
-    /// 組み立て中の文字を出す(空なら消す)
     case setComposition(segments: [WireTextSegment])
-    /// OS のモードの表示(言語バー・キーボードのオンとオフ)を合わせる
     case selectMode(mode: WireInputMode)
 
     private enum CodingKeys: String, CodingKey {
@@ -391,7 +363,6 @@ extension WireEditOperation: CustomStringConvertible, CustomDebugStringConvertib
     public var debugDescription: String { description }
 }
 
-/// エンジンが要求を断った理由
 public enum WireErrorCode: String, Sendable, Equatable, Codable, CaseIterable {
     case unsupportedVersion
     case unknownSession
@@ -404,21 +375,14 @@ extension WireErrorCode: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// DLL からエンジンへの要求
 public enum WireRequestBody: Sendable, Equatable, Codable {
-    /// 接続して最初に送る
     case hello(protocolVersion: UInt32)
-    /// 入力欄(TSF のスレッド)ごとのセッションを作る
     case openSession
     case closeSession(session: UInt32)
     case key(session: UInt32, input: WireKeyInput, context: WireFieldContext)
-    /// 言語バーなど，キー以外でモードが変わった
     case setMode(session: UInt32, mode: WireInputMode)
-    /// 入力欄からフォーカスが外れた．組み立て中の文字を確定する
     case deactivate(session: UInt32)
-    /// wakeAfterMilliseconds だけ打鍵が止まった
     case wake(session: UInt32, context: WireFieldContext)
-    /// 組み立て中の文字の位置が変わった．候補ウィンドウを動かす
     case caret(session: UInt32, rect: WireRect)
 
     private enum CodingKeys: String, CodingKey {
@@ -502,7 +466,6 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
 }
 
 public struct WireRequest: Sendable, Equatable, Codable {
-    /// 応答と組にする番号．時間切れで捨てた応答を読み飛ばすのに使う
     public var id: UInt32
     public var body: WireRequestBody
 
@@ -517,11 +480,9 @@ extension WireRequest: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// エンジンから DLL への応答
 public enum WireResponseBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case sessionOpened(session: UInt32, state: WireSessionState)
-    /// キーなどを処理した結果
     case edit(handled: Bool, operations: [WireEditOperation], state: WireSessionState)
     case done
     case error(code: WireErrorCode)
@@ -601,7 +562,6 @@ extension WireResponse: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 候補の一覧の上の種類の行の 1 つ
 public struct WireCandidateVariant: Sendable, Equatable, Codable {
     public var label: String
     public var isAvailable: Bool
@@ -619,7 +579,6 @@ extension WireCandidateVariant: CustomStringConvertible, CustomDebugStringConver
 
 public struct WireCandidateEntry: Sendable, Equatable, Codable {
     public var text: String
-    /// 「入力のまま」などの添え書き
     public var annotation: String?
 
     public init(text: String, annotation: String? = nil) {
@@ -643,7 +602,6 @@ extension WireCandidateFocus: CustomStringConvertible, CustomDebugStringConverti
     public var debugDescription: String { description }
 }
 
-/// 候補の一覧．core の CandidatePanel と同じ内容
 public struct WireCandidateList: Sendable, Equatable, Codable {
     public var variants: [WireCandidateVariant]
     public var selectedVariant: UInt32?
@@ -671,7 +629,6 @@ extension WireCandidateList: CustomStringConvertible, CustomDebugStringConvertib
     public var debugDescription: String { description }
 }
 
-/// 分岐図の文節ひとつ．core の LatticePanel.Column と同じ内容
 public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var text: String
     public var alternatives: [String]
@@ -711,7 +668,6 @@ extension WireBranchColumn: CustomStringConvertible, CustomDebugStringConvertibl
     public var debugDescription: String { description }
 }
 
-/// 分岐図の足元に出すキーの案内(「⇧← 入れ」)
 public struct WireKeyHint: Sendable, Equatable, Codable {
     public var keys: String
     public var label: String
@@ -727,13 +683,11 @@ extension WireKeyHint: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 分岐図(ADR 0007)．core の LatticePanel と同じ内容
 public struct WireBranchMap: Sendable, Equatable, Codable {
     public var columns: [WireBranchColumn]
     public var position: UInt32
     public var total: UInt32
     public var note: String?
-    /// 足元のキーの案内．出さない設定のときは空
     public var hints: [WireKeyHint]
 
     public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: String? = nil, hints: [WireKeyHint]) {
@@ -750,13 +704,9 @@ extension WireBranchMap: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
-/// 候補ウィンドウの見た目の設定．つないだときと設定が変わったときに送る
 public struct WirePresentation: Sendable, Equatable, Codable {
-    /// テーマの名前(settings.json の theme と同じ値)
     public var theme: String
-    /// 候補の文字の大きさ(pt)
     public var fontSize: Double
-    /// モードの札を出しておく時間
     public var modeIndicatorMilliseconds: UInt32
 
     public init(theme: String, fontSize: Double, modeIndicatorMilliseconds: UInt32) {
@@ -771,15 +721,12 @@ extension WirePresentation: CustomStringConvertible, CustomDebugStringConvertibl
     public var debugDescription: String { description }
 }
 
-/// エンジンから候補ウィンドウのプロセスへの指示
 public enum WireUiCommand: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case setPresentation(presentation: WirePresentation)
     case showCandidates(list: WireCandidateList, anchor: WireRect?)
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
-    /// 入力位置の近くに短い案内を出す
     case showNote(text: String, anchor: WireRect?)
-    /// モードを切り替えたことを知らせる札
     case showMode(mode: WireInputMode, anchor: WireRect?)
     case move(anchor: WireRect)
     case hide

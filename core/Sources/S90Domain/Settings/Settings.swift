@@ -10,6 +10,8 @@ public struct Settings: Sendable, Equatable {
     public var customRomaji: [RomajiRule] = []
     /// ライブ変換(R-01)
     public var liveConversion = true
+    /// 英字入力で，ローマ字として読める語を日本語にして見せる(英字入力のライブ変換．R-05)
+    public var englishInputLiveConversion = false
     /// JIS キーボードの ¥ キーで入れる文字(R-04)
     public var yenKey = YenKeyPolicy.alwaysBackslash
     /// 句読点の組み合わせ
@@ -58,6 +60,8 @@ public struct Settings: Sendable, Equatable {
     public var showsSuggestions = true
     /// 打ち間違いの補正のうち，誤りの種類ごとのオン・オフ，直さない語，置き換えの決まり
     public var correction = CorrectionCustomization()
+    /// 英字で打った語を英語にするか日本語にするかの見分け方(英字入力(自動)とローマ字入力の英単語)
+    public var wordLanguage = WordLanguageSettings()
     /// 送り仮名の付け方(本則・許容)のどちらを先に出すか
     public var okuriganaStyle = OkuriganaStyle.standard
     /// 「1+2*3=」のような式を計算した結果を候補に出す
@@ -120,15 +124,15 @@ public struct Settings: Sendable, Equatable {
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
     // MARK: 形式
-    /// 読み込んだファイルの形式の版(SettingsSchema)．今より新しい版のファイルを開いたときは，その版のまま書き戻す
+    /// 読み込んだファイルの形式のバージョン(SettingsSchema)．今より新しいバージョンのファイルを開いたときは，そのバージョンのまま書き戻す
     public var schemaVersion = SettingsSchema.currentVersion
-    /// この版が知らない項目．新しい版で書いた設定を古い版で開いて保存しても失わないよう，そのまま書き戻す
+    /// このバージョンが知らない項目．新しいバージョンで書いた設定を古いバージョンで開いて保存しても失わないよう，そのまま書き戻す
     public var unknownFields: [String: JSONValue] = [:]
 
     public init() {}
 
     /// 範囲の外の値を範囲に収め，使えない値を捨てる．設定のファイルや書き出した JSON を読むときに通す
-    /// (手で書き換えたファイルや別の版のファイルでも，画面や変換がおかしくならないように)
+    /// (手で書き換えたファイルや別のバージョンのファイルでも，画面や変換がおかしくならないように)
     public mutating func clampToValidRanges() {
         func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T { min(max(value, range.lowerBound), range.upperBound) }
         listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
@@ -149,6 +153,7 @@ public struct Settings: Sendable, Equatable {
         correction.exceptions = Array(correction.exceptions.filter(RuleListEditing.isValidException).prefix(DefaultSettings.maximumCorrectionRules))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
         keymap.clampToValidRanges()
+        wordLanguage.clampToValidRanges()
     }
 
     /// 使っているカスタムテーマ．選んでいなければ nil
@@ -184,7 +189,7 @@ extension Settings: Codable {
     public static var fieldNames: Set<String> { Set(CodingKeys.allCases.map(\.rawValue)) }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
+        case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
@@ -220,6 +225,8 @@ extension Settings: Codable {
         read(.keyboardLayout, into: \.keyboardLayout)
         readList(.customRomaji, into: \.customRomaji)
         read(.liveConversion, into: \.liveConversion)
+        read(.englishInputLiveConversion, into: \.englishInputLiveConversion)
+        read(.wordLanguage, into: \.wordLanguage)
         read(.yenKey, into: \.yenKey)
         read(.punctuation, into: \.punctuation)
         read(.brackets, into: \.brackets)
@@ -273,7 +280,7 @@ extension Settings: Codable {
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         read(.restrainsLiveConversionInCode, into: \.restrainsLiveConversionInCode)
         readList(.profileRules, into: \.profileRules)
-        // 形式の版と，この版が知らない項目
+        // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
             settings.schemaVersion = max(version, SettingsSchema.currentVersion)
@@ -292,6 +299,8 @@ extension Settings: Codable {
         try container.encode(keyboardLayout, forKey: .keyboardLayout)
         try container.encode(customRomaji, forKey: .customRomaji)
         try container.encode(liveConversion, forKey: .liveConversion)
+        try container.encode(englishInputLiveConversion, forKey: .englishInputLiveConversion)
+        try container.encode(wordLanguage, forKey: .wordLanguage)
         try container.encode(yenKey, forKey: .yenKey)
         try container.encode(punctuation, forKey: .punctuation)
         try container.encode(brackets, forKey: .brackets)

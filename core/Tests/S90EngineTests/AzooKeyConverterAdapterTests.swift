@@ -69,7 +69,9 @@ struct AzooKeyConverterAdapterTests {
     func permissions() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-engine-\(UUID().uuidString)")
         _ = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "test")
+        #if !os(Windows)
         let permissions = try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber
         #expect(permissions?.intValue == 0o700)
+        #endif
     }
 }

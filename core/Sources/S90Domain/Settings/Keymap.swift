@@ -38,7 +38,7 @@ public struct Keymap: Sendable, Equatable {
     public var entries: [KeymapEntry] {
         didSet { index = WinnerIndex(entries) }
     }
-    /// この版が知らないコマンドや状態の行．新しい版で書いた表を古い版で開いて保存しても失わないよう，そのまま書き戻す
+    /// このバージョンが知らないコマンドや状態の行．新しいバージョンで書いた表を古いバージョンで開いて保存しても失わないよう，そのまま書き戻す
     public var unknownEntries: [JSONValue] = []
     /// 状態とキーごとに使う行の位置．キーを押すたび・分岐図を描くたびに表をなめないよう，行を変えたときに作り直す
     private var index: WinnerIndex
@@ -147,7 +147,7 @@ public struct Keymap: Sendable, Equatable {
 }
 
 extension Keymap: Codable {
-    /// 行の配列として読み書きする．読めない行(この版が知らないコマンドなど)は unknownEntries に残す
+    /// 行の配列として読み書きする．読めない行(このバージョンが知らないコマンドなど)は unknownEntries に残す
     public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         var entries: [KeymapEntry] = []
