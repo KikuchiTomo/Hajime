@@ -344,6 +344,7 @@ enum UIStrings {
         static let dateConversion = "日付と時刻に変換"
         static let homophoneNotes = "同音異義語の使い分けを表示"
         static let misuseNotes = "誤用の注釈を表示"
+        static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
         static let learning = "学習"
@@ -684,7 +685,7 @@ extension UIStrings {
             "suggestionDisplay": "入力中の候補", "listCandidatesPerPage": "一覧の候補数", "branchCandidatesPerPage": "分岐図の候補数",
             "liveConversionDelay": "漢字にするまでの時間", "correctionDelay": "修正するまでの時間", "correctionSensitivity": "修正の基準",
             "showsSuggestions": "もしかして", "okuriganaStyle": "送り仮名", "calculation": "計算", "postalCodeConversion": "郵便番号変換",
-            "handwriting": "手書き入力", "homophoneNotes": "同音異義語の使い分け", "misuseNotes": "誤用の注釈", "misreadings": "読み違い",
+            "handwriting": "手書き入力", "homophoneNotes": "同音異義語の使い分け", "misuseNotes": "誤用の注釈", "proofreading": "校正支援", "misreadings": "読み違い",
             "showsVariantRow": "文字種の行", "showsKeyHints": "キーの案内", "numberKeySelection": "番号キーで選択",
             "dateConversion": "日付と時刻に変換", "symbolConversion": "記号に変換", "emojiConversion": "絵文字に変換", "learning": "学習",
             "theme": "テーマ", "candidateFontSize": "文字の大きさ", "showsModeIndicator": "入力モードの表示",

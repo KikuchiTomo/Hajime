@@ -80,6 +80,8 @@ public struct Settings: Sendable, Equatable {
     public var homophoneNotes = true
     /// 誤用とされる言い回しに注釈を添える
     public var misuseNotes = false
+    /// ら抜き言葉・さ入れ言葉・二重敬語・重言に注釈を添える(校正支援)
+    public var proofreading = true
     /// 「やじるし」などの読みから記号の候補を出す
     public var symbolConversion = true
     /// 読みから絵文字の候補を出す
@@ -184,7 +186,7 @@ extension Settings: Codable {
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
         case learning, userDictionary, importedDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, profileRules
@@ -254,6 +256,7 @@ extension Settings: Codable {
         read(.dateConversion, into: \.dateConversion)
         read(.homophoneNotes, into: \.homophoneNotes)
         read(.misuseNotes, into: \.misuseNotes)
+        read(.proofreading, into: \.proofreading)
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
         read(.learning, into: \.learning)
@@ -324,6 +327,7 @@ extension Settings: Codable {
         try container.encode(dateConversion, forKey: .dateConversion)
         try container.encode(homophoneNotes, forKey: .homophoneNotes)
         try container.encode(misuseNotes, forKey: .misuseNotes)
+        try container.encode(proofreading, forKey: .proofreading)
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(learning, forKey: .learning)
