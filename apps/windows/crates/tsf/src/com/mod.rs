@@ -7,5 +7,6 @@ mod factory;
 mod guard;
 mod ids;
 mod keyboard;
+mod langbar;
 mod registration;
 mod text_service;
