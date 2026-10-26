@@ -71,6 +71,8 @@ struct ReadingCorrectionTests {
     @Test("アプリと同じ道筋(打つ → 止まる → 別の変換器で訂正を求める → 見直す)で直すか示す", arguments: [
         "kyounotenkihayoudesune", "kyouhaitenkidesune", "kyouhaiteknidesune", "tututasakanagaookikatta", "mizurai",
         "arigatpugozaimasu", "yorosikuonagaisimasu", "konnnitiwa", "tkitou", "nankatkitou", "wakeranai", "sorehawakeranaidesu",
+        // 「nn」のあとをな行で読んだ文(ほんの)と，ローマ字として読めない並びを英単語にした文(がくsり)
+        "honnoyondekudasai", "watasihagakusridesita", "konichiha",
     ])
     func appFlow(keys: String) async throws {
         let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
