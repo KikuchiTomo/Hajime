@@ -32,9 +32,6 @@ jobs:
         target: [debug, zenzai]
     runs-on: macos-15
     timeout-minutes: 40
-    env:
-      # Zenzai のモデルはリポジトリの外に置き，キャッシュから戻す
-      MODELS_DIR: ${{ github.workspace }}/../models
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,16 +42,17 @@ jobs:
           echo "使う Xcode: $xcode"
           sudo xcode-select -s "$xcode"
           swift --version
-      # モデルは毎回取らずにキャッシュする．取得元とハッシュは fetch_zenzai.sh にあるので，それが変わったら取り直す
+      # モデルは毎回取らずにキャッシュする．取得元とハッシュは fetch_zenzai.sh にあるので，それが変わったら取り直す．
+      # actions/cache は .. を含むパスを保存できないので，リポジトリの外のホームの下に置く
       - if: matrix.target == 'zenzai'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ github.workspace }}/../models
+          path: ~/s90-models
           key: zenzai-${{ hashFiles('tools/models/fetch_zenzai.sh') }}
       # キャッシュから戻したときも SHA-256 を確かめる
       - if: matrix.target == 'zenzai'
-        run: make fetch-models
-      - run: make test-${{ matrix.target }}
+        run: make fetch-models MODELS_DIR="$HOME/s90-models"
+      - run: make test-${{ matrix.target }} MODELS_DIR="$HOME/s90-models"
 
   core-test:
     # 必須のチェックの名前(core-test)を変えずに，上の 2 つがどちらも通ったときだけ通す
