@@ -190,6 +190,9 @@ pub struct SessionState {
     #[serde(rename = "precedingTextLength")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preceding_text_length: Option<u32>,
+    #[serde(rename = "keyboardLayout")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keyboard_layout: Option<String>,
 }
 
 impl fmt::Debug for SessionState {
@@ -200,6 +203,7 @@ impl fmt::Debug for SessionState {
             .field("consumedKeys", &self.consumed_keys)
             .field("wakeAfterMilliseconds", &self.wake_after_milliseconds)
             .field("precedingTextLength", &self.preceding_text_length)
+            .field("keyboardLayout", &REDACTED)
             .finish()
     }
 }

@@ -115,7 +115,7 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?) {
+    public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
         if !isComposing {
@@ -128,7 +128,14 @@ extension WireSessionState {
         // 打ち始めのときだけ，入力位置の前の文字列を頼む(macOS と同じ．毎キー読まないため)．組み立て中は頼まない
         let precedingTextLength = isComposing ? nil : UInt32(DefaultSettings.maximumLeftContextLength)
         self.init(mode: WireInputMode(mode), isComposing: isComposing, consumedKeys: chords, wakeAfterMilliseconds: wakeAfterMilliseconds,
-                  precedingTextLength: precedingTextLength)
+                  precedingTextLength: precedingTextLength, keyboardLayout: keyboardLayout)
+    }
+
+    /// DLL が英字を打つときに使う配列(設定の「キー配列」)．macOS と同じく，ローマ字入力と英字入力のときだけ使う．
+    /// OS の配列のままなら nil
+    public static func keyboardLayout(for settings: Settings) -> String? {
+        guard settings.keyboardLayout != .system, settings.inputStyle != .kana else { return nil }
+        return settings.keyboardLayout.rawValue
     }
 }
 

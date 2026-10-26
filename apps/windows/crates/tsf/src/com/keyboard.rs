@@ -57,6 +57,8 @@ pub fn read(wparam: WPARAM, lparam: LPARAM) -> Option<RawKey> {
         modifiers,
         japanese_layout,
         label,
+        scan: scan as u16,
+        caps_lock: state[VK_CAPITAL] & 1 != 0,
     })
 }
 
