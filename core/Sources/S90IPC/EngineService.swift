@@ -216,6 +216,7 @@ public final class EngineService {
     public var presentation: WirePresentation {
         let current = settings.current
         return WirePresentation(theme: current.theme.rawValue, fontSize: current.candidateFontSize,
-                                modeIndicatorMilliseconds: Self.milliseconds(current.modeIndicatorDuration))
+                                modeIndicatorMilliseconds: Self.milliseconds(current.modeIndicatorDuration),
+                                customTheme: current.activeCustomTheme.map(WireCustomTheme.init))
     }
 }

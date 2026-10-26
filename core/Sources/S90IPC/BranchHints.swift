@@ -9,6 +9,9 @@ public enum BranchHints {
             keymap.strokes(for: command, in: .converting).first.map(label(of:)) ?? ""
         }
         let focused = panel.columns.first(where: \.isFocused)
+        if let split = focused?.split {
+            return splitHints(count: split.pieces.count - 1)
+        }
         let length: [WireKeyHint]
         if focused?.shorter == nil, focused?.longer == nil {
             length = [WireKeyHint(keys: pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ")]
@@ -28,6 +31,11 @@ public enum BranchHints {
             WireKeyHint(keys: first(.splitSegment), label: "区切る"),
         ]
         return hints.filter { !$0.keys.isEmpty }
+    }
+
+    /// 文節を区切っているとき(区切る位置を番号キーで選ぶ)の案内．枝を出さないので区切る操作だけ
+    public static func splitHints(count: Int) -> [WireKeyHint] {
+        [WireKeyHint(keys: count > 1 ? "1–\(count)" : "1", label: "区切る"), WireKeyHint(keys: "Esc", label: "やめる")]
     }
 
     public static func label(of stroke: KeyStroke) -> String {
