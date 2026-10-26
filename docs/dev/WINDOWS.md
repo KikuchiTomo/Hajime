@@ -31,7 +31,7 @@
 
 ## Windows で使わないもの
 
-Vision(手書き)・CryptoKit(同期の辞書の索引)・`os` の Logger は Apple の OS だけで作る．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+Vision(手書き)と `os` の Logger は Apple の OS だけで作る．同期の辞書の索引の SHA-256 は CryptoKit の代わりに `SHA256Digest` で求める．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
 
 ## Zenzai
 

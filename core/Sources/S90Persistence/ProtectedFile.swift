@@ -15,28 +15,41 @@ enum ProtectedFile {
             throw CocoaError(.fileWriteUnknown)
         }
         do {
-            #if os(Windows)
-            try replace(url, with: temporary)
-            #else
-            if FileManager.default.fileExists(atPath: url.path) {
-                _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
-            } else {
-                try FileManager.default.moveItem(at: temporary, to: url)
-            }
-            #endif
+            try moveIntoPlace(temporary, at: url)
         } catch {
             try? FileManager.default.removeItem(at: temporary)
             throw error
         }
     }
 
+    /// 書き終えた一時ファイルで url を置き換える(url が無ければ動かす)．失敗しても一時ファイルは消さない
+    static func moveIntoPlace(_ temporary: URL, at url: URL) throws {
+        #if os(Windows)
+        try replace(url, with: temporary)
+        #else
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+        } else {
+            try FileManager.default.moveItem(at: temporary, to: url)
+        }
+        #endif
+    }
+
     /// 大きさの上限を確かめながら読む．上限より 1 バイト多くまでだけを読み，超えていれば断る．
     /// ファイルの属性の大きさで確かめると，シンボリックリンクではリンク自体の大きさが返り，上限をすり抜けるため
     static func read(from url: URL, maximumBytes: Int) throws -> Data {
+        let handle = try openRegularFile(url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
+        guard data.count <= maximumBytes else { throw TooLarge(maximumBytes: maximumBytes) }
+        return data
+    }
+
+    /// 読むために開く．ふつうのファイルでなければ断る(名前付きパイプや FIFO を開いて止まらないように)
+    static func openRegularFile(_ url: URL) throws -> FileHandle {
         #if os(Windows)
         guard (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { throw NotRegularFile() }
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
+        return try FileHandle(forReadingFrom: url)
         #else
         // FIFO などを開いて止まらないよう，待たない開き方で開き，ふつうのファイルだけを読む(ZenzaiModel と同じ)
         let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
@@ -44,10 +57,8 @@ enum ProtectedFile {
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var status = stat()
         guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw NotRegularFile() }
+        return handle
         #endif
-        let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
-        guard data.count <= maximumBytes else { throw TooLarge(maximumBytes: maximumBytes) }
-        return data
     }
 
     #if os(Windows)
