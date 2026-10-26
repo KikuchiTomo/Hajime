@@ -59,7 +59,6 @@ enum DesignTokens {
             static let frameWidth: CGFloat = 1
             static let bevelWidth: CGFloat = 1
             static let maxVisible: CGFloat = 9
-            static let cornerRadiusNative: CGFloat = 6
             static let shadowOffset: CGFloat = 2
             static let labelFontSize: CGFloat = 11
             static let variantPaddingX: CGFloat = 6
@@ -82,6 +81,28 @@ enum DesignTokens {
         enum Settings {
             static let windowWidth: CGFloat = 620
             static let windowHeight: CGFloat = 520
+        }
+        enum Glass {
+            static let cornerRadius: CGFloat = 12
+            static let padding: CGFloat = 10
+            static let rowHeight: CGFloat = 28
+            static let labelFontSize: CGFloat = 11.5
+            static let keyFontSize: CGFloat = 10.5
+            static let badgeSize: CGFloat = 17
+            static let selectionRadius: CGFloat = 7
+            static let keycapRadius: CGFloat = 4
+            static let keycapPaddingX: CGFloat = 5
+            static let keycapHeight: CGFloat = 17
+            static let hintGap: CGFloat = 10
+            static let footerHeight: CGFloat = 28
+            static let trunkGap: CGFloat = 6
+            static let branchIndent: CGFloat = 28
+            static let branchStemX: CGFloat = 12
+            static let lineWidth: CGFloat = 1.5
+            static let lineWidthSelected: CGFloat = 2
+            static let underlineOffset: CGFloat = 4
+            static let modeIndicatorSize: CGFloat = 34
+            static let modeIndicatorFontSize: CGFloat = 17
         }
     }
     enum Motion {

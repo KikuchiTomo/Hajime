@@ -21,12 +21,17 @@ enum SnapshotRenderer {
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshots", isDirectory: true)
         print(output.path)
         try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        for theme in [ThemePreference.platinum, .desk, .native] {
-            let appearance = NSAppearance(named: theme == .desk ? .darkAqua : .aqua)
-            render(listView(theme: theme, appearance: appearance), name: "list-\(theme.rawValue)", to: output, appearance: appearance)
-            render(latticeView(theme: theme, appearance: appearance), name: "branch-\(theme.rawValue)", to: output, appearance: appearance)
-            render(previewView(theme: theme, appearance: appearance), name: "branch-preview-\(theme.rawValue)", to: output, appearance: appearance)
-            render(correctionView(theme: theme, appearance: appearance), name: "correction-\(theme.rawValue)", to: output, appearance: appearance)
+        let looks: [(theme: ThemePreference, appearance: NSAppearance.Name, name: String)] = [
+            (.automatic, .aqua, "glass-light"), (.automatic, .darkAqua, "glass-dark"), (.platinum, .aqua, "platinum"), (.desk, .darkAqua, "desk"),
+        ]
+        for look in looks {
+            let appearance = NSAppearance(named: look.appearance)
+            NSAppearance.current = appearance
+            render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
+            render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
+            render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
+            render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
+            render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
         }
         render(settingsView(), name: "settings", to: output, appearance: NSAppearance(named: .aqua))
         exit(0)
@@ -41,9 +46,28 @@ enum SnapshotRenderer {
         return view
     }
 
+    private static func modeView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+        let view = ModeIndicatorView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        view.label = UIStrings.ModeIndicator.label(for: InputMode.japanese)
+        view.frame = NSRect(origin: .zero, size: view.fittingSize)
+        return backdropped(view)
+    }
+
+    /// glass の地のぼかしは画像に写らないので，書き出すときだけ面を塗り，影の代わりに余白を付けて地の上に置く
+    private static func backdropped(_ view: NSView) -> NSView {
+        let margin: CGFloat = 16
+        let container = SnapshotDesk(frame: NSRect(x: 0, y: 0, width: view.frame.width + margin * 2, height: view.frame.height + margin * 2))
+        view.frame.origin = NSPoint(x: margin, y: margin)
+        container.addSubview(view)
+        return container
+    }
+
     private static func listView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
         let panel = CandidatePanel(
             variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
             selectedVariant: nil,
@@ -52,12 +76,13 @@ enum SnapshotRenderer {
         )
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return view
+        return backdropped(view)
     }
 
     private static func correctionView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
         let panel = CandidatePanel(
             variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
             selectedVariant: nil,
@@ -66,27 +91,29 @@ enum SnapshotRenderer {
         )
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return view
+        return backdropped(view)
     }
 
     private static func latticeView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
         let panel = LatticePanel(columns: [
             .init(text: "私の", isFocused: false, isUncertain: false),
             .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),
-            .init(text: "中のです", alternatives: ["中のです", "中野です", "仲のです", "なかのです", "那珂のです"], selectedAlternative: 1,
+            .init(text: "中野です", alternatives: ["中のです", "中野です", "仲のです", "なかのです", "那珂のです"], selectedAlternative: 1,
                   variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true),
         ], position: 1, total: 8)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return view
+        return backdropped(view)
     }
 
-    /// 迷う文節が 2 つあり，注目していない方に次の候補を添えた分岐図
+    /// 確信の低い文節が 2 つあり，注目していない方に次の候補を添えた分岐図
     private static func previewView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
         let panel = LatticePanel(columns: [
             .init(text: "Cloudflareで", isFocused: false, isUncertain: false),
             .init(text: "撮った", isFocused: false, isUncertain: true, preview: "取った"),
@@ -95,7 +122,15 @@ enum SnapshotRenderer {
         ], position: 1, total: 2)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return view
+        return backdropped(view)
+    }
+
+    /// 書き出した画像の地．入力先のアプリの画面の代わりに，薄い色の面を敷く
+    private final class SnapshotDesk: NSView {
+        override func draw(_ dirtyRect: NSRect) {
+            NSColor.underPageBackgroundColor.setFill()
+            bounds.fill()
+        }
     }
 
     private static func render(_ view: NSView, name: String, to directory: URL, appearance: NSAppearance?) {

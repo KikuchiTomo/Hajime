@@ -1,19 +1,10 @@
 import AppKit
 
-/// プラチナ外観の縁取りを線で描く．画像は貼らない(docs/dev/DESIGN-SYSTEM.md の「レトロな表現は描画で出す」)．
+/// プラチナ外観(platinum と desk)の縁取りを線で描く．glass は GlassDrawing が描く．画像は貼らない(docs/dev/DESIGN-SYSTEM.md の「レトロな表現は描画で出す」)．
 enum BevelDrawing {
     /// rect の外側に 1 ドットの外枠，その内側に光の縁(左と上)と影の縁(右と下)を描き，面を塗る
     static func drawPanel(in rect: NSRect, theme: ResolvedTheme) {
         let line = DesignTokens.Size.Candidate.frameWidth
-        if theme.kind == .native {
-            let path = NSBezierPath(roundedRect: rect.insetBy(dx: line / 2, dy: line / 2), xRadius: theme.cornerRadius, yRadius: theme.cornerRadius)
-            theme.surface.setFill()
-            path.fill()
-            theme.frame.setStroke()
-            path.lineWidth = line
-            path.stroke()
-            return
-        }
         theme.frame.setFill()
         rect.fill()
         let inner = rect.insetBy(dx: line, dy: line)
@@ -38,7 +29,7 @@ enum BevelDrawing {
     }
 
     static func drawSeparator(y: CGFloat, from minX: CGFloat, to maxX: CGFloat, theme: ResolvedTheme) {
-        theme.separator.setFill()
+        theme.line.setFill()
         NSRect(x: minX, y: y, width: maxX - minX, height: DesignTokens.Size.Candidate.frameWidth).fill()
     }
 }
