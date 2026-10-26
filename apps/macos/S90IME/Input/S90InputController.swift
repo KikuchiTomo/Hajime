@@ -1,4 +1,5 @@
 import AppKit
+import os
 import InputMethodKit
 import S90Application
 import S90Domain
@@ -14,6 +15,7 @@ final class S90InputController: IMKInputController {
     private let session: InputSession
     private let presenter: ClientActionPresenter
     private let menuBuilder: InputMenuBuilder
+    private let menuLogger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 打鍵が止まったことを知らせるタイマー(ライブ変換で，かなのまま見せていた語を変換して見せる)
     private var settleTimer: Timer?
 
@@ -120,7 +122,14 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
+        menuBuilder.menu(actions: .init(target: self, toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
+    }
+
+    /// InputMethodKit は入力メニューの項目を選ぶと，ここに動作の名前を渡す．届いたかを記録してから既定の処理(自分のメソッドを呼ぶ)に回す
+    @MainActor
+    override func doCommand(by aSelector: Selector!, command infoDictionary: [AnyHashable: Any]!) {
+        menuLogger.notice("入力メニューの動作: \(NSStringFromSelector(aSelector), privacy: .public)")
+        super.doCommand(by: aSelector, command: infoDictionary)
     }
 
     // 入力メニューの項目の動作．InputMethodKit はこのコントローラにだけ送る(InputMenuBuilder)．
