@@ -6,6 +6,7 @@ mod snapshot;
 mod system;
 mod window;
 
+use crate::announce::{self, Announcer};
 use crate::scene::{self, Look, Scene, Surround};
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
@@ -64,6 +65,7 @@ struct App {
     rest_opacity: f32,
     opacity: f32,
     fade: Fade,
+    announcer: Announcer,
 }
 
 thread_local! {
@@ -118,6 +120,7 @@ pub fn run() {
             rest_opacity: 1.0,
             opacity: 1.0,
             fade: Fade::None,
+            announcer: Announcer::default(),
         })
     });
     window::run_message_loop();
@@ -310,6 +313,22 @@ impl App {
         let _ = window.draw(&self.renderer, &scene, &measure, opacity);
     }
 
+    /// ナレーターが動いているときだけ，選んでいる候補・注目している文節・案内を読み上げる
+    fn announce(&mut self) {
+        let text = match &self.content {
+            Content::Candidates(list) => announce::candidates(list),
+            Content::BranchMap(map) => announce::branch_map(map),
+            Content::Note(text) => Some(text.clone()),
+            Content::Hidden | Content::Mode(_) => None,
+        };
+        if text.is_none() || !system::screen_reader() {
+            return;
+        }
+        if let Some(text) = self.announcer.next(text) {
+            self.window().announce(&text);
+        }
+    }
+
     fn refresh(&mut self) {
         let look = system::look(self.backdrop);
         let theme = ResolvedTheme::resolve(
@@ -362,8 +381,10 @@ impl App {
             _ => {
                 self.window().hide();
                 self.rest_opacity = 1.0;
+                self.announcer.reset();
             }
         }
+        self.announce();
         self.scene = scene;
         self.theme = Some(theme);
     }
