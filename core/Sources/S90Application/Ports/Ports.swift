@@ -31,8 +31,14 @@ public protocol KanaKanjiConverting: AnyObject {
     func setLeftContext(_ text: String?)
     /// 候補を確定したことを伝える．学習に使う
     func didCommit(_ candidate: Candidate)
-    /// 入力を最後まで確定した，または取り消した
+    /// 入力を最後まで確定した，または取り消した．学習を使わない変換(suspendLearningUntilEnd)もここで終える
     func endComposition()
+    /// 候補を学習から消す(キー設定の表の「学習から消す」．R-17)
+    func forget(_ candidate: Candidate)
+    /// 最後に終えた入力で確定した語の学習を取り消す．取り消すものがあれば true
+    func forgetLastCommit() -> Bool
+    /// 今の入力を終えるまで，学習を使わずに変換し，確定しても学ばない(キー設定の表の「学習を使わずに変換」)
+    func suspendLearningUntilEnd()
     /// 取り込んだ辞書から引いた語を渡す(R-16)．エンジンは読みの中の語として使う．同じものが続くときは何もしなくてよい
     func setAuxiliaryWords(_ words: [AuxiliaryWord])
     /// 入力先のアプリ(バンドル ID)を伝える．アプリの条件の辞書を選ぶのに使う

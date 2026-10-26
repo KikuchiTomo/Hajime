@@ -47,11 +47,43 @@ public final class FakeConverter: KanaKanjiConverting {
     public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { corrections[keys] ?? [] }
     public private(set) var leftContext: String?
     public func setLeftContext(_ text: String?) { leftContext = text }
-    public func didCommit(_ candidate: Candidate) { committed.append(candidate) }
+    public func didCommit(_ candidate: Candidate) {
+        committed.append(candidate)
+        // 本物と同じく，学習を使わない変換で確定した語は学ばない(取り消すものに数えない)
+        if !learningSuspended { committedInComposition.append(candidate) }
+    }
     /// 取り込んだ辞書から渡された語(最後に渡されたもの)
     public private(set) var auxiliaryWords: [AuxiliaryWord] = []
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) { auxiliaryWords = words }
-    public func endComposition() { endCount += 1 }
+    public func endComposition() {
+        endCount += 1
+        learningSuspended = false
+        if !committedInComposition.isEmpty { lastCommitted = committedInComposition }
+        committedInComposition = []
+    }
+
+    /// 学習から消した候補
+    public private(set) var forgotten: [Candidate] = []
+    /// 学習を使わずに変換しているか(入力を終えると戻る)
+    public private(set) var learningSuspended = false
+    /// 学習を使わずに変換したことがあるか
+    public private(set) var suspendCount = 0
+    private var committedInComposition: [Candidate] = []
+    private var lastCommitted: [Candidate] = []
+
+    public func forget(_ candidate: Candidate) { forgotten.append(candidate) }
+
+    public func forgetLastCommit() -> Bool {
+        guard !lastCommitted.isEmpty else { return false }
+        forgotten += lastCommitted
+        lastCommitted = []
+        return true
+    }
+
+    public func suspendLearningUntilEnd() {
+        learningSuspended = true
+        suspendCount += 1
+    }
 }
 
 @MainActor

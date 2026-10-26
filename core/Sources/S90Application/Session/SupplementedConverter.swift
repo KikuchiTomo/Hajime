@@ -137,6 +137,9 @@ public final class SupplementedConverter: KanaKanjiConverting {
         auxiliaryCache.lookups = [:]
         base.endComposition()
     }
+    public func forget(_ candidate: Candidate) { base.forget(candidate) }
+    public func forgetLastCommit() -> Bool { base.forgetLastCommit() }
+    public func suspendLearningUntilEnd() { base.suspendLearningUntilEnd() }
 
     private func supplement(_ candidates: [Candidate], reading: String) -> [Candidate] {
         let current = settings.current

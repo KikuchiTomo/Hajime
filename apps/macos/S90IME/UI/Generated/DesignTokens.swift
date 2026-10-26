@@ -142,6 +142,10 @@ enum DesignTokens {
             static let windowWidth: CGFloat = 820
             static let windowHeight: CGFloat = 580
             static let sidebarWidth: CGFloat = 190
+            static let keymapStateWidth: CGFloat = 120
+            static let keymapKeyWidth: CGFloat = 150
+            static let keymapMarkWidth: CGFloat = 22
+            static let keymapCaptureHeight: CGFloat = 22
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12

@@ -6,18 +6,33 @@ enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let splitNote = "数字で区切る位置を選ぶ　Esc でやめる"
     static let correctedNote = "修正"
-    static let correctionNote = "Space 入力のままに戻す"
     static let englishInputNote = "Tab 日本語にする"
-    static let readingCorrectionNote = "直しました　Esc で打ったままに戻す"
+    /// 選んでいる候補を学習から消したときの案内
+    static let candidateForgottenNote = "学習から消しました"
+    /// 最後に確定した語の学習を取り消したときの案内
+    static let lastCommitForgottenNote = "最後の学習を取り消しました"
 
-    /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文
-    static func readingCorrectedNote(typed: String) -> String { "直しました　Esc で「\(typed)」に戻す" }
+    // 案内に出すキーは，キー設定の表でそのコマンドに割り当てた最初のキー(R-17)．キーが無ければキーの部分を出さない
 
-    /// 直さずに示すときの案内．corrected は直した文
-    static func readingSuggestionNote(_ corrected: String) -> String { "もしかして「\(corrected)」　Tab で直す" }
+    /// 英単語を直した候補が先頭の一覧の案内．key は次の候補のキー
+    static func correctionNote(key: String?) -> String { key.map { "\($0) 入力のままに戻す" } ?? correctedNote }
 
+    /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
+    static func readingCorrectionNote(key: String?) -> String { key.map { "直しました　\($0) で打ったままに戻す" } ?? "直しました" }
+
+    /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文，key は取り消しのキー
+    static func readingCorrectedNote(typed: String, key: String?) -> String {
+        key.map { "直しました　\($0) で「\(typed)」に戻す" } ?? "直しました"
+    }
+
+    /// 直さずに示すときの案内．corrected は直した文，key は「もしかして」に直すキー
+    static func readingSuggestionNote(_ corrected: String, key: String?) -> String {
+        "もしかして「\(corrected)」" + (key.map { "　\($0) で直す" } ?? "")
+    }
+
+    /// - Parameter nextKey: 次の候補のキーの名前(英単語を直した候補の案内に出す)
     static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool,
-                          perPage: Int = DefaultSettings.candidatesPerPage) -> CandidatePanel {
+                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
             : []
@@ -45,7 +60,7 @@ enum PanelBuilder {
             focus: selectedVariant == nil ? .candidate : .variants,
             position: focusedIndex + 1,
             total: selection.candidates.count,
-            note: isCorrected ? correctionNote : nil
+            note: isCorrected ? correctionNote(key: nextKey) : nil
         )
     }
 

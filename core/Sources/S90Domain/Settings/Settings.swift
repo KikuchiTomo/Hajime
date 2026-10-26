@@ -28,10 +28,8 @@ public struct Settings: Sendable, Equatable {
     public var shiftStartsAlphabet = false
     /// 句読点を打ったら，その句読点まで確定する
     public var punctuationCommits = false
-    /// 変換しているとき(分岐図)のキーの割り当て
-    public var conversionKeys = KeyBindings.standard
-    /// 日本語と英数を切り替えるキー(英数・かな・半角/全角・変換・無変換)の割り当て
-    public var modeKeys = ModeKeyAssignments.standard
+    /// キー設定の表(R-17)．状態 × キー × コマンドの行．切り替えのキーも変換中のキーもここに書く
+    public var keymap = KeymapPreset.standard.keymap
     /// テンキーで打った数字と記号は，日本語のモードでも半角で，組み立てずにそのまま確定する
     public var keypadDirect = true
     /// 利用者が変えた記号の決まり(「->」→「→」，「やじるし」→「→」)．既定の決まりに重ねる
@@ -144,6 +142,7 @@ public struct Settings: Sendable, Equatable {
         correction.rules = Array(correction.rules.filter(\.isValid).prefix(DefaultSettings.maximumCorrectionRules))
         correction.exceptions = Array(correction.exceptions.filter { !$0.isEmpty && $0.count <= 64 }.prefix(DefaultSettings.maximumCorrectionRules))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
+        keymap.clampToValidRanges()
     }
 
     /// 使っているカスタムテーマ．選んでいなければ nil
@@ -179,8 +178,8 @@ extension Settings: Codable {
     public static var fieldNames: Set<String> { Set(CodingKeys.allCases.map(\.rawValue)) }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
-        case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
+        case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
+        case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
@@ -222,8 +221,7 @@ extension Settings: Codable {
         read(.spaceWidth, into: \.spaceWidth)
         read(.numberWidth, into: \.numberWidth)
         read(.punctuationCommits, into: \.punctuationCommits)
-        read(.conversionKeys, into: \.conversionKeys)
-        read(.modeKeys, into: \.modeKeys)
+        read(.keymap, into: \.keymap)
         read(.keypadDirect, into: \.keypadDirect)
         readList(.symbolRules, into: \.symbolRules)
         read(.correction, into: \.correction)
@@ -244,7 +242,6 @@ extension Settings: Codable {
         readList(.customThemes, into: \.customThemes)
         read(.customThemeID, into: \.customThemeID)
         read(.terminalCommands, into: \.terminalCommands)
-        settings.conversionKeys = settings.conversionKeys.filled()
         read(.typoCorrection, into: \.typoCorrection)
         read(.candidatePresentation, into: \.candidatePresentation)
         read(.initialFocus, into: \.initialFocus)
@@ -293,8 +290,7 @@ extension Settings: Codable {
         try container.encode(spaceWidth, forKey: .spaceWidth)
         try container.encode(numberWidth, forKey: .numberWidth)
         try container.encode(punctuationCommits, forKey: .punctuationCommits)
-        try container.encode(conversionKeys, forKey: .conversionKeys)
-        try container.encode(modeKeys, forKey: .modeKeys)
+        try container.encode(keymap, forKey: .keymap)
         try container.encode(keypadDirect, forKey: .keypadDirect)
         try container.encode(symbolRules, forKey: .symbolRules)
         try container.encode(correction, forKey: .correction)

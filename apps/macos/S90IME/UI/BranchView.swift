@@ -18,7 +18,7 @@ final class BranchView: NSView {
 
     var panel: LatticePanel? { didSet { needsDisplay = true } }
     /// 足元の案内に出すキーの割り当て
-    var keys = KeyBindings.standard { didSet { needsDisplay = true } }
+    var keys = KeymapPreset.standard.keymap { didSet { needsDisplay = true } }
     /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
     var showsHints = true { didSet { needsDisplay = true } }
 

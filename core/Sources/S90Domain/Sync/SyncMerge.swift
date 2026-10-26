@@ -31,7 +31,8 @@ public enum SyncMerge {
             let localTime = ledger.groupModifiedAt[group] ?? .distantPast
             let localValues = values(of: group, in: local)
             if let payload = remote?.groups[group], payload.modifiedAt > localTime {
-                for name in group.fieldNames {
+                // 古い版の Mac の値(legacyFieldNames)も取り込み，設定を作るときに新しい項目へ移し替える
+                for name in group.fieldNames + group.legacyFieldNames {
                     settings[name] = payload.values[name]
                 }
                 ledger.groupModifiedAt[group] = payload.modifiedAt

@@ -39,7 +39,7 @@ final class ClientActionPresenter {
             case .showLattice(let panel):
                 note.hide()
                 candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
-                                           keys: settings.current.conversionKeys, showsHints: settings.current.showsKeyHints)
+                                           keys: settings.current.keymap, showsHints: settings.current.showsKeyHints)
             case .hideCandidates:
                 candidatePanel.hide()
                 note.hide()

@@ -28,8 +28,11 @@ public enum SettingsCoding {
         return object
     }
 
-    /// JSON のオブジェクトから設定を作る．読めない項目と範囲の外の値は既定値にする
+    /// JSON のオブジェクトから設定を作る．読めない項目と範囲の外の値は既定値にする．
+    /// 古い版の Mac が書いた同期のファイルから古いキーの設定を取り込んだときは，キー設定の表に移し替える
     public static func settings(from object: [String: JSONValue]) throws -> Settings {
-        try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(JSONValue.object(object)))
+        var object = object
+        LegacyKeySettings.upgrade(&object)
+        return try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(JSONValue.object(object)))
     }
 }

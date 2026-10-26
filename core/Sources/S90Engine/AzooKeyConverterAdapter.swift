@@ -178,6 +178,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private var lastRequested: String?
     /// 入力位置の前にある文字列(左の文脈)．Zenzai が変換の手がかりに使う
     private var leftContext: String?
+    /// 学習を使わずに変換しているか(suspendLearningUntilEnd)．入力を終えると戻す
+    private var learningSuspended = false
+    /// 今の入力で確定して学んだ候補．入力を終えたら lastCommitted に移す
+    private var committedInComposition: [KanaKanjiConverterModule.Candidate] = []
+    /// 最後に終えた入力で確定して学んだ候補(最後の学習を取り消すときに使う)
+    private var lastCommitted: [KanaKanjiConverterModule.Candidate] = []
 
     init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID, scoringSessionID: KanaKanjiConverter.ConversionSessionID) {
         self.engine = engine
@@ -280,12 +286,37 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func didCommit(_ candidate: S90Domain.Candidate) {
         guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else { return }
+        let learns = !learningSuspended
         _ = engine.withSession(sessionID) { converter in
             converter.setCompletedData(engineCandidate)
-            converter.updateLearningData(engineCandidate)
+            if learns { converter.updateLearningData(engineCandidate) }
         }
+        if learns { committedInComposition.append(engineCandidate) }
         // 確定すると学習で順位が変わるので，同じ読みでも求め直す
         cache = [:]
+    }
+
+    func forget(_ candidate: S90Domain.Candidate) {
+        guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else { return }
+        _ = engine.withSession(sessionID) { $0.forgetMemory(engineCandidate) }
+        cache = [:]
+    }
+
+    func forgetLastCommit() -> Bool {
+        guard !lastCommitted.isEmpty else { return false }
+        let targets = lastCommitted
+        lastCommitted = []
+        _ = engine.withSession(sessionID) { converter in targets.forEach(converter.forgetMemory) }
+        cache = [:]
+        return true
+    }
+
+    func suspendLearningUntilEnd() {
+        guard !learningSuspended else { return }
+        learningSuspended = true
+        // 学習を使った結果を使い回さないよう，前の結果を捨てて一から変換する
+        cache = [:]
+        lastRequested = nil
     }
 
     /// 取り込んだ辞書の語が変わったら，前の結果は使えないので捨て，次は差分ではなく一から変換する
@@ -297,6 +328,9 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func endComposition() {
         lastRequested = nil
+        learningSuspended = false
+        if !committedInComposition.isEmpty { lastCommitted = committedInComposition }
+        committedInComposition = []
         _ = engine.withSession(sessionID) { $0.stopComposition() }
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
         plausibilityCache = [:]
@@ -311,7 +345,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         if let cached = cache[reading] { return cached }
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        let options = engine.options(leftContext: leftContext)
+        var options = engine.options(leftContext: leftContext)
+        if learningSuspended { options.learningType = .nothing }
         // azooKey は前に求めた読みからの差分で変換を進める．前の読みの続きでない読み(文節ごとの残りの読みなど)を
         // そのまま渡すと前の結果が混ざる(「ひとだ」→「非とだ」)ので，続きでなければ状態を捨ててから求める
         let continues = lastRequested.map(reading.hasPrefix) ?? false

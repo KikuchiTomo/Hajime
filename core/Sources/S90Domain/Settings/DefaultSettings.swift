@@ -78,6 +78,8 @@ public enum DefaultSettings {
     public static let maximumRomajiKeysLength = 4
     public static let maximumRomajiKanaLength = 6
     public static let maximumRomajiRules = 500
+    /// キー設定の表の行の上限(R-17)．ひな形はどれも 150 行ほど
+    public static let maximumKeymapEntries = 500
     /// 使い方の記録を，何回ごとにファイルへ書くか
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか

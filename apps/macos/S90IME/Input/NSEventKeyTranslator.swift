@@ -10,6 +10,11 @@ enum NSEventKeyTranslator {
         static let tab: UInt16 = 48
         static let space: UInt16 = 49
         static let delete: UInt16 = 51
+        static let forwardDelete: UInt16 = 117
+        static let home: UInt16 = 115
+        static let end: UInt16 = 119
+        static let pageUp: UInt16 = 116
+        static let pageDown: UInt16 = 121
         static let escape: UInt16 = 53
         static let left: UInt16 = 123
         static let right: UInt16 = 124
@@ -18,8 +23,11 @@ enum NSEventKeyTranslator {
         static let jisEisu: UInt16 = 102
         static let jisKana: UInt16 = 104
         static let jisYen: UInt16 = 93
-        /// F6〜F10
-        static let functionKeys: [UInt16: Int] = [97: 6, 98: 7, 100: 8, 101: 9, 109: 10]
+        /// F1〜F20(キー設定の表で割り当てられる．R-17)
+        static let functionKeys: [UInt16: Int] = [
+            122: 1, 120: 2, 99: 3, 118: 4, 96: 5, 97: 6, 98: 7, 100: 8, 101: 9, 109: 10,
+            103: 11, 111: 12, 105: 13, 107: 14, 113: 15, 106: 16, 64: 17, 79: 18, 80: 19, 90: 20,
+        ]
         /// テンキーの数字と記号(. * + / - =)．Enter(76)と Clear(71)は含めない
         static let keypad: Set<UInt16> = [65, 67, 69, 75, 78, 81, 82, 83, 84, 85, 86, 87, 88, 89, 91, 92]
     }
@@ -32,6 +40,11 @@ enum NSEventKeyTranslator {
         case KeyCode.tab: .tab
         case KeyCode.space: .space
         case KeyCode.delete: .backspace
+        case KeyCode.forwardDelete: .delete
+        case KeyCode.home: .home
+        case KeyCode.end: .end
+        case KeyCode.pageUp: .pageUp
+        case KeyCode.pageDown: .pageDown
         case KeyCode.escape: .escape
         case KeyCode.left: .left
         case KeyCode.right: .right
@@ -70,8 +83,10 @@ enum NSEventKeyTranslator {
     }()
 
     private static func character(from event: NSEvent, modifiers: KeyEvent.Modifiers) -> Character? {
-        // Control を押しているときは，Control で変わる前の文字で判断する(Control+K など)
-        let text = modifiers.contains(.control) ? event.charactersIgnoringModifiers : event.characters
+        // Control・Option・Command を押しているときは，それで変わる前の文字で判断する(Control+K，Option+Z など．キー設定の表で引く)．
+        // Option で入る特殊な文字(å)は，表に無ければ InputSession がアプリに渡し，アプリが元のキーから入れる
+        let changesCharacter = modifiers.contains(.control) || modifiers.contains(.option) || modifiers.contains(.command)
+        let text = changesCharacter ? event.charactersIgnoringModifiers : event.characters
         guard let text, text.count == 1, let character = text.first else { return nil }
         // 制御文字(矢印などの機能キーは私用領域の文字で来る)は扱わない
         guard let scalar = character.unicodeScalars.first,

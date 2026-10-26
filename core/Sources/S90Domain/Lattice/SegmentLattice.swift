@@ -115,6 +115,25 @@ public struct SegmentLattice: Sendable, Equatable {
         segments[focusedIndex] = segment
     }
 
+    /// 注目している文節の変換の候補を，perPage 件ずつのページで前後に送る．ページの先頭の候補を選ぶ．
+    /// 端を越えたら反対の端のページに戻る．字種(上の枝)にいるときは候補の先頭のページから数える
+    public mutating func moveToPage(by offset: Int, perPage: Int) {
+        let count = segments[focusedIndex].candidates.count
+        guard count > 0, perPage > 0 else { return }
+        let current: Int = if case .candidate(let value) = segments[focusedIndex].choice { value } else { 0 }
+        let pages = (count + perPage - 1) / perPage
+        let page = ((current / perPage + offset) % pages + pages) % pages
+        selectCandidate(at: page * perPage)
+    }
+
+    /// 注目している文節の変換の候補を位置で選ぶ．範囲の外なら端に収める
+    public mutating func selectCandidate(at index: Int) {
+        let count = segments[focusedIndex].candidates.count
+        guard count > 0 else { return }
+        segments[focusedIndex].choice = .candidate(min(max(index, 0), count - 1))
+        segments[focusedIndex].isDecided = true
+    }
+
     /// 注目している文節の変換の候補を番号で選ぶ．番号は今見えているページの中の順番(perPage 件ずつのページ)．範囲の外なら false
     public mutating func select(number: Int, perPage: Int = DefaultSettings.latticeCandidatesPerSegment) -> Bool {
         let current: Int = if case .candidate(let value) = segments[focusedIndex].choice { value } else { 0 }
