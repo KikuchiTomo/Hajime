@@ -456,6 +456,20 @@
       ]
     },
     {
+      "name": "SymbolDefault",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "input",
+          "type": "string"
+        },
+        {
+          "name": "output",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "RequestBody",
       "kind": "union",
       "tag": "type",
@@ -700,6 +714,9 @@
               "type": "string"
             }
           ]
+        },
+        {
+          "name": "readSymbolDefaults"
         }
       ]
     },
@@ -810,6 +827,19 @@
             {
               "name": "reason",
               "type": "FileFailure"
+            }
+          ]
+        },
+        {
+          "name": "symbolDefaults",
+          "fields": [
+            {
+              "name": "sequences",
+              "type": "[SymbolDefault]"
+            },
+            {
+              "name": "readings",
+              "type": "[SymbolDefault]"
             }
           ]
         },

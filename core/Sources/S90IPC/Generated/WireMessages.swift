@@ -556,6 +556,21 @@ extension WireFileFailure: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
+public struct WireSymbolDefault: Sendable, Equatable, Codable {
+    public var input: String
+    public var output: String
+
+    public init(input: String, output: String) {
+        self.input = input
+        self.output = output
+    }
+}
+
+extension WireSymbolDefault: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSymbolDefault" }
+    public var debugDescription: String { description }
+}
+
 public enum WireRequestBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case openSession
@@ -582,6 +597,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case exportProfileRules(path: String)
     case importRuleList(list: WireRuleList, path: String)
     case exportRuleList(list: WireRuleList, path: String)
+    case readSymbolDefaults
 
     private enum CodingKeys: String, CodingKey {
         case type, protocolVersion, session, input, context, mode, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list
@@ -641,6 +657,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .importRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
         case "exportRuleList":
             self = try .exportRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
+        case "readSymbolDefaults":
+            self = .readSymbolDefaults
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -730,6 +748,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("exportRuleList", forKey: .type)
             try container.encode(list, forKey: .list)
             try container.encode(path, forKey: .path)
+        case .readSymbolDefaults:
+            try container.encode("readSymbolDefaults", forKey: .type)
         }
     }
 }
@@ -762,6 +782,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .exportProfileRules: "WireRequestBody.exportProfileRules"
         case .importRuleList: "WireRequestBody.importRuleList"
         case .exportRuleList: "WireRequestBody.exportRuleList"
+        case .readSymbolDefaults: "WireRequestBody.readSymbolDefaults"
         }
     }
     public var debugDescription: String { description }
@@ -792,10 +813,11 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case dictionaryImported(dictionary: WireImportedDictionaryInfo)
     case imported(added: UInt32, skipped: UInt32)
     case fileFailed(reason: WireFileFailure)
+    case symbolDefaults(sequences: [WireSymbolDefault], readings: [WireSymbolDefault])
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, code
+        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, sequences, readings, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -820,6 +842,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .imported(added: container.decode(UInt32.self, forKey: .added), skipped: container.decode(UInt32.self, forKey: .skipped))
         case "fileFailed":
             self = try .fileFailed(reason: container.decode(WireFileFailure.self, forKey: .reason))
+        case "symbolDefaults":
+            self = try .symbolDefaults(sequences: container.decode([WireSymbolDefault].self, forKey: .sequences), readings: container.decode([WireSymbolDefault].self, forKey: .readings))
         case "error":
             self = try .error(code: container.decode(WireErrorCode.self, forKey: .code))
         default:
@@ -860,6 +884,10 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .fileFailed(let reason):
             try container.encode("fileFailed", forKey: .type)
             try container.encode(reason, forKey: .reason)
+        case .symbolDefaults(let sequences, let readings):
+            try container.encode("symbolDefaults", forKey: .type)
+            try container.encode(sequences, forKey: .sequences)
+            try container.encode(readings, forKey: .readings)
         case .error(let code):
             try container.encode("error", forKey: .type)
             try container.encode(code, forKey: .code)
@@ -879,6 +907,7 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .dictionaryImported: "WireResponseBody.dictionaryImported"
         case .imported: "WireResponseBody.imported"
         case .fileFailed: "WireResponseBody.fileFailed"
+        case .symbolDefaults: "WireResponseBody.symbolDefaults"
         case .error: "WireResponseBody.error"
         }
     }

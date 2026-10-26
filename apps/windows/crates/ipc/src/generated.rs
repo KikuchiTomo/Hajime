@@ -433,6 +433,21 @@ pub enum FileFailure {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SymbolDefault {
+    pub input: String,
+    pub output: String,
+}
+
+impl fmt::Debug for SymbolDefault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SymbolDefault")
+            .field("input", &REDACTED)
+            .field("output", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum RequestBody {
     Hello {
@@ -515,6 +530,7 @@ pub enum RequestBody {
         list: RuleList,
         path: String,
     },
+    ReadSymbolDefaults,
 }
 
 impl fmt::Debug for RequestBody {
@@ -618,6 +634,7 @@ impl fmt::Debug for RequestBody {
                 .field("list", list)
                 .field("path", &REDACTED)
                 .finish(),
+            Self::ReadSymbolDefaults => f.write_str("ReadSymbolDefaults"),
         }
     }
 }
@@ -670,6 +687,10 @@ pub enum ResponseBody {
     FileFailed {
         reason: FileFailure,
     },
+    SymbolDefaults {
+        sequences: Vec<SymbolDefault>,
+        readings: Vec<SymbolDefault>,
+    },
     Error {
         code: ErrorCode,
     },
@@ -714,6 +735,11 @@ impl fmt::Debug for ResponseBody {
             Self::FileFailed { reason, .. } => f
                 .debug_struct("FileFailed")
                 .field("reason", reason)
+                .finish(),
+            Self::SymbolDefaults { sequences, readings, .. } => f
+                .debug_struct("SymbolDefaults")
+                .field("sequences", sequences)
+                .field("readings", readings)
                 .finish(),
             Self::Error { code, .. } => f
                 .debug_struct("Error")

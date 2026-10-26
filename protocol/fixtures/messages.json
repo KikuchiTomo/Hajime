@@ -46,7 +46,8 @@
     { "id": 32, "body": { "type": "importProfileRules", "path": "C:\\rules.csv" } },
     { "id": 33, "body": { "type": "exportProfileRules", "path": "C:\\rules.csv" } },
     { "id": 34, "body": { "type": "importRuleList", "list": "symbolReadings", "path": "C:\\symbol-readings.tsv" } },
-    { "id": 35, "body": { "type": "exportRuleList", "list": "correctionRules", "path": "C:\\replacements.tsv" } }
+    { "id": 35, "body": { "type": "exportRuleList", "list": "correctionRules", "path": "C:\\replacements.tsv" } },
+    { "id": 36, "body": { "type": "readSymbolDefaults" } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
@@ -88,7 +89,8 @@
     { "id": 14, "body": { "type": "syncStatus", "status": { "isEnabled": false, "groups": [], "localFields": [], "isSyncing": true } } },
     { "id": 15, "body": { "type": "dictionaryImported", "dictionary": { "id": "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", "name": "nicoime", "wordCount": 300000 } } },
     { "id": 16, "body": { "type": "imported", "added": 12, "skipped": 3 } },
-    { "id": 17, "body": { "type": "fileFailed", "reason": "busy" } }
+    { "id": 17, "body": { "type": "fileFailed", "reason": "busy" } },
+    { "id": 18, "body": { "type": "symbolDefaults", "sequences": [{ "input": "->", "output": "→" }], "readings": [{ "input": "やじるし", "output": "→ ← ↑ ↓" }] } }
   ],
   "uiCommands": [
     { "type": "hello", "protocolVersion": 1 },

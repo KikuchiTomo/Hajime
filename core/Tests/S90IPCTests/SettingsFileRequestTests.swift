@@ -1,3 +1,4 @@
+import Foundation
 import S90Application
 import S90Domain
 import S90IPC
@@ -161,5 +162,20 @@ struct SettingsFileRequestTests {
         _ = await running.value
         files.holds = false
         #expect(await answer(.exportSettings(path: "/d/s.json"), from: id) == .done)
+    }
+
+    @Test("記号の既定の決まりを返し，1 回のメッセージに収まる")
+    func symbolDefaults() async throws {
+        let id = greeted()
+        let body = await answer(.readSymbolDefaults, from: id)
+        guard case .symbolDefaults(let sequences, let readings) = body else {
+            Issue.record("既定の決まりが返らない")
+            return
+        }
+        #expect(sequences.first == WireSymbolDefault(input: "->", output: "→"))
+        #expect(readings.contains { $0.input == "やじるし" && $0.output.hasPrefix("→ ← ↑ ↓") })
+        #expect(readings.count == SymbolDictionary.defaultEntries.count)
+        let encoded = try JSONEncoder().encode(WireResponse(id: 1, body: body))
+        #expect(encoded.count < WireProtocol.maximumMessageBytes)
     }
 }

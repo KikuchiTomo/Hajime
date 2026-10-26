@@ -187,6 +187,9 @@ public final class EngineService {
                 perform(.openSettings)
             }
             return .done
+        case .readSymbolDefaults:
+            // 記号のページに既定の決まりを出し，利用者の決まりと重ねるため(macOS の SymbolsPage と同じ表)
+            return .symbolDefaults(sequences: Self.symbolDefaults(.sequence), readings: Self.symbolDefaults(.reading))
         case .readSync, .setSyncFolder, .setSyncEnabled, .setSyncScope, .setSyncLocalField, .syncNow:
             return syncResponse(for: request) ?? .error(code: .malformed)
         case .importDictionary, .removeDictionary, .exportSettings, .importSettings, .importProfileRules, .exportProfileRules,
@@ -209,6 +212,10 @@ public final class EngineService {
             }
             return .settings(settings: snapshot)
         }
+    }
+
+    private static func symbolDefaults(_ kind: SymbolRule.Kind) -> [WireSymbolDefault] {
+        SymbolRuleEditing.defaults(kind).map { WireSymbolDefault(input: $0.input, output: $0.output) }
     }
 
     public var snapshot: WireSettingsSnapshot {
