@@ -1,0 +1,1037 @@
+#![forbid(unsafe_code)]
+
+//! 設定の画面のページと，その中の項目の並び．macOS の SettingsView(Group・Page・各ページの Form)と同じ並び・同じ文言にする．
+//! Windows の部品の作り方はここでは決めず，app が並びに従って部品を作る
+
+use crate::list::{Field, ListSpec};
+use crate::options::{self, Choice};
+use crate::strings::{choice, dictionaries, features, keys, menu, more, settings, sync, words};
+
+/// 左の一覧の見出し
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Group {
+    Input,
+    Dictionary,
+    Appearance,
+    Data,
+    About,
+}
+
+impl Group {
+    pub const ALL: [Group; 5] = [
+        Group::Input,
+        Group::Dictionary,
+        Group::Appearance,
+        Group::Data,
+        Group::About,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Group::Input => settings::INPUT_GROUP,
+            Group::Dictionary => settings::DICTIONARY_GROUP,
+            Group::Appearance => settings::APPEARANCE_GROUP,
+            Group::Data => settings::DATA_GROUP,
+            Group::About => settings::ABOUT_GROUP,
+        }
+    }
+}
+
+/// 左の一覧の項目．並びは左の一覧の並び
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Page {
+    Input,
+    Conversion,
+    Correction,
+    Language,
+    Romaji,
+    Keys,
+    Apps,
+    Dictionary,
+    Symbols,
+    Appearance,
+    Usage,
+    Sync,
+    Backup,
+    About,
+}
+
+impl Page {
+    pub const ALL: [Page; 14] = [
+        Page::Input,
+        Page::Conversion,
+        Page::Correction,
+        Page::Language,
+        Page::Romaji,
+        Page::Keys,
+        Page::Apps,
+        Page::Dictionary,
+        Page::Symbols,
+        Page::Appearance,
+        Page::Usage,
+        Page::Sync,
+        Page::Backup,
+        Page::About,
+    ];
+
+    pub fn group(self) -> Group {
+        match self {
+            Page::Input
+            | Page::Conversion
+            | Page::Correction
+            | Page::Language
+            | Page::Romaji
+            | Page::Keys
+            | Page::Apps => Group::Input,
+            Page::Dictionary | Page::Symbols => Group::Dictionary,
+            Page::Appearance => Group::Appearance,
+            Page::Usage | Page::Sync | Page::Backup => Group::Data,
+            Page::About => Group::About,
+        }
+    }
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Page::Input => settings::INPUT_TAB,
+            Page::Conversion => settings::CONVERSION_TAB,
+            Page::Correction => features::CORRECTION_PAGE,
+            Page::Language => features::LANGUAGE_PAGE,
+            Page::Symbols => features::SYMBOLS_PAGE,
+            Page::Keys => keys::TAB,
+            Page::Dictionary => settings::DICTIONARY_TAB,
+            Page::Romaji => settings::ROMAJI_TAB,
+            Page::Apps => settings::APPS_TAB,
+            Page::Appearance => settings::APPEARANCE_TAB,
+            Page::Usage => settings::USAGE_TAB,
+            Page::Sync => sync::PAGE,
+            Page::Backup => more::BACKUP,
+            Page::About => more::ABOUT,
+        }
+    }
+
+    /// 左の一覧の絵．Segoe Fluent Icons(Windows 10 では Segoe MDL2 Assets)の字
+    pub fn glyph(self) -> char {
+        match self {
+            Page::Input => '\u{E765}',      // キーボード
+            Page::Conversion => '\u{E8C1}', // 文字
+            Page::Correction => '\u{E70F}', // 編集
+            Page::Language => '\u{E774}',   // 地球
+            Page::Romaji => '\u{E80A}',     // 表
+            Page::Keys => '\u{E92E}',       // キーボードの全体
+            Page::Apps => '\u{ECE4}',       // 禁止
+            Page::Dictionary => '\u{E82D}', // 辞書
+            Page::Symbols => '\u{E8D2}',    // 記号
+            Page::Appearance => '\u{E790}', // 色
+            Page::Usage => '\u{E9D2}',      // グラフ
+            Page::Sync => '\u{E895}',       // 同期
+            Page::Backup => '\u{EDA2}',     // ドライブ
+            Page::About => '\u{E946}',      // 情報
+        }
+    }
+
+    /// 検索で見つけるための言葉．ページの名前に加え，そのページにある項目の名前
+    pub fn keywords(self) -> Vec<&'static str> {
+        match self {
+            Page::Input => vec![
+                choice::INPUT_STYLE,
+                choice::KEYBOARD_LAYOUT,
+                settings::PUNCTUATION,
+                features::KEYPAD_DIRECT,
+            ],
+            Page::Conversion => vec![
+                menu::LIVE_CONVERSION,
+                choice::PRESENTATION,
+                choice::INITIAL_FOCUS,
+                features::OKURIGANA,
+                features::PREFERS_KATAKANA,
+                features::CALCULATION,
+                features::POSTAL_CODE,
+                features::HANDWRITING,
+                settings::DATE_CONVERSION,
+                settings::EMOJI_CONVERSION,
+            ],
+            Page::Correction => vec![
+                features::EXCEPTIONS,
+                features::RULES,
+                features::CORRECTS_ENGLISH,
+                features::MISREADINGS,
+            ],
+            Page::Language => vec![
+                features::ENGLISH_WORDS,
+                features::JAPANESE_WORDS,
+                features::LANGUAGE_RULES,
+                features::TRY_LANGUAGE,
+                options::INPUT_STYLES[3].1,
+            ],
+            Page::Symbols => vec![features::SEQUENCES, features::READINGS],
+            // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
+            Page::Keys => std::iter::once(keys::PRESET_MENU)
+                .chain(keys::COMMANDS.iter().map(|(_, label)| *label))
+                .chain(keys::STATES.iter().map(|(_, label)| *label))
+                .chain(keys::PRESETS.iter().map(|(_, label)| *label))
+                .collect(),
+            Page::Dictionary => vec![words::READING, words::WORD, dictionaries::IMPORTED],
+            Page::Appearance => vec![more::THEME, more::CUSTOM_THEMES, more::FONT],
+            Page::Sync => vec![sync::FOLDER, sync::SCOPES, sync::DICTIONARY],
+            Page::Romaji | Page::Apps | Page::Usage | Page::Backup | Page::About => vec![],
+        }
+    }
+
+    /// 検索の言葉を名前か項目の名前に含むか．大文字と小文字は区別しない
+    pub fn matches(self, query: &str) -> bool {
+        let query = query.trim().to_lowercase();
+        query.is_empty()
+            || std::iter::once(self.title())
+                .chain(self.keywords())
+                .any(|text| text.to_lowercase().contains(&query))
+    }
+}
+
+/// 左の一覧に並べる見出しとページ．pages に無いページ(まだ作っていないもの)は出さない．検索の言葉に合うページだけを出し，空の見出しは出さない
+pub fn sidebar(pages: &[Page], query: &str) -> Vec<(Group, Vec<Page>)> {
+    Group::ALL
+        .iter()
+        .filter_map(|group| {
+            let matched: Vec<Page> = Page::ALL
+                .iter()
+                .copied()
+                .filter(|page| {
+                    page.group() == *group && pages.contains(page) && page.matches(query)
+                })
+                .collect();
+            (!matched.is_empty()).then_some((*group, matched))
+        })
+        .collect()
+}
+
+/// 項目を出す・使えるようにする条件
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Condition {
+    /// 項目の値が value のとき
+    Is(&'static str, &'static str),
+    /// 項目の値が value でないとき
+    IsNot(&'static str, &'static str),
+    /// オン・オフの項目がオンのとき
+    On(&'static str),
+}
+
+/// 1 行の部品
+#[derive(Debug, Clone, PartialEq)]
+pub enum Control {
+    /// オン・オフ
+    Toggle,
+    /// 列挙の値を選ぶ
+    Choice(&'static [Choice]),
+    /// 整数を範囲の中で選ぶ(候補の数)
+    Stepper(RangeKind),
+    /// 秒を範囲の中で選ぶ(0.1 秒ごと)
+    Seconds(RangeKind),
+    /// 注記(前の行の説明として小さい文字で出す)
+    Note,
+    /// エンジンに頼む操作のボタン(項目の名前をボタンに出す)
+    Action(Action),
+    /// 使い方の記録の値(変えられない)
+    Stat(Stat),
+    /// 決まりの一覧(入力欄・追加・削除・表)
+    List(ListSpec, LimitKind),
+    /// 英語と日本語の見分けを試す欄(打つ文・前の文字列・結果)
+    Preview,
+    /// アプリのバージョン(変えられない)
+    Version,
+    /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
+    KeymapReport,
+    /// キー設定のひな形を選んで読み込む
+    Preset,
+    /// 利用表記(THIRD_PARTY_NOTICES.md)の全文．読むだけ
+    Notices,
+    /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
+    Dictionary(ListSpec),
+}
+
+/// 一覧の上限の種類(catalog の Limits のどれか)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitKind {
+    CorrectionRules,
+    RomajiRules,
+    WordLanguageEntries,
+    ProfileRules,
+    UserDictionaryEntries,
+    KeymapEntries,
+}
+
+impl LimitKind {
+    pub fn limit(self, catalog: &crate::catalog::Catalog) -> usize {
+        match self {
+            LimitKind::CorrectionRules => catalog.limits.correction_rules,
+            LimitKind::RomajiRules => catalog.limits.romaji_rules,
+            LimitKind::WordLanguageEntries => catalog.limits.word_language_entries,
+            LimitKind::ProfileRules => catalog.limits.profile_rules,
+            LimitKind::UserDictionaryEntries => catalog.limits.user_dictionary_entries,
+            LimitKind::KeymapEntries => catalog.limits.keymap_entries,
+        }
+    }
+}
+
+/// ボタンで頼む操作
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    ResetLearning,
+    ResetUsage,
+    RestoreDefaults,
+    /// キー設定の表を標準のひな形に戻す
+    RestoreKeymap,
+    /// 設定のファイルを既定のアプリで開く(Windows だけ．画面にまだ無い項目を直すため)
+    OpenSettingsFile,
+}
+
+/// 使い方の記録の値の種類
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stat {
+    FirstCandidateRate,
+    Commits,
+    ConversionsOpened,
+    SegmentsChanged,
+    ReadingCorrections,
+    EnglishCorrections,
+}
+
+/// 範囲の種類(catalog の Ranges のどれか)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeKind {
+    CandidatesPerPage,
+    LiveConversionDelay,
+    CorrectionDelay,
+    ModeIndicatorDuration,
+    CandidateFontSize,
+}
+
+impl RangeKind {
+    pub fn range(self, catalog: &crate::catalog::Catalog) -> crate::catalog::Range {
+        let ranges = &catalog.ranges;
+        match self {
+            RangeKind::CandidatesPerPage => ranges.candidates_per_page,
+            RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
+            RangeKind::CorrectionDelay => ranges.correction_delay,
+            RangeKind::ModeIndicatorDuration => ranges.mode_indicator_duration,
+            RangeKind::CandidateFontSize => ranges.candidate_font_size,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Row {
+    pub title: &'static str,
+    /// 値の道筋(「correction.english」)．注記では空
+    pub path: &'static str,
+    pub control: Control,
+    /// 満たさないときは使えなくする
+    pub enabled: Option<Condition>,
+    /// 満たさないときは出さない
+    pub visible: Option<Condition>,
+    /// 値を変えたときに一緒に空(null)にする項目(テーマを選んだらカスタムテーマを外す)
+    pub clears: Option<&'static str>,
+}
+
+impl Row {
+    pub fn toggle(title: &'static str, path: &'static str) -> Self {
+        Self::new(title, path, Control::Toggle)
+    }
+
+    pub fn choice(title: &'static str, path: &'static str, options: &'static [Choice]) -> Self {
+        Self::new(title, path, Control::Choice(options))
+    }
+
+    pub fn stepper(title: &'static str, path: &'static str, range: RangeKind) -> Self {
+        Self::new(title, path, Control::Stepper(range))
+    }
+
+    pub fn seconds(title: &'static str, path: &'static str, range: RangeKind) -> Self {
+        Self::new(title, path, Control::Seconds(range))
+    }
+
+    pub fn note(text: &'static str) -> Self {
+        Self::new(text, "", Control::Note)
+    }
+
+    pub fn action(title: &'static str, action: Action) -> Self {
+        Self::new(title, "", Control::Action(action))
+    }
+
+    pub fn stat(title: &'static str, stat: Stat) -> Self {
+        Self::new(title, "", Control::Stat(stat))
+    }
+
+    pub fn list(spec: ListSpec, limit: LimitKind) -> Self {
+        Self::new("", spec.path, Control::List(spec, limit))
+    }
+
+    /// 設定の値を持つ行か(既定に戻すボタンを付ける行)
+    pub fn has_value(&self) -> bool {
+        matches!(
+            self.control,
+            Control::Toggle | Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_)
+        )
+    }
+
+    pub fn new(title: &'static str, path: &'static str, control: Control) -> Self {
+        Self {
+            title,
+            path,
+            control,
+            enabled: None,
+            visible: None,
+            clears: None,
+        }
+    }
+
+    pub fn clearing(mut self, path: &'static str) -> Self {
+        self.clears = Some(path);
+        self
+    }
+
+    pub fn enabled_when(mut self, condition: Condition) -> Self {
+        self.enabled = Some(condition);
+        self
+    }
+
+    pub fn visible_when(mut self, condition: Condition) -> Self {
+        self.visible = Some(condition);
+        self
+    }
+}
+
+/// 見出しの付いた行のまとまり(macOS の Form の Section)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Section {
+    pub title: Option<&'static str>,
+    pub rows: Vec<Row>,
+    /// まとまりの下の注記
+    pub footer: Option<&'static str>,
+}
+
+impl Section {
+    fn new(title: &'static str, rows: Vec<Row>) -> Self {
+        Self {
+            title: Some(title),
+            rows,
+            footer: None,
+        }
+    }
+
+    fn untitled(rows: Vec<Row>) -> Self {
+        Self {
+            title: None,
+            rows,
+            footer: None,
+        }
+    }
+}
+
+/// 作ったページ．左の一覧にはこのページだけを出す
+pub const BUILT: &[Page] = &[
+    Page::Input,
+    Page::Conversion,
+    Page::Correction,
+    Page::Language,
+    Page::Romaji,
+    Page::Keys,
+    Page::Apps,
+    Page::Dictionary,
+    Page::Appearance,
+    Page::Usage,
+    Page::Backup,
+    Page::About,
+];
+
+/// ページの中身．項目の並びだけで書けるページは sections を返す．None のページは app が専用の部品で組み立てる
+pub fn sections(page: Page) -> Option<Vec<Section>> {
+    match page {
+        Page::Input => Some(input()),
+        Page::Conversion => Some(conversion()),
+        Page::Correction => Some(correction()),
+        Page::Language => Some(language()),
+        Page::Romaji => Some(romaji()),
+        Page::Apps => Some(apps()),
+        Page::Keys => Some(keymap()),
+        Page::Dictionary => Some(dictionary()),
+        Page::Appearance => Some(appearance()),
+        Page::Usage => Some(usage()),
+        Page::Backup => Some(backup()),
+        Page::About => Some(about()),
+        _ => None,
+    }
+}
+
+/// 入力のページ(macOS の InputTab)
+fn input() -> Vec<Section> {
+    use Condition::*;
+    vec![
+        Section::new(
+            settings::INPUT_STYLE_SECTION,
+            vec![
+                Row::choice(choice::INPUT_STYLE, "inputStyle", options::INPUT_STYLES),
+                Row::note(choice::ENGLISH_AUTO_NOTE).visible_when(Is("inputStyle", "englishAuto")),
+                Row::toggle(
+                    choice::ENGLISH_INPUT_LIVE_CONVERSION,
+                    "englishInputLiveConversion",
+                )
+                .enabled_when(Is("inputStyle", "english")),
+                Row::note(choice::ENGLISH_INPUT_LIVE_CONVERSION_NOTE)
+                    .visible_when(Is("inputStyle", "english")),
+                Row::choice(
+                    choice::KEYBOARD_LAYOUT,
+                    "keyboardLayout",
+                    options::KEYBOARD_LAYOUTS,
+                ),
+                Row::note(choice::KEYBOARD_LAYOUT_NOTE),
+            ],
+        ),
+        Section::new(
+            settings::CHARACTERS,
+            vec![
+                Row::choice(settings::PUNCTUATION, "punctuation", options::PUNCTUATION),
+                Row::choice(settings::BRACKETS, "brackets", options::BRACKETS),
+                Row::choice(settings::SLASH, "slash", options::SLASH),
+                Row::choice(choice::YEN_KEY, "yenKey", options::YEN_KEY),
+                Row::choice(settings::SPACE_WIDTH, "spaceWidth", options::WIDTHS),
+                Row::choice(settings::NUMBER_WIDTH, "numberWidth", options::WIDTHS),
+                Row::choice(more::ALPHABET_WIDTH, "alphabetWidth", options::WIDTHS),
+                Row::toggle(more::SHIFT_STARTS_ALPHABET, "shiftStartsAlphabet"),
+                Row::toggle(features::KEYPAD_DIRECT, "keypadDirect"),
+            ],
+        ),
+        Section::new(
+            settings::KEYS,
+            vec![
+                Row::toggle(settings::PUNCTUATION_COMMITS, "punctuationCommits"),
+                Row::toggle(settings::NUMBER_KEY_SELECTION, "numberKeySelection"),
+                Row::toggle(settings::SHOWS_MODE_INDICATOR, "showsModeIndicator"),
+                Row::seconds(
+                    more::MODE_INDICATOR_DURATION,
+                    "modeIndicatorDuration",
+                    RangeKind::ModeIndicatorDuration,
+                )
+                .enabled_when(On("showsModeIndicator")),
+            ],
+        ),
+    ]
+}
+
+/// 変換のページ(macOS の ConversionTab)
+fn conversion() -> Vec<Section> {
+    use Condition::*;
+    vec![
+        Section::new(
+            settings::CONVERSION,
+            vec![
+                Row::toggle(menu::LIVE_CONVERSION, "liveConversion"),
+                Row::choice(
+                    choice::PRESENTATION,
+                    "candidatePresentation",
+                    options::PRESENTATIONS,
+                ),
+                Row::choice(
+                    choice::INITIAL_FOCUS,
+                    "initialFocus",
+                    options::INITIAL_FOCUS,
+                ),
+                Row::choice(
+                    choice::SUGGESTION_DISPLAY,
+                    "suggestionDisplay",
+                    options::SUGGESTION_DISPLAY,
+                ),
+                Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
+                Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
+                Row::seconds(
+                    more::LIVE_CONVERSION_DELAY,
+                    "liveConversionDelay",
+                    RangeKind::LiveConversionDelay,
+                )
+                .enabled_when(On("liveConversion")),
+            ],
+        ),
+        Section::new(
+            more::CANDIDATES,
+            vec![
+                Row::stepper(
+                    more::BRANCH_CANDIDATES,
+                    "branchCandidatesPerPage",
+                    RangeKind::CandidatesPerPage,
+                ),
+                Row::stepper(
+                    more::LIST_CANDIDATES,
+                    "listCandidatesPerPage",
+                    RangeKind::CandidatesPerPage,
+                ),
+            ],
+        ),
+        Section::new(
+            more::TYPO,
+            vec![
+                Row::choice(
+                    choice::TYPO_CORRECTION,
+                    "typoCorrection",
+                    options::TYPO_CORRECTION,
+                ),
+                Row::choice(
+                    more::CORRECTION_SENSITIVITY,
+                    "correctionSensitivity",
+                    options::CORRECTION_SENSITIVITY,
+                )
+                .enabled_when(Is("typoCorrection", "standard")),
+                Row::toggle(more::SHOWS_SUGGESTIONS, "showsSuggestions")
+                    .enabled_when(Is("typoCorrection", "standard")),
+                Row::seconds(
+                    more::CORRECTION_DELAY,
+                    "correctionDelay",
+                    RangeKind::CorrectionDelay,
+                )
+                .enabled_when(Is("typoCorrection", "standard")),
+            ],
+        ),
+        Section::new(
+            features::NOTATION,
+            vec![
+                Row::choice(features::OKURIGANA, "okuriganaStyle", options::OKURIGANA),
+                Row::toggle(features::PREFERS_KATAKANA, "prefersKatakana"),
+            ],
+        ),
+        Section::new(
+            settings::SPECIAL_CONVERSION,
+            vec![
+                Row::toggle(features::CALCULATION, "calculation"),
+                Row::toggle(features::POSTAL_CODE, "postalCodeConversion"),
+                Row::toggle(features::HANDWRITING, "handwriting"),
+                Row::toggle(settings::DATE_CONVERSION, "dateConversion"),
+                Row::toggle(settings::HOMOPHONE_NOTES, "homophoneNotes"),
+                Row::toggle(settings::MISUSE_NOTES, "misuseNotes"),
+                Row::toggle(settings::PROOFREADING, "proofreading"),
+                Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
+                Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
+            ],
+        ),
+        Section::new(
+            settings::LEARNING,
+            vec![
+                Row::choice(settings::LEARNING, "learning", options::LEARNING),
+                Row::action(settings::RESET_LEARNING, Action::ResetLearning),
+            ],
+        ),
+    ]
+}
+
+const CORRECTION_RULE_FIELDS: &[Field] = &[
+    Field::named("typed", features::TYPED, true),
+    Field::named("word", features::REPLACEMENT, false),
+];
+const EXCEPTION_FIELDS: &[Field] = &[Field::text(features::EXCEPTION_PLACEHOLDER)];
+const ROMAJI_FIELDS: &[Field] = &[
+    Field::named("keys", settings::ROMAJI_KEYS, true),
+    Field::named("kana", settings::ROMAJI_KANA, false),
+];
+const WORD_FIELDS: &[Field] = &[Field::text(features::WORD_PLACEHOLDER)];
+const LANGUAGE_RULE_FIELDS: &[Field] = &[
+    Field::named("word", features::LANGUAGE_RULE_WORD, true),
+    Field::choice(
+        "context",
+        features::LANGUAGE_RULE_CONTEXT,
+        options::WORD_CONTEXTS,
+        true,
+    ),
+    Field::choice(
+        "language",
+        features::LANGUAGE_RULE_RESULT,
+        options::WORD_LANGUAGES,
+        false,
+    ),
+];
+
+/// 補正のページ(macOS の CorrectionPage)
+fn correction() -> Vec<Section> {
+    use Condition::*;
+    vec![
+        Section::new(
+            features::CORRECTION_KINDS,
+            vec![
+                Row::toggle(features::CORRECTS_ENGLISH, "correction.english"),
+                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese"),
+                Row::toggle(features::CORRECTS_REPEATED_KEYS, "correction.repeatedKeys")
+                    .enabled_when(On("correction.japanese")),
+                Row::toggle(features::MISREADINGS, "misreadings"),
+            ],
+        ),
+        Section::new(
+            features::RULES,
+            vec![Row::list(
+                ListSpec {
+                    path: "correction.rules",
+                    fields: CORRECTION_RULE_FIELDS,
+                    empty: features::RULES_EMPTY,
+                    invalid: features::INVALID_RULE,
+                    lowercase: false,
+                    exclusive_with: None,
+                },
+                LimitKind::CorrectionRules,
+            )],
+        ),
+        Section::new(
+            features::EXCEPTIONS,
+            vec![Row::list(
+                ListSpec {
+                    path: "correction.exceptions",
+                    fields: EXCEPTION_FIELDS,
+                    empty: features::EXCEPTIONS_EMPTY,
+                    invalid: features::INVALID_EXCEPTION,
+                    lowercase: false,
+                    exclusive_with: None,
+                },
+                LimitKind::CorrectionRules,
+            )],
+        ),
+    ]
+}
+
+/// 英語と日本語のページ(macOS の WordLanguagePage)
+fn language() -> Vec<Section> {
+    let words = |path, other, empty| {
+        Row::list(
+            ListSpec {
+                path,
+                fields: WORD_FIELDS,
+                empty,
+                invalid: features::INVALID_WORD,
+                lowercase: true,
+                exclusive_with: Some(other),
+            },
+            LimitKind::WordLanguageEntries,
+        )
+    };
+    vec![
+        Section {
+            title: Some(features::LANGUAGE_JUDGING),
+            rows: vec![
+                Row::toggle(features::USES_CONTEXT, "wordLanguage.usesContext"),
+                Row::toggle(features::AVOIDS_OFFENSIVE, "wordLanguage.avoidsOffensive"),
+            ],
+            footer: Some(features::USES_CONTEXT_NOTE),
+        },
+        Section::new(
+            features::TRY_LANGUAGE,
+            vec![Row::new("", "", Control::Preview)],
+        ),
+        Section::new(
+            features::ENGLISH_WORDS,
+            vec![words(
+                "wordLanguage.englishWords",
+                "wordLanguage.japaneseWords",
+                features::ENGLISH_WORDS_EMPTY,
+            )],
+        ),
+        Section::new(
+            features::JAPANESE_WORDS,
+            vec![words(
+                "wordLanguage.japaneseWords",
+                "wordLanguage.englishWords",
+                features::JAPANESE_WORDS_EMPTY,
+            )],
+        ),
+        Section {
+            title: Some(features::LANGUAGE_RULES),
+            rows: vec![Row::list(
+                ListSpec {
+                    path: "wordLanguage.rules",
+                    fields: LANGUAGE_RULE_FIELDS,
+                    empty: crate::strings::windows::LANGUAGE_RULES_EMPTY,
+                    invalid: features::INVALID_WORD,
+                    lowercase: true,
+                    exclusive_with: None,
+                },
+                LimitKind::WordLanguageEntries,
+            )],
+            footer: Some(crate::strings::windows::LANGUAGE_NOTE),
+        },
+    ]
+}
+
+const KEYMAP_FIELDS: &[Field] = &[
+    Field::choice("state", keys::STATE, keys::STATES, false),
+    Field::key_notation("key", keys::KEY, false),
+    Field::choice("command", keys::COMMAND, keys::COMMANDS, false),
+];
+
+/// キー設定のページ(macOS の KeymapPage)．表の行は上から順に並び，同じキーの行は下の行を使う
+fn keymap() -> Vec<Section> {
+    vec![
+        Section::untitled(vec![Row::new("", "", Control::KeymapReport)]),
+        Section {
+            title: None,
+            rows: vec![Row::list(
+                ListSpec {
+                    path: "keymap",
+                    fields: KEYMAP_FIELDS,
+                    empty: "",
+                    invalid: crate::strings::windows::INVALID_KEY,
+                    lowercase: false,
+                    exclusive_with: None,
+                },
+                LimitKind::KeymapEntries,
+            )],
+            footer: Some(crate::strings::windows::KEY_NOTE),
+        },
+        Section::untitled(vec![
+            Row::new(keys::PRESET_MENU, "", Control::Preset),
+            Row::action(keys::RESTORE, Action::RestoreKeymap),
+        ]),
+    ]
+}
+
+const APP_FIELDS: &[Field] = &[
+    Field::named("applicationPrefix", more::APPS, true),
+    Field::choice("profile", more::BEHAVIOR, options::APP_PROFILES, false),
+];
+
+/// 除外設定のページ(macOS の ExclusionsPage)．アプリは実行ファイルの名前(小文字)で見分ける
+fn apps() -> Vec<Section> {
+    vec![
+        Section {
+            title: None,
+            rows: vec![Row::list(
+                ListSpec {
+                    path: "profileRules",
+                    fields: APP_FIELDS,
+                    empty: more::EXCLUSIONS_EMPTY,
+                    invalid: crate::strings::windows::INVALID_APP,
+                    lowercase: true,
+                    exclusive_with: None,
+                },
+                LimitKind::ProfileRules,
+            )],
+            footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
+        },
+        Section::untitled(vec![
+            Row::toggle(more::TERMINAL_COMMANDS, "terminalCommands"),
+            Row::toggle(
+                settings::ESCAPE_SWITCHES_TO_DIRECT,
+                "escapeSwitchesToDirect",
+            ),
+            Row::toggle(
+                more::RESTRAINS_LIVE_CONVERSION_IN_CODE,
+                "restrainsLiveConversionInCode",
+            ),
+        ]),
+    ]
+}
+
+const DICTIONARY_FIELDS: &[Field] = &[
+    Field::named("reading", settings::READING, false),
+    Field::named("word", settings::WORD, false),
+];
+
+/// ユーザー辞書のページ(macOS の DictionaryPage の登録した単語)．同じ読みに別の単語を登録できる．
+/// 取り込んだ辞書とファイルの読み込みはまだ無い
+fn dictionary() -> Vec<Section> {
+    vec![Section::untitled(vec![Row::new(
+        "",
+        "",
+        Control::Dictionary(ListSpec {
+            path: "userDictionary",
+            fields: DICTIONARY_FIELDS,
+            empty: settings::DICTIONARY_EMPTY,
+            invalid: settings::INVALID_ENTRY,
+            lowercase: false,
+            exclusive_with: None,
+        }),
+    )])]
+}
+
+/// ローマ字のページ(macOS の RomajiPage)．標準の表に重ねる綴り
+fn romaji() -> Vec<Section> {
+    vec![Section::untitled(vec![Row::list(
+        ListSpec {
+            path: "customRomaji",
+            fields: ROMAJI_FIELDS,
+            empty: settings::ROMAJI_EMPTY,
+            invalid: settings::INVALID_ROMAJI,
+            lowercase: false,
+            exclusive_with: None,
+        },
+        LimitKind::RomajiRules,
+    )])]
+}
+
+/// 外観のページ(macOS の AppearancePage のテーマと書体)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)
+fn appearance() -> Vec<Section> {
+    vec![
+        Section::new(
+            more::THEME,
+            vec![Row::choice(more::THEME, "theme", options::THEMES).clearing("customThemeID")],
+        ),
+        Section::new(
+            more::FONT,
+            vec![Row::stepper(
+                settings::FONT_SIZE,
+                "candidateFontSize",
+                RangeKind::CandidateFontSize,
+            )],
+        ),
+    ]
+}
+
+/// 統計のページ(macOS の UsageTab)．回数はエンジンに頼んで読む
+fn usage() -> Vec<Section> {
+    vec![
+        Section::untitled(vec![
+            Row::toggle(settings::RECORDS_USAGE, "recordsUsage"),
+            Row::note(settings::USAGE_NOTE),
+        ]),
+        Section::new(
+            settings::USAGE_TAB,
+            vec![
+                Row::stat(settings::FIRST_CANDIDATE_RATE, Stat::FirstCandidateRate),
+                Row::stat(settings::COMMITS, Stat::Commits),
+                Row::stat(settings::CONVERSIONS_OPENED, Stat::ConversionsOpened),
+                Row::stat(settings::SEGMENTS_CHANGED, Stat::SegmentsChanged),
+                Row::stat(settings::READING_CORRECTIONS, Stat::ReadingCorrections),
+                Row::stat(settings::ENGLISH_CORRECTIONS, Stat::EnglishCorrections),
+            ],
+        ),
+        Section::untitled(vec![Row::action(settings::RESET_USAGE, Action::ResetUsage)]),
+    ]
+}
+
+/// バックアップのページ(macOS の BackupPage)．書き出しと読み込みはまだ無いので，設定のファイルを開くボタンを置く
+fn backup() -> Vec<Section> {
+    vec![
+        Section::untitled(vec![Row::action(
+            crate::strings::windows::OPEN_SETTINGS_FILE,
+            Action::OpenSettingsFile,
+        )]),
+        Section::untitled(vec![Row::action(
+            settings::RESTORE_DEFAULTS,
+            Action::RestoreDefaults,
+        )]),
+    ]
+}
+
+/// 情報のページ(macOS の AboutPage)．謝辞は配布物に入れた THIRD_PARTY_NOTICES.md をそのまま出す
+fn about() -> Vec<Section> {
+    vec![
+        Section::untitled(vec![Row::new(more::VERSION, "", Control::Version)]),
+        Section {
+            title: Some(more::ACKNOWLEDGEMENTS),
+            rows: vec![Row::new(more::ACKNOWLEDGEMENTS, "", Control::Notices)],
+            footer: Some(more::ACKNOWLEDGEMENTS_NOTE),
+        },
+    ]
+}
+
+/// 条件を今の値で確かめる
+pub fn holds(
+    condition: Condition,
+    text: impl Fn(&str) -> String,
+    on: impl Fn(&str) -> bool,
+) -> bool {
+    match condition {
+        Condition::Is(path, value) => text(path) == value,
+        Condition::IsNot(path, value) => text(path) != value,
+        Condition::On(path) => on(path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 左の一覧は見出しごとに並ぶ() {
+        let all = sidebar(&Page::ALL, "");
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0].0, Group::Input);
+        assert_eq!(
+            all[0].1,
+            vec![
+                Page::Input,
+                Page::Conversion,
+                Page::Correction,
+                Page::Language,
+                Page::Romaji,
+                Page::Keys,
+                Page::Apps
+            ]
+        );
+        assert_eq!(all[3].1, vec![Page::Usage, Page::Sync, Page::Backup]);
+    }
+
+    #[test]
+    fn 項目の名前でページを探す() {
+        let found = sidebar(&Page::ALL, "郵便番号");
+        assert_eq!(found, vec![(Group::Input, vec![Page::Conversion])]);
+        let found = sidebar(&Page::ALL, "全角空白");
+        assert_eq!(found, vec![(Group::Input, vec![Page::Keys])]);
+    }
+
+    #[test]
+    fn 英字は大文字と小文字を区別しない() {
+        assert!(Page::Keys.matches("EMACS"));
+        assert!(Page::Input.matches(" テンキー "));
+        assert!(!Page::Input.matches("郵便番号"));
+    }
+
+    #[test]
+    fn 作っていないページは出さない() {
+        let found = sidebar(&[Page::Input], "");
+        assert_eq!(found, vec![(Group::Input, vec![Page::Input])]);
+    }
+
+    #[test]
+    fn 条件を値で確かめる() {
+        let text = |_: &str| "english".to_string();
+        let on = |_: &str| false;
+        assert!(holds(Condition::Is("inputStyle", "english"), text, on));
+        assert!(!holds(Condition::IsNot("inputStyle", "english"), text, on));
+        assert!(!holds(Condition::On("showsModeIndicator"), text, on));
+    }
+
+    #[test]
+    fn 作ったページには中身がある() {
+        for page in BUILT {
+            assert!(
+                sections(*page).is_some_and(|sections| !sections.is_empty()),
+                "{page:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn 値の項目の名前は設定のファイルにある() {
+        let catalog = crate::catalog::Catalog::load().unwrap();
+        for page in BUILT {
+            for section in sections(*page).unwrap() {
+                let lists = section
+                    .rows
+                    .iter()
+                    .filter(|row| matches!(row.control, Control::List(..)));
+                for row in section
+                    .rows
+                    .iter()
+                    .filter(|row| row.has_value())
+                    .chain(lists)
+                {
+                    let name = crate::model::field_name(row.path);
+                    assert!(catalog.fields.iter().any(|field| field == name), "{name}");
+                }
+                for row in section.rows.iter().filter_map(|row| row.clears) {
+                    assert!(catalog.fields.iter().any(|field| field == row), "{row}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn 入力のページの並び() {
+        let page = sections(Page::Input).unwrap();
+        let titles: Vec<_> = page.iter().map(|section| section.title).collect();
+        assert_eq!(titles, vec![Some("入力方式"), Some("文字"), Some("動作")]);
+        assert_eq!(page[1].rows.len(), 9);
+    }
+}

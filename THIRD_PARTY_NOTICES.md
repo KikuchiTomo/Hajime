@@ -509,6 +509,7 @@ https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
 
 https://github.com/ggml-org/llama.cpp
 改変したもの: https://github.com/azooKey/llama.cpp
+Windows 版に同梱するビルド(b4846): https://github.com/fkunn1326/llama.cpp/releases/tag/b4846
 
 ```
 MIT License
@@ -1558,3 +1559,50 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 日本郵便株式会社
 https://www.post.japanpost.jp/service/search/zipcode/download/
+
+## 日本語 WordNet
+
+Japanese WordNet wnja 2.1
+https://bond-lab.github.io/wnja/
+連想変換の辞書(data/thesaurus/wordnet-ja.tsv)に使っています．同じ意味の単語の組と意味の説明を取り出して並べ替えたものです．
+
+```
+Copyright: 2021-2026 Francis Bond, Takayuki Kuribayashi
+Copyright: 2018-2020 Francis Bond	   
+Copyright: 2016-2017 Francis Bond, Takayuki Kuribayashi
+Copyright: 2012-2015 Francis Bond	   
+Copyright: 2009-2011 NICT
+
+
+
+Japanese WordNet
+
+This software and database is being provided to you, the LICENSEE, by
+the National Institute of Information and Communications Technology
+under the following license.  By obtaining, using and/or copying this
+software and database, you agree that you have read, understood, and
+will comply with these terms and conditions:
+  
+  Permission to use, copy, modify and distribute this software and
+  database and its documentation for any purpose and without fee or
+  royalty is hereby granted, provided that you agree to comply with
+  the following copyright notice and statements, including the
+  disclaimer, and that the same appear on ALL copies of the software,
+  database and documentation, including modifications that you make
+  for internal use or for distribution.
+  
+ 
+THIS SOFTWARE AND DATABASE IS PROVIDED "AS IS" AND NICT MAKES NO
+REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED.  BY WAY OF EXAMPLE,
+BUT NOT LIMITATION, NICT MAKES NO REPRESENTATIONS OR WARRANTIES OF
+MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE
+OF THE LICENSED SOFTWARE, DATABASE OR DOCUMENTATION WILL NOT INFRINGE
+ANY THIRD PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+  
+The name of the National Institute of Information and Communications
+Technology may not be used in advertising or publicity pertaining to
+distribution of the software and/or database.  Title to copyright in
+this software, database and any associated documentation shall at all
+times remain with National Institute of Information and Communications
+Technology and LICENSEE agrees to preserve same.
+```

@@ -28,13 +28,15 @@ public final class FakeConverter: KanaKanjiConverting {
 
     /// 候補の文字列ごとの末尾の語．ライブ変換で打っている途中の語をかなのまま見せるかの確認に使う
     public var trailingWords: [String: Candidate.TrailingWord] = [:]
+    /// 候補の文字列ごとの語の並び(本物のエンジンの候補が持つもの)．直した語句の位置を求めるのに使う
+    public var candidateWords: [String: [Candidate.Word]] = [:]
 
     public func candidates(for reading: String) -> [Candidate] {
         // 本物と同じく，空の読みには空の配列を返す
         guard !reading.isEmpty else { return [] }
         return (table[reading] ?? []).enumerated().map { index, entry in
             Candidate(text: entry.text, readingCount: entry.readingCount ?? reading.count, origin: .engine(id: index), score: scores[reading] ?? 0,
-                      trailingWord: trailingWords[entry.text])
+                      trailingWord: trailingWords[entry.text], words: candidateWords[entry.text] ?? [])
         }
     }
 
@@ -124,5 +126,22 @@ public final class FakeCalendar: CalendarReading {
     public func now() -> CalendarDate { CalendarDate(year: 2026, month: 10, day: 26, weekday: 2, hour: 14, minute: 5) }
     public func day(offsetFromToday offset: Int) -> CalendarDate {
         CalendarDate(year: 2026, month: 10, day: 26 + offset, weekday: (2 + offset - 1) % 7 + 1)
+    }
+}
+
+/// 辞書の id と語ごとに決まったまとまりを返す連想の辞書(R-18)．本物の索引のファイルと同じく，まとまりの語は引いた語を除いたもの
+@MainActor
+public final class FakeAssociationLookup: AssociationLookup {
+    public var groups: [String: [String: [AssociationGroup]]]
+    /// 引いた語(引いた順)
+    public private(set) var queries: [String] = []
+
+    public init(_ groups: [String: [String: [AssociationGroup]]] = [:]) {
+        self.groups = groups
+    }
+
+    public func groups(for word: String, in dictionary: AssociationDictionary) -> [AssociationGroup] {
+        queries.append(word)
+        return groups[dictionary.id]?[word] ?? []
     }
 }

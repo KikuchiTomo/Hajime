@@ -1,4 +1,3 @@
-#if canImport(CryptoKit)
 import Foundation
 @testable import S90Domain
 @testable import S90Persistence
@@ -96,5 +95,18 @@ struct DictionaryFileSyncTests {
         #expect(!DictionaryFileSync.isIndexFileName("memo.tsv"))
         #expect(!DictionaryFileSync.isIndexFileName("\(id)-\(String(repeating: "G", count: 64)).tsv"))
     }
+
+    @Test("索引のバージョンは中身の SHA-256 で，CryptoKit の無い OS(Windows)でも同じ値になる")
+    func revisionIsContentHash() throws {
+        let folders = try Folders()
+        defer { try? FileManager.default.removeItem(at: folders.root) }
+        let dictionary = try writeIndex([DictionaryWord(reading: "でんあつ", word: "電圧")], in: folders.macA)
+        let contents = try Data(contentsOf: folders.macA.appendingPathComponent(dictionary.indexFileName))
+        #expect(dictionary.revision == SHA256Digest.hex(of: contents))
+        // 塊(syncCopyChunkBytes)をまたぐ大きさでも同じ
+        let large = folders.macA.appendingPathComponent("large.tsv")
+        let bytes = Data((0..<(DefaultSettings.syncCopyChunkBytes * 2 + 100)).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+        try bytes.write(to: large)
+        #expect(try DictionaryFileSync.sha256(of: large) == SHA256Digest.hex(of: bytes))
+    }
 }
-#endif

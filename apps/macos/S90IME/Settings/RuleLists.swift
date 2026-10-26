@@ -12,32 +12,33 @@ struct RuleListSpec<Rule> {
     let isValid: (Rule) -> Bool
     let limit: Int
     let invalidMessage: String
-    let exportFileName: String
+    /// ファイルに書き出し・読み込みするときの一覧
+    let file: RuleList
 
     static var correctionRules: RuleListSpec<CorrectionRule> {
         RuleListSpec<CorrectionRule>(
             list: \.correction.rules, key: \.typed, value: \.word, make: RuleListEditing.correctionRule(typed:word:), isValid: \.isValid,
-            limit: DefaultSettings.maximumCorrectionRules, invalidMessage: UIStrings.Features.invalidRule, exportFileName: "replacements.tsv")
+            limit: DefaultSettings.maximumCorrectionRules, invalidMessage: UIStrings.Features.invalidRule, file: .correctionRules)
     }
 
     static var exceptions: RuleListSpec<String> {
         RuleListSpec<String>(
             list: \.correction.exceptions, key: { $0 }, value: { _ in "" }, make: { key, _ in key }, isValid: RuleListEditing.isValidException,
-            limit: DefaultSettings.maximumCorrectionRules, invalidMessage: UIStrings.Features.invalidException, exportFileName: "exceptions.txt")
+            limit: DefaultSettings.maximumCorrectionRules, invalidMessage: UIStrings.Features.invalidException, file: .exceptions)
     }
 
     /// いつも英語にする語・いつも日本語にする語(英語と日本語)
-    static func languageWords(_ list: WritableKeyPath<S90Domain.Settings, [String]>, fileName: String) -> RuleListSpec<String> {
+    static func languageWords(_ language: WordLanguage) -> RuleListSpec<String> {
         RuleListSpec<String>(
-            list: list, key: { $0 }, value: { _ in "" }, make: { key, _ in key.trimmingCharacters(in: .whitespaces).lowercased() },
-            isValid: WordLanguageSettings.isValidWord, limit: DefaultSettings.maximumWordLanguageEntries,
-            invalidMessage: UIStrings.Features.invalidWord, exportFileName: fileName)
+            list: language == .english ? \.wordLanguage.englishWords : \.wordLanguage.japaneseWords, key: { $0 }, value: { _ in "" },
+            make: { key, _ in RuleList.languageWord(key) }, isValid: WordLanguageSettings.isValidWord, limit: DefaultSettings.maximumWordLanguageEntries,
+            invalidMessage: UIStrings.Features.invalidWord, file: language == .english ? .englishWords : .japaneseWords)
     }
 
     static var romaji: RuleListSpec<RomajiRule> {
         RuleListSpec<RomajiRule>(
             list: \.customRomaji, key: \.keys, value: \.kana, make: RuleListEditing.romajiRule(keys:kana:), isValid: \.isValid,
-            limit: DefaultSettings.maximumRomajiRules, invalidMessage: UIStrings.Settings.invalidRomaji, exportFileName: "romaji.tsv")
+            limit: DefaultSettings.maximumRomajiRules, invalidMessage: UIStrings.Settings.invalidRomaji, file: .romaji)
     }
 }
 
@@ -59,15 +60,8 @@ extension RuleListEditor {
                 let keys = Set(items.map(\.key))
                 model.update { $0[keyPath: spec.list].removeAll { keys.contains(spec.key($0)) } }
             },
-            importFile: {
-                model.importRuleList { rows, settings in
-                    RuleListEditing.merge(rows.map { spec.make($0.key, $0.value) }, key: spec.key, isValid: spec.isValid, limit: spec.limit,
-                                          into: &settings[keyPath: spec.list])
-                }
-            },
-            exportFile: {
-                model.exportRuleList(rules.map { RuleListFile.Row(key: spec.key($0), value: spec.value($0)) }, fileName: spec.exportFileName)
-            }
+            importFile: { model.importRuleList(spec.file) },
+            exportFile: { model.exportRuleList(spec.file) }
         )
     }
 }

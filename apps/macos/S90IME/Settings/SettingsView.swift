@@ -185,9 +185,11 @@ private struct ConversionTab: View {
                 }
                 .disabled(model.settings.typoCorrection != .standard)
             }
-            Section(UIStrings.Features.okurigana) {
+            Section(UIStrings.Features.notation) {
                 ResettablePicker(model: model, title: UIStrings.Features.okurigana, keyPath: \.okuriganaStyle, label: UIStrings.Features.label(for:))
+                ResettableToggle(model: model, title: UIStrings.Features.prefersKatakana, keyPath: \.prefersKatakana)
             }
+            AssociationSection(model: model)
             Section(UIStrings.Settings.specialConversion) {
                 ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)
                 ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
@@ -249,7 +251,7 @@ struct SecondsSlider: View {
     var body: some View {
         LabeledContent(title) {
             HStack {
-                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: 0.1) { isEditing in
+                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: DefaultSettings.secondsStep) { isEditing in
                     guard !isEditing, let editing else { return }
                     value.wrappedValue = editing
                     self.editing = nil

@@ -40,6 +40,14 @@ struct FuzzTests {
         }
     }
 
+    @Test("連想の辞書のファイル(R-18)")
+    func associationDictionary() {
+        for data in samples(count: 500) {
+            let groups = (try? AssociationFileReader.parse(data)) ?? []
+            #expect(groups.allSatisfy { $0.isValid })
+        }
+    }
+
     @Test("設定のファイル")
     func settings() {
         for data in samples(count: 500) {

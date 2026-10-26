@@ -2,6 +2,7 @@ import Foundation
 import S90Application
 import S90Domain
 import S90Engine
+import S90Persistence
 
 /// 評価用の文 1 つ．期待する変換は表記の揺れを並べて複数持てる
 struct EvaluationCase {
@@ -111,7 +112,10 @@ enum Evaluation {
             } else if applied {
                 outcome = columns[1].split(separator: "|").contains { marked.text == $0 } ? "正しく直した" : "違う文に直した"
             } else if suggested {
-                outcome = columns[1].split(separator: "|").contains { note?.contains($0) == true } ? "正しく示した" : "違う文を示した"
+                // 案内には直す語句を含む文節だけが出るので，Tab で直したあとの文で比べる
+                let accepted = session.handle(KeyEvent(.tab), context: InputContext()).actions
+                    .compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+                outcome = columns[1].split(separator: "|").contains { accepted == String($0) } ? "正しく示した" : "違う文を示した"
             } else if columns[1].split(separator: "|").contains(where: { marked.text == $0 }) {
                 // 打ったままの読みでも期待どおりの文になる(「こんにちわ」→「こんにちは」)．直す必要が無い
                 outcome = "直さずに正しい文"
@@ -192,8 +196,9 @@ enum Evaluation {
         character.unicodeScalars.allSatisfy { (0x3041...0x309F).contains($0.value) }
     }
 
+    /// アプリと同じく，エンジンの候補に記号・日付・並べ替え(SupplementedConverter)を既定の設定で足したもの
     private static func newSession(_ engine: AzooKeyConverterEngine, context: String?) -> any KanaKanjiConverting {
-        let session = engine.makeSession()
+        let session = SupplementedConverter(engine.makeSession(), settings: StaticSettings(DefaultSettings.settings), calendar: SystemCalendar(clock: { Date() }))
         session.setLeftContext(context)
         return session
     }

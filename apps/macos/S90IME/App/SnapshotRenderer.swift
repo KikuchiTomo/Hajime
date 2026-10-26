@@ -38,7 +38,11 @@ enum SnapshotRenderer {
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
+                render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
+                render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
                 render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
+                render(associationListView(theme: look.theme, appearance: appearance), name: "association-list-\(look.name)", to: output, appearance: appearance)
+                render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
         for (appearance, name) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
@@ -46,6 +50,10 @@ enum SnapshotRenderer {
             (look ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 render(keymapView(edited: false, appearance: look), name: "keymap-\(name)", to: output, appearance: look)
                 render(keymapView(edited: true, appearance: look), name: "keymap-warnings-\(name)", to: output, appearance: look)
+                render(handwritingView(appearance: look), name: "handwriting-\(name)", to: output, appearance: look)
+                // 窓を横に広げても，書く欄は正方形のまま真ん中に置く
+                render(handwritingView(appearance: look, size: NSSize(width: DesignTokens.Size.Handwriting.width * 1.6, height: DesignTokens.Size.Handwriting.height)),
+                       name: "handwriting-wide-\(name)", to: output, appearance: look)
             }
         }
         renderSettings(to: output)
@@ -87,6 +95,27 @@ enum SnapshotRenderer {
             window.close()
         }
         NSApp.appearance = NSAppearance(named: .aqua)
+        // 行の多い表を下までスクロールしたとき，行が列の見出しの下に潜らないか
+        fixture.model.update { $0.profileRules = (0..<14).map { ProfileRule(applicationPrefix: "com.example.app\($0)", profile: .terminal) } }
+        let manyNavigation = SettingsNavigation()
+        let scrolled = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: manyNavigation)
+        manyNavigation.page = .apps
+        scrolled.orderFrontRegardless()
+        SettingsFixture.settle(scrolled)
+        // ホイールと同じ道筋で，下まで動かしてから上の端まで戻す
+        if let content = scrolled.contentView {
+            var stack: [NSView] = [content]
+            while let view = stack.popLast() {
+                if let container = view as? any FormTableContainer {
+                    container.scrollTable(by: -10_000)
+                    container.scrollTable(by: 10_000)
+                }
+                stack.append(contentsOf: view.subviews)
+            }
+        }
+        SettingsFixture.settle(scrolled)
+        if let frame = scrolled.contentView?.superview { render(frame, name: "settings-apps-scrolled", to: output, appearance: NSAppearance(named: .aqua)) }
+        scrolled.close()
         // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
@@ -132,6 +161,43 @@ enum SnapshotRenderer {
         window.orderFrontRegardless()
         view.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 1))
+        window.displayIfNeeded()
+        return view
+    }
+
+    /// 手書きの窓(R-14)．「田」の線を書き，Vision で読んだ候補が並ぶまで待ってから描く
+    private static func handwritingView(appearance: NSAppearance?,
+                                        size: NSSize = NSSize(width: DesignTokens.Size.Handwriting.width, height: DesignTokens.Size.Handwriting.height)) -> NSView {
+        let model = HandwritingModel(recognizer: VisionHandwritingRecognizer())
+        model.theme = ResolvedTheme.resolve(ThemeChoice(.automatic), appearance: appearance)
+        let view = NSHostingView(rootView: HandwritingView(model: model))
+        view.frame = NSRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: -10_000, y: -10_000), size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = appearance
+        window.contentView = view
+        window.orderFrontRegardless()
+        // 書く欄の大きさが決まってから書く(大きさが変わると書いた線を消すため)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
+        // 書く欄(一辺 260 ほど)の座標
+        let strokes: [[CGPoint]] = [
+            [CGPoint(x: 70, y: 55), CGPoint(x: 71, y: 205)], [CGPoint(x: 70, y: 55), CGPoint(x: 190, y: 57), CGPoint(x: 189, y: 205)],
+            [CGPoint(x: 130, y: 57), CGPoint(x: 131, y: 203)], [CGPoint(x: 71, y: 130), CGPoint(x: 189, y: 129)],
+            [CGPoint(x: 71, y: 203), CGPoint(x: 189, y: 204)],
+        ]
+        for stroke in strokes {
+            model.draw(to: stroke[0])
+            // 指で書いたように点を細かく打つ
+            for (start, end) in zip(stroke, stroke.dropFirst()) {
+                for step in 1...20 {
+                    let t = CGFloat(step) / 20
+                    model.draw(to: CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t))
+                }
+            }
+            model.end()
+        }
+        // 線を書き終えてから認識するまでの待ちと，認識にかかる時間
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: DefaultSettings.handwritingRecognitionDelay + 2))
+        view.layoutSubtreeIfNeeded()
         window.displayIfNeeded()
         return view
     }
@@ -184,6 +250,40 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
+    /// 日本語の打ち間違いを直した一覧．候補の中の直した語句に補正の点線を引く
+    private static func readingCorrectionView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = CandidatePanel(
+            variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
+            selectedVariant: nil,
+            entries: [.init(text: "今日の天気は良いですね", annotation: nil, corrected: 6..<8), .init(text: "今日の天気はいいですね", annotation: nil, corrected: 6..<8),
+                      .init(text: "今日の天気は好いですね", annotation: nil, corrected: 6..<8)],
+            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: "直しました　Esc で打ったままに戻す"
+        )
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 打ち間違いを直した文節(良いですね)に「修正」と添えた分岐図．注目しているのは別の文節
+    private static func correctedLatticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var corrected = LatticePanel.Column(text: "良いですね", isFocused: false, isUncertain: true, preview: "様ですね")
+        corrected.isCorrected = true
+        let panel = LatticePanel(columns: [
+            .init(text: "今日の", isFocused: false, isUncertain: false),
+            .init(text: "天気は", alternatives: ["天気は", "転記は"], selectedAlternative: 0, isFocused: true, isUncertain: true),
+            corrected,
+        ], position: 1, total: 2, note: "直しました　Esc で打ったままに戻す")
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
     private static func latticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -219,6 +319,34 @@ enum SnapshotRenderer {
         focused.split = .init(pieces: ["問題", "が", "ある"])
         let panel = LatticePanel(columns: [.init(text: "それは", isFocused: false, isUncertain: false), focused,
                                            .init(text: "と思う", isFocused: false, isUncertain: false)], position: 1, total: 4)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 連想の一覧(R-18)を一覧で出したところ
+    private static func associationListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["綺麗", "麗しい", "華麗", "端麗"].map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 1, focus: .candidate, position: 2, total: 4, note: nil)
+        panel.association = AssociationHeading(headword: "美しい", label: "見た目が快い", group: 1, groupCount: 3)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 連想の一覧(R-18)を分岐図で出したところ
+    private static func associationBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = LatticePanel(columns: [
+            .init(text: "麗しい", alternatives: ["綺麗", "麗しい", "華麗", "端麗"], selectedAlternative: 1, isFocused: true, isUncertain: false),
+            .init(text: "景色", isFocused: false, isUncertain: false),
+        ], position: 1, total: 4)
+        panel.association = AssociationHeading(headword: "美しい", label: "見た目が快い", group: 1, groupCount: 3)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

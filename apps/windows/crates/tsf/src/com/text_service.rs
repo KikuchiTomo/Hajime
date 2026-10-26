@@ -2,6 +2,7 @@ use super::display_attribute;
 use super::edit_session;
 use super::guard::guard;
 use super::keyboard;
+use super::langbar::{self, InputModeItem};
 use crate::filter;
 use crate::key::{self, RawKey};
 use crate::plan::CompositionPlan;
@@ -25,11 +26,13 @@ use windows::Win32::UI::TextServices::{
     ITfDocumentMgr, ITfInputScope, ITfInsertAtSelection, ITfKeyEventSink, ITfKeyEventSink_Impl,
     ITfKeystrokeMgr, ITfRange, ITfSource, ITfTextInputProcessor, ITfTextInputProcessorEx,
     ITfTextInputProcessorEx_Impl, ITfTextInputProcessor_Impl, ITfThreadMgr, ITfThreadMgrEventSink,
-    ITfThreadMgrEventSink_Impl, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, GUID_PROP_ATTRIBUTE,
-    GUID_PROP_INPUTSCOPE, INSERT_TEXT_AT_SELECTION_FLAGS, IS_NUMERIC_PASSWORD, IS_NUMERIC_PIN,
-    IS_PASSWORD, TF_AE_NONE, TF_ANCHOR_END, TF_ANCHOR_START, TF_DEFAULT_SELECTION,
-    TF_ES_ASYNCDONTCARE, TF_ES_READ, TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY, TF_SELECTION,
-    TF_SELECTIONSTYLE, TF_ST_CORRECTION,
+    ITfThreadMgrEventSink_Impl, GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION,
+    GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, GUID_PROP_ATTRIBUTE, GUID_PROP_INPUTSCOPE,
+    INSERT_TEXT_AT_SELECTION_FLAGS, IS_NUMERIC_PASSWORD, IS_NUMERIC_PIN, IS_PASSWORD, TF_AE_NONE,
+    TF_ANCHOR_END, TF_ANCHOR_START, TF_CONVERSIONMODE_ALPHANUMERIC, TF_CONVERSIONMODE_FULLSHAPE,
+    TF_CONVERSIONMODE_NATIVE, TF_DEFAULT_SELECTION, TF_ES_ASYNCDONTCARE, TF_ES_READ,
+    TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE,
+    TF_ST_CORRECTION,
 };
 use windows::Win32::UI::WindowsAndMessaging::{KillTimer, SetTimer};
 use windows_core::{implement, ComObject, IUnknownImpl, Interface, Ref, Result, BOOL, GUID};
@@ -71,6 +74,7 @@ struct Inner {
     caret: Option<Rect>,
     timer: usize,
     application_id: Option<String>,
+    mode_item: Option<ComObject<InputModeItem>>,
 }
 
 impl ITfTextInputProcessor_Impl for TextService_Impl {
@@ -87,7 +91,7 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
                     let _ = unsafe { source.UnadviseSink(cookie) };
                 }
             }
-            let (thread_mgr, client_id, cookie, engine, session) = {
+            let (thread_mgr, client_id, cookie, engine, session, mode_item) = {
                 let mut inner = self.inner.borrow_mut();
                 (
                     inner.thread_mgr.take(),
@@ -95,12 +99,16 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
                     inner.sink_cookie.take(),
                     inner.engine.take(),
                     inner.session.take(),
+                    inner.mode_item.take(),
                 )
             };
             if let (Some(engine), Some(session)) = (engine, session) {
                 let _ = engine.send(RequestBody::CloseSession { session });
             }
             if let Some(thread_mgr) = thread_mgr {
+                if let Some(item) = mode_item {
+                    langbar::remove(&thread_mgr, &item.to_interface());
+                }
                 if let Ok(keystrokes) = thread_mgr.cast::<ITfKeystrokeMgr>() {
                     let _ = unsafe { keystrokes.UnadviseKeyEventSink(client_id) };
                 }
@@ -141,8 +149,13 @@ impl ITfTextInputProcessorEx_Impl for TextService_Impl {
                 path.file_name()
                     .map(|name| name.to_string_lossy().to_lowercase())
             });
+            let mode_item = ComObject::new(InputModeItem::new(Box::new(MenuActions)));
+            let mode_item = langbar::add(&thread_mgr, &mode_item.to_interface())
+                .ok()
+                .map(|()| mode_item);
             {
                 let mut inner = self.inner.borrow_mut();
+                inner.mode_item = mode_item;
                 inner.thread_mgr = Some(thread_mgr);
                 inner.client_id = tid;
                 inner.sink_cookie = Some(cookie);
@@ -231,7 +244,13 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
 impl TextService_Impl {
     fn wants(&self, wparam: WPARAM, lparam: LPARAM) -> Option<ipc::KeyInput> {
-        let raw: RawKey = keyboard::read(wparam, lparam)?;
+        let layout = self
+            .inner
+            .borrow()
+            .state
+            .as_ref()
+            .and_then(|state| state.keyboard_layout.clone());
+        let raw: RawKey = keyboard::read(wparam, lparam)?.with_layout(layout.as_deref());
         if key::is_modifier_only(raw.vk) {
             return None;
         }
@@ -268,25 +287,34 @@ impl TextService_Impl {
         if let Some(ResponseBody::SessionOpened { session, state }) =
             engine.send(RequestBody::OpenSession).wait(RESPONSE_TIMEOUT)
         {
-            let mut inner = self.inner.borrow_mut();
-            inner.session = Some(session);
-            inner.state = Some(state);
+            let mode = state.mode;
+            {
+                let mut inner = self.inner.borrow_mut();
+                inner.session = Some(session);
+                inner.state = Some(state);
+            }
+            self.show_mode(mode);
         }
     }
 
     fn field_context(&self, context: &ITfContext) -> FieldContext {
-        let (application_id, caret, client_id) = {
+        let (application_id, caret, client_id, wanted) = {
             let inner = self.inner.borrow();
             (
                 inner.application_id.clone(),
                 inner.caret.clone(),
                 inner.client_id,
+                inner
+                    .state
+                    .as_ref()
+                    .and_then(|state| state.preceding_text_length),
             )
         };
+        let field = read_field(context, client_id, wanted.unwrap_or(0));
         FieldContext {
             application_id,
-            is_secure: is_secure_field(context, client_id),
-            preceding_text: None,
+            is_secure: field.is_secure,
+            preceding_text: field.preceding_text,
             caret,
         }
     }
@@ -299,7 +327,9 @@ impl TextService_Impl {
                 state,
             } => {
                 let wake = state.wake_after_milliseconds;
+                let mode = state.mode;
                 self.inner.borrow_mut().state = Some(state);
+                self.show_mode(mode);
                 self.apply_operations(context, operations);
                 self.schedule_timer(wake);
                 handled
@@ -414,6 +444,42 @@ impl TextService_Impl {
         }
     }
 
+    /// タスクバーの「あ」「A」と，入力モードの compartment(タッチキーボードなどが読む)を今のモードに合わせる
+    fn show_mode(&self, mode: InputMode) {
+        let (item, thread_mgr, client_id) = {
+            let inner = self.inner.borrow();
+            (
+                inner.mode_item.clone(),
+                inner.thread_mgr.clone(),
+                inner.client_id,
+            )
+        };
+        if let Some(item) = item {
+            item.set_mode(Some(mode));
+        }
+        let Some(compartments) =
+            thread_mgr.and_then(|manager| manager.cast::<ITfCompartmentMgr>().ok())
+        else {
+            return;
+        };
+        let conversion = match mode {
+            InputMode::Japanese => TF_CONVERSIONMODE_NATIVE | TF_CONVERSIONMODE_FULLSHAPE,
+            InputMode::Direct => TF_CONVERSIONMODE_ALPHANUMERIC,
+        };
+        unsafe {
+            if let Ok(compartment) =
+                compartments.GetCompartment(&GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION)
+            {
+                let _ = compartment.SetValue(client_id, &variant_i32(conversion as i32));
+            }
+        }
+    }
+
+    fn engine_request(&self, body: RequestBody) -> Option<ResponseBody> {
+        let engine = self.inner.borrow().engine.clone()?;
+        engine.send(body).wait(RESPONSE_TIMEOUT)
+    }
+
     fn finish_composition(&self, context: Option<&ITfContext>) {
         let (composition, engine, session) = {
             let inner = self.inner.borrow();
@@ -467,6 +533,43 @@ impl TextService_Impl {
             self.ensure_session();
             return;
         }
+        let Some((context, engine, session)) = self.focused_context() else {
+            return;
+        };
+        self.apply_late(&context);
+        if !self.inner.borrow().late.is_empty() {
+            self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+            return;
+        }
+        let wants_wake = self
+            .inner
+            .borrow()
+            .state
+            .as_ref()
+            .is_some_and(|state| state.wake_after_milliseconds.is_some());
+        if !wants_wake {
+            return;
+        }
+        self.send_edit(&context, engine, session, |session, context| {
+            RequestBody::Wake { session, context }
+        });
+    }
+
+    /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く(エンジンが edit で返す)
+    fn open_handwriting(&self) {
+        if self.inner.borrow().session.is_none() {
+            self.ensure_session();
+        }
+        let Some((context, engine, session)) = self.focused_context() else {
+            return;
+        };
+        self.send_edit(&context, engine, session, |session, context| {
+            RequestBody::OpenHandwriting { session, context }
+        });
+    }
+
+    /// 入力中の文字の文脈(組み立て中ならそこ，無ければ注目している文書)と，エンジン・セッション
+    fn focused_context(&self) -> Option<(ITfContext, Option<Rc<EngineClient>>, Option<u32>)> {
         let (thread_mgr, composition, engine, session) = {
             let inner = self.inner.borrow();
             (
@@ -488,32 +591,80 @@ impl TextService_Impl {
                         .and_then(|focus: ITfDocumentMgr| focus.GetTop())
                         .ok()
                 })
-            });
-        let Some(context) = context else { return };
-        self.apply_late(&context);
-        if !self.inner.borrow().late.is_empty() {
-            self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+            })?;
+        Some((context, engine, session))
+    }
+
+    /// edit を返す要求を送り，届いた edit を文書に反映する．間に合わなかった応答は捨てずにあとで反映する(キーと同じ)
+    fn send_edit(
+        &self,
+        context: &ITfContext,
+        engine: Option<Rc<EngineClient>>,
+        session: Option<u32>,
+        make: impl FnOnce(u32, FieldContext) -> RequestBody,
+    ) {
+        let (Some(engine), Some(session)) = (engine, session) else {
             return;
+        };
+        let field = self.field_context(context);
+        let pending = engine.send(make(session, field));
+        match pending.outcome(RESPONSE_TIMEOUT) {
+            Outcome::Reply(body) => {
+                self.apply_response(context, body);
+            }
+            Outcome::TimedOut => {
+                self.inner.borrow_mut().late.push(pending);
+                self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+            }
+            Outcome::Unavailable => self.forget_session(),
         }
-        let wants_wake = self
+    }
+}
+
+/// 入力メニューで選んだことを，このスレッドで動いている文字入力のサービスに頼む
+struct MenuActions;
+
+impl MenuActions {
+    fn active() -> Option<ComObject<TextService>> {
+        ACTIVE.with(|active| active.borrow().clone())
+    }
+}
+
+impl langbar::Actions for MenuActions {
+    fn menu_settings(&self) -> Option<ipc::SettingsSnapshot> {
+        match Self::active()?.engine_request(RequestBody::ReadSettings)? {
+            ResponseBody::Settings { settings } => Some(settings),
+            _ => None,
+        }
+    }
+
+    fn run(&self, command: ipc::MenuCommand) {
+        if let Some(service) = Self::active() {
+            let _ = service.engine_request(RequestBody::Menu { command });
+        }
+    }
+
+    fn open_handwriting(&self) {
+        if let Some(service) = Self::active() {
+            service.open_handwriting();
+        }
+    }
+
+    fn toggle_mode(&self) {
+        let Some(service) = Self::active() else {
+            return;
+        };
+        let current = service
             .inner
             .borrow()
             .state
             .as_ref()
-            .is_some_and(|state| state.wake_after_milliseconds.is_some());
-        let (Some(engine), Some(session), true) = (engine, session, wants_wake) else {
-            return;
+            .map(|state| state.mode);
+        let next = match current {
+            Some(InputMode::Japanese) => InputMode::Direct,
+            _ => InputMode::Japanese,
         };
-        let field = self.field_context(&context);
-        if let Some(body) = engine
-            .send(RequestBody::Wake {
-                session,
-                context: field,
-            })
-            .wait(RESPONSE_TIMEOUT)
-        {
-            self.apply_response(&context, body);
-        }
+        service.select_mode(next);
     }
 }
 
@@ -793,18 +944,36 @@ fn text_rect(ec: u32, context: &ITfContext, composition: &ITfComposition) -> Res
     })
 }
 
-fn is_secure_field(context: &ITfContext, client_id: u32) -> bool {
-    let secure = Rc::new(std::cell::Cell::new(false));
-    let output = secure.clone();
-    let target = context.clone();
-    let _ = edit_session::request(context, client_id, TF_ES_SYNC | TF_ES_READ, move |ec| {
-        output.set(input_scope_is_secure(ec, &target)?);
-        Ok(())
-    });
-    secure.get()
+/// 入力欄について読んだこと．入力位置の前の文字列はログに出さない
+#[derive(Default)]
+struct FieldReading {
+    is_secure: bool,
+    preceding_text: Option<String>,
 }
 
-fn input_scope_is_secure(ec: u32, context: &ITfContext) -> Result<bool> {
+/// 入力欄が秘密の欄か(パスワードなど)と，入力位置の前の文字列(最大 length 文字．UTF-16 で数える)を 1 回の読み取りで読む．
+/// 秘密の欄では前の文字列を読まない
+fn read_field(context: &ITfContext, client_id: u32, length: u32) -> FieldReading {
+    let reading = Rc::new(RefCell::new(FieldReading::default()));
+    let output = reading.clone();
+    let target = context.clone();
+    let _ = edit_session::request(context, client_id, TF_ES_SYNC | TF_ES_READ, move |ec| {
+        let Some(selection) = selection_start(ec, &target)? else {
+            return Ok(());
+        };
+        let secure = input_scope_is_secure(ec, &target, &selection)?;
+        let mut field = output.borrow_mut();
+        field.is_secure = secure;
+        if !secure && length > 0 {
+            field.preceding_text = preceding_text(ec, &selection, length).ok().flatten();
+        }
+        Ok(())
+    });
+    reading.take()
+}
+
+/// 選択の始まりの位置(幅 0 の範囲)
+fn selection_start(ec: u32, context: &ITfContext) -> Result<Option<ITfRange>> {
     let mut selection = [TF_SELECTION {
         range: ManuallyDrop::new(None),
         style: TF_SELECTIONSTYLE {
@@ -815,13 +984,34 @@ fn input_scope_is_secure(ec: u32, context: &ITfContext) -> Result<bool> {
     let mut fetched = 0u32;
     unsafe { context.GetSelection(ec, TF_DEFAULT_SELECTION, &mut selection, &mut fetched)? };
     let [first] = selection;
-    let Some(range) = ManuallyDrop::into_inner(first.range) else {
-        return Ok(false);
-    };
+    let range = ManuallyDrop::into_inner(first.range);
+    if fetched == 0 {
+        return Ok(None);
+    }
+    let Some(range) = range else { return Ok(None) };
+    unsafe { range.Collapse(ec, TF_ANCHOR_START)? };
+    Ok(Some(range))
+}
+
+fn preceding_text(ec: u32, start: &ITfRange, length: u32) -> Result<Option<String>> {
+    let length = length.min(i32::MAX as u32);
+    let mut buffer = vec![0u16; length as usize];
+    let mut fetched = 0u32;
+    unsafe {
+        let range = start.Clone()?;
+        let mut moved = 0;
+        range.ShiftStart(ec, -(length as i32), &mut moved, std::ptr::null())?;
+        range.GetText(ec, 0, &mut buffer, &mut fetched)?;
+    }
+    buffer.truncate(fetched as usize);
+    Ok((!buffer.is_empty()).then(|| String::from_utf16_lossy(&buffer)))
+}
+
+fn input_scope_is_secure(ec: u32, context: &ITfContext, range: &ITfRange) -> Result<bool> {
     unsafe {
         let mut value: VARIANT = context
             .GetProperty(&GUID_PROP_INPUTSCOPE)?
-            .GetValue(ec, &range)?;
+            .GetValue(ec, range)?;
         let inner = &value.Anonymous.Anonymous;
         let scope = if inner.vt == VT_UNKNOWN {
             (*inner.Anonymous.punkVal)

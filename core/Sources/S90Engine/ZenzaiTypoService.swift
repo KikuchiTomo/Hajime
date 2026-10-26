@@ -21,9 +21,12 @@ public actor ZenzaiTypoService: TypoCorrecting {
         self.versionString = versionString
     }
 
+    /// 求めているあいだに呼んだ側が取り消したら(次のキーが来た，Space で待ちきれなかった)，途中でやめて空を返す．
+    /// 古い訂正を最後まで求め続けると，CPU を取り合って打鍵と変換が遅くなり，次の訂正の求めも待たせるため
     public func corrections(forKeys keys: [String], leftContext: String?) -> [String: [ReadingCorrection]] {
         var result: [String: [ReadingCorrection]] = [:]
         for key in keys where !key.isEmpty {
+            guard !Task.isCancelled else { return [:] }
             var composing = ComposingText()
             composing.insertAtCursorPosition(key, inputStyle: .roman2kana)
             let config = ExperimentalTypoCorrectionConfig(
@@ -31,6 +34,7 @@ public actor ZenzaiTypoService: TypoCorrecting {
             let candidates = converter.experimentalRequestTypoCorrection(
                 leftSideContext: leftContext ?? "", composingText: composing, options: options(leftContext: leftContext), inputStyle: .roman2kana, config: config)
             converter.stopComposition()
+            guard !Task.isCancelled else { return [:] }
             let beam = candidates.map {
                 ReadingCorrection(keys: $0.correctedInput, reading: $0.convertedText, score: Double($0.score), cost: Double($0.channelCost))
             }
@@ -42,6 +46,8 @@ public actor ZenzaiTypoService: TypoCorrecting {
                 plausibility: plausibility(of:),
                 languageModel: { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
             )
+            // 取り消したあとの結果は使わず，探した位置も進めない(次に同じキーで探し直す)
+            guard !Task.isCancelled else { return [:] }
             lastSearchedKeys = key
             result[key] = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits), typedKeys: key, plausibility: plausibility(of:))
         }
@@ -56,6 +62,8 @@ public actor ZenzaiTypoService: TypoCorrecting {
 
     private func plausibility(of reading: String) -> Double {
         if let cached = plausibilityCache[reading] { return cached }
+        // 取り消されたら変換せずにすぐ返す(覚えない)．残りの候補の計算を速く終わらせるため
+        guard !Task.isCancelled else { return -.infinity }
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
         var options = options(leftContext: nil)
@@ -73,6 +81,7 @@ public actor ZenzaiTypoService: TypoCorrecting {
     }
 
     private func languageModelScores(forKeys keys: [String], leftContext: String?) -> [Double?] {
+        guard !Task.isCancelled else { return keys.map { _ in nil } }
         let inputs = keys.map { key -> ComposingText in
             var composing = ComposingText()
             composing.insertAtCursorPosition(key, inputStyle: .roman2kana)

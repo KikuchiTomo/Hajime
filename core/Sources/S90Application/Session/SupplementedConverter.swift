@@ -168,8 +168,59 @@ public final class SupplementedConverter: KanaKanjiConverting {
         if current.calculation, let calculation = Calculator.evaluate(reading: reading) {
             insert([calculation.result, calculation.expression + "=" + calculation.result], into: &result, at: 0, reading: reading, origin: .symbol)
         }
+        if current.prefersKatakana { Self.preferKatakana(&result, reading: reading) }
         if current.wordLanguage.avoidsOffensive { Self.demoteOffensive(&result, reading: reading) }
         return result
+    }
+
+    /// かなで打った読みの第 1 候補が英語のつづり(「Live変換」)を含み，その部分をカタカナにした候補(「ライブ変換」)があれば，
+    /// カタカナの候補を先に出す．外来語はカタカナで書くのがふつうで，英語のつづりは選べば使えるようにする(設定で切れる)
+    static func preferKatakana(_ candidates: inout [Candidate], reading: String) {
+        guard let first = candidates.first, first.text.contains(where: Self.isLatinLetter),
+              !reading.contains(where: { $0.isASCII }) else { return }
+        let pattern = Self.runs(of: first.text)
+        guard let index = candidates.firstIndex(where: {
+            $0.readingCount == first.readingCount && !$0.text.contains(where: Self.isLatinLetter) && Self.matches(Array($0.text), pattern)
+        }) else { return }
+        candidates.insert(candidates.remove(at: index), at: 0)
+    }
+
+    private static func isLatinLetter(_ character: Character) -> Bool { character.isASCII && character.isLetter }
+
+    private static func isKatakana(_ character: Character) -> Bool {
+        character == "ー" || character.unicodeScalars.allSatisfy { (0x30A1...0x30FA).contains($0.value) }
+    }
+
+    /// 英字の並び(nil)と，それ以外の字の並び
+    private static func runs(of text: String) -> [String?] {
+        var runs: [String?] = []
+        for character in text {
+            if isLatinLetter(character) {
+                if case .some(nil) = runs.last { continue }
+                runs.append(nil)
+            } else if case .some(.some(let last)) = runs.last {
+                runs[runs.count - 1] = last + String(character)
+            } else {
+                runs.append(String(character))
+            }
+        }
+        return runs
+    }
+
+    /// text が，英字の並びを 1 字以上のカタカナに置き換えた形か
+    private static func matches(_ text: [Character], _ pattern: [String?]) -> Bool {
+        guard let head = pattern.first else { return text.isEmpty }
+        let rest = Array(pattern.dropFirst())
+        if let literal = head {
+            let characters = Array(literal)
+            return text.starts(with: characters) && matches(Array(text.dropFirst(characters.count)), rest)
+        }
+        var length = 0
+        while length < text.count, isKatakana(text[length]) {
+            length += 1
+            if matches(Array(text.dropFirst(length)), rest) { return true }
+        }
+        return false
     }
 
     /// 第 1 候補が不適切な語(「しね」→「死ね」)なら，ほかの候補を先に出す．

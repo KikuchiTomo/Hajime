@@ -11,6 +11,7 @@ import S90Domain
 //   s90-playground --evaluate-language <TSV> [--zenzai <モデル>] 英字入力(自動)で英語と日本語を見分けた結果
 //   s90-playground --typo-candidates <キー> [--zenzai <モデル>] 打ったキーの訂正の候補と点数
 //   s90-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
+//   s90-playground --split <読み,読み,…>                      文節を区切るときに区切れる位置
 //   s90-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
 //   s90-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 
@@ -35,6 +36,21 @@ MainActor.assumeIsolated {
             let session = playground.engine.makeSession()
             for reading in readings.split(separator: ",").map(String.init) {
                 print(reading, "→", session.segmentationWords(for: reading).map { "\($0.text)(\($0.readingCount))" }.joined(separator: " | "))
+            }
+        } else if let readings = arguments.value(of: "--split") {
+            // 文節を区切る(⇧↓)ときに区切れる位置
+            let session = playground.engine.makeSession()
+            let clock = ContinuousClock()
+            for reading in readings.split(separator: ",").map(String.init) {
+                var split = SegmentSplitter.Split(positions: [], pieces: [])
+                let time = clock.measure {
+                    let shown = session.segmentationWords(for: reading).map(\.text).joined()
+                    split = SegmentSplitter.split(
+                        shown: shown, reading: reading,
+                        candidates: { part in session.dictionaryCandidates(for: part).filter { $0.readingCount == part.count }.map(\.text) },
+                        words: session.segmentationWords(for:))
+                }
+                print(reading, "→", split.pieces.joined(separator: "｜"), " (\(time))")
             }
         } else if let readings = arguments.value(of: "--plausibility") {
             // 読みごとの変換のもっともらしさと，求めるのにかかる時間

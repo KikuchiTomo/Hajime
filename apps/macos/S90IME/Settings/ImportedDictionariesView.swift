@@ -18,7 +18,7 @@ struct ImportedDictionariesView: View {
             } footer: {
                 HStack {
                     Button(UIStrings.Dictionaries.importFile) { model.importDictionaryFile() }
-                        .disabled(model.isImportingDictionary || model.dictionaries == nil)
+                        .disabled(model.isImportingDictionary || model.files == nil)
                     if model.isImportingDictionary { ProgressView().controlSize(.small) }
                     Spacer()
                 }

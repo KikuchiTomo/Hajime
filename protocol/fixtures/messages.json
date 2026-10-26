@@ -26,9 +26,44 @@
     { "id": 8, "body": { "type": "setMode", "session": 4, "mode": "direct" } },
     { "id": 9, "body": { "type": "deactivate", "session": 4 } },
     { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
+    { "id": 10, "body": { "type": "openHandwriting", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
     { "id": 12, "body": { "type": "readSettings" } },
-    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } }
+    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5, "handwriting": true } } },
+    { "id": 19, "body": { "type": "menu", "command": { "type": "toggleLiveConversion" } } },
+    { "id": 20, "body": { "type": "menu", "command": { "type": "openSettings" } } },
+    { "id": 14, "body": { "type": "readSettingsFields", "names": ["theme", "keymap"], "defaults": false } },
+    { "id": 15, "body": { "type": "writeSettingsFields", "values": "{\"theme\":\"washi\"}" } },
+    { "id": 16, "body": { "type": "readKeymapPreset", "preset": "vim" } },
+    { "id": 17, "body": { "type": "checkKeymap", "values": "{\"keymap\":[]}" } },
+    { "id": 21, "body": { "type": "resetLearning" } },
+    { "id": 22, "body": { "type": "readUsage" } },
+    { "id": 23, "body": { "type": "resetUsage" } },
+    { "id": 24, "body": { "type": "previewLanguage", "text": "make sushi", "precedingText": "I" } },
+    { "id": 25, "body": { "type": "readUserDictionary", "offset": 0, "limit": 100 } },
+    { "id": 26, "body": { "type": "addUserDictionaryEntry", "entry": { "reading": "えすきゅー", "word": "s90" } } },
+    { "id": 27, "body": { "type": "removeUserDictionaryEntry", "entry": { "reading": "えすきゅー", "word": "s90" } } },
+    { "id": 28, "body": { "type": "mergeUserDictionary", "entries": [{ "reading": "よみ", "word": "語句" }] } },
+    { "id": 29, "body": { "type": "handwritingChosen", "text": "鬱" } },
+    { "id": 30, "body": { "type": "handwritingClosed" } },
+    { "id": 21, "body": { "type": "readSync" } },
+    { "id": 22, "body": { "type": "setSyncFolder", "path": "C:\\Users\\a\\OneDrive\\s90" } },
+    { "id": 23, "body": { "type": "setSyncEnabled", "enabled": false } },
+    { "id": 24, "body": { "type": "setSyncScope", "group": "appearance", "scope": "synced" } },
+    { "id": 25, "body": { "type": "setSyncLocalField", "field": "theme", "isLocal": true } },
+    { "id": 26, "body": { "type": "syncNow" } },
+    { "id": 27, "body": { "type": "importDictionary", "path": "C:\\Users\\a\\Downloads\\nicoime.txt" } },
+    { "id": 28, "body": { "type": "importDictionary", "path": "C:\\dict.txt", "replacing": "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B" } },
+    { "id": 29, "body": { "type": "removeDictionary", "id": "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B" } },
+    { "id": 30, "body": { "type": "exportSettings", "path": "C:\\backup\\s90-settings.json" } },
+    { "id": 31, "body": { "type": "importSettings", "path": "C:\\backup\\s90-settings.json" } },
+    { "id": 32, "body": { "type": "importProfileRules", "path": "C:\\rules.csv" } },
+    { "id": 33, "body": { "type": "exportProfileRules", "path": "C:\\rules.csv" } },
+    { "id": 34, "body": { "type": "importRuleList", "list": "symbolReadings", "path": "C:\\symbol-readings.tsv" } },
+    { "id": 35, "body": { "type": "exportRuleList", "list": "correctionRules", "path": "C:\\replacements.tsv" } },
+    { "id": 36, "body": { "type": "readSymbolDefaults" } },
+    { "id": 37, "body": { "type": "importUserDictionary", "path": "C:\\user-dictionary.txt" } },
+    { "id": 38, "body": { "type": "exportUserDictionary", "path": "C:\\user-dictionary.txt" } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
@@ -40,7 +75,9 @@
         "state": {
           "mode": "japanese",
           "isComposing": false,
-          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }]
+          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }],
+          "precedingTextLength": 40,
+          "keyboardLayout": "dvorak"
         }
       }
     },
@@ -63,7 +100,21 @@
     { "id": 9, "body": { "type": "error", "code": "unknownSession" } },
     { "id": 9, "body": { "type": "error", "code": "unsupportedVersion" } },
     { "id": 9, "body": { "type": "error", "code": "tooManySessions" } },
-    { "id": 9, "body": { "type": "error", "code": "malformed" } }
+    { "id": 9, "body": { "type": "error", "code": "malformed" } },
+    { "id": 14, "body": { "type": "settingsFields", "values": "{\"theme\":\"washi\"}" } },
+    { "id": 17, "body": { "type": "keymapReport", "report": { "rows": [{ "row": 2, "hiddenBy": [5], "hiddenStates": ["composing"], "blocksTyping": false }], "missing": [{ "state": "converting", "command": "cancel" }] } } },
+    { "id": 14, "body": { "type": "error", "code": "tooLarge" } },
+    { "id": 22, "body": { "type": "usage", "values": "{\"commits\":4}", "firstCandidateRate": 0.75 } },
+    { "id": 24, "body": { "type": "languagePreview", "words": [{ "typed": "make", "shown": "make", "language": "english" }] } },
+    { "id": 25, "body": { "type": "userDictionary", "entries": [{ "reading": "えすきゅー", "word": "s90" }], "total": 1 } },
+    { "id": 26, "body": { "type": "dictionaryAdded", "result": "alreadyRegistered" } },
+    { "id": 28, "body": { "type": "dictionaryMerged", "added": 1 } },
+    { "id": 13, "body": { "type": "syncStatus", "status": { "isEnabled": true, "folderPath": "C:\\Users\\a\\OneDrive\\s90", "folderName": "s90", "groups": [{ "group": "dictionary", "scope": "synced", "fields": ["userDictionary"] }], "localFields": ["theme"], "lastSyncedAt": "2026-10-26T12:00:00Z", "isSyncing": false, "problem": "folderUnavailable" } } },
+    { "id": 14, "body": { "type": "syncStatus", "status": { "isEnabled": false, "groups": [], "localFields": [], "isSyncing": true } } },
+    { "id": 15, "body": { "type": "dictionaryImported", "dictionary": { "id": "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", "name": "nicoime", "wordCount": 300000 } } },
+    { "id": 16, "body": { "type": "imported", "added": 12, "skipped": 3 } },
+    { "id": 17, "body": { "type": "fileFailed", "reason": "busy" } },
+    { "id": 18, "body": { "type": "symbolDefaults", "sequences": [{ "input": "->", "output": "→" }], "readings": [{ "input": "やじるし", "output": "→ ← ↑ ↓" }] } }
   ],
   "uiCommands": [
     { "type": "hello", "protocolVersion": 1 },
@@ -72,7 +123,7 @@
       "list": {
         "variants": [{ "label": "ひらがな", "isAvailable": true }, { "label": "全角英数", "isAvailable": false }],
         "selectedVariant": 0,
-        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }],
+        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }, { "text": "今日は良い", "correctedStart": 3, "correctedLength": 2 }],
         "selectedEntry": 1,
         "focus": "candidate",
         "position": 2,
@@ -97,6 +148,7 @@
             "isFocused": true,
             "isUncertain": true,
             "isDecided": false,
+            "isCorrected": true,
             "shorter": "今日",
             "usageNote": "使い分け",
             "alternativeNotes": [null, "修正"],
@@ -123,8 +175,32 @@
       }
     },
     { "type": "setPresentation", "presentation": { "theme": "platinum", "fontSize": 15.5, "modeIndicatorMilliseconds": 800 } },
+    {
+      "type": "setPresentation",
+      "presentation": {
+        "theme": "washi",
+        "fontSize": 16.5,
+        "modeIndicatorMilliseconds": 1200,
+        "customTheme": {
+          "base": "automatic",
+          "surface": { "red": 43, "green": 27, "blue": 23 },
+          "text": { "red": 255, "green": 232, "blue": 214 },
+          "textMuted": { "red": 201, "green": 166, "blue": 143 },
+          "selection": { "red": 255, "green": 122, "blue": 61 },
+          "selectionText": { "red": 26, "green": 14, "blue": 10 },
+          "correction": { "red": 255, "green": 210, "blue": 63 },
+          "line": { "red": 107, "green": 74, "blue": 62 },
+          "fontName": "Yu Mincho",
+          "cornerRadius": 4.5,
+          "straightBranches": true
+        }
+      }
+    },
     { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
+    { "type": "showMode", "mode": "japanese", "label": "ローマ字" },
+    { "type": "showHandwriting", "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }, "recognitionDelayMilliseconds": 600, "recognitionTimeoutMilliseconds": 3000 },
+    { "type": "hideHandwriting" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },
     { "type": "hide" }
   ]

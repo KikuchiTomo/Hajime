@@ -26,18 +26,21 @@ final class CompositionRoot {
     let sync: SyncCoordinator
     /// 取り込んだ辞書の索引(Application Support の dictionaries/)．入力欄ごとの変換と設定の画面で共有する
     let dictionaries: ImportedDictionaryStore
+    /// 連想の辞書の索引(Application Support の associations/．R-18)．入力欄ごとの変換と設定の画面で共有する
+    let associations: AssociationDictionaryStore
 
     /// 打ち間違いの訂正を別に求めるもの．Zenzai が無ければ nil
     let typoService: ZenzaiTypoService?
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
-                 dictionaries: ImportedDictionaryStore) {
+                 dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {
         self.typoService = typoService
         self.settings = settings
         self.engine = engine
         self.usage = usage
         self.sync = sync
         self.dictionaries = dictionaries
+        self.associations = associations
         self.lexicon = SpellCheckerLexicon()
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
@@ -63,9 +66,16 @@ final class CompositionRoot {
         // 同期(R-15)．この Mac の同期の設定は settings.json と別のファイルに置く
         let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
         let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))
-        let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries)
+        let sync = SyncCoordinator(synchronizer: synchronizer, runner: FolderSyncRunner(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries),
+                                   settings: settings)
         sync.start()
-        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries)
+        // 同梱の連想の辞書(日本語 WordNet)は，起動したら裏で読み始め，初めて連想変換を使うときに待たせない
+        let associations = AssociationDictionaryStore(
+            directory: support.appendingPathComponent("associations", isDirectory: true),
+            bundledSource: Bundle.main.resourceURL?.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
+        associations.preloadBundled()
+        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries,
+                                    associations: associations)
     }
 
     /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
@@ -84,7 +94,7 @@ final class CompositionRoot {
 
     func makeSession() -> InputSession {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
-                     lexicon: lexicon, settings: settings, usage: usage, typoService: typoService)
+                     lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations)
     }
 
     /// 設定の画面．開くたびに作らず使い回す
@@ -92,15 +102,15 @@ final class CompositionRoot {
         // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける
         let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
                                           lexicon: lexicon, settings: settings)
-        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, dictionaries: dictionaries,
+        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, files: SettingsFiles(settings: settings, dictionaries: dictionaries), associations: associations,
                                                   resetLearning: { [engine] in engine.resetLearning() },
                                                   previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)
         return controller
     }()
 
-    func makePresenter() -> ClientActionPresenter {
-        ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
+    func makePresenter(session: InputSession) -> ClientActionPresenter {
+        ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
                               openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting)
     }
 

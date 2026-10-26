@@ -196,6 +196,8 @@ mod tests {
                 is_composing: true,
                 consumed_keys: vec![],
                 wake_after_milliseconds: None,
+                preceding_text_length: None,
+                keyboard_layout: None,
             };
             let edit = ResponseBody::Edit {
                 handled: true,

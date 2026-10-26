@@ -49,6 +49,22 @@ extension InputContext {
     }
 }
 
+extension WireCustomTheme {
+    /// 保存したカスタムテーマを候補ウィンドウに渡す形にする．元のテーマは名前(ThemePreference の値)で渡す
+    public init(_ theme: CustomTheme) {
+        self.init(base: theme.base.rawValue, surface: WireColor(theme.surface), text: WireColor(theme.text), textMuted: WireColor(theme.textMuted),
+                  selection: WireColor(theme.selection), selectionText: WireColor(theme.selectionText), correction: WireColor(theme.correction),
+                  line: WireColor(theme.line), fontName: theme.fontName, cornerRadius: theme.cornerRadius,
+                  straightBranches: theme.branchStyle == .straight)
+    }
+}
+
+extension WireColor {
+    public init(_ color: HexColor) {
+        self.init(red: color.red, green: color.green, blue: color.blue)
+    }
+}
+
 extension InputMode {
     public init(_ wire: WireInputMode) {
         switch wire {
@@ -99,7 +115,7 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?) {
+    public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
         if !isComposing {
@@ -109,7 +125,17 @@ extension WireSessionState {
             }
             chords.append(WireKeyChord(key: .yen, modifiers: WireModifiers(shift: false, control: false, alt: false)))
         }
-        self.init(mode: WireInputMode(mode), isComposing: isComposing, consumedKeys: chords, wakeAfterMilliseconds: wakeAfterMilliseconds)
+        // 打ち始めのときだけ，入力位置の前の文字列を頼む(macOS と同じ．毎キー読まないため)．組み立て中は頼まない
+        let precedingTextLength = isComposing ? nil : UInt32(DefaultSettings.maximumLeftContextLength)
+        self.init(mode: WireInputMode(mode), isComposing: isComposing, consumedKeys: chords, wakeAfterMilliseconds: wakeAfterMilliseconds,
+                  precedingTextLength: precedingTextLength, keyboardLayout: keyboardLayout)
+    }
+
+    /// DLL が英字を打つときに使う配列(設定の「キー配列」)．macOS と同じく，ローマ字入力と英字入力のときだけ使う．
+    /// OS の配列のままなら nil
+    public static func keyboardLayout(for settings: Settings) -> String? {
+        guard settings.keyboardLayout != .system, settings.inputStyle != .kana else { return nil }
+        return settings.keyboardLayout.rawValue
     }
 }
 
@@ -129,7 +155,18 @@ extension WireCandidateList {
         self.init(
             variants: panel.variants.map { WireCandidateVariant(label: $0.label, isAvailable: $0.isAvailable) },
             selectedVariant: panel.selectedVariant.map(UInt32.init(clamping:)),
-            entries: panel.entries.map { WireCandidateEntry(text: $0.text, annotation: $0.annotation) },
+            entries: panel.entries.map { entry in
+                // 直した部分の位置は，Rust の char と同じ Unicode のスカラー値の数で送る(core は書記素の数で持つ)
+                let corrected = entry.corrected.map { range -> (start: Int, length: Int) in
+                    let characters = Array(entry.text)
+                    let scalars = { (slice: ArraySlice<Character>) in slice.reduce(0) { $0 + $1.unicodeScalars.count } }
+                    let start = min(range.lowerBound, characters.count), end = min(range.upperBound, characters.count)
+                    return (scalars(characters[..<start]), scalars(characters[start..<end]))
+                }
+                return WireCandidateEntry(text: entry.text, annotation: entry.annotation,
+                                          correctedStart: corrected.map { UInt32(clamping: $0.start) },
+                                          correctedLength: corrected.map { UInt32(clamping: $0.length) })
+            },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
             position: UInt32(clamping: panel.position),
@@ -152,6 +189,7 @@ extension WireBranchMap {
                     isFocused: column.isFocused,
                     isUncertain: column.isUncertain,
                     isDecided: column.isDecided,
+                    isCorrected: column.isCorrected ? true : nil,
                     preview: column.preview,
                     shorter: column.shorter,
                     longer: column.longer,
@@ -203,7 +241,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .hideCandidates:
                 ui.append(.hide)
             case .showModeIndicator(let mode):
-                ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor))
+                ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor, label: nil))
             case .showNote(let text):
                 ui.append(.showNote(text: text, anchor: anchor))
             case .selectInputStyle(let style):
@@ -218,6 +256,17 @@ public struct RoutedActions: Sendable, Equatable {
             case .showHandwriting:
                 host.append(.showHandwriting)
             }
+        }
+    }
+}
+
+extension WireDictionaryAddResult {
+    public init(_ result: UserDictionaryEditing.AddResult) {
+        switch result {
+        case .added: self = .added
+        case .alreadyRegistered: self = .alreadyRegistered
+        case .invalid: self = .invalid
+        case .full: self = .full
         }
     }
 }

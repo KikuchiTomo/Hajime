@@ -112,6 +112,50 @@ struct EnglishMixedScenarioTests {
         #expect(harness.committed == "reactを")
     }
 
+    /// macOS の綴りの候補(NSSpellChecker)と同じ結果を返す辞書．macOS で確かめた値
+    private func macLexicon() -> FakeLexicon {
+        FakeLexicon(words: ["javascript", "script", "scrip", "python"], suggestions: [
+            "jvascript": ["javascript"], "scri": ["sari", "seri", "scry", "scar", "scare", "score"],
+            "script": ["scrips", "scrip", "scripts"], "scrip": ["scrim", "scrap", "strip", "scrimp", "scrips", "script"],
+            "scriptde": ["scripted"], "pthon": ["python"], "pyhton": ["python"], "ctwo": ["two"], "reactwo": ["react", "reacts"],
+            "tkito": ["tike", "trite", "twit"],
+        ])
+    }
+
+    @Test("R-02: 英単語の頭がかなになった綴りの誤りも，英字の打ち始めから英単語全体で直す(「jvascript」→ javascript)", arguments: [
+        ("jvascript", "javascript"), ("jvascriptdekaku", "javascriptでかく"), ("pthonga", "pythonが"),
+        ("konojvascript", "このjavascript"), ("konojvascriptga", "このjavascriptが"), ("javascriptwo", "javascriptを"),
+    ])
+    func wholeWordMisspelling(keys: String, expected: String) {
+        let converter = FakeConverter(["この": [("この", nil)]])
+        let harness = Harness(converter: converter, lexicon: macLexicon())
+        harness.type(keys)
+        harness.settle()
+        #expect(harness.marked.text == expected)
+        harness.press(.enter)
+        #expect(harness.committed == expected)
+    }
+
+    @Test("R-02: 英単語全体で直すのは英字の打ち始めからで，前の日本語や Shift で打った英字を英単語に飲み込まない", arguments: [
+        ("konoAPIhabenridesu", "このAPIはべんりです"), ("konopthon", "この"), ("reactwo", "れあ"),
+    ])
+    func wholeWordMisspellingKeepsJapanese(keys: String, kept: String) {
+        // macOS より緩く，どの部分にも 1 字違いの英単語を返す
+        let tails = (1...keys.count).map { String(keys.suffix($0)) }
+        let lexicon = FakeLexicon(suggestions: Dictionary(uniqueKeysWithValues: tails.map { ($0, ["b" + $0.dropFirst()]) }))
+        let harness = Harness(lexicon: lexicon)
+        harness.type(keys)
+        #expect(harness.marked.text.hasPrefix(kept), "\(keys) → \(harness.marked.text)")
+    }
+
+    @Test("R-06: 識別子の続き(「my_」のあと)は，英単語全体でも直さない")
+    func wholeWordMisspellingSkipsIdentifier() {
+        let harness = Harness(lexicon: macLexicon())
+        harness.context = InputContext(precedingText: "my_")
+        harness.type("jvascript")
+        #expect(!harness.marked.text.contains("javascript"))
+    }
+
     // MARK: - 分岐図
 
     @Test("分岐図では英単語を 1 つの文節にする", arguments: [
