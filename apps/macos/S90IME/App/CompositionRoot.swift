@@ -68,7 +68,11 @@ final class CompositionRoot {
         let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))
         let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries)
         sync.start()
-        let associations = AssociationDictionaryStore(directory: support.appendingPathComponent("associations", isDirectory: true))
+        // 同梱の連想の辞書(日本語 WordNet)は，起動したら裏で読み始め，初めて連想変換を使うときに待たせない
+        let associations = AssociationDictionaryStore(
+            directory: support.appendingPathComponent("associations", isDirectory: true),
+            bundledSource: Bundle.main.resourceURL?.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
+        associations.preloadBundled()
         installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries,
                                     associations: associations)
     }

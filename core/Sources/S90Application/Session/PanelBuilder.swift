@@ -44,7 +44,8 @@ enum PanelBuilder {
     static func isCorrected(_ segment: SegmentLattice.Segment, changed: Range<Int>?) -> Bool {
         switch segment.selected.origin {
         case .correction: return true
-        case .asTyped: return false
+        // 打ったままと，連想で選び直した単語は，打ち間違いを直したものではない
+        case .asTyped, .association: return false
         case .engine, .variant, .sentencePart, .combined, .symbol, .userDictionary:
             guard let changed else { return false }
             return (segment.readingStart..<(segment.readingStart + segment.readingLength)).overlaps(changed)

@@ -100,3 +100,44 @@ struct AssociationDictionaryStoreTests {
         #expect(store.groups(for: "綺麗", in: invalid).isEmpty)
     }
 }
+
+@MainActor
+@Suite("同梱の連想の辞書(日本語 WordNet)")
+struct BundledAssociationDictionaryTests {
+    /// リポジトリの data/thesaurus/wordnet-ja.tsv
+    private var bundledFile: URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("data/thesaurus").appendingPathComponent(DefaultSettings.bundledAssociationFileName)
+    }
+
+    @Test("同梱のファイルを裏で読み，語を含むまとまりを返す(美しい → 綺麗 など)")
+    func lookup() async throws {
+        let store = AssociationDictionaryStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
+                                               bundledSource: bundledFile)
+        await store.waitForBundled()
+        let groups = store.groups(for: "美しい", in: DefaultSettings.bundledAssociationDictionary)
+        #expect(!groups.isEmpty)
+        #expect(groups.contains { $0.words.contains("綺麗") || $0.words.contains("きれい") || $0.words.contains("麗しい") })
+        #expect(groups.allSatisfy { !$0.words.contains("美しい") })
+    }
+
+    @Test("同梱のファイルが無くても落ちず，何も返さない(連想変換だけが効かない)")
+    func missingFile() async {
+        let store = AssociationDictionaryStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
+                                               bundledSource: URL(fileURLWithPath: "/nonexistent/\(UUID().uuidString).tsv"))
+        await store.waitForBundled()
+        #expect(store.groups(for: "美しい", in: DefaultSettings.bundledAssociationDictionary).isEmpty)
+    }
+
+    @Test("設定に同梱の辞書が無ければ先頭に戻し，同梱の印の付いた別の辞書は外す．前の設定(isBundled が無い)も読める")
+    func settingsKeepBundled() throws {
+        var settings = DefaultSettings.settings
+        let imported = AssociationDictionary(id: UUID().uuidString, name: "取り込み", groupCount: 3)
+        let fake = AssociationDictionary(id: UUID().uuidString, name: "偽物", groupCount: 0, isBundled: true)
+        settings.associationDictionaries = [imported, fake]
+        settings.clampToValidRanges()
+        #expect(settings.associationDictionaries.map(\.id) == [DefaultSettings.bundledAssociationDictionary.id, imported.id])
+        let old = try JSONDecoder().decode(AssociationDictionary.self, from: Data(#"{"id":"\#(imported.id)","name":"取り込み","isEnabled":false,"groupCount":3}"#.utf8))
+        #expect(old.isBundled == false && old.isEnabled == false)
+    }
+}

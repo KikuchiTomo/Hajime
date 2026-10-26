@@ -35,11 +35,12 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Zenzai') | Out-Nul
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
 
 Copy-Item (Join-Path $root 'data\postal\postal-codes.tsv') $Output
+Copy-Item (Join-Path $root 'data\thesaurus\wordnet-ja.tsv') $Output
 Copy-Item (Join-Path $root 'LICENSE') (Join-Path $Output 'LICENSE.txt')
 Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') (Join-Path $Output 'THIRD_PARTY_NOTICES.md')
 Copy-Item (Join-Path $root 'LICENSES') (Join-Path $Output 'LICENSES') -Recurse -Force
 
-$required = @('s90_tsf.dll', 'x86\s90_tsf.dll', 's90-engine-host.exe', 's90-candidate-ui.exe', 's90-settings.exe', 'postal-codes.tsv',
+$required = @('s90_tsf.dll', 'x86\s90_tsf.dll', 's90-engine-host.exe', 's90-candidate-ui.exe', 's90-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv',
     'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt')
 foreach ($file in $required) {
     if (-not (Test-Path (Join-Path $Output $file))) { throw "$file がありません" }
