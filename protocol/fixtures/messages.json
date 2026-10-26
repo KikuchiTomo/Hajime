@@ -40,7 +40,8 @@
         "state": {
           "mode": "japanese",
           "isComposing": false,
-          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }]
+          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }],
+          "precedingTextLength": 40
         }
       }
     },
