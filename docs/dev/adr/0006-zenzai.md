@@ -51,3 +51,8 @@ S90_ZENZAI_MODEL=../models/zenz-v3.2-small-Q5_K_M.gguf swift test --package-path
 
 第 1 候補の精度が上がり，左の文脈で変わる変換(「AAAまで」)にも対応できる．
 アプリは 70MB 大きくなる．エンジンを読み込むターゲットは C++ との相互運用を有効にする必要がある．
+
+## 追記(2026-10-26): 予備の取得元
+
+ビルドのときに Hugging Face から取れない場合に備えて，同じファイルを GitHub の Releases(タグ `models/zenz-v3.2-small-c67e03e`)にも置いた．`tools/models/fetch_zenzai.sh` は Hugging Face から取れなければこちらから取り，どちらから取っても SHA-256 を自動で確かめる．利用者が受け取る .pkg にはモデルが入っており，利用者の Mac では何もダウンロードしない．
+
