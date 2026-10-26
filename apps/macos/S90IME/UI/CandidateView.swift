@@ -55,6 +55,62 @@ final class CandidateView: NSView {
         return NSSize(width: (contentWidth + inset * 2 + dropShadowOffset).rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
     }
 
+    // MARK: - 押した位置
+
+    /// 押した対象を知らせる先(候補の窓をマウスで押したとき)
+    var onChoose: ((PointerTarget) -> Void)?
+
+    /// 字種の行と候補の行の位置．描くときと押した位置を調べるときで同じものを使う
+    private struct Geometry {
+        var variantsRow: NSRect?
+        var entryRows: [NSRect]
+    }
+
+    private func geometry(for panel: CandidatePanel) -> Geometry {
+        let body = NSRect(x: 0, y: 0, width: bounds.width - dropShadowOffset, height: bounds.height - dropShadowOffset)
+        let content = body.insetBy(dx: inset, dy: inset)
+        var y = content.minY
+        var variantsRow: NSRect?
+        if panel.association != nil || !panel.variants.isEmpty {
+            if panel.association == nil { variantsRow = NSRect(x: content.minX, y: y, width: content.width, height: sectionHeight) }
+            y += sectionHeight + Size.frameWidth
+        }
+        let entryRows = panel.entries.indices.map { index in
+            NSRect(x: content.minX, y: y + CGFloat(index) * rowHeight, width: content.width, height: rowHeight)
+        }
+        return Geometry(variantsRow: variantsRow, entryRows: entryRows)
+    }
+
+    /// 字種の行の 1 つずつの枠
+    private func variantCells(_ panel: CandidatePanel, in rect: NSRect) -> [NSRect] {
+        var x = rect.minX + Size.paddingX / 2
+        return panel.variants.map { variant in
+            let width = variant.label.size(withAttributes: [.font: labelFont]).width + Size.variantPaddingX * 2
+            defer { x += width }
+            return NSRect(x: x, y: rect.minY + (theme.isRounded ? 4 : 1), width: width, height: rect.height - (theme.isRounded ? 8 : 2))
+        }
+    }
+
+    /// point(この view の座標)にある押せる対象．無ければ nil
+    func target(at point: NSPoint) -> PointerTarget? {
+        guard let panel else { return nil }
+        let geometry = geometry(for: panel)
+        if let row = geometry.entryRows.firstIndex(where: { $0.contains(point) }) { return .entry(row) }
+        if let row = geometry.variantsRow, let cell = variantCells(panel, in: row).firstIndex(where: { $0.contains(point) }),
+           panel.variants[cell].isAvailable {
+            return .listVariant(cell)
+        }
+        return nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let target = target(at: convert(event.locationInWindow, from: nil)) else { return }
+        onChoose?(target)
+    }
+
+    // 窓が前に出ていなくても 1 回目の押下で選ぶ(入力先のアプリからフォーカスを移さない)
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     // MARK: - 描画
 
     override func draw(_ dirtyRect: NSRect) {
@@ -99,14 +155,11 @@ final class CandidateView: NSView {
     }
 
     private func drawVariants(_ panel: CandidatePanel, in rect: NSRect) {
-        var x = rect.minX + Size.paddingX / 2
-        for (index, variant) in panel.variants.enumerated() {
+        for (index, (variant, cell)) in zip(panel.variants, variantCells(panel, in: rect)).enumerated() {
             let isSelected = panel.focus == .variants && panel.selectedVariant == index
             // ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)
             let color: NSColor = isSelected ? theme.selectionText : (variant.isAvailable ? theme.textMuted : theme.textMuted.withAlphaComponent(0.4))
             let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: color]
-            let width = variant.label.size(withAttributes: attributes).width + Size.variantPaddingX * 2
-            let cell = NSRect(x: x, y: rect.minY + (theme.isRounded ? 4 : 1), width: width, height: rect.height - (theme.isRounded ? 8 : 2))
             if isSelected {
                 if theme.isRounded {
                     GlassDrawing.fillCapsule(cell, color: theme.selection)
@@ -116,7 +169,6 @@ final class CandidateView: NSView {
                 }
             }
             drawText(variant.label, attributes: attributes, x: cell.minX + Size.variantPaddingX, in: cell)
-            x += width
         }
     }
 

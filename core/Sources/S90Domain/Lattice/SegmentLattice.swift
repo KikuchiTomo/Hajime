@@ -148,6 +148,14 @@ public struct SegmentLattice: Sendable, Equatable {
         return true
     }
 
+    /// 注目している文節の字種(上の枝)を位置で選ぶ．位置は幹に近いものから 0．範囲の外なら false
+    public mutating func selectVariant(at index: Int) -> Bool {
+        guard segments[focusedIndex].variants.indices.contains(index) else { return false }
+        segments[focusedIndex].choice = .variant(index)
+        segments[focusedIndex].isDecided = true
+        return true
+    }
+
     /// 2 つの候補の点数の差から確信度を決める．点数は対数尤度で，大きいほどよい
     public static func isConfident(best: Candidate?, second: Candidate?) -> Bool {
         guard let best else { return false }

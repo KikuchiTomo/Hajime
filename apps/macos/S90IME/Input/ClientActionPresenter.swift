@@ -28,7 +28,15 @@ final class ClientActionPresenter {
         self.settings = settings
     }
 
+    /// 最後にキーを受けたときの入力先の文脈．候補をマウスで押したときも同じ文脈で処理する
+    var context = InputContext()
+
     func apply(_ actions: [ClientAction], to client: any IMKTextInput) {
+        // 候補をマウスで押したら，キーで選んだのと同じに処理して入力先に反映する
+        candidatePanel.onChoose = { [weak self, weak client = client as AnyObject] target in
+            guard let self, let client = client as? any IMKTextInput else { return }
+            self.apply(self.session.choose(target, context: self.context), to: client)
+        }
         for action in actions {
             switch action {
             case .commit(let text):

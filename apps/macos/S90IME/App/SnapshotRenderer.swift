@@ -29,6 +29,7 @@ enum SnapshotRenderer {
             (ThemeChoice(.washi), .aqua, "washi"), (ThemeChoice(.neon), .darkAqua, "neon"), (ThemeChoice(.terminal), .darkAqua, "terminal"), (ThemeChoice(.nordic), .aqua, "nordic"),
             (ThemeChoice(.contrast), .darkAqua, "contrast"),
         ]
+        checkPointerTargets()
         for look in looks {
             let appearance = NSAppearance(named: look.appearance)
             // 色を今の外観で決める部品があるので，その外観を描くときの外観にして組み立てる
@@ -224,12 +225,7 @@ enum SnapshotRenderer {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
-        let panel = CandidatePanel(
-            variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
-            selectedVariant: nil,
-            entries: ["変換", "返還", "偏官", "へんかん", "ヘンカン"].map { .init(text: $0, annotation: nil) },
-            selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
-        )
+        let panel = SamplePanels.list
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
@@ -282,6 +278,38 @@ enum SnapshotRenderer {
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
+    }
+
+    /// 押した位置から対象を求める処理(候補をマウスで選ぶ)を確かめる．窓を細かく区切って押してみて，
+    /// 見えている幹・枝・行・字種がどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる
+    private static func checkPointerTargets() {
+        for (name, theme) in [("glass", ThemeChoice(.automatic)), ("platinum", ThemeChoice(.platinum))] {
+            let branch = BranchView()
+            branch.theme = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
+            branch.panel = SamplePanels.lattice
+            branch.frame = NSRect(origin: .zero, size: branch.fittingSize(for: SamplePanels.lattice))
+            let list = CandidateView()
+            list.theme = branch.theme
+            list.panel = SamplePanels.list
+            list.frame = NSRect(origin: .zero, size: list.fittingSize(for: SamplePanels.list))
+            for (view, find) in [(branch as NSView, branch.target(at:)), (list as NSView, list.target(at:))] {
+                var found: [PointerTarget] = []
+                for y in stride(from: 0, to: view.bounds.height, by: 2) {
+                    for x in stride(from: 0, to: view.bounds.width, by: 4) {
+                        if let target = find(NSPoint(x: x, y: y)), found.last != target, !found.contains(target) { found.append(target) }
+                    }
+                }
+                let focused = SamplePanels.lattice.columns.first(where: \.isFocused)
+                let expected: Set<PointerTarget> = view === branch
+                    ? Set(SamplePanels.lattice.columns.indices.map(PointerTarget.segment) + (focused?.alternatives.indices.map(PointerTarget.alternative) ?? [])
+                          + (focused?.variants.indices.map(PointerTarget.variant) ?? []))
+                    : Set(SamplePanels.list.entries.indices.map(PointerTarget.entry)
+                          + SamplePanels.list.variants.indices.filter { SamplePanels.list.variants[$0].isAvailable }.map(PointerTarget.listVariant))
+                let rows = found.compactMap { if case .alternative(let index) = $0 { index } else if case .entry(let index) = $0 { index } else { nil } }
+                let ok = Set(found) == expected && rows == rows.sorted()
+                print("押した位置の確かめ(\(name)・\(view === branch ? "分岐図" : "一覧")): \(ok ? "ok" : "合わない \(found)")")
+            }
+        }
     }
 
     private static func latticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {

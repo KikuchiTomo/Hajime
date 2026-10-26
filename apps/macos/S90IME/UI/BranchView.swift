@@ -140,6 +140,42 @@ final class BranchView: NSView {
         return NSSize(width: size.width + dropShadowOffset, height: size.height + dropShadowOffset)
     }
 
+    // MARK: - 押した位置
+
+    /// 押した対象を知らせる先(候補の窓をマウスで押したとき)
+    var onChoose: ((PointerTarget) -> Void)?
+
+    /// point(この view の座標)にある押せる対象．幹の文節と，注目している文節の上下の枝．無ければ nil
+    func target(at point: NSPoint) -> PointerTarget? {
+        guard let panel else { return nil }
+        let layout = layout(for: panel)
+        let metrics = metrics
+        for index in panel.columns.indices {
+            let node = NSRect(x: layout.trunkX[index], y: layout.trunkY, width: layout.trunkWidths[index], height: metrics.rowHeight)
+            if node.contains(point) { return .segment(index) }
+        }
+        // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
+        guard let focused = panel.columns.firstIndex(where: \.isFocused), panel.columns[focused].split == nil else { return nil }
+        let left = layout.trunkX[focused]
+        func row(_ index: Int, downward: Bool) -> NSRect {
+            let y = downward ? layout.trunkY + metrics.rowHeight + CGFloat(index) * metrics.rowHeight
+                : layout.trunkY - CGFloat(index + 1) * metrics.rowHeight
+            return NSRect(x: left, y: y, width: layout.branchWidth, height: metrics.rowHeight)
+        }
+        let column = panel.columns[focused]
+        if let index = column.alternatives.indices.first(where: { row($0, downward: true).contains(point) }) { return .alternative(index) }
+        if let index = column.variants.indices.first(where: { row($0, downward: false).contains(point) }) { return .variant(index) }
+        return nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let target = target(at: convert(event.locationInWindow, from: nil)) else { return }
+        onChoose?(target)
+    }
+
+    // 窓が前に出ていなくても 1 回目の押下で選ぶ(入力先のアプリからフォーカスを移さない)
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     // MARK: - 描画
 
     override func draw(_ dirtyRect: NSRect) {
