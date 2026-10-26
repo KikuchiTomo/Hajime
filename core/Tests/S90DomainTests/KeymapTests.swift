@@ -26,8 +26,10 @@ struct KeymapTests {
         // 切り替えのキーは英数のときも効く
         #expect(standard.command(for: KeyEvent(.kana), in: .direct) == .japaneseMode)
         #expect(standard.command(for: KeyEvent(.eisu), in: .composing) == .directMode)
-        // 設定を開くキーは英数のときは効かない(アプリのショートカットを奪わない)
-        #expect(standard.command(for: KeyEvent(.character(","), modifiers: [.control, .option]), in: .direct) == nil)
+        // 設定を開くキーは英数のときも効く(ターミナルでは英数で打ち，入力メニューの操作も届かないため)
+        #expect(standard.command(for: KeyEvent(.character(","), modifiers: [.control, .option]), in: .direct) == .openSettings)
+        // 確定のような日本語の入力のコマンドは英数のときは効かない(アプリのキーを奪わない)
+        #expect(standard.command(for: KeyEvent(.enter), in: .direct) == nil)
     }
 
     @Test("R-17: 修飾キーの組み合わせを区別する")
