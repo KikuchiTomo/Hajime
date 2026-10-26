@@ -827,6 +827,7 @@ public final class InputSession {
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
                 panel.columns[focused].longer = preview.longer
+                panel.columns[focused].usageNote = usageNote(for: lattice)
             }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
             return [.setMarkedText(marked), .showLattice(panel)]
@@ -853,6 +854,18 @@ public final class InputSession {
     private func setLeftContext(_ text: String?) {
         compositionLeftContext = text
         converter.setLeftContext(text)
+    }
+
+    /// 注目している文節で選んでいる候補の使い分けと誤用の注釈(設定でオンのものだけ)
+    private func usageNote(for lattice: SegmentLattice) -> String? {
+        let segment = lattice.focused
+        let text = segment.selected.text
+        let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+        let notes = [
+            settings.current.misuseNotes ? UsageGuide.misuseNote(for: lattice.text) : nil,
+            settings.current.homophoneNotes ? UsageGuide.homophoneNote(for: text, reading: reading) : nil,
+        ].compactMap { $0 }
+        return notes.isEmpty ? nil : notes.joined(separator: "　")
     }
 
     // MARK: - 分岐図

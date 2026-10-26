@@ -101,9 +101,12 @@ final class BranchView: NSView {
         let upperRows = column?.variants.count ?? 0
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
         let footer = footerWidth(panel) + textWidth(position(of: panel), font: labelFont) + Size.paddingX * 3
-        let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2)
+        // 使い分けや誤用の注釈は，枝と足元のあいだに 1 行で出す
+        let note = column?.usageNote.map { textWidth($0, font: labelFont) + Size.paddingX * 2 } ?? 0
+        let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2)
         let trunkY = metrics.inset + CGFloat(upperRows) * metrics.rowHeight
         let height = trunkY + metrics.rowHeight * CGFloat(1 + lowerRows) + Size.frameWidth + metrics.footerHeight
+            + (column?.usageNote == nil ? 0 : metrics.footerHeight)
             + (theme.isRounded ? 0 : metrics.inset)
         return Layout(trunkX: trunkX, trunkWidths: trunkWidths, lowerRows: lowerRows, trunkY: trunkY,
                       branchWidth: branchWidth, size: NSSize(width: width.rounded(.up), height: height.rounded(.up)))
@@ -147,7 +150,12 @@ final class BranchView: NSView {
                 drawPreview(preview, under: node, maxX: limit)
             }
         }
-        let footerY = layout.trunkY + metrics.rowHeight * CGFloat(1 + layout.lowerRows)
+        var footerY = layout.trunkY + metrics.rowHeight * CGFloat(1 + layout.lowerRows)
+        if let note = panel.columns.first(where: \.isFocused)?.usageNote {
+            let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)
+            drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: row.minX, in: row)
+            footerY += metrics.footerHeight
+        }
         drawFooter(panel, y: footerY, width: body.width)
     }
 

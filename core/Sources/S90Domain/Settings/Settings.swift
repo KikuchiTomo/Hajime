@@ -74,6 +74,10 @@ public struct Settings: Sendable, Equatable {
     public var numberKeySelection = true
     /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
     public var dateConversion = true
+    /// 同音異義語の使い分けを分岐図に添える
+    public var homophoneNotes = true
+    /// 誤用とされる言い回しに注釈を添える
+    public var misuseNotes = false
     /// 「やじるし」などの読みから記号の候補を出す
     public var symbolConversion = true
     /// 読みから絵文字の候補を出す
@@ -158,7 +162,7 @@ extension Settings: Codable {
         case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
-        case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
         case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, profileRules
@@ -226,6 +230,8 @@ extension Settings: Codable {
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
+        read(.homophoneNotes, into: \.homophoneNotes)
+        read(.misuseNotes, into: \.misuseNotes)
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
         read(.learning, into: \.learning)
@@ -281,6 +287,8 @@ extension Settings: Codable {
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)
+        try container.encode(homophoneNotes, forKey: .homophoneNotes)
+        try container.encode(misuseNotes, forKey: .misuseNotes)
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(learning, forKey: .learning)
