@@ -38,7 +38,19 @@ final class EnglishWordCorrector {
     /// 読みの末尾から英単語を探して，補正を求め直す
     func update(for composition: Composition) {
         let rule = TypoCorrectionRule(level: settings.current.typoCorrection)
-        let tails = rule.tails(in: composition).filter { $0.kanaStart != dismissedKanaStart }
+        let customization = settings.current.correction
+        guard customization.english else {
+            active = nil
+            return
+        }
+        // 直さない語を含む部分は除く
+        let tails = rule.tails(in: composition)
+            .filter { $0.kanaStart != dismissedKanaStart && !customization.isException(keys: $0.keys, reading: "") }
+        // 0. 利用者が足した置き換えの決まり(「teh」→「the」)を，長い部分から探す
+        if let tail = tails.first(where: { customization.rule(for: $0.keys) != nil }), let custom = customization.rule(for: tail.keys) {
+            active = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: custom.word)
+            return
+        }
         // 1. 英単語そのものを，長い部分から探す
         if let tail = tails.first(where: { lexicon.isWord($0.keys) }),
             let word = rule.correction(for: tail.keys, isWord: true, suggestions: []) {

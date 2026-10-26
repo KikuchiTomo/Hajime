@@ -32,6 +32,12 @@ public struct Settings: Sendable, Equatable {
     public var punctuationCommits = false
     /// 変換しているとき(分岐図)のキーの割り当て
     public var conversionKeys = KeyBindings.standard
+    /// 日本語と英数を切り替えるキー(英数・かな・半角/全角・変換・無変換)の割り当て
+    public var modeKeys = ModeKeyAssignments.standard
+    /// テンキーで打った数字と記号は，日本語のモードでも半角で，組み立てずにそのまま確定する
+    public var keypadDirect = true
+    /// 利用者が変えた記号の決まり(「->」→「→」，「やじるし」→「→」)．既定の決まりに重ねる
+    public var symbolRules: [SymbolRule] = []
 
     // MARK: 変換
     /// 補正の強さ(R-02)
@@ -52,6 +58,14 @@ public struct Settings: Sendable, Equatable {
     public var correctionSensitivity = CorrectionSensitivity.standard
     /// 直すほど確かでないとき，「もしかして」と示す
     public var showsSuggestions = true
+    /// 打ち間違いの補正のうち，誤りの種類ごとのオン・オフ，直さない語，置き換えの決まり
+    public var correction = CorrectionCustomization()
+    /// 送り仮名の付け方(本則・許容)のどちらを先に出すか
+    public var okuriganaStyle = OkuriganaStyle.standard
+    /// 「1+2*3=」のような式を計算した結果を候補に出す
+    public var calculation = true
+    /// よくある読み違い(「ふいんき」→ 雰囲気)の正しい語を候補に出し，「もしかして」で示す
+    public var misreadings = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
     /// 番号キーで候補を選ぶ
@@ -107,6 +121,12 @@ public struct Settings: Sendable, Equatable {
         var themeIDs = Set<String>()
         customThemes = Array(customThemes.filter { $0.isValid && themeIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCustomThemes))
         if activeCustomTheme == nil { customThemeID = nil }
+        var symbolKeys = Set<String>()
+        // 同じ入力の決まりは後のものを残す
+        symbolRules = Array(symbolRules.reversed().filter { $0.isValid && symbolKeys.insert("\($0.kind.rawValue):\($0.input)").inserted }.reversed()
+            .prefix(DefaultSettings.maximumSymbolRules))
+        correction.rules = Array(correction.rules.filter(\.isValid).prefix(DefaultSettings.maximumCorrectionRules))
+        correction.exceptions = Array(correction.exceptions.filter { !$0.isEmpty && $0.count <= 64 }.prefix(DefaultSettings.maximumCorrectionRules))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
     }
 
@@ -133,6 +153,7 @@ private struct Skipped: Decodable {}
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
+        case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
@@ -175,6 +196,13 @@ extension Settings: Codable {
         read(.numberWidth, into: \.numberWidth)
         read(.punctuationCommits, into: \.punctuationCommits)
         read(.conversionKeys, into: \.conversionKeys)
+        read(.modeKeys, into: \.modeKeys)
+        read(.keypadDirect, into: \.keypadDirect)
+        readList(.symbolRules, into: \.symbolRules)
+        read(.correction, into: \.correction)
+        read(.okuriganaStyle, into: \.okuriganaStyle)
+        read(.calculation, into: \.calculation)
+        read(.misreadings, into: \.misreadings)
         read(.alphabetWidth, into: \.alphabetWidth)
         read(.shiftStartsAlphabet, into: \.shiftStartsAlphabet)
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
@@ -222,6 +250,13 @@ extension Settings: Codable {
         try container.encode(numberWidth, forKey: .numberWidth)
         try container.encode(punctuationCommits, forKey: .punctuationCommits)
         try container.encode(conversionKeys, forKey: .conversionKeys)
+        try container.encode(modeKeys, forKey: .modeKeys)
+        try container.encode(keypadDirect, forKey: .keypadDirect)
+        try container.encode(symbolRules, forKey: .symbolRules)
+        try container.encode(correction, forKey: .correction)
+        try container.encode(okuriganaStyle, forKey: .okuriganaStyle)
+        try container.encode(calculation, forKey: .calculation)
+        try container.encode(misreadings, forKey: .misreadings)
         try container.encode(alphabetWidth, forKey: .alphabetWidth)
         try container.encode(shiftStartsAlphabet, forKey: .shiftStartsAlphabet)
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)

@@ -279,6 +279,76 @@ enum UIStrings {
     }
 
     /// 設定の画面で足したページと項目
+    /// 足した機能の項目の名前(テンキー・切り替えのキー・記号・補正・送り仮名・計算・読み違い・キーのひな形)
+    enum Features {
+        static let keypadDirect = "テンキーの数字を半角で確定"
+        static let modeKeysSection = "切り替えのキー"
+        static let eisuKey = "英数キー"
+        static let kanaKey = "かなキー"
+        static let hankakuZenkakuKey = "半角/全角キー"
+        static let henkanKey = "変換キー"
+        static let muhenkanKey = "無変換キー"
+
+        static func label(for action: ModeKeyAction) -> String {
+            switch action {
+            case .toggle: "切り替え"
+            case .japanese: "日本語"
+            case .direct: "英数"
+            case .none: "使わない"
+            }
+        }
+
+        static let okurigana = "送り仮名"
+
+        static func label(for style: OkuriganaStyle) -> String {
+            switch style {
+            case .standard: "本則"
+            case .allowed: "許容"
+            case .engine: "変換の順のまま"
+            }
+        }
+
+        static let calculation = "計算"
+        static let misreadings = "読み違いの候補"
+        static let preset = "ひな形"
+        static let customPreset = "カスタム"
+
+        static func label(for preset: KeyPreset) -> String {
+            switch preset {
+            case .standard: "標準"
+            case .windows: "Windows 風"
+            case .emacs: "Emacs 風"
+            }
+        }
+
+        // 補正
+        static let correctionPage = "補正"
+        static let correctionKinds = "直すもの"
+        static let correctsEnglish = "英単語"
+        static let correctsJapanese = "日本語の打ち間違い"
+        static let correctsRepeatedKeys = "同じキーの重なり"
+        static let exceptions = "直さない語"
+        static let exceptionPlaceholder = "英字か読み"
+        static let rules = "置き換え"
+        static let typed = "打った英字"
+        static let replacement = "置き換える語"
+        static let invalidRule = "打った英字は 2〜24 文字の英字，置き換える語は 64 文字までにしてください"
+
+        // 記号
+        static let symbolsPage = "記号"
+        static let sequences = "続けて打つ記号"
+        static let readings = "読みから出す記号"
+        static let input = "入力"
+        static let output = "記号"
+        static let readingInput = "読み"
+        static let readingOutput = "空白で区切った記号"
+        static let search = "検索"
+        static let invalidSymbol = "続けて打つ記号は英字と数字以外の 2〜12 文字にしてください"
+        static let restoreDefault = "既定に戻す"
+        static let changed = "変更あり"
+        static let added = "追加"
+    }
+
     enum More {
         // 入力
         static let alphabetWidth = "英字幅"

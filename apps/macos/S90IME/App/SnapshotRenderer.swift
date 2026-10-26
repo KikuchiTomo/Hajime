@@ -103,12 +103,7 @@ enum SnapshotRenderer {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
-        let panel = LatticePanel(columns: [
-            .init(text: "私の", isFocused: false, isUncertain: false),
-            .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),
-            .init(text: "中野です", alternatives: ["中のです", "中野です", "仲のです", "那珂のです"], selectedAlternative: 1,
-                  variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true, shorter: "中野で", longer: nil),
-        ], position: 1, total: 8)
+        let panel = SamplePanels.lattice
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

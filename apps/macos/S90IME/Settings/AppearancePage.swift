@@ -11,6 +11,12 @@ struct AppearancePage: View {
 
     var body: some View {
         Form {
+            Section {
+                // 選んでいるテーマと文字の大きさで，分岐図の見本をその場で描く
+                ThemePreview(choice: ThemeChoice(model.settings), fontSize: fontSize ?? model.settings.candidateFontSize)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
             Section(UIStrings.More.theme) {
                 ForEach(UIStrings.Choice.themes, id: \.self) { theme in
                     ThemeRow(choice: ThemeChoice(theme), title: UIStrings.Choice.label(for: theme),
@@ -165,5 +171,28 @@ private struct CustomThemeEditor: View {
         let trimmed = String(name.trimmingCharacters(in: .whitespaces).prefix(DefaultSettings.maximumThemeNameLength))
         guard !trimmed.isEmpty, trimmed != theme.name else { return }
         model.updateCustomTheme(id: theme.id) { $0.name = trimmed }
+    }
+}
+
+/// 分岐図の見本．テーマや文字の大きさを変えると，その場で描き直す
+private struct ThemePreview: NSViewRepresentable {
+    let choice: ThemeChoice
+    let fontSize: Double
+
+    func makeNSView(context: Context) -> BranchView {
+        let view = BranchView()
+        view.fillsSurface = true
+        return view
+    }
+
+    func updateNSView(_ view: BranchView, context: Context) {
+        view.theme = ResolvedTheme.resolve(choice, appearance: view.effectiveAppearance)
+        view.fontSize = CGFloat(fontSize)
+        view.panel = SamplePanels.lattice
+        view.invalidateIntrinsicContentSize()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: BranchView, context: Context) -> CGSize? {
+        view.fittingSize(for: SamplePanels.lattice)
     }
 }
