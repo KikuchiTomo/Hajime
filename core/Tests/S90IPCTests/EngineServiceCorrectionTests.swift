@@ -136,4 +136,21 @@ struct EngineServiceCorrectionTests {
         }
         #expect(marked == "よいです")
     }
+
+    @Test("打鍵が止まったあとの訂正が長くかかるときは，期限を過ぎたらやめ，その入力は求め直さない")
+    func reviewGivesUpAfterDeadline() throws {
+        let test = EngineServiceCorrectionTests(service: Service(finishes: false))
+        let (id, session) = try test.open()
+        test.type("youdesu", session, id)
+        var started = false
+        for _ in 0..<4 where !started {
+            started = Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds
+        }
+        #expect(started)
+        test.clock.now = test.clock.now + .seconds(DefaultSettings.reviewCorrectionTimeout + 1)
+        _ = test.wake(session, id)
+        // 見直したことにしたので，次の wake で訂正を求め直さない(求め直し続けると裏の仕事が止まらない)
+        #expect(Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds)
+        #expect(Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds)
+    }
 }

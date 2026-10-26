@@ -99,8 +99,15 @@ final class S90InputController: IMKInputController {
             guard !Task.isCancelled else { return }
             // 訂正はメインスレッドの外で求め，求め終わったときに打ったキーが変わっていなければ見直す
             if let request = self.session.correctionRequest, let service = self.root.typoService {
-                let corrections = await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+                let corrections = await Deadline.run(seconds: DefaultSettings.reviewCorrectionTimeout) {
+                    await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+                }
                 guard !Task.isCancelled else { return }
+                guard let corrections else {
+                    // 求め終わらないときはやめ，この入力は見直したことにする
+                    self.session.skipReview()
+                    return
+                }
                 self.session.provideCorrections(corrections)
             }
             self.presenter.apply(self.session.review(context: context), to: client)
