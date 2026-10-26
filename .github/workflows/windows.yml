@@ -35,6 +35,9 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
+      - run: cargo build --locked --release -p tsf
+      - run: ../../tools/windows/check_exports.ps1 -Dll target/release/s90_tsf.dll
+        shell: pwsh
 
   swift:
     runs-on: windows-latest

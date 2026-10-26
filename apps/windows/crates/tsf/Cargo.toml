@@ -1,0 +1,33 @@
+[package]
+name = "tsf"
+description = "TSF のテキストサービスの DLL．入力先のアプリに読み込まれ，キーをエンジンに送り，返った操作を入力欄に反映する"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "s90_tsf"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ipc = { path = "../ipc" }
+
+[target.'cfg(windows)'.dependencies]
+windows-core.workspace = true
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Ole",
+    "Win32_System_Registry",
+    "Win32_System_Variant",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_TextServices",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[lints]
+workspace = true
