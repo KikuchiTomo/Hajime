@@ -102,11 +102,18 @@ struct InputSessionScenarioTests {
     /// 「もんだいがある」を 1 つの文節にし，語の並びを「問題｜が｜ある」にした変換器
     private func problemConverter() -> FakeConverter {
         let converter = FakeConverter(["もんだいがある": [("問題がある", nil), ("問題が或る", nil)], "もんだい": [("問題", nil)],
-                                       "がある": [("がある", nil)], "もんだいが": [("問題が", nil)], "ある": [("ある", nil)]])
+                                       "がある": [("がある", nil), ("が或る", nil)], "もんだいが": [("問題が", nil)], "ある": [("ある", nil), ("或る", nil)]])
         converter.words["もんだいがある"] = [
             Candidate.Word(text: "問題", readingCount: 4), Candidate.Word(text: "が", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
             Candidate.Word(text: "ある", readingCount: 2),
         ]
+        // 区切れる位置を決めるのに，前後の読みを別々に変換した語の並びも使う
+        let particle = Candidate.Word(text: "が", readingCount: 1, startsWithParticle: true, endsWithParticle: true)
+        let exist = Candidate.Word(text: "ある", readingCount: 2, startsWithPredicate: true)
+        converter.words["がある"] = [particle, exist]
+        converter.words["ある"] = [exist]
+        converter.words["もんだいが"] = [Candidate.Word(text: "問題", readingCount: 4), particle]
+        converter.words["もんだい"] = [Candidate.Word(text: "問題", readingCount: 4)]
         return converter
     }
 
