@@ -16,27 +16,29 @@ final class CandidatePanelController {
         window = FloatingPanel.make(contentView: view)
     }
 
-    func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemePreference, fontSize: Double) {
+    func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double) {
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.panel = panel
-        present(view, size: view.fittingSize(for: panel), caret: caret, glass: view.theme.isRounded)
+        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme)
         announceSelection(panel)
     }
 
-    func showLattice(_ panel: LatticePanel, caret: NSRect, theme: ThemePreference, fontSize: Double, keys: KeyBindings) {
+    func showLattice(_ panel: LatticePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double, keys: KeyBindings) {
         branchView.keys = keys
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, glass: branchView.theme.isRounded)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme)
         if let focused = panel.columns.first(where: \.isFocused) {
             announce(focused.text)
         }
     }
 
     /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける
-    private func present(_ content: NSView, size: NSSize, caret: NSRect, glass: Bool) {
+    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme) {
+        let glass = theme.isRounded
+        backdrop.cornerRadius = theme.cornerRadius
         let wasVisible = FloatingPanel.attach(content, to: window, backdrop: glass ? backdrop : nil)
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
         if glass { window.invalidateShadow() }

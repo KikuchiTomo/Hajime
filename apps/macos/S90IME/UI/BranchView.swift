@@ -210,7 +210,7 @@ final class BranchView: NSView {
             let y = downward ? node.maxY + CGFloat(index) * metrics.rowHeight : node.minY - CGFloat(index + 1) * metrics.rowHeight
             return NSRect(x: stemX + metrics.branchIndent, y: y, width: width - metrics.stemX - metrics.branchIndent, height: metrics.rowHeight)
         }
-        if theme.isRounded {
+        if theme.isRounded, !theme.straightBranches {
             drawCurves(rows, stemX: stemX, stemY: downward ? node.maxY - 2 : node.minY + 2, rowRect: rowRect)
         } else {
             drawStraightLines(rows, stemX: stemX, node: node, downward: downward, rowRect: rowRect)

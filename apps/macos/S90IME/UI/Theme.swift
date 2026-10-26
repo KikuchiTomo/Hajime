@@ -48,6 +48,40 @@ struct ResolvedTheme {
     /// 番号の丸とキーキャップの地
     let badge: NSColor
     var typeface: Typeface = .system
+    /// 角の丸さ(角丸のテーマ)．カスタムテーマで変えられる
+    var cornerRadius: CGFloat = DesignTokens.Size.Glass.cornerRadius
+    /// 枝を曲線でなく直線で描く(カスタムテーマ)
+    var straightBranches = false
+    /// 候補の書体の名前(カスタムテーマ)．nil ならテーマの書体
+    var customFontName: String?
+
+    /// 設定から描き方を決める．カスタムテーマを使っていれば，元のテーマの描き方に色・書体・形を重ねる
+    @MainActor
+    static func resolve(_ choice: ThemeChoice, appearance: NSAppearance? = nil) -> ResolvedTheme {
+        guard let custom = choice.custom else { return resolve(choice.preference, appearance: appearance) }
+        var theme = resolve(custom.base, appearance: appearance)
+        let text = custom.text.color
+        theme = ResolvedTheme(
+            kind: theme.kind == .glass ? .nordic : theme.kind,
+            surface: custom.surface.color,
+            bevelLight: theme.bevelLight,
+            bevelShadow: theme.bevelShadow,
+            frame: custom.line.color,
+            text: text,
+            textMuted: custom.textMuted.color,
+            selection: custom.selection.color,
+            selectionText: custom.selectionText.color,
+            correction: custom.correction.color,
+            line: custom.line.color,
+            focusTint: custom.selection.color.withAlphaComponent(0.2),
+            badge: text.withAlphaComponent(0.12),
+            typeface: theme.typeface
+        )
+        theme.cornerRadius = CGFloat(custom.cornerRadius)
+        theme.straightBranches = custom.branchStyle == .straight
+        theme.customFontName = custom.fontName
+        return theme
+    }
 
     @MainActor
     static func resolve(_ preference: ThemePreference, appearance: NSAppearance? = nil) -> ResolvedTheme {
@@ -138,6 +172,9 @@ struct ResolvedTheme {
     // MARK: - 書体
 
     private func font(size: CGFloat, weight: NSFont.Weight) -> NSFont {
+        if let customFontName, let custom = NSFont(name: customFontName, size: size) {
+            return custom
+        }
         switch typeface {
         case .system:
             return .systemFont(ofSize: size, weight: weight)
@@ -170,6 +207,27 @@ struct ResolvedTheme {
     /// 分岐図の幹の文字．候補より少し太くし，文として読めるようにする
     func trunkFont(size: CGFloat) -> NSFont {
         font(size: size, weight: kind == .contrast ? .semibold : .medium)
+    }
+}
+
+/// どのテーマで描くか．既成のテーマか，保存したカスタムテーマ
+struct ThemeChoice: Equatable {
+    var preference: ThemePreference
+    var custom: CustomTheme?
+
+    init(_ preference: ThemePreference, custom: CustomTheme? = nil) {
+        self.preference = preference
+        self.custom = custom
+    }
+
+    init(_ settings: S90Domain.Settings) {
+        self.init(settings.theme, custom: settings.activeCustomTheme)
+    }
+}
+
+extension HexColor {
+    var color: NSColor {
+        NSColor(srgbRed: CGFloat(red) / 255, green: CGFloat(green) / 255, blue: CGFloat(blue) / 255, alpha: 1)
     }
 }
 
