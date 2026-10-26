@@ -13,6 +13,21 @@ struct KeyEditSearchTests {
         #expect(Set(KeyEditSearch.edits(of: "hte").map(\.reading)).contains("て"))  // 入れ替え
     }
 
+    @Test("「nn」のあとの母音は「ん+な行」でも読む．打ち忘れの n で「ん」を書いた語(konichiha → こんにちは)も 1 か所の訂正で拾う")
+    func nasalReadings() {
+        let edits = KeyEditSearch.edits(of: "konichiha")
+        let edit = edits.first { $0.reading == "こんにちは" }
+        #expect(edit?.keys == "konnnichiha")
+        #expect(edit?.cost == KeyEditSearch.Costs().nasalSpelling)  // ローマ字の綴りの誤りなので，ふつうの打ち忘れより小さい
+        #expect(KeyEditSearch.isNasalSpelling(inserting: "n", at: 3, in: Array("konichiha")))
+        #expect(KeyEditSearch.isNasalSpelling(inserting: "n", at: 2, in: Array("konnichiha")) == false)
+        #expect(KeyEditSearch.isNasalSpelling(inserting: "n", at: 3, in: Array("kanta")) == false)
+        #expect(edits.contains { $0.reading == "こんいちは" })
+        #expect(KeyEditSearch.edits(of: "pasoko").contains { $0.reading == "ぱそこん" })
+        #expect(KeyEditSearch.nasalVariants(of: Array("hannei")) == [Array("hannnei")])
+        #expect(KeyEditSearch.nasalVariants(of: Array("hannnei")).isEmpty)
+    }
+
     @Test("音が同じ書き誤り(ず/づ・は/わ・え/へ・お/を・長音)は手間を小さくする")
     func samePronunciation() {
         let costs = KeyEditSearch.Costs()
