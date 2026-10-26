@@ -9,12 +9,14 @@ struct SettingsView: View {
 
     /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(上のタブには収まらない)
     enum Page: CaseIterable, Hashable {
-        case input, conversion, keys, dictionary, romaji, apps, appearance, usage, backup, about
+        case input, conversion, correction, symbols, keys, dictionary, romaji, apps, appearance, usage, backup, about
 
         var title: String {
             switch self {
             case .input: UIStrings.Settings.inputTab
             case .conversion: UIStrings.Settings.conversionTab
+            case .correction: UIStrings.Features.correctionPage
+            case .symbols: UIStrings.Features.symbolsPage
             case .keys: UIStrings.Keys.tab
             case .dictionary: UIStrings.Settings.dictionaryTab
             case .romaji: UIStrings.Settings.romajiTab
@@ -31,6 +33,8 @@ struct SettingsView: View {
             switch self {
             case .input: "keyboard"
             case .conversion: "character.book.closed.ja"
+            case .correction: "wand.and.stars"
+            case .symbols: "arrow.right.square"
             case .keys: "command"
             case .dictionary: "text.book.closed"
             case .romaji: "textformat.abc"
@@ -41,16 +45,39 @@ struct SettingsView: View {
             case .about: "info.circle"
             }
         }
+
+        /// 検索で見つけるための言葉．ページの名前に加え，そのページにある項目の名前
+        var keywords: [String] {
+            switch self {
+            case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect,
+                          UIStrings.Features.modeKeysSection, UIStrings.Features.eisuKey, UIStrings.Features.kanaKey, UIStrings.Features.hankakuZenkakuKey]
+            case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana,
+                               UIStrings.Features.calculation, UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion]
+            case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
+            case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
+            case .keys: [UIStrings.Features.preset, UIStrings.Keys.label(for: .openSettings)]
+            default: []
+            }
+        }
+    }
+
+    @State private var query = ""
+
+    /// 検索の言葉を含むページだけを並べる
+    private var pages: [Page] {
+        guard !query.isEmpty else { return Page.allCases }
+        return Page.allCases.filter { page in ([page.title] + page.keywords).contains { $0.localizedCaseInsensitiveContains(query) } }
     }
 
     var body: some View {
         NavigationSplitView {
-            List(Page.allCases, id: \.self, selection: $page) { page in
+            List(pages, id: \.self, selection: $page) { page in
                 Label(page.title, systemImage: page.symbol)
             }
             .navigationSplitViewColumnWidth(DesignTokens.Size.Settings.sidebarWidth)
             // 左の一覧を畳むボタンは要らない(見出しに重なる)
             .toolbar(removing: .sidebarToggle)
+            .searchable(text: $query, placement: .sidebar, prompt: UIStrings.Features.search)
         } detail: {
             detail(for: page ?? .input)
                 .navigationTitle((page ?? .input).title)
@@ -66,6 +93,8 @@ struct SettingsView: View {
         switch page {
         case .input: InputTab(model: model)
         case .conversion: ConversionTab(model: model)
+        case .correction: CorrectionPage(model: model)
+        case .symbols: SymbolsPage(model: model)
         case .keys: KeysTab(model: model)
         case .dictionary: DictionaryTab(model: model)
         case .romaji: RomajiTab(model: model)
@@ -111,6 +140,14 @@ private struct InputTab: View {
                 ChoicePicker(title: UIStrings.Settings.numberWidth, selection: model.binding(\.numberWidth), label: UIStrings.Settings.label(for:))
                 ChoicePicker(title: UIStrings.More.alphabetWidth, selection: model.binding(\.alphabetWidth), label: UIStrings.Settings.label(for:))
                 Toggle(UIStrings.More.shiftStartsAlphabet, isOn: model.binding(\.shiftStartsAlphabet))
+                ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
+            }
+            Section(UIStrings.Features.modeKeysSection) {
+                ResettablePicker(model: model, title: UIStrings.Features.eisuKey, keyPath: \.modeKeys.eisu, label: UIStrings.Features.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Features.kanaKey, keyPath: \.modeKeys.kana, label: UIStrings.Features.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Features.hankakuZenkakuKey, keyPath: \.modeKeys.hankakuZenkaku, label: UIStrings.Features.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Features.henkanKey, keyPath: \.modeKeys.henkan, label: UIStrings.Features.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Features.muhenkanKey, keyPath: \.modeKeys.muhenkan, label: UIStrings.Features.label(for:))
             }
             Section(UIStrings.Settings.keys) {
                 Toggle(UIStrings.Settings.punctuationCommits, isOn: model.binding(\.punctuationCommits))
@@ -156,7 +193,11 @@ private struct ConversionTab: View {
                 }
                 .disabled(model.settings.typoCorrection != .standard)
             }
+            Section(UIStrings.Features.okurigana) {
+                ResettablePicker(model: model, title: UIStrings.Features.okurigana, keyPath: \.okuriganaStyle, label: UIStrings.Features.label(for:))
+            }
             Section(UIStrings.Settings.specialConversion) {
+                ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)
                 Toggle(UIStrings.Settings.dateConversion, isOn: model.binding(\.dateConversion))
                 Toggle(UIStrings.Settings.symbolConversion, isOn: model.binding(\.symbolConversion))
                 Toggle(UIStrings.Settings.emojiConversion, isOn: model.binding(\.emojiConversion))
@@ -292,6 +333,17 @@ private struct KeysTab: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker(UIStrings.Features.preset, selection: Binding(
+                    get: { KeyPreset.matching(model.settings.conversionKeys) },
+                    set: { preset in if let preset { model.update { $0.conversionKeys = preset.bindings } } }
+                )) {
+                    ForEach(KeyPreset.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag(KeyPreset?.some($0)) }
+                    if KeyPreset.matching(model.settings.conversionKeys) == nil {
+                        Text(UIStrings.Features.customPreset).tag(KeyPreset?.none)
+                    }
+                }
+            }
             commandSection(UIStrings.Keys.generalSection, ConversionCommand.allCases.filter(\.isGlobal))
             commandSection(UIStrings.Keys.conversionSection, ConversionCommand.allCases.filter { !$0.isGlobal })
             Section {

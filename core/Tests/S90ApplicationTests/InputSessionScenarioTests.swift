@@ -14,7 +14,7 @@ extension Settings {
 }
 
 @MainActor
-private final class Harness {
+final class Harness {
     let converter: FakeConverter
     let lexicon: FakeLexicon
     let settings: FakeSettings
@@ -50,8 +50,8 @@ private final class Harness {
         }
     }
 
-    func press(_ key: KeyEvent.Key, _ modifiers: KeyEvent.Modifiers = []) {
-        lastResult = session.handle(KeyEvent(key, modifiers: modifiers), context: context)
+    func press(_ key: KeyEvent.Key, _ modifiers: KeyEvent.Modifiers = [], isKeypad: Bool = false) {
+        lastResult = session.handle(KeyEvent(key, modifiers: modifiers, isKeypad: isKeypad), context: context)
         for action in lastResult.actions {
             switch action {
             case .commit(let text): committed += text

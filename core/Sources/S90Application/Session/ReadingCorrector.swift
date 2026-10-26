@@ -61,12 +61,23 @@ final class ReadingCorrector {
     /// 前に直したものが，続けて打ったキーでもっともらしくなくなったら，打ったままに戻す
     func review(_ composition: inout Composition, makeComposition: () -> Composition) {
         suggestion = nil
+        suggestsMisreading = false
         let typed = typedComposition(from: composition) ?? composition
         guard let keys = typed.rawKeys, keys.count <= DefaultSettings.maximumKeysForCorrection,
             !keys.isEmpty, keys.allSatisfy(Self.isLetterKey),
             typed.pending.isEmpty || typed.pending == "n",
             !(dismissedKeys.map(keys.hasPrefix) ?? false) else { return }
-        let decision = decision(forKeys: keys, reading: typed.conversionReading)
+        let current = settings.current
+        // 誤りの種類ごとのオン・オフと，直さない語(設定)
+        let checksTypos = current.typoCorrection == .standard && current.correction.japanese
+            && !current.correction.isException(keys: keys, reading: typed.conversionReading)
+        let decision = checksTypos ? decision(forKeys: keys, reading: typed.conversionReading) : nil
+        if decision == nil, current.misreadings, applied == nil, let suggested = misreadingSuggestion(for: typed, makeComposition: makeComposition) {
+            // よくある読み違い(「ふいんき」)は，打ち間違いではないので直さず，「もしかして」と示すだけにする
+            suggestion = suggested
+            suggestsMisreading = true
+            return
+        }
         switch decision {
         case .apply(let correction):
             guard let corrected = compose(correction.keys, makeComposition: makeComposition),
@@ -87,9 +98,17 @@ final class ReadingCorrector {
         }
     }
 
-    /// 示していた直した読みにする(Tab)．直したら true
+    /// 示していた直した読みにする(Tab)．直したら true．
+    /// 読み違いを直したときは，打ったキーと読みが対応しなくなるので，Esc で戻せる直しにはしない(Backspace で消せる)
     func acceptSuggestion(_ composition: inout Composition) -> Bool {
         guard let suggested = suggestion else { return false }
+        if suggestsMisreading {
+            composition = suggested
+            suggestion = nil
+            suggestsMisreading = false
+            applied = nil
+            return true
+        }
         applied = Applied(typed: composition, correctedKeyCount: suggested.rawKeys?.count ?? 0)
         composition = suggested
         suggestion = nil
@@ -150,12 +169,24 @@ final class ReadingCorrector {
 
     // MARK: - 内部
 
+    /// 示している読みが，よくある読み違いを直したものか
+    private var suggestsMisreading = false
+
+    /// 読みの末尾がよくある読み違いなら，正しい読みにした読み(Misreadings)
+    private func misreadingSuggestion(for typed: Composition, makeComposition: () -> Composition) -> Composition? {
+        let reading = typed.conversionReading
+        guard let match = Misreadings.suffixEntry(in: reading), match.entry.correctReading != match.entry.reading else { return nil }
+        var suggested = makeComposition()
+        suggested.insertKana(String(reading.prefix(match.start)) + match.entry.correctReading)
+        return suggested
+    }
+
     private func decision(forKeys keys: String, reading: String) -> ReadingCorrectionRule.Decision? {
         if let lastReview, lastReview.keys == keys { return lastReview.decision }
         var candidates = converter.typoCorrections(forKeys: keys)
         // 同じキーを続けて 2 回打った誤りは Zenzai の訂正では探さないので，1 回にした並びも見直して比べる．
         // 直すと決まったあとも試す．試さないと，重なりを 1 回にした文よりもっともらしくない文に直すことがある(評価で 1 件 → 4 件)
-        for variant in ReadingCorrectionRule.repeatedKeyVariants(of: keys) {
+        for variant in settings.current.correction.repeatedKeys ? ReadingCorrectionRule.repeatedKeyVariants(of: keys) : [] {
             candidates += converter.typoCorrections(forKeys: variant).map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
         }
         candidates.sort { $0.score > $1.score }
