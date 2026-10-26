@@ -72,12 +72,8 @@ pub mod settings {
     pub const READING: &str = "読み";
     pub const WORD: &str = "単語";
     pub const DICTIONARY_EMPTY: &str = "登録した単語はありません";
-    pub const INVALID_ENTRY: &str =
-        "読みはひらがなで入力し、読みと単語は長すぎないようにしてください";
     pub const ROMAJI_KANA: &str = "出力";
     pub const ROMAJI_EMPTY: &str = "追加した組み合わせはありません";
-    pub const INVALID_ROMAJI: &str =
-        "入力は英小文字・「-」・「'」で 4 文字まで、出力は 6 文字までにしてください";
     pub const REMOVE: &str = "削除";
 }
 
@@ -132,7 +128,6 @@ pub mod features {
     pub const LANGUAGE_RULE_RESULT: &str = "結果";
     pub const TRY_PLACEHOLDER: &str = "英字の文";
     pub const TRY_PRECEDING: &str = "前の文字列";
-    pub const INVALID_WORD: &str = "単語は 32 文字までの英字にしてください";
     pub const ENGLISH_WORDS_EMPTY: &str = "常に英語にする単語はありません";
     pub const JAPANESE_WORDS_EMPTY: &str = "常に日本語にする単語はありません";
     pub const CORRECTION_PAGE: &str = "補正";
@@ -147,9 +142,6 @@ pub mod features {
     pub const OUTPUT: &str = "記号";
     pub const READING_INPUT: &str = "読み";
     pub const READING_OUTPUT: &str = "空白で区切った記号";
-    pub const INVALID_SYMBOL: &str = "連続入力は英字と数字以外の 2〜12 文字にしてください";
-    pub const INVALID_READING_SYMBOL: &str =
-        "読みは 12 文字まで、記号は 200 文字までにしてください";
     pub const SYMBOLS_EMPTY: &str = "ルールはありません";
     pub const CHANGED: &str = "変更あり";
     pub const ADDED: &str = "追加";
@@ -159,9 +151,6 @@ pub mod features {
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
     pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";
-    pub const INVALID_RULE: &str =
-        "入力した英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください";
-    pub const INVALID_EXCEPTION: &str = "修正しない語句は 64 文字までにしてください";
     pub const RULES_EMPTY: &str = "置き換えはありません";
     pub const EXCEPTIONS_EMPTY: &str = "修正しない語句はありません";
     pub const RESTORE_DEFAULT: &str = "既定に戻す";
@@ -207,7 +196,7 @@ pub mod more {
     pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
     pub const PREVIEW: &str = "見本";
     pub const READABILITY: &str = "読みやすさ";
-    pub const INVALID_THEME: &str = "名前を入れてください";
+    pub const INVALID_THEME: &str = "名前を入力してください";
 
     pub fn copy_name(name: &str) -> String {
         format!("{name} のコピー")
@@ -361,6 +350,33 @@ pub mod keys {
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
     ];
+    /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
+    pub const COMMAND_HELP: &[(&str, &str)] = &[
+        ("nextInputStyle", "ローマ字入力・かな入力・英字入力・英字入力(自動)を順に切り替えます"),
+        ("englishAutoStyle", "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"),
+        ("insertSpace", "幅は「スペース幅」の設定に従います。入力中の文字は確定してから入力します"),
+        ("insertAlternateSpace", "「スペース幅」の設定と逆の幅の空白を入力します"),
+        ("convert", "英単語を修正した直後は、修正前に戻します"),
+        ("convertWithoutLearning", "学習した順位を使わずに変換し、確定しても学習しません"),
+        ("insertBoundary", "入力中に、現在の位置で文節を区切ります"),
+        ("acceptSuggestion", "「もしかして」で示した読みに修正します"),
+        ("switchKanaType", "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"),
+        ("nextCandidate", "入力中に押すと変換を始めます"),
+        ("previousCandidate", "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"),
+        ("nextUncertainSegment", "誤変換の可能性が高い文節に移動します"),
+        ("previousUncertainSegment", "誤変換の可能性が高い文節に移動します"),
+        ("extendSegmentToWord", "文節の終わりを次・前の単語の切れ目まで動かします"),
+        ("shrinkSegmentToWord", "文節の終わりを次・前の単語の切れ目まで動かします"),
+        ("splitSegment", "単語の切れ目に番号を表示し、数字キーで区切ります"),
+        ("commitFirstSegment", "先頭の文節を確定し、残りの変換を続けます"),
+        ("cancel", "変換中は読みに戻し、修正した読みは入力したままに戻します。入力中は読みを削除します"),
+        ("backToReading", "変換をやめて読みに戻ります"),
+        ("forgetCandidate", "選択中の候補を学習から削除します"),
+        ("forgetLastCommit", "最後に確定した語句の学習を取り消します。入力した文字は削除しません"),
+        ("handwriting", "「手書き入力」の設定がオンのときに使えます"),
+        ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"),
+        ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
+    ];
 }
 
 /// UIStrings.RuleList
@@ -406,7 +422,7 @@ pub mod dictionaries {
         } else {
             format!("{field}・")
         };
-        format!("{field}{words} 語・{condition}")
+        format!("{field}{words} 件・{condition}")
     }
 
     /// 選んだアプリの使う場面(「選んだアプリ 2 個」)
@@ -564,7 +580,7 @@ pub mod windows {
     pub const CSV_FILES: &str = "CSV ファイル";
     pub const APP_FILES: &str = "アプリ";
 
-    /// バージョンの表示(ADR 0008．macOS と同じ「v0.1.0 (Windows)」の形)
+    /// バージョンの表示(ADR 0008．macOS と同じ「v0.1.0 (Windows)」の形．macOS は UIStrings.More.versionValue)
     pub fn version(version: &str) -> String {
         format!("v{version} (Windows)")
     }
@@ -587,44 +603,121 @@ pub mod windows {
     pub const ENGINE_UNAVAILABLE: &str = "変換エンジンが動いていないため、設定を読み込めません";
 }
 
+/// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．
+/// macOS の UIStrings も同じ文に DefaultSettings の値を差し込む
+pub mod limited {
+    use crate::catalog::Limits;
+
+    pub fn invalid_entry(limits: &Limits) -> String {
+        format!(
+            "読みはひらがなで {} 文字まで、単語は {} 文字までにしてください",
+            limits.user_dictionary_reading_length, limits.user_dictionary_word_length
+        )
+    }
+
+    pub fn invalid_romaji(limits: &Limits) -> String {
+        format!(
+            "入力は英小文字・「-」・「'」で {} 文字まで、出力は {} 文字までにしてください",
+            limits.romaji_keys_length, limits.romaji_kana_length
+        )
+    }
+
+    pub fn invalid_word(limits: &Limits) -> String {
+        format!(
+            "単語は {} 文字までの英字にしてください",
+            limits.word_language_word_length
+        )
+    }
+
+    pub fn invalid_rule(limits: &Limits) -> String {
+        format!(
+            "入力した英字は {}〜{} 文字の英字、置き換える語句は {} 文字までにしてください",
+            limits.correction_rule_typed_minimum,
+            limits.correction_rule_typed_maximum,
+            limits.correction_rule_word_length
+        )
+    }
+
+    pub fn invalid_exception(limits: &Limits) -> String {
+        format!(
+            "修正しない語句は {} 文字までにしてください",
+            limits.exception_length
+        )
+    }
+
+    pub fn invalid_symbol(limits: &Limits) -> String {
+        format!(
+            "連続入力は英字と数字以外の {}〜{} 文字にしてください",
+            limits.symbol_sequence_minimum, limits.symbol_input_length
+        )
+    }
+
+    pub fn invalid_reading_symbol(limits: &Limits) -> String {
+        format!(
+            "読みは {} 文字まで、記号は {} 文字までにしてください",
+            limits.symbol_input_length, limits.symbol_output_length
+        )
+    }
+}
+
+/// 知らせる文言．上限の数を入れるもの(Limited)は，出すときに目録の値で作る
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Text {
+    Fixed(&'static str),
+    Limited(LimitedText),
+}
+
+/// 上限の数を入れる誤りの文言の種類(limited の関数に当たる)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitedText {
+    Entry,
+    Romaji,
+    Word,
+    Rule,
+    Exception,
+    Symbol,
+    ReadingSymbol,
+}
+
+impl Text {
+    pub fn resolve(self, limits: &crate::catalog::Limits) -> std::borrow::Cow<'static, str> {
+        let make = match self {
+            Text::Fixed(text) => return text.into(),
+            Text::Limited(LimitedText::Entry) => limited::invalid_entry,
+            Text::Limited(LimitedText::Romaji) => limited::invalid_romaji,
+            Text::Limited(LimitedText::Word) => limited::invalid_word,
+            Text::Limited(LimitedText::Rule) => limited::invalid_rule,
+            Text::Limited(LimitedText::Exception) => limited::invalid_exception,
+            Text::Limited(LimitedText::Symbol) => limited::invalid_symbol,
+            Text::Limited(LimitedText::ReadingSymbol) => limited::invalid_reading_symbol,
+        };
+        make(limits).into()
+    }
+}
+
 #[cfg(test)]
 mod limits {
-    use super::{features, settings};
+    use super::limited;
     use crate::catalog::Catalog;
 
-    /// 文言に書いた上限の数が，DefaultSettings から写した目録の上限と同じか(macOS は値を差し込む)
+    /// 誤りの文言に，目録の上限の数がそのまま入るか(数を書き写さない)
     #[test]
-    fn 文言の上限の数は目録と同じ() {
+    fn 誤りの文言に目録の上限の数を入れる() {
         let limits = Catalog::load().unwrap().limits;
-        let has = |text: &str, numbers: &[usize]| {
-            numbers
-                .iter()
-                .all(|number| text.contains(&format!("{number}")))
-        };
-        assert!(has(
-            settings::INVALID_ROMAJI,
-            &[limits.romaji_keys_length, limits.romaji_kana_length]
-        ));
-        assert!(has(
-            features::INVALID_WORD,
-            &[limits.word_language_word_length]
-        ));
-        assert!(has(
-            features::INVALID_RULE,
-            &[
-                limits.correction_rule_typed_minimum,
-                limits.correction_rule_typed_maximum,
-                limits.correction_rule_word_length
-            ]
-        ));
-        assert!(has(features::INVALID_EXCEPTION, &[limits.exception_length]));
-        assert!(has(
-            features::INVALID_SYMBOL,
-            &[limits.symbol_sequence_minimum, limits.symbol_input_length]
-        ));
-        assert!(has(
-            features::INVALID_READING_SYMBOL,
-            &[limits.symbol_input_length, limits.symbol_output_length]
-        ));
+        assert_eq!(
+            limited::invalid_romaji(&limits),
+            format!(
+                "入力は英小文字・「-」・「'」で {} 文字まで、出力は {} 文字までにしてください",
+                limits.romaji_keys_length, limits.romaji_kana_length
+            )
+        );
+        assert!(limited::invalid_rule(&limits).starts_with(&format!(
+            "入力した英字は {}〜{} 文字",
+            limits.correction_rule_typed_minimum, limits.correction_rule_typed_maximum
+        )));
+        assert!(limited::invalid_entry(&limits).contains(&format!(
+            "{} 文字まで、単語は {} 文字まで",
+            limits.user_dictionary_reading_length, limits.user_dictionary_word_length
+        )));
     }
 }

@@ -354,7 +354,7 @@ const IMPORTED_SPEC: ListSpec = ListSpec {
     path: "importedDictionaries",
     fields: IMPORTED_FIELDS,
     empty: dictionaries::EMPTY,
-    invalid: crate::strings::windows::INVALID_APP,
+    invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
     lowercase: false,
     exclusive_with: None,
 };
@@ -363,7 +363,7 @@ const ASSOCIATION_SPEC: ListSpec = ListSpec {
     path: "associationDictionaries",
     fields: ASSOCIATION_FIELDS,
     empty: association::EMPTY,
-    invalid: "",
+    invalid: crate::strings::Text::Fixed(""),
     lowercase: false,
     exclusive_with: None,
 };
@@ -620,6 +620,8 @@ pub struct Section {
     pub rows: Vec<Row>,
     /// まとまりの下の注記
     pub footer: Option<&'static str>,
+    /// 注記に入れ替えて出すほかの文(値と文の組．キー設定のコマンドの説明)．注記の高さはいちばん長い文に合わせる
+    pub footer_variants: &'static [(&'static str, &'static str)],
 }
 
 impl Section {
@@ -628,6 +630,7 @@ impl Section {
             title: Some(title),
             rows,
             footer: None,
+            footer_variants: &[],
         }
     }
 
@@ -636,6 +639,7 @@ impl Section {
             title: None,
             rows,
             footer: None,
+            footer_variants: &[],
         }
     }
 }
@@ -834,6 +838,7 @@ fn conversion() -> Vec<Section> {
                 Control::Dictionaries(DictionaryList::Association, ASSOCIATION_SPEC),
             )],
             footer: Some(association::NOTE),
+            footer_variants: &[],
         },
         Section::new(
             settings::SPECIAL_CONVERSION,
@@ -907,7 +912,7 @@ fn correction() -> Vec<Section> {
                         path: "correction.rules",
                         fields: CORRECTION_RULE_FIELDS,
                         empty: features::RULES_EMPTY,
-                        invalid: features::INVALID_RULE,
+                        invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Rule),
                         lowercase: false,
                         exclusive_with: None,
                     },
@@ -924,7 +929,9 @@ fn correction() -> Vec<Section> {
                         path: "correction.exceptions",
                         fields: EXCEPTION_FIELDS,
                         empty: features::EXCEPTIONS_EMPTY,
-                        invalid: features::INVALID_EXCEPTION,
+                        invalid: crate::strings::Text::Limited(
+                            crate::strings::LimitedText::Exception,
+                        ),
                         lowercase: false,
                         exclusive_with: None,
                     },
@@ -944,7 +951,7 @@ fn language() -> Vec<Section> {
                 path,
                 fields: WORD_FIELDS,
                 empty,
-                invalid: features::INVALID_WORD,
+                invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Word),
                 lowercase: true,
                 exclusive_with: Some(other),
             },
@@ -959,6 +966,7 @@ fn language() -> Vec<Section> {
                 Row::toggle(features::AVOIDS_OFFENSIVE, "wordLanguage.avoidsOffensive"),
             ],
             footer: Some(features::USES_CONTEXT_NOTE),
+            footer_variants: &[],
         },
         Section::new(
             features::TRY_LANGUAGE,
@@ -993,13 +1001,14 @@ fn language() -> Vec<Section> {
                     path: "wordLanguage.rules",
                     fields: LANGUAGE_RULE_FIELDS,
                     empty: crate::strings::windows::LANGUAGE_RULES_EMPTY,
-                    invalid: features::INVALID_WORD,
+                    invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Word),
                     lowercase: true,
                     exclusive_with: None,
                 },
                 LimitKind::WordLanguageEntries,
             )],
             footer: Some(crate::strings::windows::LANGUAGE_NOTE),
+            footer_variants: &[],
         },
     ]
 }
@@ -1021,13 +1030,14 @@ fn keymap() -> Vec<Section> {
                     path: "keymap",
                     fields: KEYMAP_FIELDS,
                     empty: "",
-                    invalid: crate::strings::windows::INVALID_KEY,
+                    invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_KEY),
                     lowercase: false,
                     exclusive_with: None,
                 },
                 LimitKind::KeymapEntries,
             )],
             footer: Some(crate::strings::windows::KEY_NOTE),
+            footer_variants: keys::COMMAND_HELP,
         },
         Section::untitled(vec![
             Row::new(keys::PRESET_MENU, "", Control::Preset),
@@ -1052,7 +1062,7 @@ fn apps() -> Vec<Section> {
                         path: "profileRules",
                         fields: APP_FIELDS,
                         empty: more::EXCLUSIONS_EMPTY,
-                        invalid: crate::strings::windows::INVALID_APP,
+                        invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
                         lowercase: true,
                         exclusive_with: None,
                     },
@@ -1062,6 +1072,7 @@ fn apps() -> Vec<Section> {
                 Row::action(more::EXPORT_CSV, Action::File(FileTask::ExportProfileRules)),
             ],
             footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
+            footer_variants: &[],
         },
         Section::untitled(vec![
             Row::toggle(more::TERMINAL_COMMANDS, "terminalCommands"),
@@ -1092,6 +1103,7 @@ fn dictionary() -> Vec<Section> {
             Control::Dictionaries(DictionaryList::Imported, IMPORTED_SPEC),
         )],
         footer: Some(dictionaries::NOTE),
+        footer_variants: &[],
     };
     vec![
         Section::new(
@@ -1104,7 +1116,7 @@ fn dictionary() -> Vec<Section> {
                         path: "userDictionary",
                         fields: DICTIONARY_FIELDS,
                         empty: settings::DICTIONARY_EMPTY,
-                        invalid: settings::INVALID_ENTRY,
+                        invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Entry),
                         lowercase: false,
                         exclusive_with: None,
                     }),
@@ -1149,14 +1161,14 @@ fn symbols() -> Vec<Section> {
             features::SEQUENCES,
             SymbolKind::Sequence,
             SEQUENCE_FIELDS,
-            features::INVALID_SYMBOL,
+            crate::strings::Text::Limited(crate::strings::LimitedText::Symbol),
             RuleList::SymbolSequences,
         ),
         section(
             features::READINGS,
             SymbolKind::Reading,
             READING_FIELDS,
-            features::INVALID_READING_SYMBOL,
+            crate::strings::Text::Limited(crate::strings::LimitedText::ReadingSymbol),
             RuleList::SymbolReadings,
         ),
     ]
@@ -1180,7 +1192,7 @@ fn romaji() -> Vec<Section> {
                 path: "customRomaji",
                 fields: ROMAJI_FIELDS,
                 empty: settings::ROMAJI_EMPTY,
-                invalid: settings::INVALID_ROMAJI,
+                invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Romaji),
                 lowercase: false,
                 exclusive_with: None,
             },
@@ -1239,7 +1251,7 @@ fn appearance() -> Vec<Section> {
                     path: "customThemes",
                     fields: THEME_FIELDS,
                     empty: more::NO_CUSTOM_THEMES,
-                    invalid: more::INVALID_THEME,
+                    invalid: crate::strings::Text::Fixed(more::INVALID_THEME),
                     lowercase: false,
                     exclusive_with: None,
                 }),
@@ -1312,7 +1324,7 @@ fn sync_page() -> Vec<Section> {
             path: "",
             fields: &[],
             empty: "",
-            invalid: "",
+            invalid: crate::strings::Text::Fixed(""),
             lowercase: false,
             exclusive_with: None,
         }),
@@ -1333,6 +1345,7 @@ fn sync_page() -> Vec<Section> {
                 Row::action(sync::SYNC_NOW, Action::SyncNow).enabled_when(On(crate::sync::ENABLED)),
             ],
             footer: Some(crate::strings::windows::SYNC_NOTE),
+            footer_variants: &[],
         },
         Section::new(sync::SCOPES, scopes),
     ]
@@ -1368,6 +1381,7 @@ fn backup() -> Vec<Section> {
                 ),
             ],
             footer: Some(more::BACKUP_NOTE),
+            footer_variants: &[],
         },
         Section::untitled(vec![Row::action(
             crate::strings::windows::OPEN_SETTINGS_FILE,
@@ -1388,6 +1402,7 @@ fn about() -> Vec<Section> {
             title: Some(more::ACKNOWLEDGEMENTS),
             rows: vec![Row::new(more::ACKNOWLEDGEMENTS, "", Control::Notices)],
             footer: Some(more::ACKNOWLEDGEMENTS_NOTE),
+            footer_variants: &[],
         },
     ]
 }

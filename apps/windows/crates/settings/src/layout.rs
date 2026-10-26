@@ -145,7 +145,12 @@ pub fn layout(
             y = card.max_y() + size::CARD_GAP;
         }
         let footer = section.footer.map(|text| {
-            let height = lines(text, width) as f32 * size::NOTE_LINE_HEIGHT;
+            let longest = std::iter::once(text)
+                .chain(section.footer_variants.iter().map(|(_, text)| *text))
+                .map(|text| lines(text, width))
+                .max()
+                .unwrap_or(1);
+            let height = longest as f32 * size::NOTE_LINE_HEIGHT;
             let rect = Rect::new(left, y, width, height);
             y += height + size::CARD_GAP;
             rect

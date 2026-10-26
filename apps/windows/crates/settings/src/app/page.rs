@@ -448,6 +448,23 @@ impl RowView {
         }
     }
 
+    /// 入力欄の選ぶ欄で選んでいる値(設定のファイルに書く値)
+    fn chosen_values(&self) -> Vec<String> {
+        let (Some((fields, _, _)), Some((spec, _))) = (self.list_parts(), self.list_spec()) else {
+            return Vec::new();
+        };
+        spec.fields
+            .iter()
+            .zip(fields)
+            .filter_map(|(field, window)| {
+                let choices = field.choices?;
+                choices
+                    .get(selected(*window)?)
+                    .map(|(value, _)| (*value).to_string())
+            })
+            .collect()
+    }
+
     /// all_rows の index の行を入力欄に出す．選ぶ欄は表に出した名前から選ぶ
     fn fill_inputs(&self, index: usize) {
         let (Some((fields, _, _)), Some((spec, _)), Some(cells)) = (
@@ -508,6 +525,7 @@ impl PageView {
             title: None,
             rows: Vec::new(),
             footer: Some(text::ENGINE_UNAVAILABLE),
+            footer_variants: &[],
         }];
         Self::build(host, theme, page, sections, catalog)
     }
@@ -841,6 +859,37 @@ impl PageView {
 
     /// 部品からの WM_COMMAND を頼みにする
     pub fn command(&mut self, window: Window, notification: u32) -> Option<Event> {
+        let event = self.handle_command(window, notification);
+        self.show_footer_variants();
+        event
+    }
+
+    /// 注記に入れ替えて出す文(キー設定のコマンドの説明)を，入力欄で選んでいる値に合わせる．合う文が無ければ元の注記
+    fn show_footer_variants(&self) {
+        for (index, section) in self.sections.iter().enumerate() {
+            if section.footer_variants.is_empty() {
+                continue;
+            }
+            let (Some(Some(footer)), Some(note)) = (self.footers.get(index), section.footer) else {
+                continue;
+            };
+            let chosen: Vec<String> = self
+                .rows
+                .get(index)
+                .into_iter()
+                .flatten()
+                .flat_map(RowView::chosen_values)
+                .collect();
+            let shown = section
+                .footer_variants
+                .iter()
+                .find(|(value, _)| chosen.iter().any(|chosen| chosen == value))
+                .map_or(note, |(_, text)| *text);
+            ffi::set_text(*footer, shown);
+        }
+    }
+
+    fn handle_command(&mut self, window: Window, notification: u32) -> Option<Event> {
         let row = self.rows.iter_mut().flatten().find(|row| {
             row.control == Some(window) || row.reset == Some(window) || row.parts.contains(&window)
         })?;
@@ -1042,6 +1091,17 @@ impl PageView {
     /// 一覧からの WM_NOTIFY．空のときの文を返し，行を選んだら削除のボタンを使えるようにする．扱ったら true
     /// 一覧からの WM_NOTIFY．扱ったか(true なら既定の処理をしない)と，頼み(カスタムテーマを選んだなど)を返す
     pub fn notify(&mut self, window: Window, code: u32, lparam: LPARAM) -> (bool, Option<Event>) {
+        let result = self.handle_notify(window, code, lparam);
+        self.show_footer_variants();
+        result
+    }
+
+    fn handle_notify(
+        &mut self,
+        window: Window,
+        code: u32,
+        lparam: LPARAM,
+    ) -> (bool, Option<Event>) {
         let Some(row) = self
             .rows
             .iter_mut()

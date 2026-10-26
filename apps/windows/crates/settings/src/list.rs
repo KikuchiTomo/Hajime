@@ -89,7 +89,7 @@ pub struct ListSpec {
     /// 一覧が空のときの文
     pub empty: &'static str,
     /// 形が誤っていて残らなかったときの文
-    pub invalid: &'static str,
+    pub invalid: crate::strings::Text,
     /// 打つ欄を足す前に小文字にするか(英語と日本語の語)
     pub lowercase: bool,
     /// 足した語と同じ語を，この一覧からは除く(いつも英語にする語といつも日本語にする語)
@@ -261,7 +261,7 @@ mod tests {
         path: "correction.rules",
         fields: RULE_FIELDS,
         empty: "",
-        invalid: "",
+        invalid: crate::strings::Text::Fixed(""),
         lowercase: false,
         exclusive_with: None,
     };
@@ -271,7 +271,7 @@ mod tests {
         path: "wordLanguage.englishWords",
         fields: WORD_FIELDS,
         empty: "",
-        invalid: "",
+        invalid: crate::strings::Text::Fixed(""),
         lowercase: true,
         exclusive_with: Some("wordLanguage.japaneseWords"),
     };
@@ -287,7 +287,7 @@ mod tests {
         path: "wordLanguage.rules",
         fields: LANGUAGE_FIELDS,
         empty: "",
-        invalid: "",
+        invalid: crate::strings::Text::Fixed(""),
         lowercase: true,
         exclusive_with: None,
     };
@@ -360,7 +360,7 @@ mod tests {
         path: "keymap",
         fields: KEYMAP_FIELDS,
         empty: "",
-        invalid: "",
+        invalid: crate::strings::Text::Fixed(""),
         lowercase: false,
         exclusive_with: None,
     };

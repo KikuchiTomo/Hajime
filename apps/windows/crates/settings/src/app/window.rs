@@ -23,6 +23,7 @@ use ipc::{
     ContrastPair, DictionaryAddResult, DictionaryEntry, FileFailure, RequestBody, SymbolItem,
     SymbolKind, SymbolOrigin, SymbolSaveResult, SyncStatus,
 };
+use std::borrow::Cow;
 use std::cell::RefCell;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
@@ -61,7 +62,7 @@ struct NavEntry {
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
 enum After {
     Message {
-        text: &'static str,
+        text: Cow<'static, str>,
         warning: bool,
     },
     /// 件数などを含む知らせ
@@ -227,7 +228,7 @@ fn with_app<T>(f: impl FnOnce(&mut App) -> T) -> Option<T> {
 fn run_after(window: Window, after: Option<After>) {
     match after {
         Some(After::Message { text, warning }) => {
-            ffi::message(window, settings::WINDOW_TITLE, text, warning)
+            ffi::message(window, settings::WINDOW_TITLE, &text, warning)
         }
         Some(After::Notice(text)) => ffi::message(window, settings::WINDOW_TITLE, &text, false),
         Some(After::OpenSettingsFile) => {
@@ -693,9 +694,13 @@ impl App {
                         self.view.clear_list_inputs("");
                         None
                     }
-                    DictionaryAddResult::AlreadyRegistered => Some(rule_list::ALREADY_REGISTERED),
-                    DictionaryAddResult::Invalid => Some(settings::INVALID_ENTRY),
-                    DictionaryAddResult::Full => Some(rule_list::FULL),
+                    DictionaryAddResult::AlreadyRegistered => {
+                        Some(rule_list::ALREADY_REGISTERED.into())
+                    }
+                    DictionaryAddResult::Invalid => {
+                        Some(crate::strings::limited::invalid_entry(&self.catalog.limits).into())
+                    }
+                    DictionaryAddResult::Full => Some(rule_list::FULL.into()),
                 };
                 self.read_extras();
                 self.refresh();
@@ -743,7 +748,7 @@ impl App {
                 }
                 self.refresh();
                 return Some(After::Message {
-                    text: settings::LEARNING_RESET,
+                    text: settings::LEARNING_RESET.into(),
                     warning: false,
                 });
             }
@@ -814,7 +819,7 @@ impl App {
                     Some(value) => value,
                     None => {
                         return Some(After::Message {
-                            text: text::INVALID_APP,
+                            text: text::INVALID_APP.into(),
                             warning: true,
                         })
                     }
@@ -879,7 +884,7 @@ impl App {
             })),
             FileOutcome::Failed(FileFailure::WriteFailed) => Some(failed()),
             FileOutcome::Failed(_) if importing => Some(After::Message {
-                text: import_failed,
+                text: import_failed.into(),
                 warning: true,
             }),
             FileOutcome::Failed(_) | FileOutcome::Done => None,
@@ -955,7 +960,7 @@ impl App {
                     Some(changed) => changes.push((crate::themes::THEMES, changed)),
                     None => {
                         return Some(After::Message {
-                            text: more::INVALID_THEME,
+                            text: more::INVALID_THEME.into(),
                             warning: true,
                         })
                     }
@@ -1181,8 +1186,10 @@ impl App {
                     .map(|result| {
                         notice = match result {
                             SymbolSaveResult::Saved => None,
-                            SymbolSaveResult::Invalid => Some(symbol_invalid(kind)),
-                            SymbolSaveResult::Full => Some(rule_list::FULL),
+                            SymbolSaveResult::Invalid => {
+                                Some(symbol_invalid(kind, &self.catalog.limits).into())
+                            }
+                            SymbolSaveResult::Full => Some(rule_list::FULL.into()),
                         };
                     })
             }
@@ -1234,12 +1241,12 @@ impl App {
         }
         match outcome {
             FileOutcome::Done => task.done().map(|text| After::Message {
-                text,
+                text: text.into(),
                 warning: false,
             }),
             FileOutcome::Imported(added) => Some(After::Notice(task.imported(added))),
             FileOutcome::Failed(_) => Some(After::Message {
-                text: task.failed(),
+                text: task.failed().into(),
                 warning: true,
             }),
         }
@@ -1255,7 +1262,7 @@ impl App {
     ) -> Option<After> {
         if !spec.is_valid(item) {
             return Some(After::Message {
-                text: spec.invalid,
+                text: spec.invalid.resolve(&self.catalog.limits),
                 warning: true,
             });
         }
@@ -1269,7 +1276,7 @@ impl App {
         let is_new = !items.iter().any(|existing| spec.same_key(existing, item));
         if is_new && items.len() >= limit {
             return Some(After::Message {
-                text: rule_list::FULL,
+                text: rule_list::FULL.into(),
                 warning: true,
             });
         }
@@ -1283,7 +1290,7 @@ impl App {
         let after = match result {
             Err(error) => self.failure(error),
             Ok(()) if !kept => Some(After::Message {
-                text: spec.invalid,
+                text: spec.invalid.resolve(&self.catalog.limits),
                 warning: true,
             }),
             Ok(()) => {
@@ -1494,16 +1501,16 @@ fn symbol_row(item: &SymbolItem) -> Vec<String> {
     vec![item.input.clone(), item.output.clone(), state.join("・")]
 }
 
-fn symbol_invalid(kind: SymbolKind) -> &'static str {
+fn symbol_invalid(kind: SymbolKind, limits: &crate::catalog::Limits) -> String {
     match kind {
-        SymbolKind::Sequence => features::INVALID_SYMBOL,
-        SymbolKind::Reading => features::INVALID_READING_SYMBOL,
+        SymbolKind::Sequence => crate::strings::limited::invalid_symbol(limits),
+        SymbolKind::Reading => crate::strings::limited::invalid_reading_symbol(limits),
     }
 }
 
 fn failed() -> After {
     After::Message {
-        text: settings::SAVE_FAILED,
+        text: settings::SAVE_FAILED.into(),
         warning: true,
     }
 }

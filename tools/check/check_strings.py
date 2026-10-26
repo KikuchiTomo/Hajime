@@ -64,7 +64,7 @@ def swift_constants(text: str) -> dict[tuple[str, str], str]:
     return constants
 
 
-def swift_label_functions(text: str) -> list[tuple[str, str, dict[str, str]]]:
+def swift_label_functions(text: str, function_name: str = "label") -> list[tuple[str, str, dict[str, str]]]:
     """(入れ子の enum の名前，引数の型，case ごとの名前)．名前が別の label(for:) を呼ぶ case は，呼び先の名前として返す"""
     functions: list[tuple[str, str, dict[str, str]]] = []
     enums: list[tuple[str, int]] = []
@@ -74,7 +74,7 @@ def swift_label_functions(text: str) -> list[tuple[str, str, dict[str, str]]]:
         enum = re.match(r"\s*(?:public |private |fileprivate )?enum (\w+)\b.*\{", line)
         if enum:
             enums.append((enum.group(1), depth))
-        function = re.match(r"\s*static func label\(for \w+: ([\w.]+)\) -> String \{", line)
+        function = re.match(rf"\s*static func {function_name}\(for \w+: ([\w.]+)\) -> String\?? \{{", line)
         if function and enums:
             current = (enums[-1][0], function.group(1), {}, depth)
         elif current:
@@ -150,6 +150,12 @@ def check() -> list[str]:
             problems.append(f"{name}: UIStrings.{group} に同じ名前の文言がありません(Windows だけの文言は pub mod windows に置く)")
         elif mac[key] != value:
             problems.append(f"{name}: 「{value}」が macOS の「{mac[key]}」と違います")
+    # コマンドの説明(macOS の Keys.help(for:)．説明の無いコマンドは並べない)
+    help_labels = next((labels for enum, kind, labels in swift_label_functions(swift, "help") if kind == "KeymapCommand"), {})
+    windows_help = rust_table(rust, "COMMAND_HELP")
+    for value in sorted(set(windows_help) | {name for name, text in help_labels.items() if text != "@nil"}):
+        if windows_help.get(value) != help_labels.get(value):
+            problems.append(f"COMMAND_HELP の {value}: Windows「{windows_help.get(value)}」と macOS「{help_labels.get(value)}」が違います")
     for table, kind in (("STATES", "KeymapState"), ("PRESETS", "KeymapPreset"), ("COMMANDS", "KeymapCommand")):
         windows = rust_table(rust, table)
         labels = swift_labels(swift, kind)
