@@ -66,6 +66,7 @@ git push origin macos/v0.0.2
 |---|---|---|---|
 | `ci.yml` | CI | `lint`・`core-macos`・`app-macos` | 手で動かす(費用を抑えるため．実装がそろったら PR ごとに戻す) |
 | `ci-windows.yml` | CI Windows | `rust-windows`・`core-windows` | 手で動かす |
+| `ci-linux.yml` | CI Linux | `core-linux`(Zenzai なし．ADR 0012 の準備) | 手で動かす |
 | `pr-title.yml` | PR title | `pr-title` | PR を開いた・直したとき |
 | `package-macos.yml` | Package macOS | `package-macos` | `release.yml` から呼ぶ．手でも動かせる |
 | `package-windows.yml` | Package Windows | `package-windows` | `release.yml` から呼ぶ．手でも動かせる |

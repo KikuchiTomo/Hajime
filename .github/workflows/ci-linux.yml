@@ -1,0 +1,40 @@
+name: CI Linux
+
+# Linux 版の準備(docs/dev/adr/0012-linux.md)．core を Linux でビルドしてテストする．
+# Zenzai(llama.cpp)はまだ Linux 向けに用意していないので，Zenzai の trait を外して動かす．
+# 費用を抑えるため，今は手で動かす: gh workflow run ci-linux.yml --ref <ブランチ>
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-linux-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# 仕事の名前は ci.yml と同じ決まり(何を-どこで)
+jobs:
+  core-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Windows と同じ Swift の版．イメージはダイジェストで固定する
+    container: swift:6.3.3-noble@sha256:c2f3ac2eb806ce43f68859c3d52bd3bb1cfc88672fb3a948b76e136d98e39278
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: corebuild
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: core-linux-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+          restore-keys: |
+            core-linux-6.3.3-${{ hashFiles('core/Package.resolved') }}-
+      - run: swift build --package-path core --disable-default-traits
+      - run: swift test --package-path core --disable-default-traits
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: core-linux-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
