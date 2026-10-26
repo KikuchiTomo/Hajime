@@ -24,6 +24,8 @@ public final class InputSession {
     private let settings: any SettingsReading
 
     public private(set) var mode: InputMode = .japanese
+    /// 今の入力先のプロファイル(最後に受けたキーの文脈)．表示の決まり(R-06 のライブ変換を控えめにする)に使う
+    private var profile = AppProfile.standard
     private var composition = Composition()
     /// ローマ字の表．利用者が足した綴りが変わったときだけ作り直す
     private var romajiTable: (rules: [RomajiRule], table: RomajiTable) = ([], .standard)
@@ -72,7 +74,7 @@ public final class InputSession {
         self.lexicon = lexicon
         self.settings = settings
         self.usage = usage
-        self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
+        self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings, converter: converter)
         self.readingCorrector = ReadingCorrector(converter: converter, settings: settings, usesProvidedCorrections: typoService != nil)
         self.styleHandlers = [.english: EnglishInput(converter: converter), .kana: KanaInput()]
     }
@@ -87,6 +89,7 @@ public final class InputSession {
             return .passThrough
         }
         showsCorrectionNote = false
+        profile = context.profile
         let hidesNote = showsTransientNote
         showsTransientNote = false
         var result = route(event, context: context)
@@ -179,6 +182,7 @@ public final class InputSession {
     public func settle(context: InputContext) -> [ClientAction] {
         guard awaitsSettle else { return [] }
         isSettled = true
+        freezeWordsReadAsRomaji()
         return render(context: context)
     }
 
@@ -192,7 +196,9 @@ public final class InputSession {
     /// 見直すために，別のところで求める訂正のキーの並びと左の文脈．求めるものが無ければ nil
     public var correctionRequest: (keys: [String], leftContext: String?)? {
         guard awaitsReview, let keys = readingCorrector.pendingKeys(for: composition) else { return nil }
-        return (keys, compositionLeftContext)
+        // 英単語より後ろだけを見直すときは，英単語までの部分も左の文脈にする
+        guard let prefix = readingCorrector.unreviewedPrefix(of: composition) else { return (keys, compositionLeftContext) }
+        return (keys, String(((compositionLeftContext ?? "") + prefix).suffix(DefaultSettings.maximumLeftContextLength)))
     }
 
     /// 別のところで求めた訂正を受け取る．そのあと review を呼ぶと見直す
@@ -566,7 +572,8 @@ public final class InputSession {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
         } else if character.isASCII && (character.isLetter || character.isNumber) {
-            corrector.commit(into: &composition)
+            // 英単語に続けて打った大文字と数字は識別子の続き(「userName」「v2」)なので，綴りを直さず打ったとおりにする(R-06)
+            corrector.commitAsTyped(into: &composition)
             readingCorrector.didInsertLiteral()
             let width = character.isNumber ? settings.current.numberWidth : settings.current.alphabetWidth
             let text = width == .fullwidth ? KanaWidth.fullwidthASCII(from: String(character)) : String(character)
@@ -577,7 +584,12 @@ public final class InputSession {
                 // 半角のままの記号は，組み立てを始めずにアプリへ渡す(プログラミング中に Enter を要求しない)
                 return KeyResult(handled: false, actions: actions)
             }
-            corrector.commit(into: &composition)
+            if character == "_" || (character == "." && context.profile.prefersHalfwidthSymbols) {
+                // 「user_name」「a.b」の識別子は直さない(R-06)
+                corrector.commitAsTyped(into: &composition)
+            } else {
+                corrector.commit(into: &composition)
+            }
             readingCorrector.didInsertLiteral()
             composition.insertLiteral(text, rawKey: nil)
             if settings.current.punctuationCommits, SymbolTable.isPunctuation(text, settings: settings.current) {
@@ -661,6 +673,7 @@ public final class InputSession {
     /// 英単語を補正しているときは，直した英単語を読みの中に確定させてから分岐図にする(打ったままに戻すのは補正の直後の Space)
     private func enterConversion() {
         usage?.record(.conversionOpened)
+        freezeWordsReadAsRomaji()
         reviewReading()
         guard settings.current.candidatePresentation != .list else {
             phase = .selecting(makeSelection(focus: .candidate(0)))
@@ -686,6 +699,13 @@ public final class InputSession {
             lattice.focusedIndex = lattice.initialFocus(focus)
         }
         phase = .lattice(lattice)
+    }
+
+    /// ローマ字として読めてしまう英単語を英単語にする(「gitwotukau」→「gitを使う」)．打ち間違いを直して見せているときはしない
+    private func freezeWordsReadAsRomaji() {
+        guard phase == .composing, !readingCorrector.isApplied, corrector.freezeWordReadAsRomaji(in: &composition) else { return }
+        readingCorrector.forgetReview()
+        usage?.record(.englishCorrected)
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
@@ -786,6 +806,7 @@ public final class InputSession {
             let changed = selection.focus == .candidate(0) ? 0 : 1
             usage?.record(.committed(changedSegments: changed, viaConversion: true))
         } else {
+            freezeWordsReadAsRomaji()
             usage?.record(.committed(changedSegments: 0, viaConversion: false))
         }
         var actions: [ClientAction] = []
@@ -850,8 +871,10 @@ public final class InputSession {
                 let following = corrector.followingReading(in: composition).conversionReading
                 return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + following, readingCount: whole, origin: .correction)
             }
-            // Enter は区切りなので，かなのまま見せていた語も変換して確定する
-            if settings.current.liveConversion, composition.pending.isEmpty || composition.pending == "n",
+            // Enter は区切りなので，かなのまま見せていた語も変換して確定する．
+            // ただしエディタとターミナルで英数字を打っている途中なら，見せているとおり読みのまま確定する(R-06)
+            if settings.current.liveConversion, !(codeRestraintApplies && readingEndsWithAlphanumeric),
+                composition.pending.isEmpty || composition.pending == "n",
                 let live = liveCandidate() {
                 return live
             }
@@ -930,7 +953,10 @@ public final class InputSession {
 
     private func updateCorrection() {
         let before = corrector.active
-        corrector.update(for: composition)
+        // プログラミング用のアプリでは，日本語の文の中にある英単語だけを直す(R-06)
+        let context = EnglishWordCorrector.Context(correctsOnlyInJapanese: profile.prefersHalfwidthSymbols,
+                                                   precedingCharacter: compositionLeftContext?.last)
+        corrector.update(for: composition, context: context)
         if before == nil, corrector.active != nil { usage?.record(.englishCorrected) }
     }
 
@@ -1201,6 +1227,21 @@ public final class InputSession {
         return text
     }
 
+    /// エディタとターミナルでライブ変換を控えめにするか(R-06．設定)
+    private var codeRestraintApplies: Bool {
+        settings.current.restrainsLiveConversionInCode && (profile == .programming || profile == .terminal)
+    }
+
+    /// 読みの末尾が英数字か(識別子を打っている途中)
+    private var readingEndsWithAlphanumeric: Bool {
+        composition.pending.isEmpty && composition.kana.last.map(Composition.isAlphanumeric) == true
+    }
+
+    /// ライブ変換を控え，読みのまま見せるか(R-06)．打鍵が止まるまでと，英数字を打っているあいだ
+    private var holdsLiveConversionForCode: Bool {
+        codeRestraintApplies && (!isSettled || readingEndsWithAlphanumeric)
+    }
+
     private func composingMarkedText() -> MarkedText {
         if let correction = corrector.active {
             return MarkedText([
@@ -1209,7 +1250,7 @@ public final class InputSession {
                 .init(corrector.followingReading(in: composition).displayReading, style: .reading),
             ])
         }
-        guard settings.current.liveConversion else {
+        guard settings.current.liveConversion, !holdsLiveConversionForCode else {
             return MarkedText([.init(composition.displayReading, style: .reading)])
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる

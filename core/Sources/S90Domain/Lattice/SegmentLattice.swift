@@ -74,16 +74,19 @@ public struct SegmentLattice: Sendable, Equatable {
         focusedIndex = min(max(focusedIndex + offset, 0), segments.count - 1)
     }
 
-    /// 迷う文節(確信度の低い文節)へ注目を移す．端を越えたら反対の端から探す．迷う文節が無ければ動かない
+    /// 迷う文節(確信度の低い文節)へ注目を移す．端を越えたら反対の端から探す．
+    /// ほかに迷う文節が無ければ，隣の文節へ移る(端では反対の端へ)．Tab を押しても動かないと，次の文節に移れなくなるため
     public mutating func moveToUncertain(forward: Bool) {
         let count = segments.count
-        for step in 1...count {
+        guard count > 1 else { return }
+        for step in 1..<count {
             let index = ((focusedIndex + (forward ? step : -step)) % count + count) % count
             if !segments[index].isConfident {
                 focusedIndex = index
                 return
             }
         }
+        focusedIndex = ((focusedIndex + (forward ? 1 : -1)) % count + count) % count
     }
 
     /// 入力位置にいちばん近い迷う文節．無ければ最後の文節．

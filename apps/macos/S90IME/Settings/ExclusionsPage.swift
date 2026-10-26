@@ -34,7 +34,7 @@ struct ExclusionsPage: View {
                 }
                 .overlay {
                     if model.settings.profileRules.isEmpty {
-                        ContentUnavailableView(UIStrings.More.exclusionsEmpty, systemImage: "app.dashed", description: Text(UIStrings.More.exclusionsEmptyHint))
+                        ContentUnavailableView(UIStrings.More.exclusionsEmpty, systemImage: "app.dashed")
                     }
                 }
                 .frame(height: DesignTokens.Size.Settings.ruleTableHeight)
@@ -70,6 +70,7 @@ struct ExclusionsPage: View {
             Section {
                 ResettableToggle(model: model, title: UIStrings.More.terminalCommands, keyPath: \.terminalCommands)
                 ResettableToggle(model: model, title: UIStrings.Settings.escapeSwitchesToDirect, keyPath: \.escapeSwitchesToDirect)
+                ResettableToggle(model: model, title: UIStrings.More.restrainsLiveConversionInCode, keyPath: \.restrainsLiveConversionInCode)
             }
         }
         .formStyle(.grouped)

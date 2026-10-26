@@ -16,6 +16,9 @@ public struct Composition: Sendable, Equatable {
     /// 確定させた英単語の終わり(かなの文字数)．ここより前は英単語を探さない．
     /// 確定させた英単語そのものを「読めない並び」と数えて，後ろの日本語まで補正しないため
     private var frozenKanaEnd = 0
+    /// 英字として入れた部分(確定させた英単語と，Shift で打った大文字・数字)の終わり(かなの文字数)．
+    /// ローマ字として読めずに残った英字(打ち間違い)は含めない
+    private var englishKanaEnd = 0
     /// 「nn」のあとの母音の位置．語によって「ん+あ行」(hannei → はんえい)か「ん+な行」(onna → おんな)かが
     /// 変わるので，どちらの読みにも切り替えられるようにしておく．どちらにするかは変換の点数で決める(NasalReadingResolver)
     public private(set) var nasalAmbiguities: [NasalAmbiguity] = []
@@ -30,12 +33,19 @@ public struct Composition: Sendable, Equatable {
         public var naRowForm: String
         public var usesNaRow: Bool
         /// 前に読みを比べたとき，母音のあとに何文字あったか．比べ直すかどうかを決めるのに使う
-        public var evaluatedFollowingCount: Int?
+        /// 前に比べたときの，母音のあとの文字．同じなら比べ直さない．数ではなく文字で覚えるのは，打ちかけのローマ字(「ふんにk」)が
+        /// かなになったとき(「ふんにき」)に数が変わらず，比べ直さなくなるため(hunniki → 糞に来)
+        public var evaluatedFollowingText: String?
 
         public var currentForm: String { usesNaRow ? naRowForm : vowelForm }
         /// 読みの中で，この母音のあとに続く文字数
         public func followingCount(in reading: String) -> Int {
             reading.count - kanaIndex - currentForm.count
+        }
+
+        /// 読みの中で，この母音のあとに続く文字
+        public func followingText(in reading: String) -> String {
+            String(reading.dropFirst(kanaIndex + currentForm.count))
         }
     }
 
@@ -115,6 +125,7 @@ public struct Composition: Sendable, Equatable {
         boundaries = boundaries.filter { $0.kanaCount <= kana.count }
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
         frozenKanaEnd = min(frozenKanaEnd, kana.count)
+        englishKanaEnd = min(englishKanaEnd, kana.count)
     }
 
     /// 「nn」の直後にかなになった文字が母音(や行を含む)なら，両方の読みを持てるように記録する
@@ -127,13 +138,13 @@ public struct Composition: Sendable, Equatable {
         }
         let following = String(characters[index...])
         guard let form = Self.naRowForms.first(where: { following.hasPrefix($0.vowel) }) else { return }
-        nasalAmbiguities.append(NasalAmbiguity(kanaIndex: index, vowelForm: form.vowel, naRowForm: form.naRow, usesNaRow: false, evaluatedFollowingCount: nil))
+        nasalAmbiguities.append(NasalAmbiguity(kanaIndex: index, vowelForm: form.vowel, naRowForm: form.naRow, usesNaRow: false, evaluatedFollowingText: nil))
     }
 
     /// 読みを比べたことを記録する
-    public mutating func markNasalEvaluated(at position: Int, followingCount: Int) {
+    public mutating func markNasalEvaluated(at position: Int, followingText: String) {
         guard nasalAmbiguities.indices.contains(position) else { return }
-        nasalAmbiguities[position].evaluatedFollowingCount = followingCount
+        nasalAmbiguities[position].evaluatedFollowingText = followingText
     }
 
     /// 「nn」のあとの母音を「ん+あ行」と「ん+な行」のどちらで読むかを切り替える
@@ -156,6 +167,7 @@ public struct Composition: Sendable, Equatable {
             boundaries[i].kanaCount += delta
         }
         if frozenKanaEnd > ambiguity.kanaIndex { frozenKanaEnd += delta }
+        if englishKanaEnd > ambiguity.kanaIndex { englishKanaEnd += delta }
     }
 
     /// 区切りから末尾までの部分を，長いもの(前の区切り)から順に返す．打ったキーと読みの対応が外れていたら空
@@ -197,10 +209,35 @@ public struct Composition: Sendable, Equatable {
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex < kanaStart }
         nasalWatchIndex = nil
         frozenKanaEnd = kana.count
+        // 打ったとおりの英単語(「python」)は英字として入れたものとみなす．綴りを直した語(「sride」→「bride」)は，
+        // 日本語の打ち間違いを英単語と取り違えたことがあるので，日本語の打ち間違いの見直しで読み直せるようにしておく
+        if word.lowercased() == keys.lowercased() { englishKanaEnd = kana.count }
         recordBoundary()
         for key in after {
             insertRomaji(key)
         }
+    }
+
+    /// 英字として入れた部分(確定させた英単語や，Shift で打った「IME」)の直後の区切り．
+    /// ここより後ろは日本語として打った部分なので，打ち間違いの見直しはここから後ろだけにする(英単語を日本語に直さない)．
+    /// 英字として入れた部分が無ければ読みの先頭．その直後に区切りが無い(打ったキーと読みが対応しない)ときは nil
+    public var boundaryAfterEnglish: Boundary? {
+        guard englishKanaEnd > 0 else { return boundaries.first }
+        return boundaries.last { $0.kanaCount == englishKanaEnd }
+    }
+
+    /// 区切り(boundary)より後ろを捨てた読み．捨てた部分を打ち直す(打ち間違いを直したキーで入れ直す)ときに使う
+    public func truncated(to boundary: Boundary) -> Composition {
+        var copy = self
+        copy.kana = String(kana.prefix(boundary.kanaCount))
+        copy.pending = ""
+        copy.rawKeys = rawKeys.map { String($0.prefix(boundary.rawCount)) }
+        copy.boundaries = boundaries.filter { $0.rawCount <= boundary.rawCount && $0.kanaCount <= boundary.kanaCount }
+        copy.nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= boundary.kanaCount }
+        copy.nasalWatchIndex = nil
+        copy.frozenKanaEnd = min(frozenKanaEnd, boundary.kanaCount)
+        copy.englishKanaEnd = min(englishKanaEnd, boundary.kanaCount)
+        return copy
     }
 
     private mutating func recordBoundary() {
@@ -214,6 +251,7 @@ public struct Composition: Sendable, Equatable {
         flushPending()
         nasalWatchIndex = nil
         kana.append(text)
+        if text.contains(where: Self.isAlphanumeric) { englishKanaEnd = kana.count }
         mergeSymbolSequence()
         if let rawKey {
             rawKeys?.append(rawKey)
@@ -246,12 +284,13 @@ public struct Composition: Sendable, Equatable {
         }
         // 消した文字にかかっていた「nn」の読みの記録は外す．残った分は，あとの文字が変わったので比べ直す
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
-        for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingCount = nil }
+        for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingText = nil }
         if isEmpty {
             containsInvalidRomaji = false
             rawKeys = ""
             boundaries = [Boundary(rawCount: 0, kanaCount: 0)]
             frozenKanaEnd = 0
+            englishKanaEnd = 0
         }
     }
 
@@ -327,6 +366,13 @@ public struct Composition: Sendable, Equatable {
         case "n": "ん"
         default: pending
         }
+    }
+
+    /// 英数字か(半角と全角)．全角の英数字は設定(英字・数字の幅)で全角にして入れたもの
+    public static func isAlphanumeric(_ character: Character) -> Bool {
+        guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else { return false }
+        if scalar.isASCII { return character.isLetter || character.isNumber }
+        return (0xFF10...0xFF19).contains(scalar.value) || (0xFF21...0xFF3A).contains(scalar.value) || (0xFF41...0xFF5A).contains(scalar.value)
     }
 
     private static let vowelsAndY: Set<Character> = ["a", "i", "u", "e", "o", "y"]

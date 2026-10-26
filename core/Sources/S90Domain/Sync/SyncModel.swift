@@ -32,7 +32,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .dictionary: ["userDictionary"]
         case .importedDictionaries: ["importedDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]
-        case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "profileRules"]
+        case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "restrainsLiveConversionInCode", "profileRules"]
         case .usage: ["recordsUsage"]
         }
     }

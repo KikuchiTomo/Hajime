@@ -598,6 +598,23 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
     }
 
+    @Test("分岐図: ほかに迷う文節が無くても，Tab で次の文節に移り，最後の文節からは先頭に戻る．Shift+Tab で前に戻る")
+    func latticeTabWithoutOtherUncertain() {
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .start
+        let harness = Harness(converter: latticeConverter(), settings: settings)
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
+        // 迷う文節は先頭の 1 つだけ．Tab で動かないと次の文節に移れない
+        harness.press(.tab)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+        harness.press(.tab)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
+        harness.press(.tab, .shift)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+    }
+
     @Test("分岐図: Shift+← で文節を縮め，後ろを分け直す")
     func latticeResize() {
         let harness = Harness(converter: latticeConverter())

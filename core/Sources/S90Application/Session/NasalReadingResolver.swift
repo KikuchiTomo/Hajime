@@ -20,12 +20,14 @@ struct NasalReadingResolver {
         for position in max(0, count - DefaultSettings.maximumNasalAmbiguities)..<count {
             let ambiguity = composition.nasalAmbiguities[position]
             let following = ambiguity.followingCount(in: composition.conversionReading)
+            let followingText = ambiguity.followingText(in: composition.conversionReading)
+            // 数が同じでも，打ちかけのローマ字がかなになって文字が変わったら比べ直す(「ふんにk」→「ふんにき」)
             guard DefaultSettings.nasalEvaluationPoints.contains(following),
-                ambiguity.evaluatedFollowingCount != following else { continue }
+                ambiguity.evaluatedFollowingText != followingText else { continue }
             let vowel = score(composition, position: position, usesNaRow: false)
             let naRow = score(composition, position: position, usesNaRow: true)
             composition.setNasalReading(at: position, usesNaRow: naRow > vowel)
-            composition.markNasalEvaluated(at: position, followingCount: following)
+            composition.markNasalEvaluated(at: position, followingText: followingText)
         }
     }
 

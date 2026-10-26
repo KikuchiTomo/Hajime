@@ -9,10 +9,11 @@ import Testing
 @Suite("キーから確定まで(本物のエンジン)")
 @MainActor
 struct EndToEndInputTests {
-    private func run(_ keys: String, then finalKeys: [KeyEvent.Key] = [.enter], settings: Settings = DefaultSettings.settings) throws -> (committed: String, marked: String) {
+    private func run(_ keys: String, then finalKeys: [KeyEvent.Key] = [.enter], settings: Settings = DefaultSettings.settings,
+                     lexicon: FakeLexicon = FakeLexicon(words: ["python"])) throws -> (committed: String, marked: String) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-e2e-\(UUID().uuidString)")
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "e2e")
-        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(words: ["python"]), settings: FakeSettings(settings))
+        let session = InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: FakeSettings(settings))
         var committed = ""
         var marked = ""
         func apply(_ result: KeyResult) {
@@ -43,6 +44,29 @@ struct EndToEndInputTests {
     @Test("R-02: ローマ字のまま打った英単語は英単語で確定する")
     func correction() throws {
         #expect(try run("python").committed == "python")
+    }
+
+    @Test("R-02: 英語の混ざる文は英単語のまま確定し，分岐図では英単語を 1 つの文節にする", arguments: [
+        ("pythongasugoi", "pythonがすごい", "pythonが"),
+        ("gitwotukau", "gitを使う", "gitを"),
+        ("konoIMEha", "このIMEは", "IMEは"),
+        ("AAAmade", "AAAまで", "AAAまで"),
+    ])
+    func englishMixed(keys: String, expected: String, column: String) throws {
+        let settings = DefaultSettings.settings
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-e2e-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "e2e")
+        let lexicon = FakeLexicon(words: ["python", "git"])
+        #expect(try run(keys, settings: settings, lexicon: lexicon).committed == expected)
+        let session = InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: FakeSettings(settings))
+        for key in keys { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        var columns: [String] = []
+        for action in session.handle(KeyEvent(.space), context: InputContext()).actions {
+            if case .showLattice(let panel) = action { columns = panel.columns.map(\.text) }
+        }
+        print("S90_MIXED \(keys) → \(columns.joined(separator: "|"))")
+        #expect(columns.contains(column))
+        #expect(columns.joined() == expected)
     }
 
     @Test("R-01: konnnitiha で こんにちは")
@@ -76,6 +100,7 @@ struct EndToEndInputTests {
     @Test("nn のあとの母音は，語によって読みを選ぶ", arguments: [
         ("onna", "女"),
         ("hannei", "反映"),
+        ("hunniki", "雰囲気"),
         ("konnichiha", "こんにちは"),
         ("konnnitiha", "こんにちは"),
         ("tannin", "担任"),

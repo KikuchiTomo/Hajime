@@ -17,12 +17,12 @@ struct CorrectionPage: View {
             Section(UIStrings.Features.rules) {
                 RuleListEditor(model: model, spec: .correctionRules, labels: .init(
                     key: UIStrings.Features.typed, value: UIStrings.Features.replacement,
-                    empty: UIStrings.Features.rulesEmpty, emptyHint: UIStrings.Features.rulesEmptyHint))
+                    empty: UIStrings.Features.rulesEmpty))
             }
             Section(UIStrings.Features.exceptions) {
                 RuleListEditor(model: model, spec: .exceptions, labels: .init(
                     key: UIStrings.Features.exceptionPlaceholder, value: nil,
-                    empty: UIStrings.Features.exceptionsEmpty, emptyHint: UIStrings.Features.exceptionsEmptyHint))
+                    empty: UIStrings.Features.exceptionsEmpty))
             }
         }
         .formStyle(.grouped)

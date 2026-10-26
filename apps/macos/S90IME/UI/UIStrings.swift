@@ -27,8 +27,8 @@ enum UIStrings {
         static let moveUp = "優先度を上げる"
         static let moveDown = "優先度を下げる"
         static let tooMany = "取り込める辞書は 32 個までです"
-        static let importFailed = "辞書を取り込めませんでした．大きすぎるか，読めない形式です"
-        static let note = "タブ区切り(読み・単語・品詞)，SKK，macOS のユーザ辞書の書き出しを取り込めます。上にある辞書ほど優先します。「文脈に合わせる」は，その辞書の単語を使うほど優先度が上がります。"
+        static let importFailed = "辞書を取り込めませんでした。大きすぎるか、読めない形式です"
+        static let note = "タブ区切り・SKK・macOS のユーザ辞書の形式を読み込めます。上にある辞書ほど優先されます。"
         static func imported(_ count: Int) -> String { "\(count) 語を取り込みました" }
 
         static func summary(_ dictionary: ImportedDictionary) -> String {
@@ -164,18 +164,18 @@ enum UIStrings {
             case .nextInputStyle: "ローマ字入力・かな入力・英字入力を順に切り替えます"
             case .insertSpace: "幅は「スペース幅」の設定に従います。組み立て中の文字は確定してから入れます"
             case .insertAlternateSpace: "「スペース幅」の設定と逆の幅の空白を入れます"
-            case .convert: "英単語を直した直後は，直す前に戻します"
-            case .convertWithoutLearning: "学習した順位を使わずに変換し，確定しても学習しません"
-            case .insertBoundary: "打っている途中に，今の位置を文節の区切りにします"
+            case .convert: "英単語を直した直後は、直す前に戻します"
+            case .convertWithoutLearning: "学習した順位を使わずに変換し、確定しても学習しません"
+            case .insertBoundary: "打っている途中に、今の位置を文節の区切りにします"
             case .acceptSuggestion: "「もしかして」と示した読みに直します"
             case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
             case .nextCandidate: "入力中に押すと変換を始めます"
             case .previousCandidate: "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"
             case .nextUncertainSegment, .previousUncertainSegment: "確信の低い文節だけを渡り歩きます"
             case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の語の切れ目まで動かします"
-            case .splitSegment: "区切れる位置に番号を出し，数字で区切ります"
-            case .commitFirstSegment: "先頭の文節を確定し，残りの変換を続けます"
-            case .cancel: "変換中は読みに戻し，直した読みは打ったままに戻します。入力中は読みを消します"
+            case .splitSegment: "区切れる位置に番号を出し、数字で区切ります"
+            case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
+            case .cancel: "変換中は読みに戻し、直した読みは打ったままに戻します。入力中は読みを消します"
             case .backToReading: "変換をやめて読みに戻ります"
             case .forgetCandidate: "選んでいる候補を学習から消します"
             case .forgetLastCommit: "最後に確定した語の学習を取り消します。入力した文字は消しません"
@@ -234,13 +234,12 @@ enum UIStrings {
         static let clearKeyFilter = "キーでの絞り込みをやめる"
         static let noMatches = "当てはまる行はありません"
         static func rowCount(_ shown: Int, _ total: Int) -> String { shown == total ? "\(total) 行" : "\(shown) / \(total) 行" }
-        static let note = "同じ状態の同じキーは，下の行を使います。状態を選んだ行は「いつでも」の行より優先します。数字キーで候補を選ぶ動きは「番号キーで候補を選択」に従います。"
         static func hidden(by winners: String) -> String { "同じキーの行があるため使われません: \(winners)" }
         static func partlyHidden(states: String, by winners: String) -> String { "\(states)では次の行を使います: \(winners)" }
         static let plainCharacter = "修飾キーの無い文字のキーです。この状態ではその文字を打てなくなります"
         static func duplicateWarning(_ row: String) -> String { "同じキーの行があります: \(row)。追加した行を使います" }
         static func missing(state: String, command: String) -> String { "\(state)に「\(command)」のキーがありません" }
-        static let missingNote = "キーが無いと，入力を確定したり取り消したりできなくなります。"
+        static let missingNote = "キーが無いと、入力を確定したり取り消したりできなくなります。"
 
         /// 行を 1 行の文にする(警告の中で行を示す)
         static func describe(_ entry: KeymapEntry) -> String {
@@ -301,12 +300,9 @@ enum UIStrings {
         static let loading = "読み込み中…"
         static let romajiKeys = "入力"
         static let romajiKana = "出力"
-        static let romajiNote = "ローマ字の変換表に組み合わせを追加します。"
         static let romajiEmpty = "追加した組み合わせはありません"
-        static let romajiEmptyHint = "入力する英字と出力するかなを上の欄に入れて追加します。"
         static let dictionaryEmpty = "登録した単語はありません"
-        static let dictionaryEmptyHint = "読みと単語を上の欄に入れて追加します。"
-        static let invalidRomaji = "入力は英小文字・「-」・「'」で 4 文字まで，出力は 6 文字までにしてください"
+        static let invalidRomaji = "入力は英小文字・「-」・「'」で 4 文字まで、出力は 6 文字までにしてください"
         static let escapeSwitchesToDirect = "Escape で英数に切り替え"
         static let bundlePrefix = "バンドル ID"
         static let profile = "モード"
@@ -356,15 +352,15 @@ enum UIStrings {
         static let importDictionary = "インポート…"
         static let exportDictionary = "エクスポート…"
         static let exportFileName = "s90-user-dictionary.txt"
-        static let dictionaryNote = "「読み<タブ>単語」形式のテキストファイルを読み込めます。"
+        static let dictionaryNote = "読みと単語をタブで区切ったテキストファイルを読み込めます。"
         static let appearance = "外観"
         static let restoreDefaults = "初期設定に戻す"
         static let saveFailed = "設定を保存できませんでした"
-        static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため，初期設定で起動しました．元のファイルは同じ場所に \(name) として残してあります" }
+        static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため、初期設定で起動しました。元のファイルは同じ場所に \(name) として残してあります" }
         static let learningReset = "学習結果を消去しました"
         static let dictionaryFull = "ユーザー辞書に登録できるのは 10,000 語までです"
-        static let invalidEntry = "読みはひらがなで入力し，読みと単語は長すぎないようにしてください"
-        static let importFailed = "インポートできませんでした．ファイルが大きすぎるか，テキストファイルではありません"
+        static let invalidEntry = "読みはひらがなで入力し、読みと単語は長すぎないようにしてください"
+        static let importFailed = "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません"
         static let exportFailed = "エクスポートできませんでした"
         static func imported(_ count: Int) -> String { "\(count) 語を追加しました" }
         static func fontSize(_ size: Int) -> String { "候補の文字サイズ: \(size)" }
@@ -383,7 +379,7 @@ enum UIStrings {
         static func label(for mode: LearningMode) -> String {
             switch mode {
             case .enabled: "学習する"
-            case .readOnly: "学習結果を使うが，新しく学習しない"
+            case .readOnly: "学習結果を使うが、新しく学習しない"
             case .disabled: "学習しない"
             }
         }
@@ -518,12 +514,10 @@ enum UIStrings {
         static let rules = "置き換え"
         static let typed = "打った英字"
         static let replacement = "置き換える語"
-        static let invalidRule = "打った英字は 2〜24 文字の英字，置き換える語は 64 文字までにしてください"
+        static let invalidRule = "打った英字は 2〜24 文字の英字、置き換える語は 64 文字までにしてください"
         static let invalidException = "直さない語は 64 文字までにしてください"
         static let rulesEmpty = "置き換えはありません"
-        static let rulesEmptyHint = "打った英字と置き換える語を上の欄に入れて追加します。"
         static let exceptionsEmpty = "直さない語はありません"
-        static let exceptionsEmptyHint = "補正したくない英字や読みを上の欄に入れて追加します。"
 
         // 記号
         static let symbolsPage = "記号"
@@ -535,9 +529,8 @@ enum UIStrings {
         static let readingOutput = "空白で区切った記号"
         static let search = "検索"
         static let invalidSymbol = "連続入力は英字と数字以外の 2〜12 文字にしてください"
-        static let invalidReadingSymbol = "読みは 12 文字まで，記号は 200 文字までにしてください"
+        static let invalidReadingSymbol = "読みは 12 文字まで、記号は 200 文字までにしてください"
         static let symbolsEmpty = "決まりはありません"
-        static let symbolsEmptyHint = "上の欄に入力と記号を入れて追加します。"
         static let restoreDefault = "既定に戻す"
         static let changed = "変更あり"
         static let added = "追加"
@@ -569,18 +562,18 @@ enum UIStrings {
         }
 
         // 除外設定
-        static let exclusionsNote = "アプリごとに入力の扱いを変えます。上にあるものが優先されます。"
+        static let exclusionsNote = "アプリの固有IDを指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。"
         static let addApps = "アプリを追加…"
         static let exclusionsEmpty = "アプリはありません"
-        static let exclusionsEmptyHint = "「アプリを追加…」で入力の扱いを変えるアプリを選びます。"
         static let importCSV = "CSV を読み込む…"
         static let exportCSV = "CSV に書き出す…"
         static let exportCSVFileName = "s90-exclusions.csv"
         static let terminalCommands = "ターミナルでコマンドを英字で入力"
+        static let restrainsLiveConversionInCode = "エディタとターミナルでライブ変換を控える"
         static let behavior = "動作"
         static let apps = "アプリ"
         static func importedRules(_ count: Int) -> String { "\(count) 件を追加しました" }
-        static let csvFailed = "読み込めませんでした。CSV のファイルではないか，大きすぎます"
+        static let csvFailed = "読み込めませんでした。CSV のファイルではないか、大きすぎます"
         static let noBundleID = "バンドル ID の無いアプリは追加できません"
 
         // 外観
@@ -623,7 +616,7 @@ enum UIStrings {
             case .correction: correction
             }
             let ground = pair == .selectionText ? selection : surface
-            return String(format: "%@と%@の色が近く，読みにくくなっています。コントラスト比は %.1f で，%.1f 以上が目安です。", name, ground, ratio, pair.minimum)
+            return String(format: "%@と%@の色が近く、読みにくくなっています。コントラスト比は %.1f で、%.1f 以上が目安です。", name, ground, ratio, pair.minimum)
         }
 
         static func label(for style: CustomTheme.BranchStyle) -> String {
@@ -635,19 +628,19 @@ enum UIStrings {
 
         // バックアップ
         static let backup = "バックアップ"
-        static let backupNote = "ユーザー辞書・テーマ・キー設定を含むすべての設定を JSON で保存します。"
+        static let backupNote = "すべての設定をJSONとしてインポート・エクスポート可能です。"
         static let exportSettings = "設定を書き出す…"
         static let importSettings = "設定を読み込む…"
         static let exportSettingsFileName = "s90-settings.json"
         static let settingsImported = "設定を読み込みました"
-        static let settingsImportFailed = "読み込めませんでした。s90.tokyo IME の設定ファイルではないか，大きすぎます"
+        static let settingsImportFailed = "読み込めませんでした。s90.tokyo IME の設定ファイルではないか、大きすぎます"
         static let settingsExportFailed = "書き出せませんでした"
 
         // 情報
         static let about = "情報"
         static let version = "バージョン"
         static let acknowledgements = "謝辞"
-        static let acknowledgementsNote = "s90.tokyo IME は次のソフトウェア・モデル・データを利用しています。"
+        static let acknowledgementsNote = "s90.tokyo IME は上記のソフトウェア・モデル・データを利用しています。"
         static let noticesMissing = "謝辞のファイルが見つかりません"
         static let licenseText = "ライセンス全文"
     }
@@ -669,7 +662,6 @@ extension UIStrings {
         static let unreadable = "同期のファイルを読めないため、同期を止めています"
         static let items = "項目"
         static let localOnly = "この Mac だけ"
-        static let itemsNote = "印を付けた項目は、同期していてもこの Mac だけの値にします。"
 
         /// 項目(Settings の CodingKeys の名前)の表示名
         static func label(forField name: String) -> String {
@@ -691,6 +683,7 @@ extension UIStrings {
             "theme": "テーマ", "candidateFontSize": "文字の大きさ", "showsModeIndicator": "入力モードの表示",
             "modeIndicatorDuration": "入力モードの表示時間", "customThemes": "カスタムテーマ", "customThemeID": "使うカスタムテーマ",
             "escapeSwitchesToDirect": "Esc で英数", "terminalCommands": "ターミナルのコマンド", "profileRules": "アプリごとの設定",
+            "restrainsLiveConversionInCode": "エディタとターミナルのライブ変換",
         ]
 
         static func label(for scope: SyncScope) -> String {
