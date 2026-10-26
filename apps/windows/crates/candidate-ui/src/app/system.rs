@@ -7,7 +7,7 @@ use windows::Win32::System::Registry::{
 };
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::WindowsAndMessaging::{
-    SystemParametersInfoW, SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST,
+    SystemParametersInfoW, SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST, SPI_GETSCREENREADER,
     SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
 };
 use windows_core::{w, BOOL, PCWSTR};
@@ -41,6 +41,21 @@ pub fn reduce_motion() -> bool {
         )
     };
     read.is_ok() && !enabled.as_bool()
+}
+
+/// ナレーターなどの読み上げのソフトが動いているか
+pub fn screen_reader() -> bool {
+    let mut running = BOOL(0);
+    // SAFETY: running は BOOL を書き込める領域
+    let read = unsafe {
+        SystemParametersInfoW(
+            SPI_GETSCREENREADER,
+            0,
+            Some(&mut running as *mut BOOL as *mut _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    };
+    read.is_ok() && running.as_bool()
 }
 
 fn high_contrast() -> bool {

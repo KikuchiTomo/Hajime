@@ -1,5 +1,6 @@
 #![deny(unsafe_code)]
 
+pub mod announce;
 pub mod geometry;
 pub mod icon;
 pub mod keys;
