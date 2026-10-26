@@ -136,9 +136,9 @@ struct ReadingCorrectionTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: model)
         let service = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
-        // macOS の綴りの候補のように，読めない並びのどの部分にも近い英単語を返す
+        // macOS の綴りの候補のように，読めない並びのどの部分にも 1 字違いの英単語を返す(tkito → bkito)
         let tails = (1...keys.count).map { String(keys.suffix($0)) } + (1...keys.count).map { String(keys.prefix($0)) }
-        let lexicon = FakeLexicon(suggestions: Dictionary(uniqueKeysWithValues: Set(tails).map { ($0, ["bit", "kit", "epulo", "absi"]) }))
+        let lexicon = FakeLexicon(suggestions: Dictionary(uniqueKeysWithValues: Set(tails).map { ($0, ["b" + $0.dropFirst()]) }))
         let session = InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: FakeSettings(), typoService: service)
         let typed = live(session, keys)
         var actions = session.settle(context: InputContext())
