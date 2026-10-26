@@ -85,32 +85,8 @@ public final class PathSyncCoordinator: SyncControlling {
     }
 
     private func syncSettings(in folder: URL) async {
-        let backend = FolderSyncBackend(folder: folder)
-        guard let read = await Deadline.run(seconds: DefaultSettings.syncFileTimeout, { await Self.perform { try backend.read() } }) else {
-            problem = .folderUnavailable
-            return
-        }
-        do {
-            let merged = try runner.merge(remote: try read.get())
-            if let written = merged.written {
-                let wrote = await Deadline.run(seconds: DefaultSettings.syncFileTimeout, { await Self.perform { try backend.write(written) } })
-                guard let wrote else {
-                    problem = .folderUnavailable
-                    return
-                }
-                try wrote.get()
-            }
-            try runner.commit(merged)
-            problem = nil
-            syncDictionaryFiles(in: folder)
-        } catch {
-            problem = error as? SettingsSynchronizer.SyncError == .unreadableDocument ? .unreadable : .failed
-        }
-    }
-
-    @concurrent
-    private static func perform<Value: Sendable>(_ body: @Sendable () throws -> Value) async -> Result<Value, any Error> {
-        Result { try body() }
+        problem = await runner.syncSettings(in: folder)
+        if problem == nil { syncDictionaryFiles(in: folder) }
     }
 
     /// 取り込んだ辞書の索引を運ぶ．前の分が終わっていなければ何もしない(次の同期でまた見る)

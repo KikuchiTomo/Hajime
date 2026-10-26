@@ -4,6 +4,14 @@ use std::fmt;
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const MAXIMUM_MESSAGE_BYTES: usize = 262144;
 
+/// 待つ時間と，返事の遅れを許す数(schema.json の timing)
+pub mod timing {
+    pub const KEY_RESPONSE_MILLISECONDS: u64 = 50;
+    pub const RECONNECT_MILLISECONDS: u64 = 2000;
+    pub const ENGINE_STALL_MILLISECONDS: u64 = 3000;
+    pub const MAXIMUM_LATE_KEYS: usize = 16;
+}
+
 const REDACTED: &str = "<伏せた>";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -1,6 +1,7 @@
 #if os(Windows)
 import Dispatch
 import Foundation
+import S90Domain
 import Synchronization
 
 public enum EnginePipeServer {
@@ -44,8 +45,9 @@ public enum EnginePipeServer {
                     case .now(let immediate):
                         response = immediate
                     case .later(let work):
-                        // ファイルの読み書きを終えるまで，この接続のスレッドで待つ(メインスレッドは止めない)
-                        response = wait(for: work)
+                        // ファイルの読み書きを終えるまで，この接続のスレッドで待つ(メインスレッドは止めない)．
+                        // 同期のフォルダが応えないときも待ち続けないよう，設定の画面が待つ時間で打ち切る
+                        response = wait(for: work, id: request.id)
                     }
                     try connection.write(MessageFraming.encode(response))
                 }
@@ -56,7 +58,7 @@ public enum EnginePipeServer {
     }
 
     /// メインアクターで動かす非同期の仕事を，呼んだスレッド(名前付きパイプの接続のスレッド)で終わるまで待つ
-    private static func wait(for work: @escaping @MainActor @Sendable () async -> WireResponse) -> WireResponse {
+    private static func wait(for work: @escaping @MainActor @Sendable () async -> WireResponse, id: UInt32) -> WireResponse {
         let result = Mutex<WireResponse?>(nil)
         let done = DispatchSemaphore(value: 0)
         Task { @MainActor in
@@ -64,9 +66,12 @@ public enum EnginePipeServer {
             result.withLock { $0 = response }
             done.signal()
         }
-        done.wait()
+        guard done.wait(timeout: .now() + DefaultSettings.settingsAppFileTimeout) == .success else {
+            // 仕事は続けさせ(終われば結果は捨てる)，頼んだ側には今は手が離せないと答える
+            return WireResponse(id: id, body: .fileFailed(reason: .busy))
+        }
         // signal の前に必ず入れているので nil にはならない．念のため malformed で答える
-        return result.withLock { $0 } ?? WireResponse(id: 0, body: .error(code: .malformed))
+        return result.withLock { $0 } ?? WireResponse(id: id, body: .error(code: .malformed))
     }
 
     private static func onMain<Value: Sendable>(_ body: @MainActor () -> Value) -> Value {
