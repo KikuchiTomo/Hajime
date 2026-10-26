@@ -11,30 +11,33 @@ struct ExclusionsPage: View {
     var body: some View {
         Form {
             Section {
-                Table(model.settings.profileRules, selection: $selection) {
-                    TableColumn(UIStrings.More.apps) { rule in
-                        Text(rule.applicationPrefix).lineLimit(1).truncationMode(.middle)
-                    }
-                    TableColumn(UIStrings.More.behavior) { rule in
-                        Picker("", selection: Binding(get: { rule.profile }, set: { change(rule, to: $0) })) {
-                            ForEach(Self.profiles, id: \.self) { Text(UIStrings.Settings.label(for: $0)).tag($0) }
+                // Form の中でも表の中でスクロールできるよう，FormTableHost に入れる
+                FormTableHost {
+                    Table(model.settings.profileRules, selection: $selection) {
+                        TableColumn(UIStrings.More.apps) { rule in
+                            Text(rule.applicationPrefix).lineLimit(1).truncationMode(.middle)
                         }
-                        .labelsHidden()
+                        TableColumn(UIStrings.More.behavior) { rule in
+                            Picker("", selection: Binding(get: { rule.profile }, set: { change(rule, to: $0) })) {
+                                ForEach(Self.profiles, id: \.self) { Text(UIStrings.Settings.label(for: $0)).tag($0) }
+                            }
+                            .labelsHidden()
+                        }
+                        .width(min: 150, ideal: 170)
                     }
-                    .width(min: 150, ideal: 170)
-                }
-                .onDeleteCommand(perform: removeSelected)
-                .contextMenu(forSelectionType: ProfileRule.self) { picked in
-                    if !picked.isEmpty {
-                        Button(UIStrings.Settings.remove) {
-                            selection = picked
-                            removeSelected()
+                    .onDeleteCommand(perform: removeSelected)
+                    .contextMenu(forSelectionType: ProfileRule.self) { picked in
+                        if !picked.isEmpty {
+                            Button(UIStrings.Settings.remove) {
+                                selection = picked
+                                removeSelected()
+                            }
                         }
                     }
-                }
-                .overlay {
-                    if model.settings.profileRules.isEmpty {
-                        ContentUnavailableView(UIStrings.More.exclusionsEmpty, systemImage: "app.dashed")
+                    .overlay {
+                        if model.settings.profileRules.isEmpty {
+                            EmptyListLabel(text: UIStrings.More.exclusionsEmpty)
+                        }
                     }
                 }
                 .frame(height: DesignTokens.Size.Settings.ruleTableHeight)
