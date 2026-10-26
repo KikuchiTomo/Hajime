@@ -181,6 +181,22 @@ struct InputSessionScenarioTests {
         #expect(short.panel == nil)
     }
 
+    @Test("英数のときも ⌃⌥, で設定を開き，⌃⌥L でライブ変換を切り替える(ターミナルでは英数で打っていることが多い)")
+    func toolsInDirectMode() {
+        let harness = Harness()
+        harness.press(.eisu)
+        var opened = false
+        let result = harness.session.handle(KeyEvent(.character(","), modifiers: [.control, .option]), context: InputContext(profile: .terminal))
+        for action in result.actions { if case .openSettings = action { opened = true } }
+        #expect(opened)
+        #expect(result.handled)
+        var toggled = false
+        for action in harness.session.handle(KeyEvent(.character("l"), modifiers: [.control, .option]), context: InputContext()).actions {
+            if case .toggleLiveConversion = action { toggled = true }
+        }
+        #expect(toggled)
+    }
+
     @Test("R-01: 打ちながらライブ変換の結果を表示し，Enter で確定する")
     func liveConversion() {
         let harness = Harness(converter: FakeConverter(["へんかん": [("変換", nil)]]))
