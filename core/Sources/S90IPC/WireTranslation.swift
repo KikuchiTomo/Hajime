@@ -109,7 +109,10 @@ extension WireSessionState {
             }
             chords.append(WireKeyChord(key: .yen, modifiers: WireModifiers(shift: false, control: false, alt: false)))
         }
-        self.init(mode: WireInputMode(mode), isComposing: isComposing, consumedKeys: chords, wakeAfterMilliseconds: wakeAfterMilliseconds)
+        // 打ち始めのときだけ，入力位置の前の文字列を頼む(macOS と同じ．毎キー読まないため)．組み立て中は頼まない
+        let precedingTextLength = isComposing ? nil : UInt32(DefaultSettings.maximumLeftContextLength)
+        self.init(mode: WireInputMode(mode), isComposing: isComposing, consumedKeys: chords, wakeAfterMilliseconds: wakeAfterMilliseconds,
+                  precedingTextLength: precedingTextLength)
     }
 }
 

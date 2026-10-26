@@ -93,4 +93,13 @@ struct WireTranslationTests {
         #expect(composing.consumedKeys.isEmpty)
         #expect(composing.wakeAfterMilliseconds == 300)
     }
+
+    @Test("入力位置の前の文字列は打ち始めのときだけ頼む")
+    func precedingTextLength() {
+        let keymap = KeymapPreset.standard.keymap
+        let idle = WireSessionState(mode: .japanese, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil)
+        #expect(idle.precedingTextLength == UInt32(DefaultSettings.maximumLeftContextLength))
+        let composing = WireSessionState(mode: .japanese, isComposing: true, keymap: keymap, wakeAfterMilliseconds: nil)
+        #expect(composing.precedingTextLength == nil)
+    }
 }
