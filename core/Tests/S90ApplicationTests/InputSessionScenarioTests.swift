@@ -529,6 +529,19 @@ struct InputSessionScenarioTests {
         #expect(converter.committed.count == 2)
     }
 
+    @Test("字種の行を出さない設定では，分岐図にも上の枝を出さず，↑で上の枝に移らない")
+    func latticeVariantsHidden() {
+        var settings = DefaultSettings.settings
+        settings.showsVariantRow = false
+        let harness = Harness(converter: latticeConverter(), settings: settings)
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.lattice?.columns[0].variants == [])
+        harness.press(.up)
+        #expect(harness.lattice?.columns[0].selectedVariant == nil)
+        #expect(harness.marked.text == "今日は雨")
+    }
+
     @Test("分岐図: ↑で上の枝の字種(そのまま・カタカナ・半角カタカナ)を選び，上の端で止まる")
     func latticeVariants() {
         let harness = Harness(converter: latticeConverter())
