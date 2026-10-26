@@ -72,6 +72,9 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case previousCandidatePage
     case firstCandidate
     case lastCandidate
+    /// 連想変換．選んでいる文節の語と似た意味・関わりのある語の一覧に切り替える(R-18)．
+    /// 入力中なら変換してから切り替える．一覧を出しているときは元の変換に戻す
+    case associate
 
     // 文節
     case nextSegment
@@ -134,7 +137,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: .characters
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: .composing
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType: .scripts
-        case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate: .candidates
+        case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading: .commit
@@ -154,7 +157,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
-             .commit, .cancel, .nextCandidate, .previousCandidate: [.composing, .converting]
+             .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
         case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate,
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .commitFirstSegment, .backToReading,

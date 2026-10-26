@@ -11,6 +11,8 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
     case dictionary
     /// 取り込んだ辞書の一覧と設定．語の索引のファイルは同期のフォルダの s90-dictionaries/ で運ぶ
     case importedDictionaries
+    /// 連想の辞書の一覧．索引のファイルは運ばないので，既定ではこの Mac だけにする
+    case associationDictionaries
     case appearance
     case exclusions
     case usage
@@ -26,11 +28,13 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .conversion:
             ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "listCandidatesPerPage", "branchCandidatesPerPage",
              "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes", "proofreading",
-             "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning"]
+             "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning",
+             "association", "associationLimit", "showsAssociationHint"]
         case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules"]
         case .dictionary: ["userDictionary"]
         case .importedDictionaries: ["importedDictionaries"]
+        case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "restrainsLiveConversionInCode", "profileRules"]
         case .usage: ["recordsUsage"]
@@ -42,14 +46,14 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         switch self {
         case .keyboard: [LegacyKeySettings.modeKeysField]
         case .keys: [LegacyKeySettings.conversionKeysField]
-        case .input, .conversion, .correction, .symbols, .dictionary, .importedDictionaries, .appearance, .exclusions, .usage: []
+        case .input, .conversion, .correction, .symbols, .dictionary, .importedDictionaries, .associationDictionaries, .appearance, .exclusions, .usage: []
         }
     }
 
     /// 既定の範囲．キーボードや画面の大きさ，使うアプリは Mac ごとに違ってよいので，この Mac だけにする
     public var defaultScope: SyncScope {
         switch self {
-        case .keyboard, .appearance, .exclusions, .usage: .local
+        case .keyboard, .appearance, .exclusions, .usage, .associationDictionaries: .local
         case .input, .keys, .conversion, .correction, .symbols, .dictionary, .importedDictionaries: .synced
         }
     }

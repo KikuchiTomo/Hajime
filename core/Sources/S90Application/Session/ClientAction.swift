@@ -121,6 +121,10 @@ public struct CandidatePanel: Sendable, Equatable {
     public var total: Int
     /// 補正の直後など，足元に出す案内
     public var note: String?
+    /// 連想の一覧を出しているときの見出し(R-18)．ふつうの候補なら nil
+    public var association: AssociationHeading?
+    /// 選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
+    public var associationHint: String?
 
     public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: String?) {
         self.variants = variants
@@ -200,6 +204,10 @@ public struct LatticePanel: Sendable, Equatable {
     public var total: Int
     /// 説明の行に出す知らせ(打ち間違いを直したことなど)
     public var note: String?
+    /// 連想の一覧を出しているときの見出し(R-18)．注目している文節の下の枝が連想の語になる．ふつうの分岐図なら nil
+    public var association: AssociationHeading?
+    /// 注目している文節で選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
+    public var associationHint: String?
 
     public init(columns: [Column], position: Int = 1, total: Int = 0, note: String? = nil) {
         self.columns = columns
@@ -207,4 +215,28 @@ public struct LatticePanel: Sendable, Equatable {
         self.total = total
         self.note = note
     }
+}
+
+/// 連想の一覧の見出し(R-18)．元の語と，今出している意味のまとまり
+public struct AssociationHeading: Sendable, Equatable {
+    /// 連想の元にした語
+    public var headword: String
+    /// 今のまとまりの意味の説明．説明の無いまとまりは空
+    public var label: String
+    /// 今のまとまりの位置(1 から)とまとまりの数
+    public var group: Int
+    public var groupCount: Int
+
+    public init(headword: String, label: String, group: Int, groupCount: Int) {
+        self.headword = headword
+        self.label = label
+        self.group = group
+        self.groupCount = groupCount
+    }
+}
+
+extension AssociationHeading: CustomStringConvertible, CustomDebugStringConvertible {
+    // 元の語は入力内容なので，ログには位置だけを出す
+    public var description: String { "AssociationHeading(group: \(group)/\(groupCount))" }
+    public var debugDescription: String { description }
 }

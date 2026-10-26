@@ -9,6 +9,34 @@ enum UIStrings {
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
     }
 
+    /// 連想変換(R-18)
+    enum Association {
+        static let section = "連想変換"
+        static let enabled = "連想変換"
+        static let limit = "連想の候補数"
+        static let hint = "連想の案内を表示"
+        static let dictionaries = "連想の辞書"
+        static let empty = "連想の辞書はありません"
+        static let importFile = "連想の辞書を取り込む…"
+        static let tooMany = "取り込める連想の辞書は \(DefaultSettings.maximumAssociationDictionaries) 個までです"
+        static let importFailed = "連想の辞書を取り込めませんでした。大きすぎるか、読めない形式です"
+        static let note = "1 行に同じ意味の単語をタブか「,」で区切って並べたファイルを読み込めます。タブで区切るときは、先頭の列に意味の説明を書きます。上にある辞書ほど先に出ます。"
+        static func imported(_ count: Int) -> String { "\(count) 件の意味を取り込みました" }
+        static func summary(_ dictionary: AssociationDictionary) -> String { "\(dictionary.groupCount) 件の意味" }
+        /// 連想の一覧の見出しの前に置く言葉
+        static let headingPrefix = "連想"
+        static func groupPosition(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
+        /// 連想の一覧の足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキー(R-17)
+        static func hints(for keymap: Keymap) -> [KeyHint] {
+            func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(Keys.name(of:)) ?? "" }
+            return [
+                KeyHint(key: first(.nextCandidate), label: "選ぶ"),
+                KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "意味"),
+                KeyHint(key: first(.cancel), label: "戻る"),
+            ].filter { !$0.key.isEmpty }
+        }
+    }
+
     /// 取り込んだ辞書(R-16)
     enum Dictionaries {
         static let userWords = "登録した単語"
@@ -146,6 +174,7 @@ enum UIStrings {
             case .previousCandidatePage: "前の候補のページ"
             case .firstCandidate: "先頭の候補"
             case .lastCandidate: "末尾の候補"
+            case .associate: "連想変換"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
@@ -191,6 +220,7 @@ enum UIStrings {
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
+            case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
@@ -767,6 +797,7 @@ extension UIStrings {
             case .symbols: "記号"
             case .dictionary: "ユーザー辞書"
             case .importedDictionaries: "取り込んだ辞書"
+            case .associationDictionaries: "連想の辞書"
             case .appearance: "外観"
             case .exclusions: "除外設定"
             case .usage: "統計"

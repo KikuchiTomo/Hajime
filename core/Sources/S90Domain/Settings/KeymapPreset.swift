@@ -3,7 +3,7 @@
 /// 行は「状態<タブ>キー<タブ>コマンド」の形で書く(Keymap.rows(from:))．
 /// Windows 風と Mac 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行を s90 の状態とコマンドに置き換えて作った．
 /// s90 に無いコマンドの行(読みの中のカーソル移動・予測・再変換・確定の取り消しなど)は除き，
-/// 切り替えのキーと設定を開くなどのキー(common)を足してある
+/// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Ctrl+Tab を足してある
 public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// s90.tokyo IME の既定
     case standard
@@ -43,7 +43,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         anywhere\tOption Kana\tnextInputStyle
         """
 
-    /// 既定．↓ と Space で次の候補，Shift+←→ で文節の長さ，Tab で確信の低い文節へ
+    /// 既定．↓ と Space で次の候補，Shift+←→ で文節の長さ，Tab で確信の低い文節へ．
+    /// 入力中の Shift+Space と，入力中・変換中の Ctrl+Tab で連想変換(R-18)
     static let standardRows = """
         anywhere\tEnter\tcommit
         anywhere\tEscape\tcancel
@@ -64,7 +65,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         idle\tSpace\tinsertSpace
         idle\tShift Space\tinsertAlternateSpace
         composing\tSpace\tconvert
-        composing\tShift Space\tconvert
+        composing\tShift Space\tassociate
+        composing\tCtrl Tab\tassociate
         composing\tHenkan\tconvert
         composing\tBackspace\tdeleteBackward
         composing\tTab\tacceptSuggestion
@@ -76,6 +78,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tLeft\tpreviousSegment
         converting\tTab\tnextUncertainSegment
         converting\tShift Tab\tpreviousUncertainSegment
+        converting\tCtrl Tab\tassociate
         converting\tShift Right\textendSegment
         converting\tShift Left\tshrinkSegment
         converting\tCtrl Shift Right\textendSegmentToWord
@@ -210,6 +213,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tCtrl Delete\tforgetCandidate
         composing\tOption Space\tinsertBoundary
         composing\tTab\tacceptSuggestion
+        composing\tCtrl Tab\tassociate
+        converting\tCtrl Tab\tassociate
         """
 
     /// Mac 風
@@ -306,6 +311,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate
         composing\tTab\tacceptSuggestion
+        composing\tCtrl Tab\tassociate
+        converting\tCtrl Tab\tassociate
         """
 }
 

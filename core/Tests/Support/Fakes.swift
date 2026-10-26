@@ -128,3 +128,20 @@ public final class FakeCalendar: CalendarReading {
         CalendarDate(year: 2026, month: 10, day: 26 + offset, weekday: (2 + offset - 1) % 7 + 1)
     }
 }
+
+/// 辞書の id と語ごとに決まったまとまりを返す連想の辞書(R-18)．本物の索引のファイルと同じく，まとまりの語は引いた語を除いたもの
+@MainActor
+public final class FakeAssociationLookup: AssociationLookup {
+    public var groups: [String: [String: [AssociationGroup]]]
+    /// 引いた語(引いた順)
+    public private(set) var queries: [String] = []
+
+    public init(_ groups: [String: [String: [AssociationGroup]]] = [:]) {
+        self.groups = groups
+    }
+
+    public func groups(for word: String, in dictionary: AssociationDictionary) -> [AssociationGroup] {
+        queries.append(word)
+        return groups[dictionary.id]?[word] ?? []
+    }
+}
