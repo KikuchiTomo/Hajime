@@ -80,7 +80,8 @@ final class CompositionRoot {
     }()
 
     func makePresenter() -> ClientActionPresenter {
-        ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings)
+        ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
+                              openSettings: { [unowned self] in self.settingsWindow.show() })
     }
 }
 

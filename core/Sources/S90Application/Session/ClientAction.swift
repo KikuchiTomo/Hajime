@@ -16,6 +16,10 @@ public enum ClientAction: Sendable, Equatable {
     case selectMode(InputMode)
     /// 入力方式を切り替える(設定に保存する)．R-05
     case selectInputStyle(InputStyle)
+    /// 設定の画面を開く(キーで開くとき)
+    case openSettings
+    /// ライブ変換を切り替える(設定に保存する)
+    case toggleLiveConversion
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
     case showNote(String)
 }

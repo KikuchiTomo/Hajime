@@ -336,8 +336,21 @@ private struct KeysTab: View {
 
     var body: some View {
         Form {
+            commandSection(UIStrings.Keys.generalSection, ConversionCommand.allCases.filter(\.isGlobal))
+            commandSection(UIStrings.Keys.conversionSection, ConversionCommand.allCases.filter { !$0.isGlobal })
             Section {
-                ForEach(ConversionCommand.allCases, id: \.self) { command in
+                Text(UIStrings.Keys.note).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Button(UIStrings.Keys.restore) { model.update { $0.conversionKeys = .standard } }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func commandSection(_ title: String, _ commands: [ConversionCommand]) -> some View {
+        Section(title) {
+            ForEach(commands, id: \.self) { command in
                     HStack {
                         Text(UIStrings.Keys.label(for: command))
                         Spacer()
@@ -361,15 +374,8 @@ private struct KeysTab: View {
                             Button(UIStrings.Keys.add) { recording = command }
                         }
                     }
-                }
-            } footer: {
-                Text(UIStrings.Keys.note).font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Button(UIStrings.Keys.restore) { model.update { $0.conversionKeys = .standard } }
             }
         }
-        .formStyle(.grouped)
     }
 }
 

@@ -63,7 +63,7 @@ private final class Harness {
                 panel = nil
                 lattice = nil
                 note = nil
-            case .showModeIndicator, .selectMode, .selectInputStyle: break
+            case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion: break
             }
         }
     }

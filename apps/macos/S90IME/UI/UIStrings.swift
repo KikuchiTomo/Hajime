@@ -61,6 +61,8 @@ enum UIStrings {
 
         static func label(for command: ConversionCommand) -> String {
             switch command {
+            case .openSettings: "設定を開く"
+            case .toggleLiveConversion: "ライブ変換の切り替え"
             case .nextCandidate: "次の候補"
             case .previousCandidate: "前の候補"
             case .nextSegment: "右の文節"
@@ -73,7 +75,9 @@ enum UIStrings {
         }
 
         static let tab = "キー操作"
-        static let note = "変換中の操作に使うキーです。Enter・Escape・Backspace・数字キーは変更できません。"
+        static let note = "Enter・Escape・Backspace・数字キーは変更できません。"
+        static let generalSection = "いつでも"
+        static let conversionSection = "変換中"
         static let add = "追加"
         static let press = "キーを押してください"
         static let restore = "初期設定に戻す"

@@ -10,10 +10,13 @@ final class ClientActionPresenter {
     private let candidatePanel: CandidatePanelController
     private let modeIndicator: ModeIndicatorController
     private let note: NoteController
+    private let openSettings: () -> Void
     private let settings: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring) {
+    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
+         openSettings: @escaping () -> Void) {
+        self.openSettings = openSettings
         self.candidatePanel = candidatePanel
         self.modeIndicator = modeIndicator
         self.note = note
@@ -38,6 +41,14 @@ final class ClientActionPresenter {
             case .hideCandidates:
                 candidatePanel.hide()
                 note.hide()
+            case .openSettings:
+                openSettings()
+            case .toggleLiveConversion:
+                do {
+                    try settings.update { $0.liveConversion.toggle() }
+                } catch {
+                    logger.error("ライブ変換の設定を保存できませんでした: \(String(describing: error), privacy: .public)")
+                }
             case .showNote(let text):
                 note.show(text, caret: caretRect(of: client), theme: settings.current.theme)
             case .showModeIndicator(let mode):

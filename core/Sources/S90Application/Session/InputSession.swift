@@ -77,6 +77,11 @@ public final class InputSession {
             // ショートカットはアプリに任せる．組み立て中の文字は先に確定する
             return KeyResult(handled: false, actions: commitAll())
         }
+        // 設定を開く・ライブ変換を切り替えるキー．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
+        if mode == .japanese, let command = settings.current.conversionKeys.command(for: event), command.isGlobal {
+            let actions = commitAll()
+            return KeyResult(handled: true, actions: actions + [command == .openSettings ? .openSettings : .toggleLiveConversion])
+        }
         if event.modifiers.contains(.option), case .character = event.key {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
             return KeyResult(handled: false, actions: commitAll())
@@ -761,6 +766,9 @@ public final class InputSession {
         // キーの割り当ては設定で変えられる(KeyBindings)
         if let command = settings.current.conversionKeys.command(for: event) {
             switch command {
+            case .openSettings, .toggleLiveConversion:
+                // route が先に受ける
+                break
             case .nextCandidate: lattice.moveSelection(by: 1)
             case .previousCandidate: lattice.moveSelection(by: -1)
             case .nextSegment: lattice.moveFocus(by: 1)

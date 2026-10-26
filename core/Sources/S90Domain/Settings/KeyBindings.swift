@@ -1,5 +1,10 @@
-/// 変換しているとき(分岐図)の操作．キーの割り当てを設定で変えられる
+/// キーで行う操作．キーの割り当てを設定で変えられる．
+/// 分岐図の操作は変換しているときだけ，openSettings と toggleLiveConversion は日本語のモードならいつでも効く
 public enum ConversionCommand: String, Sendable, Equatable, Codable, CaseIterable, CodingKeyRepresentable {
+    /// 設定の画面を開く．入力メニューの操作を IME に取り次がないアプリ(cmux など)でも開けるようにする
+    case openSettings
+    /// ライブ変換を切り替える
+    case toggleLiveConversion
     case nextCandidate
     case previousCandidate
     case nextSegment
@@ -8,6 +13,9 @@ public enum ConversionCommand: String, Sendable, Equatable, Codable, CaseIterabl
     case previousUncertainSegment
     case extendSegment
     case shrinkSegment
+
+    /// 変換していないときも効く操作
+    public var isGlobal: Bool { self == .openSettings || self == .toggleLiveConversion }
 }
 
 /// キーの押し方．設定に保存できる形にしたもの
@@ -68,6 +76,8 @@ public struct KeyBindings: Sendable, Equatable, Codable {
 
     /// 既定の割り当て．macOS・ATOK・Microsoft IME と同じく，↓ と Space で次の候補，Shift+←→ で文節の長さ
     public static let standard = KeyBindings([
+        .openSettings: [KeyStroke(.character(","), control: true, option: true)],
+        .toggleLiveConversion: [KeyStroke(.character("l"), control: true, option: true)],
         .nextCandidate: [KeyStroke(.down), KeyStroke(.space)],
         .previousCandidate: [KeyStroke(.up), KeyStroke(.space, shift: true)],
         .nextSegment: [KeyStroke(.right)],
