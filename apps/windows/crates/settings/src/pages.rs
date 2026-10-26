@@ -373,6 +373,8 @@ const ASSOCIATION_SPEC: ListSpec = ListSpec {
 pub struct ListButtons {
     pub top: &'static [&'static str],
     pub bottom: &'static [&'static str],
+    /// 表の下の左に検索欄を置く(行の多い一覧)
+    pub search: bool,
 }
 
 impl Control {
@@ -381,6 +383,13 @@ impl Control {
         use crate::strings::{rule_list, windows};
         const ADD_REMOVE: &[&str] = &[settings::ADD, settings::REMOVE];
         let (top, bottom): (&'static [&'static str], &'static [&'static str]) = match self {
+            // キー設定はキーを押して記録する・行を複製する，除外設定はアプリのファイルを選んで足す(macOS の KeymapPage・ExclusionsPage)
+            Control::List(spec, _) if spec.path == "keymap" => {
+                (ADD_REMOVE, &[keys::RECORD, keys::DUPLICATE])
+            }
+            Control::List(spec, _) if spec.path == "profileRules" => {
+                (ADD_REMOVE, &[more::ADD_APPS])
+            }
             Control::List(..) | Control::Dictionary(_) => (ADD_REMOVE, &[]),
             Control::Symbols(..) => (
                 &[settings::ADD, settings::REMOVE, windows::TOGGLE_ENABLED],
@@ -421,7 +430,15 @@ impl Control {
             ),
             _ => return None,
         };
-        Some(ListButtons { top, bottom })
+        let search = matches!(
+            self,
+            Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
+        );
+        Some(ListButtons {
+            top,
+            bottom,
+            search,
+        })
     }
 
     /// 一覧の入力欄の決まり．一覧でなければ None

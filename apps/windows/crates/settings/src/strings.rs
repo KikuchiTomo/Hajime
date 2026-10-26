@@ -227,6 +227,7 @@ pub mod more {
     }
     pub const FONT: &str = "書体";
     pub const BACKUP: &str = "バックアップ";
+    pub const ADD_APPS: &str = "アプリを追加…";
     pub const IMPORT_CSV: &str = "CSV を読み込む…";
     pub const EXPORT_CSV: &str = "CSV に書き出す…";
     pub const EXPORT_CSV_FILE_NAME: &str = "s90-exclusions.csv";
@@ -263,6 +264,9 @@ pub mod keys {
     pub const COMMAND: &str = "コマンド";
     pub const LOAD: &str = "読み込む";
     pub const RESTORE: &str = "既定に戻す";
+    pub const DUPLICATE: &str = "複製";
+    pub const PRESS: &str = "キーを押してください";
+    pub const RECORD: &str = "キーを記録";
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
@@ -558,6 +562,7 @@ pub mod windows {
     pub const JSON_FILES: &str = "JSON ファイル";
     pub const TEXT_FILES: &str = "テキストファイル";
     pub const CSV_FILES: &str = "CSV ファイル";
+    pub const APP_FILES: &str = "アプリ";
 
     /// バージョンの表示(ADR 0008．macOS と同じ「v0.1.0 (Windows)」の形)
     pub fn version(version: &str) -> String {

@@ -373,6 +373,75 @@ fn show_dialog(
     }
 }
 
+/// 打つ欄で，次に押したキーをキー設定の書き方(crate::keys::from_key)にして入れる(キー設定の「キーを記録」)．
+/// 押すまでは案内の文字(prompt)を出す．修飾キーだけを押しているあいだは待つ
+pub fn record_key(field: HWND, prompt: &str) {
+    use windows::Win32::UI::Shell::SetWindowSubclass;
+    send_text(
+        field,
+        windows::Win32::UI::Controls::EM_SETCUEBANNER,
+        1,
+        prompt,
+    );
+    set_text(field, "");
+    // SAFETY: field はこのスレッドの窓．記録が終わったら record_procedure が外す
+    unsafe {
+        let _ = SetWindowSubclass(field, Some(record_procedure), RECORD_SUBCLASS, 0);
+        let _ = windows::Win32::UI::Input::KeyboardAndMouse::SetFocus(Some(field));
+    }
+}
+
+/// キーを記録する窓の手続きの番号
+const RECORD_SUBCLASS: usize = 0x5390;
+
+extern "system" fn record_procedure(
+    window: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    _data: usize,
+) -> LRESULT {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetKeyState, MapVirtualKeyW, MAPVK_VK_TO_CHAR, VK_CONTROL, VK_MENU, VK_SHIFT,
+    };
+    use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        WM_CHAR, WM_KEYDOWN, WM_KILLFOCUS, WM_SYSCHAR, WM_SYSKEYDOWN,
+    };
+    // SAFETY: Windows が渡した窓と引数をそのまま使う
+    unsafe {
+        match message {
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                let vk = (wparam.0 & 0xffff) as u16;
+                let pressed = |key: u16| GetKeyState(i32::from(key)) < 0;
+                // 修飾キーを除いたそのキーの文字(記号のキーの文字を書くため)
+                let character =
+                    char::from_u32(MapVirtualKeyW(u32::from(vk), MAPVK_VK_TO_CHAR) & 0xffff)
+                        .filter(|character| *character != '\0');
+                if let Some(notation) = crate::keys::from_key(
+                    vk,
+                    character,
+                    pressed(VK_CONTROL.0),
+                    pressed(VK_MENU.0),
+                    pressed(VK_SHIFT.0),
+                ) {
+                    set_text(window, &crate::keys::display(&notation));
+                    let _ = RemoveWindowSubclass(window, Some(record_procedure), RECORD_SUBCLASS);
+                }
+                LRESULT(0)
+            }
+            // 記録しているあいだは文字を入れない
+            WM_CHAR | WM_SYSCHAR => LRESULT(0),
+            WM_KILLFOCUS => {
+                let _ = RemoveWindowSubclass(window, Some(record_procedure), RECORD_SUBCLASS);
+                DefSubclassProc(window, message, wparam, lparam)
+            }
+            _ => DefSubclassProc(window, message, wparam, lparam),
+        }
+    }
+}
+
 /// 色を選ぶ窓を出し，選んだ色を返す．キャンセルしたら None
 pub fn choose_color(owner: HWND, current: Option<(u8, u8, u8)>) -> Option<(u8, u8, u8)> {
     use windows::Win32::UI::Controls::Dialogs::{

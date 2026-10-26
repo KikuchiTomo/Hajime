@@ -91,6 +91,74 @@ pub fn canonical(text: &str) -> Option<String> {
     Some(result.join(" "))
 }
 
+/// 名前で書くキーの仮想キーの番号(Windows の VK_*)
+const VIRTUAL_KEYS: &[(u16, &str)] = &[
+    (0x20, "Space"),
+    (0x0D, "Enter"),
+    (0x09, "Tab"),
+    (0x08, "Backspace"),
+    (0x2E, "Delete"),
+    (0x1B, "Escape"),
+    (0x26, "Up"),
+    (0x28, "Down"),
+    (0x25, "Left"),
+    (0x27, "Right"),
+    (0x24, "Home"),
+    (0x23, "End"),
+    (0x21, "PageUp"),
+    (0x22, "PageDown"),
+    (0x1C, "Henkan"),
+    (0x1D, "Muhenkan"),
+    (0x15, "Kana"),
+    (0xF2, "Kana"),
+    (0xF0, "Eisu"),
+    (0x19, "Hankaku/Zenkaku"),
+    (0xF3, "Hankaku/Zenkaku"),
+    (0xF4, "Hankaku/Zenkaku"),
+];
+/// F1 の仮想キーの番号(F2 からは 1 ずつ増える)
+const VK_F1: u16 = 0x70;
+/// 修飾キーだけの仮想キー(Shift・Ctrl・Alt と左右の別，Windows キー)
+const MODIFIER_KEYS: &[u16] = &[
+    0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C,
+];
+
+/// 押したキーをキーの書き方(「Ctrl Option Space」)にする(キー設定の「キーを記録」)．
+/// character はそのキーで打てる文字(修飾キーを除いた文字)．修飾キーだけ・書けないキーは None
+pub fn from_key(
+    vk: u16,
+    character: Option<char>,
+    control: bool,
+    alt: bool,
+    shift: bool,
+) -> Option<String> {
+    if MODIFIER_KEYS.contains(&vk) {
+        return None;
+    }
+    let key = if let Some((_, name)) = VIRTUAL_KEYS.iter().find(|(code, _)| *code == vk) {
+        (*name).to_string()
+    } else if (VK_F1..VK_F1 + *FUNCTION_KEYS.end() as u16).contains(&vk) {
+        format!("F{}", vk - VK_F1 + 1)
+    } else {
+        character
+            .filter(|character| !character.is_control())?
+            .to_lowercase()
+            .to_string()
+    };
+    let mut parts = Vec::new();
+    if control {
+        parts.push("ctrl");
+    }
+    if alt {
+        parts.push("alt");
+    }
+    if shift {
+        parts.push("shift");
+    }
+    parts.push(&key);
+    canonical(&parts.join(" "))
+}
+
 fn function_number(lowered: &str) -> Option<u32> {
     let digits = lowered.strip_prefix('f')?;
     if digits.is_empty() {
@@ -176,6 +244,32 @@ pub fn report_lines(report: &KeymapReport, entries: &[(String, String, String)])
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn 押したキーを書き方にする() {
+        assert_eq!(
+            super::from_key(0x20, Some(' '), true, false, true).as_deref(),
+            Some("Ctrl Shift Space")
+        );
+        assert_eq!(
+            super::from_key(0x4B, Some('k'), true, true, false).as_deref(),
+            Some("Ctrl Option k")
+        );
+        assert_eq!(
+            super::from_key(0x71, None, false, false, false).as_deref(),
+            Some("F2")
+        );
+        assert_eq!(
+            super::from_key(0x1C, None, false, false, false).as_deref(),
+            Some("Henkan")
+        );
+        // 記号の Shift は打つ文字に含まれる
+        assert_eq!(
+            super::from_key(0xBA, Some(':'), false, false, true).as_deref(),
+            Some(":")
+        );
+        assert_eq!(super::from_key(0x10, None, false, false, true), None);
+    }
+
     use super::*;
     use ipc::{KeymapMissing, KeymapRowIssue};
 

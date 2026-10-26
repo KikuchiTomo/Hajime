@@ -31,6 +31,12 @@ const JSON: FileFilter = FileFilter {
     name: windows::JSON_FILES,
     pattern: "*.json",
 };
+/// アプリの実行ファイル(除外設定のアプリを選んで足す)
+pub const APP_FILTER: FileFilter = FileFilter {
+    name: windows::APP_FILES,
+    pattern: "*.exe",
+};
+
 /// 辞書と一覧のテキストのファイル
 pub const TEXT_FILTER: FileFilter = TEXT;
 
