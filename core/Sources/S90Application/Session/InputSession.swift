@@ -404,7 +404,10 @@ public final class InputSession {
         case .convertRomaji(let keys):
             // 英字入力の語を日本語の読みにし，分岐図で変換を選べるようにする．Esc で英字に戻す
             var actions: [ClientAction] = commitAll()
-            if !isComposing { setLeftContext(context.precedingText) }
+            if !isComposing {
+                setLeftContext(context.precedingText)
+                converter.setApplication(context.applicationID)
+            }
             composition = newComposition()
             let resolver = NasalReadingResolver(converter: converter)
             for key in keys {
@@ -418,7 +421,10 @@ public final class InputSession {
         case .insertKana(let kana):
             var actions: [ClientAction] = []
             if phase != .composing { actions += commitAll() }
-            if !isComposing { setLeftContext(context.precedingText) }
+            if !isComposing {
+                setLeftContext(context.precedingText)
+                converter.setApplication(context.applicationID)
+            }
             composition.insertKana(kana)
             if settings.current.punctuationCommits, SymbolTable.isPunctuation(kana, settings: settings.current) {
                 return KeyResult(handled: true, actions: actions + commitAll())
@@ -465,6 +471,7 @@ public final class InputSession {
             composition = newComposition()
             // 打ち始めに，入力位置の前の文字列を変換の手がかりとして渡す(「AAA」+「まで」)
             setLeftContext(context.precedingText)
+            converter.setApplication(context.applicationID)
         }
         let startsAlphabet = settings.current.shiftStartsAlphabet && character.isASCII && character.isLetter && character.isUppercase
         if startsAlphabet { alphabetRun = true }
@@ -851,6 +858,9 @@ public final class InputSession {
                 panel.columns[focused].shorter = preview.shorter
                 panel.columns[focused].longer = preview.longer
                 panel.columns[focused].usageNote = usageNote(for: lattice)
+                let segment = lattice.focused
+                let segmentReading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+                panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
             }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
             if splitMode { panel.note = "\(splitGuide(lattice))　\(PanelBuilder.splitNote)" }

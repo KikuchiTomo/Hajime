@@ -416,3 +416,17 @@ struct UsageGuideTests {
         #expect(UsageGuide.misuseNote(for: "名誉挽回する") == nil)
     }
 }
+
+@Suite("取り込んだ辞書の設定(R-16)")
+struct ImportedDictionarySettingTests {
+    @Test("保存して読み直せ，条件も残る")
+    func roundTrip() throws {
+        var settings = Settings()
+        settings.importedDictionaries = [
+            ImportedDictionary(id: "a", name: "法律", field: "法律", condition: .apps(["com.microsoft.Word"]), wordCount: 3),
+            ImportedDictionary(id: "b", name: "電気", isEnabled: false, condition: .context, wordCount: 5),
+        ]
+        let decoded = try JSONDecoder().decode(Settings.self, from: try JSONEncoder().encode(settings))
+        #expect(decoded.importedDictionaries == settings.importedDictionaries)
+    }
+}

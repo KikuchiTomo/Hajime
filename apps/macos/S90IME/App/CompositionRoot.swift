@@ -24,16 +24,20 @@ final class CompositionRoot {
     let contextProvider: InputContextProvider
     let calendar = SystemCalendar(clock: { Date() })
     let sync: SyncCoordinator
+    /// 取り込んだ辞書の索引(Application Support の dictionaries/)．入力欄ごとの変換と設定の画面で共有する
+    let dictionaries: ImportedDictionaryStore
 
     /// 打ち間違いの訂正を別に求めるもの．Zenzai が無ければ nil
     let typoService: ZenzaiTypoService?
 
-    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator) {
+    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
+                 dictionaries: ImportedDictionaryStore) {
         self.typoService = typoService
         self.settings = settings
         self.engine = engine
         self.usage = usage
         self.sync = sync
+        self.dictionaries = dictionaries
         self.lexicon = SpellCheckerLexicon()
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
@@ -60,7 +64,8 @@ final class CompositionRoot {
         let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
         let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings)
         sync.start()
-        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync)
+        let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))
+        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries)
     }
 
     /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
@@ -78,13 +83,14 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes),
+        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService)
     }
 
     /// 設定の画面．開くたびに作らず使い回す
     private(set) lazy var settingsWindow: SettingsWindowController = {
-        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, resetLearning: { [engine] in engine.resetLearning() })
+        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, dictionaries: dictionaries,
+                                                  resetLearning: { [engine] in engine.resetLearning() })
         controller.noteSetAsideFile(settings.setAsideFile)
         return controller
     }()

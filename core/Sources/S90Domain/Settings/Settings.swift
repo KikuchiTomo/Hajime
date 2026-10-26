@@ -88,6 +88,8 @@ public struct Settings: Sendable, Equatable {
     public var learning = LearningMode.enabled
     /// 利用者が登録した語
     public var userDictionary: [UserDictionaryEntry] = []
+    /// 取り込んだ辞書．並び順が優先度．語は Application Support の dictionaries/ にある索引のファイルに置く
+    public var importedDictionaries: [ImportedDictionary] = []
     /// 使い方を記録する(回数だけを端末の中に)
     public var recordsUsage = true
 
@@ -180,7 +182,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
-        case learning, userDictionary, recordsUsage
+        case learning, userDictionary, importedDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, profileRules
     }
@@ -253,6 +255,7 @@ extension Settings: Codable {
         read(.emojiConversion, into: \.emojiConversion)
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
+        readList(.importedDictionaries, into: \.importedDictionaries)
         read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
@@ -319,6 +322,7 @@ extension Settings: Codable {
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
+        try container.encode(importedDictionaries, forKey: .importedDictionaries)
         try container.encode(recordsUsage, forKey: .recordsUsage)
         try container.encode(theme, forKey: .theme)
         try container.encode(candidateFontSize, forKey: .candidateFontSize)
