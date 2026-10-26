@@ -62,6 +62,11 @@ enum UIStrings {
                 KeyHint(key: first(.splitSegment), label: "区切る"),
             ]).filter { !$0.key.isEmpty }
         }
+        /// 文節を区切っているときの足元の案内．数字で区切る位置を選び，Esc でやめる(InputSession.handleSplit)．
+        /// count は区切れる位置の数
+        static func splitHints(count: Int) -> [KeyHint] {
+            [KeyHint(key: count > 1 ? "1–\(count)" : "1", label: "区切る"), KeyHint(key: "Esc", label: "やめる")]
+        }
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
         static func position(first: Int, last: Int, total: Int) -> String {
@@ -177,7 +182,7 @@ enum UIStrings {
             case .previousCandidate: "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"
             case .nextUncertainSegment, .previousUncertainSegment: "確信の低い文節だけを渡り歩きます"
             case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の単語の切れ目まで動かします"
-            case .splitSegment: "区切れる位置に番号を出し、数字で区切ります"
+            case .splitSegment: "語の切れ目に番号を出し、数字で区切ります"
             case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
             case .cancel: "変換中は読みに戻し、直した読みは打ったままに戻します。入力中は読みを消します"
             case .backToReading: "変換をやめて読みに戻ります"

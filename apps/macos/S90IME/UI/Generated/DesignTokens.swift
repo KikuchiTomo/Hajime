@@ -137,6 +137,9 @@ enum DesignTokens {
             static let lineWidth: CGFloat = 1
             static let lineWidthSelected: CGFloat = 2
             static let underlineOffset: CGFloat = 2
+            static let splitBadgeSize: CGFloat = 13
+            static let splitBadgeFontSize: CGFloat = 9
+            static let splitBadgeGap: CGFloat = 2
         }
         enum Settings {
             static let windowWidth: CGFloat = 820

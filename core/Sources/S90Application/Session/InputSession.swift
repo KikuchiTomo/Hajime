@@ -1058,7 +1058,9 @@ public final class InputSession {
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
             }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
-            if splitMode { panel.note = "\(splitGuide(lattice))　\(PanelBuilder.splitNote)" }
+            if splitMode {
+                panel = PanelBuilder.splitting(panel, pieces: focusedSplit(lattice).pieces)
+            }
             if let pendingNote { panel.note = pendingNote }
             return [.setMarkedText(marked), .showLattice(panel)]
         }
@@ -1196,7 +1198,7 @@ public final class InputSession {
                 lattice = builder.resizeToWord(lattice, grow: move == .extendToWord, reading: composition.conversionReading)
             case .split:
                 // 区切れる位置が 2 つ以上の文字のときだけ区切る状態にする
-                splitMode = !splitMode && !Self.splitPositions(of: focusedReading(lattice)).isEmpty
+                splitMode = !splitMode && !focusedSplit(lattice).positions.isEmpty
             }
             phase = .lattice(lattice)
             return KeyResult(handled: true, actions: render(context: context))
@@ -1227,7 +1229,7 @@ public final class InputSession {
         switch event.key {
         case .character(let character) where character.wholeNumberValue != nil && event.modifiers.isEmpty:
             // 数字で選んだ位置で区切る．区切ったあとは前の文節に注目したまま
-            let positions = Self.splitPositions(of: focusedReading(lattice))
+            let positions = focusedSplit(lattice).positions
             if let number = character.wholeNumberValue, positions.indices.contains(number - 1) {
                 let builder = LatticeBuilder(converter: converter)
                 lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: positions[number - 1], reading: composition.conversionReading)
@@ -1260,24 +1262,11 @@ public final class InputSession {
         String(composition.conversionReading.dropFirst(lattice.focused.readingStart).prefix(lattice.focused.readingLength))
     }
 
-    /// 文節の読みの中で区切れる位置(先頭からの文字数)．小さい「ゃ」や「ー」の前では区切らない．数字で選ぶので 9 個まで
-    public static func splitPositions(of reading: String) -> [Int] {
-        let characters = Array(reading)
-        let joins: Set<Character> = ["ゃ", "ゅ", "ょ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ゎ", "ー", "ャ", "ュ", "ョ", "ァ", "ィ", "ゥ", "ェ", "ォ"]
-        return Array(characters.indices.dropFirst().filter { !joins.contains(characters[$0]) }.prefix(9))
-    }
-
-    /// 区切る状態のとき，注目している文節の読みに番号を挟んだ案内(「き①ょう②は」)
-    private func splitGuide(_ lattice: SegmentLattice) -> String {
-        let reading = Array(focusedReading(lattice))
-        let positions = Self.splitPositions(of: String(reading))
-        let marks: [Character] = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
-        var text = ""
-        for (index, character) in reading.enumerated() {
-            if let order = positions.firstIndex(of: index) { text.append(marks[order]) }
-            text.append(character)
-        }
-        return text
+    /// 注目している文節を区切れる位置で分けたもの．意味のある切れ目(「問題｜が｜ある」)だけにし，1 文字ずつは ⇧←→ に任せる．
+    /// 切れ目が無い文節では positions が空(区切る状態に入らない)
+    private func focusedSplit(_ lattice: SegmentLattice) -> SegmentSplitter.Split {
+        let reading = focusedReading(lattice)
+        return SegmentSplitter.split(shown: lattice.focused.selected.text, reading: reading, words: converter.segmentationWords(for: reading))
     }
 
     /// エディタとターミナルでライブ変換を控えめにするか(R-06．設定)

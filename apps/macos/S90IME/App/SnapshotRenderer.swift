@@ -36,6 +36,7 @@ enum SnapshotRenderer {
                 render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
+                render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
                 render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
             }
@@ -245,6 +246,20 @@ enum SnapshotRenderer {
             .init(text: "ドメイン", alternatives: ["ドメイン", "どめいん"], selectedAlternative: 0,
                   variants: ["どめいん", "ドメイン", "ﾄﾞﾒｲﾝ"], isFocused: true, isUncertain: true),
         ], position: 1, total: 2)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 文節を区切っているところ(⇧↓)．注目している文節の読みの文字のあいだに番号を挟む
+    private static func splitView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var focused = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)
+        focused.split = .init(pieces: ["問題", "が", "ある"])
+        let panel = LatticePanel(columns: [.init(text: "それは", isFocused: false, isUncertain: false), focused,
+                                           .init(text: "と思う", isFocused: false, isUncertain: false)], position: 1, total: 4)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

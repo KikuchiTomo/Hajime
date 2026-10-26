@@ -565,6 +565,8 @@ pub struct BranchColumn {
     #[serde(rename = "sourceName")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub split: Option<BranchSplit>,
 }
 
 impl fmt::Debug for BranchColumn {
@@ -584,6 +586,20 @@ impl fmt::Debug for BranchColumn {
             .field("usageNote", &REDACTED)
             .field("alternativeNotes", &REDACTED)
             .field("sourceName", &REDACTED)
+            .field("split", &self.split)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct BranchSplit {
+    pub pieces: Vec<String>,
+}
+
+impl fmt::Debug for BranchSplit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BranchSplit")
+            .field("pieces", &REDACTED)
             .finish()
     }
 }

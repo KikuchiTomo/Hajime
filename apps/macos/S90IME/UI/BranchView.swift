@@ -8,6 +8,8 @@ import S90Domain
 /// - 上の枝: 文字種(ひらがな・カタカナ・半角カタカナ)．↑ で上へたどる
 /// - 確信の低い文節は幹の文字に点線を引き，注目していなければ次の候補を 1 つだけ薄く添える
 /// - 選び直した文節は実線を引く．変換器が書き換えない文節であることを見せる
+/// - 文節を区切っているとき(⇧↓)は，注目している文節の幹を意味のある切れ目(「問題｜が｜ある」)で分け，切れ目に小さな番号の丸を挟む．
+///   番号キーは区切る位置を選ぶので，枝は出さない(core の PanelBuilder.splitting)
 ///
 /// 幹の文節の位置は幹の文字の幅だけで決め，注目を移しても動かさない(空間の安定性)．
 /// glass は曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
@@ -22,9 +24,10 @@ final class BranchView: NSView {
     /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
     var showsHints = true { didSet { needsDisplay = true } }
 
-    /// 足元の案内．注目している文節の長さを変えたらどうなるかも出す
+    /// 足元の案内．注目している文節の長さを変えたらどうなるかも出す．区切っているときは区切る操作だけを出す
     private var hints: [KeyHint] {
         let focused = panel?.columns.first(where: \.isFocused)
+        if let split = focused?.split { return UIStrings.Branch.splitHints(count: split.pieces.count - 1) }
         return UIStrings.Branch.hints(for: keys, shorter: focused?.shorter, longer: focused?.longer)
     }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
@@ -87,7 +90,7 @@ final class BranchView: NSView {
         var trunkX: [CGFloat] = []
         var trunkWidths: [CGFloat] = []
         for column in panel.columns {
-            let width = textWidth(column.text, font: trunkFont) + Size.paddingX * 2
+            let width = (column.split.map { splitPieces($0).width } ?? textWidth(column.text, font: trunkFont)) + Size.paddingX * 2
             trunkX.append(x)
             trunkWidths.append(width)
             x += width + metrics.trunkGap
@@ -104,7 +107,7 @@ final class BranchView: NSView {
         let previewRows = panel.columns.contains { $0.preview != nil } ? 1 : 0
         let upperRows = column?.variants.count ?? 0
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
-        let footer = footerWidth(panel) + textWidth(position(of: panel), font: labelFont) + Size.paddingX * 3
+        let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Size.paddingX * 3
         // 使い分けや誤用の注釈と，IME からの知らせ(直したことなど)は，枝と足元のあいだに 1 行ずつ出す．キーの案内は消さない
         let note = [column?.usageNote, panel.note].compactMap { $0.map { textWidth($0, font: labelFont) + Size.paddingX * 2 } }.max() ?? 0
         let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2)
@@ -184,7 +187,11 @@ final class BranchView: NSView {
             }
             color = column.isFocused ? theme.selectionText : theme.text
         }
-        drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX, in: node)
+        if let split = column.split {
+            drawSplit(split, in: node, color: color)
+        } else {
+            drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX, in: node)
+        }
         // 下線: 選び直した文節は実線，確信の低い文節は点線．線の種類でも区別し，色だけに頼らない
         let offset = theme.isRounded ? Glass.underlineOffset : Branch.underlineOffset
         let y = node.maxY - offset
@@ -195,6 +202,45 @@ final class BranchView: NSView {
         } else if column.isUncertain {
             let dotColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
             drawUnderline(from: from, to: to, y: y, color: dotColor, dotted: true)
+        }
+    }
+
+    // MARK: - 区切る位置
+
+    /// 区切る位置の番号を挟んだ文節の並び．runs は番号のあいだの字と左端，badges は番号と丸の中心(幹の文字の左端から)
+    private struct SplitPieces {
+        var runs: [(text: String, x: CGFloat)] = []
+        var badges: [(label: String, centerX: CGFloat)] = []
+        var width: CGFloat = 0
+    }
+
+    private func splitPieces(_ split: LatticePanel.Column.Split) -> SplitPieces {
+        let slot = Branch.splitBadgeSize + Branch.splitBadgeGap * 2
+        var pieces = SplitPieces()
+        var x: CGFloat = 0
+        for (index, text) in split.pieces.enumerated() {
+            if index > 0 {
+                pieces.badges.append(("\(index)", x + slot / 2))
+                x += slot
+            }
+            pieces.runs.append((text, x))
+            x += textWidth(text, font: trunkFont)
+        }
+        pieces.width = x
+        return pieces
+    }
+
+    /// 区切っている文節の幹．切れ目(「問題｜が｜ある」)に，候補の番号と同じ形の小さな丸で番号を描く
+    private func drawSplit(_ split: LatticePanel.Column.Split, in node: NSRect, color: NSColor) {
+        let pieces = splitPieces(split)
+        let left = node.minX + Size.paddingX
+        for run in pieces.runs {
+            drawText(run.text, attributes: [.font: trunkFont, .foregroundColor: color], x: left + run.x, in: node)
+        }
+        // platinum と desk は注目している文節を選択の色で塗るので，丸も選んでいる行の上の描き方にする
+        for badge in pieces.badges {
+            GlassDrawing.drawBadge(badge.label, center: NSPoint(x: (left + badge.centerX).rounded(), y: node.midY.rounded()), theme: theme,
+                                   selected: !theme.isRounded, opacity: 1, size: Branch.splitBadgeSize, fontSize: Branch.splitBadgeFontSize)
         }
     }
 
@@ -336,6 +382,11 @@ final class BranchView: NSView {
 
     // MARK: - 足元
 
+    /// 足元の右に何番目の候補かを出すか．区切っているときは候補を出さないので出さない
+    private func showsPosition(_ panel: LatticePanel) -> Bool {
+        panel.columns.first(where: \.isFocused)?.split == nil
+    }
+
     private func position(of panel: LatticePanel) -> String {
         let count = panel.columns.first(where: \.isFocused)?.alternatives.count ?? 0
         return UIStrings.Branch.position(first: panel.position, last: panel.position + max(count, 1) - 1, total: panel.total)
@@ -361,7 +412,7 @@ final class BranchView: NSView {
         if showsHints {
             GlassDrawing.drawHints(hints, x: footer.minX, midY: footer.midY, theme: theme)
         }
-        let position = position(of: panel)
+        let position = showsPosition(panel) ? position(of: panel) : ""
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
         if let source = panel.columns.first(where: \.isFocused)?.sourceName {
             // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を位置の左に小さく出す(R-16)

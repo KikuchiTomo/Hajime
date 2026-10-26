@@ -687,8 +687,9 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var usageNote: String?
     public var alternativeNotes: [String?]
     public var sourceName: String?
+    public var split: WireBranchSplit?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -703,11 +704,25 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.usageNote = usageNote
         self.alternativeNotes = alternativeNotes
         self.sourceName = sourceName
+        self.split = split
     }
 }
 
 extension WireBranchColumn: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "WireBranchColumn" }
+    public var debugDescription: String { description }
+}
+
+public struct WireBranchSplit: Sendable, Equatable, Codable {
+    public var pieces: [String]
+
+    public init(pieces: [String]) {
+        self.pieces = pieces
+    }
+}
+
+extension WireBranchSplit: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireBranchSplit" }
     public var debugDescription: String { description }
 }
 

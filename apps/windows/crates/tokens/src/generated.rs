@@ -135,6 +135,9 @@ pub mod size {
         pub const LINE_WIDTH: f32 = 1.0;
         pub const LINE_WIDTH_SELECTED: f32 = 2.0;
         pub const UNDERLINE_OFFSET: f32 = 2.0;
+        pub const SPLIT_BADGE_SIZE: f32 = 13.0;
+        pub const SPLIT_BADGE_FONT_SIZE: f32 = 9.0;
+        pub const SPLIT_BADGE_GAP: f32 = 2.0;
     }
     pub mod settings {
         pub const WINDOW_WIDTH: f32 = 820.0;

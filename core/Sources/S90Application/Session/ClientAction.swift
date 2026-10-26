@@ -160,6 +160,18 @@ public struct LatticePanel: Sendable, Equatable {
         public var alternativeNotes: [String?] = []
         /// 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前(分野)．足元に小さく出す(R-16)
         public var sourceName: String?
+        /// 文節を区切っているとき(⇧↓)の，区切れる位置で分けた文節．区切っていなければ nil
+        public var split: Split?
+
+        /// 区切れる位置の案内．幹に pieces を並べ，あいだに 1 から番号を振る
+        public struct Split: Sendable, Equatable {
+            /// 語の切れ目で分けた文節(「問題」「が」「ある」)．変換した語で分けられなければ読みを分けたもの
+            public var pieces: [String]
+
+            public init(pieces: [String]) {
+                self.pieces = pieces
+            }
+        }
 
         public init(text: String, alternatives: [String] = [], selectedAlternative: Int? = nil, variants: [String] = [], selectedVariant: Int? = nil,
                     isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil, shorter: String? = nil, longer: String? = nil) {
