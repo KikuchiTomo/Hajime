@@ -111,7 +111,10 @@ enum Evaluation {
             } else if applied {
                 outcome = columns[1].split(separator: "|").contains { marked.text == $0 } ? "正しく直した" : "違う文に直した"
             } else if suggested {
-                outcome = columns[1].split(separator: "|").contains { note?.contains($0) == true } ? "正しく示した" : "違う文を示した"
+                // 案内には直す語句を含む文節だけが出るので，Tab で直したあとの文で比べる
+                let accepted = session.handle(KeyEvent(.tab), context: InputContext()).actions
+                    .compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+                outcome = columns[1].split(separator: "|").contains { accepted == String($0) } ? "正しく示した" : "違う文を示した"
             } else {
                 outcome = "直せなかった"
             }
