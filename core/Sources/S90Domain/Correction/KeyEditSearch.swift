@@ -103,11 +103,12 @@ public enum KeyEditSearch {
             .prefix(limit)
             .map(\.edit)
         let scores = languageModel([keys] + ranked.map(\.keys))
-        guard let base = scores.first ?? nil else { return [] }
-        let typed = ReadingCorrection(keys: keys, reading: KanaWidth.katakana(from: original), score: base, cost: 0)
-        return [typed] + zip(ranked, scores.dropFirst()).compactMap { edit, score in
+        // 打ったままの並びを言語モデルが読めない(かなにならない英字が残る「gakusri」)ときは，訂正の候補だけを返す
+        let typed = (scores.first ?? nil).map { ReadingCorrection(keys: keys, reading: KanaWidth.katakana(from: original), score: $0, cost: 0) }
+        let corrected = zip(ranked, scores.dropFirst()).compactMap { edit, score in
             score.map { ReadingCorrection(keys: edit.keys, reading: KanaWidth.katakana(from: edit.reading), score: $0 - edit.cost * costScale, cost: edit.cost * costScale) }
         }
+        return (typed.map { [$0] } ?? []) + corrected
     }
 
     /// 候補ごとに，読みを変換したときのもっともらしさの打ったままの読みとの差(plausibilityGain)を入れる
