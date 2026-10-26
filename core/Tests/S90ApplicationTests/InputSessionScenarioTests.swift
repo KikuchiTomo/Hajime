@@ -838,6 +838,29 @@ struct ReadingCorrectionScenarioTests {
         #expect(harness.marked.text == "ようです")
     }
 
+    @Test("R-02: 訂正を別のところで求めるときは，求め終わるまで見直さず(入力を待たせない)，受け取ったら直す")
+    func providedCorrections() {
+        struct NoService: TypoCorrecting {
+            func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] { [:] }
+        }
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(), typoService: NoService())
+        var marked = ""
+        let apply = { (actions: [ClientAction]) in for case .setMarkedText(let text) in actions { marked = text.text } }
+        for key in "youdesu" { apply(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) }
+        apply(session.settle(context: InputContext()))
+        let request = session.correctionRequest
+        #expect(request?.keys.first == "youdesu")
+        apply(session.review(context: InputContext()))
+        #expect(marked == "ようです")
+        session.provideCorrections(["youdesu": [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -5, cost: 2),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]])
+        #expect(session.correctionRequest == nil)
+        apply(session.review(context: InputContext()))
+        #expect(marked == "よいです")
+    }
+
     @Test("差が中くらいなら直さずに「もしかして」と示し，Tab で直す")
     func suggestion() {
         let converter = FakeConverter()

@@ -24,7 +24,11 @@ final class CompositionRoot {
     let contextProvider: InputContextProvider
     let calendar = SystemCalendar(clock: { Date() })
 
-    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore) {
+    /// 打ち間違いの訂正を別に求めるもの．Zenzai が無ければ nil
+    let typoService: ZenzaiTypoService?
+
+    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?) {
+        self.typoService = typoService
         self.settings = settings
         self.engine = engine
         self.usage = usage
@@ -40,17 +44,17 @@ final class CompositionRoot {
         let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent(AppIdentity.supportDirectoryName, isDirectory: true)
         let settings = FileSettingsStore(fileURL: support.appendingPathComponent("settings.json"))
-        let engine = try AzooKeyConverterEngine(
-            memoryDirectory: support.appendingPathComponent("memory", isDirectory: true),
-            versionString: AppIdentity.versionString,
-            zenzai: loadZenzaiModel()
-        )
+        let zenzai = loadZenzaiModel()
+        let memory = support.appendingPathComponent("memory", isDirectory: true)
+        let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai)
+        // 打ち間違いの訂正は時間がかかるので，別の変換器でメインスレッドの外で求める(Zenzai があるときだけ)
+        let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: AppIdentity.versionString) }
         engine.apply(settings.current)
         settings.observe { [weak engine] in engine?.apply($0) }
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
         let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
-        installed = CompositionRoot(settings: settings, engine: engine, usage: usage)
+        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService)
     }
 
     /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
@@ -68,7 +72,8 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar), lexicon: lexicon, settings: settings, usage: usage)
+        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar), lexicon: lexicon, settings: settings, usage: usage,
+                     typoService: typoService)
     }
 
     /// 設定の画面．開くたびに作らず使い回す

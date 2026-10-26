@@ -27,6 +27,19 @@ struct ReadingCorrectionTests {
         #expect(after == before || after == nil, "\(keys)")
     }
 
+    @Test("別の変換器で求めた訂正で，報告された打ち間違いを直す(打ち忘れ・余分な母音・入れ替わり)", arguments: [
+        ("kyouhaitenkidesune", "kyouhaiitenkidesune"),
+        ("kyouhaiteknidesune", "kyouhaiitenkidesune"),
+        ("tututasakanagaookikatta", "tuttasakanagaookikatta"),
+    ])
+    func service(typed: String, expected: String) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
+        let service = ZenzaiTypoService(zenzai: try ZenzaiModel.verified(at: URL(fileURLWithPath: path)), memoryDirectory: directory, versionString: "typo")
+        let corrections = await service.corrections(forKeys: [typed], leftContext: nil)
+        #expect(corrections[typed]?.first?.keys == expected)
+    }
+
     private func makeSession() throws -> InputSession {
         let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
