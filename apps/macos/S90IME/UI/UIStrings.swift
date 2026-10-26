@@ -36,7 +36,7 @@ enum UIStrings {
             switch style {
             case .romaji: "ローマ字"
             case .kana: "かな"
-            case .english: "EN"
+            case .english: "英"
             }
         }
     }
@@ -47,72 +47,72 @@ enum UIStrings {
         static let inputTab = "入力"
         static let conversionTab = "変換"
         static let dictionaryTab = "ユーザー辞書"
-        static let appearanceTab = "見た目"
-        static let usageTab = "使い方の記録"
-        static let appsTab = "アプリ"
+        static let appearanceTab = "外観"
+        static let usageTab = "統計"
+        static let appsTab = "アプリ別"
         static let romajiTab = "ローマ字"
-        static let romajiKeys = "綴り"
-        static let romajiKana = "かな"
-        static let romajiNote = "標準のローマ字の表に足す綴りです(例: wyi → ゐ)．同じ綴りは，ここに足したものを使います．綴りは英小文字・「-」・「'」の 4 文字まで，かなは 6 文字までです．"
-        static let invalidRomaji = "綴りは英小文字・「-」・「'」の 4 文字まで，かなは 6 文字までにしてください"
-        static let escapeSwitchesToDirect = "日本語のモードで Escape を押したら英数にする(Vim など)"
-        static let bundlePrefix = "アプリの ID(前方一致)"
-        static let profile = "扱い"
-        static let appsNote = "アプリの ID はバンドル ID です(例: com.microsoft.VSCode)．上にある規則ほど優先します．エディタとターミナルでは記号と空白を半角のまま入れ，ターミナルでは行の頭のコマンドを英字のまま流します．"
+        static let romajiKeys = "入力"
+        static let romajiKana = "出力"
+        static let romajiNote = "ローマ字の変換表に組み合わせを追加します。"
+        static let invalidRomaji = "入力は英小文字・「-」・「'」で 4 文字まで，出力は 6 文字までにしてください"
+        static let escapeSwitchesToDirect = "Escape で英数に切り替え"
+        static let bundlePrefix = "バンドル ID"
+        static let profile = "モード"
+        static let appsNote = "アプリの固有 ID を使用して指定します。\n優先順位順の指定が可能です。"
 
         static func label(for profile: AppProfile) -> String {
             switch profile {
-            case .standard: "ふつう"
-            case .programming: "エディタ(記号を半角)"
-            case .terminal: "ターミナル(記号を半角，コマンドを英字で)"
+            case .standard: "標準"
+            case .programming: "エディタ"
+            case .terminal: "ターミナル"
             }
         }
-        static let recordsUsage = "使い方を記録する"
-        static let usageNote = "確定した回数や選び直した回数だけを，この Mac の中に記録します．入力した文字は記録せず，どこにも送りません．"
-        static let firstCandidateRate = "選び直さずに確定した割合"
+        static let recordsUsage = "入力の統計を記録"
+        static let usageNote = "入力した文字は記録しません。"
+        static let firstCandidateRate = "第 1 候補のまま確定した割合"
         static let commits = "確定した回数"
-        static let conversionsOpened = "Space で候補を開いた回数"
+        static let conversionsOpened = "Space で変換した回数"
         static let segmentsChanged = "選び直した文節の数"
-        static let readingCorrections = "打ち間違いを直した回数 / 戻した回数"
-        static let englishCorrections = "英単語を直した回数 / 戻した回数"
-        static let resetUsage = "記録を消す"
+        static let readingCorrections = "タイプミスを修正した回数 / 取り消した回数"
+        static let englishCorrections = "英単語を修正した回数 / 取り消した回数"
+        static let resetUsage = "統計を消去"
         static let inputStyleSection = "入力方式"
-        static let characters = "入れる文字"
+        static let characters = "文字"
         static let punctuation = "句読点"
-        static let brackets = "[ ] で入れる括弧"
-        static let slash = "/ で入れる文字"
-        static let spaceWidth = "空白(Shift+Space で逆)"
-        static let numberWidth = "数字"
-        static let keys = "キー"
-        static let punctuationCommits = "句読点を打ったら確定する"
-        static let numberKeySelection = "番号キーで候補を選ぶ"
-        static let showsModeIndicator = "日本語と英数を切り替えたときにモードを出す"
+        static let brackets = "[ ] キーで入力する括弧"
+        static let slash = "/ キーで入力する文字"
+        static let spaceWidth = "スペース幅"
+        static let numberWidth = "数字幅"
+        static let keys = "キー操作"
+        static let punctuationCommits = "句読点で確定"
+        static let numberKeySelection = "番号キーで候補を選択"
+        static let showsModeIndicator = "入力モードの切り替えを表示"
         static let conversion = "変換"
-        static let specialConversion = "特別な候補"
-        static let dateConversion = "「きょう」「いま」などを日付と時刻にする"
-        static let symbolConversion = "「やじるし」などの読みから記号を出す"
-        static let emojiConversion = "読みから絵文字を出す"
+        static let specialConversion = "特殊変換"
+        static let dateConversion = "日付と時刻に変換"
+        static let symbolConversion = "記号に変換"
+        static let emojiConversion = "絵文字に変換"
         static let learning = "学習"
-        static let resetLearning = "学習した内容を消す"
-        static let reading = "読み(ひらがな)"
-        static let word = "語"
-        static let add = "登録"
-        static let remove = "選んだ語を消す"
-        static let importDictionary = "取り込む…"
-        static let exportDictionary = "書き出す…"
+        static let resetLearning = "学習結果を消去"
+        static let reading = "読み"
+        static let word = "単語"
+        static let add = "追加"
+        static let remove = "削除"
+        static let importDictionary = "インポート…"
+        static let exportDictionary = "エクスポート…"
         static let exportFileName = "s90-user-dictionary.txt"
-        static let dictionaryNote = "取り込むファイルは「読み<タブ>語」の行が並んだテキストです．Google 日本語入力と ATOK が書き出すファイルを読めます．"
-        static let appearance = "見た目"
-        static let restoreDefaults = "設定を既定に戻す(ユーザー辞書は残す)"
+        static let dictionaryNote = "「読み<タブ>単語」形式のテキストファイルを読み込めます。"
+        static let appearance = "外観"
+        static let restoreDefaults = "初期設定に戻す"
         static let saveFailed = "設定を保存できませんでした"
-        static func setAside(_ name: String) -> String { "前の設定のファイルを読めなかったので，既定の設定で始めました．前のファイルは同じ場所に \(name) として残してあります" }
-        static let learningReset = "学習した内容を消しました"
-        static let dictionaryFull = "ユーザー辞書がいっぱいです(10,000 語まで)"
-        static let invalidEntry = "読みはひらがなで，語と合わせて長すぎないようにしてください"
-        static let importFailed = "取り込めませんでした．大きすぎるか，テキストのファイルではありません"
-        static let exportFailed = "書き出せませんでした"
-        static func imported(_ count: Int) -> String { "\(count) 語を読みました" }
-        static func fontSize(_ size: Int) -> String { "候補の文字の大きさ: \(size)" }
+        static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため，初期設定で起動しました．元のファイルは同じ場所に \(name) として残してあります" }
+        static let learningReset = "学習結果を消去しました"
+        static let dictionaryFull = "ユーザー辞書に登録できるのは 10,000 語までです"
+        static let invalidEntry = "読みはひらがなで入力し，読みと単語は長すぎないようにしてください"
+        static let importFailed = "インポートできませんでした．ファイルが大きすぎるか，テキストファイルではありません"
+        static let exportFailed = "エクスポートできませんでした"
+        static func imported(_ count: Int) -> String { "\(count) 語を追加しました" }
+        static func fontSize(_ size: Int) -> String { "候補の文字サイズ: \(size)" }
 
         static func label(for style: PunctuationStyle) -> String { style.comma + style.period }
         static func label(for style: BracketStyle) -> String { style.open + style.close }
@@ -128,7 +128,7 @@ enum UIStrings {
         static func label(for mode: LearningMode) -> String {
             switch mode {
             case .enabled: "学習する"
-            case .readOnly: "学習した内容は使うが，新しく学習しない"
+            case .readOnly: "学習結果を使うが，新しく学習しない"
             case .disabled: "学習しない"
             }
         }
@@ -142,33 +142,33 @@ enum UIStrings {
     /// 設定の画面の選択肢の名前
     enum Choice {
         static let inputStyle = "入力方式"
-        static let keyboardLayout = "英字の配列"
-        static let keyboardLayoutNote = "ローマ字入力と英語のまま入力で使う配列です．かな入力はキーの位置で決まるので，この設定によりません．次に入力欄を選んだときから使います．"
+        static let keyboardLayout = "キー配列"
+        static let keyboardLayoutNote = "ローマ字入力と英字入力で使用します。"
 
         static func label(for style: InputStyle) -> String {
             switch style {
             case .romaji: "ローマ字入力"
-            case .kana: "かな入力(JIS かな配列)"
-            case .english: "英語のまま入力(Tab で日本語)"
+            case .kana: "かな入力"
+            case .english: "英字入力"
             }
         }
 
         static func label(for layout: KeyboardLayout) -> String {
             switch layout {
-            case .system: "OS で選んでいる配列のまま"
+            case .system: "システムの設定に従う"
             case .abc: "ABC"
             case .us: "US"
             case .dvorak: "Dvorak"
-            case .dvorakQwertyCommand: "Dvorak(⌘ を押す間は QWERTY)"
+            case .dvorakQwertyCommand: "Dvorak - QWERTY ⌘"
             case .colemak: "Colemak"
             }
         }
 
-        static let variantRow = "候補の上に種類の行を出す"
-        static let typoCorrection = "打ち間違いの補正"
+        static let variantRow = "候補の上に文字種の行を表示"
+        static let typoCorrection = "タイプミスの修正"
         static let yenKey = "¥ キーで入力する文字"
-        static let theme = "外観"
-        static let presentation = "候補の出し方"
+        static let theme = "テーマ"
+        static let presentation = "候補の表示"
 
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {
@@ -179,9 +179,9 @@ enum UIStrings {
 
         static func label(for level: TypoCorrectionLevel) -> String {
             switch level {
-            case .off: "しない"
-            case .conservative: "控えめ(英単語だけ)"
-            case .standard: "標準(日本語の打ち間違いも直す)"
+            case .off: "オフ"
+            case .conservative: "英単語のみ"
+            case .standard: "英単語と日本語"
             }
         }
 
@@ -199,8 +199,8 @@ enum UIStrings {
         static func label(for theme: ThemePreference) -> String {
             switch theme {
             case .automatic, .native: "標準"
-            case .platinum: "プラチナ(レトロ)"
-            case .desk: "夜のデスク(レトロ)"
+            case .platinum: "プラチナ"
+            case .desk: "夜のデスク"
             }
         }
     }

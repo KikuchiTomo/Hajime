@@ -133,7 +133,9 @@ final class BranchView: NSView {
                 drawBranches(lowerRows(column), from: node, width: layout.branchWidth, downward: true)
                 drawBranches(upperRows(column), from: node, width: layout.branchWidth, downward: false)
             } else if let preview = column.preview, !(branchRange?.overlaps(node.minX...node.maxX) ?? false) {
-                drawPreview(preview, under: node)
+                // 添える候補は次の文節の手前までに収め，はみ出す分は省く(次の文節の添え書きと重ねない)
+                let limit = index + 1 < layout.trunkX.count ? layout.trunkX[index + 1] : body.maxX - metrics.inset
+                drawPreview(preview, under: node, maxX: limit)
             }
         }
         let footerY = layout.trunkY + metrics.rowHeight * CGFloat(1 + layout.lowerRows)
@@ -262,7 +264,7 @@ final class BranchView: NSView {
     }
 
     /// 注目していない確信の低い文節の下に，次の候補を 1 つだけ薄く添える
-    private func drawPreview(_ text: String, under node: NSRect) {
+    private func drawPreview(_ text: String, under node: NSRect, maxX: CGFloat) {
         let metrics = metrics
         let stemX = (node.minX + metrics.stemX).rounded()
         let row = NSRect(x: stemX, y: node.maxY, width: node.width, height: metrics.rowHeight)
@@ -281,7 +283,18 @@ final class BranchView: NSView {
             NSRect(x: stemX, y: row.midY.rounded(), width: metrics.branchIndent / 2, height: Branch.lineWidth).fill()
             textX = stemX + metrics.branchIndent / 2 + Size.paddingX / 2
         }
-        drawText(text, attributes: [.font: candidateFont, .foregroundColor: color], x: textX, in: row)
+        let attributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: color]
+        drawText(Self.truncated(text, attributes: attributes, width: maxX - textX), attributes: attributes, x: textX, in: row)
+    }
+
+    /// 幅に収まるよう末尾を「…」で省く
+    private static func truncated(_ text: String, attributes: [NSAttributedString.Key: Any], width: CGFloat) -> String {
+        guard text.size(withAttributes: attributes).width > width else { return text }
+        var characters = Array(text)
+        while !characters.isEmpty, (String(characters) + "…").size(withAttributes: attributes).width > width {
+            characters.removeLast()
+        }
+        return characters.isEmpty ? "" : String(characters) + "…"
     }
 
     // MARK: - 足元

@@ -20,6 +20,7 @@ final class CompositionRoot {
     let lexicon: SpellCheckerLexicon
     let candidatePanel: CandidatePanelController
     let modeIndicator: ModeIndicatorController
+    let note: NoteController
     let contextProvider: InputContextProvider
     let calendar = SystemCalendar(clock: { Date() })
 
@@ -30,6 +31,7 @@ final class CompositionRoot {
         self.lexicon = SpellCheckerLexicon()
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
+        self.note = NoteController()
         self.contextProvider = InputContextProvider(settings: settings)
     }
 
@@ -78,7 +80,7 @@ final class CompositionRoot {
     }()
 
     func makePresenter() -> ClientActionPresenter {
-        ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, settings: settings)
+        ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings)
     }
 }
 
