@@ -311,6 +311,12 @@ public final class EngineService {
             } catch {
                 return .error(code: .malformed)
             }
+        case .checkCustomTheme(let text):
+            // カスタムテーマの読みやすさ(文字と地のコントラスト)．テーマは設定のファイルと同じ形の JSON
+            guard let theme = try? JSONDecoder().decode(CustomTheme.self, from: Data(text.utf8)) else { return .error(code: .malformed) }
+            return .themeReport(issues: theme.lowContrastPairs.map { pair in
+                WireContrastIssue(pair: WireContrastPair(pair), ratio: theme.contrastRatio(of: pair), minimum: pair.minimum)
+            })
         case .readSymbolItems(let kind):
             // 記号のページの一覧．既定の決まりに利用者の決まりを重ねる(macOS の SymbolsPage と同じ表)
             let items = SymbolRuleEditing.items(SymbolRule.Kind(kind), rules: settings.current.symbolRules)

@@ -13,6 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 ipc = { path = "../ipc" }
+# 外観の見本を候補ウィンドウと同じ描き方で描くため
+candidate-ui = { path = "../candidate-ui" }
 tokens = { path = "../tokens" }
 serde.workspace = true
 serde_json.workspace = true
@@ -31,6 +33,7 @@ windows = { workspace = true, features = [
     "Win32_System_Time",
     "Win32_UI_Accessibility",
     "Win32_UI_Controls",
+    "Win32_UI_Controls_Dialogs",
     "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",

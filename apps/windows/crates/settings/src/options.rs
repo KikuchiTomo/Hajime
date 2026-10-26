@@ -86,6 +86,30 @@ pub const WORD_CONTEXTS: &[Choice] = &[
     ("afterJapanese", "日本語"),
 ];
 
+/// 選択肢の値の名前(無ければ値のまま)
+pub fn label_of<'a>(choices: &'a [Choice], value: &'a str) -> &'a str {
+    choices
+        .iter()
+        .find(|(choice, _)| *choice == value)
+        .map_or(value, |(_, label)| label)
+}
+
+/// カスタムテーマの枝の線(CustomTheme.BranchStyle)
+pub const BRANCH_STYLES: &[Choice] = &[("curved", "曲線"), ("straight", "直線")];
+
+/// カスタムテーマで選べる書体．空はテーマの書体．入っていない書体はテーマの書体で描く(候補ウィンドウの Renderer)
+pub const THEME_FONTS: &[Choice] = &[
+    ("", crate::strings::more::THEME_FONT),
+    ("Yu Gothic UI", "Yu Gothic UI"),
+    ("Yu Mincho", "Yu Mincho"),
+    ("Meiryo UI", "Meiryo UI"),
+    ("BIZ UDPGothic", "BIZ UDPGothic"),
+    ("BIZ UDPMincho", "BIZ UDPMincho"),
+    ("UD Digi Kyokasho N-R", "UD Digi Kyokasho N-R"),
+    ("MS Gothic", "MS Gothic"),
+    ("Consolas", "Consolas"),
+];
+
 /// 同期の範囲(SyncScope)．macOS の「この Mac だけ」を「この PC だけ」にする
 pub const SYNC_SCOPES: &[Choice] = &[("synced", "同期する"), ("local", "この PC だけ")];
 

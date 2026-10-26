@@ -258,6 +258,14 @@ pub enum Control {
     SyncFields(ListSpec),
     /// 取り込んだ辞書・連想の辞書の一覧．入力欄で選んだ辞書の名前などを変え，下のボタンで取り込む・並べ替える・切り替える・消す
     Dictionaries(DictionaryList, ListSpec),
+    /// カスタムテーマの一覧．選んだテーマを下の行で編集し，入力欄で名前を変え，下のボタンで作る・複製する・使う・消す
+    CustomThemes(ListSpec),
+    /// 色を選ぶボタン(「#RRGGBB」の値．押すと色を選ぶ窓を出す)
+    Color,
+    /// 外観の見本(候補ウィンドウと同じ描き方の分岐図)
+    ThemePreview,
+    /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
+    ThemeReport,
 }
 
 /// 一覧の上限の種類(catalog の Limits のどれか)
@@ -390,6 +398,16 @@ impl Control {
                     settings::REMOVE,
                 ],
             ),
+            Control::CustomThemes(_) => (
+                &[rule_list::UPDATE],
+                &[
+                    windows::CREATE_THEME,
+                    more::DUPLICATE,
+                    windows::USE_THEME,
+                    more::DUPLICATE_THEME,
+                    more::DELETE_THEME,
+                ],
+            ),
             Control::Dictionaries(DictionaryList::Association, _) => (
                 &[rule_list::UPDATE],
                 &[
@@ -413,7 +431,8 @@ impl Control {
             | Control::Dictionary(spec)
             | Control::Symbols(_, spec)
             | Control::SyncFields(spec)
-            | Control::Dictionaries(_, spec) => Some(spec),
+            | Control::Dictionaries(_, spec)
+            | Control::CustomThemes(spec) => Some(spec),
             _ => None,
         }
     }
@@ -434,6 +453,7 @@ impl Control {
                 windows::DICTIONARY_SUMMARY,
                 windows::SYMBOL_STATE,
             ],
+            Control::CustomThemes(_) => vec![more::THEME_NAME, windows::SYMBOL_STATE],
             _ => fields().collect(),
         }
     }
@@ -468,6 +488,7 @@ pub enum RangeKind {
     ModeIndicatorDuration,
     CandidateFontSize,
     AssociationLimit,
+    CustomThemeCornerRadius,
 }
 
 impl RangeKind {
@@ -480,6 +501,7 @@ impl RangeKind {
             RangeKind::ModeIndicatorDuration => ranges.mode_indicator_duration,
             RangeKind::CandidateFontSize => ranges.candidate_font_size,
             RangeKind::AssociationLimit => ranges.association_limit,
+            RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
         }
     }
 
@@ -1169,12 +1191,62 @@ fn file_rows(file: RuleList) -> [Row; 2] {
     ]
 }
 
-/// 外観のページ(macOS の AppearancePage のテーマと書体)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)
+const THEME_FIELDS: &[Field] = &[Field::named("name", more::THEME_NAME, false)];
+
+/// 外観のページ(macOS の AppearancePage と CustomThemeEditor)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
+/// カスタムテーマは一覧で選んだものを下の行で編集する(値は crate::themes の「customTheme.」の道筋)
 fn appearance() -> Vec<Section> {
+    use crate::themes;
+    use Condition::*;
+    let editing = || IsNot(themes::ID, "");
+    let mut colors: Vec<Row> = themes::COLORS
+        .iter()
+        .map(|(path, title)| Row::new(title, path, Control::Color).visible_when(editing()))
+        .collect();
+    colors.push(
+        Row::new(more::READABILITY, "", Control::ThemeReport)
+            .visible_when(IsNot(themes::READABILITY, "")),
+    );
     vec![
+        Section::untitled(vec![Row::new(more::PREVIEW, "", Control::ThemePreview)]),
         Section::new(
             more::THEME,
             vec![Row::choice(more::THEME, "theme", options::THEMES).clearing("customThemeID")],
+        ),
+        Section::new(
+            more::CUSTOM_THEMES,
+            vec![Row::new(
+                "",
+                "",
+                Control::CustomThemes(ListSpec {
+                    path: "customThemes",
+                    fields: THEME_FIELDS,
+                    empty: more::NO_CUSTOM_THEMES,
+                    invalid: more::INVALID_THEME,
+                    lowercase: false,
+                    exclusive_with: None,
+                }),
+            )],
+        ),
+        Section::new(more::COLORS, colors),
+        Section::new(
+            more::SHAPE,
+            vec![
+                Row::stepper(
+                    more::CORNER_RADIUS,
+                    themes::CORNER_RADIUS,
+                    RangeKind::CustomThemeCornerRadius,
+                )
+                .visible_when(editing()),
+                Row::choice(
+                    more::BRANCH_STYLE,
+                    themes::BRANCH_STYLE,
+                    options::BRANCH_STYLES,
+                )
+                .visible_when(editing()),
+                Row::choice(more::FONT, themes::FONT_NAME, options::THEME_FONTS)
+                    .visible_when(editing()),
+            ],
         ),
         Section::new(
             more::FONT,
@@ -1394,8 +1466,11 @@ mod tests {
                     .iter()
                     .filter(|row| row.has_value())
                     .chain(lists)
-                    // 同期の値は設定のファイルの項目ではない(crate::sync)
-                    .filter(|row| !crate::sync::is_sync_path(row.path))
+                    // 同期の値と編集しているカスタムテーマの値は設定のファイルの項目ではない(crate::sync・crate::themes)
+                    .filter(|row| {
+                        !crate::sync::is_sync_path(row.path)
+                            && !crate::themes::is_theme_path(row.path)
+                    })
                 {
                     let name = crate::model::field_name(row.path);
                     assert!(catalog.fields.iter().any(|field| field == name), "{name}");

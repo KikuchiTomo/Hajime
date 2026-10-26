@@ -37,6 +37,7 @@ OPTION_TABLES = {
     "THEMES": ("Choice", "ThemePreference"),
     "SYNC_SCOPES": ("Sync", "SyncScope"),
     "SYNC_GROUPS": ("Sync", "SyncGroup"),
+    "BRANCH_STYLES": ("More", "CustomTheme.BranchStyle"),
 }
 # Windows で名前を変える選択肢(macOS の Command のキーを，Windows では Ctrl のキーにする)
 WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOPES", "local")}
@@ -73,7 +74,7 @@ def swift_label_functions(text: str) -> list[tuple[str, str, dict[str, str]]]:
         enum = re.match(r"\s*(?:public |private |fileprivate )?enum (\w+)\b.*\{", line)
         if enum:
             enums.append((enum.group(1), depth))
-        function = re.match(r"\s*static func label\(for \w+: (\w+)\) -> String \{", line)
+        function = re.match(r"\s*static func label\(for \w+: ([\w.]+)\) -> String \{", line)
         if function and enums:
             current = (enums[-1][0], function.group(1), {}, depth)
         elif current:

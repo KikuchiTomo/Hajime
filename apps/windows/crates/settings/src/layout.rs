@@ -79,10 +79,13 @@ pub fn control_width(control: &Control) -> f32 {
         | Control::Symbols(..)
         | Control::SyncFields(_)
         | Control::Dictionaries(..)
+        | Control::CustomThemes(_)
+        | Control::ThemePreview
         | Control::Notices => 0.0,
+        Control::Color => size::CONTROL_WIDTH,
         Control::Version => size::CONTROL_WIDTH,
         Control::Preset => size::CONTROL_WIDTH + size::CONTROL_GAP + size::BUTTON_WIDTH,
-        Control::KeymapReport => 0.0,
+        Control::KeymapReport | Control::ThemeReport => 0.0,
         Control::Note => 0.0,
     }
 }
@@ -105,10 +108,21 @@ pub fn layout(
     let title = Rect::new(left, y, width, size::TITLE_HEIGHT);
     y += size::TITLE_HEIGHT;
     let mut result = Vec::new();
-    for (index, section) in sections.iter().enumerate() {
-        if index > 0 {
+    let mut shown = 0;
+    for section in sections {
+        // 行がひとつも出ないまとまりは，見出しも間も置かない(カスタムテーマを選んでいないときの色・形など)
+        if !section.rows.iter().any(&visible) {
+            result.push(SectionLayout {
+                title: None,
+                cards: Vec::new(),
+                footer: None,
+            });
+            continue;
+        }
+        if shown > 0 {
             y += size::SECTION_GAP - size::CARD_GAP;
         }
+        shown += 1;
         let title = section.title.map(|_| {
             let rect = Rect::new(left, y, width, size::SECTION_TITLE_HEIGHT);
             y += size::SECTION_TITLE_HEIGHT;
@@ -162,7 +176,10 @@ fn card_height(control: &Control, width: f32) -> f32 {
             size::CARD_PADDING_X * 2.0 + inputs + size::BODY_LINE_HEIGHT * PREVIEW_LINES
         }
         Control::Notices => size::CARD_PADDING_X * 2.0 + size::LIST_HEIGHT * NOTICES_LISTS,
-        Control::KeymapReport => size::CARD_PADDING_X * 2.0 + size::BODY_LINE_HEIGHT * REPORT_LINES,
+        Control::KeymapReport | Control::ThemeReport => {
+            size::CARD_PADDING_X * 2.0 + size::BODY_LINE_HEIGHT * REPORT_LINES
+        }
+        Control::ThemePreview => size::CARD_PADDING_X * 2.0 + size::PREVIEW_HEIGHT,
         _ => size::ROW_HEIGHT,
     }
 }
@@ -195,7 +212,10 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
                 size::LIST_HEIGHT * NOTICES_LISTS,
             )
         }
-        Control::KeymapReport => {
+        Control::ThemePreview => {
+            return place_inputs(position, 0, NO_BUTTONS, card, size::PREVIEW_HEIGHT);
+        }
+        Control::KeymapReport | Control::ThemeReport => {
             return place_inputs(
                 position,
                 0,
@@ -504,6 +524,26 @@ mod tests {
         }
         assert!(button_width("有効・無効の切り替え") > size::BUTTON_WIDTH);
         assert_eq!(button_width("更新"), size::BUTTON_WIDTH);
+    }
+
+    #[test]
+    fn 行がひとつも出ないまとまりは見出しも置かない() {
+        let page = sections(Page::Appearance).unwrap();
+        // カスタムテーマを選んでいない(色・形の行を出さない)
+        let hidden = layout(&page, 800.0, |row| row.visible.is_none(), one_line);
+        let shown = layout(&page, 800.0, |_| true, one_line);
+        let titles = |layout: &PageLayout| {
+            layout
+                .sections
+                .iter()
+                .filter(|section| section.title.is_some())
+                .count()
+        };
+        assert!(titles(&hidden) < titles(&shown));
+        assert_eq!(hidden.sections.len(), page.len());
+        assert!(hidden.height < shown.height);
+        // 見本の欄は見本の高さを取る
+        assert!(shown.sections[0].cards[0].control.height >= size::PREVIEW_HEIGHT);
     }
 
     #[test]

@@ -276,37 +276,7 @@ fn strings(texts: &[&str]) -> Vec<String> {
 }
 
 fn lattice() -> BranchMap {
-    BranchMap {
-        association: None,
-        association_hint: None,
-        columns: vec![
-            column("私の"),
-            BranchColumn {
-                is_decided: true,
-                is_corrected: None,
-                ..column("名前は")
-            },
-            BranchColumn {
-                alternatives: strings(&["中のです", "中野です", "仲のです", "那珂のです"]),
-                selected_alternative: Some(1),
-                variants: strings(&["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"]),
-                is_focused: true,
-                is_uncertain: true,
-                shorter: Some("中野で".into()),
-                ..column("中野です")
-            },
-        ],
-        position: 1,
-        total: 8,
-        note: None,
-        hints: vec![
-            hint("↓", "候補"),
-            hint("↑", "文字種"),
-            hint("←→", "文節"),
-            hint("Tab", "次の文節"),
-            hint("Shift+←", "中野で"),
-        ],
-    }
+    scene::sample::branch()
 }
 
 fn preview() -> BranchMap {

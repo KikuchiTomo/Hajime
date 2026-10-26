@@ -8,6 +8,7 @@ mod association;
 mod branch;
 mod list;
 mod paint;
+pub mod sample;
 mod small;
 
 pub use crate::geometry::{Frame, Point};

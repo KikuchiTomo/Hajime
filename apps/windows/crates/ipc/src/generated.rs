@@ -605,6 +605,32 @@ impl fmt::Debug for KeymapReport {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ContrastPair {
+    Text,
+    TextMuted,
+    SelectionText,
+    Correction,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContrastIssue {
+    pub pair: ContrastPair,
+    pub ratio: f64,
+    pub minimum: f64,
+}
+
+impl fmt::Debug for ContrastIssue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ContrastIssue")
+            .field("pair", &self.pair)
+            .field("ratio", &self.ratio)
+            .field("minimum", &self.minimum)
+            .finish()
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PreviewWord {
     pub typed: String,
@@ -789,6 +815,9 @@ pub enum RequestBody {
     },
     CheckKeymap {
         values: String,
+    },
+    CheckCustomTheme {
+        theme: String,
     },
     ResetLearning,
     ReadUsage,
@@ -987,6 +1016,10 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("CheckKeymap")
                 .field("values", &REDACTED)
                 .finish(),
+            Self::CheckCustomTheme { .. } => f
+                .debug_struct("CheckCustomTheme")
+                .field("theme", &REDACTED)
+                .finish(),
             Self::ResetLearning => f.write_str("ResetLearning"),
             Self::ReadUsage => f.write_str("ReadUsage"),
             Self::ResetUsage => f.write_str("ResetUsage"),
@@ -1079,6 +1112,9 @@ pub enum ResponseBody {
     KeymapReport {
         report: KeymapReport,
     },
+    ThemeReport {
+        issues: Vec<ContrastIssue>,
+    },
     Usage {
         values: String,
         #[serde(rename = "firstCandidateRate")]
@@ -1162,6 +1198,10 @@ impl fmt::Debug for ResponseBody {
             Self::KeymapReport { report, .. } => f
                 .debug_struct("KeymapReport")
                 .field("report", report)
+                .finish(),
+            Self::ThemeReport { issues, .. } => f
+                .debug_struct("ThemeReport")
+                .field("issues", issues)
                 .finish(),
             Self::Usage { first_candidate_rate, .. } => f
                 .debug_struct("Usage")

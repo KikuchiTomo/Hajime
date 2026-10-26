@@ -635,6 +635,34 @@
       ]
     },
     {
+      "name": "ContrastPair",
+      "kind": "enum",
+      "cases": [
+        "text",
+        "textMuted",
+        "selectionText",
+        "correction"
+      ]
+    },
+    {
+      "name": "ContrastIssue",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "pair",
+          "type": "ContrastPair"
+        },
+        {
+          "name": "ratio",
+          "type": "f64"
+        },
+        {
+          "name": "minimum",
+          "type": "f64"
+        }
+      ]
+    },
+    {
       "name": "PreviewWord",
       "kind": "struct",
       "fields": [
@@ -1105,6 +1133,15 @@
           ]
         },
         {
+          "name": "checkCustomTheme",
+          "fields": [
+            {
+              "name": "theme",
+              "type": "string"
+            }
+          ]
+        },
+        {
           "name": "resetLearning"
         },
         {
@@ -1320,6 +1357,15 @@
             {
               "name": "report",
               "type": "KeymapReport"
+            }
+          ]
+        },
+        {
+          "name": "themeReport",
+          "fields": [
+            {
+              "name": "issues",
+              "type": "[ContrastIssue]"
             }
           ]
         },

@@ -4,7 +4,7 @@
 //! 状態は UI スレッドの thread_local に持ち，窓の手続きはそこから借りる．借りている間に届いたメッセージは既定の扱いにする
 
 use super::ffi::{self, Canvas, DrawTarget, Paint, Window};
-use super::page::{DictionaryAction, Event, Extras, PageView, WithSync};
+use super::page::{DictionaryAction, Event, Extras, PageView, ThemeAction, WithExtras};
 use super::theme::Theme;
 use super::Store;
 use crate::catalog::{Catalog, Timing};
@@ -12,15 +12,16 @@ use crate::engine::FileOutcome;
 use crate::files::FileTask;
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
+use crate::options;
 use crate::pages::{self, Action, DictionaryList, Group, Page};
 use crate::store::StoreError;
 use crate::strings::{
-    association, dictionaries, features, keys, rule_list, settings, sync as sync_text,
+    association, dictionaries, features, keys, more, rule_list, settings, sync as sync_text,
     windows as text,
 };
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, FileFailure, RequestBody, SymbolItem, SymbolKind,
-    SymbolOrigin, SymbolSaveResult, SyncStatus,
+    ContrastPair, DictionaryAddResult, DictionaryEntry, FileFailure, RequestBody, SymbolItem,
+    SymbolKind, SymbolOrigin, SymbolSaveResult, SyncStatus,
 };
 use std::cell::RefCell;
 use tokens::size::settings_windows as size;
@@ -70,6 +71,11 @@ enum After {
     File(FileTask),
     /// フォルダを選ぶ窓を出してから，同期のフォルダにする
     ChooseSyncFolder,
+    /// 色を選ぶ窓を出してから，path の色を変える
+    ChooseColor {
+        path: &'static str,
+        current: String,
+    },
     /// ファイルを選ぶ窓を出してから，辞書を取り込む
     ImportDictionary {
         list: DictionaryList,
@@ -91,6 +97,12 @@ struct App {
     dictionary: Vec<DictionaryEntry>,
     /// 項目ごとの同期の表の行(表と同じ並び．切り替えるときに引く)
     sync_rows: Vec<crate::sync::FieldRow>,
+    /// 同期の状態の値(「sync.」の道筋)
+    sync_values: crate::store::Fields,
+    /// 外観のページで編集しているカスタムテーマの id
+    editing_theme: Option<String>,
+    /// 外観の見本を描くもの(初めて描くときに作る．作れなければ見本を描かない)
+    preview: Option<candidate_ui::app::preview::Preview>,
     /// 記号の決まり(表の行と同じ並び．外す・切り替えるときに引く)
     sequences: Vec<SymbolItem>,
     readings: Vec<SymbolItem>,
@@ -174,6 +186,9 @@ pub fn open(catalog: Catalog, connect: fn(&Timing) -> Option<Store>) -> Option<W
         extras: Extras::default(),
         dictionary: Vec::new(),
         sync_rows: Vec::new(),
+        sync_values: crate::store::Fields::new(),
+        editing_theme: None,
+        preview: None,
         sequences: Vec::new(),
         readings: Vec::new(),
         entries: Vec::new(),
@@ -222,6 +237,22 @@ fn run_after(window: Window, after: Option<After>) {
                 return;
             };
             let after = with_app(|app| app.import_dictionary(list, path, replacing)).flatten();
+            run_after(window, after);
+        }
+        Some(After::ChooseColor { path, current }) => {
+            let Some((red, green, blue)) = ffi::choose_color(window, crate::themes::rgb(&current))
+            else {
+                return;
+            };
+            let value = serde_json::Value::String(format!("#{red:02X}{green:02X}{blue:02X}"));
+            let after = with_app(|app| {
+                app.handle(Event::Set {
+                    path,
+                    value,
+                    clears: None,
+                })
+            })
+            .flatten();
             run_after(window, after);
         }
         Some(After::ChooseSyncFolder) => {
@@ -361,6 +392,16 @@ impl App {
                     self.extras.usage = usage;
                 }
             }
+            Page::Appearance => {
+                // 初めは今使っているカスタムテーマを編集する
+                if self.editing_theme.is_none() {
+                    self.editing_theme = model
+                        .value(crate::themes::ACTIVE)
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_string);
+                }
+                self.check_theme();
+            }
             Page::Sync => {
                 if let Ok(status) = model.store().read_sync() {
                     self.show_sync(&status);
@@ -396,9 +437,18 @@ impl App {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = keymap_report(model);
             }
-            let values = WithSync {
+            // 同期の状態と，編集しているカスタムテーマの値を重ねる
+            let entries = crate::themes::entries(model.value(crate::themes::THEMES));
+            let editing = self
+                .editing_theme
+                .as_deref()
+                .and_then(|id| entries.iter().find(|entry| entry.id == id));
+            let mut extra = self.sync_values.clone();
+            extra.extend(crate::themes::values(editing, &self.extras.theme_report));
+            self.extras.extra = extra;
+            let values = WithExtras {
                 values: model,
-                sync: &self.extras.sync,
+                extra: &self.extras.extra,
             };
             self.view.sync(&values, &self.extras);
         }
@@ -515,7 +565,31 @@ impl App {
                 let body = crate::sync::request(path, value)?;
                 return self.request_sync(body);
             }
+            if crate::themes::is_theme_path(path) {
+                return self.edit_theme(path, value);
+            }
         }
+        match event {
+            Event::ThemeList {
+                action,
+                index,
+                name: _,
+            } => self.theme_list(action, index),
+            Event::ThemeSelected(index) => {
+                let entries =
+                    crate::themes::entries(self.model.as_ref()?.value(crate::themes::THEMES));
+                self.editing_theme =
+                    index.and_then(|index| entries.get(index).map(|entry| entry.id.clone()));
+                self.check_theme();
+                self.refresh();
+                None
+            }
+            Event::ChooseColor { path, current } => Some(After::ChooseColor { path, current }),
+            other => self.handle_other(other),
+        }
+    }
+
+    fn handle_other(&mut self, event: Event) -> Option<After> {
         if let Event::DictionaryList {
             list,
             action,
@@ -565,6 +639,9 @@ impl App {
             | Event::SymbolToggle { .. }
             | Event::SyncToggleFields(_)
             | Event::DictionaryList { .. }
+            | Event::ThemeList { .. }
+            | Event::ThemeSelected(_)
+            | Event::ChooseColor { .. }
             | Event::Action(Action::SyncNow | Action::ChooseSyncFolder) => return None,
             Event::DictionaryAdd(item) => {
                 let entry = DictionaryEntry {
@@ -774,9 +851,230 @@ impl App {
         }
     }
 
+    /// 編集しているカスタムテーマの色・形・書体を変える
+    fn edit_theme(&mut self, path: &str, value: &serde_json::Value) -> Option<After> {
+        let id = self.editing_theme.clone()?;
+        let model = self.model.as_mut()?;
+        let changed = crate::themes::edited(model.value(crate::themes::THEMES), &id, path, value)?;
+        if let Err(error) = model.set(crate::themes::THEMES, changed) {
+            return self.failure(error);
+        }
+        self.check_theme();
+        self.refresh();
+        None
+    }
+
+    /// 編集しているカスタムテーマの読みやすさをエンジンに確かめてもらう(macOS の CustomThemeEditor の読みやすさ)
+    fn check_theme(&mut self) {
+        self.extras.theme_report = String::new();
+        let Some(model) = &self.model else { return };
+        let entries = crate::themes::entries(model.value(crate::themes::THEMES));
+        let Some(entry) = self
+            .editing_theme
+            .as_deref()
+            .and_then(|id| entries.iter().find(|entry| entry.id == id))
+        else {
+            return;
+        };
+        let Ok(issues) = model.store().check_custom_theme(&entry.value) else {
+            return;
+        };
+        self.extras.theme_report = issues
+            .iter()
+            .map(|issue| {
+                let (name, ground) = match issue.pair {
+                    ContrastPair::Text => (more::TEXT, more::SURFACE),
+                    ContrastPair::TextMuted => (more::TEXT_MUTED, more::SURFACE),
+                    ContrastPair::SelectionText => (more::SELECTION_TEXT, more::SELECTION),
+                    ContrastPair::Correction => (more::CORRECTION, more::SURFACE),
+                };
+                more::low_contrast(name, ground, issue.ratio, issue.minimum)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+
+    /// カスタムテーマの一覧の操作(macOS の AppearancePage と SettingsModel の draftCustomTheme など)
+    fn theme_list(&mut self, action: ThemeAction, index: Option<usize>) -> Option<After> {
+        let limit = self.catalog.limits.custom_themes;
+        let name_limit = self.catalog.limits.theme_name_length;
+        let dark = self.theme.dark;
+        let model = self.model.as_mut()?;
+        let themes = model.value(crate::themes::THEMES).cloned();
+        let active = model
+            .value(crate::themes::ACTIVE)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string);
+        let entries = crate::themes::entries(themes.as_ref());
+        let chosen = index.and_then(|index| entries.get(index));
+        let full = || Some(After::Notice(more::themes_full(limit)));
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos());
+        let mut changes: Vec<(&'static str, serde_json::Value)> = Vec::new();
+        let mut editing = self.editing_theme.clone();
+        match action {
+            ThemeAction::Rename(name) => {
+                let id = &chosen?.id;
+                match crate::themes::renamed(themes.as_ref(), id, &name, name_limit) {
+                    Some(changed) => changes.push((crate::themes::THEMES, changed)),
+                    None => {
+                        return Some(After::Message {
+                            text: more::INVALID_THEME,
+                            warning: true,
+                        })
+                    }
+                }
+            }
+            ThemeAction::Create | ThemeAction::DuplicateCurrent => {
+                if entries.len() >= limit {
+                    return full();
+                }
+                let id = crate::themes::new_id(seed);
+                let active_entry = active
+                    .as_deref()
+                    .and_then(|active| entries.iter().find(|entry| entry.id == active));
+                let theme_name = model
+                    .value("theme")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("automatic")
+                    .to_string();
+                let source_name = active_entry.map_or_else(
+                    || options::label_of(options::THEMES, &theme_name).to_string(),
+                    |entry| entry.name.clone(),
+                );
+                let name: String = match action {
+                    ThemeAction::Create => more::NEW_THEME_NAME.to_string(),
+                    _ => more::copy_name(&source_name),
+                }
+                .chars()
+                .take(name_limit)
+                .collect();
+                let theme = match active_entry {
+                    Some(entry) => crate::themes::copy(&entry.value, id.clone(), name)?,
+                    None => preset_theme(&theme_name, id.clone(), name, dark),
+                };
+                changes.push((
+                    crate::themes::THEMES,
+                    crate::themes::appended(themes.as_ref(), theme),
+                ));
+                changes.push((crate::themes::ACTIVE, serde_json::Value::String(id.clone())));
+                editing = Some(id);
+            }
+            ThemeAction::Use => {
+                let entry = chosen?;
+                changes.push((
+                    crate::themes::ACTIVE,
+                    serde_json::Value::String(entry.id.clone()),
+                ));
+            }
+            ThemeAction::Duplicate => {
+                if entries.len() >= limit {
+                    return full();
+                }
+                let entry = chosen?;
+                let id = crate::themes::new_id(seed);
+                let name: String = more::copy_name(&entry.name)
+                    .chars()
+                    .take(name_limit)
+                    .collect();
+                let theme = crate::themes::copy(&entry.value, id.clone(), name)?;
+                changes.push((
+                    crate::themes::THEMES,
+                    crate::themes::appended(themes.as_ref(), theme),
+                ));
+                changes.push((crate::themes::ACTIVE, serde_json::Value::String(id.clone())));
+                editing = Some(id);
+            }
+            ThemeAction::Delete => {
+                let entry = chosen?;
+                changes.push((
+                    crate::themes::THEMES,
+                    crate::themes::removed(themes.as_ref(), &entry.id)?,
+                ));
+                if active.as_deref() == Some(entry.id.as_str()) {
+                    changes.push((crate::themes::ACTIVE, serde_json::Value::Null));
+                }
+                if editing.as_deref() == Some(entry.id.as_str()) {
+                    editing = None;
+                }
+            }
+        }
+        if let Err(error) = model.set_all(&changes) {
+            return self.failure(error);
+        }
+        self.editing_theme = editing;
+        self.check_theme();
+        self.refresh();
+        None
+    }
+
+    /// 外観の見本を描く．見本の部品でなければ false
+    fn paint_preview(&mut self, target: &DrawTarget) -> bool {
+        if !self.view.is_preview(target.window) {
+            return false;
+        }
+        Canvas::of(target).fill(target.rect, self.theme.palette.card);
+        let Some(model) = &self.model else {
+            return true;
+        };
+        if self.preview.is_none() {
+            self.preview = candidate_ui::app::preview::Preview::new().ok();
+        }
+        let Some(preview) = &self.preview else {
+            return true;
+        };
+        // 編集しているカスタムテーマがあればそれを，無ければ今使っているテーマを見せる
+        let entries = crate::themes::entries(model.value(crate::themes::THEMES));
+        let shown = self
+            .editing_theme
+            .clone()
+            .or_else(|| {
+                model
+                    .value(crate::themes::ACTIVE)
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+            })
+            .and_then(|id| entries.iter().find(|entry| entry.id == id))
+            .and_then(|entry| crate::themes::to_wire(&entry.value));
+        let theme_name = model
+            .value("theme")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("automatic");
+        let look = candidate_ui::theme::SystemLook {
+            dark: self.theme.dark,
+            accent: None,
+            increase_contrast: ffi::high_contrast(),
+            backdrop: false,
+        };
+        let resolved =
+            candidate_ui::theme::ResolvedTheme::resolve(theme_name, shown.as_ref(), &look);
+        let font_size = model
+            .value("candidateFontSize")
+            .and_then(serde_json::Value::as_f64)
+            .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
+        let (left, top, right, bottom) = target.rect;
+        let rect = windows::Win32::Foundation::RECT {
+            left,
+            top,
+            right,
+            bottom,
+        };
+        let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
+        let _ = preview.paint(
+            target.hdc,
+            rect,
+            &resolved,
+            font_size,
+            self.theme.dark,
+            scale,
+        );
+        true
+    }
+
     /// 同期の状態を画面の値にする
     fn show_sync(&mut self, status: &SyncStatus) {
-        self.extras.sync = crate::sync::values(status);
+        self.sync_values = crate::sync::values(status);
         self.extras.sync_folder = status
             .folder_name
             .clone()
@@ -1076,8 +1374,51 @@ fn confirmation(event: &Event) -> Option<(String, String)> {
             keys::RESTORE_TITLE.to_string(),
             keys::RESTORE_MESSAGE.to_string(),
         )),
+        Event::ThemeList {
+            action: ThemeAction::Delete,
+            name,
+            ..
+        } => Some((
+            settings::WINDOW_TITLE.to_string(),
+            more::confirm_delete_theme(name),
+        )),
         _ => None,
     }
+}
+
+/// 既成のテーマの色を写したカスタムテーマ(macOS の SettingsModel.customTheme(from:) と同じ)．
+/// 色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする
+fn preset_theme(
+    theme: &str,
+    id: String,
+    name: String,
+    dark: bool,
+) -> serde_json::Map<String, serde_json::Value> {
+    use candidate_ui::theme::{Color, ResolvedTheme, SystemLook};
+    let resolved = ResolvedTheme::resolve(
+        theme,
+        None,
+        &SystemLook {
+            dark,
+            ..SystemLook::default()
+        },
+    );
+    let hex = |color: Color| crate::themes::hex(color.red, color.green, color.blue);
+    crate::themes::from_colors(
+        id,
+        name,
+        theme,
+        [
+            ("surface", hex(resolved.surface)),
+            ("text", hex(resolved.text)),
+            ("textMuted", hex(resolved.text_muted)),
+            ("selection", hex(resolved.selection)),
+            ("selectionText", hex(resolved.selection_text)),
+            ("correction", hex(resolved.correction)),
+            ("line", hex(resolved.line)),
+        ],
+        f64::from(resolved.corner_radius),
+    )
 }
 
 /// 一度も同期していないときの時刻(macOS の SyncPage と同じ)
@@ -1270,6 +1611,12 @@ extern "system" fn host_procedure(
 fn host_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> Option<LRESULT> {
     match message {
         WM_ERASEBKGND => Some(LRESULT(1)),
+        WM_DRAWITEM => {
+            // 外観の見本(SS_OWNERDRAW)を候補ウィンドウと同じ描き方で描く
+            let target = ffi::draw_item(lparam)?;
+            let drawn = with_app(|app| app.paint_preview(&target))?;
+            drawn.then_some(LRESULT(1))
+        }
         WM_PAINT => {
             let paint = Paint::begin(window);
             with_app(|app| {
@@ -1298,7 +1645,12 @@ fn host_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         WM_NOTIFY => {
             let (from, code) = ffi::notify_header(lparam)?;
             if code != NM_CUSTOMDRAW {
-                let handled = with_app(|app| app.view.notify(from, code, lparam))?;
+                let (handled, event) = with_app(|app| app.view.notify(from, code, lparam))?;
+                if let Some(event) = event {
+                    let owner = with_app(|app| app.window)?;
+                    let after = with_app(|app| app.handle(event)).flatten();
+                    run_after(owner, after);
+                }
                 return handled.then_some(LRESULT(1));
             }
             let (stage, target) = ffi::custom_draw(lparam)?;

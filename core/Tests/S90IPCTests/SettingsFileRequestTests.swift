@@ -193,6 +193,22 @@ struct SettingsFileRequestTests {
         #expect(encoded.count < WireProtocol.maximumMessageBytes)
     }
 
+    @Test("カスタムテーマの読みにくい組み合わせとコントラスト比を返す．読めないテーマは malformed")
+    func customThemeReport() async throws {
+        let id = greeted()
+        let theme = CustomTheme(id: "t", name: "夕焼け", base: .automatic, surface: HexColor("#FFFFFF")!, text: HexColor("#000000")!,
+                                textMuted: HexColor("#EEEEEE")!, selection: HexColor("#0000FF")!, selectionText: HexColor("#FFFFFF")!,
+                                correction: HexColor("#FF0000")!, line: HexColor("#CCCCCC")!)
+        let text = String(decoding: try JSONEncoder().encode(theme), as: UTF8.self)
+        guard case .themeReport(let issues) = await answer(.checkCustomTheme(theme: text), from: id) else {
+            Issue.record("読みやすさが返らない")
+            return
+        }
+        #expect(issues.map(\.pair) == [.textMuted])
+        #expect(issues.first.map { $0.ratio < $0.minimum } == true)
+        #expect(await answer(.checkCustomTheme(theme: "{}"), from: id) == .error(code: .malformed))
+    }
+
     @Test("記号の決まりを書き換え・無効にし，消すと既定に戻る")
     func symbolRuleEditing() async throws {
         let id = greeted()
