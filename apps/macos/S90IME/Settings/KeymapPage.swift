@@ -336,7 +336,6 @@ struct KeymapPage: View {
                 Button(Keys.restore) { confirmsRestore = true }
                     .disabled(keymap == Self.standardKeymap)
             }
-            Text(Keys.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -34,7 +34,7 @@ struct ExclusionsPage: View {
                 }
                 .overlay {
                     if model.settings.profileRules.isEmpty {
-                        ContentUnavailableView(UIStrings.More.exclusionsEmpty, systemImage: "app.dashed", description: Text(UIStrings.More.exclusionsEmptyHint))
+                        ContentUnavailableView(UIStrings.More.exclusionsEmpty, systemImage: "app.dashed")
                     }
                 }
                 .frame(height: DesignTokens.Size.Settings.ruleTableHeight)
