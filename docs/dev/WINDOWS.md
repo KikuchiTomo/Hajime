@@ -28,6 +28,8 @@
 - 設定の「キー配列」(ABC・US・Dvorak・Colemak)は，DLL がキーの位置(スキャンコード)から文字を引く表(`crates/tsf/src/layout.rs`)で打つ．Windows で配列を読み込むと利用者の配列の一覧が変わるため，OS の配列は切り替えない．ローマ字入力と英字入力のときだけ使い，Ctrl・Alt を押したショートカットは OS の配列のまま
 - 打ち間違いの訂正は Zenzai で 1 文に 1 秒ほどかかるので，エンジンが裏で求める(`ZenzaiTypoService`)．求めているあいだは短い間隔(`EngineService.correctionPollMilliseconds`)の `wake` を頼み，求め終わったあとの `wake` で見直しや待たせていた変換(`.awaitCorrections`)の結果を返す．Space の変換を待たせるのは `DefaultSettings.correctionWaitBeforeConversion` まで．間に合わなかった `wake` の応答も，キーの応答と同じくあとで反映する
 - 設定のファイルは macOS と同じ形式．エンジンが 2 秒ごとに更新の時刻を見て，変わっていれば読み直す
+- 設定の画面(`crates/settings`)は設定のファイルを直接読まず，項目の名前と JSON の値でエンジンに読み書きを頼む(`readSettingsFields`・`writeSettingsFields`)．値の確かめ(範囲・一覧の形・上限)はエンジンが設定のファイルを読むときと同じに行い，画面は書いたあとに返った値を出す．項目の名前と値の範囲・上限は `protocol/settings-catalog.json`(core の `DefaultSettings` から作る写し．`make settings-catalog` で作り直し，古ければ core のテストが落ちる)から読み，既定値はエンジンに頼んで読む
+- 設定の画面のページと項目の並びは macOS の `SettingsView` と同じ(`crates/settings/src/pages.rs`)．文言は `UIStrings` と同じものを `strings.rs` に置き，Windows で言い方が違うものだけを変える
 
 ## Windows で使わないもの
 
@@ -41,7 +43,7 @@ Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流�
 
 ## ビルドと確かめ
 
-手元の Mac には Windows 向けの道具がないので，Windows でのビルドとテストは GitHub Actions の `windows` のワークフロー(`.github/workflows/windows.yml`)で行う．PR を出す前のブランチでも `gh workflow run windows.yml --ref <ブランチ>` で動かせる．
+手元の Mac でも，rustup で `x86_64-pc-windows-msvc` の target を足せば `cargo clippy --target x86_64-pc-windows-msvc` でコンパイルまでは確かめられる(リンクはできない)．Windows でのビルドとテストは GitHub Actions の `windows` のワークフロー(`.github/workflows/windows.yml`)で行う．PR を出す前のブランチでも `gh workflow run windows.yml --ref <ブランチ>` で動かせる．
 
 | ジョブ | 内容 |
 |---|---|

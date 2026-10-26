@@ -35,6 +35,7 @@
     "numberWidth",
     "okuriganaStyle",
     "postalCodeConversion",
+    "prefersKatakana",
     "profileRules",
     "proofreading",
     "punctuation",

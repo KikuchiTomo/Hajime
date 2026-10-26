@@ -101,6 +101,8 @@ pub mod choice {
 pub mod features {
     pub const KEYPAD_DIRECT: &str = "テンキーの数字を半角で確定";
     pub const OKURIGANA: &str = "送り仮名";
+    pub const NOTATION: &str = "表記";
+    pub const PREFERS_KATAKANA: &str = "カタカナ語を優先";
     pub const CALCULATION: &str = "計算";
     pub const POSTAL_CODE: &str = "郵便番号から住所に変換";
     pub const HANDWRITING: &str = "手書き入力";

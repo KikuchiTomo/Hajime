@@ -143,6 +143,7 @@ impl Page {
                 choice::PRESENTATION,
                 choice::INITIAL_FOCUS,
                 features::OKURIGANA,
+                features::PREFERS_KATAKANA,
                 features::CALCULATION,
                 features::POSTAL_CODE,
                 features::HANDWRITING,
@@ -589,12 +590,11 @@ fn conversion() -> Vec<Section> {
             ],
         ),
         Section::new(
-            features::OKURIGANA,
-            vec![Row::choice(
-                features::OKURIGANA,
-                "okuriganaStyle",
-                options::OKURIGANA,
-            )],
+            features::NOTATION,
+            vec![
+                Row::choice(features::OKURIGANA, "okuriganaStyle", options::OKURIGANA),
+                Row::toggle(features::PREFERS_KATAKANA, "prefersKatakana"),
+            ],
         ),
         Section::new(
             settings::SPECIAL_CONVERSION,
