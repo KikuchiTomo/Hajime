@@ -16,22 +16,29 @@ use windows::Win32::Graphics::Direct2D::{
     D2D1_LINE_JOIN_ROUND, D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
-    DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection, IDWriteTextFormat,
+    DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFontCollection, IDWriteTextFormat,
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
     DWRITE_FONT_WEIGHT, DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL,
     DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
     DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
 };
-use windows_core::{Result, BOOL, HSTRING};
+use windows_core::{Interface, Result, BOOL, HSTRING};
 
 const LOCALE: &str = "ja-JP";
 /// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
 const SHADOW_LAYERS_PER_DOT: f32 = 1.0;
 
-/// 書体の系統ごとの Windows の書体(docs/dev/DESIGN-SYSTEM.md の「書体」)．前から順に，入っている最初のものを使う
+/// 配布物に入れた書体のディレクトリ(実行ファイルと同じディレクトリの中)とファイル．
+/// Kiwi Maru(SIL OFL 1.1．LICENSES/OFL-1.1-KiwiMaru.txt)．data/fonts/ を tools/fonts/update.sh で取ってくる
+const BUNDLED_FONT_DIRECTORY: &str = "fonts";
+const BUNDLED_FONT_FILES: &[&str] = &["KiwiMaru-Regular.ttf", "KiwiMaru-Medium.ttf"];
+
+/// 書体の系統ごとの Windows の書体(docs/dev/DESIGN-SYSTEM.md の「書体」)．前から順に，入っている最初のものを使う．
+/// 日本語の UI の書体と丸みのある書体は，配布物に入れた Kiwi Maru を先に使う(入っていなければ Yu Gothic UI)
 fn families(face: &Face) -> &'static [&'static str] {
     match face {
-        Face::System | Face::Rounded | Face::Named(_) => &["Yu Gothic UI"],
+        Face::System | Face::Rounded => &["Kiwi Maru", "Yu Gothic UI"],
+        Face::Named(_) => &["Yu Gothic UI"],
         Face::Ui => &["Segoe UI"],
         Face::Mincho => &["Yu Mincho"],
         Face::Monospaced => &["BIZ UDGothic", "MS Gothic"],
@@ -60,6 +67,8 @@ pub struct Renderer {
     d2d: ID2D1Factory,
     dwrite: IDWriteFactory,
     fonts: Option<IDWriteFontCollection>,
+    /// 配布物に入れた書体の集まり．読めなければ None(OS の書体だけで描く)
+    bundled: Option<IDWriteFontCollection>,
     round: ID2D1StrokeStyle,
 }
 
@@ -112,6 +121,53 @@ impl Measure for TextMeasure {
     }
 }
 
+/// 書体の集まりに family があるか
+fn contains(collection: Option<&IDWriteFontCollection>, family: &str) -> bool {
+    let Some(collection) = collection else {
+        return false;
+    };
+    let mut index = 0;
+    let mut exists = BOOL(0);
+    // SAFETY: index と exists は書き込める領域
+    let found =
+        unsafe { collection.FindFamilyName(&HSTRING::from(family), &mut index, &mut exists) };
+    found.is_ok() && exists.as_bool()
+}
+
+/// 配布物に入れた書体を読み込んだ書体の集まり．OS に入れずにこのプロセスだけで使う(DirectWrite の書体の組．Windows 10 1703 から)．
+/// 書体のファイルが無い・読めないときは None
+fn bundled_fonts(dwrite: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    let directory = std::env::current_exe()
+        .ok()?
+        .parent()?
+        .join(BUNDLED_FONT_DIRECTORY);
+    let factory: IDWriteFactory5 = dwrite.cast().ok()?;
+    // SAFETY: 作ったばかりの COM の参照を使う．ファイルの場所の文字列は呼び出しのあいだ有効
+    unsafe {
+        let builder = factory.CreateFontSetBuilder().ok()?;
+        let mut added = false;
+        for name in BUNDLED_FONT_FILES {
+            let path = directory.join(name);
+            if !path.is_file() {
+                continue;
+            }
+            let file = dwrite
+                .CreateFontFileReference(&HSTRING::from(path.as_os_str()), None)
+                .ok()?;
+            added |= builder.AddFontFile(&file).is_ok();
+        }
+        if !added {
+            return None;
+        }
+        let set = builder.CreateFontSet().ok()?;
+        factory
+            .CreateFontCollectionFromFontSet(&set)
+            .ok()?
+            .cast()
+            .ok()
+    }
+}
+
 impl Renderer {
     pub fn new() -> Result<Self> {
         // SAFETY: 引数は定数
@@ -133,10 +189,12 @@ impl Renderer {
         };
         // SAFETY: properties は呼び出しのあいだ有効
         let round = unsafe { d2d.CreateStrokeStyle(&properties, None)? };
+        let bundled = bundled_fonts(&dwrite);
         Ok(Self {
             d2d,
             dwrite,
             fonts,
+            bundled,
             round,
         })
     }
@@ -158,15 +216,7 @@ impl Renderer {
     }
 
     fn installed(&self, family: &str) -> bool {
-        let Some(fonts) = &self.fonts else {
-            return false;
-        };
-        let mut index = 0;
-        let mut exists = BOOL(0);
-        // SAFETY: index と exists は書き込める領域
-        let found =
-            unsafe { fonts.FindFamilyName(&HSTRING::from(family), &mut index, &mut exists) };
-        found.is_ok() && exists.as_bool()
+        contains(self.fonts.as_ref(), family) || contains(self.bundled.as_ref(), family)
     }
 
     /// 書体の名前を決める．カスタムテーマの書体が入っていなければ，日本語の UI の書体にする
@@ -185,11 +235,16 @@ impl Renderer {
     }
 
     fn format(&self, spec: &FontSpec) -> Result<IDWriteTextFormat> {
+        let family = self.family(&spec.face);
+        // 配布物の書体は OS の書体の集まりに無いので，その集まりを渡す
+        let collection = self.bundled.as_ref().filter(|bundled| {
+            !contains(self.fonts.as_ref(), &family) && contains(Some(bundled), &family)
+        });
         // SAFETY: 文字列は呼び出しのあいだ有効
         let format = unsafe {
             self.dwrite.CreateTextFormat(
-                &HSTRING::from(self.family(&spec.face)),
-                None,
+                &HSTRING::from(family),
+                collection,
                 weight(spec.weight),
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
