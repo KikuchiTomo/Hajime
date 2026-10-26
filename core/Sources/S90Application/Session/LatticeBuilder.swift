@@ -71,6 +71,29 @@ struct LatticeBuilder {
         return (shorter, longer)
     }
 
+    /// 注目している文節の終わりを，前(grow が false)か次(true)の語の切れ目に動かす．
+    /// 語の切れ目は Zenzai を使わない変換の語の並び(segmentationWords)から求める．切れ目が無ければ 1 文字動かす
+    func resizeToWord(_ lattice: SegmentLattice, grow: Bool, reading: String) -> SegmentLattice {
+        let segment = lattice.focused
+        let end = segment.readingStart + segment.readingLength
+        let boundaries = wordBoundaries(of: reading)
+        let target = grow
+            ? boundaries.first { $0 > end } ?? min(end + 1, reading.count)
+            : boundaries.last { $0 > segment.readingStart && $0 < end } ?? max(end - 1, segment.readingStart + 1)
+        return resize(lattice, segmentAt: lattice.focusedIndex, to: target - segment.readingStart, reading: reading)
+    }
+
+    /// 語の切れ目の位置(読みの先頭からの文字数)．語の並びが読み全体を覆わなければ空
+    func wordBoundaries(of reading: String) -> [Int] {
+        let words = converter.segmentationWords(for: reading)
+        var position = 0
+        let boundaries = words.map { word -> Int in
+            position += word.readingCount
+            return position
+        }
+        return position == reading.count ? boundaries : []
+    }
+
     /// 打ち間違いを直したとき，直した部分を含む文節の 2 番目に，打ったままの読みの候補を入れる．
     /// 打ち間違いと決めつけず，分岐図の中で直した文と打ったままの文のどちらも選べるようにするため．
     /// 直した部分が複数の文節にまたがるときは，それらを 1 つの文節にまとめてから入れる

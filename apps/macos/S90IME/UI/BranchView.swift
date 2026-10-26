@@ -19,6 +19,8 @@ final class BranchView: NSView {
     var panel: LatticePanel? { didSet { needsDisplay = true } }
     /// 足元の案内に出すキーの割り当て
     var keys = KeyBindings.standard { didSet { needsDisplay = true } }
+    /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
+    var showsHints = true { didSet { needsDisplay = true } }
 
     /// 足元の案内．注目している文節の長さを変えたらどうなるかも出す
     private var hints: [KeyHint] {
@@ -103,12 +105,13 @@ final class BranchView: NSView {
         let upperRows = column?.variants.count ?? 0
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
         let footer = footerWidth(panel) + textWidth(position(of: panel), font: labelFont) + Size.paddingX * 3
-        // 使い分けや誤用の注釈は，枝と足元のあいだに 1 行で出す
-        let note = column?.usageNote.map { textWidth($0, font: labelFont) + Size.paddingX * 2 } ?? 0
+        // 使い分けや誤用の注釈と，IME からの知らせ(直したことなど)は，枝と足元のあいだに 1 行ずつ出す．キーの案内は消さない
+        let note = [column?.usageNote, panel.note].compactMap { $0.map { textWidth($0, font: labelFont) + Size.paddingX * 2 } }.max() ?? 0
         let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2)
         let trunkY = metrics.inset + CGFloat(upperRows) * metrics.rowHeight
         let height = trunkY + metrics.rowHeight * CGFloat(1 + lowerRows) + Size.frameWidth + metrics.footerHeight
             + (column?.usageNote == nil ? 0 : metrics.footerHeight)
+            + (panel.note == nil ? 0 : metrics.footerHeight)
             + (theme.isRounded ? 0 : metrics.inset)
         return Layout(trunkX: trunkX, trunkWidths: trunkWidths, lowerRows: lowerRows, trunkY: trunkY,
                       branchWidth: branchWidth, size: NSSize(width: width.rounded(.up), height: height.rounded(.up)))
@@ -156,6 +159,12 @@ final class BranchView: NSView {
         if let note = panel.columns.first(where: \.isFocused)?.usageNote {
             let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)
             drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: row.minX, in: row)
+            footerY += metrics.footerHeight
+        }
+        if let note = panel.note {
+            // 打ち間違いを直したことなど，IME が変えたことを知らせる
+            let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)
+            drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: row.minX, in: row)
             footerY += metrics.footerHeight
         }
         drawFooter(panel, y: footerY, width: body.width)
@@ -335,8 +344,7 @@ final class BranchView: NSView {
     private func footerWidth(_ panel: LatticePanel) -> CGFloat {
         let source = panel.columns.first(where: \.isFocused)?.sourceName
             .map { textWidth(UIStrings.Branch.dictionarySource($0), font: labelFont) + Size.paddingX } ?? 0
-        if let note = panel.note { return textWidth(note, font: labelFont) + source }
-        return GlassDrawing.hintsWidth(hints, theme: theme) + source
+        return (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0) + source
     }
 
     private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat) {
@@ -350,10 +358,7 @@ final class BranchView: NSView {
         }
         let footer = NSRect(x: metrics.inset, y: y + Size.frameWidth, width: width - metrics.inset * 2, height: metrics.footerHeight)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
-        if let note = panel.note {
-            // 打ち間違いを直したことなど，IME が変えたことを知らせる
-            drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: footer.minX, in: footer)
-        } else {
+        if showsHints {
             GlassDrawing.drawHints(hints, x: footer.minX, midY: footer.midY, theme: theme)
         }
         let position = position(of: panel)

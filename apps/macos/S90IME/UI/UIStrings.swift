@@ -57,7 +57,10 @@ enum UIStrings {
                 KeyHint(key: first(.previousCandidate), label: "文字種"),
                 KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
                 KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
-            ] + length).filter { !$0.key.isEmpty }
+            ] + length + [
+                KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "語ごと"),
+                KeyHint(key: first(.splitSegment), label: "区切る"),
+            ]).filter { !$0.key.isEmpty }
         }
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
@@ -107,6 +110,8 @@ enum UIStrings {
             case .previousUncertainSegment: "前の文節"
             case .extendSegment: "文節を長く"
             case .shrinkSegment: "文節を短く"
+            case .extendSegmentToWord: "文節を語ごとに長く"
+            case .shrinkSegmentToWord: "文節を語ごとに短く"
             case .insertBoundary: "ここで区切る"
             case .splitSegment: "文節を区切る"
             }
@@ -264,6 +269,7 @@ enum UIStrings {
         }
 
         static let variantRow = "候補の上に文字種の行を表示"
+        static let keyHints = "キーの案内を表示"
         static let typoCorrection = "タイプミスの修正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"

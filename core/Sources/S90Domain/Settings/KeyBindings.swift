@@ -15,6 +15,10 @@ public enum ConversionCommand: String, Sendable, Equatable, Codable, CaseIterabl
     case previousUncertainSegment
     case extendSegment
     case shrinkSegment
+    /// 文節の終わりを次の語の切れ目まで延ばす(1 文字ずつの extendSegment より少ない打鍵で長さを変える)
+    case extendSegmentToWord
+    /// 文節の終わりを前の語の切れ目まで縮める
+    case shrinkSegmentToWord
     /// 打っている途中に，今の位置を文節の区切りにする(分岐図でここを必ず区切る)
     case insertBoundary
     /// 分岐図で，注目している文節の区切れる位置に番号を出し，数字で区切る
@@ -93,6 +97,8 @@ public struct KeyBindings: Sendable, Equatable, Codable {
         .previousUncertainSegment: [KeyStroke(.tab, shift: true)],
         .extendSegment: [KeyStroke(.right, shift: true)],
         .shrinkSegment: [KeyStroke(.left, shift: true)],
+        .extendSegmentToWord: [KeyStroke(.right, shift: true, control: true)],
+        .shrinkSegmentToWord: [KeyStroke(.left, shift: true, control: true)],
         .insertBoundary: [KeyStroke(.space, option: true)],
         .splitSegment: [KeyStroke(.down, shift: true)],
     ])

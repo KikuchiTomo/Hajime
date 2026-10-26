@@ -70,6 +70,8 @@ public struct Settings: Sendable, Equatable {
     public var misreadings = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
+    /// 分岐図の足元にキーの案内(候補・文節・文節の長さ・区切り)を出す
+    public var showsKeyHints = true
     /// 番号キーで候補を選ぶ
     public var numberKeySelection = true
     /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
@@ -181,7 +183,7 @@ extension Settings: Codable {
         case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
-        case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
         case learning, userDictionary, importedDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, profileRules
@@ -247,6 +249,7 @@ extension Settings: Codable {
         read(.candidatePresentation, into: \.candidatePresentation)
         read(.initialFocus, into: \.initialFocus)
         read(.showsVariantRow, into: \.showsVariantRow)
+        read(.showsKeyHints, into: \.showsKeyHints)
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
         read(.homophoneNotes, into: \.homophoneNotes)
@@ -316,6 +319,7 @@ extension Settings: Codable {
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
         try container.encode(initialFocus, forKey: .initialFocus)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
+        try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)
         try container.encode(homophoneNotes, forKey: .homophoneNotes)

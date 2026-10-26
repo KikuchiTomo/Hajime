@@ -944,6 +944,8 @@ public final class InputSession {
             case .extendSegment, .shrinkSegment:
                 let length = lattice.focused.readingLength + (command == .extendSegment ? 1 : -1)
                 lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
+            case .extendSegmentToWord, .shrinkSegmentToWord:
+                lattice = builder.resizeToWord(lattice, grow: command == .extendSegmentToWord, reading: composition.conversionReading)
             }
             phase = .lattice(lattice)
             return KeyResult(handled: true, actions: render(context: context))
