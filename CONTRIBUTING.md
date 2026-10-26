@@ -11,7 +11,7 @@
 
 1. Issue で何をするかを相談する(小さな修正は不要)．Issue はテンプレートから作る
 2. ブランチを切る．名前は `<種類>/<内容>`(例: `feat/yen-key-policy`)
-3. `make check` と `make test` を通す
+3. `make fetch-models` で Zenzai のモデルを取得し，`make check` と `make test` を通す(モデルが無いと本物の Zenzai のテストを飛ばす)
 4. PR のテンプレートに沿って説明を書き，`type:` のラベルを付ける
 5. 検査が通ったらスカッシュマージする
 
