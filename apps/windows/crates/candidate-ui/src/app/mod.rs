@@ -176,6 +176,15 @@ impl App {
                 self.window
                     .start_timer(self.presentation.mode_indicator_milliseconds);
             }
+            UiCommand::ShowHandwriting {
+                anchor,
+                recognition_delay_milliseconds,
+            } => crate::handwriting::ffi::show(
+                anchor.or(self.anchor.clone()),
+                recognition_delay_milliseconds,
+                &self.presentation,
+            ),
+            UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
             UiCommand::Move { anchor } => self.anchor = Some(anchor),
             UiCommand::Hide => self.content = Content::Hidden,
         }

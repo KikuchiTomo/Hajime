@@ -333,6 +333,10 @@ pub enum RequestBody {
     WriteSettings {
         settings: SettingsSnapshot,
     },
+    HandwritingChosen {
+        text: String,
+    },
+    HandwritingClosed,
 }
 
 impl fmt::Debug for RequestBody {
@@ -377,6 +381,11 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("WriteSettings")
                 .field("settings", settings)
                 .finish(),
+            Self::HandwritingChosen { .. } => f
+                .debug_struct("HandwritingChosen")
+                .field("text", &REDACTED)
+                .finish(),
+            Self::HandwritingClosed => f.write_str("HandwritingClosed"),
         }
     }
 }
@@ -694,6 +703,13 @@ pub enum UiCommand {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
     },
+    ShowHandwriting {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        anchor: Option<Rect>,
+        #[serde(rename = "recognitionDelayMilliseconds")]
+        recognition_delay_milliseconds: u32,
+    },
+    HideHandwriting,
     Move {
         anchor: Rect,
     },
@@ -731,6 +747,12 @@ impl fmt::Debug for UiCommand {
                 .field("mode", mode)
                 .field("anchor", anchor)
                 .finish(),
+            Self::ShowHandwriting { anchor, recognition_delay_milliseconds, .. } => f
+                .debug_struct("ShowHandwriting")
+                .field("anchor", anchor)
+                .field("recognitionDelayMilliseconds", recognition_delay_milliseconds)
+                .finish(),
+            Self::HideHandwriting => f.write_str("HideHandwriting"),
             Self::Move { anchor, .. } => f
                 .debug_struct("Move")
                 .field("anchor", anchor)

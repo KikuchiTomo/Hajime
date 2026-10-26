@@ -411,9 +411,11 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case caret(session: UInt32, rect: WireRect)
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
+    case handwritingChosen(text: String)
+    case handwritingClosed
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings
+        case type, protocolVersion, session, input, context, mode, rect, settings, text
     }
 
     public init(from decoder: any Decoder) throws {
@@ -440,6 +442,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = .readSettings
         case "writeSettings":
             self = try .writeSettings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
+        case "handwritingChosen":
+            self = try .handwritingChosen(text: container.decode(String.self, forKey: .text))
+        case "handwritingClosed":
+            self = .handwritingClosed
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -481,6 +487,11 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .writeSettings(let settings):
             try container.encode("writeSettings", forKey: .type)
             try container.encode(settings, forKey: .settings)
+        case .handwritingChosen(let text):
+            try container.encode("handwritingChosen", forKey: .type)
+            try container.encode(text, forKey: .text)
+        case .handwritingClosed:
+            try container.encode("handwritingClosed", forKey: .type)
         }
     }
 }
@@ -498,6 +509,8 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .caret: "WireRequestBody.caret"
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"
+        case .handwritingChosen: "WireRequestBody.handwritingChosen"
+        case .handwritingClosed: "WireRequestBody.handwritingClosed"
         }
     }
     public var debugDescription: String { description }
@@ -788,11 +801,13 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
     case showNote(text: String, anchor: WireRect?)
     case showMode(mode: WireInputMode, anchor: WireRect?)
+    case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32)
+    case hideHandwriting
     case move(anchor: WireRect)
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, text, mode
+        case type, protocolVersion, presentation, list, anchor, map, text, mode, recognitionDelayMilliseconds
     }
 
     public init(from decoder: any Decoder) throws {
@@ -811,6 +826,10 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             self = try .showNote(text: container.decode(String.self, forKey: .text), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showMode":
             self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
+        case "showHandwriting":
+            self = try .showHandwriting(anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), recognitionDelayMilliseconds: container.decode(UInt32.self, forKey: .recognitionDelayMilliseconds))
+        case "hideHandwriting":
+            self = .hideHandwriting
         case "move":
             self = try .move(anchor: container.decode(WireRect.self, forKey: .anchor))
         case "hide":
@@ -845,6 +864,12 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode("showMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
             try container.encodeIfPresent(anchor, forKey: .anchor)
+        case .showHandwriting(let anchor, let recognitionDelayMilliseconds):
+            try container.encode("showHandwriting", forKey: .type)
+            try container.encodeIfPresent(anchor, forKey: .anchor)
+            try container.encode(recognitionDelayMilliseconds, forKey: .recognitionDelayMilliseconds)
+        case .hideHandwriting:
+            try container.encode("hideHandwriting", forKey: .type)
         case .move(let anchor):
             try container.encode("move", forKey: .type)
             try container.encode(anchor, forKey: .anchor)
@@ -863,6 +888,8 @@ extension WireUiCommand: CustomStringConvertible, CustomDebugStringConvertible {
         case .showBranchMap: "WireUiCommand.showBranchMap"
         case .showNote: "WireUiCommand.showNote"
         case .showMode: "WireUiCommand.showMode"
+        case .showHandwriting: "WireUiCommand.showHandwriting"
+        case .hideHandwriting: "WireUiCommand.hideHandwriting"
         case .move: "WireUiCommand.move"
         case .hide: "WireUiCommand.hide"
         }

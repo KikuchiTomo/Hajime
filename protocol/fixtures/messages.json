@@ -28,7 +28,9 @@
     { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
     { "id": 12, "body": { "type": "readSettings" } },
-    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } }
+    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } },
+    { "id": 14, "body": { "type": "handwritingChosen", "text": "鬱" } },
+    { "id": 15, "body": { "type": "handwritingClosed" } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
@@ -126,6 +128,8 @@
     { "type": "setPresentation", "presentation": { "theme": "platinum", "fontSize": 15.5, "modeIndicatorMilliseconds": 800 } },
     { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
+    { "type": "showHandwriting", "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }, "recognitionDelayMilliseconds": 600 },
+    { "type": "hideHandwriting" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },
     { "type": "hide" }
   ]

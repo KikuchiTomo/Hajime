@@ -35,7 +35,7 @@
   - Windows: 入力欄の InputScope が `IS_PASSWORD` などのときは変換も学習もしない
 - 学習しないアプリの一覧を設定に持つ．既定でパスワード管理アプリとターミナルの `sudo` の入力(エコーが切られている入力欄)を含める
 - クリップボードは，利用者が明示した操作(選択した文字の再変換など)のときにだけ読む
-- 手書き入力(R-14)の線は窓を閉じたら捨て，保存しない．認識は Vision で端末の中だけで行う(`VisionHandwritingRecognizer`)
+- 手書き入力(R-14)の線は窓を閉じたら捨て，保存しない．認識は端末の中だけで行う(macOS は Vision の `VisionHandwritingRecognizer`，Windows は候補ウィンドウが Windows の手書き認識を使う)
 
 ### 通信
 
@@ -84,6 +84,7 @@
 - メッセージには長さの上限を設け，超えたら接続を切る．形式は `protocol/` の定義だけを受け付ける
 - 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` のときだけ受ける
 - 1 つの接続が作れるセッションの数と，全体のセッションの数に上限を設ける．ほかの接続のセッションは使えない(`EngineService`)
+- 手書きの窓で選んだ文字(`handwritingChosen`)は，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` の接続からだけ受ける．空・長すぎる・制御文字を含む文字列は断り，窓を開いたセッションにだけ入れる
 - DLL は入力位置の前の文字列を，エンジンが頼んだとき(打ち始めのときだけ．最大 `DefaultSettings.maximumLeftContextLength` 字)に読んで `key` の `context` で送る．macOS と同じく，パスワード欄(InputScope)では読まない．DLL の中でもログに出さず，`FieldContext` の Debug は中身を伏せる
 
 ### 入力先のアプリを壊さない
