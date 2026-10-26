@@ -244,7 +244,13 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
 impl TextService_Impl {
     fn wants(&self, wparam: WPARAM, lparam: LPARAM) -> Option<ipc::KeyInput> {
-        let raw: RawKey = keyboard::read(wparam, lparam)?;
+        let layout = self
+            .inner
+            .borrow()
+            .state
+            .as_ref()
+            .and_then(|state| state.keyboard_layout.clone());
+        let raw: RawKey = keyboard::read(wparam, lparam)?.with_layout(layout.as_deref());
         if key::is_modifier_only(raw.vk) {
             return None;
         }
