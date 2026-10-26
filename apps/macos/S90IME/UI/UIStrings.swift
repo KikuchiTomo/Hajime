@@ -1,3 +1,4 @@
+import S90Application
 import S90Domain
 
 /// 画面に出す文言の置き場所．多言語にするときは Localizable.xcstrings に移す
@@ -28,12 +29,7 @@ enum UIStrings {
         static func groupPosition(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
         /// 連想の一覧の足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキー(R-17)
         static func hints(for keymap: Keymap) -> [KeyHint] {
-            func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(Keys.name(of:)) ?? "" }
-            return [
-                KeyHint(key: first(.nextCandidate), label: "選択"),
-                KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "意味"),
-                KeyHint(key: first(.cancel), label: "戻る"),
-            ].filter { !$0.key.isEmpty }
+            KeyHint.make(IndicatorLabels.associationHints, keymap: keymap)
         }
     }
 
@@ -78,22 +74,12 @@ enum UIStrings {
         /// 足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキーを出す(R-17)
         /// 文節の長さを変えるキーは「区切り調整」とまとめて出す
         static func hints(for keymap: Keymap) -> [KeyHint] {
-            func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(Keys.name(of:)) ?? "" }
-            return ([
-                KeyHint(key: first(.nextCandidate), label: "候補"),
-                KeyHint(key: first(.previousCandidate), label: "文字種"),
-                KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
-                KeyHint(key: first(.nextUncertainSegment), label: "誤りやすい文節"),
-                KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "区切り調整"),
-            ] + [
-                KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
-                KeyHint(key: first(.splitSegment), label: "区切る"),
-            ]).filter { !$0.key.isEmpty }
+            KeyHint.make(IndicatorLabels.branchHints, keymap: keymap)
         }
         /// 文節を区切っているときの足元の案内．数字で区切る位置を選び，Esc でやめる(InputSession.handleSplit)．
         /// count は区切れる位置の数
         static func splitHints(count: Int) -> [KeyHint] {
-            [KeyHint(key: count > 1 ? "1–\(count)" : "1", label: "区切り"), KeyHint(key: "Esc", label: "取消")]
+            IndicatorLabels.splitHints(count: count).map { KeyHint(key: $0.key, label: $0.label) }
         }
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
@@ -296,21 +282,8 @@ enum UIStrings {
         ]
     }
     enum ModeIndicator {
-        static func label(for mode: InputMode) -> String {
-            switch mode {
-            case .japanese: "あ"
-            case .direct: "A"
-            }
-        }
-
-        static func label(for style: InputStyle) -> String {
-            switch style {
-            case .romaji: "ローマ字"
-            case .kana: "かな"
-            case .english: "英"
-            case .englishAuto: "英自動"
-            }
-        }
+        static func label(for mode: InputMode) -> String { IndicatorLabels.label(for: mode) }
+        static func label(for style: InputStyle) -> String { IndicatorLabels.label(for: style) }
     }
 
     /// 決まりの一覧(RuleListEditor)
@@ -347,7 +320,7 @@ enum UIStrings {
         static let romajiKana = "出力"
         static let romajiEmpty = "追加した組み合わせはありません"
         static let dictionaryEmpty = "登録した単語はありません"
-        static let invalidRomaji = "入力は英小文字・「-」・「'」で 4 文字まで、出力は 6 文字までにしてください"
+        static let invalidRomaji = "入力は英小文字・「-」・「'」で \(DefaultSettings.maximumRomajiKeysLength) 文字まで、出力は \(DefaultSettings.maximumRomajiKanaLength) 文字までにしてください"
         static let escapeSwitchesToDirect = "Escape で英数に切り替え"
         static let bundlePrefix = "バンドル ID"
         static let profile = "モード"
@@ -403,7 +376,7 @@ enum UIStrings {
         static let saveFailed = "設定を保存できませんでした"
         static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため、初期設定で起動しました。元のファイルは同じ場所に \(name) として保存しました" }
         static let learningReset = "学習結果を消去しました"
-        static let dictionaryFull = "ユーザー辞書に登録できるのは 10,000 語までです"
+        static let dictionaryFull = "ユーザー辞書に登録できるのは \(DefaultSettings.maximumUserDictionaryEntries.formatted()) 語までです"
         static let invalidEntry = "読みはひらがなで入力し、読みと単語は長すぎないようにしてください"
         static let importFailed = "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません"
         static let exportFailed = "エクスポートできませんでした"
@@ -572,7 +545,7 @@ enum UIStrings {
         static let tryLanguage = "試す"
         static let tryPlaceholder = "英字の文"
         static let tryPreceding = "前の文字列"
-        static let invalidWord = "単語は 32 文字までの英字にしてください"
+        static let invalidWord = "単語は \(DefaultSettings.maximumWordLanguageWordLength) 文字までの英字にしてください"
         static let alreadyListed = "すでに一覧にあります"
         static let englishWordsEmpty = "常に英語にする単語はありません"
         static let japaneseWordsEmpty = "常に日本語にする単語はありません"
@@ -604,8 +577,8 @@ enum UIStrings {
         static let rules = "置き換え"
         static let typed = "入力した英字"
         static let replacement = "置き換える語句"
-        static let invalidRule = "入力した英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください"
-        static let invalidException = "修正しない語句は 64 文字までにしてください"
+        static let invalidRule = "入力した英字は \(DefaultSettings.correctionRuleTypedLength.lowerBound)〜\(DefaultSettings.correctionRuleTypedLength.upperBound) 文字の英字、置き換える語句は \(DefaultSettings.maximumCorrectionRuleWordLength) 文字までにしてください"
+        static let invalidException = "修正しない語句は \(DefaultSettings.maximumExceptionLength) 文字までにしてください"
         static let rulesEmpty = "置き換えはありません"
         static let exceptionsEmpty = "修正しない語句はありません"
 
@@ -618,8 +591,8 @@ enum UIStrings {
         static let readingInput = "読み"
         static let readingOutput = "空白で区切った記号"
         static let search = "検索"
-        static let invalidSymbol = "連続入力は英字と数字以外の 2〜12 文字にしてください"
-        static let invalidReadingSymbol = "読みは 12 文字まで、記号は 200 文字までにしてください"
+        static let invalidSymbol = "連続入力は英字と数字以外の \(DefaultSettings.symbolSequenceInputLength.lowerBound)〜\(DefaultSettings.symbolSequenceInputLength.upperBound) 文字にしてください"
+        static let invalidReadingSymbol = "読みは \(DefaultSettings.symbolSequenceInputLength.upperBound) 文字まで、記号は \(DefaultSettings.maximumSymbolOutputLength) 文字までにしてください"
         static let symbolsEmpty = "ルールはありません"
         static let restoreDefault = "既定に戻す"
         static let changed = "変更あり"
@@ -808,5 +781,16 @@ extension UIStrings {
             case .usage: "統計"
             }
         }
+    }
+}
+
+extension KeyHint {
+    /// 共通の案内の表(IndicatorLabels)から，キー設定の表で変換中にそのコマンドに割り当てた最初のキーを入れて作る．キーの無い案内は出さない
+    static func make(_ table: [IndicatorLabels.Hint], keymap: Keymap) -> [KeyHint] {
+        func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:)) ?? "" }
+        return table.map { hint in
+            KeyHint(key: hint.second.map { UIStrings.Keys.pair(first(hint.first), first($0)) } ?? first(hint.first), label: hint.label)
+        }
+        .filter { !$0.key.isEmpty }
     }
 }

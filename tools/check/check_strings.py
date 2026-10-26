@@ -143,6 +143,9 @@ def check() -> list[str]:
     problems: list[str] = []
     for group, name, value in rust_constants(rust):
         key = (group, name.replace("_", "").lower())
+        # macOS で上限の値を差し込む文言は，Windows では目録の上限と同じ数かを Rust のテストで確かめる(strings.rs の limits のテスト)
+        if key in mac and "\\(" in mac[key]:
+            continue
         if key not in mac:
             problems.append(f"{name}: UIStrings.{group} に同じ名前の文言がありません(Windows だけの文言は pub mod windows に置く)")
         elif mac[key] != value:

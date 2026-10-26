@@ -10,9 +10,10 @@ public struct CorrectionRule: Sendable, Equatable, Codable, Hashable {
         self.word = word
     }
 
-    /// 打った英字は 2〜24 文字の英字，直した語は 1〜64 文字
+    /// 打った英字は DefaultSettings.correctionRuleTypedLength の文字数の英字，直した語は 1 文字から上限まで
     public var isValid: Bool {
-        (2...24).contains(typed.count) && typed.allSatisfy { $0.isASCII && $0.isLetter } && (1...64).contains(word.count)
+        DefaultSettings.correctionRuleTypedLength.contains(typed.count) && typed.allSatisfy { $0.isASCII && $0.isLetter }
+            && (1...DefaultSettings.maximumCorrectionRuleWordLength).contains(word.count)
     }
 }
 

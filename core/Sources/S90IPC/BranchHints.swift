@@ -8,37 +8,22 @@ public enum BranchHints {
         func first(_ command: KeymapCommand) -> String {
             keymap.strokes(for: command, in: .converting).first.map(label(of:)) ?? ""
         }
-        // 連想の一覧では，単語を選ぶ・意味を移る・戻るだけを案内する(macOS の UIStrings.Association.hints と同じ)
-        if panel.association != nil {
-            return [
-                WireKeyHint(keys: first(.nextCandidate), label: "選択"),
-                WireKeyHint(keys: pair(first(.previousSegment), first(.nextSegment)), label: "意味"),
-                WireKeyHint(keys: first(.cancel), label: "戻る"),
-            ].filter { !$0.keys.isEmpty }
-        }
-        let focused = panel.columns.first(where: \.isFocused)
-        if let split = focused?.split {
+        // 文言とコマンドの並びは macOS と同じ表(IndicatorLabels)．連想の一覧では，単語を選ぶ・意味を移る・戻るだけを案内する
+        if let split = panel.columns.first(where: \.isFocused)?.split, panel.association == nil {
             return splitHints(count: split.pieces.count - 1)
         }
-        let hints = [
-            WireKeyHint(keys: first(.nextCandidate), label: "候補"),
-            WireKeyHint(keys: first(.previousCandidate), label: "文字種"),
-            WireKeyHint(keys: pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
-            WireKeyHint(keys: first(.nextUncertainSegment), label: "誤りやすい文節"),
-            WireKeyHint(keys: pair(first(.shrinkSegment), first(.extendSegment)), label: "区切り調整"),
-        ] + [
-            WireKeyHint(keys: pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
-            WireKeyHint(keys: first(.splitSegment), label: "区切る"),
-        ]
-        return hints.filter { !$0.keys.isEmpty }
+        let table = panel.association == nil ? IndicatorLabels.branchHints : IndicatorLabels.associationHints
+        return table.map { hint in
+            WireKeyHint(keys: hint.second.map { pair(first(hint.first), first($0)) } ?? first(hint.first), label: hint.label)
+        }
+        .filter { !$0.keys.isEmpty }
     }
 
     /// 文節を区切っているとき(区切る位置を番号キーで選ぶ)の案内．枝を出さないので区切る操作だけ
     public static func splitHints(count: Int) -> [WireKeyHint] {
-        [WireKeyHint(keys: count > 1 ? "1–\(count)" : "1", label: "区切り"), WireKeyHint(keys: "Esc", label: "取消")]
+        IndicatorLabels.splitHints(count: count).map { WireKeyHint(keys: $0.key, label: $0.label) }
     }
 
-    /// Windows の候補ウィンドウに出すキーの名前(「Ctrl+Tab」)
     public static func label(of stroke: KeyStroke) -> String {
         stroke.label(style: .windows)
     }

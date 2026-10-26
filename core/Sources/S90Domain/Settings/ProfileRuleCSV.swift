@@ -51,13 +51,12 @@ public enum ProfileRuleCSV {
     }
 
     private static func profile(named name: String) -> AppProfile? {
-        if let profile = AppProfile(rawValue: name) { return profile }
-        return switch name {
-        case "標準": .standard
-        case "記号を半角": .programming
-        case "コマンドを英字": .terminal
-        case "IME を使わない": .direct
-        default: nil
-        }
+        AppProfile(rawValue: name) ?? aliases[name]
     }
+
+    /// 扱いの別名．書き出しは値(standard など)だけを書くが，手で書いた CSV のために日本語の名前も読む．
+    /// 設定の画面の名前を変えても読めるよう，画面の文言とは別にここで決める
+    static let aliases: [String: AppProfile] = [
+        "標準": .standard, "記号を半角": .programming, "コマンドを英字": .terminal, "IME を使わない": .direct,
+    ]
 }
