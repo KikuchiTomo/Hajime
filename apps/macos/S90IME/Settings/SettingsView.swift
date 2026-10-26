@@ -185,8 +185,9 @@ private struct ConversionTab: View {
                 }
                 .disabled(model.settings.typoCorrection != .standard)
             }
-            Section(UIStrings.Features.okurigana) {
+            Section(UIStrings.Features.notation) {
                 ResettablePicker(model: model, title: UIStrings.Features.okurigana, keyPath: \.okuriganaStyle, label: UIStrings.Features.label(for:))
+                ResettableToggle(model: model, title: UIStrings.Features.prefersKatakana, keyPath: \.prefersKatakana)
             }
             Section(UIStrings.Settings.specialConversion) {
                 ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)

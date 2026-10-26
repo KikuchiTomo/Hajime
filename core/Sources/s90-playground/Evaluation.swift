@@ -2,6 +2,7 @@ import Foundation
 import S90Application
 import S90Domain
 import S90Engine
+import S90Persistence
 
 /// 評価用の文 1 つ．期待する変換は表記の揺れを並べて複数持てる
 struct EvaluationCase {
@@ -184,8 +185,9 @@ enum Evaluation {
         character.unicodeScalars.allSatisfy { (0x3041...0x309F).contains($0.value) }
     }
 
+    /// アプリと同じく，エンジンの候補に記号・日付・並べ替え(SupplementedConverter)を既定の設定で足したもの
     private static func newSession(_ engine: AzooKeyConverterEngine, context: String?) -> any KanaKanjiConverting {
-        let session = engine.makeSession()
+        let session = SupplementedConverter(engine.makeSession(), settings: StaticSettings(DefaultSettings.settings), calendar: SystemCalendar(clock: { Date() }))
         session.setLeftContext(context)
         return session
     }
