@@ -11,6 +11,7 @@ import S90Domain
 //   s90-playground --typo-candidates <キー> [--zenzai <モデル>] 打ったキーの訂正の候補と点数
 //   s90-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
 //   s90-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
+//   s90-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
@@ -26,6 +27,12 @@ MainActor.assumeIsolated {
             try Evaluation.typo(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {
             try Evaluation.correctionFeatures(file: file, engine: playground.engine)
+        } else if let readings = arguments.value(of: "--words") {
+            // 読みを変換したときの語の並び(文節の区切りと，先頭の語の候補を作るのに使う)
+            let session = playground.engine.makeSession()
+            for reading in readings.split(separator: ",").map(String.init) {
+                print(reading, "→", session.segmentationWords(for: reading).map { "\($0.text)(\($0.readingCount))" }.joined(separator: " | "))
+            }
         } else if let readings = arguments.value(of: "--plausibility") {
             // 読みごとの変換のもっともらしさと，求めるのにかかる時間
             let session = playground.engine.makeSession()
