@@ -27,7 +27,7 @@ public enum BranchHints {
             WireKeyHint(keys: pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
             WireKeyHint(keys: first(.nextUncertainSegment), label: "次の文節"),
         ] + length + [
-            WireKeyHint(keys: pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "語ごと"),
+            WireKeyHint(keys: pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
             WireKeyHint(keys: first(.splitSegment), label: "区切る"),
         ]
         return hints.filter { !$0.keys.isEmpty }
@@ -35,7 +35,7 @@ public enum BranchHints {
 
     /// 文節を区切っているとき(区切る位置を番号キーで選ぶ)の案内．枝を出さないので区切る操作だけ
     public static func splitHints(count: Int) -> [WireKeyHint] {
-        [WireKeyHint(keys: count > 1 ? "1–\(count)" : "1", label: "区切る"), WireKeyHint(keys: "Esc", label: "やめる")]
+        [WireKeyHint(keys: count > 1 ? "1–\(count)" : "1", label: "区切り"), WireKeyHint(keys: "Esc", label: "取消")]
     }
 
     public static func label(of stroke: KeyStroke) -> String {

@@ -6,7 +6,7 @@
 use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
-use crate::strings::{choice, dictionaries, features, keys, menu, more, settings, sync, words};
+use crate::strings::{choice, dictionaries, features, keys, menu, more, settings, sync};
 use ipc::RuleList;
 
 /// 左の一覧の見出し
@@ -172,9 +172,9 @@ impl Page {
                 .chain(keys::STATES.iter().map(|(_, label)| *label))
                 .chain(keys::PRESETS.iter().map(|(_, label)| *label))
                 .collect(),
-            Page::Dictionary => vec![words::READING, words::WORD, dictionaries::IMPORTED],
+            Page::Dictionary => vec![settings::READING, settings::WORD, dictionaries::IMPORTED],
             Page::Appearance => vec![more::THEME, more::CUSTOM_THEMES, more::FONT],
-            Page::Sync => vec![sync::FOLDER, sync::SCOPES, sync::DICTIONARY],
+            Page::Sync => vec![sync::FOLDER, sync::SCOPES, settings::DICTIONARY_TAB],
             Page::Romaji | Page::Apps | Page::Usage | Page::Backup | Page::About => vec![],
         }
     }
@@ -916,7 +916,7 @@ fn appearance() -> Vec<Section> {
         Section::new(
             more::FONT,
             vec![Row::stepper(
-                settings::FONT_SIZE,
+                settings::FONT_SIZE_NAME,
                 "candidateFontSize",
                 RangeKind::CandidateFontSize,
             )],

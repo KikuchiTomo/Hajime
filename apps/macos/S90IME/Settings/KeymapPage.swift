@@ -286,7 +286,7 @@ struct KeymapPage: View {
     private static let hiddenOpacity = 0.45
 
     private func describe(_ indices: [Int]) -> String {
-        indices.filter(keymap.entries.indices.contains).map { Keys.describe(keymap.entries[$0]) }.joined(separator: "，")
+        indices.filter(keymap.entries.indices.contains).map { Keys.describe(keymap.entries[$0]) }.joined(separator: "、")
     }
 
     /// 修飾キーの無い文字のキーを，文字を打つ状態に置いた行か(その文字を打てなくなる)

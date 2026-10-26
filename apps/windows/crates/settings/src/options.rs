@@ -72,7 +72,7 @@ pub const OKURIGANA: &[Choice] = &[
 
 pub const LEARNING: &[Choice] = &[
     ("enabled", "学習する"),
-    ("readOnly", "学習結果を使うが、新しく学習しない"),
+    ("readOnly", "学習結果のみ使用"),
     ("disabled", "学習しない"),
 ];
 

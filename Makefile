@@ -15,6 +15,7 @@ fetch-models:
 
 check:
 	$(PYTHON) tools/check/check_skills.py
+	$(PYTHON) tools/check/check_strings.py
 	$(PYTHON) .claude/skills/s90-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/protocol/generate.py --check

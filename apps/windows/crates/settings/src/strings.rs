@@ -13,7 +13,7 @@ pub mod settings {
         "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません";
     pub const EXPORT_FAILED: &str = "エクスポートできませんでした";
     pub fn imported(count: u32) -> String {
-        format!("{count} 語を追加しました")
+        format!("{count} 件を追加しました")
     }
     pub const OK: &str = "OK";
     pub const CANCEL: &str = "キャンセル";
@@ -65,7 +65,7 @@ pub mod settings {
     pub const ENGLISH_CORRECTIONS: &str = "英単語を修正した回数 / 取り消した回数";
     pub const RESET_USAGE: &str = "統計を消去";
     /// UIStrings.Settings.fontSize から値を除いたもの(値は部品に出す)
-    pub const FONT_SIZE: &str = "候補の文字サイズ";
+    pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const ADD: &str = "追加";
     pub const ESCAPE_SWITCHES_TO_DIRECT: &str = "Escape で英数に切り替え";
     pub const ROMAJI_KEYS: &str = "入力";
@@ -93,16 +93,16 @@ pub mod choice {
     pub const KEYBOARD_LAYOUT_NOTE: &str = "ローマ字入力と英字入力で使用します。";
     pub const ENGLISH_INPUT_LIVE_CONVERSION: &str = "英字入力のライブ変換";
     pub const ENGLISH_INPUT_LIVE_CONVERSION_NOTE: &str =
-        "オンにすると、英語の辞書にない語をローマ字として日本語にして見せます。Esc で英字に戻せます。";
+        "英語の辞書にない単語をローマ字として読み、日本語に変換して表示します。Esc で英字に戻せます。";
     pub const ENGLISH_AUTO_NOTE: &str =
-        "英語で打ちながら、日本語にできる語は自動で日本語にします。見分け方は「英語と日本語」で変えられます。";
+        "英語で入力しながら、日本語にできる語句を自動で日本語に変換します。判別方法は「英語と日本語」で変更できます。";
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
     pub const YEN_KEY: &str = "¥ キーで入力する文字";
     pub const THEME: &str = "テーマ";
     pub const PRESENTATION: &str = "候補の表示";
-    pub const INITIAL_FOCUS: &str = "最初に選ぶ文節";
+    pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const SUGGESTION_DISPLAY: &str = "入力中の候補";
 }
 
@@ -117,43 +117,43 @@ pub mod features {
     pub const HANDWRITING: &str = "手書き入力";
     pub const MISREADINGS: &str = "読み違いの候補";
     pub const LANGUAGE_PAGE: &str = "英語と日本語";
-    pub const ENGLISH_WORDS: &str = "いつも英語にする語";
-    pub const JAPANESE_WORDS: &str = "いつも日本語にする語";
-    pub const LANGUAGE_RULES: &str = "見分け方の決まり";
+    pub const ENGLISH_WORDS: &str = "常に英語にする単語";
+    pub const JAPANESE_WORDS: &str = "常に日本語にする単語";
+    pub const LANGUAGE_RULES: &str = "判別ルール";
     pub const TRY_LANGUAGE: &str = "試す";
-    pub const LANGUAGE_JUDGING: &str = "見分け方";
-    pub const USES_CONTEXT: &str = "前の語で見分ける";
+    pub const LANGUAGE_JUDGING: &str = "判別方法";
+    pub const USES_CONTEXT: &str = "前の単語で判別";
     pub const USES_CONTEXT_NOTE: &str =
-        "make・shine のように英語にも日本語にも読める語を、前が英語なら英語、日本語なら日本語にします。";
+        "make・shine のように英語にも日本語にも読める単語を、前が英語なら英語、日本語なら日本語にします。";
     pub const AVOIDS_OFFENSIVE: &str = "不適切な変換を避ける";
-    pub const WORD_PLACEHOLDER: &str = "英字で打つ語";
-    pub const LANGUAGE_RULE_WORD: &str = "語";
+    pub const WORD_PLACEHOLDER: &str = "英字の単語";
+    pub const LANGUAGE_RULE_WORD: &str = "単語";
     pub const LANGUAGE_RULE_CONTEXT: &str = "前";
     pub const LANGUAGE_RULE_RESULT: &str = "結果";
-    pub const TRY_PLACEHOLDER: &str = "英字で打つ文(空白で区切る)";
+    pub const TRY_PLACEHOLDER: &str = "英字の文";
     pub const TRY_PRECEDING: &str = "前の文字列";
-    pub const INVALID_WORD: &str = "語は 32 文字までの英字にしてください";
-    pub const ENGLISH_WORDS_EMPTY: &str = "いつも英語にする語はありません";
-    pub const JAPANESE_WORDS_EMPTY: &str = "いつも日本語にする語はありません";
+    pub const INVALID_WORD: &str = "単語は 32 文字までの英字にしてください";
+    pub const ENGLISH_WORDS_EMPTY: &str = "常に英語にする単語はありません";
+    pub const JAPANESE_WORDS_EMPTY: &str = "常に日本語にする単語はありません";
     pub const CORRECTION_PAGE: &str = "補正";
     pub const CORRECTS_ENGLISH: &str = "英単語";
-    pub const EXCEPTIONS: &str = "直さない語句";
+    pub const EXCEPTIONS: &str = "修正しない語句";
     pub const RULES: &str = "置き換え";
     pub const SYMBOLS_PAGE: &str = "記号";
     pub const SEQUENCES: &str = "連続入力によるサジェスト";
     pub const READINGS: &str = "読み仮名入力によるサジェスト";
     pub const SEARCH: &str = "検索";
-    pub const CORRECTION_KINDS: &str = "直すもの";
-    pub const CORRECTS_JAPANESE: &str = "日本語の打ち間違い";
+    pub const CORRECTION_KINDS: &str = "修正の対象";
+    pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
     pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
-    pub const TYPED: &str = "打った英字";
+    pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";
     pub const INVALID_RULE: &str =
-        "打った英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください";
-    pub const INVALID_EXCEPTION: &str = "直さない語句は 64 文字までにしてください";
+        "入力した英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください";
+    pub const INVALID_EXCEPTION: &str = "修正しない語句は 64 文字までにしてください";
     pub const RULES_EMPTY: &str = "置き換えはありません";
-    pub const EXCEPTIONS_EMPTY: &str = "直さない語句はありません";
+    pub const EXCEPTIONS_EMPTY: &str = "修正しない語句はありません";
     pub const RESTORE_DEFAULT: &str = "既定に戻す";
 }
 
@@ -217,9 +217,9 @@ pub mod keys {
     pub const RESTORE: &str = "既定に戻す";
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
-    pub const RESTORE_MESSAGE: &str = "足した行と変えた行は消えます。";
+    pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
     pub const PLAIN_CHARACTER: &str =
-        "修飾キーの無い文字のキーです。この状態ではその文字を打てなくなります";
+        "修飾キーの無い文字のキーです。この状態ではその文字を入力できなくなります";
     pub const MISSING_NOTE: &str = "キーが無いと、入力を確定したり取り消したりできなくなります。";
 
     pub fn load_preset_message(name: &str) -> String {
@@ -272,7 +272,7 @@ pub mod keys {
         ("convertWithoutLearning", "学習を使わずに変換"),
         ("deleteBackward", "左の文字を削除"),
         ("insertBoundary", "ここで区切る"),
-        ("acceptSuggestion", "「もしかして」に直す"),
+        ("acceptSuggestion", "「もしかして」に修正"),
         ("toHiragana", "ひらがなに変換"),
         ("toKatakana", "全角カタカナに変換"),
         ("toHalfwidthKatakana", "半角カタカナに変換"),
@@ -289,8 +289,8 @@ pub mod keys {
         ("previousSegment", "左の文節"),
         ("firstSegment", "先頭の文節"),
         ("lastSegment", "末尾の文節"),
-        ("nextUncertainSegment", "次の迷う文節"),
-        ("previousUncertainSegment", "前の迷う文節"),
+        ("nextUncertainSegment", "誤りやすい次の文節"),
+        ("previousUncertainSegment", "誤りやすい前の文節"),
         ("extendSegment", "文節を長く"),
         ("shrinkSegment", "文節を短く"),
         ("extendSegmentToWord", "文節を単語ごとに長く"),
@@ -314,7 +314,7 @@ pub mod keys {
 /// UIStrings.RuleList
 pub mod rule_list {
     pub const FULL: &str = "これ以上は追加できません。";
-    pub const ALREADY_REGISTERED: &str = "もう登録してあります。";
+    pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
 }
 
 /// UIStrings.Dictionaries
@@ -327,13 +327,6 @@ pub mod sync {
     pub const PAGE: &str = "同期";
     pub const FOLDER: &str = "フォルダ";
     pub const SCOPES: &str = "同期する項目";
-    pub const DICTIONARY: &str = "ユーザー辞書";
-}
-
-/// 辞書のページの検索の言葉(UIStrings.Settings.reading・word)
-pub mod words {
-    pub const READING: &str = "読み";
-    pub const WORD: &str = "単語";
 }
 
 /// Windows の画面だけの文言
@@ -352,18 +345,19 @@ pub mod windows {
     }
     /// キーの書き方(macOS は押して記録するので無い)
     pub const KEY_NOTE: &str =
-        "キーは「Ctrl Shift Space」のように、修飾キー(Ctrl・Alt・Shift)とキーの名前を空白で区切って入力します。";
+        "キーは「Ctrl Shift Space」のように、修飾キーとキーの名前を空白で区切って入力します。";
     /// 読めないキーの書き方
     pub const INVALID_KEY: &str = "キーの書き方が正しくありません";
     /// macOS の exclusionsNote の「アプリの固有ID」を，Windows で見分けに使う実行ファイルの名前にしたもの
     pub const EXCLUSIONS_NOTE: &str =
-        "実行ファイルの名前(code.exe など)を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。";
+        "実行ファイルの名前を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。";
     /// 不正な実行ファイルの名前(macOS はアプリを選んで足すので無い)
     pub const INVALID_APP: &str = "実行ファイルの名前は英数字・「.」・「-」・「_」にしてください";
     /// macOS の languageNote から，試した結果を右クリックで足す説明を除いたもの(Windows の結果は文字で出す)
-    pub const LANGUAGE_NOTE: &str = "英字入力(自動)と、ローマ字入力で英語にも読める語に使います。";
+    pub const LANGUAGE_NOTE: &str =
+        "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。";
     /// 見分け方の決まりが無いとき(macOS は空の一覧を出すだけ)
-    pub const LANGUAGE_RULES_EMPTY: &str = "見分け方の決まりはありません";
+    pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
     /// 変換エンジン(s90-engine-host)に設定を頼めないとき
     pub const ENGINE_UNAVAILABLE: &str = "変換エンジンが動いていないため、設定を読み込めません";
 }
