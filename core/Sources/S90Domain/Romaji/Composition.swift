@@ -240,6 +240,33 @@ public struct Composition: Sendable, Equatable {
         return copy
     }
 
+    /// 区切り(boundary)から後ろに打ったキーを，「nn」のあとの母音を今の読みのとおりに打ち分けた並びにして返す．
+    /// な行で読んだところ(「honno」の「の」)は「n」を 1 つ足し(「honnno」)，読みを選ぶ決まり(NasalReadingResolver)を
+    /// 知らない変換器(打ち間違いの訂正)に渡しても同じ読みになるようにする．打ち直して読みが合わなければ nil
+    public func unambiguousKeys(from boundary: Boundary) -> String? {
+        guard let rawKeys, rawKeys.count >= boundary.rawCount, kana.count >= boundary.kanaCount else { return nil }
+        let keys = rawKeys.dropFirst(boundary.rawCount)
+        let usesNaRow = nasalAmbiguities.filter { $0.kanaIndex >= boundary.kanaCount }.map(\.usesNaRow)
+        guard usesNaRow.contains(true) else { return String(keys) }
+        var trial = Composition(table: table, symbolSequences: symbolSequences)
+        var output: [Character] = []
+        // 「nn」で「ん」になった直後の位置．母音をな行で読むなら，ここに「n」を足す
+        var afterNasal = 0
+        for key in keys {
+            let before = trial.nasalAmbiguities.count
+            trial.insertRomaji(key)
+            output.append(key)
+            if key == "n", trial.pending.isEmpty, trial.kana.last == "ん" { afterNasal = output.count }
+            if trial.nasalAmbiguities.count > before, usesNaRow.indices.contains(before), usesNaRow[before] {
+                output.insert("n", at: afterNasal)
+            }
+        }
+        var replayed = Composition(table: table, symbolSequences: symbolSequences)
+        for key in output { replayed.insertRomaji(key) }
+        guard replayed.conversionReading == String(conversionReading.dropFirst(boundary.kanaCount)) else { return nil }
+        return String(output)
+    }
+
     private mutating func recordBoundary() {
         guard let rawKeys else { return }
         let boundary = Boundary(rawCount: rawKeys.count, kanaCount: kana.count)

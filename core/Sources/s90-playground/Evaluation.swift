@@ -112,6 +112,9 @@ enum Evaluation {
                 outcome = columns[1].split(separator: "|").contains { marked.text == $0 } ? "正しく直した" : "違う文に直した"
             } else if suggested {
                 outcome = columns[1].split(separator: "|").contains { note?.contains($0) == true } ? "正しく示した" : "違う文を示した"
+            } else if columns[1].split(separator: "|").contains(where: { marked.text == $0 }) {
+                // 打ったままの読みでも期待どおりの文になる(「こんにちわ」→「こんにちは」)．直す必要が無い
+                outcome = "直さずに正しい文"
             } else {
                 outcome = "直せなかった"
             }
@@ -123,30 +126,35 @@ enum Evaluation {
         print("見直しの時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
     }
 
-    /// 訂正の候補ごとの材料を TSV で出す(重みと境目を決めるため)．
-    /// 列: 文の番号, 期待(= なら直さないのが正しい), 候補のキー, 言語モデルの差(Zenzai の点数 + 手間 - 打ったままの点数), 手間, 変換のもっともらしさの差, 候補の変換, 正解か
-    static func correctionFeatures(file: String, engine: AzooKeyConverterEngine) throws {
+    /// 訂正の候補ごとの材料を TSV で出す(重みと境目を決めるため)．アプリと同じ道筋(打つ → 止まる → 訂正を求める)で，
+    /// 見直すキー(「nn」のあとをな行で読んだところは打ち分けた並び)の候補を出す．service が無ければ表示の変換器で求める．
+    /// 列: 文の番号, 期待(= なら直さないのが正しい), 候補のキー, 言語モデルの差(Zenzai の点数 + 手間 - 打ったままの点数), 手間,
+    /// 変換のもっともらしさの差, 候補の変換, 正解か．打ったままの並びを言語モデルが読めないときは，ReadingCorrectionRule と同じく最も低い候補と比べる
+    static func correctionFeatures(file: String, engine: AzooKeyConverterEngine, service: ZenzaiTypoService?) throws {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
         for (number, line) in lines.enumerated() {
             let columns = line.split(separator: "\t").map(String.init)
-            guard columns.count == 2, let original = KeyEditSearch.reading(of: columns[0]) else { continue }
-            let session = engine.makeSession()
-            let candidates = session.typoCorrections(forKeys: columns[0])
-            guard let typed = candidates.first(where: { $0.keys == columns[0] }) else { continue }
-            let base = session.plausibility(of: original)
-            for candidate in candidates where candidate.keys != columns[0] {
+            guard columns.count == 2 else { continue }
+            let converter = engine.makeSession()
+            let session = InputSession(converter: converter, lexicon: WordListLexicon(), settings: StaticSettings(DefaultSettings.settings), typoService: service)
+            for key in columns[0] { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+            _ = session.settle(context: InputContext())
+            guard let request = session.correctionRequest, let keys = request.keys.first else { continue }
+            let candidates = service.map { service in waitFor { await service.corrections(forKeys: [keys], leftContext: request.leftContext) }[keys] ?? [] }
+                ?? converter.typoCorrections(forKeys: keys)
+            guard let original = KeyEditSearch.reading(of: keys) ?? Optional(KeyEditSearch.rawReading(of: keys)),
+                let baseScore = candidates.first(where: { $0.keys == keys }).map(\.score) ?? candidates.map({ $0.score + $0.cost }).min() else { continue }
+            let base = converter.plausibility(of: original)
+            for candidate in candidates where candidate.keys != keys {
                 let reading = KanaWidth.hiragana(from: candidate.reading)
-                let text = session.candidates(for: reading).first { $0.readingCount == reading.count }?.text ?? reading
-                let correct = columns[1] != "=" && columns[1].split(separator: "|").contains { text == $0 }
-                print([String(number), columns[1], candidate.keys, String(format: "%.3f", candidate.score + candidate.cost - typed.score),
-                       String(format: "%.3f", candidate.cost), String(format: "%.3f", session.plausibility(of: reading) - base), text, correct ? "1" : "0"]
+                let text = converter.candidates(for: reading).first { $0.readingCount == reading.count }?.text ?? reading
+                let correct = !columns[1].hasPrefix("=") && columns[1].split(separator: "|").contains { text == $0 }
+                print([String(number), columns[1], candidate.keys, String(format: "%.3f", candidate.score + candidate.cost - baseScore),
+                       String(format: "%.3f", candidate.cost), String(format: "%.3f", converter.plausibility(of: reading) - base), text, correct ? "1" : "0"]
                     .joined(separator: "\t"))
             }
         }
     }
-
-
-
 
     /// 英字入力(自動)で語ごとに英語と日本語を見分けた結果を評価する．1 行は「打ったキー<TAB>入る文<TAB>前の文字列(任意)」．
     /// 打ったキーの空白は Space を押したもの．最後に Enter を押し，入力欄に入った文字(確定した文字とアプリに渡した空白)を比べる

@@ -42,6 +42,13 @@ struct KeyEditSearchTests {
         #expect(KeyEditSearch.corrections(of: "mizurai", plausibility: { _ in 0 }, languageModel: { $0.map { _ in nil } }).isEmpty)
     }
 
+    @Test("打ったままの並びを言語モデルが読めなくても(かなにならない英字が残る)，訂正の候補は返す")
+    func unscorableTyped() {
+        let list = KeyEditSearch.corrections(of: "gakusri", limit: 4, plausibility: { $0 == "がくせい" ? 0 : -20 },
+                                             languageModel: { $0.map { $0 == "gakusri" ? nil : -10 } })
+        #expect(!list.isEmpty && !list.contains(where: \.isUnchanged))
+    }
+
     @Test("2 つの候補の並びを合わせ，同じキーは点数の高い方を残す")
     func merge() {
         let a = ReadingCorrection(keys: "a", reading: "ア", score: -3, cost: 1)

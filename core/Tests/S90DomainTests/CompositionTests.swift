@@ -140,6 +140,19 @@ struct NasalAmbiguityTests {
         #expect(composition.conversionReading == "こんにゃくみんな")
     }
 
+    @Test("な行で読んだところに n を足し，ローマ字表だけで同じ読みになるキーにする(打ち間違いの訂正に渡す)")
+    func unambiguousKeys() {
+        var composition = compose("konnyakuhonnoyomu")
+        let start = composition.boundaries[0]
+        #expect(composition.unambiguousKeys(from: start) == "konnyakuhonnoyomu")
+        composition.setNasalReading(at: 1, usesNaRow: true)
+        #expect(composition.unambiguousKeys(from: start) == "konnyakuhonnnoyomu")
+        composition.setNasalReading(at: 0, usesNaRow: true)
+        let keys = composition.unambiguousKeys(from: start)
+        #expect(keys == "konnnyakuhonnnoyomu")
+        #expect(compose(keys ?? "").conversionReading == composition.conversionReading)
+    }
+
     @Test("nnn は に が確かなので記録しない")
     func tripleN() {
         #expect(compose("konnnitiha").nasalAmbiguities.isEmpty)

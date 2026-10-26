@@ -29,7 +29,7 @@ MainActor.assumeIsolated {
         } else if let file = arguments.value(of: "--evaluate-language") {
             try Evaluation.language(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {
-            try Evaluation.correctionFeatures(file: file, engine: playground.engine)
+            try Evaluation.correctionFeatures(file: file, engine: playground.engine, service: playground.typoService)
         } else if let readings = arguments.value(of: "--words") {
             // 読みを変換したときの語の並び(文節の区切りと，先頭の語の候補を作るのに使う)
             let session = playground.engine.makeSession()
