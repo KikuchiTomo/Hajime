@@ -244,11 +244,11 @@ private struct RomajiTab: View {
     }
 }
 
-extension RomajiRule: Identifiable {
+extension RomajiRule: @retroactive Identifiable {
     public var id: Self { self }
 }
 
-extension ProfileRule: Identifiable {
+extension ProfileRule: @retroactive Identifiable {
     public var id: Self { self }
 }
 
@@ -279,7 +279,7 @@ private struct UsageTab: View {
     }
 }
 
-extension UserDictionaryEntry: Identifiable {
+extension UserDictionaryEntry: @retroactive Identifiable {
     public var id: Self { self }
 }
 

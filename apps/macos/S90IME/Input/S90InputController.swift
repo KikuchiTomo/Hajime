@@ -17,7 +17,7 @@ final class S90InputController: IMKInputController {
     private let menuBuilder: InputMenuBuilder
     private let menuLogger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 打鍵が止まったことを知らせるタイマー(ライブ変換で，かなのまま見せていた語を変換して見せる)
-    private var settleTimer: Timer?
+    private var settleTask: Task<Void, Never>?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let (root, session, presenter, menuBuilder) = MainActor.assumeIsolated {
@@ -50,32 +50,25 @@ final class S90InputController: IMKInputController {
     }
 
     /// 打鍵が止まったら変換した文を見せ(settle)，さらに止まったら打ち間違いを見直す(review)．
-    /// 次のキーが来たらタイマーを止めるので，打ち続けているあいだは見直さない
+    /// 次のキーが来たら待ちを取り消すので，打ち続けているあいだは見直さない．
+    /// 待つのはメインスレッドの Task にし，入力コントローラと入力先を別のスレッドへ渡さない
     @MainActor
     private func scheduleSettle(client: any IMKTextInput, context: InputContext) {
-        settleTimer?.invalidate()
-        settleTimer = nil
-        if session.awaitsSettle {
-            settleTimer = Timer.scheduledTimer(withTimeInterval: DefaultSettings.liveConversionSettleDelay, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.presenter.apply(self.session.settle(context: context), to: client)
-                    self.scheduleReview(client: client, context: context, after: DefaultSettings.liveCorrectionDelay - DefaultSettings.liveConversionSettleDelay)
-                }
+        settleTask?.cancel()
+        settleTask = nil
+        let settles = session.awaitsSettle
+        guard settles || session.awaitsReview else { return }
+        settleTask = Task { @MainActor [weak self] in
+            if settles {
+                try? await Task.sleep(for: .seconds(DefaultSettings.liveConversionSettleDelay))
+                guard !Task.isCancelled, let self else { return }
+                self.presenter.apply(self.session.settle(context: context), to: client)
             }
-        } else {
-            scheduleReview(client: client, context: context, after: DefaultSettings.liveCorrectionDelay)
-        }
-    }
-
-    @MainActor
-    private func scheduleReview(client: any IMKTextInput, context: InputContext, after delay: TimeInterval) {
-        guard session.awaitsReview else { return }
-        settleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.presenter.apply(self.session.review(context: context), to: client)
-            }
+            let remaining = DefaultSettings.liveCorrectionDelay - (settles ? DefaultSettings.liveConversionSettleDelay : 0)
+            guard let self, self.session.awaitsReview else { return }
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled else { return }
+            self.presenter.apply(self.session.review(context: context), to: client)
         }
     }
 
@@ -92,8 +85,8 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func deactivateServer(_ sender: Any!) {
-        settleTimer?.invalidate()
-        settleTimer = nil
+        settleTask?.cancel()
+        settleTask = nil
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
         }
