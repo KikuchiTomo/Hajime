@@ -58,6 +58,8 @@ public enum DefaultSettings {
     public static let minimumKeysForLiveCorrection = 6
     /// 打ち間違いを探す最長のキーの数．長いと探すのに時間がかかり，打鍵が止まったときに待たせる
     public static let maximumKeysForCorrection = 60
+    /// 別のところで求めた訂正の候補を覚えておく数の上限(キーの並びの数)
+    public static let maximumProvidedCorrections = 64
     /// ライブ変換で，読みがこの文字数に満たないあいだは，打鍵が止まるまでかなのまま見せる
     public static let liveConversionMinimumLength = 3
     /// ライブ変換で，末尾の語の読みがこの文字数以下なら，打鍵が止まるまでかなのまま見せる(「らい」→「雷」を出さない)．

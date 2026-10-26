@@ -70,6 +70,12 @@ final class S90InputController: IMKInputController {
             guard let self, self.session.awaitsReview else { return }
             try? await Task.sleep(for: .seconds(remaining))
             guard !Task.isCancelled else { return }
+            // 訂正はメインスレッドの外で求め，求め終わったときに打ったキーが変わっていなければ見直す
+            if let request = self.session.correctionRequest, let service = self.root.typoService {
+                let corrections = await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+                guard !Task.isCancelled else { return }
+                self.session.provideCorrections(corrections)
+            }
             self.presenter.apply(self.session.review(context: context), to: client)
         }
     }

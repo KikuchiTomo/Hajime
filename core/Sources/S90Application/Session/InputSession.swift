@@ -45,6 +45,8 @@ public final class InputSession {
     private var alphabetRun = false
     /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
     private var convertedFromEnglish: String?
+    /// 組み立てを始めたときの，入力位置の前の文字列(打ち間違いの訂正の手がかり)
+    private var compositionLeftContext: String?
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
@@ -52,13 +54,15 @@ public final class InputSession {
     /// 使い方の記録(回数だけ)．記録しないときは nil
     private let usage: (any UsageRecording)?
 
-    public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil) {
+    /// - Parameter typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
+    public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
+                typoService: (any TypoCorrecting)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         self.settings = settings
         self.usage = usage
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings)
-        self.readingCorrector = ReadingCorrector(converter: converter, settings: settings)
+        self.readingCorrector = ReadingCorrector(converter: converter, settings: settings, usesProvidedCorrections: typoService != nil)
         self.styleHandlers = [.english: EnglishInput(converter: converter), .kana: KanaInput()]
     }
 
@@ -171,6 +175,17 @@ public final class InputSession {
         isSettled && phase == .composing && corrector.active == nil && !readingCorrector.isReviewed(composition)
             && (settings.current.typoCorrection == .standard || settings.current.misreadings)
             && (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection
+    }
+
+    /// 見直すために，別のところで求める訂正のキーの並びと左の文脈．求めるものが無ければ nil
+    public var correctionRequest: (keys: [String], leftContext: String?)? {
+        guard awaitsReview, let keys = readingCorrector.pendingKeys(for: composition) else { return nil }
+        return (keys, compositionLeftContext)
+    }
+
+    /// 別のところで求めた訂正を受け取る．そのあと review を呼ぶと見直す
+    public func provideCorrections(_ corrections: [String: [ReadingCorrection]]) {
+        readingCorrector.provide(corrections)
     }
 
     /// 打鍵が長く止まった(DefaultSettings.liveCorrectionDelay)．打ち間違いを見直し，直すか「もしかして」と示す．
@@ -373,7 +388,7 @@ public final class InputSession {
         case .convertRomaji(let keys):
             // 英字入力の語を日本語の読みにし，分岐図で変換を選べるようにする．Esc で英字に戻す
             var actions: [ClientAction] = commitAll()
-            if !isComposing { converter.setLeftContext(context.precedingText) }
+            if !isComposing { setLeftContext(context.precedingText) }
             composition = newComposition()
             let resolver = NasalReadingResolver(converter: converter)
             for key in keys {
@@ -387,7 +402,7 @@ public final class InputSession {
         case .insertKana(let kana):
             var actions: [ClientAction] = []
             if phase != .composing { actions += commitAll() }
-            if !isComposing { converter.setLeftContext(context.precedingText) }
+            if !isComposing { setLeftContext(context.precedingText) }
             composition.insertKana(kana)
             if settings.current.punctuationCommits, SymbolTable.isPunctuation(kana, settings: settings.current) {
                 return KeyResult(handled: true, actions: actions + commitAll())
@@ -433,7 +448,7 @@ public final class InputSession {
         if !isComposing {
             composition = newComposition()
             // 打ち始めに，入力位置の前の文字列を変換の手がかりとして渡す(「AAA」+「まで」)
-            converter.setLeftContext(context.precedingText)
+            setLeftContext(context.precedingText)
         }
         let startsAlphabet = settings.current.shiftStartsAlphabet && character.isASCII && character.isLetter && character.isUppercase
         if startsAlphabet { alphabetRun = true }
@@ -827,6 +842,11 @@ public final class InputSession {
             return [.showNote(PanelBuilder.readingSuggestionNote(shown(suggestion.conversionReading)))]
         }
         return []
+    }
+
+    private func setLeftContext(_ text: String?) {
+        compositionLeftContext = text
+        converter.setLeftContext(text)
     }
 
     // MARK: - 分岐図

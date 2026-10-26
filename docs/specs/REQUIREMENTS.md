@@ -32,10 +32,11 @@ s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs
   - 日本語のローマ字の打ち間違い: `konnnitiha` の `nnn` のような重複，隣のキーの押し間違い，母音の打ち間違い(`kyounotenkihayoudesune` → 今日の天気は良いですね)
 - 日本語の打ち間違いの直し方
   - ライブ変換で打鍵が `DefaultSettings.liveCorrectionDelay`(0.8 秒)止まったときと，Space で変換を始めるときに，Zenzai で打ったキー全体を見直す．打鍵ごとには見直さない(1 文 0.1〜0.7 秒かかるため)
-  - 打ち間違いの種類: 近くのキーの押し間違い，余分なキー，2 つのキーの入れ替わり(azooKey の訂正)に加え，ローマ字の母音の取り違え(`onagai` → お願い)と同じキーの重なり(`koonnnitiha`)を扱う．後の 2 つは s90 の azooKey のフォークで訂正のキーの距離に足した(母音どうし 1.5，同じキー 0.7)．文の末尾の重なりはフォークの訂正が扱わないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
+  - 打ち間違いの種類: 近くのキーの押し間違い，余分なキー，2 つのキーの入れ替わり(azooKey の訂正)に加え，s90 の azooKey のフォークで，ローマ字の母音の取り違え(`onagai` → お願い)，同じキーの重なり(`koonnnitiha`)，余分な母音(`tututa` → 釣った)，打ち忘れ(母音と，同じキーの 2 回目．`haitenki` → いい天気)を扱う．文の末尾の重なりはフォークの訂正が扱わないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
   - 直した読みが打ったままの読みより十分にもっともらしいとき(対数確率の差が `DefaultSettings.readingCorrectionMargin` 以上)は直して見せる．差がそれより小さく `DefaultSettings.readingSuggestionMargin` 以上なら直さず「もしかして」と示し，Tab で直せるようにする(打ち間違いと決めつけない)
   - 直したときは点線の下線と，入力位置の下の案内で知らせ，Esc で打ったままの読みに戻す．戻したキーのあいだは直し直さない
-  - `core/Evaluation/typo-correction.tsv` で測る(`s90-playground --evaluate-typo`)．2026-10-26 の結果: 打ち間違いの無い 20 文で誤って直した・示したのは 0，打ち間違いのある 13 文で正しく直したのは 9．見直しの時間は中央値 0.17 秒，最大 0.47 秒(Release，Apple M1 Pro)
+  - 訂正は探す幅 16 で求める．1 文に 0.2〜2.8 秒(中央値 1.1 秒，Release，Apple M1 Pro)かかるので，表示に使う変換器とは別の変換器でメインスレッドの外で求め(`ZenzaiTypoService`)，求め終わったときに打ったキーが変わっていなければ見直す．Space で変換するときに求め終わっていなければ，待たずに直さず変換する
+  - `core/Evaluation/typo-correction.tsv` で測る(`s90-playground --evaluate-typo`)．2026-10-26 の結果: 打ち間違いの無い 20 文で誤って直した・示したのは 0，打ち間違いのある 16 文で正しく直したのは 14(探す幅 4 では 10，8 では 11)
 - 受け入れ条件
   - 補正したことが見た目でわかる(`docs/dev/DESIGN-SYSTEM.md` の補正の表示)
   - 英単語の補正の直後に Space を押すと，打ったままの文字列に戻る．一覧の表示では打ったままの文字列を 2 番目に出す

@@ -28,10 +28,39 @@ final class ReadingCorrector {
     private var dismissedKeys: String?
     /// 前に見直したキーと結果．同じキーを何度も Zenzai に問い合わせない
     private var lastReview: (keys: String, decision: ReadingCorrectionRule.Decision?)?
+    /// 別のところで求めた訂正の候補(キーの並びごと)．入力を最後まで確定したら捨てる
+    private var provided: [String: [ReadingCorrection]] = [:]
+    /// 訂正を別のところで求めるか．true なら，求め終わっていないキーは見直さない(入力の処理を待たせない)
+    private let usesProvidedCorrections: Bool
 
-    init(converter: any KanaKanjiConverting, settings: any SettingsReading) {
+    init(converter: any KanaKanjiConverting, settings: any SettingsReading, usesProvidedCorrections: Bool = false) {
         self.converter = converter
         self.settings = settings
+        self.usesProvidedCorrections = usesProvidedCorrections
+    }
+
+    /// 見直しに要るのに，まだ求めていないキーの並び(打ったキーと，重なりを 1 回にした並び)．要らなければ nil
+    func pendingKeys(for composition: Composition) -> [String]? {
+        guard usesProvidedCorrections, let keys = reviewableKeys(of: composition) else { return nil }
+        let all = [keys] + (settings.current.correction.repeatedKeys ? ReadingCorrectionRule.repeatedKeyVariants(of: keys) : [])
+        let missing = all.filter { provided[$0] == nil }
+        return missing.isEmpty ? nil : missing
+    }
+
+    /// 別のところで求めた訂正の候補を受け取る
+    func provide(_ corrections: [String: [ReadingCorrection]]) {
+        provided.merge(corrections) { _, new in new }
+        if provided.count > DefaultSettings.maximumProvidedCorrections { provided = corrections }
+    }
+
+    /// 見直せるキーの並び．英小文字と「-」だけで，戻した並びで始まらず，長すぎないもの
+    private func reviewableKeys(of composition: Composition) -> String? {
+        let typed = typedComposition(from: composition) ?? composition
+        guard let keys = typed.rawKeys, keys.count <= DefaultSettings.maximumKeysForCorrection,
+            !keys.isEmpty, keys.allSatisfy(Self.isLetterKey),
+            typed.pending.isEmpty || typed.pending == "n",
+            !(dismissedKeys.map(keys.hasPrefix) ?? false) else { return nil }
+        return keys
     }
 
     /// 直した読みを見せているか
@@ -60,6 +89,8 @@ final class ReadingCorrector {
     /// 打ったキー全体を見直し，直すなら composition を直した読みにする．
     /// 前に直したものが，続けて打ったキーでもっともらしくなくなったら，打ったままに戻す
     func review(_ composition: inout Composition, makeComposition: () -> Composition) {
+        // 訂正をまだ求め終わっていなければ，今の表示のまま待つ(直したものを打ったままに戻したりしない)
+        if pendingKeys(for: composition) != nil { return }
         suggestion = nil
         suggestsMisreading = false
         let typed = typedComposition(from: composition) ?? composition
@@ -165,6 +196,7 @@ final class ReadingCorrector {
         suggestion = nil
         dismissedKeys = nil
         lastReview = nil
+        provided = [:]
     }
 
     // MARK: - 内部
@@ -183,11 +215,17 @@ final class ReadingCorrector {
 
     private func decision(forKeys keys: String, reading: String) -> ReadingCorrectionRule.Decision? {
         if let lastReview, lastReview.keys == keys { return lastReview.decision }
-        var candidates = converter.typoCorrections(forKeys: keys)
-        // 同じキーを続けて 2 回打った誤りは Zenzai の訂正では探さないので，1 回にした並びも見直して比べる．
+        // 別のところで求めるときは，求め終わっていなければ見直さない(入力の処理を待たせない)
+        func corrections(_ keys: String) -> [ReadingCorrection]? {
+            if let found = provided[keys] { return found }
+            return usesProvidedCorrections ? nil : converter.typoCorrections(forKeys: keys)
+        }
+        guard var candidates = corrections(keys) else { return nil }
+        // 文の末尾で同じキーを続けて 2 回打った誤りは Zenzai の訂正では探さないので，1 回にした並びも見直して比べる．
         // 直すと決まったあとも試す．試さないと，重なりを 1 回にした文よりもっともらしくない文に直すことがある(評価で 1 件 → 4 件)
         for variant in settings.current.correction.repeatedKeys ? ReadingCorrectionRule.repeatedKeyVariants(of: keys) : [] {
-            candidates += converter.typoCorrections(forKeys: variant).map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
+            guard let found = corrections(variant) else { return nil }
+            candidates += found.map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
         }
         candidates.sort { $0.score > $1.score }
         let decision = ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,

@@ -4,6 +4,13 @@ import S90Domain
 ///
 /// 変換エンジン(AzooKeyKanaKanjiConverter)はスレッドセーフではないので，メインスレッドだけで呼ぶ．
 /// Zenzai のような重い変換を入れるときは，ここを非同期にする ADR を書く．
+/// 打ち間違いの訂正を，入力を処理するスレッドとは別に求める(R-02)．
+/// 訂正は 1 文に 1 秒ほどかかることがあるので，打鍵を止めないよう別の変換器で求め，結果をあとから渡す
+public protocol TypoCorrecting: Sendable {
+    /// キーの並びごとの訂正の候補(よさそうな順)
+    func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]]
+}
+
 @MainActor
 public protocol KanaKanjiConverting: AnyObject {
     /// 読み全体の候補と，読みの先頭の一部だけの候補を，よさそうな順に返す
