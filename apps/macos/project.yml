@@ -86,7 +86,7 @@ targets:
         S90_SUPPORT_DIRECTORY: tokyo.s90.ime
         S90_ICON_SUFFIX: ""
         # 入力メニューに出す名前．make install-macos NAME=… で変えられる(tools/macos/write_input_source_names.sh)
-        S90_DISPLAY_NAME: "s90 IME"
+        S90_DISPLAY_NAME: "s90"
         MARKETING_VERSION: "0.0.1"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
@@ -102,10 +102,10 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.develop
           S90_SUPPORT_DIRECTORY: tokyo.s90.ime.develop
           S90_ICON_SUFFIX: "-dev"
-          S90_DISPLAY_NAME: "s90 IME Dev"
+          S90_DISPLAY_NAME: "s90 Dev"
         Debug:
           PRODUCT_NAME: "s90.tokyo IME Debug"
           PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.debug
           S90_SUPPORT_DIRECTORY: tokyo.s90.ime.debug
           S90_ICON_SUFFIX: "-dev"
-          S90_DISPLAY_NAME: "s90 IME Debug"
+          S90_DISPLAY_NAME: "s90 Debug"

@@ -34,7 +34,7 @@ install-macos:
 uninstall-macos:
 	tools/macos/uninstall.sh Release
 
-# 開発版(s90 IME Dev)を入れる．本番と並べて試せる．何度でも入れ直せる
+# 開発版(s90 Dev)を入れる．本番と並べて試せる．何度でも入れ直せる
 dev-macos:
 	S90_NAME="$(NAME)" tools/macos/install.sh Dev
 
