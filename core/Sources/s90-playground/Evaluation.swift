@@ -73,6 +73,7 @@ enum Evaluation {
     }
 
     /// 打ち間違いの補正を評価する．1 行は「打ったキー<TAB>直したあとの文(直さないのが正しければ =)」．
+    /// 「=」のあとに文を書いたときは，直さずにその文を見せれば正しい(英語の混ざる文．「=pythonがすごい」)．
     /// ライブ変換で打鍵が止まったときと同じに見直し，直した(点線)・示した(「もしかして」)・何もしない，のどれになったかを数える
     static func typo(file: String, engine: AzooKeyConverterEngine) throws {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
@@ -96,8 +97,10 @@ enum Evaluation {
             let applied = marked.segments.contains { $0.style == .correction }
             let suggested = note?.hasPrefix("もしかして") == true
             let outcome: String
-            if columns[1] == "=" {
-                outcome = applied ? "誤って直した" : suggested ? "誤って示した" : "正しく直さなかった"
+            if columns[1].hasPrefix("=") {
+                let expected = columns[1].dropFirst()
+                outcome = applied ? "誤って直した" : suggested ? "誤って示した"
+                    : expected.isEmpty || marked.text == expected ? "正しく直さなかった" : "直さなかったが違う文"
             } else if applied {
                 outcome = columns[1].split(separator: "|").contains { marked.text == $0 } ? "正しく直した" : "違う文に直した"
             } else if suggested {

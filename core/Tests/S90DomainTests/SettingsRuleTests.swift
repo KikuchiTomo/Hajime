@@ -112,6 +112,34 @@ struct TypoCorrectionRuleTests {
         #expect(TypoCorrectionRule(level: .off).tails(in: compose("python")).isEmpty)
     }
 
+    @Test("R-02: ローマ字として読めてしまう英単語は，綴りの途中で切れ，助詞などが続き，日本語より確からしいときだけ英単語とみなす")
+    func readsAsEnglish() {
+        let rule = TypoCorrectionRule(level: .standard)
+        #expect(rule.readsAsEnglish(endsOnBoundary: false, japanese: -52, following: -16, followingReading: "をつかう"))
+        // 区切りに合う(「kite」→ きて)
+        #expect(!rule.readsAsEnglish(endsOnBoundary: true, japanese: -52, following: -16, followingReading: "をつかう"))
+        // 日本語のほうが確からしい(「kitto」→ きっと)
+        #expect(!rule.readsAsEnglish(endsOnBoundary: false, japanese: -8, following: -9, followingReading: "と"))
+        // 助詞などで始まらない(「arigatoou」の「gat」)
+        #expect(!rule.readsAsEnglish(endsOnBoundary: false, japanese: -40, following: -5, followingReading: "おおう"))
+        #expect(!TypoCorrectionRule(level: .off).readsAsEnglish(endsOnBoundary: false, japanese: -52, following: -16, followingReading: "を"))
+    }
+
+    @Test("R-06: 識別子の続きと，日本語の文の中か")
+    func identifierAndSentence() {
+        #expect(TypoCorrectionRule.continuesIdentifier("_"))
+        #expect(TypoCorrectionRule.continuesIdentifier("."))
+        #expect(TypoCorrectionRule.continuesIdentifier("N"))
+        #expect(TypoCorrectionRule.continuesIdentifier("2"))
+        #expect(!TypoCorrectionRule.continuesIdentifier("の"))
+        #expect(!TypoCorrectionRule.continuesIdentifier(" "))
+        let rule = TypoCorrectionRule(level: .standard)
+        #expect(rule.isInJapaneseSentence(before: "この", precedingCharacter: nil))
+        #expect(rule.isInJapaneseSentence(before: "", precedingCharacter: "は"))
+        #expect(!rule.isInJapaneseSentence(before: "", precedingCharacter: " "))
+        #expect(!rule.isInJapaneseSentence(before: "", precedingCharacter: nil))
+    }
+
     @Test("入れ替えは 1 回と数える")
     func distance() {
         #expect(EditDistance.damerauLevenshtein("pyhton", "python") == 1)
@@ -294,6 +322,20 @@ struct ClauseSplitterTests {
             Word(text: "GitHub", readingCount: 5),
         ])
         #expect(clauses.map(\.text) == ["問題点が", "あれば", "GitHub"])
+    }
+
+    @Test("英字 1 文字ずつの語は 1 つの文節にまとめる(「python｜が」でなく「pythonが」，「この｜IMEは」)")
+    func joinsLatinLetters() {
+        let python = ClauseSplitter.clauses(of: "python".map { Word(text: String($0), readingCount: 1) }
+            + [Word(text: "がすごい", readingCount: 4, startsWithParticle: true)])
+        #expect(python.map(\.text) == ["pythonが", "すごい"])
+        #expect(python.map(\.readingCount) == [7, 3])
+        let ime = ClauseSplitter.clauses(of: [Word(text: "この", readingCount: 2)] + "IME".map { Word(text: String($0), readingCount: 1) }
+            + [Word(text: "は", readingCount: 1, startsWithParticle: true)])
+        #expect(ime.map(\.text) == ["この", "IMEは"])
+        // 全角の英数字もまとめる
+        let fullwidth = ClauseSplitter.clauses(of: "ＡＡＡ".map { Word(text: String($0), readingCount: 1) } + [Word(text: "まで", readingCount: 2, startsWithParticle: true)])
+        #expect(fullwidth.map(\.text) == ["ＡＡＡまで"])
     }
 }
 

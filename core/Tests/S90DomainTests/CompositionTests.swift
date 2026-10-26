@@ -9,6 +9,28 @@ private func compose(_ keys: String) -> Composition {
 
 @Suite("ローマ字の組み立て")
 struct CompositionTests {
+    @Test("R-02: 英字として入れた部分(打ったとおりの英単語・Shift の英字)の直後の区切りから，日本語の打ち間違いを見直す")
+    func boundaryAfterEnglish() throws {
+        var composition = compose("python")
+        composition.freeze(rawStart: 0, kanaStart: 0, keys: "python", as: "python", replaying: "ga")
+        #expect(composition.boundaryAfterEnglish == Composition.Boundary(rawCount: 6, kanaCount: 6))
+        let prefix = composition.truncated(to: try #require(composition.boundaryAfterEnglish))
+        #expect(prefix.displayReading == "python")
+        #expect(prefix.rawKeys == "python")
+
+        var shifted = compose("kono")
+        for key in "IME" { shifted.insertLiteral(String(key), rawKey: key) }
+        for key in "ha" { shifted.insertRomaji(key) }
+        #expect(shifted.boundaryAfterEnglish == Composition.Boundary(rawCount: 7, kanaCount: 5))
+
+        // 綴りを直した語(「sride」→「bride」)は日本語の打ち間違いかもしれないので，見直しから外さない
+        var corrected = compose("gakusride")
+        corrected.freeze(rawStart: 4, kanaStart: 2, keys: "sride", as: "bride", replaying: "")
+        #expect(corrected.boundaryAfterEnglish == Composition.Boundary(rawCount: 0, kanaCount: 0))
+        // ローマ字として読めずに残った英字(打ち間違い)も外さない
+        #expect(compose("simsu").boundaryAfterEnglish == Composition.Boundary(rawCount: 0, kanaCount: 0))
+    }
+
     @Test("よく使う綴り", arguments: [
         ("konnnitiha", "こんにちは"),
         ("hunniki", "ふんいき"),
