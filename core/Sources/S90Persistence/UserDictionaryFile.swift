@@ -2,7 +2,7 @@ import Foundation
 import S90Domain
 
 /// ユーザー辞書を「読み<タブ>語」の行のテキストで読み書きする．
-/// Google 日本語入力と ATOK が書き出す形(3 列目以降の品詞やコメントは読まない)
+/// 「読み<タブ>単語」の行が並んだタブ区切りのテキスト(3 列目以降の品詞やコメントは読まない)
 public enum UserDictionaryFile {
     public enum FileError: Error, Equatable {
         case fileTooLarge(maximumBytes: Int)

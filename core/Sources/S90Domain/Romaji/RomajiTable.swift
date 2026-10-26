@@ -42,7 +42,7 @@ public struct RomajiRule: Sendable, Equatable, Codable, Hashable {
         self.kana = kana
     }
 
-    /// 綴りは英小文字・「-」・「'」の 1〜4 文字，かなは 1〜6 文字(ATOK と同じ上限)
+    /// 綴りは英小文字・「-」・「'」の 1〜4 文字，かなは 1〜6 文字
     public var isValid: Bool {
         (1...DefaultSettings.maximumRomajiKeysLength).contains(keys.count)
             && keys.allSatisfy { ($0.isASCII && $0.isLowercase && $0.isLetter) || $0 == "-" || $0 == "'" }
