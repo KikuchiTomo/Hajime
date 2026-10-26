@@ -31,8 +31,9 @@ struct CustomThemeEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             ThemePreview(choice: ThemeChoice(theme.base, custom: theme), fontSize: model.settings.candidateFontSize)
+                .fixedSize()
+                .padding(DesignTokens.Size.Settings.previewPadding)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
                 .background(.background.secondary)
                 .accessibilityLabel(UIStrings.More.preview)
             Divider()

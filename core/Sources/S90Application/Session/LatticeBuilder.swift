@@ -176,8 +176,10 @@ struct LatticeBuilder {
         while position < reading.count {
             let rest = String(reading.dropFirst(position))
             let expected = sentence ?? converter.candidates(for: rest).first { $0.readingCount == rest.count }?.text
+            // 英数字の並び(「python」)の途中では切らない．エンジンの文節は英字 1 文字ずつのことがある
+            let latin = rest.prefix(while: Composition.isAlphanumeric).count
             let clause = converter.clauseCandidates(for: rest)
-                .filter { $0.readingCount < rest.count && expected?.hasPrefix($0.text) == true }
+                .filter { $0.readingCount < rest.count && $0.readingCount >= latin && expected?.hasPrefix($0.text) == true }
                 .min { $0.readingCount < $1.readingCount }
             let length = clause?.readingCount ?? rest.count
             result.append(makeSegment(start: position, length: length, rest: rest, preferred: clause?.text ?? expected))
