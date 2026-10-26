@@ -72,6 +72,47 @@ enum Evaluation {
         print("途中の時点: \(steps)  変換して見せた: \(converted)  誤った途中表示: \(wrong)")
     }
 
+    /// 打ち間違いの補正を評価する．1 行は「打ったキー<TAB>直したあとの文(直さないのが正しければ =)」．
+    /// ライブ変換で打鍵が止まったときと同じに見直し，直した(点線)・示した(「もしかして」)・何もしない，のどれになったかを数える
+    static func typo(file: String, engine: AzooKeyConverterEngine) throws {
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        let clock = ContinuousClock()
+        var counts: [String: Int] = [:]
+        var durations: [Duration] = []
+        for line in lines {
+            let columns = line.split(separator: "\t").map(String.init)
+            guard columns.count == 2 else { continue }
+            let store = StaticSettings(DefaultSettings.settings)
+            let session = InputSession(converter: engine.makeSession(), lexicon: WordListLexicon(), settings: store)
+            for key in columns[0] { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+            var marked = MarkedText.empty
+            var note: String?
+            durations.append(clock.measure {
+                for action in session.settle(context: InputContext()) + session.review(context: InputContext()) {
+                    if case .setMarkedText(let text) = action { marked = text }
+                    if case .showNote(let text) = action { note = text }
+                }
+            })
+            let applied = marked.segments.contains { $0.style == .correction }
+            let suggested = note?.hasPrefix("もしかして") == true
+            let outcome: String
+            if columns[1] == "=" {
+                outcome = applied ? "誤って直した" : suggested ? "誤って示した" : "正しく直さなかった"
+            } else if applied {
+                outcome = marked.text == columns[1] ? "正しく直した" : "違う文に直した"
+            } else if suggested {
+                outcome = note?.contains(columns[1]) == true ? "正しく示した" : "違う文を示した"
+            } else {
+                outcome = "直せなかった"
+            }
+            counts[outcome, default: 0] += 1
+            print("\(outcome)  \(columns[0]) → \(marked.text)\(note.map { "  [\($0)]" } ?? "")")
+        }
+        let sorted = durations.sorted()
+        print(counts.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "  "))
+        print("見直しの時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+    }
+
     private static func isHiragana(_ character: Character) -> Bool {
         character.unicodeScalars.allSatisfy { (0x3041...0x309F).contains($0.value) }
     }

@@ -125,7 +125,14 @@ enum UIStrings {
 
     enum Menu {
         static let openSettings = "設定を開く…"
+        static let liveConversion = "ライブ変換"
+    }
+
+    /// 設定の画面の選択肢の名前
+    enum Choice {
         static let inputStyle = "入力方式"
+        static let keyboardLayout = "英字の配列"
+        static let keyboardLayoutNote = "ローマ字入力と英語のまま入力で使う配列です．かな入力はキーの位置で決まるので，この設定によりません．次に入力欄を選んだときから使います．"
 
         static func label(for style: InputStyle) -> String {
             switch style {
@@ -134,25 +141,36 @@ enum UIStrings {
             case .english: "英語のまま入力(Tab で日本語)"
             }
         }
-        static let liveConversion = "ライブ変換"
+
+        static func label(for layout: KeyboardLayout) -> String {
+            switch layout {
+            case .system: "OS で選んでいる配列のまま"
+            case .abc: "ABC"
+            case .us: "US"
+            case .dvorak: "Dvorak"
+            case .dvorakQwertyCommand: "Dvorak(⌘ を押す間は QWERTY)"
+            case .colemak: "Colemak"
+            }
+        }
+
         static let variantRow = "候補の上に種類の行を出す"
-        static let typoCorrection = "タイプミスの補正"
+        static let typoCorrection = "打ち間違いの補正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "外観"
         static let presentation = "候補の出し方"
 
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {
-            case .automatic: "分岐図(英単語の補正のときは一覧)"
+            case .automatic: "分岐図"
             case .list: "一覧"
             }
         }
 
         static func label(for level: TypoCorrectionLevel) -> String {
             switch level {
-            case .off: "切る"
+            case .off: "しない"
             case .conservative: "控えめ(英単語だけ)"
-            case .standard: "標準(綴りの誤りも直す)"
+            case .standard: "標準(日本語の打ち間違いも直す)"
             }
         }
 
@@ -164,12 +182,14 @@ enum UIStrings {
             }
         }
 
+        /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
+        static let themes: [ThemePreference] = [.automatic, .platinum, .desk]
+
         static func label(for theme: ThemePreference) -> String {
             switch theme {
-            case .automatic: "自動(ライトはプラチナ，ダークは夜のデスク)"
-            case .platinum: "プラチナ"
-            case .desk: "夜のデスク"
-            case .native: "システム"
+            case .automatic, .native: "標準"
+            case .platinum: "プラチナ(レトロ)"
+            case .desk: "夜のデスク(レトロ)"
             }
         }
     }

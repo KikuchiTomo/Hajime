@@ -32,19 +32,39 @@ public struct Candidate: Sendable, Equatable {
         }
     }
 
+    /// エンジンの辞書の語ひとつ．辞書には「な人だ」「を立てる」のように，助詞や助動詞と次の語をつないだ語もある
+    public struct Word: Sendable, Equatable {
+        public var text: String
+        public var readingCount: Int
+        /// 助詞で始まる語か(「はいい」「を立てる」)
+        public var startsWithParticle: Bool
+        /// 助詞で終わる語か(「があれば」)
+        public var endsWithParticle: Bool
+
+        public init(text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false) {
+            self.text = text
+            self.readingCount = readingCount
+            self.startsWithParticle = startsWithParticle
+            self.endsWithParticle = endsWithParticle
+        }
+    }
+
     public var text: String
     public var readingCount: Int
     public var origin: CandidateOrigin
     public var score: Double
     /// 末尾の語(エンジンが語の区切りを教えるときだけ)．打っている途中の語をかなのまま見せるのに使う
     public var trailingWord: TrailingWord?
+    /// 候補を作る語の並び(エンジンが語の区切りを教えるときだけ)．文節に分けるのに使う(ClauseSplitter)
+    public var words: [Word]
 
-    public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0, trailingWord: TrailingWord? = nil) {
+    public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0, trailingWord: TrailingWord? = nil, words: [Word] = []) {
         self.text = text
         self.readingCount = readingCount
         self.origin = origin
         self.score = score
         self.trailingWord = trailingWord
+        self.words = words
     }
 
     /// 変換エンジンが出した候補か．確定したときに学習に使うのはこれだけ

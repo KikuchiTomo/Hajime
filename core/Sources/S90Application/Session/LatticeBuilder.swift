@@ -2,18 +2,33 @@ import S90Domain
 
 /// 読みを文節に分け，文節ごとの候補を集めて文節格子を作る．
 ///
-/// 区切りは，読み全体の第 1 候補(ライブ変換で見えている文)を先頭から切る位置に合わせる．
-/// 切る位置は，その文と食い違わない文節の候補のうちいちばん短いもの．
+/// 区切りは，読み全体の第 1 候補(ライブ変換で見えている文)の語の並びから決める(ClauseSplitter)．
 /// 格子の 1 段目がライブ変換の表示と同じになり，見比べる手間が出ないため．
+/// 語の並びが分からないときは，その文と食い違わない文節の候補のうちいちばん短いもので切る
 @MainActor
 struct LatticeBuilder {
     let converter: any KanaKanjiConverting
 
     func build(reading: String) -> SegmentLattice {
-        let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }?.text
-        var lattice = SegmentLattice(segments: segments(of: reading, from: 0, sentence: sentence))
+        let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
+        var lattice = SegmentLattice(segments: clauseSegments(of: reading, sentence: sentence)
+            ?? segments(of: reading, from: 0, sentence: sentence?.text))
         lattice.focusedIndex = lattice.initialFocus
         return lattice
+    }
+
+    /// 第 1 候補の語の並びで文節に分ける．語の読みの長さの合計が読みと合わなければ nil
+    private func clauseSegments(of reading: String, sentence: Candidate?) -> [SegmentLattice.Segment]? {
+        guard let sentence else { return nil }
+        let clauses = ClauseSplitter.clauses(of: sentence.words)
+        guard clauses.count > 1, clauses.reduce(0, { $0 + $1.readingCount }) == reading.count,
+            clauses.map(\.text).joined() == sentence.text else { return nil }
+        var position = 0
+        return clauses.map { clause in
+            let rest = String(reading.dropFirst(position))
+            defer { position += clause.readingCount }
+            return makeSegment(start: position, length: clause.readingCount, rest: rest, preferred: clause.text)
+        }
     }
 
     /// index の文節の長さを length に変え，それより後ろを分け直す(Shift+←→)．

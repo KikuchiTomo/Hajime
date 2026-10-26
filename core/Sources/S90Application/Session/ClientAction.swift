@@ -16,6 +16,8 @@ public enum ClientAction: Sendable, Equatable {
     case selectMode(InputMode)
     /// 入力方式を切り替える(設定に保存する)．R-05
     case selectInputStyle(InputStyle)
+    /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
+    case showNote(String)
 }
 
 /// 処理の結果．handled が false なら，キーは入力先のアプリにそのまま渡る

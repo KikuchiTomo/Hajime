@@ -24,6 +24,7 @@ private final class Harness {
     private(set) var marked = MarkedText.empty
     private(set) var panel: CandidatePanel?
     private(set) var lattice: LatticePanel?
+    private(set) var note: String?
     private(set) var lastResult = KeyResult.passThrough
 
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings) {
@@ -37,6 +38,18 @@ private final class Harness {
         for character in text { press(.character(character)) }
     }
 
+    /// 打鍵が止まり，さらに長く止まったときの処理(ライブ変換の表示と打ち間違いの見直し)
+    func settle() {
+        for action in session.settle(context: context) + session.review(context: context) {
+            switch action {
+            case .setMarkedText(let text): marked = text
+            case .showNote(let text): note = text
+            case .hideCandidates: note = nil
+            default: break
+            }
+        }
+    }
+
     func press(_ key: KeyEvent.Key, _ modifiers: KeyEvent.Modifiers = []) {
         lastResult = session.handle(KeyEvent(key, modifiers: modifiers), context: context)
         for action in lastResult.actions {
@@ -45,9 +58,11 @@ private final class Harness {
             case .setMarkedText(let text): marked = text
             case .showCandidates(let value): panel = value
             case .showLattice(let value): lattice = value
+            case .showNote(let text): note = text
             case .hideCandidates:
                 panel = nil
                 lattice = nil
+                note = nil
             case .showModeIndicator, .selectMode, .selectInputStyle: break
             }
         }
@@ -206,13 +221,22 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "python")
     }
 
-    @Test("R-02: 補正したときは，候補一覧の 2 番目に打ったままの文字列を出す")
+    @Test("R-02: 一覧のときは，補正した単語の次に打ったままの文字列を出す")
     func correctionCandidates() {
-        let harness = Harness(lexicon: FakeLexicon(words: ["python"]))
+        let harness = Harness(lexicon: FakeLexicon(words: ["python"]), settings: .listPresentation)
         harness.type("python")
         harness.press(.down)
         #expect(harness.panel?.entries.prefix(2).map(\.text) == ["python", "pyてょn"])
         #expect(harness.panel?.entries[1].annotation == "入力のまま")
+    }
+
+    @Test("R-02: 分岐図のときは，補正した単語を読みに入れてから分岐図にする")
+    func correctionInBranchMap() {
+        let harness = Harness(lexicon: FakeLexicon(words: ["python"]))
+        harness.type("python")
+        harness.press(.down)
+        #expect(harness.panel == nil)
+        #expect(harness.lattice?.columns.map(\.text).joined() == "python")
     }
 
     @Test("R-04: ¥ キーは既定で \\ を入れる")
@@ -571,6 +595,58 @@ struct ReadingCorrectionScenarioTests {
             if case .setMarkedText(let text) = action { marked = text.text }
         }
         #expect(marked == "よう")
+    }
+
+    @Test("ライブ変換で打鍵が止まったら直して点線で見せ，案内を出す．続けて打ったキーは直した読みに続け，Esc で打ったままに戻す")
+    func liveCorrection() {
+        let converter = FakeConverter()
+        converter.corrections["youdesu"] = [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -5, cost: 2),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]
+        let harness = Harness(converter: converter)
+        harness.type("youdesu")
+        #expect(harness.marked.text == "ようです")
+        harness.settle()
+        #expect(harness.marked.text == "よいです")
+        #expect(harness.marked.segments.first?.style == .correction)
+        #expect(harness.note?.contains("ようです") == true)
+        harness.type("ne")
+        #expect(harness.marked.text == "よいですね")
+        harness.press(.escape)
+        #expect(harness.marked.text == "ようですね")
+        // 戻したキーのあいだは，止まっても直し直さない
+        harness.settle()
+        #expect(harness.marked.text == "ようですね")
+    }
+
+    @Test("差が中くらいなら直さずに「もしかして」と示し，Tab で直す")
+    func suggestion() {
+        let converter = FakeConverter()
+        converter.corrections["youdesu"] = [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -7, cost: 2),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]
+        let harness = Harness(converter: converter)
+        harness.type("youdesu")
+        harness.settle()
+        #expect(harness.marked.text == "ようです")
+        #expect(harness.note?.contains("よいです") == true)
+        harness.press(.tab)
+        #expect(harness.marked.text == "よいです")
+        harness.press(.escape)
+        #expect(harness.marked.text == "ようです")
+    }
+
+    @Test("同じキーを続けて 2 回打った誤りは，1 回にした並びも見直して直す")
+    func repeatedKey() {
+        let converter = FakeConverter()
+        converter.corrections["koonnnichiha"] = [ReadingCorrection(keys: "koonnnichiha", reading: "コオンニチハ", score: -12, cost: 0)]
+        converter.corrections["konnnichiha"] = [ReadingCorrection(keys: "konnnichiha", reading: "コンニチハ", score: -4, cost: 0)]
+        let harness = Harness(converter: converter)
+        harness.type("koonnnichiha")
+        harness.settle()
+        #expect(harness.marked.text == "こんにちは")
     }
 
     @Test("差が小さければ直さない")

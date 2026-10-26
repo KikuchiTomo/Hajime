@@ -8,6 +8,19 @@ public enum InputStyle: String, Sendable, Equatable, Codable, CaseIterable {
     case english
 }
 
+/// 英字を打つときのキーボードの配列．ローマ字入力と EN 入力で，どのキーでどの英字が入るかを決める．
+/// かな入力はキーの位置からかなを決めるので，この設定によらない
+public enum KeyboardLayout: String, Sendable, Equatable, Codable, CaseIterable {
+    /// OS で最後に使った英字の配列のまま
+    case system
+    case abc
+    case us
+    case dvorak
+    /// Dvorak．Command を押している間だけ QWERTY
+    case dvorakQwertyCommand
+    case colemak
+}
+
 /// 句読点の組み合わせ
 public enum PunctuationStyle: String, Sendable, Equatable, Codable, CaseIterable {
     /// 、。

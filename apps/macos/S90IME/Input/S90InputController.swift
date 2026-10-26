@@ -47,15 +47,32 @@ final class S90InputController: IMKInputController {
         return result.handled
     }
 
+    /// 打鍵が止まったら変換した文を見せ(settle)，さらに止まったら打ち間違いを見直す(review)．
+    /// 次のキーが来たらタイマーを止めるので，打ち続けているあいだは見直さない
     @MainActor
     private func scheduleSettle(client: any IMKTextInput, context: InputContext) {
         settleTimer?.invalidate()
         settleTimer = nil
-        guard session.awaitsSettle else { return }
-        settleTimer = Timer.scheduledTimer(withTimeInterval: DefaultSettings.liveConversionSettleDelay, repeats: false) { [weak self] _ in
+        if session.awaitsSettle {
+            settleTimer = Timer.scheduledTimer(withTimeInterval: DefaultSettings.liveConversionSettleDelay, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.presenter.apply(self.session.settle(context: context), to: client)
+                    self.scheduleReview(client: client, context: context, after: DefaultSettings.liveCorrectionDelay - DefaultSettings.liveConversionSettleDelay)
+                }
+            }
+        } else {
+            scheduleReview(client: client, context: context, after: DefaultSettings.liveCorrectionDelay)
+        }
+    }
+
+    @MainActor
+    private func scheduleReview(client: any IMKTextInput, context: InputContext, after delay: TimeInterval) {
+        guard session.awaitsReview else { return }
+        settleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.presenter.apply(self.session.settle(context: context), to: client)
+                self.presenter.apply(self.session.review(context: context), to: client)
             }
         }
     }
@@ -63,6 +80,9 @@ final class S90InputController: IMKInputController {
     @MainActor
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
+        if let client = sender as? any IMKTextInput {
+            KeyboardLayoutOverride.apply(root.settings.current.keyboardLayout, to: client)
+        }
         // Chromium 系のアプリでは，ここで入力位置を問い合わせると止まることがある(azooKey-Desktop の調査)．
         // そのため候補ウィンドウを閉じるだけにする
         presenter.hideWindows()
@@ -91,6 +111,8 @@ final class S90InputController: IMKInputController {
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         if let modeKey = value as? String, let client = sender as? any IMKTextInput {
             let mode: InputMode = modeKey == AppIdentity.directModeKey ? .direct : .japanese
+            // モードを切り替えると OS が配列を戻すことがあるので，切り替えるたびに合わせ直す
+            KeyboardLayoutOverride.apply(root.settings.current.keyboardLayout, to: client)
             presenter.apply(session.setMode(mode), to: client)
         }
         super.setValue(value, forTag: tag, client: sender)
@@ -98,6 +120,16 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.makeMenu()
+        menuBuilder.makeMenu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(openSettings(_:))))
+    }
+
+    // 入力メニューの項目の動作．InputMethodKit はこのコントローラにだけ送る(InputMenuBuilder)
+
+    @MainActor @objc private func toggleLiveConversion(_ sender: Any?) {
+        menuBuilder.handleToggleLiveConversion()
+    }
+
+    @MainActor @objc private func openSettings(_ sender: Any?) {
+        menuBuilder.handleOpenSettings()
     }
 }

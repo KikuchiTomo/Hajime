@@ -25,9 +25,11 @@ final class SettingsWindowController {
         model.refreshUsage()
         let window = window ?? makeWindow()
         self.window = window
-        // 入力メソッドは前面のアプリにならないので，開くときだけ前に出す
+        // 入力メソッドは前面のアプリにならない(LSBackgroundOnly)ので，ほかのアプリのウィンドウより上の層に出して前に出す
+        window.level = .modalPanel
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     private func makeWindow() -> NSWindow {
