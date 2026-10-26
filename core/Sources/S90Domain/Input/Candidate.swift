@@ -16,6 +16,8 @@ public enum CandidateOrigin: Sendable, Equatable {
     case symbol
     /// 利用者が登録した語
     case userDictionary
+    /// 文節の長さを変えた候補．選ぶと文節をこの読みの長さに区切り直す(分岐図の「つなげる」「区切る」)
+    case resized(Int)
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．

@@ -60,6 +60,44 @@ struct LatticeBuilder {
         }
     }
 
+    /// 注目している文節の 3 番目に，文節の長さを変えた候補(次の文節とつなげたもの，短く区切ったもの)を入れる．
+    /// Shift+←→ を知らなくても，候補を選ぶのと同じ操作で区切りを直せるようにするため．ほかの文節からは取り除く
+    func withResizeOptions(_ lattice: SegmentLattice, reading: String) -> SegmentLattice {
+        var result = lattice
+        for index in result.segments.indices {
+            result.segments[index].candidates.removeAll { if case .resized = $0.origin { true } else { false } }
+            if case .candidate(let choice) = result.segments[index].choice, choice >= result.segments[index].candidates.count {
+                result.segments[index].choice = .candidate(0)
+            }
+        }
+        let index = result.focusedIndex
+        let segment = result.segments[index]
+        let rest = String(reading.dropFirst(segment.readingStart))
+        var options: [Candidate] = []
+        if index + 1 < result.segments.count {
+            let length = segment.readingLength + result.segments[index + 1].readingLength
+            options.append(resizedCandidate(rest: rest, length: length))
+        }
+        let inner = ClauseSplitter.clauses(of: converter.segmentationWords(for: String(rest.prefix(segment.readingLength))))
+        if inner.count > 1, let first = inner.first, first.readingCount < segment.readingLength {
+            options.append(resizedCandidate(rest: rest, length: first.readingCount))
+        }
+        let position = min(2, segment.candidates.count)
+        result.segments[index].candidates.insert(contentsOf: options.filter { option in
+            !segment.candidates.contains { $0.text == option.text }
+        }, at: position)
+        if case .candidate(let choice) = segment.choice, choice >= position {
+            result.segments[index].choice = .candidate(choice + options.count)
+        }
+        return result
+    }
+
+    private func resizedCandidate(rest: String, length: Int) -> Candidate {
+        let slice = String(rest.prefix(length))
+        let text = converter.candidates(for: slice).first { $0.readingCount == length }?.text ?? slice
+        return Candidate(text: text, readingCount: length, origin: .resized(length))
+    }
+
     /// 打ち間違いを直したとき，直した部分を含む文節の 2 番目に，打ったままの読みの候補を入れる．
     /// 打ち間違いと決めつけず，分岐図の中で直した文と打ったままの文のどちらも選べるようにするため．
     /// 直した部分が複数の文節にまたがるときは，それらを 1 つの文節にまとめてから入れる

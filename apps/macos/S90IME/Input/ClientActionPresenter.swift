@@ -33,7 +33,8 @@ final class ClientActionPresenter {
                 candidatePanel.show(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
             case .showLattice(let panel):
                 note.hide()
-                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
+                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize,
+                                           keys: settings.current.conversionKeys)
             case .hideCandidates:
                 candidatePanel.hide()
                 note.hide()

@@ -13,6 +13,7 @@ struct SettingsView: View {
             DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
             AppsTab(model: model).tabItem { Text(UIStrings.Settings.appsTab) }
             RomajiTab(model: model).tabItem { Text(UIStrings.Settings.romajiTab) }
+            KeysTab(model: model).tabItem { Text(UIStrings.Keys.tab) }
             AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
             UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
         }
@@ -280,4 +281,84 @@ private struct UsageTab: View {
 
 extension UserDictionaryEntry: Identifiable {
     public var id: Self { self }
+}
+
+/// 変換中(分岐図)の操作ごとのキーの割り当て．「追加」を押してからキーを押すと割り当てる
+private struct KeysTab: View {
+    @ObservedObject var model: SettingsModel
+    /// キーを待っている操作
+    @State private var recording: ConversionCommand?
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ConversionCommand.allCases, id: \.self) { command in
+                    HStack {
+                        Text(UIStrings.Keys.label(for: command))
+                        Spacer()
+                        ForEach(model.settings.conversionKeys.strokes(for: command), id: \.self) { stroke in
+                            Button {
+                                model.update { $0.conversionKeys.remove(stroke, from: command) }
+                            } label: {
+                                Text(UIStrings.Keys.name(of: stroke)).monospaced()
+                            }
+                            .buttonStyle(.bordered)
+                            .help(UIStrings.Settings.remove)
+                        }
+                        if recording == command {
+                            KeyCapture { stroke in
+                                if let stroke { model.update { $0.conversionKeys.assign(stroke, to: command) } }
+                                recording = nil
+                            }
+                            .frame(width: 140, height: 22)
+                            .overlay(Text(UIStrings.Keys.press).font(.caption).foregroundStyle(.secondary).allowsHitTesting(false))
+                        } else {
+                            Button(UIStrings.Keys.add) { recording = command }
+                        }
+                    }
+                }
+            } footer: {
+                Text(UIStrings.Keys.note).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Button(UIStrings.Keys.restore) { model.update { $0.conversionKeys = .standard } }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// 次に押したキーを受け取る．Escape で取りやめる(nil を渡す)．割り当てられないキーは受け取らずに待つ
+private struct KeyCapture: NSViewRepresentable {
+    let onCapture: (KeyStroke?) -> Void
+
+    func makeNSView(context: Context) -> CaptureView {
+        let view = CaptureView()
+        view.onCapture = onCapture
+        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
+        return view
+    }
+
+    func updateNSView(_ view: CaptureView, context: Context) {
+        view.onCapture = onCapture
+    }
+
+    final class CaptureView: NSView {
+        var onCapture: ((KeyStroke?) -> Void)?
+        override var acceptsFirstResponder: Bool { true }
+
+        override func keyDown(with event: NSEvent) {
+            if event.keyCode == 53 {
+                onCapture?(nil)
+                return
+            }
+            guard let key = NSEventKeyTranslator.translate(event), let stroke = KeyStroke(key) else { return }
+            onCapture?(stroke)
+        }
+
+        override func draw(_ dirtyRect: NSRect) {
+            NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
+            NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
+        }
+    }
 }

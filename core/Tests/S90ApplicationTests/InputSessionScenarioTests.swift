@@ -565,6 +565,48 @@ struct SymbolScenarioTests {
 }
 
 @MainActor
+@Suite("分岐図のキーと文節の長さ")
+struct BranchMapControlTests {
+    private func converter() -> FakeConverter {
+        let converter = FakeConverter([
+            "きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)],
+        ])
+        converter.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        return converter
+    }
+
+    @Test("割り当てたキーで次の文節へ移る(既定の → の代わりに l)")
+    func customBinding() {
+        var settings = DefaultSettings.settings
+        settings.conversionKeys.assign(KeyStroke(.character("l"), control: true), to: .nextSegment)
+        let harness = Harness(converter: converter(), settings: settings)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        let before = harness.lattice?.columns.firstIndex(where: \.isFocused)
+        harness.press(.left)
+        harness.press(.character("l"), .control)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == before)
+    }
+
+    @Test("注目している文節の候補に「つなげる」を出し，選ぶと次の文節とつなげる")
+    func joinFromCandidates() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.left)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.text == "今日は")
+        let joined = column?.alternativeKinds.firstIndex(of: .joined)
+        #expect(joined != nil)
+        if let joined { harness.press(.character(Character("\(joined + 1)"))) }
+        #expect(harness.lattice?.columns.count == 1)
+        #expect(harness.lattice?.columns.first?.text == "今日はいい")
+    }
+}
+
+@MainActor
 @Suite("日本語の打ち間違い")
 struct ReadingCorrectionScenarioTests {
     private func typed(_ keys: String, corrections: [ReadingCorrection]) -> (InputSession, () -> (marked: String, note: String?)) {

@@ -202,6 +202,11 @@ public final class InputSession {
         if context.profile == .terminal, let result = applyTerminal(event) {
             return result
         }
+        // 分岐図では，利用者が割り当てたキー(Control 付きも)を Ctrl+J などより先に見る
+        if case .lattice(var lattice) = phase, settings.current.conversionKeys.command(for: event) != nil,
+            let result = handleLattice(event, lattice: &lattice, context: context) {
+            return result
+        }
         if event.modifiers.contains(.control) {
             return handleControl(event, context: context)
         }
@@ -460,7 +465,7 @@ public final class InputSession {
         if let typed = readingCorrector.typedComposition(from: composition) {
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
         }
-        phase = .lattice(lattice)
+        phase = .lattice(builder.withResizeOptions(lattice, reading: composition.conversionReading))
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
@@ -748,35 +753,55 @@ public final class InputSession {
     /// ↓ と Space は下の枝(変換の候補)へ，↑ は上の枝(字種)へ．Tab は迷う文節だけを渡り歩く(ADR 0007)
     private func handleLattice(_ event: KeyEvent, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         let builder = LatticeBuilder(converter: converter)
-        switch event.key {
-        case .left, .right:
-            let forward = event.key == .right
-            if event.modifiers.contains(.shift) {
-                // Shift+←→ で注目している文節の区切りを動かす
-                let length = lattice.focused.readingLength + (forward ? 1 : -1)
+        // キーの割り当ては設定で変えられる(KeyBindings)
+        if let command = settings.current.conversionKeys.command(for: event) {
+            switch command {
+            case .nextCandidate: lattice.moveSelection(by: 1)
+            case .previousCandidate: lattice.moveSelection(by: -1)
+            case .nextSegment: lattice.moveFocus(by: 1)
+            case .previousSegment: lattice.moveFocus(by: -1)
+            case .nextUncertainSegment: lattice.moveToUncertain(forward: true)
+            case .previousUncertainSegment: lattice.moveToUncertain(forward: false)
+            case .extendSegment, .shrinkSegment:
+                let length = lattice.focused.readingLength + (command == .extendSegment ? 1 : -1)
                 lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
-            } else {
-                lattice.moveFocus(by: forward ? 1 : -1)
             }
-        case .tab:
-            lattice.moveToUncertain(forward: !event.modifiers.contains(.shift))
-        case .up:
-            lattice.moveSelection(by: -1)
-        case .down, .space:
-            lattice.moveSelection(by: 1)
+            lattice = applyResizeChoice(lattice, builder: builder)
+            phase = .lattice(lattice)
+            return KeyResult(handled: true, actions: render(context: context))
+        }
+        switch event.key {
         case .character(let character):
             guard let number = numberKey(character), lattice.select(number: number) else { return nil }
+            if case .resized = lattice.focused.selected.origin {
+                // 長さを変えた候補は，区切り直して同じ文節で選び続ける
+                lattice = applyResizeChoice(lattice, builder: builder)
+                phase = .lattice(lattice)
+                return KeyResult(handled: true, actions: render(context: context))
+            }
             // 番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)
             guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
                 phase = .lattice(lattice)
                 return KeyResult(handled: true, actions: commitAll())
             }
             lattice.focusedIndex = next
+            lattice = builder.withResizeOptions(lattice, reading: composition.conversionReading)
         default:
             return nil
         }
         phase = .lattice(lattice)
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 文節の長さを変えた候補(「つなげる」「区切る」)を選んでいたら，文節をその長さに区切り直す．
+    /// そのあと，注目している文節に長さを変えた候補を入れ直す
+    private func applyResizeChoice(_ lattice: SegmentLattice, builder: LatticeBuilder) -> SegmentLattice {
+        var lattice = lattice
+        let reading = composition.conversionReading
+        if case .resized(let length) = lattice.focused.selected.origin {
+            lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: reading)
+        }
+        return builder.withResizeOptions(lattice, reading: reading)
     }
 
     private func composingMarkedText() -> MarkedText {

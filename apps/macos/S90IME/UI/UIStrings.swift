@@ -10,18 +10,73 @@ enum UIStrings {
     }
 
     enum Branch {
-        static let hints = [
-            KeyHint(key: "↓", label: "候補"),
-            KeyHint(key: "↑", label: "文字種"),
-            KeyHint(key: "←→", label: "文節"),
-            KeyHint(key: "Tab", label: "次の文節"),
-            KeyHint(key: "⇧←→", label: "文節の長さ"),
-        ]
+        /// 足元の案内．キーは設定の割り当て(KeyBindings)の最初のキーを出す
+        static func hints(for keys: KeyBindings) -> [KeyHint] {
+            func first(_ command: ConversionCommand) -> String { keys.strokes(for: command).first.map(Keys.name(of:)) ?? "" }
+            return [
+                KeyHint(key: first(.nextCandidate), label: "候補"),
+                KeyHint(key: first(.previousCandidate), label: "文字種"),
+                KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
+                KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
+                KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ"),
+            ].filter { !$0.key.isEmpty }
+        }
+        /// 文節の長さを変える候補に添える文字
+        static let joined = "つなげる"
+        static let split = "区切る"
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
         static func position(first: Int, last: Int, total: Int) -> String {
             first == last ? "\(first) / \(total)" : "\(first)–\(last) / \(total)"
         }
+    }
+
+    /// キーの名前(macOS のメニューと同じ記号)
+    enum Keys {
+        static func name(of stroke: KeyStroke) -> String {
+            var name = ""
+            if stroke.control { name += "⌃" }
+            if stroke.option { name += "⌥" }
+            if stroke.shift { name += "⇧" }
+            switch stroke.key {
+            case .space: name += "Space"
+            case .tab: name += "Tab"
+            case .up: name += "↑"
+            case .down: name += "↓"
+            case .left: name += "←"
+            case .right: name += "→"
+            case .character(let text): name += text.uppercased()
+            }
+            return name
+        }
+
+        /// 「←」と「→」のように修飾キーだけが同じ 2 つのキーは「←→」とまとめる
+        static func pair(_ first: String, _ second: String) -> String {
+            let arrows: Set<Character> = ["←", "→"]
+            if let a = first.last, let b = second.last, arrows.contains(a), arrows.contains(b), first.dropLast() == second.dropLast() {
+                return String(first.dropLast()) + "←→"
+            }
+            return [first, second].filter { !$0.isEmpty }.joined(separator: " ")
+        }
+
+        static func label(for command: ConversionCommand) -> String {
+            switch command {
+            case .nextCandidate: "次の候補"
+            case .previousCandidate: "前の候補"
+            case .nextSegment: "右の文節"
+            case .previousSegment: "左の文節"
+            case .nextUncertainSegment: "次の文節"
+            case .previousUncertainSegment: "前の文節"
+            case .extendSegment: "文節を長く"
+            case .shrinkSegment: "文節を短く"
+            }
+        }
+
+        static let tab = "キー操作"
+        static let note = "変換中の操作に使うキーです。Enter・Escape・Backspace・数字キーは変更できません。"
+        static let add = "追加"
+        static let press = "キーを押してください"
+        static let restore = "初期設定に戻す"
     }
 
     enum ModeIndicator {

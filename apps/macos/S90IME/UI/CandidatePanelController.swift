@@ -24,7 +24,8 @@ final class CandidatePanelController {
         announceSelection(panel)
     }
 
-    func showLattice(_ panel: LatticePanel, caret: NSRect, theme: ThemePreference, fontSize: Double) {
+    func showLattice(_ panel: LatticePanel, caret: NSRect, theme: ThemePreference, fontSize: Double, keys: KeyBindings) {
+        branchView.keys = keys
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
         branchView.panel = panel

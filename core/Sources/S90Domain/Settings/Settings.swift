@@ -26,6 +26,8 @@ public struct Settings: Sendable, Equatable {
     public var numberWidth = CharacterWidth.halfwidth
     /// 句読点を打ったら，その句読点まで確定する
     public var punctuationCommits = false
+    /// 変換しているとき(分岐図)のキーの割り当て
+    public var conversionKeys = KeyBindings.standard
 
     // MARK: 変換
     /// 補正の強さ(R-02)
@@ -82,7 +84,7 @@ private struct Skipped: Decodable {}
 
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
-        case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits
+        case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
         case typoCorrection, candidatePresentation, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
         case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -122,6 +124,8 @@ extension Settings: Codable {
         read(.spaceWidth, into: \.spaceWidth)
         read(.numberWidth, into: \.numberWidth)
         read(.punctuationCommits, into: \.punctuationCommits)
+        read(.conversionKeys, into: \.conversionKeys)
+        settings.conversionKeys = settings.conversionKeys.filled()
         read(.typoCorrection, into: \.typoCorrection)
         read(.candidatePresentation, into: \.candidatePresentation)
         read(.showsVariantRow, into: \.showsVariantRow)
@@ -153,6 +157,7 @@ extension Settings: Codable {
         try container.encode(spaceWidth, forKey: .spaceWidth)
         try container.encode(numberWidth, forKey: .numberWidth)
         try container.encode(punctuationCommits, forKey: .punctuationCommits)
+        try container.encode(conversionKeys, forKey: .conversionKeys)
         try container.encode(typoCorrection, forKey: .typoCorrection)
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)

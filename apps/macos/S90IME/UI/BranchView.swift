@@ -1,5 +1,6 @@
 import AppKit
 import S90Application
+import S90Domain
 
 /// 分岐図を描く(ADR 0007)．文を 1 本の幹として文節を横に並べ，注目している文節から枝を伸ばす．
 ///
@@ -16,6 +17,8 @@ final class BranchView: NSView {
     private typealias Glass = DesignTokens.Size.Glass
 
     var panel: LatticePanel? { didSet { needsDisplay = true } }
+    /// 足元の案内に出すキーの割り当て
+    var keys = KeyBindings.standard { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
     var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
@@ -85,8 +88,11 @@ final class BranchView: NSView {
         let focused = panel.columns.firstIndex(where: \.isFocused)
         let column = focused.map { panel.columns[$0] }
         let labels = (column?.alternatives ?? []) + (column?.variants ?? [])
+        // 「つなげる」「区切る」の添え書きの幅も足す
+        let noteWidth = (column?.alternativeKinds.contains { $0 != .candidate } ?? false)
+            ? textWidth(UIStrings.Branch.joined, font: labelFont) + Size.paddingX * 2 : 0
         let branchWidth = metrics.stemX + metrics.branchIndent + metrics.lead
-            + (labels.map { textWidth($0, font: candidateFont) }.max() ?? 0) + Size.paddingX * 2
+            + (labels.map { textWidth($0, font: candidateFont) }.max() ?? 0) + noteWidth + Size.paddingX * 2
         let branchRight = (focused.map { trunkX[$0] } ?? metrics.inset) + branchWidth
         let previewRows = panel.columns.contains { $0.preview != nil } ? 1 : 0
         let upperRows = column?.variants.count ?? 0
@@ -177,12 +183,23 @@ final class BranchView: NSView {
         var badge: String
         var isSelected: Bool
         var opacity: CGFloat
+        /// 文節の長さを変える候補の添え書き(「つなげる」「区切る」)
+        var note: String? = nil
+    }
+
+    private static func note(for kind: LatticePanel.Column.AlternativeKind) -> String? {
+        switch kind {
+        case .candidate: nil
+        case .joined: UIStrings.Branch.joined
+        case .split: UIStrings.Branch.split
+        }
     }
 
     /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
     private func lowerRows(_ column: LatticePanel.Column) -> [Row] {
         column.alternatives.enumerated().map { index, text in
-            Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative, opacity: index == 0 ? 1 : restOpacity)
+            Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative, opacity: index == 0 ? 1 : restOpacity,
+                note: column.alternativeKinds.indices.contains(index) ? Self.note(for: column.alternativeKinds[index]) : nil)
         }
     }
 
@@ -247,6 +264,13 @@ final class BranchView: NSView {
 
     private func drawRow(_ row: Row, in rect: NSRect) {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
+        defer {
+            if let note = row.note {
+                let color = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
+                let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: color]
+                drawText(note, attributes: attributes, x: rect.maxX - Size.paddingX - textWidth(note, font: labelFont), in: rect)
+            }
+        }
         if theme.isGlass {
             if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection) }
             let badgeCenter = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
@@ -306,8 +330,8 @@ final class BranchView: NSView {
 
     private func footerWidth(_ panel: LatticePanel) -> CGFloat {
         if let note = panel.note { return textWidth(note, font: labelFont) }
-        return theme.isGlass ? GlassDrawing.hintsWidth(UIStrings.Branch.hints, theme: theme)
-            : textWidth(KeyHint.text(UIStrings.Branch.hints), font: labelFont)
+        return theme.isGlass ? GlassDrawing.hintsWidth(UIStrings.Branch.hints(for: keys), theme: theme)
+            : textWidth(KeyHint.text(UIStrings.Branch.hints(for: keys)), font: labelFont)
     }
 
     private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat) {
@@ -325,9 +349,9 @@ final class BranchView: NSView {
             // 打ち間違いを直したことなど，IME が変えたことを知らせる
             drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: footer.minX, in: footer)
         } else if theme.isGlass {
-            GlassDrawing.drawHints(UIStrings.Branch.hints, x: footer.minX, midY: footer.midY, theme: theme)
+            GlassDrawing.drawHints(UIStrings.Branch.hints(for: keys), x: footer.minX, midY: footer.midY, theme: theme)
         } else {
-            drawText(KeyHint.text(UIStrings.Branch.hints), attributes: muted, x: footer.minX, in: footer)
+            drawText(KeyHint.text(UIStrings.Branch.hints(for: keys)), attributes: muted, x: footer.minX, in: footer)
         }
         let position = position(of: panel)
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
