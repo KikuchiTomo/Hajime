@@ -1,28 +1,9 @@
 name: windows
 
 # Windows のビルドは時間がかかるので，Windows に関わるファイルが変わったときだけ動かす
+# 費用を抑えるため，今は自動では動かさない(利用者の指示 2026-10-27)．実装がそろってから手で一度にまとめて動かす:
+#   gh workflow run <このファイル名> --ref main
 on:
-  pull_request:
-    paths:
-      - "apps/windows/**"
-      - "core/**"
-      - "protocol/**"
-      - "design/tokens/**"
-      - "tools/windows/**"
-      - "LICENSES/**"
-      - "THIRD_PARTY_NOTICES*"
-      - ".github/workflows/windows.yml"
-  push:
-    branches: [main]
-    paths:
-      - "apps/windows/**"
-      - "core/**"
-      - "protocol/**"
-      - "design/tokens/**"
-      - "tools/windows/**"
-      - "LICENSES/**"
-      - "THIRD_PARTY_NOTICES*"
-      - ".github/workflows/windows.yml"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +11,8 @@ permissions:
 
 concurrency:
   group: windows-${{ github.ref }}
-  cancel-in-progress: true
+  # main は取り消さない(最後まで動かしてキャッシュを残し，PR がそれを使う)．PR は新しい push で古い実行を止める
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   rust:
@@ -43,13 +25,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # キャッシュは失敗・取り消しでも残す(restore と save を分ける)．鍵は実行ごとに変え，前の実行のものから戻す
+      - id: cargo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             apps/windows/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}-
       - run: rustup toolchain install
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
@@ -64,6 +50,14 @@ jobs:
       - run: cargo build --locked --release -p tsf
       - run: ../../tools/windows/check_exports.ps1 -Dll target/release/s90_tsf.dll
         shell: pwsh
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/windows/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}-${{ github.run_id }}
 
   swift:
     runs-on: windows-latest
@@ -77,12 +71,14 @@ jobs:
           swift-version: swift-6.3.3-release
           swift-build: 6.3.3-RELEASE
       - run: swift --version
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # キャッシュは失敗・取り消しでも残す(restore と save を分ける)．鍵は実行ごとに変え，前の実行のものから戻す
+      - id: swiftbuild
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: core/.build
-          key: swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
-      # Zenzai が使う llama.cpp(ハッシュを確かめて展開し，実行で探す場所に足す)．リンクで探す場所は swift build の -L で渡す
-      # (LIB を書き換えると，clang が MSVC のライブラリを自分で探さなくなる)
+          key: swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+          restore-keys: |
+            swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-
       - run: |
           tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
           "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -90,6 +86,11 @@ jobs:
         shell: pwsh
       - run: swift build --package-path core -Xswiftc "-L$env:LLAMA_DIR"
       - run: swift test --package-path core -Xswiftc "-L$env:LLAMA_DIR"
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
 
   package:
     runs-on: windows-latest
@@ -102,12 +103,14 @@ jobs:
         with:
           swift-version: swift-6.3.3-release
           swift-build: 6.3.3-RELEASE
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # キャッシュは失敗・取り消しでも残す(restore と save を分ける)．鍵は実行ごとに変え，前の実行のものから戻す
+      - id: swiftrelease
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: core/.build
-          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
-      # Zenzai が使う llama.cpp(ハッシュを確かめて展開し，実行で探す場所に足す)．リンクで探す場所は swift build の -L で渡す
-      # (LIB を書き換えると，clang が MSVC のライブラリを自分で探さなくなる)
+          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+          restore-keys: |
+            swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-
       - run: |
           tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
           "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -133,3 +136,8 @@ jobs:
           name: s90-tokyo-ime-windows
           path: apps/windows/target/s90-tokyo-ime.msi
           if-no-files-found: error
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
