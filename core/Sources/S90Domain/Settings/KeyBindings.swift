@@ -15,6 +15,10 @@ public enum ConversionCommand: String, Sendable, Equatable, Codable, CaseIterabl
     case previousUncertainSegment
     case extendSegment
     case shrinkSegment
+    /// 打っている途中に，今の位置を文節の区切りにする(分岐図でここを必ず区切る)
+    case insertBoundary
+    /// 分岐図で，注目している文節の区切れる位置に番号を出し，数字で区切る
+    case splitSegment
 
     /// 変換していないときも効く操作
     public var isGlobal: Bool { self == .openSettings || self == .toggleLiveConversion || self == .handwriting }
@@ -89,6 +93,8 @@ public struct KeyBindings: Sendable, Equatable, Codable {
         .previousUncertainSegment: [KeyStroke(.tab, shift: true)],
         .extendSegment: [KeyStroke(.right, shift: true)],
         .shrinkSegment: [KeyStroke(.left, shift: true)],
+        .insertBoundary: [KeyStroke(.space, option: true)],
+        .splitSegment: [KeyStroke(.down, shift: true)],
     ])
 
     /// このキーに割り当てた操作．無ければ nil
