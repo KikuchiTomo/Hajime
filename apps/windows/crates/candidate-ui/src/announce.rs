@@ -63,10 +63,14 @@ mod tests {
                 CandidateEntry {
                     text: "変換".into(),
                     annotation: None,
+                    corrected_start: None,
+                    corrected_length: None,
                 },
                 CandidateEntry {
                     text: "返還".into(),
                     annotation: None,
+                    corrected_start: None,
+                    corrected_length: None,
                 },
             ],
             selected_entry: Some(1),
@@ -100,6 +104,7 @@ mod tests {
             is_focused: focused,
             is_uncertain: false,
             is_decided: false,
+            is_corrected: None,
             preview: None,
             shorter: None,
             longer: None,

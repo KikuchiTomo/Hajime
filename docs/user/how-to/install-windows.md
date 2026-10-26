@@ -38,6 +38,5 @@ description: s90.tokyo IME を Windows 10 22H2 以降に入れて，入力方式
 ## Windows 版でまだ使えないもの
 
 - 英単語の綴りの補正
-- 手書き入力
 - 設定と辞書の同期
 - EUC-JP の辞書の取り込み

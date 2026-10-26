@@ -150,7 +150,7 @@ func run() -> Int32 {
     window.start(listener: windowListener, expectedImagePath: candidateWindow.path) {
         [.hello(protocolVersion: WireProtocol.version), .setPresentation(presentation: presentation)]
     }
-    EnginePipeServer.start(listener: engineListener, service: service)
+    EnginePipeServer.start(listener: engineListener, service: service, candidateWindowPath: candidateWindow.path)
     if FileManager.default.fileExists(atPath: candidateWindow.path) {
         let process = Process()
         process.executableURL = candidateWindow

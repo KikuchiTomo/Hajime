@@ -202,6 +202,8 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
         .map(|text| CandidateEntry {
             text: (*text).into(),
             annotation: None,
+            corrected_start: None,
+            corrected_length: None,
         })
         .collect()
 }
@@ -254,6 +256,7 @@ fn column(text: &str) -> BranchColumn {
         is_focused: false,
         is_uncertain: false,
         is_decided: false,
+        is_corrected: None,
         preview: None,
         shorter: None,
         longer: None,
@@ -274,6 +277,7 @@ fn lattice() -> BranchMap {
             column("私の"),
             BranchColumn {
                 is_decided: true,
+                is_corrected: None,
                 ..column("名前は")
             },
             BranchColumn {

@@ -17,7 +17,13 @@ tokens = { path = "../tokens" }
 
 [target.'cfg(windows)'.dependencies]
 windows-core.workspace = true
+windows-collections.workspace = true
+windows-future.workspace = true
+windows-numerics.workspace = true
 windows = { workspace = true, features = [
+    "Foundation",
+    "Foundation_Collections",
+    "UI_Input_Inking",
     "Win32_Foundation",
     "Win32_Graphics_Direct2D",
     "Win32_Graphics_Direct2D_Common",
@@ -33,6 +39,7 @@ windows = { workspace = true, features = [
     "Win32_UI_Accessibility",
     "Win32_UI_Controls",
     "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }
 

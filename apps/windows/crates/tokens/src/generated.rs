@@ -227,6 +227,7 @@ pub mod size {
         pub const STROKE_WIDTH: f32 = 5.0;
         pub const FRAME_WIDTH: f32 = 1.0;
         pub const GUIDE_DASH: f32 = 4.0;
+        pub const ANCHOR_GAP: f32 = 4.0;
     }
     pub mod snapshot {
         pub const MARGIN: f32 = 16.0;

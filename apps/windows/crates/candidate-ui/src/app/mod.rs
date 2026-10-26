@@ -225,6 +225,26 @@ impl App {
                 self.window()
                     .start_timer(Timer::Mode, self.presentation.mode_indicator_milliseconds);
             }
+            UiCommand::ShowHandwriting {
+                anchor,
+                recognition_delay_milliseconds,
+                recognition_timeout_milliseconds,
+            } => {
+                // 手書きの窓はすりガラスにしない(書く欄の地が透けないように)
+                let theme = ResolvedTheme::resolve(
+                    &self.presentation.theme,
+                    self.presentation.custom_theme.as_ref(),
+                    &system::look(false),
+                );
+                crate::handwriting::ffi::show(
+                    anchor.or(self.anchor.clone()),
+                    recognition_delay_milliseconds,
+                    recognition_timeout_milliseconds,
+                    theme,
+                    self.presentation.font_size as f32,
+                );
+            }
+            UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
             UiCommand::Move { anchor } => self.anchor = Some(anchor),
             UiCommand::Hide => self.content = Content::Hidden,
         }

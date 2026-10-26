@@ -540,6 +540,18 @@
           ]
         },
         {
+          "name": "handwritingChosen",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "handwritingClosed"
+        },
+        {
           "name": "readSettingsFields",
           "fields": [
             {
@@ -1179,6 +1191,26 @@
               "type": "string?"
             }
           ]
+        },
+        {
+          "name": "showHandwriting",
+          "fields": [
+            {
+              "name": "anchor",
+              "type": "Rect?"
+            },
+            {
+              "name": "recognitionDelayMilliseconds",
+              "type": "u32"
+            },
+            {
+              "name": "recognitionTimeoutMilliseconds",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "hideHandwriting"
         },
         {
           "name": "move",

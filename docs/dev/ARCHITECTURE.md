@@ -88,7 +88,7 @@ OS のキーイベント
 | 候補ウィンドウ(`apps/windows/crates/candidate-ui`) | Rust | 候補とモード表示を描く．入力先のアプリの権限や UI スレッドに影響されないよう別のプロセスにする |
 
 通信の形式は `protocol/` に定義し，Swift と Rust の両方のコードをそこから生成します．手で二重に書かないためです(ADR 0010)．
-Windows では Zenzai をまだ使いません．llama.cpp のライブラリを用意するまで，`core/Package.swift` の trait `Zenzai` を `--disable-default-traits` で外してビルドします．手書きの認識(Vision)と同期のフォルダの辞書の索引(CryptoKit)も Apple の OS でだけ作ります．
+Windows では Zenzai をまだ使いません．llama.cpp のライブラリを用意するまで，`core/Package.swift` の trait `Zenzai` を `--disable-default-traits` で外してビルドします．手書きの認識(Vision)と同期のフォルダの辞書の索引(CryptoKit)も Apple の OS でだけ作ります．Windows の手書きの窓と認識は候補ウィンドウのプロセスが受け持ちます．
 
 DLL はキーを送って入力欄への操作(確定・組み立て中の文字・モード)を受け取るだけで，候補・分岐図・案内はエンジンが候補ウィンドウに直接送ります．`ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決めます．
 

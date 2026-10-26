@@ -197,6 +197,7 @@ enum DesignTokens {
             static let strokeWidth: CGFloat = 5
             static let frameWidth: CGFloat = 1
             static let guideDash: CGFloat = 4
+            static let anchorGap: CGFloat = 4
         }
         enum Snapshot {
             static let margin: CGFloat = 16
