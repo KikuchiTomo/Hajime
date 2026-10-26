@@ -26,6 +26,8 @@ enum InputStyleInterpretation: Equatable, CustomStringConvertible, CustomDebugSt
     case handled(KeyResult)
     /// この文字を読みに足す(かな入力)．読みの組み立てと表示は InputSession が行う
     case insertKana(String)
+    /// このローマ字を日本語の読みにして，分岐図で変換を選べるようにする(英字入力の Tab)
+    case convertRomaji(String)
 
     var debugDescription: String { description }
 
@@ -34,6 +36,7 @@ enum InputStyleInterpretation: Equatable, CustomStringConvertible, CustomDebugSt
         switch self {
         case .handled: "handled"
         case .insertKana(let kana): "insertKana(length: \(kana.count))"
+        case .convertRomaji(let keys): "convertRomaji(length: \(keys.count))"
         }
     }
 }
