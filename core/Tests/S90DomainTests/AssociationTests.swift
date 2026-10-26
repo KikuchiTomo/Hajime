@@ -90,23 +90,26 @@ struct AssociationListTests {
 struct AssociationKeyTests {
     private let shiftSpace = KeyEvent(.space, modifiers: .shift)
     private let controlTab = KeyEvent(.tab, modifiers: .control)
+    private let shiftUp = KeyEvent(.up, modifiers: .shift)
+    private let optionUp = KeyEvent(.up, modifiers: .option)
 
-    @Test("標準では入力中の Shift+Space と Ctrl+Tab，変換中の Ctrl+Tab で連想変換．変換中の Shift+Space は前の候補のまま")
+    @Test("標準では入力中の Shift+Space と変換中の Shift+↑ で連想変換．Ctrl+Tab はアプリのタブの切り替えに残す．変換中の Shift+Space は前の候補のまま")
     func standard() {
         let keymap = KeymapPreset.standard.keymap
         #expect(keymap.command(for: shiftSpace, in: .composing) == .associate)
-        #expect(keymap.command(for: controlTab, in: .composing) == .associate)
-        #expect(keymap.command(for: controlTab, in: .converting) == .associate)
+        #expect(keymap.command(for: shiftUp, in: .converting) == .associate)
+        #expect(keymap.command(for: controlTab, in: .composing) == nil)
+        #expect(keymap.command(for: controlTab, in: .converting) == nil)
         #expect(keymap.command(for: shiftSpace, in: .converting) == .previousCandidate)
         #expect(keymap.command(for: shiftSpace, in: .idle) == .insertAlternateSpace)
     }
 
-    @Test("どのひな形でも Ctrl+Tab で連想変換になり，連想変換の行がほかの行に負けない")
+    @Test("どのひな形でも変換中に連想変換のキーがあり，連想変換の行がほかの行に負けない．Ctrl+Tab は使わない")
     func presets() {
         for preset in KeymapPreset.allCases {
             let keymap = preset.keymap
-            #expect(keymap.command(for: controlTab, in: .composing) == .associate, "\(preset)")
-            #expect(keymap.command(for: controlTab, in: .converting) == .associate, "\(preset)")
+            #expect(!keymap.strokes(for: .associate, in: .converting).isEmpty, "\(preset)")
+            #expect(keymap.command(for: controlTab, in: .converting) != .associate, "\(preset)")
             for index in keymap.entries.indices where keymap.entries[index].command == .associate {
                 #expect(keymap.overlap(at: index) == nil, "\(preset)")
             }
@@ -126,13 +129,45 @@ struct AssociationKeyTests {
         #expect(try upgraded(AssociationKeyUpgrade.previousStandard) == KeymapPreset.standard.keymap)
     }
 
-    @Test("変えた表には，空いていれば Ctrl+Tab だけを足し，利用者の決めたキーは変えない")
+    @Test("変えた表には連想変換のキーを足し(今は Ctrl+Tab でなく Option+↑ や Shift+↑)，利用者の決めたキーは変えない")
     func upgradesCustom() throws {
         var custom = AssociationKeyUpgrade.previousStandard
         custom.entries.append(KeymapEntry(.converting, KeyStroke(.tab, control: true), .nextSegment))
         let keymap = try upgraded(custom)
         #expect(keymap.command(for: shiftSpace, in: .composing) == .convert)
-        #expect(keymap.command(for: controlTab, in: .composing) == .associate)
+        #expect(keymap.command(for: optionUp, in: .composing) == .associate)
         #expect(keymap.command(for: controlTab, in: .converting) == .nextSegment)
+    }
+
+    private func upgraded(fromVersion6 keymap: Keymap) throws -> Keymap {
+        var object = try SettingsCoding.object(of: Settings())
+        object["keymap"] = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(keymap))
+        object[SettingsSchema.versionKey] = .number(6)
+        return try SettingsCoding.decode(JSONEncoder().encode(JSONValue.object(object))).keymap
+    }
+
+    @Test("バージョン 6 で標準のまま保存した表は，今の標準の表にする(変換中の Tab は文節の移動，連想変換は Shift+↑)")
+    func upgradesVersion6Standard() throws {
+        let previous = NavigationKeyUpgrade.previousStandard
+        #expect(previous.command(for: KeyEvent(.tab), in: .converting) == .nextUncertainSegment)
+        #expect(previous.command(for: controlTab, in: .composing) == .associate)
+        #expect(try upgraded(fromVersion6: previous) == KeymapPreset.standard.keymap)
+    }
+
+    @Test("バージョン 6 の変えた表は，前の標準と同じ行だけを変え，ふさがっていれば代わりのキーにする")
+    func upgradesVersion6Custom() throws {
+        var custom = NavigationKeyUpgrade.previousStandard
+        // 利用者が Shift+↑ を別のコマンドにしていた
+        custom.entries.append(KeymapEntry(.converting, KeyStroke(.up, shift: true), .lastCandidate))
+        custom.entries.append(KeymapEntry(.converting, KeyStroke(.right, option: true), .lastSegment))
+        let keymap = try upgraded(fromVersion6: custom)
+        #expect(keymap.command(for: KeyEvent(.tab), in: .converting) == .nextSegment)
+        #expect(keymap.command(for: KeyEvent(.tab, modifiers: .shift), in: .converting) == .previousSegment)
+        #expect(keymap.command(for: shiftUp, in: .converting) == .lastCandidate)
+        #expect(keymap.command(for: optionUp, in: .converting) == .associate)
+        #expect(keymap.command(for: controlTab, in: .converting) == nil)
+        // 利用者の Option+→ は変えない
+        #expect(keymap.command(for: KeyEvent(.right, modifiers: .option), in: .converting) == .lastSegment)
+        #expect(keymap.command(for: KeyEvent(.left, modifiers: .option), in: .converting) == .previousUncertainSegment)
     }
 }

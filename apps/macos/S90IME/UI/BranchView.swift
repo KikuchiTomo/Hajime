@@ -26,12 +26,12 @@ final class BranchView: NSView {
     /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
     var showsHints = true { didSet { needsDisplay = true } }
 
-    /// 足元の案内．注目している文節の長さを変えたらどうなるかも出す．区切っているときは区切る操作だけを出す
+    /// 足元の案内．区切っているときは区切る操作だけを出す
     private var hints: [KeyHint] {
         let focused = panel?.columns.first(where: \.isFocused)
         if let split = focused?.split { return UIStrings.Branch.splitHints(count: split.pieces.count - 1) }
         if panel?.association != nil { return UIStrings.Association.hints(for: keys) }
-        return UIStrings.Branch.hints(for: keys, shorter: focused?.shorter, longer: focused?.longer)
+        return UIStrings.Branch.hints(for: keys)
     }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }

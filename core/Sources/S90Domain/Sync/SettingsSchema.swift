@@ -7,11 +7,12 @@
 ///   移し替えは要らない．バージョン 3 までの s90 は `englishAuto` を読めずにローマ字入力として読む
 /// - バージョン 5: 連想変換(R-18)の項目と，キー設定の表のコマンド `associate` を足した．表に連想変換のキーを足す(AssociationKeyUpgrade)
 /// - バージョン 6: キー設定の表のコマンド `reconvert`(再変換)を足した．表に再変換のキーを足す(ReconversionKeyUpgrade)
+/// - バージョン 7: 変換中の Tab を文節の移動にし，連想変換の Ctrl+Tab を変換中の Shift+↑ にした(NavigationKeyUpgrade)
 ///
 /// 項目の名前や形を変えるときは，バージョンを 1 つ上げ，`migrations` に移し替えを足す．移し替えは JSON のまま行い，
 /// 読み込む前に古いバージョンから順に当てる．新しいバージョンのファイルを古いバージョンで開いたときは移し替えず，知らない項目を残す(Settings.unknownFields)
 public enum SettingsSchema {
-    public static let currentVersion = 6
+    public static let currentVersion = 7
     public static let versionKey = "schemaVersion"
 
     /// バージョン n から n+1 への移し替え．添字 0 がバージョン 1 → 2
@@ -21,6 +22,7 @@ public enum SettingsSchema {
         { _ in },
         { AssociationKeyUpgrade.upgrade(&$0) },
         { ReconversionKeyUpgrade.upgrade(&$0) },
+        { NavigationKeyUpgrade.upgrade(&$0) },
     ]
 
     /// ファイルのバージョンを読み，今のバージョンまで移し替える．今より新しいバージョンはそのまま

@@ -76,7 +76,7 @@ struct KeymapTests {
     func strokesForHints() {
         #expect(standard.strokes(for: .nextCandidate, in: .converting).first == KeyStroke(.space))
         #expect(standard.strokes(for: .nextCandidate, in: .converting).contains(KeyStroke(.down)))
-        #expect(standard.strokes(for: .previousSegment, in: .converting) == [KeyStroke(.left)])
+        #expect(standard.strokes(for: .previousSegment, in: .converting).first == KeyStroke(.left))
         #expect(standard.strokes(for: .cancel, in: .composing) == [KeyStroke(.escape)])
     }
 
