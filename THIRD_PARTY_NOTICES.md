@@ -509,6 +509,7 @@ https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
 
 https://github.com/ggml-org/llama.cpp
 改変したもの: https://github.com/azooKey/llama.cpp
+Windows 版に同梱するビルド(b4846): https://github.com/fkunn1326/llama.cpp/releases/tag/b4846
 
 ```
 MIT License
