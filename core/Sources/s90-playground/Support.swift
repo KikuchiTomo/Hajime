@@ -3,7 +3,16 @@ import S90Application
 import S90Domain
 import S90Engine
 
-/// macOS に入っている単語の一覧を英単語の辞書として使う．補正の候補は編集距離で探す
+/// macOS に入っている単語の一覧を英単語の辞書として使う．補正の候補は編集距離で探す．
+///
+/// アプリの辞書(macOS の NSSpellChecker)は AppKit にあり，ここでは使えない．単語の一覧には語の頻度が無いので，
+/// 打ち間違いの起こり方で並べて NSSpellChecker の候補に近づける．
+/// - 編集距離の近い順
+/// - 最初の文字が同じもの．最初の文字はあまり打ち間違えない
+/// - 打った綴りより短くならないもの．1 文字打ち落とした(pthon → python)か，入れ替えた(pyhton → python)ことが多い．
+///   短くなるもの(pthon → phon)は打った文字を捨てるので後ろに回す
+/// 頻度が無いので，同じ順位のもの(pyhton に対する phyton と python)は区別できない．
+/// また一覧に無い語(javascript)は候補に出ない
 @MainActor
 final class WordListLexicon: EnglishLexicon {
     private let words: Set<String>
@@ -17,10 +26,13 @@ final class WordListLexicon: EnglishLexicon {
 
     func suggestions(for text: String) -> [String] {
         let target = text.lowercased()
+        func rank(_ word: String, _ distance: Int) -> (Int, Int, Int, String) {
+            (distance, word.first == target.first ? 0 : 1, word.count < target.count ? 1 : 0, word)
+        }
         return words.filter { abs($0.count - target.count) <= DefaultSettings.maximumCorrectionDistance }
             .map { ($0, EditDistance.damerauLevenshtein($0, target)) }
             .filter { $0.1 <= DefaultSettings.maximumCorrectionDistance }
-            .sorted { ($0.1, $0.0) < ($1.1, $1.0) }
+            .sorted { rank($0.0, $0.1) < rank($1.0, $1.1) }
             .prefix(3)
             .map(\.0)
     }
