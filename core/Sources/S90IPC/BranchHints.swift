@@ -20,21 +20,13 @@ public enum BranchHints {
         if let split = focused?.split {
             return splitHints(count: split.pieces.count - 1)
         }
-        let length: [WireKeyHint]
-        if focused?.shorter == nil, focused?.longer == nil {
-            length = [WireKeyHint(keys: pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ")]
-        } else {
-            length = [
-                focused?.shorter.map { WireKeyHint(keys: first(.shrinkSegment), label: $0) },
-                focused?.longer.map { WireKeyHint(keys: first(.extendSegment), label: $0) },
-            ].compactMap { $0 }
-        }
         let hints = [
             WireKeyHint(keys: first(.nextCandidate), label: "候補"),
             WireKeyHint(keys: first(.previousCandidate), label: "文字種"),
             WireKeyHint(keys: pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
-            WireKeyHint(keys: first(.nextUncertainSegment), label: "次の文節"),
-        ] + length + [
+            WireKeyHint(keys: first(.nextUncertainSegment), label: "誤りやすい文節"),
+            WireKeyHint(keys: pair(first(.shrinkSegment), first(.extendSegment)), label: "区切り調整"),
+        ] + [
             WireKeyHint(keys: pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
             WireKeyHint(keys: first(.splitSegment), label: "区切る"),
         ]

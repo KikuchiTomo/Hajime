@@ -76,18 +76,16 @@ enum UIStrings {
         /// 選んでいる候補の取り込んだ辞書
         static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
         /// 足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキーを出す(R-17)
-        /// 文節の長さは，押したらどうなるか(shorter・longer)が分かればそれを見せる(「⇧← 入れ　⇧→ 入れると」)
-        static func hints(for keymap: Keymap, shorter: String? = nil, longer: String? = nil) -> [KeyHint] {
+        /// 文節の長さを変えるキーは「区切り調整」とまとめて出す
+        static func hints(for keymap: Keymap) -> [KeyHint] {
             func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(Keys.name(of:)) ?? "" }
-            let length: [KeyHint] = shorter == nil && longer == nil
-                ? [KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ")]
-                : [shorter.map { KeyHint(key: first(.shrinkSegment), label: $0) }, longer.map { KeyHint(key: first(.extendSegment), label: $0) }].compactMap { $0 }
             return ([
                 KeyHint(key: first(.nextCandidate), label: "候補"),
                 KeyHint(key: first(.previousCandidate), label: "文字種"),
                 KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
-                KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
-            ] + length + [
+                KeyHint(key: first(.nextUncertainSegment), label: "誤りやすい文節"),
+                KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "区切り調整"),
+            ] + [
                 KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
                 KeyHint(key: first(.splitSegment), label: "区切る"),
             ]).filter { !$0.key.isEmpty }

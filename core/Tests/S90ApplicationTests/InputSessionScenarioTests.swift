@@ -650,31 +650,28 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "京は雨")
     }
 
-    @Test("分岐図: Tab は迷う文節だけを渡り歩く")
-    func latticeTab() {
+    @Test("分岐図: Option+→ は誤りやすい文節だけを渡り歩く")
+    func latticeUncertainJump() {
         let harness = Harness(converter: latticeConverter())
         harness.type("kyouhaame")
         harness.press(.space)
         harness.press(.right)
-        harness.press(.tab)
+        harness.press(.right, .option)
         #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
     }
 
-    @Test("分岐図: ほかに迷う文節が無くても，Tab で次の文節に移り，最後の文節からは先頭に戻る．Shift+Tab で前に戻る")
-    func latticeTabWithoutOtherUncertain() {
+    @Test("分岐図: 変換中の Tab は → と同じく次の文節へ，Shift+Tab は ← と同じく前の文節へ移る")
+    func latticeTabMovesLikeArrows() {
         var settings = DefaultSettings.settings
         settings.initialFocus = .start
         let harness = Harness(converter: latticeConverter(), settings: settings)
         harness.type("kyouhaame")
         harness.press(.space)
         #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
-        // 迷う文節は先頭の 1 つだけ．Tab で動かないと次の文節に移れない
         harness.press(.tab)
         #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
-        harness.press(.tab)
-        #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
         harness.press(.tab, .shift)
-        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+        #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
     }
 
     @Test("文節の先頭の語の候補に残りをつないだものも候補に出す(ごくでしょうが → 語句でしょうが)")

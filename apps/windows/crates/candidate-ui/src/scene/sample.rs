@@ -65,8 +65,8 @@ pub fn branch() -> BranchMap {
             hint("↓", "候補"),
             hint("↑", "文字種"),
             hint("←→", "文節"),
-            hint("Tab", "次の文節"),
-            hint("Shift+←", "中野で"),
+            hint("Alt+→", "誤りやすい文節"),
+            hint("Shift+←→", "区切り調整"),
         ],
     }
 }

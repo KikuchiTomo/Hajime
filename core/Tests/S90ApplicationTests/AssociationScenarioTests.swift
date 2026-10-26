@@ -68,15 +68,15 @@ struct AssociationScenarioTests {
         #expect(harness.committed.isEmpty)
     }
 
-    @Test("変換中の Ctrl+Tab で連想の一覧にし，もう一度押すと元の変換に戻る．変換中の Shift+Space は前の候補のまま")
+    @Test("変換中の Shift+↑ で連想の一覧にし，もう一度押すと元の変換に戻る．変換中の Shift+Space は前の候補のまま")
     func controlTabInConversion() throws {
         let harness = harness()
         harness.type("utukusii")
         harness.press(.space)
         #expect(harness.lattice?.association == nil)
-        harness.press(.tab, .control)
+        harness.press(.up, .shift)
         #expect(harness.lattice?.association?.headword == "美しい")
-        harness.press(.tab, .control)
+        harness.press(.up, .shift)
         #expect(harness.lattice?.association == nil)
         #expect(harness.marked.text == "美しい")
         harness.press(.down)
@@ -133,7 +133,7 @@ struct AssociationScenarioTests {
         harness.press(.escape)
         #expect(harness.panel?.association == nil)
         #expect(harness.marked.text == "美しい")
-        harness.press(.tab, .control)
+        harness.press(.up, .shift)
         harness.press(.enter)
         #expect(harness.committed == "綺麗")
     }
@@ -170,7 +170,7 @@ struct AssociationScenarioTests {
         #expect(harness.lattice != nil)
         #expect(harness.lattice?.association == nil)
         #expect(harness.lattice?.note == nil)
-        harness.press(.tab, .control)
+        harness.press(.up, .shift)
         #expect(harness.lattice?.association == nil)
         #expect(harness.marked.text == "美しい")
     }
@@ -180,7 +180,7 @@ struct AssociationScenarioTests {
         let harness = harness()
         harness.type("utukusii")
         harness.press(.space)
-        #expect(harness.lattice?.associationHint == "⌃Tab 連想")
+        #expect(harness.lattice?.associationHint == "⇧↑ 連想")
         harness.press(.down)
         #expect(harness.lattice?.associationHint == nil)
 
@@ -188,7 +188,7 @@ struct AssociationScenarioTests {
         let windows = self.harness(keyNames: .windows)
         windows.type("utukusii")
         windows.press(.space)
-        #expect(windows.lattice?.associationHint == "Ctrl+Tab 連想")
+        #expect(windows.lattice?.associationHint == "Shift+↑ 連想")
 
         let quiet = self.harness(makeSettings { $0.showsAssociationHint = false })
         quiet.type("utukusii")

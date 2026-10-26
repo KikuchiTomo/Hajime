@@ -12,7 +12,8 @@ enum ReconversionKeyUpgrade {
 
     static func upgraded(_ keymap: Keymap) -> Keymap {
         if keymap.entries == previousStandard.entries {
-            var standard = KeymapPreset.standard.keymap
+            // バージョン 6 の標準の表にし，あとの移し替え(NavigationKeyUpgrade)で今の標準の表にする
+            var standard = NavigationKeyUpgrade.previousStandard
             standard.unknownEntries = keymap.unknownEntries
             return standard
         }
@@ -26,11 +27,11 @@ enum ReconversionKeyUpgrade {
 
     /// バージョン 6 で標準の表に足した行
     static var added: [KeymapEntry] {
-        KeymapPreset.standard.keymap.entries.filter { $0.command == .reconvert }
+        NavigationKeyUpgrade.previousStandard.entries.filter { $0.command == .reconvert }
     }
 
-    /// バージョン 5 の標準の表．今の標準の表から再変換の行を除いたもの
+    /// バージョン 5 の標準の表．バージョン 6 の標準の表から再変換の行を除いたもの
     static var previousStandard: Keymap {
-        Keymap(KeymapPreset.standard.keymap.entries.filter { $0.command != .reconvert })
+        Keymap(NavigationKeyUpgrade.previousStandard.entries.filter { $0.command != .reconvert })
     }
 }
