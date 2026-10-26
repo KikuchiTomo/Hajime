@@ -163,6 +163,8 @@ public enum DefaultSettings {
     public static let settingsAppFileTimeout = 60.0
     /// Windows の設定の画面がエンジンにつながらないとき，つなぎ直す間隔(秒)
     public static let settingsAppReconnectInterval = 3.0
+    /// Windows のエンジンが，設定の画面などが書き換えた設定のファイルを読み直すために見る間隔(秒)
+    public static let settingsFileWatchInterval = 2.0
     /// 使い方の記録を，何回ごとにファイルへ書くか
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか

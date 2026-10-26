@@ -1,4 +1,5 @@
 import AppKit
+import S90Application
 import S90Domain
 import SwiftUI
 
@@ -58,7 +59,7 @@ struct AppearancePage: View {
                             model.update { $0.candidateFontSize = value }
                             fontSize = nil
                         }
-                        .frame(width: 220)
+                        .frame(width: DesignTokens.Size.Settings.fontSliderWidth)
                     }
                 }
             }
@@ -137,22 +138,24 @@ private struct ThemeRow: View {
 }
 
 private struct ThemeSwatch: View {
+    private typealias Size = DesignTokens.Size.Settings
     let theme: ResolvedTheme
 
     var body: some View {
-        let radius = theme.isRounded ? min(theme.cornerRadius / 2, 6) : 0
+        let radius = theme.isRounded ? min(theme.cornerRadius / 2, Size.themeSwatchRadius) : 0
         ZStack {
             RoundedRectangle(cornerRadius: radius)
                 .fill(Color(nsColor: theme.surface))
                 .overlay(RoundedRectangle(cornerRadius: radius).stroke(Color(nsColor: theme.frame), lineWidth: 1))
-            HStack(spacing: 3) {
-                Text("あ").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(nsColor: theme.text))
+            HStack(spacing: Size.themeSwatchGap) {
+                Text(IndicatorLabels.label(for: InputMode.japanese))
+                    .font(.system(size: Size.themeSwatchFontSize, weight: .semibold)).foregroundStyle(Color(nsColor: theme.text))
                 RoundedRectangle(cornerRadius: radius / 2)
                     .fill(Color(nsColor: theme.selection))
-                    .frame(width: 12, height: 10)
+                    .frame(width: Size.themeSwatchSelectionWidth, height: Size.themeSwatchSelectionHeight)
             }
         }
-        .frame(width: 40, height: 20)
+        .frame(width: Size.themeSwatchWidth, height: Size.themeSwatchHeight)
     }
 }
 

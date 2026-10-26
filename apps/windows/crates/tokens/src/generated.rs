@@ -236,6 +236,17 @@ pub mod size {
         pub const THEME_EDITOR_HEIGHT: f32 = 720.0;
         pub const USER_DICTIONARY_TABLE_HEIGHT: f32 = 330.0;
         pub const PREVIEW_PADDING: f32 = 24.0;
+        pub const KEY_FILTER_RADIUS: f32 = 5.0;
+        pub const FONT_SLIDER_WIDTH: f32 = 220.0;
+        pub const SECONDS_SLIDER_WIDTH: f32 = 180.0;
+        pub const SECONDS_LABEL_WIDTH: f32 = 52.0;
+        pub const THEME_SWATCH_WIDTH: f32 = 40.0;
+        pub const THEME_SWATCH_HEIGHT: f32 = 20.0;
+        pub const THEME_SWATCH_GAP: f32 = 3.0;
+        pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
+        pub const THEME_SWATCH_SELECTION_WIDTH: f32 = 12.0;
+        pub const THEME_SWATCH_SELECTION_HEIGHT: f32 = 10.0;
+        pub const THEME_SWATCH_RADIUS: f32 = 6.0;
     }
     pub mod glass {
         pub const CORNER_RADIUS: f32 = 12.0;
@@ -277,6 +288,8 @@ pub mod size {
         pub const FRAME_WIDTH: f32 = 1.0;
         pub const GUIDE_DASH: f32 = 4.0;
         pub const ANCHOR_GAP: f32 = 4.0;
+        pub const CANDIDATE_GAP: f32 = 6.0;
+        pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
     }
     pub mod snapshot {
         pub const MARGIN: f32 = 16.0;
@@ -370,5 +383,8 @@ pub mod opacity {
     }
     pub mod shadow {
         pub const WINDOW: f32 = 0.22;
+    }
+    pub mod settings {
+        pub const KEY_FILTER: f32 = 0.15;
     }
 }

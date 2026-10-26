@@ -256,8 +256,9 @@ struct SecondsSlider: View {
                     value.wrappedValue = editing
                     self.editing = nil
                 }
-                .frame(width: 180)
-                Text(UIStrings.More.seconds(editing ?? value.wrappedValue)).monospacedDigit().frame(width: 52, alignment: .trailing)
+                .frame(width: DesignTokens.Size.Settings.secondsSliderWidth)
+                Text(UIStrings.More.seconds(editing ?? value.wrappedValue)).monospacedDigit()
+                    .frame(width: DesignTokens.Size.Settings.secondsLabelWidth, alignment: .trailing)
             }
         }
     }

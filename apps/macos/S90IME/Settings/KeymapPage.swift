@@ -536,8 +536,9 @@ struct KeyCapture: NSViewRepresentable {
         }
 
         override func draw(_ dirtyRect: NSRect) {
-            NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
+            NSColor.controlAccentColor.withAlphaComponent(DesignTokens.Opacity.Settings.keyFilter).setFill()
+            let radius = DesignTokens.Size.Settings.keyFilterRadius
+            NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
         }
     }
 }

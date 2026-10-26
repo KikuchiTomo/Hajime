@@ -158,7 +158,7 @@ final class CandidateView: NSView {
         for (index, (variant, cell)) in zip(panel.variants, variantCells(panel, in: rect)).enumerated() {
             let isSelected = panel.focus == .variants && panel.selectedVariant == index
             // ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)
-            let color: NSColor = isSelected ? theme.selectionText : (variant.isAvailable ? theme.textMuted : theme.textMuted.withAlphaComponent(0.4))
+            let color: NSColor = isSelected ? theme.selectionText : (variant.isAvailable ? theme.textMuted : theme.textMuted.withAlphaComponent(DesignTokens.Opacity.Variant.unavailable))
             let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: color]
             if isSelected {
                 if theme.isRounded {

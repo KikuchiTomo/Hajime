@@ -146,13 +146,13 @@ struct HandwritingView: View {
             }
             .frame(minWidth: DesignTokens.Size.Handwriting.canvasSize + DesignTokens.Size.Handwriting.canvasPadding * 2,
                    minHeight: DesignTokens.Size.Handwriting.canvasSize + DesignTokens.Size.Handwriting.canvasPadding * 2)
-            HStack(spacing: 6) {
+            HStack(spacing: DesignTokens.Size.Handwriting.candidateGap) {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: DesignTokens.Size.Handwriting.candidateGap) {
                         ForEach(model.candidates, id: \.self) { text in
                             Button(text) { model.onSelect(text) }
                                 .buttonStyle(.bordered)
-                                .font(.system(size: 18))
+                                .font(.system(size: DesignTokens.Size.Handwriting.candidateFontSize))
                         }
                     }
                 }
