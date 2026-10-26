@@ -20,6 +20,8 @@ enum NSEventKeyTranslator {
         static let jisYen: UInt16 = 93
         /// F6〜F10
         static let functionKeys: [UInt16: Int] = [97: 6, 98: 7, 100: 8, 101: 9, 109: 10]
+        /// テンキーの数字と記号(. * + / - =)．Enter(76)と Clear(71)は含めない
+        static let keypad: Set<UInt16> = [65, 67, 69, 75, 78, 81, 82, 83, 84, 85, 86, 87, 88, 89, 91, 92]
     }
 
     static func translate(_ event: NSEvent) -> KeyEvent? {
@@ -41,7 +43,7 @@ enum NSEventKeyTranslator {
         case let code where KeyCode.functionKeys[code] != nil: KeyCode.functionKeys[code].map(KeyEvent.Key.function)
         default: character(from: event, modifiers: modifiers).map(KeyEvent.Key.character)
         }
-        return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode]) }
+        return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode], isKeypad: KeyCode.keypad.contains(event.keyCode)) }
     }
 
     /// 仮想キーコードから，JIS キーボードのその位置の刻印を引く．かな入力でかなを引くのに使う(KanaLayout)．
