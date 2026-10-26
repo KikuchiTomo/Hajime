@@ -205,7 +205,8 @@ public final class InputSession {
 
     /// 打鍵がさらに止まるのを待って，打ち間違いを見直すか．待っていれば，止まったときに review を呼ぶ
     public var awaitsReview: Bool {
-        isSettled && phase == .composing && corrector.active == nil && !readingCorrector.isReviewed(composition)
+        isSettled && phase == .composing && (corrector.active == nil || corrector.yieldsToJapanese(in: composition))
+            && !readingCorrector.isReviewed(composition)
             && (settings.current.typoCorrection == .standard || settings.current.misreadings)
             && (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection
     }
@@ -763,9 +764,20 @@ public final class InputSession {
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
     private func reviewReading() {
-        guard corrector.active == nil else { return }
+        // 綴りを直した英単語のあとに日本語が続くときは，日本語の打ち間違いとしても見直し，直せる・示せるなら日本語に譲る
+        // (tkitou → 英単語の bit ではなく 適当)．英単語の補正は取り消し，同じ位置では直し直さない
+        let yields = corrector.yieldsToJapanese(in: composition)
+        guard corrector.active == nil || yields else { return }
         let wasApplied = readingCorrector.isApplied
         readingCorrector.review(&composition, makeComposition: newComposition)
+        if yields {
+            // 日本語として確かに直せる(「もしかして」でなく直す)ときだけ譲る．示すだけの弱い訂正で英単語(jvascript → javascript)を消さない
+            guard readingCorrector.isApplied else {
+                readingCorrector.withdrawSuggestion()
+                return
+            }
+            _ = corrector.dismiss()
+        }
         if !wasApplied, readingCorrector.isApplied { usage?.record(.readingCorrected) }
     }
 

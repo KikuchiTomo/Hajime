@@ -25,7 +25,7 @@ MainActor.assumeIsolated {
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {
-            try Evaluation.typo(file: file, engine: playground.engine)
+            try Evaluation.typo(file: file, engine: playground.engine, service: playground.typoService)
         } else if let file = arguments.value(of: "--evaluate-language") {
             try Evaluation.language(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {
