@@ -260,6 +260,15 @@ public enum DefaultSettings {
     public static let maximumCorrectionRules = 2_000
     /// 直さない語の長さの上限
     public static let maximumExceptionLength = 64
+    /// 置き換えの決まりの打った英字の長さと，置き換える語句の長さの上限
+    public static let correctionRuleTypedLength = 2...24
+    public static let maximumCorrectionRuleWordLength = 64
+    /// 記号の決まりの入力(連続入力は下限も)と記号の長さの上限
+    public static let symbolSequenceInputLength = 2...12
+    public static let maximumSymbolOutputLength = 200
+    /// カスタムテーマの id と書体の名前の長さの上限
+    public static let maximumThemeIdentifierLength = 64
+    public static let maximumThemeFontNameLength = 128
 
     // 連想変換(R-18)
     /// 連想の一覧に出す語の数(既定)と，選べる範囲

@@ -562,7 +562,7 @@ public final class EngineService {
             try? settings.update { $0.inputStyle = style }
             // 切り替えたことを入力位置の近くに出す(macOS の ClientActionPresenter と同じ)
             if settings.current.showsModeIndicator {
-                ui(.showMode(mode: .japanese, anchor: lastAnchor, label: ModeIndicatorLabels.label(for: style)))
+                ui(.showMode(mode: .japanese, anchor: lastAnchor, label: IndicatorLabels.label(for: style)))
             }
         case .toggleLiveConversion:
             try? settings.update { $0.liveConversion.toggle() }

@@ -44,9 +44,9 @@ public struct CustomTheme: Sendable, Equatable, Hashable, Codable {
 
     /// 名前が空でなく長すぎず，角の丸さが範囲の中か．読み込んだテーマはこれを満たすものだけを使う
     public var isValid: Bool {
-        !id.isEmpty && id.count <= 64 && !name.isEmpty && name.count <= DefaultSettings.maximumThemeNameLength
+        !id.isEmpty && id.count <= DefaultSettings.maximumThemeIdentifierLength && !name.isEmpty && name.count <= DefaultSettings.maximumThemeNameLength
             && DefaultSettings.customThemeCornerRadiusRange.contains(cornerRadius)
-            && (fontName.map { !$0.isEmpty && $0.count <= 128 } ?? true)
+            && (fontName.map { !$0.isEmpty && $0.count <= DefaultSettings.maximumThemeFontNameLength } ?? true)
     }
 }
 

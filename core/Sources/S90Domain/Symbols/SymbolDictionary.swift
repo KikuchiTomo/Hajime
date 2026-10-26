@@ -175,7 +175,9 @@ public struct SymbolRule: Sendable, Equatable, Codable, Hashable {
 
     /// 入力と出力が空でなく，長すぎない
     public var isValid: Bool {
-        !input.isEmpty && input.count <= 12 && output.count <= 200 && (!output.isEmpty || !isEnabled)
-            && (kind == .reading || (input.count >= 2 && input.allSatisfy { $0.isASCII && !$0.isLetter && !$0.isNumber && !$0.isWhitespace }))
+        let length = DefaultSettings.symbolSequenceInputLength
+        return !input.isEmpty && input.count <= length.upperBound && output.count <= DefaultSettings.maximumSymbolOutputLength
+            && (!output.isEmpty || !isEnabled)
+            && (kind == .reading || (input.count >= length.lowerBound && input.allSatisfy { $0.isASCII && !$0.isLetter && !$0.isNumber && !$0.isWhitespace }))
     }
 }

@@ -586,3 +586,45 @@ pub mod windows {
     /// 変換エンジン(s90-engine-host)に設定を頼めないとき
     pub const ENGINE_UNAVAILABLE: &str = "変換エンジンが動いていないため、設定を読み込めません";
 }
+
+#[cfg(test)]
+mod limits {
+    use super::{features, settings};
+    use crate::catalog::Catalog;
+
+    /// 文言に書いた上限の数が，DefaultSettings から写した目録の上限と同じか(macOS は値を差し込む)
+    #[test]
+    fn 文言の上限の数は目録と同じ() {
+        let limits = Catalog::load().unwrap().limits;
+        let has = |text: &str, numbers: &[usize]| {
+            numbers
+                .iter()
+                .all(|number| text.contains(&format!("{number}")))
+        };
+        assert!(has(
+            settings::INVALID_ROMAJI,
+            &[limits.romaji_keys_length, limits.romaji_kana_length]
+        ));
+        assert!(has(
+            features::INVALID_WORD,
+            &[limits.word_language_word_length]
+        ));
+        assert!(has(
+            features::INVALID_RULE,
+            &[
+                limits.correction_rule_typed_minimum,
+                limits.correction_rule_typed_maximum,
+                limits.correction_rule_word_length
+            ]
+        ));
+        assert!(has(features::INVALID_EXCEPTION, &[limits.exception_length]));
+        assert!(has(
+            features::INVALID_SYMBOL,
+            &[limits.symbol_sequence_minimum, limits.symbol_input_length]
+        ));
+        assert!(has(
+            features::INVALID_READING_SYMBOL,
+            &[limits.symbol_input_length, limits.symbol_output_length]
+        ));
+    }
+}

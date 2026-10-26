@@ -63,6 +63,12 @@ pub struct Limits {
     pub imported_dictionaries: usize,
     pub association_dictionaries: usize,
     pub keymap_entries: usize,
+    pub correction_rule_typed_minimum: usize,
+    pub correction_rule_typed_maximum: usize,
+    pub correction_rule_word_length: usize,
+    pub symbol_sequence_minimum: usize,
+    pub symbol_input_length: usize,
+    pub symbol_output_length: usize,
 }
 
 /// 設定の画面がエンジンを待つ時間(秒)

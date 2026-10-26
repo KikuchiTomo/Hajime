@@ -63,6 +63,12 @@ struct SettingsCatalogTests {
                 "importedDictionaries": limit(DefaultSettings.maximumImportedDictionaries),
                 "associationDictionaries": limit(DefaultSettings.maximumAssociationDictionaries),
                 "keymapEntries": limit(DefaultSettings.maximumKeymapEntries),
+                "correctionRuleTypedMinimum": limit(DefaultSettings.correctionRuleTypedLength.lowerBound),
+                "correctionRuleTypedMaximum": limit(DefaultSettings.correctionRuleTypedLength.upperBound),
+                "correctionRuleWordLength": limit(DefaultSettings.maximumCorrectionRuleWordLength),
+                "symbolSequenceMinimum": limit(DefaultSettings.symbolSequenceInputLength.lowerBound),
+                "symbolInputLength": limit(DefaultSettings.symbolSequenceInputLength.upperBound),
+                "symbolOutputLength": limit(DefaultSettings.maximumSymbolOutputLength),
             ]),
             "timing": .object([
                 "responseTimeout": .number(DefaultSettings.settingsAppResponseTimeout),
