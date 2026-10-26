@@ -153,6 +153,7 @@ enum DesignTokens {
             static let themeEditorHeight: CGFloat = 720
             static let userDictionaryTableHeight: CGFloat = 330
             static let indent: CGFloat = 16
+            static let previewPadding: CGFloat = 24
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12
