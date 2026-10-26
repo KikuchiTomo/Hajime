@@ -187,6 +187,9 @@ struct LatticeBuilder {
         if candidates.isEmpty {
             append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
         }
+        // 上の枝(ひらがな・カタカナ・半角カタカナ)にあるものは，下の枝に重ねて出さない．第 1 候補(幹)は残す
+        let variants = Self.variants(of: slice).map(\.text)
+        candidates = candidates.enumerated().filter { $0.offset == 0 || !variants.contains($0.element.text) }.map(\.element)
         let engineCandidates = candidates.filter(\.isFromEngine)
         let confident = SegmentLattice.isConfident(best: engineCandidates.first, second: engineCandidates.dropFirst().first)
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,

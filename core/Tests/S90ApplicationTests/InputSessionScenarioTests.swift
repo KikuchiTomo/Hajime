@@ -590,6 +590,17 @@ struct BranchMapControlTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == before)
     }
 
+    @Test("上の枝にあるひらがな・カタカナは，下の枝に重ねて出さない")
+    func noDuplicateVariants() {
+        let converter = FakeConverter(["らいぶ": [("ライブ", nil), ("らいぶ", nil), ("来部", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("raibu")
+        harness.press(.space)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.alternatives == ["ライブ", "来部"])
+        #expect(column?.variants.contains("らいぶ") == true)
+    }
+
     @Test("注目している文節の候補に「つなげる」を出し，選ぶと次の文節とつなげる")
     func joinFromCandidates() {
         let harness = Harness(converter: converter())

@@ -138,7 +138,7 @@ enum UIStrings {
         static let slash = "/ キーで入力する文字"
         static let spaceWidth = "スペース幅"
         static let numberWidth = "数字幅"
-        static let keys = "キー操作"
+        static let keys = "動作"
         static let punctuationCommits = "句読点で確定"
         static let numberKeySelection = "番号キーで候補を選択"
         static let showsModeIndicator = "入力モードの切り替えを表示"
