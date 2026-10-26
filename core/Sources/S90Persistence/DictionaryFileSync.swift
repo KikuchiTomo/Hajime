@@ -1,5 +1,6 @@
 #if canImport(CryptoKit)
 import CryptoKit
+#endif
 import Foundation
 import S90Domain
 
@@ -90,8 +91,9 @@ public struct DictionaryFileSync: Sendable {
 
     /// 索引のファイルの SHA-256(16 進の小文字)．上限より大きいファイルとふつうのファイルでないものは断る
     public static func sha256(of url: URL) throws -> String {
-        let handle = try openRegularFile(url)
-        var hasher = SHA256()
+        let handle = try ProtectedFile.openRegularFile(url)
+        defer { try? handle.close() }
+        var hasher = RevisionHasher()
         var total = 0
         while let chunk = try handle.read(upToCount: DefaultSettings.syncCopyChunkBytes), !chunk.isEmpty {
             total += chunk.count
@@ -100,13 +102,14 @@ public struct DictionaryFileSync: Sendable {
             }
             hasher.update(data: chunk)
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher.finalizeHex()
     }
 
     /// 少しずつ一時ファイルに写し，写した中身の SHA-256 が expectedRevision と合えば置き換える．
     /// 合わなければ(運ぶ途中で壊れた，書き換えられた)一時ファイルを消して断る
     private static func copy(from source: URL, to destination: URL, expectedRevision: String) throws {
-        let input = try openRegularFile(source)
+        let input = try ProtectedFile.openRegularFile(source)
+        defer { try? input.close() }
         let directory = destination.deletingLastPathComponent()
         let temporary = directory.appendingPathComponent(".\(destination.lastPathComponent).\(UUID().uuidString)")
         guard FileManager.default.createFile(atPath: temporary.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
@@ -115,7 +118,7 @@ public struct DictionaryFileSync: Sendable {
         do {
             let output = try FileHandle(forWritingTo: temporary)
             defer { try? output.close() }
-            var hasher = SHA256()
+            var hasher = RevisionHasher()
             var total = 0
             while let chunk = try input.read(upToCount: DefaultSettings.syncCopyChunkBytes), !chunk.isEmpty {
                 total += chunk.count
@@ -125,30 +128,32 @@ public struct DictionaryFileSync: Sendable {
                 hasher.update(data: chunk)
                 try output.write(contentsOf: chunk)
             }
-            guard hasher.finalize().map({ String(format: "%02x", $0) }).joined() == expectedRevision else { throw RevisionMismatch() }
+            guard hasher.finalizeHex() == expectedRevision else { throw RevisionMismatch() }
             try output.close()
-            if FileManager.default.fileExists(atPath: destination.path) {
-                _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
-            } else {
-                try FileManager.default.moveItem(at: temporary, to: destination)
-            }
+            try ProtectedFile.moveIntoPlace(temporary, at: destination)
         } catch {
             try? FileManager.default.removeItem(at: temporary)
             throw error
         }
     }
 
-    /// FIFO などを開いて止まらないよう，待たない開き方で開き，ふつうのファイルだけを読む(ProtectedFile と同じ)
-    private static func openRegularFile(_ url: URL) throws -> FileHandle {
-        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
-        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        var status = stat()
-        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw ProtectedFile.NotRegularFile() }
-        return handle
-    }
-
     /// 写した中身の SHA-256 が一覧の revision と合わない
     public struct RevisionMismatch: Error, Equatable {}
 }
-#endif
+
+/// SHA-256 を少しずつ求める．CryptoKit のある OS では CryptoKit を，無い OS(Windows)では SHA256Digest を使う
+private struct RevisionHasher {
+    #if canImport(CryptoKit)
+    private var digest = SHA256()
+
+    mutating func update(data: Data) { digest.update(data: data) }
+
+    mutating func finalizeHex() -> String { digest.finalize().map { String(format: "%02x", $0) }.joined() }
+    #else
+    private var digest = SHA256Digest()
+
+    mutating func update(data: Data) { digest.update(data) }
+
+    mutating func finalizeHex() -> String { digest.finalizeHex() }
+    #endif
+}

@@ -28,6 +28,19 @@ public final class ImportedDictionaryStore: DictionaryLookup {
         try SortedTabFile.write(lines, to: url)
     }
 
+    /// 辞書のファイルを読んで索引を書き，語の数と索引のバージョン(SHA-256)を入れた辞書を返す．
+    /// 大きな辞書は読むのに数秒かかるので，メインスレッドの外で呼ぶ．書いた索引を使うには reload を呼ぶ
+    public nonisolated func importFile(from source: URL, as dictionary: ImportedDictionary) throws -> ImportedDictionary {
+        let words = try DictionaryFileReader.read(from: source)
+        let destination = directory.appendingPathComponent(dictionary.indexFileName)
+        try Self.write(words, to: destination)
+        var imported = dictionary
+        imported.wordCount = words.count
+        // 同期のとき，ほかの PC の索引が古いかどうかを見分けるバージョン
+        imported.revision = try DictionaryFileSync.sha256(of: destination)
+        return imported
+    }
+
     public func reload(_ dictionary: ImportedDictionary) {
         indexes[dictionary.id] = nil
     }

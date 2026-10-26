@@ -114,6 +114,14 @@ func run() -> Int32 {
     let window = CandidateWindowLink()
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings.exe")
 
+    // 設定の同期(R-15)．同期の記録とフォルダはこの PC だけのもの(移動プロファイルで運ばない)なので Local に置く
+    let synchronizer = SettingsSynchronizer(settings: settings,
+                                            stateStore: FileSyncStateStore(fileURL: HostPaths.local.appendingPathComponent("sync-state.json")))
+    let sync = PathSyncCoordinator(synchronizer: synchronizer,
+                                   runner: FolderSyncRunner(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries),
+                                   settings: settings)
+    let files = SettingsFiles(settings: settings, dictionaries: dictionaries)
+
     // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
     let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
                                       lexicon: lexicon, settings: settings)
@@ -132,6 +140,8 @@ func run() -> Int32 {
         },
         hints: { BranchHints.make(for: $0, settings: $1) },
         typoService: typoService,
+        sync: sync,
+        files: files,
         services: SettingsServices(
             resetLearning: { [engine] in engine.resetLearning() },
             usage: usage,
@@ -143,6 +153,7 @@ func run() -> Int32 {
         window.send(.setPresentation(presentation: service.presentation))
     }
     engine.warmUp()
+    sync.start()
     let watcher = SettingsWatcher(settings: settings, url: HostPaths.roaming.appendingPathComponent("settings.json"))
 
     let presentation = service.presentation

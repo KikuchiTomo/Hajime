@@ -10,15 +10,7 @@ public enum RuleListFile {
     }
 
     /// 1 行．左は打つもの(打った英字・入力・読み)，右は出すもの
-    public struct Row: Sendable, Equatable {
-        public var key: String
-        public var value: String
-
-        public init(key: String, value: String) {
-            self.key = key
-            self.value = value
-        }
-    }
+    public typealias Row = RuleListRow
 
     /// 外から来るファイルなので，大きさに上限を設ける(docs/dev/SECURITY-MODEL.md)
     public static func read(from url: URL) throws -> [Row] {

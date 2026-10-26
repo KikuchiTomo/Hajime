@@ -66,7 +66,8 @@ final class CompositionRoot {
         // 同期(R-15)．この Mac の同期の設定は settings.json と別のファイルに置く
         let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
         let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))
-        let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries)
+        let sync = SyncCoordinator(synchronizer: synchronizer, runner: FolderSyncRunner(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries),
+                                   settings: settings)
         sync.start()
         // 同梱の連想の辞書(日本語 WordNet)は，起動したら裏で読み始め，初めて連想変換を使うときに待たせない
         let associations = AssociationDictionaryStore(
@@ -101,7 +102,7 @@ final class CompositionRoot {
         // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける
         let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
                                           lexicon: lexicon, settings: settings)
-        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, dictionaries: dictionaries, associations: associations,
+        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, files: SettingsFiles(settings: settings, dictionaries: dictionaries), associations: associations,
                                                   resetLearning: { [engine] in engine.resetLearning() },
                                                   previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)

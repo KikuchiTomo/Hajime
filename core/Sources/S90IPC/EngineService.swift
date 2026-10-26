@@ -63,6 +63,11 @@ public final class EngineService {
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
     private var nextCorrection: UInt64 = 1
+    /// 同期の操作(Windows の設定の画面から頼まれる)．無ければ同期の要求に malformed を返す
+    let sync: (any SyncControlling)?
+    /// 設定に関わるファイルの読み書き．無ければファイルの要求に malformed を返す
+    private let files: (any SettingsFileHandling)?
+    private var isRunningFileWork = false
     private let services: SettingsServices
     private var connections: [ConnectionID: Connection] = [:]
     private var sessions: [UInt32: Session] = [:]
@@ -74,10 +79,13 @@ public final class EngineService {
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
+                sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices()) {
         self.services = services
         self.typoService = typoService
         self.now = now
+        self.sync = sync
+        self.files = files
         self.makeSession = makeSession
         self.settings = settings
         self.ui = ui
@@ -118,6 +126,29 @@ public final class EngineService {
     private static func fits(_ response: WireResponse) -> Bool {
         guard let data = try? JSONEncoder().encode(response) else { return false }
         return data.count <= WireProtocol.maximumMessageBytes
+    }
+
+    /// 要求への答え方．すぐに答えるか，時間のかかる仕事(ファイルの読み書き)を終えてから答えるか
+    public enum Reply: Sendable {
+        case now(WireResponse)
+        /// メインアクターで動かして待つ．重い部分はメインスレッドの外で動くので，待つあいだもほかの要求に答えられる
+        case later(@MainActor @Sendable () async -> WireResponse)
+    }
+
+    /// 名前付きパイプから来た要求に答える．ファイルの読み書きは .later，ほかは handle と同じ
+    public func reply(to request: WireRequest, from id: ConnectionID) -> Reply {
+        guard connections[id]?.hasGreeted == true, let work = fileWork(for: request.body) else { return .now(handle(request, from: id)) }
+        guard let files else { return .now(WireResponse(id: request.id, body: .error(code: .malformed))) }
+        guard !isRunningFileWork else { return .now(WireResponse(id: request.id, body: .fileFailed(reason: .busy))) }
+        isRunningFileWork = true
+        return .later { [self] in
+            defer { isRunningFileWork = false }
+            do throws(SettingsFileFailure) {
+                return WireResponse(id: request.id, body: try await work(files))
+            } catch {
+                return WireResponse(id: request.id, body: .fileFailed(reason: WireFileFailure(error)))
+            }
+        }
     }
 
     private func body(for request: WireRequestBody, from id: ConnectionID) -> WireResponseBody {
@@ -263,6 +294,15 @@ public final class EngineService {
             } catch {
                 return .error(code: .malformed)
             }
+        case .readSymbolDefaults:
+            // 記号のページに既定の決まりを出し，利用者の決まりと重ねるため(macOS の SymbolsPage と同じ表)
+            return .symbolDefaults(sequences: Self.symbolDefaults(.sequence), readings: Self.symbolDefaults(.reading))
+        case .readSync, .setSyncFolder, .setSyncEnabled, .setSyncScope, .setSyncLocalField, .syncNow:
+            return syncResponse(for: request) ?? .error(code: .malformed)
+        case .importDictionary, .removeDictionary, .importUserDictionary, .exportUserDictionary, .exportSettings, .importSettings, .importProfileRules, .exportProfileRules,
+             .importRuleList, .exportRuleList:
+            // ファイルの読み書きは reply で受ける(時間がかかるので，答えるのを待つ形にする)
+            return .error(code: .malformed)
         case .writeSettings(let wanted):
             do {
                 try settings.update { current in
@@ -279,6 +319,10 @@ public final class EngineService {
             }
             return .settings(settings: snapshot)
         }
+    }
+
+    private static func symbolDefaults(_ kind: SymbolRule.Kind) -> [WireSymbolDefault] {
+        SymbolRuleEditing.defaults(kind).map { WireSymbolDefault(input: $0.input, output: $0.output) }
     }
 
     /// ユーザー辞書を 1 回で読む語の数の上限．1 語の大きさの上限から，応答がメッセージの上限に収まる数にする

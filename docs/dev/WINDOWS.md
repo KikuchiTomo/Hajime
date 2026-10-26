@@ -28,6 +28,8 @@
 - 設定の「キー配列」(ABC・US・Dvorak・Colemak)は，DLL がキーの位置(スキャンコード)から文字を引く表(`crates/tsf/src/layout.rs`)で打つ．Windows で配列を読み込むと利用者の配列の一覧が変わるため，OS の配列は切り替えない．ローマ字入力と英字入力のときだけ使い，Ctrl・Alt を押したショートカットは OS の配列のまま
 - 打ち間違いの訂正は Zenzai で 1 文に 1 秒ほどかかるので，エンジンが裏で求める(`ZenzaiTypoService`)．求めているあいだは短い間隔(`EngineService.correctionPollMilliseconds`)の `wake` を頼み，求め終わったあとの `wake` で見直しや待たせていた変換(`.awaitCorrections`)の結果を返す．Space の変換を待たせるのは `DefaultSettings.correctionWaitBeforeConversion` まで．間に合わなかった `wake` の応答も，キーの応答と同じくあとで反映する
 - 設定のファイルは macOS と同じ形式．エンジンが 2 秒ごとに更新の時刻を見て，変わっていれば読み直す
+- 設定の同期(R-15)はエンジンが動かす．選んだフォルダはパスで覚え(`PathSyncCoordinator`)，macOS と同じ時機(起動時・設定を変えて少し待ったとき・一定の間隔)で同期する．同期の手順は macOS と共有する(`FolderSyncRunner`)
+- 辞書の取り込み・設定のバックアップ・除外設定の CSV・決まりの一覧の読み書きは，設定の画面がパスを渡してエンジンに頼む(`SettingsFiles`)．時間がかかるので，エンジンは名前付きパイプの接続のスレッドで終わるまで待って答え，そのあいだもほかの接続(入力)には答える(`EngineService.reply`)
 - `.ui` のパイプはエンジンから候補ウィンドウへの一方向．エンジンは読みを待たない(同期の I/O のハンドルでは，読みを待っているあいだ同じハンドルへの書き込みも止まるため)
 
 ## 手書き入力
@@ -41,7 +43,7 @@
 
 ## Windows で使わないもの
 
-Vision(手書き．Windows では候補ウィンドウが Windows の手書き認識を使う)・CryptoKit(同期の辞書の索引)・`os` の Logger は Apple の OS だけで作る．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+Vision(手書き．Windows では候補ウィンドウが Windows の手書き認識を使う)と `os` の Logger は Apple の OS だけで作る．同期の辞書の索引の SHA-256 は CryptoKit の代わりに `SHA256Digest` で求める．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
 
 ## Zenzai
 

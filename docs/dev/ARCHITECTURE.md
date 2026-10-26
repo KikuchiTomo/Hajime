@@ -61,7 +61,7 @@ S90Persistence ─────┘
   - 入力方式: ローマ字入力は `InputSession` の共通の処理が受け持つ．ほかの方式は `InputStyleHandling` を実装して足す(`EnglishInput` が英字入力と英字入力(自動)，`KanaInput`)
   - ポート: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsReading`・`SettingsStoring`・`SettingsObserving`，`CalendarReading`，`UsageRecording`・`UsageReading`，`DictionaryLookup`・`AssociationLookup`
 - **S90Engine**: `AzooKeyConverterEngine` と `AzooKeyConverterSession` が `KanaKanjiConverting` を実装する．Zenzai のモデルの確認(`ZenzaiModel`)もここ．azooKey の型はこのモジュールの外に出さない
-- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`，郵便番号の表 `PostalCodeFile`，Vision で手書きを読む `VisionHandwritingRecognizer`，取り込んだ辞書の索引を同期のフォルダと運ぶ `DictionaryFileSync`，連想の辞書の取り込みと索引 `AssociationFileReader`・`AssociationDictionaryStore`．索引のファイルを写して引く処理は `SortedTabFile` にまとめる)．OS の機能は Foundation のほかに CoreGraphics・Vision・CryptoKit だけを使う．本人だけが読み書きできるファイルの読み書きは `ProtectedFile` にまとめる．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
+- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`，郵便番号の表 `PostalCodeFile`，Vision で手書きを読む `VisionHandwritingRecognizer`，取り込んだ辞書の索引を同期のフォルダと運ぶ `DictionaryFileSync`，同期の 1 回分の手順 `FolderSyncRunner`，パスで選んだフォルダの同期の時機 `PathSyncCoordinator`，設定の画面から頼まれたファイルの読み書き `SettingsFiles`，連想の辞書の取り込みと索引 `AssociationFileReader`・`AssociationDictionaryStore`．索引のファイルを写して引く処理は `SortedTabFile` にまとめる)．OS の機能は Foundation のほかに CoreGraphics・Vision・CryptoKit だけを使う．本人だけが読み書きできるファイルの読み書きは `ProtectedFile` にまとめる．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
 
 ## キー入力から画面までの流れ
 
@@ -88,7 +88,7 @@ OS のキーイベント
 | 候補ウィンドウ(`apps/windows/crates/candidate-ui`) | Rust | 候補とモード表示を描く．入力先のアプリの権限や UI スレッドに影響されないよう別のプロセスにする |
 
 通信の形式は `protocol/` に定義し，Swift と Rust の両方のコードをそこから生成します．手で二重に書かないためです(ADR 0010)．
-Windows では Zenzai をまだ使いません．llama.cpp のライブラリを用意するまで，`core/Package.swift` の trait `Zenzai` を `--disable-default-traits` で外してビルドします．手書きの認識(Vision)と同期のフォルダの辞書の索引(CryptoKit)も Apple の OS でだけ作ります．Windows の手書きの窓と認識は候補ウィンドウのプロセスが受け持ちます．
+Windows でも trait `Zenzai` を入れてビルドします(llama.cpp の取り方は `docs/dev/WINDOWS.md`)．手書きの認識(Vision)も Apple の OS でだけ作ります．同期のフォルダの辞書の索引の SHA-256 は，Apple の OS では CryptoKit で，Windows では `SHA256Digest` で求めます．Windows の手書きの窓と認識は候補ウィンドウのプロセスが受け持ちます．
 
 DLL はキーを送って入力欄への操作(確定・組み立て中の文字・モード)を受け取るだけで，候補・分岐図・案内はエンジンが候補ウィンドウに直接送ります．`ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決めます．
 

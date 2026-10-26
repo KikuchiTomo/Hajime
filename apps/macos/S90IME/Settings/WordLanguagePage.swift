@@ -40,9 +40,9 @@ struct WordLanguagePage: View {
                     }
                 }
             }
-            wordList(title: UIStrings.Features.englishWords, list: \.wordLanguage.englishWords, fileName: "english-words.txt",
+            wordList(title: UIStrings.Features.englishWords, language: .english,
                      empty: UIStrings.Features.englishWordsEmpty)
-            wordList(title: UIStrings.Features.japaneseWords, list: \.wordLanguage.japaneseWords, fileName: "japanese-words.txt",
+            wordList(title: UIStrings.Features.japaneseWords, language: .japanese,
                      empty: UIStrings.Features.japaneseWordsEmpty)
             Section {
                 HStack {
@@ -103,9 +103,9 @@ struct WordLanguagePage: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func wordList(title: String, list: WritableKeyPath<S90Domain.Settings, [String]>, fileName: String, empty: String) -> some View {
+    private func wordList(title: String, language: WordLanguage, empty: String) -> some View {
         Section(title) {
-            RuleListEditor(model: model, spec: .languageWords(list, fileName: fileName), labels: .init(
+            RuleListEditor(model: model, spec: .languageWords(language), labels: .init(
                 key: UIStrings.Features.wordPlaceholder, value: nil, empty: empty))
         }
     }
