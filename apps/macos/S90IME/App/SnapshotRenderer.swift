@@ -285,8 +285,65 @@ enum SnapshotRenderer {
         rep.size = size
         (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
             view.cacheDisplay(in: view.bounds, to: rep)
+            drawNestedTables(of: view, into: rep)
         }
         try? rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("\(name).png"))
+    }
+
+    /// Form の中の表(FormTableHost)は別の NSHostingView で描くので，外のビューの cacheDisplay では写らない(白く抜ける)．
+    /// 表のすぐ左(Form の行の地)の色で塗り，表の入れ物と見えている行を 1 つずつ写して乗算で重ねる．
+    /// cacheDisplay は透明なところを白で埋めるので，乗算で白を地の色に戻す．
+    /// ダークの外観では白い文字が乗算で消えるので，表の中は写らない(地の色だけになる)
+    static func drawNestedTables(of root: NSView, into rep: NSBitmapImageRep) {
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return }
+        let scale = CGFloat(rep.pixelsWide) / root.bounds.width
+        // rep は左下が原点
+        let flip = { (rect: NSRect) -> NSRect in
+            var rect = rect
+            if root.isFlipped { rect.origin.y = root.bounds.height - rect.maxY }
+            return rect
+        }
+        var stack = root.subviews
+        while let view = stack.popLast() {
+            guard !view.isHiddenOrHasHiddenAncestor else { continue }
+            guard view is FormTableContainer else {
+                stack.append(contentsOf: view.subviews)
+                continue
+            }
+            let frame = view.convert(view.bounds, to: root)
+            // colorAt は左上が原点
+            let fromTop = root.isFlipped ? frame.midY : root.bounds.height - frame.midY
+            guard let ground = rep.colorAt(x: Int((frame.minX - 4) * scale), y: Int(fromTop * scale)) else { continue }
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = context
+            ground.setFill()
+            flip(frame).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            draw(view, at: flip(frame), into: context, clip: nil)
+            var rows = view.subviews
+            while let row = rows.popLast() {
+                guard row is NSTableRowView, let scroll = row.enclosingScrollView else {
+                    rows.append(contentsOf: row.subviews)
+                    continue
+                }
+                // 見出しの下(contentInsets.top より下)の，行が見えている範囲で切る
+                let clip = scroll.contentView
+                var visible = clip.bounds
+                visible.size.height -= scroll.contentInsets.top
+                if clip.isFlipped { visible.origin.y += scroll.contentInsets.top }
+                draw(row, at: flip(row.convert(row.bounds, to: root)), into: context, clip: flip(clip.convert(visible, to: root)))
+            }
+        }
+    }
+
+    private static func draw(_ view: NSView, at rect: NSRect, into context: NSGraphicsContext, clip: NSRect?) {
+        guard let image = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: image)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        if let clip { NSBezierPath(rect: clip).setClip() }
+        image.draw(in: rect, from: .zero, operation: .multiply, fraction: 1, respectFlipped: false, hints: nil)
+        NSGraphicsContext.restoreGraphicsState()
     }
 }
 #endif
