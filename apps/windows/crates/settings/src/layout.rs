@@ -4,7 +4,7 @@
 //! Windows 11 の設定アプリと同じく，1 行ずつを角の丸い地(カード)に入れ，名前を左，部品を右に置く．
 //! 注記は前の行のカードの中に，名前の下の説明として入れる
 
-use crate::pages::{Control, Row, Section};
+use crate::pages::{Control, ListButtons, Row, Section};
 use tokens::size::settings_windows as size;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -78,6 +78,7 @@ pub fn control_width(control: &Control) -> f32 {
         | Control::Dictionary(_)
         | Control::Symbols(..)
         | Control::SyncFields(_)
+        | Control::Dictionaries(..)
         | Control::Notices => 0.0,
         Control::Version => size::CONTROL_WIDTH,
         Control::Preset => size::CONTROL_WIDTH + size::CONTROL_GAP + size::BUTTON_WIDTH,
@@ -125,7 +126,7 @@ pub fn layout(
                 }
                 continue;
             }
-            let card = Rect::new(left, y, width, card_height(&row.control));
+            let card = Rect::new(left, y, width, card_height(&row.control, width));
             cards.push(place(position, row, card));
             y = card.max_y() + size::CARD_GAP;
         }
@@ -148,14 +149,15 @@ pub fn layout(
     }
 }
 
-/// カードの高さ．入力欄の並ぶカードは入力欄の行と下の表・結果・文の高さを足す
-fn card_height(control: &Control) -> f32 {
+/// カードの高さ．入力欄の並ぶカードは入力欄の行と下の表・結果・文の高さを足す．width はカードの幅(表の下のボタンを折り返すため)
+fn card_height(control: &Control, width: f32) -> f32 {
     let inputs = size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    if let Some(buttons) = control.list_buttons() {
+        let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+        let below = button_lines(buttons.bottom, inner).len() as f32 * inputs;
+        return size::CARD_PADDING_X * 2.0 + inputs + size::LIST_HEIGHT + below;
+    }
     match control {
-        Control::List(..)
-        | Control::Dictionary(_)
-        | Control::Symbols(..)
-        | Control::SyncFields(_) => size::CARD_PADDING_X * 2.0 + inputs + size::LIST_HEIGHT,
         Control::Preview => {
             size::CARD_PADDING_X * 2.0 + inputs + size::BODY_LINE_HEIGHT * PREVIEW_LINES
         }
@@ -167,21 +169,40 @@ fn card_height(control: &Control) -> f32 {
 
 fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
     match &row.control {
-        Control::List(..)
-        | Control::Dictionary(_)
-        | Control::Symbols(..)
-        | Control::SyncFields(_) => {
-            let (fields, buttons) = list_shape(&row.control);
+        control if control.list_buttons().is_some() => {
+            let fields = control.list_spec().map_or(0, |spec| spec.fields.len());
+            let buttons = control.list_buttons().unwrap_or(ListButtons {
+                top: &[],
+                bottom: &[],
+            });
             return place_inputs(position, fields, buttons, card, size::LIST_HEIGHT);
         }
         Control::Preview => {
-            return place_inputs(position, 2, 0, card, size::BODY_LINE_HEIGHT * PREVIEW_LINES)
+            return place_inputs(
+                position,
+                2,
+                NO_BUTTONS,
+                card,
+                size::BODY_LINE_HEIGHT * PREVIEW_LINES,
+            )
         }
         Control::Notices => {
-            return place_inputs(position, 0, 0, card, size::LIST_HEIGHT * NOTICES_LISTS)
+            return place_inputs(
+                position,
+                0,
+                NO_BUTTONS,
+                card,
+                size::LIST_HEIGHT * NOTICES_LISTS,
+            )
         }
         Control::KeymapReport => {
-            return place_inputs(position, 0, 0, card, size::BODY_LINE_HEIGHT * REPORT_LINES)
+            return place_inputs(
+                position,
+                0,
+                NO_BUTTONS,
+                card,
+                size::BODY_LINE_HEIGHT * REPORT_LINES,
+            )
         }
         _ => {}
     }
@@ -244,15 +265,10 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
     }
 }
 
-/// 一覧の入力欄の数とボタンの数(追加・削除．記号は有効と無効の切り替えも)
-pub fn list_shape(control: &Control) -> (usize, usize) {
-    match control {
-        Control::List(spec, _) | Control::Dictionary(spec) => (spec.fields.len(), 2),
-        Control::Symbols(_, spec) => (spec.fields.len(), 3),
-        Control::SyncFields(_) => (0, 1),
-        _ => (0, 0),
-    }
-}
+const NO_BUTTONS: ListButtons = ListButtons {
+    top: &[],
+    bottom: &[],
+};
 
 /// 試す欄の結果の行の数
 const PREVIEW_LINES: f32 = 2.0;
@@ -261,18 +277,53 @@ const NOTICES_LISTS: f32 = 2.0;
 /// キー設定の表の問題の欄の行の数(超えたら欄の中で送る)
 const REPORT_LINES: f32 = 4.0;
 
-/// 入力欄の並ぶカード(一覧・試す欄)．上に入力欄とボタン，下に表か結果を置く
+/// ボタンの幅．名前の長さ(全角を 1，半角を 0.5 文字とみなす)に左右の余白を足し，下限より狭くしない
+pub fn button_width(label: &str) -> f32 {
+    let units: f32 = label
+        .chars()
+        .map(|character| if character.is_ascii() { 0.5 } else { 1.0 })
+        .sum();
+    (units * size::BODY_FONT_SIZE + size::BUTTON_PADDING_X * 2.0).max(size::BUTTON_WIDTH)
+}
+
+/// 表の下のボタンを幅 inner に収まるよう折り返した行(ボタンの幅の並び)
+fn button_lines(labels: &[&str], inner: f32) -> Vec<Vec<f32>> {
+    let mut lines: Vec<Vec<f32>> = Vec::new();
+    let mut used = 0.0;
+    for label in labels {
+        let width = button_width(label);
+        match lines.last_mut() {
+            Some(line) if used + size::CONTROL_GAP + width <= inner => {
+                used += size::CONTROL_GAP + width;
+                line.push(width);
+            }
+            _ => {
+                used = width;
+                lines.push(vec![width]);
+            }
+        }
+    }
+    lines
+}
+
+/// 入力欄の並ぶカード(一覧・試す欄)．上に入力欄とボタン，下に表か結果を置き，表の下にボタンを並べる．
+/// parts は入力欄・上のボタン・下のボタンの順
 fn place_inputs(
     position: usize,
     fields: usize,
-    buttons: usize,
+    buttons: ListButtons,
     card: Rect,
     below: f32,
 ) -> CardLayout {
     let x = card.x + size::CARD_PADDING_X;
     let top = card.y + size::CARD_PADDING_X;
     let inner = (card.width - size::CARD_PADDING_X * 2.0).max(0.0);
-    let buttons_width = (size::BUTTON_WIDTH + size::CONTROL_GAP) * buttons as f32;
+    let widths: Vec<f32> = buttons
+        .top
+        .iter()
+        .map(|label| button_width(label))
+        .collect();
+    let buttons_width: f32 = widths.iter().map(|width| width + size::CONTROL_GAP).sum();
     let count = fields.max(1) as f32;
     let field_width =
         ((inner - buttons_width - size::CONTROL_GAP * (count - 1.0)) / count).max(0.0);
@@ -282,20 +333,24 @@ fn place_inputs(
         parts.push(Rect::new(cursor, top, field_width, size::CONTROL_HEIGHT));
         cursor += field_width + size::CONTROL_GAP;
     }
-    for _ in 0..buttons {
-        parts.push(Rect::new(
-            cursor,
-            top,
-            size::BUTTON_WIDTH,
-            size::CONTROL_HEIGHT,
-        ));
-        cursor += size::BUTTON_WIDTH + size::CONTROL_GAP;
+    for width in widths {
+        parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
+        cursor += width + size::CONTROL_GAP;
     }
-    let list_top = if fields + buttons == 0 {
+    let list_top = if fields + buttons.top.len() == 0 {
         top
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
+    let mut line_top = list_top + below + size::CONTROL_GAP;
+    for line in button_lines(buttons.bottom, inner) {
+        let mut cursor = x;
+        for width in line {
+            parts.push(Rect::new(cursor, line_top, width, size::CONTROL_HEIGHT));
+            cursor += width + size::CONTROL_GAP;
+        }
+        line_top += size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    }
     CardLayout {
         row: position,
         card,
@@ -429,6 +484,26 @@ mod tests {
             assert_eq!(card.parts.len(), 5);
             assert!(card.parts[4].max_x() <= card.card.max_x());
         }
+    }
+
+    #[test]
+    fn 辞書の一覧は表の下にボタンを折り返して並べ_名前の長いボタンは広げる() {
+        let page = sections(Page::Dictionary).unwrap();
+        for width in [800.0, 400.0] {
+            let layout = layout(&page, width, |_| true, one_line);
+            let card = &layout.sections[1].cards[0];
+            // 入力欄 4 つ・更新・表の下の 6 つ
+            assert_eq!(card.parts.len(), 11);
+            for part in &card.parts {
+                assert!(part.max_x() <= card.card.max_x() - size::CARD_PADDING_X + 0.01);
+                assert!(part.max_y() <= card.card.max_y());
+            }
+            for part in &card.parts[5..] {
+                assert!(part.y >= card.control.max_y());
+            }
+        }
+        assert!(button_width("有効・無効の切り替え") > size::BUTTON_WIDTH);
+        assert_eq!(button_width("更新"), size::BUTTON_WIDTH);
     }
 
     #[test]

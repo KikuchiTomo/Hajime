@@ -54,7 +54,7 @@ enum UIStrings {
         static let addApp = "アプリを追加…"
         static let moveUp = "優先度を上げる"
         static let moveDown = "優先度を下げる"
-        static let tooMany = "取り込める辞書は 32 個までです"
+        static let tooMany = "取り込める辞書は \(DefaultSettings.maximumImportedDictionaries) 個までです"
         static let importFailed = "辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
         static let note = "タブ区切り・SKK・macOS のユーザー辞書の形式を読み込めます。上にある辞書ほど優先されます。"
         static func imported(_ count: Int) -> String { "\(count) 件を取り込みました" }

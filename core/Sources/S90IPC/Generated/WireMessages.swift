@@ -610,6 +610,23 @@ extension WireImportedDictionaryInfo: CustomStringConvertible, CustomDebugString
     public var debugDescription: String { description }
 }
 
+public struct WireAssociationDictionaryInfo: Sendable, Equatable, Codable {
+    public var id: String
+    public var name: String
+    public var groupCount: UInt32
+
+    public init(id: String, name: String, groupCount: UInt32) {
+        self.id = id
+        self.name = name
+        self.groupCount = groupCount
+    }
+}
+
+extension WireAssociationDictionaryInfo: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireAssociationDictionaryInfo" }
+    public var debugDescription: String { description }
+}
+
 public enum WireFileFailure: String, Sendable, Equatable, Codable, CaseIterable {
     case invalidPath
     case notFound
@@ -794,6 +811,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case syncNow
     case importDictionary(path: String, replacing: String?)
     case removeDictionary(id: String)
+    case importAssociationDictionary(path: String, replacing: String?)
+    case removeAssociationDictionary(id: String)
     case exportSettings(path: String)
     case importSettings(path: String)
     case importProfileRules(path: String)
@@ -871,6 +890,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .importDictionary(path: container.decode(String.self, forKey: .path), replacing: container.decodeIfPresent(String.self, forKey: .replacing))
         case "removeDictionary":
             self = try .removeDictionary(id: container.decode(String.self, forKey: .id))
+        case "importAssociationDictionary":
+            self = try .importAssociationDictionary(path: container.decode(String.self, forKey: .path), replacing: container.decodeIfPresent(String.self, forKey: .replacing))
+        case "removeAssociationDictionary":
+            self = try .removeAssociationDictionary(id: container.decode(String.self, forKey: .id))
         case "exportSettings":
             self = try .exportSettings(path: container.decode(String.self, forKey: .path))
         case "importSettings":
@@ -1002,6 +1025,13 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .removeDictionary(let id):
             try container.encode("removeDictionary", forKey: .type)
             try container.encode(id, forKey: .id)
+        case .importAssociationDictionary(let path, let replacing):
+            try container.encode("importAssociationDictionary", forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encodeIfPresent(replacing, forKey: .replacing)
+        case .removeAssociationDictionary(let id):
+            try container.encode("removeAssociationDictionary", forKey: .type)
+            try container.encode(id, forKey: .id)
         case .exportSettings(let path):
             try container.encode("exportSettings", forKey: .type)
             try container.encode(path, forKey: .path)
@@ -1114,6 +1144,8 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .syncNow: "WireRequestBody.syncNow"
         case .importDictionary: "WireRequestBody.importDictionary"
         case .removeDictionary: "WireRequestBody.removeDictionary"
+        case .importAssociationDictionary: "WireRequestBody.importAssociationDictionary"
+        case .removeAssociationDictionary: "WireRequestBody.removeAssociationDictionary"
         case .exportSettings: "WireRequestBody.exportSettings"
         case .importSettings: "WireRequestBody.importSettings"
         case .importProfileRules: "WireRequestBody.importProfileRules"
@@ -1168,6 +1200,7 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case settings(settings: WireSettingsSnapshot)
     case syncStatus(status: WireSyncStatus)
     case dictionaryImported(dictionary: WireImportedDictionaryInfo)
+    case associationImported(dictionary: WireAssociationDictionaryInfo)
     case imported(added: UInt32, skipped: UInt32)
     case fileFailed(reason: WireFileFailure)
     case symbolItems(items: [WireSymbolItem])
@@ -1203,6 +1236,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .syncStatus(status: container.decode(WireSyncStatus.self, forKey: .status))
         case "dictionaryImported":
             self = try .dictionaryImported(dictionary: container.decode(WireImportedDictionaryInfo.self, forKey: .dictionary))
+        case "associationImported":
+            self = try .associationImported(dictionary: container.decode(WireAssociationDictionaryInfo.self, forKey: .dictionary))
         case "imported":
             self = try .imported(added: container.decode(UInt32.self, forKey: .added), skipped: container.decode(UInt32.self, forKey: .skipped))
         case "fileFailed":
@@ -1258,6 +1293,9 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .dictionaryImported(let dictionary):
             try container.encode("dictionaryImported", forKey: .type)
             try container.encode(dictionary, forKey: .dictionary)
+        case .associationImported(let dictionary):
+            try container.encode("associationImported", forKey: .type)
+            try container.encode(dictionary, forKey: .dictionary)
         case .imported(let added, let skipped):
             try container.encode("imported", forKey: .type)
             try container.encode(added, forKey: .added)
@@ -1311,6 +1349,7 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .settings: "WireResponseBody.settings"
         case .syncStatus: "WireResponseBody.syncStatus"
         case .dictionaryImported: "WireResponseBody.dictionaryImported"
+        case .associationImported: "WireResponseBody.associationImported"
         case .imported: "WireResponseBody.imported"
         case .fileFailed: "WireResponseBody.fileFailed"
         case .symbolItems: "WireResponseBody.symbolItems"

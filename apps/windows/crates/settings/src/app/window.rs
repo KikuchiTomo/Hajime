@@ -4,7 +4,7 @@
 //! 状態は UI スレッドの thread_local に持ち，窓の手続きはそこから借りる．借りている間に届いたメッセージは既定の扱いにする
 
 use super::ffi::{self, Canvas, DrawTarget, Paint, Window};
-use super::page::{Event, Extras, PageView, WithSync};
+use super::page::{DictionaryAction, Event, Extras, PageView, WithSync};
 use super::theme::Theme;
 use super::Store;
 use crate::catalog::{Catalog, Timing};
@@ -12,12 +12,15 @@ use crate::engine::FileOutcome;
 use crate::files::FileTask;
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
-use crate::pages::{self, Action, Group, Page};
+use crate::pages::{self, Action, DictionaryList, Group, Page};
 use crate::store::StoreError;
-use crate::strings::{features, keys, rule_list, settings, sync as sync_text, windows as text};
+use crate::strings::{
+    association, dictionaries, features, keys, rule_list, settings, sync as sync_text,
+    windows as text,
+};
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, RequestBody, SymbolItem, SymbolKind, SymbolOrigin,
-    SymbolSaveResult, SyncStatus,
+    DictionaryAddResult, DictionaryEntry, FileFailure, RequestBody, SymbolItem, SymbolKind,
+    SymbolOrigin, SymbolSaveResult, SyncStatus,
 };
 use std::cell::RefCell;
 use tokens::size::settings_windows as size;
@@ -67,6 +70,11 @@ enum After {
     File(FileTask),
     /// フォルダを選ぶ窓を出してから，同期のフォルダにする
     ChooseSyncFolder,
+    /// ファイルを選ぶ窓を出してから，辞書を取り込む
+    ImportDictionary {
+        list: DictionaryList,
+        replacing: Option<String>,
+    },
 }
 
 struct App {
@@ -207,6 +215,14 @@ fn run_after(window: Window, after: Option<After>) {
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
             }
+        }
+        Some(After::ImportDictionary { list, replacing }) => {
+            let filter = crate::files::TEXT_FILTER;
+            let Some(path) = ffi::choose_file(window, true, "", filter.name, filter.pattern) else {
+                return;
+            };
+            let after = with_app(|app| app.import_dictionary(list, path, replacing)).flatten();
+            run_after(window, after);
         }
         Some(After::ChooseSyncFolder) => {
             let Some(path) = ffi::choose_folder(window) else {
@@ -500,6 +516,14 @@ impl App {
                 return self.request_sync(body);
             }
         }
+        if let Event::DictionaryList {
+            list,
+            action,
+            index,
+        } = event
+        {
+            return self.edit_dictionary_list(list, action, index);
+        }
         match &event {
             Event::Action(Action::SyncNow) => return self.request_sync(RequestBody::SyncNow),
             Event::Action(Action::ChooseSyncFolder) => return Some(After::ChooseSyncFolder),
@@ -540,6 +564,7 @@ impl App {
             | Event::SymbolRemove { .. }
             | Event::SymbolToggle { .. }
             | Event::SyncToggleFields(_)
+            | Event::DictionaryList { .. }
             | Event::Action(Action::SyncNow | Action::ChooseSyncFolder) => return None,
             Event::DictionaryAdd(item) => {
                 let entry = DictionaryEntry {
@@ -628,6 +653,125 @@ impl App {
         };
         self.refresh();
         after
+    }
+
+    /// 辞書の一覧の操作．名前などの書き換え・切り替え・並べ替えは設定の値を書き，取り込みと削除はエンジンに頼む
+    fn edit_dictionary_list(
+        &mut self,
+        list: DictionaryList,
+        action: DictionaryAction,
+        index: Option<usize>,
+    ) -> Option<After> {
+        let model = self.model.as_mut()?;
+        let path = list.path();
+        let current = model.value(path).cloned();
+        let entries = crate::dictionaries::entries(list, current.as_ref());
+        let chosen = index.and_then(|index| entries.get(index));
+        let changed = match (&action, index) {
+            (DictionaryAction::Import, _) => {
+                let limit = match list {
+                    DictionaryList::Imported => self.catalog.limits.imported_dictionaries,
+                    DictionaryList::Association => self.catalog.limits.association_dictionaries,
+                };
+                if entries.len() >= limit {
+                    return Some(After::Notice(match list {
+                        DictionaryList::Imported => dictionaries::too_many(limit),
+                        DictionaryList::Association => association::too_many(limit),
+                    }));
+                }
+                return Some(After::ImportDictionary {
+                    list,
+                    replacing: None,
+                });
+            }
+            (DictionaryAction::Reimport, _) => {
+                let entry = chosen.filter(|entry| !entry.is_bundled)?;
+                return Some(After::ImportDictionary {
+                    list,
+                    replacing: Some(entry.id.clone()),
+                });
+            }
+            (DictionaryAction::Remove, _) => {
+                // 同梱の辞書は消せない(オフにはできる)
+                let entry = chosen.filter(|entry| !entry.is_bundled)?;
+                let outcome = model.store().remove_dictionary(list, entry.id.clone());
+                return self.finish_dictionary(list, outcome, false);
+            }
+            (DictionaryAction::Update(inputs), Some(index)) => {
+                match crate::dictionaries::update(list, current.as_ref(), index, inputs) {
+                    Some(value) => value,
+                    None => {
+                        return Some(After::Message {
+                            text: text::INVALID_APP,
+                            warning: true,
+                        })
+                    }
+                }
+            }
+            (DictionaryAction::Toggle, Some(index)) => {
+                crate::dictionaries::toggle(current.as_ref(), index)?
+            }
+            (DictionaryAction::MoveUp, Some(index)) => {
+                crate::dictionaries::moved(current.as_ref(), index, -1)?
+            }
+            (DictionaryAction::MoveDown, Some(index)) => {
+                crate::dictionaries::moved(current.as_ref(), index, 1)?
+            }
+            _ => return None,
+        };
+        let result = model.set(path, changed);
+        let after = result.err().and_then(|error| self.failure(error));
+        self.refresh();
+        after
+    }
+
+    /// 選んだファイルを辞書として取り込む
+    fn import_dictionary(
+        &mut self,
+        list: DictionaryList,
+        path: String,
+        replacing: Option<String>,
+    ) -> Option<After> {
+        let outcome = self
+            .model
+            .as_ref()?
+            .store()
+            .import_dictionary(list, path, replacing);
+        self.finish_dictionary(list, outcome, true)
+    }
+
+    /// 取り込み・削除の結果を知らせ，設定を読み直す
+    fn finish_dictionary(
+        &mut self,
+        list: DictionaryList,
+        outcome: Result<FileOutcome, StoreError>,
+        importing: bool,
+    ) -> Option<After> {
+        let outcome = match outcome {
+            Err(error) => return self.failure(error),
+            Ok(outcome) => outcome,
+        };
+        if self.model.as_mut()?.reload().is_err() {
+            self.disconnect();
+            return None;
+        }
+        self.refresh();
+        let import_failed = match list {
+            DictionaryList::Imported => dictionaries::IMPORT_FAILED,
+            DictionaryList::Association => association::IMPORT_FAILED,
+        };
+        match outcome {
+            FileOutcome::Imported(count) => Some(After::Notice(match list {
+                DictionaryList::Imported => dictionaries::imported(count),
+                DictionaryList::Association => association::imported(count),
+            })),
+            FileOutcome::Failed(FileFailure::WriteFailed) => Some(failed()),
+            FileOutcome::Failed(_) if importing => Some(After::Message {
+                text: import_failed,
+                warning: true,
+            }),
+            FileOutcome::Failed(_) | FileOutcome::Done => None,
+        }
     }
 
     /// 同期の状態を画面の値にする

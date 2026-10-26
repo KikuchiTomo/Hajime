@@ -477,6 +477,24 @@ impl fmt::Debug for ImportedDictionaryInfo {
     }
 }
 
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssociationDictionaryInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "groupCount")]
+    pub group_count: u32,
+}
+
+impl fmt::Debug for AssociationDictionaryInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AssociationDictionaryInfo")
+            .field("id", &REDACTED)
+            .field("name", &REDACTED)
+            .field("groupCount", &self.group_count)
+            .finish()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FileFailure {
@@ -702,6 +720,14 @@ pub enum RequestBody {
     RemoveDictionary {
         id: String,
     },
+    ImportAssociationDictionary {
+        path: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        replacing: Option<String>,
+    },
+    RemoveAssociationDictionary {
+        id: String,
+    },
     ExportSettings {
         path: String,
     },
@@ -875,6 +901,15 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("RemoveDictionary")
                 .field("id", &REDACTED)
                 .finish(),
+            Self::ImportAssociationDictionary { .. } => f
+                .debug_struct("ImportAssociationDictionary")
+                .field("path", &REDACTED)
+                .field("replacing", &REDACTED)
+                .finish(),
+            Self::RemoveAssociationDictionary { .. } => f
+                .debug_struct("RemoveAssociationDictionary")
+                .field("id", &REDACTED)
+                .finish(),
             Self::ExportSettings { .. } => f
                 .debug_struct("ExportSettings")
                 .field("path", &REDACTED)
@@ -1022,6 +1057,9 @@ pub enum ResponseBody {
     DictionaryImported {
         dictionary: ImportedDictionaryInfo,
     },
+    AssociationImported {
+        dictionary: AssociationDictionaryInfo,
+    },
     Imported {
         added: u32,
         skipped: u32,
@@ -1094,6 +1132,10 @@ impl fmt::Debug for ResponseBody {
                 .finish(),
             Self::DictionaryImported { dictionary, .. } => f
                 .debug_struct("DictionaryImported")
+                .field("dictionary", dictionary)
+                .finish(),
+            Self::AssociationImported { dictionary, .. } => f
+                .debug_struct("AssociationImported")
                 .field("dictionary", dictionary)
                 .finish(),
             Self::Imported { added, skipped, .. } => f

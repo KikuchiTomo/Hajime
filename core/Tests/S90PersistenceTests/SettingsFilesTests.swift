@@ -47,6 +47,32 @@ struct SettingsFilesTests {
         #expect(!FileManager.default.fileExists(atPath: dictionaries.url(for: imported).path))
     }
 
+    @Test("連想の辞書を取り込んで一覧に足し，引ける．取り込み直すと名前はそのまま，消すと索引も消える．同梱の辞書は消せない")
+    func importAssociationDictionary() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let associations = AssociationDictionaryStore(directory: root.appendingPathComponent("associations", isDirectory: true))
+        let files = SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations)
+        let imported = try await files.importAssociationDictionary(from: try file("似た語.txt", "速い\t早い\t迅速\n大きい,巨大\n"), replacing: nil)
+        #expect(imported.name == "似た語")
+        #expect(imported.groupCount == 2)
+        #expect(settings.current.associationDictionaries.last == imported)
+        #expect(associations.groups(for: "迅速", in: imported).first?.words.contains("早い") == true)
+
+        try settings.update { $0.associationDictionaries[$0.associationDictionaries.count - 1].name = "類語" }
+        let again = try await files.importAssociationDictionary(from: try file("新しい.txt", "大きい,巨大\n"), replacing: imported.id)
+        #expect(again.name == "類語")
+        #expect(again.groupCount == 1)
+
+        try files.removeAssociationDictionary(id: imported.id)
+        #expect(!settings.current.associationDictionaries.contains { $0.id == imported.id })
+        #expect(!FileManager.default.fileExists(atPath: associations.url(for: imported).path))
+        #expect(throws: SettingsFileFailure.unknownDictionary) { try files.removeAssociationDictionary(id: DefaultSettings.bundledAssociationDictionary.id) }
+        // 連想の辞書の索引が無ければ取り込めない
+        await #expect(throws: SettingsFileFailure.unreadable) {
+            try await self.files.importAssociationDictionary(from: try self.file("x.txt", "a,b\n"), replacing: nil)
+        }
+    }
+
     @Test("取り込めない辞書の理由を分ける", arguments: [
         ("無い.txt", nil as String?, SettingsFileFailure.notFound),
         ("空.txt", "# コメントだけ\n", .empty),

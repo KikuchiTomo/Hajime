@@ -35,7 +35,9 @@ struct SettingsCatalogTests {
                 "modeIndicatorDuration": range(DefaultSettings.modeIndicatorDurationRange),
                 "candidateFontSize": range(DefaultSettings.candidateFontSizeRange),
                 "customThemeCornerRadius": range(DefaultSettings.customThemeCornerRadiusRange),
+                "associationLimit": range(DefaultSettings.associationLimitRange),
             ]),
+            "associationLimitStep": .number(Double(DefaultSettings.associationLimitStep)),
             "secondsStep": .number(DefaultSettings.secondsStep),
             "limits": .object([
                 "settingsFileBytes": limit(DefaultSettings.maximumSettingsFileBytes),
@@ -59,6 +61,7 @@ struct SettingsCatalogTests {
                 "customThemes": limit(DefaultSettings.maximumCustomThemes),
                 "themeNameLength": limit(DefaultSettings.maximumThemeNameLength),
                 "importedDictionaries": limit(DefaultSettings.maximumImportedDictionaries),
+                "associationDictionaries": limit(DefaultSettings.maximumAssociationDictionaries),
                 "keymapEntries": limit(DefaultSettings.maximumKeymapEntries),
             ]),
             "timing": .object([

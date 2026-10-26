@@ -34,6 +34,7 @@ pub struct Ranges {
     pub mode_indicator_duration: Range,
     pub candidate_font_size: Range,
     pub custom_theme_corner_radius: Range,
+    pub association_limit: Range,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -60,6 +61,7 @@ pub struct Limits {
     pub custom_themes: usize,
     pub theme_name_length: usize,
     pub imported_dictionaries: usize,
+    pub association_dictionaries: usize,
     pub keymap_entries: usize,
 }
 
@@ -97,6 +99,8 @@ pub struct Catalog {
     pub ranges: Ranges,
     /// 秒の項目を選ぶ刻み(DefaultSettings.secondsStep)
     pub seconds_step: f64,
+    /// 連想の候補数を選ぶ刻み(DefaultSettings.associationLimitStep)
+    pub association_limit_step: f64,
     pub limits: Limits,
     pub timing: Timing,
     /// 一覧を書き出すファイルの既定の名前(RuleList の名前ごと)

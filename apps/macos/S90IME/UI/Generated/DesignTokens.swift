@@ -208,6 +208,7 @@ enum DesignTokens {
             static let scrollLine: CGFloat = 40
             static let listHeight: CGFloat = 220
             static let buttonWidth: CGFloat = 96
+            static let buttonPaddingX: CGFloat = 12
             static let pagePaddingTop: CGFloat = 20
             static let titleFontSize: CGFloat = 28
             static let sectionFontSize: CGFloat = 14

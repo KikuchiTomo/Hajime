@@ -10,7 +10,7 @@ struct AssociationSection: View {
             ResettableToggle(model: model, title: UIStrings.Association.enabled, keyPath: \.association)
             Group {
                 ResettableRow(model: model, keyPath: \.associationLimit) {
-                    Stepper(value: model.binding(\.associationLimit), in: DefaultSettings.associationLimitRange, step: 10) {
+                    Stepper(value: model.binding(\.associationLimit), in: DefaultSettings.associationLimitRange, step: DefaultSettings.associationLimitStep) {
                         LabeledContent(UIStrings.Association.limit, value: "\(model.settings.associationLimit)")
                     }
                 }

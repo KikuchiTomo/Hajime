@@ -1,4 +1,5 @@
 {
+  "associationLimitStep" : 10,
   "exportFileNames" : {
     "correctionRules" : "replacements.tsv",
     "englishWords" : "english-words.txt",
@@ -74,6 +75,7 @@
   ],
   "limits" : {
     "applicationIdentifierLength" : 255,
+    "associationDictionaries" : 8,
     "correctionRules" : 2000,
     "customThemes" : 50,
     "exceptionLength" : 64,
@@ -97,6 +99,10 @@
     "wordLanguageWordLength" : 32
   },
   "ranges" : {
+    "associationLimit" : [
+      10,
+      300
+    ],
     "candidateFontSize" : [
       12,
       24
