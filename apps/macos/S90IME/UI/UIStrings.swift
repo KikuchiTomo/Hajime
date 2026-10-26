@@ -3,14 +3,25 @@ import S90Domain
 /// 画面に出す文言の置き場所．多言語にするときは Localizable.xcstrings に移す
 enum UIStrings {
     enum Candidate {
-        static let candidatesHint = "↑ 種類"
-        static let variantsHint = "← → 選ぶ　↓ 候補"
-        static func variantsPosition(_ index: Int, _ total: Int) -> String { "種類 \(index) / \(total)" }
+        static let candidatesHints = [KeyHint(key: "↑", label: "文字種")]
+        static let variantsHints = [KeyHint(key: "←→", label: "選ぶ"), KeyHint(key: "↓", label: "候補")]
+        static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
+        static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
     }
 
     enum Branch {
-        static let hint = "↓ 候補　↑ 字種　← → 文節　Tab 迷う文節　⇧← → 区切り"
-        static func position(_ first: Int, _ total: Int) -> String { "候補 \(first)〜 / \(total)" }
+        static let hints = [
+            KeyHint(key: "↓", label: "候補"),
+            KeyHint(key: "↑", label: "文字種"),
+            KeyHint(key: "←→", label: "文節"),
+            KeyHint(key: "Tab", label: "次の文節"),
+            KeyHint(key: "⇧←→", label: "文節の長さ"),
+        ]
+        /// 上の枝(文字種)の丸に入れる印
+        static let variantBadge = "↑"
+        static func position(first: Int, last: Int, total: Int) -> String {
+            first == last ? "\(first) / \(total)" : "\(first)–\(last) / \(total)"
+        }
     }
 
     enum ModeIndicator {
