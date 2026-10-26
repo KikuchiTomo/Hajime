@@ -72,6 +72,8 @@ public struct Settings: Sendable, Equatable {
     public var handwriting = false
     /// よくある読み違い(「ふいんき」→ 雰囲気)の正しい語を候補に出し，「もしかして」で示す
     public var misreadings = true
+    /// かなで打った外来語は，英語のつづり(「Live変換」)よりカタカナ(「ライブ変換」)を先に出す
+    public var prefersKatakana = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
     /// 分岐図の足元にキーの案内(候補・文節・文節の長さ・区切り)を出す
@@ -190,7 +192,7 @@ extension Settings: Codable {
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
-        case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
+        case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
@@ -243,6 +245,7 @@ extension Settings: Codable {
         read(.postalCodeConversion, into: \.postalCodeConversion)
         read(.handwriting, into: \.handwriting)
         read(.misreadings, into: \.misreadings)
+        read(.prefersKatakana, into: \.prefersKatakana)
         read(.alphabetWidth, into: \.alphabetWidth)
         read(.shiftStartsAlphabet, into: \.shiftStartsAlphabet)
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
@@ -317,6 +320,7 @@ extension Settings: Codable {
         try container.encode(postalCodeConversion, forKey: .postalCodeConversion)
         try container.encode(handwriting, forKey: .handwriting)
         try container.encode(misreadings, forKey: .misreadings)
+        try container.encode(prefersKatakana, forKey: .prefersKatakana)
         try container.encode(alphabetWidth, forKey: .alphabetWidth)
         try container.encode(shiftStartsAlphabet, forKey: .shiftStartsAlphabet)
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
