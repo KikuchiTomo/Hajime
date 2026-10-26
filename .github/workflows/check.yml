@@ -1,16 +1,17 @@
 name: check
 
+# 費用を抑えるため，今は自動では動かさない(利用者の指示 2026-10-27)．実装がそろってから手で一度にまとめて動かす:
+#   gh workflow run <このファイル名> --ref main
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  # main は取り消さない(キャッシュを残す)．PR は新しい push で古い実行を止める
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -36,4 +37,21 @@ jobs:
           echo "使う Xcode: $xcode"
           sudo xcode-select -s "$xcode"
           swift --version
+      # SwiftPM の依存と作ったものを残す．失敗・取り消しでも残し，前の実行のものから戻す
+      - id: corebuild
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            core/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: core-${{ runner.os }}-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+          restore-keys: |
+            core-${{ runner.os }}-${{ hashFiles('core/Package.resolved') }}-
       - run: swift test --package-path core
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            core/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: core-${{ runner.os }}-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
