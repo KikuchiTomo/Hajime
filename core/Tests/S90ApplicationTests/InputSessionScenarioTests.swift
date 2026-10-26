@@ -593,6 +593,21 @@ struct BranchMapControlTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
     }
 
+    @Test("R-08: 選んでいる候補に同音異義語があれば使い分けを添え，設定で切れる")
+    func homophoneNote() {
+        let converter = FakeConverter(["とった": [("撮った", nil), ("取った", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("totta")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.first?.usageNote?.hasPrefix("撮る: ") == true)
+        var off = DefaultSettings.settings
+        off.homophoneNotes = false
+        let quiet = Harness(converter: converter, settings: off)
+        quiet.type("totta")
+        quiet.press(.space)
+        #expect(quiet.lattice?.columns.first?.usageNote == nil)
+    }
+
     @Test("上の枝にあるひらがな・カタカナは，下の枝に重ねて出さない")
     func noDuplicateVariants() {
         let converter = FakeConverter(["らいぶ": [("ライブ", nil), ("らいぶ", nil), ("来部", nil)]])
