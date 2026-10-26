@@ -87,6 +87,46 @@ struct SyncMergeTests {
         #expect(result.changedLocal && result.changedRemote)
     }
 
+    @Test("まとまりを同期していても，この Mac だけの項目は取り込まず，同期のファイルの値も変えない")
+    func localField() throws {
+        var remote = SyncDocument()
+        remote.groups[.input] = .init(modifiedAt: t2, values: SyncMerge.values(of: .input, in: try object {
+            $0.liveConversion = false
+            $0.punctuationCommits = true
+        }))
+        var ledger = SyncLedger()
+        ledger.groupModifiedAt[.input] = t1
+        // 取り込み: ほかの項目は取り込み，この Mac だけの項目(liveConversion)は変えない
+        let imported = SyncMerge.merge(local: try object(), ledger: ledger, remote: remote, scopes: [:], localFields: ["liveConversion"], now: t2)
+        let merged = try SettingsCoding.settings(from: imported.settings)
+        #expect(merged.liveConversion == true)
+        #expect(merged.punctuationCommits == true)
+        // 書き出し: この Mac の方が新しくても，この Mac だけの項目は同期のファイルの値(ほかの Mac のもの)を残す
+        ledger.groupModifiedAt[.input] = t2.addingTimeInterval(10)
+        let exported = SyncMerge.merge(local: try object { $0.punctuationCommits = false }, ledger: ledger, remote: remote, scopes: [:],
+                                       localFields: ["liveConversion"], now: t2)
+        #expect(exported.document.groups[.input]?.values["liveConversion"] == .bool(false))
+        #expect(exported.document.groups[.input]?.values["punctuationCommits"] == .bool(false))
+    }
+
+    @Test("この Mac だけの項目だけを変えたときは，まとまりを変えたことにしない")
+    func localFieldChange() throws {
+        var ledger = SyncLedger()
+        SyncMerge.noteChange(from: try object(), to: try object { $0.liveConversion = false }, ledger: &ledger, localFields: ["liveConversion"], now: t1)
+        #expect(ledger.groupModifiedAt[.input] == nil)
+        SyncMerge.noteChange(from: try object(), to: try object { $0.punctuationCommits = true }, ledger: &ledger, localFields: ["liveConversion"], now: t1)
+        #expect(ledger.groupModifiedAt[.input] == t1)
+    }
+
+    @Test("この Mac だけの項目を書く前の版の同期の状態のファイルも読め，フォルダの選択を失わない")
+    func readsOldSyncState() throws {
+        let old = #"{"isEnabled":true,"folderName":"Dropbox","scopes":{},"ledger":{"groupModifiedAt":{},"dictionaryAddedAt":{},"dictionaryTombstones":{}}}"#
+        let state = try SyncCoding.decoder.decode(SyncState.self, from: Data(old.utf8))
+        #expect(state.isEnabled)
+        #expect(state.folderName == "Dropbox")
+        #expect(state.localFields.isEmpty)
+    }
+
     @Test("この Mac だけのまとまりは，取り込みも書き出しもしない")
     func localScope() throws {
         var remote = SyncDocument()

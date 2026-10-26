@@ -42,7 +42,7 @@ public final class SettingsSynchronizer {
             remote = nil
         }
         let local = try SettingsCoding.object(of: settings.current)
-        let result = SyncMerge.merge(local: local, ledger: state.ledger, remote: remote, scopes: state.scopes, now: now)
+        let result = SyncMerge.merge(local: local, ledger: state.ledger, remote: remote, scopes: state.scopes, localFields: state.localFields, now: now)
         if result.changedLocal {
             let merged = try SettingsCoding.settings(from: result.settings)
             applyingRemote = true
@@ -56,6 +56,13 @@ public final class SettingsSynchronizer {
         state.ledger = result.ledger
         try stateStore.save(state)
         return result
+    }
+
+    /// 項目をこの Mac だけで持つか(まとまりを同期していても)を変える
+    public func setLocal(_ isLocal: Bool, field: String) throws {
+        var state = stateStore.state
+        if isLocal { state.localFields.insert(field) } else { state.localFields.remove(field) }
+        try stateStore.save(state)
     }
 
     /// まとまりの範囲を変える
@@ -78,7 +85,7 @@ public final class SettingsSynchronizer {
         defer { previous = object }
         guard !applyingRemote, let old = previous else { return }
         var state = stateStore.state
-        SyncMerge.noteChange(from: old, to: object, ledger: &state.ledger, now: now)
+        SyncMerge.noteChange(from: old, to: object, ledger: &state.ledger, localFields: state.localFields, now: now)
         try? stateStore.save(state)
     }
 }
