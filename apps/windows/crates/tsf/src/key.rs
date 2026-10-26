@@ -46,6 +46,25 @@ pub struct RawKey {
     pub modifiers: Modifiers,
     pub japanese_layout: bool,
     pub label: Option<char>,
+    /// キーの位置(スキャンコード)
+    pub scan: u16,
+    pub caps_lock: bool,
+}
+
+impl RawKey {
+    /// 設定のキー配列で打つ文字に置き換える．Ctrl・Alt を押しているときは置き換えない(ショートカットは OS の配列のまま)
+    pub fn with_layout(mut self, layout: Option<&str>) -> Self {
+        let Some(layout) = layout else { return self };
+        if self.modifiers.control || self.modifiers.alt {
+            return self;
+        }
+        if let Some(text) =
+            crate::layout::character(layout, self.scan, self.modifiers.shift, self.caps_lock)
+        {
+            self.text = Some(text);
+        }
+        self
+    }
 }
 
 pub fn is_modifier_only(vk: u16) -> bool {
@@ -115,7 +134,20 @@ mod tests {
             },
             japanese_layout: true,
             label: text,
+            scan: 0,
+            caps_lock: false,
         }
+    }
+
+    #[test]
+    fn キー配列の設定で文字を置き換え_ctrl_では置き換えない() {
+        let mut q = raw(0x51, Some('q'));
+        q.scan = 0x10;
+        assert_eq!(q.clone().with_layout(Some("dvorak")).text, Some('\''));
+        assert_eq!(q.clone().with_layout(None).text, Some('q'));
+        let mut control = q;
+        control.modifiers.control = true;
+        assert_eq!(control.with_layout(Some("dvorak")).text, Some('q'));
     }
 
     #[test]
