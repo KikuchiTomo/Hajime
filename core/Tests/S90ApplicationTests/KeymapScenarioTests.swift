@@ -222,7 +222,7 @@ struct KeymapScenarioTests {
         harness.press(.down)
         harness.press(.delete, .control)
         #expect(converter.forgotten.map(\.text) == ["假名"])
-        #expect(harness.lattice?.note == "学習から消しました")
+        #expect(harness.lattice?.note == "学習から削除しました")
         harness.press(.down)
         #expect(harness.lattice?.note == nil)
     }

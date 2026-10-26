@@ -272,6 +272,7 @@ pub enum ErrorCode {
     UnknownSession,
     TooManySessions,
     Malformed,
+    TooLarge,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -305,9 +306,6 @@ impl fmt::Debug for SettingsSnapshot {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MenuCommand {
-    SelectInputStyle {
-        style: String,
-    },
     ToggleLiveConversion,
     OpenSettings,
 }
@@ -315,14 +313,103 @@ pub enum MenuCommand {
 impl fmt::Debug for MenuCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::SelectInputStyle { .. } => f
-                .debug_struct("SelectInputStyle")
-                .field("style", &REDACTED)
-                .finish(),
             Self::ToggleLiveConversion => f.write_str("ToggleLiveConversion"),
             Self::OpenSettings => f.write_str("OpenSettings"),
         }
     }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeymapRowIssue {
+    pub row: u32,
+    #[serde(rename = "hiddenBy")]
+    pub hidden_by: Vec<u32>,
+    #[serde(rename = "hiddenStates")]
+    pub hidden_states: Vec<String>,
+    #[serde(rename = "blocksTyping")]
+    pub blocks_typing: bool,
+}
+
+impl fmt::Debug for KeymapRowIssue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeymapRowIssue")
+            .field("row", &self.row)
+            .field("hiddenBy", &self.hidden_by)
+            .field("hiddenStates", &REDACTED)
+            .field("blocksTyping", &self.blocks_typing)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeymapMissing {
+    pub state: String,
+    pub command: String,
+}
+
+impl fmt::Debug for KeymapMissing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeymapMissing")
+            .field("state", &REDACTED)
+            .field("command", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeymapReport {
+    pub rows: Vec<KeymapRowIssue>,
+    pub missing: Vec<KeymapMissing>,
+}
+
+impl fmt::Debug for KeymapReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeymapReport")
+            .field("rows", &self.rows)
+            .field("missing", &self.missing)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PreviewWord {
+    pub typed: String,
+    pub shown: String,
+    pub language: String,
+}
+
+impl fmt::Debug for PreviewWord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PreviewWord")
+            .field("typed", &REDACTED)
+            .field("shown", &REDACTED)
+            .field("language", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct DictionaryEntry {
+    pub reading: String,
+    pub word: String,
+}
+
+impl fmt::Debug for DictionaryEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DictionaryEntry")
+            .field("reading", &REDACTED)
+            .field("word", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DictionaryAddResult {
+    Added,
+    AlreadyRegistered,
+    Invalid,
+    Full,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -367,6 +454,41 @@ pub enum RequestBody {
         text: String,
     },
     HandwritingClosed,
+    ReadSettingsFields {
+        names: Vec<String>,
+        defaults: bool,
+    },
+    WriteSettingsFields {
+        values: String,
+    },
+    ReadKeymapPreset {
+        preset: String,
+    },
+    CheckKeymap {
+        values: String,
+    },
+    ResetLearning,
+    ReadUsage,
+    ResetUsage,
+    PreviewLanguage {
+        text: String,
+        #[serde(rename = "precedingText")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        preceding_text: Option<String>,
+    },
+    ReadUserDictionary {
+        offset: u32,
+        limit: u32,
+    },
+    AddUserDictionaryEntry {
+        entry: DictionaryEntry,
+    },
+    RemoveUserDictionaryEntry {
+        entry: DictionaryEntry,
+    },
+    MergeUserDictionary {
+        entries: Vec<DictionaryEntry>,
+    },
 }
 
 impl fmt::Debug for RequestBody {
@@ -420,6 +542,48 @@ impl fmt::Debug for RequestBody {
                 .field("text", &REDACTED)
                 .finish(),
             Self::HandwritingClosed => f.write_str("HandwritingClosed"),
+            Self::ReadSettingsFields { defaults, .. } => f
+                .debug_struct("ReadSettingsFields")
+                .field("names", &REDACTED)
+                .field("defaults", defaults)
+                .finish(),
+            Self::WriteSettingsFields { .. } => f
+                .debug_struct("WriteSettingsFields")
+                .field("values", &REDACTED)
+                .finish(),
+            Self::ReadKeymapPreset { .. } => f
+                .debug_struct("ReadKeymapPreset")
+                .field("preset", &REDACTED)
+                .finish(),
+            Self::CheckKeymap { .. } => f
+                .debug_struct("CheckKeymap")
+                .field("values", &REDACTED)
+                .finish(),
+            Self::ResetLearning => f.write_str("ResetLearning"),
+            Self::ReadUsage => f.write_str("ReadUsage"),
+            Self::ResetUsage => f.write_str("ResetUsage"),
+            Self::PreviewLanguage { .. } => f
+                .debug_struct("PreviewLanguage")
+                .field("text", &REDACTED)
+                .field("precedingText", &REDACTED)
+                .finish(),
+            Self::ReadUserDictionary { offset, limit, .. } => f
+                .debug_struct("ReadUserDictionary")
+                .field("offset", offset)
+                .field("limit", limit)
+                .finish(),
+            Self::AddUserDictionaryEntry { entry, .. } => f
+                .debug_struct("AddUserDictionaryEntry")
+                .field("entry", entry)
+                .finish(),
+            Self::RemoveUserDictionaryEntry { entry, .. } => f
+                .debug_struct("RemoveUserDictionaryEntry")
+                .field("entry", entry)
+                .finish(),
+            Self::MergeUserDictionary { entries, .. } => f
+                .debug_struct("MergeUserDictionary")
+                .field("entries", entries)
+                .finish(),
         }
     }
 }
@@ -459,6 +623,31 @@ pub enum ResponseBody {
     Settings {
         settings: SettingsSnapshot,
     },
+    SettingsFields {
+        values: String,
+    },
+    KeymapReport {
+        report: KeymapReport,
+    },
+    Usage {
+        values: String,
+        #[serde(rename = "firstCandidateRate")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        first_candidate_rate: Option<f64>,
+    },
+    LanguagePreview {
+        words: Vec<PreviewWord>,
+    },
+    UserDictionary {
+        entries: Vec<DictionaryEntry>,
+        total: u32,
+    },
+    DictionaryAdded {
+        result: DictionaryAddResult,
+    },
+    DictionaryMerged {
+        added: u32,
+    },
     Error {
         code: ErrorCode,
     },
@@ -486,6 +675,36 @@ impl fmt::Debug for ResponseBody {
             Self::Settings { settings, .. } => f
                 .debug_struct("Settings")
                 .field("settings", settings)
+                .finish(),
+            Self::SettingsFields { .. } => f
+                .debug_struct("SettingsFields")
+                .field("values", &REDACTED)
+                .finish(),
+            Self::KeymapReport { report, .. } => f
+                .debug_struct("KeymapReport")
+                .field("report", report)
+                .finish(),
+            Self::Usage { first_candidate_rate, .. } => f
+                .debug_struct("Usage")
+                .field("values", &REDACTED)
+                .field("firstCandidateRate", first_candidate_rate)
+                .finish(),
+            Self::LanguagePreview { words, .. } => f
+                .debug_struct("LanguagePreview")
+                .field("words", words)
+                .finish(),
+            Self::UserDictionary { entries, total, .. } => f
+                .debug_struct("UserDictionary")
+                .field("entries", entries)
+                .field("total", total)
+                .finish(),
+            Self::DictionaryAdded { result, .. } => f
+                .debug_struct("DictionaryAdded")
+                .field("result", result)
+                .finish(),
+            Self::DictionaryMerged { added, .. } => f
+                .debug_struct("DictionaryMerged")
+                .field("added", added)
                 .finish(),
             Self::Error { code, .. } => f
                 .debug_struct("Error")
@@ -531,6 +750,12 @@ pub struct CandidateEntry {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotation: Option<String>,
+    #[serde(rename = "correctedStart")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corrected_start: Option<u32>,
+    #[serde(rename = "correctedLength")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corrected_length: Option<u32>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -538,6 +763,8 @@ impl fmt::Debug for CandidateEntry {
         f.debug_struct("CandidateEntry")
             .field("text", &REDACTED)
             .field("annotation", &REDACTED)
+            .field("correctedStart", &self.corrected_start)
+            .field("correctedLength", &self.corrected_length)
             .finish()
     }
 }
@@ -598,6 +825,9 @@ pub struct BranchColumn {
     pub is_uncertain: bool,
     #[serde(rename = "isDecided")]
     pub is_decided: bool,
+    #[serde(rename = "isCorrected")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_corrected: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -627,6 +857,7 @@ impl fmt::Debug for BranchColumn {
             .field("isFocused", &self.is_focused)
             .field("isUncertain", &self.is_uncertain)
             .field("isDecided", &self.is_decided)
+            .field("isCorrected", &self.is_corrected)
             .field("preview", &REDACTED)
             .field("shorter", &REDACTED)
             .field("longer", &REDACTED)
@@ -796,6 +1027,8 @@ pub enum UiCommand {
         mode: InputMode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
     },
     ShowHandwriting {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -842,6 +1075,7 @@ impl fmt::Debug for UiCommand {
                 .debug_struct("ShowMode")
                 .field("mode", mode)
                 .field("anchor", anchor)
+                .field("label", &REDACTED)
                 .finish(),
             Self::ShowHandwriting { anchor, recognition_delay_milliseconds, recognition_timeout_milliseconds, .. } => f
                 .debug_struct("ShowHandwriting")

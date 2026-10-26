@@ -16,7 +16,8 @@ final class CandidatePanelController {
         window = FloatingPanel.make(contentView: view)
     }
 
-    func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double) {
+    func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double, keys: Keymap) {
+        view.keys = keys
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.panel = panel

@@ -372,6 +372,7 @@ public enum WireErrorCode: String, Sendable, Equatable, Codable, CaseIterable {
     case unknownSession
     case tooManySessions
     case malformed
+    case tooLarge
 }
 
 extension WireErrorCode: CustomStringConvertible, CustomDebugStringConvertible {
@@ -403,20 +404,17 @@ extension WireSettingsSnapshot: CustomStringConvertible, CustomDebugStringConver
 }
 
 public enum WireMenuCommand: Sendable, Equatable, Codable {
-    case selectInputStyle(style: String)
     case toggleLiveConversion
     case openSettings
 
     private enum CodingKeys: String, CodingKey {
-        case type, style
+        case type
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try container.decode(String.self, forKey: .type)
         switch kind {
-        case "selectInputStyle":
-            self = try .selectInputStyle(style: container.decode(String.self, forKey: .style))
         case "toggleLiveConversion":
             self = .toggleLiveConversion
         case "openSettings":
@@ -429,9 +427,6 @@ public enum WireMenuCommand: Sendable, Equatable, Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .selectInputStyle(let style):
-            try container.encode("selectInputStyle", forKey: .type)
-            try container.encode(style, forKey: .style)
         case .toggleLiveConversion:
             try container.encode("toggleLiveConversion", forKey: .type)
         case .openSettings:
@@ -443,11 +438,103 @@ public enum WireMenuCommand: Sendable, Equatable, Codable {
 extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         switch self {
-        case .selectInputStyle: "WireMenuCommand.selectInputStyle"
         case .toggleLiveConversion: "WireMenuCommand.toggleLiveConversion"
         case .openSettings: "WireMenuCommand.openSettings"
         }
     }
+    public var debugDescription: String { description }
+}
+
+public struct WireKeymapRowIssue: Sendable, Equatable, Codable {
+    public var row: UInt32
+    public var hiddenBy: [UInt32]
+    public var hiddenStates: [String]
+    public var blocksTyping: Bool
+
+    public init(row: UInt32, hiddenBy: [UInt32], hiddenStates: [String], blocksTyping: Bool) {
+        self.row = row
+        self.hiddenBy = hiddenBy
+        self.hiddenStates = hiddenStates
+        self.blocksTyping = blocksTyping
+    }
+}
+
+extension WireKeymapRowIssue: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireKeymapRowIssue" }
+    public var debugDescription: String { description }
+}
+
+public struct WireKeymapMissing: Sendable, Equatable, Codable {
+    public var state: String
+    public var command: String
+
+    public init(state: String, command: String) {
+        self.state = state
+        self.command = command
+    }
+}
+
+extension WireKeymapMissing: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireKeymapMissing" }
+    public var debugDescription: String { description }
+}
+
+public struct WireKeymapReport: Sendable, Equatable, Codable {
+    public var rows: [WireKeymapRowIssue]
+    public var missing: [WireKeymapMissing]
+
+    public init(rows: [WireKeymapRowIssue], missing: [WireKeymapMissing]) {
+        self.rows = rows
+        self.missing = missing
+    }
+}
+
+extension WireKeymapReport: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireKeymapReport" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePreviewWord: Sendable, Equatable, Codable {
+    public var typed: String
+    public var shown: String
+    public var language: String
+
+    public init(typed: String, shown: String, language: String) {
+        self.typed = typed
+        self.shown = shown
+        self.language = language
+    }
+}
+
+extension WirePreviewWord: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePreviewWord" }
+    public var debugDescription: String { description }
+}
+
+public struct WireDictionaryEntry: Sendable, Equatable, Codable {
+    public var reading: String
+    public var word: String
+
+    public init(reading: String, word: String) {
+        self.reading = reading
+        self.word = word
+    }
+}
+
+extension WireDictionaryEntry: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireDictionaryEntry" }
+    public var debugDescription: String { description }
+}
+
+public enum WireDictionaryAddResult: String, Sendable, Equatable, Codable, CaseIterable {
+    case added
+    case alreadyRegistered
+    case invalid
+    case full
+}
+
+extension WireDictionaryAddResult: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireDictionaryAddResult.\(rawValue)" }
     public var debugDescription: String { description }
 }
 
@@ -465,9 +552,21 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case menu(command: WireMenuCommand)
     case handwritingChosen(text: String)
     case handwritingClosed
+    case readSettingsFields(names: [String], defaults: Bool)
+    case writeSettingsFields(values: String)
+    case readKeymapPreset(preset: String)
+    case checkKeymap(values: String)
+    case resetLearning
+    case readUsage
+    case resetUsage
+    case previewLanguage(text: String, precedingText: String?)
+    case readUserDictionary(offset: UInt32, limit: UInt32)
+    case addUserDictionaryEntry(entry: WireDictionaryEntry)
+    case removeUserDictionaryEntry(entry: WireDictionaryEntry)
+    case mergeUserDictionary(entries: [WireDictionaryEntry])
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings, command, text
+        case type, protocolVersion, session, input, context, mode, rect, settings, command, text, names, defaults, values, preset, precedingText, offset, limit, entry, entries
     }
 
     public init(from decoder: any Decoder) throws {
@@ -500,6 +599,30 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .handwritingChosen(text: container.decode(String.self, forKey: .text))
         case "handwritingClosed":
             self = .handwritingClosed
+        case "readSettingsFields":
+            self = try .readSettingsFields(names: container.decode([String].self, forKey: .names), defaults: container.decode(Bool.self, forKey: .defaults))
+        case "writeSettingsFields":
+            self = try .writeSettingsFields(values: container.decode(String.self, forKey: .values))
+        case "readKeymapPreset":
+            self = try .readKeymapPreset(preset: container.decode(String.self, forKey: .preset))
+        case "checkKeymap":
+            self = try .checkKeymap(values: container.decode(String.self, forKey: .values))
+        case "resetLearning":
+            self = .resetLearning
+        case "readUsage":
+            self = .readUsage
+        case "resetUsage":
+            self = .resetUsage
+        case "previewLanguage":
+            self = try .previewLanguage(text: container.decode(String.self, forKey: .text), precedingText: container.decodeIfPresent(String.self, forKey: .precedingText))
+        case "readUserDictionary":
+            self = try .readUserDictionary(offset: container.decode(UInt32.self, forKey: .offset), limit: container.decode(UInt32.self, forKey: .limit))
+        case "addUserDictionaryEntry":
+            self = try .addUserDictionaryEntry(entry: container.decode(WireDictionaryEntry.self, forKey: .entry))
+        case "removeUserDictionaryEntry":
+            self = try .removeUserDictionaryEntry(entry: container.decode(WireDictionaryEntry.self, forKey: .entry))
+        case "mergeUserDictionary":
+            self = try .mergeUserDictionary(entries: container.decode([WireDictionaryEntry].self, forKey: .entries))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -549,6 +672,42 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode(text, forKey: .text)
         case .handwritingClosed:
             try container.encode("handwritingClosed", forKey: .type)
+        case .readSettingsFields(let names, let defaults):
+            try container.encode("readSettingsFields", forKey: .type)
+            try container.encode(names, forKey: .names)
+            try container.encode(defaults, forKey: .defaults)
+        case .writeSettingsFields(let values):
+            try container.encode("writeSettingsFields", forKey: .type)
+            try container.encode(values, forKey: .values)
+        case .readKeymapPreset(let preset):
+            try container.encode("readKeymapPreset", forKey: .type)
+            try container.encode(preset, forKey: .preset)
+        case .checkKeymap(let values):
+            try container.encode("checkKeymap", forKey: .type)
+            try container.encode(values, forKey: .values)
+        case .resetLearning:
+            try container.encode("resetLearning", forKey: .type)
+        case .readUsage:
+            try container.encode("readUsage", forKey: .type)
+        case .resetUsage:
+            try container.encode("resetUsage", forKey: .type)
+        case .previewLanguage(let text, let precedingText):
+            try container.encode("previewLanguage", forKey: .type)
+            try container.encode(text, forKey: .text)
+            try container.encodeIfPresent(precedingText, forKey: .precedingText)
+        case .readUserDictionary(let offset, let limit):
+            try container.encode("readUserDictionary", forKey: .type)
+            try container.encode(offset, forKey: .offset)
+            try container.encode(limit, forKey: .limit)
+        case .addUserDictionaryEntry(let entry):
+            try container.encode("addUserDictionaryEntry", forKey: .type)
+            try container.encode(entry, forKey: .entry)
+        case .removeUserDictionaryEntry(let entry):
+            try container.encode("removeUserDictionaryEntry", forKey: .type)
+            try container.encode(entry, forKey: .entry)
+        case .mergeUserDictionary(let entries):
+            try container.encode("mergeUserDictionary", forKey: .type)
+            try container.encode(entries, forKey: .entries)
         }
     }
 }
@@ -569,6 +728,18 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .menu: "WireRequestBody.menu"
         case .handwritingChosen: "WireRequestBody.handwritingChosen"
         case .handwritingClosed: "WireRequestBody.handwritingClosed"
+        case .readSettingsFields: "WireRequestBody.readSettingsFields"
+        case .writeSettingsFields: "WireRequestBody.writeSettingsFields"
+        case .readKeymapPreset: "WireRequestBody.readKeymapPreset"
+        case .checkKeymap: "WireRequestBody.checkKeymap"
+        case .resetLearning: "WireRequestBody.resetLearning"
+        case .readUsage: "WireRequestBody.readUsage"
+        case .resetUsage: "WireRequestBody.resetUsage"
+        case .previewLanguage: "WireRequestBody.previewLanguage"
+        case .readUserDictionary: "WireRequestBody.readUserDictionary"
+        case .addUserDictionaryEntry: "WireRequestBody.addUserDictionaryEntry"
+        case .removeUserDictionaryEntry: "WireRequestBody.removeUserDictionaryEntry"
+        case .mergeUserDictionary: "WireRequestBody.mergeUserDictionary"
         }
     }
     public var debugDescription: String { description }
@@ -595,10 +766,17 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case edit(handled: Bool, operations: [WireEditOperation], state: WireSessionState)
     case done
     case settings(settings: WireSettingsSnapshot)
+    case settingsFields(values: String)
+    case keymapReport(report: WireKeymapReport)
+    case usage(values: String, firstCandidateRate: Double?)
+    case languagePreview(words: [WirePreviewWord])
+    case userDictionary(entries: [WireDictionaryEntry], total: UInt32)
+    case dictionaryAdded(result: WireDictionaryAddResult)
+    case dictionaryMerged(added: UInt32)
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, code
+        case type, protocolVersion, session, state, handled, operations, settings, values, report, firstCandidateRate, words, entries, total, result, added, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -615,6 +793,20 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = .done
         case "settings":
             self = try .settings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
+        case "settingsFields":
+            self = try .settingsFields(values: container.decode(String.self, forKey: .values))
+        case "keymapReport":
+            self = try .keymapReport(report: container.decode(WireKeymapReport.self, forKey: .report))
+        case "usage":
+            self = try .usage(values: container.decode(String.self, forKey: .values), firstCandidateRate: container.decodeIfPresent(Double.self, forKey: .firstCandidateRate))
+        case "languagePreview":
+            self = try .languagePreview(words: container.decode([WirePreviewWord].self, forKey: .words))
+        case "userDictionary":
+            self = try .userDictionary(entries: container.decode([WireDictionaryEntry].self, forKey: .entries), total: container.decode(UInt32.self, forKey: .total))
+        case "dictionaryAdded":
+            self = try .dictionaryAdded(result: container.decode(WireDictionaryAddResult.self, forKey: .result))
+        case "dictionaryMerged":
+            self = try .dictionaryMerged(added: container.decode(UInt32.self, forKey: .added))
         case "error":
             self = try .error(code: container.decode(WireErrorCode.self, forKey: .code))
         default:
@@ -642,6 +834,29 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .settings(let settings):
             try container.encode("settings", forKey: .type)
             try container.encode(settings, forKey: .settings)
+        case .settingsFields(let values):
+            try container.encode("settingsFields", forKey: .type)
+            try container.encode(values, forKey: .values)
+        case .keymapReport(let report):
+            try container.encode("keymapReport", forKey: .type)
+            try container.encode(report, forKey: .report)
+        case .usage(let values, let firstCandidateRate):
+            try container.encode("usage", forKey: .type)
+            try container.encode(values, forKey: .values)
+            try container.encodeIfPresent(firstCandidateRate, forKey: .firstCandidateRate)
+        case .languagePreview(let words):
+            try container.encode("languagePreview", forKey: .type)
+            try container.encode(words, forKey: .words)
+        case .userDictionary(let entries, let total):
+            try container.encode("userDictionary", forKey: .type)
+            try container.encode(entries, forKey: .entries)
+            try container.encode(total, forKey: .total)
+        case .dictionaryAdded(let result):
+            try container.encode("dictionaryAdded", forKey: .type)
+            try container.encode(result, forKey: .result)
+        case .dictionaryMerged(let added):
+            try container.encode("dictionaryMerged", forKey: .type)
+            try container.encode(added, forKey: .added)
         case .error(let code):
             try container.encode("error", forKey: .type)
             try container.encode(code, forKey: .code)
@@ -657,6 +872,13 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .edit: "WireResponseBody.edit"
         case .done: "WireResponseBody.done"
         case .settings: "WireResponseBody.settings"
+        case .settingsFields: "WireResponseBody.settingsFields"
+        case .keymapReport: "WireResponseBody.keymapReport"
+        case .usage: "WireResponseBody.usage"
+        case .languagePreview: "WireResponseBody.languagePreview"
+        case .userDictionary: "WireResponseBody.userDictionary"
+        case .dictionaryAdded: "WireResponseBody.dictionaryAdded"
+        case .dictionaryMerged: "WireResponseBody.dictionaryMerged"
         case .error: "WireResponseBody.error"
         }
     }
@@ -696,10 +918,14 @@ extension WireCandidateVariant: CustomStringConvertible, CustomDebugStringConver
 public struct WireCandidateEntry: Sendable, Equatable, Codable {
     public var text: String
     public var annotation: String?
+    public var correctedStart: UInt32?
+    public var correctedLength: UInt32?
 
-    public init(text: String, annotation: String? = nil) {
+    public init(text: String, annotation: String? = nil, correctedStart: UInt32? = nil, correctedLength: UInt32? = nil) {
         self.text = text
         self.annotation = annotation
+        self.correctedStart = correctedStart
+        self.correctedLength = correctedLength
     }
 }
 
@@ -754,6 +980,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var isFocused: Bool
     public var isUncertain: Bool
     public var isDecided: Bool
+    public var isCorrected: Bool?
     public var preview: String?
     public var shorter: String?
     public var longer: String?
@@ -762,7 +989,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var sourceName: String?
     public var split: WireBranchSplit?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -771,6 +998,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.isFocused = isFocused
         self.isUncertain = isUncertain
         self.isDecided = isDecided
+        self.isCorrected = isCorrected
         self.preview = preview
         self.shorter = shorter
         self.longer = longer
@@ -910,14 +1138,14 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case showCandidates(list: WireCandidateList, anchor: WireRect?)
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
     case showNote(text: String, anchor: WireRect?)
-    case showMode(mode: WireInputMode, anchor: WireRect?)
+    case showMode(mode: WireInputMode, anchor: WireRect?, label: String?)
     case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32, recognitionTimeoutMilliseconds: UInt32)
     case hideHandwriting
     case move(anchor: WireRect)
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, text, mode, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds
+        case type, protocolVersion, presentation, list, anchor, map, text, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds
     }
 
     public init(from decoder: any Decoder) throws {
@@ -935,7 +1163,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
         case "showNote":
             self = try .showNote(text: container.decode(String.self, forKey: .text), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showMode":
-            self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
+            self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), label: container.decodeIfPresent(String.self, forKey: .label))
         case "showHandwriting":
             self = try .showHandwriting(anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), recognitionDelayMilliseconds: container.decode(UInt32.self, forKey: .recognitionDelayMilliseconds), recognitionTimeoutMilliseconds: container.decode(UInt32.self, forKey: .recognitionTimeoutMilliseconds))
         case "hideHandwriting":
@@ -970,10 +1198,11 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode("showNote", forKey: .type)
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(anchor, forKey: .anchor)
-        case .showMode(let mode, let anchor):
+        case .showMode(let mode, let anchor, let label):
             try container.encode("showMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
             try container.encodeIfPresent(anchor, forKey: .anchor)
+            try container.encodeIfPresent(label, forKey: .label)
         case .showHandwriting(let anchor, let recognitionDelayMilliseconds, let recognitionTimeoutMilliseconds):
             try container.encode("showHandwriting", forKey: .type)
             try container.encodeIfPresent(anchor, forKey: .anchor)

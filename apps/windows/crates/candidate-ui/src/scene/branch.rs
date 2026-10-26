@@ -129,7 +129,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
             || painter.width(&column.text, Font::Trunk),
             |split| split_pieces(split, painter).width,
         );
-        let width = text + padding * 2.0;
+        let width = text + padding * 2.0 + corrected_label_width(column, painter);
         trunk_x.push(x);
         trunk_width.push(width);
         x += width + metrics.trunk_gap;
@@ -319,6 +319,15 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     )
 }
 
+/// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)．直していなければ 0
+fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
+    if column.is_corrected == Some(true) {
+        painter.width(strings::CORRECTED, Font::Label) + candidate::PADDING_X / 2.0
+    } else {
+        0.0
+    }
+}
+
 fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     let theme = painter.theme;
     let rounded = theme.is_rounded();
@@ -352,7 +361,22 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     };
     let y = node.max_y() - offset;
     let from = node.x + candidate::PADDING_X;
-    let to = node.max_x() - candidate::PADDING_X;
+    let to = node.max_x() - candidate::PADDING_X - corrected_label_width(column, painter);
+    if column.is_corrected == Some(true) {
+        // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
+        let label = if !rounded && column.is_focused {
+            theme.selection_text
+        } else {
+            theme.correction
+        };
+        painter.text(
+            strings::CORRECTED,
+            Font::Label,
+            label,
+            to + candidate::PADDING_X / 2.0,
+            node,
+        );
+    }
     if column.is_decided {
         painter.underline(
             from,
@@ -717,6 +741,7 @@ mod tests {
             is_focused: focused,
             is_uncertain: !focused,
             is_decided: false,
+            is_corrected: None,
             preview: (!focused).then(|| "腫れ".to_string()),
             shorter: None,
             longer: None,
@@ -732,11 +757,28 @@ mod tests {
             columns: vec![column("今日は", true), column("晴れ", false)],
             position: 1,
             total: 2,
-            note: Some("直しました".into()),
+            note: Some("修正しました".into()),
             hints: vec![KeyHint {
                 keys: "Space".into(),
                 label: "候補".into(),
             }],
+        }
+    }
+
+    #[test]
+    fn 直した文節に修正と添える() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut corrected = column("良いですね", false);
+            corrected.is_corrected = Some(true);
+            let marked = BranchMap {
+                columns: vec![column("今日は", true), corrected],
+                ..map()
+            };
+            let scene = branch_map(&marked, &Look::new(&theme, 15.0), &Fixed);
+            assert!(texts(&scene).contains(&(strings::CORRECTED.into(), theme.correction)));
+            let plain = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+            assert!(!texts(&plain).contains(&(strings::CORRECTED.into(), theme.correction)));
         }
     }
 
@@ -749,7 +791,7 @@ mod tests {
             assert!(texts.contains(&("京は".into(), theme.selection_text)));
             assert!(texts.contains(&("修正".into(), theme.selection_text)));
             assert!(texts.contains(&("きょうは".into(), theme.text)));
-            assert!(texts.contains(&("直しました".into(), theme.correction)));
+            assert!(texts.contains(&("修正しました".into(), theme.correction)));
             assert!(texts.contains(&("1–2 / 2".into(), theme.text_muted)));
             // 注目している文節の枝と重なる文節には，次の候補を添えない
             assert!(!texts.iter().any(|(text, _)| text == "腫れ"));

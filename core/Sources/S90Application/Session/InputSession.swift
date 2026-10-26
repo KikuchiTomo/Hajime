@@ -7,6 +7,7 @@ import S90Domain
 /// - 読みを組み立てている(ライブ変換の結果か読みを表示する)
 /// - 候補を一覧から選んでいる(候補ウィンドウを出す)
 /// - 文節格子で文節ごとに候補を選んでいる(格子のウィンドウを出す)
+/// - 連想の一覧から選んでいる(R-18．元の一覧か文節格子の上で，選んでいる文節を連想の語に置き換えて見せる)
 ///
 /// キーの意味はキー設定の表(Keymap．R-17)で決める．表の状態は，何も組み立てていない(入力文字なし)・読みを組み立てている(入力中)・
 /// 候補を選んでいる(変換中．一覧と文節格子の両方)と，英数モード(英数)
@@ -16,6 +17,8 @@ public final class InputSession {
         case composing
         case selecting(CandidateSelection)
         case lattice(SegmentLattice)
+        /// 連想の一覧(R-18)．origin は連想に切り替える前の一覧か文節格子．Esc でそこに戻る
+        indirect case association(AssociationList, origin: Phase)
     }
 
 
@@ -69,14 +72,19 @@ public final class InputSession {
 
     /// 使い方の記録(回数だけ)．記録しないときは nil
     private let usage: (any UsageRecording)?
+    /// 連想変換の語を引く(R-18)
+    private let associationFinder: AssociationFinder
 
-    /// - Parameter typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
+    /// - Parameters:
+    ///   - typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
+    ///   - associations: 取り込んだ連想の辞書を引くもの(R-18)．nil なら連想変換のキーはふつうの変換と同じに動く
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
-                typoService: (any TypoCorrecting)? = nil) {
+                typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         self.settings = settings
         self.usage = usage
+        self.associationFinder = AssociationFinder(lookup: associations, settings: settings)
         let classifier = WordLanguageClassifier(lexicon: lexicon, converter: converter, settings: settings)
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings, converter: converter, classifier: classifier)
         self.readingCorrector = ReadingCorrector(converter: converter, settings: settings, usesProvidedCorrections: typoService != nil)
@@ -343,12 +351,15 @@ public final class InputSession {
         guard isComposing else { return .idle }
         switch phase {
         case .composing: return .composing
-        case .selecting, .lattice: return .converting
+        case .selecting, .lattice, .association: return .converting
         }
     }
 
     /// 表のコマンドを行う．表は状態ごとに効くコマンドだけを返すので，ここではその状態でできることをする
     private func perform(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult {
+        if case .association(let list, let origin) = phase, let result = performInAssociation(command, list: list, origin: origin, context: context) {
+            return result
+        }
         switch command {
         // IME の機能．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
         case .openSettings: return KeyResult(handled: true, actions: commitAll() + [.openSettings])
@@ -411,6 +422,7 @@ public final class InputSession {
         case .previousCandidatePage: return moveCandidate(.previousPage, context: context)
         case .firstCandidate: return moveCandidate(.first, context: context)
         case .lastCandidate: return moveCandidate(.last, context: context)
+        case .associate: return associate(context: context)
         // 文節
         case .nextSegment: return moveSegment(.next, context: context)
         case .previousSegment: return moveSegment(.previous, context: context)
@@ -435,7 +447,7 @@ public final class InputSession {
             let candidate: Candidate? = switch phase {
             case .lattice(let lattice): lattice.focused.selected
             case .selecting: currentCandidate()
-            case .composing: nil
+            case .composing, .association: nil
             }
             if let candidate, candidate.isFromEngine {
                 converter.forget(candidate)
@@ -488,6 +500,8 @@ public final class InputSession {
             guard case .candidate(let index) = selection.focus else { return 0 }
             let perPage = settings.current.listCandidatesPerPage
             return min(selection.candidates.count - index / perPage * perPage, perPage)
+        case .association(let list, _):
+            return list.page(perPage: associationPerPage).words.count
         }
     }
 
@@ -570,6 +584,11 @@ public final class InputSession {
         var actions: [ClientAction] = []
         if case .selecting = phase, let number = numberKey(character), selectByNumber(number) {
             // 候補を選んでいるときの番号キーは，その候補を確定する
+            return KeyResult(handled: true, actions: commitAll())
+        }
+        if case .association(var list, let origin) = phase, let number = numberKey(character), list.select(number: number, perPage: associationPerPage) {
+            // 連想の一覧の番号キーも，その語を確定する
+            phase = .association(list, origin: origin)
             return KeyResult(handled: true, actions: commitAll())
         }
         if phase != .composing {
@@ -858,6 +877,8 @@ public final class InputSession {
 
     /// 組み立て中の読みを，今の表示のとおりに確定する
     private func commitComposition() -> [ClientAction] {
+        // 連想の一覧で選んでいる語は，元の変換の文節に入れてから確定する
+        resolveAssociation()
         if case .lattice(let lattice) = phase {
             for segment in lattice.segments where segment.selected.isFromEngine {
                 converter.didCommit(segment.selected)
@@ -915,9 +936,14 @@ public final class InputSession {
     }
 
     /// 今の表示で確定するとしたら何になるか
-    private func currentCandidate() -> Candidate {
+    private func currentCandidate() -> Candidate { candidate(in: phase) }
+
+    /// phase の表示で確定するとしたら何になるか
+    private func candidate(in phase: Phase) -> Candidate {
         let whole = composition.conversionReading.count
         switch phase {
+        case .association(let list, let origin):
+            return candidate(in: applying(list, to: origin))
         case .selecting(let selection):
             switch selection.focus {
             case .candidate(let index) where selection.candidates.indices.contains(index):
@@ -1050,16 +1076,26 @@ public final class InputSession {
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
             var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
-                                               perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting))
+                                               perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
+                                               corrected: correctedRange(of: \.conversionReading))
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if let pendingNote { panel.note = pendingNote }
+            if case .candidate = selection.focus {
+                panel.associationHint = associationHint(text: candidate.text, reading: String(composition.conversionReading.prefix(candidate.readingCount)))
+            }
             return [.setMarkedText(marked), .showCandidates(panel)]
+        case .association(let list, let origin):
+            return renderAssociation(list, origin: origin)
         case .lattice(let lattice):
+            // 打ち間違いを直した文節は，注目していなければ点線の下線にする
+            let corrected = correctedRange(of: \.conversionReading)
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
-                .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
+                let style: MarkedText.Style = index == lattice.focusedIndex ? .focused
+                    : PanelBuilder.isCorrected(segment, changed: corrected) ? .correction : .converted
+                return .init(segment.selected.text, style: style)
             })
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
-                                                  showsVariants: settings.current.showsVariantRow)
+                                                  showsVariants: settings.current.showsVariantRow, corrected: corrected)
             let preview = LatticeBuilder(converter: converter).resizePreview(lattice, reading: composition.conversionReading)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
@@ -1068,6 +1104,7 @@ public final class InputSession {
                 let segment = lattice.focused
                 let segmentReading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
+                panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if splitMode {
@@ -1095,9 +1132,21 @@ public final class InputSession {
             return [.showNote(PanelBuilder.readingCorrectedNote(typed: shown(typed.conversionReading), key: keyLabel(.cancel, in: .composing)))]
         }
         if let suggestion = readingCorrector.suggestion {
-            return [.showNote(PanelBuilder.readingSuggestionNote(shown(suggestion.conversionReading), key: keyLabel(.acceptSuggestion, in: .composing)))]
+            let phrase = correctedPhrase(reading: suggestion.conversionReading, other: composition.conversionReading) ?? shown(suggestion.conversionReading)
+            return [.showNote(PanelBuilder.readingSuggestionNote(phrase, key: keyLabel(.acceptSuggestion, in: .composing)))]
         }
         return []
+    }
+
+    /// 直した読み(reading)を変換した文のうち，other と違う部分を含む文節(「もしかして」の案内に出す)．
+    /// 文全体を出すと，長い文ではどこを直す案なのかが分からないため．文節に分けられなければ nil
+    private func correctedPhrase(reading: String, other: String) -> String? {
+        guard settings.current.liveConversion, let best = bestWholeCandidate(for: reading),
+            let changed = CorrectedSpan.changedRange(from: other, to: reading) else { return nil }
+        let units = ClauseSplitter.clauses(of: best.words).map { CorrectedSpan.Unit(text: $0.text, readingCount: $0.readingCount) }
+        guard let pieces = CorrectedSpan.pieces(of: best.text, units: units, readingCount: reading.count, changed: changed),
+            let range = CorrectedSpan.textRange(of: pieces) else { return nil }
+        return String(Array(best.text)[range])
     }
 
     private func setLeftContext(_ text: String?) {
@@ -1173,6 +1222,9 @@ public final class InputSession {
             case .last: selection.focus = .candidate(max(selection.candidates.count - 1, 0))
             }
             phase = .selecting(selection)
+        case .association:
+            // 連想の一覧の中の動きは performInAssociation が受け持つ
+            break
         }
         return KeyResult(handled: true, actions: render(context: context))
     }
@@ -1185,7 +1237,8 @@ public final class InputSession {
     /// 文節を移る・長さを変える・区切る．一覧は文節が 1 つなので，種類の行にいるときの左右だけ字種を移る
     private func moveSegment(_ move: SegmentMove, context: InputContext) -> KeyResult {
         switch phase {
-        case .composing:
+        case .composing, .association:
+            // 連想の一覧の中の動きは performInAssociation が受け持つ
             return KeyResult(handled: true)
         case .selecting:
             switch move {
@@ -1215,6 +1268,138 @@ public final class InputSession {
             phase = .lattice(lattice)
             return KeyResult(handled: true, actions: render(context: context))
         }
+    }
+
+    // MARK: - 連想変換(R-18)
+
+    /// 連想の一覧の 1 ページの語の数．元の出し方(分岐図か一覧)の候補の数に合わせる
+    private var associationPerPage: Int {
+        if case .association(_, .selecting) = phase { return settings.current.listCandidatesPerPage }
+        return settings.current.branchCandidatesPerPage
+    }
+
+    /// 連想変換のキー．入力中なら変換してから，変換中なら選んでいる文節を，連想の一覧に切り替える．
+    /// 連想変換を使わない設定のときは，入力中ならふつうに変換する
+    private func associate(context: InputContext) -> KeyResult {
+        guard associationFinder.isEnabled else {
+            return phase == .composing ? convert(withoutLearning: false, context: context) : KeyResult(handled: true)
+        }
+        if phase == .composing {
+            alphabetRun = false
+            waitsForCorrections = false
+            enterConversion()
+        }
+        if !enterAssociation() {
+            pendingNote = associationFinder.hasDictionaries ? PanelBuilder.noAssociationNote : PanelBuilder.noAssociationDictionaryNote
+        }
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 選んでいる文節(一覧なら選んでいる候補)の連想の一覧に切り替える．連想が無ければ false
+    private func enterAssociation() -> Bool {
+        let base: (text: String, reading: String)
+        switch phase {
+        case .lattice(let lattice):
+            base = (lattice.focused.selected.text, focusedReading(lattice))
+        case .selecting:
+            let candidate = currentCandidate()
+            base = (candidate.text, String(composition.conversionReading.prefix(candidate.readingCount)))
+        case .composing, .association:
+            return false
+        }
+        guard let associations = associationFinder.find(text: base.text, reading: base.reading) else { return false }
+        phase = .association(AssociationList(associations), origin: phase)
+        return true
+    }
+
+    /// 連想の一覧を出しているときのコマンド．一覧の中で動く・元の変換に戻るものはここで行う．
+    /// ほかのコマンドは，選んでいる語を元の変換の文節に入れてから，ふつうに行う(nil を返す)
+    private func performInAssociation(_ command: KeymapCommand, list: AssociationList, origin: Phase, context: InputContext) -> KeyResult? {
+        var list = list
+        switch command {
+        case .nextCandidate: list.move(by: 1)
+        case .previousCandidate: list.move(by: -1)
+        case .nextCandidatePage: list.movePage(by: 1, perPage: associationPerPage)
+        case .previousCandidatePage: list.movePage(by: -1, perPage: associationPerPage)
+        case .firstCandidate: list.selectFirst()
+        case .lastCandidate: list.selectLast()
+        // 左右(と迷う文節へ移るキー)で意味のまとまりを移る
+        case .nextSegment, .nextUncertainSegment: list.moveGroup(by: 1)
+        case .previousSegment, .previousUncertainSegment: list.moveGroup(by: -1)
+        case .cancel, .backToReading, .associate:
+            // 元の変換に戻る
+            phase = origin
+            return KeyResult(handled: true, actions: render(context: context))
+        default:
+            resolveAssociation()
+            return nil
+        }
+        phase = .association(list, origin: origin)
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 連想の一覧で選んでいる語を元の変換の文節に入れ，連想の一覧を閉じる
+    private func resolveAssociation() {
+        guard case .association(let list, let origin) = phase else { return }
+        phase = applying(list, to: origin)
+    }
+
+    /// origin(一覧か文節格子)の選んでいるところを，連想の一覧で選んでいる語にしたもの．
+    /// 語は候補に足して選ぶ(元の候補にあればそれを選ぶ)．足した語は学習しない(CandidateOrigin.association)
+    private func applying(_ list: AssociationList, to origin: Phase) -> Phase {
+        let word = list.selectedWord
+        switch origin {
+        case .lattice(var lattice):
+            var segment = lattice.focused
+            if let index = segment.candidates.firstIndex(where: { $0.text == word }) {
+                segment.choice = .candidate(index)
+            } else {
+                segment.candidates.append(Candidate(text: word, readingCount: segment.readingLength, origin: .association))
+                segment.choice = .candidate(segment.candidates.count - 1)
+            }
+            segment.isDecided = true
+            lattice.segments[lattice.focusedIndex] = segment
+            return .lattice(lattice)
+        case .selecting(var selection):
+            let base = candidate(in: origin)
+            if let index = selection.candidates.firstIndex(where: { $0.text == word && $0.readingCount == base.readingCount }) {
+                selection.focus = .candidate(index)
+            } else {
+                selection.candidates.append(Candidate(text: word, readingCount: base.readingCount, origin: .association))
+                selection.annotations.append(nil)
+                selection.focus = .candidate(selection.candidates.count - 1)
+            }
+            return .selecting(selection)
+        case .composing, .association:
+            return origin
+        }
+    }
+
+    /// 連想の一覧の表示．入力欄には選んでいる語を入れた文を見せる
+    private func renderAssociation(_ list: AssociationList, origin: Phase) -> [ClientAction] {
+        switch applying(list, to: origin) {
+        case .lattice(let lattice):
+            let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
+                .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
+            })
+            let panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
+            return [.setMarkedText(marked), .showLattice(panel)]
+        case .selecting(let selection):
+            let candidate = candidate(in: .selecting(selection))
+            let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
+            let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
+            let panel = PanelBuilder.associationListPanel(for: list, perPage: settings.current.listCandidatesPerPage)
+            return [.setMarkedText(marked), .showCandidates(panel)]
+        case .composing, .association:
+            return []
+        }
+    }
+
+    /// 選んでいる候補に連想があるときの知らせ．知らせない設定か，連想が無ければ nil
+    private func associationHint(text: String, reading: String) -> String? {
+        guard settings.current.showsAssociationHint, associationFinder.hasDictionaries,
+            associationFinder.find(text: text, reading: reading) != nil else { return nil }
+        return PanelBuilder.associationHint(key: keyLabel(.associate, in: .converting))
     }
 
     /// 分岐図の先頭の文節だけを確定し，残りの文節は選んだ候補のまま変換を続ける．文節が 1 つなら全体を確定する
@@ -1309,6 +1494,12 @@ public final class InputSession {
             ])
         }
         guard settings.current.liveConversion, !holdsLiveConversionForCode else {
+            // 打ち間違いを直した読みは，直したかなだけを点線の下線にする
+            if let changed = correctedRange(of: \.kana) {
+                let kana = Candidate(text: composition.kana, readingCount: composition.kana.count, origin: .variant(.hiragana))
+                return MarkedText(Self.markedSegments(CorrectedSpan.pieces(of: kana, reading: composition.kana, changed: changed), otherwise: .reading)
+                    + [.init(composition.pending, style: .reading)])
+            }
             return MarkedText([.init(composition.displayReading, style: .reading)])
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
@@ -1324,14 +1515,32 @@ public final class InputSession {
             }
             return MarkedText(segments + [.init(composition.pending, style: .reading)])
         }
-        let shown = bestWholeCandidate(for: reading).map {
-            LiveConversionRule().display(of: $0, reading: reading, settled: isSettled)
+        let best = bestWholeCandidate(for: reading)
+        let shown = best.map { LiveConversionRule().display(of: $0, reading: reading, settled: isSettled) } ?? reading
+        // 打ち間違いを直した読みは，直した語句だけを点線の下線にする．どこを直したかが分かるように
+        if readingCorrector.isApplied {
+            let candidate = best ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
+            let pieces = correctedRange(of: \.kana).map {
+                CorrectedSpan.aligning(CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0), to: shown)
+            } ?? [CorrectedSpan.Piece(shown, isCorrected: true)]
+            return MarkedText(Self.markedSegments(pieces, otherwise: .converted) + [.init(composition.pending, style: .reading)])
         }
-        // 打ち間違いを直した読みは，点線の下線で直したことを見せる
         return MarkedText([
-            .init(shown ?? reading, style: readingCorrector.isApplied ? .correction : .converted),
+            .init(shown, style: .converted),
             .init(composition.pending, style: .reading),
         ])
+    }
+
+    /// 打ち間違いを直して見せている読みのうち，直した部分(読みの先頭からの文字数)．直していなければ nil．
+    /// reading は比べる読み(ライブ変換の表示は kana，変換は conversionReading)
+    private func correctedRange(of reading: KeyPath<Composition, String>) -> Range<Int>? {
+        guard readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) else { return nil }
+        return CorrectedSpan.changedRange(from: typed[keyPath: reading], to: composition[keyPath: reading])
+    }
+
+    /// 直した部分は補正の下線，そのほかは style にする
+    private static func markedSegments(_ pieces: [CorrectedSpan.Piece], otherwise style: MarkedText.Style) -> [MarkedText.Segment] {
+        pieces.map { .init($0.text, style: $0.isCorrected ? .correction : style) }
     }
 }
 

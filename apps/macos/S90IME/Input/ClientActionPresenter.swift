@@ -38,7 +38,8 @@ final class ClientActionPresenter {
                 client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: Self.noReplacement)
             case .showCandidates(let panel):
                 note.hide()
-                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize)
+                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
+                                    keys: settings.current.keymap)
             case .showLattice(let panel):
                 note.hide()
                 candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,

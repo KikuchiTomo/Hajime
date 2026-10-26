@@ -22,6 +22,10 @@ use windows::Win32::Graphics::Gdi::{
     PAINTSTRUCT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Accessibility::{
+    NotificationKind_ActionCompleted, NotificationProcessing_ImportantMostRecent,
+    UiaHostProviderFromHwnd, UiaRaiseNotificationEvent,
+};
 use windows::Win32::UI::Controls::MARGINS;
 use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
@@ -33,10 +37,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_MOUSEACTIVATE, WM_PAINT, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES, WS_EX_NOACTIVATE,
     WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
-use windows_core::{Result, BOOL, PCWSTR};
+use windows_core::{Result, BOOL, BSTR, PCWSTR};
 
 const WM_INBOX: u32 = WM_APP + 1;
 const BASE_DPI: f32 = 96.0;
+/// 読み上げの種類の名前．同じ名前の読み上げは新しいものが前のものを置き換える
+const ANNOUNCEMENT_ID: &str = "s90.tokyo-ime.candidate";
 
 /// 時計の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -278,6 +284,24 @@ impl Window {
                 (scene.width * scale).ceil() as i32,
                 (scene.height * scale).ceil() as i32,
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            )
+        };
+    }
+
+    /// ナレーターに text を読み上げてもらう．前の読み上げを打ち切り，今の選択を読む
+    pub fn announce(&self, text: &str) {
+        // SAFETY: hwnd はこの窓．OS が窓に対応する UI オートメーションの要素を返す
+        let Ok(provider) = (unsafe { UiaHostProviderFromHwnd(self.hwnd) }) else {
+            return;
+        };
+        // SAFETY: provider と文字列は呼び出しのあいだ有効
+        let _ = unsafe {
+            UiaRaiseNotificationEvent(
+                &provider,
+                NotificationKind_ActionCompleted,
+                NotificationProcessing_ImportantMostRecent,
+                &BSTR::from(text),
+                &BSTR::from(ANNOUNCEMENT_ID),
             )
         };
     }

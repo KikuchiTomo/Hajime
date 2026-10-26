@@ -1,5 +1,5 @@
 //! タスクバーの入力モードの表示(「あ」「A」)と入力メニュー．TSF の言語バーの項目(GUID_LBI_INPUTMODE)として出す．
-//! 左クリックで日本語と英数を切り替え，右クリックのメニューで入力方式・ライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)
+//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)
 
 use super::guard::guard;
 use super::ids::CLSID_TEXT_SERVICE;
@@ -19,7 +19,7 @@ use windows::Win32::UI::TextServices::{
     ITfLangBarItem, ITfLangBarItemButton, ITfLangBarItemButton_Impl, ITfLangBarItemSink,
     ITfLangBarItem_Impl, ITfMenu, ITfSource, ITfSource_Impl, TfLBIClick, GUID_LBI_INPUTMODE,
     TF_LANGBARITEMINFO, TF_LBI_CLK_LEFT, TF_LBI_ICON, TF_LBI_STYLE_BTN_BUTTON,
-    TF_LBI_STYLE_SHOWNINTRAY, TF_LBI_TEXT, TF_LBI_TOOLTIP, TF_LBMENUF_CHECKED, TF_LBMENUF_GRAYED,
+    TF_LBI_STYLE_SHOWNINTRAY, TF_LBI_TEXT, TF_LBI_TOOLTIP, TF_LBMENUF_CHECKED,
     TF_LBMENUF_SEPARATOR,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -126,7 +126,6 @@ impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
                     Item::Command { id, label, checked } => {
                         (id, if checked { TF_LBMENUF_CHECKED } else { 0 }, label)
                     }
-                    Item::Header(label) => (0, TF_LBMENUF_GRAYED, label),
                     Item::Separator => (0, TF_LBMENUF_SEPARATOR, ""),
                 };
                 let text: Vec<u16> = label.encode_utf16().collect();

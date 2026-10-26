@@ -72,6 +72,7 @@ Windows の機械で試すときは，`package` のジョブが作る MSI を入
 - 窓は DWM に合成を任せ(`DwmExtendFrameIntoClientArea`)，描かなかったところを透けさせる．角丸の形と影は中身の側が描く
 - glass は，Windows 11 で DWM の背景(`DWMSBT_TRANSIENTWINDOW`)を使えるときだけ地をすりガラスにする．このときは角の丸み・縁・影も OS が描く．使えないとき(Windows 10・ハイコントラスト)は `glass.light`・`glass.dark` の色で地を塗る
 - 選択の色は Windows のアクセントカラー(`AccentPalette`)．ライト・ダークは `AppsUseLightTheme`，「コントラストを上げる」はハイコントラスト，動きを止めるのは「アニメーション効果」がオフのとき
+- ナレーターが動いているときは，選んでいる候補(文字種)・注目している文節・案内を UI オートメーションの知らせ(`UiaRaiseNotificationEvent`)で読み上げてもらう．同じ文は続けて読ませない
 - 見本の画像は，デバッグビルドの `s90-candidate-ui.exe --render-snapshots <ディレクトリ>` で macOS と同じ名前(`list-glass-light.png` など)で書き出す
 
 ## 決まっていないこと・まだ無いもの

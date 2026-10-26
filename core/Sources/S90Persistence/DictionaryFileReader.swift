@@ -65,10 +65,13 @@ public enum DictionaryFileReader {
         // UTF-8 として正しく読めれば UTF-8．UTF-16 や Shift_JIS の日本語は，UTF-8 としてはほとんど読めない
         if let text = String(data: data, encoding: .utf8) { return text }
         if let utf16 = bomlessUTF16(data), let text = String(data: data, encoding: utf16) { return text }
-        for encoding in [String.Encoding.shiftJIS, .japaneseEUC] {
-            if let text = String(data: data, encoding: encoding) { return text }
-        }
-        return nil
+        if let text = String(data: data, encoding: .shiftJIS) { return text }
+        #if os(Windows)
+        // Windows の Foundation は EUC-JP を読めないので，Shift_JIS に並べ替えて読む
+        return JapaneseEUC.decode(data)
+        #else
+        return String(data: data, encoding: .japaneseEUC)
+        #endif
     }
 
     /// BOM の無い UTF-16 か．はじめの部分で，1 つおきのバイト(UTF-16 の上位のバイト)の多くが，

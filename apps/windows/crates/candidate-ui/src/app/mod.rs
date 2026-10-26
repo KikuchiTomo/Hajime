@@ -6,11 +6,13 @@ mod snapshot;
 mod system;
 mod window;
 
+use crate::announce::{self, Announcer};
 use crate::scene::{self, Look, Scene, Surround};
+use crate::strings;
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
 use ipc::windows::pipe_name;
-use ipc::{InputMode, Presentation, Rect, UiCommand, PROTOCOL_VERSION};
+use ipc::{Presentation, Rect, UiCommand, PROTOCOL_VERSION};
 use render::Renderer;
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -34,7 +36,8 @@ enum Content {
     Candidates(ipc::CandidateList),
     BranchMap(ipc::BranchMap),
     Note(String),
-    Mode(InputMode),
+    /// モードの札の文字
+    Mode(String),
 }
 
 /// 動いているフェード
@@ -64,6 +67,7 @@ struct App {
     rest_opacity: f32,
     opacity: f32,
     fade: Fade,
+    announcer: Announcer,
 }
 
 thread_local! {
@@ -118,6 +122,7 @@ pub fn run() {
             rest_opacity: 1.0,
             opacity: 1.0,
             fade: Fade::None,
+            announcer: Announcer::default(),
         })
     });
     window::run_message_loop();
@@ -206,8 +211,13 @@ impl App {
                 self.content = Content::Note(text);
                 self.anchor = anchor.or(self.anchor.take());
             }
-            UiCommand::ShowMode { mode, anchor } => {
-                self.content = Content::Mode(mode);
+            UiCommand::ShowMode {
+                mode,
+                anchor,
+                label,
+            } => {
+                self.content =
+                    Content::Mode(label.unwrap_or_else(|| strings::mode(mode).to_string()));
                 self.anchor = anchor.or(self.anchor.take());
                 self.opacity = 1.0;
                 self.fade = Fade::None;
@@ -330,6 +340,22 @@ impl App {
         let _ = window.draw(&self.renderer, &scene, &measure, opacity);
     }
 
+    /// ナレーターが動いているときだけ，選んでいる候補・注目している文節・案内を読み上げる
+    fn announce(&mut self) {
+        let text = match &self.content {
+            Content::Candidates(list) => announce::candidates(list),
+            Content::BranchMap(map) => announce::branch_map(map),
+            Content::Note(text) => Some(text.clone()),
+            Content::Hidden | Content::Mode(_) => None,
+        };
+        if text.is_none() || !system::screen_reader() {
+            return;
+        }
+        if let Some(text) = self.announcer.next(text) {
+            self.window().announce(&text);
+        }
+    }
+
     fn refresh(&mut self) {
         let look = system::look(self.backdrop);
         let theme = ResolvedTheme::resolve(
@@ -348,7 +374,7 @@ impl App {
             Content::Candidates(list) => Some(scene::candidate_list(list, &style, &measure)),
             Content::BranchMap(map) => Some(scene::branch_map(map, &style, &measure)),
             Content::Note(text) => Some(scene::note(text, &style, &measure)),
-            Content::Mode(mode) => Some(scene::mode(*mode, &style, &measure)),
+            Content::Mode(label) => Some(scene::mode(label, &style, &measure)),
         }
         .map(|scene| scene::surround(scene, &theme, Surround::Shadow));
         let on_glass = theme.backdrop;
@@ -382,8 +408,10 @@ impl App {
             _ => {
                 self.window().hide();
                 self.rest_opacity = 1.0;
+                self.announcer.reset();
             }
         }
+        self.announce();
         self.scene = scene;
         self.theme = Some(theme);
     }
