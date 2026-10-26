@@ -100,6 +100,9 @@ name = "settings"
 version = "0.1.0"
 dependencies = [
  "ipc",
+ "serde",
+ "serde_json",
+ "thiserror",
  "tokens",
  "windows",
  "windows-core",

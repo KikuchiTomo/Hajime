@@ -138,6 +138,55 @@ pub const GLASS_SNAPSHOT_LIGHT: Rgb = Rgb { red: 0x9F, green: 0x9F, blue: 0x9F }
 
 pub const GLASS_SNAPSHOT_DARK: Rgb = Rgb { red: 0x26, green: 0x26, blue: 0x26 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SettingsPalette {
+    pub accent: Rgb,
+    pub accent_text: Rgb,
+    pub background: Rgb,
+    pub card: Rgb,
+    pub card_stroke: Rgb,
+    pub caution: Rgb,
+    pub control: Rgb,
+    pub control_stroke: Rgb,
+    pub nav_selected: Rgb,
+    pub switch_off: Rgb,
+    pub text: Rgb,
+    pub text_secondary: Rgb,
+}
+
+pub mod settings_windows {
+    use super::{Rgb, SettingsPalette};
+
+    pub const LIGHT: SettingsPalette = SettingsPalette {
+        accent: Rgb { red: 0x00, green: 0x5F, blue: 0xB8 },
+        accent_text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        background: Rgb { red: 0xF3, green: 0xF3, blue: 0xF3 },
+        card: Rgb { red: 0xFB, green: 0xFB, blue: 0xFB },
+        card_stroke: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
+        caution: Rgb { red: 0x9D, green: 0x5D, blue: 0x00 },
+        control: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        control_stroke: Rgb { red: 0xC4, green: 0xC4, blue: 0xC4 },
+        nav_selected: Rgb { red: 0xEA, green: 0xEA, blue: 0xEA },
+        switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
+        text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
+        text_secondary: Rgb { red: 0x5F, green: 0x5F, blue: 0x5F },
+    };
+    pub const DARK: SettingsPalette = SettingsPalette {
+        accent: Rgb { red: 0x60, green: 0xCD, blue: 0xFF },
+        accent_text: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
+        background: Rgb { red: 0x20, green: 0x20, blue: 0x20 },
+        card: Rgb { red: 0x2B, green: 0x2B, blue: 0x2B },
+        card_stroke: Rgb { red: 0x1D, green: 0x1D, blue: 0x1D },
+        caution: Rgb { red: 0xFC, green: 0xE1, blue: 0x00 },
+        control: Rgb { red: 0x37, green: 0x37, blue: 0x37 },
+        control_stroke: Rgb { red: 0x4A, green: 0x4A, blue: 0x4A },
+        nav_selected: Rgb { red: 0x2D, green: 0x2D, blue: 0x2D },
+        switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
+        text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        text_secondary: Rgb { red: 0xCF, green: 0xCF, blue: 0xCF },
+    };
+}
+
 pub mod size {
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
@@ -228,6 +277,49 @@ pub mod size {
     pub mod snapshot {
         pub const MARGIN: f32 = 16.0;
         pub const SCALE: f32 = 2.0;
+    }
+    pub mod settings_windows {
+        pub const PAGE_PADDING_X: f32 = 36.0;
+        pub const SCROLL_LINE: f32 = 40.0;
+        pub const LIST_HEIGHT: f32 = 220.0;
+        pub const BUTTON_WIDTH: f32 = 96.0;
+        pub const PAGE_PADDING_TOP: f32 = 20.0;
+        pub const TITLE_FONT_SIZE: f32 = 28.0;
+        pub const SECTION_FONT_SIZE: f32 = 14.0;
+        pub const BODY_FONT_SIZE: f32 = 14.0;
+        pub const CAPTION_FONT_SIZE: f32 = 12.0;
+        pub const ICON_FONT_SIZE: f32 = 16.0;
+        pub const SECTION_GAP: f32 = 28.0;
+        pub const SECTION_TITLE_HEIGHT: f32 = 28.0;
+        pub const CARD_GAP: f32 = 4.0;
+        pub const CARD_RADIUS: f32 = 4.0;
+        pub const CARD_PADDING_X: f32 = 16.0;
+        pub const ROW_HEIGHT: f32 = 52.0;
+        pub const CONTROL_HEIGHT: f32 = 32.0;
+        pub const CONTROL_WIDTH: f32 = 240.0;
+        pub const SWITCH_WIDTH: f32 = 40.0;
+        pub const SWITCH_HEIGHT: f32 = 20.0;
+        pub const RESET_SIZE: f32 = 28.0;
+        pub const NAV_ITEM_HEIGHT: f32 = 36.0;
+        pub const NAV_HEADER_HEIGHT: f32 = 32.0;
+        pub const NAV_PADDING_X: f32 = 12.0;
+        pub const NAV_INDICATOR_WIDTH: f32 = 3.0;
+        pub const NAV_INDICATOR_HEIGHT: f32 = 16.0;
+        pub const NAV_ICON_GAP: f32 = 12.0;
+        pub const SEARCH_HEIGHT: f32 = 32.0;
+        pub const NOTE_LINE_HEIGHT: f32 = 18.0;
+        pub const TITLE_HEIGHT: f32 = 52.0;
+        pub const BODY_LINE_HEIGHT: f32 = 20.0;
+        pub const CONTENT_MAX_WIDTH: f32 = 1000.0;
+        pub const CONTROL_GAP: f32 = 8.0;
+        pub const TOGGLE_WIDTH: f32 = 96.0;
+        pub const STEPPER_WIDTH: f32 = 96.0;
+        pub const SECONDS_LABEL_WIDTH: f32 = 56.0;
+        pub const NAV_WIDTH: f32 = 280.0;
+        pub const WINDOW_WIDTH: f32 = 1000.0;
+        pub const WINDOW_HEIGHT: f32 = 700.0;
+        pub const WINDOW_MIN_WIDTH: f32 = 640.0;
+        pub const WINDOW_MIN_HEIGHT: f32 = 480.0;
     }
 }
 

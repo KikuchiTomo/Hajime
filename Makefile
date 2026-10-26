@@ -1,7 +1,7 @@
 # 入口はすべてここ．中身はまだ検査だけ(core と apps を作ったら build と test を足す)
 PYTHON ?= python3 -I
 
-.PHONY: fetch-models setup check test tokens protocol build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models setup check test tokens protocol settings-catalog build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
 
 setup:
 	mise install
@@ -55,3 +55,7 @@ tokens:
 
 protocol:
 	$(PYTHON) tools/protocol/generate.py
+
+# Windows の設定の画面が読む，設定の項目の名前と範囲の写し(protocol/settings-catalog.json)を作り直す
+settings-catalog:
+	S90_WRITE_SETTINGS_CATALOG=1 swift test --package-path core --filter SettingsCatalogTests

@@ -1,0 +1,111 @@
+{
+  "fields" : [
+    "alphabetWidth",
+    "brackets",
+    "branchCandidatesPerPage",
+    "calculation",
+    "candidateFontSize",
+    "candidatePresentation",
+    "correction",
+    "correctionDelay",
+    "correctionSensitivity",
+    "customRomaji",
+    "customThemeID",
+    "customThemes",
+    "dateConversion",
+    "emojiConversion",
+    "englishInputLiveConversion",
+    "escapeSwitchesToDirect",
+    "handwriting",
+    "homophoneNotes",
+    "importedDictionaries",
+    "initialFocus",
+    "inputStyle",
+    "keyboardLayout",
+    "keymap",
+    "keypadDirect",
+    "learning",
+    "listCandidatesPerPage",
+    "liveConversion",
+    "liveConversionDelay",
+    "misreadings",
+    "misuseNotes",
+    "modeIndicatorDuration",
+    "numberKeySelection",
+    "numberWidth",
+    "okuriganaStyle",
+    "postalCodeConversion",
+    "profileRules",
+    "proofreading",
+    "punctuation",
+    "punctuationCommits",
+    "recordsUsage",
+    "restrainsLiveConversionInCode",
+    "shiftStartsAlphabet",
+    "showsKeyHints",
+    "showsModeIndicator",
+    "showsSuggestions",
+    "showsVariantRow",
+    "slash",
+    "spaceWidth",
+    "suggestionDisplay",
+    "symbolConversion",
+    "symbolRules",
+    "terminalCommands",
+    "theme",
+    "typoCorrection",
+    "userDictionary",
+    "wordLanguage",
+    "yenKey"
+  ],
+  "limits" : {
+    "applicationIdentifierLength" : 255,
+    "correctionRules" : 2000,
+    "customThemes" : 50,
+    "exceptionLength" : 64,
+    "importedDictionaries" : 32,
+    "keymapEntries" : 500,
+    "profileRuleFileBytes" : 262144,
+    "profileRules" : 1000,
+    "romajiKanaLength" : 6,
+    "romajiKeysLength" : 4,
+    "romajiRules" : 500,
+    "ruleListFileBytes" : 1048576,
+    "settingsFileBytes" : 9437184,
+    "symbolRules" : 2000,
+    "themeNameLength" : 40,
+    "usageFileBytes" : 16384,
+    "userDictionaryEntries" : 10000,
+    "userDictionaryFileBytes" : 4194304,
+    "userDictionaryReadingLength" : 32,
+    "userDictionaryWordLength" : 64,
+    "wordLanguageEntries" : 2000,
+    "wordLanguageWordLength" : 32
+  },
+  "ranges" : {
+    "candidateFontSize" : [
+      12,
+      24
+    ],
+    "candidatesPerPage" : [
+      3,
+      9
+    ],
+    "correctionDelay" : [
+      0.4,
+      3
+    ],
+    "customThemeCornerRadius" : [
+      0,
+      24
+    ],
+    "liveConversionDelay" : [
+      0.1,
+      1.5
+    ],
+    "modeIndicatorDuration" : [
+      0.3,
+      3
+    ]
+  }
+}
