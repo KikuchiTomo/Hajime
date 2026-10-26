@@ -6,7 +6,7 @@ macOS の配布物は `.pkg` です．Zenzai のモデルを入れた本番の�
 make package-macos
 ```
 
-`apps/macos/build/dist/s90.tokyo-IME-<版>.pkg` ができます．版は `apps/macos/project.yml` の `MARKETING_VERSION` です．
+`apps/macos/build/dist/s90.tokyo-IME-<版>.pkg` ができます．版は `apps/macos/project.yml` の `MARKETING_VERSION` です．配るたびに `tools/release/bump_patch.sh macos` で PATCH を上げ，`macos/v0.0.2` のようにタグを付けます．番号の決まりは [ADR 0008](adr/0008-versioning.md) にあります．
 
 ## 署名と公証
 

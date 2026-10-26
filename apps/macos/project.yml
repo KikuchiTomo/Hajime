@@ -82,7 +82,7 @@ targets:
         # 本番と開発版で変わる値．Info.plist から読む
         S90_SUPPORT_DIRECTORY: tokyo.s90.ime
         S90_ICON_SUFFIX: ""
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "0.0.1"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         COMBINE_HIDPI_IMAGES: YES
