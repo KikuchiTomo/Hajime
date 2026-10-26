@@ -33,6 +33,8 @@ public enum DefaultSettings {
     public static let engineCandidateCount = 20
     /// 打っているあいだに出す候補(変換と予測)の数
     public static let suggestionCount = 5
+    /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
+    public static let headWordAlternativeCount = 8
     /// 打っているあいだの候補を出し始める読みの長さ(1 文字では候補が多すぎて役に立たない)
     public static let minimumSuggestionReading = 2
     /// タイプミスの補正を試す最短の長さ．短い並びは英単語と偶然一致しやすい

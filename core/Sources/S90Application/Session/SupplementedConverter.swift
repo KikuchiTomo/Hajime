@@ -127,6 +127,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func plausibility(of reading: String) -> Double { base.plausibility(of: reading) }
     public func languageModelScores(forKeys keys: [String]) -> [Double?] { base.languageModelScores(forKeys: keys) }
     public func predictions(for reading: String) -> [Candidate] { base.predictions(for: reading) }
+    public func dictionaryCandidates(for reading: String) -> [Candidate] { base.dictionaryCandidates(for: reading) }
     public func segmentationWords(for reading: String) -> [Candidate.Word] { base.segmentationWords(for: reading) }
     public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { base.typoCorrections(forKeys: keys) }
     public func setLeftContext(_ text: String?) { base.setLeftContext(text) }
