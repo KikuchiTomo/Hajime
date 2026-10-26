@@ -897,12 +897,12 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case showCandidates(list: WireCandidateList, anchor: WireRect?)
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
     case showNote(text: String, anchor: WireRect?)
-    case showMode(mode: WireInputMode, anchor: WireRect?)
+    case showMode(mode: WireInputMode, anchor: WireRect?, label: String?)
     case move(anchor: WireRect)
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, text, mode
+        case type, protocolVersion, presentation, list, anchor, map, text, mode, label
     }
 
     public init(from decoder: any Decoder) throws {
@@ -920,7 +920,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
         case "showNote":
             self = try .showNote(text: container.decode(String.self, forKey: .text), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showMode":
-            self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
+            self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), label: container.decodeIfPresent(String.self, forKey: .label))
         case "move":
             self = try .move(anchor: container.decode(WireRect.self, forKey: .anchor))
         case "hide":
@@ -951,10 +951,11 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode("showNote", forKey: .type)
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(anchor, forKey: .anchor)
-        case .showMode(let mode, let anchor):
+        case .showMode(let mode, let anchor, let label):
             try container.encode("showMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
             try container.encodeIfPresent(anchor, forKey: .anchor)
+            try container.encodeIfPresent(label, forKey: .label)
         case .move(let anchor):
             try container.encode("move", forKey: .type)
             try container.encode(anchor, forKey: .anchor)

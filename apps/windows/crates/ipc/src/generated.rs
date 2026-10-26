@@ -787,6 +787,8 @@ pub enum UiCommand {
         mode: InputMode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
     },
     Move {
         anchor: Rect,
@@ -824,6 +826,7 @@ impl fmt::Debug for UiCommand {
                 .debug_struct("ShowMode")
                 .field("mode", mode)
                 .field("anchor", anchor)
+                .field("label", &REDACTED)
                 .finish(),
             Self::Move { anchor, .. } => f
                 .debug_struct("Move")

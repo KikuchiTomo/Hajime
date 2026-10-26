@@ -904,6 +904,10 @@
             {
               "name": "anchor",
               "type": "Rect?"
+            },
+            {
+              "name": "label",
+              "type": "string?"
             }
           ]
         },

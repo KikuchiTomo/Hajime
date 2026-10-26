@@ -7,10 +7,11 @@ mod system;
 mod window;
 
 use crate::scene::{self, Look, Scene, Surround};
+use crate::strings;
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
 use ipc::windows::pipe_name;
-use ipc::{InputMode, Presentation, Rect, UiCommand, PROTOCOL_VERSION};
+use ipc::{Presentation, Rect, UiCommand, PROTOCOL_VERSION};
 use render::Renderer;
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -34,7 +35,8 @@ enum Content {
     Candidates(ipc::CandidateList),
     BranchMap(ipc::BranchMap),
     Note(String),
-    Mode(InputMode),
+    /// モードの札の文字
+    Mode(String),
 }
 
 /// 動いているフェード
@@ -206,8 +208,13 @@ impl App {
                 self.content = Content::Note(text);
                 self.anchor = anchor.or(self.anchor.take());
             }
-            UiCommand::ShowMode { mode, anchor } => {
-                self.content = Content::Mode(mode);
+            UiCommand::ShowMode {
+                mode,
+                anchor,
+                label,
+            } => {
+                self.content =
+                    Content::Mode(label.unwrap_or_else(|| strings::mode(mode).to_string()));
                 self.anchor = anchor.or(self.anchor.take());
                 self.opacity = 1.0;
                 self.fade = Fade::None;
@@ -328,7 +335,7 @@ impl App {
             Content::Candidates(list) => Some(scene::candidate_list(list, &style, &measure)),
             Content::BranchMap(map) => Some(scene::branch_map(map, &style, &measure)),
             Content::Note(text) => Some(scene::note(text, &style, &measure)),
-            Content::Mode(mode) => Some(scene::mode(*mode, &style, &measure)),
+            Content::Mode(label) => Some(scene::mode(label, &style, &measure)),
         }
         .map(|scene| scene::surround(scene, &theme, Surround::Shadow));
         let on_glass = theme.backdrop;

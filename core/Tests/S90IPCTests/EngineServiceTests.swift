@@ -201,6 +201,24 @@ struct EngineServiceTests {
         #expect(settings.current.inputStyle == .kana)
     }
 
+    @Test("入力方式を切り替えたら，モードの札に入力方式を出す．出さない設定なら出さない")
+    func styleIndicator() throws {
+        let id = greeted()
+        sent.value.removeAll()
+        _ = service.handle(WireRequest(id: 40, body: .menu(command: .selectInputStyle(style: "kana"))), from: id)
+        #expect(sent.value.contains { command in
+            if case .showMode(_, _, let label) = command { return label == "かな" }
+            return false
+        })
+        try settings.update { $0.showsModeIndicator = false }
+        sent.value.removeAll()
+        _ = service.handle(WireRequest(id: 41, body: .menu(command: .selectInputStyle(style: "romaji"))), from: id)
+        #expect(!sent.value.contains { command in
+            if case .showMode = command { return true }
+            return false
+        })
+    }
+
     @Test("見た目の設定は設定の値を運ぶ")
     func presentation() {
         #expect(service.presentation.theme == settings.current.theme.rawValue)

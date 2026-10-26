@@ -8,7 +8,7 @@ use crate::scene::{self, Look, Scene, Surround};
 use crate::theme::{ResolvedTheme, SystemLook};
 use ipc::{
     BranchColumn, BranchMap, BranchSplit, CandidateEntry, CandidateFocus, CandidateList,
-    CandidateVariant, Color as WireColor, CustomTheme, InputMode, KeyHint,
+    CandidateVariant, Color as WireColor, CustomTheme, KeyHint,
 };
 use std::path::{Path, PathBuf};
 use windows::Win32::Foundation::GENERIC_WRITE;
@@ -113,7 +113,7 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::branch_map(&preview(), &look, &measure),
             ),
             ("branch-split", scene::branch_map(&split(), &look, &measure)),
-            ("mode", scene::mode(InputMode::Japanese, &look, &measure)),
+            ("mode", scene::mode("あ", &look, &measure)),
             ("note", scene::note("もしかして: 雰囲気", &look, &measure)),
         ];
         for (kind, scene) in scenes {

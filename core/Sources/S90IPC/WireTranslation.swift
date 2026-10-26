@@ -229,7 +229,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .hideCandidates:
                 ui.append(.hide)
             case .showModeIndicator(let mode):
-                ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor))
+                ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor, label: nil))
             case .showNote(let text):
                 ui.append(.showNote(text: text, anchor: anchor))
             case .selectInputStyle(let style):
