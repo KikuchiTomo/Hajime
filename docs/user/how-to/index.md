@@ -4,3 +4,5 @@ description: 目的ごとの手順
 ---
 
 ¥ キーで `\` を入力する，ターミナルで英数に戻す，などの手順をここに足します．
+
+- [Windows に入れる](install-windows.md)
