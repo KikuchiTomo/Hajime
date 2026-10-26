@@ -21,7 +21,9 @@ final class EnglishWordCorrector {
     /// 綴りを直した英単語を，日本語の打ち間違いの見直しにかけるか．ローマ字として読めない並びは綴りの誤りにも
     /// 日本語の打ち間違い(tkitou → 適当)にも見えるので，日本語として直せるなら日本語に譲る
     func yieldsToJapanese(in composition: Composition) -> Bool {
-        active?.isMisspelling == true
+        guard let active, active.isMisspelling else { return false }
+        let following = KanaWidth.hiragana(from: followingReading(in: composition).conversionReading)
+        return following.isEmpty || !TypoCorrectionRule.startsLikeFollowingEnglish(following)
     }
 
     /// 英単語のあとにローマ字を打ったときの扱い
@@ -175,6 +177,11 @@ final class EnglishWordCorrector {
             return .reevaluate
         }
         if following.pending.isEmpty, !following.kana.isEmpty {
+            // 綴りを直した英単語のあとが，英単語に続く語(「が」「を」「です」)で始まらなければ確定させない．
+            // 日本語の打ち間違い(tkitou → 適当)かもしれないので，打鍵が止まったときの見直し(yieldsToJapanese)で決める
+            if current.isMisspelling, !TypoCorrectionRule.startsLikeFollowingEnglish(KanaWidth.hiragana(from: following.conversionReading)) {
+                return .waiting
+            }
             commit(into: &composition)
             return .reevaluate
         }

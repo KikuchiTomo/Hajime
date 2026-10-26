@@ -1031,6 +1031,8 @@ struct ReadingCorrectionScenarioTests {
         _ = other.handle(KeyEvent(.space), context: InputContext())
         _ = other.handle(KeyEvent(.character("n")), context: InputContext())
         #expect(other.resumeConversion(context: InputContext()).isEmpty)
+    }
+
     @Test("綴りを直した英単語のあとに日本語が続き，日本語の打ち間違いとして直せるなら日本語に譲る(tkitou → 英単語の kit ではなく 適当)")
     func englishMisspellingYieldsToJapanese() {
         let converter = FakeConverter(["てきとう": [("適当", nil)]])
