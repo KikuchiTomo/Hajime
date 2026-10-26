@@ -17,9 +17,11 @@ struct AppearancePage: View {
         Form {
             Section {
                 // 選んでいるテーマと文字の大きさで，分岐図の見本をその場で描く
+                // 見本は描いた大きさのまま真ん中に置き，まわりに余白をとる(幅いっぱいに伸ばすと字が左に寄って詰まって見える)
                 ThemePreview(choice: ThemeChoice(model.settings), fontSize: fontSize ?? model.settings.candidateFontSize)
+                    .fixedSize()
+                    .padding(DesignTokens.Size.Settings.previewPadding)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
             }
             Section(UIStrings.More.theme) {
                 ForEach(UIStrings.Choice.themes, id: \.self) { theme in
