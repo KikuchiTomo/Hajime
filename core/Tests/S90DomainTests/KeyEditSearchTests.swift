@@ -24,6 +24,8 @@ struct KeyEditSearchTests {
         #expect(KeyEditSearch.isNasalSpelling(inserting: "n", at: 3, in: Array("kanta")) == false)
         #expect(edits.contains { $0.reading == "こんいちは" })
         #expect(KeyEditSearch.edits(of: "pasoko").contains { $0.reading == "ぱそこん" })
+        // 子音の前の「ん」の打ち忘れは起きやすい打ち忘れの手間．子音の途中(kya の前)には補わない
+        #expect(KeyEditSearch.edits(of: "pasokowo").first { $0.reading == "ぱそこんを" }?.cost == KeyEditSearch.Costs().easyOmission)
         #expect(KeyEditSearch.nasalVariants(of: Array("hannei")) == [Array("hannnei")])
         #expect(KeyEditSearch.nasalVariants(of: Array("hannnei")).isEmpty)
     }

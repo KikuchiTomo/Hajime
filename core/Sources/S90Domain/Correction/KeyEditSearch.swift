@@ -65,7 +65,9 @@ public enum KeyEditSearch {
             let current = index < characters.count ? characters[index] : nil
             // 打ち忘れ: index の前に 1 文字を補う
             for character in alphabet {
-                let easy = vowels.contains(character) || character == previous || character == current
+                // 子音の前の「ん」(n 1 つ)は打ち忘れやすい(pasokowo → pasokonwo)．母音のあとに n を補うときだけ(子音の途中には入れない)
+                let droppedNasal = character == "n" && previous.map(vowels.contains) == true && current.map { !vowels.contains($0) && $0 != "y" && $0 != "n" } == true
+                let easy = vowels.contains(character) || character == previous || character == current || droppedNasal
                 let nasal = isNasalSpelling(inserting: character, at: index, in: characters)
                 add(Array(characters[..<index]) + [character] + Array(characters[index...]),
                     cost: nasal ? costs.nasalSpelling : easy ? costs.easyOmission : costs.omission)
