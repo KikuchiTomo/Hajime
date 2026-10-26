@@ -2,9 +2,9 @@
 ///
 /// エンジンの「最初の文節」は粗く，「非常な人だ」を 1 つの文節にすることがある．それでは「非情」を選べないので，
 /// 語の並びから次の決まりで細かく分ける．
-/// - 漢字・カタカナ・英字で始まる語から，新しい文節を始める(「今日」「天気」「GitHub」)
+/// - 漢字・カタカナ・英字で始まる語と，ひらがなの名詞(「ところ」「こと」)から，新しい文節を始める
 /// - 語の中で，先頭のひらがなのあとに漢字などが続けば，そこで分ける(「な人だ」→「な」「人だ」，「を立てる」→「を」「立てる」)
-/// - 1 文字の助詞で始まり，ひらがなの自立語が続く語は，助詞のあとで分ける(「はいい」→「は」「いい」)
+/// - 1 文字の助詞で始まり，2 文字以上のひらがなが続く語は，助詞のあとで分ける(「はいい」→「は」「いい」，「とすれば」→「と」「すれば」)
 /// - ひらがなで始まるそのほかの語(助詞・助動詞・「する」など)は，前の文節に付ける
 public enum ClauseSplitter {
     public struct Clause: Sendable, Equatable {
@@ -32,16 +32,18 @@ public enum ClauseSplitter {
         for word in words {
             let characters = Array(word.text)
             guard let first = characters.first else { continue }
-            if !isHiragana(first) {
+            // 「お茶」「ご飯」の接頭辞は分けず，語全体を新しい文節にする
+            let leading = characters.prefix(while: isHiragana).count
+            let isPrefixed = leading == 1 && characters.count > 1 && !word.startsWithParticle && honorificPrefixes.contains(first)
+            if !isHiragana(first) || word.startsWithNoun || isPrefixed {
                 append(word.text, word.readingCount, startsClause: true)
                 continue
             }
             // 先頭のひらがなは読みと 1 文字ずつ対応するので，読みの長さもそのまま分けられる
-            let leading = characters.prefix(while: isHiragana).count
             if leading < characters.count {
                 append(String(characters.prefix(leading)), leading, startsClause: false)
                 append(String(characters.dropFirst(leading)), word.readingCount - leading, startsClause: true)
-            } else if word.startsWithParticle, !word.endsWithParticle, characters.count > 1, singleParticles.contains(first) {
+            } else if word.startsWithParticle, characters.count > 2, singleParticles.contains(first) {
                 append(String(first), 1, startsClause: false)
                 append(String(characters.dropFirst()), word.readingCount - 1, startsClause: true)
             } else {
@@ -50,6 +52,9 @@ public enum ClauseSplitter {
         }
         return clauses
     }
+
+    /// 語の頭に付く接頭辞．「お茶」「ご飯」は 1 つの語として扱う
+    private static let honorificPrefixes: Set<Character> = ["お", "ご"]
 
     /// 1 文字の助詞．語の先頭にあれば，そのあとで文節を分けてよい
     private static let singleParticles: Set<Character> = ["は", "が", "を", "に", "の", "へ", "と", "で", "も", "や"]

@@ -6,7 +6,7 @@ enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let correctionNote = "Space 入力のままに戻す"
     static let englishInputNote = "Tab 日本語にする"
-    static let readingCorrectionNote = "打ち間違いを直しました　Esc 打ったままに戻す"
+    static let readingCorrectionNote = "直しました　Esc で打ったままに戻す"
 
     /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文
     static func readingCorrectedNote(typed: String) -> String { "直しました　Esc で「\(typed)」に戻す" }
@@ -14,11 +14,11 @@ enum PanelBuilder {
     /// 直さずに示すときの案内．corrected は直した文
     static func readingSuggestionNote(_ corrected: String) -> String { "もしかして「\(corrected)」　Tab で直す" }
 
-    static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool) -> CandidatePanel {
+    static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool,
+                          perPage: Int = DefaultSettings.candidatesPerPage) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
             : []
-        let perPage = DefaultSettings.candidatesPerPage
         let focusedIndex: Int
         let selectedVariant: Int?
         switch selection.focus {
@@ -47,8 +47,7 @@ enum PanelBuilder {
         )
     }
 
-    static func latticePanel(for lattice: SegmentLattice) -> LatticePanel {
-        let perSegment = DefaultSettings.latticeCandidatesPerSegment
+    static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment) -> LatticePanel {
         var position = 1
         var total = 0
         let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in

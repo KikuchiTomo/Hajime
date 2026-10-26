@@ -17,12 +17,17 @@ enum SnapshotRenderer {
     static func runIfRequested() {
         let arguments = CommandLine.arguments
         guard arguments.contains(argument) else { return }
-        FontRegistry.registerBundledFonts()
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshots", isDirectory: true)
         print(output.path)
         try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        let looks: [(theme: ThemePreference, appearance: NSAppearance.Name, name: String)] = [
-            (.automatic, .aqua, "glass-light"), (.automatic, .darkAqua, "glass-dark"), (.platinum, .aqua, "platinum"), (.desk, .darkAqua, "desk"),
+        let sample = CustomTheme(id: "sample", name: "夕焼け", base: .automatic, surface: HexColor("#2B1B17")!, text: HexColor("#FFE8D6")!,
+                                 textMuted: HexColor("#C9A68F")!, selection: HexColor("#FF7A3D")!, selectionText: HexColor("#1A0E0A")!,
+                                 correction: HexColor("#FFD23F")!, line: HexColor("#6B4A3E")!, fontName: "HiraMaruProN-W4", cornerRadius: 4, branchStyle: .straight)
+        let looks: [(theme: ThemeChoice, appearance: NSAppearance.Name, name: String)] = [
+            (ThemeChoice(.automatic, custom: sample), .darkAqua, "custom"),
+            (ThemeChoice(.automatic), .aqua, "glass-light"), (ThemeChoice(.automatic), .darkAqua, "glass-dark"), (ThemeChoice(.platinum), .aqua, "platinum"), (ThemeChoice(.desk), .darkAqua, "desk"),
+            (ThemeChoice(.washi), .aqua, "washi"), (ThemeChoice(.neon), .darkAqua, "neon"), (ThemeChoice(.terminal), .darkAqua, "terminal"), (ThemeChoice(.nordic), .aqua, "nordic"),
+            (ThemeChoice(.contrast), .darkAqua, "contrast"),
         ]
         for look in looks {
             let appearance = NSAppearance(named: look.appearance)
@@ -46,7 +51,7 @@ enum SnapshotRenderer {
         return view
     }
 
-    private static func modeView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+    private static func modeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = ModeIndicatorView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
@@ -64,7 +69,7 @@ enum SnapshotRenderer {
         return container
     }
 
-    private static func listView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+    private static func listView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
@@ -79,7 +84,7 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    private static func correctionView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+    private static func correctionView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
@@ -94,15 +99,15 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    private static func latticeView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+    private static func latticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
         let panel = LatticePanel(columns: [
             .init(text: "私の", isFocused: false, isUncertain: false),
             .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),
-            .init(text: "中野です", alternatives: ["中のです", "中野です", "仲のです", "なかのです", "那珂のです"], selectedAlternative: 1,
-                  variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true),
+            .init(text: "中野です", alternatives: ["中のです", "中野です", "仲のです", "那珂のです"], selectedAlternative: 1,
+                  variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true, shorter: "中野で", longer: nil),
         ], position: 1, total: 8)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
@@ -110,7 +115,7 @@ enum SnapshotRenderer {
     }
 
     /// 確信の低い文節が 2 つあり，注目していない方に次の候補を添えた分岐図
-    private static func previewView(theme: ThemePreference, appearance: NSAppearance?) -> NSView {
+    private static func previewView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true

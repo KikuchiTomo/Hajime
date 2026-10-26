@@ -47,6 +47,66 @@ enum DesignTokens {
             text: RGB(red: 0xFF, green: 0xCC, blue: 0x66),
             textMuted: RGB(red: 0x99, green: 0x77, blue: 0xBB)
         )
+        static let washi = ThemePalette(
+            bevelLight: RGB(red: 0xFF, green: 0xFB, blue: 0xF2),
+            bevelShadow: RGB(red: 0xD8, green: 0xCD, blue: 0xB8),
+            correction: RGB(red: 0x1D, green: 0x4E, blue: 0x89),
+            frame: RGB(red: 0xC9, green: 0xBC, blue: 0xA3),
+            prediction: RGB(red: 0x6B, green: 0x5F, blue: 0x53),
+            selection: RGB(red: 0xB3, green: 0x26, blue: 0x2D),
+            selectionText: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            surface: RGB(red: 0xF5, green: 0xEF, blue: 0xE3),
+            text: RGB(red: 0x2A, green: 0x24, blue: 0x20),
+            textMuted: RGB(red: 0x6B, green: 0x5F, blue: 0x53)
+        )
+        static let neon = ThemePalette(
+            bevelLight: RGB(red: 0x2B, green: 0x24, blue: 0x59),
+            bevelShadow: RGB(red: 0x1C, green: 0x17, blue: 0x40),
+            correction: RGB(red: 0x2E, green: 0xE6, blue: 0xFF),
+            frame: RGB(red: 0x3D, green: 0x34, blue: 0x80),
+            prediction: RGB(red: 0xA6, green: 0x9E, blue: 0xDB),
+            selection: RGB(red: 0xFF, green: 0x2E, blue: 0x93),
+            selectionText: RGB(red: 0x14, green: 0x00, blue: 0x1F),
+            surface: RGB(red: 0x0E, green: 0x0B, blue: 0x22),
+            text: RGB(red: 0xF1, green: 0xEE, blue: 0xFF),
+            textMuted: RGB(red: 0xA6, green: 0x9E, blue: 0xDB)
+        )
+        static let terminal = ThemePalette(
+            bevelLight: RGB(red: 0x1E, green: 0x35, blue: 0x22),
+            bevelShadow: RGB(red: 0x15, green: 0x26, blue: 0x1A),
+            correction: RGB(red: 0xFF, green: 0xD4, blue: 0x4D),
+            frame: RGB(red: 0x2E, green: 0x55, blue: 0x34),
+            prediction: RGB(red: 0x5D, green: 0xB8, blue: 0x6C),
+            selection: RGB(red: 0x86, green: 0xF5, blue: 0x9A),
+            selectionText: RGB(red: 0x0A, green: 0x11, blue: 0x0B),
+            surface: RGB(red: 0x0A, green: 0x11, blue: 0x0B),
+            text: RGB(red: 0x86, green: 0xF5, blue: 0x9A),
+            textMuted: RGB(red: 0x5D, green: 0xB8, blue: 0x6C)
+        )
+        static let nordic = ThemePalette(
+            bevelLight: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            bevelShadow: RGB(red: 0xD7, green: 0xDE, blue: 0xE1),
+            correction: RGB(red: 0xB5, green: 0x57, blue: 0x3A),
+            frame: RGB(red: 0xC5, green: 0xCF, blue: 0xD4),
+            prediction: RGB(red: 0x5D, green: 0x6C, blue: 0x77),
+            selection: RGB(red: 0x41, green: 0x70, blue: 0x9C),
+            selectionText: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            surface: RGB(red: 0xF4, green: 0xF6, blue: 0xF6),
+            text: RGB(red: 0x24, green: 0x30, blue: 0x3A),
+            textMuted: RGB(red: 0x5D, green: 0x6C, blue: 0x77)
+        )
+        static let contrast = ThemePalette(
+            bevelLight: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            bevelShadow: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            correction: RGB(red: 0x00, green: 0xE5, blue: 0xFF),
+            frame: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            prediction: RGB(red: 0xE6, green: 0xE6, blue: 0xE6),
+            selection: RGB(red: 0xFF, green: 0xE6, blue: 0x00),
+            selectionText: RGB(red: 0x00, green: 0x00, blue: 0x00),
+            surface: RGB(red: 0x00, green: 0x00, blue: 0x00),
+            text: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            textMuted: RGB(red: 0xE6, green: 0xE6, blue: 0xE6)
+        )
     }
     enum Size {
         enum Candidate {
@@ -79,8 +139,9 @@ enum DesignTokens {
             static let underlineOffset: CGFloat = 2
         }
         enum Settings {
-            static let windowWidth: CGFloat = 620
-            static let windowHeight: CGFloat = 520
+            static let windowWidth: CGFloat = 820
+            static let windowHeight: CGFloat = 580
+            static let sidebarWidth: CGFloat = 190
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12

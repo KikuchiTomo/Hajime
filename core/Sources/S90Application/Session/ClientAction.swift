@@ -16,6 +16,10 @@ public enum ClientAction: Sendable, Equatable {
     case selectMode(InputMode)
     /// 入力方式を切り替える(設定に保存する)．R-05
     case selectInputStyle(InputStyle)
+    /// 設定の画面を開く(キーで開くとき)
+    case openSettings
+    /// ライブ変換を切り替える(設定に保存する)
+    case toggleLiveConversion
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
     case showNote(String)
 }
@@ -142,9 +146,14 @@ public struct LatticePanel: Sendable, Equatable {
         public var isDecided: Bool
         /// 注目していない迷う文節に薄く添える，次の候補
         public var preview: String?
+        /// 注目している文節を 1 文字短く・長くしたときの文節(足元に「⇧← 入れ　⇧→ 入れると」と見せる)
+        public var shorter: String?
+        public var longer: String?
 
         public init(text: String, alternatives: [String] = [], selectedAlternative: Int? = nil, variants: [String] = [], selectedVariant: Int? = nil,
-                    isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil) {
+                    isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil, shorter: String? = nil, longer: String? = nil) {
+            self.shorter = shorter
+            self.longer = longer
             self.text = text
             self.alternatives = alternatives
             self.selectedAlternative = selectedAlternative

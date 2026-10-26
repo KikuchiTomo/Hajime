@@ -10,18 +10,77 @@ enum UIStrings {
     }
 
     enum Branch {
-        static let hints = [
-            KeyHint(key: "↓", label: "候補"),
-            KeyHint(key: "↑", label: "文字種"),
-            KeyHint(key: "←→", label: "文節"),
-            KeyHint(key: "Tab", label: "次の文節"),
-            KeyHint(key: "⇧←→", label: "文節の長さ"),
-        ]
+        /// 足元の案内．キーは設定の割り当て(KeyBindings)の最初のキーを出す
+        /// 文節の長さは，押したらどうなるか(shorter・longer)が分かればそれを見せる(「⇧← 入れ　⇧→ 入れると」)
+        static func hints(for keys: KeyBindings, shorter: String? = nil, longer: String? = nil) -> [KeyHint] {
+            func first(_ command: ConversionCommand) -> String { keys.strokes(for: command).first.map(Keys.name(of:)) ?? "" }
+            let length: [KeyHint] = shorter == nil && longer == nil
+                ? [KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ")]
+                : [shorter.map { KeyHint(key: first(.shrinkSegment), label: $0) }, longer.map { KeyHint(key: first(.extendSegment), label: $0) }].compactMap { $0 }
+            return ([
+                KeyHint(key: first(.nextCandidate), label: "候補"),
+                KeyHint(key: first(.previousCandidate), label: "文字種"),
+                KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
+                KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
+            ] + length).filter { !$0.key.isEmpty }
+        }
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
         static func position(first: Int, last: Int, total: Int) -> String {
             first == last ? "\(first) / \(total)" : "\(first)–\(last) / \(total)"
         }
+    }
+
+    /// キーの名前(macOS のメニューと同じ記号)
+    enum Keys {
+        static func name(of stroke: KeyStroke) -> String {
+            var name = ""
+            if stroke.control { name += "⌃" }
+            if stroke.option { name += "⌥" }
+            if stroke.shift { name += "⇧" }
+            switch stroke.key {
+            case .space: name += "Space"
+            case .tab: name += "Tab"
+            case .up: name += "↑"
+            case .down: name += "↓"
+            case .left: name += "←"
+            case .right: name += "→"
+            case .character(let text): name += text.uppercased()
+            }
+            return name
+        }
+
+        /// 「←」と「→」のように修飾キーだけが同じ 2 つのキーは「←→」とまとめる
+        static func pair(_ first: String, _ second: String) -> String {
+            let arrows: Set<Character> = ["←", "→"]
+            if let a = first.last, let b = second.last, arrows.contains(a), arrows.contains(b), first.dropLast() == second.dropLast() {
+                return String(first.dropLast()) + "←→"
+            }
+            return [first, second].filter { !$0.isEmpty }.joined(separator: " ")
+        }
+
+        static func label(for command: ConversionCommand) -> String {
+            switch command {
+            case .openSettings: "設定を開く"
+            case .toggleLiveConversion: "ライブ変換の切り替え"
+            case .nextCandidate: "次の候補"
+            case .previousCandidate: "前の候補"
+            case .nextSegment: "右の文節"
+            case .previousSegment: "左の文節"
+            case .nextUncertainSegment: "次の文節"
+            case .previousUncertainSegment: "前の文節"
+            case .extendSegment: "文節を長く"
+            case .shrinkSegment: "文節を短く"
+            }
+        }
+
+        static let tab = "キー操作"
+        static let note = "Enter・Escape・Backspace・数字キーは変更できません。"
+        static let generalSection = "いつでも"
+        static let conversionSection = "変換中"
+        static let add = "追加"
+        static let press = "キーを押してください"
+        static let restore = "初期設定に戻す"
     }
 
     enum ModeIndicator {
@@ -49,7 +108,7 @@ enum UIStrings {
         static let dictionaryTab = "ユーザー辞書"
         static let appearanceTab = "外観"
         static let usageTab = "統計"
-        static let appsTab = "アプリ別"
+        static let appsTab = "除外設定"
         static let romajiTab = "ローマ字"
         static let romajiKeys = "入力"
         static let romajiKana = "出力"
@@ -58,13 +117,13 @@ enum UIStrings {
         static let escapeSwitchesToDirect = "Escape で英数に切り替え"
         static let bundlePrefix = "バンドル ID"
         static let profile = "モード"
-        static let appsNote = "アプリの固有 ID を使用して指定します。\n優先順位順の指定が可能です。"
 
         static func label(for profile: AppProfile) -> String {
             switch profile {
             case .standard: "標準"
-            case .programming: "エディタ"
-            case .terminal: "ターミナル"
+            case .programming: "記号を半角"
+            case .terminal: "コマンドを英字"
+            case .direct: "IME を使わない"
             }
         }
         static let recordsUsage = "入力の統計を記録"
@@ -83,7 +142,7 @@ enum UIStrings {
         static let slash = "/ キーで入力する文字"
         static let spaceWidth = "スペース幅"
         static let numberWidth = "数字幅"
-        static let keys = "キー操作"
+        static let keys = "動作"
         static let punctuationCommits = "句読点で確定"
         static let numberKeySelection = "番号キーで候補を選択"
         static let showsModeIndicator = "入力モードの切り替えを表示"
@@ -169,6 +228,15 @@ enum UIStrings {
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
         static let presentation = "候補の表示"
+        static let initialFocus = "最初に選ぶ文節"
+
+        static func label(for focus: InitialFocus) -> String {
+            switch focus {
+            case .start: "先頭"
+            case .end: "末尾"
+            case .automatic: "自動"
+            }
+        }
 
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {
@@ -194,14 +262,104 @@ enum UIStrings {
         }
 
         /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
-        static let themes: [ThemePreference] = [.automatic, .platinum, .desk]
+        static let themes: [ThemePreference] = [.automatic, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
 
         static func label(for theme: ThemePreference) -> String {
             switch theme {
             case .automatic, .native: "標準"
             case .platinum: "プラチナ"
             case .desk: "夜のデスク"
+            case .washi: "和紙"
+            case .neon: "ネオン"
+            case .terminal: "端末"
+            case .nordic: "北欧"
+            case .contrast: "高コントラスト"
             }
         }
+    }
+
+    /// 設定の画面で足したページと項目
+    enum More {
+        // 入力
+        static let alphabetWidth = "英字幅"
+        static let shiftStartsAlphabet = "Shift で英字入力"
+        static let modeIndicatorDuration = "モードの表示時間"
+        static func seconds(_ value: Double) -> String { String(format: "%.1f 秒", value) }
+
+        // 変換
+        static let candidates = "候補"
+        static let branchCandidates = "分岐図の候補数"
+        static let listCandidates = "一覧の候補数"
+        static let liveConversionDelay = "漢字にするまでの待ち時間"
+        static let typo = "タイプミス"
+        static let correctionSensitivity = "修正の基準"
+        static let showsSuggestions = "「もしかして」を表示"
+        static let correctionDelay = "見直すまでの待ち時間"
+
+        static func label(for sensitivity: CorrectionSensitivity) -> String {
+            switch sensitivity {
+            case .cautious: "慎重"
+            case .standard: "標準"
+            case .aggressive: "積極的"
+            }
+        }
+
+        // 除外設定
+        static let exclusionsNote = "アプリごとに入力の扱いを変えます。上にあるものが優先されます。"
+        static let addApps = "アプリを追加…"
+        static let importCSV = "CSV を読み込む…"
+        static let exportCSV = "CSV に書き出す…"
+        static let exportCSVFileName = "s90-exclusions.csv"
+        static let terminalCommands = "ターミナルでコマンドを英字で入力"
+        static let behavior = "動作"
+        static let apps = "アプリ"
+        static func importedRules(_ count: Int) -> String { "\(count) 件を追加しました" }
+        static let csvFailed = "読み込めませんでした。CSV のファイルではないか，大きすぎます"
+        static let noBundleID = "バンドル ID の無いアプリは追加できません"
+
+        // 外観
+        static let theme = "テーマ"
+        static let customThemes = "カスタムテーマ"
+        static let duplicate = "今のテーマを複製"
+        static let deleteTheme = "削除"
+        static let themeName = "名前"
+        static let colors = "色"
+        static let surface = "背景"
+        static let text = "文字"
+        static let textMuted = "補助の文字"
+        static let selection = "選択"
+        static let selectionText = "選択中の文字"
+        static let correction = "修正の印"
+        static let line = "線"
+        static let shape = "形"
+        static let cornerRadius = "角の丸さ"
+        static let branchStyle = "枝"
+        static let font = "書体"
+        static let themeFont = "テーマに合わせる"
+        static func copyName(_ name: String) -> String { "\(name) のコピー" }
+
+        static func label(for style: CustomTheme.BranchStyle) -> String {
+            switch style {
+            case .curved: "曲線"
+            case .straight: "直線"
+            }
+        }
+
+        // バックアップ
+        static let backup = "バックアップ"
+        static let backupNote = "ユーザー辞書・テーマ・キー操作を含むすべての設定を JSON で保存します。"
+        static let exportSettings = "設定を書き出す…"
+        static let importSettings = "設定を読み込む…"
+        static let exportSettingsFileName = "s90-settings.json"
+        static let settingsImported = "設定を読み込みました"
+        static let settingsImportFailed = "読み込めませんでした。s90.tokyo IME の設定ファイルではないか，大きすぎます"
+        static let settingsExportFailed = "書き出せませんでした"
+
+        // 情報
+        static let about = "情報"
+        static let version = "バージョン"
+        static let acknowledgements = "謝辞"
+        static let acknowledgementsNote = "s90.tokyo IME は次のオープンソースソフトウェアとモデルを利用しています。"
+        static let noticesMissing = "利用表記のファイルが見つかりません"
     }
 }

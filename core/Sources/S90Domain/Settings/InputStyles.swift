@@ -21,6 +21,34 @@ public enum KeyboardLayout: String, Sendable, Equatable, Codable, CaseIterable {
     case colemak
 }
 
+/// Space で変換したときに最初に選ぶ文節
+public enum InitialFocus: String, Sendable, Equatable, Codable, CaseIterable {
+    /// 文の先頭
+    case start
+    /// 文の末尾
+    case end
+    /// 誤変換の可能性がいちばん高い文節
+    case automatic
+}
+
+/// 打ち間違いを直す基準．直した読みが打ったままの読みよりどれだけもっともらしければ直すか(対数確率の差)
+public enum CorrectionSensitivity: String, Sendable, Equatable, Codable, CaseIterable {
+    /// 確かなときだけ直す
+    case cautious
+    case standard
+    /// 少しでももっともらしければ直す
+    case aggressive
+
+    /// 直す差と，直さずに「もしかして」と示す差
+    public var margins: (apply: Double, suggest: Double) {
+        switch self {
+        case .cautious: (DefaultSettings.readingCorrectionMargin + 1, DefaultSettings.readingSuggestionMargin + 1)
+        case .standard: (DefaultSettings.readingCorrectionMargin, DefaultSettings.readingSuggestionMargin)
+        case .aggressive: (DefaultSettings.readingCorrectionMargin - 1, DefaultSettings.readingSuggestionMargin - 0.5)
+        }
+    }
+}
+
 /// 句読点の組み合わせ
 public enum PunctuationStyle: String, Sendable, Equatable, Codable, CaseIterable {
     /// 、。

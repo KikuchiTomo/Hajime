@@ -63,7 +63,7 @@ private final class Harness {
                 panel = nil
                 lattice = nil
                 note = nil
-            case .showModeIndicator, .selectMode, .selectInputStyle: break
+            case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion: break
             }
         }
     }
@@ -221,6 +221,13 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "python")
     }
 
+    @Test("R-02: Shift で打った大文字を含む並びは英単語として直さず，打ったままにする(「konoIMEha」→「このIMEは」)")
+    func uppercaseIsNotCorrected() {
+        let harness = Harness(lexicon: FakeLexicon(suggestions: ["konoIMEha": ["KinoMaha"], "IMEha": ["Imeha"]]))
+        harness.type("konoIMEha")
+        #expect(harness.marked.text == "このIMEは")
+    }
+
     @Test("R-02: 一覧のときは，補正した単語の次に打ったままの文字列を出す")
     func correctionCandidates() {
         let harness = Harness(lexicon: FakeLexicon(words: ["python"]), settings: .listPresentation)
@@ -375,14 +382,18 @@ struct InputSessionScenarioTests {
         #expect(harness.marked.segments.map(\.style) == [.focused, .converted])
     }
 
-    @Test("迷う文節が無ければ，最後の文節に注目する")
-    func latticeFocusWithoutUncertainty() {
-        let converter = latticeConverter()
-        converter.clauseScoreStep = [:]
-        let harness = Harness(converter: converter)
+    @Test("最初に選ぶ文節は設定に従う．先頭・末尾・自動(第 1 候補と 2 番目の差がいちばん小さい文節)", arguments: [
+        (InitialFocus.start, [true, false]),
+        (InitialFocus.end, [false, true]),
+        (InitialFocus.automatic, [true, false]),
+    ])
+    func latticeInitialFocus(policy: InitialFocus, expected: [Bool]) {
+        var settings = DefaultSettings.settings
+        settings.initialFocus = policy
+        let harness = Harness(converter: latticeConverter(), settings: settings)
         harness.type("kyouhaame")
         harness.press(.space)
-        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+        #expect(harness.lattice?.columns.map(\.isFocused) == expected)
     }
 
     @Test("分岐図は文節が 1 つでも出す")
@@ -558,6 +569,112 @@ struct SymbolScenarioTests {
 }
 
 @MainActor
+@Suite("分岐図のキーと文節の長さ")
+struct BranchMapControlTests {
+    private func converter() -> FakeConverter {
+        let converter = FakeConverter([
+            "きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)],
+        ])
+        converter.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        return converter
+    }
+
+    @Test("割り当てたキーで次の文節へ移る(既定の → の代わりに l)")
+    func customBinding() {
+        var settings = DefaultSettings.settings
+        settings.conversionKeys.assign(KeyStroke(.character("l"), control: true), to: .nextSegment)
+        let harness = Harness(converter: converter(), settings: settings)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        harness.press(.character("l"), .control)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+    }
+
+    @Test("上の枝にあるひらがな・カタカナは，下の枝に重ねて出さない")
+    func noDuplicateVariants() {
+        let converter = FakeConverter(["らいぶ": [("ライブ", nil), ("らいぶ", nil), ("来部", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("raibu")
+        harness.press(.space)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.alternatives == ["ライブ", "来部"])
+        #expect(column?.variants.contains("らいぶ") == true)
+    }
+
+    @Test("足元に，文節を 1 文字短く・長くしたらどうなるかを出す．候補を選んでも文節の長さは変わらない")
+    func resizePreview() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.left)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.text == "今日は")
+        #expect(column?.longer != nil)
+        #expect(column?.shorter != nil)
+        let count = harness.lattice?.columns.count
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.lattice?.columns.count == count)
+    }
+}
+
+@MainActor
+@Suite("増やした設定")
+struct ExtraSettingsTests {
+    @Test("IME を使わないアプリでは，日本語のモードでも英字のままアプリに渡す")
+    func directProfile() {
+        let harness = Harness(converter: FakeConverter(["か": [("蚊", nil)]]))
+        harness.context = InputContext(profile: .direct)
+        harness.press(.character("k"))
+        #expect(harness.lastResult.handled == false)
+        #expect(harness.marked.isEmpty)
+    }
+
+    @Test("Shift で英字を打ち始めたら，Space まで英字のまま入れる(設定)")
+    func shiftStartsAlphabet() {
+        var settings = DefaultSettings.settings
+        settings.shiftStartsAlphabet = true
+        let harness = Harness(settings: settings)
+        harness.type("Python")
+        #expect(harness.marked.text == "Python")
+    }
+
+    @Test("Shift で打った英字を全角にする(設定)")
+    func fullwidthAlphabet() {
+        var settings = DefaultSettings.settings
+        settings.alphabetWidth = .fullwidth
+        let harness = Harness(settings: settings)
+        harness.type("A")
+        #expect(harness.marked.text == "Ａ")
+    }
+
+    @Test("分岐図の候補の数を設定で変える")
+    func branchCandidates() {
+        var settings = DefaultSettings.settings
+        settings.branchCandidatesPerPage = 3
+        let converter = FakeConverter(["きしゃ": [("記者", nil), ("汽車", nil), ("帰社", nil), ("貴社", nil), ("喜捨", nil)]])
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kisya")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.first(where: \.isFocused)?.alternatives.count == 3)
+    }
+
+    @Test("ターミナルでコマンドを英字で入れる設定を切ると，行の頭も日本語にする")
+    func terminalCommandsOff() {
+        var settings = DefaultSettings.settings
+        settings.terminalCommands = false
+        let harness = Harness(converter: FakeConverter(["ls": [("ls", nil)]]), settings: settings)
+        harness.context = InputContext(profile: .terminal)
+        harness.type("ls")
+        harness.press(.space)
+        #expect(harness.committed.isEmpty)
+    }
+}
+
+@MainActor
 @Suite("日本語の打ち間違い")
 struct ReadingCorrectionScenarioTests {
     private func typed(_ keys: String, corrections: [ReadingCorrection]) -> (InputSession, () -> (marked: String, note: String?)) {
@@ -618,6 +735,107 @@ struct ReadingCorrectionScenarioTests {
         // 戻したキーのあいだは，止まっても直し直さない
         harness.settle()
         #expect(harness.marked.text == "ようですね")
+    }
+
+    @Test("R-02: 直したあとに分岐図を開くと，直した文節の 2 番目に打ったままの候補を出す")
+    func typedAlternativeInLattice() {
+        let converter = FakeConverter(["きょうはよいです": [("今日は良いです", nil)], "よいです": [("良いです", nil)], "ようです": [("様です", nil)]])
+        converter.words["きょうはよいです"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "は", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "良いです", readingCount: 4),
+        ]
+        converter.corrections["kyouhayoudesu"] = [
+            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -5, cost: 2),
+            ReadingCorrection(keys: "kyouhayoudesu", reading: "キョウハヨウデス", score: -9, cost: 0),
+        ]
+        // 自動では，打ち間違いを直した文節を最初に選ぶ
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .automatic
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyouhayoudesu")
+        harness.settle()
+        harness.press(.space)
+        let focused = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(focused?.text == "良いです")
+        #expect(focused?.alternatives.prefix(3) == ["良いです", "様です", "ようです"])
+    }
+
+    /// 「youdesu」を「yoidesu」に直す変換器(差 4 で直す)
+    private func correctingHarness(margin: Double = 4) -> Harness {
+        let converter = FakeConverter()
+        converter.corrections["youdesu"] = [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -9 + margin, cost: 2),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]
+        let harness = Harness(converter: converter)
+        harness.type("youdesu")
+        harness.settle()
+        return harness
+    }
+
+    @Test("R-02: 直したあとの Enter は直した文を確定する")
+    func commitCorrected() {
+        let harness = correctingHarness()
+        harness.press(.enter)
+        #expect(harness.committed == "よいです")
+    }
+
+    @Test("R-02: 案内は見直した直後だけ出し，次のキーで消す．点線の下線は残る")
+    func noteDisappearsOnNextKey() {
+        let harness = correctingHarness()
+        #expect(harness.note != nil)
+        harness.type("n")
+        #expect(harness.note == nil)
+        #expect(harness.marked.segments.first?.style == .correction)
+    }
+
+    @Test("R-02: 直したあとに数字を打つと，直したものを受け入れたことにする(Esc で全部消える取りこぼしをしない)")
+    func literalAcceptsCorrection() {
+        let harness = correctingHarness()
+        harness.type("1")
+        harness.press(.escape)
+        #expect(harness.marked.text.isEmpty)
+        // 2 回目の Esc ではなく 1 回目で消えるのは，受け入れたあとの Esc がふつうの取り消しだから．読みは打ったままに戻らない
+        #expect(harness.committed.isEmpty)
+    }
+
+    @Test("R-02: 直したあとに「'」を打っても，Esc で読みが全部消えない")
+    func apostropheAfterCorrection() {
+        let harness = correctingHarness()
+        harness.type("n'")
+        #expect(!harness.marked.segments.contains { $0.style == .correction })
+        harness.press(.escape)
+        #expect(harness.marked.text.isEmpty)
+    }
+
+    @Test("R-02: 直したあとの Backspace で直した部分まで消すと，そこからは直していない読みとして扱う")
+    func backspaceIntoCorrection() {
+        let harness = correctingHarness()
+        harness.press(.backspace)
+        #expect(!harness.marked.segments.contains { $0.style == .correction })
+        harness.press(.escape)
+        #expect(harness.marked.text.isEmpty)
+    }
+
+    @Test("R-02: Esc で「もしかして」を取り下げると，同じキーのあいだは示し直さない")
+    func dismissSuggestion() {
+        let harness = correctingHarness(margin: 2)
+        #expect(harness.note?.contains("もしかして") == true)
+        harness.press(.escape)
+        #expect(harness.marked.text == "ようです")
+        harness.settle()
+        #expect(harness.note == nil)
+    }
+
+    @Test("R-07: ターミナルの行の頭では打ち間違いを見直さない")
+    func noReviewAtTerminalLineStart() {
+        let converter = FakeConverter()
+        converter.corrections["youdesu"] = [ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -5, cost: 2)]
+        let harness = Harness(converter: converter)
+        harness.context = InputContext(profile: .terminal)
+        harness.type("youdesu")
+        harness.settle()
+        #expect(harness.marked.text == "ようです")
     }
 
     @Test("差が中くらいなら直さずに「もしかして」と示し，Tab で直す")

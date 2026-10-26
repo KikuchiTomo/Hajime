@@ -5,27 +5,81 @@ import SwiftUI
 struct SettingsView: View {
     static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel
+    @State private var page: Page? = .input
+
+    /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(上のタブには収まらない)
+    enum Page: CaseIterable, Hashable {
+        case input, conversion, keys, dictionary, romaji, apps, appearance, usage, backup, about
+
+        var title: String {
+            switch self {
+            case .input: UIStrings.Settings.inputTab
+            case .conversion: UIStrings.Settings.conversionTab
+            case .keys: UIStrings.Keys.tab
+            case .dictionary: UIStrings.Settings.dictionaryTab
+            case .romaji: UIStrings.Settings.romajiTab
+            case .apps: UIStrings.Settings.appsTab
+            case .appearance: UIStrings.Settings.appearanceTab
+            case .usage: UIStrings.Settings.usageTab
+            case .backup: UIStrings.More.backup
+            case .about: UIStrings.More.about
+            }
+        }
+
+        /// SF Symbols の名前
+        var symbol: String {
+            switch self {
+            case .input: "keyboard"
+            case .conversion: "character.book.closed.ja"
+            case .keys: "command"
+            case .dictionary: "text.book.closed"
+            case .romaji: "textformat.abc"
+            case .apps: "nosign.app"
+            case .appearance: "paintbrush"
+            case .usage: "chart.line.uptrend.xyaxis"
+            case .backup: "externaldrive"
+            case .about: "info.circle"
+            }
+        }
+    }
 
     var body: some View {
-        TabView {
-            InputTab(model: model).tabItem { Text(UIStrings.Settings.inputTab) }
-            ConversionTab(model: model).tabItem { Text(UIStrings.Settings.conversionTab) }
-            DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
-            AppsTab(model: model).tabItem { Text(UIStrings.Settings.appsTab) }
-            RomajiTab(model: model).tabItem { Text(UIStrings.Settings.romajiTab) }
-            AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
-            UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
+        NavigationSplitView {
+            List(Page.allCases, id: \.self, selection: $page) { page in
+                Label(page.title, systemImage: page.symbol)
+            }
+            .navigationSplitViewColumnWidth(DesignTokens.Size.Settings.sidebarWidth)
+            // 左の一覧を畳むボタンは要らない(見出しに重なる)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            detail(for: page ?? .input)
+                .navigationTitle((page ?? .input).title)
         }
-        .padding()
         .frame(width: Self.size.width, height: Self.size.height)
         .alert(model.message ?? "", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button(UIStrings.Settings.ok) { model.message = nil }
         }
     }
+
+    @ViewBuilder
+    private func detail(for page: Page) -> some View {
+        switch page {
+        case .input: InputTab(model: model)
+        case .conversion: ConversionTab(model: model)
+        case .keys: KeysTab(model: model)
+        case .dictionary: DictionaryTab(model: model)
+        case .romaji: RomajiTab(model: model)
+        case .apps: ExclusionsPage(model: model)
+        case .appearance: AppearancePage(model: model)
+        case .usage: UsageTab(model: model)
+        case .backup: BackupPage(model: model)
+        case .about: AboutPage(model: model)
+        }
+    }
 }
 
 /// 列挙の値を選ぶ項目．values を渡さなければすべての値を並べる
-private struct ChoicePicker<Value: Hashable & CaseIterable>: View where Value.AllCases: RandomAccessCollection {
+struct ChoicePicker<Value: Hashable & CaseIterable>: View where Value.AllCases: RandomAccessCollection {
     let title: String
     let selection: Binding<Value>
     var values: [Value] = Array(Value.allCases)
@@ -55,11 +109,16 @@ private struct InputTab: View {
                 ChoicePicker(title: UIStrings.Choice.yenKey, selection: model.binding(\.yenKey), label: UIStrings.Choice.label(for:))
                 ChoicePicker(title: UIStrings.Settings.spaceWidth, selection: model.binding(\.spaceWidth), label: UIStrings.Settings.label(for:))
                 ChoicePicker(title: UIStrings.Settings.numberWidth, selection: model.binding(\.numberWidth), label: UIStrings.Settings.label(for:))
+                ChoicePicker(title: UIStrings.More.alphabetWidth, selection: model.binding(\.alphabetWidth), label: UIStrings.Settings.label(for:))
+                Toggle(UIStrings.More.shiftStartsAlphabet, isOn: model.binding(\.shiftStartsAlphabet))
             }
             Section(UIStrings.Settings.keys) {
                 Toggle(UIStrings.Settings.punctuationCommits, isOn: model.binding(\.punctuationCommits))
                 Toggle(UIStrings.Settings.numberKeySelection, isOn: model.binding(\.numberKeySelection))
                 Toggle(UIStrings.Settings.showsModeIndicator, isOn: model.binding(\.showsModeIndicator))
+                SecondsSlider(title: UIStrings.More.modeIndicatorDuration, value: model.binding(\.modeIndicatorDuration),
+                              range: DefaultSettings.modeIndicatorDurationRange)
+                    .disabled(!model.settings.showsModeIndicator)
             }
         }
         .formStyle(.grouped)
@@ -74,8 +133,28 @@ private struct ConversionTab: View {
             Section(UIStrings.Settings.conversion) {
                 Toggle(UIStrings.Menu.liveConversion, isOn: model.binding(\.liveConversion))
                 ChoicePicker(title: UIStrings.Choice.presentation, selection: model.binding(\.candidatePresentation), label: UIStrings.Choice.label(for:))
+                ChoicePicker(title: UIStrings.Choice.initialFocus, selection: model.binding(\.initialFocus), label: UIStrings.Choice.label(for:))
                 Toggle(UIStrings.Choice.variantRow, isOn: model.binding(\.showsVariantRow))
+                SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),
+                              range: DefaultSettings.liveConversionDelayRange)
+                    .disabled(!model.settings.liveConversion)
+            }
+            Section(UIStrings.More.candidates) {
+                Stepper(value: model.binding(\.branchCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
+                    LabeledContent(UIStrings.More.branchCandidates, value: "\(model.settings.branchCandidatesPerPage)")
+                }
+                Stepper(value: model.binding(\.listCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
+                    LabeledContent(UIStrings.More.listCandidates, value: "\(model.settings.listCandidatesPerPage)")
+                }
+            }
+            Section(UIStrings.More.typo) {
                 ChoicePicker(title: UIStrings.Choice.typoCorrection, selection: model.binding(\.typoCorrection), label: UIStrings.Choice.label(for:))
+                Group {
+                    ChoicePicker(title: UIStrings.More.correctionSensitivity, selection: model.binding(\.correctionSensitivity), label: UIStrings.More.label(for:))
+                    Toggle(UIStrings.More.showsSuggestions, isOn: model.binding(\.showsSuggestions))
+                    SecondsSlider(title: UIStrings.More.correctionDelay, value: model.binding(\.correctionDelay), range: DefaultSettings.correctionDelayRange)
+                }
+                .disabled(model.settings.typoCorrection != .standard)
             }
             Section(UIStrings.Settings.specialConversion) {
                 Toggle(UIStrings.Settings.dateConversion, isOn: model.binding(\.dateConversion))
@@ -129,83 +208,6 @@ private struct DictionaryTab: View {
     }
 }
 
-private struct AppearanceTab: View {
-    @ObservedObject var model: SettingsModel
-    /// 動かしているあいだの値．少し待ってから保存し，1 段ごとに設定のファイルを書き直さない．
-    /// キーボードや VoiceOver で動かしたときも保存されるよう，手を離したかどうかには頼らない
-    @State private var fontSize: Double?
-    @State private var saveTask: Task<Void, Never>?
-
-    var body: some View {
-        Form {
-            Section(UIStrings.Settings.appearance) {
-                ChoicePicker(title: UIStrings.Choice.theme, selection: model.binding(\.theme), values: UIStrings.Choice.themes, label: UIStrings.Choice.label(for:))
-                Slider(
-                    value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { scheduleSave($0) }),
-                    in: Double(DesignTokens.Size.Candidate.fontSizeMin)...Double(DesignTokens.Size.Candidate.fontSizeMax),
-                    step: 1
-                ) {
-                    Text(UIStrings.Settings.fontSize(Int(fontSize ?? model.settings.candidateFontSize)))
-                }
-            }
-            Section {
-                Button(UIStrings.Settings.restoreDefaults) { model.restoreDefaults() }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    private func scheduleSave(_ value: Double) {
-        fontSize = value
-        saveTask?.cancel()
-        saveTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(DefaultSettings.settingsSaveDelay))
-            guard !Task.isCancelled else { return }
-            model.update { $0.candidateFontSize = value }
-            fontSize = nil
-        }
-    }
-}
-
-/// アプリごとのプロファイル(R-06，R-07)．バンドル ID の前方一致で決める
-private struct AppsTab: View {
-    @ObservedObject var model: SettingsModel
-    @State private var prefix = ""
-    @State private var profile = AppProfile.programming
-    @State private var selection = Set<ProfileRule>()
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            Toggle(UIStrings.Settings.escapeSwitchesToDirect, isOn: model.binding(\.escapeSwitchesToDirect))
-            HStack {
-                TextField(UIStrings.Settings.bundlePrefix, text: $prefix)
-                Picker("", selection: $profile) {
-                    ForEach(AppProfile.allCases, id: \.self) { Text(UIStrings.Settings.label(for: $0)).tag($0) }
-                }
-                .labelsHidden()
-                .fixedSize()
-                Button(UIStrings.Settings.add) {
-                    if model.addProfileRule(prefix: prefix, profile: profile) { prefix = "" }
-                }
-                .disabled(prefix.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            Table(model.settings.profileRules, selection: $selection) {
-                TableColumn(UIStrings.Settings.bundlePrefix, value: \.applicationPrefix)
-                TableColumn(UIStrings.Settings.profile) { Text(UIStrings.Settings.label(for: $0.profile)) }
-            }
-            HStack {
-                Button(UIStrings.Settings.remove) {
-                    model.update { $0.profileRules.removeAll { selection.contains($0) } }
-                    selection = []
-                }
-                .disabled(selection.isEmpty)
-                Spacer()
-            }
-            Text(UIStrings.Settings.appsNote).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-}
-
 /// 利用者が足すローマ字の綴り．標準の表に重ね，同じ綴りは利用者のものを使う
 private struct RomajiTab: View {
     @ObservedObject var model: SettingsModel
@@ -243,11 +245,11 @@ private struct RomajiTab: View {
     }
 }
 
-extension RomajiRule: Identifiable {
+extension RomajiRule: @retroactive Identifiable {
     public var id: Self { self }
 }
 
-extension ProfileRule: Identifiable {
+extension ProfileRule: @retroactive Identifiable {
     public var id: Self { self }
 }
 
@@ -278,6 +280,114 @@ private struct UsageTab: View {
     }
 }
 
-extension UserDictionaryEntry: Identifiable {
+extension UserDictionaryEntry: @retroactive Identifiable {
     public var id: Self { self }
+}
+
+/// 変換中(分岐図)の操作ごとのキーの割り当て．「追加」を押してからキーを押すと割り当てる
+private struct KeysTab: View {
+    @ObservedObject var model: SettingsModel
+    /// キーを待っている操作
+    @State private var recording: ConversionCommand?
+
+    var body: some View {
+        Form {
+            commandSection(UIStrings.Keys.generalSection, ConversionCommand.allCases.filter(\.isGlobal))
+            commandSection(UIStrings.Keys.conversionSection, ConversionCommand.allCases.filter { !$0.isGlobal })
+            Section {
+                Text(UIStrings.Keys.note).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Button(UIStrings.Keys.restore) { model.update { $0.conversionKeys = .standard } }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func commandSection(_ title: String, _ commands: [ConversionCommand]) -> some View {
+        Section(title) {
+            ForEach(commands, id: \.self) { command in
+                    HStack {
+                        Text(UIStrings.Keys.label(for: command))
+                        Spacer()
+                        ForEach(model.settings.conversionKeys.strokes(for: command), id: \.self) { stroke in
+                            Button {
+                                model.update { $0.conversionKeys.remove(stroke, from: command) }
+                            } label: {
+                                Text(UIStrings.Keys.name(of: stroke)).monospaced()
+                            }
+                            .buttonStyle(.bordered)
+                            .help(UIStrings.Settings.remove)
+                        }
+                        if recording == command {
+                            KeyCapture { stroke in
+                                if let stroke { model.update { $0.conversionKeys.assign(stroke, to: command) } }
+                                recording = nil
+                            }
+                            .frame(width: 140, height: 22)
+                            .overlay(Text(UIStrings.Keys.press).font(.caption).foregroundStyle(.secondary).allowsHitTesting(false))
+                        } else {
+                            Button(UIStrings.Keys.add) { recording = command }
+                        }
+                    }
+            }
+        }
+    }
+}
+
+/// 次に押したキーを受け取る．Escape で取りやめる(nil を渡す)．割り当てられないキーは受け取らずに待つ
+private struct KeyCapture: NSViewRepresentable {
+    let onCapture: (KeyStroke?) -> Void
+
+    func makeNSView(context: Context) -> CaptureView {
+        let view = CaptureView()
+        view.onCapture = onCapture
+        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
+        return view
+    }
+
+    func updateNSView(_ view: CaptureView, context: Context) {
+        view.onCapture = onCapture
+    }
+
+    final class CaptureView: NSView {
+        var onCapture: ((KeyStroke?) -> Void)?
+        override var acceptsFirstResponder: Bool { true }
+
+        override func keyDown(with event: NSEvent) {
+            if event.keyCode == 53 {
+                onCapture?(nil)
+                return
+            }
+            guard let key = NSEventKeyTranslator.translate(event), let stroke = KeyStroke(key) else { return }
+            onCapture?(stroke)
+        }
+
+        override func draw(_ dirtyRect: NSRect) {
+            NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
+            NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
+        }
+    }
+}
+
+/// 秒で値を選ぶ項目．今の値を右に出す．動かしている間は保存せず，手を離したときに保存する(1 段ごとに設定のファイルを書き直さない)
+struct SecondsSlider: View {
+    let title: String
+    let value: Binding<Double>
+    let range: ClosedRange<Double>
+    @State private var editing: Double?
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack {
+                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: 0.1) { isEditing in
+                    guard !isEditing, let editing else { return }
+                    value.wrappedValue = editing
+                    self.editing = nil
+                }
+                .frame(width: 180)
+                Text(UIStrings.More.seconds(editing ?? value.wrappedValue)).monospacedDigit().frame(width: 52, alignment: .trailing)
+            }
+        }
+    }
 }

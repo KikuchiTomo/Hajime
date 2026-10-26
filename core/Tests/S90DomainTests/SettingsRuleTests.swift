@@ -255,6 +255,25 @@ struct ClauseSplitterTests {
         #expect(clauses == [.init(text: "非常な", readingCount: 5), .init(text: "人だ", readingCount: 3)])
     }
 
+    @Test("「お茶」「ご飯」の接頭辞は分けない")
+    func keepsHonorificPrefix() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "今日", readingCount: 3), Word(text: "は", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Word(text: "お茶", readingCount: 3), Word(text: "を", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ])
+        #expect(clauses.map(\.text) == ["今日は", "お茶を"])
+    }
+
+    @Test("ひらがなの名詞から文節を始める(「ないという｜ところですかね」)")
+    func startsAtKanaNoun() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "ないという", readingCount: 5),
+            Word(text: "ところ", readingCount: 3, startsWithNoun: true),
+            Word(text: "ですかね", readingCount: 4),
+        ])
+        #expect(clauses.map(\.text) == ["ないという", "ところですかね"])
+    }
+
     @Test("1 文字の助詞のあとのひらがなの自立語で分ける(「今日は｜いい｜天気ですね」)")
     func splitsAfterParticle() {
         let clauses = ClauseSplitter.clauses(of: [
@@ -267,13 +286,109 @@ struct ClauseSplitterTests {
         #expect(clauses.map(\.readingCount) == [4, 2, 6])
     }
 
-    @Test("助詞と助動詞だけの語は前の文節に付ける(「問題点があれば」)")
+    @Test("1 文字の助詞のあとで分け，助詞と助動詞だけの語は前の文節に付ける(「問題点が｜あれば」「天気ですね」)")
     func attachesFunctionWords() {
         let clauses = ClauseSplitter.clauses(of: [
             Word(text: "問題点", readingCount: 6),
             Word(text: "があれば", readingCount: 4, startsWithParticle: true, endsWithParticle: true),
             Word(text: "GitHub", readingCount: 5),
         ])
-        #expect(clauses.map(\.text) == ["問題点があれば", "GitHub"])
+        #expect(clauses.map(\.text) == ["問題点が", "あれば", "GitHub"])
+    }
+}
+
+@Suite("キー配列の設定")
+struct KeyboardLayoutSettingTests {
+    @Test("保存して読み直せ，知らない値は既定に戻す")
+    func roundTrip() throws {
+        var settings = Settings()
+        settings.keyboardLayout = .dvorak
+        let data = try JSONEncoder().encode(settings)
+        #expect(try JSONDecoder().decode(Settings.self, from: data).keyboardLayout == .dvorak)
+        let unknown = Data(#"{"keyboardLayout":"workman"}"#.utf8)
+        #expect(try JSONDecoder().decode(Settings.self, from: unknown).keyboardLayout == .system)
+    }
+}
+
+@Suite("変換中のキーの割り当て")
+struct KeyBindingsTests {
+    @Test("既定では ↓ と Space で次の候補，Shift+→ で文節を長く")
+    func standard() {
+        let keys = KeyBindings.standard
+        #expect(keys.command(for: KeyEvent(.down)) == .nextCandidate)
+        #expect(keys.command(for: KeyEvent(.space)) == .nextCandidate)
+        #expect(keys.command(for: KeyEvent(.right, modifiers: .shift)) == .extendSegment)
+        #expect(keys.command(for: KeyEvent(.enter)) == nil)
+    }
+
+    @Test("割り当てたキーはほかの操作から外す")
+    func assignMovesKey() {
+        var keys = KeyBindings.standard
+        keys.assign(KeyStroke(.space), to: .nextSegment)
+        #expect(keys.command(for: KeyEvent(.space)) == .nextSegment)
+        #expect(!keys.strokes(for: .nextCandidate).contains(KeyStroke(.space)))
+    }
+
+    @Test("保存して読み直せ，無い操作は既定で埋める")
+    func roundTrip() throws {
+        var settings = Settings()
+        settings.conversionKeys.assign(KeyStroke(.character("j"), control: true), to: .nextCandidate)
+        let decoded = try JSONDecoder().decode(Settings.self, from: try JSONEncoder().encode(settings))
+        #expect(decoded.conversionKeys == settings.conversionKeys)
+        let partial = Data(#"{"conversionKeys":{"commands":{"nextSegment":[{"key":{"right":{}},"shift":false,"control":false,"option":false}]}}}"#.utf8)
+        let filled = try JSONDecoder().decode(Settings.self, from: partial).conversionKeys
+        #expect(filled.strokes(for: .extendSegment) == KeyBindings.standard.strokes(for: .extendSegment))
+    }
+}
+
+@Suite("除外設定の CSV")
+struct ProfileRuleCSVTests {
+    @Test("「アプリの ID,扱い」の行を読む．扱いは英語の値と画面の名前のどちらでもよく，形の誤った行は読み飛ばす")
+    func parse() {
+        let text = """
+        app_id,mode
+        # コメント
+        com.apple.Terminal,terminal
+        com.example.Game, IME を使わない
+        com.example.Editor,記号を半角
+        bad id with space,terminal
+        com.example.Unknown,なにか
+        com.apple.Terminal,direct
+        """
+        #expect(ProfileRuleCSV.parse(text) == [
+            ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .terminal),
+            ProfileRule(applicationPrefix: "com.example.Game", profile: .direct),
+            ProfileRule(applicationPrefix: "com.example.Editor", profile: .programming),
+        ])
+    }
+}
+
+@Suite("カスタムテーマと設定の範囲")
+struct CustomThemeTests {
+    @Test("色は #RRGGBB の形で読み書きする")
+    func hexColor() {
+        #expect(HexColor("#FF6600") == HexColor(red: 255, green: 102, blue: 0))
+        #expect(HexColor("ff6600")?.hex == "#FF6600")
+        #expect(HexColor("#FF66") == nil)
+        #expect(HexColor("#GG6600") == nil)
+    }
+
+    @Test("使っているテーマが無くなったら既成のテーマに戻す")
+    func missingActiveTheme() {
+        var settings = Settings()
+        settings.customThemeID = "gone"
+        settings.clampToValidRanges()
+        #expect(settings.customThemeID == nil)
+        #expect(settings.activeCustomTheme == nil)
+    }
+
+    @Test("打ち間違いを直す基準で，直す差と示す差が変わる")
+    func sensitivity() {
+        let typed = ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0)
+        let fixed = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -6.5, cost: 2)
+        #expect(ReadingCorrectionRule(level: .standard, sensitivity: .standard).decision(among: [fixed, typed], reading: "よう") == .suggest(fixed))
+        #expect(ReadingCorrectionRule(level: .standard, sensitivity: .aggressive).decision(among: [fixed, typed], reading: "よう") == .apply(fixed))
+        #expect(ReadingCorrectionRule(level: .standard, sensitivity: .cautious).decision(among: [fixed, typed], reading: "よう") == nil)
+        #expect(ReadingCorrectionRule(level: .standard, suggests: false).decision(among: [fixed, typed], reading: "よう") == nil)
     }
 }

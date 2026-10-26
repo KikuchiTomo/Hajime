@@ -100,6 +100,23 @@ public enum DefaultSettings {
     public static let maximumUsageFileBytes = 16 * 1024
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
     public static let maximumUserDictionaryEntries = 10_000
+    /// アプリの扱いの規則の上限(CSV で取り込むとき)
+    public static let maximumProfileRules = 1_000
+    public static let maximumProfileRuleFileBytes = 256 * 1024
+    public static let maximumApplicationIdentifierLength = 255
+    /// 保存できるカスタムテーマの数と名前の長さの上限
+    public static let maximumCustomThemes = 50
+    public static let maximumThemeNameLength = 40
+    public static let customThemeCornerRadius = 12.0
+    public static let customThemeCornerRadiusRange = 0.0...24.0
+    /// 1 ページに出す候補の数を選べる範囲(番号キー 1〜9 で選べる数まで)
+    public static let candidatesPerPageRange = 3...9
+    /// ライブ変換で漢字にするまでの待ち時間・打ち間違いを見直すまでの待ち時間・モードの表示の時間を選べる範囲(秒)
+    public static let liveConversionDelayRange = 0.1...1.5
+    public static let correctionDelayRange = 0.4...3.0
+    public static let modeIndicatorDurationRange = 0.3...3.0
+    /// 候補の文字の大きさ(pt)を選べる範囲
+    public static let candidateFontSizeRange = 12.0...24.0
     public static let maximumUserDictionaryReadingLength = 32
     public static let maximumUserDictionaryWordLength = 64
     /// 取り込むユーザー辞書のファイルの大きさの上限

@@ -22,7 +22,7 @@ macOS / Windows / Linux 向けの日本語入力システムです。
 
 ## 今後開発される予定の機能および内容
 
-Windows 版はまだありません．キーの割り当てを変える設定は入れない方針です(理由は docs/user/reference/settings.md)．作る予定の一覧は [docs/specs/REQUIREMENTS.md](docs/specs/REQUIREMENTS.md) にあります．
+Windows 版はまだありません．変換中のキーの割り当ては，設定の「キー操作」で変えられます．作る予定の一覧は [docs/specs/REQUIREMENTS.md](docs/specs/REQUIREMENTS.md) にあります．
 
 ## 入力内容について
 

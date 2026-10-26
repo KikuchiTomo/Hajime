@@ -4,10 +4,11 @@ import AppKit
 enum GlassDrawing {
     private typealias Glass = DesignTokens.Size.Glass
 
-    /// 角丸の縁．fillsSurface が true なら面も塗る(ぼかしの無い画像に書き出すとき)
+    /// 角丸の縁．fillsSurface が true なら面も塗る(ぼかしの無い画像に書き出すとき)．
+    /// glass のほかの角丸のテーマは，ぼかしの地(GlassBackdrop)の上を色で塗りつぶす(角丸の形と窓の影は地の側が受け持つ)
     static func drawFrame(in rect: NSRect, theme: ResolvedTheme, fillsSurface: Bool) {
-        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: Glass.cornerRadius, yRadius: Glass.cornerRadius)
-        if fillsSurface {
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: theme.cornerRadius, yRadius: theme.cornerRadius)
+        if fillsSurface || !theme.usesBackdrop {
             theme.surface.setFill()
             path.fill()
         }
@@ -29,6 +30,18 @@ enum GlassDrawing {
         (selected ? theme.selectionText.withAlphaComponent(0.25) : theme.badge.withAlphaComponent(theme.badge.alphaComponent * opacity)).setFill()
         NSBezierPath(ovalIn: rect).fill()
         let color = (selected ? theme.selectionText : theme.textMuted).withAlphaComponent(selected ? 1 : opacity)
+        drawLabel(label, color: color, in: rect, theme: theme)
+    }
+
+    /// 番号は文字で，矢印などの記号は SF Symbols のアイコンで描く
+    static func drawLabel(_ label: String, color: NSColor, in rect: NSRect, theme: ResolvedTheme) {
+        if case .symbol(let name)? = KeyHint.parts(of: label).first, label.count == 1,
+            let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: Glass.keyFontSize - 1, weight: .bold).applying(NSImage.SymbolConfiguration(paletteColors: [color]))) {
+            let size = image.size
+            image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+            return
+        }
         drawCentered(label, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: color], in: rect)
     }
 
@@ -49,33 +62,94 @@ enum GlassDrawing {
         return hints.map { hintWidth($0, theme: theme) }.reduce(0, +) + Glass.hintGap * CGFloat(hints.count - 1)
     }
 
-    /// キーキャップ風の札とその説明を左から並べる
+    /// キーキャップの札とその説明を左から並べる．キーは文字ではなく SF Symbols のアイコンで描く(KeyHint.Part)．
+    /// 札の形はテーマに合わせる: 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
     static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
         var x = x
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: theme.textMuted]
         for hint in hints {
-            let cap = NSRect(x: x, y: (midY - Glass.keycapHeight / 2).rounded(), width: keycapWidth(hint.key, theme: theme), height: Glass.keycapHeight)
-            let path = NSBezierPath(roundedRect: cap.insetBy(dx: 0.5, dy: 0.5), xRadius: Glass.keycapRadius, yRadius: Glass.keycapRadius)
-            theme.badge.setFill()
-            path.fill()
-            theme.line.setStroke()
-            path.lineWidth = 1
-            path.stroke()
-            drawCentered(hint.key, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: theme.text], in: cap)
+            let cap = NSRect(x: x, y: (midY - Glass.keycapHeight / 2).rounded(), width: keycapWidth(hint, theme: theme), height: Glass.keycapHeight)
+            drawKeycap(cap, theme: theme)
+            var partX = cap.minX + Glass.keycapPaddingX
+            for part in hint.parts {
+                let width = partWidth(part, theme: theme)
+                drawPart(part, in: NSRect(x: partX, y: cap.minY, width: width, height: cap.height), theme: theme)
+                partX += width + partGap
+            }
             let labelSize = hint.label.size(withAttributes: labelAttributes)
             hint.label.draw(at: NSPoint(x: cap.maxX + Glass.keycapPaddingX, y: (midY - labelSize.height / 2).rounded()), withAttributes: labelAttributes)
             x += hintWidth(hint, theme: theme) + Glass.hintGap
         }
     }
 
-    private static func keycapWidth(_ key: String, theme: ResolvedTheme) -> CGFloat {
-        let width = key.size(withAttributes: [.font: theme.keyFont(size: Glass.keyFontSize)]).width + Glass.keycapPaddingX * 2
-        return max(Glass.keycapHeight, width.rounded(.up))
+    /// キーの部品のあいだの空き
+    private static let partGap: CGFloat = 1
+
+    private static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
+        switch theme.kind {
+        case .platinum:
+            // 角の立った立体の札．外枠の内側に光の縁(左と上)と影の縁(右と下)
+            theme.frame.setFill()
+            cap.fill()
+            let inner = cap.insetBy(dx: 1, dy: 1)
+            theme.surface.setFill()
+            inner.fill()
+            theme.bevelLight.setFill()
+            NSRect(x: inner.minX, y: inner.minY, width: inner.width, height: 1).fill()
+            NSRect(x: inner.minX, y: inner.minY, width: 1, height: inner.height).fill()
+            theme.bevelShadow.setFill()
+            NSRect(x: inner.minX, y: inner.maxY - 1, width: inner.width, height: 1).fill()
+            NSRect(x: inner.maxX - 1, y: inner.minY, width: 1, height: inner.height).fill()
+        case .desk:
+            // 蛍光表示管の琥珀色で縁取った札
+            theme.text.withAlphaComponent(0.12).setFill()
+            cap.fill()
+            theme.text.withAlphaComponent(0.6).setStroke()
+            let path = NSBezierPath(rect: cap.insetBy(dx: 0.5, dy: 0.5))
+            path.lineWidth = 1
+            path.stroke()
+        default:
+            let path = NSBezierPath(roundedRect: cap.insetBy(dx: 0.5, dy: 0.5), xRadius: Glass.keycapRadius, yRadius: Glass.keycapRadius)
+            theme.badge.setFill()
+            path.fill()
+            theme.line.setStroke()
+            path.lineWidth = 1
+            path.stroke()
+        }
+    }
+
+    private static func symbolImage(_ name: String, theme: ResolvedTheme) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(pointSize: Glass.keyFontSize, weight: .semibold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [theme.text]))
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
+    }
+
+    private static func partWidth(_ part: KeyHint.Part, theme: ResolvedTheme) -> CGFloat {
+        switch part {
+        case .symbol(let name): (symbolImage(name, theme: theme)?.size.width ?? Glass.keyFontSize).rounded(.up)
+        case .text(let text): text.size(withAttributes: [.font: theme.keyFont(size: Glass.keyFontSize)]).width.rounded(.up)
+        }
+    }
+
+    private static func drawPart(_ part: KeyHint.Part, in rect: NSRect, theme: ResolvedTheme) {
+        switch part {
+        case .symbol(let name):
+            guard let image = symbolImage(name, theme: theme) else { return }
+            let size = image.size
+            image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+        case .text(let text):
+            drawCentered(text, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: theme.text], in: rect)
+        }
+    }
+
+    private static func keycapWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
+        let parts = hint.parts.map { partWidth($0, theme: theme) }.reduce(0, +) + partGap * CGFloat(max(hint.parts.count - 1, 0))
+        return max(Glass.keycapHeight, (parts + Glass.keycapPaddingX * 2).rounded(.up))
     }
 
     private static func hintWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
         let label = hint.label.size(withAttributes: [.font: theme.labelFont(size: Glass.labelFontSize)]).width
-        return keycapWidth(hint.key, theme: theme) + Glass.keycapPaddingX + label.rounded(.up)
+        return keycapWidth(hint, theme: theme) + Glass.keycapPaddingX + label.rounded(.up)
     }
 
     // MARK: - 部品
@@ -86,14 +160,49 @@ enum GlassDrawing {
     }
 }
 
-/// 足元に出す操作の案内．キーと，そのキーで何をするか
+/// 足元に出す操作の案内．キーと，そのキーで何をするか．
+/// key は macOS のメニューと同じ記号で書いた名前(「⇧←」「←→」「Tab」「⌃⌥L」)．描くときはアイコンの部品に分ける
 struct KeyHint: Equatable {
     var key: String
     var label: String
 
-    /// platinum と desk は 1 行の文字で出す
-    static func text(_ hints: [KeyHint]) -> String {
-        hints.map { "\($0.key) \($0.label)" }.joined(separator: "　")
+    /// キーキャップの中に並べる部品．記号は SF Symbols のアイコン，ほかは文字
+    enum Part: Equatable {
+        case symbol(String)
+        case text(String)
+    }
+
+    var parts: [Part] { Self.parts(of: key) }
+
+    /// 記号と SF Symbols の名前
+    private static let symbols: [Character: String] = [
+        "⌃": "control", "⌥": "option", "⇧": "shift", "⌘": "command",
+        "↑": "arrow.up", "↓": "arrow.down", "←": "arrow.left", "→": "arrow.right",
+    ]
+
+    static func parts(of key: String) -> [Part] {
+        var parts: [Part] = []
+        var rest = Substring(key)
+        while let first = rest.first {
+            if rest.hasPrefix("←→") {
+                parts.append(.symbol("arrow.left.and.right"))
+                rest = rest.dropFirst(2)
+            } else if rest.hasPrefix("Tab") {
+                parts.append(.symbol("arrow.right.to.line"))
+                rest = rest.dropFirst(3)
+            } else if rest.hasPrefix("Space") {
+                parts.append(.symbol("space"))
+                rest = rest.dropFirst(5)
+            } else if let name = symbols[first] {
+                parts.append(.symbol(name))
+                rest = rest.dropFirst()
+            } else {
+                // 記号でない文字(「L」「,」)は 1 文字ずつ文字の部品にする
+                parts.append(.text(String(first).uppercased()))
+                rest = rest.dropFirst()
+            }
+        }
+        return parts
     }
 }
 
@@ -105,6 +214,14 @@ final class GlassBackdrop: NSVisualEffectView {
         blendingMode = .behindWindow
         state = .active
         maskImage = Self.mask(radius: DesignTokens.Size.Glass.cornerRadius)
+    }
+
+    /// 角の丸さ(カスタムテーマで変わる)．変わったときだけ形を作り直す
+    var cornerRadius: CGFloat = DesignTokens.Size.Glass.cornerRadius {
+        didSet {
+            guard cornerRadius != oldValue else { return }
+            maskImage = Self.mask(radius: max(cornerRadius, 0.5))
+        }
     }
 
     @available(*, unavailable)

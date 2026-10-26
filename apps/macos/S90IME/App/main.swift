@@ -18,6 +18,13 @@ MainActor.assumeIsolated {
     }
 }
 
+#if DEBUG
+// 開発版だけ: 起動してすぐ設定の画面を開く(入力メニューを使わずに，画面が出るかを確かめる)
+if CommandLine.arguments.contains("--open-settings") {
+    MainActor.assumeIsolated { CompositionRoot.installed?.settingsWindow.show() }
+}
+#endif
+
 guard let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String,
     let server = IMKServer(name: connectionName, bundleIdentifier: Bundle.main.bundleIdentifier) else {
     logger.fault("IMKServer を作れませんでした")

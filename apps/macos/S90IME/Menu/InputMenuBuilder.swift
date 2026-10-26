@@ -25,17 +25,33 @@ final class InputMenuBuilder {
         self.openSettings = openSettings
     }
 
-    func makeMenu(actions: Actions) -> NSMenu {
+    /// 入力メニュー．一度だけ作って使い回し，チェックの印だけ合わせる．項目に受け手(target)は付けない．
+    ///
+    /// InputMethodKit のサーバーは受け取ったメニューを覚え(_setCachedMenu:)，選ばれた項目をそのメニューと突き合わせて
+    /// 入力コントローラに動作を送る(_copySynchronizedActions:withMenuItems:)．打鍵のたびに作り直すと突き合わせがずれ，
+    /// 実機では最初の 1 回しか届かなかった．受け手を付けると 1 回も届かなかった．azooKey-Desktop と同じく使い回し，受け手を付けない．
+    /// なお cmux など一部のアプリは，選んだ動作を IME に取り次がない(テキストエディットでは届く)．そのため同じ操作をキーでも受ける(KeyBindings)
+    private var cachedMenu: NSMenu?
+    private var liveConversionItem: NSMenuItem?
+
+    func menu(actions: Actions) -> NSMenu {
+        if let cachedMenu {
+            liveConversionItem?.state = settings.current.liveConversion ? .on : .off
+            return cachedMenu
+        }
         let menu = NSMenu()
         let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
         live.state = settings.current.liveConversion ? .on : .off
         menu.addItem(live)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
+        cachedMenu = menu
+        liveConversionItem = live
         return menu
     }
 
     func handleToggleLiveConversion() {
+        logger.notice("入力メニュー: ライブ変換を切り替えます")
         do {
             try settings.update { $0.liveConversion.toggle() }
         } catch {
@@ -44,6 +60,7 @@ final class InputMenuBuilder {
     }
 
     func handleOpenSettings() {
+        logger.notice("入力メニュー: 設定の画面を開きます")
         openSettings()
     }
 }

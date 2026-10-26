@@ -29,11 +29,6 @@ targets:
         excludes:
           - "Info.plist"
           - "S90IME.entitlements"
-          - "Resources/Fonts"
-      # フォントはディレクトリごと Contents/Resources/Fonts に置く(FontRegistry が読む)
-      - path: S90IME/Resources/Fonts
-        type: folder
-        buildPhase: resources
       # 同梱したソフトウェアとモデルの著作権表示とライセンスの全文(THIRD_PARTY_NOTICES.md の求めによる)
       - path: ../../THIRD_PARTY_NOTICES.md
         buildPhase: resources
@@ -87,7 +82,7 @@ targets:
         # 本番と開発版で変わる値．Info.plist から読む
         S90_SUPPORT_DIRECTORY: tokyo.s90.ime
         S90_ICON_SUFFIX: ""
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "0.0.1"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         COMBINE_HIDPI_IMAGES: YES

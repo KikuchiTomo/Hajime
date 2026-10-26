@@ -22,6 +22,8 @@ public struct TypoCorrectionRule: Sendable {
                 && tail.keys.count >= DefaultSettings.minimumCorrectionLength
                 && tail.keys.count <= DefaultSettings.maximumCorrectionLength
                 && tail.keys.allSatisfy { $0.isASCII && $0.isLetter }
+                // Shift を押して打った大文字は，英字として打ったもの(「konoIMEha」の IME)．綴りを直さず打ったままにする
+                && !tail.keys.contains(where: \.isUppercase)
         }
     }
 

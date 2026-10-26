@@ -1,4 +1,5 @@
 import AppKit
+import os
 import InputMethodKit
 import S90Application
 import S90Domain
@@ -15,7 +16,7 @@ final class S90InputController: IMKInputController {
     private let presenter: ClientActionPresenter
     private let menuBuilder: InputMenuBuilder
     /// 打鍵が止まったことを知らせるタイマー(ライブ変換で，かなのまま見せていた語を変換して見せる)
-    private var settleTimer: Timer?
+    private var settleTask: Task<Void, Never>?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let (root, session, presenter, menuBuilder) = MainActor.assumeIsolated {
@@ -48,32 +49,28 @@ final class S90InputController: IMKInputController {
     }
 
     /// 打鍵が止まったら変換した文を見せ(settle)，さらに止まったら打ち間違いを見直す(review)．
-    /// 次のキーが来たらタイマーを止めるので，打ち続けているあいだは見直さない
+    /// 次のキーが来たら待ちを取り消すので，打ち続けているあいだは見直さない．
+    /// 待つのはメインスレッドの Task にし，入力コントローラと入力先を別のスレッドへ渡さない
     @MainActor
     private func scheduleSettle(client: any IMKTextInput, context: InputContext) {
-        settleTimer?.invalidate()
-        settleTimer = nil
-        if session.awaitsSettle {
-            settleTimer = Timer.scheduledTimer(withTimeInterval: DefaultSettings.liveConversionSettleDelay, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.presenter.apply(self.session.settle(context: context), to: client)
-                    self.scheduleReview(client: client, context: context, after: DefaultSettings.liveCorrectionDelay - DefaultSettings.liveConversionSettleDelay)
-                }
+        settleTask?.cancel()
+        settleTask = nil
+        let settles = session.awaitsSettle
+        // 待ち時間は設定で変えられる(ライブ変換で漢字にするまで・打ち間違いを見直すまで)
+        let settleDelay = root.settings.current.liveConversionDelay
+        let correctionDelay = root.settings.current.correctionDelay
+        guard settles || session.awaitsReview else { return }
+        settleTask = Task { @MainActor [weak self] in
+            if settles {
+                try? await Task.sleep(for: .seconds(settleDelay))
+                guard !Task.isCancelled, let self else { return }
+                self.presenter.apply(self.session.settle(context: context), to: client)
             }
-        } else {
-            scheduleReview(client: client, context: context, after: DefaultSettings.liveCorrectionDelay)
-        }
-    }
-
-    @MainActor
-    private func scheduleReview(client: any IMKTextInput, context: InputContext, after delay: TimeInterval) {
-        guard session.awaitsReview else { return }
-        settleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.presenter.apply(self.session.review(context: context), to: client)
-            }
+            let remaining = max(correctionDelay - (settles ? settleDelay : 0), 0)
+            guard let self, self.session.awaitsReview else { return }
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled else { return }
+            self.presenter.apply(self.session.review(context: context), to: client)
         }
     }
 
@@ -90,8 +87,8 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func deactivateServer(_ sender: Any!) {
-        settleTimer?.invalidate()
-        settleTimer = nil
+        settleTask?.cancel()
+        settleTask = nil
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
         }
@@ -120,16 +117,17 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.makeMenu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(openSettings(_:))))
+        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
     }
 
-    // 入力メニューの項目の動作．InputMethodKit はこのコントローラにだけ送る(InputMenuBuilder)
-
-    @MainActor @objc private func toggleLiveConversion(_ sender: Any?) {
+    @MainActor @objc func toggleLiveConversion(_ sender: Any) {
         menuBuilder.handleToggleLiveConversion()
     }
 
-    @MainActor @objc private func openSettings(_ sender: Any?) {
+    /// 設定の画面を開く．InputMethodKit が入力メソッドの設定を開くときに呼ぶメソッドなので，
+    /// 入力メニューの「設定を開く…」もこれに送る
+    @MainActor
+    override func showPreferences(_ sender: Any!) {
         menuBuilder.handleOpenSettings()
     }
 }

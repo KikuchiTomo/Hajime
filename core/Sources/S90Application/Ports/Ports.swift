@@ -13,6 +13,9 @@ public protocol KanaKanjiConverting: AnyObject {
     /// 読みとしてのもっともらしさ(大きいほどよい)．候補を作らずに点数だけを求める軽い変換で計る．
     /// 「nn」のあとの母音をどう読むかを比べるのに使う(NasalReadingResolver)
     func plausibility(of reading: String) -> Double
+    /// 読み全体を Zenzai を使わずに変換したときの語の並び．文節の区切りを決めるのに使う(ClauseSplitter)．
+    /// Zenzai が書き換えた候補は語の区切りを持たないことがあるので，区切りはこちらで決める
+    func segmentationWords(for reading: String) -> [Candidate.Word]
     /// 打ったキーの打ち間違いを直した読みの候補を，よさそうな順に返す(「ようですね」→「よいですね」)．
     /// 文脈を見る変換(Zenzai)が無ければ空．重いので 1 キーごとには呼ばない
     func typoCorrections(forKeys keys: String) -> [ReadingCorrection]

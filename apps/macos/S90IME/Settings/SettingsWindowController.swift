@@ -10,6 +10,7 @@ import SwiftUI
 final class SettingsWindowController {
     private let model: SettingsModel
     private var window: NSWindow?
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
     init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, resetLearning: @escaping () -> Void) {
         model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
@@ -21,28 +22,43 @@ final class SettingsWindowController {
         model.message = UIStrings.Settings.setAside(url.lastPathComponent)
     }
 
+    /// 設定の画面を前に出して，キーボードの入力を受けられるようにする．
+    ///
+    /// 入力メソッドは前面に出られないアプリ(Info.plist の LSBackgroundOnly)なので，そのままでは窓がほかのアプリの窓の後ろに隠れ，
+    /// 入力欄にも打てない(実機のログで visible=true key=false だった)．開いているあいだだけ前面に出られる補助アプリ(.accessory)にし，
+    /// 閉じたら前面に出ないアプリ(.prohibited)に戻す．Dock とメニューバーには出ない
     func show() {
         model.refreshUsage()
         let window = window ?? makeWindow()
         self.window = window
-        // 入力メソッドは前面のアプリにならない(LSBackgroundOnly)ので，ほかのアプリのウィンドウより上の層に出して前に出す
-        window.level = .modalPanel
+        NSApp.setActivationPolicy(.accessory)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        // 前に出たかは，切り替えが済んだあとに記録する
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [logger] in
+            logger.notice("設定の画面: visible=\(window.isVisible, privacy: .public) key=\(window.isKeyWindow, privacy: .public) active=\(NSApp.isActive, privacy: .public)")
+        }
     }
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: SettingsView.size),
-            styleMask: [.titled, .closable, .miniaturizable],
+            // 左の一覧をタイトルバーの下まで伸ばす(システム設定と同じ見た目)
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = UIStrings.Settings.windowTitle
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
         window.contentView = NSHostingView(rootView: SettingsView(model: model))
         window.isReleasedWhenClosed = false
         window.center()
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+            // 閉じたら前面に出ないアプリに戻す(入力メソッドとして，ほかのアプリの前に出ない)
+            MainActor.assumeIsolated { _ = NSApp.setActivationPolicy(.prohibited) }
+        }
         return window
     }
 }
@@ -115,7 +131,7 @@ final class SettingsModel: ObservableObject {
     /// 保存できたら true．できなければ入力欄を残す
     func addProfileRule(prefix: String, profile: AppProfile) -> Bool {
         let trimmed = prefix.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return false }
+        guard ProfileRuleCSV.isValidIdentifier(trimmed) else { return false }
         return update { current in
             current.profileRules.removeAll { $0.applicationPrefix == trimmed }
             current.profileRules.insert(ProfileRule(applicationPrefix: trimmed, profile: profile), at: 0)
@@ -184,5 +200,160 @@ final class SettingsModel: ObservableObject {
         } catch {
             message = UIStrings.Settings.exportFailed
         }
+    }
+
+    // MARK: 除外設定
+
+    /// アプリを /Applications から選んで足す．バンドル ID を手で打たなくてよいように
+    func addApplications(profile: AppProfile) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK else { return }
+        let identifiers = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }.filter(ProfileRuleCSV.isValidIdentifier)
+        guard !identifiers.isEmpty else {
+            message = UIStrings.More.noBundleID
+            return
+        }
+        update { current in
+            current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
+            current.profileRules.insert(contentsOf: identifiers.map { ProfileRule(applicationPrefix: $0, profile: profile) }, at: 0)
+        }
+    }
+
+    func importProfileRules() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let rules = try ProfileRuleFile.read(from: url)
+            let identifiers = Set(rules.map(\.applicationPrefix))
+            if update({ current in
+                current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
+                current.profileRules.insert(contentsOf: rules, at: 0)
+                current.clampToValidRanges()
+            }) {
+                message = UIStrings.More.importedRules(rules.count)
+            }
+        } catch {
+            message = UIStrings.More.csvFailed
+        }
+    }
+
+    func exportProfileRules() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = UIStrings.More.exportCSVFileName
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try ProfileRuleFile.write(settings.profileRules, to: url)
+        } catch {
+            message = UIStrings.Settings.exportFailed
+        }
+    }
+
+    // MARK: バックアップ
+
+    func exportSettings() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = UIStrings.More.exportSettingsFileName
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try SettingsTransfer.write(settings, to: url)
+        } catch {
+            message = UIStrings.More.settingsExportFailed
+        }
+    }
+
+    /// 読み込んだ設定ですべてを置き換える．読めない項目と範囲の外の値は既定値になる(SettingsTransfer)
+    func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let imported = try SettingsTransfer.read(from: url)
+            if update({ $0 = imported }) { message = UIStrings.More.settingsImported }
+        } catch {
+            message = UIStrings.More.settingsImportFailed
+        }
+    }
+
+    // MARK: カスタムテーマ
+
+    /// 今使っているテーマ(既成のテーマかカスタムテーマ)を複製して，新しいカスタムテーマにし，それを使う
+    func duplicateCurrentTheme() {
+        guard settings.customThemes.count < DefaultSettings.maximumCustomThemes else { return }
+        var theme = settings.activeCustomTheme ?? Self.customTheme(from: settings.theme)
+        theme.id = UUID().uuidString
+        theme.name = String(UIStrings.More.copyName(theme.name).prefix(DefaultSettings.maximumThemeNameLength))
+        update { current in
+            current.customThemes.append(theme)
+            current.customThemeID = theme.id
+        }
+    }
+
+    func updateCustomTheme(id: String, _ change: (inout CustomTheme) -> Void) {
+        update { current in
+            guard let index = current.customThemes.firstIndex(where: { $0.id == id }) else { return }
+            var theme = current.customThemes[index]
+            change(&theme)
+            if theme.isValid { current.customThemes[index] = theme }
+        }
+    }
+
+    func deleteCustomTheme(id: String) {
+        update { current in
+            current.customThemes.removeAll { $0.id == id }
+            if current.customThemeID == id { current.customThemeID = nil }
+        }
+    }
+
+    /// 既成のテーマを選ぶ(カスタムテーマは使わない)
+    func selectTheme(_ theme: ThemePreference) {
+        update { current in
+            current.theme = theme
+            current.customThemeID = nil
+        }
+    }
+
+    func selectCustomTheme(id: String) {
+        update { $0.customThemeID = id }
+    }
+
+    /// 既成のテーマの色を写したカスタムテーマ．標準(glass)の色は OS の色なので，今の外観での色にする
+    private static func customTheme(from preference: ThemePreference) -> CustomTheme {
+        var resolved = ResolvedTheme.resolve(preference)
+        NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
+            resolved = ResolvedTheme.resolve(preference)
+        }
+        func hex(_ color: NSColor) -> HexColor {
+            var value = HexColor(red: 0, green: 0, blue: 0)
+            NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
+                let rgb = color.usingColorSpace(.sRGB) ?? .black
+                value = HexColor(red: UInt8((rgb.redComponent * 255).rounded()), green: UInt8((rgb.greenComponent * 255).rounded()),
+                                 blue: UInt8((rgb.blueComponent * 255).rounded()))
+            }
+            return value
+        }
+        return CustomTheme(
+            id: UUID().uuidString, name: UIStrings.Choice.label(for: preference), base: preference,
+            surface: hex(resolved.surface), text: hex(resolved.text), textMuted: hex(resolved.textMuted),
+            selection: hex(resolved.selection), selectionText: hex(resolved.selectionText),
+            correction: hex(resolved.correction), line: hex(resolved.line),
+            cornerRadius: resolved.isRounded ? Double(resolved.cornerRadius) : 0
+        )
+    }
+
+    // MARK: 情報
+
+    var versionString: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+    }
+
+    /// アプリに入れた利用表記(THIRD_PARTY_NOTICES.md)．無ければ nil
+    var notices: String? {
+        guard let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md") else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 }

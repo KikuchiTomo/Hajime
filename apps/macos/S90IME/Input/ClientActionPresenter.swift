@@ -10,10 +10,13 @@ final class ClientActionPresenter {
     private let candidatePanel: CandidatePanelController
     private let modeIndicator: ModeIndicatorController
     private let note: NoteController
+    private let openSettings: () -> Void
     private let settings: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring) {
+    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
+         openSettings: @escaping () -> Void) {
+        self.openSettings = openSettings
         self.candidatePanel = candidatePanel
         self.modeIndicator = modeIndicator
         self.note = note
@@ -29,16 +32,27 @@ final class ClientActionPresenter {
                 let attributed = Self.attributedString(for: marked)
                 client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: Self.noReplacement)
             case .showCandidates(let panel):
-                candidatePanel.show(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
+                note.hide()
+                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize)
             case .showLattice(let panel):
-                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
+                note.hide()
+                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
+                                           keys: settings.current.conversionKeys)
             case .hideCandidates:
                 candidatePanel.hide()
                 note.hide()
+            case .openSettings:
+                openSettings()
+            case .toggleLiveConversion:
+                do {
+                    try settings.update { $0.liveConversion.toggle() }
+                } catch {
+                    logger.error("ライブ変換の設定を保存できませんでした: \(String(describing: error), privacy: .public)")
+                }
             case .showNote(let text):
-                note.show(text, caret: caretRect(of: client), theme: settings.current.theme)
+                note.show(text, caret: caretRect(of: client), theme: ThemeChoice(settings.current))
             case .showModeIndicator(let mode):
-                modeIndicator.show(mode, caret: caretRect(of: client), theme: settings.current.theme)
+                modeIndicator.show(mode, caret: caretRect(of: client), theme: ThemeChoice(settings.current), duration: settings.current.modeIndicatorDuration)
             case .selectMode(let mode):
                 client.selectMode(mode == .japanese ? AppIdentity.japaneseModeID : AppIdentity.directModeID)
             case .selectInputStyle(let style):
@@ -46,7 +60,7 @@ final class ClientActionPresenter {
                     try settings.update { $0.inputStyle = style }
                     // 切り替えたことを入力位置の近くに出す
                     if settings.current.showsModeIndicator {
-                        modeIndicator.show(style, caret: caretRect(of: client), theme: settings.current.theme)
+                        modeIndicator.show(style, caret: caretRect(of: client), theme: ThemeChoice(settings.current), duration: settings.current.modeIndicatorDuration)
                     }
                 } catch {
                     logger.error("入力方式を保存できませんでした: \(String(describing: error), privacy: .public)")
