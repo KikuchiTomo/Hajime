@@ -31,6 +31,8 @@ public enum KeyEditSearch {
         public var transposition = DefaultSettings.keyEditCosts.transposition
         /// 読みの音が変わらない書き誤り(ず/づ・じ/ぢ・わ/は・え/へ・お/を・おう/おお)．聞いたとおりに書いた誤りなので起きやすい
         public var samePronunciation = DefaultSettings.keyEditCosts.samePronunciation
+        /// 母音・や行・な行の前の「ん」を n 1 つで打った誤り(konichiha → konnichiha)．ローマ字の綴りの決まりの誤りなので起きやすい
+        public var nasalSpelling = DefaultSettings.keyEditCosts.nasalSpelling
         public init() {}
     }
 
@@ -44,13 +46,19 @@ public enum KeyEditSearch {
         let original = reading(of: keys, table: table)
         let originalSound = original.map(pronunciation(of:))
         var best: [String: Edit] = [:]
-        func add(_ edited: [Character], cost: Double) {
-            let edited = String(edited)
+        func record(_ edited: String, cost: Double) {
             guard let reading = reading(of: edited, table: table), reading != original else { return }
             // 音が同じなら，キーの打ち間違いでなく書き分けの誤りとみなし，手間を小さくする
             let cost = pronunciation(of: reading) == originalSound ? min(cost, costs.samePronunciation) : cost
             if let existing = best[reading], existing.cost <= cost { return }
             best[reading] = Edit(keys: edited, reading: reading, cost: cost)
+        }
+        func add(_ edited: [Character], cost: Double) {
+            // 「nn」のあとの母音は「ん+あ行」と「ん+な行」のどちらにも読める(hannei → 反映，konnichiha → こんにちは)．
+            // 表は「ん+あ行」で読むので，「ん+な行」の読みも n を 1 つ足した並びとして試す(同じ手間)
+            for variant in [edited] + nasalVariants(of: edited) {
+                record(String(variant), cost: cost)
+            }
         }
         for index in min(max(0, from), characters.count)...characters.count {
             let previous = index > 0 ? characters[index - 1] : nil
@@ -58,7 +66,9 @@ public enum KeyEditSearch {
             // 打ち忘れ: index の前に 1 文字を補う
             for character in alphabet {
                 let easy = vowels.contains(character) || character == previous || character == current
-                add(Array(characters[..<index]) + [character] + Array(characters[index...]), cost: easy ? costs.easyOmission : costs.omission)
+                let nasal = isNasalSpelling(inserting: character, at: index, in: characters)
+                add(Array(characters[..<index]) + [character] + Array(characters[index...]),
+                    cost: nasal ? costs.nasalSpelling : easy ? costs.easyOmission : costs.omission)
             }
             guard let current else { continue }
             // 余分な 1 打: index の文字を除く
@@ -79,6 +89,23 @@ public enum KeyEditSearch {
             }
         }
         return Array(best.values)
+    }
+
+    /// index に character を補うと，母音・や行・な行の前の 1 つの n が「nn」(ん)になるか
+    static func isNasalSpelling(inserting character: Character, at index: Int, in keys: [Character]) -> Bool {
+        guard character == "n", index > 0, index < keys.count, keys[index - 1] == "n" else { return false }
+        let next = keys[index]
+        return (vowels.contains(next) || next == "y" || next == "n") && (index < 2 || keys[index - 2] != "n")
+    }
+
+    /// 「nn」のあとに母音が続くところ(「nnn」でない)を 1 か所ずつ「nnn」にした並び．「ん+な行」で読ませるため
+    static func nasalVariants(of keys: [Character]) -> [[Character]] {
+        var variants: [[Character]] = []
+        for index in keys.indices.dropLast(2) where keys[index] == "n" && keys[index + 1] == "n" && vowels.contains(keys[index + 2])
+            && (index == 0 || keys[index - 1] != "n") {
+            variants.append(Array(keys[...index]) + ["n"] + Array(keys[(index + 1)...]))
+        }
+        return variants
     }
 
     /// 1 か所の打ち間違いをすべて試して，訂正の候補にする．2 段で絞る:
@@ -125,8 +152,9 @@ public enum KeyEditSearch {
 
     /// 前に見直したキーの並び(previous)と今の並びが先頭から同じ長さのうち，探し直さなくてよい長さ．
     /// 打ち間違いは変わったところの少し前にもありうる(打ち忘れ・入れ替え)ので，DefaultSettings.keyEditOverlap 文字は探し直す
+    /// 前の並びに打ち足した並び(同じ入力の続き)のときだけ探し直さない．別の入力(前の文)と頭がたまたま同じでも，全部を探す
     public static func searchStart(keys: String, previous: String?) -> Int {
-        guard let previous else { return 0 }
+        guard let previous, keys.hasPrefix(previous) else { return 0 }
         let common = zip(keys, previous).prefix { $0 == $1 }.count
         return max(0, common - DefaultSettings.keyEditOverlap)
     }

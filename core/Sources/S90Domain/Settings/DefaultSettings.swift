@@ -102,7 +102,8 @@ public enum DefaultSettings {
     public static let correctionCostWeight = 3.0
     /// KeyEditSearch の打ち間違いの手間(隣のキー・母音どうし・同じキーは起きやすいので小さい)
     public static let keyEditCosts = (neighborSubstitution: 1.0, substitution: 2.0, easyOmission: 1.5, omission: 2.5,
-                                      easyInsertion: 1.0, insertion: 2.0, transposition: 1.0, samePronunciation: 0.5)
+                                      easyInsertion: 1.0, insertion: 2.0, transposition: 1.0, samePronunciation: 0.5,
+                                      nasalSpelling: 0.5)
     /// 打ち間違いを探す幅．広いほど見つけやすいが遅い．4 で 1 文 0.2 秒以内(Zenzai small，Apple Silicon)
     public static let typoCorrectionBeamSize = 16
     public static let typoCorrectionTopK = 32
