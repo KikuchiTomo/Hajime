@@ -95,6 +95,27 @@ enum SnapshotRenderer {
             window.close()
         }
         NSApp.appearance = NSAppearance(named: .aqua)
+        // 行の多い表を下までスクロールしたとき，行が列の見出しの下に潜らないか
+        fixture.model.update { $0.profileRules = (0..<14).map { ProfileRule(applicationPrefix: "com.example.app\($0)", profile: .terminal) } }
+        let manyNavigation = SettingsNavigation()
+        let scrolled = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: manyNavigation)
+        manyNavigation.page = .apps
+        scrolled.orderFrontRegardless()
+        SettingsFixture.settle(scrolled)
+        // ホイールと同じ道筋で，下まで動かしてから上の端まで戻す
+        if let content = scrolled.contentView {
+            var stack: [NSView] = [content]
+            while let view = stack.popLast() {
+                if let container = view as? any FormTableContainer {
+                    container.scrollTable(by: -10_000)
+                    container.scrollTable(by: 10_000)
+                }
+                stack.append(contentsOf: view.subviews)
+            }
+        }
+        SettingsFixture.settle(scrolled)
+        if let frame = scrolled.contentView?.superview { render(frame, name: "settings-apps-scrolled", to: output, appearance: NSAppearance(named: .aqua)) }
+        scrolled.close()
         // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
