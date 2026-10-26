@@ -19,6 +19,9 @@ let previewOutput = arguments.count >= 3 ? URL(fileURLWithPath: arguments[2], is
 let canvas: CGFloat = 16
 let body = NSRect(x: 1, y: 2, width: 14, height: 12)
 let radius: CGFloat = 3
+/// 字の大きさ．面の縁と字のあいだに余白をとるため，面(14×12)より小さめにする(利用者の指摘で 11 から下げた)
+let glyphSize: CGFloat = 9.5
+let latinSize: CGFloat = 10
 
 enum Glyph {
     case hiragana
@@ -30,10 +33,10 @@ enum Glyph {
     func font(filled: Bool) -> NSFont {
         switch self {
         case .hiragana:
-            return NSFont(name: filled ? "HiraginoSans-W7" : "HiraginoSans-W6", size: 11) ?? .systemFont(ofSize: 11, weight: .bold)
+            return NSFont(name: filled ? "HiraginoSans-W7" : "HiraginoSans-W6", size: glyphSize) ?? .systemFont(ofSize: glyphSize, weight: .bold)
         case .latin:
-            let base = NSFont.systemFont(ofSize: 11.5, weight: filled ? .heavy : .bold)
-            return base.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: 11.5) } ?? base
+            let base = NSFont.systemFont(ofSize: latinSize, weight: filled ? .heavy : .bold)
+            return base.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: latinSize) } ?? base
         }
     }
 }

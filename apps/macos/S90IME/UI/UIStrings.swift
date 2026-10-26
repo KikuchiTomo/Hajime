@@ -480,8 +480,9 @@ enum UIStrings {
         static let about = "情報"
         static let version = "バージョン"
         static let acknowledgements = "謝辞"
-        static let acknowledgementsNote = "s90.tokyo IME は次のオープンソースソフトウェアとモデルを利用しています。"
-        static let noticesMissing = "利用表記のファイルが見つかりません"
+        static let acknowledgementsNote = "s90.tokyo IME は次のソフトウェア・モデル・データを利用しています。"
+        static let noticesMissing = "謝辞のファイルが見つかりません"
+        static let licenseText = "ライセンス全文"
     }
 }
 
