@@ -897,6 +897,37 @@ public final class InputSession {
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
+    /// 打っているあいだに出す候補(読み全体の変換と，続く語の予測)．出さない設定や，読みが短いときは空
+    private func suggestionCandidates() -> [Candidate] {
+        let display = settings.current.suggestionDisplay
+        guard display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion),
+            composition.pending.isEmpty || composition.pending == "n" else { return [] }
+        let reading = composition.conversionReading
+        guard reading.count >= DefaultSettings.minimumSuggestionReading else { return [] }
+        var seen = Set<String>()
+        let whole = converter.candidates(for: reading).filter { $0.readingCount == reading.count }
+        return (whole.prefix(2) + converter.predictions(for: reading) + whole.dropFirst(2))
+            .filter { seen.insert($0.text).inserted }
+            .prefix(DefaultSettings.suggestionCount)
+            .map { $0 }
+    }
+
+    /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ で選ぶ
+    private func suggestionPanel() -> CandidatePanel? {
+        let suggestions = suggestionCandidates()
+        guard !suggestions.isEmpty else { return nil }
+        return CandidatePanel(
+            variants: [],
+            selectedVariant: nil,
+            entries: suggestions.map { CandidatePanel.Entry(text: $0.text, annotation: nil) },
+            selectedEntry: nil,
+            focus: .candidate,
+            position: 0,
+            total: suggestions.count,
+            note: PanelBuilder.suggestionNote(key: keyLabel(.nextCandidate, in: .composing))
+        )
+    }
+
     private func updateCorrection() {
         let before = corrector.active
         corrector.update(for: composition)
@@ -919,6 +950,9 @@ public final class InputSession {
         defer { pendingNote = nil }
         switch phase {
         case .composing:
+            if let panel = suggestionPanel() {
+                return [.setMarkedText(composingMarkedText()), .showCandidates(panel)] + correctionNote()
+            }
             return [.setMarkedText(composingMarkedText()), .hideCandidates] + correctionNote()
         case .selecting(let selection):
             let candidate = currentCandidate()
@@ -1003,7 +1037,13 @@ public final class InputSession {
         switch phase {
         case .composing:
             alphabetRun = false
-            enterConversion()
+            // 打っているあいだの候補を出しているときは，↓ でその候補から選ぶ
+            let suggestions = move == .next ? suggestionCandidates() : []
+            if suggestions.isEmpty {
+                enterConversion()
+            } else {
+                phase = .selecting(CandidateSelection(candidates: suggestions, annotations: suggestions.map { _ in nil }, focus: .candidate(0)))
+            }
         case .lattice(var lattice):
             let perPage = settings.current.branchCandidatesPerPage
             switch move {

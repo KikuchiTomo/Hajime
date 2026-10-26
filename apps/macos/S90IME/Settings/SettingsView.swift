@@ -173,6 +173,7 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Menu.liveConversion, keyPath: \.liveConversion)
                 ResettablePicker(model: model, title: UIStrings.Choice.presentation, keyPath: \.candidatePresentation, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.initialFocus, keyPath: \.initialFocus, label: UIStrings.Choice.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Choice.suggestionDisplay, keyPath: \.suggestionDisplay, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
                 ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
                 ResettableRow(model: model, keyPath: \.liveConversionDelay) {

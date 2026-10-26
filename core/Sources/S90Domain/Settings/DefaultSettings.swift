@@ -31,6 +31,10 @@ public enum DefaultSettings {
     public static let candidatesPerPage = 9
     /// エンジンに求める候補の数
     public static let engineCandidateCount = 20
+    /// 打っているあいだに出す候補(変換と予測)の数
+    public static let suggestionCount = 5
+    /// 打っているあいだの候補を出し始める読みの長さ(1 文字では候補が多すぎて役に立たない)
+    public static let minimumSuggestionReading = 2
     /// タイプミスの補正を試す最短の長さ．短い並びは英単語と偶然一致しやすい
     public static let minimumCorrectionLength = 4
     /// タイプミスの補正を試す最長の長さ．長い並びを英単語の辞書に問い合わせる手間を抑える
