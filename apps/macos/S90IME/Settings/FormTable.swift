@@ -59,6 +59,50 @@ struct FormTableHost<Content: View>: NSViewRepresentable {
                 scroll.hasVerticalScroller = true
                 scroll.autohidesScrollers = true
             }
+            watch(scroll.contentView)
+            placeHeader()
+        }
+
+        // MARK: 列の見出し
+        //
+        // 列の見出しは，表のスクロールビューの上の端に重ねた別の入れ物(高さは見出しの高さ)に描かれる．Form の中の表では
+        // 上の余白(contentInsets)が 0 になるので，行は見出しの下に潜る．上の端を見出しの高さぶん上(-見出しの高さ)にして
+        // 1 行目を見出しの下から並べる．SwiftUI が表を描き直すと位置を 0 に戻すので，上の端にいるあいだは戻し直す
+
+        /// 見張っているスクロールの中身
+        private weak var watchedClip: NSClipView?
+        /// 表の上の端にいるか．上の端にいるあいだに SwiftUI が位置を 0 に戻したら，見出しの下に戻す
+        private var isAtTop = true
+
+        private var header: NSTableHeaderView? {
+            (tableScrollView?.documentView as? NSTableView)?.headerView
+        }
+
+        private func watch(_ clip: NSClipView) {
+            guard watchedClip !== clip else { return }
+            watchedClip.map { NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: $0) }
+            watchedClip = clip
+            isAtTop = true
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(clipMoved), name: NSView.boundsDidChangeNotification, object: clip)
+        }
+
+        @objc private func clipMoved(_ notification: Notification) {
+            placeHeader()
+        }
+
+        /// 上の端にいれば，1 行目を見出しの下に並べる
+        private func placeHeader() {
+            guard let scroll = tableScrollView, let header, header.frame.height > 0 else { return }
+            let clip = scroll.contentView
+            let top = -header.frame.height
+            if isAtTop, clip.bounds.origin.y != top, clip.bounds.origin.y <= 0 {
+                clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: top))
+                scroll.reflectScrolledClipView(clip)
+            } else if clip.bounds.origin.y > 0 {
+                isAtTop = false
+            }
+
         }
 
         /// 表はスクロールを止められているので，ホイールの動きを受け取って表の中を動かす．
@@ -69,20 +113,20 @@ struct FormTableHost<Content: View>: NSViewRepresentable {
             if !scrollTable(by: delta) { super.scrollWheel(with: event) }
         }
 
-        /// 表の中を delta だけ動かす．端にいて動かせなければ false．
-        /// 上の端は，列の見出しの高さぶん上にする．見出しは行の上に浮かぶので，0 まで動かすと 1 行目が見出しの下に潜る
+        /// 表の中を delta だけ動かす．端にいて動かせなければ false．上の端は見出しの高さぶん上
         @discardableResult
         func scrollTable(by delta: CGFloat) -> Bool {
             guard let scroll = tableScrollView, let document = scroll.documentView else { return false }
             let clip = scroll.contentView
-            let header = (document as? NSTableView)?.headerView?.frame.height ?? 0
-            let top = -scroll.contentInsets.top - header
-            let bottom = max(top, document.frame.height - clip.bounds.height + scroll.contentInsets.bottom)
+            let top = -(header?.frame.height ?? 0)
+            let bottom = max(top, document.frame.height - clip.bounds.height)
             let current = clip.bounds.origin.y
             let target = min(max(current - delta, top), bottom)
             guard target != current else { return false }
+            isAtTop = target == top
             clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: target))
             scroll.reflectScrolledClipView(clip)
+            placeHeader()
             return true
         }
     }
