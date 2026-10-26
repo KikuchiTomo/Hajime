@@ -1,4 +1,5 @@
 import Foundation
+import S90Domain
 
 // 入力メソッドとして入れずに，ターミナルで変換を試し，精度を測る道具(make try)．composition root のひとつ．
 //
@@ -7,6 +8,9 @@ import Foundation
 //   s90-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
 //   s90-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
 //   s90-playground --evaluate-typo <TSV> [--zenzai <モデル>]   打ち間違いの補正(直した・示した・直さなかった)
+//   s90-playground --typo-candidates <キー> [--zenzai <モデル>] 打ったキーの訂正の候補と点数
+//   s90-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
+//   s90-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
@@ -20,6 +24,25 @@ MainActor.assumeIsolated {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {
             try Evaluation.typo(file: file, engine: playground.engine)
+        } else if let file = arguments.value(of: "--correction-features") {
+            try Evaluation.correctionFeatures(file: file, engine: playground.engine)
+        } else if let readings = arguments.value(of: "--plausibility") {
+            // 読みごとの変換のもっともらしさと，求めるのにかかる時間
+            let session = playground.engine.makeSession()
+            let clock = ContinuousClock()
+            for reading in readings.split(separator: ",").map(String.init) {
+                var score = 0.0
+                let time = clock.measure { score = session.plausibility(of: reading) }
+                print(String(format: "%8.2f  %@  ", score, reading), time)
+            }
+        } else if let keys = arguments.value(of: "--typo-candidates") {
+            // 打ったキーに対する訂正の候補と点数(補正の手間を調べるため)
+            let session = playground.engine.makeSession()
+            for correction in session.typoCorrections(forKeys: keys).prefix(40) {
+                let reading = KanaWidth.hiragana(from: correction.reading)
+                print(String(format: "%7.2f  手間 %5.2f  変換 %7.2f  %@  %@", correction.score, correction.cost, session.plausibility(of: reading),
+                             correction.keys, correction.reading))
+            }
         } else {
             Interactive.run(engine: playground.engine)
         }

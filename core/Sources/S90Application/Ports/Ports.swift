@@ -27,6 +27,8 @@ public protocol KanaKanjiConverting: AnyObject {
     /// 打ったキーの打ち間違いを直した読みの候補を，よさそうな順に返す(「ようですね」→「よいですね」)．
     /// 文脈を見る変換(Zenzai)が無ければ空．重いので 1 キーごとには呼ばない
     func typoCorrections(forKeys keys: String) -> [ReadingCorrection]
+    /// キーの並びをそのまま読んだときの，文脈を見る言語モデル(Zenzai)の点数．並びごとに返し，使えなければ nil
+    func languageModelScores(forKeys keys: [String]) -> [Double?]
     /// 入力位置の前にある文字列(左の文脈)を伝える．文脈を使えるエンジン(Zenzai)が変換の手がかりにする
     func setLeftContext(_ text: String?)
     /// 候補を確定したことを伝える．学習に使う

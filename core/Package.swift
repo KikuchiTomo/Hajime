@@ -17,7 +17,7 @@ let package = Package(
         // Zenzai(文脈を見るニューラルかな漢字変換)の trait を有効にする．モデルは別に置く(docs/dev/adr/0006-zenzai.md)
         .package(
             url: "https://github.com/KikuchiTomo/AzooKeyKanaKanjiConverter",
-            revision: "f4e56a4fba8ebd59f6103357c46aad7a51cb4378",
+            revision: "c456c0d4dda385107ac48f666d7ee289710fda25",
             traits: ["Zenzai"]
         ),
     ],

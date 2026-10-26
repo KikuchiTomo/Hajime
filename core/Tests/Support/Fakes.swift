@@ -40,7 +40,9 @@ public final class FakeConverter: KanaKanjiConverting {
 
     /// 読みごとの語の並び(文節の区切りを決める)
     public var words: [String: [Candidate.Word]] = [:]
+    public var languageModelScores: [String: Double] = [:]
     public func segmentationWords(for reading: String) -> [Candidate.Word] { words[reading] ?? [] }
+    public func languageModelScores(forKeys keys: [String]) -> [Double?] { keys.map { languageModelScores[$0] } }
     public func plausibility(of reading: String) -> Double { scores[reading] ?? (table[reading] == nil ? -.infinity : 0) }
     /// 打ったキーごとの，打ち間違いを直した読みの候補
     public var corrections: [String: [ReadingCorrection]] = [:]
