@@ -1,4 +1,4 @@
-#if os(Windows)
+#if os(Windows) || os(Linux) || os(macOS)
 import Dispatch
 import Foundation
 import S90Application
@@ -7,21 +7,43 @@ import S90Engine
 import S90IPC
 import S90Persistence
 
+/// 変換のエンジンのプロセス．Windows は名前付きパイプ，Linux は Unix ドメインソケットで枠組みの口とつなぐ(ADR 0003・0012)．
+/// macOS では入力メソッドが core を直接使うので，ここは Linux の口を macOS で試すときだけ使う
 enum HostPaths {
-    static var roaming: URL { directory(environment: "APPDATA") }
-    static var local: URL { directory(environment: "LOCALAPPDATA") }
+    #if os(Windows)
+    /// 設定(移動プロファイルで運ぶ)
+    static var roaming: URL { directory(environment: "APPDATA", fallback: nil) }
+    /// 学習データ・使い方の記録・取り込んだ辞書(この PC だけのもの)
+    static var local: URL { directory(environment: "LOCALAPPDATA", fallback: nil) }
+    static let versionString = "s90.tokyo IME for Windows"
+    #else
+    /// 設定(XDG Base Directory の config)
+    static var roaming: URL { directory(environment: "XDG_CONFIG_HOME", fallback: ".config") }
+    /// 学習データ・使い方の記録・取り込んだ辞書(XDG Base Directory の data)
+    static var local: URL { directory(environment: "XDG_DATA_HOME", fallback: ".local/share") }
+    static let versionString = "s90.tokyo IME for Linux"
+    #endif
 
-    private static func directory(environment name: String) -> URL {
-        let base = ProcessInfo.processInfo.environment[name].map { URL(fileURLWithPath: $0, isDirectory: true) }
+    /// name の環境変数の場所．無ければホームの fallback(Linux)か一時フォルダ
+    private static func directory(environment name: String, fallback: String?) -> URL {
+        // XDG の値は絶対パスのときだけ使う(XDG Base Directory の決まり)
+        let value = ProcessInfo.processInfo.environment[name].flatMap { !$0.isEmpty && (fallback == nil || $0.hasPrefix("/")) ? $0 : nil }
+        let base = value.map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? fallback.map { FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent($0, isDirectory: true) }
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("s90.tokyo", isDirectory: true).appendingPathComponent("IME", isDirectory: true)
     }
 
+    /// 実行ファイルと一緒に置いたもの(Zenzai のモデル・連想の辞書・郵便番号の表)
     static var installation: URL {
         URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
     }
+}
 
-    static let versionString = "s90.tokyo IME for Windows"
+/// 英単語の辞書が無いときの代わり．英単語の綴りの補正だけを止め，入力は続ける(Linux の辞書はまだ用意していない)
+final class UnavailableEnglishLexicon: EnglishLexicon {
+    func isWord(_ text: String) -> Bool { false }
+    func suggestions(for text: String) -> [String] { [] }
 }
 
 /// インストール先の Zenzai\ に置いたモデルを確かめて読む．無いか，大きさとハッシュが合わなければ Zenzai なしで動く
@@ -70,6 +92,7 @@ final class SettingsWatcher {
 
 @MainActor
 func run() -> Int32 {
+    #if os(Windows)
     let engineListener: NamedPipeListener
     let windowListener: NamedPipeListener
     do {
@@ -81,6 +104,17 @@ func run() -> Int32 {
         FileHandle.standardError.write(Data("名前付きパイプを作れません: \(error)\n".utf8))
         return 1
     }
+    #else
+    let engineListener: UnixSocketListener
+    do {
+        engineListener = try UnixSocketListener(path: UnixSocketPath.engine())
+    } catch where error.isAlreadyRunning {
+        return 0
+    } catch {
+        FileHandle.standardError.write(Data("ソケットを作れません: \(error)\n".utf8))
+        return 1
+    }
+    #endif
 
     let settings = FileSettingsStore(fileURL: HostPaths.roaming.appendingPathComponent("settings.json"))
     let memory = HostPaths.local.appendingPathComponent("memory", isDirectory: true)
@@ -103,15 +137,26 @@ func run() -> Int32 {
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
     // 英単語の辞書は Windows のスペルチェッカー(macOS の NSSpellChecker と同じ役)
+    #if os(Windows)
     let lexicon = WindowsSpellCheckerLexicon()
     if !lexicon.isAvailable {
         // 英単語の綴りの補正だけを止めて，入力は続ける
         FileHandle.standardError.write(Data("英語のスペルチェッカーを使えません(\(lexicon.openStatus))．英単語の綴りの補正をしません\n".utf8))
     }
+    #else
+    let lexicon = UnavailableEnglishLexicon()
+    #endif
     // 打ち間違いの訂正は時間がかかるので，別の変換器で裏で求める(Zenzai があるときだけ．macOS の CompositionRoot と同じ)
     let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: HostPaths.versionString) }
+    #if os(Windows)
     let window = CandidateWindowLink()
+    let sendToWindow: (WireUiCommand) -> Void = { window.send($0) }
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings.exe")
+    #else
+    // 候補ウィンドウと設定の画面は Linux ではまだ作っていない(ADR 0012)．窓への指示は捨てる
+    let sendToWindow: (WireUiCommand) -> Void = { _ in }
+    let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings")
+    #endif
 
     // 設定の同期(R-15)．同期の記録とフォルダはこの PC だけのもの(移動プロファイルで運ばない)なので Local に置く
     let synchronizer = SettingsSynchronizer(settings: settings,
@@ -131,7 +176,7 @@ func run() -> Int32 {
                          keyNames: .windows)
         },
         settings: settings,
-        ui: { window.send($0) },
+        ui: sendToWindow,
         openSettings: {
             guard FileManager.default.fileExists(atPath: settingsApp.path) else { return }
             let process = Process()
@@ -150,12 +195,13 @@ func run() -> Int32 {
     )
     settings.observe { [weak engine] in
         engine?.apply($0)
-        window.send(.setPresentation(presentation: service.presentation))
+        sendToWindow(.setPresentation(presentation: service.presentation))
     }
     engine.warmUp()
     sync.start()
     let watcher = SettingsWatcher(settings: settings, url: HostPaths.roaming.appendingPathComponent("settings.json"))
 
+    #if os(Windows)
     let presentation = service.presentation
     let candidateWindow = HostPaths.installation.appendingPathComponent("s90-candidate-ui.exe")
     window.start(listener: windowListener, expectedImagePath: candidateWindow.path) {
@@ -167,13 +213,16 @@ func run() -> Int32 {
         process.executableURL = candidateWindow
         try? process.run()
     }
-    withExtendedLifetime(watcher) { dispatchMain() }
+    #else
+    EngineSocketServer.start(listener: engineListener, service: service, candidateWindowPath: nil)
+    #endif
+    withExtendedLifetime((watcher, engineListener)) { dispatchMain() }
 }
 
 exit(MainActor.assumeIsolated { run() })
 #else
 import Foundation
 
-FileHandle.standardError.write(Data("s90-engine-host は Windows だけで動きます(macOS では core を入力メソッドに直接つなぐ)\n".utf8))
+FileHandle.standardError.write(Data("s90-engine-host は Windows・Linux・macOS で動きます\n".utf8))
 exit(1)
 #endif

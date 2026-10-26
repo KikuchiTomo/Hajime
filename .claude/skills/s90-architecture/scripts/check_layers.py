@@ -30,7 +30,7 @@ ALLOWED: dict[str, set[str]] = {
     # CryptoKit は同期のフォルダと運ぶ辞書の索引の SHA-256 を求めるのに使う(DictionaryFileSync)
     # CWindowsSpellCheck は Windows のスペルチェッカーを呼ぶ C の口(英単語の辞書．WindowsSpellCheckerLexicon)
     "S90Persistence": {"Foundation", "S90Domain", "S90Application", "CoreGraphics", "Vision", "CryptoKit", "WinSDK", "CWindowsSpellCheck"},
-    "S90IPC": {"Foundation", "S90Domain", "S90Application", "WinSDK"},
+    "S90IPC": {"Foundation", "S90Domain", "S90Application", "WinSDK", "Glibc", "Darwin"},
     # C の口(Swift を持たない)．Windows のスペルチェッカーを呼ぶだけで，このリポジトリのモジュールを使わない
     "CWindowsSpellCheck": set(),
     "s90-playground": {"Foundation", "S90Domain", "S90Application", "S90Engine", "S90Persistence"},
