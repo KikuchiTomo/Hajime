@@ -11,6 +11,12 @@ public final class WordLanguagePreview {
         public var language: WordLanguage
         /// 入る文字(日本語にするなら変換の第 1 候補)
         public var shown: String
+
+        public init(typed: String, language: WordLanguage, shown: String) {
+            self.typed = typed
+            self.language = language
+            self.shown = shown
+        }
     }
 
     private let converter: any KanaKanjiConverting

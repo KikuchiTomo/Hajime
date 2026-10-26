@@ -240,3 +240,14 @@ public struct RoutedActions: Sendable, Equatable {
         }
     }
 }
+
+extension WireDictionaryAddResult {
+    public init(_ result: UserDictionaryEditing.AddResult) {
+        switch result {
+        case .added: self = .added
+        case .alreadyRegistered: self = .alreadyRegistered
+        case .invalid: self = .invalid
+        case .full: self = .full
+        }
+    }
+}
