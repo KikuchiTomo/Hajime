@@ -351,6 +351,6 @@ fn split() -> BranchMap {
         position: 1,
         total: 4,
         note: None,
-        hints: vec![hint("1–2", "区切る"), hint("Esc", "やめる")],
+        hints: vec![hint("1–2", "区切り"), hint("Esc", "取消")],
     }
 }

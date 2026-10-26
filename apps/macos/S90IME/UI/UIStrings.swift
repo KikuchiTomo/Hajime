@@ -4,7 +4,7 @@ import S90Domain
 enum UIStrings {
     enum Candidate {
         static let candidatesHints = [KeyHint(key: "↑", label: "文字種")]
-        static let variantsHints = [KeyHint(key: "←→", label: "選ぶ"), KeyHint(key: "↓", label: "候補")]
+        static let variantsHints = [KeyHint(key: "←→", label: "選択"), KeyHint(key: "↓", label: "候補")]
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
     }
@@ -19,7 +19,7 @@ enum UIStrings {
         static let empty = "連想の辞書はありません"
         static let importFile = "連想の辞書を取り込む…"
         static let tooMany = "取り込める連想の辞書は \(DefaultSettings.maximumAssociationDictionaries) 個までです"
-        static let importFailed = "連想の辞書を取り込めませんでした。大きすぎるか、読めない形式です"
+        static let importFailed = "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
         static let note = "1 行に同じ意味の単語をタブか「,」で区切って並べたファイルを読み込めます。タブで区切るときは、先頭の列に意味の説明を書きます。上にある辞書ほど先に出ます。"
         static func imported(_ count: Int) -> String { "\(count) 件の意味を取り込みました" }
         static func summary(_ dictionary: AssociationDictionary) -> String { "\(dictionary.groupCount) 件の意味" }
@@ -30,7 +30,7 @@ enum UIStrings {
         static func hints(for keymap: Keymap) -> [KeyHint] {
             func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(Keys.name(of:)) ?? "" }
             return [
-                KeyHint(key: first(.nextCandidate), label: "選ぶ"),
+                KeyHint(key: first(.nextCandidate), label: "選択"),
                 KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "意味"),
                 KeyHint(key: first(.cancel), label: "戻る"),
             ].filter { !$0.key.isEmpty }
@@ -55,9 +55,9 @@ enum UIStrings {
         static let moveUp = "優先度を上げる"
         static let moveDown = "優先度を下げる"
         static let tooMany = "取り込める辞書は 32 個までです"
-        static let importFailed = "辞書を取り込めませんでした。大きすぎるか、読めない形式です"
+        static let importFailed = "辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
         static let note = "タブ区切り・SKK・macOS のユーザー辞書の形式を読み込めます。上にある辞書ほど優先されます。"
-        static func imported(_ count: Int) -> String { "\(count) 語を取り込みました" }
+        static func imported(_ count: Int) -> String { "\(count) 件を取り込みました" }
 
         static func summary(_ dictionary: ImportedDictionary) -> String {
             let condition = switch dictionary.condition {
@@ -95,7 +95,7 @@ enum UIStrings {
         /// 文節を区切っているときの足元の案内．数字で区切る位置を選び，Esc でやめる(InputSession.handleSplit)．
         /// count は区切れる位置の数
         static func splitHints(count: Int) -> [KeyHint] {
-            [KeyHint(key: count > 1 ? "1–\(count)" : "1", label: "区切る"), KeyHint(key: "Esc", label: "やめる")]
+            [KeyHint(key: count > 1 ? "1–\(count)" : "1", label: "区切り"), KeyHint(key: "Esc", label: "取消")]
         }
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
@@ -267,8 +267,8 @@ enum UIStrings {
         static let duplicate = "複製"
         static let press = "キーを押してください"
         static let record = "キーを記録"
-        static let stopRecording = "記録をやめる"
-        static let chooseKey = "キーを選ぶ"
+        static let stopRecording = "記録を停止"
+        static let chooseKey = "キーを選択"
         static let specialKeys = "特別なキー"
         static let functionKeys = "ファンクションキー"
         static let modifiers = "修飾キー"
@@ -276,7 +276,7 @@ enum UIStrings {
         static let option = "⌥ Option"
         static let shift = "⇧ Shift"
         static let commandKey = "⌘ Command"
-        static let clearKeyFilter = "キーでの絞り込みをやめる"
+        static let clearKeyFilter = "絞り込みを解除"
         static let noMatches = "当てはまる行はありません"
         static func rowCount(_ shown: Int, _ total: Int) -> String { shown == total ? "\(total) 行" : "\(shown) / \(total) 行" }
         static func hidden(by winners: String) -> String { "同じキーの行があるため使われません: \(winners)" }
@@ -409,7 +409,7 @@ enum UIStrings {
         static let invalidEntry = "読みはひらがなで入力し、読みと単語は長すぎないようにしてください"
         static let importFailed = "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません"
         static let exportFailed = "エクスポートできませんでした"
-        static func imported(_ count: Int) -> String { "\(count) 語を追加しました" }
+        static func imported(_ count: Int) -> String { "\(count) 件を追加しました" }
         static let fontSizeName = "候補の文字サイズ"
         static func fontSize(_ size: Int) -> String { "\(fontSizeName): \(size)" }
 
@@ -427,7 +427,7 @@ enum UIStrings {
         static func label(for mode: LearningMode) -> String {
             switch mode {
             case .enabled: "学習する"
-            case .readOnly: "学習結果を使うが、新しく学習しない"
+            case .readOnly: "学習結果のみ使用"
             case .disabled: "学習しない"
             }
         }
@@ -474,7 +474,7 @@ enum UIStrings {
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
         static let presentation = "候補の表示"
-        static let initialFocus = "最初に選ぶ文節"
+        static let initialFocus = "最初に選択する文節"
         static let suggestionDisplay = "入力中の候補"
 
         static func label(for display: SuggestionDisplay) -> String {
@@ -622,7 +622,7 @@ enum UIStrings {
         static let search = "検索"
         static let invalidSymbol = "連続入力は英字と数字以外の 2〜12 文字にしてください"
         static let invalidReadingSymbol = "読みは 12 文字まで、記号は 200 文字までにしてください"
-        static let symbolsEmpty = "決まりはありません"
+        static let symbolsEmpty = "ルールはありません"
         static let restoreDefault = "既定に戻す"
         static let changed = "変更あり"
         static let added = "追加"
@@ -654,7 +654,7 @@ enum UIStrings {
         }
 
         // 除外設定
-        static let exclusionsNote = "バンドル ID ごとに入力の動作を指定できます。上にある行ほど優先されます。"
+        static let exclusionsNote = "アプリの固有 ID を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。"
         static let addApps = "アプリを追加…"
         static let exclusionsEmpty = "アプリはありません"
         static let importCSV = "CSV を読み込む…"
@@ -745,14 +745,14 @@ extension UIStrings {
         static let enabled = "同期"
         static let folder = "フォルダ"
         static let noFolder = "未選択"
-        static let chooseFolder = "フォルダを選ぶ…"
+        static let chooseFolder = "フォルダを選択…"
         static let lastSynced = "最後に同期した時刻"
         static let syncNow = "今すぐ同期"
         static let scopes = "同期する項目"
-        static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
+        static let note = "Dropbox や iCloud Drive のフォルダを選択すると、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
         static let unreadable = "同期ファイルを読み込めないため、同期を停止しています"
-        static let items = "項目ごとに選ぶ"
+        static let items = "項目ごとに選択"
 
         /// 項目(Settings の CodingKeys の名前)の表示名
         static func label(forField name: String) -> String {
