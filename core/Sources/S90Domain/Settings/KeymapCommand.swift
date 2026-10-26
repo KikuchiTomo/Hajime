@@ -27,8 +27,13 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case directMode
     /// 日本語入力と英数入力を入れ替える
     case toggleMode
-    /// 入力方式を順に切り替える(ローマ字 → かな → 英字)．英数のときは日本語にしてから切り替える
+    /// 入力方式を順に切り替える(ローマ字 → かな → 英字 → 英字(自動))．英数のときは日本語にしてから切り替える
     case nextInputStyle
+    /// 入力方式を決めて切り替える．英数のときは日本語にしてから切り替える
+    case romajiStyle
+    case kanaStyle
+    case englishStyle
+    case englishAutoStyle
 
     // 文字の入力
     /// 空白を入れる．幅は設定(スペース幅)に従う
@@ -124,7 +129,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
 
     public var group: Group {
         switch self {
-        case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .cancelAndDirectMode: .mode
+        case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
+             .cancelAndDirectMode: .mode
         case .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: .characters
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: .composing
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType: .scripts
@@ -142,7 +148,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         switch self {
         // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
         // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
-        case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .openSettings, .toggleLiveConversion, .handwriting:
+        case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
+             .openSettings, .toggleLiveConversion, .handwriting:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]
@@ -159,6 +166,17 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// state の行に置けるか．いつでも の行にはどのコマンドも置ける(効く状態でだけ効く)
     public func isAvailable(in state: KeymapState) -> Bool {
         state == .anywhere || states.contains(state)
+    }
+
+    /// 入力方式を決めて切り替えるコマンドなら，その入力方式
+    public var inputStyle: InputStyle? {
+        switch self {
+        case .romajiStyle: .romaji
+        case .kanaStyle: .kana
+        case .englishStyle: .english
+        case .englishAutoStyle: .englishAuto
+        default: nil
+        }
     }
 
     /// 入力モードを変えるコマンド．アプリごとの設定で IME を使わないアプリでは効かない
