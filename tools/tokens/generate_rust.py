@@ -55,7 +55,23 @@ def render(tokens: dict) -> str:
         lines += [f"        {snake(n)}: {rgb(colors[n]['$value'])}," for n in color_names]
         lines.append("    }),")
     lines.append("];")
-    for group, sections in (("size", tokens["size"]), ("motion", tokens["motion"])):
+    # Windows の glass の色．ライトとダーク
+    for appearance, body in tokens["glass"].items():
+        if appearance.startswith("$"):
+            continue
+        if body.get("$type") == "color":
+            lines.append("")
+            lines.append(f"pub const GLASS_{upper(appearance)}: Rgb = {rgb(body['$value'])};")
+            continue
+        colors = body["color"]
+        missing = set(color_names) - set(colors)
+        if missing:
+            raise ValueError(f"glass.{appearance} に色が足りません: {sorted(missing)}")
+        lines.append("")
+        lines.append(f"pub const GLASS_{upper(appearance)}: Palette = Palette {{")
+        lines += [f"    {snake(n)}: {rgb(colors[n]['$value'])}," for n in color_names]
+        lines.append("};")
+    for group, sections in (("size", tokens["size"]), ("motion", tokens["motion"]), ("opacity", tokens["opacity"])):
         lines.append("")
         lines.append(f"pub mod {group} {{")
         for section, entries in sections.items():
