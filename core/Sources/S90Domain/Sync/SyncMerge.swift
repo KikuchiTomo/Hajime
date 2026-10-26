@@ -32,7 +32,7 @@ public enum SyncMerge {
             let localTime = ledger.groupModifiedAt[group] ?? .distantPast
             var localValues = values(of: group, in: local)
             if let payload = remote?.groups[group], payload.modifiedAt > localTime {
-                // 古い版の Mac の値(legacyFieldNames)も取り込み，設定を作るときに新しい項目へ移し替える
+                // 古いバージョンの Mac の値(legacyFieldNames)も取り込み，設定を作るときに新しい項目へ移し替える
                 for name in group.fieldNames + group.legacyFieldNames where !localFields.contains(name) {
                     settings[name] = payload.values[name]
                 }

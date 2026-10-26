@@ -243,7 +243,7 @@ def swift_redaction(t: dict) -> list[str]:
 
 def generate_swift(schema: dict) -> str:
     out = [HEADER_SWIFT.rstrip("\n"), ""]
-    out.append("/// 通信の形式の版．DLL とエンジンの版が違えば接続を断る")
+    out.append("/// 通信の形式のバージョン．DLL とエンジンのバージョンが違えば接続を断る")
     out.append(f"public enum {SWIFT_PREFIX}Protocol {{")
     out.append(f"    public static let version: UInt32 = {schema['version']}")
     out.append("    /// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)")
@@ -388,7 +388,7 @@ def generate_rust(schema: dict) -> str:
     out.append("use serde::{Deserialize, Serialize};")
     out.append("use std::fmt;")
     out.append("")
-    out.append("/// 通信の形式の版．DLL とエンジンの版が違えば接続を断る")
+    out.append("/// 通信の形式のバージョン．DLL とエンジンのバージョンが違えば接続を断る")
     out.append(f"pub const PROTOCOL_VERSION: u32 = {schema['version']};")
     out.append("/// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)")
     out.append(f"pub const MAXIMUM_MESSAGE_BYTES: usize = {schema['maximumMessageBytes']};")

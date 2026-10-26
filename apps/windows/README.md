@@ -9,7 +9,7 @@ Windows の TSF テキストサービス(Rust の DLL)・候補ウィンドウ�
 
 ## 確かめる
 
-Rust の版は `rust-toolchain.toml` で固定している．
+Rust のバージョンは `rust-toolchain.toml` で固定している．
 
 ```sh
 cd apps/windows

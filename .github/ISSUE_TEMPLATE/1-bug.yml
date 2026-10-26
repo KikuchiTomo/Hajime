@@ -39,12 +39,12 @@ body:
   - type: input
     id: os-version
     attributes:
-      label: OS の版
+      label: OS のバージョン
       placeholder: macOS 26.3
   - type: input
     id: version
     attributes:
-      label: s90.tokyo IME の版かコミット
+      label: s90.tokyo IME のバージョンかコミット
   - type: input
     id: app
     attributes:

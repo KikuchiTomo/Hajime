@@ -1,7 +1,7 @@
 // このファイルは tools/protocol/generate.py が protocol/schema.json から作る．手で直さない．
 // swiftformat:disable all
 
-/// 通信の形式の版．DLL とエンジンの版が違えば接続を断る
+/// 通信の形式のバージョン．DLL とエンジンのバージョンが違えば接続を断る
 public enum WireProtocol {
     public static let version: UInt32 = 1
     /// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)

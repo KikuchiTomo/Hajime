@@ -120,15 +120,15 @@ public struct Settings: Sendable, Equatable {
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
     // MARK: 形式
-    /// 読み込んだファイルの形式の版(SettingsSchema)．今より新しい版のファイルを開いたときは，その版のまま書き戻す
+    /// 読み込んだファイルの形式のバージョン(SettingsSchema)．今より新しいバージョンのファイルを開いたときは，そのバージョンのまま書き戻す
     public var schemaVersion = SettingsSchema.currentVersion
-    /// この版が知らない項目．新しい版で書いた設定を古い版で開いて保存しても失わないよう，そのまま書き戻す
+    /// このバージョンが知らない項目．新しいバージョンで書いた設定を古いバージョンで開いて保存しても失わないよう，そのまま書き戻す
     public var unknownFields: [String: JSONValue] = [:]
 
     public init() {}
 
     /// 範囲の外の値を範囲に収め，使えない値を捨てる．設定のファイルや書き出した JSON を読むときに通す
-    /// (手で書き換えたファイルや別の版のファイルでも，画面や変換がおかしくならないように)
+    /// (手で書き換えたファイルや別のバージョンのファイルでも，画面や変換がおかしくならないように)
     public mutating func clampToValidRanges() {
         func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T { min(max(value, range.lowerBound), range.upperBound) }
         listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
@@ -273,7 +273,7 @@ extension Settings: Codable {
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         read(.restrainsLiveConversionInCode, into: \.restrainsLiveConversionInCode)
         readList(.profileRules, into: \.profileRules)
-        // 形式の版と，この版が知らない項目
+        // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
             settings.schemaVersion = max(version, SettingsSchema.currentVersion)
