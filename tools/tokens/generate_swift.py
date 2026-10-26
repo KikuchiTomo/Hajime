@@ -61,8 +61,8 @@ def main() -> int:
         args = ",\n".join(f"            {camel(n)}: {rgb(colors[n]['$value'])}" for n in color_names)
         lines.append(f"        static let {camel(theme)} = ThemePalette(\n{args}\n        )")
     lines.append("    }")
-    # 寸法は 1 ドット = 1pt の CGFloat，動きの長さはミリ秒の Double
-    for group, sections, swift_type in (("Size", tokens["size"], "CGFloat"), ("Motion", tokens["motion"], "Double")):
+    # 寸法は 1 ドット = 1pt の CGFloat，動きの長さはミリ秒の Double，不透明度は 0〜1 の CGFloat
+    for group, sections, swift_type in (("Size", tokens["size"], "CGFloat"), ("Motion", tokens["motion"], "Double"), ("Opacity", tokens["opacity"], "CGFloat")):
         lines.append(f"    enum {group} {{")
         for section, entries in sections.items():
             lines.append(f"        enum {camel(section)[:1].upper() + camel(section)[1:]} {{")
