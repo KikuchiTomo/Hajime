@@ -399,7 +399,7 @@ public final class InputSession {
     private func handleControl(_ event: KeyEvent, context: InputContext) -> KeyResult {
         // EN 入力の英字は，確定してからキーをアプリに渡す(Ctrl+A などで英字が残らないように)
         if !composingStyles.isEmpty { return KeyResult(handled: false, actions: commitAll()) }
-        // macOS の日本語入力と同じ割り当て(R-03)
+        // 字種を選ぶ割り当て(R-03)
         guard !composition.isEmpty, case .character(let character) = event.key else { return .passThrough }
         let variant: ScriptVariant? = switch character.lowercased() {
         case "j": .hiragana
@@ -896,7 +896,7 @@ public final class InputSession {
 
 extension InputSession {
     fileprivate static let fullwidthSpace = "\u{3000}"
-    /// F6〜F10 で選ぶ字種(Windows・ATOK・macOS の日本語入力と同じ割り当て)
+    /// F6〜F10 で選ぶ字種
     fileprivate static let functionKeyVariants: [Int: ScriptVariant] = [
         6: .hiragana, 7: .katakana, 8: .halfwidthKatakana, 9: .fullwidthRoman, 10: .halfwidthRoman,
     ]

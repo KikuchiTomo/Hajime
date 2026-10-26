@@ -18,7 +18,7 @@ public struct CalendarDate: Sendable, Equatable {
     }
 }
 
-/// 「きょう」「あした」「いま」などの読みを，日付や時刻の候補にする(Google 日本語入力の日付変換と同じ)
+/// 「きょう」「あした」「いま」などの読みを，日付や時刻の候補にする
 public enum DateExpressions {
     /// 読みと，今日から何日ずらすか
     private static let dayOffsets: [String: Int] = [

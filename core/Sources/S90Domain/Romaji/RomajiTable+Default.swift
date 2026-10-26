@@ -1,5 +1,5 @@
 extension RomajiTable {
-    /// 標準のローマ字表．macOS の日本語入力と Google 日本語入力でよく使われる綴りをまとめた．
+    /// 標準のローマ字表．一般に使われるローマ字の綴りをまとめた．
     /// 促音(子音の重ね打ち)と「n」「nn」の扱いは Composition が行うので，ここには書かない．
     public static let standard = RomajiTable(entries: makeStandardEntries())
 
@@ -70,7 +70,7 @@ extension RomajiTable {
             "xwa": "ゎ", "lwa": "ゎ", "xka": "ゕ", "xke": "ゖ",
             "n'": "ん", "xn": "ん",
             "-": "ー",
-            // z と組み合わせて記号を入れる(Google 日本語入力・macOS の日本語入力と同じ)
+            // z と組み合わせて記号を入れる
             "zh": "←", "zj": "↓", "zk": "↑", "zl": "→",
             "z-": "〜", "z.": "…", "z,": "‥", "z/": "・", "z[": "『", "z]": "』",
         ]
