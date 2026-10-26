@@ -94,6 +94,25 @@ struct ReadingCorrectionTests {
         #expect(corrected || note?.hasPrefix("もしかして") == true, "\(keys)")
     }
 
+    @Test("綴りを直した英単語は，打鍵が止まって日本語の見直しをしても英単語のまま(日本語として直せないとき)", arguments: [
+        ("pthon", "python"),
+    ])
+    func englishMisspellingKept(keys: String, word: String) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
+        let model = try ZenzaiModel.verified(at: URL(fileURLWithPath: path))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: model)
+        let service = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(suggestions: [keys: [word]]), settings: FakeSettings(), typoService: service)
+        _ = live(session, keys)
+        var actions = session.settle(context: InputContext())
+        if let request = session.correctionRequest {
+            session.provideCorrections(await service.corrections(forKeys: request.keys, leftContext: request.leftContext))
+        }
+        actions += session.review(context: InputContext())
+        #expect((marked(actions) ?? word) == word, "\(keys)")
+    }
+
     private func makeSession(lexicon: FakeLexicon = FakeLexicon()) throws -> InputSession {
         let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")

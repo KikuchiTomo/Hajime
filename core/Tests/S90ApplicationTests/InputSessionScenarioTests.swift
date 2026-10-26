@@ -1031,6 +1031,22 @@ struct ReadingCorrectionScenarioTests {
         _ = other.handle(KeyEvent(.space), context: InputContext())
         _ = other.handle(KeyEvent(.character("n")), context: InputContext())
         #expect(other.resumeConversion(context: InputContext()).isEmpty)
+    @Test("綴りを直した英単語のあとに日本語が続き，日本語の打ち間違いとして直せるなら日本語に譲る(tkitou → 英単語の kit ではなく 適当)")
+    func englishMisspellingYieldsToJapanese() {
+        let converter = FakeConverter(["てきとう": [("適当", nil)]])
+        converter.corrections["tkitou"] = [
+            ReadingCorrection(keys: "tekitou", reading: "テキトウ", score: -1, cost: 1.5),
+            ReadingCorrection(keys: "tkitou", reading: "tキトウ", score: -20, cost: 0),
+        ]
+        let lexicon = FakeLexicon(suggestions: ["tkitou": ["bitou"]])
+        let harness = Harness(converter: converter, lexicon: lexicon)
+        harness.type("tkitou")
+        harness.settle()
+        #expect(harness.marked.text == "適当")
+        // 日本語として直せないときは英単語の補正のまま
+        let english = Harness(converter: FakeConverter(), lexicon: FakeLexicon(suggestions: ["pthon": ["python"]]))
+        english.type("pthon")
+        #expect(english.marked.text == "python")
     }
 
     /// 「youdesu」を「yoidesu」に直す変換器(比べる点数の差 6 で直す)
