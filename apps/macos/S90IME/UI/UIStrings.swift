@@ -316,9 +316,8 @@ enum UIStrings {
         static func label(for preset: KeyPreset) -> String {
             switch preset {
             case .standard: "標準"
-            case .microsoftIME: "Microsoft IME 風"
-            case .atok: "ATOK 風"
-            case .kotoeri: "ことえり風"
+            case .windows: "Windows 風"
+            case .emacs: "Emacs 風"
             }
         }
 

@@ -118,33 +118,25 @@ public struct KeyBindings: Sendable, Equatable, Codable {
     }
 }
 
-/// キーの割り当てのひな形．ほかの日本語入力に慣れた人が，同じ手の動きで操作できるようにする．
-/// どれも変換中の基本の操作(候補・文節・文節の長さ)だけをそろえたもので，各製品のすべての割り当てを写したものではない．
-/// s90 の Tab(確信の低い文節へ移る)はほかの製品に無いので，Microsoft IME 風と ATOK 風では外す
+/// キーの割り当てのひな形．よくある手の動きで操作できるようにする．変換中の基本の操作(候補・文節・文節の長さ)だけをそろえる
 public enum KeyPreset: String, Sendable, Equatable, CaseIterable {
     /// s90.tokyo IME の既定
     case standard
-    /// Microsoft IME 風．Space・↓ で次の候補，Shift+Space・↑ で前の候補，←→ で文節，Shift+←→ で文節の長さ
-    case microsoftIME
-    /// ATOK 風．Space・↓ で次の候補，←→ で文節，Shift+←→ で文節の長さ．Tab は使わず，Shift+Space で前の候補
-    case atok
-    /// ことえり(macOS の以前の日本語入力)風．Emacs と同じ Control+N・P で候補，Control+F・B で文節を移る
-    case kotoeri
+    /// Windows 風．Space・↓ で次の候補，Shift+Space・↑ で前の候補，←→ で文節，Shift+←→ で文節の長さ．Tab は使わない
+    case windows
+    /// Emacs 風．標準に加えて Control+N・P で候補，Control+F・B で文節を移る
+    case emacs
 
     public var bindings: KeyBindings {
         var keys = KeyBindings.standard
         switch self {
         case .standard:
             break
-        case .microsoftIME:
+        case .windows:
             keys.commands[.nextUncertainSegment] = []
             keys.commands[.previousUncertainSegment] = []
             keys.commands[.previousCandidate] = [KeyStroke(.up), KeyStroke(.space, shift: true)]
-        case .atok:
-            keys.commands[.nextUncertainSegment] = []
-            keys.commands[.previousUncertainSegment] = []
-            keys.commands[.previousCandidate] = [KeyStroke(.space, shift: true), KeyStroke(.up)]
-        case .kotoeri:
+        case .emacs:
             keys.commands[.nextCandidate, default: []] += [KeyStroke(.character("n"), control: true)]
             keys.commands[.previousCandidate, default: []] += [KeyStroke(.character("p"), control: true)]
             keys.commands[.nextSegment, default: []] += [KeyStroke(.character("f"), control: true)]

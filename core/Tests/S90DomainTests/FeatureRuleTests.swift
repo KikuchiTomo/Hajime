@@ -122,8 +122,8 @@ struct KeyPresetTests {
     func presets() {
         #expect(Set(KeyPreset.allCases.map(\.bindings.commands.description)).count == KeyPreset.allCases.count)
         #expect(KeyPreset.matching(.standard) == .standard)
-        #expect(KeyPreset.kotoeri.bindings.command(for: KeyEvent(.character("n"), modifiers: .control)) == .nextCandidate)
-        #expect(KeyPreset.microsoftIME.bindings.command(for: KeyEvent(.tab)) == nil)
+        #expect(KeyPreset.emacs.bindings.command(for: KeyEvent(.character("n"), modifiers: .control)) == .nextCandidate)
+        #expect(KeyPreset.windows.bindings.command(for: KeyEvent(.tab)) == nil)
     }
 }
 

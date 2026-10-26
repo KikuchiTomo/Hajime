@@ -265,7 +265,7 @@ public final class InputSession {
             // 変換キーは，切り替えに使わないときは Space と同じに変換する
             return isComposing ? handleSpace(shift: false, context: context) : .passThrough
         case .muhenkan:
-            // 無変換キーは，切り替えに使わないときはカタカナにする(Microsoft IME と同じ)
+            // 無変換キーは，切り替えに使わないときはカタカナにする
             return isComposing ? selectVariant(.katakana, context: context) : .passThrough
         case .yen:
             let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
