@@ -33,12 +33,19 @@ public struct Composition: Sendable, Equatable {
         public var naRowForm: String
         public var usesNaRow: Bool
         /// 前に読みを比べたとき，母音のあとに何文字あったか．比べ直すかどうかを決めるのに使う
-        public var evaluatedFollowingCount: Int?
+        /// 前に比べたときの，母音のあとの文字．同じなら比べ直さない．数ではなく文字で覚えるのは，打ちかけのローマ字(「ふんにk」)が
+        /// かなになったとき(「ふんにき」)に数が変わらず，比べ直さなくなるため(hunniki → 糞に来)
+        public var evaluatedFollowingText: String?
 
         public var currentForm: String { usesNaRow ? naRowForm : vowelForm }
         /// 読みの中で，この母音のあとに続く文字数
         public func followingCount(in reading: String) -> Int {
             reading.count - kanaIndex - currentForm.count
+        }
+
+        /// 読みの中で，この母音のあとに続く文字
+        public func followingText(in reading: String) -> String {
+            String(reading.dropFirst(kanaIndex + currentForm.count))
         }
     }
 
@@ -131,13 +138,13 @@ public struct Composition: Sendable, Equatable {
         }
         let following = String(characters[index...])
         guard let form = Self.naRowForms.first(where: { following.hasPrefix($0.vowel) }) else { return }
-        nasalAmbiguities.append(NasalAmbiguity(kanaIndex: index, vowelForm: form.vowel, naRowForm: form.naRow, usesNaRow: false, evaluatedFollowingCount: nil))
+        nasalAmbiguities.append(NasalAmbiguity(kanaIndex: index, vowelForm: form.vowel, naRowForm: form.naRow, usesNaRow: false, evaluatedFollowingText: nil))
     }
 
     /// 読みを比べたことを記録する
-    public mutating func markNasalEvaluated(at position: Int, followingCount: Int) {
+    public mutating func markNasalEvaluated(at position: Int, followingText: String) {
         guard nasalAmbiguities.indices.contains(position) else { return }
-        nasalAmbiguities[position].evaluatedFollowingCount = followingCount
+        nasalAmbiguities[position].evaluatedFollowingText = followingText
     }
 
     /// 「nn」のあとの母音を「ん+あ行」と「ん+な行」のどちらで読むかを切り替える
@@ -277,7 +284,7 @@ public struct Composition: Sendable, Equatable {
         }
         // 消した文字にかかっていた「nn」の読みの記録は外す．残った分は，あとの文字が変わったので比べ直す
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
-        for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingCount = nil }
+        for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingText = nil }
         if isEmpty {
             containsInvalidRomaji = false
             rawKeys = ""
