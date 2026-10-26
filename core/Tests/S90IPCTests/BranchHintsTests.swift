@@ -23,4 +23,14 @@ struct BranchHintsTests {
         settings.showsKeyHints = false
         #expect(BranchHints.make(for: panel, settings: settings).isEmpty)
     }
+
+    @Test("文節を区切っているときは区切る操作だけを案内する")
+    func split() {
+        var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)
+        column.split = .init(pieces: ["問題", "が", "ある"])
+        let hints = BranchHints.make(for: LatticePanel(columns: [column]), settings: DefaultSettings.settings)
+        #expect(hints == [WireKeyHint(keys: "1–2", label: "区切る"), WireKeyHint(keys: "Esc", label: "やめる")])
+        column.split = .init(pieces: ["問題", "がある"])
+        #expect(BranchHints.make(for: LatticePanel(columns: [column]), settings: DefaultSettings.settings).first?.keys == "1")
+    }
 }

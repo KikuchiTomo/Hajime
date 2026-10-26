@@ -24,6 +24,7 @@
 - `ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決める
 - `OnTestKeyDown` はエンジンに問い合わせない．応答に入っている `SessionState`(組み立て中か，モード，今の状態で受け取るキー)の写しで答える
 - 打鍵が止まったときの表示の切り替えと打ち間違いの見直しは，エンジンが待つ時間を返し，DLL がタイマーで `wake` を送る
+- タスクバーの入力モードの表示は，言語バーの項目(`GUID_LBI_INPUTMODE`．`crates/tsf/src/com/langbar.rs`)で出す．右クリックのメニューの項目は macOS の入力メニューと同じ(`crates/tsf/src/menu.rs`)で，選んだ操作は `menu` の要求でエンジンに頼む
 - 設定のファイルは macOS と同じ形式．エンジンが 2 秒ごとに更新の時刻を見て，変わっていれば読み直す
 
 ## Windows で使わないもの
