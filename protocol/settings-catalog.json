@@ -1,6 +1,9 @@
 {
   "fields" : [
     "alphabetWidth",
+    "association",
+    "associationDictionaries",
+    "associationLimit",
     "brackets",
     "branchCandidatesPerPage",
     "calculation",
@@ -43,6 +46,7 @@
     "recordsUsage",
     "restrainsLiveConversionInCode",
     "shiftStartsAlphabet",
+    "showsAssociationHint",
     "showsKeyHints",
     "showsModeIndicator",
     "showsSuggestions",
