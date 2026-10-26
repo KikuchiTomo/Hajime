@@ -14,6 +14,9 @@ use windows::Win32::Graphics::Gdi::{
     DT_NOPREFIX, DT_WORDBREAK, FW_NORMAL, FW_SEMIBOLD, HBRUSH, HDC, HFONT, HGDIOBJ, LOGFONTW,
     PAINTSTRUCT, PS_SOLID, SYS_COLOR_INDEX, TRANSPARENT,
 };
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
@@ -30,7 +33,11 @@ use windows::Win32::UI::HiDpi::{
     DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
-use windows::Win32::UI::Shell::ShellExecuteW;
+use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+use windows::Win32::UI::Shell::{
+    FileOpenDialog, FileSaveDialog, IFileDialog, ShellExecuteW, FOS_FORCEFILESYSTEM,
+    SIGDN_FILESYSPATH,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
     GetWindowTextW, IsDialogMessageW, KillTimer, LoadCursorW, MessageBoxW, PostQuitMessage,
@@ -293,6 +300,53 @@ pub fn high_contrast() -> bool {
         )
     };
     result.is_ok() && info.dwFlags.contains(HCF_HIGHCONTRASTON)
+}
+
+/// この(画面の)スレッドで COM を使えるようにする．失敗したらファイルを選ぶ窓が出ないだけで，ほかは動く
+pub fn initialize_com() {
+    // SAFETY: プロセスの最初に画面のスレッドで一度だけ呼ぶ
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+}
+
+/// ファイルを選ぶ窓(開く・保存)を出し，選んだファイルの場所を返す．キャンセルしたら None
+pub fn choose_file(
+    owner: HWND,
+    open: bool,
+    name: &str,
+    filter_name: &str,
+    pattern: &str,
+) -> Option<String> {
+    let filter_name = HSTRING::from(filter_name);
+    let pattern = HSTRING::from(pattern);
+    let filters = [COMDLG_FILTERSPEC {
+        pszName: PCWSTR(filter_name.as_ptr()),
+        pszSpec: PCWSTR(pattern.as_ptr()),
+    }];
+    let class = if open {
+        &FileOpenDialog
+    } else {
+        &FileSaveDialog
+    };
+    // SAFETY: 文字列は呼び出しの間生きている．返された場所の文字列は CoTaskMemFree で放す
+    unsafe {
+        let dialog: IFileDialog = CoCreateInstance(class, None, CLSCTX_INPROC_SERVER).ok()?;
+        dialog.SetFileTypes(&filters).ok()?;
+        let options = dialog.GetOptions().ok()?;
+        dialog.SetOptions(options | FOS_FORCEFILESYSTEM).ok()?;
+        if !open && !name.is_empty() {
+            dialog.SetFileName(&HSTRING::from(name)).ok()?;
+            if let Some((_, extension)) = name.rsplit_once('.') {
+                dialog.SetDefaultExtension(&HSTRING::from(extension)).ok()?;
+            }
+        }
+        // キャンセルは Err で返る
+        dialog.Show(Some(owner)).ok()?;
+        let item = dialog.GetResult().ok()?;
+        let path = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+        let text = path.to_string().ok();
+        CoTaskMemFree(Some(path.0 as *const _));
+        text
+    }
 }
 
 /// ファイルを既定のアプリで開く

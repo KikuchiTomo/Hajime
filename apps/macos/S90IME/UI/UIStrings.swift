@@ -720,7 +720,7 @@ enum UIStrings {
 
         // バックアップ
         static let backup = "バックアップ"
-        static let backupNote = "すべての設定を JSON ファイルに書き出し、読み込めます。"
+        static let backupNote = "すべての設定を JSON としてインポート・エクスポート可能です。"
         static let exportSettings = "設定を書き出す…"
         static let importSettings = "設定を読み込む…"
         static let exportSettingsFileName = "s90-settings.json"

@@ -2,6 +2,7 @@
 
 pub mod catalog;
 pub mod engine;
+pub mod files;
 pub mod keys;
 pub mod layout;
 pub mod list;

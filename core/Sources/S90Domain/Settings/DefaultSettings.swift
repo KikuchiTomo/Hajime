@@ -158,6 +158,8 @@ public enum DefaultSettings {
     public static let maximumKeymapEntries = 500
     /// Windows の設定の画面がエンジンの応答を待つ時間(秒)．入力を止めない画面なので DLL より長く待つ
     public static let settingsAppResponseTimeout = 2.0
+    /// 設定の画面がファイルの読み込み・書き出しを待つ時間(秒)．大きな辞書のファイルも読み終えられる長さにする
+    public static let settingsAppFileTimeout = 60.0
     /// Windows の設定の画面がエンジンにつながらないとき，つなぎ直す間隔(秒)
     public static let settingsAppReconnectInterval = 3.0
     /// 使い方の記録を，何回ごとにファイルへ書くか

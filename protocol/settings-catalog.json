@@ -1,4 +1,13 @@
 {
+  "exportFileNames" : {
+    "correctionRules" : "replacements.tsv",
+    "englishWords" : "english-words.txt",
+    "exceptions" : "exceptions.txt",
+    "japaneseWords" : "japanese-words.txt",
+    "romaji" : "romaji.tsv",
+    "symbolReadings" : "symbol-readings.tsv",
+    "symbolSequences" : "symbol-sequences.tsv"
+  },
   "fields" : [
     "alphabetWidth",
     "association",
@@ -115,6 +124,7 @@
   },
   "secondsStep" : 0.1,
   "timing" : {
+    "fileTimeout" : 60,
     "reconnectInterval" : 3,
     "responseTimeout" : 2
   }

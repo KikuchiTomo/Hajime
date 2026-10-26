@@ -64,7 +64,10 @@ struct SettingsCatalogTests {
             "timing": .object([
                 "responseTimeout": .number(DefaultSettings.settingsAppResponseTimeout),
                 "reconnectInterval": .number(DefaultSettings.settingsAppReconnectInterval),
+                "fileTimeout": .number(DefaultSettings.settingsAppFileTimeout),
             ]),
+            // 書き出すファイルの既定の名前(一覧の値は protocol の RuleList と同じ名前)
+            "exportFileNames": .object(Dictionary(uniqueKeysWithValues: RuleList.allCases.map { ($0.rawValue, JSONValue.string($0.exportFileName)) })),
         ])
     }
 
