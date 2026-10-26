@@ -70,7 +70,7 @@ struct ReadingCorrectionTests {
 
     @Test("アプリと同じ道筋(打つ → 止まる → 別の変換器で訂正を求める → 見直す)で直すか示す", arguments: [
         "kyounotenkihayoudesune", "kyouhaitenkidesune", "kyouhaiteknidesune", "tututasakanagaookikatta", "mizurai",
-        "arigatpugozaimasu", "yorosikuonagaisimasu", "konnnitiwa",
+        "arigatpugozaimasu", "yorosikuonagaisimasu", "konnnitiwa", "tkitou", "nankatkitou", "wakeranai", "sorehawakeranaidesu",
     ])
     func appFlow(keys: String) async throws {
         let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])

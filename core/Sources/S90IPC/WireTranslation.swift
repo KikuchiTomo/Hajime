@@ -207,6 +207,9 @@ public struct RoutedActions: Sendable, Equatable {
                 ui.append(.showNote(text: text, anchor: anchor))
             case .selectInputStyle(let style):
                 host.append(.selectInputStyle(style))
+            case .awaitCorrections:
+                // 訂正を別のところで求める作り(typoService)のときだけ出る．エンジンのプロセスはその作りを使わないので来ない
+                break
             case .openSettings:
                 host.append(.openSettings)
             case .toggleLiveConversion:

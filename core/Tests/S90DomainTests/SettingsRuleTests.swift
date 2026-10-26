@@ -235,7 +235,7 @@ struct ReadingCorrectionRuleTests {
 
     @Test("差が中くらいなら示すだけにする")
     func suggests() {
-        let close = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -2.5, cost: 1)
+        let close = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: 0.5, cost: 2.5)
         #expect(ReadingCorrectionRule(level: .standard).decision(among: [close, typed], reading: "よう") == .suggest(close))
         #expect(ReadingCorrectionRule(level: .standard).correction(among: [close, typed], reading: "よう") == nil)
     }
@@ -418,7 +418,7 @@ struct CustomThemeTests {
     @Test("打ち間違いを直す基準で，直す差と示す差が変わる")
     func sensitivity() {
         let typed = ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0)
-        let fixed = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -2.5, cost: 1)
+        let fixed = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: 0.5, cost: 2.5)
         #expect(ReadingCorrectionRule(level: .standard, sensitivity: .standard).decision(among: [fixed, typed], reading: "よう") == .suggest(fixed))
         #expect(ReadingCorrectionRule(level: .standard, sensitivity: .aggressive).decision(among: [fixed, typed], reading: "よう") == .apply(fixed))
         #expect(ReadingCorrectionRule(level: .standard, sensitivity: .cautious).decision(among: [fixed, typed], reading: "よう") == nil)
