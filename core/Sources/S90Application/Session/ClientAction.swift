@@ -151,6 +151,8 @@ public struct LatticePanel: Sendable, Equatable {
         /// 注目している文節を 1 文字短く・長くしたときの文節(足元に「⇧← 入れ　⇧→ 入れると」と見せる)
         public var shorter: String?
         public var longer: String?
+        /// 選んでいる候補の使い分けや誤用の注釈(R-08)
+        public var usageNote: String?
 
         public init(text: String, alternatives: [String] = [], selectedAlternative: Int? = nil, variants: [String] = [], selectedVariant: Int? = nil,
                     isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil, shorter: String? = nil, longer: String? = nil) {

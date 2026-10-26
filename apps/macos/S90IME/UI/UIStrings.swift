@@ -150,6 +150,8 @@ enum UIStrings {
         static let conversion = "変換"
         static let specialConversion = "特殊変換"
         static let dateConversion = "日付と時刻に変換"
+        static let homophoneNotes = "同音異義語の使い分けを表示"
+        static let misuseNotes = "誤用の注釈を表示"
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
         static let learning = "学習"

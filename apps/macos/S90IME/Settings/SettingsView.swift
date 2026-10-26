@@ -202,6 +202,8 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
                 ResettableToggle(model: model, title: UIStrings.Features.handwriting, keyPath: \.handwriting)
                 Toggle(UIStrings.Settings.dateConversion, isOn: model.binding(\.dateConversion))
+                Toggle(UIStrings.Settings.homophoneNotes, isOn: model.binding(\.homophoneNotes))
+                Toggle(UIStrings.Settings.misuseNotes, isOn: model.binding(\.misuseNotes))
                 Toggle(UIStrings.Settings.symbolConversion, isOn: model.binding(\.symbolConversion))
                 Toggle(UIStrings.Settings.emojiConversion, isOn: model.binding(\.emojiConversion))
             }

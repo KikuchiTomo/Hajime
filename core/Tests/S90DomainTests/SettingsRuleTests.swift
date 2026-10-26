@@ -392,3 +392,27 @@ struct CustomThemeTests {
         #expect(ReadingCorrectionRule(level: .standard, suggests: false).decision(among: [fixed, typed], reading: "よう") == nil)
     }
 }
+
+@Suite("使い分けと誤用の注釈")
+struct UsageGuideTests {
+    @Test("同音異義語は，活用した形でも読みと漢字の部分で当てはめる", arguments: [
+        ("撮った", "とった", "撮る: 写真や動画を写す　ほかに 取る・採る・執る・捕る"),
+        ("会えて", "あえて", "会う: 人と顔を合わせる　ほかに 合う・遭う"),
+        ("精算", "せいさん", "精算: 料金などを細かく計算し直す　ほかに 清算・成算"),
+    ])
+    func homophone(text: String, reading: String, expected: String) {
+        #expect(UsageGuide.homophoneNote(for: text, reading: reading) == expected)
+    }
+
+    @Test("送り仮名のある語は，漢字の部分のあとが送り仮名のときだけ当てはめる(「取引」には出さない)")
+    func homophoneNeedsOkurigana() {
+        #expect(UsageGuide.homophoneNote(for: "取引", reading: "とりひき") == nil)
+        #expect(UsageGuide.homophoneNote(for: "天気", reading: "てんき") == nil)
+    }
+
+    @Test("誤用の言い回しには本来の形を添える")
+    func misuse() {
+        #expect(UsageGuide.misuseNote(for: "汚名挽回する") == "「汚名挽回」は「汚名返上」か「名誉挽回」が本来の形です")
+        #expect(UsageGuide.misuseNote(for: "名誉挽回する") == nil)
+    }
+}
