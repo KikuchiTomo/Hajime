@@ -41,6 +41,8 @@ enum SnapshotRenderer {
                 render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
                 render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
                 render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
+                render(associationListView(theme: look.theme, appearance: appearance), name: "association-list-\(look.name)", to: output, appearance: appearance)
+                render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
         for (appearance, name) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
@@ -296,6 +298,34 @@ enum SnapshotRenderer {
         focused.split = .init(pieces: ["問題", "が", "ある"])
         let panel = LatticePanel(columns: [.init(text: "それは", isFocused: false, isUncertain: false), focused,
                                            .init(text: "と思う", isFocused: false, isUncertain: false)], position: 1, total: 4)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 連想の一覧(R-18)を一覧で出したところ
+    private static func associationListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["綺麗", "麗しい", "華麗", "端麗"].map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 1, focus: .candidate, position: 2, total: 4, note: nil)
+        panel.association = AssociationHeading(headword: "美しい", label: "見た目が快い", group: 1, groupCount: 3)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 連想の一覧(R-18)を分岐図で出したところ
+    private static func associationBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = LatticePanel(columns: [
+            .init(text: "麗しい", alternatives: ["綺麗", "麗しい", "華麗", "端麗"], selectedAlternative: 1, isFocused: true, isUncertain: false),
+            .init(text: "景色", isFocused: false, isUncertain: false),
+        ], position: 1, total: 4)
+        panel.association = AssociationHeading(headword: "美しい", label: "見た目が快い", group: 1, groupCount: 3)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

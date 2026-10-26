@@ -1,12 +1,16 @@
 import AppKit
 import S90Application
+import S90Domain
 
 /// 候補ウィンドウの中身を描く．上から，文字種の行・候補・足元の 3 つの区画．
+/// 連想の一覧(R-18)では，文字種の行の代わりに見出し(元の語と意味の説明)の行を出す
 final class CandidateView: NSView {
     private typealias Size = DesignTokens.Size.Candidate
     private typealias Glass = DesignTokens.Size.Glass
 
     var panel: CandidatePanel? { didSet { needsDisplay = true } }
+    /// 足元の案内に出すキーの割り当て(連想の一覧のとき)
+    var keys = KeymapPreset.standard.keymap { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
     /// 第 1 候補と選んでいる候補以外の濃さ．出した直後は薄くし，すぐに濃くする(ephemeral adaptation)．
@@ -43,10 +47,11 @@ final class CandidateView: NSView {
             width + variant.label.size(withAttributes: labelAttributes).width + Size.variantPaddingX * 2
         }
         let footer = footerContent(for: panel)
-        let footerWidth = hintsWidth(footer.hints, note: footer.note) + footer.position.size(withAttributes: labelAttributes).width + Size.paddingX * 3
-        let contentWidth = max(Size.minWidth, lead + entryWidth + Size.paddingX * 2, variantsWidth + Size.paddingX * 2, footerWidth)
+        let footerWidth = hintsWidth(footer) + footer.position.size(withAttributes: labelAttributes).width + Size.paddingX * 3
+        let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + Size.paddingX * 2 } ?? 0
+        let contentWidth = max(Size.minWidth, lead + entryWidth + Size.paddingX * 2, variantsWidth + Size.paddingX * 2, footerWidth, headingWidth)
         var height = CGFloat(panel.entries.count) * rowHeight + sectionHeight + Size.frameWidth
-        if !panel.variants.isEmpty { height += sectionHeight + Size.frameWidth }
+        if !panel.variants.isEmpty || panel.association != nil { height += sectionHeight + Size.frameWidth }
         return NSSize(width: (contentWidth + inset * 2 + dropShadowOffset).rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
     }
 
@@ -63,7 +68,13 @@ final class CandidateView: NSView {
         }
         let content = body.insetBy(dx: inset, dy: inset)
         var y = content.minY
-        if !panel.variants.isEmpty {
+        if let heading = panel.association {
+            let row = NSRect(x: content.minX + Size.paddingX, y: y, width: content.width - Size.paddingX * 2, height: sectionHeight)
+            AssociationHeadingDrawing.draw(heading, in: row, theme: theme, font: labelFont, emphasis: labelFont)
+            y += sectionHeight
+            drawSeparator(y: y, from: content.minX, to: content.maxX)
+            y += Size.frameWidth
+        } else if !panel.variants.isEmpty {
             drawVariants(panel, in: NSRect(x: content.minX, y: y, width: content.width, height: sectionHeight))
             y += sectionHeight
             drawSeparator(y: y, from: content.minX, to: content.maxX)
@@ -157,20 +168,27 @@ final class CandidateView: NSView {
         var hints: [KeyHint]
         var note: String?
         var position: String
+        /// 選んでいる候補に連想があるときの知らせ(R-18)．キーの案内のあとに小さく出す
+        var associationHint: String?
     }
 
     private func footerContent(for panel: CandidatePanel) -> Footer {
+        if panel.association != nil {
+            return Footer(hints: UIStrings.Association.hints(for: keys), note: panel.note, position: UIStrings.Candidate.position(panel.position, panel.total))
+        }
         if panel.focus == .variants {
             let position = UIStrings.Candidate.variantsPosition(panel.selectedVariant.map { $0 + 1 } ?? 1, panel.variants.count)
             return Footer(hints: UIStrings.Candidate.variantsHints, note: panel.note, position: position)
         }
-        return Footer(hints: UIStrings.Candidate.candidatesHints, note: panel.note, position: UIStrings.Candidate.position(panel.position, panel.total))
+        return Footer(hints: UIStrings.Candidate.candidatesHints, note: panel.note, position: UIStrings.Candidate.position(panel.position, panel.total),
+                      associationHint: panel.associationHint)
     }
 
-    private func hintsWidth(_ hints: [KeyHint], note: String?) -> CGFloat {
+    private func hintsWidth(_ footer: Footer) -> CGFloat {
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
-        if let note { return note.size(withAttributes: attributes).width }
-        return GlassDrawing.hintsWidth(hints, theme: theme)
+        if let note = footer.note { return note.size(withAttributes: attributes).width }
+        let extra = footer.associationHint.map { $0.size(withAttributes: attributes).width + Size.paddingX } ?? 0
+        return GlassDrawing.hintsWidth(footer.hints, theme: theme) + extra
     }
 
     /// glass は案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)
@@ -182,11 +200,13 @@ final class CandidateView: NSView {
         let right = { (text: String, attributes: [NSAttributedString.Key: Any]) in
             self.drawText(text, attributes: attributes, x: rect.maxX - Size.paddingX - text.size(withAttributes: attributes).width, in: rect)
         }
+        let hintsWidth = GlassDrawing.hintsWidth(footer.hints, theme: theme)
         if theme.isRounded {
             if let note = footer.note {
                 drawText(note, attributes: noteAttributes, x: left, in: rect)
             } else {
                 GlassDrawing.drawHints(footer.hints, x: left, midY: rect.midY, theme: theme)
+                if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Size.paddingX, in: rect) }
             }
             right(footer.position, muted)
             return
@@ -195,8 +215,11 @@ final class CandidateView: NSView {
         if let note = footer.note {
             right(note, noteAttributes)
         } else {
-            let width = GlassDrawing.hintsWidth(footer.hints, theme: theme)
-            GlassDrawing.drawHints(footer.hints, x: rect.maxX - Size.paddingX - width, midY: rect.midY, theme: theme)
+            GlassDrawing.drawHints(footer.hints, x: rect.maxX - Size.paddingX - hintsWidth, midY: rect.midY, theme: theme)
+            if let hint = footer.associationHint {
+                let width = hint.size(withAttributes: muted).width
+                drawText(hint, attributes: muted, x: rect.maxX - Size.paddingX - hintsWidth - Size.paddingX - width, in: rect)
+            }
         }
     }
 
