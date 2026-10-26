@@ -106,7 +106,7 @@ struct WordLanguagePage: View {
     private func wordList(title: String, list: WritableKeyPath<S90Domain.Settings, [String]>, fileName: String, empty: String) -> some View {
         Section(title) {
             RuleListEditor(model: model, spec: .languageWords(list, fileName: fileName), labels: .init(
-                key: UIStrings.Features.wordPlaceholder, value: nil, empty: empty, emptyHint: UIStrings.Features.languageWordsEmptyHint))
+                key: UIStrings.Features.wordPlaceholder, value: nil, empty: empty))
         }
     }
 

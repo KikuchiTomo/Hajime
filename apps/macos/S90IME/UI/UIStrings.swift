@@ -535,7 +535,6 @@ enum UIStrings {
         static let alreadyListed = "もう一覧にあります"
         static let englishWordsEmpty = "いつも英語にする語はありません"
         static let japaneseWordsEmpty = "いつも日本語にする語はありません"
-        static let languageWordsEmptyHint = "英字で打つ語を上の欄に入れて追加します。「試す」の結果を右クリックしても足せます。"
         static let languageNote = "英字入力(自動)と、ローマ字入力で英語にも読める語に使います。試した結果を右クリックすると一覧に足せます。"
 
         static func label(for language: WordLanguage) -> String {
