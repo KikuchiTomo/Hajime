@@ -277,6 +277,7 @@ enum UIStrings {
         static func overwrites(_ key: String) -> String { "「\(key)」はもうあります。追加すると上書きします。" }
         static let alreadyRegistered = "もう登録してあります。"
         static let full = "これ以上は追加できません。"
+        static let noMatches = "一致する項目はありません"
     }
 
     enum Settings {
