@@ -1,6 +1,6 @@
 #!/bin/sh
 # 入力ソースの表示名(InfoPlist.strings)を，ビルドしたアプリの中に書く．Xcode のビルドの最後に呼ばれる．
-# 名前は S90_DISPLAY_NAME(本番は s90 IME，開発版は s90 IME Dev)．入れるときに make install-macos NAME=… で変えられる．
+# 名前は S90_DISPLAY_NAME(本番は s90，開発版は s90 Dev)．入れるときに make install-macos NAME=… で変えられる．
 # これが無いと，入力ソースの名前が com.apple.inputmethod.Japanese のように ID のまま出る
 set -eu
 resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
