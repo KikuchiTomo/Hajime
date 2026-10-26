@@ -190,10 +190,10 @@ Space で変換すると，文を幹とした分岐図を出します(ADR 0007)�
 |---|---|---|
 | 候補・幹の文字(glass) | システムの書体(SF．日本語はヒラギノ角ゴシック)．幹は medium | Kiwi Maru(配布物の fonts\\．無ければ Yu Gothic UI) |
 | 番号・案内・札(glass) | システムの書体．数字は等幅の semibold | Segoe UI |
-| platinum・desk・北欧・高コントラスト | システムの書体(高コントラストは 1 段太く) | Yu Gothic UI |
+| platinum・desk・北欧・高コントラスト | システムの書体(高コントラストは 1 段太く) | Kiwi Maru(無ければ Yu Gothic UI) |
 | 和紙 | ヒラギノ明朝(W3．幹と番号は W6) | Yu Mincho |
 | 端末 | システムの等幅の書体(日本語はヒラギノ角ゴシック) | BIZ UDゴシック |
-| ネオン | システムの丸ゴシック(SF Rounded) | Yu Gothic UI |
+| ネオン | システムの丸ゴシック(SF Rounded) | Kiwi Maru(無ければ Yu Gothic UI) |
 
 購入したフォント(s90.tokyo のサイトで使っている Chicago FLF など)は，再配布の条件があるため IME には同梱しません．
 
