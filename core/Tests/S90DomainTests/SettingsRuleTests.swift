@@ -310,37 +310,6 @@ struct KeyboardLayoutSettingTests {
     }
 }
 
-@Suite("変換中のキーの割り当て")
-struct KeyBindingsTests {
-    @Test("既定では ↓ と Space で次の候補，Shift+→ で文節を長く")
-    func standard() {
-        let keys = KeyBindings.standard
-        #expect(keys.command(for: KeyEvent(.down)) == .nextCandidate)
-        #expect(keys.command(for: KeyEvent(.space)) == .nextCandidate)
-        #expect(keys.command(for: KeyEvent(.right, modifiers: .shift)) == .extendSegment)
-        #expect(keys.command(for: KeyEvent(.enter)) == nil)
-    }
-
-    @Test("割り当てたキーはほかの操作から外す")
-    func assignMovesKey() {
-        var keys = KeyBindings.standard
-        keys.assign(KeyStroke(.space), to: .nextSegment)
-        #expect(keys.command(for: KeyEvent(.space)) == .nextSegment)
-        #expect(!keys.strokes(for: .nextCandidate).contains(KeyStroke(.space)))
-    }
-
-    @Test("保存して読み直せ，無い操作は既定で埋める")
-    func roundTrip() throws {
-        var settings = Settings()
-        settings.conversionKeys.assign(KeyStroke(.character("j"), control: true), to: .nextCandidate)
-        let decoded = try JSONDecoder().decode(Settings.self, from: try JSONEncoder().encode(settings))
-        #expect(decoded.conversionKeys == settings.conversionKeys)
-        let partial = Data(#"{"conversionKeys":{"commands":{"nextSegment":[{"key":{"right":{}},"shift":false,"control":false,"option":false}]}}}"#.utf8)
-        let filled = try JSONDecoder().decode(Settings.self, from: partial).conversionKeys
-        #expect(filled.strokes(for: .extendSegment) == KeyBindings.standard.strokes(for: .extendSegment))
-    }
-}
-
 @Suite("除外設定の CSV")
 struct ProfileRuleCSVTests {
     @Test("「アプリの ID,扱い」の行を読む．扱いは英語の値と画面の名前のどちらでもよく，形の誤った行は読み飛ばす")

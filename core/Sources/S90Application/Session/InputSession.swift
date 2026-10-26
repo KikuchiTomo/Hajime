@@ -7,6 +7,9 @@ import S90Domain
 /// - 読みを組み立てている(ライブ変換の結果か読みを表示する)
 /// - 候補を一覧から選んでいる(候補ウィンドウを出す)
 /// - 文節格子で文節ごとに候補を選んでいる(格子のウィンドウを出す)
+///
+/// キーの意味はキー設定の表(Keymap．R-17)で決める．表の状態は，何も組み立てていない(入力文字なし)・読みを組み立てている(入力中)・
+/// 候補を選んでいる(変換中．一覧と文節格子の両方)と，英数モード(英数)
 @MainActor
 public final class InputSession {
     private enum Phase: Equatable {
@@ -54,6 +57,10 @@ public final class InputSession {
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
+    /// 分岐図か一覧の足元に 1 回だけ出す案内(学習から消したとき)
+    private var pendingNote: String?
+    /// 入力文字なしで案内を出したか．出したら次のキーで消す
+    private var showsTransientNote = false
 
     /// 使い方の記録(回数だけ)．記録しないときは nil
     private let usage: (any UsageRecording)?
@@ -80,52 +87,45 @@ public final class InputSession {
             return .passThrough
         }
         showsCorrectionNote = false
-        let result = route(event, context: context)
+        let hidesNote = showsTransientNote
+        showsTransientNote = false
+        var result = route(event, context: context)
+        // 入力文字なしで出した案内(学習の取り消し)は，次のキーで消す
+        if hidesNote { result.actions.insert(.hideCandidates, at: 0) }
         // ターミナルの行には，どの経路で確定した文字もアプリに渡ったキーも，ここで 1 か所で数える
         if context.profile == .terminal { terminal.didHandle(event, result: result) }
         return result
     }
 
+    /// キーを振り分ける．キー設定の表(R-17)を先に引き，表に無いキーはふつうの処理に回す
     private func route(_ event: KeyEvent, context: InputContext) -> KeyResult {
-        if event.modifiers.contains(.command) {
-            // ショートカットはアプリに任せる．組み立て中の文字は先に確定する
+        let command = lookUp(event)
+        if let command, command.isTool {
+            // 設定を開く・ライブ変換・手書き．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
+            return perform(command, event: event, context: context)
+        }
+        if command == nil, event.modifiers.contains(.command) {
+            // 表に無い ⌘ の組み合わせはアプリのショートカット．組み立て中の文字は先に確定する
             return KeyResult(handled: false, actions: commitAll())
-        }
-        // 打っている途中に文節の区切りを入れるキー(既定 ⌥Space)
-        if mode == .japanese, phase == .composing, !composition.isEmpty, settings.current.conversionKeys.command(for: event) == .insertBoundary {
-            let position = composition.kana.count
-            if position > 0, !forcedBoundaries.contains(position) { forcedBoundaries.append(position) }
-            return KeyResult(handled: true, actions: render(context: context))
-        }
-        // 設定を開く・ライブ変換を切り替えるキー．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
-        if mode == .japanese, let command = settings.current.conversionKeys.command(for: event), command.isGlobal,
-            command != .handwriting || settings.current.handwriting {
-            let actions = commitAll()
-            let action: ClientAction = switch command {
-            case .openSettings: .openSettings
-            case .handwriting: .showHandwriting
-            default: .toggleLiveConversion
-            }
-            return KeyResult(handled: true, actions: actions + [action])
         }
         if context.profile == .direct {
             // IME を使わないアプリ(除外設定)では，日本語のモードでも英数のまま入れる
             return KeyResult(handled: false, actions: commitAll())
         }
-        if event.modifiers.contains(.option), case .character = event.key {
+        if let command, command.changesMode {
+            return perform(command, event: event, context: context)
+        }
+        if command == nil, event.modifiers.contains(.option), case .character = event.key {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
             return KeyResult(handled: false, actions: commitAll())
         }
-        if mode == .japanese, event.isKeypad, settings.current.keypadDirect, case .character(let character) = event.key {
+        if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadDirect, case .character(let character) = event.key {
             // テンキーの数字と記号は，組み立て中の文字を確定してから半角のまま確定する(設定)
             return KeyResult(handled: true, actions: commitAll() + [.commit(String(character))])
         }
-        if !(event.key == .kana && event.modifiers.contains(.option)), let result = applyModeKey(event) {
-            return result
-        }
         switch mode {
         case .direct: return handleDirect(event, context: context)
-        case .japanese: return handleJapanese(event, context: context)
+        case .japanese: return handleJapanese(event, command: command, context: context)
         }
     }
 
@@ -158,12 +158,8 @@ public final class InputSession {
         return KeyResult(handled: false, actions: actions + [.selectMode(.direct)] + modeIndicator(.direct))
     }
 
-    /// 日本語と英数を切り替えるキー(英数・かな・半角/全角・変換・無変換)．割り当て(ModeKeyAssignments)に従う．
-    /// 切り替えに使わないキーは nil を返し，ふつうの処理に回す
-    private func applyModeKey(_ event: KeyEvent) -> KeyResult? {
-        let keys = settings.current.modeKeys
-        guard let action = keys.action(for: event.key), action != .none,
-            let target = keys.mode(after: event.key, from: mode) else { return nil }
+    /// 日本語入力と英数入力を切り替える(表の 日本語入力・英数入力・切り替え のコマンド)
+    private func switchMode(to target: InputMode) -> KeyResult {
         guard target != mode else {
             // すでにそのモードなら，モードを出すだけ
             return KeyResult(handled: true, actions: modeIndicator(target))
@@ -215,32 +211,20 @@ public final class InputSession {
 
     // MARK: - 英数モード
 
+    /// 英数モードのキー．切り替えのキーは表(route)が先に受けるので，ここに来るのは表に無いキー
     private func handleDirect(_ event: KeyEvent, context: InputContext) -> KeyResult {
-        switch event.key {
-        case .kana where event.modifiers.contains(.option):
-            // 英数のときも，Option+かな は日本語に戻して入力方式を切り替える
-            mode = .japanese
-            return KeyResult(handled: true, actions: [.selectMode(.japanese), .selectInputStyle(nextInputStyle())])
-        case .yen:
-            let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
-            return KeyResult(handled: true, actions: [.commit(text)])
-        default:
-            // 切り替えに使わないと決めた英数・かな・半角/全角・変換・無変換は，アプリに渡す
+        guard event.key == .yen else {
+            // 表に無い英数・かな・半角/全角・変換・無変換などは，アプリに渡す
             return .passThrough
         }
+        let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
+        return KeyResult(handled: true, actions: [.commit(text)])
     }
 
     // MARK: - 日本語モード
 
-    /// 日本語モードのキー．次の順に回し，前の段で扱ったキーは後ろに回さない．
-    /// 1. 入力方式が前のキーから変わっていたら，組み立て中の文字を確定する
-    /// 2. ターミナルの行(コマンドの行で英字をそのまま流す判断は，ほかの処理より先に要る．
-    ///    行の長さと行の終わりは，処理の結果を見て TerminalLine.didHandle で数える)
-    /// 3. Control の組み合わせ(R-03)
-    /// 4. 分岐図の操作
-    /// 5. 入力方式ごとの処理(EN 入力・かな入力)
-    /// 6. ローマ字入力と共通の処理
-    private func handleJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
+    /// 日本語モードのキー．入力方式が前のキーから変わっていたら，組み立て中の文字を確定してから処理する
+    private func handleJapanese(_ event: KeyEvent, command: KeymapCommand?, context: InputContext) -> KeyResult {
         isSettled = false
         let styleChange = adoptInputStyle()
         if !styleChange.isEmpty, !Self.continuesAfterStyleChange(event) {
@@ -248,7 +232,9 @@ public final class InputSession {
             // 確定した文字に効いて意味が変わるので，確定だけにして飲み込む．文字・¥・英数・かなは新しい方式で続けて処理する
             return KeyResult(handled: true, actions: styleChange)
         }
-        let routed = routeJapanese(event, context: context)
+        // 確定して状態が変わったので，表を引き直す
+        let command = styleChange.isEmpty ? command : lookUp(event)
+        let routed = routeJapanese(event, command: command, context: context)
         return KeyResult(handled: routed.handled, actions: styleChange + routed.actions)
     }
 
@@ -263,19 +249,30 @@ public final class InputSession {
         }
     }
 
-    private func routeJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
+    /// 日本語モードのキー．次の順に回し，前の段で扱ったキーは後ろに回さない．
+    /// 1. ターミナルの行(コマンドの行で英字をそのまま流す判断は，ほかの処理より先に要る．
+    ///    行の長さと行の終わりは，処理の結果を見て TerminalLine.didHandle で数える)
+    /// 2. 分岐図で文節を数字で区切っているところ
+    /// 3. キー設定の表のコマンド(R-17)
+    /// 4. 表に無い Control の組み合わせ
+    /// 5. 分岐図の番号キー
+    /// 6. 入力方式ごとの処理(EN 入力・かな入力)
+    /// 7. ローマ字入力と共通の処理．文字は読みに足し，表に無いほかのキーは，組み立て中なら何もせず，組み立てていなければアプリに渡す
+    private func routeJapanese(_ event: KeyEvent, command: KeymapCommand?, context: InputContext) -> KeyResult {
         if context.profile == .terminal, settings.current.terminalCommands, let result = applyTerminal(event) {
             return result
         }
-        // 分岐図では，利用者が割り当てたキー(Control 付きも)を Ctrl+J などより先に見る
-        if case .lattice(var lattice) = phase, settings.current.conversionKeys.command(for: event) != nil,
-            let result = handleLattice(event, lattice: &lattice, context: context) {
+        if splitMode, case .lattice(var lattice) = phase, let result = handleSplit(event, lattice: &lattice, context: context) {
             return result
         }
-        if event.modifiers.contains(.control) {
-            return handleControl(event, context: context)
+        if let command {
+            return perform(command, event: event, context: context)
         }
-        if case .lattice(var lattice) = phase, let result = handleLattice(event, lattice: &lattice, context: context) {
+        if event.modifiers.contains(.control) {
+            return handleControl(event)
+        }
+        if case .lattice(var lattice) = phase, case .character(let character) = event.key,
+            let result = selectInLattice(character, lattice: &lattice, context: context) {
             return result
         }
         if event.key == .escape, settings.current.escapeSwitchesToDirect, composition.isEmpty, !composingStyles.isEmpty {
@@ -286,50 +283,138 @@ public final class InputSession {
             return result
         }
         switch event.key {
-        case .kana where event.modifiers.contains(.option):
-            // Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英語 → ローマ字)
-            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(nextInputStyle())])
-        case .kana, .eisu, .hankakuZenkaku:
-            // 切り替えに使わないと決めたとき
-            return isComposing ? KeyResult(handled: true) : .passThrough
-        case .henkan:
-            // 変換キーは，切り替えに使わないときは Space と同じに変換する
-            return isComposing ? handleSpace(shift: false, context: context) : .passThrough
-        case .muhenkan:
-            // 無変換キーは，切り替えに使わないときはカタカナにする
-            return isComposing ? selectVariant(.katakana, context: context) : .passThrough
         case .yen:
             let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
             return insertLiteral(text, rawKey: nil, context: context)
         case .character(let character):
             return insertCharacter(character, context: context)
-        case .space:
-            return handleSpace(shift: event.modifiers.contains(.shift), context: context)
-        case .enter:
-            guard isComposing else { return .passThrough }
-            return KeyResult(handled: true, actions: commitAll())
-        case .backspace:
-            return handleBackspace(context: context)
-        case .escape:
-            return handleEscape(context: context)
-        case .up:
-            return handleVertical(forward: false, context: context)
-        case .down:
-            return handleVertical(forward: true, context: context)
-        case .left, .right:
-            return handleHorizontal(forward: event.key == .right)
-        case .tab:
-            guard isComposing else { return .passThrough }
-            // 「もしかして」と示していた読みに直す
-            if phase == .composing, readingCorrector.acceptSuggestion(&composition) {
-                usage?.record(.readingCorrected)
-                showsCorrectionNote = true
-                return KeyResult(handled: true, actions: render(context: context))
+        case .escape where !isComposing && settings.current.escapeSwitchesToDirect:
+            // Vim のノーマルモードに戻る Escape で英数にする(設定)．Escape そのものはアプリに渡す
+            return switchToDirectPassingEscape(actions: [])
+        case .function:
+            // 表に無いファンクションキーはアプリに渡す
+            return .passThrough
+        default:
+            // 表に無いほかのキーは，組み立て中なら何もしない(読みが入力先に混ざらないように)．組み立てていなければアプリに渡す
+            return isComposing ? KeyResult(handled: true) : .passThrough
+        }
+    }
+
+    // MARK: - キー設定の表(R-17)
+
+    /// 今の状態でこのキーに割り当てたコマンド
+    private func lookUp(_ event: KeyEvent) -> KeymapCommand? {
+        guard let command = settings.current.keymap.command(for: event, in: keymapState) else { return nil }
+        // 英字入力で読みを組み立てていないとき(英字を打っているとき・何も打っていないとき)は英語の入力と同じに動かすため，
+        // 表は入力モードの切り替えと IME の機能にだけ使う
+        if settings.current.inputStyle == .english, composition.isEmpty, !command.changesMode, !command.isTool { return nil }
+        // 手書き入力は設定でオンにしたときだけ
+        if command == .handwriting, !settings.current.handwriting { return nil }
+        return command
+    }
+
+    /// 表を引くときの今の状態
+    private var keymapState: KeymapState {
+        guard mode == .japanese else { return .direct }
+        guard isComposing else { return .idle }
+        switch phase {
+        case .composing: return .composing
+        case .selecting, .lattice: return .converting
+        }
+    }
+
+    /// 表のコマンドを行う．表は状態ごとに効くコマンドだけを返すので，ここではその状態でできることをする
+    private func perform(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult {
+        switch command {
+        // IME の機能．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
+        case .openSettings: return KeyResult(handled: true, actions: commitAll() + [.openSettings])
+        case .toggleLiveConversion: return KeyResult(handled: true, actions: commitAll() + [.toggleLiveConversion])
+        case .handwriting: return KeyResult(handled: true, actions: commitAll() + [.showHandwriting])
+        // 入力モード
+        case .japaneseMode: return switchMode(to: .japanese)
+        case .directMode: return switchMode(to: .direct)
+        case .toggleMode: return switchMode(to: mode == .japanese ? .direct : .japanese)
+        case .nextInputStyle:
+            // 入力方式を順に切り替える(ローマ字 → かな → 英字)．英数のときは日本語に戻してから切り替える
+            guard mode == .japanese else {
+                mode = .japanese
+                return KeyResult(handled: true, actions: [.selectMode(.japanese), .selectInputStyle(nextInputStyle())])
             }
-            return KeyResult(handled: true)
-        case .function(let number):
-            guard !composition.isEmpty, let variant = Self.functionKeyVariants[number] else { return .passThrough }
-            return selectVariant(variant, context: context)
+            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(nextInputStyle())])
+        case .cancelAndDirectMode:
+            let actions = isComposing ? reset() : []
+            mode = .direct
+            terminal.endLine()
+            return KeyResult(handled: true, actions: actions + [.selectMode(.direct)] + modeIndicator(.direct))
+        // 文字の入力
+        case .insertSpace: return insertSpace(.setting, event: event, context: context)
+        case .insertAlternateSpace: return insertSpace(.alternate, event: event, context: context)
+        case .insertHalfwidthSpace: return insertSpace(.halfwidth, event: event, context: context)
+        case .insertFullwidthSpace: return insertSpace(.fullwidth, event: event, context: context)
+        // 入力中
+        case .convert: return convert(withoutLearning: false, context: context)
+        case .convertWithoutLearning: return convert(withoutLearning: true, context: context)
+        case .deleteBackward: return handleBackspace(context: context)
+        case .insertBoundary:
+            // 打っている途中に，今の位置を文節の区切りにする(分岐図でここを必ず区切る)
+            let position = composition.kana.count
+            if position > 0, !forcedBoundaries.contains(position) { forcedBoundaries.append(position) }
+            return KeyResult(handled: true, actions: render(context: context))
+        case .acceptSuggestion:
+            // 「もしかして」と示していた読みに直す
+            guard phase == .composing, readingCorrector.acceptSuggestion(&composition) else { return KeyResult(handled: true) }
+            usage?.record(.readingCorrected)
+            showsCorrectionNote = true
+            return KeyResult(handled: true, actions: render(context: context))
+        // 字種
+        case .toHiragana: return selectVariant(.hiragana, context: context)
+        case .toKatakana: return selectVariant(.katakana, context: context)
+        case .toHalfwidthKatakana: return selectVariant(.halfwidthKatakana, context: context)
+        case .toFullwidthAlphanumeric: return selectVariant(.fullwidthRoman, context: context)
+        case .toHalfwidthAlphanumeric: return selectVariant(.halfwidthRoman, context: context)
+        case .switchKanaType: return selectVariant(nextKanaType(), context: context)
+        // 候補
+        case .nextCandidate: return moveCandidate(.next, context: context)
+        case .previousCandidate: return moveCandidate(.previous, context: context)
+        case .nextCandidatePage: return moveCandidate(.nextPage, context: context)
+        case .previousCandidatePage: return moveCandidate(.previousPage, context: context)
+        case .firstCandidate: return moveCandidate(.first, context: context)
+        case .lastCandidate: return moveCandidate(.last, context: context)
+        // 文節
+        case .nextSegment: return moveSegment(.next, context: context)
+        case .previousSegment: return moveSegment(.previous, context: context)
+        case .firstSegment: return moveSegment(.first, context: context)
+        case .lastSegment: return moveSegment(.last, context: context)
+        case .nextUncertainSegment: return moveSegment(.nextUncertain, context: context)
+        case .previousUncertainSegment: return moveSegment(.previousUncertain, context: context)
+        case .extendSegment: return moveSegment(.extend, context: context)
+        case .shrinkSegment: return moveSegment(.shrink, context: context)
+        case .extendSegmentToWord: return moveSegment(.extendToWord, context: context)
+        case .shrinkSegmentToWord: return moveSegment(.shrinkToWord, context: context)
+        case .splitSegment: return moveSegment(.split, context: context)
+        // 確定と取り消し
+        case .commit: return KeyResult(handled: true, actions: commitAll())
+        case .commitFirstSegment: return commitFirstSegment(context: context)
+        case .cancel: return handleEscape(context: context)
+        case .backToReading:
+            phase = .composing
+            return KeyResult(handled: true, actions: render(context: context))
+        // 学習
+        case .forgetCandidate:
+            let candidate: Candidate? = switch phase {
+            case .lattice(let lattice): lattice.focused.selected
+            case .selecting: currentCandidate()
+            case .composing: nil
+            }
+            if let candidate, candidate.isFromEngine {
+                converter.forget(candidate)
+                pendingNote = PanelBuilder.candidateForgottenNote
+            }
+            return KeyResult(handled: true, actions: render(context: context))
+        case .forgetLastCommit:
+            guard converter.forgetLastCommit() else { return KeyResult(handled: true) }
+            showsTransientNote = true
+            return KeyResult(handled: true, actions: [.showNote(PanelBuilder.lastCommitForgottenNote)])
         }
     }
 
@@ -433,24 +518,16 @@ public final class InputSession {
         }
     }
 
-    private func handleControl(_ event: KeyEvent, context: InputContext) -> KeyResult {
+    /// 表に無い Control の組み合わせ
+    private func handleControl(_ event: KeyEvent) -> KeyResult {
         // EN 入力の英字は，確定してからキーをアプリに渡す(Ctrl+A などで英字が残らないように)
         if !composingStyles.isEmpty { return KeyResult(handled: false, actions: commitAll()) }
-        // 字種を選ぶ割り当て(R-03)
-        guard !composition.isEmpty, case .character(let character) = event.key else { return .passThrough }
-        let variant: ScriptVariant? = switch character.lowercased() {
-        case "j": .hiragana
-        case "k": .katakana
-        case ";": .halfwidthKatakana
-        case "l": .fullwidthRoman
-        case ":", "'": .halfwidthRoman
-        default: nil
-        }
-        guard let variant else { return KeyResult(handled: true) }
-        return selectVariant(variant, context: context)
+        // 読みを組み立てている途中の Control+文字は，読みが入力先に混ざらないよう，アプリに渡さずに捨てる
+        guard !composition.isEmpty, case .character = event.key else { return .passThrough }
+        return KeyResult(handled: true)
     }
 
-    /// 読み全体を字種に変えて選ぶ(Ctrl+J/K/;/L/: と F6〜F10)
+    /// 読み全体を字種に変えて選ぶ(既定では F6〜F10 と Ctrl+J/K/;/L/:．R-03)
     private func selectVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
         guard variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
         phase = .selecting(makeSelection(focus: .variant(variant)))
@@ -526,30 +603,58 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
-    private func handleSpace(shift: Bool, context: InputContext) -> KeyResult {
+    /// 空白の幅の決め方
+    private enum SpaceWidth {
+        /// 設定(スペース幅)に従う
+        case setting
+        /// 設定と逆の幅
+        case alternate
+        case halfwidth
+        case fullwidth
+    }
+
+    /// 空白を入れる．組み立て中の文字は確定してから入れる．
+    /// 設定に従う空白は，プログラミング用のアプリでは常に半角にする
+    private func insertSpace(_ width: SpaceWidth, event: KeyEvent, context: InputContext) -> KeyResult {
         // Space で英字のまま入れるところを終える
         alphabetRun = false
-        guard isComposing else {
-            // 空白の幅は設定に従い，Shift+Space で逆の幅にする．プログラミング用のアプリでは常に半角
-            let fullwidth = (settings.current.spaceWidth == .fullwidth) != shift
-            guard fullwidth, !context.profile.prefersHalfwidthSymbols else { return .passThrough }
-            return KeyResult(handled: true, actions: [.commit(Self.fullwidthSpace)])
+        let halfwidthOnly = context.profile.prefersHalfwidthSymbols
+        let fullwidth = switch width {
+        case .setting: settings.current.spaceWidth == .fullwidth && !halfwidthOnly
+        case .alternate: settings.current.spaceWidth != .fullwidth && !halfwidthOnly
+        case .halfwidth: false
+        case .fullwidth: true
         }
-        switch phase {
-        case .composing:
-            if corrector.dismiss() {
-                usage?.record(.englishCorrectionUndone)
-                // 補正の直後の Space は，補正を取り消す(R-02，Q-01)
-                return KeyResult(handled: true, actions: render(context: context))
-            }
-            enterConversion()
-        case .selecting(var selection):
-            selection.moveCandidate(by: 1)
-            phase = .selecting(selection)
-        case .lattice:
-            break
+        let actions = commitAll()
+        if !fullwidth, event.key == .space, event.modifiers.subtracting(.shift).isEmpty {
+            // 半角の空白は，Space そのものをアプリに渡す(アプリの補完などを妨げない)
+            return KeyResult(handled: false, actions: actions)
         }
+        return KeyResult(handled: true, actions: actions + [.commit(fullwidth ? Self.fullwidthSpace : " ")])
+    }
+
+    /// 変換する．英単語を直した直後は，直す前に戻す(R-02，Q-01)
+    private func convert(withoutLearning: Bool, context: InputContext) -> KeyResult {
+        // Space で英字のまま入れるところを終える
+        alphabetRun = false
+        if !withoutLearning, corrector.dismiss() {
+            usage?.record(.englishCorrectionUndone)
+            return KeyResult(handled: true, actions: render(context: context))
+        }
+        if withoutLearning { converter.suspendLearningUntilEnd() }
+        enterConversion()
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// ひらがな → 全角カタカナ → 半角カタカナ → ひらがな の順の次の字種．かなの字種を選んでいなければ全角カタカナ
+    private func nextKanaType() -> ScriptVariant {
+        guard case .selecting(let selection) = phase, case .variant(let current) = selection.focus else { return .katakana }
+        switch current {
+        case .hiragana: return .katakana
+        case .katakana: return .halfwidthKatakana
+        case .halfwidthKatakana: return .hiragana
+        case .fullwidthRoman, .halfwidthRoman: return .katakana
+        }
     }
 
     /// 変換を始める．設定が一覧でなければ分岐図にする．
@@ -591,43 +696,15 @@ public final class InputSession {
         if !wasApplied, readingCorrector.isApplied { usage?.record(.readingCorrected) }
     }
 
-    private func handleVertical(forward: Bool, context: InputContext) -> KeyResult {
-        guard isComposing else { return .passThrough }
-        switch phase {
-        case .composing:
-            enterConversion()
-        case .lattice:
-            break
-        case .selecting(var selection):
-            switch selection.focus {
-            case .variant:
-                // 種類の行から下キーで候補一覧に戻る
-                if forward { selection.focus = .candidate(0) }
-            case .candidate(let index):
-                if !forward && index == 0 && settings.current.showsVariantRow {
-                    // 候補一覧の先頭で上キーを押すと種類の行に移る(R-03)
-                    selection.focus = .variant(.hiragana)
-                } else {
-                    selection.moveCandidate(by: forward ? 1 : -1)
-                }
-            }
-            phase = .selecting(selection)
-        }
-        return KeyResult(handled: true, actions: render(context: context))
-    }
-
-    private func handleHorizontal(forward: Bool) -> KeyResult {
-        guard isComposing else { return .passThrough }
-        guard case .selecting(var selection) = phase, case .variant(let current) = selection.focus else {
-            // 文節の区切りを変える操作は，まだ用意していない
-            return KeyResult(handled: true)
-        }
+    /// 一覧の種類の行で字種を左右に移る．種類の行にいなければ何もしない
+    private func handleHorizontal(forward: Bool, context: InputContext) -> KeyResult {
+        guard case .selecting(var selection) = phase, case .variant(let current) = selection.focus else { return KeyResult(handled: true) }
         let available = ScriptVariant.allCases.filter { $0.apply(to: composition) != nil }
         guard let index = available.firstIndex(of: current) else { return KeyResult(handled: true) }
         let next = available[(index + (forward ? 1 : available.count - 1)) % available.count]
         selection.focus = .variant(next)
         phase = .selecting(selection)
-        return KeyResult(handled: true, actions: render(context: .init()))
+        return KeyResult(handled: true, actions: render(context: context))
     }
 
     private func handleBackspace(context: InputContext) -> KeyResult {
@@ -838,6 +915,8 @@ public final class InputSession {
     private func render(context: InputContext) -> [ClientAction] {
         if composition.isEmpty, let style = composingStyles.first { return style.render() }
         guard isComposing else { return reset() }
+        // 学習から消したときの案内は，その操作のあとの 1 回だけ出す
+        defer { pendingNote = nil }
         switch phase {
         case .composing:
             return [.setMarkedText(composingMarkedText()), .hideCandidates] + correctionNote()
@@ -845,8 +924,10 @@ public final class InputSession {
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
-            var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow, perPage: settings.current.listCandidatesPerPage)
-            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
+            var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
+                                               perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting))
+            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
+            if let pendingNote { panel.note = pendingNote }
             return [.setMarkedText(marked), .showCandidates(panel)]
         case .lattice(let lattice):
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
@@ -862,10 +943,16 @@ public final class InputSession {
                 let segmentReading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
             }
-            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
+            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if splitMode { panel.note = "\(splitGuide(lattice))　\(PanelBuilder.splitNote)" }
+            if let pendingNote { panel.note = pendingNote }
             return [.setMarkedText(marked), .showLattice(panel)]
         }
+    }
+
+    /// キー設定の表で，その状態のそのコマンドに割り当てた最初のキーの名前(案内に出す)．無ければ nil
+    private func keyLabel(_ command: KeymapCommand, in state: KeymapState) -> String? {
+        settings.current.keymap.strokes(for: command, in: state).first?.label
     }
 
     /// 打ち間違いを直したこと，または「もしかして」を入力位置の近くに出す．
@@ -877,10 +964,10 @@ public final class InputSession {
             return self.bestWholeCandidate(for: reading)?.text ?? reading
         }
         if readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) {
-            return [.showNote(PanelBuilder.readingCorrectedNote(typed: shown(typed.conversionReading)))]
+            return [.showNote(PanelBuilder.readingCorrectedNote(typed: shown(typed.conversionReading), key: keyLabel(.cancel, in: .composing)))]
         }
         if let suggestion = readingCorrector.suggestion {
-            return [.showNote(PanelBuilder.readingSuggestionNote(shown(suggestion.conversionReading)))]
+            return [.showNote(PanelBuilder.readingSuggestionNote(shown(suggestion.conversionReading), key: keyLabel(.acceptSuggestion, in: .composing)))]
         }
         return []
     }
@@ -902,66 +989,147 @@ public final class InputSession {
         return notes.isEmpty ? nil : notes.joined(separator: "　")
     }
 
-    // MARK: - 分岐図
+    // MARK: - 分岐図と一覧の操作(キー設定の表のコマンド)
 
-    /// 分岐図のときのキー．nil を返したキーは，ふつうの処理に回す．
-    /// ↓ と Space は下の枝(変換の候補)へ，↑ は上の枝(字種)へ．Tab は迷う文節だけを渡り歩く(ADR 0007)
-    private func handleLattice(_ event: KeyEvent, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
-        let builder = LatticeBuilder(converter: converter)
-        if splitMode {
-            splitMode = false
-            switch event.key {
-            case .character(let character) where character.wholeNumberValue != nil:
-                // 数字で選んだ位置で区切る．区切ったあとは前の文節に注目したまま
-                let positions = Self.splitPositions(of: focusedReading(lattice))
-                if let number = character.wholeNumberValue, positions.indices.contains(number - 1) {
-                    lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: positions[number - 1], reading: composition.conversionReading)
-                }
-                phase = .lattice(lattice)
-                return KeyResult(handled: true, actions: render(context: context))
-            case .escape:
-                phase = .lattice(lattice)
-                return KeyResult(handled: true, actions: render(context: context))
-            default:
-                break
+    /// 候補の動かし方
+    private enum CandidateMove {
+        case next, previous, nextPage, previousPage, first, last
+    }
+
+    /// 候補を動かす．分岐図では注目している文節の候補，一覧では一覧の候補．
+    /// 入力中の 次の候補・前の候補 は変換を始める(変換 と違い，英単語を直した直後でも戻さない)
+    private func moveCandidate(_ move: CandidateMove, context: InputContext) -> KeyResult {
+        switch phase {
+        case .composing:
+            alphabetRun = false
+            enterConversion()
+        case .lattice(var lattice):
+            let perPage = settings.current.branchCandidatesPerPage
+            switch move {
+            case .next: lattice.moveSelection(by: 1)
+            case .previous: lattice.moveSelection(by: -1)
+            case .nextPage: lattice.moveToPage(by: 1, perPage: perPage)
+            case .previousPage: lattice.moveToPage(by: -1, perPage: perPage)
+            case .first: lattice.selectCandidate(at: 0)
+            case .last: lattice.selectCandidate(at: lattice.focused.candidates.count - 1)
             }
+            phase = .lattice(lattice)
+        case .selecting(var selection):
+            let perPage = settings.current.listCandidatesPerPage
+            switch move {
+            case .next:
+                // 種類の行からは候補の先頭に戻る
+                selection.moveCandidate(by: 1)
+            case .previous:
+                switch selection.focus {
+                case .variant:
+                    break
+                case .candidate(let index):
+                    if index == 0 && settings.current.showsVariantRow {
+                        // 候補一覧の先頭で前の候補に進むと種類の行に移る(R-03)
+                        selection.focus = .variant(.hiragana)
+                    } else {
+                        selection.moveCandidate(by: -1)
+                    }
+                }
+            case .nextPage: selection.movePage(by: 1, perPage: perPage)
+            case .previousPage: selection.movePage(by: -1, perPage: perPage)
+            case .first: selection.focus = .candidate(0)
+            case .last: selection.focus = .candidate(max(selection.candidates.count - 1, 0))
+            }
+            phase = .selecting(selection)
         }
-        // キーの割り当ては設定で変えられる(KeyBindings)
-        if let command = settings.current.conversionKeys.command(for: event) {
-            switch command {
-            case .openSettings, .toggleLiveConversion, .handwriting, .insertBoundary:
-                // route が先に受ける
-                break
-            case .splitSegment:
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 文節の動かし方
+    private enum SegmentMove {
+        case next, previous, first, last, nextUncertain, previousUncertain, extend, shrink, extendToWord, shrinkToWord, split
+    }
+
+    /// 文節を移る・長さを変える・区切る．一覧は文節が 1 つなので，種類の行にいるときの左右だけ字種を移る
+    private func moveSegment(_ move: SegmentMove, context: InputContext) -> KeyResult {
+        switch phase {
+        case .composing:
+            return KeyResult(handled: true)
+        case .selecting:
+            switch move {
+            case .next: return handleHorizontal(forward: true, context: context)
+            case .previous: return handleHorizontal(forward: false, context: context)
+            case .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split: return KeyResult(handled: true)
+            }
+        case .lattice(var lattice):
+            let builder = LatticeBuilder(converter: converter)
+            switch move {
+            case .next: lattice.moveFocus(by: 1)
+            case .previous: lattice.moveFocus(by: -1)
+            case .first: lattice.focusedIndex = 0
+            case .last: lattice.focusedIndex = lattice.segments.count - 1
+            case .nextUncertain: lattice.moveToUncertain(forward: true)
+            case .previousUncertain: lattice.moveToUncertain(forward: false)
+            case .extend, .shrink:
+                let length = lattice.focused.readingLength + (move == .extend ? 1 : -1)
+                lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
+            case .extendToWord, .shrinkToWord:
+                // 文節の終わりを次・前の語の切れ目まで動かす(1 文字ずつより少ない打鍵で長さを変える)
+                lattice = builder.resizeToWord(lattice, grow: move == .extendToWord, reading: composition.conversionReading)
+            case .split:
                 // 区切れる位置が 2 つ以上の文字のときだけ区切る状態にする
                 splitMode = !splitMode && !Self.splitPositions(of: focusedReading(lattice)).isEmpty
-            case .nextCandidate: lattice.moveSelection(by: 1)
-            case .previousCandidate: lattice.moveSelection(by: -1)
-            case .nextSegment: lattice.moveFocus(by: 1)
-            case .previousSegment: lattice.moveFocus(by: -1)
-            case .nextUncertainSegment: lattice.moveToUncertain(forward: true)
-            case .previousUncertainSegment: lattice.moveToUncertain(forward: false)
-            case .extendSegment, .shrinkSegment:
-                let length = lattice.focused.readingLength + (command == .extendSegment ? 1 : -1)
-                lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
-            case .extendSegmentToWord, .shrinkSegmentToWord:
-                lattice = builder.resizeToWord(lattice, grow: command == .extendSegmentToWord, reading: composition.conversionReading)
             }
             phase = .lattice(lattice)
             return KeyResult(handled: true, actions: render(context: context))
         }
+    }
+
+    /// 分岐図の先頭の文節だけを確定し，残りの文節は選んだ候補のまま変換を続ける．文節が 1 つなら全体を確定する
+    private func commitFirstSegment(context: InputContext) -> KeyResult {
+        guard case .lattice(var lattice) = phase, lattice.segments.count > 1 else { return KeyResult(handled: true, actions: commitAll()) }
+        let first = lattice.segments.removeFirst()
+        if first.selected.isFromEngine { converter.didCommit(first.selected) }
+        usage?.record(.committed(changedSegments: first.choice == .candidate(0) ? 0 : 1, viaConversion: true))
+        composition.dropReadingPrefix(first.readingLength)
+        for index in lattice.segments.indices { lattice.segments[index].readingStart -= first.readingLength }
+        lattice.focusedIndex = max(lattice.focusedIndex - 1, 0)
+        forcedBoundaries = forcedBoundaries.map { $0 - first.readingLength }.filter { $0 > 0 }
+        // 確定した文節で読みの先頭が変わるので，打ち間違いの訂正と英字に戻す手がかりは捨てる
+        readingCorrector.reset()
+        corrector.reset()
+        convertedFromEnglish = nil
+        phase = .lattice(lattice)
+        return KeyResult(handled: true, actions: [.commit(first.selected.text)] + render(context: context))
+    }
+
+    /// 文節を数字で区切っているときのキー．数字で区切り，Esc でやめる．ほかのキーは区切るのをやめてからふつうに処理する(nil)
+    private func handleSplit(_ event: KeyEvent, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
+        splitMode = false
         switch event.key {
-        case .character(let character):
-            guard let number = numberKey(character), lattice.select(number: number, perPage: settings.current.branchCandidatesPerPage) else { return nil }
-            // 番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)
-            guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
-                phase = .lattice(lattice)
-                return KeyResult(handled: true, actions: commitAll())
+        case .character(let character) where character.wholeNumberValue != nil && event.modifiers.isEmpty:
+            // 数字で選んだ位置で区切る．区切ったあとは前の文節に注目したまま
+            let positions = Self.splitPositions(of: focusedReading(lattice))
+            if let number = character.wholeNumberValue, positions.indices.contains(number - 1) {
+                let builder = LatticeBuilder(converter: converter)
+                lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: positions[number - 1], reading: composition.conversionReading)
             }
-            lattice.focusedIndex = next
+            phase = .lattice(lattice)
+            return KeyResult(handled: true, actions: render(context: context))
+        case .escape:
+            phase = .lattice(lattice)
+            return KeyResult(handled: true, actions: render(context: context))
         default:
             return nil
         }
+    }
+
+    /// 分岐図の番号キー．番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)．
+    /// 番号キーでなければ nil
+    private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
+        guard let number = numberKey(character), lattice.select(number: number, perPage: settings.current.branchCandidatesPerPage) else { return nil }
+        guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
+            phase = .lattice(lattice)
+            return KeyResult(handled: true, actions: commitAll())
+        }
+        lattice.focusedIndex = next
         phase = .lattice(lattice)
         return KeyResult(handled: true, actions: render(context: context))
     }
@@ -1028,10 +1196,6 @@ public final class InputSession {
 
 extension InputSession {
     fileprivate static let fullwidthSpace = "\u{3000}"
-    /// F6〜F10 で選ぶ字種
-    fileprivate static let functionKeyVariants: [Int: ScriptVariant] = [
-        6: .hiragana, 7: .katakana, 8: .halfwidthKatakana, 9: .fullwidthRoman, 10: .halfwidthRoman,
-    ]
     fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
 
     fileprivate func numberKey(_ character: Character) -> Int? {

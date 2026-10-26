@@ -90,40 +90,14 @@ struct SymbolRuleTests {
     }
 }
 
-@Suite("切り替えのキー")
-struct ModeKeyTests {
-    @Test("既定は 英数=英数，かな=日本語，半角/全角=切り替え，変換・無変換=使わない")
-    func defaults() {
-        let keys = ModeKeyAssignments.standard
-        #expect(keys.mode(after: .eisu, from: .japanese) == .direct)
-        #expect(keys.mode(after: .kana, from: .direct) == .japanese)
-        #expect(keys.mode(after: .hankakuZenkaku, from: .direct) == .japanese)
-        #expect(keys.mode(after: .hankakuZenkaku, from: .japanese) == .direct)
-        #expect(keys.mode(after: .henkan, from: .direct) == nil)
-        #expect(keys.mode(after: .space, from: .direct) == nil)
-    }
-
-    @Test("古い設定のファイル(項目が無い)と，知らない値は既定で読む")
+@Suite("項目の無い設定のファイル")
+struct MissingFieldsTests {
+    @Test("項目の無い設定は既定で読む")
     func decoding() throws {
-        let partial = try JSONDecoder().decode(ModeKeyAssignments.self, from: Data(#"{"henkan":"japanese","muhenkan":"unknown"}"#.utf8))
-        #expect(partial.henkan == .japanese)
-        #expect(partial.muhenkan == ModeKeyAction.none)
-        #expect(partial.hankakuZenkaku == .toggle)
         let settings = try JSONDecoder().decode(Settings.self, from: Data("{}".utf8))
-        #expect(settings.modeKeys == .standard)
+        #expect(settings.keymap == KeymapPreset.standard.keymap)
         #expect(settings.keypadDirect)
         #expect(settings.okuriganaStyle == .standard)
-    }
-}
-
-@Suite("キーのひな形")
-struct KeyPresetTests {
-    @Test("ひな形はそれぞれ違い，今の割り当てがどのひな形かを見分けられる")
-    func presets() {
-        #expect(Set(KeyPreset.allCases.map(\.bindings.commands.description)).count == KeyPreset.allCases.count)
-        #expect(KeyPreset.matching(.standard) == .standard)
-        #expect(KeyPreset.emacs.bindings.command(for: KeyEvent(.character("n"), modifiers: .control)) == .nextCandidate)
-        #expect(KeyPreset.windows.bindings.command(for: KeyEvent(.tab)) == nil)
     }
 }
 

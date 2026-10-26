@@ -52,14 +52,15 @@ struct SettingsView: View {
         /// 検索で見つけるための言葉．ページの名前に加え，そのページにある項目の名前
         var keywords: [String] {
             switch self {
-            case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect,
-                          UIStrings.Features.modeKeysSection, UIStrings.Features.eisuKey, UIStrings.Features.kanaKey, UIStrings.Features.hankakuZenkakuKey]
+            case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion]
             case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
-            case .keys: [UIStrings.Features.preset, UIStrings.Keys.label(for: .openSettings)]
+            // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
+            case .keys: [UIStrings.Keys.presetMenu] + KeymapCommand.allCases.map(UIStrings.Keys.label(for:))
+                + KeymapState.allCases.map(UIStrings.Keys.label(for:)) + KeymapPreset.allCases.map(UIStrings.Keys.label(for:))
             case .sync: [UIStrings.Sync.folder, UIStrings.Sync.scopes, UIStrings.Sync.label(for: .dictionary)]
             default: []
             }
@@ -100,7 +101,7 @@ struct SettingsView: View {
         case .conversion: ConversionTab(model: model)
         case .correction: CorrectionPage(model: model)
         case .symbols: SymbolsPage(model: model)
-        case .keys: KeysTab(model: model)
+        case .keys: KeymapPage(model: model)
         case .dictionary: DictionaryPage(model: model)
         case .romaji: RomajiTab(model: model)
         case .apps: ExclusionsPage(model: model)
@@ -147,13 +148,6 @@ private struct InputTab: View {
                 ResettablePicker(model: model, title: UIStrings.More.alphabetWidth, keyPath: \.alphabetWidth, label: UIStrings.Settings.label(for:))
                 ResettableToggle(model: model, title: UIStrings.More.shiftStartsAlphabet, keyPath: \.shiftStartsAlphabet)
                 ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
-            }
-            Section(UIStrings.Features.modeKeysSection) {
-                ResettablePicker(model: model, title: UIStrings.Features.eisuKey, keyPath: \.modeKeys.eisu, label: UIStrings.Features.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Features.kanaKey, keyPath: \.modeKeys.kana, label: UIStrings.Features.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Features.hankakuZenkakuKey, keyPath: \.modeKeys.hankakuZenkaku, label: UIStrings.Features.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Features.henkanKey, keyPath: \.modeKeys.henkan, label: UIStrings.Features.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Features.muhenkanKey, keyPath: \.modeKeys.muhenkan, label: UIStrings.Features.label(for:))
             }
             Section(UIStrings.Settings.keys) {
                 ResettableToggle(model: model, title: UIStrings.Settings.punctuationCommits, keyPath: \.punctuationCommits)
@@ -368,103 +362,6 @@ private struct UsageTab: View {
 
 extension UserDictionaryEntry: @retroactive Identifiable {
     public var id: Self { self }
-}
-
-/// 変換中(分岐図)の操作ごとのキーの割り当て．「追加」を押してからキーを押すと割り当てる
-private struct KeysTab: View {
-    @ObservedObject var model: SettingsModel
-    /// キーを待っている操作
-    @State private var recording: ConversionCommand?
-
-    var body: some View {
-        Form {
-            Section {
-                Picker(UIStrings.Features.preset, selection: Binding(
-                    get: { KeyPreset.matching(model.settings.conversionKeys) },
-                    set: { preset in if let preset { model.update { $0.conversionKeys = preset.bindings } } }
-                )) {
-                    ForEach(KeyPreset.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag(KeyPreset?.some($0)) }
-                    if KeyPreset.matching(model.settings.conversionKeys) == nil {
-                        Text(UIStrings.Features.customPreset).tag(KeyPreset?.none)
-                    }
-                }
-            }
-            commandSection(UIStrings.Keys.generalSection, ConversionCommand.allCases.filter(\.isGlobal))
-            commandSection(UIStrings.Keys.conversionSection, ConversionCommand.allCases.filter { !$0.isGlobal })
-            Section {
-                Text(UIStrings.Keys.note).font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Button(UIStrings.Keys.restore) { model.update { $0.conversionKeys = .standard } }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    private func commandSection(_ title: String, _ commands: [ConversionCommand]) -> some View {
-        Section(title) {
-            ForEach(commands, id: \.self) { command in
-                    HStack {
-                        Text(UIStrings.Keys.label(for: command))
-                        Spacer()
-                        ForEach(model.settings.conversionKeys.strokes(for: command), id: \.self) { stroke in
-                            Button {
-                                model.update { $0.conversionKeys.remove(stroke, from: command) }
-                            } label: {
-                                Text(UIStrings.Keys.name(of: stroke)).monospaced()
-                            }
-                            .buttonStyle(.bordered)
-                            .help(UIStrings.Settings.remove)
-                        }
-                        if recording == command {
-                            KeyCapture { stroke in
-                                if let stroke { model.update { $0.conversionKeys.assign(stroke, to: command) } }
-                                recording = nil
-                            }
-                            .frame(width: 140, height: 22)
-                            .overlay(Text(UIStrings.Keys.press).font(.caption).foregroundStyle(.secondary).allowsHitTesting(false))
-                        } else {
-                            Button(UIStrings.Keys.add) { recording = command }
-                        }
-                    }
-            }
-        }
-    }
-}
-
-/// 次に押したキーを受け取る．Escape で取りやめる(nil を渡す)．割り当てられないキーは受け取らずに待つ
-private struct KeyCapture: NSViewRepresentable {
-    let onCapture: (KeyStroke?) -> Void
-
-    func makeNSView(context: Context) -> CaptureView {
-        let view = CaptureView()
-        view.onCapture = onCapture
-        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
-        return view
-    }
-
-    func updateNSView(_ view: CaptureView, context: Context) {
-        view.onCapture = onCapture
-    }
-
-    final class CaptureView: NSView {
-        var onCapture: ((KeyStroke?) -> Void)?
-        override var acceptsFirstResponder: Bool { true }
-
-        override func keyDown(with event: NSEvent) {
-            if event.keyCode == 53 {
-                onCapture?(nil)
-                return
-            }
-            guard let key = NSEventKeyTranslator.translate(event), let stroke = KeyStroke(key) else { return }
-            onCapture?(stroke)
-        }
-
-        override func draw(_ dirtyRect: NSRect) {
-            NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
-        }
-    }
 }
 
 /// 秒で値を選ぶ項目．今の値を右に出す．動かしている間は保存せず，手を離したときに保存する(1 段ごとに設定のファイルを書き直さない)

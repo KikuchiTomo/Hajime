@@ -13,7 +13,7 @@ struct SettingsTransferTests {
     func roundTrip() throws {
         var settings = Settings()
         settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "s90")]
-        settings.conversionKeys.assign(KeyStroke(.character("j"), control: true), to: .nextCandidate)
+        settings.keymap.entries.append(KeymapEntry(.converting, KeyStroke(.character("j"), control: true), .nextCandidate))
         let theme = CustomTheme(id: "a", name: "夕焼け", base: .automatic, surface: HexColor("#202020")!, text: HexColor("#FFFFFF")!,
                                 textMuted: HexColor("#AAAAAA")!, selection: HexColor("#FF6600")!, selectionText: HexColor("#000000")!,
                                 correction: HexColor("#FF0066")!, line: HexColor("#555555")!)

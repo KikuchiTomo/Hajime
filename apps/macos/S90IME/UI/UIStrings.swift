@@ -45,10 +45,10 @@ enum UIStrings {
     enum Branch {
         /// 選んでいる候補の取り込んだ辞書
         static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
-        /// 足元の案内．キーは設定の割り当て(KeyBindings)の最初のキーを出す
+        /// 足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキーを出す(R-17)
         /// 文節の長さは，押したらどうなるか(shorter・longer)が分かればそれを見せる(「⇧← 入れ　⇧→ 入れると」)
-        static func hints(for keys: KeyBindings, shorter: String? = nil, longer: String? = nil) -> [KeyHint] {
-            func first(_ command: ConversionCommand) -> String { keys.strokes(for: command).first.map(Keys.name(of:)) ?? "" }
+        static func hints(for keymap: Keymap, shorter: String? = nil, longer: String? = nil) -> [KeyHint] {
+            func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(Keys.name(of:)) ?? "" }
             let length: [KeyHint] = shorter == nil && longer == nil
                 ? [KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ")]
                 : [shorter.map { KeyHint(key: first(.shrinkSegment), label: $0) }, longer.map { KeyHint(key: first(.extendSegment), label: $0) }].compactMap { $0 }
@@ -69,24 +69,10 @@ enum UIStrings {
         }
     }
 
-    /// キーの名前(macOS のメニューと同じ記号)
+    /// キー設定(R-17)
     enum Keys {
-        static func name(of stroke: KeyStroke) -> String {
-            var name = ""
-            if stroke.control { name += "⌃" }
-            if stroke.option { name += "⌥" }
-            if stroke.shift { name += "⇧" }
-            switch stroke.key {
-            case .space: name += "Space"
-            case .tab: name += "Tab"
-            case .up: name += "↑"
-            case .down: name += "↓"
-            case .left: name += "←"
-            case .right: name += "→"
-            case .character(let text): name += text.uppercased()
-            }
-            return name
-        }
+        /// キーの名前(macOS のメニューと同じ記号)．core の KeyStroke.label と同じにする
+        static func name(of stroke: KeyStroke) -> String { stroke.label }
 
         /// 「←」と「→」のように修飾キーだけが同じ 2 つのキーは「←→」とまとめる
         static func pair(_ first: String, _ second: String) -> String {
@@ -97,35 +83,176 @@ enum UIStrings {
             return [first, second].filter { !$0.isEmpty }.joined(separator: " ")
         }
 
-        static func label(for command: ConversionCommand) -> String {
+        static func label(for state: KeymapState) -> String {
+            switch state {
+            case .anywhere: "いつでも"
+            case .idle: "入力文字なし"
+            case .composing: "入力中"
+            case .converting: "変換中"
+            case .direct: "英数"
+            }
+        }
+
+        static func label(for group: KeymapCommand.Group) -> String {
+            switch group {
+            case .mode: "入力モード"
+            case .characters: "空白"
+            case .composing: "入力"
+            case .scripts: "文字種"
+            case .candidates: "候補"
+            case .segments: "文節"
+            case .commit: "確定と取り消し"
+            case .learning: "学習"
+            case .tools: "そのほか"
+            }
+        }
+
+        static func label(for command: KeymapCommand) -> String {
             switch command {
-            case .openSettings: "設定を開く"
-            case .toggleLiveConversion: "ライブ変換の切り替え"
-            case .handwriting: "手書き入力"
+            case .japaneseMode: "日本語入力に切り替え"
+            case .directMode: "英数入力に切り替え"
+            case .toggleMode: "日本語と英数の切り替え"
+            case .nextInputStyle: "入力方式の切り替え"
+            case .cancelAndDirectMode: "取り消して英数入力に"
+            case .insertSpace: "空白を入力"
+            case .insertAlternateSpace: "逆の幅の空白を入力"
+            case .insertHalfwidthSpace: "半角空白を入力"
+            case .insertFullwidthSpace: "全角空白を入力"
+            case .convert: "変換"
+            case .convertWithoutLearning: "学習を使わずに変換"
+            case .deleteBackward: "左の文字を削除"
+            case .insertBoundary: "ここで区切る"
+            case .acceptSuggestion: "「もしかして」に直す"
+            case .toHiragana: "ひらがなに変換"
+            case .toKatakana: "全角カタカナに変換"
+            case .toHalfwidthKatakana: "半角カタカナに変換"
+            case .toFullwidthAlphanumeric: "全角英数に変換"
+            case .toHalfwidthAlphanumeric: "半角英数に変換"
+            case .switchKanaType: "かなの種類を切り替え"
             case .nextCandidate: "次の候補"
             case .previousCandidate: "前の候補"
+            case .nextCandidatePage: "次の候補のページ"
+            case .previousCandidatePage: "前の候補のページ"
+            case .firstCandidate: "先頭の候補"
+            case .lastCandidate: "末尾の候補"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
-            case .nextUncertainSegment: "次の文節"
-            case .previousUncertainSegment: "前の文節"
+            case .firstSegment: "先頭の文節"
+            case .lastSegment: "末尾の文節"
+            case .nextUncertainSegment: "次の迷う文節"
+            case .previousUncertainSegment: "前の迷う文節"
             case .extendSegment: "文節を長く"
             case .shrinkSegment: "文節を短く"
             case .extendSegmentToWord: "文節を語ごとに長く"
             case .shrinkSegmentToWord: "文節を語ごとに短く"
-            case .insertBoundary: "ここで区切る"
             case .splitSegment: "文節を区切る"
+            case .commit: "確定"
+            case .commitFirstSegment: "先頭の文節だけ確定"
+            case .cancel: "取り消し"
+            case .backToReading: "読みに戻す"
+            case .forgetCandidate: "候補を学習から削除"
+            case .forgetLastCommit: "最後の学習を取り消し"
+            case .openSettings: "設定を開く"
+            case .toggleLiveConversion: "ライブ変換の切り替え"
+            case .handwriting: "手書き入力"
             }
         }
 
-        static let tab = "キー操作"
-        static let note = "Enter・Escape・Backspace・数字キーは変更できません。"
-        static let generalSection = "いつでも"
-        static let conversionSection = "変換中"
-        static let add = "追加"
-        static let press = "キーを押してください"
-        static let restore = "初期設定に戻す"
-    }
+        /// コマンドの説明(選ぶときの補足)．名前で分かるものは nil
+        static func help(for command: KeymapCommand) -> String? {
+            switch command {
+            case .nextInputStyle: "ローマ字入力・かな入力・英字入力を順に切り替えます"
+            case .insertSpace: "幅は「スペース幅」の設定に従います。組み立て中の文字は確定してから入れます"
+            case .insertAlternateSpace: "「スペース幅」の設定と逆の幅の空白を入れます"
+            case .convert: "英単語を直した直後は，直す前に戻します"
+            case .convertWithoutLearning: "学習した順位を使わずに変換し，確定しても学習しません"
+            case .insertBoundary: "打っている途中に，今の位置を文節の区切りにします"
+            case .acceptSuggestion: "「もしかして」と示した読みに直します"
+            case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
+            case .nextCandidate: "入力中に押すと変換を始めます"
+            case .previousCandidate: "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"
+            case .nextUncertainSegment, .previousUncertainSegment: "確信の低い文節だけを渡り歩きます"
+            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の語の切れ目まで動かします"
+            case .splitSegment: "区切れる位置に番号を出し，数字で区切ります"
+            case .commitFirstSegment: "先頭の文節を確定し，残りの変換を続けます"
+            case .cancel: "変換中は読みに戻し，直した読みは打ったままに戻します。入力中は読みを消します"
+            case .backToReading: "変換をやめて読みに戻ります"
+            case .forgetCandidate: "選んでいる候補を学習から消します"
+            case .forgetLastCommit: "最後に確定した語の学習を取り消します。入力した文字は消しません"
+            case .handwriting: "「手書き入力」の設定がオンのときに使えます"
+            case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
+                 .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
+                 .previousCandidatePage, .firstCandidate, .lastCandidate, .nextSegment, .previousSegment, .firstSegment, .lastSegment,
+                 .extendSegment, .shrinkSegment, .commit, .openSettings, .toggleLiveConversion: nil
+            }
+        }
 
+        static func label(for preset: KeymapPreset) -> String {
+            switch preset {
+            case .standard: "標準"
+            case .windows: "Windows 風"
+            case .mac: "Mac 風"
+            case .emacs: "Emacs 風"
+            case .vim: "Vim 風"
+            }
+        }
+
+        // キー設定のページ
+        static let tab = "キー設定"
+        static let state = "状態"
+        static let key = "キー"
+        static let command = "コマンド"
+        static let allStates = "すべての状態"
+        static let searchPrompt = "コマンドやキーで検索"
+        static let searchByKey = "キーで検索"
+        static let searchByKeyHelp = "押したキーの行だけを出します"
+        static let presetMenu = "ひな形を読み込む"
+        static let customPreset = "カスタム"
+        static func currentPreset(_ name: String) -> String { "ひな形: \(name)" }
+        static let loadPresetTitle = "ひな形を読み込みますか？"
+        static func loadPresetMessage(_ name: String) -> String { "今の表を「\(name)」の行で置き換えます。" }
+        static let load = "読み込む"
+        static let cancel = "キャンセル"
+        static let restore = "既定に戻す"
+        static let restoreTitle = "既定の表に戻しますか？"
+        static let restoreMessage = "足した行と変えた行は消えます。"
+        static let newRow = "新しい行"
+        static let add = "追加"
+        static let remove = "削除"
+        static let duplicate = "複製"
+        static let press = "キーを押してください"
+        static let record = "キーを記録"
+        static let stopRecording = "記録をやめる"
+        static let chooseKey = "キーを選ぶ"
+        static let specialKeys = "特別なキー"
+        static let functionKeys = "ファンクションキー"
+        static let modifiers = "修飾キー"
+        static let control = "⌃ Control"
+        static let option = "⌥ Option"
+        static let shift = "⇧ Shift"
+        static let commandKey = "⌘ Command"
+        static let clearKeyFilter = "キーでの絞り込みをやめる"
+        static let noMatches = "当てはまる行はありません"
+        static func rowCount(_ shown: Int, _ total: Int) -> String { shown == total ? "\(total) 行" : "\(shown) / \(total) 行" }
+        static let note = "同じ状態の同じキーは，下の行を使います。状態を選んだ行は「いつでも」の行より優先します。数字キーで候補を選ぶ動きは「番号キーで候補を選択」に従います。"
+        static func hidden(by winners: String) -> String { "同じキーの行があるため使われません: \(winners)" }
+        static func partlyHidden(states: String, by winners: String) -> String { "\(states)では次の行を使います: \(winners)" }
+        static let plainCharacter = "修飾キーの無い文字のキーです。この状態ではその文字を打てなくなります"
+        static func duplicateWarning(_ row: String) -> String { "同じキーの行があります: \(row)。追加した行を使います" }
+        static func missing(state: String, command: String) -> String { "\(state)に「\(command)」のキーがありません" }
+        static let missingNote = "キーが無いと，入力を確定したり取り消したりできなくなります。"
+
+        /// 行を 1 行の文にする(警告の中で行を示す)
+        static func describe(_ entry: KeymapEntry) -> String {
+            "\(label(for: entry.state))・\(name(of: entry.stroke))・\(label(for: entry.command))"
+        }
+
+        /// 特別なキーとして選べるキー(押して記録しにくいもの)
+        static let specialKeyChoices: [KeyStroke.Key] = [
+            .escape, .enter, .tab, .space, .backspace, .delete, .up, .down, .left, .right, .home, .end, .pageUp, .pageDown,
+            .eisu, .kana, .hankakuZenkaku, .henkan, .muhenkan,
+        ]
+    }
     enum ModeIndicator {
         static func label(for mode: InputMode) -> String {
             switch mode {
@@ -325,24 +452,9 @@ enum UIStrings {
     }
 
     /// 設定の画面で足したページと項目
-    /// 足した機能の項目の名前(テンキー・切り替えのキー・記号・補正・送り仮名・計算・読み違い・キーのひな形)
+    /// 足した機能の項目の名前(テンキー・記号・補正・送り仮名・計算・読み違い)
     enum Features {
         static let keypadDirect = "テンキーの数字を半角で確定"
-        static let modeKeysSection = "切り替えのキー"
-        static let eisuKey = "英数キー"
-        static let kanaKey = "かなキー"
-        static let hankakuZenkakuKey = "半角/全角キー"
-        static let henkanKey = "変換キー"
-        static let muhenkanKey = "無変換キー"
-
-        static func label(for action: ModeKeyAction) -> String {
-            switch action {
-            case .toggle: "切り替え"
-            case .japanese: "日本語"
-            case .direct: "英数"
-            case .none: "使わない"
-            }
-        }
 
         static let okurigana = "送り仮名"
 
@@ -361,16 +473,6 @@ enum UIStrings {
         static let handwritingClear = "消去"
         static let handwritingPrompt = "ここに文字を書いてください"
         static let misreadings = "読み違いの候補"
-        static let preset = "ひな形"
-        static let customPreset = "カスタム"
-
-        static func label(for preset: KeyPreset) -> String {
-            switch preset {
-            case .standard: "標準"
-            case .windows: "Windows 風"
-            case .emacs: "Emacs 風"
-            }
-        }
 
         // 補正
         static let correctionPage = "補正"
@@ -468,7 +570,7 @@ enum UIStrings {
 
         // バックアップ
         static let backup = "バックアップ"
-        static let backupNote = "ユーザー辞書・テーマ・キー操作を含むすべての設定を JSON で保存します。"
+        static let backupNote = "ユーザー辞書・テーマ・キー設定を含むすべての設定を JSON で保存します。"
         static let exportSettings = "設定を書き出す…"
         static let importSettings = "設定を読み込む…"
         static let exportSettingsFileName = "s90-settings.json"
@@ -511,8 +613,8 @@ extension UIStrings {
         static func label(for group: SyncGroup) -> String {
             switch group {
             case .input: "入力"
-            case .keyboard: "キー配列と切り替えのキー"
-            case .keys: "キー操作"
+            case .keyboard: "キー配列"
+            case .keys: "キー設定"
             case .conversion: "変換"
             case .correction: "補正"
             case .symbols: "記号"

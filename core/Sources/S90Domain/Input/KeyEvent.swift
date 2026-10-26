@@ -6,19 +6,25 @@ public struct KeyEvent: Sendable, Equatable {
         case space
         case enter
         case backspace
+        /// 右の文字を消すキー(⌦)
+        case delete
         case escape
         case tab
         case up
         case down
         case left
         case right
+        case home
+        case end
+        case pageUp
+        case pageDown
         /// JIS キーボードの英数キー
         case eisu
         /// JIS キーボードのかなキー
         case kana
         /// JIS キーボードの ¥ キー(R-04)．何を入れるかは YenKeyPolicy が決める
         case yen
-        /// ファンクションキー(F1〜F12 の番号)．F6〜F10 で字種を変える(R-03)
+        /// ファンクションキー(F1〜F20 の番号)．既定では F6〜F10 で字種を変える(R-03)
         case function(Int)
         /// Windows の日本語キーボードの 半角/全角 キー
         case hankakuZenkaku

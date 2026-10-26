@@ -30,7 +30,7 @@ final class InputMenuBuilder {
     /// InputMethodKit のサーバーは受け取ったメニューを覚え(_setCachedMenu:)，選ばれた項目をそのメニューと突き合わせて
     /// 入力コントローラに動作を送る(_copySynchronizedActions:withMenuItems:)．打鍵のたびに作り直すと突き合わせがずれ，
     /// 実機では最初の 1 回しか届かなかった．受け手を付けると 1 回も届かなかった．azooKey-Desktop と同じく使い回し，受け手を付けない．
-    /// なお cmux など一部のアプリは，選んだ動作を IME に取り次がない(テキストエディットでは届く)．そのため同じ操作をキーでも受ける(KeyBindings)
+    /// なお cmux など一部のアプリは，選んだ動作を IME に取り次がない(テキストエディットでは届く)．そのため同じ操作をキーでも受ける(キー設定の表．Keymap)
     private var cachedMenu: NSMenu?
     private var liveConversionItem: NSMenuItem?
 

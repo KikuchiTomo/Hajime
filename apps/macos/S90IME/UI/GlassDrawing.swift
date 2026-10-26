@@ -178,30 +178,39 @@ struct KeyHint: Equatable {
     private static let symbols: [Character: String] = [
         "⌃": "control", "⌥": "option", "⇧": "shift", "⌘": "command",
         "↑": "arrow.up", "↓": "arrow.down", "←": "arrow.left", "→": "arrow.right",
+        "⌫": "delete.left", "⌦": "delete.right",
+    ]
+
+    /// 名前で書くキー(KeyStroke.label)のうち，アイコンで描くもの
+    private static let namedSymbols: [(String, String)] = [
+        ("←→", "arrow.left.and.right"), ("Tab", "arrow.right.to.line"), ("Space", "space"), ("Enter", "return"), ("Esc", "escape"),
     ]
 
     static func parts(of key: String) -> [Part] {
         var parts: [Part] = []
         var rest = Substring(key)
+        var text = ""
+        func flushText() {
+            // 1 文字の英字はキーの刻印と同じ大文字にする．名前(「Home」)はそのまま
+            if !text.isEmpty { parts.append(.text(text.count == 1 ? text.uppercased() : text)) }
+            text = ""
+        }
         while let first = rest.first {
-            if rest.hasPrefix("←→") {
-                parts.append(.symbol("arrow.left.and.right"))
-                rest = rest.dropFirst(2)
-            } else if rest.hasPrefix("Tab") {
-                parts.append(.symbol("arrow.right.to.line"))
-                rest = rest.dropFirst(3)
-            } else if rest.hasPrefix("Space") {
-                parts.append(.symbol("space"))
-                rest = rest.dropFirst(5)
+            if let (name, symbol) = namedSymbols.first(where: { rest.hasPrefix($0.0) }) {
+                flushText()
+                parts.append(.symbol(symbol))
+                rest = rest.dropFirst(name.count)
             } else if let name = symbols[first] {
+                flushText()
                 parts.append(.symbol(name))
                 rest = rest.dropFirst()
             } else {
-                // 記号でない文字(「L」「,」)は 1 文字ずつ文字の部品にする
-                parts.append(.text(String(first).uppercased()))
+                // 記号でない文字は続けて 1 つの文字の部品にする(「L」「F7」「変換」)
+                text.append(first)
                 rest = rest.dropFirst()
             }
         }
+        flushText()
         return parts
     }
 }

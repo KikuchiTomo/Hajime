@@ -21,8 +21,8 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .input:
             ["inputStyle", "customRomaji", "liveConversion", "yenKey", "punctuation", "brackets", "slash", "spaceWidth", "numberWidth",
              "alphabetWidth", "shiftStartsAlphabet", "punctuationCommits", "keypadDirect"]
-        case .keyboard: ["keyboardLayout", "modeKeys"]
-        case .keys: ["conversionKeys"]
+        case .keyboard: ["keyboardLayout"]
+        case .keys: ["keymap"]
         case .conversion:
             ["typoCorrection", "candidatePresentation", "initialFocus", "listCandidatesPerPage", "branchCandidatesPerPage",
              "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes",
@@ -34,6 +34,15 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "profileRules"]
         case .usage: ["recordsUsage"]
+        }
+    }
+
+    /// 古い版の Mac が同期のファイルのこのまとまりに書く項目．取り込むと新しい項目に移し替える(LegacyKeySettings)
+    public var legacyFieldNames: [String] {
+        switch self {
+        case .keyboard: [LegacyKeySettings.modeKeysField]
+        case .keys: [LegacyKeySettings.conversionKeysField]
+        case .input, .conversion, .correction, .symbols, .dictionary, .importedDictionaries, .appearance, .exclusions, .usage: []
         }
     }
 

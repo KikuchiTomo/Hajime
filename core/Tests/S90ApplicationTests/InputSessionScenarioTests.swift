@@ -658,7 +658,7 @@ struct BranchMapControlTests {
     @Test("割り当てたキーで次の文節へ移る(既定の → の代わりに l)")
     func customBinding() {
         var settings = DefaultSettings.settings
-        settings.conversionKeys.assign(KeyStroke(.character("l"), control: true), to: .nextSegment)
+        settings.keymap.entries.append(KeymapEntry(.converting, KeyStroke(.character("l"), control: true), .nextSegment))
         let harness = Harness(converter: converter(), settings: settings)
         harness.type("kyouhaii")
         harness.press(.space)

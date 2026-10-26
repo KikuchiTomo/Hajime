@@ -39,15 +39,62 @@ enum SnapshotRenderer {
             render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
         }
         render(settingsView(), name: "settings", to: output, appearance: NSAppearance(named: .aqua))
+        for (appearance, name) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            let look = NSAppearance(named: appearance)
+            NSAppearance.current = look
+            render(keymapView(edited: false, appearance: look), name: "keymap-\(name)", to: output, appearance: look)
+            render(keymapView(edited: true, appearance: look), name: "keymap-warnings-\(name)", to: output, appearance: look)
+        }
         exit(0)
     }
 
-    /// 設定の画面(入力のタブ)．設定は一時ディレクトリに置き，利用者の設定に触れない
+    /// 一時ディレクトリに置いた設定．利用者の設定に触れない
+    private static func snapshotStore(_ name: String) -> FileSettingsStore {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshot-\(name).json")
+        try? FileManager.default.removeItem(at: url)
+        return FileSettingsStore(fileURL: url)
+    }
+
+    /// 設定の画面(入力のページ)
     private static func settingsView() -> NSView {
-        let store = FileSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshot-settings.json"))
-        let view = NSHostingView(rootView: SettingsView(model: SettingsModel(store: store, usage: nil, resetLearning: {})))
+        let store = snapshotStore("settings")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshot", isDirectory: true)
+        let synchronizer = SettingsSynchronizer(settings: store, stateStore: FileSyncStateStore(fileURL: directory.appendingPathComponent("sync-state.json")))
+        let dictionaries = ImportedDictionaryStore(directory: directory.appendingPathComponent("dictionaries", isDirectory: true))
+        let sync = SyncCoordinator(synchronizer: synchronizer, settings: store, dictionaries: dictionaries)
+        let view = NSHostingView(rootView: SettingsView(model: SettingsModel(store: store, usage: nil, resetLearning: {}), sync: sync))
         view.frame = NSRect(origin: .zero, size: SettingsView.size)
         view.layoutSubtreeIfNeeded()
+        return view
+    }
+
+    /// キー設定のページ(R-17)．edited なら，重なった行・文字のキー・取り消しの無い状態の印が出る表にする
+    private static func keymapView(edited: Bool, appearance: NSAppearance?) -> NSView {
+        let store = snapshotStore(edited ? "keymap-edited" : "keymap")
+        if edited {
+            try? store.update { settings in
+                settings.keymap.entries.removeAll { $0.command == .cancel && $0.state == .anywhere }
+                // 印が見えるよう，表の先頭に入れる(1 行目は 2 行目と重なって使われず，3 行目は文字のキー)
+                settings.keymap.entries.insert(contentsOf: [
+                    KeymapEntry(.composing, KeyStroke(.character("k"), control: true), .toHiragana),
+                    KeymapEntry(.composing, KeyStroke(.character("k"), control: true), .toHalfwidthKatakana),
+                    KeymapEntry(.composing, KeyStroke(.character("q")), .commit),
+                    KeymapEntry(.converting, KeyStroke(.character("7"), control: true), .toKatakana),
+                    KeymapEntry(.composing, KeyStroke(.escape), .cancel),
+                ], at: 0)
+            }
+        }
+        let size = NSSize(width: SettingsView.size.width - DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height)
+        let view = NSHostingView(rootView: KeymapPage(model: SettingsModel(store: store, usage: nil, resetLearning: {})).frame(width: size.width, height: size.height))
+        view.frame = NSRect(origin: .zero, size: size)
+        // 表の行は窓に載って描かれるまで作られないので，画面の外の窓に載せてから描く
+        let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: -10_000, y: -10_000), size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = appearance
+        window.contentView = view
+        window.orderFrontRegardless()
+        view.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 1))
+        window.displayIfNeeded()
         return view
     }
 

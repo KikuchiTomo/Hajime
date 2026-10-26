@@ -53,7 +53,7 @@ S90Persistence ─────┘
   - 分岐図: 文節と枝(`SegmentLattice`)
   - 補正: 英単語(`TypoCorrectionRule`)と日本語の打ち間違い(`ReadingCorrectionRule`)の判定
   - 記号と日付: `SymbolDictionary`，`SymbolSequence`，`DateExpressions`
-  - 設定: `Settings` と既定値・上限(`DefaultSettings`)，記号の表(`SymbolTable`)，字種(`ScriptVariant`)
+  - 設定: `Settings` と既定値・上限(`DefaultSettings`)，記号の表(`SymbolTable`)，字種(`ScriptVariant`)，キー設定の表(`Keymap`・`KeymapCommand`・`KeymapPreset`．ADR 0009)
 - **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)と，その部品．エンジンにない候補を足す `SupplementedConverter`．外部とは `Ports/` の protocol 越しにだけ話す
   - 部品: 英単語の補正(`EnglishWordCorrector`)，「nn」の読み(`NasalReadingResolver`)，分岐図(`LatticeBuilder`，`PanelBuilder`)，ターミナルの行(`TerminalLine`)
   - 入力方式: ローマ字入力は `InputSession` の共通の処理が受け持つ．ほかの方式は `InputStyleHandling` を実装して足す(`EnglishInput`，`KanaInput`)
@@ -73,7 +73,7 @@ OS のキーイベント
 
 `InputSession` は同期的に結果を返します．Zenzai を使っても 1 キーあたり p95 で 40ms ほどで終わるので，変換もこの中で行っています(R-01 の計測)．打鍵が止まったときの表示の切り替え(`settle`)だけは，アダプタのタイマーから呼びます．
 
-分岐図(ADR 0007)の文節と枝は `LatticeBuilder` が作り，候補ウィンドウに出す内容は `PanelBuilder` が組み立てます．`InputSession` はキーと状態の移り変わりだけを受け持ちます．
+分岐図(ADR 0007)の文節と枝は `LatticeBuilder` が作り，候補ウィンドウに出す内容は `PanelBuilder` が組み立てます．`InputSession` はキーと状態の移り変わりだけを受け持ちます．キーの意味はキー設定の表(`Keymap`)で引き，今の状態(入力文字なし・入力中・変換中・英数)で効くコマンドを行います．
 
 アダプタは `ClientAction` を OS の操作に置き換えるだけで，判断をしません．macOS と Windows で動きが食い違うのを防ぐためです．
 

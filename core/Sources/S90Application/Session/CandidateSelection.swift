@@ -22,4 +22,13 @@ extension CandidateSelection {
         let count = candidates.count
         focus = .candidate(((index + offset) % count + count) % count)
     }
+
+    /// 候補を perPage 件ずつのページで前後に送り，ページの先頭を選ぶ(端では反対の端のページに戻る)
+    mutating func movePage(by offset: Int, perPage: Int) {
+        guard !candidates.isEmpty, perPage > 0 else { return }
+        let index: Int = if case .candidate(let value) = focus { value } else { 0 }
+        let pages = (candidates.count + perPage - 1) / perPage
+        let page = ((index / perPage + offset) % pages + pages) % pages
+        focus = .candidate(page * perPage)
+    }
 }

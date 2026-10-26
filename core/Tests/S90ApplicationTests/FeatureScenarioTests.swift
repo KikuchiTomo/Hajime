@@ -22,10 +22,10 @@ struct FeatureScenarioTests {
         #expect(off.marked.text == "1")
     }
 
-    @Test("R-09: 半角/全角は日本語と英数を入れ替え，変換を「日本語にする」にすれば英数から日本語にする")
+    @Test("R-09: 半角/全角は日本語と英数を入れ替え，変換を「日本語入力」にすれば英数から日本語にする")
     func modeKeys() {
         var settings = DefaultSettings.settings
-        settings.modeKeys.henkan = .japanese
+        settings.keymap.entries.append(KeymapEntry(.anywhere, KeyStroke(.henkan), .japaneseMode))
         let harness = Harness(settings: settings)
         harness.press(.hankakuZenkaku)
         #expect(harness.session.mode == .direct)
