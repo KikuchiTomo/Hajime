@@ -24,7 +24,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .keyboard: ["keyboardLayout"]
         case .keys: ["keymap"]
         case .conversion:
-            ["typoCorrection", "candidatePresentation", "initialFocus", "listCandidatesPerPage", "branchCandidatesPerPage",
+            ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "listCandidatesPerPage", "branchCandidatesPerPage",
              "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes",
              "misreadings", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning"]
         case .correction: ["correction"]

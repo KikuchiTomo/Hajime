@@ -20,6 +20,15 @@ struct AzooKeyConverterAdapterTests {
         #expect(candidates.contains { $0.text == "変換" && $0.readingCount == 4 })
     }
 
+    @Test("打っている読みに続く語の予測を返し，予測は読み全体を置き換える")
+    func predictions() throws {
+        let session = try makeEngine().makeSession()
+        let predictions = session.predictions(for: "ありがと")
+        #expect(predictions.contains { $0.text.hasPrefix("ありがとう") || $0.text.hasPrefix("有難う") })
+        #expect(predictions.allSatisfy { $0.readingCount == 4 })
+        #expect(predictions.count <= DefaultSettings.suggestionCount)
+    }
+
     @Test("文の先頭の文節だけの候補も返す")
     func firstClause() throws {
         let session = try makeEngine().makeSession()
