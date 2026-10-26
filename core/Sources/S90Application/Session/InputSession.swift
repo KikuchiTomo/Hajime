@@ -466,9 +466,12 @@ public final class InputSession {
         }
         corrector.commit(into: &composition)
         let builder = LatticeBuilder(converter: converter)
-        var lattice = builder.build(reading: composition.conversionReading)
+        let focus = settings.current.initialFocus
+        var lattice = builder.build(reading: composition.conversionReading, focus: focus)
         if let typed = readingCorrector.typedComposition(from: composition) {
+            // 打ち間違いを直した文節は，自動のときいちばん先に選ぶ(confidenceGap を最小にしてある)
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
+            lattice.focusedIndex = lattice.initialFocus(focus)
         }
         phase = .lattice(lattice)
     }

@@ -120,6 +120,7 @@ private struct ConversionTab: View {
             Section(UIStrings.Settings.conversion) {
                 Toggle(UIStrings.Menu.liveConversion, isOn: model.binding(\.liveConversion))
                 ChoicePicker(title: UIStrings.Choice.presentation, selection: model.binding(\.candidatePresentation), label: UIStrings.Choice.label(for:))
+                ChoicePicker(title: UIStrings.Choice.initialFocus, selection: model.binding(\.initialFocus), label: UIStrings.Choice.label(for:))
                 Toggle(UIStrings.Choice.variantRow, isOn: model.binding(\.showsVariantRow))
                 ChoicePicker(title: UIStrings.Choice.typoCorrection, selection: model.binding(\.typoCorrection), label: UIStrings.Choice.label(for:))
             }

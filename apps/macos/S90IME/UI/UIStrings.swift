@@ -228,6 +228,15 @@ enum UIStrings {
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
         static let presentation = "候補の表示"
+        static let initialFocus = "最初に選ぶ文節"
+
+        static func label(for focus: InitialFocus) -> String {
+            switch focus {
+            case .start: "先頭"
+            case .end: "末尾"
+            case .automatic: "自動"
+            }
+        }
 
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {

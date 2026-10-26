@@ -34,6 +34,8 @@ public struct Settings: Sendable, Equatable {
     public var typoCorrection = TypoCorrectionLevel.standard
     /// 候補の出し方(ADR 0007)
     public var candidatePresentation = CandidatePresentation.automatic
+    /// Space で変換したときに最初に選ぶ文節
+    public var initialFocus = InitialFocus.start
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
     /// 番号キーで候補を選ぶ
@@ -85,7 +87,7 @@ private struct Skipped: Decodable {}
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
-        case typoCorrection, candidatePresentation, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
         case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, profileRules
@@ -128,6 +130,7 @@ extension Settings: Codable {
         settings.conversionKeys = settings.conversionKeys.filled()
         read(.typoCorrection, into: \.typoCorrection)
         read(.candidatePresentation, into: \.candidatePresentation)
+        read(.initialFocus, into: \.initialFocus)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
@@ -160,6 +163,7 @@ extension Settings: Codable {
         try container.encode(conversionKeys, forKey: .conversionKeys)
         try container.encode(typoCorrection, forKey: .typoCorrection)
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
+        try container.encode(initialFocus, forKey: .initialFocus)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)

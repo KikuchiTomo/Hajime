@@ -21,6 +21,16 @@ public enum KeyboardLayout: String, Sendable, Equatable, Codable, CaseIterable {
     case colemak
 }
 
+/// Space で変換したときに最初に選ぶ文節
+public enum InitialFocus: String, Sendable, Equatable, Codable, CaseIterable {
+    /// 文の先頭
+    case start
+    /// 文の末尾
+    case end
+    /// 誤変換の可能性がいちばん高い文節
+    case automatic
+}
+
 /// 句読点の組み合わせ
 public enum PunctuationStyle: String, Sendable, Equatable, Codable, CaseIterable {
     /// 、。

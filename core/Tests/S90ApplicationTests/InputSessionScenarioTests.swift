@@ -382,14 +382,18 @@ struct InputSessionScenarioTests {
         #expect(harness.marked.segments.map(\.style) == [.focused, .converted])
     }
 
-    @Test("迷う文節が無ければ，最後の文節に注目する")
-    func latticeFocusWithoutUncertainty() {
-        let converter = latticeConverter()
-        converter.clauseScoreStep = [:]
-        let harness = Harness(converter: converter)
+    @Test("最初に選ぶ文節は設定に従う．先頭・末尾・自動(第 1 候補と 2 番目の差がいちばん小さい文節)", arguments: [
+        (InitialFocus.start, [true, false]),
+        (InitialFocus.end, [false, true]),
+        (InitialFocus.automatic, [true, false]),
+    ])
+    func latticeInitialFocus(policy: InitialFocus, expected: [Bool]) {
+        var settings = DefaultSettings.settings
+        settings.initialFocus = policy
+        let harness = Harness(converter: latticeConverter(), settings: settings)
         harness.type("kyouhaame")
         harness.press(.space)
-        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+        #expect(harness.lattice?.columns.map(\.isFocused) == expected)
     }
 
     @Test("分岐図は文節が 1 つでも出す")
@@ -584,10 +588,9 @@ struct BranchMapControlTests {
         let harness = Harness(converter: converter(), settings: settings)
         harness.type("kyouhaii")
         harness.press(.space)
-        let before = harness.lattice?.columns.firstIndex(where: \.isFocused)
-        harness.press(.left)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
         harness.press(.character("l"), .control)
-        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == before)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
     }
 
     @Test("上の枝にあるひらがな・カタカナは，下の枝に重ねて出さない")
@@ -692,7 +695,10 @@ struct ReadingCorrectionScenarioTests {
             ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -5, cost: 2),
             ReadingCorrection(keys: "kyouhayoudesu", reading: "キョウハヨウデス", score: -9, cost: 0),
         ]
-        let harness = Harness(converter: converter)
+        // 自動では，打ち間違いを直した文節を最初に選ぶ
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .automatic
+        let harness = Harness(converter: converter, settings: settings)
         harness.type("kyouhayoudesu")
         harness.settle()
         harness.press(.space)

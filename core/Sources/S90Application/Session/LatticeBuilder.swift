@@ -9,11 +9,11 @@ import S90Domain
 struct LatticeBuilder {
     let converter: any KanaKanjiConverting
 
-    func build(reading: String) -> SegmentLattice {
+    func build(reading: String, focus: InitialFocus = .automatic) -> SegmentLattice {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
         var lattice = SegmentLattice(segments: clauseSegments(of: reading, sentence: sentence)
             ?? segments(of: reading, from: 0, sentence: sentence?.text))
-        lattice.focusedIndex = lattice.initialFocus
+        lattice.focusedIndex = lattice.initialFocus(focus)
         return lattice
     }
 
@@ -100,8 +100,8 @@ struct LatticeBuilder {
             segment.candidates.insert(candidate, at: min(1 + offset, segment.candidates.count))
         }
         segment.isConfident = false
+        segment.confidenceGap = -.infinity
         result.segments[first] = segment
-        result.focusedIndex = first
         return result
     }
 
@@ -164,9 +164,11 @@ struct LatticeBuilder {
         let variants = Self.variants(of: slice).map(\.text)
         candidates = candidates.enumerated().filter { $0.offset == 0 || !variants.contains($0.element.text) }.map(\.element)
         let engineCandidates = candidates.filter(\.isFromEngine)
-        let confident = SegmentLattice.isConfident(best: engineCandidates.first, second: engineCandidates.dropFirst().first)
+        let best = engineCandidates.first, second = engineCandidates.dropFirst().first
+        let confident = SegmentLattice.isConfident(best: best, second: second)
+        let gap = best.flatMap { best in second.map { best.score - $0.score } } ?? .infinity
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
-                                      variants: Self.variants(of: slice), isConfident: confident)
+                                      variants: Self.variants(of: slice), isConfident: confident, confidenceGap: gap)
     }
 
     /// 上の枝に出す字種．エンジンが出さなくても選べるようにする

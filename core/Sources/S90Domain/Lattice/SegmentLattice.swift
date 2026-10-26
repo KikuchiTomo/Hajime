@@ -24,8 +24,12 @@ public struct SegmentLattice: Sendable, Equatable {
         public var isConfident: Bool
         /// 利用者が選び直したか．選び直した文節は，あとで区切りを動かしても変えない(ADR 0007)
         public var isDecided: Bool
+        /// 第 1 候補と 2 番目の点数の差．小さいほど変換を誤っている可能性が高い．候補が 1 つなら無限大
+        public var confidenceGap: Double
 
-        public init(readingStart: Int, readingLength: Int, candidates: [Candidate], variants: [Candidate] = [], choice: Choice = .candidate(0), isConfident: Bool, isDecided: Bool = false) {
+        public init(readingStart: Int, readingLength: Int, candidates: [Candidate], variants: [Candidate] = [], choice: Choice = .candidate(0), isConfident: Bool,
+                    isDecided: Bool = false, confidenceGap: Double = .infinity) {
+            self.confidenceGap = confidenceGap
             self.readingStart = readingStart
             self.readingLength = readingLength
             self.candidates = candidates
@@ -84,8 +88,18 @@ public struct SegmentLattice: Sendable, Equatable {
 
     /// 入力位置にいちばん近い迷う文節．無ければ最後の文節．
     /// 打ち間違いの多くは打った直後に気づかれるので，入力位置の近くから確かめられるようにする(ADR 0007)
-    public var initialFocus: Int {
-        segments.lastIndex { !$0.isConfident } ?? segments.count - 1
+    public var initialFocus: Int { initialFocus(.automatic) }
+
+    /// Space で変換したときに最初に選ぶ文節(設定)．
+    /// 自動では，打ち間違いや誤変換の可能性がいちばん高い文節(第 1 候補と 2 番目の点数の差がいちばん小さい文節)を選ぶ．
+    /// 選んだあとの移り方(Tab など)は設定によらない
+    public func initialFocus(_ policy: InitialFocus) -> Int {
+        switch policy {
+        case .start: return 0
+        case .end: return segments.count - 1
+        case .automatic:
+            return segments.indices.min { segments[$0].confidenceGap < segments[$1].confidenceGap } ?? 0
+        }
     }
 
     /// 注目している文節を上下に送る．下は変換の候補，上は字種．
