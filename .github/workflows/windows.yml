@@ -1,9 +1,28 @@
 name: windows
 
+# Windows のビルドは時間がかかるので，Windows に関わるファイルが変わったときだけ動かす
 on:
   pull_request:
+    paths:
+      - "apps/windows/**"
+      - "core/**"
+      - "protocol/**"
+      - "design/tokens/**"
+      - "tools/windows/**"
+      - "LICENSES/**"
+      - "THIRD_PARTY_NOTICES*"
+      - ".github/workflows/windows.yml"
   push:
     branches: [main]
+    paths:
+      - "apps/windows/**"
+      - "core/**"
+      - "protocol/**"
+      - "design/tokens/**"
+      - "tools/windows/**"
+      - "LICENSES/**"
+      - "THIRD_PARTY_NOTICES*"
+      - ".github/workflows/windows.yml"
   workflow_dispatch:
 
 permissions:
