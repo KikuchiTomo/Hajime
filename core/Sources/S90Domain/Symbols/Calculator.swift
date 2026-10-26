@@ -46,7 +46,8 @@ public enum Calculator {
             case "（": result.append("(")
             case "）": result.append(")")
             case "＝": result.append("=")
-            case "．", "。", "，" where betweenOperands: result.append(character == "，" ? "," : ".")
+            case "．" where betweenOperands, "。" where betweenOperands, "，" where betweenOperands:
+                result.append(character == "，" ? "," : ".")
             case " ", "　": break
             default: result.append(character)
             }
