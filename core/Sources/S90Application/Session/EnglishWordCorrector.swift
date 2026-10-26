@@ -34,15 +34,17 @@ final class EnglishWordCorrector {
     private let lexicon: any EnglishLexicon
     private let settings: any SettingsReading
     private let converter: any KanaKanjiConverting
+    private let classifier: WordLanguageClassifier
 
     private(set) var active: Correction?
     /// 利用者が Space で取り消した補正の位置．同じ位置では補正し直さない(Q-01)
     private var dismissedKanaStart: Int?
 
-    init(lexicon: any EnglishLexicon, settings: any SettingsReading, converter: any KanaKanjiConverting) {
+    init(lexicon: any EnglishLexicon, settings: any SettingsReading, converter: any KanaKanjiConverting, classifier: WordLanguageClassifier) {
         self.lexicon = lexicon
         self.settings = settings
         self.converter = converter
+        self.classifier = classifier
     }
 
     /// 読みの末尾から英単語を探して，補正を求め直す．
@@ -86,6 +88,20 @@ final class EnglishWordCorrector {
             return
         }
         active = nil
+    }
+
+    /// 読み全体が，英語にも日本語にも読める語(「make」→ まけ)で，英語にすると見分けたら英単語として確定させる．
+    /// ローマ字入力では日本語を打つのが主なので，前が英語のとき(「Let's」のあと)と，利用者が英語にすると決めた語だけを英語にする
+    /// (WordLanguageJudge の japaneseFirst)．打鍵が止まったときと変換・確定の前に呼ぶ．確定させたら true
+    func freezeEnglishWord(in composition: inout Composition, context: WordLanguageContext) -> Bool {
+        guard active == nil, settings.current.correction.english, settings.current.typoCorrection != .off,
+            let keys = composition.rawKeys, !keys.isEmpty, keys.allSatisfy({ $0.isASCII && $0.isLowercase && $0.isLetter }),
+            composition.pending.isEmpty || composition.pending == "n",
+            WordLanguageClassifier.reading(of: keys) != nil,
+            classifier.language(of: keys, context: context, mode: .japaneseFirst) == .english else { return false }
+        active = Correction(rawStart: 0, kanaStart: 0, keys: keys, word: keys)
+        commit(into: &composition)
+        return true
     }
 
     /// ローマ字として読めてしまう英単語を読みの中から探し，見つけたら英単語として確定させる(「gitwotukau」→「gitを使う」)．

@@ -54,7 +54,7 @@ let package = Package(
         .testTarget(name: "S90DomainTests", dependencies: ["S90Domain"]),
         .testTarget(name: "S90IPCTests", dependencies: ["S90Domain", "S90Application", "S90IPC", "S90TestSupport"]),
         .testTarget(name: "S90ApplicationTests", dependencies: ["S90Domain", "S90Application", "S90TestSupport"]),
-        // Fixtures は #filePath から読む(古い版の設定のファイル)．リソースとして入れない
+        // Fixtures は #filePath から読む(古いバージョンの設定のファイル)．リソースとして入れない
         .testTarget(name: "S90PersistenceTests", dependencies: ["S90Domain", "S90Persistence"], exclude: ["Fixtures"]),
         .testTarget(
             name: "S90EngineTests",
