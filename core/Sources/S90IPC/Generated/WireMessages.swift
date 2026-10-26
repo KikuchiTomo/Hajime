@@ -628,18 +628,54 @@ extension WireFileFailure: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
-public struct WireSymbolDefault: Sendable, Equatable, Codable {
+public enum WireSymbolKind: String, Sendable, Equatable, Codable, CaseIterable {
+    case sequence
+    case reading
+}
+
+extension WireSymbolKind: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSymbolKind.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireSymbolOrigin: String, Sendable, Equatable, Codable, CaseIterable {
+    case standard
+    case changed
+    case added
+}
+
+extension WireSymbolOrigin: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSymbolOrigin.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WireSymbolItem: Sendable, Equatable, Codable {
     public var input: String
     public var output: String
+    public var isEnabled: Bool
+    public var origin: WireSymbolOrigin
 
-    public init(input: String, output: String) {
+    public init(input: String, output: String, isEnabled: Bool, origin: WireSymbolOrigin) {
         self.input = input
         self.output = output
+        self.isEnabled = isEnabled
+        self.origin = origin
     }
 }
 
-extension WireSymbolDefault: CustomStringConvertible, CustomDebugStringConvertible {
-    public var description: String { "WireSymbolDefault" }
+extension WireSymbolItem: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSymbolItem" }
+    public var debugDescription: String { description }
+}
+
+public enum WireSymbolSaveResult: String, Sendable, Equatable, Codable, CaseIterable {
+    case saved
+    case invalid
+    case full
+}
+
+extension WireSymbolSaveResult: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSymbolSaveResult.\(rawValue)" }
     public var debugDescription: String { description }
 }
 
@@ -764,7 +800,9 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case exportProfileRules(path: String)
     case importRuleList(list: WireRuleList, path: String)
     case exportRuleList(list: WireRuleList, path: String)
-    case readSymbolDefaults
+    case readSymbolItems(kind: WireSymbolKind)
+    case saveSymbolRule(kind: WireSymbolKind, input: String, output: String, isEnabled: Bool, replacing: String?)
+    case removeSymbolRules(kind: WireSymbolKind, inputs: [String])
     case importUserDictionary(path: String)
     case exportUserDictionary(path: String)
     case handwritingChosen(text: String)
@@ -784,7 +822,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case mergeUserDictionary(entries: [WireDictionaryEntry])
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, text, reading, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, target, names, defaults, values, preset, precedingText, offset, limit, entry, entries
+        case type, protocolVersion, session, input, context, mode, text, reading, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, precedingText, offset, limit, entry, entries
     }
 
     public init(from decoder: any Decoder) throws {
@@ -845,8 +883,12 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .importRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
         case "exportRuleList":
             self = try .exportRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
-        case "readSymbolDefaults":
-            self = .readSymbolDefaults
+        case "readSymbolItems":
+            self = try .readSymbolItems(kind: container.decode(WireSymbolKind.self, forKey: .kind))
+        case "saveSymbolRule":
+            self = try .saveSymbolRule(kind: container.decode(WireSymbolKind.self, forKey: .kind), input: container.decode(String.self, forKey: .input), output: container.decode(String.self, forKey: .output), isEnabled: container.decode(Bool.self, forKey: .isEnabled), replacing: container.decodeIfPresent(String.self, forKey: .replacing))
+        case "removeSymbolRules":
+            self = try .removeSymbolRules(kind: container.decode(WireSymbolKind.self, forKey: .kind), inputs: container.decode([String].self, forKey: .inputs))
         case "importUserDictionary":
             self = try .importUserDictionary(path: container.decode(String.self, forKey: .path))
         case "exportUserDictionary":
@@ -980,8 +1022,20 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("exportRuleList", forKey: .type)
             try container.encode(list, forKey: .list)
             try container.encode(path, forKey: .path)
-        case .readSymbolDefaults:
-            try container.encode("readSymbolDefaults", forKey: .type)
+        case .readSymbolItems(let kind):
+            try container.encode("readSymbolItems", forKey: .type)
+            try container.encode(kind, forKey: .kind)
+        case .saveSymbolRule(let kind, let input, let output, let isEnabled, let replacing):
+            try container.encode("saveSymbolRule", forKey: .type)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(input, forKey: .input)
+            try container.encode(output, forKey: .output)
+            try container.encode(isEnabled, forKey: .isEnabled)
+            try container.encodeIfPresent(replacing, forKey: .replacing)
+        case .removeSymbolRules(let kind, let inputs):
+            try container.encode("removeSymbolRules", forKey: .type)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(inputs, forKey: .inputs)
         case .importUserDictionary(let path):
             try container.encode("importUserDictionary", forKey: .type)
             try container.encode(path, forKey: .path)
@@ -1066,7 +1120,9 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .exportProfileRules: "WireRequestBody.exportProfileRules"
         case .importRuleList: "WireRequestBody.importRuleList"
         case .exportRuleList: "WireRequestBody.exportRuleList"
-        case .readSymbolDefaults: "WireRequestBody.readSymbolDefaults"
+        case .readSymbolItems: "WireRequestBody.readSymbolItems"
+        case .saveSymbolRule: "WireRequestBody.saveSymbolRule"
+        case .removeSymbolRules: "WireRequestBody.removeSymbolRules"
         case .importUserDictionary: "WireRequestBody.importUserDictionary"
         case .exportUserDictionary: "WireRequestBody.exportUserDictionary"
         case .handwritingChosen: "WireRequestBody.handwritingChosen"
@@ -1114,7 +1170,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case dictionaryImported(dictionary: WireImportedDictionaryInfo)
     case imported(added: UInt32, skipped: UInt32)
     case fileFailed(reason: WireFileFailure)
-    case symbolDefaults(sequences: [WireSymbolDefault], readings: [WireSymbolDefault])
+    case symbolItems(items: [WireSymbolItem])
+    case symbolSaved(result: WireSymbolSaveResult)
     case settingsFields(values: String)
     case keymapReport(report: WireKeymapReport)
     case usage(values: String, firstCandidateRate: Double?)
@@ -1125,7 +1182,7 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, sequences, readings, values, report, firstCandidateRate, words, entries, total, result, code
+        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, items, result, values, report, firstCandidateRate, words, entries, total, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1150,8 +1207,10 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .imported(added: container.decode(UInt32.self, forKey: .added), skipped: container.decode(UInt32.self, forKey: .skipped))
         case "fileFailed":
             self = try .fileFailed(reason: container.decode(WireFileFailure.self, forKey: .reason))
-        case "symbolDefaults":
-            self = try .symbolDefaults(sequences: container.decode([WireSymbolDefault].self, forKey: .sequences), readings: container.decode([WireSymbolDefault].self, forKey: .readings))
+        case "symbolItems":
+            self = try .symbolItems(items: container.decode([WireSymbolItem].self, forKey: .items))
+        case "symbolSaved":
+            self = try .symbolSaved(result: container.decode(WireSymbolSaveResult.self, forKey: .result))
         case "settingsFields":
             self = try .settingsFields(values: container.decode(String.self, forKey: .values))
         case "keymapReport":
@@ -1206,10 +1265,12 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .fileFailed(let reason):
             try container.encode("fileFailed", forKey: .type)
             try container.encode(reason, forKey: .reason)
-        case .symbolDefaults(let sequences, let readings):
-            try container.encode("symbolDefaults", forKey: .type)
-            try container.encode(sequences, forKey: .sequences)
-            try container.encode(readings, forKey: .readings)
+        case .symbolItems(let items):
+            try container.encode("symbolItems", forKey: .type)
+            try container.encode(items, forKey: .items)
+        case .symbolSaved(let result):
+            try container.encode("symbolSaved", forKey: .type)
+            try container.encode(result, forKey: .result)
         case .settingsFields(let values):
             try container.encode("settingsFields", forKey: .type)
             try container.encode(values, forKey: .values)
@@ -1252,7 +1313,8 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .dictionaryImported: "WireResponseBody.dictionaryImported"
         case .imported: "WireResponseBody.imported"
         case .fileFailed: "WireResponseBody.fileFailed"
-        case .symbolDefaults: "WireResponseBody.symbolDefaults"
+        case .symbolItems: "WireResponseBody.symbolItems"
+        case .symbolSaved: "WireResponseBody.symbolSaved"
         case .settingsFields: "WireResponseBody.settingsFields"
         case .keymapReport: "WireResponseBody.keymapReport"
         case .usage: "WireResponseBody.usage"

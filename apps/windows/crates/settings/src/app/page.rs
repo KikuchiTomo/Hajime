@@ -15,6 +15,7 @@ use crate::store::SettingsStore;
 use crate::strings::settings;
 use crate::strings::{features, keys, more, windows as text};
 use crate::usage::Usage;
+use ipc::SymbolKind;
 use serde_json::Value;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::LPARAM;
@@ -60,6 +61,21 @@ pub enum Event {
     DictionaryAdd(Item),
     /// 選んだ単語を消す(表の行の番号)
     DictionaryRemove(Vec<usize>),
+    /// 記号の決まりを重ねる(入力・記号)
+    SymbolSave {
+        kind: SymbolKind,
+        item: Item,
+    },
+    /// 選んだ記号の決まりを外す(表の行の番号)
+    SymbolRemove {
+        kind: SymbolKind,
+        indices: Vec<usize>,
+    },
+    /// 選んだ記号の決まりの有効と無効を切り替える(表の行の番号)
+    SymbolToggle {
+        kind: SymbolKind,
+        indices: Vec<usize>,
+    },
     /// キー設定のひな形を読み込む(ひな形の値)
     LoadPreset(&'static str),
     /// 英語と日本語の見分けを試す
@@ -107,8 +123,27 @@ pub struct Extras {
     pub usage: Usage,
     /// 登録した単語(読み・単語)
     pub dictionary: Vec<Vec<String>>,
+    /// 記号の一覧(入力・記号・状態)．連続入力と読み
+    pub sequences: Vec<Vec<String>>,
+    pub readings: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
+}
+
+impl Extras {
+    pub fn symbol_rows(&self, kind: SymbolKind) -> &[Vec<String>] {
+        match kind {
+            SymbolKind::Sequence => &self.sequences,
+            SymbolKind::Reading => &self.readings,
+        }
+    }
+
+    pub fn symbol_rows_mut(&mut self, kind: SymbolKind) -> &mut Vec<Vec<String>> {
+        match kind {
+            SymbolKind::Sequence => &mut self.sequences,
+            SymbolKind::Reading => &mut self.readings,
+        }
+    }
 }
 
 struct RowView {
@@ -129,8 +164,25 @@ impl RowView {
         match &self.row.control {
             Control::List(spec, limit) => Some((spec, *limit)),
             Control::Dictionary(spec) => Some((spec, LimitKind::UserDictionaryEntries)),
+            // 記号の上限はエンジンが確かめる(SymbolRuleEditing.save)
+            Control::Symbols(_, spec) => Some((spec, LimitKind::CorrectionRules)),
             _ => None,
         }
+    }
+
+    /// 表の列の数(記号は状態の列を足す)
+    fn columns(&self) -> Option<usize> {
+        let (spec, _) = self.list_spec()?;
+        let more = usize::from(matches!(self.row.control, Control::Symbols(..)));
+        Some(spec.fields.len() + more)
+    }
+
+    /// 記号の一覧の有効と無効を切り替えるボタン
+    fn toggle_button(&self) -> Option<Window> {
+        let (spec, _) = self.list_spec()?;
+        matches!(self.row.control, Control::Symbols(..))
+            .then(|| self.parts.get(spec.fields.len() + 2).copied())
+            .flatten()
     }
 
     /// 一覧の入力欄(左・右)と追加・削除のボタン
@@ -297,11 +349,11 @@ impl PageView {
                         ffi::set_theme(*part, theme.control_theme(true));
                     }
                 }
-                Control::List(..) | Control::Dictionary(_) => {
+                Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
                     apply_list_theme(control, theme);
+                    let (fields, _) = crate::layout::list_shape(&row.row.control);
                     for (index, part) in row.parts.iter().enumerate() {
-                        let edit = index < row.parts.len().saturating_sub(2);
-                        ffi::set_theme(*part, theme.control_theme(edit));
+                        ffi::set_theme(*part, theme.control_theme(index < fields));
                     }
                 }
                 _ => {}
@@ -403,9 +455,9 @@ impl PageView {
                 for (part, rect) in row.parts.iter().zip(&card.parts) {
                     place(Some(*part), *rect);
                 }
-                if let (Some(list), Some((spec, _))) = (row.control, row.list_spec()) {
+                if let (Some(list), Some(columns)) = (row.control, row.columns()) {
                     // 列の幅は表の幅を等しく分ける(縦の送りの分を残す)
-                    let columns = spec.fields.len().max(1);
+                    let columns = columns.max(1);
                     let width = ffi::scale(card.control.width, dpi)
                         - ffi::scrollbar_width(dpi)
                         - theme.px(size::CONTROL_GAP);
@@ -503,6 +555,26 @@ impl PageView {
                 return None;
             }
             let dictionary = matches!(row.row.control, Control::Dictionary(_));
+            if let Control::Symbols(kind, _) = row.row.control {
+                let indices = || row.control.map(ffi::list_selected).unwrap_or_default();
+                return match notification {
+                    BN_CLICKED if window == add && spec.is_filled(&values) => {
+                        Some(Event::SymbolSave {
+                            kind,
+                            item: spec.make(&values),
+                        })
+                    }
+                    BN_CLICKED if window == remove => {
+                        let indices = indices();
+                        (!indices.is_empty()).then_some(Event::SymbolRemove { kind, indices })
+                    }
+                    BN_CLICKED if Some(window) == row.toggle_button() => {
+                        let indices = indices();
+                        (!indices.is_empty()).then_some(Event::SymbolToggle { kind, indices })
+                    }
+                    _ => None,
+                };
+            }
             if window == add && notification == BN_CLICKED && spec.is_filled(&values) && dictionary
             {
                 return Some(Event::DictionaryAdd(spec.make(&values)));
@@ -567,7 +639,11 @@ impl PageView {
                 true
             }
             LVN_ITEMCHANGED => {
-                ffi::enable(remove, !ffi::list_selected(window).is_empty());
+                let selected = !ffi::list_selected(window).is_empty();
+                ffi::enable(remove, selected);
+                if let Some(toggle) = row.toggle_button() {
+                    ffi::enable(toggle, selected);
+                }
                 false
             }
             _ => false,
@@ -579,6 +655,20 @@ impl PageView {
         for row in self.rows.iter().flatten() {
             if let (Control::Preview, Some(result)) = (&row.row.control, row.control) {
                 ffi::set_text(result, text);
+            }
+        }
+    }
+
+    /// 足し終えた記号の一覧の入力欄を空にする
+    pub fn clear_symbol_inputs(&self) {
+        for row in self.rows.iter().flatten() {
+            if let (Control::Symbols(..), Some((fields, add, _))) =
+                (&row.row.control, row.list_parts())
+            {
+                for window in fields {
+                    ffi::set_text(*window, "");
+                }
+                ffi::enable(add, false);
             }
         }
     }
@@ -764,7 +854,19 @@ fn create_row(
             return view;
         }
         Control::List(spec, _) | Control::Dictionary(spec) => {
-            create_list(host, theme, spec, &mut view, next_id);
+            create_list(host, theme, spec, &[], &[], &mut view, next_id);
+            return view;
+        }
+        Control::Symbols(_, spec) => {
+            create_list(
+                host,
+                theme,
+                spec,
+                &[text::TOGGLE_ENABLED],
+                &[text::SYMBOL_STATE],
+                &mut view,
+                next_id,
+            );
             return view;
         }
         Control::Preview => {
@@ -830,9 +932,11 @@ fn create_row(
             view.control = create_read_only(host, theme, "", next_id());
             return view;
         }
-        Control::Note | Control::List(..) | Control::Preview | Control::Dictionary(_) => {
-            return view
-        }
+        Control::Note
+        | Control::List(..)
+        | Control::Preview
+        | Control::Dictionary(_)
+        | Control::Symbols(..) => return view,
     };
     view.control = ffi::create(
         WINDOW_EX_STYLE::default(),
@@ -913,15 +1017,23 @@ fn create_row(
 }
 
 /// 一覧の部品を作る．入力欄は案内の文字(cue banner)に欄の名前を出す
+/// 一覧の入力欄・ボタン・表を作る．more_buttons は追加・削除の後ろに足すボタン，more_columns は入力欄の列の後ろに足す表の列
 fn create_list(
     host: Window,
     theme: &Theme,
     spec: &ListSpec,
+    more_buttons: &[&str],
+    more_columns: &[&str],
     view: &mut RowView,
     next_id: &mut impl FnMut() -> u16,
 ) {
     let fonts = &theme.fonts;
-    let labels: Vec<&str> = spec.fields.iter().map(|field| field.label).collect();
+    let labels: Vec<&str> = spec
+        .fields
+        .iter()
+        .map(|field| field.label)
+        .chain(more_columns.iter().copied())
+        .collect();
     for field in spec.fields {
         let window = match field.choices {
             None => create_edit(host, theme, field.label, next_id()),
@@ -952,7 +1064,11 @@ fn create_list(
         };
         view.parts.extend(window);
     }
-    for (title, enabled) in [(settings::ADD, false), (settings::REMOVE, false)] {
+    let buttons = [settings::ADD, settings::REMOVE]
+        .into_iter()
+        .chain(more_buttons.iter().copied());
+    for title in buttons {
+        let enabled = false;
         if let Some(button) = ffi::create(
             WINDOW_EX_STYLE::default(),
             w!("BUTTON"),
@@ -1092,6 +1208,7 @@ fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values,
         }
         Control::Stat(stat) => ffi::set_text(control, &extras.usage.text(*stat)),
         Control::Dictionary(_) => ffi::list_set_rows(control, &extras.dictionary),
+        Control::Symbols(kind, _) => ffi::list_set_rows(control, extras.symbol_rows(*kind)),
         Control::List(spec, _) => {
             let rows: Vec<Vec<String>> = spec
                 .items(values.value(spec.path))

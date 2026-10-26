@@ -311,9 +311,30 @@ public final class EngineService {
             } catch {
                 return .error(code: .malformed)
             }
-        case .readSymbolDefaults:
-            // 記号のページに既定の決まりを出し，利用者の決まりと重ねるため(macOS の SymbolsPage と同じ表)
-            return .symbolDefaults(sequences: Self.symbolDefaults(.sequence), readings: Self.symbolDefaults(.reading))
+        case .readSymbolItems(let kind):
+            // 記号のページの一覧．既定の決まりに利用者の決まりを重ねる(macOS の SymbolsPage と同じ表)
+            let items = SymbolRuleEditing.items(SymbolRule.Kind(kind), rules: settings.current.symbolRules)
+            return .symbolItems(items: items.map(WireSymbolItem.init))
+        case .saveSymbolRule(let kind, let input, let output, let isEnabled, let replacing):
+            let rule = SymbolRule(kind: SymbolRule.Kind(kind), input: input, output: output, isEnabled: isEnabled)
+            guard rule.isValid else { return .symbolSaved(result: .invalid) }
+            var saved = false
+            do {
+                try settings.update { saved = SymbolRuleEditing.save(rule, replacing: replacing, in: &$0.symbolRules) }
+            } catch {
+                return .error(code: .malformed)
+            }
+            return .symbolSaved(result: saved ? .saved : .full)
+        case .removeSymbolRules(let kind, let inputs):
+            // 既定の決まりは重ねた分を外して既定に戻し，足した決まりは消す(macOS の SymbolsPage の削除と同じ)
+            let kind = SymbolRule.Kind(kind)
+            let removed = Set(inputs)
+            do {
+                try settings.update { $0.symbolRules.removeAll { $0.kind == kind && removed.contains($0.input) } }
+            } catch {
+                return .error(code: .malformed)
+            }
+            return .done
         case .readSync, .setSyncFolder, .setSyncEnabled, .setSyncScope, .setSyncLocalField, .syncNow:
             return syncResponse(for: request) ?? .error(code: .malformed)
         case .importDictionary, .removeDictionary, .importUserDictionary, .exportUserDictionary, .exportSettings, .importSettings, .importProfileRules, .exportProfileRules,
@@ -336,10 +357,6 @@ public final class EngineService {
             }
             return .settings(settings: snapshot)
         }
-    }
-
-    private static func symbolDefaults(_ kind: SymbolRule.Kind) -> [WireSymbolDefault] {
-        SymbolRuleEditing.defaults(kind).map { WireSymbolDefault(input: $0.input, output: $0.output) }
     }
 
     /// ユーザー辞書を 1 回で読む語の数の上限．1 語の大きさの上限から，応答がメッセージの上限に収まる数にする

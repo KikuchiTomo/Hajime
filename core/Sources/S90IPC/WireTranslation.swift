@@ -263,6 +263,26 @@ public struct RoutedActions: Sendable, Equatable {
     }
 }
 
+extension SymbolRule.Kind {
+    public init(_ kind: WireSymbolKind) {
+        switch kind {
+        case .sequence: self = .sequence
+        case .reading: self = .reading
+        }
+    }
+}
+
+extension WireSymbolItem {
+    public init(_ item: SymbolRuleEditing.Item) {
+        let origin: WireSymbolOrigin = switch item.origin {
+        case .standard: .standard
+        case .changed: .changed
+        case .added: .added
+        }
+        self.init(input: item.input, output: item.output, isEnabled: item.isEnabled, origin: origin)
+    }
+}
+
 extension WireDictionaryAddResult {
     public init(_ result: UserDictionaryEditing.AddResult) {
         switch result {
