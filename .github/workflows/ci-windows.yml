@@ -1,9 +1,28 @@
 name: CI Windows
 
-# Windows のビルドは時間がかかるので，Windows に関わるファイルが変わったときだけ動かす
-# 費用を抑えるため，今は自動では動かさない(利用者の指示 2026-10-27)．実装がそろってから手で一度にまとめて動かす:
-#   gh workflow run <このファイル名> --ref main
+# Windows のビルドは時間がかかるので，Windows に関わるファイルが変わったときだけ動かす．手でも動かせる
 on:
+  pull_request:
+    paths:
+      - "apps/windows/**"
+      - "core/**"
+      - "protocol/**"
+      - "design/tokens/**"
+      - "tools/windows/**"
+      - "LICENSES/**"
+      - "THIRD_PARTY_NOTICES*"
+      - ".github/workflows/ci-windows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/windows/**"
+      - "core/**"
+      - "protocol/**"
+      - "design/tokens/**"
+      - "tools/windows/**"
+      - "LICENSES/**"
+      - "THIRD_PARTY_NOTICES*"
+      - ".github/workflows/ci-windows.yml"
   workflow_dispatch:
 
 permissions:
