@@ -14,8 +14,10 @@ use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::pages::{self, Action, Group, Page};
 use crate::store::StoreError;
-use crate::strings::{features, keys, rule_list, settings};
-use ipc::{DictionaryAddResult, DictionaryEntry};
+use crate::strings::{features, keys, rule_list, settings, windows as text};
+use ipc::{
+    DictionaryAddResult, DictionaryEntry, SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult,
+};
 use std::cell::RefCell;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
@@ -76,6 +78,9 @@ struct App {
     extras: Extras,
     /// 登録した単語(表の行と同じ並び．消すときに引く)
     dictionary: Vec<DictionaryEntry>,
+    /// 記号の決まり(表の行と同じ並び．外す・切り替えるときに引く)
+    sequences: Vec<SymbolItem>,
+    readings: Vec<SymbolItem>,
     entries: Vec<NavEntry>,
     view: PageView,
     scroll: i32,
@@ -155,6 +160,8 @@ pub fn open(catalog: Catalog, connect: fn(&Timing) -> Option<Store>) -> Option<W
         model,
         extras: Extras::default(),
         dictionary: Vec::new(),
+        sequences: Vec::new(),
+        readings: Vec::new(),
         entries: Vec::new(),
         view,
         scroll: 0,
@@ -324,6 +331,17 @@ impl App {
                     self.extras.usage = usage;
                 }
             }
+            Page::Symbols => {
+                for kind in [SymbolKind::Sequence, SymbolKind::Reading] {
+                    if let Ok(items) = model.store().read_symbol_items(kind) {
+                        *self.extras.symbol_rows_mut(kind) = items.iter().map(symbol_row).collect();
+                        match kind {
+                            SymbolKind::Sequence => self.sequences = items,
+                            SymbolKind::Reading => self.readings = items,
+                        }
+                    }
+                }
+            }
             Page::Dictionary => {
                 if let Ok(entries) = model.store().read_user_dictionary() {
                     self.extras.dictionary = entries
@@ -446,6 +464,12 @@ impl App {
         if let Event::ListAdd { spec, limit, item } = &event {
             return self.add_to_list(spec, limit.limit(&self.catalog), item);
         }
+        if matches!(
+            event,
+            Event::SymbolSave { .. } | Event::SymbolRemove { .. } | Event::SymbolToggle { .. }
+        ) {
+            return self.edit_symbols(event);
+        }
         let model = self.model.as_mut()?;
         let result = match event {
             Event::Set {
@@ -458,7 +482,10 @@ impl App {
                 let list = spec.remove(model.value(spec.path), &indices);
                 model.set(spec.path, list)
             }
-            Event::ListAdd { .. } => return None,
+            Event::ListAdd { .. }
+            | Event::SymbolSave { .. }
+            | Event::SymbolRemove { .. }
+            | Event::SymbolToggle { .. } => return None,
             Event::DictionaryAdd(item) => {
                 let entry = DictionaryEntry {
                     reading: item.first().cloned().unwrap_or_default(),
@@ -546,6 +573,75 @@ impl App {
         };
         self.refresh();
         after
+    }
+
+    /// 記号の決まりを重ねる・外す・切り替える．終わったら一覧を読み直す
+    fn edit_symbols(&mut self, event: Event) -> Option<After> {
+        let model = self.model.as_ref()?;
+        let store = model.store();
+        let items = match &event {
+            Event::SymbolSave { kind, .. }
+            | Event::SymbolRemove { kind, .. }
+            | Event::SymbolToggle { kind, .. } => match kind {
+                SymbolKind::Sequence => &self.sequences,
+                SymbolKind::Reading => &self.readings,
+            },
+            _ => return None,
+        };
+        let selected = |indices: &[usize]| -> Vec<SymbolItem> {
+            indices
+                .iter()
+                .filter_map(|index| items.get(*index).cloned())
+                .collect()
+        };
+        let mut notice = None;
+        let result = match event {
+            Event::SymbolSave { kind, item } => {
+                let input = item.first().cloned().unwrap_or_default();
+                let output = item.get(1).cloned().unwrap_or_default();
+                // 無効にしていた決まりを書き換えたときも無効のまま
+                let enabled = items
+                    .iter()
+                    .find(|existing| existing.input == input)
+                    .is_none_or(|existing| existing.is_enabled);
+                store
+                    .save_symbol_rule(kind, input, output, enabled)
+                    .map(|result| {
+                        notice = match result {
+                            SymbolSaveResult::Saved => None,
+                            SymbolSaveResult::Invalid => Some(symbol_invalid(kind)),
+                            SymbolSaveResult::Full => Some(rule_list::FULL),
+                        };
+                    })
+            }
+            Event::SymbolRemove { kind, indices } => {
+                let inputs = selected(&indices)
+                    .into_iter()
+                    .map(|item| item.input)
+                    .collect();
+                store.remove_symbol_rules(kind, inputs)
+            }
+            Event::SymbolToggle { kind, indices } => {
+                selected(&indices).into_iter().try_for_each(|item| {
+                    store
+                        .save_symbol_rule(kind, item.input, item.output, !item.is_enabled)
+                        .map(|_| ())
+                })
+            }
+            _ => Ok(()),
+        };
+        if let Err(error) = result {
+            return self.failure(error);
+        }
+        if notice.is_none() {
+            self.view.clear_symbol_inputs();
+        }
+        self.read_extras();
+        self.refresh();
+        notice.map(|text| After::Message {
+            text,
+            warning: true,
+        })
     }
 
     /// 選んだファイルを読み込む・書き出す．読み込んだら設定と辞書を読み直す
@@ -752,6 +848,28 @@ fn confirmation(event: &Event) -> Option<(String, String)> {
             keys::RESTORE_MESSAGE.to_string(),
         )),
         _ => None,
+    }
+}
+
+/// 記号の一覧の 1 行(入力・記号・状態)．状態は無効と，既定から変えた・足した印
+fn symbol_row(item: &SymbolItem) -> Vec<String> {
+    let origin = match item.origin {
+        SymbolOrigin::Standard => None,
+        SymbolOrigin::Changed => Some(features::CHANGED),
+        SymbolOrigin::Added => Some(features::ADDED),
+    };
+    let state: Vec<&str> = (!item.is_enabled)
+        .then_some(text::DISABLED)
+        .into_iter()
+        .chain(origin)
+        .collect();
+    vec![item.input.clone(), item.output.clone(), state.join("・")]
+}
+
+fn symbol_invalid(kind: SymbolKind) -> &'static str {
+    match kind {
+        SymbolKind::Sequence => features::INVALID_SYMBOL,
+        SymbolKind::Reading => features::INVALID_READING_SYMBOL,
     }
 }
 

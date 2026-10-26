@@ -519,7 +519,24 @@
       ]
     },
     {
-      "name": "SymbolDefault",
+      "name": "SymbolKind",
+      "kind": "enum",
+      "cases": [
+        "sequence",
+        "reading"
+      ]
+    },
+    {
+      "name": "SymbolOrigin",
+      "kind": "enum",
+      "cases": [
+        "standard",
+        "changed",
+        "added"
+      ]
+    },
+    {
+      "name": "SymbolItem",
       "kind": "struct",
       "fields": [
         {
@@ -529,7 +546,24 @@
         {
           "name": "output",
           "type": "string"
+        },
+        {
+          "name": "isEnabled",
+          "type": "bool"
+        },
+        {
+          "name": "origin",
+          "type": "SymbolOrigin"
         }
+      ]
+    },
+    {
+      "name": "SymbolSaveResult",
+      "kind": "enum",
+      "cases": [
+        "saved",
+        "invalid",
+        "full"
       ]
     },
     {
@@ -905,7 +939,51 @@
           ]
         },
         {
-          "name": "readSymbolDefaults"
+          "name": "readSymbolItems",
+          "fields": [
+            {
+              "name": "kind",
+              "type": "SymbolKind"
+            }
+          ]
+        },
+        {
+          "name": "saveSymbolRule",
+          "fields": [
+            {
+              "name": "kind",
+              "type": "SymbolKind"
+            },
+            {
+              "name": "input",
+              "type": "string"
+            },
+            {
+              "name": "output",
+              "type": "string"
+            },
+            {
+              "name": "isEnabled",
+              "type": "bool"
+            },
+            {
+              "name": "replacing",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "removeSymbolRules",
+          "fields": [
+            {
+              "name": "kind",
+              "type": "SymbolKind"
+            },
+            {
+              "name": "inputs",
+              "type": "[string]"
+            }
+          ]
         },
         {
           "name": "importUserDictionary",
@@ -1161,15 +1239,20 @@
           ]
         },
         {
-          "name": "symbolDefaults",
+          "name": "symbolItems",
           "fields": [
             {
-              "name": "sequences",
-              "type": "[SymbolDefault]"
-            },
+              "name": "items",
+              "type": "[SymbolItem]"
+            }
+          ]
+        },
+        {
+          "name": "symbolSaved",
+          "fields": [
             {
-              "name": "readings",
-              "type": "[SymbolDefault]"
+              "name": "result",
+              "type": "SymbolSaveResult"
             }
           ]
         },

@@ -7,7 +7,7 @@ use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
 use crate::strings::{choice, dictionaries, features, keys, menu, more, settings, sync};
-use ipc::RuleList;
+use ipc::{RuleList, SymbolKind};
 
 /// 左の一覧の見出し
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,6 +248,8 @@ pub enum Control {
     Notices,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
     Dictionary(ListSpec),
+    /// 記号の決まり．既定の決まりに利用者の決まりを重ねた一覧をエンジンに読んでもらい，決まりを重ねる・外す・有効と無効を切り替える
+    Symbols(SymbolKind, ListSpec),
 }
 
 /// 一覧の上限の種類(catalog の Limits のどれか)
@@ -441,6 +443,7 @@ pub const BUILT: &[Page] = &[
     Page::Keys,
     Page::Apps,
     Page::Dictionary,
+    Page::Symbols,
     Page::Appearance,
     Page::Usage,
     Page::Backup,
@@ -458,6 +461,7 @@ pub fn sections(page: Page) -> Option<Vec<Section>> {
         Page::Apps => Some(apps()),
         Page::Keys => Some(keymap()),
         Page::Dictionary => Some(dictionary()),
+        Page::Symbols => Some(symbols()),
         Page::Appearance => Some(appearance()),
         Page::Usage => Some(usage()),
         Page::Backup => Some(backup()),
@@ -873,6 +877,55 @@ fn dictionary() -> Vec<Section> {
     ])]
 }
 
+/// 記号のページ(macOS の SymbolsPage)．既定の決まりは変えず，変えた分だけを設定に重ねる
+fn symbols() -> Vec<Section> {
+    let section = |title, kind, fields, invalid, file| {
+        let mut rows = vec![Row::new(
+            "",
+            "",
+            Control::Symbols(
+                kind,
+                ListSpec {
+                    path: "",
+                    fields,
+                    empty: features::SYMBOLS_EMPTY,
+                    invalid,
+                    lowercase: false,
+                    exclusive_with: None,
+                },
+            ),
+        )];
+        rows.extend(file_rows(file));
+        Section::new(title, rows)
+    };
+    vec![
+        section(
+            features::SEQUENCES,
+            SymbolKind::Sequence,
+            SEQUENCE_FIELDS,
+            features::INVALID_SYMBOL,
+            RuleList::SymbolSequences,
+        ),
+        section(
+            features::READINGS,
+            SymbolKind::Reading,
+            READING_FIELDS,
+            features::INVALID_READING_SYMBOL,
+            RuleList::SymbolReadings,
+        ),
+    ]
+}
+
+const SEQUENCE_FIELDS: &[Field] = &[
+    Field::named("input", features::INPUT, false),
+    Field::named("output", features::OUTPUT, false),
+];
+
+const READING_FIELDS: &[Field] = &[
+    Field::named("input", features::READING_INPUT, false),
+    Field::named("output", features::READING_OUTPUT, false),
+];
+
 /// ローマ字のページ(macOS の RomajiPage)．標準の表に重ねる綴り
 fn romaji() -> Vec<Section> {
     vec![Section::untitled(with_files(
@@ -893,8 +946,11 @@ fn romaji() -> Vec<Section> {
 
 /// 一覧と，その一覧のファイルを読み込む・書き出すボタン(macOS の RuleListEditor のインポート・エクスポート)
 fn with_files(list: Row, file: RuleList) -> Vec<Row> {
-    vec![
-        list,
+    std::iter::once(list).chain(file_rows(file)).collect()
+}
+
+fn file_rows(file: RuleList) -> [Row; 2] {
+    [
         Row::action(
             settings::IMPORT_DICTIONARY,
             Action::File(FileTask::ImportRuleList(file)),

@@ -171,18 +171,41 @@ struct SettingsFileRequestTests {
         #expect(await answer(.exportSettings(path: "/d/s.json"), from: id) == .done)
     }
 
-    @Test("記号の既定の決まりを返し，1 回のメッセージに収まる")
-    func symbolDefaults() async throws {
+    @Test("記号の一覧は既定の決まりに利用者の決まりを重ね，1 回のメッセージに収まる")
+    func symbolItems() async throws {
         let id = greeted()
-        let body = await answer(.readSymbolDefaults, from: id)
-        guard case .symbolDefaults(let sequences, let readings) = body else {
-            Issue.record("既定の決まりが返らない")
+        let body = await answer(.readSymbolItems(kind: .reading), from: id)
+        guard case .symbolItems(let readings) = body else {
+            Issue.record("記号の一覧が返らない")
             return
         }
-        #expect(sequences.first == WireSymbolDefault(input: "->", output: "→"))
-        #expect(readings.contains { $0.input == "やじるし" && $0.output.hasPrefix("→ ← ↑ ↓") })
+        #expect(readings.contains { $0.input == "やじるし" && $0.output.hasPrefix("→ ← ↑ ↓") && $0.origin == .standard })
         #expect(readings.count == SymbolDictionary.defaultEntries.count)
         let encoded = try JSONEncoder().encode(WireResponse(id: 1, body: body))
         #expect(encoded.count < WireProtocol.maximumMessageBytes)
+    }
+
+    @Test("記号の決まりを書き換え・無効にし，消すと既定に戻る")
+    func symbolRuleEditing() async throws {
+        let id = greeted()
+        let saved = await answer(.saveSymbolRule(kind: .sequence, input: "->", output: "⇒", isEnabled: true, replacing: nil), from: id)
+        #expect(saved == .symbolSaved(result: .saved))
+        let added = await answer(.saveSymbolRule(kind: .sequence, input: "=>>", output: "⇛", isEnabled: false, replacing: nil), from: id)
+        #expect(added == .symbolSaved(result: .saved))
+        guard case .symbolItems(let items) = await answer(.readSymbolItems(kind: .sequence), from: id) else {
+            Issue.record("記号の一覧が返らない")
+            return
+        }
+        #expect(items.first { $0.input == "->" } == WireSymbolItem(input: "->", output: "⇒", isEnabled: true, origin: .changed))
+        #expect(items.last == WireSymbolItem(input: "=>>", output: "⇛", isEnabled: false, origin: .added))
+        let invalid = await answer(.saveSymbolRule(kind: .sequence, input: "", output: "⇒", isEnabled: true, replacing: nil), from: id)
+        #expect(invalid == .symbolSaved(result: .invalid))
+        #expect(await answer(.removeSymbolRules(kind: .sequence, inputs: ["->", "=>>"]), from: id) == .done)
+        guard case .symbolItems(let restored) = await answer(.readSymbolItems(kind: .sequence), from: id) else {
+            Issue.record("記号の一覧が返らない")
+            return
+        }
+        #expect(restored.first { $0.input == "->" } == WireSymbolItem(input: "->", output: "→", isEnabled: true, origin: .standard))
+        #expect(!restored.contains { $0.input == "=>>" })
     }
 }

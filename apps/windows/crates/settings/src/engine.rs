@@ -9,7 +9,7 @@ use crate::store::{Fields, SettingsStore, StoreError};
 use crate::usage::Usage;
 use ipc::{
     DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, KeymapReport, PreviewWord,
-    RequestBody, ResponseBody,
+    RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolSaveResult,
 };
 
 /// 要求を 1 つ送って応答を待つ口．応答が無い(つながらない・時間切れ)ときは None
@@ -129,6 +129,43 @@ impl<E: Engine> EngineStore<E> {
 
     pub fn remove_user_dictionary_entry(&self, entry: DictionaryEntry) -> Result<(), StoreError> {
         self.done(RequestBody::RemoveUserDictionaryEntry { entry })
+    }
+
+    /// 記号の一覧(既定の決まりに利用者の決まりを重ねたもの)
+    pub fn read_symbol_items(&self, kind: SymbolKind) -> Result<Vec<SymbolItem>, StoreError> {
+        match self.send(RequestBody::ReadSymbolItems { kind })? {
+            ResponseBody::SymbolItems { items } => Ok(items),
+            _ => Err(StoreError::Malformed),
+        }
+    }
+
+    /// 記号の決まりを重ねる(既定の決まりを変える・足す・有効にする・無効にする)
+    pub fn save_symbol_rule(
+        &self,
+        kind: SymbolKind,
+        input: String,
+        output: String,
+        is_enabled: bool,
+    ) -> Result<SymbolSaveResult, StoreError> {
+        match self.send(RequestBody::SaveSymbolRule {
+            kind,
+            input,
+            output,
+            is_enabled,
+            replacing: None,
+        })? {
+            ResponseBody::SymbolSaved { result } => Ok(result),
+            _ => Err(StoreError::Malformed),
+        }
+    }
+
+    /// 重ねた記号の決まりを外す(既定の決まりは既定に戻り，足した決まりは消える)
+    pub fn remove_symbol_rules(
+        &self,
+        kind: SymbolKind,
+        inputs: Vec<String>,
+    ) -> Result<(), StoreError> {
+        self.done(RequestBody::RemoveSymbolRules { kind, inputs })
     }
 
     /// キー設定のひな形を，keymap の項目として読む
@@ -290,6 +327,33 @@ mod tests {
         assert_eq!(
             EngineStore::new(&engine).run_file(FileTask::ExportSettings, String::new()),
             Err(StoreError::Unavailable)
+        );
+    }
+
+    #[test]
+    fn 記号の決まりを書き換える要求と結果() {
+        let engine = scripted(Some(ResponseBody::SymbolSaved {
+            result: SymbolSaveResult::Full,
+        }));
+        let store = EngineStore::new(&engine);
+        assert_eq!(
+            store.save_symbol_rule(SymbolKind::Sequence, "->".into(), "⇒".into(), false),
+            Ok(SymbolSaveResult::Full)
+        );
+        assert_eq!(
+            engine.requests.borrow()[0],
+            RequestBody::SaveSymbolRule {
+                kind: SymbolKind::Sequence,
+                input: "->".into(),
+                output: "⇒".into(),
+                is_enabled: false,
+                replacing: None
+            }
+        );
+        let engine = scripted(Some(ResponseBody::Done));
+        assert_eq!(
+            EngineStore::new(&engine).read_symbol_items(SymbolKind::Reading),
+            Err(StoreError::Malformed)
         );
     }
 

@@ -143,6 +143,16 @@ pub mod features {
     pub const SEQUENCES: &str = "連続入力によるサジェスト";
     pub const READINGS: &str = "読み仮名入力によるサジェスト";
     pub const SEARCH: &str = "検索";
+    pub const INPUT: &str = "入力";
+    pub const OUTPUT: &str = "記号";
+    pub const READING_INPUT: &str = "読み";
+    pub const READING_OUTPUT: &str = "空白で区切った記号";
+    pub const INVALID_SYMBOL: &str = "連続入力は英字と数字以外の 2〜12 文字にしてください";
+    pub const INVALID_READING_SYMBOL: &str =
+        "読みは 12 文字まで、記号は 200 文字までにしてください";
+    pub const SYMBOLS_EMPTY: &str = "ルールはありません";
+    pub const CHANGED: &str = "変更あり";
+    pub const ADDED: &str = "追加";
     pub const CORRECTION_KINDS: &str = "修正の対象";
     pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
     pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
@@ -313,6 +323,7 @@ pub mod keys {
 
 /// UIStrings.RuleList
 pub mod rule_list {
+    pub const ENABLED: &str = "有効";
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
 }
@@ -334,6 +345,11 @@ pub mod windows {
     pub const ON: &str = "オン";
     pub const OFF: &str = "オフ";
     pub const OPEN_SETTINGS_FILE: &str = "設定ファイルを開く";
+    /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
+    pub const SYMBOL_STATE: &str = "状態";
+    pub const DISABLED: &str = "無効";
+    /// 選んだ記号の決まりを有効・無効にするボタン(macOS は行ごとのオン・オフ)
+    pub const TOGGLE_ENABLED: &str = "有効・無効の切り替え";
     /// ファイルを選ぶ窓の種類の名前(macOS は種類を名前で出さない)
     pub const JSON_FILES: &str = "JSON ファイル";
     pub const TEXT_FILES: &str = "テキストファイル";

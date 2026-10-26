@@ -492,19 +492,47 @@ pub enum FileFailure {
     Busy,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct SymbolDefault {
-    pub input: String,
-    pub output: String,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SymbolKind {
+    Sequence,
+    Reading,
 }
 
-impl fmt::Debug for SymbolDefault {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SymbolOrigin {
+    Standard,
+    Changed,
+    Added,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SymbolItem {
+    pub input: String,
+    pub output: String,
+    #[serde(rename = "isEnabled")]
+    pub is_enabled: bool,
+    pub origin: SymbolOrigin,
+}
+
+impl fmt::Debug for SymbolItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SymbolDefault")
+        f.debug_struct("SymbolItem")
             .field("input", &REDACTED)
             .field("output", &REDACTED)
+            .field("isEnabled", &self.is_enabled)
+            .field("origin", &self.origin)
             .finish()
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SymbolSaveResult {
+    Saved,
+    Invalid,
+    Full,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -694,7 +722,22 @@ pub enum RequestBody {
         list: RuleList,
         path: String,
     },
-    ReadSymbolDefaults,
+    ReadSymbolItems {
+        kind: SymbolKind,
+    },
+    SaveSymbolRule {
+        kind: SymbolKind,
+        input: String,
+        output: String,
+        #[serde(rename = "isEnabled")]
+        is_enabled: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        replacing: Option<String>,
+    },
+    RemoveSymbolRules {
+        kind: SymbolKind,
+        inputs: Vec<String>,
+    },
     ImportUserDictionary {
         path: String,
     },
@@ -858,7 +901,23 @@ impl fmt::Debug for RequestBody {
                 .field("list", list)
                 .field("path", &REDACTED)
                 .finish(),
-            Self::ReadSymbolDefaults => f.write_str("ReadSymbolDefaults"),
+            Self::ReadSymbolItems { kind, .. } => f
+                .debug_struct("ReadSymbolItems")
+                .field("kind", kind)
+                .finish(),
+            Self::SaveSymbolRule { kind, is_enabled, .. } => f
+                .debug_struct("SaveSymbolRule")
+                .field("kind", kind)
+                .field("input", &REDACTED)
+                .field("output", &REDACTED)
+                .field("isEnabled", is_enabled)
+                .field("replacing", &REDACTED)
+                .finish(),
+            Self::RemoveSymbolRules { kind, .. } => f
+                .debug_struct("RemoveSymbolRules")
+                .field("kind", kind)
+                .field("inputs", &REDACTED)
+                .finish(),
             Self::ImportUserDictionary { .. } => f
                 .debug_struct("ImportUserDictionary")
                 .field("path", &REDACTED)
@@ -970,9 +1029,11 @@ pub enum ResponseBody {
     FileFailed {
         reason: FileFailure,
     },
-    SymbolDefaults {
-        sequences: Vec<SymbolDefault>,
-        readings: Vec<SymbolDefault>,
+    SymbolItems {
+        items: Vec<SymbolItem>,
+    },
+    SymbolSaved {
+        result: SymbolSaveResult,
     },
     SettingsFields {
         values: String,
@@ -1044,10 +1105,13 @@ impl fmt::Debug for ResponseBody {
                 .debug_struct("FileFailed")
                 .field("reason", reason)
                 .finish(),
-            Self::SymbolDefaults { sequences, readings, .. } => f
-                .debug_struct("SymbolDefaults")
-                .field("sequences", sequences)
-                .field("readings", readings)
+            Self::SymbolItems { items, .. } => f
+                .debug_struct("SymbolItems")
+                .field("items", items)
+                .finish(),
+            Self::SymbolSaved { result, .. } => f
+                .debug_struct("SymbolSaved")
+                .field("result", result)
                 .finish(),
             Self::SettingsFields { .. } => f
                 .debug_struct("SettingsFields")

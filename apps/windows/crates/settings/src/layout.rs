@@ -73,7 +73,11 @@ pub fn control_width(control: &Control) -> f32 {
         Control::Stepper(_) => size::STEPPER_WIDTH,
         Control::Seconds(_) => size::CONTROL_WIDTH,
         Control::Action(_) | Control::Stat(_) => size::CONTROL_WIDTH,
-        Control::List(..) | Control::Preview | Control::Dictionary(_) | Control::Notices => 0.0,
+        Control::List(..)
+        | Control::Preview
+        | Control::Dictionary(_)
+        | Control::Symbols(..)
+        | Control::Notices => 0.0,
         Control::Version => size::CONTROL_WIDTH,
         Control::Preset => size::CONTROL_WIDTH + size::CONTROL_GAP + size::BUTTON_WIDTH,
         Control::KeymapReport => 0.0,
@@ -147,7 +151,7 @@ pub fn layout(
 fn card_height(control: &Control) -> f32 {
     let inputs = size::CONTROL_HEIGHT + size::CONTROL_GAP;
     match control {
-        Control::List(..) | Control::Dictionary(_) => {
+        Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
             size::CARD_PADDING_X * 2.0 + inputs + size::LIST_HEIGHT
         }
         Control::Preview => {
@@ -161,8 +165,9 @@ fn card_height(control: &Control) -> f32 {
 
 fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
     match &row.control {
-        Control::List(spec, _) | Control::Dictionary(spec) => {
-            return place_inputs(position, spec.fields.len(), 2, card, size::LIST_HEIGHT)
+        Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
+            let (fields, buttons) = list_shape(&row.control);
+            return place_inputs(position, fields, buttons, card, size::LIST_HEIGHT);
         }
         Control::Preview => {
             return place_inputs(position, 2, 0, card, size::BODY_LINE_HEIGHT * PREVIEW_LINES)
@@ -231,6 +236,15 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
             size::RESET_SIZE,
         ),
         parts,
+    }
+}
+
+/// 一覧の入力欄の数とボタンの数(追加・削除．記号は有効と無効の切り替えも)
+pub fn list_shape(control: &Control) -> (usize, usize) {
+    match control {
+        Control::List(spec, _) | Control::Dictionary(spec) => (spec.fields.len(), 2),
+        Control::Symbols(_, spec) => (spec.fields.len(), 3),
+        _ => (0, 0),
     }
 }
 
@@ -401,8 +415,19 @@ mod tests {
     }
 
     #[test]
+    fn 記号の一覧は入力欄を2つとボタンを3つ並べる() {
+        let page = sections(Page::Symbols).unwrap();
+        let layout = layout(&page, 800.0, |_| true, one_line);
+        for section in &layout.sections {
+            let card = &section.cards[0];
+            assert_eq!(card.parts.len(), 5);
+            assert!(card.parts[4].max_x() <= card.card.max_x());
+        }
+    }
+
+    #[test]
     fn 入力欄の並ぶカードは中身がカードに収まる() {
-        for page in [Page::Language, Page::Dictionary, Page::About] {
+        for page in [Page::Language, Page::Dictionary, Page::Symbols, Page::About] {
             let page = sections(page).unwrap();
             let layout = layout(&page, 800.0, |_| true, one_line);
             for card in layout.sections.iter().flat_map(|section| &section.cards) {
