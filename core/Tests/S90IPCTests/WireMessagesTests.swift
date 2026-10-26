@@ -2,8 +2,6 @@ import Foundation
 import S90IPC
 import Testing
 
-/// protocol/fixtures/messages.json を読み，読み戻して同じ JSON になることを確かめる．
-/// Rust の側(apps/windows/crates/ipc)も同じファイルで確かめるので，両方の言語で形が食い違わない
 @Suite("通信の型(ADR 0010)")
 struct WireMessagesTests {
     private static func fixtures() throws -> [String: Any] {

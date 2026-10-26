@@ -1,19 +1,13 @@
 import Foundation
 
-/// メッセージの読み書きの失敗．入力の中身を含めない(docs/dev/SECURITY-MODEL.md)
 public enum MessageFramingError: Error, Equatable {
-    /// 上限(WireProtocol.maximumMessageBytes)より大きい．接続を切る
     case tooLarge(Int)
-    /// protocol/schema.json の定義と合わない
     case malformed
 }
 
-/// メッセージの区切り方．4 バイトの長さ(リトルエンディアン)のあとに，UTF-8 の JSON を置く
-/// (docs/dev/adr/0010-ipc-message-format.md)．Rust の側は apps/windows/crates/ipc/src/framing.rs
 public enum MessageFraming {
     public static let lengthBytes = 4
 
-    /// メッセージを，長さを前に付けたバイト列にする
     public static func encode(_ message: some Encodable) throws(MessageFramingError) -> [UInt8] {
         let body: Data
         do {
@@ -32,18 +26,15 @@ public enum MessageFraming {
         return frame
     }
 
-    /// 長さを除いた本体を読む
     public static func decode<Message: Decodable>(_ type: Message.Type, from body: some Collection<UInt8>) throws(MessageFramingError) -> Message {
         guard body.count <= WireProtocol.maximumMessageBytes else { throw .tooLarge(body.count) }
         do {
             return try JSONDecoder().decode(type, from: Data(body))
         } catch {
-            // DecodingError は値の一部を含むことがあるので，種類だけにする
             throw .malformed
         }
     }
 
-    /// 受け取ったバイトをため，メッセージごとに切り出す．パイプは 1 回の読み込みでメッセージの途中までしか返さないことがあるため
     public struct Reader: Sendable {
         private var buffer: [UInt8] = []
 
@@ -53,8 +44,6 @@ public enum MessageFraming {
             buffer.append(contentsOf: bytes)
         }
 
-        /// そろったメッセージの本体を 1 つ取り出す．まだそろっていなければ nil．
-        /// 長さが上限を超えていたら，本体を待たずに断る
         public mutating func nextBody() throws(MessageFramingError) -> [UInt8]? {
             guard buffer.count >= MessageFraming.lengthBytes else { return nil }
             var length = 0
@@ -68,7 +57,6 @@ public enum MessageFraming {
             return body
         }
 
-        /// そろったメッセージを 1 つ読む．まだそろっていなければ nil
         public mutating func next<Message: Decodable>(_ type: Message.Type) throws(MessageFramingError) -> Message? {
             guard let body = try nextBody() else { return nil }
             return try MessageFraming.decode(type, from: body)

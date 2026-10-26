@@ -33,7 +33,7 @@ core/Sources/
 ├── S90Application/   ユースケースとポート(protocol)．S90Domain だけに依存
 ├── S90Engine/        変換のポートの実装．AzooKeyKanaKanjiConverter のアダプタ
 ├── S90Persistence/   設定・ユーザー辞書・学習データの保存のポートの実装
-├── S90IPC/           Windows のエンジンとの通信のメッセージ型(protocol/ から生成)
+├── S90IPC/           Windows のエンジンとの通信．メッセージ型(protocol/ から生成)，要求をセッションに渡す EngineService，名前付きパイプ
 ├── s90-engine-host/  Windows 用のエンジンのプロセス(composition root のひとつ)
 └── s90-playground/   入れずにターミナルで変換を試す道具(make try．composition root のひとつ)
 ```
@@ -86,6 +86,8 @@ OS のキーイベント
 | 候補ウィンドウ(`apps/windows/crates/candidate-ui`) | Rust | 候補とモード表示を描く．入力先のアプリの権限や UI スレッドに影響されないよう別のプロセスにする |
 
 通信の形式は `protocol/` に定義し，Swift と Rust の両方のコードをそこから生成します．手で二重に書かないためです(ADR 0010)．
+Windows では Zenzai をまだ使いません．llama.cpp のライブラリを用意するまで，`core/Package.swift` の trait `Zenzai` を `--disable-default-traits` で外してビルドします．手書きの認識(Vision)と同期のフォルダの辞書の索引(CryptoKit)も Apple の OS でだけ作ります．
+
 DLL はキーを送って入力欄への操作(確定・組み立て中の文字・モード)を受け取るだけで，候補・分岐図・案内はエンジンが候補ウィンドウに直接送ります．`ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決めます．
 
 ## 設定とデザインの値
