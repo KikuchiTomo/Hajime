@@ -37,6 +37,8 @@ const ICON_TEXT_SCALE: f32 = 0.85;
 pub trait Actions {
     fn menu_settings(&self) -> Option<ipc::SettingsSnapshot>;
     fn run(&self, command: ipc::MenuCommand);
+    /// 手書きの窓を開く(組み立て中の文字を確定してから)
+    fn open_handwriting(&self);
     fn toggle_mode(&self);
 }
 
@@ -147,8 +149,10 @@ impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
 
     fn OnMenuSelect(&self, wid: u32) -> Result<()> {
         guard(|| {
-            if let Some(command) = menu::command(wid) {
-                self.actions.run(command);
+            match menu::selection(wid) {
+                Some(menu::Selection::Command(command)) => self.actions.run(command),
+                Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
+                None => {}
             }
             Ok(())
         })

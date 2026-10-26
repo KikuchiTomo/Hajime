@@ -412,6 +412,27 @@ struct EngineServiceTests {
         service.handle(WireRequest(id: 31, body: .wake(session: session, context: Self.field)), from: id).body
     }
 
+    @Test("入力メニューの手書き入力は，組み立て中の文字を確定する edit を返して窓を開く．使わない設定なら開かない")
+    func handwritingFromMenu() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = type("kana", session: session, from: id)
+        sent.value.removeAll()
+        guard case .edit(true, let operations, _) = service.handle(WireRequest(id: 60, body: .openHandwriting(session: session, context: Self.field)), from: id).body else {
+            Issue.record("手書きを開く要求に edit で答えない")
+            return
+        }
+        #expect(operations.contains { if case .commit = $0 { true } else { false } })
+        #expect(sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600, recognitionTimeoutMilliseconds: 3000)))
+        #expect(service.snapshot.handwriting == true)
+        try settings.update { $0.handwriting = false }
+        sent.value.removeAll()
+        _ = service.handle(WireRequest(id: 61, body: .openHandwriting(session: session, context: Self.field)), from: id)
+        #expect(!sent.value.contains { if case .showHandwriting = $0 { true } else { false } })
+        #expect(service.snapshot.handwriting == false)
+    }
+
     @Test("手書きの窓を開き，選んだ文字を開いたセッションの wake で確定する")
     func handwriting() throws {
         try settings.update { $0.handwriting = true }

@@ -319,6 +319,10 @@
         {
           "name": "candidateFontSize",
           "type": "f64"
+        },
+        {
+          "name": "handwriting",
+          "type": "bool?"
         }
       ]
     },
@@ -494,6 +498,19 @@
         },
         {
           "name": "wake",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
+          "name": "openHandwriting",
           "fields": [
             {
               "name": "session",

@@ -434,6 +434,7 @@ enum UIStrings {
     enum Menu {
         static let openSettings = "設定を開く…"
         static let liveConversion = "ライブ変換"
+        static let handwriting = "手書き入力"
     }
 
     /// 設定の画面の選択肢の名前

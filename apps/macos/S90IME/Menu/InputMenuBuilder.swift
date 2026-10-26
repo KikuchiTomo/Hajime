@@ -13,6 +13,7 @@ import S90Domain
 final class InputMenuBuilder {
     struct Actions {
         var toggleLiveConversion: Selector
+        var handwriting: Selector
         var openSettings: Selector
     }
 
@@ -33,20 +34,27 @@ final class InputMenuBuilder {
     /// なお cmux など一部のアプリは，選んだ動作を IME に取り次がない(テキストエディットでは届く)．そのため同じ操作をキーでも受ける(キー設定の表．Keymap)
     private var cachedMenu: NSMenu?
     private var liveConversionItem: NSMenuItem?
+    private var handwritingItem: NSMenuItem?
 
     func menu(actions: Actions) -> NSMenu {
         if let cachedMenu {
             liveConversionItem?.state = settings.current.liveConversion ? .on : .off
+            // 手書き入力は設定で使うときだけ出す
+            handwritingItem?.isHidden = !settings.current.handwriting
             return cachedMenu
         }
         let menu = NSMenu()
         let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
         live.state = settings.current.liveConversion ? .on : .off
         menu.addItem(live)
+        let handwriting = NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")
+        handwriting.isHidden = !settings.current.handwriting
+        menu.addItem(handwriting)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
         cachedMenu = menu
         liveConversionItem = live
+        handwritingItem = handwriting
         return menu
     }
 

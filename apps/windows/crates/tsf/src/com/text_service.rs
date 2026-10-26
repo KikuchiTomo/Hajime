@@ -533,6 +533,43 @@ impl TextService_Impl {
             self.ensure_session();
             return;
         }
+        let Some((context, engine, session)) = self.focused_context() else {
+            return;
+        };
+        self.apply_late(&context);
+        if !self.inner.borrow().late.is_empty() {
+            self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+            return;
+        }
+        let wants_wake = self
+            .inner
+            .borrow()
+            .state
+            .as_ref()
+            .is_some_and(|state| state.wake_after_milliseconds.is_some());
+        if !wants_wake {
+            return;
+        }
+        self.send_edit(&context, engine, session, |session, context| {
+            RequestBody::Wake { session, context }
+        });
+    }
+
+    /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く(エンジンが edit で返す)
+    fn open_handwriting(&self) {
+        if self.inner.borrow().session.is_none() {
+            self.ensure_session();
+        }
+        let Some((context, engine, session)) = self.focused_context() else {
+            return;
+        };
+        self.send_edit(&context, engine, session, |session, context| {
+            RequestBody::OpenHandwriting { session, context }
+        });
+    }
+
+    /// 入力中の文字の文脈(組み立て中ならそこ，無ければ注目している文書)と，エンジン・セッション
+    fn focused_context(&self) -> Option<(ITfContext, Option<Rc<EngineClient>>, Option<u32>)> {
         let (thread_mgr, composition, engine, session) = {
             let inner = self.inner.borrow();
             (
@@ -554,32 +591,27 @@ impl TextService_Impl {
                         .and_then(|focus: ITfDocumentMgr| focus.GetTop())
                         .ok()
                 })
-            });
-        let Some(context) = context else { return };
-        self.apply_late(&context);
-        if !self.inner.borrow().late.is_empty() {
-            self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
-            return;
-        }
-        let wants_wake = self
-            .inner
-            .borrow()
-            .state
-            .as_ref()
-            .is_some_and(|state| state.wake_after_milliseconds.is_some());
-        let (Some(engine), Some(session), true) = (engine, session, wants_wake) else {
+            })?;
+        Some((context, engine, session))
+    }
+
+    /// edit を返す要求を送り，届いた edit を文書に反映する．間に合わなかった応答は捨てずにあとで反映する(キーと同じ)
+    fn send_edit(
+        &self,
+        context: &ITfContext,
+        engine: Option<Rc<EngineClient>>,
+        session: Option<u32>,
+        make: impl FnOnce(u32, FieldContext) -> RequestBody,
+    ) {
+        let (Some(engine), Some(session)) = (engine, session) else {
             return;
         };
-        let field = self.field_context(&context);
-        let pending = engine.send(RequestBody::Wake {
-            session,
-            context: field,
-        });
+        let field = self.field_context(context);
+        let pending = engine.send(make(session, field));
         match pending.outcome(RESPONSE_TIMEOUT) {
             Outcome::Reply(body) => {
-                self.apply_response(&context, body);
+                self.apply_response(context, body);
             }
-            // Zenzai で変換し直すなどして間に合わなかった応答は捨てずに，あとで届いたときに反映する(キーと同じ)
             Outcome::TimedOut => {
                 self.inner.borrow_mut().late.push(pending);
                 self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
@@ -609,6 +641,12 @@ impl langbar::Actions for MenuActions {
     fn run(&self, command: ipc::MenuCommand) {
         if let Some(service) = Self::active() {
             let _ = service.engine_request(RequestBody::Menu { command });
+        }
+    }
+
+    fn open_handwriting(&self) {
+        if let Some(service) = Self::active() {
+            service.open_handwriting();
         }
     }
 

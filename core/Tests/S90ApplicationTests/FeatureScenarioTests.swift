@@ -176,4 +176,5 @@ final class FakePostalCodes: PostalCodeLooking {
     let table: [String: [String]]
     init(_ table: [String: [String]]) { self.table = table }
     func addresses(for code: String) -> [String] { table[code] ?? [] }
+
 }
