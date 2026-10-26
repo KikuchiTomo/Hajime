@@ -89,6 +89,19 @@ public enum DefaultSettings {
     public static let readingCorrectionMargin = 5.5
     /// 差がこれ以上で readingCorrectionMargin に届かないときは，直さずに「もしかして」として示し，Tab で直せるようにする
     public static let readingSuggestionMargin = 4.0
+    /// 1 か所の直し(手間がこれ以下)は，Zenzai の点数の差(ReadingCorrection.score)だけでも直す・示す(前の決まり)
+    public static let singleEditCost = 2.0
+    /// Space を押したときに打ち間違いの訂正を待つ長さ(秒)．これを過ぎたら訂正を待たずに変換する
+    public static let correctionWaitBeforeConversion = 2.5
+    /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
+    public static let unconvertiblePlausibility = -60.0
+    /// 1 か所の直しを Zenzai の点数の差だけで直す境目(#52 より前の決まりと同じ)
+    public static let readingCorrectionScoreMargin = 3.0
+    /// 1 か所の直しを Zenzai の点数の差だけで「もしかして」と示す境目
+    public static let readingSuggestionScoreMargin = 2.0
+    /// 音の変わらない書き誤り(見ずらい → 見づらい)は，変換のもっともらしさの差がこれ以上なら「もしかして」と示す．
+    /// かなの並びを見る言語モデルは書き分けの誤りを見分けにくく，辞書の語に切れるかどうかが決め手になるため
+    public static let samePronunciationSuggestionGain = 6.0
     /// 同じキーを続けて 2 回打ってしまった誤り(「koonnichiha」)を直す手間．近くのキーを余分に打った誤りの手間(3.0)より小さくする
     public static let repeatedKeyCost = 2.0
     /// 同じキーを続けて打った箇所のうち，1 回にして試す箇所の数の上限．1 か所ごとに Zenzai に問い合わせるので抑える

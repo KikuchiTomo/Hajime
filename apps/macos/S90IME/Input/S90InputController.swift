@@ -44,8 +44,37 @@ final class S90InputController: IMKInputController {
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
         let result = session.handle(key, context: context)
         presenter.apply(result.actions, to: client)
-        scheduleSettle(client: client, context: context)
+        if result.actions.contains(.awaitCorrections) {
+            convertAfterCorrections(client: client, context: context)
+        } else {
+            scheduleSettle(client: client, context: context)
+        }
         return result.handled
+    }
+
+    /// Space を押したときに打ち間違いの訂正がまだ求め終わっていなければ，求めてから変換を続ける．
+    /// 長くかかるときは待つのをやめて変換する(DefaultSettings.correctionWaitBeforeConversion)．次のキーが来たら session が変換をやめる
+    @MainActor
+    private func convertAfterCorrections(client: any IMKTextInput, context: InputContext) {
+        settleTask?.cancel()
+        settleTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let request = self.session.conversionCorrectionRequest, let service = self.root.typoService {
+                let corrections = await withTaskGroup(of: [String: [ReadingCorrection]]?.self) { group in
+                    group.addTask { await service.corrections(forKeys: request.keys, leftContext: request.leftContext) }
+                    group.addTask {
+                        try? await Task.sleep(for: .seconds(DefaultSettings.correctionWaitBeforeConversion))
+                        return nil
+                    }
+                    let first = await group.next() ?? nil
+                    group.cancelAll()
+                    return first
+                }
+                if let corrections { self.session.provideCorrections(corrections) }
+            }
+            guard !Task.isCancelled else { return }
+            self.presenter.apply(self.session.resumeConversion(context: context), to: client)
+        }
     }
 
     /// 打鍵が止まったら変換した文を見せ(settle)，さらに止まったら打ち間違いを見直す(review)．
