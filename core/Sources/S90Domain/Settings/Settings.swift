@@ -24,6 +24,10 @@ public struct Settings: Sendable, Equatable {
     public var spaceWidth = CharacterWidth.halfwidth
     /// 日本語のモードで打った数字の幅
     public var numberWidth = CharacterWidth.halfwidth
+    /// 日本語のモードで Shift を押して打った英字の幅
+    public var alphabetWidth = CharacterWidth.halfwidth
+    /// Shift を押して英字を打ったら，Space か記号を打つまで英字のまま入れる(「Python」と打てる)
+    public var shiftStartsAlphabet = false
     /// 句読点を打ったら，その句読点まで確定する
     public var punctuationCommits = false
     /// 変換しているとき(分岐図)のキーの割り当て
@@ -36,6 +40,18 @@ public struct Settings: Sendable, Equatable {
     public var candidatePresentation = CandidatePresentation.automatic
     /// Space で変換したときに最初に選ぶ文節
     public var initialFocus = InitialFocus.start
+    /// 一覧の 1 ページの候補の数
+    public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
+    /// 分岐図の下の枝に出す候補の数
+    public var branchCandidatesPerPage = DefaultSettings.latticeCandidatesPerSegment
+    /// ライブ変換で，打鍵が止まってから漢字にするまでの時間(秒)
+    public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
+    /// 打鍵が止まってから打ち間違いを見直すまでの時間(秒)
+    public var correctionDelay = DefaultSettings.liveCorrectionDelay
+    /// 打ち間違いを直す基準
+    public var correctionSensitivity = CorrectionSensitivity.standard
+    /// 直すほど確かでないとき，「もしかして」と示す
+    public var showsSuggestions = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
     /// 番号キーで候補を選ぶ
@@ -60,14 +76,44 @@ public struct Settings: Sendable, Equatable {
     public var candidateFontSize = 15.0
     /// 日本語と英数を切り替えたときに，入力位置の近くにモードを出す
     public var showsModeIndicator = true
+    /// モードの表示を出しておく時間(秒)
+    public var modeIndicatorDuration = 0.8
+    /// 保存したカスタムテーマ
+    public var customThemes: [CustomTheme] = []
+    /// 使っているカスタムテーマの ID．nil なら theme の既成のテーマ
+    public var customThemeID: String?
 
     // MARK: アプリごと
     /// 組み立てていないときの Escape で英数に切り替える(Vim のノーマルモードに戻るとき．R-06)
     public var escapeSwitchesToDirect = false
+    /// ターミナルで，行の頭のコマンドの名前を英字のまま入れる(R-07)
+    public var terminalCommands = true
     /// アプリの識別子(macOS はバンドル ID)の前方一致からプロファイルを決める規則．先にあるものを優先する
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
     public init() {}
+
+    /// 範囲の外の値を範囲に収め，使えない値を捨てる．設定のファイルや書き出した JSON を読むときに通す
+    /// (手で書き換えたファイルや別の版のファイルでも，画面や変換がおかしくならないように)
+    public mutating func clampToValidRanges() {
+        func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T { min(max(value, range.lowerBound), range.upperBound) }
+        listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
+        branchCandidatesPerPage = clamp(branchCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
+        liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
+        correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
+        correctionDelay = max(correctionDelay, liveConversionDelay)
+        modeIndicatorDuration = clamp(modeIndicatorDuration.isFinite ? modeIndicatorDuration : 0.8, DefaultSettings.modeIndicatorDurationRange)
+        candidateFontSize = clamp(candidateFontSize.isFinite ? candidateFontSize : 15, DefaultSettings.candidateFontSizeRange)
+        var themeIDs = Set<String>()
+        customThemes = Array(customThemes.filter { $0.isValid && themeIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCustomThemes))
+        if activeCustomTheme == nil { customThemeID = nil }
+        profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
+    }
+
+    /// 使っているカスタムテーマ．選んでいなければ nil
+    public var activeCustomTheme: CustomTheme? {
+        customThemeID.flatMap { id in customThemes.first { $0.id == id } }
+    }
 
     public func profile(forApplication identifier: String?) -> AppProfile {
         guard let identifier else { return .standard }
@@ -87,6 +133,8 @@ private struct Skipped: Decodable {}
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
+        case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
+        case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
         case learning, userDictionary, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -127,6 +175,18 @@ extension Settings: Codable {
         read(.numberWidth, into: \.numberWidth)
         read(.punctuationCommits, into: \.punctuationCommits)
         read(.conversionKeys, into: \.conversionKeys)
+        read(.alphabetWidth, into: \.alphabetWidth)
+        read(.shiftStartsAlphabet, into: \.shiftStartsAlphabet)
+        read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
+        read(.branchCandidatesPerPage, into: \.branchCandidatesPerPage)
+        read(.liveConversionDelay, into: \.liveConversionDelay)
+        read(.correctionDelay, into: \.correctionDelay)
+        read(.correctionSensitivity, into: \.correctionSensitivity)
+        read(.showsSuggestions, into: \.showsSuggestions)
+        read(.modeIndicatorDuration, into: \.modeIndicatorDuration)
+        readList(.customThemes, into: \.customThemes)
+        read(.customThemeID, into: \.customThemeID)
+        read(.terminalCommands, into: \.terminalCommands)
         settings.conversionKeys = settings.conversionKeys.filled()
         read(.typoCorrection, into: \.typoCorrection)
         read(.candidatePresentation, into: \.candidatePresentation)
@@ -144,6 +204,7 @@ extension Settings: Codable {
         read(.showsModeIndicator, into: \.showsModeIndicator)
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         readList(.profileRules, into: \.profileRules)
+        settings.clampToValidRanges()
         self = settings
     }
 
@@ -161,6 +222,18 @@ extension Settings: Codable {
         try container.encode(numberWidth, forKey: .numberWidth)
         try container.encode(punctuationCommits, forKey: .punctuationCommits)
         try container.encode(conversionKeys, forKey: .conversionKeys)
+        try container.encode(alphabetWidth, forKey: .alphabetWidth)
+        try container.encode(shiftStartsAlphabet, forKey: .shiftStartsAlphabet)
+        try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
+        try container.encode(branchCandidatesPerPage, forKey: .branchCandidatesPerPage)
+        try container.encode(liveConversionDelay, forKey: .liveConversionDelay)
+        try container.encode(correctionDelay, forKey: .correctionDelay)
+        try container.encode(correctionSensitivity, forKey: .correctionSensitivity)
+        try container.encode(showsSuggestions, forKey: .showsSuggestions)
+        try container.encode(modeIndicatorDuration, forKey: .modeIndicatorDuration)
+        try container.encode(customThemes, forKey: .customThemes)
+        try container.encodeIfPresent(customThemeID, forKey: .customThemeID)
+        try container.encode(terminalCommands, forKey: .terminalCommands)
         try container.encode(typoCorrection, forKey: .typoCorrection)
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
         try container.encode(initialFocus, forKey: .initialFocus)

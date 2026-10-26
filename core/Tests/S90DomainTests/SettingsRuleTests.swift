@@ -340,3 +340,55 @@ struct KeyBindingsTests {
         #expect(filled.strokes(for: .extendSegment) == KeyBindings.standard.strokes(for: .extendSegment))
     }
 }
+
+@Suite("除外設定の CSV")
+struct ProfileRuleCSVTests {
+    @Test("「アプリの ID,扱い」の行を読む．扱いは英語の値と画面の名前のどちらでもよく，形の誤った行は読み飛ばす")
+    func parse() {
+        let text = """
+        app_id,mode
+        # コメント
+        com.apple.Terminal,terminal
+        com.example.Game, IME を使わない
+        com.example.Editor,記号を半角
+        bad id with space,terminal
+        com.example.Unknown,なにか
+        com.apple.Terminal,direct
+        """
+        #expect(ProfileRuleCSV.parse(text) == [
+            ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .terminal),
+            ProfileRule(applicationPrefix: "com.example.Game", profile: .direct),
+            ProfileRule(applicationPrefix: "com.example.Editor", profile: .programming),
+        ])
+    }
+}
+
+@Suite("カスタムテーマと設定の範囲")
+struct CustomThemeTests {
+    @Test("色は #RRGGBB の形で読み書きする")
+    func hexColor() {
+        #expect(HexColor("#FF6600") == HexColor(red: 255, green: 102, blue: 0))
+        #expect(HexColor("ff6600")?.hex == "#FF6600")
+        #expect(HexColor("#FF66") == nil)
+        #expect(HexColor("#GG6600") == nil)
+    }
+
+    @Test("使っているテーマが無くなったら既成のテーマに戻す")
+    func missingActiveTheme() {
+        var settings = Settings()
+        settings.customThemeID = "gone"
+        settings.clampToValidRanges()
+        #expect(settings.customThemeID == nil)
+        #expect(settings.activeCustomTheme == nil)
+    }
+
+    @Test("打ち間違いを直す基準で，直す差と示す差が変わる")
+    func sensitivity() {
+        let typed = ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0)
+        let fixed = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -6.5, cost: 2)
+        #expect(ReadingCorrectionRule(level: .standard, sensitivity: .standard).decision(among: [fixed, typed], reading: "よう") == .suggest(fixed))
+        #expect(ReadingCorrectionRule(level: .standard, sensitivity: .aggressive).decision(among: [fixed, typed], reading: "よう") == .apply(fixed))
+        #expect(ReadingCorrectionRule(level: .standard, sensitivity: .cautious).decision(among: [fixed, typed], reading: "よう") == nil)
+        #expect(ReadingCorrectionRule(level: .standard, suggests: false).decision(among: [fixed, typed], reading: "よう") == nil)
+    }
+}

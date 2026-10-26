@@ -159,7 +159,8 @@ final class ReadingCorrector {
             candidates += converter.typoCorrections(forKeys: variant).map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
         }
         candidates.sort { $0.score > $1.score }
-        let decision = ReadingCorrectionRule(level: settings.current.typoCorrection).decision(among: candidates, reading: reading)
+        let decision = ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,
+                                             suggests: settings.current.showsSuggestions).decision(among: candidates, reading: reading)
         lastReview = (keys, decision)
         return decision
     }

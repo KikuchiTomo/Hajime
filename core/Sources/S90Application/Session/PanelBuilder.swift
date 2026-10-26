@@ -14,11 +14,11 @@ enum PanelBuilder {
     /// 直さずに示すときの案内．corrected は直した文
     static func readingSuggestionNote(_ corrected: String) -> String { "もしかして「\(corrected)」　Tab で直す" }
 
-    static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool) -> CandidatePanel {
+    static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool,
+                          perPage: Int = DefaultSettings.candidatesPerPage) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
             : []
-        let perPage = DefaultSettings.candidatesPerPage
         let focusedIndex: Int
         let selectedVariant: Int?
         switch selection.focus {
@@ -47,8 +47,7 @@ enum PanelBuilder {
         )
     }
 
-    static func latticePanel(for lattice: SegmentLattice) -> LatticePanel {
-        let perSegment = DefaultSettings.latticeCandidatesPerSegment
+    static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment) -> LatticePanel {
         var position = 1
         var total = 0
         let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in

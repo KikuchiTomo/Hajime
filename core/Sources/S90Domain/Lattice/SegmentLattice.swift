@@ -115,9 +115,10 @@ public struct SegmentLattice: Sendable, Equatable {
         segments[focusedIndex] = segment
     }
 
-    /// 注目している文節の変換の候補を番号で選ぶ．範囲の外なら false
-    public mutating func select(number: Int) -> Bool {
-        let index = number - 1
+    /// 注目している文節の変換の候補を番号で選ぶ．番号は今見えているページの中の順番(perPage 件ずつのページ)．範囲の外なら false
+    public mutating func select(number: Int, perPage: Int = DefaultSettings.latticeCandidatesPerSegment) -> Bool {
+        let current: Int = if case .candidate(let value) = segments[focusedIndex].choice { value } else { 0 }
+        let index = current / perPage * perPage + number - 1
         guard segments[focusedIndex].candidates.indices.contains(index) else { return false }
         segments[focusedIndex].choice = .candidate(index)
         segments[focusedIndex].isDecided = true
