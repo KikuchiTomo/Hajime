@@ -153,6 +153,8 @@ public struct LatticePanel: Sendable, Equatable {
         public var longer: String?
         /// 選んでいる候補の使い分けや誤用の注釈(R-08)
         public var usageNote: String?
+        /// 下の枝の候補ごとの添え書き(alternatives と同じ数)．打ったままの候補は「入力のまま」，直した候補は「修正」
+        public var alternativeNotes: [String?] = []
 
         public init(text: String, alternatives: [String] = [], selectedAlternative: Int? = nil, variants: [String] = [], selectedVariant: Int? = nil,
                     isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil, shorter: String? = nil, longer: String? = nil) {

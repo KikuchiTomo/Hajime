@@ -926,6 +926,33 @@ struct ReadingCorrectionScenarioTests {
         #expect(marked == "よいです")
     }
 
+    @Test("R-02: 「もしかして」のとき分岐図を開くと，その文節に直した候補を「修正」の印付きで出し，選べばその文節だけ直る")
+    func suggestionInLattice() {
+        let converter = FakeConverter(["きょうはようです": [("今日は様です", nil)], "ようです": [("様です", nil)], "よいです": [("良いです", nil)]])
+        converter.words["きょうはようです"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "は", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "様です", readingCount: 4),
+        ]
+        converter.corrections["kyouhayoudesu"] = [
+            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -7, cost: 2),
+            ReadingCorrection(keys: "kyouhayoudesu", reading: "キョウハヨウデス", score: -9, cost: 0),
+        ]
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .end
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyouhayoudesu")
+        harness.settle()
+        #expect(harness.note?.contains("もしかして") == true)
+        harness.press(.space)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.text == "様です")
+        #expect(column?.alternatives.prefix(2) == ["様です", "良いです"])
+        #expect(column?.alternativeNotes.prefix(2) == [nil, "修正"])
+        harness.press(.character("2"))
+        harness.press(.enter)
+        #expect(harness.committed.hasSuffix("良いです"))
+    }
+
     @Test("差が中くらいなら直さずに「もしかして」と示し，Tab で直す")
     func suggestion() {
         let converter = FakeConverter()
