@@ -75,7 +75,9 @@ enum Evaluation {
     /// 打ち間違いの補正を評価する．1 行は「打ったキー<TAB>直したあとの文(直さないのが正しければ =)」．
     /// 「=」のあとに文を書いたときは，直さずにその文を見せれば正しい(英語の混ざる文．「=pythonがすごい」)．
     /// ライブ変換で打鍵が止まったときと同じに見直し，直した(点線)・示した(「もしかして」)・何もしない，のどれになったかを数える
-    static func typo(file: String, engine: AzooKeyConverterEngine) throws {
+    /// 打ち間違いの補正を，アプリと同じ道筋(打つ → 止まる → 別の変換器で訂正を求める → 見直す)で測る．
+    /// service が無い(Zenzai なし)ときは訂正を求めずに見直す
+    static func typo(file: String, engine: AzooKeyConverterEngine, service: ZenzaiTypoService?) throws {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
         let clock = ContinuousClock()
         var counts: [String: Int] = [:]
@@ -84,16 +86,21 @@ enum Evaluation {
             let columns = line.split(separator: "\t").map(String.init)
             guard columns.count == 2 else { continue }
             let store = StaticSettings(DefaultSettings.settings)
-            let session = InputSession(converter: engine.makeSession(), lexicon: WordListLexicon(), settings: store)
+            let session = InputSession(converter: engine.makeSession(), lexicon: WordListLexicon(), settings: store, typoService: service)
             for key in columns[0] { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
             var marked = MarkedText.empty
             var note: String?
-            durations.append(clock.measure {
-                for action in session.settle(context: InputContext()) + session.review(context: InputContext()) {
-                    if case .setMarkedText(let text) = action { marked = text }
-                    if case .showNote(let text) = action { note = text }
-                }
-            })
+            let start = clock.now
+            var actions = session.settle(context: InputContext())
+            if let service, let request = session.correctionRequest {
+                session.provideCorrections(waitFor { await service.corrections(forKeys: request.keys, leftContext: request.leftContext) })
+            }
+            actions += session.review(context: InputContext())
+            durations.append(clock.now - start)
+            for action in actions {
+                if case .setMarkedText(let text) = action { marked = text }
+                if case .showNote(let text) = action { note = text }
+            }
             let applied = marked.segments.contains { $0.style == .correction }
             let suggested = note?.hasPrefix("もしかして") == true
             let outcome: String
@@ -190,5 +197,23 @@ enum Evaluation {
 
     private static func contextNote(_ item: EvaluationCase) -> String {
         item.leftContext.map { "(文脈: \($0))" } ?? ""
+    }
+}
+
+/// 非同期の処理を，メインのランループを回しながら待つ(試す道具の入り口は同期で動くため)
+@MainActor
+func waitFor<T: Sendable>(_ operation: @escaping @Sendable () async -> T) -> T {
+    let box = ResultBox<T>()
+    Task.detached { box.value = await operation() }
+    while box.value == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    return box.value!
+}
+
+private final class ResultBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: T?
+    var value: T? {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }

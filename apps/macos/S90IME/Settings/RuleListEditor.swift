@@ -34,7 +34,7 @@ struct RuleListEditor: View {
         var value: String?
         var keyPrompt: String?
         var valuePrompt: String?
-        /// 一覧が空のときの見出しと説明
+        /// 一覧が空のときに表の中に出す文
         var empty: String
     }
 
@@ -195,31 +195,34 @@ struct RuleListEditor: View {
         .width(min: 120, ideal: 240)
     }
 
-    /// 表に共通の操作(ダブルクリックで編集，右クリック，Delete キーで削除，空のときの案内)
+    /// 表に共通の操作(ダブルクリックで編集，右クリック，Delete キーで削除，空のときの案内)．
+    /// Form の中でも表の中でスクロールできるよう，FormTableHost に入れる
     private func decorated(_ table: some View) -> some View {
-        table
-            .contextMenu(forSelectionType: RuleItem.ID.self) { ids in
-                let picked = items.filter { ids.contains($0.id) }
-                if picked.count == 1, let item = picked.first {
-                    Button(UIStrings.RuleList.edit) { edit(item) }
+        FormTableHost {
+            table
+                .contextMenu(forSelectionType: RuleItem.ID.self) { ids in
+                    let picked = items.filter { ids.contains($0.id) }
+                    if picked.count == 1, let item = picked.first {
+                        Button(UIStrings.RuleList.edit) { edit(item) }
+                    }
+                    if !picked.filter({ $0.removal != .none }).isEmpty {
+                        Button(removeTitle(for: picked)) { removeItems(picked) }
+                    }
+                } primaryAction: { ids in
+                    if ids.count == 1, let item = items.first(where: { ids.contains($0.id) }) { edit(item) }
                 }
-                if !picked.filter({ $0.removal != .none }).isEmpty {
-                    Button(removeTitle(for: picked)) { removeItems(picked) }
-                }
-            } primaryAction: { ids in
-                if ids.count == 1, let item = items.first(where: { ids.contains($0.id) }) { edit(item) }
-            }
-            .onDeleteCommand { removeItems(items.filter { selection.contains($0.id) }) }
-            .overlay { emptyState }
-            .frame(height: tableHeight)
+                .onDeleteCommand { removeItems(items.filter { selection.contains($0.id) }) }
+                .overlay { emptyState }
+        }
+        .frame(height: tableHeight)
     }
 
     @ViewBuilder
     private var emptyState: some View {
         if items.isEmpty {
-            ContentUnavailableView(labels.empty, systemImage: "list.bullet.rectangle")
+            EmptyListLabel(text: labels.empty)
         } else if shownItems.isEmpty {
-            ContentUnavailableView.search(text: query)
+            EmptyListLabel(text: UIStrings.RuleList.noMatches)
         }
     }
 

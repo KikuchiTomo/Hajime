@@ -13,6 +13,17 @@ final class EnglishWordCorrector {
         var kanaStart: Int
         var keys: String
         var word: String
+        /// 辞書に無い綴りを似た英単語に直したもの(「pthon」→「python」)．ローマ字として読めない並びはこれになりやすいので，
+        /// 日本語の打ち間違い(「tkitou」→ 適当)と取り合ったら日本語に譲る
+        var isMisspelling = false
+    }
+
+    /// 綴りを直した英単語を，日本語の打ち間違いの見直しにかけるか．ローマ字として読めない並びは綴りの誤りにも
+    /// 日本語の打ち間違い(tkitou → 適当)にも見えるので，日本語として直せるなら日本語に譲る
+    func yieldsToJapanese(in composition: Composition) -> Bool {
+        guard let active, active.isMisspelling else { return false }
+        let following = KanaWidth.hiragana(from: followingReading(in: composition).conversionReading)
+        return following.isEmpty || !TypoCorrectionRule.startsLikeFollowingEnglish(following)
     }
 
     /// 英単語のあとにローマ字を打ったときの扱い
@@ -84,7 +95,7 @@ final class EnglishWordCorrector {
         // 3. 綴りの誤りは，いちばん短い部分だけで探す．長い部分で探すと前の日本語まで英単語に飲み込む
         if let tail = tails.last,
             let word = rule.correction(for: tail.keys, isWord: false, suggestions: lexicon.suggestions(for: tail.keys)) {
-            active = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word)
+            active = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word, isMisspelling: true)
             return
         }
         active = nil
@@ -166,6 +177,11 @@ final class EnglishWordCorrector {
             return .reevaluate
         }
         if following.pending.isEmpty, !following.kana.isEmpty {
+            // 綴りを直した英単語のあとが，英単語に続く語(「が」「を」「です」)で始まらなければ確定させない．
+            // 日本語の打ち間違い(tkitou → 適当)かもしれないので，打鍵が止まったときの見直し(yieldsToJapanese)で決める
+            if current.isMisspelling, !TypoCorrectionRule.startsLikeFollowingEnglish(KanaWidth.hiragana(from: following.conversionReading)) {
+                return .waiting
+            }
             commit(into: &composition)
             return .reevaluate
         }
