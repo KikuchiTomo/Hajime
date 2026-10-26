@@ -282,6 +282,8 @@ pub mod keys {
         ("openSettings", "設定を開く"),
         ("toggleLiveConversion", "ライブ変換の切り替え"),
         ("handwriting", "手書き入力"),
+        ("reconvert", "再変換"),
+        ("associate", "連想変換"),
     ];
 }
 

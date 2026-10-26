@@ -278,6 +278,15 @@
               "type": "InputMode"
             }
           ]
+        },
+        {
+          "name": "requestReconversion",
+          "fields": [
+            {
+              "name": "maximumLength",
+              "type": "u32"
+            }
+          ]
         }
       ]
     },
@@ -693,6 +702,27 @@
             {
               "name": "session",
               "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
+          "name": "reconvert",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "reading",
+              "type": "string?"
             },
             {
               "name": "context",

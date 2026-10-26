@@ -249,6 +249,9 @@ public struct RoutedActions: Sendable, Equatable {
             case .awaitCorrections:
                 // 訂正を別のところで求める作り(typoService)のときだけ出る．エンジンのプロセスはその作りを使わないので来ない
                 break
+            case .requestReconversion:
+                // 入力先の選んでいる文字は DLL が読むので，読んで reconvert で送ってもらう
+                edits.append(.requestReconversion(maximumLength: UInt32(DefaultSettings.maximumReconversionLength)))
             case .openSettings:
                 host.append(.openSettings)
             case .toggleLiveConversion:

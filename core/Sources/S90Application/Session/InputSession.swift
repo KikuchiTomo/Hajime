@@ -60,6 +60,8 @@ public final class InputSession {
     private var splitMode = false
     /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
     private var convertedFromEnglish: String?
+    /// 再変換している元の文字．Esc で読みに戻さず，この文字のまま確定して元に戻す
+    private var reconverting: String?
     /// 組み立てを始めたときの，入力位置の前の文字列(打ち間違いの訂正の手がかり)
     private var compositionLeftContext: String?
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
@@ -402,6 +404,10 @@ public final class InputSession {
         case .insertFullwidthSpace: return insertSpace(.fullwidth, event: event, context: context)
         // 入力中
         case .convert: return convert(withoutLearning: false, context: context)
+        case .reconvert:
+            // 組み立て中は効かない(表は入力文字なしの状態に置く)．入力先の選んでいる文字はアプリ側が読む
+            guard !isComposing else { return .passThrough }
+            return KeyResult(handled: true, actions: [.requestReconversion])
         case .convertWithoutLearning: return convert(withoutLearning: true, context: context)
         case .deleteBackward: return handleBackspace(context: context)
         case .insertBoundary:
@@ -842,6 +848,10 @@ public final class InputSession {
             guard settings.current.escapeSwitchesToDirect else { return .passThrough }
             return switchToDirectPassingEscape(actions: [])
         }
+        if let original = reconverting {
+            // 再変換をやめたら，選んでいた元の文字に戻す
+            return KeyResult(handled: true, actions: reset() + [.commit(original)])
+        }
         let wasConverting = phase != .composing
         if wasConverting, let english = convertedFromEnglish, let handler = styleHandlers[settings.current.inputStyle] as? EnglishInput {
             // 英字入力の Tab で開いた分岐図は，Esc で英字に戻す
@@ -931,6 +941,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         convertedFromEnglish = nil
+        reconverting = nil
         forcedBoundaries = []
         splitMode = false
         composition = newComposition()
@@ -1465,6 +1476,23 @@ public final class InputSession {
         lattice.focusedIndex = next
         phase = .lattice(lattice)
         return render(context: context)
+    }
+
+    /// 再変換．入力先で選んでいる確定済みの文字(text)を読みに戻して変換し，分岐図か一覧を出す．
+    /// 読み(reading)はアプリ側が OS の機能で求めて渡す．渡されなければ transcriber で求める．
+    /// 読みが求められない・長すぎる・組み立て中なら何もしない．Esc で元の文字に戻す(reconverting)
+    public func reconvert(_ text: String, reading given: String? = nil, transcriber: (any ReadingTranscribing)? = nil,
+                          context: InputContext) -> [ClientAction] {
+        guard !isComposing, !text.isEmpty, text.count <= DefaultSettings.maximumReconversionLength else { return [] }
+        let reading = KanaWidth.hiragana(from: given ?? transcriber?.reading(of: text) ?? "")
+        guard !reading.isEmpty, reading.count <= DefaultSettings.maximumReconversionLength,
+              reading.unicodeScalars.allSatisfy({ (0x3041...0x3096).contains($0.value) || $0 == "ー" }) else { return [] }
+        composition = newComposition()
+        composition.insertKana(reading)
+        let result = convert(withoutLearning: false, context: context)
+        // 変換に入れなかった(読みのまま)ときも，Esc で元の文字に戻せるようにする
+        reconverting = text
+        return result.actions
     }
 
     /// 候補の窓をマウスで押した．キーで同じことをしたときと同じに動く:

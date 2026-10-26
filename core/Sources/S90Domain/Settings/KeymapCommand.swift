@@ -54,6 +54,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case insertBoundary
     /// 「もしかして」と示した読みに直す
     case acceptSuggestion
+    /// 再変換．入力先で選んでいる確定済みの文字を読みに戻し，変換し直す．Esc で元の文字に戻す
+    case reconvert
 
     // 字種
     case toHiragana
@@ -135,7 +137,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
              .cancelAndDirectMode: .mode
         case .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: .characters
-        case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: .composing
+        case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .reconvert: .composing
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType: .scripts
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
@@ -162,7 +164,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .commitFirstSegment, .backToReading,
              .forgetCandidate: [.converting]
-        case .forgetLastCommit: [.idle]
+        case .forgetLastCommit, .reconvert: [.idle]
         }
     }
 

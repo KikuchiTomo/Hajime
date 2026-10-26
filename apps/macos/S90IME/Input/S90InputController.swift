@@ -46,6 +46,9 @@ final class S90InputController: IMKInputController {
         let result = session.handle(key, context: context)
         presenter.context = context
         presenter.apply(result.actions, to: client)
+        if result.actions.contains(.requestReconversion) {
+            reconvert(client: client, context: context)
+        }
         if result.actions.contains(.awaitCorrections) {
             convertAfterCorrections(client: client, context: context)
         } else {
@@ -158,6 +161,19 @@ final class S90InputController: IMKInputController {
     override func menu() -> NSMenu! {
         menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), handwriting: #selector(openHandwriting(_:)),
                                         openSettings: #selector(showPreferences(_:))))
+    }
+
+    /// 再変換．入力先で選んでいる文字を読み，読みに戻して変換する．選んでいなければ何もしない．
+    /// 最初に出す組み立て中の文字で選んでいた文字を置き換え，Esc なら元の文字を入れ直す
+    @MainActor
+    private func reconvert(client: any IMKTextInput, context: InputContext) {
+        let selection = client.selectedRange()
+        guard selection.location != NSNotFound, selection.length > 0, selection.length <= DefaultSettings.maximumReconversionLength,
+              let text = client.attributedSubstring(from: selection)?.string else { return }
+        let actions = session.reconvert(text, transcriber: root.transcriber, context: context)
+        guard !actions.isEmpty else { return }
+        presenter.replacement = selection
+        presenter.apply(actions, to: client)
     }
 
     /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く

@@ -31,6 +31,8 @@ final class CompositionRoot {
 
     /// 打ち間違いの訂正を別に求めるもの．Zenzai が無ければ nil
     let typoService: ZenzaiTypoService?
+    /// 再変換で確定済みの文字の読みを求める(OS の日本語の解析)
+    let transcriber = SystemReadingTranscriber()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
                  dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {

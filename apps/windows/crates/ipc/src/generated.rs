@@ -244,6 +244,10 @@ pub enum EditOperation {
     SelectMode {
         mode: InputMode,
     },
+    RequestReconversion {
+        #[serde(rename = "maximumLength")]
+        maximum_length: u32,
+    },
 }
 
 impl fmt::Debug for EditOperation {
@@ -260,6 +264,10 @@ impl fmt::Debug for EditOperation {
             Self::SelectMode { mode, .. } => f
                 .debug_struct("SelectMode")
                 .field("mode", mode)
+                .finish(),
+            Self::RequestReconversion { maximum_length, .. } => f
+                .debug_struct("RequestReconversion")
+                .field("maximumLength", maximum_length)
                 .finish(),
         }
     }
@@ -615,6 +623,13 @@ pub enum RequestBody {
         session: u32,
         context: FieldContext,
     },
+    Reconvert {
+        session: u32,
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reading: Option<String>,
+        context: FieldContext,
+    },
     Caret {
         session: u32,
         rect: Rect,
@@ -757,6 +772,13 @@ impl fmt::Debug for RequestBody {
             Self::OpenHandwriting { session, context, .. } => f
                 .debug_struct("OpenHandwriting")
                 .field("session", session)
+                .field("context", context)
+                .finish(),
+            Self::Reconvert { session, context, .. } => f
+                .debug_struct("Reconvert")
+                .field("session", session)
+                .field("text", &REDACTED)
+                .field("reading", &REDACTED)
                 .field("context", context)
                 .finish(),
             Self::Caret { session, rect, .. } => f

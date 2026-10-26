@@ -26,9 +26,9 @@ enum AssociationKeyUpgrade {
 
     private static let controlTab = KeyStroke(.tab, control: true)
 
-    /// バージョン 4 までの標準の表．今の標準の表から連想変換の行を除き，入力中の Shift+Space を 変換 に戻したもの
+    /// バージョン 4 までの標準の表．今の標準の表から連想変換の行とあとで足した行(再変換)を除き，入力中の Shift+Space を 変換 に戻したもの
     static var previousStandard: Keymap {
-        Keymap(KeymapPreset.standard.keymap.entries.compactMap { entry in
+        Keymap(ReconversionKeyUpgrade.previousStandard.entries.compactMap { entry in
             guard entry.command == .associate else { return entry }
             return entry.state == .composing && entry.stroke == KeyStroke(.space, shift: true) ? KeymapEntry(.composing, entry.stroke, .convert) : nil
         })

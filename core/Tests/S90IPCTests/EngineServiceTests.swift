@@ -459,6 +459,33 @@ struct EngineServiceTests {
         #expect(operations.contains { if case .commit = $0 { true } else { false } })
     }
 
+    @Test("再変換のキーで DLL に選んでいる文字を読ませ，送られた文字と読みで変換し直す")
+    func reconversion() throws {
+        let id = greeted()
+        let session = try open(id)
+        guard case .edit(true, let operations, _) = press(.henkan, session: session, from: id) else {
+            Issue.record("再変換のキーを受けない")
+            return
+        }
+        #expect(operations.contains(.requestReconversion(maximumLength: UInt32(DefaultSettings.maximumReconversionLength))))
+        sent.value.removeAll()
+        guard case .edit(true, _, let state) = service.handle(
+            WireRequest(id: 80, body: .reconvert(session: session, text: "変換", reading: "へんかん", context: Self.field)), from: id).body else {
+            Issue.record("再変換の要求に edit で答えない")
+            return
+        }
+        #expect(state.isComposing)
+        #expect(sent.value.contains { if case .showBranchMap = $0 { true } else if case .showCandidates = $0 { true } else { false } })
+        // 読みが無ければ何もしない
+        let other = try open(id)
+        guard case .edit(_, let none, let idle) = service.handle(
+            WireRequest(id: 81, body: .reconvert(session: other, text: "変換", reading: nil, context: Self.field)), from: id).body else {
+            Issue.record("再変換の要求に答えない")
+            return
+        }
+        #expect(none.isEmpty && !idle.isComposing)
+    }
+
     @Test("手書きの窓を開き，選んだ文字を開いたセッションの wake で確定する")
     func handwriting() throws {
         try settings.update { $0.handwriting = true }

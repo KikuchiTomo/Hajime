@@ -30,6 +30,8 @@ final class ClientActionPresenter {
 
     /// 最後にキーを受けたときの入力先の文脈．候補をマウスで押したときも同じ文脈で処理する
     var context = InputContext()
+    /// 次に組み立て中の文字を出すか確定するときに置き換える入力先の範囲(再変換で選んでいた文字)．1 回使ったら消す
+    var replacement: NSRange?
 
     func apply(_ actions: [ClientAction], to client: any IMKTextInput) {
         // 候補をマウスで押したら，キーで選んだのと同じに処理して入力先に反映する
@@ -40,10 +42,10 @@ final class ClientActionPresenter {
         for action in actions {
             switch action {
             case .commit(let text):
-                client.insertText(text, replacementRange: Self.noReplacement)
+                client.insertText(text, replacementRange: takeReplacement())
             case .setMarkedText(let marked):
                 let attributed = Self.attributedString(for: marked)
-                client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: Self.noReplacement)
+                client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: takeReplacement())
             case .showCandidates(let panel):
                 note.hide()
                 candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
@@ -55,6 +57,9 @@ final class ClientActionPresenter {
             case .hideCandidates:
                 candidatePanel.hide()
                 note.hide()
+            case .requestReconversion:
+                // 入力コントローラが入力先の選んでいる文字を読んで再変換する(S90InputController.reconvert)
+                break
             case .awaitCorrections:
                 // 入力コントローラが訂正を求めてから変換を続ける(S90InputController.convertAfterCorrections)
                 break
@@ -103,6 +108,11 @@ final class ClientActionPresenter {
     }
 
     private static let noReplacement = NSRange(location: NSNotFound, length: 0)
+
+    private func takeReplacement() -> NSRange {
+        defer { replacement = nil }
+        return replacement ?? Self.noReplacement
+    }
 
     private func caretRect(of client: any IMKTextInput) -> NSRect {
         var rect = NSRect.zero

@@ -154,11 +154,12 @@ struct EnglishAutoScenarioTests {
     @Test("R-17: キー設定の表で，入力方式を決めて切り替えるコマンドを割り当てられる(英数のときは日本語にしてから)")
     func styleCommand() {
         var settings = DefaultSettings.settings
-        settings.keymap.entries.append(KeymapEntry(.anywhere, KeyStroke(.henkan), .englishAutoStyle))
+        // どの状態にも割り当てていないキー(F12)に入力方式のコマンドを置く
+        settings.keymap.entries.append(KeymapEntry(.anywhere, KeyStroke(.function(12)), .englishAutoStyle))
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
-        #expect(session.handle(KeyEvent(.henkan), context: InputContext()).actions.contains(.selectInputStyle(.englishAuto)))
+        #expect(session.handle(KeyEvent(.function(12)), context: InputContext()).actions.contains(.selectInputStyle(.englishAuto)))
         _ = session.setMode(.direct)
-        let actions = session.handle(KeyEvent(.henkan), context: InputContext()).actions
+        let actions = session.handle(KeyEvent(.function(12)), context: InputContext()).actions
         #expect(actions.contains(.selectMode(.japanese)))
         #expect(actions.contains(.selectInputStyle(.englishAuto)))
         #expect(KeymapCommand.allCases.compactMap(\.inputStyle) == InputStyle.allCases)
