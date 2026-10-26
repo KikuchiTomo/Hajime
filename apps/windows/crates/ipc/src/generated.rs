@@ -267,6 +267,34 @@ pub enum ErrorCode {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SettingsSnapshot {
+    pub theme: String,
+    #[serde(rename = "inputStyle")]
+    pub input_style: String,
+    #[serde(rename = "liveConversion")]
+    pub live_conversion: bool,
+    #[serde(rename = "showsModeIndicator")]
+    pub shows_mode_indicator: bool,
+    #[serde(rename = "showsKeyHints")]
+    pub shows_key_hints: bool,
+    #[serde(rename = "candidateFontSize")]
+    pub candidate_font_size: f64,
+}
+
+impl fmt::Debug for SettingsSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SettingsSnapshot")
+            .field("theme", &REDACTED)
+            .field("inputStyle", &REDACTED)
+            .field("liveConversion", &self.live_conversion)
+            .field("showsModeIndicator", &self.shows_mode_indicator)
+            .field("showsKeyHints", &self.shows_key_hints)
+            .field("candidateFontSize", &self.candidate_font_size)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum RequestBody {
     Hello {
@@ -296,6 +324,10 @@ pub enum RequestBody {
     Caret {
         session: u32,
         rect: Rect,
+    },
+    ReadSettings,
+    WriteSettings {
+        settings: SettingsSnapshot,
     },
 }
 
@@ -336,6 +368,11 @@ impl fmt::Debug for RequestBody {
                 .field("session", session)
                 .field("rect", rect)
                 .finish(),
+            Self::ReadSettings => f.write_str("ReadSettings"),
+            Self::WriteSettings { settings, .. } => f
+                .debug_struct("WriteSettings")
+                .field("settings", settings)
+                .finish(),
         }
     }
 }
@@ -372,6 +409,9 @@ pub enum ResponseBody {
         state: SessionState,
     },
     Done,
+    Settings {
+        settings: SettingsSnapshot,
+    },
     Error {
         code: ErrorCode,
     },
@@ -396,6 +436,10 @@ impl fmt::Debug for ResponseBody {
                 .field("state", state)
                 .finish(),
             Self::Done => f.write_str("Done"),
+            Self::Settings { settings, .. } => f
+                .debug_struct("Settings")
+                .field("settings", settings)
+                .finish(),
             Self::Error { code, .. } => f
                 .debug_struct("Error")
                 .field("code", code)

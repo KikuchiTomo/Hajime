@@ -13,6 +13,13 @@ public enum DefaultSettings {
         "io.alacritty",
         "org.alacritty",
         "com.github.wez.wezterm",
+        "windowsterminal.exe",
+        "cmd.exe",
+        "powershell.exe",
+        "pwsh.exe",
+        "conhost.exe",
+        "wezterm-gui.exe",
+        "alacritty.exe",
     ].map { ProfileRule(applicationPrefix: $0, profile: .terminal) }
 
     public static let programmingRules: [ProfileRule] = [
@@ -25,6 +32,17 @@ public enum DefaultSettings {
         "com.sublimetext.",
         "org.vim.MacVim",
         "com.panic.Nova",
+        "code.exe",
+        "cursor.exe",
+        "devenv.exe",
+        "idea64.exe",
+        "pycharm64.exe",
+        "rider64.exe",
+        "clion64.exe",
+        "webstorm64.exe",
+        "goland64.exe",
+        "zed.exe",
+        "sublime_text.exe",
     ].map { ProfileRule(applicationPrefix: $0, profile: .programming) }
 
     /// 候補一覧に一度に出す数．番号キーの 1〜9 に対応させる

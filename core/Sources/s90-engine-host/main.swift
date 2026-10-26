@@ -29,6 +29,37 @@ enum HostPaths {
 }
 
 @MainActor
+final class SettingsWatcher {
+    private static let interval = DispatchTimeInterval.seconds(2)
+    private let settings: FileSettingsStore
+    private let url: URL
+    private var last: Date?
+    private let timer = DispatchSource.makeTimerSource(queue: .main)
+
+    init(settings: FileSettingsStore, url: URL) {
+        self.settings = settings
+        self.url = url
+        self.last = Self.modificationDate(of: url)
+        timer.schedule(deadline: .now() + Self.interval, repeating: Self.interval)
+        timer.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.check() }
+        }
+        timer.resume()
+    }
+
+    private func check() {
+        let date = Self.modificationDate(of: url)
+        guard date != last else { return }
+        last = date
+        settings.reload()
+    }
+
+    private static func modificationDate(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+}
+
+@MainActor
 func run() -> Int32 {
     let engineListener: NamedPipeListener
     let windowListener: NamedPipeListener
@@ -81,6 +112,7 @@ func run() -> Int32 {
         window.send(.setPresentation(presentation: service.presentation))
     }
     engine.warmUp()
+    let watcher = SettingsWatcher(settings: settings, url: HostPaths.roaming.appendingPathComponent("settings.json"))
 
     let presentation = service.presentation
     let candidateWindow = HostPaths.installation.appendingPathComponent("s90-candidate-ui.exe")
@@ -93,12 +125,10 @@ func run() -> Int32 {
         process.executableURL = candidateWindow
         try? process.run()
     }
-    return -1
+    withExtendedLifetime(watcher) { dispatchMain() }
 }
 
-let status = MainActor.assumeIsolated { run() }
-if status >= 0 { exit(status) }
-dispatchMain()
+exit(MainActor.assumeIsolated { run() })
 #else
 import Foundation
 

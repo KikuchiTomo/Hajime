@@ -112,7 +112,31 @@ public final class EngineService {
             lastAnchor = rect
             ui(.move(anchor: rect))
             return .done
+        case .readSettings:
+            return .settings(settings: snapshot)
+        case .writeSettings(let wanted):
+            do {
+                try settings.update { current in
+                    if let theme = ThemePreference(rawValue: wanted.theme) { current.theme = theme }
+                    if let style = InputStyle(rawValue: wanted.inputStyle) { current.inputStyle = style }
+                    current.liveConversion = wanted.liveConversion
+                    current.showsModeIndicator = wanted.showsModeIndicator
+                    current.showsKeyHints = wanted.showsKeyHints
+                    current.candidateFontSize = wanted.candidateFontSize
+                    current.clampToValidRanges()
+                }
+            } catch {
+                return .error(code: .malformed)
+            }
+            return .settings(settings: snapshot)
         }
+    }
+
+    public var snapshot: WireSettingsSnapshot {
+        let current = settings.current
+        return WireSettingsSnapshot(theme: current.theme.rawValue, inputStyle: current.inputStyle.rawValue, liveConversion: current.liveConversion,
+                                    showsModeIndicator: current.showsModeIndicator, showsKeyHints: current.showsKeyHints,
+                                    candidateFontSize: current.candidateFontSize)
     }
 
     private func owned(_ session: UInt32, by id: ConnectionID) -> Session? {
