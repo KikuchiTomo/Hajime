@@ -21,7 +21,7 @@ test:
 	swift test --package-path core -c release --filter LatencyProbeTests
 
 build-macos:
-	cd apps/macos && xcodegen generate --quiet && xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration Release -derivedDataPath build build -quiet
+	cd apps/macos && xcodegen generate --quiet && xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration Release -destination "generic/platform=macOS" -derivedDataPath build build -quiet
 
 # 配布物(.pkg)を作る．署名と公証は使える証明書と設定があるときだけ(tools/macos/package.sh)
 package-macos:

@@ -55,7 +55,7 @@ xcodegen generate --quiet
 work="build/package"
 rm -rf "$work"
 mkdir -p "$work/root" "$work/scripts" build/dist
-xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -derivedDataPath build build -quiet
+xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet
 # 拡張属性(._ のファイル)を配布物に入れない
 ditto --norsrc --noextattr "build/Build/Products/$configuration/$app_name.app" "$work/root/$app_name.app"
 app="$work/root/$app_name.app"

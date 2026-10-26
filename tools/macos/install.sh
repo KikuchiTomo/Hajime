@@ -27,7 +27,7 @@ xcodegen generate --quiet
 # 入力メニューに出す名前を変えるときは S90_NAME に入れる(make install-macos NAME=…)
 set --
 [ -n "${S90_NAME:-}" ] && set -- S90_DISPLAY_NAME="$S90_NAME"
-xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -derivedDataPath build build -quiet "$@"
+xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet "$@"
 built="build/Build/Products/$configuration/$app_name.app"
 if [ "$identity" != "-" ]; then
   # ビルドはアドホック署名で行い，できたアプリだけを証明書で署名し直す．
@@ -44,6 +44,9 @@ sudo rm -rf "$destination/$app_name.app"
 sudo cp -R "$built" "$destination/"
 sudo chown -R root:wheel "$destination/$app_name.app"
 swift "$root/tools/macos/input_source.swift" enable "$destination/$app_name.app"
+# 入力メニューは TextInputMenuAgent が描き，起動したときのアイコンと名前を持ち続ける．入れ直したアイコンと名前を出すため起動し直す
+# (launchd がすぐに起動し直す．止めても入力には影響しない)
+killall TextInputMenuAgent 2>/dev/null || true
 echo "入れました: $destination/$app_name.app"
-echo "初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース で「${app_name}」を足してください"
+echo "初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース で「${S90_NAME:-$display_name}」を足してください"
 echo "2 回目からは入れ直すだけで，次にキーを打ったときに新しい版が動きます"
