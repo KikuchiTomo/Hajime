@@ -198,6 +198,7 @@ Space で変換すると，文を幹とした分岐図を出します(ADR 0007)�
 - 本番は角丸の面を塗り，字(「あ」「A」)を抜く．右下の角だけ丸めず，分岐図の幹から枝が出る角に見立てる
 - 開発版は面を塗らずに 1 ドットの枠だけにし，字を塗る．本番と並べたときに見分けるため
 - 枠はピクセルにそろえ(16pt の中の 14×12)，1x(16px)と 2x(32px)を 1 つの tiff に入れる
+- 字は面より小さめ(「あ」9.5pt，「A」10pt)にして，面の縁とのあいだに余白をとる
 - 作り方: `swift tools/icons/make_input_icons.swift apps/macos/S90IME/Resources design/mockups`．見本(ライトとダーク，8 倍の拡大と実寸)は `design/mockups/input-icons.png`
 
 ## ドキュメントサイト
