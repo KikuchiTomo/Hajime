@@ -370,6 +370,7 @@ public enum WireErrorCode: String, Sendable, Equatable, Codable, CaseIterable {
     case unknownSession
     case tooManySessions
     case malformed
+    case tooLarge
 }
 
 extension WireErrorCode: CustomStringConvertible, CustomDebugStringConvertible {
@@ -449,6 +450,55 @@ extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
+public struct WireKeymapRowIssue: Sendable, Equatable, Codable {
+    public var row: UInt32
+    public var hiddenBy: [UInt32]
+    public var hiddenStates: [String]
+    public var blocksTyping: Bool
+
+    public init(row: UInt32, hiddenBy: [UInt32], hiddenStates: [String], blocksTyping: Bool) {
+        self.row = row
+        self.hiddenBy = hiddenBy
+        self.hiddenStates = hiddenStates
+        self.blocksTyping = blocksTyping
+    }
+}
+
+extension WireKeymapRowIssue: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireKeymapRowIssue" }
+    public var debugDescription: String { description }
+}
+
+public struct WireKeymapMissing: Sendable, Equatable, Codable {
+    public var state: String
+    public var command: String
+
+    public init(state: String, command: String) {
+        self.state = state
+        self.command = command
+    }
+}
+
+extension WireKeymapMissing: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireKeymapMissing" }
+    public var debugDescription: String { description }
+}
+
+public struct WireKeymapReport: Sendable, Equatable, Codable {
+    public var rows: [WireKeymapRowIssue]
+    public var missing: [WireKeymapMissing]
+
+    public init(rows: [WireKeymapRowIssue], missing: [WireKeymapMissing]) {
+        self.rows = rows
+        self.missing = missing
+    }
+}
+
+extension WireKeymapReport: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireKeymapReport" }
+    public var debugDescription: String { description }
+}
+
 public enum WireRequestBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case openSession
@@ -461,9 +511,13 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
     case menu(command: WireMenuCommand)
+    case readSettingsFields(names: [String], defaults: Bool)
+    case writeSettingsFields(values: String)
+    case readKeymapPreset(preset: String)
+    case checkKeymap(values: String)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings, command
+        case type, protocolVersion, session, input, context, mode, rect, settings, command, names, defaults, values, preset
     }
 
     public init(from decoder: any Decoder) throws {
@@ -492,6 +546,14 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .writeSettings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
         case "menu":
             self = try .menu(command: container.decode(WireMenuCommand.self, forKey: .command))
+        case "readSettingsFields":
+            self = try .readSettingsFields(names: container.decode([String].self, forKey: .names), defaults: container.decode(Bool.self, forKey: .defaults))
+        case "writeSettingsFields":
+            self = try .writeSettingsFields(values: container.decode(String.self, forKey: .values))
+        case "readKeymapPreset":
+            self = try .readKeymapPreset(preset: container.decode(String.self, forKey: .preset))
+        case "checkKeymap":
+            self = try .checkKeymap(values: container.decode(String.self, forKey: .values))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -536,6 +598,19 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .menu(let command):
             try container.encode("menu", forKey: .type)
             try container.encode(command, forKey: .command)
+        case .readSettingsFields(let names, let defaults):
+            try container.encode("readSettingsFields", forKey: .type)
+            try container.encode(names, forKey: .names)
+            try container.encode(defaults, forKey: .defaults)
+        case .writeSettingsFields(let values):
+            try container.encode("writeSettingsFields", forKey: .type)
+            try container.encode(values, forKey: .values)
+        case .readKeymapPreset(let preset):
+            try container.encode("readKeymapPreset", forKey: .type)
+            try container.encode(preset, forKey: .preset)
+        case .checkKeymap(let values):
+            try container.encode("checkKeymap", forKey: .type)
+            try container.encode(values, forKey: .values)
         }
     }
 }
@@ -554,6 +629,10 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"
         case .menu: "WireRequestBody.menu"
+        case .readSettingsFields: "WireRequestBody.readSettingsFields"
+        case .writeSettingsFields: "WireRequestBody.writeSettingsFields"
+        case .readKeymapPreset: "WireRequestBody.readKeymapPreset"
+        case .checkKeymap: "WireRequestBody.checkKeymap"
         }
     }
     public var debugDescription: String { description }
@@ -580,10 +659,12 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case edit(handled: Bool, operations: [WireEditOperation], state: WireSessionState)
     case done
     case settings(settings: WireSettingsSnapshot)
+    case settingsFields(values: String)
+    case keymapReport(report: WireKeymapReport)
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, code
+        case type, protocolVersion, session, state, handled, operations, settings, values, report, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -600,6 +681,10 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = .done
         case "settings":
             self = try .settings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
+        case "settingsFields":
+            self = try .settingsFields(values: container.decode(String.self, forKey: .values))
+        case "keymapReport":
+            self = try .keymapReport(report: container.decode(WireKeymapReport.self, forKey: .report))
         case "error":
             self = try .error(code: container.decode(WireErrorCode.self, forKey: .code))
         default:
@@ -627,6 +712,12 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .settings(let settings):
             try container.encode("settings", forKey: .type)
             try container.encode(settings, forKey: .settings)
+        case .settingsFields(let values):
+            try container.encode("settingsFields", forKey: .type)
+            try container.encode(values, forKey: .values)
+        case .keymapReport(let report):
+            try container.encode("keymapReport", forKey: .type)
+            try container.encode(report, forKey: .report)
         case .error(let code):
             try container.encode("error", forKey: .type)
             try container.encode(code, forKey: .code)
@@ -642,6 +733,8 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .edit: "WireResponseBody.edit"
         case .done: "WireResponseBody.done"
         case .settings: "WireResponseBody.settings"
+        case .settingsFields: "WireResponseBody.settingsFields"
+        case .keymapReport: "WireResponseBody.keymapReport"
         case .error: "WireResponseBody.error"
         }
     }

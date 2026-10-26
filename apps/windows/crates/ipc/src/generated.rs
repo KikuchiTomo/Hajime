@@ -268,6 +268,7 @@ pub enum ErrorCode {
     UnknownSession,
     TooManySessions,
     Malformed,
+    TooLarge,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -322,6 +323,58 @@ impl fmt::Debug for MenuCommand {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeymapRowIssue {
+    pub row: u32,
+    #[serde(rename = "hiddenBy")]
+    pub hidden_by: Vec<u32>,
+    #[serde(rename = "hiddenStates")]
+    pub hidden_states: Vec<String>,
+    #[serde(rename = "blocksTyping")]
+    pub blocks_typing: bool,
+}
+
+impl fmt::Debug for KeymapRowIssue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeymapRowIssue")
+            .field("row", &self.row)
+            .field("hiddenBy", &self.hidden_by)
+            .field("hiddenStates", &REDACTED)
+            .field("blocksTyping", &self.blocks_typing)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeymapMissing {
+    pub state: String,
+    pub command: String,
+}
+
+impl fmt::Debug for KeymapMissing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeymapMissing")
+            .field("state", &REDACTED)
+            .field("command", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeymapReport {
+    pub rows: Vec<KeymapRowIssue>,
+    pub missing: Vec<KeymapMissing>,
+}
+
+impl fmt::Debug for KeymapReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeymapReport")
+            .field("rows", &self.rows)
+            .field("missing", &self.missing)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum RequestBody {
     Hello {
@@ -358,6 +411,19 @@ pub enum RequestBody {
     },
     Menu {
         command: MenuCommand,
+    },
+    ReadSettingsFields {
+        names: Vec<String>,
+        defaults: bool,
+    },
+    WriteSettingsFields {
+        values: String,
+    },
+    ReadKeymapPreset {
+        preset: String,
+    },
+    CheckKeymap {
+        values: String,
     },
 }
 
@@ -407,6 +473,23 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("Menu")
                 .field("command", command)
                 .finish(),
+            Self::ReadSettingsFields { defaults, .. } => f
+                .debug_struct("ReadSettingsFields")
+                .field("names", &REDACTED)
+                .field("defaults", defaults)
+                .finish(),
+            Self::WriteSettingsFields { .. } => f
+                .debug_struct("WriteSettingsFields")
+                .field("values", &REDACTED)
+                .finish(),
+            Self::ReadKeymapPreset { .. } => f
+                .debug_struct("ReadKeymapPreset")
+                .field("preset", &REDACTED)
+                .finish(),
+            Self::CheckKeymap { .. } => f
+                .debug_struct("CheckKeymap")
+                .field("values", &REDACTED)
+                .finish(),
         }
     }
 }
@@ -446,6 +529,12 @@ pub enum ResponseBody {
     Settings {
         settings: SettingsSnapshot,
     },
+    SettingsFields {
+        values: String,
+    },
+    KeymapReport {
+        report: KeymapReport,
+    },
     Error {
         code: ErrorCode,
     },
@@ -473,6 +562,14 @@ impl fmt::Debug for ResponseBody {
             Self::Settings { settings, .. } => f
                 .debug_struct("Settings")
                 .field("settings", settings)
+                .finish(),
+            Self::SettingsFields { .. } => f
+                .debug_struct("SettingsFields")
+                .field("values", &REDACTED)
+                .finish(),
+            Self::KeymapReport { report, .. } => f
+                .debug_struct("KeymapReport")
+                .field("report", report)
                 .finish(),
             Self::Error { code, .. } => f
                 .debug_struct("Error")

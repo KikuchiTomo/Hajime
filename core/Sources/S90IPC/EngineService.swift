@@ -1,3 +1,4 @@
+import Foundation
 import S90Application
 import S90Domain
 
@@ -59,7 +60,15 @@ public final class EngineService {
     public var sessionCount: Int { sessions.count }
 
     public func handle(_ request: WireRequest, from id: ConnectionID) -> WireResponse {
-        WireResponse(id: request.id, body: body(for: request.body, from: id))
+        let response = WireResponse(id: request.id, body: body(for: request.body, from: id))
+        // 設定の項目は大きくなりうる(ユーザー辞書など)．送れない大きさなら，項目を分けて頼んでもらう
+        guard case .settingsFields = response.body, !Self.fits(response) else { return response }
+        return WireResponse(id: request.id, body: .error(code: .tooLarge))
+    }
+
+    private static func fits(_ response: WireResponse) -> Bool {
+        guard let data = try? JSONEncoder().encode(response) else { return false }
+        return data.count <= WireProtocol.maximumMessageBytes
     }
 
     private func body(for request: WireRequestBody, from id: ConnectionID) -> WireResponseBody {
@@ -126,6 +135,28 @@ public final class EngineService {
                 perform(.openSettings)
             }
             return .done
+        case .readSettingsFields(let names, let defaults):
+            return fields { () throws(SettingsFields.Failure) in
+                try SettingsFields.read(defaults ? DefaultSettings.settings : settings.current, names: names)
+            }
+        case .writeSettingsFields(let values):
+            return fields { () throws(SettingsFields.Failure) in
+                let merged = try SettingsFields.merge(values, into: settings.current)
+                do {
+                    try settings.update { $0 = merged.settings }
+                } catch {
+                    throw .malformed
+                }
+                return try SettingsFields.read(settings.current, names: merged.names)
+            }
+        case .readKeymapPreset(let preset):
+            return fields { () throws(SettingsFields.Failure) in try SettingsFields.keymapPreset(named: preset) }
+        case .checkKeymap(let values):
+            do {
+                return .keymapReport(report: try SettingsFields.keymapReport(values))
+            } catch {
+                return .error(code: .malformed)
+            }
         case .writeSettings(let wanted):
             do {
                 try settings.update { current in
@@ -141,6 +172,14 @@ public final class EngineService {
                 return .error(code: .malformed)
             }
             return .settings(settings: snapshot)
+        }
+    }
+
+    private func fields(_ make: () throws(SettingsFields.Failure) -> String) -> WireResponseBody {
+        do {
+            return .settingsFields(values: try make())
+        } catch {
+            return .error(code: .malformed)
         }
     }
 

@@ -31,7 +31,11 @@
     { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } },
     { "id": 18, "body": { "type": "menu", "command": { "type": "selectInputStyle", "style": "kana" } } },
     { "id": 19, "body": { "type": "menu", "command": { "type": "toggleLiveConversion" } } },
-    { "id": 20, "body": { "type": "menu", "command": { "type": "openSettings" } } }
+    { "id": 20, "body": { "type": "menu", "command": { "type": "openSettings" } } },
+    { "id": 14, "body": { "type": "readSettingsFields", "names": ["theme", "keymap"], "defaults": false } },
+    { "id": 15, "body": { "type": "writeSettingsFields", "values": "{\"theme\":\"washi\"}" } },
+    { "id": 16, "body": { "type": "readKeymapPreset", "preset": "vim" } },
+    { "id": 17, "body": { "type": "checkKeymap", "values": "{\"keymap\":[]}" } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
@@ -67,7 +71,10 @@
     { "id": 9, "body": { "type": "error", "code": "unknownSession" } },
     { "id": 9, "body": { "type": "error", "code": "unsupportedVersion" } },
     { "id": 9, "body": { "type": "error", "code": "tooManySessions" } },
-    { "id": 9, "body": { "type": "error", "code": "malformed" } }
+    { "id": 9, "body": { "type": "error", "code": "malformed" } },
+    { "id": 14, "body": { "type": "settingsFields", "values": "{\"theme\":\"washi\"}" } },
+    { "id": 17, "body": { "type": "keymapReport", "report": { "rows": [{ "row": 2, "hiddenBy": [5], "hiddenStates": ["composing"], "blocksTyping": false }], "missing": [{ "state": "converting", "command": "cancel" }] } } },
+    { "id": 14, "body": { "type": "error", "code": "tooLarge" } }
   ],
   "uiCommands": [
     { "type": "hello", "protocolVersion": 1 },

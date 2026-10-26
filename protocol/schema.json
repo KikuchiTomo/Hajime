@@ -284,7 +284,8 @@
         "unsupportedVersion",
         "unknownSession",
         "tooManySessions",
-        "malformed"
+        "malformed",
+        "tooLarge"
       ]
     },
     {
@@ -336,6 +337,56 @@
         },
         {
           "name": "openSettings"
+        }
+      ]
+    },
+    {
+      "name": "KeymapRowIssue",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "row",
+          "type": "u32"
+        },
+        {
+          "name": "hiddenBy",
+          "type": "[u32]"
+        },
+        {
+          "name": "hiddenStates",
+          "type": "[string]"
+        },
+        {
+          "name": "blocksTyping",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "KeymapMissing",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "state",
+          "type": "string"
+        },
+        {
+          "name": "command",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "KeymapReport",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "rows",
+          "type": "[KeymapRowIssue]"
+        },
+        {
+          "name": "missing",
+          "type": "[KeymapMissing]"
         }
       ]
     },
@@ -450,6 +501,46 @@
               "type": "MenuCommand"
             }
           ]
+        },
+        {
+          "name": "readSettingsFields",
+          "fields": [
+            {
+              "name": "names",
+              "type": "[string]"
+            },
+            {
+              "name": "defaults",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "writeSettingsFields",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "readKeymapPreset",
+          "fields": [
+            {
+              "name": "preset",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "checkKeymap",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            }
+          ]
         }
       ]
     },
@@ -520,6 +611,24 @@
             {
               "name": "settings",
               "type": "SettingsSnapshot"
+            }
+          ]
+        },
+        {
+          "name": "settingsFields",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "keymapReport",
+          "fields": [
+            {
+              "name": "report",
+              "type": "KeymapReport"
             }
           ]
         },
