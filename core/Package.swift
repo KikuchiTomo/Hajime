@@ -12,13 +12,16 @@ let package = Package(
         .library(name: "S90Engine", targets: ["S90Engine"]),
         .library(name: "S90Persistence", targets: ["S90Persistence"]),
     ],
+    traits: [
+        .trait(name: "Zenzai", description: "Zenzai でかな漢字変換する．llama.cpp が要る"),
+        .default(enabledTraits: ["Zenzai"]),
+    ],
     dependencies: [
         // fork を revision で固定する(docs/dev/UPSTREAM.md)．
-        // Zenzai(文脈を見るニューラルかな漢字変換)の trait を有効にする．モデルは別に置く(docs/dev/adr/0006-zenzai.md)
         .package(
             url: "https://github.com/KikuchiTomo/AzooKeyKanaKanjiConverter",
             revision: "c456c0d4dda385107ac48f666d7ee289710fda25",
-            traits: ["Zenzai"]
+            traits: [.trait(name: "Zenzai", condition: .when(traits: ["Zenzai"]))]
         ),
     ],
     targets: [
@@ -32,27 +35,31 @@ let package = Package(
                 .product(name: "KanaKanjiConverterModuleWithDefaultDictionary", package: "AzooKeyKanaKanjiConverter"),
             ],
             // Zenzai は llama.cpp(C++)を使うので，エンジンを読み込むターゲットは C++ との相互運用を有効にする
-            swiftSettings: [.interoperabilityMode(.Cxx)]
+            swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
         .target(name: "S90Persistence", dependencies: ["S90Domain", "S90Application"]),
-        // Windows の DLL・候補ウィンドウとの通信のメッセージ(protocol/ から生成．ADR 0010)
         .target(name: "S90IPC", dependencies: ["S90Domain", "S90Application"]),
+        .executableTarget(
+            name: "s90-engine-host",
+            dependencies: ["S90Domain", "S90Application", "S90Engine", "S90Persistence", "S90IPC"],
+            swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
+        ),
         // 入れずに変換を試す道具(make try)
         .executableTarget(
             name: "s90-playground",
             dependencies: ["S90Domain", "S90Application", "S90Engine", "S90Persistence"],
-            swiftSettings: [.interoperabilityMode(.Cxx)]
+            swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
         .target(name: "S90TestSupport", dependencies: ["S90Domain", "S90Application"], path: "Tests/Support"),
         .testTarget(name: "S90DomainTests", dependencies: ["S90Domain"]),
-        .testTarget(name: "S90IPCTests", dependencies: ["S90Domain", "S90Application", "S90IPC"]),
+        .testTarget(name: "S90IPCTests", dependencies: ["S90Domain", "S90Application", "S90IPC", "S90TestSupport"]),
         .testTarget(name: "S90ApplicationTests", dependencies: ["S90Domain", "S90Application", "S90TestSupport"]),
         // Fixtures は #filePath から読む(古い版の設定のファイル)．リソースとして入れない
         .testTarget(name: "S90PersistenceTests", dependencies: ["S90Domain", "S90Persistence"], exclude: ["Fixtures"]),
         .testTarget(
             name: "S90EngineTests",
             dependencies: ["S90Domain", "S90Application", "S90Engine", "S90TestSupport"],
-            swiftSettings: [.interoperabilityMode(.Cxx)]
+            swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(os)
 import os
+#endif
 import S90Application
 import S90Domain
 
@@ -28,8 +30,10 @@ public final class FileSettingsStore: SettingsStoring, SettingsObserving {
         } catch {
             // ファイルはあるが読めない．脇に置いたことを記録し，設定の画面で一度知らせる(ファイルの中身はログに出さない)
             self.setAsideFile = ProtectedFile.setAside(fileURL)
+            #if canImport(os)
             Logger(subsystem: "tokyo.s90.ime", category: "settings")
                 .notice("読めなかった設定のファイルを脇に置きました: \(self.setAsideFile?.lastPathComponent ?? "-", privacy: .public)")
+            #endif
             self.current = DefaultSettings.settings
         }
     }

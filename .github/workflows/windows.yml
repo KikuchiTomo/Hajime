@@ -1,12 +1,9 @@
 name: windows
 
-# Windows 版(apps/windows の Rust と，core の Windows でのビルド)を確かめる．
-# 手元の Mac には Windows 向けの道具がないので，Windows でのビルドとテストはここで行う
 on:
   pull_request:
   push:
     branches: [main]
-  # PR を出す前の作業のブランチでも動かせるように(gh workflow run windows.yml --ref <ブランチ>)
   workflow_dispatch:
 
 permissions:
@@ -34,8 +31,26 @@ jobs:
             ~/.cargo/git
             apps/windows/target
           key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}
-      # バージョンは rust-toolchain.toml で固定している．rustup は runner に入っている
       - run: rustup toolchain install
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
+
+  swift:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: compnerd/gha-setup-swift@9ff1ee4c44888c5817fc14d1b257ac8cabb4935f # v0.5.1
+        with:
+          swift-version: swift-6.3.3-release
+          swift-build: 6.3.3-RELEASE
+      - run: swift --version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: swift-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
+      - run: swift build --package-path core --disable-default-traits
+      - run: swift test --package-path core --disable-default-traits

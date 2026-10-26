@@ -30,6 +30,9 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
+        #if os(Windows)
+        throw .unsupportedPlatform
+        #else
         // 先に開いてから，開いたものがふつうのファイルかと大きさを確かめる．確かめてから開くまでのあいだに
         // FIFO や /dev/zero への差し替えが起きても止まらないようにするため．O_NONBLOCK で開くので，FIFO でも開く時点で止まらない
         let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
@@ -41,6 +44,7 @@ public struct ZenzaiModel: Sendable, Equatable {
         guard size == expectedSize else { throw .sizeMismatch(actual: size) }
         guard try sha256(of: handle, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
         return ZenzaiModel(url: url)
+        #endif
     }
 
     /// 決まった大きさを超えたら読むのをやめる．開いたあとでファイルが伸びても，読み続けて止まらないようにする
