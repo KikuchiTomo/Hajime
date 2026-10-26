@@ -62,6 +62,11 @@ final class SettingsWindowController {
         hosting.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hosting
         window.isReleasedWhenClosed = false
+        // いつも最前面に出す．macOS 14 からは，前面のアプリ(cmux など)が譲らない限り，ほかのアプリは前面に出られない
+        // (実機の記録で visible=true key=false active=false だった)．前面に出られなくても，ほかのアプリの窓より上に浮かせて見えるようにし，
+        // 押せばキーボードの入力を受けられる．フルスクリーンのアプリの操作スペースにも，今いる操作スペースに出す
+        window.level = .floating
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         window.center()
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
             // 閉じたら前面に出ないアプリに戻す(入力メソッドとして，ほかのアプリの前に出ない)
