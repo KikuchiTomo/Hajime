@@ -48,8 +48,8 @@ struct ExclusionsPage: View {
                 }
             }
             Section {
-                Toggle(UIStrings.More.terminalCommands, isOn: model.binding(\.terminalCommands))
-                Toggle(UIStrings.Settings.escapeSwitchesToDirect, isOn: model.binding(\.escapeSwitchesToDirect))
+                ResettableToggle(model: model, title: UIStrings.More.terminalCommands, keyPath: \.terminalCommands)
+                ResettableToggle(model: model, title: UIStrings.Settings.escapeSwitchesToDirect, keyPath: \.escapeSwitchesToDirect)
             }
         }
         .formStyle(.grouped)

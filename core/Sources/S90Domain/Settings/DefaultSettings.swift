@@ -98,6 +98,12 @@ public enum DefaultSettings {
     /// ふつうの文字なら 1 語 450 バイトほどで約 4.5MB に収まるので，余裕を見て倍にした．
     /// 結合文字を重ねた語のように 1 字が何バイトにもなる場合は超えうるが，書く前に大きさを確かめて断るので，ファイルは壊れない
     public static let maximumSettingsFileBytes = 9 * 1024 * 1024
+    /// 同期のファイルの大きさの上限．設定とユーザー辞書と墓標が入る
+    public static let maximumSyncFileBytes = 2 * maximumSettingsFileBytes
+    /// 設定を変えてから同期のファイルに書くまで待つ時間(秒)．続けて変えたときに何度も書かないため
+    public static let syncWriteDelay = 2.0
+    /// 同期のファイルがほかの Mac で変わったかを確かめる間隔(秒)
+    public static let syncPollInterval = 60.0
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする

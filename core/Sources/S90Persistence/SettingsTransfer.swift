@@ -26,14 +26,17 @@ public enum SettingsTransfer {
     }
 
     static func encode(_ settings: Settings) throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(settings)
+        try SettingsCoding.encode(settings)
     }
 
     static func decode(_ data: Data) throws -> Settings {
         // 最上位が JSON のオブジェクトでなければ，設定のファイルではないとして断る(何でも既定値として読み込まないように)
-        guard (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { throw TransferError.notSettings }
-        return try JSONDecoder().decode(Settings.self, from: data)
+        do {
+            return try SettingsCoding.decode(data)
+        } catch SettingsCoding.CodingError.notSettings {
+            throw TransferError.notSettings
+        } catch is DecodingError {
+            throw TransferError.notSettings
+        }
     }
 }

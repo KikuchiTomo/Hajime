@@ -72,6 +72,56 @@ final class Harness {
 @Suite("入力の流れ")
 @MainActor
 struct InputSessionScenarioTests {
+    @Test("打っている途中の ⌥Space で区切りを入れると，その位置で文節を分ける")
+    func insertBoundaryWhileTyping() {
+        let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil)], "は": [("は", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("kyou")
+        harness.press(.space, .option)
+        harness.type("ha")
+        harness.settle()
+        #expect(harness.marked.segments.map(\.text).prefix(2) == ["今日", "は"])
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["今日", "は"])
+        harness.press(.enter)
+        #expect(harness.committed == "今日は")
+    }
+
+    @Test("区切りを入れたあと Backspace でその位置より前に戻ると，区切りも消える")
+    func boundaryRemovedByBackspace() {
+        let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil)], "きょ": [("巨", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("kyou")
+        harness.press(.space, .option)
+        harness.press(.backspace)
+        harness.type("uha")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["京は"])
+    }
+
+    @Test("分岐図の ⇧↓ で区切れる位置に番号を出し，数字で選んだ位置で区切る")
+    func splitInLattice() {
+        let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil)], "は": [("は", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("kyouha")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.count == 1)
+        harness.press(.down, .shift)
+        // 小さい「ょ」の前には番号を出さない
+        #expect(harness.lattice?.note?.hasPrefix("きょ①う②は") == true)
+        harness.press(.character("2"))
+        #expect(harness.lattice?.columns.map(\.text) == ["今日", "は"])
+        #expect(harness.lattice?.note == nil)
+    }
+
+    @Test("区切れる位置は小さい仮名と長音の前を除き，9 個まで")
+    func splitPositions() {
+        #expect(InputSession.splitPositions(of: "きょうは") == [2, 3])
+        #expect(InputSession.splitPositions(of: "らーめん") == [2, 3])
+        #expect(InputSession.splitPositions(of: "あ") == [])
+        #expect(InputSession.splitPositions(of: String(repeating: "あ", count: 20)).count == 9)
+    }
+
     @Test("R-01: 打ちながらライブ変換の結果を表示し，Enter で確定する")
     func liveConversion() {
         let harness = Harness(converter: FakeConverter(["へんかん": [("変換", nil)]]))

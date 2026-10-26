@@ -111,6 +111,12 @@ public struct Settings: Sendable, Equatable {
     /// アプリの識別子(macOS はバンドル ID)の前方一致からプロファイルを決める規則．先にあるものを優先する
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
+    // MARK: 形式
+    /// 読み込んだファイルの形式の版(SettingsSchema)．今より新しい版のファイルを開いたときは，その版のまま書き戻す
+    public var schemaVersion = SettingsSchema.currentVersion
+    /// この版が知らない項目．新しい版で書いた設定を古い版で開いて保存しても失わないよう，そのまま書き戻す
+    public var unknownFields: [String: JSONValue] = [:]
+
     public init() {}
 
     /// 範囲の外の値を範囲に収め，使えない値を捨てる．設定のファイルや書き出した JSON を読むときに通す
@@ -156,8 +162,19 @@ extension Settings: CustomStringConvertible, CustomDebugStringConvertible {
 /// 読めない要素を読み飛ばすための型．どんな値でも読める
 private struct Skipped: Decodable {}
 
+/// 名前の決まっていない項目を読み書きするための鍵
+private struct AnyKey: CodingKey {
+    var stringValue: String
+    var intValue: Int? { nil }
+    init(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { nil }
+}
+
 extension Settings: Codable {
-    private enum CodingKeys: String, CodingKey {
+    /// 設定のファイルの項目の名前．同期の範囲(SyncGroup)もこの名前で決める
+    public static var fieldNames: Set<String> { Set(CodingKeys.allCases.map(\.rawValue)) }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
         case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
@@ -242,6 +259,15 @@ extension Settings: Codable {
         read(.showsModeIndicator, into: \.showsModeIndicator)
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         readList(.profileRules, into: \.profileRules)
+        // 形式の版と，この版が知らない項目
+        let others = try decoder.container(keyedBy: AnyKey.self)
+        if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
+            settings.schemaVersion = max(version, SettingsSchema.currentVersion)
+        }
+        let known = Self.fieldNames.union([SettingsSchema.versionKey])
+        for key in others.allKeys where !known.contains(key.stringValue) {
+            if let value = try? others.decode(JSONValue.self, forKey: key) { settings.unknownFields[key.stringValue] = value }
+        }
         settings.clampToValidRanges()
         self = settings
     }
@@ -299,6 +325,11 @@ extension Settings: Codable {
         try container.encode(showsModeIndicator, forKey: .showsModeIndicator)
         try container.encode(escapeSwitchesToDirect, forKey: .escapeSwitchesToDirect)
         try container.encode(profileRules, forKey: .profileRules)
+        var others = encoder.container(keyedBy: AnyKey.self)
+        try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))
+        for (key, value) in unknownFields where !Self.fieldNames.contains(key) && key != SettingsSchema.versionKey {
+            try others.encode(value, forKey: AnyKey(stringValue: key))
+        }
     }
 }
 

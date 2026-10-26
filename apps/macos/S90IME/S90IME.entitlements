@@ -5,6 +5,12 @@
 	<!-- サンドボックスの中で動かす．通信の権限は付けない(docs/dev/SECURITY-MODEL.md) -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- 利用者が選んだファイルとフォルダだけを読み書きする(辞書・設定の取り込みと書き出し，同期のフォルダ)．選んだフォルダは
+	     セキュリティスコープ付きのブックマークで覚える -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
 	<key>com.apple.security.temporary-exception.mach-register.global-name</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)_Connection</string>
 </dict>

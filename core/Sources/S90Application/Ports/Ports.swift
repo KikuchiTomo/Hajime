@@ -1,3 +1,4 @@
+import Foundation
 import S90Domain
 
 /// かな漢字変換のポート．入力欄ごとに 1 つ作る(変換の途中の状態を入力欄ごとに分けるため)．
@@ -89,4 +90,35 @@ public protocol PostalCodeLooking: AnyObject {
 public protocol HandwritingRecognizing: Sendable {
     /// 線(点の並び．左上が原点)を認識して，よさそうな順に文字列を返す
     func recognize(strokes: [[Point]], canvasSize: Size) async -> [String]
+}
+
+/// 同期のファイルの置き場所(R-15)．最初の実装は利用者が選んだフォルダ(FolderSyncBackend)．
+/// Google Drive・Dropbox の API で読み書きする実装も，この形で足せるようにする(今は通信しない)
+public protocol SyncBackend: Sendable {
+    /// 同期のファイルの中身．まだ無ければ nil
+    func read() throws -> Data?
+    func write(_ data: Data) throws
+}
+
+/// この Mac の同期の設定(フォルダ・範囲・記録)の保存先
+@MainActor
+public protocol SyncStateStoring: AnyObject {
+    var state: SyncState { get }
+    func save(_ state: SyncState) throws
+}
+
+/// この Mac の同期の設定．同期のファイルには入れない
+public struct SyncState: Sendable, Equatable, Codable {
+    public var isEnabled = false
+    /// 選んだフォルダ(セキュリティスコープ付きのブックマーク)．フォルダを選んでいなければ nil
+    public var folderBookmark: Data?
+    /// 画面に出すフォルダの名前
+    public var folderName: String?
+    /// まとまりごとの範囲．無いまとまりは既定の範囲(SyncGroup.defaultScope)
+    public var scopes: [SyncGroup: SyncScope] = [:]
+    public var ledger = SyncLedger()
+
+    public init() {}
+
+    public func scope(of group: SyncGroup) -> SyncScope { scopes[group] ?? group.defaultScope }
 }
