@@ -1,6 +1,7 @@
 #if os(Windows)
 import Dispatch
 import Foundation
+import Synchronization
 
 public enum EnginePipeServer {
     public static func start(listener: NamedPipeListener, service: EngineService) {
@@ -35,13 +36,34 @@ public enum EnginePipeServer {
                 reader.append(bytes)
                 while let body = try reader.nextBody() {
                     let request = try MessageFraming.decode(WireRequest.self, from: body)
-                    let response = onMain { service.handle(request, from: id) }
+                    let response: WireResponse
+                    switch onMain({ service.reply(to: request, from: id) }) {
+                    case .now(let immediate):
+                        response = immediate
+                    case .later(let work):
+                        // ファイルの読み書きを終えるまで，この接続のスレッドで待つ(メインスレッドは止めない)
+                        response = wait(for: work)
+                    }
                     try connection.write(MessageFraming.encode(response))
                 }
             }
         } catch {
             return
         }
+    }
+
+    /// メインアクターで動かす非同期の仕事を，呼んだスレッド(名前付きパイプの接続のスレッド)で終わるまで待つ
+    private static func wait(for work: @escaping @MainActor @Sendable () async -> WireResponse) -> WireResponse {
+        let result = Mutex<WireResponse?>(nil)
+        let done = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            let response = await work()
+            result.withLock { $0 = response }
+            done.signal()
+        }
+        done.wait()
+        // signal の前に必ず入れているので nil にはならない．念のため malformed で答える
+        return result.withLock { $0 } ?? WireResponse(id: 0, body: .error(code: .malformed))
     }
 
     private static func onMain<Value: Sendable>(_ body: @MainActor () -> Value) -> Value {

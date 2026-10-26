@@ -110,6 +110,14 @@ func run() -> Int32 {
     let window = CandidateWindowLink()
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings.exe")
 
+    // 設定の同期(R-15)．同期の記録とフォルダはこの PC だけのもの(移動プロファイルで運ばない)なので Local に置く
+    let synchronizer = SettingsSynchronizer(settings: settings,
+                                            stateStore: FileSyncStateStore(fileURL: HostPaths.local.appendingPathComponent("sync-state.json")))
+    let sync = PathSyncCoordinator(synchronizer: synchronizer,
+                                   runner: FolderSyncRunner(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries),
+                                   settings: settings)
+    let files = SettingsFiles(settings: settings, dictionaries: dictionaries)
+
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
@@ -124,13 +132,16 @@ func run() -> Int32 {
             try? process.run()
         },
         hints: { BranchHints.make(for: $0, settings: $1) },
-        typoService: typoService
+        typoService: typoService,
+        sync: sync,
+        files: files
     )
     settings.observe { [weak engine] in
         engine?.apply($0)
         window.send(.setPresentation(presentation: service.presentation))
     }
     engine.warmUp()
+    sync.start()
     let watcher = SettingsWatcher(settings: settings, url: HostPaths.roaming.appendingPathComponent("settings.json"))
 
     let presentation = service.presentation

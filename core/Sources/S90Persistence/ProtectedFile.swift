@@ -48,6 +48,7 @@ enum ProtectedFile {
     /// 読むために開く．ふつうのファイルでなければ断る(名前付きパイプや FIFO を開いて止まらないように)
     static func openRegularFile(_ url: URL) throws -> FileHandle {
         #if os(Windows)
+        guard FileManager.default.fileExists(atPath: url.path) else { throw CocoaError(.fileReadNoSuchFile) }
         guard (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { throw NotRegularFile() }
         return try FileHandle(forReadingFrom: url)
         #else

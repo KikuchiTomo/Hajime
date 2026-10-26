@@ -451,6 +451,111 @@ extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
+public enum WireRuleList: String, Sendable, Equatable, Codable, CaseIterable {
+    case correctionRules
+    case exceptions
+    case englishWords
+    case japaneseWords
+    case romaji
+    case symbolSequences
+    case symbolReadings
+}
+
+extension WireRuleList: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireRuleList.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireSyncProblem: String, Sendable, Equatable, Codable, CaseIterable {
+    case failed
+    case unreadable
+    case folderUnavailable
+}
+
+extension WireSyncProblem: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSyncProblem.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WireSyncGroupState: Sendable, Equatable, Codable {
+    public var group: String
+    public var scope: String
+    public var fields: [String]
+
+    public init(group: String, scope: String, fields: [String]) {
+        self.group = group
+        self.scope = scope
+        self.fields = fields
+    }
+}
+
+extension WireSyncGroupState: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSyncGroupState" }
+    public var debugDescription: String { description }
+}
+
+public struct WireSyncStatus: Sendable, Equatable, Codable {
+    public var isEnabled: Bool
+    public var folderPath: String?
+    public var folderName: String?
+    public var groups: [WireSyncGroupState]
+    public var localFields: [String]
+    public var lastSyncedAt: String?
+    public var isSyncing: Bool
+    public var problem: WireSyncProblem?
+
+    public init(isEnabled: Bool, folderPath: String? = nil, folderName: String? = nil, groups: [WireSyncGroupState], localFields: [String], lastSyncedAt: String? = nil, isSyncing: Bool, problem: WireSyncProblem? = nil) {
+        self.isEnabled = isEnabled
+        self.folderPath = folderPath
+        self.folderName = folderName
+        self.groups = groups
+        self.localFields = localFields
+        self.lastSyncedAt = lastSyncedAt
+        self.isSyncing = isSyncing
+        self.problem = problem
+    }
+}
+
+extension WireSyncStatus: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSyncStatus" }
+    public var debugDescription: String { description }
+}
+
+public struct WireImportedDictionaryInfo: Sendable, Equatable, Codable {
+    public var id: String
+    public var name: String
+    public var wordCount: UInt32
+
+    public init(id: String, name: String, wordCount: UInt32) {
+        self.id = id
+        self.name = name
+        self.wordCount = wordCount
+    }
+}
+
+extension WireImportedDictionaryInfo: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportedDictionaryInfo" }
+    public var debugDescription: String { description }
+}
+
+public enum WireFileFailure: String, Sendable, Equatable, Codable, CaseIterable {
+    case invalidPath
+    case notFound
+    case tooLarge
+    case unreadable
+    case empty
+    case notSettings
+    case tooMany
+    case unknownDictionary
+    case writeFailed
+    case busy
+}
+
+extension WireFileFailure: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireFileFailure.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
 public enum WireRequestBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case openSession
@@ -463,9 +568,23 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
     case menu(command: WireMenuCommand)
+    case readSync
+    case setSyncFolder(path: String)
+    case setSyncEnabled(enabled: Bool)
+    case setSyncScope(group: String, scope: String)
+    case setSyncLocalField(field: String, isLocal: Bool)
+    case syncNow
+    case importDictionary(path: String, replacing: String?)
+    case removeDictionary(id: String)
+    case exportSettings(path: String)
+    case importSettings(path: String)
+    case importProfileRules(path: String)
+    case exportProfileRules(path: String)
+    case importRuleList(list: WireRuleList, path: String)
+    case exportRuleList(list: WireRuleList, path: String)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings, command
+        case type, protocolVersion, session, input, context, mode, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list
     }
 
     public init(from decoder: any Decoder) throws {
@@ -494,6 +613,34 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .writeSettings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
         case "menu":
             self = try .menu(command: container.decode(WireMenuCommand.self, forKey: .command))
+        case "readSync":
+            self = .readSync
+        case "setSyncFolder":
+            self = try .setSyncFolder(path: container.decode(String.self, forKey: .path))
+        case "setSyncEnabled":
+            self = try .setSyncEnabled(enabled: container.decode(Bool.self, forKey: .enabled))
+        case "setSyncScope":
+            self = try .setSyncScope(group: container.decode(String.self, forKey: .group), scope: container.decode(String.self, forKey: .scope))
+        case "setSyncLocalField":
+            self = try .setSyncLocalField(field: container.decode(String.self, forKey: .field), isLocal: container.decode(Bool.self, forKey: .isLocal))
+        case "syncNow":
+            self = .syncNow
+        case "importDictionary":
+            self = try .importDictionary(path: container.decode(String.self, forKey: .path), replacing: container.decodeIfPresent(String.self, forKey: .replacing))
+        case "removeDictionary":
+            self = try .removeDictionary(id: container.decode(String.self, forKey: .id))
+        case "exportSettings":
+            self = try .exportSettings(path: container.decode(String.self, forKey: .path))
+        case "importSettings":
+            self = try .importSettings(path: container.decode(String.self, forKey: .path))
+        case "importProfileRules":
+            self = try .importProfileRules(path: container.decode(String.self, forKey: .path))
+        case "exportProfileRules":
+            self = try .exportProfileRules(path: container.decode(String.self, forKey: .path))
+        case "importRuleList":
+            self = try .importRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
+        case "exportRuleList":
+            self = try .exportRuleList(list: container.decode(WireRuleList.self, forKey: .list), path: container.decode(String.self, forKey: .path))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -538,6 +685,51 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .menu(let command):
             try container.encode("menu", forKey: .type)
             try container.encode(command, forKey: .command)
+        case .readSync:
+            try container.encode("readSync", forKey: .type)
+        case .setSyncFolder(let path):
+            try container.encode("setSyncFolder", forKey: .type)
+            try container.encode(path, forKey: .path)
+        case .setSyncEnabled(let enabled):
+            try container.encode("setSyncEnabled", forKey: .type)
+            try container.encode(enabled, forKey: .enabled)
+        case .setSyncScope(let group, let scope):
+            try container.encode("setSyncScope", forKey: .type)
+            try container.encode(group, forKey: .group)
+            try container.encode(scope, forKey: .scope)
+        case .setSyncLocalField(let field, let isLocal):
+            try container.encode("setSyncLocalField", forKey: .type)
+            try container.encode(field, forKey: .field)
+            try container.encode(isLocal, forKey: .isLocal)
+        case .syncNow:
+            try container.encode("syncNow", forKey: .type)
+        case .importDictionary(let path, let replacing):
+            try container.encode("importDictionary", forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encodeIfPresent(replacing, forKey: .replacing)
+        case .removeDictionary(let id):
+            try container.encode("removeDictionary", forKey: .type)
+            try container.encode(id, forKey: .id)
+        case .exportSettings(let path):
+            try container.encode("exportSettings", forKey: .type)
+            try container.encode(path, forKey: .path)
+        case .importSettings(let path):
+            try container.encode("importSettings", forKey: .type)
+            try container.encode(path, forKey: .path)
+        case .importProfileRules(let path):
+            try container.encode("importProfileRules", forKey: .type)
+            try container.encode(path, forKey: .path)
+        case .exportProfileRules(let path):
+            try container.encode("exportProfileRules", forKey: .type)
+            try container.encode(path, forKey: .path)
+        case .importRuleList(let list, let path):
+            try container.encode("importRuleList", forKey: .type)
+            try container.encode(list, forKey: .list)
+            try container.encode(path, forKey: .path)
+        case .exportRuleList(let list, let path):
+            try container.encode("exportRuleList", forKey: .type)
+            try container.encode(list, forKey: .list)
+            try container.encode(path, forKey: .path)
         }
     }
 }
@@ -556,6 +748,20 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"
         case .menu: "WireRequestBody.menu"
+        case .readSync: "WireRequestBody.readSync"
+        case .setSyncFolder: "WireRequestBody.setSyncFolder"
+        case .setSyncEnabled: "WireRequestBody.setSyncEnabled"
+        case .setSyncScope: "WireRequestBody.setSyncScope"
+        case .setSyncLocalField: "WireRequestBody.setSyncLocalField"
+        case .syncNow: "WireRequestBody.syncNow"
+        case .importDictionary: "WireRequestBody.importDictionary"
+        case .removeDictionary: "WireRequestBody.removeDictionary"
+        case .exportSettings: "WireRequestBody.exportSettings"
+        case .importSettings: "WireRequestBody.importSettings"
+        case .importProfileRules: "WireRequestBody.importProfileRules"
+        case .exportProfileRules: "WireRequestBody.exportProfileRules"
+        case .importRuleList: "WireRequestBody.importRuleList"
+        case .exportRuleList: "WireRequestBody.exportRuleList"
         }
     }
     public var debugDescription: String { description }
@@ -582,10 +788,14 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case edit(handled: Bool, operations: [WireEditOperation], state: WireSessionState)
     case done
     case settings(settings: WireSettingsSnapshot)
+    case syncStatus(status: WireSyncStatus)
+    case dictionaryImported(dictionary: WireImportedDictionaryInfo)
+    case imported(added: UInt32, skipped: UInt32)
+    case fileFailed(reason: WireFileFailure)
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, code
+        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -602,6 +812,14 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = .done
         case "settings":
             self = try .settings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
+        case "syncStatus":
+            self = try .syncStatus(status: container.decode(WireSyncStatus.self, forKey: .status))
+        case "dictionaryImported":
+            self = try .dictionaryImported(dictionary: container.decode(WireImportedDictionaryInfo.self, forKey: .dictionary))
+        case "imported":
+            self = try .imported(added: container.decode(UInt32.self, forKey: .added), skipped: container.decode(UInt32.self, forKey: .skipped))
+        case "fileFailed":
+            self = try .fileFailed(reason: container.decode(WireFileFailure.self, forKey: .reason))
         case "error":
             self = try .error(code: container.decode(WireErrorCode.self, forKey: .code))
         default:
@@ -629,6 +847,19 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .settings(let settings):
             try container.encode("settings", forKey: .type)
             try container.encode(settings, forKey: .settings)
+        case .syncStatus(let status):
+            try container.encode("syncStatus", forKey: .type)
+            try container.encode(status, forKey: .status)
+        case .dictionaryImported(let dictionary):
+            try container.encode("dictionaryImported", forKey: .type)
+            try container.encode(dictionary, forKey: .dictionary)
+        case .imported(let added, let skipped):
+            try container.encode("imported", forKey: .type)
+            try container.encode(added, forKey: .added)
+            try container.encode(skipped, forKey: .skipped)
+        case .fileFailed(let reason):
+            try container.encode("fileFailed", forKey: .type)
+            try container.encode(reason, forKey: .reason)
         case .error(let code):
             try container.encode("error", forKey: .type)
             try container.encode(code, forKey: .code)
@@ -644,6 +875,10 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .edit: "WireResponseBody.edit"
         case .done: "WireResponseBody.done"
         case .settings: "WireResponseBody.settings"
+        case .syncStatus: "WireResponseBody.syncStatus"
+        case .dictionaryImported: "WireResponseBody.dictionaryImported"
+        case .imported: "WireResponseBody.imported"
+        case .fileFailed: "WireResponseBody.fileFailed"
         case .error: "WireResponseBody.error"
         }
     }

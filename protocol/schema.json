@@ -344,6 +344,118 @@
       ]
     },
     {
+      "name": "RuleList",
+      "kind": "enum",
+      "cases": [
+        "correctionRules",
+        "exceptions",
+        "englishWords",
+        "japaneseWords",
+        "romaji",
+        "symbolSequences",
+        "symbolReadings"
+      ]
+    },
+    {
+      "name": "SyncProblem",
+      "kind": "enum",
+      "cases": [
+        "failed",
+        "unreadable",
+        "folderUnavailable"
+      ]
+    },
+    {
+      "name": "SyncGroupState",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "group",
+          "type": "string"
+        },
+        {
+          "name": "scope",
+          "type": "string"
+        },
+        {
+          "name": "fields",
+          "type": "[string]"
+        }
+      ]
+    },
+    {
+      "name": "SyncStatus",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "isEnabled",
+          "type": "bool"
+        },
+        {
+          "name": "folderPath",
+          "type": "string?"
+        },
+        {
+          "name": "folderName",
+          "type": "string?"
+        },
+        {
+          "name": "groups",
+          "type": "[SyncGroupState]"
+        },
+        {
+          "name": "localFields",
+          "type": "[string]"
+        },
+        {
+          "name": "lastSyncedAt",
+          "type": "string?"
+        },
+        {
+          "name": "isSyncing",
+          "type": "bool"
+        },
+        {
+          "name": "problem",
+          "type": "SyncProblem?"
+        }
+      ]
+    },
+    {
+      "name": "ImportedDictionaryInfo",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "wordCount",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "FileFailure",
+      "kind": "enum",
+      "cases": [
+        "invalidPath",
+        "notFound",
+        "tooLarge",
+        "unreadable",
+        "empty",
+        "notSettings",
+        "tooMany",
+        "unknownDictionary",
+        "writeFailed",
+        "busy"
+      ]
+    },
+    {
       "name": "RequestBody",
       "kind": "union",
       "tag": "type",
@@ -454,6 +566,140 @@
               "type": "MenuCommand"
             }
           ]
+        },
+        {
+          "name": "readSync"
+        },
+        {
+          "name": "setSyncFolder",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "setSyncEnabled",
+          "fields": [
+            {
+              "name": "enabled",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "setSyncScope",
+          "fields": [
+            {
+              "name": "group",
+              "type": "string"
+            },
+            {
+              "name": "scope",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "setSyncLocalField",
+          "fields": [
+            {
+              "name": "field",
+              "type": "string"
+            },
+            {
+              "name": "isLocal",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "syncNow"
+        },
+        {
+          "name": "importDictionary",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            },
+            {
+              "name": "replacing",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "removeDictionary",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "exportSettings",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "importSettings",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "importProfileRules",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "exportProfileRules",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "importRuleList",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RuleList"
+            },
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "exportRuleList",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RuleList"
+            },
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
         }
       ]
     },
@@ -524,6 +770,46 @@
             {
               "name": "settings",
               "type": "SettingsSnapshot"
+            }
+          ]
+        },
+        {
+          "name": "syncStatus",
+          "fields": [
+            {
+              "name": "status",
+              "type": "SyncStatus"
+            }
+          ]
+        },
+        {
+          "name": "dictionaryImported",
+          "fields": [
+            {
+              "name": "dictionary",
+              "type": "ImportedDictionaryInfo"
+            }
+          ]
+        },
+        {
+          "name": "imported",
+          "fields": [
+            {
+              "name": "added",
+              "type": "u32"
+            },
+            {
+              "name": "skipped",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "fileFailed",
+          "fields": [
+            {
+              "name": "reason",
+              "type": "FileFailure"
             }
           ]
         },

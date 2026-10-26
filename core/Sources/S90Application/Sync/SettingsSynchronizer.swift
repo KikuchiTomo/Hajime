@@ -80,6 +80,22 @@ public final class SettingsSynchronizer {
         try stateStore.save(state)
     }
 
+    /// フォルダをパスで選んで同期を始める(Windows)
+    public func setFolder(path: String, name: String) throws {
+        var state = stateStore.state
+        state.isEnabled = true
+        state.folderPath = path
+        state.folderName = name
+        try stateStore.save(state)
+    }
+
+    /// 同期するかだけを変える(フォルダはそのまま)
+    public func setEnabled(_ enabled: Bool) throws {
+        var state = stateStore.state
+        state.isEnabled = enabled
+        try stateStore.save(state)
+    }
+
     private func settingsDidChange(_ new: Settings) {
         guard let object = try? SettingsCoding.object(of: new) else { return }
         defer { previous = object }
