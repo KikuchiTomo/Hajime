@@ -1050,6 +1050,7 @@ public final class InputSession {
         let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
         let notes = [
             settings.current.misuseNotes ? UsageGuide.misuseNote(for: lattice.text) : nil,
+            settings.current.proofreading ? Proofreading.note(for: lattice.text) : nil,
             settings.current.homophoneNotes ? UsageGuide.homophoneNote(for: text, reading: reading) : nil,
         ].compactMap { $0 }
         return notes.isEmpty ? nil : notes.joined(separator: "　")

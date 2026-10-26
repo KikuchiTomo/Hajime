@@ -58,7 +58,7 @@ enum UIStrings {
                 KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
                 KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
             ] + length + [
-                KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "語ごと"),
+                KeyHint(key: Keys.pair(first(.shrinkSegmentToWord), first(.extendSegmentToWord)), label: "単語ごと"),
                 KeyHint(key: first(.splitSegment), label: "区切る"),
             ]).filter { !$0.key.isEmpty }
         }
@@ -143,8 +143,8 @@ enum UIStrings {
             case .previousUncertainSegment: "前の迷う文節"
             case .extendSegment: "文節を長く"
             case .shrinkSegment: "文節を短く"
-            case .extendSegmentToWord: "文節を語ごとに長く"
-            case .shrinkSegmentToWord: "文節を語ごとに短く"
+            case .extendSegmentToWord: "文節を単語ごとに長く"
+            case .shrinkSegmentToWord: "文節を単語ごとに短く"
             case .splitSegment: "文節を区切る"
             case .commit: "確定"
             case .commitFirstSegment: "先頭の文節だけ確定"
@@ -172,13 +172,13 @@ enum UIStrings {
             case .nextCandidate: "入力中に押すと変換を始めます"
             case .previousCandidate: "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"
             case .nextUncertainSegment, .previousUncertainSegment: "確信の低い文節だけを渡り歩きます"
-            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の語の切れ目まで動かします"
+            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の単語の切れ目まで動かします"
             case .splitSegment: "区切れる位置に番号を出し、数字で区切ります"
             case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
             case .cancel: "変換中は読みに戻し、直した読みは打ったままに戻します。入力中は読みを消します"
             case .backToReading: "変換をやめて読みに戻ります"
             case .forgetCandidate: "選んでいる候補を学習から消します"
-            case .forgetLastCommit: "最後に確定した語の学習を取り消します。入力した文字は消しません"
+            case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は消しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
                  .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
@@ -340,6 +340,7 @@ enum UIStrings {
         static let dateConversion = "日付と時刻に変換"
         static let homophoneNotes = "同音異義語の使い分けを表示"
         static let misuseNotes = "誤用の注釈を表示"
+        static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
         static let learning = "学習"
@@ -508,15 +509,15 @@ enum UIStrings {
         static let correctsEnglish = "英単語"
         static let correctsJapanese = "日本語の打ち間違い"
         static let correctsRepeatedKeys = "同じキーの重なり"
-        static let exceptions = "直さない語"
+        static let exceptions = "直さない語句"
         static let exceptionPlaceholder = "英字か読み"
         static let rules = "置き換え"
         static let typed = "打った英字"
-        static let replacement = "置き換える語"
-        static let invalidRule = "打った英字は 2〜24 文字の英字、置き換える語は 64 文字までにしてください"
-        static let invalidException = "直さない語は 64 文字までにしてください"
+        static let replacement = "置き換える語句"
+        static let invalidRule = "打った英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください"
+        static let invalidException = "直さない語句は 64 文字までにしてください"
         static let rulesEmpty = "置き換えはありません"
-        static let exceptionsEmpty = "直さない語はありません"
+        static let exceptionsEmpty = "直さない語句はありません"
 
         // 記号
         static let symbolsPage = "記号"
@@ -659,8 +660,7 @@ extension UIStrings {
         static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
         static let unreadable = "同期のファイルを読めないため、同期を止めています"
-        static let items = "項目"
-        static let localOnly = "この Mac だけ"
+        static let items = "項目ごとに選ぶ"
 
         /// 項目(Settings の CodingKeys の名前)の表示名
         static func label(forField name: String) -> String {
@@ -676,7 +676,7 @@ extension UIStrings {
             "suggestionDisplay": "入力中の候補", "listCandidatesPerPage": "一覧の候補数", "branchCandidatesPerPage": "分岐図の候補数",
             "liveConversionDelay": "漢字にするまでの時間", "correctionDelay": "修正するまでの時間", "correctionSensitivity": "修正の基準",
             "showsSuggestions": "もしかして", "okuriganaStyle": "送り仮名", "calculation": "計算", "postalCodeConversion": "郵便番号変換",
-            "handwriting": "手書き入力", "homophoneNotes": "同音異義語の使い分け", "misuseNotes": "誤用の注釈", "misreadings": "読み違い",
+            "handwriting": "手書き入力", "homophoneNotes": "同音異義語の使い分け", "misuseNotes": "誤用の注釈", "proofreading": "校正支援", "misreadings": "読み違い",
             "showsVariantRow": "文字種の行", "showsKeyHints": "キーの案内", "numberKeySelection": "番号キーで選択",
             "dateConversion": "日付と時刻に変換", "symbolConversion": "記号に変換", "emojiConversion": "絵文字に変換", "learning": "学習",
             "theme": "テーマ", "candidateFontSize": "文字の大きさ", "showsModeIndicator": "入力モードの表示",

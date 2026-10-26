@@ -1,5 +1,5 @@
 # Windows 版の Cargo のワークスペース．crate の分け方は .claude/skills/s90-windows/SKILL.md．
-# 依存の版はここで揃え，= で固定する(docs/dev/GUIDELINES.md)
+# 依存のバージョンはここで揃え，= で固定する(docs/dev/GUIDELINES.md)
 [workspace]
 resolver = "2"
 members = ["crates/ipc"]

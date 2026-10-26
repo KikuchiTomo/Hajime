@@ -194,7 +194,7 @@ struct KeymapPresetTests {
 
 @Suite("古いキーの設定の移し替え(R-17)")
 struct LegacyKeySettingsTests {
-    /// 版 2 で既定のまま保存した設定のファイルのキーの項目
+    /// バージョン 2 で既定のまま保存した設定のファイルのキーの項目
     private let defaultConversionKeys = #"""
         {"commands":{"nextCandidate":[{"key":{"down":{}},"shift":false,"control":false,"option":false},{"key":{"space":{}},"shift":false,"control":false,"option":false}],
         "nextSegment":[{"key":{"right":{}},"shift":false,"control":false,"option":false}]}}
@@ -233,13 +233,13 @@ struct LegacyKeySettingsTests {
         let keymap = try decode(#"{"modeKeys":{"eisu":"none","kana":"toggle","henkan":"japanese","muhenkan":"direct"}}"#).keymap
         #expect(keymap.command(for: KeyEvent(.eisu), in: .composing) == nil)
         #expect(keymap.command(for: KeyEvent(.kana), in: .direct) == .toggleMode)
-        // 版 2 では切り替えのキーがほかの働きより先に効いたので，入力中でも切り替える
+        // バージョン 2 では切り替えのキーがほかの働きより先に効いたので，入力中でも切り替える
         #expect(keymap.command(for: KeyEvent(.henkan), in: .composing) == .japaneseMode)
         #expect(keymap.command(for: KeyEvent(.muhenkan), in: .converting) == .directMode)
         #expect(keymap.command(for: KeyEvent(.hankakuZenkaku), in: .idle) == .toggleMode)
     }
 
-    @Test("古い版の Mac が書いた同期の値も表に移し替える")
+    @Test("古いバージョンの Mac が書いた同期の値も表に移し替える")
     func syncedLegacyValues() throws {
         var object = try SettingsCoding.object(of: Settings())
         object["conversionKeys"] = try JSONDecoder().decode(JSONValue.self, from: Data(

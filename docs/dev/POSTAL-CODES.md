@@ -5,12 +5,12 @@ description: 郵便番号変換(R-13)に使うデータの出典，利用条件�
 
 ## 出典と利用条件
 
-日本郵便株式会社の「郵便番号データ(住所の郵便番号，UTF-8 版の全国一括)」を使います．
+日本郵便株式会社の「郵便番号データ(住所の郵便番号，UTF-8 形式の全国一括)」を使います．
 
 - データ: <https://www.post.japanpost.jp/service/search/zipcode/download/utf/zip/utf_ken_all.zip>
 - 説明と利用条件: <https://www.post.japanpost.jp/service/search/zipcode/download/readme.html>
   - 「郵便番号データに限っては日本郵便株式会社は著作権を主張しません．自由に配布していただいて結構です．」と書かれています(2026-10-26 に確かめた)
-  - UTF-8 版は 1 つの郵便番号を 1 行に書き，読み仮名は全角カタカナです(<https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html>)
+  - UTF-8 形式は 1 つの郵便番号を 1 行に書き，読み仮名は全角カタカナです(<https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html>)
 
 ## 置き場所
 
@@ -30,4 +30,4 @@ description: 郵便番号変換(R-13)に使うデータの出典，利用条件�
 1. main から `chore/postal-YYYYMM` のブランチを作る
 2. `tools/postal/update.sh` を動かす(取ってきて整え，`data/postal/postal-codes.tsv` を書き直す)
 3. `git diff --stat` で変わった行の数を見て，極端に多くないか(全体の数 % を超えていないか)を確かめる
-4. `make test` を通し，「chore(data): 郵便番号のデータを YYYY 年 MM 月版にする」の PR にする
+4. `make test` を通し，「chore(data): 郵便番号のデータを YYYY 年 MM 月バージョンにする」の PR にする

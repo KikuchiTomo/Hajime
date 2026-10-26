@@ -25,7 +25,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .keys: ["keymap"]
         case .conversion:
             ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "listCandidatesPerPage", "branchCandidatesPerPage",
-             "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes",
+             "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes", "proofreading",
              "misreadings", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning"]
         case .correction: ["correction"]
         case .symbols: ["symbolRules"]
@@ -37,7 +37,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         }
     }
 
-    /// 古い版の Mac が同期のファイルのこのまとまりに書く項目．取り込むと新しい項目に移し替える(LegacyKeySettings)
+    /// 古いバージョンの Mac が同期のファイルのこのまとまりに書く項目．取り込むと新しい項目に移し替える(LegacyKeySettings)
     public var legacyFieldNames: [String] {
         switch self {
         case .keyboard: [LegacyKeySettings.modeKeysField]

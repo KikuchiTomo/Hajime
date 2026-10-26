@@ -20,6 +20,8 @@ public protocol KanaKanjiConverting: AnyObject {
     func clauseCandidates(for reading: String) -> [Candidate]
     /// 打っている読みに続く語の予測(入力中の候補)．読み全体を置き換える候補として返す
     func predictions(for reading: String) -> [Candidate]
+    /// 文脈を見ない辞書の変換の候補(Zenzai を使わない)．短い読みの語を文脈なしで並べるときに使う(文節の先頭の語の選び直しなど)
+    func dictionaryCandidates(for reading: String) -> [Candidate]
     /// 読みとしてのもっともらしさ(大きいほどよい)．候補を作らずに点数だけを求める軽い変換で計る．
     /// 「nn」のあとの母音をどう読むかを比べるのに使う(NasalReadingResolver)
     func plausibility(of reading: String) -> Double
@@ -53,6 +55,7 @@ public protocol KanaKanjiConverting: AnyObject {
 
 extension KanaKanjiConverting {
     public func predictions(for reading: String) -> [Candidate] { [] }
+    public func dictionaryCandidates(for reading: String) -> [Candidate] { candidates(for: reading) }
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) {}
     public func setApplication(_ identifier: String?) {}
     public func sourceName(of text: String, reading: String) -> String? { nil }
@@ -167,7 +170,7 @@ public struct SyncState: Sendable, Equatable, Codable {
         case isEnabled, folderBookmark, folderName, scopes, localFields, ledger
     }
 
-    /// 項目を足しても前の版で書いたファイルを読めるよう，無い項目は既定のままにする(読めないとフォルダの選択まで失うため)
+    /// 項目を足しても前のバージョンで書いたファイルを読めるよう，無い項目は既定のままにする(読めないとフォルダの選択まで失うため)
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false

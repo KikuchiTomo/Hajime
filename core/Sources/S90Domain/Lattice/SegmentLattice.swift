@@ -175,7 +175,7 @@ public enum CandidatePresentation: String, Sendable, Equatable, CaseIterable {
 }
 
 extension CandidatePresentation: Codable {
-    /// 古い版が保存した「文節格子(lattice)」など，今は無い値は分岐図として読む
+    /// 古いバージョンが保存した「文節格子(lattice)」など，今は無い値は分岐図として読む
     public init(from decoder: any Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = CandidatePresentation(rawValue: raw) ?? .automatic

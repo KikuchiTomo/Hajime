@@ -7,7 +7,7 @@ import S90Domain
 /// 設定の同期で辞書の一覧(id と revision)がそろったあとに呼ぶ．同期のフォルダには「<id>-<revision>.tsv」の名前で置く．
 /// - この Mac の索引が一覧の revision と同じで，フォルダに無ければ書き出す
 /// - この Mac に無いか古く，フォルダにあれば読み込み，SHA-256 が revision と合うときだけ入れ替える
-/// - フォルダにある，一覧のどれにも当たらない索引は消す(取り込み直す前の版と，消した辞書)
+/// - フォルダにある，一覧のどれにも当たらない索引は消す(取り込み直す前のバージョンと，消した辞書)
 ///
 /// 索引は数百 MB になりうるので，メモリに読み込まずに少しずつ写し，ハッシュも少しずつ求める．メインスレッドの外で呼ぶ
 public struct DictionaryFileSync: Sendable {
@@ -43,7 +43,7 @@ public struct DictionaryFileSync: Sendable {
         for dictionary in dictionaries where dictionary.hasValidIdentity {
             let local = localDirectory.appendingPathComponent(dictionary.indexFileName)
             guard let revision = dictionary.revision else {
-                // 版の無い辞書は，この Mac に索引があれば版を求めて設定に書き戻す．書き出すのは次の同期で
+                // バージョンの無い辞書は，この Mac に索引があればバージョンを求めて設定に書き戻す．書き出すのは次の同期で
                 if let computed = try? Self.sha256(of: local) { outcome.computedRevisions[dictionary.id] = computed }
                 continue
             }

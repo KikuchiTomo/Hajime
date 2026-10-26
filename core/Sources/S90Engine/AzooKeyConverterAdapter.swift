@@ -23,7 +23,7 @@ public final class AzooKeyConverterEngine {
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
-    ///   - versionString: エンジンに渡すアプリの版の文字列
+    ///   - versionString: エンジンに渡すアプリのバージョンの文字列
     ///   - zenzai: 確かめ済みの Zenzai のモデル．nil なら Zenzai を使わない
     public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil) throws {
         try FileManager.default.createDirectory(
@@ -170,6 +170,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private let scoringSessionID: KanaKanjiConverter.ConversionSessionID
     private var plausibilityCache: [String: Double] = [:]
     private var predictionCache: [String: [S90Domain.Candidate]] = [:]
+    private var dictionaryCache: [String: [S90Domain.Candidate]] = [:]
     private var segmentationCache: [String: [S90Domain.Candidate.Word]] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
@@ -206,6 +207,25 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
         request(reading)?.clauses ?? []
+    }
+
+    func dictionaryCandidates(for reading: String) -> [S90Domain.Candidate] {
+        guard !reading.isEmpty else { return [] }
+        if let cached = dictionaryCache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        var options = engine.options(leftContext: nil, usesZenzai: false, candidateCount: DefaultSettings.headWordAlternativeCount * 2)
+        options.typoCorrectionMode = .disabled
+        options.learningType = .nothing
+        let results = engine.withSession(scoringSessionID) { converter -> [KanaKanjiConverterModule.Candidate] in
+            converter.stopComposition()
+            defer { converter.stopComposition() }
+            return converter.requestCandidates(composing, options: options).mainResults
+        } ?? []
+        var seen = Set<String>()
+        let candidates = results.filter { seen.insert($0.text).inserted }.map { register($0, readingLength: reading.count) }
+        dictionaryCache[reading] = candidates
+        return candidates
     }
 
     func predictions(for reading: String) -> [S90Domain.Candidate] {
@@ -381,6 +401,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
         plausibilityCache = [:]
         predictionCache = [:]
+        dictionaryCache = [:]
         segmentationCache = [:]
         engineCandidates = [:]
         cache = [:]

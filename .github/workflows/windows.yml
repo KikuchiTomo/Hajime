@@ -34,7 +34,7 @@ jobs:
             ~/.cargo/git
             apps/windows/target
           key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}
-      # 版は rust-toolchain.toml で固定している．rustup は runner に入っている
+      # バージョンは rust-toolchain.toml で固定している．rustup は runner に入っている
       - run: rustup toolchain install
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
