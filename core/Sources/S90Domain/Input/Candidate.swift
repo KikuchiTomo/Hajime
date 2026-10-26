@@ -42,13 +42,26 @@ public struct Candidate: Sendable, Equatable {
         public var endsWithParticle: Bool
         /// 名詞などの自立語で始まる語か(ひらがなで書く「ところ」「こと」も含む)
         public var startsWithNoun: Bool
+        /// 名詞のほかの自立語(動詞・形容詞・副詞・連体詞・接続詞)で始まる語か(「ある」「いい」「また」)
+        public var startsWithPredicate: Bool
+        /// 前の語の活用した形に付く助詞(接続助詞「て」「で」「ば」)で始まる語か(「読ん｜で」と切らないため)
+        public var startsWithConjunctiveParticle: Bool
+        /// 文の終わりに付く助詞(終助詞「ね」「よ」「わ」)で終わる語か
+        public var endsWithSentenceFinalParticle: Bool
 
-        public init(text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false, startsWithNoun: Bool = false) {
+        public init(
+            text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false,
+            startsWithNoun: Bool = false, startsWithPredicate: Bool = false,
+            startsWithConjunctiveParticle: Bool = false, endsWithSentenceFinalParticle: Bool = false
+        ) {
             self.text = text
             self.readingCount = readingCount
             self.startsWithParticle = startsWithParticle
             self.endsWithParticle = endsWithParticle
             self.startsWithNoun = startsWithNoun
+            self.startsWithPredicate = startsWithPredicate
+            self.startsWithConjunctiveParticle = startsWithConjunctiveParticle
+            self.endsWithSentenceFinalParticle = endsWithSentenceFinalParticle
         }
     }
 
