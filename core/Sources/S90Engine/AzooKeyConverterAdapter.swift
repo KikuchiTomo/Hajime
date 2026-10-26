@@ -169,6 +169,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private let sessionID: KanaKanjiConverter.ConversionSessionID
     private let scoringSessionID: KanaKanjiConverter.ConversionSessionID
     private var plausibilityCache: [String: Double] = [:]
+    private var predictionCache: [String: [S90Domain.Candidate]] = [:]
     private var segmentationCache: [String: [S90Domain.Candidate.Word]] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
@@ -205,6 +206,32 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
         request(reading)?.clauses ?? []
+    }
+
+    func predictions(for reading: String) -> [S90Domain.Candidate] {
+        guard !reading.isEmpty else { return [] }
+        if let cached = predictionCache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        // 予測は Zenzai を使わない軽い変換で求める(打つたびに求めるため)．表示の変換と状態を混ぜないよう，採点用の変換器で求める
+        var options = engine.options(leftContext: leftContext, usesZenzai: false, candidateCount: DefaultSettings.suggestionCount)
+        options.requireJapanesePrediction = .manualMix
+        options.typoCorrectionMode = .disabled
+        let results = engine.withSession(scoringSessionID) { converter -> [KanaKanjiConverterModule.Candidate] in
+            converter.stopComposition()
+            defer { converter.stopComposition() }
+            return converter.requestCandidates(composing, options: options).predictionResults
+        } ?? []
+        var seen = Set<String>()
+        let predictions = results.filter { seen.insert($0.text).inserted }.prefix(DefaultSettings.suggestionCount).map { candidate in
+            // 予測は打った読み全体を置き換える
+            let id = nextID
+            nextID += 1
+            engineCandidates[id] = candidate
+            return S90Domain.Candidate(text: candidate.text, readingCount: reading.count, origin: .engine(id: id))
+        }
+        predictionCache[reading] = Array(predictions)
+        return Array(predictions)
     }
 
     func plausibility(of reading: String) -> Double {
@@ -353,6 +380,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         _ = engine.withSession(sessionID) { $0.stopComposition() }
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
         plausibilityCache = [:]
+        predictionCache = [:]
         segmentationCache = [:]
         engineCandidates = [:]
         cache = [:]

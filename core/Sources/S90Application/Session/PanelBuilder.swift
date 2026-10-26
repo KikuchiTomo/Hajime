@@ -17,6 +17,9 @@ enum PanelBuilder {
     /// 英単語を直した候補が先頭の一覧の案内．key は次の候補のキー
     static func correctionNote(key: String?) -> String { key.map { "\($0) 入力のままに戻す" } ?? correctedNote }
 
+    /// 打っているあいだの候補の窓の案内．key は候補に入るキー
+    static func suggestionNote(key: String?) -> String? { key.map { "\($0) で選ぶ" } }
+
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
     static func readingCorrectionNote(key: String?) -> String { key.map { "直しました　\($0) で打ったままに戻す" } ?? "直しました" }
 
