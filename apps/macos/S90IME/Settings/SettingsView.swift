@@ -5,11 +5,12 @@ import SwiftUI
 struct SettingsView: View {
     static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel
+    let sync: SyncCoordinator
     @State private var page: Page? = .input
 
     /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(上のタブには収まらない)
     enum Page: CaseIterable, Hashable {
-        case input, conversion, correction, symbols, keys, dictionary, romaji, apps, appearance, usage, backup, about
+        case input, conversion, correction, symbols, keys, dictionary, romaji, apps, appearance, usage, sync, backup, about
 
         var title: String {
             switch self {
@@ -23,6 +24,7 @@ struct SettingsView: View {
             case .apps: UIStrings.Settings.appsTab
             case .appearance: UIStrings.Settings.appearanceTab
             case .usage: UIStrings.Settings.usageTab
+            case .sync: UIStrings.Sync.page
             case .backup: UIStrings.More.backup
             case .about: UIStrings.More.about
             }
@@ -41,6 +43,7 @@ struct SettingsView: View {
             case .apps: "nosign.app"
             case .appearance: "paintbrush"
             case .usage: "chart.line.uptrend.xyaxis"
+            case .sync: "arrow.triangle.2.circlepath"
             case .backup: "externaldrive"
             case .about: "info.circle"
             }
@@ -57,6 +60,7 @@ struct SettingsView: View {
             case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
             case .keys: [UIStrings.Features.preset, UIStrings.Keys.label(for: .openSettings)]
+            case .sync: [UIStrings.Sync.folder, UIStrings.Sync.scopes, UIStrings.Sync.label(for: .dictionary)]
             default: []
             }
         }
@@ -102,6 +106,7 @@ struct SettingsView: View {
         case .apps: ExclusionsPage(model: model)
         case .appearance: AppearancePage(model: model)
         case .usage: UsageTab(model: model)
+        case .sync: SyncPage(sync: sync)
         case .backup: BackupPage(model: model)
         case .about: AboutPage(model: model)
         }
@@ -128,19 +133,19 @@ private struct InputTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.inputStyleSection) {
-                ChoicePicker(title: UIStrings.Choice.inputStyle, selection: model.binding(\.inputStyle), label: UIStrings.Choice.label(for:))
-                ChoicePicker(title: UIStrings.Choice.keyboardLayout, selection: model.binding(\.keyboardLayout), label: UIStrings.Choice.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle, label: UIStrings.Choice.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Choice.keyboardLayout, keyPath: \.keyboardLayout, label: UIStrings.Choice.label(for:))
                 Text(UIStrings.Choice.keyboardLayoutNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Settings.characters) {
-                ChoicePicker(title: UIStrings.Settings.punctuation, selection: model.binding(\.punctuation), label: UIStrings.Settings.label(for:))
-                ChoicePicker(title: UIStrings.Settings.brackets, selection: model.binding(\.brackets), label: UIStrings.Settings.label(for:))
-                ChoicePicker(title: UIStrings.Settings.slash, selection: model.binding(\.slash), label: UIStrings.Settings.label(for:))
-                ChoicePicker(title: UIStrings.Choice.yenKey, selection: model.binding(\.yenKey), label: UIStrings.Choice.label(for:))
-                ChoicePicker(title: UIStrings.Settings.spaceWidth, selection: model.binding(\.spaceWidth), label: UIStrings.Settings.label(for:))
-                ChoicePicker(title: UIStrings.Settings.numberWidth, selection: model.binding(\.numberWidth), label: UIStrings.Settings.label(for:))
-                ChoicePicker(title: UIStrings.More.alphabetWidth, selection: model.binding(\.alphabetWidth), label: UIStrings.Settings.label(for:))
-                Toggle(UIStrings.More.shiftStartsAlphabet, isOn: model.binding(\.shiftStartsAlphabet))
+                ResettablePicker(model: model, title: UIStrings.Settings.punctuation, keyPath: \.punctuation, label: UIStrings.Settings.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Settings.brackets, keyPath: \.brackets, label: UIStrings.Settings.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Settings.slash, keyPath: \.slash, label: UIStrings.Settings.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Choice.yenKey, keyPath: \.yenKey, label: UIStrings.Choice.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Settings.spaceWidth, keyPath: \.spaceWidth, label: UIStrings.Settings.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Settings.numberWidth, keyPath: \.numberWidth, label: UIStrings.Settings.label(for:))
+                ResettablePicker(model: model, title: UIStrings.More.alphabetWidth, keyPath: \.alphabetWidth, label: UIStrings.Settings.label(for:))
+                ResettableToggle(model: model, title: UIStrings.More.shiftStartsAlphabet, keyPath: \.shiftStartsAlphabet)
                 ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
             }
             Section(UIStrings.Features.modeKeysSection) {
@@ -151,12 +156,14 @@ private struct InputTab: View {
                 ResettablePicker(model: model, title: UIStrings.Features.muhenkanKey, keyPath: \.modeKeys.muhenkan, label: UIStrings.Features.label(for:))
             }
             Section(UIStrings.Settings.keys) {
-                Toggle(UIStrings.Settings.punctuationCommits, isOn: model.binding(\.punctuationCommits))
-                Toggle(UIStrings.Settings.numberKeySelection, isOn: model.binding(\.numberKeySelection))
-                Toggle(UIStrings.Settings.showsModeIndicator, isOn: model.binding(\.showsModeIndicator))
-                SecondsSlider(title: UIStrings.More.modeIndicatorDuration, value: model.binding(\.modeIndicatorDuration),
-                              range: DefaultSettings.modeIndicatorDurationRange)
-                    .disabled(!model.settings.showsModeIndicator)
+                ResettableToggle(model: model, title: UIStrings.Settings.punctuationCommits, keyPath: \.punctuationCommits)
+                ResettableToggle(model: model, title: UIStrings.Settings.numberKeySelection, keyPath: \.numberKeySelection)
+                ResettableToggle(model: model, title: UIStrings.Settings.showsModeIndicator, keyPath: \.showsModeIndicator)
+                ResettableRow(model: model, keyPath: \.modeIndicatorDuration) {
+                    SecondsSlider(title: UIStrings.More.modeIndicatorDuration, value: model.binding(\.modeIndicatorDuration),
+                                  range: DefaultSettings.modeIndicatorDurationRange)
+                }
+                .disabled(!model.settings.showsModeIndicator)
             }
         }
         .formStyle(.grouped)
@@ -169,28 +176,36 @@ private struct ConversionTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.conversion) {
-                Toggle(UIStrings.Menu.liveConversion, isOn: model.binding(\.liveConversion))
-                ChoicePicker(title: UIStrings.Choice.presentation, selection: model.binding(\.candidatePresentation), label: UIStrings.Choice.label(for:))
-                ChoicePicker(title: UIStrings.Choice.initialFocus, selection: model.binding(\.initialFocus), label: UIStrings.Choice.label(for:))
-                Toggle(UIStrings.Choice.variantRow, isOn: model.binding(\.showsVariantRow))
-                SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),
-                              range: DefaultSettings.liveConversionDelayRange)
-                    .disabled(!model.settings.liveConversion)
+                ResettableToggle(model: model, title: UIStrings.Menu.liveConversion, keyPath: \.liveConversion)
+                ResettablePicker(model: model, title: UIStrings.Choice.presentation, keyPath: \.candidatePresentation, label: UIStrings.Choice.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Choice.initialFocus, keyPath: \.initialFocus, label: UIStrings.Choice.label(for:))
+                ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
+                ResettableRow(model: model, keyPath: \.liveConversionDelay) {
+                    SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),
+                                  range: DefaultSettings.liveConversionDelayRange)
+                }
+                .disabled(!model.settings.liveConversion)
             }
             Section(UIStrings.More.candidates) {
-                Stepper(value: model.binding(\.branchCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
-                    LabeledContent(UIStrings.More.branchCandidates, value: "\(model.settings.branchCandidatesPerPage)")
+                ResettableRow(model: model, keyPath: \.branchCandidatesPerPage) {
+                    Stepper(value: model.binding(\.branchCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
+                        LabeledContent(UIStrings.More.branchCandidates, value: "\(model.settings.branchCandidatesPerPage)")
+                    }
                 }
-                Stepper(value: model.binding(\.listCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
-                    LabeledContent(UIStrings.More.listCandidates, value: "\(model.settings.listCandidatesPerPage)")
+                ResettableRow(model: model, keyPath: \.listCandidatesPerPage) {
+                    Stepper(value: model.binding(\.listCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
+                        LabeledContent(UIStrings.More.listCandidates, value: "\(model.settings.listCandidatesPerPage)")
+                    }
                 }
             }
             Section(UIStrings.More.typo) {
-                ChoicePicker(title: UIStrings.Choice.typoCorrection, selection: model.binding(\.typoCorrection), label: UIStrings.Choice.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
                 Group {
-                    ChoicePicker(title: UIStrings.More.correctionSensitivity, selection: model.binding(\.correctionSensitivity), label: UIStrings.More.label(for:))
-                    Toggle(UIStrings.More.showsSuggestions, isOn: model.binding(\.showsSuggestions))
-                    SecondsSlider(title: UIStrings.More.correctionDelay, value: model.binding(\.correctionDelay), range: DefaultSettings.correctionDelayRange)
+                    ResettablePicker(model: model, title: UIStrings.More.correctionSensitivity, keyPath: \.correctionSensitivity, label: UIStrings.More.label(for:))
+                    ResettableToggle(model: model, title: UIStrings.More.showsSuggestions, keyPath: \.showsSuggestions)
+                    ResettableRow(model: model, keyPath: \.correctionDelay) {
+                        SecondsSlider(title: UIStrings.More.correctionDelay, value: model.binding(\.correctionDelay), range: DefaultSettings.correctionDelayRange)
+                    }
                 }
                 .disabled(model.settings.typoCorrection != .standard)
             }
@@ -201,14 +216,14 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)
                 ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
                 ResettableToggle(model: model, title: UIStrings.Features.handwriting, keyPath: \.handwriting)
-                Toggle(UIStrings.Settings.dateConversion, isOn: model.binding(\.dateConversion))
-                Toggle(UIStrings.Settings.homophoneNotes, isOn: model.binding(\.homophoneNotes))
-                Toggle(UIStrings.Settings.misuseNotes, isOn: model.binding(\.misuseNotes))
-                Toggle(UIStrings.Settings.symbolConversion, isOn: model.binding(\.symbolConversion))
-                Toggle(UIStrings.Settings.emojiConversion, isOn: model.binding(\.emojiConversion))
+                ResettableToggle(model: model, title: UIStrings.Settings.dateConversion, keyPath: \.dateConversion)
+                ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
+                ResettableToggle(model: model, title: UIStrings.Settings.misuseNotes, keyPath: \.misuseNotes)
+                ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
+                ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
             }
             Section(UIStrings.Settings.learning) {
-                ChoicePicker(title: UIStrings.Settings.learning, selection: model.binding(\.learning), label: UIStrings.Settings.label(for:))
+                ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))
                 Button(UIStrings.Settings.resetLearning, role: .destructive) { model.resetLearning() }
             }
         }
@@ -307,7 +322,7 @@ private struct UsageTab: View {
         let counts = model.usageCounts
         Form {
             Section {
-                Toggle(UIStrings.Settings.recordsUsage, isOn: model.binding(\.recordsUsage))
+                ResettableToggle(model: model, title: UIStrings.Settings.recordsUsage, keyPath: \.recordsUsage)
                 Text(UIStrings.Settings.usageNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Settings.usageTab) {

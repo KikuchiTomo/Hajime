@@ -1,0 +1,7 @@
+{
+  "schemaVersion" : 9,
+  "inputStyle" : "romaji",
+  "liveConversion" : true,
+  "futureOption" : { "enabled" : true, "level" : 3 },
+  "anotherFutureList" : [ 1, 2, 3 ]
+}

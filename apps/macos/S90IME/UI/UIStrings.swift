@@ -443,3 +443,42 @@ enum UIStrings {
         static let noticesMissing = "利用表記のファイルが見つかりません"
     }
 }
+
+extension UIStrings {
+    /// 同期のページ
+    enum Sync {
+        static let page = "同期"
+        static let enabled = "同期"
+        static let folder = "フォルダ"
+        static let noFolder = "未選択"
+        static let chooseFolder = "フォルダを選ぶ…"
+        static let lastSynced = "最後に同期した時刻"
+        static let syncNow = "今すぐ同期"
+        static let scopes = "同期する項目"
+        static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
+        static let failed = "同期できませんでした"
+        static let unreadable = "同期のファイルを読めないため、同期を止めています"
+
+        static func label(for scope: SyncScope) -> String {
+            switch scope {
+            case .synced: "同期する"
+            case .local: "この Mac だけ"
+            }
+        }
+
+        static func label(for group: SyncGroup) -> String {
+            switch group {
+            case .input: "入力"
+            case .keyboard: "キー配列と切り替えのキー"
+            case .keys: "キー操作"
+            case .conversion: "変換"
+            case .correction: "補正"
+            case .symbols: "記号"
+            case .dictionary: "ユーザー辞書"
+            case .appearance: "外観"
+            case .exclusions: "除外設定"
+            case .usage: "統計"
+            }
+        }
+    }
+}

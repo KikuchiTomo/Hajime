@@ -23,15 +23,17 @@ final class CompositionRoot {
     let note: NoteController
     let contextProvider: InputContextProvider
     let calendar = SystemCalendar(clock: { Date() })
+    let sync: SyncCoordinator
 
     /// 打ち間違いの訂正を別に求めるもの．Zenzai が無ければ nil
     let typoService: ZenzaiTypoService?
 
-    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?) {
+    private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator) {
         self.typoService = typoService
         self.settings = settings
         self.engine = engine
         self.usage = usage
+        self.sync = sync
         self.lexicon = SpellCheckerLexicon()
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
@@ -54,7 +56,11 @@ final class CompositionRoot {
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
         let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
-        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService)
+        // 同期(R-15)．この Mac の同期の設定は settings.json と別のファイルに置く
+        let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
+        let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings)
+        sync.start()
+        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync)
     }
 
     /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
@@ -78,7 +84,7 @@ final class CompositionRoot {
 
     /// 設定の画面．開くたびに作らず使い回す
     private(set) lazy var settingsWindow: SettingsWindowController = {
-        let controller = SettingsWindowController(settings: settings, usage: usage, resetLearning: { [engine] in engine.resetLearning() })
+        let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, resetLearning: { [engine] in engine.resetLearning() })
         controller.noteSetAsideFile(settings.setAsideFile)
         return controller
     }()

@@ -12,8 +12,11 @@ final class SettingsWindowController {
     private var window: NSWindow?
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, resetLearning: @escaping () -> Void) {
+    private let sync: SyncCoordinator
+
+    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, resetLearning: @escaping () -> Void) {
         model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
+        self.sync = sync
     }
 
     /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
@@ -52,7 +55,7 @@ final class SettingsWindowController {
         window.title = UIStrings.Settings.windowTitle
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
-        window.contentView = NSHostingView(rootView: SettingsView(model: model))
+        window.contentView = NSHostingView(rootView: SettingsView(model: model, sync: sync))
         window.isReleasedWhenClosed = false
         window.center()
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in

@@ -44,17 +44,19 @@ struct AppearancePage: View {
                 CustomThemeEditor(model: model, theme: active)
             }
             Section(UIStrings.More.font) {
-                LabeledContent(UIStrings.Settings.fontSize(Int(fontSize ?? model.settings.candidateFontSize))) {
-                    Slider(
-                        value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { fontSize = $0 }),
-                        in: DefaultSettings.candidateFontSizeRange,
-                        step: 1
-                    ) { isEditing in
-                        guard !isEditing, let value = fontSize else { return }
-                        model.update { $0.candidateFontSize = value }
-                        fontSize = nil
+                ResettableRow(model: model, keyPath: \.candidateFontSize) {
+                    LabeledContent(UIStrings.Settings.fontSize(Int(fontSize ?? model.settings.candidateFontSize))) {
+                        Slider(
+                            value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { fontSize = $0 }),
+                            in: DefaultSettings.candidateFontSizeRange,
+                            step: 1
+                        ) { isEditing in
+                            guard !isEditing, let value = fontSize else { return }
+                            model.update { $0.candidateFontSize = value }
+                            fontSize = nil
+                        }
+                        .frame(width: 220)
                     }
-                    .frame(width: 220)
                 }
             }
         }
