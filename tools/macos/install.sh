@@ -2,8 +2,8 @@
 # macOS の入力メソッドをビルドし，~/Library/Input Methods に入れて有効にする．
 #
 # 使い方: tools/macos/install.sh [Release|Dev]
-#   Release: 本番(s90 IME)
-#   Dev:     開発版(s90 IME Dev)．本番と別の入力ソース・別の学習データになるので，並べて試せる．最適化は本番と同じ
+#   Release: 本番(s90)
+#   Dev:     開発版(s90 Dev)．本番と別の入力ソース・別の学習データになるので，並べて試せる．最適化は本番と同じ
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 . "$root/tools/macos/variant.sh"
