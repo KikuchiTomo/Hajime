@@ -106,6 +106,38 @@ pub const THEMES: &[(&str, Palette)] = &[
     }),
 ];
 
+pub const GLASS_LIGHT: Palette = Palette {
+    bevel_light: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+    bevel_shadow: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
+    correction: Rgb { red: 0xD6, green: 0x00, blue: 0x5A },
+    frame: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
+    prediction: Rgb { red: 0x5D, green: 0x5D, blue: 0x5D },
+    selection: Rgb { red: 0x00, green: 0x5F, blue: 0xB8 },
+    selection_text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+    surface: Rgb { red: 0xF9, green: 0xF9, blue: 0xF9 },
+    text: Rgb { red: 0x1A, green: 0x1A, blue: 0x1A },
+    text_muted: Rgb { red: 0x5D, green: 0x5D, blue: 0x5D },
+};
+
+pub const GLASS_DARK: Palette = Palette {
+    bevel_light: Rgb { red: 0x3B, green: 0x3B, blue: 0x3B },
+    bevel_shadow: Rgb { red: 0x1F, green: 0x1F, blue: 0x1F },
+    correction: Rgb { red: 0xFF, green: 0x6F, blue: 0xA5 },
+    frame: Rgb { red: 0x45, green: 0x45, blue: 0x45 },
+    prediction: Rgb { red: 0xC5, green: 0xC5, blue: 0xC5 },
+    selection: Rgb { red: 0x60, green: 0xCD, blue: 0xFF },
+    selection_text: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
+    surface: Rgb { red: 0x2C, green: 0x2C, blue: 0x2C },
+    text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+    text_muted: Rgb { red: 0xC5, green: 0xC5, blue: 0xC5 },
+};
+
+pub const GLASS_SHADOW: Rgb = Rgb { red: 0x00, green: 0x00, blue: 0x00 };
+
+pub const GLASS_SNAPSHOT_LIGHT: Rgb = Rgb { red: 0x9F, green: 0x9F, blue: 0x9F };
+
+pub const GLASS_SNAPSHOT_DARK: Rgb = Rgb { red: 0x26, green: 0x26, blue: 0x26 };
+
 pub mod size {
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
@@ -122,6 +154,7 @@ pub mod size {
         pub const VARIANT_PADDING_X: f32 = 6.0;
         pub const SECTION_PADDING_Y: f32 = 3.0;
         pub const MIN_WIDTH: f32 = 180.0;
+        pub const VARIANT_INSET_Y: f32 = 1.0;
     }
     pub mod mode_indicator {
         pub const FONT_SIZE: f32 = 14.0;
@@ -176,6 +209,15 @@ pub mod size {
         pub const UNDERLINE_OFFSET: f32 = 4.0;
         pub const MODE_INDICATOR_SIZE: f32 = 34.0;
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
+        pub const SELECTION_INSET_Y: f32 = 2.0;
+        pub const VARIANT_INSET_Y: f32 = 4.0;
+        pub const CURVE_START_OVERLAP: f32 = 2.0;
+        pub const CURVE_END_GAP: f32 = 3.0;
+        pub const CURVE_BEND: f32 = 0.35;
+        pub const DOT_PITCH: f32 = 5.0;
+        pub const KEYCAP_PART_GAP: f32 = 1.0;
+        pub const SHADOW_RADIUS: f32 = 12.0;
+        pub const SHADOW_OFFSET_Y: f32 = 3.0;
     }
     pub mod handwriting {
         pub const WIDTH: f32 = 284.0;
@@ -185,6 +227,10 @@ pub mod size {
         pub const STROKE_WIDTH: f32 = 5.0;
         pub const FRAME_WIDTH: f32 = 1.0;
         pub const GUIDE_DASH: f32 = 4.0;
+    }
+    pub mod snapshot {
+        pub const MARGIN: f32 = 16.0;
+        pub const SCALE: f32 = 2.0;
     }
 }
 
@@ -198,5 +244,35 @@ pub mod motion {
     }
     pub mod candidate_rest {
         pub const FADE_IN: f32 = 250.0;
+    }
+}
+
+pub mod opacity {
+    pub mod glass {
+        pub const LINE: f32 = 0.26;
+        pub const LINE_CONTRAST: f32 = 0.5;
+        pub const BADGE: f32 = 0.1;
+        pub const BADGE_CONTRAST: f32 = 0.26;
+        pub const FOCUS_TINT: f32 = 0.16;
+        pub const FOCUS_TINT_CONTRAST: f32 = 0.3;
+    }
+    pub mod rounded {
+        pub const BADGE: f32 = 0.12;
+        pub const BADGE_CONTRAST: f32 = 0.25;
+        pub const FOCUS_TINT: f32 = 0.2;
+        pub const FOCUS_TINT_CONTRAST: f32 = 0.35;
+    }
+    pub mod badge {
+        pub const SELECTED: f32 = 0.25;
+    }
+    pub mod variant {
+        pub const UNAVAILABLE: f32 = 0.4;
+    }
+    pub mod keycap {
+        pub const DESK_FILL: f32 = 0.12;
+        pub const DESK_STROKE: f32 = 0.6;
+    }
+    pub mod shadow {
+        pub const WINDOW: f32 = 0.22;
     }
 }
