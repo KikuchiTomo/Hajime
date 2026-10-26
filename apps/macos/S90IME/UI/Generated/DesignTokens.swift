@@ -203,6 +203,50 @@ enum DesignTokens {
             static let margin: CGFloat = 16
             static let scale: CGFloat = 2
         }
+        enum SettingsWindows {
+            static let pagePaddingX: CGFloat = 36
+            static let scrollLine: CGFloat = 40
+            static let listHeight: CGFloat = 220
+            static let buttonWidth: CGFloat = 96
+            static let pagePaddingTop: CGFloat = 20
+            static let titleFontSize: CGFloat = 28
+            static let sectionFontSize: CGFloat = 14
+            static let bodyFontSize: CGFloat = 14
+            static let captionFontSize: CGFloat = 12
+            static let iconFontSize: CGFloat = 16
+            static let sectionGap: CGFloat = 28
+            static let sectionTitleHeight: CGFloat = 28
+            static let cardGap: CGFloat = 4
+            static let cardRadius: CGFloat = 4
+            static let cardPaddingX: CGFloat = 16
+            static let rowHeight: CGFloat = 52
+            static let controlHeight: CGFloat = 32
+            static let dropdownHeight: CGFloat = 384
+            static let controlWidth: CGFloat = 240
+            static let switchWidth: CGFloat = 40
+            static let switchHeight: CGFloat = 20
+            static let resetSize: CGFloat = 28
+            static let navItemHeight: CGFloat = 36
+            static let navHeaderHeight: CGFloat = 32
+            static let navPaddingX: CGFloat = 12
+            static let navIndicatorWidth: CGFloat = 3
+            static let navIndicatorHeight: CGFloat = 16
+            static let navIconGap: CGFloat = 12
+            static let searchHeight: CGFloat = 32
+            static let noteLineHeight: CGFloat = 18
+            static let titleHeight: CGFloat = 52
+            static let bodyLineHeight: CGFloat = 20
+            static let contentMaxWidth: CGFloat = 1000
+            static let controlGap: CGFloat = 8
+            static let toggleWidth: CGFloat = 96
+            static let stepperWidth: CGFloat = 96
+            static let secondsLabelWidth: CGFloat = 56
+            static let navWidth: CGFloat = 280
+            static let windowWidth: CGFloat = 1000
+            static let windowHeight: CGFloat = 700
+            static let windowMinWidth: CGFloat = 640
+            static let windowMinHeight: CGFloat = 480
+        }
     }
     enum Motion {
         enum ModeIndicator {

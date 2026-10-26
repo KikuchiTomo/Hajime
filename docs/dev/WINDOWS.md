@@ -30,6 +30,8 @@
 - 設定のファイルは macOS と同じ形式．エンジンが 2 秒ごとに更新の時刻を見て，変わっていれば読み直す
 - 設定の同期(R-15)はエンジンが動かす．選んだフォルダはパスで覚え(`PathSyncCoordinator`)，macOS と同じ時機(起動時・設定を変えて少し待ったとき・一定の間隔)で同期する．同期の手順は macOS と共有する(`FolderSyncRunner`)
 - 辞書の取り込み・設定のバックアップ・除外設定の CSV・決まりの一覧の読み書きは，設定の画面がパスを渡してエンジンに頼む(`SettingsFiles`)．時間がかかるので，エンジンは名前付きパイプの接続のスレッドで終わるまで待って答え，そのあいだもほかの接続(入力)には答える(`EngineService.reply`)
+- 設定の画面(`crates/settings`)は設定のファイルを直接読まず，項目の名前と JSON の値でエンジンに読み書きを頼む(`readSettingsFields`・`writeSettingsFields`)．値の確かめ(範囲・一覧の形・上限)はエンジンが設定のファイルを読むときと同じに行い，画面は書いたあとに返った値を出す．項目の名前と値の範囲・上限は `protocol/settings-catalog.json`(core の `DefaultSettings` から作る写し．`make settings-catalog` で作り直し，古ければ core のテストが落ちる)から読み，既定値はエンジンに頼んで読む
+- 設定の画面のページと項目の並びは macOS の `SettingsView` と同じ(`crates/settings/src/pages.rs`)．文言は `UIStrings` と同じものを `strings.rs` に置き，Windows で言い方が違うものだけを変える
 - `.ui` のパイプはエンジンから候補ウィンドウへの一方向．エンジンは読みを待たない(同期の I/O のハンドルでは，読みを待っているあいだ同じハンドルへの書き込みも止まるため)
 
 ## 手書き入力
@@ -53,7 +55,7 @@ Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流�
 
 ## ビルドと確かめ
 
-手元の Mac には Windows 向けの道具がないので，Windows でのビルドとテストは GitHub Actions の `windows` のワークフロー(`.github/workflows/windows.yml`)で行う．PR を出す前のブランチでも `gh workflow run windows.yml --ref <ブランチ>` で動かせる．
+手元の Mac でも，rustup で `x86_64-pc-windows-msvc` の target を足せば `cargo clippy --target x86_64-pc-windows-msvc` でコンパイルまでは確かめられる(リンクはできない)．Windows でのビルドとテストは GitHub Actions の `windows` のワークフロー(`.github/workflows/windows.yml`)で行う．PR を出す前のブランチでも `gh workflow run windows.yml --ref <ブランチ>` で動かせる．
 
 | ジョブ | 内容 |
 |---|---|

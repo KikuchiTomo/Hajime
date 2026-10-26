@@ -71,6 +71,7 @@ def render(tokens: dict) -> str:
         lines.append(f"pub const GLASS_{upper(appearance)}: Palette = Palette {{")
         lines += [f"    {snake(n)}: {rgb(colors[n]['$value'])}," for n in color_names]
         lines.append("};")
+    lines += render_settings_palettes(tokens["settings-windows"])
     for group, sections in (("size", tokens["size"]), ("motion", tokens["motion"]), ("opacity", tokens["opacity"])):
         lines.append("")
         lines.append(f"pub mod {group} {{")
@@ -85,6 +86,25 @@ def render(tokens: dict) -> str:
             lines.append("    }")
         lines.append("}")
     return "\n".join(lines) + "\n"
+
+
+def render_settings_palettes(palettes: dict) -> list[str]:
+    """Windows の設定の画面の色(ライトとダーク)"""
+    modes = [mode for mode in palettes if not mode.startswith("$")]
+    names = sorted(palettes[modes[0]]["color"].keys())
+    lines = ["", "#[derive(Debug, Clone, Copy, PartialEq, Eq)]", "pub struct SettingsPalette {"]
+    lines += [f"    pub {snake(name)}: Rgb," for name in names]
+    lines += ["}", "", "pub mod settings_windows {", "    use super::{Rgb, SettingsPalette};", ""]
+    for mode in modes:
+        colors = palettes[mode]["color"]
+        missing = set(names) - set(colors)
+        if missing:
+            raise ValueError(f"settings-windows.{mode} に色が足りません: {sorted(missing)}")
+        lines.append(f"    pub const {upper(mode)}: SettingsPalette = SettingsPalette {{")
+        lines += [f"        {snake(n)}: {rgb(colors[n]['$value'])}," for n in names]
+        lines.append("    };")
+    lines.append("}")
+    return lines
 
 
 def main(argv: list[str]) -> int:

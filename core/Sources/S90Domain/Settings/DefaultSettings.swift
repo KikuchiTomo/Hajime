@@ -150,6 +150,10 @@ public enum DefaultSettings {
     public static let maximumRomajiRules = 500
     /// キー設定の表の行の上限(R-17)．ひな形はどれも 150 行ほど
     public static let maximumKeymapEntries = 500
+    /// Windows の設定の画面がエンジンの応答を待つ時間(秒)．入力を止めない画面なので DLL より長く待つ
+    public static let settingsAppResponseTimeout = 2.0
+    /// Windows の設定の画面がエンジンにつながらないとき，つなぎ直す間隔(秒)
+    public static let settingsAppReconnectInterval = 3.0
     /// 使い方の記録を，何回ごとにファイルへ書くか
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
@@ -205,6 +209,8 @@ public enum DefaultSettings {
     public static let modeIndicatorDurationRange = 0.3...3.0
     /// 候補の文字の大きさ(pt)を選べる範囲
     public static let candidateFontSizeRange = 12.0...24.0
+    /// 秒の項目(待ち時間・表示時間)を選ぶ刻み(秒)．macOS の SecondsSlider と Windows の設定の画面で使う
+    public static let secondsStep = 0.1
     public static let maximumUserDictionaryReadingLength = 32
     public static let maximumUserDictionaryWordLength = 64
     /// 取り込むユーザー辞書のファイルの大きさの上限
