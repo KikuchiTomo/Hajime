@@ -33,10 +33,10 @@ final class ClientActionPresenter {
                 client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: Self.noReplacement)
             case .showCandidates(let panel):
                 note.hide()
-                candidatePanel.show(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
+                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize)
             case .showLattice(let panel):
                 note.hide()
-                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize,
+                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
                                            keys: settings.current.conversionKeys)
             case .hideCandidates:
                 candidatePanel.hide()
@@ -50,9 +50,9 @@ final class ClientActionPresenter {
                     logger.error("ライブ変換の設定を保存できませんでした: \(String(describing: error), privacy: .public)")
                 }
             case .showNote(let text):
-                note.show(text, caret: caretRect(of: client), theme: settings.current.theme)
+                note.show(text, caret: caretRect(of: client), theme: ThemeChoice(settings.current))
             case .showModeIndicator(let mode):
-                modeIndicator.show(mode, caret: caretRect(of: client), theme: settings.current.theme)
+                modeIndicator.show(mode, caret: caretRect(of: client), theme: ThemeChoice(settings.current), duration: settings.current.modeIndicatorDuration)
             case .selectMode(let mode):
                 client.selectMode(mode == .japanese ? AppIdentity.japaneseModeID : AppIdentity.directModeID)
             case .selectInputStyle(let style):
@@ -60,7 +60,7 @@ final class ClientActionPresenter {
                     try settings.update { $0.inputStyle = style }
                     // 切り替えたことを入力位置の近くに出す
                     if settings.current.showsModeIndicator {
-                        modeIndicator.show(style, caret: caretRect(of: client), theme: settings.current.theme)
+                        modeIndicator.show(style, caret: caretRect(of: client), theme: ThemeChoice(settings.current), duration: settings.current.modeIndicatorDuration)
                     }
                 } catch {
                     logger.error("入力方式を保存できませんでした: \(String(describing: error), privacy: .public)")

@@ -13,10 +13,11 @@ final class NoteController {
         window = FloatingPanel.make(contentView: view)
     }
 
-    func show(_ text: String, caret: NSRect, theme: ThemePreference) {
+    func show(_ text: String, caret: NSRect, theme: ThemeChoice) {
         view.theme = ResolvedTheme.resolve(theme)
         view.text = text
         let size = view.fittingSize
+        backdrop.cornerRadius = view.theme.cornerRadius
         _ = FloatingPanel.attach(view, to: window, backdrop: view.theme.isRounded ? backdrop : nil)
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
         if view.theme.isRounded { window.invalidateShadow() }

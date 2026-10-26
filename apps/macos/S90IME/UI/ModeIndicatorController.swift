@@ -13,18 +13,20 @@ final class ModeIndicatorController {
         window = FloatingPanel.make(contentView: view)
     }
 
-    func show(_ mode: InputMode, caret: NSRect, theme: ThemePreference) {
-        show(label: UIStrings.ModeIndicator.label(for: mode), caret: caret, theme: theme)
+    /// - Parameter duration: 出しておく時間(秒．設定の modeIndicatorDuration)
+    func show(_ mode: InputMode, caret: NSRect, theme: ThemeChoice, duration: Double) {
+        show(label: UIStrings.ModeIndicator.label(for: mode), caret: caret, theme: theme, duration: duration)
     }
 
-    func show(_ style: InputStyle, caret: NSRect, theme: ThemePreference) {
-        show(label: UIStrings.ModeIndicator.label(for: style), caret: caret, theme: theme)
+    func show(_ style: InputStyle, caret: NSRect, theme: ThemeChoice, duration: Double) {
+        show(label: UIStrings.ModeIndicator.label(for: style), caret: caret, theme: theme, duration: duration)
     }
 
-    private func show(label: String, caret: NSRect, theme: ThemePreference) {
+    private func show(label: String, caret: NSRect, theme: ThemeChoice, duration: Double) {
         view.theme = ResolvedTheme.resolve(theme)
         view.label = label
         let size = view.fittingSize
+        backdrop.cornerRadius = view.theme.cornerRadius
         _ = FloatingPanel.attach(view, to: window, backdrop: view.theme.isRounded ? backdrop : nil)
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
         if view.theme.isRounded { window.invalidateShadow() }
@@ -32,7 +34,7 @@ final class ModeIndicatorController {
         window.orderFrontRegardless()
         hideTask?.cancel()
         hideTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(DesignTokens.Motion.ModeIndicator.visible))
+            try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
             self?.fadeOut()
         }

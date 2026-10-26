@@ -131,7 +131,7 @@ final class SettingsModel: ObservableObject {
     /// 保存できたら true．できなければ入力欄を残す
     func addProfileRule(prefix: String, profile: AppProfile) -> Bool {
         let trimmed = prefix.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return false }
+        guard ProfileRuleCSV.isValidIdentifier(trimmed) else { return false }
         return update { current in
             current.profileRules.removeAll { $0.applicationPrefix == trimmed }
             current.profileRules.insert(ProfileRule(applicationPrefix: trimmed, profile: profile), at: 0)
@@ -200,5 +200,160 @@ final class SettingsModel: ObservableObject {
         } catch {
             message = UIStrings.Settings.exportFailed
         }
+    }
+
+    // MARK: 除外設定
+
+    /// アプリを /Applications から選んで足す．バンドル ID を手で打たなくてよいように
+    func addApplications(profile: AppProfile) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK else { return }
+        let identifiers = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }.filter(ProfileRuleCSV.isValidIdentifier)
+        guard !identifiers.isEmpty else {
+            message = UIStrings.More.noBundleID
+            return
+        }
+        update { current in
+            current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
+            current.profileRules.insert(contentsOf: identifiers.map { ProfileRule(applicationPrefix: $0, profile: profile) }, at: 0)
+        }
+    }
+
+    func importProfileRules() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let rules = try ProfileRuleFile.read(from: url)
+            let identifiers = Set(rules.map(\.applicationPrefix))
+            if update({ current in
+                current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
+                current.profileRules.insert(contentsOf: rules, at: 0)
+                current.clampToValidRanges()
+            }) {
+                message = UIStrings.More.importedRules(rules.count)
+            }
+        } catch {
+            message = UIStrings.More.csvFailed
+        }
+    }
+
+    func exportProfileRules() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = UIStrings.More.exportCSVFileName
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try ProfileRuleFile.write(settings.profileRules, to: url)
+        } catch {
+            message = UIStrings.Settings.exportFailed
+        }
+    }
+
+    // MARK: バックアップ
+
+    func exportSettings() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = UIStrings.More.exportSettingsFileName
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try SettingsTransfer.write(settings, to: url)
+        } catch {
+            message = UIStrings.More.settingsExportFailed
+        }
+    }
+
+    /// 読み込んだ設定ですべてを置き換える．読めない項目と範囲の外の値は既定値になる(SettingsTransfer)
+    func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let imported = try SettingsTransfer.read(from: url)
+            if update({ $0 = imported }) { message = UIStrings.More.settingsImported }
+        } catch {
+            message = UIStrings.More.settingsImportFailed
+        }
+    }
+
+    // MARK: カスタムテーマ
+
+    /// 今使っているテーマ(既成のテーマかカスタムテーマ)を複製して，新しいカスタムテーマにし，それを使う
+    func duplicateCurrentTheme() {
+        guard settings.customThemes.count < DefaultSettings.maximumCustomThemes else { return }
+        var theme = settings.activeCustomTheme ?? Self.customTheme(from: settings.theme)
+        theme.id = UUID().uuidString
+        theme.name = String(UIStrings.More.copyName(theme.name).prefix(DefaultSettings.maximumThemeNameLength))
+        update { current in
+            current.customThemes.append(theme)
+            current.customThemeID = theme.id
+        }
+    }
+
+    func updateCustomTheme(id: String, _ change: (inout CustomTheme) -> Void) {
+        update { current in
+            guard let index = current.customThemes.firstIndex(where: { $0.id == id }) else { return }
+            var theme = current.customThemes[index]
+            change(&theme)
+            if theme.isValid { current.customThemes[index] = theme }
+        }
+    }
+
+    func deleteCustomTheme(id: String) {
+        update { current in
+            current.customThemes.removeAll { $0.id == id }
+            if current.customThemeID == id { current.customThemeID = nil }
+        }
+    }
+
+    /// 既成のテーマを選ぶ(カスタムテーマは使わない)
+    func selectTheme(_ theme: ThemePreference) {
+        update { current in
+            current.theme = theme
+            current.customThemeID = nil
+        }
+    }
+
+    func selectCustomTheme(id: String) {
+        update { $0.customThemeID = id }
+    }
+
+    /// 既成のテーマの色を写したカスタムテーマ．標準(glass)の色は OS の色なので，今の外観での色にする
+    private static func customTheme(from preference: ThemePreference) -> CustomTheme {
+        var resolved = ResolvedTheme.resolve(preference)
+        NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
+            resolved = ResolvedTheme.resolve(preference)
+        }
+        func hex(_ color: NSColor) -> HexColor {
+            var value = HexColor(red: 0, green: 0, blue: 0)
+            NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
+                let rgb = color.usingColorSpace(.sRGB) ?? .black
+                value = HexColor(red: UInt8((rgb.redComponent * 255).rounded()), green: UInt8((rgb.greenComponent * 255).rounded()),
+                                 blue: UInt8((rgb.blueComponent * 255).rounded()))
+            }
+            return value
+        }
+        return CustomTheme(
+            id: UUID().uuidString, name: UIStrings.Choice.label(for: preference), base: preference,
+            surface: hex(resolved.surface), text: hex(resolved.text), textMuted: hex(resolved.textMuted),
+            selection: hex(resolved.selection), selectionText: hex(resolved.selectionText),
+            correction: hex(resolved.correction), line: hex(resolved.line),
+            cornerRadius: resolved.isRounded ? Double(resolved.cornerRadius) : 0
+        )
+    }
+
+    // MARK: 情報
+
+    var versionString: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+    }
+
+    /// アプリに入れた利用表記(THIRD_PARTY_NOTICES.md)．無ければ nil
+    var notices: String? {
+        guard let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md") else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 }

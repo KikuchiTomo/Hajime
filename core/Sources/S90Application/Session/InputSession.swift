@@ -39,6 +39,8 @@ public final class InputSession {
     private let readingCorrector: ReadingCorrector
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
     private var isSettled = false
+    /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
+    private var alphabetRun = false
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
@@ -81,6 +83,10 @@ public final class InputSession {
         if mode == .japanese, let command = settings.current.conversionKeys.command(for: event), command.isGlobal {
             let actions = commitAll()
             return KeyResult(handled: true, actions: actions + [command == .openSettings ? .openSettings : .toggleLiveConversion])
+        }
+        if context.profile == .direct {
+            // IME を使わないアプリ(除外設定)では，日本語のモードでも英数のまま入れる
+            return KeyResult(handled: false, actions: commitAll())
         }
         if event.modifiers.contains(.option), case .character = event.key {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
@@ -204,7 +210,7 @@ public final class InputSession {
     }
 
     private func routeJapanese(_ event: KeyEvent, context: InputContext) -> KeyResult {
-        if context.profile == .terminal, let result = applyTerminal(event) {
+        if context.profile == .terminal, settings.current.terminalCommands, let result = applyTerminal(event) {
             return result
         }
         // 分岐図では，利用者が割り当てたキー(Control 付きも)を Ctrl+J などより先に見る
@@ -305,11 +311,11 @@ public final class InputSession {
         case .composing:
             return 0
         case .lattice(let lattice):
-            return min(lattice.focused.candidates.count, DefaultSettings.latticeCandidatesPerSegment)
+            return min(lattice.focused.candidates.count, settings.current.branchCandidatesPerPage)
         case .selecting(let selection):
             guard case .candidate(let index) = selection.focus else { return 0 }
-            let pageStart = index / DefaultSettings.candidatesPerPage * DefaultSettings.candidatesPerPage
-            return min(selection.candidates.count - pageStart, DefaultSettings.candidatesPerPage)
+            let perPage = settings.current.listCandidatesPerPage
+            return min(selection.candidates.count - index / perPage * perPage, perPage)
         }
     }
 
@@ -380,7 +386,10 @@ public final class InputSession {
             // 打ち始めに，入力位置の前の文字列を変換の手がかりとして渡す(「AAA」+「まで」)
             converter.setLeftContext(context.precedingText)
         }
-        let isRomaji = (character.isASCII && character.isLetter && character.isLowercase)
+        let startsAlphabet = settings.current.shiftStartsAlphabet && character.isASCII && character.isLetter && character.isUppercase
+        if startsAlphabet { alphabetRun = true }
+        if alphabetRun, !(character.isASCII && character.isLetter) { alphabetRun = false }
+        let isRomaji = !alphabetRun && (character.isASCII && character.isLetter && character.isLowercase)
             || character == "-"
             || (character == "'" && composition.pending == "n")
             // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
@@ -395,9 +404,8 @@ public final class InputSession {
         } else if character.isASCII && (character.isLetter || character.isNumber) {
             corrector.commit(into: &composition)
             readingCorrector.didInsertLiteral()
-            let text = character.isNumber && settings.current.numberWidth == .fullwidth
-                ? KanaWidth.fullwidthASCII(from: String(character))
-                : String(character)
+            let width = character.isNumber ? settings.current.numberWidth : settings.current.alphabetWidth
+            let text = width == .fullwidth ? KanaWidth.fullwidthASCII(from: String(character)) : String(character)
             composition.insertLiteral(text, rawKey: character)
         } else {
             let text = SymbolTable.text(for: character, profile: context.profile, settings: settings.current)
@@ -432,6 +440,8 @@ public final class InputSession {
     }
 
     private func handleSpace(shift: Bool, context: InputContext) -> KeyResult {
+        // Space で英字のまま入れるところを終える
+        alphabetRun = false
         guard isComposing else {
             // 空白の幅は設定に従い，Shift+Space で逆の幅にする．プログラミング用のアプリでは常に半角
             let fullwidth = (settings.current.spaceWidth == .fullwidth) != shift
@@ -562,8 +572,8 @@ public final class InputSession {
     /// 番号キーで候補を選ぶ．候補を選んでいるときだけ使う
     private func selectByNumber(_ number: Int) -> Bool {
         guard case .selecting(var selection) = phase, case .candidate(let index) = selection.focus else { return false }
-        let pageStart = index / DefaultSettings.candidatesPerPage * DefaultSettings.candidatesPerPage
-        let target = pageStart + number - 1
+        let perPage = settings.current.listCandidatesPerPage
+        let target = index / perPage * perPage + number - 1
         guard target < selection.candidates.count else { return false }
         selection.focus = .candidate(target)
         phase = .selecting(selection)
@@ -625,6 +635,7 @@ public final class InputSession {
     private func reset() -> [ClientAction] {
         composition = newComposition()
         readingCorrector.reset()
+        alphabetRun = false
         phase = .composing
         corrector.reset()
         converter.endComposition()
@@ -725,14 +736,14 @@ public final class InputSession {
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
-            var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow)
+            var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow, perPage: settings.current.listCandidatesPerPage)
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
             return [.setMarkedText(marked), .showCandidates(panel)]
         case .lattice(let lattice):
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
                 .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
             })
-            var panel = PanelBuilder.latticePanel(for: lattice)
+            var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage)
             let preview = LatticeBuilder(converter: converter).resizePreview(lattice, reading: composition.conversionReading)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
@@ -787,7 +798,7 @@ public final class InputSession {
         }
         switch event.key {
         case .character(let character):
-            guard let number = numberKey(character), lattice.select(number: number) else { return nil }
+            guard let number = numberKey(character), lattice.select(number: number, perPage: settings.current.branchCandidatesPerPage) else { return nil }
             // 番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)
             guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
                 phase = .lattice(lattice)
@@ -834,7 +845,7 @@ extension InputSession {
     fileprivate static let zSymbolKeys: Set<Character> = [".", ",", "/", "[", "]"]
 
     fileprivate func numberKey(_ character: Character) -> Int? {
-        guard settings.current.numberKeySelection, let value = character.wholeNumberValue, (1...DefaultSettings.candidatesPerPage).contains(value) else { return nil }
+        guard settings.current.numberKeySelection, let value = character.wholeNumberValue, (1...9).contains(value) else { return nil }
         return value
     }
 }

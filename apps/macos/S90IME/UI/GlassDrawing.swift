@@ -7,7 +7,7 @@ enum GlassDrawing {
     /// 角丸の縁．fillsSurface が true なら面も塗る(ぼかしの無い画像に書き出すとき)．
     /// glass のほかの角丸のテーマは，ぼかしの地(GlassBackdrop)の上を色で塗りつぶす(角丸の形と窓の影は地の側が受け持つ)
     static func drawFrame(in rect: NSRect, theme: ResolvedTheme, fillsSurface: Bool) {
-        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: Glass.cornerRadius, yRadius: Glass.cornerRadius)
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: theme.cornerRadius, yRadius: theme.cornerRadius)
         if fillsSurface || !theme.usesBackdrop {
             theme.surface.setFill()
             path.fill()
@@ -214,6 +214,14 @@ final class GlassBackdrop: NSVisualEffectView {
         blendingMode = .behindWindow
         state = .active
         maskImage = Self.mask(radius: DesignTokens.Size.Glass.cornerRadius)
+    }
+
+    /// 角の丸さ(カスタムテーマで変わる)．変わったときだけ形を作り直す
+    var cornerRadius: CGFloat = DesignTokens.Size.Glass.cornerRadius {
+        didSet {
+            guard cornerRadius != oldValue else { return }
+            maskImage = Self.mask(radius: max(cornerRadius, 0.5))
+        }
     }
 
     @available(*, unavailable)

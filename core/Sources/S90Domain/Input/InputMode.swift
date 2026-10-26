@@ -11,11 +11,13 @@ public enum AppProfile: String, Sendable, Equatable, Codable, CaseIterable {
     case programming
     /// ターミナル．記号を半角にする
     case terminal
+    /// IME を使わないアプリ．日本語のモードでも英数のまま入れる
+    case direct
 
     public var prefersHalfwidthSymbols: Bool {
         switch self {
         case .standard: false
-        case .programming, .terminal: true
+        case .programming, .terminal, .direct: true
         }
     }
 }

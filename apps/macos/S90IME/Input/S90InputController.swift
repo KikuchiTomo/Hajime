@@ -56,14 +56,17 @@ final class S90InputController: IMKInputController {
         settleTask?.cancel()
         settleTask = nil
         let settles = session.awaitsSettle
+        // 待ち時間は設定で変えられる(ライブ変換で漢字にするまで・打ち間違いを見直すまで)
+        let settleDelay = root.settings.current.liveConversionDelay
+        let correctionDelay = root.settings.current.correctionDelay
         guard settles || session.awaitsReview else { return }
         settleTask = Task { @MainActor [weak self] in
             if settles {
-                try? await Task.sleep(for: .seconds(DefaultSettings.liveConversionSettleDelay))
+                try? await Task.sleep(for: .seconds(settleDelay))
                 guard !Task.isCancelled, let self else { return }
                 self.presenter.apply(self.session.settle(context: context), to: client)
             }
-            let remaining = DefaultSettings.liveCorrectionDelay - (settles ? DefaultSettings.liveConversionSettleDelay : 0)
+            let remaining = max(correctionDelay - (settles ? settleDelay : 0), 0)
             guard let self, self.session.awaitsReview else { return }
             try? await Task.sleep(for: .seconds(remaining))
             guard !Task.isCancelled else { return }

@@ -31,6 +31,8 @@ s90.tokyo のブランドの題材である漢字Talk 7 の時代の Macintosh �
 
 テーマの設定が「標準」(値は `automatic`)のときは，ライトでもダークでも glass を使います．以前の設定のファイルにある `native` も glass として読みます．
 
+利用者は設定の「外観」で，既成のテーマを元にカスタムテーマ(`CustomTheme`．色・角の丸さ・枝の形・候補の書体)を作って保存できる．描き方は元のテーマの系統(角丸か立体の枠か)を使い，色と形だけを上書きする(`ResolvedTheme.resolve(_: ThemeChoice)`)．見本は `design/mockups/branch-custom.png`．利用者の決めた色はコントラストの検査の対象外である．
+
 glass の色は OS の意味の色なので，`tools/tokens/check_contrast.py` の検査の対象外です．代わりに，ライト・ダーク・「コントラストを上げる」の 3 つで見本の画像(`design/mockups/`)を作り，目で確かめます．
 
 ### glass の色

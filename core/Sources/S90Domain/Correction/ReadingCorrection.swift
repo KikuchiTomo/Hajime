@@ -37,9 +37,15 @@ public struct ReadingCorrectionRule: Sendable {
     }
 
     public var level: TypoCorrectionLevel
+    /// 直す基準
+    public var sensitivity: CorrectionSensitivity
+    /// 直すほど確かでないとき，示すか
+    public var suggests: Bool
 
-    public init(level: TypoCorrectionLevel) {
+    public init(level: TypoCorrectionLevel, sensitivity: CorrectionSensitivity = .standard, suggests: Bool = true) {
         self.level = level
+        self.sensitivity = sensitivity
+        self.suggests = suggests
     }
 
     /// 直すならその候補を返す．reading はこちらで組み立てた読み(ひらがな)
@@ -55,8 +61,9 @@ public struct ReadingCorrectionRule: Sendable {
         if let typed, typed.reading != KanaWidth.katakana(from: reading) { return nil }
         guard best.reading != KanaWidth.katakana(from: reading) else { return nil }
         let gain = best.score - (typed?.score ?? last.score)
-        if gain >= DefaultSettings.readingCorrectionMargin { return .apply(best) }
-        if gain >= DefaultSettings.readingSuggestionMargin { return .suggest(best) }
+        let margins = sensitivity.margins
+        if gain >= margins.apply { return .apply(best) }
+        if suggests, gain >= margins.suggest { return .suggest(best) }
         return nil
     }
 

@@ -108,7 +108,7 @@ enum UIStrings {
         static let dictionaryTab = "ユーザー辞書"
         static let appearanceTab = "外観"
         static let usageTab = "統計"
-        static let appsTab = "アプリ別"
+        static let appsTab = "除外設定"
         static let romajiTab = "ローマ字"
         static let romajiKeys = "入力"
         static let romajiKana = "出力"
@@ -117,13 +117,13 @@ enum UIStrings {
         static let escapeSwitchesToDirect = "Escape で英数に切り替え"
         static let bundlePrefix = "バンドル ID"
         static let profile = "モード"
-        static let appsNote = "アプリの固有 ID を使用して指定します。\n優先順位順の指定が可能です。"
 
         static func label(for profile: AppProfile) -> String {
             switch profile {
             case .standard: "標準"
-            case .programming: "エディタ"
-            case .terminal: "ターミナル"
+            case .programming: "記号を半角"
+            case .terminal: "コマンドを英字"
+            case .direct: "IME を使わない"
             }
         }
         static let recordsUsage = "入力の統計を記録"
@@ -276,5 +276,90 @@ enum UIStrings {
             case .contrast: "高コントラスト"
             }
         }
+    }
+
+    /// 設定の画面で足したページと項目
+    enum More {
+        // 入力
+        static let alphabetWidth = "英字幅"
+        static let shiftStartsAlphabet = "Shift で英字入力"
+        static let modeIndicatorDuration = "モードの表示時間"
+        static func seconds(_ value: Double) -> String { String(format: "%.1f 秒", value) }
+
+        // 変換
+        static let candidates = "候補"
+        static let branchCandidates = "分岐図の候補数"
+        static let listCandidates = "一覧の候補数"
+        static let liveConversionDelay = "漢字にするまでの待ち時間"
+        static let typo = "タイプミス"
+        static let correctionSensitivity = "修正の基準"
+        static let showsSuggestions = "「もしかして」を表示"
+        static let correctionDelay = "見直すまでの待ち時間"
+
+        static func label(for sensitivity: CorrectionSensitivity) -> String {
+            switch sensitivity {
+            case .cautious: "慎重"
+            case .standard: "標準"
+            case .aggressive: "積極的"
+            }
+        }
+
+        // 除外設定
+        static let exclusionsNote = "アプリごとに入力の扱いを変えます。上にあるものが優先されます。"
+        static let addApps = "アプリを追加…"
+        static let importCSV = "CSV を読み込む…"
+        static let exportCSV = "CSV に書き出す…"
+        static let exportCSVFileName = "s90-exclusions.csv"
+        static let terminalCommands = "ターミナルでコマンドを英字で入力"
+        static let behavior = "動作"
+        static let apps = "アプリ"
+        static func importedRules(_ count: Int) -> String { "\(count) 件を追加しました" }
+        static let csvFailed = "読み込めませんでした。CSV のファイルではないか，大きすぎます"
+        static let noBundleID = "バンドル ID の無いアプリは追加できません"
+
+        // 外観
+        static let theme = "テーマ"
+        static let customThemes = "カスタムテーマ"
+        static let duplicate = "今のテーマを複製"
+        static let deleteTheme = "削除"
+        static let themeName = "名前"
+        static let colors = "色"
+        static let surface = "背景"
+        static let text = "文字"
+        static let textMuted = "補助の文字"
+        static let selection = "選択"
+        static let selectionText = "選択中の文字"
+        static let correction = "修正の印"
+        static let line = "線"
+        static let shape = "形"
+        static let cornerRadius = "角の丸さ"
+        static let branchStyle = "枝"
+        static let font = "書体"
+        static let themeFont = "テーマに合わせる"
+        static func copyName(_ name: String) -> String { "\(name) のコピー" }
+
+        static func label(for style: CustomTheme.BranchStyle) -> String {
+            switch style {
+            case .curved: "曲線"
+            case .straight: "直線"
+            }
+        }
+
+        // バックアップ
+        static let backup = "バックアップ"
+        static let backupNote = "ユーザー辞書・テーマ・キー操作を含むすべての設定を JSON で保存します。"
+        static let exportSettings = "設定を書き出す…"
+        static let importSettings = "設定を読み込む…"
+        static let exportSettingsFileName = "s90-settings.json"
+        static let settingsImported = "設定を読み込みました"
+        static let settingsImportFailed = "読み込めませんでした。s90.tokyo IME の設定ファイルではないか，大きすぎます"
+        static let settingsExportFailed = "書き出せませんでした"
+
+        // 情報
+        static let about = "情報"
+        static let version = "バージョン"
+        static let acknowledgements = "謝辞"
+        static let acknowledgementsNote = "s90.tokyo IME は次のオープンソースソフトウェアとモデルを利用しています。"
+        static let noticesMissing = "利用表記のファイルが見つかりません"
     }
 }

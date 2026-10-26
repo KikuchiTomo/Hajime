@@ -622,6 +622,59 @@ struct BranchMapControlTests {
 }
 
 @MainActor
+@Suite("増やした設定")
+struct ExtraSettingsTests {
+    @Test("IME を使わないアプリでは，日本語のモードでも英字のままアプリに渡す")
+    func directProfile() {
+        let harness = Harness(converter: FakeConverter(["か": [("蚊", nil)]]))
+        harness.context = InputContext(profile: .direct)
+        harness.press(.character("k"))
+        #expect(harness.lastResult.handled == false)
+        #expect(harness.marked.isEmpty)
+    }
+
+    @Test("Shift で英字を打ち始めたら，Space まで英字のまま入れる(設定)")
+    func shiftStartsAlphabet() {
+        var settings = DefaultSettings.settings
+        settings.shiftStartsAlphabet = true
+        let harness = Harness(settings: settings)
+        harness.type("Python")
+        #expect(harness.marked.text == "Python")
+    }
+
+    @Test("Shift で打った英字を全角にする(設定)")
+    func fullwidthAlphabet() {
+        var settings = DefaultSettings.settings
+        settings.alphabetWidth = .fullwidth
+        let harness = Harness(settings: settings)
+        harness.type("A")
+        #expect(harness.marked.text == "Ａ")
+    }
+
+    @Test("分岐図の候補の数を設定で変える")
+    func branchCandidates() {
+        var settings = DefaultSettings.settings
+        settings.branchCandidatesPerPage = 3
+        let converter = FakeConverter(["きしゃ": [("記者", nil), ("汽車", nil), ("帰社", nil), ("貴社", nil), ("喜捨", nil)]])
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kisya")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.first(where: \.isFocused)?.alternatives.count == 3)
+    }
+
+    @Test("ターミナルでコマンドを英字で入れる設定を切ると，行の頭も日本語にする")
+    func terminalCommandsOff() {
+        var settings = DefaultSettings.settings
+        settings.terminalCommands = false
+        let harness = Harness(converter: FakeConverter(["ls": [("ls", nil)]]), settings: settings)
+        harness.context = InputContext(profile: .terminal)
+        harness.type("ls")
+        harness.press(.space)
+        #expect(harness.committed.isEmpty)
+    }
+}
+
+@MainActor
 @Suite("日本語の打ち間違い")
 struct ReadingCorrectionScenarioTests {
     private func typed(_ keys: String, corrections: [ReadingCorrection]) -> (InputSession, () -> (marked: String, note: String?)) {
