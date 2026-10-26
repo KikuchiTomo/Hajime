@@ -18,6 +18,8 @@ public protocol KanaKanjiConverting: AnyObject {
     func candidates(for reading: String) -> [Candidate]
     /// 読みの先頭の文節の候補だけを，よさそうな順に返す(文節格子に使う)
     func clauseCandidates(for reading: String) -> [Candidate]
+    /// 打っている読みに続く語の予測(入力中の候補)．読み全体を置き換える候補として返す
+    func predictions(for reading: String) -> [Candidate]
     /// 読みとしてのもっともらしさ(大きいほどよい)．候補を作らずに点数だけを求める軽い変換で計る．
     /// 「nn」のあとの母音をどう読むかを比べるのに使う(NasalReadingResolver)
     func plausibility(of reading: String) -> Double
@@ -50,6 +52,7 @@ public protocol KanaKanjiConverting: AnyObject {
 }
 
 extension KanaKanjiConverting {
+    public func predictions(for reading: String) -> [Candidate] { [] }
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) {}
     public func setApplication(_ identifier: String?) {}
     public func sourceName(of text: String, reading: String) -> String? { nil }

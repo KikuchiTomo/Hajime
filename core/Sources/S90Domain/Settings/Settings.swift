@@ -42,6 +42,8 @@ public struct Settings: Sendable, Equatable {
     public var candidatePresentation = CandidatePresentation.automatic
     /// Space で変換したときに最初に選ぶ文節
     public var initialFocus = InitialFocus.start
+    /// 打っているあいだに候補の窓を出すか
+    public var suggestionDisplay = SuggestionDisplay.whenLiveConversionOff
     /// 一覧の 1 ページの候補の数
     public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
     /// 分岐図の下の枝に出す候補の数
@@ -182,7 +184,7 @@ extension Settings: Codable {
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
-        case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
         case learning, userDictionary, importedDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, profileRules
@@ -245,6 +247,7 @@ extension Settings: Codable {
         read(.typoCorrection, into: \.typoCorrection)
         read(.candidatePresentation, into: \.candidatePresentation)
         read(.initialFocus, into: \.initialFocus)
+        read(.suggestionDisplay, into: \.suggestionDisplay)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
         read(.numberKeySelection, into: \.numberKeySelection)
@@ -314,6 +317,7 @@ extension Settings: Codable {
         try container.encode(typoCorrection, forKey: .typoCorrection)
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
         try container.encode(initialFocus, forKey: .initialFocus)
+        try container.encode(suggestionDisplay, forKey: .suggestionDisplay)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)

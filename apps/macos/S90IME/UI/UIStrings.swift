@@ -402,6 +402,15 @@ enum UIStrings {
         static let theme = "テーマ"
         static let presentation = "候補の表示"
         static let initialFocus = "最初に選ぶ文節"
+        static let suggestionDisplay = "入力中の候補"
+
+        static func label(for display: SuggestionDisplay) -> String {
+            switch display {
+            case .off: "表示しない"
+            case .whenLiveConversionOff: "ライブ変換がオフのとき"
+            case .always: "常に表示"
+            }
+        }
 
         static func label(for focus: InitialFocus) -> String {
             switch focus {

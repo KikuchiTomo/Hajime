@@ -146,6 +146,41 @@ struct InputSessionScenarioTests {
         #expect(InputSession.splitPositions(of: String(repeating: "あ", count: 20)).count == 9)
     }
 
+    @Test("ライブ変換がオフのときは，打っているあいだに変換と予測の候補の窓を出し，↓ で選んで Enter で確定する")
+    func suggestionWindow() {
+        let converter = FakeConverter(["きょう": [("今日", nil), ("京", nil)]])
+        converter.predictionTexts["きょう"] = ["今日は", "教室"]
+        var settings = DefaultSettings.settings
+        settings.liveConversion = false
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyou")
+        #expect(harness.panel?.entries.map(\.text) == ["今日", "京", "今日は", "教室"])
+        #expect(harness.panel?.selectedEntry == nil)
+        #expect(harness.marked.text == "きょう")
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.enter)
+        #expect(harness.committed == "今日は")
+    }
+
+    @Test("打っているあいだの候補の窓は，ライブ変換がオンなら既定では出さず，設定で「常に」にすれば出す")
+    func suggestionWindowSetting() {
+        let converter = FakeConverter(["きょう": [("今日", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("kyou")
+        #expect(harness.panel == nil)
+        var always = DefaultSettings.settings
+        always.suggestionDisplay = .always
+        let shown = Harness(converter: converter, settings: always)
+        shown.type("kyou")
+        #expect(shown.panel?.entries.first?.text == "今日")
+        // 1 文字では出さない
+        let short = Harness(converter: converter, settings: always)
+        short.type("a")
+        #expect(short.panel == nil)
+    }
+
     @Test("R-01: 打ちながらライブ変換の結果を表示し，Enter で確定する")
     func liveConversion() {
         let harness = Harness(converter: FakeConverter(["へんかん": [("変換", nil)]]))
