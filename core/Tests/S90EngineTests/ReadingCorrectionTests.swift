@@ -40,11 +40,39 @@ struct ReadingCorrectionTests {
         #expect(corrections[typed]?.first?.keys == expected)
     }
 
-    private func makeSession() throws -> InputSession {
+    @Test("英語の混ざる文は，打鍵が止まって見直しても，Space で変換しても英単語を日本語に直さない", arguments: [
+        ("pythongasugoi", "pythonがすごい"),
+        ("gitwotukau", "gitを使う"),
+        ("konoIMEha", "このIMEは"),
+        ("AAAmade", "AAAまで"),
+    ])
+    func keepsEnglish(keys: String, expected: String) throws {
+        let lexicon = FakeLexicon(words: ["python", "git"])
+        let reviewed = try makeSession(lexicon: lexicon)
+        _ = live(reviewed, keys)
+        let settled = marked(reviewed.settle(context: InputContext()) + reviewed.review(context: InputContext()))
+        #expect(settled == nil || settled == expected, "\(keys)")
+        var committed = ""
+        for action in reviewed.handle(KeyEvent(.enter), context: InputContext()).actions {
+            if case .commit(let text) = action { committed += text }
+        }
+        #expect(committed == expected)
+
+        let converted = try makeSession(lexicon: lexicon)
+        _ = live(converted, keys)
+        _ = converted.handle(KeyEvent(.space), context: InputContext())
+        committed = ""
+        for action in converted.handle(KeyEvent(.enter), context: InputContext()).actions {
+            if case .commit(let text) = action { committed += text }
+        }
+        #expect(committed == expected)
+    }
+
+    private func makeSession(lexicon: FakeLexicon = FakeLexicon()) throws -> InputSession {
         let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: try ZenzaiModel.verified(at: URL(fileURLWithPath: path)))
-        return InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings())
+        return InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: FakeSettings())
     }
 
     private func convert(_ keys: String) throws -> String {

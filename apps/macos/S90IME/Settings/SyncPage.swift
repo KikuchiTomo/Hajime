@@ -52,8 +52,6 @@ struct SyncPage: View {
                 }
             } header: {
                 Text(UIStrings.Sync.scopes)
-            } footer: {
-                Text(UIStrings.Sync.itemsNote).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

@@ -112,6 +112,8 @@ public struct Settings: Sendable, Equatable {
     public var escapeSwitchesToDirect = false
     /// ターミナルで，行の頭のコマンドの名前を英字のまま入れる(R-07)
     public var terminalCommands = true
+    /// エディタとターミナルでライブ変換を控えめにする(R-06)．打鍵が止まるまで読みのまま見せ，英数字を打っているあいだは変換しない
+    public var restrainsLiveConversionInCode = true
     /// アプリの識別子(macOS はバンドル ID)の前方一致からプロファイルを決める規則．先にあるものを優先する
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
@@ -187,7 +189,7 @@ extension Settings: Codable {
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
         case learning, userDictionary, importedDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
-        case escapeSwitchesToDirect, profileRules
+        case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -266,6 +268,7 @@ extension Settings: Codable {
         read(.candidateFontSize, into: \.candidateFontSize)
         read(.showsModeIndicator, into: \.showsModeIndicator)
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
+        read(.restrainsLiveConversionInCode, into: \.restrainsLiveConversionInCode)
         readList(.profileRules, into: \.profileRules)
         // 形式の版と，この版が知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
@@ -334,6 +337,7 @@ extension Settings: Codable {
         try container.encode(candidateFontSize, forKey: .candidateFontSize)
         try container.encode(showsModeIndicator, forKey: .showsModeIndicator)
         try container.encode(escapeSwitchesToDirect, forKey: .escapeSwitchesToDirect)
+        try container.encode(restrainsLiveConversionInCode, forKey: .restrainsLiveConversionInCode)
         try container.encode(profileRules, forKey: .profileRules)
         var others = encoder.container(keyedBy: AnyKey.self)
         try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))

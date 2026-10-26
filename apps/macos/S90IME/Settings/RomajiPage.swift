@@ -10,9 +10,7 @@ struct RomajiPage: View {
             Section {
                 RuleListEditor(model: model, spec: .romaji, labels: .init(
                     key: UIStrings.Settings.romajiKeys, value: UIStrings.Settings.romajiKana,
-                    empty: UIStrings.Settings.romajiEmpty, emptyHint: UIStrings.Settings.romajiEmptyHint))
-            } footer: {
-                Text(UIStrings.Settings.romajiNote).font(.caption).foregroundStyle(.secondary)
+                    empty: UIStrings.Settings.romajiEmpty))
             }
         }
         .formStyle(.grouped)
