@@ -13,6 +13,11 @@ enum PanelBuilder {
     /// 最後に確定した語の学習を取り消したときの案内
     static let lastCommitForgottenNote = "最後の学習を取り消しました"
 
+    /// 連想変換で，選んでいる語の連想が見つからなかったときの案内(R-18)
+    static let noAssociationNote = "連想はありません"
+    /// 連想変換を使う設定で，引ける連想の辞書が無いときの案内
+    static let noAssociationDictionaryNote = "連想の辞書がありません"
+
     // 案内に出すキーは，キー設定の表でそのコマンドに割り当てた最初のキー(R-17)．キーが無ければキーの部分を出さない
 
     /// 英単語を直した候補が先頭の一覧の案内．key は次の候補のキー
@@ -83,6 +88,51 @@ enum PanelBuilder {
             total: selection.candidates.count,
             note: isCorrected ? correctionNote(key: nextKey) : nil
         )
+    }
+
+    /// 選んでいる候補に連想があるときの知らせ．key は連想変換のキー
+    static func associationHint(key: String?) -> String { key.map { "\($0) 連想" } ?? "連想" }
+
+    // MARK: 連想(R-18)
+
+    /// 連想の見出し
+    static func associationHeading(_ list: AssociationList) -> AssociationHeading {
+        AssociationHeading(headword: list.associations.headword, label: list.group.label, group: list.groupIndex + 1,
+                           groupCount: list.associations.groups.count)
+    }
+
+    /// 一覧で出す連想．1 ページにはひとつの意味のまとまりの語だけを並べ，位置はまとまりの中で数える
+    static func associationListPanel(for list: AssociationList, perPage: Int) -> CandidatePanel {
+        let page = list.page(perPage: perPage)
+        var panel = CandidatePanel(
+            variants: [],
+            selectedVariant: nil,
+            entries: page.words.map { CandidatePanel.Entry(text: $0, annotation: nil) },
+            selectedEntry: page.selected,
+            focus: .candidate,
+            position: list.indexInGroup + 1,
+            total: list.group.words.count,
+            note: nil
+        )
+        panel.association = associationHeading(list)
+        return panel
+    }
+
+    /// 分岐図で出す連想．lattice は選んでいる連想の語を注目している文節に入れたもの．
+    /// 注目している文節の下の枝に今のまとまりの語を並べ，上の枝(字種)は出さない
+    static func associationLatticePanel(for lattice: SegmentLattice, list: AssociationList, perPage: Int) -> LatticePanel {
+        var panel = latticePanel(for: lattice, perPage: perPage, showsVariants: false)
+        let page = list.page(perPage: perPage)
+        if let focused = panel.columns.firstIndex(where: \.isFocused) {
+            panel.columns[focused].alternatives = page.words
+            panel.columns[focused].selectedAlternative = page.selected
+            panel.columns[focused].alternativeNotes = []
+            panel.columns[focused].isUncertain = false
+        }
+        panel.position = list.indexInGroup - page.selected + 1
+        panel.total = list.group.words.count
+        panel.association = associationHeading(list)
+        return panel
     }
 
     /// showsVariants が false なら上の枝(字種)を出さない(設定の「候補の上に文字種の行を表示」)

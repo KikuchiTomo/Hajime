@@ -79,6 +79,13 @@ public protocol DictionaryLookup: AnyObject {
     func words(reading: String, in dictionary: ImportedDictionary) -> [DictionaryWord]
 }
 
+/// 取り込んだ連想の辞書を語で引く(R-18)．辞書の中身(類語の辞書・利用者が作った辞書)は差し替えられる
+@MainActor
+public protocol AssociationLookup: AnyObject {
+    /// word を含む意味のまとまり．辞書に書いた順(よく使う意味から)
+    func groups(for word: String, in dictionary: AssociationDictionary) -> [AssociationGroup]
+}
+
 /// 英単語の辞書のポート(R-02)．中身は端末の中だけで調べる
 @MainActor
 public protocol EnglishLexicon: AnyObject {

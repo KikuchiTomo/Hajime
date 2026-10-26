@@ -27,11 +27,12 @@ final class Harness {
     private(set) var note: String?
     private(set) var lastResult = KeyResult.passThrough
 
-    init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings) {
+    init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
+         associations: (any AssociationLookup)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         self.settings = FakeSettings(settings)
-        self.session = InputSession(converter: converter, lexicon: lexicon, settings: self.settings)
+        self.session = InputSession(converter: converter, lexicon: lexicon, settings: self.settings, associations: associations)
     }
 
     func type(_ text: String) {

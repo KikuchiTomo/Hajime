@@ -102,6 +102,7 @@ func run() -> Int32 {
     let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
     let calendar = SystemCalendar(clock: { Date() })
     let dictionaries = ImportedDictionaryStore(directory: HostPaths.local.appendingPathComponent("dictionaries", isDirectory: true))
+    let associations = AssociationDictionaryStore(directory: HostPaths.local.appendingPathComponent("associations", isDirectory: true))
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
     let lexicon = EmptyLexicon()
@@ -116,7 +117,7 @@ func run() -> Int32 {
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
-                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService)
+                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations)
         },
         settings: settings,
         ui: { window.send($0) },

@@ -242,6 +242,22 @@ public enum DefaultSettings {
     /// 直さない語の長さの上限
     public static let maximumExceptionLength = 64
 
+    // 連想変換(R-18)
+    /// 連想の一覧に出す語の数(既定)と，選べる範囲
+    public static let associationLimit = 60
+    public static let associationLimitRange = 10...300
+    /// 取り込める連想の辞書の数の上限
+    public static let maximumAssociationDictionaries = 8
+    /// 取り込む連想の辞書のファイルの大きさの上限．日本語 WordNet を丸ごと書き出しても 10MB ほどなので余裕を見た大きさ
+    public static let maximumAssociationFileBytes = 64 * 1024 * 1024
+    /// 連想の辞書 1 つのまとまり(意味)の数の上限
+    public static let maximumAssociationGroups = 1_000_000
+    /// 1 つのまとまりの語の数の上限．索引は語ごとにまとまりを書き写すので，語の数の 2 乗で大きくなるのを抑える
+    public static let maximumAssociationGroupWords = 64
+    /// 連想の語と意味の説明の長さの上限
+    public static let maximumAssociationWordLength = 64
+    public static let maximumAssociationLabelLength = 80
+
     /// 手書きの線を書き終えてから認識するまで待つ時間(秒)．続けて書く線を待つ
     public static let handwritingRecognitionDelay = 0.6
 }

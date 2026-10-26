@@ -146,6 +146,7 @@ enum UIStrings {
             case .previousCandidatePage: "前の候補のページ"
             case .firstCandidate: "先頭の候補"
             case .lastCandidate: "末尾の候補"
+            case .associate: "連想変換"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
@@ -191,6 +192,7 @@ enum UIStrings {
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
+            case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
@@ -767,6 +769,7 @@ extension UIStrings {
             case .symbols: "記号"
             case .dictionary: "ユーザー辞書"
             case .importedDictionaries: "取り込んだ辞書"
+            case .associationDictionaries: "連想の辞書"
             case .appearance: "外観"
             case .exclusions: "除外設定"
             case .usage: "統計"
