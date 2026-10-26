@@ -95,8 +95,8 @@ final class CompositionRoot {
         return controller
     }()
 
-    func makePresenter() -> ClientActionPresenter {
-        ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
+    func makePresenter(session: InputSession) -> ClientActionPresenter {
+        ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
                               openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting)
     }
 

@@ -24,7 +24,8 @@ final class S90InputController: IMKInputController {
                 preconditionFailure("main.swift で CompositionRoot を組み立ててからサーバーを作る")
             }
             let menu = InputMenuBuilder(settings: root.settings, openSettings: { root.settingsWindow.show() })
-            return (root, root.makeSession(), root.makePresenter(), menu)
+            let session = root.makeSession()
+            return (root, session, root.makePresenter(session: session), menu)
         }
         self.root = root
         self.session = session
@@ -99,6 +100,8 @@ final class S90InputController: IMKInputController {
             presenter.apply(session.deactivate(), to: client)
         }
         presenter.hideWindows()
+        // 手書きの窓は開いたときの入力先に文字を入れるので，入力先から外れたら閉じる
+        presenter.closeHandwriting()
         root.engine.flushLearning()
         root.usage.flush()
         super.deactivateServer(sender)

@@ -26,6 +26,15 @@ MainActor.assumeIsolated {
 if CommandLine.arguments.contains("--open-settings") {
     MainActor.assumeIsolated { CompositionRoot.installed?.settingsWindow.show() }
 }
+// 開発版だけ: 起動してすぐ手書きの窓を開く(入力先が無いので，選んだら文字数だけを標準出力に出す．入力の中身は出さない)
+if CommandLine.arguments.contains("--open-handwriting") {
+    MainActor.assumeIsolated {
+        let caret = NSRect(x: 200, y: (NSScreen.main?.frame.maxY ?? 800) - 200, width: 1, height: 18)
+        CompositionRoot.installed?.handwriting.show(caret: caret, owner: NSApplication.shared) { text in
+            FileHandle.standardError.write(Data("手書きの候補を選んだ: \(text.count) 字\n".utf8))
+        }
+    }
+}
 #endif
 
 guard let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String,
