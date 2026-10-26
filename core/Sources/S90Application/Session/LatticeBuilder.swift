@@ -75,7 +75,18 @@ struct LatticeBuilder {
     /// 打ち間違いと決めつけず，分岐図の中で直した文と打ったままの文のどちらも選べるようにするため．
     /// 直した部分が複数の文節にまたがるときは，それらを 1 つの文節にまとめてから入れる
     func addingTyped(_ lattice: SegmentLattice, typedReading: String, reading: String) -> SegmentLattice {
-        let typed = Array(typedReading), corrected = Array(reading)
+        addingAlternatives(lattice, otherReading: typedReading, reading: reading, origin: .asTyped)
+    }
+
+    /// 打ち間違いを「もしかして」と示しているとき，直した部分を含む文節の 2 番目に，直した読みの候補を入れる．
+    /// 文全体を直さず，その文節だけ直す・直さないを選べるようにするため
+    func addingCorrection(_ lattice: SegmentLattice, correctedReading: String, reading: String) -> SegmentLattice {
+        addingAlternatives(lattice, otherReading: correctedReading, reading: reading, origin: .correction)
+    }
+
+    /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．違う部分が複数の文節にまたがるときは 1 つにまとめる
+    private func addingAlternatives(_ lattice: SegmentLattice, otherReading: String, reading: String, origin: CandidateOrigin) -> SegmentLattice {
+        let typed = Array(otherReading), corrected = Array(reading)
         let prefix = zip(typed, corrected).prefix { $0 == $1 }.count
         let suffix = zip(typed.reversed(), corrected.reversed()).prefix { $0 == $1 }.count
         let common = min(suffix, min(typed.count, corrected.count) - prefix)
@@ -94,8 +105,8 @@ struct LatticeBuilder {
         guard start <= prefix, typedEnd > start, typedEnd <= typed.count else { return lattice }
         let typedSlice = String(typed[start..<typedEnd])
         var additions = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count }.prefix(2)
-            .map { Candidate(text: $0.text, readingCount: length, origin: .asTyped) }
-        additions.append(Candidate(text: typedSlice, readingCount: length, origin: .asTyped))
+            .map { Candidate(text: $0.text, readingCount: length, origin: origin) }
+        additions.append(Candidate(text: typedSlice, readingCount: length, origin: origin))
         for (offset, candidate) in additions.enumerated() where !segment.candidates.contains(where: { $0.text == candidate.text }) {
             segment.candidates.insert(candidate, at: min(1 + offset, segment.candidates.count))
         }

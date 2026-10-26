@@ -5,6 +5,7 @@ import S90Domain
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let splitNote = "数字で区切る位置を選ぶ　Esc でやめる"
+    static let correctedNote = "修正"
     static let correctionNote = "Space 入力のままに戻す"
     static let englishInputNote = "Tab 日本語にする"
     static let readingCorrectionNote = "直しました　Esc で打ったままに戻す"
@@ -67,7 +68,7 @@ enum PanelBuilder {
             let page = segment.candidates[pageStart..<min(pageStart + perSegment, segment.candidates.count)]
             position = pageStart + 1
             total = segment.candidates.count
-            return LatticePanel.Column(
+            var column = LatticePanel.Column(
                 text: segment.selected.text,
                 alternatives: page.map(\.text),
                 selectedAlternative: selectedCandidate.map { $0 - pageStart },
@@ -77,6 +78,14 @@ enum PanelBuilder {
                 isUncertain: !segment.isConfident,
                 isDecided: segment.isDecided
             )
+            column.alternativeNotes = page.map { candidate in
+                switch candidate.origin {
+                case .asTyped: asTypedNote
+                case .correction: correctedNote
+                default: nil
+                }
+            }
+            return column
         }
         return LatticePanel(columns: columns, position: position, total: total)
     }

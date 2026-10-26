@@ -563,6 +563,11 @@ public final class InputSession {
             lattice = builder.splitting(lattice, at: forcedBoundaries, reading: composition.conversionReading)
             lattice.focusedIndex = lattice.initialFocus(focus)
         }
+        if let suggested = readingCorrector.suggestion, readingCorrector.typedComposition(from: composition) == nil {
+            // 「もしかして」と示しているときは，その文節だけ直せるよう，直した候補を該当の文節に入れる
+            lattice = builder.addingCorrection(lattice, correctedReading: suggested.conversionReading, reading: composition.conversionReading)
+            lattice.focusedIndex = lattice.initialFocus(focus)
+        }
         if let typed = readingCorrector.typedComposition(from: composition) {
             // 打ち間違いを直した文節は，自動のときいちばん先に選ぶ(confidenceGap を最小にしてある)
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
