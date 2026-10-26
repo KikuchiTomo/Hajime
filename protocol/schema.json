@@ -328,15 +328,6 @@
       "tag": "type",
       "cases": [
         {
-          "name": "selectInputStyle",
-          "fields": [
-            {
-              "name": "style",
-              "type": "string"
-            }
-          ]
-        },
-        {
           "name": "toggleLiveConversion"
         },
         {

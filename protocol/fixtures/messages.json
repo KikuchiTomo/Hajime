@@ -29,7 +29,6 @@
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
     { "id": 12, "body": { "type": "readSettings" } },
     { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } },
-    { "id": 18, "body": { "type": "menu", "command": { "type": "selectInputStyle", "style": "kana" } } },
     { "id": 19, "body": { "type": "menu", "command": { "type": "toggleLiveConversion" } } },
     { "id": 20, "body": { "type": "menu", "command": { "type": "openSettings" } } },
     { "id": 14, "body": { "type": "readSettingsFields", "names": ["theme", "keymap"], "defaults": false } },

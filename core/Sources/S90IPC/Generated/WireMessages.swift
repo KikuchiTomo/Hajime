@@ -404,20 +404,17 @@ extension WireSettingsSnapshot: CustomStringConvertible, CustomDebugStringConver
 }
 
 public enum WireMenuCommand: Sendable, Equatable, Codable {
-    case selectInputStyle(style: String)
     case toggleLiveConversion
     case openSettings
 
     private enum CodingKeys: String, CodingKey {
-        case type, style
+        case type
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try container.decode(String.self, forKey: .type)
         switch kind {
-        case "selectInputStyle":
-            self = try .selectInputStyle(style: container.decode(String.self, forKey: .style))
         case "toggleLiveConversion":
             self = .toggleLiveConversion
         case "openSettings":
@@ -430,9 +427,6 @@ public enum WireMenuCommand: Sendable, Equatable, Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .selectInputStyle(let style):
-            try container.encode("selectInputStyle", forKey: .type)
-            try container.encode(style, forKey: .style)
         case .toggleLiveConversion:
             try container.encode("toggleLiveConversion", forKey: .type)
         case .openSettings:
@@ -444,7 +438,6 @@ public enum WireMenuCommand: Sendable, Equatable, Codable {
 extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         switch self {
-        case .selectInputStyle: "WireMenuCommand.selectInputStyle"
         case .toggleLiveConversion: "WireMenuCommand.toggleLiveConversion"
         case .openSettings: "WireMenuCommand.openSettings"
         }
