@@ -94,7 +94,9 @@ public enum KeyEditSearch {
         plausibility: (String) -> Double,
         languageModel: ([String]) -> [Double?]
     ) -> [ReadingCorrection] {
-        guard let original = reading(of: keys) else { return [] }
+        // 打ったままの読みに，かなにならない英字が残ることがある(tkitou → tきとう)．そのときも訂正を探す
+        let original = rawReading(of: keys)
+        guard !original.isEmpty else { return [] }
         let ranked = edits(of: keys, from: from)
             .map { (edit: $0, local: localGain(of: $0.reading, over: original, plausibility: plausibility) - $0.cost) }
             .sorted { $0.local != $1.local ? $0.local > $1.local : $0.edit.keys < $1.edit.keys }
@@ -110,13 +112,12 @@ public enum KeyEditSearch {
 
     /// 候補ごとに，読みを変換したときのもっともらしさの打ったままの読みとの差(plausibilityGain)を入れる
     public static func withPlausibility(_ corrections: [ReadingCorrection], typedKeys keys: String, plausibility: (String) -> Double) -> [ReadingCorrection] {
-        guard let original = reading(of: keys) else { return corrections }
-        let base = plausibility(original)
-        guard base.isFinite else { return corrections }
+        let original = rawReading(of: keys)
+        guard !original.isEmpty else { return corrections }
+        let base = finite(plausibility(original))
         return corrections.map { correction in
             var correction = correction
-            let gain = plausibility(KanaWidth.hiragana(from: correction.reading)) - base
-            correction.plausibilityGain = gain.isFinite ? gain : 0
+            correction.plausibilityGain = finite(plausibility(KanaWidth.hiragana(from: correction.reading))) - base
             return correction
         }
     }
@@ -147,7 +148,19 @@ public enum KeyEditSearch {
         let common = min(suffix, min(a.count, b.count) - prefix)
         let start = max(0, prefix - window)
         func slice(_ text: [Character]) -> String { String(text[start..<min(text.count, text.count - common + window)]) }
-        return plausibility(slice(b)) - plausibility(slice(a))
+        return finite(plausibility(slice(b))) - finite(plausibility(slice(a)))
+    }
+
+    /// 変換できない読み(英字が残るなど)のもっともらしさは −∞ なので，比べられるよう下限の値にする
+    static func finite(_ value: Double) -> Double {
+        value.isFinite ? value : DefaultSettings.unconvertiblePlausibility
+    }
+
+    /// キーの並びの読み(ひらがな)．かなにならない英字もそのまま残す(打ったままの読み)
+    public static func rawReading(of keys: String, table: RomajiTable = .standard) -> String {
+        var composition = Composition(table: table)
+        for key in keys { composition.insertRomaji(key) }
+        return composition.conversionReading
     }
 
     /// 読みの音．書き分けても音が同じかなをそろえる(ぢ→じ，づ→ず，を→お，は→わ，へ→え)．

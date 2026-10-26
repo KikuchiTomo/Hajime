@@ -65,15 +65,34 @@ public struct ReadingCorrectionRule: Sendable {
 
     /// 直すか，示すだけか，何もしないか．比べるのは rank(言語モデル・変換のもっともらしさ・手間)
     public func decision(among candidates: [ReadingCorrection], reading: String) -> Decision? {
-        guard level == .standard, let best = candidates.max(by: { $0.rank < $1.rank }), let last = candidates.min(by: { $0.rank < $1.rank }),
-            !best.isUnchanged else { return nil }
+        guard level == .standard, let last = candidates.min(by: { $0.rank < $1.rank }) else { return nil }
         let typed = candidates.first(where: \.isUnchanged)
         if let typed, typed.reading != KanaWidth.katakana(from: reading) { return nil }
-        guard best.reading != KanaWidth.katakana(from: reading) else { return nil }
-        let gain = best.rank - (typed?.rank ?? last.rank)
+        let baseRank = typed?.rank ?? last.rank
+        let baseScore = typed?.score ?? last.score
         let margins = sensitivity.margins
-        if gain >= margins.apply { return .apply(best) }
-        if suggests, gain >= margins.suggest { return .suggest(best) }
+        let offset = margins.apply - DefaultSettings.readingCorrectionMargin
+        // 2 つの決まりのどちらかで直す・示す．
+        // 1. 言語モデル・変換のもっともらしさ・手間を合わせた点数(rank)の差．書き分けの誤り(見ずらい)や 2 か所の誤りを拾う
+        // 2. 1 か所の直し(手間が小さい)で，Zenzai の点数の差(score．前の決まり)が大きいもの．かなの並びとして明らかにおかしいもの(ようですね)を拾う
+        // 片方だけにすると，もう片方で拾えていた文を落とす(性能を落とさない)
+        func isSmall(_ candidate: ReadingCorrection) -> Bool { candidate.cost <= DefaultSettings.singleEditCost }
+        func applies(_ candidate: ReadingCorrection) -> Bool {
+            candidate.rank - baseRank >= margins.apply
+                || (isSmall(candidate) && candidate.score - baseScore >= DefaultSettings.readingCorrectionScoreMargin + offset)
+        }
+        let sound = KeyEditSearch.pronunciation(of: KanaWidth.hiragana(from: reading))
+        func suggestsCandidate(_ candidate: ReadingCorrection) -> Bool {
+            candidate.rank - baseRank >= margins.suggest
+                || (isSmall(candidate) && candidate.score - baseScore >= DefaultSettings.readingSuggestionScoreMargin + offset)
+                // 3. 音の変わらない書き誤りで，変換のもっともらしさが大きく上がるもの(見ずらい → 見づらい)
+                || (KeyEditSearch.pronunciation(of: KanaWidth.hiragana(from: candidate.reading)) == sound
+                    && candidate.plausibilityGain >= DefaultSettings.samePronunciationSuggestionGain + offset)
+        }
+        let changed = candidates.filter { !$0.isUnchanged && $0.reading != KanaWidth.katakana(from: reading) }
+        func strength(_ candidate: ReadingCorrection) -> Double { (candidate.rank - baseRank) + (candidate.score - baseScore) }
+        if let chosen = changed.filter(applies).max(by: { strength($0) < strength($1) }) { return .apply(chosen) }
+        if suggests, let chosen = changed.filter(suggestsCandidate).max(by: { strength($0) < strength($1) }) { return .suggest(chosen) }
         return nil
     }
 

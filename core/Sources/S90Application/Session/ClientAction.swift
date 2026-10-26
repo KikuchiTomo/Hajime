@@ -24,6 +24,9 @@ public enum ClientAction: Sendable, Equatable {
     case showHandwriting
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
     case showNote(String)
+    /// 打ち間違いの訂正を求め終わるまで変換を待つ．入力コントローラは訂正を求めて渡し(provideCorrections)，
+    /// resumeConversion で変換を続ける．訂正を求めない作りなら resumeConversion をすぐ呼ぶ
+    case awaitCorrections
 }
 
 /// 処理の結果．handled が false なら，キーは入力先のアプリにそのまま渡る
