@@ -43,8 +43,8 @@ public enum DefaultSettings {
     /// 打ち間違いを直した読みの候補をいくつまで求めるか
     public static let typoCorrectionCandidateCount = 5
     /// 打ち間違いを探す幅．広いほど見つけやすいが遅い．4 で 1 文 0.2 秒以内(Zenzai small，Apple Silicon)
-    public static let typoCorrectionBeamSize = 4
-    public static let typoCorrectionTopK = 8
+    public static let typoCorrectionBeamSize = 16
+    public static let typoCorrectionTopK = 32
     /// 直した読みが打ったままの読みより，対数確率でいくつ以上よければ直すか．
     /// 「こんにちは」を「こんいちば」にするような誤った訂正(差 1.9)を避け，「ようですね」→「よいですね」(差 3.6)は直す
     public static let readingCorrectionMargin = 3.0
