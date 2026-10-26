@@ -933,7 +933,8 @@ public final class InputSession {
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
                 .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
             })
-            var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage)
+            var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
+                                                  showsVariants: settings.current.showsVariantRow)
             let preview = LatticeBuilder(converter: converter).resizePreview(lattice, reading: composition.conversionReading)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
@@ -1007,7 +1008,7 @@ public final class InputSession {
             let perPage = settings.current.branchCandidatesPerPage
             switch move {
             case .next: lattice.moveSelection(by: 1)
-            case .previous: lattice.moveSelection(by: -1)
+            case .previous: lattice.moveSelection(by: -1, entersVariants: settings.current.showsVariantRow)
             case .nextPage: lattice.moveToPage(by: 1, perPage: perPage)
             case .previousPage: lattice.moveToPage(by: -1, perPage: perPage)
             case .first: lattice.selectCandidate(at: 0)

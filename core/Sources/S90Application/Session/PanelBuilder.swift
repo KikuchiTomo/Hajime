@@ -64,7 +64,9 @@ enum PanelBuilder {
         )
     }
 
-    static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment) -> LatticePanel {
+    /// showsVariants が false なら上の枝(字種)を出さない(設定の「候補の上に文字種の行を表示」)
+    static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment,
+                             showsVariants: Bool = true) -> LatticePanel {
         var position = 1
         var total = 0
         let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in
@@ -87,7 +89,7 @@ enum PanelBuilder {
                 text: segment.selected.text,
                 alternatives: page.map(\.text),
                 selectedAlternative: selectedCandidate.map { $0 - pageStart },
-                variants: segment.variants.map(\.text),
+                variants: showsVariants ? segment.variants.map(\.text) : [],
                 selectedVariant: selectedVariant,
                 isFocused: true,
                 isUncertain: !segment.isConfident,
