@@ -109,3 +109,14 @@ targets:
           S90_SUPPORT_DIRECTORY: tokyo.s90.ime.debug
           S90_ICON_SUFFIX: "-dev"
           S90_DISPLAY_NAME: "s90 Debug"
+# スキームを書いておく．書かないと xcodebuild が自動で作るスキームで実行先の機種が決まらず，
+# 「Supported platforms for the buildables in the current scheme is empty」と出る
+schemes:
+  S90IME:
+    build:
+      targets:
+        S90IME: all
+    run:
+      config: Debug
+    archive:
+      config: Release

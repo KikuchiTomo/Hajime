@@ -1,13 +1,13 @@
 # install.sh・uninstall.sh・package.sh で共有する，本番と開発版の名前と，署名の証明書の決め方．
-# 名前は apps/macos/project.yml の configs と合わせる
+# 名前は apps/macos/project.yml の configs と合わせる(app_name はアプリの名前，display_name は入力メニューに出す名前 S90_DISPLAY_NAME)
 # 全ユーザー共通の置き場所に入れる．配布物(.pkg)と azooKey と同じ場所で，手元で入力ソースとして選べることを確かめた場所
 destination="/Library/Input Methods"
 
 # 開発版は Dev の構成でビルドする(最適化は本番と同じ)．Debug の構成は画像の書き出し用の別のアプリで，ここでは入れない
 variant() {
   case "$1" in
-    Release) configuration=Release; app_name="s90.tokyo IME"; bundle_id="tokyo.s90.inputmethod.S90IME" ;;
-    Dev) configuration=Dev; app_name="s90.tokyo IME Dev"; bundle_id="tokyo.s90.inputmethod.S90IME.develop" ;;
+    Release) configuration=Release; app_name="s90.tokyo IME"; display_name="s90"; bundle_id="tokyo.s90.inputmethod.S90IME" ;;
+    Dev) configuration=Dev; app_name="s90.tokyo IME Dev"; display_name="s90 Dev"; bundle_id="tokyo.s90.inputmethod.S90IME.develop" ;;
     *) echo "Release か Dev を指定してください" >&2; exit 1 ;;
   esac
 }
