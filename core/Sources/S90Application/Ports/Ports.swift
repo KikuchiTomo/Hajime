@@ -92,7 +92,7 @@ public protocol HandwritingRecognizing: Sendable {
     func recognize(strokes: [[Point]], canvasSize: Size) async -> [String]
 }
 
-/// 同期のファイルの置き場所(TODO 43・49)．最初の実装は利用者が選んだフォルダ(FolderSyncBackend)．
+/// 同期のファイルの置き場所(R-15)．最初の実装は利用者が選んだフォルダ(FolderSyncBackend)．
 /// Google Drive・Dropbox の API で読み書きする実装も，この形で足せるようにする(今は通信しない)
 public protocol SyncBackend: Sendable {
     /// 同期のファイルの中身．まだ無ければ nil

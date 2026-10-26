@@ -57,7 +57,7 @@ struct SettingsSchemaTests {
     }
 }
 
-@Suite("同期の突き合わせ(TODO 43・49)")
+@Suite("同期の突き合わせ(R-15)")
 struct SyncMergeTests {
     private let t0 = Date(timeIntervalSince1970: 1_000)
     private let t1 = Date(timeIntervalSince1970: 2_000)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// 同期するときの設定のまとまり(TODO 43・49)．まとまりごとに「同期する」「この Mac だけ」を選べる
+/// 同期するときの設定のまとまり(R-15)．まとまりごとに「同期する」「この Mac だけ」を選べる
 public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, CodingKeyRepresentable {
     case input
     case keyboard

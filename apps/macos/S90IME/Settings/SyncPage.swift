@@ -1,7 +1,7 @@
 import S90Domain
 import SwiftUI
 
-/// 同期(TODO 43・49)．フォルダを選ぶと，設定とユーザー辞書をそのフォルダのファイルと同期する．
+/// 同期(R-15)．フォルダを選ぶと，設定とユーザー辞書をそのフォルダのファイルと同期する．
 /// まとまりごとに「同期する」「この Mac だけ」を選べる
 struct SyncPage: View {
     @ObservedObject var sync: SyncCoordinator
