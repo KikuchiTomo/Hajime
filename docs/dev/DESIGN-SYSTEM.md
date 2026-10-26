@@ -27,7 +27,7 @@ s90.tokyo のブランドの題材である漢字Talk 7 の時代の Macintosh �
 | `contrast` | 高コントラスト | 黒い地に白い文字，選択は黄．常に「コントラストを上げる」の扱い | 見分けやすさを最優先にする人 |
 
 和紙・北欧・ネオン・端末・高コントラストは，glass と同じ角丸と曲線の枝で描き，地を色で塗る．色は `tokens.json` の `theme`，コントラストは `check_contrast.py` で検査する．
-足元の案内のキー(↓ ↑ ← → ⇧ ⌃ ⌥ ⌘ Tab Space)は，すべてのテーマで SF Symbols のアイコンをキーキャップの札に入れて描く．札の形は，角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り．見本は `design/mockups/*-<テーマ>.png`
+足元の案内のキー(↓ ↑ ← → ⇧ ⌃ ⌥ ⌘ Tab Space)は，すべてのテーマで SF Symbols のアイコンをキーキャップの札に入れて描く．Windows は同じ形の線画(`candidate-ui` の `icon.rs`)で描き，Ctrl と Alt は Windows のキーの刻印どおり文字で書く．札の形は，角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り．見本は `design/mockups/*-<テーマ>.png`
 
 テーマの設定が「標準」(値は `automatic`)のときは，ライトでもダークでも glass を使います．以前の設定のファイルにある `native` も glass として読みます．
 
@@ -49,6 +49,8 @@ OS の意味の色を使い，ライト・ダーク・アクセントカラー�
 | 枝と区切りの線 | `tertiaryLabelColor` |
 | 番号の丸・キーキャップの地 | `quaternaryLabelColor` |
 | 補正の印 | `systemPink` |
+
+Windows には同じ意味の色の組が無いので，`tokens.json` の `glass.light`・`glass.dark` の色を使い(`check_contrast.py` で検査する)，選択だけを Windows のアクセントカラーにする．線・番号の丸・注目している文節の地は，文字の色や選択の色を `opacity.glass` の濃さにしたもの．地は DWM のすりガラス(`DWMSBT_TRANSIENTWINDOW`)で，使えないときだけ `surface` で塗る．
 
 ### platinum と desk の色(抜粋)
 

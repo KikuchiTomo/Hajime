@@ -26,6 +26,21 @@ enum HostPaths {
     static var installation: URL {
         URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
     }
+
+    static let versionString = "s90.tokyo IME for Windows"
+}
+
+/// インストール先の Zenzai\ に置いたモデルを確かめて読む．無いか，大きさとハッシュが合わなければ Zenzai なしで動く
+@MainActor
+func loadZenzaiModel() -> ZenzaiModel? {
+    let url = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.fileName)
+    do {
+        return try ZenzaiModel.verified(at: url)
+    } catch {
+        // 中身は書かない(ファイルの場所と理由だけ)
+        FileHandle.standardError.write(Data("Zenzai を使いません: \(error)\n".utf8))
+        return nil
+    }
 }
 
 @MainActor
@@ -74,10 +89,11 @@ func run() -> Int32 {
     }
 
     let settings = FileSettingsStore(fileURL: HostPaths.roaming.appendingPathComponent("settings.json"))
+    let memory = HostPaths.local.appendingPathComponent("memory", isDirectory: true)
+    let zenzai = loadZenzaiModel()
     let engine: AzooKeyConverterEngine
     do {
-        engine = try AzooKeyConverterEngine(memoryDirectory: HostPaths.local.appendingPathComponent("memory", isDirectory: true),
-                                            versionString: "s90.tokyo IME for Windows")
+        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: HostPaths.versionString, zenzai: zenzai)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))
         return 1
@@ -89,6 +105,8 @@ func run() -> Int32 {
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
     let lexicon = EmptyLexicon()
+    // 打ち間違いの訂正は時間がかかるので，別の変換器で裏で求める(Zenzai があるときだけ．macOS の CompositionRoot と同じ)
+    let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: HostPaths.versionString) }
     let window = CandidateWindowLink()
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings.exe")
 
@@ -98,7 +116,7 @@ func run() -> Int32 {
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
-                         lexicon: lexicon, settings: settings, usage: usage)
+                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService)
         },
         settings: settings,
         ui: { window.send($0) },
@@ -113,7 +131,8 @@ func run() -> Int32 {
             resetLearning: { [engine] in engine.resetLearning() },
             usage: usage,
             previewLanguage: { preview.preview($0, precedingText: $1) }
-        )
+        ),
+        typoService: typoService
     )
     settings.observe { [weak engine] in
         engine?.apply($0)

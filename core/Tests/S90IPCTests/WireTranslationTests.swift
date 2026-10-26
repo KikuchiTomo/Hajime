@@ -102,4 +102,16 @@ struct WireTranslationTests {
         let composing = WireSessionState(mode: .japanese, isComposing: true, keymap: keymap, wakeAfterMilliseconds: nil)
         #expect(composing.precedingTextLength == nil)
     }
+
+    @Test("キー配列はローマ字入力と英字入力のときだけ DLL に伝える")
+    func keyboardLayout() {
+        var settings = DefaultSettings.settings
+        #expect(WireSessionState.keyboardLayout(for: settings) == nil)
+        settings.keyboardLayout = .dvorak
+        #expect(WireSessionState.keyboardLayout(for: settings) == "dvorak")
+        settings.inputStyle = .englishAuto
+        #expect(WireSessionState.keyboardLayout(for: settings) == "dvorak")
+        settings.inputStyle = .kana
+        #expect(WireSessionState.keyboardLayout(for: settings) == nil)
+    }
 }

@@ -298,13 +298,22 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     /// 語の品詞の ID から，文節に分けるための印を付ける．名詞の ID は azooKey の CIDData(一般名詞 1285〜数 1295)の並びの範囲
     private static func words(of data: [DicdataElement]) -> [S90Domain.Candidate.Word] {
-        data.map {
-            .init(text: $0.word, readingCount: $0.ruby.count, startsWithParticle: CIDData.isJoshi(cid: $0.lcid),
-                  endsWithParticle: CIDData.isJoshi(cid: $0.rcid), startsWithNoun: nounIDs.contains($0.lcid))
+        data.map { element in
+            .init(text: element.word, readingCount: element.ruby.count, startsWithParticle: CIDData.isJoshi(cid: element.lcid),
+                  endsWithParticle: CIDData.isJoshi(cid: element.rcid), startsWithNoun: nounIDs.contains(element.lcid),
+                  startsWithPredicate: predicateIDs.contains { $0.contains(element.lcid) },
+                  startsWithConjunctiveParticle: conjunctiveParticleIDs.contains(element.lcid),
+                  endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid))
         }
     }
 
     private static let nounIDs = 1280...1316
+    /// 名詞のほかの自立語の品詞の ID の範囲．azooKey の品詞の ID は品詞の名前の順に並ぶ．s90-playground --words で語ごとの ID を見て確かめた
+    /// (形容詞 19・20・35・43，接続詞 555，動詞 619・772・817，副詞 1281・1282，連体詞 1315)．助詞は 147〜368，助動詞は 369〜554
+    private static let predicateIDs: [ClosedRange<Int>] = [10...146, 555...1279, 1280...1284, 1315...1315]
+    /// 助詞のうち，終助詞(ね 279・よ 288・わ 291)と接続助詞(て 307・で 308・ので 316・ば 318)の範囲．同じく語ごとの ID を見て決めた
+    private static let sentenceFinalParticleIDs = 263...295
+    private static let conjunctiveParticleIDs = 296...330
 
     func typoCorrections(forKeys keys: String) -> [ReadingCorrection] {
         guard engine.usesZenzai, !keys.isEmpty else { return [] }

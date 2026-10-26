@@ -56,7 +56,8 @@
           "mode": "japanese",
           "isComposing": false,
           "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }],
-          "precedingTextLength": 40
+          "precedingTextLength": 40,
+          "keyboardLayout": "dvorak"
         }
       }
     },
