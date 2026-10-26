@@ -22,11 +22,16 @@ jobs:
           persist-credentials: false
       - run: make check PYTHON="python3 -I"
 
-  core-test:
+  core-tests:
     # core のテスト．変換エンジンの辞書を取得するので数分かかる．
-    # 本物の Zenzai のテストと処理時間(R-01)は Release でだけ動かす(make test-zenzai)
+    # Debug のテストと，本物の Zenzai のテストと処理時間(R-01)を測る Release のテスト(make test-zenzai)を並べて動かす．
+    # Zenzai のテストは CI の Mac では GPU が遅く 15 分ほどかかるので，続けて動かさずに分ける
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [debug, zenzai]
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 40
     env:
       # Zenzai のモデルはリポジトリの外に置き，キャッシュから戻す
       MODELS_DIR: ${{ github.workspace }}/../models
@@ -41,11 +46,25 @@ jobs:
           sudo xcode-select -s "$xcode"
           swift --version
       # モデルは毎回取らずにキャッシュする．取得元とハッシュは fetch_zenzai.sh にあるので，それが変わったら取り直す
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - if: matrix.target == 'zenzai'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/../models
           key: zenzai-${{ hashFiles('tools/models/fetch_zenzai.sh') }}
       # キャッシュから戻したときも SHA-256 を確かめる
-      - run: make fetch-models
-      - run: make test-debug
-      - run: make test-zenzai
+      - if: matrix.target == 'zenzai'
+        run: make fetch-models
+      - run: make test-${{ matrix.target }}
+
+  core-test:
+    # 必須のチェックの名前(core-test)を変えずに，上の 2 つがどちらも通ったときだけ通す
+    if: always()
+    needs: core-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULT: ${{ needs.core-tests.result }}
+        run: |
+          echo "core-tests: $RESULT"
+          test "$RESULT" = success
