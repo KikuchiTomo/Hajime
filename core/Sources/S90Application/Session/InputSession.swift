@@ -74,9 +74,14 @@ public final class InputSession {
         self.lexicon = lexicon
         self.settings = settings
         self.usage = usage
-        self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings, converter: converter)
+        let classifier = WordLanguageClassifier(lexicon: lexicon, converter: converter, settings: settings)
+        self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings, converter: converter, classifier: classifier)
         self.readingCorrector = ReadingCorrector(converter: converter, settings: settings, usesProvidedCorrections: typoService != nil)
-        self.styleHandlers = [.english: EnglishInput(converter: converter), .kana: KanaInput()]
+        self.styleHandlers = [
+            .english: EnglishInput(converter: converter, classifier: classifier, settings: settings, behavior: .manual),
+            .englishAuto: EnglishInput(converter: converter, classifier: classifier, settings: settings, behavior: .automatic),
+            .kana: KanaInput(),
+        ]
     }
 
     public var isComposing: Bool { !composition.isEmpty || !composingStyles.isEmpty }
@@ -313,7 +318,7 @@ public final class InputSession {
         guard let command = settings.current.keymap.command(for: event, in: keymapState) else { return nil }
         // 英字入力で読みを組み立てていないとき(英字を打っているとき・何も打っていないとき)は英語の入力と同じに動かすため，
         // 表は入力モードの切り替えと IME の機能にだけ使う
-        if settings.current.inputStyle == .english, composition.isEmpty, !command.changesMode, !command.isTool { return nil }
+        if settings.current.inputStyle.typesLetters, composition.isEmpty, !command.changesMode, !command.isTool { return nil }
         // 手書き入力は設定でオンにしたときだけ
         if command == .handwriting, !settings.current.handwriting { return nil }
         return command
@@ -347,6 +352,13 @@ public final class InputSession {
                 return KeyResult(handled: true, actions: [.selectMode(.japanese), .selectInputStyle(nextInputStyle())])
             }
             return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(nextInputStyle())])
+        case .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle:
+            let style = command.inputStyle ?? .romaji
+            guard mode == .japanese else {
+                mode = .japanese
+                return KeyResult(handled: true, actions: [.selectMode(.japanese), .selectInputStyle(style)])
+            }
+            return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(style)])
         case .cancelAndDirectMode:
             let actions = isComposing ? reset() : []
             mode = .direct
@@ -429,7 +441,7 @@ public final class InputSession {
     /// ターミナルの行の判断に従う．ふつうの処理に回すときは nil
     private func applyTerminal(_ event: KeyEvent) -> KeyResult? {
         let composingKeys = phase == .composing && !composition.isEmpty ? composition.rawKeys : nil
-        switch terminal.decide(event, isComposing: isComposing, composingKeys: composingKeys, holdsLetters: settings.current.inputStyle == .english) {
+        switch terminal.decide(event, isComposing: isComposing, composingKeys: composingKeys, holdsLetters: settings.current.inputStyle.typesLetters) {
         case .continue:
             return nil
         case .passThrough:
@@ -477,16 +489,17 @@ public final class InputSession {
         let style = settings.current.inputStyle
         guard let handler = styleHandlers[style] else { return nil }
         // 英字入力の Tab で開いた分岐図などで英字を打ったら，選んでいる変換で確定してから英字を続ける
-        if style == .english, !composition.isEmpty, case .character(let character) = event.key, character.isASCII, character.isLetter {
+        if style.typesLetters, !composition.isEmpty, case .character(let character) = event.key, character.isASCII, character.isLetter {
             let committed = commitAll()
-            if case .handled(let result)? = handler.interpret(event, state: InputStyleState(settings: settings.current, selectableCount: 0)) {
+            if case .handled(let result)? = handler.interpret(event, state: InputStyleState(settings: settings.current, selectableCount: 0,
+                                                                                         precedingText: context.precedingText)) {
                 return KeyResult(handled: result.handled, actions: committed + result.actions)
             }
             return KeyResult(handled: true, actions: committed)
         }
         // 英字入力で日本語の読みを組み立てているあいだ(Tab で開いた分岐図)は，ほかのキーをふつうの処理に回す(Enter で確定など)
-        if style == .english, !composition.isEmpty { return nil }
-        let state = InputStyleState(settings: settings.current, selectableCount: selectableCount)
+        if style.typesLetters, !composition.isEmpty { return nil }
+        let state = InputStyleState(settings: settings.current, selectableCount: selectableCount, precedingText: context.precedingText)
         switch handler.interpret(event, state: state) {
         case nil:
             return nil
@@ -703,7 +716,10 @@ public final class InputSession {
 
     /// ローマ字として読めてしまう英単語を英単語にする(「gitwotukau」→「gitを使う」)．打ち間違いを直して見せているときはしない
     private func freezeWordsReadAsRomaji() {
-        guard phase == .composing, !readingCorrector.isApplied, corrector.freezeWordReadAsRomaji(in: &composition) else { return }
+        guard phase == .composing, !readingCorrector.isApplied else { return }
+        // 英語にも日本語にも読める語(「make」)は，前が英語のときや利用者が決めた語なら英語にする
+        let context = WordLanguageContext.of(precedingText: compositionLeftContext)
+        guard corrector.freezeEnglishWord(in: &composition, context: context) || corrector.freezeWordReadAsRomaji(in: &composition) else { return }
         readingCorrector.forgetReview()
         usage?.record(.englishCorrected)
     }
@@ -752,7 +768,7 @@ public final class InputSession {
             return switchToDirectPassingEscape(actions: [])
         }
         let wasConverting = phase != .composing
-        if wasConverting, let english = convertedFromEnglish, let handler = styleHandlers[.english] as? EnglishInput {
+        if wasConverting, let english = convertedFromEnglish, let handler = styleHandlers[settings.current.inputStyle] as? EnglishInput {
             // 英字入力の Tab で開いた分岐図は，Esc で英字に戻す
             _ = reset()
             handler.restore(english)

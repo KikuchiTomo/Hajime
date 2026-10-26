@@ -49,11 +49,7 @@ public struct TypoCorrectionRule: Sendable {
 
     /// 英単語が日本語の文の中にあるか．前の読みか，組み立てる前の入力位置の直前に日本語(かな・漢字)があればそうみなす(R-06)
     public func isInJapaneseSentence(before reading: some Collection<Character>, precedingCharacter: Character?) -> Bool {
-        reading.contains(where: Self.isJapanese) || (precedingCharacter.map(Self.isJapanese) ?? false)
-    }
-
-    private static func isJapanese(_ character: Character) -> Bool {
-        character.unicodeScalars.contains { (0x3041...0x30FF).contains($0.value) || (0x4E00...0x9FFF).contains($0.value) || (0x3400...0x4DBF).contains($0.value) }
+        reading.contains(where: WordLanguageJudge.isJapanese) || (precedingCharacter.map(WordLanguageJudge.isJapanese) ?? false)
     }
 
     /// 読みが，文の中の英単語のすぐあとによく続く語で始まるか
