@@ -19,6 +19,7 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .toggleLiveConversion: "toggleLiveConversion"
         case .showHandwriting: "showHandwriting"
         case .awaitCorrections: "awaitCorrections"
+        case .requestReconversion: "requestReconversion"
         }
     }
 

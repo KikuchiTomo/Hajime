@@ -27,6 +27,7 @@
     { "id": 9, "body": { "type": "deactivate", "session": 4 } },
     { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 10, "body": { "type": "openHandwriting", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
+    { "id": 10, "body": { "type": "reconvert", "session": 4, "text": "変換", "reading": "へんかん", "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
     { "id": 12, "body": { "type": "readSettings" } },
     { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5, "handwriting": true } } },
@@ -92,7 +93,8 @@
           { "type": "commit", "text": "変換" },
           { "type": "setComposition", "segments": [{ "text": "にほん", "style": "reading" }, { "text": "語", "style": "focused" }, { "text": "x", "style": "correction" }, { "text": "y", "style": "converted" }] },
           { "type": "setComposition", "segments": [] },
-          { "type": "selectMode", "mode": "japanese" }
+          { "type": "selectMode", "mode": "japanese" },
+          { "type": "requestReconversion", "maximumLength": 64 }
         ],
         "state": { "mode": "japanese", "isComposing": true, "consumedKeys": [], "wakeAfterMilliseconds": 300 }
       }

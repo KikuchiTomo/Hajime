@@ -3,6 +3,7 @@ use super::edit_session;
 use super::guard::guard;
 use super::keyboard;
 use super::langbar::{self, InputModeItem};
+use super::phonetic;
 use crate::filter;
 use crate::key::{self, RawKey};
 use crate::plan::CompositionPlan;
@@ -361,11 +362,18 @@ impl TextService_Impl {
 
     fn apply_operations(&self, context: &ITfContext, operations: Vec<EditOperation>) {
         let mut edits = Vec::new();
+        let mut reconversion = None;
         for operation in operations {
             match operation {
                 EditOperation::SelectMode { mode } => self.select_mode(mode),
+                EditOperation::RequestReconversion { maximum_length } => {
+                    reconversion = Some(maximum_length)
+                }
                 other => edits.push(other),
             }
+        }
+        if let Some(maximum_length) = reconversion {
+            self.reconvert(context, maximum_length);
         }
         if edits.is_empty() {
             return;
@@ -397,7 +405,8 @@ impl TextService_Impl {
                             &atoms,
                             &sink,
                         ),
-                        EditOperation::SelectMode { .. } => Ok(()),
+                        EditOperation::SelectMode { .. }
+                        | EditOperation::RequestReconversion { .. } => Ok(()),
                     };
                     if result.is_err() {
                         break;
@@ -565,6 +574,28 @@ impl TextService_Impl {
         };
         self.send_edit(&context, engine, session, |session, context| {
             RequestBody::OpenHandwriting { session, context }
+        });
+    }
+
+    /// 再変換．入力先で選んでいる文字(maximum_length 文字まで)を読み，Windows の日本語の解析で読みを求めて，エンジンに変換し直してもらう．
+    /// 選んでいない・秘密の欄・長すぎるときは何もしない
+    fn reconvert(&self, context: &ITfContext, maximum_length: u32) {
+        let client_id = self.inner.borrow().client_id;
+        let Some(text) = read_selection(context, client_id, maximum_length) else {
+            return;
+        };
+        let reading = phonetic::reading(&text);
+        let (engine, session) = {
+            let inner = self.inner.borrow();
+            (inner.engine.clone(), inner.session)
+        };
+        self.send_edit(context, engine, session, |session, context| {
+            RequestBody::Reconvert {
+                session,
+                text,
+                reading,
+                context,
+            }
         });
     }
 
@@ -970,6 +1001,54 @@ fn read_field(context: &ITfContext, client_id: u32, length: u32) -> FieldReading
         Ok(())
     });
     reading.take()
+}
+
+/// 入力先で選んでいる文字．選んでいない・秘密の欄・maximum_length(UTF-16 で数える)より長いときは None
+fn read_selection(context: &ITfContext, client_id: u32, maximum_length: u32) -> Option<String> {
+    let selected = Rc::new(RefCell::new(None));
+    let output = selected.clone();
+    let target = context.clone();
+    let _ = edit_session::request(context, client_id, TF_ES_SYNC | TF_ES_READ, move |ec| {
+        let Some(range) = selection_range(ec, &target)? else {
+            return Ok(());
+        };
+        // 秘密の欄かは選択の始まりで見る．Clone で別の範囲にする(参照の複製だと選択そのものを縮めてしまう)
+        let start = unsafe { range.Clone()? };
+        unsafe { start.Collapse(ec, TF_ANCHOR_START)? };
+        if input_scope_is_secure(ec, &target, &start)? {
+            return Ok(());
+        }
+        // 上限より 1 文字多く読み，読み切れたら長すぎるとみなす
+        let mut buffer = vec![0u16; maximum_length as usize + 1];
+        let mut fetched = 0u32;
+        unsafe { range.GetText(ec, 0, &mut buffer, &mut fetched)? };
+        if fetched == 0 || fetched > maximum_length {
+            return Ok(());
+        }
+        buffer.truncate(fetched as usize);
+        *output.borrow_mut() = Some(String::from_utf16_lossy(&buffer));
+        Ok(())
+    });
+    selected.take()
+}
+
+/// 選択の範囲(選んでいなければ幅 0)
+fn selection_range(ec: u32, context: &ITfContext) -> Result<Option<ITfRange>> {
+    let mut selection = [TF_SELECTION {
+        range: ManuallyDrop::new(None),
+        style: TF_SELECTIONSTYLE {
+            ase: TF_AE_NONE,
+            fInterimChar: false.into(),
+        },
+    }];
+    let mut fetched = 0u32;
+    unsafe { context.GetSelection(ec, TF_DEFAULT_SELECTION, &mut selection, &mut fetched)? };
+    let [first] = selection;
+    let range = ManuallyDrop::into_inner(first.range);
+    if fetched == 0 {
+        return Ok(None);
+    }
+    Ok(range)
 }
 
 /// 選択の始まりの位置(幅 0 の範囲)

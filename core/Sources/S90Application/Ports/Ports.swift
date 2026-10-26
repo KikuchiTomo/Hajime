@@ -79,6 +79,13 @@ public protocol DictionaryLookup: AnyObject {
     func words(reading: String, in dictionary: ImportedDictionary) -> [DictionaryWord]
 }
 
+/// 確定済みの文字の読み(再変換で使う)．OS の機能で求める(macOS は CFStringTokenizer，Windows は IFELanguage)
+@MainActor
+public protocol ReadingTranscribing: AnyObject {
+    /// text のひらがなの読み．求められなければ nil
+    func reading(of text: String) -> String?
+}
+
 /// 取り込んだ連想の辞書を語で引く(R-18)．辞書の中身(類語の辞書・利用者が作った辞書)は差し替えられる
 @MainActor
 public protocol AssociationLookup: AnyObject {

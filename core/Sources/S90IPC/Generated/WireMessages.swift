@@ -320,9 +320,10 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
     case commit(text: String)
     case setComposition(segments: [WireTextSegment])
     case selectMode(mode: WireInputMode)
+    case requestReconversion(maximumLength: UInt32)
 
     private enum CodingKeys: String, CodingKey {
-        case type, text, segments, mode
+        case type, text, segments, mode, maximumLength
     }
 
     public init(from decoder: any Decoder) throws {
@@ -335,6 +336,8 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
             self = try .setComposition(segments: container.decode([WireTextSegment].self, forKey: .segments))
         case "selectMode":
             self = try .selectMode(mode: container.decode(WireInputMode.self, forKey: .mode))
+        case "requestReconversion":
+            self = try .requestReconversion(maximumLength: container.decode(UInt32.self, forKey: .maximumLength))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -352,6 +355,9 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
         case .selectMode(let mode):
             try container.encode("selectMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
+        case .requestReconversion(let maximumLength):
+            try container.encode("requestReconversion", forKey: .type)
+            try container.encode(maximumLength, forKey: .maximumLength)
         }
     }
 }
@@ -362,6 +368,7 @@ extension WireEditOperation: CustomStringConvertible, CustomDebugStringConvertib
         case .commit: "WireEditOperation.commit"
         case .setComposition: "WireEditOperation.setComposition"
         case .selectMode: "WireEditOperation.selectMode"
+        case .requestReconversion: "WireEditOperation.requestReconversion"
         }
     }
     public var debugDescription: String { description }
@@ -734,6 +741,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case deactivate(session: UInt32)
     case wake(session: UInt32, context: WireFieldContext)
     case openHandwriting(session: UInt32, context: WireFieldContext)
+    case reconvert(session: UInt32, text: String, reading: String?, context: WireFieldContext)
     case caret(session: UInt32, rect: WireRect)
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
@@ -772,7 +780,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case mergeUserDictionary(entries: [WireDictionaryEntry])
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, text, target, names, defaults, values, preset, precedingText, offset, limit, entry, entries
+        case type, protocolVersion, session, input, context, mode, text, reading, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, target, names, defaults, values, preset, precedingText, offset, limit, entry, entries
     }
 
     public init(from decoder: any Decoder) throws {
@@ -795,6 +803,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .wake(session: container.decode(UInt32.self, forKey: .session), context: container.decode(WireFieldContext.self, forKey: .context))
         case "openHandwriting":
             self = try .openHandwriting(session: container.decode(UInt32.self, forKey: .session), context: container.decode(WireFieldContext.self, forKey: .context))
+        case "reconvert":
+            self = try .reconvert(session: container.decode(UInt32.self, forKey: .session), text: container.decode(String.self, forKey: .text), reading: container.decodeIfPresent(String.self, forKey: .reading), context: container.decode(WireFieldContext.self, forKey: .context))
         case "caret":
             self = try .caret(session: container.decode(UInt32.self, forKey: .session), rect: container.decode(WireRect.self, forKey: .rect))
         case "readSettings":
@@ -902,6 +912,12 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .openHandwriting(let session, let context):
             try container.encode("openHandwriting", forKey: .type)
             try container.encode(session, forKey: .session)
+            try container.encode(context, forKey: .context)
+        case .reconvert(let session, let text, let reading, let context):
+            try container.encode("reconvert", forKey: .type)
+            try container.encode(session, forKey: .session)
+            try container.encode(text, forKey: .text)
+            try container.encodeIfPresent(reading, forKey: .reading)
             try container.encode(context, forKey: .context)
         case .caret(let session, let rect):
             try container.encode("caret", forKey: .type)
@@ -1027,6 +1043,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .deactivate: "WireRequestBody.deactivate"
         case .wake: "WireRequestBody.wake"
         case .openHandwriting: "WireRequestBody.openHandwriting"
+        case .reconvert: "WireRequestBody.reconvert"
         case .caret: "WireRequestBody.caret"
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"

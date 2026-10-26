@@ -41,6 +41,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         anywhere\tKana\tjapaneseMode
         anywhere\tHankaku/Zenkaku\ttoggleMode
         anywhere\tOption Kana\tnextInputStyle
+        idle\tCtrl Shift r\treconvert
+        idle\tHenkan\treconvert
         """
 
     /// 既定．↓ と Space で次の候補，Shift+←→ で文節の長さ，Tab で確信の低い文節へ．

@@ -27,6 +27,8 @@ public enum ClientAction: Sendable, Equatable {
     /// 打ち間違いの訂正を求め終わるまで変換を待つ．入力コントローラは訂正を求めて渡し(provideCorrections)，
     /// resumeConversion で変換を続ける．訂正を求めない作りなら resumeConversion をすぐ呼ぶ
     case awaitCorrections
+    /// 再変換のキーを押した．入力先で選んでいる文字を読んで InputSession.reconvert に渡す(入力先を読めるのはアプリ側)
+    case requestReconversion
 }
 
 /// 処理の結果．handled が false なら，キーは入力先のアプリにそのまま渡る

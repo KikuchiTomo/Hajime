@@ -207,6 +207,12 @@ public final class EngineService {
         case .wake(let session, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             return wake(session: session, current: current, context: context)
+        case .reconvert(let session, let text, let reading, let context):
+            // 再変換．DLL が入力先の選んでいる文字と，OS の機能で求めた読み(IFELanguage)を送ってくる
+            guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            if let caret = context.caret { lastAnchor = caret }
+            let actions = current.input.reconvert(text, reading: reading, context: InputContext(context, settings: settings.current))
+            return edit(actions, handled: true, session: session, anchor: context.caret ?? lastAnchor)
         case .openHandwriting(let session, let context):
             // 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }

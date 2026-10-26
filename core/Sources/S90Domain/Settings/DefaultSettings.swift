@@ -109,6 +109,8 @@ public enum DefaultSettings {
     public static let readingSuggestionMargin = 4.0
     /// 1 か所の直し(手間がこれ以下)は，Zenzai の点数の差(ReadingCorrection.score)だけでも直す・示す(前の決まり)
     public static let singleEditCost = 2.0
+    /// 再変換できる文字の長さの上限(選んだ文字と読み)．長い文を選んだまま押しても重くならないよう抑える
+    public static let maximumReconversionLength = 64
     /// Space を押したときに打ち間違いの訂正を待つ長さ(秒)．これを過ぎたら訂正を待たずに変換する
     public static let correctionWaitBeforeConversion = 0.3
     /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
