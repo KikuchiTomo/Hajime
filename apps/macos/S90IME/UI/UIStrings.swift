@@ -660,8 +660,7 @@ extension UIStrings {
         static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
         static let unreadable = "同期のファイルを読めないため、同期を止めています"
-        static let items = "項目"
-        static let localOnly = "この Mac だけ"
+        static let items = "項目ごとに選ぶ"
 
         /// 項目(Settings の CodingKeys の名前)の表示名
         static func label(forField name: String) -> String {
