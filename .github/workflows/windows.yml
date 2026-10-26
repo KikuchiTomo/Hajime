@@ -54,9 +54,16 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: core/.build
-          key: swift-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
-      - run: swift build --package-path core --disable-default-traits
-      - run: swift test --package-path core --disable-default-traits
+          key: swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
+      # Zenzai が使う llama.cpp(ハッシュを確かめて展開し，実行で探す場所に足す)．リンクで探す場所は swift build の -L で渡す
+      # (LIB を書き換えると，clang が MSVC のライブラリを自分で探さなくなる)
+      - run: |
+          tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
+          "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        shell: pwsh
+      - run: swift build --package-path core -Xswiftc "-L$env:LLAMA_DIR"
+      - run: swift test --package-path core -Xswiftc "-L$env:LLAMA_DIR"
 
   package:
     runs-on: windows-latest
@@ -72,8 +79,17 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: core/.build
-          key: swift-release-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
-      - run: swift build --package-path core -c release --disable-default-traits --product s90-engine-host
+          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
+      # Zenzai が使う llama.cpp(ハッシュを確かめて展開し，実行で探す場所に足す)．リンクで探す場所は swift build の -L で渡す
+      # (LIB を書き換えると，clang が MSVC のライブラリを自分で探さなくなる)
+      - run: |
+          tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
+          "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        shell: pwsh
+      - run: tools/windows/fetch_zenzai.ps1 -Output "$env:RUNNER_TEMP\zenzai"
+        shell: pwsh
+      - run: swift build --package-path core -c release --product s90-engine-host -Xswiftc "-L$env:LLAMA_DIR"
       - run: rustup toolchain install
         working-directory: apps/windows
       - run: rustup target add i686-pc-windows-msvc
@@ -82,7 +98,7 @@ jobs:
         working-directory: apps/windows
       - run: cargo build --locked --release -p tsf --target i686-pc-windows-msvc
         working-directory: apps/windows
-      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage
+      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai"
         shell: pwsh
       - run: dotnet tool install --global wix --version 6.0.2
       - run: wix build apps/windows/installer/s90.wxs -arch x64 -d Version=0.1.0 -d StageDir=apps/windows/target/stage -o apps/windows/target/s90-tokyo-ime.msi

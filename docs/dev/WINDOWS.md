@@ -26,11 +26,18 @@
 - 打鍵が止まったときの表示の切り替えと打ち間違いの見直しは，エンジンが待つ時間を返し，DLL がタイマーで `wake` を送る
 - タスクバーの入力モードの表示は，言語バーの項目(`GUID_LBI_INPUTMODE`．`crates/tsf/src/com/langbar.rs`)で出す．右クリックのメニューの項目は macOS の入力メニューと同じ(`crates/tsf/src/menu.rs`)で，選んだ操作は `menu` の要求でエンジンに頼む
 - 設定の「キー配列」(ABC・US・Dvorak・Colemak)は，DLL がキーの位置(スキャンコード)から文字を引く表(`crates/tsf/src/layout.rs`)で打つ．Windows で配列を読み込むと利用者の配列の一覧が変わるため，OS の配列は切り替えない．ローマ字入力と英字入力のときだけ使い，Ctrl・Alt を押したショートカットは OS の配列のまま
+- 打ち間違いの訂正は Zenzai で 1 文に 1 秒ほどかかるので，エンジンが裏で求める(`ZenzaiTypoService`)．求めているあいだは短い間隔(`EngineService.correctionPollMilliseconds`)の `wake` を頼み，求め終わったあとの `wake` で見直しや待たせていた変換(`.awaitCorrections`)の結果を返す．Space の変換を待たせるのは `DefaultSettings.correctionWaitBeforeConversion` まで．間に合わなかった `wake` の応答も，キーの応答と同じくあとで反映する
 - 設定のファイルは macOS と同じ形式．エンジンが 2 秒ごとに更新の時刻を見て，変わっていれば読み直す
 
 ## Windows で使わないもの
 
-`core/Package.swift` の trait `Zenzai` を `--disable-default-traits` で外してビルドする(llama.cpp のライブラリをまだ用意していないため)．Vision(手書き)・CryptoKit(同期の辞書の索引)・`os` の Logger は Apple の OS だけで作る．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+Vision(手書き)・CryptoKit(同期の辞書の索引)・`os` の Logger は Apple の OS だけで作る．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+
+## Zenzai
+
+Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流の azooKey-Windows と同じ b4846 の Windows 向けのビルド(AVX 版)を `tools/windows/fetch_llama.ps1` で取り，SHA-256 を確かめてから使う．展開した場所は，`swift build -Xswiftc -L<場所>` でリンクの探す場所(`llama.lib`)に，`PATH` で実行時の探す場所(`llama.dll`・`ggml*.dll`)に足す．`LIB` を書き換えると clang が MSVC のライブラリを自分で探さなくなるので使わない．
+
+モデルは `tools/windows/fetch_zenzai.ps1` で取り(取得元とハッシュは `tools/models/fetch_zenzai.sh` と同じ)，インストール先の `Zenzai\` に置く．エンジンは起動のたびに大きさと SHA-256(`SHA256Digest`)を確かめ，合わなければ Zenzai なしで動く．
 
 ## ビルドと確かめ
 
@@ -39,8 +46,8 @@
 | ジョブ | 内容 |
 |---|---|
 | `rust` | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
-| `swift` | core と `s90-engine-host` を Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
-| `package` | release でビルドし，`tools/windows/stage.ps1` で集めて WiX で `s90-tokyo-ime.msi` を作る |
+| `swift` | core と `s90-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
+| `package` | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `s90-tokyo-ime.msi` を作る |
 
 Swift は swift.org の Windows 版(6.3.3)を `compnerd/gha-setup-swift` で，Rust は `apps/windows/rust-toolchain.toml` の版を，WiX は `dotnet tool` の 6.0.2 を使う．
 

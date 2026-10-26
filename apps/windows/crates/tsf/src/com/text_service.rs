@@ -571,14 +571,20 @@ impl TextService_Impl {
             return;
         };
         let field = self.field_context(&context);
-        if let Some(body) = engine
-            .send(RequestBody::Wake {
-                session,
-                context: field,
-            })
-            .wait(RESPONSE_TIMEOUT)
-        {
-            self.apply_response(&context, body);
+        let pending = engine.send(RequestBody::Wake {
+            session,
+            context: field,
+        });
+        match pending.outcome(RESPONSE_TIMEOUT) {
+            Outcome::Reply(body) => {
+                self.apply_response(&context, body);
+            }
+            // Zenzai で変換し直すなどして間に合わなかった応答は捨てずに，あとで届いたときに反映する(キーと同じ)
+            Outcome::TimedOut => {
+                self.inner.borrow_mut().late.push(pending);
+                self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+            }
+            Outcome::Unavailable => self.forget_session(),
         }
     }
 }
