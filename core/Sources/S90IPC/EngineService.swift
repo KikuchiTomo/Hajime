@@ -12,6 +12,8 @@ public final class EngineService {
     public static let maximumSessions = 1024
     /// 手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔
     public static let handwritingPollMilliseconds = milliseconds(DefaultSettings.handwritingPollInterval)
+    /// 候補の窓を出しているあいだ，DLL がマウスで押した候補を取りに来る間隔
+    public static let candidateClickPollMilliseconds = milliseconds(DefaultSettings.candidateClickPollInterval)
 
     private struct Connection {
         var hasGreeted = false
@@ -75,6 +77,10 @@ public final class EngineService {
     private var nextSession: UInt32 = 1
     private var lastAnchor: WireRect?
     private var handwriting: Handwriting?
+    /// 候補の窓を出しているセッション．候補ウィンドウで押した候補は，このセッションの次の wake で選ぶ
+    private var shownCandidates: UInt32?
+    /// 候補ウィンドウでマウスで押した候補(押したときに出ていたセッションと対象)
+    private var chosen: (session: UInt32, target: WirePointerTarget)?
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
@@ -214,6 +220,11 @@ public final class EngineService {
         case .handwritingChosen(let text):
             guard connection.isCandidateWindow, Self.isValidHandwritingText(text) else { return .error(code: .malformed) }
             handwriting?.chosen = text
+            return .done
+        case .chooseCandidate(let target):
+            // 候補ウィンドウで候補を押した．押したときに候補を出していたセッションの次の wake で，キーで選んだのと同じに処理する
+            guard connection.isCandidateWindow, let session = shownCandidates else { return .error(code: .malformed) }
+            chosen = (session, target)
             return .done
         case .handwritingClosed:
             guard connection.isCandidateWindow else { return .error(code: .malformed) }
@@ -384,6 +395,10 @@ public final class EngineService {
             handwriting = nil
             actions += current.input.insert(text)
         }
+        if let choice = chosen, choice.session == session {
+            chosen = nil
+            actions += current.input.choose(PointerTarget(choice.target), context: context)
+        }
         if let work = current.correction {
             switch work.purpose {
             case .conversion(let deadline):
@@ -446,6 +461,15 @@ public final class EngineService {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) })
         routed.ui.forEach(ui)
+        for command in routed.ui {
+            switch command {
+            case .showCandidates, .showBranchMap: shownCandidates = session
+            case .hide where shownCandidates == session:
+                shownCandidates = nil
+                chosen = nil
+            default: break
+            }
+        }
         for action in routed.host {
             if action == .showHandwriting {
                 openHandwriting(for: session, anchor: anchor)
@@ -462,8 +486,10 @@ public final class EngineService {
 
     private func wakeAfter(_ session: UInt32) -> UInt32? {
         let typing = typingWakeAfter(session)
-        guard handwriting?.session == session else { return typing }
-        return min(typing ?? .max, Self.handwritingPollMilliseconds)
+        var interval = typing
+        if shownCandidates == session { interval = min(interval ?? .max, Self.candidateClickPollMilliseconds) }
+        guard handwriting?.session == session else { return interval }
+        return min(interval ?? .max, Self.handwritingPollMilliseconds)
     }
 
     private func typingWakeAfter(_ session: UInt32) -> UInt32? {
@@ -530,5 +556,17 @@ public final class EngineService {
         return WirePresentation(theme: current.theme.rawValue, fontSize: current.candidateFontSize,
                                 modeIndicatorMilliseconds: Self.milliseconds(current.modeIndicatorDuration),
                                 customTheme: current.activeCustomTheme.map(WireCustomTheme.init))
+    }
+}
+
+extension PointerTarget {
+    init(_ wire: WirePointerTarget) {
+        switch wire {
+        case .segment(let index): self = .segment(Int(index))
+        case .alternative(let index): self = .alternative(Int(index))
+        case .variant(let index): self = .variant(Int(index))
+        case .entry(let index): self = .entry(Int(index))
+        case .listVariant(let index): self = .listVariant(Int(index))
+        }
     }
 }

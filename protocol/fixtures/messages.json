@@ -46,6 +46,8 @@
     { "id": 28, "body": { "type": "mergeUserDictionary", "entries": [{ "reading": "よみ", "word": "語句" }] } },
     { "id": 29, "body": { "type": "handwritingChosen", "text": "鬱" } },
     { "id": 30, "body": { "type": "handwritingClosed" } },
+    { "id": 31, "body": { "type": "chooseCandidate", "target": { "type": "alternative", "index": 2 } } },
+    { "id": 32, "body": { "type": "chooseCandidate", "target": { "type": "listVariant", "index": 0 } } },
     { "id": 21, "body": { "type": "readSync" } },
     { "id": 22, "body": { "type": "setSyncFolder", "path": "C:\\Users\\a\\OneDrive\\s90" } },
     { "id": 23, "body": { "type": "setSyncEnabled", "enabled": false } },

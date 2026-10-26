@@ -11,8 +11,8 @@ use crate::scene::{self, Look, Scene, Surround};
 use crate::strings;
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
-use ipc::windows::pipe_name;
-use ipc::{Presentation, Rect, UiCommand, PROTOCOL_VERSION};
+use ipc::windows::{pipe_name, EngineClient};
+use ipc::{Presentation, Rect, RequestBody, UiCommand, PROTOCOL_VERSION};
 use render::Renderer;
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -62,6 +62,8 @@ struct App {
     anchor: Option<Rect>,
     /// 描いている窓が glass か
     on_glass: bool,
+    /// 押した候補をエンジンに知らせる口．初めて押したときにつなぐ
+    engine: Option<EngineClient>,
     scene: Option<Scene>,
     theme: Option<ResolvedTheme>,
     rest_opacity: f32,
@@ -80,7 +82,7 @@ pub fn run() {
         return;
     }
     window::make_dpi_aware();
-    window::set_callbacks(on_inbox, on_timer, on_paint);
+    window::set_callbacks(on_inbox, on_timer, on_paint, on_click);
     let (Ok(plain), Ok(glass)) = (
         Window::create(w!("s90.tokyo-ime.candidate"), false),
         Window::create(w!("s90.tokyo-ime.candidate.glass"), true),
@@ -117,6 +119,7 @@ pub fn run() {
             content: Content::Hidden,
             anchor: None,
             on_glass: false,
+            engine: None,
             scene: None,
             theme: None,
             rest_opacity: 1.0,
@@ -171,6 +174,10 @@ fn on_paint() {
     with_app(App::repaint);
 }
 
+fn on_click(x: i32, y: i32) {
+    with_app(|app| app.click(x, y));
+}
+
 fn on_timer(timer: Timer) {
     with_app(|app| match timer {
         Timer::Mode => app.mode_elapsed(),
@@ -179,6 +186,23 @@ fn on_timer(timer: Timer) {
 }
 
 impl App {
+    /// 候補の窓を押した．押した候補をエンジンに知らせ，エンジンは入力先のセッションの次の wake でキーで選んだのと同じに処理する
+    fn click(&mut self, x: i32, y: i32) {
+        let Some(scene) = &self.scene else { return };
+        let scale = self.window().scale();
+        let Some(target) = scene.target_at(x as f32 / scale, y as f32 / scale) else {
+            return;
+        };
+        if self.engine.is_none() {
+            self.engine = pipe_name("engine")
+                .ok()
+                .and_then(|name| EngineClient::start(name).ok());
+        }
+        if let Some(engine) = &self.engine {
+            let _ = engine.send(RequestBody::ChooseCandidate { target });
+        }
+    }
+
     fn drain(&mut self) {
         let commands: Vec<UiCommand> = match self.inbox.lock() {
             Ok(mut queue) => queue.drain(..).collect(),

@@ -34,8 +34,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer, PostMessageW,
     RegisterClassExW, SetTimer, SetWindowPos, ShowWindow, TranslateMessage, CS_DROPSHADOW,
     HWND_TOPMOST, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP,
-    WM_MOUSEACTIVATE, WM_PAINT, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_PAINT, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use windows_core::{Result, BOOL, BSTR, PCWSTR};
 
@@ -57,12 +57,15 @@ struct Callbacks {
     inbox: fn(),
     timer: fn(Timer),
     paint: fn(),
+    /// 窓の中を押した(窓の中のピクセルの座標)
+    click: fn(i32, i32),
 }
 
 static CALLBACKS: OnceLock<Callbacks> = OnceLock::new();
 
-pub fn set_callbacks(inbox: fn(), timer: fn(Timer), paint: fn()) {
+pub fn set_callbacks(inbox: fn(), timer: fn(Timer), paint: fn(), click: fn(i32, i32)) {
     let _ = CALLBACKS.set(Callbacks {
+        click,
         inbox,
         timer,
         paint,
@@ -424,6 +427,15 @@ unsafe extern "system" fn procedure(
             Some(LRESULT(0))
         }
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),
+        // 候補を押して選ぶ．窓は前に出ない(WM_MOUSEACTIVATE で MA_NOACTIVATE)ので，入力先のアプリはフォーカスを持ったまま
+        WM_LBUTTONDOWN => {
+            let x = (lparam.0 & 0xFFFF) as u16 as i16 as i32;
+            let y = ((lparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32;
+            if let Some(callbacks) = CALLBACKS.get() {
+                (callbacks.click)(x, y);
+            }
+            Some(LRESULT(0))
+        }
         _ => None,
     });
     match handled {

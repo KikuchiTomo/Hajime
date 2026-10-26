@@ -322,6 +322,53 @@ impl fmt::Debug for MenuCommand {
     }
 }
 
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PointerTarget {
+    Segment {
+        index: u32,
+    },
+    Alternative {
+        index: u32,
+    },
+    Variant {
+        index: u32,
+    },
+    Entry {
+        index: u32,
+    },
+    ListVariant {
+        index: u32,
+    },
+}
+
+impl fmt::Debug for PointerTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Segment { index, .. } => f
+                .debug_struct("Segment")
+                .field("index", index)
+                .finish(),
+            Self::Alternative { index, .. } => f
+                .debug_struct("Alternative")
+                .field("index", index)
+                .finish(),
+            Self::Variant { index, .. } => f
+                .debug_struct("Variant")
+                .field("index", index)
+                .finish(),
+            Self::Entry { index, .. } => f
+                .debug_struct("Entry")
+                .field("index", index)
+                .finish(),
+            Self::ListVariant { index, .. } => f
+                .debug_struct("ListVariant")
+                .field("index", index)
+                .finish(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RuleList {
@@ -635,6 +682,9 @@ pub enum RequestBody {
         text: String,
     },
     HandwritingClosed,
+    ChooseCandidate {
+        target: PointerTarget,
+    },
     ReadSettingsFields {
         names: Vec<String>,
         defaults: bool,
@@ -792,6 +842,10 @@ impl fmt::Debug for RequestBody {
                 .field("text", &REDACTED)
                 .finish(),
             Self::HandwritingClosed => f.write_str("HandwritingClosed"),
+            Self::ChooseCandidate { target, .. } => f
+                .debug_struct("ChooseCandidate")
+                .field("target", target)
+                .finish(),
             Self::ReadSettingsFields { defaults, .. } => f
                 .debug_struct("ReadSettingsFields")
                 .field("names", &REDACTED)
