@@ -69,12 +69,8 @@ final class ReadingCorrector {
         guard let all = typed.rawKeys, let boundary = typed.boundaryAfterEnglish,
             typed.pending.isEmpty || typed.pending == "n",
             !(dismissedKeys.map(all.hasPrefix) ?? false) else { return nil }
-        // 「nn」のあとの母音をな行で読んだところ(「honno」→「本の」)は，訂正を求める変換器でも同じ読みになるよう打ち分けた並びにする．
-        // 打ったままの並びを渡すと，変換器は「ほんお」と読み，こちらの読みと比べられないので直せない
-        let keys = typed.unambiguousKeys(from: boundary) ?? String(all.dropFirst(boundary.rawCount))
-        // 比べる読みはキーから組み立てる．綴りを直した英単語(「gakusri」の「sri」→「bride」)を入れた読みは，
-        // 訂正を求める変換器の読み(「がくsり」)と食い違い，比べられずに直せなくなる
-        let reading = KeyEditSearch.rawReading(of: keys)
+        let keys = String(all.dropFirst(boundary.rawCount))
+        let reading = String(typed.conversionReading.dropFirst(boundary.kanaCount))
         guard !keys.isEmpty, keys.count <= DefaultSettings.maximumKeysForCorrection, keys.allSatisfy(Self.isLetterKey) else { return nil }
         guard boundary.rawCount > 0 else { return Region(prefix: nil, keys: keys, reading: reading) }
         // 英単語の後ろが短いと，打ち間違いと見分けにくく直す意味も薄い
