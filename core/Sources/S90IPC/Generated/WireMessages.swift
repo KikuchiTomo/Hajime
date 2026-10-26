@@ -271,12 +271,14 @@ public struct WireSessionState: Sendable, Equatable, Codable {
     public var isComposing: Bool
     public var consumedKeys: [WireKeyChord]
     public var wakeAfterMilliseconds: UInt32?
+    public var precedingTextLength: UInt32?
 
-    public init(mode: WireInputMode, isComposing: Bool, consumedKeys: [WireKeyChord], wakeAfterMilliseconds: UInt32? = nil) {
+    public init(mode: WireInputMode, isComposing: Bool, consumedKeys: [WireKeyChord], wakeAfterMilliseconds: UInt32? = nil, precedingTextLength: UInt32? = nil) {
         self.mode = mode
         self.isComposing = isComposing
         self.consumedKeys = consumedKeys
         self.wakeAfterMilliseconds = wakeAfterMilliseconds
+        self.precedingTextLength = precedingTextLength
     }
 }
 
@@ -398,6 +400,55 @@ extension WireSettingsSnapshot: CustomStringConvertible, CustomDebugStringConver
     public var debugDescription: String { description }
 }
 
+public enum WireMenuCommand: Sendable, Equatable, Codable {
+    case selectInputStyle(style: String)
+    case toggleLiveConversion
+    case openSettings
+
+    private enum CodingKeys: String, CodingKey {
+        case type, style
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .type)
+        switch kind {
+        case "selectInputStyle":
+            self = try .selectInputStyle(style: container.decode(String.self, forKey: .style))
+        case "toggleLiveConversion":
+            self = .toggleLiveConversion
+        case "openSettings":
+            self = .openSettings
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .selectInputStyle(let style):
+            try container.encode("selectInputStyle", forKey: .type)
+            try container.encode(style, forKey: .style)
+        case .toggleLiveConversion:
+            try container.encode("toggleLiveConversion", forKey: .type)
+        case .openSettings:
+            try container.encode("openSettings", forKey: .type)
+        }
+    }
+}
+
+extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        switch self {
+        case .selectInputStyle: "WireMenuCommand.selectInputStyle"
+        case .toggleLiveConversion: "WireMenuCommand.toggleLiveConversion"
+        case .openSettings: "WireMenuCommand.openSettings"
+        }
+    }
+    public var debugDescription: String { description }
+}
+
 public enum WireRequestBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case openSession
@@ -409,9 +460,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case caret(session: UInt32, rect: WireRect)
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
+    case menu(command: WireMenuCommand)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings
+        case type, protocolVersion, session, input, context, mode, rect, settings, command
     }
 
     public init(from decoder: any Decoder) throws {
@@ -438,6 +490,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = .readSettings
         case "writeSettings":
             self = try .writeSettings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
+        case "menu":
+            self = try .menu(command: container.decode(WireMenuCommand.self, forKey: .command))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -479,6 +533,9 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .writeSettings(let settings):
             try container.encode("writeSettings", forKey: .type)
             try container.encode(settings, forKey: .settings)
+        case .menu(let command):
+            try container.encode("menu", forKey: .type)
+            try container.encode(command, forKey: .command)
         }
     }
 }
@@ -496,6 +553,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .caret: "WireRequestBody.caret"
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"
+        case .menu: "WireRequestBody.menu"
         }
     }
     public var debugDescription: String { description }
@@ -762,15 +820,67 @@ extension WireBranchMap: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+public struct WireColor: Sendable, Equatable, Codable {
+    public var red: UInt8
+    public var green: UInt8
+    public var blue: UInt8
+
+    public init(red: UInt8, green: UInt8, blue: UInt8) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+}
+
+extension WireColor: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireColor" }
+    public var debugDescription: String { description }
+}
+
+public struct WireCustomTheme: Sendable, Equatable, Codable {
+    public var base: String
+    public var surface: WireColor
+    public var text: WireColor
+    public var textMuted: WireColor
+    public var selection: WireColor
+    public var selectionText: WireColor
+    public var correction: WireColor
+    public var line: WireColor
+    public var fontName: String?
+    public var cornerRadius: Double
+    public var straightBranches: Bool
+
+    public init(base: String, surface: WireColor, text: WireColor, textMuted: WireColor, selection: WireColor, selectionText: WireColor, correction: WireColor, line: WireColor, fontName: String? = nil, cornerRadius: Double, straightBranches: Bool) {
+        self.base = base
+        self.surface = surface
+        self.text = text
+        self.textMuted = textMuted
+        self.selection = selection
+        self.selectionText = selectionText
+        self.correction = correction
+        self.line = line
+        self.fontName = fontName
+        self.cornerRadius = cornerRadius
+        self.straightBranches = straightBranches
+    }
+}
+
+extension WireCustomTheme: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireCustomTheme" }
+    public var debugDescription: String { description }
+}
+
 public struct WirePresentation: Sendable, Equatable, Codable {
     public var theme: String
     public var fontSize: Double
     public var modeIndicatorMilliseconds: UInt32
+    public var customTheme: WireCustomTheme?
 
-    public init(theme: String, fontSize: Double, modeIndicatorMilliseconds: UInt32) {
+    public init(theme: String, fontSize: Double, modeIndicatorMilliseconds: UInt32, customTheme: WireCustomTheme? = nil) {
         self.theme = theme
         self.fontSize = fontSize
         self.modeIndicatorMilliseconds = modeIndicatorMilliseconds
+        self.customTheme = customTheme
     }
 }
 

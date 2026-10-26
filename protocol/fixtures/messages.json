@@ -28,7 +28,10 @@
     { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
     { "id": 12, "body": { "type": "readSettings" } },
-    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } }
+    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } },
+    { "id": 18, "body": { "type": "menu", "command": { "type": "selectInputStyle", "style": "kana" } } },
+    { "id": 19, "body": { "type": "menu", "command": { "type": "toggleLiveConversion" } } },
+    { "id": 20, "body": { "type": "menu", "command": { "type": "openSettings" } } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
@@ -40,7 +43,8 @@
         "state": {
           "mode": "japanese",
           "isComposing": false,
-          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }]
+          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }],
+          "precedingTextLength": 40
         }
       }
     },
@@ -123,6 +127,27 @@
       }
     },
     { "type": "setPresentation", "presentation": { "theme": "platinum", "fontSize": 15.5, "modeIndicatorMilliseconds": 800 } },
+    {
+      "type": "setPresentation",
+      "presentation": {
+        "theme": "washi",
+        "fontSize": 16.5,
+        "modeIndicatorMilliseconds": 1200,
+        "customTheme": {
+          "base": "automatic",
+          "surface": { "red": 43, "green": 27, "blue": 23 },
+          "text": { "red": 255, "green": 232, "blue": 214 },
+          "textMuted": { "red": 201, "green": 166, "blue": 143 },
+          "selection": { "red": 255, "green": 122, "blue": 61 },
+          "selectionText": { "red": 26, "green": 14, "blue": 10 },
+          "correction": { "red": 255, "green": 210, "blue": 63 },
+          "line": { "red": 107, "green": 74, "blue": 62 },
+          "fontName": "Yu Mincho",
+          "cornerRadius": 4.5,
+          "straightBranches": true
+        }
+      }
+    },
     { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },

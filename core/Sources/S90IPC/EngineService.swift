@@ -114,6 +114,18 @@ public final class EngineService {
             return .done
         case .readSettings:
             return .settings(settings: snapshot)
+        case .menu(let command):
+            // 入力メニュー(言語バーの項目)で選んだ操作．キー設定の表の同じコマンドと同じに扱う
+            switch command {
+            case .selectInputStyle(let name):
+                guard let style = InputStyle(rawValue: name) else { return .error(code: .malformed) }
+                perform(.selectInputStyle(style))
+            case .toggleLiveConversion:
+                perform(.toggleLiveConversion)
+            case .openSettings:
+                perform(.openSettings)
+            }
+            return .done
         case .writeSettings(let wanted):
             do {
                 try settings.update { current in
@@ -216,6 +228,7 @@ public final class EngineService {
     public var presentation: WirePresentation {
         let current = settings.current
         return WirePresentation(theme: current.theme.rawValue, fontSize: current.candidateFontSize,
-                                modeIndicatorMilliseconds: Self.milliseconds(current.modeIndicatorDuration))
+                                modeIndicatorMilliseconds: Self.milliseconds(current.modeIndicatorDuration),
+                                customTheme: current.activeCustomTheme.map(WireCustomTheme.init))
     }
 }
