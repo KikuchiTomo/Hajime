@@ -10,7 +10,7 @@ use crate::layout::{self, PageLayout};
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
-use crate::pages::{self, Action, Control, LimitKind, Page, Row, Section};
+use crate::pages::{self, Action, Control, Info, LimitKind, Page, Row, Section};
 use crate::store::SettingsStore;
 use crate::strings::settings;
 use crate::strings::{features, keys, more, windows as text};
@@ -76,6 +76,8 @@ pub enum Event {
         kind: SymbolKind,
         indices: Vec<usize>,
     },
+    /// 選んだ項目の同期の範囲を切り替える(表の行の番号)
+    SyncToggleFields(Vec<usize>),
     /// キー設定のひな形を読み込む(ひな形の値)
     LoadPreset(&'static str),
     /// 英語と日本語の見分けを試す
@@ -117,6 +119,34 @@ impl<S: SettingsStore> Values for SettingsModel<S> {
     }
 }
 
+/// 設定の値に，同期の状態の値(「sync.」の道筋．crate::sync)を重ねたもの
+pub struct WithSync<'a, V: Values> {
+    pub values: &'a V,
+    pub sync: &'a crate::store::Fields,
+}
+
+impl<V: Values> Values for WithSync<'_, V> {
+    fn value(&self, path: &str) -> Option<&Value> {
+        if crate::sync::is_sync_path(path) {
+            return self.sync.get(path);
+        }
+        self.values.value(path)
+    }
+
+    /// 同期の値には既定に戻すボタンを出さない
+    fn is_default(&self, path: &str) -> bool {
+        crate::sync::is_sync_path(path) || self.values.is_default(path)
+    }
+
+    /// 同期の値はエンジンから読めたときだけ使える
+    fn is_readable(&self, path: &str) -> bool {
+        if crate::sync::is_sync_path(path) {
+            return self.sync.contains_key(path);
+        }
+        self.values.is_readable(path)
+    }
+}
+
 /// 設定の値のほかにエンジンから読んで画面に出すもの
 #[derive(Debug, Default)]
 pub struct Extras {
@@ -126,6 +156,13 @@ pub struct Extras {
     /// 記号の一覧(入力・記号・状態)．連続入力と読み
     pub sequences: Vec<Vec<String>>,
     pub readings: Vec<Vec<String>>,
+    /// 同期の状態の値(「sync.」の道筋)
+    pub sync: crate::store::Fields,
+    /// 同期のフォルダの名前と最後に同期した時刻(出す形)
+    pub sync_folder: String,
+    pub last_synced: String,
+    /// 項目ごとの同期の表(項目・範囲)
+    pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
 }
@@ -166,27 +203,38 @@ impl RowView {
             Control::Dictionary(spec) => Some((spec, LimitKind::UserDictionaryEntries)),
             // 記号の上限はエンジンが確かめる(SymbolRuleEditing.save)
             Control::Symbols(_, spec) => Some((spec, LimitKind::CorrectionRules)),
+            // 項目ごとの同期の表は足さないので上限を使わない
+            Control::SyncFields(spec) => Some((spec, LimitKind::ProfileRules)),
             _ => None,
         }
     }
 
-    /// 表の列の数(記号は状態の列を足す)
+    /// 表の列の数(記号は状態の列を，項目ごとの同期は項目と範囲の列を足す)
     fn columns(&self) -> Option<usize> {
         let (spec, _) = self.list_spec()?;
-        let more = usize::from(matches!(self.row.control, Control::Symbols(..)));
+        let more = match self.row.control {
+            Control::Symbols(..) => 1,
+            Control::SyncFields(_) => 2,
+            _ => 0,
+        };
         Some(spec.fields.len() + more)
     }
 
-    /// 記号の一覧の有効と無効を切り替えるボタン
+    /// 選んだ行を切り替えるボタン(記号の有効と無効，項目ごとの同期の範囲)
     fn toggle_button(&self) -> Option<Window> {
         let (spec, _) = self.list_spec()?;
-        matches!(self.row.control, Control::Symbols(..))
-            .then(|| self.parts.get(spec.fields.len() + 2).copied())
-            .flatten()
+        match self.row.control {
+            Control::Symbols(..) => self.parts.get(spec.fields.len() + 2).copied(),
+            Control::SyncFields(_) => self.parts.first().copied(),
+            _ => None,
+        }
     }
 
-    /// 一覧の入力欄(左・右)と追加・削除のボタン
+    /// 一覧の入力欄(左・右)と追加・削除のボタン．項目ごとの同期の表には無い
     fn list_parts(&self) -> Option<(&[Window], Window, Window)> {
+        if matches!(self.row.control, Control::SyncFields(_)) {
+            return None;
+        }
         let (spec, _) = self.list_spec()?;
         let fields = spec.fields.len();
         Some((
@@ -378,12 +426,15 @@ impl PageView {
                 ffi::enable(control, enabled);
                 show_value(control, &row.row, &row.numbers, values, extras);
             }
-            // 一覧を入れ替えると選んだ行が外れるので，削除のボタンも使えなくする
+            // 一覧を入れ替えると選んだ行が外れるので，削除と切り替えのボタンも使えなくする
             if let Some((fields, _, remove)) = row.list_parts() {
                 ffi::enable(remove, false);
                 for field in fields {
                     ffi::enable(*field, enabled);
                 }
+            }
+            if let Some(toggle) = row.toggle_button() {
+                ffi::enable(toggle, false);
             }
             if let Some(label) = row.label {
                 ffi::enable(label, enabled || row.row.control == Control::Note);
@@ -503,7 +554,10 @@ impl PageView {
             } else if row.control == Some(window) {
                 Some((
                     true,
-                    matches!(row.row.control, Control::Stat(_) | Control::Version),
+                    matches!(
+                        row.row.control,
+                        Control::Stat(_) | Control::Version | Control::Info(_)
+                    ),
                 ))
             } else {
                 None
@@ -536,6 +590,13 @@ impl PageView {
                     preceding: texts.get(1).cloned().unwrap_or_default(),
                 }
             });
+        }
+        if let Control::SyncFields(_) = row.row.control {
+            let indices = row.control.map(ffi::list_selected).unwrap_or_default();
+            return (notification == BN_CLICKED
+                && Some(window) == row.toggle_button()
+                && !indices.is_empty())
+            .then_some(Event::SyncToggleFields(indices));
         }
         if let Some((fields, add, remove)) = row.list_parts() {
             let (spec, limit) = row.list_spec()?;
@@ -630,7 +691,7 @@ impl PageView {
         else {
             return false;
         };
-        let (Some((spec, _)), Some((_, _, remove))) = (row.list_spec(), row.list_parts()) else {
+        let Some((spec, _)) = row.list_spec() else {
             return false;
         };
         match code {
@@ -640,7 +701,9 @@ impl PageView {
             }
             LVN_ITEMCHANGED => {
                 let selected = !ffi::list_selected(window).is_empty();
-                ffi::enable(remove, selected);
+                if let Some((_, _, remove)) = row.list_parts() {
+                    ffi::enable(remove, selected);
+                }
                 if let Some(toggle) = row.toggle_button() {
                     ffi::enable(toggle, selected);
                 }
@@ -854,7 +917,27 @@ fn create_row(
             return view;
         }
         Control::List(spec, _) | Control::Dictionary(spec) => {
-            create_list(host, theme, spec, &[], &[], &mut view, next_id);
+            create_list(
+                host,
+                theme,
+                spec,
+                &[settings::ADD, settings::REMOVE],
+                &[],
+                &mut view,
+                next_id,
+            );
+            return view;
+        }
+        Control::SyncFields(spec) => {
+            create_list(
+                host,
+                theme,
+                spec,
+                &[text::TOGGLE_SYNC_SCOPE],
+                &[text::SYNC_FIELD, text::SYNC_SCOPE],
+                &mut view,
+                next_id,
+            );
             return view;
         }
         Control::Symbols(_, spec) => {
@@ -862,7 +945,7 @@ fn create_row(
                 host,
                 theme,
                 spec,
-                &[text::TOGGLE_ENABLED],
+                &[settings::ADD, settings::REMOVE, text::TOGGLE_ENABLED],
                 &[text::SYMBOL_STATE],
                 &mut view,
                 next_id,
@@ -907,7 +990,7 @@ fn create_row(
             row.title,
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
         ),
-        Control::Stat(_) => (
+        Control::Stat(_) | Control::Info(_) => (
             w!("STATIC"),
             "",
             WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOPREFIX.0 | SS_RIGHT.0),
@@ -936,7 +1019,8 @@ fn create_row(
         | Control::List(..)
         | Control::Preview
         | Control::Dictionary(_)
-        | Control::Symbols(..) => return view,
+        | Control::Symbols(..)
+        | Control::SyncFields(_) => return view,
     };
     view.control = ffi::create(
         WINDOW_EX_STYLE::default(),
@@ -1017,12 +1101,12 @@ fn create_row(
 }
 
 /// 一覧の部品を作る．入力欄は案内の文字(cue banner)に欄の名前を出す
-/// 一覧の入力欄・ボタン・表を作る．more_buttons は追加・削除の後ろに足すボタン，more_columns は入力欄の列の後ろに足す表の列
+/// 一覧の入力欄・ボタン・表を作る．buttons は入力欄の後ろに並べるボタン，more_columns は入力欄の列の後ろに足す表の列
 fn create_list(
     host: Window,
     theme: &Theme,
     spec: &ListSpec,
-    more_buttons: &[&str],
+    buttons: &[&str],
     more_columns: &[&str],
     view: &mut RowView,
     next_id: &mut impl FnMut() -> u16,
@@ -1064,9 +1148,6 @@ fn create_list(
         };
         view.parts.extend(window);
     }
-    let buttons = [settings::ADD, settings::REMOVE]
-        .into_iter()
-        .chain(more_buttons.iter().copied());
     for title in buttons {
         let enabled = false;
         if let Some(button) = ffi::create(
@@ -1209,6 +1290,9 @@ fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values,
         Control::Stat(stat) => ffi::set_text(control, &extras.usage.text(*stat)),
         Control::Dictionary(_) => ffi::list_set_rows(control, &extras.dictionary),
         Control::Symbols(kind, _) => ffi::list_set_rows(control, extras.symbol_rows(*kind)),
+        Control::SyncFields(_) => ffi::list_set_rows(control, &extras.sync_fields),
+        Control::Info(Info::SyncFolder) => ffi::set_text(control, &extras.sync_folder),
+        Control::Info(Info::LastSynced) => ffi::set_text(control, &extras.last_synced),
         Control::List(spec, _) => {
             let rows: Vec<Vec<String>> = spec
                 .items(values.value(spec.path))

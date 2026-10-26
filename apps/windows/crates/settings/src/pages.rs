@@ -250,6 +250,10 @@ pub enum Control {
     Dictionary(ListSpec),
     /// 記号の決まり．既定の決まりに利用者の決まりを重ねた一覧をエンジンに読んでもらい，決まりを重ねる・外す・有効と無効を切り替える
     Symbols(SymbolKind, ListSpec),
+    /// エンジンから読んだ値を出す(変えられない)
+    Info(Info),
+    /// 同期の項目ごとの範囲の表．選んだ項目の範囲を切り替える
+    SyncFields(ListSpec),
 }
 
 /// 一覧の上限の種類(catalog の Limits のどれか)
@@ -288,6 +292,19 @@ pub enum Action {
     OpenSettingsFile,
     /// ファイルを選んで読み込む・書き出す
     File(FileTask),
+    /// 同期のフォルダを選ぶ
+    ChooseSyncFolder,
+    /// 今すぐ同期する
+    SyncNow,
+}
+
+/// エンジンから読んで出す値の種類
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Info {
+    /// 同期のフォルダの名前
+    SyncFolder,
+    /// 最後に同期した時刻
+    LastSynced,
 }
 
 /// 使い方の記録の値の種類
@@ -446,6 +463,7 @@ pub const BUILT: &[Page] = &[
     Page::Symbols,
     Page::Appearance,
     Page::Usage,
+    Page::Sync,
     Page::Backup,
     Page::About,
 ];
@@ -462,11 +480,11 @@ pub fn sections(page: Page) -> Option<Vec<Section>> {
         Page::Keys => Some(keymap()),
         Page::Dictionary => Some(dictionary()),
         Page::Symbols => Some(symbols()),
+        Page::Sync => Some(sync_page()),
         Page::Appearance => Some(appearance()),
         Page::Usage => Some(usage()),
         Page::Backup => Some(backup()),
         Page::About => Some(about()),
-        _ => None,
     }
 }
 
@@ -1002,6 +1020,60 @@ fn usage() -> Vec<Section> {
     ]
 }
 
+/// 同期のページ(macOS の SyncPage)．値は「sync.」の道筋でエンジンの同期の状態から読む(crate::sync)
+fn sync_page() -> Vec<Section> {
+    use Condition::*;
+    let mut scopes: Vec<Row> = options::SYNC_GROUPS
+        .iter()
+        .map(|(group, name)| Row::choice(name, scope_path(group), options::SYNC_SCOPES))
+        .collect();
+    scopes.push(Row::new(
+        sync::ITEMS,
+        "",
+        Control::SyncFields(ListSpec {
+            path: "",
+            fields: &[],
+            empty: "",
+            invalid: "",
+            lowercase: false,
+            exclusive_with: None,
+        }),
+    ));
+    vec![
+        Section {
+            title: None,
+            rows: vec![
+                Row::toggle(sync::ENABLED, crate::sync::ENABLED)
+                    .enabled_when(IsNot(crate::sync::FOLDER, "")),
+                Row::new(sync::FOLDER, "", Control::Info(Info::SyncFolder)),
+                Row::action(sync::CHOOSE_FOLDER, Action::ChooseSyncFolder),
+                Row::new(sync::LAST_SYNCED, "", Control::Info(Info::LastSynced)),
+                Row::note(sync::FAILED)
+                    .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_FAILED)),
+                Row::note(sync::UNREADABLE)
+                    .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_UNREADABLE)),
+                Row::action(sync::SYNC_NOW, Action::SyncNow).enabled_when(On(crate::sync::ENABLED)),
+            ],
+            footer: Some(crate::strings::windows::SYNC_NOTE),
+        },
+        Section::new(sync::SCOPES, scopes),
+    ]
+}
+
+/// まとまりの範囲の道筋．ページの行は &'static str の道筋を持つので，まとまりごとに一度だけ作って残す
+fn scope_path(group: &str) -> &'static str {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    static PATHS: OnceLock<Mutex<HashMap<String, &'static str>>> = OnceLock::new();
+    let mut paths = PATHS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    paths
+        .entry(group.to_string())
+        .or_insert_with(|| Box::leak(crate::sync::scope_path(group).into_boxed_str()))
+}
+
 /// バックアップのページ(macOS の BackupPage)．設定のファイルを開くボタンも置く(画面に無い項目を直すため)
 fn backup() -> Vec<Section> {
     vec![
@@ -1133,6 +1205,8 @@ mod tests {
                     .iter()
                     .filter(|row| row.has_value())
                     .chain(lists)
+                    // 同期の値は設定のファイルの項目ではない(crate::sync)
+                    .filter(|row| !crate::sync::is_sync_path(row.path))
                 {
                     let name = crate::model::field_name(row.path);
                     assert!(catalog.fields.iter().any(|field| field == name), "{name}");

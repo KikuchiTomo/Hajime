@@ -4,7 +4,7 @@
 //! 状態は UI スレッドの thread_local に持ち，窓の手続きはそこから借りる．借りている間に届いたメッセージは既定の扱いにする
 
 use super::ffi::{self, Canvas, DrawTarget, Paint, Window};
-use super::page::{Event, Extras, PageView};
+use super::page::{Event, Extras, PageView, WithSync};
 use super::theme::Theme;
 use super::Store;
 use crate::catalog::{Catalog, Timing};
@@ -14,9 +14,10 @@ use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::pages::{self, Action, Group, Page};
 use crate::store::StoreError;
-use crate::strings::{features, keys, rule_list, settings, windows as text};
+use crate::strings::{features, keys, rule_list, settings, sync as sync_text, windows as text};
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult,
+    DictionaryAddResult, DictionaryEntry, RequestBody, SymbolItem, SymbolKind, SymbolOrigin,
+    SymbolSaveResult, SyncStatus,
 };
 use std::cell::RefCell;
 use tokens::size::settings_windows as size;
@@ -64,6 +65,8 @@ enum After {
     OpenSettingsFile,
     /// ファイルを選ぶ窓を出してから，読み込む・書き出す
     File(FileTask),
+    /// フォルダを選ぶ窓を出してから，同期のフォルダにする
+    ChooseSyncFolder,
 }
 
 struct App {
@@ -78,6 +81,8 @@ struct App {
     extras: Extras,
     /// 登録した単語(表の行と同じ並び．消すときに引く)
     dictionary: Vec<DictionaryEntry>,
+    /// 項目ごとの同期の表の行(表と同じ並び．切り替えるときに引く)
+    sync_rows: Vec<crate::sync::FieldRow>,
     /// 記号の決まり(表の行と同じ並び．外す・切り替えるときに引く)
     sequences: Vec<SymbolItem>,
     readings: Vec<SymbolItem>,
@@ -160,6 +165,7 @@ pub fn open(catalog: Catalog, connect: fn(&Timing) -> Option<Store>) -> Option<W
         model,
         extras: Extras::default(),
         dictionary: Vec::new(),
+        sync_rows: Vec::new(),
         sequences: Vec::new(),
         readings: Vec::new(),
         entries: Vec::new(),
@@ -201,6 +207,14 @@ fn run_after(window: Window, after: Option<After>) {
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
             }
+        }
+        Some(After::ChooseSyncFolder) => {
+            let Some(path) = ffi::choose_folder(window) else {
+                return;
+            };
+            let after =
+                with_app(|app| app.request_sync(RequestBody::SetSyncFolder { path })).flatten();
+            run_after(window, after);
         }
         Some(After::File(task)) => {
             let Some(name) = with_app(|app| task.default_name(&app.catalog)) else {
@@ -331,6 +345,11 @@ impl App {
                     self.extras.usage = usage;
                 }
             }
+            Page::Sync => {
+                if let Ok(status) = model.store().read_sync() {
+                    self.show_sync(&status);
+                }
+            }
             Page::Symbols => {
                 for kind in [SymbolKind::Sequence, SymbolKind::Reading] {
                     if let Ok(items) = model.store().read_symbol_items(kind) {
@@ -361,7 +380,11 @@ impl App {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = keymap_report(model);
             }
-            self.view.sync(model, &self.extras);
+            let values = WithSync {
+                values: model,
+                sync: &self.extras.sync,
+            };
+            self.view.sync(&values, &self.extras);
         }
         self.arrange_page();
     }
@@ -470,6 +493,36 @@ impl App {
         ) {
             return self.edit_symbols(event);
         }
+        // 同期の値は設定のファイルの項目ではないので，同期の要求にして頼む
+        if let Event::Set { path, value, .. } = &event {
+            if crate::sync::is_sync_path(path) {
+                let body = crate::sync::request(path, value)?;
+                return self.request_sync(body);
+            }
+        }
+        match &event {
+            Event::Action(Action::SyncNow) => return self.request_sync(RequestBody::SyncNow),
+            Event::Action(Action::ChooseSyncFolder) => return Some(After::ChooseSyncFolder),
+            Event::SyncToggleFields(indices) => {
+                let changes: Vec<RequestBody> = indices
+                    .iter()
+                    .filter_map(|index| self.sync_rows.get(*index))
+                    .map(|row| RequestBody::SetSyncLocalField {
+                        field: row.field.clone(),
+                        is_local: !row.local,
+                    })
+                    .collect();
+                let mut after = None;
+                for body in changes {
+                    after = self.request_sync(body);
+                    if after.is_some() {
+                        break;
+                    }
+                }
+                return after;
+            }
+            _ => {}
+        }
         let model = self.model.as_mut()?;
         let result = match event {
             Event::Set {
@@ -485,7 +538,9 @@ impl App {
             Event::ListAdd { .. }
             | Event::SymbolSave { .. }
             | Event::SymbolRemove { .. }
-            | Event::SymbolToggle { .. } => return None,
+            | Event::SymbolToggle { .. }
+            | Event::SyncToggleFields(_)
+            | Event::Action(Action::SyncNow | Action::ChooseSyncFolder) => return None,
             Event::DictionaryAdd(item) => {
                 let entry = DictionaryEntry {
                     reading: item.first().cloned().unwrap_or_default(),
@@ -573,6 +628,36 @@ impl App {
         };
         self.refresh();
         after
+    }
+
+    /// 同期の状態を画面の値にする
+    fn show_sync(&mut self, status: &SyncStatus) {
+        self.extras.sync = crate::sync::values(status);
+        self.extras.sync_folder = status
+            .folder_name
+            .clone()
+            .unwrap_or_else(|| sync_text::NO_FOLDER.to_string());
+        self.extras.last_synced = status
+            .last_synced_at
+            .as_deref()
+            .and_then(crate::sync::parse_time)
+            .map(|time| crate::sync::format_time(ffi::local_time(time).unwrap_or(time)))
+            .unwrap_or_else(|| NO_TIME.to_string());
+        self.sync_rows = crate::sync::field_rows(status);
+        self.extras.sync_fields = crate::sync::field_table(&self.sync_rows);
+    }
+
+    /// 同期の要求をエンジンに頼み，返った状態を画面に出す
+    fn request_sync(&mut self, body: RequestBody) -> Option<After> {
+        let result = self.model.as_ref()?.store().sync(body);
+        match result {
+            Err(error) => self.failure(error),
+            Ok(status) => {
+                self.show_sync(&status);
+                self.refresh();
+                None
+            }
+        }
     }
 
     /// 記号の決まりを重ねる・外す・切り替える．終わったら一覧を読み直す
@@ -850,6 +935,9 @@ fn confirmation(event: &Event) -> Option<(String, String)> {
         _ => None,
     }
 }
+
+/// 一度も同期していないときの時刻(macOS の SyncPage と同じ)
+const NO_TIME: &str = "—";
 
 /// 記号の一覧の 1 行(入力・記号・状態)．状態は無効と，既定から変えた・足した印
 fn symbol_row(item: &SymbolItem) -> Vec<String> {

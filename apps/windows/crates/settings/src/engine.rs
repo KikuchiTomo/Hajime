@@ -9,7 +9,7 @@ use crate::store::{Fields, SettingsStore, StoreError};
 use crate::usage::Usage;
 use ipc::{
     DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, KeymapReport, PreviewWord,
-    RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolSaveResult,
+    RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolSaveResult, SyncStatus,
 };
 
 /// 要求を 1 つ送って応答を待つ口．応答が無い(つながらない・時間切れ)ときは None
@@ -129,6 +129,19 @@ impl<E: Engine> EngineStore<E> {
 
     pub fn remove_user_dictionary_entry(&self, entry: DictionaryEntry) -> Result<(), StoreError> {
         self.done(RequestBody::RemoveUserDictionaryEntry { entry })
+    }
+
+    /// 同期の状態を読む
+    pub fn read_sync(&self) -> Result<SyncStatus, StoreError> {
+        self.sync(RequestBody::ReadSync)
+    }
+
+    /// 同期の設定を変える・今すぐ同期する(setSync…・syncNow)．変えたあとの状態を返す
+    pub fn sync(&self, body: RequestBody) -> Result<SyncStatus, StoreError> {
+        match self.send(body)? {
+            ResponseBody::SyncStatus { status } => Ok(status),
+            _ => Err(StoreError::Malformed),
+        }
     }
 
     /// 記号の一覧(既定の決まりに利用者の決まりを重ねたもの)

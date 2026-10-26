@@ -72,11 +72,12 @@ pub fn control_width(control: &Control) -> f32 {
         Control::Choice(_) => size::CONTROL_WIDTH,
         Control::Stepper(_) => size::STEPPER_WIDTH,
         Control::Seconds(_) => size::CONTROL_WIDTH,
-        Control::Action(_) | Control::Stat(_) => size::CONTROL_WIDTH,
+        Control::Action(_) | Control::Stat(_) | Control::Info(_) => size::CONTROL_WIDTH,
         Control::List(..)
         | Control::Preview
         | Control::Dictionary(_)
         | Control::Symbols(..)
+        | Control::SyncFields(_)
         | Control::Notices => 0.0,
         Control::Version => size::CONTROL_WIDTH,
         Control::Preset => size::CONTROL_WIDTH + size::CONTROL_GAP + size::BUTTON_WIDTH,
@@ -151,9 +152,10 @@ pub fn layout(
 fn card_height(control: &Control) -> f32 {
     let inputs = size::CONTROL_HEIGHT + size::CONTROL_GAP;
     match control {
-        Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
-            size::CARD_PADDING_X * 2.0 + inputs + size::LIST_HEIGHT
-        }
+        Control::List(..)
+        | Control::Dictionary(_)
+        | Control::Symbols(..)
+        | Control::SyncFields(_) => size::CARD_PADDING_X * 2.0 + inputs + size::LIST_HEIGHT,
         Control::Preview => {
             size::CARD_PADDING_X * 2.0 + inputs + size::BODY_LINE_HEIGHT * PREVIEW_LINES
         }
@@ -165,7 +167,10 @@ fn card_height(control: &Control) -> f32 {
 
 fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
     match &row.control {
-        Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
+        Control::List(..)
+        | Control::Dictionary(_)
+        | Control::Symbols(..)
+        | Control::SyncFields(_) => {
             let (fields, buttons) = list_shape(&row.control);
             return place_inputs(position, fields, buttons, card, size::LIST_HEIGHT);
         }
@@ -244,6 +249,7 @@ pub fn list_shape(control: &Control) -> (usize, usize) {
     match control {
         Control::List(spec, _) | Control::Dictionary(spec) => (spec.fields.len(), 2),
         Control::Symbols(_, spec) => (spec.fields.len(), 3),
+        Control::SyncFields(_) => (0, 1),
         _ => (0, 0),
     }
 }

@@ -5,6 +5,7 @@
 
 use crate::layout::Rect;
 use tokens::Rgb;
+use windows::Win32::Foundation::SYSTEMTIME;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_USE_IMMERSIVE_DARK_MODE};
 use windows::Win32::Graphics::Gdi::{
@@ -19,6 +20,7 @@ use windows::Win32::System::Com::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+use windows::Win32::System::Time::SystemTimeToTzSpecificLocalTime;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::Controls::{
     SetScrollInfo, SetWindowTheme, CDIS_DISABLED, CDIS_FOCUS, CDIS_HOT, CDIS_SELECTED,
@@ -35,8 +37,8 @@ use windows::Win32::UI::HiDpi::{
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
-    FileOpenDialog, FileSaveDialog, IFileDialog, ShellExecuteW, FOS_FORCEFILESYSTEM,
-    SIGDN_FILESYSPATH,
+    FileOpenDialog, FileSaveDialog, IFileDialog, ShellExecuteW, FILEOPENDIALOGOPTIONS,
+    FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
@@ -327,18 +329,40 @@ pub fn choose_file(
     } else {
         &FileSaveDialog
     };
-    // SAFETY: 文字列は呼び出しの間生きている．返された場所の文字列は CoTaskMemFree で放す
-    unsafe {
-        let dialog: IFileDialog = CoCreateInstance(class, None, CLSCTX_INPROC_SERVER).ok()?;
-        dialog.SetFileTypes(&filters).ok()?;
-        let options = dialog.GetOptions().ok()?;
-        dialog.SetOptions(options | FOS_FORCEFILESYSTEM).ok()?;
-        if !open && !name.is_empty() {
-            dialog.SetFileName(&HSTRING::from(name)).ok()?;
-            if let Some((_, extension)) = name.rsplit_once('.') {
-                dialog.SetDefaultExtension(&HSTRING::from(extension)).ok()?;
-            }
+    // SAFETY: 引数は定数だけ
+    let dialog: IFileDialog =
+        unsafe { CoCreateInstance(class, None, CLSCTX_INPROC_SERVER) }.ok()?;
+    // SAFETY: filters の文字列は呼び出しの間生きている
+    unsafe { dialog.SetFileTypes(&filters) }.ok()?;
+    if !open && !name.is_empty() {
+        // SAFETY: 文字列は呼び出しの間生きている
+        unsafe { dialog.SetFileName(&HSTRING::from(name)) }.ok()?;
+        if let Some((_, extension)) = name.rsplit_once('.') {
+            // SAFETY: 同上
+            unsafe { dialog.SetDefaultExtension(&HSTRING::from(extension)) }.ok()?;
         }
+    }
+    show_dialog(&dialog, owner, FOS_FORCEFILESYSTEM)
+}
+
+/// フォルダを選ぶ窓を出し，選んだフォルダの場所を返す．キャンセルしたら None
+pub fn choose_folder(owner: HWND) -> Option<String> {
+    // SAFETY: 引数は定数だけ
+    let dialog: IFileDialog =
+        unsafe { CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER) }.ok()?;
+    show_dialog(&dialog, owner, FOS_FORCEFILESYSTEM | FOS_PICKFOLDERS)
+}
+
+/// 窓を出して選んだ場所を返す．返された場所の文字列は CoTaskMemFree で放す
+fn show_dialog(
+    dialog: &IFileDialog,
+    owner: HWND,
+    options: FILEOPENDIALOGOPTIONS,
+) -> Option<String> {
+    // SAFETY: dialog はこの関数の間生きている COM のオブジェクト．owner はこのスレッドの窓
+    unsafe {
+        let current = dialog.GetOptions().ok()?;
+        dialog.SetOptions(current | options).ok()?;
         // キャンセルは Err で返る
         dialog.Show(Some(owner)).ok()?;
         let item = dialog.GetResult().ok()?;
@@ -347,6 +371,30 @@ pub fn choose_file(
         CoTaskMemFree(Some(path.0 as *const _));
         text
     }
+}
+
+/// UTC の年・月・日・時・分・秒を，この PC の地方時にする
+pub fn local_time([year, month, day, hour, minute, second]: [u16; 6]) -> Option<[u16; 6]> {
+    let universal = SYSTEMTIME {
+        wYear: year,
+        wMonth: month,
+        wDay: day,
+        wHour: hour,
+        wMinute: minute,
+        wSecond: second,
+        ..Default::default()
+    };
+    let mut local = SYSTEMTIME::default();
+    // SAFETY: 2 つの値はこの関数の中の値で，呼び出しの間生きている
+    unsafe { SystemTimeToTzSpecificLocalTime(None, &universal, &mut local) }.ok()?;
+    Some([
+        local.wYear,
+        local.wMonth,
+        local.wDay,
+        local.wHour,
+        local.wMinute,
+        local.wSecond,
+    ])
 }
 
 /// ファイルを既定のアプリで開く

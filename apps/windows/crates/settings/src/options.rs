@@ -86,6 +86,25 @@ pub const WORD_CONTEXTS: &[Choice] = &[
     ("afterJapanese", "日本語"),
 ];
 
+/// 同期の範囲(SyncScope)．macOS の「この Mac だけ」を「この PC だけ」にする
+pub const SYNC_SCOPES: &[Choice] = &[("synced", "同期する"), ("local", "この PC だけ")];
+
+/// 同期のまとまり(SyncGroup)．並びは core の SyncGroup と同じ
+pub const SYNC_GROUPS: &[Choice] = &[
+    ("input", "入力"),
+    ("keyboard", "キー配列"),
+    ("keys", "キー設定"),
+    ("conversion", "変換"),
+    ("correction", "補正"),
+    ("symbols", "記号"),
+    ("dictionary", "ユーザー辞書"),
+    ("importedDictionaries", "取り込んだ辞書"),
+    ("associationDictionaries", "連想の辞書"),
+    ("appearance", "外観"),
+    ("exclusions", "除外設定"),
+    ("usage", "統計"),
+];
+
 /// アプリごとの扱い(AppProfile)．標準はアプリを一覧から消すのと同じなので並べない(macOS の ExclusionsPage と同じ)
 pub const APP_PROFILES: &[Choice] = &[
     ("direct", "IME を使わない"),

@@ -35,9 +35,12 @@ OPTION_TABLES = {
     "WORD_CONTEXTS": ("Features", "WordLanguageContext"),
     "APP_PROFILES": ("Settings", "AppProfile"),
     "THEMES": ("Choice", "ThemePreference"),
+    "SYNC_SCOPES": ("Sync", "SyncScope"),
+    "SYNC_GROUPS": ("Sync", "SyncGroup"),
 }
 # Windows で名前を変える選択肢(macOS の Command のキーを，Windows では Ctrl のキーにする)
-WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand")}
+WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOPES", "local")}
+SYNC_MODEL = ROOT / "core/Sources/S90Domain/Sync/SyncModel.swift"
 
 STRING = r'"((?:[^"\\]|\\.)*)"'
 
@@ -159,7 +162,31 @@ def check() -> list[str]:
         for value, name in rust_table(options, table).items():
             if (table, value) not in WINDOWS_ONLY_OPTIONS and labels.get(value) != name:
                 problems.append(f"{table} の {value}: Windows「{name}」と macOS「{labels.get(value)}」が違います")
+    # 同期の項目の名前: macOS の fieldLabels が同期のまとまりのすべての項目を持ち，Windows の FIELD_LABELS が同じ名前か
+    labels = swift_field_labels(swift, mac)
+    model = SYNC_MODEL.read_text(encoding="utf-8")
+    names = model[model.index("public var fieldNames"):model.index("public var legacyFieldNames")]
+    for field in re.findall(r'"(\w+)"', names):
+        if field not in labels:
+            problems.append(f"UIStrings.Sync の fieldLabels に {field} の名前がありません")
+    for field, name in rust_table(rust, "FIELD_LABELS").items():
+        if labels.get(field) != name:
+            problems.append(f"FIELD_LABELS の {field}: Windows「{name}」と macOS「{labels.get(field)}」が違います")
     return problems
+
+
+def swift_field_labels(text: str, constants: dict[tuple[str, str], str]) -> dict[str, str]:
+    """UIStrings.Sync.fieldLabels の項目ごとの名前．ほかの文言を指すものはその値にする"""
+    start = text.index("private static let fieldLabels")
+    block = text[start:text.index("\n        ]", start)]
+    labels: dict[str, str] = {}
+    for field, literal, reference in re.findall(rf'"(\w+)": (?:{STRING}|((?:UIStrings\.)?\w+\.\w+))', block):
+        if reference:
+            group, name = reference.removeprefix("UIStrings.").split(".")
+            labels[field] = constants.get((group, name.lower()), reference)
+        else:
+            labels[field] = literal
+    return labels
 
 
 def main() -> int:
