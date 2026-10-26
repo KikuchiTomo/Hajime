@@ -1,16 +1,12 @@
 #![forbid(unsafe_code)]
-//! メッセージの区切り方．4 バイトの長さ(リトルエンディアン)のあとに，UTF-8 の JSON を置く
-//! (docs/dev/adr/0010-ipc-message-format.md)．Swift の側は core/Sources/S90IPC/MessageFraming.swift
 
 use crate::generated::MAXIMUM_MESSAGE_BYTES;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::io::{ErrorKind, Read, Write};
 
-/// 長さを表すバイト数
 pub const LENGTH_BYTES: usize = 4;
 
-/// 読み書きの失敗．入力の中身を含めない(serde_json のエラーは値の一部を含むことがあるので持たない)
 #[derive(Debug, thiserror::Error)]
 pub enum FrameError {
     #[error("メッセージが上限より大きい({0} バイト)")]
@@ -23,7 +19,6 @@ pub enum FrameError {
     Io(#[from] std::io::Error),
 }
 
-/// メッセージを，長さを前に付けたバイト列にする
 pub fn encode<T: Serialize>(message: &T) -> Result<Vec<u8>, FrameError> {
     let body = serde_json::to_vec(message).map_err(|_| FrameError::Malformed)?;
     if body.len() > MAXIMUM_MESSAGE_BYTES {
@@ -36,7 +31,6 @@ pub fn encode<T: Serialize>(message: &T) -> Result<Vec<u8>, FrameError> {
     Ok(frame)
 }
 
-/// 長さを除いた本体を読む
 pub fn decode<T: DeserializeOwned>(body: &[u8]) -> Result<T, FrameError> {
     if body.len() > MAXIMUM_MESSAGE_BYTES {
         return Err(FrameError::TooLarge(body.len()));
@@ -44,7 +38,6 @@ pub fn decode<T: DeserializeOwned>(body: &[u8]) -> Result<T, FrameError> {
     serde_json::from_slice(body).map_err(|_| FrameError::Malformed)
 }
 
-/// メッセージを 1 つ書く．1 回の write_all で送り，途中で別のメッセージが割り込まないようにする
 pub fn write_message<W: Write, T: Serialize>(
     writer: &mut W,
     message: &T,
@@ -55,7 +48,6 @@ pub fn write_message<W: Write, T: Serialize>(
     Ok(())
 }
 
-/// メッセージを 1 つ読む．長さが上限を超えていたら，本体を読まずに断る
 pub fn read_message<R: Read, T: DeserializeOwned>(reader: &mut R) -> Result<T, FrameError> {
     let mut length = [0u8; LENGTH_BYTES];
     match reader.read_exact(&mut length) {
