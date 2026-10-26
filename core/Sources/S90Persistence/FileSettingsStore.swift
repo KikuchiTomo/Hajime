@@ -24,7 +24,7 @@ public final class FileSettingsStore: SettingsStoring, SettingsObserving {
         }
         do {
             let data = try ProtectedFile.read(from: fileURL, maximumBytes: DefaultSettings.maximumSettingsFileBytes)
-            self.current = try JSONDecoder().decode(Settings.self, from: data)
+            self.current = try SettingsCoding.decode(data)
         } catch {
             // ファイルはあるが読めない．脇に置いたことを記録し，設定の画面で一度知らせる(ファイルの中身はログに出さない)
             self.setAsideFile = ProtectedFile.setAside(fileURL)
@@ -41,9 +41,7 @@ public final class FileSettingsStore: SettingsStoring, SettingsObserving {
         var next = current
         change(&next)
         guard next != current else { return }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(next)
+        let data = try SettingsCoding.encode(next)
         // 上限を超えるファイルは次に読めないので，書く前に断る
         guard data.count <= DefaultSettings.maximumSettingsFileBytes else { throw StoreError.fileTooLarge(bytes: data.count) }
         try ProtectedFile.write(data, to: fileURL)
