@@ -905,10 +905,14 @@ extension WireCandidateVariant: CustomStringConvertible, CustomDebugStringConver
 public struct WireCandidateEntry: Sendable, Equatable, Codable {
     public var text: String
     public var annotation: String?
+    public var correctedStart: UInt32?
+    public var correctedLength: UInt32?
 
-    public init(text: String, annotation: String? = nil) {
+    public init(text: String, annotation: String? = nil, correctedStart: UInt32? = nil, correctedLength: UInt32? = nil) {
         self.text = text
         self.annotation = annotation
+        self.correctedStart = correctedStart
+        self.correctedLength = correctedLength
     }
 }
 
@@ -963,6 +967,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var isFocused: Bool
     public var isUncertain: Bool
     public var isDecided: Bool
+    public var isCorrected: Bool?
     public var preview: String?
     public var shorter: String?
     public var longer: String?
@@ -971,7 +976,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var sourceName: String?
     public var split: WireBranchSplit?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -980,6 +985,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.isFocused = isFocused
         self.isUncertain = isUncertain
         self.isDecided = isDecided
+        self.isCorrected = isCorrected
         self.preview = preview
         self.shorter = shorter
         self.longer = longer

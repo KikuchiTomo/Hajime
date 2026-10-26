@@ -84,6 +84,11 @@ final class BranchView: NSView {
         text.size(withAttributes: [.font: font]).width.rounded(.up)
     }
 
+    /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)
+    private var correctedLabelWidth: CGFloat {
+        textWidth(UIStrings.Branch.corrected, font: labelFont) + Size.paddingX / 2
+    }
+
     private func layout(for panel: LatticePanel) -> Layout {
         let metrics = metrics
         var x = metrics.inset
@@ -91,6 +96,7 @@ final class BranchView: NSView {
         var trunkWidths: [CGFloat] = []
         for column in panel.columns {
             let width = (column.split.map { splitPieces($0).width } ?? textWidth(column.text, font: trunkFont)) + Size.paddingX * 2
+                + (column.isCorrected ? correctedLabelWidth : 0)
             trunkX.append(x)
             trunkWidths.append(width)
             x += width + metrics.trunkGap
@@ -196,12 +202,18 @@ final class BranchView: NSView {
         let offset = theme.isRounded ? Glass.underlineOffset : Branch.underlineOffset
         let y = node.maxY - offset
         let from = node.minX + Size.paddingX
-        let to = node.maxX - Size.paddingX
+        let to = node.maxX - Size.paddingX - (column.isCorrected ? correctedLabelWidth : 0)
+        if column.isCorrected {
+            // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
+            let labelColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
+            drawText(UIStrings.Branch.corrected, attributes: [.font: labelFont, .foregroundColor: labelColor],
+                     x: to + Size.paddingX / 2, in: node)
+        }
         if column.isDecided {
-            drawUnderline(from: from, to: to, y: y, color: theme.isRounded ? theme.textMuted : color, dotted: false)
+            GlassDrawing.drawUnderline(from: from, to: to, y: y, color: theme.isRounded ? theme.textMuted : color, dotted: false, theme: theme)
         } else if column.isUncertain {
             let dotColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
-            drawUnderline(from: from, to: to, y: y, color: dotColor, dotted: true)
+            GlassDrawing.drawUnderline(from: from, to: to, y: y, color: dotColor, dotted: true, theme: theme)
         }
     }
 
@@ -423,33 +435,6 @@ final class BranchView: NSView {
     }
 
     // MARK: - 部品
-
-    private func drawUnderline(from minX: CGFloat, to maxX: CGFloat, y: CGFloat, color: NSColor, dotted: Bool) {
-        if theme.isRounded {
-            // glass は丸い点と丸い端の線
-            let path = NSBezierPath()
-            path.move(to: NSPoint(x: minX, y: y))
-            path.line(to: NSPoint(x: maxX, y: y))
-            path.lineWidth = Glass.lineWidthSelected
-            path.lineCapStyle = .round
-            if dotted { path.setLineDash([0, Glass.lineWidthSelected * 2.5], count: 2, phase: 0) }
-            color.setStroke()
-            path.stroke()
-            return
-        }
-        color.setFill()
-        let rect = NSRect(x: minX, y: y, width: maxX - minX, height: Branch.lineWidth)
-        guard dotted else {
-            rect.fill()
-            return
-        }
-        let step = Branch.lineWidthSelected * 2
-        var x = rect.minX
-        while x < rect.maxX {
-            NSRect(x: x, y: rect.minY, width: min(Branch.lineWidthSelected, rect.maxX - x), height: rect.height).fill()
-            x += step
-        }
-    }
 
     private func drawText(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, in rect: NSRect) {
         let size = text.size(withAttributes: attributes)

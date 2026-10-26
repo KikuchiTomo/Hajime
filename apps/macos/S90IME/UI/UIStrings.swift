@@ -43,6 +43,8 @@ enum UIStrings {
     }
 
     enum Branch {
+        /// 打ち間違いを直した文節に添える札
+        static let corrected = "修正"
         /// 選んでいる候補の取り込んだ辞書
         static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
         /// 足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキーを出す(R-17)

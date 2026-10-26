@@ -123,13 +123,26 @@ final class CandidateView: NSView {
         let textColor = (isSelected ? theme.selectionText : theme.text).withAlphaComponent(opacity)
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
         let number = "\(index + 1)"
+        let textX: CGFloat
         if theme.isRounded {
             let center = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity)
-            drawText(entry.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: rect.minX + Size.paddingX / 2 + lead, in: rect)
+            textX = rect.minX + Size.paddingX / 2 + lead
         } else {
             drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
-            drawText(entry.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: rect.minX + Size.paddingX + lead, in: rect)
+            textX = rect.minX + Size.paddingX + lead
+        }
+        drawText(entry.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: textX, in: rect)
+        if let corrected = entry.corrected {
+            // 打ち間違いを直した語句に，入力中の文字と同じ補正の点線の下線を引く．選んでいる行は選択の文字の色にする
+            let characters = Array(entry.text)
+            let start = min(corrected.lowerBound, characters.count), end = min(corrected.upperBound, characters.count)
+            let width = { (text: ArraySlice<Character>) in String(text).size(withAttributes: [.font: self.candidateFont]).width }
+            let from = (textX + width(characters[..<start])).rounded()
+            let to = (from + width(characters[start..<end])).rounded()
+            let offset = theme.isRounded ? Glass.underlineOffset : DesignTokens.Size.Branch.underlineOffset
+            let color = (isSelected ? theme.selectionText : theme.correction).withAlphaComponent(opacity)
+            GlassDrawing.drawUnderline(from: from, to: to, y: rect.maxY - offset, color: color, dotted: true, theme: theme)
         }
         if let annotation = entry.annotation {
             let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: mutedColor]

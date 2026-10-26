@@ -34,9 +34,23 @@ enum PanelBuilder {
         "もしかして「\(corrected)」" + (key.map { "　\($0) で直す" } ?? "")
     }
 
-    /// - Parameter nextKey: 次の候補のキーの名前(英単語を直した候補の案内に出す)
+    /// 打ち間違いを直した部分を含む文節か．直した読みの部分(changed．読みの先頭からの文字数)にかかる文節で，
+    /// 打ったままの候補を選んでいないもの．「もしかして」の直した候補を選んだ文節も含む
+    static func isCorrected(_ segment: SegmentLattice.Segment, changed: Range<Int>?) -> Bool {
+        switch segment.selected.origin {
+        case .correction: return true
+        case .asTyped: return false
+        case .engine, .variant, .sentencePart, .combined, .symbol, .userDictionary:
+            guard let changed else { return false }
+            return (segment.readingStart..<(segment.readingStart + segment.readingLength)).overlaps(changed)
+        }
+    }
+
+    /// - Parameters:
+    ///   - nextKey: 次の候補のキーの名前(英単語を直した候補の案内に出す)
+    ///   - corrected: 打ち間違いを直した読みの部分(読みの先頭からの文字数)．候補の中の当たる語句に補正の下線を引く
     static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool,
-                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil) -> CandidatePanel {
+                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil, corrected: Range<Int>? = nil) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
             : []
@@ -52,8 +66,11 @@ enum PanelBuilder {
         }
         let pageStart = focusedIndex / perPage * perPage
         let pageEnd = min(pageStart + perPage, selection.candidates.count)
-        let entries = (pageStart..<pageEnd).map {
-            CandidatePanel.Entry(text: selection.candidates[$0].text, annotation: selection.annotations[$0])
+        let reading = composition.conversionReading
+        let entries = (pageStart..<pageEnd).map { index in
+            let candidate = selection.candidates[index]
+            let range = corrected.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0)) }
+            return CandidatePanel.Entry(text: candidate.text, annotation: selection.annotations[index], corrected: range)
         }
         let isCorrected = selection.candidates.first?.origin == .correction
         return CandidatePanel(
@@ -69,8 +86,9 @@ enum PanelBuilder {
     }
 
     /// showsVariants が false なら上の枝(字種)を出さない(設定の「候補の上に文字種の行を表示」)
+    /// corrected は打ち間違いを直した読みの部分．かかる文節に補正の印を付ける(isCorrected)
     static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment,
-                             showsVariants: Bool = true) -> LatticePanel {
+                             showsVariants: Bool = true, corrected: Range<Int>? = nil) -> LatticePanel {
         var position = 1
         var total = 0
         let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in
@@ -81,8 +99,10 @@ enum PanelBuilder {
                 let preview = segment.isConfident || segment.isDecided
                     ? nil
                     : segment.candidates.first { $0.text != segment.selected.text }?.text
-                return LatticePanel.Column(text: segment.selected.text, isFocused: false, isUncertain: !segment.isConfident,
-                                           isDecided: segment.isDecided, preview: preview)
+                var column = LatticePanel.Column(text: segment.selected.text, isFocused: false, isUncertain: !segment.isConfident,
+                                                 isDecided: segment.isDecided, preview: preview)
+                column.isCorrected = isCorrected(segment, changed: corrected)
+                return column
             }
             // 選んでいる候補が見えるよう，下の枝は選んでいる位置を含むページを切り出す
             let pageStart = (selectedCandidate ?? 0) / perSegment * perSegment
@@ -99,6 +119,7 @@ enum PanelBuilder {
                 isUncertain: !segment.isConfident,
                 isDecided: segment.isDecided
             )
+            column.isCorrected = isCorrected(segment, changed: corrected)
             column.alternativeNotes = page.map { candidate in
                 switch candidate.origin {
                 case .asTyped: asTypedNote

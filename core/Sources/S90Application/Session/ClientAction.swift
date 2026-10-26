@@ -93,10 +93,13 @@ public struct CandidatePanel: Sendable, Equatable {
         public var text: String
         /// 「入力のまま」などの添え書き
         public var annotation: String?
+        /// 打ち間違いを直した部分(text の中の文字の位置)．補正の点線の下線を引く．直していなければ nil
+        public var corrected: Range<Int>?
 
-        public init(text: String, annotation: String?) {
+        public init(text: String, annotation: String?, corrected: Range<Int>? = nil) {
             self.text = text
             self.annotation = annotation
+            self.corrected = corrected
         }
     }
 
@@ -149,6 +152,8 @@ public struct LatticePanel: Sendable, Equatable {
         public var isUncertain: Bool
         /// 利用者が選び直した文節か
         public var isDecided: Bool
+        /// 打ち間違いを直した部分を含む文節か．補正の印を付ける
+        public var isCorrected = false
         /// 注目していない迷う文節に薄く添える，次の候補
         public var preview: String?
         /// 注目している文節を 1 文字短く・長くしたときの文節(足元に「⇧← 入れ　⇧→ 入れると」と見せる)

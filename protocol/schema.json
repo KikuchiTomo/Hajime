@@ -834,6 +834,14 @@
         {
           "name": "annotation",
           "type": "string?"
+        },
+        {
+          "name": "correctedStart",
+          "type": "u32?"
+        },
+        {
+          "name": "correctedLength",
+          "type": "u32?"
         }
       ]
     },
@@ -918,6 +926,10 @@
         {
           "name": "isDecided",
           "type": "bool"
+        },
+        {
+          "name": "isCorrected",
+          "type": "bool?"
         },
         {
           "name": "preview",

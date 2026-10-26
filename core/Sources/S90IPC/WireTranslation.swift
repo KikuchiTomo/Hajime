@@ -155,7 +155,18 @@ extension WireCandidateList {
         self.init(
             variants: panel.variants.map { WireCandidateVariant(label: $0.label, isAvailable: $0.isAvailable) },
             selectedVariant: panel.selectedVariant.map(UInt32.init(clamping:)),
-            entries: panel.entries.map { WireCandidateEntry(text: $0.text, annotation: $0.annotation) },
+            entries: panel.entries.map { entry in
+                // 直した部分の位置は，Rust の char と同じ Unicode のスカラー値の数で送る(core は書記素の数で持つ)
+                let corrected = entry.corrected.map { range -> (start: Int, length: Int) in
+                    let characters = Array(entry.text)
+                    let scalars = { (slice: ArraySlice<Character>) in slice.reduce(0) { $0 + $1.unicodeScalars.count } }
+                    let start = min(range.lowerBound, characters.count), end = min(range.upperBound, characters.count)
+                    return (scalars(characters[..<start]), scalars(characters[start..<end]))
+                }
+                return WireCandidateEntry(text: entry.text, annotation: entry.annotation,
+                                          correctedStart: corrected.map { UInt32(clamping: $0.start) },
+                                          correctedLength: corrected.map { UInt32(clamping: $0.length) })
+            },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
             position: UInt32(clamping: panel.position),
@@ -178,6 +189,7 @@ extension WireBranchMap {
                     isFocused: column.isFocused,
                     isUncertain: column.isUncertain,
                     isDecided: column.isDecided,
+                    isCorrected: column.isCorrected ? true : nil,
                     preview: column.preview,
                     shorter: column.shorter,
                     longer: column.longer,

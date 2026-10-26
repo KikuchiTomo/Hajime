@@ -22,14 +22,29 @@ public enum ClauseSplitter {
     /// 語の並びを文節に分ける．語が無ければ空
     public static func clauses(of words: [Candidate.Word]) -> [Clause] {
         var clauses: [Clause] = []
+        for part in parts(of: words) {
+            if part.startsClause || clauses.isEmpty {
+                clauses.append(part.clause)
+            } else {
+                clauses[clauses.count - 1].text += part.clause.text
+                clauses[clauses.count - 1].readingCount += part.clause.readingCount
+            }
+        }
+        return clauses
+    }
+
+    /// 語の並びを，語の中の文節の切れ目(「は良い」→「は」「良い」，「な人だ」→「な」「人だ」)でも分けた並び．
+    /// 文節にまとめる前の細かい単位．どの語句を直したかを示すのに使う(CorrectedSpan)
+    public static func pieces(of words: [Candidate.Word]) -> [Clause] {
+        parts(of: words).map(\.clause)
+    }
+
+    /// 語を文節の切れ目で分けたものと，それが新しい文節を始めるか
+    private static func parts(of words: [Candidate.Word]) -> [(clause: Clause, startsClause: Bool)] {
+        var parts: [(clause: Clause, startsClause: Bool)] = []
         func append(_ text: String, _ readingCount: Int, startsClause: Bool) {
             guard !text.isEmpty || readingCount > 0 else { return }
-            if startsClause || clauses.isEmpty {
-                clauses.append(Clause(text: text, readingCount: readingCount))
-            } else {
-                clauses[clauses.count - 1].text += text
-                clauses[clauses.count - 1].readingCount += readingCount
-            }
+            parts.append((Clause(text: text, readingCount: readingCount), startsClause))
         }
         var previousIsLatin = false
         for word in words {
@@ -59,7 +74,7 @@ public enum ClauseSplitter {
                 append(word.text, word.readingCount, startsClause: false)
             }
         }
-        return clauses
+        return parts
     }
 
     /// 語の頭に付く接頭辞．「お茶」「ご飯」は 1 つの語として扱う

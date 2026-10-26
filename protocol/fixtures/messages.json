@@ -96,7 +96,7 @@
       "list": {
         "variants": [{ "label": "ひらがな", "isAvailable": true }, { "label": "全角英数", "isAvailable": false }],
         "selectedVariant": 0,
-        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }],
+        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }, { "text": "今日は良い", "correctedStart": 3, "correctedLength": 2 }],
         "selectedEntry": 1,
         "focus": "candidate",
         "position": 2,
@@ -121,6 +121,7 @@
             "isFocused": true,
             "isUncertain": true,
             "isDecided": false,
+            "isCorrected": true,
             "shorter": "今日",
             "usageNote": "使い分け",
             "alternativeNotes": [null, "修正"],
