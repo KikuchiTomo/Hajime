@@ -27,6 +27,46 @@ public struct TypoCorrectionRule: Sendable {
         }
     }
 
+    /// ローマ字として読めてしまう英単語を，英単語とみなすか(「gitwotukau」→「gitを使う」)．
+    /// 英単語の終わりがかなの区切りに合わない(「git」+「wo」の「two」のように，綴りの途中で切れる)ものだけを調べ，
+    /// 全体を日本語として読んだもっともらしさ(japanese)と，英単語の後ろだけを日本語として読んだもっともらしさ(following)を比べる
+    /// - Parameters:
+    ///   - endsOnBoundary: 英単語の終わりが，かなの区切りに合うか
+    ///   - japanese: 英単語から後ろ全体を日本語として読んだときのもっともらしさ
+    ///   - following: 英単語の後ろだけを日本語として読んだときのもっともらしさ
+    ///   - followingReading: 英単語の後ろの読み．英単語のあとに続く助詞などで始まるときだけ英単語とみなす
+    ///     (「gitを」「gitで」)．打ち間違いのある日本語(「arigatoou」)の一部を英単語(「gat」)と取り違えないため
+    public func readsAsEnglish(endsOnBoundary: Bool, japanese: Double, following: Double, followingReading: String) -> Bool {
+        guard level != .off, !endsOnBoundary, japanese.isFinite || following.isFinite,
+            Self.startsLikeFollowingEnglish(followingReading) else { return false }
+        return following - DefaultSettings.wordReadAsRomajiCost > japanese
+    }
+
+    /// この文字のすぐあとに打った英字は，識別子の続きか(「user_name」「a.b」「userName」「v2」)．識別子は直さない(R-06)
+    public static func continuesIdentifier(_ character: Character) -> Bool {
+        character == "_" || character == "." || (character.isASCII && (character.isLetter || character.isNumber))
+    }
+
+    /// 英単語が日本語の文の中にあるか．前の読みか，組み立てる前の入力位置の直前に日本語(かな・漢字)があればそうみなす(R-06)
+    public func isInJapaneseSentence(before reading: some Collection<Character>, precedingCharacter: Character?) -> Bool {
+        reading.contains(where: Self.isJapanese) || (precedingCharacter.map(Self.isJapanese) ?? false)
+    }
+
+    private static func isJapanese(_ character: Character) -> Bool {
+        character.unicodeScalars.contains { (0x3041...0x30FF).contains($0.value) || (0x4E00...0x9FFF).contains($0.value) || (0x3400...0x4DBF).contains($0.value) }
+    }
+
+    /// 読みが，文の中の英単語のすぐあとによく続く語で始まるか
+    public static func startsLikeFollowingEnglish(_ reading: String) -> Bool {
+        wordsAfterEnglish.contains(where: reading.hasPrefix)
+    }
+
+    /// 文の中の英単語のすぐあとによく続く語(助詞と「する」「です」など)
+    static let wordsAfterEnglish = [
+        "を", "が", "は", "に", "で", "の", "と", "も", "へ", "や", "から", "まで", "より", "って",
+        "する", "した", "して", "しま", "され", "させ", "です", "でし", "だ", "じゃ", "なら",
+    ]
+
     /// keys が英単語ならそのまま，綴りの誤りなら近い単語を補正の結果として返す
     public func correction(for keys: String, isWord: Bool, suggestions: [String]) -> String? {
         if isWord { return keys }
