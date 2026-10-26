@@ -62,7 +62,7 @@ enum UIStrings {
             case .context: context
             }
             let field = dictionary.field.isEmpty ? "" : "\(dictionary.field)・"
-            return "\(field)\(dictionary.wordCount) 語・\(condition)"
+            return "\(field)\(dictionary.wordCount) 件・\(condition)"
         }
     }
 
@@ -376,8 +376,8 @@ enum UIStrings {
         static let saveFailed = "設定を保存できませんでした"
         static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため、初期設定で起動しました。元のファイルは同じ場所に \(name) として保存しました" }
         static let learningReset = "学習結果を消去しました"
-        static let dictionaryFull = "ユーザー辞書に登録できるのは \(DefaultSettings.maximumUserDictionaryEntries.formatted()) 語までです"
-        static let invalidEntry = "読みはひらがなで入力し、読みと単語は長すぎないようにしてください"
+        static let dictionaryFull = "ユーザー辞書に登録できるのは \(DefaultSettings.maximumUserDictionaryEntries.formatted()) 件までです"
+        static let invalidEntry = "読みはひらがなで \(DefaultSettings.maximumUserDictionaryReadingLength) 文字まで、単語は \(DefaultSettings.maximumUserDictionaryWordLength) 文字までにしてください"
         static let importFailed = "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません"
         static let exportFailed = "エクスポートできませんでした"
         static func imported(_ count: Int) -> String { "\(count) 件を追加しました" }
@@ -666,7 +666,7 @@ enum UIStrings {
         static let noCustomThemes = "カスタムテーマはありません"
         static let preview = "見本"
         static let readability = "読みやすさ"
-        static let invalidTheme = "名前を入れてください"
+        static let invalidTheme = "名前を入力してください"
         static var themesFull: String { "カスタムテーマは \(DefaultSettings.maximumCustomThemes) 個までです" }
         static func confirmDeleteTheme(_ name: String) -> String { "「\(name)」を削除しますか？" }
 
@@ -702,6 +702,8 @@ enum UIStrings {
         // 情報
         static let about = "情報"
         static let version = "バージョン"
+        /// バージョンの表示(ADR 0008．Windows と同じ「v0.0.2 (macOS)」の形)
+        static func versionValue(_ version: String) -> String { "v\(version) (macOS)" }
         static let acknowledgements = "謝辞"
         static let acknowledgementsNote = "s90.tokyo IME は上記のソフトウェア・モデル・データを利用しています。"
         static let noticesMissing = "謝辞のファイルが見つかりません"

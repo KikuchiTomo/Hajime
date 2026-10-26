@@ -412,7 +412,7 @@ final class SettingsModel: ObservableObject {
     // MARK: 情報
 
     var versionString: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String).map(UIStrings.More.versionValue) ?? "-"
     }
 
     /// アプリに入れた利用表記(THIRD_PARTY_NOTICES.md)を項目に分けたもの．無ければ nil．

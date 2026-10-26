@@ -210,12 +210,12 @@ mod tests {
             vec![
                 vec![
                     "電気".to_string(),
-                    "電気・3 語・常に".to_string(),
+                    "電気・3 件・常に".to_string(),
                     String::new()
                 ],
                 vec![
                     "法律".to_string(),
-                    "12 語・選んだアプリ 1 個".to_string(),
+                    "12 件・選んだアプリ 1 個".to_string(),
                     "無効".to_string()
                 ],
             ]
