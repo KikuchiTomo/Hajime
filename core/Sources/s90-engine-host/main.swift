@@ -73,7 +73,8 @@ func run() -> Int32 {
             let process = Process()
             process.executableURL = settingsApp
             try? process.run()
-        }
+        },
+        hints: { BranchHints.make(for: $0, settings: $1) }
     )
     settings.observe { [weak engine] in
         engine?.apply($0)
