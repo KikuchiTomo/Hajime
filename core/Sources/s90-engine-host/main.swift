@@ -7,12 +7,6 @@ import S90Engine
 import S90IPC
 import S90Persistence
 
-@MainActor
-final class EmptyLexicon: EnglishLexicon {
-    func isWord(_ text: String) -> Bool { true }
-    func suggestions(for text: String) -> [String] { [] }
-}
-
 enum HostPaths {
     static var roaming: URL { directory(environment: "APPDATA") }
     static var local: URL { directory(environment: "LOCALAPPDATA") }
@@ -108,7 +102,8 @@ func run() -> Int32 {
     associations.preloadBundled()
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
-    let lexicon = EmptyLexicon()
+    // 英単語の辞書は Windows のスペルチェッカー(macOS の NSSpellChecker と同じ役)
+    let lexicon = WindowsSpellCheckerLexicon()
     // 打ち間違いの訂正は時間がかかるので，別の変換器で裏で求める(Zenzai があるときだけ．macOS の CompositionRoot と同じ)
     let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: HostPaths.versionString) }
     let window = CandidateWindowLink()

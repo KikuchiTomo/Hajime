@@ -37,7 +37,12 @@ let package = Package(
             // Zenzai は llama.cpp(C++)を使うので，エンジンを読み込むターゲットは C++ との相互運用を有効にする
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
-        .target(name: "S90Persistence", dependencies: ["S90Domain", "S90Application"]),
+        // Windows のスペルチェッカー(ISpellChecker)を呼ぶ C の口．Windows のほかでは何もしない
+        .target(name: "CWindowsSpellCheck", linkerSettings: [.linkedLibrary("ole32", .when(platforms: [.windows]))]),
+        .target(name: "S90Persistence", dependencies: [
+            "S90Domain", "S90Application",
+            .target(name: "CWindowsSpellCheck", condition: .when(platforms: [.windows])),
+        ]),
         .target(name: "S90IPC", dependencies: ["S90Domain", "S90Application"]),
         .executableTarget(
             name: "s90-engine-host",
