@@ -53,7 +53,7 @@ pub mod settings {
     pub const LEARNING: &str = "学習";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
-    pub const RESTORE_DEFAULTS: &str = "初期設定に戻す";
+    pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
     pub const LEARNING_RESET: &str = "学習結果を消去しました";
     pub const RECORDS_USAGE: &str = "入力の統計を記録";
     pub const USAGE_NOTE: &str = "入力した文字は記録しません。";
@@ -67,7 +67,7 @@ pub mod settings {
     /// UIStrings.Settings.fontSize から値を除いたもの(値は部品に出す)
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const ADD: &str = "追加";
-    pub const ESCAPE_SWITCHES_TO_DIRECT: &str = "Escape で英数に切り替え";
+    pub const ESCAPE_SWITCHES_TO_DIRECT: &str = "Esc で英数に切り替え";
     pub const ROMAJI_KEYS: &str = "入力";
     pub const READING: &str = "読み";
     pub const WORD: &str = "単語";
@@ -217,16 +217,16 @@ pub mod more {
     pub const FONT: &str = "書体";
     pub const BACKUP: &str = "バックアップ";
     pub const ADD_APPS: &str = "アプリを追加…";
-    pub const IMPORT_CSV: &str = "CSV を読み込む…";
-    pub const EXPORT_CSV: &str = "CSV に書き出す…";
+    pub const IMPORT_CSV: &str = "CSV をインポート…";
+    pub const EXPORT_CSV: &str = "CSV をエクスポート…";
     pub const EXPORT_CSV_FILE_NAME: &str = "s90-exclusions.csv";
     pub fn imported_rules(count: u32) -> String {
         format!("{count} 件を追加しました")
     }
     pub const CSV_FAILED: &str = "読み込めませんでした。CSV のファイルではないか、大きすぎます";
     pub const BACKUP_NOTE: &str = "すべての設定を JSON としてインポート・エクスポート可能です。";
-    pub const EXPORT_SETTINGS: &str = "設定を書き出す…";
-    pub const IMPORT_SETTINGS: &str = "設定を読み込む…";
+    pub const EXPORT_SETTINGS: &str = "設定をエクスポート…";
+    pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "s90-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
     pub const SETTINGS_IMPORT_FAILED: &str =
@@ -392,7 +392,7 @@ pub mod dictionaries {
     pub const USER_WORDS: &str = "登録した単語";
     pub const IMPORTED: &str = "取り込んだ辞書";
     pub const EMPTY: &str = "取り込んだ辞書はありません";
-    pub const IMPORT_FILE: &str = "辞書を取り込む…";
+    pub const IMPORT_FILE: &str = "辞書をインポート…";
     pub const REIMPORT: &str = "再読み込み…";
     pub const NAME: &str = "名前";
     pub const FIELD: &str = "分野";
@@ -439,7 +439,7 @@ pub mod association {
     pub const HINT: &str = "連想の案内を表示";
     pub const DICTIONARIES: &str = "連想の辞書";
     pub const EMPTY: &str = "連想の辞書はありません";
-    pub const IMPORT_FILE: &str = "連想の辞書を取り込む…";
+    pub const IMPORT_FILE: &str = "連想の辞書をインポート…";
     pub const IMPORT_FAILED: &str =
         "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
     pub const NOTE: &str = "1 行に同じ意味の単語をタブか「,」で区切って並べたファイルを読み込めます。タブで区切るときは、先頭の列に意味の説明を書きます。上にある辞書ほど先に出ます。";
@@ -521,7 +521,7 @@ pub mod sync {
         ("modeIndicatorDuration", "モードの表示時間"),
         ("customThemes", "カスタムテーマ"),
         ("customThemeID", "使用するカスタムテーマ"),
-        ("escapeSwitchesToDirect", "Escape で英数に切り替え"),
+        ("escapeSwitchesToDirect", "Esc で英数に切り替え"),
         ("terminalCommands", "ターミナルでコマンドを英字で入力"),
         ("profileRules", "除外設定"),
         (
