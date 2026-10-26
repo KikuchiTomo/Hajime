@@ -33,12 +33,31 @@ public final class FolderSyncRunner {
 
     public var state: SyncState { synchronizer.state }
 
-    /// 設定とユーザー辞書を同期のファイルと突き合わせる．ほかの PC で消した辞書は，この PC の索引も消す
-    public func syncSettings(in folder: URL) throws {
+    /// 設定とユーザー辞書を同期のファイルと突き合わせる．ほかの PC で消した辞書は，この PC の索引も消す．
+    /// 同期のファイルの読み書きはメインスレッドの外で行い，時間の上限(DefaultSettings.syncFileTimeout)を過ぎたら待つのをやめる
+    /// (クラウドのフォルダがファイルをまだ手元に置いていないときなど)．うまくいけば nil，できなければ理由を返す
+    public func syncSettings(in folder: URL) async -> SyncProblem? {
         let backend = FolderSyncBackend(folder: folder)
-        let merged = try merge(remote: try backend.read())
-        if let written = merged.written { try backend.write(written) }
-        try synchronizer.commit(merged)
+        guard let read = await Deadline.run(seconds: DefaultSettings.syncFileTimeout, { await Self.perform { try backend.read() } }) else {
+            return .folderUnavailable
+        }
+        do {
+            let merged = try merge(remote: try read.get())
+            if let written = merged.written {
+                let wrote = await Deadline.run(seconds: DefaultSettings.syncFileTimeout, { await Self.perform { try backend.write(written) } })
+                guard let wrote else { return .folderUnavailable }
+                try wrote.get()
+            }
+            try synchronizer.commit(merged)
+            return nil
+        } catch {
+            return error as? SettingsSynchronizer.SyncError == .unreadableDocument ? .unreadable : .failed
+        }
+    }
+
+    @concurrent
+    private static func perform<Value: Sendable>(_ body: @Sendable () throws -> Value) async -> Result<Value, any Error> {
+        Result { try body() }
     }
 
     /// 読んでおいた同期のファイルの中身と突き合わせる．ファイルの読み書きをメインスレッドの外で行うときに使う．

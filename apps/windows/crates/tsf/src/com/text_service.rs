@@ -38,8 +38,10 @@ use windows::Win32::UI::TextServices::{
 use windows::Win32::UI::WindowsAndMessaging::{KillTimer, SetTimer};
 use windows_core::{implement, ComObject, IUnknownImpl, Interface, Ref, Result, BOOL, GUID};
 
-const RESPONSE_TIMEOUT: Duration = Duration::from_millis(50);
-const RECONNECT_INTERVAL: Duration = Duration::from_secs(2);
+const RESPONSE_TIMEOUT: Duration = Duration::from_millis(ipc::timing::KEY_RESPONSE_MILLISECONDS);
+const RECONNECT_INTERVAL: Duration = Duration::from_millis(ipc::timing::RECONNECT_MILLISECONDS);
+/// 返事の遅れがこれより長く続いたら，エンジンが固まったとみなす
+const STALL_LIMIT: Duration = Duration::from_millis(ipc::timing::ENGINE_STALL_MILLISECONDS);
 
 thread_local! {
     static ACTIVE: RefCell<Option<ComObject<TextService>>> = const { RefCell::new(None) };
@@ -71,6 +73,8 @@ struct Inner {
     last_open_attempt: Option<Instant>,
     composition: Option<ITfComposition>,
     late: Vec<Pending>,
+    /// 返事の遅れが始まった時刻(late が空になったら None)
+    late_since: Option<Instant>,
     atoms: Vec<(TextStyle, u32)>,
     caret: Option<Rect>,
     timer: usize,
@@ -222,8 +226,10 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             match pending.outcome(RESPONSE_TIMEOUT) {
                 Outcome::Reply(body) => Ok(self.apply_response(context, body).into()),
                 Outcome::TimedOut => {
-                    self.inner.borrow_mut().late.push(pending);
-                    self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+                    // エンジンが固まっていたらキーを奪わずアプリに渡す(入力が消えないように)
+                    if !self.defer(pending) {
+                        return Ok(false.into());
+                    }
                     Ok(true.into())
                 }
                 Outcome::Unavailable => {
@@ -260,6 +266,38 @@ impl TextService_Impl {
             self.schedule_timer(Some(0));
         }
         filter::consumes(self.inner.borrow().state.as_ref(), &input).then_some(input)
+    }
+
+    /// 間に合わなかった返事をあとで反映するために残す．遅れが長く続いた・溜まりすぎたときは，
+    /// エンジンが固まったとみなして残さず，つなぎ直す(false を返す)
+    fn defer(&self, pending: Pending) -> bool {
+        let stalled = {
+            let mut inner = self.inner.borrow_mut();
+            let since = *inner.late_since.get_or_insert_with(Instant::now);
+            since.elapsed() >= STALL_LIMIT || inner.late.len() >= ipc::timing::MAXIMUM_LATE_KEYS
+        };
+        if stalled {
+            self.restart_engine();
+            return false;
+        }
+        self.inner.borrow_mut().late.push(pending);
+        self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+        true
+    }
+
+    /// 固まったエンジンへの接続を捨てて，新しく作り直す．届かなかった返事は捨てる
+    fn restart_engine(&self) {
+        let engine = pipe_name("engine")
+            .ok()
+            .and_then(|name| EngineClient::start(name).ok())
+            .map(Rc::new);
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.late.clear();
+            inner.late_since = None;
+            inner.engine = engine;
+        }
+        self.forget_session();
     }
 
     fn forget_session(&self) {
@@ -331,9 +369,9 @@ impl TextService_Impl {
                 let mode = state.mode;
                 self.inner.borrow_mut().state = Some(state);
                 self.show_mode(mode);
-                self.apply_operations(context, operations);
+                let applied = self.apply_operations(context, operations);
                 self.schedule_timer(wake);
-                handled
+                handled && applied
             }
             ResponseBody::Error {
                 code: ErrorCode::UnknownSession,
@@ -357,10 +395,15 @@ impl TextService_Impl {
                 Err(pending) => waiting.push(pending),
             }
         }
-        self.inner.borrow_mut().late.extend(waiting);
+        let mut inner = self.inner.borrow_mut();
+        if waiting.is_empty() {
+            inner.late_since = None;
+        }
+        inner.late.extend(waiting);
     }
 
-    fn apply_operations(&self, context: &ITfContext, operations: Vec<EditOperation>) {
+    /// 操作を文書に反映する．再変換を頼まれたのに始められなかった(選んでいる文字が無い)ときは false
+    fn apply_operations(&self, context: &ITfContext, operations: Vec<EditOperation>) -> bool {
         let mut edits = Vec::new();
         let mut reconversion = None;
         for operation in operations {
@@ -372,11 +415,10 @@ impl TextService_Impl {
                 other => edits.push(other),
             }
         }
-        if let Some(maximum_length) = reconversion {
-            self.reconvert(context, maximum_length);
-        }
+        let reconverted =
+            reconversion.is_none_or(|maximum_length| self.reconvert(context, maximum_length));
         if edits.is_empty() {
-            return;
+            return reconverted;
         }
         let client_id = self.inner.borrow().client_id;
         let service = self.to_object();
@@ -429,6 +471,7 @@ impl TextService_Impl {
                 result
             },
         );
+        reconverted
     }
 
     fn select_mode(&self, mode: InputMode) {
@@ -546,6 +589,15 @@ impl TextService_Impl {
             return;
         };
         self.apply_late(&context);
+        let stalled = self
+            .inner
+            .borrow()
+            .late_since
+            .is_some_and(|since| since.elapsed() >= STALL_LIMIT);
+        if stalled {
+            self.restart_engine();
+            return;
+        }
         if !self.inner.borrow().late.is_empty() {
             self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
             return;
@@ -578,13 +630,16 @@ impl TextService_Impl {
     }
 
     /// 再変換．入力先で選んでいる文字(maximum_length 文字まで)を読み，Windows の日本語の解析で読みを求めて，エンジンに変換し直してもらう．
-    /// 選んでいない・秘密の欄・長すぎるときは何もしない
-    fn reconvert(&self, context: &ITfContext, maximum_length: u32) {
+    /// 選んでいない・秘密の欄・長すぎる・読みを求められないときは何もせず false
+    fn reconvert(&self, context: &ITfContext, maximum_length: u32) -> bool {
         let client_id = self.inner.borrow().client_id;
         let Some(text) = read_selection(context, client_id, maximum_length) else {
-            return;
+            return false;
         };
-        let reading = phonetic::reading(&text);
+        let Some(reading) = phonetic::reading(&text) else {
+            return false;
+        };
+        let reading = Some(reading);
         let (engine, session) = {
             let inner = self.inner.borrow();
             (inner.engine.clone(), inner.session)
@@ -597,6 +652,7 @@ impl TextService_Impl {
                 context,
             }
         });
+        true
     }
 
     /// 入力中の文字の文脈(組み立て中ならそこ，無ければ注目している文書)と，エンジン・セッション
@@ -644,8 +700,7 @@ impl TextService_Impl {
                 self.apply_response(context, body);
             }
             Outcome::TimedOut => {
-                self.inner.borrow_mut().late.push(pending);
-                self.schedule_timer(Some(RESPONSE_TIMEOUT.as_millis() as u32));
+                self.defer(pending);
             }
             Outcome::Unavailable => self.forget_session(),
         }

@@ -87,28 +87,43 @@ final class SyncCoordinator: ObservableObject {
         }
     }
 
-    /// 今すぐ同期する．同期しない設定か，フォルダを選んでいなければ何もしない
+    /// 今すぐ同期する．同期しない設定か，フォルダを選んでいなければ何もしない．
+    /// 同期のファイルの読み書きはメインスレッドの外で行い，時間の上限を過ぎたら待つのをやめる(FolderSyncRunner.syncSettings)．
+    /// 入力の処理(メインスレッド)は止めない
     func syncNow() {
         guard state.isEnabled, let bookmark = state.folderBookmark, !isSyncing else { return }
-        isSyncing = true
-        defer { isSyncing = false }
+        let folder: URL
         do {
             var isStale = false
-            let folder = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
+            folder = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
             guard folder.startAccessingSecurityScopedResource() else { throw CocoaError(.fileReadNoPermission) }
-            defer { folder.stopAccessingSecurityScopedResource() }
             if isStale {
                 // フォルダを動かしたなどでブックマークが古くなったら作り直す
                 let renewed = try folder.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
                 try synchronizer.setEnabled(true, folderBookmark: renewed, folderName: folder.lastPathComponent)
             }
-            try runner.syncSettings(in: folder)
-            lastError = nil
-            syncDictionaryFiles(bookmark: state.folderBookmark ?? bookmark)
         } catch {
             fail(error)
+            refresh()
+            return
         }
-        refresh()
+        isSyncing = true
+        Task { [weak self] in
+            guard let self else {
+                folder.stopAccessingSecurityScopedResource()
+                return
+            }
+            let problem = await self.runner.syncSettings(in: folder)
+            folder.stopAccessingSecurityScopedResource()
+            self.isSyncing = false
+            if let problem {
+                self.fail(problem)
+            } else {
+                self.lastError = nil
+                self.syncDictionaryFiles(bookmark: self.state.folderBookmark ?? bookmark)
+            }
+            self.refresh()
+        }
     }
 
     /// 取り込んだ辞書の索引のファイルを同期のフォルダと運ぶ．数百 MB になりうるので，メインスレッドの外で写す．
@@ -151,6 +166,11 @@ final class SyncCoordinator: ObservableObject {
 
     private func refresh() {
         state = synchronizer.state
+    }
+
+    private func fail(_ problem: SyncProblem) {
+        logger.error("同期できませんでした: \(String(describing: problem), privacy: .public)")
+        lastError = problem == .unreadable ? UIStrings.Sync.unreadable : UIStrings.Sync.failed
     }
 
     private func fail(_ error: any Error) {

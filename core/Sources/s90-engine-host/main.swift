@@ -104,6 +104,10 @@ func run() -> Int32 {
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
     // 英単語の辞書は Windows のスペルチェッカー(macOS の NSSpellChecker と同じ役)
     let lexicon = WindowsSpellCheckerLexicon()
+    if !lexicon.isAvailable {
+        // 英単語の綴りの補正だけを止めて，入力は続ける
+        FileHandle.standardError.write(Data("英語のスペルチェッカーを使えません(\(lexicon.openStatus))．英単語の綴りの補正をしません\n".utf8))
+    }
     // 打ち間違いの訂正は時間がかかるので，別の変換器で裏で求める(Zenzai があるときだけ．macOS の CompositionRoot と同じ)
     let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: HostPaths.versionString) }
     let window = CandidateWindowLink()

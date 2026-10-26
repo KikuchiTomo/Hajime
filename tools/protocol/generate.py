@@ -219,6 +219,8 @@ def generate_swift(schema: dict) -> str:
     out.append(f"public enum {SWIFT_PREFIX}Protocol {{")
     out.append(f"    public static let version: UInt32 = {schema['version']}")
     out.append(f"    public static let maximumMessageBytes = {schema['maximumMessageBytes']}")
+    for name, value in schema["timing"].items():
+        out.append(f"    public static let {name} = {value}")
     out.append("}")
     for t in schema["types"]:
         out.append("")
@@ -358,6 +360,14 @@ def generate_rust(schema: dict) -> str:
     out.append("")
     out.append(f"pub const PROTOCOL_VERSION: u32 = {schema['version']};")
     out.append(f"pub const MAXIMUM_MESSAGE_BYTES: usize = {schema['maximumMessageBytes']};")
+    out.append("")
+    out.append("/// 待つ時間と，返事の遅れを許す数(schema.json の timing)")
+    out.append("pub mod timing {")
+    for name, value in schema["timing"].items():
+        constant = re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()
+        kind = "usize" if name.startswith("maximum") else "u64"
+        out.append(f"    pub const {constant}: {kind} = {value};")
+    out.append("}")
     out.append("")
     out.append('const REDACTED: &str = "<伏せた>";')
     for t in schema["types"]:

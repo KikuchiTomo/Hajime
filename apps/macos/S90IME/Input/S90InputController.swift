@@ -46,8 +46,9 @@ final class S90InputController: IMKInputController {
         let result = session.handle(key, context: context)
         presenter.context = context
         presenter.apply(result.actions, to: client)
-        if result.actions.contains(.requestReconversion) {
-            reconvert(client: client, context: context)
+        // 再変換できなかった(選んでいる文字が無い・読めない)ときは，キーをアプリに渡す(Ctrl+Shift+R などをアプリで使えるように)
+        if result.actions.contains(.requestReconversion), !reconvert(client: client, context: context) {
+            return false
         }
         if result.actions.contains(.awaitCorrections) {
             convertAfterCorrections(client: client, context: context)
@@ -65,15 +66,10 @@ final class S90InputController: IMKInputController {
         settleTask = Task { @MainActor [weak self] in
             guard let self else { return }
             if let request = self.session.conversionCorrectionRequest, let service = self.root.typoService {
-                let corrections = await withTaskGroup(of: [String: [ReadingCorrection]]?.self) { group in
-                    group.addTask { await service.corrections(forKeys: request.keys, leftContext: request.leftContext) }
-                    group.addTask {
-                        try? await Task.sleep(for: .seconds(DefaultSettings.correctionWaitBeforeConversion))
-                        return nil
-                    }
-                    let first = await group.next() ?? nil
-                    group.cancelAll()
-                    return first
+                // 訂正が上限までに終わらなければ待たずに変換する(訂正は裏で終わらせ，結果は捨てる)．
+                // タスクグループは子が終わるまで抜けないので使わない
+                let corrections = await Deadline.run(seconds: DefaultSettings.correctionWaitBeforeConversion) {
+                    await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
                 }
                 if let corrections { self.session.provideCorrections(corrections) }
             }
@@ -166,14 +162,16 @@ final class S90InputController: IMKInputController {
     /// 再変換．入力先で選んでいる文字を読み，読みに戻して変換する．選んでいなければ何もしない．
     /// 最初に出す組み立て中の文字で選んでいた文字を置き換え，Esc なら元の文字を入れ直す
     @MainActor
-    private func reconvert(client: any IMKTextInput, context: InputContext) {
+    /// 再変換を始めたら true
+    private func reconvert(client: any IMKTextInput, context: InputContext) -> Bool {
         let selection = client.selectedRange()
         guard selection.location != NSNotFound, selection.length > 0, selection.length <= DefaultSettings.maximumReconversionLength,
-              let text = client.attributedSubstring(from: selection)?.string else { return }
+              let text = client.attributedSubstring(from: selection)?.string else { return false }
         let actions = session.reconvert(text, transcriber: root.transcriber, context: context)
-        guard !actions.isEmpty else { return }
+        guard !actions.isEmpty else { return false }
         presenter.replacement = selection
         presenter.apply(actions, to: client)
+        return true
     }
 
     /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く

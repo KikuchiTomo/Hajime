@@ -27,14 +27,14 @@ struct FolderSyncRunnerTests {
             runner = FolderSyncRunner(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries)
         }
 
-        func sync(_ folder: URL) throws {
-            try runner.syncSettings(in: folder)
+        func sync(_ folder: URL) async throws {
+            #expect(await runner.syncSettings(in: folder) == nil)
             if let files = runner.dictionaryFiles() { runner.finish(try files.run(in: folder)) }
         }
     }
 
     @Test("A で取り込んだ辞書が B に届いて引け，A で消すと B の索引も消える")
-    func dictionaryTravels() throws {
+    func dictionaryTravels() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("s90-runner-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let folder = root.appendingPathComponent("shared", isDirectory: true)
@@ -52,17 +52,17 @@ struct FolderSyncRunnerTests {
         #expect(imported.revision == (try DictionaryFileSync.sha256(of: a.dictionaries.url(for: dictionary))))
         try a.settings.update { _ = ImportedDictionary.record(imported, isNew: true, in: &$0.importedDictionaries) }
 
-        try a.sync(folder)
+        try await a.sync(folder)
         time += 10
-        try b.sync(folder)
+        try await b.sync(folder)
         #expect(b.settings.current.importedDictionaries.map(\.id) == [dictionary.id])
         #expect(b.dictionaries.words(reading: "でんあつ", in: imported).map(\.word) == ["電圧"])
 
         time += 10
         try a.settings.update { $0.importedDictionaries = [] }
-        try a.sync(folder)
+        try await a.sync(folder)
         time += 10
-        try b.sync(folder)
+        try await b.sync(folder)
         #expect(b.settings.current.importedDictionaries.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: b.dictionaries.url(for: dictionary).path))
     }

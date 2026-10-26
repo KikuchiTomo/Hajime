@@ -7,11 +7,15 @@ import S90Domain
 /// 調べるのは端末の中だけで，外部には送らない．スペルチェッカーが使えなければ，どの語も英単語とは答えず，候補も出さない
 @MainActor
 public final class WindowsSpellCheckerLexicon: EnglishLexicon {
-    private let isAvailable: Bool
+    /// スペルチェッカーを開けたか
+    public let isAvailable: Bool
+    /// 開けなかったときの理由の番号(s90_spell_open の戻り値．-3 は英語のスペルチェッカーが入っていない)
+    public let openStatus: Int32
 
     public init() {
         let language = Array(DefaultSettings.englishSpellCheckLanguage.utf16) + [0]
-        isAvailable = s90_spell_open(language) == 0
+        openStatus = s90_spell_open(language)
+        isAvailable = openStatus == 0
     }
 
     public func isWord(_ text: String) -> Bool {
