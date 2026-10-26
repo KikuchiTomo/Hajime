@@ -19,13 +19,38 @@ public final class EngineService {
         let owner: ConnectionID
         let input: InputSession
         var hasSettled = false
+        /// 裏で求めている打ち間違いの訂正
+        var correction: CorrectionWork?
     }
+
+    /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
+    private struct CorrectionWork {
+        enum Purpose {
+            /// Space で変換するのを待たせている(.awaitCorrections)．期限を過ぎたら待たずに変換する
+            case conversion(deadline: ContinuousClock.Instant)
+            /// 打鍵が止まったので見直す
+            case review
+        }
+
+        let id: UInt64
+        let purpose: Purpose
+        let task: Task<Void, Never>
+        var result: [String: [ReadingCorrection]]?
+    }
+
+    /// 訂正を求めているあいだ，求め終わったかを見に来てもらう間隔(ミリ秒)．
+    /// DLL からエンジンへは要求と応答しか無いので，DLL のタイマーの wake で結果を渡す
+    public static let correctionPollMilliseconds: UInt32 = 30
 
     private let makeSession: () -> InputSession
     private let settings: any SettingsStoring
     private let ui: (WireUiCommand) -> Void
     private let openSettings: () -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
+    /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
+    private let typoService: (any TypoCorrecting)?
+    private let now: () -> ContinuousClock.Instant
+    private var nextCorrection: UInt64 = 1
     private var connections: [ConnectionID: Connection] = [:]
     private var sessions: [UInt32: Session] = [:]
     private var nextConnection: UInt64 = 1
@@ -33,7 +58,10 @@ public final class EngineService {
     private var lastAnchor: WireRect?
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
-                openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] }) {
+                openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
+                typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
+        self.typoService = typoService
+        self.now = now
         self.makeSession = makeSession
         self.settings = settings
         self.ui = ui
@@ -51,7 +79,7 @@ public final class EngineService {
     public func disconnect(_ id: ConnectionID) {
         guard let connection = connections.removeValue(forKey: id) else { return }
         for session in connection.sessions {
-            sessions.removeValue(forKey: session)
+            sessions.removeValue(forKey: session)?.correction?.task.cancel()
         }
         if !connection.sessions.isEmpty { ui(.hide) }
     }
@@ -88,7 +116,7 @@ public final class EngineService {
             return .sessionOpened(session: session, state: state(of: input, wakeAfter: nil))
         case .closeSession(let session):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
-            sessions.removeValue(forKey: session)
+            sessions.removeValue(forKey: session)?.correction?.task.cancel()
             connection.sessions.remove(session)
             connections[id] = connection
             return .done
@@ -97,10 +125,12 @@ public final class EngineService {
             return key(input, context: context, session: session, current: current)
         case .setMode(let session, let mode):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            cancelCorrections(of: session)
             let actions = current.input.setMode(InputMode(mode))
             return edit(actions, handled: true, session: session, anchor: lastAnchor)
         case .deactivate(let session):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            cancelCorrections(of: session)
             let actions = current.input.deactivate()
             ui(.hide)
             return edit(actions, handled: true, session: session, anchor: lastAnchor)
@@ -162,22 +192,82 @@ public final class EngineService {
         guard let event = KeyEvent(input) else {
             return .edit(handled: false, operations: [], state: state(of: current.input, wakeAfter: nil))
         }
+        // 次のキーが来たら，前のキーの並びの訂正は要らない(待たせていた変換も InputSession がやめる)
+        cancelCorrections(of: session)
         let result = current.input.handle(event, context: context)
         sessions[session]?.hasSettled = false
-        return edit(result.actions, handled: result.handled, session: session, anchor: lastAnchor)
+        var actions = result.actions
+        if actions.contains(.awaitCorrections) {
+            // 訂正を求め終わるまで変換を待つ(macOS の S90InputController と同じ)．求めるものが無ければすぐ変換を続ける
+            if let request = current.input.conversionCorrectionRequest, typoService != nil {
+                startCorrections(request, purpose: .conversion(deadline: now() + .seconds(DefaultSettings.correctionWaitBeforeConversion)), session: session)
+            } else {
+                actions += current.input.resumeConversion(context: context)
+            }
+        }
+        return edit(actions, handled: result.handled, session: session, anchor: lastAnchor)
     }
 
     private func wake(session: UInt32, current: Session, context wire: WireFieldContext) -> WireResponseBody {
         let context = InputContext(wire, settings: settings.current)
         if let caret = wire.caret { lastAnchor = caret }
         var actions: [ClientAction] = []
-        if current.input.awaitsSettle {
+        if let work = current.correction {
+            switch work.purpose {
+            case .conversion(let deadline):
+                if let result = work.result {
+                    sessions[session]?.correction = nil
+                    current.input.provideCorrections(result)
+                    actions += current.input.resumeConversion(context: context)
+                } else if now() >= deadline {
+                    // 長くかかるときは待つのをやめて，直さずに変換する
+                    cancelCorrections(of: session)
+                    actions += current.input.resumeConversion(context: context)
+                }
+            case .review:
+                if let result = work.result {
+                    sessions[session]?.correction = nil
+                    current.input.provideCorrections(result)
+                    actions += current.input.review(context: context)
+                }
+            }
+        } else if current.input.awaitsSettle {
             actions += current.input.settle(context: context)
             sessions[session]?.hasSettled = true
         } else if current.input.awaitsReview {
-            actions += current.input.review(context: context)
+            // 訂正は裏で求め，求め終わったあとの wake で見直す(打鍵を待たせない)
+            if typoService != nil, let request = current.input.correctionRequest {
+                startCorrections(request, purpose: .review, session: session)
+            } else {
+                actions += current.input.review(context: context)
+            }
         }
         return edit(actions, handled: true, session: session, anchor: lastAnchor)
+    }
+
+    private func startCorrections(_ request: (keys: [String], leftContext: String?), purpose: CorrectionWork.Purpose, session: UInt32) {
+        guard let typoService else { return }
+        cancelCorrections(of: session)
+        let id = nextCorrection
+        nextCorrection &+= 1
+        let task = Task { @MainActor [weak self] in
+            let result = await typoService.corrections(forKeys: request.keys, leftContext: request.leftContext)
+            guard !Task.isCancelled, let self, self.sessions[session]?.correction?.id == id else { return }
+            self.sessions[session]?.correction?.result = result
+        }
+        sessions[session]?.correction = CorrectionWork(id: id, purpose: purpose, task: task)
+    }
+
+    private func cancelCorrections(of session: UInt32) {
+        sessions[session]?.correction?.task.cancel()
+        sessions[session]?.correction = nil
+    }
+
+    /// 裏で求めている訂正がすべて終わるまで待つ(テスト用)
+    func waitForCorrections() async {
+        for task in sessions.values.compactMap(\.correction?.task) {
+            await task.value
+        }
     }
 
     private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?) -> WireResponseBody {
@@ -194,6 +284,7 @@ public final class EngineService {
 
     private func wakeAfter(_ session: UInt32) -> UInt32? {
         guard let current = sessions[session] else { return nil }
+        if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
         if current.input.awaitsSettle {
             return Self.milliseconds(delays.liveConversionDelay)

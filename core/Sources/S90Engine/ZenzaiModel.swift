@@ -2,6 +2,7 @@ import Foundation
 #if canImport(CryptoKit)
 import CryptoKit
 #endif
+import S90Domain
 
 /// Zenzai(文脈を見るニューラルかな漢字変換)のモデルのファイル．
 ///
@@ -12,7 +13,6 @@ public struct ZenzaiModel: Sendable, Equatable {
         case fileNotFound
         case sizeMismatch(actual: Int)
         case hashMismatch
-        case unsupportedPlatform
     }
 
     /// Miwa-Keita/zenz-v3.2-small-gguf(Apache-2.0)の ggml-model-Q5_K_M.gguf．
@@ -31,7 +31,15 @@ public struct ZenzaiModel: Sendable, Equatable {
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
         #if os(Windows)
-        throw .unsupportedPlatform
+        // Windows には FIFO や /dev/zero のような，開くと止まる・終わらないファイルが無い．
+        // ふつうのファイルかと大きさを確かめてから開き，読む量は大きさの上限で止める
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            attributes[.type] as? FileAttributeType == .typeRegular,
+            let handle = try? FileHandle(forReadingFrom: url) else { throw .fileNotFound }
+        let size = (attributes[.size] as? NSNumber)?.intValue ?? -1
+        guard size == expectedSize else { throw .sizeMismatch(actual: size) }
+        guard try sha256(of: handle, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
+        return ZenzaiModel(url: url)
         #else
         // 先に開いてから，開いたものがふつうのファイルかと大きさを確かめる．確かめてから開くまでのあいだに
         // FIFO や /dev/zero への差し替えが起きても止まらないようにするため．O_NONBLOCK で開くので，FIFO でも開く時点で止まらない
@@ -51,17 +59,26 @@ public struct ZenzaiModel: Sendable, Equatable {
     static func sha256(of handle: FileHandle, maximumBytes: Int) throws(VerificationError) -> String {
         #if canImport(CryptoKit)
         var hasher = SHA256()
+        #else
+        // CryptoKit の無い OS(Windows)では自前の SHA-256 で求める．値が同じことは SHA256DigestTests で確かめる
+        var hasher = SHA256Digest()
+        #endif
         var total = 0
         // 70MB ほどあるので，一度に読まずに区切って読む
         while let chunk = try? handle.read(upToCount: min(1 << 20, maximumBytes + 1 - total)), !chunk.isEmpty {
             total += chunk.count
             // 上限を超えたことだけが分かる．ファイルの本当の大きさは分からないので，読んだ量を入れる
             guard total <= maximumBytes else { throw .sizeMismatch(actual: total) }
+            #if canImport(CryptoKit)
             hasher.update(data: chunk)
+            #else
+            hasher.update(chunk)
+            #endif
         }
+        #if canImport(CryptoKit)
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
         #else
-        throw .unsupportedPlatform
+        return hasher.finalizeHex()
         #endif
     }
 }
