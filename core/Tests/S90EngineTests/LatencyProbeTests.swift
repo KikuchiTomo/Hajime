@@ -47,12 +47,21 @@ struct LatencyProbeTests {
         }
         let sorted = all.sorted()
         let best = passP95s.min()!
-        var load = [Double](repeating: 0, count: 3)
-        _ = getloadavg(&load, 3)
-        print("S90_LATENCY zenzai=\(engine.usesZenzai) p50=\(sorted[sorted.count / 2]) p95=\(Self.p95(all)) max=\(sorted.last!) best_pass_p95=\(best) pass_p95=\(passP95s) keys=\(keys.count) passes=\(Self.passes) load=\(load.map { String(format: "%.2f", $0) })")
+        print("S90_LATENCY zenzai=\(engine.usesZenzai) p50=\(sorted[sorted.count / 2]) p95=\(Self.p95(all)) max=\(sorted.last!) best_pass_p95=\(best) pass_p95=\(passP95s) keys=\(keys.count) passes=\(Self.passes)\(Self.loadAverage)")
         // R-01 の受け入れ条件(p95 で 50ms 以内)．ほかのプロセスが CPU を使うと時間は延びるだけで縮まないので，
         // 同じ文を何度か打ち，いちばん速かった回の p95 で判定する．遅くなる変更はどの回でも遅くなるので見逃さない
         #expect(best < .milliseconds(50), "どの回も p95 が 50ms を超えた: \(passP95s)")
+    }
+
+    /// 測ったときの負荷．時間が延びたときに，負荷のせいかを出力から見分けられるようにする
+    private static var loadAverage: String {
+        #if canImport(Darwin)
+        var load = [Double](repeating: 0, count: 3)
+        guard getloadavg(&load, 3) == 3 else { return "" }
+        return " load=\(load.map { String(format: "%.2f", $0) })"
+        #else
+        return ""
+        #endif
     }
 
     private static func p95(_ durations: [Duration]) -> Duration {
