@@ -62,9 +62,9 @@ final class CompositionRoot {
         let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
         // 同期(R-15)．この Mac の同期の設定は settings.json と別のファイルに置く
         let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
-        let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings)
-        sync.start()
         let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))
+        let sync = SyncCoordinator(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries)
+        sync.start()
         installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries)
     }
 

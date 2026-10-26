@@ -20,11 +20,12 @@ extension SettingsModel {
         isImportingDictionary = true
         // 大きな辞書は読むのに数秒かかるので，画面を止めないよう裏で読む
         Task.detached(priority: .userInitiated) {
-            let result: Result<Int, Error>
+            let result: Result<(count: Int, revision: String), Error>
             do {
                 let words = try DictionaryFileReader.read(from: source)
                 try ImportedDictionaryStore.write(words, to: destination)
-                result = .success(words.count)
+                // 同期のとき，ほかの Mac の索引が古いかどうかを見分ける版
+                result = .success((words.count, try DictionaryFileSync.sha256(of: destination)))
             } catch {
                 result = .failure(error)
             }
@@ -32,18 +33,20 @@ extension SettingsModel {
         }
     }
 
-    private func finishImport(_ dictionary: ImportedDictionary, isNew: Bool, result: Result<Int, Error>) {
+    private func finishImport(_ dictionary: ImportedDictionary, isNew: Bool, result: Result<(count: Int, revision: String), Error>) {
         isImportingDictionary = false
         switch result {
-        case .success(let count):
+        case .success(let (count, revision)):
             dictionaries?.reload(dictionary)
             var updated = dictionary
             updated.wordCount = count
+            updated.revision = revision
             if update({ settings in
                 if isNew {
                     settings.importedDictionaries.append(updated)
                 } else if let index = settings.importedDictionaries.firstIndex(where: { $0.id == updated.id }) {
                     settings.importedDictionaries[index].wordCount = count
+                    settings.importedDictionaries[index].revision = revision
                 }
             }) {
                 message = UIStrings.Dictionaries.imported(count)

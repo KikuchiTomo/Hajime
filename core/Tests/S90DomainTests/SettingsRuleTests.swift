@@ -423,10 +423,23 @@ struct ImportedDictionarySettingTests {
     func roundTrip() throws {
         var settings = Settings()
         settings.importedDictionaries = [
-            ImportedDictionary(id: "a", name: "法律", field: "法律", condition: .apps(["com.microsoft.Word"]), wordCount: 3),
-            ImportedDictionary(id: "b", name: "電気", isEnabled: false, condition: .context, wordCount: 5),
+            ImportedDictionary(id: "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", name: "法律", field: "法律", condition: .apps(["com.microsoft.Word"]), wordCount: 3,
+                               revision: String(repeating: "ab", count: 32)),
+            ImportedDictionary(id: "7A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9", name: "電気", isEnabled: false, condition: .context, wordCount: 5),
         ]
         let decoded = try JSONDecoder().decode(Settings.self, from: try JSONEncoder().encode(settings))
         #expect(decoded.importedDictionaries == settings.importedDictionaries)
+    }
+
+    @Test("同期のファイルから来た設定でも，UUID の形でない id と 16 進でない版の辞書は捨てる(パスを差し込ませない)")
+    func dropsUnsafeIdentity() throws {
+        var settings = Settings()
+        settings.importedDictionaries = [
+            ImportedDictionary(id: "../../Library/x", name: "a", wordCount: 1),
+            ImportedDictionary(id: "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", name: "b", wordCount: 1, revision: "../x"),
+            ImportedDictionary(id: "7A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9", name: "c", wordCount: 1),
+        ]
+        let decoded = try JSONDecoder().decode(Settings.self, from: try JSONEncoder().encode(settings))
+        #expect(decoded.importedDictionaries.map(\.name) == ["c"])
     }
 }

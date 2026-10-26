@@ -1,3 +1,5 @@
+import Foundation
+
 /// 取り込んだ辞書の語の品詞．変換エンジンの品詞に置き換えて渡す．
 /// 動詞や形容詞の活用は扱わないので，分からない品詞はすべて名詞として扱う
 public enum WordClass: String, Sendable, Equatable, Codable, CaseIterable {
@@ -81,18 +83,31 @@ public struct ImportedDictionary: Sendable, Equatable, Codable, Hashable, Identi
     public var condition: DictionaryCondition
     /// 取り込んだ語の数
     public var wordCount: Int
+    /// 索引のファイルの中身の SHA-256(16 進の小文字)．同期のとき，ほかの Mac の索引が古いかどうかと，
+    /// 運んだファイルが壊れていないかを確かめるのに使う．同期を入れる前に取り込んだ辞書は nil
+    public var revision: String?
 
-    public init(id: String, name: String, field: String = "", isEnabled: Bool = true, condition: DictionaryCondition = .always, wordCount: Int) {
+    public init(id: String, name: String, field: String = "", isEnabled: Bool = true, condition: DictionaryCondition = .always, wordCount: Int,
+                revision: String? = nil) {
         self.id = id
         self.name = name
         self.field = field
         self.isEnabled = isEnabled
         self.condition = condition
         self.wordCount = wordCount
+        self.revision = revision
     }
 
-    /// 索引のファイルの名前．id は取り込むときに作る UUID なので，パスを外から差し込まれない
+    /// 索引のファイルの名前．id は取り込むときに作る UUID．同期のファイルから来た設定にも入るので，
+    /// UUID の形でない id(「../」などでパスを差し込むもの)は設定を読むときに捨てる(hasValidIdentity)
     public var indexFileName: String { "\(id).tsv" }
+
+    /// id が UUID の形で，revision があれば 64 桁の 16 進の小文字か
+    public var hasValidIdentity: Bool {
+        guard UUID(uuidString: id) != nil, id.count == 36 else { return false }
+        guard let revision else { return true }
+        return revision.count == 64 && revision.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
+    }
 
     /// 分岐図に出す名前．分野があれば分野
     public var displayName: String { field.isEmpty ? name : field }
