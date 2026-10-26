@@ -1,0 +1,444 @@
+#![forbid(unsafe_code)]
+
+//! 候補の一覧(macOS の CandidateView)．上から，文字種の行・候補・足元の 3 つの区画
+
+use super::paint::Painter;
+use super::{Frame, Look, Measure, Point, Scene};
+use crate::strings;
+use crate::theme::Font;
+use ipc::{CandidateFocus, CandidateList, KeyHint};
+use tokens::opacity;
+use tokens::size::{candidate, glass};
+
+struct Metrics {
+    row_height: f32,
+    section_height: f32,
+    /// 外枠と立体の縁の太さ．角丸のテーマは余白
+    inset: f32,
+    /// 番号の幅
+    lead: f32,
+    shadow: f32,
+}
+
+impl Metrics {
+    fn new(look: &Look, measure: &dyn Measure) -> Self {
+        let rounded = look.theme.is_rounded();
+        let base_row = if rounded {
+            glass::ROW_HEIGHT
+        } else {
+            candidate::ROW_HEIGHT
+        };
+        Self {
+            row_height: (base_row * look.font_size / candidate::FONT_SIZE).round(),
+            section_height: if rounded {
+                glass::FOOTER_HEIGHT
+            } else {
+                measure.height(Font::Label).ceil().max(glass::KEYCAP_HEIGHT)
+                    + candidate::SECTION_PADDING_Y * 2.0
+            },
+            inset: if rounded {
+                glass::PADDING / 2.0
+            } else {
+                candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
+            },
+            lead: if rounded {
+                glass::BADGE_SIZE + candidate::PADDING_X
+            } else {
+                candidate::INDEX_WIDTH
+            },
+            shadow: if look.theme.has_drop_shadow() {
+                candidate::SHADOW_OFFSET
+            } else {
+                0.0
+            },
+        }
+    }
+}
+
+struct Footer {
+    hints: Vec<KeyHint>,
+    note: Option<String>,
+    position: String,
+}
+
+fn footer(list: &CandidateList) -> Footer {
+    if list.focus == CandidateFocus::Variants {
+        let index = list.selected_variant.map_or(1, |index| index + 1);
+        return Footer {
+            hints: strings::variants_hints(),
+            note: list.note.clone(),
+            position: strings::variants_position(index, list.variants.len() as u32),
+        };
+    }
+    Footer {
+        hints: strings::candidates_hints(),
+        note: list.note.clone(),
+        position: strings::position(list.position, list.position, list.total),
+    }
+}
+
+pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) -> Scene {
+    let metrics = Metrics::new(look, measure);
+    let mut painter = Painter::new(look, measure);
+    let theme = look.theme;
+    let padding = candidate::PADDING_X;
+    let footer = footer(list);
+
+    // 大きさ
+    let entry_width = list
+        .entries
+        .iter()
+        .map(|entry| {
+            painter.width(&entry.text, Font::Candidate)
+                + entry
+                    .annotation
+                    .as_deref()
+                    .map_or(0.0, |note| painter.width(note, Font::Label) + padding)
+        })
+        .fold(0.0, f32::max);
+    let variants_width: f32 = list
+        .variants
+        .iter()
+        .map(|variant| {
+            painter.width(&variant.label, Font::Label) + candidate::VARIANT_PADDING_X * 2.0
+        })
+        .sum();
+    let hints_width = match &footer.note {
+        Some(note) => painter.width(note, Font::Label),
+        None => painter.hints_width(&footer.hints),
+    };
+    let footer_width = hints_width + painter.width(&footer.position, Font::Label) + padding * 3.0;
+    let content_width = candidate::MIN_WIDTH
+        .max(metrics.lead + entry_width + padding * 2.0)
+        .max(variants_width + padding * 2.0)
+        .max(footer_width);
+    let mut content_height = list.entries.len() as f32 * metrics.row_height
+        + metrics.section_height
+        + candidate::FRAME_WIDTH;
+    if !list.variants.is_empty() {
+        content_height += metrics.section_height + candidate::FRAME_WIDTH;
+    }
+    let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
+    let height = (content_height + metrics.inset * 2.0 + metrics.shadow).ceil();
+
+    // 描く
+    let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
+    painter.panel(body);
+    let content = body.inset(metrics.inset, metrics.inset);
+    let mut y = content.y;
+    if !list.variants.is_empty() {
+        variants(
+            &mut painter,
+            list,
+            Frame::new(content.x, y, content.width, metrics.section_height),
+        );
+        y += metrics.section_height;
+        separator(&mut painter, y, content.x, content.max_x());
+        y += candidate::FRAME_WIDTH;
+    }
+    for (index, entry) in list.entries.iter().enumerate() {
+        let row = Frame::new(content.x, y, content.width, metrics.row_height);
+        let selected =
+            list.focus == CandidateFocus::Candidate && list.selected_entry == Some(index as u32);
+        if selected {
+            if theme.is_rounded() {
+                painter.capsule(row.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
+            } else {
+                painter.rect(row, theme.selection);
+            }
+        }
+        // 出した直後は，第 1 候補と選んでいる候補だけを濃く出す
+        let opacity = if selected || index == 0 {
+            1.0
+        } else {
+            look.rest_opacity
+        };
+        let text_color = if selected {
+            theme.selection_text
+        } else {
+            theme.text
+        }
+        .faded(opacity);
+        let muted_color = if selected {
+            theme.selection_text
+        } else {
+            theme.text_muted
+        }
+        .faded(opacity);
+        let number = (index + 1).to_string();
+        if theme.is_rounded() {
+            let center = Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
+            painter.badge(
+                &number,
+                center,
+                selected,
+                opacity,
+                glass::BADGE_SIZE,
+                Font::Key,
+            );
+            painter.text(
+                &entry.text,
+                Font::Candidate,
+                text_color,
+                row.x + padding / 2.0 + metrics.lead,
+                row,
+            );
+        } else {
+            painter.text(&number, Font::Label, muted_color, row.x + padding, row);
+            painter.text(
+                &entry.text,
+                Font::Candidate,
+                text_color,
+                row.x + padding + metrics.lead,
+                row,
+            );
+        }
+        if let Some(annotation) = entry.annotation.as_deref() {
+            painter.text_right(
+                annotation,
+                Font::Label,
+                muted_color,
+                row.max_x() - padding,
+                row,
+            );
+        }
+        y += metrics.row_height;
+    }
+    separator(&mut painter, y, content.x, content.max_x());
+    y += candidate::FRAME_WIDTH;
+    footer_section(
+        &mut painter,
+        &footer,
+        Frame::new(content.x, y, content.width, metrics.section_height),
+    );
+    painter.finish(width, height)
+}
+
+fn separator(painter: &mut Painter, y: f32, from: f32, to: f32) {
+    if painter.theme.is_rounded() {
+        let half = candidate::PADDING_X / 2.0;
+        painter.separator(y, from + half, to - half);
+    } else {
+        painter.separator(y, from, to);
+    }
+}
+
+/// 文字種の行．ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)
+fn variants(painter: &mut Painter, list: &CandidateList, section: Frame) {
+    let theme = painter.theme;
+    let inset_y = if theme.is_rounded() {
+        glass::VARIANT_INSET_Y
+    } else {
+        candidate::VARIANT_INSET_Y
+    };
+    let mut x = section.x + candidate::PADDING_X / 2.0;
+    for (index, variant) in list.variants.iter().enumerate() {
+        let selected =
+            list.focus == CandidateFocus::Variants && list.selected_variant == Some(index as u32);
+        let color = match (selected, variant.is_available) {
+            (true, _) => theme.selection_text,
+            (false, true) => theme.text_muted,
+            (false, false) => theme.text_muted.faded(opacity::variant::UNAVAILABLE),
+        };
+        let width = painter.width(&variant.label, Font::Label) + candidate::VARIANT_PADDING_X * 2.0;
+        let cell = Frame::new(
+            x,
+            section.y + inset_y,
+            width,
+            section.height - inset_y * 2.0,
+        );
+        if selected {
+            if theme.is_rounded() {
+                painter.capsule(cell, theme.selection);
+            } else {
+                painter.rect(cell, theme.selection);
+            }
+        }
+        painter.text(
+            &variant.label,
+            Font::Label,
+            color,
+            cell.x + candidate::VARIANT_PADDING_X,
+            cell,
+        );
+        x += width;
+    }
+}
+
+/// 角丸のテーマは案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)
+fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
+    let theme = painter.theme;
+    let left = section.x + candidate::PADDING_X;
+    let right = section.max_x() - candidate::PADDING_X;
+    if theme.is_rounded() {
+        match &footer.note {
+            Some(note) => painter.text(note, Font::Label, theme.correction, left, section),
+            None => painter.hints(&footer.hints, left, section.mid_y()),
+        }
+        painter.text_right(
+            &footer.position,
+            Font::Label,
+            theme.text_muted,
+            right,
+            section,
+        );
+        return;
+    }
+    painter.text(
+        &footer.position,
+        Font::Label,
+        theme.text_muted,
+        left,
+        section,
+    );
+    match &footer.note {
+        Some(note) => painter.text_right(note, Font::Label, theme.correction, right, section),
+        None => {
+            let width = painter.hints_width(&footer.hints);
+            painter.hints(&footer.hints, right - width, section.mid_y());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::testing::*;
+    use super::super::Draw;
+    use super::*;
+    use ipc::{CandidateEntry, CandidateVariant};
+
+    fn list(selected: Option<u32>) -> CandidateList {
+        CandidateList {
+            variants: vec![CandidateVariant {
+                label: "カタカナ".into(),
+                is_available: true,
+            }],
+            selected_variant: None,
+            entries: vec![
+                CandidateEntry {
+                    text: "変換".into(),
+                    annotation: None,
+                },
+                CandidateEntry {
+                    text: "へんかん".into(),
+                    annotation: Some("入力のまま".into()),
+                },
+            ],
+            selected_entry: selected,
+            focus: CandidateFocus::Candidate,
+            position: 2,
+            total: 30,
+            note: None,
+        }
+    }
+
+    #[test]
+    fn 選んだ行を選択の色にする() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let scene = candidate_list(&list(Some(1)), &Look::new(&theme, 15.0), &Fixed);
+            let texts = texts(&scene);
+            assert!(texts.contains(&("変換".into(), theme.text)));
+            assert!(texts.contains(&("へんかん".into(), theme.selection_text)));
+            assert!(texts.contains(&("入力のまま".into(), theme.selection_text)));
+            assert!(texts.contains(&("2 / 30".into(), theme.text_muted)));
+            assert!(scene.width >= candidate::MIN_WIDTH);
+        }
+    }
+
+    #[test]
+    fn 高さは行の数で決まる() {
+        let theme = theme("platinum");
+        let look = Look::new(&theme, 15.0);
+        let two = candidate_list(&list(None), &look, &Fixed);
+        let mut longer = list(None);
+        longer.entries.push(CandidateEntry {
+            text: "返還".into(),
+            annotation: None,
+        });
+        let three = candidate_list(&longer, &look, &Fixed);
+        assert_eq!(three.height - two.height, (candidate::ROW_HEIGHT).round());
+    }
+
+    #[test]
+    fn 角丸のテーマは番号を丸に入れ_選択を角丸にする() {
+        let theme = theme("washi");
+        let scene = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
+        assert_eq!(
+            count(&scene, |draw| matches!(draw, Draw::Ellipse { .. })),
+            2
+        );
+        assert!(scene.draws.iter().any(|draw| matches!(draw,
+            Draw::RoundRect { radius, fill: Some(color), .. } if *radius == glass::SELECTION_RADIUS && *color == theme.selection)));
+        // 足元の案内はキーキャップ(↑ のアイコン)と説明
+        assert!(scene.draws.iter().any(|draw| matches!(
+            draw,
+            Draw::Icon {
+                icon: crate::keys::Icon::Up,
+                ..
+            }
+        )));
+        assert!(texts(&scene).iter().any(|(text, _)| text == "文字種"));
+    }
+
+    #[test]
+    fn 出した直後は第_1_候補と選んだ候補のほかを薄くする() {
+        let theme = theme("nordic");
+        let mut look = Look::new(&theme, 15.0);
+        look.rest_opacity = 0.0;
+        let mut three = list(Some(2));
+        three.entries.push(CandidateEntry {
+            text: "返還".into(),
+            annotation: None,
+        });
+        three.entries.push(CandidateEntry {
+            text: "偏官".into(),
+            annotation: None,
+        });
+        let texts = texts(&candidate_list(&three, &look, &Fixed));
+        let alpha = |wanted: &str| {
+            texts
+                .iter()
+                .find(|(text, _)| text == wanted)
+                .map(|(_, color)| color.alpha)
+        };
+        assert_eq!(alpha("変換"), Some(1.0));
+        assert_eq!(alpha("へんかん"), Some(0.0));
+        assert_eq!(alpha("返還"), Some(1.0));
+    }
+
+    #[test]
+    fn 文字種の行を選んでいるときは位置と案内を変える() {
+        let theme = theme("automatic");
+        let mut variants = list(None);
+        variants.focus = CandidateFocus::Variants;
+        variants.selected_variant = Some(0);
+        let scene = candidate_list(&variants, &Look::new(&theme, 15.0), &Fixed);
+        let texts = texts(&scene);
+        assert!(texts.contains(&("文字種 1 / 1".into(), theme.text_muted)));
+        assert!(texts.contains(&("カタカナ".into(), theme.selection_text)));
+        assert!(texts.iter().any(|(text, _)| text == "選ぶ"));
+    }
+
+    #[test]
+    fn 知らせがあれば案内の代わりに出す() {
+        let theme = theme("platinum");
+        let mut noted = list(Some(0));
+        noted.note = Some("Space 入力のままに戻す".into());
+        let scene = candidate_list(&noted, &Look::new(&theme, 15.0), &Fixed);
+        assert!(texts(&scene).contains(&("Space 入力のままに戻す".into(), theme.correction)));
+        assert!(!texts(&scene).iter().any(|(text, _)| text == "文字種"));
+    }
+
+    #[test]
+    fn desk_は右と下に影の分だけ大きくする() {
+        let desk = theme("desk");
+        let platinum = theme("platinum");
+        let a = candidate_list(&list(None), &Look::new(&desk, 15.0), &Fixed);
+        let b = candidate_list(&list(None), &Look::new(&platinum, 15.0), &Fixed);
+        assert_eq!(a.width - b.width, candidate::SHADOW_OFFSET);
+        assert!(
+            matches!(a.draws[0], Draw::Rect { frame, .. } if frame.x == candidate::SHADOW_OFFSET)
+        );
+    }
+}
