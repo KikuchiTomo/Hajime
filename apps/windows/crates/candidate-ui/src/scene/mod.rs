@@ -163,13 +163,37 @@ impl Draw {
     }
 }
 
-/// 描く部品の並び．width・height はウィンドウの大きさ，body はその中の候補ウィンドウの本体(影や余白を除いた部分)
+/// 描く部品の並び．width・height はウィンドウの大きさ，body はその中の候補ウィンドウの本体(影や余白を除いた部分)．
+/// hits はマウスで押せる範囲と押したときの対象．描く位置と同じ計算で決める
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
     pub width: f32,
     pub height: f32,
     pub body: Frame,
     pub draws: Vec<Draw>,
+    pub hits: Vec<Hit>,
+}
+
+/// マウスで押せる範囲と，押したときの対象(macOS の BranchView・CandidateView の target(at:) と同じ)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Hit {
+    pub frame: Frame,
+    pub target: ipc::PointerTarget,
+}
+
+impl Scene {
+    /// (x, y)(場面の座標)を押したときの対象．押せる範囲の外なら None
+    pub fn target_at(&self, x: f32, y: f32) -> Option<ipc::PointerTarget> {
+        self.hits
+            .iter()
+            .find(|hit| {
+                x >= hit.frame.x
+                    && x < hit.frame.max_x()
+                    && y >= hit.frame.y
+                    && y < hit.frame.max_y()
+            })
+            .map(|hit| hit.target.clone())
+    }
 }
 
 /// 文字の幅と高さを測る．描く層が OS の書体で測る
@@ -256,6 +280,14 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
         height,
         body: scene.body.offset(margin_x, margin_top),
         draws: prefix,
+        hits: scene
+            .hits
+            .into_iter()
+            .map(|hit| Hit {
+                frame: hit.frame.offset(margin_x, margin_top),
+                target: hit.target,
+            })
+            .collect(),
     }
 }
 

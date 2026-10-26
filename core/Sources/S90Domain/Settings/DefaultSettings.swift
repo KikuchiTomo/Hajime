@@ -277,6 +277,8 @@ public enum DefaultSettings {
     public static let handwritingRecognitionDelay = 0.6
     /// 手書きの認識を待つ時間の上限(秒)．超えたら候補を出さずに次の線を待つ
     public static let handwritingRecognitionTimeout = 3.0
+    /// Windows で候補の窓を出しているあいだ，DLL がマウスで押した候補を取りに来る(wake)間隔(秒)
+    public static let candidateClickPollInterval = 0.1
     /// Windows で手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔(秒)
     public static let handwritingPollInterval = 0.15
     /// 手書きの窓から受け取る文字の長さの上限

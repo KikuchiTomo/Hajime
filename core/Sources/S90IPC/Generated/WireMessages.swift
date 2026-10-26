@@ -447,6 +447,71 @@ extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
+public enum WirePointerTarget: Sendable, Equatable, Codable {
+    case segment(index: UInt32)
+    case alternative(index: UInt32)
+    case variant(index: UInt32)
+    case entry(index: UInt32)
+    case listVariant(index: UInt32)
+
+    private enum CodingKeys: String, CodingKey {
+        case type, index
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .type)
+        switch kind {
+        case "segment":
+            self = try .segment(index: container.decode(UInt32.self, forKey: .index))
+        case "alternative":
+            self = try .alternative(index: container.decode(UInt32.self, forKey: .index))
+        case "variant":
+            self = try .variant(index: container.decode(UInt32.self, forKey: .index))
+        case "entry":
+            self = try .entry(index: container.decode(UInt32.self, forKey: .index))
+        case "listVariant":
+            self = try .listVariant(index: container.decode(UInt32.self, forKey: .index))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .segment(let index):
+            try container.encode("segment", forKey: .type)
+            try container.encode(index, forKey: .index)
+        case .alternative(let index):
+            try container.encode("alternative", forKey: .type)
+            try container.encode(index, forKey: .index)
+        case .variant(let index):
+            try container.encode("variant", forKey: .type)
+            try container.encode(index, forKey: .index)
+        case .entry(let index):
+            try container.encode("entry", forKey: .type)
+            try container.encode(index, forKey: .index)
+        case .listVariant(let index):
+            try container.encode("listVariant", forKey: .type)
+            try container.encode(index, forKey: .index)
+        }
+    }
+}
+
+extension WirePointerTarget: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        switch self {
+        case .segment: "WirePointerTarget.segment"
+        case .alternative: "WirePointerTarget.alternative"
+        case .variant: "WirePointerTarget.variant"
+        case .entry: "WirePointerTarget.entry"
+        case .listVariant: "WirePointerTarget.listVariant"
+        }
+    }
+    public var debugDescription: String { description }
+}
+
 public enum WireRuleList: String, Sendable, Equatable, Codable, CaseIterable {
     case correctionRules
     case exceptions
@@ -692,6 +757,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case exportUserDictionary(path: String)
     case handwritingChosen(text: String)
     case handwritingClosed
+    case chooseCandidate(target: WirePointerTarget)
     case readSettingsFields(names: [String], defaults: Bool)
     case writeSettingsFields(values: String)
     case readKeymapPreset(preset: String)
@@ -706,7 +772,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case mergeUserDictionary(entries: [WireDictionaryEntry])
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, text, names, defaults, values, preset, precedingText, offset, limit, entry, entries
+        case type, protocolVersion, session, input, context, mode, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, text, target, names, defaults, values, preset, precedingText, offset, limit, entry, entries
     }
 
     public init(from decoder: any Decoder) throws {
@@ -775,6 +841,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .handwritingChosen(text: container.decode(String.self, forKey: .text))
         case "handwritingClosed":
             self = .handwritingClosed
+        case "chooseCandidate":
+            self = try .chooseCandidate(target: container.decode(WirePointerTarget.self, forKey: .target))
         case "readSettingsFields":
             self = try .readSettingsFields(names: container.decode([String].self, forKey: .names), defaults: container.decode(Bool.self, forKey: .defaults))
         case "writeSettingsFields":
@@ -905,6 +973,9 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode(text, forKey: .text)
         case .handwritingClosed:
             try container.encode("handwritingClosed", forKey: .type)
+        case .chooseCandidate(let target):
+            try container.encode("chooseCandidate", forKey: .type)
+            try container.encode(target, forKey: .target)
         case .readSettingsFields(let names, let defaults):
             try container.encode("readSettingsFields", forKey: .type)
             try container.encode(names, forKey: .names)
@@ -979,6 +1050,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .exportUserDictionary: "WireRequestBody.exportUserDictionary"
         case .handwritingChosen: "WireRequestBody.handwritingChosen"
         case .handwritingClosed: "WireRequestBody.handwritingClosed"
+        case .chooseCandidate: "WireRequestBody.chooseCandidate"
         case .readSettingsFields: "WireRequestBody.readSettingsFields"
         case .writeSettingsFields: "WireRequestBody.writeSettingsFields"
         case .readKeymapPreset: "WireRequestBody.readKeymapPreset"

@@ -138,6 +138,12 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     }
     for (index, entry) in list.entries.iter().enumerate() {
         let row = Frame::new(content.x, y, content.width, metrics.row_height);
+        painter.hit(
+            row,
+            ipc::PointerTarget::Entry {
+                index: index as u32,
+            },
+        );
         let selected =
             list.focus == CandidateFocus::Candidate && list.selected_entry == Some(index as u32);
         if selected {
@@ -264,6 +270,14 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame) {
             width,
             section.height - inset_y * 2.0,
         );
+        if variant.is_available {
+            painter.hit(
+                cell,
+                ipc::PointerTarget::ListVariant {
+                    index: index as u32,
+                },
+            );
+        }
         if selected {
             if theme.is_rounded() {
                 painter.capsule(cell, theme.selection);
@@ -350,6 +364,29 @@ mod tests {
             position: 2,
             total: 30,
             note: None,
+        }
+    }
+
+    #[test]
+    fn 押した位置から行と字種を引く_描いた文字の位置と合う() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let scene = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
+            let at = |text: &str| {
+                let frame = text_frame(&scene, text).expect("描いた文字がある");
+                scene.target_at(frame.x + 1.0, frame.mid_y())
+            };
+            assert_eq!(at("へんかん"), Some(ipc::PointerTarget::Entry { index: 1 }));
+            assert_eq!(
+                at("カタカナ"),
+                Some(ipc::PointerTarget::ListVariant { index: 0 })
+            );
+            // 使えない字種は押せない
+            let mut unavailable = list(Some(0));
+            unavailable.variants[0].is_available = false;
+            let scene = candidate_list(&unavailable, &Look::new(&theme, 15.0), &Fixed);
+            let frame = text_frame(&scene, "カタカナ").expect("描いた文字がある");
+            assert_eq!(scene.target_at(frame.x + 1.0, frame.mid_y()), None);
         }
     }
 

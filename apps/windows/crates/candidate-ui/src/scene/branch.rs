@@ -237,6 +237,12 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             metrics.row_height,
         );
         trunk_node(&mut painter, column, node);
+        painter.hit(
+            node,
+            ipc::PointerTarget::Segment {
+                index: index as u32,
+            },
+        );
         if !theme.is_rounded() {
             if let Some(next) = layout.trunk_x.get(index + 1) {
                 // 角丸のテーマは文節の間を空けるだけにし，文として読めるようにする
@@ -252,6 +258,8 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             }
         }
         if column.is_focused {
+            // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
+            let pressable = column.split.is_none();
             branches(
                 &mut painter,
                 &lower_rows(column, look.rest_opacity),
@@ -268,6 +276,26 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                 false,
                 &metrics,
             );
+            if pressable {
+                for index in 0..column.alternatives.len() {
+                    let y = node.max_y() + index as f32 * metrics.row_height;
+                    painter.hit(
+                        Frame::new(node.x, y, layout.branch_width, metrics.row_height),
+                        ipc::PointerTarget::Alternative {
+                            index: index as u32,
+                        },
+                    );
+                }
+                for index in 0..column.variants.len() {
+                    let y = node.y - (index + 1) as f32 * metrics.row_height;
+                    painter.hit(
+                        Frame::new(node.x, y, layout.branch_width, metrics.row_height),
+                        ipc::PointerTarget::Variant {
+                            index: index as u32,
+                        },
+                    );
+                }
+            }
         } else if let Some(preview) = column.preview.as_deref() {
             let overlaps =
                 branch_range.is_some_and(|(from, to)| node.x <= to && node.max_x() >= from);
@@ -780,6 +808,44 @@ mod tests {
             let plain = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
             assert!(!texts(&plain).contains(&(strings::CORRECTED.into(), theme.correction)));
         }
+    }
+
+    #[test]
+    fn 押した位置から幹と枝を引く_描いた文字の位置と合う() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+            let at = |text: &str| {
+                let frame = text_frame(&scene, text).expect("描いた文字がある");
+                scene.target_at(frame.x + 1.0, frame.mid_y())
+            };
+            assert_eq!(
+                at("京は"),
+                Some(ipc::PointerTarget::Alternative { index: 1 })
+            );
+            assert_eq!(
+                at("きょうは"),
+                Some(ipc::PointerTarget::Variant { index: 0 })
+            );
+            assert_eq!(at("晴れ"), Some(ipc::PointerTarget::Segment { index: 1 }));
+            // 足元の案内は押せない
+            let hint = text_frame(&scene, "候補").expect("案内がある");
+            assert_eq!(scene.target_at(hint.x + 1.0, hint.mid_y()), None);
+        }
+    }
+
+    #[test]
+    fn 区切っているあいだは枝を押せない() {
+        let theme = theme("automatic");
+        let mut splitting = map();
+        splitting.columns[0].split = Some(BranchSplit {
+            pieces: vec!["今日".into(), "は".into()],
+        });
+        let scene = branch_map(&splitting, &Look::new(&theme, 15.0), &Fixed);
+        assert!(!scene.hits.iter().any(|hit| matches!(
+            hit.target,
+            ipc::PointerTarget::Alternative { .. } | ipc::PointerTarget::Variant { .. }
+        )));
     }
 
     #[test]

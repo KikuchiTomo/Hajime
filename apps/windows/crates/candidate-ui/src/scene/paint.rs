@@ -13,6 +13,7 @@ pub(super) struct Painter<'a> {
     pub theme: &'a ResolvedTheme,
     pub measure: &'a dyn Measure,
     pub draws: Vec<Draw>,
+    pub hits: Vec<super::Hit>,
 }
 
 impl<'a> Painter<'a> {
@@ -21,6 +22,7 @@ impl<'a> Painter<'a> {
             theme: look.theme,
             measure,
             draws: Vec::new(),
+            hits: Vec::new(),
         }
     }
 
@@ -30,7 +32,13 @@ impl<'a> Painter<'a> {
             height,
             body: Frame::new(0.0, 0.0, width, height),
             draws: self.draws,
+            hits: self.hits,
         }
+    }
+
+    /// マウスで押せる範囲を足す
+    pub fn hit(&mut self, frame: Frame, target: ipc::PointerTarget) {
+        self.hits.push(super::Hit { frame, target });
     }
 
     /// 文字の幅(切り上げ)

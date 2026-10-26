@@ -433,6 +433,32 @@ struct EngineServiceTests {
         #expect(service.snapshot.handwriting == false)
     }
 
+    @Test("候補ウィンドウで押した候補は，候補を出しているセッションの次の wake でキーで選んだのと同じに処理する")
+    func chooseCandidate() throws {
+        var current = settings.current
+        current.candidatePresentation = .list
+        try settings.update { $0 = current }
+        let id = greeted()
+        let session = try open(id)
+        _ = type("kyou", session: session, from: id)
+        _ = press(.space, session: session, from: id)
+        // 候補を出しているあいだは，押した候補を取りに来るよう短い間隔で起こしてもらう
+        guard case .edit(_, _, let state) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(state.wakeAfterMilliseconds.map { $0 <= EngineService.candidateClickPollMilliseconds } == true)
+        // 候補ウィンドウの接続からだけ受ける
+        #expect(service.handle(WireRequest(id: 70, body: .chooseCandidate(target: .entry(index: 0))), from: id).body == .error(code: .malformed))
+        let window = candidateWindow()
+        #expect(service.handle(WireRequest(id: 71, body: .chooseCandidate(target: .entry(index: 0))), from: window).body == .done)
+        guard case .edit(_, let operations, _) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(operations.contains { if case .commit = $0 { true } else { false } })
+    }
+
     @Test("手書きの窓を開き，選んだ文字を開いたセッションの wake で確定する")
     func handwriting() throws {
         try settings.update { $0.handwriting = true }
