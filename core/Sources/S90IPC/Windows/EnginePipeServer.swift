@@ -2,7 +2,6 @@
 import Dispatch
 import Foundation
 import S90Domain
-import Synchronization
 
 public enum EnginePipeServer {
     /// candidateWindowPath は候補ウィンドウの実行ファイル．その接続からだけ手書きの窓で選んだ文字を受ける
@@ -27,56 +26,13 @@ public enum EnginePipeServer {
         }
         let isCandidateWindow = NamedPipePeer.imagePath(processID: process)
             .map { $0.caseInsensitiveCompare(candidateWindowPath) == .orderedSame } ?? false
-        let id = onMain { service.connect(isCandidateWindow: isCandidateWindow) }
-        defer {
-            onMain { service.disconnect(id) }
-            connection.close()
-        }
-        var reader = MessageFraming.Reader()
-        do {
-            while true {
-                let bytes = try connection.read()
-                guard !bytes.isEmpty else { return }
-                reader.append(bytes)
-                while let body = try reader.nextBody() {
-                    let request = try MessageFraming.decode(WireRequest.self, from: body)
-                    let response: WireResponse
-                    switch onMain({ service.reply(to: request, from: id) }) {
-                    case .now(let immediate):
-                        response = immediate
-                    case .later(let work):
-                        // ファイルの読み書きを終えるまで，この接続のスレッドで待つ(メインスレッドは止めない)．
-                        // 同期のフォルダが応えないときも待ち続けないよう，設定の画面が待つ時間で打ち切る
-                        response = wait(for: work, id: request.id)
-                    }
-                    try connection.write(MessageFraming.encode(response))
-                }
-            }
-        } catch {
-            return
-        }
+        EngineRequestLoop.serve(connection, service: service, isCandidateWindow: isCandidateWindow)
     }
+}
 
-    /// メインアクターで動かす非同期の仕事を，呼んだスレッド(名前付きパイプの接続のスレッド)で終わるまで待つ
-    private static func wait(for work: @escaping @MainActor @Sendable () async -> WireResponse, id: UInt32) -> WireResponse {
-        let result = Mutex<WireResponse?>(nil)
-        let done = DispatchSemaphore(value: 0)
-        Task { @MainActor in
-            let response = await work()
-            result.withLock { $0 = response }
-            done.signal()
-        }
-        guard done.wait(timeout: .now() + DefaultSettings.settingsAppFileTimeout) == .success else {
-            // 仕事は続けさせ(終われば結果は捨てる)，頼んだ側には今は手が離せないと答える
-            return WireResponse(id: id, body: .fileFailed(reason: .busy))
-        }
-        // signal の前に必ず入れているので nil にはならない．念のため malformed で答える
-        return result.withLock { $0 } ?? WireResponse(id: id, body: .error(code: .malformed))
-    }
-
-    private static func onMain<Value: Sendable>(_ body: @MainActor () -> Value) -> Value {
-        DispatchQueue.main.sync { MainActor.assumeIsolated(body) }
-    }
+extension NamedPipeConnection: EngineByteStream {
+    public func readBytes() throws -> [UInt8] { try read() }
+    public func writeBytes(_ bytes: [UInt8]) throws { try write(bytes) }
 }
 
 public final class CandidateWindowLink: @unchecked Sendable {

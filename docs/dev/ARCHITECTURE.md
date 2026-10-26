@@ -34,8 +34,8 @@ core/Sources/
 ├── S90Engine/        変換のポートの実装．AzooKeyKanaKanjiConverter のアダプタ
 ├── S90Persistence/   設定・ユーザー辞書・学習データの保存のポートの実装
 ├── CWindowsSpellCheck/ Windows のスペルチェッカー(ISpellChecker)を呼ぶ C の口．Windows のほかでは何もしない
-├── S90IPC/           Windows のエンジンとの通信．メッセージ型(protocol/ から生成)，要求をセッションに渡す EngineService，名前付きパイプ
-├── s90-engine-host/  Windows 用のエンジンのプロセス(composition root のひとつ)
+├── S90IPC/           別のプロセスのエンジンとの通信．メッセージ型(protocol/ から生成)，要求をセッションに渡す EngineService，接続ごとの EngineRequestLoop，Windows の名前付きパイプと Linux の Unix ドメインソケット
+├── s90-engine-host/  Windows と Linux のエンジンのプロセス(composition root のひとつ)
 └── s90-playground/   入れずにターミナルで変換を試す道具(make try．composition root のひとつ)
 ```
 
