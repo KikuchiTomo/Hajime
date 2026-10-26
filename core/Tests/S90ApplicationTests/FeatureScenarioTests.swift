@@ -22,6 +22,24 @@ struct FeatureScenarioTests {
         #expect(off.marked.text == "1")
     }
 
+    @Test("R-08: 変換中のテンキーの数字は，ほかの数字と同じく候補を選ぶ．その番号の候補が無ければ何もしない")
+    func keypadWhileConverting() {
+        let converter = FakeConverter(["へんかん": [("変換", nil), ("返還", nil)]])
+        let harness = Harness(converter: converter, settings: .listPresentation)
+        harness.type("henkan")
+        harness.press(.space)
+        harness.press(.character("2"), isKeypad: true)
+        #expect(harness.committed == "返還")
+
+        let outOfRange = Harness(converter: converter, settings: .listPresentation)
+        outOfRange.type("henkan")
+        outOfRange.press(.space)
+        outOfRange.press(.character("9"))
+        #expect(outOfRange.committed.isEmpty)
+        #expect(outOfRange.lastResult.handled)
+        #expect(outOfRange.session.isComposing)
+    }
+
     @Test("R-09: 半角/全角は日本語と英数を入れ替え，変換を「日本語入力」にすれば英数から日本語にする")
     func modeKeys() {
         var settings = DefaultSettings.settings

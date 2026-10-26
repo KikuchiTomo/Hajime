@@ -146,8 +146,10 @@ public final class InputSession {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
             return KeyResult(handled: false, actions: commitAll())
         }
-        if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadDirect, case .character(let character) = event.key {
-            // テンキーの数字と記号は，組み立て中の文字を確定してから半角のまま確定する(設定)
+        if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadDirect, phase == .composing || !isComposing,
+            case .character(let character) = event.key {
+            // テンキーの数字と記号は，組み立て中の文字を確定してから半角のまま確定する(設定)．
+            // 変換中(候補・文節・連想を選んでいるとき)は，ほかの数字と同じく候補を選ぶのに使う
             return KeyResult(handled: true, actions: commitAll() + [.commit(String(character))])
         }
         switch mode {
@@ -599,12 +601,14 @@ public final class InputSession {
 
     private func insertCharacter(_ character: Character, context: InputContext) -> KeyResult {
         var actions: [ClientAction] = []
-        if case .selecting = phase, let number = numberKey(character), selectByNumber(number) {
-            // 候補を選んでいるときの番号キーは，その候補を確定する
+        if case .selecting = phase, let number = numberKey(character) {
+            // 候補を選んでいるときの番号キーは，その候補を確定する．その番号の候補が無ければ何もしない(打ち損じで確定しない)
+            guard selectByNumber(number) else { return KeyResult(handled: true) }
             return KeyResult(handled: true, actions: commitAll())
         }
-        if case .association(var list, let origin) = phase, let number = numberKey(character), list.select(number: number, perPage: associationPerPage) {
-            // 連想の一覧の番号キーも，その語を確定する
+        if case .association(var list, let origin) = phase, let number = numberKey(character) {
+            // 連想の一覧の番号キーも，その語句を確定する．その番号の語句が無ければ何もしない
+            guard list.select(number: number, perPage: associationPerPage) else { return KeyResult(handled: true) }
             phase = .association(list, origin: origin)
             return KeyResult(handled: true, actions: commitAll())
         }
@@ -620,12 +624,14 @@ public final class InputSession {
         }
         let startsAlphabet = settings.current.shiftStartsAlphabet && character.isASCII && character.isLetter && character.isUppercase
         if startsAlphabet { alphabetRun = true }
-        if alphabetRun, !(character.isASCII && character.isLetter) { alphabetRun = false }
-        let isRomaji = !alphabetRun && (character.isASCII && character.isLetter && character.isLowercase)
-            || character == "-"
-            || (character == "'" && composition.pending == "n")
-            // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
-            || (composition.pending == "z" && Self.zSymbolKeys.contains(character))
+        // 英字の中の「-」(Wi-Fi)は英字の続き
+        if alphabetRun, !(character.isASCII && (character.isLetter || character == "-")) { alphabetRun = false }
+        let isRomaji = !alphabetRun && (
+            (character.isASCII && character.isLetter && character.isLowercase)
+                || character == "-"
+                || (character == "'" && composition.pending == "n")
+                // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
+                || (composition.pending == "z" && Self.zSymbolKeys.contains(character)))
         if isRomaji {
             composition.insertRomaji(character)
             NasalReadingResolver(converter: converter).resolve(&composition)
@@ -633,7 +639,7 @@ public final class InputSession {
             if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
-        } else if character.isASCII && (character.isLetter || character.isNumber) {
+        } else if character.isASCII && (character.isLetter || character.isNumber || (alphabetRun && character == "-")) {
             // 英単語に続けて打った大文字と数字は識別子の続き(「userName」「v2」)なので，綴りを直さず打ったとおりにする(R-06)
             corrector.commitAsTyped(into: &composition)
             readingCorrector.didInsertLiteral()
@@ -780,8 +786,8 @@ public final class InputSession {
         let builder = LatticeBuilder(converter: converter)
         let focus = settings.current.initialFocus
         var lattice = builder.build(reading: composition.conversionReading, focus: focus)
-        if !forcedBoundaries.isEmpty {
-            // 打っている途中に入れた区切りで，必ず文節を分ける
+        if !forcedBoundaries.isEmpty, !readingCorrector.isApplied {
+            // 打っている途中に入れた区切りで，必ず文節を分ける．打ち間違いを直したときは読みの位置が変わるので使わない(入力中の表示と同じ)
             lattice = builder.splitting(lattice, at: forcedBoundaries, reading: composition.conversionReading)
             lattice.focusedIndex = lattice.initialFocus(focus)
         }
@@ -850,6 +856,8 @@ public final class InputSession {
         if composition.isEmpty {
             return KeyResult(handled: true, actions: reset())
         }
+        // Shift で始めた英字を消し切ったら，英字の続きを終える(続けて打つキーはローマ字にする)
+        if alphabetRun, !(composition.conversionReading.last.map { $0.isASCII && $0.isLetter } ?? false) { alphabetRun = false }
         NasalReadingResolver(converter: converter).resolve(&composition)
         forcedBoundaries.removeAll { $0 >= composition.kana.count }
         readingCorrector.didEdit(composition)
@@ -935,6 +943,11 @@ public final class InputSession {
             }
             actions.append(.commit(candidate.text))
             if candidate.readingCount >= composition.conversionReading.count {
+                break
+            }
+            guard candidate.readingCount > 0 else {
+                // 読みを減らさない候補では先へ進めない．残りの読みはそのまま確定して終える
+                actions.append(.commit(composition.displayReading))
                 break
             }
             // 読みの先頭だけの候補を確定したときは，残りを続けて確定する
@@ -1448,6 +1461,8 @@ public final class InputSession {
         readingCorrector.reset()
         corrector.reset()
         convertedFromEnglish = nil
+        // 再変換の一部を確定したので，Esc で元の文字に戻すと確定した部分と重なる．元の文字には戻さない
+        reconverting = nil
         phase = .lattice(lattice)
         return KeyResult(handled: true, actions: [.commit(first.selected.text)] + render(context: context))
     }
