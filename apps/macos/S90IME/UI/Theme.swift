@@ -73,8 +73,8 @@ struct ResolvedTheme {
             selectionText: custom.selectionText.color,
             correction: custom.correction.color,
             line: custom.line.color,
-            focusTint: custom.selection.color.withAlphaComponent(0.2),
-            badge: text.withAlphaComponent(0.12),
+            focusTint: custom.selection.color.withAlphaComponent(DesignTokens.Opacity.Rounded.focusTint),
+            badge: text.withAlphaComponent(DesignTokens.Opacity.Rounded.badge),
             typeface: theme.typeface
         )
         theme.cornerRadius = CGFloat(custom.cornerRadius)

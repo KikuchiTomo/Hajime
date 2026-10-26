@@ -39,7 +39,7 @@ func loadZenzaiModel() -> ZenzaiModel? {
 
 @MainActor
 final class SettingsWatcher {
-    private static let interval = DispatchTimeInterval.seconds(2)
+    private static let interval = DispatchTimeInterval.milliseconds(Int(DefaultSettings.settingsFileWatchInterval * 1000))
     private let settings: FileSettingsStore
     private let url: URL
     private var last: Date?

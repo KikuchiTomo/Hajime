@@ -157,6 +157,17 @@ enum DesignTokens {
             static let themeEditorHeight: CGFloat = 720
             static let userDictionaryTableHeight: CGFloat = 330
             static let previewPadding: CGFloat = 24
+            static let keyFilterRadius: CGFloat = 5
+            static let fontSliderWidth: CGFloat = 220
+            static let secondsSliderWidth: CGFloat = 180
+            static let secondsLabelWidth: CGFloat = 52
+            static let themeSwatchWidth: CGFloat = 40
+            static let themeSwatchHeight: CGFloat = 20
+            static let themeSwatchGap: CGFloat = 3
+            static let themeSwatchFontSize: CGFloat = 11
+            static let themeSwatchSelectionWidth: CGFloat = 12
+            static let themeSwatchSelectionHeight: CGFloat = 10
+            static let themeSwatchRadius: CGFloat = 6
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12
@@ -198,6 +209,8 @@ enum DesignTokens {
             static let frameWidth: CGFloat = 1
             static let guideDash: CGFloat = 4
             static let anchorGap: CGFloat = 4
+            static let candidateGap: CGFloat = 6
+            static let candidateFontSize: CGFloat = 18
         }
         enum Snapshot {
             static let margin: CGFloat = 16
@@ -289,6 +302,9 @@ enum DesignTokens {
         }
         enum Shadow {
             static let window: CGFloat = 0.22
+        }
+        enum Settings {
+            static let keyFilter: CGFloat = 0.15
         }
     }
 }

@@ -57,7 +57,7 @@ enum GlassDrawing {
     static func drawBadge(_ label: String, center: NSPoint, theme: ResolvedTheme, selected: Bool, opacity: CGFloat,
                           size: CGFloat = Glass.badgeSize, fontSize: CGFloat = Glass.keyFontSize) {
         let rect = NSRect(x: center.x - size / 2, y: center.y - size / 2, width: size, height: size)
-        (selected ? theme.selectionText.withAlphaComponent(0.25) : theme.badge.withAlphaComponent(theme.badge.alphaComponent * opacity)).setFill()
+        (selected ? theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected) : theme.badge.withAlphaComponent(theme.badge.alphaComponent * opacity)).setFill()
         NSBezierPath(ovalIn: rect).fill()
         let color = (selected ? theme.selectionText : theme.textMuted).withAlphaComponent(selected ? 1 : opacity)
         drawLabel(label, color: color, in: rect, theme: theme, fontSize: fontSize)
@@ -132,9 +132,9 @@ enum GlassDrawing {
             NSRect(x: inner.maxX - 1, y: inner.minY, width: 1, height: inner.height).fill()
         case .desk:
             // 蛍光表示管の琥珀色で縁取った札
-            theme.text.withAlphaComponent(0.12).setFill()
+            theme.text.withAlphaComponent(DesignTokens.Opacity.Keycap.deskFill).setFill()
             cap.fill()
-            theme.text.withAlphaComponent(0.6).setStroke()
+            theme.text.withAlphaComponent(DesignTokens.Opacity.Keycap.deskStroke).setStroke()
             let path = NSBezierPath(rect: cap.insetBy(dx: 0.5, dy: 0.5))
             path.lineWidth = 1
             path.stroke()
