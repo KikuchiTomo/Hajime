@@ -336,8 +336,92 @@ pub mod dictionaries {
 /// UIStrings.Sync
 pub mod sync {
     pub const PAGE: &str = "同期";
+    pub const ENABLED: &str = "同期";
     pub const FOLDER: &str = "フォルダ";
+    pub const NO_FOLDER: &str = "未選択";
+    pub const CHOOSE_FOLDER: &str = "フォルダを選択…";
+    pub const LAST_SYNCED: &str = "最後に同期した時刻";
+    pub const SYNC_NOW: &str = "今すぐ同期";
     pub const SCOPES: &str = "同期する項目";
+    pub const FAILED: &str = "同期できませんでした";
+    pub const UNREADABLE: &str = "同期ファイルを読み込めないため、同期を停止しています";
+    pub const ITEMS: &str = "項目ごとに選択";
+
+    /// 項目(Settings の CodingKeys の名前)の表示名(UIStrings.Sync.label(forField:))
+    pub const FIELD_LABELS: &[(&str, &str)] = &[
+        ("inputStyle", "入力方式"),
+        ("customRomaji", "ローマ字"),
+        ("liveConversion", "ライブ変換"),
+        ("englishInputLiveConversion", "英字入力のライブ変換"),
+        ("wordLanguage", "英語と日本語"),
+        ("yenKey", "¥ キーで入力する文字"),
+        ("punctuation", "句読点"),
+        ("brackets", "[ ] キーで入力する括弧"),
+        ("slash", "/ キーで入力する文字"),
+        ("spaceWidth", "スペース幅"),
+        ("numberWidth", "数字幅"),
+        ("alphabetWidth", "英字幅"),
+        ("shiftStartsAlphabet", "Shift で英字入力"),
+        ("punctuationCommits", "句読点で確定"),
+        ("keypadDirect", "テンキーの数字を半角で確定"),
+        ("typoCorrection", "タイプミスの修正"),
+        ("candidatePresentation", "候補の表示"),
+        ("initialFocus", "最初に選択する文節"),
+        ("suggestionDisplay", "入力中の候補"),
+        ("listCandidatesPerPage", "一覧の候補数"),
+        ("branchCandidatesPerPage", "分岐図の候補数"),
+        ("liveConversionDelay", "漢字にするまでの待ち時間"),
+        ("correctionDelay", "見直すまでの待ち時間"),
+        ("correctionSensitivity", "修正の基準"),
+        ("showsSuggestions", "「もしかして」を表示"),
+        ("correction", "補正"),
+        ("okuriganaStyle", "送り仮名"),
+        ("calculation", "計算"),
+        ("postalCodeConversion", "郵便番号から住所に変換"),
+        ("handwriting", "手書き入力"),
+        ("homophoneNotes", "同音異義語の使い分けを表示"),
+        ("misuseNotes", "誤用の注釈を表示"),
+        ("proofreading", "校正支援"),
+        ("misreadings", "読み違いの候補"),
+        ("prefersKatakana", "カタカナ語を優先"),
+        ("showsVariantRow", "候補の上に文字種の行を表示"),
+        ("showsKeyHints", "キーの案内を表示"),
+        ("numberKeySelection", "番号キーで候補を選択"),
+        ("dateConversion", "日付と時刻に変換"),
+        ("symbolConversion", "記号に変換"),
+        ("emojiConversion", "絵文字に変換"),
+        ("learning", "学習"),
+        ("theme", "テーマ"),
+        ("candidateFontSize", "候補の文字サイズ"),
+        ("showsModeIndicator", "入力モードの切り替えを表示"),
+        ("modeIndicatorDuration", "モードの表示時間"),
+        ("customThemes", "カスタムテーマ"),
+        ("customThemeID", "使用するカスタムテーマ"),
+        ("escapeSwitchesToDirect", "Escape で英数に切り替え"),
+        ("terminalCommands", "ターミナルでコマンドを英字で入力"),
+        ("profileRules", "除外設定"),
+        (
+            "restrainsLiveConversionInCode",
+            "エディタとターミナルでライブ変換を控える",
+        ),
+        ("association", "連想変換"),
+        ("associationLimit", "連想の候補数"),
+        ("showsAssociationHint", "連想の案内を表示"),
+        ("recordsUsage", "入力の統計を記録"),
+        ("keyboardLayout", "キー配列"),
+        ("keymap", "キー設定"),
+        ("symbolRules", "記号"),
+        ("userDictionary", "ユーザー辞書"),
+        ("importedDictionaries", "取り込んだ辞書"),
+        ("associationDictionaries", "連想の辞書"),
+    ];
+
+    pub fn field_label(name: &str) -> &str {
+        FIELD_LABELS
+            .iter()
+            .find(|(field, _)| *field == name)
+            .map_or(name, |(_, label)| label)
+    }
 }
 
 /// Windows の画面だけの文言
@@ -345,6 +429,13 @@ pub mod windows {
     pub const ON: &str = "オン";
     pub const OFF: &str = "オフ";
     pub const OPEN_SETTINGS_FILE: &str = "設定ファイルを開く";
+    /// macOS の UIStrings.Sync.note の Mac を PC に，iCloud Drive を OneDrive にしたもの
+    pub const SYNC_NOTE: &str =
+        "Dropbox や OneDrive のフォルダを選択すると、ほかの PC と同期できます。";
+    /// 項目ごとの同期の表の列(macOS は項目ごとのスイッチ)
+    pub const SYNC_FIELD: &str = "項目";
+    pub const SYNC_SCOPE: &str = "範囲";
+    pub const TOGGLE_SYNC_SCOPE: &str = "範囲の切り替え";
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
     pub const DISABLED: &str = "無効";

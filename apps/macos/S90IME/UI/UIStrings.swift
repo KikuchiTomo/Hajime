@@ -781,6 +781,10 @@ extension UIStrings {
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,
             "profileRules": UIStrings.Settings.appsTab, "restrainsLiveConversionInCode": More.restrainsLiveConversionInCode,
+            "association": Association.enabled, "associationLimit": Association.limit, "showsAssociationHint": Association.hint,
+            "recordsUsage": UIStrings.Settings.recordsUsage, "keyboardLayout": Choice.keyboardLayout, "keymap": Keys.tab,
+            "symbolRules": Features.symbolsPage, "userDictionary": UIStrings.Settings.dictionaryTab,
+            "importedDictionaries": Dictionaries.imported, "associationDictionaries": Association.dictionaries,
         ]
 
         static func label(for scope: SyncScope) -> String {
