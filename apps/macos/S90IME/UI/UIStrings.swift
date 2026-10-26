@@ -72,6 +72,8 @@ enum UIStrings {
             case .previousUncertainSegment: "前の文節"
             case .extendSegment: "文節を長く"
             case .shrinkSegment: "文節を短く"
+            case .insertBoundary: "ここで区切る"
+            case .splitSegment: "文節を区切る"
             }
         }
 
