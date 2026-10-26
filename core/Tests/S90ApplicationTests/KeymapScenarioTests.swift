@@ -111,6 +111,17 @@ struct KeymapScenarioTests {
         #expect(harness.committed == columns.joined())
     }
 
+    @Test("再変換で先頭の文節だけを確定したあとに Esc を押しても，元の文字を重ねて入れない")
+    func reconversionAfterCommittingFirstSegment() {
+        let harness = Harness(converter: twoSegments(), settings: settings(.windows))
+        _ = harness.session.reconvert("今日はいい", reading: "きょうはいい", context: InputContext())
+        harness.press(.down, .control)
+        #expect(harness.committed == "今日は")
+        // 残りの文節の変換をやめる．元の文字(今日はいい)を重ねて入れない
+        harness.press(.escape)
+        #expect(harness.committed == "今日は")
+    }
+
     @Test("R-17: 先頭・末尾の文節と，候補の先頭・末尾・ページ")
     func segmentAndCandidateJumps() {
         let harness = Harness(converter: twoSegments(), settings: settings(.windows, adding: [

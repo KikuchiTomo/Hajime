@@ -888,6 +888,21 @@ struct ExtraSettingsTests {
         #expect(harness.marked.text == "Python")
     }
 
+    @Test("Shift で始めた英字の中の「-」は英字のまま．英字を Backspace で消し切ったら，続けて打つキーはローマ字にする")
+    func shiftAlphabetHyphenAndBackspace() {
+        var settings = DefaultSettings.settings
+        settings.shiftStartsAlphabet = true
+        let wifi = Harness(settings: settings)
+        wifi.type("Wi-Fi")
+        #expect(wifi.marked.text == "Wi-Fi")
+
+        let erased = Harness(settings: settings)
+        erased.type("aT")
+        erased.press(.backspace)
+        erased.type("ka")
+        #expect(erased.marked.text == "あか")
+    }
+
     @Test("Shift で打った英字を全角にする(設定)")
     func fullwidthAlphabet() {
         var settings = DefaultSettings.settings
