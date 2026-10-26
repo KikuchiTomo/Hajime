@@ -51,6 +51,11 @@ public enum KanaWidth {
         }))
     }
 
+    /// カタカナ(ァ〜ヶ)の文字か
+    public static func isKatakana(_ character: Character) -> Bool {
+        character.unicodeScalars.contains { (hiraganaRange.lowerBound + hiraganaToKatakanaOffset...hiraganaRange.upperBound + hiraganaToKatakanaOffset).contains($0.value) }
+    }
+
     /// カタカナをひらがなにする(ァ〜ヶ)．ほかの文字はそのまま
     public static func hiragana(from text: String) -> String {
         String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in

@@ -129,6 +129,27 @@ struct NasalAmbiguityTests {
         #expect(composition.conversionReading == "おんあ")
     }
 
+    @Test("今の読みになるようにキーを綴り直す(nn のあとをな行で読むところは n を足す)")
+    func spelledKeys() {
+        var composition = compose("honnoyonnde")
+        #expect(composition.spelledKeys(from: 0) == "honnoyonnde")
+        composition.setNasalReading(at: 0, usesNaRow: true)
+        #expect(composition.conversionReading == "ほんのよんで")
+        #expect(composition.spelledKeys(from: 0) == "honnnoyonnde")
+        #expect(composition.spelledKeys(from: 3) == "nnoyonnde")
+        #expect(composition.spelledKeys(from: 4) == "oyonnde")
+    }
+
+    @Test("綴りを直して確定させた英単語は，変えたキーの数を覚える．打ったとおりの英単語は覚えない")
+    func correctedWordKeyEdits() {
+        var composition = compose("jvascriptde")
+        composition.freeze(rawStart: 0, kanaStart: 0, keys: "jvascript", as: "javascript", replaying: "de")
+        #expect(composition.correctedWordKeyEdits == 1)
+        var exact = compose("pythonde")
+        exact.freeze(rawStart: 0, kanaStart: 0, keys: "python", as: "python", replaying: "de")
+        #expect(exact.correctedWordKeyEdits == nil)
+    }
+
     @Test("nny は や と にゃ を切り替え，後ろの位置をずらす")
     func yRow() {
         var composition = compose("konnyakuminna")

@@ -22,6 +22,9 @@ public struct Composition: Sendable, Equatable {
     /// 「nn」のあとの母音の位置．語によって「ん+あ行」(hannei → はんえい)か「ん+な行」(onna → おんな)かが
     /// 変わるので，どちらの読みにも切り替えられるようにしておく．どちらにするかは変換の点数で決める(NasalReadingResolver)
     public private(set) var nasalAmbiguities: [NasalAmbiguity] = []
+    /// 綴りを直して確定させた英単語(「pthon」→「python」)のうち，キーを最も多く変えた数．無ければ nil．
+    /// 日本語の打ち間違いの見直しは，これより多くキーを変える直しで英単語を消さない
+    public private(set) var correctedWordKeyEdits: Int?
     /// 直前に「nn」を「ん」にした位置．次にかなになった文字が母音なら，そこを nasalAmbiguities に加える
     private var nasalWatchIndex: Int?
 
@@ -211,7 +214,12 @@ public struct Composition: Sendable, Equatable {
         frozenKanaEnd = kana.count
         // 打ったとおりの英単語(「python」)は英字として入れたものとみなす．綴りを直した語(「sride」→「bride」)は，
         // 日本語の打ち間違いを英単語と取り違えたことがあるので，日本語の打ち間違いの見直しで読み直せるようにしておく
-        if word.lowercased() == keys.lowercased() { englishKanaEnd = kana.count }
+        if word.lowercased() == keys.lowercased() {
+            englishKanaEnd = kana.count
+        } else {
+            let edits = EditDistance.damerauLevenshtein(keys.lowercased(), word.lowercased())
+            correctedWordKeyEdits = max(correctedWordKeyEdits ?? 0, edits)
+        }
         recordBoundary()
         for key in after {
             insertRomaji(key)
@@ -226,6 +234,22 @@ public struct Composition: Sendable, Equatable {
         return boundaries.last { $0.kanaCount == englishKanaEnd }
     }
 
+    /// 打ったキーのうち rawStart より後ろを，今の読みになるように綴り直した並び．
+    /// 「nn」のあとをな行で読んでいるところ(「honno」→「ほんの」)は n を 1 つ足す(「honnno」)．
+    /// 打ち間違いの訂正は，キーの並びを表の読み(「nn」のあとはあ行)で読んで打ったままの読みと比べるので，読みをそろえるのに使う．
+    /// キーと読みの対応が外れていたら nil
+    public func spelledKeys(from rawStart: Int) -> String? {
+        guard let rawKeys else { return nil }
+        var keys = Array(rawKeys)
+        for ambiguity in nasalAmbiguities.reversed() where ambiguity.usesNaRow {
+            // 「nn」を「ん」にしたときに，その位置(母音の前)で区切りを記録している
+            guard let boundary = boundaries.first(where: { $0.kanaCount == ambiguity.kanaIndex }), boundary.rawCount <= keys.count else { return nil }
+            guard boundary.rawCount > rawStart else { continue }
+            keys.insert("n", at: boundary.rawCount)
+        }
+        return String(keys.dropFirst(rawStart))
+    }
+
     /// 区切り(boundary)より後ろを捨てた読み．捨てた部分を打ち直す(打ち間違いを直したキーで入れ直す)ときに使う
     public func truncated(to boundary: Boundary) -> Composition {
         var copy = self
@@ -235,6 +259,8 @@ public struct Composition: Sendable, Equatable {
         copy.boundaries = boundaries.filter { $0.rawCount <= boundary.rawCount && $0.kanaCount <= boundary.kanaCount }
         copy.nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= boundary.kanaCount }
         copy.nasalWatchIndex = nil
+        // 確定させた英単語の途中で切ったら，英単語は残らない
+        if boundary.kanaCount < frozenKanaEnd { copy.correctedWordKeyEdits = nil }
         copy.frozenKanaEnd = min(frozenKanaEnd, boundary.kanaCount)
         copy.englishKanaEnd = min(englishKanaEnd, boundary.kanaCount)
         return copy
@@ -291,6 +317,7 @@ public struct Composition: Sendable, Equatable {
             boundaries = [Boundary(rawCount: 0, kanaCount: 0)]
             frozenKanaEnd = 0
             englishKanaEnd = 0
+            correctedWordKeyEdits = nil
         }
     }
 
