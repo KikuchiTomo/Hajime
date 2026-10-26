@@ -1,4 +1,7 @@
 import Foundation
+#if os(Windows)
+import WinSDK
+#endif
 
 /// 本人だけが読み書きできるファイルの読み書き(docs/dev/SECURITY-MODEL.md)．設定と使い方の記録で共有する
 enum ProtectedFile {
@@ -12,11 +15,15 @@ enum ProtectedFile {
             throw CocoaError(.fileWriteUnknown)
         }
         do {
+            #if os(Windows)
+            try replace(url, with: temporary)
+            #else
             if FileManager.default.fileExists(atPath: url.path) {
                 _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
             } else {
                 try FileManager.default.moveItem(at: temporary, to: url)
             }
+            #endif
         } catch {
             try? FileManager.default.removeItem(at: temporary)
             throw error
@@ -26,16 +33,33 @@ enum ProtectedFile {
     /// 大きさの上限を確かめながら読む．上限より 1 バイト多くまでだけを読み，超えていれば断る．
     /// ファイルの属性の大きさで確かめると，シンボリックリンクではリンク自体の大きさが返り，上限をすり抜けるため
     static func read(from url: URL, maximumBytes: Int) throws -> Data {
+        #if os(Windows)
+        guard (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { throw NotRegularFile() }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        #else
         // FIFO などを開いて止まらないよう，待たない開き方で開き，ふつうのファイルだけを読む(ZenzaiModel と同じ)
         let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var status = stat()
         guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw NotRegularFile() }
+        #endif
         let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
         guard data.count <= maximumBytes else { throw TooLarge(maximumBytes: maximumBytes) }
         return data
     }
+
+    #if os(Windows)
+    static func replace(_ url: URL, with temporary: URL) throws {
+        let moved = temporary.path.withCString(encodedAs: UTF16.self) { source in
+            url.path.withCString(encodedAs: UTF16.self) { destination in
+                MoveFileExW(source, destination, DWORD(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+            }
+        }
+        guard moved else { throw CocoaError(.fileWriteUnknown) }
+    }
+    #endif
 
     struct NotRegularFile: Error, Equatable {}
 

@@ -17,8 +17,10 @@ struct FileUsageStoreTests {
         for _ in 0..<(DefaultSettings.usageSaveInterval - 1) { store.record(.conversionOpened) }
         #expect(!FileManager.default.fileExists(atPath: url.path))
         store.record(.conversionOpened)
+        #if !os(Windows)
         let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
         #expect(permissions?.intValue == 0o600)
+        #endif
         #expect(FileUsageStore(fileURL: url, isEnabled: { true }).counts.conversionsOpened == DefaultSettings.usageSaveInterval)
     }
 

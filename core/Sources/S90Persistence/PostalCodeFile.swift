@@ -23,7 +23,7 @@ public final class PostalCodeFile: PostalCodeLooking {
     /// 「郵便番号<タブ>住所<タブ>住所…」の行を読む．# で始まる行と形の誤った行は飛ばす
     static func parse(_ text: String) -> [Substring: [String]] {
         var table: [Substring: [String]] = [:]
-        for line in text.split(separator: "\n") where !line.hasPrefix("#") {
+        for line in text.split(whereSeparator: \.isNewline) where !line.hasPrefix("#") {
             let fields = line.split(separator: "\t")
             guard fields.count >= 2, fields[0].count == 7, fields[0].allSatisfy(\.isASCII) else { continue }
             table[fields[0]] = fields.dropFirst().map(String.init)

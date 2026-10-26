@@ -1,3 +1,4 @@
+#if !os(Windows)
 import Foundation
 @testable import S90Engine
 import Testing
@@ -85,3 +86,4 @@ struct ZenzaiModelTests {
         }
     }
 }
+#endif

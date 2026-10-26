@@ -1,3 +1,4 @@
+#if canImport(Vision)
 import CoreGraphics
 import Foundation
 import S90Application
@@ -58,3 +59,4 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
         return Array(texts.prefix(maximumCandidates))
     }
 }
+#endif

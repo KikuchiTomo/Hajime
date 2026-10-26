@@ -1,5 +1,4 @@
 {
-  "$comment": "Swift(core/Tests/S90IPCTests)と Rust(apps/windows/crates/ipc)の両方が読み，読み戻して同じ JSON になることを確かめる．型を足したらここにも足す",
   "requests": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
     { "id": 2, "body": { "type": "openSession" } },

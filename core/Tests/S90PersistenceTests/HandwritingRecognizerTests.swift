@@ -1,3 +1,4 @@
+#if canImport(Vision)
 import CoreGraphics
 import CoreText
 import Foundation
@@ -37,3 +38,4 @@ struct HandwritingRecognizerTests {
         return context.makeImage()!
     }
 }
+#endif

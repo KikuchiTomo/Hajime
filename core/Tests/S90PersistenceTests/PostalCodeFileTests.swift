@@ -13,6 +13,13 @@ struct PostalCodeFileTests {
         #expect(table.count == 2)
     }
 
+    @Test("改行が CRLF の表も読む")
+    func crlf() {
+        let table = PostalCodeFile.parse("# 説明\r\n1000001\t東京都千代田区千代田\r\n0600042\t北海道札幌市中央区大通西\r\n")
+        #expect(table["1000001"] == ["東京都千代田区千代田"])
+        #expect(table["0600042"] == ["北海道札幌市中央区大通西"])
+    }
+
     @Test("同梱する表から住所を引く")
     func bundledTable() {
         let url = URL(fileURLWithPath: #filePath)

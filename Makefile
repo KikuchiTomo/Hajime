@@ -51,6 +51,5 @@ tokens:
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/tokens/generate_swift.py
 
-# Windows のプロセス間のメッセージの型を protocol/schema.json から作り直す(ADR 0010)
 protocol:
 	$(PYTHON) tools/protocol/generate.py
