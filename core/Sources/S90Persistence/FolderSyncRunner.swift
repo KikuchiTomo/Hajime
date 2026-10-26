@@ -35,10 +35,24 @@ public final class FolderSyncRunner {
 
     /// 設定とユーザー辞書を同期のファイルと突き合わせる．ほかの PC で消した辞書は，この PC の索引も消す
     public func syncSettings(in folder: URL) throws {
+        let backend = FolderSyncBackend(folder: folder)
+        let merged = try merge(remote: try backend.read())
+        if let written = merged.written { try backend.write(written) }
+        try synchronizer.commit(merged)
+    }
+
+    /// 読んでおいた同期のファイルの中身と突き合わせる．ファイルの読み書きをメインスレッドの外で行うときに使う．
+    /// 書く中身があれば同期のファイルに書き，書けたら synchronizer の commit で記録を進める
+    public func merge(remote data: Data?) throws -> SettingsSynchronizer.Merged {
         let before = settings.current.importedDictionaries
-        try synchronizer.sync(with: FolderSyncBackend(folder: folder))
+        let merged = try synchronizer.merge(remote: data)
         let remaining = Set(settings.current.importedDictionaries.map(\.id))
         for dictionary in before where !remaining.contains(dictionary.id) { dictionaries.remove(dictionary) }
+        return merged
+    }
+
+    public func commit(_ merged: SettingsSynchronizer.Merged) throws {
+        try synchronizer.commit(merged)
     }
 
     /// 索引を運ぶ仕事．取り込んだ辞書のまとまりを同期しないときと，辞書が無いときは nil

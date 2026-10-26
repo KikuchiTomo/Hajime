@@ -14,7 +14,8 @@ public final class PathSyncCoordinator: SyncControlling {
     private let synchronizer: SettingsSynchronizer
     private let runner: FolderSyncRunner
     private var problem: SyncProblem?
-    private var isSyncingSettings = false
+    /// 設定とユーザー辞書を突き合わせている仕事．終わるまで次の同期を始めない
+    private var settingsTask: Task<Void, Never>?
     private var dictionaryTask: Task<Void, Never>?
     private var writeTask: Task<Void, Never>?
     private var pollTask: Task<Void, Never>?
@@ -42,7 +43,7 @@ public final class PathSyncCoordinator: SyncControlling {
     }
 
     public var status: SyncStatus {
-        SyncStatus(state: synchronizer.state, problem: problem, isSyncing: isSyncingSettings || dictionaryTask != nil)
+        SyncStatus(state: synchronizer.state, problem: problem, isSyncing: settingsTask != nil || dictionaryTask != nil)
     }
 
     public func chooseFolder(path: String) throws {
@@ -66,24 +67,50 @@ public final class PathSyncCoordinator: SyncControlling {
         try synchronizer.setLocal(isLocal, field: field)
     }
 
-    /// 今すぐ同期する．同期しない設定か，フォルダを選んでいなければ何もしない
+    /// 今すぐ同期する．同期しない設定か，フォルダを選んでいなければ何もしない．
+    /// 同期のファイルの読み書きはメインスレッドの外で行い，時間の上限(DefaultSettings.syncFileTimeout)を過ぎたら待つのをやめる．
+    /// どこで失敗しても problem に記録するだけで，入力は止めない
     public func syncNow() {
         let state = synchronizer.state
-        guard state.isEnabled, let path = state.folderPath, !isSyncingSettings else { return }
+        guard state.isEnabled, let path = state.folderPath, settingsTask == nil else { return }
         guard let folder = LocalFilePath.existingDirectory(path) else {
             // 外付けのドライブを外した，クラウドのアプリを止めたなど．フォルダが戻れば次の同期で続ける
             problem = .folderUnavailable
             return
         }
-        isSyncingSettings = true
-        defer { isSyncingSettings = false }
+        settingsTask = Task { [weak self] in
+            await self?.syncSettings(in: folder)
+            self?.settingsTask = nil
+        }
+    }
+
+    private func syncSettings(in folder: URL) async {
+        let backend = FolderSyncBackend(folder: folder)
+        guard let read = await Deadline.run(seconds: DefaultSettings.syncFileTimeout, { await Self.perform { try backend.read() } }) else {
+            problem = .folderUnavailable
+            return
+        }
         do {
-            try runner.syncSettings(in: folder)
+            let merged = try runner.merge(remote: try read.get())
+            if let written = merged.written {
+                let wrote = await Deadline.run(seconds: DefaultSettings.syncFileTimeout, { await Self.perform { try backend.write(written) } })
+                guard let wrote else {
+                    problem = .folderUnavailable
+                    return
+                }
+                try wrote.get()
+            }
+            try runner.commit(merged)
             problem = nil
             syncDictionaryFiles(in: folder)
         } catch {
             problem = error as? SettingsSynchronizer.SyncError == .unreadableDocument ? .unreadable : .failed
         }
+    }
+
+    @concurrent
+    private static func perform<Value: Sendable>(_ body: @Sendable () throws -> Value) async -> Result<Value, any Error> {
+        Result { try body() }
     }
 
     /// 取り込んだ辞書の索引を運ぶ．前の分が終わっていなければ何もしない(次の同期でまた見る)
@@ -119,8 +146,9 @@ public final class PathSyncCoordinator: SyncControlling {
         }
     }
 
-    /// 索引を運び終えるまで待つ(テスト用)
-    func waitForDictionaryFiles() async {
+    /// 同期と索引の運びが終わるまで待つ(テスト用)
+    func waitForSync() async {
+        await settingsTask?.value
         await dictionaryTask?.value
     }
 }

@@ -42,14 +42,14 @@ struct PathSyncCoordinatorTests {
         try Data("でんあつ\t電圧\n".utf8).write(to: source)
         let dictionary = try await a.files.importDictionary(from: source.path, replacing: nil)
         try a.sync.chooseFolder(path: folder.path)
-        await a.sync.waitForDictionaryFiles()
+        await a.sync.waitForSync()
         #expect(a.sync.status.state.isEnabled)
         #expect(a.sync.status.state.folderName == "OneDrive")
         #expect(a.sync.status.problem == nil)
         #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent(FolderSyncBackend.fileName).path))
 
         try b.sync.chooseFolder(path: folder.path)
-        await b.sync.waitForDictionaryFiles()
+        await b.sync.waitForSync()
         #expect(b.settings.current.liveConversion == false)
         #expect(b.dictionaries.words(reading: "でんあつ", in: dictionary).map(\.word) == ["電圧"])
         a.sync.stop()
@@ -57,7 +57,7 @@ struct PathSyncCoordinatorTests {
     }
 
     @Test("無いフォルダは選べず，選んだフォルダが無くなれば folderUnavailable")
-    func folderProblems() throws {
+    func folderProblems() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let machine = Machine(root.appendingPathComponent("a"))
         #expect(throws: SettingsFileFailure.invalidPath) { try machine.sync.chooseFolder(path: root.appendingPathComponent("無い").path) }
@@ -67,22 +67,26 @@ struct PathSyncCoordinatorTests {
         let folder = root.appendingPathComponent("USB", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try machine.sync.chooseFolder(path: folder.path)
+        await machine.sync.waitForSync()
         try FileManager.default.removeItem(at: folder)
         machine.sync.syncNow()
         #expect(machine.sync.status.problem == .folderUnavailable)
         machine.sync.stop()
     }
 
-    @Test("同期のファイルが壊れていれば上書きせずに unreadable")
-    func unreadable() throws {
+    @Test("同期のファイルが壊れていれば上書きせずに unreadable．入力の設定はそのまま使える")
+    func unreadable() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let folder = root.appendingPathComponent("shared", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let file = folder.appendingPathComponent(FolderSyncBackend.fileName)
         try Data("not json".utf8).write(to: file)
         let machine = Machine(root.appendingPathComponent("a"))
+        try machine.settings.update { $0.liveConversion = false }
         try machine.sync.chooseFolder(path: folder.path)
+        await machine.sync.waitForSync()
         #expect(machine.sync.status.problem == .unreadable)
+        #expect(machine.settings.current.liveConversion == false)
         #expect(try Data(contentsOf: file) == Data("not json".utf8))
         machine.sync.stop()
     }

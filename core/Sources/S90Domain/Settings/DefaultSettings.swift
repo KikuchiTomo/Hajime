@@ -176,6 +176,10 @@ public enum DefaultSettings {
     public static let syncWriteDelay = 2.0
     /// 同期のファイルがほかの Mac で変わったかを確かめる間隔(秒)
     public static let syncPollInterval = 60.0
+    /// 同期のフォルダの読み書きを待つ上限(秒)．クラウドのフォルダで手元に無いファイルを読むと時間がかかるため．過ぎたら次の同期でやり直す
+    public static let syncFileTimeout = 15.0
+    /// 設定の画面から頼まれたファイルの読み書き(大きな辞書の取り込みなど)を待つ上限(秒)
+    public static let settingsFileTaskTimeout = 300.0
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
