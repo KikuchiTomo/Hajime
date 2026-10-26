@@ -49,6 +49,22 @@ extension InputContext {
     }
 }
 
+extension WireCustomTheme {
+    /// 保存したカスタムテーマを候補ウィンドウに渡す形にする．元のテーマは名前(ThemePreference の値)で渡す
+    public init(_ theme: CustomTheme) {
+        self.init(base: theme.base.rawValue, surface: WireColor(theme.surface), text: WireColor(theme.text), textMuted: WireColor(theme.textMuted),
+                  selection: WireColor(theme.selection), selectionText: WireColor(theme.selectionText), correction: WireColor(theme.correction),
+                  line: WireColor(theme.line), fontName: theme.fontName, cornerRadius: theme.cornerRadius,
+                  straightBranches: theme.branchStyle == .straight)
+    }
+}
+
+extension WireColor {
+    public init(_ color: HexColor) {
+        self.init(red: color.red, green: color.green, blue: color.blue)
+    }
+}
+
 extension InputMode {
     public init(_ wire: WireInputMode) {
         switch wire {

@@ -764,15 +764,67 @@ extension WireBranchMap: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+public struct WireColor: Sendable, Equatable, Codable {
+    public var red: UInt8
+    public var green: UInt8
+    public var blue: UInt8
+
+    public init(red: UInt8, green: UInt8, blue: UInt8) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+}
+
+extension WireColor: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireColor" }
+    public var debugDescription: String { description }
+}
+
+public struct WireCustomTheme: Sendable, Equatable, Codable {
+    public var base: String
+    public var surface: WireColor
+    public var text: WireColor
+    public var textMuted: WireColor
+    public var selection: WireColor
+    public var selectionText: WireColor
+    public var correction: WireColor
+    public var line: WireColor
+    public var fontName: String?
+    public var cornerRadius: Double
+    public var straightBranches: Bool
+
+    public init(base: String, surface: WireColor, text: WireColor, textMuted: WireColor, selection: WireColor, selectionText: WireColor, correction: WireColor, line: WireColor, fontName: String? = nil, cornerRadius: Double, straightBranches: Bool) {
+        self.base = base
+        self.surface = surface
+        self.text = text
+        self.textMuted = textMuted
+        self.selection = selection
+        self.selectionText = selectionText
+        self.correction = correction
+        self.line = line
+        self.fontName = fontName
+        self.cornerRadius = cornerRadius
+        self.straightBranches = straightBranches
+    }
+}
+
+extension WireCustomTheme: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireCustomTheme" }
+    public var debugDescription: String { description }
+}
+
 public struct WirePresentation: Sendable, Equatable, Codable {
     public var theme: String
     public var fontSize: Double
     public var modeIndicatorMilliseconds: UInt32
+    public var customTheme: WireCustomTheme?
 
-    public init(theme: String, fontSize: Double, modeIndicatorMilliseconds: UInt32) {
+    public init(theme: String, fontSize: Double, modeIndicatorMilliseconds: UInt32, customTheme: WireCustomTheme? = nil) {
         self.theme = theme
         self.fontSize = fontSize
         self.modeIndicatorMilliseconds = modeIndicatorMilliseconds
+        self.customTheme = customTheme
     }
 }
 

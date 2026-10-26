@@ -708,6 +708,74 @@
       ]
     },
     {
+      "name": "Color",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "red",
+          "type": "u8"
+        },
+        {
+          "name": "green",
+          "type": "u8"
+        },
+        {
+          "name": "blue",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "CustomTheme",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "base",
+          "type": "string"
+        },
+        {
+          "name": "surface",
+          "type": "Color"
+        },
+        {
+          "name": "text",
+          "type": "Color"
+        },
+        {
+          "name": "textMuted",
+          "type": "Color"
+        },
+        {
+          "name": "selection",
+          "type": "Color"
+        },
+        {
+          "name": "selectionText",
+          "type": "Color"
+        },
+        {
+          "name": "correction",
+          "type": "Color"
+        },
+        {
+          "name": "line",
+          "type": "Color"
+        },
+        {
+          "name": "fontName",
+          "type": "string?"
+        },
+        {
+          "name": "cornerRadius",
+          "type": "f64"
+        },
+        {
+          "name": "straightBranches",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "Presentation",
       "kind": "struct",
       "fields": [
@@ -722,6 +790,10 @@
         {
           "name": "modeIndicatorMilliseconds",
           "type": "u32"
+        },
+        {
+          "name": "customTheme",
+          "type": "CustomTheme?"
         }
       ]
     },
