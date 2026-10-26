@@ -216,6 +216,10 @@
         {
           "name": "precedingTextLength",
           "type": "u32?"
+        },
+        {
+          "name": "keyboardLayout",
+          "type": "string?"
         }
       ]
     },

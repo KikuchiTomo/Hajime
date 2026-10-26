@@ -272,13 +272,15 @@ public struct WireSessionState: Sendable, Equatable, Codable {
     public var consumedKeys: [WireKeyChord]
     public var wakeAfterMilliseconds: UInt32?
     public var precedingTextLength: UInt32?
+    public var keyboardLayout: String?
 
-    public init(mode: WireInputMode, isComposing: Bool, consumedKeys: [WireKeyChord], wakeAfterMilliseconds: UInt32? = nil, precedingTextLength: UInt32? = nil) {
+    public init(mode: WireInputMode, isComposing: Bool, consumedKeys: [WireKeyChord], wakeAfterMilliseconds: UInt32? = nil, precedingTextLength: UInt32? = nil, keyboardLayout: String? = nil) {
         self.mode = mode
         self.isComposing = isComposing
         self.consumedKeys = consumedKeys
         self.wakeAfterMilliseconds = wakeAfterMilliseconds
         self.precedingTextLength = precedingTextLength
+        self.keyboardLayout = keyboardLayout
     }
 }
 
