@@ -46,6 +46,9 @@ final class ClientActionPresenter {
             case .hideCandidates:
                 candidatePanel.hide()
                 note.hide()
+            case .awaitCorrections:
+                // 入力コントローラが訂正を求めてから変換を続ける(S90InputController.convertAfterCorrections)
+                break
             case .openSettings:
                 openSettings()
             case .showHandwriting:
