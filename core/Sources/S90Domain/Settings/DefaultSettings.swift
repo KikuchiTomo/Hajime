@@ -79,6 +79,10 @@ public enum DefaultSettings {
     public static let maximumWordLanguagePreviewWords = 20
     /// 綴りの補正で許す編集距離
     public static let maximumCorrectionDistance = 2
+    /// 英単語の辞書に使う OS のスペルチェッカーの言語(macOS は NSSpellChecker，Windows は ISpellChecker)
+    public static let englishSpellCheckLanguage = "en-US"
+    /// OS のスペルチェッカーから受け取る綴りの候補の数の上限(Windows)．綴りの補正は近い候補から順に試す
+    public static let maximumSpellingSuggestions = 8
     /// 文節格子で，第 1 候補と 2 番目の点数の差がこれより小さい文節は確信度が低いとみなし，候補の列を見せる．
     /// 点数は azooKey の対数尤度．値は試験的に決めたもので，利用の記録を見て調整する
     public static let latticeConfidenceGap: Double = 2.0

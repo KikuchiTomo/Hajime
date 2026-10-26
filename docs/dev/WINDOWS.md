@@ -45,7 +45,7 @@
 
 ## Windows で使わないもの
 
-Vision(手書き．Windows では候補ウィンドウが Windows の手書き認識を使う)と `os` の Logger は Apple の OS だけで作る．同期の辞書の索引の SHA-256 は CryptoKit の代わりに `SHA256Digest` で求める．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+Vision(手書き．Windows では候補ウィンドウが Windows の手書き認識を使う)と `os` の Logger は Apple の OS だけで作る．同期の辞書の索引の SHA-256 は CryptoKit の代わりに `SHA256Digest` で求める．英単語の辞書は Windows のスペルチェッカー(ISpellChecker)を使う(`WindowsSpellCheckerLexicon`．C の口 `CWindowsSpellCheck` を通す)．英語のスペルチェッカーが入っていなければ，英単語の綴りの補正だけが効かなくなる．
 
 ## Zenzai
 
