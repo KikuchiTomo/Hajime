@@ -114,6 +114,30 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.note == nil)
     }
 
+    @Test("⇧⌃→ で文節の終わりを次の語の切れ目まで延ばし，⇧⌃← で前の語の切れ目まで縮める")
+    func resizeToWord() {
+        let converter = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "きょう": [("今日", nil)],
+                                       "いい": [("良い", nil)], "は": [("は", nil)], "はいい": [("はいい", nil)]])
+        converter.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "は", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "いい", readingCount: 2),
+        ]
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .start
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["今日はいい"])
+        // 語の切れ目(きょう|は|いい)ごとに縮め，延ばす
+        harness.press(.left, [.shift, .control])
+        #expect(harness.lattice?.columns.first?.text == "今日は")
+        harness.press(.left, [.shift, .control])
+        #expect(harness.lattice?.columns.first?.text == "今日")
+        harness.press(.right, [.shift, .control])
+        harness.press(.right, [.shift, .control])
+        #expect(harness.lattice?.columns.first?.text == "今日はいい")
+    }
+
     @Test("区切れる位置は小さい仮名と長音の前を除き，9 個まで")
     func splitPositions() {
         #expect(InputSession.splitPositions(of: "きょうは") == [2, 3])
