@@ -642,12 +642,71 @@ impl fmt::Debug for BranchMap {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+impl fmt::Debug for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Color")
+            .field("red", &self.red)
+            .field("green", &self.green)
+            .field("blue", &self.blue)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct CustomTheme {
+    pub base: String,
+    pub surface: Color,
+    pub text: Color,
+    #[serde(rename = "textMuted")]
+    pub text_muted: Color,
+    pub selection: Color,
+    #[serde(rename = "selectionText")]
+    pub selection_text: Color,
+    pub correction: Color,
+    pub line: Color,
+    #[serde(rename = "fontName")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_name: Option<String>,
+    #[serde(rename = "cornerRadius")]
+    pub corner_radius: f64,
+    #[serde(rename = "straightBranches")]
+    pub straight_branches: bool,
+}
+
+impl fmt::Debug for CustomTheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CustomTheme")
+            .field("base", &REDACTED)
+            .field("surface", &self.surface)
+            .field("text", &self.text)
+            .field("textMuted", &self.text_muted)
+            .field("selection", &self.selection)
+            .field("selectionText", &self.selection_text)
+            .field("correction", &self.correction)
+            .field("line", &self.line)
+            .field("fontName", &REDACTED)
+            .field("cornerRadius", &self.corner_radius)
+            .field("straightBranches", &self.straight_branches)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Presentation {
     pub theme: String,
     #[serde(rename = "fontSize")]
     pub font_size: f64,
     #[serde(rename = "modeIndicatorMilliseconds")]
     pub mode_indicator_milliseconds: u32,
+    #[serde(rename = "customTheme")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_theme: Option<CustomTheme>,
 }
 
 impl fmt::Debug for Presentation {
@@ -656,6 +715,7 @@ impl fmt::Debug for Presentation {
             .field("theme", &REDACTED)
             .field("fontSize", &self.font_size)
             .field("modeIndicatorMilliseconds", &self.mode_indicator_milliseconds)
+            .field("customTheme", &self.custom_theme)
             .finish()
     }
 }

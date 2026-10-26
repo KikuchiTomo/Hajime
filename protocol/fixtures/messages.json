@@ -123,6 +123,27 @@
       }
     },
     { "type": "setPresentation", "presentation": { "theme": "platinum", "fontSize": 15.5, "modeIndicatorMilliseconds": 800 } },
+    {
+      "type": "setPresentation",
+      "presentation": {
+        "theme": "washi",
+        "fontSize": 16.5,
+        "modeIndicatorMilliseconds": 1200,
+        "customTheme": {
+          "base": "automatic",
+          "surface": { "red": 43, "green": 27, "blue": 23 },
+          "text": { "red": 255, "green": 232, "blue": 214 },
+          "textMuted": { "red": 201, "green": 166, "blue": 143 },
+          "selection": { "red": 255, "green": 122, "blue": 61 },
+          "selectionText": { "red": 26, "green": 14, "blue": 10 },
+          "correction": { "red": 255, "green": 210, "blue": 63 },
+          "line": { "red": 107, "green": 74, "blue": 62 },
+          "fontName": "Yu Mincho",
+          "cornerRadius": 4.5,
+          "straightBranches": true
+        }
+      }
+    },
     { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },

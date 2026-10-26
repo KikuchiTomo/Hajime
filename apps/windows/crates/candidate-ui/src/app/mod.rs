@@ -57,6 +57,7 @@ pub fn run() {
         theme: String::new(),
         font_size: f64::from(tokens::size::candidate::FONT_SIZE),
         mode_indicator_milliseconds: tokens::motion::mode_indicator::VISIBLE as u32,
+        custom_theme: None,
     };
     let notifier = window.notifier();
     let reader_inbox = inbox.clone();
