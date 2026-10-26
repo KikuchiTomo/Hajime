@@ -11,12 +11,14 @@ final class ClientActionPresenter {
     private let modeIndicator: ModeIndicatorController
     private let note: NoteController
     private let openSettings: () -> Void
+    private let handwriting: HandwritingController
     private let settings: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
     init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
-         openSettings: @escaping () -> Void) {
+         openSettings: @escaping () -> Void, handwriting: HandwritingController) {
         self.openSettings = openSettings
+        self.handwriting = handwriting
         self.candidatePanel = candidatePanel
         self.modeIndicator = modeIndicator
         self.note = note
@@ -43,6 +45,10 @@ final class ClientActionPresenter {
                 note.hide()
             case .openSettings:
                 openSettings()
+            case .showHandwriting:
+                handwriting.show(caret: caretRect(of: client)) { text in
+                    client.insertText(text, replacementRange: Self.noReplacement)
+                }
             case .toggleLiveConversion:
                 do {
                     try settings.update { $0.liveConversion.toggle() }

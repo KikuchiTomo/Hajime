@@ -1,10 +1,12 @@
 /// キーで行う操作．キーの割り当てを設定で変えられる．
-/// 分岐図の操作は変換しているときだけ，openSettings と toggleLiveConversion は日本語のモードならいつでも効く
+/// 分岐図の操作は変換しているときだけ，openSettings・toggleLiveConversion・handwriting は日本語のモードならいつでも効く
 public enum ConversionCommand: String, Sendable, Equatable, Codable, CaseIterable, CodingKeyRepresentable {
     /// 設定の画面を開く．入力メニューの操作を IME に取り次がないアプリ(cmux など)でも開けるようにする
     case openSettings
     /// ライブ変換を切り替える
     case toggleLiveConversion
+    /// 手書きで文字を探す窓を開く(設定の「手書き入力」がオンのときだけ．R-14)
+    case handwriting
     case nextCandidate
     case previousCandidate
     case nextSegment
@@ -15,7 +17,7 @@ public enum ConversionCommand: String, Sendable, Equatable, Codable, CaseIterabl
     case shrinkSegment
 
     /// 変換していないときも効く操作
-    public var isGlobal: Bool { self == .openSettings || self == .toggleLiveConversion }
+    public var isGlobal: Bool { self == .openSettings || self == .toggleLiveConversion || self == .handwriting }
 }
 
 /// キーの押し方．設定に保存できる形にしたもの
@@ -78,6 +80,7 @@ public struct KeyBindings: Sendable, Equatable, Codable {
     public static let standard = KeyBindings([
         .openSettings: [KeyStroke(.character(","), control: true, option: true)],
         .toggleLiveConversion: [KeyStroke(.character("l"), control: true, option: true)],
+        .handwriting: [KeyStroke(.character("h"), control: true, option: true)],
         .nextCandidate: [KeyStroke(.down), KeyStroke(.space)],
         .previousCandidate: [KeyStroke(.up), KeyStroke(.space, shift: true)],
         .nextSegment: [KeyStroke(.right)],

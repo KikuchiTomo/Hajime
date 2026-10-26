@@ -10,6 +10,7 @@ import S90Domain
 /// - 計算(Calculator): 「1+2*3=」→「7」「1+2*3=7」．結果を先頭に置く(式を打って「=」を打つのは計算したいときなので)
 /// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
+/// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
 ///
 /// 記号と日付は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
 /// 第 1 候補(ライブ変換で見える文字)は変えず，よく使う語より前に並ばないようにする
@@ -18,13 +19,15 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let base: any KanaKanjiConverting
     private let settings: any SettingsReading
     private let calendar: any CalendarReading
+    private let postalCodes: (any PostalCodeLooking)?
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
     private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [String]]) = ([], [:])
 
-    public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading) {
+    public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading, postalCodes: (any PostalCodeLooking)? = nil) {
         self.base = base
         self.settings = settings
         self.calendar = calendar
+        self.postalCodes = postalCodes
     }
 
     public func candidates(for reading: String) -> [Candidate] {
@@ -56,6 +59,9 @@ public final class SupplementedConverter: KanaKanjiConverting {
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
         if current.misreadings, let entry = Misreadings.entry(for: reading) {
             insert([entry.word], into: &result, at: 1, reading: reading, origin: .symbol)
+        }
+        if current.postalCodeConversion, let postalCodes, let query = PostalCode.query(for: reading) {
+            insert(postalCodes.addresses(for: query.code), into: &result, at: query.hasSeparator ? 0 : 1, reading: reading, origin: .symbol)
         }
         if current.calculation, let calculation = Calculator.evaluate(reading: reading) {
             insert([calculation.result, calculation.expression + "=" + calculation.result], into: &result, at: 0, reading: reading, origin: .symbol)

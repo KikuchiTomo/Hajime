@@ -72,8 +72,8 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar), lexicon: lexicon, settings: settings, usage: usage,
-                     typoService: typoService)
+        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes),
+                     lexicon: lexicon, settings: settings, usage: usage, typoService: typoService)
     }
 
     /// 設定の画面．開くたびに作らず使い回す
@@ -85,8 +85,14 @@ final class CompositionRoot {
 
     func makePresenter() -> ClientActionPresenter {
         ClientActionPresenter(candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
-                              openSettings: { [unowned self] in self.settingsWindow.show() })
+                              openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting)
     }
+
+    /// 郵便番号の表(R-13)．入力欄ごとのセッションで共有し，初めて引くときに読み込む
+    private(set) lazy var postalCodes: PostalCodeFile? = Bundle.main.url(forResource: "postal-codes", withExtension: "tsv").map(PostalCodeFile.init(url:))
+
+    /// 手書きの窓(R-14)．開くたびに作らず使い回す
+    private(set) lazy var handwriting = HandwritingController(recognizer: VisionHandwritingRecognizer(), settings: settings)
 }
 
 /// 本番と開発版(Debug)で変わる値．どちらも Info.plist から読む(apps/macos/project.yml の configs)

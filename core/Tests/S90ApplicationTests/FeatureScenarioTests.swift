@@ -120,6 +120,30 @@ struct FeatureScenarioTests {
         #expect(SupplementedConverter(FakeConverter(), settings: FakeSettings(off), calendar: FakeCalendar()).candidates(for: "1＋2＝").isEmpty)
     }
 
+    @Test("R-14: 手書きのキーは設定がオンのときだけ窓を出す")
+    func handwritingKey() {
+        let key = KeyEvent(.character("h"), modifiers: [.control, .option])
+        let off = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        #expect(!off.handle(key, context: InputContext()).actions.contains(.showHandwriting))
+        var settings = DefaultSettings.settings
+        settings.handwriting = true
+        let on = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        #expect(on.handle(key, context: InputContext()).actions == [.showHandwriting])
+    }
+
+    @Test("R-13: 郵便番号は住所を候補に出す．区切りがあれば先頭に，無ければ 2 番目に")
+    func postalCode() {
+        let postal = FakePostalCodes(["1000001": ["東京都千代田区千代田"]])
+        let separated = SupplementedConverter(FakeConverter(["100ー0001": [("100ー0001", nil)]]), settings: FakeSettings(), calendar: FakeCalendar(), postalCodes: postal)
+        #expect(separated.candidates(for: "100ー0001").first?.text == "東京都千代田区千代田")
+        let plain = SupplementedConverter(FakeConverter(["1000001": [("1000001", nil)]]), settings: FakeSettings(), calendar: FakeCalendar(), postalCodes: postal)
+        #expect(plain.candidates(for: "1000001").map(\.text) == ["1000001", "東京都千代田区千代田"])
+        var off = DefaultSettings.settings
+        off.postalCodeConversion = false
+        let disabled = SupplementedConverter(FakeConverter(), settings: FakeSettings(off), calendar: FakeCalendar(), postalCodes: postal)
+        #expect(disabled.candidates(for: "100-0001").isEmpty)
+    }
+
     @Test("R-12: 送り仮名は既定で本則を先にし，許容を選べば許容を先にする")
     func okurigana() {
         let base = FakeConverter(["おこなう": [("行なう", nil), ("行う", nil)]])
@@ -128,4 +152,12 @@ struct FeatureScenarioTests {
         allowed.okuriganaStyle = .allowed
         #expect(SupplementedConverter(base, settings: FakeSettings(allowed), calendar: FakeCalendar()).candidates(for: "おこなう").first?.text == "行なう")
     }
+}
+
+/// 郵便番号の表の代わり
+@MainActor
+final class FakePostalCodes: PostalCodeLooking {
+    let table: [String: [String]]
+    init(_ table: [String: [String]]) { self.table = table }
+    func addresses(for code: String) -> [String] { table[code] ?? [] }
 }

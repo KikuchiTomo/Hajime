@@ -37,6 +37,9 @@ targets:
       - path: ../../LICENSES
         type: folder
         buildPhase: resources
+      # 郵便番号の表(R-13)．data/postal は tools/postal/update.sh で作る
+      - path: ../../data/postal/postal-codes.tsv
+        buildPhase: resources
     postBuildScripts:
       - name: 入力ソースの表示名を書く
         path: ../../tools/macos/write_input_source_names.sh

@@ -62,6 +62,10 @@ public struct Settings: Sendable, Equatable {
     public var okuriganaStyle = OkuriganaStyle.standard
     /// 「1+2*3=」のような式を計算した結果を候補に出す
     public var calculation = true
+    /// 郵便番号(「100-0001」)から住所を候補に出す
+    public var postalCodeConversion = true
+    /// 手書きで文字を探す窓を使う(キー操作の「手書き」で開く)
+    public var handwriting = false
     /// よくある読み違い(「ふいんき」→ 雰囲気)の正しい語を候補に出し，「もしかして」で示す
     public var misreadings = true
     /// 一覧の上に字種の行を出す(R-03)
@@ -151,7 +155,7 @@ private struct Skipped: Decodable {}
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, conversionKeys
-        case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, misreadings
+        case modeKeys, keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, showsVariantRow, numberKeySelection, dateConversion, symbolConversion, emojiConversion
@@ -200,6 +204,8 @@ extension Settings: Codable {
         read(.correction, into: \.correction)
         read(.okuriganaStyle, into: \.okuriganaStyle)
         read(.calculation, into: \.calculation)
+        read(.postalCodeConversion, into: \.postalCodeConversion)
+        read(.handwriting, into: \.handwriting)
         read(.misreadings, into: \.misreadings)
         read(.alphabetWidth, into: \.alphabetWidth)
         read(.shiftStartsAlphabet, into: \.shiftStartsAlphabet)
@@ -254,6 +260,8 @@ extension Settings: Codable {
         try container.encode(correction, forKey: .correction)
         try container.encode(okuriganaStyle, forKey: .okuriganaStyle)
         try container.encode(calculation, forKey: .calculation)
+        try container.encode(postalCodeConversion, forKey: .postalCodeConversion)
+        try container.encode(handwriting, forKey: .handwriting)
         try container.encode(misreadings, forKey: .misreadings)
         try container.encode(alphabetWidth, forKey: .alphabetWidth)
         try container.encode(shiftStartsAlphabet, forKey: .shiftStartsAlphabet)
