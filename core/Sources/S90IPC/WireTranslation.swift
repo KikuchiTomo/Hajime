@@ -247,7 +247,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .selectInputStyle(let style):
                 host.append(.selectInputStyle(style))
             case .awaitCorrections:
-                // 訂正を別のところで求める作り(typoService)のときだけ出る．エンジンのプロセスはその作りを使わないので来ない
+                // 訂正を別のところで求める作り(typoService)のときだけ出る．エンジンのプロセスは EngineService が受けて訂正を待つので，ここには来ない
                 break
             case .requestReconversion:
                 // 入力先の選んでいる文字は DLL が読むので，読んで reconvert で送ってもらう

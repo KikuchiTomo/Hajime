@@ -50,6 +50,7 @@
 - 入力の流れは「キーの列 → 期待する `ClientAction` の列」の表で書く(`InputSessionScenarioTests`)．要件(R-xx)の受け入れ条件はここで確かめる
 - 変換結果そのもの(どの漢字になるか)はエンジンの性能なので，core のテストでは固定の結果を返す Fake を使う
 - Windows の TSF は単体テストが難しいので，`ClientAction` から COM の呼び出しへの変換だけを関数に切り出して試す
+- 本物の Zenzai を使うテスト(環境変数 `S90_ZENZAI_MODEL` があるときだけ動く)と 1 キーの処理時間(R-01)は，`make test-zenzai` で Release ビルドで動かす．`make test` はモデルがあればこれも動かし，無ければ飛ばしたことを最後に表示する．CI はモデルをキャッシュして毎回動かす
 
 ## コミットと PR
 
