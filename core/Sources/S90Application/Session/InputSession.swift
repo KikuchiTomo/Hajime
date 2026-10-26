@@ -39,6 +39,9 @@ public final class InputSession {
     private let readingCorrector: ReadingCorrector
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
     private var isSettled = false
+    /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
+    /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
+    private var showsCorrectionNote = false
 
     /// 使い方の記録(回数だけ)．記録しないときは nil
     private let usage: (any UsageRecording)?
@@ -62,6 +65,7 @@ public final class InputSession {
             // パスワード欄では何もしない(docs/dev/SECURITY-MODEL.md)
             return .passThrough
         }
+        showsCorrectionNote = false
         let result = route(event, context: context)
         // ターミナルの行には，どの経路で確定した文字もアプリに渡ったキーも，ここで 1 か所で数える
         if context.profile == .terminal { terminal.didHandle(event, result: result) }
@@ -131,10 +135,12 @@ public final class InputSession {
             && (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection
     }
 
-    /// 打鍵が長く止まった(DefaultSettings.liveCorrectionDelay)．打ち間違いを見直し，直すか「もしかして」と示す
+    /// 打鍵が長く止まった(DefaultSettings.liveCorrectionDelay)．打ち間違いを見直し，直すか「もしかして」と示す．
+    /// ターミナルの行の頭ではコマンドの名前を打っているかもしれないので見直さない(直すとコマンドとして流せなくなる．R-07)
     public func review(context: InputContext) -> [ClientAction] {
-        guard awaitsReview else { return [] }
+        guard awaitsReview, !(context.profile == .terminal && terminal.state.region == .lineStart) else { return [] }
         reviewReading()
+        showsCorrectionNote = true
         return render(context: context)
     }
 
@@ -245,6 +251,7 @@ public final class InputSession {
             // 「もしかして」と示していた読みに直す
             if phase == .composing, readingCorrector.acceptSuggestion(&composition) {
                 usage?.record(.readingCorrected)
+                showsCorrectionNote = true
                 return KeyResult(handled: true, actions: render(context: context))
             }
             return KeyResult(handled: true)
@@ -371,7 +378,7 @@ public final class InputSession {
         if isRomaji {
             composition.insertRomaji(character)
             NasalReadingResolver(converter: converter).resolve(&composition)
-            readingCorrector.didType()
+            readingCorrector.didType(character)
             if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
@@ -448,7 +455,12 @@ public final class InputSession {
             return
         }
         corrector.commit(into: &composition)
-        phase = .lattice(LatticeBuilder(converter: converter).build(reading: composition.conversionReading))
+        let builder = LatticeBuilder(converter: converter)
+        var lattice = builder.build(reading: composition.conversionReading)
+        if let typed = readingCorrector.typedComposition(from: composition) {
+            lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
+        }
+        phase = .lattice(lattice)
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
@@ -716,6 +728,7 @@ public final class InputSession {
     /// 打ち間違いを直したこと，または「もしかして」を入力位置の近くに出す．
     /// 文はライブ変換の設定に従って見せる(直す前の文・直した文のどちらも)
     private func correctionNote() -> [ClientAction] {
+        guard showsCorrectionNote else { return [] }
         let shown = { (reading: String) -> String in
             guard self.settings.current.liveConversion else { return reading }
             return self.bestWholeCandidate(for: reading)?.text ?? reading

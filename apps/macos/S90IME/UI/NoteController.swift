@@ -2,8 +2,7 @@ import AppKit
 import S90Domain
 
 /// 入力位置の下に短い案内を出す(打ち間違いを直したこと・「もしかして」)．
-/// 候補ウィンドウと同じ場所に出すが，案内を出すのは読みを組み立てているあいだだけなので重ならない．
-/// 消すのは候補ウィンドウと同じ時機(ClientAction.hideCandidates)
+/// 候補ウィンドウと同じ場所に出す．候補ウィンドウを出すとき(ClientActionPresenter)と hideCandidates で消す
 @MainActor
 final class NoteController {
     private let view = NoteView()
@@ -22,6 +21,13 @@ final class NoteController {
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
         if view.theme.isGlass { window.invalidateShadow() }
         window.orderFrontRegardless()
+        // VoiceOver が動いているときは，案内を読み上げる
+        if NSWorkspace.shared.isVoiceOverEnabled {
+            NSAccessibility.post(element: window, notification: .announcementRequested, userInfo: [
+                .announcement: text,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue,
+            ])
+        }
     }
 
     func hide() {
@@ -37,7 +43,7 @@ final class NoteView: NSView {
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
 
     private var attributes: [NSAttributedString.Key: Any] {
-        [.font: theme.labelFont(size: Glass.labelFontSize + 1), .foregroundColor: theme.correction]
+        [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: theme.correction]
     }
 
     private var padding: CGFloat { theme.isGlass ? Glass.padding : Size.paddingX }
@@ -45,7 +51,7 @@ final class NoteView: NSView {
     override var fittingSize: NSSize {
         let size = text.size(withAttributes: attributes)
         let inset = theme.isGlass ? 0 : Size.frameWidth + Size.bevelWidth
-        return NSSize(width: (size.width + (padding + inset) * 2).rounded(.up), height: (size.height + (Size.sectionPaddingY + inset) * 2 + 4).rounded(.up))
+        return NSSize(width: (size.width + (padding + inset) * 2).rounded(.up), height: max(Glass.footerHeight, size.height + (Size.sectionPaddingY + inset) * 2).rounded(.up))
     }
 
     override func draw(_ dirtyRect: NSRect) {

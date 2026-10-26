@@ -255,6 +255,25 @@ struct ClauseSplitterTests {
         #expect(clauses == [.init(text: "非常な", readingCount: 5), .init(text: "人だ", readingCount: 3)])
     }
 
+    @Test("「お茶」「ご飯」の接頭辞は分けない")
+    func keepsHonorificPrefix() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "今日", readingCount: 3), Word(text: "は", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Word(text: "お茶", readingCount: 3), Word(text: "を", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ])
+        #expect(clauses.map(\.text) == ["今日は", "お茶を"])
+    }
+
+    @Test("ひらがなの名詞から文節を始める(「ないという｜ところですかね」)")
+    func startsAtKanaNoun() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "ないという", readingCount: 5),
+            Word(text: "ところ", readingCount: 3, startsWithNoun: true),
+            Word(text: "ですかね", readingCount: 4),
+        ])
+        #expect(clauses.map(\.text) == ["ないという", "ところですかね"])
+    }
+
     @Test("1 文字の助詞のあとのひらがなの自立語で分ける(「今日は｜いい｜天気ですね」)")
     func splitsAfterParticle() {
         let clauses = ClauseSplitter.clauses(of: [
@@ -267,13 +286,26 @@ struct ClauseSplitterTests {
         #expect(clauses.map(\.readingCount) == [4, 2, 6])
     }
 
-    @Test("助詞と助動詞だけの語は前の文節に付ける(「問題点があれば」)")
+    @Test("1 文字の助詞のあとで分け，助詞と助動詞だけの語は前の文節に付ける(「問題点が｜あれば」「天気ですね」)")
     func attachesFunctionWords() {
         let clauses = ClauseSplitter.clauses(of: [
             Word(text: "問題点", readingCount: 6),
             Word(text: "があれば", readingCount: 4, startsWithParticle: true, endsWithParticle: true),
             Word(text: "GitHub", readingCount: 5),
         ])
-        #expect(clauses.map(\.text) == ["問題点があれば", "GitHub"])
+        #expect(clauses.map(\.text) == ["問題点が", "あれば", "GitHub"])
+    }
+}
+
+@Suite("キー配列の設定")
+struct KeyboardLayoutSettingTests {
+    @Test("保存して読み直せ，知らない値は既定に戻す")
+    func roundTrip() throws {
+        var settings = Settings()
+        settings.keyboardLayout = .dvorak
+        let data = try JSONEncoder().encode(settings)
+        #expect(try JSONDecoder().decode(Settings.self, from: data).keyboardLayout == .dvorak)
+        let unknown = Data(#"{"keyboardLayout":"workman"}"#.utf8)
+        #expect(try JSONDecoder().decode(Settings.self, from: unknown).keyboardLayout == .system)
     }
 }

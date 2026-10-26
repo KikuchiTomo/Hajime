@@ -47,7 +47,7 @@ final class ReadingCorrector {
     func typedComposition(from current: Composition) -> Composition? {
         guard let applied, let keys = current.rawKeys, keys.count >= applied.correctedKeyCount else { return nil }
         let following = keys.dropFirst(applied.correctedKeyCount)
-        guard following.allSatisfy(Self.isRomajiKey) else { return nil }
+        guard following.allSatisfy(Self.isLetterKey) else { return nil }
         var typed = applied.typed
         let resolver = NasalReadingResolver(converter: converter)
         for key in following {
@@ -63,7 +63,7 @@ final class ReadingCorrector {
         suggestion = nil
         let typed = typedComposition(from: composition) ?? composition
         guard let keys = typed.rawKeys, keys.count <= DefaultSettings.maximumKeysForCorrection,
-            !keys.isEmpty, keys.allSatisfy(Self.isRomajiKey),
+            !keys.isEmpty, keys.allSatisfy(Self.isLetterKey),
             typed.pending.isEmpty || typed.pending == "n",
             !(dismissedKeys.map(keys.hasPrefix) ?? false) else { return }
         let decision = decision(forKeys: keys, reading: typed.conversionReading)
@@ -128,9 +128,11 @@ final class ReadingCorrector {
         }
     }
 
-    /// 打ち続けた．示していた読みは古くなるので消す
-    func didType() {
+    /// 打ち続けた．示していた読みは古くなるので消す．英小文字と「-」のほかのキー(「'」や「z.」の「.」)を打ったら，
+    /// 打ったままの読みを組み立て直せないので，直したものをそのまま受け入れたことにする
+    func didType(_ key: Character) {
         suggestion = nil
+        if !Self.isLetterKey(key) { applied = nil }
     }
 
     /// 英字のまま確定した数字や記号を足した．直したものはそのまま受け入れたことにする
@@ -173,7 +175,8 @@ final class ReadingCorrector {
         return composition.isEmpty ? nil : composition
     }
 
-    private static func isRomajiKey(_ key: Character) -> Bool {
+    /// 見直しと組み立て直しに使えるキー(英小文字と長音の「-」)
+    private static func isLetterKey(_ key: Character) -> Bool {
         (key.isASCII && key.isLetter && key.isLowercase) || key == "-"
     }
 }

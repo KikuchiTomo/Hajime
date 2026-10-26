@@ -17,18 +17,81 @@ struct LatticeBuilder {
         return lattice
     }
 
-    /// 第 1 候補の語の並びで文節に分ける．語の読みの長さの合計が読みと合わなければ nil
+    /// 語の並びで文節に分ける．区切りは Zenzai を使わない変換の語の並びから決め(Zenzai が書き換えた候補は語の区切りを持たないことがある)，
+    /// 文節ごとに見せる文字は，ライブ変換で見えている文(sentence)と合うものを選ぶ．文節が 1 つにしかならなければ nil
     private func clauseSegments(of reading: String, sentence: Candidate?) -> [SegmentLattice.Segment]? {
-        guard let sentence else { return nil }
-        let clauses = ClauseSplitter.clauses(of: sentence.words)
-        guard clauses.count > 1, clauses.reduce(0, { $0 + $1.readingCount }) == reading.count,
-            clauses.map(\.text).joined() == sentence.text else { return nil }
+        let fromSentence = sentence.map { ClauseSplitter.clauses(of: $0.words) } ?? []
+        let clauses: [ClauseSplitter.Clause]
+        if fromSentence.count > 1, fromSentence.reduce(0, { $0 + $1.readingCount }) == reading.count,
+            fromSentence.map(\.text).joined() == sentence?.text {
+            clauses = fromSentence
+        } else {
+            let lengths = ClauseSplitter.clauses(of: converter.segmentationWords(for: reading))
+            guard lengths.count > 1, lengths.reduce(0, { $0 + $1.readingCount }) == reading.count else { return nil }
+            clauses = align(lengths.map(\.readingCount), reading: reading, sentence: sentence?.text ?? reading)
+        }
         var position = 0
         return clauses.map { clause in
             let rest = String(reading.dropFirst(position))
             defer { position += clause.readingCount }
-            return makeSegment(start: position, length: clause.readingCount, rest: rest, preferred: clause.text)
+            return makeSegment(start: position, length: clause.readingCount, rest: rest, preferred: clause.text.isEmpty ? nil : clause.text)
         }
+    }
+
+    /// 読みの長さの並びに，文(sentence)の文字を先頭から割り当てる．
+    /// 各文節の候補のうち文の続きと一致するもの，または文の続きがその読みのかなそのものなら，それを見せる文字にする．
+    /// 合うものが無くなったら，そこから後ろは文節ごとの第 1 候補にする(text を空にする)
+    private func align(_ lengths: [Int], reading: String, sentence: String) -> [ClauseSplitter.Clause] {
+        var rest = Substring(sentence)
+        var position = 0
+        var aligned = true
+        return lengths.map { length in
+            let slice = String(reading.dropFirst(position).prefix(length))
+            position += length
+            guard aligned else { return ClauseSplitter.Clause(text: "", readingCount: length) }
+            let options = converter.candidates(for: slice).filter { $0.readingCount == length }.map(\.text) + [slice, KanaWidth.katakana(from: slice)]
+            // 長いものから試す(「天気ですね」と「天気」のように前の部分が重なるとき)
+            if let match = options.sorted(by: { $0.count > $1.count }).first(where: { rest.hasPrefix($0) }) {
+                rest = rest.dropFirst(match.count)
+                return ClauseSplitter.Clause(text: match, readingCount: length)
+            }
+            aligned = false
+            return ClauseSplitter.Clause(text: "", readingCount: length)
+        }
+    }
+
+    /// 打ち間違いを直したとき，直した部分を含む文節の 2 番目に，打ったままの読みの候補を入れる．
+    /// 打ち間違いと決めつけず，分岐図の中で直した文と打ったままの文のどちらも選べるようにするため．
+    /// 直した部分が複数の文節にまたがるときは，それらを 1 つの文節にまとめてから入れる
+    func addingTyped(_ lattice: SegmentLattice, typedReading: String, reading: String) -> SegmentLattice {
+        let typed = Array(typedReading), corrected = Array(reading)
+        let prefix = zip(typed, corrected).prefix { $0 == $1 }.count
+        let suffix = zip(typed.reversed(), corrected.reversed()).prefix { $0 == $1 }.count
+        let common = min(suffix, min(typed.count, corrected.count) - prefix)
+        let changedEnd = max(corrected.count - common, prefix + 1)
+        guard let first = lattice.segments.firstIndex(where: { $0.readingStart + $0.readingLength > prefix }),
+            let last = lattice.segments.lastIndex(where: { $0.readingStart < changedEnd }) else { return lattice }
+        var result = lattice
+        if last > first {
+            let end = lattice.segments[last].readingStart + lattice.segments[last].readingLength
+            result = resize(result, segmentAt: first, to: end - lattice.segments[first].readingStart, reading: reading)
+        }
+        var segment = result.segments[first]
+        let start = segment.readingStart, length = segment.readingLength
+        // 文節の読みの，直した部分を打ったままの読みに置き換える
+        let typedEnd = start + length + typed.count - corrected.count
+        guard start <= prefix, typedEnd > start, typedEnd <= typed.count else { return lattice }
+        let typedSlice = String(typed[start..<typedEnd])
+        var additions = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count }.prefix(2)
+            .map { Candidate(text: $0.text, readingCount: length, origin: .asTyped) }
+        additions.append(Candidate(text: typedSlice, readingCount: length, origin: .asTyped))
+        for (offset, candidate) in additions.enumerated() where !segment.candidates.contains(where: { $0.text == candidate.text }) {
+            segment.candidates.insert(candidate, at: min(1 + offset, segment.candidates.count))
+        }
+        segment.isConfident = false
+        result.segments[first] = segment
+        result.focusedIndex = first
+        return result
     }
 
     /// index の文節の長さを length に変え，それより後ろを分け直す(Shift+←→)．

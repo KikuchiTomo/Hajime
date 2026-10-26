@@ -120,16 +120,20 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.makeMenu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(openSettings(_:))))
+        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
     }
 
-    // 入力メニューの項目の動作．InputMethodKit はこのコントローラにだけ送る(InputMenuBuilder)
+    // 入力メニューの項目の動作．InputMethodKit はこのコントローラにだけ送る(InputMenuBuilder)．
+    // sender は項目そのものではなく，項目と入力先を入れた辞書が来る
 
-    @MainActor @objc private func toggleLiveConversion(_ sender: Any?) {
+    @MainActor @objc func toggleLiveConversion(_ sender: Any) {
         menuBuilder.handleToggleLiveConversion()
     }
 
-    @MainActor @objc private func openSettings(_ sender: Any?) {
+    /// 設定の画面を開く．InputMethodKit が入力メソッドの設定を開くときに呼ぶメソッドなので，
+    /// 入力メニューの「設定を開く…」もこれに送る
+    @MainActor
+    override func showPreferences(_ sender: Any!) {
         menuBuilder.handleOpenSettings()
     }
 }

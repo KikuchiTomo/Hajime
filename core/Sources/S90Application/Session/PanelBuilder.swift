@@ -6,7 +6,7 @@ enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let correctionNote = "Space 入力のままに戻す"
     static let englishInputNote = "Tab 日本語にする"
-    static let readingCorrectionNote = "打ち間違いを直しました　Esc 打ったままに戻す"
+    static let readingCorrectionNote = "直しました　Esc で打ったままに戻す"
 
     /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文
     static func readingCorrectedNote(typed: String) -> String { "直しました　Esc で「\(typed)」に戻す" }

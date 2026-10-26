@@ -25,17 +25,27 @@ final class InputMenuBuilder {
         self.openSettings = openSettings
     }
 
-    func makeMenu(actions: Actions) -> NSMenu {
-        let menu = NSMenu()
-        let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
-        live.state = settings.current.liveConversion ? .on : .off
-        menu.addItem(live)
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
-        return menu
+    /// 入力メニュー．InputMethodKit は打鍵のたびに menu を求めるので，一度だけ作って使い回し，チェックの印だけ合わせる
+    /// (作り直すと，選んだ項目の動作が届かないことがある．azooKey-Desktop・Squirrel も使い回している)
+    private var cachedMenu: NSMenu?
+    private var liveConversionItem: NSMenuItem?
+
+    func menu(actions: Actions) -> NSMenu {
+        if cachedMenu == nil {
+            let menu = NSMenu()
+            let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
+            menu.addItem(live)
+            menu.addItem(.separator())
+            menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
+            cachedMenu = menu
+            liveConversionItem = live
+        }
+        liveConversionItem?.state = settings.current.liveConversion ? .on : .off
+        return cachedMenu!
     }
 
     func handleToggleLiveConversion() {
+        logger.notice("入力メニュー: ライブ変換を切り替えます")
         do {
             try settings.update { $0.liveConversion.toggle() }
         } catch {
@@ -44,6 +54,7 @@ final class InputMenuBuilder {
     }
 
     func handleOpenSettings() {
+        logger.notice("入力メニュー: 設定の画面を開きます")
         openSettings()
     }
 }

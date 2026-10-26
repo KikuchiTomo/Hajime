@@ -40,12 +40,15 @@ public struct Candidate: Sendable, Equatable {
         public var startsWithParticle: Bool
         /// 助詞で終わる語か(「があれば」)
         public var endsWithParticle: Bool
+        /// 名詞などの自立語で始まる語か(ひらがなで書く「ところ」「こと」も含む)
+        public var startsWithNoun: Bool
 
-        public init(text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false) {
+        public init(text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false, startsWithNoun: Bool = false) {
             self.text = text
             self.readingCount = readingCount
             self.startsWithParticle = startsWithParticle
             self.endsWithParticle = endsWithParticle
+            self.startsWithNoun = startsWithNoun
         }
     }
 

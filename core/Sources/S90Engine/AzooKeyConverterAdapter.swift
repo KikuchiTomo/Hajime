@@ -136,6 +136,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private let sessionID: KanaKanjiConverter.ConversionSessionID
     private let scoringSessionID: KanaKanjiConverter.ConversionSessionID
     private var plausibilityCache: [String: Double] = [:]
+    private var segmentationCache: [String: [S90Domain.Candidate.Word]] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
@@ -188,6 +189,37 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         return score
     }
 
+    func segmentationWords(for reading: String) -> [S90Domain.Candidate.Word] {
+        guard !reading.isEmpty else { return [] }
+        if let cached = segmentationCache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        // 語の区切りだけを使うので，Zenzai・絵文字・特別な候補・打ち間違いの補正を使わない(plausibility と同じ軽い変換)
+        var options = engine.options(leftContext: nil, usesZenzai: false, candidateCount: 1)
+        options.textReplacer = .empty
+        options.specialCandidateProviders = []
+        options.typoCorrectionMode = .disabled
+        options.learningType = .nothing
+        let data = engine.withSession(scoringSessionID) { converter -> [DicdataElement]? in
+            converter.stopComposition()
+            return converter.requestCandidates(composing, options: options).mainResults
+                .first { Self.readingCount($0.composingCount, readingLength: reading.count) == reading.count }?.data
+        }
+        let words = Self.words(of: (data ?? nil) ?? [])
+        segmentationCache[reading] = words
+        return words
+    }
+
+    /// 語の品詞の ID から，文節に分けるための印を付ける．名詞の ID は azooKey の CIDData(一般名詞 1285〜数 1295)の並びの範囲
+    private static func words(of data: [DicdataElement]) -> [S90Domain.Candidate.Word] {
+        data.map {
+            .init(text: $0.word, readingCount: $0.ruby.count, startsWithParticle: CIDData.isJoshi(cid: $0.lcid),
+                  endsWithParticle: CIDData.isJoshi(cid: $0.rcid), startsWithNoun: nounIDs.contains($0.lcid))
+        }
+    }
+
+    private static let nounIDs = 1280...1316
+
     func typoCorrections(forKeys keys: String) -> [ReadingCorrection] {
         guard engine.usesZenzai, !keys.isEmpty else { return [] }
         var composing = ComposingText()
@@ -228,6 +260,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         _ = engine.withSession(sessionID) { $0.stopComposition() }
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
         plausibilityCache = [:]
+        segmentationCache = [:]
         engineCandidates = [:]
         cache = [:]
     }
@@ -274,9 +307,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
             origin: .engine(id: id),
             score: Double(candidate.value),
             trailingWord: candidate.data.last.map { .init(readingCount: $0.ruby.count, textCount: $0.word.count) },
-            words: candidate.data.map {
-                .init(text: $0.word, readingCount: $0.ruby.count, startsWithParticle: CIDData.isJoshi(cid: $0.lcid), endsWithParticle: CIDData.isJoshi(cid: $0.rcid))
-            }
+            words: Self.words(of: candidate.data)
         )
     }
 

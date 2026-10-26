@@ -10,6 +10,7 @@ import SwiftUI
 final class SettingsWindowController {
     private let model: SettingsModel
     private var window: NSWindow?
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
     init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, resetLearning: @escaping () -> Void) {
         model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
@@ -30,6 +31,9 @@ final class SettingsWindowController {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        // 前に出したら，ふつうの層に戻す(ほかのアプリに移ったあとも最前面に残らないように)
+        DispatchQueue.main.async { window.level = .normal }
+        logger.notice("設定の画面: visible=\(window.isVisible, privacy: .public) key=\(window.isKeyWindow, privacy: .public)")
     }
 
     private func makeWindow() -> NSWindow {
