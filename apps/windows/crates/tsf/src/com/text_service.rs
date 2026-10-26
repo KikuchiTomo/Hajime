@@ -209,7 +209,8 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             let Ok(context) = pic.ok() else {
                 return Ok(false.into());
             };
-            self.apply_late(context);
+            // 前のキーの返事が遅れていたら，少し待って送った順に反映してから，このキーを送る
+            self.apply_late(context, RESPONSE_TIMEOUT);
             let field = self.field_context(context);
             let (engine, session) = {
                 let inner = self.inner.borrow();
@@ -223,6 +224,10 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
                 input,
                 context: field,
             });
+            if !self.inner.borrow().late.is_empty() {
+                // 前のキーの返事がまだ届いていない．このキーの返事を先に反映すると順が入れ替わるので，前の返事のあとに反映する
+                return Ok(self.defer(pending).into());
+            }
             match pending.outcome(RESPONSE_TIMEOUT) {
                 Outcome::Reply(body) => Ok(self.apply_response(context, body).into()),
                 Outcome::TimedOut => {
@@ -265,7 +270,10 @@ impl TextService_Impl {
         if self.inner.borrow().state.is_none() && self.inner.borrow().timer == 0 {
             self.schedule_timer(Some(0));
         }
-        filter::consumes(self.inner.borrow().state.as_ref(), &input).then_some(input)
+        // 返事が遅れているあいだは，入力の状態(組み立て中か)が古いので，キーをすべてエンジンに送って順を保つ
+        // (古い状態で決めると，組み立て中の Enter をアプリに渡してしまう)
+        let late = !self.inner.borrow().late.is_empty();
+        (late || filter::consumes(self.inner.borrow().state.as_ref(), &input)).then_some(input)
     }
 
     /// 間に合わなかった返事をあとで反映するために残す．遅れが長く続いた・溜まりすぎたときは，
@@ -383,17 +391,21 @@ impl TextService_Impl {
         }
     }
 
-    fn apply_late(&self, context: &ITfContext) {
+    /// 遅れた返事を送った順に反映する．まだ届いていない返事があれば，それとそのあとの返事は残す(順を入れ替えない)．
+    /// 先頭から wait の時間まで待つ(Duration::ZERO なら待たない)
+    fn apply_late(&self, context: &ITfContext, wait: Duration) {
         let late = std::mem::take(&mut self.inner.borrow_mut().late);
-        let mut waiting = Vec::new();
-        for pending in late {
-            match pending.try_take() {
-                Ok(Some(body)) => {
-                    self.apply_response(context, body);
-                }
-                Ok(None) => {}
-                Err(pending) => waiting.push(pending),
+        let deadline = Instant::now() + wait;
+        let (ready, waiting) = crate::late::drain_in_order(late, |pending| {
+            match pending.outcome(deadline.saturating_duration_since(Instant::now())) {
+                Outcome::Reply(body) => crate::late::Poll::Ready(body),
+                // エンジンとの接続が切れた返事は捨てる(つなぎ直しは別に行う)
+                Outcome::Unavailable => crate::late::Poll::Gone,
+                Outcome::TimedOut => crate::late::Poll::Waiting,
             }
+        });
+        for body in ready {
+            self.apply_response(context, body);
         }
         let mut inner = self.inner.borrow_mut();
         if waiting.is_empty() {
@@ -588,7 +600,7 @@ impl TextService_Impl {
         let Some((context, engine, session)) = self.focused_context() else {
             return;
         };
-        self.apply_late(&context);
+        self.apply_late(&context, Duration::ZERO);
         let stalled = self
             .inner
             .borrow()

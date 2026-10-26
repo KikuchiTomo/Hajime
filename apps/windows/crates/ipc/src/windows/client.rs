@@ -5,7 +5,7 @@ use crate::{Request, RequestBody, Response, ResponseBody, PROTOCOL_VERSION};
 use std::fs::{File, OpenOptions};
 use std::os::windows::fs::OpenOptionsExt;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, SyncSender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, SyncSender};
 use std::time::Duration;
 
 const SECURITY_IDENTIFICATION: u32 = 0x0001_0000;
@@ -43,14 +43,6 @@ impl Pending {
             Ok(response) => Outcome::Reply(response.body),
             Err(RecvTimeoutError::Timeout) => Outcome::TimedOut,
             Err(RecvTimeoutError::Disconnected) => Outcome::Unavailable,
-        }
-    }
-
-    pub fn try_take(self) -> Result<Option<ResponseBody>, Self> {
-        match self.receiver.try_recv() {
-            Ok(response) => Ok(Some(response.body)),
-            Err(TryRecvError::Disconnected) => Ok(None),
-            Err(TryRecvError::Empty) => Err(self),
         }
     }
 }
