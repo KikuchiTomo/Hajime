@@ -1,3 +1,4 @@
+#if canImport(CryptoKit)
 import Foundation
 @testable import S90Domain
 @testable import S90Persistence
@@ -96,3 +97,4 @@ struct DictionaryFileSyncTests {
         #expect(!DictionaryFileSync.isIndexFileName("\(id)-\(String(repeating: "G", count: 64)).tsv"))
     }
 }
+#endif

@@ -1,13 +1,7 @@
 import S90Application
 import S90Domain
 
-// 通信の型(protocol/ から生成した Wire*)と core の型の置き換え．判断はしない．
-// どの ClientAction をどのプロセスが受け持つかだけをここで決める(docs/dev/ARCHITECTURE.md の「Windows のプロセス」)
-
-// MARK: - DLL から来たもの
-
 extension KeyEvent {
-    /// DLL から来たキー．1 文字にならない文字のキーは nil(入力先のアプリにそのまま渡す)
     public init?(_ wire: WireKeyInput) {
         let key: Key
         switch wire.key {
@@ -45,12 +39,10 @@ extension KeyEvent {
 }
 
 extension InputContext {
-    /// DLL から来た入力先の情報．アプリの種類は，macOS と同じく設定のアプリごとの決まりで選ぶ
     public init(_ wire: WireFieldContext, settings: Settings) {
         self.init(
             profile: settings.profile(forApplication: wire.applicationId),
             isSecure: wire.isSecure,
-            // パスワード欄では前の文字列も使わない(DLL でも読まないが，念のためここでも捨てる)
             precedingText: wire.isSecure ? nil : wire.precedingText,
             applicationID: wire.applicationId
         )
@@ -75,10 +67,7 @@ extension WireInputMode {
     }
 }
 
-// MARK: - DLL に返すもの
-
 extension WireKeyChord {
-    /// キー設定の表の 1 行のキー．Windows に無い Cmd を含むものは nil
     public init?(_ stroke: KeyStroke) {
         guard !stroke.command else { return nil }
         let key: WireKey
@@ -110,8 +99,6 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    /// DLL が持つ状態の写し．組み立てていないときに受け取るキーは，キー設定の表で今の状態に割り当てたもの．
-    /// 表で決まらない ¥ キーは，InputSession がどちらのモードでも受け取るので足す
     public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
@@ -136,8 +123,6 @@ extension WireTextStyle {
         }
     }
 }
-
-// MARK: - 候補ウィンドウに送るもの
 
 extension WireCandidateList {
     public init(_ panel: CandidatePanel) {
@@ -183,9 +168,6 @@ extension WireBranchMap {
     }
 }
 
-// MARK: - 振り分け
-
-/// エンジンのプロセスが自分で行う操作(設定の保存・設定の画面)
 public enum HostAction: Sendable, Equatable {
     case selectInputStyle(InputStyle)
     case openSettings
@@ -193,8 +175,6 @@ public enum HostAction: Sendable, Equatable {
     case showHandwriting
 }
 
-/// ClientAction を，DLL が入力欄に行う操作・候補ウィンドウへの指示・エンジンが自分で行う操作に分けたもの．
-/// それぞれの中では元の順を保つ
 public struct RoutedActions: Sendable, Equatable {
     public var edits: [WireEditOperation] = []
     public var ui: [WireUiCommand] = []
@@ -206,9 +186,6 @@ public struct RoutedActions: Sendable, Equatable {
         self.host = host
     }
 
-    /// - Parameters:
-    ///   - anchor: 候補ウィンドウを出す位置(入力位置)．分からなければ nil
-    ///   - hints: 分岐図の足元に出すキーの案内を作る
     public init(_ actions: [ClientAction], anchor: WireRect?, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] }) {
         for action in actions {
             switch action {

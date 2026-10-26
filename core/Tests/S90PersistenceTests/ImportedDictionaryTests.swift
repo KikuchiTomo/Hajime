@@ -3,13 +3,17 @@ import Foundation
 @testable import S90Persistence
 import Testing
 
+#if os(Windows)
+private let readableEncodings: [String.Encoding] = [.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .shiftJIS]
+#else
+private let readableEncodings: [String.Encoding] = [.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .shiftJIS, .japaneseEUC]
+#endif
+
 @Suite("取り込む辞書のファイル(R-16)")
 struct DictionaryFileReaderTests {
     private let tsv = "!コメント\nでんあつ\t電圧\t名詞\tコメント\nやまだ\t山田\t人名\nとうきょう\t東京\t地名\n"
 
-    @Test("タブ区切りを UTF-8・BOM 付き UTF-8・UTF-16(BOM あり/なし)・Shift_JIS・EUC-JP で読む", arguments: [
-        String.Encoding.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .shiftJIS, .japaneseEUC,
-    ])
+    @Test("タブ区切りを UTF-8・BOM 付き UTF-8・UTF-16(BOM あり/なし)・Shift_JIS・EUC-JP で読む", arguments: readableEncodings)
     func encodings(encoding: String.Encoding) throws {
         let data = try #require(tsv.data(using: encoding))
         let words = try DictionaryFileReader.parse(data)

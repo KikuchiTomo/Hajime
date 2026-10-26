@@ -1,3 +1,4 @@
+#if canImport(CryptoKit)
 import CryptoKit
 import Foundation
 import S90Domain
@@ -150,3 +151,4 @@ public struct DictionaryFileSync: Sendable {
     /// 写した中身の SHA-256 が一覧の revision と合わない
     public struct RevisionMismatch: Error, Equatable {}
 }
+#endif

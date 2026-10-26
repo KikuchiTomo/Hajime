@@ -25,8 +25,10 @@ struct FileSettingsStoreTests {
         try store.update { $0.yenKey = .alwaysYen }
         #expect(FileSettingsStore(fileURL: url).current.liveConversion == false)
         #expect(FileSettingsStore(fileURL: url).current.yenKey == .alwaysYen)
+        #if !os(Windows)
         let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
         #expect(permissions?.intValue == 0o600)
+        #endif
     }
 
     @Test("壊れたファイルなら既定値で始める")
@@ -115,6 +117,7 @@ struct SettingsRobustnessTests {
     }
 }
 
+#if !os(Windows)
 @Suite("FIFO を読もうとして止まらない")
 @MainActor
 struct ProtectedFileFIFOTests {
@@ -131,3 +134,4 @@ struct ProtectedFileFIFOTests {
         #expect(throws: (any Error).self) { try UserDictionaryFile.read(from: dictionary) }
     }
 }
+#endif

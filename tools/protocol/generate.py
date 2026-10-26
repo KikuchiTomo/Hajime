@@ -1,13 +1,3 @@
-"""protocol/schema.json から，Swift と Rust のメッセージの型を作る．
-
-使い方:
-  python3 -I tools/protocol/generate.py          作り直して書き込む
-  python3 -I tools/protocol/generate.py --check  書き込まずに，生成物が定義と合っているかだけを確かめる(make check)
-
-形式は docs/dev/adr/0010-ipc-message-format.md．型の書き方は protocol/README.md．
-生成物は手で直さない．直すときは schema.json かこのスクリプトを変えて作り直す．
-"""
-
 from __future__ import annotations
 
 import json
@@ -20,7 +10,6 @@ SCHEMA = ROOT / "protocol" / "schema.json"
 SWIFT_OUT = ROOT / "core" / "Sources" / "S90IPC" / "Generated" / "WireMessages.swift"
 RUST_OUT = ROOT / "apps" / "windows" / "crates" / "ipc" / "src" / "generated.rs"
 
-# Swift では core の型(KeyEvent など)と名前がぶつからないよう，前に Wire を付ける
 SWIFT_PREFIX = "Wire"
 
 PRIMITIVES_SWIFT = {
@@ -40,22 +29,11 @@ PRIMITIVES_RUST = {
     "f64": "f64",
 }
 
-HEADER_SWIFT = """// このファイルは tools/protocol/generate.py が protocol/schema.json から作る．手で直さない．
-// swiftformat:disable all
-"""
-HEADER_RUST = """// このファイルは tools/protocol/generate.py が protocol/schema.json から作る．手で直さない．
-"""
-
-
 class SchemaError(Exception):
     pass
 
 
-# MARK: - 型の読み方
-
-
 def parse_type(text: str) -> tuple[str, bool, bool, bool]:
-    """「[T?]?」の形を (基本の型, 列か, 列の要素が省けるか, 値が省けるか) に分ける"""
     optional = text.endswith("?")
     if optional:
         text = text[:-1]
@@ -104,12 +82,8 @@ def type_kinds(schema: dict) -> dict[str, str]:
 
 
 def has_text(type_text: str, schema: dict) -> bool:
-    """値に文字列を含む型か(含むものはログに出すときに伏せる)"""
     base = parse_type(type_text)[0]
     return base == "string"
-
-
-# MARK: - Swift
 
 
 def swift_type(text: str) -> str:
@@ -121,7 +95,7 @@ def swift_type(text: str) -> str:
 
 
 def swift_doc(doc: str | None, indent: str) -> list[str]:
-    return [f"{indent}/// {doc}"] if doc else []
+    return []
 
 
 def swift_struct(t: dict) -> list[str]:
@@ -222,7 +196,6 @@ def swift_union(t: dict) -> list[str]:
 
 
 def swift_redaction(t: dict) -> list[str]:
-    """ログに出たときに中身が漏れないよう，型と種類の名前だけを出す(docs/dev/SECURITY-MODEL.md)"""
     name = SWIFT_PREFIX + t["name"]
     lines = [f"extension {name}: CustomStringConvertible, CustomDebugStringConvertible {{"]
     if t["kind"] == "union":
@@ -242,11 +215,9 @@ def swift_redaction(t: dict) -> list[str]:
 
 
 def generate_swift(schema: dict) -> str:
-    out = [HEADER_SWIFT.rstrip("\n"), ""]
-    out.append("/// 通信の形式のバージョン．DLL とエンジンのバージョンが違えば接続を断る")
+    out: list[str] = []
     out.append(f"public enum {SWIFT_PREFIX}Protocol {{")
     out.append(f"    public static let version: UInt32 = {schema['version']}")
-    out.append("    /// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)")
     out.append(f"    public static let maximumMessageBytes = {schema['maximumMessageBytes']}")
     out.append("}")
     for t in schema["types"]:
@@ -260,9 +231,6 @@ def generate_swift(schema: dict) -> str:
         out.append("")
         out += swift_redaction(t)
     return "\n".join(out) + "\n"
-
-
-# MARK: - Rust
 
 
 def pascal(name: str) -> str:
@@ -291,7 +259,7 @@ def rust_type(text: str) -> str:
 
 
 def rust_doc(doc: str | None, indent: str) -> list[str]:
-    return [f"{indent}/// {doc}"] if doc else []
+    return []
 
 
 def rust_field_lines(fields: list[dict], indent: str, public: bool) -> list[str]:
@@ -384,16 +352,13 @@ def rust_union(t: dict, schema: dict) -> list[str]:
 
 
 def generate_rust(schema: dict) -> str:
-    out = [HEADER_RUST.rstrip("\n"), ""]
+    out: list[str] = []
     out.append("use serde::{Deserialize, Serialize};")
     out.append("use std::fmt;")
     out.append("")
-    out.append("/// 通信の形式のバージョン．DLL とエンジンのバージョンが違えば接続を断る")
     out.append(f"pub const PROTOCOL_VERSION: u32 = {schema['version']};")
-    out.append("/// 1 つのメッセージの大きさの上限(バイト)．超えたら接続を切る(docs/dev/SECURITY-MODEL.md)")
     out.append(f"pub const MAXIMUM_MESSAGE_BYTES: usize = {schema['maximumMessageBytes']};")
     out.append("")
-    out.append("/// 入力の中身を持つ値をログに出すときに，中身の代わりに出す")
     out.append('const REDACTED: &str = "<伏せた>";')
     for t in schema["types"]:
         out.append("")
@@ -404,9 +369,6 @@ def generate_rust(schema: dict) -> str:
         else:
             out += rust_union(t, schema)
     return "\n".join(out) + "\n"
-
-
-# MARK: - 入口
 
 
 def main(argv: list[str]) -> int:
