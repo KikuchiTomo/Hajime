@@ -10,6 +10,11 @@ public struct KeymapEntry: Sendable, Hashable, Codable {
         self.command = command
     }
 
+    /// 修飾キーの無い文字のキーを，文字を打つ状態に置いた行か(その文字を打てなくなる)
+    public var blocksTyping: Bool {
+        stroke.isPlainCharacter && [.anywhere, .idle, .composing].contains(state)
+    }
+
     private enum CodingKeys: String, CodingKey { case state, key, command }
 
     public init(from decoder: any Decoder) throws {
