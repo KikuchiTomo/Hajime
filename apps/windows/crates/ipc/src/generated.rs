@@ -522,6 +522,12 @@ pub struct CandidateEntry {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotation: Option<String>,
+    #[serde(rename = "correctedStart")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corrected_start: Option<u32>,
+    #[serde(rename = "correctedLength")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corrected_length: Option<u32>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -529,6 +535,8 @@ impl fmt::Debug for CandidateEntry {
         f.debug_struct("CandidateEntry")
             .field("text", &REDACTED)
             .field("annotation", &REDACTED)
+            .field("correctedStart", &self.corrected_start)
+            .field("correctedLength", &self.corrected_length)
             .finish()
     }
 }
@@ -589,6 +597,9 @@ pub struct BranchColumn {
     pub is_uncertain: bool,
     #[serde(rename = "isDecided")]
     pub is_decided: bool,
+    #[serde(rename = "isCorrected")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_corrected: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -618,6 +629,7 @@ impl fmt::Debug for BranchColumn {
             .field("isFocused", &self.is_focused)
             .field("isUncertain", &self.is_uncertain)
             .field("isDecided", &self.is_decided)
+            .field("isCorrected", &self.is_corrected)
             .field("preview", &REDACTED)
             .field("shorter", &REDACTED)
             .field("longer", &REDACTED)

@@ -23,6 +23,35 @@ enum GlassDrawing {
         NSBezierPath(roundedRect: rect, xRadius: Glass.selectionRadius, yRadius: Glass.selectionRadius).fill()
     }
 
+    /// 下線．dotted なら点線(確信の低い文節と補正の印)．glass などの角丸のテーマは丸い点と丸い端の線，
+    /// platinum と desk は 1 ドットの線をデバイスのピクセルにそろえて描く．上下が反転した(isFlipped の)ビューで使う
+    static func drawUnderline(from minX: CGFloat, to maxX: CGFloat, y: CGFloat, color: NSColor, dotted: Bool, theme: ResolvedTheme) {
+        typealias Branch = DesignTokens.Size.Branch
+        if theme.isRounded {
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: minX, y: y))
+            path.line(to: NSPoint(x: maxX, y: y))
+            path.lineWidth = Glass.lineWidthSelected
+            path.lineCapStyle = .round
+            if dotted { path.setLineDash([0, Glass.lineWidthSelected * 2.5], count: 2, phase: 0) }
+            color.setStroke()
+            path.stroke()
+            return
+        }
+        color.setFill()
+        let rect = NSRect(x: minX, y: y, width: maxX - minX, height: Branch.lineWidth)
+        guard dotted else {
+            rect.fill()
+            return
+        }
+        let step = Branch.lineWidthSelected * 2
+        var x = rect.minX
+        while x < rect.maxX {
+            NSRect(x: x, y: rect.minY, width: min(Branch.lineWidthSelected, rect.maxX - x), height: rect.height).fill()
+            x += step
+        }
+    }
+
     /// 番号などを入れる小さな丸．selected は選んでいる行の上(アクセント色の地)に描くとき．
     /// 大きさを変えるときは size と fontSize を渡す(文節を区切る位置の番号は候補の番号より小さい)
     static func drawBadge(_ label: String, center: NSPoint, theme: ResolvedTheme, selected: Bool, opacity: CGFloat,

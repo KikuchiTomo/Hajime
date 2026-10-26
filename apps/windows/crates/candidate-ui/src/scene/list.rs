@@ -8,7 +8,7 @@ use crate::strings;
 use crate::theme::Font;
 use ipc::{CandidateFocus, CandidateList, KeyHint};
 use tokens::opacity;
-use tokens::size::{candidate, glass};
+use tokens::size::{branch, candidate, glass};
 
 struct Metrics {
     row_height: f32,
@@ -166,6 +166,11 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         }
         .faded(opacity);
         let number = (index + 1).to_string();
+        let text_x = if theme.is_rounded() {
+            row.x + padding / 2.0 + metrics.lead
+        } else {
+            row.x + padding + metrics.lead
+        };
         if theme.is_rounded() {
             let center = Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
             painter.badge(
@@ -176,22 +181,34 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 glass::BADGE_SIZE,
                 Font::Key,
             );
-            painter.text(
-                &entry.text,
-                Font::Candidate,
-                text_color,
-                row.x + padding / 2.0 + metrics.lead,
-                row,
-            );
+            painter.text(&entry.text, Font::Candidate, text_color, text_x, row);
         } else {
             painter.text(&number, Font::Label, muted_color, row.x + padding, row);
-            painter.text(
-                &entry.text,
-                Font::Candidate,
-                text_color,
-                row.x + padding + metrics.lead,
-                row,
-            );
+            painter.text(&entry.text, Font::Candidate, text_color, text_x, row);
+        }
+        if let (Some(start), Some(length)) = (entry.corrected_start, entry.corrected_length) {
+            // 打ち間違いを直した語句に，入力中の文字と同じ補正の点線を引く．位置は char の数で届く
+            let before: String = entry.text.chars().take(start as usize).collect();
+            let corrected: String = entry
+                .text
+                .chars()
+                .skip(start as usize)
+                .take(length as usize)
+                .collect();
+            let from = (text_x + painter.width(&before, Font::Candidate)).round();
+            let to = (from + painter.width(&corrected, Font::Candidate)).round();
+            let offset = if theme.is_rounded() {
+                glass::UNDERLINE_OFFSET
+            } else {
+                branch::UNDERLINE_OFFSET
+            };
+            let color = if selected {
+                theme.selection_text
+            } else {
+                theme.correction
+            }
+            .faded(opacity);
+            painter.underline(from, to, row.max_y() - offset, color, true);
         }
         if let Some(annotation) = entry.annotation.as_deref() {
             painter.text_right(
@@ -318,10 +335,14 @@ mod tests {
                 CandidateEntry {
                     text: "変換".into(),
                     annotation: None,
+                    corrected_start: None,
+                    corrected_length: None,
                 },
                 CandidateEntry {
                     text: "へんかん".into(),
                     annotation: Some("入力のまま".into()),
+                    corrected_start: None,
+                    corrected_length: None,
                 },
             ],
             selected_entry: selected,
@@ -347,6 +368,40 @@ mod tests {
     }
 
     #[test]
+    fn 候補の中の直した語句に補正の点線を引く() {
+        let theme = theme("automatic");
+        let mut corrected = list(None);
+        corrected.entries[0] = CandidateEntry {
+            text: "今日は良い".into(),
+            annotation: None,
+            corrected_start: Some(3),
+            corrected_length: Some(2),
+        };
+        let scene = candidate_list(&corrected, &Look::new(&theme, 15.0), &Fixed);
+        let lines: Vec<(f32, f32)> = scene
+            .draws
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Line {
+                    from,
+                    to,
+                    color,
+                    dot_pitch: Some(_),
+                    ..
+                } if *color == theme.correction => Some((from.x, to.x)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(lines.len(), 1);
+        // 「良い」の 2 文字の幅(Fixed は 1 文字 10)
+        assert_eq!(lines[0].1 - lines[0].0, 20.0);
+        assert!(candidate_list(&list(None), &Look::new(&theme, 15.0), &Fixed)
+            .draws
+            .iter()
+            .all(|draw| !matches!(draw, Draw::Line { color, dot_pitch: Some(_), .. } if *color == theme.correction)));
+    }
+
+    #[test]
     fn 高さは行の数で決まる() {
         let theme = theme("platinum");
         let look = Look::new(&theme, 15.0);
@@ -355,6 +410,8 @@ mod tests {
         longer.entries.push(CandidateEntry {
             text: "返還".into(),
             annotation: None,
+            corrected_start: None,
+            corrected_length: None,
         });
         let three = candidate_list(&longer, &look, &Fixed);
         assert_eq!(three.height - two.height, (candidate::ROW_HEIGHT).round());
@@ -390,10 +447,14 @@ mod tests {
         three.entries.push(CandidateEntry {
             text: "返還".into(),
             annotation: None,
+            corrected_start: None,
+            corrected_length: None,
         });
         three.entries.push(CandidateEntry {
             text: "偏官".into(),
             annotation: None,
+            corrected_start: None,
+            corrected_length: None,
         });
         let texts = texts(&candidate_list(&three, &look, &Fixed));
         let alpha = |wanted: &str| {

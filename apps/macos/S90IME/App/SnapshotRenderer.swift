@@ -38,6 +38,8 @@ enum SnapshotRenderer {
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
+                render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
+                render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
                 render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
             }
         }
@@ -179,6 +181,40 @@ enum SnapshotRenderer {
             entries: [.init(text: "python", annotation: nil), .init(text: "pyてょn", annotation: "入力のまま"), .init(text: "Python", annotation: nil)],
             selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: "Space 入力のままに戻す"
         )
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 日本語の打ち間違いを直した一覧．候補の中の直した語句に補正の点線を引く
+    private static func readingCorrectionView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = CandidatePanel(
+            variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
+            selectedVariant: nil,
+            entries: [.init(text: "今日の天気は良いですね", annotation: nil, corrected: 6..<8), .init(text: "今日の天気はいいですね", annotation: nil, corrected: 6..<8),
+                      .init(text: "今日の天気は好いですね", annotation: nil, corrected: 6..<8)],
+            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: "直しました　Esc で打ったままに戻す"
+        )
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 打ち間違いを直した文節(良いですね)に「修正」と添えた分岐図．注目しているのは別の文節
+    private static func correctedLatticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var corrected = LatticePanel.Column(text: "良いですね", isFocused: false, isUncertain: true, preview: "様ですね")
+        corrected.isCorrected = true
+        let panel = LatticePanel(columns: [
+            .init(text: "今日の", isFocused: false, isUncertain: false),
+            .init(text: "天気は", alternatives: ["天気は", "転記は"], selectedAlternative: 0, isFocused: true, isUncertain: true),
+            corrected,
+        ], position: 1, total: 2, note: "直しました　Esc で打ったままに戻す")
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

@@ -94,6 +94,32 @@ struct ReadingCorrectionTests {
         #expect(corrected || note?.hasPrefix("もしかして") == true, "\(keys)")
     }
 
+    @Test("直した語句だけに補正の印を付ける(入力中の文字・分岐図)", arguments: [
+        ("kyounotenkihayoudesune", "良い", "良いですね"),
+    ])
+    func marksCorrectedWord(keys: String, word: String, clause: String) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
+        let model = try ZenzaiModel.verified(at: URL(fileURLWithPath: path))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: model)
+        let service = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .automatic
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings(settings), typoService: service)
+        _ = live(session, keys)
+        var actions = session.settle(context: InputContext())
+        if let request = session.correctionRequest {
+            session.provideCorrections(await service.corrections(forKeys: request.keys, leftContext: request.leftContext))
+        }
+        actions += session.review(context: InputContext())
+        let text = try #require(actions.compactMap { if case .setMarkedText(let text) = $0 { text } else { nil } }.last)
+        let corrected = text.segments.filter { $0.style == .correction }.map(\.text)
+        #expect(corrected == [word], "\(keys): \(text.segments.map { "\($0.text):\($0.style)" })")
+        let lattice = session.handle(KeyEvent(.space), context: InputContext()).actions
+            .compactMap { if case .showLattice(let panel) = $0 { panel } else { nil } }.last
+        #expect(lattice?.columns.filter(\.isCorrected).map(\.text) == [clause])
+    }
+
     @Test("綴りを直した英単語は，打鍵が止まって日本語の見直しをしても英単語のまま(日本語として直せないとき)", arguments: [
         ("pthon", "pthon", "python"), ("pthonga", "pthon", "pythonが"), ("pyhtonwotukau", "pyhton", "pythonを使う"),
     ])

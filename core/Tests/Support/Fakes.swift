@@ -28,13 +28,15 @@ public final class FakeConverter: KanaKanjiConverting {
 
     /// 候補の文字列ごとの末尾の語．ライブ変換で打っている途中の語をかなのまま見せるかの確認に使う
     public var trailingWords: [String: Candidate.TrailingWord] = [:]
+    /// 候補の文字列ごとの語の並び(本物のエンジンの候補が持つもの)．直した語句の位置を求めるのに使う
+    public var candidateWords: [String: [Candidate.Word]] = [:]
 
     public func candidates(for reading: String) -> [Candidate] {
         // 本物と同じく，空の読みには空の配列を返す
         guard !reading.isEmpty else { return [] }
         return (table[reading] ?? []).enumerated().map { index, entry in
             Candidate(text: entry.text, readingCount: entry.readingCount ?? reading.count, origin: .engine(id: index), score: scores[reading] ?? 0,
-                      trailingWord: trailingWords[entry.text])
+                      trailingWord: trailingWords[entry.text], words: candidateWords[entry.text] ?? [])
         }
     }
 

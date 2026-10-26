@@ -1045,16 +1045,21 @@ public final class InputSession {
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
             let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
             var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
-                                               perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting))
+                                               perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
+                                               corrected: correctedRange(of: \.conversionReading))
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if let pendingNote { panel.note = pendingNote }
             return [.setMarkedText(marked), .showCandidates(panel)]
         case .lattice(let lattice):
+            // 打ち間違いを直した文節は，注目していなければ点線の下線にする
+            let corrected = correctedRange(of: \.conversionReading)
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
-                .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
+                let style: MarkedText.Style = index == lattice.focusedIndex ? .focused
+                    : PanelBuilder.isCorrected(segment, changed: corrected) ? .correction : .converted
+                return .init(segment.selected.text, style: style)
             })
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
-                                                  showsVariants: settings.current.showsVariantRow)
+                                                  showsVariants: settings.current.showsVariantRow, corrected: corrected)
             let preview = LatticeBuilder(converter: converter).resizePreview(lattice, reading: composition.conversionReading)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
@@ -1090,9 +1095,21 @@ public final class InputSession {
             return [.showNote(PanelBuilder.readingCorrectedNote(typed: shown(typed.conversionReading), key: keyLabel(.cancel, in: .composing)))]
         }
         if let suggestion = readingCorrector.suggestion {
-            return [.showNote(PanelBuilder.readingSuggestionNote(shown(suggestion.conversionReading), key: keyLabel(.acceptSuggestion, in: .composing)))]
+            let phrase = correctedPhrase(reading: suggestion.conversionReading, other: composition.conversionReading) ?? shown(suggestion.conversionReading)
+            return [.showNote(PanelBuilder.readingSuggestionNote(phrase, key: keyLabel(.acceptSuggestion, in: .composing)))]
         }
         return []
+    }
+
+    /// 直した読み(reading)を変換した文のうち，other と違う部分を含む文節(「もしかして」の案内に出す)．
+    /// 文全体を出すと，長い文ではどこを直す案なのかが分からないため．文節に分けられなければ nil
+    private func correctedPhrase(reading: String, other: String) -> String? {
+        guard settings.current.liveConversion, let best = bestWholeCandidate(for: reading),
+            let changed = CorrectedSpan.changedRange(from: other, to: reading) else { return nil }
+        let units = ClauseSplitter.clauses(of: best.words).map { CorrectedSpan.Unit(text: $0.text, readingCount: $0.readingCount) }
+        guard let pieces = CorrectedSpan.pieces(of: best.text, units: units, readingCount: reading.count, changed: changed),
+            let range = CorrectedSpan.textRange(of: pieces) else { return nil }
+        return String(Array(best.text)[range])
     }
 
     private func setLeftContext(_ text: String?) {
@@ -1304,6 +1321,12 @@ public final class InputSession {
             ])
         }
         guard settings.current.liveConversion, !holdsLiveConversionForCode else {
+            // 打ち間違いを直した読みは，直したかなだけを点線の下線にする
+            if let changed = correctedRange(of: \.kana) {
+                let kana = Candidate(text: composition.kana, readingCount: composition.kana.count, origin: .variant(.hiragana))
+                return MarkedText(Self.markedSegments(CorrectedSpan.pieces(of: kana, reading: composition.kana, changed: changed), otherwise: .reading)
+                    + [.init(composition.pending, style: .reading)])
+            }
             return MarkedText([.init(composition.displayReading, style: .reading)])
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
@@ -1319,14 +1342,32 @@ public final class InputSession {
             }
             return MarkedText(segments + [.init(composition.pending, style: .reading)])
         }
-        let shown = bestWholeCandidate(for: reading).map {
-            LiveConversionRule().display(of: $0, reading: reading, settled: isSettled)
+        let best = bestWholeCandidate(for: reading)
+        let shown = best.map { LiveConversionRule().display(of: $0, reading: reading, settled: isSettled) } ?? reading
+        // 打ち間違いを直した読みは，直した語句だけを点線の下線にする．どこを直したかが分かるように
+        if readingCorrector.isApplied {
+            let candidate = best ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
+            let pieces = correctedRange(of: \.kana).map {
+                CorrectedSpan.aligning(CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0), to: shown)
+            } ?? [CorrectedSpan.Piece(shown, isCorrected: true)]
+            return MarkedText(Self.markedSegments(pieces, otherwise: .converted) + [.init(composition.pending, style: .reading)])
         }
-        // 打ち間違いを直した読みは，点線の下線で直したことを見せる
         return MarkedText([
-            .init(shown ?? reading, style: readingCorrector.isApplied ? .correction : .converted),
+            .init(shown, style: .converted),
             .init(composition.pending, style: .reading),
         ])
+    }
+
+    /// 打ち間違いを直して見せている読みのうち，直した部分(読みの先頭からの文字数)．直していなければ nil．
+    /// reading は比べる読み(ライブ変換の表示は kana，変換は conversionReading)
+    private func correctedRange(of reading: KeyPath<Composition, String>) -> Range<Int>? {
+        guard readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) else { return nil }
+        return CorrectedSpan.changedRange(from: typed[keyPath: reading], to: composition[keyPath: reading])
+    }
+
+    /// 直した部分は補正の下線，そのほかは style にする
+    private static func markedSegments(_ pieces: [CorrectedSpan.Piece], otherwise style: MarkedText.Style) -> [MarkedText.Segment] {
+        pieces.map { .init($0.text, style: $0.isCorrected ? .correction : style) }
     }
 }
 
