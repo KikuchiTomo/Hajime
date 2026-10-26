@@ -6,6 +6,15 @@
 /// UIStrings.Settings
 pub mod settings {
     pub const WINDOW_TITLE: &str = "s90.tokyo IME の設定";
+    pub const IMPORT_DICTIONARY: &str = "インポート…";
+    pub const EXPORT_DICTIONARY: &str = "エクスポート…";
+    pub const EXPORT_FILE_NAME: &str = "s90-user-dictionary.txt";
+    pub const IMPORT_FAILED: &str =
+        "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません";
+    pub const EXPORT_FAILED: &str = "エクスポートできませんでした";
+    pub fn imported(count: u32) -> String {
+        format!("{count} 語を追加しました")
+    }
     pub const OK: &str = "OK";
     pub const CANCEL: &str = "キャンセル";
     pub const SAVE: &str = "保存";
@@ -170,6 +179,21 @@ pub mod more {
     pub const CUSTOM_THEMES: &str = "カスタムテーマ";
     pub const FONT: &str = "書体";
     pub const BACKUP: &str = "バックアップ";
+    pub const IMPORT_CSV: &str = "CSV を読み込む…";
+    pub const EXPORT_CSV: &str = "CSV に書き出す…";
+    pub const EXPORT_CSV_FILE_NAME: &str = "s90-exclusions.csv";
+    pub fn imported_rules(count: u32) -> String {
+        format!("{count} 件を追加しました")
+    }
+    pub const CSV_FAILED: &str = "読み込めませんでした。CSV のファイルではないか、大きすぎます";
+    pub const BACKUP_NOTE: &str = "すべての設定を JSON としてインポート・エクスポート可能です。";
+    pub const EXPORT_SETTINGS: &str = "設定を書き出す…";
+    pub const IMPORT_SETTINGS: &str = "設定を読み込む…";
+    pub const EXPORT_SETTINGS_FILE_NAME: &str = "s90-settings.json";
+    pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
+    pub const SETTINGS_IMPORT_FAILED: &str =
+        "読み込めませんでした。s90.tokyo IME の設定ファイルではないか、大きすぎます";
+    pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
     pub const ABOUT: &str = "情報";
     pub const VERSION: &str = "バージョン";
     pub const ACKNOWLEDGEMENTS: &str = "謝辞";
@@ -317,6 +341,10 @@ pub mod windows {
     pub const ON: &str = "オン";
     pub const OFF: &str = "オフ";
     pub const OPEN_SETTINGS_FILE: &str = "設定ファイルを開く";
+    /// ファイルを選ぶ窓の種類の名前(macOS は種類を名前で出さない)
+    pub const JSON_FILES: &str = "JSON ファイル";
+    pub const TEXT_FILES: &str = "テキストファイル";
+    pub const CSV_FILES: &str = "CSV ファイル";
 
     /// バージョンの表示(ADR 0008．macOS と同じ「v0.1.0 (Windows)」の形)
     pub fn version(version: &str) -> String {

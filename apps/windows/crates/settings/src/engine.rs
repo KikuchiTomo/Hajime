@@ -3,17 +3,32 @@
 //! エンジン(s90-engine-host)への頼みを，設定の読み書きの口(SettingsStore)と操作(学習の消去・統計)にする．
 //! パイプでの受け渡しは Engine の実装(app)が受け持ち，ここは要求と応答の形だけを扱う
 
+use crate::files::FileTask;
 use crate::options;
 use crate::store::{Fields, SettingsStore, StoreError};
 use crate::usage::Usage;
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, ErrorCode, KeymapReport, PreviewWord, RequestBody,
-    ResponseBody,
+    DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, KeymapReport, PreviewWord,
+    RequestBody, ResponseBody,
 };
 
 /// 要求を 1 つ送って応答を待つ口．応答が無い(つながらない・時間切れ)ときは None
 pub trait Engine {
     fn request(&self, body: RequestBody) -> Option<ResponseBody>;
+
+    /// ファイルの読み書きを頼む．読み終えるまで時間がかかるので，ふつうの要求より長く待つ
+    fn request_file(&self, body: RequestBody) -> Option<ResponseBody> {
+        self.request(body)
+    }
+}
+
+/// ファイルの読み書きの結果
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileOutcome {
+    Done,
+    /// 読み込んで足した件数
+    Imported(u32),
+    Failed(FileFailure),
 }
 
 pub struct EngineStore<E: Engine> {
@@ -40,6 +55,18 @@ impl<E: Engine> EngineStore<E> {
         match self.send(body)? {
             ResponseBody::Done => Ok(()),
             _ => Err(StoreError::Malformed),
+        }
+    }
+
+    /// ファイルを読み込む・書き出す(path は利用者が窓で選んだ場所)
+    pub fn run_file(&self, task: FileTask, path: String) -> Result<FileOutcome, StoreError> {
+        match self.engine.request_file(task.request(path)) {
+            None => Err(StoreError::Unavailable),
+            Some(ResponseBody::Done) => Ok(FileOutcome::Done),
+            Some(ResponseBody::Imported { added, .. }) => Ok(FileOutcome::Imported(added)),
+            Some(ResponseBody::FileFailed { reason }) => Ok(FileOutcome::Failed(reason)),
+            Some(ResponseBody::Error { .. }) => Err(StoreError::Rejected),
+            Some(_) => Err(StoreError::Malformed),
         }
     }
 
@@ -232,6 +259,36 @@ mod tests {
         let engine = scripted(None);
         assert_eq!(
             EngineStore::new(&engine).reset_learning(),
+            Err(StoreError::Unavailable)
+        );
+    }
+
+    #[test]
+    fn ファイルの読み込みの結果を件数か失敗の理由にする() {
+        let task = FileTask::ImportRuleList(ipc::RuleList::Romaji);
+        let engine = scripted(Some(ResponseBody::Imported {
+            added: 3,
+            skipped: 1,
+        }));
+        let store = EngineStore::new(&engine);
+        assert_eq!(
+            store.run_file(task, "C:\\r.tsv".into()),
+            Ok(FileOutcome::Imported(3))
+        );
+        assert_eq!(
+            engine.requests.borrow()[0],
+            task.request("C:\\r.tsv".into())
+        );
+        let engine = scripted(Some(ResponseBody::FileFailed {
+            reason: FileFailure::TooLarge,
+        }));
+        assert_eq!(
+            EngineStore::new(&engine).run_file(task, String::new()),
+            Ok(FileOutcome::Failed(FileFailure::TooLarge))
+        );
+        let engine = scripted(None);
+        assert_eq!(
+            EngineStore::new(&engine).run_file(FileTask::ExportSettings, String::new()),
             Err(StoreError::Unavailable)
         );
     }

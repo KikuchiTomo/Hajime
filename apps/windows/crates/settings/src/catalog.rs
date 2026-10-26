@@ -71,6 +71,8 @@ pub struct Timing {
     pub response_timeout: f64,
     /// つながらないときにつなぎ直す間隔
     pub reconnect_interval: f64,
+    /// ファイルの読み込み・書き出しを待つ時間
+    pub file_timeout: f64,
 }
 
 impl Timing {
@@ -80,6 +82,10 @@ impl Timing {
 
     pub fn reconnect_interval(&self) -> std::time::Duration {
         std::time::Duration::from_secs_f64(self.reconnect_interval.max(0.0))
+    }
+
+    pub fn file_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs_f64(self.file_timeout.max(0.0))
     }
 }
 
@@ -93,11 +99,19 @@ pub struct Catalog {
     pub seconds_step: f64,
     pub limits: Limits,
     pub timing: Timing,
+    /// 一覧を書き出すファイルの既定の名前(RuleList の名前ごと)
+    pub export_file_names: std::collections::BTreeMap<String, String>,
 }
 
 impl Catalog {
     pub fn load() -> Result<Self, serde_json::Error> {
         serde_json::from_str(SOURCE)
+    }
+
+    /// 一覧を書き出すファイルの既定の名前
+    pub fn export_file_name(&self, list: ipc::RuleList) -> Option<String> {
+        let key = serde_json::to_value(list).ok()?;
+        self.export_file_names.get(key.as_str()?).cloned()
     }
 }
 

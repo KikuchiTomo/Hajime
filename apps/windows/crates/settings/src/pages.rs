@@ -3,9 +3,11 @@
 //! 設定の画面のページと，その中の項目の並び．macOS の SettingsView(Group・Page・各ページの Form)と同じ並び・同じ文言にする．
 //! Windows の部品の作り方はここでは決めず，app が並びに従って部品を作る
 
+use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
 use crate::strings::{choice, dictionaries, features, keys, menu, more, settings, sync, words};
+use ipc::RuleList;
 
 /// 左の一覧の見出し
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -282,6 +284,8 @@ pub enum Action {
     RestoreKeymap,
     /// 設定のファイルを既定のアプリで開く(Windows だけ．画面にまだ無い項目を直すため)
     OpenSettingsFile,
+    /// ファイルを選んで読み込む・書き出す
+    File(FileTask),
 }
 
 /// 使い方の記録の値の種類
@@ -662,31 +666,37 @@ fn correction() -> Vec<Section> {
         ),
         Section::new(
             features::RULES,
-            vec![Row::list(
-                ListSpec {
-                    path: "correction.rules",
-                    fields: CORRECTION_RULE_FIELDS,
-                    empty: features::RULES_EMPTY,
-                    invalid: features::INVALID_RULE,
-                    lowercase: false,
-                    exclusive_with: None,
-                },
-                LimitKind::CorrectionRules,
-            )],
+            with_files(
+                Row::list(
+                    ListSpec {
+                        path: "correction.rules",
+                        fields: CORRECTION_RULE_FIELDS,
+                        empty: features::RULES_EMPTY,
+                        invalid: features::INVALID_RULE,
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::CorrectionRules,
+                ),
+                RuleList::CorrectionRules,
+            ),
         ),
         Section::new(
             features::EXCEPTIONS,
-            vec![Row::list(
-                ListSpec {
-                    path: "correction.exceptions",
-                    fields: EXCEPTION_FIELDS,
-                    empty: features::EXCEPTIONS_EMPTY,
-                    invalid: features::INVALID_EXCEPTION,
-                    lowercase: false,
-                    exclusive_with: None,
-                },
-                LimitKind::CorrectionRules,
-            )],
+            with_files(
+                Row::list(
+                    ListSpec {
+                        path: "correction.exceptions",
+                        fields: EXCEPTION_FIELDS,
+                        empty: features::EXCEPTIONS_EMPTY,
+                        invalid: features::INVALID_EXCEPTION,
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::CorrectionRules,
+                ),
+                RuleList::Exceptions,
+            ),
         ),
     ]
 }
@@ -721,19 +731,25 @@ fn language() -> Vec<Section> {
         ),
         Section::new(
             features::ENGLISH_WORDS,
-            vec![words(
-                "wordLanguage.englishWords",
-                "wordLanguage.japaneseWords",
-                features::ENGLISH_WORDS_EMPTY,
-            )],
+            with_files(
+                words(
+                    "wordLanguage.englishWords",
+                    "wordLanguage.japaneseWords",
+                    features::ENGLISH_WORDS_EMPTY,
+                ),
+                RuleList::EnglishWords,
+            ),
         ),
         Section::new(
             features::JAPANESE_WORDS,
-            vec![words(
-                "wordLanguage.japaneseWords",
-                "wordLanguage.englishWords",
-                features::JAPANESE_WORDS_EMPTY,
-            )],
+            with_files(
+                words(
+                    "wordLanguage.japaneseWords",
+                    "wordLanguage.englishWords",
+                    features::JAPANESE_WORDS_EMPTY,
+                ),
+                RuleList::JapaneseWords,
+            ),
         ),
         Section {
             title: Some(features::LANGUAGE_RULES),
@@ -795,17 +811,21 @@ fn apps() -> Vec<Section> {
     vec![
         Section {
             title: None,
-            rows: vec![Row::list(
-                ListSpec {
-                    path: "profileRules",
-                    fields: APP_FIELDS,
-                    empty: more::EXCLUSIONS_EMPTY,
-                    invalid: crate::strings::windows::INVALID_APP,
-                    lowercase: true,
-                    exclusive_with: None,
-                },
-                LimitKind::ProfileRules,
-            )],
+            rows: vec![
+                Row::list(
+                    ListSpec {
+                        path: "profileRules",
+                        fields: APP_FIELDS,
+                        empty: more::EXCLUSIONS_EMPTY,
+                        invalid: crate::strings::windows::INVALID_APP,
+                        lowercase: true,
+                        exclusive_with: None,
+                    },
+                    LimitKind::ProfileRules,
+                ),
+                Row::action(more::IMPORT_CSV, Action::File(FileTask::ImportProfileRules)),
+                Row::action(more::EXPORT_CSV, Action::File(FileTask::ExportProfileRules)),
+            ],
             footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
         },
         Section::untitled(vec![
@@ -827,36 +847,63 @@ const DICTIONARY_FIELDS: &[Field] = &[
     Field::named("word", settings::WORD, false),
 ];
 
-/// ユーザー辞書のページ(macOS の DictionaryPage の登録した単語)．同じ読みに別の単語を登録できる．
-/// 取り込んだ辞書とファイルの読み込みはまだ無い
+/// ユーザー辞書のページ(macOS の DictionaryPage の登録した単語)．同じ読みに別の単語を登録できる
 fn dictionary() -> Vec<Section> {
-    vec![Section::untitled(vec![Row::new(
-        "",
-        "",
-        Control::Dictionary(ListSpec {
-            path: "userDictionary",
-            fields: DICTIONARY_FIELDS,
-            empty: settings::DICTIONARY_EMPTY,
-            invalid: settings::INVALID_ENTRY,
-            lowercase: false,
-            exclusive_with: None,
-        }),
-    )])]
+    vec![Section::untitled(vec![
+        Row::new(
+            "",
+            "",
+            Control::Dictionary(ListSpec {
+                path: "userDictionary",
+                fields: DICTIONARY_FIELDS,
+                empty: settings::DICTIONARY_EMPTY,
+                invalid: settings::INVALID_ENTRY,
+                lowercase: false,
+                exclusive_with: None,
+            }),
+        ),
+        Row::action(
+            settings::IMPORT_DICTIONARY,
+            Action::File(FileTask::ImportUserDictionary),
+        ),
+        Row::action(
+            settings::EXPORT_DICTIONARY,
+            Action::File(FileTask::ExportUserDictionary),
+        ),
+    ])]
 }
 
 /// ローマ字のページ(macOS の RomajiPage)．標準の表に重ねる綴り
 fn romaji() -> Vec<Section> {
-    vec![Section::untitled(vec![Row::list(
-        ListSpec {
-            path: "customRomaji",
-            fields: ROMAJI_FIELDS,
-            empty: settings::ROMAJI_EMPTY,
-            invalid: settings::INVALID_ROMAJI,
-            lowercase: false,
-            exclusive_with: None,
-        },
-        LimitKind::RomajiRules,
-    )])]
+    vec![Section::untitled(with_files(
+        Row::list(
+            ListSpec {
+                path: "customRomaji",
+                fields: ROMAJI_FIELDS,
+                empty: settings::ROMAJI_EMPTY,
+                invalid: settings::INVALID_ROMAJI,
+                lowercase: false,
+                exclusive_with: None,
+            },
+            LimitKind::RomajiRules,
+        ),
+        RuleList::Romaji,
+    ))]
+}
+
+/// 一覧と，その一覧のファイルを読み込む・書き出すボタン(macOS の RuleListEditor のインポート・エクスポート)
+fn with_files(list: Row, file: RuleList) -> Vec<Row> {
+    vec![
+        list,
+        Row::action(
+            settings::IMPORT_DICTIONARY,
+            Action::File(FileTask::ImportRuleList(file)),
+        ),
+        Row::action(
+            settings::EXPORT_DICTIONARY,
+            Action::File(FileTask::ExportRuleList(file)),
+        ),
+    ]
 }
 
 /// 外観のページ(macOS の AppearancePage のテーマと書体)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)
@@ -899,9 +946,23 @@ fn usage() -> Vec<Section> {
     ]
 }
 
-/// バックアップのページ(macOS の BackupPage)．書き出しと読み込みはまだ無いので，設定のファイルを開くボタンを置く
+/// バックアップのページ(macOS の BackupPage)．設定のファイルを開くボタンも置く(画面に無い項目を直すため)
 fn backup() -> Vec<Section> {
     vec![
+        Section {
+            title: None,
+            rows: vec![
+                Row::action(
+                    more::EXPORT_SETTINGS,
+                    Action::File(FileTask::ExportSettings),
+                ),
+                Row::action(
+                    more::IMPORT_SETTINGS,
+                    Action::File(FileTask::ImportSettings),
+                ),
+            ],
+            footer: Some(more::BACKUP_NOTE),
+        },
         Section::untitled(vec![Row::action(
             crate::strings::windows::OPEN_SETTINGS_FILE,
             Action::OpenSettingsFile,

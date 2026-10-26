@@ -7,7 +7,9 @@ use super::ffi::{self, Canvas, DrawTarget, Paint, Window};
 use super::page::{Event, Extras, PageView};
 use super::theme::Theme;
 use super::Store;
-use crate::catalog::Catalog;
+use crate::catalog::{Catalog, Timing};
+use crate::engine::FileOutcome;
+use crate::files::FileTask;
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::pages::{self, Action, Group, Page};
@@ -15,7 +17,6 @@ use crate::store::StoreError;
 use crate::strings::{features, keys, rule_list, settings};
 use ipc::{DictionaryAddResult, DictionaryEntry};
 use std::cell::RefCell;
-use std::time::Duration;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{DT_END_ELLIPSIS, DT_LEFT, DT_SINGLELINE, DT_VCENTER};
@@ -52,8 +53,15 @@ struct NavEntry {
 
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
 enum After {
-    Message { text: &'static str, warning: bool },
+    Message {
+        text: &'static str,
+        warning: bool,
+    },
+    /// 件数などを含む知らせ
+    Notice(String),
     OpenSettingsFile,
+    /// ファイルを選ぶ窓を出してから，読み込む・書き出す
+    File(FileTask),
 }
 
 struct App {
@@ -63,7 +71,7 @@ struct App {
     host: Window,
     theme: Theme,
     catalog: Catalog,
-    connect: fn(Duration) -> Option<Store>,
+    connect: fn(&Timing) -> Option<Store>,
     model: Option<SettingsModel<Store>>,
     extras: Extras,
     /// 登録した単語(表の行と同じ並び．消すときに引く)
@@ -81,7 +89,7 @@ thread_local! {
 }
 
 /// 窓を作る．メッセージの繰り返しに渡す窓を返す
-pub fn open(catalog: Catalog, connect: fn(Duration) -> Option<Store>) -> Option<Window> {
+pub fn open(catalog: Catalog, connect: fn(&Timing) -> Option<Store>) -> Option<Window> {
     ffi::register_class(MAIN_CLASS, Some(main_procedure));
     ffi::register_class(HOST_CLASS, Some(host_procedure));
     let window = ffi::create(
@@ -129,8 +137,8 @@ pub fn open(catalog: Catalog, connect: fn(Duration) -> Option<Store>) -> Option<
         Some(window),
         ID_HOST,
     )?;
-    let model = connect(catalog.timing.response_timeout())
-        .and_then(|store| SettingsModel::load(store, &catalog).ok());
+    let model =
+        connect(&catalog.timing).and_then(|store| SettingsModel::load(store, &catalog).ok());
     let page = Page::Input;
     let view = match model {
         Some(_) => PageView::new(host, &theme, page, &catalog),
@@ -181,10 +189,24 @@ fn run_after(window: Window, after: Option<After>) {
         Some(After::Message { text, warning }) => {
             ffi::message(window, settings::WINDOW_TITLE, text, warning)
         }
+        Some(After::Notice(text)) => ffi::message(window, settings::WINDOW_TITLE, &text, false),
         Some(After::OpenSettingsFile) => {
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
             }
+        }
+        Some(After::File(task)) => {
+            let Some(name) = with_app(|app| task.default_name(&app.catalog)) else {
+                return;
+            };
+            let filter = task.filter();
+            let Some(path) =
+                ffi::choose_file(window, task.is_import(), &name, filter.name, filter.pattern)
+            else {
+                return;
+            };
+            let after = with_app(|app| app.run_file(task, path)).flatten();
+            run_after(window, after);
         }
         None => {}
     }
@@ -343,7 +365,7 @@ impl App {
 
     /// エンジンにつなぐ．つながったら今のページを開き直し，つなぎ直しの時計を止める
     fn connect(&mut self) {
-        self.model = (self.connect)(self.catalog.timing.response_timeout())
+        self.model = (self.connect)(&self.catalog.timing)
             .and_then(|store| SettingsModel::load(store, &self.catalog).ok());
         if self.model.is_some() {
             ffi::kill_timer(self.window, RECONNECT_TIMER);
@@ -507,6 +529,7 @@ impl App {
                 });
             }
             Event::Action(Action::OpenSettingsFile) => return Some(After::OpenSettingsFile),
+            Event::Action(Action::File(task)) => return Some(After::File(task)),
             Event::Action(Action::ResetUsage) => {
                 if let Err(error) = model.store().reset_usage() {
                     return self.failure(error);
@@ -523,6 +546,35 @@ impl App {
         };
         self.refresh();
         after
+    }
+
+    /// 選んだファイルを読み込む・書き出す．読み込んだら設定と辞書を読み直す
+    fn run_file(&mut self, task: FileTask, path: String) -> Option<After> {
+        let model = self.model.as_mut()?;
+        let outcome = model.store().run_file(task, path);
+        let outcome = match outcome {
+            Err(error) => return self.failure(error),
+            Ok(outcome) => outcome,
+        };
+        if task.is_import() {
+            if model.reload().is_err() {
+                self.disconnect();
+                return None;
+            }
+            self.read_extras();
+            self.refresh();
+        }
+        match outcome {
+            FileOutcome::Done => task.done().map(|text| After::Message {
+                text,
+                warning: false,
+            }),
+            FileOutcome::Imported(added) => Some(After::Notice(task.imported(added))),
+            FileOutcome::Failed(_) => Some(After::Message {
+                text: task.failed(),
+                warning: true,
+            }),
+        }
     }
 
     /// 一覧に行を足す．上限を超える・形が誤っていて残らないときは知らせる

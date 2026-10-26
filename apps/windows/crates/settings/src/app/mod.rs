@@ -5,7 +5,7 @@ mod page;
 mod theme;
 mod window;
 
-use crate::catalog::Catalog;
+use crate::catalog::{Catalog, Timing};
 use crate::engine::{Engine, EngineStore};
 use ipc::windows::{pipe_name, EngineClient};
 use ipc::{RequestBody, ResponseBody};
@@ -16,24 +16,36 @@ pub struct Pipe {
     client: EngineClient,
     /// 応答を待つ時間(DefaultSettings.settingsAppResponseTimeout)
     timeout: Duration,
+    /// ファイルの読み書きを待つ時間(DefaultSettings.settingsAppFileTimeout)
+    file_timeout: Duration,
 }
 
 impl Engine for Pipe {
     fn request(&self, body: RequestBody) -> Option<ResponseBody> {
         self.client.send(body).wait(self.timeout)
     }
+
+    fn request_file(&self, body: RequestBody) -> Option<ResponseBody> {
+        self.client.send(body).wait(self.file_timeout)
+    }
 }
 
 type Store = EngineStore<Pipe>;
 
-fn connect(timeout: Duration) -> Option<Store> {
+fn connect(timing: &Timing) -> Option<Store> {
     let name = pipe_name("engine").ok()?;
     let client = EngineClient::start(name).ok()?;
-    Some(EngineStore::new(Pipe { client, timeout }))
+    Some(EngineStore::new(Pipe {
+        client,
+        timeout: timing.response_timeout(),
+        file_timeout: timing.file_timeout(),
+    }))
 }
 
 pub fn run() {
     ffi::set_dpi_aware();
+    // ファイルを選ぶ窓(IFileDialog)は COM を使う
+    ffi::initialize_com();
     let Ok(catalog) = Catalog::load() else {
         return;
     };
