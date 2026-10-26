@@ -17,6 +17,7 @@ docs/
 │   ├── DESIGN-SYSTEM.md  見た目の決まり
 │   ├── UPSTREAM.md       azooKey の fork との付き合い方
 │   ├── REPOSITORY.md     GitHub の設定・ブランチ・PR・マージの決まり
+│   ├── WINDOWS.md        Windows 版のプロセス・ビルド・確かめ方
 │   ├── research/         設計の根拠にした調査(候補の出し方など)
 │   └── adr/              設計の判断の記録
 ├── specs/                要件(REQUIREMENTS.md)と機能ごとの仕様
