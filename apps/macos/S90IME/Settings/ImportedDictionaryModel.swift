@@ -16,43 +16,29 @@ extension SettingsModel {
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let source = panel.url else { return }
         let dictionary = existing ?? ImportedDictionary(id: UUID().uuidString, name: source.deletingPathExtension().lastPathComponent, wordCount: 0)
-        let destination = store.url(for: dictionary)
         isImportingDictionary = true
         // 大きな辞書は読むのに数秒かかるので，画面を止めないよう裏で読む
         Task.detached(priority: .userInitiated) {
-            let result: Result<(count: Int, revision: String), Error>
+            let result: Result<ImportedDictionary, Error>
             do {
-                let words = try DictionaryFileReader.read(from: source)
-                try ImportedDictionaryStore.write(words, to: destination)
-                // 同期のとき，ほかの Mac の索引が古いかどうかを見分けるバージョン
-                result = .success((words.count, try DictionaryFileSync.sha256(of: destination)))
+                result = .success(try store.importFile(from: source, as: dictionary))
             } catch {
                 result = .failure(error)
             }
-            await MainActor.run { self.finishImport(dictionary, isNew: existing == nil, result: result) }
+            await MainActor.run { self.finishImport(isNew: existing == nil, result: result) }
         }
     }
 
-    private func finishImport(_ dictionary: ImportedDictionary, isNew: Bool, result: Result<(count: Int, revision: String), Error>) {
+    private func finishImport(isNew: Bool, result: Result<ImportedDictionary, Error>) {
         isImportingDictionary = false
         switch result {
-        case .success(let (count, revision)):
-            dictionaries?.reload(dictionary)
-            var updated = dictionary
-            updated.wordCount = count
-            updated.revision = revision
-            if update({ settings in
-                if isNew {
-                    settings.importedDictionaries.append(updated)
-                } else if let index = settings.importedDictionaries.firstIndex(where: { $0.id == updated.id }) {
-                    settings.importedDictionaries[index].wordCount = count
-                    settings.importedDictionaries[index].revision = revision
-                }
-            }) {
-                message = UIStrings.Dictionaries.imported(count)
+        case .success(let imported):
+            dictionaries?.reload(imported)
+            if update({ _ = ImportedDictionary.record(imported, isNew: isNew, in: &$0.importedDictionaries) }) {
+                message = UIStrings.Dictionaries.imported(imported.wordCount)
             } else if isNew {
                 // 設定に残せなかった新しい辞書の索引は，どこからも使われないので消す
-                dictionaries?.remove(dictionary)
+                dictionaries?.remove(imported)
             }
         case .failure(let error):
             logger.error("辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")

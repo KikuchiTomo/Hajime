@@ -111,6 +111,20 @@ public struct ImportedDictionary: Sendable, Equatable, Codable, Hashable, Identi
 
     /// 分岐図に出す名前．分野があれば分野
     public var displayName: String { field.isEmpty ? name : field }
+
+    /// 取り込んだ(取り込み直した)結果を一覧に書く．新しい辞書は末尾に足し，取り込み直した辞書は語の数とバージョンだけを変える
+    /// (名前・分野・条件は利用者が付けたまま)．取り込み直す辞書が一覧に無ければ(ほかの PC で消したなど)変えずに false を返す
+    @discardableResult
+    public static func record(_ dictionary: ImportedDictionary, isNew: Bool, in list: inout [ImportedDictionary]) -> Bool {
+        if isNew {
+            list.append(dictionary)
+            return true
+        }
+        guard let index = list.firstIndex(where: { $0.id == dictionary.id }) else { return false }
+        list[index].wordCount = dictionary.wordCount
+        list[index].revision = dictionary.revision
+        return true
+    }
 }
 
 /// どの辞書を今効かせ，どれだけ優先するかを決める．

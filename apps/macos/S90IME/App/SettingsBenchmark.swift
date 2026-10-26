@@ -86,7 +86,7 @@ struct SettingsFixture {
         let store = FileSettingsStore(fileURL: directory.appendingPathComponent("settings.json"))
         let synchronizer = SettingsSynchronizer(settings: store, stateStore: FileSyncStateStore(fileURL: directory.appendingPathComponent("sync-state.json")))
         let dictionaries = ImportedDictionaryStore(directory: directory.appendingPathComponent("dictionaries", isDirectory: true))
-        let sync = SyncCoordinator(synchronizer: synchronizer, settings: store, dictionaries: dictionaries)
+        let sync = SyncCoordinator(synchronizer: synchronizer, runner: FolderSyncRunner(synchronizer: synchronizer, settings: store, dictionaries: dictionaries), settings: store)
         let model = SettingsModel(store: store, usage: nil, dictionaries: dictionaries, resetLearning: {})
         return SettingsFixture(model: model, sync: sync)
     }

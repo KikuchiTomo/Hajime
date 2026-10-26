@@ -21,6 +21,14 @@ public enum ProfileRuleCSV {
         return rules
     }
 
+    /// 読み込んだ規則を先頭に足す．同じアプリの ID の規則は読み込んだほうに置き換える
+    public static func merge(_ imported: [ProfileRule], into settings: inout Settings) {
+        let identifiers = Set(imported.map(\.applicationPrefix))
+        settings.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
+        settings.profileRules.insert(contentsOf: imported, at: 0)
+        settings.clampToValidRanges()
+    }
+
     public static func write(_ rules: [ProfileRule]) -> String {
         ([header] + rules.map { "\($0.applicationPrefix),\($0.profile.rawValue)" }).joined(separator: "\n") + "\n"
     }

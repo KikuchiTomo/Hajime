@@ -164,8 +164,8 @@ final class SettingsModel: ObservableObject {
         return changed
     }
 
-    /// 決まりの一覧をファイル(「左<タブ>右」の行)から読み込む．merge で設定に足し，足した数を知らせる
-    func importRuleList(_ merge: ([RuleListFile.Row], inout S90Domain.Settings) -> Int) {
+    /// 決まりの一覧をファイル(「左<タブ>右」の行)から読み込む．一覧の決まりで設定に足し，足した数を知らせる
+    func importRuleList(_ list: RuleList) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText, .tabSeparatedText]
         panel.allowsMultipleSelection = false
@@ -173,7 +173,7 @@ final class SettingsModel: ObservableObject {
         do {
             let rows = try RuleListFile.read(from: url)
             var added = 0
-            if update({ added = merge(rows, &$0) }) {
+            if update({ added = list.merge(rows, into: &$0) }) {
                 message = UIStrings.More.importedRules(added)
             }
         } catch {
@@ -181,9 +181,10 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    func exportRuleList(_ rows: [RuleListFile.Row], fileName: String) {
+    func exportRuleList(_ list: RuleList) {
+        let rows = list.rows(in: settings)
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = fileName
+        panel.nameFieldStringValue = list.exportFileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try RuleListFile.write(rows, to: url)
@@ -271,12 +272,7 @@ final class SettingsModel: ObservableObject {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let rules = try ProfileRuleFile.read(from: url)
-            let identifiers = Set(rules.map(\.applicationPrefix))
-            if update({ current in
-                current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
-                current.profileRules.insert(contentsOf: rules, at: 0)
-                current.clampToValidRanges()
-            }) {
+            if update({ ProfileRuleCSV.merge(rules, into: &$0) }) {
                 message = UIStrings.More.importedRules(rules.count)
             }
         } catch {
