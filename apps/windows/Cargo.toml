@@ -1,0 +1,25 @@
+# Windows 版の Cargo のワークスペース．crate の分け方は .claude/skills/s90-windows/SKILL.md．
+# 依存の版はここで揃え，= で固定する(docs/dev/GUIDELINES.md)
+[workspace]
+resolver = "2"
+members = ["crates/ipc"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.90"
+
+[workspace.dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+thiserror = "=2.0.21"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.release]
+# COM の境界で panic を受け止めるため，abort にしない(.claude/skills/s90-windows/references/com-patterns.md)
+panic = "unwind"

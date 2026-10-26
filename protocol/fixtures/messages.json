@@ -1,0 +1,128 @@
+{
+  "$comment": "Swift(core/Tests/S90IPCTests)と Rust(apps/windows/crates/ipc)の両方が読み，読み戻して同じ JSON になることを確かめる．型を足したらここにも足す",
+  "requests": [
+    { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
+    { "id": 2, "body": { "type": "openSession" } },
+    { "id": 3, "body": { "type": "closeSession", "session": 4 } },
+    {
+      "id": 4,
+      "body": {
+        "type": "key",
+        "session": 4,
+        "input": { "key": { "kind": "character", "text": "A" }, "modifiers": { "shift": true, "control": false, "alt": false }, "keyLabel": "a", "isKeypad": false },
+        "context": { "applicationId": "notepad.exe", "isSecure": false, "precedingText": "今日は", "caret": { "x": 100, "y": 200, "width": 2, "height": 20 } }
+      }
+    },
+    {
+      "id": 5,
+      "body": {
+        "type": "key",
+        "session": 4,
+        "input": { "key": { "kind": "function", "number": 7 }, "modifiers": { "shift": false, "control": true, "alt": true }, "isKeypad": true },
+        "context": { "isSecure": true }
+      }
+    },
+    { "id": 6, "body": { "type": "key", "session": 4, "input": { "key": { "kind": "space" }, "modifiers": { "shift": false, "control": false, "alt": false }, "isKeypad": false }, "context": { "isSecure": false } } },
+    { "id": 7, "body": { "type": "key", "session": 4, "input": { "key": { "kind": "hankakuZenkaku" }, "modifiers": { "shift": false, "control": false, "alt": false }, "isKeypad": false }, "context": { "isSecure": false } } },
+    { "id": 8, "body": { "type": "setMode", "session": 4, "mode": "direct" } },
+    { "id": 9, "body": { "type": "deactivate", "session": 4 } },
+    { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
+    { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } }
+  ],
+  "responses": [
+    { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
+    {
+      "id": 2,
+      "body": {
+        "type": "sessionOpened",
+        "session": 4,
+        "state": {
+          "mode": "japanese",
+          "isComposing": false,
+          "consumedKeys": [{ "key": { "kind": "henkan" }, "modifiers": { "shift": false, "control": false, "alt": false } }]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "body": {
+        "type": "edit",
+        "handled": true,
+        "operations": [
+          { "type": "commit", "text": "変換" },
+          { "type": "setComposition", "segments": [{ "text": "にほん", "style": "reading" }, { "text": "語", "style": "focused" }, { "text": "x", "style": "correction" }, { "text": "y", "style": "converted" }] },
+          { "type": "setComposition", "segments": [] },
+          { "type": "selectMode", "mode": "japanese" }
+        ],
+        "state": { "mode": "japanese", "isComposing": true, "consumedKeys": [], "wakeAfterMilliseconds": 300 }
+      }
+    },
+    { "id": 3, "body": { "type": "done" } },
+    { "id": 9, "body": { "type": "error", "code": "unknownSession" } },
+    { "id": 9, "body": { "type": "error", "code": "unsupportedVersion" } },
+    { "id": 9, "body": { "type": "error", "code": "tooManySessions" } },
+    { "id": 9, "body": { "type": "error", "code": "malformed" } }
+  ],
+  "uiCommands": [
+    { "type": "hello", "protocolVersion": 1 },
+    {
+      "type": "showCandidates",
+      "list": {
+        "variants": [{ "label": "ひらがな", "isAvailable": true }, { "label": "全角英数", "isAvailable": false }],
+        "selectedVariant": 0,
+        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }],
+        "selectedEntry": 1,
+        "focus": "candidate",
+        "position": 2,
+        "total": 30,
+        "note": "修正しました"
+      },
+      "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
+    },
+    {
+      "type": "showCandidates",
+      "list": { "variants": [], "entries": [], "focus": "variants", "position": 1, "total": 0 }
+    },
+    {
+      "type": "showBranchMap",
+      "map": {
+        "columns": [
+          {
+            "text": "今日は",
+            "alternatives": ["今日は", "京は"],
+            "selectedAlternative": 0,
+            "variants": ["きょうは"],
+            "isFocused": true,
+            "isUncertain": true,
+            "isDecided": false,
+            "shorter": "今日",
+            "usageNote": "使い分け",
+            "alternativeNotes": [null, "修正"],
+            "sourceName": "医療"
+          },
+          {
+            "text": "晴れ",
+            "alternatives": [],
+            "variants": [],
+            "selectedVariant": 1,
+            "isFocused": false,
+            "isUncertain": false,
+            "isDecided": true,
+            "preview": "腫れ",
+            "longer": "晴れる",
+            "alternativeNotes": []
+          }
+        ],
+        "position": 1,
+        "total": 2,
+        "note": "案内",
+        "hints": [{ "keys": "Shift+←", "label": "今日" }]
+      }
+    },
+    { "type": "setPresentation", "presentation": { "theme": "platinum", "fontSize": 15.5, "modeIndicatorMilliseconds": 800 } },
+    { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
+    { "type": "showMode", "mode": "direct" },
+    { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },
+    { "type": "hide" }
+  ]
+}
