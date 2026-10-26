@@ -94,6 +94,32 @@ struct ReadingCorrectionTests {
         #expect(corrected || note?.hasPrefix("もしかして") == true, "\(keys)")
     }
 
+    @Test("アプリと同じ道筋で，打ってすぐ Space を押しても，裏で求めた訂正が届いたら変換を直すか「もしかして」と示す", arguments: [
+        "kyounotenkihayoudesune", "kyouhaitenkidesune", "tututasakanagaookikatta", "arigatpugozaimasu", "wakeranai", "sorehawakeranaidesu",
+        "nankatkitou",
+    ])
+    func spaceRightAfterTyping(keys: String) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
+        let model = try ZenzaiModel.verified(at: URL(fileURLWithPath: path))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: model)
+        let service = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings(), typoService: service)
+        _ = live(session, keys)
+        // 止まらずに Space を押す．変換はすぐに出る
+        let space = session.handle(KeyEvent(.space), context: InputContext())
+        #expect(space.actions.contains { if case .showLattice = $0 { true } else { false } }, "\(keys): 変換がすぐ出ない")
+        #expect(space.actions.contains(.awaitCorrections), "\(keys): 訂正を頼まない")
+        let request = try #require(session.lateCorrectionRequest)
+        let corrections = await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+        let late = session.applyLateCorrections(corrections, context: InputContext())
+        let lattice = late.compactMap { if case .showLattice(let panel) = $0 { panel } else { nil } }.last
+        let corrected = late.contains { if case .setMarkedText(let text) = $0 { text.segments.contains { $0.style == .correction } } else { false } }
+        let note = lattice?.note
+        print("Space すぐ \(keys): 直した=\(corrected) 案内=\(note ?? "-") 文=\(marked(late) ?? "-")")
+        #expect(corrected || note != nil, "\(keys)")
+    }
+
     @Test("直した語句だけに補正の印を付ける(入力中の文字・分岐図)", arguments: [
         ("kyounotenkihayoudesune", "良い", "良いですね"),
     ])
