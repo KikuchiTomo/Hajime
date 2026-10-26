@@ -143,7 +143,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         var result = Okurigana.reorder(candidates, style: current.okuriganaStyle)
         let userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         insert(userWords, into: &result, at: 0, reading: reading, origin: .userDictionary)
-        // エンジンは自分の辞書にある読みの続きしかたどらないので，読み全体と一致する取り込んだ辞書の語はここで足す．
+        // 読み全体と一致する取り込んだ辞書の語は，エンジンの候補の順に関わらず前の方に出るようにここで足す．
         // 既定の 1 番目は変えず，その次に優先度の順で並べる
         let importedWords = auxiliary.filter { $0.word.reading == reading }.sorted { $0.costOffset > $1.costOffset }.map(\.word.word)
         insert(importedWords, into: &result, at: DefaultSettings.importedWordCandidateOffset, reading: reading, origin: .userDictionary)
