@@ -146,6 +146,7 @@ enum DesignTokens {
             static let keymapKeyWidth: CGFloat = 150
             static let keymapMarkWidth: CGFloat = 22
             static let keymapCaptureHeight: CGFloat = 22
+            static let indent: CGFloat = 16
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12

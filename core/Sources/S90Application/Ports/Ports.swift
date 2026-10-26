@@ -157,9 +157,26 @@ public struct SyncState: Sendable, Equatable, Codable {
     public var folderName: String?
     /// まとまりごとの範囲．無いまとまりは既定の範囲(SyncGroup.defaultScope)
     public var scopes: [SyncGroup: SyncScope] = [:]
+    /// まとまりを同期していても，この Mac だけで持つ項目(Settings の CodingKeys の名前)
+    public var localFields: Set<String> = []
     public var ledger = SyncLedger()
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case isEnabled, folderBookmark, folderName, scopes, localFields, ledger
+    }
+
+    /// 項目を足しても前の版で書いたファイルを読めるよう，無い項目は既定のままにする(読めないとフォルダの選択まで失うため)
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        folderBookmark = try container.decodeIfPresent(Data.self, forKey: .folderBookmark)
+        folderName = try container.decodeIfPresent(String.self, forKey: .folderName)
+        scopes = try container.decodeIfPresent([SyncGroup: SyncScope].self, forKey: .scopes) ?? [:]
+        localFields = try container.decodeIfPresent(Set<String>.self, forKey: .localFields) ?? []
+        ledger = try container.decodeIfPresent(SyncLedger.self, forKey: .ledger) ?? SyncLedger()
+    }
 
     public func scope(of group: SyncGroup) -> SyncScope { scopes[group] ?? group.defaultScope }
 }

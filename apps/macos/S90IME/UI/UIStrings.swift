@@ -611,6 +611,31 @@ extension UIStrings {
         static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
         static let unreadable = "同期のファイルを読めないため、同期を止めています"
+        static let items = "項目"
+        static let localOnly = "この Mac だけ"
+        static let itemsNote = "印を付けた項目は、同期していてもこの Mac だけの値にします。"
+
+        /// 項目(Settings の CodingKeys の名前)の表示名
+        static func label(forField name: String) -> String {
+            fieldLabels[name] ?? name
+        }
+
+        private static let fieldLabels: [String: String] = [
+            "inputStyle": "入力方式", "customRomaji": "ローマ字の追加", "liveConversion": "ライブ変換", "yenKey": "¥ キー",
+            "punctuation": "句読点", "brackets": "括弧", "slash": "スラッシュ", "spaceWidth": "スペース幅", "numberWidth": "数字幅",
+            "alphabetWidth": "英字幅", "shiftStartsAlphabet": "Shift で英字", "punctuationCommits": "句読点で確定",
+            "keypadDirect": "テンキーの数字を半角で確定",
+            "typoCorrection": "タイプミスの修正", "candidatePresentation": "候補の表示", "initialFocus": "最初に選ぶ文節",
+            "suggestionDisplay": "入力中の候補", "listCandidatesPerPage": "一覧の候補数", "branchCandidatesPerPage": "分岐図の候補数",
+            "liveConversionDelay": "漢字にするまでの時間", "correctionDelay": "修正するまでの時間", "correctionSensitivity": "修正の基準",
+            "showsSuggestions": "もしかして", "okuriganaStyle": "送り仮名", "calculation": "計算", "postalCodeConversion": "郵便番号変換",
+            "handwriting": "手書き入力", "homophoneNotes": "同音異義語の使い分け", "misuseNotes": "誤用の注釈", "misreadings": "読み違い",
+            "showsVariantRow": "文字種の行", "showsKeyHints": "キーの案内", "numberKeySelection": "番号キーで選択",
+            "dateConversion": "日付と時刻に変換", "symbolConversion": "記号に変換", "emojiConversion": "絵文字に変換", "learning": "学習",
+            "theme": "テーマ", "candidateFontSize": "文字の大きさ", "showsModeIndicator": "入力モードの表示",
+            "modeIndicatorDuration": "入力モードの表示時間", "customThemes": "カスタムテーマ", "customThemeID": "使うカスタムテーマ",
+            "escapeSwitchesToDirect": "Esc で英数", "terminalCommands": "ターミナルのコマンド", "profileRules": "アプリごとの設定",
+        ]
 
         static func label(for scope: SyncScope) -> String {
             switch scope {

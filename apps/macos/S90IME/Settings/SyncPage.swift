@@ -31,12 +31,29 @@ struct SyncPage: View {
             } footer: {
                 Text(UIStrings.Sync.note).font(.caption).foregroundStyle(.secondary)
             }
-            Section(UIStrings.Sync.scopes) {
+            Section {
                 ForEach(SyncGroup.allCases, id: \.self) { group in
                     Picker(UIStrings.Sync.label(for: group), selection: Binding(get: { sync.state.scope(of: group) }, set: { sync.setScope($0, for: group) })) {
                         ForEach(SyncScope.allCases, id: \.self) { Text(UIStrings.Sync.label(for: $0)).tag($0) }
                     }
+                    // 同期するまとまりの中でも，項目ごとにこの Mac だけで持てる
+                    if sync.state.scope(of: group) == .synced, group.fieldNames.count > 1 {
+                        DisclosureGroup(UIStrings.Sync.items) {
+                            ForEach(group.fieldNames, id: \.self) { field in
+                                Toggle(isOn: Binding(get: { sync.state.localFields.contains(field) }, set: { sync.setLocal($0, field: field) })) {
+                                    Text(UIStrings.Sync.label(forField: field))
+                                }
+                                .toggleStyle(.checkbox)
+                                .help(UIStrings.Sync.localOnly)
+                            }
+                        }
+                        .padding(.leading, DesignTokens.Size.Settings.indent)
+                    }
                 }
+            } header: {
+                Text(UIStrings.Sync.scopes)
+            } footer: {
+                Text(UIStrings.Sync.itemsNote).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
