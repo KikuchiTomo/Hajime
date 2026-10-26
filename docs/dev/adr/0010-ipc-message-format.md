@@ -16,7 +16,7 @@ DLL は入力先のすべてのアプリに読み込まれるので，依存を�
 - メッセージの型は `protocol/schema.json` に書く．`tools/protocol/generate.py` が Swift(`core/Sources/S90IPC/Generated/`)と Rust(`apps/windows/crates/ipc/src/generated.rs`)の型を作る．生成物はコミットし，`make check` で定義と合っているかを確かめる
 - 型の種類は構造体・文字列の列挙・種類を表すキーで分ける共用体の 3 つだけにする．JSON の形は serde の internally tagged と同じ
 - 両方の言語で同じ見本(`protocol/fixtures/messages.json`)を読み，読み戻して同じ JSON になることをテストで確かめる
-- Swift は Foundation の `JSONEncoder`，Rust は `serde` と `serde_json` を使う．どちらも版を固定する
+- Swift は Foundation の `JSONEncoder`，Rust は `serde` と `serde_json` を使う．どちらもバージョンを固定する
 - 生成した型の `description`(Swift)と `Debug`(Rust)は文字列の中身を出さない(`docs/dev/SECURITY-MODEL.md`)
 - 要求には番号を付け，応答を組にする．DLL が時間切れで捨てた応答を読み飛ばせるようにするため
 

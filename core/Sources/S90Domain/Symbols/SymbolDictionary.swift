@@ -148,7 +148,7 @@ public struct SymbolSequenceSet: Sendable, Equatable {
 }
 
 /// 利用者が変えた記号の決まり．既定の決まりと同じ入力なら上書きし(無効にもできる)，無ければ足す．
-/// 既定の決まりそのものは変えないので，版が上がって既定が増えても利用者の変更は残る
+/// 既定の決まりそのものは変えないので，バージョンが上がって既定が増えても利用者の変更は残る
 public struct SymbolRule: Sendable, Equatable, Codable, Hashable {
     public enum Kind: String, Sendable, Equatable, Codable {
         /// 続けて打った記号(「->」→「→」)

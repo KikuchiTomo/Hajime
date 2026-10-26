@@ -1,4 +1,4 @@
-/// JSON の値．設定のファイルの形を項目ごとに扱う(形式の版の移し替え，同期，知らない項目の保持)ために使う
+/// JSON の値．設定のファイルの形を項目ごとに扱う(形式のバージョンの移し替え，同期，知らない項目の保持)ために使う
 public enum JSONValue: Sendable, Equatable, Codable {
     case null
     case bool(Bool)

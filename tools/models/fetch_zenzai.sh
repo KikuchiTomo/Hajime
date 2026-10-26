@@ -1,6 +1,6 @@
 #!/bin/sh
 # Zenzai のモデルを取得し，SHA-256 を確かめる．リポジトリには入れず，リポジトリの外に置く．
-# 取得元と版を変えるときは，core/Sources/S90Engine/ZenzaiModel.swift の値と docs/dev/adr/0006-zenzai.md を一緒に変える．
+# 取得元とバージョンを変えるときは，core/Sources/S90Engine/ZenzaiModel.swift の値と docs/dev/adr/0006-zenzai.md を一緒に変える．
 #
 # 使い方: tools/models/fetch_zenzai.sh [置き場所(既定: リポジトリの 1 つ上の models/)]
 set -eu

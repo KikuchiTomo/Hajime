@@ -100,6 +100,7 @@ struct EndToEndInputTests {
     @Test("nn のあとの母音は，語によって読みを選ぶ", arguments: [
         ("onna", "女"),
         ("hannei", "反映"),
+        ("hunniki", "雰囲気"),
         ("konnichiha", "こんにちは"),
         ("konnnitiha", "こんにちは"),
         ("tannin", "担任"),

@@ -528,7 +528,7 @@ struct KeyCapture: NSViewRepresentable {
         override func resignFirstResponder() -> Bool {
             if !finished {
                 finished = true
-                // 表示を変えている途中に呼ばれることがあるので，次の回で知らせる
+                // 表示を変更している途中に呼ばれることがあるので，次の回で知らせる
                 let cancel = onCancel
                 DispatchQueue.main.async { cancel?() }
             }

@@ -24,7 +24,7 @@ extension SettingsModel {
             do {
                 let words = try DictionaryFileReader.read(from: source)
                 try ImportedDictionaryStore.write(words, to: destination)
-                // 同期のとき，ほかの Mac の索引が古いかどうかを見分ける版
+                // 同期のとき，ほかの Mac の索引が古いかどうかを見分けるバージョン
                 result = .success((words.count, try DictionaryFileSync.sha256(of: destination)))
             } catch {
                 result = .failure(error)

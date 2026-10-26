@@ -80,6 +80,8 @@ public struct Settings: Sendable, Equatable {
     public var homophoneNotes = true
     /// 誤用とされる言い回しに注釈を添える
     public var misuseNotes = false
+    /// ら抜き言葉・さ入れ言葉・二重敬語・重言に注釈を添える(校正支援)
+    public var proofreading = true
     /// 「やじるし」などの読みから記号の候補を出す
     public var symbolConversion = true
     /// 読みから絵文字の候補を出す
@@ -118,15 +120,15 @@ public struct Settings: Sendable, Equatable {
     public var profileRules: [ProfileRule] = DefaultSettings.terminalRules + DefaultSettings.programmingRules
 
     // MARK: 形式
-    /// 読み込んだファイルの形式の版(SettingsSchema)．今より新しい版のファイルを開いたときは，その版のまま書き戻す
+    /// 読み込んだファイルの形式のバージョン(SettingsSchema)．今より新しいバージョンのファイルを開いたときは，そのバージョンのまま書き戻す
     public var schemaVersion = SettingsSchema.currentVersion
-    /// この版が知らない項目．新しい版で書いた設定を古い版で開いて保存しても失わないよう，そのまま書き戻す
+    /// このバージョンが知らない項目．新しいバージョンで書いた設定を古いバージョンで開いて保存しても失わないよう，そのまま書き戻す
     public var unknownFields: [String: JSONValue] = [:]
 
     public init() {}
 
     /// 範囲の外の値を範囲に収め，使えない値を捨てる．設定のファイルや書き出した JSON を読むときに通す
-    /// (手で書き換えたファイルや別の版のファイルでも，画面や変換がおかしくならないように)
+    /// (手で書き換えたファイルや別のバージョンのファイルでも，画面や変換がおかしくならないように)
     public mutating func clampToValidRanges() {
         func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T { min(max(value, range.lowerBound), range.upperBound) }
         listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
@@ -186,7 +188,7 @@ extension Settings: Codable {
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
         case learning, userDictionary, importedDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
@@ -256,6 +258,7 @@ extension Settings: Codable {
         read(.dateConversion, into: \.dateConversion)
         read(.homophoneNotes, into: \.homophoneNotes)
         read(.misuseNotes, into: \.misuseNotes)
+        read(.proofreading, into: \.proofreading)
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
         read(.learning, into: \.learning)
@@ -270,7 +273,7 @@ extension Settings: Codable {
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         read(.restrainsLiveConversionInCode, into: \.restrainsLiveConversionInCode)
         readList(.profileRules, into: \.profileRules)
-        // 形式の版と，この版が知らない項目
+        // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
             settings.schemaVersion = max(version, SettingsSchema.currentVersion)
@@ -327,6 +330,7 @@ extension Settings: Codable {
         try container.encode(dateConversion, forKey: .dateConversion)
         try container.encode(homophoneNotes, forKey: .homophoneNotes)
         try container.encode(misuseNotes, forKey: .misuseNotes)
+        try container.encode(proofreading, forKey: .proofreading)
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(learning, forKey: .learning)

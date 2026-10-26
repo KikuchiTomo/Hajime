@@ -205,7 +205,7 @@ struct SettingsDecodingTests {
 
 @Suite("候補の出し方の設定")
 struct CandidatePresentationTests {
-    @Test("古い版が保存した文節格子(lattice)は，分岐図として読む")
+    @Test("古いバージョンが保存した文節格子(lattice)は，分岐図として読む")
     func legacyLattice() throws {
         let decoded = try JSONDecoder().decode([CandidatePresentation].self, from: Data(#"["lattice","list"]"#.utf8))
         #expect(decoded == [CandidatePresentation.automatic, .list])
@@ -464,7 +464,7 @@ struct ImportedDictionarySettingTests {
         #expect(decoded.importedDictionaries == settings.importedDictionaries)
     }
 
-    @Test("同期のファイルから来た設定でも，UUID の形でない id と 16 進でない版の辞書は捨てる(パスを差し込ませない)")
+    @Test("同期のファイルから来た設定でも，UUID の形でない id と 16 進でないバージョンの辞書は捨てる(パスを差し込ませない)")
     func dropsUnsafeIdentity() throws {
         var settings = Settings()
         settings.importedDictionaries = [

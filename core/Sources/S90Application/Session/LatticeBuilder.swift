@@ -202,6 +202,11 @@ struct LatticeBuilder {
             // 文全体の候補の一部はこの文節の候補に無いことがある．そのときも先頭に置く
             append(pool.first { $0.text == preferred } ?? Candidate(text: preferred, readingCount: length, origin: .sentencePart))
         }
+        // 文節の先頭の語の候補に，残り(助詞・助動詞など)をつないだものも候補にする．
+        // エンジンの文節全体の候補だけでは先頭の語を選び直せないことがある(ごくでしょうが → 語句でしょうが が無い)．
+        // 先頭の語の候補の順(エンジンがその語をどれだけ確からしいとみたか)に先に並べ，そのあとに文節全体の候補を並べる．
+        // 文節全体の候補の順は，先頭の語の読みを別の語に読み替えたもの(ごく → 石)が上に来ることがあるため
+        headWordAlternatives(of: slice).forEach(append)
         pool.forEach(append)
         if candidates.isEmpty {
             append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
@@ -215,6 +220,20 @@ struct LatticeBuilder {
         let gap = best.flatMap { best in second.map { best.score - $0.score } } ?? .infinity
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
                                       variants: Self.variants(of: slice), isConfident: confident, confidenceGap: gap)
+    }
+
+    /// 文節の先頭の語を別の候補に変え，残りの部分はそのままつないだ候補(ごくでしょうが → 語句でしょうが・極でしょうが)．
+    /// 語の区切りは Zenzai を使わない変換の語の並び(segmentationWords)から求める．語が 1 つなら作らない
+    private func headWordAlternatives(of slice: String) -> [Candidate] {
+        let words = converter.segmentationWords(for: slice)
+        guard words.count > 1, let head = words.first, words.reduce(0, { $0 + $1.readingCount }) == slice.count else { return [] }
+        let tail = words.dropFirst().map(\.text).joined()
+        let headReading = String(slice.prefix(head.readingCount))
+        // 先頭の語だけを文脈なしで Zenzai にかけると，ふだんの語が下がる(ごく → 語句 が見えなくなる)ので，辞書の変換の順を使う
+        return converter.dictionaryCandidates(for: headReading)
+            .filter { $0.readingCount == head.readingCount }
+            .prefix(DefaultSettings.headWordAlternativeCount)
+            .map { Candidate(text: $0.text + tail, readingCount: slice.count, origin: .combined) }
     }
 
     /// 上の枝に出す字種．エンジンが出さなくても選べるようにする
