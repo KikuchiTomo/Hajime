@@ -74,7 +74,7 @@ public struct KeyBindings: Sendable, Equatable, Codable {
         self.commands = commands
     }
 
-    /// 既定の割り当て．macOS・ATOK・Microsoft IME と同じく，↓ と Space で次の候補，Shift+←→ で文節の長さ
+    /// 既定の割り当て．↓ と Space で次の候補，Shift+←→ で文節の長さ
     public static let standard = KeyBindings([
         .openSettings: [KeyStroke(.character(","), control: true, option: true)],
         .toggleLiveConversion: [KeyStroke(.character("l"), control: true, option: true)],

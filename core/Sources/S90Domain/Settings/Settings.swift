@@ -1,7 +1,5 @@
 /// 利用者が変えられる設定．項目の既定値はここに書き，DefaultSettings.settings はそれをそのまま使う．
-///
-/// 項目は Google 日本語入力・ATOK・macOS の日本語入力・Microsoft IME の設定を調べ，
-/// 日本語の入力に効くものを選んだ(docs/user/reference/settings.md に，入れなかった項目とその理由がある)
+/// 項目の一覧は docs/user/reference/settings.md
 public struct Settings: Sendable, Equatable {
     // MARK: 入力
     /// 入力方式(R-05)
