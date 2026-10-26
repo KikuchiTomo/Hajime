@@ -187,6 +187,9 @@ pub struct SessionState {
     #[serde(rename = "wakeAfterMilliseconds")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wake_after_milliseconds: Option<u32>,
+    #[serde(rename = "precedingTextLength")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preceding_text_length: Option<u32>,
 }
 
 impl fmt::Debug for SessionState {
@@ -196,6 +199,7 @@ impl fmt::Debug for SessionState {
             .field("isComposing", &self.is_composing)
             .field("consumedKeys", &self.consumed_keys)
             .field("wakeAfterMilliseconds", &self.wake_after_milliseconds)
+            .field("precedingTextLength", &self.preceding_text_length)
             .finish()
     }
 }

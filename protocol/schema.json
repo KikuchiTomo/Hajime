@@ -212,6 +212,10 @@
         {
           "name": "wakeAfterMilliseconds",
           "type": "u32?"
+        },
+        {
+          "name": "precedingTextLength",
+          "type": "u32?"
         }
       ]
     },
