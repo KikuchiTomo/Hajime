@@ -104,12 +104,13 @@ public struct SegmentLattice: Sendable, Equatable {
 
     /// 注目している文節を上下に送る．下は変換の候補，上は字種．
     /// 下の端では幹に戻り(Space を押し続けると候補を一周する)，上の端では止まる
-    public mutating func moveSelection(by offset: Int) {
+    /// entersVariants が false なら上の枝(字種)には移らない(設定で字種の行を出さないとき)
+    public mutating func moveSelection(by offset: Int, entersVariants: Bool = true) {
         var segment = segments[focusedIndex]
         guard !segment.candidates.isEmpty else { return }
         var next = segment.axisPosition + offset
         if next >= segment.candidates.count { next = 0 }
-        next = max(next, -segment.variants.count)
+        next = max(next, entersVariants ? -segment.variants.count : 0)
         segment.setAxisPosition(next)
         segment.isDecided = segment.isDecided || offset != 0
         segments[focusedIndex] = segment
