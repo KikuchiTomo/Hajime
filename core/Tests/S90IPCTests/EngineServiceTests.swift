@@ -188,17 +188,13 @@ struct EngineServiceTests {
         #expect(written.candidateFontSize < 1000)
     }
 
-    @Test("入力メニューで入力方式・ライブ変換・設定の画面を選べる")
+    @Test("入力メニューでライブ変換と設定の画面を選べる")
     func menu() {
         let id = greeted()
-        #expect(service.handle(WireRequest(id: 30, body: .menu(command: .selectInputStyle(style: "kana"))), from: id).body == .done)
-        #expect(settings.current.inputStyle == .kana)
         #expect(service.handle(WireRequest(id: 31, body: .menu(command: .toggleLiveConversion)), from: id).body == .done)
         #expect(settings.current.liveConversion)
         #expect(service.handle(WireRequest(id: 32, body: .menu(command: .openSettings)), from: id).body == .done)
         #expect(opened.value == 1)
-        #expect(service.handle(WireRequest(id: 33, body: .menu(command: .selectInputStyle(style: "unknown"))), from: id).body == .error(code: .malformed))
-        #expect(settings.current.inputStyle == .kana)
     }
 
     @Test("見た目の設定は設定の値を運ぶ")

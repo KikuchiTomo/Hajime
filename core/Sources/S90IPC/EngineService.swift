@@ -147,9 +147,6 @@ public final class EngineService {
         case .menu(let command):
             // 入力メニュー(言語バーの項目)で選んだ操作．キー設定の表の同じコマンドと同じに扱う
             switch command {
-            case .selectInputStyle(let name):
-                guard let style = InputStyle(rawValue: name) else { return .error(code: .malformed) }
-                perform(.selectInputStyle(style))
             case .toggleLiveConversion:
                 perform(.toggleLiveConversion)
             case .openSettings:
