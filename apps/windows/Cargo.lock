@@ -102,6 +102,7 @@ dependencies = [
 name = "settings"
 version = "0.1.0"
 dependencies = [
+ "candidate-ui",
  "ipc",
  "serde",
  "serde_json",

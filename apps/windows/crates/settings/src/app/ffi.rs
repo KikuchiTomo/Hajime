@@ -373,6 +373,39 @@ fn show_dialog(
     }
 }
 
+/// 色を選ぶ窓を出し，選んだ色を返す．キャンセルしたら None
+pub fn choose_color(owner: HWND, current: Option<(u8, u8, u8)>) -> Option<(u8, u8, u8)> {
+    use windows::Win32::UI::Controls::Dialogs::{
+        ChooseColorW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW,
+    };
+    thread_local! {
+        /// 窓の「作成した色」(窓を開き直しても残す)
+        static CUSTOM: std::cell::RefCell<[COLORREF; 16]> = const { std::cell::RefCell::new([COLORREF(0x00FF_FFFF); 16]) };
+    }
+    let (red, green, blue) = current.unwrap_or((0, 0, 0));
+    CUSTOM.with(|custom| {
+        let mut custom = custom.borrow_mut();
+        let mut dialog = CHOOSECOLORW {
+            lStructSize: std::mem::size_of::<CHOOSECOLORW>() as u32,
+            hwndOwner: owner,
+            rgbResult: COLORREF(u32::from(red) | (u32::from(green) << 8) | (u32::from(blue) << 16)),
+            lpCustColors: custom.as_mut_ptr(),
+            Flags: CC_FULLOPEN | CC_RGBINIT,
+            ..Default::default()
+        };
+        // SAFETY: dialog と custom は呼び出しのあいだ生きている
+        let chosen = unsafe { ChooseColorW(&mut dialog) }.as_bool();
+        chosen.then(|| {
+            let value = dialog.rgbResult.0;
+            (
+                (value & 0xff) as u8,
+                ((value >> 8) & 0xff) as u8,
+                ((value >> 16) & 0xff) as u8,
+            )
+        })
+    })
+}
+
 /// UTC の年・月・日・時・分・秒を，この PC の地方時にする
 pub fn local_time([year, month, day, hour, minute, second]: [u16; 6]) -> Option<[u16; 6]> {
     let universal = SYSTEMTIME {

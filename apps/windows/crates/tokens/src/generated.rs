@@ -287,6 +287,7 @@ pub mod size {
         pub const SCROLL_LINE: f32 = 40.0;
         pub const LIST_HEIGHT: f32 = 220.0;
         pub const BUTTON_WIDTH: f32 = 96.0;
+        pub const PREVIEW_HEIGHT: f32 = 240.0;
         pub const BUTTON_PADDING_X: f32 = 12.0;
         pub const PAGE_PADDING_TOP: f32 = 20.0;
         pub const TITLE_FONT_SIZE: f32 = 28.0;

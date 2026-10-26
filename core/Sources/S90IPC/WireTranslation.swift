@@ -59,6 +59,17 @@ extension WireCustomTheme {
     }
 }
 
+extension WireContrastPair {
+    public init(_ pair: CustomTheme.ContrastPair) {
+        switch pair {
+        case .text: self = .text
+        case .textMuted: self = .textMuted
+        case .selectionText: self = .selectionText
+        case .correction: self = .correction
+        }
+    }
+}
+
 extension WireColor {
     public init(_ color: HexColor) {
         self.init(red: color.red, green: color.green, blue: color.blue)

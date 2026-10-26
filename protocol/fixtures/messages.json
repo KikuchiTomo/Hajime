@@ -66,6 +66,7 @@
     { "id": 35, "body": { "type": "exportRuleList", "list": "correctionRules", "path": "C:\\replacements.tsv" } },
     { "id": 36, "body": { "type": "readSymbolItems", "kind": "reading" } },
     { "id": 90, "body": { "type": "saveSymbolRule", "kind": "sequence", "input": "->", "output": "⇒", "isEnabled": true, "replacing": "->" } },
+    { "id": 94, "body": { "type": "checkCustomTheme", "theme": "{}" } },
     { "id": 92, "body": { "type": "importAssociationDictionary", "path": "C:\\related.txt" } },
     { "id": 93, "body": { "type": "removeAssociationDictionary", "id": "5B1E0C3A-0000-4000-8000-000000000001" } },
     { "id": 91, "body": { "type": "removeSymbolRules", "kind": "sequence", "inputs": ["->"] } },
@@ -123,6 +124,7 @@
     { "id": 16, "body": { "type": "imported", "added": 12, "skipped": 3 } },
     { "id": 17, "body": { "type": "fileFailed", "reason": "busy" } },
     { "id": 18, "body": { "type": "symbolItems", "items": [{ "input": "->", "output": "⇒", "isEnabled": true, "origin": "changed" }] } },
+    { "id": 92, "body": { "type": "themeReport", "issues": [{ "pair": "textMuted", "ratio": 2.5, "minimum": 4.5 }] } },
     { "id": 91, "body": { "type": "associationImported", "dictionary": { "id": "5B1E0C3A-0000-4000-8000-000000000001", "name": "related", "groupCount": 12 } } },
     { "id": 90, "body": { "type": "symbolSaved", "result": "full" } }
   ],

@@ -9,8 +9,8 @@ use crate::pages::DictionaryList;
 use crate::store::{Fields, SettingsStore, StoreError};
 use crate::usage::Usage;
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, KeymapReport, PreviewWord,
-    RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolSaveResult, SyncStatus,
+    ContrastIssue, DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, KeymapReport,
+    PreviewWord, RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolSaveResult, SyncStatus,
 };
 
 /// 要求を 1 つ送って応答を待つ口．応答が無い(つながらない・時間切れ)ときは None
@@ -175,6 +175,18 @@ impl<E: Engine> EngineStore<E> {
             Some(ResponseBody::FileFailed { reason }) => Ok(FileOutcome::Failed(reason)),
             Some(ResponseBody::Error { .. }) => Err(StoreError::Rejected),
             Some(_) => Err(StoreError::Malformed),
+        }
+    }
+
+    /// カスタムテーマ(設定のファイルと同じ形)の読みにくい組み合わせ
+    pub fn check_custom_theme(
+        &self,
+        theme: &serde_json::Value,
+    ) -> Result<Vec<ContrastIssue>, StoreError> {
+        let theme = serde_json::to_string(theme).map_err(|_| StoreError::Malformed)?;
+        match self.send(RequestBody::CheckCustomTheme { theme })? {
+            ResponseBody::ThemeReport { issues } => Ok(issues),
+            _ => Err(StoreError::Malformed),
         }
     }
 

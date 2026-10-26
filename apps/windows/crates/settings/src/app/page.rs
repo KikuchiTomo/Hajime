@@ -18,8 +18,8 @@ use ipc::SymbolKind;
 use serde_json::Value;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::LPARAM;
-use windows::Win32::Graphics::Gdi::{DT_RIGHT, DT_SINGLELINE, DT_VCENTER};
-use windows::Win32::System::SystemServices::{SS_ENDELLIPSIS, SS_NOPREFIX, SS_RIGHT};
+use windows::Win32::Graphics::Gdi::{DT_LEFT, DT_RIGHT, DT_SINGLELINE, DT_VCENTER};
+use windows::Win32::System::SystemServices::{SS_ENDELLIPSIS, SS_NOPREFIX, SS_OWNERDRAW, SS_RIGHT};
 use windows::Win32::UI::Controls::{
     EM_SETCUEBANNER, LVN_GETEMPTYMARKUP, LVN_ITEMCHANGED, LVS_NOSORTHEADER, LVS_REPORT,
     LVS_SHOWSELALWAYS, WC_LISTVIEW,
@@ -77,6 +77,19 @@ pub enum Event {
     },
     /// 選んだ項目の同期の範囲を切り替える(表の行の番号)
     SyncToggleFields(Vec<usize>),
+    /// カスタムテーマの一覧の操作(index は選んだ行，name はそのテーマの名前)
+    ThemeList {
+        action: ThemeAction,
+        index: Option<usize>,
+        name: String,
+    },
+    /// カスタムテーマの一覧で行を選んだ(選んでいなければ None)
+    ThemeSelected(Option<usize>),
+    /// 色を選ぶ窓を出す(path の値を変える．current は今の色)
+    ChooseColor {
+        path: &'static str,
+        current: String,
+    },
     /// 辞書の一覧の操作(index は選んだ行)
     DictionaryList {
         list: DictionaryList,
@@ -90,6 +103,40 @@ pub enum Event {
         text: String,
         preceding: String,
     },
+}
+
+/// カスタムテーマの一覧のボタンの操作
+#[derive(Debug, Clone, PartialEq)]
+pub enum ThemeAction {
+    /// 入力欄の名前に変える
+    Rename(String),
+    /// 今のテーマを写して新しく作る
+    Create,
+    /// 今使っているテーマを複製する
+    DuplicateCurrent,
+    Use,
+    Duplicate,
+    Delete,
+}
+
+impl ThemeAction {
+    /// 表の下のボタンの並び(pages::Control::list_buttons と同じ)
+    const BOTTOM: [ThemeAction; 5] = [
+        ThemeAction::Create,
+        ThemeAction::DuplicateCurrent,
+        ThemeAction::Use,
+        ThemeAction::Duplicate,
+        ThemeAction::Delete,
+    ];
+}
+
+/// 表の下のボタンのうち，行を選ばなくても使える先頭のボタンの数(作る・取り込む)
+fn always_enabled(control: &Control) -> usize {
+    match control {
+        Control::CustomThemes(_) => 2,
+        Control::Dictionaries(..) => 1,
+        _ => 0,
+    }
 }
 
 /// 辞書の一覧のボタンの操作
@@ -149,29 +196,34 @@ impl<S: SettingsStore> Values for SettingsModel<S> {
     }
 }
 
-/// 設定の値に，同期の状態の値(「sync.」の道筋．crate::sync)を重ねたもの
-pub struct WithSync<'a, V: Values> {
-    pub values: &'a V,
-    pub sync: &'a crate::store::Fields,
+/// 設定のファイルの項目でない値の道筋か(同期の状態「sync.」と，編集しているカスタムテーマ「customTheme.」)
+pub fn is_extra_path(path: &str) -> bool {
+    crate::sync::is_sync_path(path) || crate::themes::is_theme_path(path)
 }
 
-impl<V: Values> Values for WithSync<'_, V> {
+/// 設定の値に，同期の状態と編集しているカスタムテーマの値(is_extra_path の道筋)を重ねたもの
+pub struct WithExtras<'a, V: Values> {
+    pub values: &'a V,
+    pub extra: &'a crate::store::Fields,
+}
+
+impl<V: Values> Values for WithExtras<'_, V> {
     fn value(&self, path: &str) -> Option<&Value> {
-        if crate::sync::is_sync_path(path) {
-            return self.sync.get(path);
+        if is_extra_path(path) {
+            return self.extra.get(path);
         }
         self.values.value(path)
     }
 
-    /// 同期の値には既定に戻すボタンを出さない
+    /// 重ねた値には既定に戻すボタンを出さない
     fn is_default(&self, path: &str) -> bool {
-        crate::sync::is_sync_path(path) || self.values.is_default(path)
+        is_extra_path(path) || self.values.is_default(path)
     }
 
-    /// 同期の値はエンジンから読めたときだけ使える
+    /// 重ねた値は読めたときだけ使える
     fn is_readable(&self, path: &str) -> bool {
-        if crate::sync::is_sync_path(path) {
-            return self.sync.contains_key(path);
+        if is_extra_path(path) {
+            return self.extra.contains_key(path);
         }
         self.values.is_readable(path)
     }
@@ -186,8 +238,10 @@ pub struct Extras {
     /// 記号の一覧(入力・記号・状態)．連続入力と読み
     pub sequences: Vec<Vec<String>>,
     pub readings: Vec<Vec<String>>,
-    /// 同期の状態の値(「sync.」の道筋)
-    pub sync: crate::store::Fields,
+    /// 同期の状態と編集しているカスタムテーマの値(is_extra_path の道筋)
+    pub extra: crate::store::Fields,
+    /// カスタムテーマの読みにくい組み合わせの知らせ(無ければ空)
+    pub theme_report: String,
     /// 同期のフォルダの名前と最後に同期した時刻(出す形)
     pub sync_folder: String,
     pub last_synced: String,
@@ -224,8 +278,10 @@ struct RowView {
     /// 一覧の入力欄とボタン(layout の CardLayout::parts と同じ並び)
     parts: Vec<Window>,
     visible: bool,
-    /// 辞書の一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
+    /// 辞書・カスタムテーマの一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
     dictionary_inputs: Vec<Vec<String>>,
+    /// 色のボタンに出す色(「#RRGGBB」)
+    color: String,
 }
 
 impl RowView {
@@ -261,7 +317,7 @@ impl RowView {
     fn list_parts(&self) -> Option<(&[Window], Window, Window)> {
         if matches!(
             self.row.control,
-            Control::SyncFields(_) | Control::Dictionaries(..)
+            Control::SyncFields(_) | Control::Dictionaries(..) | Control::CustomThemes(_)
         ) {
             return None;
         }
@@ -274,9 +330,10 @@ impl RowView {
         ))
     }
 
-    /// 辞書の一覧の入力欄・更新のボタン・表の下のボタン(取り込む・再読み込み・上げる・下げる・切り替え・削除)
+    /// 辞書・カスタムテーマの一覧の入力欄・更新のボタン・表の下のボタン
     fn dictionary_parts(&self) -> Option<(&[Window], Window, &[Window])> {
-        let Control::Dictionaries(_, spec) = &self.row.control else {
+        let (Control::Dictionaries(_, spec) | Control::CustomThemes(spec)) = &self.row.control
+        else {
             return None;
         };
         let fields = spec.fields.len();
@@ -459,7 +516,11 @@ impl PageView {
                 pages::holds(condition, |path| values.text(path), |path| values.on(path))
             };
             row.visible = row.row.visible.is_none_or(condition)
-                && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty());
+                && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty())
+                && (row.row.control != Control::ThemeReport || !extras.theme_report.is_empty());
+            if row.row.control == Control::Color {
+                row.color = values.text(row.row.path);
+            }
             let readable = row.row.path.is_empty() || values.is_readable(row.row.path);
             let enabled = readable && row.row.enabled.is_none_or(condition);
             for window in row.windows().collect::<Vec<_>>() {
@@ -479,18 +540,29 @@ impl PageView {
             if let Some(toggle) = row.toggle_button() {
                 ffi::enable(toggle, false);
             }
-            if let Control::Dictionaries(list, _) = &row.row.control {
-                let entries = crate::dictionaries::entries(*list, values.value(list.path()));
-                row.dictionary_inputs = entries
-                    .iter()
-                    .map(|entry| crate::dictionaries::inputs(*list, entry))
-                    .collect();
+            match &row.row.control {
+                Control::Dictionaries(list, _) => {
+                    let entries = crate::dictionaries::entries(*list, values.value(list.path()));
+                    row.dictionary_inputs = entries
+                        .iter()
+                        .map(|entry| crate::dictionaries::inputs(*list, entry))
+                        .collect();
+                }
+                Control::CustomThemes(_) => {
+                    row.dictionary_inputs =
+                        crate::themes::entries(values.value(crate::themes::THEMES))
+                            .into_iter()
+                            .map(|entry| vec![entry.name])
+                            .collect();
+                }
+                _ => {}
             }
             if let Some((_, update, bottom)) = row.dictionary_parts() {
-                // 選んだ行に効くボタンは，行を選ぶまで使えなくする(取り込むボタンだけはいつでも使える)
+                // 選んだ行に効くボタンは，行を選ぶまで使えなくする(作る・取り込むボタンはいつでも使える)
+                let always = always_enabled(&row.row.control);
                 ffi::enable(update, false);
                 for (index, button) in bottom.iter().enumerate() {
-                    ffi::enable(*button, enabled && index == 0);
+                    ffi::enable(*button, enabled && index < always);
                 }
             }
             if let Some(label) = row.label {
@@ -648,6 +720,38 @@ impl PageView {
                 }
             });
         }
+        if let (Control::CustomThemes(_), Some((fields, update, bottom))) =
+            (&row.row.control, row.dictionary_parts())
+        {
+            if notification != BN_CLICKED {
+                return None;
+            }
+            let index = row
+                .control
+                .map(ffi::list_selected)
+                .and_then(|indices| indices.first().copied());
+            let action = if window == update {
+                ThemeAction::Rename(fields.first().map(|field| ffi::window_text(*field))?)
+            } else {
+                let position = bottom.iter().position(|button| *button == window)?;
+                ThemeAction::BOTTOM.get(position)?.clone()
+            };
+            let name = index
+                .and_then(|index| row.dictionary_inputs.get(index))
+                .and_then(|inputs| inputs.first().cloned())
+                .unwrap_or_default();
+            return Some(Event::ThemeList {
+                action,
+                index,
+                name,
+            });
+        }
+        if let (Control::Color, BN_CLICKED) = (&row.row.control, notification) {
+            return Some(Event::ChooseColor {
+                path: row.row.path,
+                current: row.color.clone(),
+            });
+        }
         if let (Control::Dictionaries(list, _), Some((fields, update, bottom))) =
             (&row.row.control, row.dictionary_parts())
         {
@@ -771,28 +875,29 @@ impl PageView {
     }
 
     /// 一覧からの WM_NOTIFY．空のときの文を返し，行を選んだら削除のボタンを使えるようにする．扱ったら true
-    pub fn notify(&self, window: Window, code: u32, lparam: LPARAM) -> bool {
+    /// 一覧からの WM_NOTIFY．扱ったか(true なら既定の処理をしない)と，頼み(カスタムテーマを選んだなど)を返す
+    pub fn notify(&self, window: Window, code: u32, lparam: LPARAM) -> (bool, Option<Event>) {
         let Some(row) = self
             .rows
             .iter()
             .flatten()
             .find(|row| row.control == Some(window))
         else {
-            return false;
+            return (false, None);
         };
         let Some((spec, _)) = row.list_spec() else {
-            return false;
+            return (false, None);
         };
         match code {
             LVN_GETEMPTYMARKUP => {
                 ffi::set_empty_markup(lparam, spec.empty);
-                true
+                (true, None)
             }
             LVN_ITEMCHANGED => {
                 let selected = !ffi::list_selected(window).is_empty();
                 if let Some((fields, update, bottom)) = row.dictionary_parts() {
                     ffi::enable(update, selected);
-                    for button in bottom.iter().skip(1) {
+                    for button in bottom.iter().skip(always_enabled(&row.row.control)) {
                         ffi::enable(*button, selected);
                     }
                     // 選んだ辞書の名前などを入力欄に出す(書き換えて「更新」を押す)
@@ -821,10 +926,21 @@ impl PageView {
                 if let Some(toggle) = row.toggle_button() {
                     ffi::enable(toggle, selected);
                 }
-                false
+                // カスタムテーマを選んだら，下の行でそのテーマを編集する
+                let event = matches!(row.row.control, Control::CustomThemes(_))
+                    .then(|| Event::ThemeSelected(ffi::list_selected(window).first().copied()));
+                (false, event)
             }
-            _ => false,
+            _ => (false, None),
         }
+    }
+
+    /// 外観の見本の部品か
+    pub fn is_preview(&self, window: Window) -> bool {
+        self.rows
+            .iter()
+            .flatten()
+            .any(|row| row.row.control == Control::ThemePreview && row.control == Some(window))
     }
 
     /// 試した結果を出す
@@ -887,6 +1003,10 @@ impl PageView {
         canvas.fill(target.rect, palette.card);
         if row.reset == Some(target.window) {
             draw_reset(&canvas, target, theme);
+            return true;
+        }
+        if row.row.control == Control::Color {
+            draw_color(&canvas, target, theme, &row.color);
             return true;
         }
         if row.row.control != Control::Toggle {
@@ -957,6 +1077,51 @@ impl PageView {
     }
 }
 
+/// 色のボタン．枠の中に色の見本と「#RRGGBB」を並べる
+fn draw_color(canvas: &Canvas, target: &DrawTarget, theme: &Theme, color: &str) {
+    let palette = &theme.palette;
+    let fill = if target.hot || target.pressed {
+        palette.nav_selected
+    } else {
+        palette.control
+    };
+    let stroke = if target.focused {
+        palette.accent
+    } else {
+        palette.control_stroke
+    };
+    canvas.round_rect(target.rect, theme.px(size::CARD_RADIUS), fill, Some(stroke));
+    let (left, top, right, bottom) = target.rect;
+    let gap = theme.px(size::CONTROL_GAP);
+    let swatch_size = (bottom - top) - gap * 2;
+    let swatch = (
+        left + gap,
+        top + gap,
+        left + gap + swatch_size,
+        top + gap + swatch_size,
+    );
+    if let Some((red, green, blue)) = crate::themes::rgb(color) {
+        canvas.round_rect(
+            swatch,
+            theme.px(size::CARD_RADIUS),
+            tokens::Rgb { red, green, blue },
+            Some(palette.control_stroke),
+        );
+    }
+    let text_color = if target.disabled {
+        palette.text_secondary
+    } else {
+        palette.text
+    };
+    canvas.text(
+        (swatch.2 + gap, top, right - gap, bottom),
+        color,
+        &theme.fonts.body,
+        text_color,
+        DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+    );
+}
+
 fn draw_reset(canvas: &Canvas, target: &DrawTarget, theme: &Theme) {
     let palette = &theme.palette;
     if target.hot || target.pressed {
@@ -1025,6 +1190,7 @@ fn create_row(
         parts: Vec::new(),
         visible: true,
         dictionary_inputs: Vec::new(),
+        color: String::new(),
     };
     match &row.control {
         Control::Note => {
@@ -1073,6 +1239,12 @@ fn create_row(
             row.title,
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
         ),
+        // 色の見本と「#RRGGBB」を自分で描く(NM_CUSTOMDRAW)．名前は読み上げのために項目の名前にする
+        Control::Color => (
+            w!("BUTTON"),
+            row.title,
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
+        ),
         Control::Stat(_) | Control::Info(_) => (
             w!("STATIC"),
             "",
@@ -1093,9 +1265,23 @@ fn create_row(
             view.control = create_notices(host, theme, next_id());
             return view;
         }
-        Control::KeymapReport => {
+        Control::KeymapReport | Control::ThemeReport => {
             view.label = None;
             view.control = create_read_only(host, theme, "", next_id());
+            return view;
+        }
+        Control::ThemePreview => {
+            // 見本は窓(s90-settings の window)が候補ウィンドウと同じ描き方で描く(WM_DRAWITEM)
+            view.label = None;
+            view.control = ffi::create(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                row.title,
+                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_OWNERDRAW.0),
+                (0, 0, 0, 0),
+                Some(host),
+                next_id(),
+            );
             return view;
         }
         Control::Note
@@ -1104,7 +1290,8 @@ fn create_row(
         | Control::Dictionary(_)
         | Control::Symbols(..)
         | Control::SyncFields(_)
-        | Control::Dictionaries(..) => return view,
+        | Control::Dictionaries(..)
+        | Control::CustomThemes(_) => return view,
     };
     view.control = ffi::create(
         WINDOW_EX_STYLE::default(),
@@ -1393,6 +1580,13 @@ fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values,
         Control::KeymapReport => {
             ffi::set_text(control, &extras.keymap_report.replace('\n', "\r\n"))
         }
+        Control::ThemeReport => ffi::set_text(control, &extras.theme_report.replace('\n', "\r\n")),
+        Control::CustomThemes(_) => {
+            let entries = crate::themes::entries(values.value(crate::themes::THEMES));
+            let active = values.value(crate::themes::ACTIVE).and_then(Value::as_str);
+            ffi::list_set_rows(control, &crate::themes::table(&entries, active));
+        }
+        Control::Color | Control::ThemePreview => ffi::invalidate(control),
         Control::Action(_)
         | Control::Note
         | Control::Preview

@@ -187,6 +187,44 @@ pub mod more {
     pub const CORRECTION_DELAY: &str = "見直すまでの待ち時間";
     pub const THEME: &str = "テーマ";
     pub const CUSTOM_THEMES: &str = "カスタムテーマ";
+    pub const DUPLICATE: &str = "今のテーマを複製";
+    pub const DELETE_THEME: &str = "削除";
+    pub const THEME_NAME: &str = "名前";
+    pub const COLORS: &str = "色";
+    pub const SURFACE: &str = "背景";
+    pub const TEXT: &str = "文字";
+    pub const TEXT_MUTED: &str = "補助の文字";
+    pub const SELECTION: &str = "選択";
+    pub const SELECTION_TEXT: &str = "選択中の文字";
+    pub const CORRECTION: &str = "修正の印";
+    pub const LINE: &str = "線";
+    pub const SHAPE: &str = "形";
+    pub const CORNER_RADIUS: &str = "角の丸さ";
+    pub const BRANCH_STYLE: &str = "枝";
+    pub const THEME_FONT: &str = "テーマに合わせる";
+    pub const DUPLICATE_THEME: &str = "複製";
+    pub const NEW_THEME_NAME: &str = "新しいテーマ";
+    pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
+    pub const PREVIEW: &str = "見本";
+    pub const READABILITY: &str = "読みやすさ";
+    pub const INVALID_THEME: &str = "名前を入れてください";
+
+    pub fn copy_name(name: &str) -> String {
+        format!("{name} のコピー")
+    }
+
+    pub fn themes_full(limit: usize) -> String {
+        format!("カスタムテーマは {limit} 個までです")
+    }
+
+    pub fn confirm_delete_theme(name: &str) -> String {
+        format!("「{name}」を削除しますか？")
+    }
+
+    /// 読みにくい組み合わせの知らせ(UIStrings.More.lowContrast と同じ文)
+    pub fn low_contrast(name: &str, ground: &str, ratio: f64, minimum: f64) -> String {
+        format!("{name}と{ground}の色が近く、読みにくくなっています。コントラスト比は {ratio:.1} で、{minimum:.1} 以上が目安です。")
+    }
     pub const FONT: &str = "書体";
     pub const BACKUP: &str = "バックアップ";
     pub const IMPORT_CSV: &str = "CSV を読み込む…";
@@ -505,6 +543,11 @@ pub mod windows {
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
     pub const DISABLED: &str = "無効";
+    /// カスタムテーマをすぐ作って下で編集する(macOS は編集の画面を開くので「…」が付く)
+    pub const CREATE_THEME: &str = "カスタムテーマを作成";
+    /// 選んだカスタムテーマを使う(macOS は行を押して使う)
+    pub const USE_THEME: &str = "使用";
+    pub const IN_USE: &str = "使用中";
     /// 取り込んだ辞書の一覧の内容の列(macOS は名前の下に小さく出す)
     pub const DICTIONARY_SUMMARY: &str = "内容";
     /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
