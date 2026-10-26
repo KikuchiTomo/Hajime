@@ -24,6 +24,8 @@ public final class InputSession {
     private var composition = Composition()
     /// ローマ字の表．利用者が足した綴りが変わったときだけ作り直す
     private var romajiTable: (rules: [RomajiRule], table: RomajiTable) = ([], .standard)
+    /// 記号をまとめる決まり．利用者の変えた決まりが変わったときだけ作り直す
+    private var symbolSequences: (rules: [SymbolRule], set: SymbolSequenceSet) = ([], .standard)
     private var phase: Phase = .composing
     /// 英単語の補正(R-02)
     private let corrector: EnglishWordCorrector
@@ -94,6 +96,13 @@ public final class InputSession {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
             return KeyResult(handled: false, actions: commitAll())
         }
+        if mode == .japanese, event.isKeypad, settings.current.keypadDirect, case .character(let character) = event.key {
+            // テンキーの数字と記号は，組み立て中の文字を確定してから半角のまま確定する(設定)
+            return KeyResult(handled: true, actions: commitAll() + [.commit(String(character))])
+        }
+        if !(event.key == .kana && event.modifiers.contains(.option)), let result = applyModeKey(event) {
+            return result
+        }
         switch mode {
         case .direct: return handleDirect(event, context: context)
         case .japanese: return handleJapanese(event, context: context)
@@ -129,6 +138,22 @@ public final class InputSession {
         return KeyResult(handled: false, actions: actions + [.selectMode(.direct)] + modeIndicator(.direct))
     }
 
+    /// 日本語と英数を切り替えるキー(英数・かな・半角/全角・変換・無変換)．割り当て(ModeKeyAssignments)に従う．
+    /// 切り替えに使わないキーは nil を返し，ふつうの処理に回す
+    private func applyModeKey(_ event: KeyEvent) -> KeyResult? {
+        let keys = settings.current.modeKeys
+        guard let action = keys.action(for: event.key), action != .none,
+            let target = keys.mode(after: event.key, from: mode) else { return nil }
+        guard target != mode else {
+            // すでにそのモードなら，モードを出すだけ
+            return KeyResult(handled: true, actions: modeIndicator(target))
+        }
+        let actions = target == .direct ? commitAll() : []
+        mode = target
+        if target == .direct { terminal.endLine() }
+        return KeyResult(handled: true, actions: actions + [.selectMode(target)] + modeIndicator(target))
+    }
+
     /// 入力位置の近くにモードを出す操作．設定で切っていれば出さない
     private func modeIndicator(_ mode: InputMode) -> [ClientAction] {
         settings.current.showsModeIndicator ? [.showModeIndicator(mode)] : []
@@ -144,7 +169,7 @@ public final class InputSession {
     /// 打鍵がさらに止まるのを待って，打ち間違いを見直すか．待っていれば，止まったときに review を呼ぶ
     public var awaitsReview: Bool {
         isSettled && phase == .composing && corrector.active == nil && !readingCorrector.isReviewed(composition)
-            && settings.current.typoCorrection == .standard
+            && (settings.current.typoCorrection == .standard || settings.current.misreadings)
             && (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection
     }
 
@@ -168,12 +193,8 @@ public final class InputSession {
         case .yen:
             let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
             return KeyResult(handled: true, actions: [.commit(text)])
-        case .kana:
-            mode = .japanese
-            return KeyResult(handled: true, actions: [.selectMode(.japanese)] + modeIndicator(.japanese))
-        case .eisu:
-            return KeyResult(handled: true, actions: modeIndicator(.direct))
         default:
+            // 切り替えに使わないと決めた英数・かな・半角/全角・変換・無変換は，アプリに渡す
             return .passThrough
         }
     }
@@ -206,7 +227,7 @@ public final class InputSession {
     private static func continuesAfterStyleChange(_ event: KeyEvent) -> Bool {
         switch event.key {
         case .character: !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
-        case .yen, .eisu, .kana: true
+        case .yen, .eisu, .kana, .hankakuZenkaku, .henkan, .muhenkan: true
         default: false
         }
     }
@@ -237,13 +258,15 @@ public final class InputSession {
         case .kana where event.modifiers.contains(.option):
             // Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英語 → ローマ字)
             return KeyResult(handled: true, actions: commitAll() + [.selectInputStyle(nextInputStyle())])
-        case .kana:
-            return KeyResult(handled: true, actions: modeIndicator(.japanese))
-        case .eisu:
-            var actions = commitAll()
-            mode = .direct
-            actions += [.selectMode(.direct)] + modeIndicator(.direct)
-            return KeyResult(handled: true, actions: actions)
+        case .kana, .eisu, .hankakuZenkaku:
+            // 切り替えに使わないと決めたとき
+            return isComposing ? KeyResult(handled: true) : .passThrough
+        case .henkan:
+            // 変換キーは，切り替えに使わないときは Space と同じに変換する
+            return isComposing ? handleSpace(shift: false, context: context) : .passThrough
+        case .muhenkan:
+            // 無変換キーは，切り替えに使わないときはカタカナにする(Microsoft IME と同じ)
+            return isComposing ? selectVariant(.katakana, context: context) : .passThrough
         case .yen:
             let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
             return insertLiteral(text, rawKey: nil, context: context)
@@ -661,7 +684,9 @@ public final class InputSession {
     private func newComposition() -> Composition {
         let rules = settings.current.customRomaji
         if rules != romajiTable.rules { romajiTable = (rules, RomajiTable.standard(adding: rules)) }
-        return Composition(table: romajiTable.table)
+        let symbolRules = settings.current.symbolRules
+        if symbolRules != symbolSequences.rules { symbolSequences = (symbolRules, SymbolSequenceSet(rules: symbolRules)) }
+        return Composition(table: romajiTable.table, symbolSequences: symbolSequences.set)
     }
 
     private func reset() -> [ClientAction] {

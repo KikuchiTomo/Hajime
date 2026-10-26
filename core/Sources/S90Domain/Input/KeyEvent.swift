@@ -20,6 +20,12 @@ public struct KeyEvent: Sendable, Equatable {
         case yen
         /// ファンクションキー(F1〜F12 の番号)．F6〜F10 で字種を変える(R-03)
         case function(Int)
+        /// Windows の日本語キーボードの 半角/全角 キー
+        case hankakuZenkaku
+        /// Windows の日本語キーボードの 変換 キー
+        case henkan
+        /// Windows の日本語キーボードの 無変換 キー
+        case muhenkan
     }
 
     public struct Modifiers: OptionSet, Sendable, Hashable {
@@ -37,11 +43,14 @@ public struct KeyEvent: Sendable, Equatable {
     /// 押したキーの JIS キーボードでの刻印(「q」「1」「@」など)．かな入力でかなを引くのに使う(KanaLayout)．
     /// 配列によらず位置で決まるので，アダプタが分かるときだけ入れる
     public var keyLabel: String?
+    /// テンキーで打ったか(数字と + - * / . =)．テンキーの数字を半角で確定する設定に使う
+    public var isKeypad: Bool
 
-    public init(_ key: Key, modifiers: Modifiers = [], keyLabel: String? = nil) {
+    public init(_ key: Key, modifiers: Modifiers = [], keyLabel: String? = nil, isKeypad: Bool = false) {
         self.key = key
         self.modifiers = modifiers
         self.keyLabel = keyLabel
+        self.isKeypad = isKeypad
     }
 }
 

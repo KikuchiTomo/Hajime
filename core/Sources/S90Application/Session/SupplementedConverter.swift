@@ -7,6 +7,9 @@ import S90Domain
 ///   たどらないので，辞書に無い読みの語は出ない．読み全体が一致する語はここで確実に出す(同じ語は重ねない)
 /// - 記号(SymbolDictionary): 「やじるし」→「→」など
 /// - 日付と時刻(DateExpressions): 「きょう」→「2026/10/26」など
+/// - 計算(Calculator): 「1+2*3=」→「7」「1+2*3=7」．結果を先頭に置く(式を打って「=」を打つのは計算したいときなので)
+/// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
+/// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
 ///
 /// 記号と日付は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
 /// 第 1 候補(ライブ変換で見える文字)は変えず，よく使う語より前に並ばないようにする
@@ -42,15 +45,21 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     private func supplement(_ candidates: [Candidate], reading: String) -> [Candidate] {
         let current = settings.current
-        var result = candidates
+        var result = Okurigana.reorder(candidates, style: current.okuriganaStyle)
         let userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         insert(userWords, into: &result, at: 0, reading: reading, origin: .userDictionary)
         var extra: [String] = []
-        if current.symbolConversion { extra += SymbolDictionary.symbols(for: reading) }
+        if current.symbolConversion { extra += SymbolDictionary.symbols(for: reading, rules: current.symbolRules) }
         if current.dateConversion {
             extra += DateExpressions.candidates(for: reading, now: calendar.now(), day: calendar.day(offsetFromToday:))
         }
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
+        if current.misreadings, let entry = Misreadings.entry(for: reading) {
+            insert([entry.word], into: &result, at: 1, reading: reading, origin: .symbol)
+        }
+        if current.calculation, let calculation = Calculator.evaluate(reading: reading) {
+            insert([calculation.result, calculation.expression + "=" + calculation.result], into: &result, at: 0, reading: reading, origin: .symbol)
+        }
         return result
     }
 
