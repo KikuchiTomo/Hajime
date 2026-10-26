@@ -122,7 +122,7 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.menu(actions: .init(target: self, toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
+        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
     }
 
     /// InputMethodKit は入力メニューの項目を選ぶと，ここに動作の名前を渡す．届いたかを記録してから既定の処理(自分のメソッドを呼ぶ)に回す

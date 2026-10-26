@@ -25,6 +25,9 @@ if CommandLine.arguments.contains("--open-settings") {
 }
 #endif
 
+// 入力メニューの動作がどこまで届くかを記録する(調査用)
+MainActor.assumeIsolated { MenuDispatchTrace.install() }
+
 guard let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String,
     let server = IMKServer(name: connectionName, bundleIdentifier: Bundle.main.bundleIdentifier) else {
     logger.fault("IMKServer を作れませんでした")
