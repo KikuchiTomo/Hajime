@@ -18,6 +18,8 @@ public final class AzooKeyConverterEngine {
     private lazy var emojiReplacer = TextReplacer.withDefaultEmojiDictionary()
     private var usesEmoji = true
     private var userDictionary: [UserDictionaryEntry] = []
+    /// 取り込んだ辞書から引いた語(R-16)．ユーザー辞書と合わせて動的な辞書としてエンジンに渡す
+    private var auxiliaryWords: [AuxiliaryWord] = []
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
@@ -71,11 +73,42 @@ public final class AzooKeyConverterEngine {
         let entries = settings.userDictionary.filter(\.isValid).prefix(DefaultSettings.maximumUserDictionaryEntries)
         if Array(entries) != userDictionary {
             userDictionary = Array(entries)
-            converter.importDynamicUserDictionary(userDictionary.map {
-                // 品詞は固有名詞として登録する(azooKey-Desktop と同じ)
-                DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.reading), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid,
-                               value: DefaultSettings.userDictionaryWordCost)
-            })
+            importDynamicUserDictionary()
+        }
+    }
+
+    /// 取り込んだ辞書から引いた語を入れ替える．変わったら true
+    fileprivate func setAuxiliaryWords(_ words: [AuxiliaryWord]) -> Bool {
+        guard words != auxiliaryWords else { return false }
+        auxiliaryWords = words
+        importDynamicUserDictionary()
+        return true
+    }
+
+    /// ユーザー辞書と取り込んだ辞書の語を，動的な辞書としてエンジンに渡す
+    private func importDynamicUserDictionary() {
+        // ユーザー辞書の語は固有名詞として登録する
+        let user = userDictionary.map {
+            DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.reading), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid,
+                           value: DefaultSettings.userDictionaryWordCost)
+        }
+        let imported = auxiliaryWords.map {
+            DicdataElement(word: $0.word.word, ruby: KanaWidth.katakana(from: $0.word.reading), cid: Self.cid(for: $0.word.wordClass),
+                           mid: MIDData.一般.mid, value: DefaultSettings.importedWordCost + $0.costOffset)
+        }
+        converter.importDynamicUserDictionary(user + imported)
+    }
+
+    private static func cid(for wordClass: WordClass) -> Int {
+        switch wordClass {
+        case .noun: CIDData.一般名詞.cid
+        case .properNoun: CIDData.固有名詞.cid
+        case .personName: CIDData.人名一般.cid
+        case .surname: CIDData.人名姓.cid
+        case .givenName: CIDData.人名名.cid
+        case .organization: CIDData.固有名詞組織.cid
+        case .place: CIDData.地名一般.cid
+        case .symbol: CIDData.記号.cid
         }
     }
 
@@ -253,6 +286,13 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         }
         // 確定すると学習で順位が変わるので，同じ読みでも求め直す
         cache = [:]
+    }
+
+    /// 取り込んだ辞書の語が変わったら，前の結果は使えないので捨て，次は差分ではなく一から変換する
+    func setAuxiliaryWords(_ words: [AuxiliaryWord]) {
+        guard engine.setAuxiliaryWords(words) else { return }
+        cache = [:]
+        lastRequested = nil
     }
 
     func endComposition() {

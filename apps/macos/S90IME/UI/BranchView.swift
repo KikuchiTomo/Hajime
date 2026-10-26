@@ -333,8 +333,10 @@ final class BranchView: NSView {
     }
 
     private func footerWidth(_ panel: LatticePanel) -> CGFloat {
-        if let note = panel.note { return textWidth(note, font: labelFont) }
-        return GlassDrawing.hintsWidth(hints, theme: theme)
+        let source = panel.columns.first(where: \.isFocused)?.sourceName
+            .map { textWidth(UIStrings.Branch.dictionarySource($0), font: labelFont) + Size.paddingX } ?? 0
+        if let note = panel.note { return textWidth(note, font: labelFont) + source }
+        return GlassDrawing.hintsWidth(hints, theme: theme) + source
     }
 
     private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat) {
@@ -356,6 +358,12 @@ final class BranchView: NSView {
         }
         let position = position(of: panel)
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
+        if let source = panel.columns.first(where: \.isFocused)?.sourceName {
+            // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を位置の左に小さく出す(R-16)
+            let label = UIStrings.Branch.dictionarySource(source)
+            let x = footer.maxX - textWidth(position, font: labelFont) - Size.paddingX - textWidth(label, font: labelFont)
+            drawText(label, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: x, in: footer)
+        }
     }
 
     // MARK: - 部品

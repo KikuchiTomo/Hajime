@@ -51,6 +51,15 @@ public enum KanaWidth {
         }))
     }
 
+    /// カタカナをひらがなにする(ァ〜ヶ)．ほかの文字はそのまま
+    public static func hiragana(from text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
+            let katakana = (hiraganaRange.lowerBound + hiraganaToKatakanaOffset)...(hiraganaRange.upperBound + hiraganaToKatakanaOffset)
+            guard katakana.contains(scalar.value), let converted = Unicode.Scalar(scalar.value - hiraganaToKatakanaOffset) else { return scalar }
+            return converted
+        }))
+    }
+
     public static func fullwidthASCII(from text: String) -> String {
         String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
             if scalar == " " { return "\u{3000}" }

@@ -101,7 +101,7 @@ struct SettingsView: View {
         case .correction: CorrectionPage(model: model)
         case .symbols: SymbolsPage(model: model)
         case .keys: KeysTab(model: model)
-        case .dictionary: DictionaryTab(model: model)
+        case .dictionary: DictionaryPage(model: model)
         case .romaji: RomajiTab(model: model)
         case .apps: ExclusionsPage(model: model)
         case .appearance: AppearancePage(model: model)
@@ -228,6 +228,30 @@ private struct ConversionTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// 辞書のページ．登録した単語と，取り込んだ辞書(R-16)を切り替えて出す
+private struct DictionaryPage: View {
+    @ObservedObject var model: SettingsModel
+    @State private var showsImported = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $showsImported) {
+                Text(UIStrings.Dictionaries.userWords).tag(false)
+                Text(UIStrings.Dictionaries.imported).tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .padding(.vertical, 8)
+            if showsImported {
+                ImportedDictionariesView(model: model)
+            } else {
+                DictionaryTab(model: model).padding()
+            }
+        }
     }
 }
 
