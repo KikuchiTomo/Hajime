@@ -386,6 +386,48 @@
       ]
     },
     {
+      "name": "PreviewWord",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "typed",
+          "type": "string"
+        },
+        {
+          "name": "shown",
+          "type": "string"
+        },
+        {
+          "name": "language",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "DictionaryEntry",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "reading",
+          "type": "string"
+        },
+        {
+          "name": "word",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "DictionaryAddResult",
+      "kind": "enum",
+      "cases": [
+        "added",
+        "alreadyRegistered",
+        "invalid",
+        "full"
+      ]
+    },
+    {
       "name": "RequestBody",
       "kind": "union",
       "tag": "type",
@@ -536,6 +578,68 @@
               "type": "string"
             }
           ]
+        },
+        {
+          "name": "resetLearning"
+        },
+        {
+          "name": "readUsage"
+        },
+        {
+          "name": "resetUsage"
+        },
+        {
+          "name": "previewLanguage",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "precedingText",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "readUserDictionary",
+          "fields": [
+            {
+              "name": "offset",
+              "type": "u32"
+            },
+            {
+              "name": "limit",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "addUserDictionaryEntry",
+          "fields": [
+            {
+              "name": "entry",
+              "type": "DictionaryEntry"
+            }
+          ]
+        },
+        {
+          "name": "removeUserDictionaryEntry",
+          "fields": [
+            {
+              "name": "entry",
+              "type": "DictionaryEntry"
+            }
+          ]
+        },
+        {
+          "name": "mergeUserDictionary",
+          "fields": [
+            {
+              "name": "entries",
+              "type": "[DictionaryEntry]"
+            }
+          ]
         }
       ]
     },
@@ -624,6 +728,59 @@
             {
               "name": "report",
               "type": "KeymapReport"
+            }
+          ]
+        },
+        {
+          "name": "usage",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            },
+            {
+              "name": "firstCandidateRate",
+              "type": "f64?"
+            }
+          ]
+        },
+        {
+          "name": "languagePreview",
+          "fields": [
+            {
+              "name": "words",
+              "type": "[PreviewWord]"
+            }
+          ]
+        },
+        {
+          "name": "userDictionary",
+          "fields": [
+            {
+              "name": "entries",
+              "type": "[DictionaryEntry]"
+            },
+            {
+              "name": "total",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "dictionaryAdded",
+          "fields": [
+            {
+              "name": "result",
+              "type": "DictionaryAddResult"
+            }
+          ]
+        },
+        {
+          "name": "dictionaryMerged",
+          "fields": [
+            {
+              "name": "added",
+              "type": "u32"
             }
           ]
         },

@@ -110,6 +110,9 @@ func run() -> Int32 {
     let window = CandidateWindowLink()
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings.exe")
 
+    // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
+    let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
+                                      lexicon: lexicon, settings: settings)
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
@@ -124,7 +127,12 @@ func run() -> Int32 {
             try? process.run()
         },
         hints: { BranchHints.make(for: $0, settings: $1) },
-        typoService: typoService
+        typoService: typoService,
+        services: SettingsServices(
+            resetLearning: { [engine] in engine.resetLearning() },
+            usage: usage,
+            previewLanguage: { preview.preview($0, precedingText: $1) }
+        )
     )
     settings.observe { [weak engine] in
         engine?.apply($0)

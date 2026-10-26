@@ -272,6 +272,83 @@ struct EngineServiceTests {
         #expect(!report.missing.contains(WireKeymapMissing(state: "composing", command: "cancel")))
     }
 
+    final class Usage: UsageReading {
+        var counts = UsageCounts()
+        func reset() { counts = UsageCounts() }
+    }
+
+    private func serviceWith(_ services: SettingsServices) -> (EngineService, EngineService.ConnectionID) {
+        let service = EngineService(makeSession: { fatalError("セッションは作らない") }, settings: settings, ui: { _ in }, openSettings: {}, services: services)
+        let id = service.connect()
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)
+        return (service, id)
+    }
+
+    @Test("学習を消す・使い方の記録を読んで消す")
+    func learningAndUsage() {
+        let resets = Box(0)
+        let usage = Usage()
+        usage.counts.commits = 4
+        usage.counts.commitsWithoutConversion = 3
+        let (service, id) = serviceWith(SettingsServices(resetLearning: { resets.value += 1 }, usage: usage))
+        #expect(service.handle(WireRequest(id: 40, body: .resetLearning), from: id).body == .done)
+        #expect(resets.value == 1)
+        guard case .usage(let values, let rate) = service.handle(WireRequest(id: 41, body: .readUsage), from: id).body,
+              let counts = try? JSONDecoder().decode(UsageCounts.self, from: Data(values.utf8)) else {
+            Issue.record("使い方の記録を読めない")
+            return
+        }
+        #expect(counts.commits == 4)
+        #expect(rate == 0.75)
+        guard case .usage(_, let cleared) = service.handle(WireRequest(id: 42, body: .resetUsage), from: id).body else {
+            Issue.record("使い方の記録を消せない")
+            return
+        }
+        #expect(cleared == nil)
+        #expect(usage.counts.commits == 0)
+    }
+
+    @Test("英語と日本語の「試す」は語ごとに見せる文字と言語を返す")
+    func previewLanguage() {
+        let received = Box<(String, String?)?>(nil)
+        let (service, id) = serviceWith(SettingsServices(previewLanguage: { text, preceding in
+            received.value = (text, preceding)
+            return [WordLanguagePreview.Word(typed: "make", language: .english, shown: "make")]
+        }))
+        let body = service.handle(WireRequest(id: 43, body: .previewLanguage(text: "make", precedingText: "I")), from: id).body
+        #expect(body == .languagePreview(words: [WirePreviewWord(typed: "make", shown: "make", language: "english")]))
+        #expect(received.value?.0 == "make")
+        #expect(received.value?.1 == "I")
+    }
+
+    @Test("ユーザー辞書の語を足す・消す・取り込む・ページごとに読む")
+    func userDictionary() {
+        let id = greeted()
+        func add(_ reading: String, _ word: String) -> WireResponseBody {
+            service.handle(WireRequest(id: 44, body: .addUserDictionaryEntry(entry: WireDictionaryEntry(reading: reading, word: word))), from: id).body
+        }
+        #expect(add("えすきゅー", "s90") == .dictionaryAdded(result: .added))
+        #expect(add("えすきゅー", "s90") == .dictionaryAdded(result: .alreadyRegistered))
+        #expect(add("ABC", "s90") == .dictionaryAdded(result: .invalid))
+        let merged = service.handle(WireRequest(id: 45, body: .mergeUserDictionary(entries: (0..<600).map { WireDictionaryEntry(reading: "よみ", word: "語句\($0)") })), from: id).body
+        #expect(merged == .dictionaryMerged(added: 600))
+        guard case .userDictionary(let page, let total) = service.handle(WireRequest(id: 46, body: .readUserDictionary(offset: 1, limit: 10_000)), from: id).body else {
+            Issue.record("ユーザー辞書を読めない")
+            return
+        }
+        #expect(total == 601)
+        #expect(page.count == EngineService.maximumDictionaryPage)
+        #expect(page.first == WireDictionaryEntry(reading: "よみ", word: "語句0"))
+        guard case .userDictionary(let tail, _) = service.handle(WireRequest(id: 47, body: .readUserDictionary(offset: 1000, limit: 10)), from: id).body else {
+            Issue.record("範囲の外を読めない")
+            return
+        }
+        #expect(tail.isEmpty)
+        #expect(service.handle(WireRequest(id: 48, body: .removeUserDictionaryEntry(entry: WireDictionaryEntry(reading: "えすきゅー", word: "s90"))), from: id).body == .done)
+        #expect(settings.current.userDictionary.count == 600)
+        #expect(!settings.current.userDictionary.contains(UserDictionaryEntry(reading: "えすきゅー", word: "s90")))
+    }
+
     @Test("見た目の設定は設定の値を運ぶ")
     func presentation() {
         #expect(service.presentation.theme == settings.current.theme.rawValue)

@@ -52,6 +52,7 @@ public final class EngineService {
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
     private var nextCorrection: UInt64 = 1
+    private let services: SettingsServices
     private var connections: [ConnectionID: Connection] = [:]
     private var sessions: [UInt32: Session] = [:]
     private var nextConnection: UInt64 = 1
@@ -60,7 +61,9 @@ public final class EngineService {
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
-                typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
+                typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
+                services: SettingsServices = SettingsServices()) {
+        self.services = services
         self.typoService = typoService
         self.now = now
         self.makeSession = makeSession
@@ -90,7 +93,12 @@ public final class EngineService {
     public func handle(_ request: WireRequest, from id: ConnectionID) -> WireResponse {
         let response = WireResponse(id: request.id, body: body(for: request.body, from: id))
         // 設定の項目は大きくなりうる(ユーザー辞書など)．送れない大きさなら，項目を分けて頼んでもらう
-        guard case .settingsFields = response.body, !Self.fits(response) else { return response }
+        switch response.body {
+        case .settingsFields, .userDictionary, .languagePreview:
+            if Self.fits(response) { return response }
+        default:
+            return response
+        }
         return WireResponse(id: request.id, body: .error(code: .tooLarge))
     }
 
@@ -178,6 +186,48 @@ public final class EngineService {
             }
         case .readKeymapPreset(let preset):
             return fields { () throws(SettingsFields.Failure) in try SettingsFields.keymapPreset(named: preset) }
+        case .resetLearning:
+            services.resetLearning()
+            return .done
+        case .readUsage:
+            return usage
+        case .resetUsage:
+            services.usage?.reset()
+            return usage
+        case .previewLanguage(let text, let precedingText):
+            let words = services.previewLanguage(text, precedingText)
+            return .languagePreview(words: words.map { WirePreviewWord(typed: $0.typed, shown: $0.shown, language: $0.language.rawValue) })
+        case .readUserDictionary(let offset, let limit):
+            let entries = settings.current.userDictionary
+            let start = min(Int(offset), entries.count)
+            let end = min(start + min(Int(limit), Self.maximumDictionaryPage), entries.count)
+            return .userDictionary(entries: entries[start..<end].map { WireDictionaryEntry(reading: $0.reading, word: $0.word) },
+                                   total: UInt32(clamping: entries.count))
+        case .addUserDictionaryEntry(let entry):
+            var result = UserDictionaryEditing.AddResult.invalid
+            do {
+                try settings.update { result = UserDictionaryEditing.add(reading: entry.reading, word: entry.word, to: &$0.userDictionary) }
+            } catch {
+                return .error(code: .malformed)
+            }
+            return .dictionaryAdded(result: WireDictionaryAddResult(result))
+        case .removeUserDictionaryEntry(let entry):
+            do {
+                try settings.update { $0.userDictionary.removeAll { $0 == UserDictionaryEntry(reading: entry.reading, word: entry.word) } }
+            } catch {
+                return .error(code: .malformed)
+            }
+            return .done
+        case .mergeUserDictionary(let wanted):
+            var added = 0
+            do {
+                try settings.update {
+                    added = UserDictionaryEditing.merge(wanted.map { UserDictionaryEntry(reading: $0.reading, word: $0.word) }, into: &$0.userDictionary)
+                }
+            } catch {
+                return .error(code: .malformed)
+            }
+            return .dictionaryMerged(added: UInt32(clamping: added))
         case .checkKeymap(let values):
             do {
                 return .keymapReport(report: try SettingsFields.keymapReport(values))
@@ -200,6 +250,15 @@ public final class EngineService {
             }
             return .settings(settings: snapshot)
         }
+    }
+
+    /// ユーザー辞書を 1 回で読む語の数の上限．1 語の大きさの上限から，応答がメッセージの上限に収まる数にする
+    public static let maximumDictionaryPage = 500
+
+    private var usage: WireResponseBody {
+        guard let counts = services.usage?.counts else { return .error(code: .malformed) }
+        guard let data = try? JSONEncoder().encode(counts), let values = String(data: data, encoding: .utf8) else { return .error(code: .malformed) }
+        return .usage(values: values, firstCandidateRate: counts.firstCandidateRate)
     }
 
     private func fields(_ make: () throws(SettingsFields.Failure) -> String) -> WireResponseBody {

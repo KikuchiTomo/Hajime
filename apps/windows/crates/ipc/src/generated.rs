@@ -372,6 +372,47 @@ impl fmt::Debug for KeymapReport {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PreviewWord {
+    pub typed: String,
+    pub shown: String,
+    pub language: String,
+}
+
+impl fmt::Debug for PreviewWord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PreviewWord")
+            .field("typed", &REDACTED)
+            .field("shown", &REDACTED)
+            .field("language", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct DictionaryEntry {
+    pub reading: String,
+    pub word: String,
+}
+
+impl fmt::Debug for DictionaryEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DictionaryEntry")
+            .field("reading", &REDACTED)
+            .field("word", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DictionaryAddResult {
+    Added,
+    AlreadyRegistered,
+    Invalid,
+    Full,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum RequestBody {
     Hello {
@@ -421,6 +462,28 @@ pub enum RequestBody {
     },
     CheckKeymap {
         values: String,
+    },
+    ResetLearning,
+    ReadUsage,
+    ResetUsage,
+    PreviewLanguage {
+        text: String,
+        #[serde(rename = "precedingText")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        preceding_text: Option<String>,
+    },
+    ReadUserDictionary {
+        offset: u32,
+        limit: u32,
+    },
+    AddUserDictionaryEntry {
+        entry: DictionaryEntry,
+    },
+    RemoveUserDictionaryEntry {
+        entry: DictionaryEntry,
+    },
+    MergeUserDictionary {
+        entries: Vec<DictionaryEntry>,
     },
 }
 
@@ -487,6 +550,31 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("CheckKeymap")
                 .field("values", &REDACTED)
                 .finish(),
+            Self::ResetLearning => f.write_str("ResetLearning"),
+            Self::ReadUsage => f.write_str("ReadUsage"),
+            Self::ResetUsage => f.write_str("ResetUsage"),
+            Self::PreviewLanguage { .. } => f
+                .debug_struct("PreviewLanguage")
+                .field("text", &REDACTED)
+                .field("precedingText", &REDACTED)
+                .finish(),
+            Self::ReadUserDictionary { offset, limit, .. } => f
+                .debug_struct("ReadUserDictionary")
+                .field("offset", offset)
+                .field("limit", limit)
+                .finish(),
+            Self::AddUserDictionaryEntry { entry, .. } => f
+                .debug_struct("AddUserDictionaryEntry")
+                .field("entry", entry)
+                .finish(),
+            Self::RemoveUserDictionaryEntry { entry, .. } => f
+                .debug_struct("RemoveUserDictionaryEntry")
+                .field("entry", entry)
+                .finish(),
+            Self::MergeUserDictionary { entries, .. } => f
+                .debug_struct("MergeUserDictionary")
+                .field("entries", entries)
+                .finish(),
         }
     }
 }
@@ -532,6 +620,25 @@ pub enum ResponseBody {
     KeymapReport {
         report: KeymapReport,
     },
+    Usage {
+        values: String,
+        #[serde(rename = "firstCandidateRate")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        first_candidate_rate: Option<f64>,
+    },
+    LanguagePreview {
+        words: Vec<PreviewWord>,
+    },
+    UserDictionary {
+        entries: Vec<DictionaryEntry>,
+        total: u32,
+    },
+    DictionaryAdded {
+        result: DictionaryAddResult,
+    },
+    DictionaryMerged {
+        added: u32,
+    },
     Error {
         code: ErrorCode,
     },
@@ -567,6 +674,28 @@ impl fmt::Debug for ResponseBody {
             Self::KeymapReport { report, .. } => f
                 .debug_struct("KeymapReport")
                 .field("report", report)
+                .finish(),
+            Self::Usage { first_candidate_rate, .. } => f
+                .debug_struct("Usage")
+                .field("values", &REDACTED)
+                .field("firstCandidateRate", first_candidate_rate)
+                .finish(),
+            Self::LanguagePreview { words, .. } => f
+                .debug_struct("LanguagePreview")
+                .field("words", words)
+                .finish(),
+            Self::UserDictionary { entries, total, .. } => f
+                .debug_struct("UserDictionary")
+                .field("entries", entries)
+                .field("total", total)
+                .finish(),
+            Self::DictionaryAdded { result, .. } => f
+                .debug_struct("DictionaryAdded")
+                .field("result", result)
+                .finish(),
+            Self::DictionaryMerged { added, .. } => f
+                .debug_struct("DictionaryMerged")
+                .field("added", added)
                 .finish(),
             Self::Error { code, .. } => f
                 .debug_struct("Error")
