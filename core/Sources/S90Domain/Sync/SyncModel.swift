@@ -23,7 +23,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .keys: ["conversionKeys"]
         case .conversion:
             ["typoCorrection", "candidatePresentation", "initialFocus", "listCandidatesPerPage", "branchCandidatesPerPage",
-             "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation",
+             "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting",
              "misreadings", "showsVariantRow", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning"]
         case .correction: ["correction"]
         case .symbols: ["symbolRules"]
