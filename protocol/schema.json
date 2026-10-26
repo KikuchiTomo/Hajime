@@ -288,7 +288,8 @@
         "unsupportedVersion",
         "unknownSession",
         "tooManySessions",
-        "malformed"
+        "malformed",
+        "tooLarge"
       ]
     },
     {
@@ -318,6 +319,10 @@
         {
           "name": "candidateFontSize",
           "type": "f64"
+        },
+        {
+          "name": "handwriting",
+          "type": "bool?"
         }
       ]
     },
@@ -326,15 +331,6 @@
       "kind": "union",
       "tag": "type",
       "cases": [
-        {
-          "name": "selectInputStyle",
-          "fields": [
-            {
-              "name": "style",
-              "type": "string"
-            }
-          ]
-        },
         {
           "name": "toggleLiveConversion"
         },
@@ -470,6 +466,98 @@
       ]
     },
     {
+      "name": "KeymapRowIssue",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "row",
+          "type": "u32"
+        },
+        {
+          "name": "hiddenBy",
+          "type": "[u32]"
+        },
+        {
+          "name": "hiddenStates",
+          "type": "[string]"
+        },
+        {
+          "name": "blocksTyping",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "KeymapMissing",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "state",
+          "type": "string"
+        },
+        {
+          "name": "command",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "KeymapReport",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "rows",
+          "type": "[KeymapRowIssue]"
+        },
+        {
+          "name": "missing",
+          "type": "[KeymapMissing]"
+        }
+      ]
+    },
+    {
+      "name": "PreviewWord",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "typed",
+          "type": "string"
+        },
+        {
+          "name": "shown",
+          "type": "string"
+        },
+        {
+          "name": "language",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "DictionaryEntry",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "reading",
+          "type": "string"
+        },
+        {
+          "name": "word",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "DictionaryAddResult",
+      "kind": "enum",
+      "cases": [
+        "added",
+        "alreadyRegistered",
+        "invalid",
+        "full"
+      ]
+    },
+    {
       "name": "RequestBody",
       "kind": "union",
       "tag": "type",
@@ -536,6 +624,19 @@
         },
         {
           "name": "wake",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
+          "name": "openHandwriting",
           "fields": [
             {
               "name": "session",
@@ -735,6 +836,120 @@
               "type": "string"
             }
           ]
+        },
+        {
+          "name": "handwritingChosen",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "handwritingClosed"
+        },
+        {
+          "name": "readSettingsFields",
+          "fields": [
+            {
+              "name": "names",
+              "type": "[string]"
+            },
+            {
+              "name": "defaults",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "writeSettingsFields",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "readKeymapPreset",
+          "fields": [
+            {
+              "name": "preset",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "checkKeymap",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "resetLearning"
+        },
+        {
+          "name": "readUsage"
+        },
+        {
+          "name": "resetUsage"
+        },
+        {
+          "name": "previewLanguage",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "precedingText",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "readUserDictionary",
+          "fields": [
+            {
+              "name": "offset",
+              "type": "u32"
+            },
+            {
+              "name": "limit",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "addUserDictionaryEntry",
+          "fields": [
+            {
+              "name": "entry",
+              "type": "DictionaryEntry"
+            }
+          ]
+        },
+        {
+          "name": "removeUserDictionaryEntry",
+          "fields": [
+            {
+              "name": "entry",
+              "type": "DictionaryEntry"
+            }
+          ]
+        },
+        {
+          "name": "mergeUserDictionary",
+          "fields": [
+            {
+              "name": "entries",
+              "type": "[DictionaryEntry]"
+            }
+          ]
         }
       ]
     },
@@ -862,6 +1077,77 @@
           ]
         },
         {
+          "name": "settingsFields",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "keymapReport",
+          "fields": [
+            {
+              "name": "report",
+              "type": "KeymapReport"
+            }
+          ]
+        },
+        {
+          "name": "usage",
+          "fields": [
+            {
+              "name": "values",
+              "type": "string"
+            },
+            {
+              "name": "firstCandidateRate",
+              "type": "f64?"
+            }
+          ]
+        },
+        {
+          "name": "languagePreview",
+          "fields": [
+            {
+              "name": "words",
+              "type": "[PreviewWord]"
+            }
+          ]
+        },
+        {
+          "name": "userDictionary",
+          "fields": [
+            {
+              "name": "entries",
+              "type": "[DictionaryEntry]"
+            },
+            {
+              "name": "total",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "dictionaryAdded",
+          "fields": [
+            {
+              "name": "result",
+              "type": "DictionaryAddResult"
+            }
+          ]
+        },
+        {
+          "name": "dictionaryMerged",
+          "fields": [
+            {
+              "name": "added",
+              "type": "u32"
+            }
+          ]
+        },
+        {
           "name": "error",
           "fields": [
             {
@@ -911,6 +1197,14 @@
         {
           "name": "annotation",
           "type": "string?"
+        },
+        {
+          "name": "correctedStart",
+          "type": "u32?"
+        },
+        {
+          "name": "correctedLength",
+          "type": "u32?"
         }
       ]
     },
@@ -995,6 +1289,10 @@
         {
           "name": "isDecided",
           "type": "bool"
+        },
+        {
+          "name": "isCorrected",
+          "type": "bool?"
         },
         {
           "name": "preview",
@@ -1238,8 +1536,32 @@
             {
               "name": "anchor",
               "type": "Rect?"
+            },
+            {
+              "name": "label",
+              "type": "string?"
             }
           ]
+        },
+        {
+          "name": "showHandwriting",
+          "fields": [
+            {
+              "name": "anchor",
+              "type": "Rect?"
+            },
+            {
+              "name": "recognitionDelayMilliseconds",
+              "type": "u32"
+            },
+            {
+              "name": "recognitionTimeoutMilliseconds",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "hideHandwriting"
         },
         {
           "name": "move",

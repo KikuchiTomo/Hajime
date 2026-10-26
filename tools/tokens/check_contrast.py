@@ -30,7 +30,8 @@ def contrast_ratio(fg: str, bg: str) -> float:
 def main(argv: list[str]) -> int:
     path = Path(argv[1]) if len(argv) > 1 else DEFAULT_TOKENS
     tokens = json.loads(path.read_text(encoding="utf-8"))
-    themes = tokens["theme"]
+    # Windows の glass の色(glass.light・glass-dark)も同じ基準で検査する
+    themes = {**tokens["theme"], **{f"glass-{name}": body for name, body in tokens.get("glass", {}).items() if "color" in body}}
     failures: list[str] = []
     for rule in tokens["$extensions"]["s90"]["contrast"]:
         colors = themes[rule["theme"]]["color"]

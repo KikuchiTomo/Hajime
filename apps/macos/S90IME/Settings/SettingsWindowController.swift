@@ -15,8 +15,10 @@ final class SettingsWindowController {
     private let sync: SyncCoordinator
 
     init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, files: (any SettingsFileHandling)? = nil,
+         associations: AssociationDictionaryStore? = nil,
          resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
-        model = SettingsModel(store: settings, usage: usage, files: files, resetLearning: resetLearning, previewLanguage: previewLanguage)
+        model = SettingsModel(store: settings, usage: usage, files: files, associations: associations, resetLearning: resetLearning,
+                              previewLanguage: previewLanguage)
         self.sync = sync
     }
 
@@ -95,15 +97,19 @@ final class SettingsModel: ObservableObject {
     let files: (any SettingsFileHandling)?
     /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
     @Published var isImportingDictionary = false
+    /// 連想の辞書の索引(R-18)．無ければ連想の辞書を取り込めない
+    let associations: AssociationDictionaryStore?
     /// 英字入力(自動)で打った文を語ごとに見分けた結果(「試す」)．無ければ「試す」を出さない
     let previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])?
 
     init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, files: (any SettingsFileHandling)? = nil,
+         associations: AssociationDictionaryStore? = nil,
          resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
         self.previewLanguage = previewLanguage
         self.store = store
         self.usage = usage
         self.files = files
+        self.associations = associations
         self.settings = store.current
         self.usageCounts = usage?.counts ?? UsageCounts()
         self.resetLearningAction = resetLearning
@@ -148,9 +154,11 @@ final class SettingsModel: ObservableObject {
         update { current in
             let dictionary = current.userDictionary
             let imported = current.importedDictionaries
+            let associations = current.associationDictionaries
             current = S90Domain.Settings()
             current.userDictionary = dictionary
             current.importedDictionaries = imported
+            current.associationDictionaries = associations
         }
     }
 

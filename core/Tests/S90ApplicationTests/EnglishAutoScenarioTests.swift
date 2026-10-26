@@ -199,6 +199,24 @@ struct EnglishAutoScenarioTests {
         #expect(words.map(\.shown) == ["今日はいい天気", "負け"])
     }
 
+    @Test("かなで打った外来語は，英語のつづりよりカタカナを先に出す(設定)")
+    func prefersKatakana() {
+        let base = FakeConverter([
+            "らいぶへんかん": [("Live変換", nil), ("LIVE変換", nil), ("ライブ変換", nil)],
+            "ぱそこんでめーるをおくる": [("PCでmailを送る", nil), ("パソコンでメールを送る", nil)],
+            "あいでぃー": [("ID", nil)],
+        ])
+        let converter = SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar())
+        #expect(converter.candidates(for: "らいぶへんかん").first?.text == "ライブ変換")
+        #expect(converter.candidates(for: "らいぶへんかん").contains { $0.text == "Live変換" })
+        #expect(converter.candidates(for: "ぱそこんでめーるをおくる").first?.text == "パソコンでメールを送る")
+        // カタカナの候補が無ければ英語のつづりのまま
+        #expect(converter.candidates(for: "あいでぃー").first?.text == "ID")
+        var off = DefaultSettings.settings
+        off.prefersKatakana = false
+        #expect(SupplementedConverter(base, settings: FakeSettings(off), calendar: FakeCalendar()).candidates(for: "らいぶへんかん").first?.text == "Live変換")
+    }
+
     @Test("R-02: 不適切な語を第 1 候補に出さない(設定)")
     func demotesOffensive() {
         let base = FakeConverter(["しね": [("死ね", nil), ("市ね", nil)], "ころす": [("殺す", nil)]])

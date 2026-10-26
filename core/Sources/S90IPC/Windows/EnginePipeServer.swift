@@ -4,12 +4,13 @@ import Foundation
 import Synchronization
 
 public enum EnginePipeServer {
-    public static func start(listener: NamedPipeListener, service: EngineService) {
+    /// candidateWindowPath は候補ウィンドウの実行ファイル．その接続からだけ手書きの窓で選んだ文字を受ける
+    public static func start(listener: NamedPipeListener, service: EngineService, candidateWindowPath: String) {
         let thread = Thread {
             while true {
                 do {
                     let connection = try listener.accept()
-                    Thread { serve(connection, service: service) }.start()
+                    Thread { serve(connection, service: service, candidateWindowPath: candidateWindowPath) }.start()
                 } catch {
                     Thread.sleep(forTimeInterval: 0.1)
                 }
@@ -18,12 +19,14 @@ public enum EnginePipeServer {
         thread.start()
     }
 
-    static func serve(_ connection: NamedPipeConnection, service: EngineService) {
+    static func serve(_ connection: NamedPipeConnection, service: EngineService, candidateWindowPath: String) {
         guard let process = try? connection.clientProcessID(), NamedPipePeer.isInCurrentSession(processID: process) else {
             connection.close()
             return
         }
-        let id = onMain { service.connect() }
+        let isCandidateWindow = NamedPipePeer.imagePath(processID: process)
+            .map { $0.caseInsensitiveCompare(candidateWindowPath) == .orderedSame } ?? false
+        let id = onMain { service.connect(isCandidateWindow: isCandidateWindow) }
         defer {
             onMain { service.disconnect(id) }
             connection.close()
@@ -98,11 +101,9 @@ public final class CandidateWindowLink: @unchecked Sendable {
                 self.connection = connection
                 lock.unlock()
                 previous?.close()
+                // 読み続けるスレッドは置かない．同期の I/O のハンドルでは，読みが止まっているあいだ同じハンドルへの
+                // 書き込みも待たされるため．候補ウィンドウはこのパイプに書かず，切れたことは書き込みの失敗で知る
                 greeting().forEach(send)
-                Thread {
-                    while let bytes = try? connection.read(), !bytes.isEmpty {}
-                    self.drop(connection)
-                }.start()
             }
         }
         thread.start()

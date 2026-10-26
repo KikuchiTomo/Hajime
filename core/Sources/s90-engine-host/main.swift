@@ -102,6 +102,10 @@ func run() -> Int32 {
     let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
     let calendar = SystemCalendar(clock: { Date() })
     let dictionaries = ImportedDictionaryStore(directory: HostPaths.local.appendingPathComponent("dictionaries", isDirectory: true))
+    let associations = AssociationDictionaryStore(
+        directory: HostPaths.local.appendingPathComponent("associations", isDirectory: true),
+        bundledSource: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
+    associations.preloadBundled()
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
     let lexicon = EmptyLexicon()
@@ -118,10 +122,13 @@ func run() -> Int32 {
                                    settings: settings)
     let files = SettingsFiles(settings: settings, dictionaries: dictionaries)
 
+    // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
+    let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
+                                      lexicon: lexicon, settings: settings)
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
-                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService)
+                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations)
         },
         settings: settings,
         ui: { window.send($0) },
@@ -134,7 +141,12 @@ func run() -> Int32 {
         hints: { BranchHints.make(for: $0, settings: $1) },
         typoService: typoService,
         sync: sync,
-        files: files
+        files: files,
+        services: SettingsServices(
+            resetLearning: { [engine] in engine.resetLearning() },
+            usage: usage,
+            previewLanguage: { preview.preview($0, precedingText: $1) }
+        )
     )
     settings.observe { [weak engine] in
         engine?.apply($0)
@@ -149,7 +161,7 @@ func run() -> Int32 {
     window.start(listener: windowListener, expectedImagePath: candidateWindow.path) {
         [.hello(protocolVersion: WireProtocol.version), .setPresentation(presentation: presentation)]
     }
-    EnginePipeServer.start(listener: engineListener, service: service)
+    EnginePipeServer.start(listener: engineListener, service: service, candidateWindowPath: candidateWindow.path)
     if FileManager.default.fileExists(atPath: candidateWindow.path) {
         let process = Process()
         process.executableURL = candidateWindow

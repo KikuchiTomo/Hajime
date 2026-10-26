@@ -148,12 +148,12 @@ public enum LegacyKeySettings {
 
     // MARK: JSON
 
-    private static func decode<Value: Decodable>(_ type: Value.Type, from value: JSONValue) -> Value? {
+    static func decode<Value: Decodable>(_ type: Value.Type, from value: JSONValue) -> Value? {
         guard let data = try? JSONEncoder().encode(value) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
 
-    private static func encode(_ keymap: Keymap) -> JSONValue? {
+    static func encode(_ keymap: Keymap) -> JSONValue? {
         guard let data = try? JSONEncoder().encode(keymap) else { return nil }
         return try? JSONDecoder().decode(JSONValue.self, from: data)
     }

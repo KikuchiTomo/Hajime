@@ -110,10 +110,8 @@ struct LatticeBuilder {
     /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．違う部分が複数の文節にまたがるときは 1 つにまとめる
     private func addingAlternatives(_ lattice: SegmentLattice, otherReading: String, reading: String, origin: CandidateOrigin) -> SegmentLattice {
         let typed = Array(otherReading), corrected = Array(reading)
-        let prefix = zip(typed, corrected).prefix { $0 == $1 }.count
-        let suffix = zip(typed.reversed(), corrected.reversed()).prefix { $0 == $1 }.count
-        let common = min(suffix, min(typed.count, corrected.count) - prefix)
-        let changedEnd = max(corrected.count - common, prefix + 1)
+        guard let changed = CorrectedSpan.changedRange(from: otherReading, to: reading) else { return lattice }
+        let prefix = changed.lowerBound, changedEnd = changed.upperBound
         guard let first = lattice.segments.firstIndex(where: { $0.readingStart + $0.readingLength > prefix }),
             let last = lattice.segments.lastIndex(where: { $0.readingStart < changedEnd }) else { return lattice }
         var result = lattice

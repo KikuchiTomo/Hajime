@@ -72,6 +72,8 @@ public struct Settings: Sendable, Equatable {
     public var handwriting = false
     /// よくある読み違い(「ふいんき」→ 雰囲気)の正しい語を候補に出し，「もしかして」で示す
     public var misreadings = true
+    /// かなで打った外来語は，英語のつづり(「Live変換」)よりカタカナ(「ライブ変換」)を先に出す
+    public var prefersKatakana = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
     /// 分岐図の足元にキーの案内(候補・文節・文節の長さ・区切り)を出す
@@ -90,6 +92,12 @@ public struct Settings: Sendable, Equatable {
     public var symbolConversion = true
     /// 読みから絵文字の候補を出す
     public var emojiConversion = true
+    /// 連想変換(R-18)．オフなら連想変換のキーはふつうの変換と同じに動く
+    public var association = true
+    /// 連想の一覧に出す語の数
+    public var associationLimit = DefaultSettings.associationLimit
+    /// 選んでいる候補に連想があるとき，候補の窓の足元に知らせる
+    public var showsAssociationHint = true
 
     // MARK: 辞書と学習
     /// 確定した候補から学ぶか
@@ -98,6 +106,8 @@ public struct Settings: Sendable, Equatable {
     public var userDictionary: [UserDictionaryEntry] = []
     /// 取り込んだ辞書．並び順が優先度．語は Application Support の dictionaries/ にある索引のファイルに置く
     public var importedDictionaries: [ImportedDictionary] = []
+    /// 取り込んだ連想の辞書(R-18)．並び順が優先度．語は Application Support の associations/ にある索引のファイルに置く
+    public var associationDictionaries: [AssociationDictionary] = [DefaultSettings.bundledAssociationDictionary]
     /// 使い方を記録する(回数だけを端末の中に)
     public var recordsUsage = true
 
@@ -137,6 +147,15 @@ public struct Settings: Sendable, Equatable {
         func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T { min(max(value, range.lowerBound), range.upperBound) }
         listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
         branchCandidatesPerPage = clamp(branchCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
+        associationLimit = clamp(associationLimit, DefaultSettings.associationLimitRange)
+        var associationIDs = Set<String>()
+        associationDictionaries = associationDictionaries.filter { $0.hasValidIdentity && associationIDs.insert($0.id).inserted }
+            // 同梱の辞書は 1 つだけで，一覧から外れていたら先頭に戻す(消せない．使わないときはオフにする)
+            .filter { $0.isBundled == ($0.id == DefaultSettings.bundledAssociationDictionary.id) }
+        if !associationDictionaries.contains(where: \.isBundled) {
+            associationDictionaries.insert(DefaultSettings.bundledAssociationDictionary, at: 0)
+        }
+        associationDictionaries = Array(associationDictionaries.prefix(DefaultSettings.maximumAssociationDictionaries))
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
         correctionDelay = max(correctionDelay, liveConversionDelay)
@@ -190,11 +209,12 @@ extension Settings: Codable {
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
-        case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
+        case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
-        case learning, userDictionary, importedDictionaries, recordsUsage
+        case association, associationLimit, showsAssociationHint
+        case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
     }
@@ -243,6 +263,7 @@ extension Settings: Codable {
         read(.postalCodeConversion, into: \.postalCodeConversion)
         read(.handwriting, into: \.handwriting)
         read(.misreadings, into: \.misreadings)
+        read(.prefersKatakana, into: \.prefersKatakana)
         read(.alphabetWidth, into: \.alphabetWidth)
         read(.shiftStartsAlphabet, into: \.shiftStartsAlphabet)
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
@@ -268,11 +289,15 @@ extension Settings: Codable {
         read(.proofreading, into: \.proofreading)
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
+        read(.association, into: \.association)
+        read(.associationLimit, into: \.associationLimit)
+        read(.showsAssociationHint, into: \.showsAssociationHint)
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
         readList(.importedDictionaries, into: \.importedDictionaries)
         // 同期のファイルから来た設定でもファイルの名前に使うので，形の違う id は捨てる
         settings.importedDictionaries.removeAll { !$0.hasValidIdentity }
+        readList(.associationDictionaries, into: \.associationDictionaries)
         read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
@@ -317,6 +342,7 @@ extension Settings: Codable {
         try container.encode(postalCodeConversion, forKey: .postalCodeConversion)
         try container.encode(handwriting, forKey: .handwriting)
         try container.encode(misreadings, forKey: .misreadings)
+        try container.encode(prefersKatakana, forKey: .prefersKatakana)
         try container.encode(alphabetWidth, forKey: .alphabetWidth)
         try container.encode(shiftStartsAlphabet, forKey: .shiftStartsAlphabet)
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
@@ -342,9 +368,13 @@ extension Settings: Codable {
         try container.encode(proofreading, forKey: .proofreading)
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
+        try container.encode(association, forKey: .association)
+        try container.encode(associationLimit, forKey: .associationLimit)
+        try container.encode(showsAssociationHint, forKey: .showsAssociationHint)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)
+        try container.encode(associationDictionaries, forKey: .associationDictionaries)
         try container.encode(recordsUsage, forKey: .recordsUsage)
         try container.encode(theme, forKey: .theme)
         try container.encode(candidateFontSize, forKey: .candidateFontSize)

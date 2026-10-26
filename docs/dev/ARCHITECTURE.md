@@ -51,16 +51,17 @@ S90Persistence ─────┘
   - 入力: 抽象化したキー(`KeyEvent`)，入力モードとアプリのプロファイル(`InputMode`，`AppProfile`)，候補(`Candidate`)，ライブ変換の見せ方(`LiveConversionRule`)，ターミナルの行の状態(`CommandLineState`)，使い方の回数(`UsageCounts`)
   - 読み: ローマ字とかなの組み立て(`Composition`，`RomajiTable`，`KanaLayout`)
   - 分岐図: 文節と枝(`SegmentLattice`)
+  - 連想: 意味のまとまりと一覧の位置(`AssociationGroup`，`AssociationList`)，連想の辞書の設定(`AssociationDictionary`)
   - 補正: 英単語(`TypoCorrectionRule`)と日本語の打ち間違い(`ReadingCorrectionRule`)の判定，英字で打った語を英語にするか日本語にするか(`WordLanguageJudge`)
   - 記号と日付: `SymbolDictionary`，`SymbolSequence`，`DateExpressions`
   - 中身の確かめ: SHA-256(`SHA256Digest`．CryptoKit の無い Windows で，Zenzai のモデルや取り込んだ辞書の索引を確かめる)
   - 設定: `Settings` と既定値・上限(`DefaultSettings`)，記号の表(`SymbolTable`)，字種(`ScriptVariant`)，キー設定の表(`Keymap`・`KeymapCommand`・`KeymapPreset`．ADR 0009)
 - **S90Application**: `InputSession`(キーを受けて状態を進め，画面への指示 `ClientAction` の列を返す)と，その部品．エンジンにない候補を足す `SupplementedConverter`．外部とは `Ports/` の protocol 越しにだけ話す
-  - 部品: 英単語の補正(`EnglishWordCorrector`)，語の英語・日本語の見分け(`WordLanguageClassifier`．設定の画面で試す `WordLanguagePreview`)，「nn」の読み(`NasalReadingResolver`)，分岐図(`LatticeBuilder`，`PanelBuilder`)，ターミナルの行(`TerminalLine`)
+  - 部品: 英単語の補正(`EnglishWordCorrector`)，語の英語・日本語の見分け(`WordLanguageClassifier`．設定の画面で試す `WordLanguagePreview`)，「nn」の読み(`NasalReadingResolver`)，分岐図(`LatticeBuilder`，`PanelBuilder`)，ターミナルの行(`TerminalLine`)，連想変換の語を引く(`AssociationFinder`)
   - 入力方式: ローマ字入力は `InputSession` の共通の処理が受け持つ．ほかの方式は `InputStyleHandling` を実装して足す(`EnglishInput` が英字入力と英字入力(自動)，`KanaInput`)
-  - ポート: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsReading`・`SettingsStoring`・`SettingsObserving`，`CalendarReading`，`UsageRecording`・`UsageReading`
+  - ポート: `KanaKanjiConverting`，`EnglishLexicon`，`SettingsReading`・`SettingsStoring`・`SettingsObserving`，`CalendarReading`，`UsageRecording`・`UsageReading`，`DictionaryLookup`・`AssociationLookup`
 - **S90Engine**: `AzooKeyConverterEngine` と `AzooKeyConverterSession` が `KanaKanjiConverting` を実装する．Zenzai のモデルの確認(`ZenzaiModel`)もここ．azooKey の型はこのモジュールの外に出さない
-- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`，郵便番号の表 `PostalCodeFile`，Vision で手書きを読む `VisionHandwritingRecognizer`，取り込んだ辞書の索引を同期のフォルダと運ぶ `DictionaryFileSync`，同期の 1 回分の手順 `FolderSyncRunner`，パスで選んだフォルダの同期の時機 `PathSyncCoordinator`，設定の画面から頼まれたファイルの読み書き `SettingsFiles`)．OS の機能は Foundation のほかに CoreGraphics・Vision・CryptoKit だけを使う．本人だけが読み書きできるファイルの読み書きは `ProtectedFile` にまとめる．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
+- **S90Persistence**: ファイルと OS から読む値の実装(`FileSettingsStore`，`FileUsageStore`，`UserDictionaryFile`，`SystemCalendar`，郵便番号の表 `PostalCodeFile`，Vision で手書きを読む `VisionHandwritingRecognizer`，取り込んだ辞書の索引を同期のフォルダと運ぶ `DictionaryFileSync`，同期の 1 回分の手順 `FolderSyncRunner`，パスで選んだフォルダの同期の時機 `PathSyncCoordinator`，設定の画面から頼まれたファイルの読み書き `SettingsFiles`，連想の辞書の取り込みと索引 `AssociationFileReader`・`AssociationDictionaryStore`．索引のファイルを写して引く処理は `SortedTabFile` にまとめる)．OS の機能は Foundation のほかに CoreGraphics・Vision・CryptoKit だけを使う．本人だけが読み書きできるファイルの読み書きは `ProtectedFile` にまとめる．保存先とファイルの権限は `docs/dev/SECURITY-MODEL.md` に従う
 
 ## キー入力から画面までの流れ
 
@@ -87,7 +88,7 @@ OS のキーイベント
 | 候補ウィンドウ(`apps/windows/crates/candidate-ui`) | Rust | 候補とモード表示を描く．入力先のアプリの権限や UI スレッドに影響されないよう別のプロセスにする |
 
 通信の形式は `protocol/` に定義し，Swift と Rust の両方のコードをそこから生成します．手で二重に書かないためです(ADR 0010)．
-Windows でも trait `Zenzai` を入れてビルドします(llama.cpp の取り方は `docs/dev/WINDOWS.md`)．手書きの認識(Vision)も Apple の OS でだけ作ります．同期のフォルダの辞書の索引の SHA-256 は，Apple の OS では CryptoKit で，Windows では `SHA256Digest` で求めます．
+Windows でも trait `Zenzai` を入れてビルドします(llama.cpp の取り方は `docs/dev/WINDOWS.md`)．手書きの認識(Vision)も Apple の OS でだけ作ります．同期のフォルダの辞書の索引の SHA-256 は，Apple の OS では CryptoKit で，Windows では `SHA256Digest` で求めます．Windows の手書きの窓と認識は候補ウィンドウのプロセスが受け持ちます．
 
 DLL はキーを送って入力欄への操作(確定・組み立て中の文字・モード)を受け取るだけで，候補・分岐図・案内はエンジンが候補ウィンドウに直接送ります．`ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決めます．
 

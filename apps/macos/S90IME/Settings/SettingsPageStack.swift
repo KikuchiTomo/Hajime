@@ -84,9 +84,15 @@ struct SettingsPageStack: NSViewRepresentable {
         }
 
         private func add(_ view: NSView) {
-            view.frame = bounds
-            view.autoresizingMask = [.width, .height]
+            view.frame = safeAreaRect
             addSubview(view)
+        }
+
+        /// ページは安全な範囲(safeAreaRect)に置く．macOS 26 では左の一覧が中身の上に浮かび，中身の欄は一覧の下まで広がる．
+        /// SwiftUI のページは自分の外の安全な範囲を知らないので，そのまま広げると左端が一覧の下に隠れる
+        override func layout() {
+            super.layout()
+            for view in subviews { view.frame = safeAreaRect }
         }
     }
 }

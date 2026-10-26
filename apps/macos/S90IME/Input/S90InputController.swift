@@ -24,7 +24,8 @@ final class S90InputController: IMKInputController {
                 preconditionFailure("main.swift で CompositionRoot を組み立ててからサーバーを作る")
             }
             let menu = InputMenuBuilder(settings: root.settings, openSettings: { root.settingsWindow.show() })
-            return (root, root.makeSession(), root.makePresenter(), menu)
+            let session = root.makeSession()
+            return (root, session, root.makePresenter(session: session), menu)
         }
         self.root = root
         self.session = session
@@ -128,6 +129,8 @@ final class S90InputController: IMKInputController {
             presenter.apply(session.deactivate(), to: client)
         }
         presenter.hideWindows()
+        // 手書きの窓は開いたときの入力先に文字を入れるので，入力先から外れたら閉じる
+        presenter.closeHandwriting()
         root.engine.flushLearning()
         root.usage.flush()
         super.deactivateServer(sender)
@@ -152,12 +155,14 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:)),
-                                        selectInputStyle: #selector(selectInputStyle(_:))))
+        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), handwriting: #selector(openHandwriting(_:)),
+                                        openSettings: #selector(showPreferences(_:))))
     }
 
-    @MainActor @objc func selectInputStyle(_ sender: Any) {
-        menuBuilder.handleSelectInputStyle(sender)
+    /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く
+    @MainActor @objc func openHandwriting(_ sender: Any) {
+        guard let client = client() else { return }
+        presenter.apply(session.openHandwriting(), to: client)
     }
 
     @MainActor @objc func toggleLiveConversion(_ sender: Any) {

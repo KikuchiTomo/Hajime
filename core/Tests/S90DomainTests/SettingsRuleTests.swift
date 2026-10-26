@@ -93,6 +93,24 @@ struct TypoCorrectionRuleTests {
         #expect(tails.contains { $0.keys == "python" && $0.kanaStart == 4 })
     }
 
+    @Test("R-02: 綴りの誤りは，英字の打ち始め(ローマ字として読めない文字)から始まる部分を長い順に調べ，かなで始まる部分は調べない")
+    func misspellingTails() {
+        let rule = TypoCorrectionRule(level: .standard)
+        // 「jゔぁscり」: 英単語の頭がかなになった綴りの誤り
+        #expect(rule.misspellingTails(from: rule.tails(in: compose("jvascri"))).map(\.keys) == ["jvascri", "scri"])
+        // 「このjゔぁscり」: かなで始まる「konojvascri」は調べない
+        #expect(rule.misspellingTails(from: rule.tails(in: compose("konojvascri"))).map(\.keys) == ["jvascri", "scri"])
+        // 「れあcとぉ」: かなで始まる「reactwo」は調べない(react にして助詞を飲み込まない)
+        #expect(rule.misspellingTails(from: rule.tails(in: compose("reactwo"))).map(\.keys) == ["ctwo"])
+    }
+
+    @Test("R-02: 打ちかけのローマ字が残っていれば部分を返さない．英単語を延ばすときだけ打ちかけを含めて返す(「jvascrip」+「t」)")
+    func tailsWithPending() {
+        let rule = TypoCorrectionRule(level: .standard)
+        #expect(rule.tails(in: compose("jvascript")).isEmpty)
+        #expect(rule.tails(in: compose("jvascript"), includingPending: true).map(\.keys) == ["jvascript", "script"])
+    }
+
     @Test("R-02: 綴りの誤りは近い単語に直す")
     func spelling() {
         let rule = TypoCorrectionRule(level: .standard)

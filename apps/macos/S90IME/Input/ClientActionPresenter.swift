@@ -7,6 +7,8 @@ import S90Domain
 /// ClientAction を InputMethodKit の操作に置き換える．判断はしない(docs/dev/ARCHITECTURE.md)．
 @MainActor
 final class ClientActionPresenter {
+    /// 手書きの窓で選んだ文字を，組み立て中の文字と合わせて入れるのに使う
+    private let session: InputSession
     private let candidatePanel: CandidatePanelController
     private let modeIndicator: ModeIndicatorController
     private let note: NoteController
@@ -15,8 +17,9 @@ final class ClientActionPresenter {
     private let settings: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
+    init(session: InputSession, candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
          openSettings: @escaping () -> Void, handwriting: HandwritingController) {
+        self.session = session
         self.openSettings = openSettings
         self.handwriting = handwriting
         self.candidatePanel = candidatePanel
@@ -35,7 +38,8 @@ final class ClientActionPresenter {
                 client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: Self.noReplacement)
             case .showCandidates(let panel):
                 note.hide()
-                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize)
+                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
+                                    keys: settings.current.keymap)
             case .showLattice(let panel):
                 note.hide()
                 candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
@@ -49,8 +53,10 @@ final class ClientActionPresenter {
             case .openSettings:
                 openSettings()
             case .showHandwriting:
-                handwriting.show(caret: caretRect(of: client)) { text in
-                    client.insertText(text, replacementRange: Self.noReplacement)
+                // 窓はフォーカスを奪わないので，選んだときも入力先は開いたときのまま(入力先から外れたら窓を閉じる)
+                handwriting.show(caret: caretRect(of: client), owner: self) { [weak self] text in
+                    guard let self else { return }
+                    self.apply(self.session.insert(text), to: client)
                 }
             case .toggleLiveConversion:
                 do {
@@ -81,6 +87,11 @@ final class ClientActionPresenter {
     func hideWindows() {
         candidatePanel.hide()
         note.hide()
+    }
+
+    /// この入力先で開いた手書きの窓を閉じる
+    func closeHandwriting() {
+        handwriting.close(openedBy: self)
     }
 
     private static let noReplacement = NSRange(location: NSNotFound, length: 0)
