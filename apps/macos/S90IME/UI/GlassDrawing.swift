@@ -23,26 +23,27 @@ enum GlassDrawing {
         NSBezierPath(roundedRect: rect, xRadius: Glass.selectionRadius, yRadius: Glass.selectionRadius).fill()
     }
 
-    /// 番号などを入れる小さな丸．selected は選んでいる行の上(アクセント色の地)に描くとき
-    static func drawBadge(_ label: String, center: NSPoint, theme: ResolvedTheme, selected: Bool, opacity: CGFloat) {
-        let size = Glass.badgeSize
+    /// 番号などを入れる小さな丸．selected は選んでいる行の上(アクセント色の地)に描くとき．
+    /// 大きさを変えるときは size と fontSize を渡す(文節を区切る位置の番号は候補の番号より小さい)
+    static func drawBadge(_ label: String, center: NSPoint, theme: ResolvedTheme, selected: Bool, opacity: CGFloat,
+                          size: CGFloat = Glass.badgeSize, fontSize: CGFloat = Glass.keyFontSize) {
         let rect = NSRect(x: center.x - size / 2, y: center.y - size / 2, width: size, height: size)
         (selected ? theme.selectionText.withAlphaComponent(0.25) : theme.badge.withAlphaComponent(theme.badge.alphaComponent * opacity)).setFill()
         NSBezierPath(ovalIn: rect).fill()
         let color = (selected ? theme.selectionText : theme.textMuted).withAlphaComponent(selected ? 1 : opacity)
-        drawLabel(label, color: color, in: rect, theme: theme)
+        drawLabel(label, color: color, in: rect, theme: theme, fontSize: fontSize)
     }
 
     /// 番号は文字で，矢印などの記号は SF Symbols のアイコンで描く
-    static func drawLabel(_ label: String, color: NSColor, in rect: NSRect, theme: ResolvedTheme) {
+    static func drawLabel(_ label: String, color: NSColor, in rect: NSRect, theme: ResolvedTheme, fontSize: CGFloat = Glass.keyFontSize) {
         if case .symbol(let name)? = KeyHint.parts(of: label).first, label.count == 1,
             let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(
-                NSImage.SymbolConfiguration(pointSize: Glass.keyFontSize - 1, weight: .bold).applying(NSImage.SymbolConfiguration(paletteColors: [color]))) {
+                NSImage.SymbolConfiguration(pointSize: fontSize - 1, weight: .bold).applying(NSImage.SymbolConfiguration(paletteColors: [color]))) {
             let size = image.size
             image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
             return
         }
-        drawCentered(label, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: color], in: rect)
+        drawCentered(label, attributes: [.font: theme.keyFont(size: fontSize), .foregroundColor: color], in: rect)
     }
 
     /// 枝の曲線．幹の下(上)の start から，候補の行の左の end へ，角を丸めて曲がる

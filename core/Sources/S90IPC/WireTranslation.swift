@@ -157,7 +157,8 @@ extension WireBranchMap {
                     longer: column.longer,
                     usageNote: column.usageNote,
                     alternativeNotes: column.alternativeNotes,
-                    sourceName: column.sourceName
+                    sourceName: column.sourceName,
+                    split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
                 )
             },
             position: UInt32(clamping: panel.position),

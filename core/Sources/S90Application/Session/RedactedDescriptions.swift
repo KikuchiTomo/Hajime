@@ -64,6 +64,11 @@ extension LatticePanel.Column: CustomStringConvertible, CustomDebugStringConvert
     public var debugDescription: String { description }
 }
 
+extension LatticePanel.Column.Split: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "Split(pieces: \(pieces.count))" }
+    public var debugDescription: String { description }
+}
+
 extension EnglishWordCorrector.Correction: CustomStringConvertible, CustomDebugStringConvertible {
     var description: String { "Correction(keysLength: \(keys.count), wordLength: \(word.count))" }
     var debugDescription: String { description }

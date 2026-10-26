@@ -4,7 +4,6 @@ import S90Domain
 /// 状態を持たない計算だけなので，InputSession から分けておく
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
-    static let splitNote = "数字で区切る位置を選ぶ　Esc でやめる"
     static let correctedNote = "修正"
     static let englishInputNote = "Tab 日本語にする"
     /// 選んでいる候補を学習から消したときの案内
@@ -108,5 +107,17 @@ enum PanelBuilder {
             return column
         }
         return LatticePanel(columns: columns, position: position, total: total)
+    }
+
+    /// 文節を区切っているとき(⇧↓)の分岐図．注目している文節を区切れる位置で分けて幹に出し，切れ目に番号を振る(SegmentSplitter)．
+    /// 番号キーは区切る位置を選ぶので，候補と字種の枝は出さない(枝の番号と取り違えないように)
+    static func splitting(_ panel: LatticePanel, pieces: [String]) -> LatticePanel {
+        guard let focused = panel.columns.firstIndex(where: \.isFocused) else { return panel }
+        var panel = panel
+        let column = panel.columns[focused]
+        var splitting = LatticePanel.Column(text: column.text, isFocused: true, isUncertain: column.isUncertain, isDecided: column.isDecided)
+        splitting.split = .init(pieces: pieces)
+        panel.columns[focused] = splitting
+        return panel
     }
 }

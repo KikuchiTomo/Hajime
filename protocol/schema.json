@@ -595,6 +595,20 @@
         {
           "name": "sourceName",
           "type": "string?"
+        },
+        {
+          "name": "split",
+          "type": "BranchSplit?"
+        }
+      ]
+    },
+    {
+      "name": "BranchSplit",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "pieces",
+          "type": "[string]"
         }
       ]
     },

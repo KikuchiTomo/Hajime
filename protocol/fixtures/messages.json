@@ -109,7 +109,8 @@
             "isDecided": true,
             "preview": "腫れ",
             "longer": "晴れる",
-            "alternativeNotes": []
+            "alternativeNotes": [],
+            "split": { "pieces": ["晴", "れ"] }
           }
         ],
         "position": 1,

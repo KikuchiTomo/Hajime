@@ -99,19 +99,58 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.text) == ["京は"])
     }
 
-    @Test("分岐図の ⇧↓ で区切れる位置に番号を出し，数字で選んだ位置で区切る")
+    /// 「もんだいがある」を 1 つの文節にし，語の並びを「問題｜が｜ある」にした変換器
+    private func problemConverter() -> FakeConverter {
+        let converter = FakeConverter(["もんだいがある": [("問題がある", nil), ("問題が或る", nil)], "もんだい": [("問題", nil)],
+                                       "がある": [("がある", nil)], "もんだいが": [("問題が", nil)], "ある": [("ある", nil)]])
+        converter.words["もんだいがある"] = [
+            Candidate.Word(text: "問題", readingCount: 4), Candidate.Word(text: "が", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "ある", readingCount: 2),
+        ]
+        return converter
+    }
+
+    @Test("分岐図の ⇧↓ で注目している文節を語の切れ目で分けて見せ，数字で選んだ切れ目で区切る")
     func splitInLattice() {
-        let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil)], "は": [("は", nil)]])
-        let harness = Harness(converter: converter)
-        harness.type("kyouha")
+        let harness = Harness(converter: problemConverter())
+        harness.type("mondaigaaru")
         harness.press(.space)
-        #expect(harness.lattice?.columns.count == 1)
+        #expect(harness.lattice?.columns.map(\.text) == ["問題がある"])
         harness.press(.down, .shift)
-        // 小さい「ょ」の前には番号を出さない
-        #expect(harness.lattice?.note?.hasPrefix("きょ①う②は") == true)
-        harness.press(.character("2"))
-        #expect(harness.lattice?.columns.map(\.text) == ["今日", "は"])
+        let column = harness.lattice?.columns.first
+        // 1 文字ごとではなく，語の切れ目(問題｜が｜ある)の 2 か所だけ
+        #expect(column?.split == LatticePanel.Column.Split(pieces: ["問題", "が", "ある"]))
+        // 番号キーは区切る位置を選ぶので，番号の付いた候補と字種の枝は出さない．足元の知らせにも出さない
+        #expect(column?.alternatives.isEmpty == true)
+        #expect(column?.variants.isEmpty == true)
         #expect(harness.lattice?.note == nil)
+        harness.press(.character("1"))
+        #expect(harness.lattice?.columns.map(\.text) == ["問題", "がある"])
+        #expect(harness.lattice?.columns.allSatisfy { $0.split == nil } == true)
+    }
+
+    @Test("区切る状態は Esc でやめ，候補の枝に戻る")
+    func cancelSplitInLattice() {
+        let harness = Harness(converter: problemConverter())
+        harness.type("mondaigaaru")
+        harness.press(.space)
+        harness.press(.down, .shift)
+        #expect(harness.lattice?.columns.first?.split != nil)
+        harness.press(.escape)
+        #expect(harness.lattice?.columns.first?.split == nil)
+        #expect(harness.lattice?.columns.first?.alternatives.isEmpty == false)
+        #expect(harness.lattice?.columns.map(\.text) == ["問題がある"])
+    }
+
+    @Test("切れ目の無い文節では区切る状態に入らない(1 文字ずつは ⇧←→)")
+    func splitNeedsWordBoundary() {
+        let converter = FakeConverter(["きょう": [("今日", nil)]])
+        converter.words["きょう"] = [Candidate.Word(text: "今日", readingCount: 3)]
+        let harness = Harness(converter: converter)
+        harness.type("kyou")
+        harness.press(.space)
+        harness.press(.down, .shift)
+        #expect(harness.lattice?.columns.first?.split == nil)
     }
 
     @Test("⇧⌃→ で文節の終わりを次の語の切れ目まで延ばし，⇧⌃← で前の語の切れ目まで縮める")
@@ -138,12 +177,18 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.first?.text == "今日はいい")
     }
 
-    @Test("区切れる位置は小さい仮名と長音の前を除き，9 個まで")
-    func splitPositions() {
-        #expect(InputSession.splitPositions(of: "きょうは") == [2, 3])
-        #expect(InputSession.splitPositions(of: "らーめん") == [2, 3])
-        #expect(InputSession.splitPositions(of: "あ") == [])
-        #expect(InputSession.splitPositions(of: String(repeating: "あ", count: 20)).count == 9)
+    @Test("区切るときは選んでいる候補の字で切れ目を見せる")
+    func splitPiecesUseSelectedCandidate() {
+        let harness = Harness(converter: problemConverter())
+        harness.type("mondaigaaru")
+        harness.press(.space)
+        // 2 番目の候補(問題が或る)を選んでいれば，その字で見せる
+        for _ in 0..<3 where harness.lattice?.columns.first?.text != "問題が或る" {
+            harness.press(.down)
+        }
+        #expect(harness.lattice?.columns.first?.text == "問題が或る")
+        harness.press(.down, .shift)
+        #expect(harness.lattice?.columns.first?.split == LatticePanel.Column.Split(pieces: ["問題", "が", "或る"]))
     }
 
     @Test("ライブ変換がオフのときは，打っているあいだに変換と予測の候補の窓を出し，↓ で選んで Enter で確定する")
