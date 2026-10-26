@@ -576,6 +576,7 @@ enum UIStrings {
         static let exportCSV = "CSV に書き出す…"
         static let exportCSVFileName = "s90-exclusions.csv"
         static let terminalCommands = "ターミナルでコマンドを英字で入力"
+        static let restrainsLiveConversionInCode = "エディタとターミナルでライブ変換を控える"
         static let behavior = "動作"
         static let apps = "アプリ"
         static func importedRules(_ count: Int) -> String { "\(count) 件を追加しました" }
@@ -690,6 +691,7 @@ extension UIStrings {
             "theme": "テーマ", "candidateFontSize": "文字の大きさ", "showsModeIndicator": "入力モードの表示",
             "modeIndicatorDuration": "入力モードの表示時間", "customThemes": "カスタムテーマ", "customThemeID": "使うカスタムテーマ",
             "escapeSwitchesToDirect": "Esc で英数", "terminalCommands": "ターミナルのコマンド", "profileRules": "アプリごとの設定",
+            "restrainsLiveConversionInCode": "エディタとターミナルのライブ変換",
         ]
 
         static func label(for scope: SyncScope) -> String {

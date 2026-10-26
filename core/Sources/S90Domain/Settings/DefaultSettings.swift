@@ -39,6 +39,14 @@ public enum DefaultSettings {
     public static let minimumCorrectionLength = 4
     /// タイプミスの補正を試す最長の長さ．長い並びを英単語の辞書に問い合わせる手間を抑える
     public static let maximumCorrectionLength = 24
+    /// ローマ字として読めてしまう英単語(「gitwotukau」の「git」)を見つける最短の長さ
+    public static let minimumWordReadAsRomajiLength = 3
+    /// ローマ字として読めてしまう英単語を探す最長の長さ．打鍵が止まるたびに英単語の辞書を引くので抑える
+    public static let maximumWordReadAsRomajiLength = 12
+    /// ローマ字として読めてしまう英単語を英単語とみなすときに，日本語として読んだときと比べる手間(対数尤度)．
+    /// 英単語の後ろの日本語のもっともらしさからこれを引いたものが，全体を日本語として読んだときより大きければ英単語にする．
+    /// 「gitwotukau」(ぎとぉつかう -52 に対し，を使う -16)は英単語にし，「kitte」(切手 -13 に対し，て -9)は日本語のままにする
+    public static let wordReadAsRomajiCost = 15.0
     /// 綴りの補正で許す編集距離
     public static let maximumCorrectionDistance = 2
     /// 文節格子で，第 1 候補と 2 番目の点数の差がこれより小さい文節は確信度が低いとみなし，候補の列を見せる．

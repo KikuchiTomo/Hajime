@@ -87,3 +87,16 @@ situmonnsitemoiidesuka	質問してもいいですか
 sietmasu	しています
 kaisyaniikimsu	会社に行きます
 dennwasimsu	電話します
+# 英語の混ざる文(英単語を日本語に直したら誤り．= のあとは見せる文)
+pythongasugoi	=pythonがすごい
+gitwotukau	=gitを使う
+konoIMEha	=このIMEは
+AAAmade	=AAAまで
+konopythonnoba-jonhafurui	=このpythonのバージョンは古い
+dockerdeugokasu	=dockerで動かす
+reactwotukatteiru	=reactを使っている
+konoAPIhabenridesu	=このAPIは便利です
+pythonnohonwoyomimasita	=pythonの本を読みました
+# 英語の混ざる文の打ち間違い(英単語より後ろの日本語だけを直す)
+pythonnohonwoyomimadita	pythonの本を読みました
+konoAPIhabenridesyu	このAPIは便利です
