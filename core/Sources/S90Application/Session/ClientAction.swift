@@ -142,20 +142,14 @@ public struct LatticePanel: Sendable, Equatable {
         public var isDecided: Bool
         /// 注目していない迷う文節に薄く添える，次の候補
         public var preview: String?
-        /// 下の枝の候補ごとの種類(alternatives と同じ数)．文節の長さを変える候補を見分けて添え書きを付ける
-        public var alternativeKinds: [AlternativeKind]
-
-        public enum AlternativeKind: Sendable, Equatable {
-            case candidate
-            /// 次の文節とつなげた候補
-            case joined
-            /// 文節を短く区切った候補
-            case split
-        }
+        /// 注目している文節を 1 文字短く・長くしたときの文節(足元に「⇧← 入れ　⇧→ 入れると」と見せる)
+        public var shorter: String?
+        public var longer: String?
 
         public init(text: String, alternatives: [String] = [], selectedAlternative: Int? = nil, variants: [String] = [], selectedVariant: Int? = nil,
-                    isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil, alternativeKinds: [AlternativeKind]? = nil) {
-            self.alternativeKinds = alternativeKinds ?? alternatives.map { _ in .candidate }
+                    isFocused: Bool, isUncertain: Bool, isDecided: Bool = false, preview: String? = nil, shorter: String? = nil, longer: String? = nil) {
+            self.shorter = shorter
+            self.longer = longer
             self.text = text
             self.alternatives = alternatives
             self.selectedAlternative = selectedAlternative

@@ -601,19 +601,20 @@ struct BranchMapControlTests {
         #expect(column?.variants.contains("らいぶ") == true)
     }
 
-    @Test("注目している文節の候補に「つなげる」を出し，選ぶと次の文節とつなげる")
-    func joinFromCandidates() {
+    @Test("足元に，文節を 1 文字短く・長くしたらどうなるかを出す．候補を選んでも文節の長さは変わらない")
+    func resizePreview() {
         let harness = Harness(converter: converter())
         harness.type("kyouhaii")
         harness.press(.space)
         harness.press(.left)
         let column = harness.lattice?.columns.first(where: \.isFocused)
         #expect(column?.text == "今日は")
-        let joined = column?.alternativeKinds.firstIndex(of: .joined)
-        #expect(joined != nil)
-        if let joined { harness.press(.character(Character("\(joined + 1)"))) }
-        #expect(harness.lattice?.columns.count == 1)
-        #expect(harness.lattice?.columns.first?.text == "今日はいい")
+        #expect(column?.longer != nil)
+        #expect(column?.shorter != nil)
+        let count = harness.lattice?.columns.count
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.lattice?.columns.count == count)
     }
 }
 

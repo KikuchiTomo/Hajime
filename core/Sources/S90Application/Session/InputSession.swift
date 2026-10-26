@@ -465,7 +465,7 @@ public final class InputSession {
         if let typed = readingCorrector.typedComposition(from: composition) {
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
         }
-        phase = .lattice(builder.withResizeOptions(lattice, reading: composition.conversionReading))
+        phase = .lattice(lattice)
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
@@ -725,6 +725,11 @@ public final class InputSession {
                 .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
             })
             var panel = PanelBuilder.latticePanel(for: lattice)
+            let preview = LatticeBuilder(converter: converter).resizePreview(lattice, reading: composition.conversionReading)
+            if let focused = panel.columns.firstIndex(where: \.isFocused) {
+                panel.columns[focused].shorter = preview.shorter
+                panel.columns[focused].longer = preview.longer
+            }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
             return [.setMarkedText(marked), .showLattice(panel)]
         }
@@ -766,42 +771,23 @@ public final class InputSession {
                 let length = lattice.focused.readingLength + (command == .extendSegment ? 1 : -1)
                 lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
             }
-            lattice = applyResizeChoice(lattice, builder: builder)
             phase = .lattice(lattice)
             return KeyResult(handled: true, actions: render(context: context))
         }
         switch event.key {
         case .character(let character):
             guard let number = numberKey(character), lattice.select(number: number) else { return nil }
-            if case .resized = lattice.focused.selected.origin {
-                // 長さを変えた候補は，区切り直して同じ文節で選び続ける
-                lattice = applyResizeChoice(lattice, builder: builder)
-                phase = .lattice(lattice)
-                return KeyResult(handled: true, actions: render(context: context))
-            }
             // 番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)
             guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
                 phase = .lattice(lattice)
                 return KeyResult(handled: true, actions: commitAll())
             }
             lattice.focusedIndex = next
-            lattice = builder.withResizeOptions(lattice, reading: composition.conversionReading)
         default:
             return nil
         }
         phase = .lattice(lattice)
         return KeyResult(handled: true, actions: render(context: context))
-    }
-
-    /// 文節の長さを変えた候補(「つなげる」「区切る」)を選んでいたら，文節をその長さに区切り直す．
-    /// そのあと，注目している文節に長さを変えた候補を入れ直す
-    private func applyResizeChoice(_ lattice: SegmentLattice, builder: LatticeBuilder) -> SegmentLattice {
-        var lattice = lattice
-        let reading = composition.conversionReading
-        if case .resized(let length) = lattice.focused.selected.origin {
-            lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: reading)
-        }
-        return builder.withResizeOptions(lattice, reading: reading)
     }
 
     private func composingMarkedText() -> MarkedText {

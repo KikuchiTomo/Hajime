@@ -11,19 +11,19 @@ enum UIStrings {
 
     enum Branch {
         /// 足元の案内．キーは設定の割り当て(KeyBindings)の最初のキーを出す
-        static func hints(for keys: KeyBindings) -> [KeyHint] {
+        /// 文節の長さは，押したらどうなるか(shorter・longer)が分かればそれを見せる(「⇧← 入れ　⇧→ 入れると」)
+        static func hints(for keys: KeyBindings, shorter: String? = nil, longer: String? = nil) -> [KeyHint] {
             func first(_ command: ConversionCommand) -> String { keys.strokes(for: command).first.map(Keys.name(of:)) ?? "" }
-            return [
+            let length: [KeyHint] = shorter == nil && longer == nil
+                ? [KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ")]
+                : [shorter.map { KeyHint(key: first(.shrinkSegment), label: $0) }, longer.map { KeyHint(key: first(.extendSegment), label: $0) }].compactMap { $0 }
+            return ([
                 KeyHint(key: first(.nextCandidate), label: "候補"),
                 KeyHint(key: first(.previousCandidate), label: "文字種"),
                 KeyHint(key: Keys.pair(first(.previousSegment), first(.nextSegment)), label: "文節"),
                 KeyHint(key: first(.nextUncertainSegment), label: "次の文節"),
-                KeyHint(key: Keys.pair(first(.shrinkSegment), first(.extendSegment)), label: "文節の長さ"),
-            ].filter { !$0.key.isEmpty }
+            ] + length).filter { !$0.key.isEmpty }
         }
-        /// 文節の長さを変える候補に添える文字
-        static let joined = "つなげる"
-        static let split = "区切る"
         /// 上の枝(文字種)の丸に入れる印
         static let variantBadge = "↑"
         static func position(first: Int, last: Int, total: Int) -> String {

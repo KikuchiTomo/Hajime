@@ -75,11 +75,7 @@ enum PanelBuilder {
                 selectedVariant: selectedVariant,
                 isFocused: true,
                 isUncertain: !segment.isConfident,
-                isDecided: segment.isDecided,
-                alternativeKinds: page.map { candidate in
-                    guard case .resized(let length) = candidate.origin else { return .candidate }
-                    return length > segment.readingLength ? .joined : .split
-                }
+                isDecided: segment.isDecided
             )
         }
         return LatticePanel(columns: columns, position: position, total: total)
