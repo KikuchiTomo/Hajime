@@ -175,10 +175,13 @@ pub mod size {
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
     }
     pub mod handwriting {
-        pub const WIDTH: f32 = 360.0;
-        pub const HEIGHT: f32 = 330.0;
-        pub const CANVAS_HEIGHT: f32 = 260.0;
+        pub const WIDTH: f32 = 284.0;
+        pub const HEIGHT: f32 = 332.0;
+        pub const CANVAS_SIZE: f32 = 260.0;
+        pub const CANVAS_PADDING: f32 = 12.0;
         pub const STROKE_WIDTH: f32 = 5.0;
+        pub const FRAME_WIDTH: f32 = 1.0;
+        pub const GUIDE_DASH: f32 = 4.0;
     }
 }
 
