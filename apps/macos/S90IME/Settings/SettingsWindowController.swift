@@ -46,6 +46,11 @@ final class SettingsWindowController {
     }
 
     private func makeWindow() -> NSWindow {
+        Self.makeWindow(model: model, sync: sync, navigation: SettingsNavigation())
+    }
+
+    /// 設定の画面の窓を作る．計測と書き出し(デバッグビルド)でも同じ窓を使う
+    static func makeWindow(model: SettingsModel, sync: SyncCoordinator, navigation: SettingsNavigation) -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: SettingsView.size),
             // 左の一覧をタイトルバーの下まで伸ばす(システム設定と同じ見た目)
@@ -58,7 +63,7 @@ final class SettingsWindowController {
         // 窓にツールバーを持たせ，SwiftUI の見出しと検索欄をそこに出して，OS にタイトルバーの地を塗らせる
         window.toolbar = NSToolbar(identifier: "settings")
         window.toolbarStyle = .unified
-        let hosting = NSHostingView(rootView: SettingsView(model: model, sync: sync))
+        let hosting = NSHostingView(rootView: SettingsView(model: model, sync: sync, navigation: navigation))
         hosting.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hosting
         window.isReleasedWhenClosed = false
@@ -146,40 +151,54 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    // MARK: アプリごとのプロファイル
+    // MARK: 決まりの一覧
 
-    /// 先頭に足す．先にある規則を優先するので，利用者が足した規則が既定の規則より効く
-    /// 保存できたら true．できなければ入力欄を残す
-    func addProfileRule(prefix: String, profile: AppProfile) -> Bool {
-        let trimmed = prefix.trimmingCharacters(in: .whitespaces)
-        guard ProfileRuleCSV.isValidIdentifier(trimmed) else { return false }
-        return update { current in
-            current.profileRules.removeAll { $0.applicationPrefix == trimmed }
-            current.profileRules.insert(ProfileRule(applicationPrefix: trimmed, profile: profile), at: 0)
+    /// 一覧を変える．change が false を返したら(形が誤っているか上限を超える)failure を知らせる．保存して変えられたら true
+    func editRules(failure: String, _ change: (inout S90Domain.Settings) -> Bool) -> Bool {
+        var changed = false
+        guard update({ changed = change(&$0) }) else { return false }
+        if !changed { message = failure }
+        return changed
+    }
+
+    /// 決まりの一覧をファイル(「左<タブ>右」の行)から読み込む．merge で設定に足し，足した数を知らせる
+    func importRuleList(_ merge: ([RuleListFile.Row], inout S90Domain.Settings) -> Int) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.plainText, .tabSeparatedText]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let rows = try RuleListFile.read(from: url)
+            var added = 0
+            if update({ added = merge(rows, &$0) }) {
+                message = UIStrings.More.importedRules(added)
+            }
+        } catch {
+            message = UIStrings.Settings.importFailed
         }
     }
 
-    // MARK: ローマ字
-
-    func addRomajiRule(keys: String, kana: String) -> Bool {
-        let rule = RomajiRule(keys: keys.trimmingCharacters(in: .whitespaces).lowercased(), kana: kana.trimmingCharacters(in: .whitespaces))
-        guard rule.isValid, settings.customRomaji.count < DefaultSettings.maximumRomajiRules else {
-            message = UIStrings.Settings.invalidRomaji
-            return false
-        }
-        return update { current in
-            current.customRomaji.removeAll { $0.keys == rule.keys }
-            current.customRomaji.append(rule)
+    func exportRuleList(_ rows: [RuleListFile.Row], fileName: String) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = fileName
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try RuleListFile.write(rows, to: url)
+        } catch {
+            message = UIStrings.Settings.exportFailed
         }
     }
 
     // MARK: ユーザー辞書
 
-    func addEntry(reading: String, word: String) -> Bool {
+    /// 語を登録する．replacing を渡すとその語を書き換える(同じ位置に置く)．保存できなければ false を返し，打った語を入力欄に残す
+    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String) -> Bool {
         var entries = settings.userDictionary
+        let index = old.flatMap { entries.firstIndex(of: $0) }
+        if let index { entries.remove(at: index) }
         switch UserDictionaryEditing.add(reading: reading, word: word, to: &entries) {
         case .added:
-            // 保存できなければ false を返し，打った語を入力欄に残す
+            if let index { entries.insert(entries.removeLast(), at: index) }
             return update { $0.userDictionary = entries }
         case .alreadyRegistered:
             return true
@@ -302,24 +321,50 @@ final class SettingsModel: ObservableObject {
 
     // MARK: カスタムテーマ
 
-    /// 今使っているテーマ(既成のテーマかカスタムテーマ)を複製して，新しいカスタムテーマにし，それを使う
-    func duplicateCurrentTheme() {
-        guard settings.customThemes.count < DefaultSettings.maximumCustomThemes else { return }
+    /// 新しいカスタムテーマの下書き．今使っているテーマ(既成のテーマかカスタムテーマ)の色を写す．保存はしない
+    func draftCustomTheme() -> CustomTheme {
         var theme = settings.activeCustomTheme ?? Self.customTheme(from: settings.theme)
         theme.id = UUID().uuidString
-        theme.name = String(UIStrings.More.copyName(theme.name).prefix(DefaultSettings.maximumThemeNameLength))
-        update { current in
-            current.customThemes.append(theme)
-            current.customThemeID = theme.id
-        }
+        theme.name = UIStrings.More.newThemeName
+        return theme
     }
 
-    func updateCustomTheme(id: String, _ change: (inout CustomTheme) -> Void) {
-        update { current in
-            guard let index = current.customThemes.firstIndex(where: { $0.id == id }) else { return }
-            var theme = current.customThemes[index]
-            change(&theme)
-            if theme.isValid { current.customThemes[index] = theme }
+    /// 今使っているテーマを複製して，新しいカスタムテーマにし，それを使う
+    func duplicateCurrentTheme() {
+        let source = settings.activeCustomTheme ?? Self.customTheme(from: settings.theme)
+        duplicate(source)
+    }
+
+    /// カスタムテーマを複製して使う
+    func duplicateCustomTheme(id: String) {
+        guard let source = settings.customThemes.first(where: { $0.id == id }) else { return }
+        duplicate(source)
+    }
+
+    private func duplicate(_ source: CustomTheme) {
+        var theme = source
+        theme.id = UUID().uuidString
+        theme.name = String(UIStrings.More.copyName(source.name).prefix(DefaultSettings.maximumThemeNameLength))
+        _ = saveCustomTheme(theme)
+    }
+
+    /// カスタムテーマを保存して使う．同じ id のテーマがあれば置き換え，無ければ足す．保存できたら true
+    func saveCustomTheme(_ theme: CustomTheme) -> Bool {
+        guard theme.isValid else {
+            message = UIStrings.More.invalidTheme
+            return false
+        }
+        guard settings.customThemes.contains(where: { $0.id == theme.id }) || settings.customThemes.count < DefaultSettings.maximumCustomThemes else {
+            message = UIStrings.More.themesFull
+            return false
+        }
+        return update { current in
+            if let index = current.customThemes.firstIndex(where: { $0.id == theme.id }) {
+                current.customThemes[index] = theme
+            } else {
+                current.customThemes.append(theme)
+            }
+            current.customThemeID = theme.id
         }
     }
 
@@ -372,9 +417,11 @@ final class SettingsModel: ObservableObject {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
 
-    /// アプリに入れた利用表記(THIRD_PARTY_NOTICES.md)．無ければ nil
-    var notices: String? {
-        guard let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md") else { return nil }
-        return try? String(contentsOf: url, encoding: .utf8)
-    }
+    /// アプリに入れた利用表記(THIRD_PARTY_NOTICES.md)を項目に分けたもの．無ければ nil．
+    /// 画面を描き直すたびにファイルを読み直さないよう，初めて使うときに一度だけ読む
+    private(set) lazy var acknowledgements: [Acknowledgement]? = {
+        guard let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        return Acknowledgement.parse(text)
+    }()
 }

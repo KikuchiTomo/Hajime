@@ -33,8 +33,8 @@ struct AboutPage: View {
                 LabeledContent(UIStrings.More.version, value: model.versionString)
             }
             Section {
-                if let notices = model.notices {
-                    ForEach(Acknowledgement.parse(notices)) { AcknowledgementRow(item: $0) }
+                if let acknowledgements = model.acknowledgements {
+                    ForEach(acknowledgements) { AcknowledgementRow(item: $0) }
                 } else {
                     Text(UIStrings.More.noticesMissing).foregroundStyle(.secondary)
                 }

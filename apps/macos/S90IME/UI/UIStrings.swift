@@ -270,9 +270,21 @@ enum UIStrings {
         }
     }
 
+    /// 決まりの一覧(RuleListEditor)
+    enum RuleList {
+        static let update = "更新"
+        static let edit = "編集"
+        static let enabled = "有効"
+        static func overwrites(_ key: String) -> String { "「\(key)」はもうあります。追加すると上書きします。" }
+        static let alreadyRegistered = "もう登録してあります。"
+        static let full = "これ以上は追加できません。"
+    }
+
     enum Settings {
         static let windowTitle = "s90.tokyo IME の設定"
         static let ok = "OK"
+        static let cancel = "キャンセル"
+        static let save = "保存"
         static let inputTab = "入力"
         static let conversionTab = "変換"
         static let dictionaryTab = "ユーザー辞書"
@@ -280,9 +292,20 @@ enum UIStrings {
         static let usageTab = "統計"
         static let appsTab = "除外設定"
         static let romajiTab = "ローマ字"
+        // 左の一覧の見出し
+        static let inputGroup = "入力と変換"
+        static let dictionaryGroup = "辞書と記号"
+        static let appearanceGroup = "見た目"
+        static let dataGroup = "データ"
+        static let aboutGroup = "このアプリについて"
+        static let loading = "読み込み中…"
         static let romajiKeys = "入力"
         static let romajiKana = "出力"
         static let romajiNote = "ローマ字の変換表に組み合わせを追加します。"
+        static let romajiEmpty = "追加した組み合わせはありません"
+        static let romajiEmptyHint = "入力する英字と出力するかなを上の欄に入れて追加します。"
+        static let dictionaryEmpty = "登録した単語はありません"
+        static let dictionaryEmptyHint = "読みと単語を上の欄に入れて追加します。"
         static let invalidRomaji = "入力は英小文字・「-」・「'」で 4 文字まで，出力は 6 文字までにしてください"
         static let escapeSwitchesToDirect = "Escape で英数に切り替え"
         static let bundlePrefix = "バンドル ID"
@@ -495,17 +518,25 @@ enum UIStrings {
         static let typed = "打った英字"
         static let replacement = "置き換える語"
         static let invalidRule = "打った英字は 2〜24 文字の英字，置き換える語は 64 文字までにしてください"
+        static let invalidException = "直さない語は 64 文字までにしてください"
+        static let rulesEmpty = "置き換えはありません"
+        static let rulesEmptyHint = "打った英字と置き換える語を上の欄に入れて追加します。"
+        static let exceptionsEmpty = "直さない語はありません"
+        static let exceptionsEmptyHint = "補正したくない英字や読みを上の欄に入れて追加します。"
 
         // 記号
         static let symbolsPage = "記号"
-        static let sequences = "続けて打つ記号"
-        static let readings = "読みから出す記号"
+        static let sequences = "連続入力によるサジェスト"
+        static let readings = "読み仮名入力によるサジェスト"
         static let input = "入力"
         static let output = "記号"
         static let readingInput = "読み"
         static let readingOutput = "空白で区切った記号"
         static let search = "検索"
-        static let invalidSymbol = "続けて打つ記号は英字と数字以外の 2〜12 文字にしてください"
+        static let invalidSymbol = "連続入力は英字と数字以外の 2〜12 文字にしてください"
+        static let invalidReadingSymbol = "読みは 12 文字まで，記号は 200 文字までにしてください"
+        static let symbolsEmpty = "決まりはありません"
+        static let symbolsEmptyHint = "上の欄に入力と記号を入れて追加します。"
         static let restoreDefault = "既定に戻す"
         static let changed = "変更あり"
         static let added = "追加"
@@ -539,6 +570,8 @@ enum UIStrings {
         // 除外設定
         static let exclusionsNote = "アプリごとに入力の扱いを変えます。上にあるものが優先されます。"
         static let addApps = "アプリを追加…"
+        static let exclusionsEmpty = "アプリはありません"
+        static let exclusionsEmptyHint = "「アプリを追加…」で入力の扱いを変えるアプリを選びます。"
         static let importCSV = "CSV を読み込む…"
         static let exportCSV = "CSV に書き出す…"
         static let exportCSVFileName = "s90-exclusions.csv"
@@ -569,6 +602,28 @@ enum UIStrings {
         static let font = "書体"
         static let themeFont = "テーマに合わせる"
         static func copyName(_ name: String) -> String { "\(name) のコピー" }
+        static let createTheme = "カスタムテーマを作成…"
+        static let editTheme = "編集…"
+        static let duplicateTheme = "複製"
+        static let newThemeName = "新しいテーマ"
+        static let noCustomThemes = "カスタムテーマはありません"
+        static let preview = "見本"
+        static let readability = "読みやすさ"
+        static let invalidTheme = "名前を入れてください"
+        static var themesFull: String { "カスタムテーマは \(DefaultSettings.maximumCustomThemes) 個までです" }
+        static func confirmDeleteTheme(_ name: String) -> String { "「\(name)」を削除しますか？" }
+
+        /// 読みにくい組み合わせの知らせ
+        static func lowContrast(_ pair: CustomTheme.ContrastPair, ratio: Double) -> String {
+            let name = switch pair {
+            case .text: text
+            case .textMuted: textMuted
+            case .selectionText: selectionText
+            case .correction: correction
+            }
+            let ground = pair == .selectionText ? selection : surface
+            return String(format: "%@と%@の色が近く，読みにくくなっています。コントラスト比は %.1f で，%.1f 以上が目安です。", name, ground, ratio, pair.minimum)
+        }
 
         static func label(for style: CustomTheme.BranchStyle) -> String {
             switch style {

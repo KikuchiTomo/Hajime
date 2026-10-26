@@ -178,7 +178,7 @@ public enum UserDictionaryEditing {
 }
 
 extension String {
-    fileprivate var trimmed: String {
+    var trimmed: String {
         String(drop { $0 == " " || $0 == "\u{3000}" || $0 == "\t" }.reversed().drop { $0 == " " || $0 == "\u{3000}" || $0 == "\t" }.reversed())
     }
 }

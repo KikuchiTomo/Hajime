@@ -342,6 +342,28 @@ struct CustomThemeTests {
         #expect(HexColor("#GG6600") == nil)
     }
 
+    @Test("コントラスト比は WCAG の式で求める(白と黒で 21，同じ色で 1)")
+    func contrastRatio() {
+        let white = HexColor(red: 255, green: 255, blue: 255), black = HexColor(red: 0, green: 0, blue: 0)
+        #expect(abs(white.contrastRatio(with: black) - 21) < 0.01)
+        #expect(abs(black.contrastRatio(with: white) - 21) < 0.01)
+        #expect(abs(white.contrastRatio(with: white) - 1) < 0.01)
+        // check_contrast.py で求めた値: #767676 と白で 4.54
+        #expect(abs(HexColor("#767676")!.contrastRatio(with: white) - 4.54) < 0.01)
+    }
+
+    @Test("文字と地が基準に届かない組み合わせを挙げる．修正の印は 3 で足りる")
+    func lowContrastPairs() {
+        let white = HexColor("#FFFFFF")!
+        var theme = CustomTheme(id: "t", name: "t", base: .automatic, surface: white, text: HexColor("#000000")!, textMuted: HexColor("#767676")!,
+                                selection: HexColor("#0057D9")!, selectionText: white, correction: HexColor("#808080")!, line: HexColor("#CCCCCC")!)
+        #expect(theme.lowContrastPairs == [])
+        theme.textMuted = HexColor("#AAAAAA")!
+        theme.selectionText = HexColor("#0057D9")!
+        theme.correction = HexColor("#EEEEEE")!
+        #expect(theme.lowContrastPairs == [.textMuted, .selectionText, .correction])
+    }
+
     @Test("使っているテーマが無くなったら既成のテーマに戻す")
     func missingActiveTheme() {
         var settings = Settings()
