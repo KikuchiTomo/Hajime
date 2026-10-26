@@ -12,8 +12,18 @@ final class CandidatePanelController {
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
 
+    /// 候補をマウスで押したときに知らせる先．押した対象(PointerTarget)を渡す
+    var onChoose: ((PointerTarget) -> Void)? {
+        didSet {
+            view.onChoose = onChoose
+            branchView.onChoose = onChoose
+        }
+    }
+
     init() {
         window = FloatingPanel.make(contentView: view)
+        // 候補を押して選べるようにする．窓は前に出ない(フォーカスを入力先のアプリから移さない)
+        window.ignoresMouseEvents = false
     }
 
     func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double, keys: Keymap) {

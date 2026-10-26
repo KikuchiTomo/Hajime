@@ -44,6 +44,7 @@ final class S90InputController: IMKInputController {
             let key = NSEventKeyTranslator.translate(event) else { return false }
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
         let result = session.handle(key, context: context)
+        presenter.context = context
         presenter.apply(result.actions, to: client)
         if result.actions.contains(.awaitCorrections) {
             convertAfterCorrections(client: client, context: context)

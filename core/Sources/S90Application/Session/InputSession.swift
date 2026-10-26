@@ -1452,13 +1452,48 @@ public final class InputSession {
     /// 番号キーでなければ nil
     private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         guard let number = numberKey(character), lattice.select(number: number, perPage: settings.current.branchCandidatesPerPage) else { return nil }
+        return KeyResult(handled: true, actions: advance(after: lattice, context: context))
+    }
+
+    /// 分岐図で文節の候補を選んだあと，まだ選んでいない迷う文節へ進む．残っていなければ確定する
+    private func advance(after chosen: SegmentLattice, context: InputContext) -> [ClientAction] {
+        var lattice = chosen
         guard let next = lattice.segments.indices.first(where: { !lattice.segments[$0].isConfident && !lattice.segments[$0].isDecided }) else {
             phase = .lattice(lattice)
-            return KeyResult(handled: true, actions: commitAll())
+            return commitAll()
         }
         lattice.focusedIndex = next
         phase = .lattice(lattice)
-        return KeyResult(handled: true, actions: render(context: context))
+        return render(context: context)
+    }
+
+    /// 候補の窓をマウスで押した．キーで同じことをしたときと同じに動く:
+    /// 分岐図の幹は文節を選び(←→)，枝は番号キーで選んだのと同じ(迷う文節へ進むか確定)，一覧の行は選んで確定する(番号 → Enter)．
+    /// 押した対象が今の状態に無ければ何もしない
+    public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
+        switch (phase, target) {
+        case (.lattice(var lattice), .segment(let index)):
+            guard lattice.segments.indices.contains(index) else { return [] }
+            lattice.focusedIndex = index
+            phase = .lattice(lattice)
+            return render(context: context)
+        case (.lattice(var lattice), .alternative(let index)):
+            guard lattice.select(number: index + 1, perPage: settings.current.branchCandidatesPerPage) else { return [] }
+            return advance(after: lattice, context: context)
+        case (.lattice(var lattice), .variant(let index)):
+            guard lattice.selectVariant(at: index) else { return [] }
+            return advance(after: lattice, context: context)
+        case (.selecting, .entry(let index)):
+            guard selectByNumber(index + 1) else { return [] }
+            return commitAll()
+        case (.selecting(var selection), .listVariant(let index)):
+            guard ScriptVariant.allCases.indices.contains(index), ScriptVariant.allCases[index].apply(to: composition) != nil else { return [] }
+            selection.focus = .variant(ScriptVariant.allCases[index])
+            phase = .selecting(selection)
+            return commitAll()
+        default:
+            return []
+        }
     }
 
     /// 注目している文節の読み

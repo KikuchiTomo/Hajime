@@ -53,7 +53,16 @@ final class Harness {
 
     func press(_ key: KeyEvent.Key, _ modifiers: KeyEvent.Modifiers = [], isKeypad: Bool = false) {
         lastResult = session.handle(KeyEvent(key, modifiers: modifiers, isKeypad: isKeypad), context: context)
-        for action in lastResult.actions {
+        apply(lastResult.actions)
+    }
+
+    /// 候補の窓をマウスで押す
+    func click(_ target: PointerTarget) {
+        apply(session.choose(target, context: context))
+    }
+
+    private func apply(_ actions: [ClientAction]) {
+        for action in actions {
             switch action {
             case .commit(let text): committed += text
             case .setMarkedText(let text): marked = text
