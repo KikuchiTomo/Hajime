@@ -4,6 +4,7 @@ import S90Domain
 /// 状態を持たない計算だけなので，InputSession から分けておく
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
+    static let splitNote = "数字で区切る位置を選ぶ　Esc でやめる"
     static let correctionNote = "Space 入力のままに戻す"
     static let englishInputNote = "Tab 日本語にする"
     static let readingCorrectionNote = "直しました　Esc で打ったままに戻す"

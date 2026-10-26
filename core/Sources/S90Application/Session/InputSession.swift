@@ -43,6 +43,10 @@ public final class InputSession {
     private var isSettled = false
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
+    /// 利用者が打っている途中に入れた文節の区切り(読みの先頭からの文字数)．分岐図ではここを必ず区切る
+    private var forcedBoundaries: [Int] = []
+    /// 分岐図で，注目している文節を数字で区切る状態か
+    private var splitMode = false
     /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
     private var convertedFromEnglish: String?
     /// 組み立てを始めたときの，入力位置の前の文字列(打ち間違いの訂正の手がかり)
@@ -86,6 +90,12 @@ public final class InputSession {
         if event.modifiers.contains(.command) {
             // ショートカットはアプリに任せる．組み立て中の文字は先に確定する
             return KeyResult(handled: false, actions: commitAll())
+        }
+        // 打っている途中に文節の区切りを入れるキー(既定 ⌥Space)
+        if mode == .japanese, phase == .composing, !composition.isEmpty, settings.current.conversionKeys.command(for: event) == .insertBoundary {
+            let position = composition.kana.count
+            if position > 0, !forcedBoundaries.contains(position) { forcedBoundaries.append(position) }
+            return KeyResult(handled: true, actions: render(context: context))
         }
         // 設定を開く・ライブ変換を切り替えるキー．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
         if mode == .japanese, let command = settings.current.conversionKeys.command(for: event), command.isGlobal,
@@ -548,6 +558,11 @@ public final class InputSession {
         let builder = LatticeBuilder(converter: converter)
         let focus = settings.current.initialFocus
         var lattice = builder.build(reading: composition.conversionReading, focus: focus)
+        if !forcedBoundaries.isEmpty {
+            // 打っている途中に入れた区切りで，必ず文節を分ける
+            lattice = builder.splitting(lattice, at: forcedBoundaries, reading: composition.conversionReading)
+            lattice.focusedIndex = lattice.initialFocus(focus)
+        }
         if let typed = readingCorrector.typedComposition(from: composition) {
             // 打ち間違いを直した文節は，自動のときいちばん先に選ぶ(confidenceGap を最小にしてある)
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
@@ -615,6 +630,7 @@ public final class InputSession {
             return KeyResult(handled: true, actions: reset())
         }
         NasalReadingResolver(converter: converter).resolve(&composition)
+        forcedBoundaries.removeAll { $0 >= composition.kana.count }
         readingCorrector.didEdit(composition)
         updateCorrection()
         return KeyResult(handled: true, actions: render(context: context))
@@ -712,6 +728,8 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         convertedFromEnglish = nil
+        forcedBoundaries = []
+        splitMode = false
         composition = newComposition()
         readingCorrector.reset()
         alphabetRun = false
@@ -830,6 +848,7 @@ public final class InputSession {
                 panel.columns[focused].usageNote = usageNote(for: lattice)
             }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote }
+            if splitMode { panel.note = "\(splitGuide(lattice))　\(PanelBuilder.splitNote)" }
             return [.setMarkedText(marked), .showLattice(panel)]
         }
     }
@@ -874,12 +893,33 @@ public final class InputSession {
     /// ↓ と Space は下の枝(変換の候補)へ，↑ は上の枝(字種)へ．Tab は迷う文節だけを渡り歩く(ADR 0007)
     private func handleLattice(_ event: KeyEvent, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         let builder = LatticeBuilder(converter: converter)
+        if splitMode {
+            splitMode = false
+            switch event.key {
+            case .character(let character) where character.wholeNumberValue != nil:
+                // 数字で選んだ位置で区切る．区切ったあとは前の文節に注目したまま
+                let positions = Self.splitPositions(of: focusedReading(lattice))
+                if let number = character.wholeNumberValue, positions.indices.contains(number - 1) {
+                    lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: positions[number - 1], reading: composition.conversionReading)
+                }
+                phase = .lattice(lattice)
+                return KeyResult(handled: true, actions: render(context: context))
+            case .escape:
+                phase = .lattice(lattice)
+                return KeyResult(handled: true, actions: render(context: context))
+            default:
+                break
+            }
+        }
         // キーの割り当ては設定で変えられる(KeyBindings)
         if let command = settings.current.conversionKeys.command(for: event) {
             switch command {
-            case .openSettings, .toggleLiveConversion, .handwriting:
+            case .openSettings, .toggleLiveConversion, .handwriting, .insertBoundary:
                 // route が先に受ける
                 break
+            case .splitSegment:
+                // 区切れる位置が 2 つ以上の文字のときだけ区切る状態にする
+                splitMode = !splitMode && !Self.splitPositions(of: focusedReading(lattice)).isEmpty
             case .nextCandidate: lattice.moveSelection(by: 1)
             case .previousCandidate: lattice.moveSelection(by: -1)
             case .nextSegment: lattice.moveFocus(by: 1)
@@ -909,6 +949,31 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
+    /// 注目している文節の読み
+    private func focusedReading(_ lattice: SegmentLattice) -> String {
+        String(composition.conversionReading.dropFirst(lattice.focused.readingStart).prefix(lattice.focused.readingLength))
+    }
+
+    /// 文節の読みの中で区切れる位置(先頭からの文字数)．小さい「ゃ」や「ー」の前では区切らない．数字で選ぶので 9 個まで
+    public static func splitPositions(of reading: String) -> [Int] {
+        let characters = Array(reading)
+        let joins: Set<Character> = ["ゃ", "ゅ", "ょ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ゎ", "ー", "ャ", "ュ", "ョ", "ァ", "ィ", "ゥ", "ェ", "ォ"]
+        return Array(characters.indices.dropFirst().filter { !joins.contains(characters[$0]) }.prefix(9))
+    }
+
+    /// 区切る状態のとき，注目している文節の読みに番号を挟んだ案内(「き①ょう②は」)
+    private func splitGuide(_ lattice: SegmentLattice) -> String {
+        let reading = Array(focusedReading(lattice))
+        let positions = Self.splitPositions(of: String(reading))
+        let marks: [Character] = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
+        var text = ""
+        for (index, character) in reading.enumerated() {
+            if let order = positions.firstIndex(of: index) { text.append(marks[order]) }
+            text.append(character)
+        }
+        return text
+    }
+
     private func composingMarkedText() -> MarkedText {
         if let correction = corrector.active {
             return MarkedText([
@@ -922,6 +987,17 @@ public final class InputSession {
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
         let reading = composition.kana
+        if !forcedBoundaries.isEmpty, !readingCorrector.isApplied {
+            // 区切りを入れたところで分けて変換し，文節ごとに下線を分けて見せる
+            var segments: [MarkedText.Segment] = []
+            var start = 0
+            for end in (forcedBoundaries.sorted() + [reading.count]) where end > start && end <= reading.count {
+                let piece = String(reading.dropFirst(start).prefix(end - start))
+                segments.append(.init(bestWholeCandidate(for: piece)?.text ?? piece, style: .converted))
+                start = end
+            }
+            return MarkedText(segments + [.init(composition.pending, style: .reading)])
+        }
         let shown = bestWholeCandidate(for: reading).map {
             LiveConversionRule().display(of: $0, reading: reading, settled: isSettled)
         }

@@ -105,6 +105,16 @@ struct LatticeBuilder {
         return result
     }
 
+    /// 利用者が入れた区切り(読みの先頭からの文字数)で，必ず文節を分ける
+    func splitting(_ lattice: SegmentLattice, at boundaries: [Int], reading: String) -> SegmentLattice {
+        var result = lattice
+        for boundary in boundaries.sorted() where boundary > 0 && boundary < reading.count {
+            guard let index = result.segments.firstIndex(where: { $0.readingStart < boundary && boundary < $0.readingStart + $0.readingLength }) else { continue }
+            result = resize(result, segmentAt: index, to: boundary - result.segments[index].readingStart, reading: reading)
+        }
+        return result
+    }
+
     /// index の文節の長さを length に変え，それより後ろを分け直す(Shift+←→)．
     /// 分け直したあとも読みの範囲が同じ文節は，利用者が選び直したものを残す(人が決めた文節は書き換えない)
     func resize(_ lattice: SegmentLattice, segmentAt index: Int, to length: Int, reading: String) -> SegmentLattice {
