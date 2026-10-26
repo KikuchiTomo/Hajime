@@ -69,6 +69,16 @@ final class SyncCoordinator: ObservableObject {
         }
     }
 
+    /// 項目をこの Mac だけで持つかを変える
+    func setLocal(_ isLocal: Bool, field: String) {
+        do {
+            try synchronizer.setLocal(isLocal, field: field)
+            refresh()
+        } catch {
+            fail(error)
+        }
+    }
+
     func setScope(_ scope: SyncScope, for group: SyncGroup) {
         do {
             try synchronizer.setScope(scope, for: group)

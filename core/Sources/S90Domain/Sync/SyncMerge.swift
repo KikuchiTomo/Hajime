@@ -21,22 +21,27 @@ public enum SyncMerge {
         public var changedRemote: Bool
     }
 
+    /// localFields はまとまりを同期していても，この Mac の値を変えず，同期のファイルの値(ほかの Mac のもの)も変えない項目
     public static func merge(local: [String: JSONValue], ledger: SyncLedger, remote: SyncDocument?,
-                             scopes: [SyncGroup: SyncScope], now: Date) -> Result {
+                             scopes: [SyncGroup: SyncScope], localFields: Set<String> = [], now: Date) -> Result {
         var settings = local
         var ledger = ledger
         var document = remote ?? SyncDocument()
         document.version = SyncDocument.currentVersion
         for group in SyncGroup.allCases where group != .dictionary && (scopes[group] ?? group.defaultScope) == .synced {
             let localTime = ledger.groupModifiedAt[group] ?? .distantPast
-            let localValues = values(of: group, in: local)
+            var localValues = values(of: group, in: local)
             if let payload = remote?.groups[group], payload.modifiedAt > localTime {
                 // 古い版の Mac の値(legacyFieldNames)も取り込み，設定を作るときに新しい項目へ移し替える
-                for name in group.fieldNames + group.legacyFieldNames {
+                for name in group.fieldNames + group.legacyFieldNames where !localFields.contains(name) {
                     settings[name] = payload.values[name]
                 }
                 ledger.groupModifiedAt[group] = payload.modifiedAt
             } else {
+                // この Mac だけの項目は，同期のファイルにある値(ほかの Mac のもの)を残す
+                for name in localFields where group.fieldNames.contains(name) {
+                    localValues[name] = remote?.groups[group]?.values[name]
+                }
                 document.groups[group] = .init(modifiedAt: localTime, values: localValues)
             }
         }
@@ -100,9 +105,13 @@ public enum SyncMerge {
     }
 
     /// この Mac で設定を変えたときに記録をつける．まとまりの値が変わったら時刻を記し，辞書の語の登録と削除を記す
-    public static func noteChange(from old: [String: JSONValue], to new: [String: JSONValue], ledger: inout SyncLedger, now: Date) {
-        for group in SyncGroup.allCases where values(of: group, in: old) != values(of: group, in: new) {
-            ledger.groupModifiedAt[group] = now
+    /// localFields(この Mac だけの項目)だけが変わったときは，まとまりを変えたことにしない(ほかの Mac に送らない)
+    public static func noteChange(from old: [String: JSONValue], to new: [String: JSONValue], ledger: inout SyncLedger,
+                                  localFields: Set<String> = [], now: Date) {
+        for group in SyncGroup.allCases {
+            let before = values(of: group, in: old).filter { !localFields.contains($0.key) }
+            let after = values(of: group, in: new).filter { !localFields.contains($0.key) }
+            if before != after { ledger.groupModifiedAt[group] = now }
         }
         let before = Set(localDictionary(old).map { key(reading: $0.reading, word: $0.word) })
         let after = Set(localDictionary(new).map { key(reading: $0.reading, word: $0.word) })
