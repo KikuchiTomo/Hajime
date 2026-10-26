@@ -56,7 +56,7 @@ struct WireTranslationTests {
             .showCandidates(list: WireCandidateList(variants: [], selectedVariant: nil, entries: [WireCandidateEntry(text: "日本", annotation: nil)],
                                                     selectedEntry: 0, focus: .candidate, position: 1, total: 1, note: nil), anchor: anchor),
             .hide,
-            .showMode(mode: .direct, anchor: anchor),
+            .showMode(mode: .direct, anchor: anchor, label: nil),
         ])
         #expect(routed.host == [.toggleLiveConversion])
     }

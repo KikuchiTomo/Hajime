@@ -171,6 +171,7 @@
     },
     { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
+    { "type": "showMode", "mode": "japanese", "label": "ローマ字" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },
     { "type": "hide" }
   ]
