@@ -1,0 +1,287 @@
+{
+  "$comment": "TSF の DLL・s90-engine-host・候補ウィンドウのあいだのメッセージの定義．書き方は protocol/README.md．変えたら make protocol で Swift と Rust のコードを作り直す",
+  "version": 1,
+  "maximumMessageBytes": 262144,
+  "types": [
+    {
+      "name": "InputMode",
+      "kind": "enum",
+      "doc": "入力のモード．日本語か英数か",
+      "cases": ["japanese", "direct"]
+    },
+    {
+      "name": "Modifiers",
+      "kind": "struct",
+      "doc": "押していた修飾キー．Windows の Alt は core の option にあたる",
+      "fields": [
+        { "name": "shift", "type": "bool" },
+        { "name": "control", "type": "bool" },
+        { "name": "alt", "type": "bool" }
+      ]
+    },
+    {
+      "name": "Key",
+      "kind": "union",
+      "tag": "kind",
+      "doc": "押したキー．core の KeyEvent.Key と 1 対 1 に対応する",
+      "cases": [
+        { "name": "character", "doc": "配列に従って入力された文字(Shift を含む)", "fields": [{ "name": "text", "type": "string" }] },
+        { "name": "space" },
+        { "name": "enter" },
+        { "name": "backspace" },
+        { "name": "delete" },
+        { "name": "escape" },
+        { "name": "tab" },
+        { "name": "up" },
+        { "name": "down" },
+        { "name": "left" },
+        { "name": "right" },
+        { "name": "home" },
+        { "name": "end" },
+        { "name": "pageUp" },
+        { "name": "pageDown" },
+        { "name": "eisu" },
+        { "name": "kana" },
+        { "name": "yen" },
+        { "name": "function", "doc": "ファンクションキー(F1〜F24 の番号)", "fields": [{ "name": "number", "type": "u8" }] },
+        { "name": "hankakuZenkaku" },
+        { "name": "henkan" },
+        { "name": "muhenkan" }
+      ]
+    },
+    {
+      "name": "KeyInput",
+      "kind": "struct",
+      "doc": "キーの入力ひとつ",
+      "fields": [
+        { "name": "key", "type": "Key" },
+        { "name": "modifiers", "type": "Modifiers" },
+        { "name": "keyLabel", "type": "string?", "doc": "押したキーの JIS キーボードでの刻印(かな入力に使う)" },
+        { "name": "isKeypad", "type": "bool" }
+      ]
+    },
+    {
+      "name": "KeyChord",
+      "kind": "struct",
+      "doc": "キーと修飾キーの組み合わせ．DLL が OnTestKeyDown で使う表の 1 行",
+      "fields": [
+        { "name": "key", "type": "Key" },
+        { "name": "modifiers", "type": "Modifiers" }
+      ]
+    },
+    {
+      "name": "Rect",
+      "kind": "struct",
+      "doc": "画面の座標(物理ピクセル)の四角．候補ウィンドウを出す位置に使う",
+      "fields": [
+        { "name": "x", "type": "i32" },
+        { "name": "y", "type": "i32" },
+        { "name": "width", "type": "i32" },
+        { "name": "height", "type": "i32" }
+      ]
+    },
+    {
+      "name": "FieldContext",
+      "kind": "struct",
+      "doc": "入力先の情報．DLL がキーごとに作って送る",
+      "fields": [
+        { "name": "applicationId", "type": "string?", "doc": "入力先のアプリの実行ファイルの名前(小文字)．アプリごとの設定を選ぶのに使う" },
+        { "name": "isSecure", "type": "bool", "doc": "パスワード欄など(InputScope)．true なら変換も学習もしない" },
+        { "name": "precedingText", "type": "string?", "doc": "入力位置の前の文字列．打ち始めのときだけ入れる" },
+        { "name": "caret", "type": "Rect?", "doc": "入力位置の四角．分からなければ省く" }
+      ]
+    },
+    {
+      "name": "SessionState",
+      "kind": "struct",
+      "doc": "DLL が持つ状態の写し．OnTestKeyDown をエンジンに問い合わせずに答えるのに使う",
+      "fields": [
+        { "name": "mode", "type": "InputMode" },
+        { "name": "isComposing", "type": "bool", "doc": "文字を組み立てているか．組み立て中は修飾キーだけの押下を除くすべてのキーを受け取る" },
+        { "name": "consumedKeys", "type": "[KeyChord]", "doc": "組み立てていないときに受け取るキー(キー設定の表で今の状態に割り当てたもの)．日本語のモードでは修飾キーなしの文字も受け取る" },
+        { "name": "wakeAfterMilliseconds", "type": "u32?", "doc": "この時間だけ打鍵が止まったら wake を送る(ライブ変換・打ち間違いの見直し)．待たなくてよければ省く" }
+      ]
+    },
+    {
+      "name": "TextStyle",
+      "kind": "enum",
+      "doc": "組み立て中の文字の区間の見せ方",
+      "cases": ["reading", "converted", "focused", "correction"]
+    },
+    {
+      "name": "TextSegment",
+      "kind": "struct",
+      "fields": [
+        { "name": "text", "type": "string" },
+        { "name": "style", "type": "TextStyle" }
+      ]
+    },
+    {
+      "name": "EditOperation",
+      "kind": "union",
+      "tag": "type",
+      "doc": "DLL が入力欄に行う操作",
+      "cases": [
+        { "name": "commit", "doc": "文字を確定して入力欄に入れる", "fields": [{ "name": "text", "type": "string" }] },
+        { "name": "setComposition", "doc": "組み立て中の文字を出す(空なら消す)", "fields": [{ "name": "segments", "type": "[TextSegment]" }] },
+        { "name": "selectMode", "doc": "OS のモードの表示(言語バー・キーボードのオンとオフ)を合わせる", "fields": [{ "name": "mode", "type": "InputMode" }] }
+      ]
+    },
+    {
+      "name": "ErrorCode",
+      "kind": "enum",
+      "doc": "エンジンが要求を断った理由",
+      "cases": ["unsupportedVersion", "unknownSession", "tooManySessions", "malformed"]
+    },
+    {
+      "name": "RequestBody",
+      "kind": "union",
+      "tag": "type",
+      "doc": "DLL からエンジンへの要求",
+      "cases": [
+        { "name": "hello", "doc": "接続して最初に送る", "fields": [{ "name": "protocolVersion", "type": "u32" }] },
+        { "name": "openSession", "doc": "入力欄(TSF のスレッド)ごとのセッションを作る" },
+        { "name": "closeSession", "fields": [{ "name": "session", "type": "u32" }] },
+        { "name": "key", "fields": [{ "name": "session", "type": "u32" }, { "name": "input", "type": "KeyInput" }, { "name": "context", "type": "FieldContext" }] },
+        { "name": "setMode", "doc": "言語バーなど，キー以外でモードが変わった", "fields": [{ "name": "session", "type": "u32" }, { "name": "mode", "type": "InputMode" }] },
+        { "name": "deactivate", "doc": "入力欄からフォーカスが外れた．組み立て中の文字を確定する", "fields": [{ "name": "session", "type": "u32" }] },
+        { "name": "wake", "doc": "wakeAfterMilliseconds だけ打鍵が止まった", "fields": [{ "name": "session", "type": "u32" }, { "name": "context", "type": "FieldContext" }] },
+        { "name": "caret", "doc": "組み立て中の文字の位置が変わった．候補ウィンドウを動かす", "fields": [{ "name": "session", "type": "u32" }, { "name": "rect", "type": "Rect" }] }
+      ]
+    },
+    {
+      "name": "Request",
+      "kind": "struct",
+      "fields": [
+        { "name": "id", "type": "u32", "doc": "応答と組にする番号．時間切れで捨てた応答を読み飛ばすのに使う" },
+        { "name": "body", "type": "RequestBody" }
+      ]
+    },
+    {
+      "name": "ResponseBody",
+      "kind": "union",
+      "tag": "type",
+      "doc": "エンジンから DLL への応答",
+      "cases": [
+        { "name": "hello", "fields": [{ "name": "protocolVersion", "type": "u32" }] },
+        { "name": "sessionOpened", "fields": [{ "name": "session", "type": "u32" }, { "name": "state", "type": "SessionState" }] },
+        { "name": "edit", "doc": "キーなどを処理した結果", "fields": [{ "name": "handled", "type": "bool", "doc": "false ならキーを入力先のアプリにそのまま渡す" }, { "name": "operations", "type": "[EditOperation]" }, { "name": "state", "type": "SessionState" }] },
+        { "name": "done" },
+        { "name": "error", "fields": [{ "name": "code", "type": "ErrorCode" }] }
+      ]
+    },
+    {
+      "name": "Response",
+      "kind": "struct",
+      "fields": [
+        { "name": "id", "type": "u32" },
+        { "name": "body", "type": "ResponseBody" }
+      ]
+    },
+    {
+      "name": "CandidateVariant",
+      "kind": "struct",
+      "doc": "候補の一覧の上の種類の行の 1 つ",
+      "fields": [
+        { "name": "label", "type": "string" },
+        { "name": "isAvailable", "type": "bool" }
+      ]
+    },
+    {
+      "name": "CandidateEntry",
+      "kind": "struct",
+      "fields": [
+        { "name": "text", "type": "string" },
+        { "name": "annotation", "type": "string?", "doc": "「入力のまま」などの添え書き" }
+      ]
+    },
+    {
+      "name": "CandidateFocus",
+      "kind": "enum",
+      "cases": ["candidate", "variants"]
+    },
+    {
+      "name": "CandidateList",
+      "kind": "struct",
+      "doc": "候補の一覧．core の CandidatePanel と同じ内容",
+      "fields": [
+        { "name": "variants", "type": "[CandidateVariant]" },
+        { "name": "selectedVariant", "type": "u32?" },
+        { "name": "entries", "type": "[CandidateEntry]" },
+        { "name": "selectedEntry", "type": "u32?" },
+        { "name": "focus", "type": "CandidateFocus" },
+        { "name": "position", "type": "u32" },
+        { "name": "total", "type": "u32" },
+        { "name": "note", "type": "string?" }
+      ]
+    },
+    {
+      "name": "BranchColumn",
+      "kind": "struct",
+      "doc": "分岐図の文節ひとつ．core の LatticePanel.Column と同じ内容",
+      "fields": [
+        { "name": "text", "type": "string" },
+        { "name": "alternatives", "type": "[string]" },
+        { "name": "selectedAlternative", "type": "u32?" },
+        { "name": "variants", "type": "[string]" },
+        { "name": "selectedVariant", "type": "u32?" },
+        { "name": "isFocused", "type": "bool" },
+        { "name": "isUncertain", "type": "bool" },
+        { "name": "isDecided", "type": "bool" },
+        { "name": "preview", "type": "string?" },
+        { "name": "shorter", "type": "string?" },
+        { "name": "longer", "type": "string?" },
+        { "name": "usageNote", "type": "string?" },
+        { "name": "alternativeNotes", "type": "[string?]" },
+        { "name": "sourceName", "type": "string?" }
+      ]
+    },
+    {
+      "name": "KeyHint",
+      "kind": "struct",
+      "doc": "分岐図の足元に出すキーの案内(「⇧← 入れ」)",
+      "fields": [
+        { "name": "keys", "type": "string" },
+        { "name": "label", "type": "string" }
+      ]
+    },
+    {
+      "name": "BranchMap",
+      "kind": "struct",
+      "doc": "分岐図(ADR 0007)．core の LatticePanel と同じ内容",
+      "fields": [
+        { "name": "columns", "type": "[BranchColumn]" },
+        { "name": "position", "type": "u32" },
+        { "name": "total", "type": "u32" },
+        { "name": "note", "type": "string?" },
+        { "name": "hints", "type": "[KeyHint]", "doc": "足元のキーの案内．出さない設定のときは空" }
+      ]
+    },
+    {
+      "name": "Presentation",
+      "kind": "struct",
+      "doc": "候補ウィンドウの見た目の設定．つないだときと設定が変わったときに送る",
+      "fields": [
+        { "name": "theme", "type": "string", "doc": "テーマの名前(settings.json の theme と同じ値)" },
+        { "name": "fontSize", "type": "f64", "doc": "候補の文字の大きさ(pt)" },
+        { "name": "modeIndicatorMilliseconds", "type": "u32", "doc": "モードの札を出しておく時間" }
+      ]
+    },
+    {
+      "name": "UiCommand",
+      "kind": "union",
+      "tag": "type",
+      "doc": "エンジンから候補ウィンドウのプロセスへの指示",
+      "cases": [
+        { "name": "hello", "fields": [{ "name": "protocolVersion", "type": "u32" }] },
+        { "name": "setPresentation", "fields": [{ "name": "presentation", "type": "Presentation" }] },
+        { "name": "showCandidates", "fields": [{ "name": "list", "type": "CandidateList" }, { "name": "anchor", "type": "Rect?" }] },
+        { "name": "showBranchMap", "fields": [{ "name": "map", "type": "BranchMap" }, { "name": "anchor", "type": "Rect?" }] },
+        { "name": "showNote", "doc": "入力位置の近くに短い案内を出す", "fields": [{ "name": "text", "type": "string" }, { "name": "anchor", "type": "Rect?" }] },
+        { "name": "showMode", "doc": "モードを切り替えたことを知らせる札", "fields": [{ "name": "mode", "type": "InputMode" }, { "name": "anchor", "type": "Rect?" }] },
+        { "name": "move", "fields": [{ "name": "anchor", "type": "Rect" }] },
+        { "name": "hide" }
+      ]
+    }
+  ]
+}
