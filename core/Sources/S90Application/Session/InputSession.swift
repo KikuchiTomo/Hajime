@@ -51,9 +51,9 @@ public final class InputSession {
     private var isSettled = false
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
-    /// 訂正を求め終わるのを待って変換するところ(Space を押した)
-    private var waitsForCorrections = false
-    private var pendingConversionLearns = true
+    /// Space で変換したときに，まだ求め終わっていなかった訂正のキーの並びと左の文脈．
+    /// 訂正が届いたら applyLateCorrections で変換を直す．次のキーが来たら捨てる
+    private var lateCorrection: (keys: [String], leftContext: String?)?
     /// 利用者が打っている途中に入れた文節の区切り(読みの先頭からの文字数)．分岐図ではここを必ず区切る
     private var forcedBoundaries: [Int] = []
     /// 分岐図で，注目している文節を数字で区切る状態か
@@ -112,8 +112,8 @@ public final class InputSession {
         }
         showsCorrectionNote = false
         profile = context.profile
-        // 変換を待たせているあいだに次のキーが来たら，待たせていた変換はやめる(次のキーを先に処理する)
-        waitsForCorrections = false
+        // 変換したあとに次のキーが来たら，あとから届く訂正では変換を直さない(選んだ候補などを変えない)
+        lateCorrection = nil
         let hidesNote = showsTransientNote
         showsTransientNote = false
         var result = route(event, context: context)
@@ -716,16 +716,12 @@ public final class InputSession {
             return KeyResult(handled: true, actions: render(context: context))
         }
         if withoutLearning { converter.suspendLearningUntilEnd() }
-        // 打ち間違いの訂正を別のところで求めていて，まだ求め終わっていなければ，求め終わるまで変換を待つ．
-        // 待たずに変換すると，Space を早く押したときに直すことも「もしかして」と示すこともできない
-        if !waitsForCorrections, conversionCorrectionRequest != nil {
-            waitsForCorrections = true
-            pendingConversionLearns = !withoutLearning
-            return KeyResult(handled: true, actions: [.awaitCorrections])
-        }
-        waitsForCorrections = false
+        // 打ち間違いの訂正を別のところで求めていて，まだ求め終わっていなければ，変換はすぐに出し，訂正は裏で求め続けてもらう．
+        // 訂正を待ってから変換すると候補が出るのが遅れ，待ちきれずにやめると直すことも「もしかして」と示すこともできない
+        let pending = conversionCorrectionRequest
         enterConversion()
-        return KeyResult(handled: true, actions: render(context: context))
+        lateCorrection = pending
+        return KeyResult(handled: true, actions: render(context: context) + (pending == nil ? [] : [.awaitCorrections]))
     }
 
     /// 変換の前に求めておく訂正のキーの並びと左の文脈．求めるものが無いか，訂正をこの中で求めるときは nil
@@ -736,13 +732,27 @@ public final class InputSession {
         return (keys, compositionLeftContext)
     }
 
-    /// 訂正を求め終わった(または待つのをやめた)あとで，待たせていた変換を続ける．待たせていなければ何もしない
-    public func resumeConversion(context: InputContext) -> [ClientAction] {
-        guard waitsForCorrections, phase == .composing else {
-            waitsForCorrections = false
+    /// Space で変換したあとに裏で求めてもらう訂正のキーの並びと左の文脈(.awaitCorrections を返したとき)．無ければ nil
+    public var lateCorrectionRequest: (keys: [String], leftContext: String?)? { lateCorrection }
+
+    /// Space で変換したあとに届いた訂正で，変換を直す(直した候補を選ぶか「もしかして」と示す)．
+    /// 変換したあとにキーを押していたら(候補を選び直したなど)何もしない．訂正で何も変わらなければ何もしない
+    public func applyLateCorrections(_ corrections: [String: [ReadingCorrection]], context: InputContext) -> [ClientAction] {
+        guard lateCorrection != nil else { return [] }
+        lateCorrection = nil
+        switch phase {
+        case .lattice, .selecting: break
+        default: return []
+        }
+        let saved = phase
+        readingCorrector.provide(corrections)
+        phase = .composing
+        enterConversion(recordsUsage: false)
+        guard readingCorrector.isApplied || readingCorrector.suggestion != nil else {
+            phase = saved
             return []
         }
-        return convert(withoutLearning: !pendingConversionLearns, context: context).actions
+        return render(context: context)
     }
 
     /// ひらがな → 全角カタカナ → 半角カタカナ → ひらがな の順の次の字種．かなの字種を選んでいなければ全角カタカナ
@@ -758,8 +768,8 @@ public final class InputSession {
 
     /// 変換を始める．設定が一覧でなければ分岐図にする．
     /// 英単語を補正しているときは，直した英単語を読みの中に確定させてから分岐図にする(打ったままに戻すのは補正の直後の Space)
-    private func enterConversion() {
-        usage?.record(.conversionOpened)
+    private func enterConversion(recordsUsage: Bool = true) {
+        if recordsUsage { usage?.record(.conversionOpened) }
         freezeWordsReadAsRomaji()
         reviewReading()
         guard settings.current.candidatePresentation != .list else {
@@ -1308,7 +1318,6 @@ public final class InputSession {
         }
         if phase == .composing {
             alphabetRun = false
-            waitsForCorrections = false
             enterConversion()
         }
         if !enterAssociation() {

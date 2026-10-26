@@ -51,30 +51,27 @@ final class S90InputController: IMKInputController {
             return false
         }
         if result.actions.contains(.awaitCorrections) {
-            convertAfterCorrections(client: client, context: context)
+            correctAfterConversion(client: client, context: context)
         } else {
             scheduleSettle(client: client, context: context)
         }
         return result.handled
     }
 
-    /// Space を押したときに打ち間違いの訂正がまだ求め終わっていなければ，求めてから変換を続ける．
-    /// 長くかかるときは待つのをやめて変換する(DefaultSettings.correctionWaitBeforeConversion)．次のキーが来たら session が変換をやめる
+    /// Space で変換したときに打ち間違いの訂正がまだ求め終わっていなければ，変換は出したまま訂正を裏で求め，
+    /// 届いたら変換を直す(直した候補にするか「もしかして」と示す)．次のキーが来たら待ちをやめる(settleTask を取り消す)．
+    /// 訂正が DefaultSettings.lateCorrectionTimeout を過ぎても終わらなければあきらめる
     @MainActor
-    private func convertAfterCorrections(client: any IMKTextInput, context: InputContext) {
+    private func correctAfterConversion(client: any IMKTextInput, context: InputContext) {
         settleTask?.cancel()
+        settleTask = nil
+        guard let request = session.lateCorrectionRequest, let service = root.typoService else { return }
         settleTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            if let request = self.session.conversionCorrectionRequest, let service = self.root.typoService {
-                // 訂正が上限までに終わらなければ待たずに変換する(訂正は裏で終わらせ，結果は捨てる)．
-                // タスクグループは子が終わるまで抜けないので使わない
-                let corrections = await Deadline.run(seconds: DefaultSettings.correctionWaitBeforeConversion) {
-                    await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
-                }
-                if let corrections { self.session.provideCorrections(corrections) }
+            let corrections = await Deadline.run(seconds: DefaultSettings.lateCorrectionTimeout) {
+                await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
             }
-            guard !Task.isCancelled else { return }
-            self.presenter.apply(self.session.resumeConversion(context: context), to: client)
+            guard !Task.isCancelled, let self, let corrections else { return }
+            self.presenter.apply(self.session.applyLateCorrections(corrections, context: context), to: client)
         }
     }
 

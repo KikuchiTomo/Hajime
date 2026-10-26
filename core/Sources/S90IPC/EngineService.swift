@@ -40,7 +40,7 @@ public final class EngineService {
     /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
     private struct CorrectionWork {
         enum Purpose {
-            /// Space で変換するのを待たせている(.awaitCorrections)．期限を過ぎたら待たずに変換する
+            /// Space で変換したあとに求めている(.awaitCorrections)．届いたら変換を直す．期限を過ぎたらやめる
             case conversion(deadline: ContinuousClock.Instant)
             /// 打鍵が止まったので見直す
             case review
@@ -405,13 +405,9 @@ public final class EngineService {
         let result = current.input.handle(event, context: context)
         sessions[session]?.hasSettled = false
         var actions = result.actions
-        if actions.contains(.awaitCorrections) {
-            // 訂正を求め終わるまで変換を待つ(macOS の S90InputController と同じ)．求めるものが無ければすぐ変換を続ける
-            if let request = current.input.conversionCorrectionRequest, typoService != nil {
-                startCorrections(request, purpose: .conversion(deadline: now() + .seconds(DefaultSettings.correctionWaitBeforeConversion)), session: session)
-            } else {
-                actions += current.input.resumeConversion(context: context)
-            }
+        if actions.contains(.awaitCorrections), let request = current.input.lateCorrectionRequest {
+            // 変換はもう出ている．訂正は裏で求め，届いたら次の wake で変換を直す(macOS の S90InputController と同じ)
+            startCorrections(request, purpose: .conversion(deadline: now() + .seconds(DefaultSettings.lateCorrectionTimeout)), session: session)
         }
         return edit(actions, handled: result.handled, session: session, anchor: lastAnchor)
     }
@@ -433,12 +429,10 @@ public final class EngineService {
             case .conversion(let deadline):
                 if let result = work.result {
                     sessions[session]?.correction = nil
-                    current.input.provideCorrections(result)
-                    actions += current.input.resumeConversion(context: context)
+                    actions += current.input.applyLateCorrections(result, context: context)
                 } else if now() >= deadline {
-                    // 長くかかるときは待つのをやめて，直さずに変換する
+                    // 長くかかるときは求めるのをやめる(変換は出ているので，そのまま使える)
                     cancelCorrections(of: session)
-                    actions += current.input.resumeConversion(context: context)
                 }
             case .review:
                 if let result = work.result {
