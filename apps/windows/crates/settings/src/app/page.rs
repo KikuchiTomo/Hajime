@@ -12,7 +12,7 @@ use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{self, Action, Control, DictionaryList, Info, LimitKind, Page, Row, Section};
 use crate::store::SettingsStore;
-use crate::strings::{features, keys, more, windows as text};
+use crate::strings::{features, keys, more, rule_list, settings, windows as text};
 use crate::usage::Usage;
 use ipc::SymbolKind;
 use serde_json::Value;
@@ -47,23 +47,29 @@ pub enum Event {
     },
     Reset(&'static str),
     Action(Action),
+    /// 一覧に行を足す．replacing は書き換える行(表の行の番号)
     ListAdd {
         spec: ListSpec,
         limit: LimitKind,
         item: Item,
+        replacing: Option<usize>,
     },
     ListRemove {
         spec: ListSpec,
         indices: Vec<usize>,
     },
-    /// 単語を登録する(読み・単語)
-    DictionaryAdd(Item),
+    /// 単語を登録する(読み・単語)．replacing は書き換える単語(表の行の番号)
+    DictionaryAdd {
+        item: Item,
+        replacing: Option<usize>,
+    },
     /// 選んだ単語を消す(表の行の番号)
     DictionaryRemove(Vec<usize>),
-    /// 記号の決まりを重ねる(入力・記号)
+    /// 記号の決まりを重ねる(入力・記号)．replacing は書き換える決まり(表の行の番号)
     SymbolSave {
         kind: SymbolKind,
         item: Item,
+        replacing: Option<usize>,
     },
     /// 選んだ記号の決まりを外す(表の行の番号)
     SymbolRemove {
@@ -85,6 +91,10 @@ pub enum Event {
     },
     /// カスタムテーマの一覧で行を選んだ(選んでいなければ None)
     ThemeSelected(Option<usize>),
+    /// アプリの実行ファイルを選ぶ窓を出し，path の一覧の入力欄に名前を入れる
+    ChooseApp {
+        path: &'static str,
+    },
     /// 色を選ぶ窓を出す(path の値を変える．current は今の色)
     ChooseColor {
         path: &'static str,
@@ -128,6 +138,42 @@ impl ThemeAction {
         ThemeAction::Duplicate,
         ThemeAction::Delete,
     ];
+}
+
+/// 一覧の表の下のボタンの操作(キー設定の記録・複製，除外設定のアプリの追加)
+fn list_bottom_action(row: &mut RowView, position: usize) -> Option<Event> {
+    let Control::List(spec, _) = &row.row.control else {
+        return None;
+    };
+    let path = spec.path;
+    match (path, position) {
+        ("keymap", 0) => {
+            // キーの欄(状態・キー・コマンドの 2 つ目)で，次に押したキーを書く
+            let (fields, _, _) = row.list_parts()?;
+            ffi::record_key(*fields.get(1)?, keys::PRESS);
+            None
+        }
+        ("keymap", 1) => {
+            // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
+            let index = *row.selected().first()?;
+            row.fill_inputs(index);
+            row.stop_editing();
+            if let Some((_, add, _)) = row.list_parts() {
+                ffi::enable(add, true);
+            }
+            None
+        }
+        ("profileRules", 0) => Some(Event::ChooseApp { path }),
+        _ => None,
+    }
+}
+
+/// 一覧の表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
+fn bottom_always_enabled(control: &Control, index: usize) -> bool {
+    match control {
+        Control::List(spec, _) => !(spec.path == "keymap" && index == 1),
+        _ => false,
+    }
 }
 
 /// 表の下のボタンのうち，行を選ばなくても使える先頭のボタンの数(作る・取り込む)
@@ -282,6 +328,11 @@ struct RowView {
     dictionary_inputs: Vec<Vec<String>>,
     /// 色のボタンに出す色(「#RRGGBB」)
     color: String,
+    /// 一覧の表のすべての行と，検索欄で絞って出している行(all_rows の番号)
+    all_rows: Vec<Vec<String>>,
+    shown: Vec<usize>,
+    /// 一覧で選んで書き換えている行(all_rows の番号)．追加のボタンは「更新」になり，この行を置き換える
+    editing: Option<usize>,
 }
 
 impl RowView {
@@ -328,6 +379,94 @@ impl RowView {
             *self.parts.get(fields)?,
             *self.parts.get(fields + 1)?,
         ))
+    }
+
+    /// 表の下の検索欄
+    fn search_field(&self) -> Option<Window> {
+        let (spec, _) = self.list_spec()?;
+        let buttons = self.row.control.list_buttons()?;
+        buttons
+            .search
+            .then(|| {
+                self.parts
+                    .get(spec.fields.len() + buttons.top.len())
+                    .copied()
+            })
+            .flatten()
+    }
+
+    /// 表の下のボタン(検索欄のあと)
+    fn bottom_buttons(&self) -> &[Window] {
+        let (Some((spec, _)), Some(buttons)) = (self.list_spec(), self.row.control.list_buttons())
+        else {
+            return &[];
+        };
+        let start = spec.fields.len() + buttons.top.len() + usize::from(buttons.search);
+        self.parts.get(start..).unwrap_or(&[])
+    }
+
+    /// 表で選んでいる行(all_rows の番号)
+    fn selected(&self) -> Vec<usize> {
+        self.control
+            .map(ffi::list_selected)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|index| self.shown.get(index).copied())
+            .collect()
+    }
+
+    /// 検索欄の言葉を含む行だけを表に出す(大文字と小文字を区別しない)
+    fn show_rows(&mut self) {
+        let query = self
+            .search_field()
+            .map(ffi::window_text)
+            .unwrap_or_default()
+            .to_lowercase();
+        self.shown = (0..self.all_rows.len())
+            .filter(|index| {
+                query.is_empty()
+                    || self.all_rows[*index]
+                        .iter()
+                        .any(|cell| cell.to_lowercase().contains(&query))
+            })
+            .collect();
+        let rows: Vec<Vec<String>> = self
+            .shown
+            .iter()
+            .map(|index| self.all_rows[*index].clone())
+            .collect();
+        if let Some(control) = self.control {
+            ffi::list_set_rows(control, &rows);
+        }
+    }
+
+    /// 書き換えている行をやめる(追加のボタンを「追加」に戻す)
+    fn stop_editing(&mut self) {
+        self.editing = None;
+        if let Some((_, add, _)) = self.list_parts() {
+            ffi::set_text(add, settings::ADD);
+        }
+    }
+
+    /// all_rows の index の行を入力欄に出す．選ぶ欄は表に出した名前から選ぶ
+    fn fill_inputs(&self, index: usize) {
+        let (Some((fields, _, _)), Some((spec, _)), Some(cells)) = (
+            self.list_parts(),
+            self.list_spec(),
+            self.all_rows.get(index),
+        ) else {
+            return;
+        };
+        for ((window, field), cell) in fields.iter().zip(spec.fields).zip(cells) {
+            match field.choices {
+                Some(choices) => {
+                    if let Some(position) = choices.iter().position(|(_, label)| label == cell) {
+                        ffi::send(*window, CB_SETCURSEL, position, 0);
+                    }
+                }
+                None => ffi::set_text(*window, cell),
+            }
+        }
     }
 
     /// 辞書・カスタムテーマの一覧の入力欄・更新のボタン・表の下のボタン
@@ -529,6 +668,12 @@ impl PageView {
             if let Some(control) = row.control {
                 ffi::enable(control, enabled);
                 show_value(control, &row.row, &row.numbers, values, extras);
+                if let Some(rows) = list_rows(&row.row, values, extras) {
+                    // 一覧を入れ替えると選んだ行が外れるので，書き換えもやめる
+                    row.all_rows = rows;
+                    row.stop_editing();
+                    row.show_rows();
+                }
             }
             // 一覧を入れ替えると選んだ行が外れるので，削除と切り替えのボタンも使えなくする
             if let Some((fields, _, remove)) = row.list_parts() {
@@ -695,10 +840,25 @@ impl PageView {
     }
 
     /// 部品からの WM_COMMAND を頼みにする
-    pub fn command(&self, window: Window, notification: u32) -> Option<Event> {
-        let row = self.rows.iter().flatten().find(|row| {
+    pub fn command(&mut self, window: Window, notification: u32) -> Option<Event> {
+        let row = self.rows.iter_mut().flatten().find(|row| {
             row.control == Some(window) || row.reset == Some(window) || row.parts.contains(&window)
         })?;
+        if Some(window) == row.search_field() {
+            if notification == EN_CHANGE {
+                row.show_rows();
+            }
+            return None;
+        }
+        if notification == BN_CLICKED {
+            if let Some(position) = row
+                .bottom_buttons()
+                .iter()
+                .position(|button| *button == window)
+            {
+                return list_bottom_action(row, position);
+            }
+        }
         if row.row.control == Control::Preset {
             let button = *row.parts.first()?;
             if window != button || notification != BN_CLICKED {
@@ -810,12 +970,13 @@ impl PageView {
             }
             let dictionary = matches!(row.row.control, Control::Dictionary(_));
             if let Control::Symbols(kind, _) = row.row.control {
-                let indices = || row.control.map(ffi::list_selected).unwrap_or_default();
+                let indices = || row.selected();
                 return match notification {
                     BN_CLICKED if window == add && spec.is_filled(&values) => {
                         Some(Event::SymbolSave {
                             kind,
                             item: spec.make(&values),
+                            replacing: row.editing,
                         })
                     }
                     BN_CLICKED if window == remove => {
@@ -831,17 +992,21 @@ impl PageView {
             }
             if window == add && notification == BN_CLICKED && spec.is_filled(&values) && dictionary
             {
-                return Some(Event::DictionaryAdd(spec.make(&values)));
+                return Some(Event::DictionaryAdd {
+                    item: spec.make(&values),
+                    replacing: row.editing,
+                });
             }
             if window == add && notification == BN_CLICKED && spec.is_filled(&values) {
                 return Some(Event::ListAdd {
                     spec: *spec,
                     limit,
                     item: spec.make(&values),
+                    replacing: row.editing,
                 });
             }
             if window == remove && notification == BN_CLICKED {
-                let indices = ffi::list_selected(row.control?);
+                let indices = row.selected();
                 if dictionary {
                     return (!indices.is_empty()).then_some(Event::DictionaryRemove(indices));
                 }
@@ -876,10 +1041,10 @@ impl PageView {
 
     /// 一覧からの WM_NOTIFY．空のときの文を返し，行を選んだら削除のボタンを使えるようにする．扱ったら true
     /// 一覧からの WM_NOTIFY．扱ったか(true なら既定の処理をしない)と，頼み(カスタムテーマを選んだなど)を返す
-    pub fn notify(&self, window: Window, code: u32, lparam: LPARAM) -> (bool, Option<Event>) {
+    pub fn notify(&mut self, window: Window, code: u32, lparam: LPARAM) -> (bool, Option<Event>) {
         let Some(row) = self
             .rows
-            .iter()
+            .iter_mut()
             .flatten()
             .find(|row| row.control == Some(window))
         else {
@@ -920,8 +1085,25 @@ impl PageView {
                         }
                     }
                 }
-                if let Some((_, _, remove)) = row.list_parts() {
+                if let Some((_, add, remove)) = row.list_parts() {
                     ffi::enable(remove, selected);
+                    // 1 行だけ選んだら入力欄に出し，追加のボタンを「更新」にする(macOS の RuleListEditor の編集)
+                    match row.selected().as_slice() {
+                        [index] => {
+                            let index = *index;
+                            row.fill_inputs(index);
+                            row.editing = Some(index);
+                            ffi::set_text(add, rule_list::UPDATE);
+                            ffi::enable(add, true);
+                        }
+                        _ => row.stop_editing(),
+                    }
+                    // 選んだ行に効く表の下のボタン(キー設定の複製)
+                    for (index, button) in row.bottom_buttons().iter().enumerate() {
+                        if !bottom_always_enabled(&row.row.control, index) {
+                            ffi::enable(*button, selected);
+                        }
+                    }
                 }
                 if let Some(toggle) = row.toggle_button() {
                     ffi::enable(toggle, selected);
@@ -948,6 +1130,23 @@ impl PageView {
         for row in self.rows.iter().flatten() {
             if let (Control::Preview, Some(result)) = (&row.row.control, row.control) {
                 ffi::set_text(result, text);
+            }
+        }
+    }
+
+    /// path の一覧の field 番目の入力欄に text を入れる(アプリを選んで足すとき)
+    pub fn set_list_input(&self, path: &str, field: usize, text: &str) {
+        for row in self.rows.iter().flatten() {
+            if let (Control::List(spec, _), Some((fields, add, _))) =
+                (&row.row.control, row.list_parts())
+            {
+                if spec.path != path {
+                    continue;
+                }
+                if let Some(window) = fields.get(field) {
+                    ffi::set_text(*window, text);
+                    ffi::enable(add, !text.is_empty());
+                }
             }
         }
     }
@@ -1191,6 +1390,9 @@ fn create_row(
         visible: true,
         dictionary_inputs: Vec::new(),
         color: String::new(),
+        all_rows: Vec::new(),
+        shown: Vec::new(),
+        editing: None,
     };
     match &row.control {
         Control::Note => {
@@ -1417,6 +1619,11 @@ fn create_list(
     }
     // 入力欄の右のボタンと表の下のボタン(配置の parts と同じ並び)．取り込むボタンだけは選ばなくても使える
     for (index, title) in buttons.top.iter().chain(buttons.bottom).enumerate() {
+        if buttons.search && index == buttons.top.len() {
+            // 検索欄は上のボタンと下のボタンのあいだ(配置の parts と同じ並び)
+            view.parts
+                .extend(create_edit(host, theme, features::SEARCH, next_id()));
+        }
         let enabled = matches!(control, Control::Dictionaries(..)) && index == buttons.top.len();
         if let Some(button) = ffi::create(
             WINDOW_EX_STYLE::default(),
@@ -1432,6 +1639,10 @@ fn create_list(
             ffi::enable(button, enabled);
             view.parts.push(button);
         }
+    }
+    if buttons.search && buttons.bottom.is_empty() {
+        view.parts
+            .extend(create_edit(host, theme, features::SEARCH, next_id()));
     }
     view.control = ffi::create(
         WS_EX_CLIENTEDGE,
@@ -1538,6 +1749,30 @@ fn selected(combo: Window) -> Option<usize> {
     usize::try_from(ffi::send(combo, CB_GETCURSEL, 0, 0)).ok()
 }
 
+/// 一覧の表の行(列ごとの文字)．一覧でなければ None
+fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec<String>>> {
+    Some(match &row.control {
+        Control::Dictionary(_) => extras.dictionary.clone(),
+        Control::Symbols(kind, _) => extras.symbol_rows(*kind).to_vec(),
+        Control::SyncFields(_) => extras.sync_fields.clone(),
+        Control::Dictionaries(list, _) => {
+            let entries = crate::dictionaries::entries(*list, values.value(list.path()));
+            crate::dictionaries::table(*list, &entries)
+        }
+        Control::List(spec, _) => spec
+            .items(values.value(spec.path))
+            .into_iter()
+            .map(|item| spec.display(&item))
+            .collect(),
+        Control::CustomThemes(_) => {
+            let entries = crate::themes::entries(values.value(crate::themes::THEMES));
+            let active = values.value(crate::themes::ACTIVE).and_then(Value::as_str);
+            crate::themes::table(&entries, active)
+        }
+        _ => return None,
+    })
+}
+
 fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values, extras: &Extras) {
     match &row.control {
         Control::Toggle => {
@@ -1556,23 +1791,16 @@ fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values,
             ffi::send(control, CB_SETCURSEL, options::nearest(numbers, value), 0);
         }
         Control::Stat(stat) => ffi::set_text(control, &extras.usage.text(*stat)),
-        Control::Dictionary(_) => ffi::list_set_rows(control, &extras.dictionary),
-        Control::Symbols(kind, _) => ffi::list_set_rows(control, extras.symbol_rows(*kind)),
-        Control::SyncFields(_) => ffi::list_set_rows(control, &extras.sync_fields),
-        Control::Dictionaries(list, _) => {
-            let entries = crate::dictionaries::entries(*list, values.value(list.path()));
-            ffi::list_set_rows(control, &crate::dictionaries::table(*list, &entries));
-        }
+        // 一覧の行は sync が検索欄で絞って出す(list_rows)
+        Control::Dictionary(_)
+        | Control::Symbols(..)
+        | Control::SyncFields(_)
+        | Control::Dictionaries(..)
+        | Control::List(..)
+        | Control::CustomThemes(_) => {}
         Control::Info(Info::SyncFolder) => ffi::set_text(control, &extras.sync_folder),
         Control::Info(Info::LastSynced) => ffi::set_text(control, &extras.last_synced),
-        Control::List(spec, _) => {
-            let rows: Vec<Vec<String>> = spec
-                .items(values.value(spec.path))
-                .into_iter()
-                .map(|item| spec.display(&item))
-                .collect();
-            ffi::list_set_rows(control, &rows);
-        }
+
         Control::Version => ffi::set_text(
             control,
             &crate::strings::windows::version(env!("CARGO_PKG_VERSION")),
@@ -1581,11 +1809,6 @@ fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values,
             ffi::set_text(control, &extras.keymap_report.replace('\n', "\r\n"))
         }
         Control::ThemeReport => ffi::set_text(control, &extras.theme_report.replace('\n', "\r\n")),
-        Control::CustomThemes(_) => {
-            let entries = crate::themes::entries(values.value(crate::themes::THEMES));
-            let active = values.value(crate::themes::ACTIVE).and_then(Value::as_str);
-            ffi::list_set_rows(control, &crate::themes::table(&entries, active));
-        }
         Control::Color | Control::ThemePreview => ffi::invalidate(control),
         Control::Action(_)
         | Control::Note

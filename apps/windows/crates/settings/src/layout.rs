@@ -168,7 +168,7 @@ fn card_height(control: &Control, width: f32) -> f32 {
     let inputs = size::CONTROL_HEIGHT + size::CONTROL_GAP;
     if let Some(buttons) = control.list_buttons() {
         let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
-        let below = button_lines(buttons.bottom, inner).len() as f32 * inputs;
+        let below = button_lines(&bottom_widths(buttons), inner).len() as f32 * inputs;
         return size::CARD_PADDING_X * 2.0 + inputs + size::LIST_HEIGHT + below;
     }
     match control {
@@ -188,10 +188,7 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
     match &row.control {
         control if control.list_buttons().is_some() => {
             let fields = control.list_spec().map_or(0, |spec| spec.fields.len());
-            let buttons = control.list_buttons().unwrap_or(ListButtons {
-                top: &[],
-                bottom: &[],
-            });
+            let buttons = control.list_buttons().unwrap_or(NO_BUTTONS);
             return place_inputs(position, fields, buttons, card, size::LIST_HEIGHT);
         }
         Control::Preview => {
@@ -288,7 +285,18 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
 const NO_BUTTONS: ListButtons = ListButtons {
     top: &[],
     bottom: &[],
+    search: false,
 };
+
+/// 表の下に並べるものの幅(検索欄と，ボタン)
+fn bottom_widths(buttons: ListButtons) -> Vec<f32> {
+    buttons
+        .search
+        .then_some(size::CONTROL_WIDTH)
+        .into_iter()
+        .chain(buttons.bottom.iter().map(|label| button_width(label)))
+        .collect()
+}
 
 /// 試す欄の結果の行の数
 const PREVIEW_LINES: f32 = 2.0;
@@ -307,11 +315,10 @@ pub fn button_width(label: &str) -> f32 {
 }
 
 /// 表の下のボタンを幅 inner に収まるよう折り返した行(ボタンの幅の並び)
-fn button_lines(labels: &[&str], inner: f32) -> Vec<Vec<f32>> {
+fn button_lines(widths: &[f32], inner: f32) -> Vec<Vec<f32>> {
     let mut lines: Vec<Vec<f32>> = Vec::new();
     let mut used = 0.0;
-    for label in labels {
-        let width = button_width(label);
+    for &width in widths {
         match lines.last_mut() {
             Some(line) if used + size::CONTROL_GAP + width <= inner => {
                 used += size::CONTROL_GAP + width;
@@ -326,8 +333,8 @@ fn button_lines(labels: &[&str], inner: f32) -> Vec<Vec<f32>> {
     lines
 }
 
-/// 入力欄の並ぶカード(一覧・試す欄)．上に入力欄とボタン，下に表か結果を置き，表の下にボタンを並べる．
-/// parts は入力欄・上のボタン・下のボタンの順
+/// 入力欄の並ぶカード(一覧・試す欄)．上に入力欄とボタン，下に表か結果を置き，表の下に検索欄とボタンを並べる．
+/// parts は入力欄・上のボタン・検索欄・下のボタンの順
 fn place_inputs(
     position: usize,
     fields: usize,
@@ -363,7 +370,7 @@ fn place_inputs(
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
     let mut line_top = list_top + below + size::CONTROL_GAP;
-    for line in button_lines(buttons.bottom, inner) {
+    for line in button_lines(&bottom_widths(buttons), inner) {
         let mut cursor = x;
         for width in line {
             parts.push(Rect::new(cursor, line_top, width, size::CONTROL_HEIGHT));
@@ -480,29 +487,34 @@ mod tests {
     }
 
     #[test]
-    fn 一覧は入力欄とボタンを表の上に並べる() {
+    fn 一覧は入力欄とボタンを表の上に並べ_検索欄を表の下に置く() {
         let page = sections(Page::Correction).unwrap();
         let layout = layout(&page, 800.0, |_| true, one_line);
         let card = &layout.sections[1].cards[0];
-        assert_eq!(card.parts.len(), 4);
-        for pair in card.parts.windows(2) {
+        // 入力欄 2 つ・追加・削除・検索欄
+        assert_eq!(card.parts.len(), 5);
+        for pair in card.parts[..4].windows(2) {
             assert!(pair[0].max_x() <= pair[1].x);
         }
         assert!(card.parts[3].max_x() <= card.card.max_x());
         assert!(card.control.y >= card.parts[0].max_y());
-        assert!(card.control.max_y() <= card.card.max_y());
+        let search = card.parts[4];
+        assert!(search.y >= card.control.max_y());
+        assert!(search.max_y() <= card.card.max_y());
         // 直さない語句は 1 列
-        assert_eq!(layout.sections[2].cards[0].parts.len(), 3);
+        assert_eq!(layout.sections[2].cards[0].parts.len(), 4);
     }
 
     #[test]
-    fn 記号の一覧は入力欄を2つとボタンを3つ並べる() {
+    fn 記号の一覧は入力欄を2つとボタンを3つ並べ_表の下に検索欄を置く() {
         let page = sections(Page::Symbols).unwrap();
         let layout = layout(&page, 800.0, |_| true, one_line);
         for section in &layout.sections {
             let card = &section.cards[0];
-            assert_eq!(card.parts.len(), 5);
+            // 入力欄 2 つ・追加・削除・切り替え・検索欄
+            assert_eq!(card.parts.len(), 6);
             assert!(card.parts[4].max_x() <= card.card.max_x());
+            assert!(card.parts[5].y >= card.control.max_y());
         }
     }
 

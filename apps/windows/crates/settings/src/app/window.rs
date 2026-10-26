@@ -76,6 +76,10 @@ enum After {
         path: &'static str,
         current: String,
     },
+    /// アプリの実行ファイルを選ぶ窓を出してから，一覧の入力欄に名前を入れる
+    ChooseApp {
+        path: &'static str,
+    },
     /// ファイルを選ぶ窓を出してから，辞書を取り込む
     ImportDictionary {
         list: DictionaryList,
@@ -230,6 +234,18 @@ fn run_after(window: Window, after: Option<After>) {
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
             }
+        }
+        Some(After::ChooseApp { path }) => {
+            let filter = crate::files::APP_FILTER;
+            let Some(file) = ffi::choose_file(window, true, "", filter.name, filter.pattern) else {
+                return;
+            };
+            // 除外設定はアプリを実行ファイルの名前(小文字)で見分ける
+            let name = std::path::Path::new(&file)
+                .file_name()
+                .map(|name| name.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            with_app(|app| app.view.set_list_input(path, 0, &name));
         }
         Some(After::ImportDictionary { list, replacing }) => {
             let filter = crate::files::TEXT_FILTER;
@@ -550,8 +566,17 @@ impl App {
     }
 
     fn handle(&mut self, event: Event) -> Option<After> {
-        if let Event::ListAdd { spec, limit, item } = &event {
-            return self.add_to_list(spec, limit.limit(&self.catalog), item);
+        if let Event::ListAdd {
+            spec,
+            limit,
+            item,
+            replacing,
+        } = &event
+        {
+            return self.add_to_list(spec, limit.limit(&self.catalog), item, *replacing);
+        }
+        if let Event::ChooseApp { path } = event {
+            return Some(After::ChooseApp { path });
         }
         if matches!(
             event,
@@ -642,13 +667,23 @@ impl App {
             | Event::ThemeList { .. }
             | Event::ThemeSelected(_)
             | Event::ChooseColor { .. }
+            | Event::ChooseApp { .. }
             | Event::Action(Action::SyncNow | Action::ChooseSyncFolder) => return None,
-            Event::DictionaryAdd(item) => {
+            Event::DictionaryAdd { item, replacing } => {
                 let entry = DictionaryEntry {
                     reading: item.first().cloned().unwrap_or_default(),
                     word: item.get(1).cloned().unwrap_or_default(),
                 };
+                // 書き換えるときは，新しい単語を登録できてから元の単語を消す(登録できなければ元のまま)
+                let old = replacing
+                    .and_then(|index| self.dictionary.get(index).cloned())
+                    .filter(|old| *old != entry);
                 let result = model.store().add_user_dictionary_entry(entry);
+                if let (Ok(DictionaryAddResult::Added), Some(old)) = (&result, old) {
+                    if let Err(error) = model.store().remove_user_dictionary_entry(old) {
+                        return self.failure(error);
+                    }
+                }
                 let result = match result {
                     Err(error) => return self.failure(error),
                     Ok(result) => result,
@@ -1123,16 +1158,26 @@ impl App {
         };
         let mut notice = None;
         let result = match event {
-            Event::SymbolSave { kind, item } => {
+            Event::SymbolSave {
+                kind,
+                item,
+                replacing,
+            } => {
                 let input = item.first().cloned().unwrap_or_default();
                 let output = item.get(1).cloned().unwrap_or_default();
+                // 選んで書き換えている決まりは，その入力を置き換える(既定の決まりの入力は変えられない)
+                let old = replacing
+                    .and_then(|index| items.get(index))
+                    .map(|item| item.input.clone());
                 // 無効にしていた決まりを書き換えたときも無効のまま
                 let enabled = items
                     .iter()
-                    .find(|existing| existing.input == input)
+                    .find(|existing| {
+                        Some(&existing.input) == old.as_ref() || existing.input == input
+                    })
                     .is_none_or(|existing| existing.is_enabled);
                 store
-                    .save_symbol_rule(kind, input, output, enabled)
+                    .save_symbol_rule(kind, input, output, enabled, old)
                     .map(|result| {
                         notice = match result {
                             SymbolSaveResult::Saved => None,
@@ -1151,7 +1196,7 @@ impl App {
             Event::SymbolToggle { kind, indices } => {
                 selected(&indices).into_iter().try_for_each(|item| {
                     store
-                        .save_symbol_rule(kind, item.input, item.output, !item.is_enabled)
+                        .save_symbol_rule(kind, item.input, item.output, !item.is_enabled, None)
                         .map(|_| ())
                 })
             }
@@ -1201,7 +1246,13 @@ impl App {
     }
 
     /// 一覧に行を足す．上限を超える・形が誤っていて残らないときは知らせる
-    fn add_to_list(&mut self, spec: &ListSpec, limit: usize, item: &Item) -> Option<After> {
+    fn add_to_list(
+        &mut self,
+        spec: &ListSpec,
+        limit: usize,
+        item: &Item,
+        replacing: Option<usize>,
+    ) -> Option<After> {
         if !spec.is_valid(item) {
             return Some(After::Message {
                 text: spec.invalid,
@@ -1209,7 +1260,11 @@ impl App {
             });
         }
         let model = self.model.as_mut()?;
-        let current = model.value(spec.path).cloned();
+        // 選んで書き換えている行は，消してから足す(同じ位置ではなく，ほかの行と同じく決まりの並びで足す)
+        let current = match replacing {
+            Some(index) => Some(spec.remove(model.value(spec.path), &[index])),
+            None => model.value(spec.path).cloned(),
+        };
         let items = spec.items(current.as_ref());
         let is_new = !items.iter().any(|existing| spec.same_key(existing, item));
         if is_new && items.len() >= limit {

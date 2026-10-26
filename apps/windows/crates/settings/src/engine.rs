@@ -218,13 +218,14 @@ impl<E: Engine> EngineStore<E> {
         input: String,
         output: String,
         is_enabled: bool,
+        replacing: Option<String>,
     ) -> Result<SymbolSaveResult, StoreError> {
         match self.send(RequestBody::SaveSymbolRule {
             kind,
             input,
             output,
             is_enabled,
-            replacing: None,
+            replacing,
         })? {
             ResponseBody::SymbolSaved { result } => Ok(result),
             _ => Err(StoreError::Malformed),
@@ -409,7 +410,7 @@ mod tests {
         }));
         let store = EngineStore::new(&engine);
         assert_eq!(
-            store.save_symbol_rule(SymbolKind::Sequence, "->".into(), "⇒".into(), false),
+            store.save_symbol_rule(SymbolKind::Sequence, "->".into(), "⇒".into(), false, None),
             Ok(SymbolSaveResult::Full)
         );
         assert_eq!(
