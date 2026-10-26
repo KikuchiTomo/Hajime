@@ -131,6 +131,10 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
+    /// 同期のフォルダと運ぶ索引のファイルの大きさの上限．索引は品詞を書き足すので，取り込むファイルより大きくなりうる
+    public static let maximumSyncedDictionaryBytes = 2 * maximumImportedDictionaryBytes
+    /// 索引を写すときとハッシュを求めるときに一度に読む大きさ
+    public static let syncCopyChunkBytes = 1024 * 1024
     /// 取り込む辞書 1 つの語の数の上限
     public static let maximumImportedWords = 3_000_000
     /// 取り込める辞書の数の上限

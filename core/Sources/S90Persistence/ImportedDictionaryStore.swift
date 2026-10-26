@@ -116,7 +116,9 @@ public final class ImportedDictionaryStore: DictionaryLookup {
             let text = String(decoding: UnsafeRawBufferPointer(rebasing: buffer[start..<end]), as: UTF8.self)
             let columns = text.split(separator: "\t", omittingEmptySubsequences: false)
             guard columns.count >= 3 else { return nil }
-            return DictionaryWord(reading: String(columns[0]), word: String(columns[1]), wordClass: WordClass(rawValue: String(columns[2])) ?? .noun)
+            // 同期のフォルダから運んだ索引も読むので，取り込むときと同じ確かめをする
+            let word = DictionaryWord(reading: String(columns[0]), word: String(columns[1]), wordClass: WordClass(rawValue: String(columns[2])) ?? .noun)
+            return word.isValid ? word : nil
         }
     }
 }

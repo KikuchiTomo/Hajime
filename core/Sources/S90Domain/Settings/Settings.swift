@@ -256,6 +256,8 @@ extension Settings: Codable {
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
         readList(.importedDictionaries, into: \.importedDictionaries)
+        // 同期のファイルから来た設定でもファイルの名前に使うので，形の違う id は捨てる
+        settings.importedDictionaries.removeAll { !$0.hasValidIdentity }
         read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
