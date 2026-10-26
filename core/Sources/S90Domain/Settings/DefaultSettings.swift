@@ -205,6 +205,8 @@ public enum DefaultSettings {
     public static let modeIndicatorDurationRange = 0.3...3.0
     /// 候補の文字の大きさ(pt)を選べる範囲
     public static let candidateFontSizeRange = 12.0...24.0
+    /// 秒の項目(待ち時間・表示時間)を選ぶ刻み(秒)．macOS の SecondsSlider と Windows の設定の画面で使う
+    public static let secondsStep = 0.1
     public static let maximumUserDictionaryReadingLength = 32
     public static let maximumUserDictionaryWordLength = 64
     /// 取り込むユーザー辞書のファイルの大きさの上限

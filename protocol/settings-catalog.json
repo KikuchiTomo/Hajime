@@ -109,6 +109,7 @@
       3
     ]
   },
+  "secondsStep" : 0.1,
   "timing" : {
     "reconnectInterval" : 3,
     "responseTimeout" : 2

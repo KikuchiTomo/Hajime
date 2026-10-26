@@ -250,7 +250,7 @@ struct SecondsSlider: View {
     var body: some View {
         LabeledContent(title) {
             HStack {
-                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: 0.1) { isEditing in
+                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: DefaultSettings.secondsStep) { isEditing in
                     guard !isEditing, let editing else { return }
                     value.wrappedValue = editing
                     self.editing = nil

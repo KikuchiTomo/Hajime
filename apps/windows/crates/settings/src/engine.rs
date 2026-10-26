@@ -11,9 +11,6 @@ use ipc::{
     ResponseBody,
 };
 
-/// 登録した単語を 1 回に読む数(エンジンが 1 回に返す上限)
-const DICTIONARY_PAGE: u32 = 500;
-
 /// 要求を 1 つ送って応答を待つ口．応答が無い(つながらない・時間切れ)ときは None
 pub trait Engine {
     fn request(&self, body: RequestBody) -> Option<ResponseBody>;
@@ -69,14 +66,14 @@ impl<E: Engine> EngineStore<E> {
         }
     }
 
-    /// 登録した単語をすべて読む．1 回に読める数(DICTIONARY_PAGE)ずつ頼む
+    /// 登録した単語をすべて読む．1 回に返す数はエンジンが決めるので，返らなかった分を続けて頼む
     pub fn read_user_dictionary(&self) -> Result<Vec<DictionaryEntry>, StoreError> {
         let mut entries = Vec::new();
         loop {
             let offset = u32::try_from(entries.len()).map_err(|_| StoreError::TooLarge)?;
             match self.send(RequestBody::ReadUserDictionary {
                 offset,
-                limit: DICTIONARY_PAGE,
+                limit: u32::MAX,
             })? {
                 ResponseBody::UserDictionary {
                     entries: page,

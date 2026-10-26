@@ -36,8 +36,6 @@ use windows_core::w;
 
 /// 部品の番号の始まり(0 は使わない)
 const FIRST_ID: u16 = 100;
-/// 一覧を開いたときに見える行の数
-const DROPDOWN_ROWS: f32 = 12.0;
 
 /// 部品の操作から生まれる頼み
 #[derive(Debug, Clone, PartialEq)]
@@ -399,7 +397,7 @@ impl PageView {
                     Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_)
                 ) {
                     // 一覧の高さは開いたときの高さ
-                    control.height = size::CONTROL_HEIGHT * DROPDOWN_ROWS;
+                    control.height = size::DROPDOWN_HEIGHT;
                 }
                 place(row.control, control);
                 for (part, rect) in row.parts.iter().zip(&card.parts) {
@@ -882,7 +880,7 @@ fn create_row(
             }
         }
         Control::Seconds(range) => {
-            view.numbers = options::steps(range.range(catalog), SECONDS_STEP);
+            view.numbers = options::steps(range.range(catalog), catalog.seconds_step);
             for number in &view.numbers {
                 ffi::send_text(control, CB_ADDSTRING, 0, &more::seconds(*number));
             }
@@ -1070,9 +1068,6 @@ fn apply_list_theme(list: Window, theme: &Theme) {
     ffi::set_theme(list, theme.control_theme(false));
     ffi::list_set_colors(list, theme.palette.text, theme.palette.control);
 }
-
-/// 秒を選ぶ部品の刻み(macOS の SecondsSlider と同じ 0.1 秒)
-const SECONDS_STEP: f64 = 0.1;
 
 fn selected(combo: Window) -> Option<usize> {
     usize::try_from(ffi::send(combo, CB_GETCURSEL, 0, 0)).ok()

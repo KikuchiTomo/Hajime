@@ -36,6 +36,7 @@ struct SettingsCatalogTests {
                 "candidateFontSize": range(DefaultSettings.candidateFontSizeRange),
                 "customThemeCornerRadius": range(DefaultSettings.customThemeCornerRadiusRange),
             ]),
+            "secondsStep": .number(DefaultSettings.secondsStep),
             "limits": .object([
                 "settingsFileBytes": limit(DefaultSettings.maximumSettingsFileBytes),
                 "usageFileBytes": limit(DefaultSettings.maximumUsageFileBytes),

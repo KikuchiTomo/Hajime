@@ -296,6 +296,7 @@ pub mod size {
         pub const CARD_PADDING_X: f32 = 16.0;
         pub const ROW_HEIGHT: f32 = 52.0;
         pub const CONTROL_HEIGHT: f32 = 32.0;
+        pub const DROPDOWN_HEIGHT: f32 = 384.0;
         pub const CONTROL_WIDTH: f32 = 240.0;
         pub const SWITCH_WIDTH: f32 = 40.0;
         pub const SWITCH_HEIGHT: f32 = 20.0;

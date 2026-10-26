@@ -217,6 +217,7 @@ enum DesignTokens {
             static let cardPaddingX: CGFloat = 16
             static let rowHeight: CGFloat = 52
             static let controlHeight: CGFloat = 32
+            static let dropdownHeight: CGFloat = 384
             static let controlWidth: CGFloat = 240
             static let switchWidth: CGFloat = 40
             static let switchHeight: CGFloat = 20

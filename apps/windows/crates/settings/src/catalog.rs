@@ -84,10 +84,13 @@ impl Timing {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Catalog {
     /// 設定のファイルの項目の名前(Settings の CodingKeys)
     pub fields: Vec<String>,
     pub ranges: Ranges,
+    /// 秒の項目を選ぶ刻み(DefaultSettings.secondsStep)
+    pub seconds_step: f64,
     pub limits: Limits,
     pub timing: Timing,
 }
