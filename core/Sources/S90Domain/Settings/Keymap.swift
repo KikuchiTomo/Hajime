@@ -35,12 +35,42 @@ public struct KeymapEntry: Sendable, Hashable, Codable {
 ///
 /// 表に無いキーは，文字なら読みに足し，それ以外は組み立て中なら何もせず，組み立てていなければアプリに渡す
 public struct Keymap: Sendable, Equatable {
-    public var entries: [KeymapEntry]
+    public var entries: [KeymapEntry] {
+        didSet { index = WinnerIndex(entries) }
+    }
     /// この版が知らないコマンドや状態の行．新しい版で書いた表を古い版で開いて保存しても失わないよう，そのまま書き戻す
     public var unknownEntries: [JSONValue] = []
+    /// 状態とキーごとに使う行の位置．キーを押すたび・分岐図を描くたびに表をなめないよう，行を変えたときに作り直す
+    private var index: WinnerIndex
 
     public init(_ entries: [KeymapEntry]) {
         self.entries = entries
+        self.index = WinnerIndex(entries)
+    }
+
+    public static func == (lhs: Keymap, rhs: Keymap) -> Bool {
+        lhs.entries == rhs.entries && lhs.unknownEntries == rhs.unknownEntries
+    }
+
+    /// 使う行の位置の索引．作ったあとは変えない
+    private final class WinnerIndex: Sendable {
+        /// 状態を書いた行(表の下にあるものが勝つ)
+        let specific: [KeymapState: [KeyStroke: Int]]
+        /// いつでも の行のうち，その状態で効くもの
+        let anywhere: [KeymapState: [KeyStroke: Int]]
+
+        init(_ entries: [KeymapEntry]) {
+            var specific: [KeymapState: [KeyStroke: Int]] = [:]
+            var anywhere: [KeymapState: [KeyStroke: Int]] = [:]
+            for (position, entry) in entries.enumerated() {
+                for state in entry.command.states {
+                    if entry.state == state { specific[state, default: [:]][entry.stroke] = position }
+                    if entry.state == .anywhere { anywhere[state, default: [:]][entry.stroke] = position }
+                }
+            }
+            self.specific = specific
+            self.anywhere = anywhere
+        }
     }
 
     /// state でこのキーを押したときに行うコマンド．無ければ nil
@@ -55,10 +85,7 @@ public struct Keymap: Sendable, Equatable {
 
     /// state でこのキーを押したときに使う行の位置
     private func winner(for stroke: KeyStroke, in state: KeymapState) -> Int? {
-        if let index = entries.lastIndex(where: { $0.state == state && $0.stroke == stroke && $0.command.states.contains(state) }) {
-            return index
-        }
-        return entries.lastIndex { $0.state == .anywhere && $0.stroke == stroke && $0.command.states.contains(state) }
+        index.specific[state]?[stroke] ?? index.anywhere[state]?[stroke]
     }
 
     /// state でこのコマンドを行うキー．表の上にある順．同じキーのほかの行に負けるものは含めない(足元の案内に出す)
