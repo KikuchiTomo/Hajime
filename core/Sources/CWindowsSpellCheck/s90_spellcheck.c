@@ -7,6 +7,11 @@
 #include <spellcheck.h>
 #include <string.h>
 
+/// spellcheck.h は CLSID と IID を宣言するだけで，C から使う定義(MIDL の _i.c)は SDK に無い．値は spellcheck.h と同じ
+/// (windows クレートの Win32::Globalization の SpellCheckerFactory・ISpellCheckerFactory と同じ値であることを確かめた)
+static const CLSID s90_clsid_spell_checker_factory = {0x7ab36653, 0x1796, 0x484b, {0xbd, 0xfa, 0xe7, 0x4f, 0x1d, 0xb7, 0xc1, 0xdc}};
+static const IID s90_iid_spell_checker_factory = {0x8e018a9d, 0x2415, 0x4677, {0xbf, 0x08, 0x79, 0x4e, 0xa6, 0x1f, 0x94, 0xbb}};
+
 static ISpellChecker *checker = NULL;
 
 /// 長さを決めた UTF-16 を，終わりに 0 を置いた文字列に写す(呼んだ側が CoTaskMemFree で放す)
@@ -24,7 +29,7 @@ int32_t s90_spell_open(const uint16_t *language) {
     HRESULT result = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(result) && result != RPC_E_CHANGED_MODE) return -1;
     ISpellCheckerFactory *factory = NULL;
-    if (FAILED(CoCreateInstance(&CLSID_SpellCheckerFactory, NULL, CLSCTX_INPROC_SERVER, &IID_ISpellCheckerFactory, (void **)&factory))) return -2;
+    if (FAILED(CoCreateInstance(&s90_clsid_spell_checker_factory, NULL, CLSCTX_INPROC_SERVER, &s90_iid_spell_checker_factory, (void **)&factory))) return -2;
     BOOL supported = FALSE;
     LPCWSTR tag = (LPCWSTR)language;
     if (FAILED(ISpellCheckerFactory_IsSupported(factory, tag, &supported)) || !supported) {
