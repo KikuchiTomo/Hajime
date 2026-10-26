@@ -1,0 +1,41 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="s90.tokyo IME" Manufacturer="s90.tokyo" Version="$(Version)" UpgradeCode="08481E5D-EF2E-4129-9B02-0DB3228DF9D5" Scope="perMachine" Language="1041" Codepage="932">
+    <MajorUpgrade DowngradeErrorMessage="新しい版の s90.tokyo IME が入っています" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="s90.tokyo IME" />
+    </StandardDirectory>
+
+    <Feature Id="Main">
+      <Files Directory="INSTALLFOLDER" Include="$(StageDir)\**" />
+      <ComponentRef Id="Autostart" />
+      <ComponentRef Id="SettingsShortcut" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="SettingsShortcut" Guid="E72997F4-1CBF-4197-9A65-1B1CC20FA1E2">
+        <Shortcut Id="SettingsShortcut" Name="s90.tokyo IME の設定" Target="[INSTALLFOLDER]s90-settings.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\s90.tokyo\IME" Name="SettingsShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Component Id="Autostart" Directory="INSTALLFOLDER" Guid="5F0B6C1E-6A43-4C1F-9C55-1E7A4E2B9D31">
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="s90.tokyo IME" Type="string" Value="&quot;[INSTALLFOLDER]s90-engine-host.exe&quot;" KeyPath="yes" />
+    </Component>
+
+    <CustomAction Id="Register64" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s &quot;[INSTALLFOLDER]s90_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="Register32" Directory="INSTALLFOLDER" ExeCommand="&quot;[SystemFolder]regsvr32.exe&quot; /s &quot;[INSTALLFOLDER]x86\s90_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="Unregister64" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s /u &quot;[INSTALLFOLDER]s90_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="Unregister32" Directory="INSTALLFOLDER" ExeCommand="&quot;[SystemFolder]regsvr32.exe&quot; /s /u &quot;[INSTALLFOLDER]x86\s90_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="StartEngine" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]s90-engine-host.exe&quot;" Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom Action="Unregister64" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+      <Custom Action="Unregister32" After="Unregister64" Condition="REMOVE=&quot;ALL&quot;" />
+      <Custom Action="Register64" After="InstallFiles" Condition="NOT REMOVE" />
+      <Custom Action="Register32" After="Register64" Condition="NOT REMOVE" />
+      <Custom Action="StartEngine" After="InstallFinalize" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

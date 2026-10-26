@@ -167,6 +167,27 @@ struct EngineServiceTests {
         #expect(handled)
     }
 
+    @Test("設定の画面から設定を読み書きし，範囲の外の値は直し，知らない値は変えない")
+    func writeSettings() {
+        let id = greeted()
+        guard case .settings(var snapshot) = service.handle(WireRequest(id: 9, body: .readSettings), from: id).body else {
+            Issue.record("設定を読めない")
+            return
+        }
+        snapshot.theme = "washi"
+        snapshot.inputStyle = "unknown"
+        snapshot.liveConversion = true
+        snapshot.candidateFontSize = 1000
+        guard case .settings(let written) = service.handle(WireRequest(id: 10, body: .writeSettings(settings: snapshot)), from: id).body else {
+            Issue.record("設定を書けない")
+            return
+        }
+        #expect(settings.current.theme == .washi)
+        #expect(settings.current.inputStyle == DefaultSettings.settings.inputStyle)
+        #expect(settings.current.liveConversion)
+        #expect(written.candidateFontSize < 1000)
+    }
+
     @Test("見た目の設定は設定の値を運ぶ")
     func presentation() {
         #expect(service.presentation.theme == settings.current.theme.rawValue)

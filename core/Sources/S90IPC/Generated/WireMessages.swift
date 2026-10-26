@@ -375,6 +375,29 @@ extension WireErrorCode: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+public struct WireSettingsSnapshot: Sendable, Equatable, Codable {
+    public var theme: String
+    public var inputStyle: String
+    public var liveConversion: Bool
+    public var showsModeIndicator: Bool
+    public var showsKeyHints: Bool
+    public var candidateFontSize: Double
+
+    public init(theme: String, inputStyle: String, liveConversion: Bool, showsModeIndicator: Bool, showsKeyHints: Bool, candidateFontSize: Double) {
+        self.theme = theme
+        self.inputStyle = inputStyle
+        self.liveConversion = liveConversion
+        self.showsModeIndicator = showsModeIndicator
+        self.showsKeyHints = showsKeyHints
+        self.candidateFontSize = candidateFontSize
+    }
+}
+
+extension WireSettingsSnapshot: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSettingsSnapshot" }
+    public var debugDescription: String { description }
+}
+
 public enum WireRequestBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case openSession
@@ -384,9 +407,11 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case deactivate(session: UInt32)
     case wake(session: UInt32, context: WireFieldContext)
     case caret(session: UInt32, rect: WireRect)
+    case readSettings
+    case writeSettings(settings: WireSettingsSnapshot)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect
+        case type, protocolVersion, session, input, context, mode, rect, settings
     }
 
     public init(from decoder: any Decoder) throws {
@@ -409,6 +434,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .wake(session: container.decode(UInt32.self, forKey: .session), context: container.decode(WireFieldContext.self, forKey: .context))
         case "caret":
             self = try .caret(session: container.decode(UInt32.self, forKey: .session), rect: container.decode(WireRect.self, forKey: .rect))
+        case "readSettings":
+            self = .readSettings
+        case "writeSettings":
+            self = try .writeSettings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -445,6 +474,11 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("caret", forKey: .type)
             try container.encode(session, forKey: .session)
             try container.encode(rect, forKey: .rect)
+        case .readSettings:
+            try container.encode("readSettings", forKey: .type)
+        case .writeSettings(let settings):
+            try container.encode("writeSettings", forKey: .type)
+            try container.encode(settings, forKey: .settings)
         }
     }
 }
@@ -460,6 +494,8 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .deactivate: "WireRequestBody.deactivate"
         case .wake: "WireRequestBody.wake"
         case .caret: "WireRequestBody.caret"
+        case .readSettings: "WireRequestBody.readSettings"
+        case .writeSettings: "WireRequestBody.writeSettings"
         }
     }
     public var debugDescription: String { description }
@@ -485,10 +521,11 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case sessionOpened(session: UInt32, state: WireSessionState)
     case edit(handled: Bool, operations: [WireEditOperation], state: WireSessionState)
     case done
+    case settings(settings: WireSettingsSnapshot)
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, code
+        case type, protocolVersion, session, state, handled, operations, settings, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -503,6 +540,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .edit(handled: container.decode(Bool.self, forKey: .handled), operations: container.decode([WireEditOperation].self, forKey: .operations), state: container.decode(WireSessionState.self, forKey: .state))
         case "done":
             self = .done
+        case "settings":
+            self = try .settings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
         case "error":
             self = try .error(code: container.decode(WireErrorCode.self, forKey: .code))
         default:
@@ -527,6 +566,9 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             try container.encode(state, forKey: .state)
         case .done:
             try container.encode("done", forKey: .type)
+        case .settings(let settings):
+            try container.encode("settings", forKey: .type)
+            try container.encode(settings, forKey: .settings)
         case .error(let code):
             try container.encode("error", forKey: .type)
             try container.encode(code, forKey: .code)
@@ -541,6 +583,7 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .sessionOpened: "WireResponseBody.sessionOpened"
         case .edit: "WireResponseBody.edit"
         case .done: "WireResponseBody.done"
+        case .settings: "WireResponseBody.settings"
         case .error: "WireResponseBody.error"
         }
     }

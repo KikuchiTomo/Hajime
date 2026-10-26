@@ -26,7 +26,9 @@
     { "id": 8, "body": { "type": "setMode", "session": 4, "mode": "direct" } },
     { "id": 9, "body": { "type": "deactivate", "session": 4 } },
     { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
-    { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } }
+    { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
+    { "id": 12, "body": { "type": "readSettings" } },
+    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },
@@ -57,6 +59,7 @@
       }
     },
     { "id": 3, "body": { "type": "done" } },
+    { "id": 12, "body": { "type": "settings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } },
     { "id": 9, "body": { "type": "error", "code": "unknownSession" } },
     { "id": 9, "body": { "type": "error", "code": "unsupportedVersion" } },
     { "id": 9, "body": { "type": "error", "code": "tooManySessions" } },
