@@ -79,8 +79,9 @@ enum DesignTokens {
             static let underlineOffset: CGFloat = 2
         }
         enum Settings {
-            static let windowWidth: CGFloat = 620
-            static let windowHeight: CGFloat = 520
+            static let windowWidth: CGFloat = 820
+            static let windowHeight: CGFloat = 580
+            static let sidebarWidth: CGFloat = 190
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12

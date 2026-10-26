@@ -5,22 +5,67 @@ import SwiftUI
 struct SettingsView: View {
     static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel
+    @State private var page: Page? = .input
+
+    /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(8 つあり，上のタブには収まらない)
+    enum Page: CaseIterable, Hashable {
+        case input, conversion, keys, dictionary, romaji, apps, appearance, usage
+
+        var title: String {
+            switch self {
+            case .input: UIStrings.Settings.inputTab
+            case .conversion: UIStrings.Settings.conversionTab
+            case .keys: UIStrings.Keys.tab
+            case .dictionary: UIStrings.Settings.dictionaryTab
+            case .romaji: UIStrings.Settings.romajiTab
+            case .apps: UIStrings.Settings.appsTab
+            case .appearance: UIStrings.Settings.appearanceTab
+            case .usage: UIStrings.Settings.usageTab
+            }
+        }
+
+        /// SF Symbols の名前
+        var symbol: String {
+            switch self {
+            case .input: "keyboard"
+            case .conversion: "character.book.closed.ja"
+            case .keys: "command"
+            case .dictionary: "text.book.closed"
+            case .romaji: "textformat.abc"
+            case .apps: "square.grid.2x2"
+            case .appearance: "paintbrush"
+            case .usage: "chart.bar"
+            }
+        }
+    }
 
     var body: some View {
-        TabView {
-            InputTab(model: model).tabItem { Text(UIStrings.Settings.inputTab) }
-            ConversionTab(model: model).tabItem { Text(UIStrings.Settings.conversionTab) }
-            DictionaryTab(model: model).tabItem { Text(UIStrings.Settings.dictionaryTab) }
-            AppsTab(model: model).tabItem { Text(UIStrings.Settings.appsTab) }
-            RomajiTab(model: model).tabItem { Text(UIStrings.Settings.romajiTab) }
-            KeysTab(model: model).tabItem { Text(UIStrings.Keys.tab) }
-            AppearanceTab(model: model).tabItem { Text(UIStrings.Settings.appearanceTab) }
-            UsageTab(model: model).tabItem { Text(UIStrings.Settings.usageTab) }
+        NavigationSplitView {
+            List(Page.allCases, id: \.self, selection: $page) { page in
+                Label(page.title, systemImage: page.symbol)
+            }
+            .navigationSplitViewColumnWidth(DesignTokens.Size.Settings.sidebarWidth)
+        } detail: {
+            detail(for: page ?? .input)
+                .navigationTitle((page ?? .input).title)
         }
-        .padding()
         .frame(width: Self.size.width, height: Self.size.height)
         .alert(model.message ?? "", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button(UIStrings.Settings.ok) { model.message = nil }
+        }
+    }
+
+    @ViewBuilder
+    private func detail(for page: Page) -> some View {
+        switch page {
+        case .input: InputTab(model: model)
+        case .conversion: ConversionTab(model: model)
+        case .keys: KeysTab(model: model)
+        case .dictionary: DictionaryTab(model: model)
+        case .romaji: RomajiTab(model: model)
+        case .apps: AppsTab(model: model)
+        case .appearance: AppearanceTab(model: model)
+        case .usage: UsageTab(model: model)
         }
     }
 }

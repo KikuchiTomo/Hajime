@@ -22,31 +22,43 @@ final class SettingsWindowController {
         model.message = UIStrings.Settings.setAside(url.lastPathComponent)
     }
 
+    /// 設定の画面を前に出して，キーボードの入力を受けられるようにする．
+    ///
+    /// 入力メソッドは前面に出られないアプリ(Info.plist の LSBackgroundOnly)なので，そのままでは窓がほかのアプリの窓の後ろに隠れ，
+    /// 入力欄にも打てない(実機のログで visible=true key=false だった)．開いているあいだだけ前面に出られる補助アプリ(.accessory)にし，
+    /// 閉じたら前面に出ないアプリ(.prohibited)に戻す．Dock とメニューバーには出ない
     func show() {
         model.refreshUsage()
         let window = window ?? makeWindow()
         self.window = window
-        // 入力メソッドは前面のアプリにならない(LSBackgroundOnly)ので，ほかのアプリのウィンドウより上の層に出して前に出す
-        window.level = .modalPanel
+        NSApp.setActivationPolicy(.accessory)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
-        // 前に出したら，ふつうの層に戻す(ほかのアプリに移ったあとも最前面に残らないように)
-        DispatchQueue.main.async { window.level = .normal }
-        logger.notice("設定の画面: visible=\(window.isVisible, privacy: .public) key=\(window.isKeyWindow, privacy: .public)")
+        // 前に出たかは，切り替えが済んだあとに記録する
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [logger] in
+            logger.notice("設定の画面: visible=\(window.isVisible, privacy: .public) key=\(window.isKeyWindow, privacy: .public) active=\(NSApp.isActive, privacy: .public)")
+        }
     }
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: SettingsView.size),
-            styleMask: [.titled, .closable, .miniaturizable],
+            // 左の一覧をタイトルバーの下まで伸ばす(システム設定と同じ見た目)
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = UIStrings.Settings.windowTitle
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
         window.contentView = NSHostingView(rootView: SettingsView(model: model))
         window.isReleasedWhenClosed = false
         window.center()
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+            // 閉じたら前面に出ないアプリに戻す(入力メソッドとして，ほかのアプリの前に出ない)
+            MainActor.assumeIsolated { _ = NSApp.setActivationPolicy(.prohibited) }
+        }
         return window
     }
 }
