@@ -24,15 +24,16 @@ struct SettingsView: View {
     }
 }
 
-/// 列挙の値を選ぶ項目
+/// 列挙の値を選ぶ項目．values を渡さなければすべての値を並べる
 private struct ChoicePicker<Value: Hashable & CaseIterable>: View where Value.AllCases: RandomAccessCollection {
     let title: String
     let selection: Binding<Value>
+    var values: [Value] = Array(Value.allCases)
     let label: (Value) -> String
 
     var body: some View {
         Picker(title, selection: selection) {
-            ForEach(Array(Value.allCases), id: \.self) { Text(label($0)).tag($0) }
+            ForEach(values, id: \.self) { Text(label($0)).tag($0) }
         }
     }
 }
@@ -43,13 +44,15 @@ private struct InputTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.inputStyleSection) {
-                ChoicePicker(title: UIStrings.Menu.inputStyle, selection: model.binding(\.inputStyle), label: UIStrings.Menu.label(for:))
+                ChoicePicker(title: UIStrings.Choice.inputStyle, selection: model.binding(\.inputStyle), label: UIStrings.Choice.label(for:))
+                ChoicePicker(title: UIStrings.Choice.keyboardLayout, selection: model.binding(\.keyboardLayout), label: UIStrings.Choice.label(for:))
+                Text(UIStrings.Choice.keyboardLayoutNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Settings.characters) {
                 ChoicePicker(title: UIStrings.Settings.punctuation, selection: model.binding(\.punctuation), label: UIStrings.Settings.label(for:))
                 ChoicePicker(title: UIStrings.Settings.brackets, selection: model.binding(\.brackets), label: UIStrings.Settings.label(for:))
                 ChoicePicker(title: UIStrings.Settings.slash, selection: model.binding(\.slash), label: UIStrings.Settings.label(for:))
-                ChoicePicker(title: UIStrings.Menu.yenKey, selection: model.binding(\.yenKey), label: UIStrings.Menu.label(for:))
+                ChoicePicker(title: UIStrings.Choice.yenKey, selection: model.binding(\.yenKey), label: UIStrings.Choice.label(for:))
                 ChoicePicker(title: UIStrings.Settings.spaceWidth, selection: model.binding(\.spaceWidth), label: UIStrings.Settings.label(for:))
                 ChoicePicker(title: UIStrings.Settings.numberWidth, selection: model.binding(\.numberWidth), label: UIStrings.Settings.label(for:))
             }
@@ -70,9 +73,9 @@ private struct ConversionTab: View {
         Form {
             Section(UIStrings.Settings.conversion) {
                 Toggle(UIStrings.Menu.liveConversion, isOn: model.binding(\.liveConversion))
-                ChoicePicker(title: UIStrings.Menu.presentation, selection: model.binding(\.candidatePresentation), label: UIStrings.Menu.label(for:))
-                Toggle(UIStrings.Menu.variantRow, isOn: model.binding(\.showsVariantRow))
-                ChoicePicker(title: UIStrings.Menu.typoCorrection, selection: model.binding(\.typoCorrection), label: UIStrings.Menu.label(for:))
+                ChoicePicker(title: UIStrings.Choice.presentation, selection: model.binding(\.candidatePresentation), label: UIStrings.Choice.label(for:))
+                Toggle(UIStrings.Choice.variantRow, isOn: model.binding(\.showsVariantRow))
+                ChoicePicker(title: UIStrings.Choice.typoCorrection, selection: model.binding(\.typoCorrection), label: UIStrings.Choice.label(for:))
             }
             Section(UIStrings.Settings.specialConversion) {
                 Toggle(UIStrings.Settings.dateConversion, isOn: model.binding(\.dateConversion))
@@ -136,7 +139,7 @@ private struct AppearanceTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.appearance) {
-                ChoicePicker(title: UIStrings.Menu.theme, selection: model.binding(\.theme), label: UIStrings.Menu.label(for:))
+                ChoicePicker(title: UIStrings.Choice.theme, selection: model.binding(\.theme), values: UIStrings.Choice.themes, label: UIStrings.Choice.label(for:))
                 Slider(
                     value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { scheduleSave($0) }),
                     in: Double(DesignTokens.Size.Candidate.fontSizeMin)...Double(DesignTokens.Size.Candidate.fontSizeMax),

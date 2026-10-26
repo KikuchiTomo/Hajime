@@ -8,6 +8,12 @@ enum PanelBuilder {
     static let englishInputNote = "Tab 日本語にする"
     static let readingCorrectionNote = "打ち間違いを直しました　Esc 打ったままに戻す"
 
+    /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文
+    static func readingCorrectedNote(typed: String) -> String { "直しました　Esc で「\(typed)」に戻す" }
+
+    /// 直さずに示すときの案内．corrected は直した文
+    static func readingSuggestionNote(_ corrected: String) -> String { "もしかして「\(corrected)」　Tab で直す" }
+
     static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }

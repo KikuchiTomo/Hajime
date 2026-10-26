@@ -205,6 +205,24 @@ struct ReadingCorrectionRuleTests {
         #expect(ReadingCorrectionRule(level: .standard).correction(among: [fixed, typed], reading: "よー") == nil)
     }
 
+    @Test("差が中くらいなら示すだけにする")
+    func suggests() {
+        let close = ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -6.5, cost: 2)
+        #expect(ReadingCorrectionRule(level: .standard).decision(among: [close, typed], reading: "よう") == .suggest(close))
+        #expect(ReadingCorrectionRule(level: .standard).correction(among: [close, typed], reading: "よう") == nil)
+    }
+
+    @Test("同じキーの重なりは，母音の 2 回と 3 回以上の重なりだけを 1 回にして試す", arguments: [
+        ("koonnichiha", ["konnichiha"]),
+        ("kitte", []),
+        ("konnnichiha", []),
+        ("aaaru", ["aaru"]),
+        ("ookii", ["okii", "ooki"]),
+    ])
+    func repeatedKeys(keys: String, expected: [String]) {
+        #expect(ReadingCorrectionRule.repeatedKeyVariants(of: keys) == expected)
+    }
+
     @Test("打ったままの読みが候補に無ければ，最後の候補より下とみなす")
     func typedMissing() {
         let other = ReadingCorrection(keys: "yoe", reading: "ヨエ", score: -9, cost: 2)
@@ -224,5 +242,38 @@ struct UsageCountsTests {
         counts.record(.committed(changedSegments: 0, viaConversion: false))
         #expect(counts.firstCandidateRate == 0.75)
         #expect(counts.segmentsChanged == 2)
+    }
+}
+
+@Suite("文節の区切り")
+struct ClauseSplitterTests {
+    private typealias Word = Candidate.Word
+
+    @Test("漢字で始まる語から文節を始め，語の中のひらがなのあとの漢字でも分ける(「非常な人だ」)")
+    func splitsInsideWord() {
+        let clauses = ClauseSplitter.clauses(of: [Word(text: "非常", readingCount: 4), Word(text: "な人だ", readingCount: 4)])
+        #expect(clauses == [.init(text: "非常な", readingCount: 5), .init(text: "人だ", readingCount: 3)])
+    }
+
+    @Test("1 文字の助詞のあとのひらがなの自立語で分ける(「今日は｜いい｜天気ですね」)")
+    func splitsAfterParticle() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "今日", readingCount: 3),
+            Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+            Word(text: "天気です", readingCount: 5),
+            Word(text: "ね", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ])
+        #expect(clauses.map(\.text) == ["今日は", "いい", "天気ですね"])
+        #expect(clauses.map(\.readingCount) == [4, 2, 6])
+    }
+
+    @Test("助詞と助動詞だけの語は前の文節に付ける(「問題点があれば」)")
+    func attachesFunctionWords() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "問題点", readingCount: 6),
+            Word(text: "があれば", readingCount: 4, startsWithParticle: true, endsWithParticle: true),
+            Word(text: "GitHub", readingCount: 5),
+        ])
+        #expect(clauses.map(\.text) == ["問題点があれば", "GitHub"])
     }
 }

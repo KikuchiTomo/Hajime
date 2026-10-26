@@ -23,9 +23,9 @@ enum Interactive {
             let list = session(.list)
             let lattice = session(.automatic)
             var marked = MarkedText.empty
+            // 2 つのセッションを 1 キーずつ交互に動かすと，同じエンジンの状態を行き来して実機と違う結果になるので，順に打つ
             for character in line {
                 marked = markedText(in: list.handle(KeyEvent(.character(character)), context: InputContext())) ?? marked
-                _ = lattice.handle(KeyEvent(.character(character)), context: InputContext())
             }
             let corrected = marked.segments.contains { $0.style == .correction }
             print("  ライブ変換: \(marked.text)\(corrected ? "  (補正しました．Space で入力のままに戻ります)" : "")")
@@ -33,6 +33,9 @@ enum Interactive {
                 guard case .showCandidates(let panel) = action else { continue }
                 let entries = panel.entries.enumerated().map { "\($0.offset + 1) \($0.element.text)" }
                 print("  一覧:       \(entries.joined(separator: "  "))")
+            }
+            for character in line {
+                _ = lattice.handle(KeyEvent(.character(character)), context: InputContext())
             }
             for action in lattice.handle(KeyEvent(.space), context: InputContext()).actions {
                 guard case .showLattice(let grid) = action else { continue }

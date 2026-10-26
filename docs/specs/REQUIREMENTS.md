@@ -31,14 +31,16 @@ s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs
   - 英単語の綴り: `pthon` → `python`
   - 日本語のローマ字の打ち間違い: `konnnitiha` の `nnn` のような重複，隣のキーの押し間違い，母音の打ち間違い(`kyounotenkihayoudesune` → 今日の天気は良いですね)
 - 日本語の打ち間違いの直し方
-  - Space で変換を始めるときに，Zenzai で打ち間違いを直した読みの候補を求める．打鍵ごとには求めない(重いため)
-  - 直した読みが打ったままの読みより十分にもっともらしいとき(対数確率の差が `DefaultSettings.readingCorrectionMargin` 以上)だけ直す
-  - 直したときは分岐図の説明の行に知らせを出し，Esc で打ったままの読みに戻す
+  - ライブ変換で打鍵が `DefaultSettings.liveCorrectionDelay`(0.8 秒)止まったときと，Space で変換を始めるときに，Zenzai で打ったキー全体を見直す．打鍵ごとには見直さない(1 文 0.1〜0.7 秒かかるため)
+  - 同じキーを続けて 2 回打った誤り(`koonnnitiha`)は Zenzai の訂正が探さないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
+  - 直した読みが打ったままの読みより十分にもっともらしいとき(対数確率の差が `DefaultSettings.readingCorrectionMargin` 以上)は直して見せる．差がそれより小さく `DefaultSettings.readingSuggestionMargin` 以上なら直さず「もしかして」と示し，Tab で直せるようにする(打ち間違いと決めつけない)
+  - 直したときは点線の下線と，入力位置の下の案内で知らせ，Esc で打ったままの読みに戻す．戻したキーのあいだは直し直さない
+  - `core/Evaluation/typo-correction.tsv` で測る(`s90-playground --evaluate-typo`)．2026-10-26 の結果: 打ち間違いの無い 20 文で誤って直した・示したのは 0，打ち間違いのある 10 文で正しく直したのは 8．見直しの時間は中央値 0.21 秒，最大 0.77 秒(Release，Apple M1 Pro)
 - 受け入れ条件
   - 補正したことが見た目でわかる(`docs/dev/DESIGN-SYSTEM.md` の補正の表示)
-  - 補正の直後に Space を押すと，打ったままの文字列に戻る．候補一覧でも打ったままの文字列を 2 番目に出す
+  - 英単語の補正の直後に Space を押すと，打ったままの文字列に戻る．一覧の表示では打ったままの文字列を 2 番目に出す
   - 補正の辞書と判定は端末の中だけで行う．入力した文字列を外部に送らない(`docs/dev/SECURITY-MODEL.md`)
-  - 補正の強さ(切る・控えめ・積極的)を設定できる
+  - 補正の強さ(オフ・英単語のみ・英単語と日本語)を設定できる
 
 ## R-03 変換候補の上の「種類」の行
 

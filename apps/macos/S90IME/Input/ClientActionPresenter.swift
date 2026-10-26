@@ -9,12 +9,14 @@ import S90Domain
 final class ClientActionPresenter {
     private let candidatePanel: CandidatePanelController
     private let modeIndicator: ModeIndicatorController
+    private let note: NoteController
     private let settings: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, settings: any SettingsStoring) {
+    init(candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring) {
         self.candidatePanel = candidatePanel
         self.modeIndicator = modeIndicator
+        self.note = note
         self.settings = settings
     }
 
@@ -32,6 +34,9 @@ final class ClientActionPresenter {
                 candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: settings.current.theme, fontSize: settings.current.candidateFontSize)
             case .hideCandidates:
                 candidatePanel.hide()
+                note.hide()
+            case .showNote(let text):
+                note.show(text, caret: caretRect(of: client), theme: settings.current.theme)
             case .showModeIndicator(let mode):
                 modeIndicator.show(mode, caret: caretRect(of: client), theme: settings.current.theme)
             case .selectMode(let mode):
@@ -52,6 +57,7 @@ final class ClientActionPresenter {
 
     func hideWindows() {
         candidatePanel.hide()
+        note.hide()
     }
 
     private static let noReplacement = NSRange(location: NSNotFound, length: 0)

@@ -48,6 +48,16 @@ public enum DefaultSettings {
     /// 直した読みが打ったままの読みより，対数確率でいくつ以上よければ直すか．
     /// 「こんにちは」を「こんいちば」にするような誤った訂正(差 1.9)を避け，「ようですね」→「よいですね」(差 3.6)は直す
     public static let readingCorrectionMargin = 3.0
+    /// 差がこれ以上で readingCorrectionMargin に届かないときは，直さずに「もしかして」として示し，Tab で直せるようにする
+    public static let readingSuggestionMargin = 2.0
+    /// 同じキーを続けて 2 回打ってしまった誤り(「koonnichiha」)を直す手間．近くのキーを余分に打った誤りの手間(3.0)より小さくする
+    public static let repeatedKeyCost = 2.0
+    /// 同じキーを続けて打った箇所のうち，1 回にして試す箇所の数の上限．1 か所ごとに Zenzai に問い合わせるので抑える
+    public static let maximumRepeatedKeyVariants = 2
+    /// ライブ変換で，打鍵が止まったときに打ち間違いを探す最短のキーの数．短い読みは見間違えやすく，直す意味も薄い
+    public static let minimumKeysForLiveCorrection = 6
+    /// 打ち間違いを探す最長のキーの数．長いと探すのに時間がかかり，打鍵が止まったときに待たせる
+    public static let maximumKeysForCorrection = 60
     /// ライブ変換で，読みがこの文字数に満たないあいだは，打鍵が止まるまでかなのまま見せる
     public static let liveConversionMinimumLength = 3
     /// ライブ変換で，末尾の語の読みがこの文字数以下なら，打鍵が止まるまでかなのまま見せる(「らい」→「雷」を出さない)．
@@ -57,6 +67,9 @@ public enum DefaultSettings {
     public static let settingsSaveDelay = 0.4
     /// 打鍵が止まったとみなすまでの時間(秒)．止まったら変換した文を見せる
     public static let liveConversionSettleDelay = 0.4
+    /// 打ち間違いを見直すまでの打鍵の止まり(秒)．見直しは 1 文 0.1〜0.7 秒かかり，その間はキーを受け付けないので，
+    /// 文を見せるときより長く止まったときだけ行う
+    public static let liveCorrectionDelay = 0.8
     /// EN 入力で日本語の候補を出し始める英字の数．短い英単語(an，to など)に候補を出さない
     public static let minimumEnglishInputSuggestionLength = 4
     /// 利用者が足すローマ字の綴りとかなの長さの上限(ATOK と同じ)と，足せる数

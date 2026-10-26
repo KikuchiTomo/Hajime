@@ -140,6 +140,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
     private var cache: [String: Result] = [:]
+    /// 前に変換を求めた読み．続きの読みなら azooKey の差分の変換を使える
+    private var lastRequested: String?
     /// 入力位置の前にある文字列(左の文脈)．Zenzai が変換の手がかりに使う
     private var leftContext: String?
 
@@ -193,8 +195,11 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         let options = engine.options(leftContext: leftContext)
         let config = ExperimentalTypoCorrectionConfig(
             beamSize: DefaultSettings.typoCorrectionBeamSize, topK: DefaultSettings.typoCorrectionTopK, nBest: DefaultSettings.typoCorrectionCandidateCount)
-        let corrections = engine.withSession(sessionID) { converter in
-            converter.experimentalRequestTypoCorrection(
+        // 訂正は表示する変換と状態を混ぜないよう，求めたあとに変換の状態を捨てる
+        lastRequested = nil
+        let corrections = engine.withSession(sessionID) { converter -> [ZenzaiTypoCandidate] in
+            defer { converter.stopComposition() }
+            return converter.experimentalRequestTypoCorrection(
                 leftSideContext: leftContext ?? "", composingText: composing, options: options, inputStyle: .roman2kana, config: config)
         } ?? []
         return corrections.map {
@@ -219,6 +224,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     }
 
     func endComposition() {
+        lastRequested = nil
         _ = engine.withSession(sessionID) { $0.stopComposition() }
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
         plausibilityCache = [:]
@@ -233,9 +239,16 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
         let options = engine.options(leftContext: leftContext)
-        guard let result = engine.withSession(sessionID, { $0.requestCandidates(composing, options: options) }) else {
+        // azooKey は前に求めた読みからの差分で変換を進める．前の読みの続きでない読み(文節ごとの残りの読みなど)を
+        // そのまま渡すと前の結果が混ざる(「ひとだ」→「非とだ」)ので，続きでなければ状態を捨ててから求める
+        let continues = lastRequested.map(reading.hasPrefix) ?? false
+        guard let result = engine.withSession(sessionID, { converter in
+            if !continues { converter.stopComposition() }
+            return converter.requestCandidates(composing, options: options)
+        }) else {
             return nil
         }
+        lastRequested = reading
         var seen = Set<String>()
         var all: [S90Domain.Candidate] = []
         for candidate in result.mainResults + result.firstClauseResults where seen.insert(candidate.text).inserted {
@@ -260,7 +273,10 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
             readingCount: Self.readingCount(candidate.composingCount, readingLength: readingLength),
             origin: .engine(id: id),
             score: Double(candidate.value),
-            trailingWord: candidate.data.last.map { .init(readingCount: $0.ruby.count, textCount: $0.word.count) }
+            trailingWord: candidate.data.last.map { .init(readingCount: $0.ruby.count, textCount: $0.word.count) },
+            words: candidate.data.map {
+                .init(text: $0.word, readingCount: $0.ruby.count, startsWithParticle: CIDData.isJoshi(cid: $0.lcid), endsWithParticle: CIDData.isJoshi(cid: $0.rcid))
+            }
         )
     }
 

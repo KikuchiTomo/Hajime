@@ -8,6 +8,7 @@ final class CandidatePanelController {
     private let window: NSPanel
     private let view = CandidateView()
     private let branchView = BranchView()
+    private let backdrop = GlassBackdrop()
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
 
@@ -19,7 +20,7 @@ final class CandidatePanelController {
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.panel = panel
-        present(view, size: view.fittingSize(for: panel), caret: caret)
+        present(view, size: view.fittingSize(for: panel), caret: caret, glass: view.theme.isGlass)
         announceSelection(panel)
     }
 
@@ -27,18 +28,17 @@ final class CandidatePanelController {
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, glass: branchView.theme.isGlass)
         if let focused = panel.columns.first(where: \.isFocused) {
             announce(focused.text)
         }
     }
 
-    private func present(_ content: NSView, size: NSSize, caret: NSRect) {
-        let wasVisible = window.isVisible && window.contentView === content
-        if window.contentView !== content {
-            window.contentView = content
-        }
+    /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける
+    private func present(_ content: NSView, size: NSSize, caret: NSRect, glass: Bool) {
+        let wasVisible = FloatingPanel.attach(content, to: window, backdrop: glass ? backdrop : nil)
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
+        if glass { window.invalidateShadow() }
         if !wasVisible {
             startRestFadeIn()
             window.orderFrontRegardless()
@@ -116,6 +116,17 @@ enum FloatingPanel {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.contentView = contentView
         return panel
+    }
+
+    /// 中身をウィンドウに付ける．backdrop を渡したら，その上に重ねて影を付ける．
+    /// 付ける前から同じ中身が見えていたら true を返す
+    static func attach(_ content: NSView, to window: NSWindow, backdrop: GlassBackdrop?) -> Bool {
+        let root: NSView = backdrop ?? content
+        let wasVisible = window.isVisible && window.contentView === root && (backdrop == nil || content.superview === backdrop)
+        if let backdrop { backdrop.host(content) }
+        if window.contentView !== root { window.contentView = root }
+        window.hasShadow = backdrop != nil
+        return wasVisible
     }
 
     /// 入力位置の行の長方形から，ウィンドウの左下の座標を決める．規則は core の PanelPlacement
