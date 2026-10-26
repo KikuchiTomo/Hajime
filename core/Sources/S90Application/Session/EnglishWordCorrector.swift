@@ -48,6 +48,8 @@ final class EnglishWordCorrector {
     private let classifier: WordLanguageClassifier
 
     private(set) var active: Correction?
+    /// 最後に補正を求めたときの入力先の文脈．英単語を延ばすとき(handleFollowingRomaji)にも同じ文脈で探す
+    private var context = Context()
     /// 利用者が Space で取り消した補正の位置．同じ位置では補正し直さない(Q-01)
     private var dismissedKanaStart: Int?
 
@@ -61,15 +63,21 @@ final class EnglishWordCorrector {
     /// 読みの末尾から英単語を探して，補正を求め直す．
     /// - Parameter context: 入力先の文脈．プログラミング用のアプリでは日本語の文の中の英単語だけを直す(R-06)
     func update(for composition: Composition, context: Context = Context()) {
-        let rule = TypoCorrectionRule(level: settings.current.typoCorrection)
-        let customization = settings.current.correction
-        guard customization.english else {
+        self.context = context
+        guard settings.current.correction.english else {
             active = nil
             return
         }
+        active = search(in: composition, includingPending: false)
+    }
+
+    /// 補正の対象を探す．includingPending なら，打ちかけのローマ字も英単語に含めて探す(英単語を延ばすとき)
+    private func search(in composition: Composition, includingPending: Bool) -> Correction? {
+        let rule = TypoCorrectionRule(level: settings.current.typoCorrection)
+        let customization = settings.current.correction
         let kana = Array(composition.kana)
         // 直さない語を含む部分と，識別子の一部(「user_」「a.」「userN」のあと)は除く
-        let tails = rule.tails(in: composition)
+        let tails = rule.tails(in: composition, includingPending: includingPending)
             .filter { $0.kanaStart != dismissedKanaStart && !customization.isException(keys: $0.keys, reading: "") }
             .filter { tail in
                 let before = tail.kanaStart > 0 ? kana[tail.kanaStart - 1] : context.precedingCharacter
@@ -78,27 +86,31 @@ final class EnglishWordCorrector {
             }
         // 0. 利用者が足した置き換えの決まり(「teh」→「the」)を，長い部分から探す
         if let tail = tails.first(where: { customization.rule(for: $0.keys) != nil }), let custom = customization.rule(for: tail.keys) {
-            active = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: custom.word)
-            return
+            return Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: custom.word)
         }
-        // 1. 英単語そのものを，長い部分から探す
+        // 綴りの誤り．どの部分を調べるかは TypoCorrectionRule.misspellingTails にある
+        func misspelling(startingBefore bound: Int?) -> Correction? {
+            for tail in rule.misspellingTails(from: tails) where bound.map({ tail.rawStart < $0 }) ?? true {
+                if let word = rule.correction(for: tail.keys, isWord: false, suggestions: lexicon.suggestions(for: tail.keys)) {
+                    return Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word, isMisspelling: true)
+                }
+            }
+            return nil
+        }
+        // 1. 英単語そのものを，長い部分から探す．ただし，それより長い部分が英字の打ち始めからの綴りの誤りなら，そちらを直す．
+        //    「jvascript」の「script」は英単語だが，打ったのは javascript のつもりなので，英単語全体で直す
         if let tail = tails.first(where: { lexicon.isWord($0.keys) }),
             let word = rule.correction(for: tail.keys, isWord: true, suggestions: []) {
-            active = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word)
-            return
+            return misspelling(startingBefore: tail.rawStart)
+                ?? Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word)
         }
-        // 2. 英単語の終わりが次の日本語の綴りにかかったもの(「react」+「wo」)
+        // 2. 英単語の終わりが次の日本語の綴りにかかったもの(「react」+「wo」)．綴りの誤りより先に調べる
+        //    (「reactwo」の「ctwo」に two を返す綴りの候補で，react を two にしないため)
         if let found = wordReadAsRomaji(in: composition, onlyUnreadable: true) {
-            active = found
-            return
+            return found
         }
-        // 3. 綴りの誤りは，いちばん短い部分だけで探す．長い部分で探すと前の日本語まで英単語に飲み込む
-        if let tail = tails.last,
-            let word = rule.correction(for: tail.keys, isWord: false, suggestions: lexicon.suggestions(for: tail.keys)) {
-            active = Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word, isMisspelling: true)
-            return
-        }
-        active = nil
+        // 3. 綴りの誤り
+        return misspelling(startingBefore: nil)
     }
 
     /// 読み全体が，英語にも日本語にも読める語(「make」→ まけ)で，英語にすると見分けたら英単語として確定させる．
@@ -173,7 +185,13 @@ final class EnglishWordCorrector {
         guard let current = active else { return .reevaluate }
         let following = followingReading(in: composition)
         if following.kana.contains(where: { $0.isASCII && $0.isLetter }) {
-            // 英字のまま残った．「pythons」のように別の英単語になるかもしれない
+            // 英字のまま残った．「pythons」のように別の英単語になるかもしれない．
+            // 英字を打ち続けているので，最後の打ちかけのローマ字(「jvascript」の t)も英単語に含めて探し直す．
+            // 含めずに求め直すと補正が消え，英単語全体(javascript)を直す機会を失う
+            if let found = search(in: composition, includingPending: true) {
+                active = found
+                return .waiting
+            }
             return .reevaluate
         }
         if following.pending.isEmpty, !following.kana.isEmpty {
@@ -189,6 +207,12 @@ final class EnglishWordCorrector {
         let extended = current.keys + followingKeys(in: composition)
         if lexicon.isWord(extended) {
             active = Correction(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: extended, word: extended)
+        }
+        // 続けて打ったキーまで含めると，いま直している部分より前から始まる英単語になることがある．
+        // 「jvascri」の「scri」を直したあとに「pt」と打つと，「jvascript」全体を javascript に直せる．
+        // 子音で終わる英単語は最後のキーが打ちかけのローマ字として残るので，打ちかけを含めて探す
+        if let current = active, let longer = search(in: composition, includingPending: true), longer.rawStart < current.rawStart {
+            active = longer
         }
         return .waiting
     }
@@ -227,6 +251,7 @@ final class EnglishWordCorrector {
     func reset() {
         active = nil
         dismissedKanaStart = nil
+        context = Context()
     }
 
     /// 直した英単語のあとに打ったキーを，日本語として読んだもの
