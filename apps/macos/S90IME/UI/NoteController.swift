@@ -17,9 +17,9 @@ final class NoteController {
         view.theme = ResolvedTheme.resolve(theme)
         view.text = text
         let size = view.fittingSize
-        _ = FloatingPanel.attach(view, to: window, backdrop: view.theme.isGlass ? backdrop : nil)
+        _ = FloatingPanel.attach(view, to: window, backdrop: view.theme.isRounded ? backdrop : nil)
         window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
-        if view.theme.isGlass { window.invalidateShadow() }
+        if view.theme.isRounded { window.invalidateShadow() }
         window.orderFrontRegardless()
         // VoiceOver が動いているときは，案内を読み上げる
         if NSWorkspace.shared.isVoiceOverEnabled {
@@ -46,16 +46,16 @@ final class NoteView: NSView {
         [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: theme.correction]
     }
 
-    private var padding: CGFloat { theme.isGlass ? Glass.padding : Size.paddingX }
+    private var padding: CGFloat { theme.isRounded ? Glass.padding : Size.paddingX }
 
     override var fittingSize: NSSize {
         let size = text.size(withAttributes: attributes)
-        let inset = theme.isGlass ? 0 : Size.frameWidth + Size.bevelWidth
+        let inset = theme.isRounded ? 0 : Size.frameWidth + Size.bevelWidth
         return NSSize(width: (size.width + (padding + inset) * 2).rounded(.up), height: max(Glass.footerHeight, size.height + (Size.sectionPaddingY + inset) * 2).rounded(.up))
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if theme.isGlass {
+        if theme.isRounded {
             GlassDrawing.drawFrame(in: bounds, theme: theme, fillsSurface: false)
         } else {
             BevelDrawing.drawPanel(in: bounds, theme: theme)

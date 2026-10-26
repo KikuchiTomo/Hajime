@@ -17,12 +17,13 @@ enum SnapshotRenderer {
     static func runIfRequested() {
         let arguments = CommandLine.arguments
         guard arguments.contains(argument) else { return }
-        FontRegistry.registerBundledFonts()
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshots", isDirectory: true)
         print(output.path)
         try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let looks: [(theme: ThemePreference, appearance: NSAppearance.Name, name: String)] = [
             (.automatic, .aqua, "glass-light"), (.automatic, .darkAqua, "glass-dark"), (.platinum, .aqua, "platinum"), (.desk, .darkAqua, "desk"),
+            (.washi, .aqua, "washi"), (.neon, .darkAqua, "neon"), (.terminal, .darkAqua, "terminal"), (.nordic, .aqua, "nordic"),
+            (.contrast, .darkAqua, "contrast"),
         ]
         for look in looks {
             let appearance = NSAppearance(named: look.appearance)

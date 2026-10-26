@@ -49,7 +49,7 @@ final class BranchView: NSView {
 
     private var metrics: Metrics {
         let scale = fontSize / Size.fontSize
-        if theme.isGlass {
+        if theme.isRounded {
             return Metrics(inset: Glass.padding, rowHeight: (Glass.rowHeight * scale).rounded(), trunkGap: Glass.trunkGap,
                            branchIndent: Glass.branchIndent, stemX: Glass.branchStemX, lead: Glass.badgeSize + Size.paddingX,
                            footerHeight: Glass.footerHeight)
@@ -57,12 +57,12 @@ final class BranchView: NSView {
         let labelHeight = (labelFont.ascender - labelFont.descender).rounded(.up) + Size.sectionPaddingY * 2
         return Metrics(inset: Size.frameWidth + Size.bevelWidth + Size.paddingX, rowHeight: (Size.rowHeight * scale).rounded(),
                        trunkGap: Branch.trunkGap, branchIndent: Branch.branchIndent, stemX: Branch.branchStemX, lead: Size.indexWidth,
-                       footerHeight: labelHeight)
+                       footerHeight: max(labelHeight, Glass.keycapHeight + Size.sectionPaddingY * 2))
     }
 
     private var candidateFont: NSFont { theme.candidateFont(size: fontSize) }
     private var trunkFont: NSFont { theme.trunkFont(size: fontSize) }
-    private var labelFont: NSFont { theme.labelFont(size: theme.isGlass ? Glass.labelFontSize : Size.labelFontSize) }
+    private var labelFont: NSFont { theme.labelFont(size: theme.isRounded ? Glass.labelFontSize : Size.labelFontSize) }
     private var dropShadowOffset: CGFloat { theme.hasDropShadow ? Size.shadowOffset : 0 }
 
     /// 幹・枝・足元の位置．描くときと大きさを求めるときで同じものを使う
@@ -104,7 +104,7 @@ final class BranchView: NSView {
         let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2)
         let trunkY = metrics.inset + CGFloat(upperRows) * metrics.rowHeight
         let height = trunkY + metrics.rowHeight * CGFloat(1 + lowerRows) + Size.frameWidth + metrics.footerHeight
-            + (theme.isGlass ? 0 : metrics.inset)
+            + (theme.isRounded ? 0 : metrics.inset)
         return Layout(trunkX: trunkX, trunkWidths: trunkWidths, lowerRows: lowerRows, trunkY: trunkY,
                       branchWidth: branchWidth, size: NSSize(width: width.rounded(.up), height: height.rounded(.up)))
     }
@@ -121,7 +121,7 @@ final class BranchView: NSView {
         let layout = layout(for: panel)
         let metrics = metrics
         let body = NSRect(origin: .zero, size: layout.size)
-        if theme.isGlass {
+        if theme.isRounded {
             GlassDrawing.drawFrame(in: body, theme: theme, fillsSurface: fillsSurface)
         } else {
             BevelDrawing.drawDropShadow(for: body, theme: theme)
@@ -133,7 +133,7 @@ final class BranchView: NSView {
         for (index, column) in panel.columns.enumerated() {
             let node = NSRect(x: layout.trunkX[index], y: layout.trunkY, width: layout.trunkWidths[index], height: metrics.rowHeight)
             drawTrunkNode(column, in: node)
-            if !theme.isGlass, index < panel.columns.count - 1 {
+            if !theme.isRounded, index < panel.columns.count - 1 {
                 // glass は文節の間を空けるだけにし，文として読めるようにする
                 theme.line.setFill()
                 NSRect(x: node.maxX, y: node.midY.rounded(), width: layout.trunkX[index + 1] - node.maxX, height: Branch.lineWidth).fill()
@@ -155,7 +155,7 @@ final class BranchView: NSView {
 
     private func drawTrunkNode(_ column: LatticePanel.Column, in node: NSRect) {
         let color: NSColor
-        if theme.isGlass {
+        if theme.isRounded {
             if column.isFocused { GlassDrawing.fillCapsule(node.insetBy(dx: 0, dy: 2), color: theme.focusTint) }
             color = theme.text
         } else {
@@ -167,14 +167,14 @@ final class BranchView: NSView {
         }
         drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX, in: node)
         // 下線: 選び直した文節は実線，確信の低い文節は点線．線の種類でも区別し，色だけに頼らない
-        let offset = theme.isGlass ? Glass.underlineOffset : Branch.underlineOffset
+        let offset = theme.isRounded ? Glass.underlineOffset : Branch.underlineOffset
         let y = node.maxY - offset
         let from = node.minX + Size.paddingX
         let to = node.maxX - Size.paddingX
         if column.isDecided {
-            drawUnderline(from: from, to: to, y: y, color: theme.isGlass ? theme.textMuted : color, dotted: false)
+            drawUnderline(from: from, to: to, y: y, color: theme.isRounded ? theme.textMuted : color, dotted: false)
         } else if column.isUncertain {
-            let dotColor = !theme.isGlass && column.isFocused ? theme.selectionText : theme.correction
+            let dotColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
             drawUnderline(from: from, to: to, y: y, color: dotColor, dotted: true)
         }
     }
@@ -210,7 +210,7 @@ final class BranchView: NSView {
             let y = downward ? node.maxY + CGFloat(index) * metrics.rowHeight : node.minY - CGFloat(index + 1) * metrics.rowHeight
             return NSRect(x: stemX + metrics.branchIndent, y: y, width: width - metrics.stemX - metrics.branchIndent, height: metrics.rowHeight)
         }
-        if theme.isGlass {
+        if theme.isRounded {
             drawCurves(rows, stemX: stemX, stemY: downward ? node.maxY - 2 : node.minY + 2, rowRect: rowRect)
         } else {
             drawStraightLines(rows, stemX: stemX, node: node, downward: downward, rowRect: rowRect)
@@ -256,7 +256,7 @@ final class BranchView: NSView {
 
     private func drawRow(_ row: Row, in rect: NSRect) {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-        if theme.isGlass {
+        if theme.isRounded {
             if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection) }
             let badgeCenter = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(row.badge, center: badgeCenter, theme: theme, selected: row.isSelected, opacity: row.opacity)
@@ -268,7 +268,7 @@ final class BranchView: NSView {
             rect.fill()
         }
         let badgeColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-        drawText(row.badge, attributes: [.font: labelFont, .foregroundColor: badgeColor], x: rect.minX + Size.paddingX / 2, in: rect)
+        GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: rect.minX + Size.paddingX / 2, y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
         drawText(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: rect.minX + Size.paddingX / 2 + metrics.lead, in: rect)
     }
 
@@ -279,7 +279,7 @@ final class BranchView: NSView {
         let row = NSRect(x: stemX, y: node.maxY, width: node.width, height: metrics.rowHeight)
         let color = theme.textMuted.withAlphaComponent(restOpacity)
         let textX: CGFloat
-        if theme.isGlass {
+        if theme.isRounded {
             let end = NSPoint(x: stemX + metrics.branchIndent / 2, y: row.midY)
             let curve = GlassDrawing.branchCurve(from: NSPoint(x: stemX, y: node.maxY - 2), to: end)
             theme.line.withAlphaComponent(theme.line.alphaComponent * restOpacity).setStroke()
@@ -315,14 +315,13 @@ final class BranchView: NSView {
 
     private func footerWidth(_ panel: LatticePanel) -> CGFloat {
         if let note = panel.note { return textWidth(note, font: labelFont) }
-        return theme.isGlass ? GlassDrawing.hintsWidth(hints, theme: theme)
-            : textWidth(KeyHint.text(hints), font: labelFont)
+        return GlassDrawing.hintsWidth(hints, theme: theme)
     }
 
     private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat) {
         let metrics = metrics
-        let lineInset = theme.isGlass ? metrics.inset : metrics.inset - Size.paddingX
-        if theme.isGlass {
+        let lineInset = theme.isRounded ? metrics.inset : metrics.inset - Size.paddingX
+        if theme.isRounded {
             theme.line.setFill()
             NSRect(x: lineInset, y: y, width: width - lineInset * 2, height: Size.frameWidth).fill()
         } else {
@@ -333,10 +332,8 @@ final class BranchView: NSView {
         if let note = panel.note {
             // 打ち間違いを直したことなど，IME が変えたことを知らせる
             drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: footer.minX, in: footer)
-        } else if theme.isGlass {
-            GlassDrawing.drawHints(hints, x: footer.minX, midY: footer.midY, theme: theme)
         } else {
-            drawText(KeyHint.text(hints), attributes: muted, x: footer.minX, in: footer)
+            GlassDrawing.drawHints(hints, x: footer.minX, midY: footer.midY, theme: theme)
         }
         let position = position(of: panel)
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
@@ -345,7 +342,7 @@ final class BranchView: NSView {
     // MARK: - 部品
 
     private func drawUnderline(from minX: CGFloat, to maxX: CGFloat, y: CGFloat, color: NSColor, dotted: Bool) {
-        if theme.isGlass {
+        if theme.isRounded {
             // glass は丸い点と丸い端の線
             let path = NSBezierPath()
             path.move(to: NSPoint(x: minX, y: y))

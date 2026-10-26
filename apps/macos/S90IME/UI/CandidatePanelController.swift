@@ -20,7 +20,7 @@ final class CandidatePanelController {
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.panel = panel
-        present(view, size: view.fittingSize(for: panel), caret: caret, glass: view.theme.isGlass)
+        present(view, size: view.fittingSize(for: panel), caret: caret, glass: view.theme.isRounded)
         announceSelection(panel)
     }
 
@@ -29,7 +29,7 @@ final class CandidatePanelController {
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, glass: branchView.theme.isGlass)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, glass: branchView.theme.isRounded)
         if let focused = panel.columns.first(where: \.isFocused) {
             announce(focused.text)
         }

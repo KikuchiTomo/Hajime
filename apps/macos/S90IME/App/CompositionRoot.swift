@@ -49,7 +49,6 @@ final class CompositionRoot {
         settings.observe { [weak engine] in engine?.apply($0) }
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
-        FontRegistry.registerBundledFonts()
         let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
         installed = CompositionRoot(settings: settings, engine: engine, usage: usage)
     }
