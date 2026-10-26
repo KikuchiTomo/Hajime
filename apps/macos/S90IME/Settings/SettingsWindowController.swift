@@ -77,7 +77,7 @@ final class SettingsModel: ObservableObject {
     private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
-    /// 取り込んだ辞書の索引(R-14)．無ければ辞書を取り込めない
+    /// 取り込んだ辞書の索引(R-16)．無ければ辞書を取り込めない
     let dictionaries: ImportedDictionaryStore?
     /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
     @Published var isImportingDictionary = false

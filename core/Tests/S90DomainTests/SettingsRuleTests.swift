@@ -417,7 +417,7 @@ struct UsageGuideTests {
     }
 }
 
-@Suite("取り込んだ辞書の設定(R-14)")
+@Suite("取り込んだ辞書の設定(R-16)")
 struct ImportedDictionarySettingTests {
     @Test("保存して読み直せ，条件も残る")
     func roundTrip() throws {

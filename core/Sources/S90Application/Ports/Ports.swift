@@ -33,7 +33,7 @@ public protocol KanaKanjiConverting: AnyObject {
     func didCommit(_ candidate: Candidate)
     /// 入力を最後まで確定した，または取り消した
     func endComposition()
-    /// 取り込んだ辞書から引いた語を渡す(R-14)．エンジンは読みの中の語として使う．同じものが続くときは何もしなくてよい
+    /// 取り込んだ辞書から引いた語を渡す(R-16)．エンジンは読みの中の語として使う．同じものが続くときは何もしなくてよい
     func setAuxiliaryWords(_ words: [AuxiliaryWord])
     /// 入力先のアプリ(バンドル ID)を伝える．アプリの条件の辞書を選ぶのに使う
     func setApplication(_ identifier: String?)
@@ -58,7 +58,7 @@ public struct AuxiliaryWord: Sendable, Equatable, Hashable {
     }
 }
 
-/// 取り込んだ辞書を読みで引く(R-14)
+/// 取り込んだ辞書を読みで引く(R-16)
 @MainActor
 public protocol DictionaryLookup: AnyObject {
     /// 読みがちょうど reading の語

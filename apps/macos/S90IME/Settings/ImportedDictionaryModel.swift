@@ -2,7 +2,7 @@ import AppKit
 import S90Domain
 import S90Persistence
 
-/// 取り込んだ辞書の取り込み・取り込み直し・削除・並べ替え(R-14)
+/// 取り込んだ辞書の取り込み・取り込み直し・削除・並べ替え(R-16)
 extension SettingsModel {
     /// 辞書のファイルを選んで取り込む．existing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
     func importDictionaryFile(replacing existing: ImportedDictionary? = nil) {

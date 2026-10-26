@@ -9,7 +9,7 @@ enum UIStrings {
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
     }
 
-    /// 取り込んだ辞書(R-14)
+    /// 取り込んだ辞書(R-16)
     enum Dictionaries {
         static let userWords = "登録した単語"
         static let imported = "取り込んだ辞書"

@@ -9,7 +9,7 @@ private final class FakeLookup: DictionaryLookup {
     func words(reading: String, in dictionary: ImportedDictionary) -> [DictionaryWord] { words[dictionary.id]?[reading] ?? [] }
 }
 
-@Suite("取り込んだ辞書を効かせる決まり(R-14)")
+@Suite("取り込んだ辞書を効かせる決まり(R-16)")
 struct DictionaryActivationTests {
     private let always = ImportedDictionary(id: "a", name: "一般", wordCount: 1)
     private let law = ImportedDictionary(id: "b", name: "法律", condition: .apps(["com.microsoft.Word"]), wordCount: 1)
@@ -39,7 +39,7 @@ struct DictionaryActivationTests {
 }
 
 @MainActor
-@Suite("取り込んだ辞書の語をエンジンに渡す(R-14)")
+@Suite("取り込んだ辞書の語をエンジンに渡す(R-16)")
 struct ImportedDictionaryConverterTests {
     private func make(_ dictionaries: [ImportedDictionary]) -> (SupplementedConverter, FakeConverter, FakeLookup) {
         var settings = Settings()

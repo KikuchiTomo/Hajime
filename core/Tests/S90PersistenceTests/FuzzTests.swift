@@ -32,7 +32,7 @@ struct FuzzTests {
         }
     }
 
-    @Test("取り込む辞書のファイル(R-14)")
+    @Test("取り込む辞書のファイル(R-16)")
     func importedDictionary() {
         for data in samples(count: 500) {
             let words = (try? DictionaryFileReader.parse(data)) ?? []

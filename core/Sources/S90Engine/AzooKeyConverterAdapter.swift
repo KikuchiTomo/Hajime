@@ -18,7 +18,7 @@ public final class AzooKeyConverterEngine {
     private lazy var emojiReplacer = TextReplacer.withDefaultEmojiDictionary()
     private var usesEmoji = true
     private var userDictionary: [UserDictionaryEntry] = []
-    /// 取り込んだ辞書から引いた語(R-14)．ユーザー辞書と合わせて動的な辞書としてエンジンに渡す
+    /// 取り込んだ辞書から引いた語(R-16)．ユーザー辞書と合わせて動的な辞書としてエンジンに渡す
     private var auxiliaryWords: [AuxiliaryWord] = []
 
     /// - Parameters:

@@ -28,7 +28,7 @@ struct AzooKeyConverterAdapterTests {
         #expect(candidates.first?.readingCount == 11)
     }
 
-    @Test("R-14: 取り込んだ辞書の語を渡すと，文の中の語として候補に出る")
+    @Test("R-16: 取り込んだ辞書の語を渡すと，文の中の語として候補に出る")
     func auxiliaryWords() throws {
         // エンジンは自分の辞書にある読みの続きしかたどらないので，辞書にある読みの語で確かめる(読み全体の一致は SupplementedConverter が受け持つ)
         let session = try makeEngine().makeSession()

@@ -1,7 +1,7 @@
 import S90Domain
 import SwiftUI
 
-/// 取り込んだ辞書の一覧(R-14)．上ほど優先する．辞書ごとにオン・オフ，名前，分野，効かせる条件を決める
+/// 取り込んだ辞書の一覧(R-16)．上ほど優先する．辞書ごとにオン・オフ，名前，分野，効かせる条件を決める
 struct ImportedDictionariesView: View {
     @ObservedObject var model: SettingsModel
 

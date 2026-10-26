@@ -29,7 +29,7 @@ public struct InputContext: Sendable, Equatable {
     public var isSecure: Bool
     /// 入力位置の前にある文字列(左の文脈)．打ち始めのときだけアダプタが入れる．文脈を使う変換(Zenzai)の手がかり
     public var precedingText: String?
-    /// 入力先のアプリの識別子(macOS はバンドル ID)．アプリの条件の辞書を選ぶのに使う(R-14)
+    /// 入力先のアプリの識別子(macOS はバンドル ID)．アプリの条件の辞書を選ぶのに使う(R-16)
     public var applicationID: String?
 
     public init(profile: AppProfile = .standard, isSecure: Bool = false, precedingText: String? = nil, applicationID: String? = nil) {

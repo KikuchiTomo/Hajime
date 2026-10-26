@@ -3,7 +3,7 @@ import Foundation
 @testable import S90Persistence
 import Testing
 
-@Suite("取り込む辞書のファイル(R-14)")
+@Suite("取り込む辞書のファイル(R-16)")
 struct DictionaryFileReaderTests {
     private let tsv = "!コメント\nでんあつ\t電圧\t名詞\tコメント\nやまだ\t山田\t人名\nとうきょう\t東京\t地名\n"
 
@@ -72,7 +72,7 @@ struct DictionaryFileReaderTests {
 }
 
 @MainActor
-@Suite("取り込んだ辞書の索引(R-14)")
+@Suite("取り込んだ辞書の索引(R-16)")
 struct ImportedDictionaryStoreTests {
     private func makeStore() -> (ImportedDictionaryStore, URL) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

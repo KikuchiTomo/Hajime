@@ -359,7 +359,7 @@ final class BranchView: NSView {
         let position = position(of: panel)
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
         if let source = panel.columns.first(where: \.isFocused)?.sourceName {
-            // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を位置の左に小さく出す(R-14)
+            // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を位置の左に小さく出す(R-16)
             let label = UIStrings.Branch.dictionarySource(source)
             let x = footer.maxX - textWidth(position, font: labelFont) - Size.paddingX - textWidth(label, font: labelFont)
             drawText(label, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: x, in: footer)

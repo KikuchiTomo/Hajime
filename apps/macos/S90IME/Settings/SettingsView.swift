@@ -231,7 +231,7 @@ private struct ConversionTab: View {
     }
 }
 
-/// 辞書のページ．登録した単語と，取り込んだ辞書(R-14)を切り替えて出す
+/// 辞書のページ．登録した単語と，取り込んだ辞書(R-16)を切り替えて出す
 private struct DictionaryPage: View {
     @ObservedObject var model: SettingsModel
     @State private var showsImported = false

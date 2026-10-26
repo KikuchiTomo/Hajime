@@ -12,7 +12,7 @@ import S90Domain
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
 /// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
 ///
-/// - 取り込んだ辞書の語(R-14): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
+/// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
 ///   どの辞書を効かせるかは DictionaryActivation が決める(アプリの条件，文脈の条件)
 ///
 /// 記号と日付は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
@@ -76,7 +76,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
             .flatMap { auxiliarySources[$0.word]?.name }
     }
 
-    // MARK: - 取り込んだ辞書(R-14)
+    // MARK: - 取り込んだ辞書(R-16)
 
     /// 読みの中の部分ごとに効いている辞書から語を引き，変わっていればエンジンに渡す
     private func prepareAuxiliaryWords(for reading: String) {
