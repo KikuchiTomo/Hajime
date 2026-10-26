@@ -36,12 +36,16 @@ final class StaticSettings: SettingsReading {
 @MainActor
 struct PlaygroundEngine {
     let engine: AzooKeyConverterEngine
+    /// アプリと同じく，打ち間違いの訂正を別の変換器で求めるもの(Zenzai があるときだけ)
+    let typoService: ZenzaiTypoService?
     private let memory: URL
 
     init(zenzaiPath: String?) throws {
         memory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-playground-\(UUID().uuidString)")
         let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
         engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "s90-playground", zenzai: zenzai)
+        let directory = memory
+        typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: directory, versionString: "s90-playground") }
     }
 
     func removeMemory() {

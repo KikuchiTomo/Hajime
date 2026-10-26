@@ -178,6 +178,11 @@ final class ReadingCorrector {
         return true
     }
 
+    /// 示していた読みを出さないようにする．利用者が取り下げたのではないので，次に見直したときはまた示せる
+    func withdrawSuggestion() {
+        suggestion = nil
+    }
+
     /// 示していた読みを取り下げる(Esc)．このキーで始まるあいだは示し直さない．取り下げたら true
     func dismissSuggestion(for composition: Composition) -> Bool {
         guard suggestion != nil else { return false }
