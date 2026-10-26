@@ -5,6 +5,7 @@ import S90Domain
 @testable import S90IPC
 import S90TestSupport
 import Testing
+import WinSDK
 
 @Suite("名前付きパイプの往復")
 struct NamedPipeTests {
@@ -54,7 +55,7 @@ struct NamedPipeTests {
         let name = Self.uniqueName()
         let listener = try NamedPipeListener(name: name)
         let service = await MainActor.run { Self.makeService() }
-        EnginePipeServer.start(listener: listener, service: service)
+        EnginePipeServer.start(listener: listener, service: service, candidateWindowPath: "")
 
         let connection = try NamedPipeClient.connect(name: name, timeoutMilliseconds: 5000)
         defer { connection.close() }
@@ -98,7 +99,7 @@ struct NamedPipeTests {
         let name = Self.uniqueName()
         let listener = try NamedPipeListener(name: name)
         let service = await MainActor.run { Self.makeService() }
-        EnginePipeServer.start(listener: listener, service: service)
+        EnginePipeServer.start(listener: listener, service: service, candidateWindowPath: "")
 
         let connection = try NamedPipeClient.connect(name: name, timeoutMilliseconds: 5000)
         defer { connection.close() }
@@ -128,7 +129,7 @@ struct NamedPipeTests {
         let name = Self.uniqueName()
         let listener = try NamedPipeListener(name: name)
         let service = await MainActor.run { Self.makeService() }
-        EnginePipeServer.start(listener: listener, service: service)
+        EnginePipeServer.start(listener: listener, service: service, candidateWindowPath: "")
 
         let connection = try NamedPipeClient.connect(name: name, timeoutMilliseconds: 5000)
         defer { connection.close() }
@@ -136,5 +137,49 @@ struct NamedPipeTests {
         try connection.write([UInt8(length & 0xff), UInt8((length >> 8) & 0xff), UInt8((length >> 16) & 0xff), UInt8(length >> 24)])
         #expect(try connection.read().isEmpty)
     }
+    @Test("手書きの窓で選んだ文字は，候補ウィンドウの実行ファイルからの接続だけが送れる")
+    func handwritingFromCandidateWindow() async throws {
+        let ownPath = try #require(NamedPipePeer.imagePath(processID: GetCurrentProcessId()))
+        for (path, expected) in [(ownPath, WireResponseBody.done), ("C:\\other.exe", .error(code: .malformed))] {
+            let name = Self.uniqueName()
+            let listener = try NamedPipeListener(name: name)
+            let service = await MainActor.run { Self.makeService() }
+            EnginePipeServer.start(listener: listener, service: service, candidateWindowPath: path)
+            let connection = try NamedPipeClient.connect(name: name, timeoutMilliseconds: 5000)
+            defer { connection.close() }
+            var reader = MessageFraming.Reader()
+            _ = try Self.exchange(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), over: connection, reader: &reader)
+            let response = try Self.exchange(WireRequest(id: 2, body: .handwritingChosen(text: "鬱")), over: connection, reader: &reader)
+            #expect(response.body == expected)
+        }
+    }
+
+    @Test("候補ウィンドウが何も書かなくても，エンジンからの送信は止まらない")
+    func candidateWindowLinkSends() throws {
+        let ownPath = try #require(NamedPipePeer.imagePath(processID: GetCurrentProcessId()))
+        let name = Self.uniqueName()
+        let listener = try NamedPipeListener(name: name)
+        let link = CandidateWindowLink()
+        link.start(listener: listener, expectedImagePath: ownPath) { [] }
+        let connection = try NamedPipeClient.connect(name: name, timeoutMilliseconds: 5000)
+        defer { connection.close() }
+        // 受け入れた接続に切り替わるまで待ってから送る
+        Thread.sleep(forTimeInterval: 0.5)
+        link.send(.hide)
+        let received = DispatchSemaphore(value: 0)
+        let box = ReceivedBytes()
+        Thread {
+            box.bytes = (try? connection.read()) ?? []
+            received.signal()
+        }.start()
+        #expect(received.wait(timeout: .now() + 5) == .success)
+        var reader = MessageFraming.Reader()
+        reader.append(box.bytes)
+        #expect(try reader.next(WireUiCommand.self) == .hide)
+    }
+}
+
+private final class ReceivedBytes: @unchecked Sendable {
+    var bytes: [UInt8] = []
 }
 #endif

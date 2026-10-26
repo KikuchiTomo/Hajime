@@ -110,7 +110,7 @@ public enum DefaultSettings {
     /// 1 か所の直し(手間がこれ以下)は，Zenzai の点数の差(ReadingCorrection.score)だけでも直す・示す(前の決まり)
     public static let singleEditCost = 2.0
     /// Space を押したときに打ち間違いの訂正を待つ長さ(秒)．これを過ぎたら訂正を待たずに変換する
-    public static let correctionWaitBeforeConversion = 2.5
+    public static let correctionWaitBeforeConversion = 0.3
     /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
     public static let unconvertiblePlausibility = -60.0
     /// 1 か所の直しを Zenzai の点数の差だけで直す境目(#52 より前の決まりと同じ)
@@ -180,6 +180,10 @@ public enum DefaultSettings {
     public static let syncWriteDelay = 2.0
     /// 同期のファイルがほかの Mac で変わったかを確かめる間隔(秒)
     public static let syncPollInterval = 60.0
+    /// 同期のフォルダの読み書きを待つ上限(秒)．クラウドのフォルダで手元に無いファイルを読むと時間がかかるため．過ぎたら次の同期でやり直す
+    public static let syncFileTimeout = 15.0
+    /// 設定の画面から頼まれたファイルの読み書き(大きな辞書の取り込みなど)を待つ上限(秒)
+    public static let settingsFileTaskTimeout = 300.0
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
@@ -248,6 +252,33 @@ public enum DefaultSettings {
     /// 直さない語の長さの上限
     public static let maximumExceptionLength = 64
 
+    // 連想変換(R-18)
+    /// 連想の一覧に出す語の数(既定)と，選べる範囲
+    public static let associationLimit = 60
+    public static let associationLimitRange = 10...300
+    /// 取り込める連想の辞書の数の上限(同梱の辞書を含む)
+    public static let maximumAssociationDictionaries = 8
+    /// アプリに同梱した連想の辞書(日本語 WordNet から作った data/thesaurus/wordnet-ja.tsv)．既定で一覧の先頭に置く
+    public static let bundledAssociationDictionary = AssociationDictionary(
+        id: "8C1F0E2A-5B7D-4E39-9A61-3D2C4B5E6F70", name: "日本語 WordNet", groupCount: 0, isBundled: true)
+    /// 同梱の連想の辞書のファイルの名前(アプリの中・Windows のインストール先に置く)
+    public static let bundledAssociationFileName = "wordnet-ja.tsv"
+    /// 取り込む連想の辞書のファイルの大きさの上限．日本語 WordNet を丸ごと書き出しても 10MB ほどなので余裕を見た大きさ
+    public static let maximumAssociationFileBytes = 64 * 1024 * 1024
+    /// 連想の辞書 1 つのまとまり(意味)の数の上限
+    public static let maximumAssociationGroups = 1_000_000
+    /// 1 つのまとまりの語の数の上限．索引は語ごとにまとまりを書き写すので，語の数の 2 乗で大きくなるのを抑える
+    public static let maximumAssociationGroupWords = 64
+    /// 連想の語と意味の説明の長さの上限
+    public static let maximumAssociationWordLength = 64
+    public static let maximumAssociationLabelLength = 80
+
     /// 手書きの線を書き終えてから認識するまで待つ時間(秒)．続けて書く線を待つ
     public static let handwritingRecognitionDelay = 0.6
+    /// 手書きの認識を待つ時間の上限(秒)．超えたら候補を出さずに次の線を待つ
+    public static let handwritingRecognitionTimeout = 3.0
+    /// Windows で手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔(秒)
+    public static let handwritingPollInterval = 0.15
+    /// 手書きの窓から受け取る文字の長さの上限
+    public static let maximumHandwritingTextLength = 16
 }

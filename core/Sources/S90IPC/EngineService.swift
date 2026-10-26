@@ -10,10 +10,21 @@ public final class EngineService {
 
     public static let maximumSessionsPerConnection = 64
     public static let maximumSessions = 1024
+    /// 手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔
+    public static let handwritingPollMilliseconds = milliseconds(DefaultSettings.handwritingPollInterval)
 
     private struct Connection {
         var hasGreeted = false
         var sessions: Set<UInt32> = []
+        /// 候補ウィンドウのプロセスからの接続か(実行ファイルを EnginePipeServer が確かめる)．手書きの窓で選んだ文字はこの接続からだけ受ける
+        var isCandidateWindow = false
+    }
+
+    /// 開いている手書きの窓(R-14)．選んだ文字は窓を開いたセッションに預け，DLL の wake で入れる
+    /// (DLL は要求にしか答えられないので，エンジンから入力欄に押し込めない)
+    private struct Handwriting {
+        let session: UInt32
+        var chosen: String?
     }
 
     private struct Session {
@@ -48,24 +59,33 @@ public final class EngineService {
     private let ui: (WireUiCommand) -> Void
     private let openSettings: () -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
-    private let services: SettingsServices
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
     private var nextCorrection: UInt64 = 1
+    /// 同期の操作(Windows の設定の画面から頼まれる)．無ければ同期の要求に malformed を返す
+    let sync: (any SyncControlling)?
+    /// 設定に関わるファイルの読み書き．無ければファイルの要求に malformed を返す
+    private let files: (any SettingsFileHandling)?
+    private var isRunningFileWork = false
+    private let services: SettingsServices
     private var connections: [ConnectionID: Connection] = [:]
     private var sessions: [UInt32: Session] = [:]
     private var nextConnection: UInt64 = 1
     private var nextSession: UInt32 = 1
     private var lastAnchor: WireRect?
+    private var handwriting: Handwriting?
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
-                services: SettingsServices = SettingsServices(),
-                typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
+                typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
+                sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
+                services: SettingsServices = SettingsServices()) {
         self.services = services
         self.typoService = typoService
         self.now = now
+        self.sync = sync
+        self.files = files
         self.makeSession = makeSession
         self.settings = settings
         self.ui = ui
@@ -73,10 +93,10 @@ public final class EngineService {
         self.hints = hints
     }
 
-    public func connect() -> ConnectionID {
+    public func connect(isCandidateWindow: Bool = false) -> ConnectionID {
         let id = ConnectionID(rawValue: nextConnection)
         nextConnection += 1
-        connections[id] = Connection()
+        connections[id] = Connection(isCandidateWindow: isCandidateWindow)
         return id
     }
 
@@ -84,6 +104,7 @@ public final class EngineService {
         guard let connection = connections.removeValue(forKey: id) else { return }
         for session in connection.sessions {
             sessions.removeValue(forKey: session)?.correction?.task.cancel()
+            closeHandwriting(ofSession: session)
         }
         if !connection.sessions.isEmpty { ui(.hide) }
     }
@@ -105,6 +126,29 @@ public final class EngineService {
     private static func fits(_ response: WireResponse) -> Bool {
         guard let data = try? JSONEncoder().encode(response) else { return false }
         return data.count <= WireProtocol.maximumMessageBytes
+    }
+
+    /// 要求への答え方．すぐに答えるか，時間のかかる仕事(ファイルの読み書き)を終えてから答えるか
+    public enum Reply: Sendable {
+        case now(WireResponse)
+        /// メインアクターで動かして待つ．重い部分はメインスレッドの外で動くので，待つあいだもほかの要求に答えられる
+        case later(@MainActor @Sendable () async -> WireResponse)
+    }
+
+    /// 名前付きパイプから来た要求に答える．ファイルの読み書きは .later，ほかは handle と同じ
+    public func reply(to request: WireRequest, from id: ConnectionID) -> Reply {
+        guard connections[id]?.hasGreeted == true, let work = fileWork(for: request.body) else { return .now(handle(request, from: id)) }
+        guard let files else { return .now(WireResponse(id: request.id, body: .error(code: .malformed))) }
+        guard !isRunningFileWork else { return .now(WireResponse(id: request.id, body: .fileFailed(reason: .busy))) }
+        isRunningFileWork = true
+        return .later { [self] in
+            defer { isRunningFileWork = false }
+            do throws(SettingsFileFailure) {
+                return WireResponse(id: request.id, body: try await work(files))
+            } catch {
+                return WireResponse(id: request.id, body: .fileFailed(reason: WireFileFailure(error)))
+            }
+        }
     }
 
     private func body(for request: WireRequestBody, from id: ConnectionID) -> WireResponseBody {
@@ -136,6 +180,7 @@ public final class EngineService {
             sessions.removeValue(forKey: session)?.correction?.task.cancel()
             connection.sessions.remove(session)
             connections[id] = connection
+            closeHandwriting(ofSession: session)
             return .done
         case .key(let session, let input, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
@@ -150,23 +195,35 @@ public final class EngineService {
             cancelCorrections(of: session)
             let actions = current.input.deactivate()
             ui(.hide)
+            // 入力先から外れたら手書きの窓も閉じる．選んだ文字が別の入力欄に入らないように
+            closeHandwriting(ofSession: session)
             return edit(actions, handled: true, session: session, anchor: lastAnchor)
         case .wake(let session, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             return wake(session: session, current: current, context: context)
+        case .openHandwriting(let session, let context):
+            // 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く
+            guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            if let caret = context.caret { lastAnchor = caret }
+            return edit(current.input.openHandwriting(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
         case .caret(let session, let rect):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
             lastAnchor = rect
             ui(.move(anchor: rect))
+            return .done
+        case .handwritingChosen(let text):
+            guard connection.isCandidateWindow, Self.isValidHandwritingText(text) else { return .error(code: .malformed) }
+            handwriting?.chosen = text
+            return .done
+        case .handwritingClosed:
+            guard connection.isCandidateWindow else { return .error(code: .malformed) }
+            if handwriting?.chosen == nil { handwriting = nil }
             return .done
         case .readSettings:
             return .settings(settings: snapshot)
         case .menu(let command):
             // 入力メニュー(言語バーの項目)で選んだ操作．キー設定の表の同じコマンドと同じに扱う
             switch command {
-            case .selectInputStyle(let name):
-                guard let style = InputStyle(rawValue: name) else { return .error(code: .malformed) }
-                perform(.selectInputStyle(style))
             case .toggleLiveConversion:
                 perform(.toggleLiveConversion)
             case .openSettings:
@@ -237,6 +294,15 @@ public final class EngineService {
             } catch {
                 return .error(code: .malformed)
             }
+        case .readSymbolDefaults:
+            // 記号のページに既定の決まりを出し，利用者の決まりと重ねるため(macOS の SymbolsPage と同じ表)
+            return .symbolDefaults(sequences: Self.symbolDefaults(.sequence), readings: Self.symbolDefaults(.reading))
+        case .readSync, .setSyncFolder, .setSyncEnabled, .setSyncScope, .setSyncLocalField, .syncNow:
+            return syncResponse(for: request) ?? .error(code: .malformed)
+        case .importDictionary, .removeDictionary, .importUserDictionary, .exportUserDictionary, .exportSettings, .importSettings, .importProfileRules, .exportProfileRules,
+             .importRuleList, .exportRuleList:
+            // ファイルの読み書きは reply で受ける(時間がかかるので，答えるのを待つ形にする)
+            return .error(code: .malformed)
         case .writeSettings(let wanted):
             do {
                 try settings.update { current in
@@ -253,6 +319,10 @@ public final class EngineService {
             }
             return .settings(settings: snapshot)
         }
+    }
+
+    private static func symbolDefaults(_ kind: SymbolRule.Kind) -> [WireSymbolDefault] {
+        SymbolRuleEditing.defaults(kind).map { WireSymbolDefault(input: $0.input, output: $0.output) }
     }
 
     /// ユーザー辞書を 1 回で読む語の数の上限．1 語の大きさの上限から，応答がメッセージの上限に収まる数にする
@@ -276,7 +346,7 @@ public final class EngineService {
         let current = settings.current
         return WireSettingsSnapshot(theme: current.theme.rawValue, inputStyle: current.inputStyle.rawValue, liveConversion: current.liveConversion,
                                     showsModeIndicator: current.showsModeIndicator, showsKeyHints: current.showsKeyHints,
-                                    candidateFontSize: current.candidateFontSize)
+                                    candidateFontSize: current.candidateFontSize, handwriting: current.handwriting)
     }
 
     private func owned(_ session: UInt32, by id: ConnectionID) -> Session? {
@@ -310,6 +380,10 @@ public final class EngineService {
         let context = InputContext(wire, settings: settings.current)
         if let caret = wire.caret { lastAnchor = caret }
         var actions: [ClientAction] = []
+        if handwriting?.session == session, let text = handwriting?.chosen {
+            handwriting = nil
+            actions += current.input.insert(text)
+        }
         if let work = current.correction {
             switch work.purpose {
             case .conversion(let deadline):
@@ -372,7 +446,13 @@ public final class EngineService {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) })
         routed.ui.forEach(ui)
-        routed.host.forEach(perform)
+        for action in routed.host {
+            if action == .showHandwriting {
+                openHandwriting(for: session, anchor: anchor)
+            } else {
+                perform(action)
+            }
+        }
         guard let input = sessions[session]?.input else {
             return .edit(handled: handled, operations: routed.edits, state: WireSessionState(mode: .japanese, isComposing: false, keymap: current.keymap, wakeAfterMilliseconds: nil,
                                                                                                   keyboardLayout: WireSessionState.keyboardLayout(for: current)))
@@ -381,6 +461,12 @@ public final class EngineService {
     }
 
     private func wakeAfter(_ session: UInt32) -> UInt32? {
+        let typing = typingWakeAfter(session)
+        guard handwriting?.session == session else { return typing }
+        return min(typing ?? .max, Self.handwritingPollMilliseconds)
+    }
+
+    private func typingWakeAfter(_ session: UInt32) -> UInt32? {
         guard let current = sessions[session] else { return nil }
         if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
@@ -392,6 +478,24 @@ public final class EngineService {
             return Self.milliseconds(remaining)
         }
         return nil
+    }
+
+    private func openHandwriting(for session: UInt32, anchor: WireRect?) {
+        handwriting = Handwriting(session: session)
+        ui(.showHandwriting(anchor: anchor, recognitionDelayMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionDelay),
+                            recognitionTimeoutMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionTimeout)))
+    }
+
+    private func closeHandwriting(ofSession session: UInt32) {
+        guard handwriting?.session == session else { return }
+        handwriting = nil
+        ui(.hideHandwriting)
+    }
+
+    /// 手書きの窓の候補として受け取ってよい文字列か．空・長すぎる・制御文字を含むものは断る
+    static func isValidHandwritingText(_ text: String) -> Bool {
+        !text.isEmpty && text.count <= DefaultSettings.maximumHandwritingTextLength
+            && !text.unicodeScalars.contains { $0.properties.generalCategory == .control || $0.properties.generalCategory == .format }
     }
 
     private static func milliseconds(_ seconds: Double) -> UInt32 {
@@ -407,11 +511,16 @@ public final class EngineService {
         switch action {
         case .selectInputStyle(let style):
             try? settings.update { $0.inputStyle = style }
+            // 切り替えたことを入力位置の近くに出す(macOS の ClientActionPresenter と同じ)
+            if settings.current.showsModeIndicator {
+                ui(.showMode(mode: .japanese, anchor: lastAnchor, label: ModeIndicatorLabels.label(for: style)))
+            }
         case .toggleLiveConversion:
             try? settings.update { $0.liveConversion.toggle() }
         case .openSettings:
             openSettings()
         case .showHandwriting:
+            // セッションが要るので edit で扱う
             break
         }
     }

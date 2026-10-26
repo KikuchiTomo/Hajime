@@ -27,11 +27,12 @@ final class Harness {
     private(set) var note: String?
     private(set) var lastResult = KeyResult.passThrough
 
-    init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings) {
+    init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
+         associations: (any AssociationLookup)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         self.settings = FakeSettings(settings)
-        self.session = InputSession(converter: converter, lexicon: lexicon, settings: self.settings)
+        self.session = InputSession(converter: converter, lexicon: lexicon, settings: self.settings, associations: associations)
     }
 
     func type(_ text: String) {
@@ -965,7 +966,7 @@ struct ReadingCorrectionScenarioTests {
         #expect(harness.marked.text == "ようです")
         harness.settle()
         #expect(harness.marked.text == "よいです")
-        #expect(harness.marked.segments.first?.style == .correction)
+        #expect(harness.marked.segments.contains { $0.style == .correction })
         #expect(harness.note?.contains("ようです") == true)
         harness.type("ne")
         #expect(harness.marked.text == "よいですね")
@@ -1058,6 +1059,101 @@ struct ReadingCorrectionScenarioTests {
         #expect(english.marked.text == "python")
     }
 
+    /// 「kyounotenkihayoudesune」を「今日の天気は良いですね」に直す(margin が 6 なら直す，4.5 なら「もしかして」)．
+    /// 候補は本物のエンジンと同じく語の並びを持つ
+    private func sentenceHarness(margin: Double = 6, settings: Settings = DefaultSettings.settings) -> Harness {
+        let converter = FakeConverter([
+            "きょうのてんきはよいですね": [("今日の天気は良いですね", nil)],
+            "きょうのてんきはようですね": [("今日の天気は様ですね", nil)],
+            "ようですね": [("様ですね", nil)],
+            "よいですね": [("良いですね", nil)],
+        ])
+        let words = [
+            Candidate.Word(text: "今日", readingCount: 3, startsWithNoun: true),
+            Candidate.Word(text: "の", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "天気", readingCount: 3, startsWithNoun: true),
+            Candidate.Word(text: "は", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "良い", readingCount: 2),
+            Candidate.Word(text: "です", readingCount: 2),
+            Candidate.Word(text: "ね", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ]
+        converter.candidateWords["今日の天気は良いですね"] = words
+        converter.words["きょうのてんきはよいですね"] = words
+        converter.corrections["kyounotenkihayoudesune"] = [
+            ReadingCorrection(keys: "kyounotenkihayoidesune", reading: "キョウノテンキハヨイデスネ", score: -9 + margin + 5, cost: 2.5),
+            ReadingCorrection(keys: "kyounotenkihayoudesune", reading: "キョウノテンキハヨウデスネ", score: -9, cost: 0),
+        ]
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyounotenkihayoudesune")
+        harness.settle()
+        return harness
+    }
+
+    @Test("R-02: ライブ変換で打ち間違いを直したら，直した語句だけを点線の下線にする(文全体にしない)")
+    func correctedWordOnlyInLiveConversion() {
+        let harness = sentenceHarness()
+        #expect(harness.marked.segments == [
+            .init("今日の天気は", style: .converted), .init("良い", style: .correction), .init("ですね", style: .converted),
+        ])
+        // 候補が語の並びを持たず対応が取れないときは，文全体を点線にする
+        let converter = FakeConverter(["よいです": [("良いです", nil)]])
+        converter.corrections["youdesu"] = [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]
+        let unknown = Harness(converter: converter)
+        unknown.type("youdesu")
+        unknown.settle()
+        #expect(unknown.marked.segments == [.init("良いです", style: .correction)])
+        // 変換できずかなのまま見せるときは，かなと 1 文字ずつ対応する
+        let kana = correctingHarness()
+        #expect(kana.marked.segments == [.init("よ", style: .converted), .init("い", style: .correction), .init("です", style: .converted)])
+    }
+
+    @Test("R-02: ライブ変換がオフでも，直したかなだけを点線の下線にする")
+    func correctedKanaWithoutLiveConversion() {
+        var settings = DefaultSettings.settings
+        settings.liveConversion = false
+        let harness = sentenceHarness(settings: settings)
+        #expect(harness.marked.segments == [
+            .init("きょうのてんきはよ", style: .reading), .init("い", style: .correction), .init("ですね", style: .reading),
+        ])
+    }
+
+    @Test("R-02: 分岐図では，直した語句を含む文節に補正の印を付け，打ったままの候補を選んだら外す")
+    func correctedSegmentInLattice() {
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .automatic
+        let harness = sentenceHarness(settings: settings)
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["今日の", "天気は", "良いですね"])
+        #expect(harness.lattice?.columns.map(\.isCorrected) == [false, false, true])
+        // 注目を外すと，入力中の文字でもその文節が点線になる
+        harness.press(.left)
+        #expect(harness.marked.segments.map(\.style) == [.converted, .focused, .correction])
+        // 打ったままの候補を選んだ文節は，もう直していない
+        harness.press(.right)
+        harness.press(.down)
+        #expect(harness.lattice?.columns.last?.text == "様ですね")
+        #expect(harness.lattice?.columns.last?.isCorrected == false)
+    }
+
+    @Test("R-02: 一覧では，候補の中の直した語句の位置を渡す(補正の下線を引く)")
+    func correctedRangeInList() {
+        var settings = DefaultSettings.settings
+        settings.candidatePresentation = .list
+        let harness = sentenceHarness(settings: settings)
+        harness.press(.space)
+        #expect(harness.panel?.entries.first?.text == "今日の天気は良いですね")
+        #expect(harness.panel?.entries.first?.corrected == 6..<8)
+    }
+
+    @Test("R-02: 「もしかして」の案内には，直す語句を含む文節だけを出す")
+    func suggestionShowsCorrectedPhrase() {
+        let harness = sentenceHarness(margin: 4.5)
+        #expect(harness.note?.contains("もしかして「良いですね」") == true)
+    }
+
     /// 「youdesu」を「yoidesu」に直す変換器(比べる点数の差 6 で直す)
     private func correctingHarness(margin: Double = 6) -> Harness {
         let converter = FakeConverter()
@@ -1084,7 +1180,7 @@ struct ReadingCorrectionScenarioTests {
         #expect(harness.note != nil)
         harness.type("n")
         #expect(harness.note == nil)
-        #expect(harness.marked.segments.first?.style == .correction)
+        #expect(harness.marked.segments.contains { $0.style == .correction })
     }
 
     @Test("R-02: 直したあとに数字を打つと，直したものを受け入れたことにする(Esc で全部消える取りこぼしをしない)")

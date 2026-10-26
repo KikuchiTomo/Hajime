@@ -189,17 +189,185 @@ struct EngineServiceTests {
         #expect(written.candidateFontSize < 1000)
     }
 
-    @Test("入力メニューで入力方式・ライブ変換・設定の画面を選べる")
+    @Test("入力メニューでライブ変換と設定の画面を選べる")
     func menu() {
         let id = greeted()
-        #expect(service.handle(WireRequest(id: 30, body: .menu(command: .selectInputStyle(style: "kana"))), from: id).body == .done)
-        #expect(settings.current.inputStyle == .kana)
         #expect(service.handle(WireRequest(id: 31, body: .menu(command: .toggleLiveConversion)), from: id).body == .done)
         #expect(settings.current.liveConversion)
         #expect(service.handle(WireRequest(id: 32, body: .menu(command: .openSettings)), from: id).body == .done)
         #expect(opened.value == 1)
-        #expect(service.handle(WireRequest(id: 33, body: .menu(command: .selectInputStyle(style: "unknown"))), from: id).body == .error(code: .malformed))
-        #expect(settings.current.inputStyle == .kana)
+    }
+
+    private func fields(_ body: WireRequestBody, from id: EngineService.ConnectionID) -> [String: JSONValue]? {
+        guard case .settingsFields(let values) = service.handle(WireRequest(id: 20, body: body), from: id).body,
+              let data = values.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode([String: JSONValue].self, from: data)
+    }
+
+    @Test("設定の項目を設定のファイルと同じ名前と形で読む．知らない名前は断る")
+    func readSettingsFields() {
+        let id = greeted()
+        let read = fields(.readSettingsFields(names: ["liveConversion", "listCandidatesPerPage"], defaults: false), from: id)
+        #expect(read == ["liveConversion": .bool(false), "listCandidatesPerPage": .number(Double(DefaultSettings.settings.listCandidatesPerPage))])
+        #expect(fields(.readSettingsFields(names: ["liveConversion"], defaults: true), from: id) == ["liveConversion": .bool(true)])
+        #expect(fields(.readSettingsFields(names: [], defaults: false), from: id)?.keys.count == Settings.fieldNames.count)
+        let unknown = service.handle(WireRequest(id: 21, body: .readSettingsFields(names: ["password"], defaults: false)), from: id)
+        #expect(unknown.body == .error(code: .malformed))
+    }
+
+    @Test("設定の項目を書き，範囲の外の値は直し，書かない項目は変えない")
+    func writeSettingsFields() {
+        let id = greeted()
+        settings.current.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "s90")]
+        let written = fields(.writeSettingsFields(values: #"{"theme":"washi","listCandidatesPerPage":1000,"keymap":[{"state":"idle","key":"Ctrl 7","command":"openSettings"}]}"#),
+                             from: id)
+        #expect(settings.current.theme == .washi)
+        #expect(settings.current.listCandidatesPerPage == DefaultSettings.candidatesPerPageRange.upperBound)
+        #expect(settings.current.keymap.entries == [KeymapEntry(.idle, KeyStroke(.character("7"), control: true), .openSettings)])
+        #expect(settings.current.userDictionary.count == 1)
+        #expect(!settings.current.liveConversion)
+        #expect(written?.keys.sorted() == ["keymap", "listCandidatesPerPage", "theme"])
+        #expect(written?["listCandidatesPerPage"] == .number(Double(DefaultSettings.candidatesPerPageRange.upperBound)))
+        for broken in [#"{"theme":"washi","password":1}"#, "[1]", "not json"] {
+            #expect(service.handle(WireRequest(id: 22, body: .writeSettingsFields(values: broken)), from: id).body == .error(code: .malformed))
+        }
+        #expect(settings.current.theme == .washi)
+    }
+
+    @Test("送れない大きさの設定は tooLarge で断る")
+    func settingsFieldsTooLarge() {
+        let id = greeted()
+        settings.current.userDictionary = (0..<20_000).map { UserDictionaryEntry(reading: "よみ\($0)", word: "語句\($0)") }
+        let response = service.handle(WireRequest(id: 23, body: .readSettingsFields(names: ["userDictionary"], defaults: false)), from: id)
+        #expect(response.body == .error(code: .tooLarge))
+        #expect(fields(.readSettingsFields(names: ["theme"], defaults: false), from: id) != nil)
+    }
+
+    @Test("キー設定のひな形を keymap の項目として返す")
+    func keymapPreset() {
+        let id = greeted()
+        guard case .settingsFields(let values) = service.handle(WireRequest(id: 24, body: .readKeymapPreset(preset: "vim")), from: id).body,
+              let merged = try? SettingsFields.merge(values, into: DefaultSettings.settings) else {
+            Issue.record("ひな形を読めない")
+            return
+        }
+        #expect(merged.settings.keymap == KeymapPreset.vim.keymap)
+        #expect(service.handle(WireRequest(id: 25, body: .readKeymapPreset(preset: "unknown")), from: id).body == .error(code: .malformed))
+    }
+
+    @Test("キー設定の表の使われない行・文字を打てなくなる行・キーの無い確定と取り消しを知らせる")
+    func checkKeymap() {
+        let id = greeted()
+        let values = #"{"keymap":[{"state":"composing","key":"Enter","command":"commit"},{"state":"composing","key":"Enter","command":"cancel"},{"state":"idle","key":"q","command":"openSettings"}]}"#
+        guard case .keymapReport(let report) = service.handle(WireRequest(id: 26, body: .checkKeymap(values: values)), from: id).body else {
+            Issue.record("表を調べられない")
+            return
+        }
+        #expect(report.rows == [
+            WireKeymapRowIssue(row: 0, hiddenBy: [1], hiddenStates: [], blocksTyping: false),
+            WireKeymapRowIssue(row: 2, hiddenBy: [], hiddenStates: [], blocksTyping: true),
+        ])
+        #expect(report.missing.contains(WireKeymapMissing(state: "composing", command: "commit")))
+        #expect(report.missing.contains(WireKeymapMissing(state: "converting", command: "cancel")))
+        #expect(!report.missing.contains(WireKeymapMissing(state: "composing", command: "cancel")))
+    }
+
+    final class Usage: UsageReading {
+        var counts = UsageCounts()
+        func reset() { counts = UsageCounts() }
+    }
+
+    private func serviceWith(_ services: SettingsServices) -> (EngineService, EngineService.ConnectionID) {
+        let service = EngineService(makeSession: { fatalError("セッションは作らない") }, settings: settings, ui: { _ in }, openSettings: {}, services: services)
+        let id = service.connect()
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)
+        return (service, id)
+    }
+
+    @Test("学習を消す・使い方の記録を読んで消す")
+    func learningAndUsage() {
+        let resets = Box(0)
+        let usage = Usage()
+        usage.counts.commits = 4
+        usage.counts.commitsWithoutConversion = 3
+        let (service, id) = serviceWith(SettingsServices(resetLearning: { resets.value += 1 }, usage: usage))
+        #expect(service.handle(WireRequest(id: 40, body: .resetLearning), from: id).body == .done)
+        #expect(resets.value == 1)
+        guard case .usage(let values, let rate) = service.handle(WireRequest(id: 41, body: .readUsage), from: id).body,
+              let counts = try? JSONDecoder().decode(UsageCounts.self, from: Data(values.utf8)) else {
+            Issue.record("使い方の記録を読めない")
+            return
+        }
+        #expect(counts.commits == 4)
+        #expect(rate == 0.75)
+        guard case .usage(_, let cleared) = service.handle(WireRequest(id: 42, body: .resetUsage), from: id).body else {
+            Issue.record("使い方の記録を消せない")
+            return
+        }
+        #expect(cleared == nil)
+        #expect(usage.counts.commits == 0)
+    }
+
+    @Test("英語と日本語の「試す」は語ごとに見せる文字と言語を返す")
+    func previewLanguage() {
+        let received = Box<(String, String?)?>(nil)
+        let (service, id) = serviceWith(SettingsServices(previewLanguage: { text, preceding in
+            received.value = (text, preceding)
+            return [WordLanguagePreview.Word(typed: "make", language: .english, shown: "make")]
+        }))
+        let body = service.handle(WireRequest(id: 43, body: .previewLanguage(text: "make", precedingText: "I")), from: id).body
+        #expect(body == .languagePreview(words: [WirePreviewWord(typed: "make", shown: "make", language: "english")]))
+        #expect(received.value?.0 == "make")
+        #expect(received.value?.1 == "I")
+    }
+
+    @Test("ユーザー辞書の語を足す・消す・取り込む・ページごとに読む")
+    func userDictionary() {
+        let id = greeted()
+        func add(_ reading: String, _ word: String) -> WireResponseBody {
+            service.handle(WireRequest(id: 44, body: .addUserDictionaryEntry(entry: WireDictionaryEntry(reading: reading, word: word))), from: id).body
+        }
+        #expect(add("えすきゅー", "s90") == .dictionaryAdded(result: .added))
+        #expect(add("えすきゅー", "s90") == .dictionaryAdded(result: .alreadyRegistered))
+        #expect(add("ABC", "s90") == .dictionaryAdded(result: .invalid))
+        let merged = service.handle(WireRequest(id: 45, body: .mergeUserDictionary(entries: (0..<600).map { WireDictionaryEntry(reading: "よみ", word: "語句\($0)") })), from: id).body
+        #expect(merged == .dictionaryMerged(added: 600))
+        guard case .userDictionary(let page, let total) = service.handle(WireRequest(id: 46, body: .readUserDictionary(offset: 1, limit: 10_000)), from: id).body else {
+            Issue.record("ユーザー辞書を読めない")
+            return
+        }
+        #expect(total == 601)
+        #expect(page.count == EngineService.maximumDictionaryPage)
+        #expect(page.first == WireDictionaryEntry(reading: "よみ", word: "語句0"))
+        guard case .userDictionary(let tail, _) = service.handle(WireRequest(id: 47, body: .readUserDictionary(offset: 1000, limit: 10)), from: id).body else {
+            Issue.record("範囲の外を読めない")
+            return
+        }
+        #expect(tail.isEmpty)
+        #expect(service.handle(WireRequest(id: 48, body: .removeUserDictionaryEntry(entry: WireDictionaryEntry(reading: "えすきゅー", word: "s90"))), from: id).body == .done)
+        #expect(settings.current.userDictionary.count == 600)
+        #expect(!settings.current.userDictionary.contains(UserDictionaryEntry(reading: "えすきゅー", word: "s90")))
+    }
+
+    @Test("入力方式を切り替えたら，モードの札に入力方式を出す．出さない設定なら出さない")
+    func styleIndicator() throws {
+        let id = greeted()
+        let session = try open(id)
+        // 入力方式はメニューではなくキー(既定は Option+かな で順に切り替える)と設定の画面で変える
+        let nextStyle = WireKeyInput(key: .kana, modifiers: WireModifiers(shift: false, control: false, alt: true), isKeypad: false)
+        sent.value.removeAll()
+        _ = service.handle(WireRequest(id: 40, body: .key(session: session, input: nextStyle, context: Self.field)), from: id)
+        #expect(sent.value.contains { command in
+            if case .showMode(_, _, let label) = command { return label == "かな" }
+            return false
+        })
+        try settings.update { $0.showsModeIndicator = false }
+        sent.value.removeAll()
+        _ = service.handle(WireRequest(id: 41, body: .key(session: session, input: nextStyle, context: Self.field)), from: id)
+        #expect(!sent.value.contains { command in
+            if case .showMode = command { return true }
+            return false
+        })
     }
 
     private func fields(_ body: WireRequestBody, from id: EngineService.ConnectionID) -> [String: JSONValue]? {
@@ -376,5 +544,173 @@ struct EngineServiceTests {
         #expect(custom.fontName == "Yu Mincho")
         #expect(custom.cornerRadius == 4)
         #expect(custom.straightBranches)
+    }
+    // MARK: 手書き入力(R-14)
+
+    private static let handwritingKey = WireKeyInput(key: .character(text: "h"), modifiers: WireModifiers(shift: false, control: true, alt: true), isKeypad: false)
+
+    private func openHandwriting(session: UInt32, from id: EngineService.ConnectionID) -> WireResponseBody {
+        service.handle(WireRequest(id: 30, body: .key(session: session, input: Self.handwritingKey, context: Self.field)), from: id).body
+    }
+
+    private func candidateWindow() -> EngineService.ConnectionID {
+        let id = service.connect(isCandidateWindow: true)
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)
+        return id
+    }
+
+    private func wake(_ session: UInt32, from id: EngineService.ConnectionID) -> WireResponseBody {
+        service.handle(WireRequest(id: 31, body: .wake(session: session, context: Self.field)), from: id).body
+    }
+
+    @Test("入力メニューの手書き入力は，組み立て中の文字を確定する edit を返して窓を開く．使わない設定なら開かない")
+    func handwritingFromMenu() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = type("kana", session: session, from: id)
+        sent.value.removeAll()
+        guard case .edit(true, let operations, _) = service.handle(WireRequest(id: 60, body: .openHandwriting(session: session, context: Self.field)), from: id).body else {
+            Issue.record("手書きを開く要求に edit で答えない")
+            return
+        }
+        #expect(operations.contains { if case .commit = $0 { true } else { false } })
+        #expect(sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600, recognitionTimeoutMilliseconds: 3000)))
+        #expect(service.snapshot.handwriting == true)
+        try settings.update { $0.handwriting = false }
+        sent.value.removeAll()
+        _ = service.handle(WireRequest(id: 61, body: .openHandwriting(session: session, context: Self.field)), from: id)
+        #expect(!sent.value.contains { if case .showHandwriting = $0 { true } else { false } })
+        #expect(service.snapshot.handwriting == false)
+    }
+
+    @Test("手書きの窓を開き，選んだ文字を開いたセッションの wake で確定する")
+    func handwriting() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        guard case .edit(true, _, let state) = openHandwriting(session: session, from: id) else {
+            Issue.record("手書きのキーを受けない")
+            return
+        }
+        #expect(sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600, recognitionTimeoutMilliseconds: 3000)))
+        #expect(state.wakeAfterMilliseconds == EngineService.handwritingPollMilliseconds)
+        // 選ぶ前の wake は何も入れず，取りに来続ける
+        guard case .edit(_, let none, let waiting) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(none.isEmpty)
+        #expect(waiting.wakeAfterMilliseconds == EngineService.handwritingPollMilliseconds)
+
+        let window = candidateWindow()
+        #expect(service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: window).body == .done)
+        guard case .edit(_, let operations, let after) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(operations == [.commit(text: "鬱")])
+        #expect(after.wakeAfterMilliseconds == nil)
+        // 一度入れたら，もう入れない
+        guard case .edit(_, let again, _) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(again.isEmpty)
+    }
+
+    @Test("組み立て中の文字は先に確定してから，選んだ文字を入れる")
+    func handwritingAfterComposition() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = type("kana", session: session, from: id)
+        _ = openHandwriting(session: session, from: id)
+        _ = service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: candidateWindow())
+        guard case .edit(_, let operations, _) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(operations.contains(.commit(text: "鬱")))
+        #expect(!operations.contains(.commit(text: "かな鬱")))
+    }
+
+    @Test("設定がオフなら手書きの窓を開かない")
+    func handwritingOff() throws {
+        try settings.update { $0.handwriting = false }
+        let id = greeted()
+        let session = try open(id)
+        _ = openHandwriting(session: session, from: id)
+        #expect(!sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600, recognitionTimeoutMilliseconds: 3000)))
+        guard case .edit(_, _, let state) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(state.wakeAfterMilliseconds == nil)
+    }
+
+    @Test("選んだ文字は窓を開いたセッションにだけ入る")
+    func handwritingOtherSession() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let owner = try open(id)
+        let other = try open(id)
+        _ = openHandwriting(session: owner, from: id)
+        _ = service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: candidateWindow())
+        guard case .edit(_, let operations, let state) = wake(other, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(operations.isEmpty)
+        #expect(state.wakeAfterMilliseconds == nil)
+    }
+
+    @Test("候補ウィンドウでない接続からの文字と，空・長すぎる・制御文字の文字は断る")
+    func handwritingRejects() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = openHandwriting(session: session, from: id)
+        #expect(service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: id).body == .error(code: .malformed))
+        let window = candidateWindow()
+        for text in ["", String(repeating: "あ", count: DefaultSettings.maximumHandwritingTextLength + 1), "a\n", "\u{202E}a"] {
+            #expect(service.handle(WireRequest(id: 33, body: .handwritingChosen(text: text)), from: window).body == .error(code: .malformed))
+        }
+        guard case .edit(_, let operations, _) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(operations.isEmpty)
+    }
+
+    @Test("入力先から外れたら手書きの窓を閉じ，選んだ文字を入れない")
+    func handwritingClosesOnDeactivate() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = openHandwriting(session: session, from: id)
+        _ = service.handle(WireRequest(id: 34, body: .deactivate(session: session)), from: id)
+        #expect(sent.value.last == .hideHandwriting)
+        _ = service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: candidateWindow())
+        guard case .edit(_, let operations, let state) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(operations.isEmpty)
+        #expect(state.wakeAfterMilliseconds == nil)
+    }
+
+    @Test("窓を閉じたら取りに来るのをやめる")
+    func handwritingClosed() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = openHandwriting(session: session, from: id)
+        #expect(service.handle(WireRequest(id: 35, body: .handwritingClosed), from: candidateWindow()).body == .done)
+        guard case .edit(_, _, let state) = wake(session, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(state.wakeAfterMilliseconds == nil)
     }
 }

@@ -1,12 +1,12 @@
 import AppKit
+import S90Application
 import S90Domain
-import S90Persistence
 
 /// 取り込んだ辞書の取り込み・取り込み直し・削除・並べ替え(R-16)
 extension SettingsModel {
     /// 辞書のファイルを選んで取り込む．existing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
     func importDictionaryFile(replacing existing: ImportedDictionary? = nil) {
-        guard let store = dictionaries else { return }
+        guard let files else { return }
         guard existing != nil || settings.importedDictionaries.count < DefaultSettings.maximumImportedDictionaries else {
             message = UIStrings.Dictionaries.tooMany
             return
@@ -15,54 +15,30 @@ extension SettingsModel {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let source = panel.url else { return }
-        let dictionary = existing ?? ImportedDictionary(id: UUID().uuidString, name: source.deletingPathExtension().lastPathComponent, wordCount: 0)
-        let destination = store.url(for: dictionary)
         isImportingDictionary = true
-        // 大きな辞書は読むのに数秒かかるので，画面を止めないよう裏で読む
-        Task.detached(priority: .userInitiated) {
-            let result: Result<(count: Int, revision: String), Error>
-            do {
-                let words = try DictionaryFileReader.read(from: source)
-                try ImportedDictionaryStore.write(words, to: destination)
-                // 同期のとき，ほかの Mac の索引が古いかどうかを見分けるバージョン
-                result = .success((words.count, try DictionaryFileSync.sha256(of: destination)))
+        // 大きな辞書は読むのに数秒かかる．読むのはメインスレッドの外(SettingsFiles)なので，画面は止まらない
+        Task {
+            defer { isImportingDictionary = false }
+            do throws(SettingsFileFailure) {
+                let imported = try await files.importDictionary(from: source.path, replacing: existing?.id)
+                message = UIStrings.Dictionaries.imported(imported.wordCount)
             } catch {
-                result = .failure(error)
-            }
-            await MainActor.run { self.finishImport(dictionary, isNew: existing == nil, result: result) }
-        }
-    }
-
-    private func finishImport(_ dictionary: ImportedDictionary, isNew: Bool, result: Result<(count: Int, revision: String), Error>) {
-        isImportingDictionary = false
-        switch result {
-        case .success(let (count, revision)):
-            dictionaries?.reload(dictionary)
-            var updated = dictionary
-            updated.wordCount = count
-            updated.revision = revision
-            if update({ settings in
-                if isNew {
-                    settings.importedDictionaries.append(updated)
-                } else if let index = settings.importedDictionaries.firstIndex(where: { $0.id == updated.id }) {
-                    settings.importedDictionaries[index].wordCount = count
-                    settings.importedDictionaries[index].revision = revision
+                logger.error("辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
+                switch error {
+                case .tooMany: message = UIStrings.Dictionaries.tooMany
+                case .writeFailed: message = UIStrings.Settings.saveFailed
+                default: message = UIStrings.Dictionaries.importFailed
                 }
-            }) {
-                message = UIStrings.Dictionaries.imported(count)
-            } else if isNew {
-                // 設定に残せなかった新しい辞書の索引は，どこからも使われないので消す
-                dictionaries?.remove(dictionary)
             }
-        case .failure(let error):
-            logger.error("辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
-            message = UIStrings.Dictionaries.importFailed
         }
     }
 
     func removeDictionary(_ dictionary: ImportedDictionary) {
-        if update({ $0.importedDictionaries.removeAll { $0.id == dictionary.id } }) {
-            dictionaries?.remove(dictionary)
+        do {
+            try files?.removeDictionary(id: dictionary.id)
+        } catch {
+            // 一覧に無い辞書(ほかの Mac で消した)は消えているので知らせない
+            if error == .writeFailed { message = UIStrings.Settings.saveFailed }
         }
     }
 

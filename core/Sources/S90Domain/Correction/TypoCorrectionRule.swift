@@ -13,9 +13,12 @@ public struct TypoCorrectionRule: Sendable {
     /// - ローマ字として読めない文字で始まるか(「このばーじょんの」+「python」)，読みの先頭から始まる(「pthon」)．
     ///   「nopython」のように前の日本語を英単語に飲み込まないため．
     ///   ただし「このrepository」のように，かなになる綴りで始まる文の途中の英単語は見つけられない
-    /// - 打ちかけのローマ字が残っていない(末尾の「n」は除く)．打っている途中の単語を補正しないため
-    public func tails(in composition: Composition) -> [Composition.Tail] {
-        guard level != .off, composition.pending.isEmpty || composition.pending == "n" else { return [] }
+    /// - 打ちかけのローマ字が残っていない(末尾の「n」は除く)．打っている途中の単語を補正しないため．
+    ///   打ちかけの子音(「reac」+「t」の t)は英単語の続きのことが多く，残りだけで直すと「reach」のように誤る．
+    ///   includingPending なら打ちかけも英単語に含めて返す．補正している英単語を，続けて打ったキーまで延ばすときに使う
+    ///   (「scrip」+「t」．子音で終わる英単語は，最後のキーが打ちかけとして残る)
+    public func tails(in composition: Composition, includingPending: Bool = false) -> [Composition.Tail] {
+        guard level != .off, includingPending || composition.pending.isEmpty || composition.pending == "n" else { return [] }
         return composition.tails().filter { tail in
             tail.containsInvalidRomaji
                 && (tail.startsWithUnconvertible || tail.startsFreeRegion)
@@ -25,6 +28,22 @@ public struct TypoCorrectionRule: Sendable {
                 // Shift を押して打った大文字は，英字として打ったもの(「konoIMEha」の IME)．綴りを直さず打ったままにする
                 && !tail.keys.contains(where: \.isUppercase)
         }
+    }
+
+    /// 綴りの誤りを探す部分を，調べる順に返す．tails は tails(in:) の結果(長い順)．
+    ///
+    /// 英単語の頭がかなになった綴りの誤り(「jvascript」→「jゔぁscりpt」)は，いちばん短い部分(「script」)だけを調べると
+    /// 英単語全体を直せない．そこで，ローマ字として読めない文字で始まる部分を長い順に調べる．
+    /// その文字(「j」)は日本語として打ったものではないので，そこを英字の打ち始めとみなせる．
+    /// かなで始まる部分(「konopthon」「reactwo」)は調べない．前の日本語や後ろの助詞まで英単語に飲み込むため
+    /// (macOS の綴りの候補は reactwo に react を返す)．
+    /// 長い部分も，候補との編集距離が maximumCorrectionDistance 以内でなければ直さない(correction)ので，
+    /// 前の日本語の打ち間違い(「tkitou」の t)から始まる部分が，後ろの日本語ごと英単語になることはまず無い．
+    /// いちばん短い部分がかなで始まるとき(確定させた英単語の直後から始まる部分)は，これまでどおりそれも最後に調べる
+    public func misspellingTails(from tails: [Composition.Tail]) -> [Composition.Tail] {
+        let starts = tails.filter(\.startsWithUnconvertible)
+        guard let last = tails.last, !starts.contains(last) else { return starts }
+        return starts + [last]
     }
 
     /// ローマ字として読めてしまう英単語を，英単語とみなすか(「gitwotukau」→「gitを使う」)．

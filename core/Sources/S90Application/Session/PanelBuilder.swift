@@ -5,13 +5,18 @@ import S90Domain
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let correctedNote = "修正"
-    static let englishInputNote = "Tab 日本語にする"
+    static let englishInputNote = "Tab 日本語に変換"
     /// 英字入力で日本語にして見せているときの案内
     static let englishInputJapaneseNote = "Esc 英字に戻す　Tab 変換"
     /// 選んでいる候補を学習から消したときの案内
-    static let candidateForgottenNote = "学習から消しました"
+    static let candidateForgottenNote = "学習から削除しました"
     /// 最後に確定した語の学習を取り消したときの案内
     static let lastCommitForgottenNote = "最後の学習を取り消しました"
+
+    /// 連想変換で，選んでいる語の連想が見つからなかったときの案内(R-18)
+    static let noAssociationNote = "連想はありません"
+    /// 連想変換を使う設定で，引ける連想の辞書が無いときの案内
+    static let noAssociationDictionaryNote = "連想の辞書がありません"
 
     // 案内に出すキーは，キー設定の表でそのコマンドに割り当てた最初のキー(R-17)．キーが無ければキーの部分を出さない
 
@@ -22,21 +27,36 @@ enum PanelBuilder {
     static func suggestionNote(key: String?) -> String? { key.map { "\($0) で選ぶ" } }
 
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
-    static func readingCorrectionNote(key: String?) -> String { key.map { "直しました　\($0) で打ったままに戻す" } ?? "直しました" }
+    static func readingCorrectionNote(key: String?) -> String { key.map { "修正しました　\($0) で入力のままに戻す" } ?? "修正しました" }
 
     /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文，key は取り消しのキー
     static func readingCorrectedNote(typed: String, key: String?) -> String {
-        key.map { "直しました　\($0) で「\(typed)」に戻す" } ?? "直しました"
+        key.map { "修正しました　\($0) で「\(typed)」に戻す" } ?? "修正しました"
     }
 
     /// 直さずに示すときの案内．corrected は直した文，key は「もしかして」に直すキー
     static func readingSuggestionNote(_ corrected: String, key: String?) -> String {
-        "もしかして「\(corrected)」" + (key.map { "　\($0) で直す" } ?? "")
+        "もしかして「\(corrected)」" + (key.map { "　\($0) で修正" } ?? "")
     }
 
-    /// - Parameter nextKey: 次の候補のキーの名前(英単語を直した候補の案内に出す)
+    /// 打ち間違いを直した部分を含む文節か．直した読みの部分(changed．読みの先頭からの文字数)にかかる文節で，
+    /// 打ったままの候補を選んでいないもの．「もしかして」の直した候補を選んだ文節も含む
+    static func isCorrected(_ segment: SegmentLattice.Segment, changed: Range<Int>?) -> Bool {
+        switch segment.selected.origin {
+        case .correction: return true
+        // 打ったままと，連想で選び直した単語は，打ち間違いを直したものではない
+        case .asTyped, .association: return false
+        case .engine, .variant, .sentencePart, .combined, .symbol, .userDictionary:
+            guard let changed else { return false }
+            return (segment.readingStart..<(segment.readingStart + segment.readingLength)).overlaps(changed)
+        }
+    }
+
+    /// - Parameters:
+    ///   - nextKey: 次の候補のキーの名前(英単語を直した候補の案内に出す)
+    ///   - corrected: 打ち間違いを直した読みの部分(読みの先頭からの文字数)．候補の中の当たる語句に補正の下線を引く
     static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool,
-                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil) -> CandidatePanel {
+                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil, corrected: Range<Int>? = nil) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
             : []
@@ -52,8 +72,11 @@ enum PanelBuilder {
         }
         let pageStart = focusedIndex / perPage * perPage
         let pageEnd = min(pageStart + perPage, selection.candidates.count)
-        let entries = (pageStart..<pageEnd).map {
-            CandidatePanel.Entry(text: selection.candidates[$0].text, annotation: selection.annotations[$0])
+        let reading = composition.conversionReading
+        let entries = (pageStart..<pageEnd).map { index in
+            let candidate = selection.candidates[index]
+            let range = corrected.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0)) }
+            return CandidatePanel.Entry(text: candidate.text, annotation: selection.annotations[index], corrected: range)
         }
         let isCorrected = selection.candidates.first?.origin == .correction
         return CandidatePanel(
@@ -68,9 +91,55 @@ enum PanelBuilder {
         )
     }
 
+    /// 選んでいる候補に連想があるときの知らせ．key は連想変換のキー
+    static func associationHint(key: String?) -> String { key.map { "\($0) 連想" } ?? "連想" }
+
+    // MARK: 連想(R-18)
+
+    /// 連想の見出し
+    static func associationHeading(_ list: AssociationList) -> AssociationHeading {
+        AssociationHeading(headword: list.associations.headword, label: list.group.label, group: list.groupIndex + 1,
+                           groupCount: list.associations.groups.count)
+    }
+
+    /// 一覧で出す連想．1 ページにはひとつの意味のまとまりの語だけを並べ，位置はまとまりの中で数える
+    static func associationListPanel(for list: AssociationList, perPage: Int) -> CandidatePanel {
+        let page = list.page(perPage: perPage)
+        var panel = CandidatePanel(
+            variants: [],
+            selectedVariant: nil,
+            entries: page.words.map { CandidatePanel.Entry(text: $0, annotation: nil) },
+            selectedEntry: page.selected,
+            focus: .candidate,
+            position: list.indexInGroup + 1,
+            total: list.group.words.count,
+            note: nil
+        )
+        panel.association = associationHeading(list)
+        return panel
+    }
+
+    /// 分岐図で出す連想．lattice は選んでいる連想の語を注目している文節に入れたもの．
+    /// 注目している文節の下の枝に今のまとまりの語を並べ，上の枝(字種)は出さない
+    static func associationLatticePanel(for lattice: SegmentLattice, list: AssociationList, perPage: Int) -> LatticePanel {
+        var panel = latticePanel(for: lattice, perPage: perPage, showsVariants: false)
+        let page = list.page(perPage: perPage)
+        if let focused = panel.columns.firstIndex(where: \.isFocused) {
+            panel.columns[focused].alternatives = page.words
+            panel.columns[focused].selectedAlternative = page.selected
+            panel.columns[focused].alternativeNotes = []
+            panel.columns[focused].isUncertain = false
+        }
+        panel.position = list.indexInGroup - page.selected + 1
+        panel.total = list.group.words.count
+        panel.association = associationHeading(list)
+        return panel
+    }
+
     /// showsVariants が false なら上の枝(字種)を出さない(設定の「候補の上に文字種の行を表示」)
+    /// corrected は打ち間違いを直した読みの部分．かかる文節に補正の印を付ける(isCorrected)
     static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment,
-                             showsVariants: Bool = true) -> LatticePanel {
+                             showsVariants: Bool = true, corrected: Range<Int>? = nil) -> LatticePanel {
         var position = 1
         var total = 0
         let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in
@@ -81,8 +150,10 @@ enum PanelBuilder {
                 let preview = segment.isConfident || segment.isDecided
                     ? nil
                     : segment.candidates.first { $0.text != segment.selected.text }?.text
-                return LatticePanel.Column(text: segment.selected.text, isFocused: false, isUncertain: !segment.isConfident,
-                                           isDecided: segment.isDecided, preview: preview)
+                var column = LatticePanel.Column(text: segment.selected.text, isFocused: false, isUncertain: !segment.isConfident,
+                                                 isDecided: segment.isDecided, preview: preview)
+                column.isCorrected = isCorrected(segment, changed: corrected)
+                return column
             }
             // 選んでいる候補が見えるよう，下の枝は選んでいる位置を含むページを切り出す
             let pageStart = (selectedCandidate ?? 0) / perSegment * perSegment
@@ -99,6 +170,7 @@ enum PanelBuilder {
                 isUncertain: !segment.isConfident,
                 isDecided: segment.isDecided
             )
+            column.isCorrected = isCorrected(segment, changed: corrected)
             column.alternativeNotes = page.map { candidate in
                 switch candidate.origin {
                 case .asTyped: asTypedNote

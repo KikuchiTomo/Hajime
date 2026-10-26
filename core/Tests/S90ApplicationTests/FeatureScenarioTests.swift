@@ -129,6 +129,22 @@ struct FeatureScenarioTests {
         settings.handwriting = true
         let on = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
         #expect(on.handle(key, context: InputContext()).actions == [.showHandwriting])
+        // 英数のときも効く
+        _ = on.setMode(.direct)
+        #expect(on.handle(key, context: InputContext()).actions == [.showHandwriting])
+    }
+
+    @Test("R-14: 手書きの窓で選んだ文字は，組み立て中の読みを先に確定してから入れる")
+    func handwritingInsert() {
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings())
+        for character in "ka" { _ = session.handle(KeyEvent(.character(character)), context: InputContext()) }
+        #expect(session.isComposing)
+        let commits = session.insert("木").compactMap { action -> String? in
+            if case .commit(let text) = action { return text }
+            return nil
+        }
+        #expect(commits == ["か", "木"])
+        #expect(!session.isComposing)
     }
 
     @Test("R-13: 郵便番号は住所を候補に出す．区切りがあれば先頭に，無ければ 2 番目に")
@@ -160,4 +176,5 @@ final class FakePostalCodes: PostalCodeLooking {
     let table: [String: [String]]
     init(_ table: [String: [String]]) { self.table = table }
     func addresses(for code: String) -> [String] { table[code] ?? [] }
+
 }

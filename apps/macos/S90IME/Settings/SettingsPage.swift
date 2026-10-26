@@ -82,7 +82,8 @@ extension SettingsView {
             case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana, UIStrings.Features.prefersKatakana,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
-                               UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion]
+                               UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Association.enabled,
+                               UIStrings.Association.limit, UIStrings.Association.dictionaries]
             case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
             case .language: [UIStrings.Features.englishWords, UIStrings.Features.japaneseWords, UIStrings.Features.languageRules,
                              UIStrings.Features.tryLanguage, UIStrings.Choice.label(for: .englishAuto)]

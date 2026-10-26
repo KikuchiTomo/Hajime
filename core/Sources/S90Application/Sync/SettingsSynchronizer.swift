@@ -33,9 +33,26 @@ public final class SettingsSynchronizer {
     /// 同期のファイルと突き合わせる．取り込んだか，書き出したかを返す
     @discardableResult
     public func sync(with backend: any SyncBackend) throws -> SyncMerge.Result {
-        var state = stateStore.state
+        let merged = try merge(remote: try backend.read())
+        if let written = merged.written { try backend.write(written) }
+        try commit(merged)
+        return merged.result
+    }
+
+    /// 突き合わせた結果．同期のファイルに書けたら commit で記録を進める
+    public struct Merged: Sendable {
+        public let result: SyncMerge.Result
+        /// 同期のファイルに書く中身．変わらなければ nil
+        public let written: Data?
+    }
+
+    /// 読んでおいた同期のファイルの中身(無ければ nil)と突き合わせ，この PC の設定に取り込む．
+    /// 同期のファイルへの書き込みと記録(commit)は呼ぶ側が行う．ファイルの読み書きをメインスレッドの外で行うときに使う
+    /// (クラウドのフォルダは読み書きに時間がかかることがあり，入力を止めないため)
+    public func merge(remote data: Data?) throws -> Merged {
+        let state = stateStore.state
         let remote: SyncDocument?
-        if let data = try backend.read() {
+        if let data {
             guard let document = try? SyncCoding.decoder.decode(SyncDocument.self, from: data) else { throw SyncError.unreadableDocument }
             remote = document
         } else {
@@ -50,12 +67,14 @@ public final class SettingsSynchronizer {
             try settings.update { $0 = merged }
             previous = try? SettingsCoding.object(of: settings.current)
         }
-        if result.changedRemote {
-            try backend.write(SyncCoding.encoder.encode(result.document))
-        }
-        state.ledger = result.ledger
+        return Merged(result: result, written: result.changedRemote ? try SyncCoding.encoder.encode(result.document) : nil)
+    }
+
+    /// 同期のファイルに書けたあとで，記録を進める
+    public func commit(_ merged: Merged) throws {
+        var state = stateStore.state
+        state.ledger = merged.result.ledger
         try stateStore.save(state)
-        return result
     }
 
     /// 項目をこの Mac だけで持つか(まとまりを同期していても)を変える
@@ -77,6 +96,22 @@ public final class SettingsSynchronizer {
         state.isEnabled = enabled
         state.folderBookmark = folderBookmark
         state.folderName = folderName
+        try stateStore.save(state)
+    }
+
+    /// フォルダをパスで選んで同期を始める(Windows)
+    public func setFolder(path: String, name: String) throws {
+        var state = stateStore.state
+        state.isEnabled = true
+        state.folderPath = path
+        state.folderName = name
+        try stateStore.save(state)
+    }
+
+    /// 同期するかだけを変える(フォルダはそのまま)
+    public func setEnabled(_ enabled: Bool) throws {
+        var state = stateStore.state
+        state.isEnabled = enabled
         try stateStore.save(state)
     }
 

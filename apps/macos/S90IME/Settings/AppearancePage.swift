@@ -17,9 +17,9 @@ struct AppearancePage: View {
         Form {
             Section {
                 // 選んでいるテーマと文字の大きさで，分岐図の見本をその場で描く
-                // 見本は描いた大きさのまま真ん中に置き，まわりに余白をとる(幅いっぱいに伸ばすと字が左に寄って詰まって見える)
+                // 見本は描いた大きさのまま真ん中に置き，まわりに余白をとる(幅いっぱいに伸ばすと字が左に寄って詰まって見える)．
+                // 欄より広いときは見本ごと縮める(そのままの幅で置くと，ページが横にはみ出して左端が切れる)
                 ThemePreview(choice: ThemeChoice(model.settings), fontSize: fontSize ?? model.settings.candidateFontSize)
-                    .fixedSize()
                     .padding(DesignTokens.Size.Settings.previewPadding)
                     .frame(maxWidth: .infinity)
             }
@@ -157,24 +157,62 @@ private struct ThemeSwatch: View {
 }
 
 /// 分岐図の見本．テーマや文字の大きさを変えると，その場で描き直す
+/// 欄の幅が描いた大きさより狭いときは，見本全体を同じ比で縮めて収める
 struct ThemePreview: NSViewRepresentable {
     let choice: ThemeChoice
     let fontSize: Double
 
-    func makeNSView(context: Context) -> BranchView {
-        let view = BranchView()
-        view.fillsSurface = true
-        return view
+    func makeNSView(context: Context) -> ScaledPreview {
+        ScaledPreview()
     }
 
-    func updateNSView(_ view: BranchView, context: Context) {
-        view.theme = ResolvedTheme.resolve(choice, appearance: view.effectiveAppearance)
-        view.fontSize = CGFloat(fontSize)
-        view.panel = SamplePanels.lattice
-        view.invalidateIntrinsicContentSize()
+    func updateNSView(_ view: ScaledPreview, context: Context) {
+        view.branch.theme = ResolvedTheme.resolve(choice, appearance: view.effectiveAppearance)
+        view.branch.fontSize = CGFloat(fontSize)
+        view.branch.panel = SamplePanels.lattice
+        view.natural = view.branch.fittingSize(for: SamplePanels.lattice)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: BranchView, context: Context) -> CGSize? {
-        view.fittingSize(for: SamplePanels.lattice)
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: ScaledPreview, context: Context) -> CGSize? {
+        let natural = view.branch.fittingSize(for: SamplePanels.lattice)
+        guard natural.width > 0 else { return natural }
+        let width = min(natural.width, proposal.width ?? natural.width)
+        return CGSize(width: width, height: (natural.height * width / natural.width).rounded(.up))
+    }
+
+    /// 分岐図を描いた大きさのまま持ち，枠が狭ければ座標の比(bounds)で縮めて描く
+    @MainActor
+    final class ScaledPreview: NSView {
+        let branch: BranchView = {
+            let view = BranchView()
+            view.fillsSurface = true
+            return view
+        }()
+        var natural: NSSize = .zero {
+            didSet { if natural != oldValue { updateScale() } }
+        }
+
+        override var isFlipped: Bool { true }
+
+        init() {
+            super.init(frame: .zero)
+            addSubview(branch)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            updateScale()
+        }
+
+        private func updateScale() {
+            branch.frame = NSRect(origin: .zero, size: natural)
+            guard natural.width > 0, frame.width > 0 else { return }
+            let scale = min(1, frame.width / natural.width)
+            setBoundsSize(NSSize(width: frame.width / scale, height: frame.height / scale))
+            branch.needsDisplay = true
+        }
     }
 }

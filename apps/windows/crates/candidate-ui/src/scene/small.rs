@@ -4,9 +4,7 @@
 
 use super::paint::Painter;
 use super::{Frame, Look, Measure, Scene};
-use crate::strings;
 use crate::theme::Font;
-use ipc::InputMode;
 use tokens::size::{candidate, glass, mode_indicator};
 
 /// 打ち間違いを直したこと・「もしかして」を知らせる 1 行
@@ -33,9 +31,8 @@ pub fn note(text: &str, look: &Look, measure: &dyn Measure) -> Scene {
     painter.finish(width, height)
 }
 
-/// 入力モードの札．角丸のテーマは角丸の正方形(文字が長いときは横に伸ばす)，platinum と desk は文字に合わせた札
-pub fn mode(mode: InputMode, look: &Look, measure: &dyn Measure) -> Scene {
-    let label = strings::mode(mode);
+/// モードの札(入力モードの「あ」「A」や，切り替えた入力方式)．角丸のテーマは角丸の正方形(文字が長いときは横に伸ばす)，platinum と desk は文字に合わせた札
+pub fn mode(label: &str, look: &Look, measure: &dyn Measure) -> Scene {
     let mut painter = Painter::new(look, measure);
     let text_width = measure.width(label, Font::Mode);
     let (width, height) = if look.theme.is_rounded() {
@@ -67,16 +64,24 @@ mod tests {
     #[test]
     fn 角丸のテーマのモードの札は正方形() {
         let theme = theme("automatic");
-        let scene = mode(InputMode::Japanese, &Look::new(&theme, 15.0), &Fixed);
+        let scene = mode("あ", &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(scene.width, glass::MODE_INDICATOR_SIZE);
         assert_eq!(scene.height, glass::MODE_INDICATOR_SIZE);
         assert!(texts(&scene).contains(&("あ".into(), theme.text)));
     }
 
     #[test]
+    fn 長い札は横に伸ばす() {
+        let theme = theme("automatic");
+        let scene = mode("ローマ字", &Look::new(&theme, 15.0), &Fixed);
+        assert!(scene.width > glass::MODE_INDICATOR_SIZE);
+        assert_eq!(scene.height, glass::MODE_INDICATOR_SIZE);
+    }
+
+    #[test]
     fn platinum_のモードの札は立体の縁() {
         let theme = theme("platinum");
-        let scene = mode(InputMode::Direct, &Look::new(&theme, 15.0), &Fixed);
+        let scene = mode("A", &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(
             scene.draws[0],
             Draw::Rect {

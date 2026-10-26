@@ -288,6 +288,8 @@ pub struct SettingsSnapshot {
     pub shows_key_hints: bool,
     #[serde(rename = "candidateFontSize")]
     pub candidate_font_size: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handwriting: Option<bool>,
 }
 
 impl fmt::Debug for SettingsSnapshot {
@@ -299,6 +301,7 @@ impl fmt::Debug for SettingsSnapshot {
             .field("showsModeIndicator", &self.shows_mode_indicator)
             .field("showsKeyHints", &self.shows_key_hints)
             .field("candidateFontSize", &self.candidate_font_size)
+            .field("handwriting", &self.handwriting)
             .finish()
     }
 }
@@ -306,9 +309,6 @@ impl fmt::Debug for SettingsSnapshot {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MenuCommand {
-    SelectInputStyle {
-        style: String,
-    },
     ToggleLiveConversion,
     OpenSettings,
 }
@@ -316,13 +316,131 @@ pub enum MenuCommand {
 impl fmt::Debug for MenuCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::SelectInputStyle { .. } => f
-                .debug_struct("SelectInputStyle")
-                .field("style", &REDACTED)
-                .finish(),
             Self::ToggleLiveConversion => f.write_str("ToggleLiveConversion"),
             Self::OpenSettings => f.write_str("OpenSettings"),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RuleList {
+    CorrectionRules,
+    Exceptions,
+    EnglishWords,
+    JapaneseWords,
+    Romaji,
+    SymbolSequences,
+    SymbolReadings,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SyncProblem {
+    Failed,
+    Unreadable,
+    FolderUnavailable,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SyncGroupState {
+    pub group: String,
+    pub scope: String,
+    pub fields: Vec<String>,
+}
+
+impl fmt::Debug for SyncGroupState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SyncGroupState")
+            .field("group", &REDACTED)
+            .field("scope", &REDACTED)
+            .field("fields", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SyncStatus {
+    #[serde(rename = "isEnabled")]
+    pub is_enabled: bool,
+    #[serde(rename = "folderPath")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_path: Option<String>,
+    #[serde(rename = "folderName")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_name: Option<String>,
+    pub groups: Vec<SyncGroupState>,
+    #[serde(rename = "localFields")]
+    pub local_fields: Vec<String>,
+    #[serde(rename = "lastSyncedAt")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_synced_at: Option<String>,
+    #[serde(rename = "isSyncing")]
+    pub is_syncing: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub problem: Option<SyncProblem>,
+}
+
+impl fmt::Debug for SyncStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SyncStatus")
+            .field("isEnabled", &self.is_enabled)
+            .field("folderPath", &REDACTED)
+            .field("folderName", &REDACTED)
+            .field("groups", &self.groups)
+            .field("localFields", &REDACTED)
+            .field("lastSyncedAt", &REDACTED)
+            .field("isSyncing", &self.is_syncing)
+            .field("problem", &self.problem)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImportedDictionaryInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "wordCount")]
+    pub word_count: u32,
+}
+
+impl fmt::Debug for ImportedDictionaryInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ImportedDictionaryInfo")
+            .field("id", &REDACTED)
+            .field("name", &REDACTED)
+            .field("wordCount", &self.word_count)
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FileFailure {
+    InvalidPath,
+    NotFound,
+    TooLarge,
+    Unreadable,
+    Empty,
+    NotSettings,
+    TooMany,
+    UnknownDictionary,
+    WriteFailed,
+    Busy,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SymbolDefault {
+    pub input: String,
+    pub output: String,
+}
+
+impl fmt::Debug for SymbolDefault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SymbolDefault")
+            .field("input", &REDACTED)
+            .field("output", &REDACTED)
+            .finish()
     }
 }
 
@@ -446,6 +564,10 @@ pub enum RequestBody {
         session: u32,
         context: FieldContext,
     },
+    OpenHandwriting {
+        session: u32,
+        context: FieldContext,
+    },
     Caret {
         session: u32,
         rect: Rect,
@@ -457,6 +579,62 @@ pub enum RequestBody {
     Menu {
         command: MenuCommand,
     },
+    ReadSync,
+    SetSyncFolder {
+        path: String,
+    },
+    SetSyncEnabled {
+        enabled: bool,
+    },
+    SetSyncScope {
+        group: String,
+        scope: String,
+    },
+    SetSyncLocalField {
+        field: String,
+        #[serde(rename = "isLocal")]
+        is_local: bool,
+    },
+    SyncNow,
+    ImportDictionary {
+        path: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        replacing: Option<String>,
+    },
+    RemoveDictionary {
+        id: String,
+    },
+    ExportSettings {
+        path: String,
+    },
+    ImportSettings {
+        path: String,
+    },
+    ImportProfileRules {
+        path: String,
+    },
+    ExportProfileRules {
+        path: String,
+    },
+    ImportRuleList {
+        list: RuleList,
+        path: String,
+    },
+    ExportRuleList {
+        list: RuleList,
+        path: String,
+    },
+    ReadSymbolDefaults,
+    ImportUserDictionary {
+        path: String,
+    },
+    ExportUserDictionary {
+        path: String,
+    },
+    HandwritingChosen {
+        text: String,
+    },
+    HandwritingClosed,
     ReadSettingsFields {
         names: Vec<String>,
         defaults: bool,
@@ -526,6 +704,11 @@ impl fmt::Debug for RequestBody {
                 .field("session", session)
                 .field("context", context)
                 .finish(),
+            Self::OpenHandwriting { session, context, .. } => f
+                .debug_struct("OpenHandwriting")
+                .field("session", session)
+                .field("context", context)
+                .finish(),
             Self::Caret { session, rect, .. } => f
                 .debug_struct("Caret")
                 .field("session", session)
@@ -540,6 +723,75 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("Menu")
                 .field("command", command)
                 .finish(),
+            Self::ReadSync => f.write_str("ReadSync"),
+            Self::SetSyncFolder { .. } => f
+                .debug_struct("SetSyncFolder")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::SetSyncEnabled { enabled, .. } => f
+                .debug_struct("SetSyncEnabled")
+                .field("enabled", enabled)
+                .finish(),
+            Self::SetSyncScope { .. } => f
+                .debug_struct("SetSyncScope")
+                .field("group", &REDACTED)
+                .field("scope", &REDACTED)
+                .finish(),
+            Self::SetSyncLocalField { is_local, .. } => f
+                .debug_struct("SetSyncLocalField")
+                .field("field", &REDACTED)
+                .field("isLocal", is_local)
+                .finish(),
+            Self::SyncNow => f.write_str("SyncNow"),
+            Self::ImportDictionary { .. } => f
+                .debug_struct("ImportDictionary")
+                .field("path", &REDACTED)
+                .field("replacing", &REDACTED)
+                .finish(),
+            Self::RemoveDictionary { .. } => f
+                .debug_struct("RemoveDictionary")
+                .field("id", &REDACTED)
+                .finish(),
+            Self::ExportSettings { .. } => f
+                .debug_struct("ExportSettings")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ImportSettings { .. } => f
+                .debug_struct("ImportSettings")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ImportProfileRules { .. } => f
+                .debug_struct("ImportProfileRules")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ExportProfileRules { .. } => f
+                .debug_struct("ExportProfileRules")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ImportRuleList { list, .. } => f
+                .debug_struct("ImportRuleList")
+                .field("list", list)
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ExportRuleList { list, .. } => f
+                .debug_struct("ExportRuleList")
+                .field("list", list)
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ReadSymbolDefaults => f.write_str("ReadSymbolDefaults"),
+            Self::ImportUserDictionary { .. } => f
+                .debug_struct("ImportUserDictionary")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::ExportUserDictionary { .. } => f
+                .debug_struct("ExportUserDictionary")
+                .field("path", &REDACTED)
+                .finish(),
+            Self::HandwritingChosen { .. } => f
+                .debug_struct("HandwritingChosen")
+                .field("text", &REDACTED)
+                .finish(),
+            Self::HandwritingClosed => f.write_str("HandwritingClosed"),
             Self::ReadSettingsFields { defaults, .. } => f
                 .debug_struct("ReadSettingsFields")
                 .field("names", &REDACTED)
@@ -621,6 +873,23 @@ pub enum ResponseBody {
     Settings {
         settings: SettingsSnapshot,
     },
+    SyncStatus {
+        status: SyncStatus,
+    },
+    DictionaryImported {
+        dictionary: ImportedDictionaryInfo,
+    },
+    Imported {
+        added: u32,
+        skipped: u32,
+    },
+    FileFailed {
+        reason: FileFailure,
+    },
+    SymbolDefaults {
+        sequences: Vec<SymbolDefault>,
+        readings: Vec<SymbolDefault>,
+    },
     SettingsFields {
         values: String,
     },
@@ -673,6 +942,28 @@ impl fmt::Debug for ResponseBody {
             Self::Settings { settings, .. } => f
                 .debug_struct("Settings")
                 .field("settings", settings)
+                .finish(),
+            Self::SyncStatus { status, .. } => f
+                .debug_struct("SyncStatus")
+                .field("status", status)
+                .finish(),
+            Self::DictionaryImported { dictionary, .. } => f
+                .debug_struct("DictionaryImported")
+                .field("dictionary", dictionary)
+                .finish(),
+            Self::Imported { added, skipped, .. } => f
+                .debug_struct("Imported")
+                .field("added", added)
+                .field("skipped", skipped)
+                .finish(),
+            Self::FileFailed { reason, .. } => f
+                .debug_struct("FileFailed")
+                .field("reason", reason)
+                .finish(),
+            Self::SymbolDefaults { sequences, readings, .. } => f
+                .debug_struct("SymbolDefaults")
+                .field("sequences", sequences)
+                .field("readings", readings)
                 .finish(),
             Self::SettingsFields { .. } => f
                 .debug_struct("SettingsFields")
@@ -748,6 +1039,12 @@ pub struct CandidateEntry {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotation: Option<String>,
+    #[serde(rename = "correctedStart")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corrected_start: Option<u32>,
+    #[serde(rename = "correctedLength")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corrected_length: Option<u32>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -755,6 +1052,8 @@ impl fmt::Debug for CandidateEntry {
         f.debug_struct("CandidateEntry")
             .field("text", &REDACTED)
             .field("annotation", &REDACTED)
+            .field("correctedStart", &self.corrected_start)
+            .field("correctedLength", &self.corrected_length)
             .finish()
     }
 }
@@ -815,6 +1114,9 @@ pub struct BranchColumn {
     pub is_uncertain: bool,
     #[serde(rename = "isDecided")]
     pub is_decided: bool,
+    #[serde(rename = "isCorrected")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_corrected: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -844,6 +1146,7 @@ impl fmt::Debug for BranchColumn {
             .field("isFocused", &self.is_focused)
             .field("isUncertain", &self.is_uncertain)
             .field("isDecided", &self.is_decided)
+            .field("isCorrected", &self.is_corrected)
             .field("preview", &REDACTED)
             .field("shorter", &REDACTED)
             .field("longer", &REDACTED)
@@ -1013,7 +1316,18 @@ pub enum UiCommand {
         mode: InputMode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
     },
+    ShowHandwriting {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        anchor: Option<Rect>,
+        #[serde(rename = "recognitionDelayMilliseconds")]
+        recognition_delay_milliseconds: u32,
+        #[serde(rename = "recognitionTimeoutMilliseconds")]
+        recognition_timeout_milliseconds: u32,
+    },
+    HideHandwriting,
     Move {
         anchor: Rect,
     },
@@ -1050,7 +1364,15 @@ impl fmt::Debug for UiCommand {
                 .debug_struct("ShowMode")
                 .field("mode", mode)
                 .field("anchor", anchor)
+                .field("label", &REDACTED)
                 .finish(),
+            Self::ShowHandwriting { anchor, recognition_delay_milliseconds, recognition_timeout_milliseconds, .. } => f
+                .debug_struct("ShowHandwriting")
+                .field("anchor", anchor)
+                .field("recognitionDelayMilliseconds", recognition_delay_milliseconds)
+                .field("recognitionTimeoutMilliseconds", recognition_timeout_milliseconds)
+                .finish(),
+            Self::HideHandwriting => f.write_str("HideHandwriting"),
             Self::Move { anchor, .. } => f
                 .debug_struct("Move")
                 .field("anchor", anchor)

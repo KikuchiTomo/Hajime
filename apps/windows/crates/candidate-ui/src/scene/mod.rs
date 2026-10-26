@@ -309,13 +309,12 @@ mod tests {
     use super::testing::*;
     use super::*;
     use crate::theme::SystemLook;
-    use ipc::InputMode;
 
     #[test]
     fn 角丸のテーマには窓の影を付け_本体をずらす() {
         let theme = theme("washi");
         let look = Look::new(&theme, 15.0);
-        let bare = mode(InputMode::Japanese, &look, &Fixed);
+        let bare = mode("あ", &look, &Fixed);
         let shadowed = surround(bare.clone(), &theme, Surround::Shadow);
         let blur = size::glass::SHADOW_RADIUS;
         assert_eq!(shadowed.body.x, blur);
@@ -323,7 +322,7 @@ mod tests {
         assert!(matches!(shadowed.draws[0], Draw::Shadow { .. }));
         // platinum は影を付けない(desk は本体の中に 2 ドットの影を描く)
         let platinum = super::testing::theme("platinum");
-        let flat = mode(InputMode::Japanese, &Look::new(&platinum, 15.0), &Fixed);
+        let flat = mode("あ", &Look::new(&platinum, 15.0), &Fixed);
         assert_eq!(surround(flat.clone(), &platinum, Surround::Shadow), flat);
     }
 
@@ -337,14 +336,14 @@ mod tests {
                 ..SystemLook::default()
             },
         );
-        let scene = mode(InputMode::Japanese, &Look::new(&theme, 15.0), &Fixed);
+        let scene = mode("あ", &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(surround(scene.clone(), &theme, Surround::Shadow), scene);
     }
 
     #[test]
     fn 見本の画像は下地の上に余白を付けて置く() {
         let theme = theme("platinum");
-        let scene = mode(InputMode::Direct, &Look::new(&theme, 15.0), &Fixed);
+        let scene = mode("A", &Look::new(&theme, 15.0), &Fixed);
         let snapshot = surround(scene.clone(), &theme, Surround::Snapshot { dark: false });
         let margin = size::snapshot::MARGIN;
         assert_eq!(snapshot.width, scene.width + margin * 2.0);

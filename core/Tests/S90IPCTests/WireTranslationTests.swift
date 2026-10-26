@@ -56,7 +56,7 @@ struct WireTranslationTests {
             .showCandidates(list: WireCandidateList(variants: [], selectedVariant: nil, entries: [WireCandidateEntry(text: "日本", annotation: nil)],
                                                     selectedEntry: 0, focus: .candidate, position: 1, total: 1, note: nil), anchor: anchor),
             .hide,
-            .showMode(mode: .direct, anchor: anchor),
+            .showMode(mode: .direct, anchor: anchor, label: nil),
         ])
         #expect(routed.host == [.toggleLiveConversion])
     }
@@ -66,6 +66,7 @@ struct WireTranslationTests {
         var column = LatticePanel.Column(text: "今日は", alternatives: ["今日は", "京は"], selectedAlternative: 1, isFocused: true, isUncertain: true, shorter: "今日")
         column.alternativeNotes = [nil, "修正"]
         column.sourceName = "医療"
+        column.isCorrected = true
         let hint = WireKeyHint(keys: "Shift+←", label: "今日")
         let routed = RoutedActions([.showLattice(LatticePanel(columns: [column], position: 1, total: 2, note: "案内"))], anchor: nil, hints: { _ in [hint] })
         guard case .showBranchMap(let map, let anchor) = routed.ui.first else {
@@ -78,6 +79,17 @@ struct WireTranslationTests {
         #expect(map.columns.first?.selectedAlternative == 1)
         #expect(map.columns.first?.alternativeNotes == [nil, "修正"])
         #expect(map.columns.first?.sourceName == "医療")
+        #expect(map.columns.first?.isCorrected == true)
+    }
+
+    @Test("候補の中の直した部分の位置は，Unicode のスカラー値の数で運ぶ(Rust の char と合わせる)")
+    func correctedRangeInScalars() {
+        // 「が」+ 結合の濁点(2 スカラーで 1 文字)のあとに直した「良い」がある
+        let entry = CandidatePanel.Entry(text: "か\u{3099}良い", annotation: nil, corrected: 1..<3)
+        let list = WireCandidateList(CandidatePanel(variants: [], selectedVariant: nil, entries: [entry], selectedEntry: 0, focus: .candidate,
+                                                    position: 1, total: 1, note: nil))
+        #expect(list.entries.first?.correctedStart == 2)
+        #expect(list.entries.first?.correctedLength == 2)
     }
 
     @Test("組み立てていないときに受け取るキーは，キー設定の表の今の状態のもの")

@@ -79,6 +79,13 @@ public protocol DictionaryLookup: AnyObject {
     func words(reading: String, in dictionary: ImportedDictionary) -> [DictionaryWord]
 }
 
+/// 取り込んだ連想の辞書を語で引く(R-18)．辞書の中身(類語の辞書・利用者が作った辞書)は差し替えられる
+@MainActor
+public protocol AssociationLookup: AnyObject {
+    /// word を含む意味のまとまり．辞書に書いた順(よく使う意味から)
+    func groups(for word: String, in dictionary: AssociationDictionary) -> [AssociationGroup]
+}
+
 /// 英単語の辞書のポート(R-02)．中身は端末の中だけで調べる
 @MainActor
 public protocol EnglishLexicon: AnyObject {
@@ -154,8 +161,10 @@ public protocol SyncStateStoring: AnyObject {
 /// この Mac の同期の設定．同期のファイルには入れない
 public struct SyncState: Sendable, Equatable, Codable {
     public var isEnabled = false
-    /// 選んだフォルダ(セキュリティスコープ付きのブックマーク)．フォルダを選んでいなければ nil
+    /// 選んだフォルダ(macOS のセキュリティスコープ付きのブックマーク)．フォルダを選んでいなければ nil
     public var folderBookmark: Data?
+    /// 選んだフォルダのパス(Windows．ブックマークが無いため)．フォルダを選んでいなければ nil
+    public var folderPath: String?
     /// 画面に出すフォルダの名前
     public var folderName: String?
     /// まとまりごとの範囲．無いまとまりは既定の範囲(SyncGroup.defaultScope)
@@ -167,7 +176,7 @@ public struct SyncState: Sendable, Equatable, Codable {
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case isEnabled, folderBookmark, folderName, scopes, localFields, ledger
+        case isEnabled, folderBookmark, folderPath, folderName, scopes, localFields, ledger
     }
 
     /// 項目を足しても前のバージョンで書いたファイルを読めるよう，無い項目は既定のままにする(読めないとフォルダの選択まで失うため)
@@ -175,6 +184,7 @@ public struct SyncState: Sendable, Equatable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
         folderBookmark = try container.decodeIfPresent(Data.self, forKey: .folderBookmark)
+        folderPath = try container.decodeIfPresent(String.self, forKey: .folderPath)
         folderName = try container.decodeIfPresent(String.self, forKey: .folderName)
         scopes = try container.decodeIfPresent([SyncGroup: SyncScope].self, forKey: .scopes) ?? [:]
         localFields = try container.decodeIfPresent(Set<String>.self, forKey: .localFields) ?? []
@@ -182,4 +192,83 @@ public struct SyncState: Sendable, Equatable, Codable {
     }
 
     public func scope(of group: SyncGroup) -> SyncScope { scopes[group] ?? group.defaultScope }
+}
+
+/// 同期の今の様子(設定の画面に出す)
+public struct SyncStatus: Sendable, Equatable {
+    public var state: SyncState
+    /// 最後の同期で起きた問題．うまくいけば nil
+    public var problem: SyncProblem?
+    /// 同期している最中(取り込んだ辞書の索引を運んでいるあいだを含む)
+    public var isSyncing: Bool
+
+    public init(state: SyncState, problem: SyncProblem?, isSyncing: Bool) {
+        self.state = state
+        self.problem = problem
+        self.isSyncing = isSyncing
+    }
+}
+
+public enum SyncProblem: Sendable, Equatable {
+    /// 読み書きできなかった
+    case failed
+    /// 同期のファイルが壊れている(上書きせずに止めた)
+    case unreadable
+    /// 選んだフォルダが無い・開けない
+    case folderUnavailable
+}
+
+/// 同期の操作．設定の画面が別のプロセスにある Windows で，エンジンから同期を動かすのに使う
+@MainActor
+public protocol SyncControlling: AnyObject {
+    var status: SyncStatus { get }
+    /// フォルダのパスを選んで同期を始める．使えないパスなら SettingsFileFailure.invalidPath
+    func chooseFolder(path: String) throws
+    func setEnabled(_ enabled: Bool) throws
+    func setScope(_ scope: SyncScope, for group: SyncGroup) throws
+    /// 項目をこの PC だけで持つか(まとまりを同期していても)
+    func setLocal(_ isLocal: Bool, field: String) throws
+    func syncNow()
+}
+
+/// 設定の画面から頼まれたファイルの読み書きに失敗した理由
+public enum SettingsFileFailure: Error, Sendable, Equatable {
+    /// ローカルのドライブの絶対パスでない
+    case invalidPath
+    case notFound
+    case tooLarge
+    /// 中身を読めない(文字コード・形式)
+    case unreadable
+    /// 読める語や行が 1 つも無い
+    case empty
+    /// 設定のファイルではない
+    case notSettings
+    /// 取り込んだ辞書の数が上限に達している
+    case tooMany
+    /// 取り込み直す・消す辞書が一覧に無い
+    case unknownDictionary
+    case writeFailed
+}
+
+/// 設定に関わるファイルの読み書き(辞書の取り込み・バックアップ・除外設定の CSV・決まりの一覧)．
+/// パスは設定の画面で利用者が選んだもの．重い読み書きはメインスレッドの外で行う
+@MainActor
+public protocol SettingsFileHandling: AnyObject {
+    /// 辞書のファイルを取り込む．replacing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
+    func importDictionary(from path: String, replacing id: String?) async throws(SettingsFileFailure) -> ImportedDictionary
+    /// 辞書を一覧と索引から消す
+    func removeDictionary(id: String) throws(SettingsFileFailure)
+    /// ユーザー辞書を「読み<タブ>語」の行のファイルから取り込む．新しく足した語と，読めなかった行の数を返す
+    func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int)
+    func exportUserDictionary(to path: String) async throws(SettingsFileFailure)
+    /// すべての設定を JSON のファイルに書き出す
+    func exportSettings(to path: String) async throws(SettingsFileFailure)
+    /// 読み込んだ設定ですべてを置き換える
+    func importSettings(from path: String) async throws(SettingsFileFailure)
+    /// 除外設定の CSV を読み込む．足した規則と読めなかった行の数を返す
+    func importProfileRules(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int)
+    func exportProfileRules(to path: String) async throws(SettingsFileFailure)
+    /// 決まりの一覧を読み込む．足した(上書きを含む)行と，足せなかった行の数を返す
+    func importRuleList(_ list: RuleList, from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int)
+    func exportRuleList(_ list: RuleList, to path: String) async throws(SettingsFileFailure)
 }

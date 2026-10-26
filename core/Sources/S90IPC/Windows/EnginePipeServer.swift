@@ -1,14 +1,16 @@
 #if os(Windows)
 import Dispatch
 import Foundation
+import Synchronization
 
 public enum EnginePipeServer {
-    public static func start(listener: NamedPipeListener, service: EngineService) {
+    /// candidateWindowPath は候補ウィンドウの実行ファイル．その接続からだけ手書きの窓で選んだ文字を受ける
+    public static func start(listener: NamedPipeListener, service: EngineService, candidateWindowPath: String) {
         let thread = Thread {
             while true {
                 do {
                     let connection = try listener.accept()
-                    Thread { serve(connection, service: service) }.start()
+                    Thread { serve(connection, service: service, candidateWindowPath: candidateWindowPath) }.start()
                 } catch {
                     Thread.sleep(forTimeInterval: 0.1)
                 }
@@ -17,12 +19,14 @@ public enum EnginePipeServer {
         thread.start()
     }
 
-    static func serve(_ connection: NamedPipeConnection, service: EngineService) {
+    static func serve(_ connection: NamedPipeConnection, service: EngineService, candidateWindowPath: String) {
         guard let process = try? connection.clientProcessID(), NamedPipePeer.isInCurrentSession(processID: process) else {
             connection.close()
             return
         }
-        let id = onMain { service.connect() }
+        let isCandidateWindow = NamedPipePeer.imagePath(processID: process)
+            .map { $0.caseInsensitiveCompare(candidateWindowPath) == .orderedSame } ?? false
+        let id = onMain { service.connect(isCandidateWindow: isCandidateWindow) }
         defer {
             onMain { service.disconnect(id) }
             connection.close()
@@ -35,13 +39,34 @@ public enum EnginePipeServer {
                 reader.append(bytes)
                 while let body = try reader.nextBody() {
                     let request = try MessageFraming.decode(WireRequest.self, from: body)
-                    let response = onMain { service.handle(request, from: id) }
+                    let response: WireResponse
+                    switch onMain({ service.reply(to: request, from: id) }) {
+                    case .now(let immediate):
+                        response = immediate
+                    case .later(let work):
+                        // ファイルの読み書きを終えるまで，この接続のスレッドで待つ(メインスレッドは止めない)
+                        response = wait(for: work)
+                    }
                     try connection.write(MessageFraming.encode(response))
                 }
             }
         } catch {
             return
         }
+    }
+
+    /// メインアクターで動かす非同期の仕事を，呼んだスレッド(名前付きパイプの接続のスレッド)で終わるまで待つ
+    private static func wait(for work: @escaping @MainActor @Sendable () async -> WireResponse) -> WireResponse {
+        let result = Mutex<WireResponse?>(nil)
+        let done = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            let response = await work()
+            result.withLock { $0 = response }
+            done.signal()
+        }
+        done.wait()
+        // signal の前に必ず入れているので nil にはならない．念のため malformed で答える
+        return result.withLock { $0 } ?? WireResponse(id: 0, body: .error(code: .malformed))
     }
 
     private static func onMain<Value: Sendable>(_ body: @MainActor () -> Value) -> Value {
@@ -76,11 +101,9 @@ public final class CandidateWindowLink: @unchecked Sendable {
                 self.connection = connection
                 lock.unlock()
                 previous?.close()
+                // 読み続けるスレッドは置かない．同期の I/O のハンドルでは，読みが止まっているあいだ同じハンドルへの
+                // 書き込みも待たされるため．候補ウィンドウはこのパイプに書かず，切れたことは書き込みの失敗で知る
                 greeting().forEach(send)
-                Thread {
-                    while let bytes = try? connection.read(), !bytes.isEmpty {}
-                    self.drop(connection)
-                }.start()
             }
         }
         thread.start()

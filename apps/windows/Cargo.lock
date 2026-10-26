@@ -9,7 +9,10 @@ dependencies = [
  "ipc",
  "tokens",
  "windows",
+ "windows-collections",
  "windows-core",
+ "windows-future",
+ "windows-numerics",
 ]
 
 [[package]]

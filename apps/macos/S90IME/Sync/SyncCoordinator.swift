@@ -13,19 +13,17 @@ final class SyncCoordinator: ObservableObject {
     @Published private(set) var state: SyncState
     @Published private(set) var lastError: String?
     private let synchronizer: SettingsSynchronizer
-    private let settings: any SettingsStoring & SettingsObserving
-    /// 取り込んだ辞書の索引．索引のファイルも同期のフォルダで運ぶ(R-16)
-    private let dictionaries: ImportedDictionaryStore
+    /// 同期の 1 回分の手順．取り込んだ辞書の索引のファイルも同期のフォルダで運ぶ(R-16)
+    private let runner: FolderSyncRunner
     private var dictionaryTask: Task<Void, Never>?
     private var writeTask: Task<Void, Never>?
     private var pollTask: Task<Void, Never>?
     private var isSyncing = false
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "sync")
 
-    init(synchronizer: SettingsSynchronizer, settings: any SettingsStoring & SettingsObserving, dictionaries: ImportedDictionaryStore) {
+    init(synchronizer: SettingsSynchronizer, runner: FolderSyncRunner, settings: any SettingsObserving) {
         self.synchronizer = synchronizer
-        self.settings = settings
-        self.dictionaries = dictionaries
+        self.runner = runner
         self.state = synchronizer.state
         settings.observe { [weak self] _ in self?.scheduleSync() }
     }
@@ -104,11 +102,7 @@ final class SyncCoordinator: ObservableObject {
                 let renewed = try folder.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
                 try synchronizer.setEnabled(true, folderBookmark: renewed, folderName: folder.lastPathComponent)
             }
-            let before = settings.current.importedDictionaries
-            try synchronizer.sync(with: FolderSyncBackend(folder: folder))
-            // ほかの Mac で消した辞書は，この Mac の索引も消す
-            let remaining = Set(settings.current.importedDictionaries.map(\.id))
-            for dictionary in before where !remaining.contains(dictionary.id) { dictionaries.remove(dictionary) }
+            try runner.syncSettings(in: folder)
             lastError = nil
             syncDictionaryFiles(bookmark: state.folderBookmark ?? bookmark)
         } catch {
@@ -120,11 +114,7 @@ final class SyncCoordinator: ObservableObject {
     /// 取り込んだ辞書の索引のファイルを同期のフォルダと運ぶ．数百 MB になりうるので，メインスレッドの外で写す．
     /// 前の分が終わっていなければ何もしない(次の同期でまた見る)
     private func syncDictionaryFiles(bookmark: Data) {
-        let scope = state.scopes[.importedDictionaries] ?? SyncGroup.importedDictionaries.defaultScope
-        guard scope == .synced, dictionaryTask == nil else { return }
-        let list = settings.current.importedDictionaries
-        guard !list.isEmpty else { return }
-        let localDirectory = dictionaries.directory
+        guard dictionaryTask == nil, let job = runner.dictionaryFiles() else { return }
         dictionaryTask = Task.detached(priority: .utility) { [weak self] in
             let result: Result<DictionaryFileSync.Outcome, Error>
             do {
@@ -132,7 +122,7 @@ final class SyncCoordinator: ObservableObject {
                 let folder = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
                 guard folder.startAccessingSecurityScopedResource() else { throw CocoaError(.fileReadNoPermission) }
                 defer { folder.stopAccessingSecurityScopedResource() }
-                result = .success(try DictionaryFileSync(localDirectory: localDirectory, syncFolder: folder).sync(list))
+                result = .success(try job.run(in: folder))
             } catch {
                 result = .failure(error)
             }
@@ -144,17 +134,7 @@ final class SyncCoordinator: ObservableObject {
         dictionaryTask = nil
         switch result {
         case .success(let outcome):
-            for dictionary in settings.current.importedDictionaries where outcome.installed.contains(dictionary.id) {
-                dictionaries.reload(dictionary)
-            }
-            if !outcome.computedRevisions.isEmpty {
-                // 同期を入れる前に取り込んだ辞書にバージョンを書き戻す．設定が変わるので，次の同期で索引を書き出す
-                try? settings.update { current in
-                    for index in current.importedDictionaries.indices where current.importedDictionaries[index].revision == nil {
-                        current.importedDictionaries[index].revision = outcome.computedRevisions[current.importedDictionaries[index].id]
-                    }
-                }
-            }
+            runner.finish(outcome)
         case .failure(let error):
             fail(error)
         }

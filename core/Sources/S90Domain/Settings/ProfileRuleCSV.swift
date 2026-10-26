@@ -9,9 +9,7 @@ public enum ProfileRuleCSV {
     public static func parse(_ text: String) -> [ProfileRule] {
         var seen = Set<String>()
         var rules: [ProfileRule] = []
-        for line in text.split(whereSeparator: \.isNewline) {
-            let trimmed = trim(line)
-            guard !trimmed.isEmpty, !trimmed.hasPrefix("#"), trimmed.lowercased() != header else { continue }
+        for trimmed in ruleLines(text) {
             let columns = trimmed.split(separator: ",", omittingEmptySubsequences: false).map(trim)
             guard columns.count == 2, let profile = profile(named: columns[1]), isValidIdentifier(columns[0]),
                 seen.insert(columns[0]).inserted else { continue }
@@ -19,6 +17,14 @@ public enum ProfileRuleCSV {
             if rules.count == DefaultSettings.maximumProfileRules { break }
         }
         return rules
+    }
+
+    /// 読み込んだ規則を先頭に足す．同じアプリの ID の規則は読み込んだほうに置き換える
+    public static func merge(_ imported: [ProfileRule], into settings: inout Settings) {
+        let identifiers = Set(imported.map(\.applicationPrefix))
+        settings.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
+        settings.profileRules.insert(contentsOf: imported, at: 0)
+        settings.clampToValidRanges()
     }
 
     public static func write(_ rules: [ProfileRule]) -> String {
@@ -29,6 +35,15 @@ public enum ProfileRuleCSV {
     public static func isValidIdentifier(_ text: String) -> Bool {
         !text.isEmpty && text.count <= DefaultSettings.maximumApplicationIdentifierLength
             && text.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || ".-_".contains($0)) }
+    }
+
+    /// 規則として読む行(見出し・# で始まる行・空の行を除く)の数
+    public static func ruleLineCount(_ text: String) -> Int {
+        ruleLines(text).count
+    }
+
+    private static func ruleLines(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isNewline).map(trim).filter { !$0.isEmpty && !$0.hasPrefix("#") && $0.lowercased() != header }
     }
 
     private static func trim(_ text: Substring) -> String {

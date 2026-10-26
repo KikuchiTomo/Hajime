@@ -16,6 +16,8 @@ public enum CandidateOrigin: Sendable, Equatable {
     case symbol
     /// 利用者が登録した語
     case userDictionary
+    /// 連想変換の一覧から選んだ語(R-18)．学習には使わない
+    case association
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．

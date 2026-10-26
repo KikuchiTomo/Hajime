@@ -5,6 +5,9 @@ use ipc::{InputMode, KeyHint};
 /// 上の枝(文字種)の丸に入れる印
 pub const VARIANT_BADGE: &str = "↑";
 
+/// 打ち間違いを直した文節の幹に添える札
+pub const CORRECTED: &str = "修正";
+
 pub fn mode(mode: InputMode) -> &'static str {
     match mode {
         InputMode::Japanese => "あ",

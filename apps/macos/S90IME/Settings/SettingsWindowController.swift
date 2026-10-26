@@ -14,9 +14,11 @@ final class SettingsWindowController {
 
     private let sync: SyncCoordinator
 
-    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, dictionaries: ImportedDictionaryStore? = nil,
+    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, files: (any SettingsFileHandling)? = nil,
+         associations: AssociationDictionaryStore? = nil,
          resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
-        model = SettingsModel(store: settings, usage: usage, dictionaries: dictionaries, resetLearning: resetLearning, previewLanguage: previewLanguage)
+        model = SettingsModel(store: settings, usage: usage, files: files, associations: associations, resetLearning: resetLearning,
+                              previewLanguage: previewLanguage)
         self.sync = sync
     }
 
@@ -91,19 +93,23 @@ final class SettingsModel: ObservableObject {
     private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
-    /// 取り込んだ辞書の索引(R-16)．無ければ辞書を取り込めない
-    let dictionaries: ImportedDictionaryStore?
+    /// 辞書の取り込み・バックアップ・CSV・決まりの一覧の読み書き(Windows のエンジンと同じもの)．無ければ辞書を取り込めない
+    let files: (any SettingsFileHandling)?
     /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
     @Published var isImportingDictionary = false
+    /// 連想の辞書の索引(R-18)．無ければ連想の辞書を取り込めない
+    let associations: AssociationDictionaryStore?
     /// 英字入力(自動)で打った文を語ごとに見分けた結果(「試す」)．無ければ「試す」を出さない
     let previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])?
 
-    init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, dictionaries: ImportedDictionaryStore? = nil,
+    init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, files: (any SettingsFileHandling)? = nil,
+         associations: AssociationDictionaryStore? = nil,
          resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
         self.previewLanguage = previewLanguage
         self.store = store
         self.usage = usage
-        self.dictionaries = dictionaries
+        self.files = files
+        self.associations = associations
         self.settings = store.current
         self.usageCounts = usage?.counts ?? UsageCounts()
         self.resetLearningAction = resetLearning
@@ -148,9 +154,11 @@ final class SettingsModel: ObservableObject {
         update { current in
             let dictionary = current.userDictionary
             let imported = current.importedDictionaries
+            let associations = current.associationDictionaries
             current = S90Domain.Settings()
             current.userDictionary = dictionary
             current.importedDictionaries = imported
+            current.associationDictionaries = associations
         }
     }
 
@@ -164,31 +172,39 @@ final class SettingsModel: ObservableObject {
         return changed
     }
 
-    /// 決まりの一覧をファイル(「左<タブ>右」の行)から読み込む．merge で設定に足し，足した数を知らせる
-    func importRuleList(_ merge: ([RuleListFile.Row], inout S90Domain.Settings) -> Int) {
+    /// 決まりの一覧をファイル(「左<タブ>右」の行)から読み込む．一覧の決まりで設定に足し，足した数を知らせる
+    func importRuleList(_ list: RuleList) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText, .tabSeparatedText]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let rows = try RuleListFile.read(from: url)
-            var added = 0
-            if update({ added = merge(rows, &$0) }) {
-                message = UIStrings.More.importedRules(added)
-            }
-        } catch {
-            message = UIStrings.Settings.importFailed
+        runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+            UIStrings.More.importedRules(try await files.importRuleList(list, from: url.path).added)
         }
     }
 
-    func exportRuleList(_ rows: [RuleListFile.Row], fileName: String) {
+    func exportRuleList(_ list: RuleList) {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = fileName
+        panel.nameFieldStringValue = list.exportFileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try RuleListFile.write(rows, to: url)
-        } catch {
-            message = UIStrings.Settings.exportFailed
+        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+            try await files.exportRuleList(list, to: url.path)
+            return nil
+        }
+    }
+
+    /// ファイルの読み書きを頼み，終わったら結果を知らせる．
+    /// 読み込み(importsIntoSettings)で，読めたのに設定を保存できなかったときは，保存の失敗として知らせる
+    func runFileTask(failure: String, importsIntoSettings: Bool = false,
+                     _ work: @escaping @MainActor (any SettingsFileHandling) async throws(SettingsFileFailure) -> String?) {
+        guard let files else { return }
+        Task {
+            do throws(SettingsFileFailure) {
+                if let done = try await work(files) { message = done }
+            } catch {
+                logger.error("ファイルを読み書きできませんでした: \(String(describing: error), privacy: .public)")
+                message = importsIntoSettings && error == .writeFailed ? UIStrings.Settings.saveFailed : failure
+            }
         }
     }
 
@@ -223,14 +239,8 @@ final class SettingsModel: ObservableObject {
         panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            var entries = settings.userDictionary
-            let added = UserDictionaryEditing.merge(try UserDictionaryFile.read(from: url), into: &entries)
-            if update({ $0.userDictionary = entries }) {
-                message = UIStrings.Settings.imported(added)
-            }
-        } catch {
-            message = UIStrings.Settings.importFailed
+        runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+            UIStrings.Settings.imported(try await files.importUserDictionary(from: url.path).added)
         }
     }
 
@@ -238,10 +248,9 @@ final class SettingsModel: ObservableObject {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = UIStrings.Settings.exportFileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try UserDictionaryFile.write(settings.userDictionary, to: url)
-        } catch {
-            message = UIStrings.Settings.exportFailed
+        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+            try await files.exportUserDictionary(to: url.path)
+            return nil
         }
     }
 
@@ -269,18 +278,8 @@ final class SettingsModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .plainText]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let rules = try ProfileRuleFile.read(from: url)
-            let identifiers = Set(rules.map(\.applicationPrefix))
-            if update({ current in
-                current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
-                current.profileRules.insert(contentsOf: rules, at: 0)
-                current.clampToValidRanges()
-            }) {
-                message = UIStrings.More.importedRules(rules.count)
-            }
-        } catch {
-            message = UIStrings.More.csvFailed
+        runFileTask(failure: UIStrings.More.csvFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+            UIStrings.More.importedRules(try await files.importProfileRules(from: url.path).added)
         }
     }
 
@@ -288,10 +287,9 @@ final class SettingsModel: ObservableObject {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = UIStrings.More.exportCSVFileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try ProfileRuleFile.write(settings.profileRules, to: url)
-        } catch {
-            message = UIStrings.Settings.exportFailed
+        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+            try await files.exportProfileRules(to: url.path)
+            return nil
         }
     }
 
@@ -302,10 +300,9 @@ final class SettingsModel: ObservableObject {
         panel.nameFieldStringValue = UIStrings.More.exportSettingsFileName
         panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try SettingsTransfer.write(settings, to: url)
-        } catch {
-            message = UIStrings.More.settingsExportFailed
+        runFileTask(failure: UIStrings.More.settingsExportFailed) { files throws(SettingsFileFailure) in
+            try await files.exportSettings(to: url.path)
+            return nil
         }
     }
 
@@ -314,11 +311,9 @@ final class SettingsModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let imported = try SettingsTransfer.read(from: url)
-            if update({ $0 = imported }) { message = UIStrings.More.settingsImported }
-        } catch {
-            message = UIStrings.More.settingsImportFailed
+        runFileTask(failure: UIStrings.More.settingsImportFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+            try await files.importSettings(from: url.path)
+            return UIStrings.More.settingsImported
         }
     }
 

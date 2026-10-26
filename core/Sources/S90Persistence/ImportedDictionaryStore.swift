@@ -4,9 +4,8 @@ import S90Domain
 
 /// 取り込んだ辞書の語を，辞書ごとに索引のファイルに置き，読みで引く(R-16)．
 ///
-/// 索引のファイルは「読み<タブ>語<タブ>品詞」の行を読みのバイト順に並べた UTF-8 のテキスト．
-/// 引くときはファイルをメモリに写し(mmap)，行の頭の位置の表を作って二分探索する．起動時には読まず，初めて引くときに開く．
-/// 数十万語の辞書でも，1 つの読みを引くのは数十回の比較で済む
+/// 索引のファイルは「読み<タブ>語<タブ>品詞」の行を読みのバイト順に並べた UTF-8 のテキスト(SortedTabFile)．
+/// 起動時には読まず，初めて引くときに開く
 @MainActor
 public final class ImportedDictionaryStore: DictionaryLookup {
     /// 置き場所(Application Support の dictionaries/)
@@ -23,16 +22,23 @@ public final class ImportedDictionaryStore: DictionaryLookup {
 
     /// 語を読みで並べて索引のファイルに書く．同じ辞書を開いていれば閉じる(取り込み直し)
     public nonisolated static func write(_ words: [DictionaryWord], to url: URL) throws {
-        let lines = words.filter(\.isValid)
-            .map { "\($0.reading)\t\($0.word)\t\($0.wordClass.rawValue)" }
+        // 読みが同じ語は語のバイト順に並べる(同じ辞書から同じ索引を作り，同期のバージョンを変えないため)
+        let lines = words.filter(\.isValid).map { "\($0.reading)\t\($0.word)\t\($0.wordClass.rawValue)" }
             .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
-        var data = Data()
-        data.reserveCapacity(lines.reduce(0) { $0 + $1.utf8.count + 1 })
-        for line in lines {
-            data.append(contentsOf: line.utf8)
-            data.append(0x0A)
-        }
-        try ProtectedFile.write(data, to: url)
+        try SortedTabFile.write(lines, to: url)
+    }
+
+    /// 辞書のファイルを読んで索引を書き，語の数と索引のバージョン(SHA-256)を入れた辞書を返す．
+    /// 大きな辞書は読むのに数秒かかるので，メインスレッドの外で呼ぶ．書いた索引を使うには reload を呼ぶ
+    public nonisolated func importFile(from source: URL, as dictionary: ImportedDictionary) throws -> ImportedDictionary {
+        let words = try DictionaryFileReader.read(from: source)
+        let destination = directory.appendingPathComponent(dictionary.indexFileName)
+        try Self.write(words, to: destination)
+        var imported = dictionary
+        imported.wordCount = words.count
+        // 同期のとき，ほかの PC の索引が古いかどうかを見分けるバージョン
+        imported.revision = try DictionaryFileSync.sha256(of: destination)
+        return imported
     }
 
     public func reload(_ dictionary: ImportedDictionary) {
@@ -55,66 +61,24 @@ public final class ImportedDictionaryStore: DictionaryLookup {
         return index
     }
 
-    /// 写したファイルと，行の頭の位置の表
+    /// 索引のファイル(SortedTabFile)と，行を語に読む処理
     final class Index {
-        private let data: Data
-        private let lineStarts: [Int]
+        private let file: SortedTabFile
 
         init?(url: URL) {
-            guard let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return nil }
-            self.data = data
-            var starts: [Int] = []
-            data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
-                var start = 0
-                for (offset, byte) in buffer.enumerated() where byte == 0x0A {
-                    if offset > start { starts.append(start) }
-                    start = offset + 1
-                }
-                if start < buffer.count { starts.append(start) }
-            }
-            lineStarts = starts
+            guard let file = SortedTabFile(url: url) else { return nil }
+            self.file = file
         }
 
-        var count: Int { lineStarts.count }
+        var count: Int { file.count }
 
         /// 読みがちょうど reading の語
         func words(reading: String) -> [DictionaryWord] {
-            let key = Array(reading.utf8)
-            return data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> [DictionaryWord] in
-                // 読み(タブまで)を key と比べる．小さければ負，同じなら 0，大きければ正
-                func compare(_ line: Int) -> Int {
-                    var position = lineStarts[line]
-                    for byte in key {
-                        guard position < buffer.count else { return -1 }
-                        let current = buffer[position]
-                        if current == 0x09 { return -1 }
-                        if current != byte { return current < byte ? -1 : 1 }
-                        position += 1
-                    }
-                    return position < buffer.count && buffer[position] == 0x09 ? 0 : 1
-                }
-                var low = 0
-                var high = lineStarts.count
-                while low < high {
-                    let middle = (low + high) / 2
-                    if compare(middle) < 0 { low = middle + 1 } else { high = middle }
-                }
-                var result: [DictionaryWord] = []
-                var line = low
-                while line < lineStarts.count, compare(line) == 0 {
-                    if let word = parse(line, buffer) { result.append(word) }
-                    line += 1
-                }
-                return result
-            }
+            file.lines(withKey: reading).compactMap(Self.parse)
         }
 
-        private func parse(_ line: Int, _ buffer: UnsafeRawBufferPointer) -> DictionaryWord? {
-            let start = lineStarts[line]
-            var end = start
-            while end < buffer.count, buffer[end] != 0x0A { end += 1 }
-            let text = String(decoding: UnsafeRawBufferPointer(rebasing: buffer[start..<end]), as: UTF8.self)
-            let columns = text.split(separator: "\t", omittingEmptySubsequences: false)
+        private static func parse(_ line: String) -> DictionaryWord? {
+            let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard columns.count >= 3 else { return nil }
             // 同期のフォルダから運んだ索引も読むので，取り込むときと同じ確かめをする
             let word = DictionaryWord(reading: String(columns[0]), word: String(columns[1]), wordClass: WordClass(rawValue: String(columns[2])) ?? .noun)
