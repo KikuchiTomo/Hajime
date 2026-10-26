@@ -8,6 +8,7 @@ import S90Domain
 //   s90-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
 //   s90-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
 //   s90-playground --evaluate-typo <TSV> [--zenzai <モデル>]   打ち間違いの補正(直した・示した・直さなかった)
+//   s90-playground --evaluate-language <TSV> [--zenzai <モデル>] 英字入力(自動)で英語と日本語を見分けた結果
 //   s90-playground --typo-candidates <キー> [--zenzai <モデル>] 打ったキーの訂正の候補と点数
 //   s90-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
 //   s90-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
@@ -24,6 +25,8 @@ MainActor.assumeIsolated {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {
             try Evaluation.typo(file: file, engine: playground.engine)
+        } else if let file = arguments.value(of: "--evaluate-language") {
+            try Evaluation.language(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {
             try Evaluation.correctionFeatures(file: file, engine: playground.engine)
         } else if let readings = arguments.value(of: "--plausibility") {

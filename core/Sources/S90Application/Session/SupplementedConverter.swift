@@ -167,7 +167,20 @@ public final class SupplementedConverter: KanaKanjiConverting {
         if current.calculation, let calculation = Calculator.evaluate(reading: reading) {
             insert([calculation.result, calculation.expression + "=" + calculation.result], into: &result, at: 0, reading: reading, origin: .symbol)
         }
+        if current.wordLanguage.avoidsOffensive { Self.demoteOffensive(&result, reading: reading) }
         return result
+    }
+
+    /// 第 1 候補が不適切な語(「しね」→「死ね」)なら，ほかの候補を先に出す．
+    /// 英語の語がローマ字として読めてしまったとき(「shine」)に，意図しない語をライブ変換で見せないため
+    static func demoteOffensive(_ candidates: inout [Candidate], reading: String) {
+        guard let first = candidates.first, OffensiveWords.isOffensive(text: first.text) else { return }
+        if let index = candidates.firstIndex(where: { $0.readingCount == first.readingCount && !OffensiveWords.isOffensive(text: $0.text) }) {
+            candidates.insert(candidates.remove(at: index), at: 0)
+        } else {
+            let slice = String(reading.prefix(first.readingCount))
+            candidates.insert(Candidate(text: slice, readingCount: first.readingCount, origin: .variant(.hiragana)), at: 0)
+        }
     }
 
     private func userDictionaryWords(for reading: String, in entries: [UserDictionaryEntry]) -> [String] {

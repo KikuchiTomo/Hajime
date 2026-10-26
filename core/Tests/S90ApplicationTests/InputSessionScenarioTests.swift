@@ -1399,13 +1399,15 @@ struct EscapeToDirectTests {
 @MainActor
 @Suite("入力方式の切り替え")
 struct InputStyleSwitchTests {
-    @Test("Option+かな で入力方式を順に切り替える")
-    func cycles() {
+    @Test("Option+かな で入力方式を順に切り替える(ローマ字 → かな → 英字 → 英字(自動) → ローマ字)", arguments: [
+        (InputStyle.english, InputStyle.englishAuto), (.englishAuto, .romaji), (.romaji, .kana),
+    ])
+    func cycles(current: InputStyle, next: InputStyle) {
         var settings = Settings()
-        settings.inputStyle = .english
+        settings.inputStyle = current
         let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
         let actions = session.handle(KeyEvent(.kana, modifiers: .option), context: InputContext()).actions
-        #expect(actions.contains(.selectInputStyle(.romaji)))
+        #expect(actions.contains(.selectInputStyle(next)))
     }
 }
 

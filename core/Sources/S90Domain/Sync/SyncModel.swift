@@ -19,7 +19,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
     public var fieldNames: [String] {
         switch self {
         case .input:
-            ["inputStyle", "customRomaji", "liveConversion", "yenKey", "punctuation", "brackets", "slash", "spaceWidth", "numberWidth",
+            ["inputStyle", "customRomaji", "liveConversion", "englishInputLiveConversion", "yenKey", "punctuation", "brackets", "slash", "spaceWidth", "numberWidth",
              "alphabetWidth", "shiftStartsAlphabet", "punctuationCommits", "keypadDirect"]
         case .keyboard: ["keyboardLayout"]
         case .keys: ["keymap"]
@@ -27,7 +27,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
             ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "listCandidatesPerPage", "branchCandidatesPerPage",
              "liveConversionDelay", "correctionDelay", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes",
              "misreadings", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning"]
-        case .correction: ["correction"]
+        case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules"]
         case .dictionary: ["userDictionary"]
         case .importedDictionaries: ["importedDictionaries"]

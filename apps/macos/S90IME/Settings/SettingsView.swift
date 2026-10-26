@@ -35,6 +35,7 @@ struct SettingsView: View {
         case .input: InputTab(model: model)
         case .conversion: ConversionTab(model: model)
         case .correction: CorrectionPage(model: model)
+        case .language: WordLanguagePage(model: model)
         case .symbols: SymbolsPage(model: model)
         case .keys: KeymapPage(model: model)
         case .dictionary: DictionaryPage(model: model)
@@ -106,6 +107,14 @@ private struct InputTab: View {
         Form {
             Section(UIStrings.Settings.inputStyleSection) {
                 ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle, label: UIStrings.Choice.label(for:))
+                if model.settings.inputStyle == .englishAuto {
+                    Text(UIStrings.Choice.englishAutoNote).font(.caption).foregroundStyle(.secondary)
+                }
+                ResettableToggle(model: model, title: UIStrings.Choice.englishInputLiveConversion, keyPath: \.englishInputLiveConversion)
+                    .disabled(model.settings.inputStyle != .english)
+                if model.settings.inputStyle == .english {
+                    Text(UIStrings.Choice.englishInputLiveConversionNote).font(.caption).foregroundStyle(.secondary)
+                }
                 ResettablePicker(model: model, title: UIStrings.Choice.keyboardLayout, keyPath: \.keyboardLayout, label: UIStrings.Choice.label(for:))
                 Text(UIStrings.Choice.keyboardLayoutNote).font(.caption).foregroundStyle(.secondary)
             }

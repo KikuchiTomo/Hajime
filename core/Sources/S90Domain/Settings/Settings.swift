@@ -10,6 +10,8 @@ public struct Settings: Sendable, Equatable {
     public var customRomaji: [RomajiRule] = []
     /// ライブ変換(R-01)
     public var liveConversion = true
+    /// 英字入力で，ローマ字として読める語を日本語にして見せる(英字入力のライブ変換．R-05)
+    public var englishInputLiveConversion = false
     /// JIS キーボードの ¥ キーで入れる文字(R-04)
     public var yenKey = YenKeyPolicy.alwaysBackslash
     /// 句読点の組み合わせ
@@ -58,6 +60,8 @@ public struct Settings: Sendable, Equatable {
     public var showsSuggestions = true
     /// 打ち間違いの補正のうち，誤りの種類ごとのオン・オフ，直さない語，置き換えの決まり
     public var correction = CorrectionCustomization()
+    /// 英字で打った語を英語にするか日本語にするかの見分け方(英字入力(自動)とローマ字入力の英単語)
+    public var wordLanguage = WordLanguageSettings()
     /// 送り仮名の付け方(本則・許容)のどちらを先に出すか
     public var okuriganaStyle = OkuriganaStyle.standard
     /// 「1+2*3=」のような式を計算した結果を候補に出す
@@ -147,6 +151,7 @@ public struct Settings: Sendable, Equatable {
         correction.exceptions = Array(correction.exceptions.filter(RuleListEditing.isValidException).prefix(DefaultSettings.maximumCorrectionRules))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
         keymap.clampToValidRanges()
+        wordLanguage.clampToValidRanges()
     }
 
     /// 使っているカスタムテーマ．選んでいなければ nil
@@ -182,7 +187,7 @@ extension Settings: Codable {
     public static var fieldNames: Set<String> { Set(CodingKeys.allCases.map(\.rawValue)) }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case inputStyle, keyboardLayout, customRomaji, liveConversion, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
+        case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
@@ -218,6 +223,8 @@ extension Settings: Codable {
         read(.keyboardLayout, into: \.keyboardLayout)
         readList(.customRomaji, into: \.customRomaji)
         read(.liveConversion, into: \.liveConversion)
+        read(.englishInputLiveConversion, into: \.englishInputLiveConversion)
+        read(.wordLanguage, into: \.wordLanguage)
         read(.yenKey, into: \.yenKey)
         read(.punctuation, into: \.punctuation)
         read(.brackets, into: \.brackets)
@@ -289,6 +296,8 @@ extension Settings: Codable {
         try container.encode(keyboardLayout, forKey: .keyboardLayout)
         try container.encode(customRomaji, forKey: .customRomaji)
         try container.encode(liveConversion, forKey: .liveConversion)
+        try container.encode(englishInputLiveConversion, forKey: .englishInputLiveConversion)
+        try container.encode(wordLanguage, forKey: .wordLanguage)
         try container.encode(yenKey, forKey: .yenKey)
         try container.encode(punctuation, forKey: .punctuation)
         try container.encode(brackets, forKey: .brackets)

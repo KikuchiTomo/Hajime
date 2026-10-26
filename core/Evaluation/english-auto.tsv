@@ -1,0 +1,25 @@
+# 英字入力(自動)の評価用．打ったキー(空白は Space)<TAB>入る文<TAB>前の文字列(任意)
+# 英語の文(日本語にしたら誤り)
+hello world	hello world
+this is a pen	this is a pen
+i love sushi	i love sushi
+make sense	make sense
+let me take a look	let me take a look
+the game is fun	the game is fun
+we are the same	we are the same
+fly a kite	fly a kite
+let it shine	let it shine
+open the file	open the file
+# 日本語の文(英語のままにしたら誤り)
+kyouhaiitenkidesune	今日はいい天気ですね
+watasihagakuseidesu	私は学生です
+arigatougozaimasu	ありがとうございます
+yorosikuonegaisimasu	よろしくお願いします
+sinkansendeoosakaniikimasu	新幹線で大阪に行きます
+# 英語にも日本語にも読める語を，前の日本語で日本語にする(どの漢字にするかは変換の受け持ちなので，エンジンの第 1 候補を書く)
+make	負け	試合に
+kite	きて	早く
+sake	酒	お
+take	たけ	松と
+# 混ざる文
+hello kyouhaiitenkidesune	hello 今日はいい天気ですね
