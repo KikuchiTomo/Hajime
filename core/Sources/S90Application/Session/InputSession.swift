@@ -76,12 +76,16 @@ public final class InputSession {
     private let usage: (any UsageRecording)?
     /// 連想変換の語を引く(R-18)
     private let associationFinder: AssociationFinder
+    /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
+    private let keyNames: KeyNameStyle
 
     /// - Parameters:
     ///   - typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
     ///   - associations: 取り込んだ連想の辞書を引くもの(R-18)．nil なら連想変換のキーはふつうの変換と同じに動く
+    ///   - keyNames: 候補ウィンドウの案内と注記に出すキーの名前の書き方(入力メソッドを動かす OS に合わせる)
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
-                typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil) {
+                typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac) {
+        self.keyNames = keyNames
         self.converter = converter
         self.lexicon = lexicon
         self.settings = settings
@@ -1135,7 +1139,7 @@ public final class InputSession {
 
     /// キー設定の表で，その状態のそのコマンドに割り当てた最初のキーの名前(案内に出す)．無ければ nil
     private func keyLabel(_ command: KeymapCommand, in state: KeymapState) -> String? {
-        settings.current.keymap.strokes(for: command, in: state).first?.label
+        settings.current.keymap.strokes(for: command, in: state).first?.label(style: keyNames)
     }
 
     /// 打ち間違いを直したこと，または「もしかして」を入力位置の近くに出す．

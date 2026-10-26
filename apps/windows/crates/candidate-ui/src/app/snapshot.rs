@@ -220,6 +220,8 @@ fn variants() -> Vec<CandidateVariant> {
 
 fn list() -> CandidateList {
     CandidateList {
+        association: None,
+        association_hint: None,
         variants: variants(),
         selected_variant: None,
         entries: entries(&["変換", "返還", "偏官", "へんかん", "ヘンカン"]),
@@ -235,6 +237,8 @@ fn correction() -> CandidateList {
     let mut entries = entries(&["python", "pyてょn", "Python"]);
     entries[1].annotation = Some("入力のまま".into());
     CandidateList {
+        association: None,
+        association_hint: None,
         variants: variants(),
         selected_variant: None,
         entries,
@@ -273,6 +277,8 @@ fn strings(texts: &[&str]) -> Vec<String> {
 
 fn lattice() -> BranchMap {
     BranchMap {
+        association: None,
+        association_hint: None,
         columns: vec![
             column("私の"),
             BranchColumn {
@@ -305,6 +311,8 @@ fn lattice() -> BranchMap {
 
 fn preview() -> BranchMap {
     BranchMap {
+        association: None,
+        association_hint: None,
         columns: vec![
             column("Cloudflareで"),
             BranchColumn {
@@ -336,6 +344,8 @@ fn preview() -> BranchMap {
 
 fn split() -> BranchMap {
     BranchMap {
+        association: None,
+        association_hint: None,
         columns: vec![
             column("それは"),
             BranchColumn {

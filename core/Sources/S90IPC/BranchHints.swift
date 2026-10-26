@@ -8,6 +8,14 @@ public enum BranchHints {
         func first(_ command: KeymapCommand) -> String {
             keymap.strokes(for: command, in: .converting).first.map(label(of:)) ?? ""
         }
+        // 連想の一覧では，単語を選ぶ・意味を移る・戻るだけを案内する(macOS の UIStrings.Association.hints と同じ)
+        if panel.association != nil {
+            return [
+                WireKeyHint(keys: first(.nextCandidate), label: "選択"),
+                WireKeyHint(keys: pair(first(.previousSegment), first(.nextSegment)), label: "意味"),
+                WireKeyHint(keys: first(.cancel), label: "戻る"),
+            ].filter { !$0.keys.isEmpty }
+        }
         let focused = panel.columns.first(where: \.isFocused)
         if let split = focused?.split {
             return splitHints(count: split.pieces.count - 1)
@@ -38,39 +46,9 @@ public enum BranchHints {
         [WireKeyHint(keys: count > 1 ? "1–\(count)" : "1", label: "区切り"), WireKeyHint(keys: "Esc", label: "取消")]
     }
 
+    /// Windows の候補ウィンドウに出すキーの名前(「Ctrl+Tab」)
     public static func label(of stroke: KeyStroke) -> String {
-        var parts: [String] = []
-        if stroke.control { parts.append("Ctrl") }
-        if stroke.option { parts.append("Alt") }
-        if stroke.shift { parts.append("Shift") }
-        parts.append(name(of: stroke.key))
-        return parts.joined(separator: "+")
-    }
-
-    private static func name(of key: KeyStroke.Key) -> String {
-        switch key {
-        case .character(let text): text.uppercased()
-        case .space: "Space"
-        case .enter: "Enter"
-        case .tab: "Tab"
-        case .backspace: "BS"
-        case .delete: "Del"
-        case .escape: "Esc"
-        case .up: "↑"
-        case .down: "↓"
-        case .left: "←"
-        case .right: "→"
-        case .home: "Home"
-        case .end: "End"
-        case .pageUp: "PgUp"
-        case .pageDown: "PgDn"
-        case .function(let number): "F\(number)"
-        case .eisu: "英数"
-        case .kana: "かな"
-        case .hankakuZenkaku: "半角/全角"
-        case .henkan: "変換"
-        case .muhenkan: "無変換"
-        }
+        stroke.label(style: .windows)
     }
 
     public static func pair(_ first: String, _ second: String) -> String {

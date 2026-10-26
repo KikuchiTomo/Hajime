@@ -177,12 +177,18 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     .flatten()
     .map(|text| painter.width(text, Font::Label) + padding * 2.0)
     .fold(0.0, f32::max);
+    let heading = map
+        .association
+        .as_ref()
+        .map_or(0.0, |heading| super::association::width(painter, heading));
     let width = candidate::MIN_WIDTH
         .max(trunk_right + metrics.inset)
         .max(branch_right + metrics.inset)
         .max(footer + metrics.inset * 2.0)
-        .max(note + metrics.inset * 2.0);
-    let trunk_y = metrics.inset + upper_rows as f32 * metrics.row_height;
+        .max(note + metrics.inset * 2.0)
+        .max(heading + metrics.inset * 2.0);
+    let trunk_y =
+        metrics.inset + heading_height(map, metrics) + upper_rows as f32 * metrics.row_height;
     let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
         + usize::from(map.note.is_some());
     let height = trunk_y
@@ -211,7 +217,19 @@ fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
         .map_or(0.0, |name| {
             painter.width(&strings::dictionary_source(name), Font::Label) + candidate::PADDING_X
         });
-    painter.hints_width(&map.hints) + source
+    let association = map.association_hint.as_deref().map_or(0.0, |hint| {
+        painter.width(hint, Font::Label) + candidate::PADDING_X
+    });
+    painter.hints_width(&map.hints) + source + association
+}
+
+/// 連想の一覧の見出しの行の高さ(区切りの線を含む)．連想でなければ 0
+fn heading_height(map: &BranchMap, metrics: &Metrics) -> f32 {
+    if map.association.is_some() {
+        metrics.footer_height + candidate::FRAME_WIDTH
+    } else {
+        0.0
+    }
 }
 
 pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
@@ -221,6 +239,21 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     let layout = layout(map, &metrics, &painter);
     let body = Frame::new(0.0, 0.0, layout.width, layout.height);
     painter.panel(body);
+    if let Some(heading) = &map.association {
+        let row = Frame::new(
+            metrics.inset,
+            metrics.inset,
+            body.width - metrics.inset * 2.0,
+            metrics.footer_height,
+        );
+        super::association::draw(&mut painter, heading, row);
+        let line_inset = if theme.is_rounded() {
+            metrics.inset
+        } else {
+            metrics.inset - candidate::PADDING_X
+        };
+        painter.separator(row.max_y(), line_inset, body.width - line_inset);
+    }
     let focused_index = focused(map).map(|(index, _)| index);
     // 注目している文節の枝が重なる範囲には，ほかの文節の添え書きを描かない
     let branch_range = focused_index.map(|index| {
@@ -727,6 +760,11 @@ fn footer(painter: &mut Painter, map: &BranchMap, y: f32, width: f32, metrics: &
         metrics.footer_height,
     );
     painter.hints(&map.hints, footer.x, footer.mid_y());
+    if let Some(hint) = map.association_hint.as_deref() {
+        // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
+        let x = footer.x + painter.hints_width(&map.hints) + candidate::PADDING_X;
+        painter.text(hint, Font::Label, theme.text_muted, x, footer);
+    }
     let position = position(map);
     let position_width = painter.width(&position, Font::Label);
     painter.text_right(
@@ -782,6 +820,8 @@ mod tests {
 
     fn map() -> BranchMap {
         BranchMap {
+            association: None,
+            association_hint: None,
             columns: vec![column("今日は", true), column("晴れ", false)],
             position: 1,
             total: 2,
@@ -933,6 +973,8 @@ mod tests {
                 pieces: vec!["問題".into(), "が".into(), "ある".into()],
             });
             let split = BranchMap {
+                association: None,
+                association_hint: None,
                 columns: vec![focused],
                 position: 1,
                 total: 4,

@@ -1256,6 +1256,26 @@ pub enum CandidateFocus {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssociationHeading {
+    pub headword: String,
+    pub label: String,
+    pub group: u32,
+    #[serde(rename = "groupCount")]
+    pub group_count: u32,
+}
+
+impl fmt::Debug for AssociationHeading {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AssociationHeading")
+            .field("headword", &REDACTED)
+            .field("label", &REDACTED)
+            .field("group", &self.group)
+            .field("groupCount", &self.group_count)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidateList {
     pub variants: Vec<CandidateVariant>,
     #[serde(rename = "selectedVariant")]
@@ -1270,6 +1290,11 @@ pub struct CandidateList {
     pub total: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association: Option<AssociationHeading>,
+    #[serde(rename = "associationHint")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association_hint: Option<String>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1283,6 +1308,8 @@ impl fmt::Debug for CandidateList {
             .field("position", &self.position)
             .field("total", &self.total)
             .field("note", &REDACTED)
+            .field("association", &self.association)
+            .field("associationHint", &REDACTED)
             .finish()
     }
 }
@@ -1384,6 +1411,11 @@ pub struct BranchMap {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     pub hints: Vec<KeyHint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association: Option<AssociationHeading>,
+    #[serde(rename = "associationHint")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association_hint: Option<String>,
 }
 
 impl fmt::Debug for BranchMap {
@@ -1394,6 +1426,8 @@ impl fmt::Debug for BranchMap {
             .field("total", &self.total)
             .field("note", &REDACTED)
             .field("hints", &self.hints)
+            .field("association", &self.association)
+            .field("associationHint", &REDACTED)
             .finish()
     }
 }

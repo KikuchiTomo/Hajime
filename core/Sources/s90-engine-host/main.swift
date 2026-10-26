@@ -127,7 +127,8 @@ func run() -> Int32 {
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
-                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations)
+                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
+                         keyNames: .windows)
         },
         settings: settings,
         ui: { window.send($0) },

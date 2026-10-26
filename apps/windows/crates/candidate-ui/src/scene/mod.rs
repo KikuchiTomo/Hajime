@@ -4,6 +4,7 @@
 //! 配置と色はここで決め(macOS の CandidateView・BranchView・GlassDrawing と同じ決め方)，描く層(app::render)は部品をなぞるだけにする．
 //! そのため，配置と線の座標を Windows でなくても確かめられる
 
+mod association;
 mod branch;
 mod list;
 mod paint;

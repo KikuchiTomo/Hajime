@@ -171,8 +171,17 @@ extension WireCandidateList {
             focus: panel.focus == .candidate ? .candidate : .variants,
             position: UInt32(clamping: panel.position),
             total: UInt32(clamping: panel.total),
-            note: panel.note
+            note: panel.note,
+            association: panel.association.map(WireAssociationHeading.init),
+            associationHint: panel.associationHint
         )
+    }
+}
+
+extension WireAssociationHeading {
+    public init(_ heading: AssociationHeading) {
+        self.init(headword: heading.headword, label: heading.label,
+                  group: UInt32(clamping: heading.group), groupCount: UInt32(clamping: heading.groupCount))
     }
 }
 
@@ -202,7 +211,9 @@ extension WireBranchMap {
             position: UInt32(clamping: panel.position),
             total: UInt32(clamping: panel.total),
             note: panel.note,
-            hints: hints
+            hints: hints,
+            association: panel.association.map(WireAssociationHeading.init),
+            associationHint: panel.associationHint
         )
     }
 }

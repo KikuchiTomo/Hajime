@@ -1426,6 +1426,25 @@ extension WireCandidateFocus: CustomStringConvertible, CustomDebugStringConverti
     public var debugDescription: String { description }
 }
 
+public struct WireAssociationHeading: Sendable, Equatable, Codable {
+    public var headword: String
+    public var label: String
+    public var group: UInt32
+    public var groupCount: UInt32
+
+    public init(headword: String, label: String, group: UInt32, groupCount: UInt32) {
+        self.headword = headword
+        self.label = label
+        self.group = group
+        self.groupCount = groupCount
+    }
+}
+
+extension WireAssociationHeading: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireAssociationHeading" }
+    public var debugDescription: String { description }
+}
+
 public struct WireCandidateList: Sendable, Equatable, Codable {
     public var variants: [WireCandidateVariant]
     public var selectedVariant: UInt32?
@@ -1435,8 +1454,10 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var position: UInt32
     public var total: UInt32
     public var note: String?
+    public var association: WireAssociationHeading?
+    public var associationHint: String?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: String? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: String? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1445,6 +1466,8 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.position = position
         self.total = total
         self.note = note
+        self.association = association
+        self.associationHint = associationHint
     }
 }
 
@@ -1530,13 +1553,17 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var total: UInt32
     public var note: String?
     public var hints: [WireKeyHint]
+    public var association: WireAssociationHeading?
+    public var associationHint: String?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: String? = nil, hints: [WireKeyHint]) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: String? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
         self.note = note
         self.hints = hints
+        self.association = association
+        self.associationHint = associationHint
     }
 }
 

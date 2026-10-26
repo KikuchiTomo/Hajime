@@ -54,6 +54,8 @@ mod tests {
 
     fn list(focus: CandidateFocus) -> CandidateList {
         CandidateList {
+            association: None,
+            association_hint: None,
             variants: vec![CandidateVariant {
                 label: "カタカナ".into(),
                 is_available: true,
@@ -114,6 +116,8 @@ mod tests {
             split: None,
         };
         let map = BranchMap {
+            association: None,
+            association_hint: None,
             columns: vec![column("今日は", false), column("晴れ", true)],
             position: 1,
             total: 1,

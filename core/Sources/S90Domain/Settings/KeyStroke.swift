@@ -92,26 +92,48 @@ public struct KeyStroke: Sendable, Hashable {
 
 // MARK: - 画面に出す名前
 
+/// キーの名前の書き方．OS の慣れた書き方に合わせる
+public enum KeyNameStyle: Sendable, Equatable {
+    /// 「⌃⇧Space」．修飾キーは macOS のメニューと同じ記号で ⌃⌥⇧⌘ の順
+    case mac
+    /// 「Ctrl+Shift+Space」．修飾キーは Ctrl・Alt・Shift・Win の順で「+」でつなぐ
+    case windows
+}
+
 extension KeyStroke {
-    /// 画面に出す短い名前(「⌃⇧Space」「⌥F1」「⌃K」)．修飾キーは macOS のメニューと同じ記号で ⌃⌥⇧⌘ の順．
-    /// 候補ウィンドウの案内(core が組み立てる)と設定の画面で同じ名前を使う
-    public var label: String {
-        var name = ""
-        if control { name += "⌃" }
-        if option { name += "⌥" }
-        if shift { name += "⇧" }
-        if command { name += "⌘" }
-        return name + Self.label(of: key)
+    /// 画面に出す短い名前(macOS の書き方)．設定の画面と，macOS の候補ウィンドウの案内で使う
+    public var label: String { label(style: .mac) }
+
+    /// 画面に出す短い名前．候補ウィンドウの案内(core が組み立てる)は，入力メソッドを動かす OS の書き方にする
+    public func label(style: KeyNameStyle) -> String {
+        switch style {
+        case .mac:
+            var name = ""
+            if control { name += "⌃" }
+            if option { name += "⌥" }
+            if shift { name += "⇧" }
+            if command { name += "⌘" }
+            return name + Self.label(of: key, style: style)
+        case .windows:
+            var parts: [String] = []
+            if control { parts.append("Ctrl") }
+            if option { parts.append("Alt") }
+            if shift { parts.append("Shift") }
+            if command { parts.append("Win") }
+            parts.append(Self.label(of: key, style: style))
+            return parts.joined(separator: "+")
+        }
     }
 
-    private static func label(of key: Key) -> String {
-        switch key {
+    private static func label(of key: Key, style: KeyNameStyle) -> String {
+        let mac = style == .mac
+        return switch key {
         case .character(let text): text.uppercased()
         case .space: "Space"
         case .enter: "Enter"
         case .tab: "Tab"
-        case .backspace: "⌫"
-        case .delete: "⌦"
+        case .backspace: mac ? "⌫" : "BS"
+        case .delete: mac ? "⌦" : "Del"
         case .escape: "Esc"
         case .up: "↑"
         case .down: "↓"
@@ -119,8 +141,8 @@ extension KeyStroke {
         case .right: "→"
         case .home: "Home"
         case .end: "End"
-        case .pageUp: "PageUp"
-        case .pageDown: "PageDown"
+        case .pageUp: mac ? "PageUp" : "PgUp"
+        case .pageDown: mac ? "PageDown" : "PgDn"
         case .function(let number): "F\(number)"
         case .eisu: "英数"
         case .kana: "かな"
