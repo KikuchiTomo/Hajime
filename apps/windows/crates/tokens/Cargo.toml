@@ -1,0 +1,11 @@
+[package]
+name = "tokens"
+description = "design/tokens/tokens.json から作る色と寸法"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
