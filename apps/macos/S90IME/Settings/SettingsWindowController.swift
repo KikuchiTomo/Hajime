@@ -14,8 +14,9 @@ final class SettingsWindowController {
 
     private let sync: SyncCoordinator
 
-    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, resetLearning: @escaping () -> Void) {
-        model = SettingsModel(store: settings, usage: usage, resetLearning: resetLearning)
+    init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, dictionaries: ImportedDictionaryStore? = nil,
+         resetLearning: @escaping () -> Void) {
+        model = SettingsModel(store: settings, usage: usage, dictionaries: dictionaries, resetLearning: resetLearning)
         self.sync = sync
     }
 
@@ -75,11 +76,17 @@ final class SettingsModel: ObservableObject {
     private let store: any SettingsStoring & SettingsObserving
     private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void
-    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
+    let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
+    /// 取り込んだ辞書の索引(R-14)．無ければ辞書を取り込めない
+    let dictionaries: ImportedDictionaryStore?
+    /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
+    @Published var isImportingDictionary = false
 
-    init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, resetLearning: @escaping () -> Void) {
+    init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, dictionaries: ImportedDictionaryStore? = nil,
+         resetLearning: @escaping () -> Void) {
         self.store = store
         self.usage = usage
+        self.dictionaries = dictionaries
         self.settings = store.current
         self.usageCounts = usage?.counts ?? UsageCounts()
         self.resetLearningAction = resetLearning
@@ -123,8 +130,10 @@ final class SettingsModel: ObservableObject {
         // ユーザー辞書は既定に戻さない．登録した語を消すのは辞書の画面で行う
         update { current in
             let dictionary = current.userDictionary
+            let imported = current.importedDictionaries
             current = S90Domain.Settings()
             current.userDictionary = dictionary
+            current.importedDictionaries = imported
         }
     }
 

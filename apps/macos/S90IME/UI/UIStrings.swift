@@ -9,7 +9,42 @@ enum UIStrings {
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
     }
 
+    /// 取り込んだ辞書(R-14)
+    enum Dictionaries {
+        static let userWords = "登録した単語"
+        static let imported = "取り込んだ辞書"
+        static let empty = "取り込んだ辞書はありません"
+        static let importFile = "辞書を取り込む…"
+        static let reimport = "取り込み直す…"
+        static let name = "名前"
+        static let field = "分野"
+        static let fieldPrompt = "電気・法律など"
+        static let condition = "使う場面"
+        static let always = "常に"
+        static let apps = "選んだアプリ"
+        static let context = "文脈に合わせる"
+        static let addApp = "アプリを追加…"
+        static let moveUp = "優先度を上げる"
+        static let moveDown = "優先度を下げる"
+        static let tooMany = "取り込める辞書は 32 個までです"
+        static let importFailed = "辞書を取り込めませんでした．大きすぎるか，読めない形式です"
+        static let note = "タブ区切り(読み・単語・品詞)，SKK，macOS のユーザ辞書の書き出しを取り込めます。上にある辞書ほど優先します。「文脈に合わせる」は，その辞書の単語を使うほど優先度が上がります。"
+        static func imported(_ count: Int) -> String { "\(count) 語を取り込みました" }
+
+        static func summary(_ dictionary: ImportedDictionary) -> String {
+            let condition = switch dictionary.condition {
+            case .always: always
+            case .apps(let apps): "\(Dictionaries.apps) \(apps.count) 個"
+            case .context: context
+            }
+            let field = dictionary.field.isEmpty ? "" : "\(dictionary.field)・"
+            return "\(field)\(dictionary.wordCount) 語・\(condition)"
+        }
+    }
+
     enum Branch {
+        /// 選んでいる候補の取り込んだ辞書
+        static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
         /// 足元の案内．キーは設定の割り当て(KeyBindings)の最初のキーを出す
         /// 文節の長さは，押したらどうなるか(shorter・longer)が分かればそれを見せる(「⇧← 入れ　⇧→ 入れると」)
         static func hints(for keys: KeyBindings, shorter: String? = nil, longer: String? = nil) -> [KeyHint] {

@@ -32,6 +32,14 @@ struct FuzzTests {
         }
     }
 
+    @Test("取り込む辞書のファイル(R-14)")
+    func importedDictionary() {
+        for data in samples(count: 500) {
+            let words = (try? DictionaryFileReader.parse(data)) ?? []
+            #expect(words.allSatisfy { $0.isValid })
+        }
+    }
+
     @Test("設定のファイル")
     func settings() {
         for data in samples(count: 500) {

@@ -16,10 +16,12 @@ final class InputContextProvider {
     func context(for client: any IMKTextInput, includePrecedingText: Bool) -> InputContext {
         // パスワード欄などで Secure Input が有効なら，変換も学習もしない．前の文字列も読まない
         let isSecure = IsSecureEventInputEnabled()
+        let application = client.bundleIdentifier()
         return InputContext(
-            profile: settings.current.profile(forApplication: client.bundleIdentifier()),
+            profile: settings.current.profile(forApplication: application),
             isSecure: isSecure,
-            precedingText: includePrecedingText && !isSecure ? precedingText(of: client) : nil
+            precedingText: includePrecedingText && !isSecure ? precedingText(of: client) : nil,
+            applicationID: application
         )
     }
 

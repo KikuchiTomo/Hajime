@@ -48,6 +48,9 @@ public final class FakeConverter: KanaKanjiConverting {
     public private(set) var leftContext: String?
     public func setLeftContext(_ text: String?) { leftContext = text }
     public func didCommit(_ candidate: Candidate) { committed.append(candidate) }
+    /// 取り込んだ辞書から渡された語(最後に渡されたもの)
+    public private(set) var auxiliaryWords: [AuxiliaryWord] = []
+    public func setAuxiliaryWords(_ words: [AuxiliaryWord]) { auxiliaryWords = words }
     public func endComposition() { endCount += 1 }
 }
 

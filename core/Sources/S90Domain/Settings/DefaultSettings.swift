@@ -129,6 +129,27 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryWordLength = 64
     /// 取り込むユーザー辞書のファイルの大きさの上限
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
+    /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
+    public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
+    /// 取り込む辞書 1 つの語の数の上限
+    public static let maximumImportedWords = 3_000_000
+    /// 取り込める辞書の数の上限
+    public static let maximumImportedDictionaries = 32
+    /// 取り込む語の読みと語の長さの上限
+    public static let maximumImportedReadingLength = 32
+    public static let maximumImportedWordLength = 64
+    /// 取り込んだ辞書の語の点数(大きいほど優先)．登録した語(userDictionaryWordCost)よりわずかに低くする
+    public static let importedWordCost: Float = -6
+    /// 一覧で 1 つ下の辞書ほど，語の点数をこれだけ下げる
+    public static let importedDictionaryPriorityStep: Float = 0.5
+    /// 文脈の条件の辞書を，最近その辞書の語を確定していないときに下げる点数
+    public static let importedDictionaryContextPenalty: Float = 4
+    /// 文脈の条件の辞書の優先度を上げる，最近確定したその辞書の語の数
+    public static let importedDictionaryContextHits = 2
+    /// 読み全体と一致する取り込んだ辞書の語を差し込む位置(上から何番目か)
+    public static let importedWordCandidateOffset = 1
+    /// 「最近」とみなす確定の回数
+    public static let importedDictionaryContextWindow = 30
     /// ユーザー辞書の語の点数(対数尤度)．辞書の一般的な語より少し上に出る値(azooKey-Desktop と同じ)
     public static let userDictionaryWordCost: Float = -5
 
