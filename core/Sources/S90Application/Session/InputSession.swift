@@ -728,7 +728,7 @@ public final class InputSession {
     public var conversionCorrectionRequest: (keys: [String], leftContext: String?)? {
         guard phase == .composing, settings.current.typoCorrection == .standard,
             (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection,
-            let keys = readingCorrector.pendingKeys(for: composition) else { return nil }
+            let keys = readingCorrector.pendingKeys(for: composition, final: true) else { return nil }
         return (keys, compositionLeftContext)
     }
 
@@ -771,7 +771,7 @@ public final class InputSession {
     private func enterConversion(recordsUsage: Bool = true) {
         if recordsUsage { usage?.record(.conversionOpened) }
         freezeWordsReadAsRomaji()
-        reviewReading()
+        reviewReading(final: true)
         guard settings.current.candidatePresentation != .list else {
             phase = .selecting(makeSelection(focus: .candidate(0)))
             return
@@ -809,13 +809,14 @@ public final class InputSession {
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
-    private func reviewReading() {
+    /// final は打ち終えたとき(変換する)．末尾の打ちかけのローマ字も見直す
+    private func reviewReading(final: Bool = false) {
         // 綴りを直した英単語のあとに日本語が続くときは，日本語の打ち間違いとしても見直し，直せる・示せるなら日本語に譲る
         // (tkitou → 英単語の bit ではなく 適当)．英単語の補正は取り消し，同じ位置では直し直さない
         let yields = corrector.yieldsToJapanese(in: composition)
         guard corrector.active == nil || yields else { return }
         let wasApplied = readingCorrector.isApplied
-        readingCorrector.review(&composition, makeComposition: newComposition)
+        readingCorrector.review(&composition, makeComposition: newComposition, final: final)
         if yields {
             // 日本語として確かに直せる(「もしかして」でなく直す)ときだけ譲る．示すだけの弱い訂正で英単語(jvascript → javascript)を消さない
             guard readingCorrector.isApplied else {
