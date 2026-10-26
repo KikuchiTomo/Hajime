@@ -55,19 +55,19 @@ Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流�
 
 ## ビルドと確かめ
 
-手元の Mac でも，rustup で `x86_64-pc-windows-msvc` の target を足せば `cargo clippy --target x86_64-pc-windows-msvc` でコンパイルまでは確かめられる(リンクはできない)．Windows でのビルドとテストは GitHub Actions の `windows` のワークフロー(`.github/workflows/windows.yml`)で行う．PR を出す前のブランチでも `gh workflow run windows.yml --ref <ブランチ>` で動かせる．
+手元の Mac でも，rustup で `x86_64-pc-windows-msvc` の target を足せば `cargo clippy --target x86_64-pc-windows-msvc` でコンパイルまでは確かめられる(リンクはできない)．Windows でのビルドとテストは GitHub Actions の `CI Windows` のワークフロー(`.github/workflows/ci-windows.yml`)で，インストーラーは `Package Windows`(`.github/workflows/package-windows.yml`)で作る．PR を出す前のブランチでも `gh workflow run ci-windows.yml --ref <ブランチ>` で動かせる．
 
 | ジョブ | 内容 |
 |---|---|
-| `rust` | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．候補ウィンドウの見本を PNG に書き出して成果物 `candidate-ui-snapshots` にする．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
-| `swift` | core と `s90-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
-| `package` | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `s90-tokyo-ime.msi` を作る |
+| `rust-windows`(ci-windows) | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．候補ウィンドウの見本を PNG に書き出して成果物 `candidate-ui-snapshots` にする．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
+| `core-windows`(ci-windows) | core と `s90-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
+| `package-windows`(package-windows) | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `s90.tokyo-IME-<バージョン>.msi` を作る |
 
 Windows 向けの Rust のコードは，Mac でも型の検査まではできる．rustup で `x86_64-pc-windows-msvc` の標準ライブラリを入れ，`apps/windows` で `cargo clippy --target x86_64-pc-windows-msvc -p candidate-ui --all-targets` を動かす(リンクはしない)．
 
 Swift は swift.org の Windows 版(6.3.3)を `compnerd/gha-setup-swift` で，Rust は `apps/windows/rust-toolchain.toml` の版を，WiX は `dotnet tool` の 6.0.2 を使う．
 
-Windows の機械で試すときは，`package` のジョブが作る MSI を入れる(`docs/user/how-to/install-windows.md`)．DLL だけを入れ替えるときは，管理者のコマンドプロンプトで `regsvr32 /u` で外してから置き換え，`regsvr32` で登録し直す．TSF の DLL はアプリに読み込まれたままになるので，置き換えたあとはアプリを開き直す．
+Windows の機械で試すときは，`package-windows` のジョブが作る MSI を入れる(`docs/user/how-to/install-windows.md`)．DLL だけを入れ替えるときは，管理者のコマンドプロンプトで `regsvr32 /u` で外してから置き換え，`regsvr32` で登録し直す．TSF の DLL はアプリに読み込まれたままになるので，置き換えたあとはアプリを開き直す．
 
 ## 候補ウィンドウの描き方
 

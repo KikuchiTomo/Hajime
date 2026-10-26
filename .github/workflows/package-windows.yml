@@ -1,0 +1,74 @@
+name: Package Windows
+
+# Windows のインストーラー(.msi)を作る．release.yml から呼ぶほか，手で動かして作ったものを試せる:
+#   gh workflow run package-windows.yml --ref <ブランチ>
+# 署名はしない(利用者が署名の設定をするまで．docs/dev/RELEASE.md)
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 作るコミット(タグなど)．空なら呼び出したワークフローのコミット
+        type: string
+        default: ""
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: compnerd/gha-setup-swift@9ff1ee4c44888c5817fc14d1b257ac8cabb4935f # v0.5.1
+        with:
+          swift-version: swift-6.3.3-release
+          swift-build: 6.3.3-RELEASE
+      # キャッシュは失敗・取り消しでも残す(restore と save を分ける)．鍵は実行ごとに変え，前の実行のものから戻す
+      - id: swiftrelease
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+          restore-keys: |
+            swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-
+      - run: |
+          tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
+          "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        shell: pwsh
+      - run: tools/windows/fetch_zenzai.ps1 -Output "$env:RUNNER_TEMP\zenzai"
+        shell: pwsh
+      - run: swift build --package-path core -c release --product s90-engine-host -Xswiftc "-L$env:LLAMA_DIR"
+      - run: rustup toolchain install
+        working-directory: apps/windows
+      - run: rustup target add i686-pc-windows-msvc
+        working-directory: apps/windows
+      - run: cargo build --locked --release
+        working-directory: apps/windows
+      - run: cargo build --locked --release -p tsf --target i686-pc-windows-msvc
+        working-directory: apps/windows
+      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai"
+        shell: pwsh
+      - run: dotnet tool install --global wix --version 6.0.2
+      - name: インストーラーを作る(バージョンは apps/windows/Cargo.toml の workspace.package.version)
+        shell: pwsh
+        run: |
+          $version = (cargo metadata --format-version 1 --no-deps --manifest-path apps/windows/Cargo.toml | ConvertFrom-Json).packages[0].version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "バージョンが読めません: $version" }
+          New-Item -ItemType Directory -Force apps/windows/target/dist | Out-Null
+          wix build apps/windows/installer/s90.wxs -arch x64 -d Version=$version -d StageDir=apps/windows/target/stage -o "apps/windows/target/dist/s90.tokyo-IME-$version.msi"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-windows
+          path: apps/windows/target/dist/*.msi
+          if-no-files-found: error
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}

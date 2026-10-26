@@ -1,4 +1,4 @@
-name: pr-title
+name: PR title
 
 # スカッシュマージでは PR のタイトルがそのまま main のコミットになるので，
 # タイトルが Conventional Commits の形(種類とスコープ)になっているかを確かめる(docs/dev/REPOSITORY.md)

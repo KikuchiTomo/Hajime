@@ -1,4 +1,4 @@
-name: windows
+name: CI Windows
 
 # Windows のビルドは時間がかかるので，Windows に関わるファイルが変わったときだけ動かす
 # 費用を抑えるため，今は自動では動かさない(利用者の指示 2026-10-27)．実装がそろってから手で一度にまとめて動かす:
@@ -10,12 +10,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-${{ github.ref }}
+  group: ci-windows-${{ github.ref }}
   # main は取り消さない(最後まで動かしてキャッシュを残し，PR がそれを使う)．PR は新しい push で古い実行を止める
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# 仕事の名前は ci.yml と同じ決まり(何を-どこで)．インストーラーを作るのは package-windows.yml
 jobs:
-  rust:
+  rust-windows:
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -59,7 +60,7 @@ jobs:
             apps/windows/target
           key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}-${{ github.run_id }}
 
-  swift:
+  core-windows:
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -91,58 +92,3 @@ jobs:
         with:
           path: core/.build
           key: swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
-
-  package:
-    runs-on: windows-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: compnerd/gha-setup-swift@9ff1ee4c44888c5817fc14d1b257ac8cabb4935f # v0.5.1
-        with:
-          swift-version: swift-6.3.3-release
-          swift-build: 6.3.3-RELEASE
-      # キャッシュは失敗・取り消しでも残す(restore と save を分ける)．鍵は実行ごとに変え，前の実行のものから戻す
-      - id: swiftrelease
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: core/.build
-          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
-          restore-keys: |
-            swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-
-      - run: |
-          tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
-          "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-        shell: pwsh
-      - run: tools/windows/fetch_zenzai.ps1 -Output "$env:RUNNER_TEMP\zenzai"
-        shell: pwsh
-      - run: swift build --package-path core -c release --product s90-engine-host -Xswiftc "-L$env:LLAMA_DIR"
-      - run: rustup toolchain install
-        working-directory: apps/windows
-      - run: rustup target add i686-pc-windows-msvc
-        working-directory: apps/windows
-      - run: cargo build --locked --release
-        working-directory: apps/windows
-      - run: cargo build --locked --release -p tsf --target i686-pc-windows-msvc
-        working-directory: apps/windows
-      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai"
-        shell: pwsh
-      - run: dotnet tool install --global wix --version 6.0.2
-      - name: インストーラーを作る(バージョンは apps/windows/Cargo.toml の workspace.package.version)
-        shell: pwsh
-        run: |
-          $version = (cargo metadata --format-version 1 --no-deps --manifest-path apps/windows/Cargo.toml | ConvertFrom-Json).packages[0].version
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "バージョンが読めません: $version" }
-          wix build apps/windows/installer/s90.wxs -arch x64 -d Version=$version -d StageDir=apps/windows/target/stage -o apps/windows/target/s90-tokyo-ime.msi
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: s90-tokyo-ime-windows
-          path: apps/windows/target/s90-tokyo-ime.msi
-          if-no-files-found: error
-      - if: always()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: core/.build
-          key: swift-release-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}

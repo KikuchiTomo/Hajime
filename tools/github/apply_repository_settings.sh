@@ -64,8 +64,9 @@ ruleset=$(cat <<'JSON'
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "check" },
-          { "context": "core-test" },
+          { "context": "lint" },
+          { "context": "core-macos" },
+          { "context": "app-macos" },
           { "context": "pr-title" }
         ]
       }
