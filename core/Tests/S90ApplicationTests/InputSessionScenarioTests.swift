@@ -1035,7 +1035,30 @@ struct InputStyleScenarioTests {
         let typed = actions(session, "konnnitiha".map { KeyEvent(.character($0)) })
         #expect(typed.marked == "konnnitiha")
         #expect(typed.panel?.entries.first?.text == "こんにちは")
-        #expect(actions(session, [KeyEvent(.tab)]).committed == "こんにちは")
+        // Tab では確定せず分岐図を開き，Enter で確定する
+        let opened = actions(session, [KeyEvent(.tab)])
+        #expect(opened.committed.isEmpty)
+        #expect(opened.marked == "こんにちは")
+        #expect(actions(session, [KeyEvent(.enter)]).committed == "こんにちは")
+    }
+
+    @Test("EN 入力: Tab で開いた分岐図で Esc を押すと英字に戻る")
+    func englishTabEscape() {
+        let converter = FakeConverter(["こんにちは": [("こんにちは", nil)]])
+        let session = session(.english, converter: converter)
+        _ = actions(session, "konnnitiha".map { KeyEvent(.character($0)) })
+        _ = actions(session, [KeyEvent(.tab)])
+        #expect(actions(session, [KeyEvent(.escape)]).marked == "konnnitiha")
+    }
+
+    @Test("EN 入力: 語の途中の「-」は伸ばし棒として読み，英字のまま確定すれば「-」のまま")
+    func englishLongVowel() {
+        let converter = FakeConverter(["らーめん": [("ラーメン", nil)]])
+        let session = session(.english, converter: converter)
+        let typed = actions(session, "ra-men".map { KeyEvent(.character($0)) })
+        #expect(typed.marked == "ra-men")
+        #expect(typed.panel?.entries.first?.text == "ラーメン")
+        #expect(actions(session, [KeyEvent(.space)]).committed == "ra-men")
     }
 
     @Test("EN 入力: Space は英字のまま確定してアプリに渡す")
@@ -1082,6 +1105,33 @@ struct TerminalScenarioTests {
         let result = type(session, "git status")
         #expect(result.committed == "git ")
         #expect(result.passed == "status")
+    }
+
+    @Test("英字入力: コマンドの行でも英字を組み立て，Tab で日本語にする")
+    func englishTabInCommandLine() {
+        var settings = Settings()
+        settings.inputStyle = .english
+        let session = InputSession(converter: FakeConverter(["こんにちは": [("こんにちは", nil)]]), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        _ = type(session, "echo konnnitiha")
+        var committed = ""
+        let result = session.handle(KeyEvent(.tab), context: terminal)
+        #expect(result.handled)
+        let enter = session.handle(KeyEvent(.enter), context: terminal)
+        for action in enter.actions { if case .commit(let value) = action { committed += value } }
+        #expect(committed == "こんにちは")
+    }
+
+    @Test("英字入力: 日本語の候補が無いときの Tab は，英字を確定してターミナルに渡す(補完を妨げない)")
+    func englishTabCompletion() {
+        var settings = Settings()
+        settings.inputStyle = .english
+        let session = InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        _ = type(session, "cd Docu")
+        var committed = ""
+        let result = session.handle(KeyEvent(.tab), context: terminal)
+        for action in result.actions { if case .commit(let value) = action { committed += value } }
+        #expect(!result.handled)
+        #expect(committed == "Docu")
     }
 
     @Test("引用符の中は日本語を打て，閉じる引用符で確定する")

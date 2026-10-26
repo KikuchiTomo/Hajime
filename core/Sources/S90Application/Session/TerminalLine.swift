@@ -27,7 +27,8 @@ final class TerminalLine {
     /// - Parameters:
     ///   - composingKeys: 読みを組み立てているなら，その打ったキー(ローマ字)．組み立てていなければ nil
     ///   - isComposing: 何かを組み立てているか(EN 入力の英字を含む)
-    func decide(_ event: KeyEvent, isComposing: Bool, composingKeys: String?) -> Decision {
+    ///   - holdsLetters: 英字入力のときは true．コマンドの行でも英字を流さずに組み立て，Tab で日本語にできるようにする
+    func decide(_ event: KeyEvent, isComposing: Bool, composingKeys: String?, holdsLetters: Bool = false) -> Decision {
         guard !event.modifiers.contains(.control) else { return .continue }
         switch event.key {
         case .space where !isComposing:
@@ -35,8 +36,8 @@ final class TerminalLine {
         case .space:
             guard let keys = composingKeys, state.didTypeFirstWord(keys) else { return .continue }
             return .commitCommand(keys)
-        case .character where state.passesThrough && !isComposing:
-            // コマンドの行では英字も記号もそのまま流す
+        case .character(let character) where state.passesThrough && !isComposing && !(holdsLetters && character.isASCII && character.isLetter):
+            // コマンドの行では英字も記号もそのまま流す(英字入力の英字は組み立てる)
             return .passThrough
         case .character(let character) where isComposing && state.region == .quoted(character):
             // 引用符の中の日本語は，閉じる引用符で確定し，引用符はそのまま流す

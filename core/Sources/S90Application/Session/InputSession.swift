@@ -41,6 +41,8 @@ public final class InputSession {
     private var isSettled = false
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
+    /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
+    private var convertedFromEnglish: String?
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
@@ -282,7 +284,7 @@ public final class InputSession {
     /// ターミナルの行の判断に従う．ふつうの処理に回すときは nil
     private func applyTerminal(_ event: KeyEvent) -> KeyResult? {
         let composingKeys = phase == .composing && !composition.isEmpty ? composition.rawKeys : nil
-        switch terminal.decide(event, isComposing: isComposing, composingKeys: composingKeys) {
+        switch terminal.decide(event, isComposing: isComposing, composingKeys: composingKeys, holdsLetters: settings.current.inputStyle == .english) {
         case .continue:
             return nil
         case .passThrough:
@@ -329,12 +331,36 @@ public final class InputSession {
     private func applyInputStyle(_ event: KeyEvent, context: InputContext) -> KeyResult? {
         let style = settings.current.inputStyle
         guard let handler = styleHandlers[style] else { return nil }
+        // 英字入力の Tab で開いた分岐図などで英字を打ったら，選んでいる変換で確定してから英字を続ける
+        if style == .english, !composition.isEmpty, case .character(let character) = event.key, character.isASCII, character.isLetter {
+            let committed = commitAll()
+            if case .handled(let result)? = handler.interpret(event, state: InputStyleState(settings: settings.current, selectableCount: 0)) {
+                return KeyResult(handled: result.handled, actions: committed + result.actions)
+            }
+            return KeyResult(handled: true, actions: committed)
+        }
+        // 英字入力で日本語の読みを組み立てているあいだ(Tab で開いた分岐図)は，ほかのキーをふつうの処理に回す(Enter で確定など)
+        if style == .english, !composition.isEmpty { return nil }
         let state = InputStyleState(settings: settings.current, selectableCount: selectableCount)
         switch handler.interpret(event, state: state) {
         case nil:
             return nil
         case .handled(let result):
             return result
+        case .convertRomaji(let keys):
+            // 英字入力の語を日本語の読みにし，分岐図で変換を選べるようにする．Esc で英字に戻す
+            var actions: [ClientAction] = commitAll()
+            if !isComposing { converter.setLeftContext(context.precedingText) }
+            composition = newComposition()
+            let resolver = NasalReadingResolver(converter: converter)
+            for key in keys {
+                composition.insertRomaji(key)
+                resolver.resolve(&composition)
+            }
+            convertedFromEnglish = keys
+            enterConversion()
+            actions += [.hideCandidates] + render(context: context)
+            return KeyResult(handled: true, actions: actions)
         case .insertKana(let kana):
             var actions: [ClientAction] = []
             if phase != .composing { actions += commitAll() }
@@ -557,6 +583,12 @@ public final class InputSession {
             return switchToDirectPassingEscape(actions: [])
         }
         let wasConverting = phase != .composing
+        if wasConverting, let english = convertedFromEnglish, let handler = styleHandlers[.english] as? EnglishInput {
+            // 英字入力の Tab で開いた分岐図は，Esc で英字に戻す
+            _ = reset()
+            handler.restore(english)
+            return KeyResult(handled: true, actions: handler.render())
+        }
         phase = .composing
         if readingCorrector.revert(&composition) {
             // 打ち間違いを直していたら，打ったままの読みに戻す
@@ -633,6 +665,7 @@ public final class InputSession {
     }
 
     private func reset() -> [ClientAction] {
+        convertedFromEnglish = nil
         composition = newComposition()
         readingCorrector.reset()
         alphabetRun = false
