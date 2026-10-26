@@ -1,3 +1,5 @@
+import Foundation
+
 /// 利用者が色や形を決めて保存したテーマ．元にしたテーマ(base)の描き方(角丸か立体の枠か)を使い，色と書体と形を上書きする
 public struct CustomTheme: Sendable, Equatable, Hashable, Codable {
     /// 枝の線の形
@@ -82,5 +84,55 @@ public struct HexColor: Sendable, Equatable, Hashable, Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(hex)
+    }
+}
+
+extension HexColor {
+    /// WCAG 2.2 の相対輝度(tools/tokens/check_contrast.py と同じ式)
+    public var relativeLuminance: Double {
+        func linear(_ channel: UInt8) -> Double {
+            let value = Double(channel) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
+
+    /// WCAG 2.2 のコントラスト比(1〜21)
+    public func contrastRatio(with other: HexColor) -> Double {
+        let (lighter, darker) = (max(relativeLuminance, other.relativeLuminance), min(relativeLuminance, other.relativeLuminance))
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+}
+
+extension CustomTheme {
+    /// 文字と地のコントラストを確かめる組み合わせ．基準は design/tokens/tokens.json の既成のテーマと同じ
+    public enum ContrastPair: Sendable, Equatable, CaseIterable {
+        /// 文字と背景
+        case text
+        /// 補助の文字と背景
+        case textMuted
+        /// 選択中の文字と選択の色
+        case selectionText
+        /// 修正の印と背景
+        case correction
+
+        /// 求めるコントラスト比．文字は 4.5，印(下線)は 3
+        public var minimum: Double {
+            self == .correction ? DefaultSettings.minimumMarkContrast : DefaultSettings.minimumTextContrast
+        }
+    }
+
+    public func contrastRatio(of pair: ContrastPair) -> Double {
+        switch pair {
+        case .text: text.contrastRatio(with: surface)
+        case .textMuted: textMuted.contrastRatio(with: surface)
+        case .selectionText: selectionText.contrastRatio(with: selection)
+        case .correction: correction.contrastRatio(with: surface)
+        }
+    }
+
+    /// 基準に届かず読みにくい組み合わせ
+    public var lowContrastPairs: [ContrastPair] {
+        ContrastPair.allCases.filter { contrastRatio(of: $0) < $0.minimum }
     }
 }

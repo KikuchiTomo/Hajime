@@ -6,86 +6,21 @@ struct SettingsView: View {
     static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel
     let sync: SyncCoordinator
-    @State private var page: Page? = .input
-
-    /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(上のタブには収まらない)
-    enum Page: CaseIterable, Hashable {
-        case input, conversion, correction, symbols, keys, dictionary, romaji, apps, appearance, usage, sync, backup, about
-
-        var title: String {
-            switch self {
-            case .input: UIStrings.Settings.inputTab
-            case .conversion: UIStrings.Settings.conversionTab
-            case .correction: UIStrings.Features.correctionPage
-            case .symbols: UIStrings.Features.symbolsPage
-            case .keys: UIStrings.Keys.tab
-            case .dictionary: UIStrings.Settings.dictionaryTab
-            case .romaji: UIStrings.Settings.romajiTab
-            case .apps: UIStrings.Settings.appsTab
-            case .appearance: UIStrings.Settings.appearanceTab
-            case .usage: UIStrings.Settings.usageTab
-            case .sync: UIStrings.Sync.page
-            case .backup: UIStrings.More.backup
-            case .about: UIStrings.More.about
-            }
-        }
-
-        /// SF Symbols の名前
-        var symbol: String {
-            switch self {
-            case .input: "keyboard"
-            case .conversion: "character.book.closed.ja"
-            case .correction: "wand.and.stars"
-            case .symbols: "arrow.right.square"
-            case .keys: "command"
-            case .dictionary: "text.book.closed"
-            case .romaji: "textformat.abc"
-            case .apps: "nosign.app"
-            case .appearance: "paintbrush"
-            case .usage: "chart.line.uptrend.xyaxis"
-            case .sync: "arrow.triangle.2.circlepath"
-            case .backup: "externaldrive"
-            case .about: "info.circle"
-            }
-        }
-
-        /// 検索で見つけるための言葉．ページの名前に加え，そのページにある項目の名前
-        var keywords: [String] {
-            switch self {
-            case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect]
-            case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana,
-                               UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
-                               UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion]
-            case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
-            case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
-            // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
-            case .keys: [UIStrings.Keys.presetMenu] + KeymapCommand.allCases.map(UIStrings.Keys.label(for:))
-                + KeymapState.allCases.map(UIStrings.Keys.label(for:)) + KeymapPreset.allCases.map(UIStrings.Keys.label(for:))
-            case .sync: [UIStrings.Sync.folder, UIStrings.Sync.scopes, UIStrings.Sync.label(for: .dictionary)]
-            default: []
-            }
-        }
-    }
+    /// 開いているページ．窓の外(計測など)からも切り替えられるように持ち出す
+    @Bindable var navigation: SettingsNavigation
+    private var page: Page? { navigation.page }
 
     @State private var query = ""
 
-    /// 検索の言葉を含むページだけを並べる
-    private var pages: [Page] {
-        guard !query.isEmpty else { return Page.allCases }
-        return Page.allCases.filter { page in ([page.title] + page.keywords).contains { $0.localizedCaseInsensitiveContains(query) } }
-    }
-
     var body: some View {
         NavigationSplitView {
-            List(pages, id: \.self, selection: $page) { page in
-                Label(page.title, systemImage: page.symbol)
-            }
-            .navigationSplitViewColumnWidth(DesignTokens.Size.Settings.sidebarWidth)
-            // 左の一覧を畳むボタンは要らない(見出しに重なる)
-            .toolbar(removing: .sidebarToggle)
-            .searchable(text: $query, placement: .sidebar, prompt: UIStrings.Features.search)
+            SettingsSidebar(query: query, selection: $navigation.page)
+                .navigationSplitViewColumnWidth(DesignTokens.Size.Settings.sidebarWidth)
+                // 左の一覧を畳むボタンは要らない(見出しに重なる)
+                .toolbar(removing: .sidebarToggle)
+                .searchable(text: $query, placement: .sidebar, prompt: UIStrings.Features.search)
         } detail: {
-            detail(for: page ?? .input)
+            SettingsPageStack(current: page ?? .input) { AnyView(detail(for: $0)) }
                 .navigationTitle((page ?? .input).title)
         }
         .frame(width: Self.size.width, height: Self.size.height)
@@ -103,7 +38,7 @@ struct SettingsView: View {
         case .symbols: SymbolsPage(model: model)
         case .keys: KeymapPage(model: model)
         case .dictionary: DictionaryPage(model: model)
-        case .romaji: RomajiTab(model: model)
+        case .romaji: RomajiPage(model: model)
         case .apps: ExclusionsPage(model: model)
         case .appearance: AppearancePage(model: model)
         case .usage: UsageTab(model: model)
@@ -111,6 +46,42 @@ struct SettingsView: View {
         case .backup: BackupPage(model: model)
         case .about: AboutPage(model: model)
         }
+    }
+}
+
+/// 左の一覧．見出しごとにまとめ，検索の言葉を含むページだけを並べる
+struct SettingsSidebar: View {
+    let query: String
+    @Binding var selection: SettingsView.Page?
+
+    var body: some View {
+        List(selection: $selection) {
+            ForEach(SettingsView.Group.allCases, id: \.self) { group in
+                let pages = pages(in: group)
+                if !pages.isEmpty {
+                    Section(group.title) {
+                        ForEach(pages, id: \.self) { page in
+                            Label(page.title, systemImage: page.symbol)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func pages(in group: SettingsView.Group) -> [SettingsView.Page] {
+        guard !query.isEmpty else { return group.pages }
+        return group.pages.filter { page in ([page.title] + page.keywords).contains { $0.localizedCaseInsensitiveContains(query) } }
+    }
+}
+
+/// 設定の画面で開いているページ
+@MainActor @Observable
+final class SettingsNavigation {
+    var page: SettingsView.Page?
+
+    init(page: SettingsView.Page = .input) {
+        self.page = page
     }
 }
 
@@ -227,109 +198,6 @@ private struct ConversionTab: View {
     }
 }
 
-/// 辞書のページ．登録した単語と，取り込んだ辞書(R-16)を切り替えて出す
-private struct DictionaryPage: View {
-    @ObservedObject var model: SettingsModel
-    @State private var showsImported = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $showsImported) {
-                Text(UIStrings.Dictionaries.userWords).tag(false)
-                Text(UIStrings.Dictionaries.imported).tag(true)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .padding(.vertical, 8)
-            if showsImported {
-                ImportedDictionariesView(model: model)
-            } else {
-                DictionaryTab(model: model).padding()
-            }
-        }
-    }
-}
-
-private struct DictionaryTab: View {
-    @ObservedObject var model: SettingsModel
-    @State private var reading = ""
-    @State private var word = ""
-    @State private var selection = Set<UserDictionaryEntry>()
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                TextField(UIStrings.Settings.reading, text: $reading)
-                TextField(UIStrings.Settings.word, text: $word)
-                Button(UIStrings.Settings.add) {
-                    if model.addEntry(reading: reading, word: word) {
-                        reading = ""
-                        word = ""
-                    }
-                }
-                .disabled(reading.isEmpty || word.isEmpty)
-            }
-            Table(model.settings.userDictionary, selection: $selection) {
-                TableColumn(UIStrings.Settings.reading, value: \.reading)
-                TableColumn(UIStrings.Settings.word, value: \.word)
-            }
-            HStack {
-                Button(UIStrings.Settings.remove) {
-                    model.removeEntries(selection)
-                    selection = []
-                }
-                .disabled(selection.isEmpty)
-                Spacer()
-                Button(UIStrings.Settings.importDictionary) { model.importDictionary() }
-                Button(UIStrings.Settings.exportDictionary) { model.exportDictionary() }
-            }
-            Text(UIStrings.Settings.dictionaryNote).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-}
-
-/// 利用者が足すローマ字の綴り．標準の表に重ね，同じ綴りは利用者のものを使う
-private struct RomajiTab: View {
-    @ObservedObject var model: SettingsModel
-    @State private var keys = ""
-    @State private var kana = ""
-    @State private var selection = Set<RomajiRule>()
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                TextField(UIStrings.Settings.romajiKeys, text: $keys)
-                TextField(UIStrings.Settings.romajiKana, text: $kana)
-                Button(UIStrings.Settings.add) {
-                    if model.addRomajiRule(keys: keys, kana: kana) {
-                        keys = ""
-                        kana = ""
-                    }
-                }
-                .disabled(keys.isEmpty || kana.isEmpty)
-            }
-            Table(model.settings.customRomaji, selection: $selection) {
-                TableColumn(UIStrings.Settings.romajiKeys, value: \.keys)
-                TableColumn(UIStrings.Settings.romajiKana, value: \.kana)
-            }
-            HStack {
-                Button(UIStrings.Settings.remove) {
-                    model.update { $0.customRomaji.removeAll { selection.contains($0) } }
-                    selection = []
-                }
-                .disabled(selection.isEmpty)
-                Spacer()
-            }
-            Text(UIStrings.Settings.romajiNote).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-}
-
-extension RomajiRule: @retroactive Identifiable {
-    public var id: Self { self }
-}
-
 extension ProfileRule: @retroactive Identifiable {
     public var id: Self { self }
 }
@@ -359,10 +227,6 @@ private struct UsageTab: View {
         }
         .formStyle(.grouped)
     }
-}
-
-extension UserDictionaryEntry: @retroactive Identifiable {
-    public var id: Self { self }
 }
 
 /// 秒で値を選ぶ項目．今の値を右に出す．動かしている間は保存せず，手を離したときに保存する(1 段ごとに設定のファイルを書き直さない)

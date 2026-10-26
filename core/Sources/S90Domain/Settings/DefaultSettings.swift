@@ -138,6 +138,10 @@ public enum DefaultSettings {
     public static let maximumThemeNameLength = 40
     public static let customThemeCornerRadius = 12.0
     public static let customThemeCornerRadiusRange = 0.0...24.0
+    /// カスタムテーマで文字と地に求めるコントラスト比(WCAG 2.2 AA)．下回れば設定の画面で知らせる
+    public static let minimumTextContrast = 4.5
+    /// カスタムテーマで印(修正の下線)と地に求めるコントラスト比
+    public static let minimumMarkContrast = 3.0
     /// 1 ページに出す候補の数を選べる範囲(番号キー 1〜9 で選べる数まで)
     public static let candidatesPerPageRange = 3...9
     /// ライブ変換で漢字にするまでの待ち時間・打ち間違いを見直すまでの待ち時間・モードの表示の時間を選べる範囲(秒)
@@ -150,6 +154,8 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryWordLength = 64
     /// 取り込むユーザー辞書のファイルの大きさの上限
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
+    /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限
+    public static let maximumRuleListFileBytes = 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
     /// 同期のフォルダと運ぶ索引のファイルの大きさの上限．索引は品詞を書き足すので，取り込むファイルより大きくなりうる
@@ -182,6 +188,8 @@ public enum DefaultSettings {
     public static let maximumSymbolRules = 2_000
     /// 置き換えの決まりと直さない語の数の上限
     public static let maximumCorrectionRules = 2_000
+    /// 直さない語の長さの上限
+    public static let maximumExceptionLength = 64
 
     /// 手書きの線を書き終えてから認識するまで待つ時間(秒)．続けて書く線を待つ
     public static let handwritingRecognitionDelay = 0.6

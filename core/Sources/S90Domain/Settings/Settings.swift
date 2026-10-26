@@ -142,7 +142,7 @@ public struct Settings: Sendable, Equatable {
         symbolRules = Array(symbolRules.reversed().filter { $0.isValid && symbolKeys.insert("\($0.kind.rawValue):\($0.input)").inserted }.reversed()
             .prefix(DefaultSettings.maximumSymbolRules))
         correction.rules = Array(correction.rules.filter(\.isValid).prefix(DefaultSettings.maximumCorrectionRules))
-        correction.exceptions = Array(correction.exceptions.filter { !$0.isEmpty && $0.count <= 64 }.prefix(DefaultSettings.maximumCorrectionRules))
+        correction.exceptions = Array(correction.exceptions.filter(RuleListEditing.isValidException).prefix(DefaultSettings.maximumCorrectionRules))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
         keymap.clampToValidRanges()
     }

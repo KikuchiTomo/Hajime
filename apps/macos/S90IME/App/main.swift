@@ -5,7 +5,10 @@ import os
 private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "app")
 
 #if DEBUG
-MainActor.assumeIsolated { SnapshotRenderer.runIfRequested() }
+MainActor.assumeIsolated {
+    SnapshotRenderer.runIfRequested()
+    SettingsBenchmark.runIfRequested()
+}
 #endif
 
 MainActor.assumeIsolated {

@@ -31,20 +31,23 @@ enum SnapshotRenderer {
         ]
         for look in looks {
             let appearance = NSAppearance(named: look.appearance)
-            NSAppearance.current = appearance
-            render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
-            render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
-            render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
-            render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
-            render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
+            // 色を今の外観で決める部品があるので，その外観を描くときの外観にして組み立てる
+            (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
+                render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
+                render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
+                render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
+                render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
+                render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
+            }
         }
-        render(settingsView(), name: "settings", to: output, appearance: NSAppearance(named: .aqua))
         for (appearance, name) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
             let look = NSAppearance(named: appearance)
-            NSAppearance.current = look
-            render(keymapView(edited: false, appearance: look), name: "keymap-\(name)", to: output, appearance: look)
-            render(keymapView(edited: true, appearance: look), name: "keymap-warnings-\(name)", to: output, appearance: look)
+            (look ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
+                render(keymapView(edited: false, appearance: look), name: "keymap-\(name)", to: output, appearance: look)
+                render(keymapView(edited: true, appearance: look), name: "keymap-warnings-\(name)", to: output, appearance: look)
+            }
         }
+        renderSettings(to: output)
         exit(0)
     }
 
@@ -55,17 +58,51 @@ enum SnapshotRenderer {
         return FileSettingsStore(fileURL: url)
     }
 
-    /// 設定の画面(入力のページ)
-    private static func settingsView() -> NSView {
-        let store = snapshotStore("settings")
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-snapshot", isDirectory: true)
-        let synchronizer = SettingsSynchronizer(settings: store, stateStore: FileSyncStateStore(fileURL: directory.appendingPathComponent("sync-state.json")))
-        let dictionaries = ImportedDictionaryStore(directory: directory.appendingPathComponent("dictionaries", isDirectory: true))
-        let sync = SyncCoordinator(synchronizer: synchronizer, settings: store, dictionaries: dictionaries)
-        let view = NSHostingView(rootView: SettingsView(model: SettingsModel(store: store, usage: nil, resetLearning: {}), sync: sync))
-        view.frame = NSRect(origin: .zero, size: SettingsView.size)
-        view.layoutSubtreeIfNeeded()
-        return view
+    /// 設定の画面の各ページ(ライトとダーク)と，カスタムテーマの編集の画面．設定は一時ディレクトリに置き，利用者の設定に触れない．
+    /// 窓の枠(見出しと検索欄のあるツールバー)ごと写し，ページの中身がツールバーの下から始まるかも確かめられるようにする
+    private static func renderSettings(to output: URL) {
+        _ = NSApplication.shared
+        let fixture = SettingsFixture.make(name: "snapshot")
+        fixture.model.update { settings in
+            settings.correction.rules = [CorrectionRule(typed: "teh", word: "the"), CorrectionRule(typed: "recieve", word: "receive"),
+                                         CorrectionRule(typed: "adn", word: "and")]
+            settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "wye", kana: "ゑ")]
+            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "s90"), UserDictionaryEntry(reading: "かいしゃ", word: "会社")]
+            settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
+                                    SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]
+            settings.profileRules = [ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .terminal)]
+        }
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            let navigation = SettingsNavigation()
+            let window = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: navigation)
+            window.orderFrontRegardless()
+            for page in SettingsView.Page.allCases {
+                navigation.page = page
+                SettingsFixture.settle(window)
+                guard let frame = window.contentView?.superview else { continue }
+                render(frame, name: "settings-\(page)\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+            }
+            window.close()
+        }
+        NSApp.appearance = NSAppearance(named: .aqua)
+        // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
+        let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
+        let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
+                                     styleMask: [.borderless], backing: .buffered, defer: false)
+        sidebarWindow.contentView = sidebar
+        sidebarWindow.orderFrontRegardless()
+        SettingsFixture.settle(sidebarWindow)
+        render(sidebar, name: "settings-sidebar", to: output, appearance: NSAppearance(named: .aqua))
+        sidebarWindow.close()
+        // 読みにくい色を選んだカスタムテーマの編集の画面(知らせが出るか)
+        var theme = fixture.model.draftCustomTheme()
+        theme.textMuted = HexColor("#B0B0B0")!
+        theme.surface = HexColor("#FFFFFF")!
+        let editor = NSHostingView(rootView: CustomThemeEditor(model: fixture.model, draft: ThemeDraft(theme: theme, isNew: true)))
+        editor.frame = NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.themeEditorWidth, height: DesignTokens.Size.Settings.themeEditorHeight)
+        editor.layoutSubtreeIfNeeded()
+        render(editor, name: "settings-theme-editor", to: output, appearance: NSAppearance(named: .aqua))
     }
 
     /// キー設定のページ(R-17)．edited なら，重なった行・文字のキー・取り消しの無い状態の印が出る表にする
@@ -190,8 +227,9 @@ enum SnapshotRenderer {
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
             bytesPerRow: 0, bitsPerPixel: 0) else { return }
         rep.size = size
-        NSAppearance.current = appearance ?? NSAppearance(named: .aqua)!
-        view.cacheDisplay(in: view.bounds, to: rep)
+        (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
+            view.cacheDisplay(in: view.bounds, to: rep)
+        }
         try? rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("\(name).png"))
     }
 }

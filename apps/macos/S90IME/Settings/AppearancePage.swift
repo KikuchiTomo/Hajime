@@ -8,6 +8,10 @@ struct AppearancePage: View {
     @ObservedObject var model: SettingsModel
     /// 動かしているあいだの値．手を離したときに保存し，1 段ごとに設定のファイルを書き直さない
     @State private var fontSize: Double?
+    /// 編集の画面で開いているカスタムテーマ
+    @State private var editing: ThemeDraft?
+    /// 消してよいかを尋ねているカスタムテーマ
+    @State private var deleting: CustomTheme?
 
     var body: some View {
         Form {
@@ -26,22 +30,19 @@ struct AppearancePage: View {
                 }
             }
             Section(UIStrings.More.customThemes) {
+                if model.settings.customThemes.isEmpty {
+                    Text(UIStrings.More.noCustomThemes).foregroundStyle(.secondary)
+                }
                 ForEach(model.settings.customThemes, id: \.id) { theme in
-                    ThemeRow(choice: ThemeChoice(theme.base, custom: theme), title: theme.name, isSelected: model.settings.customThemeID == theme.id) {
-                        model.selectCustomTheme(id: theme.id)
-                    }
+                    CustomThemeRow(model: model, theme: theme, edit: { editing = ThemeDraft(theme: theme, isNew: false) },
+                                   delete: { deleting = theme })
                 }
                 HStack {
+                    Button(UIStrings.More.createTheme) { editing = ThemeDraft(theme: model.draftCustomTheme(), isNew: true) }
                     Button(UIStrings.More.duplicate) { model.duplicateCurrentTheme() }
-                        .disabled(model.settings.customThemes.count >= DefaultSettings.maximumCustomThemes)
                     Spacer()
-                    if let active = model.settings.activeCustomTheme {
-                        Button(UIStrings.More.deleteTheme, role: .destructive) { model.deleteCustomTheme(id: active.id) }
-                    }
                 }
-            }
-            if let active = model.settings.activeCustomTheme {
-                CustomThemeEditor(model: model, theme: active)
+                .disabled(model.settings.customThemes.count >= DefaultSettings.maximumCustomThemes)
             }
             Section(UIStrings.More.font) {
                 ResettableRow(model: model, keyPath: \.candidateFontSize) {
@@ -61,6 +62,53 @@ struct AppearancePage: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(item: $editing) { draft in
+            CustomThemeEditor(model: model, draft: draft)
+        }
+        .confirmationDialog(deleting.map { UIStrings.More.confirmDeleteTheme($0.name) } ?? "",
+                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
+            Button(UIStrings.More.deleteTheme, role: .destructive) {
+                if let deleting { model.deleteCustomTheme(id: deleting.id) }
+            }
+        }
+    }
+}
+
+/// カスタムテーマの一行．押すと使い，右のボタンで編集・複製・削除する
+private struct CustomThemeRow: View {
+    @ObservedObject var model: SettingsModel
+    let theme: CustomTheme
+    let edit: () -> Void
+    let delete: () -> Void
+
+    var body: some View {
+        HStack {
+            ThemeRow(choice: ThemeChoice(theme.base, custom: theme), title: theme.name, isSelected: model.settings.customThemeID == theme.id) {
+                model.selectCustomTheme(id: theme.id)
+            }
+            if !theme.lowContrastPairs.isEmpty {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .help(UIStrings.More.readability)
+                    .accessibilityLabel(UIStrings.More.readability)
+            }
+            button(UIStrings.More.editTheme, systemImage: "pencil", action: edit)
+            button(UIStrings.More.duplicateTheme, systemImage: "plus.square.on.square") { model.duplicateCustomTheme(id: theme.id) }
+                .disabled(model.settings.customThemes.count >= DefaultSettings.maximumCustomThemes)
+            button(UIStrings.More.deleteTheme, systemImage: "trash", action: delete)
+        }
+        .contextMenu {
+            Button(UIStrings.More.editTheme, action: edit)
+            Button(UIStrings.More.duplicateTheme) { model.duplicateCustomTheme(id: theme.id) }
+            Button(UIStrings.More.deleteTheme, role: .destructive, action: delete)
+        }
+    }
+
+    private func button(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: systemImage) }
+            .buttonStyle(.borderless)
+            .help(title)
+            .accessibilityLabel(title)
     }
 }
 
@@ -106,78 +154,8 @@ private struct ThemeSwatch: View {
     }
 }
 
-/// 使っているカスタムテーマの色・形・書体を変える．変えたらすぐに保存し，候補ウィンドウにも映る
-private struct CustomThemeEditor: View {
-    @ObservedObject var model: SettingsModel
-    let theme: CustomTheme
-    @State private var name = ""
-
-    var body: some View {
-        Section(UIStrings.More.colors) {
-            LabeledContent(UIStrings.More.themeName) {
-                TextField("", text: $name)
-                    .onSubmit(saveName)
-                    .frame(width: 220)
-            }
-            color(UIStrings.More.surface, \.surface)
-            color(UIStrings.More.text, \.text)
-            color(UIStrings.More.textMuted, \.textMuted)
-            color(UIStrings.More.selection, \.selection)
-            color(UIStrings.More.selectionText, \.selectionText)
-            color(UIStrings.More.correction, \.correction)
-            color(UIStrings.More.line, \.line)
-        }
-        .onAppear { name = theme.name }
-        .onChange(of: theme.id) { name = theme.name }
-        .onDisappear(perform: saveName)
-        Section(UIStrings.More.shape) {
-            LabeledContent(UIStrings.More.cornerRadius) {
-                Slider(value: binding(\.cornerRadius), in: DefaultSettings.customThemeCornerRadiusRange, step: 1)
-                    .frame(width: 220)
-            }
-            Picker(UIStrings.More.branchStyle, selection: binding(\.branchStyle)) {
-                ForEach(CustomTheme.BranchStyle.allCases, id: \.self) { Text(UIStrings.More.label(for: $0)).tag($0) }
-            }
-            Picker(UIStrings.More.font, selection: binding(\.fontName)) {
-                Text(UIStrings.More.themeFont).tag(String?.none)
-                ForEach(Self.fonts, id: \.self) { font in
-                    Text(NSFont(name: font, size: 13)?.displayName ?? font).tag(String?.some(font))
-                }
-            }
-        }
-    }
-
-    /// 選べる候補の書体．この Mac にあるものだけ
-    private static let fonts = [
-        "HiraginoSans-W3", "HiraginoSans-W6", "HiraMinProN-W3", "HiraMinProN-W6", "HiraMaruProN-W4",
-        "YuGothic-Medium", "YuMincho-Regular", "ToppanBunkyuGothicPr6N-DB", "ToppanBunkyuMinchoPr6N-RG", "Osaka", "Menlo-Regular",
-    ].filter { NSFont(name: $0, size: 13) != nil }
-
-    private func binding<Value>(_ keyPath: WritableKeyPath<CustomTheme, Value>) -> Binding<Value> {
-        Binding(get: { theme[keyPath: keyPath] }, set: { value in model.updateCustomTheme(id: theme.id) { $0[keyPath: keyPath] = value } })
-    }
-
-    private func color(_ title: String, _ keyPath: WritableKeyPath<CustomTheme, HexColor>) -> some View {
-        ColorPicker(title, selection: Binding(
-            get: { Color(nsColor: theme[keyPath: keyPath].color) },
-            set: { color in
-                guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return }
-                let hex = HexColor(red: UInt8((rgb.redComponent * 255).rounded()), green: UInt8((rgb.greenComponent * 255).rounded()),
-                                   blue: UInt8((rgb.blueComponent * 255).rounded()))
-                model.updateCustomTheme(id: theme.id) { $0[keyPath: keyPath] = hex }
-            }
-        ), supportsOpacity: false)
-    }
-
-    private func saveName() {
-        let trimmed = String(name.trimmingCharacters(in: .whitespaces).prefix(DefaultSettings.maximumThemeNameLength))
-        guard !trimmed.isEmpty, trimmed != theme.name else { return }
-        model.updateCustomTheme(id: theme.id) { $0.name = trimmed }
-    }
-}
-
 /// 分岐図の見本．テーマや文字の大きさを変えると，その場で描き直す
-private struct ThemePreview: NSViewRepresentable {
+struct ThemePreview: NSViewRepresentable {
     let choice: ThemeChoice
     let fontSize: Double
 

@@ -146,6 +146,12 @@ enum DesignTokens {
             static let keymapKeyWidth: CGFloat = 150
             static let keymapMarkWidth: CGFloat = 22
             static let keymapCaptureHeight: CGFloat = 22
+            static let ruleTableHeight: CGFloat = 220
+            static let ruleSearchWidth: CGFloat = 160
+            static let ruleCheckColumnWidth: CGFloat = 40
+            static let themeEditorWidth: CGFloat = 640
+            static let themeEditorHeight: CGFloat = 720
+            static let userDictionaryTableHeight: CGFloat = 330
             static let indent: CGFloat = 16
         }
         enum Glass {
