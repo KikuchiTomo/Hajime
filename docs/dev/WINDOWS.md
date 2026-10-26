@@ -45,13 +45,24 @@ Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流�
 
 | ジョブ | 内容 |
 |---|---|
-| `rust` | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
+| `rust` | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．候補ウィンドウの見本を PNG に書き出して成果物 `candidate-ui-snapshots` にする．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
 | `swift` | core と `s90-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
 | `package` | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `s90-tokyo-ime.msi` を作る |
+
+Windows 向けの Rust のコードは，Mac でも型の検査まではできる．rustup で `x86_64-pc-windows-msvc` の標準ライブラリを入れ，`apps/windows` で `cargo clippy --target x86_64-pc-windows-msvc -p candidate-ui --all-targets` を動かす(リンクはしない)．
 
 Swift は swift.org の Windows 版(6.3.3)を `compnerd/gha-setup-swift` で，Rust は `apps/windows/rust-toolchain.toml` の版を，WiX は `dotnet tool` の 6.0.2 を使う．
 
 Windows の機械で試すときは，`package` のジョブが作る MSI を入れる(`docs/user/how-to/install-windows.md`)．DLL だけを入れ替えるときは，管理者のコマンドプロンプトで `regsvr32 /u` で外してから置き換え，`regsvr32` で登録し直す．TSF の DLL はアプリに読み込まれたままになるので，置き換えたあとはアプリを開き直す．
+
+## 候補ウィンドウの描き方
+
+配置と色は `candidate-ui` の `scene`(OS に依らない)が macOS の `CandidateView`・`BranchView` と同じ決め方で決め，`app::render` が Direct2D でなぞる．テーマの色と書体は `theme::ResolvedTheme` が設定(カスタムテーマを含む)と OS の外観から決める．
+
+- 窓は DWM に合成を任せ(`DwmExtendFrameIntoClientArea`)，描かなかったところを透けさせる．角丸の形と影は中身の側が描く
+- glass は，Windows 11 で DWM の背景(`DWMSBT_TRANSIENTWINDOW`)を使えるときだけ地をすりガラスにする．このときは角の丸み・縁・影も OS が描く．使えないとき(Windows 10・ハイコントラスト)は `glass.light`・`glass.dark` の色で地を塗る
+- 選択の色は Windows のアクセントカラー(`AccentPalette`)．ライト・ダークは `AppsUseLightTheme`，「コントラストを上げる」はハイコントラスト，動きを止めるのは「アニメーション効果」がオフのとき
+- 見本の画像は，デバッグビルドの `s90-candidate-ui.exe --render-snapshots <ディレクトリ>` で macOS と同じ名前(`list-glass-light.png` など)で書き出す
 
 ## 決まっていないこと・まだ無いもの
 

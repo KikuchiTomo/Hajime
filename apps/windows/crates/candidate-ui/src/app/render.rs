@@ -1,58 +1,100 @@
-use super::window::Window;
-use crate::scene::{Draw, Font, Frame, Measure, Role, Scene};
-use tokens::{Palette, Rgb};
-use windows::Win32::Foundation::HWND;
+//! scene の部品を Direct2D と DirectWrite で描く．配置と色は scene が決めるので，ここは部品をなぞるだけにする
+
+use crate::geometry::Frame;
+use crate::icon;
+use crate::scene::{Draw, Measure, Scene};
+use crate::theme::{Color, Face, Font, FontSpec, ResolvedTheme, Weight};
+use std::collections::HashMap;
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_U,
+    D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED,
+    D2D1_FIGURE_END_OPEN, D2D_RECT_F,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-    D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_HWND_RENDER_TARGET_PROPERTIES,
-    D2D1_PRESENT_OPTIONS_NONE, D2D1_RENDER_TARGET_PROPERTIES,
+    D2D1CreateFactory, ID2D1Factory, ID2D1Geometry, ID2D1RenderTarget, ID2D1SolidColorBrush,
+    ID2D1StrokeStyle, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_CUSTOM, D2D1_DASH_STYLE_SOLID,
+    D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    D2D1_LINE_JOIN_ROUND, D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
-    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, DWRITE_FACTORY_TYPE_SHARED,
-    DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_NORMAL,
-    DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS,
-    DWRITE_WORD_WRAPPING_NO_WRAP,
+    DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection, IDWriteTextFormat,
+    DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+    DWRITE_FONT_WEIGHT, DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL,
+    DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
+    DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
 };
-use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
-use windows_core::{Result, HSTRING};
+use windows_core::{Result, BOOL, HSTRING};
 
-const FONT_FAMILY: &str = "Yu Gothic UI";
 const LOCALE: &str = "ja-JP";
-const DOT_STEP: f32 = 2.0;
+/// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
+const SHADOW_LAYERS_PER_DOT: f32 = 1.0;
+
+/// 書体の系統ごとの Windows の書体(docs/dev/DESIGN-SYSTEM.md の「書体」)．前から順に，入っている最初のものを使う
+fn families(face: &Face) -> &'static [&'static str] {
+    match face {
+        Face::System | Face::Rounded | Face::Named(_) => &["Yu Gothic UI"],
+        Face::Ui => &["Segoe UI"],
+        Face::Mincho => &["Yu Mincho"],
+        Face::Monospaced => &["BIZ UDGothic", "MS Gothic"],
+    }
+}
+
+fn weight(weight: Weight) -> DWRITE_FONT_WEIGHT {
+    match weight {
+        Weight::Regular => DWRITE_FONT_WEIGHT_NORMAL,
+        Weight::Medium => DWRITE_FONT_WEIGHT_MEDIUM,
+        Weight::Semibold => DWRITE_FONT_WEIGHT_SEMI_BOLD,
+    }
+}
+
+/// Direct2D の点(windows_numerics::Vector2)を，その型の名前を出さずに作る(windows クレートが再公開しない型のために依存を増やさない)
+macro_rules! vector {
+    ($x:expr, $y:expr) => {{
+        let mut point = D2D1_ELLIPSE::default().point;
+        point.X = $x;
+        point.Y = $y;
+        point
+    }};
+}
 
 pub struct Renderer {
     d2d: ID2D1Factory,
     dwrite: IDWriteFactory,
-    target: Option<(isize, ID2D1HwndRenderTarget)>,
+    fonts: Option<IDWriteFontCollection>,
+    round: ID2D1StrokeStyle,
 }
 
+/// テーマと文字の大きさを決めた書体の組．文字の幅を測り，描くときにも使う
 pub struct TextMeasure {
     dwrite: IDWriteFactory,
-    candidate: IDWriteTextFormat,
-    label: IDWriteTextFormat,
-    mode: IDWriteTextFormat,
+    formats: HashMap<Font, IDWriteTextFormat>,
 }
 
+const FONTS: [Font; 7] = [
+    Font::Candidate,
+    Font::Trunk,
+    Font::Label,
+    Font::Note,
+    Font::Key,
+    Font::SplitKey,
+    Font::Mode,
+];
+
 impl TextMeasure {
-    fn format(&self, font: Font) -> &IDWriteTextFormat {
-        match font {
-            Font::Candidate => &self.candidate,
-            Font::Label => &self.label,
-            Font::Mode => &self.mode,
-        }
+    fn format(&self, font: Font) -> Option<&IDWriteTextFormat> {
+        self.formats.get(&font)
     }
 
     fn metrics(&self, text: &str, font: Font) -> Option<DWRITE_TEXT_METRICS> {
         let wide: Vec<u16> = text.encode_utf16().collect();
+        let format = self.format(font)?;
+        // SAFETY: format は生きている COM の参照で，wide は呼び出しのあいだ有効
         let layout = unsafe {
             self.dwrite
-                .CreateTextLayout(&wide, self.format(font), f32::MAX, f32::MAX)
+                .CreateTextLayout(&wide, format, f32::MAX, f32::MAX)
                 .ok()?
         };
         let mut metrics = DWRITE_TEXT_METRICS::default();
+        // SAFETY: metrics は書き込める領域
         unsafe { layout.GetMetrics(&mut metrics).ok()? };
         Some(metrics)
     }
@@ -60,49 +102,102 @@ impl TextMeasure {
 
 impl Measure for TextMeasure {
     fn width(&self, text: &str, font: Font) -> f32 {
-        self.metrics(text, font).map_or(0.0, |metrics| {
-            metrics.widthIncludingTrailingWhitespace.ceil()
-        })
+        self.metrics(text, font)
+            .map_or(0.0, |metrics| metrics.widthIncludingTrailingWhitespace)
     }
 
     fn height(&self, font: Font) -> f32 {
         self.metrics("あ", font)
-            .map_or(0.0, |metrics| metrics.height.ceil())
+            .map_or(0.0, |metrics| metrics.height)
     }
 }
 
 impl Renderer {
     pub fn new() -> Result<Self> {
-        let d2d = unsafe { D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, None)? };
-        let dwrite = unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)? };
+        // SAFETY: 引数は定数
+        let d2d: ID2D1Factory =
+            unsafe { D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, None)? };
+        // SAFETY: 引数は定数
+        let dwrite: IDWriteFactory = unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)? };
+        let mut fonts = None;
+        // SAFETY: fonts は書き込める領域
+        let _ = unsafe { dwrite.GetSystemFontCollection(&mut fonts, false) };
+        let properties = D2D1_STROKE_STYLE_PROPERTIES {
+            startCap: D2D1_CAP_STYLE_ROUND,
+            endCap: D2D1_CAP_STYLE_ROUND,
+            dashCap: D2D1_CAP_STYLE_ROUND,
+            lineJoin: D2D1_LINE_JOIN_ROUND,
+            miterLimit: 1.0,
+            dashStyle: D2D1_DASH_STYLE_SOLID,
+            dashOffset: 0.0,
+        };
+        // SAFETY: properties は呼び出しのあいだ有効
+        let round = unsafe { d2d.CreateStrokeStyle(&properties, None)? };
         Ok(Self {
             d2d,
             dwrite,
-            target: None,
+            fonts,
+            round,
         })
     }
 
-    pub fn measure(&self, font_size: f32) -> Result<TextMeasure> {
+    pub fn factory(&self) -> &ID2D1Factory {
+        &self.d2d
+    }
+
+    /// テーマの書体で，文字を測り描くための書体の組を作る
+    pub fn measure(&self, theme: &ResolvedTheme, font_size: f32) -> Result<TextMeasure> {
+        let mut formats = HashMap::new();
+        for font in FONTS {
+            formats.insert(font, self.format(&theme.font(font, font_size))?);
+        }
         Ok(TextMeasure {
             dwrite: self.dwrite.clone(),
-            candidate: self.format(font_size)?,
-            label: self.format(tokens::size::candidate::LABEL_FONT_SIZE)?,
-            mode: self.format(tokens::size::mode_indicator::FONT_SIZE)?,
+            formats,
         })
     }
 
-    fn format(&self, size: f32) -> Result<IDWriteTextFormat> {
+    fn installed(&self, family: &str) -> bool {
+        let Some(fonts) = &self.fonts else {
+            return false;
+        };
+        let mut index = 0;
+        let mut exists = BOOL(0);
+        // SAFETY: index と exists は書き込める領域
+        let found =
+            unsafe { fonts.FindFamilyName(&HSTRING::from(family), &mut index, &mut exists) };
+        found.is_ok() && exists.as_bool()
+    }
+
+    /// 書体の名前を決める．カスタムテーマの書体が入っていなければ，日本語の UI の書体にする
+    fn family(&self, face: &Face) -> String {
+        if let Face::Named(name) = face {
+            if self.installed(name) {
+                return name.clone();
+            }
+        }
+        let candidates = families(face);
+        candidates
+            .iter()
+            .find(|family| self.installed(family))
+            .or(candidates.first())
+            .map_or_else(String::new, |family| (*family).to_string())
+    }
+
+    fn format(&self, spec: &FontSpec) -> Result<IDWriteTextFormat> {
+        // SAFETY: 文字列は呼び出しのあいだ有効
         let format = unsafe {
             self.dwrite.CreateTextFormat(
-                &HSTRING::from(FONT_FAMILY),
+                &HSTRING::from(self.family(&spec.face)),
                 None,
-                DWRITE_FONT_WEIGHT_NORMAL,
+                weight(spec.weight),
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
-                size,
+                spec.size,
                 &HSTRING::from(LOCALE),
             )?
         };
+        // SAFETY: format は作ったばかりの COM の参照
         unsafe {
             format.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER)?;
             format.SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP)?;
@@ -110,126 +205,279 @@ impl Renderer {
         Ok(format)
     }
 
-    fn target(
-        &mut self,
-        window: &Window,
-        width: u32,
-        height: u32,
-    ) -> Result<ID2D1HwndRenderTarget> {
-        let hwnd = window.hwnd();
-        let size = D2D_SIZE_U { width, height };
-        if let Some((owner, target)) = &self.target {
-            if *owner == hwnd.0 as isize {
-                unsafe { target.Resize(&size)? };
-                return Ok(target.clone());
-            }
-        }
-        let properties = D2D1_RENDER_TARGET_PROPERTIES {
-            pixelFormat: D2D1_PIXEL_FORMAT {
-                format: DXGI_FORMAT_B8G8R8A8_UNORM,
-                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
-            },
-            ..Default::default()
-        };
-        let target = unsafe {
-            self.d2d.CreateHwndRenderTarget(
-                &properties,
-                &D2D1_HWND_RENDER_TARGET_PROPERTIES {
-                    hwnd: HWND(hwnd.0),
-                    pixelSize: size,
-                    presentOptions: D2D1_PRESENT_OPTIONS_NONE,
-                },
-            )?
-        };
-        self.target = Some((hwnd.0 as isize, target.clone()));
-        Ok(target)
-    }
-
-    pub fn draw(
-        &mut self,
-        window: &Window,
+    /// target に scene を描く．BeginDraw と EndDraw は呼ぶ側が受け持つ．
+    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モードの札のフェード)
+    pub fn paint(
+        &self,
+        target: &ID2D1RenderTarget,
         scene: &Scene,
-        palette: &Palette,
         measure: &TextMeasure,
+        scale: f32,
+        opacity: f32,
     ) -> Result<()> {
-        let scale = window.scale();
-        let width = (scene.width * scale).ceil() as u32;
-        let height = (scene.height * scale).ceil() as u32;
-        let target = self.target(window, width.max(1), height.max(1))?;
-        let brush = unsafe { target.CreateSolidColorBrush(&color(palette.surface, 1.0), None)? };
-        unsafe {
-            target.SetDpi(96.0 * scale, 96.0 * scale);
-            target.BeginDraw();
-            target.Clear(Some(&color(palette.surface, 1.0)));
-        }
+        let clear = D2D1_COLOR_F::default();
+        // SAFETY: target は描いている途中の COM の参照
+        let brush = unsafe {
+            target.Clear(Some(&clear));
+            target.CreateSolidColorBrush(&clear, None)?
+        };
+        let painter = Painter {
+            renderer: self,
+            target,
+            brush: &brush,
+            measure,
+            scale,
+            opacity,
+        };
         for draw in &scene.draws {
-            match draw {
-                Draw::Fill { frame, role } => unsafe {
-                    brush.SetColor(&color(rgb(palette, *role), 1.0));
-                    target.FillRectangle(&rect(frame), &brush);
-                },
-                Draw::Text {
-                    frame,
-                    text,
-                    font,
-                    role,
-                    opacity,
-                } => unsafe {
-                    brush.SetColor(&color(rgb(palette, *role), *opacity));
-                    let wide: Vec<u16> = text.encode_utf16().collect();
-                    target.DrawText(
-                        &wide,
-                        measure.format(*font),
-                        &rect(frame),
-                        &brush,
-                        D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                        DWRITE_MEASURING_MODE_NATURAL,
-                    );
-                },
-                Draw::Dots { frame, role } => unsafe {
-                    brush.SetColor(&color(rgb(palette, *role), 1.0));
-                    let mut x = frame.x;
-                    while x < frame.max_x() {
-                        let dot = Frame::new(
-                            x,
-                            frame.y,
-                            (DOT_STEP / 2.0).min(frame.max_x() - x),
-                            frame.height,
-                        );
-                        target.FillRectangle(&rect(&dot), &brush);
-                        x += DOT_STEP;
+            painter.draw(draw)?;
+        }
+        Ok(())
+    }
+}
+
+struct Painter<'a> {
+    renderer: &'a Renderer,
+    target: &'a ID2D1RenderTarget,
+    brush: &'a ID2D1SolidColorBrush,
+    measure: &'a TextMeasure,
+    scale: f32,
+    opacity: f32,
+}
+
+impl Painter<'_> {
+    fn color(&self, color: Color) {
+        let color = D2D1_COLOR_F {
+            r: color.red,
+            g: color.green,
+            b: color.blue,
+            a: color.alpha * self.opacity,
+        };
+        // SAFETY: brush は生きている COM の参照
+        unsafe { self.brush.SetColor(&color) };
+    }
+
+    /// 1 ドットの線をぼかさないよう，長方形の辺をデバイスのピクセルにそろえる
+    fn snapped(&self, frame: &Frame) -> D2D_RECT_F {
+        let snap = |value: f32| (value * self.scale).round() / self.scale;
+        D2D_RECT_F {
+            left: snap(frame.x),
+            top: snap(frame.y),
+            right: snap(frame.max_x()),
+            bottom: snap(frame.max_y()),
+        }
+    }
+
+    fn stroke_style(&self, dot_pitch: Option<f32>, width: f32) -> Result<ID2D1StrokeStyle> {
+        let Some(pitch) = dot_pitch else {
+            return Ok(self.renderer.round.clone());
+        };
+        let properties = D2D1_STROKE_STYLE_PROPERTIES {
+            startCap: D2D1_CAP_STYLE_ROUND,
+            endCap: D2D1_CAP_STYLE_ROUND,
+            dashCap: D2D1_CAP_STYLE_ROUND,
+            lineJoin: D2D1_LINE_JOIN_ROUND,
+            miterLimit: 1.0,
+            dashStyle: D2D1_DASH_STYLE_CUSTOM,
+            dashOffset: 0.0,
+        };
+        // 長さ 0 の線と丸い端で丸い点にする．間隔は線の太さを 1 とした長さで渡す
+        let dashes = [0.0, pitch / width.max(f32::EPSILON)];
+        // SAFETY: properties と dashes は呼び出しのあいだ有効
+        unsafe {
+            self.renderer
+                .d2d
+                .CreateStrokeStyle(&properties, Some(&dashes))
+        }
+    }
+
+    fn draw(&self, draw: &Draw) -> Result<()> {
+        match draw {
+            Draw::Rect { frame, color } => {
+                self.color(*color);
+                // SAFETY: target・brush は生きている COM の参照
+                unsafe { self.target.FillRectangle(&self.snapped(frame), self.brush) };
+            }
+            Draw::RoundRect {
+                frame,
+                radius,
+                fill,
+                stroke,
+            } => {
+                let shape = D2D1_ROUNDED_RECT {
+                    rect: rect(frame),
+                    radiusX: *radius,
+                    radiusY: *radius,
+                };
+                if let Some(color) = fill {
+                    self.color(*color);
+                    // SAFETY: 同上
+                    unsafe { self.target.FillRoundedRectangle(&shape, self.brush) };
+                }
+                if let Some((color, width)) = stroke {
+                    self.color(*color);
+                    // SAFETY: 同上
+                    unsafe {
+                        self.target
+                            .DrawRoundedRectangle(&shape, self.brush, *width, None)
+                    };
+                }
+            }
+            Draw::Ellipse { frame, color } => {
+                self.color(*color);
+                let ellipse = D2D1_ELLIPSE {
+                    point: vector!(frame.mid_x(), frame.mid_y()),
+                    radiusX: frame.width / 2.0,
+                    radiusY: frame.height / 2.0,
+                };
+                // SAFETY: 同上
+                unsafe { self.target.FillEllipse(&ellipse, self.brush) };
+            }
+            Draw::Curve {
+                from,
+                control1,
+                control2,
+                to,
+                color,
+                width,
+            } => {
+                // SAFETY: factory は生きている COM の参照．sink は閉じるまでこの関数の中だけで使う
+                let geometry = unsafe {
+                    let path = self.renderer.d2d.CreatePathGeometry()?;
+                    let sink = path.Open()?;
+                    sink.BeginFigure(vector!(from.x, from.y), D2D1_FIGURE_BEGIN_HOLLOW);
+                    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
+                        point1: vector!(control1.x, control1.y),
+                        point2: vector!(control2.x, control2.y),
+                        point3: vector!(to.x, to.y),
+                    });
+                    sink.EndFigure(D2D1_FIGURE_END_OPEN);
+                    sink.Close()?;
+                    path
+                };
+                self.stroke(&geometry.into(), *color, *width, None)?;
+            }
+            Draw::Line {
+                from,
+                to,
+                color,
+                width,
+                dot_pitch,
+            } => {
+                self.color(*color);
+                let style = self.stroke_style(*dot_pitch, *width)?;
+                // SAFETY: 同上
+                unsafe {
+                    self.target.DrawLine(
+                        vector!(from.x, from.y),
+                        vector!(to.x, to.y),
+                        self.brush,
+                        *width,
+                        &style,
+                    )
+                };
+            }
+            Draw::Icon {
+                icon,
+                frame,
+                color,
+                width,
+            } => {
+                let figures = icon::figures(*icon, *frame);
+                // SAFETY: 同上
+                let geometry = unsafe {
+                    let path = self.renderer.d2d.CreatePathGeometry()?;
+                    let sink = path.Open()?;
+                    for figure in &figures {
+                        let Some((first, rest)) = figure.points.split_first() else {
+                            continue;
+                        };
+                        sink.BeginFigure(vector!(first.x, first.y), D2D1_FIGURE_BEGIN_HOLLOW);
+                        let rest: Vec<_> =
+                            rest.iter().map(|point| vector!(point.x, point.y)).collect();
+                        sink.AddLines(&rest);
+                        sink.EndFigure(if figure.closed {
+                            D2D1_FIGURE_END_CLOSED
+                        } else {
+                            D2D1_FIGURE_END_OPEN
+                        });
                     }
-                },
+                    sink.Close()?;
+                    path
+                };
+                self.stroke(&geometry.into(), *color, *width, None)?;
+            }
+            Draw::Text {
+                frame,
+                text,
+                font,
+                color,
+            } => {
+                let Some(format) = self.measure.format(*font) else {
+                    return Ok(());
+                };
+                self.color(*color);
+                let wide: Vec<u16> = text.encode_utf16().collect();
+                // 測った幅に少し余裕を持たせ，最後の字が折り返したり切れたりしないようにする
+                let layout = D2D_RECT_F {
+                    left: frame.x,
+                    top: frame.y,
+                    right: frame.max_x() + frame.height,
+                    bottom: frame.max_y(),
+                };
+                // SAFETY: 同上．wide は呼び出しのあいだ有効
+                unsafe {
+                    self.target.DrawText(
+                        &wide,
+                        format,
+                        &layout,
+                        self.brush,
+                        D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT,
+                        DWRITE_MEASURING_MODE_NATURAL,
+                    )
+                };
+            }
+            Draw::Shadow {
+                frame,
+                radius,
+                blur,
+                color,
+            } => {
+                // 角丸の形を少しずつ広げて薄く重ね，ぼかした影に見せる
+                let layers = (blur * SHADOW_LAYERS_PER_DOT).ceil().max(1.0);
+                self.color(color.with_alpha(color.alpha / layers));
+                let mut layer = 0.0;
+                while layer < layers {
+                    let spread = blur * (1.0 - layer / layers);
+                    let shape = D2D1_ROUNDED_RECT {
+                        rect: rect(&frame.inset(-spread, -spread)),
+                        radiusX: radius + spread,
+                        radiusY: radius + spread,
+                    };
+                    // SAFETY: 同上
+                    unsafe { self.target.FillRoundedRectangle(&shape, self.brush) };
+                    layer += 1.0;
+                }
             }
         }
-        let result = unsafe { target.EndDraw(None, None) };
-        if result.is_err() {
-            self.target = None;
-        }
-        result
+        Ok(())
     }
-}
 
-fn rgb(palette: &Palette, role: Role) -> Rgb {
-    match role {
-        Role::Surface => palette.surface,
-        Role::BevelLight => palette.bevel_light,
-        Role::BevelShadow => palette.bevel_shadow,
-        Role::Frame => palette.frame,
-        Role::Text => palette.text,
-        Role::TextMuted => palette.text_muted,
-        Role::Selection => palette.selection,
-        Role::SelectionText => palette.selection_text,
-        Role::Correction => palette.correction,
-    }
-}
-
-fn color(rgb: Rgb, alpha: f32) -> D2D1_COLOR_F {
-    D2D1_COLOR_F {
-        r: f32::from(rgb.red) / 255.0,
-        g: f32::from(rgb.green) / 255.0,
-        b: f32::from(rgb.blue) / 255.0,
-        a: alpha,
+    fn stroke(
+        &self,
+        geometry: &ID2D1Geometry,
+        color: Color,
+        width: f32,
+        dot_pitch: Option<f32>,
+    ) -> Result<()> {
+        self.color(color);
+        let style = self.stroke_style(dot_pitch, width)?;
+        // SAFETY: 同上
+        unsafe {
+            self.target
+                .DrawGeometry(geometry, self.brush, width, &style)
+        };
+        Ok(())
     }
 }
 
