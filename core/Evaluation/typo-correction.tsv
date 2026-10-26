@@ -46,7 +46,7 @@ sushiwotabemasyou	=
 zuttomatteimasu	=
 tudukiwoyomitai	=
 mizuwononndekudasai	=
-tikazimidesu	=
+tikazikaiaimasu	=
 hanabitaikainiikimasu	=
 dousitemowakaranai	=
 toukyouekimadearukimasu	=
@@ -100,3 +100,8 @@ pythonnohonwoyomimasita	=pythonの本を読みました
 # 英語の混ざる文の打ち間違い(英単語より後ろの日本語だけを直す)
 pythonnohonwoyomimadita	pythonの本を読みました
 konoAPIhabenridesyu	このAPIは便利です
+# 打ち間違いのある文(追加: かなにならない英字が残るもの・母音の打ち間違い)
+tkitou	適当
+nankatkitou	なんか適当
+wakeranai	分からない|わからない
+sorehawakeranaidesu	それは分からないです|それはわからないです

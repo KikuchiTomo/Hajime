@@ -63,7 +63,7 @@ final class Harness {
                 panel = nil
                 lattice = nil
                 note = nil
-            case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting: break
+            case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting, .awaitCorrections: break
             }
         }
     }
@@ -992,11 +992,52 @@ struct ReadingCorrectionScenarioTests {
         #expect(focused?.alternatives.prefix(3) == ["良いです", "様です", "ようです"])
     }
 
+    @Test("ライブ変換がオフでも，打鍵が止まったら打ち間違いを見直して直す")
+    func reviewWithoutLiveConversion() {
+        let converter = FakeConverter(["ようです": [("様です", nil)], "よいです": [("良いです", nil)]])
+        converter.corrections["youdesu"] = [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]
+        var settings = DefaultSettings.settings
+        settings.liveConversion = false
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("youdesu")
+        harness.settle()
+        #expect(harness.marked.text == "よいです")
+    }
+
+    @Test("訂正を別のところで求めるとき，求め終わる前に Space を押すと待ち，受け取ってから直して変換する")
+    func conversionAwaitsCorrections() {
+        struct Service: TypoCorrecting {
+            func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] { [:] }
+        }
+        let converter = FakeConverter(["ようです": [("様です", nil)], "よいです": [("良いです", nil)]])
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
+        for key in "youdesu" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        let first = session.handle(KeyEvent(.space), context: InputContext())
+        #expect(first.actions == [.awaitCorrections])
+        #expect(session.conversionCorrectionRequest?.keys.contains("youdesu") == true)
+        session.provideCorrections(["youdesu": [
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1),
+            ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
+        ]])
+        let resumed = session.resumeConversion(context: InputContext())
+        let marked = resumed.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
+        #expect(marked == "良いです")
+        // 待っているあいだに次のキーが来たら，待たせていた変換はやめる
+        let other = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
+        for key in "youdesu" { _ = other.handle(KeyEvent(.character(key)), context: InputContext()) }
+        _ = other.handle(KeyEvent(.space), context: InputContext())
+        _ = other.handle(KeyEvent(.character("n")), context: InputContext())
+        #expect(other.resumeConversion(context: InputContext()).isEmpty)
+    }
+
     /// 「youdesu」を「yoidesu」に直す変換器(比べる点数の差 6 で直す)
     private func correctingHarness(margin: Double = 6) -> Harness {
         let converter = FakeConverter()
         converter.corrections["youdesu"] = [
-            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -9 + margin + 2, cost: 1),
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -9 + margin + 5, cost: 2.5),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
         ]
         let harness = Harness(converter: converter)
@@ -1101,7 +1142,7 @@ struct ReadingCorrectionScenarioTests {
             Candidate.Word(text: "様です", readingCount: 4),
         ]
         converter.corrections["kyouhayoudesu"] = [
-            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -2.5, cost: 1),
+            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: 0.5, cost: 2.5),
             ReadingCorrection(keys: "kyouhayoudesu", reading: "キョウハヨウデス", score: -9, cost: 0),
         ]
         var settings = DefaultSettings.settings
@@ -1124,7 +1165,7 @@ struct ReadingCorrectionScenarioTests {
     func suggestion() {
         let converter = FakeConverter()
         converter.corrections["youdesu"] = [
-            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -2.5, cost: 1),
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: 0.5, cost: 2.5),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
         ]
         let harness = Harness(converter: converter)

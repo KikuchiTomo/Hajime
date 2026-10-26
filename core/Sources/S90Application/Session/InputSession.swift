@@ -48,6 +48,9 @@ public final class InputSession {
     private var isSettled = false
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
+    /// 訂正を求め終わるのを待って変換するところ(Space を押した)
+    private var waitsForCorrections = false
+    private var pendingConversionLearns = true
     /// 利用者が打っている途中に入れた文節の区切り(読みの先頭からの文字数)．分岐図ではここを必ず区切る
     private var forcedBoundaries: [Int] = []
     /// 分岐図で，注目している文節を数字で区切る状態か
@@ -95,6 +98,8 @@ public final class InputSession {
         }
         showsCorrectionNote = false
         profile = context.profile
+        // 変換を待たせているあいだに次のキーが来たら，待たせていた変換はやめる(次のキーを先に処理する)
+        waitsForCorrections = false
         let hidesNote = showsTransientNote
         showsTransientNote = false
         var result = route(event, context: context)
@@ -158,7 +163,9 @@ public final class InputSession {
     /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ．
     /// EN 入力の英字は変換して見せないので待たない
     public var awaitsSettle: Bool {
-        !composition.isEmpty && phase == .composing && !isSettled && settings.current.liveConversion
+        // ライブ変換がオフでも，打鍵が止まったことは覚える．覚えないと打ち間違いの見直し(awaitsReview)が始まらず，
+        // 直すことも「もしかして」と示すこともなくなる．ライブ変換がオフのときの表示は読みのまま変わらない
+        !composition.isEmpty && phase == .composing && !isSettled
     }
 
     private func switchToDirectPassingEscape(actions: [ClientAction]) -> KeyResult {
@@ -667,8 +674,33 @@ public final class InputSession {
             return KeyResult(handled: true, actions: render(context: context))
         }
         if withoutLearning { converter.suspendLearningUntilEnd() }
+        // 打ち間違いの訂正を別のところで求めていて，まだ求め終わっていなければ，求め終わるまで変換を待つ．
+        // 待たずに変換すると，Space を早く押したときに直すことも「もしかして」と示すこともできない
+        if !waitsForCorrections, conversionCorrectionRequest != nil {
+            waitsForCorrections = true
+            pendingConversionLearns = !withoutLearning
+            return KeyResult(handled: true, actions: [.awaitCorrections])
+        }
+        waitsForCorrections = false
         enterConversion()
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 変換の前に求めておく訂正のキーの並びと左の文脈．求めるものが無いか，訂正をこの中で求めるときは nil
+    public var conversionCorrectionRequest: (keys: [String], leftContext: String?)? {
+        guard phase == .composing, settings.current.typoCorrection == .standard,
+            (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection,
+            let keys = readingCorrector.pendingKeys(for: composition) else { return nil }
+        return (keys, compositionLeftContext)
+    }
+
+    /// 訂正を求め終わった(または待つのをやめた)あとで，待たせていた変換を続ける．待たせていなければ何もしない
+    public func resumeConversion(context: InputContext) -> [ClientAction] {
+        guard waitsForCorrections, phase == .composing else {
+            waitsForCorrections = false
+            return []
+        }
+        return convert(withoutLearning: !pendingConversionLearns, context: context).actions
     }
 
     /// ひらがな → 全角カタカナ → 半角カタカナ → ひらがな の順の次の字種．かなの字種を選んでいなければ全角カタカナ
