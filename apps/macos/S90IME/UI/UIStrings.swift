@@ -510,6 +510,7 @@ extension UIStrings {
             case .correction: "補正"
             case .symbols: "記号"
             case .dictionary: "ユーザー辞書"
+            case .importedDictionaries: "取り込んだ辞書"
             case .appearance: "外観"
             case .exclusions: "除外設定"
             case .usage: "統計"

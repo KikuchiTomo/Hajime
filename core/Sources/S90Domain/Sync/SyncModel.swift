@@ -9,6 +9,8 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
     case correction
     case symbols
     case dictionary
+    /// 取り込んだ辞書の一覧と設定．語の索引のファイルはまだ同期しないので，既定はこの Mac だけ
+    case importedDictionaries
     case appearance
     case exclusions
     case usage
@@ -28,6 +30,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .correction: ["correction"]
         case .symbols: ["symbolRules"]
         case .dictionary: ["userDictionary"]
+        case .importedDictionaries: ["importedDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "profileRules"]
         case .usage: ["recordsUsage"]
@@ -37,7 +40,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
     /// 既定の範囲．キーボードや画面の大きさ，使うアプリは Mac ごとに違ってよいので，この Mac だけにする
     public var defaultScope: SyncScope {
         switch self {
-        case .keyboard, .appearance, .exclusions, .usage: .local
+        case .keyboard, .appearance, .exclusions, .usage, .importedDictionaries: .local
         case .input, .keys, .conversion, .correction, .symbols, .dictionary: .synced
         }
     }
