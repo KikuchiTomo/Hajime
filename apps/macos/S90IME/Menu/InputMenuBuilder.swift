@@ -25,16 +25,32 @@ final class InputMenuBuilder {
         self.openSettings = openSettings
     }
 
-    /// 入力メニュー．呼ばれるたびに作り直し，項目に受け手(target)を付けない．
-    /// InputMethodKit はメニューを別のプロセス(TextInputMenuAgent)に写して出し，選ばれた動作の名前を入力コントローラに送り返す．
-    /// 受け手を付けたり項目を使い回したりすると送り返されないことがあった(macSKK・vChewing も毎回作り，受け手を付けない)
+    /// 入力メニュー．一度だけ作って使い回し，チェックの印だけ合わせる．項目に受け手(target)は付けない．
+    ///
+    /// InputMethodKit のサーバーは受け取ったメニューを覚え(_setCachedMenu:)，選ばれた項目をそのメニューと突き合わせて
+    /// 入力コントローラに動作を送る(_copySynchronizedActions:withMenuItems:)．打鍵のたびに作り直すと突き合わせがずれ，
+    /// 実機では最初の 1 回しか届かなかった．受け手を付けると 1 回も届かなかった．azooKey-Desktop と同じく使い回し，受け手を付けない
+    private var cachedMenu: NSMenu?
+    private var liveConversionItem: NSMenuItem?
+    private var requests = 0
+
     func menu(actions: Actions) -> NSMenu {
+        requests += 1
+        if requests == 1 || requests % 50 == 0 {
+            logger.notice("入力メニューを求められた回数: \(self.requests, privacy: .public)")
+        }
+        if let cachedMenu {
+            liveConversionItem?.state = settings.current.liveConversion ? .on : .off
+            return cachedMenu
+        }
         let menu = NSMenu()
         let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
         live.state = settings.current.liveConversion ? .on : .off
         menu.addItem(live)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
+        cachedMenu = menu
+        liveConversionItem = live
         return menu
     }
 

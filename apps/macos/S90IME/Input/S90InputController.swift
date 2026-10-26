@@ -118,6 +118,15 @@ final class S90InputController: IMKInputController {
         menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
     }
 
+    /// InputMethodKit が入力メニューの動作に応じられるかを問い合わせたかを記録する(入力メニューの動作が届かない件の調査)
+    override func responds(to aSelector: Selector!) -> Bool {
+        let result = super.responds(to: aSelector)
+        if let aSelector, [#selector(toggleLiveConversion(_:)), #selector(showPreferences(_:))].contains(aSelector) {
+            menuLogger.notice("問い合わせ: \(NSStringFromSelector(aSelector), privacy: .public) -> \(result, privacy: .public)")
+        }
+        return result
+    }
+
     /// InputMethodKit は入力メニューの項目を選ぶと，ここに動作の名前を渡す．届いたかを記録してから既定の処理(自分のメソッドを呼ぶ)に回す
     @MainActor
     override func doCommand(by aSelector: Selector!, command infoDictionary: [AnyHashable: Any]!) {
