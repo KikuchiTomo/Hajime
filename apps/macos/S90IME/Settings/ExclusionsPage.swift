@@ -70,6 +70,7 @@ struct ExclusionsPage: View {
             Section {
                 ResettableToggle(model: model, title: UIStrings.More.terminalCommands, keyPath: \.terminalCommands)
                 ResettableToggle(model: model, title: UIStrings.Settings.escapeSwitchesToDirect, keyPath: \.escapeSwitchesToDirect)
+                ResettableToggle(model: model, title: UIStrings.More.restrainsLiveConversionInCode, keyPath: \.restrainsLiveConversionInCode)
             }
         }
         .formStyle(.grouped)

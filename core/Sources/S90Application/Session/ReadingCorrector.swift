@@ -53,14 +53,38 @@ final class ReadingCorrector {
         if provided.count > DefaultSettings.maximumProvidedCorrections { provided = corrections }
     }
 
-    /// 見直せるキーの並び．英小文字と「-」だけで，戻した並びで始まらず，長すぎないもの
-    private func reviewableKeys(of composition: Composition) -> String? {
-        let typed = typedComposition(from: composition) ?? composition
-        guard let keys = typed.rawKeys, keys.count <= DefaultSettings.maximumKeysForCorrection,
-            !keys.isEmpty, keys.allSatisfy(Self.isLetterKey),
+    /// 見直す部分．読みに英単語(確定させた英単語や Shift で打った英字)があれば，最後の英単語より後ろの日本語だけを見直す．
+    /// 英単語は英単語の補正(EnglishWordCorrector)の受け持ちで，日本語の打ち間違いとして直すと「python」が「ぴょん」になる
+    private struct Region {
+        /// 見直さない前の部分(英単語まで)．直したキーはこれに続けて入れ直す
+        var prefix: Composition?
+        /// 見直すキー
+        var keys: String
+        /// 見直すキーの読み
+        var reading: String
+    }
+
+    /// 見直せる部分．キーが英小文字と「-」だけで，戻した並びで始まらず，長すぎないもの
+    private func reviewableRegion(of typed: Composition) -> Region? {
+        guard let all = typed.rawKeys, let boundary = typed.boundaryAfterEnglish,
             typed.pending.isEmpty || typed.pending == "n",
-            !(dismissedKeys.map(keys.hasPrefix) ?? false) else { return nil }
-        return keys
+            !(dismissedKeys.map(all.hasPrefix) ?? false) else { return nil }
+        let keys = String(all.dropFirst(boundary.rawCount))
+        let reading = String(typed.conversionReading.dropFirst(boundary.kanaCount))
+        guard !keys.isEmpty, keys.count <= DefaultSettings.maximumKeysForCorrection, keys.allSatisfy(Self.isLetterKey) else { return nil }
+        guard boundary.rawCount > 0 else { return Region(prefix: nil, keys: keys, reading: reading) }
+        // 英単語の後ろが短いと，打ち間違いと見分けにくく直す意味も薄い
+        guard keys.count >= DefaultSettings.minimumKeysForLiveCorrection else { return nil }
+        return Region(prefix: typed.truncated(to: boundary), keys: keys, reading: reading)
+    }
+
+    private func reviewableKeys(of composition: Composition) -> String? {
+        reviewableRegion(of: typedComposition(from: composition) ?? composition)?.keys
+    }
+
+    /// 見直さない前の部分(英単語まで)の読み．訂正を別のところで求めるとき，左の文脈に足す
+    func unreviewedPrefix(of composition: Composition) -> String? {
+        reviewableRegion(of: typedComposition(from: composition) ?? composition)?.prefix?.displayReading
     }
 
     /// 直した読みを見せているか
@@ -94,24 +118,32 @@ final class ReadingCorrector {
         suggestion = nil
         suggestsMisreading = false
         let typed = typedComposition(from: composition) ?? composition
-        guard let keys = typed.rawKeys, keys.count <= DefaultSettings.maximumKeysForCorrection,
-            !keys.isEmpty, keys.allSatisfy(Self.isLetterKey),
-            typed.pending.isEmpty || typed.pending == "n",
-            !(dismissedKeys.map(keys.hasPrefix) ?? false) else { return }
+        guard let region = reviewableRegion(of: typed) else {
+            lastReview = (typed.rawKeys ?? "", nil)
+            return
+        }
         let current = settings.current
         // 誤りの種類ごとのオン・オフと，直さない語(設定)
         let checksTypos = current.typoCorrection == .standard && current.correction.japanese
-            && !current.correction.isException(keys: keys, reading: typed.conversionReading)
-        let decision = checksTypos ? decision(forKeys: keys, reading: typed.conversionReading) : nil
+            && !current.correction.isException(keys: region.keys, reading: region.reading)
+        let reviewedKeys = typed.rawKeys ?? ""
+        let decision: ReadingCorrectionRule.Decision?
+        if let lastReview, lastReview.keys == reviewedKeys {
+            decision = lastReview.decision
+        } else {
+            decision = checksTypos ? self.decision(forKeys: region.keys, reading: region.reading) : nil
+            lastReview = (reviewedKeys, decision)
+        }
         if decision == nil, current.misreadings, applied == nil, let suggested = misreadingSuggestion(for: typed, makeComposition: makeComposition) {
             // よくある読み違い(「ふいんき」)は，打ち間違いではないので直さず，「もしかして」と示すだけにする
             suggestion = suggested
             suggestsMisreading = true
             return
         }
+        let base = { region.prefix ?? makeComposition() }
         switch decision {
         case .apply(let correction):
-            guard let corrected = compose(correction.keys, makeComposition: makeComposition),
+            guard let corrected = compose(correction.keys, onto: base),
                 corrected.conversionReading != typed.conversionReading else {
                 if applied != nil { composition = typed }
                 applied = nil
@@ -122,7 +154,7 @@ final class ReadingCorrector {
         case .suggest(let correction):
             if applied != nil { composition = typed }
             applied = nil
-            suggestion = compose(correction.keys, makeComposition: makeComposition)
+            suggestion = compose(correction.keys, onto: base)
         case nil:
             if applied != nil { composition = typed }
             applied = nil
@@ -191,6 +223,11 @@ final class ReadingCorrector {
         suggestion = nil
     }
 
+    /// 読みの組み立てが変わった(英単語を確定させた)．打ったキーが同じでも見直し直す
+    func forgetReview() {
+        lastReview = nil
+    }
+
     func reset() {
         applied = nil
         suggestion = nil
@@ -214,7 +251,6 @@ final class ReadingCorrector {
     }
 
     private func decision(forKeys keys: String, reading: String) -> ReadingCorrectionRule.Decision? {
-        if let lastReview, lastReview.keys == keys { return lastReview.decision }
         // 別のところで求めるときは，求め終わっていなければ見直さない(入力の処理を待たせない)
         func corrections(_ keys: String) -> [ReadingCorrection]? {
             if let found = provided[keys] { return found }
@@ -228,15 +264,14 @@ final class ReadingCorrector {
             candidates += found.map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
         }
         candidates.sort { $0.score > $1.score }
-        let decision = ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,
-                                             suggests: settings.current.showsSuggestions).decision(among: candidates, reading: reading)
-        lastReview = (keys, decision)
-        return decision
+        return ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,
+                                     suggests: settings.current.showsSuggestions).decision(among: candidates, reading: reading)
     }
 
-    /// 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ
-    private func compose(_ keys: String, makeComposition: () -> Composition) -> Composition? {
-        var composition = makeComposition()
+    /// 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ．
+    /// base は入れ直す前の読み(英単語までの部分か，空の読み)
+    private func compose(_ keys: String, onto base: () -> Composition) -> Composition? {
+        var composition = base()
         let resolver = NasalReadingResolver(converter: converter)
         for key in keys {
             composition.insertRomaji(key)

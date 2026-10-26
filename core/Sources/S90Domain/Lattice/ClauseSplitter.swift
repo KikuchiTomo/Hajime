@@ -6,6 +6,8 @@
 /// - 語の中で，先頭のひらがなのあとに漢字などが続けば，そこで分ける(「な人だ」→「な」「人だ」，「を立てる」→「を」「立てる」)
 /// - 1 文字の助詞で始まり，2 文字以上のひらがなが続く語は，助詞のあとで分ける(「はいい」→「は」「いい」，「とすれば」→「と」「すれば」)
 /// - ひらがなで始まるそのほかの語(助詞・助動詞・「する」など)は，前の文節に付ける
+/// - 英数字だけの語が続くときは 1 つの文節にまとめる．エンジンは英字を 1 文字ずつの語にするので，
+///   そのままでは「python」が p・y・t・h・o・n の 6 つの文節になる
 public enum ClauseSplitter {
     public struct Clause: Sendable, Equatable {
         public var text: String
@@ -29,9 +31,16 @@ public enum ClauseSplitter {
                 clauses[clauses.count - 1].readingCount += readingCount
             }
         }
+        var previousIsLatin = false
         for word in words {
             let characters = Array(word.text)
             guard let first = characters.first else { continue }
+            let isLatin = characters.allSatisfy(Composition.isAlphanumeric)
+            defer { previousIsLatin = isLatin }
+            if isLatin, previousIsLatin {
+                append(word.text, word.readingCount, startsClause: false)
+                continue
+            }
             // 「お茶」「ご飯」の接頭辞は分けず，語全体を新しい文節にする
             let leading = characters.prefix(while: isHiragana).count
             let isPrefixed = leading == 1 && characters.count > 1 && !word.startsWithParticle && honorificPrefixes.contains(first)
