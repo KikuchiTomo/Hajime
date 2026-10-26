@@ -186,7 +186,8 @@ public final class EngineService {
         routed.ui.forEach(ui)
         routed.host.forEach(perform)
         guard let input = sessions[session]?.input else {
-            return .edit(handled: handled, operations: routed.edits, state: WireSessionState(mode: .japanese, isComposing: false, keymap: current.keymap, wakeAfterMilliseconds: nil))
+            return .edit(handled: handled, operations: routed.edits, state: WireSessionState(mode: .japanese, isComposing: false, keymap: current.keymap, wakeAfterMilliseconds: nil,
+                                                                                                  keyboardLayout: WireSessionState.keyboardLayout(for: current)))
         }
         return .edit(handled: handled, operations: routed.edits, state: state(of: input, wakeAfter: wakeAfter(session)))
     }
@@ -209,7 +210,8 @@ public final class EngineService {
     }
 
     private func state(of input: InputSession, wakeAfter: UInt32?) -> WireSessionState {
-        WireSessionState(mode: input.mode, isComposing: input.isComposing, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter)
+        WireSessionState(mode: input.mode, isComposing: input.isComposing, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter,
+                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current))
     }
 
     private func perform(_ action: HostAction) {
