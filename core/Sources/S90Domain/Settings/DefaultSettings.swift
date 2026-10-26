@@ -110,7 +110,7 @@ public enum DefaultSettings {
     /// 1 か所の直し(手間がこれ以下)は，Zenzai の点数の差(ReadingCorrection.score)だけでも直す・示す(前の決まり)
     public static let singleEditCost = 2.0
     /// Space を押したときに打ち間違いの訂正を待つ長さ(秒)．これを過ぎたら訂正を待たずに変換する
-    public static let correctionWaitBeforeConversion = 2.5
+    public static let correctionWaitBeforeConversion = 0.3
     /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
     public static let unconvertiblePlausibility = -60.0
     /// 1 か所の直しを Zenzai の点数の差だけで直す境目(#52 より前の決まりと同じ)
