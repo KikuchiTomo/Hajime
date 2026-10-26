@@ -1,7 +1,7 @@
 import S90Domain
 import SwiftUI
 
-/// 設定の画面．項目は Google 日本語入力・ATOK などの設定を調べて選んだ(docs/user/reference/settings.md)
+/// 設定の画面．項目の一覧は docs/user/reference/settings.md
 struct SettingsView: View {
     static let size = NSSize(width: DesignTokens.Size.Settings.windowWidth, height: DesignTokens.Size.Settings.windowHeight)
     @ObservedObject var model: SettingsModel

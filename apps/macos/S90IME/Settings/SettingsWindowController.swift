@@ -174,7 +174,7 @@ final class SettingsModel: ObservableObject {
         update { $0.userDictionary.removeAll { entries.contains($0) } }
     }
 
-    /// 「読み<タブ>語」の行が並んだテキストのファイルから取り込む(Google 日本語入力・ATOK の書き出しと同じ形)
+    /// 「読み<タブ>語」の行が並んだテキストのファイルから取り込む
     func importDictionary() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]
