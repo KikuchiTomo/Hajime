@@ -400,6 +400,55 @@ extension WireSettingsSnapshot: CustomStringConvertible, CustomDebugStringConver
     public var debugDescription: String { description }
 }
 
+public enum WireMenuCommand: Sendable, Equatable, Codable {
+    case selectInputStyle(style: String)
+    case toggleLiveConversion
+    case openSettings
+
+    private enum CodingKeys: String, CodingKey {
+        case type, style
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .type)
+        switch kind {
+        case "selectInputStyle":
+            self = try .selectInputStyle(style: container.decode(String.self, forKey: .style))
+        case "toggleLiveConversion":
+            self = .toggleLiveConversion
+        case "openSettings":
+            self = .openSettings
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .selectInputStyle(let style):
+            try container.encode("selectInputStyle", forKey: .type)
+            try container.encode(style, forKey: .style)
+        case .toggleLiveConversion:
+            try container.encode("toggleLiveConversion", forKey: .type)
+        case .openSettings:
+            try container.encode("openSettings", forKey: .type)
+        }
+    }
+}
+
+extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        switch self {
+        case .selectInputStyle: "WireMenuCommand.selectInputStyle"
+        case .toggleLiveConversion: "WireMenuCommand.toggleLiveConversion"
+        case .openSettings: "WireMenuCommand.openSettings"
+        }
+    }
+    public var debugDescription: String { description }
+}
+
 public enum WireRequestBody: Sendable, Equatable, Codable {
     case hello(protocolVersion: UInt32)
     case openSession
@@ -411,9 +460,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case caret(session: UInt32, rect: WireRect)
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
+    case menu(command: WireMenuCommand)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, rect, settings
+        case type, protocolVersion, session, input, context, mode, rect, settings, command
     }
 
     public init(from decoder: any Decoder) throws {
@@ -440,6 +490,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = .readSettings
         case "writeSettings":
             self = try .writeSettings(settings: container.decode(WireSettingsSnapshot.self, forKey: .settings))
+        case "menu":
+            self = try .menu(command: container.decode(WireMenuCommand.self, forKey: .command))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -481,6 +533,9 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .writeSettings(let settings):
             try container.encode("writeSettings", forKey: .type)
             try container.encode(settings, forKey: .settings)
+        case .menu(let command):
+            try container.encode("menu", forKey: .type)
+            try container.encode(command, forKey: .command)
         }
     }
 }
@@ -498,6 +553,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .caret: "WireRequestBody.caret"
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"
+        case .menu: "WireRequestBody.menu"
         }
     }
     public var debugDescription: String { description }

@@ -300,6 +300,29 @@ impl fmt::Debug for SettingsSnapshot {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
+pub enum MenuCommand {
+    SelectInputStyle {
+        style: String,
+    },
+    ToggleLiveConversion,
+    OpenSettings,
+}
+
+impl fmt::Debug for MenuCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SelectInputStyle { .. } => f
+                .debug_struct("SelectInputStyle")
+                .field("style", &REDACTED)
+                .finish(),
+            Self::ToggleLiveConversion => f.write_str("ToggleLiveConversion"),
+            Self::OpenSettings => f.write_str("OpenSettings"),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum RequestBody {
     Hello {
         #[serde(rename = "protocolVersion")]
@@ -332,6 +355,9 @@ pub enum RequestBody {
     ReadSettings,
     WriteSettings {
         settings: SettingsSnapshot,
+    },
+    Menu {
+        command: MenuCommand,
     },
 }
 
@@ -376,6 +402,10 @@ impl fmt::Debug for RequestBody {
             Self::WriteSettings { settings, .. } => f
                 .debug_struct("WriteSettings")
                 .field("settings", settings)
+                .finish(),
+            Self::Menu { command, .. } => f
+                .debug_struct("Menu")
+                .field("command", command)
                 .finish(),
         }
     }

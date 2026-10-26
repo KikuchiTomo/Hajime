@@ -318,6 +318,28 @@
       ]
     },
     {
+      "name": "MenuCommand",
+      "kind": "union",
+      "tag": "type",
+      "cases": [
+        {
+          "name": "selectInputStyle",
+          "fields": [
+            {
+              "name": "style",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "toggleLiveConversion"
+        },
+        {
+          "name": "openSettings"
+        }
+      ]
+    },
+    {
       "name": "RequestBody",
       "kind": "union",
       "tag": "type",
@@ -417,6 +439,15 @@
             {
               "name": "settings",
               "type": "SettingsSnapshot"
+            }
+          ]
+        },
+        {
+          "name": "menu",
+          "fields": [
+            {
+              "name": "command",
+              "type": "MenuCommand"
             }
           ]
         }
