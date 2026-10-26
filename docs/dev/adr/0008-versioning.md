@@ -36,10 +36,10 @@ description: macOS 版と Windows 版のバージョン番号(セマンティッ
 
 ### 置き場所と名前
 
-- バージョンは `apps/macos/project.yml` の `MARKETING_VERSION`(Windows 版はそのプロジェクトの同じ役の値)だけに書く
-- ビルド番号(`CURRENT_PROJECT_VERSION`)はバージョンごとに 1 ずつ上げる整数．同じバージョンを作り直したときも上げる
+- バージョンは `apps/macos/project.yml` の `MARKETING_VERSION` だけに書く．Windows 版は `apps/windows/Cargo.toml` の `[workspace.package]` の `version` だけに書き，インストーラーはこの値で作る
+- ビルド番号(macOS は `CURRENT_PROJECT_VERSION`，Windows は `[workspace.metadata.s90]` の `build`)はバージョンごとに 1 ずつ上げる整数．同じバージョンを作り直したときも上げる
 - Git のタグは `macos/v0.0.2`・`windows/v0.1.0` のようにバージョンごとに分ける
-- 上げるのは `tools/release/bump_patch.sh macos` で行う(PATCH とビルド番号を 1 つずつ上げる)
+- 上げるのは `tools/release/bump_patch.sh macos` と `tools/release/bump_patch.sh windows` で行う(PATCH とビルド番号を 1 つずつ上げる)
 - 設定の画面と README には「v0.0.2 (macOS)」のように，バージョンと OS を並べて出す
 
 ## 採らなかった案

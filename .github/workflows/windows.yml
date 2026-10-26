@@ -108,7 +108,12 @@ jobs:
       - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai"
         shell: pwsh
       - run: dotnet tool install --global wix --version 6.0.2
-      - run: wix build apps/windows/installer/s90.wxs -arch x64 -d Version=0.1.0 -d StageDir=apps/windows/target/stage -o apps/windows/target/s90-tokyo-ime.msi
+      - name: インストーラーを作る(バージョンは apps/windows/Cargo.toml の workspace.package.version)
+        shell: pwsh
+        run: |
+          $version = (cargo metadata --format-version 1 --no-deps --manifest-path apps/windows/Cargo.toml | ConvertFrom-Json).packages[0].version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "バージョンが読めません: $version" }
+          wix build apps/windows/installer/s90.wxs -arch x64 -d Version=$version -d StageDir=apps/windows/target/stage -o apps/windows/target/s90-tokyo-ime.msi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: s90-tokyo-ime-windows
