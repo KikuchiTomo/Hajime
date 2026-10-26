@@ -68,6 +68,32 @@ struct ReadingCorrectionTests {
         #expect(committed == expected)
     }
 
+    @Test("アプリと同じ道筋(打つ → 止まる → 別の変換器で訂正を求める → 見直す)で直すか示す", arguments: [
+        "kyounotenkihayoudesune", "kyouhaitenkidesune", "kyouhaiteknidesune", "tututasakanagaookikatta", "mizurai",
+        "arigatpugozaimasu", "yorosikuonagaisimasu", "konnnitiwa",
+    ])
+    func appFlow(keys: String) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
+        let model = try ZenzaiModel.verified(at: URL(fileURLWithPath: path))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: model)
+        let service = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings(), typoService: service)
+        _ = live(session, keys)
+        var actions = session.settle(context: InputContext())
+        let request = session.correctionRequest
+        #expect(request != nil, "\(keys): 訂正を求めない")
+        if let request {
+            let corrections = await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+            session.provideCorrections(corrections)
+        }
+        actions += session.review(context: InputContext())
+        let note = actions.compactMap { if case .showNote(let text) = $0 { text } else { nil } }.last
+        let corrected = actions.contains { if case .setMarkedText(let text) = $0 { text.segments.contains { $0.style == .correction } } else { false } }
+        print("通し \(keys): 直した=\(corrected) 案内=\(note ?? "-") 文=\(marked(actions) ?? "-")")
+        #expect(corrected || note?.hasPrefix("もしかして") == true, "\(keys)")
+    }
+
     private func makeSession(lexicon: FakeLexicon = FakeLexicon()) throws -> InputSession {
         let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
