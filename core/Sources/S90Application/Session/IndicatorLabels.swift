@@ -47,7 +47,7 @@ public enum IndicatorLabels {
         Hint(.nextUncertainSegment, "誤りやすい文節"),
         Hint(.shrinkSegment, .extendSegment, "区切り調整"),
         Hint(.shrinkSegmentToWord, .extendSegmentToWord, "単語ごと"),
-        Hint(.splitSegment, "区切る"),
+        Hint(.splitSegment, "区切り"),
     ]
 
     /// 連想の一覧の足元の案内
@@ -59,6 +59,6 @@ public enum IndicatorLabels {
 
     /// 文節を区切っているときの案内(数字で区切る位置を選び，Esc でやめる)．count は区切れる位置の数
     public static func splitHints(count: Int) -> [(key: String, label: String)] {
-        [(count > 1 ? "1–\(count)" : "1", "区切り"), ("Esc", "取消")]
+        [(count > 1 ? "1–\(count)" : "1", "区切り"), ("Esc", "取り消し")]
     }
 }

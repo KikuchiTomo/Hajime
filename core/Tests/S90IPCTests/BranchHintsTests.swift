@@ -41,7 +41,7 @@ struct BranchHintsTests {
         var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)
         column.split = .init(pieces: ["問題", "が", "ある"])
         let hints = BranchHints.make(for: LatticePanel(columns: [column]), settings: DefaultSettings.settings)
-        #expect(hints == [WireKeyHint(keys: "1–2", label: "区切り"), WireKeyHint(keys: "Esc", label: "取消")])
+        #expect(hints == [WireKeyHint(keys: "1–2", label: "区切り"), WireKeyHint(keys: "Esc", label: "取り消し")])
         column.split = .init(pieces: ["問題", "がある"])
         #expect(BranchHints.make(for: LatticePanel(columns: [column]), settings: DefaultSettings.settings).first?.keys == "1")
     }

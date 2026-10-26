@@ -256,7 +256,7 @@ enum SnapshotRenderer {
             selectedVariant: nil,
             entries: [.init(text: "今日の天気は良いですね", annotation: nil, corrected: 6..<8), .init(text: "今日の天気はいいですね", annotation: nil, corrected: 6..<8),
                       .init(text: "今日の天気は好いですね", annotation: nil, corrected: 6..<8)],
-            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: "直しました　Esc で打ったままに戻す"
+            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: "修正しました　Esc で入力のままに戻す"
         )
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
@@ -274,7 +274,7 @@ enum SnapshotRenderer {
             .init(text: "今日の", isFocused: false, isUncertain: false),
             .init(text: "天気は", alternatives: ["天気は", "転記は"], selectedAlternative: 0, isFocused: true, isUncertain: true),
             corrected,
-        ], position: 1, total: 2, note: "直しました　Esc で打ったままに戻す")
+        ], position: 1, total: 2, note: "修正しました　Esc で入力のままに戻す")
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
