@@ -1,6 +1,6 @@
 # s90.tokyo IME
 
-[![check](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/check.yml)
+[![CI](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey.svg)
 ![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
