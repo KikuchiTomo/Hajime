@@ -352,15 +352,18 @@ struct EngineServiceTests {
     @Test("入力方式を切り替えたら，モードの札に入力方式を出す．出さない設定なら出さない")
     func styleIndicator() throws {
         let id = greeted()
+        let session = try open(id)
+        // 入力方式はメニューではなくキー(既定は Option+かな で順に切り替える)と設定の画面で変える
+        let nextStyle = WireKeyInput(key: .kana, modifiers: WireModifiers(shift: false, control: false, alt: true), isKeypad: false)
         sent.value.removeAll()
-        _ = service.handle(WireRequest(id: 40, body: .menu(command: .selectInputStyle(style: "kana"))), from: id)
+        _ = service.handle(WireRequest(id: 40, body: .key(session: session, input: nextStyle, context: Self.field)), from: id)
         #expect(sent.value.contains { command in
             if case .showMode(_, _, let label) = command { return label == "かな" }
             return false
         })
         try settings.update { $0.showsModeIndicator = false }
         sent.value.removeAll()
-        _ = service.handle(WireRequest(id: 41, body: .menu(command: .selectInputStyle(style: "romaji"))), from: id)
+        _ = service.handle(WireRequest(id: 41, body: .key(session: session, input: nextStyle, context: Self.field)), from: id)
         #expect(!sent.value.contains { command in
             if case .showMode = command { return true }
             return false
