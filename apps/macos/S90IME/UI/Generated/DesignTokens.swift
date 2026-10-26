@@ -124,6 +124,7 @@ enum DesignTokens {
             static let variantPaddingX: CGFloat = 6
             static let sectionPaddingY: CGFloat = 3
             static let minWidth: CGFloat = 180
+            static let variantInsetY: CGFloat = 1
         }
         enum ModeIndicator {
             static let fontSize: CGFloat = 14
@@ -178,6 +179,15 @@ enum DesignTokens {
             static let underlineOffset: CGFloat = 4
             static let modeIndicatorSize: CGFloat = 34
             static let modeIndicatorFontSize: CGFloat = 17
+            static let selectionInsetY: CGFloat = 2
+            static let variantInsetY: CGFloat = 4
+            static let curveStartOverlap: CGFloat = 2
+            static let curveEndGap: CGFloat = 3
+            static let curveBend: CGFloat = 0.35
+            static let dotPitch: CGFloat = 5
+            static let keycapPartGap: CGFloat = 1
+            static let shadowRadius: CGFloat = 12
+            static let shadowOffsetY: CGFloat = 3
         }
         enum Handwriting {
             static let width: CGFloat = 284
@@ -187,6 +197,10 @@ enum DesignTokens {
             static let strokeWidth: CGFloat = 5
             static let frameWidth: CGFloat = 1
             static let guideDash: CGFloat = 4
+        }
+        enum Snapshot {
+            static let margin: CGFloat = 16
+            static let scale: CGFloat = 2
         }
     }
     enum Motion {
@@ -199,6 +213,35 @@ enum DesignTokens {
         }
         enum CandidateRest {
             static let fadeIn: Double = 250
+        }
+    }
+    enum Opacity {
+        enum Glass {
+            static let line: CGFloat = 0.26
+            static let lineContrast: CGFloat = 0.5
+            static let badge: CGFloat = 0.1
+            static let badgeContrast: CGFloat = 0.26
+            static let focusTint: CGFloat = 0.16
+            static let focusTintContrast: CGFloat = 0.3
+        }
+        enum Rounded {
+            static let badge: CGFloat = 0.12
+            static let badgeContrast: CGFloat = 0.25
+            static let focusTint: CGFloat = 0.2
+            static let focusTintContrast: CGFloat = 0.35
+        }
+        enum Badge {
+            static let selected: CGFloat = 0.25
+        }
+        enum Variant {
+            static let unavailable: CGFloat = 0.4
+        }
+        enum Keycap {
+            static let deskFill: CGFloat = 0.12
+            static let deskStroke: CGFloat = 0.6
+        }
+        enum Shadow {
+            static let window: CGFloat = 0.22
         }
     }
 }

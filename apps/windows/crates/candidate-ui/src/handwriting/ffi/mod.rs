@@ -7,8 +7,9 @@ mod window;
 use super::ink::{Ink, Point};
 use super::layout::{origin, Bounds, Hit, Layout};
 use super::strings;
+use crate::theme::ResolvedTheme;
 use ipc::windows::{pipe_name, EngineClient};
-use ipc::{Presentation, Rect, RequestBody};
+use ipc::{Rect, RequestBody};
 use recognizer::{Outcome, Recognizer};
 use render::{Fonts, Renderer};
 use std::cell::RefCell;
@@ -30,7 +31,7 @@ struct Controller {
     ink: Ink,
     layout: Option<Layout>,
     fonts: Option<Fonts>,
-    theme: String,
+    theme: Option<ResolvedTheme>,
     delay: u32,
     unavailable: bool,
     visible: bool,
@@ -44,15 +45,13 @@ thread_local! {
 pub fn show(
     anchor: Option<Rect>,
     recognition_delay_milliseconds: u32,
-    presentation: &Presentation,
+    theme: ResolvedTheme,
+    font_size: f32,
 ) {
     with_controller(|controller| {
-        controller.theme = presentation.theme.clone();
         controller.delay = recognition_delay_milliseconds;
-        controller.fonts = controller
-            .renderer
-            .fonts(presentation.font_size as f32)
-            .ok();
+        controller.fonts = controller.renderer.fonts(font_size).ok();
+        controller.theme = Some(theme);
         controller.ink.clear();
         controller.relayout();
         controller.place(anchor);
@@ -118,7 +117,7 @@ impl Controller {
             ink: Ink::default(),
             layout: None,
             fonts: None,
-            theme: String::new(),
+            theme: None,
             delay: 0,
             unavailable: false,
             visible: false,
@@ -264,18 +263,18 @@ impl Controller {
         if !self.visible {
             return;
         }
-        let (Some(layout), Some(fonts)) = (&self.layout, &self.fonts) else {
+        let (Some(layout), Some(fonts), Some(theme)) = (&self.layout, &self.fonts, &self.theme)
+        else {
             return;
         };
         let note = self.unavailable.then_some(strings::NO_RECOGNIZER);
-        let palette = tokens::palette(&self.theme);
         let _ = self.renderer.draw(
             self.window.hwnd(),
             self.window.scale(),
             layout,
             &self.ink,
             note,
-            &palette,
+            theme,
             fonts,
         );
     }

@@ -188,10 +188,42 @@ struct EngineServiceTests {
         #expect(written.candidateFontSize < 1000)
     }
 
+    @Test("入力メニューで入力方式・ライブ変換・設定の画面を選べる")
+    func menu() {
+        let id = greeted()
+        #expect(service.handle(WireRequest(id: 30, body: .menu(command: .selectInputStyle(style: "kana"))), from: id).body == .done)
+        #expect(settings.current.inputStyle == .kana)
+        #expect(service.handle(WireRequest(id: 31, body: .menu(command: .toggleLiveConversion)), from: id).body == .done)
+        #expect(settings.current.liveConversion)
+        #expect(service.handle(WireRequest(id: 32, body: .menu(command: .openSettings)), from: id).body == .done)
+        #expect(opened.value == 1)
+        #expect(service.handle(WireRequest(id: 33, body: .menu(command: .selectInputStyle(style: "unknown"))), from: id).body == .error(code: .malformed))
+        #expect(settings.current.inputStyle == .kana)
+    }
+
     @Test("見た目の設定は設定の値を運ぶ")
     func presentation() {
         #expect(service.presentation.theme == settings.current.theme.rawValue)
         #expect(service.presentation.fontSize == settings.current.candidateFontSize)
+        #expect(service.presentation.customTheme == nil)
+    }
+
+    @Test("使っているカスタムテーマの色と形を運ぶ")
+    func customThemePresentation() throws {
+        let theme = CustomTheme(id: "sunset", name: "夕焼け", base: .washi, surface: HexColor("#2B1B17")!, text: HexColor("#FFE8D6")!,
+                                textMuted: HexColor("#C9A68F")!, selection: HexColor("#FF7A3D")!, selectionText: HexColor("#1A0E0A")!,
+                                correction: HexColor("#FFD23F")!, line: HexColor("#6B4A3E")!, fontName: "Yu Mincho", cornerRadius: 4, branchStyle: .straight)
+        try settings.update {
+            $0.customThemes = [theme]
+            $0.customThemeID = theme.id
+        }
+        let custom = try #require(service.presentation.customTheme)
+        #expect(custom.base == "washi")
+        #expect(custom.surface == WireColor(red: 0x2B, green: 0x1B, blue: 0x17))
+        #expect(custom.line == WireColor(red: 0x6B, green: 0x4A, blue: 0x3E))
+        #expect(custom.fontName == "Yu Mincho")
+        #expect(custom.cornerRadius == 4)
+        #expect(custom.straightBranches)
     }
     // MARK: 手書き入力(R-14)
 

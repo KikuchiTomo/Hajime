@@ -2,8 +2,8 @@ use crate::handwriting::ink::Ink;
 use crate::handwriting::layout::{Layout, TextWidth};
 use crate::handwriting::strings;
 use crate::scene::Frame;
+use crate::theme::{Color, ResolvedTheme};
 use tokens::size::{candidate, handwriting};
-use tokens::{Palette, Rgb};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_U,
@@ -164,14 +164,14 @@ impl Renderer {
         layout: &Layout,
         ink: &Ink,
         note: Option<&str>,
-        palette: &Palette,
+        theme: &ResolvedTheme,
         fonts: &Fonts,
     ) -> Result<()> {
         let width = (layout.width * scale).ceil() as u32;
         let height = (layout.height * scale).ceil() as u32;
         let target = self.target(hwnd, width.max(1), height.max(1))?;
         // SAFETY: 描画先と筆はこの関数の中だけで使う
-        let brush = unsafe { target.CreateSolidColorBrush(&color(palette.surface), None)? };
+        let brush = unsafe { target.CreateSolidColorBrush(&d2d(theme.surface), None)? };
         let painter = Painter {
             target: &target,
             brush: &brush,
@@ -181,9 +181,9 @@ impl Renderer {
         unsafe {
             target.SetDpi(96.0 * scale, 96.0 * scale);
             target.BeginDraw();
-            target.Clear(Some(&color(palette.surface)));
+            target.Clear(Some(&d2d(theme.surface)));
         }
-        painter.paint(layout, ink, note, palette, fonts);
+        painter.paint(layout, ink, note, theme, fonts);
         // SAFETY: BeginDraw と対にする
         let result = unsafe { target.EndDraw(None, None) };
         if result.is_err() {
@@ -205,12 +205,12 @@ impl Painter<'_> {
         layout: &Layout,
         ink: &Ink,
         note: Option<&str>,
-        palette: &Palette,
+        theme: &ResolvedTheme,
         fonts: &Fonts,
     ) {
         let line = handwriting::FRAME_WIDTH;
         let whole = Frame::new(0.0, 0.0, layout.width, layout.height);
-        self.outline(&whole, palette.frame, candidate::FRAME_WIDTH);
+        self.outline(&whole, theme.frame, candidate::FRAME_WIDTH);
         // 見出しの帯
         let title = Frame::new(
             candidate::PADDING_X,
@@ -218,36 +218,36 @@ impl Painter<'_> {
             layout.close.x - candidate::PADDING_X,
             layout.header.height,
         );
-        self.text(strings::TITLE, &title, &fonts.label, palette.text);
+        self.text(strings::TITLE, &title, &fonts.label, theme.text);
         self.text(
             strings::CLOSE,
             &layout.close,
             &fonts.label_centered,
-            palette.text,
+            theme.text,
         );
         self.fill(
             &Frame::new(0.0, layout.header.max_y() - line, layout.width, line),
-            palette.bevel_shadow,
+            theme.bevel_shadow,
         );
         // 書く欄．実線の枠と，破線の十字
-        self.outline(&layout.canvas, palette.text_muted, line);
+        self.outline(&layout.canvas, theme.text_muted, line);
         for dash in layout.guide() {
-            self.fill(&dash, palette.text_muted);
+            self.fill(&dash, theme.text_muted);
         }
         if ink.is_empty() {
             self.text(
                 strings::PROMPT,
                 &layout.canvas,
                 &fonts.label_centered,
-                palette.text_muted,
+                theme.text_muted,
             );
         }
-        self.strokes(layout, ink, palette.text);
+        self.strokes(layout, ink, theme.text);
         // 候補と消去
         for (frame, index) in &layout.chips {
             if let Some(text) = ink.candidates().get(*index) {
-                self.outline(frame, palette.bevel_shadow, line);
-                self.text(text, frame, &fonts.candidate, palette.text);
+                self.outline(frame, theme.bevel_shadow, line);
+                self.text(text, frame, &fonts.candidate, theme.text);
             }
         }
         if let Some(note) = note {
@@ -257,18 +257,13 @@ impl Painter<'_> {
                 layout.clear.x - layout.canvas.x,
                 layout.clear.height,
             );
-            self.text(note, &row, &fonts.label, palette.text_muted);
+            self.text(note, &row, &fonts.label, theme.text_muted);
         }
-        self.outline(&layout.clear, palette.bevel_shadow, line);
-        self.text(
-            strings::CLEAR,
-            &layout.clear,
-            &fonts.candidate,
-            palette.text,
-        );
+        self.outline(&layout.clear, theme.bevel_shadow, line);
+        self.text(strings::CLEAR, &layout.clear, &fonts.candidate, theme.text);
     }
 
-    fn strokes(&self, layout: &Layout, ink: &Ink, rgb: Rgb) {
+    fn strokes(&self, layout: &Layout, ink: &Ink, color: Color) {
         let width = handwriting::STROKE_WIDTH;
         let origin = |x: f32, y: f32| Vector2 {
             X: layout.canvas.x + x,
@@ -276,7 +271,7 @@ impl Painter<'_> {
         };
         // SAFETY: BeginDraw と EndDraw の中で，生きている筆で描く
         unsafe {
-            self.brush.SetColor(&color(rgb));
+            self.brush.SetColor(&d2d(color));
             for stroke in ink.strokes() {
                 if let [only] = stroke.as_slice() {
                     let ellipse = D2D1_ELLIPSE {
@@ -300,15 +295,15 @@ impl Painter<'_> {
         }
     }
 
-    fn fill(&self, frame: &Frame, rgb: Rgb) {
+    fn fill(&self, frame: &Frame, color: Color) {
         // SAFETY: BeginDraw と EndDraw の中で，生きている筆で描く
         unsafe {
-            self.brush.SetColor(&color(rgb));
+            self.brush.SetColor(&d2d(color));
             self.target.FillRectangle(&rect(frame), self.brush);
         }
     }
 
-    fn outline(&self, frame: &Frame, rgb: Rgb, width: f32) {
+    fn outline(&self, frame: &Frame, color: Color, width: f32) {
         let inset = Frame::new(
             frame.x + width / 2.0,
             frame.y + width / 2.0,
@@ -317,17 +312,17 @@ impl Painter<'_> {
         );
         // SAFETY: BeginDraw と EndDraw の中で，生きている筆で描く
         unsafe {
-            self.brush.SetColor(&color(rgb));
+            self.brush.SetColor(&d2d(color));
             self.target
                 .DrawRectangle(&rect(&inset), self.brush, width, None);
         }
     }
 
-    fn text(&self, text: &str, frame: &Frame, format: &IDWriteTextFormat, rgb: Rgb) {
+    fn text(&self, text: &str, frame: &Frame, format: &IDWriteTextFormat, color: Color) {
         let wide: Vec<u16> = text.encode_utf16().collect();
         // SAFETY: BeginDraw と EndDraw の中で，生きている筆と書式で描く
         unsafe {
-            self.brush.SetColor(&color(rgb));
+            self.brush.SetColor(&d2d(color));
             self.target.DrawText(
                 &wide,
                 format,
@@ -340,12 +335,12 @@ impl Painter<'_> {
     }
 }
 
-fn color(rgb: Rgb) -> D2D1_COLOR_F {
+fn d2d(color: Color) -> D2D1_COLOR_F {
     D2D1_COLOR_F {
-        r: f32::from(rgb.red) / 255.0,
-        g: f32::from(rgb.green) / 255.0,
-        b: f32::from(rgb.blue) / 255.0,
-        a: 1.0,
+        r: color.red,
+        g: color.green,
+        b: color.blue,
+        a: color.alpha,
     }
 }
 

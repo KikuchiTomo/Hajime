@@ -1278,7 +1278,11 @@ public final class InputSession {
     /// 切れ目が無い文節では positions が空(区切る状態に入らない)
     private func focusedSplit(_ lattice: SegmentLattice) -> SegmentSplitter.Split {
         let reading = focusedReading(lattice)
-        return SegmentSplitter.split(shown: lattice.focused.selected.text, reading: reading, words: converter.segmentationWords(for: reading))
+        let converter = converter
+        return SegmentSplitter.split(
+            shown: lattice.focused.selected.text, reading: reading,
+            candidates: { part in converter.dictionaryCandidates(for: part).filter { $0.readingCount == part.count }.map(\.text) },
+            words: converter.segmentationWords(for:))
     }
 
     /// エディタとターミナルでライブ変換を控えめにするか(R-06．設定)

@@ -24,6 +24,9 @@
 - `ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決める
 - `OnTestKeyDown` はエンジンに問い合わせない．応答に入っている `SessionState`(組み立て中か，モード，今の状態で受け取るキー)の写しで答える
 - 打鍵が止まったときの表示の切り替えと打ち間違いの見直しは，エンジンが待つ時間を返し，DLL がタイマーで `wake` を送る
+- タスクバーの入力モードの表示は，言語バーの項目(`GUID_LBI_INPUTMODE`．`crates/tsf/src/com/langbar.rs`)で出す．右クリックのメニューの項目は macOS の入力メニューと同じ(`crates/tsf/src/menu.rs`)で，選んだ操作は `menu` の要求でエンジンに頼む
+- 設定の「キー配列」(ABC・US・Dvorak・Colemak)は，DLL がキーの位置(スキャンコード)から文字を引く表(`crates/tsf/src/layout.rs`)で打つ．Windows で配列を読み込むと利用者の配列の一覧が変わるため，OS の配列は切り替えない．ローマ字入力と英字入力のときだけ使い，Ctrl・Alt を押したショートカットは OS の配列のまま
+- 打ち間違いの訂正は Zenzai で 1 文に 1 秒ほどかかるので，エンジンが裏で求める(`ZenzaiTypoService`)．求めているあいだは短い間隔(`EngineService.correctionPollMilliseconds`)の `wake` を頼み，求め終わったあとの `wake` で見直しや待たせていた変換(`.awaitCorrections`)の結果を返す．Space の変換を待たせるのは `DefaultSettings.correctionWaitBeforeConversion` まで．間に合わなかった `wake` の応答も，キーの応答と同じくあとで反映する
 - 設定のファイルは macOS と同じ形式．エンジンが 2 秒ごとに更新の時刻を見て，変わっていれば読み直す
 - `.ui` のパイプはエンジンから候補ウィンドウへの一方向．エンジンは読みを待たない(同期の I/O のハンドルでは，読みを待っているあいだ同じハンドルへの書き込みも止まるため)
 
@@ -38,7 +41,13 @@
 
 ## Windows で使わないもの
 
-`core/Package.swift` の trait `Zenzai` を `--disable-default-traits` で外してビルドする(llama.cpp のライブラリをまだ用意していないため)．Vision(手書き．Windows では候補ウィンドウが Windows の手書き認識を使う)・CryptoKit(同期の辞書の索引)・`os` の Logger は Apple の OS だけで作る．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+Vision(手書き．Windows では候補ウィンドウが Windows の手書き認識を使う)・CryptoKit(同期の辞書の索引)・`os` の Logger は Apple の OS だけで作る．英単語の辞書は Windows のスペルチェッカーをつなぐまで空にしている．
+
+## Zenzai
+
+Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流の azooKey-Windows と同じ b4846 の Windows 向けのビルド(AVX 版)を `tools/windows/fetch_llama.ps1` で取り，SHA-256 を確かめてから使う．展開した場所は，`swift build -Xswiftc -L<場所>` でリンクの探す場所(`llama.lib`)に，`PATH` で実行時の探す場所(`llama.dll`・`ggml*.dll`)に足す．`LIB` を書き換えると clang が MSVC のライブラリを自分で探さなくなるので使わない．
+
+モデルは `tools/windows/fetch_zenzai.ps1` で取り(取得元とハッシュは `tools/models/fetch_zenzai.sh` と同じ)，インストール先の `Zenzai\` に置く．エンジンは起動のたびに大きさと SHA-256(`SHA256Digest`)を確かめ，合わなければ Zenzai なしで動く．
 
 ## ビルドと確かめ
 
@@ -46,13 +55,24 @@
 
 | ジョブ | 内容 |
 |---|---|
-| `rust` | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
-| `swift` | core と `s90-engine-host` を Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
-| `package` | release でビルドし，`tools/windows/stage.ps1` で集めて WiX で `s90-tokyo-ime.msi` を作る |
+| `rust` | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．候補ウィンドウの見本を PNG に書き出して成果物 `candidate-ui-snapshots` にする．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
+| `swift` | core と `s90-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
+| `package` | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `s90-tokyo-ime.msi` を作る |
+
+Windows 向けの Rust のコードは，Mac でも型の検査まではできる．rustup で `x86_64-pc-windows-msvc` の標準ライブラリを入れ，`apps/windows` で `cargo clippy --target x86_64-pc-windows-msvc -p candidate-ui --all-targets` を動かす(リンクはしない)．
 
 Swift は swift.org の Windows 版(6.3.3)を `compnerd/gha-setup-swift` で，Rust は `apps/windows/rust-toolchain.toml` の版を，WiX は `dotnet tool` の 6.0.2 を使う．
 
 Windows の機械で試すときは，`package` のジョブが作る MSI を入れる(`docs/user/how-to/install-windows.md`)．DLL だけを入れ替えるときは，管理者のコマンドプロンプトで `regsvr32 /u` で外してから置き換え，`regsvr32` で登録し直す．TSF の DLL はアプリに読み込まれたままになるので，置き換えたあとはアプリを開き直す．
+
+## 候補ウィンドウの描き方
+
+配置と色は `candidate-ui` の `scene`(OS に依らない)が macOS の `CandidateView`・`BranchView` と同じ決め方で決め，`app::render` が Direct2D でなぞる．テーマの色と書体は `theme::ResolvedTheme` が設定(カスタムテーマを含む)と OS の外観から決める．
+
+- 窓は DWM に合成を任せ(`DwmExtendFrameIntoClientArea`)，描かなかったところを透けさせる．角丸の形と影は中身の側が描く
+- glass は，Windows 11 で DWM の背景(`DWMSBT_TRANSIENTWINDOW`)を使えるときだけ地をすりガラスにする．このときは角の丸み・縁・影も OS が描く．使えないとき(Windows 10・ハイコントラスト)は `glass.light`・`glass.dark` の色で地を塗る
+- 選択の色は Windows のアクセントカラー(`AccentPalette`)．ライト・ダークは `AppsUseLightTheme`，「コントラストを上げる」はハイコントラスト，動きを止めるのは「アニメーション効果」がオフのとき
+- 見本の画像は，デバッグビルドの `s90-candidate-ui.exe --render-snapshots <ディレクトリ>` で macOS と同じ名前(`list-glass-light.png` など)で書き出す
 
 ## 決まっていないこと・まだ無いもの
 

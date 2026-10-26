@@ -190,6 +190,9 @@ pub struct SessionState {
     #[serde(rename = "precedingTextLength")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preceding_text_length: Option<u32>,
+    #[serde(rename = "keyboardLayout")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keyboard_layout: Option<String>,
 }
 
 impl fmt::Debug for SessionState {
@@ -200,6 +203,7 @@ impl fmt::Debug for SessionState {
             .field("consumedKeys", &self.consumed_keys)
             .field("wakeAfterMilliseconds", &self.wake_after_milliseconds)
             .field("precedingTextLength", &self.preceding_text_length)
+            .field("keyboardLayout", &REDACTED)
             .finish()
     }
 }
@@ -300,6 +304,29 @@ impl fmt::Debug for SettingsSnapshot {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
+pub enum MenuCommand {
+    SelectInputStyle {
+        style: String,
+    },
+    ToggleLiveConversion,
+    OpenSettings,
+}
+
+impl fmt::Debug for MenuCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SelectInputStyle { .. } => f
+                .debug_struct("SelectInputStyle")
+                .field("style", &REDACTED)
+                .finish(),
+            Self::ToggleLiveConversion => f.write_str("ToggleLiveConversion"),
+            Self::OpenSettings => f.write_str("OpenSettings"),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum RequestBody {
     Hello {
         #[serde(rename = "protocolVersion")]
@@ -332,6 +359,9 @@ pub enum RequestBody {
     ReadSettings,
     WriteSettings {
         settings: SettingsSnapshot,
+    },
+    Menu {
+        command: MenuCommand,
     },
     HandwritingChosen {
         text: String,
@@ -380,6 +410,10 @@ impl fmt::Debug for RequestBody {
             Self::WriteSettings { settings, .. } => f
                 .debug_struct("WriteSettings")
                 .field("settings", settings)
+                .finish(),
+            Self::Menu { command, .. } => f
+                .debug_struct("Menu")
+                .field("command", command)
                 .finish(),
             Self::HandwritingChosen { .. } => f
                 .debug_struct("HandwritingChosen")
@@ -655,12 +689,71 @@ impl fmt::Debug for BranchMap {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+impl fmt::Debug for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Color")
+            .field("red", &self.red)
+            .field("green", &self.green)
+            .field("blue", &self.blue)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct CustomTheme {
+    pub base: String,
+    pub surface: Color,
+    pub text: Color,
+    #[serde(rename = "textMuted")]
+    pub text_muted: Color,
+    pub selection: Color,
+    #[serde(rename = "selectionText")]
+    pub selection_text: Color,
+    pub correction: Color,
+    pub line: Color,
+    #[serde(rename = "fontName")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_name: Option<String>,
+    #[serde(rename = "cornerRadius")]
+    pub corner_radius: f64,
+    #[serde(rename = "straightBranches")]
+    pub straight_branches: bool,
+}
+
+impl fmt::Debug for CustomTheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CustomTheme")
+            .field("base", &REDACTED)
+            .field("surface", &self.surface)
+            .field("text", &self.text)
+            .field("textMuted", &self.text_muted)
+            .field("selection", &self.selection)
+            .field("selectionText", &self.selection_text)
+            .field("correction", &self.correction)
+            .field("line", &self.line)
+            .field("fontName", &REDACTED)
+            .field("cornerRadius", &self.corner_radius)
+            .field("straightBranches", &self.straight_branches)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Presentation {
     pub theme: String,
     #[serde(rename = "fontSize")]
     pub font_size: f64,
     #[serde(rename = "modeIndicatorMilliseconds")]
     pub mode_indicator_milliseconds: u32,
+    #[serde(rename = "customTheme")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_theme: Option<CustomTheme>,
 }
 
 impl fmt::Debug for Presentation {
@@ -669,6 +762,7 @@ impl fmt::Debug for Presentation {
             .field("theme", &REDACTED)
             .field("fontSize", &self.font_size)
             .field("modeIndicatorMilliseconds", &self.mode_indicator_milliseconds)
+            .field("customTheme", &self.custom_theme)
             .finish()
     }
 }

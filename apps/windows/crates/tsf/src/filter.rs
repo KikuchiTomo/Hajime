@@ -72,6 +72,7 @@ mod tests {
             consumed_keys,
             wake_after_milliseconds: None,
             preceding_text_length: None,
+            keyboard_layout: None,
         }
     }
 
