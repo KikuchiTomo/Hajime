@@ -40,8 +40,9 @@ final class ReadingCorrector {
     }
 
     /// 見直しに要るのに，まだ求めていないキーの並び(読みに合わせて綴り直したキー・打ったままのキー・重なりを 1 回にした並び)．要らなければ nil
-    func pendingKeys(for composition: Composition) -> [String]? {
-        guard usesProvidedCorrections, let region = reviewableRegion(of: typedComposition(from: composition) ?? composition) else { return nil }
+    /// final は打ち終えたとき(Space で変換する)．かなになり切っていない末尾のローマ字(「…ましょうak」の k)も見直す
+    func pendingKeys(for composition: Composition, final: Bool = false) -> [String]? {
+        guard usesProvidedCorrections, let region = reviewableRegion(of: typedComposition(from: composition) ?? composition, final: final) else { return nil }
         let all = requiredKeys(for: region)
         let missing = all.filter { provided[$0] == nil }
         return missing.isEmpty ? nil : missing
@@ -66,10 +67,12 @@ final class ReadingCorrector {
         var reading: String
     }
 
-    /// 見直せる部分．キーが英小文字と「-」だけで，戻した並びで始まらず，長すぎないもの
-    private func reviewableRegion(of typed: Composition) -> Region? {
+    /// 見直せる部分．キーが英小文字と「-」だけで，戻した並びで始まらず，長すぎないもの．
+    /// 打っている途中は，かなになり切っていないローマ字が末尾にあれば見直さない(打ちかけの「k」を余分な 1 打として消さない)．
+    /// 打ち終えたとき(final)は，それも打ち間違いとして見直す
+    private func reviewableRegion(of typed: Composition, final: Bool = false) -> Region? {
         guard let all = typed.rawKeys, let boundary = typed.boundaryAfterEnglish,
-            typed.pending.isEmpty || typed.pending == "n",
+            final || typed.pending.isEmpty || typed.pending == "n",
             !(dismissedKeys.map(all.hasPrefix) ?? false) else { return nil }
         // 「nn」のあとをな行で読んだところは綴り直す．訂正は打ったままの読みと比べるので，読みがそろっていないと直せない
         guard let keys = typed.spelledKeys(from: boundary.rawCount) else { return nil }
@@ -122,14 +125,15 @@ final class ReadingCorrector {
 
     /// 打ったキー全体を見直し，直すなら composition を直した読みにする．
     /// 前に直したものが，続けて打ったキーでもっともらしくなくなったら，打ったままに戻す
-    func review(_ composition: inout Composition, makeComposition: () -> Composition) {
+    func review(_ composition: inout Composition, makeComposition: () -> Composition, final: Bool = false) {
         // 訂正をまだ求め終わっていなければ，今の表示のまま待つ(直したものを打ったままに戻したりしない)
-        if pendingKeys(for: composition) != nil { return }
+        if pendingKeys(for: composition, final: final) != nil { return }
         suggestion = nil
         suggestsMisreading = false
         let typed = typedComposition(from: composition) ?? composition
-        guard let region = reviewableRegion(of: typed) else {
-            lastReview = (typed.rawKeys ?? "", nil)
+        guard let region = reviewableRegion(of: typed, final: final) else {
+            // 打ちかけのローマ字があって見直さなかったときは，見直し済みにしない(打ち終えたときに見直す)
+            if final || reviewableRegion(of: typed, final: true) == nil { lastReview = (typed.rawKeys ?? "", nil) }
             return
         }
         let current = settings.current

@@ -98,6 +98,8 @@ struct ReadingCorrectionTests {
 
     @Test("アプリと同じ道筋で，打ってすぐ Space を押しても，裏で求めた訂正が届いたら変換を直すか「もしかして」と示す", arguments: [
         "kyounotenkihayoudesune", "kyouhaitenkidesune", "tututasakanagaookikatta", "arigatpugozaimasu", "wakeranai", "sorehawakeranaidesu",
+        // 末尾がかなになり切っていない文(打ち終えて Space を押したときは，末尾の打ちかけも打ち間違いとして見直す)
+        "otyawoiremasyouak",
         "nankatkitou",
     ])
     func spaceRightAfterTyping(keys: String) async throws {
