@@ -185,7 +185,12 @@ private struct AppearanceTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.appearance) {
-                ChoicePicker(title: UIStrings.Choice.theme, selection: model.binding(\.theme), values: UIStrings.Choice.themes, label: UIStrings.Choice.label(for:))
+                Picker(UIStrings.Choice.theme, selection: model.binding(\.theme)) {
+                    ForEach(UIStrings.Choice.themes, id: \.self) { theme in
+                        ThemeSwatch(theme: theme).tag(theme)
+                    }
+                }
+                .pickerStyle(.radioGroup)
                 Slider(
                     value: Binding(get: { fontSize ?? model.settings.candidateFontSize }, set: { scheduleSave($0) }),
                     in: Double(DesignTokens.Size.Candidate.fontSizeMin)...Double(DesignTokens.Size.Candidate.fontSizeMax),
@@ -411,5 +416,30 @@ private struct KeyCapture: NSViewRepresentable {
             NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
             NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
         }
+    }
+}
+
+/// 外観の選択肢．名前の前に，地・文字・選択の色を小さく並べる
+private struct ThemeSwatch: View {
+    let theme: ThemePreference
+
+    var body: some View {
+        let resolved = ResolvedTheme.resolve(theme)
+        HStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: resolved.isRounded ? 5 : 0)
+                    .fill(Color(nsColor: resolved.surface))
+                    .overlay(RoundedRectangle(cornerRadius: resolved.isRounded ? 5 : 0).stroke(Color(nsColor: resolved.frame), lineWidth: 1))
+                HStack(spacing: 3) {
+                    Text("あ").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(nsColor: resolved.text))
+                    RoundedRectangle(cornerRadius: resolved.isRounded ? 3 : 0)
+                        .fill(Color(nsColor: resolved.selection))
+                        .frame(width: 12, height: 10)
+                }
+            }
+            .frame(width: 40, height: 20)
+            Text(UIStrings.Choice.label(for: theme))
+        }
+        .padding(.vertical, 2)
     }
 }

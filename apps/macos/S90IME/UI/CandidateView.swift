@@ -18,15 +18,16 @@ final class CandidateView: NSView {
     override var isFlipped: Bool { true }
 
     private var candidateFont: NSFont { theme.candidateFont(size: fontSize) }
-    private var labelFont: NSFont { theme.labelFont(size: theme.isGlass ? Glass.labelFontSize : Size.labelFontSize) }
-    private var rowHeight: CGFloat { ((theme.isGlass ? Glass.rowHeight : Size.rowHeight) * fontSize / Size.fontSize).rounded() }
+    private var labelFont: NSFont { theme.labelFont(size: theme.isRounded ? Glass.labelFontSize : Size.labelFontSize) }
+    private var rowHeight: CGFloat { ((theme.isRounded ? Glass.rowHeight : Size.rowHeight) * fontSize / Size.fontSize).rounded() }
     private var sectionHeight: CGFloat {
-        theme.isGlass ? Glass.footerHeight : (labelFont.ascender - labelFont.descender).rounded(.up) + Size.sectionPaddingY * 2
+        theme.isRounded ? Glass.footerHeight
+            : max((labelFont.ascender - labelFont.descender).rounded(.up), Glass.keycapHeight) + Size.sectionPaddingY * 2
     }
     /// 外枠と立体の縁の太さ．glass は余白
-    private var inset: CGFloat { theme.isGlass ? Glass.padding / 2 : Size.frameWidth + Size.bevelWidth }
+    private var inset: CGFloat { theme.isRounded ? Glass.padding / 2 : Size.frameWidth + Size.bevelWidth }
     /// 番号の幅
-    private var lead: CGFloat { theme.isGlass ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
+    private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
     private var dropShadowOffset: CGFloat { theme.hasDropShadow ? Size.shadowOffset : 0 }
 
     // MARK: - 大きさ
@@ -54,7 +55,7 @@ final class CandidateView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let panel else { return }
         let body = NSRect(x: 0, y: 0, width: bounds.width - dropShadowOffset, height: bounds.height - dropShadowOffset)
-        if theme.isGlass {
+        if theme.isRounded {
             GlassDrawing.drawFrame(in: body, theme: theme, fillsSurface: fillsSurface)
         } else {
             BevelDrawing.drawDropShadow(for: body, theme: theme)
@@ -78,7 +79,7 @@ final class CandidateView: NSView {
     }
 
     private func drawSeparator(y: CGFloat, from minX: CGFloat, to maxX: CGFloat) {
-        if theme.isGlass {
+        if theme.isRounded {
             theme.line.setFill()
             NSRect(x: minX + Size.paddingX / 2, y: y, width: maxX - minX - Size.paddingX, height: Size.frameWidth).fill()
         } else {
@@ -94,9 +95,9 @@ final class CandidateView: NSView {
             let color: NSColor = isSelected ? theme.selectionText : (variant.isAvailable ? theme.textMuted : theme.textMuted.withAlphaComponent(0.4))
             let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: color]
             let width = variant.label.size(withAttributes: attributes).width + Size.variantPaddingX * 2
-            let cell = NSRect(x: x, y: rect.minY + (theme.isGlass ? 4 : 1), width: width, height: rect.height - (theme.isGlass ? 8 : 2))
+            let cell = NSRect(x: x, y: rect.minY + (theme.isRounded ? 4 : 1), width: width, height: rect.height - (theme.isRounded ? 8 : 2))
             if isSelected {
-                if theme.isGlass {
+                if theme.isRounded {
                     GlassDrawing.fillCapsule(cell, color: theme.selection)
                 } else {
                     theme.selection.setFill()
@@ -111,7 +112,7 @@ final class CandidateView: NSView {
     private func drawEntry(_ entry: CandidatePanel.Entry, index: Int, panel: CandidatePanel, in rect: NSRect) {
         let isSelected = panel.focus == .candidate && panel.selectedEntry == index
         if isSelected {
-            if theme.isGlass {
+            if theme.isRounded {
                 GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection)
             } else {
                 theme.selection.setFill()
@@ -122,7 +123,7 @@ final class CandidateView: NSView {
         let textColor = (isSelected ? theme.selectionText : theme.text).withAlphaComponent(opacity)
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
         let number = "\(index + 1)"
-        if theme.isGlass {
+        if theme.isRounded {
             let center = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity)
             drawText(entry.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: rect.minX + Size.paddingX / 2 + lead, in: rect)
@@ -156,7 +157,7 @@ final class CandidateView: NSView {
     private func hintsWidth(_ hints: [KeyHint], note: String?) -> CGFloat {
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         if let note { return note.size(withAttributes: attributes).width }
-        return theme.isGlass ? GlassDrawing.hintsWidth(hints, theme: theme) : KeyHint.text(hints).size(withAttributes: attributes).width
+        return GlassDrawing.hintsWidth(hints, theme: theme)
     }
 
     /// glass は案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)
@@ -168,7 +169,7 @@ final class CandidateView: NSView {
         let right = { (text: String, attributes: [NSAttributedString.Key: Any]) in
             self.drawText(text, attributes: attributes, x: rect.maxX - Size.paddingX - text.size(withAttributes: attributes).width, in: rect)
         }
-        if theme.isGlass {
+        if theme.isRounded {
             if let note = footer.note {
                 drawText(note, attributes: noteAttributes, x: left, in: rect)
             } else {
@@ -181,7 +182,8 @@ final class CandidateView: NSView {
         if let note = footer.note {
             right(note, noteAttributes)
         } else {
-            right(KeyHint.text(footer.hints), muted)
+            let width = GlassDrawing.hintsWidth(footer.hints, theme: theme)
+            GlassDrawing.drawHints(footer.hints, x: rect.maxX - Size.paddingX - width, midY: rect.midY, theme: theme)
         }
     }
 

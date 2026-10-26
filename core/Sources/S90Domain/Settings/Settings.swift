@@ -187,11 +187,17 @@ public struct ProfileRule: Sendable, Equatable, Codable, Hashable {
 }
 
 public enum ThemePreference: String, Sendable, Equatable, Codable, CaseIterable {
-    /// ライトモードで platinum，ダークモードで desk
+    /// 標準(すりガラス．ライトとダークに合わせる)
     case automatic
     case platinum
     case desk
+    /// 以前の値．標準と同じに読む
     case native
+    case washi
+    case neon
+    case terminal
+    case nordic
+    case contrast
 }
 
 /// タイプミスの補正の強さ(R-02)
