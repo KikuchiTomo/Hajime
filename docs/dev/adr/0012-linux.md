@@ -28,6 +28,11 @@ macOS 版・Windows 版と同じ機能を，同じ挙動で使えるようにす
 3. `s90-engine-host` の置き場所(`HostPaths`)を Linux の XDG の場所にする(設定は `$XDG_CONFIG_HOME/s90.tokyo/IME`，学習データは `$XDG_DATA_HOME/s90.tokyo/IME`)
 4. Fcitx 5 のアドオンを `apps/linux/fcitx5` に作る
 
+## 準備で分かった Linux の残り
+
+- Linux の Foundation(swift-corelibs-foundation)は Shift_JIS と EUC-JP を読めない．取り込む辞書のうち，この 2 つの符号化のファイルはまだ読めない(UTF-8・UTF-16 は読める)．JIS X 0208 の対応表を持って自分で読むか，ICU の変換を使うかを決める
+- 英単語の辞書(macOS の NSSpellChecker・Windows のスペルチェッカーに当たるもの)が無い．Hunspell などを使うかを決める
+
 ## 検討したほかの案
 
 | 案 | 採らなかった理由 |

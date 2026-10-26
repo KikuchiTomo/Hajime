@@ -66,11 +66,11 @@ public enum DictionaryFileReader {
         if let text = String(data: data, encoding: .utf8) { return text }
         if let utf16 = bomlessUTF16(data), let text = String(data: data, encoding: utf16) { return text }
         if let text = String(data: data, encoding: .shiftJIS) { return text }
-        #if os(Windows)
-        // Windows の Foundation は EUC-JP を読めないので，Shift_JIS に並べ替えて読む
-        return JapaneseEUC.decode(data)
-        #else
+        #if canImport(Darwin)
         return String(data: data, encoding: .japaneseEUC)
+        #else
+        // Windows と Linux の Foundation は EUC-JP を読めないので，Shift_JIS に並べ替えて読む
+        return JapaneseEUC.decode(data)
         #endif
     }
 

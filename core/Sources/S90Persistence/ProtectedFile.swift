@@ -27,10 +27,10 @@ enum ProtectedFile {
         #if os(Windows)
         try replace(url, with: temporary)
         #else
-        if FileManager.default.fileExists(atPath: url.path) {
-            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
-        } else {
-            try FileManager.default.moveItem(at: temporary, to: url)
+        // rename(2) は同じフォルダの中なら一度に置き換える(macOS と Linux で同じ動き)．
+        // FileManager.replaceItemAt では，Linux の CI で設定を保存して読み直すテストが通らなかった
+        guard rename(temporary.path, url.path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
         #endif
     }

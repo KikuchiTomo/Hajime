@@ -117,8 +117,8 @@ public final class UnixSocketConnection: EngineByteStream, @unchecked Sendable {
     public func peerUserID() throws(UnixSocketError) -> uid_t {
         let descriptor = current
         #if canImport(Glibc)
-        var credentials = ucred()
-        var length = socklen_t(MemoryLayout<ucred>.size)
+        var credentials = PeerCredentials()
+        var length = socklen_t(MemoryLayout<PeerCredentials>.size)
         guard getsockopt(descriptor, SOL_SOCKET, SO_PEERCRED, &credentials, &length) == 0 else { throw UnixSocketError(.peer) }
         return credentials.uid
         #else
@@ -133,8 +133,8 @@ public final class UnixSocketConnection: EngineByteStream, @unchecked Sendable {
     public func peerProcessID() -> pid_t? {
         let descriptor = current
         #if canImport(Glibc)
-        var credentials = ucred()
-        var length = socklen_t(MemoryLayout<ucred>.size)
+        var credentials = PeerCredentials()
+        var length = socklen_t(MemoryLayout<PeerCredentials>.size)
         guard getsockopt(descriptor, SOL_SOCKET, SO_PEERCRED, &credentials, &length) == 0 else { return nil }
         return credentials.pid
         #else
@@ -221,6 +221,16 @@ public final class UnixSocketListener: @unchecked Sendable {
         }
     }
 }
+
+#if canImport(Glibc)
+/// SO_PEERCRED で受け取る相手の情報(Linux の struct ucred と同じ並び)．
+/// Glibc の ucred は _GNU_SOURCE のときだけ見えるので，Swift からは同じ形の型を使う
+private struct PeerCredentials {
+    var pid: pid_t = 0
+    var uid: uid_t = 0
+    var gid: gid_t = 0
+}
+#endif
 
 public enum UnixSocketPeer {
     /// 相手のプロセスの実行ファイルの場所(Linux の /proc/<ID>/exe)．分からなければ nil

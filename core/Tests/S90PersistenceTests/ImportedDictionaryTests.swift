@@ -3,10 +3,14 @@ import Foundation
 @testable import S90Persistence
 import Testing
 
-#if os(Windows)
+// テストの文を作る(tsv.data(using:))のに Foundation の符号化を使うので，OS の Foundation が書ける符号化だけを試す．
+// Windows の Foundation は EUC-JP を，Linux の Foundation は Shift_JIS と EUC-JP を書けない(ADR 0012 の Linux の残り)
+#if canImport(Darwin)
+private let readableEncodings: [String.Encoding] = [.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .shiftJIS, .japaneseEUC]
+#elseif os(Windows)
 private let readableEncodings: [String.Encoding] = [.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .shiftJIS]
 #else
-private let readableEncodings: [String.Encoding] = [.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .shiftJIS, .japaneseEUC]
+private let readableEncodings: [String.Encoding] = [.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian]
 #endif
 
 @Suite("取り込む辞書のファイル(R-16)")

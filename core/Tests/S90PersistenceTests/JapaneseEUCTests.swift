@@ -11,7 +11,10 @@ struct JapaneseEUCTests {
         0xA4, 0xE4, 0xA4, 0xDE, 0xA4, 0xC0, 0x09, 0xBB, 0xB3, 0xC5, 0xC4, 0x09, 0xBF, 0xCD, 0xCC, 0xBE, 0x0A,
     ]
 
-    @Test("EUC-JP の辞書をどの OS でも読む")
+    /// Shift_JIS を Foundation で読める OS か(Linux の Foundation は読めない．ADR 0012 の Linux の残り)
+    static let readsShiftJIS = String(bytes: [0x82, 0xA0], encoding: .shiftJIS) != nil
+
+    @Test("EUC-JP の辞書を macOS と Windows で読む", .enabled(if: readsShiftJIS))
     func readsDictionary() throws {
         #expect(JapaneseEUC.decode(Data(dictionary)) == "でんあつ\t電圧\t名詞\nやまだ\t山田\t人名\n")
         #expect(try DictionaryFileReader.parse(Data(dictionary)) == [
@@ -38,7 +41,7 @@ struct JapaneseEUCTests {
         #expect(JapaneseEUC.decode(Data(bytes)) == nil)
     }
 
-    #if !os(Windows)
+    #if canImport(Darwin)
     /// 13 区(NEC の特殊文字)は，macOS の japaneseEUC が独自の文字(㈰ など)に割り当てるので比べない．
     /// こちらは Windows の EUC-JP(CP51932)と同じに ① などとして読む
     @Test("JIS X 0208 のすべての文字を，macOS の japaneseEUC と同じ文字として読む")
