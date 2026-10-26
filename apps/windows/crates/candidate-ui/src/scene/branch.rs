@@ -757,7 +757,7 @@ mod tests {
             columns: vec![column("今日は", true), column("晴れ", false)],
             position: 1,
             total: 2,
-            note: Some("直しました".into()),
+            note: Some("修正しました".into()),
             hints: vec![KeyHint {
                 keys: "Space".into(),
                 label: "候補".into(),
@@ -791,7 +791,7 @@ mod tests {
             assert!(texts.contains(&("京は".into(), theme.selection_text)));
             assert!(texts.contains(&("修正".into(), theme.selection_text)));
             assert!(texts.contains(&("きょうは".into(), theme.text)));
-            assert!(texts.contains(&("直しました".into(), theme.correction)));
+            assert!(texts.contains(&("修正しました".into(), theme.correction)));
             assert!(texts.contains(&("1–2 / 2".into(), theme.text_muted)));
             // 注目している文節の枝と重なる文節には，次の候補を添えない
             assert!(!texts.iter().any(|(text, _)| text == "腫れ"));

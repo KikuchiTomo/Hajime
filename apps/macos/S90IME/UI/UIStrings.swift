@@ -15,7 +15,7 @@ enum UIStrings {
         static let imported = "取り込んだ辞書"
         static let empty = "取り込んだ辞書はありません"
         static let importFile = "辞書を取り込む…"
-        static let reimport = "取り込み直す…"
+        static let reimport = "再読み込み…"
         static let name = "名前"
         static let field = "分野"
         static let fieldPrompt = "電気・法律など"
@@ -28,7 +28,7 @@ enum UIStrings {
         static let moveDown = "優先度を下げる"
         static let tooMany = "取り込める辞書は 32 個までです"
         static let importFailed = "辞書を取り込めませんでした。大きすぎるか、読めない形式です"
-        static let note = "タブ区切り・SKK・macOS のユーザ辞書の形式を読み込めます。上にある辞書ほど優先されます。"
+        static let note = "タブ区切り・SKK・macOS のユーザー辞書の形式を読み込めます。上にある辞書ほど優先されます。"
         static func imported(_ count: Int) -> String { "\(count) 語を取り込みました" }
 
         static func summary(_ dictionary: ImportedDictionary) -> String {
@@ -133,7 +133,7 @@ enum UIStrings {
             case .convertWithoutLearning: "学習を使わずに変換"
             case .deleteBackward: "左の文字を削除"
             case .insertBoundary: "ここで区切る"
-            case .acceptSuggestion: "「もしかして」に直す"
+            case .acceptSuggestion: "「もしかして」に修正"
             case .toHiragana: "ひらがなに変換"
             case .toKatakana: "全角カタカナに変換"
             case .toHalfwidthKatakana: "半角カタカナに変換"
@@ -150,8 +150,8 @@ enum UIStrings {
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
             case .lastSegment: "末尾の文節"
-            case .nextUncertainSegment: "次の迷う文節"
-            case .previousUncertainSegment: "前の迷う文節"
+            case .nextUncertainSegment: "誤りやすい次の文節"
+            case .previousUncertainSegment: "誤りやすい前の文節"
             case .extendSegment: "文節を長く"
             case .shrinkSegment: "文節を短く"
             case .extendSegmentToWord: "文節を単語ごとに長く"
@@ -173,25 +173,25 @@ enum UIStrings {
         static func help(for command: KeymapCommand) -> String? {
             switch command {
             case .nextInputStyle: "ローマ字入力・かな入力・英字入力・英字入力(自動)を順に切り替えます"
-            case .insertSpace: "幅は「スペース幅」の設定に従います。組み立て中の文字は確定してから入れます"
-            case .insertAlternateSpace: "「スペース幅」の設定と逆の幅の空白を入れます"
-            case .convert: "英単語を直した直後は、直す前に戻します"
+            case .insertSpace: "幅は「スペース幅」の設定に従います。入力中の文字は確定してから入力します"
+            case .insertAlternateSpace: "「スペース幅」の設定と逆の幅の空白を入力します"
+            case .convert: "英単語を修正した直後は、修正前に戻します"
             case .convertWithoutLearning: "学習した順位を使わずに変換し、確定しても学習しません"
-            case .insertBoundary: "打っている途中に、今の位置を文節の区切りにします"
-            case .acceptSuggestion: "「もしかして」と示した読みに直します"
+            case .insertBoundary: "入力中に、現在の位置で文節を区切ります"
+            case .acceptSuggestion: "「もしかして」で示した読みに修正します"
             case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
             case .nextCandidate: "入力中に押すと変換を始めます"
             case .previousCandidate: "入力中に押すと変換を始めます。分岐図では上の枝の文字種へ進みます"
-            case .nextUncertainSegment, .previousUncertainSegment: "確信の低い文節だけを渡り歩きます"
+            case .nextUncertainSegment, .previousUncertainSegment: "誤変換の可能性が高い文節に移動します"
             case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の単語の切れ目まで動かします"
-            case .splitSegment: "語の切れ目に番号を出し、数字で区切ります"
+            case .splitSegment: "単語の切れ目に番号を表示し、数字キーで区切ります"
             case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
-            case .cancel: "変換中は読みに戻し、直した読みは打ったままに戻します。入力中は読みを消します"
+            case .cancel: "変換中は読みに戻し、修正した読みは入力したままに戻します。入力中は読みを削除します"
             case .backToReading: "変換をやめて読みに戻ります"
-            case .forgetCandidate: "選んでいる候補を学習から消します"
-            case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は消しません"
+            case .forgetCandidate: "選択中の候補を学習から削除します"
+            case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
-            case .englishAutoStyle: "英語で打ちながら，日本語にできる語を自動で日本語にします"
+            case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
                  .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
@@ -218,7 +218,7 @@ enum UIStrings {
         static let allStates = "すべての状態"
         static let searchPrompt = "コマンドやキーで検索"
         static let searchByKey = "キーで検索"
-        static let searchByKeyHelp = "押したキーの行だけを出します"
+        static let searchByKeyHelp = "押したキーの行だけを表示します"
         static let presetMenu = "ひな形を読み込む"
         static let customPreset = "カスタム"
         static func currentPreset(_ name: String) -> String { "ひな形: \(name)" }
@@ -228,7 +228,7 @@ enum UIStrings {
         static let cancel = "キャンセル"
         static let restore = "既定に戻す"
         static let restoreTitle = "既定の表に戻しますか？"
-        static let restoreMessage = "足した行と変えた行は消えます。"
+        static let restoreMessage = "追加した行と変更した行は削除されます。"
         static let newRow = "新しい行"
         static let add = "追加"
         static let remove = "削除"
@@ -249,7 +249,7 @@ enum UIStrings {
         static func rowCount(_ shown: Int, _ total: Int) -> String { shown == total ? "\(total) 行" : "\(shown) / \(total) 行" }
         static func hidden(by winners: String) -> String { "同じキーの行があるため使われません: \(winners)" }
         static func partlyHidden(states: String, by winners: String) -> String { "\(states)では次の行を使います: \(winners)" }
-        static let plainCharacter = "修飾キーの無い文字のキーです。この状態ではその文字を打てなくなります"
+        static let plainCharacter = "修飾キーの無い文字のキーです。この状態ではその文字を入力できなくなります"
         static func duplicateWarning(_ row: String) -> String { "同じキーの行があります: \(row)。追加した行を使います" }
         static func missing(state: String, command: String) -> String { "\(state)に「\(command)」のキーがありません" }
         static let missingNote = "キーが無いと、入力を確定したり取り消したりできなくなります。"
@@ -288,8 +288,8 @@ enum UIStrings {
         static let update = "更新"
         static let edit = "編集"
         static let enabled = "有効"
-        static func overwrites(_ key: String) -> String { "「\(key)」はもうあります。追加すると上書きします。" }
-        static let alreadyRegistered = "もう登録してあります。"
+        static func overwrites(_ key: String) -> String { "「\(key)」はすでにあります。追加すると上書きします。" }
+        static let alreadyRegistered = "すでに登録されています。"
         static let full = "これ以上は追加できません。"
         static let noMatches = "一致する項目はありません"
     }
@@ -371,14 +371,15 @@ enum UIStrings {
         static let appearance = "外観"
         static let restoreDefaults = "初期設定に戻す"
         static let saveFailed = "設定を保存できませんでした"
-        static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため、初期設定で起動しました。元のファイルは同じ場所に \(name) として残してあります" }
+        static func setAside(_ name: String) -> String { "設定ファイルを読み込めなかったため、初期設定で起動しました。元のファイルは同じ場所に \(name) として保存しました" }
         static let learningReset = "学習結果を消去しました"
         static let dictionaryFull = "ユーザー辞書に登録できるのは 10,000 語までです"
         static let invalidEntry = "読みはひらがなで入力し、読みと単語は長すぎないようにしてください"
         static let importFailed = "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません"
         static let exportFailed = "エクスポートできませんでした"
         static func imported(_ count: Int) -> String { "\(count) 語を追加しました" }
-        static func fontSize(_ size: Int) -> String { "候補の文字サイズ: \(size)" }
+        static let fontSizeName = "候補の文字サイズ"
+        static func fontSize(_ size: Int) -> String { "\(fontSizeName): \(size)" }
 
         static func label(for style: PunctuationStyle) -> String { style.comma + style.period }
         static func label(for style: BracketStyle) -> String { style.open + style.close }
@@ -411,8 +412,8 @@ enum UIStrings {
         static let keyboardLayout = "キー配列"
         static let keyboardLayoutNote = "ローマ字入力と英字入力で使用します。"
         static let englishInputLiveConversion = "英字入力のライブ変換"
-        static let englishInputLiveConversionNote = "オンにすると、英語の辞書にない語をローマ字として日本語にして見せます。Esc で英字に戻せます。"
-        static let englishAutoNote = "英語で打ちながら、日本語にできる語は自動で日本語にします。見分け方は「英語と日本語」で変えられます。"
+        static let englishInputLiveConversionNote = "英語の辞書にない単語をローマ字として読み、日本語に変換して表示します。Esc で英字に戻せます。"
+        static let englishAutoNote = "英語で入力しながら、日本語にできる語句を自動で日本語に変換します。判別方法は「英語と日本語」で変更できます。"
 
         static func label(for style: InputStyle) -> String {
             switch style {
@@ -526,25 +527,25 @@ enum UIStrings {
 
         // 英語と日本語
         static let languagePage = "英語と日本語"
-        static let languageJudging = "見分け方"
-        static let usesContext = "前の語で見分ける"
-        static let usesContextNote = "make・shine のように英語にも日本語にも読める語を、前が英語なら英語、日本語なら日本語にします。"
+        static let languageJudging = "判別方法"
+        static let usesContext = "前の単語で判別"
+        static let usesContextNote = "make・shine のように英語にも日本語にも読める単語を、前が英語なら英語、日本語なら日本語にします。"
         static let avoidsOffensive = "不適切な変換を避ける"
-        static let englishWords = "いつも英語にする語"
-        static let japaneseWords = "いつも日本語にする語"
-        static let wordPlaceholder = "英字で打つ語"
-        static let languageRules = "見分け方の決まり"
-        static let languageRuleWord = "語"
+        static let englishWords = "常に英語にする単語"
+        static let japaneseWords = "常に日本語にする単語"
+        static let wordPlaceholder = "英字の単語"
+        static let languageRules = "判別ルール"
+        static let languageRuleWord = "単語"
         static let languageRuleContext = "前"
         static let languageRuleResult = "結果"
         static let tryLanguage = "試す"
-        static let tryPlaceholder = "英字で打つ文(空白で区切る)"
+        static let tryPlaceholder = "英字の文"
         static let tryPreceding = "前の文字列"
-        static let invalidWord = "語は 32 文字までの英字にしてください"
-        static let alreadyListed = "もう一覧にあります"
-        static let englishWordsEmpty = "いつも英語にする語はありません"
-        static let japaneseWordsEmpty = "いつも日本語にする語はありません"
-        static let languageNote = "英字入力(自動)と、ローマ字入力で英語にも読める語に使います。試した結果を右クリックすると一覧に足せます。"
+        static let invalidWord = "単語は 32 文字までの英字にしてください"
+        static let alreadyListed = "すでに一覧にあります"
+        static let englishWordsEmpty = "常に英語にする単語はありません"
+        static let japaneseWordsEmpty = "常に日本語にする単語はありません"
+        static let languageNote = "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。試した結果を右クリックすると一覧に追加できます。"
 
         static func label(for language: WordLanguage) -> String {
             switch language {
@@ -563,19 +564,19 @@ enum UIStrings {
 
         // 補正
         static let correctionPage = "補正"
-        static let correctionKinds = "直すもの"
+        static let correctionKinds = "修正の対象"
         static let correctsEnglish = "英単語"
-        static let correctsJapanese = "日本語の打ち間違い"
+        static let correctsJapanese = "日本語のタイプミス"
         static let correctsRepeatedKeys = "同じキーの重なり"
-        static let exceptions = "直さない語句"
+        static let exceptions = "修正しない語句"
         static let exceptionPlaceholder = "英字か読み"
         static let rules = "置き換え"
-        static let typed = "打った英字"
+        static let typed = "入力した英字"
         static let replacement = "置き換える語句"
-        static let invalidRule = "打った英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください"
-        static let invalidException = "直さない語句は 64 文字までにしてください"
+        static let invalidRule = "入力した英字は 2〜24 文字の英字、置き換える語句は 64 文字までにしてください"
+        static let invalidException = "修正しない語句は 64 文字までにしてください"
         static let rulesEmpty = "置き換えはありません"
-        static let exceptionsEmpty = "直さない語句はありません"
+        static let exceptionsEmpty = "修正しない語句はありません"
 
         // 記号
         static let symbolsPage = "記号"
@@ -620,7 +621,7 @@ enum UIStrings {
         }
 
         // 除外設定
-        static let exclusionsNote = "アプリの固有IDを指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。"
+        static let exclusionsNote = "バンドル ID ごとに入力の動作を指定できます。上にある行ほど優先されます。"
         static let addApps = "アプリを追加…"
         static let exclusionsEmpty = "アプリはありません"
         static let importCSV = "CSV を読み込む…"
@@ -686,7 +687,7 @@ enum UIStrings {
 
         // バックアップ
         static let backup = "バックアップ"
-        static let backupNote = "すべての設定をJSONとしてインポート・エクスポート可能です。"
+        static let backupNote = "すべての設定を JSON ファイルに書き出し、読み込めます。"
         static let exportSettings = "設定を書き出す…"
         static let importSettings = "設定を読み込む…"
         static let exportSettingsFileName = "s90-settings.json"
@@ -717,7 +718,7 @@ extension UIStrings {
         static let scopes = "同期する項目"
         static let note = "Dropbox や iCloud Drive のフォルダを選ぶと、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
-        static let unreadable = "同期のファイルを読めないため、同期を止めています"
+        static let unreadable = "同期ファイルを読み込めないため、同期を停止しています"
         static let items = "項目ごとに選ぶ"
 
         /// 項目(Settings の CodingKeys の名前)の表示名
@@ -725,23 +726,28 @@ extension UIStrings {
             fieldLabels[name] ?? name
         }
 
+        /// 設定の画面の項目と同じ名前にする
         private static let fieldLabels: [String: String] = [
-            "inputStyle": "入力方式", "customRomaji": "ローマ字の追加", "liveConversion": "ライブ変換",
-            "englishInputLiveConversion": "英字入力のライブ変換", "wordLanguage": "英語と日本語", "yenKey": "¥ キー",
-            "punctuation": "句読点", "brackets": "括弧", "slash": "スラッシュ", "spaceWidth": "スペース幅", "numberWidth": "数字幅",
-            "alphabetWidth": "英字幅", "shiftStartsAlphabet": "Shift で英字", "punctuationCommits": "句読点で確定",
-            "keypadDirect": "テンキーの数字を半角で確定",
-            "typoCorrection": "タイプミスの修正", "candidatePresentation": "候補の表示", "initialFocus": "最初に選ぶ文節",
-            "suggestionDisplay": "入力中の候補", "listCandidatesPerPage": "一覧の候補数", "branchCandidatesPerPage": "分岐図の候補数",
-            "liveConversionDelay": "漢字にするまでの時間", "correctionDelay": "修正するまでの時間", "correctionSensitivity": "修正の基準",
-            "showsSuggestions": "もしかして", "okuriganaStyle": "送り仮名", "calculation": "計算", "postalCodeConversion": "郵便番号変換",
-            "handwriting": "手書き入力", "homophoneNotes": "同音異義語の使い分け", "misuseNotes": "誤用の注釈", "proofreading": "校正支援", "misreadings": "読み違い", "prefersKatakana": "カタカナ語を優先",
-            "showsVariantRow": "文字種の行", "showsKeyHints": "キーの案内", "numberKeySelection": "番号キーで選択",
-            "dateConversion": "日付と時刻に変換", "symbolConversion": "記号に変換", "emojiConversion": "絵文字に変換", "learning": "学習",
-            "theme": "テーマ", "candidateFontSize": "文字の大きさ", "showsModeIndicator": "入力モードの表示",
-            "modeIndicatorDuration": "入力モードの表示時間", "customThemes": "カスタムテーマ", "customThemeID": "使うカスタムテーマ",
-            "escapeSwitchesToDirect": "Esc で英数", "terminalCommands": "ターミナルのコマンド", "profileRules": "アプリごとの設定",
-            "restrainsLiveConversionInCode": "エディタとターミナルのライブ変換",
+            "inputStyle": Choice.inputStyle, "customRomaji": Settings.romajiTab, "liveConversion": Menu.liveConversion,
+            "englishInputLiveConversion": Choice.englishInputLiveConversion, "wordLanguage": Features.languagePage, "yenKey": Choice.yenKey,
+            "punctuation": UIStrings.Settings.punctuation, "brackets": UIStrings.Settings.brackets, "slash": UIStrings.Settings.slash,
+            "spaceWidth": UIStrings.Settings.spaceWidth, "numberWidth": UIStrings.Settings.numberWidth,
+            "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet, "punctuationCommits": UIStrings.Settings.punctuationCommits,
+            "keypadDirect": Features.keypadDirect,
+            "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
+            "suggestionDisplay": Choice.suggestionDisplay, "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
+            "liveConversionDelay": More.liveConversionDelay, "correctionDelay": More.correctionDelay, "correctionSensitivity": More.correctionSensitivity,
+            "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,
+            "calculation": Features.calculation, "postalCodeConversion": Features.postalCode,
+            "handwriting": Features.handwriting, "homophoneNotes": UIStrings.Settings.homophoneNotes, "misuseNotes": UIStrings.Settings.misuseNotes,
+            "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
+            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
+            "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
+            "emojiConversion": UIStrings.Settings.emojiConversion, "learning": UIStrings.Settings.learning,
+            "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
+            "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
+            "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,
+            "profileRules": UIStrings.Settings.appsTab, "restrainsLiveConversionInCode": More.restrainsLiveConversionInCode,
         ]
 
         static func label(for scope: SyncScope) -> String {

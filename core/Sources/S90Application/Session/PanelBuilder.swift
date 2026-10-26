@@ -5,11 +5,11 @@ import S90Domain
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
     static let correctedNote = "修正"
-    static let englishInputNote = "Tab 日本語にする"
+    static let englishInputNote = "Tab 日本語に変換"
     /// 英字入力で日本語にして見せているときの案内
     static let englishInputJapaneseNote = "Esc 英字に戻す　Tab 変換"
     /// 選んでいる候補を学習から消したときの案内
-    static let candidateForgottenNote = "学習から消しました"
+    static let candidateForgottenNote = "学習から削除しました"
     /// 最後に確定した語の学習を取り消したときの案内
     static let lastCommitForgottenNote = "最後の学習を取り消しました"
 
@@ -22,16 +22,16 @@ enum PanelBuilder {
     static func suggestionNote(key: String?) -> String? { key.map { "\($0) で選ぶ" } }
 
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
-    static func readingCorrectionNote(key: String?) -> String { key.map { "直しました　\($0) で打ったままに戻す" } ?? "直しました" }
+    static func readingCorrectionNote(key: String?) -> String { key.map { "修正しました　\($0) で入力のままに戻す" } ?? "修正しました" }
 
     /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文，key は取り消しのキー
     static func readingCorrectedNote(typed: String, key: String?) -> String {
-        key.map { "直しました　\($0) で「\(typed)」に戻す" } ?? "直しました"
+        key.map { "修正しました　\($0) で「\(typed)」に戻す" } ?? "修正しました"
     }
 
     /// 直さずに示すときの案内．corrected は直した文，key は「もしかして」に直すキー
     static func readingSuggestionNote(_ corrected: String, key: String?) -> String {
-        "もしかして「\(corrected)」" + (key.map { "　\($0) で直す" } ?? "")
+        "もしかして「\(corrected)」" + (key.map { "　\($0) で修正" } ?? "")
     }
 
     /// 打ち間違いを直した部分を含む文節か．直した読みの部分(changed．読みの先頭からの文字数)にかかる文節で，
