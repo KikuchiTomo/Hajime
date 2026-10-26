@@ -48,6 +48,10 @@ enum SnapshotRenderer {
             (look ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 render(keymapView(edited: false, appearance: look), name: "keymap-\(name)", to: output, appearance: look)
                 render(keymapView(edited: true, appearance: look), name: "keymap-warnings-\(name)", to: output, appearance: look)
+                render(handwritingView(appearance: look), name: "handwriting-\(name)", to: output, appearance: look)
+                // 窓を横に広げても，書く欄は正方形のまま真ん中に置く
+                render(handwritingView(appearance: look, size: NSSize(width: DesignTokens.Size.Handwriting.width * 1.6, height: DesignTokens.Size.Handwriting.height)),
+                       name: "handwriting-wide-\(name)", to: output, appearance: look)
             }
         }
         renderSettings(to: output)
@@ -134,6 +138,43 @@ enum SnapshotRenderer {
         window.orderFrontRegardless()
         view.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 1))
+        window.displayIfNeeded()
+        return view
+    }
+
+    /// 手書きの窓(R-14)．「田」の線を書き，Vision で読んだ候補が並ぶまで待ってから描く
+    private static func handwritingView(appearance: NSAppearance?,
+                                        size: NSSize = NSSize(width: DesignTokens.Size.Handwriting.width, height: DesignTokens.Size.Handwriting.height)) -> NSView {
+        let model = HandwritingModel(recognizer: VisionHandwritingRecognizer())
+        model.theme = ResolvedTheme.resolve(ThemeChoice(.automatic), appearance: appearance)
+        let view = NSHostingView(rootView: HandwritingView(model: model))
+        view.frame = NSRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: -10_000, y: -10_000), size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = appearance
+        window.contentView = view
+        window.orderFrontRegardless()
+        // 書く欄の大きさが決まってから書く(大きさが変わると書いた線を消すため)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
+        // 書く欄(一辺 260 ほど)の座標
+        let strokes: [[CGPoint]] = [
+            [CGPoint(x: 70, y: 55), CGPoint(x: 71, y: 205)], [CGPoint(x: 70, y: 55), CGPoint(x: 190, y: 57), CGPoint(x: 189, y: 205)],
+            [CGPoint(x: 130, y: 57), CGPoint(x: 131, y: 203)], [CGPoint(x: 71, y: 130), CGPoint(x: 189, y: 129)],
+            [CGPoint(x: 71, y: 203), CGPoint(x: 189, y: 204)],
+        ]
+        for stroke in strokes {
+            model.draw(to: stroke[0])
+            // 指で書いたように点を細かく打つ
+            for (start, end) in zip(stroke, stroke.dropFirst()) {
+                for step in 1...20 {
+                    let t = CGFloat(step) / 20
+                    model.draw(to: CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t))
+                }
+            }
+            model.end()
+        }
+        // 線を書き終えてから認識するまでの待ちと，認識にかかる時間
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: DefaultSettings.handwritingRecognitionDelay + 2))
+        view.layoutSubtreeIfNeeded()
         window.displayIfNeeded()
         return view
     }

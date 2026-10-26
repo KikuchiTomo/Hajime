@@ -190,10 +190,13 @@ enum DesignTokens {
             static let shadowOffsetY: CGFloat = 3
         }
         enum Handwriting {
-            static let width: CGFloat = 360
-            static let height: CGFloat = 330
-            static let canvasHeight: CGFloat = 260
+            static let width: CGFloat = 284
+            static let height: CGFloat = 332
+            static let canvasSize: CGFloat = 260
+            static let canvasPadding: CGFloat = 12
             static let strokeWidth: CGFloat = 5
+            static let frameWidth: CGFloat = 1
+            static let guideDash: CGFloat = 4
         }
         enum Snapshot {
             static let margin: CGFloat = 16

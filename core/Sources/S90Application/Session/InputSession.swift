@@ -160,6 +160,11 @@ public final class InputSession {
         return actions
     }
 
+    /// キーの外で選んだ文字(手書きの窓の候補)を入れる．組み立て中の文字があれば先に確定し，選んだ文字で置き換えない
+    public func insert(_ text: String) -> [ClientAction] {
+        commitAll() + [.commit(text)]
+    }
+
     /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ．
     /// EN 入力の英字は変換して見せないので待たない
     public var awaitsSettle: Bool {
