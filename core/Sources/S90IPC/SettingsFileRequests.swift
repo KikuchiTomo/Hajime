@@ -53,6 +53,17 @@ extension EngineService {
                 try files.removeDictionary(id: id)
                 return .done
             }
+        case .importAssociationDictionary(let path, let replacing):
+            return { files throws(SettingsFileFailure) in
+                let dictionary = try await files.importAssociationDictionary(from: path, replacing: replacing)
+                return .associationImported(dictionary: WireAssociationDictionaryInfo(
+                    id: dictionary.id, name: dictionary.name, groupCount: UInt32(clamping: dictionary.groupCount)))
+            }
+        case .removeAssociationDictionary(let id):
+            return { files throws(SettingsFileFailure) in
+                try files.removeAssociationDictionary(id: id)
+                return .done
+            }
         case .importUserDictionary(let path):
             return { files throws(SettingsFileFailure) in Self.imported(try await files.importUserDictionary(from: path)) }
         case .exportUserDictionary(let path):

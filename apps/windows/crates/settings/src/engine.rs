@@ -5,6 +5,7 @@
 
 use crate::files::FileTask;
 use crate::options;
+use crate::pages::DictionaryList;
 use crate::store::{Fields, SettingsStore, StoreError};
 use crate::usage::Usage;
 use ipc::{
@@ -129,6 +130,52 @@ impl<E: Engine> EngineStore<E> {
 
     pub fn remove_user_dictionary_entry(&self, entry: DictionaryEntry) -> Result<(), StoreError> {
         self.done(RequestBody::RemoveUserDictionaryEntry { entry })
+    }
+
+    /// 辞書のファイルを取り込む(replacing を渡すとその辞書を取り込み直す)．取り込んだ件数か失敗の理由を返す
+    pub fn import_dictionary(
+        &self,
+        list: DictionaryList,
+        path: String,
+        replacing: Option<String>,
+    ) -> Result<FileOutcome, StoreError> {
+        let body = match list {
+            DictionaryList::Imported => RequestBody::ImportDictionary { path, replacing },
+            DictionaryList::Association => {
+                RequestBody::ImportAssociationDictionary { path, replacing }
+            }
+        };
+        match self.engine.request_file(body) {
+            None => Err(StoreError::Unavailable),
+            Some(ResponseBody::DictionaryImported { dictionary }) => {
+                Ok(FileOutcome::Imported(dictionary.word_count))
+            }
+            Some(ResponseBody::AssociationImported { dictionary }) => {
+                Ok(FileOutcome::Imported(dictionary.group_count))
+            }
+            Some(ResponseBody::FileFailed { reason }) => Ok(FileOutcome::Failed(reason)),
+            Some(ResponseBody::Error { .. }) => Err(StoreError::Rejected),
+            Some(_) => Err(StoreError::Malformed),
+        }
+    }
+
+    /// 辞書を一覧と索引から消す
+    pub fn remove_dictionary(
+        &self,
+        list: DictionaryList,
+        id: String,
+    ) -> Result<FileOutcome, StoreError> {
+        let body = match list {
+            DictionaryList::Imported => RequestBody::RemoveDictionary { id },
+            DictionaryList::Association => RequestBody::RemoveAssociationDictionary { id },
+        };
+        match self.engine.request_file(body) {
+            None => Err(StoreError::Unavailable),
+            Some(ResponseBody::Done) => Ok(FileOutcome::Done),
+            Some(ResponseBody::FileFailed { reason }) => Ok(FileOutcome::Failed(reason)),
+            Some(ResponseBody::Error { .. }) => Err(StoreError::Rejected),
+            Some(_) => Err(StoreError::Malformed),
+        }
     }
 
     /// 同期の状態を読む
@@ -367,6 +414,38 @@ mod tests {
         assert_eq!(
             EngineStore::new(&engine).read_symbol_items(SymbolKind::Reading),
             Err(StoreError::Malformed)
+        );
+    }
+
+    #[test]
+    fn 辞書の取り込みと削除は一覧ごとの要求にする() {
+        let engine = scripted(Some(ResponseBody::AssociationImported {
+            dictionary: ipc::AssociationDictionaryInfo {
+                id: "a".into(),
+                name: "類語".into(),
+                group_count: 7,
+            },
+        }));
+        let store = EngineStore::new(&engine);
+        assert_eq!(
+            store.import_dictionary(DictionaryList::Association, "C:\\a.txt".into(), None),
+            Ok(FileOutcome::Imported(7))
+        );
+        assert_eq!(
+            engine.requests.borrow()[0],
+            RequestBody::ImportAssociationDictionary {
+                path: "C:\\a.txt".into(),
+                replacing: None
+            }
+        );
+        let engine = scripted(Some(ResponseBody::Done));
+        assert_eq!(
+            EngineStore::new(&engine).remove_dictionary(DictionaryList::Imported, "x".into()),
+            Ok(FileOutcome::Done)
+        );
+        assert_eq!(
+            engine.requests.borrow()[0],
+            RequestBody::RemoveDictionary { id: "x".into() }
         );
     }
 

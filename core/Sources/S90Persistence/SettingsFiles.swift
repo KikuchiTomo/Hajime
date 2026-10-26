@@ -11,10 +11,13 @@ import S90Domain
 public final class SettingsFiles: SettingsFileHandling {
     private let settings: any SettingsStoring
     private let dictionaries: ImportedDictionaryStore
+    /// 連想の辞書の索引．無ければ連想の辞書は取り込めない
+    private let associations: AssociationDictionaryStore?
 
-    public init(settings: any SettingsStoring, dictionaries: ImportedDictionaryStore) {
+    public init(settings: any SettingsStoring, dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore? = nil) {
         self.settings = settings
         self.dictionaries = dictionaries
+        self.associations = associations
     }
 
     // MARK: 取り込んだ辞書
@@ -46,6 +49,53 @@ public final class SettingsFiles: SettingsFileHandling {
             throw .writeFailed
         }
         dictionaries.remove(dictionary)
+    }
+
+    // MARK: 連想の辞書
+
+    public func importAssociationDictionary(from path: String, replacing id: String?) async throws(SettingsFileFailure) -> AssociationDictionary {
+        guard let associations else { throw .unreadable }
+        let source = try Self.url(path)
+        let list = settings.current.associationDictionaries
+        let existing = id.flatMap { id in list.first { $0.id == id && !$0.isBundled } }
+        if id != nil, existing == nil { throw .unknownDictionary }
+        guard existing != nil || list.count < DefaultSettings.maximumAssociationDictionaries else { throw .tooMany }
+        var dictionary = existing ?? AssociationDictionary(id: UUID().uuidString, name: source.deletingPathExtension().lastPathComponent, groupCount: 0)
+        let destination = associations.url(for: dictionary)
+        // 大きな辞書は読むのに数秒かかるので，メインスレッドの外で読んで索引を書く
+        dictionary.groupCount = try await Self.read {
+            let groups = try AssociationFileReader.read(from: source)
+            try AssociationDictionaryStore.write(groups, to: destination)
+            return groups.count
+        }
+        associations.reload(dictionary)
+        let imported = dictionary
+        do {
+            try settings.update { settings in
+                if let index = settings.associationDictionaries.firstIndex(where: { $0.id == imported.id }) {
+                    settings.associationDictionaries[index].groupCount = imported.groupCount
+                } else {
+                    settings.associationDictionaries.append(imported)
+                }
+            }
+        } catch {
+            // 設定に残せなかった新しい辞書の索引は，どこからも使われないので消す
+            if existing == nil { associations.remove(imported) }
+            throw .writeFailed
+        }
+        return imported
+    }
+
+    public func removeAssociationDictionary(id: String) throws(SettingsFileFailure) {
+        guard let dictionary = settings.current.associationDictionaries.first(where: { $0.id == id && !$0.isBundled }) else {
+            throw .unknownDictionary
+        }
+        do {
+            try settings.update { $0.associationDictionaries.removeAll { $0.id == id } }
+        } catch {
+            throw .writeFailed
+        }
+        associations?.remove(dictionary)
     }
 
     // MARK: ユーザー辞書

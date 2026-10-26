@@ -6,7 +6,9 @@
 use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
-use crate::strings::{choice, dictionaries, features, keys, menu, more, settings, sync};
+use crate::strings::{
+    association, choice, dictionaries, features, keys, menu, more, settings, sync,
+};
 use ipc::{RuleList, SymbolKind};
 
 /// 左の一覧の見出し
@@ -254,6 +256,8 @@ pub enum Control {
     Info(Info),
     /// 同期の項目ごとの範囲の表．選んだ項目の範囲を切り替える
     SyncFields(ListSpec),
+    /// 取り込んだ辞書・連想の辞書の一覧．入力欄で選んだ辞書の名前などを変え，下のボタンで取り込む・並べ替える・切り替える・消す
+    Dictionaries(DictionaryList, ListSpec),
 }
 
 /// 一覧の上限の種類(catalog の Limits のどれか)
@@ -298,6 +302,143 @@ pub enum Action {
     SyncNow,
 }
 
+/// 取り込んで使う辞書の一覧の種類
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DictionaryList {
+    /// 取り込んだ辞書(importedDictionaries)
+    Imported,
+    /// 連想の辞書(associationDictionaries)
+    Association,
+}
+
+impl DictionaryList {
+    /// 設定のファイルの項目
+    pub fn path(self) -> &'static str {
+        match self {
+            DictionaryList::Imported => "importedDictionaries",
+            DictionaryList::Association => "associationDictionaries",
+        }
+    }
+}
+
+/// 使う場面(DictionaryCondition)の選択肢．値は設定のファイルの名前
+pub const DICTIONARY_CONDITIONS: &[Choice] = &[
+    ("always", dictionaries::ALWAYS),
+    ("apps", dictionaries::APPS),
+    ("context", dictionaries::CONTEXT),
+];
+
+const IMPORTED_FIELDS: &[Field] = &[
+    Field::named("name", dictionaries::NAME, false),
+    Field::named("field", dictionaries::FIELD, false),
+    Field::choice(
+        "condition",
+        dictionaries::CONDITION,
+        DICTIONARY_CONDITIONS,
+        false,
+    ),
+    Field::named("apps", crate::strings::windows::DICTIONARY_APPS, false),
+];
+
+const ASSOCIATION_FIELDS: &[Field] = &[Field::named("name", dictionaries::NAME, false)];
+
+const IMPORTED_SPEC: ListSpec = ListSpec {
+    path: "importedDictionaries",
+    fields: IMPORTED_FIELDS,
+    empty: dictionaries::EMPTY,
+    invalid: crate::strings::windows::INVALID_APP,
+    lowercase: false,
+    exclusive_with: None,
+};
+
+const ASSOCIATION_SPEC: ListSpec = ListSpec {
+    path: "associationDictionaries",
+    fields: ASSOCIATION_FIELDS,
+    empty: association::EMPTY,
+    invalid: "",
+    lowercase: false,
+    exclusive_with: None,
+};
+
+/// 一覧の入力欄の右のボタンと，表の下のボタン(並びは部品を作る順と同じ)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListButtons {
+    pub top: &'static [&'static str],
+    pub bottom: &'static [&'static str],
+}
+
+impl Control {
+    /// 一覧の部品のボタン．一覧でなければ None
+    pub fn list_buttons(&self) -> Option<ListButtons> {
+        use crate::strings::{rule_list, windows};
+        const ADD_REMOVE: &[&str] = &[settings::ADD, settings::REMOVE];
+        let (top, bottom): (&'static [&'static str], &'static [&'static str]) = match self {
+            Control::List(..) | Control::Dictionary(_) => (ADD_REMOVE, &[]),
+            Control::Symbols(..) => (
+                &[settings::ADD, settings::REMOVE, windows::TOGGLE_ENABLED],
+                &[],
+            ),
+            Control::SyncFields(_) => (&[windows::TOGGLE_SYNC_SCOPE], &[]),
+            Control::Dictionaries(DictionaryList::Imported, _) => (
+                &[rule_list::UPDATE],
+                &[
+                    dictionaries::IMPORT_FILE,
+                    dictionaries::REIMPORT,
+                    dictionaries::MOVE_UP,
+                    dictionaries::MOVE_DOWN,
+                    windows::TOGGLE_ENABLED,
+                    settings::REMOVE,
+                ],
+            ),
+            Control::Dictionaries(DictionaryList::Association, _) => (
+                &[rule_list::UPDATE],
+                &[
+                    association::IMPORT_FILE,
+                    dictionaries::REIMPORT,
+                    dictionaries::MOVE_UP,
+                    dictionaries::MOVE_DOWN,
+                    windows::TOGGLE_ENABLED,
+                    settings::REMOVE,
+                ],
+            ),
+            _ => return None,
+        };
+        Some(ListButtons { top, bottom })
+    }
+
+    /// 一覧の入力欄の決まり．一覧でなければ None
+    pub fn list_spec(&self) -> Option<&ListSpec> {
+        match self {
+            Control::List(spec, _)
+            | Control::Dictionary(spec)
+            | Control::Symbols(_, spec)
+            | Control::SyncFields(spec)
+            | Control::Dictionaries(_, spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    /// 表の列の名前．ふつうは入力欄と同じ列で，記号は状態の列を足す．項目ごとの同期と辞書の一覧は入力欄と別の列
+    pub fn table_columns(&self) -> Vec<&'static str> {
+        use crate::strings::windows;
+        let fields = || {
+            self.list_spec()
+                .into_iter()
+                .flat_map(|spec| spec.fields.iter().map(|field| field.label))
+        };
+        match self {
+            Control::Symbols(..) => fields().chain([windows::SYMBOL_STATE]).collect(),
+            Control::SyncFields(_) => vec![windows::SYNC_FIELD, windows::SYNC_SCOPE],
+            Control::Dictionaries(..) => vec![
+                dictionaries::NAME,
+                windows::DICTIONARY_SUMMARY,
+                windows::SYMBOL_STATE,
+            ],
+            _ => fields().collect(),
+        }
+    }
+}
+
 /// エンジンから読んで出す値の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Info {
@@ -326,6 +467,7 @@ pub enum RangeKind {
     CorrectionDelay,
     ModeIndicatorDuration,
     CandidateFontSize,
+    AssociationLimit,
 }
 
 impl RangeKind {
@@ -337,6 +479,15 @@ impl RangeKind {
             RangeKind::CorrectionDelay => ranges.correction_delay,
             RangeKind::ModeIndicatorDuration => ranges.mode_indicator_duration,
             RangeKind::CandidateFontSize => ranges.candidate_font_size,
+            RangeKind::AssociationLimit => ranges.association_limit,
+        }
+    }
+
+    /// 選べる値の刻み
+    pub fn step(self, catalog: &crate::catalog::Catalog) -> f64 {
+        match self {
+            RangeKind::AssociationLimit => catalog.association_limit_step,
+            _ => 1.0,
         }
     }
 }
@@ -623,6 +774,29 @@ fn conversion() -> Vec<Section> {
             ],
         ),
         Section::new(
+            association::SECTION,
+            vec![
+                Row::toggle(association::ENABLED, "association"),
+                Row::stepper(
+                    association::LIMIT,
+                    "associationLimit",
+                    RangeKind::AssociationLimit,
+                )
+                .enabled_when(Condition::On("association")),
+                Row::toggle(association::HINT, "showsAssociationHint")
+                    .enabled_when(Condition::On("association")),
+            ],
+        ),
+        Section {
+            title: Some(association::DICTIONARIES),
+            rows: vec![Row::new(
+                "",
+                "",
+                Control::Dictionaries(DictionaryList::Association, ASSOCIATION_SPEC),
+            )],
+            footer: Some(association::NOTE),
+        },
+        Section::new(
             settings::SPECIAL_CONVERSION,
             vec![
                 Row::toggle(features::CALCULATION, "calculation"),
@@ -869,30 +1043,45 @@ const DICTIONARY_FIELDS: &[Field] = &[
     Field::named("word", settings::WORD, false),
 ];
 
-/// ユーザー辞書のページ(macOS の DictionaryPage の登録した単語)．同じ読みに別の単語を登録できる
+/// ユーザー辞書のページ(macOS の DictionaryPage)．登録した単語(同じ読みに別の単語を登録できる)と取り込んだ辞書
 fn dictionary() -> Vec<Section> {
-    vec![Section::untitled(vec![
-        Row::new(
+    let imported = Section {
+        title: Some(dictionaries::IMPORTED),
+        rows: vec![Row::new(
             "",
             "",
-            Control::Dictionary(ListSpec {
-                path: "userDictionary",
-                fields: DICTIONARY_FIELDS,
-                empty: settings::DICTIONARY_EMPTY,
-                invalid: settings::INVALID_ENTRY,
-                lowercase: false,
-                exclusive_with: None,
-            }),
+            Control::Dictionaries(DictionaryList::Imported, IMPORTED_SPEC),
+        )],
+        footer: Some(dictionaries::NOTE),
+    };
+    vec![
+        Section::new(
+            crate::strings::dictionaries::USER_WORDS,
+            vec![
+                Row::new(
+                    "",
+                    "",
+                    Control::Dictionary(ListSpec {
+                        path: "userDictionary",
+                        fields: DICTIONARY_FIELDS,
+                        empty: settings::DICTIONARY_EMPTY,
+                        invalid: settings::INVALID_ENTRY,
+                        lowercase: false,
+                        exclusive_with: None,
+                    }),
+                ),
+                Row::action(
+                    settings::IMPORT_DICTIONARY,
+                    Action::File(FileTask::ImportUserDictionary),
+                ),
+                Row::action(
+                    settings::EXPORT_DICTIONARY,
+                    Action::File(FileTask::ExportUserDictionary),
+                ),
+            ],
         ),
-        Row::action(
-            settings::IMPORT_DICTIONARY,
-            Action::File(FileTask::ImportUserDictionary),
-        ),
-        Row::action(
-            settings::EXPORT_DICTIONARY,
-            Action::File(FileTask::ExportUserDictionary),
-        ),
-    ])]
+        imported,
+    ]
 }
 
 /// 記号のページ(macOS の SymbolsPage)．既定の決まりは変えず，変えた分だけを設定に重ねる

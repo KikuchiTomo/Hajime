@@ -323,6 +323,7 @@ pub mod keys {
 
 /// UIStrings.RuleList
 pub mod rule_list {
+    pub const UPDATE: &str = "更新";
     pub const ENABLED: &str = "有効";
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
@@ -330,7 +331,72 @@ pub mod rule_list {
 
 /// UIStrings.Dictionaries
 pub mod dictionaries {
+    pub const USER_WORDS: &str = "登録した単語";
     pub const IMPORTED: &str = "取り込んだ辞書";
+    pub const EMPTY: &str = "取り込んだ辞書はありません";
+    pub const IMPORT_FILE: &str = "辞書を取り込む…";
+    pub const REIMPORT: &str = "再読み込み…";
+    pub const NAME: &str = "名前";
+    pub const FIELD: &str = "分野";
+    pub const CONDITION: &str = "使う場面";
+    pub const ALWAYS: &str = "常に";
+    pub const APPS: &str = "選んだアプリ";
+    pub const CONTEXT: &str = "文脈に合わせる";
+    pub const MOVE_UP: &str = "優先度を上げる";
+    pub const MOVE_DOWN: &str = "優先度を下げる";
+    pub const IMPORT_FAILED: &str =
+        "辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
+    pub const NOTE: &str =
+        "タブ区切り・SKK・macOS のユーザー辞書の形式を読み込めます。上にある辞書ほど優先されます。";
+
+    pub fn too_many(limit: usize) -> String {
+        format!("取り込める辞書は {limit} 個までです")
+    }
+
+    pub fn imported(count: u32) -> String {
+        format!("{count} 件を取り込みました")
+    }
+
+    /// 一覧の内容の列(分野・語の数・使う場面)．UIStrings.Dictionaries.summary と同じ形
+    pub fn summary(field: &str, words: u64, condition: &str) -> String {
+        let field = if field.is_empty() {
+            String::new()
+        } else {
+            format!("{field}・")
+        };
+        format!("{field}{words} 語・{condition}")
+    }
+
+    /// 選んだアプリの使う場面(「選んだアプリ 2 個」)
+    pub fn apps_condition(count: usize) -> String {
+        format!("{APPS} {count} 個")
+    }
+}
+
+/// UIStrings.Association
+pub mod association {
+    pub const SECTION: &str = "連想変換";
+    pub const ENABLED: &str = "連想変換";
+    pub const LIMIT: &str = "連想の候補数";
+    pub const HINT: &str = "連想の案内を表示";
+    pub const DICTIONARIES: &str = "連想の辞書";
+    pub const EMPTY: &str = "連想の辞書はありません";
+    pub const IMPORT_FILE: &str = "連想の辞書を取り込む…";
+    pub const IMPORT_FAILED: &str =
+        "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
+    pub const NOTE: &str = "1 行に同じ意味の単語をタブか「,」で区切って並べたファイルを読み込めます。タブで区切るときは、先頭の列に意味の説明を書きます。上にある辞書ほど先に出ます。";
+
+    pub fn too_many(limit: usize) -> String {
+        format!("取り込める連想の辞書は {limit} 個までです")
+    }
+
+    pub fn imported(count: u32) -> String {
+        format!("{count} 件の意味を取り込みました")
+    }
+
+    pub fn summary(groups: u64) -> String {
+        format!("{groups} 件の意味")
+    }
 }
 
 /// UIStrings.Sync
@@ -439,6 +505,10 @@ pub mod windows {
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
     pub const DISABLED: &str = "無効";
+    /// 取り込んだ辞書の一覧の内容の列(macOS は名前の下に小さく出す)
+    pub const DICTIONARY_SUMMARY: &str = "内容";
+    /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
+    pub const DICTIONARY_APPS: &str = "アプリの実行ファイル名";
     /// 選んだ記号の決まりを有効・無効にするボタン(macOS は行ごとのオン・オフ)
     pub const TOGGLE_ENABLED: &str = "有効・無効の切り替え";
     /// ファイルを選ぶ窓の種類の名前(macOS は種類を名前で出さない)

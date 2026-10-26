@@ -264,6 +264,8 @@ public enum DefaultSettings {
     /// 連想の一覧に出す語の数(既定)と，選べる範囲
     public static let associationLimit = 60
     public static let associationLimitRange = 10...300
+    /// 連想の候補数を変える刻み
+    public static let associationLimitStep = 10
     /// 取り込める連想の辞書の数の上限(同梱の辞書を含む)
     public static let maximumAssociationDictionaries = 8
     /// アプリに同梱した連想の辞書(日本語 WordNet から作った data/thesaurus/wordnet-ja.tsv)．既定で一覧の先頭に置く

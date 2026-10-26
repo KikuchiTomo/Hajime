@@ -31,6 +31,9 @@ const JSON: FileFilter = FileFilter {
     name: windows::JSON_FILES,
     pattern: "*.json",
 };
+/// 辞書と一覧のテキストのファイル
+pub const TEXT_FILTER: FileFilter = TEXT;
+
 const TEXT: FileFilter = FileFilter {
     name: windows::TEXT_FILES,
     pattern: "*.txt;*.tsv;*.csv",

@@ -41,6 +41,11 @@ struct SettingsFileRequestTests {
             return ImportedDictionary(id: "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", name: "電気", wordCount: 3)
         }
         func removeDictionary(id: String) throws(SettingsFileFailure) { calls.append("removeDictionary \(id)") }
+        func importAssociationDictionary(from path: String, replacing id: String?) async throws(SettingsFileFailure) -> AssociationDictionary {
+            calls.append("importAssociationDictionary \(path) \(id ?? "-")")
+            return AssociationDictionary(id: "a", name: "related", groupCount: 12)
+        }
+        func removeAssociationDictionary(id: String) throws(SettingsFileFailure) { calls.append("removeAssociationDictionary \(id)") }
         func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int) {
             calls.append("importUserDictionary \(path)")
             return (4, 2)
@@ -132,6 +137,9 @@ struct SettingsFileRequestTests {
         #expect(await answer(.importDictionary(path: "/d/電気.txt", replacing: nil), from: id)
             == .dictionaryImported(dictionary: WireImportedDictionaryInfo(id: "6F1C2B0A-3D4E-4F50-8A9B-0C1D2E3F4A5B", name: "電気", wordCount: 3)))
         #expect(await answer(.importDictionary(path: "/d/壊れた.bin", replacing: nil), from: id) == .fileFailed(reason: .unreadable))
+        #expect(await answer(.importAssociationDictionary(path: "/d/related.txt", replacing: nil), from: id)
+            == .associationImported(dictionary: WireAssociationDictionaryInfo(id: "a", name: "related", groupCount: 12)))
+        #expect(await answer(.removeAssociationDictionary(id: "a"), from: id) == .done)
         #expect(await answer(.importProfileRules(path: "/d/rules.csv"), from: id) == .imported(added: 2, skipped: 1))
         #expect(await answer(.importRuleList(list: .symbolReadings, path: "/d/s.tsv"), from: id) == .imported(added: 5, skipped: 0))
         #expect(await answer(.exportRuleList(list: .romaji, path: "/d/r.tsv"), from: id) == .done)

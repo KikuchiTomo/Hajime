@@ -503,6 +503,24 @@
       ]
     },
     {
+      "name": "AssociationDictionaryInfo",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "groupCount",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "FileFailure",
       "kind": "enum",
       "cases": [
@@ -877,6 +895,28 @@
           ]
         },
         {
+          "name": "importAssociationDictionary",
+          "fields": [
+            {
+              "name": "path",
+              "type": "string"
+            },
+            {
+              "name": "replacing",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "removeAssociationDictionary",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            }
+          ]
+        },
+        {
           "name": "exportSettings",
           "fields": [
             {
@@ -1213,6 +1253,15 @@
             {
               "name": "dictionary",
               "type": "ImportedDictionaryInfo"
+            }
+          ]
+        },
+        {
+          "name": "associationImported",
+          "fields": [
+            {
+              "name": "dictionary",
+              "type": "AssociationDictionaryInfo"
             }
           ]
         },

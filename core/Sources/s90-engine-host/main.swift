@@ -119,7 +119,7 @@ func run() -> Int32 {
     let sync = PathSyncCoordinator(synchronizer: synchronizer,
                                    runner: FolderSyncRunner(synchronizer: synchronizer, settings: settings, dictionaries: dictionaries),
                                    settings: settings)
-    let files = SettingsFiles(settings: settings, dictionaries: dictionaries)
+    let files = SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations)
 
     // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
     let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),

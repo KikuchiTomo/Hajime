@@ -10,9 +10,8 @@ use crate::layout::{self, PageLayout};
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
-use crate::pages::{self, Action, Control, Info, LimitKind, Page, Row, Section};
+use crate::pages::{self, Action, Control, DictionaryList, Info, LimitKind, Page, Row, Section};
 use crate::store::SettingsStore;
-use crate::strings::settings;
 use crate::strings::{features, keys, more, windows as text};
 use crate::usage::Usage;
 use ipc::SymbolKind;
@@ -78,6 +77,12 @@ pub enum Event {
     },
     /// 選んだ項目の同期の範囲を切り替える(表の行の番号)
     SyncToggleFields(Vec<usize>),
+    /// 辞書の一覧の操作(index は選んだ行)
+    DictionaryList {
+        list: DictionaryList,
+        action: DictionaryAction,
+        index: Option<usize>,
+    },
     /// キー設定のひな形を読み込む(ひな形の値)
     LoadPreset(&'static str),
     /// 英語と日本語の見分けを試す
@@ -85,6 +90,31 @@ pub enum Event {
         text: String,
         preceding: String,
     },
+}
+
+/// 辞書の一覧のボタンの操作
+#[derive(Debug, Clone, PartialEq)]
+pub enum DictionaryAction {
+    /// 入力欄の値(名前・分野・使う場面・アプリ)で選んだ辞書を書き換える
+    Update(Vec<String>),
+    Import,
+    Reimport,
+    MoveUp,
+    MoveDown,
+    Toggle,
+    Remove,
+}
+
+impl DictionaryAction {
+    /// 表の下のボタンの並び(pages::Control::list_buttons と同じ)
+    const BOTTOM: [DictionaryAction; 6] = [
+        DictionaryAction::Import,
+        DictionaryAction::Reimport,
+        DictionaryAction::MoveUp,
+        DictionaryAction::MoveDown,
+        DictionaryAction::Toggle,
+        DictionaryAction::Remove,
+    ];
 }
 
 /// 画面に映す値
@@ -191,9 +221,11 @@ struct RowView {
     reset: Option<Window>,
     /// 数を選ぶ部品の選択肢
     numbers: Vec<f64>,
-    /// 一覧の入力欄と追加・削除のボタン(layout の CardLayout::parts と同じ並び)
+    /// 一覧の入力欄とボタン(layout の CardLayout::parts と同じ並び)
     parts: Vec<Window>,
     visible: bool,
+    /// 辞書の一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
+    dictionary_inputs: Vec<Vec<String>>,
 }
 
 impl RowView {
@@ -201,23 +233,18 @@ impl RowView {
         match &self.row.control {
             Control::List(spec, limit) => Some((spec, *limit)),
             Control::Dictionary(spec) => Some((spec, LimitKind::UserDictionaryEntries)),
-            // 記号の上限はエンジンが確かめる(SymbolRuleEditing.save)
-            Control::Symbols(_, spec) => Some((spec, LimitKind::CorrectionRules)),
-            // 項目ごとの同期の表は足さないので上限を使わない
-            Control::SyncFields(spec) => Some((spec, LimitKind::ProfileRules)),
+            // 記号・辞書の上限はエンジンが確かめ，項目ごとの同期は足さないので，上限は使わない
+            Control::Symbols(_, spec)
+            | Control::SyncFields(spec)
+            | Control::Dictionaries(_, spec) => Some((spec, LimitKind::ProfileRules)),
             _ => None,
         }
     }
 
-    /// 表の列の数(記号は状態の列を，項目ごとの同期は項目と範囲の列を足す)
+    /// 表の列の数
     fn columns(&self) -> Option<usize> {
-        let (spec, _) = self.list_spec()?;
-        let more = match self.row.control {
-            Control::Symbols(..) => 1,
-            Control::SyncFields(_) => 2,
-            _ => 0,
-        };
-        Some(spec.fields.len() + more)
+        self.list_spec()?;
+        Some(self.row.control.table_columns().len())
     }
 
     /// 選んだ行を切り替えるボタン(記号の有効と無効，項目ごとの同期の範囲)
@@ -230,9 +257,12 @@ impl RowView {
         }
     }
 
-    /// 一覧の入力欄(左・右)と追加・削除のボタン．項目ごとの同期の表には無い
+    /// 一覧の入力欄(左・右)と追加・削除のボタン．追加・削除の無い一覧(項目ごとの同期・辞書の一覧)では None
     fn list_parts(&self) -> Option<(&[Window], Window, Window)> {
-        if matches!(self.row.control, Control::SyncFields(_)) {
+        if matches!(
+            self.row.control,
+            Control::SyncFields(_) | Control::Dictionaries(..)
+        ) {
             return None;
         }
         let (spec, _) = self.list_spec()?;
@@ -241,6 +271,19 @@ impl RowView {
             self.parts.get(..fields)?,
             *self.parts.get(fields)?,
             *self.parts.get(fields + 1)?,
+        ))
+    }
+
+    /// 辞書の一覧の入力欄・更新のボタン・表の下のボタン(取り込む・再読み込み・上げる・下げる・切り替え・削除)
+    fn dictionary_parts(&self) -> Option<(&[Window], Window, &[Window])> {
+        let Control::Dictionaries(_, spec) = &self.row.control else {
+            return None;
+        };
+        let fields = spec.fields.len();
+        Some((
+            self.parts.get(..fields)?,
+            *self.parts.get(fields)?,
+            self.parts.get(fields + 1..)?,
         ))
     }
 
@@ -387,7 +430,7 @@ impl PageView {
     pub fn apply_theme(&self, theme: &Theme) {
         for row in self.rows.iter().flatten() {
             let Some(control) = row.control else { continue };
-            match row.row.control {
+            match &row.row.control {
                 Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) => {
                     ffi::set_theme(control, theme.control_theme(true))
                 }
@@ -397,9 +440,9 @@ impl PageView {
                         ffi::set_theme(*part, theme.control_theme(true));
                     }
                 }
-                Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
+                list if list.list_buttons().is_some() => {
                     apply_list_theme(control, theme);
-                    let (fields, _) = crate::layout::list_shape(&row.row.control);
+                    let fields = list.list_spec().map_or(0, |spec| spec.fields.len());
                     for (index, part) in row.parts.iter().enumerate() {
                         ffi::set_theme(*part, theme.control_theme(index < fields));
                     }
@@ -435,6 +478,20 @@ impl PageView {
             }
             if let Some(toggle) = row.toggle_button() {
                 ffi::enable(toggle, false);
+            }
+            if let Control::Dictionaries(list, _) = &row.row.control {
+                let entries = crate::dictionaries::entries(*list, values.value(list.path()));
+                row.dictionary_inputs = entries
+                    .iter()
+                    .map(|entry| crate::dictionaries::inputs(*list, entry))
+                    .collect();
+            }
+            if let Some((_, update, bottom)) = row.dictionary_parts() {
+                // 選んだ行に効くボタンは，行を選ぶまで使えなくする(取り込むボタンだけはいつでも使える)
+                ffi::enable(update, false);
+                for (index, button) in bottom.iter().enumerate() {
+                    ffi::enable(*button, enabled && index == 0);
+                }
             }
             if let Some(label) = row.label {
                 ffi::enable(label, enabled || row.row.control == Control::Note);
@@ -591,6 +648,38 @@ impl PageView {
                 }
             });
         }
+        if let (Control::Dictionaries(list, _), Some((fields, update, bottom))) =
+            (&row.row.control, row.dictionary_parts())
+        {
+            if notification != BN_CLICKED {
+                return None;
+            }
+            let index = row
+                .control
+                .map(ffi::list_selected)
+                .and_then(|indices| indices.first().copied());
+            let action = if window == update {
+                let values = fields
+                    .iter()
+                    .zip(row.row.control.list_spec()?.fields)
+                    .map(|(window, field)| match field.choices {
+                        Some(choices) => selected(*window)
+                            .and_then(|index| choices.get(index))
+                            .map_or_else(String::new, |(value, _)| (*value).to_string()),
+                        None => ffi::window_text(*window),
+                    })
+                    .collect();
+                DictionaryAction::Update(values)
+            } else {
+                let position = bottom.iter().position(|button| *button == window)?;
+                DictionaryAction::BOTTOM.get(position)?.clone()
+            };
+            return Some(Event::DictionaryList {
+                list: *list,
+                action,
+                index,
+            });
+        }
         if let Control::SyncFields(_) = row.row.control {
             let indices = row.control.map(ffi::list_selected).unwrap_or_default();
             return (notification == BN_CLICKED
@@ -701,6 +790,31 @@ impl PageView {
             }
             LVN_ITEMCHANGED => {
                 let selected = !ffi::list_selected(window).is_empty();
+                if let Some((fields, update, bottom)) = row.dictionary_parts() {
+                    ffi::enable(update, selected);
+                    for button in bottom.iter().skip(1) {
+                        ffi::enable(*button, selected);
+                    }
+                    // 選んだ辞書の名前などを入力欄に出す(書き換えて「更新」を押す)
+                    let chosen = ffi::list_selected(window)
+                        .first()
+                        .and_then(|index| row.dictionary_inputs.get(*index));
+                    if let (Some(values), Some(spec)) = (chosen, row.row.control.list_spec()) {
+                        for ((window, field), value) in fields.iter().zip(spec.fields).zip(values) {
+                            match field.choices {
+                                Some(choices) => {
+                                    ffi::send(
+                                        *window,
+                                        CB_SETCURSEL,
+                                        options::index_of(choices, value),
+                                        0,
+                                    );
+                                }
+                                None => ffi::set_text(*window, value),
+                            }
+                        }
+                    }
+                }
                 if let Some((_, _, remove)) = row.list_parts() {
                     ffi::enable(remove, selected);
                 }
@@ -910,46 +1024,15 @@ fn create_row(
         numbers: Vec::new(),
         parts: Vec::new(),
         visible: true,
+        dictionary_inputs: Vec::new(),
     };
     match &row.control {
         Control::Note => {
             view.label = label(host, row.title, &fonts.caption, next_id());
             return view;
         }
-        Control::List(spec, _) | Control::Dictionary(spec) => {
-            create_list(
-                host,
-                theme,
-                spec,
-                &[settings::ADD, settings::REMOVE],
-                &[],
-                &mut view,
-                next_id,
-            );
-            return view;
-        }
-        Control::SyncFields(spec) => {
-            create_list(
-                host,
-                theme,
-                spec,
-                &[text::TOGGLE_SYNC_SCOPE],
-                &[text::SYNC_FIELD, text::SYNC_SCOPE],
-                &mut view,
-                next_id,
-            );
-            return view;
-        }
-        Control::Symbols(_, spec) => {
-            create_list(
-                host,
-                theme,
-                spec,
-                &[settings::ADD, settings::REMOVE, text::TOGGLE_ENABLED],
-                &[text::SYMBOL_STATE],
-                &mut view,
-                next_id,
-            );
+        control if control.list_buttons().is_some() => {
+            create_list(host, theme, control, &mut view, next_id);
             return view;
         }
         Control::Preview => {
@@ -1020,7 +1103,8 @@ fn create_row(
         | Control::Preview
         | Control::Dictionary(_)
         | Control::Symbols(..)
-        | Control::SyncFields(_) => return view,
+        | Control::SyncFields(_)
+        | Control::Dictionaries(..) => return view,
     };
     view.control = ffi::create(
         WINDOW_EX_STYLE::default(),
@@ -1105,19 +1189,15 @@ fn create_row(
 fn create_list(
     host: Window,
     theme: &Theme,
-    spec: &ListSpec,
-    buttons: &[&str],
-    more_columns: &[&str],
+    control: &Control,
     view: &mut RowView,
     next_id: &mut impl FnMut() -> u16,
 ) {
+    let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) else {
+        return;
+    };
     let fonts = &theme.fonts;
-    let labels: Vec<&str> = spec
-        .fields
-        .iter()
-        .map(|field| field.label)
-        .chain(more_columns.iter().copied())
-        .collect();
+    let labels = control.table_columns();
     for field in spec.fields {
         let window = match field.choices {
             None => create_edit(host, theme, field.label, next_id()),
@@ -1148,8 +1228,9 @@ fn create_list(
         };
         view.parts.extend(window);
     }
-    for title in buttons {
-        let enabled = false;
+    // 入力欄の右のボタンと表の下のボタン(配置の parts と同じ並び)．取り込むボタンだけは選ばなくても使える
+    for (index, title) in buttons.top.iter().chain(buttons.bottom).enumerate() {
+        let enabled = matches!(control, Control::Dictionaries(..)) && index == buttons.top.len();
         if let Some(button) = ffi::create(
             WINDOW_EX_STYLE::default(),
             w!("BUTTON"),
@@ -1291,6 +1372,10 @@ fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values,
         Control::Dictionary(_) => ffi::list_set_rows(control, &extras.dictionary),
         Control::Symbols(kind, _) => ffi::list_set_rows(control, extras.symbol_rows(*kind)),
         Control::SyncFields(_) => ffi::list_set_rows(control, &extras.sync_fields),
+        Control::Dictionaries(list, _) => {
+            let entries = crate::dictionaries::entries(*list, values.value(list.path()));
+            ffi::list_set_rows(control, &crate::dictionaries::table(*list, &entries));
+        }
         Control::Info(Info::SyncFolder) => ffi::set_text(control, &extras.sync_folder),
         Control::Info(Info::LastSynced) => ffi::set_text(control, &extras.last_synced),
         Control::List(spec, _) => {
