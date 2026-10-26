@@ -15,8 +15,8 @@ final class SettingsWindowController {
     private let sync: SyncCoordinator
 
     init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, dictionaries: ImportedDictionaryStore? = nil,
-         resetLearning: @escaping () -> Void) {
-        model = SettingsModel(store: settings, usage: usage, dictionaries: dictionaries, resetLearning: resetLearning)
+         resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
+        model = SettingsModel(store: settings, usage: usage, dictionaries: dictionaries, resetLearning: resetLearning, previewLanguage: previewLanguage)
         self.sync = sync
     }
 
@@ -95,9 +95,12 @@ final class SettingsModel: ObservableObject {
     let dictionaries: ImportedDictionaryStore?
     /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
     @Published var isImportingDictionary = false
+    /// 英字入力(自動)で打った文を語ごとに見分けた結果(「試す」)．無ければ「試す」を出さない
+    let previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])?
 
     init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, dictionaries: ImportedDictionaryStore? = nil,
-         resetLearning: @escaping () -> Void) {
+         resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
+        self.previewLanguage = previewLanguage
         self.store = store
         self.usage = usage
         self.dictionaries = dictionaries

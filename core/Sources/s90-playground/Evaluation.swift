@@ -141,6 +141,38 @@ enum Evaluation {
 
 
 
+    /// 英字入力(自動)で語ごとに英語と日本語を見分けた結果を評価する．1 行は「打ったキー<TAB>入る文<TAB>前の文字列(任意)」．
+    /// 打ったキーの空白は Space を押したもの．最後に Enter を押し，入力欄に入った文字(確定した文字とアプリに渡した空白)を比べる
+    static func language(file: String, engine: AzooKeyConverterEngine) throws {
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        var settings = DefaultSettings.settings
+        settings.inputStyle = .englishAuto
+        let lexicon = WordListLexicon()
+        var passed = 0
+        for line in lines {
+            let columns = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard columns.count >= 2 else { continue }
+            let session = InputSession(converter: engine.makeSession(), lexicon: lexicon, settings: StaticSettings(settings))
+            var text = ""
+            var precedingText = columns.count >= 3 && !columns[2].isEmpty ? columns[2] : nil
+            func press(_ key: KeyEvent.Key, _ typed: String) {
+                let context = InputContext(precedingText: session.isComposing ? nil : (precedingText ?? "") + text)
+                let result = session.handle(KeyEvent(key), context: context)
+                for action in result.actions { if case .commit(let value) = action { text += value } }
+                if !result.handled { text += typed }
+            }
+            for character in columns[0] {
+                press(character == " " ? .space : .character(character), String(character))
+            }
+            press(.enter, "")
+            precedingText = nil
+            let ok = text == columns[1]
+            if ok { passed += 1 }
+            print("\(ok ? "○" : "×")  \(columns[0]) → \(text)\(ok ? "" : "   期待: \(columns[1])")")
+        }
+        print("正解: \(passed) / \(lines.count)")
+    }
+
     private static func isHiragana(_ character: Character) -> Bool {
         character.unicodeScalars.allSatisfy { (0x3041...0x309F).contains($0.value) }
     }

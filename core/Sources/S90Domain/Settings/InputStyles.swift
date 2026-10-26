@@ -6,6 +6,16 @@ public enum InputStyle: String, Sendable, Equatable, Codable, CaseIterable {
     case kana
     /// 英語のまま入力し，ローマ字として読める並びには日本語の候補を出す(EN 入力)．Tab で日本語にする
     case english
+    /// 英語で打ちながら，日本語にできる語は語ごとに見分けて日本語にする(英字入力(自動))
+    case englishAuto
+
+    /// 英字のまま打つ方式か(英字入力と英字入力(自動))
+    public var typesLetters: Bool {
+        switch self {
+        case .english, .englishAuto: true
+        case .romaji, .kana: false
+        }
+    }
 }
 
 /// 英字を打つときのキーボードの配列．ローマ字入力と EN 入力で，どのキーでどの英字が入るかを決める．
