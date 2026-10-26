@@ -115,8 +115,9 @@ public enum DefaultSettings {
     public static let singleEditCost = 2.0
     /// 再変換できる文字の長さの上限(選んだ文字と読み)．長い文を選んだまま押しても重くならないよう抑える
     public static let maximumReconversionLength = 64
-    /// Space を押したときに打ち間違いの訂正を待つ長さ(秒)．これを過ぎたら訂正を待たずに変換する
-    public static let correctionWaitBeforeConversion = 0.3
+    /// Space で変換したあと，裏で求めている打ち間違いの訂正を待つ長さの上限(秒)．
+    /// 変換はすぐに出し，訂正が届いたら(そのあいだにキーを押していなければ)直した変換に入れ替える
+    public static let lateCorrectionTimeout = 5.0
     /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
     public static let unconvertiblePlausibility = -60.0
     /// 1 か所の直しを Zenzai の点数の差だけで直す境目(#52 より前の決まりと同じ)

@@ -84,12 +84,13 @@ struct EngineServiceCorrectionTests {
         return state.wakeAfterMilliseconds
     }
 
-    @Test("Space で訂正を待つあいだは短い wake を頼み，求め終わったら直して変換する")
-    func conversionWaitsForCorrections() async throws {
+    @Test("Space ですぐ変換を出し，訂正は裏で求めて，届いたあとの wake で直した変換に入れ替える")
+    func conversionShowsAtOnceAndCorrectsLater() async throws {
         let (id, session) = try open()
         type("youdesu", session, id)
         let space = press(.space, session, id)
-        #expect(Self.composition(space) == nil)
+        // 訂正を待たずに変換を出す(候補が遅れて出ない)
+        #expect(Self.composition(space) == "様です")
         #expect(Self.wakeAfter(space) == EngineService.correctionPollMilliseconds)
         await service.waitForCorrections()
         let woke = wake(session, id)
@@ -97,20 +98,22 @@ struct EngineServiceCorrectionTests {
         #expect(Self.wakeAfter(woke) != EngineService.correctionPollMilliseconds)
     }
 
-    @Test("訂正が長くかかるときは，期限を過ぎたら直さずに変換する")
+    @Test("訂正が長くかかるときは，期限を過ぎたら求めるのをやめ，出した変換はそのまま")
     func conversionGivesUpAfterDeadline() throws {
         let test = EngineServiceCorrectionTests(service: Service(finishes: false))
         let (id, session) = try test.open()
         test.type("youdesu", session, id)
-        _ = test.press(.space, session, id)
+        #expect(Self.composition(test.press(.space, session, id)) == "様です")
         let early = test.wake(session, id)
         #expect(Self.composition(early) == nil)
         #expect(Self.wakeAfter(early) == EngineService.correctionPollMilliseconds)
-        test.clock.now = test.clock.now + .seconds(DefaultSettings.correctionWaitBeforeConversion + 1)
-        #expect(Self.composition(test.wake(session, id)) == "様です")
+        test.clock.now = test.clock.now + .seconds(DefaultSettings.lateCorrectionTimeout + 1)
+        let late = test.wake(session, id)
+        #expect(Self.composition(late) == nil)
+        #expect(Self.wakeAfter(late) != EngineService.correctionPollMilliseconds)
     }
 
-    @Test("待っているあいだに次のキーを打ったら，待たせていた変換はしない")
+    @Test("変換したあとに次のキーを打ったら，あとから届いた訂正では変換を直さない")
     func keyCancelsWaitingConversion() async throws {
         let (id, session) = try open()
         type("youdesu", session, id)

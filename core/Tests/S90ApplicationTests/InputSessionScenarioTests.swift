@@ -1024,30 +1024,38 @@ struct ReadingCorrectionScenarioTests {
         #expect(harness.marked.text == "よいです")
     }
 
-    @Test("訂正を別のところで求めるとき，求め終わる前に Space を押すと待ち，受け取ってから直して変換する")
-    func conversionAwaitsCorrections() {
+    @Test("訂正を別のところで求めるとき，求め終わる前に Space を押すとすぐ変換を出し，あとから届いた訂正で直す")
+    func conversionCorrectsLater() {
         struct Service: TypoCorrecting {
             func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] { [:] }
         }
         let converter = FakeConverter(["ようです": [("様です", nil)], "よいです": [("良いです", nil)]])
         let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
         for key in "youdesu" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
-        let first = session.handle(KeyEvent(.space), context: InputContext())
-        #expect(first.actions == [.awaitCorrections])
-        #expect(session.conversionCorrectionRequest?.keys.contains("youdesu") == true)
-        session.provideCorrections(["youdesu": [
+        let corrections = ["youdesu": [
             ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
-        ]])
-        let resumed = session.resumeConversion(context: InputContext())
-        let marked = resumed.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
-        #expect(marked == "良いです")
-        // 待っているあいだに次のキーが来たら，待たせていた変換はやめる
+        ]]
+        let marked = { (actions: [ClientAction]) in actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last }
+        let first = session.handle(KeyEvent(.space), context: InputContext())
+        // 訂正を待たずに変換を出し，訂正を裏で求めるよう頼む
+        #expect(marked(first.actions) == "様です")
+        #expect(first.actions.contains(.awaitCorrections))
+        #expect(session.lateCorrectionRequest?.keys.contains("youdesu") == true)
+        #expect(marked(session.applyLateCorrections(corrections, context: InputContext())) == "良いです")
+        // 2 度目は何もしない
+        #expect(session.applyLateCorrections(corrections, context: InputContext()).isEmpty)
+        // 変換したあとに次のキーが来たら，あとから届いた訂正では直さない
         let other = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
         for key in "youdesu" { _ = other.handle(KeyEvent(.character(key)), context: InputContext()) }
         _ = other.handle(KeyEvent(.space), context: InputContext())
-        _ = other.handle(KeyEvent(.character("n")), context: InputContext())
-        #expect(other.resumeConversion(context: InputContext()).isEmpty)
+        _ = other.handle(KeyEvent(.down), context: InputContext())
+        #expect(other.applyLateCorrections(corrections, context: InputContext()).isEmpty)
+        // 訂正で何も変わらないときは変換を出し直さない
+        let same = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
+        for key in "youdesu" { _ = same.handle(KeyEvent(.character(key)), context: InputContext()) }
+        _ = same.handle(KeyEvent(.space), context: InputContext())
+        #expect(same.applyLateCorrections(["youdesu": []], context: InputContext()).isEmpty)
     }
 
     @Test("綴りを直した英単語のあとに日本語が続き，日本語の打ち間違いとして直せるなら日本語に譲る(tkitou → 英単語の kit ではなく 適当)")

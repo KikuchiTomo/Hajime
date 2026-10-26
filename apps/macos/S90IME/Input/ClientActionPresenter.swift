@@ -61,7 +61,7 @@ final class ClientActionPresenter {
                 // 入力コントローラが入力先の選んでいる文字を読んで再変換する(S90InputController.reconvert)
                 break
             case .awaitCorrections:
-                // 入力コントローラが訂正を求めてから変換を続ける(S90InputController.convertAfterCorrections)
+                // 入力コントローラが裏で訂正を求め，届いたら変換を直す(S90InputController.correctAfterConversion)
                 break
             case .openSettings:
                 openSettings()
