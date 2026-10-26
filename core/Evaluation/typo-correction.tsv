@@ -1,4 +1,4 @@
-# 打ち間違いの補正の評価用．打ったキー<TAB>直したあとの文(直さないのが正しければ =)
+# 打ち間違いの補正の評価用．打ったキー<TAB>直したあとの文(直さないのが正しければ =．正しい文が複数あれば | で区切る)
 # 打ち間違いの無い文(直したら誤り)
 kyouhaiitenkidesune	=
 konnnitiha	=
@@ -37,3 +37,53 @@ arigatougozaimasi	ありがとうございます
 tututasakanagaookikatta	釣った魚が大きかった
 kyouhaitenkidesune	今日はいい天気ですね
 kyouhaiteknidesune	今日はいい天気ですね
+# 打ち間違いの無い文(追加: わ・へ・を・ず・づ・長音・促音を含むもの)
+kawaiinekodesune	=
+hawainiikimasita	=
+watasiwaraimasita	=
+kinounoeigawomimasita	=
+sushiwotabemasyou	=
+zuttomatteimasu	=
+tudukiwoyomitai	=
+mizuwononndekudasai	=
+tikazimidesu	=
+hanabitaikainiikimasu	=
+dousitemowakaranai	=
+toukyouekimadearukimasu	=
+ookinaieniikitai	=
+tokeiwonakusimasita	=
+kittewokaimasita	=
+sekkakunanode	=
+benkyousimasu	=
+ryokouniikimasu	=
+syukudaigaowaranai	=
+meirudeosirasesimasu	=
+eigononyuuryokumodekiru	=
+kousuiwokaimasita	=
+hennsyuusitekudasai	=
+kyakusamaniaimasu	=
+zehiitadakitaidesu	=
+# 打ち間違いのある文(追加: かなの書き誤り)
+mizurai	見づらい|みづらい
+settingugamizuraidesu	セッチングが見づらいです|セッティングが見づらいです|設定が見づらいです
+iizuraikotodesu	言いづらいことです
+tuzukiwoyomitai	続きを読みたい
+tizimimasita	縮みました
+konnnitiwa	こんにちは
+konbanwa	こんばんは
+ekieikimasu	駅へ行きます
+honnoyondekudasai	本を読んでください
+touriwoaruku	通りを歩く
+oukiinekodesu	大きい猫です|大きいねこです
+touidesune	遠いですね
+# 打ち間違いのある文(追加: キーの打ち間違い)
+kyuohaamedesu	今日は雨です
+arigatpugozaimasu	ありがとうございます
+yorpsikuonegaisimasu	よろしくお願いします
+benkosimasu	勉強します
+mateimasu	待っています|待てます
+konichiha	こんにちは
+situmonnsitemoiidesuka	質問してもいいですか
+sietmasu	しています
+kaisyaniikimsu	会社に行きます
+dennwasimsu	電話します

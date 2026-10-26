@@ -5,16 +5,25 @@ public struct ReadingCorrection: Sendable, Equatable {
     public var reading: String
     public var score: Double
     public var cost: Double
+    /// 読みを変換したときのもっともらしさの，打ったままの読みとの差(辞書の語に切れるほど大きい)．
+    /// 言語モデルはかなの並びを見るので，「みずらい」と「みづらい」のような書き分けの誤りを見分けにくい．変換の側から補う
+    public var plausibilityGain: Double
 
-    public init(keys: String, reading: String, score: Double, cost: Double) {
+    public init(keys: String, reading: String, score: Double, cost: Double, plausibilityGain: Double = 0) {
         self.keys = keys
         self.reading = reading
         self.score = score
         self.cost = cost
+        self.plausibilityGain = plausibilityGain
     }
 
     /// 打ったまま(直していない)か
     public var isUnchanged: Bool { cost == 0 }
+
+    /// 直すかどうかを比べる点数．言語モデルの点数に変換のもっともらしさの差を足し，手間を重く引く(重みは評価の文で決めた DefaultSettings)
+    public var rank: Double {
+        (score + cost) + DefaultSettings.correctionPlausibilityWeight * plausibilityGain - DefaultSettings.correctionCostWeight * cost
+    }
 }
 
 /// 日本語の打ち間違い(「ようですね」→「よいですね」)を直すかどうかの判定．
@@ -54,13 +63,14 @@ public struct ReadingCorrectionRule: Sendable {
         return correction
     }
 
-    /// 直すか，示すだけか，何もしないか．candidates は点数の高い順
+    /// 直すか，示すだけか，何もしないか．比べるのは rank(言語モデル・変換のもっともらしさ・手間)
     public func decision(among candidates: [ReadingCorrection], reading: String) -> Decision? {
-        guard level == .standard, let best = candidates.first, let last = candidates.last, !best.isUnchanged else { return nil }
+        guard level == .standard, let best = candidates.max(by: { $0.rank < $1.rank }), let last = candidates.min(by: { $0.rank < $1.rank }),
+            !best.isUnchanged else { return nil }
         let typed = candidates.first(where: \.isUnchanged)
         if let typed, typed.reading != KanaWidth.katakana(from: reading) { return nil }
         guard best.reading != KanaWidth.katakana(from: reading) else { return nil }
-        let gain = best.score - (typed?.score ?? last.score)
+        let gain = best.rank - (typed?.rank ?? last.rank)
         let margins = sensitivity.margins
         if gain >= margins.apply { return .apply(best) }
         if suggests, gain >= margins.suggest { return .suggest(best) }
@@ -90,7 +100,7 @@ public struct ReadingCorrectionRule: Sendable {
 extension ReadingCorrection {
     /// 直す手間を足したもの(キーの並びを変えてから求めた候補に使う)
     public func adding(cost extra: Double) -> ReadingCorrection {
-        ReadingCorrection(keys: keys, reading: reading, score: score - extra, cost: cost + extra)
+        ReadingCorrection(keys: keys, reading: reading, score: score - extra, cost: cost + extra, plausibilityGain: plausibilityGain)
     }
 }
 

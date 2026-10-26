@@ -31,11 +31,57 @@ public actor ZenzaiTypoService: TypoCorrecting {
             let candidates = converter.experimentalRequestTypoCorrection(
                 leftSideContext: leftContext ?? "", composingText: composing, options: options(leftContext: leftContext), inputStyle: .roman2kana, config: config)
             converter.stopComposition()
-            result[key] = candidates.map {
+            let beam = candidates.map {
                 ReadingCorrection(keys: $0.correctedInput, reading: $0.convertedText, score: Double($0.score), cost: Double($0.channelCost))
             }
+            // Zenzai の探索が拾わない誤り(かなの書き誤りなど)を，1 か所の打ち間違いを全部試して補う
+            // 前に見直した部分は探し直さない(打っているあいだは新しく打った数文字だけを試すので速い)
+            let edits = KeyEditSearch.corrections(
+                of: key,
+                from: KeyEditSearch.searchStart(keys: key, previous: lastSearchedKeys),
+                plausibility: plausibility(of:),
+                languageModel: { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
+            )
+            lastSearchedKeys = key
+            result[key] = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits), typedKeys: key, plausibility: plausibility(of:))
         }
         return result
+    }
+
+    /// 前に 1 か所の打ち間違いを探したキーの並び
+    private var lastSearchedKeys: String?
+
+    /// 読みを変換したときのもっともらしさ(Zenzai を使わない軽い変換の点数)．読みごとに覚えておく
+    private var plausibilityCache: [String: Double] = [:]
+
+    private func plausibility(of reading: String) -> Double {
+        if let cached = plausibilityCache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        var options = options(leftContext: nil)
+        options.zenzaiMode = .off
+        options.N_best = 1
+        options.learningType = .nothing
+        options.typoCorrectionMode = .disabled
+        let best = converter.requestCandidates(composing, options: options).mainResults
+            .first { AzooKeyConverterSession.readingCount($0.composingCount, readingLength: reading.count) == reading.count }
+            .map { Double($0.value) } ?? -.infinity
+        converter.stopComposition()
+        if plausibilityCache.count > DefaultSettings.maximumPlausibilityCacheEntries { plausibilityCache.removeAll() }
+        plausibilityCache[reading] = best
+        return best
+    }
+
+    private func languageModelScores(forKeys keys: [String], leftContext: String?) -> [Double?] {
+        let inputs = keys.map { key -> ComposingText in
+            var composing = ComposingText()
+            composing.insertAtCursorPosition(key, inputStyle: .roman2kana)
+            return composing
+        }
+        let scores = converter.experimentalScoreTypoInputs(
+            leftSideContext: leftContext ?? "", inputs: inputs, options: options(leftContext: leftContext), inputStyle: .roman2kana)
+        converter.stopComposition()
+        return scores.map { $0.map(Double.init) }
     }
 
     private func options(leftContext: String?) -> ConvertRequestOptions {

@@ -42,14 +42,29 @@ public enum DefaultSettings {
     public static let latticeConfidenceGap: Double = 2.0
     /// 打ち間違いを直した読みの候補をいくつまで求めるか
     public static let typoCorrectionCandidateCount = 5
+    /// 1 か所の打ち間違いを全部試す探し方(KeyEditSearch)で，言語モデルで採点する候補の数．多いほど拾えるが遅い
+    public static let keyEditCandidateCount = 16
+    /// 前に見直した部分のうち，探し直す文字の数(KeyEditSearch.searchStart)
+    public static let keyEditOverlap = 4
+    /// 訂正を裏で求めるときに覚えておく，読みの変換のもっともらしさの数．超えたら捨てる(メモリを増やし続けない)
+    public static let maximumPlausibilityCacheEntries = 20_000
+    /// KeyEditSearch の手間を，Zenzai の訂正の手間(隣のキーとの取り違え 1 回で 2)にそろえる倍率
+    public static let keyEditCostScale = 2.0
+    /// 直すかどうかを比べる点数(ReadingCorrection.rank)で，変換のもっともらしさの差に掛ける重みと，手間に掛ける重み．
+    /// 評価の文(core/Evaluation/typo-correction.tsv)で，正しい文を誤って直さない範囲で直せる文が最も多くなる値を選んだ
+    public static let correctionPlausibilityWeight = 0.25
+    public static let correctionCostWeight = 3.0
+    /// KeyEditSearch の打ち間違いの手間(隣のキー・母音どうし・同じキーは起きやすいので小さい)
+    public static let keyEditCosts = (neighborSubstitution: 1.0, substitution: 2.0, easyOmission: 1.5, omission: 2.5,
+                                      easyInsertion: 1.0, insertion: 2.0, transposition: 1.0, samePronunciation: 0.5)
     /// 打ち間違いを探す幅．広いほど見つけやすいが遅い．4 で 1 文 0.2 秒以内(Zenzai small，Apple Silicon)
     public static let typoCorrectionBeamSize = 16
     public static let typoCorrectionTopK = 32
     /// 直した読みが打ったままの読みより，対数確率でいくつ以上よければ直すか．
     /// 「こんにちは」を「こんいちば」にするような誤った訂正(差 1.9)を避け，「ようですね」→「よいですね」(差 3.6)は直す
-    public static let readingCorrectionMargin = 3.0
+    public static let readingCorrectionMargin = 5.5
     /// 差がこれ以上で readingCorrectionMargin に届かないときは，直さずに「もしかして」として示し，Tab で直せるようにする
-    public static let readingSuggestionMargin = 2.0
+    public static let readingSuggestionMargin = 4.0
     /// 同じキーを続けて 2 回打ってしまった誤り(「koonnichiha」)を直す手間．近くのキーを余分に打った誤りの手間(3.0)より小さくする
     public static let repeatedKeyCost = 2.0
     /// 同じキーを続けて打った箇所のうち，1 回にして試す箇所の数の上限．1 か所ごとに Zenzai に問い合わせるので抑える

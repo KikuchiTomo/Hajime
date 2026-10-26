@@ -99,9 +99,9 @@ enum Evaluation {
             if columns[1] == "=" {
                 outcome = applied ? "誤って直した" : suggested ? "誤って示した" : "正しく直さなかった"
             } else if applied {
-                outcome = marked.text == columns[1] ? "正しく直した" : "違う文に直した"
+                outcome = columns[1].split(separator: "|").contains { marked.text == $0 } ? "正しく直した" : "違う文に直した"
             } else if suggested {
-                outcome = note?.contains(columns[1]) == true ? "正しく示した" : "違う文を示した"
+                outcome = columns[1].split(separator: "|").contains { note?.contains($0) == true } ? "正しく示した" : "違う文を示した"
             } else {
                 outcome = "直せなかった"
             }
@@ -112,6 +112,31 @@ enum Evaluation {
         print(counts.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "  "))
         print("見直しの時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
     }
+
+    /// 訂正の候補ごとの材料を TSV で出す(重みと境目を決めるため)．
+    /// 列: 文の番号, 期待(= なら直さないのが正しい), 候補のキー, 言語モデルの差(Zenzai の点数 + 手間 - 打ったままの点数), 手間, 変換のもっともらしさの差, 候補の変換, 正解か
+    static func correctionFeatures(file: String, engine: AzooKeyConverterEngine) throws {
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        for (number, line) in lines.enumerated() {
+            let columns = line.split(separator: "\t").map(String.init)
+            guard columns.count == 2, let original = KeyEditSearch.reading(of: columns[0]) else { continue }
+            let session = engine.makeSession()
+            let candidates = session.typoCorrections(forKeys: columns[0])
+            guard let typed = candidates.first(where: { $0.keys == columns[0] }) else { continue }
+            let base = session.plausibility(of: original)
+            for candidate in candidates where candidate.keys != columns[0] {
+                let reading = KanaWidth.hiragana(from: candidate.reading)
+                let text = session.candidates(for: reading).first { $0.readingCount == reading.count }?.text ?? reading
+                let correct = columns[1] != "=" && columns[1].split(separator: "|").contains { text == $0 }
+                print([String(number), columns[1], candidate.keys, String(format: "%.3f", candidate.score + candidate.cost - typed.score),
+                       String(format: "%.3f", candidate.cost), String(format: "%.3f", session.plausibility(of: reading) - base), text, correct ? "1" : "0"]
+                    .joined(separator: "\t"))
+            }
+        }
+    }
+
+
+
 
     private static func isHiragana(_ character: Character) -> Bool {
         character.unicodeScalars.allSatisfy { (0x3041...0x309F).contains($0.value) }

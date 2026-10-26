@@ -785,7 +785,7 @@ struct ReadingCorrectionScenarioTests {
     @Test("Space で変換するとき，十分にもっともらしい読みに直し，Esc で打ったままに戻す")
     func correctAndUndo() {
         let (session, state) = typed("you", corrections: [
-            ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -5, cost: 2),
+            ReadingCorrection(keys: "yoi", reading: "ヨイ", score: -1, cost: 1),
             ReadingCorrection(keys: "you", reading: "ヨウ", score: -9, cost: 0),
         ])
         #expect(state().marked == "よう")
@@ -807,7 +807,7 @@ struct ReadingCorrectionScenarioTests {
     func liveCorrection() {
         let converter = FakeConverter()
         converter.corrections["youdesu"] = [
-            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -5, cost: 2),
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
         ]
         let harness = Harness(converter: converter)
@@ -834,7 +834,7 @@ struct ReadingCorrectionScenarioTests {
             Candidate.Word(text: "良いです", readingCount: 4),
         ]
         converter.corrections["kyouhayoudesu"] = [
-            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -5, cost: 2),
+            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -1, cost: 1),
             ReadingCorrection(keys: "kyouhayoudesu", reading: "キョウハヨウデス", score: -9, cost: 0),
         ]
         // 自動では，打ち間違いを直した文節を最初に選ぶ
@@ -849,11 +849,11 @@ struct ReadingCorrectionScenarioTests {
         #expect(focused?.alternatives.prefix(3) == ["良いです", "様です", "ようです"])
     }
 
-    /// 「youdesu」を「yoidesu」に直す変換器(差 4 で直す)
-    private func correctingHarness(margin: Double = 4) -> Harness {
+    /// 「youdesu」を「yoidesu」に直す変換器(比べる点数の差 6 で直す)
+    private func correctingHarness(margin: Double = 6) -> Harness {
         let converter = FakeConverter()
         converter.corrections["youdesu"] = [
-            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -9 + margin, cost: 2),
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -9 + margin + 2, cost: 1),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
         ]
         let harness = Harness(converter: converter)
@@ -908,7 +908,7 @@ struct ReadingCorrectionScenarioTests {
 
     @Test("R-02: Esc で「もしかして」を取り下げると，同じキーのあいだは示し直さない")
     func dismissSuggestion() {
-        let harness = correctingHarness(margin: 2)
+        let harness = correctingHarness(margin: 4.5)
         #expect(harness.note?.contains("もしかして") == true)
         harness.press(.escape)
         #expect(harness.marked.text == "ようです")
@@ -919,7 +919,7 @@ struct ReadingCorrectionScenarioTests {
     @Test("R-07: ターミナルの行の頭では打ち間違いを見直さない")
     func noReviewAtTerminalLineStart() {
         let converter = FakeConverter()
-        converter.corrections["youdesu"] = [ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -5, cost: 2)]
+        converter.corrections["youdesu"] = [ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1)]
         let harness = Harness(converter: converter)
         harness.context = InputContext(profile: .terminal)
         harness.type("youdesu")
@@ -942,7 +942,7 @@ struct ReadingCorrectionScenarioTests {
         apply(session.review(context: InputContext()))
         #expect(marked == "ようです")
         session.provideCorrections(["youdesu": [
-            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -5, cost: 2),
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -1, cost: 1),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
         ]])
         #expect(session.correctionRequest == nil)
@@ -958,7 +958,7 @@ struct ReadingCorrectionScenarioTests {
             Candidate.Word(text: "様です", readingCount: 4),
         ]
         converter.corrections["kyouhayoudesu"] = [
-            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -7, cost: 2),
+            ReadingCorrection(keys: "kyouhayoidesu", reading: "キョウハヨイデス", score: -2.5, cost: 1),
             ReadingCorrection(keys: "kyouhayoudesu", reading: "キョウハヨウデス", score: -9, cost: 0),
         ]
         var settings = DefaultSettings.settings
@@ -981,7 +981,7 @@ struct ReadingCorrectionScenarioTests {
     func suggestion() {
         let converter = FakeConverter()
         converter.corrections["youdesu"] = [
-            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -7, cost: 2),
+            ReadingCorrection(keys: "yoidesu", reading: "ヨイデス", score: -2.5, cost: 1),
             ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
         ]
         let harness = Harness(converter: converter)
@@ -999,7 +999,7 @@ struct ReadingCorrectionScenarioTests {
     func repeatedKey() {
         let converter = FakeConverter()
         converter.corrections["koonnnichiha"] = [ReadingCorrection(keys: "koonnnichiha", reading: "コオンニチハ", score: -12, cost: 0)]
-        converter.corrections["konnnichiha"] = [ReadingCorrection(keys: "konnnichiha", reading: "コンニチハ", score: -4, cost: 0)]
+        converter.corrections["konnnichiha"] = [ReadingCorrection(keys: "konnnichiha", reading: "コンニチハ", score: 0, cost: 0)]
         let harness = Harness(converter: converter)
         harness.type("koonnnichiha")
         harness.settle()

@@ -273,9 +273,28 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
             return converter.experimentalRequestTypoCorrection(
                 leftSideContext: leftContext ?? "", composingText: composing, options: options, inputStyle: .roman2kana, config: config)
         } ?? []
-        return corrections.map {
+        let beam = corrections.map {
             ReadingCorrection(keys: $0.correctedInput, reading: $0.convertedText, score: Double($0.score), cost: Double($0.channelCost))
         }
+        // Zenzai の探索が拾わない誤り(かなの書き誤りなど)を，1 か所の打ち間違いを全部試して補う
+        let edits = KeyEditSearch.corrections(of: keys, plausibility: plausibility(of:), languageModel: languageModelScores(forKeys:))
+        return KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits), typedKeys: keys, plausibility: plausibility(of:))
+    }
+
+    func languageModelScores(forKeys keys: [String]) -> [Double?] {
+        guard engine.usesZenzai, !keys.isEmpty else { return keys.map { _ in nil } }
+        let inputs = keys.map { key -> ComposingText in
+            var composing = ComposingText()
+            composing.insertAtCursorPosition(key, inputStyle: .roman2kana)
+            return composing
+        }
+        let options = engine.options(leftContext: leftContext)
+        lastRequested = nil
+        let scores = engine.withSession(sessionID) { converter -> [Float?] in
+            defer { converter.stopComposition() }
+            return converter.experimentalScoreTypoInputs(leftSideContext: leftContext ?? "", inputs: inputs, options: options, inputStyle: .roman2kana)
+        } ?? keys.map { _ in nil }
+        return scores.map { $0.map(Double.init) }
     }
 
     func setLeftContext(_ text: String?) {
@@ -387,7 +406,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     }
 
     /// 入力を .direct で渡しているので，入力の数と読みの文字数は同じになる
-    private static func readingCount(_ count: ComposingCount, readingLength: Int) -> Int {
+    nonisolated static func readingCount(_ count: ComposingCount, readingLength: Int) -> Int {
         switch count {
         case .inputCount(let value), .surfaceCount(let value):
             return min(value, readingLength)
