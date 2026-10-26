@@ -89,8 +89,12 @@ final class CompositionRoot {
 
     /// 設定の画面．開くたびに作らず使い回す
     private(set) lazy var settingsWindow: SettingsWindowController = {
+        // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける
+        let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
+                                          lexicon: lexicon, settings: settings)
         let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, dictionaries: dictionaries,
-                                                  resetLearning: { [engine] in engine.resetLearning() })
+                                                  resetLearning: { [engine] in engine.resetLearning() },
+                                                  previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)
         return controller
     }()

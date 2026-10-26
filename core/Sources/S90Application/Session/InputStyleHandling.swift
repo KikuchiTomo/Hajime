@@ -19,6 +19,8 @@ struct InputStyleState {
     var settings: Settings
     /// 候補を選んでいるとき，番号キーで選べる候補の数．選んでいなければ 0
     var selectableCount: Int
+    /// 入力位置の前の文字列．打ち始めのときだけ入る(英字入力(自動)で前の語の手がかりにする)
+    var precedingText: String? = nil
 }
 
 enum InputStyleInterpretation: Equatable, CustomStringConvertible, CustomDebugStringConvertible {

@@ -26,6 +26,14 @@ struct RuleListSpec<Rule> {
             limit: DefaultSettings.maximumCorrectionRules, invalidMessage: UIStrings.Features.invalidException, exportFileName: "exceptions.txt")
     }
 
+    /// いつも英語にする語・いつも日本語にする語(英語と日本語)
+    static func languageWords(_ list: WritableKeyPath<S90Domain.Settings, [String]>, fileName: String) -> RuleListSpec<String> {
+        RuleListSpec<String>(
+            list: list, key: { $0 }, value: { _ in "" }, make: { key, _ in key.trimmingCharacters(in: .whitespaces).lowercased() },
+            isValid: WordLanguageSettings.isValidWord, limit: DefaultSettings.maximumWordLanguageEntries,
+            invalidMessage: UIStrings.Features.invalidWord, exportFileName: fileName)
+    }
+
     static var romaji: RuleListSpec<RomajiRule> {
         RuleListSpec<RomajiRule>(
             list: \.customRomaji, key: \.keys, value: \.kana, make: RuleListEditing.romajiRule(keys:kana:), isValid: \.isValid,
