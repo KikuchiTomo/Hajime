@@ -1,14 +1,17 @@
 # 入口はすべてここ．中身はまだ検査だけ(core と apps を作ったら build と test を足す)
 PYTHON ?= python3 -I
+# Zenzai のモデルの置き場所．既定は tools/models/fetch_zenzai.sh と同じリポジトリの 1 つ上の models/
+MODELS_DIR ?= $(abspath $(CURDIR)/../models)
+ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
 
-.PHONY: fetch-models setup check test tokens protocol build-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models setup check test test-debug test-zenzai tokens protocol build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
 
 setup:
 	mise install
 
 # Zenzai のモデルを取得してハッシュを確かめる(docs/dev/adr/0006-zenzai.md)
 fetch-models:
-	tools/models/fetch_zenzai.sh
+	tools/models/fetch_zenzai.sh "$(MODELS_DIR)"
 
 check:
 	$(PYTHON) tools/check/check_skills.py
@@ -17,10 +20,23 @@ check:
 	$(PYTHON) tools/protocol/generate.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check
 
-test:
-	swift test --package-path core
-	# 処理時間(R-01)は Release でだけ測る
-	swift test --package-path core -c release --filter LatencyProbeTests
+# モデルがあれば本物の Zenzai のテストも動かす．無ければ飛ばしたことを最後に出す
+test: test-debug
+	@if [ -f "$(ZENZAI_MODEL)" ]; then \
+		$(MAKE) --no-print-directory test-zenzai; \
+	else \
+		swift test --package-path core -c release --filter LatencyProbeTests && \
+		printf '\n注意: Zenzai のモデルが無いので，本物の Zenzai のテストを飛ばし，処理時間は Zenzai なしで測りました\n  モデルの場所: %s\n  make fetch-models で取得してから make test を動かし直してください\n\n' "$(ZENZAI_MODEL)" >&2; \
+	fi
+
+# Debug ビルドのテスト．本物の Zenzai のテストはデバッグビルドでは遅すぎるので，ここでは飛ばして test-zenzai で動かす
+test-debug:
+	env -u S90_ZENZAI_MODEL swift test --package-path core
+
+# 本物の Zenzai のテストと処理時間(R-01)を Release で動かす．モデルが無ければ失敗する(CI はこちらを使う)
+test-zenzai:
+	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
+	S90_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" swift test --package-path core -c release --filter S90EngineTests
 
 build-macos:
 	cd apps/macos && xcodegen generate --quiet && xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration Release -destination "generic/platform=macOS" -derivedDataPath build build -quiet
