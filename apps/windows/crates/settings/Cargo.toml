@@ -1,0 +1,32 @@
+[package]
+name = "settings"
+description = "設定の画面．設定の読み書きはエンジンに頼む"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "s90-settings"
+path = "src/main.rs"
+
+[dependencies]
+ipc = { path = "../ipc" }
+tokens = { path = "../tokens" }
+
+[target.'cfg(windows)'.dependencies]
+windows-core.workspace = true
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Controls",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[lints]
+workspace = true

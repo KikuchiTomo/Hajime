@@ -284,6 +284,36 @@
       ]
     },
     {
+      "name": "SettingsSnapshot",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "theme",
+          "type": "string"
+        },
+        {
+          "name": "inputStyle",
+          "type": "string"
+        },
+        {
+          "name": "liveConversion",
+          "type": "bool"
+        },
+        {
+          "name": "showsModeIndicator",
+          "type": "bool"
+        },
+        {
+          "name": "showsKeyHints",
+          "type": "bool"
+        },
+        {
+          "name": "candidateFontSize",
+          "type": "f64"
+        }
+      ]
+    },
+    {
       "name": "RequestBody",
       "kind": "union",
       "tag": "type",
@@ -373,6 +403,18 @@
               "type": "Rect"
             }
           ]
+        },
+        {
+          "name": "readSettings"
+        },
+        {
+          "name": "writeSettings",
+          "fields": [
+            {
+              "name": "settings",
+              "type": "SettingsSnapshot"
+            }
+          ]
         }
       ]
     },
@@ -436,6 +478,15 @@
         },
         {
           "name": "done"
+        },
+        {
+          "name": "settings",
+          "fields": [
+            {
+              "name": "settings",
+              "type": "SettingsSnapshot"
+            }
+          ]
         },
         {
           "name": "error",

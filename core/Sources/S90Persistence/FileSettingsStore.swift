@@ -41,6 +41,13 @@ public final class FileSettingsStore: SettingsStoring, SettingsObserving {
     /// 起動したときに読めず，脇に置いた設定のファイル．無ければ nil
     public private(set) var setAsideFile: URL?
 
+    public func reload() {
+        guard let data = try? ProtectedFile.read(from: fileURL, maximumBytes: DefaultSettings.maximumSettingsFileBytes),
+              let next = try? SettingsCoding.decode(data), next != current else { return }
+        current = next
+        observers.forEach { $0(next) }
+    }
+
     public func update(_ change: (inout Settings) -> Void) throws {
         var next = current
         change(&next)

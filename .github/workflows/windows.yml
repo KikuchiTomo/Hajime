@@ -57,3 +57,37 @@ jobs:
           key: swift-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
       - run: swift build --package-path core --disable-default-traits
       - run: swift test --package-path core --disable-default-traits
+
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: compnerd/gha-setup-swift@9ff1ee4c44888c5817fc14d1b257ac8cabb4935f # v0.5.1
+        with:
+          swift-version: swift-6.3.3-release
+          swift-build: 6.3.3-RELEASE
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: core/.build
+          key: swift-release-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}
+      - run: swift build --package-path core -c release --disable-default-traits --product s90-engine-host
+      - run: rustup toolchain install
+        working-directory: apps/windows
+      - run: rustup target add i686-pc-windows-msvc
+        working-directory: apps/windows
+      - run: cargo build --locked --release
+        working-directory: apps/windows
+      - run: cargo build --locked --release -p tsf --target i686-pc-windows-msvc
+        working-directory: apps/windows
+      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage
+        shell: pwsh
+      - run: dotnet tool install --global wix --version 6.0.2
+      - run: wix build apps/windows/installer/s90.wxs -arch x64 -d Version=0.1.0 -d StageDir=apps/windows/target/stage -o apps/windows/target/s90-tokyo-ime.msi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: s90-tokyo-ime-windows
+          path: apps/windows/target/s90-tokyo-ime.msi
+          if-no-files-found: error
