@@ -140,9 +140,11 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// このコマンドが効く状態(いつでも を含まない)
     public var states: Set<KeymapState> {
         switch self {
-        case .japaneseMode, .directMode, .toggleMode, .nextInputStyle: [.direct, .idle, .composing, .converting]
-        case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace,
-             .openSettings, .toggleLiveConversion, .handwriting: [.idle, .composing, .converting]
+        // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
+        // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
+        case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .openSettings, .toggleLiveConversion, .handwriting:
+            [.direct, .idle, .composing, .converting]
+        case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .commit, .cancel, .nextCandidate, .previousCandidate: [.composing, .converting]
