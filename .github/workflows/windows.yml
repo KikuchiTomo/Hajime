@@ -35,6 +35,13 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
+      # 候補ウィンドウの見本を PNG に書き出す．macOS の --render-snapshots(design/mockups)と見比べる
+      - run: cargo run --locked -p candidate-ui -- --render-snapshots target/snapshots
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-ui-snapshots
+          path: apps/windows/target/snapshots
+          if-no-files-found: error
       - run: cargo build --locked --release -p tsf
       - run: ../../tools/windows/check_exports.ps1 -Dll target/release/s90_tsf.dll
         shell: pwsh
