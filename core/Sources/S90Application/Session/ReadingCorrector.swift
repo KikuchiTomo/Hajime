@@ -103,6 +103,12 @@ final class ReadingCorrector {
     /// 直した読みを見せているか
     var isApplied: Bool { applied != nil }
 
+    /// 今の読みを，直さずに見直し済みにする(訂正が時間内に求まらなかったとき)
+    func markReviewed(_ composition: Composition) {
+        let typed = typedComposition(from: composition) ?? composition
+        lastReview = (typed.rawKeys ?? "", nil)
+    }
+
     /// この読みは見直し済みか(打ったキーが前に見直したときと同じか)
     func isReviewed(_ composition: Composition) -> Bool {
         let typed = typedComposition(from: composition) ?? composition

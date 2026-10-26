@@ -42,8 +42,8 @@ public final class EngineService {
         enum Purpose {
             /// Space で変換したあとに求めている(.awaitCorrections)．届いたら変換を直す．期限を過ぎたらやめる
             case conversion(deadline: ContinuousClock.Instant)
-            /// 打鍵が止まったので見直す
-            case review
+            /// 打鍵が止まったので見直す．期限を過ぎたらその入力は見直さない
+            case review(deadline: ContinuousClock.Instant)
         }
 
         let id: UInt64
@@ -434,11 +434,15 @@ public final class EngineService {
                     // 長くかかるときは求めるのをやめる(変換は出ているので，そのまま使える)
                     cancelCorrections(of: session)
                 }
-            case .review:
+            case .review(let deadline):
                 if let result = work.result {
                     sessions[session]?.correction = nil
                     current.input.provideCorrections(result)
                     actions += current.input.review(context: context)
+                } else if now() >= deadline {
+                    // 求め終わらないときはやめ，この入力は見直したことにする(求め直し続けない)
+                    cancelCorrections(of: session)
+                    current.input.skipReview()
                 }
             }
         } else if current.input.awaitsSettle {
@@ -447,7 +451,7 @@ public final class EngineService {
         } else if current.input.awaitsReview {
             // 訂正は裏で求め，求め終わったあとの wake で見直す(打鍵を待たせない)
             if typoService != nil, let request = current.input.correctionRequest {
-                startCorrections(request, purpose: .review, session: session)
+                startCorrections(request, purpose: .review(deadline: now() + .seconds(DefaultSettings.reviewCorrectionTimeout)), session: session)
             } else {
                 actions += current.input.review(context: context)
             }

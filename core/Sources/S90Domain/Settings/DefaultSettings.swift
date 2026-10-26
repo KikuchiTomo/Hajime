@@ -119,6 +119,9 @@ public enum DefaultSettings {
     /// Space で変換したあと，裏で求めている打ち間違いの訂正を待つ長さの上限(秒)．
     /// 変換はすぐに出し，訂正が届いたら(そのあいだにキーを押していなければ)直した変換に入れ替える
     public static let lateCorrectionTimeout = 5.0
+    /// 打鍵が止まって見直すときに，裏で求める訂正を待つ上限(秒)．過ぎたらその入力は見直さない．
+    /// 入力を待たせない裏の仕事なので，長い文(評価の文で最大 10 秒ほど)も求め終われるよう長めにする
+    public static let reviewCorrectionTimeout = 15.0
     /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
     public static let unconvertiblePlausibility = -60.0
     /// 1 か所の直しを Zenzai の点数の差だけで直す境目(#52 より前の決まりと同じ)

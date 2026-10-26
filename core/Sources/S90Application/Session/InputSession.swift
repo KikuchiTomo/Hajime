@@ -240,6 +240,11 @@ public final class InputSession {
         readingCorrector.provide(corrections)
     }
 
+    /// 訂正が時間内に求まらなかった．今の入力は見直したことにして，求め直さない(次に打てばまた見直す)
+    public func skipReview() {
+        readingCorrector.markReviewed(composition)
+    }
+
     /// 打鍵が長く止まった(DefaultSettings.liveCorrectionDelay)．打ち間違いを見直し，直すか「もしかして」と示す．
     /// ターミナルの行の頭ではコマンドの名前を打っているかもしれないので見直さない(直すとコマンドとして流せなくなる．R-07)
     public func review(context: InputContext) -> [ClientAction] {
