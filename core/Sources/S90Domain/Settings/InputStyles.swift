@@ -31,6 +31,14 @@ public enum InitialFocus: String, Sendable, Equatable, Codable, CaseIterable {
     case automatic
 }
 
+/// 打っているあいだに候補(変換と予測)の窓を出すか
+public enum SuggestionDisplay: String, Sendable, Equatable, Codable, CaseIterable {
+    case off
+    /// ライブ変換がオフのときだけ出す(ライブ変換で文が見えているときは要らない)
+    case whenLiveConversionOff
+    case always
+}
+
 /// 打ち間違いを直す基準．直した読みが打ったままの読みよりどれだけもっともらしければ直すか(対数確率の差)
 public enum CorrectionSensitivity: String, Sendable, Equatable, Codable, CaseIterable {
     /// 確かなときだけ直す
