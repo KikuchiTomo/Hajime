@@ -33,13 +33,14 @@ use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
-    GetWindowTextW, IsDialogMessageW, LoadCursorW, MessageBoxW, PostQuitMessage, RegisterClassExW,
-    SendMessageW, SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW,
-    TranslateMessage, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MINMAXINFO, MSG, SB_VERT, SCROLLINFO,
-    SIF_PAGE, SIF_POS, SIF_RANGE, SM_CXVSCROLL, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE,
-    SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW, WNDPROC,
+    GetWindowTextW, IsDialogMessageW, KillTimer, LoadCursorW, MessageBoxW, PostQuitMessage,
+    RegisterClassExW, SendMessageW, SetTimer, SetWindowPos, SetWindowTextW, ShowWindow,
+    SystemParametersInfoW, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK,
+    MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MINMAXINFO, MSG,
+    SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SM_CXVSCROLL, SPI_GETHIGHCONTRAST,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNORMAL,
+    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW,
+    WNDPROC,
 };
 use windows_core::{w, BOOL, HSTRING, PCWSTR, PWSTR};
 
@@ -456,6 +457,17 @@ pub fn run_message_loop(dialog: HWND) {
             DispatchMessageW(&message);
         }
     }
+}
+
+/// 窓に時計を付ける(WM_TIMER が届く)．同じ番号なら置き換える
+pub fn set_timer(window: HWND, id: usize, milliseconds: u32) {
+    // SAFETY: このスレッドの窓．手続きは窓のものを使う
+    unsafe { SetTimer(Some(window), id, milliseconds, None) };
+}
+
+pub fn kill_timer(window: HWND, id: usize) {
+    // SAFETY: このスレッドの窓
+    let _ = unsafe { KillTimer(Some(window), id) };
 }
 
 pub fn quit() {

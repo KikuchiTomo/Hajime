@@ -60,6 +60,10 @@ struct SettingsCatalogTests {
                 "importedDictionaries": limit(DefaultSettings.maximumImportedDictionaries),
                 "keymapEntries": limit(DefaultSettings.maximumKeymapEntries),
             ]),
+            "timing": .object([
+                "responseTimeout": .number(DefaultSettings.settingsAppResponseTimeout),
+                "reconnectInterval": .number(DefaultSettings.settingsAppReconnectInterval),
+            ]),
         ])
     }
 

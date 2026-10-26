@@ -63,12 +63,33 @@ pub struct Limits {
     pub keymap_entries: usize,
 }
 
+/// 設定の画面がエンジンを待つ時間(秒)
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Timing {
+    /// 応答を待つ時間
+    pub response_timeout: f64,
+    /// つながらないときにつなぎ直す間隔
+    pub reconnect_interval: f64,
+}
+
+impl Timing {
+    pub fn response_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs_f64(self.response_timeout.max(0.0))
+    }
+
+    pub fn reconnect_interval(&self) -> std::time::Duration {
+        std::time::Duration::from_secs_f64(self.reconnect_interval.max(0.0))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Catalog {
     /// 設定のファイルの項目の名前(Settings の CodingKeys)
     pub fields: Vec<String>,
     pub ranges: Ranges,
     pub limits: Limits,
+    pub timing: Timing,
 }
 
 impl Catalog {
@@ -89,6 +110,7 @@ mod tests {
             catalog.ranges.candidates_per_page.lower() < catalog.ranges.candidates_per_page.upper()
         );
         assert!(catalog.limits.custom_themes > 0);
+        assert!(catalog.timing.response_timeout().as_secs_f64() > 0.0);
     }
 
     #[test]

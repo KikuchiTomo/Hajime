@@ -15,6 +15,7 @@ use crate::store::StoreError;
 use crate::strings::{features, keys, rule_list, settings};
 use ipc::{DictionaryAddResult, DictionaryEntry};
 use std::cell::RefCell;
+use std::time::Duration;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{DT_END_ELLIPSIS, DT_LEFT, DT_SINGLELINE, DT_VCENTER};
@@ -28,9 +29,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SB_TOP, WA_INACTIVE, WHEEL_DELTA, WINDOW_EX_STYLE, WINDOW_STYLE, WM_ACTIVATE, WM_COMMAND,
     WM_CTLCOLORBTN, WM_CTLCOLOREDIT, WM_CTLCOLORLISTBOX, WM_CTLCOLORSTATIC, WM_DESTROY,
     WM_DPICHANGED, WM_DRAWITEM, WM_ERASEBKGND, WM_GETMINMAXINFO, WM_MEASUREITEM, WM_MOUSEWHEEL,
-    WM_NOTIFY, WM_PAINT, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOLORCHANGE, WM_THEMECHANGED, WM_VSCROLL,
-    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WM_NOTIFY, WM_PAINT, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOLORCHANGE, WM_THEMECHANGED, WM_TIMER,
+    WM_VSCROLL, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows_core::{w, PCWSTR};
 
@@ -39,6 +40,8 @@ const HOST_CLASS: PCWSTR = w!("s90.tokyo-ime.settings.page");
 const ID_SEARCH: u16 = 1;
 const ID_NAV: u16 = 2;
 const ID_HOST: u16 = 3;
+/// つなぎ直しの時計の番号
+const RECONNECT_TIMER: usize = 1;
 
 /// 左の一覧の 1 項目．見出しの最初のページは上に見出しを描く
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,7 +63,7 @@ struct App {
     host: Window,
     theme: Theme,
     catalog: Catalog,
-    connect: fn() -> Option<Store>,
+    connect: fn(Duration) -> Option<Store>,
     model: Option<SettingsModel<Store>>,
     extras: Extras,
     /// 登録した単語(表の行と同じ並び．消すときに引く)
@@ -78,7 +81,7 @@ thread_local! {
 }
 
 /// 窓を作る．メッセージの繰り返しに渡す窓を返す
-pub fn open(catalog: Catalog, connect: fn() -> Option<Store>) -> Option<Window> {
+pub fn open(catalog: Catalog, connect: fn(Duration) -> Option<Store>) -> Option<Window> {
     ffi::register_class(MAIN_CLASS, Some(main_procedure));
     ffi::register_class(HOST_CLASS, Some(host_procedure));
     let window = ffi::create(
@@ -126,7 +129,8 @@ pub fn open(catalog: Catalog, connect: fn() -> Option<Store>) -> Option<Window> 
         Some(window),
         ID_HOST,
     )?;
-    let model = connect().and_then(|store| SettingsModel::load(store, &catalog).ok());
+    let model = connect(catalog.timing.response_timeout())
+        .and_then(|store| SettingsModel::load(store, &catalog).ok());
     let page = Page::Input;
     let view = match model {
         Some(_) => PageView::new(host, &theme, page, &catalog),
@@ -151,6 +155,9 @@ pub fn open(catalog: Catalog, connect: fn() -> Option<Store>) -> Option<Window> 
     APP.with(|cell| *cell.borrow_mut() = Some(app));
     with_app(|app| {
         app.apply_theme();
+        if app.model.is_none() {
+            app.disconnect();
+        }
         app.fill_nav("");
         app.refresh();
         let px = |value: f32| app.theme.px(value);
@@ -324,21 +331,51 @@ impl App {
         match &mut self.model {
             Some(model) => {
                 if model.reload().is_err() {
-                    self.model = None;
-                    self.open_page(self.view.page);
+                    self.disconnect();
                     return;
                 }
                 self.read_extras();
                 self.refresh();
             }
-            None => {
-                self.model = (self.connect)()
-                    .and_then(|store| SettingsModel::load(store, &self.catalog).ok());
-                if self.model.is_some() {
-                    self.open_page(self.view.page);
-                }
+            None => self.connect(),
+        }
+    }
+
+    /// エンジンにつなぐ．つながったら今のページを開き直し，つなぎ直しの時計を止める
+    fn connect(&mut self) {
+        self.model = (self.connect)(self.catalog.timing.response_timeout())
+            .and_then(|store| SettingsModel::load(store, &self.catalog).ok());
+        if self.model.is_some() {
+            ffi::kill_timer(self.window, RECONNECT_TIMER);
+            self.open_page(self.view.page);
+        }
+    }
+
+    /// エンジンが答えなくなった．画面は閉じずに知らせを出し，間隔をおいてつなぎ直す
+    fn disconnect(&mut self) {
+        self.model = None;
+        self.open_page(self.view.page);
+        let interval = self.catalog.timing.reconnect_interval().as_millis();
+        ffi::set_timer(
+            self.window,
+            RECONNECT_TIMER,
+            u32::try_from(interval).unwrap_or(u32::MAX),
+        );
+    }
+
+    /// 頼みが失敗したときの後始末．つながらないならつなぎ直しに回し，ほかは書けなかったと知らせる
+    fn failure(&mut self, error: StoreError) -> Option<After> {
+        if error == StoreError::Unavailable {
+            self.disconnect();
+            return None;
+        }
+        if let Some(model) = self.model.as_mut() {
+            if model.reload().is_err() {
+                self.disconnect();
+                return None;
             }
         }
+        Some(failed())
     }
 
     fn arrange_window(&mut self) {
@@ -406,17 +443,18 @@ impl App {
                     word: item.get(1).cloned().unwrap_or_default(),
                 };
                 let result = model.store().add_user_dictionary_entry(entry);
+                let result = match result {
+                    Err(error) => return self.failure(error),
+                    Ok(result) => result,
+                };
                 let after = match result {
-                    Ok(DictionaryAddResult::Added) => {
+                    DictionaryAddResult::Added => {
                         self.view.clear_list_inputs("");
                         None
                     }
-                    Ok(DictionaryAddResult::AlreadyRegistered) => {
-                        Some(rule_list::ALREADY_REGISTERED)
-                    }
-                    Ok(DictionaryAddResult::Invalid) => Some(settings::INVALID_ENTRY),
-                    Ok(DictionaryAddResult::Full) => Some(rule_list::FULL),
-                    Err(_) => Some(settings::SAVE_FAILED),
+                    DictionaryAddResult::AlreadyRegistered => Some(rule_list::ALREADY_REGISTERED),
+                    DictionaryAddResult::Invalid => Some(settings::INVALID_ENTRY),
+                    DictionaryAddResult::Full => Some(rule_list::FULL),
                 };
                 self.read_extras();
                 self.refresh();
@@ -430,18 +468,17 @@ impl App {
                     .iter()
                     .filter_map(|index| self.dictionary.get(*index).cloned())
                     .collect();
-                let failures = entries
+                // 消せなかった語があっても残りは消す
+                let error = entries
                     .into_iter()
-                    .filter(|entry| {
-                        model
-                            .store()
-                            .remove_user_dictionary_entry(entry.clone())
-                            .is_err()
-                    })
-                    .count();
+                    .filter_map(|entry| model.store().remove_user_dictionary_entry(entry).err())
+                    .last();
+                if let Some(error) = error {
+                    return self.failure(error);
+                }
                 self.read_extras();
                 self.refresh();
-                return (failures > 0).then(failed);
+                return None;
             }
             Event::Preview { text, preceding } => {
                 let shown = if text.trim().is_empty() {
@@ -460,29 +497,30 @@ impl App {
             Event::Action(Action::RestoreKeymap) => load_preset(model, STANDARD_PRESET),
             Event::LoadPreset(preset) => load_preset(model, preset),
             Event::Action(Action::ResetLearning) => {
-                let result = model.store().reset_learning();
+                if let Err(error) = model.store().reset_learning() {
+                    return self.failure(error);
+                }
                 self.refresh();
-                return Some(match result {
-                    Ok(()) => After::Message {
-                        text: settings::LEARNING_RESET,
-                        warning: false,
-                    },
-                    Err(_) => failed(),
+                return Some(After::Message {
+                    text: settings::LEARNING_RESET,
+                    warning: false,
                 });
             }
             Event::Action(Action::OpenSettingsFile) => return Some(After::OpenSettingsFile),
             Event::Action(Action::ResetUsage) => {
-                let result = model.store().reset_usage();
+                if let Err(error) = model.store().reset_usage() {
+                    return self.failure(error);
+                }
                 self.read_extras();
                 self.refresh();
-                return result.err().map(|_| failed());
+                return None;
             }
         };
-        let after = result.err().map(|_: StoreError| {
-            // 書けなかったときは今の値を読み直して部品を戻す
-            let _ = self.model.as_mut().map(SettingsModel::reload);
-            failed()
-        });
+        // 書けなかったときは今の値を読み直して部品を戻す
+        let after = match result {
+            Err(error) => self.failure(error),
+            Ok(()) => None,
+        };
         self.refresh();
         after
     }
@@ -513,10 +551,7 @@ impl App {
         let result = model.set_all(&changes);
         let kept = spec.contains(model.value(spec.path), item);
         let after = match result {
-            Err(_) => {
-                let _ = model.reload();
-                Some(failed())
-            }
+            Err(error) => self.failure(error),
             Ok(()) if !kept => Some(After::Message {
                 text: spec.invalid,
                 warning: true,
@@ -761,6 +796,16 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
                 ffi::scale(size::WINDOW_MIN_WIDTH, dpi),
                 ffi::scale(size::WINDOW_MIN_HEIGHT, dpi),
             );
+            Some(LRESULT(0))
+        }
+        WM_TIMER if wparam.0 == RECONNECT_TIMER => {
+            with_app(|app| {
+                if app.model.is_none() {
+                    app.connect();
+                } else {
+                    ffi::kill_timer(app.window, RECONNECT_TIMER);
+                }
+            });
             Some(LRESULT(0))
         }
         WM_ACTIVATE => {
