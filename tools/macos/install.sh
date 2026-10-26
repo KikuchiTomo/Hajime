@@ -2,8 +2,8 @@
 # macOS の入力メソッドをビルドし，~/Library/Input Methods に入れて有効にする．
 #
 # 使い方: tools/macos/install.sh [Release|Dev]
-#   Release: 本番(s90.tokyo IME)
-#   Dev:     開発版(s90.tokyo IME Dev)．本番と別の入力ソース・別の学習データになるので，並べて試せる．最適化は本番と同じ
+#   Release: 本番(s90 IME)
+#   Dev:     開発版(s90 IME Dev)．本番と別の入力ソース・別の学習データになるので，並べて試せる．最適化は本番と同じ
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 . "$root/tools/macos/variant.sh"
@@ -24,7 +24,10 @@ echo "署名: ${identity_label:-$identity}"
 
 cd "$root/apps/macos"
 xcodegen generate --quiet
-xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -derivedDataPath build build -quiet
+# 入力メニューに出す名前を変えるときは S90_NAME に入れる(make install-macos NAME=…)
+set --
+[ -n "${S90_NAME:-}" ] && set -- S90_DISPLAY_NAME="$S90_NAME"
+xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -derivedDataPath build build -quiet "$@"
 built="build/Build/Products/$configuration/$app_name.app"
 if [ "$identity" != "-" ]; then
   # ビルドはアドホック署名で行い，できたアプリだけを証明書で署名し直す．
