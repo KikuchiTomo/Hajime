@@ -66,4 +66,4 @@ PR の中のコミットは main に残りませんが，同じ形で書いて�
 
 ## Claude Code を使う場合
 
-`.claude/skills/` にこのリポジトリ用のスキルがあります．`CLAUDE.md` の表のとおりに使われます．スキルを直すときは `skill-creator` を使い，`python3 -I tools/check/check_skills.py` を通してください．
+`.claude/skills/` にこのリポジトリ用のスキルがあります．`CLAUDE.md` の表のとおりに使われます．スキルを直すときは `skill-creator` を使い，`python3 -I tools/check/check_skills.py` を通してください．`skill-creator`・`frontend-design`・`webapp-testing` は [anthropics/skills](https://github.com/anthropics/skills) のもので，Apache License 2.0 です(各ディレクトリの `LICENSE.txt`)．
