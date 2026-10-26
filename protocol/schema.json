@@ -1446,6 +1446,28 @@
       ]
     },
     {
+      "name": "AssociationHeading",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "headword",
+          "type": "string"
+        },
+        {
+          "name": "label",
+          "type": "string"
+        },
+        {
+          "name": "group",
+          "type": "u32"
+        },
+        {
+          "name": "groupCount",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "CandidateList",
       "kind": "struct",
       "fields": [
@@ -1479,6 +1501,14 @@
         },
         {
           "name": "note",
+          "type": "string?"
+        },
+        {
+          "name": "association",
+          "type": "AssociationHeading?"
+        },
+        {
+          "name": "associationHint",
           "type": "string?"
         }
       ]
@@ -1600,6 +1630,14 @@
         {
           "name": "hints",
           "type": "[KeyHint]"
+        },
+        {
+          "name": "association",
+          "type": "AssociationHeading?"
+        },
+        {
+          "name": "associationHint",
+          "type": "string?"
         }
       ]
     },

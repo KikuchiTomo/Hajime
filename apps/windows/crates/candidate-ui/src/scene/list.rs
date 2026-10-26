@@ -59,6 +59,8 @@ struct Footer {
     hints: Vec<KeyHint>,
     note: Option<String>,
     position: String,
+    /// 選んでいる候補に連想があることの知らせ(「Ctrl+Tab 連想」)
+    association_hint: Option<String>,
 }
 
 fn footer(list: &CandidateList) -> Footer {
@@ -68,12 +70,19 @@ fn footer(list: &CandidateList) -> Footer {
             hints: strings::variants_hints(),
             note: list.note.clone(),
             position: strings::variants_position(index, list.variants.len() as u32),
+            association_hint: None,
         };
     }
     Footer {
-        hints: strings::candidates_hints(),
+        // 連想の一覧には文字種の行が無いので，文字種の案内を出さない
+        hints: if list.association.is_some() {
+            Vec::new()
+        } else {
+            strings::candidates_hints()
+        },
         note: list.note.clone(),
         position: strings::position(list.position, list.position, list.total),
+        association_hint: list.association_hint.clone(),
     }
 }
 
@@ -107,15 +116,28 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         Some(note) => painter.width(note, Font::Label),
         None => painter.hints_width(&footer.hints),
     };
-    let footer_width = hints_width + painter.width(&footer.position, Font::Label) + padding * 3.0;
+    let association_hint = list
+        .association_hint
+        .as_deref()
+        .map_or(0.0, |hint| painter.width(hint, Font::Label) + padding);
+    let footer_width = hints_width
+        + association_hint
+        + painter.width(&footer.position, Font::Label)
+        + padding * 3.0;
+    let heading_width = list
+        .association
+        .as_ref()
+        .map_or(0.0, |heading| super::association::width(&painter, heading));
     let content_width = candidate::MIN_WIDTH
         .max(metrics.lead + entry_width + padding * 2.0)
         .max(variants_width + padding * 2.0)
+        .max(heading_width)
         .max(footer_width);
     let mut content_height = list.entries.len() as f32 * metrics.row_height
         + metrics.section_height
         + candidate::FRAME_WIDTH;
-    if !list.variants.is_empty() {
+    // 連想の一覧では，文字種の行の代わりに見出しの行を出す
+    if !list.variants.is_empty() || list.association.is_some() {
         content_height += metrics.section_height + candidate::FRAME_WIDTH;
     }
     let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
@@ -126,7 +148,16 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     painter.panel(body);
     let content = body.inset(metrics.inset, metrics.inset);
     let mut y = content.y;
-    if !list.variants.is_empty() {
+    if let Some(heading) = &list.association {
+        super::association::draw(
+            &mut painter,
+            heading,
+            Frame::new(content.x, y, content.width, metrics.section_height),
+        );
+        y += metrics.section_height;
+        separator(&mut painter, y, content.x, content.max_x());
+        y += candidate::FRAME_WIDTH;
+    } else if !list.variants.is_empty() {
         variants(
             &mut painter,
             list,
@@ -304,7 +335,14 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
     if theme.is_rounded() {
         match &footer.note {
             Some(note) => painter.text(note, Font::Label, theme.correction, left, section),
-            None => painter.hints(&footer.hints, left, section.mid_y()),
+            None => {
+                painter.hints(&footer.hints, left, section.mid_y());
+                if let Some(hint) = &footer.association_hint {
+                    // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
+                    let x = left + painter.hints_width(&footer.hints) + candidate::PADDING_X;
+                    painter.text(hint, Font::Label, theme.text_muted, x, section);
+                }
+            }
         }
         painter.text_right(
             &footer.position,
@@ -327,6 +365,10 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
         None => {
             let width = painter.hints_width(&footer.hints);
             painter.hints(&footer.hints, right - width, section.mid_y());
+            if let Some(hint) = &footer.association_hint {
+                let end = right - width - candidate::PADDING_X;
+                painter.text_right(hint, Font::Label, theme.text_muted, end, section);
+            }
         }
     }
 }
@@ -340,6 +382,8 @@ mod tests {
 
     fn list(selected: Option<u32>) -> CandidateList {
         CandidateList {
+            association: None,
+            association_hint: None,
             variants: vec![CandidateVariant {
                 label: "カタカナ".into(),
                 is_available: true,
@@ -388,6 +432,33 @@ mod tests {
             let frame = text_frame(&scene, "カタカナ").expect("描いた文字がある");
             assert_eq!(scene.target_at(frame.x + 1.0, frame.mid_y()), None);
         }
+    }
+
+    #[test]
+    fn 連想の一覧は文字種の行の代わりに見出しを出し_足元に連想の知らせを出す() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut associated = list(Some(0));
+            associated.association = Some(ipc::AssociationHeading {
+                headword: "速い".into(),
+                label: "速度".into(),
+                group: 1,
+                group_count: 3,
+            });
+            let scene = candidate_list(&associated, &Look::new(&theme, 15.0), &Fixed);
+            let texts: Vec<String> = texts(&scene).into_iter().map(|(text, _)| text).collect();
+            assert!(texts.contains(&"速い".to_string()));
+            assert!(texts.contains(&"1 / 3".to_string()));
+            assert!(!texts.contains(&"カタカナ".to_string()));
+            let mut hinted = list(Some(0));
+            hinted.association_hint = Some("Ctrl+Tab 連想".into());
+            let scene = candidate_list(&hinted, &Look::new(&theme, 15.0), &Fixed);
+            assert!(texts_of(&scene).contains(&"Ctrl+Tab 連想".to_string()));
+        }
+    }
+
+    fn texts_of(scene: &Scene) -> Vec<String> {
+        texts(scene).into_iter().map(|(text, _)| text).collect()
     }
 
     #[test]
@@ -515,7 +586,7 @@ mod tests {
         let texts = texts(&scene);
         assert!(texts.contains(&("文字種 1 / 1".into(), theme.text_muted)));
         assert!(texts.contains(&("カタカナ".into(), theme.selection_text)));
-        assert!(texts.iter().any(|(text, _)| text == "選ぶ"));
+        assert!(texts.iter().any(|(text, _)| text == "選択"));
     }
 
     #[test]

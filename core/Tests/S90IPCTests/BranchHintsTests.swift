@@ -24,6 +24,18 @@ struct BranchHintsTests {
         #expect(BranchHints.make(for: panel, settings: settings).isEmpty)
     }
 
+    @Test("連想の一覧では単語を選ぶ・意味を移る・戻るだけを案内し，見出しと連想の知らせを送る")
+    func association() {
+        var association = panel
+        association.association = AssociationHeading(headword: "速い", label: "速度", group: 1, groupCount: 3)
+        association.associationHint = "Ctrl+Tab 連想"
+        let hints = BranchHints.make(for: association, settings: DefaultSettings.settings)
+        #expect(hints.map(\.label) == ["選択", "意味", "戻る"])
+        let map = WireBranchMap(association, hints: hints)
+        #expect(map.association == WireAssociationHeading(headword: "速い", label: "速度", group: 1, groupCount: 3))
+        #expect(map.associationHint == "Ctrl+Tab 連想")
+    }
+
     @Test("文節を区切っているときは区切る操作だけを案内する")
     func split() {
         var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)

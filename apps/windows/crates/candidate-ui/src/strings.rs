@@ -28,6 +28,14 @@ pub fn variants_position(index: u32, total: u32) -> String {
     format!("文字種 {index} / {total}")
 }
 
+/// 連想の一覧の見出しの前に置く言葉(macOS の UIStrings.Association.headingPrefix)
+pub const ASSOCIATION_PREFIX: &str = "連想";
+
+/// 連想の意味のまとまりの位置
+pub fn association_position(index: u32, total: u32) -> String {
+    format!("{index} / {total}")
+}
+
 pub fn dictionary_source(name: &str) -> String {
     format!("辞書: {name}")
 }
@@ -46,5 +54,5 @@ pub fn candidates_hints() -> Vec<KeyHint> {
 
 /// 文字種の行を選んでいるときの足元の案内
 pub fn variants_hints() -> Vec<KeyHint> {
-    vec![hint("←→", "選ぶ"), hint("↓", "候補")]
+    vec![hint("←→", "選択"), hint("↓", "候補")]
 }

@@ -19,10 +19,10 @@ struct AssociationScenarioTests {
         return settings
     }
 
-    private func harness(_ settings: Settings? = nil, lookup: FakeAssociationLookup? = nil) -> Harness {
+    private func harness(_ settings: Settings? = nil, lookup: FakeAssociationLookup? = nil, keyNames: KeyNameStyle = .mac) -> Harness {
         let converter = FakeConverter(["うつくしい": [("美しい", nil), ("美しき", nil)]], clauses: ["うつくしい": [("美しい", 5), ("美しき", 5)]])
         let lookup = lookup ?? FakeAssociationLookup([Self.dictionary.id: ["美しい": Self.groups]])
-        return Harness(converter: converter, settings: settings ?? makeSettings(), associations: lookup)
+        return Harness(converter: converter, settings: settings ?? makeSettings(), associations: lookup, keyNames: keyNames)
     }
 
     @Test("入力中の Shift+Space で変換し，選んでいる文節を連想の一覧にする．見出しは元の語と意味の説明")
@@ -183,6 +183,12 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.associationHint == "⌃Tab 連想")
         harness.press(.down)
         #expect(harness.lattice?.associationHint == nil)
+
+        // Windows のエンジンでは Windows のキーの書き方で知らせる
+        let windows = self.harness(keyNames: .windows)
+        windows.type("utukusii")
+        windows.press(.space)
+        #expect(windows.lattice?.associationHint == "Ctrl+Tab 連想")
 
         let quiet = self.harness(makeSettings { $0.showsAssociationHint = false })
         quiet.type("utukusii")

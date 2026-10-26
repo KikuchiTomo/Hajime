@@ -109,6 +109,10 @@ struct KeymapTests {
         #expect(KeyStroke(notation: "") == nil)
         #expect(KeyStroke(.character("k"), shift: true, control: true).label == "⌃⇧K")
         #expect(KeyStroke(.function(7), option: true).label == "⌥F7")
+        // Windows の候補ウィンドウと注記は Windows の書き方
+        #expect(KeyStroke(.character("k"), shift: true, control: true).label(style: .windows) == "Ctrl+Shift+K")
+        #expect(KeyStroke(.tab, control: true).label(style: .windows) == "Ctrl+Tab")
+        #expect(KeyStroke(.backspace).label(style: .windows) == "BS")
     }
 
     @Test("R-17: 表は保存して読み直せ，知らないコマンドの行は消さずに残す")
