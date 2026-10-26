@@ -6,15 +6,42 @@ import S90Domain
 ///
 /// 索引のファイルは「見出しの語<タブ>意味の説明<タブ>語<タブ>語…」の行を見出しのバイト順に並べた UTF-8 のテキスト(SortedTabFile)．
 /// まとまりの語ごとに，その語を見出しにした行を書く．見出しが同じ行は取り込んだファイルの順(よく使う意味が先)のまま並べる．
-/// 起動時には読まず，初めて引くときに開く
+/// 起動時には読まず，初めて引くときに開く．
+///
+/// 同梱の辞書(AssociationDictionary.isBundled)は，アプリに入れた取り込む形のファイル(bundledSource)を裏で読んでメモリに置く．
+/// 読み終わるまでと，読めなかったときは何も返さない(連想変換だけが効かなくなり，入力は止めない)
 @MainActor
 public final class AssociationDictionaryStore: AssociationLookup {
     /// 置き場所(Application Support の associations/)
     public let directory: URL
     private var indexes: [String: SortedTabFile] = [:]
+    /// 同梱の辞書のファイル．無ければ同梱の辞書は引けない
+    private let bundledSource: URL?
+    private var bundled: BundledIndex?
+    private var bundledLoading: Task<Void, Never>?
 
-    public init(directory: URL) {
+    public init(directory: URL, bundledSource: URL? = nil) {
         self.directory = directory
+        self.bundledSource = bundledSource
+    }
+
+    /// 同梱の辞書を裏で読み始める．起動時に呼んでおくと，初めて連想変換を使うときに待たない
+    public func preloadBundled() {
+        guard bundledLoading == nil, let source = bundledSource else { return }
+        bundledLoading = Task.detached(priority: .utility) { [weak self] in
+            let index = BundledIndex.load(source)
+            await self?.finishLoading(index)
+        }
+    }
+
+    /// 同梱の辞書を読み終わるまで待つ(試す道具とテストのため)
+    public func waitForBundled() async {
+        preloadBundled()
+        await bundledLoading?.value
+    }
+
+    private func finishLoading(_ index: BundledIndex?) {
+        bundled = index
     }
 
     public func url(for dictionary: AssociationDictionary) -> URL {
@@ -43,6 +70,10 @@ public final class AssociationDictionaryStore: AssociationLookup {
     }
 
     public func groups(for word: String, in dictionary: AssociationDictionary) -> [AssociationGroup] {
+        if dictionary.isBundled {
+            preloadBundled()
+            return bundled?.groups(for: word) ?? []
+        }
         guard dictionary.hasValidIdentity, let index = index(for: dictionary) else { return [] }
         return index.lines(withKey: word).compactMap(Self.parse)
     }
@@ -62,5 +93,31 @@ public final class AssociationDictionaryStore: AssociationLookup {
         let others = Array(columns.dropFirst(2))
         guard AssociationGroup(label: columns[1], words: [columns[0]] + others).isValid else { return nil }
         return AssociationGroup(label: columns[1], words: others)
+    }
+}
+
+/// 同梱の辞書をメモリに置いたもの．単語ごとに，その単語を含むまとまりの位置を持つ．作ったあとは変えない
+final class BundledIndex: Sendable {
+    private let groups: [AssociationGroup]
+    private let positions: [String: [Int]]
+
+    init(groups: [AssociationGroup]) {
+        var positions: [String: [Int]] = [:]
+        for (index, group) in groups.enumerated() {
+            for word in group.words { positions[word, default: []].append(index) }
+        }
+        self.groups = groups
+        self.positions = positions
+    }
+
+    /// 読めなければ nil．取り込むときと同じ大きさの上限と形の確かめをする(AssociationFileReader)
+    static func load(_ url: URL) -> BundledIndex? {
+        guard let groups = try? AssociationFileReader.read(from: url) else { return nil }
+        return BundledIndex(groups: groups)
+    }
+
+    /// word を含むまとまり．まとまりの語は word を除いたもの
+    func groups(for word: String) -> [AssociationGroup] {
+        (positions[word] ?? []).map { AssociationGroup(label: groups[$0].label, words: groups[$0].words.filter { $0 != word }) }
     }
 }

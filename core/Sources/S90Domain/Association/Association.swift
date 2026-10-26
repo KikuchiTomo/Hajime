@@ -145,20 +145,35 @@ extension AssociationList: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
-/// 取り込んだ連想の辞書 1 つの設定(R-18)．語そのものは別のファイル(索引)に置き，設定には入れない．
-/// 一覧の並び順が優先度(上ほど先に出す)
+/// 連想の辞書 1 つの設定(R-18)．アプリに同梱した辞書と，利用者が取り込んだ辞書がある．
+/// 語そのものは別のファイル(同梱のファイルか取り込んだ索引)に置き，設定には入れない．一覧の並び順が優先度(上ほど先に出す)
 public struct AssociationDictionary: Sendable, Equatable, Codable, Hashable, Identifiable {
     public var id: String
     public var name: String
     public var isEnabled: Bool
-    /// 取り込んだまとまり(意味)の数
+    /// 取り込んだまとまり(意味)の数．同梱の辞書は 0
     public var groupCount: Int
+    /// アプリに同梱した辞書か．同梱の辞書は消せない(オフにはできる)
+    public var isBundled: Bool
 
-    public init(id: String, name: String, isEnabled: Bool = true, groupCount: Int) {
+    public init(id: String, name: String, isEnabled: Bool = true, groupCount: Int, isBundled: Bool = false) {
         self.id = id
         self.name = name
         self.isEnabled = isEnabled
         self.groupCount = groupCount
+        self.isBundled = isBundled
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, isEnabled, groupCount, isBundled }
+
+    /// 項目を足しても前に保存した設定を読めるよう，無い項目は既定にする
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        groupCount = try container.decodeIfPresent(Int.self, forKey: .groupCount) ?? 0
+        isBundled = try container.decodeIfPresent(Bool.self, forKey: .isBundled) ?? false
     }
 
     /// 索引のファイルの名前．id は取り込むときに作る UUID．設定のファイルを手で書き換えて

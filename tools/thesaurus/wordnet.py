@@ -10,8 +10,8 @@
 - --max-words で 1 つの意味の単語の数を抑える
 - 最後に，取り込んだときの索引のおおよその大きさを標準エラーに出す
 
-データは利用者が https://bond-lab.github.io/wnja/ から取得する．このリポジトリには入れない．
-ライセンス(Japanese WordNet の LICENSE)は，配るときにデータに添える決まり．
+同梱する data/thesaurus/wordnet-ja.tsv は tools/thesaurus/update.sh がこのスクリプトで作る(入手先・バージョン・SHA-256 は update.sh に書く)．
+ライセンス(LICENSES/JapaneseWordNet.txt)は，配るときにデータに添える決まり．
 外から来る XML なので，外部の実体を読まない ElementTree の iterparse で少しずつ読む
 """
 import argparse
@@ -24,6 +24,7 @@ parser.add_argument("destination")
 parser.add_argument("--min-count", type=int, default=0)
 parser.add_argument("--max-words", type=int, default=64)
 parser.add_argument("--label-length", type=int, default=24)
+parser.add_argument("--version", default="")
 options = parser.parse_args()
 
 # synset → [(単語, その意味での回数)]
@@ -82,7 +83,7 @@ for synset, words in members.items():
 groups.sort(key=lambda group: -group[0])
 with open(options.destination, "w", encoding="utf-8", newline="\n") as out:
     out.write("# 日本語 WordNet から作った連想の辞書．意味の説明<タブ>単語<タブ>単語…\n")
-    out.write("# 出典: Japanese WordNet (c) NICT, Francis Bond, Takayuki Kuribayashi．ライセンスは Japanese WordNet の LICENSE\n")
+    out.write(f"# 出典: Japanese WordNet {options.version}(https://bond-lab.github.io/wnja/)．ライセンスは LICENSES/JapaneseWordNet.txt\n")
     for _, label, words in groups:
         out.write(label + "\t" + "\t".join(words) + "\n")
 

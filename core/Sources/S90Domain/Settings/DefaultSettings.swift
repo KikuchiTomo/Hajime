@@ -246,8 +246,13 @@ public enum DefaultSettings {
     /// 連想の一覧に出す語の数(既定)と，選べる範囲
     public static let associationLimit = 60
     public static let associationLimitRange = 10...300
-    /// 取り込める連想の辞書の数の上限
+    /// 取り込める連想の辞書の数の上限(同梱の辞書を含む)
     public static let maximumAssociationDictionaries = 8
+    /// アプリに同梱した連想の辞書(日本語 WordNet から作った data/thesaurus/wordnet-ja.tsv)．既定で一覧の先頭に置く
+    public static let bundledAssociationDictionary = AssociationDictionary(
+        id: "8C1F0E2A-5B7D-4E39-9A61-3D2C4B5E6F70", name: "日本語 WordNet", groupCount: 0, isBundled: true)
+    /// 同梱の連想の辞書のファイルの名前(アプリの中・Windows のインストール先に置く)
+    public static let bundledAssociationFileName = "wordnet-ja.tsv"
     /// 取り込む連想の辞書のファイルの大きさの上限．日本語 WordNet を丸ごと書き出しても 10MB ほどなので余裕を見た大きさ
     public static let maximumAssociationFileBytes = 64 * 1024 * 1024
     /// 連想の辞書 1 つのまとまり(意味)の数の上限

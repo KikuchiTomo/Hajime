@@ -107,7 +107,7 @@ public struct Settings: Sendable, Equatable {
     /// 取り込んだ辞書．並び順が優先度．語は Application Support の dictionaries/ にある索引のファイルに置く
     public var importedDictionaries: [ImportedDictionary] = []
     /// 取り込んだ連想の辞書(R-18)．並び順が優先度．語は Application Support の associations/ にある索引のファイルに置く
-    public var associationDictionaries: [AssociationDictionary] = []
+    public var associationDictionaries: [AssociationDictionary] = [DefaultSettings.bundledAssociationDictionary]
     /// 使い方を記録する(回数だけを端末の中に)
     public var recordsUsage = true
 
@@ -149,8 +149,13 @@ public struct Settings: Sendable, Equatable {
         branchCandidatesPerPage = clamp(branchCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
         associationLimit = clamp(associationLimit, DefaultSettings.associationLimitRange)
         var associationIDs = Set<String>()
-        associationDictionaries = Array(associationDictionaries.filter { $0.hasValidIdentity && associationIDs.insert($0.id).inserted }
-            .prefix(DefaultSettings.maximumAssociationDictionaries))
+        associationDictionaries = associationDictionaries.filter { $0.hasValidIdentity && associationIDs.insert($0.id).inserted }
+            // 同梱の辞書は 1 つだけで，一覧から外れていたら先頭に戻す(消せない．使わないときはオフにする)
+            .filter { $0.isBundled == ($0.id == DefaultSettings.bundledAssociationDictionary.id) }
+        if !associationDictionaries.contains(where: \.isBundled) {
+            associationDictionaries.insert(DefaultSettings.bundledAssociationDictionary, at: 0)
+        }
+        associationDictionaries = Array(associationDictionaries.prefix(DefaultSettings.maximumAssociationDictionaries))
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
         correctionDelay = max(correctionDelay, liveConversionDelay)
