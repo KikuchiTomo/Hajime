@@ -117,3 +117,36 @@ public struct KeyBindings: Sendable, Equatable, Codable {
         return result
     }
 }
+
+/// キーの割り当てのひな形．よくある手の動きで操作できるようにする．変換中の基本の操作(候補・文節・文節の長さ)だけをそろえる
+public enum KeyPreset: String, Sendable, Equatable, CaseIterable {
+    /// s90.tokyo IME の既定
+    case standard
+    /// Windows 風．Space・↓ で次の候補，Shift+Space・↑ で前の候補，←→ で文節，Shift+←→ で文節の長さ．Tab は使わない
+    case windows
+    /// Emacs 風．標準に加えて Control+N・P で候補，Control+F・B で文節を移る
+    case emacs
+
+    public var bindings: KeyBindings {
+        var keys = KeyBindings.standard
+        switch self {
+        case .standard:
+            break
+        case .windows:
+            keys.commands[.nextUncertainSegment] = []
+            keys.commands[.previousUncertainSegment] = []
+            keys.commands[.previousCandidate] = [KeyStroke(.up), KeyStroke(.space, shift: true)]
+        case .emacs:
+            keys.commands[.nextCandidate, default: []] += [KeyStroke(.character("n"), control: true)]
+            keys.commands[.previousCandidate, default: []] += [KeyStroke(.character("p"), control: true)]
+            keys.commands[.nextSegment, default: []] += [KeyStroke(.character("f"), control: true)]
+            keys.commands[.previousSegment, default: []] += [KeyStroke(.character("b"), control: true)]
+        }
+        return keys
+    }
+
+    /// 今の割り当てがどのひな形と同じか．利用者が変えていれば nil
+    public static func matching(_ keys: KeyBindings) -> KeyPreset? {
+        allCases.first { $0.bindings == keys }
+    }
+}

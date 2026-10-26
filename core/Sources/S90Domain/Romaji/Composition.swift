@@ -65,9 +65,13 @@ public struct Composition: Sendable, Equatable {
 
     private let table: RomajiTable
 
-    public init(table: RomajiTable = .standard) {
+    public init(table: RomajiTable = .standard, symbolSequences: SymbolSequenceSet = .standard) {
         self.table = table
+        self.symbolSequences = symbolSequences
     }
+
+    /// 続けて打った記号をまとめる決まり(「->」→「→」)
+    private let symbolSequences: SymbolSequenceSet
 
     public var isEmpty: Bool { kana.isEmpty && pending.isEmpty }
 
@@ -102,9 +106,9 @@ public struct Composition: Sendable, Equatable {
         if pending.isEmpty { recordBoundary() }
     }
 
-    /// 続けて打った記号を 1 つにまとめる(「ー＞」→「→」)．規則は SymbolSequence
+    /// 続けて打った記号を 1 つにまとめる(「ー＞」→「→」)．規則は SymbolSequenceSet
     private mutating func mergeSymbolSequence() {
-        guard pending.isEmpty, let match = SymbolSequence.match(suffixOf: kana) else { return }
+        guard pending.isEmpty, let match = symbolSequences.match(suffixOf: kana) else { return }
         kana.removeLast(match.length)
         kana.append(match.symbol)
         // まとめた記号の途中を指す記録は使えないので外す

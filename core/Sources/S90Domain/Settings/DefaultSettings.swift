@@ -123,4 +123,9 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// ユーザー辞書の語の点数(対数尤度)．辞書の一般的な語より少し上に出る値(azooKey-Desktop と同じ)
     public static let userDictionaryWordCost: Float = -5
+
+    /// 利用者が変えられる記号の決まりの数の上限
+    public static let maximumSymbolRules = 2_000
+    /// 置き換えの決まりと直さない語の数の上限
+    public static let maximumCorrectionRules = 2_000
 }
