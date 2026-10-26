@@ -15,6 +15,7 @@ check:
 	$(PYTHON) .claude/skills/s90-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/protocol/generate.py --check
+	$(PYTHON) tools/tokens/generate_rust.py --check
 
 test:
 	swift test --package-path core
@@ -50,6 +51,7 @@ try:
 tokens:
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/tokens/generate_swift.py
+	$(PYTHON) tools/tokens/generate_rust.py
 
 protocol:
 	$(PYTHON) tools/protocol/generate.py
