@@ -275,18 +275,23 @@ impl TextService_Impl {
     }
 
     fn field_context(&self, context: &ITfContext) -> FieldContext {
-        let (application_id, caret, client_id) = {
+        let (application_id, caret, client_id, wanted) = {
             let inner = self.inner.borrow();
             (
                 inner.application_id.clone(),
                 inner.caret.clone(),
                 inner.client_id,
+                inner
+                    .state
+                    .as_ref()
+                    .and_then(|state| state.preceding_text_length),
             )
         };
+        let field = read_field(context, client_id, wanted.unwrap_or(0));
         FieldContext {
             application_id,
-            is_secure: is_secure_field(context, client_id),
-            preceding_text: None,
+            is_secure: field.is_secure,
+            preceding_text: field.preceding_text,
             caret,
         }
     }
@@ -793,18 +798,36 @@ fn text_rect(ec: u32, context: &ITfContext, composition: &ITfComposition) -> Res
     })
 }
 
-fn is_secure_field(context: &ITfContext, client_id: u32) -> bool {
-    let secure = Rc::new(std::cell::Cell::new(false));
-    let output = secure.clone();
-    let target = context.clone();
-    let _ = edit_session::request(context, client_id, TF_ES_SYNC | TF_ES_READ, move |ec| {
-        output.set(input_scope_is_secure(ec, &target)?);
-        Ok(())
-    });
-    secure.get()
+/// 入力欄について読んだこと．入力位置の前の文字列はログに出さない
+#[derive(Default)]
+struct FieldReading {
+    is_secure: bool,
+    preceding_text: Option<String>,
 }
 
-fn input_scope_is_secure(ec: u32, context: &ITfContext) -> Result<bool> {
+/// 入力欄が秘密の欄か(パスワードなど)と，入力位置の前の文字列(最大 length 文字．UTF-16 で数える)を 1 回の読み取りで読む．
+/// 秘密の欄では前の文字列を読まない
+fn read_field(context: &ITfContext, client_id: u32, length: u32) -> FieldReading {
+    let reading = Rc::new(RefCell::new(FieldReading::default()));
+    let output = reading.clone();
+    let target = context.clone();
+    let _ = edit_session::request(context, client_id, TF_ES_SYNC | TF_ES_READ, move |ec| {
+        let Some(selection) = selection_start(ec, &target)? else {
+            return Ok(());
+        };
+        let secure = input_scope_is_secure(ec, &target, &selection)?;
+        let mut field = output.borrow_mut();
+        field.is_secure = secure;
+        if !secure && length > 0 {
+            field.preceding_text = preceding_text(ec, &selection, length).ok().flatten();
+        }
+        Ok(())
+    });
+    reading.take()
+}
+
+/// 選択の始まりの位置(幅 0 の範囲)
+fn selection_start(ec: u32, context: &ITfContext) -> Result<Option<ITfRange>> {
     let mut selection = [TF_SELECTION {
         range: ManuallyDrop::new(None),
         style: TF_SELECTIONSTYLE {
@@ -815,13 +838,34 @@ fn input_scope_is_secure(ec: u32, context: &ITfContext) -> Result<bool> {
     let mut fetched = 0u32;
     unsafe { context.GetSelection(ec, TF_DEFAULT_SELECTION, &mut selection, &mut fetched)? };
     let [first] = selection;
-    let Some(range) = ManuallyDrop::into_inner(first.range) else {
-        return Ok(false);
-    };
+    let range = ManuallyDrop::into_inner(first.range);
+    if fetched == 0 {
+        return Ok(None);
+    }
+    let Some(range) = range else { return Ok(None) };
+    unsafe { range.Collapse(ec, TF_ANCHOR_START)? };
+    Ok(Some(range))
+}
+
+fn preceding_text(ec: u32, start: &ITfRange, length: u32) -> Result<Option<String>> {
+    let length = length.min(i32::MAX as u32);
+    let mut buffer = vec![0u16; length as usize];
+    let mut fetched = 0u32;
+    unsafe {
+        let range = start.Clone()?;
+        let mut moved = 0;
+        range.ShiftStart(ec, -(length as i32), &mut moved, std::ptr::null())?;
+        range.GetText(ec, 0, &mut buffer, &mut fetched)?;
+    }
+    buffer.truncate(fetched as usize);
+    Ok((!buffer.is_empty()).then(|| String::from_utf16_lossy(&buffer)))
+}
+
+fn input_scope_is_secure(ec: u32, context: &ITfContext, range: &ITfRange) -> Result<bool> {
     unsafe {
         let mut value: VARIANT = context
             .GetProperty(&GUID_PROP_INPUTSCOPE)?
-            .GetValue(ec, &range)?;
+            .GetValue(ec, range)?;
         let inner = &value.Anonymous.Anonymous;
         let scope = if inner.vt == VT_UNKNOWN {
             (*inner.Anonymous.punkVal)

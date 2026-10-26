@@ -84,7 +84,7 @@
 - メッセージには長さの上限を設け，超えたら接続を切る．形式は `protocol/` の定義だけを受け付ける
 - 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` のときだけ受ける
 - 1 つの接続が作れるセッションの数と，全体のセッションの数に上限を設ける．ほかの接続のセッションは使えない(`EngineService`)
-- DLL は入力位置の前の文字列を読まない(Windows では文脈を使う変換をまだ使わないため)
+- DLL は入力位置の前の文字列を，エンジンが頼んだとき(打ち始めのときだけ．最大 `DefaultSettings.maximumLeftContextLength` 字)に読んで `key` の `context` で送る．macOS と同じく，パスワード欄(InputScope)では読まない．DLL の中でもログに出さず，`FieldContext` の Debug は中身を伏せる
 
 ### 入力先のアプリを壊さない
 

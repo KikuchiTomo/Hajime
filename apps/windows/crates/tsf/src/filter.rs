@@ -71,6 +71,7 @@ mod tests {
             is_composing,
             consumed_keys,
             wake_after_milliseconds: None,
+            preceding_text_length: None,
         }
     }
 
