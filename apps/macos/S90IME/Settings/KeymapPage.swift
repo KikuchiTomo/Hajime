@@ -201,9 +201,16 @@ struct KeymapPage: View {
 
     private var table: some View {
         Table(rows, selection: $selection) {
+            // 選んでいる行だけ選択肢を出し，ほかの行は文字で見せる．行ごとに選択肢(60 ほどのコマンド)を作ると開くのに数秒かかる
             TableColumn(Keys.state) { row in
-                statePicker(selection: Binding(get: { row.entry.state }, set: { state in change(row.id) { $0.state = state } }), command: row.entry.command)
-                    .opacity(dimming(row))
+                Group {
+                    if selection.contains(row.id) {
+                        statePicker(selection: Binding(get: { row.entry.state }, set: { state in change(row.id) { $0.state = state } }), command: row.entry.command)
+                    } else {
+                        Text(Keys.label(for: row.entry.state))
+                    }
+                }
+                .opacity(dimming(row))
             }
             .width(DesignTokens.Size.Settings.keymapStateWidth)
             TableColumn(Keys.key) { row in
@@ -214,9 +221,15 @@ struct KeymapPage: View {
             }
             .width(DesignTokens.Size.Settings.keymapKeyWidth)
             TableColumn(Keys.command) { row in
-                commandPicker(selection: Binding(get: { row.entry.command }, set: { command in change(row.id) { $0.command = command } }),
-                              state: row.entry.state)
-                    .opacity(dimming(row))
+                Group {
+                    if selection.contains(row.id) {
+                        commandPicker(selection: Binding(get: { row.entry.command }, set: { command in change(row.id) { $0.command = command } }),
+                                      state: row.entry.state)
+                    } else {
+                        Text(Keys.label(for: row.entry.command)).help(Keys.help(for: row.entry.command) ?? "")
+                    }
+                }
+                .opacity(dimming(row))
             }
             TableColumn("") { row in
                 mark(for: row)
@@ -265,6 +278,9 @@ struct KeymapPage: View {
         if case .hidden? = keymap.overlap(at: row.id) { return Self.hiddenOpacity }
         return 1
     }
+
+    /// 既定の表．描くたびにひな形の行を読み直さないよう，一度だけ作る
+    private static let standardKeymap = KeymapPreset.standard.keymap
 
     /// 使われない行の濃さ(無効の項目と同じくらいの薄さ)
     private static let hiddenOpacity = 0.45
@@ -318,7 +334,7 @@ struct KeymapPage: View {
                 Text(Keys.rowCount(rows.count, keymap.entries.count)).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button(Keys.restore) { confirmsRestore = true }
-                    .disabled(keymap == KeymapPreset.standard.keymap)
+                    .disabled(keymap == Self.standardKeymap)
             }
             Text(Keys.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
