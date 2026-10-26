@@ -30,7 +30,6 @@ struct AzooKeyConverterAdapterTests {
 
     @Test("R-16: 取り込んだ辞書の語を渡すと，文の中の語として候補に出る")
     func auxiliaryWords() throws {
-        // エンジンは自分の辞書にある読みの続きしかたどらないので，辞書にある読みの語で確かめる(読み全体の一致は SupplementedConverter が受け持つ)
         let session = try makeEngine().makeSession()
         let word = AuxiliaryWord(word: DictionaryWord(reading: "でんあつ", word: "電圧ピヨ", wordClass: .noun), costOffset: 0)
         #expect(!session.candidates(for: "でんあつをはかる").contains { $0.text.hasPrefix("電圧ピヨ") })
@@ -38,6 +37,18 @@ struct AzooKeyConverterAdapterTests {
         #expect(session.candidates(for: "でんあつをはかる").contains { $0.text.hasPrefix("電圧ピヨ") })
         session.setAuxiliaryWords([])
         #expect(!session.candidates(for: "でんあつをはかる").contains { $0.text.hasPrefix("電圧ピヨ") })
+    }
+
+    @Test("R-16: 本体の辞書に無い読みの取り込んだ辞書の語も，文の途中で候補に出る")
+    func auxiliaryWordsOutsideDefaultDictionary() throws {
+        // 「ぴえぞでんき」は本体の辞書に 1 語としては無い読み．エンジンが本体の辞書の続きだけをたどると，読み全体と一致したときにしか出ない．
+        // 「ピエゾ」と「電気」をつないだ候補と見分けるため，語は本体の辞書から作れない表記にする
+        let session = try makeEngine().makeSession()
+        let word = AuxiliaryWord(word: DictionaryWord(reading: "ぴえぞでんき", word: "ピヨ圧電", wordClass: .noun), costOffset: 0)
+        #expect(!session.candidates(for: "ぴえぞでんきをつかう").contains { $0.text.contains("ピヨ圧電") })
+        session.setAuxiliaryWords([word])
+        #expect(session.candidates(for: "ぴえぞでんきをつかう").contains { $0.text.contains("ピヨ圧電") })
+        #expect(session.candidates(for: "これはぴえぞでんきをつかう").contains { $0.text.contains("ピヨ圧電") })
     }
 
     @Test("空の読みには何も返さない")
