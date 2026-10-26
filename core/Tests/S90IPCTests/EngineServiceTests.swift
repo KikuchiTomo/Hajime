@@ -252,7 +252,7 @@ struct EngineServiceTests {
             Issue.record("手書きのキーを受けない")
             return
         }
-        #expect(sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600)))
+        #expect(sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600, recognitionTimeoutMilliseconds: 3000)))
         #expect(state.wakeAfterMilliseconds == EngineService.handwritingPollMilliseconds)
         // 選ぶ前の wake は何も入れず，取りに来続ける
         guard case .edit(_, let none, let waiting) = wake(session, from: id) else {
@@ -300,7 +300,7 @@ struct EngineServiceTests {
         let id = greeted()
         let session = try open(id)
         _ = openHandwriting(session: session, from: id)
-        #expect(!sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600)))
+        #expect(!sent.value.contains(.showHandwriting(anchor: Self.field.caret, recognitionDelayMilliseconds: 600, recognitionTimeoutMilliseconds: 3000)))
         guard case .edit(_, _, let state) = wake(session, from: id) else {
             Issue.record("wake に答えない")
             return
@@ -332,7 +332,7 @@ struct EngineServiceTests {
         _ = openHandwriting(session: session, from: id)
         #expect(service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: id).body == .error(code: .malformed))
         let window = candidateWindow()
-        for text in ["", String(repeating: "あ", count: EngineService.maximumHandwritingTextLength + 1), "a\n", "\u{202E}a"] {
+        for text in ["", String(repeating: "あ", count: DefaultSettings.maximumHandwritingTextLength + 1), "a\n", "\u{202E}a"] {
             #expect(service.handle(WireRequest(id: 33, body: .handwritingChosen(text: text)), from: window).body == .error(code: .malformed))
         }
         guard case .edit(_, let operations, _) = wake(session, from: id) else {

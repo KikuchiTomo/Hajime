@@ -911,13 +911,13 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
     case showNote(text: String, anchor: WireRect?)
     case showMode(mode: WireInputMode, anchor: WireRect?)
-    case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32)
+    case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32, recognitionTimeoutMilliseconds: UInt32)
     case hideHandwriting
     case move(anchor: WireRect)
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, text, mode, recognitionDelayMilliseconds
+        case type, protocolVersion, presentation, list, anchor, map, text, mode, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds
     }
 
     public init(from decoder: any Decoder) throws {
@@ -937,7 +937,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
         case "showMode":
             self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showHandwriting":
-            self = try .showHandwriting(anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), recognitionDelayMilliseconds: container.decode(UInt32.self, forKey: .recognitionDelayMilliseconds))
+            self = try .showHandwriting(anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), recognitionDelayMilliseconds: container.decode(UInt32.self, forKey: .recognitionDelayMilliseconds), recognitionTimeoutMilliseconds: container.decode(UInt32.self, forKey: .recognitionTimeoutMilliseconds))
         case "hideHandwriting":
             self = .hideHandwriting
         case "move":
@@ -974,10 +974,11 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode("showMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
             try container.encodeIfPresent(anchor, forKey: .anchor)
-        case .showHandwriting(let anchor, let recognitionDelayMilliseconds):
+        case .showHandwriting(let anchor, let recognitionDelayMilliseconds, let recognitionTimeoutMilliseconds):
             try container.encode("showHandwriting", forKey: .type)
             try container.encodeIfPresent(anchor, forKey: .anchor)
             try container.encode(recognitionDelayMilliseconds, forKey: .recognitionDelayMilliseconds)
+            try container.encode(recognitionTimeoutMilliseconds, forKey: .recognitionTimeoutMilliseconds)
         case .hideHandwriting:
             try container.encode("hideHandwriting", forKey: .type)
         case .move(let anchor):

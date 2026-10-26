@@ -223,6 +223,7 @@ pub mod size {
         pub const WIDTH: f32 = 284.0;
         pub const HEIGHT: f32 = 332.0;
         pub const CANVAS_SIZE: f32 = 260.0;
+        pub const ANCHOR_GAP: f32 = 4.0;
         pub const CANVAS_PADDING: f32 = 12.0;
         pub const STROKE_WIDTH: f32 = 5.0;
         pub const FRAME_WIDTH: f32 = 1.0;

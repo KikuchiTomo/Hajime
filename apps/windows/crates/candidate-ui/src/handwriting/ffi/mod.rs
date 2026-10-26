@@ -14,10 +14,8 @@ use recognizer::{Outcome, Recognizer};
 use render::{Fonts, Renderer};
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use window::{Event, Window};
-
-/// 入力位置と窓のあいだの隙間(ピクセル)
-const ANCHOR_GAP: i32 = 4;
 
 type Results = Arc<Mutex<Option<(u64, Outcome)>>>;
 
@@ -33,6 +31,7 @@ struct Controller {
     fonts: Option<Fonts>,
     theme: Option<ResolvedTheme>,
     delay: u32,
+    timeout: Duration,
     unavailable: bool,
     visible: bool,
 }
@@ -45,11 +44,13 @@ thread_local! {
 pub fn show(
     anchor: Option<Rect>,
     recognition_delay_milliseconds: u32,
+    recognition_timeout_milliseconds: u32,
     theme: ResolvedTheme,
     font_size: f32,
 ) {
     with_controller(|controller| {
         controller.delay = recognition_delay_milliseconds;
+        controller.timeout = Duration::from_millis(u64::from(recognition_timeout_milliseconds));
         controller.fonts = controller.renderer.fonts(font_size).ok();
         controller.theme = Some(theme);
         controller.ink.clear();
@@ -119,6 +120,7 @@ impl Controller {
             fonts: None,
             theme: None,
             delay: 0,
+            timeout: Duration::ZERO,
             unavailable: false,
             visible: false,
         })
@@ -152,7 +154,11 @@ impl Controller {
             }
             Event::RecognizeNow => {
                 if let Some(recognizer) = &self.recognizer {
-                    recognizer.recognize(self.ink.generation(), self.ink.strokes().to_vec());
+                    recognizer.recognize(
+                        self.ink.generation(),
+                        self.ink.strokes().to_vec(),
+                        self.timeout,
+                    );
                 } else {
                     self.unavailable = true;
                     self.repaint();
@@ -254,7 +260,13 @@ impl Controller {
         let scale = self.window.scale();
         let width = (layout.width * scale).ceil() as i32;
         let height = (layout.height * scale).ceil() as i32;
-        let (x, y) = origin(caret, Window::work_area(caret), width, height, ANCHOR_GAP);
+        let (x, y) = origin(
+            caret,
+            Window::work_area(caret),
+            width,
+            height,
+            (tokens::size::handwriting::ANCHOR_GAP * scale).round() as i32,
+        );
         self.window.show_at(x, y, width, height);
         self.visible = true;
     }

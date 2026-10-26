@@ -1,10 +1,12 @@
 use crate::handwriting::ink::{merge_segments, Point};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::time::{Duration, Instant};
 use windows::Foundation::Point as InkPoint;
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 use windows::UI::Input::Inking::{InkManager, InkRecognitionTarget, InkStrokeBuilder};
 use windows_collections::IIterable;
 use windows_core::Result;
+use windows_future::AsyncStatus;
 
 /// 認識の結果
 pub enum Outcome {
@@ -17,7 +19,11 @@ pub enum Outcome {
 struct Job {
     generation: u64,
     strokes: Vec<Vec<Point>>,
+    timeout: Duration,
 }
+
+/// 認識の終わりを確かめる間隔
+const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// 書いた線を Windows の手書き認識(Windows.UI.Input.Inking)で読む．端末の中だけで読み，通信しない．
 /// 認識は待つことがあるので，窓のスレッドを止めないよう別のスレッドで行う
@@ -35,10 +41,12 @@ impl Recognizer {
         Ok(Self { jobs })
     }
 
-    pub fn recognize(&self, generation: u64, strokes: Vec<Vec<Point>>) {
+    /// timeout を過ぎても読み終わらなければ，読むのをやめて候補を空にする
+    pub fn recognize(&self, generation: u64, strokes: Vec<Vec<Point>>, timeout: Duration) {
         let _ = self.jobs.send(Job {
             generation,
             strokes,
+            timeout,
         });
     }
 }
@@ -51,7 +59,7 @@ fn run(jobs: &Receiver<Job>, done: &dyn Fn(u64, Outcome)) {
         while let Ok(newer) = jobs.try_recv() {
             job = newer;
         }
-        let outcome = match recognize(&job.strokes) {
+        let outcome = match recognize(&job.strokes, job.timeout) {
             Ok(Some(candidates)) => Outcome::Candidates(candidates),
             Ok(None) => Outcome::Unavailable,
             Err(_) => Outcome::Candidates(Vec::new()),
@@ -61,7 +69,7 @@ fn run(jobs: &Receiver<Job>, done: &dyn Fn(u64, Outcome)) {
 }
 
 /// 日本語の認識器が無ければ None
-fn recognize(strokes: &[Vec<Point>]) -> Result<Option<Vec<String>>> {
+fn recognize(strokes: &[Vec<Point>], timeout: Duration) -> Result<Option<Vec<String>>> {
     let manager = InkManager::new()?;
     let recognizers = manager.GetRecognizers()?;
     let mut japanese = None;
@@ -96,7 +104,16 @@ fn recognize(strokes: &[Vec<Point>]) -> Result<Option<Vec<String>>> {
         let stroke = builder.CreateStroke(&IIterable::<InkPoint>::from(points))?;
         manager.AddStroke(&stroke)?;
     }
-    let results = manager.RecognizeAsync(InkRecognitionTarget::All)?.join()?;
+    let operation = manager.RecognizeAsync(InkRecognitionTarget::All)?;
+    let deadline = Instant::now() + timeout;
+    while operation.Status()? == AsyncStatus::Started {
+        if Instant::now() >= deadline {
+            let _ = operation.Cancel();
+            return Ok(Some(Vec::new()));
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
+    let results = operation.GetResults()?;
     let mut segments = Vec::new();
     for index in 0..results.Size()? {
         let texts = results.GetAt(index)?.GetTextCandidates()?;

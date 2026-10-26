@@ -153,7 +153,7 @@
     },
     { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
-    { "type": "showHandwriting", "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }, "recognitionDelayMilliseconds": 600 },
+    { "type": "showHandwriting", "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }, "recognitionDelayMilliseconds": 600, "recognitionTimeoutMilliseconds": 3000 },
     { "type": "hideHandwriting" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },
     { "type": "hide" }

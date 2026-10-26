@@ -218,6 +218,7 @@ impl App {
             UiCommand::ShowHandwriting {
                 anchor,
                 recognition_delay_milliseconds,
+                recognition_timeout_milliseconds,
             } => {
                 // 手書きの窓はすりガラスにしない(書く欄の地が透けないように)
                 let theme = ResolvedTheme::resolve(
@@ -228,6 +229,7 @@ impl App {
                 crate::handwriting::ffi::show(
                     anchor.or(self.anchor.clone()),
                     recognition_delay_milliseconds,
+                    recognition_timeout_milliseconds,
                     theme,
                     self.presentation.font_size as f32,
                 );

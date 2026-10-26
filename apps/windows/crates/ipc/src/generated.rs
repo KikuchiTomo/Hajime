@@ -802,6 +802,8 @@ pub enum UiCommand {
         anchor: Option<Rect>,
         #[serde(rename = "recognitionDelayMilliseconds")]
         recognition_delay_milliseconds: u32,
+        #[serde(rename = "recognitionTimeoutMilliseconds")]
+        recognition_timeout_milliseconds: u32,
     },
     HideHandwriting,
     Move {
@@ -841,10 +843,11 @@ impl fmt::Debug for UiCommand {
                 .field("mode", mode)
                 .field("anchor", anchor)
                 .finish(),
-            Self::ShowHandwriting { anchor, recognition_delay_milliseconds, .. } => f
+            Self::ShowHandwriting { anchor, recognition_delay_milliseconds, recognition_timeout_milliseconds, .. } => f
                 .debug_struct("ShowHandwriting")
                 .field("anchor", anchor)
                 .field("recognitionDelayMilliseconds", recognition_delay_milliseconds)
+                .field("recognitionTimeoutMilliseconds", recognition_timeout_milliseconds)
                 .finish(),
             Self::HideHandwriting => f.write_str("HideHandwriting"),
             Self::Move { anchor, .. } => f

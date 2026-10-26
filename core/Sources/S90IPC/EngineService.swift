@@ -10,9 +10,7 @@ public final class EngineService {
     public static let maximumSessionsPerConnection = 64
     public static let maximumSessions = 1024
     /// 手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔
-    public static let handwritingPollMilliseconds: UInt32 = 150
-    /// 手書きの窓から受け取る文字の長さの上限
-    public static let maximumHandwritingTextLength = 16
+    public static let handwritingPollMilliseconds = milliseconds(DefaultSettings.handwritingPollInterval)
 
     private struct Connection {
         var hasGreeted = false
@@ -340,7 +338,8 @@ public final class EngineService {
 
     private func openHandwriting(for session: UInt32, anchor: WireRect?) {
         handwriting = Handwriting(session: session)
-        ui(.showHandwriting(anchor: anchor, recognitionDelayMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionDelay)))
+        ui(.showHandwriting(anchor: anchor, recognitionDelayMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionDelay),
+                            recognitionTimeoutMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionTimeout)))
     }
 
     private func closeHandwriting(ofSession session: UInt32) {
@@ -351,7 +350,7 @@ public final class EngineService {
 
     /// 手書きの窓の候補として受け取ってよい文字列か．空・長すぎる・制御文字を含むものは断る
     static func isValidHandwritingText(_ text: String) -> Bool {
-        !text.isEmpty && text.count <= maximumHandwritingTextLength
+        !text.isEmpty && text.count <= DefaultSettings.maximumHandwritingTextLength
             && !text.unicodeScalars.contains { $0.properties.generalCategory == .control || $0.properties.generalCategory == .format }
     }
 
