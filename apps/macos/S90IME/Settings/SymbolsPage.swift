@@ -21,7 +21,7 @@ struct SymbolsPage: View {
             RuleListEditor(
                 labels: .init(key: isSequence ? UIStrings.Features.input : UIStrings.Features.readingInput,
                               value: isSequence ? UIStrings.Features.output : UIStrings.Features.readingOutput,
-                              empty: UIStrings.Features.symbolsEmpty, emptyHint: UIStrings.Features.symbolsEmptyHint),
+                              empty: UIStrings.Features.symbolsEmpty),
                 items: Self.items(kind, rules: model.settings.symbolRules),
                 problem: { input, output in
                     SymbolRule(kind: kind, input: input, output: output).isValid

@@ -36,7 +36,6 @@ struct RuleListEditor: View {
         var valuePrompt: String?
         /// 一覧が空のときの見出しと説明
         var empty: String
-        var emptyHint: String
     }
 
     let labels: Labels
@@ -218,7 +217,7 @@ struct RuleListEditor: View {
     @ViewBuilder
     private var emptyState: some View {
         if items.isEmpty {
-            ContentUnavailableView(labels.empty, systemImage: "list.bullet.rectangle", description: Text(labels.emptyHint))
+            ContentUnavailableView(labels.empty, systemImage: "list.bullet.rectangle")
         } else if shownItems.isEmpty {
             ContentUnavailableView.search(text: query)
         }

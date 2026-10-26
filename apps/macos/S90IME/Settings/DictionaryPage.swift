@@ -34,7 +34,7 @@ private struct UserWordsView: View {
             Section {
                 RuleListEditor(
                     labels: .init(key: UIStrings.Settings.reading, value: UIStrings.Settings.word,
-                                  empty: UIStrings.Settings.dictionaryEmpty, emptyHint: UIStrings.Settings.dictionaryEmptyHint),
+                                  empty: UIStrings.Settings.dictionaryEmpty),
                     items: model.settings.userDictionary.map { RuleItem(id: "\($0.reading)\t\($0.word)", key: $0.reading, value: $0.word) },
                     problem: { reading, word in
                         UserDictionaryEntry(reading: reading, word: word).isValid ? nil : UIStrings.Settings.invalidEntry
