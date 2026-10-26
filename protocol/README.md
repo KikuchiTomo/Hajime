@@ -42,3 +42,4 @@ TSF の DLL ──Request──→ s90-engine-host ──UiCommand──→ 候�
 - DLL はキーを `key` で送り，返った `edit` の `operations` を入力欄に反映する．`state` は OnTestKeyDown に答えるための写し
 - 候補・分岐図・案内・モードの札はエンジンが候補ウィンドウに直接送る．DLL は入力位置(`caret`)だけを知らせる
 - 設定の画面(`s90-settings.exe`)は `readSettingsFields`・`writeSettingsFields` で，設定の項目を設定のファイル(`settings.json`)と同じ名前と JSON の形で読み書きする．値は文字列に入れた JSON のオブジェクトで，項目を足しても定義は変えない．キー設定のひな形は `readKeymapPreset`，表の知らせ(使われない行・文字を打てなくなる行・キーの無い確定と取り消し)は `checkKeymap` で頼む
+- 設定のファイルの外にあるものは別の要求で頼む．学習を消す `resetLearning`，使い方の記録 `readUsage`・`resetUsage`，英語と日本語の「試す」`previewLanguage`，ユーザー辞書 `readUserDictionary`(ページごと．1 回 500 語まで)・`addUserDictionaryEntry`・`removeUserDictionaryEntry`・`mergeUserDictionary`(取り込み)．ユーザー辞書は大きくなるので `readSettingsFields` では読まない
