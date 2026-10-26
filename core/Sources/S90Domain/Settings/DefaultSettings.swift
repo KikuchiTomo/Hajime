@@ -130,4 +130,7 @@ public enum DefaultSettings {
     public static let maximumSymbolRules = 2_000
     /// 置き換えの決まりと直さない語の数の上限
     public static let maximumCorrectionRules = 2_000
+
+    /// 手書きの線を書き終えてから認識するまで待つ時間(秒)．続けて書く線を待つ
+    public static let handwritingRecognitionDelay = 0.6
 }

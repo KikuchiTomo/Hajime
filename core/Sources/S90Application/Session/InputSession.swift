@@ -88,9 +88,15 @@ public final class InputSession {
             return KeyResult(handled: false, actions: commitAll())
         }
         // 設定を開く・ライブ変換を切り替えるキー．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
-        if mode == .japanese, let command = settings.current.conversionKeys.command(for: event), command.isGlobal {
+        if mode == .japanese, let command = settings.current.conversionKeys.command(for: event), command.isGlobal,
+            command != .handwriting || settings.current.handwriting {
             let actions = commitAll()
-            return KeyResult(handled: true, actions: actions + [command == .openSettings ? .openSettings : .toggleLiveConversion])
+            let action: ClientAction = switch command {
+            case .openSettings: .openSettings
+            case .handwriting: .showHandwriting
+            default: .toggleLiveConversion
+            }
+            return KeyResult(handled: true, actions: actions + [action])
         }
         if context.profile == .direct {
             // IME を使わないアプリ(除外設定)では，日本語のモードでも英数のまま入れる
@@ -858,7 +864,7 @@ public final class InputSession {
         // キーの割り当ては設定で変えられる(KeyBindings)
         if let command = settings.current.conversionKeys.command(for: event) {
             switch command {
-            case .openSettings, .toggleLiveConversion:
+            case .openSettings, .toggleLiveConversion, .handwriting:
                 // route が先に受ける
                 break
             case .nextCandidate: lattice.moveSelection(by: 1)

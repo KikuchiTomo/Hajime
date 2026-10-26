@@ -77,3 +77,16 @@ public protocol UsageReading: AnyObject {
     var counts: UsageCounts { get }
     func reset()
 }
+
+/// 郵便番号から住所を引くポート(R-13)．表は端末の中にあり，通信しない
+@MainActor
+public protocol PostalCodeLooking: AnyObject {
+    /// 7 桁の郵便番号の住所．無ければ空
+    func addresses(for code: String) -> [String]
+}
+
+/// 手書きの線から文字を探すポート(R-14)．端末の中だけで認識し，通信しない
+public protocol HandwritingRecognizing: Sendable {
+    /// 線(点の並び．左上が原点)を認識して，よさそうな順に文字列を返す
+    func recognize(strokes: [[Point]], canvasSize: Size) async -> [String]
+}

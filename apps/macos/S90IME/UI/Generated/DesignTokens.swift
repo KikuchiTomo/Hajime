@@ -165,6 +165,12 @@ enum DesignTokens {
             static let modeIndicatorSize: CGFloat = 34
             static let modeIndicatorFontSize: CGFloat = 17
         }
+        enum Handwriting {
+            static let width: CGFloat = 360
+            static let height: CGFloat = 330
+            static let canvasHeight: CGFloat = 260
+            static let strokeWidth: CGFloat = 5
+        }
     }
     enum Motion {
         enum ModeIndicator {

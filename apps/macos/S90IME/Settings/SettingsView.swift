@@ -52,7 +52,8 @@ struct SettingsView: View {
             case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect,
                           UIStrings.Features.modeKeysSection, UIStrings.Features.eisuKey, UIStrings.Features.kanaKey, UIStrings.Features.hankakuZenkakuKey]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana,
-                               UIStrings.Features.calculation, UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion]
+                               UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
+                               UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion]
             case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
             case .keys: [UIStrings.Features.preset, UIStrings.Keys.label(for: .openSettings)]
@@ -198,6 +199,8 @@ private struct ConversionTab: View {
             }
             Section(UIStrings.Settings.specialConversion) {
                 ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)
+                ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
+                ResettableToggle(model: model, title: UIStrings.Features.handwriting, keyPath: \.handwriting)
                 Toggle(UIStrings.Settings.dateConversion, isOn: model.binding(\.dateConversion))
                 Toggle(UIStrings.Settings.symbolConversion, isOn: model.binding(\.symbolConversion))
                 Toggle(UIStrings.Settings.emojiConversion, isOn: model.binding(\.emojiConversion))

@@ -63,6 +63,7 @@ enum UIStrings {
             switch command {
             case .openSettings: "設定を開く"
             case .toggleLiveConversion: "ライブ変換の切り替え"
+            case .handwriting: "手書き入力"
             case .nextCandidate: "次の候補"
             case .previousCandidate: "前の候補"
             case .nextSegment: "右の文節"
@@ -309,6 +310,11 @@ enum UIStrings {
         }
 
         static let calculation = "計算"
+        static let postalCode = "郵便番号から住所に変換"
+        static let handwriting = "手書き入力"
+        static let handwritingTitle = "手書き入力"
+        static let handwritingClear = "消去"
+        static let handwritingPrompt = "ここに文字を書いてください"
         static let misreadings = "読み違いの候補"
         static let preset = "ひな形"
         static let customPreset = "カスタム"

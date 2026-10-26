@@ -26,7 +26,8 @@ ALLOWED: dict[str, set[str]] = {
         # Zenzai のモデルのハッシュを確かめるため(OS の標準のライブラリ)
         "CryptoKit",
     },
-    "S90Persistence": {"Foundation", "S90Domain", "S90Application"},
+    # Vision と CoreGraphics は手書きの認識(端末の中だけ．VisionHandwritingRecognizer)に使う
+    "S90Persistence": {"Foundation", "S90Domain", "S90Application", "CoreGraphics", "Vision"},
     "S90IPC": {"Foundation", "S90Domain", "S90Application"},
     "s90-playground": {"Foundation", "S90Domain", "S90Application", "S90Engine", "S90Persistence"},
     "s90-engine-host": {

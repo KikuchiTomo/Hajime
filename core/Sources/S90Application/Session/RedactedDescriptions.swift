@@ -17,6 +17,7 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .showNote(let text): "showNote(length: \(text.count))"
         case .openSettings: "openSettings"
         case .toggleLiveConversion: "toggleLiveConversion"
+        case .showHandwriting: "showHandwriting"
         }
     }
 

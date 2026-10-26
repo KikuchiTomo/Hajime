@@ -20,6 +20,8 @@ public enum ClientAction: Sendable, Equatable {
     case openSettings
     /// ライブ変換を切り替える(設定に保存する)
     case toggleLiveConversion
+    /// 手書きで文字を探す窓を出す(R-14)．選んだ文字は commit と同じく入力先に入れる
+    case showHandwriting
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
     case showNote(String)
 }
