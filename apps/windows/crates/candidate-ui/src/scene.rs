@@ -952,6 +952,7 @@ mod tests {
             usage_note: None,
             alternative_notes: vec![None, Some("修正".into())],
             source_name: None,
+            split: None,
         }
     }
 
