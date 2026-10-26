@@ -288,6 +288,8 @@ pub struct SettingsSnapshot {
     pub shows_key_hints: bool,
     #[serde(rename = "candidateFontSize")]
     pub candidate_font_size: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handwriting: Option<bool>,
 }
 
 impl fmt::Debug for SettingsSnapshot {
@@ -299,6 +301,7 @@ impl fmt::Debug for SettingsSnapshot {
             .field("showsModeIndicator", &self.shows_mode_indicator)
             .field("showsKeyHints", &self.shows_key_hints)
             .field("candidateFontSize", &self.candidate_font_size)
+            .field("handwriting", &self.handwriting)
             .finish()
     }
 }
@@ -439,6 +442,10 @@ pub enum RequestBody {
         session: u32,
         context: FieldContext,
     },
+    OpenHandwriting {
+        session: u32,
+        context: FieldContext,
+    },
     Caret {
         session: u32,
         rect: Rect,
@@ -520,6 +527,11 @@ impl fmt::Debug for RequestBody {
                 .finish(),
             Self::Wake { session, context, .. } => f
                 .debug_struct("Wake")
+                .field("session", session)
+                .field("context", context)
+                .finish(),
+            Self::OpenHandwriting { session, context, .. } => f
+                .debug_struct("OpenHandwriting")
                 .field("session", session)
                 .field("context", context)
                 .finish(),

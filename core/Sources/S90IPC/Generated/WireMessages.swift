@@ -387,14 +387,16 @@ public struct WireSettingsSnapshot: Sendable, Equatable, Codable {
     public var showsModeIndicator: Bool
     public var showsKeyHints: Bool
     public var candidateFontSize: Double
+    public var handwriting: Bool?
 
-    public init(theme: String, inputStyle: String, liveConversion: Bool, showsModeIndicator: Bool, showsKeyHints: Bool, candidateFontSize: Double) {
+    public init(theme: String, inputStyle: String, liveConversion: Bool, showsModeIndicator: Bool, showsKeyHints: Bool, candidateFontSize: Double, handwriting: Bool? = nil) {
         self.theme = theme
         self.inputStyle = inputStyle
         self.liveConversion = liveConversion
         self.showsModeIndicator = showsModeIndicator
         self.showsKeyHints = showsKeyHints
         self.candidateFontSize = candidateFontSize
+        self.handwriting = handwriting
     }
 }
 
@@ -546,6 +548,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case setMode(session: UInt32, mode: WireInputMode)
     case deactivate(session: UInt32)
     case wake(session: UInt32, context: WireFieldContext)
+    case openHandwriting(session: UInt32, context: WireFieldContext)
     case caret(session: UInt32, rect: WireRect)
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
@@ -587,6 +590,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .deactivate(session: container.decode(UInt32.self, forKey: .session))
         case "wake":
             self = try .wake(session: container.decode(UInt32.self, forKey: .session), context: container.decode(WireFieldContext.self, forKey: .context))
+        case "openHandwriting":
+            self = try .openHandwriting(session: container.decode(UInt32.self, forKey: .session), context: container.decode(WireFieldContext.self, forKey: .context))
         case "caret":
             self = try .caret(session: container.decode(UInt32.self, forKey: .session), rect: container.decode(WireRect.self, forKey: .rect))
         case "readSettings":
@@ -653,6 +658,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode(session, forKey: .session)
         case .wake(let session, let context):
             try container.encode("wake", forKey: .type)
+            try container.encode(session, forKey: .session)
+            try container.encode(context, forKey: .context)
+        case .openHandwriting(let session, let context):
+            try container.encode("openHandwriting", forKey: .type)
             try container.encode(session, forKey: .session)
             try container.encode(context, forKey: .context)
         case .caret(let session, let rect):
@@ -722,6 +731,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .setMode: "WireRequestBody.setMode"
         case .deactivate: "WireRequestBody.deactivate"
         case .wake: "WireRequestBody.wake"
+        case .openHandwriting: "WireRequestBody.openHandwriting"
         case .caret: "WireRequestBody.caret"
         case .readSettings: "WireRequestBody.readSettings"
         case .writeSettings: "WireRequestBody.writeSettings"

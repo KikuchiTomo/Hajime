@@ -170,6 +170,11 @@ public final class EngineService {
         case .wake(let session, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             return wake(session: session, current: current, context: context)
+        case .openHandwriting(let session, let context):
+            // 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く
+            guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            if let caret = context.caret { lastAnchor = caret }
+            return edit(current.input.openHandwriting(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
         case .caret(let session, let rect):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
             lastAnchor = rect
@@ -297,7 +302,7 @@ public final class EngineService {
         let current = settings.current
         return WireSettingsSnapshot(theme: current.theme.rawValue, inputStyle: current.inputStyle.rawValue, liveConversion: current.liveConversion,
                                     showsModeIndicator: current.showsModeIndicator, showsKeyHints: current.showsKeyHints,
-                                    candidateFontSize: current.candidateFontSize)
+                                    candidateFontSize: current.candidateFontSize, handwriting: current.handwriting)
     }
 
     private func owned(_ session: UInt32, by id: ConnectionID) -> Session? {

@@ -356,6 +356,13 @@ public final class InputSession {
     }
 
     /// 表のコマンドを行う．表は状態ごとに効くコマンドだけを返すので，ここではその状態でできることをする
+    /// 入力メニューから手書き入力を開く．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く．
+    /// 手書き入力を使わない設定なら何もしない
+    public func openHandwriting() -> [ClientAction] {
+        guard settings.current.handwriting else { return [] }
+        return commitAll() + [.showHandwriting]
+    }
+
     private func perform(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult {
         if case .association(let list, let origin) = phase, let result = performInAssociation(command, list: list, origin: origin, context: context) {
             return result
