@@ -399,7 +399,6 @@ enum UIStrings {
     }
 
     enum Menu {
-        static let inputStyle = "入力方式"
         static let openSettings = "設定を開く…"
         static let liveConversion = "ライブ変換"
     }

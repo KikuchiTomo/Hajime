@@ -152,12 +152,7 @@ final class S90InputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:)),
-                                        selectInputStyle: #selector(selectInputStyle(_:))))
-    }
-
-    @MainActor @objc func selectInputStyle(_ sender: Any) {
-        menuBuilder.handleSelectInputStyle(sender)
+        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), openSettings: #selector(showPreferences(_:))))
     }
 
     @MainActor @objc func toggleLiveConversion(_ sender: Any) {
