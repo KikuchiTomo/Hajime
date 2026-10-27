@@ -1,9 +1,13 @@
 # s90.tokyo IME
 
 [![CI](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml)
+[![CI Windows](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci-windows.yml)
+[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/s90.tokyo-IME?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/s90.tokyo-IME/releases)
+[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/s90.tokyo-IME?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/s90.tokyo-IME/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B-lightgrey.svg)
 ![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
+![Rust](https://img.shields.io/badge/Rust-1.90-b7410e.svg)
 [![Engine](https://img.shields.io/badge/engine-azooKey%20%2B%20Zenzai-6b4fbb.svg)](https://github.com/azooKey/AzooKeyKanaKanjiConverter)
 
 A Japanese input method for macOS. Kana-kanji conversion uses the [azooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) engine with Zenzai, which picks the first candidate from the sentence and the text before the cursor. A Windows version is in progress.

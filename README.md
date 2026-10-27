@@ -1,9 +1,13 @@
 # s90.tokyo IME
 
 [![CI](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml)
+[![CI Windows](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci-windows.yml)
+[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/s90.tokyo-IME?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/s90.tokyo-IME/releases)
+[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/s90.tokyo-IME?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/s90.tokyo-IME/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B-lightgrey.svg)
 ![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
+![Rust](https://img.shields.io/badge/Rust-1.90-b7410e.svg)
 [![Engine](https://img.shields.io/badge/engine-azooKey%20%2B%20Zenzai-6b4fbb.svg)](https://github.com/azooKey/AzooKeyKanaKanjiConverter)
 
 macOS / Windows / Linux 向けの日本語入力システムです。
@@ -23,13 +27,32 @@ macOS / Windows / Linux 向けの日本語入力システムです。
 
 ## インストール方法
 
-ダウンロードサイト (準備中) からそれぞれの環境に合ったリリースをダウンロードしてください。
+[Releases](https://github.com/KikuchiTomo/s90.tokyo-IME/releases) から，お使いの OS 向けのものをダウンロードしてください．
 
-### Windows / macOS
-最新バージョンをGitHubリリースからダウンロードできます．
+### macOS
 
-### Linux 
-開発中のため提供されていません．
+macOS 14 以降で使えます．
+
+1. `v0.1.2-macos` のような名前のリリースから `.pkg` をダウンロードし，開いてインストールします．開けないと表示されたら，システム設定 > プライバシーとセキュリティ で「このまま開く」を押し，もう一度開いてください．
+2. ログアウトしてログインし直します．
+3. システム設定 > キーボード > 入力ソース の「編集」で「+」を押し，日本語の「s90.tokyo IME」を追加します．
+
+新しいバージョンにするときは，新しい `.pkg` を入れるだけです．
+
+### Windows
+
+Windows 10 22H2 以降の 64 ビット版で使えます．
+
+1. `v0.1.1-windows` のような名前のリリースから `.msi` をダウンロードし，開いてインストールします．SmartScreen の警告が出たら，「詳細情報」から「実行」を選んでください．
+2. サインアウトしてサインインし直します．
+3. 設定 > 時刻と言語 > 言語と地域 で「日本語」の「言語のオプション」を開き，「キーボードの追加」から「s90.tokyo IME」を選びます．
+4. Windows キー + Space で切り替えます．
+
+詳しい手順は [Windows に入れる](docs/user/how-to/install-windows.md) にあります．
+
+### Linux
+
+まだ提供していません．
 
 ## 開発
 
