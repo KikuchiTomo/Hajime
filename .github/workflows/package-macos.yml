@@ -10,6 +10,10 @@ on:
         description: 作るコミット(タグなど)．空なら呼び出したワークフローのコミット
         type: string
         default: ""
+      require-signing:
+        description: Developer ID の署名と公証を必須にする(Releases に置くとき)．Secrets が無ければ作らずに止める
+        type: boolean
+        default: false
     secrets:
       MACOS_CERTIFICATES_P12:
         required: false
@@ -56,9 +60,13 @@ jobs:
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          REQUIRE_SIGNING: ${{ inputs.require-signing }}
         run: |
           if [ -n "$MACOS_CERTIFICATES_P12" ]; then
             tools/macos/ci_signing.sh setup
+          elif [ "$REQUIRE_SIGNING" = "true" ]; then
+            echo "::error::Releases に置く .pkg は Developer ID で署名して公証します．Secrets に証明書と公証の資格情報を入れてください(docs/dev/RELEASE.md)"
+            exit 1
           else
             echo "Developer ID の証明書が Secrets に無いので，アドホック署名で作ります"
           fi

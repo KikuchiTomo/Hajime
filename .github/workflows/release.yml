@@ -49,6 +49,7 @@ jobs:
     uses: ./.github/workflows/package-macos.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
+      require-signing: true
     # 署名と公証に使う Secrets だけを渡す
     secrets:
       MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
