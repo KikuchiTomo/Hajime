@@ -242,6 +242,149 @@ impl<'a> Painter<'a> {
         }
     }
 
+    // MARK: - 案内と札(macOS の NoteDrawing と同じ形)
+
+    /// 案内の頭のアイコン．ほかの知らせにはアイコンを付けない
+    fn note_icon(tone: ipc::NoteTone) -> Option<Icon> {
+        match tone {
+            ipc::NoteTone::Correction => Some(Icon::Sparkle),
+            ipc::NoteTone::Suggestion => Some(Icon::Lightbulb),
+            ipc::NoteTone::Info => None,
+        }
+    }
+
+    fn note_hints(note: &ipc::Note) -> Vec<KeyHint> {
+        match (&note.key, &note.key_action) {
+            (Some(key), Some(action)) => vec![KeyHint {
+                keys: key.clone(),
+                label: action.clone(),
+            }],
+            _ => Vec::new(),
+        }
+    }
+
+    /// 案内の幅．描くときと大きさを求めるときで同じものを使う
+    pub fn note_width(&self, note: &ipc::Note) -> f32 {
+        let mut parts = Vec::new();
+        if Self::note_icon(note.tone).is_some() {
+            parts.push(glass::NOTE_ICON_SIZE);
+        }
+        if !note.title.is_empty() {
+            parts.push(self.width(&note.title, Font::Label));
+        }
+        if let Some(subject) = &note.subject {
+            parts.push(self.width(subject, Font::Label));
+        }
+        let hints = Self::note_hints(note);
+        if !hints.is_empty() {
+            parts.push(self.hints_width(&hints));
+        }
+        parts.iter().sum::<f32>() + glass::NOTE_GAP * parts.len().saturating_sub(1) as f32
+    }
+
+    /// 案内を x から左寄せで描く: 頭のアイコン(補正の色の地の丸)，主な語(補正の色)，
+    /// 対象の字(直す前の字は薄く取り消し線，直した字は文字の色)，キーキャップの札とそのキーでできること
+    pub fn note(&mut self, note: &ipc::Note, x: f32, mid_y: f32) {
+        let theme = self.theme;
+        let mut x = x;
+        if let Some(icon) = Self::note_icon(note.tone) {
+            let frame = Frame::square(
+                Point::new(x + glass::NOTE_ICON_SIZE / 2.0, mid_y),
+                glass::NOTE_ICON_SIZE,
+            );
+            if theme.is_rounded() {
+                self.draws.push(Draw::Ellipse {
+                    frame,
+                    color: theme.correction_tint(),
+                });
+            } else {
+                self.rect(frame, theme.correction_tint());
+            }
+            self.icon(
+                icon,
+                Frame::square(
+                    Point::new(frame.mid_x(), frame.mid_y()),
+                    glass::KEY_FONT_SIZE,
+                ),
+                theme.correction,
+            );
+            x = frame.max_x() + glass::NOTE_GAP;
+        }
+        let row = Frame::new(
+            x,
+            (mid_y - glass::FOOTER_HEIGHT / 2.0).round(),
+            0.0,
+            glass::FOOTER_HEIGHT,
+        );
+        if !note.title.is_empty() {
+            let color = if note.tone == ipc::NoteTone::Info {
+                theme.text_muted
+            } else {
+                theme.correction
+            };
+            self.text(&note.title, Font::Label, color, x, row);
+            x += self.width(&note.title, Font::Label) + glass::NOTE_GAP;
+        }
+        if let Some(subject) = &note.subject {
+            let width = self.width(subject, Font::Label);
+            if note.tone == ipc::NoteTone::Correction {
+                // 直す前の字は，消したことが分かるよう取り消し線で薄く
+                self.text(subject, Font::Label, theme.text_muted, x, row);
+                self.rect(
+                    Frame::new(x, mid_y.round(), width, branch::LINE_WIDTH),
+                    theme.text_muted,
+                );
+            } else {
+                self.text(subject, Font::Label, theme.text, x, row);
+            }
+            x += width + glass::NOTE_GAP;
+        }
+        let hints = Self::note_hints(note);
+        if !hints.is_empty() {
+            self.hints(&hints, x, mid_y);
+        }
+    }
+
+    /// 候補の横の札の幅
+    pub fn tag_width(&self, text: &str) -> f32 {
+        (self.width(text, Font::Label) + glass::TAG_PADDING_X * 2.0).ceil()
+    }
+
+    /// 候補の横の札(「修正」「入力のまま」，取り込んだ辞書の名前)．「修正」は補正の色の地，ほかは控えめな地．
+    /// selected は選んでいる行の上(選択の地)に描くとき
+    pub fn tag(&mut self, text: &str, max_x: f32, mid_y: f32, selected: bool, corrected: bool) {
+        let theme = self.theme;
+        let width = self.tag_width(text);
+        let frame = Frame::new(
+            (max_x - width).round(),
+            (mid_y - glass::TAG_HEIGHT / 2.0).round(),
+            width,
+            glass::TAG_HEIGHT,
+        );
+        let (fill, color) = if selected {
+            (
+                theme.selection_text.with_alpha(opacity::badge::SELECTED),
+                theme.selection_text,
+            )
+        } else if corrected {
+            (theme.correction_tint(), theme.correction)
+        } else {
+            (theme.badge, theme.text_muted)
+        };
+        let radius = if theme.is_rounded() {
+            glass::TAG_RADIUS
+        } else {
+            0.0
+        };
+        self.draws.push(Draw::RoundRect {
+            frame,
+            radius,
+            fill: Some(fill),
+            stroke: None,
+        });
+        self.centered(text, Font::Label, color, frame);
+    }
+
     // MARK: - 足元の案内
 
     /// 案内の幅．描くときと大きさを求めるときで同じものを使う

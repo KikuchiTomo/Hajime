@@ -194,6 +194,17 @@ struct ResolvedTheme {
         font(size: size, weight: .medium)
     }
 
+    /// 案内の主な語(「修正」「もしかして」)の書体
+    func emphasisFont(size: CGFloat) -> NSFont {
+        font(size: size, weight: .semibold)
+    }
+
+    /// 補正の色を薄く敷いた地(候補の横の「修正」の札と，案内の頭のアイコンの丸)
+    var correctionTint: NSColor {
+        let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast || kind == .contrast
+        return correction.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.correctionTagContrast : DesignTokens.Opacity.Glass.correctionTag)
+    }
+
     /// 番号の丸とキーキャップの中の文字．数字の幅をそろえる
     func keyFont(size: CGFloat) -> NSFont {
         typeface == .system ? .monospacedDigitSystemFont(ofSize: size, weight: .semibold) : font(size: size, weight: .semibold)

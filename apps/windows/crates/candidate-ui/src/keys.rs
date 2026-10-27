@@ -17,6 +17,10 @@ pub enum Icon {
     Enter,
     Escape,
     Backspace,
+    /// 案内の頭のアイコン．打ち間違いを直した(macOS の wand.and.stars に当たるきらめき)
+    Sparkle,
+    /// 案内の頭のアイコン．「もしかして」(macOS の lightbulb)
+    Lightbulb,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

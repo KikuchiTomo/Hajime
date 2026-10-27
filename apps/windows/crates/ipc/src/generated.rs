@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 pub const MAXIMUM_MESSAGE_BYTES: usize = 262144;
 
 /// 待つ時間と，返事の遅れを許す数(schema.json の timing)
@@ -1295,6 +1295,41 @@ pub enum CandidateFocus {
     Variants,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteTone {
+    Correction,
+    Suggestion,
+    Info,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct Note {
+    pub tone: NoteTone,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    #[serde(rename = "keyAction")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_action: Option<String>,
+    pub text: String,
+}
+
+impl fmt::Debug for Note {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Note")
+            .field("tone", &self.tone)
+            .field("title", &REDACTED)
+            .field("subject", &REDACTED)
+            .field("key", &REDACTED)
+            .field("keyAction", &REDACTED)
+            .field("text", &REDACTED)
+            .finish()
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssociationHeading {
     pub headword: String,
@@ -1329,7 +1364,7 @@ pub struct CandidateList {
     pub position: u32,
     pub total: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<String>,
+    pub note: Option<Note>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association: Option<AssociationHeading>,
     #[serde(rename = "associationHint")]
@@ -1347,7 +1382,7 @@ impl fmt::Debug for CandidateList {
             .field("focus", &self.focus)
             .field("position", &self.position)
             .field("total", &self.total)
-            .field("note", &REDACTED)
+            .field("note", &self.note)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
             .finish()
@@ -1449,7 +1484,7 @@ pub struct BranchMap {
     pub position: u32,
     pub total: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<String>,
+    pub note: Option<Note>,
     pub hints: Vec<KeyHint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association: Option<AssociationHeading>,
@@ -1464,7 +1499,7 @@ impl fmt::Debug for BranchMap {
             .field("columns", &self.columns)
             .field("position", &self.position)
             .field("total", &self.total)
-            .field("note", &REDACTED)
+            .field("note", &self.note)
             .field("hints", &self.hints)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
@@ -1572,7 +1607,7 @@ pub enum UiCommand {
         anchor: Option<Rect>,
     },
     ShowNote {
-        text: String,
+        note: Note,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
     },
@@ -1619,9 +1654,9 @@ impl fmt::Debug for UiCommand {
                 .field("map", map)
                 .field("anchor", anchor)
                 .finish(),
-            Self::ShowNote { anchor, .. } => f
+            Self::ShowNote { note, anchor, .. } => f
                 .debug_struct("ShowNote")
-                .field("text", &REDACTED)
+                .field("note", note)
                 .field("anchor", anchor)
                 .finish(),
             Self::ShowMode { mode, anchor, .. } => f

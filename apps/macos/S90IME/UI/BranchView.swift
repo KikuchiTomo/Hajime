@@ -89,7 +89,7 @@ final class BranchView: NSView {
 
     /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)
     private var correctedLabelWidth: CGFloat {
-        textWidth(UIStrings.Branch.corrected, font: labelFont) + Size.paddingX / 2
+        NoteDrawing.tagWidth(UIStrings.Branch.corrected, theme: theme) + Size.paddingX / 2
     }
 
     private func layout(for panel: LatticePanel) -> Layout {
@@ -118,7 +118,8 @@ final class BranchView: NSView {
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
         let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Size.paddingX * 3
         // 使い分けや誤用の注釈と，IME からの知らせ(直したことなど)は，枝と足元のあいだに 1 行ずつ出す．キーの案内は消さない
-        let note = [column?.usageNote, panel.note].compactMap { $0.map { textWidth($0, font: labelFont) + Size.paddingX * 2 } }.max() ?? 0
+        let note = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) }]
+            .compactMap { $0.map { $0 + Size.paddingX * 2 } }.max() ?? 0
         let heading = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + metrics.inset * 2 } ?? 0
         let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2, heading)
         let trunkY = metrics.inset + headingHeight(panel) + CGFloat(upperRows) * metrics.rowHeight
@@ -229,7 +230,7 @@ final class BranchView: NSView {
         if let note = panel.note {
             // 打ち間違いを直したことなど，IME が変えたことを知らせる
             let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)
-            drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.correction], x: row.minX, in: row)
+            NoteDrawing.draw(note, x: row.minX, midY: row.midY, theme: theme)
             footerY += metrics.footerHeight
         }
         drawFooter(panel, y: footerY, width: body.width)
@@ -261,9 +262,8 @@ final class BranchView: NSView {
         let to = node.maxX - Size.paddingX - (column.isCorrected ? correctedLabelWidth : 0)
         if column.isCorrected {
             // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
-            let labelColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
-            drawText(UIStrings.Branch.corrected, attributes: [.font: labelFont, .foregroundColor: labelColor],
-                     x: to + Size.paddingX / 2, in: node)
+            NoteDrawing.drawTag(UIStrings.Branch.corrected, maxX: node.maxX - Size.paddingX / 2, midY: node.midY, theme: theme,
+                                selected: !theme.isRounded && column.isFocused)
         }
         if column.isDecided {
             GlassDrawing.drawUnderline(from: from, to: to, y: y, color: theme.isRounded ? theme.textMuted : color, dotted: false, theme: theme)
@@ -394,8 +394,7 @@ final class BranchView: NSView {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
         defer {
             if let note = row.note {
-                let color = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-                drawText(note, attributes: [.font: labelFont, .foregroundColor: color], x: rect.maxX - Size.paddingX - textWidth(note, font: labelFont), in: rect)
+                NoteDrawing.drawTag(note, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: row.isSelected)
             }
         }
         if theme.isRounded {

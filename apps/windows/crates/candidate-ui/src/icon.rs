@@ -69,6 +69,25 @@ const ESCAPE_GAP_FROM: f32 = 195.0;
 const ESCAPE_GAP_TO: f32 = 255.0;
 /// 円を折れ線にするときの 1 周の分け方
 const CIRCLE_STEPS: usize = 36;
+/// ✦ の形(4 つの尖りの星)と，右上の小さな星
+const SPARKLE: Unit = &[
+    (0.4, 0.14),
+    (0.5, 0.48),
+    (0.82, 0.58),
+    (0.5, 0.68),
+    (0.4, 0.94),
+    (0.3, 0.68),
+    (0.04, 0.58),
+    (0.3, 0.48),
+];
+const SPARKLE_SMALL: &[Unit] = &[&[(0.8, 0.06), (0.8, 0.34)], &[(0.66, 0.2), (0.94, 0.2)]];
+/// 電球の球の中心と半径，口金の線
+const BULB_CENTER: (f32, f32) = (0.5, 0.4);
+const BULB_RADIUS: f32 = 0.3;
+const BULB_BASE: &[Unit] = &[
+    &[(0.36, 0.66), (0.36, 0.8), (0.64, 0.8), (0.64, 0.66)],
+    &[(0.4, 0.94), (0.6, 0.94)],
+];
 
 pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
     let place =
@@ -103,6 +122,33 @@ pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
             figures.extend(open(BACKSPACE_CROSS, |p| p));
             figures
         }
+        Icon::Sparkle => {
+            let mut figures = vec![Figure {
+                points: SPARKLE.iter().map(|point| place(*point)).collect(),
+                closed: true,
+            }];
+            figures.extend(open(SPARKLE_SMALL, |p| p));
+            figures
+        }
+        Icon::Lightbulb => {
+            // 球は下を開けた円(口金につなぐ)
+            let arc = (0..=CIRCLE_STEPS)
+                .map(|step| {
+                    let degrees = 120.0 + 300.0 * step as f32 / CIRCLE_STEPS as f32;
+                    let radians = degrees * PI / 180.0;
+                    place((
+                        BULB_CENTER.0 + BULB_RADIUS * radians.cos(),
+                        BULB_CENTER.1 + BULB_RADIUS * radians.sin(),
+                    ))
+                })
+                .collect();
+            let mut figures = vec![Figure {
+                points: arc,
+                closed: false,
+            }];
+            figures.extend(open(BULB_BASE, |p| p));
+            figures
+        }
         Icon::Escape => {
             let span = 360.0 - (ESCAPE_GAP_TO - ESCAPE_GAP_FROM);
             let arc = (0..=CIRCLE_STEPS)
@@ -129,7 +175,7 @@ pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
 mod tests {
     use super::*;
 
-    const ALL: [Icon; 11] = [
+    const ALL: [Icon; 13] = [
         Icon::Up,
         Icon::Down,
         Icon::Left,
@@ -141,6 +187,8 @@ mod tests {
         Icon::Enter,
         Icon::Escape,
         Icon::Backspace,
+        Icon::Sparkle,
+        Icon::Lightbulb,
     ];
 
     #[test]

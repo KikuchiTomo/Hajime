@@ -283,6 +283,11 @@ pub mod size {
         pub const KEYCAP_PART_GAP: f32 = 1.0;
         pub const SHADOW_RADIUS: f32 = 12.0;
         pub const SHADOW_OFFSET_Y: f32 = 3.0;
+        pub const TAG_HEIGHT: f32 = 16.0;
+        pub const TAG_PADDING_X: f32 = 6.0;
+        pub const TAG_RADIUS: f32 = 8.0;
+        pub const NOTE_ICON_SIZE: f32 = 18.0;
+        pub const NOTE_GAP: f32 = 6.0;
     }
     pub mod handwriting {
         pub const WIDTH: f32 = 284.0;
@@ -369,6 +374,8 @@ pub mod opacity {
         pub const BADGE_CONTRAST: f32 = 0.26;
         pub const FOCUS_TINT: f32 = 0.16;
         pub const FOCUS_TINT_CONTRAST: f32 = 0.3;
+        pub const CORRECTION_TAG: f32 = 0.16;
+        pub const CORRECTION_TAG_CONTRAST: f32 = 0.3;
     }
     pub mod rounded {
         pub const BADGE: f32 = 0.12;

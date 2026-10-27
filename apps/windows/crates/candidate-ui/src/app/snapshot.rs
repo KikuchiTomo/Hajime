@@ -114,7 +114,21 @@ fn render_all(output: &Path) -> Result<()> {
             ),
             ("branch-split", scene::branch_map(&split(), &look, &measure)),
             ("mode", scene::mode("あ", &look, &measure)),
-            ("note", scene::note("もしかして: 雰囲気", &look, &measure)),
+            (
+                "note",
+                scene::note(
+                    &ipc::Note {
+                        tone: ipc::NoteTone::Correction,
+                        title: "修正".into(),
+                        subject: Some("オン外します".into()),
+                        key: Some("Esc".into()),
+                        key_action: Some("戻す".into()),
+                        text: "修正「オン外します」　Esc 戻す".into(),
+                    },
+                    &look,
+                    &measure,
+                ),
+            ),
         ];
         for (kind, scene) in scenes {
             let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });

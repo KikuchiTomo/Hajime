@@ -1,5 +1,5 @@
 public enum WireProtocol {
-    public static let version: UInt32 = 1
+    public static let version: UInt32 = 2
     public static let maximumMessageBytes = 262144
     public static let keyResponseMilliseconds = 50
     public static let reconnectMilliseconds = 2000
@@ -1469,6 +1469,40 @@ extension WireCandidateFocus: CustomStringConvertible, CustomDebugStringConverti
     public var debugDescription: String { description }
 }
 
+public enum WireNoteTone: String, Sendable, Equatable, Codable, CaseIterable {
+    case correction
+    case suggestion
+    case info
+}
+
+extension WireNoteTone: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireNoteTone.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WireNote: Sendable, Equatable, Codable {
+    public var tone: WireNoteTone
+    public var title: String
+    public var subject: String?
+    public var key: String?
+    public var keyAction: String?
+    public var text: String
+
+    public init(tone: WireNoteTone, title: String, subject: String? = nil, key: String? = nil, keyAction: String? = nil, text: String) {
+        self.tone = tone
+        self.title = title
+        self.subject = subject
+        self.key = key
+        self.keyAction = keyAction
+        self.text = text
+    }
+}
+
+extension WireNote: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireNote" }
+    public var debugDescription: String { description }
+}
+
 public struct WireAssociationHeading: Sendable, Equatable, Codable {
     public var headword: String
     public var label: String
@@ -1496,11 +1530,11 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var focus: WireCandidateFocus
     public var position: UInt32
     public var total: UInt32
-    public var note: String?
+    public var note: WireNote?
     public var association: WireAssociationHeading?
     public var associationHint: String?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: String? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1594,12 +1628,12 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var columns: [WireBranchColumn]
     public var position: UInt32
     public var total: UInt32
-    public var note: String?
+    public var note: WireNote?
     public var hints: [WireKeyHint]
     public var association: WireAssociationHeading?
     public var associationHint: String?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: String? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -1689,7 +1723,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case setPresentation(presentation: WirePresentation)
     case showCandidates(list: WireCandidateList, anchor: WireRect?)
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
-    case showNote(text: String, anchor: WireRect?)
+    case showNote(note: WireNote, anchor: WireRect?)
     case showMode(mode: WireInputMode, anchor: WireRect?, label: String?)
     case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32, recognitionTimeoutMilliseconds: UInt32)
     case hideHandwriting
@@ -1697,7 +1731,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, text, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds
+        case type, protocolVersion, presentation, list, anchor, map, note, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1713,7 +1747,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
         case "showBranchMap":
             self = try .showBranchMap(map: container.decode(WireBranchMap.self, forKey: .map), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showNote":
-            self = try .showNote(text: container.decode(String.self, forKey: .text), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
+            self = try .showNote(note: container.decode(WireNote.self, forKey: .note), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showMode":
             self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), label: container.decodeIfPresent(String.self, forKey: .label))
         case "showHandwriting":
@@ -1746,9 +1780,9 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode("showBranchMap", forKey: .type)
             try container.encode(map, forKey: .map)
             try container.encodeIfPresent(anchor, forKey: .anchor)
-        case .showNote(let text, let anchor):
+        case .showNote(let note, let anchor):
             try container.encode("showNote", forKey: .type)
-            try container.encode(text, forKey: .text)
+            try container.encode(note, forKey: .note)
             try container.encodeIfPresent(anchor, forKey: .anchor)
         case .showMode(let mode, let anchor, let label):
             try container.encode("showMode", forKey: .type)

@@ -68,7 +68,7 @@ public final class InputSession {
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
     /// 分岐図か一覧の足元に 1 回だけ出す案内(学習から消したとき)
-    private var pendingNote: String?
+    private var pendingNote: Note?
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
 

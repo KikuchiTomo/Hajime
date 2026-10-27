@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "maximumMessageBytes": 262144,
   "timing": {
     "keyResponseMilliseconds": 50,
@@ -1492,6 +1492,45 @@
       ]
     },
     {
+      "name": "NoteTone",
+      "kind": "enum",
+      "cases": [
+        "correction",
+        "suggestion",
+        "info"
+      ]
+    },
+    {
+      "name": "Note",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "tone",
+          "type": "NoteTone"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "subject",
+          "type": "string?"
+        },
+        {
+          "name": "key",
+          "type": "string?"
+        },
+        {
+          "name": "keyAction",
+          "type": "string?"
+        },
+        {
+          "name": "text",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "AssociationHeading",
       "kind": "struct",
       "fields": [
@@ -1547,7 +1586,7 @@
         },
         {
           "name": "note",
-          "type": "string?"
+          "type": "Note?"
         },
         {
           "name": "association",
@@ -1671,7 +1710,7 @@
         },
         {
           "name": "note",
-          "type": "string?"
+          "type": "Note?"
         },
         {
           "name": "hints",
@@ -1830,8 +1869,8 @@
           "name": "showNote",
           "fields": [
             {
-              "name": "text",
-              "type": "string"
+              "name": "note",
+              "type": "Note"
             },
             {
               "name": "anchor",
