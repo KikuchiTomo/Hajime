@@ -59,7 +59,10 @@ struct LatencyProbeTests {
         let zenzai = try ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai)
         engine.warmUp()
-        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings())
+        // アプリと同じく，記号・日付・送り仮名などの候補を足す変換器(SupplementedConverter)を通して測る
+        let settings = FakeSettings()
+        let converter = SupplementedConverter(engine.makeSession(), settings: settings, calendar: FakeCalendar())
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings)
         _ = session.handle(KeyEvent(.character("a")), context: InputContext())
         _ = session.handle(KeyEvent(.escape), context: InputContext())
         let keys = Array("kinouhatomodatitoeigawominiittekaerinikissatendekohiwonondekaraiedeyuuhanwotabemasita")
