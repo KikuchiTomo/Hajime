@@ -106,10 +106,19 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
         return context.makeImage()
     }
 
+    /// Vision の認識を動かすキュー．認識は終わるまでスレッドを止めるので，Swift の並行処理のスレッドでは動かさない
+    /// (スレッドの少ない環境では，止まったスレッドを Vision の中の仕事が待ち合い，認識が終わらなくなった)
+    private static let queue = DispatchQueue(label: "tokyo.s90.handwriting.vision", qos: .userInitiated)
+
     /// 画像の文字を読む．よさそうな順に，重ねずに返す．
-    /// どのアクターにも属さない async 関数なので，呼んだ側(手書きの窓のメインスレッド)の外で動く
-    static func recognize(image: CGImage) async -> [String] {
-        recognizeSynchronously(image: image)
+    /// 認識は専用のキューで動かし，DefaultSettings.handwritingRecognitionTimeout を過ぎたら候補なしで返す(入力を止めない)
+    static func recognize(image: CGImage, timeout: Double = DefaultSettings.handwritingRecognitionTimeout) async -> [String] {
+        let image = SendableImage(image)
+        return await withCheckedContinuation { continuation in
+            let once = ResumeOnce(continuation)
+            queue.async { once.resume(recognizeSynchronously(image: image.value)) }
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) { once.resume([]) }
+        }
     }
 
     static func recognizeSynchronously(image: CGImage) -> [String] {
@@ -126,6 +135,28 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && seen.insert($0).inserted }
         return Array(texts.prefix(maximumCandidates))
+    }
+
+    /// CGImage は作ったあと書き換えないので，キューへ渡してよい
+    private struct SendableImage: @unchecked Sendable {
+        let value: CGImage
+        init(_ value: CGImage) { self.value = value }
+    }
+
+    /// 認識の結果と時間切れのうち，先に来た方だけで続きを再開する
+    private final class ResumeOnce: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<[String], Never>?
+
+        init(_ continuation: CheckedContinuation<[String], Never>) { self.continuation = continuation }
+
+        func resume(_ texts: [String]) {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume(returning: texts)
+        }
     }
 }
 #endif
