@@ -105,6 +105,36 @@ struct LatencyProbeTests {
         #expect(right < .milliseconds(150) && resize < .milliseconds(150), "長い文で変換中の操作が 0.15 秒を超えた: → \(right)，⇧→ \(resize)")
     }
 
+    @Test("短い文(文節が 1 つ)でも，打鍵が止まったあいだに前もって求めると Space が速くなる", .enabled(if: isReleaseBuild))
+    func shortSentenceWarmedSpace() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-latency-\(UUID().uuidString)")
+        let zenzai = try ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai)
+        engine.warmUp()
+        // アプリでは打ち間違いの訂正を裏で求めるので，Space の時間に入らない．ここでも訂正を切って，分岐図を出す時間だけを測る
+        var initial = Settings()
+        initial.typoCorrection = .off
+        initial.misreadings = false
+        let settings = FakeSettings(initial)
+        let session = InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: FakeCalendar()),
+                                   lexicon: FakeLexicon(), settings: settings)
+        let clock = ContinuousClock()
+        var cold = Duration.seconds(Int64.max), warmed = Duration.seconds(Int64.max)
+        for _ in 0..<Self.passes {
+            for warming in [false, true] {
+                for key in "kyouhaame" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+                _ = session.settle(context: InputContext())
+                if warming { session.latticeWarmingSteps.forEach { $0() } }
+                let space = clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) }
+                if warming { warmed = min(warmed, space) } else { cold = min(cold, space) }
+                _ = session.handle(KeyEvent(.escape), context: InputContext())
+                _ = session.handle(KeyEvent(.escape), context: InputContext())
+            }
+        }
+        print("S90_SHORT zenzai=\(engine.usesZenzai) space=\(cold) warmed_space=\(warmed)\(Self.loadAverage)")
+        #expect(warmed < cold, "前もって求めても Space が速くならない: \(warmed)，求めないとき \(cold)")
+    }
+
     /// 測ったときの負荷．時間が延びたときに，負荷のせいかを出力から見分けられるようにする
     private static var loadAverage: String {
         #if canImport(Darwin)

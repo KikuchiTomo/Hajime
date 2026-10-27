@@ -227,7 +227,17 @@ public final class InputSession {
     /// 分岐図を使わない設定(一覧)や，入力中でなければ空
     public var latticeWarmingSteps: [@MainActor () -> Void] {
         guard phase == .composing, !composition.isEmpty, settings.current.candidatePresentation != .list else { return [] }
-        return LatticeBuilder(converter: converter).warmingSteps(reading: composition.conversionReading)
+        let builder = LatticeBuilder(converter: converter)
+        let reading = composition.conversionReading
+        // 最後に，Space と同じ分岐図(文節が 1 つの文の分け方や訂正を含む)と，足元に出す文節の長さの下見(短く・長く)も，
+        // 1 つずつ求める(1 歩を短くし，そのあいだに来たキーを待たせない)
+        var lattice: SegmentLattice?
+        let unchanged = { [self] in phase == .composing && composition.conversionReading == reading }
+        return builder.warmingSteps(reading: reading) + [
+            { [self] in if unchanged() { lattice = initialLattice(builder) } },
+            { if unchanged(), let lattice { _ = builder.resizedText(lattice, reading: reading, longer: false) } },
+            { if unchanged(), let lattice { _ = builder.resizedText(lattice, reading: reading, longer: true) } },
+        ]
     }
 
     /// 打鍵がさらに止まるのを待って，打ち間違いを見直すか．待っていれば，止まったときに review を呼ぶ
@@ -821,7 +831,11 @@ public final class InputSession {
             return
         }
         corrector.commit(into: &composition)
-        let builder = LatticeBuilder(converter: converter)
+        phase = .lattice(initialLattice(LatticeBuilder(converter: converter)))
+    }
+
+    /// Space で出す分岐図．打っている途中に入れた区切りと，打ち間違いの訂正を入れる(状態は変えない)
+    private func initialLattice(_ builder: LatticeBuilder) -> SegmentLattice {
         let focus = settings.current.initialFocus
         var lattice = builder.build(reading: composition.conversionReading, focus: focus)
         if !forcedBoundaries.isEmpty, !readingCorrector.isApplied {
@@ -839,7 +853,7 @@ public final class InputSession {
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
             lattice.focusedIndex = lattice.initialFocus(focus)
         }
-        phase = .lattice(lattice)
+        return lattice
     }
 
     /// ローマ字として読めてしまう英単語を英単語にする(「gitwotukau」→「gitを使う」)．打ち間違いを直して見せているときはしない
