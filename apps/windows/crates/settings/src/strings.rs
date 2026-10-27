@@ -580,7 +580,7 @@ pub mod windows {
     pub const CSV_FILES: &str = "CSV ファイル";
     pub const APP_FILES: &str = "アプリ";
 
-    /// バージョンの表示(ADR 0008．macOS と同じ「v0.1.0 (Windows)」の形．macOS は UIStrings.More.versionValue)
+    /// バージョンの表示(ADR 0008．macOS と同じ「v0.0.1 (Windows)」の形．macOS は UIStrings.More.versionValue)
     pub fn version(version: &str) -> String {
         format!("v{version} (Windows)")
     }

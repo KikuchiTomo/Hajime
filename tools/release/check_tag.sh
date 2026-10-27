@@ -1,5 +1,5 @@
 #!/bin/sh
-# リリースのタグ(macos/v0.0.2・windows/v0.1.0)から OS とバージョンを読み，リポジトリに書いたバージョンと同じかを確かめる．
+# リリースのタグ(macos/v0.0.2・windows/v0.0.2)から OS とバージョンを読み，リポジトリに書いたバージョンと同じかを確かめる．
 # 出力は GitHub Actions の出力の形(platform=…・version=…・tag=…)
 # 使い方: tools/release/check_tag.sh <タグ>
 set -eu
