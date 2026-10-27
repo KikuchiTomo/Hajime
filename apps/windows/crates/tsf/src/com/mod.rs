@@ -12,3 +12,4 @@ mod launch;
 mod phonetic;
 mod registration;
 mod text_service;
+mod timer;

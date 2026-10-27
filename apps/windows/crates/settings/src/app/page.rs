@@ -905,12 +905,13 @@ impl PageView {
                 _ => {}
             }
             if let Some(rows) = list_rows(&row.row, values, extras) {
-                // 一覧を入れ替えると選んだ行が外れるので，書き換えもやめる
-                row.table.set_rows(rows);
+                // 一覧が変わると選んだ行が外れるので，書き換えもやめる．変わらなければ選んだ行を残す
+                if row.table.set_rows(rows) {
+                    row.editing = None;
+                }
                 if let Some(search) = row.search {
                     row.table.filter(&ffi::window_text(search));
                 }
-                row.editing = None;
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 row.table_scroll.set_extent(content, table_viewport(row));
             }

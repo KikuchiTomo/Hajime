@@ -32,10 +32,16 @@ pub struct Table {
 
 impl Table {
     /// 行を入れ替える．選んでいた行は外す(並びが変わるため)
-    pub fn set_rows(&mut self, rows: Vec<Vec<String>>) {
+    /// 行を入れ替える．中身が変わったら選んでいた行を外して true を返す．同じなら何もしない
+    /// (ページを映し直すたびに選択が外れると，選んだ行に対するボタン(使用・削除など)が使えない)
+    pub fn set_rows(&mut self, rows: Vec<Vec<String>>) -> bool {
+        if self.rows == rows {
+            return false;
+        }
         self.rows = rows;
         self.clear_selection();
         self.refilter();
+        true
     }
 
     pub fn rows(&self) -> &[Vec<String>] {
@@ -200,6 +206,18 @@ mod tests {
         assert_eq!(table.selected_rows(), vec![3]);
         // 絞り直すと選びを外す
         table.filter("a");
+        assert!(table.selected_rows().is_empty());
+    }
+
+    #[test]
+    fn 同じ行を入れ直しても選んだ行を残す() {
+        let mut table = table();
+        table.click(2, false, false);
+        let rows = table.rows().to_vec();
+        assert!(!table.set_rows(rows));
+        assert_eq!(table.selected_rows(), vec![2]);
+        // 中身が変われば外す
+        assert!(table.set_rows(vec![vec!["kyou".into(), "y".into()]]));
         assert!(table.selected_rows().is_empty());
     }
 
