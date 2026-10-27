@@ -85,7 +85,8 @@
   - クライアントは `SECURITY_IDENTIFICATION` で開き，エンジンがクライアントになりすませないようにする
 - `PIPE_REJECT_REMOTE_CLIENTS` を付け，ネットワーク越しの接続を受けない
 - メッセージには長さの上限を設け，超えたら接続を切る．形式は `protocol/` の定義だけを受け付ける
-- 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` のときだけ受ける
+- 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` のときだけ受ける．実行ファイルの場所は区切り(`\` と `/`)と大文字・小文字をそろえてから比べる(`NamedPipePeer.isSameImage`)
+- エンジンを起動するのは，ログオン(`HKLM\...\Run`)・インストールの直後・設定の画面(利用者が開いたプロセス．同じフォルダの `s90-engine-host.exe`)だけにする．DLL は入力先のアプリの権限(管理者・整合性レベルの低いプロセス・AppContainer)を引き継がせないよう，エンジンを起動しない．入力メニューの「設定を開く…」をエンジンに頼めないときだけ，DLL がインストール先の `s90-settings.exe` を起動する．そのときはハンドルを引き継がせず(`bInheritHandles` を偽)，作業フォルダをインストール先にする
 - 1 つの接続が作れるセッションの数と，全体のセッションの数に上限を設ける．ほかの接続のセッションは使えない(`EngineService`)
 - 手書きの窓で選んだ文字(`handwritingChosen`)は，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` の接続からだけ受ける．空・長すぎる・制御文字を含む文字列は断り，窓を開いたセッションにだけ入れる
 - DLL は入力位置の前の文字列を，エンジンが頼んだとき(打ち始めのときだけ．最大 `DefaultSettings.maximumLeftContextLength` 字)に読んで `key` の `context` で送る．macOS と同じく，パスワード欄(InputScope)では読まない．DLL の中でもログに出さず，`FieldContext` の Debug は中身を伏せる
