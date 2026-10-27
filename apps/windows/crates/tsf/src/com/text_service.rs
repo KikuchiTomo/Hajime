@@ -11,7 +11,7 @@ use crate::key::{self, RawKey};
 use crate::plan::CompositionPlan;
 use ipc::windows::{pipe_name, EngineClient, Outcome, Pending};
 use ipc::{
-    EditOperation, ErrorCode, FieldContext, InputMode, Rect, RequestBody, ResponseBody,
+    EditOperation, ErrorCode, FieldContext, InputMode, Key, Rect, RequestBody, ResponseBody,
     SessionState, TextStyle,
 };
 use std::cell::RefCell;
@@ -40,6 +40,10 @@ use windows::Win32::UI::TextServices::{
 use windows_core::{implement, ComObject, IUnknownImpl, Interface, Ref, Result, BOOL, GUID};
 
 const RESPONSE_TIMEOUT: Duration = Duration::from_millis(ipc::timing::KEY_RESPONSE_MILLISECONDS);
+/// 変換のキー(Space・変換)の返事を待つ時間．Zenzai で文全体を変換し直すので CPU では 100ms ほどかかる．
+/// 待たずにタイマーで後から反映すると，変換が出るまで間が空き，タイマーの知らせが遅れるアプリでは更に遅れる
+const CONVERSION_TIMEOUT: Duration =
+    Duration::from_millis(ipc::timing::CONVERSION_RESPONSE_MILLISECONDS);
 const RECONNECT_INTERVAL: Duration = Duration::from_millis(ipc::timing::RECONNECT_MILLISECONDS);
 /// 返事の遅れがこれより長く続いたら，エンジンが固まったとみなす
 const STALL_LIMIT: Duration = Duration::from_millis(ipc::timing::ENGINE_STALL_MILLISECONDS);
@@ -214,6 +218,11 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             // 前のキーの返事が遅れていたら，少し待って送った順に反映してから，このキーを送る
             self.apply_late(context, RESPONSE_TIMEOUT);
             let field = self.field_context(context);
+            let timeout = if matches!(input.key, Key::Space | Key::Henkan) {
+                CONVERSION_TIMEOUT
+            } else {
+                RESPONSE_TIMEOUT
+            };
             let (engine, session) = {
                 let inner = self.inner.borrow();
                 (inner.engine.clone(), inner.session)
@@ -230,7 +239,7 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
                 // 前のキーの返事がまだ届いていない．このキーの返事を先に反映すると順が入れ替わるので，前の返事のあとに反映する
                 return Ok(self.defer(pending).into());
             }
-            match pending.outcome(RESPONSE_TIMEOUT) {
+            match pending.outcome(timeout) {
                 Outcome::Reply(body) => Ok(self.apply_response(context, body).into()),
                 Outcome::TimedOut => {
                     // エンジンが固まっていたらキーを奪わずアプリに渡す(入力が消えないように)

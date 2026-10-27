@@ -37,6 +37,11 @@ enum PanelBuilder {
     static func suggestionNote(key: String?) -> Note? { key.map { .info("\($0) で選ぶ") } }
 
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
+    /// 文節をその場で打ち直しているときの案内．subject は打ち直す前の文節，key は打ち直した読みを変換するキー
+    static func inlineEditNote(replacing subject: String, key: String?) -> Note {
+        Note(tone: .info, title: "打ち直し", subject: subject, key: key, keyAction: key.map { _ in "変換" })
+    }
+
     static func readingCorrectionNote(key: String?) -> Note {
         Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
     }
