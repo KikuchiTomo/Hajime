@@ -114,6 +114,17 @@ impl Theme {
         }
     }
 
+    /// 高コントラストのときの見た目(OS の色)．OS の設定を変えずに確かめる(--theme contrast)
+    pub fn contrast(dpi: u32) -> Self {
+        Self {
+            palette: system_palette(),
+            dark: false,
+            high_contrast: true,
+            dpi,
+            glyphs: GLYPHS,
+        }
+    }
+
     /// 96dpi の値を窓の DPI のピクセルにする
     pub fn px(&self, value: f32) -> i32 {
         ffi::scale(value, self.dpi)

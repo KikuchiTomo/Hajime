@@ -82,9 +82,10 @@ fn options(started: std::time::Instant) -> window::Options {
     };
     window::Options {
         started,
-        dark: value("--theme").and_then(|theme| match theme.as_str() {
-            "light" => Some(false),
-            "dark" => Some(true),
+        theme: value("--theme").and_then(|theme| match theme.as_str() {
+            "light" => Some(window::ForcedTheme::Light),
+            "dark" => Some(window::ForcedTheme::Dark),
+            "contrast" => Some(window::ForcedTheme::Contrast),
             _ => None,
         }),
         measure: value("--measure").map(std::path::PathBuf::from),

@@ -114,8 +114,8 @@ pub struct App {
     mica: bool,
     /// 窓を描いたあとに検索欄を描き直したか．検索欄は自分の面を持つ窓で，窓が出る前に描いた絵は画面に出ない
     search_painted: bool,
-    /// --theme で決めた明暗(OS の設定を読まない)
-    forced_dark: Option<bool>,
+    /// --theme で決めた見た目(OS の設定を読まない)
+    forced_theme: Option<ForcedTheme>,
     animations: bool,
     pub(super) catalog: Catalog,
     connect: fn(&Timing) -> Option<Store>,
@@ -188,8 +188,8 @@ pub fn open(
         0,
     )?;
     let dpi = ffi::dpi(window);
-    let theme = match options.dark {
-        Some(dark) => Theme::fixed(dark, dpi),
+    let theme = match options.theme {
+        Some(forced) => forced.theme(dpi),
         None => Theme::load(dpi),
     };
     let graphics = Graphics::new().ok()?;
@@ -215,7 +215,7 @@ pub fn open(
         theme,
         mica: false,
         search_painted: false,
-        forced_dark: options.dark,
+        forced_theme: options.theme,
         animations: ffi::animations_enabled(),
         catalog,
         connect,
@@ -277,11 +277,30 @@ pub fn open(
     Some(window)
 }
 
+/// --theme で決める見た目．OS の設定を変えずに見本を撮る
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ForcedTheme {
+    Light,
+    Dark,
+    /// 高コントラスト(OS の色で描き，Mica を使わない)
+    Contrast,
+}
+
+impl ForcedTheme {
+    fn theme(self, dpi: u32) -> Theme {
+        match self {
+            Self::Light => Theme::fixed(false, dpi),
+            Self::Dark => Theme::fixed(true, dpi),
+            Self::Contrast => Theme::contrast(dpi),
+        }
+    }
+}
+
 /// 起動の引数で決めること
 pub struct Options {
     pub started: Instant,
-    /// 明暗を決める(見本の撮影)．None なら OS の設定
-    pub dark: Option<bool>,
+    /// 見た目を決める(見本の撮影)．None なら OS の設定
+    pub theme: Option<ForcedTheme>,
     /// 測った結果を書くファイル
     pub measure: Option<std::path::PathBuf>,
     /// 初めに開くページ(見本の撮影)
@@ -333,8 +352,8 @@ impl App {
     /// 色・書体を作り直す(OS の設定や DPI が変わったとき)
     fn reload_theme(&mut self, dpi: u32) {
         let font_changed = dpi != self.theme.dpi;
-        self.theme = match self.forced_dark {
-            Some(dark) => Theme::fixed(dark, dpi),
+        self.theme = match self.forced_theme {
+            Some(forced) => forced.theme(dpi),
             None => Theme::load(dpi),
         };
         self.animations = ffi::animations_enabled();
