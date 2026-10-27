@@ -31,6 +31,8 @@ pub struct Ranges {
     pub candidates_per_page: Range,
     pub live_conversion_delay: Range,
     pub correction_delay: Range,
+    pub review_correction_timeout: Range,
+    pub late_correction_timeout: Range,
     pub mode_indicator_duration: Range,
     pub candidate_font_size: Range,
     pub custom_theme_corner_radius: Range,
@@ -105,6 +107,8 @@ pub struct Catalog {
     pub ranges: Ranges,
     /// 秒の項目を選ぶ刻み(DefaultSettings.secondsStep)
     pub seconds_step: f64,
+    /// 打ち間違いを探す時間の上限を選ぶ刻み(DefaultSettings.correctionTimeoutStep)
+    pub correction_timeout_step: f64,
     /// 連想の候補数を選ぶ刻み(DefaultSettings.associationLimitStep)
     pub association_limit_step: f64,
     pub limits: Limits,

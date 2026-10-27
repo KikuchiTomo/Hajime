@@ -502,6 +502,8 @@ pub enum RangeKind {
     CandidatesPerPage,
     LiveConversionDelay,
     CorrectionDelay,
+    ReviewCorrectionTimeout,
+    LateCorrectionTimeout,
     ModeIndicatorDuration,
     CandidateFontSize,
     AssociationLimit,
@@ -515,10 +517,22 @@ impl RangeKind {
             RangeKind::CandidatesPerPage => ranges.candidates_per_page,
             RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
             RangeKind::CorrectionDelay => ranges.correction_delay,
+            RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
+            RangeKind::LateCorrectionTimeout => ranges.late_correction_timeout,
             RangeKind::ModeIndicatorDuration => ranges.mode_indicator_duration,
             RangeKind::CandidateFontSize => ranges.candidate_font_size,
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
+        }
+    }
+
+    /// 秒の項目を選ぶ刻み．打ち間違いを探す時間の上限は範囲が広いので 1 秒ずつ
+    pub fn seconds_step(self, catalog: &crate::catalog::Catalog) -> f64 {
+        match self {
+            RangeKind::ReviewCorrectionTimeout | RangeKind::LateCorrectionTimeout => {
+                catalog.correction_timeout_step
+            }
+            _ => catalog.seconds_step,
         }
     }
 
@@ -805,6 +819,23 @@ fn conversion() -> Vec<Section> {
                     more::CORRECTION_DELAY,
                     "correctionDelay",
                     RangeKind::CorrectionDelay,
+                )
+                .enabled_when(Is("typoCorrection", "standard")),
+                Row::seconds(
+                    more::REVIEW_CORRECTION_TIMEOUT,
+                    "reviewCorrectionTimeout",
+                    RangeKind::ReviewCorrectionTimeout,
+                )
+                .enabled_when(Is("typoCorrection", "standard")),
+                Row::seconds(
+                    more::LATE_CORRECTION_TIMEOUT,
+                    "lateCorrectionTimeout",
+                    RangeKind::LateCorrectionTimeout,
+                )
+                .enabled_when(Is("typoCorrection", "standard")),
+                Row::toggle(
+                    more::REMEMBERS_REJECTED_CORRECTIONS,
+                    "remembersRejectedCorrections",
                 )
                 .enabled_when(Is("typoCorrection", "standard")),
             ],

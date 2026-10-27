@@ -32,6 +32,8 @@ struct SettingsCatalogTests {
                 "candidatesPerPage": range(DefaultSettings.candidatesPerPageRange),
                 "liveConversionDelay": range(DefaultSettings.liveConversionDelayRange),
                 "correctionDelay": range(DefaultSettings.correctionDelayRange),
+                "reviewCorrectionTimeout": range(DefaultSettings.reviewCorrectionTimeoutRange),
+                "lateCorrectionTimeout": range(DefaultSettings.lateCorrectionTimeoutRange),
                 "modeIndicatorDuration": range(DefaultSettings.modeIndicatorDurationRange),
                 "candidateFontSize": range(DefaultSettings.candidateFontSizeRange),
                 "customThemeCornerRadius": range(DefaultSettings.customThemeCornerRadiusRange),
@@ -39,6 +41,7 @@ struct SettingsCatalogTests {
             ]),
             "associationLimitStep": .number(Double(DefaultSettings.associationLimitStep)),
             "secondsStep": .number(DefaultSettings.secondsStep),
+            "correctionTimeoutStep": .number(DefaultSettings.correctionTimeoutStep),
             "limits": .object([
                 "settingsFileBytes": limit(DefaultSettings.maximumSettingsFileBytes),
                 "usageFileBytes": limit(DefaultSettings.maximumUsageFileBytes),

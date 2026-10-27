@@ -380,7 +380,9 @@ impl RowState {
     fn new(row: &Row, section: usize, catalog: &Catalog) -> Self {
         let numbers = match &row.control {
             Control::Stepper(range) => options::steps(range.range(catalog), 1.0),
-            Control::Seconds(range) => options::steps(range.range(catalog), catalog.seconds_step),
+            Control::Seconds(range) => {
+                options::steps(range.range(catalog), range.seconds_step(catalog))
+            }
             _ => Vec::new(),
         };
         let text = match &row.control {

@@ -174,6 +174,9 @@ pub mod more {
     pub const CORRECTION_SENSITIVITY: &str = "修正の基準";
     pub const SHOWS_SUGGESTIONS: &str = "「もしかして」を表示";
     pub const CORRECTION_DELAY: &str = "見直すまでの待ち時間";
+    pub const REVIEW_CORRECTION_TIMEOUT: &str = "見直しの時間の上限";
+    pub const LATE_CORRECTION_TIMEOUT: &str = "変換後の補正の時間の上限";
+    pub const REMEMBERS_REJECTED_CORRECTIONS: &str = "自動修正のキャンセルを学習";
     pub const THEME: &str = "テーマ";
     pub const CUSTOM_THEMES: &str = "カスタムテーマ";
     pub const DUPLICATE: &str = "今のテーマを複製";
@@ -496,6 +499,9 @@ pub mod sync {
         ("branchCandidatesPerPage", "分岐図の候補数"),
         ("liveConversionDelay", "漢字にするまでの待ち時間"),
         ("correctionDelay", "見直すまでの待ち時間"),
+        ("reviewCorrectionTimeout", "見直しの時間の上限"),
+        ("lateCorrectionTimeout", "変換後の補正の時間の上限"),
+        ("remembersRejectedCorrections", "自動修正のキャンセルを学習"),
         ("correctionSensitivity", "修正の基準"),
         ("showsSuggestions", "「もしかして」を表示"),
         ("correction", "補正"),

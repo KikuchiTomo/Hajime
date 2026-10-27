@@ -946,10 +946,12 @@ public final class InputSession {
         }
         phase = .composing
         if readingCorrector.revert(&composition) {
-            // 打ち間違いを直していたら，打ったままの読みに戻す．わざとそう打った語句なので覚え，次から直さない
+            // 打ち間違いを直していたら，打ったままの読みに戻す．
+            // 設定(自動修正のキャンセルを学習)がオンなら，わざとそう打った語句として覚え，次から直さない
             usage?.record(.readingCorrectionUndone)
             var actions = render(context: context)
-            if let phrase = readingCorrector.rejectedPhrase, rejections?.recordRejected(phrase: phrase) == true {
+            if settings.current.remembersRejectedCorrections, let phrase = readingCorrector.rejectedPhrase,
+                rejections?.recordRejected(phrase: phrase) == true {
                 actions.append(.showNote(PanelBuilder.correctionRememberedNote(phrase)))
             }
             return KeyResult(handled: true, actions: actions)
