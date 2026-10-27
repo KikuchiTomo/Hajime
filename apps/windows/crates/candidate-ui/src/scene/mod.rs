@@ -362,14 +362,10 @@ mod tests {
 
     #[test]
     fn すりガラスの地は_os_が影を描くので付けない() {
-        let theme = ResolvedTheme::resolve(
-            "automatic",
-            None,
-            &SystemLook {
-                backdrop: true,
-                ..SystemLook::default()
-            },
-        );
+        let theme = ResolvedTheme {
+            backdrop: true,
+            ..ResolvedTheme::resolve("nordic", None, &SystemLook::default())
+        };
         let scene = mode("あ", &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(surround(scene.clone(), &theme, Surround::Shadow), scene);
     }
