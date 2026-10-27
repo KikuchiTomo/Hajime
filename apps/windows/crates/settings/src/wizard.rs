@@ -113,7 +113,13 @@ impl Step {
                 Field::Path("initialFocus"),
                 options::INITIAL_FOCUS,
             )],
-            Step::Correction => vec![Group::radio(None, Field::Correction, CORRECTION)],
+            Step::Correction => vec![
+                Group::radio(None, Field::Correction, CORRECTION),
+                Group::toggle(
+                    crate::strings::more::REMEMBERS_REJECTED_CORRECTIONS,
+                    "remembersRejectedCorrections",
+                ),
+            ],
             Step::Features => FEATURES
                 .iter()
                 .map(|(path, title)| Group::toggle(title, path))
@@ -229,9 +235,7 @@ pub fn choice_note(field: Field, value: &str) -> Option<&'static str> {
         (Field::Path("initialFocus"), "automatic") => Some(text::FOCUS_AUTOMATIC_NOTE),
         (Field::Correction, "off") => Some(text::CORRECTION_OFF_NOTE),
         (Field::Correction, "conservative") => Some(text::CORRECTION_ENGLISH_NOTE),
-        (Field::Correction, "cautious" | "standard" | "aggressive") => {
-            Some(text::CORRECTION_JAPANESE_NOTE)
-        }
+        (Field::Correction, "standard") => Some(text::CORRECTION_JAPANESE_NOTE),
         _ => None,
     }
 }
@@ -503,6 +507,7 @@ mod tests {
                 ("punctuation", json!("commaPeriod")),
                 ("association", json!(true)),
                 ("calculation", json!(false)),
+                ("remembersRejectedCorrections", json!(false)),
                 (
                     "keymap",
                     json!([{"state": "anywhere", "key": "Enter", "command": "commit"}]),

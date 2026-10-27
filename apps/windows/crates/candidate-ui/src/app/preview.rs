@@ -2,8 +2,9 @@
 //! 設定の画面(s90-settings)が GDI の画面の中に描けるよう，DC に結び付ける Direct2D の描き先を使う
 
 use super::render::Renderer;
-use crate::scene::{self, sample, Look, Surround};
-use crate::theme::ResolvedTheme;
+use crate::geometry::Frame;
+use crate::scene::{self, sample, Draw, Look, Surround};
+use crate::theme::{Color, ResolvedTheme};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Direct2D::Common::{D2D1_ALPHA_MODE_IGNORE, D2D1_PIXEL_FORMAT};
 use windows::Win32::Graphics::Direct2D::{
@@ -31,7 +32,9 @@ pub enum Shown<'a> {
 pub enum Placement {
     Center,
     /// 左上に寄せる(初期設定ウィザードの実演．文字の下に出す)
-    TopLeft,
+    TopLeft {
+        ground: tokens::Rgb,
+    },
 }
 
 pub struct Preview {
@@ -79,7 +82,22 @@ impl Preview {
             Shown::Branch(map) => scene::branch_map(map, &look, &measure),
             Shown::List(list) => scene::candidate_list(list, &look, &measure),
         };
-        let scene = scene::surround(scene, theme, Surround::Snapshot { dark });
+        // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
+        let surround = match placement {
+            Placement::Center => Surround::Snapshot { dark },
+            Placement::TopLeft { .. } => Surround::Bare,
+        };
+        let mut scene = scene::surround(scene, theme, surround);
+        if let Placement::TopLeft { ground } = placement {
+            // 角の丸みの外を地の色で塗る(画像は不透明)
+            scene.draws.insert(
+                0,
+                Draw::Rect {
+                    frame: Frame::new(0.0, 0.0, scene.width, scene.height),
+                    color: Color::rgb(ground),
+                },
+            );
+        }
         let available_width = (rect.right - rect.left).max(0) as f32;
         let available_height = (rect.bottom - rect.top).max(0) as f32;
         if scene.width <= 0.0 || scene.height <= 0.0 {
@@ -96,7 +114,7 @@ impl Preview {
                 rect.left + (rect.right - rect.left - width) / 2,
                 rect.top + (rect.bottom - rect.top - height) / 2,
             ),
-            Placement::TopLeft => (rect.left, rect.top),
+            Placement::TopLeft { .. } => (rect.left, rect.top),
         };
         let bound = RECT {
             left,

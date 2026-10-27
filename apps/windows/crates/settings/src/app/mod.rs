@@ -136,7 +136,7 @@ fn mode(arguments: &[String]) -> Mode {
     }
 }
 
-/// --step <名前> で初めに開くウィザードのページ(見本の撮影)
+/// --step <名前> で初めに開くウィザードのページを決め，--offline でエンジンにつながずに見本の値で開く(見本の撮影)
 fn setup_options(started: std::time::Instant) -> wizard::Options {
     let window = options(started);
     let arguments: Vec<String> = std::env::args().collect();
@@ -153,6 +153,7 @@ fn setup_options(started: std::time::Instant) -> wizard::Options {
         started,
         theme: window.theme,
         step,
+        offline: arguments.iter().any(|argument| argument == "--offline"),
     }
 }
 

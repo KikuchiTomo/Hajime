@@ -114,6 +114,8 @@ pub struct Options {
     pub theme: Option<ForcedTheme>,
     /// 初めに開くページ(見本の撮影)
     pub step: Option<Step>,
+    /// エンジンにつながずに見本の値で開く(見本の撮影．値は書かない)
+    pub offline: bool,
 }
 
 struct Wizard {
@@ -126,6 +128,8 @@ struct Wizard {
     animations: bool,
     catalog: Catalog,
     connect: fn(&Timing) -> Option<Store>,
+    /// エンジンにつながず，見本の値で開いた(書き込まない)
+    offline: bool,
     model: Option<Model>,
     loaded: Loaded,
     loading: bool,
@@ -202,6 +206,7 @@ pub fn open(
         loaded: Arc::new(Mutex::new(None)),
         loading: false,
         step,
+        offline: options.offline,
         script: demo::script(step, &choices, today),
         choices,
         demo_started: 0.0,
@@ -226,10 +231,46 @@ pub fn open(
     with_wizard(|wizard| {
         wizard.apply_theme();
         wizard.fit_window();
-        wizard.start_loading();
+        if wizard.offline {
+            wizard.choices = Choices::load(&Sample::new());
+            wizard.restart_demo();
+        } else {
+            wizard.start_loading();
+        }
     });
     ffi::show_default(window);
     Some(window)
+}
+
+/// エンジンにつながずに開くときの値(見本の撮影)．推奨の無い項目はエンジンの既定と同じにする
+struct Sample(serde_json::Value);
+
+impl Sample {
+    fn new() -> Self {
+        Self(serde_json::json!({
+            "inputStyle": "romaji",
+            "punctuation": "toutenKuten",
+            "liveConversion": true,
+            "typoCorrection": "standard",
+            "correctionSensitivity": "standard",
+            "remembersRejectedCorrections": false,
+            "association": true,
+            "calculation": true,
+            "postalCodeConversion": true,
+            "dateConversion": true,
+            "theme": "automatic",
+        }))
+    }
+}
+
+impl wizard::Read for Sample {
+    fn value(&self, path: &str) -> Option<&serde_json::Value> {
+        self.0.get(path)
+    }
+
+    fn is_default(&self, _: &str) -> bool {
+        true
+    }
 }
 
 /// 今の UTC の時刻を地方時の年・月・日・時・分・秒にする
@@ -344,7 +385,7 @@ impl Wizard {
 
     /// 選ぶものを出せるか(エンジンから値を読んだ)
     fn ready(&self) -> bool {
-        self.model.is_some()
+        self.model.is_some() || self.offline
     }
 
     // MARK: - ページ
@@ -432,7 +473,9 @@ impl Wizard {
             }
             Button::OpenSettings | Button::Finish => {
                 self.save();
-                ffi::set_setup_completed();
+                if !self.offline {
+                    ffi::set_setup_completed();
+                }
                 if button == Button::OpenSettings {
                     super::launch_settings(&[]);
                 }
@@ -542,25 +585,31 @@ impl Wizard {
                         .any(|(value, _)| wizard::choice_note(group.field, value).is_some());
                     // 説明の無い選択肢が多いときは 2 列に並べる
                     let columns = if !notes && choices.len() >= 4 { 2 } else { 1 };
-                    let row_height = if notes {
-                        size::WIZARD_OPTION_NOTE_HEIGHT
-                    } else {
-                        size::WIZARD_OPTION_HEIGHT
-                    };
                     let gap = size::WIZARD_OPTION_GAP;
-                    let cell = (column - gap * (columns - 1) as f32) / columns as f32;
-                    for index in 0..choices.len() {
-                        let row = index / columns;
-                        let col = index % columns;
-                        rows.push(Rect::new(
-                            x + col as f32 * (cell + gap),
-                            y + row as f32 * (row_height + gap),
-                            cell,
-                            row_height,
-                        ));
+                    if columns == 1 {
+                        // 1 列なら，説明のある行だけを高くする
+                        for (value, _) in choices {
+                            let row_height = if wizard::choice_note(group.field, value).is_some() {
+                                size::WIZARD_OPTION_NOTE_HEIGHT
+                            } else {
+                                size::WIZARD_OPTION_HEIGHT
+                            };
+                            rows.push(Rect::new(x, y, column, row_height));
+                            y += row_height + gap;
+                        }
+                    } else {
+                        let row_height = size::WIZARD_OPTION_HEIGHT;
+                        let cell = (column - gap * (columns - 1) as f32) / columns as f32;
+                        for index in 0..choices.len() {
+                            rows.push(Rect::new(
+                                x + (index % columns) as f32 * (cell + gap),
+                                y + (index / columns) as f32 * (row_height + gap),
+                                cell,
+                                row_height,
+                            ));
+                        }
+                        y += choices.len().div_ceil(columns) as f32 * (row_height + gap);
                     }
-                    let lines = choices.len().div_ceil(columns);
-                    y += lines as f32 * (row_height + gap);
                 }
                 GroupKind::Toggle => {
                     let row_height = size::WIZARD_OPTION_NOTE_HEIGHT;
@@ -697,7 +746,9 @@ impl Wizard {
             scale: self.theme.dpi as f32 / ffi::BASE_DPI as f32,
             background: self.theme.palette.card,
             shown,
-            placement: candidate_ui::app::preview::Placement::TopLeft,
+            placement: candidate_ui::app::preview::Placement::TopLeft {
+                ground: self.theme.palette.card,
+            },
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
             return;
@@ -1189,7 +1240,7 @@ fn paint_window(canvas: &mut dyn Canvas, state: &PaintState) {
         let target = Target::Button(*button);
         let kind = match button {
             Button::Next | Button::Finish => ButtonKind::Accent,
-            Button::Later => ButtonKind::Subtle,
+
             _ => ButtonKind::Standard,
         };
         let control = State {
@@ -1402,7 +1453,7 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
 
 fn toggle_note(path: &str) -> Option<&'static str> {
     match path {
-        "liveConversion" => Some(text::LIVE_TEXT),
+        "remembersRejectedCorrections" => Some(text::REMEMBERS_REJECTED_NOTE),
         "association" => Some(text::ASSOCIATION_NOTE),
         "calculation" => Some(text::CALCULATION_NOTE),
         "postalCodeConversion" => Some(text::POSTAL_CODE_NOTE),

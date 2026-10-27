@@ -674,6 +674,8 @@ pub mod wizard {
     pub const CORRECTION_STANDARD: &str = "標準";
     pub const CORRECTION_AGGRESSIVE: &str = "積極的";
     pub const CORRECTION_OFF_NOTE: &str = "打ったとおりに変換します。";
+    pub const REMEMBERS_REJECTED_NOTE: &str =
+        "直した文字を取り消した読みは、次から直さないようにします。";
     pub const CORRECTION_ENGLISH_NOTE: &str = "英単語のつづりだけを直します。";
     pub const CORRECTION_JAPANESE_NOTE: &str =
         "英単語と日本語を直します。強いほど多くの間違いを直します。";
@@ -695,7 +697,8 @@ pub mod wizard {
 
     /// 候補ウィンドウの足元の案内(実演)
     pub const HINTS: &[(&str, &str)] = &[("↓", "候補"), ("←→", "文節"), ("Shift+↑", "連想")];
-    pub const ASSOCIATION_LABEL: &str = "連想";
+    /// 連想の見出しの種類(実演では出さない)
+    pub const ASSOCIATION_LABEL: &str = "";
 
     /// 実演で押すキー
     pub const KEY_ENTER: &str = "Enter";
