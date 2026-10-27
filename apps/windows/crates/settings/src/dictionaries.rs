@@ -98,6 +98,10 @@ pub fn table(list: DictionaryList, entries: &[Entry]) -> Vec<Vec<String>> {
                     };
                     dictionaries::summary(&entry.field, entry.count, &condition)
                 }
+                // 同梱の辞書は件数を数えていない(設定には 0 と書いてある)ので，件数のかわりに同梱と出す
+                DictionaryList::Association if entry.is_bundled => {
+                    crate::strings::windows::ASSOCIATION_BUNDLED.to_string()
+                }
                 DictionaryList::Association => association::summary(entry.count),
             };
             let state = if entry.is_enabled {
@@ -229,7 +233,7 @@ mod tests {
         assert!(entries[0].is_bundled);
         assert_eq!(
             table(DictionaryList::Association, &entries)[0][1],
-            "0 件の意味"
+            crate::strings::windows::ASSOCIATION_BUNDLED
         );
     }
 

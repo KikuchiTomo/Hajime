@@ -349,6 +349,9 @@ struct RowState {
     knob: Tween,
     /// ドロップダウンで選んでいる番号
     choice: Option<usize>,
+    /// 選択肢の後ろに足して選んだ状態にする名前(カスタムテーマを使っているときのテーマの欄．macOS と同じく，
+    /// 既成のテーマのどれも選んでいないことを見せる)．選んでも何もしない
+    extra_choice: Option<String>,
     /// 数を選ぶ部品の選択肢
     numbers: Vec<f64>,
     /// 統計・情報・バージョン・知らせの文
@@ -396,6 +399,7 @@ impl RowState {
             on: false,
             knob: Tween::fixed(0.0),
             choice: matches!(row.control, Control::Preset).then_some(0),
+            extra_choice: None,
             numbers,
             text,
             color: String::new(),
@@ -654,6 +658,7 @@ impl RowState {
             (Control::Choice(choices), Part::Dropdown) => choices
                 .iter()
                 .map(|(_, name)| (*name).to_string())
+                .chain(self.extra_choice.clone())
                 .collect(),
             (Control::Stepper(_), Part::Dropdown) => self
                 .numbers
@@ -871,7 +876,18 @@ impl PageView {
                     }
                 }
                 Control::Choice(choices) => {
-                    row.choice = Some(options::index_of(choices, &values.text(row.row.path)));
+                    row.extra_choice = (row.row.path == crate::themes::BASE_THEME)
+                        .then(|| {
+                            crate::themes::active_name(
+                                values.value(crate::themes::THEMES),
+                                &values.text(crate::themes::ACTIVE),
+                            )
+                        })
+                        .flatten();
+                    row.choice = Some(match row.extra_choice {
+                        Some(_) => choices.len(),
+                        None => options::index_of(choices, &values.text(row.row.path)),
+                    });
                 }
                 Control::Stepper(_) | Control::Seconds(_) => {
                     let value = values

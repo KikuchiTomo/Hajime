@@ -621,7 +621,9 @@ impl App {
                     |entry| entry.name.clone(),
                 );
                 let name: String = match action {
-                    ThemeAction::Create => more::NEW_THEME_NAME.to_string(),
+                    ThemeAction::Create => {
+                        crate::themes::unique_name(more::NEW_THEME_NAME, &entries)
+                    }
                     _ => more::copy_name(&source_name),
                 }
                 .chars()

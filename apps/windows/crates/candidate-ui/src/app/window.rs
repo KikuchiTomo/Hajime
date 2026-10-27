@@ -3,6 +3,7 @@ use crate::scene::Scene;
 use crate::theme::Color;
 use ipc::Rect;
 use std::sync::OnceLock;
+use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_PIXEL_FORMAT, D2D_SIZE_U,
@@ -22,6 +23,7 @@ use windows::Win32::Graphics::Gdi::{
     PAINTSTRUCT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::Accessibility::{
     NotificationKind_ActionCompleted, NotificationProcessing_ImportantMostRecent,
     UiaHostProviderFromHwnd, UiaRaiseNotificationEvent,
@@ -31,13 +33,13 @@ use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer, PostMessageW,
-    RegisterClassExW, SetTimer, SetWindowPos, ShowWindow, TranslateMessage, CS_DROPSHADOW,
-    HWND_TOPMOST, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP,
-    WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_PAINT, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer, LoadCursorW,
+    PostMessageW, RegisterClassExW, SetTimer, SetWindowPos, ShowWindow, TranslateMessage,
+    CS_DROPSHADOW, HWND_TOPMOST, IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW,
+    SW_HIDE, WM_APP, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_PAINT, WM_TIMER, WNDCLASSEXW,
+    WNDCLASS_STYLES, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
-use windows_core::{Result, BOOL, BSTR, PCWSTR};
+use windows_core::{w, Result, BOOL, BSTR, PCWSTR};
 
 const WM_INBOX: u32 = WM_APP + 1;
 const BASE_DPI: f32 = 96.0;
@@ -100,6 +102,22 @@ pub fn make_dpi_aware() {
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
 }
 
+/// 同じログオンのセッションで候補ウィンドウを 1 つだけ動かす印(名前付きのミューテックス)．
+/// エンジンは候補ウィンドウを起動し，新しくつないできた候補ウィンドウに切り替えて前の接続を閉じる．
+/// エンジンが起動し直すなどで候補ウィンドウが 2 つ動くと，毎秒つなぎ直すたびに互いの接続を閉じ，出している候補が消える．
+/// すでにほかの候補ウィンドウが動いていれば None(このプロセスは終わる)．返した印はプロセスが終わるまで持つ
+pub fn single_instance() -> Option<HANDLE> {
+    // SAFETY: 名前は定数．ハンドルはプロセスが終わるまで持つ(OS が閉じる)
+    unsafe {
+        let handle = CreateMutexW(None, false, w!(r"Local\s90.tokyo-ime.candidate-ui")).ok()?;
+        if GetLastError() == ERROR_ALREADY_EXISTS {
+            let _ = CloseHandle(handle);
+            return None;
+        }
+        Some(handle)
+    }
+}
+
 pub fn run_message_loop() {
     let mut message = MSG::default();
     // SAFETY: message はこのスレッドの MSG
@@ -146,6 +164,9 @@ impl Window {
             lpfnWndProc: Some(procedure),
             hInstance: instance.into(),
             lpszClassName: class,
+            // 矢印にする．決めないと窓の上で前のカーソル(読み込み中の形など)が残る
+            // SAFETY: OS の標準のカーソルを読むだけ
+            hCursor: unsafe { LoadCursorW(None, IDC_ARROW) }.unwrap_or_default(),
             ..Default::default()
         };
         // SAFETY: description は有効な WNDCLASSEXW

@@ -38,6 +38,10 @@ pub const VK_DBE_KATAKANA: u16 = 0xF1;
 pub const VK_DBE_HIRAGANA: u16 = 0xF2;
 pub const VK_DBE_SBCSCHAR: u16 = 0xF3;
 pub const VK_DBE_DBCSCHAR: u16 = 0xF4;
+/// USB の LANG1・LANG2 のキー(Apple の JIS キーボードなどの「かな」「英数」)のスキャンコード．
+/// Windows は仮想キーを 0x15・0x19 にして送り，日本語の配列ではカナ・半角/全角と同じ番号になるので，スキャンコードで見分ける
+pub const SCAN_LANG1: u16 = 0xF2;
+pub const SCAN_LANG2: u16 = 0xF1;
 
 #[derive(Clone, PartialEq)]
 pub struct RawKey {
@@ -76,6 +80,8 @@ pub fn is_modifier_only(vk: u16) -> bool {
 
 pub fn translate(raw: &RawKey) -> Option<KeyInput> {
     let named = match raw.vk {
+        _ if raw.scan == SCAN_LANG1 => Some(Key::Kana),
+        _ if raw.scan == SCAN_LANG2 => Some(Key::Eisu),
         VK_BACK => Some(Key::Backspace),
         VK_TAB => Some(Key::Tab),
         VK_RETURN => Some(Key::Enter),
@@ -137,6 +143,22 @@ mod tests {
             scan: 0,
             caps_lock: false,
         }
+    }
+
+    #[test]
+    fn lang1_と_lang2_はスキャンコードでかなと英数にする() {
+        // Windows は LANG2(英数)を半角/全角と同じ仮想キーにして送る
+        let mut eisu = raw(VK_KANJI, None);
+        eisu.scan = SCAN_LANG2;
+        assert_eq!(translate(&eisu).unwrap().key, Key::Eisu);
+        let mut kana = raw(VK_KANA, None);
+        kana.scan = SCAN_LANG1;
+        assert_eq!(translate(&kana).unwrap().key, Key::Kana);
+        // ふつうの半角/全角はそのまま
+        assert_eq!(
+            translate(&raw(VK_KANJI, None)).unwrap().key,
+            Key::HankakuZenkaku
+        );
     }
 
     #[test]

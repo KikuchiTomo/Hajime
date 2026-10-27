@@ -550,6 +550,8 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
+    pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
     pub const ON: &str = "オン";
     pub const OFF: &str = "オフ";
     pub const OPEN_SETTINGS_FILE: &str = "設定ファイルを開く";
