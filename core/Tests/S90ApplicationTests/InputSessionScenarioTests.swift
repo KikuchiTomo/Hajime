@@ -28,11 +28,13 @@ final class Harness {
     private(set) var lastResult = KeyResult.passThrough
 
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
-         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac) {
+         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false) {
         self.converter = converter
         self.lexicon = lexicon
-        self.settings = FakeSettings(settings)
-        self.session = InputSession(converter: converter, lexicon: lexicon, settings: self.settings, associations: associations, keyNames: keyNames)
+        let store = FakeSettings(settings)
+        self.settings = store
+        self.session = InputSession(converter: converter, lexicon: lexicon, settings: store, associations: associations, keyNames: keyNames,
+                                    rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil)
     }
 
     func type(_ text: String) {
@@ -994,6 +996,34 @@ struct ReadingCorrectionScenarioTests {
         harness.press(.escape)
         #expect(harness.marked.text == "ようですね")
         // 戻したキーのあいだは，止まっても直し直さない
+        harness.settle()
+        #expect(harness.marked.text == "ようですね")
+    }
+
+    @Test("直しを Esc で戻すと，直された文節を直さない語句に覚えて案内し，次からは同じ語句を直さない")
+    func rememberRejectedCorrection() {
+        let converter = FakeConverter()
+        converter.corrections["youdesune"] = [
+            ReadingCorrection(keys: "yoidesune", reading: "ヨイデスネ", score: -1, cost: 1),
+            ReadingCorrection(keys: "youdesune", reading: "ヨウデスネ", score: -9, cost: 0),
+        ]
+        converter.words["ようですね"] = [
+            Candidate.Word(text: "様", readingCount: 2), Candidate.Word(text: "です", readingCount: 2, startsWithPredicate: true),
+            Candidate.Word(text: "ね", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ]
+        let harness = Harness(converter: converter, remembersRejections: true)
+        harness.type("youdesune")
+        harness.settle()
+        #expect(harness.marked.text == "よいですね")
+        harness.press(.escape)
+        #expect(harness.marked.text == "ようですね")
+        let remembered = harness.settings.current.correction.exceptions
+        #expect(remembered.count == 1)
+        #expect(remembered.allSatisfy { "ようですね".contains($0) && $0.count >= DefaultSettings.minimumRememberedPhraseLength })
+        #expect(harness.note == "「\(remembered.first ?? "")」は次から直しません")
+        harness.press(.enter)
+        // 同じ語句を打っても，もう直さない
+        harness.type("youdesune")
         harness.settle()
         #expect(harness.marked.text == "ようですね")
     }
