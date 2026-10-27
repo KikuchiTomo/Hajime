@@ -62,7 +62,7 @@ Secrets を入れるまでは，macOS の .pkg はアドホック署名で公証
 
 ## Releases の .pkg に署名して公証する
 
-GitHub の Secrets に Developer ID の証明書と公証の資格情報を入れると，`Release` の macOS の .pkg を署名して公証します．入れていなければ，アドホック署名で作ります．Developer ID は手元の Apple Development の証明書と同じチームなので，署名した .pkg は開発に使っている Mac にもそのまま入れられます．
+`Release` の macOS の .pkg は，GitHub の Secrets の Developer ID の証明書と公証の資格情報で署名して公証します．Secrets が無ければ作らずに止まります．手で動かす `package-macos.yml` は，Secrets が無ければアドホック署名で作ります．開発に使っている Mac に署名した .pkg を入れるときは，それまで `make install-macos` で入れていたアプリと同じチームで署名している必要があります(データの置き場所がチームに結び付くため．「署名の証明書を変えるとき」を参照)．
 
 Secrets はリポジトリの管理者が入れます．値は `tools/macos/ci_signing.sh` が使い捨てのキーチェーンに入れて使い，仕事が終わると消します．記録には出しません．
 
