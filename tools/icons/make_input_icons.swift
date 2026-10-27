@@ -17,11 +17,12 @@ let previewOutput = arguments.count >= 3 ? URL(fileURLWithPath: arguments[2], is
 
 /// 1 ドット = 1pt の 16pt 四方で描く
 let canvas: CGFloat = 16
-let body = NSRect(x: 1, y: 2, width: 14, height: 12)
-let radius: CGFloat = 3
-/// 字の大きさ．面の縁と字のあいだに余白をとるため，面(14×12)より小さめにする(利用者の指摘で 11 から下げた)
-let glyphSize: CGFloat = 9.5
-let latinSize: CGFloat = 10
+/// 面は 16pt 四方いっぱいにする(macOS の標準の入力ソースのアイコンと同じ大きさ．小さいと並べたときに見劣りする)
+let body = NSRect(x: 0, y: 0, width: 16, height: 16)
+let radius: CGFloat = 3.5
+/// 字の大きさ．標準のアイコンと同じく大きめで細い字にし，太い字で面を埋めない(字の周りに余白が見える)
+let glyphSize: CGFloat = 11.5
+let latinSize: CGFloat = 12
 
 enum Glyph {
     case hiragana
@@ -29,14 +30,13 @@ enum Glyph {
 
     var text: String { self == .hiragana ? "あ" : "A" }
 
-    /// 字の大きさと太さ．抜いた字が 16px でも潰れない太さにする
+    /// 字の大きさと太さ．標準のアイコンに近い細さにし，抜いた字が 16px でも切れない太さにする(ひらがなは W4，英字は medium)
     func font(filled: Bool) -> NSFont {
         switch self {
         case .hiragana:
-            return NSFont(name: filled ? "HiraginoSans-W7" : "HiraginoSans-W6", size: glyphSize) ?? .systemFont(ofSize: glyphSize, weight: .bold)
+            return NSFont(name: filled ? "HiraginoSans-W4" : "HiraginoSans-W5", size: glyphSize) ?? .systemFont(ofSize: glyphSize, weight: .regular)
         case .latin:
-            let base = NSFont.systemFont(ofSize: latinSize, weight: filled ? .heavy : .bold)
-            return base.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: latinSize) } ?? base
+            return NSFont.systemFont(ofSize: latinSize, weight: filled ? .medium : .semibold)
         }
     }
 }
