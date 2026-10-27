@@ -9,37 +9,27 @@
 macOS / Windows / Linux 向けの日本語入力システムです。
 かな漢字変換エンジンには、 [azooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) のエンジンを使用しています。
 
-開発中のため，動きや設定は予告なく変わります．
+開発中のため，仕様は余儀なく変更される可能性があります．
 
 ## 機能
 
 - ライブ変換機能
 - 英単語変換機能 (日本語で入力すると固有名詞等を推測して英単語に変換します)
 - 分岐図を使用した変換メニュー
-- タイピングミスの補正 (Zenzaiで補正します)
+- タイピングミスの補正 (自動補正機能)
 - ローカルへの記録結果の保存 (補正した回数などを記録します)
-
-
-## 今後開発される予定の機能および内容
-
-Windows 版はまだありません．変換中のキーの割り当ては，設定の「キー操作」で変えられます．作る予定の一覧は [docs/specs/REQUIREMENTS.md](docs/specs/REQUIREMENTS.md) にあります．
-
-## 入力内容について
-
-IME 自体は通信を行いません。
-セキュリティの観点から入力した文字列や前の文字列はメモリの中だけで扱います。ログ等にも出力することはありません。
-詳しくは [docs/dev/SECURITY-MODEL.md](docs/dev/SECURITY-MODEL.md) にあります．
+- 高いカスタマイズ性
+- 言い換え変換
 
 ## インストール方法
 
 ダウンロードサイト (準備中) からそれぞれの環境に合ったリリースをダウンロードしてください。
 
-### Windows
-
-### macOS
+### Windows / macOS
+最新バージョンをGitHubリリースからダウンロードできます．
 
 ### Linux 
-
+開発中のため提供されていません．
 
 ## 開発
 
@@ -54,7 +44,7 @@ IME 自体は通信を行いません。
 | [docs/dev/adr/README.md](docs/dev/adr/README.md) | 設計の判断の記録 |
 | [docs/README.md](docs/README.md) | ドキュメントの地図 |
 
-また、脆弱性については [SECURITY.md](SECURITY.md) の手順でお知らせいただけますとタスカリアス。
+また、脆弱性については [SECURITY.md](SECURITY.md) の手順でお知らせいただけますと助かります．
 
 ## ライセンス
 
@@ -62,8 +52,8 @@ MIT License です([LICENSE](LICENSE))．
 
 ### 謝辞
 
-本ソフトウェアは、azooKey(MIT)と Zenzai のモデル(Apache-2.0)を使用しています。
-著作権表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にあります．
+本ソフトウェアは、azooKey(MIT)と Zenzai のモデル(Apache-2.0)を使用しています．
+著作権表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 及び本ソフトウェア内で提示されています．
 
 English: [README.en.md](README.en.md)
 
