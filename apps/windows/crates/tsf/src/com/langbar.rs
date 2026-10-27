@@ -1,5 +1,7 @@
 //! タスクバーの入力モードの表示(「あ」「A」)と入力メニュー．TSF の言語バーの項目(GUID_LBI_INPUTMODE)として出す．
-//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)
+//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)．
+//! Windows 8 からのタスクバーの入力インジケーターは，右クリックで InitMenu を呼ばず OnClick(TF_LBI_CLK_RIGHT) を呼ぶだけなので，
+//! メニューは自分で出す(InitMenu は古い言語バーのために残す)
 
 use super::guard::guard;
 use super::ids::CLSID_TEXT_SERVICE;
@@ -9,8 +11,8 @@ use std::cell::{Cell, RefCell};
 use windows::Win32::Foundation::{COLORREF, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     CreateBitmap, CreateCompatibleDC, CreateDIBSection, CreateFontW, DeleteDC, DeleteObject,
-    DrawTextW, SelectObject, SetBkMode, SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-    CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DT_CENTER,
+    DrawTextW, SelectObject, SetBkMode, SetTextColor, ANTIALIASED_QUALITY, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DT_CENTER,
     DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, FF_DONTCARE, FW_NORMAL, HBITMAP, HGDIOBJ,
     OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
@@ -18,20 +20,24 @@ use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_R
 use windows::Win32::UI::TextServices::{
     ITfLangBarItem, ITfLangBarItemButton, ITfLangBarItemButton_Impl, ITfLangBarItemSink,
     ITfLangBarItem_Impl, ITfMenu, ITfSource, ITfSource_Impl, TfLBIClick, GUID_LBI_INPUTMODE,
-    TF_LANGBARITEMINFO, TF_LBI_CLK_LEFT, TF_LBI_ICON, TF_LBI_STYLE_BTN_BUTTON,
+    TF_LANGBARITEMINFO, TF_LBI_CLK_LEFT, TF_LBI_CLK_RIGHT, TF_LBI_ICON, TF_LBI_STYLE_BTN_BUTTON,
     TF_LBI_STYLE_SHOWNINTRAY, TF_LBI_TEXT, TF_LBI_TOOLTIP, TF_LBMENUF_CHECKED,
     TF_LBMENUF_SEPARATOR,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconIndirect, GetSystemMetrics, HICON, ICONINFO, SM_CXSMICON, SM_CYSMICON,
+    AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DestroyMenu, DestroyWindow,
+    GetSystemMetrics, PostMessageW, SetForegroundWindow, TrackPopupMenuEx, HICON, ICONINFO,
+    MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SM_CXSMICON, SM_CYSMICON, TPM_BOTTOMALIGN,
+    TPM_LEFTALIGN, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_NULL,
+    WS_POPUP,
 };
-use windows_core::{implement, w, IUnknown, Interface, Ref, Result, BOOL, BSTR, GUID, PCWSTR};
+use windows_core::{
+    implement, w, IUnknown, Interface, Ref, Result, BOOL, BSTR, GUID, HSTRING, PCWSTR,
+};
 
 /// 言語バーの項目に知らせてもらう相手(言語バー)の受け付け番号．相手は 1 つだけ
 const SINK_COOKIE: u32 = 1;
 const ICON_FONT: PCWSTR = w!("Yu Gothic UI");
-/// 字の高さをアイコンの何割にするか
-const ICON_TEXT_SCALE: f32 = 0.85;
 
 /// 項目で選んだことを文字入力のサービスに頼む口
 pub trait Actions {
@@ -40,6 +46,8 @@ pub trait Actions {
     /// 手書きの窓を開く(組み立て中の文字を確定してから)
     fn open_handwriting(&self);
     fn toggle_mode(&self);
+    /// エンジンとつながっているか
+    fn connected(&self) -> bool;
 }
 
 #[implement(ITfLangBarItemButton, ITfLangBarItem, ITfSource)]
@@ -55,6 +63,15 @@ impl InputModeItem {
             sink: RefCell::new(None),
             mode: Cell::new(None),
             actions,
+        }
+    }
+
+    /// メニューで選んだ項目を行う
+    fn select(&self, id: u32) {
+        match menu::selection(id) {
+            Some(menu::Selection::Command(command)) => self.actions.run(command),
+            Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
+            None => {}
         }
     }
 
@@ -105,15 +122,20 @@ impl ITfLangBarItem_Impl for InputModeItem_Impl {
     }
 
     fn GetTooltipString(&self) -> Result<BSTR> {
-        Ok(BSTR::from(menu::DESCRIPTION))
+        guard(|| Ok(BSTR::from(menu::tooltip(self.actions.connected()))))
     }
 }
 
 impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
-    fn OnClick(&self, click: TfLBIClick, _pt: &POINT, _prcarea: *const RECT) -> Result<()> {
+    fn OnClick(&self, click: TfLBIClick, pt: &POINT, _prcarea: *const RECT) -> Result<()> {
         guard(|| {
             if click == TF_LBI_CLK_LEFT {
                 self.actions.toggle_mode();
+            } else if click == TF_LBI_CLK_RIGHT {
+                let items = menu::items(self.actions.menu_settings().as_ref());
+                if let Some(id) = popup(&items, *pt)? {
+                    self.select(id);
+                }
             }
             Ok(())
         })
@@ -149,11 +171,7 @@ impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
 
     fn OnMenuSelect(&self, wid: u32) -> Result<()> {
         guard(|| {
-            match menu::selection(wid) {
-                Some(menu::Selection::Command(command)) => self.actions.run(command),
-                Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
-                None => {}
-            }
+            self.select(wid);
             Ok(())
         })
     }
@@ -193,6 +211,66 @@ impl ITfSource_Impl for InputModeItem_Impl {
     }
 }
 
+/// 右クリックのメニューを at(画面の座標)に出し，選んだ項目の番号を返す．選ばずに閉じたら None
+fn popup(items: &[Item], at: POINT) -> Result<Option<u32>> {
+    // SAFETY: メニューと持ち主の窓はこの関数の中で作って消す．文字列は AppendMenuW の呼び出しのあいだ生きている
+    unsafe {
+        let menu = CreatePopupMenu()?;
+        let mut appended = Ok(());
+        for item in items {
+            appended = match item {
+                Item::Command { id, label, checked } => {
+                    let check = if *checked { MF_CHECKED } else { MF_UNCHECKED };
+                    let label = HSTRING::from(*label);
+                    AppendMenuW(menu, MF_STRING | check, *id as usize, &label)
+                }
+                Item::Separator => AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()),
+            };
+            if appended.is_err() {
+                break;
+            }
+        }
+        // メニューの持ち主はこのスレッドの窓でなければならない．入力先のアプリの窓は使わず，見えない窓を作る．
+        // 前に出しておかないと，メニューの外をクリックしても閉じない
+        let owner = match appended.and_then(|()| {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                None,
+                None,
+            )
+        }) {
+            Ok(owner) => owner,
+            Err(error) => {
+                let _ = DestroyMenu(menu);
+                return Err(error);
+            }
+        };
+        let _ = SetForegroundWindow(owner);
+        let chosen = TrackPopupMenuEx(
+            menu,
+            (TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_BOTTOMALIGN).0,
+            at.x,
+            at.y,
+            owner,
+            None,
+        );
+        // 次にメニューを出したときにすぐ閉じないよう，持ち主の窓にメッセージを送ってから消す
+        let _ = PostMessageW(Some(owner), WM_NULL, Default::default(), Default::default());
+        let _ = DestroyWindow(owner);
+        let _ = DestroyMenu(menu);
+        Ok(u32::try_from(chosen.0).ok().filter(|id| *id != 0))
+    }
+}
+
 /// タスクバーの色(ライトかダークか)に合わせた字の色．読めなければダーク(白い字)にする
 fn text_color() -> (u8, u8, u8) {
     let mut light = 0u32;
@@ -216,7 +294,7 @@ fn text_color() -> (u8, u8, u8) {
     }
 }
 
-/// 字 1 つを描いたアイコン．呼び出し側(言語バー)が消す
+/// 角丸の面から字 1 つを抜いたアイコン．呼び出し側(言語バー)が消す
 fn text_icon(text: &str) -> Result<HICON> {
     // SAFETY: GDI のオブジェクトはこの関数の中で作って消す．DIB の画素は width × height の 32 ビットで，
     // CreateDIBSection が返した bits を DeleteObject の前だけ読み書きする
@@ -241,7 +319,7 @@ fn text_icon(text: &str) -> Result<HICON> {
         let color = CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)?;
         let mask = CreateBitmap(width, height, 1, 1, None);
         let font = CreateFontW(
-            -((height as f32 * ICON_TEXT_SCALE) as i32),
+            -crate::icon::glyph_size(text, height),
             0,
             0,
             0,
@@ -252,13 +330,14 @@ fn text_icon(text: &str) -> Result<HICON> {
             DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS,
             CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY,
+            // 色ずれの無い覆う割合がほしいので ClearType にしない
+            ANTIALIASED_QUALITY,
             FF_DONTCARE.0 as u32,
             ICON_FONT,
         );
         let old_bitmap = SelectObject(dc, HGDIOBJ(color.0));
         let old_font = SelectObject(dc, HGDIOBJ(font.0));
-        // 黒の地に白で描き，明るさを不透明度にして，字の色で塗り直す
+        // 黒の地に白で描いて字の覆う割合を取り，角丸の面から抜いて，字の色で塗る(crate::icon)
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, COLORREF(0x00FF_FFFF));
         let mut rect = RECT {
@@ -276,13 +355,13 @@ fn text_icon(text: &str) -> Result<HICON> {
         );
         let (red, green, blue) = text_color();
         if !bits.is_null() {
-            let pixels =
-                std::slice::from_raw_parts_mut(bits as *mut u32, (width * height) as usize);
-            for pixel in pixels.iter_mut() {
-                let coverage = ((*pixel >> 16) & 0xFF)
-                    .max((*pixel >> 8) & 0xFF)
-                    .max(*pixel & 0xFF);
-                *pixel = (coverage << 24)
+            let (columns, rows) = (width as usize, height as usize);
+            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, columns * rows);
+            let glyph: Vec<u8> = pixels.iter().map(|pixel| (*pixel >> 8) as u8).collect();
+            let glyph = crate::icon::centered(&glyph, columns, rows);
+            let plate = crate::icon::plate_coverage(columns, rows);
+            for (pixel, opacity) in pixels.iter_mut().zip(crate::icon::compose(&plate, &glyph)) {
+                *pixel = (u32::from(opacity) << 24)
                     | (u32::from(red) << 16)
                     | (u32::from(green) << 8)
                     | u32::from(blue);

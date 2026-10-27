@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 
 pub mod filter;
+pub mod icon;
 pub mod key;
 pub mod late;
 pub mod layout;

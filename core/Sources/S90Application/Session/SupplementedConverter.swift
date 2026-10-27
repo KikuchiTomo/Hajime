@@ -137,6 +137,9 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func segmentationWords(for reading: String) -> [Candidate.Word] { base.segmentationWords(for: reading) }
     public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { base.typoCorrections(forKeys: keys) }
     public func setLeftContext(_ text: String?) { base.setLeftContext(text) }
+    public func setTyping(_ typing: Bool) { base.setTyping(typing) }
+    public var hasDeferredConversion: Bool { base.hasDeferredConversion }
+    public func performDeferredConversion() { base.performDeferredConversion() }
     public func didCommit(_ candidate: Candidate) {
         recordDictionaryCommit(candidate)
         base.didCommit(candidate)

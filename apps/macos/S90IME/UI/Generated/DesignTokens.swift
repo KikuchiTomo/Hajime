@@ -271,6 +271,26 @@ enum DesignTokens {
             static let windowHeight: CGFloat = 700
             static let windowMinWidth: CGFloat = 640
             static let windowMinHeight: CGFloat = 480
+            static let navGroupGap: CGFloat = 12
+            static let navHeaderFontSize: CGFloat = 12
+            static let controlRadius: CGFloat = 4
+            static let fieldPaddingX: CGFloat = 11
+            static let focusStroke: CGFloat = 2
+            static let chevronSize: CGFloat = 12
+            static let flyoutPadding: CGFloat = 4
+            static let flyoutItemHeight: CGFloat = 32
+            static let flyoutRadius: CGFloat = 8
+            static let tableRowHeight: CGFloat = 30
+            static let tableHeaderHeight: CGFloat = 32
+            static let scrollbarThin: CGFloat = 2
+            static let scrollbarWide: CGFloat = 6
+            static let scrollbarMargin: CGFloat = 3
+            static let scrollbarHit: CGFloat = 14
+            static let scrollbarMinThumb: CGFloat = 24
+            static let progressRingSize: CGFloat = 32
+            static let progressRingStroke: CGFloat = 3
+            static let pageEnterOffset: CGFloat = 12
+            static let wheelStep: CGFloat = 48
         }
     }
     enum Motion {
@@ -283,6 +303,17 @@ enum DesignTokens {
         }
         enum CandidateRest {
             static let fadeIn: Double = 250
+        }
+        enum SettingsWindows {
+            static let pageEnter: Double = 167
+            static let hover: Double = 83
+            static let toggle: Double = 167
+            static let flyout: Double = 167
+            static let navIndicator: Double = 167
+            static let scroll: Double = 200
+            static let scrollbarIdle: Double = 1200
+            static let scrollbarFade: Double = 250
+            static let progressRing: Double = 1400
         }
     }
     enum Opacity {
@@ -317,6 +348,8 @@ enum DesignTokens {
         }
         enum Settings {
             static let keyFilter: CGFloat = 0.15
+            static let subtleSelected: CGFloat = 0.08
+            static let subtleHover: CGFloat = 0.05
         }
     }
 }

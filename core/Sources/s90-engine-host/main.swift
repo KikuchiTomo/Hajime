@@ -104,6 +104,7 @@ func run() -> Int32 {
         FileHandle.standardError.write(Data("名前付きパイプを作れません: \(error)\n".utf8))
         return 1
     }
+    EngineProcess.requestFullExecutionSpeed()
     #else
     let engineListener: UnixSocketListener
     let windowListener: UnixSocketListener

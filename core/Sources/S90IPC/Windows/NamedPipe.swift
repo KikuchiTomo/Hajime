@@ -201,6 +201,21 @@ public enum NamedPipePeer {
         guard QueryFullProcessImageNameW(process, 0, &buffer, &size) else { return nil }
         return String(decoding: buffer.prefix(Int(size)), as: UTF16.self)
     }
+
+    /// 実行ファイルの場所が同じか．imagePath は \ で区切るが，URL.path は Windows でも / で区切り，
+    /// 先頭に / が付くこともあるので，形をそろえてから大文字と小文字を区別せずに比べる
+    public static func isSameImage(_ path: String, as expected: String) -> Bool {
+        normalizedImagePath(path).caseInsensitiveCompare(normalizedImagePath(expected)) == .orderedSame
+    }
+
+    static func normalizedImagePath(_ path: String) -> String {
+        var normalized = path.replacingOccurrences(of: "/", with: "\\")
+        // "\C:\..." の先頭の区切りを外す(UNC の "\\server\..." はそのまま)
+        if normalized.hasPrefix("\\"), normalized.dropFirst(2).first == ":" {
+            normalized.removeFirst()
+        }
+        return normalized
+    }
 }
 
 extension NSLock {

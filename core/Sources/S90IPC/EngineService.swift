@@ -13,6 +13,8 @@ public final class EngineService {
     /// 手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔
     public static let handwritingPollMilliseconds = milliseconds(DefaultSettings.handwritingPollInterval)
     public static let latticeWarmingPollMilliseconds = milliseconds(DefaultSettings.latticeWarmingPollInterval)
+    /// 入力中の表示で済ませなかった Zenzai の変換を，打鍵の合間に求めるために DLL に来てもらう間隔
+    public static let deferredConversionPollMilliseconds = milliseconds(DefaultSettings.deferredConversionPollInterval)
     /// 候補の窓を出しているあいだ，DLL がマウスで押した候補を取りに来る間隔
     public static let candidateClickPollMilliseconds = milliseconds(DefaultSettings.candidateClickPollInterval)
 
@@ -454,7 +456,12 @@ public final class EngineService {
                     current.input.skipReview()
                 }
             }
-        } else if current.input.awaitsSettle {
+        } else if current.input.awaitsDeferredConversion {
+            current.input.performDeferredConversion()
+            // 打鍵の合間に，Space で出す分岐図の候補も 1 文節ずつ前もって求める．文節の候補は読みごとにためるので，
+            // 打ち進めても前の文節の分は使える(打ってすぐ Space を押しても，求めるのは新しい文節の分だけになる)
+            sessions[session]?.warming = current.input.latticeWarmingSteps
+        } else if current.input.awaitsSettle, settleDelay(of: current) == 0 {
             actions += current.input.settle(context: context)
             sessions[session]?.hasSettled = true
             // 見直しを待つあいだに，Space で出す分岐図の候補を前もって求める(macOS の S90InputController と同じ)
@@ -538,14 +545,25 @@ public final class EngineService {
         guard let current = sessions[session] else { return nil }
         if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
-        if current.input.awaitsSettle {
-            return Self.milliseconds(delays.liveConversionDelay)
-        }
+        if current.input.awaitsDeferredConversion { return Self.deferredConversionPollMilliseconds }
         if !current.warming.isEmpty { return Self.latticeWarmingPollMilliseconds }
+        if current.input.awaitsSettle {
+            return Self.milliseconds(settleDelay(of: current))
+        }
         if current.input.awaitsReview {
             return Self.milliseconds(reviewDelay(of: current))
         }
         return nil
+    }
+
+    /// 打鍵が止まったとみなすまでの残りの時間(秒)．打鍵から liveConversionDelay たつまで待つ
+    /// (打鍵の合間に Zenzai の変換を求めて wake が挟まっても，止まったとみなす時機は変えない)
+    private func settleDelay(of current: Session) -> Double {
+        let delay = settings.current.liveConversionDelay
+        guard let stoppedAt = current.stoppedAt else { return delay }
+        let elapsed = now() - stoppedAt
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return max(delay - seconds, 0)
     }
 
     /// 見直すまでの残りの時間(秒)．打鍵が止まってから correctionDelay たつまで待つ

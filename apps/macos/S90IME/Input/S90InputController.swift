@@ -88,8 +88,17 @@ final class S90InputController: IMKInputController {
         guard settles || session.awaitsReview else { return }
         settleTask = Task { @MainActor [weak self] in
             let start = ContinuousClock.now
+            // Zenzai が遅い環境で入力中の表示を Zenzai なしで求めたときは，打鍵の合間に Zenzai の変換を求めておく
+            // (打鍵が止まったときと Space ですぐ使える．Windows の EngineService の wake と同じ)
+            if let self, self.session.awaitsDeferredConversion {
+                try? await Task.sleep(for: .seconds(DefaultSettings.deferredConversionPollInterval))
+                guard !Task.isCancelled else { return }
+                self.session.performDeferredConversion()
+                // 分岐図の候補も 1 文節ずつ前もって求める(文節ごとに次のキーに譲る)
+                await self.warmLattice()
+            }
             if settles {
-                try? await Task.sleep(for: .seconds(settleDelay))
+                try? await Task.sleep(until: start + .seconds(settleDelay), clock: .continuous)
                 guard !Task.isCancelled, let self else { return }
                 self.presenter.apply(self.session.settle(context: context), to: client)
                 // 見直しを待つあいだに，Space で出す分岐図の候補を前もって求める

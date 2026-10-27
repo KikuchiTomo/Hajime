@@ -601,6 +601,9 @@ pub mod windows {
     pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
     /// 変換エンジン(s90-engine-host)に設定を頼めないとき
     pub const ENGINE_UNAVAILABLE: &str = "変換エンジンが動いていないため、設定を読み込めません";
+    /// 変換エンジンにつながらないときの案内(設定の画面がエンジンを起動し，つながるまでつなぎ直す)
+    pub const ENGINE_UNAVAILABLE_DETAIL: &str =
+        "変換エンジンが動いていないため、設定を読み込めません。エンジンを起動して、つながるまで待っています。しばらくしても変わらないときは、サインインし直してください。";
 }
 
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．

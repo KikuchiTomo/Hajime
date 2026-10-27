@@ -154,7 +154,7 @@ fn close(key: HKEY) {
     let _ = unsafe { RegCloseKey(key) };
 }
 
-fn module_path() -> Result<String> {
+pub(super) fn module_path() -> Result<String> {
     let mut module = HMODULE::default();
     let address = module_path as *const () as *const u16;
     unsafe {

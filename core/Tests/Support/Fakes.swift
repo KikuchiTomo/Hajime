@@ -42,7 +42,16 @@ public final class FakeConverter: KanaKanjiConverting {
     /// 候補の文字列ごとの語の並び(本物のエンジンの候補が持つもの)．直した語句の位置を求めるのに使う
     public var candidateWords: [String: [Candidate.Word]] = [:]
 
+    /// 入力中の表示を求めているか(setTyping)と，候補を求めた読みごとにそのときの値
+    public private(set) var typing = false
+    public private(set) var requests: [(reading: String, typing: Bool)] = []
+
+    public func setTyping(_ typing: Bool) {
+        self.typing = typing
+    }
+
     public func candidates(for reading: String) -> [Candidate] {
+        requests.append((reading, typing))
         // 本物と同じく，空の読みには空の配列を返す
         guard !reading.isEmpty else { return [] }
         return (table[reading] ?? []).enumerated().map { index, entry in

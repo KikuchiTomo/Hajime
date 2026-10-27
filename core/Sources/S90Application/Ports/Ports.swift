@@ -57,9 +57,19 @@ public protocol KanaKanjiConverting: AnyObject {
     func setApplication(_ identifier: String?)
     /// 候補がどの取り込んだ辞書の語か(分岐図に小さく出す)．取り込んだ辞書の語でなければ nil
     func sourceName(of text: String, reading: String) -> String?
+    /// 打鍵が止まる前の入力中の表示(ライブ変換)を求めているあいだは true．文脈を見る変換(Zenzai)が 1 キーの時間に
+    /// 収まらない環境(GPU の無い Windows など)では，そのあいだ Zenzai を使わずに求め，打鍵が止まったときや Space では使う
+    func setTyping(_ typing: Bool)
+    /// 入力中の表示を Zenzai なしで求めたため，打鍵の合間に Zenzai で求めておく読みがあるか
+    var hasDeferredConversion: Bool { get }
+    /// 打鍵の合間に，Zenzai なしで済ませた読みを Zenzai で求めておく(打鍵が止まったときや Space ですぐ使えるように)
+    func performDeferredConversion()
 }
 
 extension KanaKanjiConverting {
+    public func setTyping(_ typing: Bool) {}
+    public var hasDeferredConversion: Bool { false }
+    public func performDeferredConversion() {}
     public func predictions(for reading: String) -> [Candidate] { [] }
     public func dictionaryCandidates(for reading: String) -> [Candidate] { candidates(for: reading) }
     public func segmentCandidates(for reading: String) -> [Candidate] { candidates(for: reading) }

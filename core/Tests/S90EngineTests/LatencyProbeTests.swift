@@ -39,6 +39,12 @@ struct LatencyProbeTests {
             var durations: [Duration] = []
             for key in keys {
                 durations.append(clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) })
+                // アプリと同じく，打鍵の合間に Zenzai の変換を追いかけて求め，分岐図の候補も前もって求める(Zenzai が遅い環境だけ．
+                // 1 キーの時間には入れない)．文節の候補はためてあるので，求めるのは新しい文節の分だけで，人の打鍵の間に収まる
+                if session.awaitsDeferredConversion {
+                    session.performDeferredConversion()
+                    session.latticeWarmingSteps.forEach { $0() }
+                }
             }
             _ = session.handle(KeyEvent(.enter), context: InputContext())
             guard pass > 0 else { continue }
@@ -82,6 +88,12 @@ struct LatencyProbeTests {
             var durations: [Duration] = []
             for key in keys {
                 durations.append(clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) })
+                // アプリと同じく，打鍵の合間に Zenzai の変換を追いかけて求め，分岐図の候補も前もって求める(Zenzai が遅い環境だけ．
+                // 1 キーの時間には入れない)．文節の候補はためてあるので，求めるのは新しい文節の分だけで，人の打鍵の間に収まる
+                if session.awaitsDeferredConversion {
+                    session.performDeferredConversion()
+                    session.latticeWarmingSteps.forEach { $0() }
+                }
             }
             space = min(space, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
             // 変換中の文節の移動と，文節の長さを変える操作(区切り直しと下見)
@@ -101,7 +113,8 @@ struct LatencyProbeTests {
         // 打鍵が止まったあいだに前もって求めていれば，Space は文節ごとに変換し直さない
         // 前もって求める 1 歩のあいだに来たキーはその分待つので，1 歩も 1 キーと同じく 50ms 以内
         #expect(warmingStep < .milliseconds(50), "前もって求める 1 歩が 50ms を超えた: \(warmingStep)")
-        #expect(warmedSpace < space, "前もって求めても Space が速くならない: \(warmedSpace)，求めないとき \(space)")
+        // Zenzai が遅い環境では打鍵の合間にも前もって求めるので，止まらずに押した Space も同じくらい速い(そのときは 50ms 以内を見る)
+        #expect(warmedSpace < space || warmedSpace < .milliseconds(50), "前もって求めても Space が速くならない: \(warmedSpace)，求めないとき \(space)")
         #expect(right < .milliseconds(150) && resize < .milliseconds(150), "長い文で変換中の操作が 0.15 秒を超えた: → \(right)，⇧→ \(resize)")
     }
 
