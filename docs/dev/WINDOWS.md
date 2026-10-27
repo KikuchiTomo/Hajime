@@ -24,6 +24,7 @@
 - `ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決める
 - `OnTestKeyDown` はエンジンに問い合わせない．応答に入っている `SessionState`(組み立て中か，モード，今の状態で受け取るキー)の写しで答える
 - 打鍵が止まったときの表示の切り替えと打ち間違いの見直しは，エンジンが待つ時間を返し，DLL がタイマーで `wake` を送る
+- DLL はキーの返事を `keyResponseMilliseconds`(50ms)まで待ち，間に合わなければタイマーで後から反映する．変換のキー(Space・変換)だけは `conversionResponseMilliseconds`(250ms)まで待つ．Zenzai で文全体を変換し直すので CPU では 100ms ほどかかり，後から反映すると変換が出るまでに間が空くため
 - DLL のタイマーは，入力先のアプリのスレッドごとに作るメッセージ専用の窓に付ける(`crates/tsf/src/com/timer.rs`)．窓の無いタイマー(`SetTimer(None, …)`)の知らせは宛先の窓が無く，アプリのメッセージの処理によっては配られないため．配られないと，Space の変換の遅れた返事・打鍵が止まったときの変換・打ち間違いの見直しが画面に出ない(0.1.4 で起きた)
 - タスクバーの入力モードの表示は，言語バーの項目(`GUID_LBI_INPUTMODE`．`crates/tsf/src/com/langbar.rs`)で出す．右クリックのメニューの項目は macOS の入力メニューと同じ(`crates/tsf/src/menu.rs`)で，選んだ操作は `menu` の要求でエンジンに頼む
 - 設定の「キー配列」(ABC・US・Dvorak・Colemak)は，DLL がキーの位置(スキャンコード)から文字を引く表(`crates/tsf/src/layout.rs`)で打つ．Windows で配列を読み込むと利用者の配列の一覧が変わるため，OS の配列は切り替えない．ローマ字入力と英字入力のときだけ使い，Ctrl・Alt を押したショートカットは OS の配列のまま
