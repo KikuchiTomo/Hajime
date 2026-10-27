@@ -7,7 +7,9 @@ import S90Domain
 ///
 /// 訂正は探す幅を広げると 1 文に 1 秒ほどかかる．メインスレッドで求めると打鍵が止まるので，
 /// 表示に使う変換器とは別の変換器を持ち，このアクターの中だけで使う(azooKey の変換器はスレッドセーフではない)．
-/// 辞書と Zenzai のモデルを別に読み込むぶん，メモリは増える．学習はしない(読むだけ)
+/// Zenzai も表示の変換とは別の推論の文脈で使う(ZenzaiModel.separateContextURL)．同じ文脈を使うと，
+/// 訂正を求めているあいだ表示の変換が文脈の順番を待って止まる．
+/// 辞書と推論の文脈を別に持つぶん，メモリは増える(モデルの重みは共有する)．学習はしない(読むだけ)
 public actor ZenzaiTypoService: TypoCorrecting {
     private let converter: KanaKanjiConverter
     private let zenzai: ZenzaiModel
@@ -140,7 +142,7 @@ public actor ZenzaiTypoService: TypoCorrecting {
             textReplacer: .empty,
             specialCandidateProviders: [],
             zenzaiMode: .on(
-                weight: zenzai.url,
+                weight: zenzai.separateContextURL,
                 inferenceLimit: DefaultSettings.zenzaiInferenceLimit,
                 personalizationMode: nil,
                 versionDependentMode: .v3(.init(leftSideContext: leftContext, maxLeftSideContextLength: DefaultSettings.maximumLeftContextLength))

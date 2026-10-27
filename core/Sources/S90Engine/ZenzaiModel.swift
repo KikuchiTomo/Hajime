@@ -23,6 +23,17 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     public let url: URL
 
+    /// 表示の変換とは別の推論の文脈で Zenzai を使うための場所(打ち間違いの訂正 ZenzaiTypoService が使う)．
+    ///
+    /// azooKey は Zenzai を場所(URL の文字列)ごとに 1 つ共有し，推論を 1 本ずつ流す．訂正が表示の変換と同じ文脈を使うと，
+    /// 訂正を求めているあいだ打鍵の変換が待たされる(CPU で推論する Windows では 1〜2 秒止まる)．
+    /// フラグメントを付けた URL は別の文脈になる．読むファイル(path)は同じなので，モデルの重みは共有したまま
+    public var separateContextURL: URL {
+        URL(string: url.absoluteString + "#" + Self.separateContextFragment) ?? url
+    }
+
+    static let separateContextFragment = "typo"
+
     /// ファイルを確かめてから作る．大きさとハッシュのどちらかが違えば使わない
     public static func verified(at url: URL) throws(VerificationError) -> ZenzaiModel {
         try verified(at: url, expectedSize: expectedSize, expectedSHA256: expectedSHA256)
