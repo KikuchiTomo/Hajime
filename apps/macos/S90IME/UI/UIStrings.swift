@@ -291,6 +291,8 @@ enum UIStrings {
         static let update = "更新"
         static let edit = "編集"
         static let enabled = "有効"
+        /// 列の見出しを押したときの読み上げの案内
+        static let sortHint = "並べ替え"
         static func overwrites(_ key: String) -> String { "「\(key)」はすでにあります。追加すると上書きします。" }
         static let alreadyRegistered = "すでに登録されています。"
         static let full = "これ以上は追加できません。"

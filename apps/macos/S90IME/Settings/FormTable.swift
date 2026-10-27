@@ -7,7 +7,8 @@ import SwiftUI
 /// 高さを決めた表では，はみ出した行が見えなくなる．scrollDisabled(false)・isScrollEnabled・別の NSHostingView に入れる，
 /// のどれでも戻らない(macOS 26 で確かめた)．表は止められたホイールの動きを外(レスポンダチェーン)へ渡すので，
 /// 表を AppKit の入れ物(DetachedContainer)に入れてその動きを受け，表の中を動かす．
-/// 表は入れ物の中の NSHostingView で描く．中身は更新のたびに入れ替えるので，状態とバインディングはそのまま効く
+/// 表は入れ物の中の NSHostingView で描く．中身は更新のたびに入れ替えるので，状態とバインディングはそのまま効く．
+/// 列の見出しは表の外に FormTableHeader で描く
 struct FormTableHost<Content: View>: NSViewRepresentable {
     private let content: Content
 
@@ -54,55 +55,9 @@ struct FormTableHost<Content: View>: NSViewRepresentable {
         override func layout() {
             super.layout()
             // Form が消したスクロールバーを出す(行がはみ出していることが見て分かるように)
-            guard let scroll = tableScrollView else { return }
-            if !scroll.hasVerticalScroller {
-                scroll.hasVerticalScroller = true
-                scroll.autohidesScrollers = true
-            }
-            watch(scroll.contentView)
-            placeHeader()
-        }
-
-        // MARK: 列の見出し
-        //
-        // 列の見出しは，表のスクロールビューの上の端に重ねた別の入れ物(高さは見出しの高さ)に描かれる．Form の中の表では
-        // 上の余白(contentInsets)が 0 になるので，行は見出しの下に潜る．上の端を見出しの高さぶん上(-見出しの高さ)にして
-        // 1 行目を見出しの下から並べる．SwiftUI が表を描き直すと位置を 0 に戻すので，上の端にいるあいだは戻し直す
-
-        /// 見張っているスクロールの中身
-        private weak var watchedClip: NSClipView?
-        /// 表の上の端にいるか．上の端にいるあいだに SwiftUI が位置を 0 に戻したら，見出しの下に戻す
-        private var isAtTop = true
-
-        private var header: NSTableHeaderView? {
-            (tableScrollView?.documentView as? NSTableView)?.headerView
-        }
-
-        private func watch(_ clip: NSClipView) {
-            guard watchedClip !== clip else { return }
-            watchedClip.map { NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: $0) }
-            watchedClip = clip
-            isAtTop = true
-            clip.postsBoundsChangedNotifications = true
-            NotificationCenter.default.addObserver(self, selector: #selector(clipMoved), name: NSView.boundsDidChangeNotification, object: clip)
-        }
-
-        @objc private func clipMoved(_ notification: Notification) {
-            placeHeader()
-        }
-
-        /// 上の端にいれば，1 行目を見出しの下に並べる
-        private func placeHeader() {
-            guard let scroll = tableScrollView, let header, header.frame.height > 0 else { return }
-            let clip = scroll.contentView
-            let top = -header.frame.height
-            if isAtTop, clip.bounds.origin.y != top, clip.bounds.origin.y <= 0 {
-                clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: top))
-                scroll.reflectScrolledClipView(clip)
-            } else if clip.bounds.origin.y > 0 {
-                isAtTop = false
-            }
-
+            guard let scroll = tableScrollView, !scroll.hasVerticalScroller else { return }
+            scroll.hasVerticalScroller = true
+            scroll.autohidesScrollers = true
         }
 
         /// 表はスクロールを止められているので，ホイールの動きを受け取って表の中を動かす．
@@ -113,21 +68,71 @@ struct FormTableHost<Content: View>: NSViewRepresentable {
             if !scrollTable(by: delta) { super.scrollWheel(with: event) }
         }
 
-        /// 表の中を delta だけ動かす．端にいて動かせなければ false．上の端は見出しの高さぶん上
+        /// 表の中を delta だけ動かす．端にいて動かせなければ false
         @discardableResult
         func scrollTable(by delta: CGFloat) -> Bool {
             guard let scroll = tableScrollView, let document = scroll.documentView else { return false }
             let clip = scroll.contentView
-            let top = -(header?.frame.height ?? 0)
-            let bottom = max(top, document.frame.height - clip.bounds.height)
+            let bottom = max(0, document.frame.height - clip.bounds.height)
             let current = clip.bounds.origin.y
-            let target = min(max(current - delta, top), bottom)
+            let target = min(max(current - delta, 0), bottom)
             guard target != current else { return false }
-            isAtTop = target == top
             clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: target))
             scroll.reflectScrolledClipView(clip)
-            placeHeader()
             return true
+        }
+    }
+}
+
+/// 表の列の見出し．FormTableHost の表の上(スクロールの外)に置き，表の見出しは .tableColumnHeaders(.hidden) で隠す．
+///
+/// 表の見出し(NSTableHeaderView)は，Form の中では地が描かれず，位置も SwiftUI に動かされる．スクロールすると行が見出しの下を通って
+/// 重なり，外から位置や地を直しても描き直しで戻された．見出しを表の外に描けば，行は見出しの下を通らない．
+/// 列の幅は表の列と同じ値(DesignTokens)を使い，最後の列だけを残りの幅にする
+struct FormTableHeader: View {
+    struct Column {
+        let title: String
+        /// nil なら残りの幅
+        var width: CGFloat?
+        /// 押して並べ替える列なら，押したときの動き
+        var sort: (() -> Void)?
+        /// 並べ替えている向き(昇順なら true)．並べ替えていなければ nil
+        var ascending: Bool?
+        /// 列の中身の文字が左に余白を持つとき(ポップアップなど)，見出しもその分ずらす
+        var leadingInset: CGFloat = 0
+    }
+
+    let columns: [Column]
+
+    var body: some View {
+        HStack(spacing: DesignTokens.Size.Settings.tableColumnSpacing) {
+            ForEach(columns.indices, id: \.self) { index in
+                cell(columns[index])
+                    .padding(.leading, columns[index].leadingInset)
+                    .frame(width: columns[index].width, alignment: .leading)
+                    .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, DesignTokens.Size.Settings.tableHeaderInset)
+    }
+
+    @ViewBuilder
+    private func cell(_ column: Column) -> some View {
+        if let sort = column.sort {
+            Button(action: sort) {
+                HStack {
+                    Text(column.title)
+                    if let ascending = column.ascending {
+                        Image(systemName: ascending ? "chevron.up" : "chevron.down").imageScale(.small)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(UIStrings.RuleList.sortHint)
+        } else {
+            Text(column.title)
         }
     }
 }

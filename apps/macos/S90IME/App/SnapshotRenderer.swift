@@ -116,6 +116,25 @@ enum SnapshotRenderer {
         }
         SettingsFixture.settle(scrolled)
         if let frame = scrolled.contentView?.superview { render(frame, name: "settings-apps-scrolled", to: output, appearance: NSAppearance(named: .aqua)) }
+        // スクロールの途中(行が見出しの下を通るところ)．上の端に戻した画像だけでは，見出しと行の重なりが写らない
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            if let content = scrolled.contentView {
+                var stack: [NSView] = [content]
+                while let view = stack.popLast() {
+                    if let container = view as? any FormTableContainer {
+                        container.scrollTable(by: 10_000)
+                        container.scrollTable(by: -DesignTokens.Size.Settings.ruleTableHeight / 2)
+                    }
+                    stack.append(contentsOf: view.subviews)
+                }
+            }
+            SettingsFixture.settle(scrolled)
+            if let frame = scrolled.contentView?.superview {
+                render(frame, name: "settings-apps-scrolled-middle\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+            }
+        }
+        NSApp.appearance = NSAppearance(named: .aqua)
         scrolled.close()
         // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
