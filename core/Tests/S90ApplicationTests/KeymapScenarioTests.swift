@@ -250,6 +250,31 @@ struct KeymapScenarioTests {
         #expect(harness.lattice?.note == "学習から削除しました")
     }
 
+    @Test("分岐図の文節が文全体の候補を切り出したもので，文節の候補に無いときは，文全体の候補のうちその文節の語だけを学習から消す")
+    func forgetSegmentOfSentence() {
+        let converter = FakeConverter([
+            "きょうはいいてんきです": [("教派言い天気です", nil)],
+            "きょうはいい": [("今日はいい", nil)],
+            "てんきです": [("天気です", nil)],
+        ])
+        let words = [
+            Candidate.Word(text: "教派言い", readingCount: 6, startsWithNoun: true),
+            Candidate.Word(text: "天気", readingCount: 3, startsWithNoun: true), Candidate.Word(text: "です", readingCount: 2),
+        ]
+        converter.candidateWords["教派言い天気です"] = words
+        converter.words["きょうはいいてんきです"] = words
+        let harness = Harness(converter: converter)
+        harness.type("kyouhaiitenkidesu")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["教派言い", "天気です"])
+        while harness.lattice?.columns.first?.isFocused == false { harness.press(.left) }
+        harness.press(.backspace, .control)
+        #expect(converter.forgotten.isEmpty)
+        #expect(converter.forgottenRanges.map(\.text) == ["教派言い天気です"])
+        #expect(converter.forgottenRanges.map(\.range) == [0..<6])
+        #expect(harness.lattice?.note == "学習から削除しました")
+    }
+
     @Test("R-17: 入力文字なしで最後の学習を取り消し，次のキーで案内を消す")
     func forgetLastCommit() {
         let converter = FakeConverter(["かな": [("仮名", nil)]])
