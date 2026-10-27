@@ -911,7 +911,7 @@ mod tests {
 
     #[test]
     fn 角丸のテーマは曲線の枝で_選んだ枝を最後に選択の色で描く() {
-        let theme = theme("automatic");
+        let theme = theme("nordic");
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         let curves: Vec<_> = scene
             .draws

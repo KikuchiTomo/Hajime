@@ -20,6 +20,18 @@ pub struct Palette {
 }
 
 pub const THEMES: &[(&str, Palette)] = &[
+    ("standard", Palette {
+        bevel_light: Rgb { red: 0x1E, green: 0x1E, blue: 0x1E },
+        bevel_shadow: Rgb { red: 0x1E, green: 0x1E, blue: 0x1E },
+        correction: Rgb { red: 0xFF, green: 0x37, blue: 0x5F },
+        frame: Rgb { red: 0xA9, green: 0xA8, blue: 0xB6 },
+        prediction: Rgb { red: 0xA9, green: 0xA8, blue: 0xB6 },
+        selection: Rgb { red: 0x01, green: 0x69, blue: 0xFF },
+        selection_text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        surface: Rgb { red: 0x1E, green: 0x1E, blue: 0x1E },
+        text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        text_muted: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+    }),
     ("platinum", Palette {
         bevel_light: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         bevel_shadow: Rgb { red: 0x99, green: 0x99, blue: 0x99 },
@@ -403,6 +415,9 @@ pub mod size {
         pub const PROGRESS_RING_STROKE: f32 = 3.0;
         pub const PAGE_ENTER_OFFSET: f32 = 12.0;
         pub const WHEEL_STEP: f32 = 48.0;
+    }
+    pub mod standard_theme {
+        pub const CORNER_RADIUS: f32 = 12.0;
     }
 }
 

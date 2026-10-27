@@ -23,6 +23,18 @@ struct ThemePalette: Equatable, Sendable {
 
 enum DesignTokens {
     enum Palette {
+        static let standard = ThemePalette(
+            bevelLight: RGB(red: 0x1E, green: 0x1E, blue: 0x1E),
+            bevelShadow: RGB(red: 0x1E, green: 0x1E, blue: 0x1E),
+            correction: RGB(red: 0xFF, green: 0x37, blue: 0x5F),
+            frame: RGB(red: 0xA9, green: 0xA8, blue: 0xB6),
+            prediction: RGB(red: 0xA9, green: 0xA8, blue: 0xB6),
+            selection: RGB(red: 0x01, green: 0x69, blue: 0xFF),
+            selectionText: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            surface: RGB(red: 0x1E, green: 0x1E, blue: 0x1E),
+            text: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            textMuted: RGB(red: 0xFF, green: 0xFF, blue: 0xFF)
+        )
         static let platinum = ThemePalette(
             bevelLight: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
             bevelShadow: RGB(red: 0x99, green: 0x99, blue: 0x99),
@@ -291,6 +303,9 @@ enum DesignTokens {
             static let progressRingStroke: CGFloat = 3
             static let pageEnterOffset: CGFloat = 12
             static let wheelStep: CGFloat = 48
+        }
+        enum StandardTheme {
+            static let cornerRadius: CGFloat = 12
         }
     }
     enum Motion {

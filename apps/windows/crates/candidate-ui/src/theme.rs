@@ -199,7 +199,7 @@ impl ResolvedTheme {
     fn preset(kind: Kind, look: &SystemLook) -> Self {
         let contrast = look.increase_contrast;
         match kind {
-            Kind::Glass => Self::glass(look),
+            Kind::Glass => Self::standard(contrast),
             Kind::Platinum | Kind::Desk => Self::bevelled(kind, contrast),
             Kind::Washi => Self::rounded(kind, Typeface::Mincho, contrast),
             Kind::Neon => Self::rounded(kind, Typeface::Rounded, contrast),
@@ -209,63 +209,27 @@ impl ResolvedTheme {
         }
     }
 
-    /// glass は OS の外観(ライト・ダーク・アクセントカラー)に合わせる．
-    /// 「コントラストを上げる」が有効なときは，線と弱い文字と番号の丸を 1 段濃くする
-    fn glass(look: &SystemLook) -> Self {
-        let palette = if look.dark {
-            tokens::GLASS_DARK
-        } else {
-            tokens::GLASS_LIGHT
-        };
-        let contrast = look.increase_contrast;
-        let text = Color::rgb(palette.text);
-        let text_muted = if contrast {
-            text
-        } else {
-            Color::rgb(palette.text_muted)
-        };
-        let selection = Color::rgb(look.accent.unwrap_or(palette.selection));
+    /// 標準のテーマ．暗い地に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
+    /// macOS と同じく，角丸の描き方に色・書体・形を重ねる．書体は丸ゴシックの系統(同梱の Kiwi Maru)
+    fn standard(contrast: bool) -> Self {
         Self {
-            kind: Kind::Glass,
-            surface: Color::rgb(palette.surface),
-            bevel_light: Color::CLEAR,
-            bevel_shadow: Color::CLEAR,
-            frame: if contrast {
-                Color::rgb(palette.text_muted)
-            } else {
-                Color::rgb(palette.frame)
-            },
-            text,
-            text_muted,
-            selection,
-            selection_text: Color::rgb(palette.selection_text),
-            correction: Color::rgb(palette.correction),
-            line: text.with_alpha(if contrast {
-                opacity::glass::LINE_CONTRAST
-            } else {
-                opacity::glass::LINE
-            }),
-            focus_tint: selection.with_alpha(if contrast {
-                opacity::glass::FOCUS_TINT_CONTRAST
-            } else {
-                opacity::glass::FOCUS_TINT
-            }),
-            badge: text.with_alpha(if contrast {
-                opacity::glass::BADGE_CONTRAST
-            } else {
-                opacity::glass::BADGE
-            }),
-            typeface: Typeface::System,
-            corner_radius: size::glass::CORNER_RADIUS,
-            straight_branches: false,
-            font_name: None,
-            backdrop: look.backdrop && !contrast,
+            corner_radius: size::standard_theme::CORNER_RADIUS,
+            straight_branches: true,
+            ..Self::rounded_with(
+                Kind::Nordic,
+                standard_palette(),
+                Typeface::Rounded,
+                contrast,
+            )
         }
     }
 
     /// 角丸のテーマを色のトークンで塗る．線は外枠の色，番号の丸とキーキャップは文字の色を薄くしたもの
     fn rounded(kind: Kind, typeface: Typeface, contrast: bool) -> Self {
-        let palette = palette(kind);
+        Self::rounded_with(kind, palette(kind), typeface, contrast)
+    }
+
+    fn rounded_with(kind: Kind, palette: Palette, typeface: Typeface, contrast: bool) -> Self {
         let text = Color::rgb(palette.text);
         let selection = Color::rgb(palette.selection);
         Self {
@@ -464,6 +428,14 @@ pub fn accent_from_palette(bytes: &[u8], dark: bool) -> Option<Rgb> {
     })
 }
 
+/// 標準のテーマの色(tokens.json の theme.standard)
+fn standard_palette() -> Palette {
+    tokens::THEMES
+        .iter()
+        .find(|(theme, _)| *theme == "standard")
+        .map_or(tokens::GLASS_DARK, |(_, palette)| *palette)
+}
+
 fn palette(kind: Kind) -> Palette {
     let name = kind.token_name();
     tokens::THEMES
@@ -545,12 +517,13 @@ mod tests {
     }
 
     #[test]
-    fn 標準と知らない値は_glass() {
+    fn 標準と知らない値は標準のテーマ() {
         for name in ["automatic", "native", "", "unknown"] {
-            assert_eq!(
-                ResolvedTheme::resolve(name, None, &look()).kind,
-                Kind::Glass
-            );
+            let theme = ResolvedTheme::resolve(name, None, &look());
+            assert_eq!(theme.surface, Color::rgb(standard_palette().surface));
+            assert_eq!(theme.selection, Color::rgb(standard_palette().selection));
+            assert_eq!(theme.corner_radius, size::standard_theme::CORNER_RADIUS);
+            assert!(theme.straight_branches);
         }
         assert_eq!(
             ResolvedTheme::resolve("desk", None, &look()).kind,
@@ -559,22 +532,16 @@ mod tests {
     }
 
     #[test]
-    fn glass_はアクセントカラーとダークに合わせる() {
-        let accent = Rgb {
-            red: 0x10,
-            green: 0x20,
-            blue: 0x30,
-        };
+    fn 標準のテーマはライトとダークで色を変えない() {
         let dark = SystemLook {
             dark: true,
-            accent: Some(accent),
             ..look()
         };
         let theme = ResolvedTheme::resolve("automatic", None, &dark);
-        assert_eq!(theme.selection, Color::rgb(accent));
-        assert_eq!(theme.text, Color::rgb(tokens::GLASS_DARK.text));
-        let light = ResolvedTheme::resolve("automatic", None, &look());
-        assert_eq!(light.selection, Color::rgb(tokens::GLASS_LIGHT.selection));
+        assert_eq!(
+            theme.text,
+            ResolvedTheme::resolve("automatic", None, &look()).text
+        );
     }
 
     #[test]
@@ -659,9 +626,8 @@ mod tests {
         assert_eq!(washi.font(Font::Key, 15.0).face, Face::Mincho);
         let terminal = ResolvedTheme::resolve("terminal", None, &look());
         assert_eq!(terminal.font(Font::Trunk, 15.0).face, Face::Monospaced);
-        let glass = ResolvedTheme::resolve("automatic", None, &look());
-        assert_eq!(glass.font(Font::Label, 15.0).face, Face::Ui);
-        assert_eq!(glass.font(Font::Trunk, 15.0).weight, Weight::Medium);
+        let standard = ResolvedTheme::resolve("automatic", None, &look());
+        assert_eq!(standard.font(Font::Candidate, 15.0).face, Face::Rounded);
         let contrast = ResolvedTheme::resolve("contrast", None, &look());
         assert_eq!(contrast.font(Font::Candidate, 15.0).weight, Weight::Medium);
         let platinum = ResolvedTheme::resolve("platinum", None, &look());

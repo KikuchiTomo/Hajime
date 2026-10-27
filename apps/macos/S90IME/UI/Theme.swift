@@ -87,7 +87,7 @@ struct ResolvedTheme {
     static func resolve(_ preference: ThemePreference, appearance: NSAppearance? = nil) -> ResolvedTheme {
         let increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
         switch preference {
-        case .automatic, .native: return glass(increaseContrast: increaseContrast)
+        case .automatic, .native: return standard(increaseContrast: increaseContrast)
         case .platinum: return palette(DesignTokens.Palette.platinum, kind: .platinum, increaseContrast: increaseContrast)
         case .desk: return palette(DesignTokens.Palette.desk, kind: .desk, increaseContrast: increaseContrast)
         case .washi: return rounded(DesignTokens.Palette.washi, kind: .washi, typeface: .mincho, increaseContrast: increaseContrast)
@@ -98,24 +98,17 @@ struct ResolvedTheme {
         }
     }
 
-    /// 色は OS の意味の色なので，描くときの外観(ライト・ダーク)で決まる
-    private static func glass(increaseContrast: Bool) -> ResolvedTheme {
-        // 「コントラストを上げる」が有効なときは，線と弱い文字を 1 段濃くする
-        ResolvedTheme(
-            kind: .glass,
-            surface: .windowBackgroundColor,
-            bevelLight: .clear,
-            bevelShadow: .clear,
-            frame: increaseContrast ? .secondaryLabelColor : .separatorColor,
-            text: .labelColor,
-            textMuted: increaseContrast ? .labelColor : .secondaryLabelColor,
-            selection: .controlAccentColor,
-            selectionText: .alternateSelectedControlTextColor,
-            correction: .systemPink,
-            line: increaseContrast ? .secondaryLabelColor : .tertiaryLabelColor,
-            focusTint: NSColor.controlAccentColor.withAlphaComponent(increaseContrast ? 0.3 : 0.16),
-            badge: increaseContrast ? .tertiaryLabelColor : .quaternaryLabelColor
-        )
+    /// 標準のテーマの書体(ヒラギノ丸ゴ)．標準のテーマは枝を直線で描く
+    static let standardFontName = "HiraMaruProN-W4"
+
+    /// 標準のテーマ．暗い地に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
+    /// カスタムテーマと同じく，角丸の描き方に色・書体・形を重ねる．ライトとダークで色を変えない
+    private static func standard(increaseContrast: Bool) -> ResolvedTheme {
+        var theme = rounded(DesignTokens.Palette.standard, kind: .nordic, typeface: .rounded, increaseContrast: increaseContrast)
+        theme.cornerRadius = DesignTokens.Size.StandardTheme.cornerRadius
+        theme.straightBranches = true
+        theme.customFontName = standardFontName
+        return theme
     }
 
     /// 角丸のテーマを色のトークンで塗る．線は外枠の色，番号の丸とキーキャップは文字の色を薄くしたもの
