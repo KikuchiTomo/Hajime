@@ -59,6 +59,19 @@ public enum SegmentSplitter {
         return Split(positions: Array(cuts.prefix(maximumPositions).map(\.reading)), pieces: Array(pieces.prefix(maximumPositions)) + [rest])
     }
 
+    /// 字だけで語の途中と分かる切れ目か．カタカナどうし(「ログ｜アウト」)と，どちらかが 1 字の漢字どうし(「天｜気」「移転｜期」)
+    public static func cutsWord(before: String, after: String) -> Bool {
+        guard let last = before.last, let first = after.first else { return false }
+        switch (kind(of: last), kind(of: first)) {
+        case (.katakana, .katakana):
+            return true
+        case (.other, .other) where isIdeograph(last) && isIdeograph(first):
+            return ideographRun(before.reversed()) < 2 || ideographRun(after) < 2
+        default:
+            return false
+        }
+    }
+
     /// 字の切れ目が語の途中でないか．字の種類の組ごとに決める
     private static func allows(
         before: ArraySlice<Character>, after: ArraySlice<Character>,
@@ -76,7 +89,7 @@ public enum SegmentSplitter {
                 || (tail.endsWithParticle && !tail.endsWithSentenceFinalParticle && head.startsWithPredicate)
         case (.katakana, .katakana):
             // カタカナの並びは 1 語のことが多い(「ログ｜アウト」と切らない)
-            return false
+            return !cutsWord(before: String(before), after: String(after))
         case (.other, .hiragana) where isIdeograph(last):
             // 漢字のあとのひらがなは送り仮名のことがある(「飲｜み」「食｜べて」)．漢字が 2 字以上か，助詞で始まるときだけ切る．
             // 活用した形に付く助詞の前では切らない
@@ -88,7 +101,7 @@ public enum SegmentSplitter {
             return run < before.count || run >= 2 || leftWords().last?.endsWithParticle == true
         case (.other, .other) where isIdeograph(last) && isIdeograph(first):
             // 漢字どうしは，どちらも 2 字以上のときだけ切る(「運転｜免許」．「天｜気」「東京｜都」は切らない)
-            return ideographRun(before.reversed()) >= 2 && ideographRun(after) >= 2
+            return !cutsWord(before: String(before), after: String(after))
         default:
             return true
         }

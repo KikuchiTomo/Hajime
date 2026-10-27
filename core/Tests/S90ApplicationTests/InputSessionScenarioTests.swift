@@ -99,6 +99,24 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "今日は")
     }
 
+    @Test("見えている文の語の並びが語の途中で切れているとき(Zenzai が書き換えた文の「天｜気ですね」)は，その区切りを使わない")
+    func ignoresClauseInsideWord() {
+        let converter = FakeConverter(["てんきですね": [("天気ですね", nil)], "てん": [("天", nil)], "きですね": [("気ですね", nil)]])
+        // Zenzai が書き換えた文の語の並びは「天｜気｜です｜ね」．Zenzai を使わない変換の語の並びは「天気｜です｜ね」
+        converter.candidateWords["天気ですね"] = [
+            Candidate.Word(text: "天", readingCount: 2, startsWithNoun: true), Candidate.Word(text: "気", readingCount: 1, startsWithNoun: true),
+            Candidate.Word(text: "です", readingCount: 2), Candidate.Word(text: "ね", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ]
+        converter.words["てんきですね"] = [
+            Candidate.Word(text: "天気", readingCount: 3, startsWithNoun: true), Candidate.Word(text: "です", readingCount: 2),
+            Candidate.Word(text: "ね", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+        ]
+        let harness = Harness(converter: converter)
+        harness.type("tenkidesune")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["天気ですね"])
+    }
+
     @Test("区切りを入れたあと Backspace でその位置より前に戻ると，区切りも消える")
     func boundaryRemovedByBackspace() {
         let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil)], "きょ": [("巨", nil)]])
