@@ -1,6 +1,7 @@
 import AppKit
 
 /// すりガラスの見た目(glass)の部品を描く．地のぼかしは GlassBackdrop が受け持ち，ここでは縁と中身だけを描く
+@MainActor
 enum GlassDrawing {
     private typealias Glass = DesignTokens.Size.Glass
 
@@ -66,8 +67,7 @@ enum GlassDrawing {
     /// 番号は文字で，矢印などの記号は SF Symbols のアイコンで描く
     static func drawLabel(_ label: String, color: NSColor, in rect: NSRect, theme: ResolvedTheme, fontSize: CGFloat = Glass.keyFontSize) {
         if case .symbol(let name)? = KeyHint.parts(of: label).first, label.count == 1,
-            let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(
-                NSImage.SymbolConfiguration(pointSize: fontSize - 1, weight: .bold).applying(NSImage.SymbolConfiguration(paletteColors: [color]))) {
+            let image = SymbolImageCache.image(name, pointSize: fontSize - 1, weight: .bold, color: color) {
             let size = image.size
             image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
             return
@@ -149,9 +149,7 @@ enum GlassDrawing {
     }
 
     private static func symbolImage(_ name: String, theme: ResolvedTheme) -> NSImage? {
-        let configuration = NSImage.SymbolConfiguration(pointSize: Glass.keyFontSize, weight: .semibold)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [theme.text]))
-        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
+        SymbolImageCache.image(name, pointSize: Glass.keyFontSize, weight: .semibold, color: theme.text)
     }
 
     private static func partWidth(_ part: KeyHint.Part, theme: ResolvedTheme) -> CGFloat {
