@@ -340,6 +340,21 @@ pub fn set_mica(window: HWND, on: bool) -> bool {
     extend
 }
 
+/// 窓を画面に出さずに隠しておく(true)・出す(false)．出したあと最初に描くまでの白いコマを見せないため，
+/// 隠したまま見せて 1 枚描いてから出す
+pub fn cloak(window: HWND, on: bool) {
+    let value = windows_core::BOOL::from(on);
+    // SAFETY: value はこの関数の中の値で，大きさを正しく渡す
+    let _ = unsafe {
+        DwmSetWindowAttribute(
+            window,
+            windows::Win32::Graphics::Dwm::DWMWA_CLOAK,
+            (&raw const value).cast(),
+            std::mem::size_of_val(&value) as u32,
+        )
+    };
+}
+
 /// 次の画面の合成まで待つ(動きのフレームを画面の更新に揃える)
 pub fn wait_for_compositor() {
     // SAFETY: 引数なし．合成が止まっていればすぐ戻る

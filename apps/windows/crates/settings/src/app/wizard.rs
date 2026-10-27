@@ -238,7 +238,11 @@ pub fn open(
             wizard.start_loading();
         }
     });
+    // 最初の 1 枚を描いてから出す(白いコマを見せない)
+    ffi::cloak(window, true);
     ffi::show_default(window);
+    with_wizard(Wizard::paint);
+    ffi::cloak(window, false);
     Some(window)
 }
 
