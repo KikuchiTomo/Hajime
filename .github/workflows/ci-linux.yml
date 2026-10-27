@@ -38,3 +38,30 @@ jobs:
         with:
           path: core/.build
           key: core-linux-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+
+  # Fcitx 5 のアドオン(apps/linux/fcitx5)．Rust の橋渡しのテストと，Fcitx 5 の開発用ファイルでのビルド・配置を確かめる
+  fcitx5-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends cmake g++ libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev
+      # Rust の版は bridge/rust-toolchain.toml で決まる(rustup が入れる)
+      - working-directory: apps/linux/fcitx5/bridge
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - run: cmake -S apps/linux/fcitx5 -B build/fcitx5 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+      - run: cmake --build build/fcitx5
+      - name: 決まった場所に配置できる
+        run: |
+          DESTDIR="$PWD/build/stage" cmake --install build/fcitx5
+          find build/stage -type f | sort
+          test -n "$(find build/stage -path '*/fcitx5/s90.so')"
+          test -n "$(find build/stage -path '*/fcitx5/addon/s90.conf')"
+          test -n "$(find build/stage -path '*/fcitx5/inputmethod/s90.conf')"
+          # Fcitx 5 が呼ぶ入り口があり，橋渡しの関数が中に入っていること
+          nm -D --defined-only "$(find build/stage -path '*/fcitx5/s90.so')" | grep -q fcitx_addon_factory_instance

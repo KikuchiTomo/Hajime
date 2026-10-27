@@ -35,15 +35,8 @@ extension NamedPipeConnection: EngineByteStream {
     public func writeBytes(_ bytes: [UInt8]) throws { try write(bytes) }
 }
 
-public final class CandidateWindowLink: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "tokyo.s90.ime.candidate-window")
-    private let lock = NSLock()
-    private var connection: NamedPipeConnection?
-    private var pending = 0
-    private static let maximumPending = 256
-
-    public init() {}
-
+extension CandidateWindowLink {
+    /// 名前付きパイプで候補ウィンドウを待ち受ける．同じセッションの，決まった実行ファイルのプロセスだけを相手にする
     public func start(listener: NamedPipeListener, expectedImagePath: String, greeting: @escaping @Sendable () -> [WireUiCommand]) {
         let thread = Thread { [self] in
             while true {
@@ -57,47 +50,10 @@ public final class CandidateWindowLink: @unchecked Sendable {
                     connection.close()
                     continue
                 }
-                lock.lock()
-                let previous = self.connection
-                self.connection = connection
-                lock.unlock()
-                previous?.close()
-                // 読み続けるスレッドは置かない．同期の I/O のハンドルでは，読みが止まっているあいだ同じハンドルへの
-                // 書き込みも待たされるため．候補ウィンドウはこのパイプに書かず，切れたことは書き込みの失敗で知る
-                greeting().forEach(send)
+                attach(connection, greeting: greeting())
             }
         }
         thread.start()
-    }
-
-    private func drop(_ closed: NamedPipeConnection) {
-        lock.lock()
-        if connection === closed { connection = nil }
-        lock.unlock()
-        closed.close()
-    }
-
-    public func send(_ command: WireUiCommand) {
-        lock.lock()
-        guard let connection, pending < Self.maximumPending else {
-            lock.unlock()
-            return
-        }
-        pending += 1
-        lock.unlock()
-        queue.async { [self] in
-            defer {
-                lock.lock()
-                pending -= 1
-                lock.unlock()
-            }
-            guard let frame = try? MessageFraming.encode(command) else { return }
-            do {
-                try connection.write(frame)
-            } catch {
-                drop(connection)
-            }
-        }
     }
 }
 #endif

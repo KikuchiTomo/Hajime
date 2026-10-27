@@ -26,7 +26,10 @@ macOS 版・Windows 版と同じ機能を，同じ挙動で使えるようにす
 1. core を Linux でビルドしてテストを通す(Swift の公式の Linux のツールチェーン)．CI に `core-linux` を足す
 2. `S90IPC` に Unix ドメインソケットの送り方を足し，Windows の `EnginePipeServer` と共通の部分(要求をセッションに渡す処理)を分ける
 3. `s90-engine-host` の置き場所(`HostPaths`)を Linux の XDG の場所にする(設定は `$XDG_CONFIG_HOME/s90.tokyo/IME`，学習データは `$XDG_DATA_HOME/s90.tokyo/IME`)
-4. Fcitx 5 のアドオンを `apps/linux/fcitx5` に作る
+4. Fcitx 5 のアドオンを `apps/linux/fcitx5` に作る．C++ の薄い口(`src/`)と，エンジンと話す Rust の橋渡し(`bridge/`．Windows と同じ `ipc` を使う静的ライブラリ)に分ける．C++ は JSON もソケットも扱わない
+   - エンジンは候補の指示(`UiCommand`)を，Windows の候補ウィンドウと同じ形で `candidate-window.sock` に送る(`CandidateWindowLink` を Windows と共通にした)．アドオンがそれを受け取り，Fcitx 5 の候補の一覧と案内(上下の補助の文)に出す．分岐図は，選んでいる文節の候補と種類を一覧にする
+   - キーはエンジンの返事を待ってから受け取るかを決める(上限は `timing.ENGINE_STALL_MILLISECONDS`)．Windows のように遅れた返事を後から当てる仕組みは，まだ入れていない
+   - まだ無いもの: マウスで候補を選ぶ，再変換，モードの札，手書き，設定の画面，配布のパッケージ
 5. Rust の手元側(`apps/windows/crates/ipc`)のつなぎ方を差し替えられるようにし，Unix ドメインソケットでもつなぐ(`ipc::unix`)．Windows と Linux で要求の送り方と挨拶を共通にする．つなぐ前に，ソケットのフォルダが本人のもので，ほかの人が読み書きできないことを確かめる
 
 ## 準備で分かった Linux の残り
