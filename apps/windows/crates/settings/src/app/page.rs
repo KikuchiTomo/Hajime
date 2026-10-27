@@ -1,40 +1,31 @@
 #![forbid(unsafe_code)]
 
-//! 1 ページ分の部品．項目の並び(pages::Section)から部品を作り，値を映し，押された部品を頼み(Event)にする．
-//! 名前と説明は STATIC にして読み上げで部品の名前として読まれるようにし，カードの地は親の窓が描く
+//! 1 ページ分の部品．項目の並び(pages::Section)から部品の状態を作り，値を映し，押された部品を頼み(Event)にする．
+//! 部品は子の窓にせず，状態だけを持って Direct2D で描く(ページを開くたびに窓を作り直さない)．
+//! 文字を打つ欄だけは標準の EDIT にする(IME・クリップボード・読み上げのため)
 
-use super::ffi::{self, Canvas, DrawTarget, Window};
-use super::theme::Theme;
+use super::ffi::{self, edit, Window};
+use super::paint::{self, Canvas, State, TextLayout, TextStyle};
+use super::theme::{Color, Theme};
 use crate::catalog::Catalog;
-use crate::layout::{self, PageLayout};
+use crate::layout::{self, PageLayout, Rect};
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{self, Action, Control, DictionaryList, Info, LimitKind, Page, Row, Section};
 use crate::store::SettingsStore;
 use crate::strings::{features, keys, more, rule_list, settings, windows as text};
+use crate::ui::anim::{Easing, Tween};
+use crate::ui::scroll::Scroller;
+use crate::ui::table::{Move, Table};
 use crate::usage::Usage;
 use ipc::SymbolKind;
 use serde_json::Value;
+use std::collections::HashMap;
+use tokens::motion::settings_windows as motion;
 use tokens::size::settings_windows as size;
-use windows::Win32::Foundation::LPARAM;
-use windows::Win32::Graphics::Gdi::{DT_LEFT, DT_RIGHT, DT_SINGLELINE, DT_VCENTER};
-use windows::Win32::System::SystemServices::{SS_ENDELLIPSIS, SS_NOPREFIX, SS_OWNERDRAW, SS_RIGHT};
-use windows::Win32::UI::Controls::{
-    EM_SETCUEBANNER, LVN_GETEMPTYMARKUP, LVN_ITEMCHANGED, LVS_NOSORTHEADER, LVS_REPORT,
-    LVS_SHOWSELALWAYS, WC_LISTVIEW,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BN_CLICKED, BS_AUTOCHECKBOX, BS_PUSHBUTTON, CBN_SELCHANGE,
-    CBS_DROPDOWNLIST, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CB_SETITEMHEIGHT, WINDOW_EX_STYLE,
-    WINDOW_STYLE, WS_CHILD, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    EN_CHANGE, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, WS_EX_CLIENTEDGE,
-};
-use windows_core::w;
 
-/// 部品の番号の始まり(0 は使わない)
+/// 部品の番号の始まり(0 は使わない．窓の部品の番号と分ける)
 const FIRST_ID: u16 = 100;
 
 /// 部品の操作から生まれる頼み
@@ -140,51 +131,6 @@ impl ThemeAction {
     ];
 }
 
-/// 一覧の表の下のボタンの操作(キー設定の記録・複製，除外設定のアプリの追加)
-fn list_bottom_action(row: &mut RowView, position: usize) -> Option<Event> {
-    let Control::List(spec, _) = &row.row.control else {
-        return None;
-    };
-    let path = spec.path;
-    match (path, position) {
-        ("keymap", 0) => {
-            // キーの欄(状態・キー・コマンドの 2 つ目)で，次に押したキーを書く
-            let (fields, _, _) = row.list_parts()?;
-            ffi::record_key(*fields.get(1)?, keys::PRESS);
-            None
-        }
-        ("keymap", 1) => {
-            // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
-            let index = *row.selected().first()?;
-            row.fill_inputs(index);
-            row.stop_editing();
-            if let Some((_, add, _)) = row.list_parts() {
-                ffi::enable(add, true);
-            }
-            None
-        }
-        ("profileRules", 0) => Some(Event::ChooseApp { path }),
-        _ => None,
-    }
-}
-
-/// 一覧の表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
-fn bottom_always_enabled(control: &Control, index: usize) -> bool {
-    match control {
-        Control::List(spec, _) => !(spec.path == "keymap" && index == 1),
-        _ => false,
-    }
-}
-
-/// 表の下のボタンのうち，行を選ばなくても使える先頭のボタンの数(作る・取り込む)
-fn always_enabled(control: &Control) -> usize {
-    match control {
-        Control::CustomThemes(_) => 2,
-        Control::Dictionaries(..) => 1,
-        _ => 0,
-    }
-}
-
 /// 辞書の一覧のボタンの操作
 #[derive(Debug, Clone, PartialEq)]
 pub enum DictionaryAction {
@@ -208,6 +154,23 @@ impl DictionaryAction {
         DictionaryAction::Toggle,
         DictionaryAction::Remove,
     ];
+}
+
+/// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
+fn bottom_always_enabled(control: &Control, index: usize) -> bool {
+    match control {
+        Control::List(spec, _) => !(spec.path == "keymap" && index == 1),
+        _ => false,
+    }
+}
+
+/// 表の下のボタンのうち，行を選ばなくても使える先頭のボタンの数(作る・取り込む)
+fn always_enabled(control: &Control) -> usize {
+    match control {
+        Control::CustomThemes(_) => 2,
+        Control::Dictionaries(..) => 1,
+        _ => 0,
+    }
 }
 
 /// 画面に映す値
@@ -313,29 +276,141 @@ impl Extras {
     }
 }
 
-struct RowView {
-    row: Row,
-    /// 名前(注記では説明)
-    label: Option<Window>,
-    control: Option<Window>,
-    reset: Option<Window>,
-    /// 数を選ぶ部品の選択肢
-    numbers: Vec<f64>,
-    /// 一覧の入力欄とボタン(layout の CardLayout::parts と同じ並び)
-    parts: Vec<Window>,
-    visible: bool,
-    /// 辞書・カスタムテーマの一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
-    dictionary_inputs: Vec<Vec<String>>,
-    /// 色のボタンに出す色(「#RRGGBB」)
-    color: String,
-    /// 一覧の表のすべての行と，検索欄で絞って出している行(all_rows の番号)
-    all_rows: Vec<Vec<String>>,
-    shown: Vec<usize>,
-    /// 一覧で選んで書き換えている行(all_rows の番号)．追加のボタンは「更新」になり，この行を置き換える
-    editing: Option<usize>,
+/// 行の中の押せる部品
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Part {
+    /// 既定に戻すボタン
+    Reset,
+    Toggle,
+    /// 値を選ぶドロップダウン(選択肢・数・秒・ひな形)
+    Dropdown,
+    /// 操作のボタン
+    Action,
+    /// 色のボタン
+    Color,
+    /// ひな形を読み込むボタン
+    PresetLoad,
+    /// 一覧の入力欄(打つ欄か選ぶ欄)
+    Field(usize),
+    /// 入力欄の右のボタン(追加・削除・切り替え・更新)
+    Top(usize),
+    /// 表の下の検索欄
+    Search,
+    /// 表の下のボタン
+    Bottom(usize),
+    Table,
+    /// 試す欄(打つ文・前の文字列)
+    PreviewField(usize),
+    /// 読むだけの長い文(送れる)
+    Text,
 }
 
-impl RowView {
+/// ページの中の部品(行の番号と部品)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Element {
+    pub row: usize,
+    pub part: Part,
+}
+
+/// 読み上げに見せる部品の種類
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Described {
+    Button,
+    Toggle(bool),
+    /// 選んでいる選択肢の名前
+    Dropdown(String),
+    Table,
+    Text,
+    /// 標準の EDIT(自分で読ませる)
+    Edit,
+}
+
+/// 一覧の入力欄
+#[derive(Debug)]
+enum Input {
+    /// 打つ欄(標準の EDIT)
+    Edit(Window),
+    /// 選ぶ欄(選んでいる選択肢の番号)
+    Choice(usize),
+}
+
+struct RowState {
+    row: Row,
+    section: usize,
+    /// 部品を置いたカード(出さない行は None)
+    card: Option<layout::CardLayout>,
+    visible: bool,
+    enabled: bool,
+    readable: bool,
+    /// 既定に戻すボタンを出す
+    resettable: bool,
+    on: bool,
+    /// トグルのつまみの位置(0 はオフ，1 はオン)
+    knob: Tween,
+    /// ドロップダウンで選んでいる番号
+    choice: Option<usize>,
+    /// 数を選ぶ部品の選択肢
+    numbers: Vec<f64>,
+    /// 統計・情報・バージョン・知らせの文
+    text: String,
+    /// 色のボタンに出す色(「#RRGGBB」)
+    color: String,
+    /// 一覧の表
+    table: Table,
+    table_scroll: Scroller,
+    /// 一覧の入力欄(list_spec の欄と同じ並び)
+    inputs: Vec<Input>,
+    /// 表の下の検索欄
+    search: Option<Window>,
+    /// 一覧で選んで書き換えている行(rows の番号)．追加のボタンは「更新」になり，この行を置き換える
+    editing: Option<usize>,
+    /// 辞書・カスタムテーマの一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
+    dictionary_inputs: Vec<Vec<String>>,
+    /// 試す欄(打つ文・前の文字列)と結果
+    preview_fields: Vec<Window>,
+    preview_result: String,
+    /// 長い文の送り
+    text_scroll: Scroller,
+}
+
+impl RowState {
+    fn new(row: &Row, section: usize, catalog: &Catalog) -> Self {
+        let numbers = match &row.control {
+            Control::Stepper(range) => options::steps(range.range(catalog), 1.0),
+            Control::Seconds(range) => options::steps(range.range(catalog), catalog.seconds_step),
+            _ => Vec::new(),
+        };
+        let text = match &row.control {
+            Control::Notices => notices(),
+            Control::Version => text::version(env!("CARGO_PKG_VERSION")),
+            _ => String::new(),
+        };
+        Self {
+            row: row.clone(),
+            section,
+            card: None,
+            visible: true,
+            enabled: true,
+            readable: true,
+            resettable: false,
+            on: false,
+            knob: Tween::fixed(0.0),
+            choice: matches!(row.control, Control::Preset).then_some(0),
+            numbers,
+            text,
+            color: String::new(),
+            table: Table::default(),
+            table_scroll: Scroller::default(),
+            inputs: Vec::new(),
+            search: None,
+            editing: None,
+            dictionary_inputs: Vec::new(),
+            preview_fields: Vec::new(),
+            preview_result: String::new(),
+            text_scroll: Scroller::default(),
+        }
+    }
+
     fn list_spec(&self) -> Option<(&ListSpec, LimitKind)> {
         match &self.row.control {
             Control::List(spec, limit) => Some((spec, *limit)),
@@ -348,360 +423,480 @@ impl RowView {
         }
     }
 
-    /// 表の列の数
-    fn columns(&self) -> Option<usize> {
-        self.list_spec()?;
-        Some(self.row.control.table_columns().len())
+    /// 入力欄・追加・削除のある一覧か(項目ごとの同期・辞書の一覧・カスタムテーマの一覧は違う)
+    fn has_add_remove(&self) -> bool {
+        self.list_spec().is_some()
+            && !matches!(
+                self.row.control,
+                Control::SyncFields(_) | Control::Dictionaries(..) | Control::CustomThemes(_)
+            )
+    }
+
+    /// 辞書・カスタムテーマの一覧か(入力欄・更新・表の下のボタン)
+    fn is_dictionary_list(&self) -> bool {
+        matches!(
+            self.row.control,
+            Control::Dictionaries(..) | Control::CustomThemes(_)
+        )
     }
 
     /// 選んだ行を切り替えるボタン(記号の有効と無効，項目ごとの同期の範囲)
-    fn toggle_button(&self) -> Option<Window> {
-        let (spec, _) = self.list_spec()?;
+    fn toggle_part(&self) -> Option<Part> {
         match self.row.control {
-            Control::Symbols(..) => self.parts.get(spec.fields.len() + 2).copied(),
-            Control::SyncFields(_) => self.parts.first().copied(),
+            Control::Symbols(..) => Some(Part::Top(2)),
+            Control::SyncFields(_) => Some(Part::Top(0)),
             _ => None,
         }
     }
 
-    /// 一覧の入力欄(左・右)と追加・削除のボタン．追加・削除の無い一覧(項目ごとの同期・辞書の一覧)では None
-    fn list_parts(&self) -> Option<(&[Window], Window, Window)> {
-        if matches!(
-            self.row.control,
-            Control::SyncFields(_) | Control::Dictionaries(..) | Control::CustomThemes(_)
-        ) {
-            return None;
-        }
-        let (spec, _) = self.list_spec()?;
-        let fields = spec.fields.len();
-        Some((
-            self.parts.get(..fields)?,
-            *self.parts.get(fields)?,
-            *self.parts.get(fields + 1)?,
-        ))
-    }
-
-    /// 表の下の検索欄
-    fn search_field(&self) -> Option<Window> {
-        let (spec, _) = self.list_spec()?;
-        let buttons = self.row.control.list_buttons()?;
-        buttons
-            .search
-            .then(|| {
-                self.parts
-                    .get(spec.fields.len() + buttons.top.len())
-                    .copied()
-            })
-            .flatten()
-    }
-
-    /// 表の下のボタン(検索欄のあと)
-    fn bottom_buttons(&self) -> &[Window] {
-        let (Some((spec, _)), Some(buttons)) = (self.list_spec(), self.row.control.list_buttons())
-        else {
-            return &[];
-        };
-        let start = spec.fields.len() + buttons.top.len() + usize::from(buttons.search);
-        self.parts.get(start..).unwrap_or(&[])
-    }
-
-    /// 表で選んでいる行(all_rows の番号)
-    fn selected(&self) -> Vec<usize> {
-        self.control
-            .map(ffi::list_selected)
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|index| self.shown.get(index).copied())
-            .collect()
-    }
-
-    /// 検索欄の言葉を含む行だけを表に出す(大文字と小文字を区別しない)
-    fn show_rows(&mut self) {
-        let query = self
-            .search_field()
-            .map(ffi::window_text)
-            .unwrap_or_default()
-            .to_lowercase();
-        self.shown = (0..self.all_rows.len())
-            .filter(|index| {
-                query.is_empty()
-                    || self.all_rows[*index]
-                        .iter()
-                        .any(|cell| cell.to_lowercase().contains(&query))
-            })
-            .collect();
-        let rows: Vec<Vec<String>> = self
-            .shown
-            .iter()
-            .map(|index| self.all_rows[*index].clone())
-            .collect();
-        if let Some(control) = self.control {
-            ffi::list_set_rows(control, &rows);
-        }
-    }
-
-    /// 書き換えている行をやめる(追加のボタンを「追加」に戻す)
-    fn stop_editing(&mut self) {
-        self.editing = None;
-        if let Some((_, add, _)) = self.list_parts() {
-            ffi::set_text(add, settings::ADD);
-        }
-    }
-
-    /// 入力欄の選ぶ欄で選んでいる値(設定のファイルに書く値)
-    fn chosen_values(&self) -> Vec<String> {
-        let (Some((fields, _, _)), Some((spec, _))) = (self.list_parts(), self.list_spec()) else {
+    /// 入力欄の値(選ぶ欄は設定のファイルに書く値)
+    fn input_values(&self) -> Vec<String> {
+        let Some(spec) = self.row.control.list_spec() else {
             return Vec::new();
         };
         spec.fields
             .iter()
-            .zip(fields)
-            .filter_map(|(field, window)| {
-                let choices = field.choices?;
-                choices
-                    .get(selected(*window)?)
-                    .map(|(value, _)| (*value).to_string())
+            .zip(&self.inputs)
+            .map(|(field, input)| match (input, field.choices) {
+                (Input::Choice(index), Some(choices)) => choices
+                    .get(*index)
+                    .map_or_else(String::new, |(value, _)| (*value).to_string()),
+                (Input::Edit(window), _) => ffi::window_text(*window),
+                (Input::Choice(_), None) => String::new(),
             })
             .collect()
     }
 
-    /// all_rows の index の行を入力欄に出す．選ぶ欄は表に出した名前から選ぶ
-    fn fill_inputs(&self, index: usize) {
-        let (Some((fields, _, _)), Some((spec, _)), Some(cells)) = (
-            self.list_parts(),
-            self.list_spec(),
-            self.all_rows.get(index),
-        ) else {
+    /// 入力欄の選ぶ欄で選んでいる値(注記を入れ替えるため)
+    fn chosen_values(&self) -> Vec<String> {
+        let Some(spec) = self.row.control.list_spec() else {
+            return Vec::new();
+        };
+        spec.fields
+            .iter()
+            .zip(&self.inputs)
+            .filter_map(|(field, input)| match (input, field.choices) {
+                (Input::Choice(index), Some(choices)) => {
+                    choices.get(*index).map(|(value, _)| (*value).to_string())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// rows の index の行を入力欄に出す．選ぶ欄は表に出した名前から選ぶ
+    fn fill_inputs(&mut self, index: usize) {
+        let Some(spec) = self.row.control.list_spec().copied() else {
             return;
         };
-        for ((window, field), cell) in fields.iter().zip(spec.fields).zip(cells) {
-            match field.choices {
-                Some(choices) => {
+        let Some(cells) = self.table.rows().get(index).cloned() else {
+            return;
+        };
+        for ((input, field), cell) in self.inputs.iter_mut().zip(spec.fields).zip(&cells) {
+            match (input, field.choices) {
+                (Input::Choice(selected), Some(choices)) => {
                     if let Some(position) = choices.iter().position(|(_, label)| label == cell) {
-                        ffi::send(*window, CB_SETCURSEL, position, 0);
+                        *selected = position;
                     }
                 }
-                None => ffi::set_text(*window, cell),
-            }
-        }
-    }
-
-    /// 辞書・カスタムテーマの一覧の入力欄・更新のボタン・表の下のボタン
-    fn dictionary_parts(&self) -> Option<(&[Window], Window, &[Window])> {
-        let (Control::Dictionaries(_, spec) | Control::CustomThemes(spec)) = &self.row.control
-        else {
-            return None;
-        };
-        let fields = spec.fields.len();
-        Some((
-            self.parts.get(..fields)?,
-            *self.parts.get(fields)?,
-            self.parts.get(fields + 1..)?,
-        ))
-    }
-
-    fn windows(&self) -> impl Iterator<Item = Window> + '_ {
-        [self.label, self.control, self.reset]
-            .into_iter()
-            .flatten()
-            .chain(self.parts.iter().copied())
-    }
-}
-
-pub struct PageView {
-    pub page: Page,
-    sections: Vec<Section>,
-    title: Option<Window>,
-    section_titles: Vec<Option<Window>>,
-    footers: Vec<Option<Window>>,
-    rows: Vec<Vec<RowView>>,
-    layout: PageLayout,
-}
-
-impl PageView {
-    /// エンジンにつながらないときのページ(名前と知らせだけ)
-    pub fn unavailable(host: Window, theme: &Theme, page: Page, catalog: &Catalog) -> Self {
-        let sections = vec![Section {
-            title: None,
-            rows: Vec::new(),
-            footer: Some(text::ENGINE_UNAVAILABLE),
-            footer_variants: &[],
-        }];
-        Self::build(host, theme, page, sections, catalog)
-    }
-
-    pub fn new(host: Window, theme: &Theme, page: Page, catalog: &Catalog) -> Self {
-        Self::build(
-            host,
-            theme,
-            page,
-            pages::sections(page).unwrap_or_default(),
-            catalog,
-        )
-    }
-
-    fn build(
-        host: Window,
-        theme: &Theme,
-        page: Page,
-        sections: Vec<Section>,
-        catalog: &Catalog,
-    ) -> Self {
-        let mut id = FIRST_ID;
-        let mut next_id = || {
-            id = id.wrapping_add(1);
-            id
-        };
-        let title = label(host, page.title(), &theme.fonts.title, next_id());
-        let mut section_titles = Vec::new();
-        let mut footers = Vec::new();
-        let mut rows = Vec::new();
-        for section in &sections {
-            section_titles.push(
-                section
-                    .title
-                    .and_then(|title| label(host, title, &theme.fonts.section, next_id())),
-            );
-            let mut views = Vec::new();
-            for row in &section.rows {
-                views.push(create_row(host, theme, row, catalog, &mut next_id));
-            }
-            rows.push(views);
-            footers.push(
-                section
-                    .footer
-                    .and_then(|footer| label(host, footer, &theme.fonts.caption, next_id())),
-            );
-        }
-        Self {
-            page,
-            sections,
-            title,
-            section_titles,
-            footers,
-            rows,
-            layout: PageLayout {
-                title: Default::default(),
-                sections: Vec::new(),
-                height: 0.0,
-            },
-        }
-    }
-
-    /// 部品をすべて消す
-    pub fn destroy(self) {
-        let windows = self
-            .rows
-            .iter()
-            .flatten()
-            .flat_map(|row| row.windows().collect::<Vec<_>>())
-            .chain(self.section_titles.iter().flatten().copied())
-            .chain(self.footers.iter().flatten().copied())
-            .chain(self.title);
-        for window in windows.collect::<Vec<_>>() {
-            ffi::destroy(window);
-        }
-    }
-
-    /// 書体を付け直す(DPI が変わったとき)
-    pub fn apply_fonts(&self, theme: &Theme) {
-        let fonts = &theme.fonts;
-        if let Some(title) = self.title {
-            ffi::set_font(title, &fonts.title);
-        }
-        for title in self.section_titles.iter().flatten() {
-            ffi::set_font(*title, &fonts.section);
-        }
-        for footer in self.footers.iter().flatten() {
-            ffi::set_font(*footer, &fonts.caption);
-        }
-        for row in self.rows.iter().flatten() {
-            let label_font = if row.row.control == Control::Note {
-                &fonts.caption
-            } else {
-                &fonts.body
-            };
-            if let Some(label) = row.label {
-                ffi::set_font(label, label_font);
-            }
-            for part in &row.parts {
-                ffi::set_font(*part, &fonts.body);
-            }
-            if let Some(control) = row.control {
-                ffi::set_font(control, &fonts.body);
-                if matches!(
-                    row.row.control,
-                    Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_)
-                ) {
-                    let field = theme.px(size::CONTROL_HEIGHT) - theme.px(size::CONTROL_GAP);
-                    ffi::send(control, CB_SETITEMHEIGHT, usize::MAX, field as isize);
-                }
-            }
-        }
-    }
-
-    /// 標準の部品の見た目をライト・ダークに合わせる
-    pub fn apply_theme(&self, theme: &Theme) {
-        for row in self.rows.iter().flatten() {
-            let Some(control) = row.control else { continue };
-            match &row.row.control {
-                Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) => {
-                    ffi::set_theme(control, theme.control_theme(true))
-                }
-                Control::Action(_) => ffi::set_theme(control, theme.control_theme(false)),
-                Control::Preview => {
-                    for part in &row.parts {
-                        ffi::set_theme(*part, theme.control_theme(true));
-                    }
-                }
-                list if list.list_buttons().is_some() => {
-                    apply_list_theme(control, theme);
-                    let fields = list.list_spec().map_or(0, |spec| spec.fields.len());
-                    for (index, part) in row.parts.iter().enumerate() {
-                        ffi::set_theme(*part, theme.control_theme(index < fields));
-                    }
-                }
+                (Input::Edit(window), _) => ffi::set_text(*window, cell),
                 _ => {}
             }
         }
     }
 
+    /// 辞書・カスタムテーマの一覧で選んだ行の値を入力欄に出す
+    fn fill_dictionary_inputs(&mut self, position: usize) {
+        let Some(spec) = self.row.control.list_spec().copied() else {
+            return;
+        };
+        let Some(values) = self.dictionary_inputs.get(position).cloned() else {
+            return;
+        };
+        for ((input, field), value) in self.inputs.iter_mut().zip(spec.fields).zip(&values) {
+            match (input, field.choices) {
+                (Input::Choice(selected), Some(choices)) => {
+                    *selected = options::index_of(choices, value);
+                }
+                (Input::Edit(window), _) => ffi::set_text(*window, value),
+                _ => {}
+            }
+        }
+    }
+
+    fn windows(&self) -> impl Iterator<Item = Window> + '_ {
+        self.inputs
+            .iter()
+            .filter_map(|input| match input {
+                Input::Edit(window) => Some(*window),
+                Input::Choice(_) => None,
+            })
+            .chain(self.search)
+            .chain(self.preview_fields.iter().copied())
+    }
+
+    /// 部品の位置(ページの中の座標)
+    fn part_rect(&self, part: Part) -> Option<Rect> {
+        let card = self.card.as_ref()?;
+        let fields = self
+            .row
+            .control
+            .list_spec()
+            .map_or(0, |spec| spec.fields.len());
+        let buttons = self.row.control.list_buttons();
+        let top = buttons.map_or(0, |buttons| buttons.top.len());
+        let search = buttons.is_some_and(|buttons| buttons.search);
+        match part {
+            Part::Reset => Some(card.reset),
+            Part::Toggle
+            | Part::Dropdown
+            | Part::Action
+            | Part::Color
+            | Part::Table
+            | Part::Text => Some(card.control),
+            Part::PresetLoad => card.parts.first().copied(),
+            Part::Field(index) | Part::PreviewField(index) => card.parts.get(index).copied(),
+            Part::Top(index) => card.parts.get(fields + index).copied(),
+            Part::Search => search
+                .then(|| card.parts.get(fields + top).copied())
+                .flatten(),
+            Part::Bottom(index) => card
+                .parts
+                .get(fields + top + usize::from(search) + index)
+                .copied(),
+        }
+    }
+
+    /// 行の押せる部品(フォーカスの順)
+    fn parts(&self) -> Vec<Part> {
+        let mut parts = Vec::new();
+        match &self.row.control {
+            Control::Toggle => parts.push(Part::Toggle),
+            Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) => {
+                parts.push(Part::Dropdown)
+            }
+            Control::Action(_) => parts.push(Part::Action),
+            Control::Color => parts.push(Part::Color),
+            Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
+            Control::Notices | Control::KeymapReport | Control::ThemeReport => {
+                parts.push(Part::Text)
+            }
+            Control::Preview => parts.extend([Part::PreviewField(0), Part::PreviewField(1)]),
+            control => {
+                if let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
+                    parts.extend((0..spec.fields.len()).map(Part::Field));
+                    parts.extend((0..buttons.top.len()).map(Part::Top));
+                    parts.push(Part::Table);
+                    if buttons.search {
+                        parts.push(Part::Search);
+                    }
+                    parts.extend((0..buttons.bottom.len()).map(Part::Bottom));
+                }
+            }
+        }
+        if self.resettable {
+            parts.insert(0, Part::Reset);
+        }
+        parts
+    }
+
+    /// 部品を使えるか(選んだ行に効くボタンは，行を選ぶまで使えない)
+    fn part_enabled(&self, part: Part) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        let selected = !self.table.selected_positions().is_empty();
+        let fields = self
+            .row
+            .control
+            .list_spec()
+            .map_or(0, |spec| spec.fields.len());
+        match part {
+            Part::Top(0) if self.has_add_remove() => {
+                self.editing.is_some()
+                    || self
+                        .list_spec()
+                        .is_some_and(|(spec, _)| spec.is_filled(&self.input_values()))
+            }
+            Part::Top(1) if self.has_add_remove() => selected,
+            Part::Top(index) if self.toggle_part() == Some(Part::Top(index)) => selected,
+            // 辞書・カスタムテーマの一覧の更新
+            Part::Top(0) if self.is_dictionary_list() => selected,
+            Part::Bottom(index) if self.is_dictionary_list() => {
+                index < always_enabled(&self.row.control) || selected
+            }
+            Part::Bottom(index) => bottom_always_enabled(&self.row.control, index) || selected,
+            Part::Field(index) => index < fields,
+            _ => true,
+        }
+    }
+
+    /// ボタンの名前(追加のボタンは書き換えているあいだ「更新」)
+    fn button_label(&self, part: Part) -> &'static str {
+        let buttons = self.row.control.list_buttons();
+        match part {
+            Part::Top(0) if self.has_add_remove() && self.editing.is_some() => rule_list::UPDATE,
+            Part::Top(index) => buttons
+                .and_then(|buttons| buttons.top.get(index).copied())
+                .unwrap_or(""),
+            Part::Bottom(index) => buttons
+                .and_then(|buttons| buttons.bottom.get(index).copied())
+                .unwrap_or(""),
+            Part::PresetLoad => keys::LOAD,
+            Part::Action => self.row.title,
+            _ => "",
+        }
+    }
+
+    /// ドロップダウンの選択肢の名前
+    fn dropdown_items(&self, part: Part) -> Vec<String> {
+        match (&self.row.control, part) {
+            (Control::Choice(choices), Part::Dropdown) => choices
+                .iter()
+                .map(|(_, name)| (*name).to_string())
+                .collect(),
+            (Control::Stepper(_), Part::Dropdown) => self
+                .numbers
+                .iter()
+                .map(|number| format!("{number}"))
+                .collect(),
+            (Control::Seconds(_), Part::Dropdown) => self
+                .numbers
+                .iter()
+                .map(|number| more::seconds(*number))
+                .collect(),
+            (Control::Preset, Part::Dropdown) => keys::PRESETS
+                .iter()
+                .map(|(_, name)| (*name).to_string())
+                .collect(),
+            (control, Part::Field(index)) => control
+                .list_spec()
+                .and_then(|spec| spec.fields.get(index))
+                .and_then(|field| field.choices)
+                .map(|choices| {
+                    choices
+                        .iter()
+                        .map(|(_, name)| (*name).to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// ドロップダウンで選んでいる番号
+    fn dropdown_selected(&self, part: Part) -> Option<usize> {
+        match part {
+            Part::Dropdown => self.choice,
+            Part::Field(index) => match self.inputs.get(index) {
+                Some(Input::Choice(selected)) => Some(*selected),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// 部品が選ぶ欄か
+    fn is_dropdown(&self, part: Part) -> bool {
+        match part {
+            Part::Dropdown => true,
+            Part::Field(index) => matches!(self.inputs.get(index), Some(Input::Choice(_))),
+            _ => false,
+        }
+    }
+
+    /// 打つ欄の窓
+    fn edit(&self, part: Part) -> Option<Window> {
+        match part {
+            Part::Field(index) => match self.inputs.get(index) {
+                Some(Input::Edit(window)) => Some(*window),
+                _ => None,
+            },
+            Part::PreviewField(index) => self.preview_fields.get(index).copied(),
+            Part::Search => self.search,
+            _ => None,
+        }
+    }
+}
+
+/// 配布物に入れた利用表記のファイルの中身(実行ファイルと同じディレクトリ．tools/windows/stage.ps1)
+fn notices() -> String {
+    const NOTICES_FILE: &str = "THIRD_PARTY_NOTICES.md";
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|dir| dir.join(NOTICES_FILE)))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| text.replace("\r\n", "\n"))
+        .unwrap_or_else(|| more::NOTICES_MISSING.to_string())
+}
+
+/// ページの状態(読み込み中・使える・エンジンにつながらない)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Availability {
+    Loading,
+    Ready,
+    Unavailable,
+}
+
+pub struct PageView {
+    pub page: Page,
+    pub availability: Availability,
+    sections: Vec<Section>,
+    rows: Vec<RowState>,
+    layout: PageLayout,
+    /// 節の注記として出している文(注記を入れ替える節がある)
+    footers: Vec<Option<&'static str>>,
+    /// ポインターを載せている部品と，載せた・外した動き
+    hover: HashMap<Element, Tween>,
+    /// 表の上でポインターを載せている行(行の番号と表の中の位置)
+    table_hover: Option<(usize, usize)>,
+    /// 中身の幅(DIP)
+    width: f32,
+}
+
+/// 描くときに窓から渡すもの
+pub struct Frame<'a> {
+    pub theme: &'a Theme,
+    pub now: f64,
+    pub focus: Option<Element>,
+    /// フォーカスの印を出す(キーボードで動かしたあと)
+    pub focus_visible: bool,
+    /// ボタンを押している部品
+    pub pressed: Option<Element>,
+    /// 開いているドロップダウン
+    pub open: Option<Element>,
+    /// フォーカスのある打つ欄の窓
+    pub focused_edit: Option<Window>,
+    /// 標準の EDIT を描けないとき(見本の書き出し)は，欄の文字を自分で描く
+    pub draw_fields: bool,
+    /// 見えているところ(ページの中の上端と下端)．外の部品は描かない
+    pub visible: (f32, f32),
+}
+
+impl Frame<'_> {
+    fn shows(&self, rect: Rect) -> bool {
+        rect.max_y() >= self.visible.0 && rect.y <= self.visible.1
+    }
+}
+
+impl PageView {
+    /// pool は前のページで使った打つ欄(作り直さずに使い回す．作るのは 1 つ数ミリ秒かかる)
+    pub fn new(
+        parent: Window,
+        font: &ffi::Font,
+        pool: &mut Vec<Window>,
+        page: Page,
+        catalog: &Catalog,
+        availability: Availability,
+    ) -> Self {
+        let sections = match availability {
+            Availability::Ready => pages::sections(page).unwrap_or_default(),
+            Availability::Loading | Availability::Unavailable => Vec::new(),
+        };
+        let mut id = FIRST_ID;
+        let mut next_id = || {
+            id = id.wrapping_add(1);
+            id
+        };
+        let mut rows = Vec::new();
+        for (index, section) in sections.iter().enumerate() {
+            for row in &section.rows {
+                let mut state = RowState::new(row, index, catalog);
+                let mut fields = FieldSource {
+                    parent,
+                    font,
+                    pool: &mut *pool,
+                    next_id: &mut next_id,
+                };
+                create_inputs(&mut fields, &mut state);
+                rows.push(state);
+            }
+        }
+        let footers = sections.iter().map(|section| section.footer).collect();
+        Self {
+            page,
+            availability,
+            sections,
+            rows,
+            layout: PageLayout {
+                title: Rect::default(),
+                sections: Vec::new(),
+                height: 0.0,
+            },
+            footers,
+            hover: HashMap::new(),
+            table_hover: None,
+            width: 0.0,
+        }
+    }
+
+    /// 標準の EDIT の窓を隠して pool に返す(次のページで使い回す)
+    pub fn release(self, pool: &mut Vec<Window>) {
+        for window in self.windows() {
+            ffi::show(window, false);
+            ffi::set_text(window, "");
+            pool.push(window);
+        }
+    }
+
+    /// 標準の EDIT の窓
+    pub fn windows(&self) -> Vec<Window> {
+        self.rows.iter().flat_map(RowState::windows).collect()
+    }
+
     /// 値を部品に映し，出す・使える状態を決める
-    pub fn sync(&mut self, values: &impl Values, extras: &Extras) {
-        for row in self.rows.iter_mut().flatten() {
+    pub fn sync(&mut self, values: &impl Values, extras: &Extras, now: f64) {
+        for row in &mut self.rows {
             let condition = |condition| {
                 pages::holds(condition, |path| values.text(path), |path| values.on(path))
             };
             row.visible = row.row.visible.is_none_or(condition)
                 && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty())
                 && (row.row.control != Control::ThemeReport || !extras.theme_report.is_empty());
-            if row.row.control == Control::Color {
-                row.color = values.text(row.row.path);
-            }
-            let readable = row.row.path.is_empty() || values.is_readable(row.row.path);
-            let enabled = readable && row.row.enabled.is_none_or(condition);
-            for window in row.windows().collect::<Vec<_>>() {
-                ffi::show(window, row.visible);
-            }
-            if let Some(control) = row.control {
-                ffi::enable(control, enabled);
-                show_value(control, &row.row, &row.numbers, values, extras);
-                if let Some(rows) = list_rows(&row.row, values, extras) {
-                    // 一覧を入れ替えると選んだ行が外れるので，書き換えもやめる
-                    row.all_rows = rows;
-                    row.stop_editing();
-                    row.show_rows();
+            row.readable = row.row.path.is_empty() || values.is_readable(row.row.path);
+            row.enabled = row.readable && row.row.enabled.is_none_or(condition);
+            row.resettable =
+                row.row.has_value() && row.readable && !values.is_default(row.row.path);
+            match &row.row.control {
+                Control::Toggle => {
+                    let on = values.on(row.row.path);
+                    if on != row.on {
+                        row.knob.retarget(
+                            if on { 1.0 } else { 0.0 },
+                            now,
+                            f64::from(motion::TOGGLE),
+                            Easing::STANDARD,
+                        );
+                        row.on = on;
+                    }
                 }
-            }
-            // 一覧を入れ替えると選んだ行が外れるので，削除と切り替えのボタンも使えなくする
-            if let Some((fields, _, remove)) = row.list_parts() {
-                ffi::enable(remove, false);
-                for field in fields {
-                    ffi::enable(*field, enabled);
+                Control::Choice(choices) => {
+                    row.choice = Some(options::index_of(choices, &values.text(row.row.path)));
                 }
+                Control::Stepper(_) | Control::Seconds(_) => {
+                    let value = values
+                        .value(row.row.path)
+                        .and_then(Value::as_f64)
+                        .unwrap_or(0.0);
+                    row.choice = Some(options::nearest(&row.numbers, value));
+                }
+                Control::Stat(stat) => row.text = extras.usage.text(*stat),
+                Control::Info(Info::SyncFolder) => row.text = extras.sync_folder.clone(),
+                Control::Info(Info::LastSynced) => row.text = extras.last_synced.clone(),
+                Control::KeymapReport => row.text = extras.keymap_report.clone(),
+                Control::ThemeReport => row.text = extras.theme_report.clone(),
+                Control::Color => row.color = values.text(row.row.path),
+                _ => {}
             }
-            if let Some(toggle) = row.toggle_button() {
-                ffi::enable(toggle, false);
+            if let Some(rows) = list_rows(&row.row, values, extras) {
+                // 一覧を入れ替えると選んだ行が外れるので，書き換えもやめる
+                row.table.set_rows(rows);
+                if let Some(search) = row.search {
+                    row.table.filter(&ffi::window_text(search));
+                }
+                row.editing = None;
+                let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
+                row.table_scroll.set_extent(content, table_viewport(row));
             }
             match &row.row.control {
                 Control::Dictionaries(list, _) => {
@@ -720,1093 +915,1315 @@ impl PageView {
                 }
                 _ => {}
             }
-            if let Some((_, update, bottom)) = row.dictionary_parts() {
-                // 選んだ行に効くボタンは，行を選ぶまで使えなくする(作る・取り込むボタンはいつでも使える)
-                let always = always_enabled(&row.row.control);
-                ffi::enable(update, false);
-                for (index, button) in bottom.iter().enumerate() {
-                    ffi::enable(*button, enabled && index < always);
-                }
-            }
-            if let Some(label) = row.label {
-                ffi::enable(label, enabled || row.row.control == Control::Note);
-            }
-            if let Some(reset) = row.reset {
-                ffi::show(
-                    reset,
-                    row.visible && readable && !values.is_default(row.row.path),
-                );
-                ffi::enable(reset, enabled);
+            for window in row.windows().collect::<Vec<_>>() {
+                ffi::enable(window, row.enabled);
             }
         }
+        self.show_footer_variants();
     }
 
-    /// 部品を置く．width は窓の幅，scroll は上に送った量(どちらも窓の DPI の値)．中身の高さを返す
-    pub fn arrange(&mut self, host: Window, theme: &Theme, width: i32, scroll: i32) -> i32 {
-        let dpi = theme.dpi;
-        let width_96 = width as f32 * ffi::BASE_DPI as f32 / dpi as f32;
-        let visible: Vec<bool> = self.rows.iter().flatten().map(|row| row.visible).collect();
+    /// 部品を置く．width はページの幅(DIP)．中身の高さを返す
+    pub fn arrange(&mut self, width: f32, measure: &dyn paint::Measure) -> f32 {
+        self.width = width;
+        let visible: Vec<bool> = self.rows.iter().map(|row| row.visible).collect();
         let all: Vec<&Row> = self
             .sections
             .iter()
             .flat_map(|section| &section.rows)
             .collect();
-        let line = theme.px(size::NOTE_LINE_HEIGHT).max(1);
-        let caption = &theme.fonts.caption;
+        let line = size::NOTE_LINE_HEIGHT;
         self.layout = layout::layout(
             &self.sections,
-            width_96,
+            width,
             |row| {
                 all.iter()
                     .position(|candidate| std::ptr::eq(*candidate, row))
                     .is_none_or(|index| visible[index])
             },
             |text, width| {
-                let height = ffi::text_height(host, caption, text, ffi::scale(width, dpi));
-                usize::try_from((height + line - 1) / line)
-                    .unwrap_or(1)
-                    .max(1)
+                let height = measure.wrapped_height(text, TextStyle::Caption, width);
+                ((height / line).ceil() as usize).max(1)
             },
         );
-        let place = |window: Option<Window>, rect: layout::Rect| {
-            if let Some(window) = window {
-                let (left, top, right, bottom) = ffi::scaled_rect(rect, dpi, scroll);
-                ffi::place(window, left, top, right - left, bottom - top);
-            }
-        };
-        place(self.title, self.layout.title);
+        for row in &mut self.rows {
+            row.card = None;
+        }
+        let mut offset = 0;
+        let mut starts = Vec::new();
+        for section in &self.sections {
+            starts.push(offset);
+            offset += section.rows.len();
+        }
         for (index, section) in self.layout.sections.iter().enumerate() {
-            if let Some(rect) = section.title {
-                place(self.section_titles[index], rect);
-            }
-            if let Some(rect) = section.footer {
-                place(self.footers[index], rect);
-            }
             for card in &section.cards {
-                let row = &self.rows[index][card.row];
-                place(row.label, card.label);
-                place(row.reset, card.reset);
-                let mut control = card.control;
+                let flat = starts[index] + card.row;
+                if let Some(row) = self.rows.get_mut(flat) {
+                    row.card = Some(card.clone());
+                }
+            }
+        }
+        for row in &mut self.rows {
+            if row.card.is_some() {
+                let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
+                let viewport = table_viewport(row);
+                row.table_scroll.set_extent(content, viewport);
                 if matches!(
                     row.row.control,
-                    Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_)
+                    Control::Notices | Control::KeymapReport | Control::ThemeReport
                 ) {
-                    // 一覧の高さは開いたときの高さ
-                    control.height = size::DROPDOWN_HEIGHT;
-                }
-                place(row.control, control);
-                for (part, rect) in row.parts.iter().zip(&card.parts) {
-                    place(Some(*part), *rect);
-                }
-                if let (Some(list), Some(columns)) = (row.control, row.columns()) {
-                    // 列の幅は表の幅を等しく分ける(縦の送りの分を残す)
-                    let columns = columns.max(1);
-                    let width = ffi::scale(card.control.width, dpi)
-                        - ffi::scrollbar_width(dpi)
-                        - theme.px(size::CONTROL_GAP);
-                    for column in 0..columns {
-                        ffi::list_set_column_width(list, column, (width / columns as i32).max(0));
+                    if let Some(card) = &row.card {
+                        let inner = card.control.width - size::FIELD_PADDING_X * 2.0;
+                        let height = measure.wrapped_height(&row.text, TextStyle::Caption, inner)
+                            + size::FIELD_PADDING_X;
+                        row.text_scroll.set_extent(height, card.control.height);
                     }
                 }
-                for (position, rect) in &card.descriptions {
-                    place(self.rows[index][*position].label, *rect);
-                }
             }
         }
-        ffi::scale(self.layout.height, dpi)
+        self.layout.height
     }
 
-    /// カードの地を描く
-    pub fn paint(&self, canvas: Canvas, theme: &Theme, scroll: i32) {
-        let radius = theme.px(size::CARD_RADIUS);
-        for section in &self.layout.sections {
-            for card in &section.cards {
-                let rect = ffi::scaled_rect(card.card, theme.dpi, scroll);
-                canvas.round_rect(
-                    rect,
-                    radius,
-                    theme.palette.card,
-                    Some(theme.palette.card_stroke),
+    /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)
+    pub fn place_fields(&self, theme: &Theme, origin: (f32, f32), scroll: f32, hidden: bool) {
+        for row in &self.rows {
+            let shown = !hidden && row.visible && row.card.is_some();
+            for part in row.parts() {
+                let Some(window) = row.edit(part) else {
+                    continue;
+                };
+                let Some(rect) = row.part_rect(part).filter(|_| shown) else {
+                    ffi::show(window, false);
+                    continue;
+                };
+                let line = size::BODY_LINE_HEIGHT;
+                let x = origin.0 + rect.x + size::FIELD_PADDING_X;
+                let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
+                let width = rect.width - size::FIELD_PADDING_X * 2.0;
+                let left = theme.px(x);
+                let top = theme.px(y);
+                ffi::place(
+                    window,
+                    left,
+                    top,
+                    theme.px(x + width) - left,
+                    theme.px(y + line) - top,
                 );
+                ffi::show(window, true);
             }
         }
     }
 
-    /// STATIC がカードの上にあるか(地の色を決める)．説明か統計の値なら薄い文字にする
-    pub fn static_style(&self, window: Window) -> Option<(bool, bool)> {
-        if self.title == Some(window) || self.section_titles.contains(&Some(window)) {
-            return Some((false, false));
-        }
-        if self.footers.contains(&Some(window)) {
-            return Some((false, true));
-        }
-        self.rows.iter().flatten().find_map(|row| {
-            if row.label == Some(window) {
-                Some((true, row.row.control == Control::Note))
-            } else if row.control == Some(window) {
-                Some((
-                    true,
-                    matches!(
-                        row.row.control,
-                        Control::Stat(_) | Control::Version | Control::Info(_)
-                    ),
-                ))
-            } else {
-                None
+    /// フォーカスで巡る部品(出していて使えるもの)
+    pub fn focusable(&self) -> Vec<Element> {
+        self.rows
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| row.visible && row.card.is_some())
+            .flat_map(|(index, row)| {
+                row.parts()
+                    .into_iter()
+                    .filter(|part| row.part_enabled(*part))
+                    .map(move |part| Element { row: index, part })
+            })
+            .collect()
+    }
+
+    /// 部品の位置(ページの中の座標)
+    pub fn rect(&self, element: Element) -> Option<Rect> {
+        self.rows.get(element.row)?.part_rect(element.part)
+    }
+
+    /// 部品の名前(読み上げ)
+    pub fn name(&self, element: Element) -> String {
+        let Some(row) = self.rows.get(element.row) else {
+            return String::new();
+        };
+        match element.part {
+            Part::Reset => format!("{} {}", row.row.title, features::RESTORE_DEFAULT),
+            Part::Top(_) | Part::Bottom(_) | Part::PresetLoad | Part::Action => {
+                row.button_label(element.part).to_string()
             }
+            Part::Field(index) => row
+                .row
+                .control
+                .list_spec()
+                .and_then(|spec| spec.fields.get(index))
+                .map_or_else(String::new, |field| field.label.to_string()),
+            Part::Search => features::SEARCH.to_string(),
+            Part::Table => row.row.control.table_columns().join("・"),
+            _ => row.row.title.to_string(),
+        }
+    }
+
+    /// 打つ欄の窓
+    pub fn edit(&self, element: Element) -> Option<Window> {
+        self.rows.get(element.row)?.edit(element.part)
+    }
+
+    /// 読み上げに見せる部品の種類と状態
+    pub fn describe(&self, element: Element) -> Option<Described> {
+        let row = self.rows.get(element.row)?;
+        Some(match element.part {
+            Part::Toggle => Described::Toggle(row.on),
+            Part::Dropdown | Part::Field(_) if row.is_dropdown(element.part) => {
+                let items = row.dropdown_items(element.part);
+                let label = row
+                    .dropdown_selected(element.part)
+                    .and_then(|selected| items.get(selected).cloned())
+                    .unwrap_or_default();
+                Described::Dropdown(label)
+            }
+            Part::Table => Described::Table,
+            Part::Text => Described::Text,
+            Part::Field(_) | Part::Search | Part::PreviewField(_) => Described::Edit,
+            _ => Described::Button,
         })
     }
 
-    /// 部品からの WM_COMMAND を頼みにする
-    pub fn command(&mut self, window: Window, notification: u32) -> Option<Event> {
-        let event = self.handle_command(window, notification);
+    /// 部品の番号(読み上げで見分ける．ページの中で変わらない)
+    pub fn element_id(element: Element) -> i32 {
+        let part = match element.part {
+            Part::Reset => 0,
+            Part::Toggle => 1,
+            Part::Dropdown => 2,
+            Part::Action => 3,
+            Part::Color => 4,
+            Part::PresetLoad => 5,
+            Part::Field(index) => 10 + index,
+            Part::Top(index) => 20 + index,
+            Part::Search => 30,
+            Part::Bottom(index) => 40 + index,
+            Part::Table => 50,
+            Part::PreviewField(index) => 60 + index,
+            Part::Text => 70,
+        };
+        let id = element.row * 100 + part;
+        i32::try_from(id).unwrap_or(i32::MAX)
+    }
+
+    /// 窓から打つ欄を引く
+    pub fn element_of(&self, window: Window) -> Option<Element> {
+        self.rows.iter().enumerate().find_map(|(index, row)| {
+            row.parts()
+                .into_iter()
+                .find(|part| row.edit(*part) == Some(window))
+                .map(|part| Element { row: index, part })
+        })
+    }
+
+    /// (x, y)(ページの中の座標)にある部品
+    pub fn hit(&self, x: f32, y: f32) -> Option<Element> {
+        self.rows.iter().enumerate().find_map(|(index, row)| {
+            if !row.visible || row.card.is_none() {
+                return None;
+            }
+            row.parts().into_iter().find_map(|part| {
+                let rect = row.part_rect(part)?;
+                let inside = x >= rect.x && x < rect.max_x() && y >= rect.y && y < rect.max_y();
+                (inside && row.part_enabled(part)).then_some(Element { row: index, part })
+            })
+        })
+    }
+
+    pub fn enabled(&self, element: Element) -> bool {
+        self.rows
+            .get(element.row)
+            .is_some_and(|row| row.visible && row.part_enabled(element.part))
+    }
+
+    pub fn is_dropdown(&self, element: Element) -> bool {
+        self.rows
+            .get(element.row)
+            .is_some_and(|row| row.is_dropdown(element.part))
+    }
+
+    pub fn dropdown_items(&self, element: Element) -> (Vec<String>, Option<usize>) {
+        self.rows
+            .get(element.row)
+            .map_or((Vec::new(), None), |row| {
+                (
+                    row.dropdown_items(element.part),
+                    row.dropdown_selected(element.part),
+                )
+            })
+    }
+
+    /// ポインターを載せた部品を変える．動きが始まったら true
+    pub fn set_hover(&mut self, element: Option<Element>, now: f64) {
+        let duration = f64::from(motion::HOVER);
+        for (key, tween) in &mut self.hover {
+            if Some(*key) != element {
+                tween.retarget(0.0, now, duration, Easing::LINEAR);
+            }
+        }
+        if let Some(element) = element {
+            self.hover
+                .entry(element)
+                .or_insert_with(|| Tween::fixed(0.0))
+                .retarget(1.0, now, duration, Easing::LINEAR);
+        }
+        self.hover
+            .retain(|_, tween| tween.target() > 0.0 || tween.running(now));
+    }
+
+    pub fn set_table_hover(&mut self, hover: Option<(usize, usize)>) -> bool {
+        let changed = self.table_hover != hover;
+        self.table_hover = hover;
+        changed
+    }
+
+    /// 動きの途中か(フレームを回し続けるか)
+    pub fn animating(&self, now: f64) -> bool {
+        self.hover.values().any(|tween| tween.running(now))
+            || self.rows.iter().any(|row| {
+                row.knob.running(now)
+                    || row.table_scroll.animating(now)
+                    || row.text_scroll.animating(now)
+            })
+    }
+
+    fn hover_value(&self, element: Element, now: f64) -> f32 {
+        self.hover
+            .get(&element)
+            .map_or(0.0, |tween| tween.value(now))
+    }
+
+    /// 部品を押した(クリック・Space・Enter)．頼みがあれば返す
+    pub fn activate(&mut self, element: Element, now: f64) -> Option<Event> {
+        let event = self.handle_activate(element, now);
         self.show_footer_variants();
         event
     }
 
-    /// 注記に入れ替えて出す文(キー設定のコマンドの説明)を，入力欄で選んでいる値に合わせる．合う文が無ければ元の注記
-    fn show_footer_variants(&self) {
-        for (index, section) in self.sections.iter().enumerate() {
-            if section.footer_variants.is_empty() {
-                continue;
-            }
-            let (Some(Some(footer)), Some(note)) = (self.footers.get(index), section.footer) else {
-                continue;
-            };
-            let chosen: Vec<String> = self
-                .rows
-                .get(index)
-                .into_iter()
-                .flatten()
-                .flat_map(RowView::chosen_values)
-                .collect();
-            let shown = section
-                .footer_variants
-                .iter()
-                .find(|(value, _)| chosen.iter().any(|chosen| chosen == value))
-                .map_or(note, |(_, text)| *text);
-            ffi::set_text(*footer, shown);
-        }
-    }
-
-    fn handle_command(&mut self, window: Window, notification: u32) -> Option<Event> {
-        let row = self.rows.iter_mut().flatten().find(|row| {
-            row.control == Some(window) || row.reset == Some(window) || row.parts.contains(&window)
-        })?;
-        if Some(window) == row.search_field() {
-            if notification == EN_CHANGE {
-                row.show_rows();
-            }
+    fn handle_activate(&mut self, element: Element, now: f64) -> Option<Event> {
+        let row = self.rows.get_mut(element.row)?;
+        if !row.part_enabled(element.part) {
             return None;
         }
-        if notification == BN_CLICKED {
-            if let Some(position) = row
-                .bottom_buttons()
-                .iter()
-                .position(|button| *button == window)
-            {
-                return list_bottom_action(row, position);
+        let part = element.part;
+        match (&row.row.control, part) {
+            (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
+            (Control::Toggle, Part::Toggle) => {
+                let on = !row.on;
+                row.on = on;
+                row.knob.retarget(
+                    if on { 1.0 } else { 0.0 },
+                    now,
+                    f64::from(motion::TOGGLE),
+                    Easing::STANDARD,
+                );
+                return Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::Bool(on),
+                    clears: row.row.clears,
+                });
             }
-        }
-        if row.row.control == Control::Preset {
-            let button = *row.parts.first()?;
-            if window != button || notification != BN_CLICKED {
-                return None;
+            (Control::Action(action), Part::Action) => return Some(Event::Action(*action)),
+            (Control::Color, Part::Color) => {
+                return Some(Event::ChooseColor {
+                    path: row.row.path,
+                    current: row.color.clone(),
+                })
             }
-            let (preset, _) = keys::PRESETS.get(selected(row.control?)?)?;
-            return Some(Event::LoadPreset(preset));
+            (Control::Preset, Part::PresetLoad) => {
+                let (preset, _) = keys::PRESETS.get(row.choice?)?;
+                return Some(Event::LoadPreset(preset));
+            }
+            _ => {}
         }
-        if row.row.control == Control::Preview {
-            let texts: Vec<String> = row
-                .parts
-                .iter()
-                .map(|part| ffi::window_text(*part))
-                .collect();
-            return (row.parts.contains(&window) && notification == EN_CHANGE).then(|| {
-                Event::Preview {
-                    text: texts.first().cloned().unwrap_or_default(),
-                    preceding: texts.get(1).cloned().unwrap_or_default(),
-                }
-            });
-        }
-        if let (Control::CustomThemes(_), Some((fields, update, bottom))) =
-            (&row.row.control, row.dictionary_parts())
+        let positions = row.table.selected_positions();
+        let first = positions.first().copied();
+        if let (Control::CustomThemes(_), Part::Top(0) | Part::Bottom(_)) = (&row.row.control, part)
         {
-            if notification != BN_CLICKED {
-                return None;
-            }
-            let index = row
-                .control
-                .map(ffi::list_selected)
-                .and_then(|indices| indices.first().copied());
-            let action = if window == update {
-                ThemeAction::Rename(fields.first().map(|field| ffi::window_text(*field))?)
-            } else {
-                let position = bottom.iter().position(|button| *button == window)?;
-                ThemeAction::BOTTOM.get(position)?.clone()
+            let action = match part {
+                Part::Top(_) => ThemeAction::Rename(
+                    row.edit(Part::Field(0))
+                        .map(ffi::window_text)
+                        .unwrap_or_default(),
+                ),
+                Part::Bottom(index) => ThemeAction::BOTTOM.get(index)?.clone(),
+                _ => return None,
             };
-            let name = index
+            let name = first
                 .and_then(|index| row.dictionary_inputs.get(index))
                 .and_then(|inputs| inputs.first().cloned())
                 .unwrap_or_default();
             return Some(Event::ThemeList {
                 action,
-                index,
+                index: first,
                 name,
             });
         }
-        if let (Control::Color, BN_CLICKED) = (&row.row.control, notification) {
-            return Some(Event::ChooseColor {
-                path: row.row.path,
-                current: row.color.clone(),
-            });
-        }
-        if let (Control::Dictionaries(list, _), Some((fields, update, bottom))) =
-            (&row.row.control, row.dictionary_parts())
+        if let (Control::Dictionaries(list, _), Part::Top(0) | Part::Bottom(_)) =
+            (&row.row.control, part)
         {
-            if notification != BN_CLICKED {
-                return None;
-            }
-            let index = row
-                .control
-                .map(ffi::list_selected)
-                .and_then(|indices| indices.first().copied());
-            let action = if window == update {
-                let values = fields
-                    .iter()
-                    .zip(row.row.control.list_spec()?.fields)
-                    .map(|(window, field)| match field.choices {
-                        Some(choices) => selected(*window)
-                            .and_then(|index| choices.get(index))
-                            .map_or_else(String::new, |(value, _)| (*value).to_string()),
-                        None => ffi::window_text(*window),
-                    })
-                    .collect();
-                DictionaryAction::Update(values)
-            } else {
-                let position = bottom.iter().position(|button| *button == window)?;
-                DictionaryAction::BOTTOM.get(position)?.clone()
+            let action = match part {
+                Part::Top(_) => DictionaryAction::Update(row.input_values()),
+                Part::Bottom(index) => DictionaryAction::BOTTOM.get(index)?.clone(),
+                _ => return None,
             };
             return Some(Event::DictionaryList {
                 list: *list,
                 action,
-                index,
+                index: first,
             });
         }
         if let Control::SyncFields(_) = row.row.control {
-            let indices = row.control.map(ffi::list_selected).unwrap_or_default();
-            return (notification == BN_CLICKED
-                && Some(window) == row.toggle_button()
-                && !indices.is_empty())
-            .then_some(Event::SyncToggleFields(indices));
+            return (Some(part) == row.toggle_part() && !positions.is_empty())
+                .then_some(Event::SyncToggleFields(positions));
         }
-        if let Some((fields, add, remove)) = row.list_parts() {
-            let (spec, limit) = row.list_spec()?;
-            let values: Vec<String> = spec
-                .fields
-                .iter()
-                .zip(fields)
-                .map(|(field, window)| match field.choices {
-                    Some(choices) => selected(*window)
-                        .and_then(|index| choices.get(index))
-                        .map_or_else(String::new, |(value, _)| (*value).to_string()),
-                    None => ffi::window_text(*window),
-                })
-                .collect();
-            if fields.contains(&window) && notification == EN_CHANGE {
-                ffi::enable(add, spec.is_filled(&values));
-                return None;
-            }
-            let dictionary = matches!(row.row.control, Control::Dictionary(_));
-            if let Control::Symbols(kind, _) = row.row.control {
-                let indices = || row.selected();
-                return match notification {
-                    BN_CLICKED if window == add && spec.is_filled(&values) => {
-                        Some(Event::SymbolSave {
-                            kind,
-                            item: spec.make(&values),
-                            replacing: row.editing,
-                        })
+        if let Control::List(spec, _) = &row.row.control {
+            match (spec.path, part) {
+                ("keymap", Part::Bottom(0)) => {
+                    // キーの欄(状態・キー・コマンドの 2 つ目)で，次に押したキーを書く
+                    if let Some(window) = row.edit(Part::Field(1)) {
+                        edit::record_key(window, keys::PRESS);
                     }
-                    BN_CLICKED if window == remove => {
-                        let indices = indices();
-                        (!indices.is_empty()).then_some(Event::SymbolRemove { kind, indices })
-                    }
-                    BN_CLICKED if Some(window) == row.toggle_button() => {
-                        let indices = indices();
-                        (!indices.is_empty()).then_some(Event::SymbolToggle { kind, indices })
-                    }
-                    _ => None,
-                };
-            }
-            if window == add && notification == BN_CLICKED && spec.is_filled(&values) && dictionary
-            {
-                return Some(Event::DictionaryAdd {
-                    item: spec.make(&values),
-                    replacing: row.editing,
-                });
-            }
-            if window == add && notification == BN_CLICKED && spec.is_filled(&values) {
-                return Some(Event::ListAdd {
-                    spec: *spec,
-                    limit,
-                    item: spec.make(&values),
-                    replacing: row.editing,
-                });
-            }
-            if window == remove && notification == BN_CLICKED {
-                let indices = row.selected();
-                if dictionary {
-                    return (!indices.is_empty()).then_some(Event::DictionaryRemove(indices));
+                    return None;
                 }
-                return (!indices.is_empty()).then_some(Event::ListRemove {
-                    spec: *spec,
-                    indices,
-                });
+                ("keymap", Part::Bottom(1)) => {
+                    // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
+                    let index = *row.table.selected_rows().first()?;
+                    row.fill_inputs(index);
+                    row.editing = None;
+                    return None;
+                }
+                ("profileRules", Part::Bottom(0)) => {
+                    return Some(Event::ChooseApp { path: spec.path })
+                }
+                _ => {}
             }
+        }
+        if !row.has_add_remove() {
             return None;
         }
-        if row.reset == Some(window) {
-            return (notification == BN_CLICKED).then_some(Event::Reset(row.row.path));
+        let (spec, limit) = row.list_spec().map(|(spec, limit)| (*spec, limit))?;
+        let values = row.input_values();
+        let selected = row.table.selected_rows();
+        let dictionary = matches!(row.row.control, Control::Dictionary(_));
+        if let Control::Symbols(kind, _) = row.row.control {
+            return match part {
+                Part::Top(0) if spec.is_filled(&values) => Some(Event::SymbolSave {
+                    kind,
+                    item: spec.make(&values),
+                    replacing: row.editing,
+                }),
+                Part::Top(1) => (!selected.is_empty()).then_some(Event::SymbolRemove {
+                    kind,
+                    indices: selected,
+                }),
+                Part::Top(2) => (!selected.is_empty()).then_some(Event::SymbolToggle {
+                    kind,
+                    indices: selected,
+                }),
+                _ => None,
+            };
         }
-        let value = match (&row.row.control, notification) {
-            (Control::Toggle, BN_CLICKED) => Value::Bool(ffi::send(window, BM_GETCHECK, 0, 0) == 1),
-            (Control::Choice(choices), CBN_SELCHANGE) => {
-                let (value, _) = choices.get(selected(window)?)?;
-                Value::String((*value).to_string())
+        match part {
+            Part::Top(0) if spec.is_filled(&values) && dictionary => Some(Event::DictionaryAdd {
+                item: spec.make(&values),
+                replacing: row.editing,
+            }),
+            Part::Top(0) if spec.is_filled(&values) => Some(Event::ListAdd {
+                spec,
+                limit,
+                item: spec.make(&values),
+                replacing: row.editing,
+            }),
+            Part::Top(1) if dictionary => {
+                (!selected.is_empty()).then_some(Event::DictionaryRemove(selected))
             }
-            (Control::Stepper(_) | Control::Seconds(_), CBN_SELCHANGE) => {
-                crate::model::number(*row.numbers.get(selected(window)?)?)
-            }
-            (Control::Action(action), BN_CLICKED) => return Some(Event::Action(*action)),
-            _ => return None,
-        };
-        Some(Event::Set {
-            path: row.row.path,
-            value,
-            clears: row.row.clears,
-        })
+            Part::Top(1) => (!selected.is_empty()).then_some(Event::ListRemove {
+                spec,
+                indices: selected,
+            }),
+            _ => None,
+        }
     }
 
-    /// 一覧からの WM_NOTIFY．空のときの文を返し，行を選んだら削除のボタンを使えるようにする．扱ったら true
-    /// 一覧からの WM_NOTIFY．扱ったか(true なら既定の処理をしない)と，頼み(カスタムテーマを選んだなど)を返す
-    pub fn notify(&mut self, window: Window, code: u32, lparam: LPARAM) -> (bool, Option<Event>) {
-        let result = self.handle_notify(window, code, lparam);
+    /// ドロップダウンで index を選んだ．頼みがあれば返す
+    pub fn choose(&mut self, element: Element, index: usize) -> Option<Event> {
+        let row = self.rows.get_mut(element.row)?;
+        let event = match (&row.row.control, element.part) {
+            (Control::Choice(choices), Part::Dropdown) => {
+                let (value, _) = choices.get(index)?;
+                row.choice = Some(index);
+                Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::String((*value).to_string()),
+                    clears: row.row.clears,
+                })
+            }
+            (Control::Stepper(_) | Control::Seconds(_), Part::Dropdown) => {
+                let number = *row.numbers.get(index)?;
+                row.choice = Some(index);
+                Some(Event::Set {
+                    path: row.row.path,
+                    value: crate::model::number(number),
+                    clears: row.row.clears,
+                })
+            }
+            (Control::Preset, Part::Dropdown) => {
+                row.choice = Some(index);
+                None
+            }
+            (_, Part::Field(field)) => {
+                if let Some(Input::Choice(selected)) = row.inputs.get_mut(field) {
+                    *selected = index;
+                }
+                None
+            }
+            _ => None,
+        };
         self.show_footer_variants();
-        result
+        event
     }
 
-    fn handle_notify(
+    /// 打つ欄の文字が変わった．頼みがあれば返す(試す欄)
+    pub fn edited(&mut self, element: Element) -> Option<Event> {
+        let row = self.rows.get_mut(element.row)?;
+        match element.part {
+            Part::Search => {
+                let query = row.search.map(ffi::window_text).unwrap_or_default();
+                row.table.filter(&query);
+                row.editing = None;
+                let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
+                let viewport = table_viewport(row);
+                row.table_scroll.set_extent(content, viewport);
+                row.table_scroll.jump_to(0.0);
+                None
+            }
+            Part::PreviewField(_) => {
+                let texts: Vec<String> = row
+                    .preview_fields
+                    .iter()
+                    .map(|window| ffi::window_text(*window))
+                    .collect();
+                Some(Event::Preview {
+                    text: texts.first().cloned().unwrap_or_default(),
+                    preceding: texts.get(1).cloned().unwrap_or_default(),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// 打つ欄で Enter を押した(一覧なら追加・更新のボタンを押す)
+    pub fn submit(&mut self, element: Element, now: f64) -> Option<Event> {
+        let row = self.rows.get(element.row)?;
+        if !matches!(element.part, Part::Field(_)) {
+            return None;
+        }
+        let button = Element {
+            row: element.row,
+            part: Part::Top(0),
+        };
+        if row.list_spec().is_some() && row.part_enabled(Part::Top(0)) {
+            return self.activate(button, now);
+        }
+        None
+    }
+
+    /// 表の行を押した．頼みがあれば返す
+    pub fn table_click(
         &mut self,
-        window: Window,
-        code: u32,
-        lparam: LPARAM,
-    ) -> (bool, Option<Event>) {
-        let Some(row) = self
-            .rows
-            .iter_mut()
-            .flatten()
-            .find(|row| row.control == Some(window))
-        else {
-            return (false, None);
-        };
-        let Some((spec, _)) = row.list_spec() else {
-            return (false, None);
-        };
-        match code {
-            LVN_GETEMPTYMARKUP => {
-                ffi::set_empty_markup(lparam, spec.empty);
-                (true, None)
-            }
-            LVN_ITEMCHANGED => {
-                let selected = !ffi::list_selected(window).is_empty();
-                if let Some((fields, update, bottom)) = row.dictionary_parts() {
-                    ffi::enable(update, selected);
-                    for button in bottom.iter().skip(always_enabled(&row.row.control)) {
-                        ffi::enable(*button, selected);
-                    }
-                    // 選んだ辞書の名前などを入力欄に出す(書き換えて「更新」を押す)
-                    let chosen = ffi::list_selected(window)
-                        .first()
-                        .and_then(|index| row.dictionary_inputs.get(*index));
-                    if let (Some(values), Some(spec)) = (chosen, row.row.control.list_spec()) {
-                        for ((window, field), value) in fields.iter().zip(spec.fields).zip(values) {
-                            match field.choices {
-                                Some(choices) => {
-                                    ffi::send(
-                                        *window,
-                                        CB_SETCURSEL,
-                                        options::index_of(choices, value),
-                                        0,
-                                    );
-                                }
-                                None => ffi::set_text(*window, value),
-                            }
-                        }
-                    }
-                }
-                if let Some((_, add, remove)) = row.list_parts() {
-                    ffi::enable(remove, selected);
-                    // 1 行だけ選んだら入力欄に出し，追加のボタンを「更新」にする(macOS の RuleListEditor の編集)
-                    match row.selected().as_slice() {
-                        [index] => {
-                            let index = *index;
-                            row.fill_inputs(index);
-                            row.editing = Some(index);
-                            ffi::set_text(add, rule_list::UPDATE);
-                            ffi::enable(add, true);
-                        }
-                        _ => row.stop_editing(),
-                    }
-                    // 選んだ行に効く表の下のボタン(キー設定の複製)
-                    for (index, button) in row.bottom_buttons().iter().enumerate() {
-                        if !bottom_always_enabled(&row.row.control, index) {
-                            ffi::enable(*button, selected);
-                        }
-                    }
-                }
-                if let Some(toggle) = row.toggle_button() {
-                    ffi::enable(toggle, selected);
-                }
-                // カスタムテーマを選んだら，下の行でそのテーマを編集する
-                let event = matches!(row.row.control, Control::CustomThemes(_))
-                    .then(|| Event::ThemeSelected(ffi::list_selected(window).first().copied()));
-                (false, event)
-            }
-            _ => (false, None),
+        row_index: usize,
+        position: usize,
+        control: bool,
+        shift: bool,
+    ) -> Option<Event> {
+        let row = self.rows.get_mut(row_index)?;
+        if !row.table.click(position, control, shift) {
+            return None;
         }
+        self.selection_changed(row_index)
     }
 
-    /// 外観の見本の部品か
-    pub fn is_preview(&self, window: Window) -> bool {
+    /// 表の上でキーを押した．頼みがあれば返す
+    pub fn table_key(
+        &mut self,
+        row_index: usize,
+        movement: Move,
+        shift: bool,
+        now: f64,
+    ) -> Option<Event> {
+        let row = self.rows.get_mut(row_index)?;
+        if !row.table.move_cursor(movement, shift) {
+            return None;
+        }
+        if let Some(cursor) = row.table.cursor() {
+            let top = cursor as f32 * size::TABLE_ROW_HEIGHT;
+            row.table_scroll
+                .reveal(top, top + size::TABLE_ROW_HEIGHT, now);
+        }
+        self.selection_changed(row_index)
+    }
+
+    /// 表の行の数(1 ページ分．PageUp・PageDown で動かす数)
+    pub fn table_page(&self, row_index: usize) -> usize {
         self.rows
-            .iter()
-            .flatten()
-            .any(|row| row.row.control == Control::ThemePreview && row.control == Some(window))
+            .get(row_index)
+            .map_or(1, |row| {
+                (table_viewport(row) / size::TABLE_ROW_HEIGHT).floor() as usize
+            })
+            .max(1)
     }
 
-    /// 試した結果を出す
-    pub fn show_preview(&self, text: &str) {
-        for row in self.rows.iter().flatten() {
-            if let (Control::Preview, Some(result)) = (&row.row.control, row.control) {
-                ffi::set_text(result, text);
+    /// 表で選んだ行が変わったあとの入力欄・ボタンの状態(macOS の RuleListEditor と同じ)
+    fn selection_changed(&mut self, row_index: usize) -> Option<Event> {
+        let row = self.rows.get_mut(row_index)?;
+        let positions = row.table.selected_positions();
+        if row.is_dictionary_list() {
+            // 選んだ辞書の名前などを入力欄に出す(書き換えて「更新」を押す)
+            if let Some(first) = positions.first() {
+                row.fill_dictionary_inputs(*first);
             }
         }
+        if row.has_add_remove() {
+            // 1 行だけ選んだら入力欄に出し，追加のボタンを「更新」にする
+            match row.table.selected_rows().as_slice() {
+                [index] => {
+                    let index = *index;
+                    row.fill_inputs(index);
+                    row.editing = Some(index);
+                }
+                _ => row.editing = None,
+            }
+        }
+        let event = matches!(row.row.control, Control::CustomThemes(_))
+            .then(|| Event::ThemeSelected(positions.first().copied()));
+        self.show_footer_variants();
+        event
+    }
+
+    /// 表の (x, y)(ページの中の座標)にある行の位置
+    pub fn table_position(&self, row_index: usize, y: f32, now: f64) -> Option<usize> {
+        let row = self.rows.get(row_index)?;
+        let rect = row.part_rect(Part::Table)?;
+        let top = rect.y + size::TABLE_HEADER_HEIGHT;
+        if y < top {
+            return None;
+        }
+        let position = ((y - top + row.table_scroll.offset(now)) / size::TABLE_ROW_HEIGHT) as usize;
+        (position < row.table.len()).then_some(position)
+    }
+
+    /// ホイールで部品の中を送る．送れたら true(送れなければページを送る)
+    pub fn scroll_inside(&mut self, element: Element, delta: f32, now: f64) -> bool {
+        let Some(row) = self.rows.get_mut(element.row) else {
+            return false;
+        };
+        let scroller = match element.part {
+            Part::Table => &mut row.table_scroll,
+            Part::Text => &mut row.text_scroll,
+            _ => return false,
+        };
+        let before = scroller.target();
+        scroller.scroll_by(delta, now);
+        scroller.target() != before
     }
 
     /// path の一覧の field 番目の入力欄に text を入れる(アプリを選んで足すとき)
-    pub fn set_list_input(&self, path: &str, field: usize, text: &str) {
-        for row in self.rows.iter().flatten() {
-            if let (Control::List(spec, _), Some((fields, add, _))) =
-                (&row.row.control, row.list_parts())
-            {
+    pub fn set_list_input(&mut self, path: &str, field: usize, text: &str) {
+        for row in &mut self.rows {
+            if let Control::List(spec, _) = &row.row.control {
                 if spec.path != path {
                     continue;
                 }
-                if let Some(window) = fields.get(field) {
+                if let Some(Input::Edit(window)) = row.inputs.get(field) {
                     ffi::set_text(*window, text);
-                    ffi::enable(add, !text.is_empty());
                 }
             }
         }
     }
 
     /// 足し終えた記号の一覧の入力欄を空にする
-    pub fn clear_symbol_inputs(&self) {
-        for row in self.rows.iter().flatten() {
-            if let (Control::Symbols(..), Some((fields, add, _))) =
-                (&row.row.control, row.list_parts())
-            {
-                for window in fields {
-                    ffi::set_text(*window, "");
+    pub fn clear_symbol_inputs(&mut self) {
+        for row in &mut self.rows {
+            if let Control::Symbols(..) = row.row.control {
+                for input in &row.inputs {
+                    if let Input::Edit(window) = input {
+                        ffi::set_text(*window, "");
+                    }
                 }
-                ffi::enable(add, false);
+                row.editing = None;
             }
         }
     }
 
     /// 足し終えた一覧の入力欄を空にする
-    pub fn clear_list_inputs(&self, path: &str) {
-        for row in self
-            .rows
-            .iter()
-            .flatten()
-            .filter(|row| row.row.path == path)
-        {
-            if let (Some((fields, add, _)), Some((spec, _))) = (row.list_parts(), row.list_spec()) {
-                for (field, window) in spec.fields.iter().zip(fields) {
-                    if field.choices.is_none() {
-                        ffi::set_text(*window, "");
-                    }
+    pub fn clear_list_inputs(&mut self, path: &str) {
+        for row in self.rows.iter_mut().filter(|row| row.row.path == path) {
+            if !row.has_add_remove() {
+                continue;
+            }
+            for input in &row.inputs {
+                if let Input::Edit(window) = input {
+                    ffi::set_text(*window, "");
                 }
-                ffi::enable(
-                    add,
-                    !spec.fields.iter().any(|field| field.choices.is_none()),
+            }
+            row.editing = None;
+        }
+    }
+
+    /// 試した結果を出す
+    pub fn show_preview(&mut self, text: &str) {
+        for row in &mut self.rows {
+            if row.row.control == Control::Preview {
+                row.preview_result = text.to_string();
+            }
+        }
+    }
+
+    /// 外観の見本を描く場所(ページの中の座標)
+    pub fn preview_rect(&self) -> Option<Rect> {
+        self.rows
+            .iter()
+            .find(|row| row.row.control == Control::ThemePreview && row.visible)
+            .and_then(|row| row.card.as_ref())
+            .map(|card| card.control)
+    }
+
+    /// 注記に入れ替えて出す文(キー設定のコマンドの説明)を，入力欄で選んでいる値に合わせる．合う文が無ければ元の注記
+    fn show_footer_variants(&mut self) {
+        for (index, section) in self.sections.iter().enumerate() {
+            if section.footer_variants.is_empty() {
+                continue;
+            }
+            let Some(note) = section.footer else {
+                continue;
+            };
+            let chosen: Vec<String> = self
+                .rows
+                .iter()
+                .filter(|row| row.section == index)
+                .flat_map(RowState::chosen_values)
+                .collect();
+            let shown = section
+                .footer_variants
+                .iter()
+                .find(|(value, _)| chosen.iter().any(|chosen| chosen == value))
+                .map_or(note, |(_, text)| *text);
+            if let Some(slot) = self.footers.get_mut(index) {
+                *slot = Some(shown);
+            }
+        }
+    }
+
+    /// ページを描く(座標はページの中．呼ぶ側が送った量だけずらしておく)
+    pub fn paint(&self, canvas: &mut dyn Canvas, frame: &Frame) {
+        let theme = frame.theme;
+        let palette = &theme.palette;
+        if frame.shows(self.layout.title) {
+            canvas.text(
+                self.layout.title,
+                self.page.title(),
+                TextStyle::Title,
+                Color::from(palette.text),
+                TextLayout::LINE,
+            );
+        }
+        for (index, section) in self.layout.sections.iter().enumerate() {
+            if let (Some(rect), Some(title)) = (
+                section.title.filter(|rect| frame.shows(*rect)),
+                self.sections.get(index).and_then(|section| section.title),
+            ) {
+                canvas.text(
+                    rect,
+                    title,
+                    TextStyle::Section,
+                    Color::from(palette.text),
+                    TextLayout::LINE,
+                );
+            }
+            for card in section.cards.iter().filter(|card| frame.shows(card.card)) {
+                canvas.fill_round(card.card, size::CARD_RADIUS, Color::from(palette.card));
+                canvas.stroke_round(
+                    card.card,
+                    size::CARD_RADIUS,
+                    1.0,
+                    Color::from(palette.card_stroke),
+                );
+            }
+            if let (Some(rect), Some(Some(footer))) = (
+                section.footer.filter(|rect| frame.shows(*rect)),
+                self.footers.get(index),
+            ) {
+                canvas.text(
+                    rect,
+                    footer,
+                    TextStyle::Caption,
+                    Color::from(palette.text_secondary),
+                    TextLayout::WRAP,
                 );
             }
         }
+        for (index, row) in self.rows.iter().enumerate() {
+            let shown = row.card.as_ref().is_some_and(|card| frame.shows(card.card));
+            if row.visible && shown {
+                self.paint_row(canvas, frame, index, row);
+            }
+        }
     }
 
-    /// 自分で描く部品(オン・オフと既定に戻す)を描く．描いたら true
-    pub fn draw(&self, target: &DrawTarget, theme: &Theme) -> bool {
-        let Some(row) = self
-            .rows
-            .iter()
-            .flatten()
-            .find(|row| row.control == Some(target.window) || row.reset == Some(target.window))
-        else {
-            return false;
-        };
-        let canvas = Canvas::of(target);
+    fn state(&self, frame: &Frame, element: Element, enabled: bool) -> State {
+        State {
+            enabled,
+            hover: if enabled {
+                self.hover_value(element, frame.now)
+            } else {
+                0.0
+            },
+            pressed: frame.pressed == Some(element),
+            focus_visible: frame.focus_visible && frame.focus == Some(element),
+        }
+    }
+
+    fn paint_row(&self, canvas: &mut dyn Canvas, frame: &Frame, index: usize, row: &RowState) {
+        let theme = frame.theme;
         let palette = &theme.palette;
-        canvas.fill(target.rect, palette.card);
-        if row.reset == Some(target.window) {
-            draw_reset(&canvas, target, theme);
-            return true;
-        }
-        if row.row.control == Control::Color {
-            draw_color(&canvas, target, theme, &row.color);
-            return true;
-        }
-        if row.row.control != Control::Toggle {
-            return false;
-        }
-        let on = ffi::send(target.window, BM_GETCHECK, 0, 0) == 1;
-        let (left, top, right, bottom) = target.rect;
-        let switch_width = theme.px(size::SWITCH_WIDTH);
-        let switch_height = theme.px(size::SWITCH_HEIGHT);
-        let switch_left = right - switch_width - 1;
-        let switch_top = top + (bottom - top - switch_height) / 2;
-        let switch = (
-            switch_left,
-            switch_top,
-            switch_left + switch_width,
-            switch_top + switch_height,
-        );
-        let (fill, stroke, knob) = match (on, target.disabled) {
-            (true, false) => (palette.accent, palette.accent, palette.accent_text),
-            (true, true) => (palette.switch_off, palette.switch_off, palette.card),
-            (false, _) => (palette.card, palette.switch_off, palette.switch_off),
-        };
-        canvas.round_rect(switch, switch_height / 2, fill, Some(stroke));
-        let inset = theme.px(size::SWITCH_HEIGHT / 5.0);
-        let knob_size = switch_height - inset * 2;
-        let knob_left = if on {
-            switch.2 - inset - knob_size
-        } else {
-            switch.0 + inset
-        };
-        canvas.round_rect(
-            (
-                knob_left,
-                switch.1 + inset,
-                knob_left + knob_size,
-                switch.1 + inset + knob_size,
-            ),
-            knob_size / 2,
-            knob,
-            None,
-        );
-        let color = if target.disabled {
-            palette.text_secondary
-        } else {
+        let Some(card) = &row.card else { return };
+        let label_color = if row.enabled || row.row.control == Control::Note {
             palette.text
+        } else {
+            palette.text_disabled
         };
-        let gap = theme.px(size::CONTROL_GAP) + theme.px(size::CONTROL_GAP);
-        canvas.text(
-            (left, top, switch_left - gap, bottom),
-            if on { text::ON } else { text::OFF },
-            &theme.fonts.body,
-            color,
-            DT_RIGHT | DT_VCENTER | DT_SINGLELINE,
-        );
-        if target.focused {
-            let outer = theme.px(2.0);
-            canvas.frame(
-                (
-                    switch.0 - outer,
-                    switch.1 - outer,
-                    switch.2 + outer,
-                    switch.3 + outer,
-                ),
-                palette.text,
+        if card.label.width > 0.0 && card.label.height > 0.0 {
+            canvas.text(
+                card.label,
+                row.row.title,
+                TextStyle::Body,
+                Color::from(label_color),
+                TextLayout::LINE,
             );
         }
-        true
-    }
-}
-
-/// 色のボタン．枠の中に色の見本と「#RRGGBB」を並べる
-fn draw_color(canvas: &Canvas, target: &DrawTarget, theme: &Theme, color: &str) {
-    let palette = &theme.palette;
-    let fill = if target.hot || target.pressed {
-        palette.nav_selected
-    } else {
-        palette.control
-    };
-    let stroke = if target.focused {
-        palette.accent
-    } else {
-        palette.control_stroke
-    };
-    canvas.round_rect(target.rect, theme.px(size::CARD_RADIUS), fill, Some(stroke));
-    let (left, top, right, bottom) = target.rect;
-    let gap = theme.px(size::CONTROL_GAP);
-    let swatch_size = (bottom - top) - gap * 2;
-    let swatch = (
-        left + gap,
-        top + gap,
-        left + gap + swatch_size,
-        top + gap + swatch_size,
-    );
-    if let Some((red, green, blue)) = crate::themes::rgb(color) {
-        canvas.round_rect(
-            swatch,
-            theme.px(size::CARD_RADIUS),
-            tokens::Rgb { red, green, blue },
-            Some(palette.control_stroke),
-        );
-    }
-    let text_color = if target.disabled {
-        palette.text_secondary
-    } else {
-        palette.text
-    };
-    canvas.text(
-        (swatch.2 + gap, top, right - gap, bottom),
-        color,
-        &theme.fonts.body,
-        text_color,
-        DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-    );
-}
-
-fn draw_reset(canvas: &Canvas, target: &DrawTarget, theme: &Theme) {
-    let palette = &theme.palette;
-    if target.hot || target.pressed {
-        canvas.round_rect(
-            target.rect,
-            theme.px(size::CARD_RADIUS),
-            palette.nav_selected,
-            None,
-        );
-    }
-    let color = if target.disabled {
-        palette.text_secondary
-    } else {
-        palette.accent
-    };
-    match &theme.fonts.icon {
-        // Undo の絵
-        Some(icon) => canvas.text(
-            target.rect,
-            "\u{E7A7}",
-            icon,
-            color,
-            windows::Win32::Graphics::Gdi::DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-        ),
-        None => canvas.text(
-            target.rect,
-            "↺",
-            &theme.fonts.body,
-            color,
-            windows::Win32::Graphics::Gdi::DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-        ),
-    }
-    if target.focused {
-        canvas.frame(target.rect, palette.text);
-    }
-}
-
-fn label(host: Window, text: &str, font: &ffi::Font, id: u16) -> Option<Window> {
-    let window = ffi::create(
-        WINDOW_EX_STYLE::default(),
-        w!("STATIC"),
-        text,
-        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOPREFIX.0),
-        (0, 0, 0, 0),
-        Some(host),
-        id,
-    )?;
-    ffi::set_font(window, font);
-    Some(window)
-}
-
-fn create_row(
-    host: Window,
-    theme: &Theme,
-    row: &Row,
-    catalog: &Catalog,
-    next_id: &mut impl FnMut() -> u16,
-) -> RowView {
-    let fonts = &theme.fonts;
-    let mut view = RowView {
-        row: row.clone(),
-        label: None,
-        control: None,
-        reset: None,
-        numbers: Vec::new(),
-        parts: Vec::new(),
-        visible: true,
-        dictionary_inputs: Vec::new(),
-        color: String::new(),
-        all_rows: Vec::new(),
-        shown: Vec::new(),
-        editing: None,
-    };
-    match &row.control {
-        Control::Note => {
-            view.label = label(host, row.title, &fonts.caption, next_id());
-            return view;
-        }
-        control if control.list_buttons().is_some() => {
-            create_list(host, theme, control, &mut view, next_id);
-            return view;
-        }
-        Control::Preview => {
-            create_preview(host, theme, &mut view, next_id);
-            return view;
-        }
-        Control::Action(_) => {}
-        _ => {
-            let style = WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOPREFIX.0 | SS_ENDELLIPSIS.0);
-            view.label = ffi::create(
-                WINDOW_EX_STYLE::default(),
-                w!("STATIC"),
-                row.title,
-                style,
-                (0, 0, 0, 0),
-                Some(host),
-                next_id(),
+        for (position, rect) in &card.descriptions {
+            let Some(note) = self
+                .rows
+                .iter()
+                .filter(|other| other.section == row.section)
+                .nth(*position)
+            else {
+                continue;
+            };
+            canvas.text(
+                *rect,
+                note.row.title,
+                TextStyle::Caption,
+                Color::from(palette.text_secondary),
+                TextLayout::WRAP,
             );
-            if let Some(label) = view.label {
-                ffi::set_font(label, &fonts.body);
-            }
         }
-    }
-    let combo_style =
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(CBS_DROPDOWNLIST as u32);
-    let (class, title, style) = match &row.control {
-        // 名前は読み上げのために項目の名前にする(画面には自分で「オン」「オフ」を描く)
-        Control::Toggle => (
-            w!("BUTTON"),
-            row.title,
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-        ),
-        Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) => {
-            (w!("COMBOBOX"), "", combo_style)
-        }
-        Control::Action(_) => (
-            w!("BUTTON"),
-            row.title,
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-        ),
-        // 色の見本と「#RRGGBB」を自分で描く(NM_CUSTOMDRAW)．名前は読み上げのために項目の名前にする
-        Control::Color => (
-            w!("BUTTON"),
-            row.title,
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-        ),
-        Control::Stat(_) | Control::Info(_) => (
-            w!("STATIC"),
-            "",
-            WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOPREFIX.0 | SS_RIGHT.0),
-        ),
-        Control::Preset => (
-            w!("COMBOBOX"),
-            "",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-        ),
-        Control::Version => (
-            w!("STATIC"),
-            "",
-            WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOPREFIX.0 | SS_RIGHT.0),
-        ),
-        Control::Notices => {
-            view.label = None;
-            view.control = create_notices(host, theme, next_id());
-            return view;
-        }
-        Control::KeymapReport | Control::ThemeReport => {
-            view.label = None;
-            view.control = create_read_only(host, theme, "", next_id());
-            return view;
-        }
-        Control::ThemePreview => {
-            // 見本は窓(s90-settings の window)が候補ウィンドウと同じ描き方で描く(WM_DRAWITEM)
-            view.label = None;
-            view.control = ffi::create(
-                WINDOW_EX_STYLE::default(),
-                w!("STATIC"),
-                row.title,
-                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_OWNERDRAW.0),
-                (0, 0, 0, 0),
-                Some(host),
-                next_id(),
+        let element = |part| Element { row: index, part };
+        if row.resettable {
+            let reset = element(Part::Reset);
+            paint::button(
+                canvas,
+                theme,
+                card.reset,
+                theme.glyphs.undo,
+                paint::ButtonKind::Subtle,
+                self.state(frame, reset, row.enabled),
             );
-            return view;
         }
-        Control::Note
-        | Control::List(..)
-        | Control::Preview
-        | Control::Dictionary(_)
-        | Control::Symbols(..)
-        | Control::SyncFields(_)
-        | Control::Dictionaries(..)
-        | Control::CustomThemes(_) => return view,
-    };
-    view.control = ffi::create(
-        WINDOW_EX_STYLE::default(),
-        class,
-        title,
-        style,
-        (0, 0, 0, 0),
-        Some(host),
-        next_id(),
-    );
-    let Some(control) = view.control else {
-        return view;
-    };
-    ffi::set_font(control, &fonts.body);
-    match &row.control {
-        Control::Choice(choices) => {
-            for (_, name) in choices.iter() {
-                ffi::send_text(control, CB_ADDSTRING, 0, name);
+        match &row.row.control {
+            Control::Toggle => {
+                let toggle = element(Part::Toggle);
+                paint::toggle(
+                    canvas,
+                    theme,
+                    card.control,
+                    row.on,
+                    row.knob.value(frame.now),
+                    text::ON,
+                    text::OFF,
+                    self.state(frame, toggle, row.enabled),
+                );
             }
+            Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) | Control::Preset => {
+                let dropdown = element(Part::Dropdown);
+                let items = row.dropdown_items(Part::Dropdown);
+                let label = row
+                    .choice
+                    .and_then(|choice| items.get(choice))
+                    .cloned()
+                    .unwrap_or_default();
+                paint::dropdown(
+                    canvas,
+                    theme,
+                    card.control,
+                    &label,
+                    frame.open == Some(dropdown),
+                    self.state(frame, dropdown, row.enabled),
+                );
+                if let (Control::Preset, Some(rect)) =
+                    (&row.row.control, row.part_rect(Part::PresetLoad))
+                {
+                    let load = element(Part::PresetLoad);
+                    paint::button(
+                        canvas,
+                        theme,
+                        rect,
+                        keys::LOAD,
+                        paint::ButtonKind::Standard,
+                        self.state(frame, load, row.enabled),
+                    );
+                }
+            }
+            Control::Action(_) => {
+                let action = element(Part::Action);
+                paint::button(
+                    canvas,
+                    theme,
+                    card.control,
+                    row.row.title,
+                    paint::ButtonKind::Standard,
+                    self.state(frame, action, row.enabled),
+                );
+            }
+            Control::Color => self.paint_color(canvas, frame, index, row, card.control),
+            Control::Stat(_) | Control::Info(_) | Control::Version => {
+                canvas.text(
+                    card.control,
+                    &row.text,
+                    TextStyle::Body,
+                    Color::from(palette.text_secondary),
+                    TextLayout::TRAILING,
+                );
+            }
+            Control::Notices | Control::KeymapReport | Control::ThemeReport => {
+                self.paint_text_box(canvas, frame, index, row, card.control);
+            }
+            Control::ThemePreview => canvas.preview(card.control),
+            Control::Preview => {
+                for field in 0..2 {
+                    self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
+                }
+                canvas.text(
+                    card.control,
+                    &row.preview_result,
+                    TextStyle::Body,
+                    Color::from(palette.text),
+                    TextLayout::WRAP,
+                );
+            }
+            Control::Note => {}
+            _ => self.paint_list(canvas, frame, index, row),
         }
-        Control::Preset => {
-            for (_, name) in keys::PRESETS {
-                ffi::send_text(control, CB_ADDSTRING, 0, name);
-            }
-            ffi::send(control, CB_SETCURSEL, 0, 0);
-            ffi::set_theme(control, theme.control_theme(true));
-            if let Some(button) = ffi::create(
-                WINDOW_EX_STYLE::default(),
-                w!("BUTTON"),
-                keys::LOAD,
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                (0, 0, 0, 0),
-                Some(host),
-                next_id(),
-            ) {
-                ffi::set_font(button, &fonts.body);
-                ffi::set_theme(button, theme.control_theme(false));
-                view.parts.push(button);
-            }
-        }
-        Control::Stepper(range) => {
-            view.numbers = options::steps(range.range(catalog), 1.0);
-            for number in &view.numbers {
-                ffi::send_text(control, CB_ADDSTRING, 0, &format!("{number}"));
-            }
-        }
-        Control::Seconds(range) => {
-            view.numbers = options::steps(range.range(catalog), catalog.seconds_step);
-            for number in &view.numbers {
-                ffi::send_text(control, CB_ADDSTRING, 0, &more::seconds(*number));
-            }
-        }
-        _ => {}
     }
-    if matches!(
-        row.control,
-        Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_)
+
+    fn paint_field(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+        part: Part,
     ) {
-        let field = theme.px(size::CONTROL_HEIGHT) - theme.px(size::CONTROL_GAP);
-        ffi::send(control, CB_SETITEMHEIGHT, usize::MAX, field as isize);
-        ffi::set_theme(control, theme.control_theme(true));
+        let Some(rect) = row.part_rect(part) else {
+            return;
+        };
+        let element = Element { row: index, part };
+        let window = row.edit(part);
+        let focused = window.is_some() && window == frame.focused_edit;
+        paint::field_frame(
+            canvas,
+            frame.theme,
+            rect,
+            focused,
+            self.state(frame, element, row.enabled),
+        );
+        if frame.draw_fields {
+            // 見本の書き出しでは EDIT が写らないので，欄の文字か案内を描く
+            let text = window.map(ffi::window_text).unwrap_or_default();
+            let (shown, color) = if text.is_empty() {
+                (self.name(element), frame.theme.palette.text_secondary)
+            } else {
+                (text, frame.theme.palette.text)
+            };
+            let inner = Rect::new(
+                rect.x + size::FIELD_PADDING_X,
+                rect.y,
+                rect.width - size::FIELD_PADDING_X * 2.0,
+                rect.height,
+            );
+            canvas.text(
+                inner,
+                &shown,
+                TextStyle::Body,
+                Color::from(color),
+                TextLayout::LINE,
+            );
+        }
     }
-    if let Control::Action(_) = row.control {
-        ffi::set_theme(control, theme.control_theme(false));
-    }
-    if row.has_value() {
-        view.reset = ffi::create(
-            WINDOW_EX_STYLE::default(),
-            w!("BUTTON"),
-            crate::strings::features::RESTORE_DEFAULT,
-            WS_CHILD | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-            (0, 0, 0, 0),
-            Some(host),
-            next_id(),
+
+    fn paint_color(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+        rect: Rect,
+    ) {
+        let theme = frame.theme;
+        let palette = &theme.palette;
+        let element = Element {
+            row: index,
+            part: Part::Color,
+        };
+        let state = self.state(frame, element, row.enabled);
+        paint::button(canvas, theme, rect, "", paint::ButtonKind::Standard, state);
+        let gap = size::CONTROL_GAP;
+        let swatch_size = rect.height - gap * 2.0;
+        let swatch = Rect::new(rect.x + gap, rect.y + gap, swatch_size, swatch_size);
+        if let Some((red, green, blue)) = crate::themes::rgb(&row.color) {
+            canvas.fill_round(
+                swatch,
+                size::CONTROL_RADIUS,
+                Color::from(tokens::Rgb { red, green, blue }),
+            );
+            canvas.stroke_round(
+                swatch,
+                size::CONTROL_RADIUS,
+                1.0,
+                Color::from(palette.control_stroke),
+            );
+        }
+        let text = if row.enabled {
+            palette.text
+        } else {
+            palette.text_disabled
+        };
+        canvas.text(
+            Rect::new(
+                swatch.max_x() + gap,
+                rect.y,
+                rect.width - swatch_size - gap * 3.0,
+                rect.height,
+            ),
+            &row.color,
+            TextStyle::Body,
+            Color::from(text),
+            TextLayout::LINE,
         );
     }
-    view
+
+    fn paint_text_box(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+        rect: Rect,
+    ) {
+        let theme = frame.theme;
+        let palette = &theme.palette;
+        canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.control));
+        canvas.stroke_round(
+            rect,
+            size::CONTROL_RADIUS,
+            1.0,
+            Color::from(palette.control_stroke),
+        );
+        let offset = row.text_scroll.offset(frame.now);
+        let padding = size::FIELD_PADDING_X;
+        canvas.push_clip(rect);
+        // 高さは測ったときと同じにして，組んだ文字を使い回す
+        let inner = Rect::new(
+            rect.x + padding,
+            rect.y + padding / 2.0 - offset,
+            rect.width - padding * 2.0,
+            f32::MAX,
+        );
+        canvas.text(
+            inner,
+            &row.text,
+            TextStyle::Caption,
+            Color::from(palette.text),
+            TextLayout::WRAP,
+        );
+        canvas.pop_clip();
+        scrollbar(canvas, theme, rect, &row.text_scroll, frame.now);
+        let element = Element {
+            row: index,
+            part: Part::Text,
+        };
+        if frame.focus_visible && frame.focus == Some(element) {
+            paint::focus_ring(canvas, theme, rect, size::CONTROL_RADIUS);
+        }
+    }
+
+    fn paint_list(&self, canvas: &mut dyn Canvas, frame: &Frame, index: usize, row: &RowState) {
+        let theme = frame.theme;
+        for part in row.parts() {
+            let element = Element { row: index, part };
+            let Some(rect) = row.part_rect(part) else {
+                continue;
+            };
+            match part {
+                Part::Field(_) if row.is_dropdown(part) => {
+                    let items = row.dropdown_items(part);
+                    let label = row
+                        .dropdown_selected(part)
+                        .and_then(|selected| items.get(selected))
+                        .cloned()
+                        .unwrap_or_default();
+                    paint::dropdown(
+                        canvas,
+                        theme,
+                        rect,
+                        &label,
+                        frame.open == Some(element),
+                        self.state(frame, element, row.part_enabled(part)),
+                    );
+                }
+                Part::Field(_) | Part::Search => self.paint_field(canvas, frame, index, row, part),
+                Part::Top(_) | Part::Bottom(_) => {
+                    let kind = if part == Part::Top(0) && row.has_add_remove() {
+                        paint::ButtonKind::Accent
+                    } else {
+                        paint::ButtonKind::Standard
+                    };
+                    paint::button(
+                        canvas,
+                        theme,
+                        rect,
+                        row.button_label(part),
+                        kind,
+                        self.state(frame, element, row.part_enabled(part)),
+                    );
+                }
+                Part::Table => self.paint_table(canvas, frame, index, row, rect),
+                _ => {}
+            }
+        }
+    }
+
+    fn paint_table(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+        rect: Rect,
+    ) {
+        let theme = frame.theme;
+        let palette = &theme.palette;
+        canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.control));
+        let columns = row.row.control.table_columns();
+        let count = columns.len().max(1) as f32;
+        let padding = size::FIELD_PADDING_X;
+        let column_width = (rect.width - padding) / count;
+        let header = Rect::new(rect.x, rect.y, rect.width, size::TABLE_HEADER_HEIGHT);
+        for (column, title) in columns.iter().enumerate() {
+            canvas.text(
+                Rect::new(
+                    header.x + padding + column_width * column as f32,
+                    header.y,
+                    column_width - padding,
+                    header.height,
+                ),
+                title,
+                TextStyle::Caption,
+                Color::from(palette.text_secondary),
+                TextLayout::LINE,
+            );
+        }
+        canvas.fill_rect(
+            Rect::new(rect.x, header.max_y() - 1.0, rect.width, 1.0),
+            Color::from(palette.card_stroke),
+        );
+        let body = Rect::new(
+            rect.x,
+            header.max_y(),
+            rect.width,
+            (rect.height - size::TABLE_HEADER_HEIGHT).max(0.0),
+        );
+        canvas.push_clip(body);
+        if row.table.is_empty() {
+            let empty = row.list_spec().map_or("", |(spec, _)| spec.empty);
+            canvas.text(
+                body,
+                empty,
+                TextStyle::Body,
+                Color::from(palette.text_secondary),
+                TextLayout::CENTER,
+            );
+        }
+        let offset = row.table_scroll.offset(frame.now);
+        let row_height = size::TABLE_ROW_HEIGHT;
+        let first = (offset / row_height).floor().max(0.0) as usize;
+        let visible = (body.height / row_height).ceil() as usize + 1;
+        for position in first..(first + visible).min(row.table.len()) {
+            let Some(cells) = row.table.shown_row(position) else {
+                continue;
+            };
+            let top = body.y + position as f32 * row_height - offset;
+            let line = Rect::new(rect.x + 2.0, top + 1.0, rect.width - 4.0, row_height - 2.0);
+            let selected = row.table.is_selected(position);
+            if selected {
+                canvas.fill_round(
+                    line,
+                    size::CONTROL_RADIUS,
+                    Color::from(palette.nav_selected),
+                );
+                let indicator = size::NAV_INDICATOR_HEIGHT.min(row_height - 8.0);
+                canvas.fill_round(
+                    Rect::new(
+                        line.x,
+                        line.y + (line.height - indicator) / 2.0,
+                        size::NAV_INDICATOR_WIDTH,
+                        indicator,
+                    ),
+                    size::NAV_INDICATOR_WIDTH / 2.0,
+                    Color::from(palette.accent),
+                );
+            } else if self.table_hover == Some((index, position)) {
+                canvas.fill_round(line, size::CONTROL_RADIUS, Color::from(palette.nav_hover));
+            }
+            let text = if row.enabled {
+                palette.text
+            } else {
+                palette.text_disabled
+            };
+            for (column, cell) in cells.iter().enumerate() {
+                canvas.text(
+                    Rect::new(
+                        rect.x + padding + column_width * column as f32,
+                        top,
+                        column_width - padding,
+                        row_height,
+                    ),
+                    cell,
+                    TextStyle::Body,
+                    Color::from(text),
+                    TextLayout::LINE,
+                );
+            }
+        }
+        canvas.pop_clip();
+        scrollbar(canvas, theme, body, &row.table_scroll, frame.now);
+        canvas.stroke_round(
+            rect,
+            size::CONTROL_RADIUS,
+            1.0,
+            Color::from(palette.control_stroke),
+        );
+        let element = Element {
+            row: index,
+            part: Part::Table,
+        };
+        if frame.focus_visible && frame.focus == Some(element) {
+            paint::focus_ring(canvas, theme, rect, size::CONTROL_RADIUS);
+        }
+    }
+
+    /// 部品の中の送り(ポインターを載せたとき太くする)
+    pub fn set_scrollbar_hover(&mut self, element: Option<Element>, now: f64) {
+        for (index, row) in self.rows.iter_mut().enumerate() {
+            let table = element
+                == Some(Element {
+                    row: index,
+                    part: Part::Table,
+                });
+            let text = element
+                == Some(Element {
+                    row: index,
+                    part: Part::Text,
+                });
+            row.table_scroll.set_hover(table, now);
+            row.text_scroll.set_hover(text, now);
+        }
+    }
 }
 
-/// 一覧の部品を作る．入力欄は案内の文字(cue banner)に欄の名前を出す
-/// 一覧の入力欄・ボタン・表を作る．buttons は入力欄の後ろに並べるボタン，more_columns は入力欄の列の後ろに足す表の列
-fn create_list(
-    host: Window,
+/// 表の行を見せる高さ
+fn table_viewport(row: &RowState) -> f32 {
+    row.card.as_ref().map_or(0.0, |card| {
+        (card.control.height - size::TABLE_HEADER_HEIGHT).max(0.0)
+    })
+}
+
+/// 重ねる細いスクロールバー(track の右端)
+pub fn scrollbar(
+    canvas: &mut dyn Canvas,
     theme: &Theme,
-    control: &Control,
-    view: &mut RowView,
-    next_id: &mut impl FnMut() -> u16,
+    track: Rect,
+    scroller: &Scroller,
+    now: f64,
 ) {
-    let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) else {
+    let opacity = scroller.bar_opacity(now);
+    if opacity <= 0.0 {
+        return;
+    }
+    let margin = size::SCROLLBAR_MARGIN;
+    let inner = track.height - margin * 2.0;
+    let Some(thumb) = scroller.thumb(inner, now) else {
         return;
     };
-    let fonts = &theme.fonts;
-    let labels = control.table_columns();
-    for field in spec.fields {
-        let window = match field.choices {
-            None => create_edit(host, theme, field.label, next_id()),
-            Some(choices) => {
-                let combo = ffi::create(
-                    WINDOW_EX_STYLE::default(),
-                    w!("COMBOBOX"),
-                    "",
-                    WS_CHILD
-                        | WS_VISIBLE
-                        | WS_TABSTOP
-                        | WS_VSCROLL
-                        | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                    (0, 0, 0, 0),
-                    Some(host),
-                    next_id(),
-                );
-                if let Some(combo) = combo {
-                    ffi::set_font(combo, &fonts.body);
-                    for (_, name) in choices {
-                        ffi::send_text(combo, CB_ADDSTRING, 0, name);
-                    }
-                    ffi::send(combo, CB_SETCURSEL, 0, 0);
-                    ffi::set_theme(combo, theme.control_theme(true));
+    let width = scroller.bar_width(now);
+    let rect = Rect::new(
+        track.max_x() - margin - width,
+        track.y + margin + thumb.top,
+        width,
+        thumb.height,
+    );
+    canvas.fill_round(
+        rect,
+        width / 2.0,
+        Color::from(theme.palette.scrollbar).with_alpha(opacity),
+    );
+}
+
+/// 打つ欄を用意するところ(使い回せる欄があれば使い，無ければ作る)
+struct FieldSource<'a, F: FnMut() -> u16> {
+    parent: Window,
+    font: &'a ffi::Font,
+    pool: &'a mut Vec<Window>,
+    next_id: &'a mut F,
+}
+
+impl<F: FnMut() -> u16> FieldSource<'_, F> {
+    fn take(&mut self, placeholder: &str) -> Option<Window> {
+        if let Some(window) = self.pool.pop() {
+            edit::set_placeholder(window, placeholder);
+            ffi::set_font(window, self.font);
+            ffi::enable(window, true);
+            return Some(window);
+        }
+        edit::create(self.parent, (self.next_id)(), placeholder, self.font)
+    }
+}
+
+/// 一覧の入力欄・検索欄・試す欄の標準の EDIT を用意する
+fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowState) {
+    match &row.row.control {
+        Control::Preview => {
+            for label in [features::TRY_PLACEHOLDER, features::TRY_PRECEDING] {
+                if let Some(window) = fields.take(label) {
+                    row.preview_fields.push(window);
                 }
-                combo
             }
-        };
-        view.parts.extend(window);
-    }
-    // 入力欄の右のボタンと表の下のボタン(配置の parts と同じ並び)．取り込むボタンだけは選ばなくても使える
-    for (index, title) in buttons.top.iter().chain(buttons.bottom).enumerate() {
-        if buttons.search && index == buttons.top.len() {
-            // 検索欄は上のボタンと下のボタンのあいだ(配置の parts と同じ並び)
-            view.parts
-                .extend(create_edit(host, theme, features::SEARCH, next_id()));
         }
-        let enabled = matches!(control, Control::Dictionaries(..)) && index == buttons.top.len();
-        if let Some(button) = ffi::create(
-            WINDOW_EX_STYLE::default(),
-            w!("BUTTON"),
-            title,
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-            (0, 0, 0, 0),
-            Some(host),
-            next_id(),
-        ) {
-            ffi::set_font(button, &fonts.body);
-            ffi::set_theme(button, theme.control_theme(false));
-            ffi::enable(button, enabled);
-            view.parts.push(button);
+        control => {
+            let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) else {
+                return;
+            };
+            for field in spec.fields {
+                let input = match field.choices {
+                    Some(_) => Input::Choice(0),
+                    None => match fields.take(field.label) {
+                        Some(window) => Input::Edit(window),
+                        None => Input::Choice(0),
+                    },
+                };
+                row.inputs.push(input);
+            }
+            if buttons.search {
+                row.search = fields.take(features::SEARCH);
+            }
         }
     }
-    if buttons.search && buttons.bottom.is_empty() {
-        view.parts
-            .extend(create_edit(host, theme, features::SEARCH, next_id()));
-    }
-    view.control = ffi::create(
-        WS_EX_CLIENTEDGE,
-        WC_LISTVIEW,
-        "",
-        WS_CHILD
-            | WS_VISIBLE
-            | WS_TABSTOP
-            | WINDOW_STYLE(LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER),
-        (0, 0, 0, 0),
-        Some(host),
-        next_id(),
-    );
-    if let Some(list) = view.control {
-        ffi::set_font(list, &fonts.body);
-        ffi::list_set_columns(list, &labels, &vec![0; labels.len()]);
-        apply_list_theme(list, theme);
-    }
-}
-
-/// 謝辞の欄．配布物の THIRD_PARTY_NOTICES.md(実行ファイルと同じディレクトリ)を読むだけの欄に出す
-fn create_notices(host: Window, theme: &Theme, id: u16) -> Option<Window> {
-    let text = std::env::current_exe()
-        .ok()
-        .and_then(|path| path.parent().map(|dir| dir.join(NOTICES_FILE)))
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        // EDIT の改行は CR LF
-        .map(|text| text.replace("\r\n", "\n").replace('\n', "\r\n"))
-        .unwrap_or_else(|| more::NOTICES_MISSING.to_string());
-    create_read_only(host, theme, &text, id)
-}
-
-/// 読むだけの複数行の欄
-fn create_read_only(host: Window, theme: &Theme, text: &str, id: u16) -> Option<Window> {
-    let field = ffi::create(
-        WS_EX_CLIENTEDGE,
-        w!("EDIT"),
-        text,
-        WS_CHILD
-            | WS_VISIBLE
-            | WS_TABSTOP
-            | WS_VSCROLL
-            | WINDOW_STYLE((ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL) as u32),
-        (0, 0, 0, 0),
-        Some(host),
-        id,
-    )?;
-    ffi::set_font(field, &theme.fonts.caption);
-    ffi::set_theme(field, theme.control_theme(true));
-    Some(field)
-}
-
-/// 配布物に入れる利用表記のファイルの名前(tools/windows/stage.ps1)
-const NOTICES_FILE: &str = "THIRD_PARTY_NOTICES.md";
-
-/// 打つ欄．案内の文字(cue banner)に欄の名前を出す
-fn create_edit(host: Window, theme: &Theme, label: &str, id: u16) -> Option<Window> {
-    let field = ffi::create(
-        WS_EX_CLIENTEDGE,
-        w!("EDIT"),
-        "",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-        (0, 0, 0, 0),
-        Some(host),
-        id,
-    )?;
-    ffi::set_font(field, &theme.fonts.body);
-    ffi::send_text(field, EM_SETCUEBANNER, 1, label);
-    ffi::set_theme(field, theme.control_theme(true));
-    Some(field)
-}
-
-/// 試す欄の部品(打つ文・前の文字列・結果)
-fn create_preview(
-    host: Window,
-    theme: &Theme,
-    view: &mut RowView,
-    next_id: &mut impl FnMut() -> u16,
-) {
-    for label in [features::TRY_PLACEHOLDER, features::TRY_PRECEDING] {
-        view.parts
-            .extend(create_edit(host, theme, label, next_id()));
-    }
-    view.control = ffi::create(
-        WINDOW_EX_STYLE::default(),
-        w!("STATIC"),
-        "",
-        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOPREFIX.0),
-        (0, 0, 0, 0),
-        Some(host),
-        next_id(),
-    );
-    if let Some(result) = view.control {
-        ffi::set_font(result, &theme.fonts.body);
-    }
-}
-
-fn apply_list_theme(list: Window, theme: &Theme) {
-    ffi::set_theme(list, theme.control_theme(false));
-    ffi::list_set_colors(list, theme.palette.text, theme.palette.control);
-}
-
-fn selected(combo: Window) -> Option<usize> {
-    usize::try_from(ffi::send(combo, CB_GETCURSEL, 0, 0)).ok()
 }
 
 /// 一覧の表の行(列ごとの文字)．一覧でなければ None
@@ -1833,47 +2250,75 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
     })
 }
 
-fn show_value(control: Window, row: &Row, numbers: &[f64], values: &impl Values, extras: &Extras) {
-    match &row.control {
-        Control::Toggle => {
-            ffi::send(control, BM_SETCHECK, usize::from(values.on(row.path)), 0);
-            ffi::invalidate(control);
+/// ページの名前と知らせ(読み込み中・つながらない)を描く
+pub fn paint_status(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    page: Page,
+    availability: Availability,
+    width: f32,
+    height: f32,
+    now: f64,
+) {
+    let palette = &theme.palette;
+    let (left, content) = layout::content_frame(width);
+    let title = Rect::new(left, size::PAGE_PADDING_TOP, content, size::TITLE_HEIGHT);
+    canvas.text(
+        title,
+        page.title(),
+        TextStyle::Title,
+        Color::from(palette.text),
+        TextLayout::LINE,
+    );
+    let middle = (height / 2.0).max(title.max_y() + size::PROGRESS_RING_SIZE * 2.0);
+    let message = Rect::new(
+        left,
+        middle + size::PROGRESS_RING_SIZE,
+        content,
+        size::BODY_LINE_HEIGHT * 3.0,
+    );
+    match availability {
+        Availability::Loading => {
+            let period = f64::from(motion::PROGRESS_RING);
+            let phase = ((now % period) / period) as f32;
+            paint::progress_ring(canvas, theme, left + content / 2.0, middle, phase);
+            canvas.text(
+                message,
+                settings::LOADING,
+                TextStyle::Body,
+                Color::from(palette.text_secondary),
+                TextLayout {
+                    align: paint::Align::Center,
+                    wrap: true,
+                    center: false,
+                },
+            );
         }
-        Control::Choice(choices) => {
-            let index = options::index_of(choices, &values.text(row.path));
-            ffi::send(control, CB_SETCURSEL, index, 0);
+        Availability::Unavailable => {
+            canvas.text(
+                Rect::new(
+                    left,
+                    middle - size::ICON_FONT_SIZE,
+                    content,
+                    size::ICON_FONT_SIZE * 2.0,
+                ),
+                theme.glyphs.warning,
+                TextStyle::Icon,
+                Color::from(palette.caution),
+                TextLayout::CENTER,
+            );
+            canvas.text(
+                message,
+                text::ENGINE_UNAVAILABLE_DETAIL,
+                TextStyle::Body,
+                Color::from(palette.text_secondary),
+                TextLayout {
+                    align: paint::Align::Center,
+                    wrap: true,
+                    center: false,
+                },
+            );
         }
-        Control::Stepper(_) | Control::Seconds(_) => {
-            let value = values
-                .value(row.path)
-                .and_then(Value::as_f64)
-                .unwrap_or(0.0);
-            ffi::send(control, CB_SETCURSEL, options::nearest(numbers, value), 0);
-        }
-        Control::Stat(stat) => ffi::set_text(control, &extras.usage.text(*stat)),
-        // 一覧の行は sync が検索欄で絞って出す(list_rows)
-        Control::Dictionary(_)
-        | Control::Symbols(..)
-        | Control::SyncFields(_)
-        | Control::Dictionaries(..)
-        | Control::List(..)
-        | Control::CustomThemes(_) => {}
-        Control::Info(Info::SyncFolder) => ffi::set_text(control, &extras.sync_folder),
-        Control::Info(Info::LastSynced) => ffi::set_text(control, &extras.last_synced),
-
-        Control::Version => ffi::set_text(
-            control,
-            &crate::strings::windows::version(env!("CARGO_PKG_VERSION")),
-        ),
-        Control::KeymapReport => {
-            ffi::set_text(control, &extras.keymap_report.replace('\n', "\r\n"))
-        }
-        Control::ThemeReport => ffi::set_text(control, &extras.theme_report.replace('\n', "\r\n")),
-        Control::Color | Control::ThemePreview => ffi::invalidate(control),
-        Control::Action(_)
-        | Control::Note
-        | Control::Preview
-        | Control::Preset
-        | Control::Notices => {}
+        Availability::Ready => {}
     }
 }
