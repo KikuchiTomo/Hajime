@@ -56,6 +56,8 @@ public final class EngineService {
         let id: UInt64
         let purpose: Purpose
         let task: Task<Void, Never>
+        /// 求め始めた時刻(記録に使う)
+        let started: ContinuousClock.Instant
         var result: [String: [ReadingCorrection]]?
     }
 
@@ -66,6 +68,8 @@ public final class EngineService {
     private let makeSession: () -> InputSession
     private let settings: any SettingsStoring
     private let ui: (WireUiCommand) -> Void
+    /// 打ち間違いの見直しの結果の記録(CorrectionReport の文．入力の中身は含めない)．Windows はデバッグ出力に流す
+    private let log: (String) -> Void
     private let openSettings: () -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
@@ -93,8 +97,9 @@ public final class EngineService {
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
-                services: SettingsServices = SettingsServices()) {
+                services: SettingsServices = SettingsServices(), log: @escaping (String) -> Void = { _ in }) {
         self.services = services
+        self.log = log
         self.typoService = typoService
         self.now = now
         self.sync = sync
@@ -438,20 +443,26 @@ public final class EngineService {
             case .conversion(let deadline):
                 if let result = work.result {
                     sessions[session]?.correction = nil
-                    actions += current.input.applyLateCorrections(result, context: context)
+                    let applied = current.input.applyLateCorrections(result, context: context)
+                    log(CorrectionReport.outcome("変換後の補正", corrections: result, actions: applied, milliseconds: Self.elapsedMilliseconds(since: work.started, now: now())))
+                    actions += applied
                 } else if now() >= deadline {
                     // 長くかかるときは求めるのをやめる(変換は出ているので，そのまま使える)
+                    log(CorrectionReport.timedOut("変換後の補正", seconds: settings.current.lateCorrectionTimeout))
                     cancelCorrections(of: session)
                 }
             case .review(let deadline):
                 if let result = work.result {
                     sessions[session]?.correction = nil
                     current.input.provideCorrections(result)
-                    actions += current.input.review(context: context)
+                    let reviewed = current.input.review(context: context)
+                    log(CorrectionReport.outcome("見直し", corrections: result, actions: reviewed, milliseconds: Self.elapsedMilliseconds(since: work.started, now: now())))
+                    actions += reviewed
                     // 見直しで読みを直したときは，直した読みの候補も前もって求める
                     sessions[session]?.warming = current.input.latticeWarmingSteps
                 } else if now() >= deadline {
                     // 求め終わらないときはやめ，この入力は見直したことにする(求め直し続けない)
+                    log(CorrectionReport.timedOut("見直し", seconds: settings.current.reviewCorrectionTimeout))
                     cancelCorrections(of: session)
                     current.input.skipReview()
                 }
@@ -474,6 +485,7 @@ public final class EngineService {
             if typoService != nil, let request = current.input.correctionRequest {
                 startCorrections(request, purpose: .review(deadline: now() + .seconds(settings.current.reviewCorrectionTimeout)), session: session)
             } else {
+                if typoService == nil { log(CorrectionReport.unavailable) }
                 actions += current.input.review(context: context)
                 sessions[session]?.warming = current.input.latticeWarmingSteps
             }
@@ -491,7 +503,7 @@ public final class EngineService {
             guard !Task.isCancelled, let self, self.sessions[session]?.correction?.id == id else { return }
             self.sessions[session]?.correction?.result = result
         }
-        sessions[session]?.correction = CorrectionWork(id: id, purpose: purpose, task: task)
+        sessions[session]?.correction = CorrectionWork(id: id, purpose: purpose, task: task, started: now())
     }
 
     private func cancelCorrections(of session: UInt32) {
@@ -590,6 +602,10 @@ public final class EngineService {
     static func isValidHandwritingText(_ text: String) -> Bool {
         !text.isEmpty && text.count <= DefaultSettings.maximumHandwritingTextLength
             && !text.unicodeScalars.contains { $0.properties.generalCategory == .control || $0.properties.generalCategory == .format }
+    }
+
+    private static func elapsedMilliseconds(since start: ContinuousClock.Instant, now: ContinuousClock.Instant) -> Int {
+        Int((now - start) / .milliseconds(1))
     }
 
     private static func milliseconds(_ seconds: Double) -> UInt32 {
