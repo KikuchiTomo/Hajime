@@ -61,8 +61,8 @@ ditto --norsrc --noextattr "build/Build/Products/$configuration/$app_name.app" "
 app="$work/root/$app_name.app"
 version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Contents/Info.plist")
 
-if [ -n "$app_identity" ]; then
-  entitlements=$(find build/Build/Intermediates.noindex -path "*$configuration*" -name "$app_name.app.xcent" | head -1)
+entitlements=$(find build/Build/Intermediates.noindex -path "*$configuration*" -name "$app_name.app.xcent" | head -1)
+if [ -n "$app_identity" ] && [ "$app_identity" != "-" ]; then
   case "$app_identity_name" in
     "Developer ID Application"*) timestamp="--timestamp" ;;
     *) timestamp="--timestamp=none" ;;
@@ -70,7 +70,18 @@ if [ -n "$app_identity" ]; then
   codesign --force --deep --options runtime "$timestamp" --entitlements "$entitlements" --sign "$app_identity" "$app"
   echo "アプリの署名: $app_identity_name"
 else
-  echo "アプリの署名に使える証明書が無いので，アドホック署名のままにします"
+  # 証明書が無いときはアドホック署名にする．ハードンドランタイムは付けない．
+  # ハードンドランタイムの付いたアプリは，チームの同じ署名の部品しか読み込めず(Library Validation)，
+  # チームの無いアドホック署名では同梱の llama.framework を読み込めずに起動の途中で止まる
+  codesign --force --deep --timestamp=none --entitlements "$entitlements" --sign - "$app"
+  echo "アプリの署名に使える証明書が無いので，アドホック署名にします(ハードンドランタイムなし)"
+fi
+# 署名を確かめる．ハードンドランタイムが付いていてチームが無いと，同梱の部品を読み込めない
+codesign --verify --deep --strict "$app"
+signature=$(codesign -dv "$app" 2>&1)
+if printf '%s\n' "$signature" | grep -q '^CodeDirectory.*flags=.*runtime' && printf '%s\n' "$signature" | grep -q '^TeamIdentifier=not set'; then
+  echo "アプリにハードンドランタイムが付いていて，署名にチームがありません．同梱の部品を読み込めず起動できないので，作るのをやめます" >&2
+  exit 1
 fi
 
 if [ -n "$notary_profile" ]; then
