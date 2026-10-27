@@ -3,7 +3,7 @@
 ///
 /// 言葉の一覧は持たない．変換で語にならずかなのまま残った部分(spans)のかなを 1 か所だけ変えた読みを全部作り，
 /// 文全体の言語モデルの点数から変えた手間を引いた値で選ぶ(KeyEditSearch と同じ尺度．ReadingCorrectionRule がそのまま比べる)．
-/// 手間は，かなをローマ字にした綴りの違いの数で決める(ゆ yu → い i は 2)．音が同じ書き分け(ず → づ)は小さくする．
+/// 手間は，かなの音の違い(KanaPhonetics．子音と母音の違い)で決める(ゆ → い は 1.5，ゆ → ま は 2 で置き換えない)．音が同じ書き分け(ず → づ)は小さくする．
 /// 直した読みはキーの並び(KanaRomanizer)にして返すので，そのあとはキーの訂正と同じ道筋で直す・示す
 public enum KanaEditSearch {
     public struct Edit: Sendable, Equatable {
@@ -14,10 +14,10 @@ public enum KanaEditSearch {
     }
 
     public struct Costs: Sendable {
-        /// 置き換えで，綴りが 1 字違うごとの手間
-        public var substitutionPerLetter = DefaultSettings.kanaEditCosts.substitutionPerLetter
-        /// 置き換えてよい綴りの違いの数の上限．これより遠い字には置き換えない
-        public var maximumSpellingDistance = DefaultSettings.kanaEditCosts.maximumSpellingDistance
+        /// 置き換えで，音の違い(KanaPhonetics.distance)1 つごとの手間
+        public var substitutionPerDifference = DefaultSettings.kanaEditCosts.substitutionPerDifference
+        /// 置き換えてよい音の違いの上限．これより遠い字には置き換えない
+        public var maximumPhoneticDistance = DefaultSettings.kanaEditCosts.maximumPhoneticDistance
         public var insertion = DefaultSettings.kanaEditCosts.insertion
         public var deletion = DefaultSettings.kanaEditCosts.deletion
         public var transposition = DefaultSettings.kanaEditCosts.transposition
@@ -43,15 +43,13 @@ public enum KanaEditSearch {
             let lower = max(0, span.lowerBound), upper = min(characters.count, span.upperBound)
             guard lower < upper else { continue }
             for index in lower..<upper {
-                guard let spelling = KanaRomanizer.spelling(of: characters[index]) else { continue }
-                // 置き換え: 綴りが近い字だけ
+                guard KanaRomanizer.spelling(of: characters[index]) != nil else { continue }
+                // 置き換え: 音が近い字だけ(KanaPhonetics)
                 for kana in KanaRomanizer.singleKana where kana != characters[index] {
-                    guard let other = KanaRomanizer.spelling(of: kana) else { continue }
-                    let distance = EditDistance.damerauLevenshtein(spelling, other)
-                    guard distance <= costs.maximumSpellingDistance else { continue }
+                    guard let distance = KanaPhonetics.distance(characters[index], kana), distance <= costs.maximumPhoneticDistance else { continue }
                     var edited = characters
                     edited[index] = kana
-                    record(edited, cost: Double(distance) * costs.substitutionPerLetter, changed: index..<(index + 1))
+                    record(edited, cost: distance * costs.substitutionPerDifference, changed: index..<(index + 1))
                 }
                 // 余分な字
                 var removed = characters
@@ -64,9 +62,14 @@ public enum KanaEditSearch {
                     record(swapped, cost: costs.transposition, changed: index..<(index + 2))
                 }
             }
-            // 抜けた字(範囲の前後も含めて補う)
+            // 抜けた字(範囲の前後も含めて補う)．抜けやすいのは特殊拍(っ・ん・ー)と，隣の字と綴りが近い字(同じ音の繰り返し・伸ばす音)．
+            // どの字も補うと候補が千を超えて遅くなる(1 回 1 秒)ので，音の作りで絞る
             for index in lower...upper {
+                let neighbors = [index > 0 ? characters[index - 1] : nil, index < characters.count ? characters[index] : nil]
+                    .compactMap { $0 }.compactMap(KanaRomanizer.spelling(of:))
                 for kana in KanaRomanizer.singleKana {
+                    guard let spelling = KanaRomanizer.spelling(of: kana),
+                        specialMora.contains(kana) || neighbors.contains(where: { EditDistance.damerauLevenshtein($0, spelling) <= 1 }) else { continue }
                     var inserted = characters
                     inserted.insert(kana, at: index)
                     record(inserted, cost: costs.insertion, changed: index..<(index + 1))
@@ -75,6 +78,9 @@ public enum KanaEditSearch {
         }
         return Array(best.values)
     }
+
+    /// 特殊拍(促音・撥音・長音)．単独で拍になり，抜けやすい
+    static let specialMora: Set<Character> = ["っ", "ん", "ー"]
 
     /// spans の中のかなを 1 か所変えた読みを，変わったところの前後のもっともらしさで limit 件に絞り，言語モデルで採点する．
     /// 点数は「言語モデルの点数 - 手間 × costScale」(KeyEditSearch.corrections と同じ)．キーの並びにできない読みは除く．
@@ -104,7 +110,7 @@ public enum KanaEditSearch {
         let scores = languageModel(ranked.map { $0.keys })
         return zip(ranked, scores).compactMap { item, score in
             score.map { ReadingCorrection(keys: item.keys, reading: KanaWidth.katakana(from: item.edit.reading),
-                                          score: $0 - item.edit.cost * costScale, cost: item.edit.cost * costScale) }
+                                          score: $0 - item.edit.cost * costScale, cost: item.edit.cost * costScale, isReadingEdit: true) }
         }
     }
 }

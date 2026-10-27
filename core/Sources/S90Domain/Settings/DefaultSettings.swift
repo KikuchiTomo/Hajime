@@ -92,9 +92,9 @@ public enum DefaultSettings {
     public static let keyEditCandidateCount = 16
     /// かなの単位の訂正(KanaEditSearch)で，言語モデルにかける候補の数．変わったところの前後のもっともらしさで絞る
     public static let kanaEditCandidateCount = 12
-    /// かなの単位の訂正の手間．置き換えは綴り(ローマ字)が 1 字違うごとに substitutionPerLetter．
-    /// 綴りが maximumSpellingDistance より遠い字には置き換えない(候補の数を抑え，ありえない置き換えを試さない)
-    public static let kanaEditCosts = (substitutionPerLetter: 0.5, maximumSpellingDistance: 2, insertion: 1.0, deletion: 1.0, transposition: 1.0)
+    /// かなの単位の訂正の手間．置き換えは音の違い(KanaPhonetics．子音と母音)1 つごとに substitutionPerDifference．
+    /// 音の違いが maximumPhoneticDistance より大きい字には置き換えない(候補の数を抑え，ありえない置き換えを試さない)
+    public static let kanaEditCosts = (substitutionPerDifference: 0.5, maximumPhoneticDistance: 1.5, insertion: 1.0, deletion: 1.0, transposition: 1.0)
     /// 変換でかなのまま残った部分のうち，かなの単位の訂正を試す長さの下限(文字数)．1 字の助詞などは試さない
     public static let minimumUnconvertedSpanLength = 2
     /// 前に見直した部分のうち，探し直す文字の数(KeyEditSearch.searchStart)

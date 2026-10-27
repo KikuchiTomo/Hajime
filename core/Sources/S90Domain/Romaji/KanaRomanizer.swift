@@ -1,7 +1,7 @@
 /// かなの読みを，打てばその読みになるローマ字のキーの並びに直す(ローマ字表を逆に引く)．
 ///
 /// かなの単位で直した読み(KanaEditSearch)を，キーの単位で直した読みと同じ道筋(キーの並びから組み立て直す)で扱うために使う．
-/// かなごとに，その字になるいちばん短い綴りを使う(同じ長さなら x・l で始まらないもの，そのあとは辞書順)．
+/// かなごとに，その字になるいちばん短い綴りを使う(同じ長さなら標準の子音の綴り，そのあとは辞書順)．
 /// 「ん」は「nn」，「っ」は次の字の子音を重ねる(重ねられなければ「xtu」)．読み戻して元の読みにならなければ nil
 public enum KanaRomanizer {
     /// 標準のローマ字表で直す(キーの訂正 KeyEditSearch と同じ表)
@@ -82,8 +82,12 @@ public enum KanaRomanizer {
 
     private static func isBetter(_ keys: String, than other: String) -> Bool {
         if keys.count != other.count { return keys.count < other.count }
-        let isSmall = { (spelling: String) in spelling.hasPrefix("x") || spelling.hasPrefix("l") }
-        if isSmall(keys) != isSmall(other) { return !isSmall(keys) }
+        // 同じ長さなら，行を表す標準の子音の綴り(か ka・ふ hu・じ zi)を先にする(音の近さ KanaPhonetics が子音で比べるため)
+        let isAlternative = { (spelling: String) in spelling.first.map(alternativeHeads.contains) ?? false }
+        if isAlternative(keys) != isAlternative(other) { return !isAlternative(keys) }
         return keys < other
     }
+
+    /// 標準でない綴りの頭(c・q は か行・く，x・l は小さい字，f は ふ，j は じ)
+    private static let alternativeHeads: Set<Character> = ["c", "q", "x", "l", "f", "j"]
 }
