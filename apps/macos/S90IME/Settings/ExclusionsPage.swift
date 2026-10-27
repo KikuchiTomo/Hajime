@@ -11,7 +11,12 @@ struct ExclusionsPage: View {
     var body: some View {
         Form {
             Section {
-                // Form の中でも表の中でスクロールできるよう，FormTableHost に入れる
+                // 列の見出しは表の外に描く(FormTableHeader)．Form の中でも表の中でスクロールできるよう，表は FormTableHost に入れる
+                FormTableHeader(columns: [
+                    .init(title: UIStrings.More.apps),
+                    .init(title: UIStrings.More.behavior, width: DesignTokens.Size.Settings.ruleProfileColumnWidth,
+                          leadingInset: DesignTokens.Size.Settings.tablePopupTextInset),
+                ])
                 FormTableHost {
                     Table(model.settings.profileRules, selection: $selection) {
                         TableColumn(UIStrings.More.apps) { rule in
@@ -23,8 +28,9 @@ struct ExclusionsPage: View {
                             }
                             .labelsHidden()
                         }
-                        .width(min: 150, ideal: 170)
+                        .width(DesignTokens.Size.Settings.ruleProfileColumnWidth)
                     }
+                    .tableColumnHeaders(.hidden)
                     .onDeleteCommand(perform: removeSelected)
                     .contextMenu(forSelectionType: ProfileRule.self) { picked in
                         if !picked.isEmpty {
