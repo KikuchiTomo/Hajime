@@ -1,19 +1,9 @@
 name: CI Windows
 
-# Windows のビルドは時間がかかるので，Windows に関わるファイルが変わったときだけ動かす．手でも動かせる
+# Windows のビルドは時間がかかるので，Windows に関わるファイルが変わった PR でだけ動かす(持ち主の PR では動かさない)．
+# まとめて確かめるときは手で動かす: gh workflow run ci-windows.yml --ref <ブランチ>
 on:
   pull_request:
-    paths:
-      - "apps/windows/**"
-      - "core/**"
-      - "protocol/**"
-      - "design/tokens/**"
-      - "tools/windows/**"
-      - "LICENSES/**"
-      - "THIRD_PARTY_NOTICES*"
-      - ".github/workflows/ci-windows.yml"
-  push:
-    branches: [main]
     paths:
       - "apps/windows/**"
       - "core/**"
@@ -30,12 +20,14 @@ permissions:
 
 concurrency:
   group: ci-windows-${{ github.ref }}
-  # main は取り消さない(最後まで動かしてキャッシュを残し，PR がそれを使う)．PR は新しい push で古い実行を止める
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # 同じブランチ(main を含む)に新しいコミットが来たら，古い実行を止める．キャッシュは新しい実行が残す
+  cancel-in-progress: true
 
 # 仕事の名前は ci.yml と同じ決まり(何を-どこで)．インストーラーを作るのは package-windows.yml
 jobs:
   rust-windows:
+    # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -80,6 +72,8 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}-${{ github.run_id }}
 
   core-windows:
+    # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner
     runs-on: windows-latest
     timeout-minutes: 90
     steps:

@@ -2,7 +2,7 @@ name: Package macOS
 
 # macOS の配布物(.pkg)を作る．release.yml から呼ぶほか，手で動かして作ったものを試せる:
 #   gh workflow run package-macos.yml --ref <ブランチ>
-# 署名と公証はしない(アドホック署名．利用者が署名の設定をするまで．docs/dev/RELEASE.md)
+# Secrets に Developer ID の証明書と公証の資格情報があれば，署名して公証する．無ければアドホック署名で作る(docs/dev/RELEASE.md)
 on:
   workflow_call:
     inputs:
@@ -10,6 +10,21 @@ on:
         description: 作るコミット(タグなど)．空なら呼び出したワークフローのコミット
         type: string
         default: ""
+      require-signing:
+        description: Developer ID の署名と公証を必須にする(Releases に置くとき)．Secrets が無ければ作らずに止める
+        type: boolean
+        default: false
+    secrets:
+      MACOS_CERTIFICATES_P12:
+        required: false
+      MACOS_CERTIFICATES_PASSWORD:
+        required: false
+      MACOS_NOTARY_KEY:
+        required: false
+      MACOS_NOTARY_KEY_ID:
+        required: false
+      MACOS_NOTARY_ISSUER_ID:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -25,7 +40,7 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: false
       - run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
           echo "使う Xcode: $xcode"
           sudo xcode-select -s "$xcode"
       # xcodegen の版は mise.toml で固定している
@@ -37,7 +52,29 @@ jobs:
         with:
           path: ${{ github.workspace }}/../models
           key: zenzai-${{ hashFiles('tools/models/fetch_zenzai.sh') }}
+      # 証明書と公証の資格情報を使い捨てのキーチェーンに入れる．Secrets は使うこの手順にだけ渡す
+      - name: 署名と公証の準備
+        env:
+          MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+          MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          REQUIRE_SIGNING: ${{ inputs.require-signing }}
+        run: |
+          if [ -n "$MACOS_CERTIFICATES_P12" ]; then
+            tools/macos/ci_signing.sh setup
+          elif [ "$REQUIRE_SIGNING" = "true" ]; then
+            echo "::error::Releases に置く .pkg は Developer ID で署名して公証します．Secrets に証明書と公証の資格情報を入れてください(docs/dev/RELEASE.md)"
+            exit 1
+          else
+            echo "Developer ID の証明書が Secrets に無いので，アドホック署名で作ります"
+          fi
       - run: make package-macos
+      # 成否に関係なく，キーチェーンと鍵のファイルを消す
+      - name: 署名の後片付け
+        if: always()
+        run: tools/macos/ci_signing.sh cleanup
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-macos

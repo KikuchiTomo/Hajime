@@ -1,0 +1,29 @@
+name: Cancel closed
+
+# PR を閉じたら(マージを含む)，そのブランチでまだ動いている CI を止める．マージしたあとの PR の CI は結果を使わない
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  cancel-closed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: 動いている実行を止める
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          SELF: ${{ github.run_id }}
+        run: |
+          for status in queued in_progress waiting pending requested; do
+            gh run list --repo "$REPOSITORY" --branch "$BRANCH" --status "$status" --json databaseId --jq '.[].databaseId'
+          done | sort -u | while read -r run; do
+            if [ "$run" != "$SELF" ]; then
+              gh run cancel "$run" --repo "$REPOSITORY" || true
+            fi
+          done

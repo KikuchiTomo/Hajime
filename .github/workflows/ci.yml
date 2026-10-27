@@ -1,10 +1,8 @@
 name: CI
 
-# PR と main への push で動かす．手でも動かせる: gh workflow run ci.yml --ref <ブランチ>
+# PR で動かす(macOS の仕事は持ち主の PR では動かさない)．まとめて確かめるときは手で動かす: gh workflow run ci.yml --ref <ブランチ>
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -12,8 +10,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  # main は取り消さない(キャッシュを残す)．PR は新しい push で古い実行を止める
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # 同じブランチ(main を含む)に新しいコミットが来たら，古い実行を止める．キャッシュは新しい実行が残す
+  cancel-in-progress: true
 
 # ワークフローの名前の決まり(docs/dev/REPOSITORY.md): ファイルは ci・ci-windows・package-<OS>・release・pr-title．
 # 仕事の名前は「何を-どこで」(lint，core-macos，app-macos)．必須の検査はこの仕事の名前で指定する
@@ -29,6 +27,8 @@ jobs:
       - run: make check PYTHON="python3 -I"
 
   core-macos:
+    # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner
     # core のテスト．変換エンジンの辞書を取得するので数分かかる．
     # 本物の Zenzai のテストと処理時間(R-01)は Release でだけ動かす(make test-zenzai)
     runs-on: macos-15
@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
       # 依存(swift-collections 1.7 以降)が Swift 6.2 を要るので，開発の Mac と同じ Xcode 26 の最新を使う
       - run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
           echo "使う Xcode: $xcode"
           sudo xcode-select -s "$xcode"
           swift --version
@@ -75,6 +75,8 @@ jobs:
           key: core-${{ runner.os }}-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
 
   app-macos:
+    # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner
     # macOS のアプリをビルドできるか(署名はアドホック．project.yml の CODE_SIGN_IDENTITY)
     runs-on: macos-15
     timeout-minutes: 45
@@ -83,7 +85,7 @@ jobs:
         with:
           persist-credentials: false
       - run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
           sudo xcode-select -s "$xcode"
       # xcodegen の版は mise.toml で固定している
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
