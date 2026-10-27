@@ -99,6 +99,25 @@ enum SnapshotRenderer {
             }
             window.close()
         }
+        // 初期設定の各ページ(実演は最後の場面で止めて写す)
+        DemoStageView.showsLastFrameOnly = true
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            let model = OnboardingModel(store: SettingsFixture.make(name: "onboarding").store)
+            let window = OnboardingWindowController.makeWindow()
+            window.contentView = OnboardingWindowController.makeContent(model: model)
+            window.orderFrontRegardless()
+            for page in OnboardingPage.allCases {
+                // ページを切り替える動きを止め，切り替えたあとの画面を写す
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { model.page = page }
+                SettingsFixture.settle(window)
+                guard let frame = window.contentView?.superview else { continue }
+                render(frame, name: "onboarding-\(page)\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+            }
+            window.close()
+        }
         NSApp.appearance = NSAppearance(named: .aqua)
         // 行の多い表を下までスクロールしたとき，行が列の見出しの下に潜らないか
         fixture.model.update { $0.profileRules = (0..<14).map { ProfileRule(applicationPrefix: "com.example.app\($0)", profile: .terminal) } }

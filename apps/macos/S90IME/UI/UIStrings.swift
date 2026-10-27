@@ -406,6 +406,85 @@ enum UIStrings {
         }
     }
 
+    /// 初期設定(初めて使うときに 1 回だけ開く案内)
+    enum Onboarding {
+        static let windowTitle = "s90.tokyo IME へようこそ"
+        static let recommended = "推奨"
+        static let back = "戻る"
+        static let next = "次へ"
+        static let skip = "あとで設定する"
+        static let finish = "はじめる"
+        static func step(_ index: Int, of count: Int) -> String { "\(index) / \(count)" }
+        static let redo = "初期設定をやり直す"
+        static let redoLabel = "初期設定"
+
+        // a. 英数とかなの切り替え
+        static let modeTitle = "英数とかなの切り替え"
+        static let modeDetail = "日本語と英数を切り替えるキーを選びます。"
+        static func label(for style: ModeSwitchStyle) -> String {
+            switch style {
+            case .separate: "英数キーとかなキーで分ける"
+            case .single: "1 つのキーで切り替え"
+            }
+        }
+        static func detail(for style: ModeSwitchStyle) -> String {
+            switch style {
+            case .separate: "英数キーで英数、かなキーで日本語になります。"
+            case .single: "英数キーとかなキーのどちらでも、押すたびに切り替わります。"
+            }
+        }
+
+        // b. 自動補正
+        static let correctionTitle = "自動補正"
+        static let correctionDetail = "打ち間違いを、文の流れから見つけて直します。直したところには点線が付き、Esc で打ったままに戻せます。"
+        static let correctionOff = "直さない"
+        static func detail(for sensitivity: CorrectionSensitivity) -> String {
+            switch sensitivity {
+            case .cautious: "確かなときだけ直し、迷うときは「もしかして」で知らせます。"
+            case .standard: "よくある打ち間違いを直します。"
+            case .aggressive: "少しでも打ち間違いらしければ直します。"
+            }
+        }
+
+        // c. 外観
+        static let themeTitle = "外観"
+        static let themeDetail = "候補ウィンドウの見た目を選びます。あとから設定の画面で、色や書体を自由に変えられます。"
+
+        // d. ライブ変換
+        static let liveTitle = "ライブ変換"
+        static let liveDetail = "打ちながら漢字に変換して見せます。Space を押さずに、そのまま Enter で確定できます。"
+        static let liveOn = "ライブ変換を使う"
+        static let liveOff = "使わない"
+        static let liveDelay = "漢字にするまでの時間"
+
+        // e. 候補の出し方
+        static let presentationTitle = "候補の出し方"
+        static let presentationDetail = "Space を押したときの候補の並べ方と、最初に選ぶ文節を選びます。"
+        static func detail(for presentation: CandidatePresentation) -> String {
+            switch presentation {
+            case .automatic: "文節ごとに候補が枝分かれします。文全体を見渡しながら、直したい文節だけを選び直せます。"
+            case .list: "選んでいる文節の候補を縦に並べます。"
+            }
+        }
+        static let initialFocus = "最初に選ぶ文節"
+
+        // f. 入力する文字
+        static let charactersTitle = "入力する文字"
+        static let charactersDetail = "句読点や括弧など、キーを押したときに入る文字を選びます。"
+
+        // g. 機能の紹介
+        static let featuresTitle = "便利な機能"
+        static let featuresDetail = "変換の候補に、関連する語や計算の結果などを出します。"
+        static let association = "連想変換"
+        static let associationDetail = "Shift + Space で、似た意味の語を出します。"
+        static let calculation = "計算"
+        static let calculationDetail = "「1+2*3=」と打つと、答えを候補に出します。"
+        static let postalCode = "郵便番号"
+        static let postalCodeDetail = "郵便番号から住所を出します。"
+        static let date = "日付と時刻"
+        static let dateDetail = "「きょう」「いま」「なう」から日付と時刻を出します。"
+    }
+
     enum Menu {
         static let openSettings = "設定を開く…"
         static let liveConversion = "ライブ変換"

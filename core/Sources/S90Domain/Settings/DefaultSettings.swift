@@ -161,6 +161,8 @@ public enum DefaultSettings {
     public static let settingsSaveDelay = 0.4
     /// 打鍵が止まったとみなすまでの時間(秒)．止まったら変換した文を見せる
     public static let liveConversionSettleDelay = 0.4
+    /// 初期設定で推奨する，ライブ変換で漢字にするまでの時間(秒)
+    public static let onboardingLiveConversionDelay = 0.5
     /// 打ち間違いを見直すまでの打鍵の止まり(秒)．見直しは 1 文 0.1〜0.7 秒かかり，その間はキーを受け付けないので，
     /// 文を見せるときより長く止まったときだけ行う
     public static let liveCorrectionDelay = 0.8

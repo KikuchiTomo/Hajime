@@ -21,6 +21,17 @@ MainActor.assumeIsolated {
     }
 }
 
+// 初期設定がまだ済んでいなければ，起動したときに 1 回だけ開く(開発版は --open-onboarding で済んでいても開く)
+MainActor.assumeIsolated {
+    #if DEBUG
+    if CommandLine.arguments.contains("--open-onboarding") {
+        CompositionRoot.installed?.onboarding.show()
+        return
+    }
+    #endif
+    CompositionRoot.installed?.onboarding.showIfNeeded()
+}
+
 #if DEBUG
 // 開発版だけ: 起動してすぐ設定の画面を開く(入力メニューを使わずに，画面が出るかを確かめる)
 if CommandLine.arguments.contains("--open-settings") {
