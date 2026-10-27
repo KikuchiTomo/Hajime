@@ -25,6 +25,13 @@ struct WordLanguageTests {
         #expect(judge.decide(evidence("kathio", english: false, plausibility: -12), context: .afterEnglish) == .japanese)
         #expect(judge.decide(evidence("make", english: true), context: .sentenceStart) == .japanese)
         #expect(judge.decide(evidence("make", english: true), context: .afterEnglish) == .english)
+        // 短い語(「no」)は前が英語でも日本語．利用者が英語に決めた語は英語
+        #expect(judge.decide(evidence("no", english: true, reading: "の"), context: .afterEnglish) == .japanese)
+        var settings = WordLanguageSettings()
+        settings.englishWords = ["no"]
+        #expect(WordLanguageJudge(settings: settings, mode: .japaneseFirst).decide(evidence("no", english: true, reading: "の"), context: .afterEnglish) == .english)
+        // 英字入力(自動)では今までどおり
+        #expect(WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst).decide(evidence("no", english: true, reading: "の"), context: .afterEnglish) == .english)
     }
 
     @Test("R-05: 英字入力のライブ変換は，英語の辞書の語だけを英語にする")

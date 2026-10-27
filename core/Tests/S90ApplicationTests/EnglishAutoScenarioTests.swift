@@ -100,6 +100,28 @@ struct EnglishAutoScenarioTests {
         #expect(harness.marked.text == expected)
     }
 
+    @Test("R-02: ローマ字入力で英語と見分けて英字のまま入れた語(「make」)も，分岐図の上の枝でかなに直せる")
+    func englishWordHasKanaVariants() {
+        let harness = harness(.romaji, converter: converter)
+        harness.context = InputContext(precedingText: "Let's ")
+        harness.type("make")
+        harness.settle()
+        harness.press(.space)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.text == "make")
+        #expect(column?.variants == ["まけ", "マケ", "ﾏｹ"])
+    }
+
+    @Test("R-02: ローマ字入力では，短い語(「no」)は前が英語でも日本語にする")
+    func shortWordStaysJapanese() {
+        let converter = FakeConverter(["の": [("の", nil), ("野", nil)]])
+        let harness = harness(.romaji, converter: converter, lexicon: ["no"])
+        harness.context = InputContext(precedingText: "Let's ")
+        harness.type("no")
+        harness.settle()
+        #expect(harness.marked.text == "の")
+    }
+
     @Test("R-02: 前の手がかりで見分けない設定なら，英字入力(自動)では英語にする")
     func ambiguousWithoutContext() {
         let harness = harness(.englishAuto, converter: converter) { $0.wordLanguage.usesContext = false }
