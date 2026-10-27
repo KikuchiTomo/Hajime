@@ -61,7 +61,11 @@ jobs:
           $version = (cargo metadata --format-version 1 --no-deps --manifest-path apps/windows/Cargo.toml | ConvertFrom-Json).packages[0].version
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "バージョンが読めません: $version" }
           New-Item -ItemType Directory -Force apps/windows/target/dist | Out-Null
-          wix build apps/windows/installer/s90.wxs -arch x64 -d Version=$version -d StageDir=apps/windows/target/stage -o "apps/windows/target/dist/s90.tokyo-IME-$version.msi"
+          # 相対の場所は .wxs のフォルダから探されるので，集めたフォルダは絶対の場所で渡す．
+          # ファイルを拾えないなどの警告はエラーにする(-wx)．中身の無いインストーラーを作らない
+          $stage = (Resolve-Path apps/windows/target/stage).Path
+          wix build apps/windows/installer/s90.wxs -arch x64 -wx -d Version=$version -d "StageDir=$stage" -o "apps/windows/target/dist/s90.tokyo-IME-$version.msi"
+          if ($LASTEXITCODE -ne 0) { throw "インストーラーを作れませんでした" }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-windows
