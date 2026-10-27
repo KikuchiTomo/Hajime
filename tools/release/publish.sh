@@ -10,8 +10,7 @@ platform=$2
 version=$3
 dist=$4
 case "$platform" in
-  macos) label="macOS" ;;
-  windows) label="Windows" ;;
+  macos|windows) ;;
   *) echo "OS は macos か windows です: $platform" >&2; exit 2 ;;
 esac
 files=$(find "$dist" -maxdepth 1 -type f \( -name '*.pkg' -o -name '*.msi' \) | sort)
@@ -19,7 +18,7 @@ if [ -z "$files" ]; then
   echo "配布物がありません: $dist" >&2
   exit 1
 fi
-# shellcheck disable=SC2086 # ファイル名に空白は無い(s90.tokyo-IME-<バージョン>.pkg)
+# shellcheck disable=SC2086,SC2046 # ファイル名に空白は無い(s90.tokyo-IME-<バージョン>.pkg)
 (cd "$dist" && sha256sum $(for file in $files; do basename "$file"; done) > SHA256SUMS.txt)
 notes="$dist/notes.md"
 sed -e "s/@VERSION@/$version/g" "$root/tools/release/notes/$platform.md" > "$notes"
@@ -32,6 +31,6 @@ prerelease=""
 case "$version" in 0.*) prerelease="--prerelease" ;; esac
 # shellcheck disable=SC2086
 gh release create "$tag" --verify-tag $prerelease $start --generate-notes \
-  --title "s90.tokyo IME $version ($label)" --notes-file "$notes" \
+  --title "v$version-$platform" --notes-file "$notes" \
   $files "$dist/SHA256SUMS.txt"
 echo "置きました: $tag"
