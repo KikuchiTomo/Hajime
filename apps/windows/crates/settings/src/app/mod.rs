@@ -1,7 +1,9 @@
 //! 設定の画面のアプリ．エンジンへの接続と窓をここで組み立てる(composition root)
 
+mod actions;
 mod ffi;
 mod page;
+mod paint;
 mod theme;
 mod window;
 
@@ -68,16 +70,46 @@ fn start_engine() {
     }
 }
 
+/// 起動の引数．--measure <ファイル> で窓を出すまで・中身を出すまで・ページを開く・送る時間を測って書き，終える．
+/// --theme light|dark で OS の設定によらず明暗を決め，--page <名前> で初めに開くページを決める(見本の撮影)
+fn options(started: std::time::Instant) -> window::Options {
+    let arguments: Vec<String> = std::env::args().collect();
+    let value = |name: &str| {
+        arguments
+            .iter()
+            .position(|argument| argument == name)
+            .and_then(|index| arguments.get(index + 1))
+    };
+    window::Options {
+        started,
+        dark: value("--theme").and_then(|theme| match theme.as_str() {
+            "light" => Some(false),
+            "dark" => Some(true),
+            _ => None,
+        }),
+        measure: value("--measure").map(std::path::PathBuf::from),
+        page: value("--page").and_then(|name| {
+            crate::pages::Page::ALL
+                .into_iter()
+                .find(|page| format!("{page:?}").eq_ignore_ascii_case(name))
+        }),
+    }
+}
+
 pub fn run() {
-    start_engine();
+    let started = std::time::Instant::now();
+    // エンジンの起動は窓を出すのを待たせない
+    let _ = std::thread::Builder::new()
+        .name("engine-start".into())
+        .spawn(start_engine);
     ffi::set_dpi_aware();
     // ファイルを選ぶ窓(IFileDialog)は COM を使う
     ffi::initialize_com();
     let Ok(catalog) = Catalog::load() else {
         return;
     };
-    let Some(window) = window::open(catalog, connect) else {
+    if window::open(catalog, connect, options(started)).is_none() {
         return;
-    };
-    ffi::run_message_loop(window);
+    }
+    ffi::run_message_loop();
 }

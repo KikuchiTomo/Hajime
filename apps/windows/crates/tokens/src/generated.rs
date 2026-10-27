@@ -141,16 +141,27 @@ pub const GLASS_SNAPSHOT_DARK: Rgb = Rgb { red: 0x26, green: 0x26, blue: 0x26 };
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SettingsPalette {
     pub accent: Rgb,
+    pub accent_hover: Rgb,
+    pub accent_pressed: Rgb,
     pub accent_text: Rgb,
     pub background: Rgb,
     pub card: Rgb,
     pub card_stroke: Rgb,
     pub caution: Rgb,
     pub control: Rgb,
+    pub control_hover: Rgb,
+    pub control_pressed: Rgb,
     pub control_stroke: Rgb,
+    pub control_strong_stroke: Rgb,
+    pub flyout: Rgb,
+    pub flyout_stroke: Rgb,
+    pub nav_hover: Rgb,
+    pub nav_pressed: Rgb,
     pub nav_selected: Rgb,
+    pub scrollbar: Rgb,
     pub switch_off: Rgb,
     pub text: Rgb,
+    pub text_disabled: Rgb,
     pub text_secondary: Rgb,
 }
 
@@ -159,30 +170,52 @@ pub mod settings_windows {
 
     pub const LIGHT: SettingsPalette = SettingsPalette {
         accent: Rgb { red: 0x00, green: 0x5F, blue: 0xB8 },
+        accent_hover: Rgb { red: 0x1A, green: 0x6F, blue: 0xBF },
+        accent_pressed: Rgb { red: 0x33, green: 0x83, blue: 0xCA },
         accent_text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         background: Rgb { red: 0xF3, green: 0xF3, blue: 0xF3 },
         card: Rgb { red: 0xFB, green: 0xFB, blue: 0xFB },
         card_stroke: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
         caution: Rgb { red: 0x9D, green: 0x5D, blue: 0x00 },
         control: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        control_hover: Rgb { red: 0xF9, green: 0xF9, blue: 0xF9 },
+        control_pressed: Rgb { red: 0xF5, green: 0xF5, blue: 0xF5 },
         control_stroke: Rgb { red: 0xC4, green: 0xC4, blue: 0xC4 },
+        control_strong_stroke: Rgb { red: 0x8A, green: 0x8A, blue: 0x8A },
+        flyout: Rgb { red: 0xF9, green: 0xF9, blue: 0xF9 },
+        flyout_stroke: Rgb { red: 0xD9, green: 0xD9, blue: 0xD9 },
+        nav_hover: Rgb { red: 0xED, green: 0xED, blue: 0xED },
+        nav_pressed: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
         nav_selected: Rgb { red: 0xEA, green: 0xEA, blue: 0xEA },
+        scrollbar: Rgb { red: 0x8A, green: 0x8A, blue: 0x8A },
         switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
         text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
+        text_disabled: Rgb { red: 0xA0, green: 0xA0, blue: 0xA0 },
         text_secondary: Rgb { red: 0x5F, green: 0x5F, blue: 0x5F },
     };
     pub const DARK: SettingsPalette = SettingsPalette {
         accent: Rgb { red: 0x60, green: 0xCD, blue: 0xFF },
+        accent_hover: Rgb { red: 0x57, green: 0xBF, blue: 0xEB },
+        accent_pressed: Rgb { red: 0x4E, green: 0xAA, blue: 0xD3 },
         accent_text: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         background: Rgb { red: 0x20, green: 0x20, blue: 0x20 },
         card: Rgb { red: 0x2B, green: 0x2B, blue: 0x2B },
         card_stroke: Rgb { red: 0x1D, green: 0x1D, blue: 0x1D },
         caution: Rgb { red: 0xFC, green: 0xE1, blue: 0x00 },
         control: Rgb { red: 0x37, green: 0x37, blue: 0x37 },
+        control_hover: Rgb { red: 0x3C, green: 0x3C, blue: 0x3C },
+        control_pressed: Rgb { red: 0x32, green: 0x32, blue: 0x32 },
         control_stroke: Rgb { red: 0x4A, green: 0x4A, blue: 0x4A },
+        control_strong_stroke: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
+        flyout: Rgb { red: 0x2C, green: 0x2C, blue: 0x2C },
+        flyout_stroke: Rgb { red: 0x3D, green: 0x3D, blue: 0x3D },
+        nav_hover: Rgb { red: 0x29, green: 0x29, blue: 0x29 },
+        nav_pressed: Rgb { red: 0x26, green: 0x26, blue: 0x26 },
         nav_selected: Rgb { red: 0x2D, green: 0x2D, blue: 0x2D },
+        scrollbar: Rgb { red: 0x9F, green: 0x9F, blue: 0x9F },
         switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        text_disabled: Rgb { red: 0x78, green: 0x78, blue: 0x78 },
         text_secondary: Rgb { red: 0xCF, green: 0xCF, blue: 0xCF },
     };
 }
@@ -350,6 +383,26 @@ pub mod size {
         pub const WINDOW_HEIGHT: f32 = 700.0;
         pub const WINDOW_MIN_WIDTH: f32 = 640.0;
         pub const WINDOW_MIN_HEIGHT: f32 = 480.0;
+        pub const NAV_GROUP_GAP: f32 = 12.0;
+        pub const NAV_HEADER_FONT_SIZE: f32 = 12.0;
+        pub const CONTROL_RADIUS: f32 = 4.0;
+        pub const FIELD_PADDING_X: f32 = 11.0;
+        pub const FOCUS_STROKE: f32 = 2.0;
+        pub const CHEVRON_SIZE: f32 = 12.0;
+        pub const FLYOUT_PADDING: f32 = 4.0;
+        pub const FLYOUT_ITEM_HEIGHT: f32 = 32.0;
+        pub const FLYOUT_RADIUS: f32 = 8.0;
+        pub const TABLE_ROW_HEIGHT: f32 = 30.0;
+        pub const TABLE_HEADER_HEIGHT: f32 = 32.0;
+        pub const SCROLLBAR_THIN: f32 = 2.0;
+        pub const SCROLLBAR_WIDE: f32 = 6.0;
+        pub const SCROLLBAR_MARGIN: f32 = 3.0;
+        pub const SCROLLBAR_HIT: f32 = 14.0;
+        pub const SCROLLBAR_MIN_THUMB: f32 = 24.0;
+        pub const PROGRESS_RING_SIZE: f32 = 32.0;
+        pub const PROGRESS_RING_STROKE: f32 = 3.0;
+        pub const PAGE_ENTER_OFFSET: f32 = 12.0;
+        pub const WHEEL_STEP: f32 = 48.0;
     }
 }
 
@@ -363,6 +416,17 @@ pub mod motion {
     }
     pub mod candidate_rest {
         pub const FADE_IN: f32 = 250.0;
+    }
+    pub mod settings_windows {
+        pub const PAGE_ENTER: f32 = 167.0;
+        pub const HOVER: f32 = 83.0;
+        pub const TOGGLE: f32 = 167.0;
+        pub const FLYOUT: f32 = 167.0;
+        pub const NAV_INDICATOR: f32 = 167.0;
+        pub const SCROLL: f32 = 200.0;
+        pub const SCROLLBAR_IDLE: f32 = 1200.0;
+        pub const SCROLLBAR_FADE: f32 = 250.0;
+        pub const PROGRESS_RING: f32 = 1400.0;
     }
 }
 
@@ -398,5 +462,7 @@ pub mod opacity {
     }
     pub mod settings {
         pub const KEY_FILTER: f32 = 0.15;
+        pub const SUBTLE_SELECTED: f32 = 0.08;
+        pub const SUBTLE_HOVER: f32 = 0.05;
     }
 }

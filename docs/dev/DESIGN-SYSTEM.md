@@ -227,6 +227,22 @@ Space で変換すると，文を幹とした分岐図を出します(ADR 0007)�
 見た目はデバッグビルドの `--render-snapshots` で `settings-<ページ>.png`・`settings-<ページ>-dark.png`・`settings-sidebar.png`・`settings-theme-editor.png` に書き出して確かめる．左の一覧は窓の中では地のぼかしごと写せないので，一覧だけを別に描く．
 ページの切り替えにかかる時間は，デバッグビルドの `--measure-settings` で測る(ページごとに初めて開く時間と，2 回目からの中央値，設定を 1 つ変えたときの時間を出す)．環境変数 `S90_MEASURE_PAGES`(ページの名前をカンマで区切る)・`S90_MEASURE_ROUNDS`・`S90_MEASURE_CHANGES` で，測るページ・切り替えの回数・設定を変える回数を選べる．Debug の構成は最適化しないので，実際に近い時間は `SWIFT_OPTIMIZATION_LEVEL=-O` を付けてビルドして測る．
 
+### Windows
+
+Windows 11 の設定アプリに合わせ，1 枚の窓に Direct2D で描く(ADR [0013](adr/0013-windows-settings-direct2d.md))．色・寸法・動きの長さは `tokens.json` の `settings-windows`．部品の形は `crates/settings/src/app/paint.rs` にまとめる．
+
+- **文字**: DirectWrite のグレースケールの滑らかさ(ClearType の色ずれを出さない)．英数字は Segoe UI Variable(題は Display，本文は Text)，日本語は Yu Gothic UI
+- **左の一覧**: 見出しは小さい `text-secondary` の字にし，2 つ目からの見出しの上に `nav-group-gap` の間を取って，選べる項目と見分けられるようにする．選んでいる項目は角丸の地と左のアクセントの線で示し，線は項目のあいだを動く(`motion.settings-windows.nav-indicator`)
+- **入力欄・検索欄**: 角丸の枠の下に線を引き，フォーカスがあればアクセントの太い線にする(WinUI の TextBox と同じ)．中の文字は枠の無い標準の EDIT が描く．案内の文字は `text-secondary` で描く
+- **ドロップダウン**: 角丸の枠に名前と山形の印．開いた一覧は角丸の影のある窓に，選んでいる項目をアクセントの線で示す．選んでいる・ポインターを載せた項目の地は文字の色を薄く重ねる(`opacity.settings.subtle-*`)
+- **トグル**: つまみが動き(`motion.settings-windows.toggle`)，オンでアクセントの地にする
+- **スクロール**: ホイールで目標の位置を動かし，そこへ補間する(`motion.settings-windows.scroll`)．スクロールバーは中身に重ねる細い線にし，ポインターを載せると太くし，操作が止まると消す
+- **ページの入り**: 開いたページは下から少し上がりながら現れる(`page-enter-offset`・`motion.settings-windows.page-enter`)
+- **読み込み中**: 窓を先に出し，設定を読むまでは輪を回す．エンジンにつながらなければ理由とつなぎ直していることを出す
+- **フォーカスの印**: キーボードで動かしたときだけ，部品の外側に 2 本の線を引く(WinUI と同じ)
+
+ページを開く・描く・送る時間は `s90-settings.exe --measure <ファイル>` で測る．窓を出すまで・中身を出すまで・ページごとの開く時間(部品を作る・エンジンから読む・値を映して置くの内わけ)・初めて描く時間と 2 回目に描く時間・送るときの 1 フレームの間隔と描く時間を書いて終える．見本の撮影には `--theme light|dark` と `--page <名前>` を使う．
+
 ## 入力メニューのアイコン
 
 メニューバーの入力ソースのアイコンはテンプレート画像(黒とアルファ)で，色は OS がメニューバーのライト・ダークに合わせて付けます．

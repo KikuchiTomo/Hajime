@@ -14,6 +14,7 @@ pub mod store;
 pub mod strings;
 pub mod sync;
 pub mod themes;
+pub mod ui;
 pub mod usage;
 
 #[cfg(windows)]
