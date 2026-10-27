@@ -17,6 +17,9 @@ final class S90InputController: IMKInputController {
     private let menuBuilder: InputMenuBuilder
     /// 打鍵が止まったことを知らせるタイマー(ライブ変換で，かなのまま見せていた語を変換して見せる)
     private var settleTask: Task<Void, Never>?
+    /// 打ち間違いの見直しの記録．補正が出ないときに，求めなかったのか・時間切れか・直さないと決めたのかを実機で見分けるため．
+    /// 打った文字・読み・候補は記録せず，数と時間と結果の種類だけを残す(docs/dev/SECURITY-MODEL.md)
+    private static let correctionLogger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "correction")
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let (root, session, presenter, menuBuilder) = MainActor.assumeIsolated {
@@ -67,11 +70,18 @@ final class S90InputController: IMKInputController {
         guard let request = session.lateCorrectionRequest, let service = root.typoService else { return }
         let timeout = root.settings.current.lateCorrectionTimeout
         settleTask = Task { @MainActor [weak self] in
+            let start = ContinuousClock.now
             let corrections = await Deadline.run(seconds: timeout) {
                 await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
             }
-            guard !Task.isCancelled, let self, let corrections else { return }
-            self.presenter.apply(self.session.applyLateCorrections(corrections, context: context), to: client)
+            guard !Task.isCancelled else { return }
+            guard let self, let corrections else {
+                Self.correctionLogger.notice("変換後の補正: 時間切れ(\(timeout, privacy: .public) 秒)")
+                return
+            }
+            let actions = self.session.applyLateCorrections(corrections, context: context)
+            Self.logOutcome("変換後の補正", corrections: corrections, actions: actions, since: start)
+            self.presenter.apply(actions, to: client)
         }
     }
 
@@ -110,22 +120,41 @@ final class S90InputController: IMKInputController {
             try? await Task.sleep(until: start + .seconds(correctionDelay), clock: .continuous)
             guard !Task.isCancelled else { return }
             // 訂正はメインスレッドの外で求め，求め終わったときに打ったキーが変わっていなければ見直す
+            let reviewStart = ContinuousClock.now
+            var provided: [String: [ReadingCorrection]] = [:]
             if let request = self.session.correctionRequest, let service = self.root.typoService {
-                let corrections = await Deadline.run(seconds: self.root.settings.current.reviewCorrectionTimeout) {
+                let timeout = self.root.settings.current.reviewCorrectionTimeout
+                let corrections = await Deadline.run(seconds: timeout) {
                     await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
                 }
                 guard !Task.isCancelled else { return }
                 guard let corrections else {
                     // 求め終わらないときはやめ，この入力は見直したことにする
+                    Self.correctionLogger.notice("見直し: 時間切れ(\(timeout, privacy: .public) 秒)．この入力は見直さない")
                     self.session.skipReview()
                     return
                 }
+                provided = corrections
                 self.session.provideCorrections(corrections)
+            } else if self.root.typoService == nil {
+                Self.correctionLogger.notice("見直し: 訂正を求める処理が無い(Zenzai を読み込めていない)")
             }
-            self.presenter.apply(self.session.review(context: context), to: client)
+            let reviewActions = self.session.review(context: context)
+            Self.logOutcome("見直し", corrections: provided, actions: reviewActions, since: reviewStart)
+            self.presenter.apply(reviewActions, to: client)
             // 見直しで読みを直したときは，直した読みの候補も前もって求める(変わらない文節はためたものを使う)
             await self.warmLattice()
         }
+    }
+
+    /// 見直しの結果を記録する．直したか(補正の下線)・示したか(「もしかして」)・どちらでもないか，求めた並びと候補の数，かかった時間だけ
+    private static func logOutcome(_ label: String, corrections: [String: [ReadingCorrection]], actions: [ClientAction], since start: ContinuousClock.Instant) {
+        let corrected = actions.contains { if case .setMarkedText(let text) = $0 { text.segments.contains { $0.style == .correction } } else { false } }
+        let suggested = actions.contains { if case .showNote(let note) = $0 { note.tone == .suggestion } else { false } }
+        let outcome = corrected ? "直した" : suggested ? "示した" : "直さない"
+        let candidates = corrections.values.reduce(0) { $0 + $1.count }
+        let milliseconds = Int((ContinuousClock.now - start) / .milliseconds(1))
+        correctionLogger.notice("\(label, privacy: .public): \(outcome, privacy: .public)．並び \(corrections.count, privacy: .public) 件・候補 \(candidates, privacy: .public) 件・\(milliseconds, privacy: .public) ms")
     }
 
     /// 分岐図の候補を 1 文節ずつ前もって求める．文節ごとにほかの処理(次のキー)に譲り，取り消されたらやめる
