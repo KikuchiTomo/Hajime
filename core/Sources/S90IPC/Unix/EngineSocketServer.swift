@@ -35,4 +35,24 @@ public enum EngineSocketServer {
         EngineRequestLoop.serve(connection, service: service, isCandidateWindow: isCandidateWindow)
     }
 }
+extension CandidateWindowLink {
+    /// Unix ドメインソケットで候補ウィンドウ(Linux は Fcitx 5 のアドオン)を待ち受ける．同じユーザーのプロセスだけを相手にする．
+    /// アドオンは Fcitx 5 のプロセスの中で動くので，Windows のように実行ファイルでは確かめられない
+    public func start(listener: UnixSocketListener, greeting: @escaping @Sendable () -> [WireUiCommand]) {
+        let thread = Thread { [self] in
+            while true {
+                guard let connection = try? listener.accept() else {
+                    Thread.sleep(forTimeInterval: 0.1)
+                    continue
+                }
+                guard let user = try? connection.peerUserID(), user == getuid() else {
+                    connection.close()
+                    continue
+                }
+                attach(connection, greeting: greeting())
+            }
+        }
+        thread.start()
+    }
+}
 #endif

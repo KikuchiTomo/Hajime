@@ -29,7 +29,8 @@ pub fn socket_path(role: &str) -> std::io::Result<PathBuf> {
     Ok(directory.join(format!("{role}.sock")))
 }
 
-fn connect(path: &Path) -> std::io::Result<UnixStream> {
+/// path のソケットにつなぐ．先にフォルダが本人のもので，ほかの人が読み書きできないことを確かめる
+pub fn connect(path: &Path) -> std::io::Result<UnixStream> {
     let directory = path
         .parent()
         .ok_or_else(|| Error::from(ErrorKind::InvalidInput))?;

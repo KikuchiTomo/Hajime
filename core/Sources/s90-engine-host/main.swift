@@ -106,8 +106,10 @@ func run() -> Int32 {
     }
     #else
     let engineListener: UnixSocketListener
+    let windowListener: UnixSocketListener
     do {
         engineListener = try UnixSocketListener(path: UnixSocketPath.engine())
+        windowListener = try UnixSocketListener(path: UnixSocketPath.candidateWindow())
     } catch where error.isAlreadyRunning {
         return 0
     } catch {
@@ -148,13 +150,13 @@ func run() -> Int32 {
     #endif
     // 打ち間違いの訂正は時間がかかるので，別の変換器で裏で求める(Zenzai があるときだけ．macOS の CompositionRoot と同じ)
     let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: HostPaths.versionString) }
-    #if os(Windows)
+    // 候補の指示は，Windows は候補ウィンドウ(s90-candidate-ui.exe)，Linux は Fcitx 5 のアドオンが受け取る
     let window = CandidateWindowLink()
     let sendToWindow: (WireUiCommand) -> Void = { window.send($0) }
+    #if os(Windows)
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings.exe")
     #else
-    // 候補ウィンドウと設定の画面は Linux ではまだ作っていない(ADR 0012)．窓への指示は捨てる
-    let sendToWindow: (WireUiCommand) -> Void = { _ in }
+    // 設定の画面は Linux ではまだ作っていない(ADR 0012)
     let settingsApp = HostPaths.installation.appendingPathComponent("s90-settings")
     #endif
 
@@ -214,9 +216,13 @@ func run() -> Int32 {
         try? process.run()
     }
     #else
+    let presentation = service.presentation
+    window.start(listener: windowListener) {
+        [.hello(protocolVersion: WireProtocol.version), .setPresentation(presentation: presentation)]
+    }
     EngineSocketServer.start(listener: engineListener, service: service, candidateWindowPath: nil)
     #endif
-    withExtendedLifetime((watcher, engineListener)) { dispatchMain() }
+    withExtendedLifetime((watcher, engineListener, windowListener)) { dispatchMain() }
 }
 
 exit(MainActor.assumeIsolated { run() })
