@@ -303,6 +303,22 @@ enum DesignTokens {
             static let progressRingStroke: CGFloat = 3
             static let pageEnterOffset: CGFloat = 12
             static let wheelStep: CGFloat = 48
+            static let wizardWidth: CGFloat = 920
+            static let wizardHeight: CGFloat = 640
+            static let wizardTextWidth: CGFloat = 380
+            static let wizardPadding: CGFloat = 32
+            static let wizardFooterHeight: CGFloat = 72
+            static let wizardStepBar: CGFloat = 4
+            static let wizardOptionHeight: CGFloat = 44
+            static let wizardOptionNoteHeight: CGFloat = 64
+            static let wizardOptionGap: CGFloat = 6
+            static let wizardRadioSize: CGFloat = 20
+            static let wizardDemoFontSize: CGFloat = 20
+            static let wizardDemoLineHeight: CGFloat = 34
+            static let wizardKeycapHeight: CGFloat = 40
+            static let wizardKeycapMinWidth: CGFloat = 48
+            static let wizardModeSize: CGFloat = 28
+            static let wizardHeroSize: CGFloat = 72
         }
         enum StandardTheme {
             static let cornerRadius: CGFloat = 12
@@ -346,6 +362,11 @@ enum DesignTokens {
             static let scrollbarIdle: Double = 1200
             static let scrollbarFade: Double = 250
             static let progressRing: Double = 1400
+            static let wizardKey: Double = 110
+            static let wizardKeyPress: Double = 320
+            static let wizardPause: Double = 700
+            static let wizardHold: Double = 2200
+            static let wizardPage: Double = 250
         }
         enum Onboarding {
             static let keystroke: Double = 85

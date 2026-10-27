@@ -96,6 +96,17 @@ Windows の機械で試すときは，`package-windows` のジョブが作る MS
 | ページを 2 回目から描く | 平均 0.4ms |
 | 送るときの 1 フレーム | 描く時間 0.8ms．間隔は画面の合成に揃う |
 
+## 初期設定ウィザードとインストール後の再起動
+
+ADR [0015](adr/0015-windows-setup-wizard.md)．macOS 版はまだ無いので，Windows 版もリリースしない．
+
+- **再起動**: インストーラーは入れ終えたら(上書きでも)`ScheduleReboot` で再起動を求める．確認は Windows Installer の標準のもので，自前の画面は作らない．文字入力のサービスの DLL は，起動しているアプリには読み込まれないため
+- **起動**: HKLM の `Run` に `s90-settings.exe --setup-if-needed` を入れる．ログオンのたびに起動し，済んでいれば(HKCU `Software\s90.tokyo\IME` の `SetupCompleted` が 1)窓を出さずにすぐ終わる．済んだことはエンジンの設定のファイルには書かない(利用者ごと・PC ごとの記録で，同期しない)
+- **開き直す**: 設定の画面の「情報」の「初期設定をやり直す」で，同じ実行ファイルを `--setup` で起動する．ウィザードの窓がもうあれば開かない
+- **作り**: `crates/settings` の `wizard.rs`(ページと選ぶ値．OS に依らない)，`demo.rs`(実演の台本)，`app/wizard.rs`(窓)．値はページを離れるときにエンジンに書く(`SettingsModel::set_all`)．「あとで」・窓を閉じたときは済んだことにしない(次のログオンでまた出す)．「完了」「設定を開く」で済んだことにする
+- **見本の撮影**: `s90-settings.exe --setup --offline --theme dark --step window` のように開く．`--offline` はエンジンにつながず見本の値で開き，値も済んだことも書かない．`--step` はページの名前(`welcome`・`switch`・`characters`・`liveconversion`・`window`・`focus`・`correction`・`features`・`appearance`・`done`)
+- **CPU**: 止まっているコマのあいだは時計で次のコマを待つ．手元の PC で，最後のページ(動かない)は 10 秒で CPU 0ms，候補の窓の実演を繰り返すページは 10 秒で約 140ms だった
+
 ## 決まっていないこと・まだ無いもの
 
 - 配布物の署名(Authenticode)

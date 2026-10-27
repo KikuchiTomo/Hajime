@@ -415,6 +415,22 @@ pub mod size {
         pub const PROGRESS_RING_STROKE: f32 = 3.0;
         pub const PAGE_ENTER_OFFSET: f32 = 12.0;
         pub const WHEEL_STEP: f32 = 48.0;
+        pub const WIZARD_WIDTH: f32 = 920.0;
+        pub const WIZARD_HEIGHT: f32 = 640.0;
+        pub const WIZARD_TEXT_WIDTH: f32 = 380.0;
+        pub const WIZARD_PADDING: f32 = 32.0;
+        pub const WIZARD_FOOTER_HEIGHT: f32 = 72.0;
+        pub const WIZARD_STEP_BAR: f32 = 4.0;
+        pub const WIZARD_OPTION_HEIGHT: f32 = 44.0;
+        pub const WIZARD_OPTION_NOTE_HEIGHT: f32 = 64.0;
+        pub const WIZARD_OPTION_GAP: f32 = 6.0;
+        pub const WIZARD_RADIO_SIZE: f32 = 20.0;
+        pub const WIZARD_DEMO_FONT_SIZE: f32 = 20.0;
+        pub const WIZARD_DEMO_LINE_HEIGHT: f32 = 34.0;
+        pub const WIZARD_KEYCAP_HEIGHT: f32 = 40.0;
+        pub const WIZARD_KEYCAP_MIN_WIDTH: f32 = 48.0;
+        pub const WIZARD_MODE_SIZE: f32 = 28.0;
+        pub const WIZARD_HERO_SIZE: f32 = 72.0;
     }
     pub mod standard_theme {
         pub const CORNER_RADIUS: f32 = 12.0;
@@ -459,6 +475,11 @@ pub mod motion {
         pub const SCROLLBAR_IDLE: f32 = 1200.0;
         pub const SCROLLBAR_FADE: f32 = 250.0;
         pub const PROGRESS_RING: f32 = 1400.0;
+        pub const WIZARD_KEY: f32 = 110.0;
+        pub const WIZARD_KEY_PRESS: f32 = 320.0;
+        pub const WIZARD_PAUSE: f32 = 700.0;
+        pub const WIZARD_HOLD: f32 = 2200.0;
+        pub const WIZARD_PAGE: f32 = 250.0;
     }
     pub mod onboarding {
         pub const KEYSTROKE: f32 = 85.0;

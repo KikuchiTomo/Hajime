@@ -33,6 +33,8 @@ pub enum After {
     /// 件数などを含む知らせ
     Notice(String),
     OpenSettingsFile,
+    /// 初期設定ウィザードを開く(同じ実行ファイルを --setup で起動する)
+    OpenSetup,
     /// ファイルを選ぶ窓を出してから，読み込む・書き出す
     File(FileTask),
     /// フォルダを選ぶ窓を出してから，同期のフォルダにする
@@ -59,6 +61,7 @@ pub fn run_after(window: Window, after: Option<After>) {
             ffi::message(window, settings::WINDOW_TITLE, &text, warning)
         }
         Some(After::Notice(text)) => ffi::message(window, settings::WINDOW_TITLE, &text, false),
+        Some(After::OpenSetup) => super::launch_settings(&[super::SETUP]),
         Some(After::OpenSettingsFile) => {
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
@@ -264,6 +267,7 @@ impl App {
         match &event {
             Event::Action(Action::SyncNow) => return self.request_sync(RequestBody::SyncNow),
             Event::Action(Action::ChooseSyncFolder) => return Some(After::ChooseSyncFolder),
+            Event::Action(Action::OpenSetup) => return Some(After::OpenSetup),
             Event::SyncToggleFields(indices) => {
                 let changes: Vec<RequestBody> = indices
                     .iter()
@@ -306,7 +310,9 @@ impl App {
             | Event::ThemeSelected(_)
             | Event::ChooseColor { .. }
             | Event::ChooseApp { .. }
-            | Event::Action(Action::SyncNow | Action::ChooseSyncFolder) => return None,
+            | Event::Action(Action::SyncNow | Action::ChooseSyncFolder | Action::OpenSetup) => {
+                return None
+            }
             Event::DictionaryAdd { item, replacing } => {
                 let entry = DictionaryEntry {
                     reading: item.first().cloned().unwrap_or_default(),

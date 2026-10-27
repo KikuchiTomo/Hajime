@@ -6,6 +6,7 @@ mod page;
 mod paint;
 mod theme;
 mod window;
+mod wizard;
 
 use crate::catalog::{Catalog, Timing};
 use crate::engine::{Engine, EngineStore};
@@ -97,8 +98,72 @@ fn options(started: std::time::Instant) -> window::Options {
     }
 }
 
+/// 初期設定ウィザードを開く引数．--setup-if-needed は済んでいれば何もしない(ログオンのたびに起動する)
+pub(crate) const SETUP: &str = "--setup";
+const SETUP_IF_NEEDED: &str = "--setup-if-needed";
+
+/// 同じ実行ファイルを arguments で起動する(ウィザードから設定の画面，設定の画面からウィザードを開く)
+pub(crate) fn launch_settings(arguments: &[&str]) {
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = Command::new(exe)
+            .args(arguments)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+    }
+}
+
+/// ウィザードを開くか．--setup なら開き，--setup-if-needed なら済んでいないときだけ開く
+enum Mode {
+    Settings,
+    Setup,
+    /// 済んでいるので何もしない
+    Nothing,
+}
+
+fn mode(arguments: &[String]) -> Mode {
+    if arguments.iter().any(|argument| argument == SETUP) {
+        Mode::Setup
+    } else if arguments.iter().any(|argument| argument == SETUP_IF_NEEDED) {
+        if ffi::setup_completed() {
+            Mode::Nothing
+        } else {
+            Mode::Setup
+        }
+    } else {
+        Mode::Settings
+    }
+}
+
+/// --step <名前> で初めに開くウィザードのページを決め，--offline でエンジンにつながずに見本の値で開く(見本の撮影)
+fn setup_options(started: std::time::Instant) -> wizard::Options {
+    let window = options(started);
+    let arguments: Vec<String> = std::env::args().collect();
+    let step = arguments
+        .iter()
+        .position(|argument| argument == "--step")
+        .and_then(|index| arguments.get(index + 1))
+        .and_then(|name| {
+            crate::wizard::Step::ALL
+                .into_iter()
+                .find(|step| format!("{step:?}").eq_ignore_ascii_case(name))
+        });
+    wizard::Options {
+        started,
+        theme: window.theme,
+        step,
+        offline: arguments.iter().any(|argument| argument == "--offline"),
+    }
+}
+
 pub fn run() {
     let started = std::time::Instant::now();
+    let arguments: Vec<String> = std::env::args().collect();
+    let mode = mode(&arguments);
+    if matches!(mode, Mode::Nothing) {
+        return;
+    }
     // エンジンの起動は窓を出すのを待たせない
     let _ = std::thread::Builder::new()
         .name("engine-start".into())
@@ -109,7 +174,11 @@ pub fn run() {
     let Ok(catalog) = Catalog::load() else {
         return;
     };
-    if window::open(catalog, connect, options(started)).is_none() {
+    let opened = match mode {
+        Mode::Setup => wizard::open(catalog, connect, setup_options(started)).is_some(),
+        _ => window::open(catalog, connect, options(started)).is_some(),
+    };
+    if !opened {
         return;
     }
     ffi::run_message_loop();

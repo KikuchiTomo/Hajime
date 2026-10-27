@@ -18,7 +18,9 @@ use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+use windows::Win32::System::Registry::{
+    RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_DWORD, RRF_RT_REG_DWORD,
+};
 use windows::Win32::System::Time::SystemTimeToTzSpecificLocalTime;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::Controls::MARGINS;
@@ -35,15 +37,15 @@ use windows::Win32::UI::Shell::{
     FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
-    GetWindowTextLengthW, GetWindowTextW, KillTimer, LoadCursorW, LoadIconW, MessageBoxW,
-    PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW, SetTimer, SetWindowPos,
-    SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, CS_DBLCLKS, CS_DROPSHADOW,
-    CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK, MB_ICONINFORMATION, MB_ICONQUESTION,
-    MB_ICONWARNING, MB_OK, MB_OKCANCEL, MINMAXINFO, MSG, SPI_GETCLIENTAREAANIMATION,
-    SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNA,
-    SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT,
-    WNDCLASSEXW, WNDPROC,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW, GetClientRect,
+    GetMessageW, GetWindowTextLengthW, GetWindowTextW, KillTimer, LoadCursorW, LoadIconW,
+    MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW, SetTimer,
+    SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, CS_DBLCLKS,
+    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MINMAXINFO, MSG,
+    SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+    SW_HIDE, SW_SHOW, SW_SHOWNA, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW, WNDPROC,
 };
 use windows_core::{w, BOOL, HSTRING, PCWSTR};
 
@@ -338,6 +340,21 @@ pub fn set_mica(window: HWND, on: bool) -> bool {
     extend
 }
 
+/// 窓を画面に出さずに隠しておく(true)・出す(false)．出したあと最初に描くまでの白いコマを見せないため，
+/// 隠したまま見せて 1 枚描いてから出す
+pub fn cloak(window: HWND, on: bool) {
+    let value = windows_core::BOOL::from(on);
+    // SAFETY: value はこの関数の中の値で，大きさを正しく渡す
+    let _ = unsafe {
+        DwmSetWindowAttribute(
+            window,
+            windows::Win32::Graphics::Dwm::DWMWA_CLOAK,
+            (&raw const value).cast(),
+            std::mem::size_of_val(&value) as u32,
+        )
+    };
+}
+
 /// 次の画面の合成まで待つ(動きのフレームを画面の更新に揃える)
 pub fn wait_for_compositor() {
     // SAFETY: 引数なし．合成が止まっていればすぐ戻る
@@ -374,6 +391,52 @@ fn registry_dword(name: PCWSTR) -> Option<u32> {
         )
     };
     result.is_ok().then_some(value)
+}
+
+/// 初期設定ウィザードを済ませたかを書く場所(利用者ごと．エンジンの設定のファイルには書かない)
+const SETUP_KEY: PCWSTR = w!("Software\\s90.tokyo\\IME");
+const SETUP_VALUE: PCWSTR = w!("SetupCompleted");
+
+/// 初期設定ウィザードを済ませたか
+pub fn setup_completed() -> bool {
+    let mut value = 0u32;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    // SAFETY: value と size はこの関数の中の値で，DWORD を 1 つ受ける大きさ
+    let result = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            SETUP_KEY,
+            SETUP_VALUE,
+            RRF_RT_REG_DWORD,
+            None,
+            Some((&raw mut value).cast()),
+            Some(&mut size),
+        )
+    };
+    result.is_ok() && value != 0
+}
+
+/// 初期設定ウィザードを済ませたことを書く
+pub fn set_setup_completed() -> bool {
+    let value = 1u32;
+    // SAFETY: value はこの関数の中の値で，大きさを正しく渡す．キーが無ければ作る
+    let result = unsafe {
+        RegSetKeyValueW(
+            HKEY_CURRENT_USER,
+            SETUP_KEY,
+            SETUP_VALUE,
+            REG_DWORD.0,
+            Some((&raw const value).cast()),
+            std::mem::size_of::<u32>() as u32,
+        )
+    };
+    result.is_ok()
+}
+
+/// この利用者の画面に class の窓がもうあるか(二重に開かない)
+pub fn window_exists(class: PCWSTR) -> bool {
+    // SAFETY: class は静的な文字列
+    unsafe { FindWindowW(class, PCWSTR::null()) }.is_ok_and(|window| !window.is_invalid())
 }
 
 /// アプリをダークで描くか(設定 > 個人用設定 > 色 > アプリ モード)

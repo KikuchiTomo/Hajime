@@ -2,8 +2,9 @@
 //! 設定の画面(s90-settings)が GDI の画面の中に描けるよう，DC に結び付ける Direct2D の描き先を使う
 
 use super::render::Renderer;
-use crate::scene::{self, sample, Look, Surround};
-use crate::theme::ResolvedTheme;
+use crate::geometry::Frame;
+use crate::scene::{self, sample, Draw, Look, Surround};
+use crate::theme::{Color, ResolvedTheme};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Direct2D::Common::{D2D1_ALPHA_MODE_IGNORE, D2D1_PIXEL_FORMAT};
 use windows::Win32::Graphics::Direct2D::{
@@ -16,6 +17,25 @@ use windows::Win32::Graphics::Gdi::HDC;
 use windows_core::{Interface, Result};
 
 const BASE_DPI: f32 = 96.0;
+
+/// 見本に描く候補の窓
+#[derive(Debug, Clone, Copy)]
+pub enum Shown<'a> {
+    /// 外観の見本の分岐図(sample::branch)
+    Sample,
+    Branch(&'a ipc::BranchMap),
+    List(&'a ipc::CandidateList),
+}
+
+/// rect の中のどこに置くか
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Placement {
+    Center,
+    /// 左上に寄せる(初期設定ウィザードの実演．文字の下に出す)
+    TopLeft {
+        ground: tokens::Rgb,
+    },
+}
 
 pub struct Preview {
     renderer: Renderer,
@@ -41,8 +61,9 @@ impl Preview {
         Ok(Self { renderer, target })
     }
 
-    /// hdc の rect(デバイスのピクセル)の真ん中に，見本の分岐図を描く．scale は画面の DPI の倍率．
+    /// hdc の rect(デバイスのピクセル)に，候補の窓 shown を描く．scale は画面の DPI の倍率．
     /// 見本が rect より大きければ見本ごと縮める(macOS の ScaledPreview と同じ)
+    #[allow(clippy::too_many_arguments)]
     pub fn paint(
         &self,
         hdc: HDC,
@@ -51,11 +72,32 @@ impl Preview {
         font_size: f32,
         dark: bool,
         scale: f32,
+        shown: Shown,
+        placement: Placement,
     ) -> Result<()> {
         let measure = self.renderer.measure(theme, font_size)?;
         let look = Look::new(theme, font_size);
-        let scene = scene::branch_map(&sample::branch(), &look, &measure);
-        let scene = scene::surround(scene, theme, Surround::Snapshot { dark });
+        let scene = match shown {
+            Shown::Sample => scene::branch_map(&sample::branch(), &look, &measure),
+            Shown::Branch(map) => scene::branch_map(map, &look, &measure),
+            Shown::List(list) => scene::candidate_list(list, &look, &measure),
+        };
+        // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
+        let surround = match placement {
+            Placement::Center => Surround::Snapshot { dark },
+            Placement::TopLeft { .. } => Surround::Bare,
+        };
+        let mut scene = scene::surround(scene, theme, surround);
+        if let Placement::TopLeft { ground } = placement {
+            // 角の丸みの外を地の色で塗る(画像は不透明)
+            scene.draws.insert(
+                0,
+                Draw::Rect {
+                    frame: Frame::new(0.0, 0.0, scene.width, scene.height),
+                    color: Color::rgb(ground),
+                },
+            );
+        }
         let available_width = (rect.right - rect.left).max(0) as f32;
         let available_height = (rect.bottom - rect.top).max(0) as f32;
         if scene.width <= 0.0 || scene.height <= 0.0 {
@@ -67,8 +109,13 @@ impl Preview {
         let shown = scale * fit;
         let width = (scene.width * shown).ceil() as i32;
         let height = (scene.height * shown).ceil() as i32;
-        let left = rect.left + (rect.right - rect.left - width) / 2;
-        let top = rect.top + (rect.bottom - rect.top - height) / 2;
+        let (left, top) = match placement {
+            Placement::Center => (
+                rect.left + (rect.right - rect.left - width) / 2,
+                rect.top + (rect.bottom - rect.top - height) / 2,
+            ),
+            Placement::TopLeft { .. } => (rect.left, rect.top),
+        };
         let bound = RECT {
             left,
             top,

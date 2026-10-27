@@ -11,6 +11,7 @@
       <Files Directory="INSTALLFOLDER" Include="$(StageDir)\**" />
       <ComponentRef Id="Autostart" />
       <ComponentRef Id="SettingsShortcut" />
+      <ComponentRef Id="SetupWizard" />
     </Feature>
 
     <StandardDirectory Id="ProgramMenuFolder">
@@ -22,6 +23,11 @@
 
     <Component Id="Autostart" Directory="INSTALLFOLDER" Guid="5F0B6C1E-6A43-4C1F-9C55-1E7A4E2B9D31">
       <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="s90.tokyo IME" Type="string" Value="&quot;[INSTALLFOLDER]s90-engine-host.exe&quot;" KeyPath="yes" />
+    </Component>
+
+    <!-- ログオンのたびに初期設定ウィザードを起動する．済んでいれば(HKCU の SetupCompleted)すぐに終わる -->
+    <Component Id="SetupWizard" Directory="INSTALLFOLDER" Guid="B3E1F0A2-7C4D-4E8B-9A61-2D5C8F7E3A14">
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="s90.tokyo IME Setup" Type="string" Value="&quot;[INSTALLFOLDER]s90-settings.exe&quot; --setup-if-needed" KeyPath="yes" />
     </Component>
 
     <CustomAction Id="Register64" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s &quot;[INSTALLFOLDER]s90_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
@@ -36,6 +42,8 @@
       <Custom Action="Register64" After="InstallFiles" Condition="NOT REMOVE" />
       <Custom Action="Register32" After="Register64" Condition="NOT REMOVE" />
       <Custom Action="StartEngine" After="InstallFinalize" Condition="NOT REMOVE" />
+      <!-- 文字入力のサービスは起動中のアプリに読み込まれないので，入れたあと(上書きも)は Windows Installer の標準の確認で再起動を求める -->
+      <ScheduleReboot After="StartEngine" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
   </Package>
 </Wix>
