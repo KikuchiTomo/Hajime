@@ -85,12 +85,15 @@ Secrets はリポジトリの管理者が入れます．値は `tools/macos/ci_s
 
 | ファイル | 名前 | 仕事 | 動くとき |
 |---|---|---|---|
-| `ci.yml` | CI | `lint`・`core-macos`・`app-macos` | PR と main への push |
-| `ci-windows.yml` | CI Windows | `rust-windows`・`core-windows` | Windows に関わるファイルを変えた PR と main への push |
+| `ci.yml` | CI | `lint`・`core-macos`・`app-macos` | PR．`core-macos`・`app-macos` は持ち主の PR では動かさず，まとめて確かめるときに手で動かす |
+| `ci-windows.yml` | CI Windows | `rust-windows`・`core-windows` | Windows に関わるファイルを変えた PR(持ち主の PR では動かさない)．まとめて確かめるときに手で動かす |
 | `ci-linux.yml` | CI Linux | `core-linux`(Zenzai なし．ADR 0012 の準備) | 手で動かす |
 | `pr-title.yml` | PR title | `pr-title` | PR を開いた・直したとき |
+| `cancel-closed.yml` | Cancel closed | `cancel-closed` | PR を閉じたとき．そのブランチでまだ動いている実行を止める |
 | `package-macos.yml` | Package macOS | `package-macos` | `release.yml` から呼ぶ．手でも動かせる |
 | `package-windows.yml` | Package Windows | `package-windows` | `release.yml` から呼ぶ．手でも動かせる |
 | `release.yml` | Release | `prepare`・`package-macos`・`package-windows`・`publish` | タグ `macos/v*`・`windows/v*` を push したとき |
+
+macOS と Windows のランナーは費用が高いので，持ち主が出してすぐマージする PR では動かしません．同じブランチに新しいコミットが来たら古い実行を止めます．
 
 ファイルの名前は目的(ci・package・release)と OS で付け，仕事の名前は「何を-どこで」にそろえます．必須の検査(ルールセット)は仕事の名前で指定します．
