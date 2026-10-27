@@ -5,7 +5,7 @@ members = ["crates/ipc", "crates/tsf", "crates/tokens", "crates/candidate-ui", "
 [workspace.package]
 # Windows 版のバージョン(docs/dev/adr/0008-versioning.md)．ここだけに書き，インストーラーと設定の画面はこの値を使う．
 # 上げるのは tools/release/bump_version.sh windows
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 license = "MIT"
 publish = false
@@ -13,7 +13,7 @@ rust-version = "1.90"
 
 [workspace.metadata.s90]
 # ビルド番号．バージョンごとに 1 ずつ上げる整数(同じバージョンを作り直したときも上げる)
-build = 5
+build = 6
 
 [workspace.dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }

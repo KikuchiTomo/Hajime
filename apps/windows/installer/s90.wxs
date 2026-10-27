@@ -1,6 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="s90.tokyo IME" Manufacturer="s90.tokyo" Version="$(Version)" UpgradeCode="08481E5D-EF2E-4129-9B02-0DB3228DF9D5" Scope="perMachine" Language="1041" Codepage="932">
-    <MajorUpgrade DowngradeErrorMessage="新しい版の s90.tokyo IME が入っています" />
+    <!-- 同じ版でも上書きできるようにする(試しに入れた版の上から入れ直すとき) -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="新しい版の s90.tokyo IME が入っています" />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
