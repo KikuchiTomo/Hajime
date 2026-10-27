@@ -5,6 +5,7 @@ use super::keyboard;
 use super::langbar::{self, InputModeItem};
 use super::launch;
 use super::phonetic;
+use super::timer;
 use crate::filter;
 use crate::key::{self, RawKey};
 use crate::plan::CompositionPlan;
@@ -17,7 +18,7 @@ use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
+use windows::Win32::Foundation::{LPARAM, RECT, WPARAM};
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_I4, VT_UNKNOWN};
 use windows::Win32::UI::TextServices::{
@@ -36,7 +37,6 @@ use windows::Win32::UI::TextServices::{
     TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE,
     TF_ST_CORRECTION,
 };
-use windows::Win32::UI::WindowsAndMessaging::{KillTimer, SetTimer};
 use windows_core::{implement, ComObject, IUnknownImpl, Interface, Ref, Result, BOOL, GUID};
 
 const RESPONSE_TIMEOUT: Duration = Duration::from_millis(ipc::timing::KEY_RESPONSE_MILLISECONDS);
@@ -92,6 +92,7 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
         guard(|| {
             self.finish_composition(None);
             self.cancel_timer();
+            timer::close();
             if let Some((compartment, cookie)) = self.inner.borrow_mut().mode_cookie.take() {
                 if let Ok(source) = compartment.cast::<ITfSource>() {
                     let _ = unsafe { source.UnadviseSink(cookie) };
@@ -581,14 +582,14 @@ impl TextService_Impl {
         let Some(milliseconds) = milliseconds else {
             return;
         };
-        let timer = unsafe { SetTimer(None, 0, milliseconds.max(1), Some(on_timer)) };
-        self.inner.borrow_mut().timer = timer;
+        timer::schedule(milliseconds, on_timer);
+        self.inner.borrow_mut().timer = 1;
     }
 
     fn cancel_timer(&self) {
         let timer = std::mem::take(&mut self.inner.borrow_mut().timer);
         if timer != 0 {
-            let _ = unsafe { KillTimer(None, timer) };
+            timer::cancel();
         }
     }
 
@@ -776,14 +777,13 @@ impl langbar::Actions for MenuActions {
     }
 }
 
-unsafe extern "system" fn on_timer(_hwnd: HWND, _message: u32, timer: usize, _time: u32) {
-    let _ = std::panic::catch_unwind(|| {
-        let _ = unsafe { KillTimer(None, timer) };
-        let service = ACTIVE.with(|active| active.borrow().clone());
-        if let Some(service) = service {
-            service.on_wake();
-        }
-    });
+/// 時計が鳴った(timer の窓の手続きが panic を受け止める)
+fn on_timer() {
+    let service = ACTIVE.with(|active| active.borrow().clone());
+    if let Some(service) = service {
+        service.inner.borrow_mut().timer = 0;
+        service.on_wake();
+    }
 }
 
 impl ITfThreadMgrEventSink_Impl for TextService_Impl {
