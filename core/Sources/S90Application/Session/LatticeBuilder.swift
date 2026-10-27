@@ -27,7 +27,10 @@ struct LatticeBuilder {
     private func clauseSegmentMakers(of reading: String, sentence: Candidate?) -> [() -> SegmentLattice.Segment]? {
         let fromSentence = sentence.map { ClauseSplitter.clauses(of: $0.words) } ?? []
         let clauses: [ClauseSplitter.Clause]
-        if fromSentence.count > 1, fromSentence.reduce(0, { $0 + $1.readingCount }) == reading.count,
+        // Zenzai が書き換えた文の語の並びは，語の途中で切れていることがある(てんきですね → 天｜気ですね)．
+        // 字だけで語の途中と分かる区切りがあれば使わず，Zenzai を使わない変換の語の並びで分ける
+        let cutsWord = zip(fromSentence, fromSentence.dropFirst()).contains { SegmentSplitter.cutsWord(before: $0.text, after: $1.text) }
+        if fromSentence.count > 1, !cutsWord, fromSentence.reduce(0, { $0 + $1.readingCount }) == reading.count,
             fromSentence.map(\.text).joined() == sentence?.text {
             clauses = fromSentence
         } else {
