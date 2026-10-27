@@ -8,7 +8,7 @@ use crate::theme::Font;
 use tokens::size::{candidate, glass, mode_indicator};
 
 /// 打ち間違いを直したこと・「もしかして」を知らせる 1 行
-pub fn note(text: &str, look: &Look, measure: &dyn Measure) -> Scene {
+pub fn note(note: &ipc::Note, look: &Look, measure: &dyn Measure) -> Scene {
     let mut painter = Painter::new(look, measure);
     let rounded = look.theme.is_rounded();
     let padding = if rounded {
@@ -21,13 +21,16 @@ pub fn note(text: &str, look: &Look, measure: &dyn Measure) -> Scene {
     } else {
         candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
     };
-    let width = (painter.width(text, Font::Note) + (padding + inset) * 2.0).ceil();
+    let width = (painter.note_width(note) + (padding + inset) * 2.0).ceil();
+    let content = glass::NOTE_ICON_SIZE
+        .max(glass::KEYCAP_HEIGHT)
+        .max(measure.height(Font::Label));
     let height = glass::FOOTER_HEIGHT
-        .max(measure.height(Font::Note) + (candidate::SECTION_PADDING_Y + inset) * 2.0)
+        .max(content + (candidate::SECTION_PADDING_Y + inset) * 2.0)
         .ceil();
     let body = Frame::new(0.0, 0.0, width, height);
     painter.panel(body);
-    painter.centered(text, Font::Note, look.theme.correction, body);
+    painter.note(note, padding + inset, body.mid_y());
     painter.finish(width, height)
 }
 
@@ -91,12 +94,55 @@ mod tests {
         );
     }
 
+    fn correction_note() -> ipc::Note {
+        ipc::Note {
+            tone: ipc::NoteTone::Correction,
+            title: "修正".into(),
+            subject: Some("ようですね".into()),
+            key: Some("Esc".into()),
+            key_action: Some("戻す".into()),
+            text: "修正「ようですね」　Esc 戻す".into(),
+        }
+    }
+
     #[test]
-    fn 案内は補正の色で中央に出す() {
+    fn 案内はアイコンのあとに主な語を補正の色で出し_直す前の字を薄く取り消す() {
         let theme = theme("washi");
-        let scene = note("もしかして", &Look::new(&theme, 15.0), &Fixed);
-        let frame = text_frame(&scene, "もしかして");
-        assert_eq!(frame.map(|frame| frame.x), Some(glass::PADDING));
-        assert!(texts(&scene).contains(&("もしかして".into(), theme.correction)));
+        let scene = note(&correction_note(), &Look::new(&theme, 15.0), &Fixed);
+        // 頭のアイコンの丸の右に主な語を置く
+        let title = text_frame(&scene, "修正").expect("主な語");
+        assert_eq!(
+            title.x,
+            glass::PADDING + glass::NOTE_ICON_SIZE + glass::NOTE_GAP
+        );
+        assert!(texts(&scene).contains(&("修正".into(), theme.correction)));
+        assert!(texts(&scene).contains(&("ようですね".into(), theme.text_muted)));
+        assert!(texts(&scene).contains(&("戻す".into(), theme.text_muted)));
+        // 直す前の字には取り消し線を引く
+        let subject = text_frame(&scene, "ようですね").expect("直す前の字");
+        assert!(scene.draws.iter().any(|draw| matches!(draw,
+            Draw::Rect { frame, color } if *color == theme.text_muted && frame.x == subject.x && frame.height <= 1.0)));
+    }
+
+    #[test]
+    fn ほかの知らせにはアイコンを付けない() {
+        let theme = theme("washi");
+        let info = ipc::Note {
+            tone: ipc::NoteTone::Info,
+            title: "学習から削除しました".into(),
+            subject: None,
+            key: None,
+            key_action: None,
+            text: "学習から削除しました".into(),
+        };
+        let scene = note(&info, &Look::new(&theme, 15.0), &Fixed);
+        assert_eq!(
+            text_frame(&scene, "学習から削除しました").map(|frame| frame.x),
+            Some(glass::PADDING)
+        );
+        assert!(!scene
+            .draws
+            .iter()
+            .any(|draw| matches!(draw, Draw::Ellipse { .. })));
     }
 }

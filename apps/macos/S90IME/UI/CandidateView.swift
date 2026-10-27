@@ -40,7 +40,7 @@ final class CandidateView: NSView {
         let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont]
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         let entryWidth = panel.entries.map { entry in
-            let annotation = entry.annotation.map { $0.size(withAttributes: labelAttributes).width + Size.paddingX } ?? 0
+            let annotation = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
             return entry.text.size(withAttributes: textAttributes).width + annotation
         }.max() ?? 0
         let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
@@ -208,9 +208,7 @@ final class CandidateView: NSView {
             GlassDrawing.drawUnderline(from: from, to: to, y: rect.maxY - offset, color: color, dotted: true, theme: theme)
         }
         if let annotation = entry.annotation {
-            let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: mutedColor]
-            let width = annotation.size(withAttributes: attributes).width
-            drawText(annotation, attributes: attributes, x: rect.maxX - Size.paddingX - width, in: rect)
+            NoteDrawing.drawTag(annotation, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: isSelected)
         }
     }
 
@@ -218,7 +216,7 @@ final class CandidateView: NSView {
 
     private struct Footer {
         var hints: [KeyHint]
-        var note: String?
+        var note: Note?
         var position: String
         /// 選んでいる候補に連想があるときの知らせ(R-18)．キーの案内のあとに小さく出す
         var associationHint: String?
@@ -238,7 +236,7 @@ final class CandidateView: NSView {
 
     private func hintsWidth(_ footer: Footer) -> CGFloat {
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
-        if let note = footer.note { return note.size(withAttributes: attributes).width }
+        if let note = footer.note { return NoteDrawing.width(note, theme: theme) }
         let extra = footer.associationHint.map { $0.size(withAttributes: attributes).width + Size.paddingX } ?? 0
         return GlassDrawing.hintsWidth(footer.hints, theme: theme) + extra
     }
@@ -247,7 +245,6 @@ final class CandidateView: NSView {
     private func drawFooter(_ panel: CandidatePanel, in rect: NSRect) {
         let footer = footerContent(for: panel)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
-        let noteAttributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.correction]
         let left = rect.minX + Size.paddingX
         let right = { (text: String, attributes: [NSAttributedString.Key: Any]) in
             self.drawText(text, attributes: attributes, x: rect.maxX - Size.paddingX - text.size(withAttributes: attributes).width, in: rect)
@@ -255,7 +252,7 @@ final class CandidateView: NSView {
         let hintsWidth = GlassDrawing.hintsWidth(footer.hints, theme: theme)
         if theme.isRounded {
             if let note = footer.note {
-                drawText(note, attributes: noteAttributes, x: left, in: rect)
+                NoteDrawing.draw(note, x: left, midY: rect.midY, theme: theme)
             } else {
                 GlassDrawing.drawHints(footer.hints, x: left, midY: rect.midY, theme: theme)
                 if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Size.paddingX, in: rect) }
@@ -265,7 +262,7 @@ final class CandidateView: NSView {
         }
         drawText(footer.position, attributes: muted, x: left, in: rect)
         if let note = footer.note {
-            right(note, noteAttributes)
+            NoteDrawing.draw(note, x: rect.maxX - Size.paddingX - NoteDrawing.width(note, theme: theme), midY: rect.midY, theme: theme)
         } else {
             GlassDrawing.drawHints(footer.hints, x: rect.maxX - Size.paddingX - hintsWidth, midY: rect.midY, theme: theme)
             if let hint = footer.associationHint {

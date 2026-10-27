@@ -154,12 +154,12 @@ struct AssociationScenarioTests {
         missing.type("utukusii")
         missing.press(.space, .shift)
         #expect(missing.lattice?.association == nil)
-        #expect(missing.lattice?.note == "連想はありません")
+        #expect(missing.lattice?.note?.text == "連想はありません")
 
         let noDictionary = harness(makeSettings { $0.associationDictionaries = [] })
         noDictionary.type("utukusii")
         noDictionary.press(.space, .shift)
-        #expect(noDictionary.lattice?.note == "連想の辞書がありません")
+        #expect(noDictionary.lattice?.note?.text == "連想の辞書がありません")
     }
 
     @Test("連想変換を切ると，入力中の Shift+Space はふつうの変換．変換中の Ctrl+Tab は何もしない")

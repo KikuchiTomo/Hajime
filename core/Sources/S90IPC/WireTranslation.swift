@@ -182,7 +182,7 @@ extension WireCandidateList {
             focus: panel.focus == .candidate ? .candidate : .variants,
             position: UInt32(clamping: panel.position),
             total: UInt32(clamping: panel.total),
-            note: panel.note,
+            note: panel.note.map(WireNote.init),
             association: panel.association.map(WireAssociationHeading.init),
             associationHint: panel.associationHint
         )
@@ -221,7 +221,7 @@ extension WireBranchMap {
             },
             position: UInt32(clamping: panel.position),
             total: UInt32(clamping: panel.total),
-            note: panel.note,
+            note: panel.note.map(WireNote.init),
             hints: hints,
             association: panel.association.map(WireAssociationHeading.init),
             associationHint: panel.associationHint
@@ -264,8 +264,8 @@ public struct RoutedActions: Sendable, Equatable {
                 ui.append(.hide)
             case .showModeIndicator(let mode):
                 ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor, label: nil))
-            case .showNote(let text):
-                ui.append(.showNote(text: text, anchor: anchor))
+            case .showNote(let note):
+                ui.append(.showNote(note: WireNote(note), anchor: anchor))
             case .selectInputStyle(let style):
                 host.append(.selectInputStyle(style))
             case .awaitCorrections:
@@ -313,5 +313,16 @@ extension WireDictionaryAddResult {
         case .invalid: self = .invalid
         case .full: self = .full
         }
+    }
+}
+
+extension WireNote {
+    init(_ note: Note) {
+        let tone: WireNoteTone = switch note.tone {
+        case .correction: .correction
+        case .suggestion: .suggestion
+        case .info: .info
+        }
+        self.init(tone: tone, title: note.title, subject: note.subject, key: note.key, keyAction: note.keyAction, text: note.text)
     }
 }

@@ -100,7 +100,7 @@ enum Evaluation {
             durations.append(clock.now - start)
             for action in actions {
                 if case .setMarkedText(let text) = action { marked = text }
-                if case .showNote(let text) = action { note = text }
+                if case .showNote(let shown) = action { note = shown.text }
             }
             let applied = marked.segments.contains { $0.style == .correction }
             let suggested = note?.hasPrefix("もしかして") == true

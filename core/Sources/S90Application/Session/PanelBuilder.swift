@@ -4,41 +4,51 @@ import S90Domain
 /// 状態を持たない計算だけなので，InputSession から分けておく
 enum PanelBuilder {
     static let asTypedNote = "入力のまま"
-    static let correctedNote = "修正"
-    static let englishInputNote = "Tab 日本語に変換"
+    static let correctedNote = CandidatePanel.correctedAnnotation
+    static let englishInputNote = Note.info("Tab 日本語に変換")
     /// 英字入力で日本語にして見せているときの案内
-    static let englishInputJapaneseNote = "Esc 英字に戻す　Tab 変換"
+    static let englishInputJapaneseNote = Note.info("Esc 英字に戻す　Tab 変換")
     /// 選んでいる候補を学習から消したときの案内
-    static let candidateForgottenNote = "学習から削除しました"
+    static let candidateForgottenNote = Note.info("学習から削除しました")
     /// 最後に確定した語の学習を取り消したときの案内
-    static let lastCommitForgottenNote = "最後の学習を取り消しました"
+    static let lastCommitForgottenNote = Note.info("最後の学習を取り消しました")
     /// 戻した補正を覚えたときの案内．phrase は覚えた語句(打ったままの読み)
-    static func correctionRememberedNote(_ phrase: String) -> String { "「\(phrase)」は次から直しません" }
+    static func correctionRememberedNote(_ phrase: String) -> Note { .info("「\(phrase)」は次から直しません") }
 
     /// 連想変換で，選んでいる語の連想が見つからなかったときの案内(R-18)
-    static let noAssociationNote = "連想はありません"
+    static let noAssociationNote = Note.info("連想はありません")
     /// 連想変換を使う設定で，引ける連想の辞書が無いときの案内
-    static let noAssociationDictionaryNote = "連想の辞書がありません"
+    static let noAssociationDictionaryNote = Note.info("連想の辞書がありません")
+
+    /// 打ち間違いの案内の主な語と，キーでできること
+    private static let correctedTitle = "修正"
+    private static let suggestionTitle = "もしかして"
+    private static let revertAction = "戻す"
+    private static let applyAction = "修正"
 
     // 案内に出すキーは，キー設定の表でそのコマンドに割り当てた最初のキー(R-17)．キーが無ければキーの部分を出さない
 
     /// 英単語を直した候補が先頭の一覧の案内．key は次の候補のキー
-    static func correctionNote(key: String?) -> String { key.map { "\($0) 入力のままに戻す" } ?? correctedNote }
+    static func correctionNote(key: String?) -> Note {
+        Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
+    }
 
     /// 打っているあいだの候補の窓の案内．key は候補に入るキー
-    static func suggestionNote(key: String?) -> String? { key.map { "\($0) で選ぶ" } }
+    static func suggestionNote(key: String?) -> Note? { key.map { .info("\($0) で選ぶ") } }
 
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
-    static func readingCorrectionNote(key: String?) -> String { key.map { "修正しました　\($0) で入力のままに戻す" } ?? "修正しました" }
+    static func readingCorrectionNote(key: String?) -> Note {
+        Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
+    }
 
     /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文，key は取り消しのキー
-    static func readingCorrectedNote(typed: String, key: String?) -> String {
-        key.map { "修正しました　\($0) で「\(typed)」に戻す" } ?? "修正しました"
+    static func readingCorrectedNote(typed: String, key: String?) -> Note {
+        Note(tone: .correction, title: correctedTitle, subject: typed, key: key, keyAction: key.map { _ in revertAction })
     }
 
     /// 直さずに示すときの案内．corrected は直した文，key は「もしかして」に直すキー
-    static func readingSuggestionNote(_ corrected: String, key: String?) -> String {
-        "もしかして「\(corrected)」" + (key.map { "　\($0) で修正" } ?? "")
+    static func readingSuggestionNote(_ corrected: String, key: String?) -> Note {
+        Note(tone: .suggestion, title: suggestionTitle, subject: corrected, key: key, keyAction: key.map { _ in applyAction })
     }
 
     /// 打ち間違いを直した部分を含む文節か．直した読みの部分(changed．読みの先頭からの文字数)にかかる文節で，

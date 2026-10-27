@@ -77,8 +77,8 @@ final class ClientActionPresenter {
                 } catch {
                     logger.error("ライブ変換の設定を保存できませんでした: \(String(describing: error), privacy: .public)")
                 }
-            case .showNote(let text):
-                note.show(text, caret: caretRect(of: client), theme: ThemeChoice(settings.current))
+            case .showNote(let shown):
+                note.show(shown, caret: caretRect(of: client), theme: ThemeChoice(settings.current))
             case .showModeIndicator(let mode):
                 modeIndicator.show(mode, caret: caretRect(of: client), theme: ThemeChoice(settings.current), duration: settings.current.modeIndicatorDuration)
             case .selectMode(let mode):

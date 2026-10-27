@@ -150,7 +150,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
                 .alternative_notes
                 .iter()
                 .flatten()
-                .map(|note| painter.width(note, Font::Label))
+                .map(|note| painter.tag_width(note))
                 .reduce(f32::max)
         })
         .map_or(0.0, |width| width + padding * 2.0);
@@ -170,12 +170,14 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         footer_width(map, painter) + painter.width(&position(map), Font::Label) + padding * 3.0;
     // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す
     let note = [
-        column.and_then(|column| column.usage_note.as_deref()),
-        map.note.as_deref(),
+        column
+            .and_then(|column| column.usage_note.as_deref())
+            .map(|text| painter.width(text, Font::Label)),
+        map.note.as_ref().map(|note| painter.note_width(note)),
     ]
     .into_iter()
     .flatten()
-    .map(|text| painter.width(text, Font::Label) + padding * 2.0)
+    .map(|width| width + padding * 2.0)
     .fold(0.0, f32::max);
     let heading = map
         .association
@@ -362,7 +364,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         painter.text(note, Font::Label, theme.text_muted, row.x, row);
         footer_y += metrics.footer_height;
     }
-    if let Some(note) = map.note.as_deref() {
+    if let Some(note) = map.note.as_ref() {
         // 打ち間違いを直したことなど，IME が変えたことを知らせる
         let row = Frame::new(
             metrics.inset,
@@ -370,7 +372,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             content_width,
             metrics.footer_height,
         );
-        painter.text(note, Font::Label, theme.correction, row.x, row);
+        painter.note(note, row.x, row.mid_y());
         footer_y += metrics.footer_height;
     }
     footer(&mut painter, map, footer_y, body.width, &metrics);
@@ -383,7 +385,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
 /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)．直していなければ 0
 fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
     if column.is_corrected == Some(true) {
-        painter.width(strings::CORRECTED, Font::Label) + candidate::PADDING_X / 2.0
+        painter.tag_width(strings::CORRECTED) + candidate::PADDING_X / 2.0
     } else {
         0.0
     }
@@ -425,17 +427,12 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     let to = node.max_x() - candidate::PADDING_X - corrected_label_width(column, painter);
     if column.is_corrected == Some(true) {
         // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
-        let label = if !rounded && column.is_focused {
-            theme.selection_text
-        } else {
-            theme.correction
-        };
-        painter.text(
+        painter.tag(
             strings::CORRECTED,
-            Font::Label,
-            label,
-            to + candidate::PADDING_X / 2.0,
-            node,
+            node.max_x() - candidate::PADDING_X / 2.0,
+            node.mid_y(),
+            !rounded && column.is_focused,
+            true,
         );
     }
     if column.is_decided {
@@ -695,12 +692,12 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
         frame,
     );
     if let Some(note) = row.note.as_deref() {
-        painter.text_right(
+        painter.tag(
             note,
-            Font::Label,
-            muted_color,
-            frame.max_x() - padding,
-            frame,
+            frame.max_x() - padding / 2.0,
+            frame.mid_y(),
+            row.selected,
+            note == strings::CORRECTED,
         );
     }
 }
@@ -825,7 +822,14 @@ mod tests {
             columns: vec![column("今日は", true), column("晴れ", false)],
             position: 1,
             total: 2,
-            note: Some("修正しました".into()),
+            note: Some(ipc::Note {
+                tone: ipc::NoteTone::Info,
+                title: "学習から削除しました".into(),
+                subject: None,
+                key: None,
+                key_action: None,
+                text: "学習から削除しました".into(),
+            }),
             hints: vec![KeyHint {
                 keys: "Space".into(),
                 label: "候補".into(),
@@ -897,7 +901,8 @@ mod tests {
             assert!(texts.contains(&("京は".into(), theme.selection_text)));
             assert!(texts.contains(&("修正".into(), theme.selection_text)));
             assert!(texts.contains(&("きょうは".into(), theme.text)));
-            assert!(texts.contains(&("修正しました".into(), theme.correction)));
+            // ほかの知らせは控えめな色で出す
+            assert!(texts.contains(&("学習から削除しました".into(), theme.text_muted)));
             assert!(texts.contains(&("1–2 / 2".into(), theme.text_muted)));
             // 注目している文節の枝と重なる文節には，次の候補を添えない
             assert!(!texts.iter().any(|(text, _)| text == "腫れ"));

@@ -31,7 +31,8 @@ impl Panel {
             UiCommand::ShowCandidates { list, .. } => *self = Self::from_list(list),
             UiCommand::ShowBranchMap { map, .. } => *self = Self::from_map(map),
             UiCommand::Hide => *self = Self::default(),
-            UiCommand::ShowNote { text, .. } => self.note = text,
+            // Fcitx5 の案内は文字の行なので，部品を 1 行の文にしたものを出す
+            UiCommand::ShowNote { note, .. } => self.note = note.text,
             _ => {}
         }
     }
@@ -40,7 +41,7 @@ impl Panel {
         Self {
             candidates: list.entries.into_iter().map(|entry| entry.text).collect(),
             selected: list.selected_entry.map(|index| index as usize),
-            note: list.note.unwrap_or_default(),
+            note: list.note.map(|note| note.text).unwrap_or_default(),
             hints: String::new(),
             position: Some((list.position, list.total)),
         }
@@ -56,7 +57,10 @@ impl Panel {
             .selected_variant
             .map(|index| alternatives + index as usize)
             .or(column.selected_alternative.map(|index| index as usize));
-        let note = column.usage_note.or(map.note).unwrap_or_default();
+        let note = column
+            .usage_note
+            .or(map.note.map(|note| note.text))
+            .unwrap_or_default();
         let hints = map
             .hints
             .iter()
@@ -153,7 +157,14 @@ mod tests {
                 columns: vec![column(false), column(true)],
                 position: 2,
                 total: 3,
-                note: Some("案内".into()),
+                note: Some(ipc::Note {
+                    tone: ipc::NoteTone::Info,
+                    title: "案内".into(),
+                    subject: None,
+                    key: None,
+                    key_action: None,
+                    text: "案内".into(),
+                }),
                 hints: vec![KeyHint {
                     keys: "⇧←→".into(),
                     label: "区切り調整".into(),
