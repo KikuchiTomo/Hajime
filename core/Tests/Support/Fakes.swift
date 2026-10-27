@@ -91,6 +91,9 @@ public final class FakeConverter: KanaKanjiConverting {
     private var lastCommitted: [Candidate] = []
 
     public func forget(_ candidate: Candidate) { forgotten.append(candidate) }
+    /// 読みの一部だけを学習から消したときの，候補と読みの範囲
+    public private(set) var forgottenRanges: [(text: String, range: Range<Int>)] = []
+    public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { forgottenRanges.append((candidate.text, range)) }
 
     public func forgetLastCommit() -> Bool {
         guard !lastCommitted.isEmpty else { return false }

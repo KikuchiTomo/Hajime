@@ -421,6 +421,19 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         cache = [:]
     }
 
+    func forget(_ candidate: S90Domain.Candidate, readingRange range: Range<Int>) {
+        guard case .engine(let id) = candidate.origin, var engineCandidate = engineCandidates[id] else { return }
+        // 読みの range に掛かる語だけを残す(語の読みはカタカナで，字の数はひらがなの読みと同じ)
+        var start = 0
+        engineCandidate.data = engineCandidate.data.filter { element in
+            defer { start += element.ruby.count }
+            return start < range.upperBound && start + element.ruby.count > range.lowerBound
+        }
+        guard !engineCandidate.data.isEmpty else { return }
+        _ = engine.withSession(sessionID) { $0.forgetMemory(engineCandidate) }
+        cache = [:]
+    }
+
     func forgetLastCommit() -> Bool {
         guard !lastCommitted.isEmpty else { return false }
         let targets = lastCommitted

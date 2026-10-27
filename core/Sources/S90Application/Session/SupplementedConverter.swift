@@ -147,6 +147,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         base.endComposition()
     }
     public func forget(_ candidate: Candidate) { base.forget(candidate) }
+    public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { base.forget(candidate, readingRange: range) }
     public func forgetLastCommit() -> Bool { base.forgetLastCommit() }
     public func suspendLearningUntilEnd() { base.suspendLearningUntilEnd() }
 

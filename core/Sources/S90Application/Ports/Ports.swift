@@ -44,6 +44,9 @@ public protocol KanaKanjiConverting: AnyObject {
     func endComposition()
     /// 候補を学習から消す(キー設定の表の「学習から消す」．R-17)
     func forget(_ candidate: Candidate)
+    /// 候補のうち，読みの range(候補の読みの先頭からの文字数)に当たる語だけを学習から消す
+    /// (文全体の候補を切り出した文節で，その文節の語だけを消す)
+    func forget(_ candidate: Candidate, readingRange range: Range<Int>)
     /// 最後に終えた入力で確定した語の学習を取り消す．取り消すものがあれば true
     func forgetLastCommit() -> Bool
     /// 今の入力を終えるまで，学習を使わずに変換し，確定しても学ばない(キー設定の表の「学習を使わずに変換」)
@@ -63,6 +66,7 @@ extension KanaKanjiConverting {
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) {}
     public func setApplication(_ identifier: String?) {}
     public func sourceName(of text: String, reading: String) -> String? { nil }
+    public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { forget(candidate) }
 }
 
 /// エンジンに渡す，取り込んだ辞書の語．costOffset は語の点数に足す値(優先度)

@@ -479,14 +479,17 @@ public final class InputSession {
             return KeyResult(handled: true, actions: render(context: context))
         // 学習
         case .forgetCandidate:
-            let candidate: Candidate? = switch phase {
-            case .lattice(let lattice): lattice.focused.selected
-            case .selecting: currentCandidate()
-            case .composing, .association: nil
-            }
-            if let candidate, candidate.isFromEngine {
-                converter.forget(candidate)
-                pendingNote = PanelBuilder.candidateForgottenNote
+            switch phase {
+            case .lattice(let lattice):
+                if forget(lattice) { pendingNote = PanelBuilder.candidateForgottenNote }
+            case .selecting:
+                let candidate = currentCandidate()
+                if candidate.isFromEngine {
+                    converter.forget(candidate)
+                    pendingNote = PanelBuilder.candidateForgottenNote
+                }
+            case .composing, .association:
+                break
             }
             return KeyResult(handled: true, actions: render(context: context))
         case .forgetLastCommit:
@@ -494,6 +497,25 @@ public final class InputSession {
             showsTransientNote = true
             return KeyResult(handled: true, actions: [.showNote(PanelBuilder.lastCommitForgottenNote)])
         }
+    }
+
+    /// 分岐図で選んでいる文節の候補を学習から消す．消せたら true．
+    ///
+    /// 文節の 1 段目は，見えている文(Zenzai が書いた文全体の候補)を切り出したもので，エンジンの文節の候補に無いことがある
+    /// (学習で「教派言い天気です」が先に出るようになったときの「教派言い」)．そのときは同じ字のエンジンの候補を探し，
+    /// 無ければ文全体の候補のうち，その文節の読みに当たる語だけを消す(ほかの文節の語の学習は残す)
+    private func forget(_ lattice: SegmentLattice) -> Bool {
+        let segment = lattice.focused, selected = segment.selected
+        if let candidate = selected.isFromEngine ? selected : segment.candidates.first(where: { $0.isFromEngine && $0.text == selected.text }) {
+            converter.forget(candidate)
+            return true
+        }
+        let reading = composition.conversionReading
+        let sentence = lattice.segments.map(\.selected.text).joined()
+        guard let whole = converter.candidates(for: reading).first(where: { $0.isFromEngine && $0.readingCount == reading.count && $0.text == sentence })
+        else { return false }
+        converter.forget(whole, readingRange: segment.readingStart..<(segment.readingStart + segment.readingLength))
+        return true
     }
 
     // MARK: - ターミナル(R-07)
