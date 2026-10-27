@@ -3,6 +3,7 @@
   "maximumMessageBytes": 262144,
   "timing": {
     "keyResponseMilliseconds": 50,
+    "conversionResponseMilliseconds": 250,
     "reconnectMilliseconds": 2000,
     "engineStallMilliseconds": 3000,
     "maximumLateKeys": 16

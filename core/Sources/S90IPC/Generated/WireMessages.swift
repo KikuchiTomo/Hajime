@@ -2,6 +2,7 @@ public enum WireProtocol {
     public static let version: UInt32 = 2
     public static let maximumMessageBytes = 262144
     public static let keyResponseMilliseconds = 50
+    public static let conversionResponseMilliseconds = 250
     public static let reconnectMilliseconds = 2000
     public static let engineStallMilliseconds = 3000
     public static let maximumLateKeys = 16
