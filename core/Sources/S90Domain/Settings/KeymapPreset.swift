@@ -88,6 +88,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tCtrl Shift Left\tshrinkSegmentToWord
         converting\tShift Down\tsplitSegment
         converting\tBackspace\tbackToReading
+        converting\tCtrl Backspace\tforgetCandidate
         """
 
     /// Emacs 風．標準に加えて Control+N・P で候補，Control+F・B で文節，Control+G で取り消す

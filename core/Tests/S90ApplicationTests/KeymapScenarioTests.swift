@@ -238,6 +238,18 @@ struct KeymapScenarioTests {
         #expect(harness.lattice?.note == nil)
     }
 
+    @Test("標準のキー設定でも，変換中の ⌃⌫ で選んでいる候補を学習から消せる")
+    func forgetCandidateInStandard() {
+        let converter = FakeConverter(["かな": [("仮名", nil), ("假名", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("kana")
+        harness.press(.space)
+        harness.press(.down)
+        harness.press(.backspace, .control)
+        #expect(converter.forgotten.map(\.text) == ["假名"])
+        #expect(harness.lattice?.note == "学習から削除しました")
+    }
+
     @Test("R-17: 入力文字なしで最後の学習を取り消し，次のキーで案内を消す")
     func forgetLastCommit() {
         let converter = FakeConverter(["かな": [("仮名", nil)]])
