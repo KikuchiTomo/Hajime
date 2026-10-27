@@ -84,7 +84,7 @@ struct EngineServiceTests {
             return
         }
         #expect(handled)
-        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)])])
+        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil)])
         #expect(state.isComposing)
         #expect(state.consumedKeys.isEmpty)
 

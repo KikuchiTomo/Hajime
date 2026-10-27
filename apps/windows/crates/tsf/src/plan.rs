@@ -13,6 +13,8 @@ pub struct StyledRange {
 pub struct CompositionPlan {
     pub text: Vec<u16>,
     pub ranges: Vec<StyledRange>,
+    /// 入力位置(先頭からの UTF-16 の単位の数)．None なら末尾
+    pub caret: Option<i32>,
 }
 
 impl CompositionPlan {
@@ -31,7 +33,19 @@ impl CompositionPlan {
                 });
             }
         }
-        Self { text, ranges }
+        Self {
+            text,
+            ranges,
+            caret: None,
+        }
+    }
+
+    /// 入力位置を置く．文字の長さを超えるときは末尾にする
+    pub fn with_caret(mut self, caret: Option<u32>) -> Self {
+        self.caret = caret
+            .map(|caret| clamp(caret as usize))
+            .filter(|caret| *caret < clamp(self.text.len()));
+        self
     }
 
     pub fn is_empty(&self) -> bool {
@@ -83,5 +97,22 @@ mod tests {
         let plan = CompositionPlan::new(&[segment("", TextStyle::Reading)]);
         assert!(plan.is_empty());
         assert!(plan.ranges.is_empty());
+    }
+
+    #[test]
+    fn 入力位置は文字の中だけに置き_外なら末尾にする() {
+        let segments = [
+            segment("今日は", TextStyle::Converted),
+            segment("かな", TextStyle::Reading),
+        ];
+        assert_eq!(
+            CompositionPlan::new(&segments).with_caret(Some(3)).caret,
+            Some(3)
+        );
+        assert_eq!(
+            CompositionPlan::new(&segments).with_caret(Some(5)).caret,
+            None
+        );
+        assert_eq!(CompositionPlan::new(&segments).with_caret(None).caret, None);
     }
 }

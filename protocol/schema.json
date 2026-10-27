@@ -274,6 +274,10 @@
             {
               "name": "segments",
               "type": "[TextSegment]"
+            },
+            {
+              "name": "caret",
+              "type": "u32?"
             }
           ]
         },

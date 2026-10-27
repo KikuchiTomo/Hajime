@@ -249,6 +249,8 @@ pub enum EditOperation {
     },
     SetComposition {
         segments: Vec<TextSegment>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        caret: Option<u32>,
     },
     SelectMode {
         mode: InputMode,
@@ -266,9 +268,10 @@ impl fmt::Debug for EditOperation {
                 .debug_struct("Commit")
                 .field("text", &REDACTED)
                 .finish(),
-            Self::SetComposition { segments, .. } => f
+            Self::SetComposition { segments, caret, .. } => f
                 .debug_struct("SetComposition")
                 .field("segments", segments)
+                .field("caret", caret)
                 .finish(),
             Self::SelectMode { mode, .. } => f
                 .debug_struct("SelectMode")

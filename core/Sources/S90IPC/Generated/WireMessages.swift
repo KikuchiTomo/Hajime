@@ -323,12 +323,12 @@ extension WireTextSegment: CustomStringConvertible, CustomDebugStringConvertible
 
 public enum WireEditOperation: Sendable, Equatable, Codable {
     case commit(text: String)
-    case setComposition(segments: [WireTextSegment])
+    case setComposition(segments: [WireTextSegment], caret: UInt32?)
     case selectMode(mode: WireInputMode)
     case requestReconversion(maximumLength: UInt32)
 
     private enum CodingKeys: String, CodingKey {
-        case type, text, segments, mode, maximumLength
+        case type, text, segments, caret, mode, maximumLength
     }
 
     public init(from decoder: any Decoder) throws {
@@ -338,7 +338,7 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
         case "commit":
             self = try .commit(text: container.decode(String.self, forKey: .text))
         case "setComposition":
-            self = try .setComposition(segments: container.decode([WireTextSegment].self, forKey: .segments))
+            self = try .setComposition(segments: container.decode([WireTextSegment].self, forKey: .segments), caret: container.decodeIfPresent(UInt32.self, forKey: .caret))
         case "selectMode":
             self = try .selectMode(mode: container.decode(WireInputMode.self, forKey: .mode))
         case "requestReconversion":
@@ -354,9 +354,10 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
         case .commit(let text):
             try container.encode("commit", forKey: .type)
             try container.encode(text, forKey: .text)
-        case .setComposition(let segments):
+        case .setComposition(let segments, let caret):
             try container.encode("setComposition", forKey: .type)
             try container.encode(segments, forKey: .segments)
+            try container.encodeIfPresent(caret, forKey: .caret)
         case .selectMode(let mode):
             try container.encode("selectMode", forKey: .type)
             try container.encode(mode, forKey: .mode)

@@ -129,7 +129,8 @@ impl Session {
         for operation in operations {
             match operation {
                 EditOperation::Commit { text } => output.commit.push_str(&text),
-                EditOperation::SetComposition { segments } => {
+                // 入力位置(caret)は Linux ではまだ扱わない(入力中の文字の末尾に置く)
+                EditOperation::SetComposition { segments, .. } => {
                     output.preedit = Some(
                         segments
                             .into_iter()
@@ -162,6 +163,7 @@ mod tests {
                     text: "てんき".into(),
                     style: TextStyle::Reading,
                 }],
+                caret: None,
             },
         ];
         let output = Session::output(true, operations, true, Some(300));

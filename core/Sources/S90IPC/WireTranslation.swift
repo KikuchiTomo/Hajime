@@ -253,7 +253,8 @@ public struct RoutedActions: Sendable, Equatable {
             case .commit(let text):
                 edits.append(.commit(text: text))
             case .setMarkedText(let marked):
-                edits.append(.setComposition(segments: marked.segments.map { WireTextSegment(text: $0.text, style: WireTextStyle($0.style)) }))
+                edits.append(.setComposition(segments: marked.segments.map { WireTextSegment(text: $0.text, style: WireTextStyle($0.style)) },
+                                             caret: marked.caret.map { _ in UInt32(marked.textBeforeCaret.utf16.count) }))
             case .selectMode(let mode):
                 edits.append(.selectMode(mode: WireInputMode(mode)))
             case .showCandidates(let panel):

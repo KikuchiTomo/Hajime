@@ -45,7 +45,7 @@ final class ClientActionPresenter {
                 client.insertText(text, replacementRange: takeReplacement())
             case .setMarkedText(let marked):
                 let attributed = Self.attributedString(for: marked)
-                client.setMarkedText(attributed, selectionRange: NSRange(location: attributed.length, length: 0), replacementRange: takeReplacement())
+                client.setMarkedText(attributed, selectionRange: NSRange(location: (marked.textBeforeCaret as NSString).length, length: 0), replacementRange: takeReplacement())
             case .showCandidates(let panel):
                 note.hide()
                 candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
