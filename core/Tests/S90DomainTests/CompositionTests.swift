@@ -9,6 +9,14 @@ private func compose(_ keys: String) -> Composition {
 
 @Suite("ローマ字の組み立て")
 struct CompositionTests {
+    @Test("n のあとに子音が続いて「ん」になったところも，かなの区切りとして記録する(kissaten + de の ten を英単語とみなさない)")
+    func boundaryAfterNasalBeforeConsonant() {
+        let composition = compose("kissatende")
+        // k i s s a t e n の 8 キーで「きっさてん」の 5 字
+        #expect(composition.boundaries.contains(Composition.Boundary(rawCount: 8, kanaCount: 5)))
+        #expect(composition.conversionReading == "きっさてんで")
+    }
+
     @Test("R-02: 英字として入れた部分(打ったとおりの英単語・Shift の英字)の直後の区切りから，日本語の打ち間違いを見直す")
     func boundaryAfterEnglish() throws {
         var composition = compose("python")

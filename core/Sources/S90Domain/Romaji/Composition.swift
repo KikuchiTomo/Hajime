@@ -268,7 +268,10 @@ public struct Composition: Sendable, Equatable {
 
     private mutating func recordBoundary() {
         guard let rawKeys else { return }
-        let boundary = Boundary(rawCount: rawKeys.count, kanaCount: kana.count)
+        recordBoundary(at: Boundary(rawCount: rawKeys.count, kanaCount: kana.count))
+    }
+
+    private mutating func recordBoundary(at boundary: Boundary) {
         if boundaries.last != boundary { boundaries.append(boundary) }
     }
 
@@ -371,6 +374,9 @@ public struct Composition: Sendable, Equatable {
             if first == "n", characters.count >= 2, !Self.vowelsAndY.contains(characters[1]) {
                 kana.append("ん")
                 pending.removeFirst()
+                // 「ん」のあとはかなの区切り．続く子音がまだかなになっていなくても記録する
+                // (記録しないと「kissaten」+「de」の「ten」を，終わりがかなの区切りに合わない英単語とみなしてしまう)
+                if let rawKeys { recordBoundary(at: Boundary(rawCount: rawKeys.count - pending.count, kanaCount: kana.count)) }
                 continue
             }
             // どの綴りにもならないので，先頭の文字を英字のまま残す
