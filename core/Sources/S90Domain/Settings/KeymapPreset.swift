@@ -211,7 +211,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tShift Right\textendSegment
         converting\tShift Space\tpreviousCandidate
         converting\tShift Tab\tpreviousCandidate
-        converting\tShift Up\tpreviousCandidatePage
+        converting\tShift Up\tassociate
         converting\tSpace\tnextCandidate
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate

@@ -169,6 +169,9 @@ struct KeymapPresetTests {
         #expect(windows.command(for: KeyEvent(.function(2)), in: .composing) == .convertWithoutLearning)
         #expect(windows.command(for: KeyEvent(.muhenkan), in: .composing) == .switchKanaType)
         #expect(windows.command(for: KeyEvent(.tab), in: .converting) == nil)
+        // 連想は macOS の標準と同じ ⇧↑(Alt+↑ も使える)
+        #expect(windows.command(for: KeyEvent(.up, modifiers: .shift), in: .converting) == .associate)
+        #expect(windows.command(for: KeyEvent(.up, modifiers: .option), in: .converting) == .associate)
         let mac = KeymapPreset.mac.keymap
         #expect(mac.command(for: KeyEvent(.character("z"), modifiers: .option), in: .converting) == .toHiragana)
         #expect(mac.command(for: KeyEvent(.space, modifiers: .option), in: .composing) == .insertFullwidthSpace)
