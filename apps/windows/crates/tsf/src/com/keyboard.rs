@@ -2,7 +2,7 @@ use crate::key::{RawKey, VK_CONTROL, VK_MENU, VK_SHIFT};
 use ipc::Modifiers;
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyboardLayout, GetKeyboardState, ToUnicodeEx, HKL,
+    GetAsyncKeyState, GetKeyboardLayout, GetKeyboardState, ToUnicodeEx, HKL,
 };
 
 const VK_CAPITAL: usize = 0x14;
@@ -21,6 +21,24 @@ pub fn read(wparam: WPARAM, lparam: LPARAM) -> Option<RawKey> {
     let scan = ((lparam.0 >> 16) & 0xff) as u32;
     let mut state = [0u8; 256];
     unsafe { GetKeyboardState(&mut state).ok()? };
+    // 修飾キーは今のキーボードの状態からも読む．Windows 11 のメモ帳など(XAML のアプリ)では，入力のスレッドから見た
+    // キーの状態に Shift・Ctrl・Alt が入らず，Shift+← などが ← として届いていた
+    for modifier in [
+        VK_SHIFT as usize,
+        VK_LSHIFT,
+        VK_RSHIFT,
+        VK_CONTROL as usize,
+        VK_LCONTROL,
+        VK_RCONTROL,
+        VK_MENU as usize,
+        VK_LMENU,
+        VK_RMENU,
+    ] {
+        // SAFETY: 引数は仮想キーの番号だけ．上の位(負)が今押されていること
+        if unsafe { GetAsyncKeyState(modifier as i32) } < 0 {
+            state[modifier] |= PRESSED;
+        }
+    }
     let pressed = |vk: u16| state[vk as usize] & PRESSED != 0;
     let modifiers = Modifiers {
         shift: pressed(VK_SHIFT),
