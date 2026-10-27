@@ -54,9 +54,30 @@ public actor ZenzaiTypoService: TypoCorrecting {
             let kanaEdits = kanaCorrections(forKeys: key, leftContext: leftContext)
             guard !Task.isCancelled else { return [:] }
             lastSearchedKeys = key
-            result[key] = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits, kanaEdits), typedKeys: key, plausibility: plausibility(of:))
+            let merged = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits, kanaEdits), typedKeys: key, plausibility: plausibility(of:))
+            result[key] = withContextFreeScores(merged, leftContext: leftContext)
+            guard !Task.isCancelled else { return [:] }
         }
         return result
+    }
+
+    /// 左の文脈があるとき，打ったままと点数の高い候補(DefaultSettings.contextFreeCandidateCount 件)に，文脈を使わない点数を付ける．
+    /// 言語モデルの採点を 1 回だけ足す(候補ごとに探し直さない)．文脈が無ければ何もしない
+    private func withContextFreeScores(_ corrections: [ReadingCorrection], leftContext: String?) -> [ReadingCorrection] {
+        guard let leftContext, !leftContext.isEmpty, !Task.isCancelled else { return corrections }
+        let top = corrections.filter { !$0.isUnchanged }.sorted { $0.rank > $1.rank }.prefix(DefaultSettings.contextFreeCandidateCount)
+        let targets = corrections.filter(\.isUnchanged).prefix(1) + top
+        guard targets.count > 1 else { return corrections }
+        let scores = languageModelScores(forKeys: targets.map(\.keys), leftContext: nil)
+        var free: [String: Double] = [:]
+        for (target, score) in zip(targets, scores) {
+            if let score { free[target.keys] = score - target.cost }
+        }
+        return corrections.map { correction in
+            var correction = correction
+            correction.contextFreeScore = free[correction.keys]
+            return correction
+        }
     }
 
     /// かなの単位の訂正(KanaEditSearch)．読みにかなにならない英字が残るときは探さない

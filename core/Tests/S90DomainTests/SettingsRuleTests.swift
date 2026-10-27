@@ -240,6 +240,22 @@ struct ReadingCorrectionRuleTests {
         #expect(ReadingCorrectionRule(level: .standard).correction(among: [fixed, typed], reading: "よう") == fixed)
     }
 
+    @Test("左の文脈では直さないが，文脈を使わなければ直すものは，自動で直さず「もしかして」で示す．示さない設定では何もしない")
+    func contextFreeSuggestion() {
+        var typedInContext = typed
+        typedInContext.score = -1
+        typedInContext.contextFreeScore = -9
+        var fixedInContext = fixed
+        fixedInContext.score = -1.5
+        fixedInContext.contextFreeScore = -1
+        let rule = ReadingCorrectionRule(level: .standard)
+        #expect(rule.decision(among: [fixedInContext, typedInContext], reading: "よう") == .suggest(fixedInContext))
+        #expect(ReadingCorrectionRule(level: .standard, suggests: false).decision(among: [fixedInContext, typedInContext], reading: "よう") == nil)
+        // 文脈を使わない点数が無ければ，これまでどおり
+        typedInContext.contextFreeScore = nil
+        #expect(rule.decision(among: [fixedInContext, typedInContext], reading: "よう") == nil)
+    }
+
     @Test("控えめ・切るの設定では直さない")
     func levels() {
         #expect(ReadingCorrectionRule(level: .conservative).correction(among: [fixed, typed], reading: "よう") == nil)

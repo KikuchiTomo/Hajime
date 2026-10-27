@@ -101,6 +101,8 @@ public enum DefaultSettings {
     public static let keyEditOverlap = 4
     /// 訂正を裏で求めるときに覚えておく，読みの変換のもっともらしさの数．超えたら捨てる(メモリを増やし続けない)
     public static let maximumPlausibilityCacheEntries = 20_000
+    /// 左の文脈を使わない点数も求める，訂正の候補の数(点数の高い順)．多いほど裏の処理が長くなる
+    public static let contextFreeCandidateCount = 3
     /// KeyEditSearch の手間を，Zenzai の訂正の手間(隣のキーとの取り違え 1 回で 2)にそろえる倍率
     public static let keyEditCostScale = 2.0
     /// 直すかどうかを比べる点数(ReadingCorrection.rank)で，変換のもっともらしさの差に掛ける重みと，手間に掛ける重み．
