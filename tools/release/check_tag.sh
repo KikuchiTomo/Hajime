@@ -1,5 +1,5 @@
 #!/bin/sh
-# リリースのタグ(macos/v0.0.2・windows/v0.0.2)から OS とバージョンを読み，リポジトリに書いたバージョンと同じかを確かめる．
+# リリースのタグ(macos/v0.1.1・windows/v0.1.1)から OS とバージョンを読み，リポジトリに書いたバージョンと同じかを確かめる．
 # 出力は GitHub Actions の出力の形(platform=…・version=…・tag=…)
 # 使い方: tools/release/check_tag.sh <タグ>
 set -eu
@@ -17,7 +17,7 @@ if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
 fi
 written=$("$root/tools/release/version.sh" "$platform")
 if [ "$written" != "$version" ]; then
-  echo "タグのバージョン($version)と，リポジトリに書いたバージョン($written)が違います．tools/release/bump_patch.sh $platform で上げてからタグを付けてください" >&2
+  echo "タグのバージョン($version)と，リポジトリに書いたバージョン($written)が違います．tools/release/bump_version.sh $platform で上げてからタグを付けてください" >&2
   exit 1
 fi
 printf 'platform=%s\nversion=%s\ntag=%s\n' "$platform" "$version" "$tag"
