@@ -26,12 +26,13 @@ final class InputMenuBuilder {
         self.openSettings = openSettings
     }
 
-    /// 入力メニュー．一度だけ作って使い回し，チェックの印だけ合わせる．項目に受け手(target)は付けない．
+    /// 入力メニュー．プロセスで一度だけ作って使い回し，チェックの印だけ合わせる．項目に受け手(target)は付けない．
     ///
     /// InputMethodKit のサーバーは受け取ったメニューを覚え(_setCachedMenu:)，選ばれた項目をそのメニューと突き合わせて
-    /// 入力コントローラに動作を送る(_copySynchronizedActions:withMenuItems:)．打鍵のたびに作り直すと突き合わせがずれ，
-    /// 実機では最初の 1 回しか届かなかった．受け手を付けると 1 回も届かなかった．そのため使い回し，受け手を付けない．
-    /// なお cmux など一部のアプリは，選んだ動作を IME に取り次がない(テキストエディットでは届く)．そのため同じ操作をキーでも受ける(キー設定の表．Keymap)
+    /// 入力コントローラに動作を送る(_copySynchronizedActions:withMenuItems:)．作り直すと突き合わせがずれて届かない．
+    /// コントローラは入力欄ごとに作られるので，コントローラごとにメニューを作ると，入力欄が次々に変わるアプリ(cmux など)では
+    /// 別のメニューと突き合わせることになり届かなかった．そのため 1 つを全部のコントローラで共有する(CompositionRoot.inputMenu)．
+    /// 受け手を付けると 1 回も届かなかった．同じ操作はキーでも受ける(キー設定の表．Keymap)
     private var cachedMenu: NSMenu?
     private var liveConversionItem: NSMenuItem?
     private var handwritingItem: NSMenuItem?

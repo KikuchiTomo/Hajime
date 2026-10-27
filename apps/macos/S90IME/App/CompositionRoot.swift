@@ -115,6 +115,9 @@ final class CompositionRoot {
         return controller
     }()
 
+    /// 入力メニュー．入力欄ごとのコントローラで 1 つを共有する(InputMenuBuilder の説明)
+    private(set) lazy var inputMenu = InputMenuBuilder(settings: settings, openSettings: { [unowned self] in self.settingsWindow.show() })
+
     func makePresenter(session: InputSession) -> ClientActionPresenter {
         ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
                               openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting)
