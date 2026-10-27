@@ -416,7 +416,7 @@ public final class EngineService {
         var actions = result.actions
         if actions.contains(.awaitCorrections), let request = current.input.lateCorrectionRequest {
             // 変換はもう出ている．訂正は裏で求め，届いたら次の wake で変換を直す(macOS の S90InputController と同じ)
-            startCorrections(request, purpose: .conversion(deadline: now() + .seconds(DefaultSettings.lateCorrectionTimeout)), session: session)
+            startCorrections(request, purpose: .conversion(deadline: now() + .seconds(settings.current.lateCorrectionTimeout)), session: session)
         }
         return edit(actions, handled: result.handled, session: session, anchor: lastAnchor)
     }
@@ -472,7 +472,7 @@ public final class EngineService {
         } else if current.input.awaitsReview, reviewDelay(of: current) == 0 {
             // 訂正は裏で求め，求め終わったあとの wake で見直す(打鍵を待たせない)
             if typoService != nil, let request = current.input.correctionRequest {
-                startCorrections(request, purpose: .review(deadline: now() + .seconds(DefaultSettings.reviewCorrectionTimeout)), session: session)
+                startCorrections(request, purpose: .review(deadline: now() + .seconds(settings.current.reviewCorrectionTimeout)), session: session)
             } else {
                 actions += current.input.review(context: context)
                 sessions[session]?.warming = current.input.latticeWarmingSteps

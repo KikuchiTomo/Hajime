@@ -54,6 +54,12 @@ public struct Settings: Sendable, Equatable {
     public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
     /// 打鍵が止まってから打ち間違いを見直すまでの時間(秒)
     public var correctionDelay = DefaultSettings.liveCorrectionDelay
+    /// 打鍵が止まって見直すときに，打ち間違いを探す時間の上限(秒)．過ぎたらその入力は見直さない
+    public var reviewCorrectionTimeout = DefaultSettings.reviewCorrectionTimeout
+    /// Space で変換したあとに，打ち間違いを探す時間の上限(秒)．過ぎたら補正をあきらめ，変換はそのまま
+    public var lateCorrectionTimeout = DefaultSettings.lateCorrectionTimeout
+    /// 補正を Esc で戻した語句を「直さない語句」に覚え，次から直さない
+    public var remembersRejectedCorrections = false
     /// 打ち間違いを直す基準
     public var correctionSensitivity = CorrectionSensitivity.standard
     /// 直すほど確かでないとき，「もしかして」と示す
@@ -159,6 +165,8 @@ public struct Settings: Sendable, Equatable {
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
         correctionDelay = max(correctionDelay, liveConversionDelay)
+        reviewCorrectionTimeout = clamp(reviewCorrectionTimeout.isFinite ? reviewCorrectionTimeout : DefaultSettings.reviewCorrectionTimeout, DefaultSettings.reviewCorrectionTimeoutRange)
+        lateCorrectionTimeout = clamp(lateCorrectionTimeout.isFinite ? lateCorrectionTimeout : DefaultSettings.lateCorrectionTimeout, DefaultSettings.lateCorrectionTimeoutRange)
         modeIndicatorDuration = clamp(modeIndicatorDuration.isFinite ? modeIndicatorDuration : 0.8, DefaultSettings.modeIndicatorDurationRange)
         candidateFontSize = clamp(candidateFontSize.isFinite ? candidateFontSize : 15, DefaultSettings.candidateFontSizeRange)
         var themeIDs = Set<String>()
@@ -212,6 +220,7 @@ extension Settings: Codable {
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
+        case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
         case association, associationLimit, showsAssociationHint
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
@@ -271,6 +280,9 @@ extension Settings: Codable {
         read(.liveConversionDelay, into: \.liveConversionDelay)
         read(.correctionDelay, into: \.correctionDelay)
         read(.correctionSensitivity, into: \.correctionSensitivity)
+        read(.reviewCorrectionTimeout, into: \.reviewCorrectionTimeout)
+        read(.lateCorrectionTimeout, into: \.lateCorrectionTimeout)
+        read(.remembersRejectedCorrections, into: \.remembersRejectedCorrections)
         read(.showsSuggestions, into: \.showsSuggestions)
         read(.modeIndicatorDuration, into: \.modeIndicatorDuration)
         readList(.customThemes, into: \.customThemes)
@@ -350,6 +362,9 @@ extension Settings: Codable {
         try container.encode(liveConversionDelay, forKey: .liveConversionDelay)
         try container.encode(correctionDelay, forKey: .correctionDelay)
         try container.encode(correctionSensitivity, forKey: .correctionSensitivity)
+        try container.encode(reviewCorrectionTimeout, forKey: .reviewCorrectionTimeout)
+        try container.encode(lateCorrectionTimeout, forKey: .lateCorrectionTimeout)
+        try container.encode(remembersRejectedCorrections, forKey: .remembersRejectedCorrections)
         try container.encode(showsSuggestions, forKey: .showsSuggestions)
         try container.encode(modeIndicatorDuration, forKey: .modeIndicatorDuration)
         try container.encode(customThemes, forKey: .customThemes)

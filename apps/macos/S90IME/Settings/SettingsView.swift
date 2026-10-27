@@ -182,6 +182,15 @@ private struct ConversionTab: View {
                     ResettableRow(model: model, keyPath: \.correctionDelay) {
                         SecondsSlider(title: UIStrings.More.correctionDelay, value: model.binding(\.correctionDelay), range: DefaultSettings.correctionDelayRange)
                     }
+                    ResettableRow(model: model, keyPath: \.reviewCorrectionTimeout) {
+                        SecondsSlider(title: UIStrings.More.reviewCorrectionTimeout, value: model.binding(\.reviewCorrectionTimeout),
+                                      range: DefaultSettings.reviewCorrectionTimeoutRange, step: DefaultSettings.correctionTimeoutStep)
+                    }
+                    ResettableRow(model: model, keyPath: \.lateCorrectionTimeout) {
+                        SecondsSlider(title: UIStrings.More.lateCorrectionTimeout, value: model.binding(\.lateCorrectionTimeout),
+                                      range: DefaultSettings.lateCorrectionTimeoutRange, step: DefaultSettings.correctionTimeoutStep)
+                    }
+                    ResettableToggle(model: model, title: UIStrings.More.remembersRejectedCorrections, keyPath: \.remembersRejectedCorrections)
                 }
                 .disabled(model.settings.typoCorrection != .standard)
             }
@@ -246,12 +255,13 @@ struct SecondsSlider: View {
     let title: String
     let value: Binding<Double>
     let range: ClosedRange<Double>
+    var step = DefaultSettings.secondsStep
     @State private var editing: Double?
 
     var body: some View {
         LabeledContent(title) {
             HStack {
-                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: DefaultSettings.secondsStep) { isEditing in
+                Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: step) { isEditing in
                     guard !isEditing, let editing else { return }
                     value.wrappedValue = editing
                     self.editing = nil

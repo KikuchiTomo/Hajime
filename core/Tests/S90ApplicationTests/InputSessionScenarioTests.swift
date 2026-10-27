@@ -1018,8 +1018,8 @@ struct ReadingCorrectionScenarioTests {
         #expect(harness.marked.text == "ようですね")
     }
 
-    @Test("直しを Esc で戻すと，直された文節を直さない語句に覚えて案内し，次からは同じ語句を直さない")
-    func rememberRejectedCorrection() {
+    /// 「youdesune」を「よいですね」に直す変換器
+    private func rejectableConverter() -> FakeConverter {
         let converter = FakeConverter()
         converter.corrections["youdesune"] = [
             ReadingCorrection(keys: "yoidesune", reading: "ヨイデスネ", score: -1, cost: 1),
@@ -1029,7 +1029,31 @@ struct ReadingCorrectionScenarioTests {
             Candidate.Word(text: "様", readingCount: 2), Candidate.Word(text: "です", readingCount: 2, startsWithPredicate: true),
             Candidate.Word(text: "ね", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
         ]
-        let harness = Harness(converter: converter, remembersRejections: true)
+        return converter
+    }
+
+    @Test("既定(自動修正のキャンセルを学習がオフ)では，直しを Esc で戻しても覚えず，次に打ったときもまた直す")
+    func rejectedCorrectionNotRememberedByDefault() {
+        let harness = Harness(converter: rejectableConverter(), remembersRejections: true)
+        #expect(!harness.settings.current.remembersRejectedCorrections)
+        harness.type("youdesune")
+        harness.settle()
+        #expect(harness.marked.text == "よいですね")
+        harness.press(.escape)
+        #expect(harness.marked.text == "ようですね")
+        #expect(harness.settings.current.correction.exceptions.isEmpty)
+        #expect(harness.note == nil)
+        harness.press(.enter)
+        harness.type("youdesune")
+        harness.settle()
+        #expect(harness.marked.text == "よいですね")
+    }
+
+    @Test("自動修正のキャンセルを学習がオンなら，直しを Esc で戻すと，直された文節を直さない語句に覚えて案内し，次からは同じ語句を直さない")
+    func rememberRejectedCorrection() {
+        var settings = DefaultSettings.settings
+        settings.remembersRejectedCorrections = true
+        let harness = Harness(converter: rejectableConverter(), settings: settings, remembersRejections: true)
         harness.type("youdesune")
         harness.settle()
         #expect(harness.marked.text == "よいですね")

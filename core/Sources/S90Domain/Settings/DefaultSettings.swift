@@ -126,9 +126,13 @@ public enum DefaultSettings {
     /// Space で変換したあと，裏で求めている打ち間違いの訂正を待つ長さの上限(秒)．
     /// 変換はすぐに出し，訂正が届いたら(そのあいだにキーを押していなければ)直した変換に入れ替える
     public static let lateCorrectionTimeout = 5.0
+    /// 利用者が変えられる lateCorrectionTimeout の範囲(秒)
+    public static let lateCorrectionTimeoutRange = 1.0...30.0
     /// 打鍵が止まって見直すときに，裏で求める訂正を待つ上限(秒)．過ぎたらその入力は見直さない．
     /// 入力を待たせない裏の仕事なので，長い文(評価の文で最大 10 秒ほど)も求め終われるよう長めにする
     public static let reviewCorrectionTimeout = 15.0
+    /// 利用者が変えられる reviewCorrectionTimeout の範囲(秒)
+    public static let reviewCorrectionTimeoutRange = 5.0...60.0
     /// 変換できない読み(英字が残るなど)のもっともらしさの代わりに使う値．ふつうの読みより十分低い
     public static let unconvertiblePlausibility = -60.0
     /// 1 か所の直しを Zenzai の点数の差だけで直す境目(#52 より前の決まりと同じ)
@@ -241,6 +245,8 @@ public enum DefaultSettings {
     public static let candidateFontSizeRange = 12.0...24.0
     /// 秒の項目(待ち時間・表示時間)を選ぶ刻み(秒)．macOS の SecondsSlider と Windows の設定の画面で使う
     public static let secondsStep = 0.1
+    /// 打ち間違いを探す時間の上限(reviewCorrectionTimeout・lateCorrectionTimeout)を設定の画面で選ぶきざみ(秒)
+    public static let correctionTimeoutStep = 1.0
     public static let maximumUserDictionaryReadingLength = 32
     public static let maximumUserDictionaryWordLength = 64
     /// 取り込むユーザー辞書のファイルの大きさの上限

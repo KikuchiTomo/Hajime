@@ -617,6 +617,9 @@ enum UIStrings {
         static let correctionSensitivity = "修正の基準"
         static let showsSuggestions = "「もしかして」を表示"
         static let correctionDelay = "見直すまでの待ち時間"
+        static let reviewCorrectionTimeout = "見直しの時間の上限"
+        static let lateCorrectionTimeout = "変換後の補正の時間の上限"
+        static let remembersRejectedCorrections = "自動修正のキャンセルを学習"
 
         static func label(for sensitivity: CorrectionSensitivity) -> String {
             switch sensitivity {
@@ -744,7 +747,8 @@ extension UIStrings {
             "keypadDirect": Features.keypadDirect,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
-            "liveConversionDelay": More.liveConversionDelay, "correctionDelay": More.correctionDelay, "correctionSensitivity": More.correctionSensitivity,
+            "liveConversionDelay": More.liveConversionDelay, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
+            "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,
             "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,
             "calculation": Features.calculation, "postalCodeConversion": Features.postalCode,
             "handwriting": Features.handwriting, "homophoneNotes": UIStrings.Settings.homophoneNotes, "misuseNotes": UIStrings.Settings.misuseNotes,

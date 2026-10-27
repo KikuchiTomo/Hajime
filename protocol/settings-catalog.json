@@ -1,5 +1,6 @@
 {
   "associationLimitStep" : 10,
+  "correctionTimeoutStep" : 1,
   "exportFileNames" : {
     "correctionRules" : "replacements.tsv",
     "englishWords" : "english-words.txt",
@@ -37,6 +38,7 @@
     "keyboardLayout",
     "keymap",
     "keypadDirect",
+    "lateCorrectionTimeout",
     "learning",
     "listCandidatesPerPage",
     "liveConversion",
@@ -54,7 +56,9 @@
     "punctuation",
     "punctuationCommits",
     "recordsUsage",
+    "remembersRejectedCorrections",
     "restrainsLiveConversionInCode",
+    "reviewCorrectionTimeout",
     "shiftStartsAlphabet",
     "showsAssociationHint",
     "showsKeyHints",
@@ -125,6 +129,10 @@
       0,
       24
     ],
+    "lateCorrectionTimeout" : [
+      1,
+      30
+    ],
     "liveConversionDelay" : [
       0.1,
       1.5
@@ -132,6 +140,10 @@
     "modeIndicatorDuration" : [
       0.3,
       3
+    ],
+    "reviewCorrectionTimeout" : [
+      5,
+      60
     ]
   },
   "secondsStep" : 0.1,
