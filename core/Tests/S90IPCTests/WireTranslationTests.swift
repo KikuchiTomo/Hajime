@@ -68,14 +68,14 @@ struct WireTranslationTests {
         column.sourceName = "医療"
         column.isCorrected = true
         let hint = WireKeyHint(keys: "Shift+←", label: "今日")
-        let routed = RoutedActions([.showLattice(LatticePanel(columns: [column], position: 1, total: 2, note: "案内"))], anchor: nil, hints: { _ in [hint] })
+        let routed = RoutedActions([.showLattice(LatticePanel(columns: [column], position: 1, total: 2, note: .info("案内")))], anchor: nil, hints: { _ in [hint] })
         guard case .showBranchMap(let map, let anchor) = routed.ui.first else {
             Issue.record("分岐図の指示にならない")
             return
         }
         #expect(anchor == nil)
         #expect(map.hints == [hint])
-        #expect(map.note == "案内")
+        #expect(map.note?.text == "案内")
         #expect(map.columns.first?.selectedAlternative == 1)
         #expect(map.columns.first?.alternativeNotes == [nil, "修正"])
         #expect(map.columns.first?.sourceName == "医療")

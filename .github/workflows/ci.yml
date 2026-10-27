@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
       # 依存(swift-collections 1.7 以降)が Swift 6.2 を要るので，開発の Mac と同じ Xcode 26 の最新を使う
       - run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
           echo "使う Xcode: $xcode"
           sudo xcode-select -s "$xcode"
           swift --version
@@ -83,7 +83,7 @@ jobs:
         with:
           persist-credentials: false
       - run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
           sudo xcode-select -s "$xcode"
       # xcodegen の版は mise.toml で固定している
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1

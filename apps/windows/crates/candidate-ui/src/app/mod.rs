@@ -36,7 +36,7 @@ enum Content {
     Hidden,
     Candidates(ipc::CandidateList),
     BranchMap(ipc::BranchMap),
-    Note(String),
+    Note(ipc::Note),
     /// モードの札の文字
     Mode(String),
 }
@@ -232,8 +232,8 @@ impl App {
                 self.content = Content::BranchMap(map);
                 self.anchor = anchor.or(self.anchor.take());
             }
-            UiCommand::ShowNote { text, anchor } => {
-                self.content = Content::Note(text);
+            UiCommand::ShowNote { note, anchor } => {
+                self.content = Content::Note(note);
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowMode {
@@ -370,7 +370,7 @@ impl App {
         let text = match &self.content {
             Content::Candidates(list) => announce::candidates(list),
             Content::BranchMap(map) => announce::branch_map(map),
-            Content::Note(text) => Some(text.clone()),
+            Content::Note(note) => Some(note.text.clone()),
             Content::Hidden | Content::Mode(_) => None,
         };
         if text.is_none() || !system::screen_reader() {
@@ -398,7 +398,7 @@ impl App {
             Content::Hidden => None,
             Content::Candidates(list) => Some(scene::candidate_list(list, &style, &measure)),
             Content::BranchMap(map) => Some(scene::branch_map(map, &style, &measure)),
-            Content::Note(text) => Some(scene::note(text, &style, &measure)),
+            Content::Note(note) => Some(scene::note(note, &style, &measure)),
             Content::Mode(label) => Some(scene::mode(label, &style, &measure)),
         }
         .map(|scene| scene::surround(scene, &theme, Surround::Shadow));

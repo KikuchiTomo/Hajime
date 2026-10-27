@@ -90,7 +90,7 @@ struct ReadingCorrectionTests {
             session.provideCorrections(corrections)
         }
         actions += session.review(context: InputContext())
-        let note = actions.compactMap { if case .showNote(let text) = $0 { text } else { nil } }.last
+        let note = actions.compactMap { if case .showNote(let shown) = $0 { shown.text } else { nil } }.last
         let corrected = actions.contains { if case .setMarkedText(let text) = $0 { text.segments.contains { $0.style == .correction } } else { false } }
         print("通し \(keys): 直した=\(corrected) 案内=\(note ?? "-") 文=\(marked(actions) ?? "-")")
         #expect(corrected || note?.hasPrefix("もしかして") == true, "\(keys)")
@@ -119,7 +119,7 @@ struct ReadingCorrectionTests {
         let late = session.applyLateCorrections(corrections, context: InputContext())
         let lattice = late.compactMap { if case .showLattice(let panel) = $0 { panel } else { nil } }.last
         let corrected = late.contains { if case .setMarkedText(let text) = $0 { text.segments.contains { $0.style == .correction } } else { false } }
-        let note = lattice?.note
+        let note = lattice?.note?.text
         print("Space すぐ \(keys): 直した=\(corrected) 案内=\(note ?? "-") 文=\(marked(late) ?? "-")")
         #expect(corrected || note != nil, "\(keys)")
     }

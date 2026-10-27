@@ -204,6 +204,11 @@ enum DesignTokens {
             static let keycapPartGap: CGFloat = 1
             static let shadowRadius: CGFloat = 12
             static let shadowOffsetY: CGFloat = 3
+            static let tagHeight: CGFloat = 16
+            static let tagPaddingX: CGFloat = 6
+            static let tagRadius: CGFloat = 8
+            static let noteIconSize: CGFloat = 18
+            static let noteGap: CGFloat = 6
         }
         enum Handwriting {
             static let width: CGFloat = 284
@@ -288,6 +293,8 @@ enum DesignTokens {
             static let badgeContrast: CGFloat = 0.26
             static let focusTint: CGFloat = 0.16
             static let focusTintContrast: CGFloat = 0.3
+            static let correctionTag: CGFloat = 0.16
+            static let correctionTagContrast: CGFloat = 0.3
         }
         enum Rounded {
             static let badge: CGFloat = 0.12

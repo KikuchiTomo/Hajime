@@ -114,7 +114,21 @@ fn render_all(output: &Path) -> Result<()> {
             ),
             ("branch-split", scene::branch_map(&split(), &look, &measure)),
             ("mode", scene::mode("あ", &look, &measure)),
-            ("note", scene::note("もしかして: 雰囲気", &look, &measure)),
+            (
+                "note",
+                scene::note(
+                    &ipc::Note {
+                        tone: ipc::NoteTone::Correction,
+                        title: "修正".into(),
+                        subject: Some("オン外します".into()),
+                        key: Some("Esc".into()),
+                        key_action: Some("戻す".into()),
+                        text: "修正「オン外します」　Esc 戻す".into(),
+                    },
+                    &look,
+                    &measure,
+                ),
+            ),
         ];
         for (kind, scene) in scenes {
             let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });
@@ -246,7 +260,14 @@ fn correction() -> CandidateList {
         focus: CandidateFocus::Candidate,
         position: 1,
         total: 3,
-        note: Some("Space 入力のままに戻す".into()),
+        note: Some(ipc::Note {
+            tone: ipc::NoteTone::Correction,
+            title: "修正".into(),
+            subject: None,
+            key: Some("Space".into()),
+            key_action: Some("入力のままに戻す".into()),
+            text: "修正　Space 入力のままに戻す".into(),
+        }),
     }
 }
 

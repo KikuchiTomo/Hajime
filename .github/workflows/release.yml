@@ -49,6 +49,13 @@ jobs:
     uses: ./.github/workflows/package-macos.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
+    # 署名と公証に使う Secrets だけを渡す
+    secrets:
+      MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+      MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+      MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+      MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+      MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
 
   package-windows:
     needs: prepare

@@ -57,7 +57,7 @@ impl Metrics {
 
 struct Footer {
     hints: Vec<KeyHint>,
-    note: Option<String>,
+    note: Option<ipc::Note>,
     position: String,
     /// 選んでいる候補に連想があることの知らせ(「Ctrl+Tab 連想」)
     association_hint: Option<String>,
@@ -102,7 +102,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 + entry
                     .annotation
                     .as_deref()
-                    .map_or(0.0, |note| painter.width(note, Font::Label) + padding)
+                    .map_or(0.0, |note| painter.tag_width(note) + padding)
         })
         .fold(0.0, f32::max);
     let variants_width: f32 = list
@@ -113,7 +113,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         })
         .sum();
     let hints_width = match &footer.note {
-        Some(note) => painter.width(note, Font::Label),
+        Some(note) => painter.note_width(note),
         None => painter.hints_width(&footer.hints),
     };
     let association_hint = list
@@ -248,12 +248,12 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
             painter.underline(from, to, row.max_y() - offset, color, true);
         }
         if let Some(annotation) = entry.annotation.as_deref() {
-            painter.text_right(
+            painter.tag(
                 annotation,
-                Font::Label,
-                muted_color,
-                row.max_x() - padding,
-                row,
+                row.max_x() - padding / 2.0,
+                row.mid_y(),
+                selected,
+                annotation == strings::CORRECTED,
             );
         }
         y += metrics.row_height;
@@ -334,7 +334,7 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
     let right = section.max_x() - candidate::PADDING_X;
     if theme.is_rounded() {
         match &footer.note {
-            Some(note) => painter.text(note, Font::Label, theme.correction, left, section),
+            Some(note) => painter.note(note, left, section.mid_y()),
             None => {
                 painter.hints(&footer.hints, left, section.mid_y());
                 if let Some(hint) = &footer.association_hint {
@@ -361,7 +361,10 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
         section,
     );
     match &footer.note {
-        Some(note) => painter.text_right(note, Font::Label, theme.correction, right, section),
+        Some(note) => {
+            let width = painter.note_width(note);
+            painter.note(note, right - width, section.mid_y());
+        }
         None => {
             let width = painter.hints_width(&footer.hints);
             painter.hints(&footer.hints, right - width, section.mid_y());
@@ -593,9 +596,18 @@ mod tests {
     fn 知らせがあれば案内の代わりに出す() {
         let theme = theme("platinum");
         let mut noted = list(Some(0));
-        noted.note = Some("Space 入力のままに戻す".into());
+        noted.note = Some(ipc::Note {
+            tone: ipc::NoteTone::Correction,
+            title: "修正".into(),
+            subject: None,
+            key: Some("Space".into()),
+            key_action: Some("入力のままに戻す".into()),
+            text: "修正　Space 入力のままに戻す".into(),
+        });
         let scene = candidate_list(&noted, &Look::new(&theme, 15.0), &Fixed);
-        assert!(texts(&scene).contains(&("Space 入力のままに戻す".into(), theme.correction)));
+        // 主な語は補正の色，キーでできることはキーの案内と同じ控えめな色
+        assert!(texts(&scene).contains(&("修正".into(), theme.correction)));
+        assert!(texts(&scene).contains(&("入力のままに戻す".into(), theme.text_muted)));
         assert!(!texts(&scene).iter().any(|(text, _)| text == "文字種"));
     }
 

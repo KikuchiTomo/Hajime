@@ -14,7 +14,7 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .showModeIndicator(let mode): "showModeIndicator(\(mode))"
         case .selectMode(let mode): "selectMode(\(mode))"
         case .selectInputStyle(let style): "selectInputStyle(\(style))"
-        case .showNote(let text): "showNote(length: \(text.count))"
+        case .showNote(let note): "showNote(\(note.tone.rawValue), length: \(note.text.count))"
         case .openSettings: "openSettings"
         case .toggleLiveConversion: "toggleLiveConversion"
         case .showHandwriting: "showHandwriting"

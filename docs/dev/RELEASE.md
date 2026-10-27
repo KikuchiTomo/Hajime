@@ -54,11 +54,32 @@ git tag macos/v0.1.1 origin/main
 git push origin macos/v0.1.1
 ```
 
-`Release` は，タグのバージョンがリポジトリに書いたバージョン(`tools/release/version.sh`)と同じかを確かめてから，その OS の配布物を作ります．Releases には配布物と，その SHA-256 の一覧(`SHA256SUMS.txt`)を置きます．説明は `tools/release/notes/<OS>.md` に，同じ OS の前のタグからの変更の一覧を足したものです．1.0.0 より前のバージョンは試用のバージョン(pre-release)として置きます．
+`Release` は，タグのバージョンがリポジトリに書いたバージョン(`tools/release/version.sh`)と同じかを確かめてから，その OS の配布物を作ります．Releases には配布物と，その SHA-256 の一覧(`SHA256SUMS.txt`)を置きます．タイトルは `v0.1.1-macos`・`v0.1.1-windows` のように，バージョンと OS を並べます．説明は，同じ OS の前のタグからのコミットの作者(ボットを除く)をメンションしたコントリビューターの一覧だけです．1.0.0 より前のバージョンは試用のバージョン(pre-release)として置きます．
 
 タグを付けたあとで作り直すときは，`gh workflow run release.yml -f tag=macos/v0.1.1` で動かします(同じタグの Release があれば失敗するので，先に消します)．
 
-今は署名しません．macOS の .pkg はアドホック署名で公証もしていないので，開くときに「このまま開く」が要ります．Windows の .msi も署名していないので SmartScreen の警告が出ます．署名に使う証明書と公証の資格情報は GitHub の Secrets に置く必要があり，利用者が設定します．
+Secrets を入れるまでは，macOS の .pkg はアドホック署名で公証もしていないので，開くときに「このまま開く」が要ります．アドホック署名のアプリにはハードンドランタイムを付けません(付けるとチームの無い署名では同梱の llama.framework を読み込めず，起動の途中で止まる)．`tools/macos/package.sh` は，ハードンドランタイムが付いていてチームの無いアプリを作ったら止まります．Windows の .msi も署名していないので SmartScreen の警告が出ます．署名に使う証明書と公証の資格情報は GitHub の Secrets に置く必要があり，利用者が設定します．
+
+## Releases の .pkg に署名して公証する
+
+GitHub の Secrets に Developer ID の証明書と公証の資格情報を入れると，`Release` の macOS の .pkg を署名して公証します．入れていなければ，アドホック署名で作ります．Developer ID は手元の Apple Development の証明書と同じチームなので，署名した .pkg は開発に使っている Mac にもそのまま入れられます．
+
+Secrets はリポジトリの管理者が入れます．値は `tools/macos/ci_signing.sh` が使い捨てのキーチェーンに入れて使い，仕事が終わると消します．記録には出しません．
+
+1. Developer ID の証明書を 2 つ作る．Xcode の「設定 → Accounts → Manage Certificates → +」で「Developer ID Application」と「Developer ID Installer」を足す(作れるのはアカウントの持ち主だけ)
+2. キーチェーンアクセスの「自分の証明書」で 2 つの証明書を選び，「書き出す」で 1 つの .p12 にする(パスワードを付ける)
+3. App Store Connect の「ユーザとアクセス → 統合 → App Store Connect API」で，役割が Developer のチームのキーを作り，.p8 をダウンロードする(1 回しかダウンロードできない)．Key ID と Issuer ID を控える
+4. GitHub のリポジトリの「Settings → Secrets and variables → Actions」に次の 5 つを入れる
+
+| Secret | 中身 |
+|---|---|
+| `MACOS_CERTIFICATES_P12` | 2. の .p12 を base64 にしたもの(`base64 -i 証明書.p12 \| pbcopy`) |
+| `MACOS_CERTIFICATES_PASSWORD` | 2. で付けたパスワード |
+| `MACOS_NOTARY_KEY` | 3. の .p8 の中身(`pbcopy < AuthKey_XXXX.p8`) |
+| `MACOS_NOTARY_KEY_ID` | 3. の Key ID |
+| `MACOS_NOTARY_ISSUER_ID` | 3. の Issuer ID |
+
+入れたら，`gh workflow run package-macos.yml` で作って，署名と公証が通るかを確かめます．公証した .pkg は，Gatekeeper の検査(`spctl --assess --type install`)を通ることを `package.sh` が確かめます．
 
 ## ワークフロー
 

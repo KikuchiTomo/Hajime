@@ -46,7 +46,7 @@ final class Harness {
         for action in session.settle(context: context) + session.review(context: context) {
             switch action {
             case .setMarkedText(let text): marked = text
-            case .showNote(let text): note = text
+            case .showNote(let shown): note = shown.text
             case .hideCandidates: note = nil
             default: break
             }
@@ -70,7 +70,7 @@ final class Harness {
             case .setMarkedText(let text): marked = text
             case .showCandidates(let value): panel = value
             case .showLattice(let value): lattice = value
-            case .showNote(let text): note = text
+            case .showNote(let shown): note = shown.text
             case .hideCandidates:
                 panel = nil
                 lattice = nil
@@ -967,7 +967,7 @@ struct ReadingCorrectionScenarioTests {
         let record = { (actions: [ClientAction]) in
             for action in actions {
                 if case .setMarkedText(let text) = action { marked = text.text }
-                if case .showLattice(let panel) = action { note = panel.note }
+                if case .showLattice(let panel) = action { note = panel.note?.text }
             }
         }
         for key in keys { record(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) }
@@ -985,7 +985,7 @@ struct ReadingCorrectionScenarioTests {
         var note: String?
         for action in session.handle(KeyEvent(.space), context: InputContext()).actions {
             if case .setMarkedText(let text) = action { marked = text.text }
-            if case .showLattice(let panel) = action { note = panel.note }
+            if case .showLattice(let panel) = action { note = panel.note?.text }
         }
         #expect(marked == "よい")
         #expect(note != nil)

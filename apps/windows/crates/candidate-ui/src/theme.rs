@@ -154,6 +154,15 @@ pub struct ResolvedTheme {
 }
 
 impl ResolvedTheme {
+    /// 補正の色を薄く敷いた地(候補の横の「修正」の札と，案内の頭のアイコンの丸)
+    pub fn correction_tint(&self) -> Color {
+        self.correction.with_alpha(if self.kind == Kind::Contrast {
+            opacity::glass::CORRECTION_TAG_CONTRAST
+        } else {
+            opacity::glass::CORRECTION_TAG
+        })
+    }
+
     /// 設定から描き方を決める．カスタムテーマを使っていれば，元のテーマの描き方に色・書体・形を重ねる
     pub fn resolve(theme: &str, custom: Option<&CustomTheme>, look: &SystemLook) -> Self {
         let Some(custom) = custom else {

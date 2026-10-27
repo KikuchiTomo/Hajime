@@ -10,6 +10,7 @@
 #   S90_INSTALLER_IDENTITY  .pkg の署名．無ければ Developer ID Installer の証明書．どちらも無ければ署名しない
 #   S90_NOTARY_PROFILE      公証に使う notarytool のキーチェーンのプロファイル名．無ければ公証しない(手元に入れる .pkg)
 #                           (作り方: xcrun notarytool store-credentials <名前>)
+#   S90_NOTARY_KEYCHAIN     公証のプロファイルを入れたキーチェーン．無ければ既定のキーチェーン(CI は ci_signing.sh が作る)
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 
@@ -30,6 +31,14 @@ if [ -n "$installer_identity" ]; then
   fi
 fi
 notary_profile=${S90_NOTARY_PROFILE:-}
+notary_keychain=${S90_NOTARY_KEYCHAIN:-}
+notarize() {
+  if [ -n "$notary_keychain" ]; then
+    xcrun notarytool submit "$1" --keychain-profile "$notary_profile" --keychain "$notary_keychain" --wait
+  else
+    xcrun notarytool submit "$1" --keychain-profile "$notary_profile" --wait
+  fi
+}
 if [ -n "${S90_APP_IDENTITY:-}" ]; then
   app_identity=$S90_APP_IDENTITY
 elif [ -n "$notary_profile" ]; then
@@ -61,8 +70,8 @@ ditto --norsrc --noextattr "build/Build/Products/$configuration/$app_name.app" "
 app="$work/root/$app_name.app"
 version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Contents/Info.plist")
 
-if [ -n "$app_identity" ]; then
-  entitlements=$(find build/Build/Intermediates.noindex -path "*$configuration*" -name "$app_name.app.xcent" | head -1)
+entitlements=$(find build/Build/Intermediates.noindex -path "*$configuration*" -name "$app_name.app.xcent" | head -1)
+if [ -n "$app_identity" ] && [ "$app_identity" != "-" ]; then
   case "$app_identity_name" in
     "Developer ID Application"*) timestamp="--timestamp" ;;
     *) timestamp="--timestamp=none" ;;
@@ -70,12 +79,23 @@ if [ -n "$app_identity" ]; then
   codesign --force --deep --options runtime "$timestamp" --entitlements "$entitlements" --sign "$app_identity" "$app"
   echo "アプリの署名: $app_identity_name"
 else
-  echo "アプリの署名に使える証明書が無いので，アドホック署名のままにします"
+  # 証明書が無いときはアドホック署名にする．ハードンドランタイムは付けない．
+  # ハードンドランタイムの付いたアプリは，チームの同じ署名の部品しか読み込めず(Library Validation)，
+  # チームの無いアドホック署名では同梱の llama.framework を読み込めずに起動の途中で止まる
+  codesign --force --deep --timestamp=none --entitlements "$entitlements" --sign - "$app"
+  echo "アプリの署名に使える証明書が無いので，アドホック署名にします(ハードンドランタイムなし)"
+fi
+# 署名を確かめる．ハードンドランタイムが付いていてチームが無いと，同梱の部品を読み込めない
+codesign --verify --deep --strict "$app"
+signature=$(codesign -dv "$app" 2>&1)
+if printf '%s\n' "$signature" | grep -q '^CodeDirectory.*flags=.*runtime' && printf '%s\n' "$signature" | grep -q '^TeamIdentifier=not set'; then
+  echo "アプリにハードンドランタイムが付いていて，署名にチームがありません．同梱の部品を読み込めず起動できないので，作るのをやめます" >&2
+  exit 1
 fi
 
 if [ -n "$notary_profile" ]; then
   ditto -c -k --sequesterRsrc --keepParent "$app" "$work/app.zip"
-  xcrun notarytool submit "$work/app.zip" --keychain-profile "$notary_profile" --wait
+  notarize "$work/app.zip"
   xcrun stapler staple "$app"
 fi
 
@@ -93,8 +113,10 @@ if [ -n "$installer_identity" ]; then
   productbuild --distribution "$work/distribution.xml" --package-path "$work" --sign "$installer_identity" "$output"
   echo ".pkg の署名: $installer_identity"
   if [ -n "$notary_profile" ]; then
-    xcrun notarytool submit "$output" --keychain-profile "$notary_profile" --wait
+    notarize "$output"
     xcrun stapler staple "$output"
+    # 公証した .pkg は，Gatekeeper の検査で警告なしに開けることを確かめる
+    spctl --assess --type install --verbose "$output"
   fi
 else
   productbuild --distribution "$work/distribution.xml" --package-path "$work" "$output"

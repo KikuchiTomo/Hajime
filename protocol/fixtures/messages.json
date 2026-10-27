@@ -140,7 +140,7 @@
         "focus": "candidate",
         "position": 2,
         "total": 30,
-        "note": "修正しました"
+        "note": { "tone": "correction", "title": "修正", "subject": "ようですね", "key": "Esc", "keyAction": "戻す", "text": "修正「ようですね」　Esc 戻す" }
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },
@@ -182,7 +182,7 @@
         ],
         "position": 1,
         "total": 2,
-        "note": "案内",
+        "note": { "tone": "info", "title": "案内", "text": "案内" },
         "hints": [{ "keys": "Shift+←", "label": "今日" }]
       }
     },
@@ -208,7 +208,7 @@
         }
       }
     },
-    { "type": "showNote", "text": "もしかして", "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
+    { "type": "showNote", "note": { "tone": "suggestion", "title": "もしかして", "subject": "良いですね", "key": "Tab", "keyAction": "修正", "text": "もしかして「良いですね」　Tab 修正" }, "anchor": { "x": 0, "y": 0, "width": 0, "height": 0 } },
     { "type": "showMode", "mode": "direct" },
     { "type": "showMode", "mode": "japanese", "label": "ローマ字" },
     { "type": "showHandwriting", "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }, "recognitionDelayMilliseconds": 600, "recognitionTimeoutMilliseconds": 3000 },

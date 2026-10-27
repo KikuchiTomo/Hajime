@@ -233,7 +233,7 @@ struct KeymapScenarioTests {
         harness.press(.down)
         harness.press(.delete, .control)
         #expect(converter.forgotten.map(\.text) == ["假名"])
-        #expect(harness.lattice?.note == "学習から削除しました")
+        #expect(harness.lattice?.note?.text == "学習から削除しました")
         harness.press(.down)
         #expect(harness.lattice?.note == nil)
     }
@@ -247,7 +247,7 @@ struct KeymapScenarioTests {
         harness.press(.down)
         harness.press(.backspace, .control)
         #expect(converter.forgotten.map(\.text) == ["假名"])
-        #expect(harness.lattice?.note == "学習から削除しました")
+        #expect(harness.lattice?.note?.text == "学習から削除しました")
     }
 
     @Test("分岐図の文節が文全体の候補を切り出したもので，文節の候補に無いときは，文全体の候補のうちその文節の語だけを学習から消す")
@@ -272,7 +272,7 @@ struct KeymapScenarioTests {
         #expect(converter.forgotten.isEmpty)
         #expect(converter.forgottenRanges.map(\.text) == ["教派言い天気です"])
         #expect(converter.forgottenRanges.map(\.range) == [0..<6])
-        #expect(harness.lattice?.note == "学習から削除しました")
+        #expect(harness.lattice?.note?.text == "学習から削除しました")
     }
 
     @Test("R-17: 入力文字なしで最後の学習を取り消し，次のキーで案内を消す")
@@ -327,7 +327,7 @@ struct KeymapScenarioTests {
         let harness = Harness(lexicon: FakeLexicon(words: ["python"]), settings: keymap)
         harness.type("python")
         harness.press(.down)
-        #expect(harness.panel?.note == "⌃N 入力のままに戻す")
+        #expect(harness.panel?.note?.text == "修正　⌃N 入力のままに戻す")
     }
 
     @Test("R-17: 英字入力では，読みを組み立てていないとき表の入力中・入力文字なしの行を使わない")

@@ -23,7 +23,7 @@ public enum ClientAction: Sendable, Equatable {
     /// 手書きで文字を探す窓を出す(R-14)．選んだ文字は commit と同じく入力先に入れる
     case showHandwriting
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
-    case showNote(String)
+    case showNote(Note)
     /// 打ち間違いの訂正を求め終わるまで変換を待つ．入力コントローラは訂正を求めて渡し(provideCorrections)，
     /// resumeConversion で変換を続ける．訂正を求めない作りなら resumeConversion をすぐ呼ぶ
     case awaitCorrections
@@ -122,13 +122,13 @@ public struct CandidatePanel: Sendable, Equatable {
     public var position: Int
     public var total: Int
     /// 補正の直後など，足元に出す案内
-    public var note: String?
+    public var note: Note?
     /// 連想の一覧を出しているときの見出し(R-18)．ふつうの候補なら nil
     public var association: AssociationHeading?
     /// 選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
     public var associationHint: String?
 
-    public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: String?) {
+    public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: Note?) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -205,13 +205,13 @@ public struct LatticePanel: Sendable, Equatable {
     public var position: Int
     public var total: Int
     /// 説明の行に出す知らせ(打ち間違いを直したことなど)
-    public var note: String?
+    public var note: Note?
     /// 連想の一覧を出しているときの見出し(R-18)．注目している文節の下の枝が連想の語になる．ふつうの分岐図なら nil
     public var association: AssociationHeading?
     /// 注目している文節で選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
     public var associationHint: String?
 
-    public init(columns: [Column], position: Int = 1, total: Int = 0, note: String? = nil) {
+    public init(columns: [Column], position: Int = 1, total: Int = 0, note: Note? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -241,4 +241,51 @@ extension AssociationHeading: CustomStringConvertible, CustomDebugStringConverti
     // 元の語は入力内容なので，ログには位置だけを出す
     public var description: String { "AssociationHeading(group: \(group)/\(groupCount))" }
     public var debugDescription: String { description }
+}
+
+/// 候補の窓の足元や入力位置の下に出す案内．見た目を作り込めるよう，部品に分けて渡す
+/// (「修正」と打ったままの字と戻すキーを，色・取り消し線・キーの札で描き分ける)
+public struct Note: Sendable, Equatable {
+    public enum Tone: String, Sendable, Equatable {
+        /// 打ち間違いを直した
+        case correction
+        /// 直さずに「もしかして」と示す
+        case suggestion
+        /// ほかの知らせ(学習から削除した，など)
+        case info
+    }
+
+    public var tone: Tone
+    /// 主な語(「修正」「もしかして」「学習から削除しました」)
+    public var title: String
+    /// 対象の字．correction では直す前の字(取り消し線で見せる)，suggestion では直した字
+    public var subject: String?
+    /// キーの名前と，そのキーでできること(「Esc」「戻す」)．キーが割り当てられていなければ nil
+    public var key: String?
+    public var keyAction: String?
+
+    public init(tone: Tone, title: String, subject: String? = nil, key: String? = nil, keyAction: String? = nil) {
+        self.tone = tone
+        self.title = title
+        self.subject = subject
+        self.key = key
+        self.keyAction = keyAction
+    }
+
+    /// ほかの知らせ
+    public static func info(_ text: String) -> Note { Note(tone: .info, title: text) }
+
+    /// 1 行の文として読んだもの(読み上げ，部品を描き分けない画面)
+    public var text: String {
+        var parts = [title]
+        if let subject { parts.append("「\(subject)」") }
+        var line = parts.joined()
+        if let key, let keyAction { line += "　\(key) \(keyAction)" }
+        return line
+    }
+}
+
+extension CandidatePanel {
+    /// 打ち間違いを直した候補の添え書き．描く側で補正の色の札にする
+    public static let correctedAnnotation = "修正"
 }
