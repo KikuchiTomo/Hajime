@@ -54,7 +54,7 @@ git tag macos/v0.1.1 origin/main
 git push origin macos/v0.1.1
 ```
 
-`Release` は，タグのバージョンがリポジトリに書いたバージョン(`tools/release/version.sh`)と同じかを確かめてから，その OS の配布物を作ります．Releases には配布物と，その SHA-256 の一覧(`SHA256SUMS.txt`)を置きます．タイトルは `v0.1.1-macos`・`v0.1.1-windows` のように，バージョンと OS を並べます．説明は `tools/release/notes/<OS>.md` に，同じ OS の前のタグからの変更の一覧を足したものです．1.0.0 より前のバージョンは試用のバージョン(pre-release)として置きます．
+`Release` は，タグのバージョンがリポジトリに書いたバージョン(`tools/release/version.sh`)と同じかを確かめてから，その OS の配布物を作ります．Releases には配布物と，その SHA-256 の一覧(`SHA256SUMS.txt`)を置きます．タイトルは `v0.1.1-macos`・`v0.1.1-windows` のように，バージョンと OS を並べます．説明は，同じ OS の前のタグからのコミットの作者(ボットを除く)をメンションしたコントリビューターの一覧だけです．1.0.0 より前のバージョンは試用のバージョン(pre-release)として置きます．
 
 タグを付けたあとで作り直すときは，`gh workflow run release.yml -f tag=macos/v0.1.1` で動かします(同じタグの Release があれば失敗するので，先に消します)．
 
