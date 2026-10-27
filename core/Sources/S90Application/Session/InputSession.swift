@@ -74,6 +74,8 @@ public final class InputSession {
 
     /// 使い方の記録(回数だけ)．記録しないときは nil
     private let usage: (any UsageRecording)?
+    /// 戻した補正を覚えるところ．無ければ覚えない
+    private let rejections: (any CorrectionRejectionRecording)?
     /// 連想変換の語を引く(R-18)
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
@@ -84,8 +86,10 @@ public final class InputSession {
     ///   - associations: 取り込んだ連想の辞書を引くもの(R-18)．nil なら連想変換のキーはふつうの変換と同じに動く
     ///   - keyNames: 候補ウィンドウの案内と注記に出すキーの名前の書き方(入力メソッドを動かす OS に合わせる)
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
-                typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac) {
+                typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
+                rejections: (any CorrectionRejectionRecording)? = nil) {
         self.keyNames = keyNames
+        self.rejections = rejections
         self.converter = converter
         self.lexicon = lexicon
         self.settings = settings
@@ -889,9 +893,13 @@ public final class InputSession {
         }
         phase = .composing
         if readingCorrector.revert(&composition) {
-            // 打ち間違いを直していたら，打ったままの読みに戻す
+            // 打ち間違いを直していたら，打ったままの読みに戻す．わざとそう打った語句なので覚え，次から直さない
             usage?.record(.readingCorrectionUndone)
-            return KeyResult(handled: true, actions: render(context: context))
+            var actions = render(context: context)
+            if let phrase = readingCorrector.rejectedPhrase, rejections?.recordRejected(phrase: phrase) == true {
+                actions.append(.showNote(PanelBuilder.correctionRememberedNote(phrase)))
+            }
+            return KeyResult(handled: true, actions: actions)
         }
         if wasConverting || readingCorrector.dismissSuggestion(for: composition) {
             return KeyResult(handled: true, actions: render(context: context))
