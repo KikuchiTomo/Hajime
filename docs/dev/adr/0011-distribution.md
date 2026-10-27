@@ -49,7 +49,7 @@ description: macOS と Windows の配布物をどこで配るか．ストアで�
 
 ## 結果
 
-- 署名をしていないあいだは，macOS では「このまま開く」，Windows では SmartScreen の「詳細情報」から「実行」が要る．Releases の説明に書く(`tools/release/notes/`)
+- 署名をしていないあいだは，macOS では「このまま開く」，Windows では SmartScreen の「詳細情報」から「実行」が要る．入れ方は docs/user の入れ方の文書に書く
 - macOS と Windows で同じバージョンの機能をそろえる決まりは ADR 0008 のまま
 - App Store の判断は，Apple が入力メソッドの扱いを変えたら見直す
 
