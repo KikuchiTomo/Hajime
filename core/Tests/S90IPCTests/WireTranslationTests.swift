@@ -49,7 +49,7 @@ struct WireTranslationTests {
         ], anchor: anchor)
         #expect(routed.edits == [
             .commit(text: "確定"),
-            .setComposition(segments: [WireTextSegment(text: "にほん", style: .reading), WireTextSegment(text: "語", style: .focused)]),
+            .setComposition(segments: [WireTextSegment(text: "にほん", style: .reading), WireTextSegment(text: "語", style: .focused)], caret: nil),
             .selectMode(mode: .direct),
         ])
         #expect(routed.ui == [

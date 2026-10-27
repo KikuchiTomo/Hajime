@@ -64,6 +64,8 @@ struct KeymapScenarioTests {
         #expect(harness.marked.text == "今日は")
         harness.type("kana")
         #expect(harness.marked.text == "今日はかな")
+        // 入力位置は，打ち直している文節の終わり
+        #expect(harness.marked.caret == 5)
         #expect(harness.lattice != nil)
         harness.press(.tab)
         #expect(harness.marked.text == "今日は仮名")

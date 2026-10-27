@@ -81,7 +81,7 @@ struct EngineServiceCorrectionTests {
     private static func composition(_ body: WireResponseBody) -> String? {
         guard case .edit(_, let operations, _) = body else { return nil }
         return operations.compactMap { operation -> String? in
-            if case .setComposition(let segments) = operation { return segments.map(\.text).joined() }
+            if case .setComposition(let segments, _) = operation { return segments.map(\.text).joined() }
             return nil
         }.last
     }

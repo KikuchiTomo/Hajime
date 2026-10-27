@@ -462,11 +462,11 @@ impl TextService_Impl {
                         EditOperation::Commit { text } => {
                             commit(ec, &target, &mut composition, &text)
                         }
-                        EditOperation::SetComposition { segments } => show(
+                        EditOperation::SetComposition { segments, caret } => show(
                             ec,
                             &target,
                             &mut composition,
-                            &CompositionPlan::new(&segments),
+                            &CompositionPlan::new(&segments).with_caret(caret),
                             &atoms,
                             &sink,
                         ),
@@ -1025,7 +1025,16 @@ fn show(
             property.SetValue(ec, &part, &variant_i32(*atom as i32))?;
         }
         let caret: ITfRange = range.Clone()?;
-        caret.Collapse(ec, TF_ANCHOR_END)?;
+        match plan.caret {
+            // 文節をその場で打ち直しているときは，打ち直している文節の終わりに入力位置を置く
+            Some(offset) => {
+                caret.Collapse(ec, TF_ANCHOR_START)?;
+                let mut moved = 0;
+                caret.ShiftEnd(ec, offset, &mut moved, std::ptr::null())?;
+                caret.Collapse(ec, TF_ANCHOR_END)?;
+            }
+            None => caret.Collapse(ec, TF_ANCHOR_END)?,
+        }
         set_selection(ec, context, &caret)?;
     }
     Ok(())

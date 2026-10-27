@@ -1483,7 +1483,8 @@ public final class InputSession {
         var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                               showsVariants: settings.current.showsVariantRow, corrected: nil)
         panel.note = PanelBuilder.inlineEditNote(replacing: lattice.segments[edit.index].selected.text, key: keyLabel(.nextSegment, in: .converting))
-        return [.setMarkedText(MarkedText(segments)), .showLattice(panel)]
+        let caret = lattice.segments.prefix(edit.index).reduce(0) { $0 + $1.selected.text.count } + edit.typed.displayReading.count
+        return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 
     // MARK: - 連想変換(R-18)

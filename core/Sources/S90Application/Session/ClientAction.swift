@@ -68,10 +68,16 @@ public struct MarkedText: Sendable, Equatable {
     }
 
     public var segments: [Segment]
+    /// 入力位置(先頭からの文字数)．nil なら末尾．文節をその場で打ち直しているときは，打ち直している文節の終わりに置く
+    public var caret: Int?
 
-    public init(_ segments: [Segment]) {
+    public init(_ segments: [Segment], caret: Int? = nil) {
         self.segments = segments.filter { !$0.text.isEmpty }
+        self.caret = caret
     }
+
+    /// 入力位置の前の文字列
+    public var textBeforeCaret: String { caret.map { String(text.prefix($0)) } ?? text }
 
     public static let empty = MarkedText([])
 
