@@ -810,6 +810,14 @@ struct SymbolScenarioTests {
         #expect(converter.candidates(for: "ことし").map(\.text).contains("令和8年"))
     }
 
+    @Test("「なう」は，第 1 候補を変えずに，今の日時を添えた形を候補に足す")
+    func nowStampCandidate() {
+        let converter = SupplementedConverter(FakeConverter(["なう": [("なう", nil), ("ナウ", nil)]]), settings: FakeSettings(), calendar: FakeCalendar())
+        let texts = converter.candidates(for: "なう").map(\.text)
+        #expect(texts.first == "なう")
+        #expect(texts.contains("なう (2026/10/26 14:05)"))
+    }
+
     @Test("ユーザー辞書の語は読みが一致すれば先頭に置く")
     func userDictionary() {
         var settings = Settings()

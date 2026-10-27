@@ -26,6 +26,8 @@ public enum DateExpressions {
     ]
     private static let yearOffsets: [String: Int] = ["きょねん": -1, "ことし": 0, "らいねん": 1]
     private static let nowReadings: Set<String> = ["いま", "げんざい"]
+    /// 「なう」は，今していることに添える日時の形(「なう (2026/10/28 01:08)」)にする
+    private static let nowStampReading = "なう"
     private static let weekdayNames = ["日", "月", "火", "水", "木", "金", "土"]
     /// 令和元年の前の年．令和 n 年は西暦 n + 2018 年
     private static let reiwaOffset = 2018
@@ -47,6 +49,10 @@ public enum DateExpressions {
         if let offset = yearOffsets[reading] {
             let year = now.year + offset
             return ["\(year)年", "令和\(year - reiwaOffset)年"]
+        }
+        if reading == nowStampReading {
+            let stamp = "\(now.year)/\(pad(now.month))/\(pad(now.day)) \(pad(now.hour)):\(pad(now.minute))"
+            return ["\(reading) (\(stamp))", stamp]
         }
         if nowReadings.contains(reading) {
             let half = now.hour < 12 ? "午前" : "午後"

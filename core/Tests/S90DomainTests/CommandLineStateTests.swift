@@ -71,6 +71,12 @@ struct DateExpressionsTests {
         #expect(DateExpressions.candidates(for: "いま", now: now, day: day) == ["0:03", "0時3分", "午前0時3分"])
     }
 
+    @Test("「なう」は，今の日時を添えた形(なう (年/月/日 時:分))と日時だけを出す")
+    func nowStamp() {
+        let now = CalendarDate(year: 2026, month: 10, day: 28, weekday: 4, hour: 1, minute: 8)
+        #expect(DateExpressions.candidates(for: "なう", now: now, day: day) == ["なう (2026/10/28 01:08)", "2026/10/28 01:08"])
+    }
+
     @Test("日付の読みでなければ何も出さない")
     func other() {
         #expect(DateExpressions.candidates(for: "あめ", now: CalendarDate(year: 2026, month: 1, day: 1, weekday: 5), day: day).isEmpty)
