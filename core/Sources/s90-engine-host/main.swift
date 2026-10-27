@@ -6,6 +6,9 @@ import S90Domain
 import S90Engine
 import S90IPC
 import S90Persistence
+#if os(Windows)
+import WinSDK
+#endif
 
 /// 変換のエンジンのプロセス．Windows は名前付きパイプ，Linux は Unix ドメインソケットで枠組みの口とつなぐ(ADR 0003・0012)．
 /// macOS では入力メソッドが core を直接使うので，ここは Linux の口を macOS で試すときだけ使う
@@ -90,6 +93,19 @@ final class SettingsWatcher {
     }
 }
 
+#if os(Windows)
+/// 変換は打鍵ごとに CPU を使い，Zenzai は何本ものスレッドで推論してそろうのを待つ．窓の無いプロセスは Windows に
+/// 省電力(EcoQoS)の扱いを受けやすく，速さの違うコアを混ぜた CPU では遅いコアに回されて 1 キーが延びる．
+/// 省電力の扱いから外し，速さを優先してもらう
+func requestFullExecutionSpeed() {
+    var state = PROCESS_POWER_THROTTLING_STATE()
+    state.Version = ULONG(PROCESS_POWER_THROTTLING_CURRENT_VERSION)
+    state.ControlMask = ULONG(PROCESS_POWER_THROTTLING_EXECUTION_SPEED)
+    state.StateMask = 0
+    _ = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &state, DWORD(MemoryLayout<PROCESS_POWER_THROTTLING_STATE>.size))
+}
+#endif
+
 @MainActor
 func run() -> Int32 {
     #if os(Windows)
@@ -104,6 +120,7 @@ func run() -> Int32 {
         FileHandle.standardError.write(Data("名前付きパイプを作れません: \(error)\n".utf8))
         return 1
     }
+    requestFullExecutionSpeed()
     #else
     let engineListener: UnixSocketListener
     let windowListener: UnixSocketListener
