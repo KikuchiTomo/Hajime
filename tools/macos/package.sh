@@ -90,7 +90,21 @@ sign_app() {
 }
 if [ -n "$app_identity" ] && [ "$app_identity" != "-" ]; then
   case "$app_identity_name" in
-    "Developer ID Application"*) timestamp="--timestamp" ;;
+    "Developer ID Application"*)
+      timestamp="--timestamp"
+      # ほかの人に配るアプリには，デバッグのための権限(Xcode が開発用のビルドに足す get-task-allow)を付けない．
+      # 付いていると公証で受け付けられない
+      cp "$entitlements" "$work/entitlements.plist"
+      entitlements="$work/entitlements.plist"
+      # 権限の名前の「.」を入れ子の区切りと読まれないよう，「\.」と書く
+      if plutil -extract 'com\.apple\.security\.get-task-allow' raw "$entitlements" >/dev/null 2>&1; then
+        plutil -remove 'com\.apple\.security\.get-task-allow' "$entitlements"
+      fi
+      if plutil -extract 'com\.apple\.security\.get-task-allow' raw "$entitlements" >/dev/null 2>&1; then
+        echo "デバッグのための権限(get-task-allow)を外せませんでした" >&2
+        exit 1
+      fi
+      ;;
     *) timestamp="--timestamp=none" ;;
   esac
   sign_app --options runtime "$timestamp" --sign "$app_identity"
