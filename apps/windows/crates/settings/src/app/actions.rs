@@ -234,6 +234,10 @@ impl App {
             if crate::themes::is_theme_path(path) {
                 return self.edit_theme(path, value);
             }
+            // テーマを選び直したら，編集していたカスタムテーマを外す(外さないと見本がカスタムテーマのまま変わらない)
+            if *path == crate::themes::BASE_THEME {
+                self.editing_theme = None;
+            }
         }
         match event {
             Event::ThemeList {

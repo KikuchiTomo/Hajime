@@ -721,12 +721,14 @@ impl App {
             .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
         let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
         let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        // カスタムテーマはすべての項目(元のテーマ・色・書体・角の丸み)で見分ける．一部だけで見分けると，
+        // ほかの項目を変えても見本を作り直さず，変えたことがすぐ映らない
         let key = format!(
             "{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
             shown
                 .as_ref()
-                .map_or_else(String::new, |theme| format!("{theme:?}").len().to_string()
-                    + &format!("{:?}", theme.surface)),
+                .and_then(|theme| serde_json::to_string(theme).ok())
+                .unwrap_or_default(),
             self.theme.dark,
             self.theme.dpi,
         );
