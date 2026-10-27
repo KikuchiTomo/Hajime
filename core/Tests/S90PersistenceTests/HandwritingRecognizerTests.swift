@@ -8,11 +8,14 @@ import Testing
 
 @Suite("手書きの認識(R-14)")
 struct HandwritingRecognizerTests {
+    /// CI の仮想マシンでは最初の認識に数秒かかるので，アプリの上限より長く待つ
+    static let timeout = 60.0
+
     /// 既知の文字を書体で描いた画像を Vision に渡し，その文字が候補に入ることを確かめる
     @Test("書いた文字を候補に出す")
     func recognizeKnownCharacters() async {
         let image = Self.image(of: "東京", size: 96)
-        let texts = await VisionHandwritingRecognizer.recognize(image: image)
+        let texts = await VisionHandwritingRecognizer.recognize(image: image, timeout: Self.timeout)
         #expect(texts.contains { $0.contains("東京") })
     }
 
@@ -20,7 +23,7 @@ struct HandwritingRecognizerTests {
     @Test("大きく 1 字だけ書いた線を読む", arguments: ["木", "田", "し"])
     func recognizeHandwrittenCharacter(expected: String) async throws {
         let strokes = try #require(Self.handwritten[expected])
-        let texts = await VisionHandwritingRecognizer().recognize(strokes: strokes, canvasSize: Size(width: 360, height: 260))
+        let texts = await VisionHandwritingRecognizer(timeout: Self.timeout).recognize(strokes: strokes, canvasSize: Size(width: 360, height: 260))
         #expect(texts.contains(expected))
     }
 

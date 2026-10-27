@@ -21,7 +21,12 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
         "+": ["十"], "Y": ["人"], "-": ["一"], "ー": ["一"], "11": ["い"], "<": ["く"], ">": ["く"], "■": ["口"], "□": ["口"],
     ]
 
-    public init() {}
+    /// 1 枚の画像の認識を待つ時間の上限(秒)
+    let timeout: Double
+
+    public init(timeout: Double = DefaultSettings.handwritingRecognitionTimeout) {
+        self.timeout = timeout
+    }
 
     public func recognize(strokes: [[Point]], canvasSize: Size) async -> [String] {
         let strokes = strokes.filter { !$0.isEmpty }
@@ -33,7 +38,7 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
             }
         }
         var readings: [[String]] = []
-        for image in images { readings.append(await Self.recognize(image: image)) }
+        for image in images { readings.append(await Self.recognize(image: image, timeout: timeout)) }
         return Self.rank(readings)
     }
 
@@ -112,7 +117,7 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
 
     /// 画像の文字を読む．よさそうな順に，重ねずに返す．
     /// 認識は専用のキューで動かし，DefaultSettings.handwritingRecognitionTimeout を過ぎたら候補なしで返す(入力を止めない)
-    static func recognize(image: CGImage, timeout: Double = DefaultSettings.handwritingRecognitionTimeout) async -> [String] {
+    static func recognize(image: CGImage, timeout: Double) async -> [String] {
         let image = SendableImage(image)
         return await withCheckedContinuation { continuation in
             let once = ResumeOnce(continuation)
