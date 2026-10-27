@@ -64,19 +64,25 @@ struct LatencyProbeTests {
         _ = session.handle(KeyEvent(.escape), context: InputContext())
         let keys = Array("kinouhatomodatitoeigawominiittekaerinikissatendekohiwonondekaraiedeyuuhanwotabemasita")
         let clock = ContinuousClock()
-        var durations: [Duration] = []
-        for key in keys {
-            durations.append(clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) })
+        // ほかのプロセスに CPU を取られた回があっても正しく測れるよう，同じ文を何回か打ち，項目ごとにいちばん速かった回で判定する(perKey と同じ)
+        var chunks: [Duration] = []
+        var space = Duration.seconds(Int64.max), right = Duration.seconds(Int64.max), resize = Duration.seconds(Int64.max)
+        for _ in 0..<Self.passes {
+            var durations: [Duration] = []
+            for key in keys {
+                durations.append(clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) })
+            }
+            space = min(space, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
+            // 変換中の文節の移動と，文節の長さを変える操作(区切り直しと下見)
+            right = min(right, clock.measure { _ = session.handle(KeyEvent(.right), context: InputContext()) })
+            resize = min(resize, clock.measure { _ = session.handle(KeyEvent(.right, modifiers: [.shift]), context: InputContext()) })
+            _ = session.handle(KeyEvent(.enter), context: InputContext())
+            let passChunks = stride(from: 0, to: durations.count, by: 10).map { start in
+                durations[start..<min(start + 10, durations.count)].max()!
+            }
+            chunks = chunks.isEmpty ? passChunks : zip(chunks, passChunks).map { min($0, $1) }
         }
-        let space = clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) }
-        // 変換中の文節の移動と，文節の長さを変える操作(区切り直しと下見)
-        let right = clock.measure { _ = session.handle(KeyEvent(.right), context: InputContext()) }
-        let resize = clock.measure { _ = session.handle(KeyEvent(.right, modifiers: [.shift]), context: InputContext()) }
-        _ = session.handle(KeyEvent(.enter), context: InputContext())
-        let chunks = stride(from: 0, to: durations.count, by: 10).map { start in
-            durations[start..<min(start + 10, durations.count)].max()!
-        }
-        print("S90_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) max_per_10keys=\(chunks) space=\(space) right=\(right) resize=\(resize)\(Self.loadAverage)")
+        print("S90_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) passes=\(Self.passes) max_per_10keys=\(chunks) space=\(space) right=\(right) resize=\(resize)\(Self.loadAverage)")
         // 文が長くなっても 1 キーは 50ms 以内(R-01)．Space で分岐図を出すまでは，待たされたと感じない 0.1 秒を目安に，
         // ほかのプロセスの負荷で延びる分を見込んで 0.15 秒以内．文節ごとにライブ変換の状態を捨てて変換し直していたときは 0.58 秒だった
         #expect(chunks.allSatisfy { $0 < .milliseconds(50) }, "長い文で 1 キーが 50ms を超えた: \(chunks)")
