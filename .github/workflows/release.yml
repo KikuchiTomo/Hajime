@@ -1,8 +1,8 @@
 name: Release
 
 # タグ macos/vX.Y.Z か windows/vX.Y.Z を push すると，その OS の配布物を作り，GitHub の Releases に置く(docs/dev/RELEASE.md)．
-# タグは tools/release/bump_patch.sh でバージョンを上げてマージしたあとに付ける．手で動かすときはタグを指定する:
-#   gh workflow run release.yml -f tag=macos/v0.0.2
+# タグは tools/release/bump_version.sh でバージョンを上げてマージしたあとに付ける．手で動かすときはタグを指定する:
+#   gh workflow run release.yml -f tag=macos/v0.1.1
 # 配布物には署名しない．署名の設定は利用者が行う(ここでは秘密の値を使わない)
 on:
   push:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 配布するタグ(macos/v0.0.2 など)
+        description: 配布するタグ(macos/v0.1.1 など)
         required: true
         type: string
 

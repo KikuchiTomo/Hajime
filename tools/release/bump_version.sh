@@ -1,14 +1,20 @@
 #!/bin/sh
-# バージョンの PATCH とビルド番号を 1 つずつ上げる(docs/dev/adr/0008-versioning.md)．
-# 使い方: tools/release/bump_patch.sh macos|windows
+# バージョンの PATCH か MINOR と，ビルド番号を 1 つ上げる(docs/dev/adr/0008-versioning.md)．
+# MINOR を上げるときは PATCH を 0 に戻す．macOS 版と Windows 版の MINOR はそろえる(同じ MINOR なら同じ機能)
+# 使い方: tools/release/bump_version.sh macos|windows [patch|minor]
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 platform=${1:-}
+level=${2:-patch}
+case "$level" in
+  patch|minor) ;;
+  *) echo "使い方: $0 macos|windows [patch|minor]" >&2; exit 2 ;;
+esac
 
 bump() {
   major=${version%%.*}; rest=${version#*.}; minor=${rest%%.*}; patch=${rest#*.}
   case "$major$minor$patch$build" in *[!0-9]*|"") echo "バージョンの書き方が読めません: $version ($build)" >&2; exit 1 ;; esac
-  next="$major.$minor.$((patch + 1))"
+  if [ "$level" = minor ]; then next="$major.$((minor + 1)).0"; else next="$major.$minor.$((patch + 1))"; fi
   next_build=$((build + 1))
 }
 
@@ -32,6 +38,6 @@ case "$platform" in
       sed -i '' "/^name = \"$crate\"$/{n;s/^version = \"$version\"/version = \"$next\"/;}" "$lock"
     done
     ;;
-  *) echo "使い方: $0 macos|windows" >&2; exit 2 ;;
+  *) echo "使い方: $0 macos|windows [patch|minor]" >&2; exit 2 ;;
 esac
 echo "$platform: v$version → v$next (ビルド $next_build)．タグは $platform/v$next"

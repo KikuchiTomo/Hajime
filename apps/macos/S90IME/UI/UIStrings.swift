@@ -704,7 +704,7 @@ enum UIStrings {
         // 情報
         static let about = "情報"
         static let version = "バージョン"
-        /// バージョンの表示(ADR 0008．Windows と同じ「v0.0.2 (macOS)」の形)
+        /// バージョンの表示(ADR 0008．Windows と同じ「v0.1.0 (macOS)」の形)
         static func versionValue(_ version: String) -> String { "v\(version) (macOS)" }
         static let acknowledgements = "謝辞"
         static let acknowledgementsNote = "s90.tokyo IME は上記のソフトウェア・モデル・データを利用しています。"

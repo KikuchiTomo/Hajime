@@ -6,7 +6,7 @@ macOS の配布物は `.pkg` です．Zenzai のモデルを入れた本番の�
 make package-macos
 ```
 
-`apps/macos/build/dist/s90.tokyo-IME-<バージョン>.pkg` ができます．バージョンは `apps/macos/project.yml` の `MARKETING_VERSION` です．配るたびに `tools/release/bump_patch.sh macos` で PATCH を上げ，`macos/v0.0.2` のようにタグを付けます．番号の決まりは [ADR 0008](adr/0008-versioning.md) にあります．
+`apps/macos/build/dist/s90.tokyo-IME-<バージョン>.pkg` ができます．バージョンは `apps/macos/project.yml` の `MARKETING_VERSION` です．配るたびに `tools/release/bump_version.sh macos` で PATCH を上げ(MINOR を上げるときは `tools/release/bump_version.sh macos minor`)，`macos/v0.1.1` のようにタグを付けます．番号の決まりは [ADR 0008](adr/0008-versioning.md) にあります．
 
 ## 署名と公証
 
@@ -46,17 +46,17 @@ macOS はアプリのデータの置き場所(`~/Library/Containers/<バンド�
 
 配布物は GitHub Actions の `Release`(`.github/workflows/release.yml`)が作って Releases に置きます．どの経路で配るかは [ADR 0011](adr/0011-distribution.md) にあります．
 
-1. `tools/release/bump_patch.sh macos`(Windows は `windows`)でバージョンを上げ，PR にしてマージします
+1. `tools/release/bump_version.sh macos`(Windows は `windows`．MINOR を上げるときは後ろに `minor`)でバージョンを上げ，PR にしてマージします
 2. main のマージしたコミットにタグを付けて push します
 
 ```sh
-git tag macos/v0.0.2 origin/main
-git push origin macos/v0.0.2
+git tag macos/v0.1.1 origin/main
+git push origin macos/v0.1.1
 ```
 
 `Release` は，タグのバージョンがリポジトリに書いたバージョン(`tools/release/version.sh`)と同じかを確かめてから，その OS の配布物を作ります．Releases には配布物と，その SHA-256 の一覧(`SHA256SUMS.txt`)を置きます．説明は `tools/release/notes/<OS>.md` に，同じ OS の前のタグからの変更の一覧を足したものです．1.0.0 より前のバージョンは試用のバージョン(pre-release)として置きます．
 
-タグを付けたあとで作り直すときは，`gh workflow run release.yml -f tag=macos/v0.0.2` で動かします(同じタグの Release があれば失敗するので，先に消します)．
+タグを付けたあとで作り直すときは，`gh workflow run release.yml -f tag=macos/v0.1.1` で動かします(同じタグの Release があれば失敗するので，先に消します)．
 
 今は署名しません．macOS の .pkg はアドホック署名で公証もしていないので，開くときに「このまま開く」が要ります．Windows の .msi も署名していないので SmartScreen の警告が出ます．署名に使う証明書と公証の資格情報は GitHub の Secrets に置く必要があり，利用者が設定します．
 
