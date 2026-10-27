@@ -82,14 +82,15 @@ struct LatticeBuilder {
     /// 押す前に結果が分かれば，文節の長さを試しに変えて戻す手間が要らない
     /// 分岐図を出すたびに求めるので，長さを変えた文節だけを作る(後ろの文節は作り直さない．resize と同じ 1 段目になる)
     func resizePreview(_ lattice: SegmentLattice, reading: String) -> (shorter: String?, longer: String?) {
+        (resizedText(lattice, reading: reading, longer: false), resizedText(lattice, reading: reading, longer: true))
+    }
+
+    /// 注目している文節を 1 文字短く(longer が false)・長くしたときの文節の字．そうできなければ nil
+    func resizedText(_ lattice: SegmentLattice, reading: String, longer: Bool) -> String? {
         let segment = lattice.focused
-        let rest = String(reading.dropFirst(segment.readingStart))
-        func text(length: Int) -> String {
-            makeSegment(start: segment.readingStart, length: length, rest: rest, preferred: nil).selected.text
-        }
-        let shorter = segment.readingLength > 1 ? text(length: segment.readingLength - 1) : nil
-        let longer = segment.readingStart + segment.readingLength < reading.count ? text(length: segment.readingLength + 1) : nil
-        return (shorter, longer)
+        let length = segment.readingLength + (longer ? 1 : -1)
+        guard length >= 1, segment.readingStart + length <= reading.count else { return nil }
+        return makeSegment(start: segment.readingStart, length: length, rest: String(reading.dropFirst(segment.readingStart)), preferred: nil).selected.text
     }
 
     /// 注目している文節の終わりを，前(grow が false)か次(true)の語の切れ目に動かす．
