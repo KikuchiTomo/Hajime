@@ -9,6 +9,7 @@ use windows::Win32::Graphics::Gdi::{
     SetTextColor, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, HBRUSH, HDC, HGDIOBJ,
     PAINTSTRUCT, TRANSPARENT,
 };
+use windows::Win32::UI::Input::Ime::{ImmAssociateContextEx, HIMC, IACE_CHILDREN, IACE_DEFAULT};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, MapVirtualKeyW, MAPVK_VK_TO_CHAR, VK_CONTROL, VK_ESCAPE, VK_MENU, VK_RETURN,
     VK_SHIFT, VK_TAB,
@@ -96,9 +97,18 @@ pub fn record_key(window: HWND, prompt: &str) {
     with_data(window, |data| {
         data.recording = Some(prompt.encode_utf16().collect());
     });
+    // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
+    set_ime(window, false);
     super::win32::set_text(window, "");
     super::win32::focus(window);
     super::win32::invalidate(window);
+}
+
+/// 欄で IME を使うか(記録しているあいだだけ使わない)
+fn set_ime(window: HWND, enabled: bool) {
+    let flags = if enabled { IACE_DEFAULT } else { IACE_CHILDREN };
+    // SAFETY: このスレッドの窓．使わないときは入力のコンテキストを外し，使うときは既定のものに戻す
+    let _ = unsafe { ImmAssociateContextEx(window, HIMC::default(), flags) };
 }
 
 fn with_data(window: HWND, f: impl FnOnce(&mut FieldData)) {
@@ -193,6 +203,7 @@ fn handle(
     match message {
         WM_KEYDOWN | WM_SYSKEYDOWN if field.recording.is_some() => {
             let vk = (wparam.0 & 0xffff) as u16;
+            let scan = ((lparam.0 >> 16) & 0xff) as u16;
             // 修飾キーを除いたそのキーの文字(記号のキーの文字を書くため)
             // SAFETY: キーの番号を渡して文字を引くだけ
             let character =
@@ -200,12 +211,14 @@ fn handle(
                     .filter(|character| *character != '\0');
             if let Some(notation) = crate::keys::from_key(
                 vk,
+                scan,
                 character,
                 pressed(VK_CONTROL.0),
                 pressed(VK_MENU.0),
                 pressed(VK_SHIFT.0),
             ) {
                 field.recording = None;
+                set_ime(window, true);
                 super::win32::set_text(window, &crate::keys::display(&notation));
                 notify_parent(window, WM_FIELD_RECORDED, 0);
             }
@@ -225,8 +238,8 @@ fn handle(
         WM_CHAR if matches!(wparam.0, 0x09 | 0x0D | 0x1B) => Some(LRESULT(0)),
         WM_KEYDOWN if wparam.0 == usize::from(VK_ESCAPE.0) => Some(LRESULT(0)),
         WM_SETFOCUS | WM_KILLFOCUS => {
-            if message == WM_KILLFOCUS {
-                field.recording = None;
+            if message == WM_KILLFOCUS && field.recording.take().is_some() {
+                set_ime(window, true);
             }
             notify_parent(window, WM_FIELD_FOCUS, usize::from(message == WM_SETFOCUS));
             None
