@@ -1420,6 +1420,21 @@ struct LiveConversionTimingTests {
         actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } }.last
     }
 
+    @Test("打鍵が止まる前の表示だけを入力中として変換器に伝え，止まったときと Space では伝えない")
+    func tellsTyping() {
+        let (session, converter) = session()
+        for key in "kyouharai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        #expect(converter.requests.contains { $0.reading == "きょうはらい" && $0.typing })
+        #expect(!converter.typing)
+        let typed = converter.requests.count
+        _ = session.settle(context: InputContext())
+        #expect(converter.requests.dropFirst(typed).allSatisfy { !$0.typing })
+        let settled = converter.requests.count
+        _ = session.handle(KeyEvent(.space), context: InputContext())
+        #expect(converter.requests.dropFirst(settled).allSatisfy { !$0.typing })
+        #expect(!converter.typing)
+    }
+
     @Test("打っている途中の短い語はかなのまま見せ，打鍵が止まったら変換して見せる")
     func holdsShortWord() {
         let (session, _) = session()

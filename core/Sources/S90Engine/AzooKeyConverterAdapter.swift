@@ -20,6 +20,8 @@ public final class AzooKeyConverterEngine {
     private var userDictionary: [UserDictionaryEntry] = []
     /// 取り込んだ辞書から引いた語(R-16)．ユーザー辞書と合わせて動的な辞書としてエンジンに渡す
     private var auxiliaryWords: [AuxiliaryWord] = []
+    /// Zenzai を使った変換にかかった時間の移動平均(秒)．まだ測っていなければ nil
+    private var zenzaiCost: Double?
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
@@ -39,14 +41,37 @@ public final class AzooKeyConverterEngine {
 
     public func makeSession() -> any KanaKanjiConverting {
         // 読みのもっともらしさを測る変換は，表示する変換と状態を混ぜないよう別のセッションで行う
-        AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession())
+        AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
+                                typingSessionID: converter.createSession(), restSessionID: converter.createSession())
     }
 
     /// 最初の変換で Zenzai のモデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
+    /// 入力中の表示で Zenzai を使わないか．Zenzai の変換が 1 キーの時間に収まらない環境(GPU の無い Windows など)だけ true
+    var skipsZenzaiWhileTyping: Bool {
+        Self.exceedsTypingBudget(zenzaiCost)
+    }
+
+    /// Zenzai を使った変換の時間を覚える(打鍵が止まったときや Space の変換も測り，速い環境に戻ったら入力中にも使う)
+    func recordZenzaiCost(_ duration: Duration) {
+        zenzaiCost = Self.smoothedCost(zenzaiCost, adding: duration)
+    }
+
+    nonisolated static func smoothedCost(_ current: Double?, adding duration: Duration) -> Double {
+        let seconds = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+        guard let current else { return seconds }
+        return current + (seconds - current) * DefaultSettings.zenzaiCostSmoothing
+    }
+
+    nonisolated static func exceedsTypingBudget(_ cost: Double?) -> Bool {
+        (cost ?? 0) > DefaultSettings.zenzaiTypingBudget
+    }
+
     public func warmUp() {
         let session = makeSession()
         _ = session.candidates(for: Self.warmUpReading)
         session.endComposition()
+        // 最初の変換はモデルの準備の時間を含むので，Zenzai の時間として数えない
+        zenzaiCost = nil
     }
 
     private static let warmUpReading = "きょうはいいてんきです"
@@ -168,6 +193,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private let engine: AzooKeyConverterEngine
     private let sessionID: KanaKanjiConverter.ConversionSessionID
     private let scoringSessionID: KanaKanjiConverter.ConversionSessionID
+    /// Zenzai が遅い環境で，打鍵が止まる前の表示を Zenzai なしで求めるセッション．azooKey は前の読みからの差分で変換するので，
+    /// Zenzai を使う変換(止まったとき・Space)と同じセッションで交互に求めると，差分が使えず毎回一から変換して遅くなる
+    private let typingSessionID: KanaKanjiConverter.ConversionSessionID
+    /// 打っている文の続きでない読み(分岐図の文節より後ろの残りの読み・Backspace で戻った読み)を Zenzai で求めるセッション．
+    /// 同じセッションで求めると，打っている文の差分の変換の状態が捨てられ，次の打鍵で文を一から変換し直して遅くなる
+    private let restSessionID: KanaKanjiConverter.ConversionSessionID
     private var plausibilityCache: [String: Double] = [:]
     private var predictionCache: [String: [S90Domain.Candidate]] = [:]
     private var dictionaryCache: [String: [S90Domain.Candidate]] = [:]
@@ -177,8 +208,16 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
     private var cache: [String: Result] = [:]
+    /// 打鍵が止まる前の表示を求めているか(setTyping)．Zenzai が遅い環境では，そのあいだ Zenzai を使わない
+    private var typing = false
     /// 前に変換を求めた読み．続きの読みなら azooKey の差分の変換を使える
     private var lastRequested: String?
+    /// 入力中の表示のセッション(typingSessionID)で前に変換を求めた読み
+    private var lastTypingRequested: String?
+    /// 残りの読みのセッション(restSessionID)で前に変換を求めた読み
+    private var lastRestRequested: String?
+    /// 入力中の表示を Zenzai なしで求めた最後の読み．打鍵の合間に Zenzai で求めておく(performDeferredConversion)
+    private var deferredReading: String?
     /// 入力位置の前にある文字列(左の文脈)．Zenzai が変換の手がかりに使う
     private var leftContext: String?
     /// 学習を使わずに変換しているか(suspendLearningUntilEnd)．入力を終えると戻す
@@ -188,22 +227,43 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     /// 最後に終えた入力で確定して学んだ候補(最後の学習を取り消すときに使う)
     private var lastCommitted: [KanaKanjiConverterModule.Candidate] = []
 
-    init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID, scoringSessionID: KanaKanjiConverter.ConversionSessionID) {
+    init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID, scoringSessionID: KanaKanjiConverter.ConversionSessionID,
+         typingSessionID: KanaKanjiConverter.ConversionSessionID, restSessionID: KanaKanjiConverter.ConversionSessionID) {
         self.engine = engine
         self.sessionID = sessionID
         self.scoringSessionID = scoringSessionID
+        self.typingSessionID = typingSessionID
+        self.restSessionID = restSessionID
     }
 
     deinit {
         // deinit はどのスレッドで動くか決まっていないので，エンジンへの操作はメインアクターに頼む．
         // isolated deinit は Swift 6.2 からで，CI の Swift 6.1 では使えない
         let engine = engine
-        let sessionIDs = [sessionID, scoringSessionID]
+        let sessionIDs = [sessionID, scoringSessionID, typingSessionID, restSessionID]
         Task { @MainActor in sessionIDs.forEach(engine.removeSession) }
     }
 
     func candidates(for reading: String) -> [S90Domain.Candidate] {
         request(reading)?.all ?? []
+    }
+
+    func setTyping(_ typing: Bool) {
+        self.typing = typing
+    }
+
+    var hasDeferredConversion: Bool {
+        deferredReading.map { cache[$0] == nil } ?? false
+    }
+
+    /// Zenzai を使うセッションで求める．前に Zenzai で求めた読みの続きなら差分で進むので，1 打鍵分の時間で済む
+    func performDeferredConversion() {
+        guard let reading = deferredReading else { return }
+        deferredReading = nil
+        let wasTyping = typing
+        typing = false
+        defer { typing = wasTyping }
+        _ = request(reading)
     }
 
     func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
@@ -449,6 +509,9 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         // 学習を使った結果を使い回さないよう，前の結果を捨てて一から変換する
         cache = [:]
         lastRequested = nil
+        lastTypingRequested = nil
+        lastRestRequested = nil
+        deferredReading = nil
     }
 
     /// 取り込んだ辞書の語が変わったら，前の結果は使えないので捨て，次は差分ではなく一から変換する
@@ -457,15 +520,23 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         cache = [:]
         segmentCandidateCache = [:]
         lastRequested = nil
+        lastTypingRequested = nil
+        lastRestRequested = nil
+        deferredReading = nil
     }
 
     func endComposition() {
         lastRequested = nil
+        lastTypingRequested = nil
+        lastRestRequested = nil
+        deferredReading = nil
         learningSuspended = false
         if !committedInComposition.isEmpty { lastCommitted = committedInComposition }
         committedInComposition = []
         _ = engine.withSession(sessionID) { $0.stopComposition() }
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
+        _ = engine.withSession(typingSessionID) { $0.stopComposition() }
+        _ = engine.withSession(restSessionID) { $0.stopComposition() }
         plausibilityCache = [:]
         predictionCache = [:]
         dictionaryCache = [:]
@@ -477,22 +548,48 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     private func request(_ reading: String) -> Result? {
         guard !reading.isEmpty else { return nil }
+        // Zenzai が遅い環境では，打鍵が止まる前の表示を Zenzai なしで求める．その結果は止まったときに求め直すので，
+        // Zenzai を使った結果とは別のキーで覚える(Zenzai を使った結果があればそれを使う)
+        let skipsZenzai = typing && engine.usesZenzai && engine.skipsZenzaiWhileTyping
         // ライブ変換の表示と候補一覧で同じ読みを続けて求めることが多いので，結果を使い回す
         if let cached = cache[reading] { return cached }
+        let key = skipsZenzai ? Self.typingCacheKey(reading) : reading
+        if let cached = cache[key] { return cached }
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        var options = engine.options(leftContext: leftContext)
+        var options = engine.options(leftContext: leftContext, usesZenzai: !skipsZenzai)
         if learningSuspended { options.learningType = .nothing }
         // azooKey は前に求めた読みからの差分で変換を進める．前の読みの続きでない読み(文節ごとの残りの読みなど)を
         // そのまま渡すと前の結果が混ざる(「ひとだ」→「非とだ」)ので，続きでなければ状態を捨ててから求める
-        let continues = lastRequested.map(reading.hasPrefix) ?? false
-        guard let result = engine.withSession(sessionID, { converter in
+        let stream = stream(for: reading, skipsZenzai: skipsZenzai)
+        let previous = switch stream {
+        case .typing: lastTypingRequested
+        case .sentence: lastRequested
+        case .rest: lastRestRequested
+        }
+        let continues = previous.map(reading.hasPrefix) ?? false
+        let session = switch stream {
+        case .typing: typingSessionID
+        case .sentence: sessionID
+        case .rest: restSessionID
+        }
+        let started = ContinuousClock.now
+        guard let result = engine.withSession(session, { converter in
             if !continues { converter.stopComposition() }
             return converter.requestCandidates(composing, options: options)
         }) else {
             return nil
         }
-        lastRequested = reading
+        switch stream {
+        case .typing:
+            lastTypingRequested = reading
+            deferredReading = reading
+        case .sentence:
+            lastRequested = reading
+        case .rest:
+            lastRestRequested = reading
+        }
+        if stream != .typing, engine.usesZenzai { engine.recordZenzaiCost(ContinuousClock.now - started) }
         var seen = Set<String>()
         var all: [S90Domain.Candidate] = []
         for candidate in result.mainResults + result.firstClauseResults where seen.insert(candidate.text).inserted {
@@ -504,8 +601,28 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
             clauses.append(register(candidate, readingLength: reading.count))
         }
         let value = Result(all: all, clauses: clauses)
-        cache[reading] = value
+        cache[key] = value
         return value
+    }
+
+    /// 変換を求めるセッションの流れ
+    private enum Stream {
+        /// 打鍵が止まる前の表示(Zenzai なし)
+        case typing
+        /// 打っている文．前の読みの続きを差分で変換する
+        case sentence
+        /// 打っている文の続きでない読み
+        case rest
+    }
+
+    private func stream(for reading: String, skipsZenzai: Bool) -> Stream {
+        if skipsZenzai { return .typing }
+        return lastRequested.map(reading.hasPrefix) ?? true ? .sentence : .rest
+    }
+
+    /// Zenzai を使わずに求めた入力中の表示を覚えるキー(読みの前に読みには出ない文字を付ける)
+    nonisolated static func typingCacheKey(_ reading: String) -> String {
+        "\u{0}" + reading
     }
 
     private func register(_ candidate: KanaKanjiConverterModule.Candidate, readingLength: Int) -> S90Domain.Candidate {

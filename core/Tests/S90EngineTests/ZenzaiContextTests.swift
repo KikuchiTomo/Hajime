@@ -17,4 +17,24 @@ struct ZenzaiContextTests {
         #expect(separate.isFileURL)
         #expect(separate.fragment == ZenzaiModel.separateContextFragment)
     }
+
+    @Test("Zenzai の変換が 1 キーの時間に収まらない環境だけ，入力中の表示に Zenzai を使わない")
+    func typingBudget() {
+        // まだ測っていなければ使う
+        #expect(!AzooKeyConverterEngine.exceedsTypingBudget(nil))
+        let fast = AzooKeyConverterEngine.smoothedCost(nil, adding: .milliseconds(8))
+        #expect(!AzooKeyConverterEngine.exceedsTypingBudget(fast))
+        // 遅い変換が続けば使わなくなり，速い変換が続けばまた使う
+        var cost: Double? = fast
+        for _ in 0..<5 { cost = AzooKeyConverterEngine.smoothedCost(cost, adding: .milliseconds(70)) }
+        #expect(AzooKeyConverterEngine.exceedsTypingBudget(cost))
+        for _ in 0..<15 { cost = AzooKeyConverterEngine.smoothedCost(cost, adding: .milliseconds(8)) }
+        #expect(!AzooKeyConverterEngine.exceedsTypingBudget(cost))
+    }
+
+    @Test("Zenzai を使わずに求めた表示は，読みと別のキーで覚える")
+    func typingCacheKey() {
+        #expect(AzooKeyConverterSession.typingCacheKey("きょう") != "きょう")
+        #expect(AzooKeyConverterSession.typingCacheKey("きょう").hasSuffix("きょう"))
+    }
 }

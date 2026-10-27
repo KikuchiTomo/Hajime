@@ -193,6 +193,11 @@ public enum DefaultSettings {
     public static let nasalEvaluationPoints: Set<Int> = [0, 1, 2, 3]
     /// Zenzai が 1 回の変換で推論する回数の上限．小さいほど速く，大きいほど精度がよい(azooKey の既定は 10)
     public static let zenzaiInferenceLimit = 10
+    /// 入力中の表示(ライブ変換)で Zenzai を使ってよい 1 回の時間の目安(秒)．Zenzai の変換の時間の移動平均がこれを超える環境では，
+    /// 打鍵が止まる前の表示に Zenzai を使わない(R-01 の 1 キー 50ms に，Zenzai 以外の処理と DLL との往復の分を残す)
+    public static let zenzaiTypingBudget = 0.025
+    /// Zenzai の変換の時間の移動平均で，新しく測った時間に掛ける重み
+    public static let zenzaiCostSmoothing = 0.3
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)
     public static let maximumLeftContextLength = 40
     /// 設定のファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)．ユーザー辞書を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても，
@@ -321,6 +326,8 @@ public enum DefaultSettings {
     public static let handwritingPollInterval = 0.15
     /// Windows で打鍵が止まったあと，分岐図の候補を 1 文節ずつ前もって求めるために DLL に来てもらう(wake)間隔(秒)
     public static let latticeWarmingPollInterval = 0.01
+    /// 入力中の表示を Zenzai なしで求めたとき，打鍵の合間に Zenzai の変換を求めるまでの間(秒)．Windows では DLL に来てもらう(wake)間隔
+    public static let deferredConversionPollInterval = 0.005
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
 }

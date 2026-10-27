@@ -215,6 +215,16 @@ public final class InputSession {
         settings.current.showsModeIndicator ? [.showModeIndicator(mode)] : []
     }
 
+    /// 打鍵の合間に追いかけて求める変換があるか(Zenzai が遅い環境で，入力中の表示を Zenzai なしで求めたとき)
+    public var awaitsDeferredConversion: Bool {
+        phase == .composing && !composition.isEmpty && converter.hasDeferredConversion
+    }
+
+    /// 打鍵の合間に，入力中の表示で済ませなかった Zenzai の変換を求めておく．表示は変えない(止まったときに出す)
+    public func performDeferredConversion() {
+        converter.performDeferredConversion()
+    }
+
     /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
     public func settle(context: InputContext) -> [ClientAction] {
         guard awaitsSettle else { return [] }
@@ -1175,6 +1185,9 @@ public final class InputSession {
         defer { pendingNote = nil }
         switch phase {
         case .composing:
+            // 打鍵が止まる前の表示だけを入力中として求める(Space の分岐図や，止まったときの表示は Zenzai を使う)
+            converter.setTyping(!isSettled)
+            defer { converter.setTyping(false) }
             if let panel = suggestionPanel() {
                 return [.setMarkedText(composingMarkedText()), .showCandidates(panel)] + correctionNote()
             }
