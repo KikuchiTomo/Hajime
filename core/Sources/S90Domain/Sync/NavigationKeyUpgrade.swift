@@ -56,7 +56,7 @@ enum NavigationKeyUpgrade {
     /// バージョン 6 の標準の表．今の標準の表の行を前の行に戻し，足した行を除き，外した行(入力中の Ctrl+Tab)を元の位置に戻したもの
     static var previousStandard: Keymap {
         var entries: [KeymapEntry] = []
-        for entry in KeymapPreset.standard.keymap.entries where !added.contains(entry) {
+        for entry in ForgetKeyUpgrade.previousStandard.entries where !added.contains(entry) {
             entries.append(replacements.first { $0.new == entry }?.old ?? entry)
             // 入力中の Ctrl+Tab は，入力中の Shift+Space(連想変換)のすぐあとにあった
             if entry == KeymapEntry(.composing, KeyStroke(.space, shift: true), .associate) {
