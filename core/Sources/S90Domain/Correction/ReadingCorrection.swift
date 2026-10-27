@@ -11,6 +11,9 @@ public struct ReadingCorrection: Sendable, Equatable {
     /// かなの単位で直した候補(言い違い・書き違い．KanaEditSearch)か．キーの打ち間違いより起きにくいので，
     /// キーの打ち間違いの候補で直すものも示すものも無いときだけ使う(ReadingCorrector)
     public var isReadingEdit: Bool
+    /// 左の文脈(入力位置の前の文)を使わずに求めた score．無ければ nil．
+    /// 前の行に直らないまま確定した同じ誤りがあると，それを手がかりに直さなくなる．文脈なしなら直すときは「もしかして」で示すのに使う
+    public var contextFreeScore: Double?
 
     public init(keys: String, reading: String, score: Double, cost: Double, plausibilityGain: Double = 0, isReadingEdit: Bool = false) {
         self.keys = keys
@@ -97,7 +100,26 @@ public struct ReadingCorrectionRule: Sendable {
         func strength(_ candidate: ReadingCorrection) -> Double { (candidate.rank - baseRank) + (candidate.score - baseScore) }
         if let chosen = changed.filter(applies).max(by: { strength($0) < strength($1) }) { return .apply(chosen) }
         if suggests, let chosen = changed.filter(suggestsCandidate).max(by: { strength($0) < strength($1) }) { return .suggest(chosen) }
+        // 4. 左の文脈を使うと直さないが，使わなければ直すか示すもの．前の行に直らないまま確定した同じ誤りに引きずられていることがあるので，
+        // 自動では直さず「もしかして」で示す(わざとそう書いているなら，そのまま打ち続けられる)
+        if suggests, let contextFree = contextFreeDecision(among: candidates, reading: reading),
+            let original = candidates.first(where: { $0.keys == contextFree.correction.keys }) {
+            return .suggest(original)
+        }
         return nil
+    }
+
+    /// 左の文脈を使わない点数(contextFreeScore)で決め直したもの．その点数が無い候補は除く
+    private func contextFreeDecision(among candidates: [ReadingCorrection], reading: String) -> Decision? {
+        let free = candidates.compactMap { candidate -> ReadingCorrection? in
+            guard let score = candidate.contextFreeScore else { return nil }
+            var copy = candidate
+            copy.score = score
+            copy.contextFreeScore = nil
+            return copy
+        }
+        guard free.contains(where: \.isUnchanged), free.contains(where: { !$0.isUnchanged }) else { return nil }
+        return decision(among: free, reading: reading)
     }
 
     /// 同じキーを続けて打った箇所を 1 回にしたキーの並び．母音の重なり(「oo」)と，3 回以上の重なりだけを試す．
@@ -123,7 +145,9 @@ public struct ReadingCorrectionRule: Sendable {
 extension ReadingCorrection {
     /// 直す手間を足したもの(キーの並びを変えてから求めた候補に使う)
     public func adding(cost extra: Double) -> ReadingCorrection {
-        ReadingCorrection(keys: keys, reading: reading, score: score - extra, cost: cost + extra, plausibilityGain: plausibilityGain, isReadingEdit: isReadingEdit)
+        var copy = ReadingCorrection(keys: keys, reading: reading, score: score - extra, cost: cost + extra, plausibilityGain: plausibilityGain, isReadingEdit: isReadingEdit)
+        copy.contextFreeScore = contextFreeScore.map { $0 - extra }
+        return copy
     }
 }
 

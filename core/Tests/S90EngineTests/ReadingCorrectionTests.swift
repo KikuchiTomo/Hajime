@@ -222,6 +222,27 @@ struct ReadingCorrectionTests {
         #expect(text == expected, "\(keys) → \(text)")
     }
 
+    @Test("前の行に直らないまま確定した同じ誤りがあっても，「もしかして」で示す(自動では直さない)")
+    func suggestsDespiteSameErrorInLeftContext() async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"])
+        let model = try ZenzaiModel.verified(at: URL(fileURLWithPath: path))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-typo-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "typo", zenzai: model)
+        let service = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        let context = InputContext(precedingText: "私は学生でした\n今日の天気はようですね\n")
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings(), typoService: service)
+        for key in "kyounotenkihayoudesune" { _ = session.handle(KeyEvent(.character(key)), context: context) }
+        var actions = session.settle(context: context)
+        if let request = session.correctionRequest {
+            session.provideCorrections(await service.corrections(forKeys: request.keys, leftContext: request.leftContext))
+        }
+        actions += session.review(context: context)
+        let note = actions.compactMap { if case .showNote(let shown) = $0 { shown.text } else { nil } }.last
+        let corrected = actions.contains { if case .setMarkedText(let text) = $0 { text.segments.contains { $0.style == .correction } } else { false } }
+        #expect(!corrected)
+        #expect(note?.hasPrefix("もしかして") == true, "\(note ?? "-")")
+    }
+
     private func live(_ session: InputSession, _ keys: String) -> String? {
         var result: String?
         for key in keys { result = marked(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) ?? result }
