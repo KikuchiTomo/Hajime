@@ -111,6 +111,14 @@ public protocol SettingsStoring: SettingsReading {
     func update(_ change: (inout Settings) -> Void) throws
 }
 
+/// 利用者が戻した日本語の補正を覚え，次から同じ語句を直さないようにするポート(設定の「直さない語句」に入れる)．
+/// わざとそう打った語句を，打つたびに戻す手間をなくすため
+@MainActor
+public protocol CorrectionRejectionRecording: AnyObject {
+    /// phrase は打ったままの読みのうち，直された部分を含む文節．覚えたら true(すでに覚えていれば false)
+    func recordRejected(phrase: String) -> Bool
+}
+
 /// 設定が変わったことを知らせるポート．エンジンや設定の画面を新しい設定に合わせるのに使う
 @MainActor
 public protocol SettingsObserving: AnyObject {

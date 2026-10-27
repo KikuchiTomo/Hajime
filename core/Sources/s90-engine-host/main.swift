@@ -171,11 +171,13 @@ func run() -> Int32 {
     // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
     let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
                                       lexicon: lexicon, settings: settings)
+    // 戻した補正を設定の「直さない語句」に覚える(macOS の CompositionRoot と同じ)
+    let rejections = SettingsCorrectionRejections(settings: settings)
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                         keyNames: .windows)
+                         keyNames: .windows, rejections: rejections)
         },
         settings: settings,
         ui: sendToWindow,
