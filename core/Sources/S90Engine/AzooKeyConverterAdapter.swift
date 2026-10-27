@@ -171,6 +171,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private var plausibilityCache: [String: Double] = [:]
     private var predictionCache: [String: [S90Domain.Candidate]] = [:]
     private var dictionaryCache: [String: [S90Domain.Candidate]] = [:]
+    private var segmentCandidateCache: [String: [S90Domain.Candidate]] = [:]
     private var segmentationCache: [String: [S90Domain.Candidate.Word]] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
@@ -207,6 +208,27 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     func clauseCandidates(for reading: String) -> [S90Domain.Candidate] {
         request(reading)?.clauses ?? []
+    }
+
+    func segmentCandidates(for reading: String) -> [S90Domain.Candidate] {
+        guard !reading.isEmpty else { return [] }
+        if let cached = segmentCandidateCache[reading] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        // ライブ変換の状態を捨てないよう採点用の変換器で求める．文脈が無いので Zenzai は使わない
+        var options = engine.options(leftContext: nil, usesZenzai: false)
+        options.typoCorrectionMode = .disabled
+        if learningSuspended { options.learningType = .nothing }
+        let results = engine.withSession(scoringSessionID) { converter -> [KanaKanjiConverterModule.Candidate] in
+            converter.stopComposition()
+            defer { converter.stopComposition() }
+            let result = converter.requestCandidates(composing, options: options)
+            return result.mainResults + result.firstClauseResults
+        } ?? []
+        var seen = Set<String>()
+        let candidates = results.filter { seen.insert($0.text).inserted }.map { register($0, readingLength: reading.count) }
+        segmentCandidateCache[reading] = candidates
+        return candidates
     }
 
     func dictionaryCandidates(for reading: String) -> [S90Domain.Candidate] {
@@ -420,6 +442,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     func setAuxiliaryWords(_ words: [AuxiliaryWord]) {
         guard engine.setAuxiliaryWords(words) else { return }
         cache = [:]
+        segmentCandidateCache = [:]
         lastRequested = nil
     }
 
@@ -434,6 +457,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         predictionCache = [:]
         dictionaryCache = [:]
         segmentationCache = [:]
+        segmentCandidateCache = [:]
         engineCandidates = [:]
         cache = [:]
     }

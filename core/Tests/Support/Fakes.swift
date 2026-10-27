@@ -26,6 +26,17 @@ public final class FakeConverter: KanaKanjiConverting {
         }
     }
 
+    /// 文節の読みだけの候補．本物は文節の読みだけを変換する．ここでは，その読みで始まる読みの文節の候補のうち，
+    /// 長さが文節の読みと同じものを集める(文節の候補の表を後ろの読みごとに書いておけば，文節の読みだけでも同じ候補になる)
+    public func segmentCandidates(for reading: String) -> [Candidate] {
+        guard !reading.isEmpty else { return [] }
+        var seen = Set<String>()
+        let fromClauses = clauseTable.keys.sorted { ($0.count, $0) < ($1.count, $1) }.filter { $0.hasPrefix(reading) }
+            .flatMap { clauseCandidates(for: $0) }
+            .filter { $0.readingCount == reading.count && seen.insert($0.text).inserted }
+        return fromClauses + candidates(for: reading).filter { $0.readingCount == reading.count && seen.insert($0.text).inserted }
+    }
+
     /// 候補の文字列ごとの末尾の語．ライブ変換で打っている途中の語をかなのまま見せるかの確認に使う
     public var trailingWords: [String: Candidate.TrailingWord] = [:]
     /// 候補の文字列ごとの語の並び(本物のエンジンの候補が持つもの)．直した語句の位置を求めるのに使う
