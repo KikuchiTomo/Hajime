@@ -30,6 +30,15 @@ struct KeyEditSearchTests {
         #expect(KeyEditSearch.nasalVariants(of: Array("hannnei")).isEmpty)
     }
 
+    @Test("余分な 1 打は，前のキーか次のキーの隣を一緒に押したものなら手間を小さくする")
+    func neighborInsertion() {
+        let costs = KeyEditSearch.Costs()
+        func cost(_ keys: String, _ reading: String) -> Double? { KeyEditSearch.edits(of: keys).first { $0.reading == reading }?.cost }
+        #expect(cost("desyu", "です") == costs.easyInsertion)  // y は次の u の隣
+        #expect(cost("desdu", "です") == costs.easyInsertion)  // d は前の s の隣
+        #expect(cost("desqu", "です") == costs.insertion)  // q は s とも u とも隣でない
+    }
+
     @Test("音が同じ書き誤り(ず/づ・は/わ・え/へ・お/を・長音)は手間を小さくする")
     func samePronunciation() {
         let costs = KeyEditSearch.Costs()

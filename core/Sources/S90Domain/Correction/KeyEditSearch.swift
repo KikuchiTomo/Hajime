@@ -73,8 +73,10 @@ public enum KeyEditSearch {
                     cost: nasal ? costs.nasalSpelling : easy ? costs.easyOmission : costs.omission)
             }
             guard let current else { continue }
-            // 余分な 1 打: index の文字を除く
-            let easyInsertion = current == previous || vowels.contains(current) || previous.map { KeyAdjacency.areNeighbors($0, current) } == true
+            // 余分な 1 打: index の文字を除く．前のキーか次のキーの隣を一緒に押したものは打ちやすい(desyu → desu の y は u の隣)
+            let next = index + 1 < characters.count ? characters[index + 1] : nil
+            let easyInsertion = current == previous || vowels.contains(current)
+                || [previous, next].contains { $0.map { KeyAdjacency.areNeighbors($0, current) } == true }
             add(Array(characters[..<index]) + Array(characters[(index + 1)...]), cost: easyInsertion ? costs.easyInsertion : costs.insertion)
             // 取り違え: index の文字を別の文字にする
             for character in alphabet where character != current {
