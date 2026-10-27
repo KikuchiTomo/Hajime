@@ -87,6 +87,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tCtrl Shift Right\textendSegmentToWord
         converting\tCtrl Shift Left\tshrinkSegmentToWord
         converting\tShift Down\tsplitSegment
+        converting\tShift Backspace\teditSegment
         converting\tBackspace\tbackToReading
         converting\tCtrl Backspace\tforgetCandidate
         """

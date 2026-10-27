@@ -161,6 +161,30 @@ struct LatticeBuilder {
         return result
     }
 
+    /// index の文節の読みを slice に替える(その場で打ち直す)．ほかの文節は選んだ候補ごと残し，後ろの文節は位置だけずらす．
+    /// slice はその読みだけで文節に分ける(長く打ち直せば 2 つ以上の文節になる)．slice が空なら文節を消す．
+    /// 注目は打ち直した文節の先頭(消したときは次の文節)に置く
+    func replacing(_ lattice: SegmentLattice, segmentAt index: Int, with slice: String) -> SegmentLattice {
+        let old = lattice.segments[index]
+        let delta = slice.count - old.readingLength
+        var replaced: [SegmentLattice.Segment] = []
+        if !slice.isEmpty {
+            let sentence = converter.candidates(for: slice).first { $0.readingCount == slice.count }
+            replaced = (clauseSegments(of: slice, sentence: sentence) ?? segments(of: slice, from: 0, sentence: sentence?.text)).map { segment in
+                var segment = segment
+                segment.readingStart += old.readingStart
+                return segment
+            }
+        }
+        let after = lattice.segments.dropFirst(index + 1).map { segment in
+            var segment = segment
+            segment.readingStart += delta
+            return segment
+        }
+        let segments = Array(lattice.segments.prefix(index)) + replaced + after
+        return SegmentLattice(segments: segments, focusedIndex: min(index, max(segments.count - 1, 0)))
+    }
+
     /// 利用者が入れた区切り(読みの先頭からの文字数)で，必ず文節を分ける
     func splitting(_ lattice: SegmentLattice, at boundaries: [Int], reading: String) -> SegmentLattice {
         var result = lattice
