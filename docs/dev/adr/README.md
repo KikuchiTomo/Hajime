@@ -21,3 +21,4 @@
 | [0011](0011-distribution.md) | 配布の経路 | 採用 |
 | [0012](0012-linux.md) | Linux 版の組み立て | 提案 |
 | [0013](0013-windows-settings-direct2d.md) | Windows の設定の画面は Direct2D で描く | 採用 |
+| [0014](0014-zenzai-on-slow-machines.md) | Zenzai が遅い環境では，打鍵が止まる前の表示に Zenzai を使わず，打鍵の合間に追いかけて求める | 採用 |
