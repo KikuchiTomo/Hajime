@@ -22,25 +22,23 @@ final class SettingsWindowController {
         self.sync = sync
     }
 
+    /// 「初期設定をやり直す」で開く窓を渡す
+    func setOpenOnboarding(_ open: @escaping () -> Void) {
+        model.openOnboarding = open
+    }
+
     /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
     func noteSetAsideFile(_ url: URL?) {
         guard let url else { return }
         model.message = UIStrings.Settings.setAside(url.lastPathComponent)
     }
 
-    /// 設定の画面を前に出して，キーボードの入力を受けられるようにする．
-    ///
-    /// 入力メソッドは前面に出られないアプリ(Info.plist の LSBackgroundOnly)なので，そのままでは窓がほかのアプリの窓の後ろに隠れ，
-    /// 入力欄にも打てない(実機のログで visible=true key=false だった)．開いているあいだだけ前面に出られる補助アプリ(.accessory)にし，
-    /// 閉じたら前面に出ないアプリ(.prohibited)に戻す．Dock とメニューバーには出ない
+    /// 設定の画面を前に出して，キーボードの入力を受けられるようにする(ForegroundWindow)
     func show() {
         model.refreshUsage()
         let window = window ?? makeWindow()
         self.window = window
-        NSApp.setActivationPolicy(.accessory)
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
+        ForegroundWindow.present(window)
         // 前に出たかは，切り替えが済んだあとに記録する
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [logger] in
             logger.notice("設定の画面: visible=\(window.isVisible, privacy: .public) key=\(window.isKeyWindow, privacy: .public) active=\(NSApp.isActive, privacy: .public)")
@@ -68,17 +66,9 @@ final class SettingsWindowController {
         let hosting = NSHostingView(rootView: SettingsView(model: model, sync: sync, navigation: navigation))
         hosting.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hosting
-        window.isReleasedWhenClosed = false
-        // いつも最前面に出す．macOS 14 からは，前面のアプリ(cmux など)が譲らない限り，ほかのアプリは前面に出られない
-        // (実機の記録で visible=true key=false active=false だった)．前面に出られなくても，ほかのアプリの窓より上に浮かせて見えるようにし，
-        // 押せばキーボードの入力を受けられる．フルスクリーンのアプリの操作スペースにも，今いる操作スペースに出す
-        window.level = .floating
-        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        // いつも最前面に出す(実機の記録で visible=true key=false active=false だった．ForegroundWindow)
+        ForegroundWindow.configure(window)
         window.center()
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
-            // 閉じたら前面に出ないアプリに戻す(入力メソッドとして，ほかのアプリの前に出ない)
-            MainActor.assumeIsolated { _ = NSApp.setActivationPolicy(.prohibited) }
-        }
         return window
     }
 }
@@ -92,6 +82,8 @@ final class SettingsModel: ObservableObject {
     private let store: any SettingsStoring & SettingsObserving
     private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void
+    /// 「初期設定をやり直す」で初期設定の窓を開く．無ければ情報のページにボタンを出さない
+    var openOnboarding: (() -> Void)?
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 辞書の取り込み・バックアップ・CSV・決まりの一覧の読み書き(Windows のエンジンと同じもの)．無ければ辞書を取り込めない
     let files: (any SettingsFileHandling)?

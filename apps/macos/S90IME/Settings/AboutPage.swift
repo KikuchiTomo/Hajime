@@ -31,6 +31,11 @@ struct AboutPage: View {
         Form {
             Section {
                 LabeledContent(UIStrings.More.version, value: model.versionString)
+                if let open = model.openOnboarding {
+                    LabeledContent(UIStrings.Onboarding.redoLabel) {
+                        Button(UIStrings.Onboarding.redo, action: open)
+                    }
+                }
             }
             Section {
                 if let acknowledgements = model.acknowledgements {

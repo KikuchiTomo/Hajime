@@ -112,8 +112,12 @@ final class CompositionRoot {
                                                   resetLearning: { [engine] in engine.resetLearning() },
                                                   previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)
+        controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
         return controller
     }()
+
+    /// 初期設定の窓．開くたびに作らず使い回す
+    private(set) lazy var onboarding = OnboardingWindowController(settings: settings)
 
     /// 入力メニュー．入力欄ごとのコントローラで 1 つを共有する(InputMenuBuilder の説明)
     private(set) lazy var inputMenu = InputMenuBuilder(settings: settings, openSettings: { [unowned self] in self.settingsWindow.show() })

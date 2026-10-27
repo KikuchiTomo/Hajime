@@ -307,6 +307,23 @@ enum DesignTokens {
         enum StandardTheme {
             static let cornerRadius: CGFloat = 12
         }
+        enum Onboarding {
+            static let width: CGFloat = 900
+            static let height: CGFloat = 600
+            static let stageWidth: CGFloat = 440
+            static let padding: CGFloat = 36
+            static let stagePadding: CGFloat = 28
+            static let cardRadius: CGFloat = 12
+            static let cardPadding: CGFloat = 14
+            static let cardGap: CGFloat = 10
+            static let dotSize: CGFloat = 7
+            static let dotGap: CGFloat = 6
+            static let fieldHeight: CGFloat = 46
+            static let fieldRadius: CGFloat = 10
+            static let fieldFontSize: CGFloat = 19
+            static let demoGap: CGFloat = 14
+            static let badgeRadius: CGFloat = 6
+        }
     }
     enum Motion {
         enum ModeIndicator {
@@ -329,6 +346,11 @@ enum DesignTokens {
             static let scrollbarIdle: Double = 1200
             static let scrollbarFade: Double = 250
             static let progressRing: Double = 1400
+        }
+        enum Onboarding {
+            static let keystroke: Double = 85
+            static let hold: Double = 1400
+            static let page: Double = 220
         }
     }
     enum Opacity {
@@ -365,6 +387,13 @@ enum DesignTokens {
             static let keyFilter: CGFloat = 0.15
             static let subtleSelected: CGFloat = 0.08
             static let subtleHover: CGFloat = 0.05
+        }
+        enum Onboarding {
+            static let stageGlow: CGFloat = 0.32
+            static let stageGlowSecondary: CGFloat = 0.18
+            static let cardSelected: CGFloat = 0.12
+            static let cardIdle: CGFloat = 0.05
+            static let field: CGFloat = 0.82
         }
     }
 }

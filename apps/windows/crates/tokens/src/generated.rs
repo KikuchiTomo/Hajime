@@ -419,6 +419,23 @@ pub mod size {
     pub mod standard_theme {
         pub const CORNER_RADIUS: f32 = 12.0;
     }
+    pub mod onboarding {
+        pub const WIDTH: f32 = 900.0;
+        pub const HEIGHT: f32 = 600.0;
+        pub const STAGE_WIDTH: f32 = 440.0;
+        pub const PADDING: f32 = 36.0;
+        pub const STAGE_PADDING: f32 = 28.0;
+        pub const CARD_RADIUS: f32 = 12.0;
+        pub const CARD_PADDING: f32 = 14.0;
+        pub const CARD_GAP: f32 = 10.0;
+        pub const DOT_SIZE: f32 = 7.0;
+        pub const DOT_GAP: f32 = 6.0;
+        pub const FIELD_HEIGHT: f32 = 46.0;
+        pub const FIELD_RADIUS: f32 = 10.0;
+        pub const FIELD_FONT_SIZE: f32 = 19.0;
+        pub const DEMO_GAP: f32 = 14.0;
+        pub const BADGE_RADIUS: f32 = 6.0;
+    }
 }
 
 pub mod motion {
@@ -442,6 +459,11 @@ pub mod motion {
         pub const SCROLLBAR_IDLE: f32 = 1200.0;
         pub const SCROLLBAR_FADE: f32 = 250.0;
         pub const PROGRESS_RING: f32 = 1400.0;
+    }
+    pub mod onboarding {
+        pub const KEYSTROKE: f32 = 85.0;
+        pub const HOLD: f32 = 1400.0;
+        pub const PAGE: f32 = 220.0;
     }
 }
 
@@ -479,5 +501,12 @@ pub mod opacity {
         pub const KEY_FILTER: f32 = 0.15;
         pub const SUBTLE_SELECTED: f32 = 0.08;
         pub const SUBTLE_HOVER: f32 = 0.05;
+    }
+    pub mod onboarding {
+        pub const STAGE_GLOW: f32 = 0.32;
+        pub const STAGE_GLOW_SECONDARY: f32 = 0.18;
+        pub const CARD_SELECTED: f32 = 0.12;
+        pub const CARD_IDLE: f32 = 0.05;
+        pub const FIELD: f32 = 0.82;
     }
 }

@@ -78,6 +78,7 @@ enum SettingsBenchmark {
 struct SettingsFixture {
     let model: SettingsModel
     let sync: SyncCoordinator
+    let store: FileSettingsStore
 
     static func make(name: String) -> SettingsFixture {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-\(name)", isDirectory: true)
@@ -88,7 +89,7 @@ struct SettingsFixture {
         let dictionaries = ImportedDictionaryStore(directory: directory.appendingPathComponent("dictionaries", isDirectory: true))
         let sync = SyncCoordinator(synchronizer: synchronizer, runner: FolderSyncRunner(synchronizer: synchronizer, settings: store, dictionaries: dictionaries), settings: store)
         let model = SettingsModel(store: store, usage: nil, files: SettingsFiles(settings: store, dictionaries: dictionaries), resetLearning: {})
-        return SettingsFixture(model: model, sync: sync)
+        return SettingsFixture(model: model, sync: sync, store: store)
     }
 
     /// 切り替えを画面に映し終わるまで回す．SwiftUI は実行ループの区切りで描き直すので，実行ループを回してから描く．
