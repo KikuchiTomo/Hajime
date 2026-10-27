@@ -24,13 +24,13 @@ use windows::Win32::UI::Accessibility::{
     ProviderOptions_UseComThreading, ToggleState, ToggleState_Off, ToggleState_On,
     UIA_AutomationFocusChangedEventId, UIA_AutomationIdPropertyId, UIA_ButtonControlTypeId,
     UIA_CheckBoxControlTypeId, UIA_ComboBoxControlTypeId, UIA_ControlTypePropertyId,
-    UIA_DocumentControlTypeId, UIA_ExpandCollapsePatternId, UIA_HasKeyboardFocusPropertyId,
-    UIA_InvokePatternId, UIA_IsEnabledPropertyId, UIA_IsKeyboardFocusablePropertyId,
-    UIA_ListControlTypeId, UIA_ListItemControlTypeId, UIA_NamePropertyId,
-    UIA_SelectionItemPatternId, UIA_TogglePatternId, UIA_ValuePatternId, UiaAppendRuntimeId,
-    UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent, UiaRect,
-    UiaReturnRawElementProvider, UiaRootObjectId, UIA_E_ELEMENTNOTAVAILABLE, UIA_PATTERN_ID,
-    UIA_PROPERTY_ID,
+    UIA_DocumentControlTypeId, UIA_EditControlTypeId, UIA_ExpandCollapsePatternId,
+    UIA_HasKeyboardFocusPropertyId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
+    UIA_IsKeyboardFocusablePropertyId, UIA_ListControlTypeId, UIA_ListItemControlTypeId,
+    UIA_NamePropertyId, UIA_SelectionItemPatternId, UIA_TogglePatternId, UIA_ValuePatternId,
+    UiaAppendRuntimeId, UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent,
+    UiaRect, UiaReturnRawElementProvider, UiaRootObjectId, UIA_E_ELEMENTNOTAVAILABLE,
+    UIA_PATTERN_ID, UIA_PROPERTY_ID,
 };
 use windows_core::{
     implement, ComObject, Error, IUnknown, IUnknownImpl, Result, BOOL, BSTR, HRESULT, PCWSTR,
@@ -45,6 +45,8 @@ pub enum Role {
     ListItem,
     List,
     Document,
+    /// 打つ欄．中身と操作は標準の EDIT が受け持つ(Node::host)
+    Edit,
 }
 
 /// 要素(窓が今の状態から作る)
@@ -62,6 +64,8 @@ pub struct Node {
     pub expanded: Option<bool>,
     pub value: Option<String>,
     pub selected: Option<bool>,
+    /// 要素の元になる標準の窓(打つ欄の EDIT)．値の読み書きなどはその窓が答える
+    pub host: Option<HWND>,
 }
 
 /// 読み上げの側から頼まれる操作
@@ -328,7 +332,8 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             Role::ListItem => {
                 patternid == UIA_SelectionItemPatternId || patternid == UIA_InvokePatternId
             }
-            Role::List | Role::Document => false,
+            // 打つ欄の値の読み書きは標準の EDIT(host)が答える
+            Role::List | Role::Document | Role::Edit => false,
         };
         if supported {
             Ok(self.to_interface())
@@ -346,6 +351,7 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             Role::ListItem => UIA_ListItemControlTypeId,
             Role::List => UIA_ListControlTypeId,
             Role::Document => UIA_DocumentControlTypeId,
+            Role::Edit => UIA_EditControlTypeId,
         };
         Ok(match propertyid {
             UIA_NamePropertyId => variant_text(&node.name),
@@ -359,7 +365,11 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
     }
 
     fn HostRawElementProvider(&self) -> Result<IRawElementProviderSimple> {
-        null()
+        match self.node()?.host {
+            // SAFETY: host はこのスレッドの窓(打つ欄)．標準の窓の読み上げを，この要素に重ねる
+            Some(host) => unsafe { UiaHostProviderFromHwnd(host) },
+            None => null(),
+        }
     }
 }
 

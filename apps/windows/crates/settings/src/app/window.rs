@@ -1268,16 +1268,26 @@ impl App {
 
     fn nodes(&self) -> Vec<uia::Node> {
         let now = self.now();
-        let (width, height) = self.size();
+        let (width, _) = self.size();
         let nav_width = nav_width(width);
         let nav_top = self.nav_top();
         let nav_offset = self.nav_scroll.offset(now);
-        let mut nodes = Vec::new();
+        let mut nodes = vec![uia::Node {
+            id: NODE_SEARCH,
+            role: uia::Role::Edit,
+            name: features::SEARCH.to_string(),
+            rect: self.screen_rect(self.search_rect()),
+            enabled: true,
+            focused: self.focus == Focus::Search,
+            toggled: None,
+            expanded: None,
+            value: None,
+            selected: None,
+            host: Some(self.search),
+        }];
+        // 見えている範囲の外の項目も入れる(読み上げの側が送って読めるように)
         for (index, item) in self.nav.items.iter().enumerate() {
             let top = nav_top + item.top - nav_offset;
-            if top + item.height < nav_top || top > height {
-                continue;
-            }
             let selected = item.page == self.view.page;
             nodes.push(uia::Node {
                 id: i32::try_from(index).unwrap_or(0) + 1,
@@ -1290,6 +1300,7 @@ impl App {
                 expanded: None,
                 value: None,
                 selected: Some(selected),
+                host: None,
             });
         }
         if self.availability() != Availability::Ready {
@@ -1303,9 +1314,16 @@ impl App {
             let Some(rect) = self.view.rect(element) else {
                 continue;
             };
+            let mut host = None;
             let (role, toggled, expanded, value) = match described {
-                // 打つ欄は標準の EDIT が自分で読ませる
-                Described::Edit => continue,
+                // 打つ欄は標準の EDIT を元にする(中身と操作は EDIT が答える)
+                Described::Edit => {
+                    host = self.view.edit(element);
+                    if host.is_none() {
+                        continue;
+                    }
+                    (uia::Role::Edit, None, None, None)
+                }
                 Described::Button => (uia::Role::Button, None, None, None),
                 Described::Toggle(on) => (uia::Role::CheckBox, Some(on), None, None),
                 Described::Dropdown(label) => (
@@ -1334,12 +1352,19 @@ impl App {
                 expanded,
                 value,
                 selected: None,
+                host,
             });
         }
         nodes
     }
 
     fn accessibility_act(&mut self, id: i32, act: uia::Act) {
+        if id == NODE_SEARCH {
+            if act == uia::Act::Focus {
+                self.set_focus(Focus::Search);
+            }
+            return;
+        }
         if id < NODE_PAGE {
             let Some(page) = usize::try_from(id - 1)
                 .ok()
@@ -1914,6 +1939,8 @@ fn paint_flyout_items(
 
 /// ページの部品の読み上げの番号の始まり(左の一覧の項目と分ける)
 const NODE_PAGE: i32 = 1000;
+/// 読み上げの番号: 検索欄(左の一覧の項目の番号とページの部品の番号のあいだ)
+const NODE_SEARCH: i32 = 900;
 
 fn accessibility_nodes() -> Vec<uia::Node> {
     with_app(|app| app.nodes()).unwrap_or_default()
