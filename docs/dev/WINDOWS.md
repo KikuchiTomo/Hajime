@@ -24,6 +24,7 @@
 - `ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決める
 - `OnTestKeyDown` はエンジンに問い合わせない．応答に入っている `SessionState`(組み立て中か，モード，今の状態で受け取るキー)の写しで答える
 - 打鍵が止まったときの表示の切り替えと打ち間違いの見直しは，エンジンが待つ時間を返し，DLL がタイマーで `wake` を送る
+- DLL のタイマーは，入力先のアプリのスレッドごとに作るメッセージ専用の窓に付ける(`crates/tsf/src/com/timer.rs`)．窓の無いタイマー(`SetTimer(None, …)`)の知らせは宛先の窓が無く，アプリのメッセージの処理によっては配られないため．配られないと，Space の変換の遅れた返事・打鍵が止まったときの変換・打ち間違いの見直しが画面に出ない(0.1.4 で起きた)
 - タスクバーの入力モードの表示は，言語バーの項目(`GUID_LBI_INPUTMODE`．`crates/tsf/src/com/langbar.rs`)で出す．右クリックのメニューの項目は macOS の入力メニューと同じ(`crates/tsf/src/menu.rs`)で，選んだ操作は `menu` の要求でエンジンに頼む
 - 設定の「キー配列」(ABC・US・Dvorak・Colemak)は，DLL がキーの位置(スキャンコード)から文字を引く表(`crates/tsf/src/layout.rs`)で打つ．Windows で配列を読み込むと利用者の配列の一覧が変わるため，OS の配列は切り替えない．ローマ字入力と英字入力のときだけ使い，Ctrl・Alt を押したショートカットは OS の配列のまま
 - 打ち間違いの訂正は Zenzai で 1 文に 1 秒ほどかかるので，エンジンが裏で求める(`ZenzaiTypoService`)．求めているあいだは短い間隔(`EngineService.correctionPollMilliseconds`)の `wake` を頼み，求め終わったあとの `wake` で見直しの結果を返す．Space では訂正を待たずにすぐ変換を出し(`.awaitCorrections`)，訂正が届いたあとの `wake` で，そのあいだにキーを押していなければ直した変換に入れ替える(`InputSession.applyLateCorrections`．求めるのは `DefaultSettings.lateCorrectionTimeout` まで)．間に合わなかった `wake` の応答も，キーの応答と同じくあとで反映する
@@ -33,6 +34,7 @@
 - 設定の画面(`crates/settings`)は設定のファイルを直接読まず，項目の名前と JSON の値でエンジンに読み書きを頼む(`readSettingsFields`・`writeSettingsFields`)．値の確かめ(範囲・一覧の形・上限)はエンジンが設定のファイルを読むときと同じに行い，画面は書いたあとに返った値を出す．項目の名前と値の範囲・上限は `protocol/settings-catalog.json`(core の `DefaultSettings` から作る写し．`make settings-catalog` で作り直し，古ければ core のテストが落ちる)から読み，既定値はエンジンに頼んで読む
 - 設定の画面のページと項目の並びは macOS の `SettingsView` と同じ(`crates/settings/src/pages.rs`)．文言は `UIStrings` と同じものを `strings.rs` に置き，Windows で言い方が違うものだけを変える
 - 設定の画面は 1 枚の窓に Direct2D で描く(ADR [0013](adr/0013-windows-settings-direct2d.md))．部品は子の窓にせず状態として持ち(`app/page.rs`)，文字を打つ欄だけ枠の無い EDIT を使い回す．窓を先に出し，エンジンへの接続と設定の読み込みは別のスレッドで行う．つながらなければ同じフォルダのエンジンを起動し(`app/mod.rs`)，間隔をおいてつなぎ直す
+- 候補ウィンドウは同じセッションで 1 つだけ動かす(名前付きのミューテックス)．エンジンは新しくつないできた候補ウィンドウに切り替えて前の接続を閉じるので，2 つ動くと互いの接続を閉じ合い，出している候補が消える
 - `.ui` のパイプはエンジンから候補ウィンドウへの一方向．エンジンは読みを待たない(同期の I/O のハンドルでは，読みを待っているあいだ同じハンドルへの書き込みも止まるため)
 
 ## 手書き入力
