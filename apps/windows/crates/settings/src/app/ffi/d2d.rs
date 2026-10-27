@@ -180,6 +180,16 @@ impl Graphics {
                 size::CHEVRON_SIZE,
                 DWRITE_FONT_WEIGHT_NORMAL,
             ),
+            TextStyle::Demo => (
+                self.text_family,
+                size::WIZARD_DEMO_FONT_SIZE,
+                DWRITE_FONT_WEIGHT_NORMAL,
+            ),
+            TextStyle::Hero => (
+                self.icon_family,
+                size::WIZARD_HERO_SIZE / 2.0,
+                DWRITE_FONT_WEIGHT_NORMAL,
+            ),
         };
         // SAFETY: 文字列は呼び出しのあいだ有効
         let format = unsafe {
@@ -725,6 +735,9 @@ pub struct PreviewRequest<'a> {
     pub scale: f32,
     /// 見本の外の地
     pub background: tokens::Rgb,
+    /// 描く候補の窓と置き方
+    pub shown: candidate_ui::app::preview::Shown<'a>,
+    pub placement: candidate_ui::app::preview::Placement,
 }
 
 /// 外観の見本を，窓の DPI のピクセルで width × height の画像にする(GDI の DC に描く Preview を使う)
@@ -786,6 +799,8 @@ pub fn render_preview(
                 request.font_size,
                 request.dark,
                 request.scale,
+                request.shown,
+                request.placement,
             )
             .is_ok();
         let result = painted.then(|| pixels.to_vec());

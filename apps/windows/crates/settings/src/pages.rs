@@ -306,6 +306,8 @@ pub enum Action {
     File(FileTask),
     /// 同期のフォルダを選ぶ
     ChooseSyncFolder,
+    /// 初期設定ウィザードを開き直す
+    OpenSetup,
     /// 今すぐ同期する
     SyncNow,
 }
@@ -1428,7 +1430,10 @@ fn backup() -> Vec<Section> {
 /// 情報のページ(macOS の AboutPage)．謝辞は配布物に入れた THIRD_PARTY_NOTICES.md をそのまま出す
 fn about() -> Vec<Section> {
     vec![
-        Section::untitled(vec![Row::new(more::VERSION, "", Control::Version)]),
+        Section::untitled(vec![
+            Row::new(more::VERSION, "", Control::Version),
+            Row::action(crate::strings::wizard::REDO, Action::OpenSetup),
+        ]),
         Section {
             title: Some(more::ACKNOWLEDGEMENTS),
             rows: vec![Row::new(more::ACKNOWLEDGEMENTS, "", Control::Notices)],

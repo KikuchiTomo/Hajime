@@ -287,7 +287,7 @@ pub enum ForcedTheme {
 }
 
 impl ForcedTheme {
-    fn theme(self, dpi: u32) -> Theme {
+    pub(super) fn theme(self, dpi: u32) -> Theme {
         match self {
             Self::Light => Theme::fixed(false, dpi),
             Self::Dark => Theme::fixed(true, dpi),
@@ -761,6 +761,8 @@ impl App {
             dark: self.theme.dark,
             scale,
             background: self.theme.palette.card,
+            shown: candidate_ui::app::preview::Shown::Sample,
+            placement: candidate_ui::app::preview::Placement::Center,
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
             return;

@@ -614,6 +614,115 @@ pub mod windows {
         "変換エンジンが動いていないため、設定を読み込めません。エンジンを起動して、つながるまで待っています。しばらくしても変わらないときは、サインインし直してください。";
 }
 
+/// 初期設定ウィザード(Windows だけ．macOS 版はまだ無い)
+pub mod wizard {
+    pub const WINDOW_TITLE: &str = "s90.tokyo IME の初期設定";
+    pub const RECOMMENDED: &str = "推奨";
+    pub const BACK: &str = "戻る";
+    pub const NEXT: &str = "次へ";
+    pub const LATER: &str = "あとで";
+    pub const FINISH: &str = "完了";
+    pub const OPEN_SETTINGS: &str = "設定を開く";
+    /// 実演の領域の読み上げの名前
+    pub const DEMO: &str = "実演";
+    pub const LOADING: &str = "設定を読み込んでいます…";
+    pub const SAVE_FAILED: &str =
+        "設定を保存できませんでした。変換エンジンが動いているか確かめてください。";
+    /// 設定の画面の「情報」のページからウィザードを開く
+    pub const REDO: &str = "初期設定をやり直す";
+
+    /// 何ページ目か
+    pub fn step(index: usize, total: usize) -> String {
+        format!("{index} / {total}")
+    }
+
+    pub const WELCOME_TITLE: &str = "ようこそ";
+    pub const WELCOME_TEXT: &str = "s90.tokyo IME をインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
+    pub const SWITCH_TITLE: &str = "英語と日本語の切り替え";
+    pub const SWITCH_TEXT: &str = "英語と日本語を切り替えるキーを選びます。";
+    pub const SWITCH_TOGGLE: &str = "半角/全角キーで切り替える";
+    pub const SWITCH_TOGGLE_NOTE: &str = "1 つのキーを押すたびに、英語と日本語が入れ替わります。";
+    pub const SWITCH_HENKAN: &str = "変換キーで日本語、無変換キーで英語";
+    pub const SWITCH_HENKAN_NOTE: &str =
+        "押したキーで入力モードが決まるので、今どちらかを気にせずに打てます。";
+    pub const CHARACTERS_TITLE: &str = "入力する文字";
+    pub const CHARACTERS_TEXT: &str = "かなの打ち方と、句読点の形を選びます。";
+    pub const INPUT_STYLE: &str = "入力方式";
+    pub const PUNCTUATION: &str = "句読点";
+    pub const LIVE_TITLE: &str = "ライブ変換";
+    pub const LIVE_TEXT: &str = "打つ手を止めると、Space を押さなくても漢字に変換します。";
+    pub const LIVE_CONVERSION: &str = "ライブ変換を使う";
+    pub const LIVE_DELAY: &str = "漢字にするまでの時間";
+    pub const DELAY_SHORT: &str = "0.3 秒";
+    pub const DELAY_STANDARD: &str = "0.5 秒";
+    pub const DELAY_LONG: &str = "0.8 秒";
+    pub const DELAY_LONGER: &str = "1.2 秒";
+    pub const WINDOW_STEP_TITLE: &str = "候補ウィンドウ";
+    pub const WINDOW_TEXT: &str = "変換の候補の出し方を選びます。";
+    pub const BRANCH_NOTE: &str = "文節ごとの候補を枝分かれで並べます。文全体を見ながら選べます。";
+    pub const LIST_NOTE: &str = "選んでいる文節の候補を縦に並べます。";
+    pub const FOCUS_TITLE: &str = "最初に選ぶ文節";
+    pub const FOCUS_TEXT: &str = "Space で変換したとき、どの文節から選び始めるかを決めます。";
+    pub const FOCUS_START_NOTE: &str = "文の頭から順に直していけます。";
+    pub const FOCUS_END_NOTE: &str = "最後に打った文節から選びます。";
+    pub const FOCUS_AUTOMATIC_NOTE: &str = "誤りやすい文節を選びます。";
+    pub const CORRECTION_TITLE: &str = "打ち間違いの補正";
+    pub const CORRECTION_TEXT: &str = "母音と子音の打ち間違いや、同じキーを 2 度打ったときに、正しい読みに直します。直した文字には点線が付きます。";
+    pub const CORRECTION_OFF: &str = "補正しない";
+    pub const CORRECTION_ENGLISH: &str = "英単語だけ";
+    pub const CORRECTION_CAUTIOUS: &str = "控えめ";
+    pub const CORRECTION_STANDARD: &str = "標準";
+    pub const CORRECTION_AGGRESSIVE: &str = "積極的";
+    pub const CORRECTION_OFF_NOTE: &str = "打ったとおりに変換します。";
+    pub const CORRECTION_ENGLISH_NOTE: &str = "英単語のつづりだけを直します。";
+    pub const CORRECTION_JAPANESE_NOTE: &str =
+        "英単語と日本語を直します。強いほど多くの間違いを直します。";
+    pub const FEATURES_TITLE: &str = "便利な機能";
+    pub const FEATURES_TEXT: &str = "変換するだけで使える機能です。使わないものはオフにできます。";
+    pub const ASSOCIATION: &str = "連想";
+    pub const ASSOCIATION_NOTE: &str = "変換中に Shift+↑ で、選んだ語に続く語を出します。";
+    pub const CALCULATION: &str = "計算";
+    pub const CALCULATION_NOTE: &str = "「1+2*3=」のように式を打って変換すると、答えを出します。";
+    pub const POSTAL_CODE: &str = "郵便番号";
+    pub const POSTAL_CODE_NOTE: &str =
+        "「100-0001」のように郵便番号を打って変換すると、住所を出します。";
+    pub const DATE: &str = "日付と時刻";
+    pub const DATE_NOTE: &str = "「きょう」「あした」「いま」を変換すると、日付や時刻を出します。";
+    pub const APPEARANCE_TITLE: &str = "外観";
+    pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
+    pub const DONE_TITLE: &str = "準備ができました";
+    pub const DONE_TEXT: &str = "選んだ設定で使い始められます。設定はあとから「s90.tokyo IME の設定」でいつでも変えられます。タスクバーの入力モードのアイコンを右クリックしても開けます。";
+
+    /// 候補ウィンドウの足元の案内(実演)
+    pub const HINTS: &[(&str, &str)] = &[("↓", "候補"), ("←→", "文節"), ("Shift+↑", "連想")];
+    pub const ASSOCIATION_LABEL: &str = "連想";
+
+    /// 実演で押すキー
+    pub const KEY_ENTER: &str = "Enter";
+    pub const KEY_SPACE: &str = "Space";
+    pub const KEY_HANKAKU: &str = "半角/全角";
+    pub const KEY_HENKAN: &str = "変換";
+    pub const KEY_MUHENKAN: &str = "無変換";
+    pub const KEY_DOWN: &str = "↓";
+    pub const KEY_UP: &str = "↑";
+    pub const KEY_RIGHT: &str = "→";
+    pub const KEY_LEFT: &str = "←";
+    pub const KEY_ASSOCIATE: &str = "Shift+↑";
+
+    /// 実演の説明
+    pub const CAPTION_ENGLISH: &str = "英語で入力";
+    pub const CAPTION_JAPANESE: &str = "日本語で入力";
+    pub const CAPTION_ROMAJI: &str = "ローマ字で入力";
+    pub const CAPTION_KANA: &str = "かなで入力";
+    pub const CAPTION_LIVE: &str = "手を止めると漢字に";
+    pub const CAPTION_SPACE: &str = "Space で変換";
+    pub const CAPTION_FOCUS: &str = "太い下線が選んでいる文節";
+    pub const CAPTION_TYPO: &str = "「う」を 2 度打ってしまった";
+    pub const CAPTION_CORRECTED: &str = "補正して「ありがとう」に";
+    pub const CAPTION_NOT_CORRECTED: &str = "打ったとおりに変換";
+    pub const CAPTION_OFF: &str = "オフにしているので出ません";
+}
+
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．
 /// macOS の UIStrings も同じ文に DefaultSettings の値を差し込む
 pub mod limited {

@@ -22,6 +22,10 @@ pub enum TextStyle {
     Icon,
     /// 小さい絵(山形の印・チェック)
     IconSmall,
+    /// 初期設定ウィザードの実演の文書の文字
+    Demo,
+    /// 初期設定ウィザードの最初と最後のページの大きな絵
+    Hero,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
