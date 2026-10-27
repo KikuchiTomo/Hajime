@@ -13,5 +13,11 @@ public enum EngineProcess {
         state.StateMask = 0
         _ = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &state, DWORD(MemoryLayout<PROCESS_POWER_THROTTLING_STATE>.size))
     }
+
+    /// OS のデバッグ出力に 1 行書く(DebugView などで見られる．ファイルには残さない)．
+    /// 入力した文字・読み・候補を含む文を渡さない(CorrectionReport の文だけ)
+    public static func debugLog(_ message: String) {
+        "s90-engine-host: \(message)\n".withCString(encodedAs: UTF16.self) { OutputDebugStringW($0) }
+    }
 }
 #endif

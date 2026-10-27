@@ -196,7 +196,12 @@ func run() -> Int32 {
             resetLearning: { [engine] in engine.resetLearning() },
             usage: usage,
             previewLanguage: { preview.preview($0, precedingText: $1) }
-        )
+        ),
+        log: { message in
+            #if os(Windows)
+            EngineProcess.debugLog(message)
+            #endif
+        }
     )
     settings.observe { [weak engine] in
         engine?.apply($0)
