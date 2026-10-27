@@ -1028,6 +1028,20 @@ impl PageView {
             .collect()
     }
 
+    /// 出している部品(使えないものも含む．読み上げ)
+    pub fn elements(&self) -> Vec<Element> {
+        self.rows
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| row.visible && row.card.is_some())
+            .flat_map(|(index, row)| {
+                row.parts()
+                    .into_iter()
+                    .map(move |part| Element { row: index, part })
+            })
+            .collect()
+    }
+
     /// 部品の位置(ページの中の座標)
     pub fn rect(&self, element: Element) -> Option<Rect> {
         self.rows.get(element.row)?.part_rect(element.part)

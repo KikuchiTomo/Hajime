@@ -1256,7 +1256,7 @@ impl App {
             return nodes;
         }
         let offset = self.scroll.offset(now);
-        for element in self.view.focusable() {
+        for element in self.view.elements() {
             let Some(described) = self.view.describe(element) else {
                 continue;
             };
