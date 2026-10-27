@@ -9,6 +9,15 @@ fn main() {
     let msvc = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
     if windows && msvc {
         println!("cargo:rustc-link-arg-bins=/MANIFEST:EMBED");
+        // 対応する Windows の宣言(子の窓の WS_EX_LAYERED に要る．s90-settings.manifest)
+        let manifest =
+            std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default())
+                .join("s90-settings.manifest");
+        println!("cargo:rerun-if-changed={}", manifest.display());
+        println!(
+            "cargo:rustc-link-arg-bins=/MANIFESTINPUT:{}",
+            manifest.display()
+        );
         println!(
             "cargo:rustc-link-arg-bins=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
         );

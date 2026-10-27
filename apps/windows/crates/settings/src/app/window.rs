@@ -110,6 +110,10 @@ pub struct App {
     graphics: Graphics,
     surface: Surface,
     pub(super) theme: Theme,
+    /// 窓の地を Mica にしているか(Windows 11 22H2 から．高コントラストでは使わない)
+    mica: bool,
+    /// 窓を描いたあとに検索欄を描き直したか．検索欄は自分の面を持つ窓で，窓が出る前に描いた絵は画面に出ない
+    search_painted: bool,
     /// --theme で決めた明暗(OS の設定を読まない)
     forced_dark: Option<bool>,
     animations: bool,
@@ -209,6 +213,8 @@ pub fn open(
         graphics,
         surface: Surface::new(window),
         theme,
+        mica: false,
+        search_painted: false,
         forced_dark: options.dark,
         animations: ffi::animations_enabled(),
         catalog,
@@ -310,6 +316,10 @@ impl App {
 
     fn apply_theme(&mut self) {
         ffi::set_dark_title_bar(self.window, self.theme.dark);
+        // 高コントラストのときは OS の色で塗るので Mica にしない
+        self.mica = ffi::set_mica(self.window, !self.theme.high_contrast);
+        // 先に作った検索欄は，地を変えたあとに描き直す(自分の面を持つ窓なので，前の絵が残る)
+        self.search_painted = false;
         edit::set_placeholder_color(self.theme.palette.text_secondary);
         self.field_brush = edit::Brush::new(self.theme.palette.control);
         if let Some(font) = &self.field_font {
@@ -600,7 +610,12 @@ impl App {
         self.update_preview();
         let (width, height) = self.size();
         let theme = self.theme;
-        let clear = Color::from(theme.palette.background);
+        // Mica のときは地を透明にし，Mica を見せる(カードと部品は不透明のまま描く)
+        let clear = if self.mica {
+            Color::from(theme.palette.background).with_alpha(0.0)
+        } else {
+            Color::from(theme.palette.background)
+        };
         let size = ffi::client_size(self.window);
         let preview = self.preview_pixels.as_ref().map(|(_, pixels)| pixels);
         let graphics = &self.graphics;
@@ -644,7 +659,13 @@ impl App {
         }
         // 入りの動きが終わったら打つ欄を出す．送っているあいだは欄も送る
         self.place_fields();
-        if self.animating(self.now()) {
+        if !self.search_painted {
+            self.search_painted = true;
+            ffi::invalidate(self.search);
+        }
+        // 描いた時刻で動いていたら，もう 1 フレーム描く．描き終えた時刻で決めると，動きが終わる直前の
+        // フレーム(入りの動きの途中の薄い絵)のまま止まり，入りの動きのあとに出す打つ欄も出ない
+        if self.animating(now) {
             // 画面の合成に合わせて次のフレームを描く(速く回しすぎない)
             ffi::wait_for_compositor();
             ffi::invalidate(self.window);
@@ -1918,8 +1939,9 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
     match message {
         WM_ERASEBKGND => Some(LRESULT(1)),
         WM_PAINT => {
-            with_app(App::paint);
+            // 描く前に済んだことにする．描いたあとにすると，描く中で頼んだ次のフレーム(動き)が打ち消されて止まる
             ffi::validate(window);
+            with_app(App::paint);
             Some(LRESULT(0))
         }
         WM_SIZE => {
@@ -2127,8 +2149,8 @@ fn flyout_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) ->
     match message {
         WM_ERASEBKGND => Some(LRESULT(1)),
         WM_PAINT => {
-            with_app(App::paint_flyout);
             ffi::validate(window);
+            with_app(App::paint_flyout);
             Some(LRESULT(0))
         }
         // 押しても前に出さない(フォーカスは設定の窓に残す)

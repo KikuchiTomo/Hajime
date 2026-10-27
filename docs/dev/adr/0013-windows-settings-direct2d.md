@@ -27,7 +27,10 @@ Windows の設定の画面(`s90-settings.exe`)は，Win32 の標準の部品(STA
 - 部品の配置(`layout.rs`)・動き・スクロール・表の選び方・左の一覧の並び(`ui/`)は OS に依存しない層に置き，テストする
 - 色・寸法・動きの長さは `design/tokens/tokens.json` の `settings-windows` に置く
 
-Windows 11 の Mica(`DWMSBT_MAINWINDOW`)は使わない．窓の中まで枠を広げると，子の窓の EDIT が GDI で描いた地が透けてしまう．EDIT を自分の面を持つ窓にする(`WS_EX_LAYERED` の子の窓)には，マニフェストに Windows 8 以降の宣言が要る．
+窓の地は Windows 11 の Mica(`DWMSBT_MAINWINDOW`)にする．枠を窓の中まで広げ，地(ページとサイドバー)を透明で描いたところに Mica が見える．カードと部品は不透明のまま描く．
+子の窓の EDIT は GDI で描くので，そのままでは透けてしまう．EDIT は自分の面を持つ窓(`WS_EX_LAYERED` の子の窓．不透明)にし，そのためにマニフェストに Windows 10/11 の宣言を入れる(`crates/settings/s90-settings.manifest`)．
+自分の面を持つ窓は，描画を終えたあとに DC を借りて重ねた絵が画面に出ないので，案内の文字は `WM_PAINT` の中で既定の描き方(`WM_PRINTCLIENT`)と一緒に描く．
+Mica を使えない Windows(22H2 より前)と高コントラストのときは，地を不透明で塗る．
 
 ## 検討したほかの案
 

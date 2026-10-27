@@ -5,7 +5,8 @@ use windows::Win32::Foundation::{
     COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SYSTEMTIME, WPARAM,
 };
 use windows::Win32::Graphics::Dwm::{
-    DwmSetWindowAttribute, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
+    DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW, DWMSBT_NONE,
+    DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
     DWMWCP_ROUND,
 };
 use windows::Win32::Graphics::Gdi::{
@@ -20,6 +21,7 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
 use windows::Win32::System::Time::SystemTimeToTzSpecificLocalTime;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
+use windows::Win32::UI::Controls::MARGINS;
 use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
@@ -307,6 +309,33 @@ pub fn set_dark_title_bar(window: HWND, dark: bool) {
             std::mem::size_of::<BOOL>() as u32,
         )
     };
+}
+
+/// 窓の地を Windows 11 の Mica にする(on が偽なら戻す)．枠を窓の中まで広げ，地を透明で描いたところに Mica が見える．
+/// Mica を使えない Windows(22H2 より前)では偽を返し，枠も広げない
+pub fn set_mica(window: HWND, on: bool) -> bool {
+    let backdrop = if on { DWMSBT_MAINWINDOW } else { DWMSBT_NONE };
+    // SAFETY: backdrop はこの関数の中の値で，大きさを正しく渡す
+    let applied = unsafe {
+        DwmSetWindowAttribute(
+            window,
+            DWMWA_SYSTEMBACKDROP_TYPE,
+            (&raw const backdrop).cast(),
+            std::mem::size_of_val(&backdrop) as u32,
+        )
+    }
+    .is_ok();
+    let extend = on && applied;
+    let margin = if extend { -1 } else { 0 };
+    let margins = MARGINS {
+        cxLeftWidth: margin,
+        cxRightWidth: margin,
+        cyTopHeight: margin,
+        cyBottomHeight: margin,
+    };
+    // SAFETY: margins はこの関数の中の値
+    let _ = unsafe { DwmExtendFrameIntoClientArea(window, &margins) };
+    extend
 }
 
 /// 次の画面の合成まで待つ(動きのフレームを画面の更新に揃える)

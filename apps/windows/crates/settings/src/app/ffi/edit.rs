@@ -5,8 +5,9 @@ use super::win32::{colorref, Font};
 use std::cell::Cell;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, DrawTextW, GetDC, ReleaseDC, SelectObject, SetBkMode,
-    SetTextColor, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, HBRUSH, HGDIOBJ, TRANSPARENT,
+    BeginPaint, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, SelectObject, SetBkMode,
+    SetTextColor, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, HBRUSH, HDC, HGDIOBJ,
+    PAINTSTRUCT, TRANSPARENT,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, MapVirtualKeyW, MAPVK_VK_TO_CHAR, VK_CONTROL, VK_ESCAPE, VK_MENU, VK_RETURN,
@@ -14,10 +15,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClientRect, GetParent, GetWindowTextLengthW, PostMessageW, SendMessageW, ES_AUTOHSCROLL,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CHAR, WM_GETFONT, WM_KEYDOWN, WM_KILLFOCUS,
-    WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_SETFOCUS, WM_SYSCHAR, WM_SYSKEYDOWN, WS_CHILD,
-    WS_TABSTOP,
+    GetClientRect, GetParent, GetWindowTextLengthW, PostMessageW, SendMessageW,
+    SetLayeredWindowAttributes, ES_AUTOHSCROLL, LWA_ALPHA, PRF_CLIENT, PRF_ERASEBKGND,
+    WINDOW_STYLE, WM_APP, WM_CHAR, WM_GETFONT, WM_KEYDOWN, WM_KILLFOCUS, WM_MOUSEWHEEL,
+    WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_SETFOCUS, WM_SYSCHAR, WM_SYSKEYDOWN, WS_CHILD,
+    WS_EX_LAYERED, WS_TABSTOP,
 };
 use windows_core::w;
 
@@ -50,8 +52,10 @@ struct FieldData {
 
 /// 枠の無い欄を作る(見えない状態で作る．置くときに見せる)
 pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<HWND> {
+    // 親の窓の地が Mica(透明)でも GDI で描いた欄が透けないよう，自分の面を持つ窓(子の WS_EX_LAYERED．
+    // Windows 8 からで，マニフェストの宣言が要る．build.rs)にして，不透明に重ねる
     let window = super::win32::create(
-        WINDOW_EX_STYLE::default(),
+        WS_EX_LAYERED,
         w!("EDIT"),
         "",
         WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
@@ -59,6 +63,8 @@ pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<H
         Some(parent),
         id,
     )?;
+    // SAFETY: window はこのスレッドの窓
+    let _ = unsafe { SetLayeredWindowAttributes(window, COLORREF(0), u8::MAX, LWA_ALPHA) };
     super::win32::set_font(window, font);
     let data = Box::new(FieldData {
         placeholder: placeholder.encode_utf16().collect(),
@@ -236,19 +242,31 @@ fn handle(
             Some(LRESULT(0))
         }
         WM_PAINT => {
-            // SAFETY: 既定の描き方のあとに，空なら案内の文字を重ねる．DC は借りて返す
-            unsafe {
-                let result = DefSubclassProc(window, message, wparam, lparam);
-                if GetWindowTextLengthW(window) == 0 {
-                    let text = field
-                        .recording
-                        .as_ref()
-                        .unwrap_or(&field.placeholder)
-                        .clone();
-                    paint_placeholder(window, text);
-                }
-                Some(result)
+            // SAFETY: このスレッドの窓．空でなければ既定の描き方に任せる
+            if unsafe { GetWindowTextLengthW(window) } != 0 {
+                return Some(unsafe { DefSubclassProc(window, message, wparam, lparam) });
             }
+            // 空なら，既定の描き方(WM_PRINTCLIENT)と案内の文字を同じ描画の中で描く．
+            // 欄は自分の面を持つ窓なので，描画を終えたあとに DC を借りて重ねた分は画面に出ない
+            let text = field
+                .recording
+                .as_ref()
+                .unwrap_or(&field.placeholder)
+                .clone();
+            let mut paint = PAINTSTRUCT::default();
+            // SAFETY: BeginPaint と EndPaint を対にする．hdc は描画のあいだだけ使う
+            unsafe {
+                let hdc = BeginPaint(window, &mut paint);
+                DefSubclassProc(
+                    window,
+                    WM_PRINTCLIENT,
+                    WPARAM(hdc.0 as usize),
+                    LPARAM((PRF_CLIENT | PRF_ERASEBKGND) as isize),
+                );
+                paint_placeholder(window, hdc, text);
+                let _ = EndPaint(window, &paint);
+            }
+            Some(LRESULT(0))
         }
         WM_NCDESTROY => {
             // SAFETY: create で付けた手続きを外し，Box に戻して放す
@@ -263,13 +281,12 @@ fn handle(
 }
 
 /// 空の欄に案内の文字を描く
-fn paint_placeholder(window: HWND, mut text: Vec<u16>) {
+fn paint_placeholder(window: HWND, hdc: HDC, mut text: Vec<u16>) {
     if text.is_empty() {
         return;
     }
-    // SAFETY: このスレッドの窓の DC を借りて返す．書体は選んで戻す
+    // SAFETY: hdc は描画のあいだの DC．書体は選んで戻す
     unsafe {
-        let hdc = GetDC(Some(window));
         let font = SendMessageW(window, WM_GETFONT, None, None).0;
         let old = SelectObject(hdc, HGDIOBJ(font as *mut _));
         SetBkMode(hdc, TRANSPARENT);
@@ -285,6 +302,5 @@ fn paint_placeholder(window: HWND, mut text: Vec<u16>) {
             DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
         );
         SelectObject(hdc, old);
-        ReleaseDC(Some(window), hdc);
     }
 }
