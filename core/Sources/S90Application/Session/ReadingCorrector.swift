@@ -235,10 +235,49 @@ final class ReadingCorrector {
             return false
         }
         dismissedKeys = typed.rawKeys
+        rejectedPhrase = changedClause(typed: typed.conversionReading, corrected: composition.conversionReading)
         composition = typed
         applied = nil
         suggestion = nil
         return true
+    }
+
+    /// 最後に戻した補正で直されていた語句(打ったままの読みの，直された部分を含む文節)．戻した補正を覚えるのに使う
+    private(set) var rejectedPhrase: String?
+
+    /// 打ったままの読みのうち，直されて違っていた部分を含む文節．
+    /// 文節に分けられないときや，文節が DefaultSettings.minimumRememberedPhraseLength に満たないときは読み全体にする．
+    /// 短い語句(「う」)を覚えると，その字を含むほかの文まで直さなくなるため
+    private func changedClause(typed: String, corrected: String) -> String? {
+        guard let clause = changedSpan(typed: typed, corrected: corrected), clause.count >= DefaultSettings.minimumRememberedPhraseLength else {
+            return typed.isEmpty ? nil : typed
+        }
+        return clause
+    }
+
+    private func changedSpan(typed: String, corrected: String) -> String? {
+        let a = Array(typed), b = Array(corrected)
+        let prefix = zip(a, b).prefix { $0 == $1 }.count
+        let suffix = min(zip(a.reversed(), b.reversed()).prefix { $0 == $1 }.count, min(a.count, b.count) - prefix)
+        let end = max(a.count - suffix, min(prefix + 1, a.count))
+        guard prefix < end else { return nil }
+        let clauses = ClauseSplitter.clauses(of: converter.segmentationWords(for: typed))
+        guard clauses.reduce(0, { $0 + $1.readingCount }) == a.count else { return nil }
+        var start = 0, from = 0, to = a.count
+        var foundStart = false
+        for clause in clauses {
+            let clauseEnd = start + clause.readingCount
+            if !foundStart, clauseEnd > prefix {
+                from = start
+                foundStart = true
+            }
+            if clauseEnd >= end {
+                to = clauseEnd
+                break
+            }
+            start = clauseEnd
+        }
+        return String(a[from..<to])
     }
 
     /// 読みを編集した(Backspace)．直した部分まで消したら，直した読みのまま受け入れたことにする

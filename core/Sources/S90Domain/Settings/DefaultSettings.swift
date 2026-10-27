@@ -266,6 +266,8 @@ public enum DefaultSettings {
     public static let maximumCorrectionRules = 2_000
     /// 直さない語の長さの上限
     public static let maximumExceptionLength = 64
+    /// 戻した補正から覚える語句の短さの下限(文字数)．これより短い文節は，読み全体を覚える
+    public static let minimumRememberedPhraseLength = 2
     /// 置き換えの決まりの打った英字の長さと，置き換える語句の長さの上限
     public static let correctionRuleTypedLength = 2...24
     public static let maximumCorrectionRuleWordLength = 64
