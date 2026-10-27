@@ -131,6 +131,9 @@ public enum DefaultSettings {
     /// 音の変わらない書き誤り(見ずらい → 見づらい)は，変換のもっともらしさの差がこれ以上なら「もしかして」と示す．
     /// かなの並びを見る言語モデルは書き分けの誤りを見分けにくく，辞書の語に切れるかどうかが決め手になるため
     public static let samePronunciationSuggestionGain = 6.0
+    /// 文の途中の言い違い(「ゆった」→「いった」)は，言い直した読みの変換のもっともらしさがこれ以上よくなるときだけ「もしかして」と示す．
+    /// 言い違いの部分が変換でかなのまま残るとき(Misreadings.fragmentVariants)に限ったうえで，言い直しても変わらない読みには示さない
+    public static let misreadingFragmentGain = 6.0
     /// 同じキーを続けて 2 回打ってしまった誤り(「koonnichiha」)を直す手間．近くのキーを余分に打った誤りの手間(3.0)より小さくする
     public static let repeatedKeyCost = 2.0
     /// 同じキーを続けて打った箇所のうち，1 回にして試す箇所の数の上限．1 か所ごとに Zenzai に問い合わせるので抑える

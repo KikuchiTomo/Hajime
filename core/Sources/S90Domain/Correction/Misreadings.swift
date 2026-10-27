@@ -45,6 +45,40 @@ public enum Misreadings {
         Entry(reading: "こんばんわ", word: "こんばんは", correctReading: "こんばんは"),
     ]
 
+    /// 文の途中にも出る言い違いの部分．話し言葉の発音のまま打ったもの(「なんてゆったの」の「ゆっ」→「いっ」)．
+    /// 「言う」は活用で形が変わるので，活用した形ごとに書く．
+    /// 正しい使い方もある(「髪をゆった」= 結った)ので決め打ちでは直さず，言い直した読みのほうが変換としてもっともらしいときだけ示す(ReadingCorrector)
+    public struct Fragment: Sendable, Equatable {
+        public var reading: String
+        public var correctReading: String
+    }
+
+    public static let fragments: [Fragment] = [
+        Fragment(reading: "ゆう", correctReading: "いう"),
+        Fragment(reading: "ゆっ", correctReading: "いっ"),
+        Fragment(reading: "ゆわ", correctReading: "いわ"),
+        Fragment(reading: "ゆえば", correctReading: "いえば"),
+        Fragment(reading: "ゆおう", correctReading: "いおう"),
+        Fragment(reading: "ゆいます", correctReading: "いいます"),
+        Fragment(reading: "ゆいました", correctReading: "いいました"),
+    ]
+
+    /// 読みの中の言い違いの部分を 1 か所ずつ言い直した読み(長い部分を先に当てる)．
+    /// converted は打ったままの読みを変換した文．その部分が変換でかなのまま残っているもの(どの語にも当たらなかった)だけを言い直す．
+    /// 正しい使い方なら変換で語になる(「髪をゆった」→「髪を結った」)
+    public static func fragmentVariants(of reading: String, converted: String) -> [String] {
+        var variants: [String] = []
+        for fragment in fragments.sorted(by: { $0.reading.count > $1.reading.count }) where converted.contains(fragment.reading) {
+            var searchRange = reading.startIndex..<reading.endIndex
+            while let range = reading.range(of: fragment.reading, range: searchRange) {
+                let variant = reading.replacingCharacters(in: range, with: fragment.correctReading)
+                if !variants.contains(variant) { variants.append(variant) }
+                searchRange = range.upperBound..<reading.endIndex
+            }
+        }
+        return variants
+    }
+
     private static let table = Dictionary(entries.map { ($0.reading, $0) }, uniquingKeysWith: { first, _ in first })
 
     /// 読み全体がよくある読み違いなら，その項目

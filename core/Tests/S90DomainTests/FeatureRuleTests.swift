@@ -110,6 +110,14 @@ struct MisreadingTests {
         #expect(Misreadings.entry(for: "ふんいき") == nil)
         #expect(Set(Misreadings.entries.map(\.reading)).count == Misreadings.entries.count)
     }
+
+    @Test("文の途中の言い違いは，変換でかなのまま残った部分だけを言い直す(結った・勇気は言い直さない)")
+    func fragments() {
+        #expect(Misreadings.fragmentVariants(of: "なんてゆったの", converted: "なんてゆったの") == ["なんていったの"])
+        #expect(Misreadings.fragmentVariants(of: "そうゆうこと", converted: "そうゆうこと") == ["そういうこと"])
+        #expect(Misreadings.fragmentVariants(of: "かみをゆった", converted: "髪を結った").isEmpty)
+        #expect(Misreadings.fragmentVariants(of: "ゆうきがある", converted: "勇気がある").isEmpty)
+    }
 }
 
 @Suite("補正の決まり")

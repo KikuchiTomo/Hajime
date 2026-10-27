@@ -286,10 +286,30 @@ final class ReadingCorrector {
     /// 読みの末尾がよくある読み違いなら，正しい読みにした読み(Misreadings)
     private func misreadingSuggestion(for typed: Composition, makeComposition: () -> Composition) -> Composition? {
         let reading = typed.conversionReading
-        guard let match = Misreadings.suffixEntry(in: reading), match.entry.correctReading != match.entry.reading else { return nil }
+        let corrected: String
+        if let match = Misreadings.suffixEntry(in: reading), match.entry.correctReading != match.entry.reading {
+            corrected = String(reading.prefix(match.start)) + match.entry.correctReading
+        } else if let best = fragmentSuggestion(for: reading) {
+            corrected = best
+        } else {
+            return nil
+        }
         var suggested = makeComposition()
-        suggested.insertKana(String(reading.prefix(match.start)) + match.entry.correctReading)
+        suggested.insertKana(corrected)
         return suggested
+    }
+
+    /// 文の途中の言い違い(「ゆった」→「いった」)を言い直した読みのうち，変換としていちばんもっともらしく，
+    /// 打ったままの読みより DefaultSettings.misreadingFragmentGain 以上よいもの．正しい使い方(結った)では言い直さない
+    private func fragmentSuggestion(for reading: String) -> String? {
+        guard Misreadings.fragments.contains(where: { reading.contains($0.reading) }) else { return nil }
+        let converted = converter.candidates(for: reading).first { $0.readingCount == reading.count }?.text ?? reading
+        let variants = Misreadings.fragmentVariants(of: reading, converted: converted)
+        guard !variants.isEmpty else { return nil }
+        let base = converter.plausibility(of: reading)
+        return variants.map { (reading: $0, gain: converter.plausibility(of: $0) - base) }
+            .filter { $0.gain >= DefaultSettings.misreadingFragmentGain }
+            .max { $0.gain < $1.gain }?.reading
     }
 
     private func decision(for region: Region) -> ReadingCorrectionRule.Decision? {
