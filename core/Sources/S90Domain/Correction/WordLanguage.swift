@@ -169,6 +169,8 @@ public struct WordLanguageJudge: Sendable {
         if let rule = settings.rules.last(where: { $0.word == word && $0.context == context }) { return rule.language }
         guard evidence.reading != nil else { return .english }
         if mode == .dictionaryOnly { return evidence.isEnglishWord ? .english : .japanese }
+        // ローマ字入力では，短い語(「no」)は前が英語でも日本語にする
+        if mode == .japaneseFirst, word.count <= DefaultSettings.maximumJapaneseFirstShortWordLength, !evidence.isOffensive { return .japanese }
         guard evidence.isEnglishWord else {
             switch mode {
             case .dictionaryOnly: return .japanese

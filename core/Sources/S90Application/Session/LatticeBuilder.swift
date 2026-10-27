@@ -8,6 +8,8 @@ import S90Domain
 @MainActor
 struct LatticeBuilder {
     let converter: any KanaKanjiConverting
+    /// 上の枝(字種)を作るときに，読みに残った英字(英語と判定した語)をかなにするローマ字の表
+    var romajiTable: RomajiTable = .standard
 
     func build(reading: String, focus: InitialFocus = .automatic) -> SegmentLattice {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
@@ -250,14 +252,14 @@ struct LatticeBuilder {
             append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
         }
         // 上の枝(ひらがな・カタカナ・半角カタカナ)にあるものは，下の枝に重ねて出さない．第 1 候補(幹)は残す
-        let variants = Self.variants(of: slice).map(\.text)
-        candidates = candidates.enumerated().filter { $0.offset == 0 || !variants.contains($0.element.text) }.map(\.element)
+        let variantTexts = variants(of: slice).map(\.text)
+        candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
         let engineCandidates = candidates.filter(\.isFromEngine)
         let best = engineCandidates.first, second = engineCandidates.dropFirst().first
         let confident = SegmentLattice.isConfident(best: best, second: second)
         let gap = best.flatMap { best in second.map { best.score - $0.score } } ?? .infinity
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
-                                      variants: Self.variants(of: slice), isConfident: confident, confidenceGap: gap)
+                                      variants: variants(of: slice), isConfident: confident, confidenceGap: gap)
     }
 
     /// 文節の先頭の語を別の候補に変え，残りの部分はそのままつないだ候補(ごくでしょうが → 語句でしょうが・極でしょうが)．
@@ -275,12 +277,43 @@ struct LatticeBuilder {
     }
 
     /// 上の枝に出す字種．エンジンが出さなくても選べるようにする
-    static func variants(of slice: String) -> [Candidate] {
-        let katakana = KanaWidth.katakana(from: slice)
+    /// 上の枝(ひらがな・カタカナ・半角カタカナ)．英語と判定して英字のまま読みに入れた語(「no」)は，
+    /// ローマ字としてかなにしてから作る(上の枝で「の」「ノ」に直せるように)
+    func variants(of slice: String) -> [Candidate] {
+        let hiragana = Self.kana(of: slice, table: romajiTable)
+        let katakana = KanaWidth.katakana(from: hiragana)
         return [
-            Candidate(text: slice, readingCount: slice.count, origin: .variant(.hiragana)),
+            Candidate(text: hiragana, readingCount: slice.count, origin: .variant(.hiragana)),
             Candidate(text: katakana, readingCount: slice.count, origin: .variant(.katakana)),
             Candidate(text: KanaWidth.halfwidthKatakana(from: katakana), readingCount: slice.count, origin: .variant(.halfwidthKatakana)),
         ]
+    }
+
+    /// 英小文字の並びを，ローマ字としてかなにする．かなにしきれない並び(ローマ字として読めない)は英字のまま残す．
+    /// 大文字を含む並び(Shift で打った「API」)は打ったとおりの英字なので変えない
+    static func kana(of text: String, table: RomajiTable) -> String {
+        var result = ""
+        var run = ""
+        func flush() {
+            guard !run.isEmpty else { return }
+            var composition = Composition(table: table)
+            run.forEach { composition.insertRomaji($0) }
+            let kana = composition.conversionReading
+            result += kana.contains(where: \.isASCII) ? run : kana
+            run = ""
+        }
+        for (index, character) in text.enumerated() {
+            if character.isASCII, character.isLetter {
+                run.append(character)
+                let isLast = index == text.count - 1
+                let next = isLast ? nil : text[text.index(text.startIndex, offsetBy: index + 1)]
+                guard next.map({ $0.isASCII && $0.isLetter }) != true else { continue }
+                if run.contains(where: \.isUppercase) { result += run; run = "" } else { flush() }
+            } else {
+                result.append(character)
+            }
+        }
+        flush()
+        return result
     }
 }

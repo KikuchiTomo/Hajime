@@ -227,7 +227,7 @@ public final class InputSession {
     /// 分岐図を使わない設定(一覧)や，入力中でなければ空
     public var latticeWarmingSteps: [@MainActor () -> Void] {
         guard phase == .composing, !composition.isEmpty, settings.current.candidatePresentation != .list else { return [] }
-        let builder = LatticeBuilder(converter: converter)
+        let builder = latticeBuilder
         let reading = composition.conversionReading
         // 最後に，Space と同じ分岐図(文節が 1 つの文の分け方や訂正を含む)と，足元に出す文節の長さの下見(短く・長く)も，
         // 1 つずつ求める(1 歩を短くし，そのあいだに来たキーを待たせない)
@@ -831,7 +831,7 @@ public final class InputSession {
             return
         }
         corrector.commit(into: &composition)
-        phase = .lattice(initialLattice(LatticeBuilder(converter: converter)))
+        phase = .lattice(initialLattice(latticeBuilder))
     }
 
     /// Space で出す分岐図．打っている途中に入れた区切りと，打ち間違いの訂正を入れる(状態は変えない)
@@ -1012,6 +1012,12 @@ public final class InputSession {
             corrector.reset()
         }
         return actions + reset()
+    }
+
+    /// 分岐図を作るもの．上の枝で英字をかなにするときも，利用者が足したローマ字の綴りを使う
+    private var latticeBuilder: LatticeBuilder {
+        _ = newComposition()
+        return LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
     }
 
     /// 空の読み．利用者が足したローマ字の綴りを使う
@@ -1198,7 +1204,7 @@ public final class InputSession {
             })
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                                   showsVariants: settings.current.showsVariantRow, corrected: corrected)
-            let preview = LatticeBuilder(converter: converter).resizePreview(lattice, reading: composition.conversionReading)
+            let preview = latticeBuilder.resizePreview(lattice, reading: composition.conversionReading)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
                 panel.columns[focused].longer = preview.longer
@@ -1349,7 +1355,7 @@ public final class InputSession {
             case .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split: return KeyResult(handled: true)
             }
         case .lattice(var lattice):
-            let builder = LatticeBuilder(converter: converter)
+            let builder = latticeBuilder
             switch move {
             case .next: lattice.moveFocus(by: 1)
             case .previous: lattice.moveFocus(by: -1)
@@ -1531,7 +1537,7 @@ public final class InputSession {
             // 数字で選んだ位置で区切る．区切ったあとは前の文節に注目したまま
             let positions = focusedSplit(lattice).positions
             if let number = character.wholeNumberValue, positions.indices.contains(number - 1) {
-                let builder = LatticeBuilder(converter: converter)
+                let builder = latticeBuilder
                 lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: positions[number - 1], reading: composition.conversionReading)
             }
             phase = .lattice(lattice)

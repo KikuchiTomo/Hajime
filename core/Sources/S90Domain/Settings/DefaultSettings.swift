@@ -160,6 +160,9 @@ public enum DefaultSettings {
     /// 打ち間違いを見直すまでの打鍵の止まり(秒)．見直しは 1 文 0.1〜0.7 秒かかり，その間はキーを受け付けないので，
     /// 文を見せるときより長く止まったときだけ行う
     public static let liveCorrectionDelay = 0.8
+    /// ローマ字入力で，前が英語でも日本語にする語の長さ(英字の数)の上限．「no」「to」のような短い語は助詞などのことが多く，
+    /// 英語にすると上の枝でもかなに直しにくい．英語の語は変換の候補で出せる
+    public static let maximumJapaneseFirstShortWordLength = 2
     /// EN 入力で日本語の候補を出し始める英字の数．短い英単語(an，to など)に候補を出さない
     public static let minimumEnglishInputSuggestionLength = 4
     /// 利用者が足すローマ字の綴りとかなの長さの上限と，足せる数
