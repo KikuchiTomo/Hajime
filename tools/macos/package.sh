@@ -10,6 +10,7 @@
 #   S90_INSTALLER_IDENTITY  .pkg の署名．無ければ Developer ID Installer の証明書．どちらも無ければ署名しない
 #   S90_NOTARY_PROFILE      公証に使う notarytool のキーチェーンのプロファイル名．無ければ公証しない(手元に入れる .pkg)
 #                           (作り方: xcrun notarytool store-credentials <名前>)
+#   S90_NOTARY_KEYCHAIN     公証のプロファイルを入れたキーチェーン．無ければ既定のキーチェーン(CI は ci_signing.sh が作る)
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 
@@ -30,6 +31,14 @@ if [ -n "$installer_identity" ]; then
   fi
 fi
 notary_profile=${S90_NOTARY_PROFILE:-}
+notary_keychain=${S90_NOTARY_KEYCHAIN:-}
+notarize() {
+  if [ -n "$notary_keychain" ]; then
+    xcrun notarytool submit "$1" --keychain-profile "$notary_profile" --keychain "$notary_keychain" --wait
+  else
+    xcrun notarytool submit "$1" --keychain-profile "$notary_profile" --wait
+  fi
+}
 if [ -n "${S90_APP_IDENTITY:-}" ]; then
   app_identity=$S90_APP_IDENTITY
 elif [ -n "$notary_profile" ]; then
@@ -86,7 +95,7 @@ fi
 
 if [ -n "$notary_profile" ]; then
   ditto -c -k --sequesterRsrc --keepParent "$app" "$work/app.zip"
-  xcrun notarytool submit "$work/app.zip" --keychain-profile "$notary_profile" --wait
+  notarize "$work/app.zip"
   xcrun stapler staple "$app"
 fi
 
@@ -104,8 +113,10 @@ if [ -n "$installer_identity" ]; then
   productbuild --distribution "$work/distribution.xml" --package-path "$work" --sign "$installer_identity" "$output"
   echo ".pkg の署名: $installer_identity"
   if [ -n "$notary_profile" ]; then
-    xcrun notarytool submit "$output" --keychain-profile "$notary_profile" --wait
+    notarize "$output"
     xcrun stapler staple "$output"
+    # 公証した .pkg は，Gatekeeper の検査で警告なしに開けることを確かめる
+    spctl --assess --type install --verbose "$output"
   fi
 else
   productbuild --distribution "$work/distribution.xml" --package-path "$work" "$output"
