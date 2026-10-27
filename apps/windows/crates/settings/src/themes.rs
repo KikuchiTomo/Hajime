@@ -9,6 +9,8 @@ use serde_json::{json, Map, Value};
 
 pub const THEMES: &str = "customThemes";
 pub const ACTIVE: &str = "customThemeID";
+/// 既成のテーマを選ぶ設定(カスタムテーマを使っているときは，その名前を選んだ状態で見せる)
+pub const BASE_THEME: &str = "theme";
 
 /// 編集しているテーマの id(選んでいなければ空)
 pub const ID: &str = "customTheme.id";
@@ -56,6 +58,29 @@ pub fn entries(themes: Option<&Value>) -> Vec<Entry> {
             })
         })
         .collect()
+}
+
+/// 使っているカスタムテーマの名前．使っていなければ None
+pub fn active_name(themes: Option<&Value>, active: &str) -> Option<String> {
+    if active.is_empty() {
+        return None;
+    }
+    entries(themes)
+        .into_iter()
+        .find(|entry| entry.id == active)
+        .map(|entry| entry.name)
+}
+
+/// ほかのテーマと重ならない名前(「新しいテーマ」「新しいテーマ 2」…)
+pub fn unique_name(base: &str, entries: &[Entry]) -> String {
+    let taken = |name: &str| entries.iter().any(|entry| entry.name == name);
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..)
+        .map(|number| format!("{base} {number}"))
+        .find(|name| !taken(name))
+        .unwrap_or_else(|| base.to_string())
 }
 
 /// 表の行(名前・状態)
@@ -283,6 +308,25 @@ mod tests {
              "selection": "#0040FF", "selectionText": "#FFFFFF", "correction": "#FF0000", "line": "#CCCCCC",
              "fontName": "Meiryo UI", "cornerRadius": 0.0, "branchStyle": "straight"}
         ])
+    }
+
+    #[test]
+    fn 新しいテーマの名前は重ならない() {
+        let themes = serde_json::json!([
+            {"id": "a", "name": "新しいテーマ"},
+            {"id": "b", "name": "新しいテーマ 2"},
+        ]);
+        let list = entries(Some(&themes));
+        assert_eq!(unique_name("新しいテーマ", &list), "新しいテーマ 3");
+        assert_eq!(unique_name("夜", &list), "夜");
+    }
+
+    #[test]
+    fn 使っているカスタムテーマの名前() {
+        let themes = serde_json::json!([{"id": "a", "name": "夜"}]);
+        assert_eq!(active_name(Some(&themes), "a").as_deref(), Some("夜"));
+        assert_eq!(active_name(Some(&themes), ""), None);
+        assert_eq!(active_name(Some(&themes), "z"), None);
     }
 
     #[test]
