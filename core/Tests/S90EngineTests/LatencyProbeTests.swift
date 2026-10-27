@@ -70,7 +70,15 @@ struct LatencyProbeTests {
         // ほかのプロセスに CPU を取られた回があっても正しく測れるよう，同じ文を何回か打ち，項目ごとにいちばん速かった回で判定する(perKey と同じ)
         var chunks: [Duration] = []
         var space = Duration.seconds(Int64.max), right = Duration.seconds(Int64.max), resize = Duration.seconds(Int64.max)
+        var warmedSpace = Duration.seconds(Int64.max), warmingStep = Duration.seconds(Int64.max)
         for _ in 0..<Self.passes {
+            // 打鍵が止まったあいだに分岐図の候補を前もって求めたとき(アプリでふつうに起きる順)の Space
+            for key in keys { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+            _ = session.settle(context: InputContext())
+            let steps = session.latticeWarmingSteps
+            warmingStep = min(warmingStep, steps.map { step in clock.measure { step() } }.max() ?? .zero)
+            warmedSpace = min(warmedSpace, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
+            _ = session.handle(KeyEvent(.enter), context: InputContext())
             var durations: [Duration] = []
             for key in keys {
                 durations.append(clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) })
@@ -85,11 +93,15 @@ struct LatencyProbeTests {
             }
             chunks = chunks.isEmpty ? passChunks : zip(chunks, passChunks).map { min($0, $1) }
         }
-        print("S90_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) passes=\(Self.passes) max_per_10keys=\(chunks) space=\(space) right=\(right) resize=\(resize)\(Self.loadAverage)")
+        print("S90_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) passes=\(Self.passes) max_per_10keys=\(chunks) space=\(space) warmed_space=\(warmedSpace) warming_step=\(warmingStep) right=\(right) resize=\(resize)\(Self.loadAverage)")
         // 文が長くなっても 1 キーは 50ms 以内(R-01)．Space で分岐図を出すまでは，待たされたと感じない 0.1 秒を目安に，
         // ほかのプロセスの負荷で延びる分を見込んで 0.15 秒以内．文節ごとにライブ変換の状態を捨てて変換し直していたときは 0.58 秒だった
         #expect(chunks.allSatisfy { $0 < .milliseconds(50) }, "長い文で 1 キーが 50ms を超えた: \(chunks)")
         #expect(space < .milliseconds(150), "長い文で Space から分岐図までが 0.15 秒を超えた: \(space)")
+        // 打鍵が止まったあいだに前もって求めていれば，Space は文節ごとに変換し直さない
+        // 前もって求める 1 歩のあいだに来たキーはその分待つので，1 歩も 1 キーと同じく 50ms 以内
+        #expect(warmingStep < .milliseconds(50), "前もって求める 1 歩が 50ms を超えた: \(warmingStep)")
+        #expect(warmedSpace < space, "前もって求めても Space が速くならない: \(warmedSpace)，求めないとき \(space)")
         #expect(right < .milliseconds(150) && resize < .milliseconds(150), "長い文で変換中の操作が 0.15 秒を超えた: → \(right)，⇧→ \(resize)")
     }
 

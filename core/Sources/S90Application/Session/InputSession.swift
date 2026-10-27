@@ -223,6 +223,13 @@ public final class InputSession {
         return render(context: context)
     }
 
+    /// 打鍵が止まったあいだに，Space で分岐図を出すときに求める候補を前もって求める手順(LatticeBuilder.warmingSteps)．
+    /// 分岐図を使わない設定(一覧)や，入力中でなければ空
+    public var latticeWarmingSteps: [@MainActor () -> Void] {
+        guard phase == .composing, !composition.isEmpty, settings.current.candidatePresentation != .list else { return [] }
+        return LatticeBuilder(converter: converter).warmingSteps(reading: composition.conversionReading)
+    }
+
     /// 打鍵がさらに止まるのを待って，打ち間違いを見直すか．待っていれば，止まったときに review を呼ぶ
     public var awaitsReview: Bool {
         isSettled && phase == .composing && (corrector.active == nil || corrector.yieldsToJapanese(in: composition))

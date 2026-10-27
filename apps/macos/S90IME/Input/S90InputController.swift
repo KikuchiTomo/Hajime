@@ -88,14 +88,17 @@ final class S90InputController: IMKInputController {
         let correctionDelay = root.settings.current.correctionDelay
         guard settles || session.awaitsReview else { return }
         settleTask = Task { @MainActor [weak self] in
+            let start = ContinuousClock.now
             if settles {
                 try? await Task.sleep(for: .seconds(settleDelay))
                 guard !Task.isCancelled, let self else { return }
                 self.presenter.apply(self.session.settle(context: context), to: client)
+                // 見直しを待つあいだに，Space で出す分岐図の候補を前もって求める
+                await self.warmLattice()
             }
-            let remaining = max(correctionDelay - (settles ? settleDelay : 0), 0)
             guard let self, self.session.awaitsReview else { return }
-            try? await Task.sleep(for: .seconds(remaining))
+            // 見直すのは，打鍵が止まってから correctionDelay たったとき(前もって求めた時間を含める)
+            try? await Task.sleep(until: start + .seconds(correctionDelay), clock: .continuous)
             guard !Task.isCancelled else { return }
             // 訂正はメインスレッドの外で求め，求め終わったときに打ったキーが変わっていなければ見直す
             if let request = self.session.correctionRequest, let service = self.root.typoService {
@@ -111,6 +114,18 @@ final class S90InputController: IMKInputController {
                 self.session.provideCorrections(corrections)
             }
             self.presenter.apply(self.session.review(context: context), to: client)
+            // 見直しで読みを直したときは，直した読みの候補も前もって求める(変わらない文節はためたものを使う)
+            await self.warmLattice()
+        }
+    }
+
+    /// 分岐図の候補を 1 文節ずつ前もって求める．文節ごとにほかの処理(次のキー)に譲り，取り消されたらやめる
+    @MainActor
+    private func warmLattice() async {
+        for step in session.latticeWarmingSteps {
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            step()
         }
     }
 
