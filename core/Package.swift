@@ -47,7 +47,10 @@ let package = Package(
         .executableTarget(
             name: "s90-engine-host",
             dependencies: ["S90Domain", "S90Application", "S90Engine", "S90Persistence", "S90IPC"],
-            swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
+            swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))],
+            // Windows では窓を持たないプログラムにする．コンソールのプログラムだと，インストーラーやサインインのときの起動で
+            // 黒いコンソールの窓が出る(main.swift を使うので入り口は C ランタイムの mainCRTStartup のまま)
+            linkerSettings: [.unsafeFlags(["-Xlinker", "/SUBSYSTEM:WINDOWS", "-Xlinker", "/ENTRY:mainCRTStartup"], .when(platforms: [.windows]))]
         ),
         // 入れずに変換を試す道具(make try)
         .executableTarget(
