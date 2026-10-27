@@ -114,8 +114,38 @@ struct RuleListEditor: View {
                 .font(.caption)
                 .foregroundStyle(message.isProblem ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
         }
+        header
         table
         footer
+    }
+
+    /// 列の見出し(表の外に描く．FormTableHeader)．読み・入力と値の列は，押すと並べ替える
+    private var header: some View {
+        var columns: [FormTableHeader.Column] = []
+        if setEnabled != nil {
+            columns.append(.init(title: UIStrings.RuleList.enabled, width: DesignTokens.Size.Settings.ruleCheckColumnWidth))
+        }
+        columns.append(.init(title: labels.key, width: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : nil,
+                             sort: { toggleSort(\.key) }, ascending: sortDirection(\.key)))
+        if let valueLabel = labels.value {
+            columns.append(.init(title: valueLabel, sort: { toggleSort(\.value) }, ascending: sortDirection(\.value)))
+        }
+        return FormTableHeader(columns: columns)
+    }
+
+    /// 同じ列を押すたびに昇順と降順を入れ替える．別の列を押せばその列の昇順にする
+    private func toggleSort(_ keyPath: KeyPath<RuleItem, String>) {
+        if var current = sortOrder.first, current.keyPath == keyPath {
+            current.order = current.order == .forward ? .reverse : .forward
+            sortOrder = [current]
+        } else {
+            sortOrder = [KeyPathComparator(keyPath)]
+        }
+    }
+
+    private func sortDirection(_ keyPath: KeyPath<RuleItem, String>) -> Bool? {
+        guard let current = sortOrder.first, current.keyPath == keyPath else { return nil }
+        return current.order == .forward
     }
 
     private var editor: some View {
@@ -177,7 +207,10 @@ struct RuleListEditor: View {
         TableColumn(labels.key, value: \.key) { item in
             Text(item.key).monospaced().foregroundStyle(item.isEnabled ? .primary : .secondary)
         }
-        .width(min: 80, ideal: hasValue ? 160 : 400, max: hasValue ? 320 : .infinity)
+        // 右に値の列があるときは，表の外の見出し(FormTableHeader)とそろえるため幅を決める
+        .width(min: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : 80,
+               ideal: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : 400,
+               max: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : .infinity)
     }
 
     private var valueColumn: some TableColumnContent<RuleItem, KeyPathComparator<RuleItem>> {
@@ -196,10 +229,11 @@ struct RuleListEditor: View {
     }
 
     /// 表に共通の操作(ダブルクリックで編集，右クリック，Delete キーで削除，空のときの案内)．
-    /// Form の中でも表の中でスクロールできるよう，FormTableHost に入れる
+    /// Form の中でも表の中でスクロールできるよう，FormTableHost に入れる．列の見出しは表の外に描く(header)
     private func decorated(_ table: some View) -> some View {
         FormTableHost {
             table
+                .tableColumnHeaders(.hidden)
                 .contextMenu(forSelectionType: RuleItem.ID.self) { ids in
                     let picked = items.filter { ids.contains($0.id) }
                     if picked.count == 1, let item = picked.first {
