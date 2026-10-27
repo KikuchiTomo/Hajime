@@ -66,6 +66,12 @@ public final class SupplementedConverter: KanaKanjiConverting {
         return supplement(base.clauseCandidates(for: reading), reading: reading)
     }
 
+    /// 文節の読みは文全体の読みの一部で，取り込んだ辞書の語は文全体の読みの部分ごとに引いてあるので，引き直さない．
+    /// 引き直すとエンジンに渡す語が入れ替わり，ライブ変換の変換の状態が捨てられて遅くなる
+    public func segmentCandidates(for reading: String) -> [Candidate] {
+        supplement(base.segmentCandidates(for: reading), reading: reading)
+    }
+
     public func setApplication(_ identifier: String?) {
         applicationID = identifier
         base.setApplication(identifier)

@@ -62,12 +62,15 @@ struct LatticeBuilder {
 
     /// 注目している文節の長さを 1 文字短く・長くしたら，その文節が何になるか(分岐図の足元に「⇧← 入れ　⇧→ 入れると」と見せる)．
     /// 押す前に結果が分かれば，文節の長さを試しに変えて戻す手間が要らない
+    /// 分岐図を出すたびに求めるので，長さを変えた文節だけを作る(後ろの文節は作り直さない．resize と同じ 1 段目になる)
     func resizePreview(_ lattice: SegmentLattice, reading: String) -> (shorter: String?, longer: String?) {
         let segment = lattice.focused
-        let shorter = segment.readingLength > 1
-            ? resize(lattice, segmentAt: lattice.focusedIndex, to: segment.readingLength - 1, reading: reading).focused.selected.text : nil
-        let longer = segment.readingStart + segment.readingLength < reading.count
-            ? resize(lattice, segmentAt: lattice.focusedIndex, to: segment.readingLength + 1, reading: reading).focused.selected.text : nil
+        let rest = String(reading.dropFirst(segment.readingStart))
+        func text(length: Int) -> String {
+            makeSegment(start: segment.readingStart, length: length, rest: rest, preferred: nil).selected.text
+        }
+        let shorter = segment.readingLength > 1 ? text(length: segment.readingLength - 1) : nil
+        let longer = segment.readingStart + segment.readingLength < reading.count ? text(length: segment.readingLength + 1) : nil
         return (shorter, longer)
     }
 
@@ -159,10 +162,26 @@ struct LatticeBuilder {
         segments.append(makeSegment(start: segment.readingStart, length: length, rest: rest, preferred: nil))
         // 区切りを変えた後ろは，その読みだけで求め直す
         let decided = lattice.segments.dropFirst(index + 1).filter(\.isDecided)
-        segments += self.segments(of: reading, from: segment.readingStart + length, sentence: nil).map { rebuilt in
+        segments += following(reading, from: segment.readingStart + length).map { rebuilt in
             decided.first { $0.readingStart == rebuilt.readingStart && $0.readingLength == rebuilt.readingLength } ?? rebuilt
         }
         return SegmentLattice(segments: segments, focusedIndex: index)
+    }
+
+    /// start より後ろの読みを文節に分ける．build と同じく，その読みの第 1 候補の語の並びで区切る(clauseSegments)．
+    /// 語の並びで区切れなければ，文節の候補で区切る(segments)
+    private func following(_ reading: String, from start: Int) -> [SegmentLattice.Segment] {
+        let rest = String(reading.dropFirst(start))
+        guard !rest.isEmpty else { return [] }
+        let sentence = converter.candidates(for: rest).first { $0.readingCount == rest.count }
+        guard let clauses = clauseSegments(of: rest, sentence: sentence) else {
+            return segments(of: reading, from: start, sentence: sentence?.text)
+        }
+        return clauses.map { clause in
+            var clause = clause
+            clause.readingStart += start
+            return clause
+        }
     }
 
     /// - Parameter sentence: 読み全体の第 1 候補のうち，start より後ろに当たる文字列．
@@ -194,8 +213,10 @@ struct LatticeBuilder {
         func append(_ candidate: Candidate) {
             if !candidates.contains(where: { $0.text == candidate.text }) { candidates.append(candidate) }
         }
-        let pool = converter.clauseCandidates(for: rest).filter { $0.readingCount == length }
-            + converter.candidates(for: slice).filter { $0.readingCount == length }
+        // 候補はこの文節の読みだけを，ライブ変換と別の変換の状態で Zenzai を使わずに求める(segmentCandidates)．
+        // 後ろの読み全体を文節ごとにライブ変換と同じ状態で変換し直していたときは，文節ごとに状態を捨てて変換し直すので，
+        // 長い文ほど Space で分岐図が出るまでが延びた(85 キーの文で 0.36 秒)．1 段目は preferred(見えている文)が受け持つ
+        let pool = converter.segmentCandidates(for: slice).filter { $0.readingCount == length }
         if let preferred {
             // 文全体の候補の一部はこの文節の候補に無いことがある．そのときも先頭に置く
             append(pool.first { $0.text == preferred } ?? Candidate(text: preferred, readingCount: length, origin: .sentencePart))

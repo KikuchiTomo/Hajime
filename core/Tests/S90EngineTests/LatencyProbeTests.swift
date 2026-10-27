@@ -53,6 +53,37 @@ struct LatencyProbeTests {
         #expect(best < .milliseconds(50), "どの回も p95 が 50ms を超えた: \(passP95s)")
     }
 
+    @Test("長い文で，打つ位置ごとの 1 キーの時間と Space で変換するまでの時間を測る", .enabled(if: isReleaseBuild))
+    func longSentence() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("s90-latency-\(UUID().uuidString)")
+        let zenzai = try ProcessInfo.processInfo.environment["S90_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai)
+        engine.warmUp()
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings())
+        _ = session.handle(KeyEvent(.character("a")), context: InputContext())
+        _ = session.handle(KeyEvent(.escape), context: InputContext())
+        let keys = Array("kinouhatomodatitoeigawominiittekaerinikissatendekohiwonondekaraiedeyuuhanwotabemasita")
+        let clock = ContinuousClock()
+        var durations: [Duration] = []
+        for key in keys {
+            durations.append(clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) })
+        }
+        let space = clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) }
+        // 変換中の文節の移動と，文節の長さを変える操作(区切り直しと下見)
+        let right = clock.measure { _ = session.handle(KeyEvent(.right), context: InputContext()) }
+        let resize = clock.measure { _ = session.handle(KeyEvent(.right, modifiers: [.shift]), context: InputContext()) }
+        _ = session.handle(KeyEvent(.enter), context: InputContext())
+        let chunks = stride(from: 0, to: durations.count, by: 10).map { start in
+            durations[start..<min(start + 10, durations.count)].max()!
+        }
+        print("S90_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) max_per_10keys=\(chunks) space=\(space) right=\(right) resize=\(resize)\(Self.loadAverage)")
+        // 文が長くなっても 1 キーは 50ms 以内(R-01)．Space で分岐図を出すまでは，待たされたと感じない 0.1 秒を目安に，
+        // ほかのプロセスの負荷で延びる分を見込んで 0.15 秒以内．文節ごとにライブ変換の状態を捨てて変換し直していたときは 0.58 秒だった
+        #expect(chunks.allSatisfy { $0 < .milliseconds(50) }, "長い文で 1 キーが 50ms を超えた: \(chunks)")
+        #expect(space < .milliseconds(150), "長い文で Space から分岐図までが 0.15 秒を超えた: \(space)")
+        #expect(right < .milliseconds(150) && resize < .milliseconds(150), "長い文で変換中の操作が 0.15 秒を超えた: → \(right)，⇧→ \(resize)")
+    }
+
     /// 測ったときの負荷．時間が延びたときに，負荷のせいかを出力から見分けられるようにする
     private static var loadAverage: String {
         #if canImport(Darwin)
