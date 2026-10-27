@@ -11,7 +11,7 @@ description: macOS 版と Windows 版のバージョン番号(セマンティッ
 利用者から，次のように決めるよう指示を受けた．
 
 - セマンティック バージョニングを使う
-- Windows 版が出るまでは v0.0.1 から始め，修正や機能を入れて配るたびに v0.0.2 のように PATCH だけを上げる．MAJOR と MINOR は変えない
+- v0.0.1 から始め，修正や機能を入れて配るたびに v0.0.2 のように PATCH だけを上げる．MAJOR と MINOR は変えない
 - macOS 版と Windows 版は別々に管理することになるが，機能に差があるのはおかしい．一方で，両方そろわないと出せないとすると，片方だけの安全上の修正が遅れる
 
 ## 決めたこと
@@ -29,16 +29,17 @@ description: macOS 版と Windows 版のバージョン番号(セマンティッ
 - 不具合と安全上の修正は，片方のバージョンだけで PATCH を上げてすぐに出してよい．もう片方を待たない
 - core(両方が使う部分)を直したときは，両方の PATCH を上げる
 
-### Windows 版が出るまで
+### 当分のあいだ(0.0.x)
 
-- macOS 版だけを 0.0.x で出す．入れて配るたびに PATCH を 1 つ上げる(0.0.1 → 0.0.2)
-- Windows 版を初めて出すときに，両方を 0.1.0 にそろえる．ここから上の決まりで進める
+- 利用者の指示(2026-10-27)で，当分は macOS 版も Windows 版も 0.0.x で出す．最初は両方とも v0.0.1
+- 入れて配るたびに PATCH を 1 つ上げる(0.0.1 → 0.0.2)．MAJOR と MINOR は変えない
+- この間は MINOR で機能の水準を表さない．macOS 版と Windows 版は同じ機能を持つように作る(ADR 0011)
 
 ### 置き場所と名前
 
 - バージョンは `apps/macos/project.yml` の `MARKETING_VERSION` だけに書く．Windows 版は `apps/windows/Cargo.toml` の `[workspace.package]` の `version` だけに書き，インストーラーはこの値で作る
 - ビルド番号(macOS は `CURRENT_PROJECT_VERSION`，Windows は `[workspace.metadata.s90]` の `build`)はバージョンごとに 1 ずつ上げる整数．同じバージョンを作り直したときも上げる
-- Git のタグは `macos/v0.0.2`・`windows/v0.1.0` のようにバージョンごとに分ける
+- Git のタグは `macos/v0.0.2`・`windows/v0.0.2` のように OS ごとに分ける
 - 上げるのは `tools/release/bump_patch.sh macos` と `tools/release/bump_patch.sh windows` で行う(PATCH とビルド番号を 1 つずつ上げる)
 - 設定の画面と README には「v0.0.2 (macOS)」のように，バージョンと OS を並べて出す
 
