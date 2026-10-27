@@ -20,6 +20,11 @@ struct LatticeBuilder {
     /// 語の並びで文節に分ける．区切りは Zenzai を使わない変換の語の並びから決め(Zenzai が書き換えた候補は語の区切りを持たないことがある)，
     /// 文節ごとに見せる文字は，ライブ変換で見えている文(sentence)と合うものを選ぶ．文節が 1 つにしかならなければ nil
     private func clauseSegments(of reading: String, sentence: Candidate?) -> [SegmentLattice.Segment]? {
+        clauseSegmentMakers(of: reading, sentence: sentence)?.map { $0() }
+    }
+
+    /// 文節ごとに，その文節を作る手順．文節が 1 つにしかならなければ nil
+    private func clauseSegmentMakers(of reading: String, sentence: Candidate?) -> [() -> SegmentLattice.Segment]? {
         let fromSentence = sentence.map { ClauseSplitter.clauses(of: $0.words) } ?? []
         let clauses: [ClauseSplitter.Clause]
         if fromSentence.count > 1, fromSentence.reduce(0, { $0 + $1.readingCount }) == reading.count,
@@ -32,10 +37,20 @@ struct LatticeBuilder {
         }
         var position = 0
         return clauses.map { clause in
-            let rest = String(reading.dropFirst(position))
-            defer { position += clause.readingCount }
-            return makeSegment(start: position, length: clause.readingCount, rest: rest, preferred: clause.text.isEmpty ? nil : clause.text)
+            let start = position
+            position += clause.readingCount
+            return { [self] in
+                makeSegment(start: start, length: clause.readingCount, rest: String(reading.dropFirst(start)),
+                            preferred: clause.text.isEmpty ? nil : clause.text)
+            }
         }
+    }
+
+    /// build が文節ごとに求める候補を，1 文節ずつ前もって求める手順．変換器が読みごとに候補をためるので，あとの build が速くなる．
+    /// 打鍵が止まったあいだに 1 つずつ動かし，次のキーが来たらやめる(長い文で Space から分岐図が出るまでを短くする)
+    func warmingSteps(reading: String) -> [@MainActor () -> Void] {
+        let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
+        return (clauseSegmentMakers(of: reading, sentence: sentence) ?? []).map { make in { _ = make() } }
     }
 
     /// 読みの長さの並びに，文(sentence)の文字を先頭から割り当てる．

@@ -25,8 +25,10 @@ struct EngineServiceCorrectionTests {
         }
     }
 
+    /// DLL のタイマーのように，前の応答で頼まれた間隔(wakeAfterMilliseconds)だけ待ってから wake する時計
     final class Clock {
         var now = ContinuousClock.now
+        var requestedWait: UInt32?
     }
 
     private let settings: FakeSettings
@@ -60,7 +62,9 @@ struct EngineServiceCorrectionTests {
     }
 
     private func press(_ key: WireKey, _ session: UInt32, _ id: EngineService.ConnectionID) -> WireResponseBody {
-        service.handle(WireRequest(id: 3, body: .key(session: session, input: WireKeyInput(key: key, modifiers: Self.plain, isKeypad: false), context: Self.field)), from: id).body
+        let body = service.handle(WireRequest(id: 3, body: .key(session: session, input: WireKeyInput(key: key, modifiers: Self.plain, isKeypad: false), context: Self.field)), from: id).body
+        clock.requestedWait = Self.wakeAfter(body)
+        return body
     }
 
     private func type(_ text: String, _ session: UInt32, _ id: EngineService.ConnectionID) {
@@ -68,7 +72,10 @@ struct EngineServiceCorrectionTests {
     }
 
     private func wake(_ session: UInt32, _ id: EngineService.ConnectionID) -> WireResponseBody {
-        service.handle(WireRequest(id: 4, body: .wake(session: session, context: Self.field)), from: id).body
+        if let wait = clock.requestedWait { clock.now = clock.now + .milliseconds(Int(wait)) }
+        let body = service.handle(WireRequest(id: 4, body: .wake(session: session, context: Self.field)), from: id).body
+        clock.requestedWait = Self.wakeAfter(body)
+        return body
     }
 
     private static func composition(_ body: WireResponseBody) -> String? {
@@ -78,6 +85,9 @@ struct EngineServiceCorrectionTests {
             return nil
         }.last
     }
+
+    /// 見直すまでに要る wake の回数の上限(いちばん長い correctionDelay を，いちばん短い wake の間隔で割った数)
+    private static let wakesUntilReview = Int(DefaultSettings.correctionDelayRange.upperBound / DefaultSettings.latticeWarmingPollInterval) + 2
 
     private static func wakeAfter(_ body: WireResponseBody) -> UInt32? {
         guard case .edit(_, _, let state) = body else { return nil }
@@ -129,7 +139,8 @@ struct EngineServiceCorrectionTests {
         let (id, session) = try open()
         type("youdesu", session, id)
         var marked: String?
-        for _ in 0..<6 {
+        // 見直すのは打鍵が止まってから correctionDelay たったとき．それまで DLL の間隔で wake する
+        for _ in 0..<Self.wakesUntilReview {
             let woke = wake(session, id)
             if let text = Self.composition(woke) { marked = text }
             await service.waitForCorrections()
@@ -143,7 +154,7 @@ struct EngineServiceCorrectionTests {
         let (id, session) = try test.open()
         test.type("youdesu", session, id)
         var started = false
-        for _ in 0..<4 where !started {
+        for _ in 0..<Self.wakesUntilReview where !started {
             started = Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds
         }
         #expect(started)

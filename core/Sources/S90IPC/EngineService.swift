@@ -12,6 +12,7 @@ public final class EngineService {
     public static let maximumSessions = 1024
     /// 手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔
     public static let handwritingPollMilliseconds = milliseconds(DefaultSettings.handwritingPollInterval)
+    public static let latticeWarmingPollMilliseconds = milliseconds(DefaultSettings.latticeWarmingPollInterval)
     /// 候補の窓を出しているあいだ，DLL がマウスで押した候補を取りに来る間隔
     public static let candidateClickPollMilliseconds = milliseconds(DefaultSettings.candidateClickPollInterval)
 
@@ -33,6 +34,10 @@ public final class EngineService {
         let owner: ConnectionID
         let input: InputSession
         var hasSettled = false
+        /// 打鍵が止まった時刻．見直すのは，ここから correctionDelay たったとき
+        var stoppedAt: ContinuousClock.Instant?
+        /// 打鍵が止まったあとに，分岐図の候補を 1 文節ずつ前もって求める残りの手順(InputSession.latticeWarmingSteps)
+        var warming: [@MainActor () -> Void] = []
         /// 裏で求めている打ち間違いの訂正
         var correction: CorrectionWork?
     }
@@ -404,6 +409,8 @@ public final class EngineService {
         cancelCorrections(of: session)
         let result = current.input.handle(event, context: context)
         sessions[session]?.hasSettled = false
+        sessions[session]?.stoppedAt = now()
+        sessions[session]?.warming = []
         var actions = result.actions
         if actions.contains(.awaitCorrections), let request = current.input.lateCorrectionRequest {
             // 変換はもう出ている．訂正は裏で求め，届いたら次の wake で変換を直す(macOS の S90InputController と同じ)
@@ -439,6 +446,8 @@ public final class EngineService {
                     sessions[session]?.correction = nil
                     current.input.provideCorrections(result)
                     actions += current.input.review(context: context)
+                    // 見直しで読みを直したときは，直した読みの候補も前もって求める
+                    sessions[session]?.warming = current.input.latticeWarmingSteps
                 } else if now() >= deadline {
                     // 求め終わらないときはやめ，この入力は見直したことにする(求め直し続けない)
                     cancelCorrections(of: session)
@@ -448,12 +457,18 @@ public final class EngineService {
         } else if current.input.awaitsSettle {
             actions += current.input.settle(context: context)
             sessions[session]?.hasSettled = true
-        } else if current.input.awaitsReview {
+            // 見直しを待つあいだに，Space で出す分岐図の候補を前もって求める(macOS の S90InputController と同じ)
+            sessions[session]?.warming = current.input.latticeWarmingSteps
+        } else if let step = current.warming.first {
+            sessions[session]?.warming.removeFirst()
+            step()
+        } else if current.input.awaitsReview, reviewDelay(of: current) == 0 {
             // 訂正は裏で求め，求め終わったあとの wake で見直す(打鍵を待たせない)
             if typoService != nil, let request = current.input.correctionRequest {
                 startCorrections(request, purpose: .review(deadline: now() + .seconds(DefaultSettings.reviewCorrectionTimeout)), session: session)
             } else {
                 actions += current.input.review(context: context)
+                sessions[session]?.warming = current.input.latticeWarmingSteps
             }
         }
         return edit(actions, handled: true, session: session, anchor: lastAnchor)
@@ -526,11 +541,19 @@ public final class EngineService {
         if current.input.awaitsSettle {
             return Self.milliseconds(delays.liveConversionDelay)
         }
+        if !current.warming.isEmpty { return Self.latticeWarmingPollMilliseconds }
         if current.input.awaitsReview {
-            let remaining = current.hasSettled ? delays.correctionDelay - delays.liveConversionDelay : delays.correctionDelay
-            return Self.milliseconds(remaining)
+            return Self.milliseconds(reviewDelay(of: current))
         }
         return nil
+    }
+
+    /// 見直すまでの残りの時間(秒)．打鍵が止まってから correctionDelay たつまで待つ
+    private func reviewDelay(of current: Session) -> Double {
+        guard let stoppedAt = current.stoppedAt else { return 0 }
+        let elapsed = now() - stoppedAt
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return max(settings.current.correctionDelay - seconds, 0)
     }
 
     private func openHandwriting(for session: UInt32, anchor: WireRect?) {

@@ -316,6 +316,8 @@ public enum DefaultSettings {
     public static let candidateClickPollInterval = 0.1
     /// Windows で手書きの窓を開いているあいだ，DLL が選んだ文字を取りに来る(wake)間隔(秒)
     public static let handwritingPollInterval = 0.15
+    /// Windows で打鍵が止まったあと，分岐図の候補を 1 文節ずつ前もって求めるために DLL に来てもらう(wake)間隔(秒)
+    public static let latticeWarmingPollInterval = 0.01
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
 }
