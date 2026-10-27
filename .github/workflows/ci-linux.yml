@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: ci-linux-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 # 仕事の名前は ci.yml と同じ決まり(何を-どこで)
 jobs:
