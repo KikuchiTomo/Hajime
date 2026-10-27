@@ -1,8 +1,10 @@
 name: CI
 
-# 費用を抑えるため，今は自動では動かさない(利用者の指示 2026-10-27)．実装がそろってから手で一度にまとめて動かす:
-#   gh workflow run <このファイル名> --ref main
+# PR と main への push で動かす．手でも動かせる: gh workflow run ci.yml --ref <ブランチ>
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -30,7 +32,8 @@ jobs:
     # core のテスト．変換エンジンの辞書を取得するので数分かかる．
     # 本物の Zenzai のテストと処理時間(R-01)は Release でだけ動かす(make test-zenzai)
     runs-on: macos-15
-    timeout-minutes: 45
+    # キャッシュが無いときは，変換エンジンと辞書をはじめから作るので 45 分では足りない(2026-10-27 に打ち切られた)
+    timeout-minutes: 90
     env:
       # Zenzai のモデルはリポジトリの外に置き，キャッシュから戻す
       MODELS_DIR: ${{ github.workspace }}/../models
