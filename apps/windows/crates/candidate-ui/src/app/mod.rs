@@ -82,6 +82,9 @@ pub fn run() {
     if snapshot::run_if_requested() {
         return;
     }
+    let Some(_instance) = window::single_instance() else {
+        return;
+    };
     window::make_dpi_aware();
     window::set_callbacks(on_inbox, on_timer, on_paint, on_click);
     let (Ok(plain), Ok(glass)) = (

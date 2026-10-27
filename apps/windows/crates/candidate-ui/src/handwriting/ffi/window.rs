@@ -76,6 +76,14 @@ impl Window {
             lpfnWndProc: Some(procedure),
             hInstance: instance.into(),
             lpszClassName: CLASS,
+            // SAFETY: OS の標準のカーソルを読むだけ
+            hCursor: unsafe {
+                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                    None,
+                    windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+                )
+            }
+            .unwrap_or_default(),
             ..Default::default()
         };
         // SAFETY: class はこの呼び出しのあいだ生きている
