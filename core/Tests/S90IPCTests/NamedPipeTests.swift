@@ -154,6 +154,41 @@ struct NamedPipeTests {
         }
     }
 
+    @Test("実行ファイルの場所は，URL.path の / 区切りでも同じ場所とみなす", arguments: [
+        (#"C:\Program Files\s90.tokyo IME\s90-candidate-ui.exe"#, "C:/Program Files/s90.tokyo IME/s90-candidate-ui.exe", true),
+        (#"C:\Program Files\s90.tokyo IME\s90-candidate-ui.exe"#, "/C:/Program Files/s90.tokyo IME/s90-candidate-ui.exe", true),
+        (#"C:\Program Files\s90.tokyo IME\s90-candidate-ui.exe"#, #"c:\program files\S90.TOKYO IME\S90-CANDIDATE-UI.EXE"#, true),
+        (#"C:\Program Files\s90.tokyo IME\s90-candidate-ui.exe"#, "C:/Program Files/s90.tokyo IME/s90-settings.exe", false),
+        (#"\\server\share\s90-candidate-ui.exe"#, "C:/server/share/s90-candidate-ui.exe", false),
+        (#"C:\s90-candidate-ui.exe"#, "", false),
+    ])
+    func sameImage(path: String, expected: String, same: Bool) {
+        #expect(NamedPipePeer.isSameImage(path, as: expected) == same)
+    }
+
+    @Test("URL から作った候補ウィンドウの場所で，自分の実行ファイルからの接続を受け入れる")
+    func candidateWindowLinkAcceptsURLPath() throws {
+        let ownPath = try #require(NamedPipePeer.imagePath(processID: GetCurrentProcessId()))
+        // エンジンは HostPaths.installation(URL)から候補ウィンドウの場所を作り，.path で渡す
+        let expected = URL(fileURLWithPath: ownPath).path
+        let name = Self.uniqueName()
+        let listener = try NamedPipeListener(name: name)
+        let link = CandidateWindowLink()
+        link.start(listener: listener, expectedImagePath: expected) { [.hide] }
+        let connection = try NamedPipeClient.connect(name: name, timeoutMilliseconds: 5000)
+        defer { connection.close() }
+        let received = DispatchSemaphore(value: 0)
+        let box = ReceivedBytes()
+        Thread {
+            box.bytes = (try? connection.read()) ?? []
+            received.signal()
+        }.start()
+        #expect(received.wait(timeout: .now() + 5) == .success)
+        var reader = MessageFraming.Reader()
+        reader.append(box.bytes)
+        #expect(try reader.next(WireUiCommand.self) == .hide)
+    }
+
     @Test("候補ウィンドウが何も書かなくても，エンジンからの送信は止まらない")
     func candidateWindowLinkSends() throws {
         let ownPath = try #require(NamedPipePeer.imagePath(processID: GetCurrentProcessId()))

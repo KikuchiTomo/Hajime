@@ -9,7 +9,14 @@ use crate::catalog::{Catalog, Timing};
 use crate::engine::{Engine, EngineStore};
 use ipc::windows::{pipe_name, EngineClient};
 use ipc::{RequestBody, ResponseBody};
+use std::os::windows::process::CommandExt;
+use std::process::{Command, Stdio};
 use std::time::Duration;
+
+/// 設定の画面と同じフォルダに置いたエンジン
+const ENGINE_FILE: &str = "s90-engine-host.exe";
+/// エンジンはコンソールのアプリなので，窓を出さずに起動する
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// 名前付きパイプでエンジンに頼む口
 pub struct Pipe {
@@ -42,7 +49,27 @@ fn connect(timing: &Timing) -> Option<Store> {
     }))
 }
 
+/// エンジンが落ちていても設定の画面を開けば戻るよう，同じフォルダのエンジンを起動する．
+/// すでに動いていれば，起動したほうはパイプを作れずにすぐ終わる．つながるまでは窓がつなぎ直す
+fn start_engine() {
+    let Some(engine) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.join(ENGINE_FILE)))
+    else {
+        return;
+    };
+    if engine.is_file() {
+        let _ = Command::new(engine)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+}
+
 pub fn run() {
+    start_engine();
     ffi::set_dpi_aware();
     // ファイルを選ぶ窓(IFileDialog)は COM を使う
     ffi::initialize_com();

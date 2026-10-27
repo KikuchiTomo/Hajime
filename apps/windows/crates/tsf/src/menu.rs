@@ -13,6 +13,9 @@ pub const OPEN_SETTINGS: &str = "設定を開く…";
 pub const JAPANESE_ICON: &str = "あ";
 pub const DIRECT_ICON: &str = "A";
 pub const DESCRIPTION: &str = "入力モード";
+/// エンジンにつながっていないときのツールチップ．設定の画面を開くとエンジンを起動し直す
+pub const ENGINE_UNAVAILABLE: &str =
+    "入力モード(変換エンジンに接続できません．設定を開くと起動し直します)";
 
 const ID_LIVE_CONVERSION: u32 = 1;
 const ID_OPEN_SETTINGS: u32 = 2;
@@ -70,6 +73,15 @@ pub fn selection(id: u32) -> Option<Selection> {
         ID_OPEN_SETTINGS => Some(Selection::Command(MenuCommand::OpenSettings)),
         ID_HANDWRITING => Some(Selection::Handwriting),
         _ => None,
+    }
+}
+
+/// タスクバーの表示のツールチップ
+pub fn tooltip(connected: bool) -> &'static str {
+    if connected {
+        DESCRIPTION
+    } else {
+        ENGINE_UNAVAILABLE
     }
 }
 
@@ -151,6 +163,12 @@ mod tests {
         assert_eq!(selection(ID_HANDWRITING), Some(Selection::Handwriting));
         assert_eq!(selection(0), None);
         assert_eq!(selection(10), None);
+    }
+
+    #[test]
+    fn エンジンにつながっていないことをツールチップで知らせる() {
+        assert_eq!(tooltip(true), DESCRIPTION);
+        assert_eq!(tooltip(false), ENGINE_UNAVAILABLE);
     }
 
     #[test]

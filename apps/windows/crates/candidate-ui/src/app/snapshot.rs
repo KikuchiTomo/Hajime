@@ -260,7 +260,14 @@ fn correction() -> CandidateList {
         focus: CandidateFocus::Candidate,
         position: 1,
         total: 3,
-        note: Some("Space 入力のままに戻す".into()),
+        note: Some(ipc::Note {
+            tone: ipc::NoteTone::Correction,
+            title: "修正".into(),
+            subject: None,
+            key: Some("Space".into()),
+            key_action: Some("入力のままに戻す".into()),
+            text: "修正　Space 入力のままに戻す".into(),
+        }),
     }
 }
 

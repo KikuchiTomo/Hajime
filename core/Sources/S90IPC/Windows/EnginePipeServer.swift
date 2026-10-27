@@ -25,7 +25,7 @@ public enum EnginePipeServer {
             return
         }
         let isCandidateWindow = NamedPipePeer.imagePath(processID: process)
-            .map { $0.caseInsensitiveCompare(candidateWindowPath) == .orderedSame } ?? false
+            .map { NamedPipePeer.isSameImage($0, as: candidateWindowPath) } ?? false
         EngineRequestLoop.serve(connection, service: service, isCandidateWindow: isCandidateWindow)
     }
 }
@@ -46,7 +46,7 @@ extension CandidateWindowLink {
                 }
                 guard let process = try? connection.clientProcessID(), NamedPipePeer.isInCurrentSession(processID: process),
                       let path = NamedPipePeer.imagePath(processID: process),
-                      path.caseInsensitiveCompare(expectedImagePath) == .orderedSame else {
+                      NamedPipePeer.isSameImage(path, as: expectedImagePath) else {
                     connection.close()
                     continue
                 }

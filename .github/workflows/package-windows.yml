@@ -54,6 +54,9 @@ jobs:
         working-directory: apps/windows
       - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai"
         shell: pwsh
+      # 集めた DLL だけでエンジンが起動できることを確かめる(足りないと 0xC0000135 で終わり，入力できない)
+      - run: tools/windows/check_stage.ps1 -Stage apps/windows/target/stage
+        shell: pwsh
       - run: dotnet tool install --global wix --version 6.0.2
       - name: インストーラーを作る(バージョンは apps/windows/Cargo.toml の workspace.package.version)
         shell: pwsh

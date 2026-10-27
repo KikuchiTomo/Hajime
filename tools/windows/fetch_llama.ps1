@@ -1,6 +1,7 @@
 # Zenzai が使う llama.cpp の Windows 向けのビルド(b4846．AVX 版)を取得し，SHA-256 を確かめて展開する．
 # エンジン(core)の AzooKeyKanaKanjiConverter は Windows では llama.cpp をシステムのライブラリとして探すので，
 # 展開した場所を LIB(リンク時の llama.lib)と PATH(実行時の llama.dll・ggml*.dll)に足して使う．
+# ggml.dll は ggml-rpc.dll も読み込むので，配布物にはこれも入れる(tools/windows/stage.ps1)．
 # バージョンを変えるときは，AzooKeyKanaKanjiConverter の llama.cpp のヘッダーのバージョンと合わせ，ハッシュを取り直す．
 #
 # 使い方: tools/windows/fetch_llama.ps1 -Output <展開する場所>
@@ -23,7 +24,7 @@ try {
 } finally {
     Remove-Item -Force -ErrorAction SilentlyContinue $archive
 }
-foreach ($file in @('llama.lib', 'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll')) {
+foreach ($file in @('llama.lib', 'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll')) {
     if (-not (Test-Path (Join-Path $Output $file))) { throw "$file がありません" }
 }
 Write-Host "確かめました: $Output"

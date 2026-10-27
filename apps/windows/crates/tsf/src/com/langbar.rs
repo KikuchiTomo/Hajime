@@ -1,5 +1,7 @@
 //! タスクバーの入力モードの表示(「あ」「A」)と入力メニュー．TSF の言語バーの項目(GUID_LBI_INPUTMODE)として出す．
-//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)
+//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)．
+//! Windows 8 からのタスクバーの入力インジケーターは，右クリックで InitMenu を呼ばず OnClick(TF_LBI_CLK_RIGHT) を呼ぶだけなので，
+//! メニューは自分で出す(InitMenu は古い言語バーのために残す)
 
 use super::guard::guard;
 use super::ids::CLSID_TEXT_SERVICE;
@@ -18,14 +20,20 @@ use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_R
 use windows::Win32::UI::TextServices::{
     ITfLangBarItem, ITfLangBarItemButton, ITfLangBarItemButton_Impl, ITfLangBarItemSink,
     ITfLangBarItem_Impl, ITfMenu, ITfSource, ITfSource_Impl, TfLBIClick, GUID_LBI_INPUTMODE,
-    TF_LANGBARITEMINFO, TF_LBI_CLK_LEFT, TF_LBI_ICON, TF_LBI_STYLE_BTN_BUTTON,
+    TF_LANGBARITEMINFO, TF_LBI_CLK_LEFT, TF_LBI_CLK_RIGHT, TF_LBI_ICON, TF_LBI_STYLE_BTN_BUTTON,
     TF_LBI_STYLE_SHOWNINTRAY, TF_LBI_TEXT, TF_LBI_TOOLTIP, TF_LBMENUF_CHECKED,
     TF_LBMENUF_SEPARATOR,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconIndirect, GetSystemMetrics, HICON, ICONINFO, SM_CXSMICON, SM_CYSMICON,
+    AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DestroyMenu, DestroyWindow,
+    GetSystemMetrics, PostMessageW, SetForegroundWindow, TrackPopupMenuEx, HICON, ICONINFO,
+    MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SM_CXSMICON, SM_CYSMICON, TPM_BOTTOMALIGN,
+    TPM_LEFTALIGN, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_NULL,
+    WS_POPUP,
 };
-use windows_core::{implement, w, IUnknown, Interface, Ref, Result, BOOL, BSTR, GUID, PCWSTR};
+use windows_core::{
+    implement, w, IUnknown, Interface, Ref, Result, BOOL, BSTR, GUID, HSTRING, PCWSTR,
+};
 
 /// 言語バーの項目に知らせてもらう相手(言語バー)の受け付け番号．相手は 1 つだけ
 const SINK_COOKIE: u32 = 1;
@@ -40,6 +48,8 @@ pub trait Actions {
     /// 手書きの窓を開く(組み立て中の文字を確定してから)
     fn open_handwriting(&self);
     fn toggle_mode(&self);
+    /// エンジンとつながっているか
+    fn connected(&self) -> bool;
 }
 
 #[implement(ITfLangBarItemButton, ITfLangBarItem, ITfSource)]
@@ -55,6 +65,15 @@ impl InputModeItem {
             sink: RefCell::new(None),
             mode: Cell::new(None),
             actions,
+        }
+    }
+
+    /// メニューで選んだ項目を行う
+    fn select(&self, id: u32) {
+        match menu::selection(id) {
+            Some(menu::Selection::Command(command)) => self.actions.run(command),
+            Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
+            None => {}
         }
     }
 
@@ -105,15 +124,20 @@ impl ITfLangBarItem_Impl for InputModeItem_Impl {
     }
 
     fn GetTooltipString(&self) -> Result<BSTR> {
-        Ok(BSTR::from(menu::DESCRIPTION))
+        guard(|| Ok(BSTR::from(menu::tooltip(self.actions.connected()))))
     }
 }
 
 impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
-    fn OnClick(&self, click: TfLBIClick, _pt: &POINT, _prcarea: *const RECT) -> Result<()> {
+    fn OnClick(&self, click: TfLBIClick, pt: &POINT, _prcarea: *const RECT) -> Result<()> {
         guard(|| {
             if click == TF_LBI_CLK_LEFT {
                 self.actions.toggle_mode();
+            } else if click == TF_LBI_CLK_RIGHT {
+                let items = menu::items(self.actions.menu_settings().as_ref());
+                if let Some(id) = popup(&items, *pt)? {
+                    self.select(id);
+                }
             }
             Ok(())
         })
@@ -149,11 +173,7 @@ impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
 
     fn OnMenuSelect(&self, wid: u32) -> Result<()> {
         guard(|| {
-            match menu::selection(wid) {
-                Some(menu::Selection::Command(command)) => self.actions.run(command),
-                Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
-                None => {}
-            }
+            self.select(wid);
             Ok(())
         })
     }
@@ -190,6 +210,66 @@ impl ITfSource_Impl for InputModeItem_Impl {
             }
             Ok(())
         })
+    }
+}
+
+/// 右クリックのメニューを at(画面の座標)に出し，選んだ項目の番号を返す．選ばずに閉じたら None
+fn popup(items: &[Item], at: POINT) -> Result<Option<u32>> {
+    // SAFETY: メニューと持ち主の窓はこの関数の中で作って消す．文字列は AppendMenuW の呼び出しのあいだ生きている
+    unsafe {
+        let menu = CreatePopupMenu()?;
+        let mut appended = Ok(());
+        for item in items {
+            appended = match item {
+                Item::Command { id, label, checked } => {
+                    let check = if *checked { MF_CHECKED } else { MF_UNCHECKED };
+                    let label = HSTRING::from(*label);
+                    AppendMenuW(menu, MF_STRING | check, *id as usize, &label)
+                }
+                Item::Separator => AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()),
+            };
+            if appended.is_err() {
+                break;
+            }
+        }
+        // メニューの持ち主はこのスレッドの窓でなければならない．入力先のアプリの窓は使わず，見えない窓を作る．
+        // 前に出しておかないと，メニューの外をクリックしても閉じない
+        let owner = match appended.and_then(|()| {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                None,
+                None,
+            )
+        }) {
+            Ok(owner) => owner,
+            Err(error) => {
+                let _ = DestroyMenu(menu);
+                return Err(error);
+            }
+        };
+        let _ = SetForegroundWindow(owner);
+        let chosen = TrackPopupMenuEx(
+            menu,
+            (TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_BOTTOMALIGN).0,
+            at.x,
+            at.y,
+            owner,
+            None,
+        );
+        // 次にメニューを出したときにすぐ閉じないよう，持ち主の窓にメッセージを送ってから消す
+        let _ = PostMessageW(Some(owner), WM_NULL, Default::default(), Default::default());
+        let _ = DestroyWindow(owner);
+        let _ = DestroyMenu(menu);
+        Ok(u32::try_from(chosen.0).ok().filter(|id| *id != 0))
     }
 }
 

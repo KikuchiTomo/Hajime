@@ -370,7 +370,7 @@ impl App {
         let text = match &self.content {
             Content::Candidates(list) => announce::candidates(list),
             Content::BranchMap(map) => announce::branch_map(map),
-            Content::Note(text) => Some(text.clone()),
+            Content::Note(note) => Some(note.text.clone()),
             Content::Hidden | Content::Mode(_) => None,
         };
         if text.is_none() || !system::screen_reader() {

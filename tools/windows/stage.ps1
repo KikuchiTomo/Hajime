@@ -27,8 +27,9 @@ $runtime = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Programs\Swift\Runt
 if (-not $runtime) { throw 'Swift のランタイムが見つかりません' }
 Get-ChildItem -Path (Join-Path $runtime.FullName 'usr\bin') -Filter '*.dll' | Copy-Item -Destination $Output
 
-# Zenzai が使う llama.cpp の DLL と，確かめ済みのモデル(エンジンは Zenzai\ から読み，ハッシュを確かめ直す)
-foreach ($file in @('llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll')) {
+# Zenzai が使う llama.cpp の DLL と，確かめ済みのモデル(エンジンは Zenzai\ から読み，ハッシュを確かめ直す)．
+# ggml.dll は ggml-rpc.dll を読み込むので，これが無いとエンジンが起動しない(0xC0000135)
+foreach ($file in @('llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll')) {
     Copy-Item (Join-Path $Llama $file) $Output
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Zenzai') | Out-Null
@@ -43,7 +44,7 @@ Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') (Join-Path $Output 'THIRD_P
 Copy-Item (Join-Path $root 'LICENSES') (Join-Path $Output 'LICENSES') -Recurse -Force
 
 $required = @('s90_tsf.dll', 'x86\s90_tsf.dll', 's90-engine-host.exe', 's90-candidate-ui.exe', 's90-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv',
-    'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
+    'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
 foreach ($file in $required) {
     if (-not (Test-Path (Join-Path $Output $file))) { throw "$file がありません" }

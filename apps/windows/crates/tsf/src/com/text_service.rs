@@ -3,6 +3,7 @@ use super::edit_session;
 use super::guard::guard;
 use super::keyboard;
 use super::langbar::{self, InputModeItem};
+use super::launch;
 use super::phonetic;
 use crate::filter;
 use crate::key::{self, RawKey};
@@ -737,9 +738,18 @@ impl langbar::Actions for MenuActions {
     }
 
     fn run(&self, command: ipc::MenuCommand) {
-        if let Some(service) = Self::active() {
-            let _ = service.engine_request(RequestBody::Menu { command });
+        let opens_settings = command == ipc::MenuCommand::OpenSettings;
+        let answered = Self::active()
+            .and_then(|service| service.engine_request(RequestBody::Menu { command }))
+            .is_some();
+        // エンジンが動いていなくても設定の画面は開けるようにする(設定の画面がエンジンを起動し直す)
+        if !answered && opens_settings {
+            let _ = launch::start(launch::SETTINGS_FILE);
         }
+    }
+
+    fn connected(&self) -> bool {
+        Self::active().is_some_and(|service| service.inner.borrow().session.is_some())
     }
 
     fn open_handwriting(&self) {

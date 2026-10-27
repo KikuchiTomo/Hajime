@@ -8,6 +8,7 @@ mod guard;
 mod ids;
 mod keyboard;
 mod langbar;
+mod launch;
 mod phonetic;
 mod registration;
 mod text_service;
