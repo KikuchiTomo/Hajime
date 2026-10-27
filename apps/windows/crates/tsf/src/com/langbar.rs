@@ -11,8 +11,8 @@ use std::cell::{Cell, RefCell};
 use windows::Win32::Foundation::{COLORREF, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     CreateBitmap, CreateCompatibleDC, CreateDIBSection, CreateFontW, DeleteDC, DeleteObject,
-    DrawTextW, SelectObject, SetBkMode, SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-    CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DT_CENTER,
+    DrawTextW, SelectObject, SetBkMode, SetTextColor, ANTIALIASED_QUALITY, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DT_CENTER,
     DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, FF_DONTCARE, FW_NORMAL, HBITMAP, HGDIOBJ,
     OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
@@ -38,8 +38,6 @@ use windows_core::{
 /// 言語バーの項目に知らせてもらう相手(言語バー)の受け付け番号．相手は 1 つだけ
 const SINK_COOKIE: u32 = 1;
 const ICON_FONT: PCWSTR = w!("Yu Gothic UI");
-/// 字の高さをアイコンの何割にするか
-const ICON_TEXT_SCALE: f32 = 0.85;
 
 /// 項目で選んだことを文字入力のサービスに頼む口
 pub trait Actions {
@@ -296,7 +294,7 @@ fn text_color() -> (u8, u8, u8) {
     }
 }
 
-/// 字 1 つを描いたアイコン．呼び出し側(言語バー)が消す
+/// 角丸の面から字 1 つを抜いたアイコン．呼び出し側(言語バー)が消す
 fn text_icon(text: &str) -> Result<HICON> {
     // SAFETY: GDI のオブジェクトはこの関数の中で作って消す．DIB の画素は width × height の 32 ビットで，
     // CreateDIBSection が返した bits を DeleteObject の前だけ読み書きする
@@ -321,7 +319,7 @@ fn text_icon(text: &str) -> Result<HICON> {
         let color = CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)?;
         let mask = CreateBitmap(width, height, 1, 1, None);
         let font = CreateFontW(
-            -((height as f32 * ICON_TEXT_SCALE) as i32),
+            -crate::icon::glyph_size(text, height),
             0,
             0,
             0,
@@ -332,13 +330,14 @@ fn text_icon(text: &str) -> Result<HICON> {
             DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS,
             CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY,
+            // 色ずれの無い覆う割合がほしいので ClearType にしない
+            ANTIALIASED_QUALITY,
             FF_DONTCARE.0 as u32,
             ICON_FONT,
         );
         let old_bitmap = SelectObject(dc, HGDIOBJ(color.0));
         let old_font = SelectObject(dc, HGDIOBJ(font.0));
-        // 黒の地に白で描き，明るさを不透明度にして，字の色で塗り直す
+        // 黒の地に白で描いて字の覆う割合を取り，角丸の面から抜いて，字の色で塗る(crate::icon)
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, COLORREF(0x00FF_FFFF));
         let mut rect = RECT {
@@ -356,13 +355,13 @@ fn text_icon(text: &str) -> Result<HICON> {
         );
         let (red, green, blue) = text_color();
         if !bits.is_null() {
-            let pixels =
-                std::slice::from_raw_parts_mut(bits as *mut u32, (width * height) as usize);
-            for pixel in pixels.iter_mut() {
-                let coverage = ((*pixel >> 16) & 0xFF)
-                    .max((*pixel >> 8) & 0xFF)
-                    .max(*pixel & 0xFF);
-                *pixel = (coverage << 24)
+            let (columns, rows) = (width as usize, height as usize);
+            let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, columns * rows);
+            let glyph: Vec<u8> = pixels.iter().map(|pixel| (*pixel >> 8) as u8).collect();
+            let glyph = crate::icon::centered(&glyph, columns, rows);
+            let plate = crate::icon::plate_coverage(columns, rows);
+            for (pixel, opacity) in pixels.iter_mut().zip(crate::icon::compose(&plate, &glyph)) {
+                *pixel = (u32::from(opacity) << 24)
                     | (u32::from(red) << 16)
                     | (u32::from(green) << 8)
                     | u32::from(blue);
