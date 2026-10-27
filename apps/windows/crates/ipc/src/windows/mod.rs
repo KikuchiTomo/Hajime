@@ -3,7 +3,7 @@
 mod client;
 mod ffi;
 
-pub use client::{EngineClient, Outcome, Pending};
+pub use crate::client::{EngineClient, Outcome, Pending};
 
 pub fn pipe_name(role: &str) -> windows::core::Result<String> {
     Ok(format_pipe_name(

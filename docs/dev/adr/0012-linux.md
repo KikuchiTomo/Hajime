@@ -27,6 +27,7 @@ macOS 版・Windows 版と同じ機能を，同じ挙動で使えるようにす
 2. `S90IPC` に Unix ドメインソケットの送り方を足し，Windows の `EnginePipeServer` と共通の部分(要求をセッションに渡す処理)を分ける
 3. `s90-engine-host` の置き場所(`HostPaths`)を Linux の XDG の場所にする(設定は `$XDG_CONFIG_HOME/s90.tokyo/IME`，学習データは `$XDG_DATA_HOME/s90.tokyo/IME`)
 4. Fcitx 5 のアドオンを `apps/linux/fcitx5` に作る
+5. Rust の手元側(`apps/windows/crates/ipc`)のつなぎ方を差し替えられるようにし，Unix ドメインソケットでもつなぐ(`ipc::unix`)．Windows と Linux で要求の送り方と挨拶を共通にする．つなぐ前に，ソケットのフォルダが本人のもので，ほかの人が読み書きできないことを確かめる
 
 ## 準備で分かった Linux の残り
 
