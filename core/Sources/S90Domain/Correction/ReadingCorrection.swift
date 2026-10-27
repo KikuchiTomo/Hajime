@@ -8,13 +8,17 @@ public struct ReadingCorrection: Sendable, Equatable {
     /// 読みを変換したときのもっともらしさの，打ったままの読みとの差(辞書の語に切れるほど大きい)．
     /// 言語モデルはかなの並びを見るので，「みずらい」と「みづらい」のような書き分けの誤りを見分けにくい．変換の側から補う
     public var plausibilityGain: Double
+    /// かなの単位で直した候補(言い違い・書き違い．KanaEditSearch)か．キーの打ち間違いより起きにくいので，
+    /// キーの打ち間違いの候補で直すものも示すものも無いときだけ使う(ReadingCorrector)
+    public var isReadingEdit: Bool
 
-    public init(keys: String, reading: String, score: Double, cost: Double, plausibilityGain: Double = 0) {
+    public init(keys: String, reading: String, score: Double, cost: Double, plausibilityGain: Double = 0, isReadingEdit: Bool = false) {
         self.keys = keys
         self.reading = reading
         self.score = score
         self.cost = cost
         self.plausibilityGain = plausibilityGain
+        self.isReadingEdit = isReadingEdit
     }
 
     /// 打ったまま(直していない)か
@@ -119,7 +123,7 @@ public struct ReadingCorrectionRule: Sendable {
 extension ReadingCorrection {
     /// 直す手間を足したもの(キーの並びを変えてから求めた候補に使う)
     public func adding(cost extra: Double) -> ReadingCorrection {
-        ReadingCorrection(keys: keys, reading: reading, score: score - extra, cost: cost + extra, plausibilityGain: plausibilityGain)
+        ReadingCorrection(keys: keys, reading: reading, score: score - extra, cost: cost + extra, plausibilityGain: plausibilityGain, isReadingEdit: isReadingEdit)
     }
 }
 

@@ -351,8 +351,12 @@ final class ReadingCorrector {
             candidates += found.map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
         }
         candidates.sort { $0.score > $1.score }
-        return ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,
-                                     suggests: settings.current.showsSuggestions).decision(among: candidates, reading: region.reading)
+        let rule = ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,
+                                         suggests: settings.current.showsSuggestions)
+        // キーの打ち間違いで直すか示すものがあればそれにする．無いときだけ，かなの単位の候補(言い違い・書き違い)も入れて決める
+        if let decision = rule.decision(among: candidates.filter { !$0.isReadingEdit }, reading: region.reading) { return decision }
+        guard candidates.contains(where: \.isReadingEdit) else { return nil }
+        return rule.decision(among: candidates, reading: region.reading)
     }
 
     /// 打ったときと同じ順にキーを入れ直し，「nn」のあとの母音の読みも打つときと同じ決まりで選ぶ．

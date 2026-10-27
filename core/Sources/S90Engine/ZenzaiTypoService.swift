@@ -48,10 +48,42 @@ public actor ZenzaiTypoService: TypoCorrecting {
             )
             // 取り消したあとの結果は使わず，探した位置も進めない(次に同じキーで探し直す)
             guard !Task.isCancelled else { return [:] }
+            // 読みそのものの誤り(言い違い・書き違い)は，変換で語にならずかなのまま残った部分のかなを変えて探す
+            let kanaEdits = kanaCorrections(forKeys: key, leftContext: leftContext)
+            guard !Task.isCancelled else { return [:] }
             lastSearchedKeys = key
-            result[key] = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits), typedKeys: key, plausibility: plausibility(of:))
+            result[key] = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits, kanaEdits), typedKeys: key, plausibility: plausibility(of:))
         }
         return result
+    }
+
+    /// かなの単位の訂正(KanaEditSearch)．読みにかなにならない英字が残るときは探さない
+    private func kanaCorrections(forKeys keys: String, leftContext: String?) -> [ReadingCorrection] {
+        let reading = KeyEditSearch.rawReading(of: keys)
+        guard !reading.isEmpty, !reading.contains(where: \.isASCII) else { return [] }
+        return KanaEditSearch.corrections(
+            of: reading,
+            in: unconvertedSpans(of: reading),
+            plausibility: plausibility(of:),
+            unconverted: { self.unconvertedSpans(of: $0, minimumLength: 1) },
+            languageModel: { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
+        )
+    }
+
+    /// 読みを Zenzai を使わずに変換したとき，語にならずかなのまま残った部分
+    private func unconvertedSpans(of reading: String, minimumLength: Int = DefaultSettings.minimumUnconvertedSpanLength) -> [Range<Int>] {
+        guard !Task.isCancelled else { return [] }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        var options = options(leftContext: nil)
+        options.zenzaiMode = .off
+        options.N_best = 1
+        options.learningType = .nothing
+        options.typoCorrectionMode = .disabled
+        let data = converter.requestCandidates(composing, options: options).mainResults
+            .first { AzooKeyConverterSession.readingCount($0.composingCount, readingLength: reading.count) == reading.count }?.data ?? []
+        converter.stopComposition()
+        return AzooKeyConverterSession.unconvertedSpans(of: data, minimumLength: minimumLength)
     }
 
     /// 前に 1 か所の打ち間違いを探したキーの並び

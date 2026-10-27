@@ -329,6 +329,28 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         }
     }
 
+    /// 変換で語にならず，かなのまま残った部分の位置(読みの文字数の範囲)．助詞・助動詞(かなで書くのがふつうの語)は除く．
+    /// かなの単位の訂正(KanaEditSearch)を試す場所に使う．隣どうしの部分はつなげる(「そう」「ゆう」→「そうゆう」)
+    nonisolated static func unconvertedSpans(of data: [DicdataElement], minimumLength: Int = DefaultSettings.minimumUnconvertedSpanLength) -> [Range<Int>] {
+        var spans: [Range<Int>] = []
+        var position = 0
+        for element in data {
+            let length = element.ruby.count
+            defer { position += length }
+            let isFunctionWord = functionWordIDs.contains(element.lcid)
+            guard !isFunctionWord, element.word == KanaWidth.hiragana(from: element.ruby) else { continue }
+            if let last = spans.last, last.upperBound == position {
+                spans[spans.count - 1] = last.lowerBound..<(position + length)
+            } else {
+                spans.append(position..<(position + length))
+            }
+        }
+        return spans.filter { $0.count >= minimumLength }
+    }
+
+    /// 助詞(147〜368)と助動詞(369〜554)．かなで書くのがふつうなので，かなのまま残っても語にならなかったとはみなさない
+    private nonisolated static let functionWordIDs = 147...554
+
     private static let nounIDs = 1280...1316
     /// 名詞のほかの自立語の品詞の ID の範囲．azooKey の品詞の ID は品詞の名前の順に並ぶ．s90-playground --words で語ごとの ID を見て確かめた
     /// (形容詞 19・20・35・43，接続詞 555，動詞 619・772・817，副詞 1281・1282，連体詞 1315)．助詞は 147〜368，助動詞は 369〜554
