@@ -49,6 +49,9 @@ public enum Okurigana {
         var characters = Array(text)
         var changed = false
         for pair in pairs {
+            // 候補のほとんどは語幹を含まないので，含まない組は語尾ごとに照らし合わせない(分岐図を出すたびに候補の数だけ呼ぶため)
+            let fromStem = style == .standard ? pair.allowedStem : pair.standardStem
+            guard (changed ? String(characters) : text).contains(fromStem) else { continue }
             for ending in pair.endings {
                 if style == .allowed, pair.standardStem == "行", ending == "っ" { continue }
                 let (from, to) = style == .standard
@@ -56,7 +59,7 @@ public enum Okurigana {
                     : (Array(pair.standardStem + String(ending)), Array(pair.allowedStem + String(ending)))
                 var index = 0
                 while index + from.count <= characters.count {
-                    let matches = Array(characters[index..<(index + from.count)]) == from
+                    let matches = characters[index..<(index + from.count)].elementsEqual(from)
                     let afterKanji = index > 0 && isKanji(characters[index - 1])
                     if matches, !afterKanji {
                         characters.replaceSubrange(index..<(index + from.count), with: to)
