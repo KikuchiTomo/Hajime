@@ -94,6 +94,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case shrinkSegmentToWord
     /// 注目している文節の区切れる位置に番号を出し，数字で区切る
     case splitSegment
+    /// 注目している文節を消し，その場で読みを打ち直す．文節を移るキー・Space・Enter で打ち直した読みを変換する
+    case editSegment
 
     // 確定と取り消し
     case commit
@@ -141,7 +143,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType: .scripts
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
-             .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment: .segments
+             .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading: .commit
         case .forgetCandidate, .forgetLastCommit: .learning
         case .openSettings, .toggleLiveConversion, .handwriting: .tools
@@ -162,7 +164,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
         case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate,
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
-             .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .commitFirstSegment, .backToReading,
+             .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .forgetCandidate: [.converting]
         case .forgetLastCommit, .reconvert: [.idle]
         }

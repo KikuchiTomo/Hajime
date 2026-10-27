@@ -58,6 +58,9 @@ public final class InputSession {
     private var forcedBoundaries: [Int] = []
     /// 分岐図で，注目している文節を数字で区切る状態か
     private var splitMode = false
+    /// 分岐図で，その場で読みを打ち直している文節の位置と，打った読み(editSegment)．
+    /// 分岐図は出したままにし，文節を移るキー・Space・Enter で打ち直した読みに替えて変換する
+    private var inlineEdit: (index: Int, typed: Composition)?
     /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
     private var convertedFromEnglish: String?
     /// 再変換している元の文字．Esc で読みに戻さず，この文字のまま確定して元に戻す
@@ -130,6 +133,9 @@ public final class InputSession {
 
     /// キーを振り分ける．キー設定の表(R-17)を先に引き，表に無いキーはふつうの処理に回す
     private func route(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        if inlineEdit != nil, let result = handleInlineEdit(event, context: context) {
+            return result
+        }
         let command = lookUp(event)
         if let command, command.isTool {
             // 設定を開く・ライブ変換・手書き．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
@@ -490,6 +496,7 @@ public final class InputSession {
         case .extendSegmentToWord: return moveSegment(.extendToWord, context: context)
         case .shrinkSegmentToWord: return moveSegment(.shrinkToWord, context: context)
         case .splitSegment: return moveSegment(.split, context: context)
+        case .editSegment: return beginInlineEdit(context: context)
         // 確定と取り消し
         case .commit: return KeyResult(handled: true, actions: commitAll())
         case .commitFirstSegment: return commitFirstSegment(context: context)
@@ -977,6 +984,8 @@ public final class InputSession {
 
     /// 組み立て中の文字を，今の表示のとおりに確定する
     private func commitAll() -> [ClientAction] {
+        // その場で打ち直していれば，打ち直した読みに替えて変換してから確定する
+        if inlineEdit != nil, !finishInlineEdit() { return reset() }
         // EN 入力の英字と読みが両方あれば(入力方式を途中で変えたとき)，打った順に英字から確定する
         let styleActions = composingStyles.flatMap { $0.commit() }
         guard !composition.isEmpty else { return styleActions }
@@ -1046,6 +1055,7 @@ public final class InputSession {
         reconverting = nil
         forcedBoundaries = []
         splitMode = false
+        inlineEdit = nil
         composition = newComposition()
         readingCorrector.reset()
         alphabetRun = false
@@ -1209,6 +1219,8 @@ public final class InputSession {
             return [.setMarkedText(marked), .showCandidates(panel)]
         case .association(let list, let origin):
             return renderAssociation(list, origin: origin)
+        case .lattice(let lattice) where inlineEdit != nil:
+            return renderInlineEdit(lattice)
         case .lattice(let lattice):
             // 打ち間違いを直した文節は，注目していなければ点線の下線にする
             let corrected = correctedRange(of: \.conversionReading)
@@ -1391,6 +1403,87 @@ public final class InputSession {
             phase = .lattice(lattice)
             return KeyResult(handled: true, actions: render(context: context))
         }
+    }
+
+    // MARK: - その場で打ち直す
+
+    /// 分岐図で注目している文節を消し，その場で読みを打ち直し始める．分岐図でなければ何もしない
+    private func beginInlineEdit(context: InputContext) -> KeyResult {
+        guard case .lattice(let lattice) = phase else { return KeyResult(handled: true) }
+        splitMode = false
+        inlineEdit = (lattice.focusedIndex, newComposition())
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 打ち直しているあいだのキー．文字は打ち直す読みに足し，Backspace で消し，Esc で打ち直しをやめる(文節を元に戻す)．
+    /// ほかのキーは，打ち直した読みに替えて変換してから，分岐図のキーとして行う(nil を返す)．
+    /// Space と変換のキーは替えるだけにし，候補は進めない(打ち直した文節の第 1 候補を見せる)
+    private func handleInlineEdit(_ event: KeyEvent, context: InputContext) -> KeyResult? {
+        guard var edit = inlineEdit, case .lattice = phase else {
+            inlineEdit = nil
+            return nil
+        }
+        let typesText = !event.modifiers.contains(.command) && !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
+        switch event.key {
+        case .character(let character) where typesText:
+            if settings.current.inputStyle == .kana,
+                let kana = event.keyLabel.flatMap({ KanaLayout.text(forKey: $0, shift: event.modifiers.contains(.shift), settings: settings.current) }) {
+                edit.typed.insertKana(kana)
+            } else {
+                edit.typed.insertRomaji(character)
+            }
+            inlineEdit = edit
+            return KeyResult(handled: true, actions: render(context: context))
+        case .backspace where typesText:
+            edit.typed.deleteBackward()
+            inlineEdit = edit
+            return KeyResult(handled: true, actions: render(context: context))
+        case .escape:
+            inlineEdit = nil
+            return KeyResult(handled: true, actions: render(context: context))
+        default:
+            let command = lookUp(event)
+            guard finishInlineEdit() else { return KeyResult(handled: true, actions: reset()) }
+            if command == .nextCandidate || command == .convert || event.key == .space {
+                return KeyResult(handled: true, actions: render(context: context))
+            }
+            return nil
+        }
+    }
+
+    /// 打ち直した読みに替えて，その文節を変換し直す．ほかの文節の選んだ候補はそのまま．
+    /// 打ち直した読みが空なら文節を消す．文節が 1 つも残らなければ false(呼び出し側で組み立てをやめる)
+    private func finishInlineEdit() -> Bool {
+        guard let edit = inlineEdit, case .lattice(let lattice) = phase, lattice.segments.indices.contains(edit.index) else {
+            inlineEdit = nil
+            return true
+        }
+        inlineEdit = nil
+        let old = lattice.segments[edit.index]
+        let slice = edit.typed.conversionReading
+        let reading = composition.conversionReading
+        let replacedReading = String(reading.prefix(old.readingStart)) + slice + String(reading.dropFirst(old.readingStart + old.readingLength))
+        guard !replacedReading.isEmpty else { return false }
+        // 読みを替えたので，打ち間違いの訂正と英単語の補正の記録は捨てる(打ち直した読みのまま確定する)
+        composition = newComposition()
+        composition.insertKana(replacedReading)
+        readingCorrector.reset()
+        corrector.reset()
+        forcedBoundaries = []
+        phase = .lattice(latticeBuilder.replacing(lattice, segmentAt: edit.index, with: slice))
+        return true
+    }
+
+    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れ，分岐図は打ち直す前のまま出しておく
+    private func renderInlineEdit(_ lattice: SegmentLattice) -> [ClientAction] {
+        guard let edit = inlineEdit else { return [] }
+        let segments: [MarkedText.Segment] = lattice.segments.enumerated().map { index, segment in
+            index == edit.index ? .init(edit.typed.displayReading, style: .reading) : .init(segment.selected.text, style: .converted)
+        }
+        var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
+                                              showsVariants: settings.current.showsVariantRow, corrected: nil)
+        panel.note = PanelBuilder.inlineEditNote(replacing: lattice.segments[edit.index].selected.text, key: keyLabel(.nextSegment, in: .converting))
+        return [.setMarkedText(MarkedText(segments)), .showLattice(panel)]
     }
 
     // MARK: - 連想変換(R-18)
@@ -1605,6 +1698,7 @@ public final class InputSession {
     /// 分岐図の幹は文節を選び(←→)，枝は番号キーで選んだのと同じ(迷う文節へ進むか確定)，一覧の行は選んで確定する(番号 → Enter)．
     /// 押した対象が今の状態に無ければ何もしない
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
+        if inlineEdit != nil, !finishInlineEdit() { return reset() }
         switch (phase, target) {
         case (.lattice(var lattice), .segment(let index)):
             guard lattice.segments.indices.contains(index) else { return [] }

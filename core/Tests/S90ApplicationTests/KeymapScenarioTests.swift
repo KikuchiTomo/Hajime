@@ -43,6 +43,72 @@ struct KeymapScenarioTests {
         #expect(composing.marked.text == "かな")
     }
 
+    /// 「きょうはいい」を変換し，2 つ目の文節(いい)を選んで ⇧⌫ で打ち直し始めたところ
+    private func editingSecondSegment() -> Harness {
+        let converter = twoSegments()
+        converter.table["かな"] = [("仮名", nil)]
+        var settings = settings()
+        settings.initialFocus = .start
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        harness.press(.backspace, .shift)
+        return harness
+    }
+
+    @Test("⇧⌫ で選んでいる文節を消し，その場で打ち直す．分岐図は出したままにし，Tab で打ち直した読みを変換する")
+    func editSegmentInPlace() {
+        let harness = editingSecondSegment()
+        #expect(harness.marked.text == "今日は")
+        harness.type("kana")
+        #expect(harness.marked.text == "今日はかな")
+        #expect(harness.lattice != nil)
+        harness.press(.tab)
+        #expect(harness.marked.text == "今日は仮名")
+        #expect(harness.lattice?.columns.map(\.text) == ["今日は", "仮名"])
+        harness.press(.enter)
+        #expect(harness.committed == "今日は仮名")
+    }
+
+    @Test("打ち直しているあいだの Enter は，打ち直した読みを変換して確定する")
+    func editSegmentThenCommit() {
+        let harness = editingSecondSegment()
+        harness.type("kana")
+        harness.press(.enter)
+        #expect(harness.committed == "今日は仮名")
+    }
+
+    @Test("打ち直しているあいだの Space は，打ち直した文節を変換し，候補は進めない")
+    func editSegmentThenSpace() {
+        let harness = editingSecondSegment()
+        harness.type("kana")
+        harness.press(.space)
+        #expect(harness.marked.text == "今日は仮名")
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        #expect(harness.lattice?.columns[1].selectedAlternative ?? 0 == 0)
+    }
+
+    @Test("打ち直しを Esc でやめると，文節を元に戻す．Backspace は打ち直している読みを消す")
+    func editSegmentCancel() {
+        let harness = editingSecondSegment()
+        harness.type("kana")
+        harness.press(.backspace)
+        #expect(harness.marked.text == "今日はか")
+        harness.press(.escape)
+        #expect(harness.marked.text == "今日はいい")
+        #expect(harness.lattice?.columns.count == 2)
+    }
+
+    @Test("何も打たずに文節を移ると，その文節を消す")
+    func editSegmentDeletes() {
+        let harness = editingSecondSegment()
+        harness.press(.tab)
+        #expect(harness.marked.text == "今日は")
+        #expect(harness.lattice?.columns.count == 1)
+    }
+
     @Test("R-17: 入力文字なしで ⇧Space は設定と逆の幅の空白，⌃⇧Space は全角空白")
     func spaces() {
         let harness = Harness(settings: settings(.windows))
