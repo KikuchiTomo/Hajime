@@ -6,7 +6,7 @@ destination="/Library/Input Methods"
 # 開発版は Dev の構成でビルドする(最適化は本番と同じ)．Debug の構成は画像の書き出し用の別のアプリで，ここでは入れない
 variant() {
   case "$1" in
-    Release) configuration=Release; app_name="Hajime"; display_name="はじめ"; bundle_id="men.haji.inputmethod" ;;
+    Release) configuration=Release; app_name="Hajime"; display_name="はじめ"; bundle_id="men.haji.inputmethod.Hajime" ;;
     Dev) configuration=Dev; app_name="Hajime Dev"; display_name="はじめ Dev"; bundle_id="men.haji.inputmethod.develop" ;;
     *) echo "Release か Dev を指定してください" >&2; exit 1 ;;
   esac

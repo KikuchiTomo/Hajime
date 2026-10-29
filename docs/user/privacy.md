@@ -21,7 +21,7 @@ description: はじめが保存するデータと，その保存場所
 
 | OS | 場所 |
 |---|---|
-| macOS | `~/Library/Containers/men.haji.inputmethod/` |
+| macOS | `~/Library/Containers/men.haji.inputmethod.Hajime/` |
 | Windows | 設定は `%APPDATA%\haji.men\IME\`，そのほかは `%LOCALAPPDATA%\haji.men\IME\` |
 
 同期を設定したときだけ，指定したフォルダに設定と辞書を書き出します．フォルダの中身をほかのパソコンに運ぶのは，Dropbox などのアプリです．

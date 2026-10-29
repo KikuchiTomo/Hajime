@@ -1,4 +1,18 @@
 #!/bin/sh
-# 入れ替えたあと，動いている古い版を止める．次にキーを打ったとき OS が新しい版を起こす
+# 入れ替えたあと，動いている古いバージョンを止める．次にキーを打ったとき OS が新しいバージョンを起こす
 pkill -x "Hajime" 2>/dev/null || true
+
+# ログイン中の利用者の入力ソースに登録して有効にする．ログアウトしなくても入力メニューに出る．
+# 誰もログインしていなければ(コマンドで入れたときなど)何もしない．次のログインで OS が見つける
+app="$2/Hajime.app"
+user=$(stat -f %Su /dev/console)
+if [ -n "$user" ] && [ "$user" != "root" ] && [ -d "$app" ]; then
+  uid=$(id -u "$user")
+  # インストーラーのスクリプトの置き場所は root しか読めないことがあるので，利用者が動かせる一時的な場所に写して動かす
+  tool_dir=$(mktemp -d)
+  cp "$(dirname "$0")/input_source" "$tool_dir/input_source"
+  chmod 755 "$tool_dir" "$tool_dir/input_source"
+  launchctl asuser "$uid" sudo -u "$user" "$tool_dir/input_source" enable "$app" || true
+  rm -rf "$tool_dir"
+fi
 exit 0

@@ -132,12 +132,23 @@ fi
 
 cp "$root/tools/macos/pkg/postinstall" "$work/scripts/postinstall"
 chmod +x "$work/scripts/postinstall"
+# インストール後処理が入力ソースを登録する道具．アプリはサンドボックスの中で動き，そこから登録しても OS の入力ソースに届かないため，
+# サンドボックスの外で動く別の実行ファイルにする．入れる先の Mac の CPU を選ばないよう，両方の CPU 向けにまとめる
+for arch in arm64 x86_64; do
+  xcrun swiftc -O -target "$arch-apple-macos14.0" -o "$work/input_source-$arch" "$root/tools/macos/input_source.swift"
+done
+lipo -create "$work/input_source-arm64" "$work/input_source-x86_64" -output "$work/scripts/input_source"
+if [ -n "$app_identity" ] && [ "$app_identity" != "-" ]; then
+  codesign --force --options runtime "$timestamp" --sign "$app_identity" "$work/scripts/input_source"
+else
+  codesign --force --timestamp=none --sign - "$work/scripts/input_source"
+fi
 # 入れる場所を動かさない(OS は入力メソッドを決まった場所からしか読まない)
 pkgbuild --analyze --root "$work/root" "$work/component.plist" >/dev/null
 plutil -replace 0.BundleIsRelocatable -bool NO "$work/component.plist"
 COPYFILE_DISABLE=1 pkgbuild --root "$work/root" --component-plist "$work/component.plist" --scripts "$work/scripts" \
   --identifier "$bundle_id" --version "$version" --install-location "$destination" "$work/component.pkg"
-sed -e "s/@VERSION@/$version/g" "$root/tools/macos/pkg/distribution.xml" > "$work/distribution.xml"
+sed -e "s/@VERSION@/$version/g" -e "s/@BUNDLE_ID@/$bundle_id/g" "$root/tools/macos/pkg/distribution.xml" > "$work/distribution.xml"
 output="build/dist/Hajime-$version.pkg"
 rm -f "$output"
 if [ -n "$installer_identity" ]; then

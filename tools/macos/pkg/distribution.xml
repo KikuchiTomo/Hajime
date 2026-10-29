@@ -7,15 +7,15 @@
             <os-version min="14.0"/>
         </allowed-os-versions>
     </volume-check>
-    <pkg-ref id="men.haji.inputmethod"/>
+    <pkg-ref id="@BUNDLE_ID@"/>
     <choices-outline>
         <line choice="default">
-            <line choice="men.haji.inputmethod"/>
+            <line choice="@BUNDLE_ID@"/>
         </line>
     </choices-outline>
     <choice id="default"/>
-    <choice id="men.haji.inputmethod" visible="false">
-        <pkg-ref id="men.haji.inputmethod"/>
+    <choice id="@BUNDLE_ID@" visible="false">
+        <pkg-ref id="@BUNDLE_ID@"/>
     </choice>
-    <pkg-ref id="men.haji.inputmethod" version="@VERSION@" onConclusion="RequireLogout">component.pkg</pkg-ref>
+    <pkg-ref id="@BUNDLE_ID@" version="@VERSION@" onConclusion="RequireLogout">component.pkg</pkg-ref>
 </installer-gui-script>
