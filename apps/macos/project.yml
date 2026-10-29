@@ -93,8 +93,8 @@ targets:
         HAJIME_DISPLAY_NAME: "はじめ"
         # 英字の入力モードの名前
         HAJIME_DISPLAY_NAME_EN: "Hajime"
-        MARKETING_VERSION: "0.1.10"
-        CURRENT_PROJECT_VERSION: "12"
+        MARKETING_VERSION: "0.1.11"
+        CURRENT_PROJECT_VERSION: "13"
         GENERATE_INFOPLIST_FILE: NO
         COMBINE_HIDPI_IMAGES: YES
       # Dev と Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる．
