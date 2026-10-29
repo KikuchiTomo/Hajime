@@ -48,6 +48,22 @@ notarize() {
     exit 1
   fi
 }
+
+# 公証の結果をファイルに付ける．Apple のサーバーとの通信が途中で切れて失敗することがあるので，間を空けて何回かやり直す
+staple() {
+  if xcrun stapler staple "$1"; then
+    return
+  fi
+  for attempt in 1 2 3 4; do
+    echo "公証の結果を付けられませんでした($attempt 回目)．$((attempt * 15)) 秒後にやり直します" >&2
+    sleep $((attempt * 15))
+    if xcrun stapler staple "$1"; then
+      return
+    fi
+  done
+  echo "公証の結果を付けられませんでした: $1" >&2
+  exit 1
+}
 if [ -n "${HAJIME_APP_IDENTITY:-}" ]; then
   app_identity=$HAJIME_APP_IDENTITY
 elif [ -n "$notary_profile" ]; then
@@ -127,7 +143,7 @@ fi
 if [ -n "$notary_profile" ]; then
   ditto -c -k --sequesterRsrc --keepParent "$app" "$work/app.zip"
   notarize "$work/app.zip"
-  xcrun stapler staple "$app"
+  staple "$app"
 fi
 
 cp "$root/tools/macos/pkg/postinstall" "$work/scripts/postinstall"
@@ -156,7 +172,7 @@ if [ -n "$installer_identity" ]; then
   echo ".pkg の署名: $installer_identity"
   if [ -n "$notary_profile" ]; then
     notarize "$output"
-    xcrun stapler staple "$output"
+    staple "$output"
     # 公証した .pkg は，Gatekeeper の検査で警告なしに開けることを確かめる
     spctl --assess --type install --verbose "$output"
   fi
