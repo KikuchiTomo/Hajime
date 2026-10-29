@@ -12,30 +12,27 @@ Hajime is under active development, and its behavior may change.
 
 ## Features
 
-| Feature | Description |
-|---|---|
-| Live conversion | Converts to kanji as you type. |
-| Branch map | Candidates branch out per segment, so you can re-pick only the segments you need while seeing the whole sentence. A classic list view is also available. |
-| Segment editing | Resize segments by character or by word, split them at word boundaries, or retype a segment in place. |
-| Typo correction | Fixes vowel and consonant slips and missed keys from context. When unsure, it suggests a fix instead. Press Esc to restore what you typed. |
-| English spelling correction | Fixes English words typed in romaji (`pthon` → `python`). |
-| English input mode | Type in English and convert only the words you want into Japanese. |
-| Association | Shift+Space shows words with similar or related meanings. |
-| Handy conversions | Arithmetic (`1+2*3=`), postal codes to addresses, dates and times, symbols, and emoji. |
-| Writing aids | Notes on common usage mistakes and homophones. |
-| Handwriting input | Find kanji you cannot read by drawing them. |
-| Dictionaries | A user dictionary, plus imported dictionaries with hundreds of thousands of words. |
-| Customization | Every key binding can be changed, with Windows, Mac, Emacs, and Vim presets. You can also create your own themes. |
-| Per-app behavior | In editors and terminals, symbols stay half-width and commands stay in English. |
-| Sync and backup | Sync settings and dictionaries across computers through a folder such as Dropbox, and export settings as JSON. |
-| Privacy | Hajime never sends what you type off your computer and makes no network connections. |
+- Live conversion
+- Branch map of candidates
+- Segment resizing, splitting, and retyping
+- Automatic typo correction with suggestions
+- English spelling correction
+- English input mode
+- Association
+- Arithmetic, postal code, date and time, and symbol conversion
+- Writing aids
+- Handwriting input
+- Dictionary import
+- Customizable key bindings and themes
+- Per-app input settings
+- Settings sync and backup
 
 ## Installation
 
 | OS | Requirements | Download |
 |---|---|---|
-| macOS | MacOS 14 or later | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true) (`.pkg`) |
-| Windows | Windows 10 22H2 or later (64-bit) | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true) (`.msi`) |
+| macOS | macOS 14 or later | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true) |
+| Windows | Windows 10 22H2 or later (64-bit) | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true) |
 | Linux (WIP) | | Not yet available |
 
 After installing, sign out once, then add "Hajime" in your OS input source settings.
