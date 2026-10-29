@@ -1,82 +1,52 @@
 # はじめ
 
-[![CI](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci.yml)
-[![CI Windows](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci-windows.yml)
-[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/Hajime/releases)
-[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/Hajime/releases)
+[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true)
+[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B-lightgrey.svg)
-![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
-![Rust](https://img.shields.io/badge/Rust-1.90-b7410e.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B%20%7C%20Linux%20(WIP)-lightgrey.svg)
 [![Engine](https://img.shields.io/badge/engine-azooKey%20%2B%20Zenzai-6b4fbb.svg)](https://github.com/azooKey/AzooKeyKanaKanjiConverter)
 
-macOS / Windows / Linux 向けの日本語入力システムです。
-かな漢字変換エンジンには、 [azooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) のエンジンを使用しています。
+macOS・Windows 向けの日本語入力システムです．
+かな漢字変換には [azooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) のエンジンと，ニューラル言語モデルの Zenzai を使用しています．
 
-開発中のため，仕様は余儀なく変更される可能性があります．
+開発中のため，仕様は変更される可能性があります．
 
 ## 機能
 
-- ライブ変換機能
-- 英単語変換機能 (日本語で入力すると固有名詞等を推測して英単語に変換します)
-- 分岐図を使用した変換メニュー
-- タイピングミスの補正 (自動補正機能)
-- ローカルへの記録結果の保存 (補正した回数などを記録します)
-- 高いカスタマイズ性
-- 言い換え変換
-
-## インストール方法
-
-[Releases](https://github.com/KikuchiTomo/Hajime/releases) から，お使いの OS 向けのものをダウンロードしてください．
-
-### macOS
-
-macOS 14 以降で使えます．
-
-1. `v0.1.2-macos` のような名前のリリースから `.pkg` をダウンロードし，開いてインストールします．開けないと表示されたら，システム設定 > プライバシーとセキュリティ で「このまま開く」を押し，もう一度開いてください．
-2. ログアウトしてログインし直します．
-3. システム設定 > キーボード > 入力ソース の「編集」で「+」を押し，日本語の「はじめ」を追加します．
-
-新しいバージョンにするときは，新しい `.pkg` を入れるだけです．
-
-### Windows
-
-Windows 10 22H2 以降の 64 ビット版で使えます．
-
-1. `v0.1.1-windows` のような名前のリリースから `.msi` をダウンロードし，開いてインストールします．SmartScreen の警告が出たら，「詳細情報」から「実行」を選んでください．
-2. サインアウトしてサインインし直します．
-3. 設定 > 時刻と言語 > 言語と地域 で「日本語」の「言語のオプション」を開き，「キーボードの追加」から「はじめ」を選びます．
-4. Windows キー + Space で切り替えます．
-
-詳しい手順は [Windows に入れる](docs/user/how-to/install-windows.md) にあります．
-
-### Linux
-
-まだ提供していません．
-
-## 開発
-
-開発するかたは以下のドキュメントに手順が記載されています。
-また、ブランチと PR の規約については [CONTRIBUTING.md](CONTRIBUTING.md) を参照ください。
-
-| 文書 | 内容 |
+| 機能 | 内容 |
 |---|---|
-| [docs/dev/ARCHITECTURE.md](docs/dev/ARCHITECTURE.md) | 構成と層 |
-| [docs/dev/GUIDELINES.md](docs/dev/GUIDELINES.md) | 置き場所・名前・書き方 |
-| [docs/dev/DESIGN-SYSTEM.md](docs/dev/DESIGN-SYSTEM.md) | 見た目の決まり |
-| [docs/dev/adr/README.md](docs/dev/adr/README.md) | 設計の判断の記録 |
-| [docs/README.md](docs/README.md) | ドキュメントの地図 |
+| ライブ変換 | 入力しながら漢字に変換します．漢字にするまでの待ち時間を設定できます． |
+| 分岐図 | 文節ごとに候補が枝分かれして並び，文全体を見ながら必要な文節だけを選び直せます．従来の一覧表示にも切り替えられます． |
+| 文節の操作 | 文節の長さは 1 文字単位と単語単位で調整できます．単語の切れ目での分割や，文節の入力し直しにも対応しています． |
+| 打ち間違いの補正 | 母音・子音の打ち間違いや打ち忘れを文脈から判断して補正します(「yorosikuonagaisimasu」→「よろしくお願いします」)．確信が持てないときは「もしかして」で候補を示します．Esc で入力どおりに戻せます． |
+| 英単語の補正 | ローマ字で入力した英単語のつづりを補正します(「pthon」→「python」)． |
+| 英字入力 | 英語のまま入力しながら，必要な語だけを日本語に変換します． |
+| 連想変換 | Shift+Space で，似た意味の語や関連する語を候補に出します． |
+| 便利な変換 | 計算(「1+2*3=」)，郵便番号からの住所，日付と時刻(「きょう」「なう」)，記号と絵文字に変換できます． |
+| 校正支援 | ら抜き言葉・二重敬語・重言や，同音異義語の使い分けを候補に添えます． |
+| 手書き入力 | 読みの分からない漢字を，手書きで探して入力できます． |
+| 辞書 | ユーザー辞書のほか，数十万語の専門用語辞書なども取り込めます． |
+| カスタマイズ | すべてのキー操作を変更でき，Windows 風・Mac 風・Emacs 風・Vim 風のひな形を用意しています．テーマは独自に作成できます． |
+| アプリごとの設定 | エディタやターミナルでは記号を半角で入力し，コマンドを英字のまま入力できます． |
+| 同期とバックアップ | Dropbox などのフォルダを通じて，複数のパソコンで設定と辞書を同期できます．設定は JSON で書き出せます． |
+| プライバシー | 入力した文字を端末の外に送信しません．通信も行いません． |
 
-また、脆弱性については [SECURITY.md](SECURITY.md) の手順でお知らせいただけますと助かります．
+## インストール
+
+| OS | 対応バージョン | ダウンロード |
+|---|---|---|
+| macOS | macOS 14 以降 | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true)(`.pkg`) |
+| Windows | Windows 10 22H2 以降(64 ビット) | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true)(`.msi`) |
+| Linux (WIP) | | 準備中 |
+
+インストールしたら，一度ログアウトしてから，OS の入力ソースの設定で「はじめ」を追加してください．
 
 ## ライセンス
 
 MIT License です([LICENSE](LICENSE))．
 
-### 謝辞
+本ソフトウェアは azooKey(MIT)と Zenzai のモデル(Apache-2.0)を使用しています．著作権表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) と，アプリの設定画面の「情報」に記載しています．
 
-本ソフトウェアは、azooKey(MIT)と Zenzai のモデル(Apache-2.0)を使用しています．
-著作権表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 及び本ソフトウェア内で提示されています．
+脆弱性の報告は [SECURITY.md](SECURITY.md) をご覧ください．
 
 English: [README.en.md](README.en.md)
-
