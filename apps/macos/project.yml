@@ -77,8 +77,9 @@ targets:
         # Zenzai(llama.cpp)を含むエンジンを読み込むため，C++ との相互運用を有効にする(azooKey-Desktop と同じ設定)
         SWIFT_OBJC_INTEROP_MODE: objcxx
         PRODUCT_MODULE_NAME: Hajime
-        # 入力メソッドのバンドル ID には inputmethod を含める決まりがある
-        PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod
+        # 入力メソッドのバンドル ID は .inputmethod. を途中に含める．men.haji.inputmethod のように inputmethod で終わる ID は，
+        # OS が入力ソースとして登録しない(2026-10-30 に確かめた)
+        PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.Hajime
         INFOPLIST_FILE: Hajime/Info.plist
         CODE_SIGN_ENTITLEMENTS: Hajime/Hajime.entitlements
         # 署名は tools/macos/install.sh が Apple Development の証明書で行う．

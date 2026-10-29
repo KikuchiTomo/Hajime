@@ -5,7 +5,7 @@ azooKey-Desktop(`../upstream/azooKey-Desktop/azooKeyMac/`)の実装を読むと�
 ## 入力メソッドの登録
 
 - `Info.plist` の `InputMethodConnectionName`，`InputMethodServerControllerClass`，`tsInputModeListKey` で入力モード(ひらがな・英数など)を宣言する
-- バンドル ID は `men.haji.inputmethod` を使う．入力モードの ID はその下に `.Japanese`，`.Roman` を付ける
+- バンドル ID は `men.haji.inputmethod.Hajime` を使う．`.inputmethod.` を途中に含めないと OS が入力ソースとして登録しない．入力モードの ID はその下に `.Japanese`，`.Roman` を付ける
 - インストール先は `~/Library/Input Methods/`(開発中)か `/Library/Input Methods/`(配布物)
 
 ## コントローラ

@@ -136,7 +136,7 @@ final class CompositionRoot {
 
 /// 本番と開発版(Debug)で変わる値．どちらも Info.plist から読む(apps/macos/project.yml の configs)
 enum AppIdentity {
-    static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "men.haji.inputmethod"
+    static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "men.haji.inputmethod.Hajime"
     static let supportDirectoryName = Bundle.main.infoDictionary?["HajimeSupportDirectoryName"] as? String ?? "men.haji.inputmethod"
     static let japaneseModeID = bundleIdentifier + ".Japanese"
     static let directModeID = bundleIdentifier + ".Roman"
