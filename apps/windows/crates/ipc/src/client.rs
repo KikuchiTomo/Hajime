@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! エンジン(s90-engine-host)への要求を 1 本のスレッドで順に送り，応答を待つ手元側．
+//! エンジン(hajime-engine-host)への要求を 1 本のスレッドで順に送り，応答を待つ手元側．
 //! つなぎ方(Windows の名前付きパイプ・Unix ドメインソケット)だけを OS ごとに差し替える
 
 use crate::framing::{read_message, write_message, FrameError};
@@ -56,7 +56,7 @@ impl EngineClient {
     {
         let (jobs, receiver) = mpsc::channel::<Job>();
         std::thread::Builder::new()
-            .name("s90-engine-client".into())
+            .name("hajime-engine-client".into())
             .spawn(move || run(connect, receiver))?;
         Ok(Self {
             jobs,

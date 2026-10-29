@@ -1,5 +1,5 @@
-import S90Application
-import S90Domain
+import HajimeApplication
+import HajimeDomain
 
 /// 読みごとに決まった候補を返す変換エンジン．変換の質はエンジンの性能なので，core のテストでは固定する
 @MainActor

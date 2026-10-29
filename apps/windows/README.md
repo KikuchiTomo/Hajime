@@ -1,12 +1,12 @@
 # apps/windows
 
 Windows の TSF テキストサービス(Rust の DLL)・候補ウィンドウ・インストーラーを置く Cargo のワークスペース．
-変換は `core/` の `s90-engine-host` が別のプロセスで行う(ADR 0003)．crate の分け方は `.claude/skills/s90-windows/SKILL.md`．
+変換は `core/` の `hajime-engine-host` が別のプロセスで行う(ADR 0003)．crate の分け方は `.claude/skills/hajime-windows/SKILL.md`．
 
 | crate | 中身 |
 |---|---|
 | `crates/ipc` | エンジンとのメッセージ(`protocol/schema.json` から生成)，その区切り方，名前付きパイプの接続 |
-| `crates/tsf` | TSF のテキストサービスの DLL(`s90_tsf.dll`)．キーをエンジンに送り，返った操作を入力欄に反映する |
+| `crates/tsf` | TSF のテキストサービスの DLL(`hajime_tsf.dll`)．キーをエンジンに送り，返った操作を入力欄に反映する |
 
 ## 確かめる
 

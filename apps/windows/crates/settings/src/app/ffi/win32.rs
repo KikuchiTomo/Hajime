@@ -394,7 +394,7 @@ fn registry_dword(name: PCWSTR) -> Option<u32> {
 }
 
 /// 初期設定ウィザードを済ませたかを書く場所(利用者ごと．エンジンの設定のファイルには書かない)
-const SETUP_KEY: PCWSTR = w!("Software\\s90.tokyo\\IME");
+const SETUP_KEY: PCWSTR = w!("Software\\haji.men\\IME");
 const SETUP_VALUE: PCWSTR = w!("SetupCompleted");
 
 /// 初期設定ウィザードを済ませたか

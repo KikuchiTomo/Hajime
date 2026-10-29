@@ -1,8 +1,8 @@
-//! 本物のエンジン(s90-engine-host)と確かめる．エンジンを動かし，同じ XDG_RUNTIME_DIR を渡して
+//! 本物のエンジン(hajime-engine-host)と確かめる．エンジンを動かし，同じ XDG_RUNTIME_DIR を渡して
 //! `cargo test -- --ignored` で動かす(CI ではエンジンを動かさないので飛ばす)
 
 use ipc::{FieldContext, Key, Modifiers};
-use s90_fcitx5_bridge::Bridge;
+use hajime_fcitx5_bridge::Bridge;
 use std::time::{Duration, Instant};
 
 fn context() -> FieldContext {

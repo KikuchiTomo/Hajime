@@ -29,7 +29,7 @@ main には直接 push できません．決まりの詳細は [docs/dev/REPOSIT
 | 開発版を入れる | `make dev-macos` | 実際のアプリで打ち心地を試したい．本番と並べて使える |
 | 本番を入れる | `make install-macos` | 普段使いにする |
 
-開発版は「s90.tokyo IME Dev」という別の入力ソースです．本番とはバンドル ID・学習データ・設定が分かれていて，メニューバーのアイコンは点線の枠になります．
+開発版は「Hajime Dev」という別の入力ソースです．本番とはバンドル ID・学習データ・設定が分かれていて，メニューバーのアイコンは点線の枠になります．
 
 - 入れる先は `/Library/Input Methods` なので，管理者のパスワードを聞かれます
 - 初めて入れたときだけ，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース の「+」から足す
@@ -40,15 +40,15 @@ main には直接 push できません．決まりの詳細は [docs/dev/REPOSIT
 
 - 入っているバージョンが証明書で署名されていれば，それと同じチームの証明書を使う．キーチェーンに無ければ入れるのをやめる
 - アプリだけ消して置き場所が残っているときは，置き場所を作った署名が分からないので入れるのをやめる
-- アドホック署名のバージョンが入っていて置き場所があるときは，証明書で署名すると止まるおそれがあるので入れるのをやめる．アドホック署名のまま入れ直すときは `S90_SIGN_IDENTITY=-` を付ける
+- アドホック署名のバージョンが入っていて置き場所があるときは，証明書で署名すると止まるおそれがあるので入れるのをやめる．アドホック署名のまま入れ直すときは `HAJIME_SIGN_IDENTITY=-` を付ける
 - 入っているバージョンが証明書で署名されておらず，置き場所も無いとき(初めて入れるときなど)は，Apple Development の最初の証明書を使う(`security find-identity -v -p codesigning` で確かめられる)．証明書が 1 つも無ければアドホック署名になり，入力ソースとして選べないことがある
-- 別の証明書を使うときは `S90_SIGN_IDENTITY="Apple Development: 名前 (ID)" make dev-macos` のように選ぶ
+- 別の証明書を使うときは `HAJIME_SIGN_IDENTITY="Apple Development: 名前 (ID)" make dev-macos` のように選ぶ
 
 止まったときに学習データと設定を消してよければ，先にアプリを消し(`make uninstall-macos` か `make uninstall-dev-macos`)，Finder で置き場所をゴミ箱に入れてから入れ直します．
 
-見た目だけを確かめるときは，Debug でビルドした「s90.tokyo IME Debug」(`apps/macos/build/Build/Products/Debug/`)を `--render-snapshots` 付きで起動すると，候補ウィンドウと設定の画面の画像を書き出します(`design/mockups/` の画像はこれで作っています)．Debug は開発版と別のバンドル ID なので，入れた開発版のデータには触れません．
+見た目だけを確かめるときは，Debug でビルドした「Hajime Debug」(`apps/macos/build/Build/Products/Debug/`)を `--render-snapshots` 付きで起動すると，候補ウィンドウと設定の画面の画像を書き出します(`design/mockups/` の画像はこれで作っています)．Debug は開発版と別のバンドル ID なので，入れた開発版のデータには触れません．
 
-開発版のバンドル ID は 2026-10-26 に `tokyo.s90.inputmethod.S90IME.dev` から `.develop` に変えました．前の開発版を入れていた場合は，システム設定 > キーボード > 入力ソース で前の「s90.tokyo IME Dev」を外し，新しく足し直してください．前の開発版の学習データと設定(`~/Library/Containers/tokyo.s90.inputmethod.S90IME.dev`)は使わないので，Finder で消してかまいません．
+開発版のバンドル ID は 2026-10-26 に `men.haji.inputmethod.dev` から `.develop` に変えました．前の開発版を入れていた場合は，システム設定 > キーボード > 入力ソース で前の「Hajime Dev」を外し，新しく足し直してください．前の開発版の学習データと設定(`~/Library/Containers/men.haji.inputmethod.dev`)は使わないので，Finder で消してかまいません．
 
 ## PR のタイトルとコミット
 

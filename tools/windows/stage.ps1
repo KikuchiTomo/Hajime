@@ -14,12 +14,12 @@ $swift = Join-Path $root 'core\.build\x86_64-unknown-windows-msvc\release'
 New-Item -ItemType Directory -Force -Path $Output | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $Output 'x86') | Out-Null
 
-Copy-Item (Join-Path $rust 'release\s90_tsf.dll') $Output
-Copy-Item (Join-Path $rust 'release\s90-candidate-ui.exe') $Output
-Copy-Item (Join-Path $rust 'release\s90-settings.exe') $Output
-Copy-Item (Join-Path $rust 'i686-pc-windows-msvc\release\s90_tsf.dll') (Join-Path $Output 'x86')
+Copy-Item (Join-Path $rust 'release\hajime_tsf.dll') $Output
+Copy-Item (Join-Path $rust 'release\hajime-candidate-ui.exe') $Output
+Copy-Item (Join-Path $rust 'release\hajime-settings.exe') $Output
+Copy-Item (Join-Path $rust 'i686-pc-windows-msvc\release\hajime_tsf.dll') (Join-Path $Output 'x86')
 
-Copy-Item (Join-Path $swift 's90-engine-host.exe') $Output
+Copy-Item (Join-Path $swift 'hajime-engine-host.exe') $Output
 Get-ChildItem -Path $swift -File -Filter '*.dll' | Copy-Item -Destination $Output
 Get-ChildItem -Path $swift -Directory -Filter '*.resources' | Copy-Item -Destination $Output -Recurse
 
@@ -43,7 +43,7 @@ Copy-Item (Join-Path $root 'LICENSE') (Join-Path $Output 'LICENSE.txt')
 Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') (Join-Path $Output 'THIRD_PARTY_NOTICES.md')
 Copy-Item (Join-Path $root 'LICENSES') (Join-Path $Output 'LICENSES') -Recurse -Force
 
-$required = @('s90_tsf.dll', 'x86\s90_tsf.dll', 's90-engine-host.exe', 's90-candidate-ui.exe', 's90-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv',
+$required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv',
     'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
 foreach ($file in $required) {

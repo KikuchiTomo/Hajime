@@ -17,7 +17,7 @@ if [ -z "$files" ]; then
   echo "配布物がありません: $dist" >&2
   exit 1
 fi
-# shellcheck disable=SC2086,SC2046 # ファイル名に空白は無い(s90.tokyo-IME-<バージョン>.pkg)
+# shellcheck disable=SC2086,SC2046 # ファイル名に空白は無い(Hajime-<バージョン>.pkg)
 (cd "$dist" && sha256sum $(for file in $files; do basename "$file"; done) > SHA256SUMS.txt)
 # コントリビューターは，同じ OS の前のタグからのコミットの作者(もう片方の OS のタグとの差にしない)
 repository=${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}

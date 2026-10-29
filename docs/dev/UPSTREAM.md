@@ -1,6 +1,6 @@
 # azooKey の fork との付き合い方
 
-s90.tokyo IME は azooKey から分かれて独自に進めます．ただし変換エンジンの改善は今後も azooKey 側で続くので，取り込める状態は保っておきます．
+はじめは azooKey から分かれて独自に進めます．ただし変換エンジンの改善は今後も azooKey 側で続くので，取り込める状態は保っておきます．
 
 ## fork
 
@@ -31,4 +31,4 @@ s90.tokyo IME は azooKey から分かれて独自に進めます．ただし変
 3. エンジンの場合は `core/Package.swift` の revision を上げ，`make test` を通す
 4. PR に元のコミットの URL と，取り込んだ理由・取り込まなかった部分を書く
 
-取り込みの作業の進め方は `.claude/skills/s90-upstream-port/SKILL.md` にまとめています．
+取り込みの作業の進め方は `.claude/skills/hajime-upstream-port/SKILL.md` にまとめています．

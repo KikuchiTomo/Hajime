@@ -1,5 +1,5 @@
 # Xcode のプロジェクトはこのファイルから作る(xcodegen generate)．.xcodeproj はコミットしない
-name: S90IME
+name: Hajime
 # Dev は開発版を入れるための構成．最適化はリリースと同じにする．
 # Debug の構成ではエンジンと Zenzai(llama.cpp)が最適化なしでビルドされ，1 キーに数秒かかって入力できなくなるため
 configs:
@@ -7,7 +7,7 @@ configs:
   Release: release
   Dev: release
 options:
-  bundleIdPrefix: tokyo.s90
+  bundleIdPrefix: men.haji
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
@@ -18,17 +18,17 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
 packages:
-  S90Core:
+  HajimeCore:
     path: ../../core
 targets:
-  S90IME:
+  Hajime:
     type: application
     platform: macOS
     sources:
-      - path: S90IME
+      - path: Hajime
         excludes:
           - "Info.plist"
-          - "S90IME.entitlements"
+          - "Hajime.entitlements"
       # 同梱したソフトウェアとモデルの著作権表示とライセンスの全文(THIRD_PARTY_NOTICES.md の求めによる)
       - path: ../../THIRD_PARTY_NOTICES.md
         buildPhase: resources
@@ -59,37 +59,39 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-small-Q5_K_M.gguf
     dependencies:
-      - package: S90Core
-        product: S90Domain
-      - package: S90Core
-        product: S90Application
-      - package: S90Core
-        product: S90Engine
-      - package: S90Core
-        product: S90Persistence
+      - package: HajimeCore
+        product: HajimeDomain
+      - package: HajimeCore
+        product: HajimeApplication
+      - package: HajimeCore
+        product: HajimeEngine
+      - package: HajimeCore
+        product: HajimePersistence
     settings:
       base:
-        PRODUCT_NAME: "s90.tokyo IME"
+        PRODUCT_NAME: "Hajime"
         # InputMethodKit に並行性の注釈が無いため，このターゲットだけ Swift 5 の言語モードにする．
         # 判断を持つ core は Swift 6 の厳格な検査のまま(docs/dev/GUIDELINES.md)
         SWIFT_VERSION: "5.0"
         SWIFT_STRICT_CONCURRENCY: minimal
         # Zenzai(llama.cpp)を含むエンジンを読み込むため，C++ との相互運用を有効にする(azooKey-Desktop と同じ設定)
         SWIFT_OBJC_INTEROP_MODE: objcxx
-        PRODUCT_MODULE_NAME: S90IME
+        PRODUCT_MODULE_NAME: Hajime
         # 入力メソッドのバンドル ID には inputmethod を含める決まりがある
-        PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME
-        INFOPLIST_FILE: S90IME/Info.plist
-        CODE_SIGN_ENTITLEMENTS: S90IME/S90IME.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod
+        INFOPLIST_FILE: Hajime/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Hajime/Hajime.entitlements
         # 署名は tools/macos/install.sh が Apple Development の証明書で行う．
         # 証明書の無い環境でもビルドだけはできるよう，既定はアドホック署名にしておく
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
         # 本番と開発版で変わる値．Info.plist から読む
-        S90_SUPPORT_DIRECTORY: tokyo.s90.ime
-        S90_ICON_SUFFIX: ""
+        HAJIME_SUPPORT_DIRECTORY: men.haji.inputmethod
+        HAJIME_ICON_SUFFIX: ""
         # 入力メニューに出す名前．make install-macos NAME=… で変えられる(tools/macos/write_input_source_names.sh)
-        S90_DISPLAY_NAME: "s90"
+        HAJIME_DISPLAY_NAME: "はじめ"
+        # 英字の入力モードの名前
+        HAJIME_DISPLAY_NAME_EN: "Hajime"
         MARKETING_VERSION: "0.1.7"
         CURRENT_PROJECT_VERSION: "9"
         GENERATE_INFOPLIST_FILE: NO
@@ -101,24 +103,26 @@ targets:
       # 入れる開発版(証明書で署名)が同じ ID だと，入れた開発版が止まって入力できなくなる．開発版の ID は前に使っていた .dev から変えた
       configs:
         Dev:
-          PRODUCT_NAME: "s90.tokyo IME Dev"
-          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.develop
-          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.develop
-          S90_ICON_SUFFIX: "-dev"
-          S90_DISPLAY_NAME: "s90 Dev"
+          PRODUCT_NAME: "Hajime Dev"
+          PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.develop
+          HAJIME_SUPPORT_DIRECTORY: men.haji.inputmethod.develop
+          HAJIME_ICON_SUFFIX: "-dev"
+          HAJIME_DISPLAY_NAME: "はじめ Dev"
+          HAJIME_DISPLAY_NAME_EN: "Hajime Dev"
         Debug:
-          PRODUCT_NAME: "s90.tokyo IME Debug"
-          PRODUCT_BUNDLE_IDENTIFIER: tokyo.s90.inputmethod.S90IME.debug
-          S90_SUPPORT_DIRECTORY: tokyo.s90.ime.debug
-          S90_ICON_SUFFIX: "-dev"
-          S90_DISPLAY_NAME: "s90 Debug"
+          PRODUCT_NAME: "Hajime Debug"
+          PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.debug
+          HAJIME_SUPPORT_DIRECTORY: men.haji.inputmethod.debug
+          HAJIME_ICON_SUFFIX: "-dev"
+          HAJIME_DISPLAY_NAME: "はじめ Debug"
+          HAJIME_DISPLAY_NAME_EN: "Hajime Debug"
 # スキームを書いておく．書かないと xcodebuild が自動で作るスキームで実行先の機種が決まらず，
 # 「Supported platforms for the buildables in the current scheme is empty」と出る
 schemes:
-  S90IME:
+  Hajime:
     build:
       targets:
-        S90IME: all
+        Hajime: all
     run:
       config: Debug
     archive:

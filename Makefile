@@ -16,7 +16,7 @@ fetch-models:
 check:
 	$(PYTHON) tools/check/check_skills.py
 	$(PYTHON) tools/check/check_strings.py
-	$(PYTHON) .claude/skills/s90-architecture/scripts/check_layers.py
+	$(PYTHON) .claude/skills/hajime-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/protocol/generate.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check
@@ -32,15 +32,15 @@ test: test-debug
 
 # Debug ビルドのテスト．本物の Zenzai のテストはデバッグビルドでは遅すぎるので，ここでは飛ばして test-zenzai で動かす
 test-debug:
-	env -u S90_ZENZAI_MODEL swift test --package-path core
+	env -u HAJIME_ZENZAI_MODEL swift test --package-path core
 
 # 本物の Zenzai のテストと処理時間(R-01)を Release で動かす．モデルが無ければ失敗する(CI はこちらを使う)
 test-zenzai:
 	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
-	S90_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" swift test --package-path core -c release --filter S90EngineTests
+	HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" swift test --package-path core -c release --filter HajimeEngineTests
 
 build-macos:
-	cd apps/macos && xcodegen generate --quiet && xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration Release -destination "generic/platform=macOS" -derivedDataPath build build -quiet
+	cd apps/macos && xcodegen generate --quiet && xcodebuild -project Hajime.xcodeproj -scheme Hajime -configuration Release -destination "generic/platform=macOS" -derivedDataPath build build -quiet
 
 # 配布物(.pkg)を作る．署名と公証は使える証明書と設定があるときだけ(tools/macos/package.sh)
 package-macos:
@@ -48,14 +48,14 @@ package-macos:
 
 # 本番を入れる．入力メニューの名前を変えるときは make install-macos NAME="好きな名前"
 install-macos:
-	S90_NAME="$(NAME)" tools/macos/install.sh Release
+	HAJIME_NAME="$(NAME)" tools/macos/install.sh Release
 
 uninstall-macos:
 	tools/macos/uninstall.sh Release
 
-# 開発版(s90 Dev)を入れる．本番と並べて試せる．何度でも入れ直せる
+# 開発版(Hajime Dev)を入れる．本番と並べて試せる．何度でも入れ直せる
 dev-macos:
-	S90_NAME="$(NAME)" tools/macos/install.sh Dev
+	HAJIME_NAME="$(NAME)" tools/macos/install.sh Dev
 
 # 開発版を消す．学習データと設定も消すときは make uninstall-dev-macos PURGE=--purge
 uninstall-dev-macos:
@@ -63,7 +63,7 @@ uninstall-dev-macos:
 
 # 入力メソッドとして入れずに，ターミナルで変換を試す
 try:
-	swift run --package-path core -c release s90-playground
+	swift run --package-path core -c release hajime-playground
 
 tokens:
 	$(PYTHON) tools/tokens/check_contrast.py
@@ -75,4 +75,4 @@ protocol:
 
 # Windows の設定の画面が読む，設定の項目の名前と範囲の写し(protocol/settings-catalog.json)を作り直す
 settings-catalog:
-	S90_WRITE_SETTINGS_CATALOG=1 swift test --package-path core --filter SettingsCatalogTests
+	HAJIME_WRITE_SETTINGS_CATALOG=1 swift test --package-path core --filter SettingsCatalogTests

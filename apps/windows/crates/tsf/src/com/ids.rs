@@ -8,5 +8,5 @@ pub const GUID_ATTRIBUTE_CONVERTED: GUID = GUID::from_u128(0x4804b68b_27bc_460e_
 pub const GUID_ATTRIBUTE_FOCUSED: GUID = GUID::from_u128(0x538b6f8c_9999_4c90_aa25_9b539f837e6d);
 pub const GUID_ATTRIBUTE_CORRECTION: GUID = GUID::from_u128(0xb3263560_ea70_4d14_b90e_dc84d6e56310);
 
-pub const SERVICE_NAME: &str = "s90.tokyo IME";
+pub const SERVICE_NAME: &str = "はじめ";
 pub const LANGID_JAPANESE: u16 = 0x0411;

@@ -6,7 +6,7 @@
 
 ## 背景
 
-Windows の設定の画面(`s90-settings.exe`)は，Win32 の標準の部品(STATIC・BUTTON・COMBOBOX・LISTBOX・ListView・EDIT)を GDI で描いていた．使ってみると次の困りごとがあった．
+Windows の設定の画面(`hajime-settings.exe`)は，Win32 の標準の部品(STATIC・BUTTON・COMBOBOX・LISTBOX・ListView・EDIT)を GDI で描いていた．使ってみると次の困りごとがあった．
 
 - 暗い地に GDI の ClearType で描いた文字が色ずれして滲む．検索欄・入力欄・ドロップダウン・スクロールバーが古い見た目のままで，ダークの見た目も部品ごとに揃わない(時々文字の色が反転する)
 - ページを開くたびに，すべての行の部品を子の窓として作り直していた．スクロールでは子の窓を全部置き直していて，描き直しが追いつかずに崩れた
@@ -28,7 +28,7 @@ Windows の設定の画面(`s90-settings.exe`)は，Win32 の標準の部品(STA
 - 色・寸法・動きの長さは `design/tokens/tokens.json` の `settings-windows` に置く
 
 窓の地は Windows 11 の Mica(`DWMSBT_MAINWINDOW`)にする．枠を窓の中まで広げ，地(ページとサイドバー)を透明で描いたところに Mica が見える．カードと部品は不透明のまま描く．
-子の窓の EDIT は GDI で描くので，そのままでは透けてしまう．EDIT は自分の面を持つ窓(`WS_EX_LAYERED` の子の窓．不透明)にし，そのためにマニフェストに Windows 10/11 の宣言を入れる(`crates/settings/s90-settings.manifest`)．
+子の窓の EDIT は GDI で描くので，そのままでは透けてしまう．EDIT は自分の面を持つ窓(`WS_EX_LAYERED` の子の窓．不透明)にし，そのためにマニフェストに Windows 10/11 の宣言を入れる(`crates/settings/hajime-settings.manifest`)．
 自分の面を持つ窓は，描画を終えたあとに DC を借りて重ねた絵が画面に出ないので，案内の文字は `WM_PAINT` の中で既定の描き方(`WM_PRINTCLIENT`)と一緒に描く．
 Mica を使えない Windows(22H2 より前)と高コントラストのときは，地を不透明で塗る．
 

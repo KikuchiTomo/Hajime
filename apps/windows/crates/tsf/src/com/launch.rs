@@ -9,7 +9,7 @@ use windows::Win32::System::Threading::{
 };
 use windows_core::{Result, HSTRING, PWSTR};
 
-pub const SETTINGS_FILE: &str = "s90-settings.exe";
+pub const SETTINGS_FILE: &str = "hajime-settings.exe";
 /// 32 ビットの DLL を置くフォルダ(インストール先の下)
 const X86_FOLDER: &str = "x86";
 

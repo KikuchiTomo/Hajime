@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SWIFT = ROOT / "apps/macos/S90IME/UI/UIStrings.swift"
+SWIFT = ROOT / "apps/macos/Hajime/UI/UIStrings.swift"
 RUST = ROOT / "apps/windows/crates/settings/src/strings.rs"
 OPTIONS = ROOT / "apps/windows/crates/settings/src/options.rs"
 
@@ -41,7 +41,7 @@ OPTION_TABLES = {
 }
 # Windows で名前を変える選択肢(macOS の Command のキーを，Windows では Ctrl のキーにする)
 WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOPES", "local")}
-SYNC_MODEL = ROOT / "core/Sources/S90Domain/Sync/SyncModel.swift"
+SYNC_MODEL = ROOT / "core/Sources/HajimeDomain/Sync/SyncModel.swift"
 
 STRING = r'"((?:[^"\\]|\\.)*)"'
 

@@ -14,7 +14,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows_core::{w, PCWSTR};
 
-const CLASS: PCWSTR = w!("s90.tokyo-ime.tsf.timer");
+const CLASS: PCWSTR = w!("hajime.tsf.timer");
 /// 時計の番号(窓ごとに 1 つだけ使う)
 const TIMER_ID: usize = 1;
 /// GetModuleHandleExW の FROM_ADDRESS | UNCHANGED_REFCOUNT

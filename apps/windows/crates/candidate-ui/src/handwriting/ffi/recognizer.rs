@@ -36,7 +36,7 @@ impl Recognizer {
     pub fn start(done: impl Fn(u64, Outcome) + Send + 'static) -> std::io::Result<Self> {
         let (jobs, receiver) = mpsc::channel();
         std::thread::Builder::new()
-            .name("s90-handwriting-recognizer".into())
+            .name("hajime-handwriting-recognizer".into())
             .spawn(move || run(&receiver, &done))?;
         Ok(Self { jobs })
     }

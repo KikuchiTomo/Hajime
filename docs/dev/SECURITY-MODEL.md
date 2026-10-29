@@ -1,7 +1,7 @@
 # セキュリティモデル
 
 入力メソッドは，パスワードやメッセージを含め，利用者が打つすべてのキーを受け取ります．
-そのため s90.tokyo IME では「入力した内容を端末の外に出さない」「入力先のアプリを壊さない」の 2 つを，ほかの機能より優先します．
+そのためはじめでは「入力した内容を端末の外に出さない」「入力先のアプリを壊さない」の 2 つを，ほかの機能より優先します．
 
 脆弱性の報告の窓口は `SECURITY.md` にあります．
 
@@ -48,18 +48,18 @@
 ### 保存
 
 - 保存先
-  - macOS: `~/Library/Application Support/tokyo.s90.ime/`
-  - Windows: 設定(`settings.json`．macOS と同じ形式)は `%APPDATA%\s90.tokyo\IME\`，学習データ・使い方の記録・取り込んだ辞書は `%LOCALAPPDATA%\s90.tokyo\IME\`(ローミングしない)
+  - macOS: `~/Library/Application Support/men.haji.inputmethod/`
+  - Windows: 設定(`settings.json`．macOS と同じ形式)は `%APPDATA%\haji.men\IME\`，学習データ・使い方の記録・取り込んだ辞書は `%LOCALAPPDATA%\haji.men\IME\`(ローミングしない)
 - ファイルは本人だけが読み書きできる権限で作る(macOS は 0600．Windows はユーザーのプロファイルの ACL を受け継ぎ，本人・SYSTEM・Administrators だけが読める)
 - 学習データとユーザー辞書は，設定画面から消せて，書き出せるようにする
 
 ### 同期のフォルダ
 
 - 利用者が選んだフォルダだけを読み書きする(サンドボックスの `files.user-selected.read-write`)．選んだフォルダはセキュリティスコープ付きのブックマークで覚え，同期のたびに開いて閉じる
-- Windows ではブックマークが無いので，設定の画面で選んだフォルダのパスを `%LOCALAPPDATA%\s90.tokyo\IME\sync-state.json` に覚える(`PathSyncCoordinator`)．受け付けるのは今あるフォルダの，ローカルのドライブの絶対パスだけ(`LocalFilePath`)
-- 同期のファイル(`s90-sync.json`)には設定とユーザー辞書が入る．入力した文字そのものは入れない．中身はログに出さない(失敗したときは理由の型だけを記録する)
+- Windows ではブックマークが無いので，設定の画面で選んだフォルダのパスを `%LOCALAPPDATA%\haji.men\IME\sync-state.json` に覚える(`PathSyncCoordinator`)．受け付けるのは今あるフォルダの，ローカルのドライブの絶対パスだけ(`LocalFilePath`)
+- 同期のファイル(`hajime-sync.json`)には設定とユーザー辞書が入る．入力した文字そのものは入れない．中身はログに出さない(失敗したときは理由の型だけを記録する)
 - 読むときは大きさの上限(`maximumSyncFileBytes`)を確かめ，ふつうのファイルだけを読む(ProtectedFile)．読めないファイルは上書きせずに同期を止め，ほかの Mac の設定を消さない
-- 取り込んだ辞書の索引は `s90-dictionaries/<UUID>-<SHA-256>.tsv` として運ぶ(DictionaryFileSync)．設定の中の辞書の id は UUID の形，バージョンは 64 桁の 16 進だけを受け付け，ほかの形の辞書は設定を読むときに捨てる(フォルダの外のパスを差し込ませない)．運ぶときは一時ファイルに少しずつ写しながら SHA-256 を求め，バージョンと合うときだけ置き換える．大きさの上限は `maximumSyncedDictionaryBytes`．索引から引いた語は取り込むときと同じ確かめ(DictionaryWord.isValid)をしてから使う．フォルダから消すのはこの形の名前のファイルだけで，利用者が置いたほかのファイルには触れない
+- 取り込んだ辞書の索引は `hajime-dictionaries/<UUID>-<SHA-256>.tsv` として運ぶ(DictionaryFileSync)．設定の中の辞書の id は UUID の形，バージョンは 64 桁の 16 進だけを受け付け，ほかの形の辞書は設定を読むときに捨てる(フォルダの外のパスを差し込ませない)．運ぶときは一時ファイルに少しずつ写しながら SHA-256 を求め，バージョンと合うときだけ置き換える．大きさの上限は `maximumSyncedDictionaryBytes`．索引から引いた語は取り込むときと同じ確かめ(DictionaryWord.isValid)をしてから使う．フォルダから消すのはこの形の名前のファイルだけで，利用者が置いたほかのファイルには触れない
 - このアプリは通信しない．フォルダをほかの Mac に運ぶのは Dropbox などのアプリで，将来 API で読み書きする実装を足すときは通信の決まりに従う
 
 ### 外から来るファイル
@@ -71,24 +71,24 @@
 - ユーザー辞書の取り込み(`UserDictionaryFile`)は 4MB までのテキストだけを読み，読みがひらがなで長さが上限以内の行だけを使う．登録できる語は 10,000 語まで
 - 辞書の取り込み(`DictionaryFileReader`)は 256MB までのファイルだけを読み，読みがひらがなで長さが上限以内，語にタブと改行を含まない行だけを使う．1 つの辞書は 300 万語まで，辞書は 32 個まで．索引のファイルの名前は取り込むときに作る UUID だけにし，ファイルの中身や名前からパスを作らない
 - 連想の辞書の取り込み(`AssociationFileReader`)は 64MB までのファイルだけを読み，説明と語にタブと改行を含まず長さが上限以内で，語が 2 つ以上のまとまりだけを使う．1 つのまとまりの語は 64 個まで，まとまりは 100 万個まで，辞書は 8 個まで．索引のファイルの名前は取り込むときに作る UUID だけにし，UUID の形でない id の辞書は設定を読むときに捨てる．索引から引いた行も取り込むときと同じ確かめ(`AssociationGroup.isValid`)をしてから使う
-- パーサにはファズテストを用意する(`core/Tests/S90PersistenceTests/FuzzTests.swift`)
+- パーサにはファズテストを用意する(`core/Tests/HajimePersistenceTests/FuzzTests.swift`)
 - 読めなかった設定のファイルは脇に置き(`settings.json.unreadable-*`)，既定値で上書きしない．脇に置いたことは，設定の画面を最初に開いたときに知らせる．書く前にも大きさの上限を確かめる
 - 入力した文字・読み・候補・設定の中身を持つ型は，ログに出す表示(`description` と `debugDescription`)で中身を伏せ，長さと数だけを出す(`RedactedDescriptions.swift` など)．`dump()` と `Mirror` は中身をそのまま出すので，入力内容を持つ値に使わない
 
 ### Windows のプロセス間通信
 
 - 名前付きパイプはユーザーごと・セッションごとの名前にし，ACL で本人の SID だけを許可する
-  - 名前は `\\.\pipe\s90.tokyo-ime.<ユーザーの SID>.<セッションの番号>.engine`(DLL がつなぐ)と `.ui`(候補ウィンドウがつなぐ)
+  - 名前は `\\.\pipe\hajime.<ユーザーの SID>.<セッションの番号>.engine`(DLL がつなぐ)と `.ui`(候補ウィンドウがつなぐ)
   - DACL は `D:P(A;;GA;;;<本人の SID>)(A;;GRGW;;;AC)`．ストアのアプリ(AppContainer)に読み込まれた DLL もつなげるよう ALL APPLICATION PACKAGES を足す．AppContainer のプロセスは本人の SID の項目も満たさないとつなげないので，ほかのユーザーのアプリはつなげない
   - 整合性レベルの低いプロセスから書けるよう，SACL に `S:(ML;;NW;;;LW)` を付ける
   - 最初のインスタンスは `FILE_FLAG_FIRST_PIPE_INSTANCE` で作り，同じ名前が先に取られていたら起動をやめる(なりすましを防ぐ)
   - クライアントは `SECURITY_IDENTIFICATION` で開き，エンジンがクライアントになりすませないようにする
 - `PIPE_REJECT_REMOTE_CLIENTS` を付け，ネットワーク越しの接続を受けない
 - メッセージには長さの上限を設け，超えたら接続を切る．形式は `protocol/` の定義だけを受け付ける
-- 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` のときだけ受ける．実行ファイルの場所は区切り(`\` と `/`)と大文字・小文字をそろえてから比べる(`NamedPipePeer.isSameImage`)
-- エンジンを起動するのは，ログオン(`HKLM\...\Run`)・インストールの直後・設定の画面(利用者が開いたプロセス．同じフォルダの `s90-engine-host.exe`)だけにする．DLL は入力先のアプリの権限(管理者・整合性レベルの低いプロセス・AppContainer)を引き継がせないよう，エンジンを起動しない．入力メニューの「設定を開く…」をエンジンに頼めないときだけ，DLL がインストール先の `s90-settings.exe` を起動する．そのときはハンドルを引き継がせず(`bInheritHandles` を偽)，作業フォルダをインストール先にする
+- 接続してきたプロセスの ID を確かめる(`GetNamedPipeClientProcessId`)．同じログオンのセッションのプロセスだけを受ける．候補ウィンドウのパイプは，実行ファイルがエンジンと同じディレクトリの `hajime-candidate-ui.exe` のときだけ受ける．実行ファイルの場所は区切り(`\` と `/`)と大文字・小文字をそろえてから比べる(`NamedPipePeer.isSameImage`)
+- エンジンを起動するのは，ログオン(`HKLM\...\Run`)・インストールの直後・設定の画面(利用者が開いたプロセス．同じフォルダの `hajime-engine-host.exe`)だけにする．DLL は入力先のアプリの権限(管理者・整合性レベルの低いプロセス・AppContainer)を引き継がせないよう，エンジンを起動しない．入力メニューの「設定を開く…」をエンジンに頼めないときだけ，DLL がインストール先の `hajime-settings.exe` を起動する．そのときはハンドルを引き継がせず(`bInheritHandles` を偽)，作業フォルダをインストール先にする
 - 1 つの接続が作れるセッションの数と，全体のセッションの数に上限を設ける．ほかの接続のセッションは使えない(`EngineService`)
-- 手書きの窓で選んだ文字(`handwritingChosen`)は，実行ファイルがエンジンと同じディレクトリの `s90-candidate-ui.exe` の接続からだけ受ける．空・長すぎる・制御文字を含む文字列は断り，窓を開いたセッションにだけ入れる
+- 手書きの窓で選んだ文字(`handwritingChosen`)は，実行ファイルがエンジンと同じディレクトリの `hajime-candidate-ui.exe` の接続からだけ受ける．空・長すぎる・制御文字を含む文字列は断り，窓を開いたセッションにだけ入れる
 - DLL は入力位置の前の文字列を，エンジンが頼んだとき(打ち始めのときだけ．最大 `DefaultSettings.maximumLeftContextLength` 字)に読んで `key` の `context` で送る．macOS と同じく，パスワード欄(InputScope)では読まない．DLL の中でもログに出さず，`FieldContext` の Debug は中身を伏せる
 - 設定の画面は，設定の項目を設定のファイルと同じ名前と JSON の形でエンジンに読み書きしてもらう(`readSettingsFields`・`writeSettingsFields`)．書けるのは設定のファイルにある項目だけで，値は設定のファイルを読むときと同じ確かめ(範囲に収める・読めない値は捨てる)を通す．ユーザー辞書も読めるが，同じユーザーのプロセスは設定のファイルをそのまま読めるので，読める範囲は広がらない．応答がメッセージの上限を超えるときは `tooLarge` で断る
 - 設定の画面はファイルの読み書き(辞書の取り込み・バックアップ・除外設定の CSV・決まりの一覧)と同期をエンジンに頼む(`SettingsFiles`・`PathSyncCoordinator`)．パスは利用者がファイルを選ぶ画面で選んだものをそのまま受け取り，エンジンは組み立てない．ローカルのドライブの絶対パス(`C:\` の形)だけを受け付け，ネットワークの共有(`\\server\share`)・デバイスや名前付きパイプ(`\\.\`・`\\?\`)・代替データストリーム(`file.txt:stream`)・`..` を含むパスは断る(`LocalFilePath`)．読むときは外から来るファイルの決まり(大きさの上限・ふつうのファイルだけ)に従う．同時に動かす読み書きは 1 つだけで，重い読み書きはメインスレッドの外で行い，入力の処理を止めない
@@ -96,7 +96,7 @@
 
 ### Linux のプロセス間通信(準備中．ADR 0012)
 
-- エンジンは Unix ドメインソケット `$XDG_RUNTIME_DIR/s90.tokyo/engine.sock` で待ち受ける．`$XDG_RUNTIME_DIR` が無いときは一時フォルダの `s90.tokyo-<ユーザー ID>/` に置く
+- エンジンは Unix ドメインソケット `$XDG_RUNTIME_DIR/haji.men/engine.sock` で待ち受ける．`$XDG_RUNTIME_DIR` が無いときは一時フォルダの `haji.men-<ユーザー ID>/` に置く
 - フォルダは本人だけが読み書きできる形(0700)で作り，本人のフォルダでないとき・ほかの人が読み書きできるとき・リンクのときは使わない．ソケットのファイルも 0600 にする
 - 同じ場所でほかのエンジンが待ち受けていたら起動をやめる(なりすましを防ぐ)．つなげない古いファイルは消して作り直す
 - つないできた相手のユーザー ID を `SO_PEERCRED`(macOS で試すときは `getpeereid`)で確かめ，本人のプロセスだけを受ける
@@ -117,4 +117,4 @@
 
 ## レビューで確かめること
 
-`.claude/skills/s90-security/SKILL.md` に，PR ごとに確かめる項目の一覧があります．
+`.claude/skills/hajime-security/SKILL.md` に，PR ごとに確かめる項目の一覧があります．

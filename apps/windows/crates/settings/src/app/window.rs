@@ -44,8 +44,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows_core::{w, PCWSTR};
 
-const MAIN_CLASS: PCWSTR = w!("s90.tokyo-ime.settings");
-const FLYOUT_CLASS: PCWSTR = w!("s90.tokyo-ime.settings.flyout");
+const MAIN_CLASS: PCWSTR = w!("hajime.settings");
+const FLYOUT_CLASS: PCWSTR = w!("hajime.settings.flyout");
 const ID_SEARCH: u16 = 1;
 /// 前もって作る打つ欄の番号の始まり
 const WARM_ID: u16 = 50;

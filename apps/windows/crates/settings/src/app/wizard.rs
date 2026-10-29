@@ -37,7 +37,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows_core::{w, PCWSTR};
 
-pub const CLASS: PCWSTR = w!("s90.tokyo-ime.setup");
+pub const CLASS: PCWSTR = w!("hajime.setup");
 /// 実演の次のコマを待つ時計
 const DEMO_TIMER: usize = 1;
 /// エンジンにつなぎ直す時計

@@ -1,5 +1,5 @@
-//! Fcitx 5 のアドオン(C++)から呼ぶ橋渡し．エンジン(s90-engine-host)との通信は Windows と同じ ipc を使い，
-//! C++ には C の関数(include/s90_bridge.h)だけを見せる．C++ 側は JSON もソケットも扱わない
+//! Fcitx 5 のアドオン(C++)から呼ぶ橋渡し．エンジン(hajime-engine-host)との通信は Windows と同じ ipc を使い，
+//! C++ には C の関数(include/hajime_bridge.h)だけを見せる．C++ 側は JSON もソケットも扱わない
 //!
 //! 文字列はすべて UTF-8．橋渡しが返す文字列は，次に同じ橋渡しを呼ぶまで有効
 

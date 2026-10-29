@@ -60,7 +60,7 @@ jobs:
           path: apps/windows/target/snapshots
           if-no-files-found: error
       - run: cargo build --locked --release -p tsf
-      - run: ../../tools/windows/check_exports.ps1 -Dll target/release/s90_tsf.dll
+      - run: ../../tools/windows/check_exports.ps1 -Dll target/release/hajime_tsf.dll
         shell: pwsh
       - if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

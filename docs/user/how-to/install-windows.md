@@ -1,6 +1,6 @@
 ---
 title: Windows に入れる
-description: s90.tokyo IME を Windows 10 22H2 以降に入れて，入力方式として選ぶまでの手順
+description: はじめを Windows 10 22H2 以降に入れて，入力方式として選ぶまでの手順
 ---
 
 ## 前提
@@ -10,11 +10,11 @@ description: s90.tokyo IME を Windows 10 22H2 以降に入れて，入力方式
 
 ## 手順
 
-1. GitHub の [Releases](https://github.com/KikuchiTomo/s90.tokyo-IME/releases) から，Windows のバージョン(`windows/v…`)の `s90.tokyo-IME-<バージョン>.msi` をダウンロードします
+1. GitHub の [Releases](https://github.com/KikuchiTomo/Hajime/releases) から，Windows のバージョン(`windows/v…`)の `Hajime-<バージョン>.msi` をダウンロードします
 2. `.msi` を開いて入れます．まだ署名していないので，SmartScreen の警告が出たら「詳細情報」から「実行」を選びます
-3. 一度サインアウトしてサインインし直します．ログオンのたびに変換エンジン(`s90-engine-host.exe`)が動き始めます
-4. 設定 > 時刻と言語 > 言語と地域 で「日本語」の「言語のオプション」を開き，「キーボードの追加」から「s90.tokyo IME」を選びます
-5. Windows キー + Space で s90.tokyo IME に切り替えます
+3. 一度サインアウトしてサインインし直します．ログオンのたびに変換エンジン(`hajime-engine-host.exe`)が動き始めます
+4. 設定 > 時刻と言語 > 言語と地域 で「日本語」の「言語のオプション」を開き，「キーボードの追加」から「はじめ」を選びます
+5. Windows キー + Space ではじめに切り替えます
 6. メモ帳で `kyouhaiitenkidesune` と打つと「今日はいい天気ですね」と表示されます．Enter で確定します
 
 ## 入力メニュー
@@ -23,7 +23,7 @@ description: s90.tokyo IME を Windows 10 22H2 以降に入れて，入力方式
 
 ## 設定を変える
 
-スタートメニューの「s90.tokyo IME の設定」を開くと，macOS 版と同じく左の一覧からページを選んで設定を変えられます．上の検索欄に項目の名前を入れると，その項目のあるページだけが並びます．既定から変えた項目には右に「既定に戻す」のボタンが出ます．
+スタートメニューの「はじめの設定」を開くと，macOS 版と同じく左の一覧からページを選んで設定を変えられます．上の検索欄に項目の名前を入れると，その項目のあるページだけが並びます．既定から変えた項目には右に「既定に戻す」のボタンが出ます．
 
 ページと項目は macOS 版と同じです．設定のファイル(`settings.json`)の形式も macOS 版と同じなので，バックアップのページで書き出した設定をもう一方の OS で読み込めます．
 
@@ -31,9 +31,9 @@ description: s90.tokyo IME を Windows 10 22H2 以降に入れて，入力方式
 
 | ファイル | 置き場所 |
 |---|---|
-| 設定 | `%APPDATA%\s90.tokyo\IME\settings.json` |
-| 学習データ・使い方の記録・取り込んだ辞書 | `%LOCALAPPDATA%\s90.tokyo\IME\` |
+| 設定 | `%APPDATA%\haji.men\IME\settings.json` |
+| 学習データ・使い方の記録・取り込んだ辞書 | `%LOCALAPPDATA%\haji.men\IME\` |
 
 ## 取り除く
 
-設定 > アプリ > インストールされているアプリ から「s90.tokyo IME」を選んでアンインストールします．設定と学習データは残るので，要らなければ上の置き場所のフォルダを消します．
+設定 > アプリ > インストールされているアプリ から「はじめ」を選んでアンインストールします．設定と学習データは残るので，要らなければ上の置き場所のフォルダを消します．

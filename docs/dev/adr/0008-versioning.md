@@ -37,7 +37,7 @@ description: macOS 版と Windows 版のバージョン番号(セマンティッ
 ### 置き場所と名前
 
 - バージョンは `apps/macos/project.yml` の `MARKETING_VERSION` だけに書く．Windows 版は `apps/windows/Cargo.toml` の `[workspace.package]` の `version` だけに書き，インストーラーはこの値で作る
-- ビルド番号(macOS は `CURRENT_PROJECT_VERSION`，Windows は `[workspace.metadata.s90]` の `build`)はバージョンごとに 1 ずつ上げる整数．同じバージョンを作り直したときも上げる
+- ビルド番号(macOS は `CURRENT_PROJECT_VERSION`，Windows は `[workspace.metadata.はじめ]` の `build`)はバージョンごとに 1 ずつ上げる整数．同じバージョンを作り直したときも上げる
 - Git のタグは `macos/v0.1.0`・`windows/v0.1.0` のように OS ごとに分ける
 - 上げるのは `tools/release/bump_version.sh macos` と `tools/release/bump_version.sh windows` で行う(PATCH とビルド番号を 1 つずつ上げる)．MINOR を上げるときは後ろに `minor` を付ける(PATCH を 0 に戻す)．MINOR は両方で同じ値にする
 - 設定の画面と README には「v0.1.0 (macOS)」のように，バージョンと OS を並べて出す

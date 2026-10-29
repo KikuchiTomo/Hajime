@@ -2,7 +2,7 @@
 
 ## 脆弱性の報告
 
-脆弱性は公開の Issue に書かず，GitHub の [Private vulnerability reporting](https://github.com/KikuchiTomo/s90.tokyo-IME/security/advisories/new) から報告してください．
+脆弱性は公開の Issue に書かず，GitHub の [Private vulnerability reporting](https://github.com/KikuchiTomo/Hajime/security/advisories/new) から報告してください．
 
 次の情報があると調べやすくなります．
 

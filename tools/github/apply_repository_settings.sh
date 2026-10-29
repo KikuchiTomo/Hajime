@@ -5,7 +5,7 @@
 # 使い方: tools/github/apply_repository_settings.sh [owner/repo]
 # 必要なもの: gh(リポジトリの管理者の権限でログインしていること)
 set -eu
-repo=${1:-KikuchiTomo/s90.tokyo-IME}
+repo=${1:-KikuchiTomo/Hajime}
 
 echo "== マージの方式: スカッシュマージだけを許す"
 # PR のタイトルがそのまま main のコミットの 1 行になる．本文は付けない(コミットは 1 行の決まり)

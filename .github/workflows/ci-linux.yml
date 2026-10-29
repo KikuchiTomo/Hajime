@@ -60,8 +60,8 @@ jobs:
         run: |
           DESTDIR="$PWD/build/stage" cmake --install build/fcitx5
           find build/stage -type f | sort
-          test -n "$(find build/stage -path '*/fcitx5/s90.so')"
-          test -n "$(find build/stage -path '*/fcitx5/addon/s90.conf')"
-          test -n "$(find build/stage -path '*/fcitx5/inputmethod/s90.conf')"
+          test -n "$(find build/stage -path '*/fcitx5/hajime.so')"
+          test -n "$(find build/stage -path '*/fcitx5/addon/hajime.conf')"
+          test -n "$(find build/stage -path '*/fcitx5/inputmethod/hajime.conf')"
           # Fcitx 5 が呼ぶ入り口があり，橋渡しの関数が中に入っていること
-          nm -D --defined-only "$(find build/stage -path '*/fcitx5/s90.so')" | grep -q fcitx_addon_factory_instance
+          nm -D --defined-only "$(find build/stage -path '*/fcitx5/hajime.so')" | grep -q fcitx_addon_factory_instance

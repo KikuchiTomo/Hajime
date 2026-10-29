@@ -2,15 +2,15 @@
 import PackageDescription
 
 // 層と依存の向きは docs/dev/ARCHITECTURE.md．ここを変えたら
-// .claude/skills/s90-architecture/scripts/check_layers.py の ALLOWED も合わせる．
+// .claude/skills/hajime-architecture/scripts/check_layers.py の ALLOWED も合わせる．
 let package = Package(
-    name: "S90Core",
+    name: "HajimeCore",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "S90Domain", targets: ["S90Domain"]),
-        .library(name: "S90Application", targets: ["S90Application"]),
-        .library(name: "S90Engine", targets: ["S90Engine"]),
-        .library(name: "S90Persistence", targets: ["S90Persistence"]),
+        .library(name: "HajimeDomain", targets: ["HajimeDomain"]),
+        .library(name: "HajimeApplication", targets: ["HajimeApplication"]),
+        .library(name: "HajimeEngine", targets: ["HajimeEngine"]),
+        .library(name: "HajimePersistence", targets: ["HajimePersistence"]),
     ],
     traits: [
         .trait(name: "Zenzai", description: "Zenzai でかな漢字変換する．llama.cpp が要る"),
@@ -25,13 +25,13 @@ let package = Package(
         ),
     ],
     targets: [
-        .target(name: "S90Domain"),
-        .target(name: "S90Application", dependencies: ["S90Domain"]),
+        .target(name: "HajimeDomain"),
+        .target(name: "HajimeApplication", dependencies: ["HajimeDomain"]),
         .target(
-            name: "S90Engine",
+            name: "HajimeEngine",
             dependencies: [
-                "S90Domain",
-                "S90Application",
+                "HajimeDomain",
+                "HajimeApplication",
                 .product(name: "KanaKanjiConverterModuleWithDefaultDictionary", package: "AzooKeyKanaKanjiConverter"),
             ],
             // Zenzai は llama.cpp(C++)を使うので，エンジンを読み込むターゲットは C++ との相互運用を有効にする
@@ -39,14 +39,14 @@ let package = Package(
         ),
         // Windows のスペルチェッカー(ISpellChecker)を呼ぶ C の口．Windows のほかでは何もしない
         .target(name: "CWindowsSpellCheck", linkerSettings: [.linkedLibrary("ole32", .when(platforms: [.windows]))]),
-        .target(name: "S90Persistence", dependencies: [
-            "S90Domain", "S90Application",
+        .target(name: "HajimePersistence", dependencies: [
+            "HajimeDomain", "HajimeApplication",
             .target(name: "CWindowsSpellCheck", condition: .when(platforms: [.windows])),
         ]),
-        .target(name: "S90IPC", dependencies: ["S90Domain", "S90Application"]),
+        .target(name: "HajimeIPC", dependencies: ["HajimeDomain", "HajimeApplication"]),
         .executableTarget(
-            name: "s90-engine-host",
-            dependencies: ["S90Domain", "S90Application", "S90Engine", "S90Persistence", "S90IPC"],
+            name: "hajime-engine-host",
+            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimePersistence", "HajimeIPC"],
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))],
             // Windows では窓を持たないプログラムにする．コンソールのプログラムだと，インストーラーやサインインのときの起動で
             // 黒いコンソールの窓が出る(main.swift を使うので入り口は C ランタイムの mainCRTStartup のまま)
@@ -54,19 +54,19 @@ let package = Package(
         ),
         // 入れずに変換を試す道具(make try)
         .executableTarget(
-            name: "s90-playground",
-            dependencies: ["S90Domain", "S90Application", "S90Engine", "S90Persistence"],
+            name: "hajime-playground",
+            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimePersistence"],
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
-        .target(name: "S90TestSupport", dependencies: ["S90Domain", "S90Application"], path: "Tests/Support"),
-        .testTarget(name: "S90DomainTests", dependencies: ["S90Domain"]),
-        .testTarget(name: "S90IPCTests", dependencies: ["S90Domain", "S90Application", "S90IPC", "S90TestSupport"]),
-        .testTarget(name: "S90ApplicationTests", dependencies: ["S90Domain", "S90Application", "S90TestSupport"]),
+        .target(name: "HajimeTestSupport", dependencies: ["HajimeDomain", "HajimeApplication"], path: "Tests/Support"),
+        .testTarget(name: "HajimeDomainTests", dependencies: ["HajimeDomain"]),
+        .testTarget(name: "HajimeIPCTests", dependencies: ["HajimeDomain", "HajimeApplication", "HajimeIPC", "HajimeTestSupport"]),
+        .testTarget(name: "HajimeApplicationTests", dependencies: ["HajimeDomain", "HajimeApplication", "HajimeTestSupport"]),
         // Fixtures は #filePath から読む(古いバージョンの設定のファイル)．リソースとして入れない
-        .testTarget(name: "S90PersistenceTests", dependencies: ["S90Domain", "S90Persistence"], exclude: ["Fixtures"]),
+        .testTarget(name: "HajimePersistenceTests", dependencies: ["HajimeDomain", "HajimePersistence"], exclude: ["Fixtures"]),
         .testTarget(
-            name: "S90EngineTests",
-            dependencies: ["S90Domain", "S90Application", "S90Engine", "S90TestSupport"],
+            name: "HajimeEngineTests",
+            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimeTestSupport"],
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
     ],

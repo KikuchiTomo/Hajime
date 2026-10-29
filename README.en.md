@@ -1,9 +1,9 @@
-# s90.tokyo IME
+# Hajime
 
-[![CI](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci.yml)
-[![CI Windows](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/s90.tokyo-IME/actions/workflows/ci-windows.yml)
-[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/s90.tokyo-IME?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/s90.tokyo-IME/releases)
-[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/s90.tokyo-IME?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/s90.tokyo-IME/releases)
+[![CI](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci.yml)
+[![CI Windows](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/KikuchiTomo/Hajime/actions/workflows/ci-windows.yml)
+[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/Hajime/releases)
+[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/Hajime/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B-lightgrey.svg)
 ![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
@@ -16,7 +16,7 @@ What works today: live conversion, context-aware conversion, correction of Engli
 
 The IME itself makes no network connections. The only download is the Zenzai model at install time, verified by SHA-256.
 
-Install on macOS (Xcode 26, XcodeGen and an Apple Development certificate are required): `make install-macos`. On first install, log out and back in, then add "s90.tokyo IME" in System Settings > Keyboard > Input Sources.
+Install on macOS (Xcode 26, XcodeGen and an Apple Development certificate are required): `make install-macos`. On first install, log out and back in, then add "Hajime" in System Settings > Keyboard > Input Sources.
 
 Documentation is written in Japanese first. See [docs/README.md](docs/README.md).
 

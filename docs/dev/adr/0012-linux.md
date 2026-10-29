@@ -14,8 +14,8 @@ macOS 版・Windows 版と同じ機能を，同じ挙動で使えるようにす
 
 ## 判断
 
-- **エンジンは Windows と同じく別のプロセスにする**．`s90-engine-host`(Swift)を Linux でも作り，入力の状態・候補・補正はすべて core(`EngineService`)で行う．枠組みの口は，キーを渡して結果を画面に出すだけにする
-- **通信は Unix ドメインソケット**にする．メッセージの形(`protocol/`，長さ付きの JSON)は Windows の名前付きパイプと同じにし，送り方だけを替える．ソケットは `$XDG_RUNTIME_DIR/s90.tokyo/engine.sock`(本人だけが読み書きできる場所)に置き，つないできた相手が同じユーザーかを `SO_PEERCRED` で確かめる(Windows の「同じセッション」に当たる)
+- **エンジンは Windows と同じく別のプロセスにする**．`hajime-engine-host`(Swift)を Linux でも作り，入力の状態・候補・補正はすべて core(`EngineService`)で行う．枠組みの口は，キーを渡して結果を画面に出すだけにする
+- **通信は Unix ドメインソケット**にする．メッセージの形(`protocol/`，長さ付きの JSON)は Windows の名前付きパイプと同じにし，送り方だけを替える．ソケットは `$XDG_RUNTIME_DIR/haji.men/engine.sock`(本人だけが読み書きできる場所)に置き，つないできた相手が同じユーザーかを `SO_PEERCRED` で確かめる(Windows の「同じセッション」に当たる)
 - **最初の口は Fcitx 5 のアドオン**(C++)にする．日本語の利用者が多く，Wayland でも入力欄の位置に候補を出す仕組み(classicui・kimpanel)がある．IBus の口はそのあとで足す
 - **候補の出し方**は，最初は枠組みの候補の一覧(一覧の表示)を使う．分岐図は枠組みの外に窓を出す必要があるので，X11 では別のプロセスの窓で描き，Wayland では枠組みの UI の口(Fcitx 5 の UI アドオン)で描けるかを試してから決める
 - **設定の画面**は，Windows の設定の画面と同じく設定の目録(`protocol/settings-catalog.json`)から作る．GTK 4 で作るか，Windows と共通の Rust の UI にするかは，作り始めるときに決める
@@ -24,8 +24,8 @@ macOS 版・Windows 版と同じ機能を，同じ挙動で使えるようにす
 ## 準備として行うこと
 
 1. core を Linux でビルドしてテストを通す(Swift の公式の Linux のツールチェーン)．CI に `core-linux` を足す
-2. `S90IPC` に Unix ドメインソケットの送り方を足し，Windows の `EnginePipeServer` と共通の部分(要求をセッションに渡す処理)を分ける
-3. `s90-engine-host` の置き場所(`HostPaths`)を Linux の XDG の場所にする(設定は `$XDG_CONFIG_HOME/s90.tokyo/IME`，学習データは `$XDG_DATA_HOME/s90.tokyo/IME`)
+2. `HajimeIPC` に Unix ドメインソケットの送り方を足し，Windows の `EnginePipeServer` と共通の部分(要求をセッションに渡す処理)を分ける
+3. `hajime-engine-host` の置き場所(`HostPaths`)を Linux の XDG の場所にする(設定は `$XDG_CONFIG_HOME/haji.men/IME`，学習データは `$XDG_DATA_HOME/haji.men/IME`)
 4. Fcitx 5 のアドオンを `apps/linux/fcitx5` に作る．C++ の薄い口(`src/`)と，エンジンと話す Rust の橋渡し(`bridge/`．Windows と同じ `ipc` を使う静的ライブラリ)に分ける．C++ は JSON もソケットも扱わない
    - エンジンは候補の指示(`UiCommand`)を，Windows の候補ウィンドウと同じ形で `candidate-window.sock` に送る(`CandidateWindowLink` を Windows と共通にした)．アドオンがそれを受け取り，Fcitx 5 の候補の一覧と案内(上下の補助の文)に出す．分岐図は，選んでいる文節の候補と種類を一覧にする
    - キーはエンジンの返事を待ってから受け取るかを決める(上限は `timing.ENGINE_STALL_MILLISECONDS`)．Windows のように遅れた返事を後から当てる仕組みは，まだ入れていない

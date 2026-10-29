@@ -6,14 +6,14 @@
 
 ## 背景
 
-ADR 0003 で，Windows では TSF の DLL(Rust)・`s90-engine-host`(Swift)・候補ウィンドウ(Rust)を別のプロセスにし，名前付きパイプで通信すると決めた．
+ADR 0003 で，Windows では TSF の DLL(Rust)・`hajime-engine-host`(Swift)・候補ウィンドウ(Rust)を別のプロセスにし，名前付きパイプで通信すると決めた．
 形式は「Protocol Buffers か，より軽い独自の形式か」を DLL の大きさを見て決めることにしていた(`protocol/README.md`)．
 DLL は入力先のすべてのアプリに読み込まれるので，依存を小さくしたい．Swift と Rust で型を手で二重に書くと，片方だけ変えて食い違うおそれがある．
 
 ## 判断
 
 - 1 つのメッセージは「4 バイトの長さ(リトルエンディアン)＋UTF-8 の JSON」にする．長さの上限は定義の `maximumMessageBytes`(256KiB)で，超えたら接続を切る
-- メッセージの型は `protocol/schema.json` に書く．`tools/protocol/generate.py` が Swift(`core/Sources/S90IPC/Generated/`)と Rust(`apps/windows/crates/ipc/src/generated.rs`)の型を作る．生成物はコミットし，`make check` で定義と合っているかを確かめる
+- メッセージの型は `protocol/schema.json` に書く．`tools/protocol/generate.py` が Swift(`core/Sources/HajimeIPC/Generated/`)と Rust(`apps/windows/crates/ipc/src/generated.rs`)の型を作る．生成物はコミットし，`make check` で定義と合っているかを確かめる
 - 型の種類は構造体・文字列の列挙・種類を表すキーで分ける共用体の 3 つだけにする．JSON の形は serde の internally tagged と同じ
 - 両方の言語で同じ見本(`protocol/fixtures/messages.json`)を読み，読み戻して同じ JSON になることをテストで確かめる
 - Swift は Foundation の `JSONEncoder`，Rust は `serde` と `serde_json` を使う．どちらもバージョンを固定する

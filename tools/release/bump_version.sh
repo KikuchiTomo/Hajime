@@ -30,9 +30,9 @@ case "$platform" in
     file="$root/apps/windows/Cargo.toml"
     lock="$root/apps/windows/Cargo.lock"
     version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' "$file")
-    build=$(sed -n '/^\[workspace.metadata.s90\]/,/^\[/s/^build = \([0-9]*\)/\1/p' "$file")
+    build=$(sed -n '/^\[workspace.metadata.hajime\]/,/^\[/s/^build = \([0-9]*\)/\1/p' "$file")
     bump
-    sed -i '' "/^\[workspace.package\]/,/^\[/s/^version = \"$version\"/version = \"$next\"/; /^\[workspace.metadata.s90\]/,/^\[/s/^build = $build/build = $next_build/" "$file"
+    sed -i '' "/^\[workspace.package\]/,/^\[/s/^version = \"$version\"/version = \"$next\"/; /^\[workspace.metadata.hajime\]/,/^\[/s/^build = $build/build = $next_build/" "$file"
     # Cargo.lock の自分の crate の版も合わせる(CI は --locked でビルドする)
     for crate in candidate-ui ipc settings tokens tsf; do
       sed -i '' "/^name = \"$crate\"$/{n;s/^version = \"$version\"/version = \"$next\"/;}" "$lock"

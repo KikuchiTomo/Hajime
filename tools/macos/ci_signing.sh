@@ -14,9 +14,9 @@
 #   MACOS_NOTARY_KEY_ID          API キーの Key ID
 #   MACOS_NOTARY_ISSUER_ID       API キーの Issuer ID
 set -eu
-work="${RUNNER_TEMP:?RUNNER_TEMP がありません(GitHub Actions の中で動かしてください)}/s90-signing"
+work="${RUNNER_TEMP:?RUNNER_TEMP がありません(GitHub Actions の中で動かしてください)}/hajime-signing"
 keychain="$work/signing.keychain-db"
-profile="s90-notary"
+profile="hajime-notary"
 
 case "${1:-}" in
   setup)
@@ -48,8 +48,8 @@ case "${1:-}" in
     security find-identity -v -p basic "$keychain" | grep -q 'Developer ID Installer' \
       || { echo "Developer ID Installer の証明書がありません" >&2; exit 1; }
     {
-      echo "S90_NOTARY_PROFILE=$profile"
-      echo "S90_NOTARY_KEYCHAIN=$keychain"
+      echo "HAJIME_NOTARY_PROFILE=$profile"
+      echo "HAJIME_NOTARY_KEYCHAIN=$keychain"
     } >> "${GITHUB_ENV:?}"
     echo "署名と公証の準備ができました"
     ;;

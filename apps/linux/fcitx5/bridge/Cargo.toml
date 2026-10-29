@@ -1,6 +1,6 @@
 [package]
-name = "s90-fcitx5-bridge"
-description = "Fcitx 5 のアドオン(C++)と s90-engine-host をつなぐ橋渡し．通信は Windows と同じ ipc を使う"
+name = "hajime-fcitx5-bridge"
+description = "Fcitx 5 のアドオン(C++)と hajime-engine-host をつなぐ橋渡し．通信は Windows と同じ ipc を使う"
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

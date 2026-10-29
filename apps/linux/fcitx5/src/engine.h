@@ -1,7 +1,7 @@
-// s90.tokyo IME の Fcitx 5 のアドオン．キーを Rust の橋渡し(bridge/)に渡し，返ってきた入力中の文字・確定・候補の一覧を Fcitx 5 に出す．
-// 入力の状態・候補・補正はすべてエンジン(s90-engine-host)が決める(docs/dev/adr/0012-linux.md)
-#ifndef S90_FCITX5_ENGINE_H
-#define S90_FCITX5_ENGINE_H
+// はじめの Fcitx 5 のアドオン．キーを Rust の橋渡し(bridge/)に渡し，返ってきた入力中の文字・確定・候補の一覧を Fcitx 5 に出す．
+// 入力の状態・候補・補正はすべてエンジン(hajime-engine-host)が決める(docs/dev/adr/0012-linux.md)
+#ifndef HAJIME_FCITX5_ENGINE_H
+#define HAJIME_FCITX5_ENGINE_H
 
 #include <memory>
 #include <string>
@@ -14,9 +14,9 @@
 #include <fcitx/inputmethodengine.h>
 #include <fcitx/instance.h>
 
-#include "s90_bridge.h"
+#include "hajime_bridge.h"
 
-namespace s90 {
+namespace hajime {
 
 class Engine : public fcitx::InputMethodEngine {
 public:
@@ -38,7 +38,7 @@ private:
     void finish(fcitx::InputContext *inputContext);
 
     fcitx::Instance *instance_;
-    S90Bridge *bridge_ = nullptr;
+    HajimeBridge *bridge_ = nullptr;
     // 候補の一覧と wake の結果を出す先(最後にキーを受け取った入力欄)
     fcitx::TrackableObjectReference<fcitx::InputContext> target_;
     std::unique_ptr<fcitx::EventSourceIO> panelEvent_;
@@ -50,6 +50,6 @@ public:
     fcitx::AddonInstance *create(fcitx::AddonManager *manager) override;
 };
 
-} // namespace s90
+} // namespace hajime
 
 #endif

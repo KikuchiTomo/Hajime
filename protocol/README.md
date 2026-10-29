@@ -1,6 +1,6 @@
 # protocol
 
-Windows の TSF の DLL・候補ウィンドウと `s90-engine-host` のあいだのメッセージの定義を置く．
+Windows の TSF の DLL・候補ウィンドウと `hajime-engine-host` のあいだのメッセージの定義を置く．
 形式は長さ付きの JSON(ADR [0010](../docs/dev/adr/0010-ipc-message-format.md))．安全の決まりは [docs/dev/SECURITY-MODEL.md](../docs/dev/SECURITY-MODEL.md) の「Windows のプロセス間通信」．
 
 | ファイル | 中身 |
@@ -12,7 +12,7 @@ Windows の TSF の DLL・候補ウィンドウと `s90-engine-host` のあい�
 
 1. `schema.json` を変える
 2. `make protocol` で Swift と Rust の型を作り直す
-   - Swift: `core/Sources/S90IPC/Generated/WireMessages.swift`(名前の前に `Wire` を付ける．core の `KeyEvent` などとぶつけないため)
+   - Swift: `core/Sources/HajimeIPC/Generated/WireMessages.swift`(名前の前に `Wire` を付ける．core の `KeyEvent` などとぶつけないため)
    - Rust: `apps/windows/crates/ipc/src/generated.rs`
 3. 足した型や種類を `fixtures/messages.json` に足す
 4. 互換のない変更(名前を変える・必須の項目を足す)では `version` を 1 つ上げる．DLL とエンジンのバージョンが違えば接続を断る
@@ -35,11 +35,11 @@ Windows の TSF の DLL・候補ウィンドウと `s90-engine-host` のあい�
 ## 流れ
 
 ```
-TSF の DLL ──Request──→ s90-engine-host ──UiCommand──→ 候補ウィンドウ
+TSF の DLL ──Request──→ hajime-engine-host ──UiCommand──→ 候補ウィンドウ
            ←─Response──
 ```
 
 - DLL はキーを `key` で送り，返った `edit` の `operations` を入力欄に反映する．`state` は OnTestKeyDown に答えるための写し
 - 候補・分岐図・案内・モードの札はエンジンが候補ウィンドウに直接送る．DLL は入力位置(`caret`)だけを知らせる
-- 設定の画面(`s90-settings.exe`)は `readSettingsFields`・`writeSettingsFields` で，設定の項目を設定のファイル(`settings.json`)と同じ名前と JSON の形で読み書きする．値は文字列に入れた JSON のオブジェクトで，項目を足しても定義は変えない．キー設定のひな形は `readKeymapPreset`，表の知らせ(使われない行・文字を打てなくなる行・キーの無い確定と取り消し)は `checkKeymap` で頼む
+- 設定の画面(`hajime-settings.exe`)は `readSettingsFields`・`writeSettingsFields` で，設定の項目を設定のファイル(`settings.json`)と同じ名前と JSON の形で読み書きする．値は文字列に入れた JSON のオブジェクトで，項目を足しても定義は変えない．キー設定のひな形は `readKeymapPreset`，表の知らせ(使われない行・文字を打てなくなる行・キーの無い確定と取り消し)は `checkKeymap` で頼む
 - 設定のファイルの外にあるものは別の要求で頼む．学習を消す `resetLearning`，使い方の記録 `readUsage`・`resetUsage`，英語と日本語の「試す」`previewLanguage`，ユーザー辞書 `readUserDictionary`(ページごと．1 回 500 語まで)・`addUserDictionaryEntry`・`removeUserDictionaryEntry`・`mergeUserDictionary`(取り込み)．ユーザー辞書は大きくなるので `readSettingsFields` では読まない

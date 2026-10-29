@@ -1,6 +1,6 @@
 # デザインシステム
 
-s90.tokyo IME の既定の見た目は，今の macOS になじむすりガラスの候補ウィンドウ(glass)です．文を幹として候補を曲線の枝で伸ばす分岐図(ADR 0007)を，角丸の選択・番号の丸・キーキャップ風の案内で描きます．
+はじめの既定の見た目は，今の macOS になじむすりガラスの候補ウィンドウ(glass)です．文を幹として候補を曲線の枝で伸ばす分岐図(ADR 0007)を，角丸の選択・番号の丸・キーキャップ風の案内で描きます．
 s90.tokyo のブランドの題材である漢字Talk 7 の時代の Macintosh とシティポップの東京は，選べる外観(platinum・desk)として残しています．
 
 値の置き場所は `design/tokens/tokens.json` だけです．この文書の数値はそこからの抜粋で，食い違ったときは tokens.json が正しいものとします．
@@ -37,7 +37,7 @@ glass の色は OS の意味の色なので，`tools/tokens/check_contrast.py` �
 
 ### glass の色
 
-OS の意味の色を使い，ライト・ダーク・アクセントカラーに OS が合わせます(`apps/macos/S90IME/UI/Theme.swift`)．
+OS の意味の色を使い，ライト・ダーク・アクセントカラーに OS が合わせます(`apps/macos/Hajime/UI/Theme.swift`)．
 
 | 役割 | 色 |
 |---|---|
@@ -70,7 +70,7 @@ Windows には同じ意味の色の組が無いので，`tokens.json` の `glass
 
 desk の選択は，ネオンの桃色の地に紫の文字です．白い文字ではコントラストが 3.4:1 で足りないため，地の側の紫を文字に使っています．
 
-文字と地のコントラストは WCAG 2.2 の AA(文字は 4.5:1，下線などの印は 3:1)以上にします．`tools/tokens/check_contrast.py` が `tokens.json` の `$extensions.s90.contrast` に書いた組み合わせを検査し，満たさないものがあれば止まります．
+文字と地のコントラストは WCAG 2.2 の AA(文字は 4.5:1，下線などの印は 3:1)以上にします．`tools/tokens/check_contrast.py` が `tokens.json` の `$extensions.はじめ.contrast` に書いた組み合わせを検査し，満たさないものがあれば止まります．
 
 ## 候補ウィンドウ
 
@@ -225,7 +225,7 @@ Space で変換すると，文を幹とした分岐図を出します(ADR 0007)�
 - **カスタムテーマ**: `CustomThemeEditor` で組み立てる．上に分岐図の見本を出し，選んだ色をすぐ映す．文字と地のコントラストが上の基準(文字 4.5:1，印 3:1)に届かなければ知らせる(`CustomTheme.lowContrastPairs`)
 
 見た目はデバッグビルドの `--render-snapshots` で `settings-<ページ>.png`・`settings-<ページ>-dark.png`・`settings-sidebar.png`・`settings-theme-editor.png` に書き出して確かめる．左の一覧は窓の中では地のぼかしごと写せないので，一覧だけを別に描く．
-ページの切り替えにかかる時間は，デバッグビルドの `--measure-settings` で測る(ページごとに初めて開く時間と，2 回目からの中央値，設定を 1 つ変えたときの時間を出す)．環境変数 `S90_MEASURE_PAGES`(ページの名前をカンマで区切る)・`S90_MEASURE_ROUNDS`・`S90_MEASURE_CHANGES` で，測るページ・切り替えの回数・設定を変える回数を選べる．Debug の構成は最適化しないので，実際に近い時間は `SWIFT_OPTIMIZATION_LEVEL=-O` を付けてビルドして測る．
+ページの切り替えにかかる時間は，デバッグビルドの `--measure-settings` で測る(ページごとに初めて開く時間と，2 回目からの中央値，設定を 1 つ変えたときの時間を出す)．環境変数 `HAJIME_MEASURE_PAGES`(ページの名前をカンマで区切る)・`HAJIME_MEASURE_ROUNDS`・`HAJIME_MEASURE_CHANGES` で，測るページ・切り替えの回数・設定を変える回数を選べる．Debug の構成は最適化しないので，実際に近い時間は `SWIFT_OPTIMIZATION_LEVEL=-O` を付けてビルドして測る．
 
 ### Windows
 
@@ -241,7 +241,7 @@ Windows 11 の設定アプリに合わせ，1 枚の窓に Direct2D で描く(AD
 - **読み込み中**: 窓を先に出し，設定を読むまでは輪を回す．エンジンにつながらなければ理由とつなぎ直していることを出す
 - **フォーカスの印**: キーボードで動かしたときだけ，部品の外側に 2 本の線を引く(WinUI と同じ)
 
-ページを開く・描く・送る時間は `s90-settings.exe --measure <ファイル>` で測る．窓を出すまで・中身を出すまで・ページごとの開く時間(部品を作る・エンジンから読む・値を映して置くの内わけ)・初めて描く時間と 2 回目に描く時間・送るときの 1 フレームの間隔と描く時間を書いて終える．見本の撮影には `--theme light|dark` と `--page <名前>` を使う．
+ページを開く・描く・送る時間は `hajime-settings.exe --measure <ファイル>` で測る．窓を出すまで・中身を出すまで・ページごとの開く時間(部品を作る・エンジンから読む・値を映して置くの内わけ)・初めて描く時間と 2 回目に描く時間・送るときの 1 フレームの間隔と描く時間を書いて終える．見本の撮影には `--theme light|dark` と `--page <名前>` を使う．
 
 #### 初期設定ウィザード
 
@@ -261,7 +261,7 @@ Windows 11 の設定アプリに合わせ，1 枚の窓に Direct2D で描く(AD
 - 開発版は面を塗らずに 1 ドットの枠だけにし，字を塗る．本番と並べたときに見分けるため
 - 面は 16pt 四方いっぱい(角の丸み 3.5pt)にする．macOS の標準の入力ソースのアイコンと同じ大きさで，システム設定の入力ソースの一覧に並べても小さく見えない．1x(16px)と 2x(32px)を 1 つの tiff に入れる
 - 字は標準のアイコンと同じく大きめで細い字(「あ」はヒラギノ角ゴ W4 の 11.5pt，「A」はシステムの書体の medium の 12pt)にする．太い字で面を埋めず，字の周りに余白が見えるようにする
-- 作り方: `swift tools/icons/make_input_icons.swift apps/macos/S90IME/Resources design/mockups`．見本(ライトとダーク，8 倍の拡大と実寸)は `design/mockups/input-icons.png`
+- 作り方: `swift tools/icons/make_input_icons.swift apps/macos/Hajime/Resources design/mockups`．見本(ライトとダーク，8 倍の拡大と実寸)は `design/mockups/input-icons.png`
 
 ## ドキュメントサイト
 

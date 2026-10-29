@@ -1,0 +1,13 @@
+{
+  "brackets" : "square",
+  "candidateFontSize" : 18,
+  "customRomaji" : [ { "kana" : "ゐ", "keys" : "wyi" } ],
+  "inputStyle" : "kana",
+  "liveConversion" : false,
+  "profileRules" : [ { "applicationPrefix" : "com.example.editor", "profile" : "programming" } ],
+  "punctuation" : "commaPeriod",
+  "theme" : "desk",
+  "typoCorrection" : "conservative",
+  "userDictionary" : [ { "reading" : "えすきゅー", "word" : "hajime" } ],
+  "yenKey" : "alwaysYen"
+}
