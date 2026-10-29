@@ -40,23 +40,32 @@ final class InputMenuBuilder {
     func menu(actions: Actions) -> NSMenu {
         if let cachedMenu {
             liveConversionItem?.state = settings.current.liveConversion ? .on : .off
-            // 手書き入力は設定で使うときだけ出す
-            handwritingItem?.isHidden = !settings.current.handwriting
+            syncHandwritingItem(in: cachedMenu)
             return cachedMenu
         }
         let menu = NSMenu()
         let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
         live.state = settings.current.liveConversion ? .on : .off
         menu.addItem(live)
-        let handwriting = NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")
-        handwriting.isHidden = !settings.current.handwriting
-        menu.addItem(handwriting)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
         cachedMenu = menu
         liveConversionItem = live
-        handwritingItem = handwriting
+        handwritingItem = NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")
+        syncHandwritingItem(in: menu)
         return menu
+    }
+
+    /// 手書き入力は設定で使うときだけ，ライブ変換の次に置く．隠した項目(isHidden)を入れておくと，
+    /// InputMethodKit がメニューを入力メニューに渡せず，項目がすべて消えるので，使わないときは外す
+    private func syncHandwritingItem(in menu: NSMenu) {
+        guard let handwritingItem else { return }
+        let present = menu.index(of: handwritingItem) >= 0
+        if settings.current.handwriting, !present {
+            menu.insertItem(handwritingItem, at: 1)
+        } else if !settings.current.handwriting, present {
+            menu.removeItem(handwritingItem)
+        }
     }
 
     func handleToggleLiveConversion() {
