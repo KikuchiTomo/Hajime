@@ -8,8 +8,8 @@ app="$2/Hajime.app"
 user=$(stat -f %Su /dev/console)
 if [ -n "$user" ] && [ "$user" != "root" ] && [ -d "$app" ]; then
   uid=$(id -u "$user")
-  # インストーラーのスクリプトの置き場所は root しか読めないことがあるので，利用者が動かせる一時的な場所に写して動かす
-  tool_dir=$(mktemp -d)
+  # インストーラーのスクリプトの置き場所と root の一時フォルダ(TMPDIR)は利用者が入れないので，誰でも入れる /private/tmp に写して動かす
+  tool_dir=$(mktemp -d /private/tmp/hajime.XXXXXX)
   cp "$(dirname "$0")/input_source" "$tool_dir/input_source"
   chmod 755 "$tool_dir" "$tool_dir/input_source"
   launchctl asuser "$uid" sudo -u "$user" "$tool_dir/input_source" enable "$app" || true
