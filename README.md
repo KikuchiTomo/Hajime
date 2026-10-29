@@ -36,7 +36,7 @@ macOS・Windows 向けの日本語入力システムです．
 | Windows | Windows 10 22H2 以降(64 ビット) | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true) |
 | Linux (WIP) | | 準備中 |
 
-インストールしたら，一度ログアウトしてから，OS の入力ソースの設定で「はじめ」を追加してください．
+インストール後には，お使いの PC の再起動を推奨します．
 
 ## ライセンス
 

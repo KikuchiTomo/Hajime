@@ -35,7 +35,7 @@ Hajime is under active development, and its behavior may change.
 | Windows | Windows 10 22H2 or later (64-bit) | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true) |
 | Linux (WIP) | | Not yet available |
 
-After installing, sign out once, then add "Hajime" in your OS input source settings.
+We recommend restarting your PC after installation.
 
 ## License
 
