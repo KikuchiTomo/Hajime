@@ -11,7 +11,7 @@ azooKey-Desktop では判断と macOS の API の呼び出しが 1 つのクラ�
 
 ## 判断
 
-- 判断は `core/`(Swift Package `S90Core`)に置き，OS ごとのアプリはキーの変換と `ClientAction` の反映だけを行う
+- 判断は `core/`(Swift Package `HajimeCore`)に置き，OS ごとのアプリはキーの変換と `ClientAction` の反映だけを行う
 - Swift を選ぶのは，変換エンジン(AzooKeyKanaKanjiConverter)が Swift で書かれていて，Windows でも Swift のツールチェーンで動くため
 
 ## 検討したほかの案

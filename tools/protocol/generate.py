@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = ROOT / "protocol" / "schema.json"
-SWIFT_OUT = ROOT / "core" / "Sources" / "S90IPC" / "Generated" / "WireMessages.swift"
+SWIFT_OUT = ROOT / "core" / "Sources" / "HajimeIPC" / "Generated" / "WireMessages.swift"
 RUST_OUT = ROOT / "apps" / "windows" / "crates" / "ipc" / "src" / "generated.rs"
 
 SWIFT_PREFIX = "Wire"

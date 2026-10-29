@@ -88,8 +88,8 @@ pub fn run() {
     window::make_dpi_aware();
     window::set_callbacks(on_inbox, on_timer, on_paint, on_click);
     let (Ok(plain), Ok(glass)) = (
-        Window::create(w!("s90.tokyo-ime.candidate"), false),
-        Window::create(w!("s90.tokyo-ime.candidate.glass"), true),
+        Window::create(w!("hajime.candidate"), false),
+        Window::create(w!("hajime.candidate.glass"), true),
     ) else {
         return;
     };
@@ -107,7 +107,7 @@ pub fn run() {
     let notifier = plain.notifier();
     let reader_inbox = inbox.clone();
     let spawned = std::thread::Builder::new()
-        .name("s90-candidate-ui-reader".into())
+        .name("hajime-candidate-ui-reader".into())
         .spawn(move || read_commands(&reader_inbox, &notifier));
     if spawned.is_err() {
         return;

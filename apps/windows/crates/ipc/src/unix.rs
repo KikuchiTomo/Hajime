@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 //! Linux(と試しの macOS)で，Unix ドメインソケットでエンジンにつなぐ．
-//! 場所は Swift の UnixSocketPath と同じ: `$XDG_RUNTIME_DIR/s90.tokyo/<役>.sock`．
-//! `XDG_RUNTIME_DIR` が無ければ一時フォルダの `s90.tokyo-<uid>/<役>.sock`．
+//! 場所は Swift の UnixSocketPath と同じ: `$XDG_RUNTIME_DIR/haji.men/<役>.sock`．
+//! `XDG_RUNTIME_DIR` が無ければ一時フォルダの `haji.men-<uid>/<役>.sock`．
 //! フォルダはエンジンが作る．手元側は，本人のフォルダでほかの人が読み書きできないことを確かめてからつなぐ(なりすましを防ぐ)
 
 use crate::client::EngineClient;
@@ -11,7 +11,7 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 
-const DIRECTORY: &str = "s90.tokyo";
+const DIRECTORY: &str = "haji.men";
 
 impl EngineClient {
     /// Unix ドメインソケット(path)でエンジンにつなぐ手元側を作る．つなぐたびにフォルダの持ち主と権限を確かめる
@@ -52,7 +52,7 @@ fn current_uid() -> std::io::Result<u32> {
     if let Ok(metadata) = std::fs::metadata("/proc/self") {
         return Ok(metadata.uid());
     }
-    let probe = std::env::temp_dir().join(format!("s90.tokyo-uid-{}", std::process::id()));
+    let probe = std::env::temp_dir().join(format!("haji.men-uid-{}", std::process::id()));
     let file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
@@ -79,7 +79,7 @@ mod tests {
             .unwrap_or(0);
         // ソケットの場所の長さには上限(104 バイトほど)があるので /tmp の下に短く作る
         let directory = PathBuf::from(format!(
-            "/tmp/s90t.{}.{}",
+            "/tmp/hajime.{}.{}",
             std::process::id(),
             nanos % 1_000_000
         ));
@@ -163,13 +163,13 @@ mod tests {
         assert!(parent == DIRECTORY || parent.starts_with(&format!("{DIRECTORY}-")));
     }
 
-    /// 本物のエンジン(s90-engine-host)とつないで確かめる．S90_ENGINE_SOCKET にソケットの場所を入れて
+    /// 本物のエンジン(hajime-engine-host)とつないで確かめる．HAJIME_ENGINE_SOCKET にソケットの場所を入れて
     /// `cargo test -p ipc -- --ignored` で動かす(CI ではエンジンを動かさないので飛ばす)
     #[test]
     #[ignore]
     fn 本物のエンジンで打った読みを変換して確定する() {
         use crate::{EditOperation, FieldContext, Key, KeyInput, Modifiers};
-        let path = PathBuf::from(std::env::var("S90_ENGINE_SOCKET").unwrap());
+        let path = PathBuf::from(std::env::var("HAJIME_ENGINE_SOCKET").unwrap());
         let client = EngineClient::start_unix(path).unwrap();
         let timeout = Duration::from_secs(10);
         let Some(ResponseBody::SessionOpened { session, .. }) =

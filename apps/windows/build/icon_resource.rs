@@ -1,4 +1,4 @@
-// アプリのアイコン(apps/windows/resources/s90.ico)を，実行ファイル・DLL のリソースにする．
+// アプリのアイコン(apps/windows/resources/はじめ.ico)を，実行ファイル・DLL のリソースにする．
 // 各 crate の build.rs から include! で読み込む．rc.exe や依存の crate を使わず，リソースのファイル(.res)を
 // ここで書いてリンカーに渡す(link.exe は .res をそのまま受け取る)．
 // アイコンの組(RT_GROUP_ICON)の番号は 1．入力の一覧に出すアイコン(RegisterProfile の 0 番目)と窓のアイコンに使う
@@ -110,7 +110,7 @@ fn embed_icon(link_kind: &str) {
     let windows = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
     let msvc = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default());
-    let ico = manifest.join("../../resources/s90.ico");
+    let ico = manifest.join("../../resources/hajime.ico");
     println!("cargo:rerun-if-changed={}", ico.display());
     if !(windows && msvc) {
         return;
@@ -119,7 +119,7 @@ fn embed_icon(link_kind: &str) {
         println!("cargo:warning=アイコンを読めませんでした: {}", ico.display());
         return;
     };
-    let out = Path::new(&std::env::var("OUT_DIR").unwrap_or_default()).join("s90-icon.res");
+    let out = Path::new(&std::env::var("OUT_DIR").unwrap_or_default()).join("hajime-icon.res");
     if std::fs::write(&out, res).is_ok() {
         println!("cargo:rustc-link-arg-{link_kind}={}", out.display());
     }

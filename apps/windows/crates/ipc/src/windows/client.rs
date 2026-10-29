@@ -32,10 +32,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|elapsed| elapsed.as_nanos())
             .unwrap_or(0);
-        format!(
-            r"\\.\pipe\s90.tokyo-ime.test.{}.{nanos}",
-            std::process::id()
-        )
+        format!(r"\\.\pipe\hajime.test.{}.{nanos}", std::process::id())
     }
 
     fn key() -> RequestBody {

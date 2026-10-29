@@ -1,0 +1,17 @@
+{
+  "skill_name": "hajime-windows",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "TSF の OnTestKeyDown を実装して",
+      "expected_output": "guard で panic を受け止め，エンジンと通信せずに DLL の中の写しの状態だけで判定する",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "tsf crate で serde_json と tokio を使いたい",
+      "expected_output": "tsf は ipc と tokens 以外に依存しない方針を説明し，理由(入力先のアプリに読み込まれる)を示す",
+      "files": []
+    }
+  ]
+}

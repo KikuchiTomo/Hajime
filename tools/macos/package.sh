@@ -2,22 +2,22 @@
 # 配布物(.pkg)を作る．Zenzai のモデルを入れた本番のアプリを /Library/Input Methods に入れる .pkg になる．
 #
 # 使い方: tools/macos/package.sh
-# 出力:   apps/macos/build/dist/s90.tokyo-IME-<バージョン>.pkg
+# 出力:   apps/macos/build/dist/Hajime-<バージョン>.pkg
 #
 # 署名と公証は，使える証明書と設定があるときだけ行う．
-#   S90_APP_IDENTITY        アプリの署名(名前か SHA-1)．無ければ，公証するときは Developer ID Application，
+#   HAJIME_APP_IDENTITY        アプリの署名(名前か SHA-1)．無ければ，公証するときは Developer ID Application，
 #                           しないときは make install-macos と同じ決め方(入っているバージョンと同じチームの証明書．variant.sh)
-#   S90_INSTALLER_IDENTITY  .pkg の署名．無ければ Developer ID Installer の証明書．どちらも無ければ署名しない
-#   S90_NOTARY_PROFILE      公証に使う notarytool のキーチェーンのプロファイル名．無ければ公証しない(手元に入れる .pkg)
+#   HAJIME_INSTALLER_IDENTITY  .pkg の署名．無ければ Developer ID Installer の証明書．どちらも無ければ署名しない
+#   HAJIME_NOTARY_PROFILE      公証に使う notarytool のキーチェーンのプロファイル名．無ければ公証しない(手元に入れる .pkg)
 #                           (作り方: xcrun notarytool store-credentials <名前>)
-#   S90_NOTARY_KEYCHAIN     公証のプロファイルを入れたキーチェーン．無ければ既定のキーチェーン(CI は ci_signing.sh が作る)
+#   HAJIME_NOTARY_KEYCHAIN     公証のプロファイルを入れたキーチェーン．無ければ既定のキーチェーン(CI は ci_signing.sh が作る)
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 
 . "$root/tools/macos/variant.sh"
 variant Release
 # productbuild の --sign は証明書の名前(Common Name)を受け取る(man productbuild)．同じ名前が 2 つあると選べないので止める
-installer_identity=${S90_INSTALLER_IDENTITY:-$(identities basic | awk -F '\t' '$2 ~ /^Developer ID Installer/ { print $2; exit }')}
+installer_identity=${HAJIME_INSTALLER_IDENTITY:-$(identities basic | awk -F '\t' '$2 ~ /^Developer ID Installer/ { print $2; exit }')}
 if [ -n "$installer_identity" ]; then
   # 同じ証明書が 2 つのキーチェーンに出ることがあるので，SHA-1 で重ねずに数える
   installer_count=$(identities basic | awk -F '\t' -v name="$installer_identity" '$2 == name { print $1 }' | sort -u | wc -l | tr -d ' ')
@@ -30,8 +30,8 @@ if [ -n "$installer_identity" ]; then
     exit 1
   fi
 fi
-notary_profile=${S90_NOTARY_PROFILE:-}
-notary_keychain=${S90_NOTARY_KEYCHAIN:-}
+notary_profile=${HAJIME_NOTARY_PROFILE:-}
+notary_keychain=${HAJIME_NOTARY_KEYCHAIN:-}
 # 公証に出して結果を待つ．受け付けられなければ(Accepted でなければ)，Apple の審査の記録(問題のあるファイルと理由)を出して止まる
 notarize() {
   set -- "$1" --keychain-profile "$notary_profile"
@@ -48,8 +48,8 @@ notarize() {
     exit 1
   fi
 }
-if [ -n "${S90_APP_IDENTITY:-}" ]; then
-  app_identity=$S90_APP_IDENTITY
+if [ -n "${HAJIME_APP_IDENTITY:-}" ]; then
+  app_identity=$HAJIME_APP_IDENTITY
 elif [ -n "$notary_profile" ]; then
   # ほかの人に配る .pkg．公証には Developer ID の署名が要る
   app_identity=$(code_signing_identities | awk -F '\t' '$2 ~ /^Developer ID Application/ { print $1; exit }')
@@ -62,7 +62,7 @@ app_identity_name=${app_identity_name:-$app_identity}
 if [ -n "$notary_profile" ]; then
   case "$app_identity_name" in
     "Developer ID Application"*) ;;
-    *) echo "公証するには Developer ID Application の証明書で署名します(今の選択: ${app_identity_name:-なし})．S90_APP_IDENTITY で指定してください" >&2; exit 1 ;;
+    *) echo "公証するには Developer ID Application の証明書で署名します(今の選択: ${app_identity_name:-なし})．HAJIME_APP_IDENTITY で指定してください" >&2; exit 1 ;;
   esac
 fi
 
@@ -73,7 +73,7 @@ xcodegen generate --quiet
 work="build/package"
 rm -rf "$work"
 mkdir -p "$work/root" "$work/scripts" build/dist
-xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet
+xcodebuild -project Hajime.xcodeproj -scheme Hajime -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet
 # 拡張属性(._ のファイル)を配布物に入れない
 ditto --norsrc --noextattr "build/Build/Products/$configuration/$app_name.app" "$work/root/$app_name.app"
 app="$work/root/$app_name.app"
@@ -138,7 +138,7 @@ plutil -replace 0.BundleIsRelocatable -bool NO "$work/component.plist"
 COPYFILE_DISABLE=1 pkgbuild --root "$work/root" --component-plist "$work/component.plist" --scripts "$work/scripts" \
   --identifier "$bundle_id" --version "$version" --install-location "$destination" "$work/component.pkg"
 sed -e "s/@VERSION@/$version/g" "$root/tools/macos/pkg/distribution.xml" > "$work/distribution.xml"
-output="build/dist/s90.tokyo-IME-$version.pkg"
+output="build/dist/Hajime-$version.pkg"
 rm -f "$output"
 if [ -n "$installer_identity" ]; then
   productbuild --distribution "$work/distribution.xml" --package-path "$work" --sign "$installer_identity" "$output"

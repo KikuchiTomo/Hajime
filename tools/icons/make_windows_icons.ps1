@@ -103,7 +103,7 @@ foreach ($image in $images) { $writer.Write($image) }
 $writer.Flush()
 
 New-Item -ItemType Directory -Force -Path $Output | Out-Null
-$target = Join-Path (Resolve-Path $Output) 's90.ico'
+$target = Join-Path (Resolve-Path $Output) 'hajime.ico'
 [System.IO.File]::WriteAllBytes($target, $ico.ToArray())
 # 見本: 大きさごとに並べた PNG(design/mockups に置いて見比べる)
 $previewSizes = @(16, 24, 32, 48, 256)

@@ -44,7 +44,7 @@ use windows_core::{w, Result, BOOL, BSTR, PCWSTR};
 const WM_INBOX: u32 = WM_APP + 1;
 const BASE_DPI: f32 = 96.0;
 /// 読み上げの種類の名前．同じ名前の読み上げは新しいものが前のものを置き換える
-const ANNOUNCEMENT_ID: &str = "s90.tokyo-ime.candidate";
+const ANNOUNCEMENT_ID: &str = "hajime.candidate";
 
 /// 時計の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,7 +109,7 @@ pub fn make_dpi_aware() {
 pub fn single_instance() -> Option<HANDLE> {
     // SAFETY: 名前は定数．ハンドルはプロセスが終わるまで持つ(OS が閉じる)
     unsafe {
-        let handle = CreateMutexW(None, false, w!(r"Local\s90.tokyo-ime.candidate-ui")).ok()?;
+        let handle = CreateMutexW(None, false, w!(r"Local\hajime.candidate-ui")).ok()?;
         if GetLastError() == ERROR_ALREADY_EXISTS {
             let _ = CloseHandle(handle);
             return None;

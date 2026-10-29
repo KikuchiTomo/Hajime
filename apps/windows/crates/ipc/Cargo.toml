@@ -1,6 +1,6 @@
 [package]
 name = "ipc"
-description = "TSF の DLL・候補ウィンドウと s90-engine-host のあいだのメッセージ(protocol/ から生成)と，その読み書き"
+description = "TSF の DLL・候補ウィンドウと hajime-engine-host のあいだのメッセージ(protocol/ から生成)と，その読み書き"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

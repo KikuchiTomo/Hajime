@@ -132,11 +132,11 @@ pub fn run_after(window: Window, after: Option<After>) {
     with_app(|app| ffi::invalidate(app.window));
 }
 
-/// 設定のファイルの置き場所(エンジンの S90Persistence と同じ %APPDATA%\s90.tokyo\IME\settings.json)
+/// 設定のファイルの置き場所(エンジンの HajimePersistence と同じ %APPDATA%\haji.men\IME\settings.json)
 fn settings_file() -> Option<std::path::PathBuf> {
     std::env::var_os("APPDATA").map(|base| {
         std::path::PathBuf::from(base)
-            .join("s90.tokyo")
+            .join("haji.men")
             .join("IME")
             .join("settings.json")
     })

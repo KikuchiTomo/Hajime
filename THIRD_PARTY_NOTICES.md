@@ -1,6 +1,6 @@
 # 謝辞
 
-s90.tokyo IME は次のソフトウェア・モデル・データを利用しています．
+はじめは次のソフトウェア・モデル・データを利用しています．
 
 ## AzooKeyKanaKanjiConverter
 
@@ -1522,7 +1522,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 ## Mozc
 
-https://github.com/google/mozc (the "Windows 風" and "Mac 風" key setting presets in `core/Sources/S90Domain/Settings/KeymapPreset.swift` are derived from the key setting tables in `src/data/keymap/`, commit c4b2aef7c65e61be394bacadaec200eb5b97f91c)
+https://github.com/google/mozc (the "Windows 風" and "Mac 風" key setting presets in `core/Sources/HajimeDomain/Settings/KeymapPreset.swift` are derived from the key setting tables in `src/data/keymap/`, commit c4b2aef7c65e61be394bacadaec200eb5b97f91c)
 
 ```
 Copyright 2010-2018, Google Inc.
@@ -1611,7 +1611,7 @@ Technology and LICENSEE agrees to preserve same.
 
 Kiwi Maru(Google Fonts の google/fonts の 130fcfb0ff422fec96b335616b2ca99f91914792)
 https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru
-Windows の候補ウィンドウの既定の書体に使っています(配布物の fonts\\ に入れ，s90.tokyo IME の中だけで使います)．
+Windows の候補ウィンドウの既定の書体に使っています(配布物の fonts\\ に入れ，はじめの中だけで使います)．
 
 ```
 Copyright 2020 The Kiwi Maru Project Authors (https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru)

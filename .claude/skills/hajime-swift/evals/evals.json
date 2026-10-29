@@ -1,0 +1,17 @@
+{
+  "skill_name": "hajime-swift",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "変換エンジンを呼んで候補を返す InputSession のメソッドを書いて",
+      "expected_output": "handle は待たずに読みを返し，結果は AsyncStream で後から流す．要求番号で古い結果を捨てる．actor に閉じ込める",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "R-03 の種類の行の上キーの動きのテストを書いて",
+      "expected_output": "Swift Testing のパラメータ化したテストで，キーの列と ClientAction の列を表にし，テスト名に R-03 を入れる",
+      "files": []
+    }
+  ]
+}

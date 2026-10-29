@@ -1,5 +1,5 @@
 //! 設定の画面の外観の見本(macOS の ThemePreview)．候補ウィンドウと同じ描き方で，見本の分岐図を描く．
-//! 設定の画面(s90-settings)が GDI の画面の中に描けるよう，DC に結び付ける Direct2D の描き先を使う
+//! 設定の画面(hajime-settings)が GDI の画面の中に描けるよう，DC に結び付ける Direct2D の描き先を使う
 
 use super::render::Renderer;
 use crate::geometry::Frame;

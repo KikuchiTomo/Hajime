@@ -25,8 +25,8 @@ azooKey のエンジンは，Zenzai(文と左の文脈を見るニューラル�
 
 ```sh
 tools/models/fetch_zenzai.sh
-swift run --package-path core -c release s90-playground --evaluate core/Evaluation/conversion-basic.tsv --zenzai ../models/zenz-v3.2-small-Q5_K_M.gguf
-S90_ZENZAI_MODEL=../models/zenz-v3.2-small-Q5_K_M.gguf swift test --package-path core -c release --filter LatencyProbeTests
+swift run --package-path core -c release hajime-playground --evaluate core/Evaluation/conversion-basic.tsv --zenzai ../models/zenz-v3.2-small-Q5_K_M.gguf
+HAJIME_ZENZAI_MODEL=../models/zenz-v3.2-small-Q5_K_M.gguf swift test --package-path core -c release --filter LatencyProbeTests
 ```
 
 ## 判断

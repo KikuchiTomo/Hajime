@@ -91,7 +91,7 @@ impl Receiver {
         let panel = Arc::new(Mutex::new(Panel::default()));
         let shared = Arc::clone(&panel);
         std::thread::Builder::new()
-            .name("s90-candidate-receiver".into())
+            .name("hajime-candidate-receiver".into())
             .spawn(move || receive(&path, &shared, notify))?;
         Ok(Self { panel })
     }

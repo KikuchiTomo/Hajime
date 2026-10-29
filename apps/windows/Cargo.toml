@@ -11,7 +11,7 @@ license = "MIT"
 publish = false
 rust-version = "1.90"
 
-[workspace.metadata.s90]
+[workspace.metadata.hajime]
 # ビルド番号．バージョンごとに 1 ずつ上げる整数(同じバージョンを作り直したときも上げる)
 build = 7
 

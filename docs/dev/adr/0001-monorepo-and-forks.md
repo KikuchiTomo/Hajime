@@ -9,7 +9,7 @@ azooKey から分かれて独自に進める．macOS と Windows の両方を作
 
 ## 判断
 
-- 製品は新しい公開リポジトリ `KikuchiTomo/s90.tokyo-IME` で作る．GitHub の fork にはしない
+- 製品は新しい公開リポジトリ `KikuchiTomo/Hajime` で作る．GitHub の fork にはしない
 - `AzooKeyKanaKanjiConverter`，`azooKey-Desktop`，`azooKey-Windows` は fork を作り，参照元として使う
 - 変換エンジンは fork を SwiftPM の依存として revision で固定して使う
 - アプリのコードは fork からこのリポジトリに移しながら，`docs/dev/ARCHITECTURE.md` の層に合わせて作り直す

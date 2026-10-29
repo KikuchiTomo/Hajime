@@ -2,8 +2,8 @@
 # macOS の入力メソッドをビルドし，~/Library/Input Methods に入れて有効にする．
 #
 # 使い方: tools/macos/install.sh [Release|Dev]
-#   Release: 本番(s90)
-#   Dev:     開発版(s90 Dev)．本番と別の入力ソース・別の学習データになるので，並べて試せる．最適化は本番と同じ
+#   Release: 本番(はじめ)
+#   Dev:     開発版(Hajime Dev)．本番と別の入力ソース・別の学習データになるので，並べて試せる．最適化は本番と同じ
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 . "$root/tools/macos/variant.sh"
@@ -24,10 +24,10 @@ echo "署名: ${identity_label:-$identity}"
 
 cd "$root/apps/macos"
 xcodegen generate --quiet
-# 入力メニューに出す名前を変えるときは S90_NAME に入れる(make install-macos NAME=…)
+# 入力メニューに出す名前を変えるときは HAJIME_NAME に入れる(make install-macos NAME=…)
 set --
-[ -n "${S90_NAME:-}" ] && set -- S90_DISPLAY_NAME="$S90_NAME"
-xcodebuild -project S90IME.xcodeproj -scheme S90IME -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet "$@"
+[ -n "${HAJIME_NAME:-}" ] && set -- HAJIME_DISPLAY_NAME="$HAJIME_NAME"
+xcodebuild -project Hajime.xcodeproj -scheme Hajime -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet "$@"
 built="build/Build/Products/$configuration/$app_name.app"
 if [ "$identity" != "-" ]; then
   # ビルドはアドホック署名で行い，できたアプリだけを証明書で署名し直す．
@@ -48,5 +48,5 @@ swift "$root/tools/macos/input_source.swift" enable "$destination/$app_name.app"
 # (launchd がすぐに起動し直す．止めても入力には影響しない)
 killall TextInputMenuAgent 2>/dev/null || true
 echo "入れました: $destination/$app_name.app"
-echo "初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース で「${S90_NAME:-$display_name}」を足してください"
+echo "初めて入れたときは，一度ログアウトしてログインし直し，システム設定 > キーボード > 入力ソース で「${HAJIME_NAME:-$display_name}」を足してください"
 echo "2 回目からは入れ直すだけで，次にキーを打ったときに新しいバージョンが動きます"

@@ -1,7 +1,7 @@
 //! 候補ウィンドウの見た目を PNG に書き出す(デバッグビルドだけ)．macOS の SnapshotRenderer と同じ見本・同じ名前で書き出し，
 //! 2 つの OS の絵を見比べられるようにする．CI の Windows のジョブが成果物にする
 //!
-//! 使い方: s90-candidate-ui.exe --render-snapshots <書き出し先のディレクトリ>
+//! 使い方: hajime-candidate-ui.exe --render-snapshots <書き出し先のディレクトリ>
 
 use super::render::Renderer;
 use crate::scene::{self, Look, Scene, Surround};

@@ -1,7 +1,7 @@
 """design/tokens/tokens.json から macOS 用の Swift のコードを作る．
 
 使い方: python3 -I tools/tokens/generate_swift.py
-生成先: apps/macos/S90IME/UI/Generated/DesignTokens.swift(手で編集しない)
+生成先: apps/macos/Hajime/UI/Generated/DesignTokens.swift(手で編集しない)
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TOKENS = ROOT / "design" / "tokens" / "tokens.json"
-OUTPUT = ROOT / "apps" / "macos" / "S90IME" / "UI" / "Generated" / "DesignTokens.swift"
+OUTPUT = ROOT / "apps" / "macos" / "Hajime" / "UI" / "Generated" / "DesignTokens.swift"
 
 
 def camel(name: str) -> str:

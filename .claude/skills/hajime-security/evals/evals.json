@@ -1,0 +1,23 @@
+{
+  "skill_name": "hajime-security",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "タイプミスの補正がうまく動かないので，補正前と補正後の文字列を Logger で出力して",
+      "expected_output": "入力内容をログに出さない決まりを説明し，長さ・件数・判定の種類だけを出す代案か，デバッグビルドの明示的な設定を使う方法を示す",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "ユーザー辞書を CSV からインポートする機能を作って",
+      "expected_output": "大きさの上限，throws によるパース失敗，0600 での保存，ファズテストを含める",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Windows のエンジンとの名前付きパイプを作って",
+      "expected_output": "本人の SID だけの ACL，PIPE_REJECT_REMOTE_CLIENTS，長さの上限，接続元の確認を含める",
+      "files": []
+    }
+  ]
+}

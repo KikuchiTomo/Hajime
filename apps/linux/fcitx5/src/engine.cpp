@@ -12,11 +12,11 @@
 #include <fcitx/text.h>
 #include <fcitx/userinterface.h>
 
-#ifndef S90_ENGINE_PATH
-#error "S90_ENGINE_PATH(エンジンの実行ファイルの場所)を CMake で渡してください"
+#ifndef HAJIME_ENGINE_PATH
+#error "HAJIME_ENGINE_PATH(エンジンの実行ファイルの場所)を CMake で渡してください"
 #endif
 
-namespace s90 {
+namespace hajime {
 namespace {
 
 struct KeyCode {
@@ -28,91 +28,91 @@ struct KeyCode {
 
 bool isKeypad(fcitx::KeySym sym) { return sym >= FcitxKey_KP_Space && sym <= FcitxKey_KP_9; }
 
-// Fcitx 5 のキーを，エンジンのキー(s90_bridge.h の S90KeyKind)にする．エンジンが扱わないキー(修飾キーだけなど)は nullopt
+// Fcitx 5 のキーを，エンジンのキー(hajime_bridge.h の HajimeKeyKind)にする．エンジンが扱わないキー(修飾キーだけなど)は nullopt
 std::optional<KeyCode> keyCode(const fcitx::Key &key) {
     const fcitx::KeySym sym = key.sym();
     switch (sym) {
     case FcitxKey_space:
     case FcitxKey_KP_Space:
-        return KeyCode{S90_KEY_SPACE, {}};
+        return KeyCode{HAJIME_KEY_SPACE, {}};
     case FcitxKey_Return:
     case FcitxKey_KP_Enter:
-        return KeyCode{S90_KEY_ENTER, {}};
+        return KeyCode{HAJIME_KEY_ENTER, {}};
     case FcitxKey_BackSpace:
-        return KeyCode{S90_KEY_BACKSPACE, {}};
+        return KeyCode{HAJIME_KEY_BACKSPACE, {}};
     case FcitxKey_Delete:
     case FcitxKey_KP_Delete:
-        return KeyCode{S90_KEY_DELETE, {}};
+        return KeyCode{HAJIME_KEY_DELETE, {}};
     case FcitxKey_Escape:
-        return KeyCode{S90_KEY_ESCAPE, {}};
+        return KeyCode{HAJIME_KEY_ESCAPE, {}};
     case FcitxKey_Tab:
     case FcitxKey_ISO_Left_Tab:
-        return KeyCode{S90_KEY_TAB, {}};
+        return KeyCode{HAJIME_KEY_TAB, {}};
     case FcitxKey_Up:
     case FcitxKey_KP_Up:
-        return KeyCode{S90_KEY_UP, {}};
+        return KeyCode{HAJIME_KEY_UP, {}};
     case FcitxKey_Down:
     case FcitxKey_KP_Down:
-        return KeyCode{S90_KEY_DOWN, {}};
+        return KeyCode{HAJIME_KEY_DOWN, {}};
     case FcitxKey_Left:
     case FcitxKey_KP_Left:
-        return KeyCode{S90_KEY_LEFT, {}};
+        return KeyCode{HAJIME_KEY_LEFT, {}};
     case FcitxKey_Right:
     case FcitxKey_KP_Right:
-        return KeyCode{S90_KEY_RIGHT, {}};
+        return KeyCode{HAJIME_KEY_RIGHT, {}};
     case FcitxKey_Home:
     case FcitxKey_KP_Home:
-        return KeyCode{S90_KEY_HOME, {}};
+        return KeyCode{HAJIME_KEY_HOME, {}};
     case FcitxKey_End:
     case FcitxKey_KP_End:
-        return KeyCode{S90_KEY_END, {}};
+        return KeyCode{HAJIME_KEY_END, {}};
     case FcitxKey_Page_Up:
     case FcitxKey_KP_Page_Up:
-        return KeyCode{S90_KEY_PAGE_UP, {}};
+        return KeyCode{HAJIME_KEY_PAGE_UP, {}};
     case FcitxKey_Page_Down:
     case FcitxKey_KP_Page_Down:
-        return KeyCode{S90_KEY_PAGE_DOWN, {}};
+        return KeyCode{HAJIME_KEY_PAGE_DOWN, {}};
     case FcitxKey_Eisu_toggle:
     case FcitxKey_Eisu_Shift:
-        return KeyCode{S90_KEY_EISU, {}};
+        return KeyCode{HAJIME_KEY_EISU, {}};
     case FcitxKey_Hiragana_Katakana:
     case FcitxKey_Hiragana:
     case FcitxKey_Katakana:
-        return KeyCode{S90_KEY_KANA, {}};
+        return KeyCode{HAJIME_KEY_KANA, {}};
     case FcitxKey_yen:
-        return KeyCode{S90_KEY_YEN, {}};
+        return KeyCode{HAJIME_KEY_YEN, {}};
     case FcitxKey_Zenkaku_Hankaku:
     case FcitxKey_Zenkaku:
     case FcitxKey_Hankaku:
-        return KeyCode{S90_KEY_HANKAKU_ZENKAKU, {}};
+        return KeyCode{HAJIME_KEY_HANKAKU_ZENKAKU, {}};
     case FcitxKey_Henkan_Mode:
-        return KeyCode{S90_KEY_HENKAN, {}};
+        return KeyCode{HAJIME_KEY_HENKAN, {}};
     case FcitxKey_Muhenkan:
-        return KeyCode{S90_KEY_MUHENKAN, {}};
+        return KeyCode{HAJIME_KEY_MUHENKAN, {}};
     default:
         break;
     }
     if (sym >= FcitxKey_F1 && sym <= FcitxKey_F24) {
-        return KeyCode{S90_KEY_FUNCTION, {}, static_cast<uint32_t>(sym - FcitxKey_F1 + 1)};
+        return KeyCode{HAJIME_KEY_FUNCTION, {}, static_cast<uint32_t>(sym - FcitxKey_F1 + 1)};
     }
     std::string text = fcitx::Key::keySymToUTF8(sym);
     if (text.empty()) {
         return std::nullopt;
     }
-    return KeyCode{S90_KEY_CHARACTER, std::move(text), 0, isKeypad(sym)};
+    return KeyCode{HAJIME_KEY_CHARACTER, std::move(text), 0, isKeypad(sym)};
 }
 
 uint32_t modifiers(const fcitx::Key &key) {
     uint32_t result = 0;
     const auto states = key.states();
     if (states.test(fcitx::KeyState::Shift)) {
-        result |= S90_MODIFIER_SHIFT;
+        result |= HAJIME_MODIFIER_SHIFT;
     }
     if (states.test(fcitx::KeyState::Ctrl)) {
-        result |= S90_MODIFIER_CONTROL;
+        result |= HAJIME_MODIFIER_CONTROL;
     }
     if (states.test(fcitx::KeyState::Alt)) {
-        result |= S90_MODIFIER_ALT;
+        result |= HAJIME_MODIFIER_ALT;
     }
     return result;
 }
@@ -125,9 +125,9 @@ int isSecure(fcitx::InputContext *inputContext) {
 
 fcitx::TextFormatFlags format(uint32_t style) {
     switch (style) {
-    case S90_STYLE_FOCUSED:
+    case HAJIME_STYLE_FOCUSED:
         return {fcitx::TextFormatFlag::Underline, fcitx::TextFormatFlag::HighLight};
-    case S90_STYLE_CORRECTION:
+    case HAJIME_STYLE_CORRECTION:
         return {fcitx::TextFormatFlag::Underline, fcitx::TextFormatFlag::Bold};
     default:
         return fcitx::TextFormatFlag::Underline;
@@ -148,19 +148,19 @@ uint64_t after(uint32_t milliseconds) {
 } // namespace
 
 Engine::Engine(fcitx::Instance *instance) : instance_(instance) {
-    bridge_ = s90_bridge_new(S90_ENGINE_PATH);
+    bridge_ = hajime_bridge_new(HAJIME_ENGINE_PATH);
     if (bridge_ == nullptr) {
-        FCITX_ERROR() << "s90.tokyo IME: エンジンへの橋渡しを作れません．キーはそのままアプリに渡します";
+        FCITX_ERROR() << "はじめ: エンジンへの橋渡しを作れません．キーはそのままアプリに渡します";
         return;
     }
-    const int fd = s90_bridge_notify_fd(bridge_);
+    const int fd = hajime_bridge_notify_fd(bridge_);
     if (fd >= 0) {
         panelEvent_ = instance_->eventLoop().addIOEvent(
             fd, fcitx::IOEventFlag::In, [this](fcitx::EventSourceIO *, int, fcitx::IOEventFlags) {
                 if (auto *inputContext = target_.get()) {
                     showPanel(inputContext);
                 } else {
-                    s90_bridge_load_panel(bridge_);
+                    hajime_bridge_load_panel(bridge_);
                 }
                 return true;
             });
@@ -170,7 +170,7 @@ Engine::Engine(fcitx::Instance *instance) : instance_(instance) {
 Engine::~Engine() {
     panelEvent_.reset();
     wakeEvent_.reset();
-    s90_bridge_free(bridge_);
+    hajime_bridge_free(bridge_);
 }
 
 void Engine::keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &keyEvent) {
@@ -184,7 +184,7 @@ void Engine::keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &keyEvent
     auto *inputContext = keyEvent.inputContext();
     target_ = inputContext->watch();
     const std::string program = inputContext->program();
-    const int handled = s90_bridge_key(bridge_, code->kind, code->text.empty() ? nullptr : code->text.c_str(), code->number,
+    const int handled = hajime_bridge_key(bridge_, code->kind, code->text.empty() ? nullptr : code->text.c_str(), code->number,
                                        modifiers(keyEvent.key()), code->keypad ? 1 : 0, program.c_str(), isSecure(inputContext));
     render(inputContext);
     scheduleWake(inputContext);
@@ -211,22 +211,22 @@ void Engine::finish(fcitx::InputContext *inputContext) {
         return;
     }
     wakeEvent_.reset();
-    s90_bridge_deactivate(bridge_);
+    hajime_bridge_deactivate(bridge_);
     render(inputContext);
     inputContext->inputPanel().reset();
     inputContext->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
 }
 
 void Engine::render(fcitx::InputContext *inputContext) {
-    const char *commit = s90_bridge_commit(bridge_);
+    const char *commit = hajime_bridge_commit(bridge_);
     if (commit != nullptr && commit[0] != '\0') {
         inputContext->commitString(commit);
     }
     fcitx::Text preedit;
-    const size_t count = s90_bridge_preedit_count(bridge_);
+    const size_t count = hajime_bridge_preedit_count(bridge_);
     for (size_t index = 0; index < count; ++index) {
-        uint32_t style = S90_STYLE_READING;
-        const char *text = s90_bridge_preedit_text(bridge_, index, &style);
+        uint32_t style = HAJIME_STYLE_READING;
+        const char *text = hajime_bridge_preedit_text(bridge_, index, &style);
         if (text != nullptr) {
             preedit.append(text, format(style));
         }
@@ -243,9 +243,9 @@ void Engine::render(fcitx::InputContext *inputContext) {
 }
 
 void Engine::showPanel(fcitx::InputContext *inputContext) {
-    s90_bridge_load_panel(bridge_);
+    hajime_bridge_load_panel(bridge_);
     auto &panel = inputContext->inputPanel();
-    const size_t count = s90_bridge_candidate_count(bridge_);
+    const size_t count = hajime_bridge_candidate_count(bridge_);
     if (count == 0) {
         panel.setCandidateList(nullptr);
         panel.setAuxUp(fcitx::Text());
@@ -256,24 +256,24 @@ void Engine::showPanel(fcitx::InputContext *inputContext) {
         list->setPageSize(static_cast<int>(count));
         list->setLayoutHint(fcitx::CandidateLayoutHint::Vertical);
         for (size_t index = 0; index < count; ++index) {
-            const char *text = s90_bridge_candidate(bridge_, index);
+            const char *text = hajime_bridge_candidate(bridge_, index);
             list->append<Candidate>(text != nullptr ? text : "");
         }
-        const int32_t selected = s90_bridge_selected(bridge_);
+        const int32_t selected = hajime_bridge_selected(bridge_);
         if (selected >= 0 && static_cast<size_t>(selected) < count) {
             list->setGlobalCursorIndex(selected);
         }
         panel.setCandidateList(std::move(list));
-        const char *note = s90_bridge_note(bridge_);
+        const char *note = hajime_bridge_note(bridge_);
         panel.setAuxUp(fcitx::Text(note != nullptr ? note : ""));
-        const char *hints = s90_bridge_hints(bridge_);
+        const char *hints = hajime_bridge_hints(bridge_);
         panel.setAuxDown(fcitx::Text(hints != nullptr ? hints : ""));
     }
     inputContext->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
 }
 
 void Engine::scheduleWake(fcitx::InputContext *inputContext) {
-    const uint32_t milliseconds = s90_bridge_wake_after(bridge_);
+    const uint32_t milliseconds = hajime_bridge_wake_after(bridge_);
     if (milliseconds == 0) {
         wakeEvent_.reset();
         return;
@@ -289,9 +289,9 @@ void Engine::scheduleWake(fcitx::InputContext *inputContext) {
                 return true;
             }
             const std::string program = inputContext->program();
-            s90_bridge_wake(bridge_, program.c_str(), isSecure(inputContext));
+            hajime_bridge_wake(bridge_, program.c_str(), isSecure(inputContext));
             render(inputContext);
-            const uint32_t next = s90_bridge_wake_after(bridge_);
+            const uint32_t next = hajime_bridge_wake_after(bridge_);
             if (next == 0) {
                 source->setEnabled(false);
             } else {
@@ -304,6 +304,6 @@ void Engine::scheduleWake(fcitx::InputContext *inputContext) {
 
 fcitx::AddonInstance *EngineFactory::create(fcitx::AddonManager *manager) { return new Engine(manager->instance()); }
 
-} // namespace s90
+} // namespace hajime
 
-FCITX_ADDON_FACTORY(s90::EngineFactory);
+FCITX_ADDON_FACTORY(hajime::EngineFactory);

@@ -14,8 +14,8 @@
 新しいコードを書くときは，次の順に考えて置き場所を決める．
 
 1. OS の API を呼ぶか．呼ぶなら `apps/<OS>/` のアダプタ．呼ばないなら `core/`
-2. 外部(ファイル・変換エンジン・時刻・ネットワーク)に触れるか．触れるなら `S90Application/Ports/` に protocol を足し，実装を `S90Engine` か `S90Persistence` に置く
-3. 状態を進める処理か．進めるなら `S90Application` のユースケース．値の計算だけなら `S90Domain`
+2. 外部(ファイル・変換エンジン・時刻・ネットワーク)に触れるか．触れるなら `HajimeApplication/Ports/` に protocol を足し，実装を `HajimeEngine` か `HajimePersistence` に置く
+3. 状態を進める処理か．進めるなら `HajimeApplication` のユースケース．値の計算だけなら `HajimeDomain`
 
 迷ったら内側(Domain 寄り)に置き，外部に触れる部分だけを外に出す．テストを書きやすいからです．
 
@@ -34,7 +34,7 @@
 
 - **値をコードに直接書かない**．色と寸法は `design/tokens/`，設定の既定値は `DefaultSettings.swift`，文言は各 OS の文言ファイル
   - コードに残す定数は，意味のある名前を付けて型の中か ファイルの先頭に置く
-- 依存はコンストラクタ(イニシャライザ)で受け取る．具象を組み立てるのは composition root(`apps/macos/S90IME/CompositionRoot.swift` と `core/Sources/s90-engine-host/main.swift`)だけ
+- 依存はコンストラクタ(イニシャライザ)で受け取る．具象を組み立てるのは composition root(`apps/macos/Hajime/CompositionRoot.swift` と `core/Sources/hajime-engine-host/main.swift`)だけ
 - シングルトンとグローバルな可変状態を作らない．`static var` が要りそうになったら，所有者を決めて注入する
 - 1 つの型に 1 つの理由でしか変更が入らないようにする．入力メソッドのコントローラに変換・候補の表示・設定の読み込みを同居させない(azooKey-Desktop の `azooKeyMacInputController` が 1000 行を超えたのを繰り返さない)
 - 同じ判断を 2 か所に書かない．macOS と Windows の両方に同じ分岐が要るなら，それは `core/` の仕事
@@ -46,11 +46,11 @@
 
 ## テスト
 
-- `S90Domain` と `S90Application` に処理を足したら，テストも足す．ポートはテスト用の実装(`Fake<名前>`)を `core/Tests/Support/` に置いて使い回す
+- `HajimeDomain` と `HajimeApplication` に処理を足したら，テストも足す．ポートはテスト用の実装(`Fake<名前>`)を `core/Tests/Support/` に置いて使い回す
 - 入力の流れは「キーの列 → 期待する `ClientAction` の列」の表で書く(`InputSessionScenarioTests`)．要件(R-xx)の受け入れ条件はここで確かめる
 - 変換結果そのもの(どの漢字になるか)はエンジンの性能なので，core のテストでは固定の結果を返す Fake を使う
 - Windows の TSF は単体テストが難しいので，`ClientAction` から COM の呼び出しへの変換だけを関数に切り出して試す
-- 本物の Zenzai を使うテスト(環境変数 `S90_ZENZAI_MODEL` があるときだけ動く)と 1 キーの処理時間(R-01)は，`make test-zenzai` で Release ビルドで動かす．`make test` はモデルがあればこれも動かし，無ければ飛ばしたことを最後に表示する．CI はモデルをキャッシュして毎回動かす
+- 本物の Zenzai を使うテスト(環境変数 `HAJIME_ZENZAI_MODEL` があるときだけ動く)と 1 キーの処理時間(R-01)は，`make test-zenzai` で Release ビルドで動かす．`make test` はモデルがあればこれも動かし，無ければ飛ばしたことを最後に表示する．CI はモデルをキャッシュして毎回動かす
 
 ## コミットと PR
 

@@ -17,7 +17,7 @@ use windows_core::{w, Result};
 
 use crate::handwriting::layout::Bounds;
 
-const CLASS: windows_core::PCWSTR = w!("s90.tokyo-ime.handwriting");
+const CLASS: windows_core::PCWSTR = w!("hajime.handwriting");
 const WM_RECOGNIZED: u32 = WM_APP + 2;
 const RECOGNIZE_TIMER: usize = 1;
 const BASE_DPI: f32 = 96.0;

@@ -9,10 +9,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$engine = Join-Path (Resolve-Path $Stage) 's90-engine-host.exe'
+$engine = Join-Path (Resolve-Path $Stage) 'hajime-engine-host.exe'
 if (-not (Test-Path $engine)) { throw "$engine がありません" }
 # エンジンがすでに動いていると，2 つ目はすぐに終わる(終了コード 0)ので確かめられない
-if (Get-Process -Name 's90-engine-host' -ErrorAction SilentlyContinue) { throw 's90-engine-host がすでに動いています．止めてから確かめてください' }
+if (Get-Process -Name 'hajime-engine-host' -ErrorAction SilentlyContinue) { throw 'hajime-engine-host がすでに動いています．止めてから確かめてください' }
 
 $info = New-Object System.Diagnostics.ProcessStartInfo $engine
 $info.UseShellExecute = $false
@@ -30,7 +30,7 @@ try {
         $process.WaitForExit()
     }
     # エンジンが起動した候補ウィンドウも止める
-    Get-Process -Name 's90-candidate-ui' -ErrorAction SilentlyContinue |
+    Get-Process -Name 'hajime-candidate-ui' -ErrorAction SilentlyContinue |
         Where-Object { $_.Path -and $_.Path.StartsWith((Split-Path $engine), [System.StringComparison]::OrdinalIgnoreCase) } |
         Stop-Process -Force
 }

@@ -37,7 +37,7 @@ def main(argv: list[str]) -> int:
         if not mode.startswith("$"):
             themes[f"settings-windows.{mode}"] = body
     failures: list[str] = []
-    for rule in tokens["$extensions"]["s90"]["contrast"]:
+    for rule in tokens["$extensions"]["hajime"]["contrast"]:
         colors = themes[rule["theme"]]["color"]
         ratio = contrast_ratio(colors[rule["fg"]]["$value"], colors[rule["bg"]]["$value"])
         line = f'{rule["theme"]}: {rule["fg"]} / {rule["bg"]} = {ratio:.2f} (必要 {rule["min"]})'

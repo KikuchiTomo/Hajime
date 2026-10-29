@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! エンジン(s90-engine-host)への頼みを，設定の読み書きの口(SettingsStore)と操作(学習の消去・統計)にする．
+//! エンジン(hajime-engine-host)への頼みを，設定の読み書きの口(SettingsStore)と操作(学習の消去・統計)にする．
 //! パイプでの受け渡しは Engine の実装(app)が受け持ち，ここは要求と応答の形だけを扱う
 
 use crate::files::FileTask;

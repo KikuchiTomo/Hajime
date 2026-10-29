@@ -1,4 +1,4 @@
-//! C の関数(include/s90_bridge.h)．ポインタを受け取るところだけが unsafe で，中身は Bridge の安全な関数に渡す．
+//! C の関数(include/hajime_bridge.h)．ポインタを受け取るところだけが unsafe で，中身は Bridge の安全な関数に渡す．
 //! panic は C++ をまたがせない(Cargo.toml の panic = "abort")
 
 #![allow(unsafe_code)]
@@ -10,7 +10,7 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::ptr;
 
-/// s90_bridge.h の S90KeyKind と同じ順
+/// hajime_bridge.h の HajimeKeyKind と同じ順
 fn key(kind: u32, text: Option<String>, number: u32) -> Option<Key> {
     Some(match kind {
         0 => Key::Character { text: text? },
@@ -41,7 +41,7 @@ fn key(kind: u32, text: Option<String>, number: u32) -> Option<Key> {
     })
 }
 
-/// s90_bridge.h の S90Style と同じ値
+/// hajime_bridge.h の HajimeStyle と同じ値
 fn style(style: TextStyle) -> u32 {
     match style {
         TextStyle::Reading => 0,
@@ -56,7 +56,7 @@ unsafe fn string(text: *const c_char) -> Option<String> {
     if text.is_null() {
         return None;
     }
-    // SAFETY: 呼ぶ側が NUL で終わる文字列を渡す(s90_bridge.h の約束)
+    // SAFETY: 呼ぶ側が NUL で終わる文字列を渡す(hajime_bridge.h の約束)
     unsafe { CStr::from_ptr(text) }
         .to_str()
         .ok()
@@ -74,14 +74,14 @@ unsafe fn context(application_id: *const c_char, secure: c_int) -> FieldContext 
     }
 }
 
-/// SAFETY: bridge は s90_bridge_new が返し，まだ s90_bridge_free していないもの
+/// SAFETY: bridge は hajime_bridge_new が返し，まだ hajime_bridge_free していないもの
 unsafe fn bridge<'a>(bridge: *mut Bridge) -> Option<&'a mut Bridge> {
     // SAFETY: 呼ぶ側の約束どおり．Fcitx 5 は 1 本のスレッドで呼ぶので，同時に借りない
     unsafe { bridge.as_mut() }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_new(engine_path: *const c_char) -> *mut Bridge {
+pub unsafe extern "C" fn hajime_bridge_new(engine_path: *const c_char) -> *mut Bridge {
     // SAFETY: engine_path は NULL か NUL で終わる文字列
     let engine = unsafe { string(engine_path) };
     match Bridge::new(engine.as_deref().map(Path::new)) {
@@ -91,22 +91,22 @@ pub unsafe extern "C" fn s90_bridge_new(engine_path: *const c_char) -> *mut Brid
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_free(bridge: *mut Bridge) {
+pub unsafe extern "C" fn hajime_bridge_free(bridge: *mut Bridge) {
     if !bridge.is_null() {
-        // SAFETY: s90_bridge_new が Box から作ったもので，1 回だけ放す
+        // SAFETY: hajime_bridge_new が Box から作ったもので，1 回だけ放す
         drop(unsafe { Box::from_raw(bridge) });
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_notify_fd(bridge: *mut Bridge) -> c_int {
+pub unsafe extern "C" fn hajime_bridge_notify_fd(bridge: *mut Bridge) -> c_int {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(-1, |bridge| bridge.notify.as_raw_fd())
 }
 
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub unsafe extern "C" fn s90_bridge_key(
+pub unsafe extern "C" fn hajime_bridge_key(
     bridge: *mut Bridge,
     kind: u32,
     text: *const c_char,
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn s90_bridge_key(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_wake(
+pub unsafe extern "C" fn hajime_bridge_wake(
     bridge: *mut Bridge,
     application_id: *const c_char,
     secure: c_int,
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn s90_bridge_wake(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_deactivate(bridge: *mut Bridge) {
+pub unsafe extern "C" fn hajime_bridge_deactivate(bridge: *mut Bridge) {
     // SAFETY: 呼ぶ側の約束どおり
     if let Some(bridge) = unsafe { self::bridge(bridge) } {
         bridge.deactivate();
@@ -155,19 +155,19 @@ pub unsafe extern "C" fn s90_bridge_deactivate(bridge: *mut Bridge) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_commit(bridge: *mut Bridge) -> *const c_char {
+pub unsafe extern "C" fn hajime_bridge_commit(bridge: *mut Bridge) -> *const c_char {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(ptr::null(), |bridge| bridge.commit.as_ptr())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_preedit_count(bridge: *mut Bridge) -> usize {
+pub unsafe extern "C" fn hajime_bridge_preedit_count(bridge: *mut Bridge) -> usize {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(0, |bridge| bridge.preedit.len())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_preedit_text(
+pub unsafe extern "C" fn hajime_bridge_preedit_text(
     bridge: *mut Bridge,
     index: usize,
     style_out: *mut u32,
@@ -186,13 +186,13 @@ pub unsafe extern "C" fn s90_bridge_preedit_text(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_is_composing(bridge: *mut Bridge) -> c_int {
+pub unsafe extern "C" fn hajime_bridge_is_composing(bridge: *mut Bridge) -> c_int {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(0, |bridge| c_int::from(bridge.output.is_composing))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_wake_after(bridge: *mut Bridge) -> u32 {
+pub unsafe extern "C" fn hajime_bridge_wake_after(bridge: *mut Bridge) -> u32 {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }
         .and_then(|bridge| bridge.output.wake_after)
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn s90_bridge_wake_after(bridge: *mut Bridge) -> u32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_load_panel(bridge: *mut Bridge) {
+pub unsafe extern "C" fn hajime_bridge_load_panel(bridge: *mut Bridge) {
     // SAFETY: 呼ぶ側の約束どおり
     if let Some(bridge) = unsafe { self::bridge(bridge) } {
         bridge.load_panel();
@@ -208,13 +208,13 @@ pub unsafe extern "C" fn s90_bridge_load_panel(bridge: *mut Bridge) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_candidate_count(bridge: *mut Bridge) -> usize {
+pub unsafe extern "C" fn hajime_bridge_candidate_count(bridge: *mut Bridge) -> usize {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(0, |bridge| bridge.candidates.len())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_candidate(bridge: *mut Bridge, index: usize) -> *const c_char {
+pub unsafe extern "C" fn hajime_bridge_candidate(bridge: *mut Bridge, index: usize) -> *const c_char {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }
         .and_then(|bridge| bridge.candidates.get(index))
@@ -222,7 +222,7 @@ pub unsafe extern "C" fn s90_bridge_candidate(bridge: *mut Bridge, index: usize)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_selected(bridge: *mut Bridge) -> i32 {
+pub unsafe extern "C" fn hajime_bridge_selected(bridge: *mut Bridge) -> i32 {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }
         .and_then(|bridge| bridge.panel.selected)
@@ -231,13 +231,13 @@ pub unsafe extern "C" fn s90_bridge_selected(bridge: *mut Bridge) -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_note(bridge: *mut Bridge) -> *const c_char {
+pub unsafe extern "C" fn hajime_bridge_note(bridge: *mut Bridge) -> *const c_char {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(ptr::null(), |bridge| bridge.note.as_ptr())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn s90_bridge_hints(bridge: *mut Bridge) -> *const c_char {
+pub unsafe extern "C" fn hajime_bridge_hints(bridge: *mut Bridge) -> *const c_char {
     // SAFETY: 呼ぶ側の約束どおり
     unsafe { self::bridge(bridge) }.map_or(ptr::null(), |bridge| bridge.hints.as_ptr())
 }

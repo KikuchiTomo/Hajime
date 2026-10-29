@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         入力した文章そのものは，再現に要る部分だけを書いてください．パスワードや個人の情報は書かないでください．
-        脆弱性は [非公開の報告](https://github.com/KikuchiTomo/s90.tokyo-IME/security/advisories/new) から送ってください．
+        脆弱性は [非公開の報告](https://github.com/KikuchiTomo/Hajime/security/advisories/new) から送ってください．
   - type: textarea
     id: what-happened
     attributes:
@@ -44,7 +44,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: s90.tokyo IME のバージョンかコミット
+      label: はじめのバージョンかコミット
   - type: input
     id: app
     attributes:

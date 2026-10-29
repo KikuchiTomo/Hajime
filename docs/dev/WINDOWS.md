@@ -6,22 +6,22 @@
 
 | プロセス | 置き場所 | 言語 | 役割 |
 |---|---|---|---|
-| `s90_tsf.dll` | `apps/windows/crates/tsf` | Rust | TSF のテキストサービス．キーをエンジンに送り，返った操作で入力欄を更新する．32 ビットと 64 ビットの 2 つを入れる |
-| `s90-engine-host.exe` | `core/Sources/s90-engine-host` | Swift | core の `InputSession` を動かす．ログオンのたびに 1 つ動く(`HKLM\...\Run`) |
-| `s90-candidate-ui.exe` | `apps/windows/crates/candidate-ui` | Rust | 候補の一覧・分岐図・案内・モードの札・手書きの窓を Direct2D で描く．エンジンが立ち上げる |
-| `s90-settings.exe` | `apps/windows/crates/settings` | Rust | 設定の画面．設定の読み書きはエンジンに頼む |
+| `hajime_tsf.dll` | `apps/windows/crates/tsf` | Rust | TSF のテキストサービス．キーをエンジンに送り，返った操作で入力欄を更新する．32 ビットと 64 ビットの 2 つを入れる |
+| `hajime-engine-host.exe` | `core/Sources/hajime-engine-host` | Swift | core の `InputSession` を動かす．ログオンのたびに 1 つ動く(`HKLM\...\Run`) |
+| `hajime-candidate-ui.exe` | `apps/windows/crates/candidate-ui` | Rust | 候補の一覧・分岐図・案内・モードの札・手書きの窓を Direct2D で描く．エンジンが立ち上げる |
+| `hajime-settings.exe` | `apps/windows/crates/settings` | Rust | 設定の画面．設定の読み書きはエンジンに頼む |
 
 ```
-アプリのプロセス              s90-engine-host                 s90-candidate-ui
+アプリのプロセス              hajime-engine-host                 hajime-candidate-ui
 ┌──────────────┐  key など   ┌────────────────────┐  UiCommand  ┌──────────────┐
-│ s90_tsf.dll  │────────────→│ EngineService      │────────────→│ 候補ウィンドウ │
+│ hajime_tsf.dll  │────────────→│ EngineService      │────────────→│ 候補ウィンドウ │
 │              │←────────────│  └ InputSession    │             └──────────────┘
-└──────────────┘  edit       │ FileSettingsStore  │←──── s90-settings.exe(readSettings・writeSettings)
+└──────────────┘  edit       │ FileSettingsStore  │←──── hajime-settings.exe(readSettings・writeSettings)
                              └────────────────────┘
 ```
 
 - 判断はすべて core にある．DLL はキーを `KeyInput` に置き換え，返った `EditOperation`(確定・組み立て中の文字・モード)を入力欄に反映するだけ
-- `ClientAction` をどのプロセスが受け持つかは `S90IPC` の `RoutedActions` が決める
+- `ClientAction` をどのプロセスが受け持つかは `HajimeIPC` の `RoutedActions` が決める
 - `OnTestKeyDown` はエンジンに問い合わせない．応答に入っている `SessionState`(組み立て中か，モード，今の状態で受け取るキー)の写しで答える
 - 打鍵が止まったときの表示の切り替えと打ち間違いの見直しは，エンジンが待つ時間を返し，DLL がタイマーで `wake` を送る
 - DLL はキーの返事を `keyResponseMilliseconds`(50ms)まで待ち，間に合わなければタイマーで後から反映する．変換のキー(Space・変換)だけは `conversionResponseMilliseconds`(250ms)まで待つ．Zenzai で文全体を変換し直すので CPU では 100ms ほどかかり，後から反映すると変換が出るまでに間が空くため
@@ -44,7 +44,7 @@
 
 1. 手書き入力のキーで，エンジンが窓を開いたセッションを覚え，候補ウィンドウに `showHandwriting` を送る
 2. 線を書き終えて少し待つと(`DefaultSettings.handwritingRecognitionDelay`)，Windows の手書き認識(`Windows.UI.Input.Inking`)で読み，候補を並べる．日本語の認識器が無ければ案内を出す
-3. 候補を押すと，候補ウィンドウはエンジンのパイプにつないで `handwritingChosen` を送る．エンジンはこの要求を，実行ファイルが `s90-candidate-ui.exe` の接続からだけ受ける
+3. 候補を押すと，候補ウィンドウはエンジンのパイプにつないで `handwritingChosen` を送る．エンジンはこの要求を，実行ファイルが `hajime-candidate-ui.exe` の接続からだけ受ける
 4. DLL はエンジンから押し込まれる口を持たないので，窓を開いているあいだエンジンは短い間隔の `wakeAfterMilliseconds` を返し，DLL の `wake` で選んだ文字を `commit` にして返す．窓を閉じるか，入力先から外れたら(`deactivate`)取りに来るのをやめる
 
 ## Windows で使わないもの
@@ -64,8 +64,8 @@ Windows でも trait `Zenzai` を入れてビルドする．llama.cpp は上流�
 | ジョブ | 内容 |
 |---|---|
 | `rust-windows`(ci-windows) | `apps/windows` の `cargo fmt --check`・`clippy`・`test`．候補ウィンドウの見本を PNG に書き出して成果物 `candidate-ui-snapshots` にする．DLL の公開する関数が 4 つだけかを `tools/windows/check_exports.ps1` で確かめる |
-| `core-windows`(ci-windows) | core と `s90-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
-| `package-windows`(package-windows) | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `s90.tokyo-IME-<バージョン>.msi` を作る |
+| `core-windows`(ci-windows) | core と `hajime-engine-host` を Zenzai 入りで Windows でビルドし，core のテスト(名前付きパイプの往復を含む)を動かす |
+| `package-windows`(package-windows) | release でビルドし，`tools/windows/stage.ps1` で llama.cpp の DLL と Zenzai のモデルと一緒に集めて，WiX で `Hajime-<バージョン>.msi` を作る |
 
 Windows 向けの Rust のコードは，Mac でも型の検査まではできる．rustup で `x86_64-pc-windows-msvc` の標準ライブラリを入れ，`apps/windows` で `cargo clippy --target x86_64-pc-windows-msvc -p candidate-ui --all-targets` を動かす(リンクはしない)．
 
@@ -81,11 +81,11 @@ Windows の機械で試すときは，`package-windows` のジョブが作る MS
 - glass は，Windows 11 で DWM の背景(`DWMSBT_TRANSIENTWINDOW`)を使えるときだけ地をすりガラスにする．このときは角の丸み・縁・影も OS が描く．使えないとき(Windows 10・ハイコントラスト)は `glass.light`・`glass.dark` の色で地を塗る
 - 選択の色は Windows のアクセントカラー(`AccentPalette`)．ライト・ダークは `AppsUseLightTheme`，「コントラストを上げる」はハイコントラスト，動きを止めるのは「アニメーション効果」がオフのとき
 - ナレーターが動いているときは，選んでいる候補(文字種)・注目している文節・案内を UI オートメーションの知らせ(`UiaRaiseNotificationEvent`)で読み上げてもらう．同じ文は続けて読ませない
-- 見本の画像は，デバッグビルドの `s90-candidate-ui.exe --render-snapshots <ディレクトリ>` で macOS と同じ名前(`list-glass-light.png` など)で書き出す
+- 見本の画像は，デバッグビルドの `hajime-candidate-ui.exe --render-snapshots <ディレクトリ>` で macOS と同じ名前(`list-glass-light.png` など)で書き出す
 
 ## 設定の画面の速さ
 
-`s90-settings.exe --measure <ファイル>` で測る(窓はふつうに出し，測り終えたら閉じる)．2026-10-27 に手元の PC(DPI 100%)で測った値:
+`hajime-settings.exe --measure <ファイル>` で測る(窓はふつうに出し，測り終えたら閉じる)．2026-10-27 に手元の PC(DPI 100%)で測った値:
 
 | 項目 | 値 |
 |---|---|
@@ -101,10 +101,10 @@ Windows の機械で試すときは，`package-windows` のジョブが作る MS
 ADR [0015](adr/0015-windows-setup-wizard.md)．macOS 版はまだ無いので，Windows 版もリリースしない．
 
 - **再起動**: インストーラーは入れ終えたら(上書きでも)`ScheduleReboot` で再起動を求める．確認は Windows Installer の標準のもので，自前の画面は作らない．文字入力のサービスの DLL は，起動しているアプリには読み込まれないため
-- **起動**: HKLM の `Run` に `s90-settings.exe --setup-if-needed` を入れる．ログオンのたびに起動し，済んでいれば(HKCU `Software\s90.tokyo\IME` の `SetupCompleted` が 1)窓を出さずにすぐ終わる．済んだことはエンジンの設定のファイルには書かない(利用者ごと・PC ごとの記録で，同期しない)
+- **起動**: HKLM の `Run` に `hajime-settings.exe --setup-if-needed` を入れる．ログオンのたびに起動し，済んでいれば(HKCU `Software\haji.men\IME` の `SetupCompleted` が 1)窓を出さずにすぐ終わる．済んだことはエンジンの設定のファイルには書かない(利用者ごと・PC ごとの記録で，同期しない)
 - **開き直す**: 設定の画面の「情報」の「初期設定をやり直す」で，同じ実行ファイルを `--setup` で起動する．ウィザードの窓がもうあれば開かない
 - **作り**: `crates/settings` の `wizard.rs`(ページと選ぶ値．OS に依らない)，`demo.rs`(実演の台本)，`app/wizard.rs`(窓)．値はページを離れるときにエンジンに書く(`SettingsModel::set_all`)．「あとで」・窓を閉じたときは済んだことにしない(次のログオンでまた出す)．「完了」「設定を開く」で済んだことにする
-- **見本の撮影**: `s90-settings.exe --setup --offline --theme dark --step window` のように開く．`--offline` はエンジンにつながず見本の値で開き，値も済んだことも書かない．`--step` はページの名前(`welcome`・`switch`・`characters`・`liveconversion`・`window`・`focus`・`correction`・`features`・`appearance`・`done`)
+- **見本の撮影**: `hajime-settings.exe --setup --offline --theme dark --step window` のように開く．`--offline` はエンジンにつながず見本の値で開き，値も済んだことも書かない．`--step` はページの名前(`welcome`・`switch`・`characters`・`liveconversion`・`window`・`focus`・`correction`・`features`・`appearance`・`done`)
 - **CPU**: 止まっているコマのあいだは時計で次のコマを待つ．手元の PC で，最後のページ(動かない)は 10 秒で CPU 0ms，候補の窓の実演を繰り返すページは 10 秒で約 140ms だった
 
 ## 決まっていないこと・まだ無いもの

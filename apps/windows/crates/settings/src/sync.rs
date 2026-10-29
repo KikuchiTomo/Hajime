@@ -142,8 +142,8 @@ mod tests {
     fn status() -> SyncStatus {
         SyncStatus {
             is_enabled: true,
-            folder_path: Some("C:\\Dropbox\\s90".into()),
-            folder_name: Some("s90".into()),
+            folder_path: Some("C:\\Dropbox\\hajime".into()),
+            folder_name: Some("hajime".into()),
             groups: vec![
                 SyncGroupState {
                     group: "input".into(),
@@ -172,7 +172,7 @@ mod tests {
     fn 同期の状態を部品の値にする() {
         let values = values(&status());
         assert_eq!(values[ENABLED], Value::Bool(true));
-        assert_eq!(values[FOLDER], Value::String("s90".into()));
+        assert_eq!(values[FOLDER], Value::String("hajime".into()));
         assert_eq!(values[PROBLEM], Value::String(PROBLEM_FAILED.into()));
         assert_eq!(
             values["sync.scope.appearance"],

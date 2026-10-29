@@ -8,7 +8,7 @@ publish.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "s90-candidate-ui"
+name = "hajime-candidate-ui"
 path = "src/main.rs"
 
 [dependencies]

@@ -17,11 +17,11 @@
 
 | スキル | 使いどころ |
 |---|---|
-| `s90-architecture` | 置き場所・層・依存の向き・SOLID/DRY |
-| `s90-security` | 入力内容・保存・通信・IPC・unsafe・依存・CI |
-| `s90-swift` | Swift(core と macOS) |
-| `s90-windows` | Rust(TSF と Windows のプロセス) |
-| `s90-design` | 見た目とデザイントークン |
-| `s90-docs` | ドキュメント・ADR・仕様 |
-| `s90-review` | コミットや PR の前のレビュー |
-| `s90-upstream-port` | azooKey の fork からの持ち込み |
+| `hajime-architecture` | 置き場所・層・依存の向き・SOLID/DRY |
+| `hajime-security` | 入力内容・保存・通信・IPC・unsafe・依存・CI |
+| `hajime-swift` | Swift(core と macOS) |
+| `hajime-windows` | Rust(TSF と Windows のプロセス) |
+| `hajime-design` | 見た目とデザイントークン |
+| `hajime-docs` | ドキュメント・ADR・仕様 |
+| `hajime-review` | コミットや PR の前のレビュー |
+| `hajime-upstream-port` | azooKey の fork からの持ち込み |

@@ -1,14 +1,14 @@
 #![forbid(unsafe_code)]
 
-//! 画面に出す文言．macOS の設定の画面(apps/macos/S90IME/UI/UIStrings.swift)と同じ文言を，同じまとまりの名前で置く．
+//! 画面に出す文言．macOS の設定の画面(apps/macos/Hajime/UI/UIStrings.swift)と同じ文言を，同じまとまりの名前で置く．
 //! Windows で言い方が違うもの(キーの名前，Mac と PC など)だけを変える
 
 /// UIStrings.Settings
 pub mod settings {
-    pub const WINDOW_TITLE: &str = "s90.tokyo IME の設定";
+    pub const WINDOW_TITLE: &str = "はじめの設定";
     pub const IMPORT_DICTIONARY: &str = "インポート…";
     pub const EXPORT_DICTIONARY: &str = "エクスポート…";
-    pub const EXPORT_FILE_NAME: &str = "s90-user-dictionary.txt";
+    pub const EXPORT_FILE_NAME: &str = "hajime-user-dictionary.txt";
     pub const IMPORT_FAILED: &str =
         "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません";
     pub const EXPORT_FAILED: &str = "エクスポートできませんでした";
@@ -222,7 +222,7 @@ pub mod more {
     pub const ADD_APPS: &str = "アプリを追加…";
     pub const IMPORT_CSV: &str = "CSV をインポート…";
     pub const EXPORT_CSV: &str = "CSV をエクスポート…";
-    pub const EXPORT_CSV_FILE_NAME: &str = "s90-exclusions.csv";
+    pub const EXPORT_CSV_FILE_NAME: &str = "hajime-exclusions.csv";
     pub fn imported_rules(count: u32) -> String {
         format!("{count} 件を追加しました")
     }
@@ -230,16 +230,16 @@ pub mod more {
     pub const BACKUP_NOTE: &str = "すべての設定を JSON としてインポート・エクスポート可能です。";
     pub const EXPORT_SETTINGS: &str = "設定をエクスポート…";
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
-    pub const EXPORT_SETTINGS_FILE_NAME: &str = "s90-settings.json";
+    pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
     pub const SETTINGS_IMPORT_FAILED: &str =
-        "読み込めませんでした。s90.tokyo IME の設定ファイルではないか、大きすぎます";
+        "読み込めませんでした。はじめの設定ファイルではないか、大きすぎます";
     pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
     pub const ABOUT: &str = "情報";
     pub const VERSION: &str = "バージョン";
     pub const ACKNOWLEDGEMENTS: &str = "謝辞";
     pub const ACKNOWLEDGEMENTS_NOTE: &str =
-        "s90.tokyo IME は上記のソフトウェア・モデル・データを利用しています。";
+        "はじめは上記のソフトウェア・モデル・データを利用しています。";
     pub const NOTICES_MISSING: &str = "謝辞のファイルが見つかりません";
 
     pub fn seconds(value: f64) -> String {
@@ -609,7 +609,7 @@ pub mod windows {
         "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。";
     /// 見分け方の決まりが無いとき(macOS は空の一覧を出すだけ)
     pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
-    /// 変換エンジン(s90-engine-host)に設定を頼めないとき
+    /// 変換エンジン(hajime-engine-host)に設定を頼めないとき
     pub const ENGINE_UNAVAILABLE: &str = "変換エンジンが動いていないため、設定を読み込めません";
     /// 変換エンジンにつながらないときの案内(設定の画面がエンジンを起動し，つながるまでつなぎ直す)
     pub const ENGINE_UNAVAILABLE_DETAIL: &str =
@@ -618,7 +618,7 @@ pub mod windows {
 
 /// 初期設定ウィザード(Windows だけ．macOS 版はまだ無い)
 pub mod wizard {
-    pub const WINDOW_TITLE: &str = "s90.tokyo IME の初期設定";
+    pub const WINDOW_TITLE: &str = "はじめの初期設定";
     pub const RECOMMENDED: &str = "推奨";
     pub const BACK: &str = "戻る";
     pub const NEXT: &str = "次へ";
@@ -639,7 +639,7 @@ pub mod wizard {
     }
 
     pub const WELCOME_TITLE: &str = "ようこそ";
-    pub const WELCOME_TEXT: &str = "s90.tokyo IME をインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
+    pub const WELCOME_TEXT: &str = "はじめをインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
     pub const SWITCH_TITLE: &str = "英語と日本語の切り替え";
     pub const SWITCH_TEXT: &str = "英語と日本語を切り替えるキーを選びます。";
     pub const SWITCH_TOGGLE: &str = "半角/全角キーで切り替える";
@@ -695,7 +695,7 @@ pub mod wizard {
     pub const APPEARANCE_TITLE: &str = "外観";
     pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
     pub const DONE_TITLE: &str = "準備ができました";
-    pub const DONE_TEXT: &str = "選んだ設定で使い始められます。設定はあとから「s90.tokyo IME の設定」でいつでも変えられます。タスクバーの入力モードのアイコンを右クリックしても開けます。";
+    pub const DONE_TEXT: &str = "選んだ設定で使い始められます。設定はあとから「はじめの設定」でいつでも変えられます。タスクバーの入力モードのアイコンを右クリックしても開けます。";
 
     /// 候補ウィンドウの足元の案内(実演)
     pub const HINTS: &[(&str, &str)] = &[("↓", "候補"), ("←→", "文節"), ("Shift+↑", "連想")];

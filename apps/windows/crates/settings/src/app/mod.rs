@@ -17,7 +17,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 /// 設定の画面と同じフォルダに置いたエンジン
-const ENGINE_FILE: &str = "s90-engine-host.exe";
+const ENGINE_FILE: &str = "hajime-engine-host.exe";
 /// エンジンはコンソールのアプリなので，窓を出さずに起動する
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 

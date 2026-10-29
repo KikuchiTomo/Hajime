@@ -1,6 +1,6 @@
 # 要件
 
-s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs/<id>-*.md`)はここにある ID を参照して書きます．
+はじめが満たす要件の一覧です．機能の仕様書(`docs/specs/<id>-*.md`)はここにある ID を参照して書きます．
 受け入れ条件は，テストか手動の確認手順に落とせる粒度で書きます．
 
 対象は macOS と Windows です．Linux などは後で足す前提で，プラットフォームに依存しない部分を `core/` に寄せます(`docs/dev/ARCHITECTURE.md`)．
@@ -12,7 +12,7 @@ s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs
 - 受け入れ条件
   - ローマ字・かな入力のどちらでも動く
   - 1 キーの処理(ライブ変換を含む)は，p95 で 50ms 以内．打鍵の間隔(速い人で 170ms 前後)より十分に短くする
-    - 2026-10-26 の計測(Apple Silicon，Release，30 字ほどの文．`core/Tests/S90EngineTests/LatencyProbeTests.swift`): Zenzai なしで p50 18ms，p95 30ms．Zenzai ありで p50 20ms，p95 34ms
+    - 2026-10-26 の計測(Apple Silicon，Release，30 字ほどの文．`core/Tests/HajimeEngineTests/LatencyProbeTests.swift`): Zenzai なしで p50 18ms，p95 30ms．Zenzai ありで p50 20ms，p95 34ms
     - 2026-10-26 の再計測(72 キー，nn を含む文．絵文字の辞書を変換のたびに作らないようにしたあと): Zenzai ありで p50 0.8ms，p95 14ms．評価用の文の 1 回の変換は中央値 16ms(前は 37ms)
     - Zenzai のような重い変換を入れて間に合わなくなったら，読みのまま表示して結果が出たら置き換える形にする
   - 句読点・Enter・Space で，表示中の結果を確定または候補選択に移れる
@@ -20,7 +20,7 @@ s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs
 - 打っている途中の見せ方(`LiveConversionRule`)
   - 打鍵が続くあいだは，3 文字に満たない読みと，読みが 3 文字以下の末尾の語をかなのまま見せる(「らい」を「雷」にしない)
   - 打鍵が 0.4 秒止まったとき，Space・Enter のときは，変換した文をそのまま見せる．Enter は変換した文を確定する
-  - 評価用の文(`core/Evaluation/conversion-basic.tsv`，Zenzai あり)で，確定する文と食い違う漢字やカタカナを見せた途中表示は 240 時点中 50 から 23 に減った(`s90-playground --evaluate-live`)
+  - 評価用の文(`core/Evaluation/conversion-basic.tsv`，Zenzai あり)で，確定する文と食い違う漢字やカタカナを見せた途中表示は 240 時点中 50 から 23 に減った(`hajime-playground --evaluate-live`)
 
 ## R-02 タイプミスの自動補正
 
@@ -32,13 +32,13 @@ s90.tokyo IME が満たす要件の一覧です．機能の仕様書(`docs/specs
   - 日本語のローマ字の打ち間違い: `konnnitiha` の `nnn` のような重複，隣のキーの押し間違い，母音の打ち間違い(`kyounotenkihayoudesune` → 今日の天気は良いですね)
 - 日本語の打ち間違いの直し方
   - ライブ変換で打鍵が `DefaultSettings.liveCorrectionDelay`(0.8 秒)止まったときと，Space で変換を始めるときに，Zenzai で打ったキー全体を見直す．打鍵ごとには見直さない(1 文 0.1〜0.7 秒かかるため)
-  - 打ち間違いの種類: 近くのキーの押し間違い，余分なキー，2 つのキーの入れ替わり(azooKey の訂正)に加え，s90 の azooKey のフォークで，ローマ字の母音の取り違え(`onagai` → お願い)，同じキーの重なり(`koonnnitiha`)，余分な母音(`tututa` → 釣った)，打ち忘れ(母音と，同じキーの 2 回目．`haitenki` → いい天気)を扱う．文の末尾の重なりはフォークの訂正が扱わないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
+  - 打ち間違いの種類: 近くのキーの押し間違い，余分なキー，2 つのキーの入れ替わり(azooKey の訂正)に加え，はじめの azooKey のフォークで，ローマ字の母音の取り違え(`onagai` → お願い)，同じキーの重なり(`koonnnitiha`)，余分な母音(`tututa` → 釣った)，打ち忘れ(母音と，同じキーの 2 回目．`haitenki` → いい天気)を扱う．文の末尾の重なりはフォークの訂正が扱わないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
   - 誤りの種類を決め打ちしない訂正(`KeyEditSearch`): 打ったキーの 1 か所を，どのキーとの取り違え・打ち忘れ・余分な 1 打・隣どうしの入れ替えに変えた並びを全部作る．変わったところの前後の変換のもっともらしさで上位 `DefaultSettings.keyEditCandidateCount` 件に絞り，Zenzai で採点して上の訂正の候補と合わせる．音の変わらない書き誤り(ず/づ・じ/ぢ・わ/は・え/へ・お/を・おう/おお)は聞いたとおりに書いた誤りとして手間を小さくする(`見ずらい` → 見づらい，`いいずらい` → 言いづらい，`とうり` → 通り)．前に見直した部分は探し直さない
   - 直すかどうかは，言語モデルの点数・読みを変換したときのもっともらしさの差・手間を合わせた点数(`ReadingCorrection.rank`．重みは `DefaultSettings.correctionPlausibilityWeight`・`correctionCostWeight`)で比べる．言語モデルはかなの並びを見るので書き分けの誤りを見分けにくく，変換のもっともらしさで補う．重みと境目は評価の文で，正しい文を誤って直さない範囲で直せる文が最も多くなるように決めた
   - 直した読みが打ったままの読みより十分にもっともらしいとき(点数の差が `DefaultSettings.readingCorrectionMargin` 以上)は直して見せる．差がそれより小さく `DefaultSettings.readingSuggestionMargin` 以上なら直さず「もしかして」と示し，Tab で直せるようにする(打ち間違いと決めつけない)
   - 直したときは点線の下線と，入力位置の下の案内で知らせ，Esc で打ったままの読みに戻す．戻したキーのあいだは直し直さない
   - 訂正は探す幅 16 で求める．1 文に 0.2〜2.8 秒(中央値 1.1 秒，Release，Apple M1 Pro)かかるので，表示に使う変換器とは別の変換器でメインスレッドの外で求め(`ZenzaiTypoService`)，求め終わったときに打ったキーが変わっていなければ見直す．Space で変換するときに求め終わっていなければ，待たずに直さず変換する
-  - `core/Evaluation/typo-correction.tsv` で測る(`s90-playground --evaluate-typo`)．2026-10-26 の結果: 打ち間違いの無い 20 文で誤って直した・示したのは 0，打ち間違いのある 16 文で正しく直したのは 14(探す幅 4 では 10，8 では 11)．書き誤り・キーの打ち間違いの文を足した 83 文(正しい 45・打ち間違い 38)では，`KeyEditSearch` を入れる前は誤って直した 1・違う文に直した・示した 7・正しく直した 20・示した 3，入れたあとは誤って直した 0・違う文に直した・示した 2・正しく直した 22・示した 3
+  - `core/Evaluation/typo-correction.tsv` で測る(`hajime-playground --evaluate-typo`)．2026-10-26 の結果: 打ち間違いの無い 20 文で誤って直した・示したのは 0，打ち間違いのある 16 文で正しく直したのは 14(探す幅 4 では 10，8 では 11)．書き誤り・キーの打ち間違いの文を足した 83 文(正しい 45・打ち間違い 38)では，`KeyEditSearch` を入れる前は誤って直した 1・違う文に直した・示した 7・正しく直した 20・示した 3，入れたあとは誤って直した 0・違う文に直した・示した 2・正しく直した 22・示した 3
 - 英語の混ざる読み
   - 打ったとおりの英単語(「python」)と Shift で打った英字(「IME」)は，日本語の打ち間違いの見直しに含めない．見直すのは最後の英単語より後ろの日本語だけ(`Composition.boundaryAfterEnglish`)．英単語の綴りは英単語の補正(`EnglishWordCorrector`)の受け持ち．綴りを直した英単語(「sride」→「bride」)は日本語の打ち間違いを取り違えたことがあるので，見直しで読み直せるようにしておく
   - ローマ字として読めてしまう英単語(「gitwotukau」の「git」)は，英単語の終わりがローマ字の綴りの途中にかかり，後ろが助詞や「する」「です」で始まり，後ろだけを日本語として読んだもっともらしさから `DefaultSettings.wordReadAsRomajiCost` を引いても全体を日本語として読むより高いときに英単語にする(`TypoCorrectionRule.readsAsEnglish`)．「kitto」(きっと)・「kite」(来て)は日本語のまま．辞書を引く回数を抑えるため，ローマ字として読める部分は打鍵が止まったときと変換・確定の前にだけ調べ，読めない並びを含む部分(「react」+「wo」)は打鍵ごとに調べる
@@ -85,7 +85,7 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
   - 見分け方(`WordLanguageJudge` の `englishFirst`): 利用者の「いつも英語」「いつも日本語」の語と見分け方の決まり → ローマ字として読めなければ英語 → 英語の辞書にない語は，読みを変換したもっともらしさ(1 文字あたり `DefaultSettings.minimumJapanesePlausibilityPerCharacter` 以上)なら日本語 → 英語にも日本語にも読める語(`make`・`shine`)は前の語で見分ける(前が英語なら英語，日本語なら日本語．前は入力位置の前の文字列，読めないアプリでは前に確定した語) → 手がかりが無ければ英語
   - Zenzai の点数(`languageModelScores`)は使わない．1 語ごとに打鍵のたびに見分けるので，Zenzai を回すと 1 キーの処理が間に合わない(R-01)．軽い変換のもっともらしさ(`plausibility`)だけを使う
   - 打鍵ごとに見分ける(語は 4 文字から．短い語に日本語を出さない)．日本語にして見せている語は Space と Enter で日本語を確定し(空白や改行は入れない)，Esc で英字に戻す．英字を見せている語は英語の入力と同じに動く．Tab で分岐図を開いて変換を選べる
-  - 評価(`core/Evaluation/english-auto.tsv`，`s90-playground --evaluate-language`): 2026-10-26 の結果は 20 文中 19 文．誤った 1 文は「i love sushi」の sushi を日本語にした(評価で使う英語の辞書 `/usr/share/dict/words` に sushi が無いため．macOS のスペルチェッカーでは英語の辞書にある)
+  - 評価(`core/Evaluation/english-auto.tsv`，`hajime-playground --evaluate-language`): 2026-10-26 の結果は 20 文中 19 文．誤った 1 文は「i love sushi」の sushi を日本語にした(評価で使う英語の辞書 `/usr/share/dict/words` に sushi が無いため．macOS のスペルチェッカーでは英語の辞書にある)
 - 英語にも日本語にも読める語の扱いは，ローマ字入力でも使う(R-02)．ローマ字入力では前が英語のときと，利用者が英語にすると決めた語だけを英語にする(`japaneseFirst`)
 - 不適切な語(「しね」→「死ね」)は，第 1 候補に出さない(`SupplementedConverter`．設定で切れる)．英字入力(自動)では前が日本語でなければ日本語にしない
 - 受け入れ条件

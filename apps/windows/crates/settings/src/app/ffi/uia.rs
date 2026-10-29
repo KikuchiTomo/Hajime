@@ -359,7 +359,7 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             UIA_IsEnabledPropertyId => variant_bool(node.enabled),
             UIA_HasKeyboardFocusPropertyId => variant_bool(node.focused),
             UIA_IsKeyboardFocusablePropertyId => variant_bool(node.enabled),
-            UIA_AutomationIdPropertyId => variant_text(&format!("s90.settings.{}", node.id)),
+            UIA_AutomationIdPropertyId => variant_text(&format!("hajime.settings.{}", node.id)),
             _ => VARIANT::default(),
         })
     }
