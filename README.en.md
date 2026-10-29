@@ -1,4 +1,6 @@
-# Hajime
+<p align="center">
+  <img src="docs/assets/hajime-logo.png" alt="Hajime" width="560">
+</p>
 
 [![macOS](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true)
 [![Windows](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true)
