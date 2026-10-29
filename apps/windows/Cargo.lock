@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "candidate-ui"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "ipc",
  "tokens",
@@ -17,7 +17,7 @@ dependencies = [
 
 [[package]]
 name = "ipc"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "serde",
  "serde_json",
@@ -100,7 +100,7 @@ dependencies = [
 
 [[package]]
 name = "settings"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "candidate-ui",
  "ipc",
@@ -156,11 +156,11 @@ dependencies = [
 
 [[package]]
 name = "tokens"
-version = "0.1.8"
+version = "0.1.9"
 
 [[package]]
 name = "tsf"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "ipc",
  "windows",
