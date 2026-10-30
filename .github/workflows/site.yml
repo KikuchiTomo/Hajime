@@ -1,0 +1,124 @@
+name: Site
+
+# 公式サイト(apps/docs-site)をビルドし，main なら Cloudflare Workers の静的アセットとして置く(apps/docs-site/wrangler.jsonc)．
+# 本文は docs/user から読むので，そこが変わったときも動かす．リリースを出したときはダウンロードのリンクを新しい版にするために動かす．
+# 手で動かすとき: gh workflow run site.yml --ref main
+#
+# 秘密の値は environment「cloudflare」にだけ置き，main からしか使えないようにする(リポジトリの Settings > Environments)．
+#   secrets.CLOUDFLARE_API_TOKEN  Account > Workers Scripts > Edit だけの API トークン
+#   secrets.CLOUDFLARE_ACCOUNT_ID Cloudflare のアカウント ID
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/docs-site/**
+      - docs/user/**
+      - .github/workflows/site.yml
+  pull_request:
+    paths:
+      - apps/docs-site/**
+      - docs/user/**
+      - .github/workflows/site.yml
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # PR は新しいコミットが来たら古いビルドを止める．公開は途中で止めず，順に行う
+  group: site-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  HUGO_VERSION: 0.168.0
+  # hugo_extended_<版>_linux-amd64.tar.gz の SHA-256(公式の hugo_<版>_checksums.txt と同じ値)
+  HUGO_SHA256: 787f100057328824f38c6ad7c87ff10d6451ae0a7bc39cedaad0dd2bcde17e53
+
+jobs:
+  build:
+    # 秘密の値を使わない．fork の PR でもここだけ動く
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # リリースのときはタグではなく main のサイトを作る
+          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || '' }}
+
+      # Hugo Modules(Hextra の取得)に Go を使う．版は apps/docs-site/go.mod に合わせる
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/docs-site/go.mod
+          cache: false
+
+      - name: Hugo を入れる
+        run: |
+          archive="hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${archive}"
+          echo "${HUGO_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/hugo"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/hugo" hugo
+          echo "$RUNNER_TEMP/hugo" >> "$GITHUB_PATH"
+
+      - name: ビルドする
+        env:
+          # 最新のリリースを読むためだけに使う(contents: read)．出力には書き込まない
+          HUGO_GITHUB_TOKEN: ${{ github.token }}
+          HUGO_ENVIRONMENT: production
+          # Hextra の版は go.sum で確かめる
+          GOFLAGS: -mod=readonly
+        run: make site SITE_OUT="$RUNNER_TEMP/site"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site
+          path: ${{ runner.temp }}/site
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy-cloudflare:
+    needs: build
+    if: github.event_name == 'release' || (github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: cloudflare
+      url: https://haji.men
+    steps:
+      # wrangler の版(package-lock.json)と配信の設定(wrangler.jsonc)だけを取り出す
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || '' }}
+          sparse-checkout: |
+            apps/docs-site/package.json
+            apps/docs-site/package-lock.json
+            apps/docs-site/wrangler.jsonc
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: site
+          # wrangler.jsonc の assets.directory
+          path: apps/docs-site/public
+
+      - name: wrangler を入れる
+        working-directory: apps/docs-site
+        # 依存のインストールスクリプトは動かさない(Worker のコードが無いので bundle せず，要らない)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Cloudflare Workers に置く
+        working-directory: apps/docs-site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: "false"
+        # リリースのときは main をビルドしているので，GITHUB_SHA(タグ)ではなく取り出したコミットを記録する
+        run: |
+          npx --no-install wrangler deploy \
+            --message="$(git rev-parse --short HEAD)"

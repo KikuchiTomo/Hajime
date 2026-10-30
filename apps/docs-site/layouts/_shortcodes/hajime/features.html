@@ -1,0 +1,8 @@
+{{- /*
+機能の一覧．中に hajime/feature を並べる．画像のある機能は，説明と画像を左右交互に置く
+@example {{< hajime/features title="機能" >}}{{< hajime/feature title="…" subtitle="…" link="…" image="…" >}}{{< /hajime/features >}}
+*/ -}}
+<section class="hajime-features not-prose">
+  {{- with .Get "title" }}<h2 class="hajime-features__title">{{ . }}</h2>{{ end }}
+  {{- .Inner -}}
+</section>

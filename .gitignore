@@ -31,3 +31,10 @@ secrets/
 *.pfx
 *.pem
 .env
+
+# 公式サイトのビルドの出力
+apps/docs-site/public/
+apps/docs-site/resources/
+apps/docs-site/.hugo_build.lock
+apps/docs-site/node_modules/
+apps/docs-site/.wrangler/

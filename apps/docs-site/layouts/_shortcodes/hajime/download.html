@@ -1,0 +1,21 @@
+{{- /*
+最新のリリースから，拡張子が ext の配布物へ直接リンクするボタン．
+@example {{< hajime/download ext="pkg" text="macOS 版をダウンロード" >}}
+*/ -}}
+{{- $ext := .Get "ext" -}}
+{{- $text := .Get "text" -}}
+{{- $style := .Get "style" -}}
+
+{{- $href := "https://github.com/KikuchiTomo/Hajime/releases/latest" -}}
+{{- $version := "" -}}
+{{- $release := partialCached "hajime/latest-release.html" . -}}
+{{- range $release.assets -}}
+  {{- if strings.HasSuffix .name (printf ".%s" $ext) -}}
+    {{- $href = .browser_download_url -}}
+    {{- $version = $release.tag_name -}}
+  {{- end -}}
+{{- end -}}
+
+<a href="{{ $href }}" class="hajime-download not-prose hx:font-medium hx:cursor-pointer hx:px-6 hx:py-3 hx:rounded-full hx:text-center hx:text-white hx:inline-block hx:bg-primary-600 hx:hover:bg-primary-700 hx:hextra-focus-visible hx:dark:bg-primary-600 hx:dark:hover:bg-primary-700 hx:transition-all hx:ease-in hx:duration-200"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
+  {{- $text -}}{{ with $version }}<span class="hajime-download__version">{{ . }}</span>{{ end -}}
+</a>

@@ -1,0 +1,103 @@
+# はじめの公式サイト．本文は docs/ を読み込み，このディレクトリにはコピーしない(docs/site/PLAN.md)
+baseURL: https://haji.men/
+title: はじめ
+locale: ja
+defaultContentLanguage: ja
+hasCJKLanguage: true
+enableRobotsTXT: true
+enableGitInfo: false
+disableKinds: [taxonomy, term]
+
+module:
+  imports:
+    - path: github.com/imfing/hextra
+      # テーマの static(Hextra のロゴとアイコン)は使わない．テンプレートと CSS・JS・翻訳だけを取り込む
+      mounts:
+        - source: layouts
+          target: layouts
+        - source: assets
+          target: assets
+        - source: i18n
+          target: i18n
+        - source: data
+          target: data
+  mounts:
+    # 既定のマウントは mounts を書くと消えるので並べ直す
+    - source: content
+      target: content
+    - source: static
+      target: static
+    - source: layouts
+      target: layouts
+    - source: assets
+      target: assets
+    - source: i18n
+      target: i18n
+    # 利用者向けの文書をそのまま「ドキュメント」の節にする．usage.md のような相対リンクは Hextra が URL に直す
+    - source: ../../docs/user
+      target: content/docs
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+  highlight:
+    noClasses: false
+
+menu:
+  main:
+    - name: ドキュメント
+      pageRef: /docs
+      weight: 1
+    - name: ダウンロード
+      url: https://github.com/KikuchiTomo/Hajime/releases
+      weight: 2
+    - name: 検索
+      weight: 3
+      params:
+        type: search
+    - name: GitHub
+      weight: 4
+      url: https://github.com/KikuchiTomo/Hajime
+      params:
+        icon: github
+
+params:
+  description: macOS・Windows 向けの日本語入力システム．ライブ変換と打ち間違いの補正を，すべて端末の中で処理します．
+
+  navbar:
+    displayTitle: false
+    displayLogo: true
+    logo:
+      path: images/hajime-logo.png
+      dark: images/hajime-logo.png
+      width: 129
+      height: 40
+    width: wide
+
+  page:
+    width: normal
+
+  theme:
+    default: system
+    displayToggle: true
+
+  footer:
+    enable: true
+    displayCopyright: true
+    displayPoweredBy: false
+    width: normal
+
+  search:
+    enable: true
+    type: flexsearch
+    flexsearch:
+      # 日本語は空白で区切られないので，部分一致で引けるようにする
+      index: content
+      tokenize: full
+
+  editURL:
+    enable: true
+    base: https://github.com/KikuchiTomo/Hajime/edit/main/docs/user
+
+  displayUpdatedDate: false
