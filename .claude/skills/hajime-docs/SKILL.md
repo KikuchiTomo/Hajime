@@ -5,7 +5,7 @@ description: はじめのドキュメント(docs/ 以下の使う人向けの文
 
 # ドキュメントの決まり
 
-地図は `docs/README.md`，サイトの計画は `docs/site/PLAN.md`．
+地図は `docs/README.md`．
 
 ## どこに書くか
 
