@@ -7,7 +7,7 @@ description: はじめのインストール，入力ソースの追加，アン�
 
 macOS 14 以降に対応しています．
 
-1. [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true)から `.pkg` をダウンロードし，インストールします．
+1. [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases/latest)から `.pkg` をダウンロードし，インストールします．
 2. 一度ログアウトしてから，ログインし直します．
 3. システム設定 > キーボード > 入力ソース で「+」を押し，日本語の「はじめ」を追加します．
 
@@ -19,7 +19,7 @@ macOS 14 以降に対応しています．
 
 Windows 10 22H2 以降(64 ビット)に対応しています．インストールには管理者の権限が必要です．
 
-1. [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true)から `.msi` をダウンロードし，インストールします．
+1. [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases/latest)から `.msi` をダウンロードし，インストールします．
 2. 一度サインアウトしてから，サインインし直します．
 3. 設定 > 時刻と言語 > 言語と地域 で「日本語」の「言語のオプション」を開き，「キーボードの追加」から「はじめ」を追加します．
 

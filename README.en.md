@@ -2,8 +2,7 @@
   <img src="docs/assets/hajime-logo.png" alt="Hajime" width="560">
 </p>
 
-[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true)
-[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true)
+[![Release](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=v*&sort=semver&label=release)](https://github.com/KikuchiTomo/Hajime/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B%20%7C%20Linux%20(WIP)-lightgrey.svg)
 [![Engine](https://img.shields.io/badge/engine-azooKey%20%2B%20Zenzai-6b4fbb.svg)](https://github.com/azooKey/AzooKeyKanaKanjiConverter)
@@ -33,8 +32,8 @@ Hajime is under active development, and its behavior may change.
 
 | OS | Requirements | Download |
 |---|---|---|
-| macOS | macOS 14 or later | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true) |
-| Windows | Windows 10 22H2 or later (64-bit) | [Latest release](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true) |
+| macOS | macOS 14 or later | [Latest release](https://github.com/KikuchiTomo/Hajime/releases/latest) |
+| Windows | Windows 10 22H2 or later (64-bit) | [Latest release](https://github.com/KikuchiTomo/Hajime/releases/latest) |
 | Linux (WIP) | | Not yet available |
 
 We recommend restarting your PC after installation.
