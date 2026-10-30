@@ -4,7 +4,7 @@ PYTHON ?= python3 -I
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
 
-.PHONY: fetch-models setup check test test-debug test-zenzai tokens protocol settings-catalog build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
 
 setup:
 	mise install
@@ -38,6 +38,15 @@ test-debug:
 test-zenzai:
 	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
 	HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" swift test --package-path core -c release --filter HajimeEngineTests
+
+# 公式サイト(apps/docs-site)．本文は docs/user を読み込む．出力先は make site SITE_OUT=<ディレクトリ> で変えられる
+SITE_OUT ?= $(CURDIR)/apps/docs-site/public
+
+site:
+	cd apps/docs-site && hugo --gc --minify --destination "$(abspath $(SITE_OUT))"
+
+site-serve:
+	cd apps/docs-site && hugo server
 
 build-macos:
 	cd apps/macos && xcodegen generate --quiet && xcodebuild -project Hajime.xcodeproj -scheme Hajime -configuration Release -destination "generic/platform=macOS" -derivedDataPath build build -quiet

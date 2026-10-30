@@ -1,0 +1,19 @@
+{{- /*
+GitHub の最新のリリースを，ビルドのときに 1 度だけ取得する．閲覧する人のブラウザは GitHub の API に触れない．
+CI では HUGO_GITHUB_TOKEN(読み取りだけの GITHUB_TOKEN)を付けて，API の回数の制限にかからないようにする．
+取得できないときは空の dict を返し，呼び出し側はリリースの一覧へのリンクにする．
+リリースを出したらサイトをビルドし直すと，リンクが新しい版になる
+*/ -}}
+{{- $release := dict -}}
+{{- $headers := dict "Accept" "application/vnd.github+json" -}}
+{{- with os.Getenv "HUGO_GITHUB_TOKEN" -}}
+  {{- $headers = merge $headers (dict "Authorization" (printf "Bearer %s" .)) -}}
+{{- end -}}
+{{- with try (resources.GetRemote "https://api.github.com/repos/KikuchiTomo/Hajime/releases/latest" (dict "headers" $headers)) -}}
+  {{- with .Err -}}
+    {{- warnf "最新のリリースを取得できませんでした: %s" . -}}
+  {{- else with .Value -}}
+    {{- $release = . | transform.Unmarshal -}}
+  {{- end -}}
+{{- end -}}
+{{- return $release -}}

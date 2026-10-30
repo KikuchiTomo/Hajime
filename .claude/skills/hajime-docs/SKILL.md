@@ -1,6 +1,6 @@
 ---
 name: hajime-docs
-description: はじめのドキュメント(docs/ 以下の使う人向けの文書・開発者向けの文書・要件・仕様・ADR，README，CONTRIBUTING，SECURITY，コードのコメント，PR の説明)を書く・直すときの決まり．Diátaxis による分け方，frontmatter，将来のドキュメントサイト(Starlight)に載せるための書き方，日本語の文体を含む．Markdown を書くとき，設計を変えて文書の更新が要るとき，ADR や仕様を書くとき，「ドキュメント」「説明を書いて」「README」と言われたときは必ず使う．Use for any documentation, spec, ADR, README or comment writing in this repository.
+description: はじめのドキュメント(docs/ 以下の使う人向けの文書・開発者向けの文書・要件・仕様・ADR，README，CONTRIBUTING，SECURITY，コードのコメント，PR の説明)を書く・直すときの決まり．Diátaxis による分け方，frontmatter，ドキュメントサイト(apps/docs-site)に載せるための書き方，日本語の文体を含む．Markdown を書くとき，設計を変えて文書の更新が要るとき，ADR や仕様を書くとき，「ドキュメント」「説明を書いて」「README」と言われたときは必ず使う．Use for any documentation, spec, ADR, README or comment writing in this repository.
 ---
 
 # ドキュメントの決まり

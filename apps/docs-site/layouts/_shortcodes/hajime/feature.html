@@ -1,0 +1,18 @@
+{{- /*
+機能の 1 項目．title が見出し，subtitle が説明，link は詳しい説明のページ，image は画面の写真(static からのパス)，alt はその説明
+*/ -}}
+{{- $link := .Get "link" -}}
+{{- $href := cond (hasPrefix $link "/") ($link | relURL) $link -}}
+{{- $image := .Get "image" -}}
+<article class="hajime-feature{{ if not $image }} hajime-feature--text{{ end }}">
+  <div class="hajime-feature__body">
+    <h3 class="hajime-feature__name">{{ .Get "title" }}</h3>
+    <p class="hajime-feature__text">{{ .Get "subtitle" }}</p>
+    {{- with $link }}
+    <a class="hajime-feature__more" href="{{ $href }}">詳しく</a>
+    {{- end }}
+  </div>
+  {{- with $image }}
+  <img class="hajime-feature__image" src="{{ . | relURL }}" alt="{{ $.Get "alt" }}" loading="lazy" decoding="async" />
+  {{- end }}
+</article>

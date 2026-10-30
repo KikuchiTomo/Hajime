@@ -1,10 +1,6 @@
 # ドキュメントサイトの計画
 
-まだサイトは作りません．あとで作るときに文書を書き直さずに済むよう，今のうちに置き場所と書き方を決めておきます．
-
-## 公開する場所
-
-`haji.men` を案とします．s90.tokyo のブランドサイトからリンクします．
+公式サイトは `apps/docs-site/` にあり，`https://haji.men` で公開します．s90.tokyo のブランドサイトからリンクします．
 
 ## 載せるもの
 
@@ -17,15 +13,17 @@
 | 開発 | `docs/dev/`，`docs/specs/`，`docs/dev/adr/` | 貢献したい人 |
 | リリースノート | GitHub の Releases から生成 | 更新した人 |
 
-## 生成器
+## 生成器と公開
 
-Astro の Starlight を第一候補とします(ADR 0004)．
+Hugo とテーマの Hextra で作ります．
 
-- Markdown の frontmatter(`title`，`description`)と，日本語・英語の切り替えをそのまま扱える
-- 全文検索(Pagefind)がビルド時に作られ，外部のサービスに頼らない
-- 見た目を CSS の変数で変えられるので，`design/tokens/tokens.json` から生成した変数をそのまま使える
+- `docs/user/` をそのまま「ドキュメント」の節として読み込む．本文をサイトの中にコピーしない
+- 全文検索の索引はビルド時に作り，外部のサービスに頼らない
+- ダウンロードのボタンは，ビルド時に GitHub の最新のリリースを読んで配布物へ直接リンクする
 
-サイトのソースは `apps/docs-site/` に置き，本文は `docs/` を読み込みます．本文をサイトの中にコピーしないためです．
+`make site` でビルドします．出力先は `make site SITE_OUT=<ディレクトリ>` で変えられます．
+main で `apps/docs-site/` か `docs/user/` が変わったときと，リリースを出したときに，`.github/workflows/site.yml` が Cloudflare Workers の静的アセットとして公開します．
+`haji.men` は Cloudflare のダッシュボードで Worker に付けます．
 
 ## 見た目
 

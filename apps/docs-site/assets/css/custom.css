@@ -1,0 +1,208 @@
+/*
+ * ロゴの色からとったサイトの色．試作のあいだはここに置く．
+ * 採用するなら design/tokens/tokens.json に brand として足し，tools/tokens から生成する
+ */
+:root {
+  --hajime-sun-from: #ff8a1f;
+  --hajime-sun-to: #f2240f;
+  --hajime-step-from: #4f7cf7;
+  --hajime-step-via: #8b5cf6;
+  --hajime-step-to: #f04fb4;
+
+  /* Hextra の primary を，ワードマークの朱色にする */
+  --primary-hue: 8deg;
+  --primary-saturation: 90%;
+  --primary-lightness: 50%;
+
+  --hajime-rule: rgb(0 0 0 / 0.12);
+}
+
+.dark {
+  --primary-lightness: 62%;
+  --hajime-rule: rgb(255 255 255 / 0.14);
+}
+
+.hajime-gradient-text {
+  background-image: linear-gradient(90deg, var(--hajime-sun-from), var(--hajime-sun-to) 45%, var(--hajime-step-via) 80%, var(--hajime-step-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ヒーロー: 左に文，右にマーク．狭い画面ではマークを上に小さく出す */
+.hajime-hero {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 2rem;
+  width: 100%;
+}
+
+.hajime-hero__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hajime-hero__mark {
+  position: relative;
+  flex: none;
+  width: 120px;
+}
+
+.hajime-hero__mark img {
+  position: relative;
+  width: 100%;
+  height: auto;
+}
+
+/* マークの後ろに日の出の光を置く */
+.hajime-hero__mark::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 40% 45%, rgb(255 138 31 / 0.35), rgb(139 92 246 / 0.18) 45%, transparent 70%);
+  filter: blur(24px);
+}
+
+.hajime-hero__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.hajime-hero__buttons a {
+  margin: 0;
+}
+
+.hajime-hero__note {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+.hajime-hero__note a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .hajime-hero {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .hajime-hero__mark {
+    width: 300px;
+  }
+}
+
+/*
+ * 機能の一覧．説明と実際の画面の写真を左右交互に並べる．カードやアイコンで飾らない
+ */
+.hajime-features {
+  width: 100%;
+}
+
+.hajime-feature {
+  display: grid;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 2.5rem 0;
+}
+
+.hajime-feature + .hajime-feature {
+  border-top: 1px solid var(--hajime-rule);
+}
+
+.hajime-feature__name {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hajime-feature__text {
+  margin-top: 0.5rem;
+  line-height: 1.8;
+  opacity: 0.8;
+}
+
+.hajime-feature__more {
+  display: inline-block;
+  margin-top: 1.25rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  transition: background-color 150ms ease-in, color 150ms ease-in;
+}
+
+.hajime-feature__more:hover {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  color: #fff;
+}
+
+.hajime-feature__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+@media (min-width: 768px) {
+  .hajime-feature {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 3rem;
+  }
+
+  /* 偶数番目は写真を左に置く．写真の列を広いほうにそろえる */
+  .hajime-feature:nth-of-type(even) {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+
+  .hajime-feature:nth-of-type(even) .hajime-feature__body {
+    order: 2;
+  }
+
+  .hajime-feature--text {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hajime-download__version {
+  margin-left: 0.5em;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.hajime-engine {
+  margin-top: 2rem;
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+.hajime-engine a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hajime-hero__mark img {
+    animation: hajime-rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+
+@keyframes hajime-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
