@@ -63,6 +63,8 @@ menu:
         icon: github
 
 params:
+  images:
+    - images/ogp.jpg
   description: macOS・Windows 向けの日本語入力システム．ライブ変換と打ち間違いの補正を，すべて端末の中で処理します．
 
   navbar:
