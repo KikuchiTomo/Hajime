@@ -1,4 +1,3 @@
-# はじめの公式サイト．本文は docs/ を読み込み，このディレクトリにはコピーしない(docs/site/PLAN.md)
 baseURL: https://haji.men/
 title: はじめ
 locale: ja
