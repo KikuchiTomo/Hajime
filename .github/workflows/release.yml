@@ -1,18 +1,16 @@
 name: Release
 
-# タグ macos/vX.Y.Z か windows/vX.Y.Z を push すると，その OS の配布物を作り，GitHub の Releases に置く(docs/dev/RELEASE.md)．
-# タグは tools/release/bump_version.sh でバージョンを上げてマージしたあとに付ける．手で動かすときはタグを指定する:
-#   gh workflow run release.yml -f tag=macos/v0.1.1
-# 配布物には署名しない．署名の設定は利用者が行う(ここでは秘密の値を使わない)
+# タグ vX.Y.Z を push すると，macOS と Windows の配布物を作り，GitHub の 1 つのリリースに置く．
+# タグは tools/release/bump_version.sh で両方のバージョンを上げてマージしたあとに付ける．手で動かすときはタグを指定する:
+#   gh workflow run release.yml -f tag=v0.1.1
 on:
   push:
     tags:
-      - "macos/v*"
-      - "windows/v*"
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 配布するタグ(macos/v0.1.1 など)
+        description: 配布するタグ(v0.1.1 など)
         required: true
         type: string
 
@@ -25,11 +23,10 @@ concurrency:
 
 jobs:
   prepare:
-    # タグの OS とバージョンを読み，リポジトリに書いたバージョンと同じかを確かめる
+    # タグのバージョンを読み，リポジトリに書いた macOS と Windows のバージョンと同じかを確かめる
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      platform: ${{ steps.tag.outputs.platform }}
       version: ${{ steps.tag.outputs.version }}
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -45,7 +42,6 @@ jobs:
 
   package-macos:
     needs: prepare
-    if: needs.prepare.outputs.platform == 'macos'
     uses: ./.github/workflows/package-macos.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
@@ -60,15 +56,13 @@ jobs:
 
   package-windows:
     needs: prepare
-    if: needs.prepare.outputs.platform == 'windows'
     uses: ./.github/workflows/package-windows.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
 
   publish:
-    # 作った配布物と SHA-256 の一覧を Releases に置く．書き込みの権限はこの仕事にだけ渡す
+    # 両方の OS の配布物と SHA-256 の一覧を 1 つのリリースに置く．書き込みの権限はこの仕事にだけ渡す
     needs: [prepare, package-macos, package-windows]
-    if: always() && needs.prepare.result == 'success' && (needs.package-macos.result == 'success' || needs.package-windows.result == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -80,11 +74,11 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: package-${{ needs.prepare.outputs.platform }}
+          pattern: package-*
+          merge-multiple: true
           path: dist
       - env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
-          PLATFORM: ${{ needs.prepare.outputs.platform }}
           VERSION: ${{ needs.prepare.outputs.version }}
-        run: tools/release/publish.sh "$TAG" "$PLATFORM" "$VERSION" dist
+        run: tools/release/publish.sh "$TAG" "$VERSION" dist
