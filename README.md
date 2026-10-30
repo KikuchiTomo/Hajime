@@ -1,7 +1,8 @@
 <p align="center">
-  <img src="docs/assets/hajime-logo.png" alt="はじめ" width="560">
+  <a href="https://haji.men"><img src="docs/assets/hajime-logo.png" alt="はじめ" width="560"></a>
 </p>
 
+[![Website](https://img.shields.io/badge/%E5%85%AC%E5%BC%8F%E3%82%B5%E3%82%A4%E3%83%88-haji.men-f2240f.svg)](https://haji.men)
 [![Release](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=v*&sort=semver&label=release)](https://github.com/KikuchiTomo/Hajime/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B%20%7C%20Linux%20(WIP)-lightgrey.svg)
