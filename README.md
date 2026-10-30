@@ -2,8 +2,7 @@
   <img src="docs/assets/hajime-logo.png" alt="はじめ" width="560">
 </p>
 
-[![macOS](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-macos&include_prereleases&sort=semver&display_name=release&label=macOS&logo=apple)](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true)
-[![Windows](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=*-windows&include_prereleases&sort=semver&display_name=release&label=Windows&logo=windows)](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true)
+[![Release](https://img.shields.io/github/v/release/KikuchiTomo/Hajime?filter=v*&sort=semver&label=release)](https://github.com/KikuchiTomo/Hajime/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B%20%7C%20Linux%20(WIP)-lightgrey.svg)
 [![Engine](https://img.shields.io/badge/engine-azooKey%20%2B%20Zenzai-6b4fbb.svg)](https://github.com/azooKey/AzooKeyKanaKanjiConverter)
@@ -32,8 +31,8 @@ macOS・Windows 向けの日本語入力システムです．
 
 | OS | 対応バージョン | ダウンロード |
 |---|---|---|
-| macOS | macOS 14 以降 | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=macos&expanded=true) |
-| Windows | Windows 10 22H2 以降(64 ビット) | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases?q=windows&expanded=true) |
+| macOS | macOS 14 以降 | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases/latest) |
+| Windows | Windows 10 22H2 以降(64 ビット) | [最新のリリース](https://github.com/KikuchiTomo/Hajime/releases/latest) |
 | Linux (WIP) | | 準備中 |
 
 インストール後には，お使いの PC の再起動を推奨します．
