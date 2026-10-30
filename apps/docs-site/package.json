@@ -3,6 +3,6 @@
   "private": true,
   "description": "公式サイトを Cloudflare Workers に置くための道具．ビルドは Hugo で行い，ここでは wrangler だけを使う",
   "devDependencies": {
-    "wrangler": "4.151.1"
+    "wrangler": "4.156.0"
   }
 }
