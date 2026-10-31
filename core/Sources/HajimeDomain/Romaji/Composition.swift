@@ -27,6 +27,14 @@ public struct Composition: Sendable, Equatable {
     public private(set) var correctedWordKeyEdits: Int?
     /// 直前に「nn」を「ん」にした位置．次にかなになった文字が母音なら，そこを nasalAmbiguities に加える
     private var nasalWatchIndex: Int?
+    /// 最後のキーで，前の打ちかけのローマ字が綴りにならずにかなや英字になった分(「s」+「k」の s，「t」+「t」の っ)．
+    /// そのキーを消したら，打ちかけに戻す
+    private var resolvedByLastKey: Reopenable?
+
+    private struct Reopenable: Sendable, Equatable {
+        var kana: String
+        var keys: String
+    }
 
     /// 「nn」のあとの母音 1 つぶん．kanaIndex は読みの中の位置
     public struct NasalAmbiguity: Sendable, Equatable {
@@ -107,13 +115,18 @@ public struct Composition: Sendable, Equatable {
             kana.append("ん")
             pending = ""
             nasalWatchIndex = kana.count
+            resolvedByLastKey = nil
             recordBoundary()
             return
         }
         let watch = nasalWatchIndex
         nasalWatchIndex = nil
         pending.append(lowered)
+        let keys = pending
+        let kanaCount = kana.count
         resolvePending()
+        resolvedByLastKey = !pending.isEmpty && kana.count > kanaCount
+            ? Reopenable(kana: String(kana.dropFirst(kanaCount)), keys: String(keys.dropLast(pending.count))) : nil
         if let watch { noteNasalAmbiguity(at: watch) }
         mergeSymbolSequence()
         if pending.isEmpty { recordBoundary() }
@@ -211,6 +224,7 @@ public struct Composition: Sendable, Equatable {
         rawKeys = prefixKeys + keys
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex < kanaStart }
         nasalWatchIndex = nil
+        resolvedByLastKey = nil
         frozenKanaEnd = kana.count
         // 打ったとおりの英単語(「python」)は英字として入れたものとみなす．綴りを直した語(「sride」→「bride」)は，
         // 日本語の打ち間違いを英単語と取り違えたことがあるので，日本語の打ち間違いの見直しで読み直せるようにしておく
@@ -259,6 +273,7 @@ public struct Composition: Sendable, Equatable {
         copy.boundaries = boundaries.filter { $0.rawCount <= boundary.rawCount && $0.kanaCount <= boundary.kanaCount }
         copy.nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= boundary.kanaCount }
         copy.nasalWatchIndex = nil
+        copy.resolvedByLastKey = nil
         // 確定させた英単語の途中で切ったら，英単語は残らない
         if boundary.kanaCount < frozenKanaEnd { copy.correctedWordKeyEdits = nil }
         copy.frozenKanaEnd = min(frozenKanaEnd, boundary.kanaCount)
@@ -279,6 +294,7 @@ public struct Composition: Sendable, Equatable {
     public mutating func insertLiteral(_ text: String, rawKey: Character? = nil) {
         flushPending()
         nasalWatchIndex = nil
+        resolvedByLastKey = nil
         kana.append(text)
         if text.contains(where: Self.isAlphanumeric) { englishKanaEnd = kana.count }
         mergeSymbolSequence()
@@ -294,6 +310,7 @@ public struct Composition: Sendable, Equatable {
     public mutating func insertKana(_ text: String) {
         flushPending()
         nasalWatchIndex = nil
+        resolvedByLastKey = nil
         rawKeys = nil
         if text.count == 1, let mark = text.first, let last = kana.last, let combined = KanaLayout.combine(last, with: mark) {
             kana.removeLast()
@@ -306,11 +323,19 @@ public struct Composition: Sendable, Equatable {
     public mutating func deleteBackward() {
         rawKeys = nil
         nasalWatchIndex = nil
+        let resolved = resolvedByLastKey
+        resolvedByLastKey = nil
         if !pending.isEmpty {
             pending.removeLast()
+            // 最後のキーを消したので，そのキーで決まったかなや英字を打ちかけに戻す(「tt」→「っt」を消すと「t」)
+            if pending.isEmpty, let resolved, kana.hasSuffix(resolved.kana) {
+                kana.removeLast(resolved.kana.count)
+                pending = resolved.keys
+            }
         } else if !kana.isEmpty {
             kana.removeLast()
         }
+        if pending.isEmpty { reopenTrailingLetters() }
         // 消した文字にかかっていた「nn」の読みの記録は外す．残った分は，あとの文字が変わったので比べ直す
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
         for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingText = nil }
@@ -384,6 +409,18 @@ public struct Composition: Sendable, Equatable {
             containsInvalidRomaji = true
             pending.removeFirst()
         }
+    }
+
+    /// 読めずに英字のまま残した末尾の文字を，打ちかけのローマ字に戻す．
+    /// 「sk」の k を消したあとに「ya」と打ったら「sや」ではなく「しゃ」にするため．
+    /// 英字は，次のキーと綴りにならなかったので残したものなので，そのキーを消したら打ちかけに戻すのが打った順と合う．
+    /// 綴りの頭になる末尾のうち，いちばん長いものを戻す．英字として入れた部分(確定させた英単語・大文字)は戻さない
+    private mutating func reopenTrailingLetters() {
+        let start = max(frozenKanaEnd, englishKanaEnd)
+        let letters = String(kana.dropFirst(start).reversed().prefix { $0.isASCII && $0.isLowercase && $0.isLetter }.reversed())
+        guard let reopened = letters.indices.lazy.map({ String(letters[$0...]) }).first(where: table.isPrefix) else { return }
+        kana.removeLast(reopened.count)
+        pending = reopened
     }
 
     private mutating func flushPending() {
