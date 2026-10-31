@@ -50,6 +50,24 @@ public final class InputSession {
     private let readingCorrector: ReadingCorrector
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
     private var isSettled = false
+    /// Space で出した分岐図を，利用者がまだ動かしていないか．自動で選ぶ文節は，候補が揃ってから選び直す(動かしたあとは変えない)
+    private var latticeUntouched = false
+    /// 注目している文節の長さを変えたときの下見(読みと文節の位置ごと)．分岐図を出してから求めて足す
+    private var resizePreviews: [ResizePreviewKey: (shorter: String?, longer: String?)] = [:]
+    /// 入力中の候補の窓に足す，続く語の予測．窓を出してから求めて足す
+    private var suggestionPredictions: (reading: String, candidates: [Candidate])?
+    /// 最後に出した入力中の候補の窓．ローマ字を打ちかけているあいだはこれを出しておく
+    private var shownSuggestionPanel: CandidatePanel?
+    /// 最後に出した案内(学習の取り消しなど)．あとから足して出し直すときにも同じ案内を出す
+    private var renderedNote: Note?
+    /// 最後に出した組み立て中の文字
+    private var renderedMarkedText: MarkedText?
+
+    private struct ResizePreviewKey: Hashable {
+        var reading: String
+        var start: Int
+        var length: Int
+    }
     /// 前に打鍵が止まったときにライブ変換で見せた文と読み．打っている途中の文の先頭をこれに合わせ，ちらつかせない(LiveConversionRule.stabilized)
     private var settledLive: (candidate: Candidate, reading: String)?
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
@@ -124,6 +142,7 @@ public final class InputSession {
         }
         showsCorrectionNote = false
         profile = context.profile
+        latticeUntouched = false
         // 変換したあとに次のキーが来たら，あとから届く訂正では変換を直さない(選んだ候補などを変えない)
         lateCorrection = nil
         let hidesNote = showsTransientNote
@@ -224,6 +243,77 @@ public final class InputSession {
     /// 入力位置の近くにモードを出す操作．設定で切っていれば出さない
     private func modeIndicator(_ mode: InputMode) -> [ClientAction] {
         settings.current.showsModeIndicator ? [.showModeIndicator(mode)] : []
+    }
+
+    /// キーを処理して画面を出したあとに，1 つずつ求めて足すもの．分岐図の文節の候補(選んでいない文節)，文節の長さの下見，
+    /// 入力中の候補の窓の予測．入力メソッドは次のキーに譲りながら 1 つずつ動かし，返した表示を出す．次のキーが来たら残りはやめる．
+    /// 求めるあいだに状態が変わっていたら(次のキーで変換を変えたなど)何もせず空を返す
+    public func followUps(context: InputContext) -> [@MainActor () -> [ClientAction]] {
+        switch phase {
+        case .lattice(let lattice) where inlineEdit == nil && !splitMode:
+            let reading = composition.conversionReading
+            // 注目している文節に近いものから求める(見ているあたりから揃う)
+            let pending = lattice.segments.indices.filter { lattice.segments[$0].isPending }
+                .sorted { abs($0 - lattice.focusedIndex) < abs($1 - lattice.focusedIndex) }
+                .map { (start: lattice.segments[$0].readingStart, length: lattice.segments[$0].readingLength) }
+            let fills: [@MainActor () -> [ClientAction]] = pending.map { target in
+                { [self] in
+                    guard case .lattice(var current) = phase, composition.conversionReading == reading,
+                          let index = current.segments.firstIndex(where: {
+                              $0.isPending && $0.readingStart == target.start && $0.readingLength == target.length
+                          }) else { return [] }
+                    current.segments[index] = latticeBuilder.filled(current.segments[index], reading: reading)
+                    // 自動で選ぶ文節は，候補が揃ったときに選び直す(利用者が動かす前だけ)
+                    if latticeUntouched, settings.current.initialFocus == .automatic, !current.segments.contains(where: \.isPending) {
+                        current.focusedIndex = current.initialFocus(.automatic)
+                    }
+                    phase = .lattice(current)
+                    return rerender(context: context)
+                }
+            }
+            let preview: @MainActor () -> [ClientAction] = { [self] in
+                guard case .lattice(let current) = phase, composition.conversionReading == reading, inlineEdit == nil else { return [] }
+                let key = resizePreviewKey(current)
+                guard resizePreviews[key] == nil else { return [] }
+                resizePreviews[key] = latticeBuilder.resizePreview(current, reading: reading)
+                return rerender(context: context)
+            }
+            return fills + [preview]
+        case .composing where suggestionPredictions?.reading != composition.conversionReading && suggestionsShown:
+            let reading = composition.conversionReading
+            return [{ [self] in
+                guard phase == .composing, composition.conversionReading == reading else { return [] }
+                suggestionPredictions = (reading, converter.predictions(for: reading))
+                return rerender(context: context)
+            }]
+        default:
+            return []
+        }
+    }
+
+    /// あとから求めた候補を足して出し直す．前に出した案内はそのまま出す．
+    /// 組み立て中の文字が前に出したものと同じなら送り直さない(アプリによっては送るたびに文字がちらつく)
+    private func rerender(context: InputContext) -> [ClientAction] {
+        pendingNote = renderedNote
+        let previous = renderedMarkedText
+        return render(context: context).filter { action in
+            if case .setMarkedText(let marked) = action { return marked != previous }
+            return true
+        }
+    }
+
+    private func resizePreviewKey(_ lattice: SegmentLattice) -> ResizePreviewKey {
+        ResizePreviewKey(reading: composition.conversionReading, start: lattice.focused.readingStart, length: lattice.focused.readingLength)
+    }
+
+    /// 候補をまだ求めていない文節の候補を，今すぐ求める(only が無ければすべて)
+    private func fillPendingSegments(only index: Int? = nil) {
+        guard case .lattice(var lattice) = phase else { return }
+        let reading = composition.conversionReading
+        for i in lattice.segments.indices where lattice.segments[i].isPending && (index == nil || index == i) {
+            lattice.segments[i] = latticeBuilder.filled(lattice.segments[i], reading: reading)
+        }
+        phase = .lattice(lattice)
     }
 
     /// 打鍵の合間に追いかけて求める変換があるか(Zenzai が遅い環境で，入力中の表示を Zenzai なしで求めたとき)
@@ -853,13 +943,18 @@ public final class InputSession {
             return
         }
         corrector.commit(into: &composition)
-        phase = .lattice(initialLattice(latticeBuilder))
+        // 区切りと幹だけの分岐図をすぐ出し，注目している文節の候補だけをここで求める．ほかの文節は followUps で足す
+        phase = .lattice(initialLattice(latticeBuilder, quick: true))
+        latticeUntouched = true
+        if case .lattice(let lattice) = phase { fillPendingSegments(only: lattice.focusedIndex) }
     }
 
-    /// Space で出す分岐図．打っている途中に入れた区切りと，打ち間違いの訂正を入れる(状態は変えない)
-    private func initialLattice(_ builder: LatticeBuilder) -> SegmentLattice {
+    /// Space で出す分岐図．打っている途中に入れた区切りと，打ち間違いの訂正を入れる(状態は変えない)．
+    /// quick なら文節ごとの候補をまだ求めない(LatticeBuilder.quickBuild)
+    private func initialLattice(_ builder: LatticeBuilder, quick: Bool = false) -> SegmentLattice {
         let focus = settings.current.initialFocus
-        var lattice = builder.build(reading: composition.conversionReading, focus: focus)
+        var lattice = quick ? builder.quickBuild(reading: composition.conversionReading, focus: focus)
+            : builder.build(reading: composition.conversionReading, focus: focus)
         if !forcedBoundaries.isEmpty, !readingCorrector.isApplied {
             // 打っている途中に入れた区切りで，必ず文節を分ける．打ち間違いを直したときは読みの位置が変わるので使わない(入力中の表示と同じ)
             lattice = builder.splitting(lattice, at: forcedBoundaries, reading: composition.conversionReading)
@@ -1001,6 +1096,8 @@ public final class InputSession {
     private func commitComposition() -> [ClientAction] {
         // 連想の一覧で選んでいる語は，元の変換の文節に入れてから確定する
         resolveAssociation()
+        // 候補を求めていない文節は，学習に使うエンジンの候補にするため求めてから確定する
+        fillPendingSegments()
         if case .lattice(let lattice) = phase {
             for segment in lattice.segments where segment.selected.isFromEngine {
                 converter.didCommit(segment.selected)
@@ -1062,6 +1159,9 @@ public final class InputSession {
         splitMode = false
         inlineEdit = nil
         settledLive = nil
+        resizePreviews = [:]
+        suggestionPredictions = nil
+        shownSuggestionPanel = nil
         composition = newComposition()
         readingCorrector.reset()
         alphabetRun = false
@@ -1147,16 +1247,30 @@ public final class InputSession {
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
-    /// 打っているあいだに出す候補(読み全体の変換と，続く語の予測)．出さない設定や，読みが短いときは空
-    private func suggestionCandidates() -> [Candidate] {
+    /// 打っているあいだに候補の窓を出す設定で，読みが出すのに足りる長さか
+    private var suggestionsEnabled: Bool {
         let display = settings.current.suggestionDisplay
-        guard display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion),
-            composition.pending.isEmpty || composition.pending == "n" else { return [] }
+        return (display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion))
+            && composition.conversionReading.count >= DefaultSettings.minimumSuggestionReading
+    }
+
+    /// 今の読みで候補を求めるか．打ちかけのローマ字(「ky」)があるあいだは求めない(かなになってから求める)
+    private var suggestionsShown: Bool {
+        suggestionsEnabled && (composition.pending.isEmpty || composition.pending == "n")
+    }
+
+    /// 打っているあいだに出す候補(読み全体の変換と，続く語の予測)．出さない設定や，読みが短いときは空．
+    /// 予測は窓を出してから求めて足す(followUps)．waitsForPredictions なら今すぐ求める(↓ で選び始めるとき)
+    private func suggestionCandidates(waitsForPredictions: Bool = false) -> [Candidate] {
+        guard suggestionsShown else { return [] }
         let reading = composition.conversionReading
-        guard reading.count >= DefaultSettings.minimumSuggestionReading else { return [] }
+        if waitsForPredictions, suggestionPredictions?.reading != reading {
+            suggestionPredictions = (reading, converter.predictions(for: reading))
+        }
+        let predictions = suggestionPredictions?.reading == reading ? suggestionPredictions?.candidates ?? [] : []
         var seen = Set<String>()
         let whole = converter.candidates(for: reading).filter { $0.readingCount == reading.count }
-        return (whole.prefix(2) + converter.predictions(for: reading) + whole.dropFirst(2))
+        return (Array(whole.prefix(2)) + predictions + Array(whole.dropFirst(2)))
             .filter { seen.insert($0.text).inserted }
             .prefix(DefaultSettings.suggestionCount)
             .map { $0 }
@@ -1197,9 +1311,21 @@ public final class InputSession {
     // MARK: - 表示
 
     private func render(context: InputContext) -> [ClientAction] {
+        let actions = renderActions(context: context)
+        if let marked = actions.lazy.compactMap({ action -> MarkedText? in
+            if case .setMarkedText(let marked) = action { return marked }
+            return nil
+        }).last {
+            renderedMarkedText = marked
+        }
+        return actions
+    }
+
+    private func renderActions(context: InputContext) -> [ClientAction] {
         if composition.isEmpty, let style = composingStyles.first { return style.render() }
         guard isComposing else { return reset() }
-        // 学習から消したときの案内は，その操作のあとの 1 回だけ出す
+        // 学習から消したときの案内は，その操作のあとの 1 回だけ出す(あとから足して出し直すときは同じ案内を出す)
+        renderedNote = pendingNote
         defer { pendingNote = nil }
         switch phase {
         case .composing:
@@ -1207,8 +1333,14 @@ public final class InputSession {
             converter.setTyping(!isSettled)
             defer { converter.setTyping(false) }
             if let panel = suggestionPanel() {
+                shownSuggestionPanel = panel
                 return [.setMarkedText(composingMarkedText()), .showCandidates(panel)] + correctionNote()
             }
+            // ローマ字を打ちかけているあいだは，前の窓をそのまま出しておく(打つたびに窓が消えて出直さないように)
+            if suggestionsEnabled, !composition.pending.isEmpty, let shown = shownSuggestionPanel {
+                return [.setMarkedText(composingMarkedText()), .showCandidates(shown)] + correctionNote()
+            }
+            shownSuggestionPanel = nil
             return [.setMarkedText(composingMarkedText()), .hideCandidates] + correctionNote()
         case .selecting(let selection):
             let candidate = currentCandidate()
@@ -1227,7 +1359,12 @@ public final class InputSession {
             return renderAssociation(list, origin: origin)
         case .lattice(let lattice) where inlineEdit != nil:
             return renderInlineEdit(lattice)
-        case .lattice(let lattice):
+        case .lattice(var lattice):
+            // 注目している文節の候補は今すぐ要る(ほかの文節は followUps で足す)
+            if lattice.focused.isPending {
+                fillPendingSegments(only: lattice.focusedIndex)
+                if case .lattice(let filled) = phase { lattice = filled }
+            }
             // 打ち間違いを直した文節は，注目していなければ点線の下線にする
             let corrected = correctedRange(of: \.conversionReading)
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
@@ -1238,7 +1375,8 @@ public final class InputSession {
             if isSegmentList { return [.setMarkedText(marked), .showCandidates(segmentListPanel(lattice, corrected: corrected))] }
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                                   showsVariants: settings.current.showsVariantRow, corrected: corrected)
-            let preview = latticeBuilder.resizePreview(lattice, reading: composition.conversionReading)
+            // 文節の長さを変えたときの下見は，求めてあれば出す(無ければ followUps で求めて出し直す)
+            let preview = resizePreviews[resizePreviewKey(lattice)] ?? (nil, nil)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
                 panel.columns[focused].shorter = preview.shorter
                 panel.columns[focused].longer = preview.longer
@@ -1354,7 +1492,7 @@ public final class InputSession {
         case .composing:
             alphabetRun = false
             // 打っているあいだの候補を出しているときは，↓ でその候補から選ぶ
-            let suggestions = move == .next ? suggestionCandidates() : []
+            let suggestions = move == .next ? suggestionCandidates(waitsForPredictions: true) : []
             if suggestions.isEmpty {
                 enterConversion()
             } else {
@@ -1426,6 +1564,11 @@ public final class InputSession {
                 _ = lattice.selectVariant(at: (index + (move == .next ? 1 : count - 1)) % count)
                 phase = .lattice(lattice)
                 return KeyResult(handled: true, actions: render(context: context))
+            }
+            if move == .nextUncertain || move == .previousUncertain {
+                // 迷う文節は候補を求めないと分からない
+                fillPendingSegments()
+                if case .lattice(let filled) = phase { lattice = filled }
             }
             let builder = latticeBuilder
             switch move {

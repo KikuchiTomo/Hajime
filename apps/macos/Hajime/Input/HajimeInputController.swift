@@ -17,6 +17,8 @@ final class HajimeInputController: IMKInputController {
     private let menuBuilder: InputMenuBuilder
     /// 打鍵が止まったことを知らせるタイマー(ライブ変換で，かなのまま見せていた語を変換して見せる)
     private var settleTask: Task<Void, Never>?
+    /// キーのあとで，画面を出してから 1 つずつ求めて足す処理(InputSession.followUps)．次のキーが来たらやめる
+    private var followUpTask: Task<Void, Never>?
     /// 打ち間違いの見直しの記録．補正が出ないときに，求めなかったのか・時間切れか・直さないと決めたのかを実機で見分けるため．
     /// 打った文字・読み・候補は記録せず，数と時間と結果の種類だけを残す(docs/dev/SECURITY-MODEL.md)
     private static let correctionLogger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "correction")
@@ -44,10 +46,13 @@ final class HajimeInputController: IMKInputController {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, let client = sender as? any IMKTextInput,
             let key = NSEventKeyTranslator.translate(event) else { return false }
+        followUpTask?.cancel()
+        followUpTask = nil
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
         let result = session.handle(key, context: context)
         presenter.context = context
         presenter.apply(result.actions, to: client)
+        runFollowUps(client: client, context: context)
         // 再変換できなかった(選んでいる文字が無い・読めない)ときは，キーをアプリに渡す(Ctrl+Shift+R などをアプリで使えるように)
         if result.actions.contains(.requestReconversion), !reconvert(client: client, context: context) {
             return false
@@ -157,6 +162,21 @@ final class HajimeInputController: IMKInputController {
         correctionLogger.notice("\(label, privacy: .public): \(outcome, privacy: .public)．並び \(corrections.count, privacy: .public) 件・候補 \(candidates, privacy: .public) 件・\(milliseconds, privacy: .public) ms")
     }
 
+    /// 画面を出したあとで，分岐図の文節の候補や入力中の候補の窓の予測を 1 つずつ求めて足す．
+    /// 1 つごとにほかの処理(次のキー)に譲り，次のキーが来たらやめる(まず反応し，求まったものから出す)
+    @MainActor
+    private func runFollowUps(client: any IMKTextInput, context: InputContext) {
+        let steps = session.followUps(context: context)
+        guard !steps.isEmpty else { return }
+        followUpTask = Task { @MainActor [weak self] in
+            for step in steps {
+                await Task.yield()
+                guard !Task.isCancelled, let self else { return }
+                self.presenter.apply(step(), to: client)
+            }
+        }
+    }
+
     /// 分岐図の候補を 1 文節ずつ前もって求める．文節ごとにほかの処理(次のキー)に譲り，取り消されたらやめる
     @MainActor
     private func warmLattice() async {
@@ -182,6 +202,8 @@ final class HajimeInputController: IMKInputController {
     override func deactivateServer(_ sender: Any!) {
         settleTask?.cancel()
         settleTask = nil
+        followUpTask?.cancel()
+        followUpTask = nil
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
         }
