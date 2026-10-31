@@ -349,6 +349,9 @@ public enum DefaultSettings {
     public static let latticeWarmingPollInterval = 0.01
     /// 入力中の表示を Zenzai なしで求めたとき，打鍵の合間に Zenzai の変換を求めるまでの間(秒)．Windows では DLL に来てもらう(wake)間隔
     public static let deferredConversionPollInterval = 0.005
+    /// キーのあとで，画面を出してから 1 つずつ求めて足す処理(InputSession.followUps)のために，Windows で DLL に来てもらう間隔(秒)．
+    /// 待たせずに次を求めたいので短くする(来るまでのあいだに次のキーが来れば，そのキーを先に処理する)
+    public static let followUpPollInterval = 0.001
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
 }

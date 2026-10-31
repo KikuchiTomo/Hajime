@@ -99,9 +99,12 @@ struct EngineServiceCorrectionTests {
         let (id, session) = try open()
         type("youdesu", session, id)
         let space = press(.space, session, id)
-        // 訂正を待たずに変換を出す(候補が遅れて出ない)
+        // 訂正を待たずに変換を出す(候補が遅れて出ない)．文節の長さの下見などは，すぐ来てもらう wake で足す
         #expect(Self.composition(space) == "様です")
-        #expect(Self.wakeAfter(space) == EngineService.correctionPollMilliseconds)
+        #expect(Self.wakeAfter(space) == EngineService.followUpPollMilliseconds)
+        var followed = wake(session, id)
+        while Self.wakeAfter(followed) == EngineService.followUpPollMilliseconds { followed = wake(session, id) }
+        #expect(Self.wakeAfter(followed) == EngineService.correctionPollMilliseconds)
         await service.waitForCorrections()
         let woke = wake(session, id)
         #expect(Self.composition(woke) == "良いです")

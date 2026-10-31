@@ -15,6 +15,8 @@ public final class EngineService {
     public static let latticeWarmingPollMilliseconds = milliseconds(DefaultSettings.latticeWarmingPollInterval)
     /// 入力中の表示で済ませなかった Zenzai の変換を，打鍵の合間に求めるために DLL に来てもらう間隔
     public static let deferredConversionPollMilliseconds = milliseconds(DefaultSettings.deferredConversionPollInterval)
+    /// キーのあとで求めて足す処理(InputSession.followUps)を続けて動かすために，DLL に来てもらう間隔
+    public static let followUpPollMilliseconds = milliseconds(DefaultSettings.followUpPollInterval)
     /// 候補の窓を出しているあいだ，DLL がマウスで押した候補を取りに来る間隔
     public static let candidateClickPollMilliseconds = milliseconds(DefaultSettings.candidateClickPollInterval)
 
@@ -40,6 +42,8 @@ public final class EngineService {
         var stoppedAt: ContinuousClock.Instant?
         /// 打鍵が止まったあとに，分岐図の候補を 1 文節ずつ前もって求める残りの手順(InputSession.latticeWarmingSteps)
         var warming: [@MainActor () -> Void] = []
+        /// キーのあとで，画面を出してから 1 つずつ求めて足す残りの処理(InputSession.followUps)．次のキーで捨てる
+        var followUps: [@MainActor () -> [ClientAction]] = []
         /// 裏で求めている打ち間違いの訂正
         var correction: CorrectionWork?
     }
@@ -418,6 +422,7 @@ public final class EngineService {
         sessions[session]?.hasSettled = false
         sessions[session]?.stoppedAt = now()
         sessions[session]?.warming = []
+        sessions[session]?.followUps = current.input.followUps(context: context)
         var actions = result.actions
         if actions.contains(.awaitCorrections), let request = current.input.lateCorrectionRequest {
             // 変換はもう出ている．訂正は裏で求め，届いたら次の wake で変換を直す(macOS の HajimeInputController と同じ)
@@ -437,8 +442,13 @@ public final class EngineService {
         if let choice = chosen, choice.session == session {
             chosen = nil
             actions += current.input.choose(PointerTarget(choice.target), context: context)
+            sessions[session]?.followUps = current.input.followUps(context: context)
         }
-        if let work = current.correction {
+        if let step = sessions[session]?.followUps.first {
+            // 画面を出したあとで求めて足す処理を，1 回の wake に 1 つずつ動かす(macOS の HajimeInputController と同じ)
+            sessions[session]?.followUps.removeFirst()
+            actions += step()
+        } else if let work = current.correction {
             switch work.purpose {
             case .conversion(let deadline):
                 if let result = work.result {
@@ -555,6 +565,7 @@ public final class EngineService {
 
     private func typingWakeAfter(_ session: UInt32) -> UInt32? {
         guard let current = sessions[session] else { return nil }
+        if !current.followUps.isEmpty { return Self.followUpPollMilliseconds }
         if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
         if current.input.awaitsDeferredConversion { return Self.deferredConversionPollMilliseconds }

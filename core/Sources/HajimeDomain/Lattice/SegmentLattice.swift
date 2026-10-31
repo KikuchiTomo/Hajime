@@ -26,10 +26,13 @@ public struct SegmentLattice: Sendable, Equatable {
         public var isDecided: Bool
         /// 第 1 候補と 2 番目の点数の差．小さいほど変換を誤っている可能性が高い．候補が 1 つなら無限大
         public var confidenceGap: Double
+        /// 候補をまだ求めていないか．Space ですぐ分岐図を出すため，見えている文字(幹)だけを持たせ，候補はあとから求める
+        public var isPending: Bool
 
         public init(readingStart: Int, readingLength: Int, candidates: [Candidate], variants: [Candidate] = [], choice: Choice = .candidate(0), isConfident: Bool,
-                    isDecided: Bool = false, confidenceGap: Double = .infinity) {
+                    isDecided: Bool = false, confidenceGap: Double = .infinity, isPending: Bool = false) {
             self.confidenceGap = confidenceGap
+            self.isPending = isPending
             self.readingStart = readingStart
             self.readingLength = readingLength
             self.candidates = candidates

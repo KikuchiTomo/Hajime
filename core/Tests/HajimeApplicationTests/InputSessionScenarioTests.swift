@@ -26,6 +26,9 @@ final class Harness {
     private(set) var lattice: LatticePanel?
     private(set) var note: String?
     private(set) var lastResult = KeyResult.passThrough
+    /// キーのあとで，あとから求めて足す処理(InputSession.followUps)を動かすか．アプリは次のキーが来るまで動かす．
+    /// false にすると，キーに反応してすぐ出した画面を確かめられる
+    var runsFollowUps = true
 
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
          associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false) {
@@ -56,11 +59,18 @@ final class Harness {
     func press(_ key: KeyEvent.Key, _ modifiers: KeyEvent.Modifiers = [], isKeypad: Bool = false) {
         lastResult = session.handle(KeyEvent(key, modifiers: modifiers, isKeypad: isKeypad), context: context)
         apply(lastResult.actions)
+        if runsFollowUps { followUp() }
     }
 
     /// 候補の窓をマウスで押す
     func click(_ target: PointerTarget) {
         apply(session.choose(target, context: context))
+        if runsFollowUps { followUp() }
+    }
+
+    /// あとから求めて足す処理を，アプリと同じく 1 つずつ動かして出す
+    func followUp() {
+        for step in session.followUps(context: context) { apply(step()) }
     }
 
     private func apply(_ actions: [ClientAction]) {

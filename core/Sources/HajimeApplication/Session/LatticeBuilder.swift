@@ -19,6 +19,43 @@ struct LatticeBuilder {
         return lattice
     }
 
+    /// Space ですぐ出す分岐図．build と同じ区切りと幹(ライブ変換で見えている文)を持ち，文節ごとの候補はまだ求めない(isPending)．
+    /// 候補は filled で文節ごとにあとから求める．文節が 1 つにしかならない読みは，区切りを候補で決めるので build と同じに求める
+    func quickBuild(reading: String, focus: InitialFocus = .automatic) -> SegmentLattice {
+        let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
+        guard let plan = clausePlan(of: reading, sentence: sentence) else { return build(reading: reading, focus: focus) }
+        var lattice = SegmentLattice(segments: plan.map { pendingSegment($0, reading: reading) })
+        lattice.focusedIndex = lattice.initialFocus(focus)
+        return lattice
+    }
+
+    /// 候補をまだ求めていない文節の候補を求める．選んでいる字種と，選び直したかは残す
+    func filled(_ segment: SegmentLattice.Segment, reading: String) -> SegmentLattice.Segment {
+        guard segment.isPending else { return segment }
+        let preferred = segment.candidates.first.flatMap { $0.origin == .sentencePart ? $0.text : nil }
+        var result = makeSegment(start: segment.readingStart, length: segment.readingLength,
+                                 rest: String(reading.dropFirst(segment.readingStart)), preferred: preferred)
+        if case .variant(let index) = segment.choice, result.variants.indices.contains(index) { result.choice = segment.choice }
+        result.isDecided = segment.isDecided
+        return result
+    }
+
+    /// 文節を作る位置と長さと幹の文字(build が文節ごとに使う)
+    private struct ClausePlan {
+        var start: Int
+        var length: Int
+        var preferred: String?
+    }
+
+    /// 候補を求める前の文節．幹は見えている文の文字(無ければ読みのかな)にする
+    private func pendingSegment(_ plan: ClausePlan, reading: String) -> SegmentLattice.Segment {
+        let slice = String(reading.dropFirst(plan.start).prefix(plan.length))
+        let trunk = plan.preferred.map { Candidate(text: $0, readingCount: plan.length, origin: .sentencePart) }
+            ?? Candidate(text: slice, readingCount: plan.length, origin: .variant(.hiragana))
+        return SegmentLattice.Segment(readingStart: plan.start, readingLength: plan.length, candidates: [trunk],
+                                      variants: variants(of: slice), isConfident: true, isPending: true)
+    }
+
     /// 語の並びで文節に分ける．区切りは Zenzai を使わない変換の語の並びから決め(Zenzai が書き換えた候補は語の区切りを持たないことがある)，
     /// 文節ごとに見せる文字は，ライブ変換で見えている文(sentence)と合うものを選ぶ．文節が 1 つにしかならなければ nil
     private func clauseSegments(of reading: String, sentence: Candidate?) -> [SegmentLattice.Segment]? {
@@ -27,6 +64,13 @@ struct LatticeBuilder {
 
     /// 文節ごとに，その文節を作る手順．文節が 1 つにしかならなければ nil
     private func clauseSegmentMakers(of reading: String, sentence: Candidate?) -> [() -> SegmentLattice.Segment]? {
+        clausePlan(of: reading, sentence: sentence)?.map { plan in
+            { [self] in makeSegment(start: plan.start, length: plan.length, rest: String(reading.dropFirst(plan.start)), preferred: plan.preferred) }
+        }
+    }
+
+    /// 文節の位置と長さと幹の文字．文節が 1 つにしかならなければ nil
+    private func clausePlan(of reading: String, sentence: Candidate?) -> [ClausePlan]? {
         let fromSentence = sentence.map { ClauseSplitter.clauses(of: $0.words) } ?? []
         let clauses: [ClauseSplitter.Clause]
         // Zenzai が書き換えた文の語の並びは，語の途中で切れていることがある(てんきですね → 天｜気ですね)．
@@ -44,10 +88,7 @@ struct LatticeBuilder {
         return clauses.map { clause in
             let start = position
             position += clause.readingCount
-            return { [self] in
-                makeSegment(start: start, length: clause.readingCount, rest: String(reading.dropFirst(start)),
-                            preferred: clause.text.isEmpty ? nil : clause.text)
-            }
+            return ClausePlan(start: start, length: clause.readingCount, preferred: clause.text.isEmpty ? nil : clause.text)
         }
     }
 
@@ -143,7 +184,8 @@ struct LatticeBuilder {
             let end = lattice.segments[last].readingStart + lattice.segments[last].readingLength
             result = resize(result, segmentAt: first, to: end - lattice.segments[first].readingStart, reading: reading)
         }
-        var segment = result.segments[first]
+        // 足す候補を，あとで候補を求め直して消さないよう，先にこの文節の候補を求める
+        var segment = filled(result.segments[first], reading: reading)
         let start = segment.readingStart, length = segment.readingLength
         // 文節の読みの，直した部分を打ったままの読みに置き換える
         let typedEnd = start + length + typed.count - corrected.count
