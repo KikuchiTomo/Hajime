@@ -39,6 +39,11 @@ public final class AzooKeyConverterEngine {
         self.converter = KanaKanjiConverter.withDefaultDictionary()
     }
 
+    /// 読みに合う絵文字(EmojiLooking)．肌の色などを変えた形は除く
+    public func emoji(for reading: String) -> [String] {
+        emojiReplacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true).map(\.text)
+    }
+
     public func makeSession() -> any KanaKanjiConverting {
         // 読みのもっともらしさを測る変換は，表示する変換と状態を混ぜないよう別のセッションで行う
         AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
@@ -181,6 +186,8 @@ public final class AzooKeyConverterEngine {
         )
     }
 }
+
+extension AzooKeyConverterEngine: EmojiLooking {}
 
 /// 入力欄ひとつぶんの変換の状態．
 @MainActor

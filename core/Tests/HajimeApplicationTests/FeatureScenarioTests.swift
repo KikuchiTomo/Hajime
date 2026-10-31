@@ -167,6 +167,17 @@ struct FeatureScenarioTests {
         #expect(!session.isComposing)
     }
 
+    @Test("読みで引いた絵文字を，よく使う語のあとの候補に足す．設定で切れる")
+    func emoji() {
+        let base = FakeConverter(["なく": [("なく", nil), ("泣く", nil), ("鳴く", nil), ("無く", nil), ("亡く", nil), ("啼く", nil)]])
+        let table = FakeEmoji(["なく": ["😢", "😭", "🐦", "🐱"]])
+        let candidates = SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar(), emoji: table).candidates(for: "なく").map(\.text)
+        #expect(candidates == ["なく", "泣く", "鳴く", "無く", "亡く", "😢", "😭", "🐦", "啼く"])
+        var off = DefaultSettings.settings
+        off.emojiConversion = false
+        #expect(!SupplementedConverter(base, settings: FakeSettings(off), calendar: FakeCalendar(), emoji: table).candidates(for: "なく").map(\.text).contains("😢"))
+    }
+
     @Test("R-13: 郵便番号は住所を候補に出す．区切りがあれば先頭に，無ければ 2 番目に")
     func postalCode() {
         let postal = FakePostalCodes(["1000001": ["東京都千代田区千代田"]])
@@ -197,4 +208,12 @@ final class FakePostalCodes: PostalCodeLooking {
     init(_ table: [String: [String]]) { self.table = table }
     func addresses(for code: String) -> [String] { table[code] ?? [] }
 
+}
+
+/// 絵文字の表の代わり
+@MainActor
+final class FakeEmoji: EmojiLooking {
+    let table: [String: [String]]
+    init(_ table: [String: [String]]) { self.table = table }
+    func emoji(for reading: String) -> [String] { table[reading] ?? [] }
 }

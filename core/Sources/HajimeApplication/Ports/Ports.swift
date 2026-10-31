@@ -170,6 +170,13 @@ public protocol PostalCodeLooking: AnyObject {
     func addresses(for code: String) -> [String]
 }
 
+/// 読みから絵文字を引くポート(「なく」→ 😢)．表は端末の中にあり，通信しない
+@MainActor
+public protocol EmojiLooking: AnyObject {
+    /// 読みに合う絵文字．よく使うものから並べる．無ければ空
+    func emoji(for reading: String) -> [String]
+}
+
 /// 手書きの線から文字を探すポート(R-14)．端末の中だけで認識し，通信しない
 public protocol HandwritingRecognizing: Sendable {
     /// 線(点の並び．左上が原点)を認識して，よさそうな順に文字列を返す

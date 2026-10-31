@@ -195,6 +195,9 @@ public enum DefaultSettings {
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
     public static let symbolCandidateOffset = 3
+    /// 読みで引いた絵文字を差し込む位置と，差し込む数．よく使う語のあとに並べ，候補の一覧の 1 ページに収める
+    public static let emojiCandidateOffset = 5
+    public static let emojiCandidateCount = 3
     /// 文節格子の列ごとに見せる候補の数
     public static let latticeCandidatesPerSegment = 5
     /// 「nn」のあとの母音の読みを選び直す数．1 キーごとに変換にかけるので小さく保つ

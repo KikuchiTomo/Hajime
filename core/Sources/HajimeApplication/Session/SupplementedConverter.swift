@@ -10,6 +10,7 @@ import HajimeDomain
 /// - 計算(Calculator): 「1+2*3=」→「7」「1+2*3=7」．結果を先頭に置く(式を打って「=」を打つのは計算したいときなので)
 /// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
+/// - 絵文字(EmojiLooking): 「なく」→ 😢．読みで引き，上から DefaultSettings.emojiCandidateOffset 番目に差し込む
 /// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
 ///
 /// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
@@ -23,6 +24,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let settings: any SettingsReading
     private let calendar: any CalendarReading
     private let postalCodes: (any PostalCodeLooking)?
+    private let emoji: (any EmojiLooking)?
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
     private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [String]]) = ([], [:])
     /// 取り込んだ辞書を引くもの．無ければ取り込んだ辞書は使わない
@@ -47,11 +49,12 @@ public final class SupplementedConverter: KanaKanjiConverting {
     }
 
     public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading,
-                postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil) {
+                postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil, emoji: (any EmojiLooking)? = nil) {
         self.base = base
         self.settings = settings
         self.calendar = calendar
         self.postalCodes = postalCodes
+        self.emoji = emoji
         self.lookup = dictionaries
     }
 
@@ -169,6 +172,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
             extra += DateExpressions.candidates(for: reading, now: calendar.now(), day: calendar.day(offsetFromToday:))
         }
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
+        if current.emojiConversion, let emoji {
+            insert(Array(emoji.emoji(for: reading).prefix(DefaultSettings.emojiCandidateCount)), into: &result,
+                   at: DefaultSettings.emojiCandidateOffset, reading: reading, origin: .symbol)
+        }
         if current.misreadings, let entry = Misreadings.entry(for: reading) {
             insert([entry.word], into: &result, at: 1, reading: reading, origin: .symbol)
         }
