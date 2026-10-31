@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-はじめは azooKey をもとにした macOS / Windows 向けの日本語入力システム．
+Hajime は azooKey をもとにした macOS / Windows 向けの日本語入力システム．
 
 作業の前に `docs/dev/ARCHITECTURE.md` と `docs/dev/GUIDELINES.md` を読み，配置・命名・層の決まりに従うこと．
 要件は `docs/specs/REQUIREMENTS.md`(R-xx)．設計の判断は `docs/dev/adr/`．

@@ -1,6 +1,6 @@
 # 謝辞
 
-はじめは次のソフトウェア・モデル・データを利用しています．
+Hajime IME は次のソフトウェア・モデル・データを利用しています．
 
 ## AzooKeyKanaKanjiConverter
 
@@ -1643,7 +1643,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Kiwi Maru(Google Fonts の google/fonts の 130fcfb0ff422fec96b335616b2ca99f91914792)
 https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru
-Windows の候補ウィンドウの既定の書体に使っています(配布物の fonts\\ に入れ，はじめの中だけで使います)．
+Windows の候補ウィンドウの既定の書体に使っています(配布物の fonts\\ に入れ，Hajime の中だけで使います)．
 
 ```
 Copyright 2020 The Kiwi Maru Project Authors (https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru)

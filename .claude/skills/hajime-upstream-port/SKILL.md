@@ -1,6 +1,6 @@
 ---
 name: hajime-upstream-port
-description: azooKey の fork(../upstream/ の AzooKeyKanaKanjiConverter・azooKey-Desktop・azooKey-Windows)からコードや変更をはじめに持ち込む・参考にする・エンジンの revision を上げるときの手順．ライセンスの表示，差分の読み方，このリポジトリの層への書き直し方を含む．「azooKey から持ってくる」「upstream を取り込む」「エンジンを更新」「azooKey-Desktop ではどうしているか」と言われたときは必ず使う．Use whenever porting, syncing or referencing code from the azooKey forks.
+description: azooKey の fork(../upstream/ の AzooKeyKanaKanjiConverter・azooKey-Desktop・azooKey-Windows)からコードや変更を Hajime に持ち込む・参考にする・エンジンの revision を上げるときの手順．ライセンスの表示，差分の読み方，このリポジトリの層への書き直し方を含む．「azooKey から持ってくる」「upstream を取り込む」「エンジンを更新」「azooKey-Desktop ではどうしているか」と言われたときは必ず使う．Use whenever porting, syncing or referencing code from the azooKey forks.
 ---
 
 # azooKey からの持ち込み
@@ -16,7 +16,7 @@ description: azooKey の fork(../upstream/ の AzooKeyKanaKanjiConverter・azooK
 
 1. `git -C ../upstream/AzooKeyKanaKanjiConverter fetch upstream`
 2. `core/Package.swift` に固定している revision から `upstream/main` までの `git log` と差分を読む．公開 API の変更と，辞書・モデルのファイルの変更を書き出す
-3. fork の `main` に merge して push する．はじめ独自の変更がある場合は競合を解き，独自の変更の一覧(fork の `HAJIME_CHANGES.md`)を更新する
+3. fork の `main` に merge して push する．Hajime 独自の変更がある場合は競合を解き，独自の変更の一覧(fork の `HAJIME_CHANGES.md`)を更新する
 4. `core/Package.swift` の revision を上げ，`HajimeEngine` のアダプタを直す．azooKey の型の変更はアダプタの中で吸収し，`HajimeApplication` に波及させない
 5. `make test`．変換の結果が変わったテストは，エンジンの改善なのか退行なのかを PR に書く
 

@@ -1,6 +1,6 @@
 ---
 title: インストール
-description: はじめのインストール，入力ソースの追加，アンインストールの手順
+description: Hajime IME のインストール，入力ソースの追加，アンインストールの手順
 ---
 
 ## macOS

@@ -1,6 +1,6 @@
 ---
 name: hajime-swift
-description: はじめの Swift コード(core/ の HajimeCore パッケージ，apps/macos の InputMethodKit・AppKit・SwiftUI)を書く・直す・テストするときの決まり．Swift 6 の並行性(actor，Sendable，@MainActor)，エラーの型，依存の注入，Swift Testing によるテスト，InputMethodKit の注意点を含む．.swift ファイルや Package.swift，project.yml に触れるときは必ず使う．Use whenever writing, editing, testing or reviewing Swift in this repository.
+description: Hajime の Swift コード(core/ の HajimeCore パッケージ，apps/macos の InputMethodKit・AppKit・SwiftUI)を書く・直す・テストするときの決まり．Swift 6 の並行性(actor，Sendable，@MainActor)，エラーの型，依存の注入，Swift Testing によるテスト，InputMethodKit の注意点を含む．.swift ファイルや Package.swift，project.yml に触れるときは必ず使う．Use whenever writing, editing, testing or reviewing Swift in this repository.
 ---
 
 # Swift の決まり

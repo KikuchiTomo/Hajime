@@ -1,9 +1,9 @@
 ---
 name: hajime-design
-description: はじめの見た目(候補ウィンドウ，種類の行，補正の下線，モードの札，設定アプリ，ドキュメントサイト，アイコン，モックアップ)を設計・実装・レビューするときの決まり．テーマ(glass・platinum・desk)，デザイントークン(design/tokens/tokens.json)，漢字Talk 7 のプラチナ外観を描画で再現する方法，アクセシビリティを含む．色・寸法・書体・動き・UI の配置に触れるとき，SwiftUI / AppKit / Direct2D / CSS で画面を作るとき，「デザイン」「見た目」「UI」「テーマ」と言われたときは必ず使う．Use for any visual, UI, theme, token or mockup work.
+description: Hajime の見た目(候補ウィンドウ，種類の行，補正の下線，モードの札，設定アプリ，ドキュメントサイト，アイコン，モックアップ)を設計・実装・レビューするときの決まり．テーマ(glass・platinum・desk)，デザイントークン(design/tokens/tokens.json)，漢字Talk 7 のプラチナ外観を描画で再現する方法，アクセシビリティを含む．色・寸法・書体・動き・UI の配置に触れるとき，SwiftUI / AppKit / Direct2D / CSS で画面を作るとき，「デザイン」「見た目」「UI」「テーマ」と言われたときは必ず使う．Use for any visual, UI, theme, token or mockup work.
 ---
 
-# はじめのデザイン
+# Hajime のデザイン
 
 決まりの本体は `docs/dev/DESIGN-SYSTEM.md`．値は `design/tokens/tokens.json` だけにある．
 
@@ -13,7 +13,7 @@ Web の画面(ドキュメントサイト・モックアップ)を作るとき�
 
 1. DESIGN-SYSTEM.md を読み，変える部品(候補ウィンドウ・種類の行・補正・モードの札・設定アプリ)を特定する
 2. 新しい値が要るなら，先に `tokens.json` に足す．コードに色や寸法を直接書かない
-3. `python3 -I tools/tokens/check_contrast.py` を通す．新しい色の組み合わせは `$extensions.はじめ.contrast` に足してから検査する
+3. `python3 -I tools/tokens/check_contrast.py` を通す．新しい色の組み合わせは `$extensions.hajime.contrast` に足してから検査する
 4. 実装する．3 つのテーマ(glass・platinum・desk)と，ライト・ダーク・コントラストを上げる設定のすべてで見た目を確かめる
 5. スクリーンショットか HTML のモックアップを `design/mockups/` に置き，PR に貼る
 

@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://haji.men"><img src="docs/assets/hajime-logo.png" alt="はじめ" width="560"></a>
+  <a href="https://haji.men"><img src="docs/assets/hajime-logo.png" alt="Hajime IME" width="560"></a>
 </p>
 
 [![Website](https://img.shields.io/badge/%E5%85%AC%E5%BC%8F%E3%82%B5%E3%82%A4%E3%83%88-haji.men-f2240f.svg)](https://haji.men)

@@ -1,5 +1,5 @@
 ---
-title: はじめ
+title: Hajime IME
 description: macOS・Windows 向けの日本語IME
 layout: hextra-home
 ---
