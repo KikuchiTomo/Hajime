@@ -597,8 +597,8 @@ public final class InputSession {
         case .lastCandidate: return moveCandidate(.last, context: context)
         case .associate: return associate(context: context)
         // 文節
-        case .nextSegment: return moveSegment(.next, context: context)
-        case .previousSegment: return moveSegment(.previous, context: context)
+        case .nextSegment: return moveSegment(.next, event: event, context: context)
+        case .previousSegment: return moveSegment(.previous, event: event, context: context)
         case .firstSegment: return moveSegment(.first, context: context)
         case .lastSegment: return moveSegment(.last, context: context)
         case .nextUncertainSegment: return moveSegment(.nextUncertain, context: context)
@@ -1585,7 +1585,7 @@ public final class InputSession {
     }
 
     /// 文節を移る・長さを変える・区切る．一覧は文節が 1 つなので，種類の行にいるときの左右だけ字種を移る
-    private func moveSegment(_ move: SegmentMove, context: InputContext) -> KeyResult {
+    private func moveSegment(_ move: SegmentMove, event: KeyEvent? = nil, context: InputContext) -> KeyResult {
         switch phase {
         case .composing, .association:
             // 連想の一覧の中の動きは performInAssociation が受け持つ
@@ -1597,8 +1597,10 @@ public final class InputSession {
             case .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split: return KeyResult(handled: true)
             }
         case .lattice(var lattice):
-            if isSegmentList, case .variant(let index) = lattice.focused.choice, move == .next || move == .previous {
-                // 文節ごとの一覧の種類の行は横に並ぶので，左右で字種を移る(文全体の一覧と同じ)
+            if isSegmentList, case .variant(let index) = lattice.focused.choice, move == .next || move == .previous,
+                event?.key != .tab {
+                // 文節ごとの一覧の種類の行は横に並ぶので，左右のキーで字種を移る(文全体の一覧と同じ)．
+                // Tab は向きを持たない「次の項目へ」のキーなので，種類の行にいても次の文節へ移る
                 let count = lattice.focused.variants.count
                 _ = lattice.selectVariant(at: (index + (move == .next ? 1 : count - 1)) % count)
                 phase = .lattice(lattice)
@@ -1611,8 +1613,10 @@ public final class InputSession {
             }
             let builder = latticeBuilder
             switch move {
-            case .next: lattice.moveFocus(by: 1)
-            case .previous: lattice.moveFocus(by: -1)
+            // Tab は端で反対の端へ回る．最初の注目は迷う文節に置くので最後の文節から始まることがあり，
+            // 端で止まると Tab で次の文節に移れない．← → は端で止める(選び終えた文節に戻らないように)
+            case .next: lattice.moveFocus(by: 1, wraps: event?.key == .tab)
+            case .previous: lattice.moveFocus(by: -1, wraps: event?.key == .tab)
             case .first: lattice.focusedIndex = 0
             case .last: lattice.focusedIndex = lattice.segments.count - 1
             case .nextUncertain: lattice.moveToUncertain(forward: true)

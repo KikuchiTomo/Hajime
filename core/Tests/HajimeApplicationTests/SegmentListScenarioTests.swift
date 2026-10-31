@@ -94,4 +94,20 @@ struct SegmentListScenarioTests {
         harness.press(.enter)
         #expect(harness.committed == "キョウ")
     }
+
+    @Test("種類の行にいても，Tab は字種でなく次の文節へ移る")
+    func tabLeavesVariantRow() {
+        let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil), ("京", nil)], "は": [("は", nil), ("葉", nil)]])
+        let harness = Harness(converter: converter, settings: settings())
+        harness.type("kyou")
+        harness.press(.space, .option)
+        harness.type("ha")
+        harness.press(.space)
+        #expect(harness.marked.segments.count == 2)
+        harness.press(.up)
+        #expect(harness.panel?.focus == .variants)
+        harness.press(.tab)
+        #expect(harness.panel?.focus != .variants)
+        #expect(harness.marked.segments.firstIndex { $0.style == .focused } == 1)
+    }
 }

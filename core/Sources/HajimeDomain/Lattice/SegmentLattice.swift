@@ -73,8 +73,12 @@ public struct SegmentLattice: Sendable, Equatable {
     public var focused: Segment { segments[focusedIndex] }
     public var text: String { segments.map(\.selected.text).joined() }
 
-    public mutating func moveFocus(by offset: Int) {
-        focusedIndex = min(max(focusedIndex + offset, 0), segments.count - 1)
+    /// 注目を隣の文節へ移す．端では止まる．wraps なら端を越えて反対の端へ移る(moveToUncertain と同じ)
+    public mutating func moveFocus(by offset: Int, wraps: Bool = false) {
+        guard !segments.isEmpty else { return }
+        focusedIndex = wraps
+            ? ((focusedIndex + offset) % segments.count + segments.count) % segments.count
+            : min(max(focusedIndex + offset, 0), segments.count - 1)
     }
 
     /// 迷う文節(確信度の低い文節)へ注目を移す．端を越えたら反対の端から探す．
