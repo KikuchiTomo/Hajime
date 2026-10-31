@@ -447,9 +447,12 @@ public enum YenKeyPolicy: String, Sendable, Equatable, Codable, CaseIterable {
 
     public static let backslash = "\\"
     public static let yen = "¥"
+    /// Shift を押したときの文字(JIS キーボードの刻印)
+    public static let shifted = "|"
 
-    /// Option を押しているときは逆の文字にする
-    public func character(profile: AppProfile, optionPressed: Bool) -> String {
+    /// Shift を押しているときは |．Option を押しているときは逆の文字にする
+    public func character(profile: AppProfile, shiftPressed: Bool, optionPressed: Bool) -> String {
+        if shiftPressed { return Self.shifted }
         let prefersBackslash: Bool = switch self {
         case .alwaysBackslash: true
         case .alwaysYen: false

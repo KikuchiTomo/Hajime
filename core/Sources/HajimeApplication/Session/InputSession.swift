@@ -299,7 +299,7 @@ public final class InputSession {
             // 表に無い英数・かな・半角/全角・変換・無変換などは，アプリに渡す
             return .passThrough
         }
-        let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
+        let text = settings.current.yenKey.character(profile: context.profile, shiftPressed: event.modifiers.contains(.shift), optionPressed: event.modifiers.contains(.option))
         return KeyResult(handled: true, actions: [.commit(text)])
     }
 
@@ -366,7 +366,7 @@ public final class InputSession {
         }
         switch event.key {
         case .yen:
-            let text = settings.current.yenKey.character(profile: context.profile, optionPressed: event.modifiers.contains(.option))
+            let text = settings.current.yenKey.character(profile: context.profile, shiftPressed: event.modifiers.contains(.shift), optionPressed: event.modifiers.contains(.option))
             return insertLiteral(text, rawKey: nil, context: context)
         case .character(let character):
             return insertCharacter(character, context: context)
