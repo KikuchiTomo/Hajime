@@ -8,6 +8,7 @@ mod system;
 mod window;
 
 use crate::announce::{self, Announcer};
+use crate::motion;
 use crate::scene::{self, Look, Scene, Surround};
 use crate::strings;
 use crate::theme::ResolvedTheme;
@@ -71,6 +72,13 @@ struct App {
     opacity: f32,
     fade: Fade,
     announcer: Announcer,
+    /// 出している窓の大きさ(影の分を含む)と，大きさが変わる途中の動き
+    shown_size: Option<(f32, f32)>,
+    resize: Option<motion::Resize>,
+    /// あとから届いた中身を重ねて変えている途中の，前の中身と始めた時刻
+    crossfade: Option<(Scene, Instant)>,
+    /// 選んでいるものが同じまま中身が変わった(次の refresh で重ねて変える)
+    arrived: bool,
 }
 
 thread_local! {
@@ -130,6 +138,10 @@ pub fn run() {
             opacity: 1.0,
             fade: Fade::None,
             announcer: Announcer::default(),
+            shown_size: None,
+            resize: None,
+            crossfade: None,
+            arrived: false,
         })
     });
     window::run_message_loop();
@@ -186,6 +198,7 @@ fn on_timer(timer: Timer) {
     with_app(|app| match timer {
         Timer::Mode => app.mode_elapsed(),
         Timer::Fade => app.step_fade(),
+        Timer::Motion => app.step_motion(),
     });
 }
 
@@ -228,10 +241,12 @@ impl App {
             }
             UiCommand::SetPresentation { presentation } => self.presentation = presentation,
             UiCommand::ShowCandidates { list, anchor } => {
+                self.arrived = matches!(&self.content, Content::Candidates(shown) if motion::arrived_list(shown, &list));
                 self.content = Content::Candidates(list);
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowBranchMap { map, anchor } => {
+                self.arrived = matches!(&self.content, Content::BranchMap(shown) if motion::arrived_branch(shown, &map));
                 self.content = Content::BranchMap(map);
                 self.anchor = anchor.or(self.anchor.take());
             }
@@ -349,6 +364,41 @@ impl App {
         }
     }
 
+    /// 窓の大きさの動きと重ね変わりの 1 コマ．どちらも終わったら時計を止める
+    fn step_motion(&mut self) {
+        if self.resize.is_none() && self.crossfade.is_none() {
+            self.window().stop_timer(Timer::Motion);
+            return;
+        }
+        self.refresh();
+    }
+
+    /// 窓の大きさの動き．出ている窓の大きさが変わったら，前の大きさ(動いている途中ならその大きさ)から新しい大きさへ動かす．
+    /// 返すのは今描く大きさ(動いていなければ None)
+    fn moving_size(&mut self, natural: (f32, f32), now: Instant) -> Option<(f32, f32)> {
+        let animates = self.scene.is_some() && !system::reduce_motion();
+        if !animates {
+            self.resize = None;
+            return None;
+        }
+        if let Some(shown) = self.shown_size {
+            if self.resize.map(|resize| resize.to) != Some(natural) && shown != natural {
+                let from = self.resize.map_or(shown, |resize| resize.size_at(now));
+                self.resize = Some(motion::Resize {
+                    from,
+                    to: natural,
+                    start: now,
+                });
+            }
+        }
+        let resize = self.resize?;
+        if resize.is_done(now) {
+            self.resize = None;
+            return None;
+        }
+        Some(resize.size_at(now))
+    }
+
     fn repaint(&mut self) {
         let (Some(scene), Some(theme)) = (self.scene.clone(), self.theme.clone()) else {
             return;
@@ -397,14 +447,48 @@ impl App {
         };
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
-        let scene = match &self.content {
+        let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
-            Content::Candidates(list) => Some(scene::candidate_list(list, &style, &measure)),
-            Content::BranchMap(map) => Some(scene::branch_map(map, &style, &measure)),
-            Content::Note(note) => Some(scene::note(note, &style, &measure)),
-            Content::Mode(label) => Some(scene::mode(label, &style, &measure)),
+            Content::Candidates(list) => Some(scene::candidate_list(list, style, &measure)),
+            Content::BranchMap(map) => Some(scene::branch_map(map, style, &measure)),
+            Content::Note(note) => Some(scene::note(note, style, &measure)),
+            Content::Mode(label) => Some(scene::mode(label, style, &measure)),
+        };
+        let mut scene = build(&self.content, &style);
+        // 候補の窓は，大きさが変わるときに縁を滑らかに動かす(地と縁は途中の大きさで描き，中身は新しい配置のまま)
+        let now = Instant::now();
+        let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
+        let natural = scene.as_ref().map(|scene| (scene.width, scene.height));
+        if let (true, Some(natural)) = (is_list, natural) {
+            if let Some(size) = self.moving_size(natural, now) {
+                scene = build(
+                    &self.content,
+                    &Look {
+                        size: Some(size),
+                        ..style
+                    },
+                );
+            }
+            self.shown_size = scene.as_ref().map(|scene| (scene.width, scene.height));
+        } else {
+            self.shown_size = None;
+            self.resize = None;
         }
-        .map(|scene| scene::surround(scene, &theme, Surround::Shadow));
+        let scene = scene.map(|scene| scene::surround(scene, &theme, Surround::Shadow));
+        // あとから届いた中身は，前の中身の上に重ねて濃くしていく
+        if std::mem::take(&mut self.arrived) && is_list {
+            self.crossfade = self.scene.clone().map(|shown| (shown, now));
+        }
+        if self
+            .crossfade
+            .as_ref()
+            .is_some_and(|(_, start)| now.duration_since(*start) >= motion::crossfade_duration())
+        {
+            self.crossfade = None;
+        }
+        if self.resize.is_some() || self.crossfade.is_some() {
+            self.window().start_timer(Timer::Motion, FRAME_MILLISECONDS);
+        }
         let on_glass = theme.backdrop;
         if on_glass != self.on_glass {
             // 窓を替える．動いている時計も移す
@@ -426,15 +510,23 @@ impl App {
                     .set_chrome(theme.backdrop, look.dark, theme.frame);
                 self.window().place(&anchor, scene, ANCHOR_GAP);
                 let opacity = self.opacity;
+                let below = self
+                    .crossfade
+                    .as_ref()
+                    .map(|(shown, start)| (shown, motion::crossfade_opacity(*start, now)));
                 let window = if self.on_glass {
                     &mut self.glass
                 } else {
                     &mut self.plain
                 };
-                let _ = window.draw(&self.renderer, scene, &measure, opacity);
+                let _ = window.draw_over(&self.renderer, below, scene, &measure, opacity);
             }
             _ => {
                 self.window().hide();
+                self.window().stop_timer(Timer::Motion);
+                self.shown_size = None;
+                self.resize = None;
+                self.crossfade = None;
                 self.rest_opacity = 1.0;
                 self.announcer.reset();
             }

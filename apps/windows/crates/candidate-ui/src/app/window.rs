@@ -53,6 +53,8 @@ pub enum Timer {
     Mode = 1,
     /// フェード(出し始めの濃さ・モードの札を消す)の 1 コマ
     Fade = 2,
+    /// 窓の大きさの動きと，あとから届いた中身の重ね変わりの 1 コマ
+    Motion = 3,
 }
 
 struct Callbacks {
@@ -377,6 +379,19 @@ impl Window {
         measure: &TextMeasure,
         opacity: f32,
     ) -> Result<()> {
+        self.draw_over(renderer, None, scene, measure, opacity)
+    }
+
+    /// 前の中身 below を描き，その上に scene を重ねて描く(あとから届いた候補の重ね変わり)．
+    /// below の濃さは opacity，scene の濃さは below があれば (opacity × その濃さ)
+    pub fn draw_over(
+        &mut self,
+        renderer: &Renderer,
+        below: Option<(&Scene, f32)>,
+        scene: &Scene,
+        measure: &TextMeasure,
+        opacity: f32,
+    ) -> Result<()> {
         let scale = self.scale();
         let width = ((scene.width * scale).ceil() as u32).max(1);
         let height = ((scene.height * scale).ceil() as u32).max(1);
@@ -386,7 +401,14 @@ impl Window {
             target.SetDpi(BASE_DPI * scale, BASE_DPI * scale);
             target.BeginDraw();
         }
-        let painted = renderer.paint(&target, scene, measure, scale, opacity);
+        let painted = match below {
+            Some((under, strength)) => renderer
+                .paint(&target, under, measure, scale, opacity)
+                .and_then(|()| {
+                    renderer.paint_over(&target, scene, measure, scale, opacity * strength)
+                }),
+            None => renderer.paint(&target, scene, measure, scale, opacity),
+        };
         // SAFETY: BeginDraw と対にする
         let ended = unsafe { target.EndDraw(None, None) };
         if ended.is_err() {

@@ -465,6 +465,10 @@ pub mod motion {
     pub mod candidate_rest {
         pub const FADE_IN: f32 = 250.0;
     }
+    pub mod candidate_window {
+        pub const RESIZE: f32 = 150.0;
+        pub const UPDATE: f32 = 120.0;
+    }
     pub mod settings_windows {
         pub const PAGE_ENTER: f32 = 167.0;
         pub const HOVER: f32 = 83.0;

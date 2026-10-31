@@ -11,6 +11,9 @@ final class CandidatePanelController {
     private let backdrop = GlassBackdrop()
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
+    /// 前に出した一覧と分岐図．あとから届いた候補で中身だけが変わったか(選んでいるものは同じか)を見分ける
+    private var shownList: CandidatePanel?
+    private var shownLattice: LatticePanel?
 
     /// 候補をマウスで押したときに知らせる先．押した対象(PointerTarget)を渡す
     var onChoose: ((PointerTarget) -> Void)? {
@@ -30,8 +33,12 @@ final class CandidatePanelController {
         view.keys = keys
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
+        // 選んでいる候補が同じまま中身が変わったときは，あとから届いた候補なので重ねて変える(選び直しはすぐ見せる)
+        let arrived = shownList.map { $0 != panel && $0.selectedEntry == panel.selectedEntry && $0.focus == panel.focus } ?? false
+        shownList = panel
+        shownLattice = nil
         view.panel = panel
-        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme)
+        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived)
         announceSelection(panel)
     }
 
@@ -40,20 +47,53 @@ final class CandidatePanelController {
         branchView.showsHints = showsHints
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
+        let arrived = shownLattice.map { shown in
+            shown != panel && shown.columns.map(\.text) == panel.columns.map(\.text)
+                && shown.columns.firstIndex(where: \.isFocused) == panel.columns.firstIndex(where: \.isFocused)
+                && shown.columns.map(\.selectedAlternative) == panel.columns.map(\.selectedAlternative)
+        } ?? false
+        shownLattice = panel
+        shownList = nil
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived)
         if let focused = panel.columns.first(where: \.isFocused) {
             announce(focused.text)
         }
     }
 
-    /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける
-    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme) {
+    /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．
+    /// 出ている窓の大きさが変わるときは縁を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
+    /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)
+    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false) {
         let glass = theme.isRounded
         backdrop.cornerRadius = theme.cornerRadius
         let wasVisible = FloatingPanel.attach(content, to: window, backdrop: glass ? backdrop : nil)
-        window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
-        if glass { window.invalidateShadow() }
+        let frame = NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size)
+        if wasVisible, crossfades, let root = window.contentView {
+            root.wantsLayer = true
+            let transition = CATransition()
+            transition.type = .fade
+            transition.duration = DesignTokens.Motion.CandidateWindow.update / 1000
+            root.layer?.add(transition, forKey: "arrived")
+        }
+        // 窓が入力位置の上下を入れ替えるとき(画面の下の端)は，入力位置をまたいで滑らせず，すぐ移す
+        let current = window.frame
+        let staysOnSide = abs(frame.maxY - current.maxY) < 1 || abs(frame.minY - current.minY) < 1
+        if wasVisible, frame != current, staysOnSide, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = DesignTokens.Motion.CandidateWindow.resize / 1000
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                context.allowsImplicitAnimation = true
+                window.animator().setFrame(frame, display: true)
+            } completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    if glass { self?.window.invalidateShadow() }
+                }
+            }
+        } else {
+            window.setFrame(frame, display: true)
+            if glass { window.invalidateShadow() }
+        }
         if !wasVisible {
             startRestFadeIn()
             window.orderFrontRegardless()
@@ -64,6 +104,8 @@ final class CandidatePanelController {
         fadeTimer?.invalidate()
         fadeTimer = nil
         lastAnnounced = nil
+        shownList = nil
+        shownLattice = nil
         window.orderOut(nil)
     }
 

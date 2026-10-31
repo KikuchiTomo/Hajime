@@ -272,10 +272,22 @@ impl Renderer {
     ) -> Result<()> {
         let clear = D2D1_COLOR_F::default();
         // SAFETY: target は描いている途中の COM の参照
-        let brush = unsafe {
-            target.Clear(Some(&clear));
-            target.CreateSolidColorBrush(&clear, None)?
-        };
+        unsafe { target.Clear(Some(&clear)) };
+        self.paint_over(target, scene, measure, scale, opacity)
+    }
+
+    /// 前に描いたものを消さずに，その上に scene を opacity の濃さで描く(重ね変わり)
+    pub fn paint_over(
+        &self,
+        target: &ID2D1RenderTarget,
+        scene: &Scene,
+        measure: &TextMeasure,
+        scale: f32,
+        opacity: f32,
+    ) -> Result<()> {
+        let clear = D2D1_COLOR_F::default();
+        // SAFETY: target は描いている途中の COM の参照
+        let brush = unsafe { target.CreateSolidColorBrush(&clear, None)? };
         let painter = Painter {
             renderer: self,
             target,
