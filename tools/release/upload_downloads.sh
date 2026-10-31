@@ -2,7 +2,8 @@
 # 作った配布物を Cloudflare R2 に置き，https://haji.men/download/ から配る(apps/docs-site/worker/downloads.js)．
 # バージョンのフォルダ(v<バージョン>/)に配布物と SHA256SUMS.txt を置いてから，最新のバージョン(latest.json)を書き換える．
 # 使い方: tools/release/upload_downloads.sh <バージョン> <配布物の置き場所>
-# CLOUDFLARE_API_TOKEN(R2 に書ける API トークン)と CLOUDFLARE_ACCOUNT_ID が要る．wrangler は apps/docs-site に入れておく
+# R2 の S3 互換 API に AWS CLI で送る．AWS_ACCESS_KEY_ID と AWS_SECRET_ACCESS_KEY(このバケットだけに書ける R2 のアクセスキー)と
+# CLOUDFLARE_ACCOUNT_ID が要る
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 version=$1
@@ -15,8 +16,10 @@ if [ -z "$bucket" ] || [ "$(printf '%s\n' "$bucket" | wc -l | tr -d ' ')" -ne 1 
   exit 1
 fi
 
+endpoint="https://${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID が要ります}.r2.cloudflarestorage.com"
 put() {
-  (cd "$site" && npx --no-install wrangler r2 object put "$bucket/$1" --file "$2" --content-type "$3" --remote)
+  aws s3api put-object --endpoint-url "$endpoint" --region auto \
+    --bucket "$bucket" --key "$1" --body "$2" --content-type "$3" --output text --query ETag > /dev/null
 }
 
 "$root/tools/release/checksums.sh" "$dist"

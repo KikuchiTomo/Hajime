@@ -86,8 +86,9 @@ jobs:
   upload-cloudflare:
     # 同じ配布物を Cloudflare R2 に置き，https://haji.men/download/ から配る(tools/release/upload_downloads.sh)．
     # 秘密の値は environment「cloudflare」にだけ置き，この仕事にだけ渡す
-    #   secrets.CLOUDFLARE_R2_API_TOKEN  Account > Workers R2 Storage > Edit だけの API トークン
-    #   secrets.CLOUDFLARE_ACCOUNT_ID    Cloudflare のアカウント ID
+    #   secrets.R2_ACCESS_KEY_ID        hajime-downloads だけを読み書きできる R2 のアクセスキー
+    #   secrets.R2_SECRET_ACCESS_KEY    そのシークレット
+    #   secrets.CLOUDFLARE_ACCOUNT_ID   Cloudflare のアカウント ID
     needs: [prepare, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -104,12 +105,12 @@ jobs:
           pattern: package-*
           merge-multiple: true
           path: dist
-      - name: wrangler を入れる
-        working-directory: apps/docs-site
-        run: npm ci --ignore-scripts --no-audit --no-fund
       - env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_R2_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_SEND_METRICS: "false"
+          # R2 が受け付けない既定のチェックサムの付加を，必要なときだけにする
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
           VERSION: ${{ needs.prepare.outputs.version }}
         run: tools/release/upload_downloads.sh "$VERSION" dist
