@@ -18,6 +18,10 @@
       "bucket_name": "hajime-downloads"
     }
   ],
+  // R2 にまだ配布物が無いときの /download/macos・/download/windows の転送先
+  "vars": {
+    "DOWNLOADS_FALLBACK": "https://github.com/KikuchiTomo/Hajime/releases/latest"
+  },
   "workers_dev": false,
   "preview_urls": false,
   "observability": {

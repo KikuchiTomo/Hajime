@@ -1,7 +1,7 @@
 // 配布物(/download/ の下)を R2 から配る．ほかのページは静的アセットのまま Worker を通らない(wrangler.jsonc の run_worker_first)．
 //
 //   /download/v0.1.13/Hajime-0.1.13.msi  そのバージョンの配布物．あとから中身を変えない(Microsoft Store はこの URL を登録する)
-//   /download/macos・/download/windows   最新のバージョンの配布物へ転送する
+//   /download/macos・/download/windows   最新のバージョンの配布物へ転送する．R2 にまだ無ければ DOWNLOADS_FALLBACK(wrangler.jsonc)へ転送する
 //
 // R2 には tools/release/upload_downloads.sh が置く．最新のバージョンは latest.json に書く:
 //   { "version": "0.1.13", "files": { "macos": "v0.1.13/Hajime-0.1.13.pkg", "windows": "v0.1.13/Hajime-0.1.13.msi" } }
@@ -24,25 +24,27 @@ export default {
     if (VERSIONED.test(key)) {
       return serve(request, env.DOWNLOADS, key);
     }
-    return redirectToLatest(env.DOWNLOADS, key, request.url);
+    return redirectToLatest(env, key, request.url);
   },
 };
 
-async function redirectToLatest(bucket, platform, base) {
-  const latest = await bucket.get(LATEST);
+async function redirectToLatest(env, platform, base) {
+  const latest = await env.DOWNLOADS.get(LATEST);
   if (latest === null) {
-    return notFound();
+    // まだ一度も R2 に置いていない
+    return redirect(env.DOWNLOADS_FALLBACK);
   }
   const files = (await latest.json()).files ?? {};
   const key = Object.hasOwn(files, platform) ? files[platform] : null;
   if (typeof key !== "string" || !VERSIONED.test(key)) {
     return notFound();
   }
-  return new Response(null, {
-    status: 302,
-    // 新しいバージョンを出したらすぐ切り替わるよう，転送は覚えさせない
-    headers: { Location: new URL(PREFIX + key, base).toString(), "Cache-Control": "no-store" },
-  });
+  return redirect(new URL(PREFIX + key, base).toString());
+}
+
+function redirect(location) {
+  // 新しいバージョンを出したらすぐ切り替わるよう，転送は覚えさせない
+  return new Response(null, { status: 302, headers: { Location: location, "Cache-Control": "no-store" } });
 }
 
 async function serve(request, bucket, key) {
