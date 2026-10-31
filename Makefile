@@ -3,6 +3,8 @@ PYTHON ?= python3 -I
 # Zenzai のモデルの置き場所．既定は tools/models/fetch_zenzai.sh と同じリポジトリの 1 つ上の models/
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
+# かな漢字変換の辞書(hajime-dictionary)．tools/dictionary/fetch_dictionary.sh が MODELS_DIR に展開する
+BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.1.1/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
@@ -11,9 +13,10 @@ EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 setup:
 	mise install
 
-# Zenzai のモデルを取得してハッシュを確かめる(docs/dev/adr/0006-zenzai.md)
+# Zenzai のモデルとかな漢字変換の辞書を取得してハッシュを確かめる(docs/dev/adr/0006-zenzai.md)
 fetch-models:
 	tools/models/fetch_zenzai.sh "$(MODELS_DIR)"
+	tools/dictionary/fetch_dictionary.sh "$(MODELS_DIR)"
 
 check:
 	$(PYTHON) tools/check/check_skills.py
@@ -39,7 +42,8 @@ test-debug:
 # 本物の Zenzai のテストと処理時間(R-01)を Release で動かす．モデルが無ければ失敗する(CI はこちらを使う)
 test-zenzai:
 	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
-	HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" swift test --package-path core -c release --filter HajimeEngineTests
+	@dictionary=; if [ -d "$(BUNDLED_DICTIONARY)" ]; then dictionary="HAJIME_BUNDLED_DICTIONARY=$(abspath $(BUNDLED_DICTIONARY))"; fi; \
+	env HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" $$dictionary swift test --package-path core -c release --filter HajimeEngineTests
 
 # 公式サイト(apps/docs-site)．出力先は make site SITE_OUT=<ディレクトリ> で変えられる
 SITE_OUT ?= $(CURDIR)/apps/docs-site/public

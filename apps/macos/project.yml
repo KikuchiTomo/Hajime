@@ -61,6 +61,13 @@ targets:
           - $(SRCROOT)/../../../models/zenz-v3.2-small-Q5_K_M.gguf
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-small-Q5_K_M.gguf
+      - name: かな漢字変換の辞書を入れる
+        path: ../../tools/macos/copy_dictionary.sh
+        inputFiles:
+          - $(SRCROOT)/../../tools/macos/copy_dictionary.sh
+          - $(SRCROOT)/../../../models/hajime-dictionary-0.1.1/Dictionary/SHA256SUMS
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Dictionary/SHA256SUMS
     dependencies:
       - package: HajimeCore
         product: HajimeDomain

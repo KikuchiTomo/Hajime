@@ -57,7 +57,8 @@ final class CompositionRoot {
         let settings = FileSettingsStore(fileURL: support.appendingPathComponent("settings.json"))
         let zenzai = loadZenzaiModel()
         let memory = support.appendingPathComponent("memory", isDirectory: true)
-        let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai)
+        let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai,
+                                                dictionaryDirectory: loadBundledDictionary()?.url)
         // 打ち間違いの訂正は時間がかかるので，別の変換器でメインスレッドの外で求める(Zenzai があるときだけ)
         let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: AppIdentity.versionString) }
         engine.apply(settings.current)
@@ -78,6 +79,18 @@ final class CompositionRoot {
         associations.preloadBundled()
         installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries,
                                     associations: associations)
+    }
+
+    /// アプリに入れたかな漢字変換の辞書を確かめて読む．無いか，ハッシュが合わなければ azooKey に同梱の辞書で動く
+    private static func loadBundledDictionary() -> BundledDictionary? {
+        guard let url = Bundle.main.resourceURL?.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true) else { return nil }
+        do {
+            return try BundledDictionary.verified(at: url)
+        } catch {
+            Logger(subsystem: AppIdentity.bundleIdentifier, category: "dictionary")
+                .notice("同梱の辞書を使いません: \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く

@@ -83,6 +83,7 @@ if [ -n "$notary_profile" ]; then
 fi
 
 "$root/tools/models/fetch_zenzai.sh"
+"$root/tools/dictionary/fetch_dictionary.sh"
 
 cd "$root/apps/macos"
 xcodegen generate --quiet

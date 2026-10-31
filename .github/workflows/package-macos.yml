@@ -47,11 +47,11 @@ jobs:
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
         with:
           install_args: xcodegen
-      # Zenzai のモデルは .pkg に入れる．取得元とハッシュは fetch_zenzai.sh にあり，package.sh が取って確かめる
+      # Zenzai のモデルとかな漢字変換の辞書は .pkg に入れる．取得元とハッシュは fetch_zenzai.sh・fetch_dictionary.sh にあり，package.sh が取って確かめる
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/../models
-          key: zenzai-${{ hashFiles('tools/models/fetch_zenzai.sh') }}
+          key: models-${{ hashFiles('tools/models/fetch_zenzai.sh', 'tools/dictionary/fetch_dictionary.sh') }}
       # 証明書と公証の資格情報を使い捨てのキーチェーンに入れる．Secrets は使うこの手順にだけ渡す
       - name: 署名と公証の準備
         env:
