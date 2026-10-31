@@ -39,7 +39,7 @@ test-zenzai:
 	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
 	HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" swift test --package-path core -c release --filter HajimeEngineTests
 
-# 公式サイト(apps/docs-site)．本文は docs/user を読み込む．出力先は make site SITE_OUT=<ディレクトリ> で変えられる
+# 公式サイト(apps/docs-site)．出力先は make site SITE_OUT=<ディレクトリ> で変えられる
 SITE_OUT ?= $(CURDIR)/apps/docs-site/public
 
 site:

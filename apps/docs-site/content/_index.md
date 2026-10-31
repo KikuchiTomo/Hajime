@@ -78,7 +78,7 @@ layout: hextra-home
   {{< hajime/feature
     title="外部通信不要"
     subtitle="AI補正などもすべてローカルで実施します．"
-    link="docs/privacy/"
+    link="privacy/"
   >}}
 {{< /hajime/features >}}
 

@@ -1,5 +1,5 @@
 /// 利用者が変えられる設定．項目の既定値はここに書き，DefaultSettings.settings はそれをそのまま使う．
-/// 項目の一覧は docs/user/reference/settings.md
+/// 項目の一覧は apps/docs-site/content/docs/settings.md
 public struct Settings: Sendable, Equatable {
     // MARK: 入力
     /// 入力方式(R-05)
