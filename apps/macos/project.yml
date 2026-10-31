@@ -43,6 +43,9 @@ targets:
       # 連想変換の辞書(R-18)．data/thesaurus は tools/thesaurus/update.sh で日本語 WordNet から作る
       - path: ../../data/thesaurus/wordnet-ja.tsv
         buildPhase: resources
+      # 同音異義語の使い分けの辞書(R-08)．data/usage は tools/usage/update.sh で japanese-usage-dictionary から取る
+      - path: ../../data/usage/usage_dict.txt
+        buildPhase: resources
     postBuildScripts:
       - name: 入力ソースの表示名を書く
         path: ../../tools/macos/write_input_source_names.sh

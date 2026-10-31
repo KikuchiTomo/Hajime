@@ -37,13 +37,14 @@ Copy-Item (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') (Join-Path $Output '
 
 Copy-Item (Join-Path $root 'data\postal\postal-codes.tsv') $Output
 Copy-Item (Join-Path $root 'data\thesaurus\wordnet-ja.tsv') $Output
+Copy-Item (Join-Path $root 'data\usage\usage_dict.txt') $Output
 # 候補ウィンドウの既定の書体(Kiwi Maru．SIL OFL 1.1)．候補ウィンドウと設定の画面が fonts\ から読む
 Copy-Item (Join-Path $root 'data\fonts') (Join-Path $Output 'fonts') -Recurse -Force
 Copy-Item (Join-Path $root 'LICENSE') (Join-Path $Output 'LICENSE.txt')
 Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') (Join-Path $Output 'THIRD_PARTY_NOTICES.md')
 Copy-Item (Join-Path $root 'LICENSES') (Join-Path $Output 'LICENSES') -Recurse -Force
 
-$required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv',
+$required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv', 'usage_dict.txt',
     'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
 foreach ($file in $required) {

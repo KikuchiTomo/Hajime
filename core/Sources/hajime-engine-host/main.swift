@@ -139,6 +139,8 @@ func run() -> Int32 {
     associations.preloadBundled()
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
+    let usageTable = HostPaths.installation.appendingPathComponent("usage_dict.txt")
+    let usageDictionary = FileManager.default.fileExists(atPath: usageTable.path) ? UsageDictionaryFile(url: usageTable) : nil
     // 英単語の辞書は Windows のスペルチェッカー(macOS の NSSpellChecker と同じ役)
     #if os(Windows)
     let lexicon = WindowsSpellCheckerLexicon()
@@ -178,7 +180,7 @@ func run() -> Int32 {
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                         keyNames: .windows, rejections: rejections)
+                         keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary)
         },
         settings: settings,
         ui: sendToWindow,
