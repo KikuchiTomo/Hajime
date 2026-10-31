@@ -9,6 +9,7 @@
 /// 漢字 1 字どうしなので切らない)．ただし次の切れ目は語の途中のことが多いので除く:
 /// - ひらがなどうしのあいだ(「あ｜る」「で｜す」)．右が助詞で始まるか，左が助詞で終わり右が 2 文字以上の語で始まるときだけ切る(「ある｜と」「が｜ある」)
 /// - 漢字どうしのあいだで，どちらかが 1 字のもの(「天｜気」)．2 字以上どうしは切る(「運転｜免許」)
+/// - 語の頭に来ない字(「ん」「っ」，小さいかな，長音)の前(「ウブ｜ンツ」)
 public enum SegmentSplitter {
     /// 区切れる位置で分けた文節
     public struct Split: Sendable, Equatable {
@@ -77,7 +78,8 @@ public enum SegmentSplitter {
         before: ArraySlice<Character>, after: ArraySlice<Character>,
         leftWords: () -> [Candidate.Word], rightWords: () -> [Candidate.Word]
     ) -> Bool {
-        guard let last = before.last, let first = after.first else { return false }
+        // 語の頭に来ない字(「ん」「っ」，小さいかな，長音)の前は語の途中
+        guard let last = before.last, let first = after.first, ClauseSplitter.canStartClause(with: first) else { return false }
         switch (kind(of: last), kind(of: first)) {
         case (.hiragana, .hiragana):
             // 右が助詞で始まり左の語が 2 文字以上(「ある｜と」「です｜ね」．「て｜も」は切らない)か，

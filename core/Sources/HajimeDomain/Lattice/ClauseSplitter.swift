@@ -8,6 +8,8 @@
 /// - ひらがなで始まるそのほかの語(助詞・助動詞・「する」など)は，前の文節に付ける
 /// - 英数字だけの語が続くときは 1 つの文節にまとめる．エンジンは英字を 1 文字ずつの語にするので，
 ///   そのままでは「python」が p・y・t・h・o・n の 6 つの文節になる
+/// - カタカナだけの語が続くときも 1 つの文節にまとめる．辞書に無いカタカナ語は短い語の並びになる(「ウブ」「ン」「ツ」)
+/// - 語の頭に来ない字(「ん」「っ」，小さいかな，長音)で始まる語は，前の文節に付ける(「ウブ｜ンツ」と切らない)
 public enum ClauseSplitter {
     public struct Clause: Sendable, Equatable {
         public var text: String
@@ -46,13 +48,14 @@ public enum ClauseSplitter {
             guard !text.isEmpty || readingCount > 0 else { return }
             parts.append((Clause(text: text, readingCount: readingCount), startsClause))
         }
-        var previousIsLatin = false
+        var previousIsLatin = false, previousIsKatakana = false
         for word in words {
             let characters = Array(word.text)
             guard let first = characters.first else { continue }
             let isLatin = characters.allSatisfy(Composition.isAlphanumeric)
-            defer { previousIsLatin = isLatin }
-            if isLatin, previousIsLatin {
+            let isKatakana = characters.allSatisfy(isKatakanaCharacter)
+            defer { previousIsLatin = isLatin; previousIsKatakana = isKatakana }
+            if (isLatin && previousIsLatin) || (isKatakana && previousIsKatakana) || !canStartClause(with: first) {
                 append(word.text, word.readingCount, startsClause: false)
                 continue
             }
@@ -75,6 +78,18 @@ public enum ClauseSplitter {
             }
         }
         return parts
+    }
+
+    /// この字で文節を始められるか．「ん」「っ」，小さいかな，長音は語の頭に来ないので，その前では区切らない
+    public static func canStartClause(with character: Character) -> Bool {
+        !nonInitialCharacters.contains(character)
+    }
+
+    /// 語の頭に来ない字(ひらがな・カタカナ・半角カタカナ)
+    private static let nonInitialCharacters: Set<Character> = Set("んっぁぃぅぇぉゃゅょゎゕゖンッァィゥェォャュョヮヵヶーﾝｯｧｨｩｪｫｬｭｮｰ")
+
+    private static func isKatakanaCharacter(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { (0x30A1...0x30FA).contains($0.value) || $0 == "ー" }
     }
 
     /// 語の頭に付く接頭辞．「お茶」「ご飯」は 1 つの語として扱う
