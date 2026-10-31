@@ -39,7 +39,8 @@ Copy-Item (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') (Join-Path $Output '
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-xsmall-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
 
 # かな漢字変換の辞書(エンジンは Dictionary\ から読み，ファイルごとのハッシュを確かめ直す)と，辞書のライセンスの表示
-Copy-Item (Join-Path $Dictionary 'Dictionary') (Join-Path $Output 'Dictionary') -Recurse -Force
+# 辞書には [0022].louds のように角かっこを含む名前のファイルがあるので，ワイルドカードとして読まない -LiteralPath で写す
+Copy-Item -LiteralPath (Join-Path $Dictionary 'Dictionary') -Destination (Join-Path $Output 'Dictionary') -Recurse -Force
 
 Copy-Item (Join-Path $root 'data\postal\postal-codes.tsv') $Output
 Copy-Item (Join-Path $root 'data\thesaurus\wordnet-ja.tsv') $Output

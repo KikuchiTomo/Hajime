@@ -17,7 +17,7 @@ $manifest = '8b73e404747c801017c9ca37219bb9ba97702939ef29822e704f741d2c827779'
 New-Item -ItemType Directory -Force -Path $Output | Out-Null
 $directory = Join-Path $Output "hajime-dictionary-$version"
 $sums = Join-Path $directory 'Dictionary\SHA256SUMS'
-if ((Test-Path $sums) -and ((Get-FileHash -Algorithm SHA256 -Path $sums).Hash.ToLowerInvariant() -eq $manifest)) {
+if ((Test-Path -LiteralPath $sums) -and ((Get-FileHash -Algorithm SHA256 -LiteralPath $sums).Hash.ToLowerInvariant() -eq $manifest)) {
     Write-Host "確かめました: $directory\Dictionary"
     exit 0
 }
@@ -26,18 +26,19 @@ New-Item -ItemType Directory -Force -Path $work | Out-Null
 try {
     $archive = Join-Path $work 'dictionary.tar.gz'
     Invoke-WebRequest -Uri $url -OutFile $archive
-    $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
+    $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
     if ($actual -ne $expected) { throw "辞書の SHA-256 が一致しません: $actual" }
     # Windows 10 以降に入っている tar(bsdtar)で展開する
     tar -xzf $archive -C $work
     if ($LASTEXITCODE -ne 0) { throw '辞書を展開できません' }
     $extracted = Join-Path $work "hajime-dictionary-$version"
     $extractedSums = Join-Path $extracted 'Dictionary\SHA256SUMS'
-    if ((Get-FileHash -Algorithm SHA256 -Path $extractedSums).Hash.ToLowerInvariant() -ne $manifest) { throw '辞書の一覧の SHA-256 が一致しません' }
-    foreach ($line in Get-Content -Encoding UTF8 $extractedSums) {
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $extractedSums).Hash.ToLowerInvariant() -ne $manifest) { throw '辞書の一覧の SHA-256 が一致しません' }
+    # 辞書には [0022].louds のように角かっこを含む名前のファイルがある．-Path はワイルドカードとして読むので，-LiteralPath で開く
+    foreach ($line in Get-Content -Encoding UTF8 -LiteralPath $extractedSums) {
         $hash, $path = $line -split '  ', 2
         $file = Join-Path (Join-Path $extracted 'Dictionary') ($path -replace '/', '\')
-        if ((Get-FileHash -Algorithm SHA256 -Path $file).Hash.ToLowerInvariant() -ne $hash) { throw "辞書のファイルの SHA-256 が一覧と一致しません: $path" }
+        if ((Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant() -ne $hash) { throw "辞書のファイルの SHA-256 が一覧と一致しません: $path" }
     }
     if (Test-Path $directory) { Remove-Item -Recurse -Force $directory }
     Move-Item $extracted $directory
