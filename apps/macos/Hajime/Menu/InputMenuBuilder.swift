@@ -15,15 +15,18 @@ final class InputMenuBuilder {
         var toggleLiveConversion: Selector
         var handwriting: Selector
         var openSettings: Selector
+        var checkForUpdates: Selector
     }
 
     private let settings: any SettingsStoring
     private let openSettings: () -> Void
+    private let checkForUpdates: () -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(settings: any SettingsStoring, openSettings: @escaping () -> Void) {
+    init(settings: any SettingsStoring, openSettings: @escaping () -> Void, checkForUpdates: @escaping () -> Void) {
         self.settings = settings
         self.openSettings = openSettings
+        self.checkForUpdates = checkForUpdates
     }
 
     /// 入力メニュー．プロセスで一度だけ作って使い回し，チェックの印だけ合わせる．項目に受け手(target)は付けない．
@@ -49,6 +52,7 @@ final class InputMenuBuilder {
         menu.addItem(live)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: UIStrings.Menu.checkForUpdates, action: actions.checkForUpdates, keyEquivalent: ""))
         cachedMenu = menu
         liveConversionItem = live
         handwritingItem = NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")
@@ -75,6 +79,12 @@ final class InputMenuBuilder {
         } catch {
             logger.error("設定を保存できませんでした: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    /// 最新のリリースのページをブラウザで開く(アプリは通信しない)
+    func handleCheckForUpdates() {
+        logger.notice("入力メニュー: 最新のリリースのページを開きます")
+        checkForUpdates()
     }
 
     func handleOpenSettings() {

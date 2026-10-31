@@ -492,6 +492,7 @@ enum UIStrings {
         static let openSettings = "設定を開く…"
         static let liveConversion = "ライブ変換"
         static let handwriting = "手書き入力"
+        static let checkForUpdates = "更新を確認"
     }
 
     /// 設定の画面の選択肢の名前
@@ -796,6 +797,7 @@ enum UIStrings {
         static let version = "バージョン"
         /// バージョンの表示(ADR 0008．Windows と同じ「v0.1.0 (macOS)」の形)
         static func versionValue(_ version: String) -> String { "v\(version) (macOS)" }
+        static let checkForUpdates = "更新を確認"
         static let acknowledgements = "謝辞"
         static let acknowledgementsNote = "はじめは上記のソフトウェア・モデル・データを利用しています。"
         static let noticesMissing = "謝辞のファイルが見つかりません"

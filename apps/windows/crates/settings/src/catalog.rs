@@ -117,6 +117,9 @@ pub struct Catalog {
     pub timing: Timing,
     /// 一覧を書き出すファイルの既定の名前(RuleList の名前ごと)
     pub export_file_names: std::collections::BTreeMap<String, String>,
+    /// 「更新を確認」で開く最新のリリースのページ(DefaultSettings.latestReleaseURL)
+    #[serde(rename = "latestReleaseURL")]
+    pub latest_release_url: String,
 }
 
 impl Catalog {
@@ -144,6 +147,12 @@ mod tests {
         );
         assert!(catalog.limits.custom_themes > 0);
         assert!(catalog.timing.response_timeout().as_secs_f64() > 0.0);
+    }
+
+    #[test]
+    fn 更新を確認で開くページは_https() {
+        let catalog = Catalog::load().unwrap();
+        assert!(catalog.latest_release_url.starts_with("https://"));
     }
 
     #[test]

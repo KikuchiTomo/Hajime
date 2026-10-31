@@ -673,6 +673,18 @@ pub fn open_with_default_app(path: &std::path::Path) {
     }
 }
 
+/// URL を既定のブラウザで開く．https の URL だけを渡す(ファイルや実行ファイルを開かない)
+pub fn open_url(url: &str) {
+    if !url.starts_with("https://") {
+        return;
+    }
+    let url = HSTRING::from(url);
+    // SAFETY: url は呼び出しの間生きている
+    unsafe {
+        ShellExecuteW(None, w!("open"), &url, None, None, SW_SHOWNORMAL);
+    }
+}
+
 /// 確かめる窓(OK とキャンセル)．OK なら true
 pub fn confirm(owner: HWND, title: &str, text: &str) -> bool {
     // SAFETY: owner はこのスレッドの窓．文字列は呼び出しの間生きている

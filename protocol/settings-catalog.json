@@ -79,6 +79,7 @@
     "wordLanguage",
     "yenKey"
   ],
+  "latestReleaseURL" : "https://github.com/KikuchiTomo/Hajime/releases/latest",
   "limits" : {
     "applicationIdentifierLength" : 255,
     "associationDictionaries" : 8,
