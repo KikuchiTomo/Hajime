@@ -176,7 +176,7 @@ func run() -> Int32 {
     let rejections = SettingsCorrectionRejections(settings: settings)
     let service = EngineService(
         makeSession: {
-            InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries),
+            InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                          keyNames: .windows, rejections: rejections)
         },
