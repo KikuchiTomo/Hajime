@@ -1,4 +1,5 @@
-/// 変換の候補に添える使い分けと誤用の注釈(R-08)．文はすべてこのリポジトリで書いたもの．
+/// 変換の候補に添える使い分けと誤用の注釈(R-08)．同音異義語は同梱の辞書(UsageDictionary)を先に使い，
+/// 辞書に無い語はこのリポジトリで書いた組で補う．誤用の文はすべてこのリポジトリで書いたもの．
 ///
 /// - 同音異義語: 同じ読みで意味の違う語の使い分け(「撮る」写真や動画を写す，など)．既定で出す
 /// - 誤用: 本来とは違う形で広まっている言い回し(「汚名挽回」→「汚名返上」「名誉挽回」)．既定では出さない
@@ -25,10 +26,12 @@ public enum UsageGuide {
         var words: [Homophone]
     }
 
-    /// 文節の候補に当てはまる同音異義語の使い分け．当てはまらなければ nil．
+    /// 文節の候補に当てはまる同音異義語の使い分け．同梱の辞書(dictionary)を先に引き，無ければこのリポジトリで書いた組を引く．
+    /// 当てはまらなければ nil．
     /// 活用した形(「撮った」)にも当てはまるよう，語の漢字の部分(「撮」)が候補にあり，文節の読みが組の読み(「と」)で始まるものを探す．
     /// 例: 「撮った」(読み「とった」)→「撮る: 写真や動画を写す　ほかに 取る・採る・執る・捕る」
-    public static func homophoneNote(for text: String, reading: String) -> String? {
+    public static func homophoneNote(for text: String, reading: String, dictionary: UsageDictionary? = nil) -> String? {
+        if let note = dictionary?.note(for: text, reading: reading) { return note }
         for group in homophoneGroups where reading.hasPrefix(group.reading) {
             guard let hit = group.words.first(where: { $0.matches(text) }) else { continue }
             let others = group.words.filter { $0.word != hit.word }.map(\.word).joined(separator: "・")

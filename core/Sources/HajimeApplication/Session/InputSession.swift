@@ -24,6 +24,7 @@ public final class InputSession {
 
     private let converter: any KanaKanjiConverting
     private let lexicon: any EnglishLexicon
+    private let usageDictionary: (any UsageDictionaryProviding)?
     private let settings: any SettingsReading
 
     public private(set) var mode: InputMode = .japanese
@@ -90,9 +91,11 @@ public final class InputSession {
     ///   - typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
     ///   - associations: 取り込んだ連想の辞書を引くもの(R-18)．nil なら連想変換のキーはふつうの変換と同じに動く
     ///   - keyNames: 候補ウィンドウの案内と注記に出すキーの名前の書き方(入力メソッドを動かす OS に合わせる)
+    ///   - usageDictionary: 同音異義語の使い分けの辞書(R-08)．nil ならこのリポジトリで書いた組だけを使う
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
-                rejections: (any CorrectionRejectionRecording)? = nil) {
+                rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil) {
+        self.usageDictionary = usageDictionary
         self.keyNames = keyNames
         self.rejections = rejections
         self.converter = converter
@@ -1331,7 +1334,8 @@ public final class InputSession {
         let notes = [
             settings.current.misuseNotes ? UsageGuide.misuseNote(for: lattice.text) : nil,
             settings.current.proofreading ? Proofreading.note(for: lattice.text) : nil,
-            settings.current.homophoneNotes ? UsageGuide.homophoneNote(for: text, reading: reading) : nil,
+            settings.current.homophoneNotes
+                ? UsageGuide.homophoneNote(for: text, reading: reading, dictionary: usageDictionary?.usageDictionary) : nil,
         ].compactMap { $0 }
         return notes.isEmpty ? nil : notes.joined(separator: "　")
     }

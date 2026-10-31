@@ -97,7 +97,7 @@ final class CompositionRoot {
     func makeSession() -> InputSession {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                     rejections: correctionRejections)
+                     rejections: correctionRejections, usageDictionary: usageDictionary)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)
@@ -129,6 +129,9 @@ final class CompositionRoot {
 
     /// 郵便番号の表(R-13)．入力欄ごとのセッションで共有し，初めて引くときに読み込む
     private(set) lazy var postalCodes: PostalCodeFile? = Bundle.main.url(forResource: "postal-codes", withExtension: "tsv").map(PostalCodeFile.init(url:))
+    /// 同音異義語の使い分けの辞書(R-08)．data/usage/usage_dict.txt を同梱する
+    private(set) lazy var usageDictionary: UsageDictionaryFile? = Bundle.main.url(forResource: "usage_dict", withExtension: "txt")
+        .map(UsageDictionaryFile.init(url:))
 
     /// 手書きの窓(R-14)．開くたびに作らず使い回す
     private(set) lazy var handwriting = HandwritingController(recognizer: VisionHandwritingRecognizer(), settings: settings)
