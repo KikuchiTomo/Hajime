@@ -94,7 +94,8 @@ struct EnglishAutoScenarioTests {
         (nil, "make"),
     ] as [(String?, String)])
     func ambiguousByContext(preceding: String?, expected: String) {
-        let harness = harness(.englishAuto, converter: converter)
+        // 読みの長さでは見分けない(英単語にしない文字数を 0 にする)
+        let harness = harness(.englishAuto, converter: converter) { $0.englishSkipLength = 0 }
         harness.context = InputContext(precedingText: preceding)
         harness.type("make")
         #expect(harness.marked.text == expected)
@@ -124,7 +125,10 @@ struct EnglishAutoScenarioTests {
 
     @Test("R-02: 前の手がかりで見分けない設定なら，英字入力(自動)では英語にする")
     func ambiguousWithoutContext() {
-        let harness = harness(.englishAuto, converter: converter) { $0.wordLanguage.usesContext = false }
+        let harness = harness(.englishAuto, converter: converter) {
+            $0.wordLanguage.usesContext = false
+            $0.englishSkipLength = 0
+        }
         harness.context = InputContext(precedingText: "試合に")
         harness.type("make")
         #expect(harness.marked.text == "make")
@@ -216,7 +220,10 @@ struct EnglishAutoScenarioTests {
 
     @Test("設定の画面の「試す」は，入力と同じ見分け方で語ごとの結果を出し，前の語を次の語の手がかりにする")
     func preview() {
-        let preview = WordLanguagePreview(converter: converter, lexicon: FakeLexicon(words: ["make", "sense"]), settings: FakeSettings())
+        var settings = DefaultSettings.settings
+        // 読みの長さでは見分けない(英単語にしない文字数を 0 にする)
+        settings.englishSkipLength = 0
+        let preview = WordLanguagePreview(converter: converter, lexicon: FakeLexicon(words: ["make", "sense"]), settings: FakeSettings(settings))
         #expect(preview.preview("make sense").map(\.shown) == ["make", "sense"])
         #expect(preview.preview("make", precedingText: "試合に").map(\.shown) == ["負け"])
         let words = preview.preview("kyouhaiitenki make")

@@ -664,7 +664,12 @@ impl RowState {
                 .map(|(_, name)| (*name).to_string())
                 .chain(self.extra_choice.clone())
                 .collect(),
-            (Control::Stepper(RangeKind::LiveConversionSkipLength), Part::Dropdown) => self
+            (
+                Control::Stepper(
+                    RangeKind::LiveConversionSkipLength | RangeKind::EnglishSkipLength,
+                ),
+                Part::Dropdown,
+            ) => self
                 .numbers
                 .iter()
                 .map(|number| more::skip_length(*number))

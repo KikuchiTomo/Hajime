@@ -504,6 +504,7 @@ pub enum RangeKind {
     CandidatesPerPage,
     LiveConversionDelay,
     LiveConversionSkipLength,
+    EnglishSkipLength,
     CorrectionDelay,
     ReviewCorrectionTimeout,
     LateCorrectionTimeout,
@@ -520,6 +521,7 @@ impl RangeKind {
             RangeKind::CandidatesPerPage => ranges.candidates_per_page,
             RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
             RangeKind::LiveConversionSkipLength => ranges.live_conversion_skip_length,
+            RangeKind::EnglishSkipLength => ranges.english_skip_length,
             RangeKind::CorrectionDelay => ranges.correction_delay,
             RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
             RangeKind::LateCorrectionTimeout => ranges.late_correction_timeout,
@@ -816,6 +818,11 @@ fn conversion() -> Vec<Section> {
                     choice::TYPO_CORRECTION,
                     "typoCorrection",
                     options::TYPO_CORRECTION,
+                ),
+                Row::stepper(
+                    more::ENGLISH_SKIP_LENGTH,
+                    "englishSkipLength",
+                    RangeKind::EnglishSkipLength,
                 ),
                 Row::choice(
                     more::CORRECTION_SENSITIVITY,

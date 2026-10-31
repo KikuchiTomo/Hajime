@@ -171,6 +171,7 @@ pub mod more {
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
     pub const LIVE_CONVERSION_DELAY: &str = "漢字にするまでの待ち時間";
     pub const LIVE_CONVERSION_SKIP_LENGTH: &str = "ライブ変換しない文字数";
+    pub const ENGLISH_SKIP_LENGTH: &str = "英単語にしない文字数";
     pub const TYPO: &str = "タイプミス";
     pub const CORRECTION_SENSITIVITY: &str = "修正の基準";
     pub const SHOWS_SUGGESTIONS: &str = "「もしかして」を表示";
@@ -247,7 +248,7 @@ pub mod more {
         format!("{value:.1} 秒")
     }
 
-    /// ライブ変換しない文字数の表示．0 はオフ
+    /// ライブ変換しない文字数・英単語にしない文字数の表示．0 はオフ
     pub fn skip_length(value: f64) -> String {
         if value == 0.0 {
             "オフ".to_string()
@@ -511,6 +512,7 @@ pub mod sync {
         ("branchCandidatesPerPage", "分岐図の候補数"),
         ("liveConversionDelay", "漢字にするまでの待ち時間"),
         ("liveConversionSkipLength", "ライブ変換しない文字数"),
+        ("englishSkipLength", "英単語にしない文字数"),
         ("correctionDelay", "見直すまでの待ち時間"),
         ("reviewCorrectionTimeout", "見直しの時間の上限"),
         ("lateCorrectionTimeout", "変換後の補正の時間の上限"),

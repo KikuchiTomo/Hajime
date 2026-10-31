@@ -182,6 +182,11 @@ private struct ConversionTab: View {
             }
             Section(UIStrings.More.typo) {
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
+                ResettableRow(model: model, keyPath: \.englishSkipLength) {
+                    Stepper(value: model.binding(\.englishSkipLength), in: DefaultSettings.englishSkipLengthRange) {
+                        LabeledContent(UIStrings.More.englishSkipLength, value: UIStrings.More.skipLength(model.settings.englishSkipLength))
+                    }
+                }
                 Group {
                     ResettablePicker(model: model, title: UIStrings.More.correctionSensitivity, keyPath: \.correctionSensitivity, label: UIStrings.More.label(for:))
                     ResettableToggle(model: model, title: UIStrings.More.showsSuggestions, keyPath: \.showsSuggestions)

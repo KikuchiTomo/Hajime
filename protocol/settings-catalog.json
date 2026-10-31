@@ -29,6 +29,7 @@
     "dateConversion",
     "emojiConversion",
     "englishInputLiveConversion",
+    "englishSkipLength",
     "escapeSwitchesToDirect",
     "handwriting",
     "homophoneNotes",
@@ -129,6 +130,10 @@
     "customThemeCornerRadius" : [
       0,
       24
+    ],
+    "englishSkipLength" : [
+      0,
+      10
     ],
     "lateCorrectionTimeout" : [
       1,

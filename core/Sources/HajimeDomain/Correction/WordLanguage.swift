@@ -149,16 +149,20 @@ public struct WordLanguageJudge: Sendable {
 
     public var settings: WordLanguageSettings
     public var mode: Mode
+    /// 英単語にしない読みの長さ(設定)．ローマ字として読んだかながこの文字数以下の語は，前が英語でなければ日本語にする
+    public var japaneseReadingLength: Int
 
-    public init(settings: WordLanguageSettings, mode: Mode) {
+    public init(settings: WordLanguageSettings, mode: Mode, japaneseReadingLength: Int = DefaultSettings.englishSkipLength) {
         self.settings = settings
         self.mode = mode
+        self.japaneseReadingLength = japaneseReadingLength
     }
 
     /// 英語か日本語か．次の順に決める
     /// 1. 利用者が足した「いつも英語」「いつも日本語」の語(英字入力のライブ変換では 3 のあと，英語の辞書の語は英語)
     /// 2. 利用者が足した見分け方の決まり(語と前の手がかり)
     /// 3. ローマ字として読めなければ英語
+    /// 3a. 読みが短い語(設定の英単語にしない文字数以下．「make」→ まけ)は，前が英語でなければ日本語
     /// 4. 英語の辞書にない語は，英字入力(自動)では日本語らしければ日本語(読みのもっともらしさ)，ローマ字入力では日本語
     /// 5. 英語にも日本語にも読める語(「make」「shine」)は，前の語で見分ける(設定)．前が英語なら英語，前が日本語なら日本語
     /// 6. 手がかりが無ければ，不適切な語(「しね」)は英語にし，ほかは入力方式の主な言語にする
@@ -171,6 +175,9 @@ public struct WordLanguageJudge: Sendable {
         if mode == .dictionaryOnly { return evidence.isEnglishWord ? .english : .japanese }
         // ローマ字入力では，短い語(「no」)は前が英語でも日本語にする
         if mode == .japaneseFirst, word.count <= DefaultSettings.maximumJapaneseFirstShortWordLength, !evidence.isOffensive { return .japanese }
+        // 読みが短い語(「make」→ まけ)は，前が英語でなければ日本語にする(設定)．前が英語なら下の前の語の見分けに任せる
+        if let reading = evidence.reading, reading.count <= japaneseReadingLength, !evidence.isOffensive,
+           !(settings.usesContext && context == .afterEnglish) { return .japanese }
         guard evidence.isEnglishWord else {
             switch mode {
             case .dictionaryOnly: return .japanese

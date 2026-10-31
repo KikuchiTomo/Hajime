@@ -10,7 +10,8 @@ struct WordLanguageTests {
 
     @Test("R-05: 英字入力(自動)の見分け．読めない語は英語，辞書にない語はもっともらしさ，両方に読める語は前の語")
     func englishFirst() {
-        let judge = WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst)
+        // 読みの長さでは見分けない(英単語にしない文字数を 0 にする)
+        let judge = WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst, japaneseReadingLength: 0)
         #expect(judge.decide(evidence("hello", english: true, reading: nil), context: .afterJapanese) == .english)
         #expect(judge.decide(evidence("kyou", english: false), context: .sentenceStart) == .japanese)
         #expect(judge.decide(evidence("kathio", english: false, plausibility: -12), context: .sentenceStart) == .english)
@@ -32,6 +33,15 @@ struct WordLanguageTests {
         #expect(WordLanguageJudge(settings: settings, mode: .japaneseFirst).decide(evidence("no", english: true, reading: "の"), context: .afterEnglish) == .english)
         // 英字入力(自動)では今までどおり
         #expect(WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst).decide(evidence("no", english: true, reading: "の"), context: .afterEnglish) == .english)
+    }
+
+    @Test("R-02: 読みが英単語にしない文字数以下の語は，前が英語でなければ日本語にする")
+    func shortReading() {
+        let judge = WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst, japaneseReadingLength: 2)
+        #expect(judge.decide(evidence("make", english: true, reading: "まけ"), context: .sentenceStart) == .japanese)
+        #expect(judge.decide(evidence("make", english: true, reading: "まけ"), context: .afterEnglish) == .english)
+        #expect(judge.decide(evidence("shine", english: true, reading: "しね", offensive: true), context: .sentenceStart) == .english)
+        #expect(judge.decide(evidence("sense", english: true, reading: "せんせ"), context: .sentenceStart) == .english)
     }
 
     @Test("R-05: 英字入力のライブ変換は，英語の辞書の語だけを英語にする")
@@ -57,7 +67,7 @@ struct WordLanguageTests {
         settings.englishWords = ["kore"]
         settings.japaneseWords = ["make"]
         settings.rules = [WordLanguageRule(word: "same", context: .afterJapanese, language: .english)]
-        let judge = WordLanguageJudge(settings: settings, mode: .englishFirst)
+        let judge = WordLanguageJudge(settings: settings, mode: .englishFirst, japaneseReadingLength: 0)
         #expect(judge.decide(evidence("kore", english: false), context: .afterJapanese) == .english)
         #expect(judge.decide(evidence("Make", english: true), context: .afterEnglish) == .japanese)
         #expect(judge.decide(evidence("same", english: true), context: .afterJapanese) == .english)
