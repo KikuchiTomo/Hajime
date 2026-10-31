@@ -749,6 +749,7 @@ enum UIStrings {
         static let branchStyle = "枝"
         static let font = "書体"
         static let themeFont = "テーマに合わせる"
+        static let fontStyle = "スタイル"
         static func copyName(_ name: String) -> String { "\(name) のコピー" }
         static let createTheme = "カスタムテーマを作成…"
         static let editTheme = "編集…"
