@@ -130,6 +130,16 @@ public enum LearningMode: String, Sendable, Equatable, Codable, CaseIterable {
     case disabled
 }
 
+/// かな漢字変換に使う Zenzai のモデル．xsmall のモデルが無い環境では，どれを選んでも small で変換する
+public enum ZenzaiModelChoice: String, Sendable, Equatable, Codable, CaseIterable {
+    /// small のモデルだけを使う．精度を優先する
+    case accurate
+    /// xsmall のモデルだけを使う．速さを優先する(GPU の無い環境で打っている間も Zenzai を使えるように)
+    case fast
+    /// 打っている間の表示は xsmall，打鍵が止まったときと変換(Space)は small で求める
+    case combined
+}
+
 /// 利用者が登録した語
 public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
     /// 読み．ひらがなか，ローマ字・英字(「gh」「toyota」)．引くときは lookupReading にそろえる

@@ -52,11 +52,21 @@ struct PlaygroundEngine {
     let typoService: ZenzaiTypoService?
     private let memory: URL
 
-    init(zenzaiPath: String?, dictionaryPath: String?) throws {
+    /// - Parameters:
+    ///   - fastZenzaiPath: 速さを優先するモデル(xsmall)の場所．併用(zenzaiChoice)を試すときに渡す
+    ///   - zenzaiChoice: 設定の「Zenzai のモデル」．渡したときだけ既定の設定にこれを入れてエンジンに渡す(渡さなければ今までどおり設定を渡さない)
+    init(zenzaiPath: String?, zenzaiVariant: ZenzaiModel.Variant = .small, fastZenzaiPath: String? = nil, zenzaiChoice: ZenzaiModelChoice? = nil,
+         dictionaryPath: String?) throws {
         memory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-playground-\(UUID().uuidString)")
-        let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
-        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "hajime-playground", zenzai: zenzai,
+        let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0), variant: zenzaiVariant) }
+        let fastZenzai = try fastZenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0), variant: .xsmall) }
+        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "hajime-playground", zenzai: zenzai, fastZenzai: fastZenzai,
                                             dictionaryDirectory: dictionaryPath.map { URL(fileURLWithPath: $0, isDirectory: true) })
+        if let zenzaiChoice {
+            var settings = DefaultSettings.settings
+            settings.zenzaiModel = zenzaiChoice
+            engine.apply(settings)
+        }
         let directory = memory
         typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: directory, versionString: "hajime-playground") }
     }

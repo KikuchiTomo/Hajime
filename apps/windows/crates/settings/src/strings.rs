@@ -52,6 +52,9 @@ pub mod settings {
     pub const EMOJI_CONVERSION: &str = "絵文字に変換";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
     pub const LEARNING: &str = "学習";
+    pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
+    pub const ZENZAI_MODEL_NOTE: &str =
+        "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
     pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
@@ -579,6 +582,7 @@ pub mod sync {
         ("emojiConversion", "絵文字に変換"),
         ("latexConversion", "LaTeX のコマンドに変換"),
         ("learning", "学習"),
+        ("zenzaiModel", "Zenzai のモデル"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),
         ("showsModeIndicator", "入力モードの切り替えを表示"),

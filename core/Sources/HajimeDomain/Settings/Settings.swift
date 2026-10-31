@@ -125,6 +125,9 @@ public struct Settings: Sendable, Equatable {
     /// 選んでいる候補に連想があるとき，候補の窓の足元に知らせる
     public var showsAssociationHint = true
 
+    /// かな漢字変換に使う Zenzai のモデル
+    public var zenzaiModel = ZenzaiModelChoice.accurate
+
     // MARK: 辞書と学習
     /// 確定した候補から学ぶか
     public var learning = LearningMode.enabled
@@ -262,7 +265,7 @@ extension Settings: Codable {
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
-        case association, associationLimit, showsAssociationHint
+        case association, associationLimit, showsAssociationHint, zenzaiModel
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
@@ -348,6 +351,7 @@ extension Settings: Codable {
         read(.association, into: \.association)
         read(.associationLimit, into: \.associationLimit)
         read(.showsAssociationHint, into: \.showsAssociationHint)
+        read(.zenzaiModel, into: \.zenzaiModel)
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
         readList(.importedDictionaries, into: \.importedDictionaries)
@@ -441,6 +445,7 @@ extension Settings: Codable {
         try container.encode(association, forKey: .association)
         try container.encode(associationLimit, forKey: .associationLimit)
         try container.encode(showsAssociationHint, forKey: .showsAssociationHint)
+        try container.encode(zenzaiModel, forKey: .zenzaiModel)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)
