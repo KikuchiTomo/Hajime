@@ -1,9 +1,9 @@
 ---
 name: hajime-architecture
-description: はじめのコードの置き場所・層・依存の向き・SOLID/DRY の決まりに従って設計と実装を進める．新しい型・ファイル・モジュール・ディレクトリを作るとき，機能を実装するとき，既存コードを移す・分割する・リファクタリングするとき，azooKey からコードを持ち込むときは必ず使う．「どこに書くか」「どの層か」を少しでも判断する場面なら，明示されていなくても使うこと．Use for any design, placement, layering, dependency, refactor or new-feature work in this repository.
+description: Hajime のコードの置き場所・層・依存の向き・SOLID/DRY の決まりに従って設計と実装を進める．新しい型・ファイル・モジュール・ディレクトリを作るとき，機能を実装するとき，既存コードを移す・分割する・リファクタリングするとき，azooKey からコードを持ち込むときは必ず使う．「どこに書くか」「どの層か」を少しでも判断する場面なら，明示されていなくても使うこと．Use for any design, placement, layering, dependency, refactor or new-feature work in this repository.
 ---
 
-# はじめのアーキテクチャに従う
+# Hajime のアーキテクチャに従う
 
 決まりの本体は `docs/dev/ARCHITECTURE.md` と `docs/dev/GUIDELINES.md` にある．このスキルは，それを作業の手順に落としたもの．決まりそのものを変えたいときは，コードより先に文書と ADR を変える(`docs/dev/adr/README.md`)．
 

@@ -1,6 +1,6 @@
 ---
 name: hajime-windows
-description: はじめの Windows 版(apps/windows の Rust の Cargo ワークスペース．TSF テキストサービスの DLL，候補ウィンドウ，インストーラー，hajime-engine-host との名前付きパイプの通信)を書く・直す・レビューするときの決まり．COM，unsafe，panic の扱い，スレッド，TSF の composition，InputScope を含む．.rs ファイル，Cargo.toml，TSF，COM，Win32，名前付きパイプ，Windows のインストーラーに触れるときは必ず使う．Use whenever working on Windows, Rust, TSF or COM code in this repository.
+description: Hajime の Windows 版(apps/windows の Rust の Cargo ワークスペース．TSF テキストサービスの DLL，候補ウィンドウ，インストーラー，hajime-engine-host との名前付きパイプの通信)を書く・直す・レビューするときの決まり．COM，unsafe，panic の扱い，スレッド，TSF の composition，InputScope を含む．.rs ファイル，Cargo.toml，TSF，COM，Win32，名前付きパイプ，Windows のインストーラーに触れるときは必ず使う．Use whenever working on Windows, Rust, TSF or COM code in this repository.
 ---
 
 # Windows 版の決まり

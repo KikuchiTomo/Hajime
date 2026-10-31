@@ -1,9 +1,9 @@
 ---
 name: hajime-review
-description: はじめの変更(作業中の差分，ブランチ，PR)を，このリポジトリの決まり(層と依存，SOLID/DRY，セキュリティとプライバシー，デザイン，ドキュメント，テスト)に照らしてレビューする．「レビューして」「見て」「確認して」「PR を出す前に」と言われたとき，実装を終えてコミットや PR に進む前には必ず使う．GitHub にはコメントせず，会話の中で指摘する．Use before committing or opening a PR, and whenever asked to review changes in this repository.
+description: Hajime の変更(作業中の差分，ブランチ，PR)を，このリポジトリの決まり(層と依存，SOLID/DRY，セキュリティとプライバシー，デザイン，ドキュメント，テスト)に照らしてレビューする．「レビューして」「見て」「確認して」「PR を出す前に」と言われたとき，実装を終えてコミットや PR に進む前には必ず使う．GitHub にはコメントせず，会話の中で指摘する．Use before committing or opening a PR, and whenever asked to review changes in this repository.
 ---
 
-# はじめのレビュー
+# Hajime のレビュー
 
 レビューは 1 回で全部を見ようとせず，観点ごとに分けて見る．観点ごとの決まりは各スキルにあるので，ここでは順序と出力の形だけを決める．
 

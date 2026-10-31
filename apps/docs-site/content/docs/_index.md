@@ -1,6 +1,6 @@
 ---
 title: ドキュメント
-description: はじめのインストール・使い方・設定
+description: Hajime IME のインストール・使い方・設定
 cascade:
   # 並び順はここで決める
   - target: {path: /docs/install}
@@ -11,7 +11,7 @@ cascade:
     weight: 3
 ---
 
-はじめは，macOS・Windows 向けの日本語入力システムです．
+Hajime IME は，macOS・Windows 向けの日本語入力システムです．
 
 {{< cards >}}
   {{< card link="install" title="インストール" subtitle="入れかた，入力ソースの追加，アンインストール" icon="download" >}}

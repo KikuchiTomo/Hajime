@@ -1,9 +1,9 @@
 ---
 name: hajime-security
-description: はじめのセキュリティとプライバシーの決まりに従って実装・レビューする．IME は利用者のすべてのキー入力を受け取るため，入力文字列・候補・学習データ・ユーザー辞書・ログ・クラッシュレポート・ファイルの読み書き・設定の保存・クリップボード・通信(LLM 連携，アップデート)・Windows の名前付きパイプ・TSF の DLL・unsafe・依存の追加・CI のワークフローに触れる変更では必ず使う．「ログを足す」「デバッグ出力」「ファイルをインポート」「API キー」「外部と通信」が出てきたら，セキュリティの話に見えなくても使うこと．Use for any change touching user input, logging, persistence, IPC, network, unsafe code, dependencies or CI.
+description: Hajime のセキュリティとプライバシーの決まりに従って実装・レビューする．IME は利用者のすべてのキー入力を受け取るため，入力文字列・候補・学習データ・ユーザー辞書・ログ・クラッシュレポート・ファイルの読み書き・設定の保存・クリップボード・通信(LLM 連携，アップデート)・Windows の名前付きパイプ・TSF の DLL・unsafe・依存の追加・CI のワークフローに触れる変更では必ず使う．「ログを足す」「デバッグ出力」「ファイルをインポート」「API キー」「外部と通信」が出てきたら，セキュリティの話に見えなくても使うこと．Use for any change touching user input, logging, persistence, IPC, network, unsafe code, dependencies or CI.
 ---
 
-# はじめのセキュリティを守る
+# Hajime のセキュリティを守る
 
 決まりの本体は `docs/dev/SECURITY-MODEL.md`．作業の前に読み，変更がどの「守るもの」に触れるかを最初に書き出す．
 
