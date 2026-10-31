@@ -52,6 +52,8 @@ public struct Settings: Sendable, Equatable {
     public var branchCandidatesPerPage = DefaultSettings.latticeCandidatesPerSegment
     /// ライブ変換で，打鍵が止まってから漢字にするまでの時間(秒)
     public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
+    /// 読みがこの文字数以下のときはライブ変換しない(Space で変換する)．0 なら長さによらずライブ変換する
+    public var liveConversionSkipLength = DefaultSettings.liveConversionSkipLength
     /// 打鍵が止まってから打ち間違いを見直すまでの時間(秒)
     public var correctionDelay = DefaultSettings.liveCorrectionDelay
     /// 打鍵が止まって見直すときに，打ち間違いを探す時間の上限(秒)．過ぎたらその入力は見直さない
@@ -147,6 +149,11 @@ public struct Settings: Sendable, Equatable {
 
     public init() {}
 
+    /// この長さの読みをライブ変換するか(ライブ変換がオンで，ライブ変換しない長さより長い)
+    public func liveConverts(readingLength: Int) -> Bool {
+        liveConversion && readingLength > liveConversionSkipLength
+    }
+
     /// 範囲の外の値を範囲に収め，使えない値を捨てる．設定のファイルや書き出した JSON を読むときに通す
     /// (手で書き換えたファイルや別のバージョンのファイルでも，画面や変換がおかしくならないように)
     public mutating func clampToValidRanges() {
@@ -162,6 +169,7 @@ public struct Settings: Sendable, Equatable {
             associationDictionaries.insert(DefaultSettings.bundledAssociationDictionary, at: 0)
         }
         associationDictionaries = Array(associationDictionaries.prefix(DefaultSettings.maximumAssociationDictionaries))
+        liveConversionSkipLength = clamp(liveConversionSkipLength, DefaultSettings.liveConversionSkipLengthRange)
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
         correctionDelay = max(correctionDelay, liveConversionDelay)
@@ -218,7 +226,7 @@ extension Settings: Codable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
-        case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, correctionDelay
+        case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
@@ -278,6 +286,7 @@ extension Settings: Codable {
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
         read(.branchCandidatesPerPage, into: \.branchCandidatesPerPage)
         read(.liveConversionDelay, into: \.liveConversionDelay)
+        read(.liveConversionSkipLength, into: \.liveConversionSkipLength)
         read(.correctionDelay, into: \.correctionDelay)
         read(.correctionSensitivity, into: \.correctionSensitivity)
         read(.reviewCorrectionTimeout, into: \.reviewCorrectionTimeout)
@@ -360,6 +369,7 @@ extension Settings: Codable {
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
         try container.encode(branchCandidatesPerPage, forKey: .branchCandidatesPerPage)
         try container.encode(liveConversionDelay, forKey: .liveConversionDelay)
+        try container.encode(liveConversionSkipLength, forKey: .liveConversionSkipLength)
         try container.encode(correctionDelay, forKey: .correctionDelay)
         try container.encode(correctionSensitivity, forKey: .correctionSensitivity)
         try container.encode(reviewCorrectionTimeout, forKey: .reviewCorrectionTimeout)

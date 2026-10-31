@@ -12,7 +12,9 @@ use crate::layout::{self, PageLayout, Rect};
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
-use crate::pages::{self, Action, Control, DictionaryList, Info, LimitKind, Page, Row, Section};
+use crate::pages::{
+    self, Action, Control, DictionaryList, Info, LimitKind, Page, RangeKind, Row, Section,
+};
 use crate::store::SettingsStore;
 use crate::strings::{features, keys, more, rule_list, settings, windows as text};
 use crate::ui::anim::{Easing, Tween};
@@ -661,6 +663,11 @@ impl RowState {
                 .iter()
                 .map(|(_, name)| (*name).to_string())
                 .chain(self.extra_choice.clone())
+                .collect(),
+            (Control::Stepper(RangeKind::LiveConversionSkipLength), Part::Dropdown) => self
+                .numbers
+                .iter()
+                .map(|number| more::skip_length(*number))
                 .collect(),
             (Control::Stepper(_), Part::Dropdown) => self
                 .numbers

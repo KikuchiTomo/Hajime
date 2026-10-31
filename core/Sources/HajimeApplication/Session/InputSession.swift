@@ -1094,7 +1094,7 @@ public final class InputSession {
             }
             // Enter は区切りなので，かなのまま見せていた語も変換して確定する．
             // ただしエディタとターミナルで英数字を打っている途中なら，見せているとおり読みのまま確定する(R-06)
-            if settings.current.liveConversion, !(codeRestraintApplies && readingEndsWithAlphanumeric),
+            if settings.current.liveConverts(readingLength: composition.kana.count), !(codeRestraintApplies && readingEndsWithAlphanumeric),
                 composition.pending.isEmpty || composition.pending == "n",
                 let live = liveCandidate() {
                 return live
@@ -1184,7 +1184,7 @@ public final class InputSession {
     /// 読みの先頭から kanaStart 文字目までを，ライブ変換の設定に従って表示する文字にする
     private func livePrefix(upTo kanaStart: Int) -> String {
         let prefix = String(composition.kana.prefix(kanaStart))
-        guard settings.current.liveConversion else { return prefix }
+        guard settings.current.liveConverts(readingLength: composition.kana.count) else { return prefix }
         return bestWholeCandidate(for: prefix)?.text ?? prefix
     }
 
@@ -1260,7 +1260,7 @@ public final class InputSession {
     private func correctionNote() -> [ClientAction] {
         guard showsCorrectionNote else { return [] }
         let shown = { (reading: String) -> String in
-            guard self.settings.current.liveConversion else { return reading }
+            guard self.settings.current.liveConverts(readingLength: reading.count) else { return reading }
             return self.bestWholeCandidate(for: reading)?.text ?? reading
         }
         if readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) {
@@ -1276,7 +1276,7 @@ public final class InputSession {
     /// 直した読み(reading)を変換した文のうち，other と違う部分を含む文節(「もしかして」の案内に出す)．
     /// 文全体を出すと，長い文ではどこを直す案なのかが分からないため．文節に分けられなければ nil
     private func correctedPhrase(reading: String, other: String) -> String? {
-        guard settings.current.liveConversion, let best = bestWholeCandidate(for: reading),
+        guard settings.current.liveConverts(readingLength: reading.count), let best = bestWholeCandidate(for: reading),
             let changed = CorrectedSpan.changedRange(from: other, to: reading) else { return nil }
         let units = ClauseSplitter.clauses(of: best.words).map { CorrectedSpan.Unit(text: $0.text, readingCount: $0.readingCount) }
         guard let pieces = CorrectedSpan.pieces(of: best.text, units: units, readingCount: reading.count, changed: changed),
@@ -1764,7 +1764,7 @@ public final class InputSession {
                 .init(corrector.followingReading(in: composition).displayReading, style: .reading),
             ])
         }
-        guard settings.current.liveConversion, !holdsLiveConversionForCode else {
+        guard settings.current.liveConverts(readingLength: composition.kana.count), !holdsLiveConversionForCode else {
             // 打ち間違いを直した読みは，直したかなだけを点線の下線にする
             if let changed = correctedRange(of: \.kana) {
                 let kana = Candidate(text: composition.kana, readingCount: composition.kana.count, origin: .variant(.hiragana))

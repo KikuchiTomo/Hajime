@@ -246,6 +246,34 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "今日は")
     }
 
+    @Test("ライブ変換しない文字数(既定 2)以下の読みは，打鍵が止まってもかなのまま見せ，Enter でかなのまま確定する")
+    func liveConversionSkipLength() {
+        let converter = FakeConverter(["はし": [("箸", nil)], "はしる": [("走る", nil)]])
+        let harness = Harness(converter: converter)
+        harness.type("hasi")
+        harness.settle()
+        #expect(harness.marked.text == "はし")
+        harness.type("ru")
+        harness.settle()
+        #expect(harness.marked.text == "走る")
+        harness.press(.enter)
+        #expect(harness.committed == "走る")
+        harness.type("hasi")
+        harness.settle()
+        harness.press(.enter)
+        #expect(harness.committed == "走るはし")
+    }
+
+    @Test("ライブ変換しない文字数を 0 にすると，短い読みもライブ変換する")
+    func liveConversionSkipLengthOff() {
+        var settings = DefaultSettings.settings
+        settings.liveConversionSkipLength = 0
+        let harness = Harness(converter: FakeConverter(["はし": [("箸", nil)]]), settings: settings)
+        harness.type("hasi")
+        harness.settle()
+        #expect(harness.marked.text == "箸")
+    }
+
     @Test("打っているあいだの候補の窓は，ライブ変換がオンなら既定では出さず，設定で「常に」にすれば出す")
     func suggestionWindowSetting() {
         let converter = FakeConverter(["きょう": [("今日", nil)]])
@@ -327,6 +355,8 @@ struct InputSessionScenarioTests {
         ])
         let harness = Harness(converter: converter, settings: .listPresentation)
         harness.type("kyouhaame")
+        // 短い読みもライブ変換して確かめる(ライブ変換しない文字数を 0 にする)
+        harness.settings.current.liveConversionSkipLength = 0
         harness.press(.space)
         harness.press(.enter)
         #expect(harness.committed == "今日は雨")
