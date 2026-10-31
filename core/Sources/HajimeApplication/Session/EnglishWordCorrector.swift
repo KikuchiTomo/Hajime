@@ -78,7 +78,7 @@ final class EnglishWordCorrector {
         let kana = Array(composition.kana)
         // 直さない語を含む部分と，識別子の一部(「user_」「a.」「userN」のあと)は除く
         let tails = rule.tails(in: composition, includingPending: includingPending)
-            .filter { $0.kanaStart != dismissedKanaStart && !customization.isException(keys: $0.keys, reading: "") }
+            .filter { $0.kanaStart != dismissedKanaStart && !customization.isException(keys: $0.keys, reading: "") && !readsAsShortJapanese($0.keys) }
             .filter { tail in
                 let before = tail.kanaStart > 0 ? kana[tail.kanaStart - 1] : context.precedingCharacter
                 return !(before.map(TypoCorrectionRule.continuesIdentifier) ?? false)
@@ -127,6 +127,15 @@ final class EnglishWordCorrector {
         return true
     }
 
+    /// ローマ字として読んだかなが，英単語にしない長さ(設定)以下か(「make」→ まけ，「line」→ りね)．
+    /// ローマ字として読めない並び(「pthon」)は日本語ではないので false．利用者が「いつも英語」にした語も false．
+    /// 前の語で英語と見分ける語(「Let's make」)は freezeEnglishWord が見分け方の決まりで決める
+    private func readsAsShortJapanese(_ keys: String) -> Bool {
+        guard let reading = WordLanguageClassifier.reading(of: keys),
+              !settings.current.wordLanguage.englishWords.contains(keys.lowercased()) else { return false }
+        return reading.count <= settings.current.englishSkipLength
+    }
+
     /// ローマ字として読めてしまう英単語を読みの中から探し，見つけたら英単語として確定させる(「gitwotukau」→「gitを使う」)．
     /// 変換を使うので，打鍵ごとには呼ばず，打鍵が止まったときと変換・確定の前に呼ぶ．確定させたら true
     func freezeWordReadAsRomaji(in composition: inout Composition) -> Bool {
@@ -166,7 +175,7 @@ final class EnglishWordCorrector {
                 for key in keys[end...] { following.insertRomaji(key) }
                 guard !following.containsInvalidRomaji, following.pending.isEmpty || following.pending == "n",
                     TypoCorrectionRule.startsLikeFollowingEnglish(following.conversionReading),
-                    lexicon.isWord(word), !customization.isException(keys: word, reading: "") else { continue }
+                    lexicon.isWord(word), !customization.isException(keys: word, reading: ""), !readsAsShortJapanese(word) else { continue }
                 let score = converter.plausibility(of: following.conversionReading)
                 let whole = japanese ?? converter.plausibility(of: String(kana[tail.kanaStart...]))
                 japanese = whole
@@ -205,7 +214,7 @@ final class EnglishWordCorrector {
         }
         // 「s」のように英単語の続きかもしれないキーは，英単語として読めるならそちらを優先する
         let extended = current.keys + followingKeys(in: composition)
-        if lexicon.isWord(extended) {
+        if lexicon.isWord(extended), !readsAsShortJapanese(extended) {
             active = Correction(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: extended, word: extended)
         }
         // 続けて打ったキーまで含めると，いま直している部分より前から始まる英単語になることがある．

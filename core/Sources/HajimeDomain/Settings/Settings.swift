@@ -54,6 +54,8 @@ public struct Settings: Sendable, Equatable {
     public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
     /// 読みがこの文字数以下のときはライブ変換しない(Space で変換する)．0 なら長さによらずライブ変換する
     public var liveConversionSkipLength = DefaultSettings.liveConversionSkipLength
+    /// 英単語にしない読みの長さ(文字)．ローマ字として読んだかながこの文字数以下なら，英単語の綴りでも日本語として読む．0 は長さで区別しない
+    public var englishSkipLength = DefaultSettings.englishSkipLength
     /// 打鍵が止まってから打ち間違いを見直すまでの時間(秒)
     public var correctionDelay = DefaultSettings.liveCorrectionDelay
     /// 打鍵が止まって見直すときに，打ち間違いを探す時間の上限(秒)．過ぎたらその入力は見直さない
@@ -170,6 +172,7 @@ public struct Settings: Sendable, Equatable {
         }
         associationDictionaries = Array(associationDictionaries.prefix(DefaultSettings.maximumAssociationDictionaries))
         liveConversionSkipLength = clamp(liveConversionSkipLength, DefaultSettings.liveConversionSkipLengthRange)
+        englishSkipLength = clamp(englishSkipLength, DefaultSettings.englishSkipLengthRange)
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
         correctionDelay = max(correctionDelay, liveConversionDelay)
@@ -226,7 +229,7 @@ extension Settings: Codable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
-        case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, correctionDelay
+        case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
@@ -287,6 +290,7 @@ extension Settings: Codable {
         read(.branchCandidatesPerPage, into: \.branchCandidatesPerPage)
         read(.liveConversionDelay, into: \.liveConversionDelay)
         read(.liveConversionSkipLength, into: \.liveConversionSkipLength)
+        read(.englishSkipLength, into: \.englishSkipLength)
         read(.correctionDelay, into: \.correctionDelay)
         read(.correctionSensitivity, into: \.correctionSensitivity)
         read(.reviewCorrectionTimeout, into: \.reviewCorrectionTimeout)
@@ -370,6 +374,7 @@ extension Settings: Codable {
         try container.encode(branchCandidatesPerPage, forKey: .branchCandidatesPerPage)
         try container.encode(liveConversionDelay, forKey: .liveConversionDelay)
         try container.encode(liveConversionSkipLength, forKey: .liveConversionSkipLength)
+        try container.encode(englishSkipLength, forKey: .englishSkipLength)
         try container.encode(correctionDelay, forKey: .correctionDelay)
         try container.encode(correctionSensitivity, forKey: .correctionSensitivity)
         try container.encode(reviewCorrectionTimeout, forKey: .reviewCorrectionTimeout)

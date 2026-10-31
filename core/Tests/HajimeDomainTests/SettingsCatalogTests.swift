@@ -32,6 +32,7 @@ struct SettingsCatalogTests {
                 "candidatesPerPage": range(DefaultSettings.candidatesPerPageRange),
                 "liveConversionDelay": range(DefaultSettings.liveConversionDelayRange),
                 "liveConversionSkipLength": range(DefaultSettings.liveConversionSkipLengthRange),
+                "englishSkipLength": range(DefaultSettings.englishSkipLengthRange),
                 "correctionDelay": range(DefaultSettings.correctionDelayRange),
                 "reviewCorrectionTimeout": range(DefaultSettings.reviewCorrectionTimeoutRange),
                 "lateCorrectionTimeout": range(DefaultSettings.lateCorrectionTimeoutRange),

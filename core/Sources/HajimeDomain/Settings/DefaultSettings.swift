@@ -158,6 +158,8 @@ public enum DefaultSettings {
     public static let liveConversionMinimumLength = 3
     /// ライブ変換しない読みの長さの既定．読みがこの文字数以下なら，打鍵が止まってもかなのまま見せる(「の」「です」を漢字にしない)
     public static let liveConversionSkipLength = 2
+    /// 英単語にしない読みの長さの既定．ローマ字として読んだかながこの文字数以下の並び(「no」→ の，「make」→ まけ)は英単語にしない
+    public static let englishSkipLength = 2
     /// ライブ変換で，末尾の語の読みがこの文字数以下なら，打鍵が止まるまでかなのまま見せる(「らい」→「雷」を出さない)．
     /// 評価用の文で途中表示の誤りが 50 から 23 に減り，変換して見せた時点は 197 から 169 に減った
     public static let liveConversionHeldWordLength = 3
@@ -247,6 +249,8 @@ public enum DefaultSettings {
     public static let liveConversionDelayRange = 0.1...1.5
     /// ライブ変換しない読みの長さを選べる範囲(文字)．0 はすべてライブ変換する
     public static let liveConversionSkipLengthRange = 0...10
+    /// 英単語にしない読みの長さを選べる範囲(文字)．0 は長さで区別しない
+    public static let englishSkipLengthRange = 0...10
     public static let correctionDelayRange = 0.4...3.0
     public static let modeIndicatorDurationRange = 0.3...3.0
     /// 候補の文字の大きさ(pt)を選べる範囲

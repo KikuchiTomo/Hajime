@@ -697,6 +697,7 @@ enum UIStrings {
         static let listCandidates = "一覧の候補数"
         static let liveConversionDelay = "漢字にするまでの待ち時間"
         static let liveConversionSkipLength = "ライブ変換しない文字数"
+        static let englishSkipLength = "英単語にしない文字数"
         static func skipLength(_ value: Int) -> String { value == 0 ? "オフ" : "\(value) 文字以下" }
         static let typo = "タイプミス"
         static let correctionSensitivity = "修正の基準"
@@ -832,7 +833,7 @@ extension UIStrings {
             "keypadDirect": Features.keypadDirect,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
-            "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
+            "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,
             "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,
             "calculation": Features.calculation, "postalCodeConversion": Features.postalCode,

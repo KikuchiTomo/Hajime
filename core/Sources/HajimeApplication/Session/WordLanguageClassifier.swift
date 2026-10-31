@@ -17,7 +17,7 @@ final class WordLanguageClassifier {
     }
 
     func language(of keys: String, context: WordLanguageContext, mode: WordLanguageJudge.Mode) -> WordLanguage {
-        WordLanguageJudge(settings: settings.current.wordLanguage, mode: mode).decide(evidence(for: keys), context: context)
+        WordLanguageJudge(settings: settings.current.wordLanguage, mode: mode, japaneseReadingLength: settings.current.englishSkipLength).decide(evidence(for: keys), context: context)
     }
 
     /// ローマ字として読めれば，その読み
