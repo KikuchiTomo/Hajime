@@ -52,7 +52,8 @@ enum NSEventKeyTranslator {
         case KeyCode.up: .up
         case KeyCode.jisEisu: .eisu
         case KeyCode.jisKana: .kana
-        case KeyCode.jisYen: .yen
+        // charactersIgnoringModifiers は Shift だけを効かせた文字(Option で変わる前)．Shift+¥ の | は配列の文字のまま使う
+        case KeyCode.jisYen where YenKeyPolicy.isChoosable(event.charactersIgnoringModifiers ?? ""): .yen
         case let code where KeyCode.functionKeys[code] != nil: KeyCode.functionKeys[code].map(KeyEvent.Key.function)
         default: character(from: event, modifiers: modifiers).map(KeyEvent.Key.character)
         }

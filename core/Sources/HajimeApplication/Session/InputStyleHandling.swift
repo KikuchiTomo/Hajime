@@ -61,8 +61,7 @@ final class KanaInput: InputStyleHandling {
         let shift = event.modifiers.contains(.shift)
         let kana: String? = switch event.key {
         case .character: event.keyLabel.flatMap { KanaLayout.text(forKey: $0, shift: shift, settings: state.settings) }
-        // Shift+¥ はかなを持たず | を入れるので，ローマ字入力と同じ処理に回す
-        case .yen: shift ? nil : KanaLayout.text(forKey: "¥", shift: false, settings: state.settings)
+        case .yen: KanaLayout.text(forKey: "¥", shift: false, settings: state.settings)
         default: nil
         }
         return kana.map(InputStyleInterpretation.insertKana)
