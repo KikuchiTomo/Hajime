@@ -244,4 +244,13 @@ struct EnglishMixedScenarioTests {
         harness.settle()
         #expect(harness.marked.text == "今日はID")
     }
+
+    @Test("R-02: 英字の略語に続けて打った助詞は，英単語に飲み込んで直さない(「pcから」が「pickら」にならない)",
+          arguments: ["pckara", "pcdemo", "snswo", "okdesu"])
+    func lettersBeforeParticle(typed: String) {
+        let lexicon = FakeLexicon(suggestions: ["pcka": ["pick"], "pcde": ["pace"], "snswo": ["senso"], "okde": ["okee"], "kde": ["kde"]])
+        let harness = Harness(lexicon: lexicon)
+        harness.type(typed)
+        #expect(!harness.marked.segments.contains { $0.style == .correction })
+    }
 }
