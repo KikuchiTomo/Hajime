@@ -160,6 +160,10 @@ fn setup_options(started: std::time::Instant) -> wizard::Options {
 pub fn run() {
     let started = std::time::Instant::now();
     let arguments: Vec<String> = std::env::args().collect();
+    // ログオンのたびの起動で，利用者の入力方式に Hajime を一度だけ加える
+    if arguments.iter().any(|argument| argument == SETUP_IF_NEEDED) {
+        ffi::add_input_method_once();
+    }
     let mode = mode(&arguments);
     if matches!(mode, Mode::Nothing) {
         return;

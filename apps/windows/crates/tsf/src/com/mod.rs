@@ -13,3 +13,6 @@ mod phonetic;
 mod registration;
 mod text_service;
 mod timer;
+mod user_profile;
+
+pub use user_profile::add_to_user_input_methods;
