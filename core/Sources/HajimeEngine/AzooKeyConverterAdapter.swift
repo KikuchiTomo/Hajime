@@ -111,7 +111,11 @@ public final class AzooKeyConverterEngine {
         case .disabled: .nothing
         }
         usesEmoji = settings.emojiConversion
-        let entries = settings.userDictionary.filter(\.isValid).prefix(DefaultSettings.maximumUserDictionaryEntries)
+        // かなにならない読み(「gh」)と，入れる時に中身を決める語(TextTemplate)は，文の中の語として渡さない．
+        // SupplementedConverter が読み全体の一致で候補に出す
+        let entries = settings.userDictionary
+            .filter { $0.isValid && $0.hasKanaReading && !(settings.dynamicDictionary && TextTemplate.containsPlaceholder($0.word)) }
+            .prefix(DefaultSettings.maximumUserDictionaryEntries)
         if Array(entries) != userDictionary {
             userDictionary = Array(entries)
             importDynamicUserDictionary()
@@ -130,7 +134,7 @@ public final class AzooKeyConverterEngine {
     private func importDynamicUserDictionary() {
         // ユーザー辞書の語は固有名詞として登録する
         let user = userDictionary.map {
-            DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.reading), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid,
+            DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.lookupReading ?? $0.reading), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid,
                            value: DefaultSettings.userDictionaryWordCost)
         }
         let imported = auxiliaryWords.map {

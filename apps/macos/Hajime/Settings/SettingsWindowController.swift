@@ -15,10 +15,11 @@ final class SettingsWindowController {
     private let sync: SyncCoordinator
 
     init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, files: (any SettingsFileHandling)? = nil,
-         associations: AssociationDictionaryStore? = nil,
+         associations: AssociationDictionaryStore? = nil, commandBookmarks: CommandBookmarks? = nil,
          resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
         model = SettingsModel(store: settings, usage: usage, files: files, associations: associations, resetLearning: resetLearning,
                               previewLanguage: previewLanguage)
+        model.commandBookmarks = commandBookmarks
         self.sync = sync
     }
 
@@ -98,6 +99,8 @@ final class SettingsModel: ObservableObject {
     @Published var isImportingDictionary = false
     /// 連想の辞書の索引(R-18)．無ければ連想の辞書を取り込めない
     let associations: AssociationDictionaryStore?
+    /// 「ファイルを開く」コマンドのファイルのブックマーク(R-22)．無ければファイルのコマンドを足せない
+    var commandBookmarks: CommandBookmarks?
     /// 英字入力(自動)で打った文を語ごとに見分けた結果(「試す」)．無ければ「試す」を出さない
     let previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])?
 

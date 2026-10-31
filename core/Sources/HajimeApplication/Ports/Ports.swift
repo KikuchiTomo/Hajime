@@ -25,6 +25,8 @@ public protocol KanaKanjiConverting: AnyObject {
     func candidates(for reading: String) -> [Candidate]
     /// 読みの先頭の文節の候補だけを，よさそうな順に返す(文節格子に使う)
     func clauseCandidates(for reading: String) -> [Candidate]
+    /// 変換の一覧(Space)に出す，読み全体の候補．candidates に，打っているあいだは出さない候補(コマンドなど)を足したもの
+    func listCandidates(for reading: String) -> [Candidate]
     /// 打っている読みに続く語の予測(入力中の候補)．読み全体を置き換える候補として返す
     func predictions(for reading: String) -> [Candidate]
     /// 文節の読みだけの候補(Zenzai を使わない．学習と辞書の語は使う)．分岐図の文節ごとの候補に使う．
@@ -75,6 +77,7 @@ public protocol KanaKanjiConverting: AnyObject {
 
 extension KanaKanjiConverting {
     public func setTyping(_ typing: Bool) {}
+    public func listCandidates(for reading: String) -> [Candidate] { candidates(for: reading) }
     public var hasDeferredConversion: Bool { false }
     public func performDeferredConversion() {}
     public func predictions(for reading: String) -> [Candidate] { [] }

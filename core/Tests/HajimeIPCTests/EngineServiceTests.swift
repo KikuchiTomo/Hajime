@@ -329,7 +329,7 @@ struct EngineServiceTests {
         }
         #expect(add("えすきゅー", "hajime") == .dictionaryAdded(result: .added))
         #expect(add("えすきゅー", "hajime") == .dictionaryAdded(result: .alreadyRegistered))
-        #expect(add("ABC", "hajime") == .dictionaryAdded(result: .invalid))
+        #expect(add("漢字", "hajime") == .dictionaryAdded(result: .invalid))
         let merged = service.handle(WireRequest(id: 45, body: .mergeUserDictionary(entries: (0..<600).map { WireDictionaryEntry(reading: "よみ", word: "語句\($0)") })), from: id).body
         #expect(merged == .dictionaryMerged(added: 600))
         guard case .userDictionary(let page, let total) = service.handle(WireRequest(id: 46, body: .readUserDictionary(offset: 1, limit: 10_000)), from: id).body else {

@@ -6,6 +6,13 @@
 /// 値と画面に出す名前
 pub type Choice = (&'static str, &'static str);
 
+/// コマンドの動作．ショートカット App(runShortcut)は macOS だけなので出さない
+pub const COMMAND_KINDS: &[Choice] = &[
+    ("openApplication", "アプリを開く"),
+    ("openURL", "Web ページを開く"),
+    ("openFile", "ファイルを開く"),
+];
+
 pub const INPUT_STYLES: &[Choice] = &[
     ("romaji", "ローマ字入力"),
     ("kana", "かな入力"),

@@ -62,7 +62,7 @@ enum PanelBuilder {
         switch segment.selected.origin {
         case .correction: return true
         // 打ったままと，連想で選び直した単語は，打ち間違いを直したものではない
-        case .asTyped, .association: return false
+        case .asTyped, .association, .command: return false
         case .engine, .variant, .sentencePart, .combined, .symbol, .userDictionary:
             guard let changed else { return false }
             return (segment.readingStart..<(segment.readingStart + segment.readingLength)).overlaps(changed)

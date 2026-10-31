@@ -95,7 +95,8 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine),
+        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
+                                                         lexicon: lexicon),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                      rejections: correctionRejections, usageDictionary: usageDictionary)
     }
@@ -109,6 +110,7 @@ final class CompositionRoot {
         let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
                                           lexicon: lexicon, settings: settings)
         let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, files: SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations), associations: associations,
+                                                  commandBookmarks: commandBookmarks,
                                                   resetLearning: { [engine] in engine.resetLearning() },
                                                   previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)
@@ -132,8 +134,14 @@ final class CompositionRoot {
 
     func makePresenter(session: InputSession) -> ClientActionPresenter {
         ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
-                              openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting)
+                              openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting,
+                              runCommand: { [unowned self] in self.commandLauncher.run($0) })
     }
+
+    /// 「ファイルを開く」コマンドのファイルのブックマーク(この Mac だけ)
+    private(set) lazy var commandBookmarks = CommandBookmarks(defaults: .standard)
+    /// 読みで呼び出すコマンドを動かすもの(R-22)
+    private(set) lazy var commandLauncher = CommandLauncher(bookmarks: commandBookmarks)
 
     /// 郵便番号の表(R-13)．入力欄ごとのセッションで共有し，初めて引くときに読み込む
     private(set) lazy var postalCodes: PostalCodeFile? = Bundle.main.url(forResource: "postal-codes", withExtension: "tsv").map(PostalCodeFile.init(url:))

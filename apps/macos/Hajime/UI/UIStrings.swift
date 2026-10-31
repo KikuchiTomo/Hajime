@@ -34,6 +34,53 @@ enum UIStrings {
     }
 
     /// 取り込んだ辞書(R-16)
+    /// 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ(R-02・R-16・R-18・R-22)
+    enum Extras {
+        static let handShift = "手の位置のずれを修正（試験的）"
+        static let handShiftNote = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。"
+        static let looseReadings = "うろ覚えのカタカナ語の候補"
+        static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。"
+        static let phoneticSpelling = "発音どおりに綴った英単語の候補"
+        static let phoneticSpellingNote = "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。"
+        static let dynamicDictionary = "単語の {datetime:…} などを入力時の値にする"
+        static let dynamicDictionaryNote = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。"
+        static let commandsPage = "コマンド"
+        static let commandsSection = "コマンド"
+        static let launcherCommands = "読みでコマンドを呼び出す"
+        static let commandsNote = "読みを変換すると、候補の一覧に「▶ 名前」が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
+        static let commandReading = "読み"
+        static let commandTitle = "名前"
+        static let commandKind = "動作"
+        static let commandTarget = "行き先"
+        static let commandsEmpty = "コマンドはありません"
+        static let addCommand = "コマンドを追加…"
+        static let editCommand = "編集…"
+        static let removeCommand = "削除"
+        static let chooseApplication = "アプリを選択…"
+        static let chooseFile = "ファイルを選択…"
+        static let invalidCommand = "読み・名前・行き先を確認してください"
+        static let tooManyCommands = "これ以上コマンドを追加できません"
+        static let save = "保存"
+        static let cancel = "キャンセル"
+        static let targetPlaceholderURL = "https://"
+        static let targetPlaceholderShortcut = "ショートカットの名前"
+        static let macrosSection = "変換マクロ"
+        static let conversionMacros = "連想変換のキーで変換マクロを表示"
+        static let macrosNote = "変換中に連想変換のキーを押すと、選んでいる語を整えた形が「整形」に並びます。{text} が語、{reading} が読みです。{text|upper} のように変換もかけられます。"
+        static let macroPattern = "形"
+        static let macrosEmpty = "マクロはありません"
+        static let invalidMacro = "{text} か {reading} を含めてください"
+
+        static func label(for kind: LauncherCommand.Kind) -> String {
+            switch kind {
+            case .openApplication: "アプリを開く"
+            case .openURL: "Web ページを開く"
+            case .openFile: "ファイルを開く"
+            case .runShortcut: "ショートカットを実行"
+            }
+        }
+    }
+
     enum Dictionaries {
         static let userWords = "登録した単語"
         static let imported = "取り込んだ辞書"
@@ -478,6 +525,15 @@ enum UIStrings {
         // g. 機能の紹介
         static let featuresTitle = "便利な機能"
         static let featuresDetail = "変換の候補に、関連する語や計算の結果などを出します。"
+        static let extrasTitle = "試験的な機能"
+        static let extrasDetail = "既定ではオフの機能です。あとから設定の画面でも変えられます。"
+        static let macros = "変換マクロ"
+        static let macrosDetail = "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。"
+        static let dynamicDictionary = "動的なユーザー辞書"
+        static let dynamicDictionaryDetail = "単語に {datetime:YYYY/MM/DD} などを書くと、入力したときの値にします。"
+        static let commands = "コマンド"
+        static let commandsDetail = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。"
+        static let commandsExample = "Claude を開く"
         static let association = "連想変換"
         static let associationDetail = "Shift + Space で、似た意味の語を出します。"
         static let calculation = "計算"
@@ -853,6 +909,9 @@ extension UIStrings {
             "recordsUsage": UIStrings.Settings.recordsUsage, "keyboardLayout": Choice.keyboardLayout, "keymap": Keys.tab,
             "symbolRules": Features.symbolsPage, "userDictionary": UIStrings.Settings.dictionaryTab,
             "importedDictionaries": Dictionaries.imported, "associationDictionaries": Association.dictionaries,
+            "handShiftCorrection": Extras.handShift, "looseReadings": Extras.looseReadings, "phoneticSpelling": Extras.phoneticSpelling,
+            "dynamicDictionary": Extras.dynamicDictionary, "conversionMacros": Extras.conversionMacros, "macros": Extras.macrosSection,
+            "launcherCommands": Extras.launcherCommands, "commands": Extras.commandsPage,
         ]
 
         static func label(for scope: SyncScope) -> String {
@@ -876,6 +935,7 @@ extension UIStrings {
             case .appearance: "外観"
             case .exclusions: "除外設定"
             case .usage: "統計"
+            case .commands: "コマンド"
             }
         }
     }

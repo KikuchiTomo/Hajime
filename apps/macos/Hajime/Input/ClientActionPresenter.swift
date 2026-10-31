@@ -15,11 +15,14 @@ final class ClientActionPresenter {
     private let openSettings: () -> Void
     private let handwriting: HandwritingController
     private let settings: any SettingsStoring
+    /// コマンドの候補を選んで確定したときに動かす(R-22)
+    private let runCommand: (LauncherCommand) -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
     init(session: InputSession, candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
-         openSettings: @escaping () -> Void, handwriting: HandwritingController) {
+         openSettings: @escaping () -> Void, handwriting: HandwritingController, runCommand: @escaping (LauncherCommand) -> Void) {
         self.session = session
+        self.runCommand = runCommand
         self.openSettings = openSettings
         self.handwriting = handwriting
         self.candidatePanel = candidatePanel
@@ -65,6 +68,10 @@ final class ClientActionPresenter {
                 break
             case .openSettings:
                 openSettings()
+            case .runCommand(let command):
+                // 確定したときの設定にまだあり，使う設定のときだけ動かす(Windows の EngineService と同じ)
+                guard settings.current.launcherCommands, settings.current.commands.contains(command) else { break }
+                runCommand(command)
             case .showHandwriting:
                 // 窓はフォーカスを奪わないので，選んだときも入力先は開いたときのまま(入力先から外れたら窓を閉じる)
                 handwriting.show(caret: caretRect(of: client), owner: self) { [weak self] text in

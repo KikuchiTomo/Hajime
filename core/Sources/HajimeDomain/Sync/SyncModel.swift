@@ -16,6 +16,8 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
     case appearance
     case exclusions
     case usage
+    /// 読みで呼び出すコマンド．アプリやファイルを開くので，ほかの Mac から書き換えられないよう同期しない(isSyncable)
+    case commands
 
     /// このまとまりに入る設定のファイルの項目の名前(Settings の CodingKeys)
     public var fieldNames: [String] {
@@ -29,15 +31,17 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
             ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "listCandidatesPerPage", "branchCandidatesPerPage",
              "liveConversionDelay", "liveConversionSkipLength", "englishSkipLength", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "remembersRejectedCorrections", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes", "proofreading",
              "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning",
-             "association", "associationLimit", "showsAssociationHint"]
+             "association", "associationLimit", "showsAssociationHint", "handShiftCorrection", "looseReadings", "phoneticSpelling", "dynamicDictionary",
+             "conversionMacros"]
         case .correction: ["correction", "wordLanguage"]
-        case .symbols: ["symbolRules"]
+        case .symbols: ["symbolRules", "macros"]
         case .dictionary: ["userDictionary"]
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "restrainsLiveConversionInCode", "profileRules"]
         case .usage: ["recordsUsage"]
+        case .commands: ["launcherCommands", "commands"]
         }
     }
 
@@ -46,14 +50,22 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         switch self {
         case .keyboard: [LegacyKeySettings.modeKeysField]
         case .keys: [LegacyKeySettings.conversionKeysField]
-        case .input, .conversion, .correction, .symbols, .dictionary, .importedDictionaries, .associationDictionaries, .appearance, .exclusions, .usage: []
+        case .input, .conversion, .correction, .symbols, .dictionary, .importedDictionaries, .associationDictionaries, .appearance, .exclusions, .usage,
+             .commands: []
         }
     }
+
+    /// 同期できるまとまりか．コマンドは，同期のフォルダに書けるもの(ほかの Mac や，フォルダを共有する別のアプリ)から
+    /// アプリやファイルを開く指示を差し込まれないよう，どの範囲を選んでも同期しない
+    public var isSyncable: Bool { self != .commands }
+
+    /// 同期の画面に出すまとまり
+    public static var syncableCases: [SyncGroup] { allCases.filter(\.isSyncable) }
 
     /// 既定の範囲．キーボードや画面の大きさ，使うアプリは Mac ごとに違ってよいので，この Mac だけにする
     public var defaultScope: SyncScope {
         switch self {
-        case .keyboard, .appearance, .exclusions, .usage, .associationDictionaries: .local
+        case .keyboard, .appearance, .exclusions, .usage, .associationDictionaries, .commands: .local
         case .input, .keys, .conversion, .correction, .symbols, .dictionary, .importedDictionaries: .synced
         }
     }

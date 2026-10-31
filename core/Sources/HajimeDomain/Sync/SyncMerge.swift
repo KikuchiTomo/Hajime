@@ -28,7 +28,7 @@ public enum SyncMerge {
         var ledger = ledger
         var document = remote ?? SyncDocument()
         document.version = SyncDocument.currentVersion
-        for group in SyncGroup.allCases where group != .dictionary && (scopes[group] ?? group.defaultScope) == .synced {
+        for group in SyncGroup.syncableCases where group != .dictionary && (scopes[group] ?? group.defaultScope) == .synced {
             let localTime = ledger.groupModifiedAt[group] ?? .distantPast
             var localValues = values(of: group, in: local)
             if let payload = remote?.groups[group], payload.modifiedAt > localTime {
@@ -108,7 +108,7 @@ public enum SyncMerge {
     /// localFields(この Mac だけの項目)だけが変わったときは，まとまりを変えたことにしない(ほかの Mac に送らない)
     public static func noteChange(from old: [String: JSONValue], to new: [String: JSONValue], ledger: inout SyncLedger,
                                   localFields: Set<String> = [], now: Date) {
-        for group in SyncGroup.allCases {
+        for group in SyncGroup.syncableCases {
             let before = values(of: group, in: old).filter { !localFields.contains($0.key) }
             let after = values(of: group, in: new).filter { !localFields.contains($0.key) }
             if before != after { ledger.groupModifiedAt[group] = now }

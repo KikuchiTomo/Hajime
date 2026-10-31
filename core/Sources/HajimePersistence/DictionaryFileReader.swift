@@ -3,7 +3,8 @@ import HajimeDomain
 
 /// 取り込む辞書のファイルを読む．形式と文字コードはファイルの中身から見分ける．
 ///
-/// - タブ区切り: 「読み<タブ>語<タブ>品詞<タブ>コメント」の行(3 列目以降は無くてよい)．「!」「#」で始まる行は読まない
+/// - タブ区切り: 「読み<タブ>語<タブ>品詞<タブ>コメント」の行(3 列目以降は無くてよい)．「!」「#」で始まる行は読まない．
+///   Google 日本語入力・Microsoft IME(UTF-16)・ATOK の書き出しはこの形
 /// - plist: macOS のユーザ辞書を書き出した形(phrase と shortcut の組の配列)
 /// - SKK: 「よみ /語1/語2;注釈/」の行．「;」で始まる行と，送り仮名のある読み(末尾が英字)は読まない
 ///
@@ -126,7 +127,7 @@ public enum DictionaryFileReader {
 
     // MARK: - plist
 
-    private static func isPropertyList(_ data: Data) -> Bool {
+    static func isPropertyList(_ data: Data) -> Bool {
         let head = data.prefix(64)
         if head.starts(with: Array("bplist".utf8)) { return true }
         guard let text = String(data: head, encoding: .utf8) else { return false }
@@ -145,8 +146,9 @@ public enum DictionaryFileReader {
         }.prefix(DefaultSettings.maximumImportedWords).map { $0 }
     }
 
-    /// 読みをひらがなにそろえる(カタカナの読みの辞書もあるため)
+    /// 読みをひらがなにそろえる(カタカナの読みの辞書もあるため)．Google 日本語入力や Microsoft IME の書き出しにある
+    /// ローマ字・英字の読み(「gh」)は，打ったときの読みにそろえる(ReadingNormalization)．使えない読みは空にして捨てる
     private static func normalizedReading(_ reading: Substring) -> String {
-        KanaWidth.hiragana(from: reading.trimmingCharacters(in: .whitespaces))
+        ReadingNormalization.normalized(reading.trimmingCharacters(in: .whitespaces)) ?? ""
     }
 }

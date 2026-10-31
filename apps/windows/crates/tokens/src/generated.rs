@@ -275,6 +275,7 @@ pub mod size {
         pub const KEYMAP_MARK_WIDTH: f32 = 22.0;
         pub const KEYMAP_CAPTURE_HEIGHT: f32 = 22.0;
         pub const RULE_TABLE_HEIGHT: f32 = 220.0;
+        pub const COMMAND_EDITOR_WIDTH: f32 = 460.0;
         pub const RULE_SEARCH_WIDTH: f32 = 160.0;
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;

@@ -44,14 +44,24 @@ struct DictionaryFileReaderTests {
 
     @Test("macOS のユーザ辞書の plist")
     func propertyList() throws {
-        let list: [[String: String]] = [["phrase": "電磁誘導", "shortcut": "でんじゆうどう"], ["phrase": "壊れた", "shortcut": "abc"]]
+        let list: [[String: String]] = [["phrase": "電磁誘導", "shortcut": "でんじゆうどう"], ["phrase": "壊れた", "shortcut": "漢字"]]
         let data = try PropertyListSerialization.data(fromPropertyList: list, format: .xml, options: 0)
         #expect(try DictionaryFileReader.parse(data) == [DictionaryWord(reading: "でんじゆうどう", word: "電磁誘導")])
     }
 
+    @Test("R-16: Google 日本語入力・Microsoft IME の書き出しにある英字の読みは，打ったときの読みにそろえて読む")
+    func romajiReadings() throws {
+        let google = try DictionaryFileReader.parse(Data("gh\tGitHub\t固有名詞\t\ntoyota\tトヨタ\t名詞\t\n".utf8))
+        #expect(google.map(\.reading) == ["gh", "とよた"])
+        // Microsoft IME は BOM の付いた UTF-16 で書き出す
+        var utf16 = Data([0xFF, 0xFE])
+        utf16.append("!Microsoft IME Dictionary Tool\r\nvscode\tVisual Studio Code\t固有名詞\r\n".data(using: .utf16LittleEndian)!)
+        #expect(try DictionaryFileReader.parse(utf16).map(\.word) == ["Visual Studio Code"])
+    }
+
     @Test("カタカナの読みはひらがなにそろえ，形の誤った行は読まない")
     func normalize() throws {
-        let words = try DictionaryFileReader.parse(Data("デンアツ\t電圧\nabc\t壊れた\n\t空\n".utf8))
+        let words = try DictionaryFileReader.parse(Data("デンアツ\t電圧\n漢字\t壊れた\n\t空\n".utf8))
         #expect(words == [DictionaryWord(reading: "でんあつ", word: "電圧")])
     }
 

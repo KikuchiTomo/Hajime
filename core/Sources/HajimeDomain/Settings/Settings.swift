@@ -82,6 +82,20 @@ public struct Settings: Sendable, Equatable {
     public var handwriting = false
     /// よくある読み違い(「ふいんき」→ 雰囲気)の正しい語を候補に出し，「もしかして」で示す
     public var misreadings = true
+    /// 手の置き場所が横にずれたまま打った並びを直す(HandShift．試験的)
+    public var handShiftCorrection = false
+    /// うろ覚えで読みを少し違えた外来語(しゅみれーしょん → シミュレーション)を候補に出す(LooseReadings)
+    public var looseReadings = false
+    /// 発音どおりに綴った英単語(foto → photo)を候補に出す(PhoneticSpelling)
+    public var phoneticSpelling = false
+    /// ユーザー辞書の語の `{datetime:...}` などを，入れるときの値に置き換える(TextTemplate)
+    public var dynamicDictionary = false
+    /// 連想変換のキーで出す一覧に，選んでいる語を整えた形(変換マクロ)を並べる
+    public var conversionMacros = false
+    public var macros: [ConversionMacro] = DefaultSettings.conversionMacros
+    /// 読みで呼び出すコマンド(ランチャー)を使う．同期しない(SyncGroup.commands)
+    public var launcherCommands = false
+    public var commands: [LauncherCommand] = []
     /// かなで打った外来語は，英語のつづり(「Live変換」)よりカタカナ(「ライブ変換」)を先に出す
     public var prefersKatakana = true
     /// 一覧の上に字種の行を出す(R-03)
@@ -190,8 +204,21 @@ public struct Settings: Sendable, Equatable {
         correction.rules = Array(correction.rules.filter(\.isValid).prefix(DefaultSettings.maximumCorrectionRules))
         correction.exceptions = Array(correction.exceptions.filter(RuleListEditing.isValidException).prefix(DefaultSettings.maximumCorrectionRules))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
+        var macroIDs = Set<String>()
+        macros = Array(macros.filter { $0.isValid && macroIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumMacros))
+        var commandIDs = Set<String>()
+        commands = Array(commands.filter { $0.isValid && commandIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCommands))
         keymap.clampToValidRanges()
         wordLanguage.clampToValidRanges()
+    }
+
+    /// コマンド(SyncGroup.commands の項目)だけを current のものにした設定．
+    /// 設定のファイルの読み込みや，設定の画面でない接続からの書き込みで，コマンドを書き換えさせないために使う
+    public func keepingCommands(of current: Settings) -> Settings {
+        var result = self
+        result.launcherCommands = current.launcherCommands
+        result.commands = current.commands
+        return result
     }
 
     /// 使っているカスタムテーマ．選んでいなければ nil
@@ -207,7 +234,7 @@ public struct Settings: Sendable, Equatable {
 
 extension Settings: CustomStringConvertible, CustomDebugStringConvertible {
     // ユーザー辞書の語を含むので，ログには語の数だけを出す(docs/dev/SECURITY-MODEL.md)
-    public var description: String { "Settings(userDictionary: \(userDictionary.count) 語)" }
+    public var description: String { "Settings(userDictionary: \(userDictionary.count) 語, commands: \(commands.count))" }
     public var debugDescription: String { description }
 }
 
@@ -237,6 +264,7 @@ extension Settings: Codable {
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
+        case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, launcherCommands, commands
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -330,6 +358,14 @@ extension Settings: Codable {
         read(.escapeSwitchesToDirect, into: \.escapeSwitchesToDirect)
         read(.restrainsLiveConversionInCode, into: \.restrainsLiveConversionInCode)
         readList(.profileRules, into: \.profileRules)
+        read(.handShiftCorrection, into: \.handShiftCorrection)
+        read(.looseReadings, into: \.looseReadings)
+        read(.phoneticSpelling, into: \.phoneticSpelling)
+        read(.dynamicDictionary, into: \.dynamicDictionary)
+        read(.conversionMacros, into: \.conversionMacros)
+        readList(.macros, into: \.macros)
+        read(.launcherCommands, into: \.launcherCommands)
+        readList(.commands, into: \.commands)
         // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
@@ -412,6 +448,14 @@ extension Settings: Codable {
         try container.encode(escapeSwitchesToDirect, forKey: .escapeSwitchesToDirect)
         try container.encode(restrainsLiveConversionInCode, forKey: .restrainsLiveConversionInCode)
         try container.encode(profileRules, forKey: .profileRules)
+        try container.encode(handShiftCorrection, forKey: .handShiftCorrection)
+        try container.encode(looseReadings, forKey: .looseReadings)
+        try container.encode(phoneticSpelling, forKey: .phoneticSpelling)
+        try container.encode(dynamicDictionary, forKey: .dynamicDictionary)
+        try container.encode(conversionMacros, forKey: .conversionMacros)
+        try container.encode(macros, forKey: .macros)
+        try container.encode(launcherCommands, forKey: .launcherCommands)
+        try container.encode(commands, forKey: .commands)
         var others = encoder.container(keyedBy: AnyKey.self)
         try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))
         for (key, value) in unknownFields where !Self.fieldNames.contains(key) && key != SettingsSchema.versionKey {

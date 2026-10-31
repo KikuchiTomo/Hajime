@@ -7,14 +7,19 @@ public struct CalendarDate: Sendable, Equatable {
     public var weekday: Int
     public var hour: Int
     public var minute: Int
+    public var second: Int
+    /// UTC との差(秒)．ISO 8601 の形(「+09:00」)に使う
+    public var utcOffsetSeconds: Int
 
-    public init(year: Int, month: Int, day: Int, weekday: Int, hour: Int = 0, minute: Int = 0) {
+    public init(year: Int, month: Int, day: Int, weekday: Int, hour: Int = 0, minute: Int = 0, second: Int = 0, utcOffsetSeconds: Int = 0) {
         self.year = year
         self.month = month
         self.day = day
         self.weekday = weekday
         self.hour = hour
         self.minute = minute
+        self.second = second
+        self.utcOffsetSeconds = utcOffsetSeconds
     }
 }
 
@@ -26,6 +31,13 @@ public enum DateExpressions {
     ]
     private static let yearOffsets: [String: Int] = ["きょねん": -1, "ことし": 0, "らいねん": 1]
     private static let nowReadings: Set<String> = ["いま", "げんざい"]
+    /// 「にちじ」は日付と時刻を合わせた形(「2026/11/01 12:34:56」など)にする
+    private static let dateTimeReadings: Set<String> = ["にちじ", "にちじこく", "たいむすたんぷ"]
+    /// 「にちじ」の形．書式の記号は DateTimeFormat
+    static let dateTimeFormats = [
+        "YYYY/MM/DD hh:mm:ss", "YYYY/MM/DD hh:mm", "YYYY-MM-DD hh:mm:ss", "YYYY-MM-DD'T'hh:mm:ssZZ", "YYYY年M月D日 h時m分s秒",
+        "YYYY年M月D日(ddd) h:mm", "GGE年M月D日 h時m分", "YYYYMMDDhhmmss",
+    ]
     /// 「なう」は，今していることに添える日時の形(「なう (2026/10/28 01:08)」)にする
     private static let nowStampReading = "なう"
     private static let weekdayNames = ["日", "月", "火", "水", "木", "金", "土"]
@@ -57,7 +69,11 @@ public enum DateExpressions {
         if nowReadings.contains(reading) {
             let half = now.hour < 12 ? "午前" : "午後"
             let hour12 = now.hour % 12
-            return ["\(now.hour):\(pad(now.minute))", "\(now.hour)時\(now.minute)分", "\(half)\(hour12)時\(now.minute)分"]
+            return ["\(now.hour):\(pad(now.minute))", "\(now.hour)時\(now.minute)分", "\(half)\(hour12)時\(now.minute)分",
+                    "\(pad(now.hour)):\(pad(now.minute)):\(pad(now.second))"]
+        }
+        if dateTimeReadings.contains(reading) {
+            return dateTimeFormats.map { DateTimeFormat.format($0, date: now) }
         }
         return []
     }

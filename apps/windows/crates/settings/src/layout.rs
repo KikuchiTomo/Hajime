@@ -495,7 +495,8 @@ mod tests {
     fn 一覧は入力欄とボタンを表の上に並べ_検索欄を表の下に置く() {
         let page = sections(Page::Correction).unwrap();
         let layout = layout(&page, 800.0, |_| true, one_line);
-        let card = &layout.sections[1].cards[0];
+        // 0 は修正の対象，1 は手のずれ
+        let card = &layout.sections[2].cards[0];
         // 入力欄 2 つ・追加・削除・検索欄
         assert_eq!(card.parts.len(), 5);
         for pair in card.parts[..4].windows(2) {
@@ -507,7 +508,7 @@ mod tests {
         assert!(search.y >= card.control.max_y());
         assert!(search.max_y() <= card.card.max_y());
         // 直さない語句は 1 列
-        assert_eq!(layout.sections[2].cards[0].parts.len(), 4);
+        assert_eq!(layout.sections[3].cards[0].parts.len(), 4);
     }
 
     #[test]
@@ -528,7 +529,8 @@ mod tests {
         let page = sections(Page::Dictionary).unwrap();
         for width in [800.0, 400.0] {
             let layout = layout(&page, width, |_| true, one_line);
-            let card = &layout.sections[1].cards[0];
+            // 0 は動的なユーザー辞書，1 は登録した単語
+            let card = &layout.sections[2].cards[0];
             // 入力欄 4 つ・更新・表の下の 6 つ
             assert_eq!(card.parts.len(), 11);
             for part in &card.parts {

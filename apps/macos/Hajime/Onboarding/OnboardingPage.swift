@@ -9,6 +9,8 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     case presentation
     case characters
     case features
+    /// 既定ではオフの試験的な機能(手のずれ・うろ覚えの語・動的な辞書・変換マクロ・コマンド)
+    case extras
 
     var id: Int { rawValue }
 
@@ -21,6 +23,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         case .presentation: UIStrings.Onboarding.presentationTitle
         case .characters: UIStrings.Onboarding.charactersTitle
         case .features: UIStrings.Onboarding.featuresTitle
+        case .extras: UIStrings.Onboarding.extrasTitle
         }
     }
 
@@ -33,6 +36,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         case .presentation: UIStrings.Onboarding.presentationDetail
         case .characters: UIStrings.Onboarding.charactersDetail
         case .features: UIStrings.Onboarding.featuresDetail
+        case .extras: UIStrings.Onboarding.extrasDetail
         }
     }
 

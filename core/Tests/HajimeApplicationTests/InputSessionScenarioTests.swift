@@ -29,14 +29,18 @@ final class Harness {
     /// キーのあとで，あとから求めて足す処理(InputSession.followUps)を動かすか．アプリは次のキーが来るまで動かす．
     /// false にすると，キーに反応してすぐ出した画面を確かめられる
     var runsFollowUps = true
+    /// 動かすよう頼まれたコマンド(R-22)
+    private(set) var ranCommands: [LauncherCommand] = []
 
+    /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
-         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false) {
+         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false,
+         wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
         self.settings = store
-        self.session = InputSession(converter: converter, lexicon: lexicon, settings: store, associations: associations, keyNames: keyNames,
+        self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: lexicon, settings: store, associations: associations, keyNames: keyNames,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil)
     }
 
@@ -85,6 +89,7 @@ final class Harness {
                 panel = nil
                 lattice = nil
                 note = nil
+            case .runCommand(let command): ranCommands.append(command)
             case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting, .awaitCorrections, .requestReconversion: break
             }
         }

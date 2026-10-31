@@ -80,6 +80,7 @@ struct OnboardingView: View {
         case .presentation: presentation
         case .characters: characters
         case .features: features
+        case .extras: extras
         }
     }
 
@@ -177,6 +178,18 @@ struct OnboardingView: View {
             FeatureRow(title: UIStrings.Onboarding.calculation, detail: UIStrings.Onboarding.calculationDetail, isOn: model.binding(\.calculation))
             FeatureRow(title: UIStrings.Onboarding.postalCode, detail: UIStrings.Onboarding.postalCodeDetail, isOn: model.binding(\.postalCodeConversion))
             FeatureRow(title: UIStrings.Onboarding.date, detail: UIStrings.Onboarding.dateDetail, isOn: model.binding(\.dateConversion))
+        }
+    }
+
+    /// 既定ではオフの機能．ここでオンにでき，あとから設定の画面でも変えられる
+    private var extras: some View {
+        VStack(spacing: Size.cardGap) {
+            FeatureRow(title: UIStrings.Extras.looseReadings, detail: UIStrings.Extras.looseReadingsNote, isOn: model.binding(\.looseReadings))
+            FeatureRow(title: UIStrings.Extras.phoneticSpelling, detail: UIStrings.Extras.phoneticSpellingNote, isOn: model.binding(\.phoneticSpelling))
+            FeatureRow(title: UIStrings.Extras.handShift, detail: UIStrings.Extras.handShiftNote, isOn: model.binding(\.handShiftCorrection))
+            FeatureRow(title: UIStrings.Onboarding.macros, detail: UIStrings.Onboarding.macrosDetail, isOn: model.binding(\.conversionMacros))
+            FeatureRow(title: UIStrings.Onboarding.dynamicDictionary, detail: UIStrings.Onboarding.dynamicDictionaryDetail, isOn: model.binding(\.dynamicDictionary))
+            FeatureRow(title: UIStrings.Onboarding.commands, detail: UIStrings.Onboarding.commandsDetail, isOn: model.binding(\.launcherCommands))
         }
     }
 

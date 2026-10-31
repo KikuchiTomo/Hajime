@@ -144,7 +144,7 @@ struct SettingsFilesTests {
     func userDictionary() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         try settings.update { $0.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "hajime")] }
-        let path = try file("user.txt", "! コメント\nえすきゅー\thajime\nでんあつ\t電圧\nabc\t形が誤り\n1 列だけ\n")
+        let path = try file("user.txt", "! コメント\nえすきゅー\thajime\nでんあつ\t電圧\n漢字\t形が誤り\n1 列だけ\n")
         let counts = try await files.importUserDictionary(from: path)
         #expect(counts.added == 1)
         #expect(counts.skipped == 2)

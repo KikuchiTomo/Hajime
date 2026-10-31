@@ -93,6 +93,16 @@ final class ReadingCorrector {
         let keys = region.keys
         let typed = region.typedKeys == keys ? [] : [region.typedKeys]
         return [keys] + typed + (settings.current.correction.repeatedKeys ? ReadingCorrectionRule.repeatedKeyVariants(of: keys) : [])
+            + handShiftVariants(of: keys)
+    }
+
+    /// 手の置き場所がずれたまま打った並びを戻した並び(HandShift．設定でオンのときだけ)．
+    /// 打ったキーがローマ字として読み切れるときは試さない．ずれた並びはかなにならない英字が残ることがほとんどで，
+    /// 読み切れる並びまで試すと，訂正を求める回数がずれの組の数(6)だけ増えて遅くなるため
+    private func handShiftVariants(of keys: String) -> [String] {
+        let current = settings.current
+        guard current.handShiftCorrection, KeyEditSearch.reading(of: keys) == nil else { return [] }
+        return HandShift.variants(of: keys, layout: KeyboardGeometry.of(current.keyboardLayout)).map(\.keys)
     }
 
     /// 見直さない前の部分(英単語まで)の読み．訂正を別のところで求めるとき，左の文脈に足す
@@ -349,6 +359,11 @@ final class ReadingCorrector {
         for variant in settings.current.correction.repeatedKeys ? ReadingCorrectionRule.repeatedKeyVariants(of: keys) : [] {
             guard let found = corrections(variant) else { return nil }
             candidates += found.map { $0.adding(cost: DefaultSettings.repeatedKeyCost) }
+        }
+        // 手のずれを戻した並び．戻した並びにさらに残る打ち間違いも Zenzai が直すので，その候補もずれの手間を足して比べる
+        for variant in handShiftVariants(of: keys) {
+            guard let found = corrections(variant) else { return nil }
+            candidates += found.map { $0.adding(cost: DefaultSettings.handShiftCost) }
         }
         candidates.sort { $0.score > $1.score }
         let rule = ReadingCorrectionRule(level: settings.current.typoCorrection, sensitivity: settings.current.correctionSensitivity,

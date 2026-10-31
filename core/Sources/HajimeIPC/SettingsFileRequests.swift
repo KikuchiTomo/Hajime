@@ -112,7 +112,7 @@ extension WireSyncStatus {
             isEnabled: state.isEnabled,
             folderPath: state.folderPath,
             folderName: state.folderName,
-            groups: SyncGroup.allCases.map { WireSyncGroupState(group: $0.rawValue, scope: state.scope(of: $0).rawValue, fields: $0.fieldNames) },
+            groups: SyncGroup.syncableCases.map { WireSyncGroupState(group: $0.rawValue, scope: state.scope(of: $0).rawValue, fields: $0.fieldNames) },
             localFields: state.localFields.sorted(),
             lastSyncedAt: state.ledger.lastSyncedAt.map { ISO8601DateFormatter().string(from: $0) },
             isSyncing: status.isSyncing,

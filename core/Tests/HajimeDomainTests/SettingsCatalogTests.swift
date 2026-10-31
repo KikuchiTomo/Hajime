@@ -59,6 +59,8 @@ struct SettingsCatalogTests {
                 "wordLanguageEntries": limit(DefaultSettings.maximumWordLanguageEntries),
                 "wordLanguageWordLength": limit(DefaultSettings.maximumWordLanguageWordLength),
                 "userDictionaryEntries": limit(DefaultSettings.maximumUserDictionaryEntries),
+                "commands": limit(DefaultSettings.maximumCommands),
+                "macros": limit(DefaultSettings.maximumMacros),
                 "userDictionaryReadingLength": limit(DefaultSettings.maximumUserDictionaryReadingLength),
                 "userDictionaryWordLength": limit(DefaultSettings.maximumUserDictionaryWordLength),
                 "profileRules": limit(DefaultSettings.maximumProfileRules),

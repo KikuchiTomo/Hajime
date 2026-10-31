@@ -132,7 +132,7 @@ public enum LearningMode: String, Sendable, Equatable, Codable, CaseIterable {
 
 /// 利用者が登録した語
 public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
-    /// 読み(ひらがな)
+    /// 読み．ひらがなか，ローマ字・英字(「gh」「toyota」)．引くときは lookupReading にそろえる
     public var reading: String
     public var word: String
 
@@ -141,12 +141,21 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
         self.word = word
     }
 
-    /// 読みはひらがなと長音だけ，語は空でなく，どちらも上限の長さ以内
+    /// 読みはひらがな・長音か，ローマ字・英字・数字．語は空でなく，どちらも上限の長さ以内
     public var isValid: Bool {
         !reading.isEmpty && !word.isEmpty
             && reading.count <= DefaultSettings.maximumUserDictionaryReadingLength
             && word.count <= DefaultSettings.maximumUserDictionaryWordLength
-            && reading.unicodeScalars.allSatisfy { (0x3041...0x3096).contains($0.value) || $0 == "ー" }
+            && lookupReading != nil
+    }
+
+    /// 引くときの読み(ReadingNormalization)．ローマ字の読みは，打ったときと同じかなにする
+    public var lookupReading: String? { ReadingNormalization.normalized(reading) }
+
+    /// 読みが，かなになり切るか(変換エンジンに文の中の語として渡せるか)．
+    /// かなにならない英字の残る読み(「gh」)は，読み全体が一致したときだけ候補に出す
+    public var hasKanaReading: Bool {
+        lookupReading.map { !$0.contains(where: \.isASCII) } ?? false
     }
 }
 

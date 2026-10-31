@@ -13,8 +13,8 @@ public protocol EngineByteStream: AnyObject, Sendable {
 /// 1 つの接続で，要求を読んでサービスに渡し，応答を書き返す．送り方によらない部分(Windows と Linux で共通)．
 /// 接続ごとのスレッドで呼ぶ．サービスはメインアクターで動かす
 public enum EngineRequestLoop {
-    public static func serve(_ stream: some EngineByteStream, service: EngineService, isCandidateWindow: Bool) {
-        let id = onMain { service.connect(isCandidateWindow: isCandidateWindow) }
+    public static func serve(_ stream: some EngineByteStream, service: EngineService, isCandidateWindow: Bool, isSettingsApp: Bool = false) {
+        let id = onMain { service.connect(isCandidateWindow: isCandidateWindow, isSettingsApp: isSettingsApp) }
         defer {
             onMain { service.disconnect(id) }
             stream.close()

@@ -7,7 +7,7 @@ use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
 use crate::strings::{
-    association, choice, dictionaries, features, keys, menu, more, settings, sync,
+    association, choice, dictionaries, extras, features, keys, menu, more, settings, sync,
 };
 use ipc::{RuleList, SymbolKind};
 
@@ -53,6 +53,7 @@ pub enum Page {
     Apps,
     Dictionary,
     Symbols,
+    Commands,
     Appearance,
     Usage,
     Sync,
@@ -61,7 +62,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 14] = [
+    pub const ALL: [Page; 15] = [
         Page::Input,
         Page::Conversion,
         Page::Correction,
@@ -71,6 +72,7 @@ impl Page {
         Page::Apps,
         Page::Dictionary,
         Page::Symbols,
+        Page::Commands,
         Page::Appearance,
         Page::Usage,
         Page::Sync,
@@ -87,7 +89,7 @@ impl Page {
             | Page::Romaji
             | Page::Keys
             | Page::Apps => Group::Input,
-            Page::Dictionary | Page::Symbols => Group::Dictionary,
+            Page::Dictionary | Page::Symbols | Page::Commands => Group::Dictionary,
             Page::Appearance => Group::Appearance,
             Page::Usage | Page::Sync | Page::Backup => Group::Data,
             Page::About => Group::About,
@@ -103,6 +105,7 @@ impl Page {
             Page::Symbols => features::SYMBOLS_PAGE,
             Page::Keys => keys::TAB,
             Page::Dictionary => settings::DICTIONARY_TAB,
+            Page::Commands => extras::COMMANDS_PAGE,
             Page::Romaji => settings::ROMAJI_TAB,
             Page::Apps => settings::APPS_TAB,
             Page::Appearance => settings::APPEARANCE_TAB,
@@ -125,6 +128,7 @@ impl Page {
             Page::Apps => '\u{ECE4}',       // 禁止
             Page::Dictionary => '\u{E82D}', // 辞書
             Page::Symbols => '\u{E8D2}',    // 記号
+            Page::Commands => '\u{E945}',   // 稲妻
             Page::Appearance => '\u{E790}', // 色
             Page::Usage => '\u{E9D2}',      // グラフ
             Page::Sync => '\u{E895}',       // 同期
@@ -159,6 +163,9 @@ impl Page {
                 features::RULES,
                 features::CORRECTS_ENGLISH,
                 features::MISREADINGS,
+                extras::HAND_SHIFT,
+                extras::LOOSE_READINGS,
+                extras::PHONETIC_SPELLING,
             ],
             Page::Language => vec![
                 features::ENGLISH_WORDS,
@@ -174,7 +181,17 @@ impl Page {
                 .chain(keys::STATES.iter().map(|(_, label)| *label))
                 .chain(keys::PRESETS.iter().map(|(_, label)| *label))
                 .collect(),
-            Page::Dictionary => vec![settings::READING, settings::WORD, dictionaries::IMPORTED],
+            Page::Dictionary => vec![
+                settings::READING,
+                settings::WORD,
+                dictionaries::IMPORTED,
+                extras::DYNAMIC_DICTIONARY,
+            ],
+            Page::Commands => vec![
+                extras::LAUNCHER_COMMANDS,
+                extras::MACROS_SECTION,
+                extras::CONVERSION_MACROS,
+            ],
             Page::Appearance => vec![more::THEME, more::CUSTOM_THEMES, more::FONT],
             Page::Sync => vec![sync::FOLDER, sync::SCOPES, settings::DICTIONARY_TAB],
             Page::Romaji | Page::Apps | Page::Usage | Page::Backup | Page::About => vec![],
@@ -288,6 +305,8 @@ pub enum LimitKind {
     ProfileRules,
     UserDictionaryEntries,
     KeymapEntries,
+    Commands,
+    Macros,
 }
 
 impl LimitKind {
@@ -299,6 +318,8 @@ impl LimitKind {
             LimitKind::ProfileRules => catalog.limits.profile_rules,
             LimitKind::UserDictionaryEntries => catalog.limits.user_dictionary_entries,
             LimitKind::KeymapEntries => catalog.limits.keymap_entries,
+            LimitKind::Commands => catalog.limits.commands,
+            LimitKind::Macros => catalog.limits.macros,
         }
     }
 }
@@ -711,6 +732,7 @@ pub fn sections(page: Page) -> Option<Vec<Section>> {
         Page::Keys => Some(keymap()),
         Page::Dictionary => Some(dictionary()),
         Page::Symbols => Some(symbols()),
+        Page::Commands => Some(commands()),
         Page::Sync => Some(sync_page()),
         Page::Appearance => Some(appearance()),
         Page::Usage => Some(usage()),
@@ -967,8 +989,17 @@ fn correction() -> Vec<Section> {
                 Row::toggle(features::CORRECTS_REPEATED_KEYS, "correction.repeatedKeys")
                     .enabled_when(On("correction.japanese")),
                 Row::toggle(features::MISREADINGS, "misreadings"),
+                Row::toggle(extras::LOOSE_READINGS, "looseReadings"),
+                Row::toggle(extras::PHONETIC_SPELLING, "phoneticSpelling"),
             ],
         ),
+        Section {
+            title: None,
+            rows: vec![Row::toggle(extras::HAND_SHIFT, "handShiftCorrection")
+                .enabled_when(On("correction.japanese"))],
+            footer: Some(extras::HAND_SHIFT_NOTE),
+            footer_variants: &[],
+        },
         Section::new(
             features::RULES,
             with_files(
@@ -1159,6 +1190,59 @@ const DICTIONARY_FIELDS: &[Field] = &[
 ];
 
 /// ユーザー辞書のページ(macOS の DictionaryPage)．登録した単語(同じ読みに別の単語を登録できる)と取り込んだ辞書
+const COMMAND_FIELDS: &[Field] = &[
+    Field::named("reading", extras::COMMAND_READING, true),
+    Field::named("title", extras::COMMAND_TITLE, false),
+    Field::choice("kind", extras::COMMAND_KIND, options::COMMAND_KINDS, false),
+    Field::named("target", extras::COMMAND_TARGET, false),
+];
+
+const MACRO_FIELDS: &[Field] = &[Field::named("pattern", extras::MACRO_PATTERN, true)];
+
+/// コマンドと変換マクロのページ(macOS の CommandsPage)．コマンドの行き先は実行ファイル・ファイルのパスか URL を打つ
+fn commands() -> Vec<Section> {
+    vec![
+        Section {
+            title: Some(extras::COMMANDS_SECTION),
+            rows: vec![
+                Row::toggle(extras::LAUNCHER_COMMANDS, "launcherCommands"),
+                Row::list(
+                    ListSpec {
+                        path: "commands",
+                        fields: COMMAND_FIELDS,
+                        empty: extras::COMMANDS_EMPTY,
+                        invalid: crate::strings::Text::Fixed(extras::INVALID_COMMAND),
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::Commands,
+                ),
+            ],
+            footer: Some(extras::COMMANDS_NOTE),
+            footer_variants: &[],
+        },
+        Section {
+            title: Some(extras::MACROS_SECTION),
+            rows: vec![
+                Row::toggle(extras::CONVERSION_MACROS, "conversionMacros"),
+                Row::list(
+                    ListSpec {
+                        path: "macros",
+                        fields: MACRO_FIELDS,
+                        empty: extras::MACROS_EMPTY,
+                        invalid: crate::strings::Text::Fixed(extras::INVALID_MACRO),
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::Macros,
+                ),
+            ],
+            footer: Some(extras::MACROS_NOTE),
+            footer_variants: &[],
+        },
+    ]
+}
+
 fn dictionary() -> Vec<Section> {
     let imported = Section {
         title: Some(dictionaries::IMPORTED),
@@ -1171,6 +1255,12 @@ fn dictionary() -> Vec<Section> {
         footer_variants: &[],
     };
     vec![
+        Section {
+            title: None,
+            rows: vec![Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary")],
+            footer: Some(extras::DYNAMIC_DICTIONARY_NOTE),
+            footer_variants: &[],
+        },
         Section::new(
             crate::strings::dictionaries::USER_WORDS,
             vec![

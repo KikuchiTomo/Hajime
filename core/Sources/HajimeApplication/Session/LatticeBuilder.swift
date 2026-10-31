@@ -303,7 +303,9 @@ struct LatticeBuilder {
         // 候補はこの文節の読みだけを，ライブ変換と別の変換の状態で Zenzai を使わずに求める(segmentCandidates)．
         // 後ろの読み全体を文節ごとにライブ変換と同じ状態で変換し直していたときは，文節ごとに状態を捨てて変換し直すので，
         // 長い文ほど Space で分岐図が出るまでが延びた(85 キーの文で 0.36 秒)．1 段目は preferred(見えている文)が受け持つ
-        let pool = converter.segmentCandidates(for: slice).filter { $0.readingCount == length }
+        // コマンドの候補(R-22)は，読み全体で 1 つの文節にしたときだけ並べる．文の一部の文節で選ぶと，残りの文字の扱いが決まらないため
+        let isWhole = start == 0 && length == rest.count
+        let pool = converter.segmentCandidates(for: slice).filter { $0.readingCount == length && (isWhole || $0.commandID == nil) }
         if let preferred {
             // 文全体の候補の一部はこの文節の候補に無いことがある．そのときも先頭に置く
             append(pool.first { $0.text == preferred } ?? Candidate(text: preferred, readingCount: length, origin: .sentencePart))

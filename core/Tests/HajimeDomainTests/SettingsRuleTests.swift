@@ -63,10 +63,11 @@ struct ProfileTests {
         #expect(SymbolTable.text(for: "[", profile: .programming, settings: settings) == "[")
     }
 
-    @Test("ユーザー辞書の語は，読みがひらがなで，長さが上限以内のときだけ使える")
+    @Test("ユーザー辞書の語は，読みがひらがなかローマ字・英字で，長さが上限以内のときだけ使える")
     func userDictionaryEntry() {
         #expect(UserDictionaryEntry(reading: "えすきゅーじゅう", word: "hajime").isValid)
-        #expect(!UserDictionaryEntry(reading: "Hajime", word: "hajime").isValid)
+        #expect(UserDictionaryEntry(reading: "Hajime", word: "hajime").isValid)
+        #expect(!UserDictionaryEntry(reading: "漢字", word: "hajime").isValid)
         #expect(!UserDictionaryEntry(reading: "", word: "hajime").isValid)
         #expect(!UserDictionaryEntry(reading: "あ", word: String(repeating: "a", count: 65)).isValid)
     }

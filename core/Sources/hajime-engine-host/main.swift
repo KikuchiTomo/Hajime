@@ -178,7 +178,8 @@ func run() -> Int32 {
     let rejections = SettingsCorrectionRejections(settings: settings)
     let service = EngineService(
         makeSession: {
-            InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine),
+            InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
+                                                          lexicon: lexicon),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                          keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary)
         },
@@ -199,6 +200,14 @@ func run() -> Int32 {
             usage: usage,
             previewLanguage: { preview.preview($0, precedingText: $1) }
         ),
+        runCommand: { command in
+            // 読みで呼び出すコマンド(R-22)．Windows だけで動かす(Linux はまだ設定の画面が無く，コマンドを登録できない)
+            #if os(Windows)
+            WindowsCommandLauncher.run(command)
+            #else
+            _ = command
+            #endif
+        },
         log: { message in
             #if os(Windows)
             EngineProcess.debugLog(message)
@@ -219,7 +228,7 @@ func run() -> Int32 {
     window.start(listener: windowListener, expectedImagePath: candidateWindow.path) {
         [.hello(protocolVersion: WireProtocol.version), .setPresentation(presentation: presentation)]
     }
-    EnginePipeServer.start(listener: engineListener, service: service, candidateWindowPath: candidateWindow.path)
+    EnginePipeServer.start(listener: engineListener, service: service, candidateWindowPath: candidateWindow.path, settingsAppPath: settingsApp.path)
     if FileManager.default.fileExists(atPath: candidateWindow.path) {
         let process = Process()
         process.executableURL = candidateWindow

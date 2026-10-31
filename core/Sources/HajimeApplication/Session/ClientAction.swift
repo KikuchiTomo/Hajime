@@ -29,6 +29,9 @@ public enum ClientAction: Sendable, Equatable {
     case awaitCorrections
     /// 再変換のキーを押した．入力先で選んでいる文字を読んで InputSession.reconvert に渡す(入力先を読めるのはアプリ側)
     case requestReconversion
+    /// コマンドの候補を選んで確定した．アプリ側(macOS は入力メソッドのプロセス，Windows はエンジンのプロセス)がコマンドを動かす．
+    /// 入力先のアプリ(Windows の DLL)には渡さない
+    case runCommand(LauncherCommand)
 }
 
 /// 処理の結果．handled が false なら，キーは入力先のアプリにそのまま渡る
