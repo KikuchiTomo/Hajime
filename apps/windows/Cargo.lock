@@ -108,6 +108,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokens",
+ "tsf",
  "windows",
  "windows-core",
 ]

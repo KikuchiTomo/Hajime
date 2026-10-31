@@ -21,6 +21,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(windows)'.dependencies]
+# 利用者の入力方式に加えるときに，テキストサービスの ID を使う
+tsf = { path = "../tsf" }
 windows-core.workspace = true
 windows = { workspace = true, features = [
     "Win32_Foundation",

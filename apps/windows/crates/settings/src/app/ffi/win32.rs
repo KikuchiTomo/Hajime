@@ -393,20 +393,39 @@ fn registry_dword(name: PCWSTR) -> Option<u32> {
     result.is_ok().then_some(value)
 }
 
-/// 初期設定ウィザードを済ませたかを書く場所(利用者ごと．エンジンの設定のファイルには書かない)
-const SETUP_KEY: PCWSTR = w!("Software\\haji.men\\IME");
+/// 利用者ごとの印を書く場所(エンジンの設定のファイルには書かない)
+const USER_KEY: PCWSTR = w!("Software\\haji.men\\IME");
+/// 初期設定ウィザードを済ませた印
 const SETUP_VALUE: PCWSTR = w!("SetupCompleted");
+/// 利用者の入力方式に Hajime を加えた印．一度だけ加え，利用者があとで外したら加え直さない
+const INPUT_METHOD_VALUE: PCWSTR = w!("InputMethodAdded");
 
 /// 初期設定ウィザードを済ませたか
 pub fn setup_completed() -> bool {
+    user_flag(SETUP_VALUE)
+}
+
+/// 初期設定ウィザードを済ませたことを書く
+pub fn set_setup_completed() -> bool {
+    set_user_flag(SETUP_VALUE)
+}
+
+/// この利用者の入力方式に Hajime をまだ加えていなければ加える(既定の入力方式の上書きの一覧に出すため)
+pub fn add_input_method_once() {
+    if !user_flag(INPUT_METHOD_VALUE) && hajime_tsf::add_to_user_input_methods() {
+        set_user_flag(INPUT_METHOD_VALUE);
+    }
+}
+
+fn user_flag(name: PCWSTR) -> bool {
     let mut value = 0u32;
     let mut size = std::mem::size_of::<u32>() as u32;
     // SAFETY: value と size はこの関数の中の値で，DWORD を 1 つ受ける大きさ
     let result = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
-            SETUP_KEY,
-            SETUP_VALUE,
+            USER_KEY,
+            name,
             RRF_RT_REG_DWORD,
             None,
             Some((&raw mut value).cast()),
@@ -416,15 +435,14 @@ pub fn setup_completed() -> bool {
     result.is_ok() && value != 0
 }
 
-/// 初期設定ウィザードを済ませたことを書く
-pub fn set_setup_completed() -> bool {
+fn set_user_flag(name: PCWSTR) -> bool {
     let value = 1u32;
     // SAFETY: value はこの関数の中の値で，大きさを正しく渡す．キーが無ければ作る
     let result = unsafe {
         RegSetKeyValueW(
             HKEY_CURRENT_USER,
-            SETUP_KEY,
-            SETUP_VALUE,
+            USER_KEY,
+            name,
             REG_DWORD.0,
             Some((&raw const value).cast()),
             std::mem::size_of::<u32>() as u32,
