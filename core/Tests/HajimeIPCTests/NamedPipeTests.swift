@@ -157,7 +157,7 @@ struct NamedPipeTests {
     @Test("実行ファイルの場所は，URL.path の / 区切りでも同じ場所とみなす", arguments: [
         (#"C:\Program Files\Hajime\hajime-candidate-ui.exe"#, "C:/Program Files/Hajime/hajime-candidate-ui.exe", true),
         (#"C:\Program Files\Hajime\hajime-candidate-ui.exe"#, "/C:/Program Files/Hajime/hajime-candidate-ui.exe", true),
-        (#"C:\Program Files\Hajime\hajime-candidate-ui.exe"#, #"c:\program files\Hajime.TOKYO IME\Hajime-CANDIDATE-UI.EXE"#, true),
+        (#"C:\Program Files\Hajime\hajime-candidate-ui.exe"#, #"c:\program files\HAJIME\HAJIME-CANDIDATE-UI.EXE"#, true),
         (#"C:\Program Files\Hajime\hajime-candidate-ui.exe"#, "C:/Program Files/Hajime/hajime-settings.exe", false),
         (#"\\server\share\hajime-candidate-ui.exe"#, "C:/server/share/hajime-candidate-ui.exe", false),
         (#"C:\hajime-candidate-ui.exe"#, "", false),

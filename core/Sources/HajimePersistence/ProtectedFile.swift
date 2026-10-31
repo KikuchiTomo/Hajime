@@ -10,7 +10,7 @@ enum ProtectedFile {
     static func write(_ data: Data, to url: URL) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        let temporary = directory.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
+        let temporary = temporaryURL(in: directory)
         guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
             throw CocoaError(.fileWriteUnknown)
         }
@@ -20,6 +20,12 @@ enum ProtectedFile {
             try? FileManager.default.removeItem(at: temporary)
             throw error
         }
+    }
+
+    /// 置き換える前に書く一時ファイルの場所(url と同じフォルダ)．名前は置き換える先によらない短いものにする．
+    /// Windows はパスの長さに上限(MAX_PATH の 260 文字)があり，同期のフォルダの長い名前の索引を足すと超えて書けなくなるため
+    static func temporaryURL(in directory: URL) -> URL {
+        directory.appendingPathComponent(".\(UUID().uuidString).tmp")
     }
 
     /// 書き終えた一時ファイルで url を置き換える(url が無ければ動かす)．失敗しても一時ファイルは消さない
