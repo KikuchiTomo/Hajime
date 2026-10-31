@@ -76,6 +76,21 @@ public struct TypoCorrectionRule: Sendable {
         wordsAfterEnglish.contains(where: reading.hasPrefix)
     }
 
+    /// 綴りの誤りとみなす部分の後ろが，英字のあとに続く日本語として読めるか(「pc」+「から」，「sns」+「を」，「ok」+「です」)．
+    /// 英字の略語などをそのまま打ち，続けて助詞を打ったものなので，後ろの日本語まで英単語に飲み込んで直さない(「pcka」→ pika)．
+    /// 後ろは英字のあとのいちばん長い，かなになり切る部分で，打ちかけのとき(「か」)は続く語の頭でもよい
+    public static func endsWithJapaneseAfterLetters(_ keys: String) -> Bool {
+        let keys = Array(keys)
+        for start in keys.indices.dropFirst() {
+            var following = Composition()
+            for key in keys[start...] { following.insertRomaji(key) }
+            guard !following.containsInvalidRomaji, following.pending.isEmpty else { continue }
+            let reading = following.conversionReading
+            return startsLikeFollowingEnglish(reading) || wordsAfterEnglish.contains { $0.hasPrefix(reading) }
+        }
+        return false
+    }
+
     /// 文の中の英単語のすぐあとによく続く語(助詞と「する」「です」など)
     static let wordsAfterEnglish = [
         "を", "が", "は", "に", "で", "の", "と", "も", "へ", "や", "から", "まで", "より", "って",

@@ -90,7 +90,8 @@ final class EnglishWordCorrector {
         }
         // 綴りの誤り．どの部分を調べるかは TypoCorrectionRule.misspellingTails にある
         func misspelling(startingBefore bound: Int?) -> Correction? {
-            for tail in rule.misspellingTails(from: tails) where bound.map({ tail.rawStart < $0 }) ?? true {
+            for tail in rule.misspellingTails(from: tails) where (bound.map({ tail.rawStart < $0 }) ?? true)
+                && !TypoCorrectionRule.endsWithJapaneseAfterLetters(tail.keys) {
                 if let word = rule.correction(for: tail.keys, isWord: false, suggestions: lexicon.suggestions(for: tail.keys)) {
                     return Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word, isMisspelling: true)
                 }
