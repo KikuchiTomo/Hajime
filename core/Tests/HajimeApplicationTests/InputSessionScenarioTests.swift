@@ -279,6 +279,23 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "走るはし")
     }
 
+    @Test("かなのまま見せている読みの末尾の打ちかけの n は，Enter で見えているとおり n のまま確定する．nn と打てば ん")
+    func commitsPendingNasalAsShown() {
+        let harness = Harness()
+        harness.type("n")
+        #expect(harness.marked.text == "n")
+        harness.press(.enter)
+        #expect(harness.committed == "n")
+        harness.type("kan")
+        #expect(harness.marked.text == "かn")
+        harness.press(.enter)
+        #expect(harness.committed == "nかn")
+        harness.type("kann")
+        #expect(harness.marked.text == "かん")
+        harness.press(.enter)
+        #expect(harness.committed == "nかnかん")
+    }
+
     @Test("ライブ変換しない文字数を 0 にすると，短い読みもライブ変換する")
     func liveConversionSkipLengthOff() {
         var settings = DefaultSettings.settings
