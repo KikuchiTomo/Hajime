@@ -179,7 +179,13 @@ extension SegmentLattice: CustomStringConvertible, CustomDebugStringConvertible 
 public enum CandidatePresentation: String, Sendable, Equatable, CaseIterable {
     /// 分岐図．英単語を補正しているときだけ一覧
     case automatic
+    /// 文節ごとの一覧．文節は分岐図と同じに分け，注目している文節の候補を縦に並べる．操作は分岐図と同じ
+    case segmentList
+    /// 文全体の候補の一覧
     case list
+
+    /// Space で読みを文節に分けて変換するか(分岐図と文節ごとの一覧)
+    public var segmentsReading: Bool { self != .list }
 }
 
 extension CandidatePresentation: Codable {

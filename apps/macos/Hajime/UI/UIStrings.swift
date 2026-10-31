@@ -465,7 +465,8 @@ enum UIStrings {
         static func detail(for presentation: CandidatePresentation) -> String {
             switch presentation {
             case .automatic: "文節ごとに候補が枝分かれします。文全体を見渡しながら、直したい文節だけを選び直せます。"
-            case .list: "選んでいる文節の候補を縦に並べます。"
+            case .segmentList: "選んでいる文節の候補を縦に並べます。"
+            case .list: "文全体の候補を縦に並べます。"
             }
         }
         static let initialFocus = "最初に選ぶ文節"
@@ -550,7 +551,8 @@ enum UIStrings {
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {
             case .automatic: "分岐図"
-            case .list: "一覧"
+            case .segmentList: "一覧"
+            case .list: "文全体の一覧"
             }
         }
 

@@ -229,6 +229,7 @@ pub fn choice_note(field: Field, value: &str) -> Option<&'static str> {
         (Field::Switch, SWITCH_TOGGLE) => Some(text::SWITCH_TOGGLE_NOTE),
         (Field::Switch, SWITCH_HENKAN) => Some(text::SWITCH_HENKAN_NOTE),
         (Field::Path("candidatePresentation"), "automatic") => Some(text::BRANCH_NOTE),
+        (Field::Path("candidatePresentation"), "segmentList") => Some(text::SEGMENT_LIST_NOTE),
         (Field::Path("candidatePresentation"), "list") => Some(text::LIST_NOTE),
         (Field::Path("initialFocus"), "start") => Some(text::FOCUS_START_NOTE),
         (Field::Path("initialFocus"), "end") => Some(text::FOCUS_END_NOTE),

@@ -673,7 +673,8 @@ pub mod wizard {
     pub const WINDOW_STEP_TITLE: &str = "候補ウィンドウ";
     pub const WINDOW_TEXT: &str = "変換の候補の出し方を選びます。";
     pub const BRANCH_NOTE: &str = "文節ごとの候補を枝分かれで並べます。文全体を見ながら選べます。";
-    pub const LIST_NOTE: &str = "選んでいる文節の候補を縦に並べます。";
+    pub const SEGMENT_LIST_NOTE: &str = "選んでいる文節の候補を縦に並べます。";
+    pub const LIST_NOTE: &str = "文全体の候補を縦に並べます。";
     pub const FOCUS_TITLE: &str = "最初に選ぶ文節";
     pub const FOCUS_TEXT: &str = "Space で変換したとき、どの文節から選び始めるかを決めます。";
     pub const FOCUS_START_NOTE: &str = "文の頭から順に直していけます。";

@@ -42,7 +42,11 @@ pub const YEN_KEY: &[Choice] = &[
     ("backslashInProgramming", "エディタとターミナルだけ \\"),
 ];
 
-pub const PRESENTATIONS: &[Choice] = &[("automatic", "分岐図"), ("list", "一覧")];
+pub const PRESENTATIONS: &[Choice] = &[
+    ("automatic", "分岐図"),
+    ("segmentList", "一覧"),
+    ("list", "文全体の一覧"),
+];
 
 pub const INITIAL_FOCUS: &[Choice] = &[("start", "先頭"), ("end", "末尾"), ("automatic", "自動")];
 
