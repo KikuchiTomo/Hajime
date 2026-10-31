@@ -36,6 +36,13 @@ struct SegmentSplitterTests {
         #expect(split.positions == [4, 5])
     }
 
+    @Test("語の頭に来ない字(「ん」「っ」，小さいかな，長音)の前では切らない(「ウブ｜ンツ」「初｜んつ」)")
+    func keepsNonInitialCharacters() {
+        let dictionary = Dictionary(candidates: ["うぶ": ["ウブ", "初"], "んつ": ["ンツ", "んつ"]])
+        #expect(dictionary.split("ウブンツ", "うぶんつ").pieces == ["ウブンツ"])
+        #expect(dictionary.split("初んつ", "うぶんつ").pieces == ["初んつ"])
+    }
+
     @Test("ひらがなどうしは，助詞の前後の語の切れ目だけで切る(「ある｜と」．「あ｜る」は切らない)")
     func hiraganaNeedsParticle() {
         let dictionary = Dictionary(

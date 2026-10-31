@@ -38,6 +38,24 @@ struct ReportedExamplesTests {
         #expect(try commit("made", precedingText: "AAA") == "まで")
     }
 
+    @Test("辞書に無いカタカナ語(ubuntu → うぶんつ)を，分岐図で「ウブ｜ンツ」「ウブン｜ツ」と切らない")
+    func katakanaWordStaysTogether() throws {
+        let path = try #require(ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"])
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-reported-\(UUID().uuidString)")
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "reported", zenzai: try ZenzaiModel.verified(at: URL(fileURLWithPath: path)))
+        var settings = DefaultSettings.settings
+        settings.typoCorrection = .off
+        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings(settings))
+        for key in "ubuntuwoireru" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        var columns: [String] = []
+        for action in session.handle(KeyEvent(.space), context: InputContext()).actions {
+            if case .showLattice(let panel) = action { columns = panel.columns.map(\.text) }
+        }
+        #expect(columns.count > 0)
+        #expect(!columns.contains { $0.first.map { !ClauseSplitter.canStartClause(with: $0) } ?? false })
+        #expect(!zip(columns, columns.dropFirst()).contains { SegmentSplitter.cutsWord(before: $0, after: $1) })
+    }
+
     @Test("「Cloudflareで取ったドメイン」")
     func cloudflare() throws {
         #expect(try commit("kuraudohureadetottadomeinn").contains("取った"))

@@ -367,6 +367,29 @@ struct ClauseSplitterTests {
         #expect(clauses.map(\.text) == ["問題点が", "あれば", "GitHub"])
     }
 
+    @Test("カタカナだけの語が続くときは 1 つの文節にまとめる(「ウブ｜ン｜ツ」でなく「ウブンツ」)")
+    func joinsKatakanaWords() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "ウブ", readingCount: 2), Word(text: "ン", readingCount: 1), Word(text: "ツ", readingCount: 1),
+            Word(text: "を", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Word(text: "入れる", readingCount: 3),
+        ])
+        #expect(clauses.map(\.text) == ["ウブンツを", "入れる"])
+        #expect(clauses.map(\.readingCount) == [5, 3])
+    }
+
+    @Test("語の頭に来ない字(「ん」「っ」，小さいかな，長音)で始まる語は前の文節に付ける(「ウブ｜んつ」と切らない)")
+    func attachesNonInitialCharacters() {
+        let clauses = ClauseSplitter.clauses(of: [
+            Word(text: "ウブ", readingCount: 2), Word(text: "ン", readingCount: 1, startsWithNoun: true), Word(text: "つ", readingCount: 1),
+        ])
+        #expect(clauses.map(\.text) == ["ウブンつ"])
+        let hiragana = ClauseSplitter.clauses(of: [Word(text: "初", readingCount: 2), Word(text: "んつ", readingCount: 2, startsWithNoun: true)])
+        #expect(hiragana.map(\.text) == ["初んつ"])
+        #expect(ClauseSplitter.canStartClause(with: "ウ"))
+        #expect(!["ん", "ン", "っ", "ャ", "ー", "ﾝ"].contains { ClauseSplitter.canStartClause(with: $0) })
+    }
+
     @Test("英字 1 文字ずつの語は 1 つの文節にまとめる(「python｜が」でなく「pythonが」，「この｜IMEは」)")
     func joinsLatinLetters() {
         let python = ClauseSplitter.clauses(of: "python".map { Word(text: String($0), readingCount: 1) }
