@@ -462,6 +462,19 @@ struct InputSessionScenarioTests {
         #expect(harness.committed == "\\¥")
     }
 
+    @Test("R-04: Shift+¥ は | を入れる(日本語・英数・ターミナル)")
+    func shiftYenKey() {
+        let harness = Harness()
+        harness.press(.yen, .shift)
+        #expect(harness.committed == "|")
+        harness.context = InputContext(profile: .terminal)
+        harness.press(.yen, .shift)
+        #expect(harness.committed == "||")
+        harness.press(.eisu)
+        harness.press(.yen, .shift)
+        #expect(harness.committed == "|||")
+    }
+
     @Test("R-04: 英数モードでも ¥ キーの設定に従う")
     func yenKeyInDirectMode() {
         let harness = Harness()
