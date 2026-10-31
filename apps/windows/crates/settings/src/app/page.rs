@@ -13,7 +13,7 @@ use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{
-    self, Action, Control, DictionaryList, Info, LimitKind, Page, RangeKind, Row, Section,
+    self, Action, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row, Section,
 };
 use crate::store::SettingsStore;
 use crate::strings::{features, keys, more, rule_list, settings, windows as text};
@@ -21,6 +21,7 @@ use crate::ui::anim::{Easing, Tween};
 use crate::ui::scroll::Scroller;
 use crate::ui::table::{Move, Table};
 use crate::usage::Usage;
+use candidate_ui::fonts::{self as fonts, InstalledFace, Selection};
 use ipc::SymbolKind;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -260,6 +261,8 @@ pub struct Extras {
     pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
+    /// OS に入っている書体(外観のページを初めて開いたときに読む)
+    pub fonts: Vec<InstalledFace>,
 }
 
 impl Extras {
@@ -354,6 +357,8 @@ struct RowState {
     /// 選択肢の後ろに足して選んだ状態にする名前(カスタムテーマを使っているときのテーマの欄．macOS と同じく，
     /// 既成のテーマのどれも選んでいないことを見せる)．選んでも何もしない
     extra_choice: Option<String>,
+    /// カスタムテーマの書体の欄の選択肢(選んだときに入れる値と画面に出す名前)
+    font_items: Vec<(String, String)>,
     /// 数を選ぶ部品の選択肢
     numbers: Vec<f64>,
     /// 統計・情報・バージョン・知らせの文
@@ -404,6 +409,7 @@ impl RowState {
             knob: Tween::fixed(0.0),
             choice: matches!(row.control, Control::Preset).then_some(0),
             extra_choice: None,
+            font_items: Vec::new(),
             numbers,
             text,
             color: String::new(),
@@ -580,9 +586,10 @@ impl RowState {
         let mut parts = Vec::new();
         match &self.row.control {
             Control::Toggle => parts.push(Part::Toggle),
-            Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) => {
-                parts.push(Part::Dropdown)
-            }
+            Control::Choice(_)
+            | Control::ThemeFont(_)
+            | Control::Stepper(_)
+            | Control::Seconds(_) => parts.push(Part::Dropdown),
             Control::Action(_) => parts.push(Part::Action),
             Control::Color => parts.push(Part::Color),
             Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
@@ -659,6 +666,11 @@ impl RowState {
     /// ドロップダウンの選択肢の名前
     fn dropdown_items(&self, part: Part) -> Vec<String> {
         match (&self.row.control, part) {
+            (Control::ThemeFont(_), Part::Dropdown) => self
+                .font_items
+                .iter()
+                .map(|(_, label)| label.clone())
+                .collect(),
             (Control::Choice(choices), Part::Dropdown) => choices
                 .iter()
                 .map(|(_, name)| (*name).to_string())
@@ -888,6 +900,13 @@ impl PageView {
                         );
                         row.on = on;
                     }
+                }
+                Control::ThemeFont(part) => {
+                    let (items, choice) =
+                        font_items(*part, &extras.fonts, &values.text(row.row.path));
+                    row.visible &= !items.is_empty();
+                    row.font_items = items;
+                    row.choice = choice;
                 }
                 Control::Choice(choices) => {
                     row.extra_choice = (row.row.path == crate::themes::BASE_THEME)
@@ -1390,6 +1409,15 @@ impl PageView {
     pub fn choose(&mut self, element: Element, index: usize) -> Option<Event> {
         let row = self.rows.get_mut(element.row)?;
         let event = match (&row.row.control, element.part) {
+            (Control::ThemeFont(_), Part::Dropdown) => {
+                let (value, _) = row.font_items.get(index)?;
+                row.choice = Some(index);
+                Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::String(value.clone()),
+                    clears: row.row.clears,
+                })
+            }
             (Control::Choice(choices), Part::Dropdown) => {
                 let (value, _) = choices.get(index)?;
                 row.choice = Some(index);
@@ -1785,7 +1813,11 @@ impl PageView {
                     self.state(frame, toggle, row.enabled),
                 );
             }
-            Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_) | Control::Preset => {
+            Control::Choice(_)
+            | Control::ThemeFont(_)
+            | Control::Stepper(_)
+            | Control::Seconds(_)
+            | Control::Preset => {
                 let dropdown = element(Part::Dropdown);
                 let items = row.dropdown_items(Part::Dropdown);
                 let label = row
@@ -2365,5 +2397,55 @@ pub fn paint_status(
             );
         }
         Availability::Ready => {}
+    }
+}
+
+/// カスタムテーマの書体の欄の選択肢と，選んでいる番号(macOS の ThemeFontPicker)．
+/// 選択肢は選んだときに入れる値と画面に出す名前．ファミリーを選ぶと，太さと斜体が今の書体に近いスタイルの PostScript 名を入れる．
+/// スタイルの欄は，今の書体が入っていなければ選択肢を空にする(出さない)
+fn font_items(
+    part: FontPart,
+    faces: &[InstalledFace],
+    value: &str,
+) -> (Vec<(String, String)>, Option<usize>) {
+    let current = fonts::find(faces, value);
+    match part {
+        FontPart::Family => {
+            let mut items = vec![(String::new(), more::THEME_FONT.to_string())];
+            // 入っていない書体を保存していれば，その名前のまま出す(選び直すまで値を変えない)
+            if !value.is_empty() && current.is_none() {
+                items.push((value.to_string(), value.to_string()));
+            }
+            let mut choice = Some(if value.is_empty() { 0 } else { 1 });
+            let groups = fonts::by_family(faces);
+            for (family, label) in fonts::families(faces) {
+                if current.is_some_and(|current| current.family() == family) {
+                    choice = Some(items.len());
+                }
+                let target = groups
+                    .get(&family.to_lowercase())
+                    .and_then(|members| fonts::closest_in(members, current))
+                    .map_or_else(|| family.to_string(), |face| face.postscript.clone());
+                items.push((target, label.to_string()));
+            }
+            (items, choice)
+        }
+        FontPart::Style => {
+            let Some(current) = current else {
+                return (Vec::new(), None);
+            };
+            let members = fonts::faces_of(faces, current.family());
+            let choice = match current {
+                Selection::Face(face) => members
+                    .iter()
+                    .position(|member| member.postscript == face.postscript),
+                Selection::Family(_) => None,
+            };
+            let items = members
+                .into_iter()
+                .map(|face| (face.postscript.clone(), face.label.clone()))
+                .collect();
+            (items, choice)
+        }
     }
 }

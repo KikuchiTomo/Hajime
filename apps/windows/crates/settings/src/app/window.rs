@@ -509,6 +509,9 @@ impl App {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = super::actions::keymap_report(model);
             }
+            if self.view.page == Page::Appearance && self.extras.fonts.is_empty() {
+                self.extras.fonts = candidate_ui::app::fonts::installed();
+            }
             // 同期の状態と，編集しているカスタムテーマの値を重ねる
             let entries = crate::themes::entries(model.value(crate::themes::THEMES));
             let editing = self

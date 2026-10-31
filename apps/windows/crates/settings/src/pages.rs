@@ -219,6 +219,15 @@ pub enum Condition {
     On(&'static str),
 }
 
+/// カスタムテーマの書体の欄(macOS の ThemeFontPicker)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FontPart {
+    /// ファミリー
+    Family,
+    /// ファミリーの中のスタイル(太さ・斜体など)
+    Style,
+}
+
 /// 1 行の部品
 #[derive(Debug, Clone, PartialEq)]
 pub enum Control {
@@ -226,6 +235,8 @@ pub enum Control {
     Toggle,
     /// 列挙の値を選ぶ
     Choice(&'static [Choice]),
+    /// カスタムテーマの書体(入っている書体から選ぶ．選択肢は OS から読む)
+    ThemeFont(FontPart),
     /// 整数を範囲の中で選ぶ(候補の数)
     Stepper(RangeKind),
     /// 秒を範囲の中で選ぶ(0.1 秒ごと)
@@ -604,7 +615,11 @@ impl Row {
     pub fn has_value(&self) -> bool {
         matches!(
             self.control,
-            Control::Toggle | Control::Choice(_) | Control::Stepper(_) | Control::Seconds(_)
+            Control::Toggle
+                | Control::Choice(_)
+                | Control::ThemeFont(_)
+                | Control::Stepper(_)
+                | Control::Seconds(_)
         )
     }
 
@@ -1323,8 +1338,18 @@ fn appearance() -> Vec<Section> {
                     options::BRANCH_STYLES,
                 )
                 .visible_when(editing()),
-                Row::choice(more::FONT, themes::FONT_NAME, options::THEME_FONTS)
-                    .visible_when(editing()),
+                Row::new(
+                    more::FONT,
+                    themes::FONT_NAME,
+                    Control::ThemeFont(FontPart::Family),
+                )
+                .visible_when(editing()),
+                Row::new(
+                    more::FONT_STYLE,
+                    themes::FONT_NAME,
+                    Control::ThemeFont(FontPart::Style),
+                )
+                .visible_when(editing()),
             ],
         ),
         Section::new(

@@ -196,6 +196,7 @@ pub mod more {
     pub const CORNER_RADIUS: &str = "角の丸さ";
     pub const BRANCH_STYLE: &str = "枝";
     pub const THEME_FONT: &str = "テーマに合わせる";
+    pub const FONT_STYLE: &str = "スタイル";
     pub const DUPLICATE_THEME: &str = "複製";
     pub const NEW_THEME_NAME: &str = "新しいテーマ";
     pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
