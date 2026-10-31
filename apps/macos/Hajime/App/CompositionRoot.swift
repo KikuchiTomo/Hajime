@@ -113,6 +113,7 @@ final class CompositionRoot {
                                                   previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
+        controller.setOpenLatestRelease(Self.openLatestRelease)
         return controller
     }()
 
@@ -120,7 +121,14 @@ final class CompositionRoot {
     private(set) lazy var onboarding = OnboardingWindowController(settings: settings)
 
     /// 入力メニュー．入力欄ごとのコントローラで 1 つを共有する(InputMenuBuilder の説明)
-    private(set) lazy var inputMenu = InputMenuBuilder(settings: settings, openSettings: { [unowned self] in self.settingsWindow.show() })
+    private(set) lazy var inputMenu = InputMenuBuilder(settings: settings, openSettings: { [unowned self] in self.settingsWindow.show() },
+                                                       checkForUpdates: Self.openLatestRelease)
+
+    /// 最新のリリースのページを既定のブラウザで開く．アプリは通信しない(SECURITY-MODEL.md の通信)
+    private static func openLatestRelease() {
+        guard let url = URL(string: DefaultSettings.latestReleaseURL) else { return }
+        NSWorkspace.shared.open(url)
+    }
 
     func makePresenter(session: InputSession) -> ClientActionPresenter {
         ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,

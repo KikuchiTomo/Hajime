@@ -354,4 +354,7 @@ public enum DefaultSettings {
     public static let followUpPollInterval = 0.001
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
+    /// 「更新を確認」で開く最新のリリースのページ．アプリは通信せず，ブラウザで開くだけにする(SECURITY-MODEL.md の通信)．
+    /// macOS と Windows の配布物は同じリリースに置く
+    public static let latestReleaseURL = "https://github.com/KikuchiTomo/Hajime/releases/latest"
 }

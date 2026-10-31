@@ -239,6 +239,7 @@ pub mod more {
     pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
     pub const ABOUT: &str = "情報";
     pub const VERSION: &str = "バージョン";
+    pub const CHECK_FOR_UPDATES: &str = "更新を確認";
     pub const ACKNOWLEDGEMENTS: &str = "謝辞";
     pub const ACKNOWLEDGEMENTS_NOTE: &str =
         "はじめは上記のソフトウェア・モデル・データを利用しています。";

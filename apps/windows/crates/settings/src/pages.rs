@@ -310,6 +310,8 @@ pub enum Action {
     OpenSetup,
     /// 今すぐ同期する
     SyncNow,
+    /// 最新のリリースのページを既定のブラウザで開く(アプリは通信しない)
+    OpenLatestRelease,
 }
 
 /// 取り込んで使う辞書の一覧の種類
@@ -1447,6 +1449,7 @@ fn about() -> Vec<Section> {
     vec![
         Section::untitled(vec![
             Row::new(more::VERSION, "", Control::Version),
+            Row::action(more::CHECK_FOR_UPDATES, Action::OpenLatestRelease),
             Row::action(crate::strings::wizard::REDO, Action::OpenSetup),
         ]),
         Section {

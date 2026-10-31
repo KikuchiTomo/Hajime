@@ -30,7 +30,14 @@ struct AboutPage: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent(UIStrings.More.version, value: model.versionString)
+                LabeledContent(UIStrings.More.version) {
+                    HStack {
+                        Text(model.versionString)
+                        if let open = model.openLatestRelease {
+                            Button(UIStrings.More.checkForUpdates, action: open)
+                        }
+                    }
+                }
                 if let open = model.openOnboarding {
                     LabeledContent(UIStrings.Onboarding.redoLabel) {
                         Button(UIStrings.Onboarding.redo, action: open)

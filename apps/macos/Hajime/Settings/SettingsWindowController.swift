@@ -27,6 +27,11 @@ final class SettingsWindowController {
         model.openOnboarding = open
     }
 
+    /// 「更新を確認」で最新のリリースのページを開く処理を渡す
+    func setOpenLatestRelease(_ open: @escaping () -> Void) {
+        model.openLatestRelease = open
+    }
+
     /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
     func noteSetAsideFile(_ url: URL?) {
         guard let url else { return }
@@ -84,6 +89,8 @@ final class SettingsModel: ObservableObject {
     private let resetLearningAction: () -> Void
     /// 「初期設定をやり直す」で初期設定の窓を開く．無ければ情報のページにボタンを出さない
     var openOnboarding: (() -> Void)?
+    /// 「更新を確認」で最新のリリースのページをブラウザで開く．無ければ情報のページにボタンを出さない
+    var openLatestRelease: (() -> Void)?
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 辞書の取り込み・バックアップ・CSV・決まりの一覧の読み書き(Windows のエンジンと同じもの)．無ければ辞書を取り込めない
     let files: (any SettingsFileHandling)?

@@ -235,7 +235,7 @@ final class HajimeInputController: IMKInputController {
     @MainActor
     override func menu() -> NSMenu! {
         menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), handwriting: #selector(openHandwriting(_:)),
-                                        openSettings: #selector(showPreferences(_:))))
+                                        openSettings: #selector(showPreferences(_:)), checkForUpdates: #selector(checkForUpdates(_:))))
     }
 
     /// 再変換．入力先で選んでいる文字を読み，読みに戻して変換する．選んでいなければ何もしない．
@@ -261,6 +261,11 @@ final class HajimeInputController: IMKInputController {
 
     @MainActor @objc func toggleLiveConversion(_ sender: Any) {
         menuBuilder.handleToggleLiveConversion()
+    }
+
+    /// 入力メニューの「更新を確認」
+    @MainActor @objc func checkForUpdates(_ sender: Any) {
+        menuBuilder.handleCheckForUpdates()
     }
 
     /// 設定の画面を開く．InputMethodKit が入力メソッドの設定を開くときに呼ぶメソッドなので，

@@ -81,6 +81,8 @@ struct SettingsCatalogTests {
                 "fileTimeout": .number(DefaultSettings.settingsAppFileTimeout),
             ]),
             // 書き出すファイルの既定の名前(一覧の値は protocol の RuleList と同じ名前)
+            // 「更新を確認」で開く最新のリリースのページ
+            "latestReleaseURL": .string(DefaultSettings.latestReleaseURL),
             "exportFileNames": .object(Dictionary(uniqueKeysWithValues: RuleList.allCases.map { ($0.rawValue, JSONValue.string($0.exportFileName)) })),
         ])
     }
