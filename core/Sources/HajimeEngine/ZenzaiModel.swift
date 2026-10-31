@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(CryptoKit)
-import CryptoKit
-#endif
 import HajimeDomain
 
 /// Zenzai(文脈を見るニューラルかな漢字変換)のモデルのファイル．
@@ -41,55 +38,18 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
-        #if os(Windows)
-        // Windows には FIFO や /dev/zero のような，開くと止まる・終わらないファイルが無い．
-        // ふつうのファイルかと大きさを確かめてから開き，読む量は大きさの上限で止める
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-            attributes[.type] as? FileAttributeType == .typeRegular,
-            let handle = try? FileHandle(forReadingFrom: url) else { throw .fileNotFound }
-        let size = (attributes[.size] as? NSNumber)?.intValue ?? -1
+        guard let (handle, size) = FileDigest.openRegularFile(at: url) else { throw .fileNotFound }
         guard size == expectedSize else { throw .sizeMismatch(actual: size) }
         guard try sha256(of: handle, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
         return ZenzaiModel(url: url)
-        #else
-        // 先に開いてから，開いたものがふつうのファイルかと大きさを確かめる．確かめてから開くまでのあいだに
-        // FIFO や /dev/zero への差し替えが起きても止まらないようにするため．O_NONBLOCK で開くので，FIFO でも開く時点で止まらない
-        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
-        guard descriptor >= 0 else { throw .fileNotFound }
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        var status = stat()
-        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .fileNotFound }
-        let size = Int(status.st_size)
-        guard size == expectedSize else { throw .sizeMismatch(actual: size) }
-        guard try sha256(of: handle, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
-        return ZenzaiModel(url: url)
-        #endif
     }
 
-    /// 決まった大きさを超えたら読むのをやめる．開いたあとでファイルが伸びても，読み続けて止まらないようにする
+    /// 決まった大きさを超えたら読むのをやめる(FileDigest.sha256)．超えたときは読んだ量を大きさとして返す
     static func sha256(of handle: FileHandle, maximumBytes: Int) throws(VerificationError) -> String {
-        #if canImport(CryptoKit)
-        var hasher = SHA256()
-        #else
-        // CryptoKit の無い OS(Windows)では自前の SHA-256 で求める．値が同じことは SHA256DigestTests で確かめる
-        var hasher = SHA256Digest()
-        #endif
-        var total = 0
-        // 70MB ほどあるので，一度に読まずに区切って読む
-        while let chunk = try? handle.read(upToCount: min(1 << 20, maximumBytes + 1 - total)), !chunk.isEmpty {
-            total += chunk.count
-            // 上限を超えたことだけが分かる．ファイルの本当の大きさは分からないので，読んだ量を入れる
-            guard total <= maximumBytes else { throw .sizeMismatch(actual: total) }
-            #if canImport(CryptoKit)
-            hasher.update(data: chunk)
-            #else
-            hasher.update(chunk)
-            #endif
+        do {
+            return try FileDigest.sha256(of: handle, maximumBytes: maximumBytes)
+        } catch {
+            throw .sizeMismatch(actual: error.readBytes)
         }
-        #if canImport(CryptoKit)
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
-        #else
-        return hasher.finalizeHex()
-        #endif
     }
 }

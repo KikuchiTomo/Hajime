@@ -34,7 +34,7 @@ enum HostPaths {
         return base.appendingPathComponent("haji.men", isDirectory: true).appendingPathComponent("IME", isDirectory: true)
     }
 
-    /// 実行ファイルと一緒に置いたもの(Zenzai のモデル・連想の辞書・郵便番号の表)
+    /// 実行ファイルと一緒に置いたもの(Zenzai のモデル・かな漢字変換の辞書・連想の辞書・郵便番号の表)
     static var installation: URL {
         URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
     }
@@ -44,6 +44,18 @@ enum HostPaths {
 final class UnavailableEnglishLexicon: EnglishLexicon {
     func isWord(_ text: String) -> Bool { false }
     func suggestions(for text: String) -> [String] { [] }
+}
+
+/// インストール先の Dictionary\ に置いたかな漢字変換の辞書を確かめて読む．無いか，ハッシュが合わなければ azooKey に同梱の辞書で動く
+@MainActor
+func loadBundledDictionary() -> BundledDictionary? {
+    let url = HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true)
+    do {
+        return try BundledDictionary.verified(at: url)
+    } catch {
+        FileHandle.standardError.write(Data("同梱の辞書を使いません: \(error)\n".utf8))
+        return nil
+    }
 }
 
 /// インストール先の Zenzai\ に置いたモデルを確かめて読む．無いか，大きさとハッシュが合わなければ Zenzai なしで動く
@@ -124,7 +136,8 @@ func run() -> Int32 {
     let zenzai = loadZenzaiModel()
     let engine: AzooKeyConverterEngine
     do {
-        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: HostPaths.versionString, zenzai: zenzai)
+        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: HostPaths.versionString, zenzai: zenzai,
+                                            dictionaryDirectory: loadBundledDictionary()?.url)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))
         return 1
