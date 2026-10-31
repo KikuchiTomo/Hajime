@@ -12,6 +12,15 @@ struct EngineServiceCorrectionTests {
     /// 「youdesu」を「yoidesu」に直す訂正を返す．finishes が false なら取り消されるまで返さない
     struct Service: TypoCorrecting {
         var finishes = true
+        /// 前もって求めたことを記録する．記録するときは，取り消されるまで返さない
+        var prefetches: Prefetches?
+
+        func prefetch(forKeys keys: [String], leftContext: String?) async {
+            guard let prefetches else { return }
+            await prefetches.requested(keys)
+            while !Task.isCancelled { await Task.yield() }
+            await prefetches.cancelled()
+        }
 
         func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] {
             if !finishes {
@@ -23,6 +32,13 @@ struct EngineServiceCorrectionTests {
                 ReadingCorrection(keys: "youdesu", reading: "ヨウデス", score: -9, cost: 0),
             ]]
         }
+    }
+
+    actor Prefetches {
+        private(set) var requests: [[String]] = []
+        private(set) var cancellations = 0
+        func requested(_ keys: [String]) { requests.append(keys) }
+        func cancelled() { cancellations += 1 }
     }
 
     /// DLL のタイマーのように，前の応答で頼まれた間隔(wakeAfterMilliseconds)だけ待ってから wake する時計
@@ -166,5 +182,26 @@ struct EngineServiceCorrectionTests {
         // 見直したことにしたので，次の wake で訂正を求め直さない(求め直し続けると裏の仕事が止まらない)
         #expect(Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds)
         #expect(Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds)
+    }
+
+    @Test("打鍵が少し止まったら，見直すときの訂正を前もって求め始め，次のキーが来たら取り消す")
+    func prefetchesWhileTypingAndCancelsOnNextKey() async throws {
+        let prefetches = Prefetches()
+        let test = EngineServiceCorrectionTests(service: Service(prefetches: prefetches))
+        let (id, session) = try test.open()
+        test.type("youdesu", session, id)
+        let typed = test.clock.now
+        // DLL の wake の間隔で来てもらううちに，correctionPrefetchDelay たったところで前もって求め始める．見直す時機よりずっと早い
+        for _ in 0..<Self.wakesUntilReview where await prefetches.requests.isEmpty {
+            _ = test.wake(session, id)
+            for _ in 0..<100 where await prefetches.requests.isEmpty { await Task.yield() }
+        }
+        #expect(await prefetches.requests == [["youdesu"]])
+        let started = test.clock.now - typed
+        #expect(started >= .seconds(DefaultSettings.correctionPrefetchDelay))
+        #expect(started < .seconds(DefaultSettings.liveCorrectionDelay))
+        _ = test.press(.character(text: "n"), session, id)
+        for _ in 0..<1_000 where await prefetches.cancellations == 0 { await Task.yield() }
+        #expect(await prefetches.cancellations == 1)
     }
 }

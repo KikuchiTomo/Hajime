@@ -19,6 +19,8 @@ final class HajimeInputController: IMKInputController {
     private var settleTask: Task<Void, Never>?
     /// キーのあとで，画面を出してから 1 つずつ求めて足す処理(InputSession.followUps)．次のキーが来たらやめる
     private var followUpTask: Task<Void, Never>?
+    /// 打っているあいだに前もって求めている打ち間違いの訂正(見直すときに待たせないため)．次のキーで取り消す
+    private var prefetchTask: Task<Void, Never>?
     /// 打ち間違いの見直しの記録．補正が出ないときに，求めなかったのか・時間切れか・直さないと決めたのかを実機で見分けるため．
     /// 打った文字・読み・候補は記録せず，数と時間と結果の種類だけを残す(docs/dev/SECURITY-MODEL.md)
     private static let correctionLogger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "correction")
@@ -72,6 +74,7 @@ final class HajimeInputController: IMKInputController {
     private func correctAfterConversion(client: any IMKTextInput, context: InputContext) {
         settleTask?.cancel()
         settleTask = nil
+        cancelPrefetch()
         guard let request = session.lateCorrectionRequest, let service = root.typoService else { return }
         let timeout = root.settings.current.lateCorrectionTimeout
         settleTask = Task { @MainActor [weak self] in
@@ -97,6 +100,8 @@ final class HajimeInputController: IMKInputController {
     private func scheduleSettle(client: any IMKTextInput, context: InputContext) {
         settleTask?.cancel()
         settleTask = nil
+        // 前もって求めていた訂正は途中でやめる(途中までの探索は訂正を求めるものが覚えていて，次に使う)
+        cancelPrefetch()
         let settles = session.awaitsSettle
         // 待ち時間は設定で変えられる(ライブ変換で漢字にするまで・打ち間違いを見直すまで)
         let settleDelay = root.settings.current.liveConversionDelay
@@ -112,6 +117,14 @@ final class HajimeInputController: IMKInputController {
                 self.session.performDeferredConversion()
                 // 分岐図の候補も 1 文節ずつ前もって求める(文節ごとに次のキーに譲る)
                 await self.warmLattice()
+            }
+            // 打鍵が少し止まったら，見直すときに求める訂正を前もって求め始める
+            if let self, let service = self.root.typoService {
+                try? await Task.sleep(until: start + .seconds(DefaultSettings.correctionPrefetchDelay), clock: .continuous)
+                guard !Task.isCancelled else { return }
+                if let request = self.session.prefetchRequest {
+                    self.prefetchTask = Task { await service.prefetch(forKeys: request.keys, leftContext: request.leftContext) }
+                }
             }
             if settles {
                 try? await Task.sleep(until: start + .seconds(settleDelay), clock: .continuous)
@@ -129,8 +142,11 @@ final class HajimeInputController: IMKInputController {
             var provided: [String: [ReadingCorrection]] = [:]
             if let request = self.session.correctionRequest, let service = self.root.typoService {
                 let timeout = self.root.settings.current.reviewCorrectionTimeout
+                // 前もって求めている途中なら，それを待ってから求める(同じ並びを二重に求めない)
+                let prefetch = self.prefetchTask
                 let corrections = await Deadline.run(seconds: timeout) {
-                    await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+                    await prefetch?.value
+                    return await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
                 }
                 guard !Task.isCancelled else { return }
                 guard let corrections else {
@@ -177,6 +193,12 @@ final class HajimeInputController: IMKInputController {
         }
     }
 
+    @MainActor
+    private func cancelPrefetch() {
+        prefetchTask?.cancel()
+        prefetchTask = nil
+    }
+
     /// 分岐図の候補を 1 文節ずつ前もって求める．文節ごとにほかの処理(次のキー)に譲り，取り消されたらやめる
     @MainActor
     private func warmLattice() async {
@@ -204,6 +226,7 @@ final class HajimeInputController: IMKInputController {
         settleTask = nil
         followUpTask?.cancel()
         followUpTask = nil
+        cancelPrefetch()
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
         }

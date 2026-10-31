@@ -46,6 +46,8 @@ public final class EngineService {
         var followUps: [@MainActor () -> [ClientAction]] = []
         /// 裏で求めている打ち間違いの訂正
         var correction: CorrectionWork?
+        /// 打っているあいだに前もって求めている打ち間違いの訂正(見直すときに待たせないため)．次のキーで取り消す
+        var prefetch: Task<Void, Never>?
     }
 
     /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
@@ -125,7 +127,9 @@ public final class EngineService {
     public func disconnect(_ id: ConnectionID) {
         guard let connection = connections.removeValue(forKey: id) else { return }
         for session in connection.sessions {
-            sessions.removeValue(forKey: session)?.correction?.task.cancel()
+            let removed = sessions.removeValue(forKey: session)
+            removed?.correction?.task.cancel()
+            removed?.prefetch?.cancel()
             closeHandwriting(ofSession: session)
         }
         if !connection.sessions.isEmpty { ui(.hide) }
@@ -199,7 +203,9 @@ public final class EngineService {
             return .sessionOpened(session: session, state: state(of: input, wakeAfter: nil))
         case .closeSession(let session):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
-            sessions.removeValue(forKey: session)?.correction?.task.cancel()
+            let removed = sessions.removeValue(forKey: session)
+            removed?.correction?.task.cancel()
+            removed?.prefetch?.cancel()
             connection.sessions.remove(session)
             connections[id] = connection
             closeHandwriting(ofSession: session)
@@ -416,8 +422,11 @@ public final class EngineService {
         guard let event = KeyEvent(input) else {
             return .edit(handled: false, operations: [], state: state(of: current.input, wakeAfter: nil))
         }
-        // 次のキーが来たら，前のキーの並びの訂正は要らない(待たせていた変換も InputSession がやめる)
+        // 次のキーが来たら，前のキーの並びの訂正は要らない(待たせていた変換も InputSession がやめる)．
+        // 前もって求めていた分も途中でやめる(途中までの探索は訂正を求めるものが覚えていて，次に使う)
         cancelCorrections(of: session)
+        sessions[session]?.prefetch?.cancel()
+        sessions[session]?.prefetch = nil
         let result = current.input.handle(event, context: context)
         sessions[session]?.hasSettled = false
         sessions[session]?.stoppedAt = now()
@@ -500,7 +509,18 @@ public final class EngineService {
                 sessions[session]?.warming = current.input.latticeWarmingSteps
             }
         }
+        startPrefetch(session: session)
         return edit(actions, handled: true, session: session, anchor: lastAnchor)
+    }
+
+    /// 打鍵が correctionPrefetchDelay 止まったら，見直すときに求める訂正を前もって求め始める(打鍵ごとに 1 回)
+    private func startPrefetch(session: UInt32) {
+        guard let typoService, let current = sessions[session], current.prefetch == nil, current.correction == nil,
+            !current.input.awaitsDeferredConversion, prefetchDelay(of: current) == 0,
+            let request = current.input.prefetchRequest else { return }
+        sessions[session]?.prefetch = Task { @MainActor in
+            await typoService.prefetch(forKeys: request.keys, leftContext: request.leftContext)
+        }
     }
 
     private func startCorrections(_ request: (keys: [String], leftContext: String?), purpose: CorrectionWork.Purpose, session: UInt32) {
@@ -508,7 +528,10 @@ public final class EngineService {
         cancelCorrections(of: session)
         let id = nextCorrection
         nextCorrection &+= 1
+        // 前もって求めている途中なら，それを待ってから求める(同じ並びを二重に求めない)
+        let prefetch = sessions[session]?.prefetch
         let task = Task { @MainActor [weak self] in
+            await prefetch?.value
             let result = await typoService.corrections(forKeys: request.keys, leftContext: request.leftContext)
             guard !Task.isCancelled, let self, self.sessions[session]?.correction?.id == id else { return }
             self.sessions[session]?.correction?.result = result
@@ -570,13 +593,25 @@ public final class EngineService {
         let delays = settings.current
         if current.input.awaitsDeferredConversion { return Self.deferredConversionPollMilliseconds }
         if !current.warming.isEmpty { return Self.latticeWarmingPollMilliseconds }
+        // 訂正を前もって求め始める時機にも来てもらう
+        let prefetch = typoService != nil && current.prefetch == nil && current.input.prefetchRequest != nil
+            ? Self.milliseconds(prefetchDelay(of: current)) : nil
         if current.input.awaitsSettle {
-            return Self.milliseconds(settleDelay(of: current))
+            return min(Self.milliseconds(settleDelay(of: current)), prefetch ?? .max)
         }
         if current.input.awaitsReview {
-            return Self.milliseconds(reviewDelay(of: current))
+            return min(Self.milliseconds(reviewDelay(of: current)), prefetch ?? .max)
         }
-        return nil
+        return prefetch
+    }
+
+    /// 訂正を前もって求め始めるまでの残りの時間(秒)．打鍵から correctionPrefetchDelay たつまで待つ
+    private func prefetchDelay(of current: Session) -> Double {
+        let delay = DefaultSettings.correctionPrefetchDelay
+        guard let stoppedAt = current.stoppedAt else { return delay }
+        let elapsed = now() - stoppedAt
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return max(delay - seconds, 0)
     }
 
     /// 打鍵が止まったとみなすまでの残りの時間(秒)．打鍵から liveConversionDelay たつまで待つ

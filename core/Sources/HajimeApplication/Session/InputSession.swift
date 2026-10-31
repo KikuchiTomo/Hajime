@@ -353,7 +353,12 @@ public final class InputSession {
 
     /// 打鍵がさらに止まるのを待って，打ち間違いを見直すか．待っていれば，止まったときに review を呼ぶ
     public var awaitsReview: Bool {
-        isSettled && phase == .composing && (corrector.active == nil || corrector.yieldsToJapanese(in: composition))
+        isSettled && isReviewable
+    }
+
+    /// 打鍵が止まれば見直す読みか(止まったかは見ない)
+    private var isReviewable: Bool {
+        phase == .composing && (corrector.active == nil || corrector.yieldsToJapanese(in: composition))
             && !readingCorrector.isReviewed(composition)
             && (settings.current.typoCorrection == .standard || settings.current.misreadings)
             && (composition.rawKeys?.count ?? 0) >= DefaultSettings.minimumKeysForLiveCorrection
@@ -361,7 +366,19 @@ public final class InputSession {
 
     /// 見直すために，別のところで求める訂正のキーの並びと左の文脈．求めるものが無ければ nil
     public var correctionRequest: (keys: [String], leftContext: String?)? {
-        guard awaitsReview, let keys = readingCorrector.pendingKeys(for: composition) else { return nil }
+        guard awaitsReview else { return nil }
+        return reviewRequest
+    }
+
+    /// 打っているあいだに前もって求めておく訂正のキーの並びと左の文脈．打鍵が止まったときの correctionRequest と同じ．
+    /// 打ち間違いの補正がオフなら求めない(よくある読み違いは訂正を求めずに示す)
+    public var prefetchRequest: (keys: [String], leftContext: String?)? {
+        guard isReviewable, settings.current.typoCorrection == .standard else { return nil }
+        return reviewRequest
+    }
+
+    private var reviewRequest: (keys: [String], leftContext: String?)? {
+        guard let keys = readingCorrector.pendingKeys(for: composition) else { return nil }
         // 英単語より後ろだけを見直すときは，英単語までの部分も左の文脈にする
         guard let prefix = readingCorrector.unreviewedPrefix(of: composition) else { return (keys, compositionLeftContext) }
         return (keys, String(((compositionLeftContext ?? "") + prefix).suffix(DefaultSettings.maximumLeftContextLength)))

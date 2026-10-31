@@ -1190,6 +1190,29 @@ struct ReadingCorrectionScenarioTests {
         #expect(same.applyLateCorrections(["youdesu": []], context: InputContext()).isEmpty)
     }
 
+    @Test("訂正を別のところで求めるとき，打鍵が止まる前から，止まったときに求めるのと同じ並びを前もって求められる")
+    func prefetchRequestMatchesReview() {
+        struct Service: TypoCorrecting {
+            func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] { [:] }
+        }
+        let converter = FakeConverter(["ほんのよんでください": [("本の読んでください", nil)]])
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
+        for key in "honnoyondekudasai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        #expect(session.correctionRequest == nil)
+        let prefetch = session.prefetchRequest
+        #expect(prefetch != nil)
+        _ = session.settle(context: InputContext())
+        let review = session.correctionRequest
+        #expect(prefetch?.keys == review?.keys)
+        #expect(prefetch?.leftContext == review?.leftContext)
+        // 打ち間違いの補正がオフなら前もって求めない
+        var settings = DefaultSettings.settings
+        settings.typoCorrection = .off
+        let off = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(settings), typoService: Service())
+        for key in "honnoyondekudasai" { _ = off.handle(KeyEvent(.character(key)), context: InputContext()) }
+        #expect(off.prefetchRequest == nil)
+    }
+
     @Test("綴りを直した英単語のあとに日本語が続き，日本語の打ち間違いとして直せるなら日本語に譲る(tkitou → 英単語の kit ではなく 適当)")
     func englishMisspellingYieldsToJapanese() {
         let converter = FakeConverter(["てきとう": [("適当", nil)]])

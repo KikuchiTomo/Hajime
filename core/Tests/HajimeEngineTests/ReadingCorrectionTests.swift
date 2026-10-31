@@ -243,6 +243,32 @@ struct ReadingCorrectionTests {
         #expect(note?.hasPrefix("もしかして") == true, "\(note ?? "-")")
     }
 
+    @Test("打っているあいだに前もって求めても，途中で取り消しても，求めた訂正は前もって求めないときと同じ", arguments: [
+        ("kyounotenkihayoudesune", nil as String?),
+        ("kyouhaiteknidesune", "昨日は雨でした"),
+        ("tututasakanagaookikatta", nil),
+    ])
+    func prefetchKeepsResults(keys: String, leftContext: String?) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"])
+        let model = try ZenzaiModel.verified(at: URL(fileURLWithPath: path))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-typo-\(UUID().uuidString)")
+        let plain = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        let prefetched = ZenzaiTypoService(zenzai: model, memoryDirectory: directory, versionString: "typo")
+        // 1 キーごとに前もって求め，次のキーが来たように途中で取り消す．最後だけ求め終える
+        for length in DefaultSettings.minimumKeysForLiveCorrection...keys.count {
+            let prefix = String(keys.prefix(length))
+            let task = Task { await prefetched.prefetch(forKeys: [prefix], leftContext: leftContext) }
+            if length < keys.count {
+                try? await Task.sleep(for: .milliseconds(20))
+                task.cancel()
+            }
+            await task.value
+        }
+        let expected = await plain.corrections(forKeys: [keys], leftContext: leftContext)
+        let actual = await prefetched.corrections(forKeys: [keys], leftContext: leftContext)
+        #expect(actual == expected, "\(keys)")
+    }
+
     private func live(_ session: InputSession, _ keys: String) -> String? {
         var result: String?
         for key in keys { result = marked(session.handle(KeyEvent(.character(key)), context: InputContext()).actions) ?? result }

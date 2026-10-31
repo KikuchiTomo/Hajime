@@ -112,23 +112,45 @@ enum Evaluation {
     /// ライブ変換で打鍵が止まったときと同じに見直し，直した(点線)・示した(「もしかして」)・何もしない，のどれになったかを数える
     /// 打ち間違いの補正を，アプリと同じ道筋(打つ → 止まる → 別の変換器で訂正を求める → 見直す)で測る．
     /// service が無い(Zenzai なし)ときは訂正を求めずに見直す
-    static func typo(file: String, engine: AzooKeyConverterEngine, service: ZenzaiTypoService?) throws {
+    /// typingInterval を与えると，その間隔でキーを打ったときと同じに，打鍵の合間(correctionPrefetchDelay 止まったあと)に訂正を前もって求め，
+    /// 次のキーで取り消す．打ち終えたあとも，見直すまで(correctionDelay)のあいだ前もって求める．見直しの時間は止まってから correctionDelay たったあとから測る
+    static func typo(file: String, engine: AzooKeyConverterEngine, service: ZenzaiTypoService?, typingInterval: Double? = nil) throws {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
         let clock = ContinuousClock()
         var counts: [String: Int] = [:]
         var durations: [Duration] = []
+        var keyDurations: [Duration] = []
+        /// 打鍵の合間に訂正を前もって求める．seconds たったら取り消す(次のキーが来た)．取り消さないときは見直しで待つ
+        func prefetch(_ session: InputSession, for seconds: Double, cancels: Bool) -> Task<Void, Never>? {
+            guard let service, seconds > DefaultSettings.correctionPrefetchDelay else { return nil }
+            RunLoop.main.run(until: Date().addingTimeInterval(DefaultSettings.correctionPrefetchDelay))
+            guard let request = session.prefetchRequest else { return nil }
+            let task = Task { await service.prefetch(forKeys: request.keys, leftContext: request.leftContext) }
+            RunLoop.main.run(until: Date().addingTimeInterval(seconds - DefaultSettings.correctionPrefetchDelay))
+            if cancels { task.cancel() }
+            return task
+        }
         for line in lines {
             let columns = line.split(separator: "\t").map(String.init)
             guard columns.count == 2 else { continue }
             let store = StaticSettings(DefaultSettings.settings)
             let session = InputSession(converter: engine.makeSession(), lexicon: WordListLexicon(), settings: store, typoService: service)
-            for key in columns[0] { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+            for key in columns[0] {
+                let keyStart = clock.now
+                _ = session.handle(KeyEvent(.character(key)), context: InputContext())
+                keyDurations.append(clock.now - keyStart)
+                if let typingInterval { _ = prefetch(session, for: typingInterval, cancels: true) }
+            }
             var marked = MarkedText.empty
             var note: String?
+            let pending = typingInterval.flatMap { _ in prefetch(session, for: DefaultSettings.liveCorrectionDelay, cancels: false) }
             let start = clock.now
             var actions = session.settle(context: InputContext())
             if let service, let request = session.correctionRequest {
-                session.provideCorrections(waitFor { await service.corrections(forKeys: request.keys, leftContext: request.leftContext) })
+                session.provideCorrections(waitFor {
+                    await pending?.value
+                    return await service.corrections(forKeys: request.keys, leftContext: request.leftContext)
+                })
             }
             actions += session.review(context: InputContext())
             durations.append(clock.now - start)
@@ -161,7 +183,11 @@ enum Evaluation {
         }
         let sorted = durations.sorted()
         print(counts.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "  "))
-        print("見直しの時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+        print("見直しの時間 中央値: \(sorted[sorted.count / 2])  90%: \(sorted[sorted.count * 9 / 10])  最大: \(sorted.last!)")
+        let keys = keyDurations.sorted()
+        if !keys.isEmpty {
+            print("1 キーの処理の時間 中央値: \(keys[keys.count / 2])  99%: \(keys[keys.count * 99 / 100])  最大: \(keys.last!)")
+        }
     }
 
     /// 訂正の候補ごとの材料を TSV で出す(重みと境目を決めるため)．アプリと同じ道筋(打つ → 止まる → 訂正を求める)で，

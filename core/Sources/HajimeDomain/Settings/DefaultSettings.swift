@@ -101,6 +101,9 @@ public enum DefaultSettings {
     public static let keyEditOverlap = 4
     /// 訂正を裏で求めるときに覚えておく，読みの変換のもっともらしさの数．超えたら捨てる(メモリを増やし続けない)
     public static let maximumPlausibilityCacheEntries = 20_000
+    /// 訂正を裏で求めるときに覚えておく，キーの並びごとの訂正の候補の数．超えたら捨てる．
+    /// 打っているあいだに前もって求めた候補を，打鍵が止まって見直すときにそのまま使うため
+    public static let maximumMemoizedCorrections = 256
     /// 左の文脈を使わない点数も求める，訂正の候補の数(点数の高い順)．多いほど裏の処理が長くなる
     public static let contextFreeCandidateCount = 3
     /// KeyEditSearch の手間を，Zenzai の訂正の手間(隣のキーとの取り違え 1 回で 2)にそろえる倍率
@@ -172,6 +175,9 @@ public enum DefaultSettings {
     /// 打ち間違いを見直すまでの打鍵の止まり(秒)．見直しは 1 文 0.1〜0.7 秒かかり，その間はキーを受け付けないので，
     /// 文を見せるときより長く止まったときだけ行う
     public static let liveCorrectionDelay = 0.8
+    /// 打っているあいだに，打ち間違いの訂正を前もって求め始めるまでの打鍵の止まり(秒)．
+    /// 見直すとき(liveCorrectionDelay)に求め終わっているよう早めに始め，次のキーが来たら途中でやめる(途中までの分は次に使う)
+    public static let correctionPrefetchDelay = 0.1
     /// ローマ字入力で，前が英語でも日本語にする語の長さ(英字の数)の上限．「no」「to」のような短い語は助詞などのことが多く，
     /// 英語にすると上の枝でもかなに直しにくい．英語の語は変換の候補で出せる
     public static let maximumJapaneseFirstShortWordLength = 2
