@@ -52,10 +52,11 @@ struct PlaygroundEngine {
     let typoService: ZenzaiTypoService?
     private let memory: URL
 
-    init(zenzaiPath: String?) throws {
+    init(zenzaiPath: String?, dictionaryPath: String?) throws {
         memory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-playground-\(UUID().uuidString)")
         let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
-        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "hajime-playground", zenzai: zenzai)
+        engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "hajime-playground", zenzai: zenzai,
+                                            dictionaryDirectory: dictionaryPath.map { URL(fileURLWithPath: $0, isDirectory: true) })
         let directory = memory
         typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: directory, versionString: "hajime-playground") }
     }

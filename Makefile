@@ -3,8 +3,10 @@ PYTHON ?= python3 -I
 # Zenzai のモデルの置き場所．既定は tools/models/fetch_zenzai.sh と同じリポジトリの 1 つ上の models/
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
+# 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
+EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
-.PHONY: fetch-models setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models fetch-evaluation evaluate setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
 
 setup:
 	mise install
@@ -73,6 +75,22 @@ uninstall-dev-macos:
 # 入力メソッドとして入れずに，ターミナルで変換を試す
 try:
 	swift run --package-path core -c release hajime-playground
+
+# AJIMEE-Bench を取得してハッシュを確かめ，評価用の TSV にする
+fetch-evaluation:
+	tools/evaluation/fetch_ajimee.sh "$(EVALUATION_DIR)"
+
+# かな漢字変換の正解率と MinCER を測る．Zenzai のモデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
+evaluate:
+	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
+	swift build --package-path core -c release --product hajime-playground
+	@options=; if [ -f "$(ZENZAI_MODEL)" ]; then options="--zenzai $(abspath $(ZENZAI_MODEL))"; fi; \
+	if [ -n "$(DICTIONARY)" ]; then options="$$options --dictionary $(abspath $(DICTIONARY))"; fi; \
+	bin=$$(swift build --package-path core -c release --show-bin-path); \
+	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv"; do \
+		echo "== $$file"; \
+		"$$bin/hajime-playground" --evaluate "$$file" $$options 2>/dev/null | tail -1; \
+	done
 
 tokens:
 	$(PYTHON) tools/tokens/check_contrast.py

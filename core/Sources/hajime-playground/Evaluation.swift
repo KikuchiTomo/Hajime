@@ -30,6 +30,7 @@ enum Evaluation {
     static func conversion(cases: [EvaluationCase], engine: AzooKeyConverterEngine) {
         let clock = ContinuousClock()
         var passed = 0
+        var errorRates: [Double] = []
         var durations: [Duration] = []
         for item in cases {
             // 文ごとに新しいセッションにして，前の文の変換や学習の影響を受けないようにする
@@ -38,10 +39,34 @@ enum Evaluation {
             durations.append(clock.measure { output = best(session, item.reading) })
             let ok = item.expected.contains(output)
             if ok { passed += 1 }
+            errorRates.append(minimumCharacterErrorRate(expected: item.expected, output: output))
             print("\(ok ? "○" : "×")  \(item.reading)\(contextNote(item))  → \(output)\(ok ? "" : "   期待: \(item.expected.joined(separator: " か "))")")
         }
         let sorted = durations.sorted()
-        print("正解: \(passed) / \(cases.count)  変換の時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+        let accuracy = Double(passed) / Double(cases.count) * 100
+        let meanErrorRate = errorRates.reduce(0, +) / Double(errorRates.count) * 100
+        print(String(format: "正解: %d / %d (%.1f%%)  MinCER: %.2f%%", passed, cases.count, accuracy, meanErrorRate)
+              + "  変換の時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+    }
+
+    /// 期待する変換のうち最も近いものとの文字誤り率(編集距離 ÷ 期待する文の文字数)．AJIMEE-Bench の MinCER と同じ測り方
+    static func minimumCharacterErrorRate(expected: [String], output: String) -> Double {
+        expected.filter { !$0.isEmpty }
+            .map { Double(editDistance(Array($0), Array(output))) / Double($0.count) }
+            .min() ?? 0
+    }
+
+    /// 文字単位の編集距離(置き換え・削除・挿入をそれぞれ 1 と数える)
+    static func editDistance(_ a: [Character], _ b: [Character]) -> Int {
+        var previous = Array(0...b.count)
+        for (i, x) in a.enumerated() {
+            var current = [i + 1] + Array(repeating: 0, count: b.count)
+            for (j, y) in b.enumerated() {
+                current[j + 1] = min(previous[j + 1] + 1, current[j] + 1, previous[j] + (x == y ? 0 : 1))
+            }
+            previous = current
+        }
+        return previous[b.count]
     }
 
     /// 打っている途中の表示を評価する．読みを 1 文字ずつ増やし，各時点で見せる文字が
