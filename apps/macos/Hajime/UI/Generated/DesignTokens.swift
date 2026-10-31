@@ -352,6 +352,10 @@ enum DesignTokens {
         enum CandidateRest {
             static let fadeIn: Double = 250
         }
+        enum CandidateWindow {
+            static let resize: Double = 150
+            static let update: Double = 120
+        }
         enum SettingsWindows {
             static let pageEnter: Double = 167
             static let hover: Double = 83

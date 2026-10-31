@@ -239,7 +239,11 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
     let layout = layout(map, &metrics, &painter);
-    let body = Frame::new(0.0, 0.0, layout.width, layout.height);
+    let (width, height) = look.sized(
+        layout.width + metrics.shadow,
+        layout.height + metrics.shadow,
+    );
+    let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
     painter.panel(body);
     if let Some(heading) = &map.association {
         let row = Frame::new(
@@ -376,10 +380,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         footer_y += metrics.footer_height;
     }
     footer(&mut painter, map, footer_y, body.width, &metrics);
-    painter.finish(
-        layout.width + metrics.shadow,
-        layout.height + metrics.shadow,
-    )
+    painter.finish(width, height)
 }
 
 /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)．直していなければ 0

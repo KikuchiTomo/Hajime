@@ -5,6 +5,7 @@ pub mod geometry;
 pub mod handwriting;
 pub mod icon;
 pub mod keys;
+pub mod motion;
 pub mod scene;
 pub mod strings;
 pub mod theme;

@@ -142,6 +142,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     }
     let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
     let height = (content_height + metrics.inset * 2.0 + metrics.shadow).ceil();
+    let (width, height) = look.sized(width, height);
 
     // 描く
     let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
@@ -382,6 +383,24 @@ mod tests {
     use super::super::Draw;
     use super::*;
     use ipc::{CandidateEntry, CandidateVariant};
+
+    #[test]
+    fn 窓の大きさを外から決めると_その大きさで描く() {
+        let theme = theme("washi");
+        let look = Look::new(&theme, 15.0);
+        let natural = candidate_list(&list(Some(0)), &look, &Fixed);
+        let narrower = (natural.width - 10.0, natural.height - 10.0);
+        let sized = candidate_list(
+            &list(Some(0)),
+            &Look {
+                size: Some(narrower),
+                ..look
+            },
+            &Fixed,
+        );
+        assert_eq!((sized.width, sized.height), narrower);
+        assert_eq!(texts(&sized), texts(&natural));
+    }
 
     fn list(selected: Option<u32>) -> CandidateList {
         CandidateList {

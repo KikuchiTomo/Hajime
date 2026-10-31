@@ -211,6 +211,9 @@ pub struct Look<'a> {
     pub font_size: f32,
     /// 第 1 候補と選んでいる候補以外の濃さ(0〜1)．出した直後は薄くし，すぐに濃くする
     pub rest_opacity: f32,
+    /// 窓の大きさ(影の分を含む)を外から決める．窓の大きさが変わる途中に，地と縁をその大きさで描く．
+    /// 中身は中身に合わせた配置のまま描き，はみ出した分は窓で切れる．None なら中身に合わせる
+    pub size: Option<(f32, f32)>,
 }
 
 impl<'a> Look<'a> {
@@ -222,7 +225,13 @@ impl<'a> Look<'a> {
                 size::candidate::FONT_SIZE_MAX,
             ),
             rest_opacity: 1.0,
+            size: None,
         }
+    }
+
+    /// 中身に合わせた窓の大きさ(width, height)を，外から決めた大きさがあればそれにする
+    pub(super) fn sized(&self, width: f32, height: f32) -> (f32, f32) {
+        self.size.unwrap_or((width, height))
     }
 }
 
@@ -358,6 +367,33 @@ mod tests {
         let platinum = super::testing::theme("platinum");
         let flat = mode("あ", &Look::new(&platinum, 15.0), &Fixed);
         assert_eq!(surround(flat.clone(), &platinum, Surround::Shadow), flat);
+    }
+
+    #[test]
+    fn 窓の大きさを外から決めると_地をその大きさで描き_中身の位置は変えない() {
+        for name in ["washi", "platinum", "desk"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let map = sample::branch();
+            let natural = branch_map(&map, &look, &Fixed);
+            let wider = (natural.width + 40.0, natural.height + 20.0);
+            let sized = branch_map(
+                &map,
+                &Look {
+                    size: Some(wider),
+                    ..look
+                },
+                &Fixed,
+            );
+            assert_eq!((sized.width, sized.height), wider, "{name}");
+            assert_eq!(texts(&sized), texts(&natural), "{name}");
+            let first = texts(&natural)[0].0.clone();
+            assert_eq!(
+                text_frame(&sized, &first),
+                text_frame(&natural, &first),
+                "{name}"
+            );
+        }
     }
 
     #[test]
