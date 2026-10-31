@@ -6,28 +6,27 @@ import Testing
 struct YenKeyPolicyTests {
     @Test("R-04: 既定は \\")
     func defaultIsBackslash() {
-        #expect(DefaultSettings.settings.yenKey.character(profile: .standard, shiftPressed: false, optionPressed: false) == "\\")
+        #expect(DefaultSettings.settings.yenKey.character(profile: .standard, optionPressed: false) == "\\")
     }
 
     @Test("R-04: Option で逆の文字")
     func optionInverts() {
-        #expect(YenKeyPolicy.alwaysBackslash.character(profile: .standard, shiftPressed: false, optionPressed: true) == "¥")
-        #expect(YenKeyPolicy.alwaysYen.character(profile: .standard, shiftPressed: false, optionPressed: true) == "\\")
+        #expect(YenKeyPolicy.alwaysBackslash.character(profile: .standard, optionPressed: true) == "¥")
+        #expect(YenKeyPolicy.alwaysYen.character(profile: .standard, optionPressed: true) == "\\")
+    }
+
+    @Test("R-04: 設定で決めるのは ¥ と \\ だけ．配列が入れるほかの文字(Shift+¥ の |)はそのまま")
+    func choosableCharacters() {
+        #expect(YenKeyPolicy.isChoosable("¥"))
+        #expect(YenKeyPolicy.isChoosable("\\"))
+        #expect(!YenKeyPolicy.isChoosable("|"))
+        #expect(!YenKeyPolicy.isChoosable(""))
     }
 
     @Test("R-04: プログラミング用のアプリだけ \\")
     func programmingOnly() {
-        #expect(YenKeyPolicy.backslashInProgramming.character(profile: .standard, shiftPressed: false, optionPressed: false) == "¥")
-        #expect(YenKeyPolicy.backslashInProgramming.character(profile: .terminal, shiftPressed: false, optionPressed: false) == "\\")
-    }
-
-    @Test("R-04: Shift を押すと設定に関係なく |")
-    func shiftGivesPipe() {
-        for policy in YenKeyPolicy.allCases {
-            for option in [false, true] {
-                #expect(policy.character(profile: .terminal, shiftPressed: true, optionPressed: option) == "|")
-            }
-        }
+        #expect(YenKeyPolicy.backslashInProgramming.character(profile: .standard, optionPressed: false) == "¥")
+        #expect(YenKeyPolicy.backslashInProgramming.character(profile: .terminal, optionPressed: false) == "\\")
     }
 }
 
