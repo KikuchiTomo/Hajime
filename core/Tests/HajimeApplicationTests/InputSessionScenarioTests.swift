@@ -756,6 +756,20 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
     }
 
+    @Test("分岐図: 最後の文節で Tab を押すと最初の文節へ，最初の文節で Shift+Tab を押すと最後の文節へ移る")
+    func latticeTabWrapsAround() {
+        var settings = DefaultSettings.settings
+        settings.initialFocus = .end
+        let harness = Harness(converter: latticeConverter(), settings: settings)
+        harness.type("kyouhaame")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+        harness.press(.tab)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [true, false])
+        harness.press(.tab, .shift)
+        #expect(harness.lattice?.columns.map(\.isFocused) == [false, true])
+    }
+
     @Test("文節の先頭の語の候補に残りをつないだものも候補に出す(ごくでしょうが → 語句でしょうが)")
     func headWordAlternatives() {
         let converter = FakeConverter(["ごくでしょうが": [("極でしょうが", nil)], "ごく": [("極", nil), ("語句", nil), ("獄", nil)]])
