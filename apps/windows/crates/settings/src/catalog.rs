@@ -30,6 +30,7 @@ impl Range {
 pub struct Ranges {
     pub candidates_per_page: Range,
     pub live_conversion_delay: Range,
+    pub live_conversion_skip_length: Range,
     pub correction_delay: Range,
     pub review_correction_timeout: Range,
     pub late_correction_timeout: Range,

@@ -27,7 +27,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .keys: ["keymap"]
         case .conversion:
             ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "listCandidatesPerPage", "branchCandidatesPerPage",
-             "liveConversionDelay", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "remembersRejectedCorrections", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes", "proofreading",
+             "liveConversionDelay", "liveConversionSkipLength", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "remembersRejectedCorrections", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes", "proofreading",
              "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "learning",
              "association", "associationLimit", "showsAssociationHint"]
         case .correction: ["correction", "wordLanguage"]

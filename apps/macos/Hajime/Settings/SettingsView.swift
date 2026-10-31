@@ -161,6 +161,12 @@ private struct ConversionTab: View {
                                   range: DefaultSettings.liveConversionDelayRange)
                 }
                 .disabled(!model.settings.liveConversion)
+                ResettableRow(model: model, keyPath: \.liveConversionSkipLength) {
+                    Stepper(value: model.binding(\.liveConversionSkipLength), in: DefaultSettings.liveConversionSkipLengthRange) {
+                        LabeledContent(UIStrings.More.liveConversionSkipLength, value: UIStrings.More.skipLength(model.settings.liveConversionSkipLength))
+                    }
+                }
+                .disabled(!model.settings.liveConversion)
             }
             Section(UIStrings.More.candidates) {
                 ResettableRow(model: model, keyPath: \.branchCandidatesPerPage) {

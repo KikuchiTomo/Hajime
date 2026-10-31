@@ -197,6 +197,8 @@ struct EnglishAutoScenarioTests {
     func romajiAmbiguous(preceding: String?, expected: String) {
         let harness = harness(.romaji, converter: converter)
         harness.context = InputContext(precedingText: preceding)
+        // 短い読みもライブ変換して確かめる(ライブ変換しない文字数を 0 にする)
+        harness.settings.current.liveConversionSkipLength = 0
         harness.type("make")
         harness.settle()
         #expect(harness.marked.text == expected)

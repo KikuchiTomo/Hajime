@@ -9,6 +9,8 @@ struct FeatureScenarioTests {
     @Test("R-08: テンキーの数字は，読みを確定してから半角のまま確定する．設定を切れば読みに入れる")
     func keypad() {
         let harness = Harness(converter: FakeConverter(["か": [("蚊", nil)]]))
+        // 短い読みもライブ変換して確かめる(ライブ変換しない文字数を 0 にする)
+        harness.settings.current.liveConversionSkipLength = 0
         harness.type("ka")
         harness.press(.character("1"), isKeypad: true)
         #expect(harness.committed == "蚊1")

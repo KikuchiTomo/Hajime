@@ -130,6 +130,8 @@ struct KeymapScenarioTests {
     @Test("R-17: 組み立て中に空白を入れるコマンドは，確定してから空白を入れる")
     func spaceWhileComposing() {
         let harness = Harness(converter: FakeConverter(["かな": [("仮名", nil)]]), settings: settings(.windows))
+        // 短い読みもライブ変換して確かめる(ライブ変換しない文字数を 0 にする)
+        harness.settings.current.liveConversionSkipLength = 0
         harness.type("kana")
         harness.press(.space, [.control, .shift])
         #expect(harness.committed == "仮名\u{3000}")
@@ -155,6 +157,8 @@ struct KeymapScenarioTests {
         settings.keymap.entries.removeAll { $0.stroke == KeyStroke(.enter) }
         settings.keymap.entries.append(KeymapEntry(.composing, KeyStroke(.character("m"), control: true), .commit))
         let harness = Harness(converter: FakeConverter(["かな": [("仮名", nil)]]), settings: settings)
+        // 短い読みもライブ変換して確かめる(ライブ変換しない文字数を 0 にする)
+        harness.settings.current.liveConversionSkipLength = 0
         harness.type("kana")
         harness.press(.enter)
         #expect(harness.lastResult.handled)
@@ -378,6 +382,8 @@ struct KeymapScenarioTests {
     func customModeKey() {
         let harness = Harness(converter: FakeConverter(["かな": [("仮名", nil)]]),
                               settings: settings(adding: [KeymapEntry(.anywhere, KeyStroke(.space, control: true), .toggleMode)]))
+        // 短い読みもライブ変換して確かめる(ライブ変換しない文字数を 0 にする)
+        harness.settings.current.liveConversionSkipLength = 0
         harness.type("kana")
         harness.press(.space, .control)
         #expect(harness.committed == "仮名")

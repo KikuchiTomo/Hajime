@@ -43,6 +43,7 @@
     "listCandidatesPerPage",
     "liveConversion",
     "liveConversionDelay",
+    "liveConversionSkipLength",
     "misreadings",
     "misuseNotes",
     "modeIndicatorDuration",
@@ -136,6 +137,10 @@
     "liveConversionDelay" : [
       0.1,
       1.5
+    ],
+    "liveConversionSkipLength" : [
+      0,
+      10
     ],
     "modeIndicatorDuration" : [
       0.3,

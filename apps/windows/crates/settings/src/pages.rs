@@ -503,6 +503,7 @@ pub enum Stat {
 pub enum RangeKind {
     CandidatesPerPage,
     LiveConversionDelay,
+    LiveConversionSkipLength,
     CorrectionDelay,
     ReviewCorrectionTimeout,
     LateCorrectionTimeout,
@@ -518,6 +519,7 @@ impl RangeKind {
         match self {
             RangeKind::CandidatesPerPage => ranges.candidates_per_page,
             RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
+            RangeKind::LiveConversionSkipLength => ranges.live_conversion_skip_length,
             RangeKind::CorrectionDelay => ranges.correction_delay,
             RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
             RangeKind::LateCorrectionTimeout => ranges.late_correction_timeout,
@@ -782,6 +784,12 @@ fn conversion() -> Vec<Section> {
                     more::LIVE_CONVERSION_DELAY,
                     "liveConversionDelay",
                     RangeKind::LiveConversionDelay,
+                )
+                .enabled_when(On("liveConversion")),
+                Row::stepper(
+                    more::LIVE_CONVERSION_SKIP_LENGTH,
+                    "liveConversionSkipLength",
+                    RangeKind::LiveConversionSkipLength,
                 )
                 .enabled_when(On("liveConversion")),
             ],
