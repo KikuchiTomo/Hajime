@@ -111,7 +111,7 @@ public struct DictionaryFileSync: Sendable {
         let input = try ProtectedFile.openRegularFile(source)
         defer { try? input.close() }
         let directory = destination.deletingLastPathComponent()
-        let temporary = directory.appendingPathComponent(".\(destination.lastPathComponent).\(UUID().uuidString)")
+        let temporary = ProtectedFile.temporaryURL(in: directory)
         guard FileManager.default.createFile(atPath: temporary.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
             throw CocoaError(.fileWriteUnknown)
         }
