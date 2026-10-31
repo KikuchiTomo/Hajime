@@ -11,6 +11,7 @@ import HajimeDomain
 /// - 計算(Calculator): 「1+2*3=」→「7」「1+2*3=7」．結果を先頭に置く(式を打って「=」を打つのは計算したいときなので)
 /// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
+/// - LaTeX のコマンド(LatexCommands): 「らむだ」→「\lambda」．設定でオンにしたときだけ．記号と同じ位置に差し込む
 /// - 絵文字(EmojiLooking): 「なく」→ 😢．読みで引き，上から DefaultSettings.emojiCandidateOffset 番目に差し込む
 /// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
 /// - ユーザー辞書のローマ字の読み(「gh」→ GitHub)と，入れるときに中身を決める語(TextTemplate．「にちじ」→ `{datetime:...}`)
@@ -191,6 +192,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         insert(importedWords, into: &result, at: DefaultSettings.importedWordCandidateOffset, reading: reading, origin: .userDictionary)
         var extra: [String] = []
         if current.symbolConversion { extra += SymbolDictionary.symbols(for: reading, rules: current.symbolRules) }
+        if current.latexConversion { extra += LatexCommands.commands(for: reading) }
         if current.dateConversion {
             extra += DateExpressions.candidates(for: reading, now: calendar.now(), day: calendar.day(offsetFromToday:))
         }

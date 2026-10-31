@@ -412,6 +412,7 @@ enum UIStrings {
         static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
+        static let latexConversion = "LaTeX のコマンドに変換"
         static let learning = "学習"
         static let resetLearning = "学習結果を消去"
         static let reading = "読み"
@@ -900,7 +901,8 @@ extension UIStrings {
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
-            "emojiConversion": UIStrings.Settings.emojiConversion, "learning": UIStrings.Settings.learning,
+            "emojiConversion": UIStrings.Settings.emojiConversion,
+            "latexConversion": UIStrings.Settings.latexConversion, "learning": UIStrings.Settings.learning,
             "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,

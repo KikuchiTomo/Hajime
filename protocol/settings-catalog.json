@@ -44,6 +44,7 @@
     "keymap",
     "keypadDirect",
     "lateCorrectionTimeout",
+    "latexConversion",
     "launcherCommands",
     "learning",
     "listCandidatesPerPage",

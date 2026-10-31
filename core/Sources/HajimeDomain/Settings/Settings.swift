@@ -116,6 +116,8 @@ public struct Settings: Sendable, Equatable {
     public var symbolConversion = true
     /// 読みから絵文字の候補を出す
     public var emojiConversion = true
+    /// 読み(「らむだ」)から LaTeX のコマンド(「\lambda」)の候補を出す
+    public var latexConversion = false
     /// 連想変換(R-18)．オフなら連想変換のキーはふつうの変換と同じに動く
     public var association = true
     /// 連想の一覧に出す語の数
@@ -259,7 +261,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case association, associationLimit, showsAssociationHint
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -342,6 +344,7 @@ extension Settings: Codable {
         read(.proofreading, into: \.proofreading)
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
+        read(.latexConversion, into: \.latexConversion)
         read(.association, into: \.association)
         read(.associationLimit, into: \.associationLimit)
         read(.showsAssociationHint, into: \.showsAssociationHint)
@@ -434,6 +437,7 @@ extension Settings: Codable {
         try container.encode(proofreading, forKey: .proofreading)
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
+        try container.encode(latexConversion, forKey: .latexConversion)
         try container.encode(association, forKey: .association)
         try container.encode(associationLimit, forKey: .associationLimit)
         try container.encode(showsAssociationHint, forKey: .showsAssociationHint)
