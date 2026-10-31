@@ -242,7 +242,7 @@ public final class InputSession {
     /// 打鍵が止まったあいだに，Space で分岐図を出すときに求める候補を前もって求める手順(LatticeBuilder.warmingSteps)．
     /// 分岐図を使わない設定(一覧)や，入力中でなければ空
     public var latticeWarmingSteps: [@MainActor () -> Void] {
-        guard phase == .composing, !composition.isEmpty, settings.current.candidatePresentation != .list else { return [] }
+        guard phase == .composing, !composition.isEmpty, settings.current.candidatePresentation.segmentsReading else { return [] }
         let builder = latticeBuilder
         let reading = composition.conversionReading
         // 最後に，Space と同じ分岐図(文節が 1 つの文の分け方や訂正を含む)と，足元に出す文節の長さの下見(短く・長く)も，
@@ -579,7 +579,7 @@ public final class InputSession {
         case .composing:
             return 0
         case .lattice(let lattice):
-            return min(lattice.focused.candidates.count, settings.current.branchCandidatesPerPage)
+            return min(lattice.focused.candidates.count, latticePerPage)
         case .selecting(let selection):
             guard case .candidate(let index) = selection.focus else { return 0 }
             let perPage = settings.current.listCandidatesPerPage
@@ -843,7 +843,7 @@ public final class InputSession {
         if recordsUsage { usage?.record(.conversionOpened) }
         freezeWordsReadAsRomaji()
         reviewReading(final: true)
-        guard settings.current.candidatePresentation != .list else {
+        guard settings.current.candidatePresentation.segmentsReading else {
             phase = .selecting(makeSelection(focus: .candidate(0)))
             return
         }
@@ -1229,6 +1229,7 @@ public final class InputSession {
                     : PanelBuilder.isCorrected(segment, changed: corrected) ? .correction : .converted
                 return .init(segment.selected.text, style: style)
             })
+            if isSegmentList { return [.setMarkedText(marked), .showCandidates(segmentListPanel(lattice, corrected: corrected))] }
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                                   showsVariants: settings.current.showsVariantRow, corrected: corrected)
             let preview = latticeBuilder.resizePreview(lattice, reading: composition.conversionReading)
@@ -1248,6 +1249,36 @@ public final class InputSession {
             if let pendingNote { panel.note = pendingNote }
             return [.setMarkedText(marked), .showLattice(panel)]
         }
+    }
+
+    /// 文節ごとの一覧で見せるか(分岐図と同じ文節格子を，注目している文節の一覧として見せる)
+    private var isSegmentList: Bool { settings.current.candidatePresentation == .segmentList }
+
+    /// 文節格子の 1 ページの候補の数．文節ごとの一覧なら一覧の候補数
+    private var latticePerPage: Int {
+        isSegmentList ? settings.current.listCandidatesPerPage : settings.current.branchCandidatesPerPage
+    }
+
+    /// 文節ごとの一覧の窓．分岐図の足元の案内(打ち間違い・使い分け・連想・区切る状態)も同じに出す
+    private func segmentListPanel(_ lattice: SegmentLattice, corrected: Range<Int>?) -> CandidatePanel {
+        if splitMode { return PanelBuilder.splittingList(pieces: focusedSplit(lattice).pieces) }
+        var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
+                                                  corrected: corrected, reading: composition.conversionReading)
+        let segment = lattice.focused
+        let segmentReading = focusedReading(lattice)
+        if case .candidate = segment.choice {
+            panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
+        }
+        if let usage = usageNote(for: lattice) { panel.note = .info(usage) }
+        if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
+        if let pendingNote { panel.note = pendingNote }
+        return panel
+    }
+
+    /// 字種(variant)が文節の字種(上の枝)の何番目か．無ければ nil
+    private func segmentVariantIndex(_ variant: ScriptVariant?, in segment: SegmentLattice.Segment) -> Int? {
+        guard let variant else { return nil }
+        return segment.variants.firstIndex { $0.origin == .variant(variant) }
     }
 
     /// キー設定の表で，その状態のそのコマンドに割り当てた最初のキーの名前(案内に出す)．無ければ nil
@@ -1323,7 +1354,7 @@ public final class InputSession {
                 phase = .selecting(CandidateSelection(candidates: suggestions, annotations: suggestions.map { _ in nil }, focus: .candidate(0)))
             }
         case .lattice(var lattice):
-            let perPage = settings.current.branchCandidatesPerPage
+            let perPage = latticePerPage
             switch move {
             case .next: lattice.moveSelection(by: 1)
             case .previous: lattice.moveSelection(by: -1, entersVariants: settings.current.showsVariantRow)
@@ -1382,6 +1413,13 @@ public final class InputSession {
             case .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split: return KeyResult(handled: true)
             }
         case .lattice(var lattice):
+            if isSegmentList, case .variant(let index) = lattice.focused.choice, move == .next || move == .previous {
+                // 文節ごとの一覧の種類の行は横に並ぶので，左右で字種を移る(文全体の一覧と同じ)
+                let count = lattice.focused.variants.count
+                _ = lattice.selectVariant(at: (index + (move == .next ? 1 : count - 1)) % count)
+                phase = .lattice(lattice)
+                return KeyResult(handled: true, actions: render(context: context))
+            }
             let builder = latticeBuilder
             switch move {
             case .next: lattice.moveFocus(by: 1)
@@ -1480,10 +1518,17 @@ public final class InputSession {
         let segments: [MarkedText.Segment] = lattice.segments.enumerated().map { index, segment in
             index == edit.index ? .init(edit.typed.displayReading, style: .reading) : .init(segment.selected.text, style: .converted)
         }
+        let note = PanelBuilder.inlineEditNote(replacing: lattice.segments[edit.index].selected.text, key: keyLabel(.nextSegment, in: .converting))
+        let caret = lattice.segments.prefix(edit.index).reduce(0) { $0 + $1.selected.text.count } + edit.typed.displayReading.count
+        if isSegmentList {
+            var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
+                                                      reading: composition.conversionReading)
+            panel.note = note
+            return [.setMarkedText(MarkedText(segments, caret: caret)), .showCandidates(panel)]
+        }
         var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                               showsVariants: settings.current.showsVariantRow, corrected: nil)
-        panel.note = PanelBuilder.inlineEditNote(replacing: lattice.segments[edit.index].selected.text, key: keyLabel(.nextSegment, in: .converting))
-        let caret = lattice.segments.prefix(edit.index).reduce(0) { $0 + $1.selected.text.count } + edit.typed.displayReading.count
+        panel.note = note
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 
@@ -1492,7 +1537,7 @@ public final class InputSession {
     /// 連想の一覧の 1 ページの語の数．元の出し方(分岐図か一覧)の候補の数に合わせる
     private var associationPerPage: Int {
         if case .association(_, .selecting) = phase { return settings.current.listCandidatesPerPage }
-        return settings.current.branchCandidatesPerPage
+        return latticePerPage
     }
 
     /// 連想変換のキー．入力中なら変換してから，変換中なら選んでいる文節を，連想の一覧に切り替える．
@@ -1598,6 +1643,9 @@ public final class InputSession {
             let marked = MarkedText(lattice.segments.enumerated().map { index, segment in
                 .init(segment.selected.text, style: index == lattice.focusedIndex ? .focused : .converted)
             })
+            if isSegmentList {
+                return [.setMarkedText(marked), .showCandidates(PanelBuilder.associationListPanel(for: list, perPage: latticePerPage))]
+            }
             let panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
             return [.setMarkedText(marked), .showLattice(panel)]
         case .selecting(let selection):
@@ -1662,7 +1710,7 @@ public final class InputSession {
     /// 分岐図の番号キー．番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)．
     /// 番号キーでなければ nil
     private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
-        guard let number = numberKey(character), lattice.select(number: number, perPage: settings.current.branchCandidatesPerPage) else { return nil }
+        guard let number = numberKey(character), lattice.select(number: number, perPage: latticePerPage) else { return nil }
         return KeyResult(handled: true, actions: advance(after: lattice, context: context))
     }
 
@@ -1707,10 +1755,18 @@ public final class InputSession {
             phase = .lattice(lattice)
             return render(context: context)
         case (.lattice(var lattice), .alternative(let index)):
-            guard lattice.select(number: index + 1, perPage: settings.current.branchCandidatesPerPage) else { return [] }
+            guard lattice.select(number: index + 1, perPage: latticePerPage) else { return [] }
             return advance(after: lattice, context: context)
         case (.lattice(var lattice), .variant(let index)):
             guard lattice.selectVariant(at: index) else { return [] }
+            return advance(after: lattice, context: context)
+        case (.lattice(var lattice), .entry(let index)):
+            // 文節ごとの一覧の候補．分岐図の下の枝と同じに選ぶ
+            guard lattice.select(number: index + 1, perPage: latticePerPage) else { return [] }
+            return advance(after: lattice, context: context)
+        case (.lattice(var lattice), .listVariant(let index)):
+            guard let variant = segmentVariantIndex(ScriptVariant.allCases.indices.contains(index) ? ScriptVariant.allCases[index] : nil, in: lattice.focused),
+                  lattice.selectVariant(at: variant) else { return [] }
             return advance(after: lattice, context: context)
         case (.selecting, .entry(let index)):
             guard selectByNumber(index + 1) else { return [] }

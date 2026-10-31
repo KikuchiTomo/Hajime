@@ -128,6 +128,11 @@ enum DemoScripts {
         switch settings.candidatePresentation {
         case .automatic:
             frames.append(converted(marked, panel: .lattice(nameLattice(focus: focus))))
+        case .segmentList:
+            let entries = [segments[focus], focus == 0 ? "わたしの" : "中のです", focus == 0 ? "ワタシノ" : "なかのです"]
+            let list = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },
+                                      selectedEntry: 0, focus: .candidate, position: 1, total: entries.count, note: nil)
+            frames.append(converted(marked, panel: .list(list)))
         case .list:
             let entries = ["私の名前は中野です", "私の名前は中のです", "わたしのなまえはなかのです"]
             let list = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },

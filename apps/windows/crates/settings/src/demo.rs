@@ -549,7 +549,7 @@ pub fn script(step: Step, choices: &Choices, today: Today) -> Script {
     } else {
         Keys::Romaji
     };
-    let branch_map = choices.value(Field::Path("candidatePresentation")) != "list";
+    let branch_map = choices.value(Field::Path("candidatePresentation")) == "automatic";
     let mut b = Builder::new(keys);
     match step {
         Step::Welcome => {

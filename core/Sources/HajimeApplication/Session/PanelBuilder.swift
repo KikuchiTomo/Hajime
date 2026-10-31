@@ -200,6 +200,61 @@ enum PanelBuilder {
         return LatticePanel(columns: columns, position: position, total: total)
     }
 
+    /// 文節ごとの一覧．注目している文節の候補を縦に並べ，字種は上の種類の行に出す(分岐図の下の枝と上の枝にあたる)
+    static func segmentListPanel(for lattice: SegmentLattice, perPage: Int, showsVariants: Bool, corrected: Range<Int>? = nil,
+                                 reading: String) -> CandidatePanel {
+        let segment = lattice.focused
+        let selectedCandidate: Int? = if case .candidate(let value) = segment.choice { value } else { nil }
+        let selectedVariant: Int? = if case .variant(let value) = segment.choice { value } else { nil }
+        let variants = showsVariants
+            ? ScriptVariant.allCases.map { variant in
+                CandidatePanel.Variant(label: variant.label, isAvailable: segment.variants.contains { $0.origin == .variant(variant) })
+            }
+            : []
+        let pageStart = (selectedCandidate ?? 0) / perPage * perPage
+        let page = pageStart..<min(pageStart + perPage, segment.candidates.count)
+        // 打ち間違いを直した部分は，候補の中の当たる語句に補正の下線を引く(読みの位置は文節の中で数え直す)
+        let start = segment.readingStart
+        let changed = corrected.map { max($0.lowerBound - start, 0)..<max($0.upperBound - start, 0) }.flatMap { $0.isEmpty ? nil : $0 }
+        let segmentReading = String(reading.dropFirst(start).prefix(segment.readingLength))
+        let entries = page.map { index in
+            let candidate = segment.candidates[index]
+            let range = changed.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: segmentReading, changed: $0)) }
+            let annotation: String? = switch candidate.origin {
+            case .asTyped: asTypedNote
+            case .correction: correctedNote
+            default: nil
+            }
+            return CandidatePanel.Entry(text: candidate.text, annotation: annotation, corrected: range)
+        }
+        let variantIndex = selectedVariant.flatMap { index -> Int? in
+            guard case .variant(let variant) = segment.variants[index].origin else { return nil }
+            return ScriptVariant.allCases.firstIndex(of: variant)
+        }
+        return CandidatePanel(
+            variants: variants,
+            selectedVariant: variantIndex,
+            entries: entries,
+            selectedEntry: selectedCandidate.map { $0 - pageStart },
+            focus: selectedVariant == nil ? .candidate : .variants,
+            position: (selectedCandidate ?? 0) + 1,
+            total: segment.candidates.count,
+            note: nil
+        )
+    }
+
+    /// 文節ごとの一覧で文節を区切っているとき(⇧↓)．区切れる位置ごとに，そこで区切った文節を番号順に並べる(番号キーで選ぶ)
+    static func splittingList(pieces: [String]) -> CandidatePanel {
+        let entries = (1..<max(pieces.count, 1)).map { position in
+            CandidatePanel.Entry(text: pieces[..<position].joined() + splitMark + pieces[position...].joined(), annotation: nil)
+        }
+        return CandidatePanel(variants: [], selectedVariant: nil, entries: entries, selectedEntry: nil, focus: .candidate,
+                              position: 0, total: entries.count, note: nil)
+    }
+
+    /// 区切る位置を見せる印
+    static let splitMark = "｜"
+
     /// 文節を区切っているとき(⇧↓)の分岐図．注目している文節を区切れる位置で分けて幹に出し，切れ目に番号を振る(SegmentSplitter)．
     /// 番号キーは区切る位置を選ぶので，候補と字種の枝は出さない(枝の番号と取り違えないように)
     static func splitting(_ panel: LatticePanel, pieces: [String]) -> LatticePanel {
