@@ -1242,6 +1242,8 @@ public final class InputSession {
                 let live = liveCandidate() {
                 return live
             }
+            // かなのまま見せている読みは，見えているとおりに確定する．末尾の打ちかけの「n」を「ん」にしない(「ん」は nn で打つ)
+            return Candidate(text: composition.displayReading, readingCount: whole, origin: .variant(.hiragana))
         }
         return Candidate(text: composition.conversionReading, readingCount: whole, origin: .variant(.hiragana))
     }
