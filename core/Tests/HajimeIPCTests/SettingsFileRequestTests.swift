@@ -101,7 +101,7 @@ struct SettingsFileRequestTests {
             return
         }
         #expect(!status.isEnabled)
-        #expect(status.groups.count == SyncGroup.allCases.count)
+        #expect(status.groups.count == SyncGroup.syncableCases.count)
         #expect(status.groups.first { $0.group == "appearance" }?.scope == "local")
         #expect(status.groups.first { $0.group == "dictionary" }?.fields == ["userDictionary"])
     }

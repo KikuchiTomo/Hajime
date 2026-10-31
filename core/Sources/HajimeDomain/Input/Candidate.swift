@@ -18,6 +18,8 @@ public enum CandidateOrigin: Sendable, Equatable {
     case userDictionary
     /// 連想変換の一覧から選んだ語(R-18)．学習には使わない
     case association
+    /// 読みで呼び出すコマンド(LauncherCommand の id)．選んで確定すると文字を入れずにコマンドを動かす．第 1 候補にはしない
+    case command(id: String)
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．
@@ -88,6 +90,11 @@ public struct Candidate: Sendable, Equatable {
     /// 変換エンジンが出した候補か．確定したときに学習に使うのはこれだけ
     public var isFromEngine: Bool {
         if case .engine = origin { true } else { false }
+    }
+
+    /// コマンドの候補なら，そのコマンドの id
+    public var commandID: String? {
+        if case .command(let id) = origin { id } else { nil }
     }
 }
 

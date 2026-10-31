@@ -363,4 +363,59 @@ public enum DefaultSettings {
     /// 「更新を確認」で開く最新のリリースのページ．アプリは通信せず，ブラウザで開くだけにする(SECURITY-MODEL.md の通信)．
     /// macOS と Windows の配布物は同じリリースに置く
     public static let latestReleaseURL = "https://github.com/KikuchiTomo/Hajime/releases/latest"
+
+    // MARK: 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ
+
+    /// 手の置き場所のずれを戻した並び(HandShift)に足す手間．ずれは 1 回の誤りなので，同じキーの重なり(repeatedKeyCost)と同じ重さにする
+    public static let handShiftCost = 2.0
+    /// うろ覚えの読み(LooseReadings)を試す読みの長さ
+    public static let minimumLooseReadingLength = 3
+    public static let maximumLooseReadingLength = 14
+    /// うろ覚えの読みとして試す組み替えの数の上限(1 つごとに変換を 1 回求めるため)
+    public static let maximumLooseReadingVariants = 16
+    /// うろ覚えの語として出す候補の数の上限
+    public static let maximumLooseReadingWords = 2
+    /// うろ覚えの語を候補に出す位置(上からの番目)．第 1 候補は変えない
+    public static let looseReadingCandidateOffset = 1
+    /// 発音どおりの綴り(PhoneticSpelling)を試す英単語の長さ
+    public static let minimumPhoneticWordLength = 3
+    public static let maximumPhoneticWordLength = 16
+    /// 発音どおりの綴りの置き換えで作る綴りの数の上限(1 つごとに英単語の辞書を引くため)
+    public static let maximumPhoneticVariants = 120
+    /// 発音どおりの綴りから見つけた英単語を出す数と位置
+    public static let maximumPhoneticWords = 2
+    public static let phoneticCandidateOffset = 2
+    /// 動的なユーザー辞書の語(TextTemplate)を置き換えた文字列の長さの上限
+    public static let maximumTemplateOutputLength = 256
+    /// `{random:a-b}` の範囲の幅の上限
+    public static let maximumTemplateRandomRange = 1_000_000_000
+    /// `{datetime+nd}` でずらせる日数の上限
+    public static let maximumTemplateDayOffset = 36_500
+    /// コマンドの数・名前と行き先の長さの上限
+    public static let maximumCommands = 200
+    public static let maximumCommandTitleLength = 40
+    public static let maximumCommandTargetLength = 2_048
+    /// コマンドで開ける URL の種類
+    public static let commandURLSchemes: Set<String> = ["https", "http"]
+    /// コマンドの候補の頭に付ける印．文字を入れる候補と見分けるため
+    public static let commandCandidateMark = "▶ "
+    /// コマンドを候補に出す位置(上からの番目)．第 1 候補(ライブ変換で見える文字・Enter で確定する候補)には決してしない
+    public static let commandCandidateOffset = 1
+    /// 変換マクロの数と形の長さの上限
+    public static let maximumMacros = 100
+    public static let maximumMacroPatternLength = 120
+    /// 連想の一覧で変換マクロのまとまりに付ける説明
+    public static let macroGroupLabel = "整形"
+    /// 初めから入っている変換マクロ
+    public static let conversionMacros: [ConversionMacro] = [
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000001", pattern: "「{text}」"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000002", pattern: "『{text}』"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000003", pattern: "【{text}】"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000004", pattern: "（{text}）"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000005", pattern: "{text}（{reading}）"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000006", pattern: "|{text}《{reading}》"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000007", pattern: "<ruby>{text}<rt>{reading}</rt></ruby>"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000008", pattern: "**{text}**"),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000009", pattern: "`{text}`"),
+    ]
 }

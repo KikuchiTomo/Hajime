@@ -68,7 +68,7 @@ struct DateExpressionsTests {
     @Test("午前 0 時は午前0時と書く")
     func midnight() {
         let now = CalendarDate(year: 2026, month: 1, day: 1, weekday: 5, hour: 0, minute: 3)
-        #expect(DateExpressions.candidates(for: "いま", now: now, day: day) == ["0:03", "0時3分", "午前0時3分"])
+        #expect(DateExpressions.candidates(for: "いま", now: now, day: day) == ["0:03", "0時3分", "午前0時3分", "00:03:00"])
     }
 
     @Test("「なう」は，今の日時を添えた形(なう (年/月/日 時:分))と日時だけを出す")
@@ -91,7 +91,8 @@ struct UserDictionaryEditingTests {
         #expect(UserDictionaryEditing.add(reading: " えすきゅー ", word: "hajime\u{3000}", to: &entries) == .added)
         #expect(entries == [UserDictionaryEntry(reading: "えすきゅー", word: "hajime")])
         #expect(UserDictionaryEditing.add(reading: "えすきゅー", word: "hajime", to: &entries) == .alreadyRegistered)
-        #expect(UserDictionaryEditing.add(reading: "ABC", word: "x", to: &entries) == .invalid)
+        #expect(UserDictionaryEditing.add(reading: "漢字", word: "x", to: &entries) == .invalid)
+        #expect(UserDictionaryEditing.add(reading: "gh", word: "GitHub", to: &entries) == .added)
         var full = (0..<DefaultSettings.maximumUserDictionaryEntries).map { UserDictionaryEntry(reading: "あ", word: "\($0)") }
         #expect(UserDictionaryEditing.add(reading: "い", word: "x", to: &full) == .full)
     }
@@ -99,7 +100,7 @@ struct UserDictionaryEditingTests {
     @Test("取り込みは足した数を返し，重複と形の誤りを除く")
     func merge() {
         var entries = [UserDictionaryEntry(reading: "あ", word: "亜")]
-        let imported = [UserDictionaryEntry(reading: "あ", word: "亜"), UserDictionaryEntry(reading: "い", word: "井"), UserDictionaryEntry(reading: "X", word: "x")]
+        let imported = [UserDictionaryEntry(reading: "あ", word: "亜"), UserDictionaryEntry(reading: "い", word: "井"), UserDictionaryEntry(reading: "X/", word: "x")]
         #expect(UserDictionaryEditing.merge(imported, into: &entries) == 1)
         #expect(entries.count == 2)
     }

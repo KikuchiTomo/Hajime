@@ -32,6 +32,11 @@ private struct UserWordsView: View {
     var body: some View {
         Form {
             Section {
+                ResettableToggle(model: model, title: UIStrings.Extras.dynamicDictionary, keyPath: \.dynamicDictionary)
+            } footer: {
+                Text(UIStrings.Extras.dynamicDictionaryNote).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 RuleListEditor(
                     labels: .init(key: UIStrings.Settings.reading, value: UIStrings.Settings.word,
                                   empty: UIStrings.Settings.dictionaryEmpty),

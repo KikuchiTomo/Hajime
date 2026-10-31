@@ -2,7 +2,8 @@ import Foundation
 import HajimeDomain
 
 /// ユーザー辞書を「読み<タブ>語」の行のテキストで読み書きする．
-/// 「読み<タブ>単語」の行が並んだタブ区切りのテキスト(3 列目以降の品詞やコメントは読まない)
+/// 「読み<タブ>単語」の行が並んだタブ区切りのテキスト(3 列目以降の品詞やコメントは読まない)．
+/// Google 日本語入力・Microsoft IME(UTF-16)・ATOK の書き出し，Shift_JIS・EUC-JP のファイル，macOS のユーザ辞書の plist，SKK の辞書も読む
 public enum UserDictionaryFile {
     public enum FileError: Error, Equatable {
         case fileTooLarge(maximumBytes: Int)
@@ -22,12 +23,23 @@ public enum UserDictionaryFile {
         } catch let error as ProtectedFile.TooLarge {
             throw FileError.fileTooLarge(maximumBytes: error.maximumBytes)
         }
-        guard let text = decode(data) else { throw FileError.notText }
+        // 他の IME の書き出しをそのまま読めるよう，文字コードと形(タブ区切り・macOS の plist・SKK)は取り込む辞書と同じに見分ける
+        if DictionaryFileReader.isPropertyList(data) { return try fromOtherFormat(data) }
+        guard let text = DictionaryFileReader.decode(data) else {
+            return try fromOtherFormat(data)
+        }
+        if DictionaryFileReader.detectFormat(text) == .skk { return try fromOtherFormat(data) }
         let entries = parse(text)
         return (entries, max(entryLines(text).count - entries.count, 0))
     }
 
-    /// UTF-8 か，BOM の付いた UTF-16(Windows の辞書ツールが書き出す形)だけを読む．
+    /// タブ区切りでないファイル(plist・SKK)を取り込む辞書と同じに読む．形の誤った行は数えない
+    private static func fromOtherFormat(_ data: Data) throws -> (entries: [UserDictionaryEntry], skipped: Int) {
+        guard let words = try? DictionaryFileReader.parse(data) else { throw FileError.notText }
+        return (words.map { UserDictionaryEntry(reading: $0.reading, word: $0.word) }.filter(\.isValid), 0)
+    }
+
+    /// UTF-8 か，BOM の付いた UTF-16(Windows の辞書ツールが書き出す形)だけを読む(決まりの一覧のファイル RuleListFile が使う)．
     /// BOM の無い UTF-16 はほとんどどんなバイト列でも読めてしまい，Shift_JIS などを文字化けしたまま読むため
     static func decode(_ data: Data) -> String? {
         let bytes = [UInt8](data.prefix(2))

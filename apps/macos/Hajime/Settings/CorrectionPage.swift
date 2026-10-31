@@ -13,6 +13,16 @@ struct CorrectionPage: View {
                 ResettableToggle(model: model, title: UIStrings.Features.correctsRepeatedKeys, keyPath: \.correction.repeatedKeys)
                     .disabled(!model.settings.correction.japanese)
                 ResettableToggle(model: model, title: UIStrings.Features.misreadings, keyPath: \.misreadings)
+                ResettableToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings)
+                    .help(UIStrings.Extras.looseReadingsNote)
+                ResettableToggle(model: model, title: UIStrings.Extras.phoneticSpelling, keyPath: \.phoneticSpelling)
+                    .help(UIStrings.Extras.phoneticSpellingNote)
+            }
+            Section {
+                ResettableToggle(model: model, title: UIStrings.Extras.handShift, keyPath: \.handShiftCorrection)
+                    .disabled(!model.settings.correction.japanese)
+            } footer: {
+                Text(UIStrings.Extras.handShiftNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Features.rules) {
                 RuleListEditor(model: model, spec: .correctionRules, labels: .init(

@@ -163,6 +163,7 @@ enum DesignTokens {
             static let keymapMarkWidth: CGFloat = 22
             static let keymapCaptureHeight: CGFloat = 22
             static let ruleTableHeight: CGFloat = 220
+            static let commandEditorWidth: CGFloat = 460
             static let ruleSearchWidth: CGFloat = 160
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160

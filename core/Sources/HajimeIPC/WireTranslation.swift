@@ -234,6 +234,8 @@ public enum HostAction: Sendable, Equatable {
     case openSettings
     case toggleLiveConversion
     case showHandwriting
+    /// コマンドを動かす(エンジンのプロセスで．DLL には送らない)
+    case runCommand(LauncherCommand)
 }
 
 public struct RoutedActions: Sendable, Equatable {
@@ -281,6 +283,8 @@ public struct RoutedActions: Sendable, Equatable {
                 host.append(.toggleLiveConversion)
             case .showHandwriting:
                 host.append(.showHandwriting)
+            case .runCommand(let command):
+                host.append(.runCommand(command))
             }
         }
     }

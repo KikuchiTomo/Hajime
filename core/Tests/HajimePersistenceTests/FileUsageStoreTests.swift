@@ -53,7 +53,8 @@ struct SystemCalendarTests {
         gregorian.timeZone = SystemCalendar.localTimeZone(at: Date())
         let date = try #require(gregorian.date(from: components))
         let calendar = SystemCalendar(clock: { date })
-        #expect(calendar.now() == CalendarDate(year: 2026, month: 10, day: 31, weekday: 7, hour: 23, minute: 59))
+        let offset = gregorian.timeZone.secondsFromGMT(for: date)
+        #expect(calendar.now() == CalendarDate(year: 2026, month: 10, day: 31, weekday: 7, hour: 23, minute: 59, utcOffsetSeconds: offset))
         let tomorrow = calendar.day(offsetFromToday: 1)
         #expect((tomorrow.month, tomorrow.day, tomorrow.weekday) == (11, 1, 1))
     }
@@ -63,7 +64,7 @@ struct SystemCalendarTests {
         let date = Date(timeIntervalSince1970: 1_793_118_600)  // 2026-10-27 16:30 UTC
         let tokyo = try #require(TimeZone(secondsFromGMT: 9 * 3600))
         let calendar = SystemCalendar(clock: { date }, timeZone: { _ in tokyo })
-        #expect(calendar.now() == CalendarDate(year: 2026, month: 10, day: 28, weekday: 4, hour: 1, minute: 30))
+        #expect(calendar.now() == CalendarDate(year: 2026, month: 10, day: 28, weekday: 4, hour: 1, minute: 30, utcOffsetSeconds: 9 * 3600))
         #expect(calendar.day(offsetFromToday: 0).day == 28)
     }
 

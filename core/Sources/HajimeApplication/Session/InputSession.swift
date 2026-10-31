@@ -1116,6 +1116,10 @@ public final class InputSession {
         // 候補を求めていない文節は，学習に使うエンジンの候補にするため求めてから確定する
         fillPendingSegments()
         if case .lattice(let lattice) = phase {
+            // 読み全体で 1 つの文節にしたコマンドの候補を選んでいれば，文字を入れずにコマンドを動かす
+            if lattice.segments.count == 1, let id = lattice.segments[0].selected.commandID {
+                return commandActions(id: id)
+            }
             for segment in lattice.segments where segment.selected.isFromEngine {
                 converter.didCommit(segment.selected)
             }
@@ -1125,6 +1129,10 @@ public final class InputSession {
             return [.commit(lattice.text)] + reset()
         }
         if case .selecting(let selection) = phase {
+            if case .candidate(let index) = selection.focus, selection.candidates.indices.contains(index),
+                let id = selection.candidates[index].commandID {
+                return commandActions(id: id)
+            }
             let changed = selection.focus == .candidate(0) ? 0 : 1
             usage?.record(.committed(changedSegments: changed, viaConversion: true))
         } else {
@@ -1152,6 +1160,18 @@ public final class InputSession {
             corrector.reset()
         }
         return actions + reset()
+    }
+
+    /// コマンドの候補を選んで確定した(R-22)．文字は入れず，読みを消してコマンドを動かす．
+    /// 一覧を出してからコマンドを消したり使わない設定にしたりしていたら，コマンドは動かさず読みのまま確定する
+    private func commandActions(id: String) -> [ClientAction] {
+        let current = settings.current
+        guard current.launcherCommands, let command = current.commands.first(where: { $0.id == id }), command.isEnabled, command.isValid else {
+            let reading = composition.displayReading
+            return reset() + [.commit(reading)]
+        }
+        usage?.record(.committed(changedSegments: 1, viaConversion: true))
+        return reset() + [.runCommand(command)]
     }
 
     /// 分岐図を作るもの．上の枝で英字をかなにするときも，利用者が足したローマ字の綴りを使う
@@ -1252,7 +1272,7 @@ public final class InputSession {
             ]
             annotations += [nil, PanelBuilder.asTypedNote]
         }
-        for candidate in converter.candidates(for: composition.conversionReading)
+        for candidate in converter.listCandidates(for: composition.conversionReading)
         where !candidates.contains(where: { $0.text == candidate.text }) {
             candidates.append(candidate)
             annotations.append(nil)
@@ -1829,7 +1849,7 @@ public final class InputSession {
     /// 選んでいる候補に連想があるときの知らせ．知らせない設定か，連想が無ければ nil
     private func associationHint(text: String, reading: String) -> String? {
         guard settings.current.showsAssociationHint, associationFinder.hasDictionaries,
-            associationFinder.find(text: text, reading: reading) != nil else { return nil }
+            associationFinder.find(text: text, reading: reading, includesMacros: false) != nil else { return nil }
         return PanelBuilder.associationHint(key: keyLabel(.associate, in: .converting))
     }
 

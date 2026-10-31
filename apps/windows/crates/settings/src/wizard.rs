@@ -18,12 +18,13 @@ pub enum Step {
     Focus,
     Correction,
     Features,
+    Extras,
     Appearance,
     Done,
 }
 
 impl Step {
-    pub const ALL: [Step; 10] = [
+    pub const ALL: [Step; 11] = [
         Step::Welcome,
         Step::Switch,
         Step::Characters,
@@ -32,6 +33,7 @@ impl Step {
         Step::Focus,
         Step::Correction,
         Step::Features,
+        Step::Extras,
         Step::Appearance,
         Step::Done,
     ];
@@ -58,6 +60,7 @@ impl Step {
             Step::Focus => text::FOCUS_TITLE,
             Step::Correction => text::CORRECTION_TITLE,
             Step::Features => text::FEATURES_TITLE,
+            Step::Extras => text::EXTRAS_TITLE,
             Step::Appearance => text::APPEARANCE_TITLE,
             Step::Done => text::DONE_TITLE,
         }
@@ -73,6 +76,7 @@ impl Step {
             Step::Focus => text::FOCUS_TEXT,
             Step::Correction => text::CORRECTION_TEXT,
             Step::Features => text::FEATURES_TEXT,
+            Step::Extras => text::EXTRAS_TEXT,
             Step::Appearance => text::APPEARANCE_TEXT,
             Step::Done => text::DONE_TEXT,
         }
@@ -121,6 +125,10 @@ impl Step {
                 ),
             ],
             Step::Features => FEATURES
+                .iter()
+                .map(|(path, title)| Group::toggle(title, path))
+                .collect(),
+            Step::Extras => EXTRAS
                 .iter()
                 .map(|(path, title)| Group::toggle(title, path))
                 .collect(),
@@ -211,6 +219,19 @@ pub const FEATURES: &[(&str, &str)] = &[
     ("calculation", text::CALCULATION),
     ("postalCodeConversion", text::POSTAL_CODE),
     ("dateConversion", text::DATE),
+];
+
+/// 紹介する試験的な機能(既定ではオフ．macOS の初期設定の「試験的な機能」と同じ並び)
+pub const EXTRAS: &[(&str, &str)] = &[
+    ("looseReadings", crate::strings::extras::LOOSE_READINGS),
+    (
+        "phoneticSpelling",
+        crate::strings::extras::PHONETIC_SPELLING,
+    ),
+    ("handShiftCorrection", crate::strings::extras::HAND_SHIFT),
+    ("conversionMacros", text::MACROS),
+    ("dynamicDictionary", text::DYNAMIC_DICTIONARY),
+    ("launcherCommands", text::COMMANDS),
 ];
 
 /// 推奨する値(利用者が決めたもの)

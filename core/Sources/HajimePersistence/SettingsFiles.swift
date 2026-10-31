@@ -122,11 +122,12 @@ public final class SettingsFiles: SettingsFileHandling {
         try await Self.write { try SettingsTransfer.write(current, to: destination) }
     }
 
-    /// 読み込んだ設定ですべてを置き換える．読めない項目と範囲の外の値は既定値になる(SettingsTransfer)
+    /// 読み込んだ設定ですべてを置き換える(コマンドは除く)．読めない項目と範囲の外の値は既定値になる(SettingsTransfer)
     public func importSettings(from path: String) async throws(SettingsFileFailure) {
         let source = try Self.url(path)
         let imported = try await Self.read { try SettingsTransfer.read(from: source) }
-        try apply { $0 = imported }
+        // コマンドは読み込んだファイルで置き換えない(アプリやファイルを開く指示を，人から受け取ったファイルで差し込まれないように)
+        try apply { $0 = imported.keepingCommands(of: $0) }
     }
 
     // MARK: 除外設定

@@ -39,6 +39,7 @@ struct SettingsView: View {
         case .symbols: SymbolsPage(model: model)
         case .keys: KeymapPage(model: model)
         case .dictionary: DictionaryPage(model: model)
+        case .commands: CommandsPage(model: model, bookmarks: model.commandBookmarks)
         case .romaji: RomajiPage(model: model)
         case .apps: ExclusionsPage(model: model)
         case .appearance: AppearancePage(model: model)

@@ -58,6 +58,8 @@ pub struct Limits {
     pub word_language_entries: usize,
     pub word_language_word_length: usize,
     pub user_dictionary_entries: usize,
+    pub commands: usize,
+    pub macros: usize,
     pub user_dictionary_reading_length: usize,
     pub user_dictionary_word_length: usize,
     pub profile_rules: usize,

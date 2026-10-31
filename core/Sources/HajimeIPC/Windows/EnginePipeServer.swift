@@ -4,13 +4,14 @@ import Foundation
 import HajimeDomain
 
 public enum EnginePipeServer {
-    /// candidateWindowPath は候補ウィンドウの実行ファイル．その接続からだけ手書きの窓で選んだ文字を受ける
-    public static func start(listener: NamedPipeListener, service: EngineService, candidateWindowPath: String) {
+    /// candidateWindowPath は候補ウィンドウの実行ファイル．その接続からだけ手書きの窓で選んだ文字を受ける．
+    /// settingsAppPath は設定の画面の実行ファイル．その接続からだけコマンド(LauncherCommand)の書き換えを受ける
+    public static func start(listener: NamedPipeListener, service: EngineService, candidateWindowPath: String, settingsAppPath: String = "") {
         let thread = Thread {
             while true {
                 do {
                     let connection = try listener.accept()
-                    Thread { serve(connection, service: service, candidateWindowPath: candidateWindowPath) }.start()
+                    Thread { serve(connection, service: service, candidateWindowPath: candidateWindowPath, settingsAppPath: settingsAppPath) }.start()
                 } catch {
                     Thread.sleep(forTimeInterval: 0.1)
                 }
@@ -19,14 +20,16 @@ public enum EnginePipeServer {
         thread.start()
     }
 
-    static func serve(_ connection: NamedPipeConnection, service: EngineService, candidateWindowPath: String) {
+    static func serve(_ connection: NamedPipeConnection, service: EngineService, candidateWindowPath: String, settingsAppPath: String) {
         guard let process = try? connection.clientProcessID(), NamedPipePeer.isInCurrentSession(processID: process) else {
             connection.close()
             return
         }
-        let isCandidateWindow = NamedPipePeer.imagePath(processID: process)
-            .map { NamedPipePeer.isSameImage($0, as: candidateWindowPath) } ?? false
-        EngineRequestLoop.serve(connection, service: service, isCandidateWindow: isCandidateWindow)
+        let image = NamedPipePeer.imagePath(processID: process)
+        let isCandidateWindow = image.map { NamedPipePeer.isSameImage($0, as: candidateWindowPath) } ?? false
+        // 入力先のアプリ(サンドボックスのアプリも DLL を通してつなげる)からはコマンドを書き換えさせない
+        let isSettingsApp = !settingsAppPath.isEmpty && (image.map { NamedPipePeer.isSameImage($0, as: settingsAppPath) } ?? false)
+        EngineRequestLoop.serve(connection, service: service, isCandidateWindow: isCandidateWindow, isSettingsApp: isSettingsApp)
     }
 }
 

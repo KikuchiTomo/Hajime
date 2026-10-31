@@ -34,6 +34,7 @@ enum DemoScripts {
         case .presentation: presentation(settings)
         case .characters: characters(settings)
         case .features: features(settings, now: now)
+        case .extras: extras(settings)
         }
     }
 
@@ -172,6 +173,25 @@ enum DemoScripts {
             formatter.dateFormat = "y/MM/dd"
             show("kyou", entries: [long, formatter.string(from: now), "今日"])
         }
+        return frames.isEmpty ? [DemoFrame(duration: hold)] : frames
+    }
+
+    /// 試験的な機能．オンにしたものだけを見せる(うろ覚えの語・変換マクロ・コマンド)
+    private static func extras(_ settings: Settings) -> [DemoFrame] {
+        var frames: [DemoFrame] = []
+        func show(_ keys: String, entries: [String], heading: AssociationHeading? = nil, selected: Int = 0) {
+            frames += typing(keys)
+            var list = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },
+                                      selectedEntry: selected, focus: .candidate, position: selected + 1, total: entries.count, note: nil)
+            list.association = heading
+            frames.append(converted([(entries[selected], .focused)], panel: .list(list)))
+        }
+        if settings.looseReadings { show("shumire-shon", entries: ["シュミレーション", "シミュレーション"], selected: 1) }
+        if settings.conversionMacros {
+            show("toukyou", entries: ["「東京」", "【東京】", "東京（とうきょう）"],
+                 heading: AssociationHeading(headword: "東京", label: DefaultSettings.macroGroupLabel, group: 1, groupCount: 1))
+        }
+        if settings.launcherCommands { show("kuro-do", entries: ["クロード", DefaultSettings.commandCandidateMark + UIStrings.Onboarding.commandsExample], selected: 1) }
         return frames.isEmpty ? [DemoFrame(duration: hold)] : frames
     }
 

@@ -725,7 +725,7 @@ pub fn script(step: Step, choices: &Choices, today: Today) -> Script {
             b.hold();
         }
         Step::Features => features(&mut b, choices, today, branch_map),
-        Step::Done => {}
+        Step::Extras | Step::Done => {}
     }
     b.finish()
 }

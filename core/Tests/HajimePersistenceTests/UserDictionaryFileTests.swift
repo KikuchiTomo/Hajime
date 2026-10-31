@@ -11,12 +11,14 @@ struct UserDictionaryFileTests {
         !Microsoft IME Dictionary Tool
         えすきゅー\thajime\t固有名詞\t
         # コメント
-        ABC\t読みがひらがなでない
+        漢字\t読みがひらがなでない
+        gh\tGitHub
         ひとつだけ
         かいしゃ\t会社
         """
         #expect(UserDictionaryFile.parse(text) == [
             UserDictionaryEntry(reading: "えすきゅー", word: "hajime"),
+            UserDictionaryEntry(reading: "gh", word: "GitHub"),
             UserDictionaryEntry(reading: "かいしゃ", word: "会社"),
         ])
     }

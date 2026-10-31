@@ -45,12 +45,12 @@ public struct DictionaryWord: Sendable, Equatable, Hashable {
         self.wordClass = wordClass
     }
 
-    /// 読みはひらがなと長音だけ，語は空でなく，どちらも上限の長さ以内．タブと改行を含まない(索引のファイルの区切りのため)
+    /// 読みはひらがなと長音(ローマ字の読みは取り込むときに ReadingNormalization でそろえる)，語は空でなく，どちらも上限の長さ以内．タブと改行を含まない(索引のファイルの区切りのため)
     public var isValid: Bool {
         !reading.isEmpty && !word.isEmpty
             && reading.count <= DefaultSettings.maximumImportedReadingLength
             && word.count <= DefaultSettings.maximumImportedWordLength
-            && reading.unicodeScalars.allSatisfy { (0x3041...0x3096).contains($0.value) || $0 == "ー" }
+            && ReadingNormalization.isNormalizedReading(reading)
             && !word.contains(where: { $0 == "\t" || $0.isNewline })
     }
 }

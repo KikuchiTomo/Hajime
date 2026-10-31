@@ -33,9 +33,11 @@ public final class SystemCalendar: CalendarReading {
     }
 
     private func components(of date: Date) -> CalendarDate {
-        let parts = calendar(at: date).dateComponents([.year, .month, .day, .weekday, .hour, .minute], from: date)
+        let calendar = calendar(at: date)
+        let parts = calendar.dateComponents([.year, .month, .day, .weekday, .hour, .minute, .second], from: date)
         return CalendarDate(year: parts.year ?? 0, month: parts.month ?? 0, day: parts.day ?? 0, weekday: parts.weekday ?? 1,
-                            hour: parts.hour ?? 0, minute: parts.minute ?? 0)
+                            hour: parts.hour ?? 0, minute: parts.minute ?? 0, second: parts.second ?? 0,
+                            utcOffsetSeconds: calendar.timeZone.secondsFromGMT(for: date))
     }
 
     /// 端末の時間帯．Windows の Foundation は OS の時間帯を読めず GMT を返すので，C ランタイムが読む

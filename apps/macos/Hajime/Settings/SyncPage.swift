@@ -32,7 +32,7 @@ struct SyncPage: View {
                 Text(UIStrings.Sync.note).font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                ForEach(SyncGroup.allCases, id: \.self) { group in
+                ForEach(SyncGroup.syncableCases, id: \.self) { group in
                     Picker(UIStrings.Sync.label(for: group), selection: Binding(get: { sync.state.scope(of: group) }, set: { sync.setScope($0, for: group) })) {
                         ForEach(SyncScope.allCases, id: \.self) { Text(UIStrings.Sync.label(for: $0)).tag($0) }
                     }

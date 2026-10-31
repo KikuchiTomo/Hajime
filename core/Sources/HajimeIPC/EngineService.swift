@@ -25,6 +25,8 @@ public final class EngineService {
         var sessions: Set<UInt32> = []
         /// 候補ウィンドウのプロセスからの接続か(実行ファイルを EnginePipeServer が確かめる)．手書きの窓で選んだ文字はこの接続からだけ受ける
         var isCandidateWindow = false
+        /// 設定の画面のプロセスからの接続か(実行ファイルを EnginePipeServer が確かめる)．コマンドはこの接続からだけ書き換える
+        var isSettingsApp = false
     }
 
     /// 開いている手書きの窓(R-14)．選んだ文字は窓を開いたセッションに預け，DLL の wake で入れる
@@ -77,6 +79,8 @@ public final class EngineService {
     /// 打ち間違いの見直しの結果の記録(CorrectionReport の文．入力の中身は含めない)．Windows はデバッグ出力に流す
     private let log: (String) -> Void
     private let openSettings: () -> Void
+    /// コマンドを動かす(R-22)．エンジンのプロセスで動かし，DLL(入力先のアプリの中)には任せない
+    private let runCommand: (LauncherCommand) -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
     private let typoService: (any TypoCorrecting)?
@@ -103,7 +107,9 @@ public final class EngineService {
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
-                services: SettingsServices = SettingsServices(), log: @escaping (String) -> Void = { _ in }) {
+                services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
+                log: @escaping (String) -> Void = { _ in }) {
+        self.runCommand = runCommand
         self.services = services
         self.log = log
         self.typoService = typoService
@@ -117,10 +123,10 @@ public final class EngineService {
         self.hints = hints
     }
 
-    public func connect(isCandidateWindow: Bool = false) -> ConnectionID {
+    public func connect(isCandidateWindow: Bool = false, isSettingsApp: Bool = false) -> ConnectionID {
         let id = ConnectionID(rawValue: nextConnection)
         nextConnection += 1
-        connections[id] = Connection(isCandidateWindow: isCandidateWindow)
+        connections[id] = Connection(isCandidateWindow: isCandidateWindow, isSettingsApp: isSettingsApp)
         return id
     }
 
@@ -276,8 +282,10 @@ public final class EngineService {
         case .writeSettingsFields(let values):
             return fields { () throws(SettingsFields.Failure) in
                 let merged = try SettingsFields.merge(values, into: settings.current)
+                // コマンドは設定の画面からの接続でだけ書き換える．入力先のアプリから，アプリやファイルを開く指示を差し込まれないように
+                let next = connection.isSettingsApp ? merged.settings : merged.settings.keepingCommands(of: settings.current)
                 do {
-                    try settings.update { $0 = merged.settings }
+                    try settings.update { $0 = next }
                 } catch {
                     throw .malformed
                 }
@@ -678,6 +686,11 @@ public final class EngineService {
         case .showHandwriting:
             // セッションが要るので edit で扱う
             break
+        case .runCommand(let command):
+            // 確定したときの設定にまだあり，使う設定のときだけ動かす(一覧を出してから消したコマンドを動かさない)
+            let current = settings.current
+            guard current.launcherCommands, current.commands.contains(command), command.isValid else { return }
+            runCommand(command)
         }
     }
 

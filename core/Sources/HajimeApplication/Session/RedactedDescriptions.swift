@@ -20,6 +20,7 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .showHandwriting: "showHandwriting"
         case .awaitCorrections: "awaitCorrections"
         case .requestReconversion: "requestReconversion"
+        case .runCommand(let command): "runCommand(\(command))"
         }
     }
 

@@ -1,3 +1,4 @@
+import Foundation
 import HajimeDomain
 
 /// 変換エンジンの候補に，エンジンが出さない候補を足す．
@@ -12,6 +13,12 @@ import HajimeDomain
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
 /// - 絵文字(EmojiLooking): 「なく」→ 😢．読みで引き，上から DefaultSettings.emojiCandidateOffset 番目に差し込む
 /// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
+/// - ユーザー辞書のローマ字の読み(「gh」→ GitHub)と，入れるときに中身を決める語(TextTemplate．「にちじ」→ `{datetime:...}`)
+///
+/// 変換の一覧と分岐図の文節(listCandidates・segmentCandidates)にだけ足すもの．打っているあいだ(ライブ変換)には出さず，第 1 候補にもしない
+/// - コマンド(LauncherCommand): 読みが一致すれば 2 番目に「▶ 名前」を置く．選んで確定したときだけ動く(R-22)
+/// - うろ覚えの語(LooseReadings): 「しゅみれーしょん」→「シミュレーション」
+/// - 発音どおりに綴った英単語(PhoneticSpelling): 「ふぉと」→「photo」
 ///
 /// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
 ///   どの辞書を効かせるかは DictionaryActivation が決める(アプリの条件，文脈の条件)
@@ -25,6 +32,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let calendar: any CalendarReading
     private let postalCodes: (any PostalCodeLooking)?
     private let emoji: (any EmojiLooking)?
+    /// 発音どおりに綴った英単語を確かめる英単語の辞書．無ければ探さない
+    private let lexicon: (any EnglishLexicon)?
+    /// 読みごとに見つけたうろ覚えの語と英単語．入力を終えたときに捨てる
+    private var listExtrasCache: [String: (loose: [String], phonetic: [String])] = [:]
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
     private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [String]]) = ([], [:])
     /// 取り込んだ辞書を引くもの．無ければ取り込んだ辞書は使わない
@@ -49,8 +60,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
     }
 
     public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading,
-                postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil, emoji: (any EmojiLooking)? = nil) {
+                postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil, emoji: (any EmojiLooking)? = nil,
+                lexicon: (any EnglishLexicon)? = nil) {
         self.base = base
+        self.lexicon = lexicon
         self.settings = settings
         self.calendar = calendar
         self.postalCodes = postalCodes
@@ -72,7 +85,12 @@ public final class SupplementedConverter: KanaKanjiConverting {
     /// 文節の読みは文全体の読みの一部で，取り込んだ辞書の語は文全体の読みの部分ごとに引いてあるので，引き直さない．
     /// 引き直すとエンジンに渡す語が入れ替わり，ライブ変換の変換の状態が捨てられて遅くなる
     public func segmentCandidates(for reading: String) -> [Candidate] {
-        supplement(base.segmentCandidates(for: reading), reading: reading)
+        supplement(base.segmentCandidates(for: reading), reading: reading, forList: true)
+    }
+
+    public func listCandidates(for reading: String) -> [Candidate] {
+        prepareAuxiliaryWords(for: reading)
+        return supplement(base.candidates(for: reading), reading: reading, forList: true)
     }
 
     public func setApplication(_ identifier: String?) {
@@ -150,6 +168,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) { base.setAuxiliaryWords(words) }
     public func endComposition() {
         auxiliaryCache.lookups = [:]
+        listExtrasCache = [:]
         base.endComposition()
     }
     public func forget(_ candidate: Candidate) { base.forget(candidate) }
@@ -157,10 +176,14 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func forgetLastCommit() -> Bool { base.forgetLastCommit() }
     public func suspendLearningUntilEnd() { base.suspendLearningUntilEnd() }
 
-    private func supplement(_ candidates: [Candidate], reading: String) -> [Candidate] {
+    private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {
         let current = settings.current
         var result = Okurigana.reorder(candidates, style: current.okuriganaStyle)
-        let userWords = userDictionaryWords(for: reading, in: current.userDictionary)
+        var userWords = userDictionaryWords(for: reading, in: current.userDictionary)
+        if current.dynamicDictionary, userWords.contains(where: TextTemplate.containsPlaceholder) {
+            let values = templateValues()
+            userWords = userWords.map { TextTemplate.expand($0, values: values) }
+        }
         insert(userWords, into: &result, at: 0, reading: reading, origin: .userDictionary)
         // 読み全体と一致する取り込んだ辞書の語は，エンジンの候補の順に関わらず前の方に出るようにここで足す．
         // 既定の 1 番目は変えず，その次に優先度の順で並べる
@@ -187,7 +210,61 @@ public final class SupplementedConverter: KanaKanjiConverting {
         }
         if current.prefersKatakana { Self.preferKatakana(&result, reading: reading) }
         if current.wordLanguage.avoidsOffensive { Self.demoteOffensive(&result, reading: reading) }
+        if forList { addListExtras(to: &result, reading: reading, settings: current) }
         return result
+    }
+
+    /// 一覧と文節の候補にだけ足す候補(うろ覚えの語・発音どおりの英単語・コマンド)．どれも第 1 候補は変えない
+    private func addListExtras(to result: inout [Candidate], reading: String, settings current: Settings) {
+        guard current.looseReadings || current.phoneticSpelling || current.launcherCommands else { return }
+        if result.isEmpty { result.append(Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))) }
+        let extras = listExtras(for: reading, settings: current)
+        insert(extras.loose, into: &result, at: DefaultSettings.looseReadingCandidateOffset, reading: reading, origin: .symbol)
+        insert(extras.phonetic, into: &result, at: DefaultSettings.phoneticCandidateOffset, reading: reading, origin: .symbol)
+        guard current.launcherCommands else { return }
+        let commands = LauncherCommands.matching(reading, in: current.commands)
+            .map { Candidate(text: $0.candidateText, readingCount: reading.count, origin: .command(id: $0.id)) }
+        result.insert(contentsOf: commands, at: min(max(DefaultSettings.commandCandidateOffset, 1), result.count))
+    }
+
+    private func listExtras(for reading: String, settings current: Settings) -> (loose: [String], phonetic: [String]) {
+        if let cached = listExtrasCache[reading] { return cached }
+        let found = (loose: current.looseReadings ? looseReadingWords(for: reading) : [],
+                     phonetic: current.phoneticSpelling ? phoneticWords(for: reading) : [])
+        listExtrasCache[reading] = found
+        return found
+    }
+
+    /// うろ覚えの読みを組み替えた読みのうち，辞書の 1 語になるものの語．元の読みが 1 語になるなら探さない(正しく打っている)
+    private func looseReadingWords(for reading: String) -> [String] {
+        guard reading.unicodeScalars.allSatisfy({ (0x3041...0x3096).contains($0.value) || $0 == "ー" }), dictionaryWord(for: reading) == nil else { return [] }
+        var words: [String] = []
+        for variant in LooseReadings.variants(of: reading) {
+            if let word = dictionaryWord(for: variant), !words.contains(word) { words.append(word) }
+            if words.count >= DefaultSettings.maximumLooseReadingWords { break }
+        }
+        return words
+    }
+
+    /// 読み全体が辞書の 1 語(ひらがなだけの語は除く)になれば，その語．語の並びの分からない候補は使わない
+    private func dictionaryWord(for reading: String) -> String? {
+        base.dictionaryCandidates(for: reading).first { candidate in
+            candidate.readingCount == reading.count && candidate.words.count == 1 && candidate.words[0].readingCount == reading.count
+                && candidate.text != reading
+        }?.text
+    }
+
+    /// 読みをローマ字に直した綴り(「ふぉと」→ foto)の音を変えない置き換えのうち，英単語の辞書にあるもの
+    private func phoneticWords(for reading: String) -> [String] {
+        guard let lexicon, let keys = KanaRomanizer.keys(for: reading) else { return [] }
+        if lexicon.isWord(keys) { return [] }
+        return Array(PhoneticSpelling.variants(of: keys).lazy.filter { lexicon.isWord($0) }.prefix(DefaultSettings.maximumPhoneticWords))
+    }
+
+    /// 入れるときに中身を決める語(TextTemplate)に渡す値
+    private func templateValues() -> TextTemplate.Values {
+        TextTemplate.Values(now: calendar.now(), day: { [calendar] in calendar.day(offsetFromToday: $0) },
+                            uuid: { UUID().uuidString }, random: { Int.random(in: $0) })
     }
 
     /// かなで打った読みの第 1 候補が英語のつづり(「Live変換」)を含み，その部分をカタカナにした候補(「ライブ変換」)があれば，
@@ -255,7 +332,9 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private func userDictionaryWords(for reading: String, in entries: [UserDictionaryEntry]) -> [String] {
         // 設定を写しても配列の中身は共有されるので，変わっていなければ比べるのはすぐ済む
         if dictionaryIndex.source != entries {
-            dictionaryIndex = (entries, Dictionary(grouping: entries.filter(\.isValid), by: \.reading).mapValues { $0.map(\.word) })
+            // ローマ字の読み(「gh」「toyota」)は，打ったときと同じ読みにそろえて引く(ReadingNormalization)
+            let valid = entries.compactMap { entry in entry.isValid ? entry.lookupReading.map { ($0, entry.word) } : nil }
+            dictionaryIndex = (entries, Dictionary(grouping: valid, by: \.0).mapValues { $0.map(\.1) })
         }
         return dictionaryIndex.words[reading] ?? []
     }

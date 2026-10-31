@@ -20,12 +20,12 @@ extension SettingsView {
 
     /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(上のタブには収まらない)．並びは左の一覧の並び
     enum Page: CaseIterable, Hashable {
-        case input, conversion, correction, language, romaji, keys, apps, dictionary, symbols, appearance, usage, sync, backup, about
+        case input, conversion, correction, language, romaji, keys, apps, dictionary, symbols, commands, appearance, usage, sync, backup, about
 
         var group: Group {
             switch self {
             case .input, .conversion, .correction, .language, .romaji, .keys, .apps: .input
-            case .dictionary, .symbols: .dictionary
+            case .dictionary, .symbols, .commands: .dictionary
             case .appearance: .appearance
             case .usage, .sync, .backup: .data
             case .about: .about
@@ -41,6 +41,7 @@ extension SettingsView {
             case .symbols: UIStrings.Features.symbolsPage
             case .keys: UIStrings.Keys.tab
             case .dictionary: UIStrings.Settings.dictionaryTab
+            case .commands: UIStrings.Extras.commandsPage
             case .romaji: UIStrings.Settings.romajiTab
             case .apps: UIStrings.Settings.appsTab
             case .appearance: UIStrings.Settings.appearanceTab
@@ -66,6 +67,7 @@ extension SettingsView {
             case .symbols: "arrow.right.square"
             case .keys: "command"
             case .dictionary: "text.book.closed"
+            case .commands: "bolt.horizontal"
             case .romaji: "tablecells"
             case .apps: "nosign.app"
             case .appearance: "paintbrush"
@@ -84,14 +86,16 @@ extension SettingsView {
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Association.enabled,
                                UIStrings.Association.limit, UIStrings.Association.dictionaries]
-            case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings]
+            case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings,
+                               UIStrings.Extras.handShift, UIStrings.Extras.looseReadings, UIStrings.Extras.phoneticSpelling]
             case .language: [UIStrings.Features.englishWords, UIStrings.Features.japaneseWords, UIStrings.Features.languageRules,
                              UIStrings.Features.tryLanguage, UIStrings.Choice.label(for: .englishAuto)]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             case .keys: [UIStrings.Keys.presetMenu] + KeymapCommand.allCases.map(UIStrings.Keys.label(for:))
                 + KeymapState.allCases.map(UIStrings.Keys.label(for:)) + KeymapPreset.allCases.map(UIStrings.Keys.label(for:))
-            case .dictionary: [UIStrings.Settings.reading, UIStrings.Settings.word, UIStrings.Dictionaries.imported]
+            case .dictionary: [UIStrings.Settings.reading, UIStrings.Settings.word, UIStrings.Dictionaries.imported, UIStrings.Extras.dynamicDictionary]
+            case .commands: [UIStrings.Extras.launcherCommands, UIStrings.Extras.macrosSection, UIStrings.Extras.conversionMacros]
             case .appearance: [UIStrings.More.theme, UIStrings.More.customThemes, UIStrings.More.font]
             case .sync: [UIStrings.Sync.folder, UIStrings.Sync.scopes, UIStrings.Sync.label(for: .dictionary)]
             default: []

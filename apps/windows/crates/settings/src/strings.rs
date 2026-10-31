@@ -156,6 +156,45 @@ pub mod features {
     pub const RESTORE_DEFAULT: &str = "既定に戻す";
 }
 
+/// UIStrings.Extras
+pub mod extras {
+    pub const HAND_SHIFT: &str = "手の位置のずれを修正（試験的）";
+    pub const HAND_SHIFT_NOTE: &str = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。";
+    pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
+    pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。";
+    pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
+    pub const PHONETIC_SPELLING_NOTE: &str =
+        "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。";
+    pub const DYNAMIC_DICTIONARY: &str = "単語の {datetime:…} などを入力時の値にする";
+    pub const DYNAMIC_DICTIONARY_NOTE: &str = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。";
+    pub const COMMANDS_PAGE: &str = "コマンド";
+    pub const COMMANDS_SECTION: &str = "コマンド";
+    pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
+    pub const COMMANDS_NOTE: &str = "読みを変換すると、候補の一覧に「▶ 名前」が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
+    pub const COMMAND_READING: &str = "読み";
+    pub const COMMAND_TITLE: &str = "名前";
+    pub const COMMAND_KIND: &str = "動作";
+    pub const COMMAND_TARGET: &str = "行き先";
+    pub const COMMANDS_EMPTY: &str = "コマンドはありません";
+    pub const ADD_COMMAND: &str = "コマンドを追加…";
+    pub const EDIT_COMMAND: &str = "編集…";
+    pub const REMOVE_COMMAND: &str = "削除";
+    pub const CHOOSE_APPLICATION: &str = "アプリを選択…";
+    pub const CHOOSE_FILE: &str = "ファイルを選択…";
+    pub const INVALID_COMMAND: &str = "読み・名前・行き先を確認してください";
+    pub const TOO_MANY_COMMANDS: &str = "これ以上コマンドを追加できません";
+    pub const SAVE: &str = "保存";
+    pub const CANCEL: &str = "キャンセル";
+    pub const TARGET_PLACEHOLDER_U_R_L: &str = "https://";
+    pub const TARGET_PLACEHOLDER_SHORTCUT: &str = "ショートカットの名前";
+    pub const MACROS_SECTION: &str = "変換マクロ";
+    pub const CONVERSION_MACROS: &str = "連想変換のキーで変換マクロを表示";
+    pub const MACROS_NOTE: &str = "変換中に連想変換のキーを押すと、選んでいる語を整えた形が「整形」に並びます。{text} が語、{reading} が読みです。{text|upper} のように変換もかけられます。";
+    pub const MACRO_PATTERN: &str = "形";
+    pub const MACROS_EMPTY: &str = "マクロはありません";
+    pub const INVALID_MACRO: &str = "{text} か {reading} を含めてください";
+}
+
 /// UIStrings.More
 pub mod more {
     pub const ALPHABET_WIDTH: &str = "英字幅";
@@ -708,6 +747,11 @@ pub mod wizard {
         "「100-0001」のように郵便番号を打って変換すると、住所を出します。";
     pub const DATE: &str = "日付と時刻";
     pub const DATE_NOTE: &str = "「きょう」「あした」「いま」を変換すると、日付や時刻を出します。";
+    pub const EXTRAS_TITLE: &str = "試験的な機能";
+    pub const EXTRAS_TEXT: &str = "既定ではオフの機能です。あとから設定の画面でも変えられます。";
+    pub const MACROS: &str = "変換マクロ";
+    pub const DYNAMIC_DICTIONARY: &str = "動的なユーザー辞書";
+    pub const COMMANDS: &str = "コマンド";
     pub const APPEARANCE_TITLE: &str = "外観";
     pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
     pub const DONE_TITLE: &str = "準備ができました";
