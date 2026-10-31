@@ -80,14 +80,14 @@ try:
 fetch-evaluation:
 	tools/evaluation/fetch_ajimee.sh "$(EVALUATION_DIR)"
 
-# かな漢字変換の正解率と MinCER を測る．Zenzai のモデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
+# かな漢字変換の正解率・上位の候補に正解が入った割合・MinCER を，文(conversion-basic と AJIMEE-Bench)と語彙(vocabulary-*)で測る．Zenzai のモデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
 evaluate:
 	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
 	swift build --package-path core -c release --product hajime-playground
 	@options=; if [ -f "$(ZENZAI_MODEL)" ]; then options="--zenzai $(abspath $(ZENZAI_MODEL))"; fi; \
 	if [ -n "$(DICTIONARY)" ]; then options="$$options --dictionary $(abspath $(DICTIONARY))"; fi; \
 	bin=$$(swift build --package-path core -c release --show-bin-path); \
-	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv"; do \
+	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv" core/Evaluation/vocabulary-*.tsv; do \
 		echo "== $$file"; \
 		"$$bin/hajime-playground" --evaluate "$$file" $$options 2>/dev/null | tail -1; \
 	done
