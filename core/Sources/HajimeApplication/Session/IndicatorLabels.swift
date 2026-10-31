@@ -48,6 +48,7 @@ public enum IndicatorLabels {
         Hint(.shrinkSegment, .extendSegment, "区切り調整"),
         Hint(.shrinkSegmentToWord, .extendSegmentToWord, "単語ごと"),
         Hint(.splitSegment, "区切り"),
+        Hint(.editSegment, "打ち直し"),
     ]
 
     /// 連想の一覧の足元の案内

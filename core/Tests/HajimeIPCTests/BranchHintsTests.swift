@@ -20,6 +20,7 @@ struct BranchHintsTests {
         var settings = DefaultSettings.settings
         let hints = BranchHints.make(for: panel, settings: settings)
         #expect(hints.contains { $0.label == "候補" && !$0.keys.isEmpty })
+        #expect(hints.contains { $0.label == "打ち直し" && $0.keys == BranchHints.label(of: KeyStroke(.backspace, shift: true)) })
         settings.showsKeyHints = false
         #expect(BranchHints.make(for: panel, settings: settings).isEmpty)
     }
