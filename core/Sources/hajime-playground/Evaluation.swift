@@ -89,6 +89,9 @@ enum Evaluation {
             let session = newSession(engine, context: item.leftContext)
             let final = best(session, item.reading)
             var mistakes: [String] = []
+            // 打鍵が止まる前の表示として求める(アプリと同じく，併用なら速いモデル，Zenzai が遅い環境なら Zenzai なしで求める)
+            session.setTyping(true)
+            defer { session.setTyping(false) }
             for length in 1..<item.reading.count {
                 let prefix = String(item.reading.prefix(length))
                 let candidate = session.candidates(for: prefix).first { $0.readingCount == prefix.count }

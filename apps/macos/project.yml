@@ -59,8 +59,10 @@ targets:
         inputFiles:
           - $(SRCROOT)/../../tools/macos/copy_zenzai_model.sh
           - $(SRCROOT)/../../../models/zenz-v3.2-small-Q5_K_M.gguf
+          - $(SRCROOT)/../../../models/zenz-v3.2-xsmall-Q5_K_M.gguf
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-small-Q5_K_M.gguf
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-xsmall-Q5_K_M.gguf
       - name: かな漢字変換の辞書を入れる
         path: ../../tools/macos/copy_dictionary.sh
         inputFiles:

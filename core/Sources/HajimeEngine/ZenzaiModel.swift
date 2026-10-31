@@ -12,11 +12,39 @@ public struct ZenzaiModel: Sendable, Equatable {
         case hashMismatch
     }
 
-    /// Miwa-Keita/zenz-v3.2-small-gguf(Apache-2.0)の ggml-model-Q5_K_M.gguf．
-    /// Hugging Face のコミット c67e03e07d215c869f591b274c1631170d3e11fe
-    public static let expectedSHA256 = "29c223d4c23327b80fd13ebb5ab2555057a46317997d5da391584ffbef0db673"
-    public static let expectedSize = 73_871_936
-    public static let fileName = "zenz-v3.2-small-Q5_K_M.gguf"
+    /// 使えるモデルの種類．どれも zenz の v3 の形式で，同じ使い方で読める
+    public enum Variant: String, Sendable, Equatable, CaseIterable {
+        /// Miwa-Keita/zenz-v3.2-small-gguf(Apache-2.0)の ggml-model-Q5_K_M.gguf．Hugging Face のコミット c67e03e07d215c869f591b274c1631170d3e11fe
+        case small
+        /// Miwa-Keita/zenz-v3.2-xsmall-gguf(Apache-2.0)の ggml-model-Q5_K_M.gguf．Hugging Face のコミット 4f5423f0fad41a73b1242eb96fe5c12ae4fdca83．
+        /// small より小さく速いが，変換の精度は下がる
+        case xsmall
+
+        public var fileName: String {
+            switch self {
+            case .small: "zenz-v3.2-small-Q5_K_M.gguf"
+            case .xsmall: "zenz-v3.2-xsmall-Q5_K_M.gguf"
+            }
+        }
+
+        public var expectedSHA256: String {
+            switch self {
+            case .small: "29c223d4c23327b80fd13ebb5ab2555057a46317997d5da391584ffbef0db673"
+            case .xsmall: "00c64b3d318045a708d0cad5434faccab10f5481a49e6362864551fd0995fa58"
+            }
+        }
+
+        public var expectedSize: Int {
+            switch self {
+            case .small: 73_871_936
+            case .xsmall: 20_970_304
+            }
+        }
+    }
+
+    public static let expectedSHA256 = Variant.small.expectedSHA256
+    public static let expectedSize = Variant.small.expectedSize
+    public static let fileName = Variant.small.fileName
 
     public let url: URL
 
@@ -32,8 +60,8 @@ public struct ZenzaiModel: Sendable, Equatable {
     static let separateContextFragment = "typo"
 
     /// ファイルを確かめてから作る．大きさとハッシュのどちらかが違えば使わない
-    public static func verified(at url: URL) throws(VerificationError) -> ZenzaiModel {
-        try verified(at: url, expectedSize: expectedSize, expectedSHA256: expectedSHA256)
+    public static func verified(at url: URL, variant: Variant = .small) throws(VerificationError) -> ZenzaiModel {
+        try verified(at: url, expectedSize: variant.expectedSize, expectedSHA256: variant.expectedSHA256)
     }
 
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため

@@ -58,6 +58,7 @@ final class CompositionRoot {
         let zenzai = loadZenzaiModel()
         let memory = support.appendingPathComponent("memory", isDirectory: true)
         let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai,
+                                                fastZenzai: loadZenzaiModel(.xsmall),
                                                 dictionaryDirectory: loadBundledDictionary()?.url)
         // 打ち間違いの訂正は時間がかかるので，別の変換器でメインスレッドの外で求める(Zenzai があるときだけ)
         let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: AppIdentity.versionString) }
@@ -93,16 +94,16 @@ final class CompositionRoot {
         }
     }
 
-    /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければ Zenzai なしで動く
-    private static func loadZenzaiModel() -> ZenzaiModel? {
+    /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければそのモデルなしで動く(small が無ければ Zenzai なし)
+    private static func loadZenzaiModel(_ variant: ZenzaiModel.Variant = .small) -> ZenzaiModel? {
         guard let url = Bundle.main.resourceURL?
             .appendingPathComponent("Zenzai", isDirectory: true)
-            .appendingPathComponent(ZenzaiModel.fileName) else { return nil }
+            .appendingPathComponent(variant.fileName) else { return nil }
         do {
-            return try ZenzaiModel.verified(at: url)
+            return try ZenzaiModel.verified(at: url, variant: variant)
         } catch {
             Logger(subsystem: AppIdentity.bundleIdentifier, category: "zenzai")
-                .notice("Zenzai を使いません: \(String(describing: error), privacy: .public)")
+                .notice("Zenzai(\(variant.rawValue, privacy: .public))を使いません: \(String(describing: error), privacy: .public)")
             return nil
         }
     }

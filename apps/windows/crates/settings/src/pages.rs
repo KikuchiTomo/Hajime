@@ -944,6 +944,13 @@ fn conversion() -> Vec<Section> {
             ],
         ),
         Section::new(
+            settings::ZENZAI_MODEL,
+            vec![
+                Row::choice(settings::ZENZAI_MODEL, "zenzaiModel", options::ZENZAI_MODELS),
+                Row::note(settings::ZENZAI_MODEL_NOTE),
+            ],
+        ),
+        Section::new(
             settings::LEARNING,
             vec![
                 Row::choice(settings::LEARNING, "learning", options::LEARNING),

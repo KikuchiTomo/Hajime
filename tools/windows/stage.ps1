@@ -36,6 +36,7 @@ foreach ($file in @('llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'g
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Zenzai') | Out-Null
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
+Copy-Item (Join-Path $Zenzai 'zenz-v3.2-xsmall-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
 
 # かな漢字変換の辞書(エンジンは Dictionary\ から読み，ファイルごとのハッシュを確かめ直す)と，辞書のライセンスの表示
 Copy-Item (Join-Path $Dictionary 'Dictionary') (Join-Path $Output 'Dictionary') -Recurse -Force
@@ -53,7 +54,7 @@ Copy-Item (Join-Path $Dictionary 'NOTICE.md') (Join-Path $Output 'LICENSES\hajim
 Copy-Item (Join-Path $Dictionary 'LICENSES\*') (Join-Path $Output 'LICENSES\hajime-dictionary')
 
 $required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv', 'usage_dict.txt',
-    'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
+    'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'Zenzai\zenz-v3.2-xsmall-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
     'Dictionary\SHA256SUMS', 'Dictionary\louds\charID.chid', 'LICENSES\hajime-dictionary\NOTICE.md', 'LICENSES\hajime-dictionary\Mozc-LICENSE.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
 foreach ($file in $required) {

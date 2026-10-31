@@ -86,7 +86,8 @@
     "typoCorrection",
     "userDictionary",
     "wordLanguage",
-    "yenKey"
+    "yenKey",
+    "zenzaiModel"
   ],
   "latestReleaseURL" : "https://github.com/KikuchiTomo/Hajime/releases/latest",
   "limits" : {

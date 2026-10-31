@@ -16,7 +16,11 @@ public final class AzooKeyConverterEngine {
     private let converter: KanaKanjiConverter
     private let memoryDirectory: URL
     private let versionString: String
-    private let zenzai: ZenzaiModel?
+    /// 精度を優先するモデル(small)と，速さを優先するモデル(xsmall)．どちらも確かめ済み．無ければ nil
+    private let accurateZenzai: ZenzaiModel?
+    private let fastZenzai: ZenzaiModel?
+    /// 設定で選んだモデルの使い方(apply(_:) で入れ替える)
+    private var zenzaiChoice = ZenzaiModelChoice.accurate
     /// 変換に効く設定(学習・日付・絵文字)．apply(_:) で入れ替える
     private var learningType: LearningType = .inputAndOutput
     /// 絵文字の辞書は読み込みが重いので，一度だけ作って使い回す
@@ -31,9 +35,11 @@ public final class AzooKeyConverterEngine {
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
     ///   - versionString: エンジンに渡すアプリのバージョンの文字列
-    ///   - zenzai: 確かめ済みの Zenzai のモデル．nil なら Zenzai を使わない
+    ///   - zenzai: 確かめ済みの Zenzai のモデル(small)．nil なら Zenzai を使わない
+    ///   - fastZenzai: 確かめ済みの速さを優先する Zenzai のモデル(xsmall)．nil なら設定にかかわらず zenzai だけを使う
     ///   - dictionaryDirectory: かな漢字変換の辞書(louds/・cb/・p/・mm.binary を持つディレクトリ)．nil なら azooKey に同梱の辞書を使う
-    public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil, dictionaryDirectory: URL? = nil) throws {
+    public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil, fastZenzai: ZenzaiModel? = nil,
+                dictionaryDirectory: URL? = nil) throws {
         // 辞書の場所を誤ると，エンジンは何も言わずに語の無い状態で動き，変換がほぼすべて読みのままになる．作る前に止める
         if let dictionaryDirectory {
             let charID = dictionaryDirectory.appendingPathComponent("louds/charID.chid", isDirectory: false)
@@ -46,7 +52,8 @@ public final class AzooKeyConverterEngine {
         )
         self.memoryDirectory = memoryDirectory
         self.versionString = versionString
-        self.zenzai = zenzai
+        self.accurateZenzai = zenzai
+        self.fastZenzai = fastZenzai
         self.converter = dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary()
     }
 
@@ -111,6 +118,11 @@ public final class AzooKeyConverterEngine {
         case .disabled: .nothing
         }
         usesEmoji = settings.emojiConversion
+        if settings.zenzaiModel != zenzaiChoice {
+            zenzaiChoice = settings.zenzaiModel
+            // 測った時間は前のモデルのものなので，選び直したモデルで測り直す
+            zenzaiCost = nil
+        }
         // かなにならない読み(「gh」)と，入れる時に中身を決める語(TextTemplate)は，文の中の語として渡さない．
         // SupplementedConverter が読み全体の一致で候補に出す
         let entries = settings.userDictionary
@@ -167,8 +179,22 @@ public final class AzooKeyConverterEngine {
 
     public var usesZenzai: Bool { zenzai != nil }
 
-    private func zenzaiMode(leftContext: String?) -> ConvertRequestOptions.ZenzaiMode {
-        guard let zenzai else { return .off }
+    /// 打鍵が止まったときと変換(Space)に使うモデル．速さを優先するときだけ xsmall
+    var zenzai: ZenzaiModel? {
+        switch zenzaiChoice {
+        case .fast: fastZenzai ?? accurateZenzai
+        case .accurate, .combined: accurateZenzai ?? fastZenzai
+        }
+    }
+
+    /// 打っている間の表示に別に使うモデル．併用のときの xsmall．nil なら打っている間も zenzai を使う
+    var typingZenzai: ZenzaiModel? {
+        guard zenzaiChoice == .combined, accurateZenzai != nil else { return nil }
+        return fastZenzai
+    }
+
+    private func zenzaiMode(leftContext: String?, model: ZenzaiModel?) -> ConvertRequestOptions.ZenzaiMode {
+        guard let zenzai = model else { return .off }
         return .on(
             weight: zenzai.url,
             inferenceLimit: DefaultSettings.zenzaiInferenceLimit,
@@ -180,7 +206,9 @@ public final class AzooKeyConverterEngine {
         )
     }
 
-    fileprivate func options(leftContext: String?, usesZenzai: Bool = true, candidateCount: Int = DefaultSettings.engineCandidateCount) -> ConvertRequestOptions {
+    /// - Parameter usesTypingModel: 打っている間の表示を求めるとき true．併用なら xsmall で求める
+    fileprivate func options(leftContext: String?, usesZenzai: Bool = true, usesTypingModel: Bool = false,
+                             candidateCount: Int = DefaultSettings.engineCandidateCount) -> ConvertRequestOptions {
         ConvertRequestOptions(
             N_best: candidateCount,
             requireJapanesePrediction: .disabled,
@@ -196,7 +224,7 @@ public final class AzooKeyConverterEngine {
             // 和暦と西暦の読み替え(「れいわ8ねん」→「2026年」)や数の桁区切りは azooKey が出す．
             // 「きょう」→ 日付の候補は SupplementedConverter が出す(設定の dateConversion)
             specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
-            zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext) : .off,
+            zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext, model: usesTypingModel ? typingZenzai ?? zenzai : zenzai) : .off,
             metadata: .init(versionString: versionString)
         )
     }
@@ -570,20 +598,22 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     private func request(_ reading: String) -> Result? {
         guard !reading.isEmpty else { return nil }
-        // Zenzai が遅い環境では，打鍵が止まる前の表示を Zenzai なしで求める．その結果は止まったときに求め直すので，
-        // Zenzai を使った結果とは別のキーで覚える(Zenzai を使った結果があればそれを使う)
-        let skipsZenzai = typing && engine.usesZenzai && engine.skipsZenzaiWhileTyping
+        // 併用のときは，打鍵が止まる前の表示を速いモデル(xsmall)で求める．
+        // そうでなく Zenzai が遅い環境では，打鍵が止まる前の表示を Zenzai なしで求める．
+        // どちらの結果も止まったときに求め直すので，止まったときの結果とは別のキーで覚える(止まったときの結果があればそれを使う)
+        let usesTypingModel = typing && engine.typingZenzai != nil
+        let skipsZenzai = typing && !usesTypingModel && engine.usesZenzai && engine.skipsZenzaiWhileTyping
         // ライブ変換の表示と候補一覧で同じ読みを続けて求めることが多いので，結果を使い回す
         if let cached = cache[reading] { return cached }
-        let key = skipsZenzai ? Self.typingCacheKey(reading) : reading
+        let key = skipsZenzai || usesTypingModel ? Self.typingCacheKey(reading) : reading
         if let cached = cache[key] { return cached }
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        var options = engine.options(leftContext: leftContext, usesZenzai: !skipsZenzai)
+        var options = engine.options(leftContext: leftContext, usesZenzai: !skipsZenzai, usesTypingModel: usesTypingModel)
         if learningSuspended { options.learningType = .nothing }
         // azooKey は前に求めた読みからの差分で変換を進める．前の読みの続きでない読み(文節ごとの残りの読みなど)を
         // そのまま渡すと前の結果が混ざる(「ひとだ」→「非とだ」)ので，続きでなければ状態を捨ててから求める
-        let stream = stream(for: reading, skipsZenzai: skipsZenzai)
+        let stream = stream(for: reading, separatesTyping: skipsZenzai || usesTypingModel)
         let previous = switch stream {
         case .typing: lastTypingRequested
         case .sentence: lastRequested
@@ -629,7 +659,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
 
     /// 変換を求めるセッションの流れ
     private enum Stream {
-        /// 打鍵が止まる前の表示(Zenzai なし)
+        /// 打鍵が止まる前の表示(Zenzai なしか，併用のときの速いモデル)
         case typing
         /// 打っている文．前の読みの続きを差分で変換する
         case sentence
@@ -637,12 +667,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         case rest
     }
 
-    private func stream(for reading: String, skipsZenzai: Bool) -> Stream {
-        if skipsZenzai { return .typing }
+    private func stream(for reading: String, separatesTyping: Bool) -> Stream {
+        if separatesTyping { return .typing }
         return lastRequested.map(reading.hasPrefix) ?? true ? .sentence : .rest
     }
 
-    /// Zenzai を使わずに求めた入力中の表示を覚えるキー(読みの前に読みには出ない文字を付ける)
+    /// 打鍵が止まる前に求めた表示(Zenzai なしか，併用のときの速いモデル)を覚えるキー(読みの前に読みには出ない文字を付ける)
     nonisolated static func typingCacheKey(_ reading: String) -> String {
         "\u{0}" + reading
     }

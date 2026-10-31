@@ -60,13 +60,13 @@ func loadBundledDictionary() -> BundledDictionary? {
 
 /// インストール先の Zenzai\ に置いたモデルを確かめて読む．無いか，大きさとハッシュが合わなければ Zenzai なしで動く
 @MainActor
-func loadZenzaiModel() -> ZenzaiModel? {
-    let url = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.fileName)
+func loadZenzaiModel(_ variant: ZenzaiModel.Variant = .small) -> ZenzaiModel? {
+    let url = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(variant.fileName)
     do {
-        return try ZenzaiModel.verified(at: url)
+        return try ZenzaiModel.verified(at: url, variant: variant)
     } catch {
         // 中身は書かない(ファイルの場所と理由だけ)
-        FileHandle.standardError.write(Data("Zenzai を使いません: \(error)\n".utf8))
+        FileHandle.standardError.write(Data("Zenzai(\(variant.rawValue))を使いません: \(error)\n".utf8))
         return nil
     }
 }
@@ -137,6 +137,7 @@ func run() -> Int32 {
     let engine: AzooKeyConverterEngine
     do {
         engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: HostPaths.versionString, zenzai: zenzai,
+                                            fastZenzai: loadZenzaiModel(.xsmall),
                                             dictionaryDirectory: loadBundledDictionary()?.url)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))

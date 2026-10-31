@@ -414,6 +414,8 @@ enum UIStrings {
         static let emojiConversion = "絵文字に変換"
         static let latexConversion = "LaTeX のコマンドに変換"
         static let learning = "学習"
+        static let zenzaiModel = "Zenzai のモデル"
+        static let zenzaiModelNote = "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。"
         static let resetLearning = "学習結果を消去"
         static let reading = "読み"
         static let word = "単語"
@@ -444,6 +446,14 @@ enum UIStrings {
             switch width {
             case .halfwidth: "半角"
             case .fullwidth: "全角"
+            }
+        }
+
+        static func label(for choice: ZenzaiModelChoice) -> String {
+            switch choice {
+            case .accurate: "精度を優先"
+            case .fast: "速さを優先"
+            case .combined: "併用"
             }
         }
 
@@ -902,7 +912,7 @@ extension UIStrings {
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion,
-            "latexConversion": UIStrings.Settings.latexConversion, "learning": UIStrings.Settings.learning,
+            "latexConversion": UIStrings.Settings.latexConversion, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
             "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,

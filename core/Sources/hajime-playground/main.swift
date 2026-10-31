@@ -1,5 +1,6 @@
 import Foundation
 import HajimeDomain
+import HajimeEngine
 
 // 入力メソッドとして入れずに，ターミナルで変換を試し，精度を測る道具(make try)．composition root のひとつ．
 //
@@ -18,11 +19,17 @@ import HajimeDomain
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
+// --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
+// --zenzai-fast <xsmall のモデル> と --zenzai-model accurate|fast|combined で，設定の「Zenzai のモデル」を試す
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
     do {
-        let playground = try PlaygroundEngine(zenzaiPath: arguments.value(of: "--zenzai"), dictionaryPath: arguments.value(of: "--dictionary"))
+        let playground = try PlaygroundEngine(zenzaiPath: arguments.value(of: "--zenzai"),
+                                              zenzaiVariant: arguments.value(of: "--zenzai-variant").flatMap(ZenzaiModel.Variant.init(rawValue:)) ?? .small,
+                                              fastZenzaiPath: arguments.value(of: "--zenzai-fast"),
+                                              zenzaiChoice: arguments.value(of: "--zenzai-model").flatMap(ZenzaiModelChoice.init(rawValue:)),
+                                              dictionaryPath: arguments.value(of: "--dictionary"))
         defer { playground.removeMemory() }
         print("Zenzai: \(playground.engine.usesZenzai ? "あり" : "なし")")
         if let file = arguments.value(of: "--evaluate") {

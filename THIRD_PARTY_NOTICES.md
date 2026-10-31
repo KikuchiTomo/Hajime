@@ -505,6 +505,10 @@ https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
    END OF TERMS AND CONDITIONS
 ```
 
+## Zenzai(zenz-v3.2-xsmall)
+
+https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf(コミット 4f5423f0fad41a73b1242eb96fe5c12ae4fdca83 の ggml-model-Q5_K_M.gguf)．設定の「Zenzai のモデル」で速さを優先するときと併用するときに使う．ライセンスは上の zenz-v3.2-small と同じ Apache License 2.0(全文は上の節)．
+
 ## llama.cpp
 
 https://github.com/ggml-org/llama.cpp

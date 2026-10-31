@@ -81,6 +81,9 @@ pub const OKURIGANA: &[Choice] = &[
     ("engine", "変換の順のまま"),
 ];
 
+/// かな漢字変換に使う Zenzai のモデル(ZenzaiModelChoice)．UIStrings.Settings.label(for: ZenzaiModelChoice)
+pub const ZENZAI_MODELS: &[Choice] = &[("accurate", "精度を優先"), ("fast", "速さを優先"), ("combined", "併用")];
+
 pub const LEARNING: &[Choice] = &[
     ("enabled", "学習する"),
     ("readOnly", "学習結果のみ使用"),
@@ -225,6 +228,7 @@ mod tests {
             CORRECTION_SENSITIVITY,
             OKURIGANA,
             LEARNING,
+            ZENZAI_MODELS,
             THEMES,
             WORD_LANGUAGES,
             WORD_CONTEXTS,

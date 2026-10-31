@@ -223,6 +223,13 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
             }
+            Section {
+                ResettablePicker(model: model, title: UIStrings.Settings.zenzaiModel, keyPath: \.zenzaiModel, label: UIStrings.Settings.label(for:))
+            } header: {
+                Text(UIStrings.Settings.zenzaiModel)
+            } footer: {
+                Text(UIStrings.Settings.zenzaiModelNote)
+            }
             Section(UIStrings.Settings.learning) {
                 ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))
                 Button(UIStrings.Settings.resetLearning, role: .destructive) { model.resetLearning() }
