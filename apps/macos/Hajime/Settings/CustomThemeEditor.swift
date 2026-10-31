@@ -69,12 +69,7 @@ struct CustomThemeEditor: View {
                     Picker(UIStrings.More.branchStyle, selection: $theme.branchStyle) {
                         ForEach(CustomTheme.BranchStyle.allCases, id: \.self) { Text(UIStrings.More.label(for: $0)).tag($0) }
                     }
-                    Picker(UIStrings.More.font, selection: $theme.fontName) {
-                        Text(UIStrings.More.themeFont).tag(String?.none)
-                        ForEach(Self.fonts, id: \.self) { font in
-                            Text(NSFont(name: font, size: 13)?.displayName ?? font).tag(String?.some(font))
-                        }
-                    }
+                    ThemeFontPicker(fontName: $theme.fontName)
                 }
             }
             .formStyle(.grouped)
@@ -103,12 +98,6 @@ struct CustomThemeEditor: View {
         }
         .frame(width: DesignTokens.Size.Settings.themeEditorWidth, height: DesignTokens.Size.Settings.themeEditorHeight)
     }
-
-    /// 選べる候補の書体．この Mac にあるものだけ
-    private static let fonts = [
-        "HiraginoSans-W3", "HiraginoSans-W6", "HiraMinProN-W3", "HiraMinProN-W6", "HiraMaruProN-W4",
-        "YuGothic-Medium", "YuMincho-Regular", "ToppanBunkyuGothicPr6N-DB", "ToppanBunkyuMinchoPr6N-RG", "Osaka", "Menlo-Regular",
-    ].filter { NSFont(name: $0, size: 13) != nil }
 
     /// 色を選ぶ行．読みにくい組み合わせに入る色には印を付ける
     private func color(_ title: String, _ keyPath: WritableKeyPath<CustomTheme, HexColor>, warns: Bool = false) -> some View {

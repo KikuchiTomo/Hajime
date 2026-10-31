@@ -176,6 +176,16 @@ enum SnapshotRenderer {
         editor.frame = NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.themeEditorWidth, height: DesignTokens.Size.Settings.themeEditorHeight)
         editor.layoutSubtreeIfNeeded()
         render(editor, name: "settings-theme-editor", to: output, appearance: NSAppearance(named: .aqua))
+        // 書体のファミリーとスタイル(太さ)を選んだときの行と見本
+        theme.fontName = "HiraginoSans-W8"
+        let font = NSHostingView(rootView: VStack(spacing: 0) {
+            ThemePreview(choice: ThemeChoice(theme.base, custom: theme), fontSize: fixture.model.settings.candidateFontSize)
+                .padding(DesignTokens.Size.Settings.previewPadding)
+            Form { ThemeFontPicker(fontName: .constant(theme.fontName)) }.formStyle(.grouped)
+        }.frame(width: DesignTokens.Size.Settings.themeEditorWidth))
+        font.frame = NSRect(origin: .zero, size: font.fittingSize)
+        font.layoutSubtreeIfNeeded()
+        render(font, name: "settings-theme-font", to: output, appearance: NSAppearance(named: .aqua))
     }
 
     /// キー設定のページ(R-17)．edited なら，重なった行・文字のキー・取り消しの無い状態の印が出る表にする
