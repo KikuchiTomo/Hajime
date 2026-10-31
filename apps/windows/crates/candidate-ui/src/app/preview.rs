@@ -88,15 +88,28 @@ impl Preview {
             Placement::TopLeft { .. } => Surround::Bare,
         };
         let mut scene = scene::surround(scene, theme, surround);
-        if let Placement::TopLeft { ground } = placement {
-            // 角の丸みの外を地の色で塗る(画像は不透明)
-            scene.draws.insert(
-                0,
-                Draw::Rect {
-                    frame: Frame::new(0.0, 0.0, scene.width, scene.height),
-                    color: Color::rgb(ground),
-                },
-            );
+        match placement {
+            Placement::TopLeft { ground } => {
+                // 角の丸みの外を地の色で塗る(画像は不透明)
+                scene.draws.insert(
+                    0,
+                    Draw::Rect {
+                        frame: Frame::new(0.0, 0.0, scene.width, scene.height),
+                        color: Color::rgb(ground),
+                    },
+                );
+            }
+            Placement::Center => {
+                // 下地は設定の画面のカードと同じく角を丸める．丸みの外は設定の画面が塗った地の色のまま残る
+                if let Some(Draw::Rect { frame, color }) = scene.draws.first().cloned() {
+                    scene.draws[0] = Draw::RoundRect {
+                        frame,
+                        radius: tokens::size::settings_windows::CARD_RADIUS,
+                        fill: Some(color),
+                        stroke: None,
+                    };
+                }
+            }
         }
         let available_width = (rect.right - rect.left).max(0) as f32;
         let available_height = (rect.bottom - rect.top).max(0) as f32;
