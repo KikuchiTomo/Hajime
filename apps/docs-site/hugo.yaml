@@ -32,9 +32,6 @@ module:
       target: assets
     - source: i18n
       target: i18n
-    # 利用者向けの文書をそのまま「ドキュメント」の節にする．usage.md のような相対リンクは Hextra が URL に直す
-    - source: ../../docs/user
-      target: content/docs
 
 markup:
   goldmark:
@@ -60,6 +57,11 @@ menu:
       url: https://github.com/KikuchiTomo/Hajime
       params:
         icon: github
+  # ドキュメントの横の一覧の下に出す．ページはサイトの直下(/privacy/)
+  sidebar:
+    - name: プライバシーポリシー
+      pageRef: /privacy
+      weight: 1
 
 params:
   images:
@@ -99,6 +101,6 @@ params:
 
   editURL:
     enable: true
-    base: https://github.com/KikuchiTomo/Hajime/edit/main/docs/user
+    base: https://github.com/KikuchiTomo/Hajime/edit/main/apps/docs-site/content
 
   displayUpdatedDate: false

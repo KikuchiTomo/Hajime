@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "¥ キーで \\ を入力する方法をユーザー向けに書いて",
-      "expected_output": "docs/user/how-to/ に frontmatter つきで置き，前提・手順・確かめ方の形で書く",
+      "expected_output": "apps/docs-site/content/docs/ に frontmatter つきで置く",
       "files": []
     },
     {
