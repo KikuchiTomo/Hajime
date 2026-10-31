@@ -25,8 +25,8 @@ layout: hextra-home
 </div>
 
 <div class="hajime-hero__buttons">
-{{< hajime/download ext="pkg" text="macOS 版をダウンロード" >}}
-{{< hajime/download ext="msi" text="Windows 版をダウンロード" style="background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor;" >}}
+{{< hajime/download platform="macos" ext="pkg" text="macOS 版をダウンロード" >}}
+{{< hajime/download platform="windows" ext="msi" text="Windows 版をダウンロード" style="background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor;" >}}
 </div>
 
 <p class="hajime-hero__note">macOS 14 / Windows 10 22H2 (64bit) 以降 <a href="docs/install/">インストールの手順についてはこちら</a></p>

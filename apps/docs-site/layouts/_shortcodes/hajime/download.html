@@ -1,17 +1,18 @@
 {{- /*
-最新のリリースから，拡張子が ext の配布物へ直接リンクするボタン．
-@example {{< hajime/download ext="pkg" text="macOS 版をダウンロード" >}}
+最新の配布物(https://haji.men/download/<platform>．最新のバージョンへ転送する)へリンクするボタン．
+バージョンは，最新のリリースにある拡張子が ext の配布物から読む．
+@example {{< hajime/download platform="macos" ext="pkg" text="macOS 版をダウンロード" >}}
 */ -}}
+{{- $platform := .Get "platform" -}}
 {{- $ext := .Get "ext" -}}
 {{- $text := .Get "text" -}}
 {{- $style := .Get "style" -}}
 
-{{- $href := "https://github.com/KikuchiTomo/Hajime/releases/latest" -}}
+{{- $href := printf "/download/%s" $platform -}}
 {{- $version := "" -}}
 {{- $release := partialCached "hajime/latest-release.html" . -}}
 {{- range $release.assets -}}
   {{- if strings.HasSuffix .name (printf ".%s" $ext) -}}
-    {{- $href = .browser_download_url -}}
     {{- $version = $release.tag_name -}}
   {{- end -}}
 {{- end -}}

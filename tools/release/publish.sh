@@ -7,16 +7,8 @@ set -eu
 tag=$1
 version=$2
 dist=$3
-# 両方の OS の配布物がそろっていなければ置かない
-for pattern in '*.pkg' '*.msi'; do
-  if [ -z "$(find "$dist" -maxdepth 1 -type f -name "$pattern")" ]; then
-    echo "配布物($pattern)がありません: $dist" >&2
-    exit 1
-  fi
-done
+"$(dirname "$0")/checksums.sh" "$dist"
 files=$(find "$dist" -maxdepth 1 -type f \( -name '*.pkg' -o -name '*.msi' \) | sort)
-# shellcheck disable=SC2086,SC2046 # ファイル名に空白は無い(Hajime-<バージョン>.pkg・.msi)
-(cd "$dist" && sha256sum $(for file in $files; do basename "$file"; done) > SHA256SUMS.txt)
 repository=${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}
 previous=$(git ls-remote --tags --refs origin 'refs/tags/v*' | sed 's|.*refs/tags/||' | sort -V | awk -v tag="$tag" '$0 == tag { print last; exit } { last = $0 }')
 if [ -n "$previous" ]; then
