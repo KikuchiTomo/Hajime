@@ -98,6 +98,16 @@ struct CompositionTests {
         #expect(composition.isEmpty)
     }
 
+    @Test("消したキーで決まったかなや英字は，打ちかけのローマ字に戻る(sk → s → sya は しゃ)", arguments: [
+        ("mondaisk", "ya", "もんだいしゃ"), ("tt", "a", "た"), ("kank", "a", "かな"), ("ska", "ya", "しゃ"), ("pyth", "on", "pyとん"),
+    ])
+    func backspaceReopensPending(typed: String, retyped: String, expected: String) {
+        var composition = compose(typed)
+        composition.deleteBackward()
+        for key in retyped { composition.insertRomaji(key) }
+        #expect(composition.conversionReading == expected)
+    }
+
     @Test("先頭だけ確定すると残りの読みになる")
     func dropPrefix() {
         var composition = compose("kyouhaame")

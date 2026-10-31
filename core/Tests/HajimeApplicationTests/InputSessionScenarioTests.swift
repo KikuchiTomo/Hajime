@@ -2335,4 +2335,13 @@ struct TerminalUnknownLineTests {
         for key in "git" { _ = session.handle(KeyEvent(.character(key)), context: terminal) }
         #expect(session.handle(KeyEvent(.space), context: terminal).actions.contains(.commit("git ")))
     }
+
+    @Test("Backspace で消したキーで英字になった文字は，打ちかけに戻る(「問題sk」→ ⌫ →「ya」は 問題しゃ)")
+    func backspaceReopensRomaji() {
+        let harness = Harness(converter: FakeConverter())
+        harness.type("mondaisk")
+        harness.press(.backspace)
+        harness.type("ya")
+        #expect(harness.marked.text == "もんだいしゃ")
+    }
 }
