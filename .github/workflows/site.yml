@@ -88,7 +88,7 @@ jobs:
       name: cloudflare
       url: https://haji.men
     steps:
-      # wrangler の版(package-lock.json)と配信の設定(wrangler.jsonc)だけを取り出す
+      # wrangler の版(package-lock.json)と配信の設定(wrangler.jsonc)と Worker(worker/)だけを取り出す
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -97,6 +97,7 @@ jobs:
             apps/docs-site/package.json
             apps/docs-site/package-lock.json
             apps/docs-site/wrangler.jsonc
+            apps/docs-site/worker/
           sparse-checkout-cone-mode: false
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -107,7 +108,7 @@ jobs:
 
       - name: wrangler を入れる
         working-directory: apps/docs-site
-        # 依存のインストールスクリプトは動かさない(Worker のコードが無いので bundle せず，要らない)
+        # 依存のインストールスクリプトは動かさない(Worker は bundle しない．wrangler.jsonc の no_bundle)
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Cloudflare Workers に置く
