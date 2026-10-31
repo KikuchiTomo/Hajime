@@ -26,4 +26,56 @@ public struct LiveConversionRule: Sendable {
         guard shown != tail else { return candidate.text }
         return String(candidate.text.dropLast(word.textCount)) + tail
     }
+
+    /// 打っている途中の文(candidate)の先頭を，前に打鍵が止まったときに見せた文(settled)に合わせる．
+    /// 止まったときは時間をかけて求める(Zenzai)ので，打っている途中の速い変換とは先頭の語が違うことがある(打って ↔ 売って)．
+    /// 打つたびに先頭が入れ替わるとちらつくので，両方の語の区切りが合う位置までは止まったときの文を使う．
+    /// settled の読みが reading の先頭でないとき，語の区切りが分からないとき，合う区切りが無いときは candidate の文のまま
+    /// - Parameters:
+    ///   - candidate: 読み全体の第 1 候補(打っている途中の速い変換)
+    ///   - reading: 読み(かな)
+    ///   - settled: 前に打鍵が止まったときの読み全体の第 1 候補と，その読み
+    public func stabilized(_ candidate: Candidate, reading: String, settled: (candidate: Candidate, reading: String)?) -> Candidate {
+        guard let settled, settled.reading.count < reading.count, reading.hasPrefix(settled.reading),
+              let before = Self.boundaries(of: settled.candidate), let now = Self.boundaries(of: candidate) else { return candidate }
+        // 両方の文で語が切れる，いちばん後ろの読みの位置
+        guard let shared = before.keys.filter({ $0 > 0 && now[$0] != nil }).max(),
+              let settledEnd = before[shared], let currentEnd = now[shared] else { return candidate }
+        var result = candidate
+        result.text = String(settled.candidate.text.prefix(settledEnd)) + String(candidate.text.dropFirst(currentEnd))
+        result.words = Self.words(of: settled.candidate, upTo: shared) + Self.words(of: candidate, from: shared)
+        return result
+    }
+
+    /// 読みの先頭から position 文字までの語
+    private static func words(of candidate: Candidate, upTo position: Int) -> [Candidate.Word] {
+        var reading = 0
+        return candidate.words.prefix { word in
+            reading += word.readingCount
+            return reading <= position
+        }
+    }
+
+    /// 読みの position 文字目から後ろの語
+    private static func words(of candidate: Candidate, from position: Int) -> [Candidate.Word] {
+        var reading = 0
+        return Array(candidate.words.drop { word in
+            reading += word.readingCount
+            return reading <= position
+        })
+    }
+
+    /// 語の区切りの読みの位置と，そこまでの文字数．語をつなげて文にならなければ nil
+    private static func boundaries(of candidate: Candidate) -> [Int: Int]? {
+        guard !candidate.words.isEmpty, candidate.words.map(\.text).joined() == candidate.text else { return nil }
+        var result: [Int: Int] = [:]
+        var reading = 0
+        var text = 0
+        for word in candidate.words {
+            reading += word.readingCount
+            text += word.text.count
+            result[reading] = text
+        }
+        return result
+    }
 }

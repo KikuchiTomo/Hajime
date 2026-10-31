@@ -49,6 +49,8 @@ public final class InputSession {
     private let readingCorrector: ReadingCorrector
     /// 打鍵が止まったか．止まるまでは打っている途中の語をかなのまま見せる(LiveConversionRule)
     private var isSettled = false
+    /// 前に打鍵が止まったときにライブ変換で見せた文と読み．打っている途中の文の先頭をこれに合わせ，ちらつかせない(LiveConversionRule.stabilized)
+    private var settledLive: (candidate: Candidate, reading: String)?
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
     /// Space で変換したときに，まだ求め終わっていなかった訂正のキーの並びと左の文脈．
@@ -1056,6 +1058,7 @@ public final class InputSession {
         forcedBoundaries = []
         splitMode = false
         inlineEdit = nil
+        settledLive = nil
         composition = newComposition()
         readingCorrector.reset()
         alphabetRun = false
@@ -1842,8 +1845,14 @@ public final class InputSession {
             }
             return MarkedText(segments + [.init(composition.pending, style: .reading)])
         }
-        let best = bestWholeCandidate(for: reading)
-        let shown = best.map { LiveConversionRule().display(of: $0, reading: reading, settled: isSettled) } ?? reading
+        let rule = LiveConversionRule()
+        var best = bestWholeCandidate(for: reading)
+        if isSettled {
+            settledLive = best.map { ($0, reading) }
+        } else if let candidate = best {
+            best = rule.stabilized(candidate, reading: reading, settled: settledLive)
+        }
+        let shown = best.map { rule.display(of: $0, reading: reading, settled: isSettled) } ?? reading
         // 打ち間違いを直した読みは，直した語句だけを点線の下線にする．どこを直したかが分かるように
         if readingCorrector.isApplied {
             let candidate = best ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
