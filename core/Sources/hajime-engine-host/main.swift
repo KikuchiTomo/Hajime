@@ -153,8 +153,9 @@ func run() -> Int32 {
     associations.preloadBundled()
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
-    let usageTable = HostPaths.installation.appendingPathComponent("usage_dict.txt")
-    let usageDictionary = FileManager.default.fileExists(atPath: usageTable.path) ? UsageDictionaryFile(url: usageTable) : nil
+    let usageTables = ["usage_dict.txt", "usage_dict_extra.tsv"].map { HostPaths.installation.appendingPathComponent($0) }
+        .filter { FileManager.default.fileExists(atPath: $0.path) }
+    let usageDictionary = usageTables.isEmpty ? nil : UsageDictionaryFile(urls: usageTables)
     // 英単語の辞書は Windows のスペルチェッカー(macOS の NSSpellChecker と同じ役)
     #if os(Windows)
     let lexicon = WindowsSpellCheckerLexicon()

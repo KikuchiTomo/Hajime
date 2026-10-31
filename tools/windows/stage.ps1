@@ -45,6 +45,7 @@ Copy-Item -LiteralPath (Join-Path $Dictionary 'Dictionary') -Destination (Join-P
 Copy-Item (Join-Path $root 'data\postal\postal-codes.tsv') $Output
 Copy-Item (Join-Path $root 'data\thesaurus\wordnet-ja.tsv') $Output
 Copy-Item (Join-Path $root 'data\usage\usage_dict.txt') $Output
+Copy-Item (Join-Path $root 'data\usage\usage_dict_extra.tsv') $Output
 # 候補ウィンドウの既定の書体(Kiwi Maru．SIL OFL 1.1)．候補ウィンドウと設定の画面が fonts\ から読む
 Copy-Item (Join-Path $root 'data\fonts') (Join-Path $Output 'fonts') -Recurse -Force
 Copy-Item (Join-Path $root 'LICENSE') (Join-Path $Output 'LICENSE.txt')
@@ -54,7 +55,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Output 'LICENSES\hajime-di
 Copy-Item (Join-Path $Dictionary 'NOTICE.md') (Join-Path $Output 'LICENSES\hajime-dictionary')
 Copy-Item (Join-Path $Dictionary 'LICENSES\*') (Join-Path $Output 'LICENSES\hajime-dictionary')
 
-$required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv', 'usage_dict.txt',
+$required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv', 'usage_dict.txt', 'usage_dict_extra.tsv',
     'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'Zenzai\zenz-v3.2-xsmall-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
     'Dictionary\SHA256SUMS', 'Dictionary\louds\charID.chid', 'LICENSES\hajime-dictionary\NOTICE.md', 'LICENSES\hajime-dictionary\Mozc-LICENSE.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
