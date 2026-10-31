@@ -26,22 +26,56 @@ struct EvaluationCase {
 
 @MainActor
 enum Evaluation {
-    /// 評価用の文を変換して，期待どおりになった割合と 1 回の変換の時間を出す
+    /// 正解が入っているかを数える候補の数．語彙の評価で，辞書に語があるのに同じ読みの別の表記が先に出たものを見分けるため
+    static let candidateWindow = 10
+
+    /// 評価用の文を変換して，期待どおりになった割合・上位の候補に正解が入った割合・1 回の変換の時間を出す
     static func conversion(cases: [EvaluationCase], engine: AzooKeyConverterEngine) {
         let clock = ContinuousClock()
         var passed = 0
+        var listed = 0
+        var errorRates: [Double] = []
         var durations: [Duration] = []
         for item in cases {
             // 文ごとに新しいセッションにして，前の文の変換や学習の影響を受けないようにする
             let session = newSession(engine, context: item.leftContext)
-            var output = ""
-            durations.append(clock.measure { output = best(session, item.reading) })
+            var candidates: [String] = []
+            durations.append(clock.measure { candidates = wholeCandidates(session, item.reading) })
+            let output = candidates.first ?? item.reading
             let ok = item.expected.contains(output)
             if ok { passed += 1 }
-            print("\(ok ? "○" : "×")  \(item.reading)\(contextNote(item))  → \(output)\(ok ? "" : "   期待: \(item.expected.joined(separator: " か "))")")
+            let rank = candidates.prefix(candidateWindow).firstIndex { item.expected.contains($0) }
+            if rank != nil { listed += 1 }
+            errorRates.append(minimumCharacterErrorRate(expected: item.expected, output: output))
+            let note = ok ? "" : "   期待: \(item.expected.joined(separator: " か "))" + (rank.map { "(\($0 + 1) 番目の候補)" } ?? "")
+            print("\(ok ? "○" : rank == nil ? "×" : "△")  \(item.reading)\(contextNote(item))  → \(output)\(note)")
         }
         let sorted = durations.sorted()
-        print("正解: \(passed) / \(cases.count)  変換の時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+        let accuracy = Double(passed) / Double(cases.count) * 100
+        let listedRate = Double(listed) / Double(cases.count) * 100
+        let meanErrorRate = errorRates.reduce(0, +) / Double(errorRates.count) * 100
+        print(String(format: "正解: %d / %d (%.1f%%)  上位 %d 候補: %.1f%%  MinCER: %.2f%%", passed, cases.count, accuracy, candidateWindow, listedRate, meanErrorRate)
+              + "  変換の時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+    }
+
+    /// 期待する変換のうち最も近いものとの文字誤り率(編集距離 ÷ 期待する文の文字数)．AJIMEE-Bench の MinCER と同じ測り方
+    static func minimumCharacterErrorRate(expected: [String], output: String) -> Double {
+        expected.filter { !$0.isEmpty }
+            .map { Double(editDistance(Array($0), Array(output))) / Double($0.count) }
+            .min() ?? 0
+    }
+
+    /// 文字単位の編集距離(置き換え・削除・挿入をそれぞれ 1 と数える)
+    static func editDistance(_ a: [Character], _ b: [Character]) -> Int {
+        var previous = Array(0...b.count)
+        for (i, x) in a.enumerated() {
+            var current = [i + 1] + Array(repeating: 0, count: b.count)
+            for (j, y) in b.enumerated() {
+                current[j + 1] = min(previous[j + 1] + 1, current[j] + 1, previous[j] + (x == y ? 0 : 1))
+            }
+            previous = current
+        }
+        return previous[b.count]
     }
 
     /// 打っている途中の表示を評価する．読みを 1 文字ずつ増やし，各時点で見せる文字が
@@ -206,6 +240,12 @@ enum Evaluation {
     /// 読み全体に対応する第 1 候補．無ければ読みのまま
     private static func best(_ session: any KanaKanjiConverting, _ reading: String) -> String {
         session.candidates(for: reading).first { $0.readingCount == reading.count }?.text ?? reading
+    }
+
+    /// 読み全体に対応する候補を，出る順に重なりなく並べたもの
+    private static func wholeCandidates(_ session: any KanaKanjiConverting, _ reading: String) -> [String] {
+        var seen = Set<String>()
+        return session.candidates(for: reading).filter { $0.readingCount == reading.count }.map(\.text).filter { seen.insert($0).inserted }
     }
 
     private static func contextNote(_ item: EvaluationCase) -> String {

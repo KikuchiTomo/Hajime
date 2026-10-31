@@ -3,6 +3,11 @@ import KanaKanjiConverterModuleWithDefaultDictionary
 import HajimeApplication
 import HajimeDomain
 
+/// 渡された辞書のディレクトリが辞書として読めない(louds/charID.chid が無い)
+public enum DictionaryDirectoryError: Error, Equatable {
+    case notFound
+}
+
 /// 辞書と学習データを持つ変換エンジン．アプリ全体で 1 つ作り，入力欄ごとのセッションを渡す．
 ///
 /// azooKey の型はこのモジュールの外に出さない(docs/dev/ARCHITECTURE.md)．
@@ -27,7 +32,13 @@ public final class AzooKeyConverterEngine {
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
     ///   - versionString: エンジンに渡すアプリのバージョンの文字列
     ///   - zenzai: 確かめ済みの Zenzai のモデル．nil なら Zenzai を使わない
-    public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil) throws {
+    ///   - dictionaryDirectory: かな漢字変換の辞書(louds/・cb/・p/・mm.binary を持つディレクトリ)．nil なら azooKey に同梱の辞書を使う
+    public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil, dictionaryDirectory: URL? = nil) throws {
+        // 辞書の場所を誤ると，エンジンは何も言わずに語の無い状態で動き，変換がほぼすべて読みのままになる．作る前に止める
+        if let dictionaryDirectory {
+            let charID = dictionaryDirectory.appendingPathComponent("louds/charID.chid", isDirectory: false)
+            guard FileManager.default.fileExists(atPath: charID.path) else { throw DictionaryDirectoryError.notFound }
+        }
         try FileManager.default.createDirectory(
             at: memoryDirectory,
             withIntermediateDirectories: true,
@@ -36,7 +47,7 @@ public final class AzooKeyConverterEngine {
         self.memoryDirectory = memoryDirectory
         self.versionString = versionString
         self.zenzai = zenzai
-        self.converter = KanaKanjiConverter.withDefaultDictionary()
+        self.converter = dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary()
     }
 
     /// 読みに合う絵文字(EmojiLooking)．肌の色などを変えた形は除く

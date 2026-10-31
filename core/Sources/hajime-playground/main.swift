@@ -14,11 +14,13 @@ import HajimeDomain
 //   hajime-playground --split <読み,読み,…>                      文節を区切るときに区切れる位置
 //   hajime-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
+//
+// どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
     do {
-        let playground = try PlaygroundEngine(zenzaiPath: arguments.value(of: "--zenzai"))
+        let playground = try PlaygroundEngine(zenzaiPath: arguments.value(of: "--zenzai"), dictionaryPath: arguments.value(of: "--dictionary"))
         defer { playground.removeMemory() }
         print("Zenzai: \(playground.engine.usesZenzai ? "あり" : "なし")")
         if let file = arguments.value(of: "--evaluate") {
