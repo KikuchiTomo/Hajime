@@ -1,5 +1,6 @@
 #![allow(unsafe_code)]
 
+pub mod fonts;
 pub mod preview;
 mod render;
 #[cfg(debug_assertions)]

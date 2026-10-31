@@ -1,10 +1,12 @@
 //! scene の部品を Direct2D と DirectWrite で描く．配置と色は scene が決めるので，ここは部品をなぞるだけにする
 
+use crate::fonts::{InstalledFace, Selection};
 use crate::geometry::Frame;
 use crate::icon;
 use crate::scene::{Draw, Measure, Scene};
 use crate::theme::{Color, Face, Font, FontSpec, ResolvedTheme, Weight};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED,
     D2D1_FIGURE_END_OPEN, D2D_RECT_F,
@@ -17,10 +19,11 @@ use windows::Win32::Graphics::Direct2D::{
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFontCollection, IDWriteTextFormat,
-    DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-    DWRITE_FONT_WEIGHT, DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL,
-    DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
-    DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
+    DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH, DWRITE_FONT_STRETCH_NORMAL,
+    DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT,
+    DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD,
+    DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS,
+    DWRITE_WORD_WRAPPING_NO_WRAP,
 };
 use windows_core::{Interface, Result, BOOL, HSTRING};
 
@@ -70,6 +73,8 @@ pub struct Renderer {
     /// 配布物に入れた書体の集まり．読めなければ None(OS の書体だけで描く)
     bundled: Option<IDWriteFontCollection>,
     round: ID2D1StrokeStyle,
+    /// OS に入っている書体の一覧．カスタムテーマの書体の PostScript 名を初めて引くときに読む
+    faces: OnceLock<Vec<InstalledFace>>,
 }
 
 /// テーマと文字の大きさを決めた書体の組．文字の幅を測り，描くときにも使う
@@ -196,6 +201,7 @@ impl Renderer {
             fonts,
             bundled,
             round,
+            faces: OnceLock::new(),
         })
     }
 
@@ -234,8 +240,45 @@ impl Renderer {
             .map_or_else(String::new, |family| (*family).to_string())
     }
 
+    /// カスタムテーマの書体が PostScript 名で入っている書体．ファミリーの名前(古い版で保存した値)や入っていない書体なら None
+    fn named_face(&self, face: &Face) -> Option<&InstalledFace> {
+        let Face::Named(name) = face else {
+            return None;
+        };
+        if self.installed(name) {
+            return None;
+        }
+        let faces = self.faces.get_or_init(|| {
+            self.fonts
+                .as_ref()
+                .map_or_else(Vec::new, super::fonts::faces)
+        });
+        match crate::fonts::find(faces, name)? {
+            Selection::Face(face) => Some(face),
+            Selection::Family(_) => None,
+        }
+    }
+
     fn format(&self, spec: &FontSpec) -> Result<IDWriteTextFormat> {
-        let family = self.family(&spec.face);
+        // カスタムテーマで PostScript 名の書体を選んでいれば，そのファミリーと太さ・斜体・幅で作る
+        let (family, weight, style, stretch) = match self.named_face(&spec.face) {
+            Some(face) => (
+                face.family.clone(),
+                DWRITE_FONT_WEIGHT(i32::try_from(face.weight).unwrap_or(400)),
+                if face.italic {
+                    DWRITE_FONT_STYLE_ITALIC
+                } else {
+                    DWRITE_FONT_STYLE_NORMAL
+                },
+                DWRITE_FONT_STRETCH(i32::try_from(face.stretch).unwrap_or(5)),
+            ),
+            None => (
+                self.family(&spec.face),
+                weight(spec.weight),
+                DWRITE_FONT_STYLE_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL,
+            ),
+        };
         // 配布物の書体は OS の書体の集まりに無いので，その集まりを渡す
         let collection = self.bundled.as_ref().filter(|bundled| {
             !contains(self.fonts.as_ref(), &family) && contains(Some(bundled), &family)
@@ -243,11 +286,11 @@ impl Renderer {
         // SAFETY: 文字列は呼び出しのあいだ有効
         let format = unsafe {
             self.dwrite.CreateTextFormat(
-                &HSTRING::from(family),
+                &HSTRING::from(family.as_str()),
                 collection,
-                weight(spec.weight),
-                DWRITE_FONT_STYLE_NORMAL,
-                DWRITE_FONT_STRETCH_NORMAL,
+                weight,
+                style,
+                stretch,
                 spec.size,
                 &HSTRING::from(LOCALE),
             )?

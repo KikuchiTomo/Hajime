@@ -69,7 +69,7 @@ pub struct PageLayout {
 pub fn control_width(control: &Control) -> f32 {
     match control {
         Control::Toggle => size::TOGGLE_WIDTH,
-        Control::Choice(_) => size::CONTROL_WIDTH,
+        Control::Choice(_) | Control::ThemeFont(_) => size::CONTROL_WIDTH,
         Control::Stepper(_) => size::STEPPER_WIDTH,
         Control::Seconds(_) => size::CONTROL_WIDTH,
         Control::Action(_) | Control::Stat(_) | Control::Info(_) => size::CONTROL_WIDTH,
