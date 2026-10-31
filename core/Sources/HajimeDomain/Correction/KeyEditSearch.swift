@@ -125,14 +125,37 @@ public enum KeyEditSearch {
         plausibility: (String) -> Double,
         languageModel: ([String]) -> [Double?]
     ) -> [ReadingCorrection] {
+        scoredCorrections(of: keys, ranked: rankedEdits(of: keys, from: from, limit: limit, plausibility: plausibility),
+                          costScale: costScale, languageModel: languageModel)
+    }
+
+    /// corrections の 1 段目．1 か所の打ち間違いをすべて作り，変わったところの前後のもっともらしさから手間を引いた値で limit 件に絞る．
+    /// 言語モデルを使わないので，言語モデルで採点する処理と並べて動かせる
+    public static func rankedEdits(
+        of keys: String,
+        from: Int = 0,
+        limit: Int = DefaultSettings.keyEditCandidateCount,
+        plausibility: (String) -> Double
+    ) -> [Edit] {
         // 打ったままの読みに，かなにならない英字が残ることがある(tkitou → tきとう)．そのときも訂正を探す
         let original = rawReading(of: keys)
         guard !original.isEmpty else { return [] }
-        let ranked = edits(of: keys, from: from)
+        return edits(of: keys, from: from)
             .map { (edit: $0, local: localGain(of: $0.reading, over: original, plausibility: plausibility) - $0.cost) }
             .sorted { $0.local != $1.local ? $0.local > $1.local : $0.edit.keys < $1.edit.keys }
             .prefix(limit)
             .map(\.edit)
+    }
+
+    /// corrections の 2 段目．絞った候補(ranked)と打ったままの並びを，文脈を見る言語モデルで採点する
+    public static func scoredCorrections(
+        of keys: String,
+        ranked: [Edit],
+        costScale: Double = DefaultSettings.keyEditCostScale,
+        languageModel: ([String]) -> [Double?]
+    ) -> [ReadingCorrection] {
+        let original = rawReading(of: keys)
+        guard !original.isEmpty else { return [] }
         let scores = languageModel([keys] + ranked.map(\.keys))
         // 打ったままの並びを言語モデルが読めない(かなにならない英字が残る「gakusri」)ときは，訂正の候補だけを返す
         let typed = (scores.first ?? nil).map { ReadingCorrection(keys: keys, reading: KanaWidth.katakana(from: original), score: $0, cost: 0) }

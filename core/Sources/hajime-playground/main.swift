@@ -7,7 +7,9 @@ import HajimeDomain
 //   hajime-playground [--zenzai <モデル>]                         ローマ字を打って結果を見る
 //   hajime-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
 //   hajime-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
-//   hajime-playground --evaluate-typo <TSV> [--zenzai <モデル>]   打ち間違いの補正(直した・示した・直さなかった)
+//   hajime-playground --evaluate-typo <TSV> [--zenzai <モデル>] [--typing-interval <秒>]
+//                                                                打ち間違いの補正(直した・示した・直さなかった)．
+//                                                                --typing-interval を付けると，その間隔で打ったときのように打鍵の合間に訂正を前もって求める
 //   hajime-playground --evaluate-language <TSV> [--zenzai <モデル>] 英字入力(自動)で英語と日本語を見分けた結果
 //   hajime-playground --typo-candidates <キー> [--zenzai <モデル>] 打ったキーの訂正の候補と点数
 //   hajime-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
@@ -28,7 +30,8 @@ MainActor.assumeIsolated {
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {
-            try Evaluation.typo(file: file, engine: playground.engine, service: playground.typoService)
+            try Evaluation.typo(file: file, engine: playground.engine, service: playground.typoService,
+                                typingInterval: arguments.value(of: "--typing-interval").flatMap(Double.init))
         } else if let file = arguments.value(of: "--evaluate-language") {
             try Evaluation.language(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {

@@ -9,57 +9,103 @@ import HajimeDomain
 /// 表示に使う変換器とは別の変換器を持ち，このアクターの中だけで使う(azooKey の変換器はスレッドセーフではない)．
 /// Zenzai も表示の変換とは別の推論の文脈で使う(ZenzaiModel.separateContextURL)．同じ文脈を使うと，
 /// 訂正を求めているあいだ表示の変換が文脈の順番を待って止まる．
+/// 1 か所の打ち間違いを全部試す候補を軽い変換で絞る仕事は，別の変換器(TypoPlausibilityService)で Zenzai の探索と並べて行う．
 /// 辞書と推論の文脈を別に持つぶん，メモリは増える(モデルの重みは共有する)．学習はしない(読むだけ)
 public actor ZenzaiTypoService: TypoCorrecting {
     private let converter: KanaKanjiConverter
+    private let plausibility: TypoPlausibilityService
     private let zenzai: ZenzaiModel
     private let memoryDirectory: URL
     private let versionString: String
 
     public init(zenzai: ZenzaiModel, memoryDirectory: URL, versionString: String) {
         self.converter = KanaKanjiConverter.withDefaultDictionary()
+        self.plausibility = TypoPlausibilityService(memoryDirectory: memoryDirectory, versionString: versionString)
         self.zenzai = zenzai
         self.memoryDirectory = memoryDirectory
         self.versionString = versionString
     }
 
     /// 求めているあいだに呼んだ側が取り消したら(次のキーが来た，Space で待ちきれなかった)，途中でやめて空を返す．
-    /// 古い訂正を最後まで求め続けると，CPU を取り合って打鍵と変換が遅くなり，次の訂正の求めも待たせるため
-    public func corrections(forKeys keys: [String], leftContext: String?) -> [String: [ReadingCorrection]] {
+    /// 古い訂正を最後まで求め続けると，CPU を取り合って打鍵と変換が遅くなり，次の訂正の求めも待たせるため．
+    /// 求め終わった並びの候補と途中までの探索は覚えておき，次に同じ並びやその続きを求めるときに使う
+    public func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] {
         var result: [String: [ReadingCorrection]] = [:]
+        var previous = lastSearchedKeys
         for key in keys where !key.isEmpty {
             guard !Task.isCancelled else { return [:] }
-            var composing = ComposingText()
-            composing.insertAtCursorPosition(key, inputStyle: .roman2kana)
-            let config = ExperimentalTypoCorrectionConfig(
-                beamSize: DefaultSettings.typoCorrectionBeamSize, topK: DefaultSettings.typoCorrectionTopK, nBest: DefaultSettings.typoCorrectionCandidateCount)
-            let candidates = converter.experimentalRequestTypoCorrection(
-                leftSideContext: leftContext ?? "", composingText: composing, options: options(leftContext: leftContext), inputStyle: .roman2kana, config: config)
-            converter.stopComposition()
-            guard !Task.isCancelled else { return [:] }
-            let beam = candidates.map {
-                ReadingCorrection(keys: $0.correctedInput, reading: $0.convertedText, score: Double($0.score), cost: Double($0.channelCost))
-            }
-            // Zenzai の探索が拾わない誤り(かなの書き誤りなど)を，1 か所の打ち間違いを全部試して補う
             // 前に見直した部分は探し直さない(打っているあいだは新しく打った数文字だけを試すので速い)
-            let edits = KeyEditSearch.corrections(
-                of: key,
-                from: KeyEditSearch.searchStart(keys: key, previous: lastSearchedKeys),
-                plausibility: plausibility(of:),
-                languageModel: { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
-            )
+            let from = KeyEditSearch.searchStart(keys: key, previous: previous)
             // 取り消したあとの結果は使わず，探した位置も進めない(次に同じキーで探し直す)
-            guard !Task.isCancelled else { return [:] }
-            // 読みそのものの誤り(言い違い・書き違い)は，変換で語にならずかなのまま残った部分のかなを変えて探す
-            let kanaEdits = kanaCorrections(forKeys: key, leftContext: leftContext)
-            guard !Task.isCancelled else { return [:] }
+            guard let found = await corrections(forKey: key, from: from, leftContext: leftContext) else { return [:] }
+            previous = key
             lastSearchedKeys = key
-            let merged = KeyEditSearch.withPlausibility(KeyEditSearch.merge(beam, edits, kanaEdits), typedKeys: key, plausibility: plausibility(of:))
-            result[key] = withContextFreeScores(merged, leftContext: leftContext)
-            guard !Task.isCancelled else { return [:] }
+            result[key] = found
         }
         return result
     }
+
+    /// corrections と同じ並びを同じ順に求めて覚えておく．探した位置(lastSearchedKeys)は進めないので，
+    /// あとで corrections を呼んだときの結果は，前もって求めなかったときと同じになる
+    public func prefetch(forKeys keys: [String], leftContext: String?) async {
+        var previous = lastSearchedKeys
+        for key in keys where !key.isEmpty {
+            guard !Task.isCancelled else { return }
+            let from = KeyEditSearch.searchStart(keys: key, previous: previous)
+            guard await corrections(forKey: key, from: from, leftContext: leftContext) != nil else { return }
+            previous = key
+        }
+    }
+
+    /// 1 つの並びの訂正の候補．取り消されたら nil
+    private func corrections(forKey key: String, from: Int, leftContext: String?) async -> [ReadingCorrection]? {
+        let memoKey = MemoKey(keys: key, leftContext: leftContext, from: from)
+        if let memoized = memoized[memoKey] { return memoized }
+        // Zenzai の探索が拾わない誤り(かなの書き誤りなど)を，1 か所の打ち間違いを全部試して補う．
+        // 読みそのものの誤り(言い違い・書き違い)は，変換で語にならずかなのまま残った部分のかなを変えて探す．
+        // どちらも候補を軽い変換で絞る仕事は別の変換器で行い，そのあいだにこちらで Zenzai の探索をする
+        async let rankedEdits = plausibility.rankedKeyEdits(of: key, from: from)
+        async let rankedKanaEdits = plausibility.rankedKanaEdits(ofKeys: key)
+        let beam = beamCorrections(forKey: key, leftContext: leftContext)
+        let (edits, kanaEdits) = await (rankedEdits, rankedKanaEdits)
+        guard !Task.isCancelled else { return nil }
+        let keyCorrections = KeyEditSearch.scoredCorrections(of: key, ranked: edits) { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
+        guard !Task.isCancelled else { return nil }
+        let kanaCorrections = KanaEditSearch.scoredCorrections(ranked: kanaEdits) { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
+        guard !Task.isCancelled else { return nil }
+        let merged = await plausibility.withPlausibility(KeyEditSearch.merge(beam, keyCorrections, kanaCorrections), typedKeys: key)
+        guard !Task.isCancelled else { return nil }
+        let result = withContextFreeScores(merged, leftContext: leftContext)
+        guard !Task.isCancelled else { return nil }
+        if memoized.count >= DefaultSettings.maximumMemoizedCorrections { memoized.removeAll() }
+        memoized[memoKey] = result
+        return result
+    }
+
+    /// Zenzai の探索による訂正の候補．取り消されたら途中でやめる(途中までの探索は変換器が覚えている)
+    private func beamCorrections(forKey key: String, leftContext: String?) -> [ReadingCorrection] {
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(key, inputStyle: .roman2kana)
+        let config = ExperimentalTypoCorrectionConfig(
+            beamSize: DefaultSettings.typoCorrectionBeamSize, topK: DefaultSettings.typoCorrectionTopK, nBest: DefaultSettings.typoCorrectionCandidateCount)
+        let candidates = converter.experimentalRequestTypoCorrection(
+            leftSideContext: leftContext ?? "", composingText: composing, options: options(leftContext: leftContext), inputStyle: .roman2kana, config: config,
+            shouldStop: { Task.isCancelled })
+        converter.stopComposition()
+        return candidates.map {
+            ReadingCorrection(keys: $0.correctedInput, reading: $0.convertedText, score: Double($0.score), cost: Double($0.channelCost))
+        }
+    }
+
+    /// 求めた訂正の候補を見分ける鍵．探し始める位置(from)で候補が変わるので含める
+    private struct MemoKey: Hashable {
+        var keys: String
+        var leftContext: String?
+        var from: Int
+    }
+
+    /// 求めた訂正の候補．打っているあいだに前もって求めたものを，打鍵が止まって見直すときに使う
+    private var memoized: [MemoKey: [ReadingCorrection]] = [:]
 
     /// 左の文脈があるとき，打ったままと点数の高い候補(DefaultSettings.contextFreeCandidateCount 件)に，文脈を使わない点数を付ける．
     /// 言語モデルの採点を 1 回だけ足す(候補ごとに探し直さない)．文脈が無ければ何もしない
@@ -80,60 +126,8 @@ public actor ZenzaiTypoService: TypoCorrecting {
         }
     }
 
-    /// かなの単位の訂正(KanaEditSearch)．読みにかなにならない英字が残るときは探さない
-    private func kanaCorrections(forKeys keys: String, leftContext: String?) -> [ReadingCorrection] {
-        let reading = KeyEditSearch.rawReading(of: keys)
-        guard !reading.isEmpty, !reading.contains(where: \.isASCII) else { return [] }
-        return KanaEditSearch.corrections(
-            of: reading,
-            in: unconvertedSpans(of: reading),
-            plausibility: plausibility(of:),
-            unconverted: { self.unconvertedSpans(of: $0, minimumLength: 1) },
-            languageModel: { self.languageModelScores(forKeys: $0, leftContext: leftContext) }
-        )
-    }
-
-    /// 読みを Zenzai を使わずに変換したとき，語にならずかなのまま残った部分
-    private func unconvertedSpans(of reading: String, minimumLength: Int = DefaultSettings.minimumUnconvertedSpanLength) -> [Range<Int>] {
-        guard !Task.isCancelled else { return [] }
-        var composing = ComposingText()
-        composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        var options = options(leftContext: nil)
-        options.zenzaiMode = .off
-        options.N_best = 1
-        options.learningType = .nothing
-        options.typoCorrectionMode = .disabled
-        let data = converter.requestCandidates(composing, options: options).mainResults
-            .first { AzooKeyConverterSession.readingCount($0.composingCount, readingLength: reading.count) == reading.count }?.data ?? []
-        converter.stopComposition()
-        return AzooKeyConverterSession.unconvertedSpans(of: data, minimumLength: minimumLength)
-    }
-
-    /// 前に 1 か所の打ち間違いを探したキーの並び
+    /// 前に 1 か所の打ち間違いを探したキーの並び(見直しで求め終えたもの)
     private var lastSearchedKeys: String?
-
-    /// 読みを変換したときのもっともらしさ(Zenzai を使わない軽い変換の点数)．読みごとに覚えておく
-    private var plausibilityCache: [String: Double] = [:]
-
-    private func plausibility(of reading: String) -> Double {
-        if let cached = plausibilityCache[reading] { return cached }
-        // 取り消されたら変換せずにすぐ返す(覚えない)．残りの候補の計算を速く終わらせるため
-        guard !Task.isCancelled else { return -.infinity }
-        var composing = ComposingText()
-        composing.insertAtCursorPosition(reading, inputStyle: .direct)
-        var options = options(leftContext: nil)
-        options.zenzaiMode = .off
-        options.N_best = 1
-        options.learningType = .nothing
-        options.typoCorrectionMode = .disabled
-        let best = converter.requestCandidates(composing, options: options).mainResults
-            .first { AzooKeyConverterSession.readingCount($0.composingCount, readingLength: reading.count) == reading.count }
-            .map { Double($0.value) } ?? -.infinity
-        converter.stopComposition()
-        if plausibilityCache.count > DefaultSettings.maximumPlausibilityCacheEntries { plausibilityCache.removeAll() }
-        plausibilityCache[reading] = best
-        return best
-    }
 
     private func languageModelScores(forKeys keys: [String], leftContext: String?) -> [Double?] {
         guard !Task.isCancelled else { return keys.map { _ in nil } }
@@ -143,7 +137,8 @@ public actor ZenzaiTypoService: TypoCorrecting {
             return composing
         }
         let scores = converter.experimentalScoreTypoInputs(
-            leftSideContext: leftContext ?? "", inputs: inputs, options: options(leftContext: leftContext), inputStyle: .roman2kana)
+            leftSideContext: leftContext ?? "", inputs: inputs, options: options(leftContext: leftContext), inputStyle: .roman2kana,
+            shouldStop: { Task.isCancelled })
         converter.stopComposition()
         return scores.map { $0.map(Double.init) }
     }

@@ -10,6 +10,13 @@ import HajimeDomain
 public protocol TypoCorrecting: Sendable {
     /// キーの並びごとの訂正の候補(よさそうな順)
     func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]]
+    /// 打っているあいだに，同じ並びの訂正を前もって求めておく(打鍵が止まって見直すときに待たせないため)．
+    /// 求めた結果は corrections と同じになる．取り消されたら途中でやめ，そこまでの分を次に使う
+    func prefetch(forKeys keys: [String], leftContext: String?) async
+}
+
+extension TypoCorrecting {
+    public func prefetch(forKeys keys: [String], leftContext: String?) async {}
 }
 
 @MainActor

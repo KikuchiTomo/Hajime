@@ -96,18 +96,47 @@ public enum KanaEditSearch {
         unconverted: (String) -> [Range<Int>],
         languageModel: ([String]) -> [Double?]
     ) -> [ReadingCorrection] {
+        scoredCorrections(ranked: rankedEdits(of: reading, in: spans, limit: limit, plausibility: plausibility, unconverted: unconverted),
+                          costScale: costScale, languageModel: languageModel)
+    }
+
+    /// 言語モデルにかける候補(直した読みとそのキーの並び)
+    public struct RankedEdit: Sendable, Equatable {
+        public var edit: Edit
+        public var keys: String
+    }
+
+    /// corrections の 1 段目．かなを 1 か所変えた読みを，変わったところの前後のもっともらしさで limit 件に絞る．
+    /// 言語モデルを使わないので，言語モデルで採点する処理と並べて動かせる
+    public static func rankedEdits(
+        of reading: String,
+        in spans: [Range<Int>],
+        limit: Int = DefaultSettings.kanaEditCandidateCount,
+        plausibility: (String) -> Double,
+        unconverted: (String) -> [Range<Int>]
+    ) -> [RankedEdit] {
         guard !spans.isEmpty else { return [] }
         let scored: [(edit: Edit, local: Double)] = edits(of: reading, in: spans).map { edit in
             (edit: edit, local: KeyEditSearch.localGain(of: edit.reading, over: reading, plausibility: plausibility) - edit.cost)
         }
         let sorted = scored.sorted { $0.local != $1.local ? $0.local > $1.local : $0.edit.reading < $1.edit.reading }
-        var ranked: [(edit: Edit, keys: String)] = []
+        var ranked: [RankedEdit] = []
         for item in sorted where ranked.count < limit {
             guard let keys = KanaRomanizer.keys(for: item.edit.reading),
                 !unconverted(item.edit.reading).contains(where: { $0.overlaps(item.edit.changed) }) else { continue }
-            ranked.append((edit: item.edit, keys: keys))
+            ranked.append(RankedEdit(edit: item.edit, keys: keys))
         }
-        let scores = languageModel(ranked.map { $0.keys })
+        return ranked
+    }
+
+    /// corrections の 2 段目．絞った候補を言語モデルで採点する
+    public static func scoredCorrections(
+        ranked: [RankedEdit],
+        costScale: Double = DefaultSettings.keyEditCostScale,
+        languageModel: ([String]) -> [Double?]
+    ) -> [ReadingCorrection] {
+        guard !ranked.isEmpty else { return [] }
+        let scores = languageModel(ranked.map(\.keys))
         return zip(ranked, scores).compactMap { item, score in
             score.map { ReadingCorrection(keys: item.keys, reading: KanaWidth.katakana(from: item.edit.reading),
                                           score: $0 - item.edit.cost * costScale, cost: item.edit.cost * costScale, isReadingEdit: true) }
