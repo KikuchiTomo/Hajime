@@ -50,6 +50,7 @@ pub mod settings {
     pub const PROOFREADING: &str = "校正支援";
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
     pub const EMOJI_CONVERSION: &str = "絵文字に変換";
+    pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
     pub const LEARNING: &str = "学習";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
@@ -576,6 +577,7 @@ pub mod sync {
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
         ("emojiConversion", "絵文字に変換"),
+        ("latexConversion", "LaTeX のコマンドに変換"),
         ("learning", "学習"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),

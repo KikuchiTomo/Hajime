@@ -178,6 +178,16 @@ struct FeatureScenarioTests {
         #expect(!SupplementedConverter(base, settings: FakeSettings(off), calendar: FakeCalendar(), emoji: table).candidates(for: "なく").map(\.text).contains("😢"))
     }
 
+    @Test("R-23: オンにすると読みから LaTeX のコマンドを候補に出し，第 1 候補は変えない．既定はオフ")
+    func latexCommands() {
+        let base = FakeConverter(["らむだ": [("ラムダ", nil), ("らむだ", nil)]])
+        #expect(!SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar()).candidates(for: "らむだ").map(\.text).contains("\\lambda"))
+        var on = DefaultSettings.settings
+        on.latexConversion = true
+        let candidates = SupplementedConverter(base, settings: FakeSettings(on), calendar: FakeCalendar()).candidates(for: "らむだ").map(\.text)
+        #expect(candidates == ["ラムダ", "らむだ", "λ", "Λ", "\\lambda", "\\Lambda"])
+    }
+
     @Test("R-13: 郵便番号は住所を候補に出す．区切りがあれば先頭に，無ければ 2 番目に")
     func postalCode() {
         let postal = FakePostalCodes(["1000001": ["東京都千代田区千代田"]])

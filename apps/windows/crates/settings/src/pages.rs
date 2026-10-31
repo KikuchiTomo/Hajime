@@ -157,6 +157,7 @@ impl Page {
                 features::HANDWRITING,
                 settings::DATE_CONVERSION,
                 settings::EMOJI_CONVERSION,
+                settings::LATEX_CONVERSION,
             ],
             Page::Correction => vec![
                 features::EXCEPTIONS,
@@ -939,6 +940,7 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(settings::PROOFREADING, "proofreading"),
                 Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
                 Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
+                Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
             ],
         ),
         Section::new(
