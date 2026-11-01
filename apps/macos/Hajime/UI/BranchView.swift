@@ -119,7 +119,8 @@ final class BranchView: NSView {
         var trunkX: [CGFloat] = []
         var trunkWidths: [CGFloat] = []
         for column in panel.columns {
-            let width = (column.split.map { splitPieces($0).width } ?? textWidth(column.text, font: trunkFont)) + Size.paddingX * 2
+            let text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) } ?? textWidth(column.text, font: trunkFont)
+            let width = (column.split.map { splitPieces($0).width } ?? text) + Size.paddingX * 2
                 + (column.isCorrected ? correctedLabelWidth : 0)
             trunkX.append(x)
             trunkWidths.append(width)
@@ -128,11 +129,13 @@ final class BranchView: NSView {
         let trunkRight = x - metrics.trunkGap
         let focused = panel.columns.firstIndex(where: \.isFocused)
         let column = focused.map { panel.columns[$0] }
-        let labels = (column?.alternatives ?? []) + (column?.variants ?? [])
-        // 打ったまま・修正の添え書きの幅も足す
+        // コマンドの候補は文字の前に種類のアイコンを置くので，その幅も足す
+        let labelWidths = (column.map(lowerRows) ?? []).map { textWidth($0.text, font: candidateFont) + ($0.command == nil ? 0 : CommandDrawing.width) }
+            + (column?.variants ?? []).map { textWidth($0, font: candidateFont) }
+        // 打ったまま・修正・コマンドの添え書きの幅も足す
         let noteWidth = (column?.alternativeNotes.compactMap { $0 }.map { textWidth($0, font: labelFont) }.max()).map { $0 + Size.paddingX * 2 } ?? 0
         let branchWidth = metrics.stemX + metrics.branchIndent + metrics.lead
-            + (labels.map { textWidth($0, font: candidateFont) }.max() ?? 0) + noteWidth + Size.paddingX * 2
+            + (labelWidths.max() ?? 0) + noteWidth + Size.paddingX * 2
         let branchRight = (focused.map { trunkX[$0] } ?? metrics.inset) + branchWidth
         let previewRows = panel.columns.contains { $0.preview != nil } ? 1 : 0
         let upperRows = column?.variants.count ?? 0
@@ -320,6 +323,10 @@ final class BranchView: NSView {
         }
         if let split = column.split {
             drawSplit(split, in: node, color: color)
+        } else if let command = trunkCommand(column) {
+            // コマンドを選んでいれば，幹も枝と同じく種類のアイコンと名前で見せる(入力中の文字には印を付けた名前が出る)
+            CommandDrawing.drawIcon(command.kind, x: node.minX + Size.paddingX, midY: node.midY, theme: theme, selected: !theme.isRounded && column.isFocused)
+            drawText(command.title, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX + CommandDrawing.width, in: node)
         } else {
             drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX, in: node)
         }
@@ -339,6 +346,13 @@ final class BranchView: NSView {
             let dotColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
             GlassDrawing.drawUnderline(from: from, to: to, y: y, color: dotColor, dotted: true, theme: theme)
         }
+    }
+
+    /// 幹の文節で選んでいるコマンドの種類と名前．コマンドを選んでいなければ nil
+    private func trunkCommand(_ column: LatticePanel.Column) -> (kind: LauncherCommand.Kind, title: String)? {
+        guard let index = column.selectedAlternative, column.alternativeCommands.indices.contains(index), column.alternatives.indices.contains(index),
+              let kind = column.alternativeCommands[index] else { return nil }
+        return (kind, column.alternatives[index])
     }
 
     // MARK: - 区切る位置
@@ -387,15 +401,18 @@ final class BranchView: NSView {
         var badge: String
         var isSelected: Bool
         var opacity: CGFloat
-        /// 打ったまま・修正の添え書き
+        /// 打ったまま・修正・コマンドの添え書き
         var note: String? = nil
+        /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
+        var command: LauncherCommand.Kind? = nil
     }
 
     /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
     private func lowerRows(_ column: LatticePanel.Column) -> [Row] {
         column.alternatives.enumerated().map { index, text in
             Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative, opacity: index == 0 ? 1 : restOpacity,
-                note: column.alternativeNotes.indices.contains(index) ? column.alternativeNotes[index] : nil)
+                note: column.alternativeNotes.indices.contains(index) ? column.alternativeNotes[index] : nil,
+                command: column.alternativeCommands.indices.contains(index) ? column.alternativeCommands[index] : nil)
         }
     }
 
@@ -460,25 +477,28 @@ final class BranchView: NSView {
 
     private func drawRow(_ row: Row, in rect: NSRect) {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-        defer {
-            if let note = row.note {
-                NoteDrawing.drawTag(note, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: row.isSelected)
-            }
-        }
         if theme.isRounded {
             if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection) }
             let badgeCenter = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(row.badge, center: badgeCenter, theme: theme, selected: row.isSelected, opacity: row.opacity)
-            drawText(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: rect.minX + Size.paddingX / 2 + metrics.lead, in: rect)
-            return
+        } else {
+            if row.isSelected {
+                theme.selection.setFill()
+                rect.fill()
+            }
+            let badgeColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
+            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: rect.minX + Size.paddingX / 2, y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
         }
-        if row.isSelected {
-            theme.selection.setFill()
-            rect.fill()
+        var textX = rect.minX + Size.paddingX / 2 + metrics.lead
+        if let kind = row.command {
+            // コマンドの候補は，文字の前に種類のアイコンを置く
+            CommandDrawing.drawIcon(kind, x: textX, midY: rect.midY, theme: theme, selected: row.isSelected, opacity: row.isSelected ? 1 : row.opacity)
+            textX += CommandDrawing.width
         }
-        let badgeColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-        GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: rect.minX + Size.paddingX / 2, y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
-        drawText(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: rect.minX + Size.paddingX / 2 + metrics.lead, in: rect)
+        drawText(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: textX, in: rect)
+        if let note = row.note {
+            NoteDrawing.drawTag(note, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: row.isSelected, command: row.command != nil)
+        }
     }
 
     /// 注目していない確信の低い文節の下に，次の候補を 1 つだけ薄く添える

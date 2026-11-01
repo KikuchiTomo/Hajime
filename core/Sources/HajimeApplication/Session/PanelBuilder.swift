@@ -94,6 +94,7 @@ enum PanelBuilder {
             let candidate = selection.candidates[index]
             let range = corrected.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0)) }
             // 前の文節(shownPrefix)は一覧に出さない
+            if let entry = commandEntry(candidate) { return entry }
             let text = !selection.shownPrefix.isEmpty && candidate.text.hasPrefix(selection.shownPrefix)
                 ? String(candidate.text.dropFirst(selection.shownPrefix.count)) : candidate.text
             return CandidatePanel.Entry(text: text, annotation: selection.annotations[index], corrected: selection.shownPrefix.isEmpty ? range : nil)
@@ -109,6 +110,18 @@ enum PanelBuilder {
             total: selection.candidates.count,
             note: isCorrected ? correctionNote(key: nextKey) : nil
         )
+    }
+
+    /// コマンドの候補の行．印(▶)の代わりに種類と「コマンド」の札を付け，文字を入れる候補と見分けられるようにする．コマンドでなければ nil
+    static func commandEntry(_ candidate: Candidate) -> CandidatePanel.Entry? {
+        candidate.commandKind.map {
+            CandidatePanel.Entry(text: LauncherCommand.title(ofCandidateText: candidate.text), annotation: CandidatePanel.commandAnnotation, command: $0)
+        }
+    }
+
+    /// コマンドの候補を選んでいるときの案内(確定のキーで動く)．key は確定のキー．キーが無ければ nil
+    static func commandNote(key: String?) -> Note? {
+        key.map { Note(tone: .info, title: "", key: $0, keyAction: "実行") }
     }
 
     /// 選んでいる候補に連想があるときの知らせ．key は連想変換のキー
@@ -148,6 +161,7 @@ enum PanelBuilder {
             panel.columns[focused].alternatives = page.words
             panel.columns[focused].selectedAlternative = page.selected
             panel.columns[focused].alternativeNotes = []
+            panel.columns[focused].alternativeCommands = []
             panel.columns[focused].isUncertain = false
         }
         panel.position = list.indexInGroup - page.selected + 1
@@ -182,7 +196,7 @@ enum PanelBuilder {
             total = segment.candidates.count
             var column = LatticePanel.Column(
                 text: segment.selected.text,
-                alternatives: page.map(\.text),
+                alternatives: page.map { $0.commandKind == nil ? $0.text : LauncherCommand.title(ofCandidateText: $0.text) },
                 selectedAlternative: selectedCandidate.map { $0 - pageStart },
                 variants: showsVariants ? segment.variants.map(\.text) : [],
                 selectedVariant: selectedVariant,
@@ -195,9 +209,12 @@ enum PanelBuilder {
                 switch candidate.origin {
                 case .asTyped: asTypedNote
                 case .correction: correctedNote
+                case .command: CandidatePanel.commandAnnotation
                 default: nil
                 }
             }
+            // コマンドの候補が無いページでは送らない
+            if page.contains(where: { $0.commandKind != nil }) { column.alternativeCommands = page.map(\.commandKind) }
             return column
         }
         return LatticePanel(columns: columns, position: position, total: total)
@@ -222,6 +239,7 @@ enum PanelBuilder {
         let segmentReading = String(reading.dropFirst(start).prefix(segment.readingLength))
         let entries = page.map { index in
             let candidate = segment.candidates[index]
+            if let entry = commandEntry(candidate) { return entry }
             let range = changed.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: segmentReading, changed: $0)) }
             let annotation: String? = switch candidate.origin {
             case .asTyped: asTypedNote

@@ -21,6 +21,7 @@ fn column(text: &str) -> BranchColumn {
         usage_note: None,
         homophone: None,
         alternative_notes: vec![],
+        alternative_commands: None,
         source_name: None,
         split: None,
     }

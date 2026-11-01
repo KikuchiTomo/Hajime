@@ -438,6 +438,7 @@ fn column(text: &str) -> BranchColumn {
         usage_note: None,
         homophone: None,
         alternative_notes: vec![],
+        alternative_commands: None,
         source_name: None,
         split: None,
     }
@@ -492,6 +493,7 @@ fn list(entries: &[&str], selected: usize, association: Option<&str>) -> Popup {
                 annotation: None,
                 corrected_start: None,
                 corrected_length: None,
+                command: None,
             })
             .collect(),
         selected_entry: Some(selected as u32),

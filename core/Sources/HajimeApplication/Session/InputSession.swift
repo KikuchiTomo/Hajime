@@ -1412,6 +1412,7 @@ public final class InputSession {
             var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
                                                perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
                                                corrected: correctedRange(of: \.conversionReading))
+            if case .candidate = selection.focus, candidate.commandID != nil, let note = commandNote { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if let pendingNote { panel.note = pendingNote }
             if !selection.shownPrefix.isEmpty { panel.anchor = selection.shownPrefix.utf16.count }
@@ -1451,6 +1452,7 @@ public final class InputSession {
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
                 panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
+            if let note = commandNote(for: lattice) { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if splitMode {
                 panel = PanelBuilder.splitting(panel, pieces: focusedSplit(lattice).pieces)
@@ -1479,6 +1481,7 @@ public final class InputSession {
             panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
         }
         if let usage = usageNote(for: lattice) { panel.note = .info(usage) }
+        if let note = commandNote(for: lattice) { panel.note = note }
         panel.homophone = homophone(for: lattice)
         if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
         if let pendingNote { panel.note = pendingNote }
@@ -1489,6 +1492,15 @@ public final class InputSession {
     private func segmentVariantIndex(_ variant: ScriptVariant?, in segment: SegmentLattice.Segment) -> Int? {
         guard let variant else { return nil }
         return segment.variants.firstIndex { $0.origin == .variant(variant) }
+    }
+
+    /// コマンドの候補を選んでいるときの案内(確定のキーで動く)
+    private var commandNote: Note? { PanelBuilder.commandNote(key: keyLabel(.commit, in: .converting)) }
+
+    /// 文節格子でコマンドの候補を選んでいるときの案内．コマンドは読み全体の 1 つの文節で選んだときだけ動く(commitComposition)
+    private func commandNote(for lattice: SegmentLattice) -> Note? {
+        guard lattice.segments.count == 1, lattice.focused.selected.commandID != nil, case .candidate = lattice.focused.choice else { return nil }
+        return commandNote
     }
 
     /// キー設定の表で，その状態のそのコマンドに割り当てた最初のキーの名前(案内に出す)．無ければ nil

@@ -336,6 +336,8 @@ pub mod size {
         pub const TAG_PADDING_X: f32 = 6.0;
         pub const TAG_RADIUS: f32 = 8.0;
         pub const NOTE_ICON_SIZE: f32 = 18.0;
+        pub const COMMAND_ICON_SIZE: f32 = 18.0;
+        pub const COMMAND_ICON_RADIUS: f32 = 5.0;
         pub const NOTE_GAP: f32 = 6.0;
         pub const USAGE_MAX_WIDTH: f32 = 360.0;
         pub const USAGE_ROW_HEIGHT: f32 = 22.0;
@@ -512,6 +514,8 @@ pub mod opacity {
         pub const FOCUS_TINT_CONTRAST: f32 = 0.3;
         pub const CORRECTION_TAG: f32 = 0.16;
         pub const CORRECTION_TAG_CONTRAST: f32 = 0.3;
+        pub const COMMAND_TAG: f32 = 0.16;
+        pub const COMMAND_TAG_CONTRAST: f32 = 0.3;
     }
     pub mod rounded {
         pub const BADGE: f32 = 0.12;

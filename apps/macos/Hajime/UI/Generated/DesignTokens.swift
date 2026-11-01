@@ -224,6 +224,8 @@ enum DesignTokens {
             static let tagPaddingX: CGFloat = 6
             static let tagRadius: CGFloat = 8
             static let noteIconSize: CGFloat = 18
+            static let commandIconSize: CGFloat = 18
+            static let commandIconRadius: CGFloat = 5
             static let noteGap: CGFloat = 6
             static let usageMaxWidth: CGFloat = 360
             static let usageRowHeight: CGFloat = 22
@@ -398,6 +400,8 @@ enum DesignTokens {
             static let focusTintContrast: CGFloat = 0.3
             static let correctionTag: CGFloat = 0.16
             static let correctionTagContrast: CGFloat = 0.3
+            static let commandTag: CGFloat = 0.16
+            static let commandTagContrast: CGFloat = 0.3
         }
         enum Rounded {
             static let badge: CGFloat = 0.12

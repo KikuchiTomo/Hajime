@@ -89,6 +89,26 @@ const BULB_BASE: &[Unit] = &[
     &[(0.4, 0.94), (0.6, 0.94)],
 ];
 
+/// 窓の形(外枠と，題の帯の下の線)
+const WINDOW_FRAME: Unit = &[(0.06, 0.16), (0.94, 0.16), (0.94, 0.84), (0.06, 0.84)];
+const WINDOW_BAR: &[Unit] = &[&[(0.06, 0.36), (0.94, 0.36)]];
+/// 地球の外の円の半径，経線の楕円の横の半径，緯線
+const GLOBE_RADIUS: f32 = 0.44;
+const GLOBE_MERIDIAN: f32 = 0.2;
+const GLOBE_LINES: &[Unit] = &[&[(0.06, 0.5), (0.94, 0.5)], &[(0.5, 0.06), (0.5, 0.94)]];
+/// 書類の形(右上を折った紙と，折り目)
+const DOCUMENT: Unit = &[
+    (0.18, 0.06),
+    (0.6, 0.06),
+    (0.82, 0.28),
+    (0.82, 0.94),
+    (0.18, 0.94),
+];
+const DOCUMENT_FOLD: &[Unit] = &[&[(0.6, 0.06), (0.6, 0.28), (0.82, 0.28)]];
+/// 重なった 2 枚の板(上の板と，下の板の見える縁)
+const LAYERS_TOP: Unit = &[(0.5, 0.1), (0.94, 0.34), (0.5, 0.58), (0.06, 0.34)];
+const LAYERS_BOTTOM: &[Unit] = &[&[(0.06, 0.6), (0.5, 0.84), (0.94, 0.6)]];
+
 pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
     let place =
         |(x, y): (f32, f32)| Point::new(frame.x + x * frame.width, frame.y + y * frame.height);
@@ -149,6 +169,48 @@ pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
             figures.extend(open(BULB_BASE, |p| p));
             figures
         }
+        Icon::Window => {
+            let mut figures = vec![Figure {
+                points: WINDOW_FRAME.iter().map(|point| place(*point)).collect(),
+                closed: true,
+            }];
+            figures.extend(open(WINDOW_BAR, |p| p));
+            figures
+        }
+        Icon::Globe => {
+            // 外の円と，縦長の楕円(経線)．円は 1 周を折れ線にする
+            let ellipse = |radius_x: f32| Figure {
+                points: (0..CIRCLE_STEPS)
+                    .map(|step| {
+                        let radians = 2.0 * PI * step as f32 / CIRCLE_STEPS as f32;
+                        place((
+                            0.5 + radius_x * radians.cos(),
+                            0.5 + GLOBE_RADIUS * radians.sin(),
+                        ))
+                    })
+                    .collect(),
+                closed: true,
+            };
+            let mut figures = vec![ellipse(GLOBE_RADIUS), ellipse(GLOBE_MERIDIAN)];
+            figures.extend(open(GLOBE_LINES, |p| p));
+            figures
+        }
+        Icon::Document => {
+            let mut figures = vec![Figure {
+                points: DOCUMENT.iter().map(|point| place(*point)).collect(),
+                closed: true,
+            }];
+            figures.extend(open(DOCUMENT_FOLD, |p| p));
+            figures
+        }
+        Icon::Layers => {
+            let mut figures = vec![Figure {
+                points: LAYERS_TOP.iter().map(|point| place(*point)).collect(),
+                closed: true,
+            }];
+            figures.extend(open(LAYERS_BOTTOM, |p| p));
+            figures
+        }
         Icon::Escape => {
             let span = 360.0 - (ESCAPE_GAP_TO - ESCAPE_GAP_FROM);
             let arc = (0..=CIRCLE_STEPS)
@@ -175,7 +237,7 @@ pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
 mod tests {
     use super::*;
 
-    const ALL: [Icon; 13] = [
+    const ALL: [Icon; 17] = [
         Icon::Up,
         Icon::Down,
         Icon::Left,
@@ -189,6 +251,10 @@ mod tests {
         Icon::Backspace,
         Icon::Sparkle,
         Icon::Lightbulb,
+        Icon::Window,
+        Icon::Globe,
+        Icon::Document,
+        Icon::Layers,
     ];
 
     #[test]

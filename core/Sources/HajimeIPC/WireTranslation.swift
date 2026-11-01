@@ -176,7 +176,8 @@ extension WireCandidateList {
                 }
                 return WireCandidateEntry(text: entry.text, annotation: entry.annotation,
                                           correctedStart: corrected.map { UInt32(clamping: $0.start) },
-                                          correctedLength: corrected.map { UInt32(clamping: $0.length) })
+                                          correctedLength: corrected.map { UInt32(clamping: $0.length) },
+                                          command: entry.command.map(WireCommandKind.init))
             },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
@@ -187,6 +188,17 @@ extension WireCandidateList {
             associationHint: panel.associationHint,
             homophone: panel.homophone.map(WireHomophoneNote.init)
         )
+    }
+}
+
+extension WireCommandKind {
+    public init(_ kind: LauncherCommand.Kind) {
+        switch kind {
+        case .openApplication: self = .openApplication
+        case .openURL: self = .openURL
+        case .openFile: self = .openFile
+        case .runShortcut: self = .runShortcut
+        }
     }
 }
 
@@ -223,6 +235,7 @@ extension WireBranchMap {
                     usageNote: column.usageNote,
                     homophone: column.homophone.map(WireHomophoneNote.init),
                     alternativeNotes: column.alternativeNotes,
+                    alternativeCommands: column.alternativeCommands.isEmpty ? nil : column.alternativeCommands.map { $0.map(WireCommandKind.init) },
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
                 )

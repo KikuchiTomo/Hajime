@@ -43,18 +43,30 @@ struct InputExtrasScenarioTests {
         harness.press(.space)
         let panel = try #require(harness.panel)
         #expect(panel.entries.first?.text == "クロード")
-        #expect(panel.entries.dropFirst().first?.text == Self.claude.candidateText)
+        #expect(panel.entries.first?.command == nil)
+        // 一覧では印を除いた名前に，種類と「コマンド」の札を付けて見せる
+        let entry = try #require(panel.entries.dropFirst().first)
+        #expect(entry.text == Self.claude.title)
+        #expect(entry.command == .openApplication)
+        #expect(entry.annotation == CandidatePanel.commandAnnotation)
+        #expect(panel.note == nil)
         harness.press(.enter)
         #expect(harness.committed == "クロード")
         #expect(harness.ranCommands.isEmpty)
     }
 
     @Test("R-22: 一覧でコマンドの候補を選んで確定したときだけ動かし，文字は入れない")
-    func commandRunsWhenChosen() {
+    func commandRunsWhenChosen() throws {
         let harness = harness(.listPresentation, change: withCommands)
         harness.type("kuro-do")
         harness.press(.space)
         harness.press(.space)
+        // 選んでいるあいだは，確定のキーで動くことを足元に出す．入力中の文字には印を付けた名前を出す
+        let note = try #require(harness.panel?.note)
+        #expect(note.key == "Enter")
+        #expect(note.keyAction == "実行")
+        #expect(note.text == "Enter 実行")
+        #expect(harness.marked.text == Self.claude.candidateText)
         harness.press(.enter)
         #expect(harness.ranCommands == [Self.claude])
         #expect(harness.committed.isEmpty)
@@ -69,13 +81,37 @@ struct InputExtrasScenarioTests {
         let lattice = try #require(harness.lattice)
         #expect(lattice.columns.count == 1)
         #expect(lattice.columns[0].text == "クロード")
-        #expect(lattice.columns[0].alternatives.contains(Self.claude.candidateText))
-        let index = try #require(lattice.columns[0].alternatives.firstIndex(of: Self.claude.candidateText))
+        let index = try #require(lattice.columns[0].alternatives.firstIndex(of: Self.claude.title))
         #expect(index > 0)
+        #expect(lattice.columns[0].alternativeCommands[index] == .openApplication)
+        #expect(lattice.columns[0].alternativeCommands[0] == nil)
+        #expect(lattice.columns[0].alternativeNotes[index] == CandidatePanel.commandAnnotation)
+        #expect(lattice.note == nil)
         for _ in 0..<index { harness.press(.down) }
+        #expect(harness.lattice?.note?.keyAction == "実行")
         harness.press(.enter)
         #expect(harness.ranCommands == [Self.claude])
         #expect(harness.committed.isEmpty)
+    }
+
+    @Test("R-22: 文節ごとの一覧でも，コマンドに種類と札を付け，選んでいるあいだは確定のキーで動くことを出す")
+    func commandInSegmentList() throws {
+        let harness = harness(change: {
+            withCommands(&$0)
+            $0.candidatePresentation = .segmentList
+        })
+        harness.type("kuro-do")
+        harness.press(.space)
+        let panel = try #require(harness.panel)
+        let index = try #require(panel.entries.firstIndex { $0.command != nil })
+        #expect(index > 0)
+        #expect(panel.entries[index].text == Self.claude.title)
+        #expect(panel.entries[index].annotation == CandidatePanel.commandAnnotation)
+        #expect(panel.note == nil)
+        for _ in 0..<index { harness.press(.down) }
+        #expect(harness.panel?.note?.keyAction == "実行")
+        harness.press(.enter)
+        #expect(harness.ranCommands == [Self.claude])
     }
 
     @Test("R-22: コマンドを使わない設定と，使わないコマンドは出さない")
@@ -83,7 +119,7 @@ struct InputExtrasScenarioTests {
         let off = harness(.listPresentation) { $0.commands = [Self.claude] }
         off.type("kuro-do")
         off.press(.space)
-        #expect(try #require(off.panel).entries.allSatisfy { $0.text != Self.claude.candidateText })
+        #expect(try #require(off.panel).entries.allSatisfy { $0.command == nil && $0.text != Self.claude.title })
 
         var disabled = Self.claude
         disabled.isEnabled = false
@@ -93,7 +129,7 @@ struct InputExtrasScenarioTests {
         }
         harness.type("kuro-do")
         harness.press(.space)
-        #expect(try #require(harness.panel).entries.allSatisfy { $0.text != Self.claude.candidateText })
+        #expect(try #require(harness.panel).entries.allSatisfy { $0.command == nil && $0.text != Self.claude.title })
     }
 
     @Test("R-22: 一覧を出してからコマンドを使わない設定にしたら，選んで確定しても動かさず読みを入れる")

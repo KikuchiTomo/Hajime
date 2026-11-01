@@ -2,7 +2,7 @@
 
 //! 候補の一覧(macOS の CandidateView)．上から，文字種の行・候補・足元の 3 つの区画
 
-use super::paint::Painter;
+use super::paint::{Painter, TagStyle};
 use super::{Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
@@ -98,7 +98,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .entries
         .iter()
         .map(|entry| {
-            painter.width(&entry.text, Font::Candidate)
+            entry.command.map_or(0.0, |_| Painter::command_width())
+                + painter.width(&entry.text, Font::Candidate)
                 + entry
                     .annotation
                     .as_deref()
@@ -211,11 +212,16 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         }
         .faded(opacity);
         let number = (index + 1).to_string();
-        let text_x = if theme.is_rounded() {
+        let mut text_x = if theme.is_rounded() {
             row.x + padding / 2.0 + metrics.lead
         } else {
             row.x + padding + metrics.lead
         };
+        if let Some(kind) = entry.command {
+            // コマンドの候補は，文字の前に種類のアイコンを置く
+            painter.command(kind, text_x, row.mid_y(), selected, opacity);
+            text_x += Painter::command_width();
+        }
         if theme.is_rounded() {
             let center = Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
             painter.badge(
@@ -261,7 +267,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 row.max_x() - padding / 2.0,
                 row.mid_y(),
                 selected,
-                annotation == strings::CORRECTED,
+                TagStyle::of(annotation, entry.command.is_some()),
             );
         }
         y += metrics.row_height;
@@ -441,12 +447,14 @@ mod tests {
                     annotation: None,
                     corrected_start: None,
                     corrected_length: None,
+                    command: None,
                 },
                 CandidateEntry {
                     text: "へんかん".into(),
                     annotation: Some("入力のまま".into()),
                     corrected_start: None,
                     corrected_length: None,
+                    command: None,
                 },
             ],
             selected_entry: selected,
@@ -575,6 +583,55 @@ mod tests {
     }
 
     #[test]
+    fn コマンドの候補は種類のアイコンを文字の前に置き_札をアクセントの色にする() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut commands = list(Some(0));
+            commands.entries.push(CandidateEntry {
+                text: "Claude を開く".into(),
+                annotation: Some(strings::COMMAND.into()),
+                corrected_start: None,
+                corrected_length: None,
+                command: Some(ipc::CommandKind::OpenApplication),
+            });
+            let plain = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
+            let scene = candidate_list(&commands, &Look::new(&theme, 15.0), &Fixed);
+            let icon = scene.draws.iter().find_map(|draw| match draw {
+                Draw::Icon {
+                    icon, frame, color, ..
+                } if *icon == crate::keys::Icon::Window => Some((*frame, *color)),
+                _ => None,
+            });
+            let (icon, color) = icon.expect("種類のアイコンを描く");
+            assert_eq!(color, theme.selection);
+            // 文字はアイコンの右から書き，ほかの行の文字より右に寄る
+            let title = text_frame(&scene, "Claude を開く").unwrap();
+            assert!(title.x >= icon.max_x());
+            assert!(title.x > text_frame(&scene, "変換").unwrap().x);
+            assert!(texts(&scene).contains(&(strings::COMMAND.into(), theme.selection)));
+            // アイコンの幅だけ窓を広げる
+            assert!(scene.width > plain.width);
+        }
+    }
+
+    #[test]
+    fn 選んでいるコマンドの候補は_アイコンと札を選択の文字の色にする() {
+        let theme = theme("automatic");
+        let mut commands = list(Some(2));
+        commands.entries.push(CandidateEntry {
+            text: "サイト".into(),
+            annotation: Some(strings::COMMAND.into()),
+            corrected_start: None,
+            corrected_length: None,
+            command: Some(ipc::CommandKind::OpenURL),
+        });
+        let scene = candidate_list(&commands, &Look::new(&theme, 15.0), &Fixed);
+        assert!(scene.draws.iter().any(|draw| matches!(draw,
+            Draw::Icon { icon: crate::keys::Icon::Globe, color, .. } if *color == theme.selection_text)));
+        assert!(texts(&scene).contains(&(strings::COMMAND.into(), theme.selection_text)));
+    }
+
+    #[test]
     fn 候補の中の直した語句に補正の点線を引く() {
         let theme = theme("automatic");
         let mut corrected = list(None);
@@ -583,6 +640,7 @@ mod tests {
             annotation: None,
             corrected_start: Some(3),
             corrected_length: Some(2),
+            command: None,
         };
         let scene = candidate_list(&corrected, &Look::new(&theme, 15.0), &Fixed);
         let lines: Vec<(f32, f32)> = scene
@@ -619,6 +677,7 @@ mod tests {
             annotation: None,
             corrected_start: None,
             corrected_length: None,
+            command: None,
         });
         let three = candidate_list(&longer, &look, &Fixed);
         assert_eq!(three.height - two.height, (candidate::ROW_HEIGHT).round());
@@ -656,12 +715,14 @@ mod tests {
             annotation: None,
             corrected_start: None,
             corrected_length: None,
+            command: None,
         });
         three.entries.push(CandidateEntry {
             text: "偏官".into(),
             annotation: None,
             corrected_start: None,
             corrected_length: None,
+            command: None,
         });
         let texts = texts(&candidate_list(&three, &look, &Fixed));
         let alpha = |wanted: &str| {

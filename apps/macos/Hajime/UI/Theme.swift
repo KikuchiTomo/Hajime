@@ -198,6 +198,12 @@ struct ResolvedTheme {
         return correction.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.correctionTagContrast : DesignTokens.Opacity.Glass.correctionTag)
     }
 
+    /// アクセントの色を薄く敷いた地(コマンドの候補の札と，種類のアイコンの四角)
+    var commandTint: NSColor {
+        let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast || kind == .contrast
+        return selection.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.commandTagContrast : DesignTokens.Opacity.Glass.commandTag)
+    }
+
     /// 番号の丸とキーキャップの中の文字．数字の幅をそろえる
     func keyFont(size: CGFloat) -> NSFont {
         typeface == .system ? .monospacedDigitSystemFont(ofSize: size, weight: .semibold) : font(size: size, weight: .semibold)

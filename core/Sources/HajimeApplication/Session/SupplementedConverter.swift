@@ -17,7 +17,7 @@ import HajimeDomain
 /// - ユーザー辞書のローマ字の読み(「gh」→ GitHub)と，入れるときに中身を決める語(TextTemplate．「にちじ」→ `{datetime:...}`)
 ///
 /// 変換の一覧と分岐図の文節(listCandidates・segmentCandidates)にだけ足すもの．打っているあいだ(ライブ変換)には出さず，第 1 候補にもしない
-/// - コマンド(LauncherCommand): 読みが一致すれば 2 番目に「▶ 名前」を置く．選んで確定したときだけ動く(R-22)
+/// - コマンド(LauncherCommand): 読みが一致すれば 2 番目に「▶ 名前」を置く．候補の窓では印の代わりにアイコンと札で見せる．選んで確定したときだけ動く(R-22)
 /// - うろ覚えの語(LooseReadings): 「しゅみれーしょん」→「シミュレーション」
 /// - 発音どおりに綴った英単語(PhoneticSpelling): 「ふぉと」→「photo」
 ///
@@ -225,7 +225,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         insert(extras.phonetic, into: &result, at: DefaultSettings.phoneticCandidateOffset, reading: reading, origin: .symbol)
         guard current.launcherCommands else { return }
         let commands = LauncherCommands.matching(reading, in: current.commands)
-            .map { Candidate(text: $0.candidateText, readingCount: reading.count, origin: .command(id: $0.id)) }
+            .map { Candidate(text: $0.candidateText, readingCount: reading.count, origin: .command(id: $0.id, kind: $0.kind)) }
         result.insert(contentsOf: commands, at: min(max(DefaultSettings.commandCandidateOffset, 1), result.count))
     }
 

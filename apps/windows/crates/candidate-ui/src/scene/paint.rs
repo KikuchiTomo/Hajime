@@ -5,9 +5,33 @@
 use super::{Draw, Frame, Look, Measure, Point, Scene};
 use crate::keys::{self, Icon, Part};
 use crate::theme::{Color, Font, Kind, ResolvedTheme};
-use ipc::KeyHint;
+use ipc::{CommandKind, KeyHint};
 use tokens::opacity;
 use tokens::size::{branch, candidate, glass};
+
+/// 候補の横の札の色分け
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TagStyle {
+    /// 控えめな地(「入力のまま」，取り込んだ辞書の名前)
+    Plain,
+    /// 補正の色の地(「修正」)
+    Corrected,
+    /// アクセントの色の地(「コマンド」)
+    Command,
+}
+
+impl TagStyle {
+    /// 添え書きの文字から決める(コマンドかどうかは候補の種類で決める)
+    pub fn of(text: &str, command: bool) -> Self {
+        if command {
+            Self::Command
+        } else if text == crate::strings::CORRECTED {
+            Self::Corrected
+        } else {
+            Self::Plain
+        }
+    }
+}
 
 pub(super) struct Painter<'a> {
     pub theme: &'a ResolvedTheme,
@@ -350,9 +374,9 @@ impl<'a> Painter<'a> {
         (self.width(text, Font::Label) + glass::TAG_PADDING_X * 2.0).ceil()
     }
 
-    /// 候補の横の札(「修正」「入力のまま」，取り込んだ辞書の名前)．「修正」は補正の色の地，ほかは控えめな地．
-    /// selected は選んでいる行の上(選択の地)に描くとき
-    pub fn tag(&mut self, text: &str, max_x: f32, mid_y: f32, selected: bool, corrected: bool) {
+    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前)．「修正」は補正の色の地，
+    /// コマンドはアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(選択の地)に描くとき
+    pub fn tag(&mut self, text: &str, max_x: f32, mid_y: f32, selected: bool, style: TagStyle) {
         let theme = self.theme;
         let width = self.tag_width(text);
         let frame = Frame::new(
@@ -366,10 +390,12 @@ impl<'a> Painter<'a> {
                 theme.selection_text.with_alpha(opacity::badge::SELECTED),
                 theme.selection_text,
             )
-        } else if corrected {
-            (theme.correction_tint(), theme.correction)
         } else {
-            (theme.badge, theme.text_muted)
+            match style {
+                TagStyle::Corrected => (theme.correction_tint(), theme.correction),
+                TagStyle::Command => (theme.command_tint(), theme.selection),
+                TagStyle::Plain => (theme.badge, theme.text_muted),
+            }
         };
         let radius = if theme.is_rounded() {
             glass::TAG_RADIUS
@@ -383,6 +409,58 @@ impl<'a> Painter<'a> {
             stroke: None,
         });
         self.centered(text, Font::Label, color, frame);
+    }
+
+    // MARK: - コマンドの候補(macOS の CommandDrawing と同じ形)
+
+    /// 種類ごとのアイコン
+    fn command_icon(kind: CommandKind) -> Icon {
+        match kind {
+            CommandKind::OpenApplication => Icon::Window,
+            CommandKind::OpenURL => Icon::Globe,
+            CommandKind::OpenFile => Icon::Document,
+            CommandKind::RunShortcut => Icon::Layers,
+        }
+    }
+
+    /// 種類のアイコンと，そのあとの文字までの空きを合わせた幅
+    pub fn command_width() -> f32 {
+        glass::COMMAND_ICON_SIZE + glass::NOTE_GAP
+    }
+
+    /// x を左端に種類のアイコンを描く．アクセントの色を薄く敷いた四角(角丸のテーマは角を丸める)にアクセントの色の線画．
+    /// selected は選んでいる行の上(選択の地)に描くとき．opacity は出し始めの薄さ
+    pub fn command(&mut self, kind: CommandKind, x: f32, mid_y: f32, selected: bool, opacity: f32) {
+        let theme = self.theme;
+        let size = glass::COMMAND_ICON_SIZE;
+        let frame = Frame::new(x.round(), (mid_y - size / 2.0).round(), size, size);
+        let (fill, color) = if selected {
+            (
+                theme.selection_text.with_alpha(opacity::badge::SELECTED),
+                theme.selection_text,
+            )
+        } else {
+            (theme.command_tint(), theme.selection)
+        };
+        let radius = if theme.is_rounded() {
+            glass::COMMAND_ICON_RADIUS
+        } else {
+            0.0
+        };
+        self.draws.push(Draw::RoundRect {
+            frame,
+            radius,
+            fill: Some(fill.faded(opacity)),
+            stroke: None,
+        });
+        self.icon(
+            Self::command_icon(kind),
+            Frame::square(
+                Point::new(frame.mid_x(), frame.mid_y()),
+                glass::KEY_FONT_SIZE,
+            ),
+            color.faded(opacity),
+        );
     }
 
     // MARK: - 足元の案内
