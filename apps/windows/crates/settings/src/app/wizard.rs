@@ -151,6 +151,8 @@ struct Wizard {
     /// 機能の紹介のページで見せている機能(項目)と，その説明の札を出す動き(0 から 1)
     spotlight: Option<&'static str>,
     caption: Tween,
+    /// オン・オフを切り替えたときのつまみの動き(項目ごと．0 はオフ，1 はオン)
+    knobs: Vec<(&'static str, Tween)>,
     focus: Focus,
     focus_visible: bool,
     hover: Option<Target>,
@@ -225,6 +227,7 @@ pub fn open(
         progress: Tween::fixed(progress_of(step)),
         spotlight: wizard::spotlight_items(step).first().map(|(path, _)| *path),
         caption: Tween::fixed(1.0),
+        knobs: Vec::new(),
         focus: Focus::Button(Button::Next),
         focus_visible: false,
         hover: None,
@@ -557,6 +560,20 @@ impl Wizard {
         {
             let on = self.choices.is_on(path);
             self.choices.set_toggle(path, !on);
+            let now = self.now();
+            let duration = self.duration(motion::TOGGLE);
+            let target = if on { 0.0 } else { 1.0 };
+            match self
+                .knobs
+                .iter_mut()
+                .find(|(candidate, _)| candidate == path)
+            {
+                Some((_, knob)) => knob.retarget(target, now, duration, Easing::STANDARD),
+                None => self.knobs.push((
+                    path,
+                    Tween::new(1.0 - target, target, now, duration, Easing::STANDARD),
+                )),
+            }
             self.restart_demo();
         }
     }
@@ -961,8 +978,10 @@ impl Wizard {
 
     /// 次に描く時を決める．動いているあいだは画面の更新に合わせ，止まっているコマでは次のコマまで時計で待つ
     fn schedule(&self, now: f64) {
-        let tweens =
-            self.enter.running(now) || self.progress.running(now) || self.caption.running(now);
+        let tweens = self.enter.running(now)
+            || self.progress.running(now)
+            || self.caption.running(now)
+            || self.knobs.iter().any(|(_, knob)| knob.running(now));
         let loading = !self.ready() && !self.step.groups().is_empty();
         let demo = self.demo_frame(now);
         let moving = demo.is_some_and(|(frame, position)| {
@@ -1637,7 +1656,13 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
                         rect.height,
                     ),
                     on,
-                    if on { 1.0 } else { 0.0 },
+                    wizard
+                        .knobs
+                        .iter()
+                        .find(|(candidate, _)| *candidate == path)
+                        .map_or(if on { 1.0 } else { 0.0 }, |(_, knob)| {
+                            knob.value(state.now)
+                        }),
                     crate::strings::windows::ON,
                     crate::strings::windows::OFF,
                     State {
