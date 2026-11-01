@@ -46,6 +46,9 @@ targets:
       # 同音異義語の使い分けの辞書(R-08)．data/usage は tools/usage/update.sh で japanese-usage-dictionary から取る
       - path: ../../data/usage/usage_dict.txt
         buildPhase: resources
+      # Mozc の辞書から抜き出した同音異義語に，Claude で説明と用例を付けた辞書．tools/usage/gen で作る
+      - path: ../../data/usage/usage_dict_extra.tsv
+        buildPhase: resources
     postBuildScripts:
       - name: 入力ソースの表示名を書く
         path: ../../tools/macos/write_input_source_names.sh

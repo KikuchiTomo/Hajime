@@ -161,9 +161,12 @@ final class CompositionRoot {
 
     /// 郵便番号の表(R-13)．入力欄ごとのセッションで共有し，初めて引くときに読み込む
     private(set) lazy var postalCodes: PostalCodeFile? = Bundle.main.url(forResource: "postal-codes", withExtension: "tsv").map(PostalCodeFile.init(url:))
-    /// 同音異義語の使い分けの辞書(R-08)．data/usage/usage_dict.txt を同梱する
-    private(set) lazy var usageDictionary: UsageDictionaryFile? = Bundle.main.url(forResource: "usage_dict", withExtension: "txt")
-        .map(UsageDictionaryFile.init(url:))
+    /// 同音異義語の使い分けの辞書(R-08)．data/usage/usage_dict.txt と，Mozc の辞書から作った usage_dict_extra.tsv を同梱する
+    private(set) lazy var usageDictionary: UsageDictionaryFile? = {
+        let urls = [Bundle.main.url(forResource: "usage_dict", withExtension: "txt"),
+                    Bundle.main.url(forResource: "usage_dict_extra", withExtension: "tsv")].compactMap { $0 }
+        return urls.isEmpty ? nil : UsageDictionaryFile(urls: urls)
+    }()
 
     /// 手書きの窓(R-14)．開くたびに作らず使い回す
     private(set) lazy var handwriting = HandwritingController(recognizer: VisionHandwritingRecognizer(), settings: settings)

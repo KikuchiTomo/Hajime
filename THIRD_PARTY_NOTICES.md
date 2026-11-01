@@ -1563,6 +1563,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 https://github.com/KikuchiTomo/hajime-dictionary(v0.1.1)．かな漢字変換の辞書として同梱する．azooKey_dictionary_storage(上の節，Apache License 2.0)の辞書に，Mozc の src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語を足したもの．品詞の番号の対応に mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使った．Mozc の著作権表示とライセンスは上の Mozc の節と同じ．辞書の語の多くは IPAdic に由来し，次の表示が求められる(dictionary_oss の README.txt より)．
 
+同音異義語の使い分けの辞書 data/usage/usage_dict_extra.tsv の読みと表記も，同じ dictionary_oss から抜き出した(tools/usage/gen)．説明と用例は Claude で書いた．
+
 ```
 IPAdic is licensed as follows:
 
