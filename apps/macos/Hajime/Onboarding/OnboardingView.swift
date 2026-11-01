@@ -22,7 +22,8 @@ struct OnboardingView: View {
                         .padding(.vertical, Size.cardGap / 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scrollIndicators(.never)
+                // 窓が低くて入らないときは，スクロールできることが分かるようにする
+                .scrollIndicators(.automatic)
                 footer
             }
             .padding(Size.padding)
@@ -43,10 +44,18 @@ struct OnboardingView: View {
                            startRadius: 0, endRadius: Size.height * 0.8)
             RadialGradient(colors: [Color(nsColor: .systemPink).opacity(Opacity.stageGlowSecondary), .clear], center: .bottomTrailing,
                            startRadius: 0, endRadius: Size.height * 0.7)
-            OnboardingStage(page: model.page, settings: model.draft)
+            OnboardingStage(page: model.page, settings: model.draft, spotlight: model.spotlight)
                 .id(model.page)
                 .transition(.opacity)
+            if let spotlight = model.spotlight {
+                SpotlightCaption(spotlight: spotlight)
+                    .id(spotlight)
+                    .transition(.asymmetric(insertion: .offset(y: Size.cardGap * 2).combined(with: .opacity), removal: .opacity))
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(Size.stagePadding)
+            }
         }
+        .animation(.spring(response: DesignTokens.Motion.Onboarding.page / 1000 * 1.6, dampingFraction: 0.82), value: model.spotlight)
         .ignoresSafeArea()
         .clipped()
     }
@@ -192,24 +201,23 @@ struct OnboardingView: View {
         }
     }
 
-    private var features: some View {
-        VStack(spacing: Size.cardGap) {
-            FeatureRow(title: UIStrings.Onboarding.association, detail: UIStrings.Onboarding.associationDetail, isOn: model.binding(\.association))
-            FeatureRow(title: UIStrings.Onboarding.calculation, detail: UIStrings.Onboarding.calculationDetail, isOn: model.binding(\.calculation))
-            FeatureRow(title: UIStrings.Onboarding.postalCode, detail: UIStrings.Onboarding.postalCodeDetail, isOn: model.binding(\.postalCodeConversion))
-            FeatureRow(title: UIStrings.Onboarding.date, detail: UIStrings.Onboarding.dateDetail, isOn: model.binding(\.dateConversion))
-        }
-    }
+    private var features: some View { spotlightRows(on: .features) }
 
     /// 既定ではオフの機能．ここでオンにでき，あとから設定の画面でも変えられる
-    private var extras: some View {
-        VStack(spacing: Size.cardGap) {
-            FeatureRow(title: UIStrings.Extras.looseReadings, detail: UIStrings.Extras.looseReadingsNote, isOn: model.binding(\.looseReadings))
-            FeatureRow(title: UIStrings.Extras.phoneticSpelling, detail: UIStrings.Extras.phoneticSpellingNote, isOn: model.binding(\.phoneticSpelling))
-            FeatureRow(title: UIStrings.Extras.handShift, detail: UIStrings.Extras.handShiftNote, isOn: model.binding(\.handShiftCorrection))
-            FeatureRow(title: UIStrings.Onboarding.macros, detail: UIStrings.Onboarding.macrosDetail, isOn: model.binding(\.conversionMacros))
-            FeatureRow(title: UIStrings.Onboarding.dynamicDictionary, detail: UIStrings.Onboarding.dynamicDictionaryDetail, isOn: model.binding(\.dynamicDictionary))
-            FeatureRow(title: UIStrings.Onboarding.commands, detail: UIStrings.Onboarding.commandsDetail, isOn: model.binding(\.launcherCommands))
+    private var extras: some View { spotlightRows(on: .extras) }
+
+    /// 機能の一覧．項目にポインタを置くと，左の舞台にその機能の実演と説明を出す(説明は舞台に出すので，項目は名前とスイッチだけ)
+    private func spotlightRows(on page: OnboardingPage) -> some View {
+        VStack(alignment: .leading, spacing: Size.cardGap) {
+            ForEach(OnboardingSpotlight.items(on: page)) { item in
+                SpotlightRow(item: item, isOn: model.binding(item.setting), highlighted: model.spotlight == item) {
+                    model.spotlight = item
+                }
+            }
+            Label(UIStrings.Onboarding.spotlightHint, systemImage: "cursorarrow.rays")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, Size.cardGap / 2)
         }
     }
 
@@ -398,25 +406,69 @@ private struct InfoCard: View {
     }
 }
 
-/// 機能の紹介の 1 行．名前と説明，オン・オフ
-private struct FeatureRow: View {
+/// 機能の一覧の 1 行．アイコン・名前・スイッチ．ポインタを置くか押すと，左の舞台にその機能を見せる
+private struct SpotlightRow: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding
 
-    let title: String
-    let detail: String
+    let item: OnboardingSpotlight
     let isOn: Binding<Bool>
+    let highlighted: Bool
+    let focus: () -> Void
+
+    var body: some View {
+        HStack(spacing: Size.cardGap) {
+            Image(systemName: item.symbol)
+                .font(.title3)
+                .foregroundStyle(highlighted ? Color.accentColor : Color.secondary)
+                .frame(width: Size.infoSymbolWidth)
+                .accessibilityHidden(true)
+            Text(item.title).font(.headline)
+            Spacer(minLength: Size.cardGap)
+            Toggle(item.title, isOn: isOn).labelsHidden().toggleStyle(.switch)
+        }
+        .padding(.horizontal, Size.cardPadding)
+        .padding(.vertical, Size.cardPadding * 0.7)
+        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
+            .fill(highlighted ? Color.accentColor.opacity(Opacity.cardSelected) : Color.primary.opacity(Opacity.cardIdle)))
+        .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
+            .strokeBorder(highlighted ? Color.accentColor : Color.clear, lineWidth: 1.5))
+        .contentShape(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous))
+        .onHover { inside in if inside { focus() } }
+        .onTapGesture(perform: focus)
+        .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: highlighted)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(item.detail)
+    }
+}
+
+/// 舞台の下に出す，見せている機能の説明の札．項目を移るたびに下から浮かび上がる
+private struct SpotlightCaption: View {
+    private typealias Size = DesignTokens.Size.Onboarding
+
+    let spotlight: OnboardingSpotlight
 
     var body: some View {
         HStack(alignment: .top, spacing: Size.cardGap) {
+            Image(systemName: spotlight.symbol)
+                .font(.title2)
+                .foregroundStyle(.white)
+                .frame(width: Size.fieldHeight, height: Size.fieldHeight)
+                .background(Circle().fill(Color.accentColor))
+                .symbolEffect(.bounce, value: spotlight)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Size.cardGap / 3) {
-                Text(title).font(.headline)
-                Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(spotlight.title).font(.headline)
+                Text(spotlight.detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
-            Toggle(title, isOn: isOn).labelsHidden().toggleStyle(.switch)
+            Spacer(minLength: 0)
         }
         .padding(Size.cardPadding)
-        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).fill(Color.primary.opacity(Opacity.cardIdle)))
+        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).fill(.regularMaterial))
+        .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1))
+        .accessibilityElement(children: .combine)
     }
 }

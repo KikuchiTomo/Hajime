@@ -137,6 +137,9 @@ enum DesignTokens {
             static let sectionPaddingY: CGFloat = 3
             static let minWidth: CGFloat = 180
             static let variantInsetY: CGFloat = 1
+            static let maxWidth: CGFloat = 720
+            static let screenMargin: CGFloat = 16
+            static let truncationContext: CGFloat = 4
         }
         enum ModeIndicator {
             static let fontSize: CGFloat = 14

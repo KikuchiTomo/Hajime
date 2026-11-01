@@ -563,6 +563,7 @@ enum UIStrings {
         static let commands = "コマンド"
         static let commandsDetail = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。"
         static let commandsExample = "Claude を開く"
+        static let spotlightHint = "項目にポインタを置くと、左に使い方を出します。"
         static let association = "連想変換"
         static let associationDetail = "Shift + Space で、似た意味の語を出します。"
         static let calculation = "計算"

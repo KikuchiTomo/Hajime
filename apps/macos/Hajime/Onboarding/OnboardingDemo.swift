@@ -27,8 +27,10 @@ enum DemoScripts {
     private static var keystroke: TimeInterval { DesignTokens.Motion.Onboarding.keystroke / 1000 }
     private static var hold: TimeInterval { DesignTokens.Motion.Onboarding.hold / 1000 }
 
-    static func frames(for page: OnboardingPage, settings: Settings, now: Date = Date()) -> [DemoFrame] {
-        switch page {
+    static func frames(for page: OnboardingPage, settings: Settings, spotlight: OnboardingSpotlight? = nil, now: Date = Date()) -> [DemoFrame] {
+        // 機能のページでは，ポインタを置いた機能だけを(オフでも)見せる
+        if let spotlight, spotlight.page == page { return frames(for: spotlight, now: now) }
+        return switch page {
         case .modeSwitch: modeSwitch(settings)
         case .appModes: appModes()
         case .correction: correction(settings)
@@ -204,21 +206,82 @@ enum DemoScripts {
 
     /// 試験的な機能．オンにしたものだけを見せる(うろ覚えの語・変換マクロ・コマンド)
     private static func extras(_ settings: Settings) -> [DemoFrame] {
+        let frames = OnboardingSpotlight.items(on: .extras).filter { settings[keyPath: $0.setting] }.flatMap { self.frames(for: $0, now: Date()) }
+        return frames.isEmpty ? [DemoFrame(duration: hold)] : frames
+    }
+
+    // MARK: - 機能ごとの実演
+
+    /// 候補の一覧のコマ．選んでいる候補を from から to まで 1 つずつ動かし，最後に確定する(commit が nil なら確定しない)
+    private static func choosing(_ entries: [String], from: Int = 0, to: Int, heading: AssociationHeading? = nil, marked: [(String, MarkedText.Style)]? = nil,
+                                 commit: String? = nil) -> [DemoFrame] {
         var frames: [DemoFrame] = []
-        func show(_ keys: String, entries: [String], heading: AssociationHeading? = nil, selected: Int = 0) {
-            frames += typing(keys)
+        for selected in from...max(from, to) {
             var list = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },
                                       selectedEntry: selected, focus: .candidate, position: selected + 1, total: entries.count, note: nil)
             list.association = heading
-            frames.append(converted([(entries[selected], .focused)], panel: .list(list)))
+            var frame = converted(marked ?? [(entries[selected], .focused)], panel: .list(list))
+            // 選んでいる候補を動かすあいだは短く，最後の候補は長く見せる
+            frame.duration = selected == max(from, to) ? hold : hold / 2
+            frames.append(frame)
         }
-        if settings.looseReadings { show("shumire-shon", entries: ["シュミレーション", "シミュレーション"], selected: 1) }
-        if settings.conversionMacros {
-            show("toukyou", entries: ["「東京」", "【東京】", "東京（とうきょう）"],
-                 heading: AssociationHeading(headword: "東京", label: DefaultSettings.macroGroupLabel, group: 1, groupCount: 1))
+        if let commit { frames.append(DemoFrame(committed: commit, duration: hold)) }
+        return frames
+    }
+
+    /// 打ちかけの字をそのまま 1 字ずつ見せる(数字や記号はローマ字の組み立てを通さない)
+    private static func typingLiterally(_ text: String) -> [DemoFrame] {
+        text.indices.map { DemoFrame(marked: MarkedText([.init(String(text[...$0]), style: .reading)]), duration: keystroke * 1.5) }
+    }
+
+    /// 一つの機能の実演．オンかどうかによらず，その機能が何をするかを見せる
+    static func frames(for spotlight: OnboardingSpotlight, now: Date) -> [DemoFrame] {
+        switch spotlight {
+        case .association:
+            return typing("kawaii") + choosing(["可愛い", "かわいい", "カワイイ"], to: 0)
+                + choosing(["愛らしい", "可憐", "愛くるしい", "キュート"], to: 3,
+                           heading: AssociationHeading(headword: "可愛い", label: UIStrings.Onboarding.association, group: 1, groupCount: 1), commit: "キュート")
+        case .calculation:
+            return typingLiterally("1+2*3=") + choosing(["7", "1+2*3=7"], to: 1, commit: "1+2*3=7")
+        case .postalCode:
+            return typingLiterally("100-0001") + choosing(["東京都千代田区千代田", "100-0001"], to: 0, commit: "東京都千代田区千代田")
+        case .date:
+            let long = formatted(now, "y年M月d日"), short = formatted(now, "y/MM/dd")
+            return typing("kyou") + choosing([long, short, "今日"], to: 1, commit: short)
+        case .looseReadings:
+            return typing("shumire-shon") + choosing(["シュミレーション", "シミュレーション", "趣味レーション"], to: 1, commit: "シミュレーション")
+        case .phoneticSpelling:
+            return typing("foto") + choosing(["フォト", "photo", "ふぉと"], to: 1, commit: "photo")
+        case .handShift:
+            // 右手も左手も 1 キー右にずれたまま「konnichiha」と打った(QWERTY)
+            let keys = "lpmmovjojs"
+            var frames = typing(keys)
+            frames += pause(frames.last, seconds: hold / 2)
+            let note = Note(tone: .correction, title: "修正", subject: keys, key: "Esc", keyAction: "戻す")
+            frames.append(converted([("こんにちは", .correction)], panel: .note(note)))
+            frames.append(DemoFrame(committed: "こんにちは", duration: hold))
+            return frames
+        case .macros:
+            let heading = AssociationHeading(headword: "東京", label: DefaultSettings.macroGroupLabel, group: 1, groupCount: 1)
+            return typing("toukyou") + choosing(["東京", "とうきょう", "トウキョウ"], to: 0)
+                + choosing(["「東京」", "『東京』", "【東京】", "（東京）", "東京（とうきょう）"], to: 4, heading: heading, commit: "東京（とうきょう）")
+        case .dynamicDictionary:
+            // 読み「ts」・単語「{datetime:YYYY-MM-DD hh:mm:ss}」を登録したとき(読みはローマ字でもよい)
+            let stamp = formatted(now, "yyyy-MM-dd HH:mm:ss")
+            return typingLiterally("ts") + choosing([stamp, "ts", "TS"], to: 0, commit: stamp)
+        case .commands:
+            // 第 1 候補は語のまま．コマンドは 2 番目に並び，選んで確定したときだけ動く(文字は入らない)
+            return typing("kuro-do") + choosing(["クロード", DefaultSettings.commandCandidateMark + UIStrings.Onboarding.commandsExample, "黒戸"], to: 1)
+                + [DemoFrame(duration: hold)]
         }
-        if settings.launcherCommands { show("kuro-do", entries: ["クロード", DefaultSettings.commandCandidateMark + UIStrings.Onboarding.commandsExample], selected: 1) }
-        return frames.isEmpty ? [DemoFrame(duration: hold)] : frames
+    }
+
+    private static func formatted(_ date: Date, _ pattern: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = pattern
+        return formatter.string(from: date)
     }
 
     // MARK: - 見本の分岐図

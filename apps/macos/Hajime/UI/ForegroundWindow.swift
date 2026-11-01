@@ -25,7 +25,16 @@ enum ForegroundWindow {
     /// 窓を前に出して，キーボードの入力を受けられるようにする
     static func present(_ window: NSWindow) {
         NSApp.setActivationPolicy(.accessory)
-        NSApp.activate(ignoringOtherApps: true)
+        bringForward(window)
+        // 前面に出られるアプリへの切り替えは少し遅れて効くので，切り替えが済んでからもう一度前に出す
+        // (すぐに頼むだけだと，窓は出ても前に来ず，キーの入力も受けない)
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { bringForward(window) }
+        }
+    }
+
+    private static func bringForward(_ window: NSWindow) {
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
     }
