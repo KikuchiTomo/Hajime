@@ -1596,6 +1596,22 @@ impl PageView {
         scroller.target() != before
     }
 
+    /// 一覧の入力欄の値で行を足す(追加のボタンを押したのと同じ)．入力欄が埋まっていなければ None
+    pub fn list_add_event(&self, path: &str) -> Option<Event> {
+        let row = self
+            .rows
+            .iter()
+            .find(|row| matches!(&row.row.control, Control::List(spec, _) if spec.path == path))?;
+        let (spec, limit) = row.list_spec().map(|(spec, limit)| (*spec, limit))?;
+        let values = row.input_values();
+        spec.is_filled(&values).then(|| Event::ListAdd {
+            spec,
+            limit,
+            item: spec.make(&values),
+            replacing: None,
+        })
+    }
+
     /// path の一覧の field 番目の入力欄に text を入れる(アプリを選んで足すとき)
     pub fn set_list_input(&mut self, path: &str, field: usize, text: &str) {
         for row in &mut self.rows {

@@ -82,7 +82,11 @@ pub const OKURIGANA: &[Choice] = &[
 ];
 
 /// かな漢字変換に使う Zenzai のモデル(ZenzaiModelChoice)．UIStrings.Settings.label(for: ZenzaiModelChoice)
-pub const ZENZAI_MODELS: &[Choice] = &[("accurate", "精度を優先"), ("fast", "速さを優先"), ("combined", "併用")];
+pub const ZENZAI_MODELS: &[Choice] = &[
+    ("accurate", "精度を優先"),
+    ("fast", "速さを優先"),
+    ("combined", "併用"),
+];
 
 pub const LEARNING: &[Choice] = &[
     ("enabled", "学習する"),
@@ -133,6 +137,9 @@ pub const SYNC_GROUPS: &[Choice] = &[
 /// アプリごとの扱い(AppProfile)．標準はアプリを一覧から消すのと同じなので並べない(macOS の ExclusionsPage と同じ)
 pub const APP_PROFILES: &[Choice] = &[
     ("direct", "IME を使わない"),
+    ("imeOff", "IME をオフ"),
+    ("imeOn", "IME をオン"),
+    ("remembersMode", "IME のオンオフを記憶"),
     ("programming", "記号を半角"),
     ("terminal", "コマンドを英字"),
 ];

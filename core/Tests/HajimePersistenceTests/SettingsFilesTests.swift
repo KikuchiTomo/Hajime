@@ -118,7 +118,7 @@ struct SettingsFilesTests {
     @Test("除外設定の CSV を読み込み，読めなかった行を数える．書き出すと同じ規則が読める")
     func profileRules() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        let path = try file("rules.csv", "app_id,mode\n# メモ\nWindowsTerminal.exe,terminal\ncode.exe,programming\nbad id,terminal\nx.exe,unknown\n")
+        let path = try file("rules.csv", "app_id,mode\n# メモ\nWindowsTerminal.exe,terminal\ncode.exe,programming\nbad/id,terminal\nx.exe,unknown\n")
         let counts = try await files.importProfileRules(from: path)
         #expect(counts.added == 2)
         #expect(counts.skipped == 2)

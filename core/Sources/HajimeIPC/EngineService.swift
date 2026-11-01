@@ -50,6 +50,8 @@ public final class EngineService {
         var correction: CorrectionWork?
         /// 打っているあいだに前もって求めている打ち間違いの訂正(見直すときに待たせないため)．次のキーで取り消す
         var prefetch: Task<Void, Never>?
+        /// 入力先のアプリの識別子．activate で受け取り，モードを覚えるのに使う
+        var application: String?
     }
 
     /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
@@ -96,6 +98,8 @@ public final class EngineService {
     private var sessions: [UInt32: Session] = [:]
     private var nextConnection: UInt64 = 1
     private var nextSession: UInt32 = 1
+    /// アプリごとに最後に使ったモード．セッション(DLL を読み込んだアプリ)をまたいでモードを揃えるのにも使う
+    private var modeMemory = AppModeMemory()
     private var lastAnchor: WireRect?
     private var handwriting: Handwriting?
     /// 候補の窓を出しているセッション．候補ウィンドウで押した候補は，このセッションの次の wake で選ぶ
@@ -223,10 +227,29 @@ public final class EngineService {
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             cancelCorrections(of: session)
             let actions = current.input.setMode(InputMode(mode))
+            rememberMode(of: current)
             return edit(actions, handled: true, session: session, anchor: lastAnchor)
+        case .activate(let session, let wire):
+            guard var current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            cancelCorrections(of: session)
+            current.application = wire.applicationId
+            sessions[session]?.application = wire.applicationId
+            // 除外設定で決めたモードにする．決めていなければ，どのアプリでも最後に使ったモードにそろえる
+            // (macOS は OS がモードを 1 つだけ持つ．Windows はアプリごとにセッションがあるので，ここでそろえる)．
+            // DLL はアプリ(スレッド)に入力先が移ったときだけ送るので，macOS と違って同じアプリの中の移動は除かなくてよい
+            let profile = settings.current.modeProfile(forApplication: wire.applicationId)
+            var actions: [ClientAction] = []
+            if let mode = modeMemory.mode(entering: wire.applicationId, profile: profile) ?? modeMemory.lastMode, mode != current.input.mode {
+                // OS の入力モード(Windows の OPENCLOSE)も合わせて変える
+                actions = current.input.setMode(mode) + [.selectMode(mode)]
+            }
+            // 移ったアプリのモードを先に覚える．前のアプリの deactivate より先に届いても，次のアプリがこのモードにそろう
+            rememberMode(of: current)
+            return edit(actions, handled: true, session: session, anchor: wire.caret ?? lastAnchor)
         case .deactivate(let session):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             cancelCorrections(of: session)
+            rememberMode(of: current)
             let actions = current.input.deactivate()
             ui(.hide)
             // 入力先から外れたら手書きの窓も閉じる．選んだ文字が別の入力欄に入らないように
@@ -419,6 +442,12 @@ public final class EngineService {
                                     candidateFontSize: current.candidateFontSize, handwriting: current.handwriting)
     }
 
+    /// セッションの今のモードを，入力先のアプリのモードとして覚える．キーで切り替えたモードも，ほかのアプリに移る前に覚えておく
+    /// (アプリを移ると，前のアプリの deactivate より先に次のアプリの activate が届くことがある)
+    private func rememberMode(of current: Session) {
+        modeMemory.record(current.input.mode, application: current.application)
+    }
+
     private func owned(_ session: UInt32, by id: ConnectionID) -> Session? {
         guard let current = sessions[session], current.owner == id else { return nil }
         return current
@@ -436,6 +465,7 @@ public final class EngineService {
         sessions[session]?.prefetch?.cancel()
         sessions[session]?.prefetch = nil
         let result = current.input.handle(event, context: context)
+        rememberMode(of: current)
         sessions[session]?.hasSettled = false
         sessions[session]?.stoppedAt = now()
         sessions[session]?.warming = []

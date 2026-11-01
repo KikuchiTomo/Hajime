@@ -84,7 +84,10 @@ enum SnapshotRenderer {
             settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "はじめ"), UserDictionaryEntry(reading: "かいしゃ", word: "会社")]
             settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
                                     SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]
-            settings.profileRules = [ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .terminal)]
+            settings.profileRules = [ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .imeOff),
+                                     ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .terminal),
+                                     ProfileRule(applicationPrefix: "com.apple.Notes", profile: .remembersMode),
+                                     ProfileRule(applicationPrefix: "com.tinyspeck.slackmacgap", profile: .imeOn)]
         }
         for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
             NSApp.appearance = NSAppearance(named: appearance)

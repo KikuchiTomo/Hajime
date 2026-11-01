@@ -766,6 +766,19 @@
           ]
         },
         {
+          "name": "activate",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
           "name": "deactivate",
           "fields": [
             {

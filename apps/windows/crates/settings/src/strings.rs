@@ -663,7 +663,7 @@ pub mod windows {
     pub const EXCLUSIONS_NOTE: &str =
         "実行ファイルの名前を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。";
     /// 不正な実行ファイルの名前(macOS はアプリを選んで足すので無い)
-    pub const INVALID_APP: &str = "実行ファイルの名前は英数字・「.」・「-」・「_」にしてください";
+    pub const INVALID_APP: &str = "実行ファイルの名前に使えない文字が含まれています";
     /// macOS の languageNote から，試した結果を右クリックで足す説明を除いたもの(Windows の結果は文字で出す)
     pub const LANGUAGE_NOTE: &str =
         "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。";
@@ -702,6 +702,8 @@ pub mod wizard {
     pub const WELCOME_TEXT: &str = "はじめをインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
     pub const SWITCH_TITLE: &str = "英語と日本語の切り替え";
     pub const SWITCH_TEXT: &str = "英語と日本語を切り替えるキーを選びます。";
+    pub const APP_MODES_TITLE: &str = "アプリごとの入力モード";
+    pub const APP_MODES_TEXT: &str = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。";
     pub const SWITCH_TOGGLE: &str = "半角/全角キーで切り替える";
     pub const SWITCH_TOGGLE_NOTE: &str = "1 つのキーを押すたびに、英語と日本語が入れ替わります。";
     pub const SWITCH_HENKAN: &str = "変換キーで日本語、無変換キーで英語";
@@ -783,6 +785,9 @@ pub mod wizard {
     /// 実演の説明
     pub const CAPTION_ENGLISH: &str = "英語で入力";
     pub const CAPTION_JAPANESE: &str = "日本語で入力";
+    pub const CAPTION_APP_NOTES: &str = "メモ帳では日本語入力";
+    pub const CAPTION_APP_TERMINAL: &str = "ターミナルに切り替えると英語入力";
+    pub const CAPTION_APP_BACK: &str = "メモ帳に戻すと日本語入力";
     pub const CAPTION_ROMAJI: &str = "ローマ字で入力";
     pub const CAPTION_KANA: &str = "かなで入力";
     pub const CAPTION_LIVE: &str = "手を止めると漢字に";

@@ -12,6 +12,8 @@ use serde_json::{json, Value};
 pub enum Step {
     Welcome,
     Switch,
+    /// アプリごとの入力モード(除外設定の IME をオフ・オン・オンオフを記憶)の紹介
+    AppModes,
     Characters,
     LiveConversion,
     Window,
@@ -24,9 +26,10 @@ pub enum Step {
 }
 
 impl Step {
-    pub const ALL: [Step; 11] = [
+    pub const ALL: [Step; 12] = [
         Step::Welcome,
         Step::Switch,
+        Step::AppModes,
         Step::Characters,
         Step::LiveConversion,
         Step::Window,
@@ -54,6 +57,7 @@ impl Step {
         match self {
             Step::Welcome => text::WELCOME_TITLE,
             Step::Switch => text::SWITCH_TITLE,
+            Step::AppModes => text::APP_MODES_TITLE,
             Step::Characters => text::CHARACTERS_TITLE,
             Step::LiveConversion => text::LIVE_TITLE,
             Step::Window => text::WINDOW_STEP_TITLE,
@@ -70,6 +74,7 @@ impl Step {
         match self {
             Step::Welcome => text::WELCOME_TEXT,
             Step::Switch => text::SWITCH_TEXT,
+            Step::AppModes => text::APP_MODES_TEXT,
             Step::Characters => text::CHARACTERS_TEXT,
             Step::LiveConversion => text::LIVE_TEXT,
             Step::Window => text::WINDOW_TEXT,
@@ -85,7 +90,8 @@ impl Step {
     /// 選ぶもの(上から順)
     pub fn groups(self) -> Vec<Group> {
         match self {
-            Step::Welcome | Step::Done => vec![],
+            // アプリごとの入力モードは紹介だけ．選ぶのは設定の画面の除外設定
+            Step::Welcome | Step::AppModes | Step::Done => vec![],
             Step::Switch => vec![Group::radio(None, Field::Switch, SWITCH)],
             Step::Characters => vec![
                 Group::radio(

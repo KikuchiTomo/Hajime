@@ -231,9 +231,21 @@ public struct Settings: Sendable, Equatable {
         customThemeID.flatMap { id in customThemes.first { $0.id == id } }
     }
 
+    /// アプリの入力の扱い(記号を半角・コマンドを英字・IME を使わない)．決まりが無ければ標準
     public func profile(forApplication identifier: String?) -> AppProfile {
-        guard let identifier else { return .standard }
-        return profileRules.first { identifier.hasPrefix($0.applicationPrefix) }?.profile ?? .standard
+        rule(forApplication: identifier) { !$0.setsModeOnFocus }?.profile ?? .standard
+    }
+
+    /// 入力先をアプリに移したときのモードの扱い(IME をオフ・オン・オンオフを記憶)．決まりが無ければ標準(切り替えない)
+    public func modeProfile(forApplication identifier: String?) -> AppProfile {
+        rule(forApplication: identifier) { $0.setsModeOnFocus }?.profile ?? .standard
+    }
+
+    /// アプリに合う決まりのうち，いちばん上のもの．
+    /// 大文字と小文字は区別しない．Windows の実行ファイルの名前は書き方がそろわない(WindowsTerminal.exe と windowsterminal.exe)
+    private func rule(forApplication identifier: String?, where kind: (AppProfile) -> Bool) -> ProfileRule? {
+        guard let identifier = identifier?.lowercased() else { return nil }
+        return profileRules.first { kind($0.profile) && identifier.hasPrefix($0.applicationPrefix.lowercased()) }
     }
 }
 

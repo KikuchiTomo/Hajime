@@ -696,6 +696,10 @@ pub enum RequestBody {
         session: u32,
         mode: InputMode,
     },
+    Activate {
+        session: u32,
+        context: FieldContext,
+    },
     Deactivate {
         session: u32,
     },
@@ -869,6 +873,11 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("SetMode")
                 .field("session", session)
                 .field("mode", mode)
+                .finish(),
+            Self::Activate { session, context, .. } => f
+                .debug_struct("Activate")
+                .field("session", session)
+                .field("context", context)
                 .finish(),
             Self::Deactivate { session, .. } => f
                 .debug_struct("Deactivate")

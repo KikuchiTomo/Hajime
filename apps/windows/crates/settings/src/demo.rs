@@ -579,6 +579,31 @@ pub fn script(step: Step, choices: &Choices, today: Today) -> Script {
             b.commit();
             b.hold();
         }
+        Step::AppModes => {
+            // メモ帳(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英語になり，
+            // メモ帳に戻すと日本語に戻る(macOS の初期設定と同じ)
+            b.caption(text::CAPTION_APP_NOTES);
+            b.type_units(KYOUHA);
+            b.key(text::KEY_SPACE);
+            b.replace_composition(&[("今日は", Style::Converted)]);
+            b.pause(motion::WIZARD_KEY);
+            b.key(text::KEY_ENTER);
+            b.commit();
+            b.pause(motion::WIZARD_KEY);
+            b.frame.runs.clear();
+            b.frame.mode = Mode::English;
+            b.caption(text::CAPTION_APP_TERMINAL);
+            b.pause(motion::WIZARD_KEY);
+            b.type_direct("git status");
+            b.pause(motion::WIZARD_PAUSE);
+            b.frame.runs = vec![Run {
+                text: "今日は".into(),
+                style: Style::Plain,
+            }];
+            b.frame.mode = Mode::Japanese;
+            b.caption(text::CAPTION_APP_BACK);
+            b.hold();
+        }
         Step::Characters => {
             let (comma, period) = match choices.value(Field::Path("punctuation")) {
                 "commaPeriod" => ("，", "．"),
@@ -1024,6 +1049,17 @@ mod tests {
         assert_eq!(utc_fields(951_782_400), [2000, 2, 29, 0, 0, 0]);
         assert_eq!(Today::from_fields([2026, 10, 28, 0, 0, 0]), TODAY);
         assert_eq!(Today::from_fields([1970, 1, 1, 0, 0, 0]).weekday, 4);
+    }
+
+    #[test]
+    fn アプリを切り替えるとモードが変わる() {
+        let script = script(Step::AppModes, &choices(), TODAY);
+        let modes: Vec<Mode> = frames(&script).iter().map(|frame| frame.mode).collect();
+        assert!(modes.contains(&Mode::English));
+        assert_eq!(
+            script.result().map(|frame| frame.mode),
+            Some(Mode::Japanese)
+        );
     }
 
     #[test]
