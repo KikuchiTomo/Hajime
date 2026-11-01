@@ -99,11 +99,14 @@ impl Step {
                     Field::Path("inputStyle"),
                     &options::INPUT_STYLES[..2],
                 ),
-                Group::radio(
-                    Some(text::PUNCTUATION),
-                    Field::Path("punctuation"),
-                    options::PUNCTUATION,
-                ),
+                // 細かい設定は macOS の初期設定と同じ 7 つを 1 行ずつ並べる
+                Group::compact(text::PUNCTUATION, "punctuation", options::PUNCTUATION),
+                Group::compact(text::CHAR_BRACKETS, "brackets", options::BRACKETS),
+                Group::compact(text::CHAR_SLASH, "slash", options::SLASH),
+                Group::compact(text::CHAR_YEN, "yenKey", YEN_KEY),
+                Group::compact(text::CHAR_SPACE, "spaceWidth", options::WIDTHS),
+                Group::compact(text::CHAR_NUMBER, "numberWidth", options::WIDTHS),
+                Group::compact(text::CHAR_ALPHABET, "alphabetWidth", options::WIDTHS),
             ],
             Step::LiveConversion => vec![
                 Group::toggle(text::LIVE_CONVERSION, "liveConversion"),
@@ -168,6 +171,8 @@ pub struct Group {
     pub title: Option<&'static str>,
     pub field: Field,
     pub kind: GroupKind,
+    /// 名前と選択肢を 1 行に並べる(入力する文字のページの細かい設定．macOS の CharacterRow)
+    pub compact: bool,
 }
 
 impl Group {
@@ -176,6 +181,17 @@ impl Group {
             title,
             field,
             kind: GroupKind::Radio(choices),
+            compact: false,
+        }
+    }
+
+    /// 名前と選択肢を 1 行に並べる選ぶもの
+    fn compact(title: &'static str, path: &'static str, choices: &'static [Choice]) -> Self {
+        Self {
+            title: Some(title),
+            field: Field::Path(path),
+            kind: GroupKind::Radio(choices),
+            compact: true,
         }
     }
 
@@ -184,9 +200,17 @@ impl Group {
             title: Some(title),
             field: Field::Path(path),
             kind: GroupKind::Toggle,
+            compact: false,
         }
     }
 }
+
+/// ¥ キーで入力する文字(1 行に収まるよう，設定の画面より短い名前にする)
+const YEN_KEY: &[Choice] = &[
+    ("alwaysBackslash", text::YEN_BACKSLASH),
+    ("alwaysYen", text::YEN_YEN),
+    ("backslashInProgramming", text::YEN_PROGRAMMING),
+];
 
 /// 切り替えのキー(値はウィザードだけのもの．キー設定の表の行に写す)
 pub const SWITCH_TOGGLE: &str = "toggle";

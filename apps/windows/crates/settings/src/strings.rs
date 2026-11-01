@@ -714,9 +714,20 @@ pub mod wizard {
     pub const SWITCH_HENKAN_NOTE: &str =
         "押したキーで入力モードが決まるので、今どちらかを気にせずに打てます。";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
-    pub const CHARACTERS_TEXT: &str = "かなの打ち方と、句読点の形を選びます。";
+    pub const CHARACTERS_TEXT: &str =
+        "かなの打ち方と、句読点や括弧など、キーを押したときに入る文字を選びます。";
     pub const INPUT_STYLE: &str = "入力方式";
     pub const PUNCTUATION: &str = "句読点";
+    /// 入力する文字のページの細かい設定の名前(1 行に収まるよう短くする)
+    pub const CHAR_BRACKETS: &str = "[ ] キー";
+    pub const CHAR_SLASH: &str = "/ キー";
+    pub const CHAR_YEN: &str = "¥ キー";
+    pub const CHAR_SPACE: &str = "スペース";
+    pub const CHAR_NUMBER: &str = "数字";
+    pub const CHAR_ALPHABET: &str = "英字";
+    pub const YEN_BACKSLASH: &str = "\\";
+    pub const YEN_YEN: &str = "¥";
+    pub const YEN_PROGRAMMING: &str = "エディタでは \\";
     pub const LIVE_TITLE: &str = "ライブ変換";
     pub const LIVE_TEXT: &str = "打つ手を止めると、Space を押さなくても漢字に変換します。";
     pub const LIVE_CONVERSION: &str = "ライブ変換を使う";

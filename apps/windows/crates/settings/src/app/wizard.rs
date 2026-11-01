@@ -621,6 +621,49 @@ impl Wizard {
         y += description_height + size::SECTION_GAP / 2.0;
         let mut groups = Vec::new();
         for group in self.step.groups() {
+            if let (true, GroupKind::Radio(choices), Some(_)) =
+                (group.compact, group.kind, group.title)
+            {
+                // 名前を左に，選択肢を右に 1 行に並べる．選択肢の幅は名前の長さに合わせて分ける
+                let label = Rect::new(x, y, COMPACT_LABEL, COMPACT_HEIGHT);
+                let left = x + COMPACT_LABEL + size::CONTROL_GAP;
+                let gap = size::CARD_GAP;
+                let available = column
+                    - COMPACT_LABEL
+                    - size::CONTROL_GAP
+                    - gap * choices.len().saturating_sub(1) as f32;
+                let widths: Vec<f32> = choices
+                    .iter()
+                    .map(|(_, label)| {
+                        measure.width(label, TextStyle::Body) + size::FIELD_PADDING_X * 2.0
+                    })
+                    .collect();
+                let total: f32 = widths.iter().sum();
+                let equal = available / choices.len().max(1) as f32;
+                let fits_equally = widths.iter().all(|width| *width <= equal);
+                // 名前がどれも入るなら同じ幅にし，入らなければ名前の長さに合わせて分ける
+                let extra = (available - total) / choices.len().max(1) as f32;
+                let mut chip_x = left;
+                let mut rows = Vec::new();
+                for width in widths {
+                    let width = if fits_equally {
+                        equal
+                    } else if extra >= 0.0 {
+                        width + extra
+                    } else {
+                        width * available / total
+                    };
+                    rows.push(Rect::new(chip_x, y, width, COMPACT_HEIGHT));
+                    chip_x += width + gap;
+                }
+                y += COMPACT_HEIGHT + size::CARD_GAP * 1.5;
+                groups.push(GroupLayout {
+                    group,
+                    title: Some(label),
+                    rows,
+                });
+                continue;
+            }
             let title = match (group.title, group.kind) {
                 (Some(_), GroupKind::Radio(_)) => {
                     let rect = Rect::new(x, y, column, size::SECTION_TITLE_HEIGHT);
@@ -635,8 +678,14 @@ impl Wizard {
                     let notes = choices
                         .iter()
                         .any(|(value, _)| wizard::choice_note(group.field, value).is_some());
-                    // 説明の無い選択肢が多いときは 2 列に並べる
-                    let columns = if !notes && choices.len() >= 4 { 2 } else { 1 };
+                    // 説明の無い選択肢が多いときは 2 列に並べる．入力する文字のページは細かい設定を並べるので，
+                    // 入力方式も 2 列にして縦を詰める
+                    let crowded = self.step == Step::Characters;
+                    let columns = if !notes && (choices.len() >= 4 || crowded) {
+                        2
+                    } else {
+                        1
+                    };
                     let gap = size::WIZARD_OPTION_GAP;
                     if columns == 1 {
                         // 1 列なら，説明のある行だけを高くする
@@ -1480,12 +1529,35 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
             canvas.text(
                 rect,
                 title,
-                TextStyle::Section,
+                if group.group.compact {
+                    TextStyle::Body
+                } else {
+                    TextStyle::Section
+                },
                 Color::from(palette.text),
                 TextLayout::LINE,
             );
         }
         let focused = wizard.focus_visible && wizard.focus == Focus::Group(index);
+        if let (true, GroupKind::Radio(choices)) = (group.group.compact, group.group.kind) {
+            let current = wizard.choices.value(group.group.field);
+            for (position, ((value, label), rect)) in choices.iter().zip(&group.rows).enumerate() {
+                let target = Target::Option(index, position);
+                paint_chip(
+                    canvas,
+                    theme,
+                    *rect,
+                    label,
+                    *value == current,
+                    wizard.hover == Some(target),
+                    wizard.pressed == Some(target),
+                );
+                if focused && *value == current {
+                    paint::focus_ring(canvas, theme, *rect, size::CONTROL_RADIUS);
+                }
+            }
+            continue;
+        }
         match group.group.kind {
             GroupKind::Radio(choices) => {
                 let current = wizard.choices.value(group.group.field);
@@ -1692,6 +1764,45 @@ struct OptionLook<'a> {
     hover: bool,
     pressed: bool,
 }
+
+/// 1 行に並べる選択肢(選んだものを強調の色で塗る)
+fn paint_chip(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    label: &str,
+    selected: bool,
+    hover: bool,
+    pressed: bool,
+) {
+    let palette = &theme.palette;
+    let (fill, text) = match (selected, pressed, hover) {
+        (true, _, _) => (palette.accent, palette.accent_text),
+        (false, true, _) => (palette.control_pressed, palette.text),
+        (false, false, true) => (palette.control_hover, palette.text),
+        _ => (palette.card, palette.text),
+    };
+    canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(fill));
+    if !selected {
+        canvas.stroke_round(
+            rect,
+            size::CONTROL_RADIUS,
+            1.0,
+            Color::from(palette.card_stroke),
+        );
+    }
+    canvas.text(
+        rect,
+        label,
+        TextStyle::Body,
+        Color::from(text),
+        TextLayout::CENTER,
+    );
+}
+
+/// 1 行に並べる選ぶものの高さと名前の幅
+const COMPACT_HEIGHT: f32 = size::CONTROL_HEIGHT;
+const COMPACT_LABEL: f32 = size::BUTTON_WIDTH;
 
 /// 選択肢の行(丸・名前・推奨の札・説明)
 fn paint_option(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, look: OptionLook) {
