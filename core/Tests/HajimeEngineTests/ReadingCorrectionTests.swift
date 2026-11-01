@@ -266,7 +266,39 @@ struct ReadingCorrectionTests {
         }
         let expected = await plain.corrections(forKeys: [keys], leftContext: leftContext)
         let actual = await prefetched.corrections(forKeys: [keys], leftContext: leftContext)
-        #expect(actual == expected, "\(keys)")
+        let expectedCorrections = try #require(expected[keys])
+        let actualCorrections = try #require(actual[keys])
+        // 候補(キー・読み・手間・書き違いか・変換のもっともらしさ)は同じ．Zenzai の点数は，llama.cpp が前に求めた途中の計算(KV キャッシュ)を
+        // 使い回すかどうかで浮動小数の端が揺れるので，揺れの幅(scoreTolerance)までは同じとみなす
+        #expect(actualCorrections.count == expectedCorrections.count, "\(keys)")
+        for correction in expectedCorrections {
+            let other = actualCorrections.first { $0.keys == correction.keys }
+            #expect(other.map { Self.isSame($0, correction) } == true, "\(keys)")
+        }
+        // 直すか，示すか，何もしないかの判定も同じ
+        let rule = ReadingCorrectionRule(level: .standard)
+        let typed = try #require(expectedCorrections.first { $0.isUnchanged })
+        let reading = KanaWidth.hiragana(from: typed.reading)
+        #expect(rule.decision(among: actualCorrections, reading: reading).map(Self.decisionKey) == rule.decision(among: expectedCorrections, reading: reading).map(Self.decisionKey), "\(keys)")
+    }
+
+    /// Zenzai の点数の揺れとみなす幅．直す・示すの差の決まり(DefaultSettings.readingSuggestionScoreMargin など)より十分に小さい
+    private static let scoreTolerance = 0.01
+
+    private static func isSame(_ lhs: ReadingCorrection, _ rhs: ReadingCorrection) -> Bool {
+        func close(_ a: Double?, _ b: Double?) -> Bool {
+            guard let a, let b else { return a == nil && b == nil }
+            return (a - b).magnitude <= Self.scoreTolerance
+        }
+        return lhs.keys == rhs.keys && lhs.reading == rhs.reading && lhs.cost == rhs.cost && lhs.isReadingEdit == rhs.isReadingEdit
+            && lhs.plausibilityGain == rhs.plausibilityGain && close(lhs.score, rhs.score) && close(lhs.contextFreeScore, rhs.contextFreeScore)
+    }
+
+    private static func decisionKey(_ decision: ReadingCorrectionRule.Decision) -> String {
+        switch decision {
+        case .apply(let correction): "apply " + correction.keys
+        case .suggest(let correction): "suggest " + correction.keys
+        }
     }
 
     private func live(_ session: InputSession, _ keys: String) -> String? {
