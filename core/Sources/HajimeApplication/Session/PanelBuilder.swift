@@ -91,10 +91,10 @@ enum PanelBuilder {
         let pageEnd = min(pageStart + perPage, selection.candidates.count)
         let reading = composition.conversionReading
         let entries = (pageStart..<pageEnd).map { index in
+            if let entry = commandEntry(selection.candidates[index]) { return entry }
             let candidate = selection.candidates[index]
             let range = corrected.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0)) }
             // 前の文節(shownPrefix)は一覧に出さない
-            if let entry = commandEntry(candidate) { return entry }
             let text = !selection.shownPrefix.isEmpty && candidate.text.hasPrefix(selection.shownPrefix)
                 ? String(candidate.text.dropFirst(selection.shownPrefix.count)) : candidate.text
             return CandidatePanel.Entry(text: text, annotation: selection.annotations[index], corrected: selection.shownPrefix.isEmpty ? range : nil)
@@ -114,9 +114,8 @@ enum PanelBuilder {
 
     /// コマンドの候補の行．印(▶)の代わりに種類と「コマンド」の札を付け，文字を入れる候補と見分けられるようにする．コマンドでなければ nil
     static func commandEntry(_ candidate: Candidate) -> CandidatePanel.Entry? {
-        candidate.commandKind.map {
-            CandidatePanel.Entry(text: LauncherCommand.title(ofCandidateText: candidate.text), annotation: CandidatePanel.commandAnnotation, command: $0)
-        }
+        guard let kind = candidate.commandKind else { return nil }
+        return CandidatePanel.Entry(text: LauncherCommand.title(ofCandidateText: candidate.text), annotation: CandidatePanel.commandAnnotation, command: kind)
     }
 
     /// コマンドの候補を選んでいるときの案内(確定のキーで動く)．key は確定のキー．キーが無ければ nil
