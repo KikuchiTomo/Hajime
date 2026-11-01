@@ -428,7 +428,7 @@ struct ProfileRuleCSVTests {
         com.apple.Terminal,terminal
         com.example.Game, IME を使わない
         com.example.Editor,記号を半角
-        bad id with space,terminal
+        bad/id,terminal
         com.example.Unknown,なにか
         com.apple.Terminal,direct
         """

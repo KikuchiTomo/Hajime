@@ -241,6 +241,8 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryEntries = 10_000
     /// アプリの扱いの規則の上限(CSV で取り込むとき)
     public static let maximumProfileRules = 1_000
+    /// 「IME のオンオフを記憶」で覚えておくアプリの数
+    public static let maximumRememberedApplications = 256
     public static let maximumProfileRuleFileBytes = 256 * 1024
     public static let maximumApplicationIdentifierLength = 255
     /// 保存できるカスタムテーマの数と名前の長さの上限

@@ -270,9 +270,10 @@ final class SettingsModel: ObservableObject {
             message = UIStrings.More.noBundleID
             return
         }
+        // 同じアプリの同じ種類の扱い(入力の扱いとモードの扱い)は置き換える．種類が違えば両方を残す
+        let added = identifiers.map { ProfileRule(applicationPrefix: $0, profile: profile) }
         update { current in
-            current.profileRules.removeAll { identifiers.contains($0.applicationPrefix) }
-            current.profileRules.insert(contentsOf: identifiers.map { ProfileRule(applicationPrefix: $0, profile: profile) }, at: 0)
+            ProfileRuleCSV.merge(added, into: &current)
         }
     }
 

@@ -80,10 +80,18 @@ pub fn run_after(window: Window, after: Option<After>) {
                 .file_name()
                 .map(|name| name.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
-            with_app(|app| {
+            // 選んだアプリは，入力欄で選んでいる扱いでそのまま足す(macOS の ExclusionsPage と同じ)
+            let after = with_app(|app| {
                 app.view.set_list_input(path, 0, &name);
+                let after = app
+                    .view
+                    .list_add_event(path)
+                    .and_then(|event| app.handle(event));
                 ffi::invalidate(app.window);
-            });
+                after
+            })
+            .flatten();
+            run_after(window, after);
         }
         Some(After::ImportDictionary { list, replacing }) => {
             let filter = crate::files::TEXT_FILTER;

@@ -69,6 +69,13 @@ layout: hextra-home
     alt="「美しい」の連想として，優・素晴しい・綺麗・美的・可愛いが並んでいる"
   >}}
   {{< hajime/feature
+    title="アプリごとの入力モード"
+    subtitle="アプリを切り替えたときに IME をオンにするかオフにするかを，アプリごとに決められます．"
+    link="docs/settings/#除外設定"
+    image="images/features/app-modes.webp"
+    alt="初期設定のアプリごとの入力モードの画面．IME をオフ，IME をオン，IME のオンオフを記憶を説明している"
+  >}}
+  {{< hajime/feature
     title="計算・郵便番号・日付"
     subtitle="1+2*3= は 7 に，100-0001 は住所に，きょうは今日の日付等に変換可能です．"
     link="docs/usage/#便利な変換"

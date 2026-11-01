@@ -15,6 +15,8 @@ struct DemoFrame: Equatable {
     var panel: Panel?
     /// 入力欄の横に出すモードの札(「あ」「A」)
     var mode: String?
+    /// 入力欄の上に出すアプリの名前．アプリを切り替える実演で使う
+    var application: String?
     /// このコマを見せておく時間(秒)
     var duration: TimeInterval
 }
@@ -28,6 +30,7 @@ enum DemoScripts {
     static func frames(for page: OnboardingPage, settings: Settings, now: Date = Date()) -> [DemoFrame] {
         switch page {
         case .modeSwitch: modeSwitch(settings)
+        case .appModes: appModes()
         case .correction: correction(settings)
         case .theme: theme()
         case .liveConversion: liveConversion(settings)
@@ -64,6 +67,29 @@ enum DemoScripts {
     }
 
     // MARK: - ページ
+
+    /// メモ(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英数になり，メモに戻すと日本語に戻る
+    private static func appModes() -> [DemoFrame] {
+        let direct = UIStrings.ModeIndicator.label(for: InputMode.direct)
+        let japanese = UIStrings.ModeIndicator.label(for: InputMode.japanese)
+        let notes = UIStrings.Onboarding.demoNotes
+        let terminal = UIStrings.Onboarding.demoTerminal
+        let command = "git status"
+        func inApp(_ frames: [DemoFrame], _ application: String) -> [DemoFrame] {
+            frames.map { frame in
+                var frame = frame
+                frame.application = application
+                return frame
+            }
+        }
+        var frames = inApp([DemoFrame(mode: japanese, duration: hold / 2)] + typing("kyouha", mode: japanese), notes)
+        frames += inApp([converted([("今日は", .converted)]), DemoFrame(committed: "今日は", mode: japanese, duration: hold)], notes)
+        frames += inApp([DemoFrame(mode: direct, duration: hold / 2)], terminal)
+        frames += inApp(command.indices.map { DemoFrame(committed: String(command[...$0]), mode: direct, duration: keystroke) }, terminal)
+        frames += inApp([DemoFrame(committed: command, mode: direct, duration: hold)], terminal)
+        frames += inApp([DemoFrame(committed: "今日は", mode: japanese, duration: hold)], notes)
+        return frames
+    }
 
     private static func modeSwitch(_ settings: Settings) -> [DemoFrame] {
         let direct = UIStrings.ModeIndicator.label(for: InputMode.direct)

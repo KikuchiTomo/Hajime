@@ -279,7 +279,7 @@ pub mod size {
         pub const RULE_SEARCH_WIDTH: f32 = 160.0;
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;
-        pub const RULE_PROFILE_COLUMN_WIDTH: f32 = 170.0;
+        pub const RULE_PROFILE_COLUMN_WIDTH: f32 = 210.0;
         pub const TABLE_HEADER_INSET: f32 = 10.0;
         pub const TABLE_COLUMN_SPACING: f32 = 17.0;
         pub const TABLE_POPUP_TEXT_INSET: f32 = 21.0;
@@ -450,6 +450,8 @@ pub mod size {
         pub const FIELD_HEIGHT: f32 = 46.0;
         pub const FIELD_RADIUS: f32 = 10.0;
         pub const FIELD_FONT_SIZE: f32 = 19.0;
+        pub const APPLICATION_TAB_FONT_SIZE: f32 = 12.0;
+        pub const INFO_SYMBOL_WIDTH: f32 = 28.0;
         pub const DEMO_GAP: f32 = 14.0;
         pub const BADGE_RADIUS: f32 = 6.0;
     }

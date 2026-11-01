@@ -136,6 +136,90 @@ struct EngineServiceTests {
         #expect(service.handle(WireRequest(id: 6, body: .openSession), from: id).body == .error(code: .tooManySessions))
     }
 
+    private func activate(_ application: String, session: UInt32, from id: EngineService.ConnectionID) -> WireInputMode? {
+        let body = service.handle(WireRequest(id: 8, body: .activate(session: session, context: WireFieldContext(applicationId: application, isSecure: false))), from: id).body
+        guard case .edit(_, _, let state) = body else { return nil }
+        return state.mode
+    }
+
+    private func setMode(_ mode: WireInputMode, session: UInt32, from id: EngineService.ConnectionID) {
+        _ = service.handle(WireRequest(id: 9, body: .setMode(session: session, mode: mode)), from: id)
+    }
+
+    @Test("除外設定の「IME のオンオフを記憶」のアプリは，入力先を戻すと最後に使ったモードになる．決まりの無いアプリはほかのアプリで最後に使ったモードに揃う")
+    func remembersModePerApplication() throws {
+        try settings.update { $0.profileRules = [ProfileRule(applicationPrefix: "a.exe", profile: .remembersMode)] }
+        let id = greeted()
+        let first = try open(id)
+        let second = try open(id)
+        #expect(activate("A.exe", session: first, from: id) == .japanese)
+        _ = service.handle(WireRequest(id: 10, body: .deactivate(session: first)), from: id)
+        #expect(activate("b.exe", session: second, from: id) == .japanese)
+        setMode(.direct, session: second, from: id)
+        _ = service.handle(WireRequest(id: 10, body: .deactivate(session: second)), from: id)
+        #expect(activate("a.exe", session: first, from: id) == .japanese)
+        _ = service.handle(WireRequest(id: 10, body: .deactivate(session: first)), from: id)
+        #expect(activate("b.exe", session: second, from: id) == .japanese)
+    }
+
+    @Test("入力先が移ってモードを変えたら，OS の入力モードも変えさせる")
+    func activateSelectsMode() throws {
+        try settings.update { $0.profileRules = [ProfileRule(applicationPrefix: "off.exe", profile: .imeOff)] }
+        let id = greeted()
+        let session = try open(id)
+        let body = service.handle(WireRequest(id: 8, body: .activate(session: session, context: WireFieldContext(applicationId: "off.exe", isSecure: false))), from: id).body
+        guard case .edit(_, let operations, let state) = body else {
+            Issue.record("編集の応答にならない")
+            return
+        }
+        #expect(state.mode == .direct)
+        #expect(operations.contains(.selectMode(mode: .direct)))
+        // もう同じモードなら何も送らない
+        _ = service.handle(WireRequest(id: 10, body: .deactivate(session: session)), from: id)
+        let again = service.handle(WireRequest(id: 8, body: .activate(session: session, context: WireFieldContext(applicationId: "off.exe", isSecure: false))), from: id).body
+        guard case .edit(_, let none, _) = again else { return }
+        #expect(none.isEmpty)
+    }
+
+    @Test("前のアプリの deactivate より先に次のアプリの activate が届いても，その次のアプリは移ったときのモードにそろう")
+    func activateBeforeDeactivate() throws {
+        try settings.update { $0.profileRules = [ProfileRule(applicationPrefix: "b.exe", profile: .imeOff)] }
+        let id = greeted()
+        let a = try open(id), b = try open(id), c = try open(id)
+        #expect(activate("a.exe", session: a, from: id) == .japanese)
+        #expect(activate("b.exe", session: b, from: id) == .direct)
+        #expect(activate("c.exe", session: c, from: id) == .direct)
+    }
+
+    @Test("同じアプリに入力の扱いとモードの扱いを両方付けられる")
+    func profileAndModeRules() throws {
+        try settings.update {
+            $0.profileRules = [ProfileRule(applicationPrefix: "windowsterminal.exe", profile: .imeOff),
+                               ProfileRule(applicationPrefix: "windowsterminal.exe", profile: .terminal)]
+        }
+        #expect(settings.current.profile(forApplication: "WindowsTerminal.exe") == .terminal)
+        #expect(settings.current.modeProfile(forApplication: "WindowsTerminal.exe") == .imeOff)
+        let id = greeted()
+        let session = try open(id)
+        #expect(activate("WindowsTerminal.exe", session: session, from: id) == .direct)
+    }
+
+    @Test("除外設定の「IME をオフ」「IME をオン」のアプリは，入力先を移すたびにそのモードになる")
+    func fixedModePerApplication() throws {
+        try settings.update {
+            $0.profileRules = [ProfileRule(applicationPrefix: "off.exe", profile: .imeOff), ProfileRule(applicationPrefix: "on.exe", profile: .imeOn)]
+        }
+        let id = greeted()
+        let off = try open(id)
+        let on = try open(id)
+        #expect(activate("off.exe", session: off, from: id) == .direct)
+        setMode(.japanese, session: off, from: id)
+        #expect(activate("on.exe", session: on, from: id) == .japanese)
+        setMode(.direct, session: on, from: id)
+        #expect(activate("off.exe", session: off, from: id) == .direct)
+        #expect(activate("on.exe", session: on, from: id) == .japanese)
+    }
+
     @Test("パスワード欄では何もしない")
     func secure() throws {
         let id = greeted()

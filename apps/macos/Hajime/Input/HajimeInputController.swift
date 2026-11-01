@@ -214,6 +214,12 @@ final class HajimeInputController: IMKInputController {
         super.activateServer(sender)
         if let client = sender as? any IMKTextInput {
             KeyboardLayoutOverride.apply(root.settings.current.keyboardLayout, to: client)
+            // 除外設定でアプリに入力先を移したときのモードを決めていれば，そのモードにする
+            let application = client.bundleIdentifier()
+            let profile = root.settings.current.modeProfile(forApplication: application)
+            if let mode = root.modeMemory.enter(application, profile: profile) {
+                presenter.apply([.selectMode(mode)], to: client)
+            }
         }
         // Chromium 系のアプリでは，ここで入力位置を問い合わせると止まることがある(azooKey-Desktop の調査)．
         // そのため候補ウィンドウを閉じるだけにする
@@ -229,6 +235,7 @@ final class HajimeInputController: IMKInputController {
         cancelPrefetch()
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
+            root.modeMemory.record(session.mode, application: client.bundleIdentifier())
         }
         presenter.hideWindows()
         // 手書きの窓は開いたときの入力先に文字を入れるので，入力先から外れたら閉じる

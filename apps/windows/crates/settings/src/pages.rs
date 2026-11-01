@@ -946,7 +946,11 @@ fn conversion() -> Vec<Section> {
         Section::new(
             settings::ZENZAI_MODEL,
             vec![
-                Row::choice(settings::ZENZAI_MODEL, "zenzaiModel", options::ZENZAI_MODELS),
+                Row::choice(
+                    settings::ZENZAI_MODEL,
+                    "zenzaiModel",
+                    options::ZENZAI_MODELS,
+                ),
                 Row::note(settings::ZENZAI_MODEL_NOTE),
             ],
         ),
@@ -1153,7 +1157,8 @@ fn keymap() -> Vec<Section> {
 
 const APP_FIELDS: &[Field] = &[
     Field::named("applicationPrefix", more::APPS, true),
-    Field::choice("profile", more::BEHAVIOR, options::APP_PROFILES, false),
+    // 同じアプリに入力の扱いとモードの扱い(IME をオフなど)を 1 つずつ付けられるよう，動作も行を見分ける欄にする
+    Field::choice("profile", more::BEHAVIOR, options::APP_PROFILES, true),
 ];
 
 /// 除外設定のページ(macOS の ExclusionsPage)．アプリは実行ファイルの名前(小文字)で見分ける

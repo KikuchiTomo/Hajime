@@ -74,6 +74,7 @@ struct OnboardingView: View {
     @ViewBuilder private var content: some View {
         switch model.page {
         case .modeSwitch: modeSwitch
+        case .appModes: appModes
         case .correction: correction
         case .theme: theme
         case .liveConversion: liveConversion
@@ -92,6 +93,25 @@ struct OnboardingView: View {
                     model.modeSwitchStyle = style
                 }
             }
+        }
+    }
+
+    /// 除外設定で選べる，アプリを切り替えたときのモード．ここでは紹介だけで，選ぶのは設定の画面
+    private var appModes: some View {
+        VStack(spacing: Size.cardGap) {
+            ForEach([AppProfile.imeOff, .imeOn, .remembersMode], id: \.self) { profile in
+                InfoCard(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile),
+                         detail: UIStrings.Onboarding.appModeDetail(for: profile))
+            }
+        }
+    }
+
+    /// カードの札．モードの札と同じ文字(A・あ)を枠に入れて見せる．記憶は両方を並べる
+    private static func mark(for profile: AppProfile) -> String {
+        switch profile {
+        case .imeOff: UIStrings.ModeIndicator.label(for: InputMode.direct)
+        case .imeOn: UIStrings.ModeIndicator.label(for: InputMode.japanese)
+        default: UIStrings.ModeIndicator.label(for: InputMode.direct) + UIStrings.ModeIndicator.label(for: InputMode.japanese)
         }
     }
 
@@ -343,6 +363,38 @@ private struct CharacterRow<Value: Hashable & CaseIterable>: View where Value.Al
         .padding(.horizontal, Size.cardPadding)
         .padding(.vertical, Size.cardPadding / 2)
         .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).fill(Color.primary.opacity(Opacity.cardIdle)))
+    }
+}
+
+/// 説明だけのカード．入力モードの札と名前と説明を並べる
+private struct InfoCard: View {
+    private typealias Size = DesignTokens.Size.Onboarding
+    private typealias Opacity = DesignTokens.Opacity.Onboarding
+
+    let mark: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Size.cardGap) {
+            Text(mark)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .lineLimit(1)
+                .fixedSize()
+                // 3 つの札の幅をそろえる(記憶の札は A とあの 2 文字)
+                .frame(width: Size.infoSymbolWidth * 2, height: Size.infoSymbolWidth)
+                .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).stroke(Color.accentColor, lineWidth: 1.5))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Size.cardGap / 3) {
+                Text(title).font(.headline)
+                Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Size.cardPadding)
+        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).fill(Color.primary.opacity(Opacity.cardIdle)))
+        .accessibilityElement(children: .combine)
     }
 }
 

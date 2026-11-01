@@ -3,6 +3,8 @@ import HajimeDomain
 /// 初期設定のページ．並びは Windows 版と同じ
 enum OnboardingPage: Int, CaseIterable, Identifiable {
     case modeSwitch
+    /// アプリごとの入力モード(除外設定の IME をオフ・オン・オンオフを記憶)の紹介
+    case appModes
     case correction
     case theme
     case liveConversion
@@ -17,6 +19,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .modeSwitch: UIStrings.Onboarding.modeTitle
+        case .appModes: UIStrings.Onboarding.appModesTitle
         case .correction: UIStrings.Onboarding.correctionTitle
         case .theme: UIStrings.Onboarding.themeTitle
         case .liveConversion: UIStrings.Onboarding.liveTitle
@@ -30,6 +33,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .modeSwitch: UIStrings.Onboarding.modeDetail
+        case .appModes: UIStrings.Onboarding.appModesDetail
         case .correction: UIStrings.Onboarding.correctionDetail
         case .theme: UIStrings.Onboarding.themeDetail
         case .liveConversion: UIStrings.Onboarding.liveDetail

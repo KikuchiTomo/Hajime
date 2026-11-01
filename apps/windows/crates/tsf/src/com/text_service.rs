@@ -28,14 +28,14 @@ use windows::Win32::UI::TextServices::{
     ITfDisplayAttributeInfo, ITfDisplayAttributeProvider, ITfDisplayAttributeProvider_Impl,
     ITfDocumentMgr, ITfInputScope, ITfInsertAtSelection, ITfKeyEventSink, ITfKeyEventSink_Impl,
     ITfKeystrokeMgr, ITfRange, ITfSource, ITfTextInputProcessor, ITfTextInputProcessorEx,
-    ITfTextInputProcessorEx_Impl, ITfTextInputProcessor_Impl, ITfThreadMgr, ITfThreadMgrEventSink,
-    ITfThreadMgrEventSink_Impl, GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION,
-    GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, GUID_PROP_ATTRIBUTE, GUID_PROP_INPUTSCOPE,
-    INSERT_TEXT_AT_SELECTION_FLAGS, IS_NUMERIC_PASSWORD, IS_NUMERIC_PIN, IS_PASSWORD, TF_AE_NONE,
-    TF_ANCHOR_END, TF_ANCHOR_START, TF_CONVERSIONMODE_ALPHANUMERIC, TF_CONVERSIONMODE_FULLSHAPE,
-    TF_CONVERSIONMODE_NATIVE, TF_DEFAULT_SELECTION, TF_ES_ASYNCDONTCARE, TF_ES_READ,
-    TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE,
-    TF_ST_CORRECTION,
+    ITfTextInputProcessorEx_Impl, ITfTextInputProcessor_Impl, ITfThreadFocusSink,
+    ITfThreadFocusSink_Impl, ITfThreadMgr, ITfThreadMgrEventSink, ITfThreadMgrEventSink_Impl,
+    GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE,
+    GUID_PROP_ATTRIBUTE, GUID_PROP_INPUTSCOPE, INSERT_TEXT_AT_SELECTION_FLAGS, IS_NUMERIC_PASSWORD,
+    IS_NUMERIC_PIN, IS_PASSWORD, TF_AE_NONE, TF_ANCHOR_END, TF_ANCHOR_START,
+    TF_CONVERSIONMODE_ALPHANUMERIC, TF_CONVERSIONMODE_FULLSHAPE, TF_CONVERSIONMODE_NATIVE,
+    TF_DEFAULT_SELECTION, TF_ES_ASYNCDONTCARE, TF_ES_READ, TF_ES_READWRITE, TF_ES_SYNC,
+    TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE, TF_ST_CORRECTION,
 };
 use windows_core::{implement, ComObject, IUnknownImpl, Interface, Ref, Result, BOOL, GUID};
 
@@ -59,6 +59,7 @@ thread_local! {
     ITfThreadMgrEventSink,
     ITfCompositionSink,
     ITfCompartmentEventSink,
+    ITfThreadFocusSink,
     ITfDisplayAttributeProvider
 )]
 #[derive(Default)]
@@ -71,6 +72,8 @@ struct Inner {
     thread_mgr: Option<ITfThreadMgr>,
     client_id: u32,
     sink_cookie: Option<u32>,
+    /// アプリに入力先が移った・外れたを知る ITfThreadFocusSink の登録
+    thread_focus_cookie: Option<u32>,
     mode_cookie: Option<(ITfCompartment, u32)>,
     engine: Option<Rc<EngineClient>>,
     session: Option<u32>,
@@ -102,12 +105,13 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
                     let _ = unsafe { source.UnadviseSink(cookie) };
                 }
             }
-            let (thread_mgr, client_id, cookie, engine, session, mode_item) = {
+            let (thread_mgr, client_id, cookie, focus_cookie, engine, session, mode_item) = {
                 let mut inner = self.inner.borrow_mut();
                 (
                     inner.thread_mgr.take(),
                     inner.client_id,
                     inner.sink_cookie.take(),
+                    inner.thread_focus_cookie.take(),
                     inner.engine.take(),
                     inner.session.take(),
                     inner.mode_item.take(),
@@ -123,8 +127,10 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
                 if let Ok(keystrokes) = thread_mgr.cast::<ITfKeystrokeMgr>() {
                     let _ = unsafe { keystrokes.UnadviseKeyEventSink(client_id) };
                 }
-                if let (Ok(source), Some(cookie)) = (thread_mgr.cast::<ITfSource>(), cookie) {
-                    let _ = unsafe { source.UnadviseSink(cookie) };
+                if let Ok(source) = thread_mgr.cast::<ITfSource>() {
+                    for cookie in [cookie, focus_cookie].into_iter().flatten() {
+                        let _ = unsafe { source.UnadviseSink(cookie) };
+                    }
                 }
             }
             *self.inner.borrow_mut() = Inner::default();
@@ -150,6 +156,13 @@ impl ITfTextInputProcessorEx_Impl for TextService_Impl {
                     .cast::<ITfSource>()?
                     .AdviseSink(&ITfThreadMgrEventSink::IID, &focus_sink)?
             };
+            let thread_focus_sink: ITfThreadFocusSink = self.to_interface();
+            let thread_focus_cookie = unsafe {
+                thread_mgr
+                    .cast::<ITfSource>()?
+                    .AdviseSink(&ITfThreadFocusSink::IID, &thread_focus_sink)
+                    .ok()
+            };
             let atoms = register_attributes().unwrap_or_default();
             let mode_cookie = self.watch_mode(&thread_mgr).ok();
             let engine = pipe_name("engine")
@@ -170,6 +183,7 @@ impl ITfTextInputProcessorEx_Impl for TextService_Impl {
                 inner.thread_mgr = Some(thread_mgr);
                 inner.client_id = tid;
                 inner.sink_cookie = Some(cookie);
+                inner.thread_focus_cookie = thread_focus_cookie;
                 inner.mode_cookie = mode_cookie;
                 inner.atoms = atoms;
                 inner.engine = engine;
@@ -352,6 +366,61 @@ impl TextService_Impl {
                 inner.state = Some(state);
             }
             self.show_mode(mode);
+            self.activate();
+        }
+    }
+
+    /// アプリに入力先が移ったことをエンジンに知らせる．除外設定で決めたモードか，ほかのアプリで最後に使ったモードに揃う
+    fn activate(&self) {
+        let (engine, session, thread_mgr) = {
+            let inner = self.inner.borrow();
+            (
+                inner.engine.clone(),
+                inner.session,
+                inner.thread_mgr.clone(),
+            )
+        };
+        let (Some(engine), Some(session)) = (engine, session) else {
+            return;
+        };
+        let target = thread_mgr.and_then(|manager| unsafe {
+            manager
+                .GetFocus()
+                .and_then(|focus: ITfDocumentMgr| focus.GetTop())
+                .ok()
+        });
+        // 前のキーの返事が遅れていたら，先に反映する(あとから古い返事がモードを戻さないように)
+        if let Some(target) = &target {
+            self.apply_late(target, RESPONSE_TIMEOUT);
+        }
+        // エンジンはアプリの識別子だけを使う．入力欄の前の文字は読まない・送らない
+        let context = {
+            let inner = self.inner.borrow();
+            FieldContext {
+                application_id: inner.application_id.clone(),
+                is_secure: false,
+                preceding_text: None,
+                caret: inner.caret.clone(),
+            }
+        };
+        let pending = engine.send(RequestBody::Activate { session, context });
+        match pending.outcome(RESPONSE_TIMEOUT) {
+            Outcome::Reply(body) => match (body, target) {
+                (body, Some(target)) => {
+                    self.apply_response(&target, body);
+                }
+                (ResponseBody::Edit { state, .. }, None) => {
+                    let mode = state.mode;
+                    self.inner.borrow_mut().state = Some(state);
+                    self.show_mode(mode);
+                }
+                _ => {}
+            },
+            // 間に合わなければ，キーの返事と同じく，あとで送った順に反映する(エンジンとモードがずれたままにしない)
+            Outcome::TimedOut => {
+                self.defer(pending);
+            }
+            Outcome::Unavailable => self.forget_session(),
         }
     }
 
@@ -822,6 +891,28 @@ impl ITfThreadMgrEventSink_Impl for TextService_Impl {
 
     fn OnPopContext(&self, _pic: Ref<ITfContext>) -> Result<()> {
         Ok(())
+    }
+}
+
+impl ITfThreadFocusSink_Impl for TextService_Impl {
+    fn OnSetThreadFocus(&self) -> Result<()> {
+        guard(|| {
+            if self.inner.borrow().session.is_some() {
+                self.activate();
+            } else {
+                self.ensure_session();
+            }
+            Ok(())
+        })
+    }
+
+    fn OnKillThreadFocus(&self) -> Result<()> {
+        guard(|| {
+            // 組み立て中の文字を確定し，このアプリのモードをエンジンに覚えさせる(macOS の deactivateServer と同じ)
+            self.finish_composition(None);
+            self.cancel_timer();
+            Ok(())
+        })
     }
 }
 

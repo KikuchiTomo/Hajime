@@ -201,6 +201,22 @@ final class DemoStageView: NSView {
         // 入力位置
         NSColor.controlAccentColor.setFill()
         NSRect(x: x.rounded(), y: lineTop, width: 2, height: lineHeight).fill()
+        if let application = current?.application {
+            drawApplicationTab(application, above: field)
+        }
+    }
+
+    /// 入力欄の上に，入力先のアプリの名前を窓の見出しのように出す
+    private func drawApplicationTab(_ name: String, above field: NSRect) {
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
+                                                         .foregroundColor: NSColor.secondaryLabelColor]
+        let text = name.size(withAttributes: attributes)
+        let tab = NSRect(x: field.minX, y: field.minY - Size.demoGap / 2 - text.height - Size.cardGap / 2,
+                         width: text.width + Size.cardGap * 2, height: text.height + Size.cardGap / 2)
+        let path = NSBezierPath(roundedRect: tab, xRadius: tab.height / 2, yRadius: tab.height / 2)
+        NSColor.controlAccentColor.withAlphaComponent(DesignTokens.Opacity.Onboarding.cardSelected).setFill()
+        path.fill()
+        name.draw(at: NSPoint(x: tab.minX + Size.cardGap, y: tab.minY + Size.cardGap / 4), withAttributes: attributes)
     }
 }
 

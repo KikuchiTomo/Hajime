@@ -1,7 +1,7 @@
 import HajimeDomain
 import SwiftUI
 
-/// 除外設定．アプリごとに入力の扱いを変える(IME を使わない・記号を半角・コマンドを英字)．
+/// 除外設定．アプリごとに入力の扱いを変える(IME を使わない・入力先を移したときのモード・記号を半角・コマンドを英字)．
 /// アプリは /Applications から選んで足し，CSV で読み込み・書き出しできる
 struct ExclusionsPage: View {
     @ObservedObject var model: SettingsModel
@@ -86,7 +86,7 @@ struct ExclusionsPage: View {
     }
 
     /// 選べる扱い．標準はアプリを一覧から消すのと同じなので並べない
-    private static let profiles: [AppProfile] = [.direct, .programming, .terminal]
+    private static let profiles: [AppProfile] = [.direct, .imeOff, .imeOn, .remembersMode, .programming, .terminal]
 
     /// 選んだ 1 つの決まりを上か下へ 1 つ動かす
     private func move(by offset: Int) {

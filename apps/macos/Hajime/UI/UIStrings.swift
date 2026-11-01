@@ -382,6 +382,9 @@ enum UIStrings {
             case .programming: "記号を半角"
             case .terminal: "コマンドを英字"
             case .direct: "IME を使わない"
+            case .imeOff: "IME をオフ"
+            case .imeOn: "IME をオン"
+            case .remembersMode: "IME のオンオフを記憶"
             }
         }
         static let recordsUsage = "入力の統計を記録"
@@ -493,6 +496,21 @@ enum UIStrings {
             case .single: "英数キーとかなキーのどちらでも、押すたびに切り替わります。"
             }
         }
+
+        // アプリごとの入力モード
+        static let appModesTitle = "アプリごとの入力モード"
+        static let appModesDetail = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。"
+        static func appModeDetail(for profile: AppProfile) -> String {
+            switch profile {
+            case .imeOff: "そのアプリに切り替えるたびに英数にします。あとから日本語入力にも切り替えられます。"
+            case .imeOn: "そのアプリに切り替えるたびに日本語入力にします。"
+            case .remembersMode: "そのアプリで最後に使った入力モードに戻します。"
+            case .standard, .programming, .terminal, .direct: ""
+            }
+        }
+        /// 実演でアプリを切り替えるときに出す名前
+        static let demoNotes = "メモ"
+        static let demoTerminal = "ターミナル"
 
         // b. 自動補正
         static let correctionTitle = "自動補正"

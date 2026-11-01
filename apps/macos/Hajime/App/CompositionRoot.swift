@@ -33,6 +33,8 @@ final class CompositionRoot {
     let typoService: ZenzaiTypoService?
     /// 再変換で確定済みの文字の読みを求める(OS の日本語の解析)
     let transcriber = SystemReadingTranscriber()
+    /// アプリごとに最後に使ったモード(除外設定の「IME のオンオフを記憶」)．入力欄ごとのコントローラーで共有する
+    var modeMemory = AppModeMemory()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
                  dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {

@@ -826,6 +826,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case closeSession(session: UInt32)
     case key(session: UInt32, input: WireKeyInput, context: WireFieldContext)
     case setMode(session: UInt32, mode: WireInputMode)
+    case activate(session: UInt32, context: WireFieldContext)
     case deactivate(session: UInt32)
     case wake(session: UInt32, context: WireFieldContext)
     case openHandwriting(session: UInt32, context: WireFieldContext)
@@ -890,6 +891,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .key(session: container.decode(UInt32.self, forKey: .session), input: container.decode(WireKeyInput.self, forKey: .input), context: container.decode(WireFieldContext.self, forKey: .context))
         case "setMode":
             self = try .setMode(session: container.decode(UInt32.self, forKey: .session), mode: container.decode(WireInputMode.self, forKey: .mode))
+        case "activate":
+            self = try .activate(session: container.decode(UInt32.self, forKey: .session), context: container.decode(WireFieldContext.self, forKey: .context))
         case "deactivate":
             self = try .deactivate(session: container.decode(UInt32.self, forKey: .session))
         case "wake":
@@ -1005,6 +1008,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("setMode", forKey: .type)
             try container.encode(session, forKey: .session)
             try container.encode(mode, forKey: .mode)
+        case .activate(let session, let context):
+            try container.encode("activate", forKey: .type)
+            try container.encode(session, forKey: .session)
+            try container.encode(context, forKey: .context)
         case .deactivate(let session):
             try container.encode("deactivate", forKey: .type)
             try container.encode(session, forKey: .session)
@@ -1165,6 +1172,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .closeSession: "WireRequestBody.closeSession"
         case .key: "WireRequestBody.key"
         case .setMode: "WireRequestBody.setMode"
+        case .activate: "WireRequestBody.activate"
         case .deactivate: "WireRequestBody.deactivate"
         case .wake: "WireRequestBody.wake"
         case .openHandwriting: "WireRequestBody.openHandwriting"

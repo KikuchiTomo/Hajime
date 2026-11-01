@@ -167,7 +167,7 @@ enum DesignTokens {
             static let ruleSearchWidth: CGFloat = 160
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
-            static let ruleProfileColumnWidth: CGFloat = 170
+            static let ruleProfileColumnWidth: CGFloat = 210
             static let tableHeaderInset: CGFloat = 10
             static let tableColumnSpacing: CGFloat = 17
             static let tablePopupTextInset: CGFloat = 21
@@ -338,6 +338,8 @@ enum DesignTokens {
             static let fieldHeight: CGFloat = 46
             static let fieldRadius: CGFloat = 10
             static let fieldFontSize: CGFloat = 19
+            static let applicationTabFontSize: CGFloat = 12
+            static let infoSymbolWidth: CGFloat = 28
             static let demoGap: CGFloat = 14
             static let badgeRadius: CGFloat = 6
         }
