@@ -5,6 +5,8 @@ struct CandidateSelection: Equatable {
     var candidates: [Candidate]
     var annotations: [String?]
     var focus: Focus
+    /// 候補の頭の，一覧に出さない字(打っているあいだに最後の文節だけを選ぶときの，前の文節)．一覧には残りだけを出す
+    var shownPrefix = ""
 
     enum Focus: Equatable {
         case candidate(Int)
@@ -30,5 +32,18 @@ extension CandidateSelection {
         let pages = (candidates.count + perPage - 1) / perPage
         let page = ((index / perPage + offset) % pages + pages) % pages
         focus = .candidate(page * perPage)
+    }
+}
+
+/// 打っているあいだに最後の文節だけの候補を出すときの，その前の文節(見えているライブ変換の字と，読みの字数)
+struct SuggestionPrefix: Equatable {
+    var text: String
+    var readingCount: Int
+
+    /// 前の文節と文節の候補をつないだ，読み全体の候補．確定したら文節の候補を学ぶ
+    func joined(with candidate: Candidate, readingCount whole: Int) -> Candidate {
+        var joined = Candidate(text: text + candidate.text, readingCount: whole, origin: .combined)
+        joined.learnedParts = candidate.isFromEngine ? [candidate] : candidate.learnedParts
+        return joined
     }
 }

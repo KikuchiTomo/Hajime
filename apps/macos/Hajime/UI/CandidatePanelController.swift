@@ -16,6 +16,8 @@ final class CandidatePanelController {
     private var shownLattice: LatticePanel?
     /// 窓を入力位置の上と下のどちらに置いているか．出しているあいだは同じ側に保ち，隠したら決め直す
     private var side: PanelPlacement.Side?
+    /// 窓の縁を動かしている途中か
+    private var isAnimatingFrame = false
 
     /// 候補をマウスで押したときに知らせる先．押した対象(PointerTarget)を渡す
     var onChoose: ((PointerTarget) -> Void)? {
@@ -41,7 +43,8 @@ final class CandidatePanelController {
         shownList = panel
         shownLattice = nil
         view.panel = panel
-        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived)
+        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える
+        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: panel.selectedEntry != nil)
         announceSelection(panel)
     }
 
@@ -74,7 +77,7 @@ final class CandidatePanelController {
     /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．
     /// 出ている窓の大きさが変わるときは縁を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
     /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)
-    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false) {
+    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false, animatesFrame: Bool = true) {
         let glass = theme.isRounded
         backdrop.cornerRadius = theme.cornerRadius
         // 一覧と分岐図を切り替えたときも，窓が出たままなら同じ側に置く
@@ -90,10 +93,15 @@ final class CandidatePanelController {
             transition.duration = DesignTokens.Motion.CandidateWindow.update / 1000
             root.layer?.add(transition, forKey: "arrived")
         }
-        // 窓が入力位置の上下を入れ替えるとき(画面の下の端)は，入力位置をまたいで滑らせず，すぐ移す
+        // 動かすのは，左端と入力位置の側の辺(下に置くなら上の辺)がそのままで，大きさだけが変わるときに限る．
+        // 窓ごと動くとき(入力位置が移った)は滑らせずにすぐ移す．動いている途中に次の大きさが届くと縁が揺れて見えるため，
+        // 動いている途中なら今の動きを止めてすぐ移す
         let current = window.frame
-        let staysOnSide = abs(frame.maxY - current.maxY) < 1 || abs(frame.minY - current.minY) < 1
-        if wasVisible, frame != current, staysOnSide, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        let anchoredEdgeStays = placed.side == .below ? abs(frame.maxY - current.maxY) < 1 : abs(frame.minY - current.minY) < 1
+        let animates = wasVisible && animatesFrame && frame != current && anchoredEdgeStays && abs(frame.minX - current.minX) < 1 && !isAnimatingFrame
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if animates {
+            isAnimatingFrame = true
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = DesignTokens.Motion.CandidateWindow.resize / 1000
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -101,9 +109,18 @@ final class CandidatePanelController {
                 window.animator().setFrame(frame, display: true)
             } completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
+                    self?.isAnimatingFrame = false
                     if glass { self?.window.invalidateShadow() }
                 }
             }
+        } else if isAnimatingFrame {
+            // 動いている途中の動きを，長さ 0 の動きで置き換えて止める(そのままだと前の動きが新しい位置を上書きする)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                window.animator().setFrame(frame, display: true)
+            }
+            isAnimatingFrame = false
+            if glass { window.invalidateShadow() }
         } else {
             window.setFrame(frame, display: true)
             if glass { window.invalidateShadow() }

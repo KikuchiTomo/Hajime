@@ -48,14 +48,15 @@ final class ClientActionPresenter {
                 client.insertText(text, replacementRange: takeReplacement())
             case .setMarkedText(let marked):
                 let attributed = Self.attributedString(for: marked)
+                markedLength = (marked.text as NSString).length
                 client.setMarkedText(attributed, selectionRange: NSRange(location: (marked.textBeforeCaret as NSString).length, length: 0), replacementRange: takeReplacement())
             case .showCandidates(let panel):
                 note.hide()
-                candidatePanel.show(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
+                candidatePanel.show(panel, caret: panelAnchor(of: client, at: panel.anchor), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
                                     keys: settings.current.keymap)
             case .showLattice(let panel):
                 note.hide()
-                candidatePanel.showLattice(panel, caret: caretRect(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
+                candidatePanel.showLattice(panel, caret: panelAnchor(of: client, at: nil), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
                                            keys: settings.current.keymap, showsHints: settings.current.showsKeyHints)
             case .hideCandidates:
                 candidatePanel.hide()
@@ -122,9 +123,30 @@ final class ClientActionPresenter {
     }
 
     private func caretRect(of client: any IMKTextInput) -> NSRect {
+        lineRect(of: client, at: 0)
+    }
+
+    /// 組み立て中の文字の index 番目(UTF-16)の字がある行の長方形．アプリが教えなければ .zero
+    private func lineRect(of client: any IMKTextInput, at index: Int) -> NSRect {
         var rect = NSRect.zero
-        _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
+        _ = client.attributes(forCharacterIndex: index, lineHeightRectangle: &rect)
         return rect
+    }
+
+    /// 最後に出した組み立て中の文字の長さ(UTF-16)
+    private var markedLength = 0
+
+    /// 候補の窓を置く基準．左端は anchor の字(無ければ組み立て中の文字の頭)，上の辺は頭の行の上，下の辺は最後の行の下．
+    /// 組み立て中の文字が何行かに折り返しても，窓を文字に重ねない(下に置くときは最後の行の下，上に置くときは頭の行の上)
+    private func panelAnchor(of client: any IMKTextInput, at anchor: Int?) -> NSRect {
+        let start = lineRect(of: client, at: 0)
+        guard start != .zero, markedLength > 1 else { return start }
+        let end = lineRect(of: client, at: markedLength - 1)
+        let left = anchor.map { lineRect(of: client, at: min(max($0, 0), markedLength - 1)) } ?? start
+        let lines = [start, end, left].filter { $0 != .zero }
+        let bottom = lines.map(\.minY).min() ?? start.minY
+        let top = max(start.maxY, bottom)
+        return NSRect(x: left == .zero ? start.minX : left.minX, y: bottom, width: max(left.width, 1), height: top - bottom)
     }
 
     private static func attributedString(for marked: MarkedText) -> NSAttributedString {
