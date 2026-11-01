@@ -714,6 +714,7 @@ pub const BUILT: &[Page] = &[
     Page::Apps,
     Page::Dictionary,
     Page::Symbols,
+    Page::Commands,
     Page::Appearance,
     Page::Usage,
     Page::Sync,
