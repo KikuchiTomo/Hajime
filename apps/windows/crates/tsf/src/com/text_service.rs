@@ -230,14 +230,15 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
                 return Ok(false.into());
             };
             // コマンドの候補を確定すると，エンジンがアプリやページを開く．エンジンは裏のプロセスで窓を前に出せないので，
-            // 前にいる入力先のアプリから前に出ることを許す(許さないと，開いたアプリが今の窓の後ろに出る)
+            // 前にいる入力先のアプリから，つないでいるエンジンにだけ前に出ることを許す(許さないと開いたアプリが後ろに出る)
             if input.key == Key::Enter {
-                // SAFETY: 引数は定数
-                let _ = unsafe {
-                    windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(
-                        windows::Win32::UI::WindowsAndMessaging::ASFW_ANY,
-                    )
-                };
+                let engine = self.inner.borrow().engine.clone();
+                if let Some(id) = engine.and_then(|engine| engine.server_process_id()) {
+                    // SAFETY: 引数はプロセスの番号だけ
+                    let _ = unsafe {
+                        windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(id)
+                    };
+                }
             }
             // 前のキーの返事が遅れていたら，少し待って送った順に反映してから，このキーを送る
             self.apply_late(context, RESPONSE_TIMEOUT);

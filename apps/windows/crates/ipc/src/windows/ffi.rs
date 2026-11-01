@@ -8,6 +8,21 @@ use windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKE
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
+/// 名前付きパイプの向こうのプロセスの番号
+pub fn server_process_id(pipe: &std::fs::File) -> Option<u32> {
+    use std::os::windows::io::AsRawHandle;
+    let mut id = 0u32;
+    // SAFETY: pipe は開いている名前付きパイプのハンドルで，呼び出しのあいだ生きている．id は書き込める領域
+    unsafe {
+        windows::Win32::System::Pipes::GetNamedPipeServerProcessId(
+            HANDLE(pipe.as_raw_handle()),
+            &mut id,
+        )
+    }
+    .ok()?;
+    Some(id)
+}
+
 pub fn current_session_id() -> u32 {
     let mut session = 0u32;
     match unsafe { ProcessIdToSessionId(std::process::id(), &mut session) } {
