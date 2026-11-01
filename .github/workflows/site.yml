@@ -2,6 +2,7 @@ name: Site
 
 # 公式サイト(apps/docs-site)をビルドし，main なら Cloudflare Workers の静的アセットとして置く(apps/docs-site/wrangler.jsonc)．
 # リリースを出したときはダウンロードのリンクを新しい版にするために動かす．
+# Release(release.yml)が出したリリースでは release のきっかけが来ないので，release.yml の update-site が手で動かす．
 # 手で動かすとき: gh workflow run site.yml --ref main
 #
 # 秘密の値は environment「cloudflare」にだけ置き，main からしか使えないようにする(リポジトリの Settings > Environments)．
