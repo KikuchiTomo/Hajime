@@ -229,6 +229,16 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             let Ok(context) = pic.ok() else {
                 return Ok(false.into());
             };
+            // コマンドの候補を確定すると，エンジンがアプリやページを開く．エンジンは裏のプロセスで窓を前に出せないので，
+            // 前にいる入力先のアプリから前に出ることを許す(許さないと，開いたアプリが今の窓の後ろに出る)
+            if input.key == Key::Enter {
+                // SAFETY: 引数は定数
+                let _ = unsafe {
+                    windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(
+                        windows::Win32::UI::WindowsAndMessaging::ASFW_ANY,
+                    )
+                };
+            }
             // 前のキーの返事が遅れていたら，少し待って送った順に反映してから，このキーを送る
             self.apply_late(context, RESPONSE_TIMEOUT);
             let field = self.field_context(context);
@@ -393,9 +403,17 @@ impl TextService_Impl {
         if let Some(target) = &target {
             self.apply_late(target, RESPONSE_TIMEOUT);
         }
+        // 今の入力位置(モードの札をそこに出す)．読めなければ前の位置
+        let client_id = self.inner.borrow().client_id;
+        let current = target
+            .as_ref()
+            .and_then(|target| read_field(target, client_id, 0).caret);
         // エンジンはアプリの識別子だけを使う．入力欄の前の文字は読まない・送らない
         let context = {
-            let inner = self.inner.borrow();
+            let mut inner = self.inner.borrow_mut();
+            if let Some(current) = &current {
+                inner.caret = Some(current.clone());
+            }
             FieldContext {
                 application_id: inner.application_id.clone(),
                 is_secure: false,
@@ -425,7 +443,7 @@ impl TextService_Impl {
     }
 
     fn field_context(&self, context: &ITfContext) -> FieldContext {
-        let (application_id, caret, client_id, wanted) = {
+        let (application_id, caret, client_id, wanted, composing) = {
             let inner = self.inner.borrow();
             (
                 inner.application_id.clone(),
@@ -435,9 +453,19 @@ impl TextService_Impl {
                     .state
                     .as_ref()
                     .and_then(|state| state.preceding_text_length),
+                inner.composition.is_some(),
             )
         };
         let field = read_field(context, client_id, wanted.unwrap_or(0));
+        // 組み立てていないときは今の入力位置を使う(前の組み立ての位置は，ほかの欄やほかのアプリのことがある．
+        // モードの札や最初の候補の窓がそこに出てしまう)
+        let caret = match (composing, field.caret) {
+            (false, Some(current)) => {
+                self.inner.borrow_mut().caret = Some(current.clone());
+                Some(current)
+            }
+            _ => caret,
+        };
         FieldContext {
             application_id,
             is_secure: field.is_secure,
@@ -1145,13 +1173,22 @@ fn set_selection(ec: u32, context: &ITfContext, range: &ITfRange) -> Result<()> 
 }
 
 fn text_rect(ec: u32, context: &ITfContext, composition: &ITfComposition) -> Result<Rect> {
+    let range = unsafe { composition.GetRange()? };
+    range_rect(ec, context, &range)
+}
+
+/// 範囲の画面の上の位置(入力位置なら幅 0 の範囲)
+fn range_rect(ec: u32, context: &ITfContext, range: &ITfRange) -> Result<Rect> {
     let mut rect = RECT::default();
     let mut clipped = BOOL::default();
     unsafe {
-        let range = composition.GetRange()?;
         context
             .GetActiveView()?
-            .GetTextExt(ec, &range, &mut rect, &mut clipped)?;
+            .GetTextExt(ec, range, &mut rect, &mut clipped)?;
+    }
+    // 位置を返せないアプリ(組み立て直後で配置が決まっていない)は空の矩形を返す
+    if rect.right == rect.left && rect.bottom == rect.top && rect.left == 0 && rect.top == 0 {
+        return Err(windows::Win32::Foundation::E_FAIL.into());
     }
     Ok(Rect {
         x: rect.left,
@@ -1166,6 +1203,8 @@ fn text_rect(ec: u32, context: &ITfContext, composition: &ITfComposition) -> Res
 struct FieldReading {
     is_secure: bool,
     preceding_text: Option<String>,
+    /// 入力位置の画面の上の位置(読めなければ None)
+    caret: Option<Rect>,
 }
 
 /// 入力欄が秘密の欄か(パスワードなど)と，入力位置の前の文字列(最大 length 文字．UTF-16 で数える)を 1 回の読み取りで読む．
@@ -1179,8 +1218,10 @@ fn read_field(context: &ITfContext, client_id: u32, length: u32) -> FieldReading
             return Ok(());
         };
         let secure = input_scope_is_secure(ec, &target, &selection)?;
+        let caret = range_rect(ec, &target, &selection).ok();
         let mut field = output.borrow_mut();
         field.is_secure = secure;
+        field.caret = caret;
         if !secure && length > 0 {
             field.preceding_text = preceding_text(ec, &selection, length).ok().flatten();
         }
