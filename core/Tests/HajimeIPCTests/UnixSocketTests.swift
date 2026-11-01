@@ -113,7 +113,7 @@ struct UnixSocketTests {
             Issue.record("編集の応答にならない")
             return
         }
-        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil)])
+        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil, panelAnchor: nil)])
         _ = try Self.exchange(WireRequest(id: 20, body: .key(session: session, input: WireKeyInput(key: .space, modifiers: plain, isKeypad: false), context: context)),
                               over: connection, reader: &reader)
         let enter = try Self.exchange(WireRequest(id: 21, body: .key(session: session, input: WireKeyInput(key: .enter, modifiers: plain, isKeypad: false), context: context)),

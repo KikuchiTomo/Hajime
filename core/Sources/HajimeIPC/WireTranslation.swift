@@ -277,7 +277,8 @@ public struct RoutedActions: Sendable, Equatable {
                 edits.append(.commit(text: text))
             case .setMarkedText(let marked):
                 edits.append(.setComposition(segments: marked.segments.map { WireTextSegment(text: $0.text, style: WireTextStyle($0.style)) },
-                                             caret: marked.caret.map { _ in UInt32(marked.textBeforeCaret.utf16.count) }))
+                                             caret: marked.caret.map { _ in UInt32(marked.textBeforeCaret.utf16.count) },
+                                             panelAnchor: nil))
             case .selectMode(let mode):
                 edits.append(.selectMode(mode: WireInputMode(mode)))
             case .showCandidates(let panel):
@@ -307,6 +308,16 @@ public struct RoutedActions: Sendable, Equatable {
             case .runCommand(let command):
                 host.append(.runCommand(command))
             }
+        }
+        // 候補の窓を組み立て中の文字の途中(今打っている文節・選んでいる文節)にそろえるときは，その位置を組み立て中の文字の
+        // 書き換えに添える．画面の上の位置は入力先のアプリにしか分からないので，DLL がその字の位置を求めて送り直す(macOS は panelAnchor)
+        let panelAnchor = actions.lazy.compactMap { action -> Int? in
+            if case .showCandidates(let panel) = action { return panel.anchor }
+            return nil
+        }.first
+        if let panelAnchor, let index = edits.lastIndex(where: { if case .setComposition = $0 { true } else { false } }),
+           case .setComposition(let segments, let caret, _) = edits[index] {
+            edits[index] = .setComposition(segments: segments, caret: caret, panelAnchor: UInt32(clamping: panelAnchor))
         }
     }
 }

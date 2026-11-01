@@ -429,6 +429,11 @@ impl Control {
             Control::List(spec, _) if spec.path == "profileRules" => {
                 (ADD_REMOVE, &[more::ADD_APPS])
             }
+            // コマンドは行き先のファイルやアプリを選べる(macOS の CommandsPage の選ぶボタン)
+            Control::List(spec, _) if spec.path == "commands" => (
+                ADD_REMOVE,
+                &[windows::CHOOSE_TARGET, windows::TOGGLE_ENABLED],
+            ),
             Control::List(spec, _) if spec.has_enabled_flag() => {
                 (ADD_REMOVE, &[windows::TOGGLE_ENABLED])
             }

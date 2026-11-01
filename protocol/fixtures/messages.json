@@ -99,6 +99,7 @@
           { "type": "setComposition", "segments": [{ "text": "にほん", "style": "reading" }, { "text": "語", "style": "focused" }, { "text": "x", "style": "correction" }, { "text": "y", "style": "converted" }] },
           { "type": "setComposition", "segments": [] },
           { "type": "setComposition", "segments": [{ "text": "今日はかな", "style": "converted" }], "caret": 3 },
+          { "type": "setComposition", "segments": [{ "text": "今日は", "style": "converted" }, { "text": "かな", "style": "reading" }], "panelAnchor": 3 },
           { "type": "selectMode", "mode": "japanese" },
           { "type": "requestReconversion", "maximumLength": 64 }
         ],

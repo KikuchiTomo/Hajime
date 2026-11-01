@@ -80,7 +80,7 @@ struct NamedPipeTests {
             Issue.record("編集の応答にならない")
             return
         }
-        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil)])
+        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil, panelAnchor: nil)])
 
         let space = try Self.exchange(WireRequest(id: 20, body: .key(session: session, input: WireKeyInput(key: .space, modifiers: plain, isKeypad: false), context: context)),
                                       over: connection, reader: &reader)

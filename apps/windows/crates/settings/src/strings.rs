@@ -644,6 +644,14 @@ pub mod windows {
     pub const DICTIONARY_SUMMARY: &str = "内容";
     /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
     pub const DICTIONARY_APPS: &str = "アプリの実行ファイル名";
+    /// コマンドの行き先のファイルやアプリを選ぶボタンと，選ぶ窓の種類の名前
+    pub const CHOOSE_TARGET: &str = "行き先を選択…";
+    pub const ALL_FILES: &str = "すべてのファイル";
+    /// 試した語を一覧に足すボタン(macOS は結果の語を右クリックして選ぶ)
+    pub const ADD_TO_ENGLISH: &str = "常に英語にする単語に追加";
+    pub const ADD_TO_JAPANESE: &str = "常に日本語にする単語に追加";
+    /// 試した語を足せないとき(1 語でない)
+    pub const ADD_ONE_WORD: &str = "1 語だけを入力すると、一覧に追加できます";
     /// 選んだ記号の決まりを有効・無効にするボタン(macOS は行ごとのオン・オフ)
     pub const TOGGLE_ENABLED: &str = "有効・無効の切り替え";
     /// ファイルを選ぶ窓の種類の名前(macOS は種類を名前で出さない)

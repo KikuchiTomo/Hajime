@@ -25,6 +25,12 @@ use ipc::{
 use std::borrow::Cow;
 
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
+/// コマンドの一覧と，その入力欄の番号(pages の COMMAND_FIELDS の並び)
+const COMMANDS: &str = "commands";
+const COMMAND_TITLE: usize = 1;
+const COMMAND_KIND: usize = 2;
+const COMMAND_TARGET: usize = 3;
+
 pub enum After {
     Message {
         text: Cow<'static, str>,
@@ -32,6 +38,8 @@ pub enum After {
     },
     /// 件数などを含む知らせ
     Notice(String),
+    /// コマンドの行き先を選ぶ窓を出す
+    ChooseCommandTarget,
     OpenSettingsFile,
     /// 初期設定ウィザードを開く(同じ実行ファイルを --setup で起動する)
     OpenSetup,
@@ -92,6 +100,36 @@ pub fn run_after(window: Window, after: Option<After>) {
             })
             .flatten();
             run_after(window, after);
+        }
+        Some(After::ChooseCommandTarget) => {
+            let Some(file) = ffi::choose_file(window, true, "", text::ALL_FILES, "*.*") else {
+                return;
+            };
+            // 実行ファイルならアプリを開く，ほかはファイルを開くコマンドにする．名前が空なら拡張子を除いたファイルの名前にする
+            let path = std::path::Path::new(&file);
+            let is_app = path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
+            let stem = path
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_string())
+                .unwrap_or_default();
+            with_app(|app| {
+                app.view.set_list_input(COMMANDS, COMMAND_TARGET, &file);
+                app.view.set_list_choice(
+                    COMMANDS,
+                    COMMAND_KIND,
+                    if is_app {
+                        "openApplication"
+                    } else {
+                        "openFile"
+                    },
+                );
+                if app.view.list_input(COMMANDS, COMMAND_TITLE).is_empty() {
+                    app.view.set_list_input(COMMANDS, COMMAND_TITLE, &stem);
+                }
+                ffi::invalidate(app.window);
+            });
         }
         Some(After::ImportDictionary { list, replacing }) => {
             let filter = crate::files::TEXT_FILTER;
@@ -233,6 +271,15 @@ impl App {
         if let Event::OpenUrl(url) = event {
             return Some(After::OpenUrl(url));
         }
+        if event == Event::ChooseCommandTarget {
+            return Some(After::ChooseCommandTarget);
+        }
+        if let Event::Notice(text) = event {
+            return Some(After::Message {
+                text: text.into(),
+                warning: true,
+            });
+        }
         if event == Event::Relayout {
             self.arrange();
             return None;
@@ -340,6 +387,8 @@ impl App {
             | Event::ChooseColor { .. }
             | Event::ChooseApp { .. }
             | Event::OpenUrl(_)
+            | Event::Notice(_)
+            | Event::ChooseCommandTarget
             | Event::Relayout
             | Event::Action(
                 Action::SyncNow

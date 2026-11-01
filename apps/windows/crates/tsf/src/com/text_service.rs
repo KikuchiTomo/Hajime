@@ -554,12 +554,23 @@ impl TextService_Impl {
                     (inner.composition.clone(), inner.atoms.clone())
                 };
                 let mut result = Ok(());
+                // 候補の窓をそろえる字(組み立て中の文字の頭からの UTF-16 の位置)．無ければ頭にそろえる
+                let mut panel_anchor = None;
                 for edit in edits {
+                    if let EditOperation::SetComposition {
+                        panel_anchor: anchor,
+                        ..
+                    } = &edit
+                    {
+                        panel_anchor = *anchor;
+                    }
                     result = match edit {
                         EditOperation::Commit { text } => {
                             commit(ec, &target, &mut composition, &text)
                         }
-                        EditOperation::SetComposition { segments, caret } => show(
+                        EditOperation::SetComposition {
+                            segments, caret, ..
+                        } => show(
                             ec,
                             &target,
                             &mut composition,
@@ -574,9 +585,14 @@ impl TextService_Impl {
                         break;
                     }
                 }
-                let caret = composition
-                    .as_ref()
-                    .and_then(|current| text_rect(ec, &target, current).ok());
+                let caret = composition.as_ref().and_then(|current| {
+                    let whole = text_rect(ec, &target, current).ok()?;
+                    Some(
+                        panel_anchor
+                            .and_then(|offset| anchored_rect(ec, &target, current, offset, &whole))
+                            .unwrap_or(whole),
+                    )
+                });
                 let (engine, session) = {
                     let mut inner = service.inner.borrow_mut();
                     inner.composition = composition;
@@ -1177,6 +1193,47 @@ fn text_rect(ec: u32, context: &ITfContext, composition: &ITfComposition) -> Res
     range_rect(ec, context, &range)
 }
 
+/// 候補の窓を置く基準(macOS の ClientActionPresenter.panelAnchor)．左端は組み立て中の文字の offset の字，上下は
+/// 組み立て中の文字の全体(折り返していても窓を文字に重ねない)．字の位置を読めなければ None
+fn anchored_rect(
+    ec: u32,
+    context: &ITfContext,
+    composition: &ITfComposition,
+    offset: u32,
+    whole: &Rect,
+) -> Option<Rect> {
+    let range = unsafe { composition.GetRange().ok()?.Clone().ok()? };
+    let mut moved = 0;
+    unsafe {
+        range.Collapse(ec, TF_ANCHOR_START).ok()?;
+        range
+            .ShiftStart(
+                ec,
+                i32::try_from(offset).ok()?,
+                &mut moved,
+                std::ptr::null(),
+            )
+            .ok()?;
+        range.Collapse(ec, TF_ANCHOR_START).ok()?;
+        range.ShiftEnd(ec, 1, &mut moved, std::ptr::null()).ok()?;
+    }
+    if moved == 0 {
+        return None;
+    }
+    let character = range_rect(ec, context, &range).ok()?;
+    Some(anchored(whole, &character))
+}
+
+/// 組み立て中の文字の全体の位置と，そろえる字の位置から，候補の窓を置く基準を作る
+fn anchored(whole: &Rect, character: &Rect) -> Rect {
+    Rect {
+        x: character.x,
+        y: whole.y,
+        width: character.width.max(1),
+        height: whole.height,
+    }
+}
+
 /// 範囲の画面の上の位置(入力位置なら幅 0 の範囲)
 fn range_rect(ec: u32, context: &ITfContext, range: &ITfRange) -> Result<Rect> {
     let mut rect = RECT::default();
@@ -1355,4 +1412,34 @@ fn variant_i32(value: i32) -> VARIANT {
         inner.Anonymous.lVal = value;
     }
     variant
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 候補の窓は文節の字の左にそろえ上下は組み立て中の文字の全体にする() {
+        let whole = Rect {
+            x: 100,
+            y: 200,
+            width: 300,
+            height: 40,
+        };
+        let character = Rect {
+            x: 250,
+            y: 220,
+            width: 0,
+            height: 20,
+        };
+        assert_eq!(
+            anchored(&whole, &character),
+            Rect {
+                x: 250,
+                y: 200,
+                width: 1,
+                height: 40
+            }
+        );
+    }
 }

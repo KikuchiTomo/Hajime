@@ -114,6 +114,10 @@ pub enum Event {
     },
     /// 既定のブラウザーで開く(謝辞の出どころ)
     OpenUrl(String),
+    /// 知らせを出すだけ(操作できない理由)
+    Notice(&'static str),
+    /// コマンドの行き先のファイルやアプリを選ぶ窓を出し，入力欄に入れる
+    ChooseCommandTarget,
     /// 部品の大きさが変わったので置き直す(謝辞のライセンスの全文を開いた・閉じた)
     Relayout,
 }
@@ -171,7 +175,8 @@ impl DictionaryAction {
 /// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
 fn bottom_always_enabled(control: &Control, index: usize) -> bool {
     match control {
-        // 有効・無効の切り替えは行を選んでから使う
+        // 行き先を選ぶのはいつでも，有効・無効の切り替えは行を選んでから使う
+        Control::List(spec, _) if spec.path == "commands" => index == 0,
         Control::List(spec, _) if spec.has_enabled_flag() => false,
         Control::List(spec, _) => !(spec.path == "keymap" && index == 1),
         _ => false,
@@ -321,6 +326,8 @@ pub enum Part {
     Text,
     /// 謝辞の出どころの行の中の URL(行の番号)
     Link(usize),
+    /// 試した語をいつも英語(0)・いつも日本語(1)にする単語に足すボタン
+    PreviewAdd(usize),
     /// 謝辞のライセンスの全文を開く・閉じる
     Expand,
 }
@@ -579,6 +586,7 @@ impl RowState {
     fn toggle_part(&self) -> Option<Part> {
         match self.row.control {
             Control::Symbols(..) => Some(Part::Top(2)),
+            Control::List(spec, _) if spec.path == "commands" => Some(Part::Bottom(1)),
             Control::List(spec, _) if spec.has_enabled_flag() => Some(Part::Bottom(0)),
             Control::SyncFields(_) => Some(Part::Top(0)),
             _ => None,
@@ -695,6 +703,8 @@ impl RowState {
                 .acknowledgement
                 .as_ref()
                 .and_then(|layout| layout.expand),
+            // 試す欄(2 つ)の後ろに並べたボタン
+            Part::PreviewAdd(index) => card.parts.get(2 + index).copied(),
             Part::Toggle
             | Part::Dropdown
             | Part::Action
@@ -743,7 +753,12 @@ impl RowState {
             Control::Color => parts.push(Part::Color),
             Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
             Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
-            Control::Preview => parts.extend([Part::PreviewField(0), Part::PreviewField(1)]),
+            Control::Preview => parts.extend([
+                Part::PreviewField(0),
+                Part::PreviewField(1),
+                Part::PreviewAdd(0),
+                Part::PreviewAdd(1),
+            ]),
             control => {
                 if let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
                     parts.extend((0..spec.fields.len()).map(Part::Field));
@@ -816,6 +831,8 @@ impl RowState {
                 .and_then(|line| crate::notices::split_url(line))
                 .map_or("", |(_, url)| url),
             Part::Expand => more::LICENSE_TEXT,
+            Part::PreviewAdd(0) => text::ADD_TO_ENGLISH,
+            Part::PreviewAdd(_) => text::ADD_TO_JAPANESE,
             _ => "",
         }
     }
@@ -1283,6 +1300,7 @@ impl PageView {
             | Part::PresetLoad
             | Part::Action
             | Part::Link(_)
+            | Part::PreviewAdd(_)
             | Part::Expand => row.button_label(element.part).to_string(),
             Part::Field(index) => row
                 .row
@@ -1338,6 +1356,7 @@ impl PageView {
             Part::PreviewField(index) => 60 + index,
             Part::Text => 70,
             Part::Expand => 79,
+            Part::PreviewAdd(index) => 65 + index,
             Part::Link(index) => 80 + index,
         };
         let id = element.row * 100 + part;
@@ -1475,6 +1494,36 @@ impl PageView {
                     .map(|(_, url)| url.to_string())?;
                 return Some(Event::OpenUrl(url));
             }
+            (Control::Preview, Part::PreviewAdd(index)) => {
+                let typed = row
+                    .edit(Part::PreviewField(0))
+                    .map(ffi::window_text)
+                    .unwrap_or_default();
+                let word = typed.trim().to_lowercase();
+                if word.is_empty() || word.contains(char::is_whitespace) {
+                    return Some(Event::Notice(text::ADD_ONE_WORD));
+                }
+                let path = if index == 0 {
+                    "wordLanguage.englishWords"
+                } else {
+                    "wordLanguage.japaneseWords"
+                };
+                let (spec, limit) =
+                    self.rows
+                        .iter()
+                        .find_map(|other| match &other.row.control {
+                            Control::List(spec, limit) if spec.path == path => {
+                                Some((*spec, *limit))
+                            }
+                            _ => None,
+                        })?;
+                return Some(Event::ListAdd {
+                    spec,
+                    limit,
+                    item: vec![word],
+                    replacing: None,
+                });
+            }
             (Control::Acknowledgement(_), Part::Expand) => {
                 row.expanded = !row.expanded;
                 return Some(Event::Relayout);
@@ -1551,6 +1600,7 @@ impl PageView {
                 ("profileRules", Part::Bottom(0)) => {
                     return Some(Event::ChooseApp { path: spec.path })
                 }
+                ("commands", Part::Bottom(0)) => return Some(Event::ChooseCommandTarget),
                 _ => {}
             }
         }
@@ -1597,7 +1647,9 @@ impl PageView {
                 spec,
                 indices: selected,
             }),
-            Part::Bottom(0) if spec.has_enabled_flag() => {
+            Part::Bottom(index)
+                if spec.has_enabled_flag() && row.toggle_part() == Some(Part::Bottom(index)) =>
+            {
                 (!selected.is_empty()).then_some(Event::ListToggle {
                     spec,
                     indices: selected,
@@ -1869,6 +1921,41 @@ impl PageView {
             item: spec.make(&values),
             replacing: None,
         })
+    }
+
+    /// path の一覧の field 番目の打つ欄の文字
+    pub fn list_input(&self, path: &str, field: usize) -> String {
+        self.rows
+            .iter()
+            .find_map(|row| match (&row.row.control, row.inputs.get(field)) {
+                (Control::List(spec, _), Some(Input::Edit(window))) if spec.path == path => {
+                    Some(ffi::window_text(*window))
+                }
+                _ => None,
+            })
+            .unwrap_or_default()
+    }
+
+    /// path の一覧の field 番目の選ぶ欄で value を選ぶ
+    pub fn set_list_choice(&mut self, path: &str, field: usize, value: &str) {
+        for row in &mut self.rows {
+            let Control::List(spec, _) = &row.row.control else {
+                continue;
+            };
+            if spec.path != path {
+                continue;
+            }
+            let position = spec
+                .fields
+                .get(field)
+                .and_then(|field| field.choices)
+                .and_then(|choices| choices.iter().position(|(raw, _)| *raw == value));
+            if let (Some(position), Some(Input::Choice(selected))) =
+                (position, row.inputs.get_mut(field))
+            {
+                *selected = position;
+            }
+        }
     }
 
     /// path の一覧の field 番目の入力欄に text を入れる(アプリを選んで足すとき)
@@ -2182,6 +2269,19 @@ impl PageView {
             Control::Preview => {
                 for field in 0..2 {
                     self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
+                }
+                for button in 0..2 {
+                    let part = Part::PreviewAdd(button);
+                    if let Some(rect) = row.part_rect(part) {
+                        paint::button(
+                            canvas,
+                            theme,
+                            rect,
+                            row.button_label(part),
+                            paint::ButtonKind::Standard,
+                            self.state(frame, element(part), row.enabled),
+                        );
+                    }
                 }
                 canvas.text(
                     card.control,

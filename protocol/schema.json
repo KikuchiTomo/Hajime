@@ -278,6 +278,10 @@
             {
               "name": "caret",
               "type": "u32?"
+            },
+            {
+              "name": "panelAnchor",
+              "type": "u32?"
             }
           ]
         },

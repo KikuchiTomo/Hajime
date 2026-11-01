@@ -196,7 +196,7 @@ fn card_height(control: &Control, width: f32) -> f32 {
     }
     match control {
         Control::Preview => {
-            size::CARD_PADDING_X * 2.0 + inputs + size::BODY_LINE_HEIGHT * PREVIEW_LINES
+            size::CARD_PADDING_X * 2.0 + inputs * 2.0 + size::BODY_LINE_HEIGHT * PREVIEW_LINES
         }
         Control::KeymapReport | Control::ThemeReport => {
             size::CARD_PADDING_X * 2.0 + size::BODY_LINE_HEIGHT * REPORT_LINES
@@ -217,7 +217,7 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
             return place_inputs(
                 position,
                 2,
-                NO_BUTTONS,
+                PREVIEW_BUTTONS,
                 card,
                 size::BODY_LINE_HEIGHT * PREVIEW_LINES,
             )
@@ -322,6 +322,16 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
         parts,
     }
 }
+
+/// 試す欄の下のボタン(試した語をいつも英語・いつも日本語にする単語に足す．macOS は結果の語のメニュー)
+pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
+    top: &[],
+    bottom: &[
+        crate::strings::windows::ADD_TO_ENGLISH,
+        crate::strings::windows::ADD_TO_JAPANESE,
+    ],
+    search: false,
+};
 
 const NO_BUTTONS: ListButtons = ListButtons {
     top: &[],

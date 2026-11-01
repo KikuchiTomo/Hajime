@@ -251,6 +251,9 @@ pub enum EditOperation {
         segments: Vec<TextSegment>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         caret: Option<u32>,
+        #[serde(rename = "panelAnchor")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        panel_anchor: Option<u32>,
     },
     SelectMode {
         mode: InputMode,
@@ -268,10 +271,11 @@ impl fmt::Debug for EditOperation {
                 .debug_struct("Commit")
                 .field("text", &REDACTED)
                 .finish(),
-            Self::SetComposition { segments, caret, .. } => f
+            Self::SetComposition { segments, caret, panel_anchor, .. } => f
                 .debug_struct("SetComposition")
                 .field("segments", segments)
                 .field("caret", caret)
+                .field("panelAnchor", panel_anchor)
                 .finish(),
             Self::SelectMode { mode, .. } => f
                 .debug_struct("SelectMode")
