@@ -42,6 +42,8 @@ const JAPANESE_FAMILY: &str = "Yu Gothic UI";
 /// 英数字の書体(Windows 11)．無ければ日本語の書体だけで描く
 const TEXT_FAMILY: &str = "Segoe UI Variable Text";
 const DISPLAY_FAMILY: &str = "Segoe UI Variable Display";
+/// 等幅の書体(Windows に必ず入っている．日本語は OS の代わりの書体で出る)
+const MONO_FAMILY: &str = "Consolas";
 /// 絵の書体(Windows 11，無ければ Windows 10)
 const ICON_FAMILIES: [&str; 2] = ["Segoe Fluent Icons", "Segoe MDL2 Assets"];
 const BASE_DPI: f32 = 96.0;
@@ -188,6 +190,11 @@ impl Graphics {
             TextStyle::Hero => (
                 self.icon_family,
                 size::WIZARD_HERO_SIZE / 2.0,
+                DWRITE_FONT_WEIGHT_NORMAL,
+            ),
+            TextStyle::Mono => (
+                MONO_FAMILY,
+                size::CAPTION_FONT_SIZE,
                 DWRITE_FONT_WEIGHT_NORMAL,
             ),
         };

@@ -98,7 +98,11 @@ struct Layout {
     title: Rect,
     description: Rect,
     groups: Vec<GroupLayout>,
+    /// 機能の紹介のページの案内(項目にポインターを置くと実演を出す)
+    hint: Option<Rect>,
     demo: Rect,
+    /// 見せている機能の説明の札(実演の下)
+    caption: Option<Rect>,
     buttons: Vec<(Button, Rect)>,
 }
 
@@ -144,6 +148,11 @@ struct Wizard {
     direction: f32,
     /// 進み具合の帯
     progress: Tween,
+    /// 機能の紹介のページで見せている機能(項目)と，その説明の札を出す動き(0 から 1)
+    spotlight: Option<&'static str>,
+    caption: Tween,
+    /// オン・オフを切り替えたときのつまみの動き(項目ごと．0 はオフ，1 はオン)
+    knobs: Vec<(&'static str, Tween)>,
     focus: Focus,
     focus_visible: bool,
     hover: Option<Target>,
@@ -151,6 +160,8 @@ struct Wizard {
     error: Option<&'static str>,
     preview: Option<candidate_ui::app::preview::Preview>,
     popup_pixels: Option<(String, PreviewPixels)>,
+    /// 描いた候補の窓の画像(中身と見た目の鍵と画素)．実演は繰り返すので，同じ窓は描き直さない
+    popup_cache: Vec<(String, Vec<u8>)>,
     started: Instant,
 }
 
@@ -214,6 +225,9 @@ pub fn open(
         enter: Tween::fixed(1.0),
         direction: 1.0,
         progress: Tween::fixed(progress_of(step)),
+        spotlight: wizard::spotlight_items(step).first().map(|(path, _)| *path),
+        caption: Tween::fixed(1.0),
+        knobs: Vec::new(),
         focus: Focus::Button(Button::Next),
         focus_visible: false,
         hover: None,
@@ -221,6 +235,7 @@ pub fn open(
         error: None,
         preview: None,
         popup_pixels: None,
+        popup_cache: Vec::new(),
         started: options.started,
     };
     WIZARD.with(|cell| *cell.borrow_mut() = Some(wizard));
@@ -325,6 +340,7 @@ impl Wizard {
         ffi::set_dark_title_bar(self.window, self.theme.dark);
         self.mica = ffi::set_mica(self.window, !self.theme.high_contrast);
         self.popup_pixels = None;
+        self.popup_cache.clear();
     }
 
     fn reload_theme(&mut self, dpi: u32) {
@@ -395,19 +411,26 @@ impl Wizard {
     // MARK: - ページ
 
     fn restart_demo(&mut self) {
-        self.script = demo::script(self.step, &self.choices, self.today);
+        self.script = match self.spotlight {
+            Some(path) => demo::spotlight(path, &self.choices, self.today),
+            None => demo::script(self.step, &self.choices, self.today),
+        };
         self.demo_started = self.now();
         self.popup_pixels = None;
         ffi::kill_timer(self.window, DEMO_TIMER);
         ffi::invalidate(self.window);
     }
 
-    /// 選んだ値をエンジンに書く．書けなければ誤りを出して false
+    /// すべてのページで選んだ値をまとめてエンジンに書く(macOS と同じく，終えるときだけ書く．ページを送るたびに
+    /// エンジンと通信すると，送る動きが通信を待って遅れる)．書けなければ誤りを出して false
     fn save(&mut self) -> bool {
         let Some(model) = &mut self.model else {
             return true;
         };
-        let changes = self.choices.changes(self.step, model);
+        let changes: Vec<_> = Step::ALL
+            .into_iter()
+            .flat_map(|step| self.choices.changes(step, model))
+            .collect();
         if changes.is_empty() {
             return true;
         }
@@ -446,6 +469,15 @@ impl Wizard {
             Easing::DECELERATE,
         );
         self.hover = None;
+        // ページを替えたら最初の機能を見せる(macOS と同じ)
+        self.spotlight = wizard::spotlight_items(step).first().map(|(path, _)| *path);
+        self.caption = Tween::new(
+            0.0,
+            1.0,
+            now,
+            self.duration(motion::WIZARD_PAGE * CAPTION_MOTION),
+            Easing::DECELERATE,
+        );
         self.focus = Focus::Button(if step == Step::Done {
             Button::Finish
         } else {
@@ -459,24 +491,23 @@ impl Wizard {
         match button {
             Button::Back => {
                 if let Some(previous) = self.step.previous() {
-                    self.save();
                     self.go(previous);
                 }
             }
             Button::Next => {
-                if !self.button_enabled(Button::Next) || !self.save() {
+                if !self.button_enabled(Button::Next) {
                     return;
                 }
                 if let Some(next) = self.step.next() {
                     self.go(next);
                 }
             }
-            Button::Later => {
-                self.save();
-                ffi::destroy(self.window);
-            }
+            // あとで設定する: 選んだ値は捨てる(macOS と同じ．次のログオンでまた開く)
+            Button::Later => ffi::destroy(self.window),
             Button::OpenSettings | Button::Finish => {
-                self.save();
+                if !self.save() {
+                    return;
+                }
                 if !self.offline {
                     ffi::set_setup_completed();
                 }
@@ -529,8 +560,42 @@ impl Wizard {
         {
             let on = self.choices.is_on(path);
             self.choices.set_toggle(path, !on);
+            let now = self.now();
+            let duration = self.duration(motion::TOGGLE);
+            let target = if on { 0.0 } else { 1.0 };
+            match self
+                .knobs
+                .iter_mut()
+                .find(|(candidate, _)| candidate == path)
+            {
+                Some((_, knob)) => knob.retarget(target, now, duration, Easing::STANDARD),
+                None => self.knobs.push((
+                    path,
+                    Tween::new(1.0 - target, target, now, duration, Easing::STANDARD),
+                )),
+            }
             self.restart_demo();
         }
+    }
+
+    /// 見せる機能を group 番目の項目にする(機能の紹介のページだけ)．変わったら実演を始め直し，説明の札を浮かべ直す
+    fn spotlight_group(&mut self, group: usize) {
+        let Some((path, _)) = wizard::spotlight_items(self.step).get(group) else {
+            return;
+        };
+        if self.spotlight == Some(*path) {
+            return;
+        }
+        self.spotlight = Some(*path);
+        let now = self.now();
+        self.caption = Tween::new(
+            0.0,
+            1.0,
+            now,
+            self.duration(motion::WIZARD_PAGE * CAPTION_MOTION),
+            Easing::DECELERATE,
+        );
+        self.restart_demo();
     }
 
     fn press(&mut self, target: Target) {
@@ -573,6 +638,49 @@ impl Wizard {
         y += description_height + size::SECTION_GAP / 2.0;
         let mut groups = Vec::new();
         for group in self.step.groups() {
+            if let (true, GroupKind::Radio(choices), Some(_)) =
+                (group.compact, group.kind, group.title)
+            {
+                // 名前を左に，選択肢を右に 1 行に並べる．選択肢の幅は名前の長さに合わせて分ける
+                let label = Rect::new(x, y, COMPACT_LABEL, COMPACT_HEIGHT);
+                let left = x + COMPACT_LABEL + size::CONTROL_GAP;
+                let gap = size::CARD_GAP;
+                let available = column
+                    - COMPACT_LABEL
+                    - size::CONTROL_GAP
+                    - gap * choices.len().saturating_sub(1) as f32;
+                let widths: Vec<f32> = choices
+                    .iter()
+                    .map(|(_, label)| {
+                        measure.width(label, TextStyle::Body) + size::FIELD_PADDING_X * 2.0
+                    })
+                    .collect();
+                let total: f32 = widths.iter().sum();
+                let equal = available / choices.len().max(1) as f32;
+                let fits_equally = widths.iter().all(|width| *width <= equal);
+                // 名前がどれも入るなら同じ幅にし，入らなければ名前の長さに合わせて分ける
+                let extra = (available - total) / choices.len().max(1) as f32;
+                let mut chip_x = left;
+                let mut rows = Vec::new();
+                for width in widths {
+                    let width = if fits_equally {
+                        equal
+                    } else if extra >= 0.0 {
+                        width + extra
+                    } else {
+                        width * available / total
+                    };
+                    rows.push(Rect::new(chip_x, y, width, COMPACT_HEIGHT));
+                    chip_x += width + gap;
+                }
+                y += COMPACT_HEIGHT + size::CARD_GAP * 1.5;
+                groups.push(GroupLayout {
+                    group,
+                    title: Some(label),
+                    rows,
+                });
+                continue;
+            }
             let title = match (group.title, group.kind) {
                 (Some(_), GroupKind::Radio(_)) => {
                     let rect = Rect::new(x, y, column, size::SECTION_TITLE_HEIGHT);
@@ -587,8 +695,14 @@ impl Wizard {
                     let notes = choices
                         .iter()
                         .any(|(value, _)| wizard::choice_note(group.field, value).is_some());
-                    // 説明の無い選択肢が多いときは 2 列に並べる
-                    let columns = if !notes && choices.len() >= 4 { 2 } else { 1 };
+                    // 説明の無い選択肢が多いときは 2 列に並べる．入力する文字のページは細かい設定を並べるので，
+                    // 入力方式も 2 列にして縦を詰める
+                    let crowded = self.step == Step::Characters;
+                    let columns = if !notes && (choices.len() >= 4 || crowded) {
+                        2
+                    } else {
+                        1
+                    };
                     let gap = size::WIZARD_OPTION_GAP;
                     if columns == 1 {
                         // 1 列なら，説明のある行だけを高くする
@@ -616,7 +730,15 @@ impl Wizard {
                     }
                 }
                 GroupKind::Toggle => {
-                    let row_height = size::WIZARD_OPTION_NOTE_HEIGHT;
+                    let note = match group.field {
+                        Field::Path(path) => toggle_note(path).is_some(),
+                        _ => false,
+                    };
+                    let row_height = if note {
+                        size::WIZARD_OPTION_NOTE_HEIGHT
+                    } else {
+                        size::WIZARD_OPTION_HEIGHT
+                    };
                     rows.push(Rect::new(x, y, column, row_height));
                     y += row_height + size::WIZARD_OPTION_GAP;
                 }
@@ -624,14 +746,32 @@ impl Wizard {
             y += size::CONTROL_GAP;
             groups.push(GroupLayout { group, title, rows });
         }
+        let hint = (!wizard::spotlight_items(self.step).is_empty()).then(|| {
+            let height = measure.wrapped_height(text::SPOTLIGHT_HINT, TextStyle::Caption, column);
+            Rect::new(x, y, column, height)
+        });
         let footer = height - size::WIZARD_FOOTER_HEIGHT;
         let demo_x = padding * 2.0 + column;
-        let demo = Rect::new(
+        let mut demo = Rect::new(
             demo_x,
             size::WIZARD_STEP_BAR + padding,
             (width - padding - demo_x).max(0.0),
             (footer - size::WIZARD_STEP_BAR - padding).max(0.0),
         );
+        // 説明の札は実演の下に置き，実演の欄をその分だけ縮める
+        let caption = self
+            .spotlight
+            .and_then(wizard::spotlight_detail)
+            .map(|detail| {
+                let inner = demo.width - size::CARD_PADDING_X * 3.0 - CAPTION_ICON;
+                let text = size::BODY_LINE_HEIGHT
+                    + size::CARD_GAP
+                    + measure.wrapped_height(detail, TextStyle::Caption, inner);
+                let height = text.max(CAPTION_ICON) + size::CARD_PADDING_X * 2.0;
+                let rect = Rect::new(demo.x, demo.max_y() - height, demo.width, height);
+                demo.height = (demo.height - height - size::CONTROL_GAP).max(0.0);
+                rect
+            });
         let button_y = footer + (size::WIZARD_FOOTER_HEIGHT - size::CONTROL_HEIGHT) / 2.0;
         let mut buttons = Vec::new();
         let mut right = width - padding;
@@ -652,7 +792,9 @@ impl Wizard {
             title,
             description,
             groups,
+            hint,
             demo,
+            caption,
             buttons,
         }
     }
@@ -711,15 +853,44 @@ impl Wizard {
         };
         let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
         let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        let font_size = self
+            .model
+            .as_ref()
+            .and_then(|model| model.value("candidateFontSize"))
+            .and_then(serde_json::Value::as_f64)
+            .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
+        // 窓の中身そのものを鍵にする(台本を始め直しても，同じ窓なら描き直さない)
         let key = format!(
-            "{:?}|{}|{}|{theme_name}|{}|{}|{width}x{height}",
-            self.step, frame.popup_id, self.demo_started, self.theme.dark, self.theme.dpi
+            "{theme_name}|{}|{}|{width}x{height}|{font_size}|{popup:?}",
+            self.theme.dark, self.theme.dpi
         );
         if self
             .popup_pixels
             .as_ref()
             .is_some_and(|(current, _)| *current == key)
         {
+            return;
+        }
+        let generation = self
+            .popup_pixels
+            .as_ref()
+            .map_or(1, |(_, pixels)| pixels.generation + 1);
+        if let Some(position) = self
+            .popup_cache
+            .iter()
+            .position(|(cached, _)| *cached == key)
+        {
+            let entry = self.popup_cache.remove(position);
+            self.popup_pixels = Some((
+                key,
+                PreviewPixels {
+                    generation,
+                    width,
+                    height,
+                    pixels: entry.1.clone(),
+                },
+            ));
+            self.popup_cache.push(entry);
             return;
         }
         if self.preview.is_none() {
@@ -733,12 +904,6 @@ impl Wizard {
             backdrop: false,
         };
         let resolved = candidate_ui::theme::ResolvedTheme::resolve(&theme_name, None, &look);
-        let font_size = self
-            .model
-            .as_ref()
-            .and_then(|model| model.value("candidateFontSize"))
-            .and_then(serde_json::Value::as_f64)
-            .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
         let shown = match &popup {
             Popup::Branch(map) => candidate_ui::app::preview::Shown::Branch(map),
             Popup::List(list) => candidate_ui::app::preview::Shown::List(list),
@@ -757,10 +922,10 @@ impl Wizard {
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
             return;
         };
-        let generation = self
-            .popup_pixels
-            .as_ref()
-            .map_or(1, |(_, pixels)| pixels.generation + 1);
+        if self.popup_cache.len() >= POPUP_CACHE {
+            self.popup_cache.remove(0);
+        }
+        self.popup_cache.push((key.clone(), pixels.clone()));
         self.popup_pixels = Some((
             key,
             PreviewPixels {
@@ -813,7 +978,10 @@ impl Wizard {
 
     /// 次に描く時を決める．動いているあいだは画面の更新に合わせ，止まっているコマでは次のコマまで時計で待つ
     fn schedule(&self, now: f64) {
-        let tweens = self.enter.running(now) || self.progress.running(now);
+        let tweens = self.enter.running(now)
+            || self.progress.running(now)
+            || self.caption.running(now)
+            || self.knobs.iter().any(|(_, knob)| knob.running(now));
         let loading = !self.ready() && !self.step.groups().is_empty();
         let demo = self.demo_frame(now);
         let moving = demo.is_some_and(|(frame, position)| {
@@ -957,6 +1125,9 @@ impl Wizard {
             key if key == VK_ESCAPE.0 => self.activate(Button::Later),
             _ => return false,
         }
+        if let Focus::Group(group) = self.focus {
+            self.spotlight_group(group);
+        }
         if WIZARD_ALIVE.with(|alive| alive.get()) {
             self.focus_visible = true;
             uia::focus_changed(self.window, self.focus_node());
@@ -976,6 +1147,9 @@ impl Wizard {
     fn mouse_move(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
         let hover = self.target_at(x, y);
+        if let Some(Target::Toggle(group)) = hover {
+            self.spotlight_group(group);
+        }
         if hover != self.hover {
             self.hover = hover;
             ffi::track_leave(self.window);
@@ -1089,7 +1263,13 @@ impl Wizard {
                                 ..node(
                                     NODE_TOGGLE + index as i32,
                                     uia::Role::CheckBox,
-                                    group.group.title.unwrap_or_default().to_string(),
+                                    match wizard::spotlight_detail(path) {
+                                        Some(detail) => format!(
+                                            "{} {detail}",
+                                            group.group.title.unwrap_or_default()
+                                        ),
+                                        None => group.group.title.unwrap_or_default().to_string(),
+                                    },
                                     rect,
                                 )
                             });
@@ -1297,7 +1477,17 @@ fn paint_window(canvas: &mut dyn Canvas, state: &PaintState) {
     canvas.translate(offset, 0.0);
     canvas.set_opacity(enter);
     paint_text_column(canvas, state);
+    if let (Some(hint), true) = (state.layout.hint, wizard.ready()) {
+        canvas.text(
+            hint,
+            text::SPOTLIGHT_HINT,
+            TextStyle::Caption,
+            Color::from(palette.text_secondary),
+            TextLayout::WRAP,
+        );
+    }
     paint_demo(canvas, state);
+    paint_caption(canvas, state);
     canvas.set_opacity(1.0);
     canvas.translate(-offset, 0.0);
 }
@@ -1358,12 +1548,35 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
             canvas.text(
                 rect,
                 title,
-                TextStyle::Section,
+                if group.group.compact {
+                    TextStyle::Body
+                } else {
+                    TextStyle::Section
+                },
                 Color::from(palette.text),
                 TextLayout::LINE,
             );
         }
         let focused = wizard.focus_visible && wizard.focus == Focus::Group(index);
+        if let (true, GroupKind::Radio(choices)) = (group.group.compact, group.group.kind) {
+            let current = wizard.choices.value(group.group.field);
+            for (position, ((value, label), rect)) in choices.iter().zip(&group.rows).enumerate() {
+                let target = Target::Option(index, position);
+                paint_chip(
+                    canvas,
+                    theme,
+                    *rect,
+                    label,
+                    *value == current,
+                    wizard.hover == Some(target),
+                    wizard.pressed == Some(target),
+                );
+                if focused && *value == current {
+                    paint::focus_ring(canvas, theme, *rect, size::CONTROL_RADIUS);
+                }
+            }
+            continue;
+        }
         match group.group.kind {
             GroupKind::Radio(choices) => {
                 let current = wizard.choices.value(group.group.field);
@@ -1397,7 +1610,9 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
                 };
                 let target = Target::Toggle(index);
                 let hover = wizard.hover == Some(target);
-                let fill = if hover {
+                // 実演と説明を出している機能の行は強調する
+                let lit = wizard.spotlight == Some(path);
+                let fill = if hover || lit {
                     palette.control_hover
                 } else {
                     palette.card
@@ -1407,7 +1622,11 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
                     *rect,
                     size::CARD_RADIUS,
                     1.0,
-                    Color::from(palette.card_stroke),
+                    if lit {
+                        Color::from(palette.accent)
+                    } else {
+                        Color::from(palette.card_stroke)
+                    },
                 );
                 let inner = Rect::new(
                     rect.x + size::CARD_PADDING_X,
@@ -1437,7 +1656,13 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
                         rect.height,
                     ),
                     on,
-                    if on { 1.0 } else { 0.0 },
+                    wizard
+                        .knobs
+                        .iter()
+                        .find(|(candidate, _)| *candidate == path)
+                        .map_or(if on { 1.0 } else { 0.0 }, |(_, knob)| {
+                            knob.value(state.now)
+                        }),
                     crate::strings::windows::ON,
                     crate::strings::windows::OFF,
                     State {
@@ -1455,15 +1680,105 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
     }
 }
 
+/// オン・オフの行の説明．機能の紹介のページの項目は説明を実演の下の札に出すので，行には出さない(macOS と同じ)
 fn toggle_note(path: &str) -> Option<&'static str> {
     match path {
         "remembersRejectedCorrections" => Some(text::REMEMBERS_REJECTED_NOTE),
-        "association" => Some(text::ASSOCIATION_NOTE),
-        "calculation" => Some(text::CALCULATION_NOTE),
-        "postalCodeConversion" => Some(text::POSTAL_CODE_NOTE),
-        "dateConversion" => Some(text::DATE_NOTE),
         _ => None,
     }
+}
+
+/// 説明の札の絵(Segoe Fluent Icons．macOS の OnboardingSpotlight.symbol に近いもの)
+fn spotlight_glyph(path: &str) -> &'static str {
+    match path {
+        "association" => "\u{E71B}",
+        "calculation" => "\u{E8EF}",
+        "postalCodeConversion" => "\u{E715}",
+        "dateConversion" => "\u{E787}",
+        "looseReadings" => "\u{E897}",
+        "phoneticSpelling" => "\u{E767}",
+        "handShiftCorrection" => "\u{E765}",
+        "conversionMacros" => "\u{E70F}",
+        "dynamicDictionary" => "\u{E81C}",
+        "launcherCommands" => "\u{E768}",
+        _ => "\u{E946}",
+    }
+}
+
+/// 覚えておく候補の窓の画像の数(1 つの台本の窓が収まる数)
+const POPUP_CACHE: usize = 24;
+
+/// 説明の札の絵の丸の大きさ
+const CAPTION_ICON: f32 = size::CONTROL_HEIGHT;
+/// 説明の札を浮かべる動きの長さ(ページを替える動きの何倍か．macOS は少し弾む動き)
+const CAPTION_MOTION: f32 = 1.6;
+
+/// 機能の紹介のページの，見せている機能の説明の札．下から浮かび上がる(macOS の SpotlightCaption)
+fn paint_caption(canvas: &mut dyn Canvas, state: &PaintState) {
+    let wizard = state.wizard;
+    let theme = &wizard.theme;
+    let palette = &theme.palette;
+    let (Some(rect), Some(path)) = (state.layout.caption, wizard.spotlight) else {
+        return;
+    };
+    let Some(detail) = wizard::spotlight_detail(path) else {
+        return;
+    };
+    let title = wizard::spotlight_items(wizard.step)
+        .iter()
+        .find(|(candidate, _)| *candidate == path)
+        .map_or("", |(_, title)| *title);
+    let shown = wizard.caption.value(state.now);
+    let lift = (1.0 - shown) * size::CARD_GAP * 3.0;
+    let opacity = wizard.enter.value(state.now);
+    canvas.set_opacity(opacity * shown);
+    canvas.translate(0.0, lift);
+    canvas.fill_round(rect, size::CARD_RADIUS, Color::from(palette.card));
+    canvas.stroke_round(
+        rect,
+        size::CARD_RADIUS,
+        1.0,
+        Color::from(palette.card_stroke),
+    );
+    let padding = size::CARD_PADDING_X;
+    let icon = Rect::new(
+        rect.x + padding,
+        rect.y + padding,
+        CAPTION_ICON,
+        CAPTION_ICON,
+    );
+    canvas.fill_round(icon, CAPTION_ICON / 2.0, Color::from(palette.accent));
+    canvas.text(
+        icon,
+        spotlight_glyph(path),
+        TextStyle::IconSmall,
+        Color::from(palette.accent_text),
+        TextLayout::CENTER,
+    );
+    let text_x = icon.max_x() + padding;
+    let text_width = rect.max_x() - padding - text_x;
+    canvas.text(
+        Rect::new(text_x, rect.y + padding, text_width, size::BODY_LINE_HEIGHT),
+        title,
+        TextStyle::Section,
+        Color::from(palette.text),
+        TextLayout::LINE,
+    );
+    let detail_top = rect.y + padding + size::BODY_LINE_HEIGHT + size::CARD_GAP;
+    canvas.text(
+        Rect::new(
+            text_x,
+            detail_top,
+            text_width,
+            rect.max_y() - padding - detail_top,
+        ),
+        detail,
+        TextStyle::Caption,
+        Color::from(palette.text_secondary),
+        TextLayout::WRAP,
+    );
+    canvas.translate(0.0, -lift);
+    canvas.set_opacity(opacity);
 }
 
 struct OptionLook<'a> {
@@ -1474,6 +1789,45 @@ struct OptionLook<'a> {
     hover: bool,
     pressed: bool,
 }
+
+/// 1 行に並べる選択肢(選んだものを強調の色で塗る)
+fn paint_chip(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    label: &str,
+    selected: bool,
+    hover: bool,
+    pressed: bool,
+) {
+    let palette = &theme.palette;
+    let (fill, text) = match (selected, pressed, hover) {
+        (true, _, _) => (palette.accent, palette.accent_text),
+        (false, true, _) => (palette.control_pressed, palette.text),
+        (false, false, true) => (palette.control_hover, palette.text),
+        _ => (palette.card, palette.text),
+    };
+    canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(fill));
+    if !selected {
+        canvas.stroke_round(
+            rect,
+            size::CONTROL_RADIUS,
+            1.0,
+            Color::from(palette.card_stroke),
+        );
+    }
+    canvas.text(
+        rect,
+        label,
+        TextStyle::Body,
+        Color::from(text),
+        TextLayout::CENTER,
+    );
+}
+
+/// 1 行に並べる選ぶものの高さと名前の幅
+const COMPACT_HEIGHT: f32 = size::CONTROL_HEIGHT;
+const COMPACT_LABEL: f32 = size::BUTTON_WIDTH;
 
 /// 選択肢の行(丸・名前・推奨の札・説明)
 fn paint_option(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, look: OptionLook) {

@@ -4,10 +4,14 @@
 use crate::fonts::InstalledFace;
 use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory, IDWriteFont, IDWriteFontCollection,
-    IDWriteLocalizedStrings, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_SIMULATIONS_NONE,
+    IDWriteFontCollection1, IDWriteFontSet, IDWriteLocalizedStrings, DWRITE_FACTORY_TYPE_SHARED,
+    DWRITE_FONT_PROPERTY_ID, DWRITE_FONT_PROPERTY_ID_POSTSCRIPT_NAME,
+    DWRITE_FONT_PROPERTY_ID_STRETCH, DWRITE_FONT_PROPERTY_ID_STYLE, DWRITE_FONT_PROPERTY_ID_WEIGHT,
+    DWRITE_FONT_PROPERTY_ID_WEIGHT_STRETCH_STYLE_FACE_NAME,
+    DWRITE_FONT_PROPERTY_ID_WEIGHT_STRETCH_STYLE_FAMILY_NAME, DWRITE_FONT_SIMULATIONS_NONE,
     DWRITE_FONT_STYLE_NORMAL, DWRITE_INFORMATIONAL_STRING_POSTSCRIPT_NAME,
 };
-use windows_core::{BOOL, HSTRING};
+use windows_core::{Interface, BOOL, HSTRING};
 
 /// 画面に出す名前の言語．無ければ英語，それも無ければ最初の名前
 const LABEL_LOCALE: &str = "ja-jp";
@@ -26,8 +30,78 @@ pub fn installed() -> Vec<InstalledFace> {
     collection.map_or_else(Vec::new, |collection| faces(&collection))
 }
 
-/// 書体の集まりの中の書体．太さや斜体を OS が作ったもの(シミュレーション)と，PostScript 名の無いものは除く
+/// 書体の集まりの中の書体．太さや斜体を OS が作ったもの(シミュレーション)と，PostScript 名の無いものは除く．
+/// 書体の組(IDWriteFontSet)の属性は OS の書体のキャッシュから読むので速い．書体ごとに IDWriteFont から読むと
+/// ファイルを 1 つずつ開くことになり，書体の多い PC では十数秒かかる
 pub(super) fn faces(collection: &IDWriteFontCollection) -> Vec<InstalledFace> {
+    let set = collection
+        .cast::<IDWriteFontCollection1>()
+        .ok()
+        // SAFETY: collection は生きている COM の参照
+        .and_then(|collection| unsafe { collection.GetFontSet() }.ok());
+    match set {
+        Some(set) => faces_of_set(&set),
+        None => faces_of_collection(collection),
+    }
+}
+
+/// 書体の組の属性から読む(Windows 10 から)．書体の組には OS が作った書体は入っていない
+fn faces_of_set(set: &IDWriteFontSet) -> Vec<InstalledFace> {
+    let mut faces = Vec::new();
+    // SAFETY: set は生きている COM の参照で，番号は数の範囲の中
+    let count = unsafe { set.GetFontCount() };
+    for index in 0..count {
+        let property = |id| property(set, index, id);
+        let (Some(names), Some(postscript)) = (
+            property(DWRITE_FONT_PROPERTY_ID_WEIGHT_STRETCH_STYLE_FAMILY_NAME),
+            property(DWRITE_FONT_PROPERTY_ID_POSTSCRIPT_NAME),
+        ) else {
+            continue;
+        };
+        let (Some(family), Some(postscript)) = (
+            text(&names, ENGLISH_LOCALE),
+            text(&postscript, ENGLISH_LOCALE),
+        ) else {
+            continue;
+        };
+        let family_label = text(&names, LABEL_LOCALE).unwrap_or_else(|| family.clone());
+        let label = property(DWRITE_FONT_PROPERTY_ID_WEIGHT_STRETCH_STYLE_FACE_NAME)
+            .and_then(|names| text(&names, LABEL_LOCALE))
+            .unwrap_or_else(|| postscript.clone());
+        let number = |id, default: u32| {
+            property(id)
+                .and_then(|value| text(&value, ENGLISH_LOCALE))
+                .and_then(|value| value.trim().parse::<u32>().ok())
+                .unwrap_or(default)
+        };
+        faces.push(InstalledFace {
+            family,
+            family_label,
+            postscript,
+            label,
+            weight: number(DWRITE_FONT_PROPERTY_ID_WEIGHT, 400),
+            italic: number(DWRITE_FONT_PROPERTY_ID_STYLE, 0) != 0,
+            stretch: number(DWRITE_FONT_PROPERTY_ID_STRETCH, 5),
+        });
+    }
+    faces
+}
+
+/// 書体の組の index 番目の書体の属性
+fn property(
+    set: &IDWriteFontSet,
+    index: u32,
+    id: DWRITE_FONT_PROPERTY_ID,
+) -> Option<IDWriteLocalizedStrings> {
+    let mut exists = BOOL(0);
+    let mut values = None;
+    // SAFETY: set は生きている COM の参照で，番号は数の範囲の中．exists と values は書き込める領域
+    unsafe { set.GetPropertyValues3(index, id, &mut exists, &mut values) }.ok()?;
+    values.filter(|_| exists.as_bool())
+}
+
+/// 書体ごとに IDWriteFont から読む(書体の組を使えないとき)
+fn faces_of_collection(collection: &IDWriteFontCollection) -> Vec<InstalledFace> {
     let mut faces = Vec::new();
     // SAFETY: collection は生きている COM の参照で，番号は数の範囲の中
     unsafe {
@@ -116,5 +190,22 @@ fn text(strings: &IDWriteLocalizedStrings, locale: &str) -> Option<String> {
         String::from_utf16(&buffer)
             .ok()
             .filter(|name| !name.is_empty())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 入っている書体を速く読む() {
+        let started = std::time::Instant::now();
+        let faces = installed();
+        let elapsed = started.elapsed();
+        assert!(!faces.is_empty());
+        assert!(faces
+            .iter()
+            .any(|face| face.family == "Segoe UI" && face.weight == 400 && !face.italic));
+        assert!(elapsed.as_secs() < 3, "{elapsed:?}");
     }
 }

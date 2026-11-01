@@ -101,6 +101,8 @@ fn options(started: std::time::Instant) -> window::Options {
 /// 初期設定ウィザードを開く引数．--setup-if-needed は済んでいれば何もしない(ログオンのたびに起動する)
 pub(crate) const SETUP: &str = "--setup";
 const SETUP_IF_NEEDED: &str = "--setup-if-needed";
+/// 最新のリリースのページをブラウザーで開いて終える(入力メニューの「更新を確認」．macOS と同じく通信しない)
+pub const CHECK_FOR_UPDATES: &str = "--check-for-updates";
 
 /// 同じ実行ファイルを arguments で起動する(ウィザードから設定の画面，設定の画面からウィザードを開く)
 pub(crate) fn launch_settings(arguments: &[&str]) {
@@ -163,6 +165,16 @@ pub fn run() {
     // ログオンのたびの起動で，利用者の入力方式に Hajime を一度だけ加える
     if arguments.iter().any(|argument| argument == SETUP_IF_NEEDED) {
         ffi::add_input_method_once();
+    }
+    if arguments
+        .iter()
+        .any(|argument| argument == CHECK_FOR_UPDATES)
+    {
+        if let Ok(catalog) = Catalog::load() {
+            ffi::initialize_com();
+            ffi::open_url(&catalog.latest_release_url);
+        }
+        return;
     }
     let mode = mode(&arguments);
     if matches!(mode, Mode::Nothing) {

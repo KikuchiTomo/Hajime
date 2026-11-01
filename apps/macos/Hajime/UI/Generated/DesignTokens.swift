@@ -378,11 +378,11 @@ enum DesignTokens {
             static let scrollbarIdle: Double = 1200
             static let scrollbarFade: Double = 250
             static let progressRing: Double = 1400
-            static let wizardKey: Double = 110
+            static let wizardKey: Double = 85
             static let wizardKeyPress: Double = 320
             static let wizardPause: Double = 700
-            static let wizardHold: Double = 2200
-            static let wizardPage: Double = 250
+            static let wizardHold: Double = 1400
+            static let wizardPage: Double = 220
         }
         enum Onboarding {
             static let keystroke: Double = 85

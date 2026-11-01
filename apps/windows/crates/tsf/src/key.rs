@@ -71,6 +71,68 @@ impl RawKey {
     }
 }
 
+/// キーの位置(スキャンコード)から，JIS キーボードのその位置の刻印を引く．かな入力でかなを引くのに使う(core の KanaLayout)．
+/// スキャンコードはキーの位置で決まり，配列の設定(US・JIS など)によらない(macOS の NSEventKeyTranslator.jisLabels と同じ表)．
+/// テンキーなどの拡張キー(E0 の付くキー)は同じ番号でも別のキーなので引かない
+pub fn jis_label(scan: u16, extended: bool) -> Option<char> {
+    if extended {
+        return None;
+    }
+    const LABELS: &[(u16, char)] = &[
+        (0x02, '1'),
+        (0x03, '2'),
+        (0x04, '3'),
+        (0x05, '4'),
+        (0x06, '5'),
+        (0x07, '6'),
+        (0x08, '7'),
+        (0x09, '8'),
+        (0x0A, '9'),
+        (0x0B, '0'),
+        (0x0C, '-'),
+        (0x0D, '^'),
+        (0x10, 'q'),
+        (0x11, 'w'),
+        (0x12, 'e'),
+        (0x13, 'r'),
+        (0x14, 't'),
+        (0x15, 'y'),
+        (0x16, 'u'),
+        (0x17, 'i'),
+        (0x18, 'o'),
+        (0x19, 'p'),
+        (0x1A, '@'),
+        (0x1B, '['),
+        (0x1E, 'a'),
+        (0x1F, 's'),
+        (0x20, 'd'),
+        (0x21, 'f'),
+        (0x22, 'g'),
+        (0x23, 'h'),
+        (0x24, 'j'),
+        (0x25, 'k'),
+        (0x26, 'l'),
+        (0x27, ';'),
+        (0x28, ':'),
+        (0x2B, ']'),
+        (0x2C, 'z'),
+        (0x2D, 'x'),
+        (0x2E, 'c'),
+        (0x2F, 'v'),
+        (0x30, 'b'),
+        (0x31, 'n'),
+        (0x32, 'm'),
+        (0x33, ','),
+        (0x34, '.'),
+        (0x35, '/'),
+        (0x73, '_'),
+    ];
+    LABELS
+        .iter()
+        .find(|(code, _)| *code == scan)
+        .map(|(_, label)| *label)
+}
+
 pub fn is_modifier_only(vk: u16) -> bool {
     matches!(
         vk,
@@ -101,7 +163,8 @@ pub fn translate(raw: &RawKey) -> Option<KeyInput> {
         VK_KANJI | VK_DBE_SBCSCHAR | VK_DBE_DBCSCHAR => Some(Key::HankakuZenkaku),
         VK_KANA | VK_DBE_HIRAGANA | VK_DBE_KATAKANA => Some(Key::Kana),
         VK_DBE_ALPHANUMERIC => Some(Key::Eisu),
-        VK_OEM_5 if raw.japanese_layout => Some(Key::Yen),
+        // ¥ のキー(JIS 配列の ¥ か \ の文字のとき)．Shift+¥ の | は配列の文字のまま使う(macOS の YenKeyPolicy と同じ)
+        VK_OEM_5 if raw.japanese_layout && matches!(raw.text, Some('\\' | '¥')) => Some(Key::Yen),
         vk if (VK_F1..=VK_F24).contains(&vk) => Some(Key::Function {
             number: (vk - VK_F1 + 1) as u8,
         }),
@@ -214,6 +277,28 @@ mod tests {
             translate(&us).unwrap().key,
             Key::Character { text: "\\".into() }
         );
+    }
+
+    #[test]
+    fn shift_と円記号のキーは配列の文字のまま() {
+        let mut bar = raw(VK_OEM_5, Some('|'));
+        bar.modifiers.shift = true;
+        assert_eq!(
+            translate(&bar).unwrap().key,
+            Key::Character { text: "|".into() }
+        );
+        assert_eq!(translate(&raw(VK_OEM_5, Some('¥'))).unwrap().key, Key::Yen);
+    }
+
+    #[test]
+    fn かな入力の刻印はキーの位置で配列によらず引く() {
+        assert_eq!(jis_label(0x1E, false), Some('a'));
+        assert_eq!(jis_label(0x73, false), Some('_'));
+        assert_eq!(jis_label(0x1A, false), Some('@'));
+        assert_eq!(jis_label(0x28, false), Some(':'));
+        // テンキーの / は拡張キーなので刻印にしない
+        assert_eq!(jis_label(0x35, true), None);
+        assert_eq!(jis_label(0x01, false), None);
     }
 
     #[test]

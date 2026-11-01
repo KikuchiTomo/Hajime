@@ -55,6 +55,7 @@ impl From<Rgb> for Color {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Glyphs {
     pub chevron_down: &'static str,
+    pub chevron_right: &'static str,
     pub check: &'static str,
     pub undo: &'static str,
     pub search: &'static str,
@@ -63,6 +64,7 @@ pub struct Glyphs {
 
 pub const GLYPHS: Glyphs = Glyphs {
     chevron_down: "\u{E70D}",
+    chevron_right: "\u{E76C}",
     check: "\u{E73E}",
     undo: "\u{E7A7}",
     search: "\u{E721}",

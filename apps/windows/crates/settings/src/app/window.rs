@@ -51,6 +51,10 @@ const ID_SEARCH: u16 = 1;
 const WARM_ID: u16 = 50;
 /// つなぎ直しの時計の番号
 const RECONNECT_TIMER: usize = 1;
+/// 説明の吹き出しを出すまでの時計の番号
+const TOOLTIP_TIMER: usize = 2;
+/// ポインターを載せてから説明の吹き出しを出すまで(ミリ秒．OS のツールチップと同じくらい)
+const TOOLTIP_DELAY: u32 = 500;
 /// 読み込みのスレッドが終わった知らせ
 const WM_LOADED: u32 = WM_APP + 20;
 /// 測る手順を 1 つ進める知らせ(--measure)
@@ -154,6 +158,8 @@ pub struct App {
     focus_visible: bool,
     focused_edit: Option<Window>,
     hover: Option<Target>,
+    /// 説明の吹き出し(文と，ポインターの位置と，載せた時刻)
+    tooltip: Option<(&'static str, f32, f32, f64)>,
     pressed: Option<Target>,
     flyout: Option<Flyout>,
     started: Instant,
@@ -245,6 +251,7 @@ pub fn open(
         focus_visible: false,
         focused_edit: None,
         hover: None,
+        tooltip: None,
         pressed: None,
         flyout: None,
         started,
@@ -662,12 +669,18 @@ impl App {
             search: self.search_rect(),
             nav_top: self.nav_top(),
         };
+        let tooltip = self.tooltip.filter(|(.., since)| {
+            now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
+        });
         let mut cpu = 0.0;
         let drawn = self
             .surface
             .draw(graphics, size, theme.dpi, clear, preview, |canvas| {
                 let start = Instant::now();
                 paint_window(canvas, &state, nav, nav_scroll, view, scroll);
+                if let Some((text, x, y, _)) = tooltip {
+                    paint_tooltip(canvas, &theme, text, (x, y), (width, height));
+                }
                 cpu = start.elapsed().as_secs_f64() * 1000.0;
             });
         if drawn.is_err() {
@@ -786,7 +799,7 @@ impl App {
     // MARK: - ポインター
 
     /// 窓の中の点(DIP)にあるもの
-    fn target_at(&self, x: f32, y: f32) -> Option<Target> {
+    fn target_at(&mut self, x: f32, y: f32) -> Option<Target> {
         let (width, height) = self.size();
         let nav_width = nav_width(width);
         let now = self.now();
@@ -812,7 +825,9 @@ impl App {
         let element = self.view.hit(page_x, page_y)?;
         if matches!(element.part, Part::Table | Part::Text) {
             if let Some(rect) = self.view.rect(element) {
-                if page_x >= rect.max_x() - size::SCROLLBAR_HIT {
+                if page_x >= rect.max_x() - size::SCROLLBAR_HIT
+                    && self.view.can_scroll_inside(element)
+                {
                     return Some(Target::InnerScrollbar(element));
                 }
             }
@@ -848,11 +863,26 @@ impl App {
                 ffi::invalidate(self.window);
                 return;
             }
+            Some(Target::InnerScrollbar(element)) => {
+                let page_y = y + self.scroll.offset(now);
+                self.view.drag_inner_scrollbar(element, page_y, now);
+                ffi::invalidate(self.window);
+                return;
+            }
             _ => {}
         }
         let target = self.target_at(x, y);
         if target != self.hover {
             self.hover = target;
+            self.tooltip = match target {
+                Some(Target::Page(element)) => {
+                    self.view.tooltip(element).map(|text| (text, x, y, now))
+                }
+                _ => None,
+            };
+            if self.tooltip.is_some() {
+                ffi::set_timer(self.window, TOOLTIP_TIMER, TOOLTIP_DELAY);
+            }
             for (index, tween) in self.nav_hover.iter_mut().enumerate() {
                 let on = target == Some(Target::Nav(index));
                 tween.retarget(
@@ -898,6 +928,7 @@ impl App {
     fn mouse_leave(&mut self) {
         let now = self.now();
         self.hover = None;
+        self.tooltip = None;
         for tween in &mut self.nav_hover {
             tween.retarget(0.0, now, f64::from(motion::HOVER), Easing::LINEAR);
         }
@@ -941,7 +972,11 @@ impl App {
                 let top = self.nav_top();
                 self.nav_scroll.press(y - top, height - top, now);
             }
-            Some(Target::InnerScrollbar(element)) => self.set_focus(Focus::Page(element)),
+            Some(Target::InnerScrollbar(element)) => {
+                self.set_focus(Focus::Page(element));
+                let page_y = y + self.scroll.offset(now);
+                self.view.press_inner_scrollbar(element, page_y, now);
+            }
             Some(Target::Nav(_)) => self.set_focus(Focus::Nav),
             Some(Target::Page(element)) => {
                 if self.view.edit(element).is_none() {
@@ -968,6 +1003,7 @@ impl App {
         ffi::release_capture();
         self.scroll.release(now);
         self.nav_scroll.release(now);
+        self.view.release_inner_scrollbars(now);
         let target = self.target_at(x, y);
         match (pressed, target) {
             (Some(Target::Nav(index)), Some(Target::Nav(over))) if index == over => {
@@ -1545,6 +1581,81 @@ impl App {
         true
     }
 
+    /// ドロップダウンの一覧の点がスクロールバーの上なら，トラックの中の y(上からの距離)とトラックの高さ
+    fn flyout_scrollbar_point(&self, lparam: LPARAM) -> Option<(f32, f32)> {
+        let flyout = self.flyout.as_ref()?;
+        let (x, y) = self.point(lparam);
+        let grabbing = flyout.scroll.grabbing();
+        if !flyout.scroll.can_scroll() || (!grabbing && x < flyout.width - size::SCROLLBAR_HIT) {
+            return None;
+        }
+        // paint_flyout の body の中に，page::scrollbar と同じ余白で置いたトラック
+        let top = size::FLYOUT_PADDING + size::SCROLLBAR_MARGIN;
+        let track = flyout.height - (size::FLYOUT_PADDING + size::SCROLLBAR_MARGIN) * 2.0;
+        Some((y - top, track))
+    }
+
+    /// ドロップダウンの一覧でボタンを押した．スクロールバーの上ならつかむ
+    fn flyout_press(&mut self, lparam: LPARAM) {
+        let now = self.now();
+        let Some((y, track)) = self.flyout_scrollbar_point(lparam) else {
+            return;
+        };
+        if let Some(flyout) = self.flyout.as_mut() {
+            flyout.scroll.press(y, track, now);
+            ffi::capture(flyout.window);
+            ffi::invalidate(flyout.window);
+        }
+    }
+
+    /// ドロップダウンの一覧の上でポインターを動かした．つまみをつかんでいれば送り，そうでなければ項目に印を付ける
+    fn flyout_move(&mut self, lparam: LPARAM) {
+        let now = self.now();
+        let bar = self.flyout_scrollbar_point(lparam);
+        let index = self.flyout_point(lparam);
+        let Some(flyout) = self.flyout.as_mut() else {
+            return;
+        };
+        if flyout.scroll.grabbing() {
+            if let Some((y, track)) = bar {
+                flyout.scroll.drag(y, track, now);
+            }
+            ffi::invalidate(flyout.window);
+            return;
+        }
+        let over_bar = bar.is_some();
+        if flyout.scroll.hover() != over_bar {
+            flyout.scroll.set_hover(over_bar, now);
+            ffi::invalidate(flyout.window);
+        }
+        if over_bar {
+            return;
+        }
+        if flyout.hover != index && index.is_some() {
+            flyout.hover = index;
+            ffi::invalidate(flyout.window);
+        }
+    }
+
+    /// ドロップダウンの一覧でボタンを放した．つまみを放したときは選ばない
+    fn flyout_release(&mut self, lparam: LPARAM) {
+        let now = self.now();
+        if let Some(flyout) = self.flyout.as_mut() {
+            if flyout.scroll.grabbing() {
+                flyout.scroll.release(now);
+                ffi::release_capture();
+                ffi::invalidate(flyout.window);
+                return;
+            }
+        }
+        if self.flyout_scrollbar_point(lparam).is_some() {
+            return;
+        }
+        if let Some(index) = self.flyout_point(lparam) {
+            self.flyout_choose(index);
+        }
+    }
+
     fn flyout_point(&self, lparam: LPARAM) -> Option<usize> {
         let flyout = self.flyout.as_ref()?;
         let (_, y) = self.point(lparam);
@@ -1942,6 +2053,44 @@ fn paint_flyout_items(
     page::scrollbar(canvas, theme, body, scroll, now);
 }
 
+/// 説明の吹き出し．ポインターの右下に出し，窓からはみ出さないよう詰める
+fn paint_tooltip(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    text: &str,
+    (x, y): (f32, f32),
+    (width, height): (f32, f32),
+) {
+    let palette = &theme.palette;
+    let padding = size::FIELD_PADDING_X;
+    let bubble_width = canvas.width(text, TextStyle::Caption) + padding * 2.0;
+    let bubble_height = size::NOTE_LINE_HEIGHT + padding;
+    let left = (x + padding)
+        .min(width - bubble_width - size::CARD_GAP)
+        .max(0.0);
+    let below = y + size::CONTROL_HEIGHT * 0.75;
+    let top = if below + bubble_height > height {
+        y - bubble_height - size::CARD_GAP
+    } else {
+        below
+    };
+    let rect = Rect::new(left, top, bubble_width, bubble_height);
+    canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.card));
+    canvas.stroke_round(
+        rect,
+        size::CONTROL_RADIUS,
+        1.0,
+        Color::from(palette.control_strong_stroke),
+    );
+    canvas.text(
+        rect,
+        text,
+        TextStyle::Caption,
+        Color::from(palette.text),
+        TextLayout::CENTER,
+    );
+}
+
 // MARK: - 窓の手続き
 
 /// ページの部品の読み上げの番号の始まり(左の一覧の項目と分ける)
@@ -2021,6 +2170,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         WM_WARM => {
             with_app(App::warm_fields);
             Some(LRESULT(0))
+        }
+        WM_TIMER if wparam.0 == TOOLTIP_TIMER => {
+            ffi::kill_timer(window, TOOLTIP_TIMER);
+            ffi::invalidate(window);
+            None
         }
         WM_TIMER if wparam.0 == RECONNECT_TIMER => {
             with_app(|app| {
@@ -2210,23 +2364,15 @@ fn flyout_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) ->
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),
         WM_NCHITTEST => None,
         WM_MOUSEMOVE => {
-            with_app(|app| {
-                let index = app.flyout_point(lparam);
-                if let Some(flyout) = app.flyout.as_mut() {
-                    if flyout.hover != index && index.is_some() {
-                        flyout.hover = index;
-                        ffi::invalidate(flyout.window);
-                    }
-                }
-            });
+            with_app(|app| app.flyout_move(lparam));
+            Some(LRESULT(0))
+        }
+        WM_LBUTTONDOWN => {
+            with_app(|app| app.flyout_press(lparam));
             Some(LRESULT(0))
         }
         WM_LBUTTONUP => {
-            with_app(|app| {
-                if let Some(index) = app.flyout_point(lparam) {
-                    app.flyout_choose(index);
-                }
-            });
+            with_app(|app| app.flyout_release(lparam));
             Some(LRESULT(0))
         }
         WM_MOUSEWHEEL => {

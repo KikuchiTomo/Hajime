@@ -25,6 +25,12 @@ use ipc::{
 use std::borrow::Cow;
 
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
+/// コマンドの一覧と，その入力欄の番号(pages の COMMAND_FIELDS の並び)
+const COMMANDS: &str = "commands";
+const COMMAND_TITLE: usize = 1;
+const COMMAND_KIND: usize = 2;
+const COMMAND_TARGET: usize = 3;
+
 pub enum After {
     Message {
         text: Cow<'static, str>,
@@ -32,6 +38,8 @@ pub enum After {
     },
     /// 件数などを含む知らせ
     Notice(String),
+    /// コマンドの行き先を選ぶ窓を出す
+    ChooseCommandTarget,
     OpenSettingsFile,
     /// 初期設定ウィザードを開く(同じ実行ファイルを --setup で起動する)
     OpenSetup,
@@ -92,6 +100,36 @@ pub fn run_after(window: Window, after: Option<After>) {
             })
             .flatten();
             run_after(window, after);
+        }
+        Some(After::ChooseCommandTarget) => {
+            let Some(file) = ffi::choose_file(window, true, "", text::ALL_FILES, "*.*") else {
+                return;
+            };
+            // 実行ファイルならアプリを開く，ほかはファイルを開くコマンドにする．名前が空なら拡張子を除いたファイルの名前にする
+            let path = std::path::Path::new(&file);
+            let is_app = path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
+            let stem = path
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_string())
+                .unwrap_or_default();
+            with_app(|app| {
+                app.view.set_list_input(COMMANDS, COMMAND_TARGET, &file);
+                app.view.set_list_choice(
+                    COMMANDS,
+                    COMMAND_KIND,
+                    if is_app {
+                        "openApplication"
+                    } else {
+                        "openFile"
+                    },
+                );
+                if app.view.list_input(COMMANDS, COMMAND_TITLE).is_empty() {
+                    app.view.set_list_input(COMMANDS, COMMAND_TITLE, &stem);
+                }
+                ffi::invalidate(app.window);
+            });
         }
         Some(After::ImportDictionary { list, replacing }) => {
             let filter = crate::files::TEXT_FILTER;
@@ -230,6 +268,22 @@ impl App {
         if let Event::ChooseApp { path } = event {
             return Some(After::ChooseApp { path });
         }
+        if let Event::OpenUrl(url) = event {
+            return Some(After::OpenUrl(url));
+        }
+        if event == Event::ChooseCommandTarget {
+            return Some(After::ChooseCommandTarget);
+        }
+        if let Event::Notice(text) = event {
+            return Some(After::Message {
+                text: text.into(),
+                warning: true,
+            });
+        }
+        if event == Event::Relayout {
+            self.arrange();
+            return None;
+        }
         if matches!(
             event,
             Event::SymbolSave { .. } | Event::SymbolRemove { .. } | Event::SymbolToggle { .. }
@@ -318,6 +372,10 @@ impl App {
                 let list = spec.remove(model.value(spec.path), &indices);
                 model.set(spec.path, list)
             }
+            Event::ListToggle { spec, indices } => {
+                let list = spec.toggle_enabled(model.value(spec.path), &indices);
+                model.set(spec.path, list)
+            }
             Event::ListAdd { .. }
             | Event::SymbolSave { .. }
             | Event::SymbolRemove { .. }
@@ -328,6 +386,10 @@ impl App {
             | Event::ThemeSelected(_)
             | Event::ChooseColor { .. }
             | Event::ChooseApp { .. }
+            | Event::OpenUrl(_)
+            | Event::Notice(_)
+            | Event::ChooseCommandTarget
+            | Event::Relayout
             | Event::Action(
                 Action::SyncNow
                 | Action::ChooseSyncFolder
@@ -875,6 +937,8 @@ impl App {
             Some(index) => Some(spec.remove(model.value(spec.path), &[index])),
             None => model.value(spec.path).cloned(),
         };
+        // 書き換える行の欄に無い値(id・isEnabled など)は引き継ぐ
+        let base = replacing.and_then(|index| spec.element_at(model.value(spec.path), index));
         let items = spec.items(current.as_ref());
         let is_new = !items.iter().any(|existing| spec.same_key(existing, item));
         if is_new && items.len() >= limit {
@@ -884,7 +948,10 @@ impl App {
             });
         }
         // いつも英語にする語といつも日本語にする語は，足した語をもう一方から除く(macOS と同じ)
-        let mut changes = vec![(spec.path, spec.upsert(current.as_ref(), item))];
+        let mut changes = vec![(
+            spec.path,
+            spec.upsert_with(current.as_ref(), item, base.as_ref()),
+        )];
         if let (Some(other), Some(word)) = (spec.exclusive_with, item.first()) {
             changes.push((other, ListSpec::without(model.value(other), word)));
         }

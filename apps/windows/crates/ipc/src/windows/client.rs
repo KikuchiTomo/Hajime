@@ -9,13 +9,23 @@ const SECURITY_IDENTIFICATION: u32 = 0x0001_0000;
 impl EngineClient {
     /// 名前付きパイプでエンジンにつなぐ手元側を作る
     pub fn start(pipe_name: String) -> std::io::Result<Self> {
-        Self::start_with(move || {
-            OpenOptions::new()
+        let server = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let recorded = server.clone();
+        let mut client = Self::start_with(move || {
+            let pipe = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .security_qos_flags(SECURITY_IDENTIFICATION)
-                .open(&pipe_name)
-        })
+                .open(&pipe_name)?;
+            // つないだ相手のプロセス(前に出ることを許す相手)を覚える
+            recorded.store(
+                super::ffi::server_process_id(&pipe).unwrap_or(0),
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            Ok(pipe)
+        })?;
+        client.server = server;
+        Ok(client)
     }
 }
 
@@ -111,6 +121,8 @@ mod tests {
             body,
             Some(ResponseBody::Edit { handled: true, .. })
         ));
+        // つないだ相手(このテストではこのプロセス)を，前に出ることを許す相手として覚えている
+        assert_eq!(client.server_process_id(), Some(std::process::id()));
         server.join().unwrap();
     }
 

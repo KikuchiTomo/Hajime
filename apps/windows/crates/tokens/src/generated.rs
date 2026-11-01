@@ -491,11 +491,11 @@ pub mod motion {
         pub const SCROLLBAR_IDLE: f32 = 1200.0;
         pub const SCROLLBAR_FADE: f32 = 250.0;
         pub const PROGRESS_RING: f32 = 1400.0;
-        pub const WIZARD_KEY: f32 = 110.0;
+        pub const WIZARD_KEY: f32 = 85.0;
         pub const WIZARD_KEY_PRESS: f32 = 320.0;
         pub const WIZARD_PAUSE: f32 = 700.0;
-        pub const WIZARD_HOLD: f32 = 2200.0;
-        pub const WIZARD_PAGE: f32 = 250.0;
+        pub const WIZARD_HOLD: f32 = 1400.0;
+        pub const WIZARD_PAGE: f32 = 220.0;
     }
     pub mod onboarding {
         pub const KEYSTROKE: f32 = 85.0;

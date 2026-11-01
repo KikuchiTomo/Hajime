@@ -49,7 +49,7 @@ struct WireTranslationTests {
         ], anchor: anchor)
         #expect(routed.edits == [
             .commit(text: "確定"),
-            .setComposition(segments: [WireTextSegment(text: "にほん", style: .reading), WireTextSegment(text: "語", style: .focused)], caret: nil),
+            .setComposition(segments: [WireTextSegment(text: "にほん", style: .reading), WireTextSegment(text: "語", style: .focused)], caret: nil, panelAnchor: nil),
             .selectMode(mode: .direct),
         ])
         #expect(routed.ui == [
@@ -59,6 +59,21 @@ struct WireTranslationTests {
             .showMode(mode: .direct, anchor: anchor, label: nil),
         ])
         #expect(routed.host == [.toggleLiveConversion])
+    }
+
+    @Test("候補の窓を文節にそろえる位置は，組み立て中の文字の書き換えに添えて DLL に送る")
+    func panelAnchor() {
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: "仮名", annotation: nil)], selectedEntry: nil,
+                                   focus: .candidate, position: 0, total: 1, note: nil)
+        panel.anchor = 3
+        let routed = RoutedActions([
+            .setMarkedText(MarkedText([.init("今日は", style: .converted), .init("かな", style: .reading)])),
+            .showCandidates(panel),
+        ], anchor: nil)
+        #expect(routed.edits == [
+            .setComposition(segments: [WireTextSegment(text: "今日は", style: .converted), WireTextSegment(text: "かな", style: .reading)],
+                            caret: nil, panelAnchor: 3),
+        ])
     }
 
     @Test("分岐図は文節の内容をそのまま運ぶ")

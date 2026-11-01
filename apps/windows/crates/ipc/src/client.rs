@@ -18,6 +18,8 @@ struct Job {
 pub struct EngineClient {
     jobs: Sender<Job>,
     next_id: AtomicU32,
+    /// つないだエンジンのプロセスの番号(分からなければ 0)．つなぎ直すたびに書き換える
+    pub(crate) server: std::sync::Arc<AtomicU32>,
 }
 
 pub struct Pending {
@@ -61,7 +63,13 @@ impl EngineClient {
         Ok(Self {
             jobs,
             next_id: AtomicU32::new(1),
+            server: std::sync::Arc::new(AtomicU32::new(0)),
         })
+    }
+
+    /// つないでいるエンジンのプロセスの番号(まだつないでいなければ None)
+    pub fn server_process_id(&self) -> Option<u32> {
+        Some(self.server.load(Ordering::Relaxed)).filter(|id| *id != 0)
     }
 
     pub fn send(&self, body: RequestBody) -> Pending {

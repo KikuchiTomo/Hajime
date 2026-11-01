@@ -269,14 +269,16 @@ pub enum Control {
     List(ListSpec, LimitKind),
     /// 英語と日本語の見分けを試す欄(打つ文・前の文字列・結果)
     Preview,
-    /// アプリのバージョン(変えられない)
+    /// アプリのバージョン(変えられない)と，更新を確かめるボタン
     Version,
+    /// 名前の右に置く操作のボタン(ボタンの名前)．macOS の LabeledContent の中のボタン
+    LabeledAction(Action, &'static str),
+    /// 謝辞の 1 項目(notices::installed の番号)．名前・出どころ・開いて読むライセンスの全文
+    Acknowledgement(usize),
     /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
     KeymapReport,
     /// キー設定のひな形を選んで読み込む
     Preset,
-    /// 利用表記(THIRD_PARTY_NOTICES.md)の全文．読むだけ
-    Notices,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
     Dictionary(ListSpec),
     /// 記号の決まり．既定の決まりに利用者の決まりを重ねた一覧をエンジンに読んでもらい，決まりを重ねる・外す・有効と無効を切り替える
@@ -427,6 +429,14 @@ impl Control {
             Control::List(spec, _) if spec.path == "profileRules" => {
                 (ADD_REMOVE, &[more::ADD_APPS])
             }
+            // コマンドは行き先のファイルやアプリを選べる(macOS の CommandsPage の選ぶボタン)
+            Control::List(spec, _) if spec.path == "commands" => (
+                ADD_REMOVE,
+                &[windows::CHOOSE_TARGET, windows::TOGGLE_ENABLED],
+            ),
+            Control::List(spec, _) if spec.has_enabled_flag() => {
+                (ADD_REMOVE, &[windows::TOGGLE_ENABLED])
+            }
             Control::List(..) | Control::Dictionary(_) => (ADD_REMOVE, &[]),
             Control::Symbols(..) => (
                 &[settings::ADD, settings::REMOVE, windows::TOGGLE_ENABLED],
@@ -501,6 +511,9 @@ impl Control {
         };
         match self {
             Control::Symbols(..) => fields().chain([windows::SYMBOL_STATE]).collect(),
+            Control::List(spec, _) if spec.has_enabled_flag() => {
+                fields().chain([windows::SYMBOL_STATE]).collect()
+            }
             Control::SyncFields(_) => vec![windows::SYNC_FIELD, windows::SYNC_SCOPE],
             Control::Dictionaries(..) => vec![
                 dictionaries::NAME,
@@ -1004,7 +1017,9 @@ fn correction() -> Vec<Section> {
                     .enabled_when(On("correction.japanese")),
                 Row::toggle(features::MISREADINGS, "misreadings"),
                 Row::toggle(extras::LOOSE_READINGS, "looseReadings"),
+                Row::note(extras::LOOSE_READINGS_NOTE),
                 Row::toggle(extras::PHONETIC_SPELLING, "phoneticSpelling"),
+                Row::note(extras::PHONETIC_SPELLING_NOTE),
             ],
         ),
         Section {
@@ -1574,17 +1589,35 @@ fn backup() -> Vec<Section> {
     ]
 }
 
-/// 情報のページ(macOS の AboutPage)．謝辞は配布物に入れた THIRD_PARTY_NOTICES.md をそのまま出す
+/// 情報のページ(macOS の AboutPage)．謝辞は配布物に入れた THIRD_PARTY_NOTICES.md を項目ごとのカードにする
 fn about() -> Vec<Section> {
+    let notices = crate::notices::installed();
+    let rows = if notices.is_empty() {
+        // 番号の無い項目は名前(読めない知らせ)だけを出す
+        vec![Row::new(
+            more::NOTICES_MISSING,
+            "",
+            Control::Acknowledgement(usize::MAX),
+        )]
+    } else {
+        notices
+            .iter()
+            .enumerate()
+            .map(|(index, item)| Row::new(item.name.as_str(), "", Control::Acknowledgement(index)))
+            .collect()
+    };
     vec![
         Section::untitled(vec![
             Row::new(more::VERSION, "", Control::Version),
-            Row::action(more::CHECK_FOR_UPDATES, Action::OpenLatestRelease),
-            Row::action(crate::strings::wizard::REDO, Action::OpenSetup),
+            Row::new(
+                crate::strings::wizard::REDO_LABEL,
+                "",
+                Control::LabeledAction(Action::OpenSetup, crate::strings::wizard::REDO),
+            ),
         ]),
         Section {
             title: Some(more::ACKNOWLEDGEMENTS),
-            rows: vec![Row::new(more::ACKNOWLEDGEMENTS, "", Control::Notices)],
+            rows,
             footer: Some(more::ACKNOWLEDGEMENTS_NOTE),
             footer_variants: &[],
         },

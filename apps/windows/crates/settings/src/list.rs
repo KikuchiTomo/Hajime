@@ -99,6 +99,9 @@ pub struct ListSpec {
 /// 一覧の 1 行(欄ごとの値．選ぶ欄は設定のファイルに書く値)
 pub type Item = Vec<String>;
 
+/// 行ごとの有効・無効の値の名前(コマンドと変換マクロ)
+const ENABLED: &str = "isEnabled";
+
 impl ListSpec {
     fn is_strings(&self) -> bool {
         self.fields
@@ -175,17 +178,70 @@ impl ListSpec {
                 .all(|(index, _)| a.get(index) == b.get(index))
     }
 
-    /// 行を足した配列．見分ける欄が同じ行があれば置き換える
-    pub fn upsert(&self, list: Option<&Value>, item: &Item) -> Value {
-        let mut items = self.items(list);
-        match items
+    /// 形の合う要素と，その行．一覧の要素の並びのまま
+    fn entries(&self, list: Option<&Value>) -> Vec<(Value, Option<Item>)> {
+        let Some(Value::Array(elements)) = list else {
+            return Vec::new();
+        };
+        elements
             .iter()
-            .position(|existing| self.same_key(existing, item))
-        {
-            Some(index) => items[index] = item.clone(),
-            None => items.push(item.clone()),
+            .map(|element| (element.clone(), self.item(element)))
+            .collect()
+    }
+
+    /// 行を足した配列．見分ける欄が同じ行があれば置き換える．置き換えるときは，欄に無い値(コマンドやマクロの
+    /// id・isEnabled など)を元の要素から引き継ぐ(落とすとエンジンが新しい id を振り，オフにしたものがオンに戻る)
+    pub fn upsert(&self, list: Option<&Value>, item: &Item) -> Value {
+        let mut entries = self.entries(list);
+        let existing = entries.iter().position(|(_, existing)| {
+            existing
+                .as_ref()
+                .is_some_and(|existing| self.same_key(existing, item))
+        });
+        match existing {
+            Some(index) => {
+                let merged = self.merged(&entries[index].0, item);
+                entries[index] = (merged, Some(item.clone()));
+            }
+            None => entries.push((self.element(item), Some(item.clone()))),
         }
-        self.array(&items)
+        Value::Array(entries.into_iter().map(|(element, _)| element).collect())
+    }
+
+    /// 元の要素の欄の値を item で置き換えた要素
+    fn merged(&self, original: &Value, item: &Item) -> Value {
+        match (original, self.element(item)) {
+            (Value::Object(original), Value::Object(values)) => {
+                let mut object = original.clone();
+                object.extend(values);
+                Value::Object(object)
+            }
+            (_, element) => element,
+        }
+    }
+
+    /// index 番目の行(items の並び)の元の要素
+    pub fn element_at(&self, list: Option<&Value>, index: usize) -> Option<Value> {
+        self.entries(list)
+            .into_iter()
+            .filter(|(_, item)| item.is_some())
+            .nth(index)
+            .map(|(element, _)| element)
+    }
+
+    /// upsert と同じ．新しく足すときは，欄に無い値を base(書き換える前の行の要素)から引き継ぐ
+    pub fn upsert_with(&self, list: Option<&Value>, item: &Item, base: Option<&Value>) -> Value {
+        let mut result = self.upsert(list, item);
+        let added = !self
+            .items(list)
+            .iter()
+            .any(|existing| self.same_key(existing, item));
+        if let (true, Some(base), Value::Array(elements)) = (added, base, &mut result) {
+            if let Some(last) = elements.last_mut() {
+                *last = self.merged(base, item);
+            }
+        }
+        result
     }
 
     /// 文字列の配列から text を除いた配列(exclusive_with の一覧に使う)
@@ -202,20 +258,19 @@ impl ListSpec {
         )
     }
 
-    /// indices の行を除いた配列
+    /// indices の行(items の並び)を除いた配列．残す要素は元のまま(欄に無い値も落とさない)
     pub fn remove(&self, list: Option<&Value>, indices: &[usize]) -> Value {
-        let items: Vec<Item> = self
-            .items(list)
+        let mut position = 0;
+        let elements = self
+            .entries(list)
             .into_iter()
-            .enumerate()
-            .filter(|(index, _)| !indices.contains(index))
-            .map(|(_, item)| item)
+            .filter_map(|(element, item)| {
+                item?;
+                position += 1;
+                (!indices.contains(&(position - 1))).then_some(element)
+            })
             .collect();
-        self.array(&items)
-    }
-
-    fn array(&self, items: &[Item]) -> Value {
-        Value::Array(items.iter().map(|item| self.element(item)).collect())
+        Value::Array(elements)
     }
 
     pub fn contains(&self, list: Option<&Value>, item: &Item) -> bool {
@@ -239,6 +294,48 @@ impl ListSpec {
     }
 
     /// 表に出す文字
+    /// 行ごとに有効・無効を切り替えられる一覧か(コマンドと変換マクロ．macOS は行ごとのオン・オフ)
+    pub fn has_enabled_flag(&self) -> bool {
+        matches!(self.path, "commands" | "macros")
+    }
+
+    /// 行ごとの有効・無効(items の並び．値が無ければ有効)
+    pub fn enabled_flags(&self, list: Option<&Value>) -> Vec<bool> {
+        self.entries(list)
+            .into_iter()
+            .filter(|(_, item)| item.is_some())
+            .map(|(element, _)| {
+                element
+                    .get(ENABLED)
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+            })
+            .collect()
+    }
+
+    /// indices の行(items の並び)の有効・無効を切り替えた配列．ほかの値は元のまま
+    pub fn toggle_enabled(&self, list: Option<&Value>, indices: &[usize]) -> Value {
+        let mut position = 0;
+        let elements = self
+            .entries(list)
+            .into_iter()
+            .map(|(mut element, item)| {
+                if item.is_none() {
+                    return element;
+                }
+                position += 1;
+                if indices.contains(&(position - 1)) {
+                    if let Value::Object(object) = &mut element {
+                        let enabled = object.get(ENABLED).and_then(Value::as_bool).unwrap_or(true);
+                        object.insert(ENABLED.to_string(), Value::Bool(!enabled));
+                    }
+                }
+                element
+            })
+            .collect();
+        Value::Array(elements)
+    }
+
     pub fn display(&self, item: &Item) -> Vec<String> {
         self.fields
             .iter()
@@ -393,5 +490,51 @@ mod tests {
         assert!(!RULES.is_filled(&texts(&["teh", " "])));
         assert!(RULES.is_filled(&texts(&["teh", "the"])));
         assert!(LANGUAGE_RULES.is_filled(&texts(&["make", "", ""])));
+    }
+
+    #[test]
+    fn 行ごとに有効と無効を切り替える() {
+        const MACROS: ListSpec = ListSpec {
+            path: "macros",
+            fields: RULE_FIELDS,
+            ..RULES
+        };
+        let list = json!([
+            {"id": "a", "typed": "a", "word": "A"},
+            {"id": "b", "isEnabled": false, "typed": "b", "word": "B"},
+        ]);
+        assert!(MACROS.has_enabled_flag());
+        assert!(!RULES.has_enabled_flag());
+        assert_eq!(MACROS.enabled_flags(Some(&list)), vec![true, false]);
+        let toggled = MACROS.toggle_enabled(Some(&list), &[0, 1]);
+        assert_eq!(MACROS.enabled_flags(Some(&toggled)), vec![false, true]);
+        assert_eq!(toggled[0]["id"], "a");
+    }
+
+    #[test]
+    fn 足す_消す_書き換えるときに欄に無い値を落とさない() {
+        let list = json!([
+            {"id": "a", "isEnabled": false, "typed": "teh", "word": "the"},
+            {"id": "b", "isEnabled": true, "typed": "adn", "word": "and"},
+        ]);
+        // 同じ見分ける欄の行を足すと，id と isEnabled を残して置き換える
+        let item = vec!["teh".to_string(), "THE".to_string()];
+        let upserted = RULES.upsert(Some(&list), &item);
+        assert_eq!(
+            upserted[0],
+            json!({"id": "a", "isEnabled": false, "typed": "teh", "word": "THE"})
+        );
+        // 消しても残す行は元のまま
+        let removed = RULES.remove(Some(&list), &[0]);
+        assert_eq!(removed, json!([list[1].clone()]));
+        // 選んだ行を書き換えると(消してから足す)，元の行の値を引き継ぐ
+        let base = RULES.element_at(Some(&list), 0);
+        let rest = RULES.remove(Some(&list), &[0]);
+        let item = vec!["hte".to_string(), "the".to_string()];
+        let edited = RULES.upsert_with(Some(&rest), &item, base.as_ref());
+        assert_eq!(
+            edited[1],
+            json!({"id": "a", "isEnabled": false, "typed": "hte", "word": "the"})
+        );
     }
 }

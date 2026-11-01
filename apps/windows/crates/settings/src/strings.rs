@@ -288,6 +288,8 @@ pub mod more {
     pub const ACKNOWLEDGEMENTS_NOTE: &str =
         "はじめは上記のソフトウェア・モデル・データを利用しています。";
     pub const NOTICES_MISSING: &str = "謝辞のファイルが見つかりません";
+    /// 謝辞の項目のライセンスの全文を開く(macOS の UIStrings.More.licenseText)
+    pub const LICENSE_TEXT: &str = "ライセンス全文";
 
     pub fn seconds(value: f64) -> String {
         format!("{value:.1} 秒")
@@ -642,6 +644,14 @@ pub mod windows {
     pub const DICTIONARY_SUMMARY: &str = "内容";
     /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
     pub const DICTIONARY_APPS: &str = "アプリの実行ファイル名";
+    /// コマンドの行き先のファイルやアプリを選ぶボタンと，選ぶ窓の種類の名前
+    pub const CHOOSE_TARGET: &str = "行き先を選択…";
+    pub const ALL_FILES: &str = "すべてのファイル";
+    /// 試した語を一覧に足すボタン(macOS は結果の語を右クリックして選ぶ)
+    pub const ADD_TO_ENGLISH: &str = "常に英語にする単語に追加";
+    pub const ADD_TO_JAPANESE: &str = "常に日本語にする単語に追加";
+    /// 試した語を足せないとき(1 語でない)
+    pub const ADD_ONE_WORD: &str = "1 語だけを入力すると、一覧に追加できます";
     /// 選んだ記号の決まりを有効・無効にするボタン(macOS は行ごとのオン・オフ)
     pub const TOGGLE_ENABLED: &str = "有効・無効の切り替え";
     /// ファイルを選ぶ窓の種類の名前(macOS は種類を名前で出さない)
@@ -692,6 +702,8 @@ pub mod wizard {
         "設定を保存できませんでした。変換エンジンが動いているか確かめてください。";
     /// 設定の画面の「情報」のページからウィザードを開く
     pub const REDO: &str = "初期設定をやり直す";
+    /// 情報のページの，ウィザードを開く行の名前(macOS の UIStrings.Onboarding.redoLabel)
+    pub const REDO_LABEL: &str = "初期設定";
 
     /// 何ページ目か
     pub fn step(index: usize, total: usize) -> String {
@@ -710,9 +722,20 @@ pub mod wizard {
     pub const SWITCH_HENKAN_NOTE: &str =
         "押したキーで入力モードが決まるので、今どちらかを気にせずに打てます。";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
-    pub const CHARACTERS_TEXT: &str = "かなの打ち方と、句読点の形を選びます。";
+    pub const CHARACTERS_TEXT: &str =
+        "かなの打ち方と、句読点や括弧など、キーを押したときに入る文字を選びます。";
     pub const INPUT_STYLE: &str = "入力方式";
     pub const PUNCTUATION: &str = "句読点";
+    /// 入力する文字のページの細かい設定の名前(1 行に収まるよう短くする)
+    pub const CHAR_BRACKETS: &str = "[ ] キー";
+    pub const CHAR_SLASH: &str = "/ キー";
+    pub const CHAR_YEN: &str = "¥ キー";
+    pub const CHAR_SPACE: &str = "スペース";
+    pub const CHAR_NUMBER: &str = "数字";
+    pub const CHAR_ALPHABET: &str = "英字";
+    pub const YEN_BACKSLASH: &str = "\\";
+    pub const YEN_YEN: &str = "¥";
+    pub const YEN_PROGRAMMING: &str = "エディタでは \\";
     pub const LIVE_TITLE: &str = "ライブ変換";
     pub const LIVE_TEXT: &str = "打つ手を止めると、Space を押さなくても漢字に変換します。";
     pub const LIVE_CONVERSION: &str = "ライブ変換を使う";
@@ -747,7 +770,7 @@ pub mod wizard {
     pub const FEATURES_TITLE: &str = "便利な機能";
     pub const FEATURES_TEXT: &str = "変換するだけで使える機能です。使わないものはオフにできます。";
     pub const ASSOCIATION: &str = "連想";
-    pub const ASSOCIATION_NOTE: &str = "変換中に Shift+↑ で、選んだ語に続く語を出します。";
+    pub const ASSOCIATION_NOTE: &str = "変換中に Shift+↑ で、似た意味の語を出します。";
     pub const CALCULATION: &str = "計算";
     pub const CALCULATION_NOTE: &str = "「1+2*3=」のように式を打って変換すると、答えを出します。";
     pub const POSTAL_CODE: &str = "郵便番号";
@@ -760,6 +783,20 @@ pub mod wizard {
     pub const MACROS: &str = "変換マクロ";
     pub const DYNAMIC_DICTIONARY: &str = "動的なユーザー辞書";
     pub const COMMANDS: &str = "コマンド";
+    /// 機能ごとの実演の説明(macOS の UIStrings.Onboarding の Detail)
+    pub const MACROS_DETAIL: &str =
+        "連想変換と同じ Shift+↑ で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
+    pub const DYNAMIC_DICTIONARY_DETAIL: &str =
+        "単語に {datetime:YYYY/MM/DD} などを書くと、入力したときの値にします。";
+    pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。";
+    /// コマンドの実演の候補(macOS の UIStrings.Onboarding.commandsExample)
+    pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
+    /// コマンドの候補の頭の印(core の DefaultSettings.commandCandidateMark)
+    pub const COMMAND_MARK: &str = "▶ ";
+    /// 変換マクロの見出しの種類(core の DefaultSettings.macroGroupLabel)
+    pub const MACRO_LABEL: &str = "整形";
+    /// 機能の紹介のページの案内(macOS の UIStrings.Onboarding.spotlightHint．実演は右に出す)
+    pub const SPOTLIGHT_HINT: &str = "項目にポインターを置くと、右に使い方を出します。";
     pub const APPEARANCE_TITLE: &str = "外観";
     pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
     pub const DONE_TITLE: &str = "準備ができました";
@@ -781,6 +818,7 @@ pub mod wizard {
     pub const KEY_RIGHT: &str = "→";
     pub const KEY_LEFT: &str = "←";
     pub const KEY_ASSOCIATE: &str = "Shift+↑";
+    pub const KEY_ESCAPE: &str = "Esc";
 
     /// 実演の説明
     pub const CAPTION_ENGLISH: &str = "英語で入力";
@@ -797,6 +835,8 @@ pub mod wizard {
     pub const CAPTION_CORRECTED: &str = "補正して「ありがとう」に";
     pub const CAPTION_NOT_CORRECTED: &str = "打ったとおりに変換";
     pub const CAPTION_OFF: &str = "オフにしているので出ません";
+    pub const CAPTION_HAND_SHIFT: &str = "ずれたまま打った文を「こんにちは」に";
+    pub const CAPTION_COMMAND: &str = "選んで Enter でアプリを開く";
 }
 
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．

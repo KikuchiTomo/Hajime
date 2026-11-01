@@ -26,6 +26,8 @@ pub enum TextStyle {
     Demo,
     /// 初期設定ウィザードの最初と最後のページの大きな絵
     Hero,
+    /// 等幅の小さい文字(ライセンスの全文)
+    Mono,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
