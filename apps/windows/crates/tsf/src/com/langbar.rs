@@ -71,6 +71,12 @@ impl InputModeItem {
         match menu::selection(id) {
             Some(menu::Selection::Command(command)) => self.actions.run(command),
             Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
+            Some(menu::Selection::CheckForUpdates) => {
+                let _ = super::launch::start_with(
+                    super::launch::SETTINGS_FILE,
+                    menu::CHECK_FOR_UPDATES_ARGUMENT,
+                );
+            }
             None => {}
         }
     }

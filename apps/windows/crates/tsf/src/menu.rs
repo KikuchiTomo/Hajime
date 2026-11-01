@@ -1,13 +1,16 @@
 #![forbid(unsafe_code)]
 
 //! 入力メニュー(タスクバーの「あ」「A」を右クリックしたときのメニュー)の項目．macOS の入力メニューと同じ項目にする．
-//! 項目は「ライブ変換」「手書き入力」(使う設定のときだけ)「設定を開く…」にし，入力方式などほかの設定は設定の画面とキーで変える
+//! 項目は「ライブ変換」「手書き入力」(使う設定のときだけ)「設定を開く…」「更新を確認」にし，入力方式などほかの設定は設定の画面とキーで変える
 
 use ipc::{InputMode, MenuCommand, SettingsSnapshot};
 
 pub const LIVE_CONVERSION: &str = "ライブ変換";
 pub const HANDWRITING: &str = "手書き入力";
 pub const OPEN_SETTINGS: &str = "設定を開く…";
+pub const CHECK_FOR_UPDATES: &str = "更新を確認";
+/// 「更新を確認」で設定の画面の実行ファイルに渡す引数(最新のリリースのページを開いて終える)
+pub const CHECK_FOR_UPDATES_ARGUMENT: &str = "--check-for-updates";
 
 /// 日本語・英数のときにタスクバーに出す字と，説明
 pub const JAPANESE_ICON: &str = "あ";
@@ -20,6 +23,7 @@ pub const ENGINE_UNAVAILABLE: &str =
 const ID_LIVE_CONVERSION: u32 = 1;
 const ID_OPEN_SETTINGS: u32 = 2;
 const ID_HANDWRITING: u32 = 3;
+const ID_CHECK_FOR_UPDATES: u32 = 4;
 
 /// 選んだ項目の扱い
 #[derive(Debug, Clone, PartialEq)]
@@ -28,6 +32,8 @@ pub enum Selection {
     Command(MenuCommand),
     /// 手書きの窓を開く(組み立て中の文字を確定するので，文書を書き換えられる要求で頼む)
     Handwriting,
+    /// 最新のリリースのページを開く(入力先のアプリから起動するので，ブラウザーが前に出る)
+    CheckForUpdates,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +68,11 @@ pub fn items(settings: Option<&SettingsSnapshot>) -> Vec<Item> {
             label: OPEN_SETTINGS,
             checked: false,
         },
+        Item::Command {
+            id: ID_CHECK_FOR_UPDATES,
+            label: CHECK_FOR_UPDATES,
+            checked: false,
+        },
     ]);
     items
 }
@@ -72,6 +83,7 @@ pub fn selection(id: u32) -> Option<Selection> {
         ID_LIVE_CONVERSION => Some(Selection::Command(MenuCommand::ToggleLiveConversion)),
         ID_OPEN_SETTINGS => Some(Selection::Command(MenuCommand::OpenSettings)),
         ID_HANDWRITING => Some(Selection::Handwriting),
+        ID_CHECK_FOR_UPDATES => Some(Selection::CheckForUpdates),
         _ => None,
     }
 }
@@ -120,14 +132,22 @@ mod tests {
     }
 
     #[test]
-    fn 項目はライブ変換と設定を開くだけ() {
+    fn 項目はライブ変換と設定を開くと更新を確認() {
         assert_eq!(
             labels(&items(Some(&snapshot(true)))),
-            vec![(LIVE_CONVERSION, true), (OPEN_SETTINGS, false)]
+            vec![
+                (LIVE_CONVERSION, true),
+                (OPEN_SETTINGS, false),
+                (CHECK_FOR_UPDATES, false)
+            ]
         );
         assert_eq!(
             labels(&items(None)),
-            vec![(LIVE_CONVERSION, false), (OPEN_SETTINGS, false)]
+            vec![
+                (LIVE_CONVERSION, false),
+                (OPEN_SETTINGS, false),
+                (CHECK_FOR_UPDATES, false)
+            ]
         );
     }
 
@@ -140,13 +160,18 @@ mod tests {
             vec![
                 (LIVE_CONVERSION, false),
                 (HANDWRITING, false),
-                (OPEN_SETTINGS, false)
+                (OPEN_SETTINGS, false),
+                (CHECK_FOR_UPDATES, false)
             ]
         );
         on.handwriting = Some(false);
         assert_eq!(
             labels(&items(Some(&on))),
-            vec![(LIVE_CONVERSION, false), (OPEN_SETTINGS, false)]
+            vec![
+                (LIVE_CONVERSION, false),
+                (OPEN_SETTINGS, false),
+                (CHECK_FOR_UPDATES, false)
+            ]
         );
     }
 
@@ -161,6 +186,10 @@ mod tests {
             Some(Selection::Command(MenuCommand::OpenSettings))
         );
         assert_eq!(selection(ID_HANDWRITING), Some(Selection::Handwriting));
+        assert_eq!(
+            selection(ID_CHECK_FOR_UPDATES),
+            Some(Selection::CheckForUpdates)
+        );
         assert_eq!(selection(0), None);
         assert_eq!(selection(10), None);
     }

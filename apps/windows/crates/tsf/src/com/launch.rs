@@ -29,6 +29,11 @@ fn installation() -> Option<PathBuf> {
 
 /// インストール先の file を起動する
 pub fn start(file: &str) -> Result<()> {
+    start_with(file, "")
+}
+
+/// インストール先の file を引数 arguments で起動する
+pub fn start_with(file: &str, arguments: &str) -> Result<()> {
     let folder = installation()
         .ok_or_else(|| windows_core::Error::from(windows::Win32::Foundation::E_FAIL))?;
     let path = folder.join(file);
@@ -39,7 +44,7 @@ pub fn start(file: &str) -> Result<()> {
     // 作業フォルダは入力先のアプリのものを引き継がず，インストール先にする
     let directory = HSTRING::from(folder.as_os_str());
     // CreateProcessW はコマンドラインを書き換えることがあるので，書き換えてよい領域を渡す
-    let mut command_line: Vec<u16> = format!("\"{}\"", path.display())
+    let mut command_line: Vec<u16> = format!("\"{}\" {arguments}", path.display())
         .encode_utf16()
         .chain(std::iter::once(0))
         .collect();

@@ -52,6 +52,11 @@ pub enum Event {
         spec: ListSpec,
         indices: Vec<usize>,
     },
+    /// 選んだ行の有効と無効を切り替える(コマンドと変換マクロ．表の行の番号)
+    ListToggle {
+        spec: ListSpec,
+        indices: Vec<usize>,
+    },
     /// 単語を登録する(読み・単語)．replacing は書き換える単語(表の行の番号)
     DictionaryAdd {
         item: Item,
@@ -166,6 +171,8 @@ impl DictionaryAction {
 /// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
 fn bottom_always_enabled(control: &Control, index: usize) -> bool {
     match control {
+        // 有効・無効の切り替えは行を選んでから使う
+        Control::List(spec, _) if spec.has_enabled_flag() => false,
         Control::List(spec, _) => !(spec.path == "keymap" && index == 1),
         _ => false,
     }
@@ -572,6 +579,7 @@ impl RowState {
     fn toggle_part(&self) -> Option<Part> {
         match self.row.control {
             Control::Symbols(..) => Some(Part::Top(2)),
+            Control::List(spec, _) if spec.has_enabled_flag() => Some(Part::Bottom(0)),
             Control::SyncFields(_) => Some(Part::Top(0)),
             _ => None,
         }
@@ -1581,6 +1589,12 @@ impl PageView {
                 spec,
                 indices: selected,
             }),
+            Part::Bottom(0) if spec.has_enabled_flag() => {
+                (!selected.is_empty()).then_some(Event::ListToggle {
+                    spec,
+                    indices: selected,
+                })
+            }
             _ => None,
         }
     }
@@ -2747,6 +2761,22 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
         Control::Dictionaries(list, _) => {
             let entries = crate::dictionaries::entries(*list, values.value(list.path()));
             crate::dictionaries::table(*list, &entries)
+        }
+        Control::List(spec, _) if spec.has_enabled_flag() => {
+            let list = values.value(spec.path);
+            spec.items(list)
+                .into_iter()
+                .zip(spec.enabled_flags(list))
+                .map(|(item, enabled)| {
+                    let mut columns = spec.display(&item);
+                    columns.push(if enabled {
+                        String::new()
+                    } else {
+                        text::DISABLED.to_string()
+                    });
+                    columns
+                })
+                .collect()
         }
         Control::List(spec, _) => spec
             .items(values.value(spec.path))

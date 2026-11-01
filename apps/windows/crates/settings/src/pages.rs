@@ -429,6 +429,9 @@ impl Control {
             Control::List(spec, _) if spec.path == "profileRules" => {
                 (ADD_REMOVE, &[more::ADD_APPS])
             }
+            Control::List(spec, _) if spec.has_enabled_flag() => {
+                (ADD_REMOVE, &[windows::TOGGLE_ENABLED])
+            }
             Control::List(..) | Control::Dictionary(_) => (ADD_REMOVE, &[]),
             Control::Symbols(..) => (
                 &[settings::ADD, settings::REMOVE, windows::TOGGLE_ENABLED],
@@ -503,6 +506,9 @@ impl Control {
         };
         match self {
             Control::Symbols(..) => fields().chain([windows::SYMBOL_STATE]).collect(),
+            Control::List(spec, _) if spec.has_enabled_flag() => {
+                fields().chain([windows::SYMBOL_STATE]).collect()
+            }
             Control::SyncFields(_) => vec![windows::SYNC_FIELD, windows::SYNC_SCOPE],
             Control::Dictionaries(..) => vec![
                 dictionaries::NAME,

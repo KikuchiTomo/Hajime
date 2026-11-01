@@ -99,6 +99,9 @@ pub struct ListSpec {
 /// 一覧の 1 行(欄ごとの値．選ぶ欄は設定のファイルに書く値)
 pub type Item = Vec<String>;
 
+/// 行ごとの有効・無効の値の名前(コマンドと変換マクロ)
+const ENABLED: &str = "isEnabled";
+
 impl ListSpec {
     fn is_strings(&self) -> bool {
         self.fields
@@ -291,6 +294,48 @@ impl ListSpec {
     }
 
     /// 表に出す文字
+    /// 行ごとに有効・無効を切り替えられる一覧か(コマンドと変換マクロ．macOS は行ごとのオン・オフ)
+    pub fn has_enabled_flag(&self) -> bool {
+        matches!(self.path, "commands" | "macros")
+    }
+
+    /// 行ごとの有効・無効(items の並び．値が無ければ有効)
+    pub fn enabled_flags(&self, list: Option<&Value>) -> Vec<bool> {
+        self.entries(list)
+            .into_iter()
+            .filter(|(_, item)| item.is_some())
+            .map(|(element, _)| {
+                element
+                    .get(ENABLED)
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+            })
+            .collect()
+    }
+
+    /// indices の行(items の並び)の有効・無効を切り替えた配列．ほかの値は元のまま
+    pub fn toggle_enabled(&self, list: Option<&Value>, indices: &[usize]) -> Value {
+        let mut position = 0;
+        let elements = self
+            .entries(list)
+            .into_iter()
+            .map(|(mut element, item)| {
+                if item.is_none() {
+                    return element;
+                }
+                position += 1;
+                if indices.contains(&(position - 1)) {
+                    if let Value::Object(object) = &mut element {
+                        let enabled = object.get(ENABLED).and_then(Value::as_bool).unwrap_or(true);
+                        object.insert(ENABLED.to_string(), Value::Bool(!enabled));
+                    }
+                }
+                element
+            })
+            .collect();
+        Value::Array(elements)
+    }
+
     pub fn display(&self, item: &Item) -> Vec<String> {
         self.fields
             .iter()
@@ -445,6 +490,25 @@ mod tests {
         assert!(!RULES.is_filled(&texts(&["teh", " "])));
         assert!(RULES.is_filled(&texts(&["teh", "the"])));
         assert!(LANGUAGE_RULES.is_filled(&texts(&["make", "", ""])));
+    }
+
+    #[test]
+    fn 行ごとに有効と無効を切り替える() {
+        const MACROS: ListSpec = ListSpec {
+            path: "macros",
+            fields: RULE_FIELDS,
+            ..RULES
+        };
+        let list = json!([
+            {"id": "a", "typed": "a", "word": "A"},
+            {"id": "b", "isEnabled": false, "typed": "b", "word": "B"},
+        ]);
+        assert!(MACROS.has_enabled_flag());
+        assert!(!RULES.has_enabled_flag());
+        assert_eq!(MACROS.enabled_flags(Some(&list)), vec![true, false]);
+        let toggled = MACROS.toggle_enabled(Some(&list), &[0, 1]);
+        assert_eq!(MACROS.enabled_flags(Some(&toggled)), vec![false, true]);
+        assert_eq!(toggled[0]["id"], "a");
     }
 
     #[test]

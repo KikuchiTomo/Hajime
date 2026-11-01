@@ -325,6 +325,10 @@ impl App {
                 let list = spec.remove(model.value(spec.path), &indices);
                 model.set(spec.path, list)
             }
+            Event::ListToggle { spec, indices } => {
+                let list = spec.toggle_enabled(model.value(spec.path), &indices);
+                model.set(spec.path, list)
+            }
             Event::ListAdd { .. }
             | Event::SymbolSave { .. }
             | Event::SymbolRemove { .. }
