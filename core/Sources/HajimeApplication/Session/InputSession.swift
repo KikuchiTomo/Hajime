@@ -279,11 +279,12 @@ public final class InputSession {
                 return rerender(context: context)
             }
             return fills + [preview]
-        case .composing where suggestionPredictions?.reading != composition.conversionReading && suggestionsShown:
+        case .composing where suggestionsShown && suggestionPredictions?.reading != suggestionTarget().reading:
             let reading = composition.conversionReading
+            let target = suggestionTarget().reading
             return [{ [self] in
                 guard phase == .composing, composition.conversionReading == reading else { return [] }
-                suggestionPredictions = (reading, converter.predictions(for: reading))
+                suggestionPredictions = (target, converter.predictions(for: target))
                 return rerender(context: context)
             }]
         default:
@@ -1142,7 +1143,7 @@ public final class InputSession {
         var actions: [ClientAction] = []
         while !composition.isEmpty {
             let candidate = currentCandidate()
-            if candidate.isFromEngine {
+            if candidate.isLearnable {
                 converter.didCommit(candidate)
             }
             actions.append(.commit(candidate.text))
@@ -1298,28 +1299,45 @@ public final class InputSession {
         suggestionsEnabled && (composition.pending.isEmpty || composition.pending == "n")
     }
 
-    /// 打っているあいだに出す候補(読み全体の変換と，続く語の予測)．出さない設定や，読みが短いときは空．
-    /// 予測は窓を出してから求めて足す(followUps)．waitsForPredictions なら今すぐ求める(↓ で選び始めるとき)
-    private func suggestionCandidates(waitsForPredictions: Bool = false) -> [Candidate] {
-        guard suggestionsShown else { return [] }
+    /// 打っているあいだの候補を求める読みと，その前に置く文節．ライブ変換で文が見えているときは，文全体の候補を並べても
+    /// 頭が同じ文ばかりで見分けられないので，今打っている最後の文節の候補を出す(その前の文節は見えている変換のまま)．
+    /// ライブ変換でないとき，文節が 1 つのときは，読み全体
+    private func suggestionTarget() -> (reading: String, prefix: SuggestionPrefix?) {
         let reading = composition.conversionReading
+        guard settings.current.liveConverts(readingLength: composition.kana.count), !holdsLiveConversionForCode,
+              corrector.active == nil, forcedBoundaries.isEmpty, !readingCorrector.isApplied,
+              let best = bestWholeCandidate(for: reading) else { return (reading, nil) }
+        let clauses = ClauseSplitter.clauses(of: best.words)
+        guard clauses.count > 1, clauses.reduce(0, { $0 + $1.readingCount }) == reading.count, let last = clauses.last else { return (reading, nil) }
+        let prefix = SuggestionPrefix(text: clauses.dropLast().map(\.text).joined(), readingCount: reading.count - last.readingCount)
+        return (String(reading.dropFirst(prefix.readingCount)), prefix)
+    }
+
+    /// 打っているあいだに出す候補(読みの変換と，続く語の予測)．出さない設定や，読みが短いときは空．
+    /// 予測は窓を出してから求めて足す(followUps)．waitsForPredictions なら今すぐ求める(↓ で選び始めるとき)．
+    /// ライブ変換で文が見えているときは最後の文節の候補(suggestionTarget)
+    private func suggestionCandidates(waitsForPredictions: Bool = false) -> (candidates: [Candidate], prefix: SuggestionPrefix?) {
+        guard suggestionsShown else { return ([], nil) }
+        let (reading, prefix) = suggestionTarget()
         if waitsForPredictions, suggestionPredictions?.reading != reading {
             suggestionPredictions = (reading, converter.predictions(for: reading))
         }
         let predictions = suggestionPredictions?.reading == reading ? suggestionPredictions?.candidates ?? [] : []
         var seen = Set<String>()
-        let whole = converter.candidates(for: reading).filter { $0.readingCount == reading.count }
-        return (Array(whole.prefix(2)) + predictions + Array(whole.dropFirst(2)))
+        // 文節の候補は，ライブ変換と別の変換の状態で Zenzai を使わずに求める(打つたびに求めるため．分岐図の文節と同じ)
+        let whole = (prefix == nil ? converter.candidates(for: reading) : converter.segmentCandidates(for: reading))
+            .filter { $0.readingCount == reading.count && $0.commandID == nil }
+        let candidates = (Array(whole.prefix(2)) + predictions + Array(whole.dropFirst(2)))
             .filter { seen.insert($0.text).inserted }
             .prefix(DefaultSettings.suggestionCount)
-            .map { $0 }
+        return (Array(candidates), prefix)
     }
 
     /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ で選ぶ
     private func suggestionPanel() -> CandidatePanel? {
-        let suggestions = suggestionCandidates()
+        let (suggestions, prefix) = suggestionCandidates()
         guard !suggestions.isEmpty else { return nil }
-        return CandidatePanel(
+        var panel = CandidatePanel(
             variants: [],
             selectedVariant: nil,
             entries: suggestions.map { CandidatePanel.Entry(text: $0.text, annotation: nil) },
@@ -1329,6 +1347,9 @@ public final class InputSession {
             total: suggestions.count,
             note: PanelBuilder.suggestionNote(key: keyLabel(.nextCandidate, in: .composing))
         )
+        // 窓を今打っている文節の下にそろえる
+        panel.anchor = prefix.map { $0.text.utf16.count }
+        return panel
     }
 
     private func updateCorrection() {
@@ -1384,12 +1405,16 @@ public final class InputSession {
         case .selecting(let selection):
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
-            let marked = MarkedText([.init(candidate.text, style: .focused), .init(remainder, style: .reading)])
+            // 最後の文節だけを選んでいるときは，前の文節は変換したまま見せ，選んでいる文節だけを強調する
+            let shownPrefix = candidate.text.hasPrefix(selection.shownPrefix) ? selection.shownPrefix : ""
+            let marked = MarkedText([.init(shownPrefix, style: .converted), .init(String(candidate.text.dropFirst(shownPrefix.count)), style: .focused),
+                                     .init(remainder, style: .reading)].filter { !$0.text.isEmpty })
             var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
                                                perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
                                                corrected: correctedRange(of: \.conversionReading))
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
             if let pendingNote { panel.note = pendingNote }
+            if !selection.shownPrefix.isEmpty { panel.anchor = selection.shownPrefix.utf16.count }
             if case .candidate = selection.focus {
                 panel.associationHint = associationHint(text: candidate.text, reading: String(composition.conversionReading.prefix(candidate.readingCount)))
             }
@@ -1531,11 +1556,15 @@ public final class InputSession {
         case .composing:
             alphabetRun = false
             // 打っているあいだの候補を出しているときは，↓ でその候補から選ぶ
-            let suggestions = move == .next ? suggestionCandidates(waitsForPredictions: true) : []
+            let (suggestions, prefix) = move == .next ? suggestionCandidates(waitsForPredictions: true) : ([], nil)
             if suggestions.isEmpty {
                 enterConversion()
             } else {
-                phase = .selecting(CandidateSelection(candidates: suggestions, annotations: suggestions.map { _ in nil }, focus: .candidate(0)))
+                // 最後の文節の候補は，前の文節(見えている変換)とつないだ読み全体の候補にして選ぶ．一覧には文節の部分だけを出す
+                let candidates = prefix.map { prefix in suggestions.map { prefix.joined(with: $0, readingCount: composition.conversionReading.count) } } ?? suggestions
+                var selection = CandidateSelection(candidates: candidates, annotations: suggestions.map { _ in nil }, focus: .candidate(0))
+                selection.shownPrefix = prefix?.text ?? ""
+                phase = .selecting(selection)
             }
         case .lattice(var lattice):
             let perPage = latticePerPage

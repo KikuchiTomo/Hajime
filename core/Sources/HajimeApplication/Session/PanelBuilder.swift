@@ -93,7 +93,10 @@ enum PanelBuilder {
         let entries = (pageStart..<pageEnd).map { index in
             let candidate = selection.candidates[index]
             let range = corrected.flatMap { CorrectedSpan.textRange(of: CorrectedSpan.pieces(of: candidate, reading: reading, changed: $0)) }
-            return CandidatePanel.Entry(text: candidate.text, annotation: selection.annotations[index], corrected: range)
+            // 前の文節(shownPrefix)は一覧に出さない
+            let text = !selection.shownPrefix.isEmpty && candidate.text.hasPrefix(selection.shownPrefix)
+                ? String(candidate.text.dropFirst(selection.shownPrefix.count)) : candidate.text
+            return CandidatePanel.Entry(text: text, annotation: selection.annotations[index], corrected: selection.shownPrefix.isEmpty ? range : nil)
         }
         let isCorrected = selection.candidates.first?.origin == .correction
         return CandidatePanel(

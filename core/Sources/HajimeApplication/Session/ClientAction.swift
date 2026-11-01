@@ -136,6 +136,9 @@ public struct CandidatePanel: Sendable, Equatable {
     public var association: AssociationHeading?
     /// 選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
     public var associationHint: String?
+    /// 窓の左端をそろえる，組み立て中の文字の位置(UTF-16 の数)．nil なら組み立て中の文字の頭．
+    /// 打っているあいだに最後の文節だけの候補を出すときは，その文節の頭にそろえる
+    public var anchor: Int?
 
     public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: Note?) {
         self.variants = variants

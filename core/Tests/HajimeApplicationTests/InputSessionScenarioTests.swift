@@ -323,6 +323,31 @@ struct InputSessionScenarioTests {
         #expect(short.panel == nil)
     }
 
+    @Test("ライブ変換で文が見えているときは，打っているあいだの候補を最後の文節だけで出し，選ぶと前の文節とつないで確定する")
+    func suggestionsForLastClause() {
+        let converter = FakeConverter(["きょうはあめ": [("今日は雨", nil)], "あめ": [("雨", nil), ("飴", nil)]])
+        converter.candidateWords["今日は雨"] = [
+            Candidate.Word(text: "今日", readingCount: 3, startsWithNoun: true),
+            Candidate.Word(text: "は", readingCount: 1, startsWithParticle: true),
+            Candidate.Word(text: "雨", readingCount: 2, startsWithNoun: true),
+        ]
+        var settings = DefaultSettings.settings
+        settings.suggestionDisplay = .always
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyouhaame")
+        #expect(harness.panel?.entries.map(\.text) == ["雨", "飴"])
+        // 窓は今打っている文節の頭にそろえる
+        #expect(harness.panel?.anchor == "今日は".utf16.count)
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.panel?.entries.map(\.text) == ["雨", "飴"])
+        #expect(harness.marked.segments == [.init("今日は", style: .converted), .init("飴", style: .focused)])
+        harness.press(.enter)
+        #expect(harness.committed == "今日は飴")
+        // 選んだ文節の候補を学ぶ(つないだ候補の元の語として渡す)
+        #expect(converter.committed.flatMap(\.learnedParts).map(\.text) == ["飴"])
+    }
+
     @Test("英数のときも ⌃⌥, で設定を開き，⌃⌥L でライブ変換を切り替える(ターミナルでは英数で打っていることが多い)")
     func toolsInDirectMode() {
         let harness = Harness()
