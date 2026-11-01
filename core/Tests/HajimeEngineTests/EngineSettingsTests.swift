@@ -35,4 +35,30 @@ struct EngineSettingsTests {
         session.endComposition()
         #expect(engine.makeSession().candidates(for: "きしゃ").map(\.text).first == before.first)
     }
+
+    @Test("学習を使わない求め(点数・語の区切り)のあとに確定しても，次の変換で上に来る")
+    func learnsAfterScoringRequest() throws {
+        let engine = try makeEngine()
+        let session = engine.makeSession()
+        let third = try #require(session.candidates(for: "きしゃ").dropFirst(2).first)
+        // 分岐図を作るときは，確定の直前に学習を使わない求めが入る
+        _ = session.plausibility(of: "きしゃ")
+        _ = session.segmentationWords(for: "きしゃ")
+        session.didCommit(third)
+        session.endComposition()
+        #expect(engine.makeSession().candidates(for: "きしゃ").first?.text == third.text)
+    }
+
+    @Test("先頭の語を選び直してつないだ候補を確定すると，元の語を学ぶ")
+    func learnsHeadWordOfCombinedCandidate() throws {
+        let engine = try makeEngine()
+        let session = engine.makeSession()
+        let word = try #require(session.dictionaryCandidates(for: "きしゃ").dropFirst(2).first)
+        var combined = Candidate(text: word.text + "に", readingCount: 4, origin: .combined)
+        combined.learnedParts = [word]
+        #expect(combined.isLearnable)
+        session.didCommit(combined)
+        session.endComposition()
+        #expect(engine.makeSession().candidates(for: "きしゃ").first?.text == word.text)
+    }
 }
