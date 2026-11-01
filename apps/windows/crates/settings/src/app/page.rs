@@ -107,6 +107,10 @@ pub enum Event {
         text: String,
         preceding: String,
     },
+    /// 既定のブラウザーで開く(謝辞の出どころ)
+    OpenUrl(String),
+    /// 部品の大きさが変わったので置き直す(謝辞のライセンスの全文を開いた・閉じた)
+    Relayout,
 }
 
 /// カスタムテーマの一覧のボタンの操作
@@ -308,6 +312,10 @@ pub enum Part {
     PreviewField(usize),
     /// 読むだけの長い文(送れる)
     Text,
+    /// 謝辞の出どころの行の中の URL(行の番号)
+    Link(usize),
+    /// 謝辞のライセンスの全文を開く・閉じる
+    Expand,
 }
 
 /// ページの中の部品(行の番号と部品)
@@ -381,19 +389,115 @@ struct RowState {
     preview_result: String,
     /// 長い文の送り
     text_scroll: Scroller,
+    /// 謝辞のライセンスの全文を開いている
+    expanded: bool,
+    /// 謝辞のカードの中の置き場所(ページの中の座標)
+    acknowledgement: Option<AcknowledgementLayout>,
+}
+
+/// 謝辞のカードの中の置き場所
+#[derive(Debug, Clone, Default, PartialEq)]
+struct AcknowledgementLayout {
+    name: Rect,
+    /// 出どころの行と，行の中の URL(押せる欄)
+    sources: Vec<(Rect, Option<Rect>)>,
+    /// ライセンスの全文を開くボタン(全文が無ければ None)
+    expand: Option<Rect>,
+    /// 開いたライセンスの全文の欄
+    license: Option<Rect>,
+}
+
+impl AcknowledgementLayout {
+    /// 謝辞の項目を幅 width に置いたときの置き場所と高さ．(x, y) はカードの中身の左上(カードの上端)
+    fn new(
+        item: Option<&crate::notices::Acknowledgement>,
+        (x, y, width): (f32, f32, f32),
+        expanded: bool,
+        measure: &dyn paint::Measure,
+    ) -> (Self, f32) {
+        let padding = (size::ROW_HEIGHT - size::CONTROL_HEIGHT) / 2.0;
+        let Some(item) = item else {
+            // 謝辞のファイルが無いときは名前(知らせ)だけを 1 行で出す
+            let name = Rect::new(
+                x,
+                y + (size::ROW_HEIGHT - size::BODY_LINE_HEIGHT) / 2.0,
+                width,
+                size::BODY_LINE_HEIGHT,
+            );
+            return (
+                Self {
+                    name,
+                    ..Self::default()
+                },
+                size::ROW_HEIGHT,
+            );
+        };
+        let mut top = y + padding;
+        let name = Rect::new(x, top, width, size::BODY_LINE_HEIGHT);
+        top += size::BODY_LINE_HEIGHT + size::CARD_GAP;
+        let mut sources = Vec::new();
+        for line in &item.sources {
+            let height = measure
+                .wrapped_height(line, TextStyle::Caption, width)
+                .max(size::NOTE_LINE_HEIGHT);
+            let rect = Rect::new(x, top, width, height);
+            let link = crate::notices::split_url(line).map(|(prefix, url)| {
+                let before = measure.width(prefix, TextStyle::Caption);
+                let length = measure.width(url, TextStyle::Caption);
+                if before + length <= width {
+                    Rect::new(x + before, top, length, size::NOTE_LINE_HEIGHT)
+                } else {
+                    rect
+                }
+            });
+            sources.push((rect, link));
+            top += height;
+        }
+        let mut expand = None;
+        let mut license = None;
+        if let Some(text) = &item.license {
+            top += size::CONTROL_GAP / 2.0;
+            let label = measure.width(more::LICENSE_TEXT, TextStyle::Body);
+            let button = Rect::new(
+                x - size::FIELD_PADDING_X / 2.0,
+                top,
+                label + size::CHEVRON_SIZE + size::FIELD_PADDING_X * 2.0,
+                size::CONTROL_HEIGHT,
+            );
+            expand = Some(button);
+            top += size::CONTROL_HEIGHT;
+            if expanded {
+                top += size::CONTROL_GAP;
+                let inner = width - size::FIELD_PADDING_X * 2.0;
+                let height = measure.wrapped_height(text, TextStyle::Mono, inner)
+                    + size::FIELD_PADDING_X * 2.0;
+                license = Some(Rect::new(x, top, width, height));
+                top += height;
+            }
+        }
+        top += padding;
+        (
+            Self {
+                name,
+                sources,
+                expand,
+                license,
+            },
+            top - y,
+        )
+    }
 }
 
 impl RowState {
     fn new(row: &Row, section: usize, catalog: &Catalog) -> Self {
         let numbers = match &row.control {
-            Control::Stepper(range) => options::steps(range.range(catalog), 1.0),
+            Control::Stepper(range) => options::steps(range.range(catalog), range.step(catalog)),
             Control::Seconds(range) => {
                 options::steps(range.range(catalog), range.seconds_step(catalog))
             }
             _ => Vec::new(),
         };
         let text = match &row.control {
-            Control::Notices => notices(),
             Control::Version => text::version(env!("CARGO_PKG_VERSION")),
             _ => String::new(),
         };
@@ -422,6 +526,16 @@ impl RowState {
             preview_fields: Vec::new(),
             preview_result: String::new(),
             text_scroll: Scroller::default(),
+            expanded: false,
+            acknowledgement: None,
+        }
+    }
+
+    /// 謝辞の項目(番号が無ければ None)
+    fn notice(&self) -> Option<&'static crate::notices::Acknowledgement> {
+        match self.row.control {
+            Control::Acknowledgement(index) => crate::notices::installed().get(index),
+            _ => None,
         }
     }
 
@@ -562,6 +676,17 @@ impl RowState {
         let search = buttons.is_some_and(|buttons| buttons.search);
         match part {
             Part::Reset => Some(card.reset),
+            // バージョンの行の更新を確かめるボタンは値の右
+            Part::Action if self.row.control == Control::Version => card.parts.first().copied(),
+            Part::Link(index) => self
+                .acknowledgement
+                .as_ref()
+                .and_then(|layout| layout.sources.get(index))
+                .and_then(|(_, link)| *link),
+            Part::Expand => self
+                .acknowledgement
+                .as_ref()
+                .and_then(|layout| layout.expand),
             Part::Toggle
             | Part::Dropdown
             | Part::Action
@@ -590,12 +715,26 @@ impl RowState {
             | Control::ThemeFont(_)
             | Control::Stepper(_)
             | Control::Seconds(_) => parts.push(Part::Dropdown),
-            Control::Action(_) => parts.push(Part::Action),
+            Control::Action(_) | Control::LabeledAction(..) | Control::Version => {
+                parts.push(Part::Action)
+            }
+            Control::Acknowledgement(_) => {
+                if let Some(item) = self.notice() {
+                    parts.extend(
+                        item.sources
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, line)| crate::notices::split_url(line).is_some())
+                            .map(|(index, _)| Part::Link(index)),
+                    );
+                    if item.license.is_some() {
+                        parts.push(Part::Expand);
+                    }
+                }
+            }
             Control::Color => parts.push(Part::Color),
             Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
-            Control::Notices | Control::KeymapReport | Control::ThemeReport => {
-                parts.push(Part::Text)
-            }
+            Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
             Control::Preview => parts.extend([Part::PreviewField(0), Part::PreviewField(1)]),
             control => {
                 if let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
@@ -658,7 +797,17 @@ impl RowState {
                 .and_then(|buttons| buttons.bottom.get(index).copied())
                 .unwrap_or(""),
             Part::PresetLoad => keys::LOAD,
-            Part::Action => self.row.title,
+            Part::Action => match self.row.control {
+                Control::Version => more::CHECK_FOR_UPDATES,
+                Control::LabeledAction(_, label) => label,
+                _ => self.row.title,
+            },
+            Part::Link(index) => self
+                .notice()
+                .and_then(|item| item.sources.get(index))
+                .and_then(|line| crate::notices::split_url(line))
+                .map_or("", |(_, url)| url),
+            Part::Expand => more::LICENSE_TEXT,
             _ => "",
         }
     }
@@ -748,17 +897,6 @@ impl RowState {
             _ => None,
         }
     }
-}
-
-/// 配布物に入れた利用表記のファイルの中身(実行ファイルと同じディレクトリ．tools/windows/stage.ps1)
-fn notices() -> String {
-    const NOTICES_FILE: &str = "THIRD_PARTY_NOTICES.md";
-    std::env::current_exe()
-        .ok()
-        .and_then(|path| path.parent().map(|dir| dir.join(NOTICES_FILE)))
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .map(|text| text.replace("\r\n", "\n"))
-        .unwrap_or_else(|| more::NOTICES_MISSING.to_string())
 }
 
 /// ページの状態(読み込み中・使える・エンジンにつながらない)
@@ -981,18 +1119,28 @@ impl PageView {
             .iter()
             .flat_map(|section| &section.rows)
             .collect();
+        let expanded: Vec<bool> = self.rows.iter().map(|row| row.expanded).collect();
         let line = size::NOTE_LINE_HEIGHT;
-        self.layout = layout::layout(
+        let position = |row: &Row| {
+            all.iter()
+                .position(|candidate| std::ptr::eq(*candidate, row))
+        };
+        self.layout = layout::layout_with(
             &self.sections,
             width,
-            |row| {
-                all.iter()
-                    .position(|candidate| std::ptr::eq(*candidate, row))
-                    .is_none_or(|index| visible[index])
-            },
+            |row| position(row).is_none_or(|index| visible[index]),
             |text, width| {
                 let height = measure.wrapped_height(text, TextStyle::Caption, width);
                 ((height / line).ceil() as usize).max(1)
+            },
+            |row, width| {
+                let Control::Acknowledgement(index) = row.control else {
+                    return None;
+                };
+                let open = position(row).is_some_and(|position| expanded[position]);
+                let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+                let item = crate::notices::installed().get(index);
+                Some(AcknowledgementLayout::new(item, (0.0, 0.0, inner), open, measure).1)
             },
         );
         for row in &mut self.rows {
@@ -1013,13 +1161,23 @@ impl PageView {
             }
         }
         for row in &mut self.rows {
+            row.acknowledgement = match (&row.row.control, &row.card) {
+                (Control::Acknowledgement(_), Some(card)) => {
+                    let inner = card.control;
+                    let origin = (inner.x, inner.y, inner.width);
+                    Some(AcknowledgementLayout::new(row.notice(), origin, row.expanded, measure).0)
+                }
+                _ => None,
+            };
+        }
+        for row in &mut self.rows {
             if row.card.is_some() {
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 let viewport = table_viewport(row);
                 row.table_scroll.set_extent(content, viewport);
                 if matches!(
                     row.row.control,
-                    Control::Notices | Control::KeymapReport | Control::ThemeReport
+                    Control::KeymapReport | Control::ThemeReport
                 ) {
                     if let Some(card) = &row.card {
                         let inner = card.control.width - size::FIELD_PADDING_X * 2.0;
@@ -1104,9 +1262,12 @@ impl PageView {
         };
         match element.part {
             Part::Reset => format!("{} {}", row.row.title, features::RESTORE_DEFAULT),
-            Part::Top(_) | Part::Bottom(_) | Part::PresetLoad | Part::Action => {
-                row.button_label(element.part).to_string()
-            }
+            Part::Top(_)
+            | Part::Bottom(_)
+            | Part::PresetLoad
+            | Part::Action
+            | Part::Link(_)
+            | Part::Expand => row.button_label(element.part).to_string(),
             Part::Field(index) => row
                 .row
                 .control
@@ -1160,6 +1321,8 @@ impl PageView {
             Part::Table => 50,
             Part::PreviewField(index) => 60 + index,
             Part::Text => 70,
+            Part::Expand => 79,
+            Part::Link(index) => 80 + index,
         };
         let id = element.row * 100 + part;
         i32::try_from(id).unwrap_or(i32::MAX)
@@ -1282,7 +1445,24 @@ impl PageView {
                     clears: row.row.clears,
                 });
             }
-            (Control::Action(action), Part::Action) => return Some(Event::Action(*action)),
+            (Control::Action(action) | Control::LabeledAction(action, _), Part::Action) => {
+                return Some(Event::Action(*action))
+            }
+            (Control::Version, Part::Action) => {
+                return Some(Event::Action(Action::OpenLatestRelease))
+            }
+            (Control::Acknowledgement(_), Part::Link(index)) => {
+                let url = row
+                    .notice()
+                    .and_then(|item| item.sources.get(index))
+                    .and_then(|line| crate::notices::split_url(line))
+                    .map(|(_, url)| url.to_string())?;
+                return Some(Event::OpenUrl(url));
+            }
+            (Control::Acknowledgement(_), Part::Expand) => {
+                row.expanded = !row.expanded;
+                return Some(Event::Relayout);
+            }
             (Control::Color, Part::Color) => {
                 return Some(Event::ChooseColor {
                     path: row.row.path,
@@ -1596,6 +1776,63 @@ impl PageView {
         scroller.target() != before
     }
 
+    /// 部品の中の送りのトラック(ページの中の座標．つまみが動く範囲)と送り．送れなければ None
+    fn inner_scroller(&mut self, element: Element) -> Option<(Rect, &mut Scroller)> {
+        let row = self.rows.get_mut(element.row)?;
+        let rect = row.part_rect(element.part)?;
+        let (track, scroller) = match element.part {
+            Part::Table => (
+                Rect::new(
+                    rect.x,
+                    rect.y + size::TABLE_HEADER_HEIGHT,
+                    rect.width,
+                    (rect.height - size::TABLE_HEADER_HEIGHT).max(0.0),
+                ),
+                &mut row.table_scroll,
+            ),
+            Part::Text => (rect, &mut row.text_scroll),
+            _ => return None,
+        };
+        if !scroller.can_scroll() {
+            return None;
+        }
+        let margin = size::SCROLLBAR_MARGIN;
+        let inner = Rect::new(
+            track.x,
+            track.y + margin,
+            track.width,
+            (track.height - margin * 2.0).max(0.0),
+        );
+        Some((inner, scroller))
+    }
+
+    /// 部品の中を送れるか(右端を押したらスクロールバーとして扱う)
+    pub fn can_scroll_inside(&mut self, element: Element) -> bool {
+        self.inner_scroller(element).is_some()
+    }
+
+    /// 部品の中のスクロールバーを y(ページの中の座標)で押した．つまみならつかみ，外ならそこへ送る
+    pub fn press_inner_scrollbar(&mut self, element: Element, y: f32, now: f64) {
+        if let Some((track, scroller)) = self.inner_scroller(element) {
+            scroller.press(y - track.y, track.height, now);
+        }
+    }
+
+    /// 部品の中のスクロールバーのつまみをつかんだまま y(ページの中の座標)まで動かした
+    pub fn drag_inner_scrollbar(&mut self, element: Element, y: f32, now: f64) {
+        if let Some((track, scroller)) = self.inner_scroller(element) {
+            scroller.drag(y - track.y, track.height, now);
+        }
+    }
+
+    /// 部品の中のスクロールバーのつまみを放した
+    pub fn release_inner_scrollbars(&mut self, now: f64) {
+        for row in &mut self.rows {
+            row.table_scroll.release(now);
+            row.text_scroll.release(now);
+        }
+    }
+
     /// 一覧の入力欄の値で行を足す(追加のボタンを押したのと同じ)．入力欄が埋まっていなければ None
     pub fn list_add_event(&self, path: &str) -> Option<Event> {
         let row = self
@@ -1875,7 +2112,39 @@ impl PageView {
                 );
             }
             Control::Color => self.paint_color(canvas, frame, index, row, card.control),
-            Control::Stat(_) | Control::Info(_) | Control::Version => {
+            Control::LabeledAction(_, label) => {
+                let action = element(Part::Action);
+                paint::button(
+                    canvas,
+                    theme,
+                    card.control,
+                    label,
+                    paint::ButtonKind::Standard,
+                    self.state(frame, action, row.enabled),
+                );
+            }
+            Control::Acknowledgement(_) => self.paint_acknowledgement(canvas, frame, index, row),
+            Control::Version => {
+                canvas.text(
+                    card.control,
+                    &row.text,
+                    TextStyle::Body,
+                    Color::from(palette.text_secondary),
+                    TextLayout::TRAILING,
+                );
+                if let Some(rect) = row.part_rect(Part::Action) {
+                    let update = element(Part::Action);
+                    paint::button(
+                        canvas,
+                        theme,
+                        rect,
+                        more::CHECK_FOR_UPDATES,
+                        paint::ButtonKind::Standard,
+                        self.state(frame, update, row.enabled),
+                    );
+                }
+            }
+            Control::Stat(_) | Control::Info(_) => {
                 canvas.text(
                     card.control,
                     &row.text,
@@ -1884,7 +2153,7 @@ impl PageView {
                     TextLayout::TRAILING,
                 );
             }
-            Control::Notices | Control::KeymapReport | Control::ThemeReport => {
+            Control::KeymapReport | Control::ThemeReport => {
                 self.paint_text_box(canvas, frame, index, row, card.control);
             }
             Control::ThemePreview => canvas.preview(card.control),
@@ -2043,6 +2312,156 @@ impl PageView {
         };
         if frame.focus_visible && frame.focus == Some(element) {
             paint::focus_ring(canvas, theme, rect, size::CONTROL_RADIUS);
+        }
+    }
+
+    /// 謝辞の 1 項目(名前・出どころ・ライセンスの全文を開くボタンと全文)．macOS の AcknowledgementRow
+    fn paint_acknowledgement(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+    ) {
+        let theme = frame.theme;
+        let palette = &theme.palette;
+        let Some(layout) = &row.acknowledgement else {
+            return;
+        };
+        let Some(item) = row.notice() else {
+            canvas.text(
+                layout.name,
+                row.row.title,
+                TextStyle::Body,
+                Color::from(palette.text_secondary),
+                TextLayout::LINE,
+            );
+            return;
+        };
+        canvas.text(
+            layout.name,
+            &item.name,
+            TextStyle::Section,
+            Color::from(palette.text),
+            TextLayout::LINE,
+        );
+        let secondary = Color::from(palette.text_secondary);
+        for (position, (line, (rect, link))) in item.sources.iter().zip(&layout.sources).enumerate()
+        {
+            match (crate::notices::split_url(line), link) {
+                // URL の前置きは文字で，URL は押せる色で出す(macOS の Link)
+                (Some((prefix, url)), Some(link)) if link.height <= size::NOTE_LINE_HEIGHT => {
+                    if !prefix.is_empty() {
+                        canvas.text(
+                            *rect,
+                            prefix,
+                            TextStyle::Caption,
+                            secondary,
+                            TextLayout::LINE,
+                        );
+                    }
+                    let element = Element {
+                        row: index,
+                        part: Part::Link(position),
+                    };
+                    let state = self.state(frame, element, row.enabled);
+                    let accent = Color::from(palette.accent);
+                    let color = accent.mix(Color::from(palette.text), state.hover * 0.35);
+                    canvas.text(*link, url, TextStyle::Caption, color, TextLayout::LINE);
+                    // 押せることを下線で示す(ポインターを載せると濃くする)
+                    canvas.fill_rect(
+                        Rect::new(link.x, link.max_y() - 2.0, link.width, 1.0),
+                        color.with_alpha(0.4 + 0.6 * state.hover),
+                    );
+                    if state.focus_visible {
+                        paint::focus_ring(canvas, theme, *link, size::CONTROL_RADIUS);
+                    }
+                }
+                (Some(_), Some(link)) => {
+                    let element = Element {
+                        row: index,
+                        part: Part::Link(position),
+                    };
+                    let state = self.state(frame, element, row.enabled);
+                    let accent = Color::from(palette.accent);
+                    canvas.text(*link, line, TextStyle::Caption, accent, TextLayout::WRAP);
+                    if state.focus_visible {
+                        paint::focus_ring(canvas, theme, *link, size::CONTROL_RADIUS);
+                    }
+                }
+                _ => canvas.text(*rect, line, TextStyle::Caption, secondary, TextLayout::WRAP),
+            }
+        }
+        if let Some(button) = layout.expand {
+            let element = Element {
+                row: index,
+                part: Part::Expand,
+            };
+            let state = self.state(frame, element, row.enabled);
+            if state.hover > 0.0 || state.pressed {
+                let opacity = tokens::opacity::settings::SUBTLE_HOVER
+                    * if state.pressed { 2.0 } else { state.hover };
+                canvas.fill_round(
+                    button,
+                    size::CONTROL_RADIUS,
+                    Color::from(palette.text).with_alpha(opacity),
+                );
+            }
+            let glyph = if row.expanded {
+                theme.glyphs.chevron_down
+            } else {
+                theme.glyphs.chevron_right
+            };
+            let padding = size::FIELD_PADDING_X / 2.0;
+            canvas.text(
+                Rect::new(
+                    button.x + padding,
+                    button.y,
+                    size::CHEVRON_SIZE,
+                    button.height,
+                ),
+                glyph,
+                TextStyle::IconSmall,
+                Color::from(palette.text_secondary),
+                TextLayout::CENTER,
+            );
+            canvas.text(
+                Rect::new(
+                    button.x + padding * 2.0 + size::CHEVRON_SIZE,
+                    button.y,
+                    button.width - padding * 3.0 - size::CHEVRON_SIZE,
+                    button.height,
+                ),
+                more::LICENSE_TEXT,
+                TextStyle::Body,
+                Color::from(palette.text),
+                TextLayout::LINE,
+            );
+            if state.focus_visible {
+                paint::focus_ring(canvas, theme, button, size::CONTROL_RADIUS);
+            }
+        }
+        if let (Some(rect), Some(text)) = (layout.license, &item.license) {
+            canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.control));
+            canvas.stroke_round(
+                rect,
+                size::CONTROL_RADIUS,
+                1.0,
+                Color::from(palette.control_stroke),
+            );
+            let padding = size::FIELD_PADDING_X;
+            canvas.text(
+                Rect::new(
+                    rect.x + padding,
+                    rect.y + padding,
+                    rect.width - padding * 2.0,
+                    rect.height - padding * 2.0,
+                ),
+                text,
+                TextStyle::Mono,
+                Color::from(palette.text),
+                TextLayout::WRAP,
+            );
         }
     }
 

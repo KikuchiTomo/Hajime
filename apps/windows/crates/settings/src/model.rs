@@ -7,8 +7,19 @@ use crate::catalog::Catalog;
 use crate::store::{read_all, Fields, SettingsStore, StoreError};
 use serde_json::{Number, Value};
 
-/// 「既定に戻す」(すべて)で戻さない項目．登録した語と取り込んだ辞書は辞書の画面で消す(macOS の restoreDefaults と同じ)
-pub const KEPT_ON_RESTORE: &[&str] = &["userDictionary", "importedDictionaries"];
+/// 「既定に戻す」(すべて)で戻さない項目．登録した語と取り込んだ辞書・連想の辞書は辞書の画面で消す(macOS の restoreDefaults と同じ)
+pub const KEPT_ON_RESTORE: &[&str] = &[
+    "userDictionary",
+    "importedDictionaries",
+    "associationDictionaries",
+];
+
+/// 書くとエンジンがほかの項目も合わせて直す項目と，直される項目(core の Settings.normalized)．
+/// エンジンは書いた項目の値だけを返すので，直される項目は読み直す
+const LINKED: &[(&str, &[&str])] = &[
+    ("liveConversionDelay", &["correctionDelay"]),
+    ("customThemes", &["customThemeID"]),
+];
 
 /// 一度に書く項目の数．応答の上限(256KB)を超えないよう，すべてを戻すときは分けて書く
 const WRITE_BATCH: usize = 8;
@@ -111,7 +122,24 @@ impl<S: SettingsStore> SettingsModel<S> {
         }
         let written = self.store.write(&values)?;
         self.current.extend(written);
+        self.reload_linked(values.keys());
         Ok(())
+    }
+
+    /// 書いた項目に合わせてエンジンが直した項目を読み直す．読めなくても書いたことは取り消さない
+    fn reload_linked<'a>(&mut self, written: impl Iterator<Item = &'a String>) {
+        let linked: Vec<String> = written
+            .flat_map(|name| {
+                LINKED
+                    .iter()
+                    .filter(move |(source, _)| *source == name.as_str())
+                    .flat_map(|(_, targets)| targets.iter().map(|target| target.to_string()))
+            })
+            .filter(|name| self.names.contains(name))
+            .collect();
+        if let Ok(read) = read_all(&self.store, &linked, false) {
+            self.current.extend(read.fields);
+        }
     }
 
     pub fn set_bool(&mut self, path: &str, value: bool) -> Result<(), StoreError> {
@@ -140,15 +168,30 @@ impl<S: SettingsStore> SettingsModel<S> {
             .filter(|name| !KEPT_ON_RESTORE.contains(&name.as_str()))
             .filter(|name| !self.unreadable.contains(name))
             .collect();
-        for chunk in names.chunks(WRITE_BATCH) {
-            let values: Fields = chunk
+        let defaults = |names: &[&String]| -> Fields {
+            names
                 .iter()
                 .filter_map(|name| {
                     self.defaults
                         .get(name.as_str())
                         .map(|value| (name.to_string(), value.clone()))
                 })
-                .collect();
+                .collect()
+        };
+        for chunk in names.chunks(WRITE_BATCH) {
+            let values = defaults(chunk);
+            let written = self.store.write(&values)?;
+            self.current.extend(written);
+        }
+        // 分けて書くと，ほかの項目に合わせて詰められた値が残る(補正の時間はライブ変換の時間より短くできないので，
+        // ライブ変換の時間を戻す前に補正の時間を戻すと前の値に詰められる)．既定と違って残った項目をもう一度書く
+        let left: Vec<&String> = names
+            .iter()
+            .copied()
+            .filter(|name| self.current.get(name.as_str()) != self.defaults.get(name.as_str()))
+            .collect();
+        for chunk in left.chunks(WRITE_BATCH) {
+            let values = defaults(chunk);
             let written = self.store.write(&values)?;
             self.current.extend(written);
         }

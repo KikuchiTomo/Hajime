@@ -230,6 +230,13 @@ impl App {
         if let Event::ChooseApp { path } = event {
             return Some(After::ChooseApp { path });
         }
+        if let Event::OpenUrl(url) = event {
+            return Some(After::OpenUrl(url));
+        }
+        if event == Event::Relayout {
+            self.arrange();
+            return None;
+        }
         if matches!(
             event,
             Event::SymbolSave { .. } | Event::SymbolRemove { .. } | Event::SymbolToggle { .. }
@@ -328,6 +335,8 @@ impl App {
             | Event::ThemeSelected(_)
             | Event::ChooseColor { .. }
             | Event::ChooseApp { .. }
+            | Event::OpenUrl(_)
+            | Event::Relayout
             | Event::Action(
                 Action::SyncNow
                 | Action::ChooseSyncFolder
@@ -875,6 +884,8 @@ impl App {
             Some(index) => Some(spec.remove(model.value(spec.path), &[index])),
             None => model.value(spec.path).cloned(),
         };
+        // 書き換える行の欄に無い値(id・isEnabled など)は引き継ぐ
+        let base = replacing.and_then(|index| spec.element_at(model.value(spec.path), index));
         let items = spec.items(current.as_ref());
         let is_new = !items.iter().any(|existing| spec.same_key(existing, item));
         if is_new && items.len() >= limit {
@@ -884,7 +895,10 @@ impl App {
             });
         }
         // いつも英語にする語といつも日本語にする語は，足した語をもう一方から除く(macOS と同じ)
-        let mut changes = vec![(spec.path, spec.upsert(current.as_ref(), item))];
+        let mut changes = vec![(
+            spec.path,
+            spec.upsert_with(current.as_ref(), item, base.as_ref()),
+        )];
         if let (Some(other), Some(word)) = (spec.exclusive_with, item.first()) {
             changes.push((other, ListSpec::without(model.value(other), word)));
         }

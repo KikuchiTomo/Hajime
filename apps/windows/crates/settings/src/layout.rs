@@ -80,10 +80,16 @@ pub fn control_width(control: &Control) -> f32 {
         | Control::SyncFields(_)
         | Control::Dictionaries(..)
         | Control::CustomThemes(_)
-        | Control::ThemePreview
-        | Control::Notices => 0.0,
+        | Control::ThemePreview => 0.0,
         Control::Color => size::CONTROL_WIDTH,
-        Control::Version => size::CONTROL_WIDTH,
+        // 値と，その右の更新を確かめるボタン
+        Control::Version => {
+            size::CONTROL_WIDTH
+                + size::CONTROL_GAP
+                + button_width(crate::strings::more::CHECK_FOR_UPDATES)
+        }
+        Control::LabeledAction(_, label) => button_width(label),
+        Control::Acknowledgement(_) => 0.0,
         Control::Preset => size::CONTROL_WIDTH + size::CONTROL_GAP + size::BUTTON_WIDTH,
         Control::KeymapReport | Control::ThemeReport => 0.0,
         Control::Note => 0.0,
@@ -102,6 +108,17 @@ pub fn layout(
     page_width: f32,
     visible: impl Fn(&Row) -> bool,
     lines: impl Fn(&str, f32) -> usize,
+) -> PageLayout {
+    layout_with(sections, page_width, visible, lines, |_, _| None)
+}
+
+/// layout と同じ．heights は中身で高さの変わるカード(謝辞)の高さ(カードの幅を渡す．None なら決まった高さ)
+pub fn layout_with(
+    sections: &[Section],
+    page_width: f32,
+    visible: impl Fn(&Row) -> bool,
+    lines: impl Fn(&str, f32) -> usize,
+    heights: impl Fn(&Row, f32) -> Option<f32>,
 ) -> PageLayout {
     let (left, width) = content_frame(page_width);
     let mut y = size::PAGE_PADDING_TOP;
@@ -140,7 +157,8 @@ pub fn layout(
                 }
                 continue;
             }
-            let card = Rect::new(left, y, width, card_height(&row.control, width));
+            let height = heights(row, width).unwrap_or_else(|| card_height(&row.control, width));
+            let card = Rect::new(left, y, width, height);
             cards.push(place(position, row, card));
             y = card.max_y() + size::CARD_GAP;
         }
@@ -180,7 +198,6 @@ fn card_height(control: &Control, width: f32) -> f32 {
         Control::Preview => {
             size::CARD_PADDING_X * 2.0 + inputs + size::BODY_LINE_HEIGHT * PREVIEW_LINES
         }
-        Control::Notices => size::CARD_PADDING_X * 2.0 + size::LIST_HEIGHT * NOTICES_LISTS,
         Control::KeymapReport | Control::ThemeReport => {
             size::CARD_PADDING_X * 2.0 + size::BODY_LINE_HEIGHT * REPORT_LINES
         }
@@ -205,15 +222,6 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
                 size::BODY_LINE_HEIGHT * PREVIEW_LINES,
             )
         }
-        Control::Notices => {
-            return place_inputs(
-                position,
-                0,
-                NO_BUTTONS,
-                card,
-                size::LIST_HEIGHT * NOTICES_LISTS,
-            )
-        }
         Control::ThemePreview => {
             return place_inputs(position, 0, NO_BUTTONS, card, size::PREVIEW_HEIGHT);
         }
@@ -225,6 +233,24 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
                 card,
                 size::BODY_LINE_HEIGHT * REPORT_LINES,
             )
+        }
+        // 謝辞は中身(名前・出どころ・ライセンスの全文)を画面の側で測って置く．部品の欄はカードの中の全体
+        Control::Acknowledgement(_) => {
+            let inner = Rect::new(
+                card.x + size::CARD_PADDING_X,
+                card.y,
+                (card.width - size::CARD_PADDING_X * 2.0).max(0.0),
+                card.height,
+            );
+            return CardLayout {
+                row: position,
+                card,
+                label: Rect::new(inner.x, card.y, 0.0, 0.0),
+                descriptions: Vec::new(),
+                control: inner,
+                reset: Rect::new(inner.x, card.y, 0.0, 0.0),
+                parts: Vec::new(),
+            };
         }
         _ => {}
     }
@@ -253,9 +279,19 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
     let reset_x = control_x - size::CONTROL_GAP - size::RESET_SIZE;
     let label_x = card.x + size::CARD_PADDING_X;
     let control_y = card.y + (card.height - size::CONTROL_HEIGHT) / 2.0;
-    // ひな形は一覧と読み込むボタンを並べる
-    let (control_width, parts) = match row.control {
+    // ひな形は一覧と読み込むボタンを並べる．バージョンは値の右に更新を確かめるボタンを置く(macOS と同じ)
+    let (control_x, control_width, parts) = match row.control {
+        Control::Version => {
+            let button = button_width(crate::strings::more::CHECK_FOR_UPDATES);
+            let button_x = card.max_x() - size::CARD_PADDING_X - button;
+            (
+                button_x - size::CONTROL_GAP - size::CONTROL_WIDTH,
+                size::CONTROL_WIDTH,
+                vec![Rect::new(button_x, control_y, button, size::CONTROL_HEIGHT)],
+            )
+        }
         Control::Preset => (
+            control_x,
             size::CONTROL_WIDTH,
             vec![Rect::new(
                 control_x + size::CONTROL_WIDTH + size::CONTROL_GAP,
@@ -264,7 +300,7 @@ fn place(position: usize, row: &Row, card: Rect) -> CardLayout {
                 size::CONTROL_HEIGHT,
             )],
         ),
-        _ => (control_width, Vec::new()),
+        _ => (control_x, control_width, Vec::new()),
     };
     CardLayout {
         row: position,
@@ -305,8 +341,6 @@ fn bottom_widths(buttons: ListButtons) -> Vec<f32> {
 
 /// 試す欄の結果の行の数
 const PREVIEW_LINES: f32 = 2.0;
-/// 謝辞の欄の高さ(一覧の表の何倍か)
-const NOTICES_LISTS: f32 = 2.0;
 /// キー設定の表の問題の欄の行の数(超えたら欄の中で送る)
 const REPORT_LINES: f32 = 4.0;
 

@@ -288,6 +288,8 @@ pub mod more {
     pub const ACKNOWLEDGEMENTS_NOTE: &str =
         "はじめは上記のソフトウェア・モデル・データを利用しています。";
     pub const NOTICES_MISSING: &str = "謝辞のファイルが見つかりません";
+    /// 謝辞の項目のライセンスの全文を開く(macOS の UIStrings.More.licenseText)
+    pub const LICENSE_TEXT: &str = "ライセンス全文";
 
     pub fn seconds(value: f64) -> String {
         format!("{value:.1} 秒")
@@ -692,6 +694,8 @@ pub mod wizard {
         "設定を保存できませんでした。変換エンジンが動いているか確かめてください。";
     /// 設定の画面の「情報」のページからウィザードを開く
     pub const REDO: &str = "初期設定をやり直す";
+    /// 情報のページの，ウィザードを開く行の名前(macOS の UIStrings.Onboarding.redoLabel)
+    pub const REDO_LABEL: &str = "初期設定";
 
     /// 何ページ目か
     pub fn step(index: usize, total: usize) -> String {

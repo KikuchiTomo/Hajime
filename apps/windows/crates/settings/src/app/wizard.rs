@@ -402,12 +402,16 @@ impl Wizard {
         ffi::invalidate(self.window);
     }
 
-    /// 選んだ値をエンジンに書く．書けなければ誤りを出して false
+    /// すべてのページで選んだ値をまとめてエンジンに書く(macOS と同じく，終えるときだけ書く．ページを送るたびに
+    /// エンジンと通信すると，送る動きが通信を待って遅れる)．書けなければ誤りを出して false
     fn save(&mut self) -> bool {
         let Some(model) = &mut self.model else {
             return true;
         };
-        let changes = self.choices.changes(self.step, model);
+        let changes: Vec<_> = Step::ALL
+            .into_iter()
+            .flat_map(|step| self.choices.changes(step, model))
+            .collect();
         if changes.is_empty() {
             return true;
         }
@@ -459,24 +463,23 @@ impl Wizard {
         match button {
             Button::Back => {
                 if let Some(previous) = self.step.previous() {
-                    self.save();
                     self.go(previous);
                 }
             }
             Button::Next => {
-                if !self.button_enabled(Button::Next) || !self.save() {
+                if !self.button_enabled(Button::Next) {
                     return;
                 }
                 if let Some(next) = self.step.next() {
                     self.go(next);
                 }
             }
-            Button::Later => {
-                self.save();
-                ffi::destroy(self.window);
-            }
+            // あとで設定する: 選んだ値は捨てる(macOS と同じ．次のログオンでまた開く)
+            Button::Later => ffi::destroy(self.window),
             Button::OpenSettings | Button::Finish => {
-                self.save();
+                if !self.save() {
+                    return;
+                }
                 if !self.offline {
                     ffi::set_setup_completed();
                 }

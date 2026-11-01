@@ -447,6 +447,7 @@ unsafe extern "system" fn procedure(
             let timer = match wparam.0 {
                 id if id == Timer::Mode as usize => Some(Timer::Mode),
                 id if id == Timer::Fade as usize => Some(Timer::Fade),
+                id if id == Timer::Motion as usize => Some(Timer::Motion),
                 _ => None,
             };
             let callbacks = CALLBACKS.get();

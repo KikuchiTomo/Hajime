@@ -290,7 +290,13 @@ impl App {
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
             UiCommand::Move { anchor } => self.anchor = Some(anchor),
-            UiCommand::Hide => self.content = Content::Hidden,
+            // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
+            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)
+            UiCommand::Hide => {
+                if !matches!(self.content, Content::Mode(_)) {
+                    self.content = Content::Hidden;
+                }
+            }
         }
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
         if is_list && !was_list {
@@ -459,8 +465,14 @@ impl App {
         // 候補の窓は，大きさが変わるときに縁を滑らかに動かす(地と縁は途中の大きさで描き，中身は新しい配置のまま)
         let now = Instant::now();
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
+        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える(macOS と同じ)
+        let typing =
+            matches!(&self.content, Content::Candidates(list) if list.selected_entry.is_none());
         let natural = scene.as_ref().map(|scene| (scene.width, scene.height));
-        if let (true, Some(natural)) = (is_list, natural) {
+        if typing {
+            self.resize = None;
+        }
+        if let (true, false, Some(natural)) = (is_list, typing, natural) {
             if let Some(size) = self.moving_size(natural, now) {
                 scene = build(
                     &self.content,
@@ -471,6 +483,8 @@ impl App {
                 );
             }
             self.shown_size = scene.as_ref().map(|scene| (scene.width, scene.height));
+        } else if typing {
+            self.shown_size = natural;
         } else {
             self.shown_size = None;
             self.resize = None;

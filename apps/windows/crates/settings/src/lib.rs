@@ -9,6 +9,7 @@ pub mod keys;
 pub mod layout;
 pub mod list;
 pub mod model;
+pub mod notices;
 pub mod options;
 pub mod pages;
 pub mod store;

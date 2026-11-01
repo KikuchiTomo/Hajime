@@ -19,6 +19,8 @@ const LANGID_JAPANESE: usize = 0x0411;
 pub fn read(wparam: WPARAM, lparam: LPARAM) -> Option<RawKey> {
     let vk = u16::try_from(wparam.0).ok()?;
     let scan = ((lparam.0 >> 16) & 0xff) as u32;
+    // 拡張キー(E0 の付くキー．テンキーの / や矢印など)
+    let extended = (lparam.0 >> 24) & 1 != 0;
     let mut state = [0u8; 256];
     unsafe { GetKeyboardState(&mut state).ok()? };
     // 修飾キーは今のキーボードの状態からも読む．Windows 11 のメモ帳など(XAML のアプリ)では，入力のスレッドから見た
@@ -60,15 +62,7 @@ pub fn read(wparam: WPARAM, lparam: LPARAM) -> Option<RawKey> {
         without_control[index] = 0;
     }
     let text = character(vk, scan, &without_control, layout);
-    let mut plain = without_control;
-    for index in [VK_SHIFT as usize, VK_LSHIFT, VK_RSHIFT, VK_CAPITAL] {
-        plain[index] = 0;
-    }
-    let label = if japanese_layout {
-        character(vk, scan, &plain, layout)
-    } else {
-        None
-    };
+    let label = crate::key::jis_label(scan as u16, extended);
     Some(RawKey {
         vk,
         text,
