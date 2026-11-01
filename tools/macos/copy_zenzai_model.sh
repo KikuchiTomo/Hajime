@@ -10,6 +10,6 @@ for file in zenz-v3.2-small-Q5_K_M.gguf zenz-v3.2-xsmall-Q5_K_M.gguf; do
     cp -f "$model" "$destination/"
     echo "Zenzai のモデルを入れました: $file"
   else
-    echo "warning: Zenzai のモデルがありません: $file．tools/models/fetch_zenzai.sh で取得してください"
+    echo "warning: Zenzai のモデルがありません: ${file}．tools/models/fetch_zenzai.sh で取得してください"
   fi
 done
