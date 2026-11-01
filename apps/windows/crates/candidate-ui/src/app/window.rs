@@ -79,6 +79,16 @@ pub fn set_callbacks(inbox: fn(), timer: fn(Timer), paint: fn(), click: fn(i32, 
 pub struct Window {
     hwnd: HWND,
     target: Option<ID2D1HwndRenderTarget>,
+    /// 出している窓を入力位置の上と下のどちらに置いたか．出しているあいだは同じ側に置き続ける
+    /// (打つたびに窓が上下に跳ねないように．macOS の PanelPlacement と同じ)
+    side: std::cell::Cell<Option<Side>>,
+}
+
+/// 入力位置に対して窓を置いた側
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Side {
+    Above,
+    Below,
 }
 
 pub struct Notifier {
@@ -199,7 +209,11 @@ impl Window {
         };
         // SAFETY: hwnd は作ったばかりの窓
         let _ = unsafe { DwmExtendFrameIntoClientArea(hwnd, &margins) };
-        Ok(Self { hwnd, target: None })
+        Ok(Self {
+            hwnd,
+            target: None,
+            side: std::cell::Cell::new(None),
+        })
     }
 
     pub fn notifier(&self) -> Notifier {
@@ -293,13 +307,15 @@ impl Window {
             }
         };
         let pixels = |value: f32| (value * scale).round() as i32;
-        let (x, y) = position(
+        let (x, y, side) = position(
             &anchor_rect,
             &work,
             pixels(scene.body.width),
             pixels(scene.body.height),
             gap,
+            self.side.get(),
         );
+        self.side.set(Some(side));
         // SAFETY: hwnd はこの窓
         let _ = unsafe {
             SetWindowPos(
@@ -333,6 +349,7 @@ impl Window {
     }
 
     pub fn hide(&self) {
+        self.side.set(None);
         // SAFETY: hwnd はこの窓
         let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
     }
@@ -419,15 +436,33 @@ impl Window {
     }
 }
 
-fn position(anchor: &RECT, work: &RECT, width: i32, height: i32, gap: i32) -> (i32, i32) {
+/// 窓の左上と置いた側．下に入れば下，入らなければ上に置く．keeping の側に置いていたら，入るかぎりその側に置き続ける．
+/// どちらにも入らなければ画面の中に詰める(core の PanelPlacement と同じ決まり)
+fn position(
+    anchor: &RECT,
+    work: &RECT,
+    width: i32,
+    height: i32,
+    gap: i32,
+    keeping: Option<Side>,
+) -> (i32, i32, Side) {
     let below = anchor.bottom + gap;
-    let y = if below + height > work.bottom && anchor.top - gap - height >= work.top {
-        anchor.top - gap - height
-    } else {
-        below
+    let above = anchor.top - gap - height;
+    let fits_below = below + height <= work.bottom;
+    let fits_above = above >= work.top;
+    let side = match keeping {
+        Some(Side::Above) if fits_above || !fits_below => Side::Above,
+        Some(Side::Above) => Side::Below,
+        _ if fits_below => Side::Below,
+        _ => Side::Above,
     };
+    let y = match side {
+        Side::Below => below,
+        Side::Above => above,
+    };
+    let y = y.min(work.bottom - height).max(work.top);
     let x = anchor.left.min(work.right - width).max(work.left);
-    (x, y)
+    (x, y, side)
 }
 
 unsafe extern "system" fn procedure(
@@ -506,8 +541,8 @@ mod tests {
     fn 入力位置の下に出す() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
-            position(&rect(100, 100, 102, 120), &work, 200, 150, 2),
-            (100, 122)
+            position(&rect(100, 100, 102, 120), &work, 200, 150, 2, None),
+            (100, 122, Side::Below)
         );
     }
 
@@ -515,8 +550,8 @@ mod tests {
     fn 画面の下にはみ出すなら上に出す() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
-            position(&rect(100, 1000, 102, 1020), &work, 200, 150, 2),
-            (100, 848)
+            position(&rect(100, 1000, 102, 1020), &work, 200, 150, 2, None),
+            (100, 848, Side::Above)
         );
     }
 
@@ -524,9 +559,42 @@ mod tests {
     fn 画面の右にはみ出さない() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
-            position(&rect(1900, 100, 1902, 120), &work, 200, 150, 2).0,
+            position(&rect(1900, 100, 1902, 120), &work, 200, 150, 2, None).0,
             1720
         );
+    }
+
+    #[test]
+    fn 上に置いた窓は入るかぎり上に置き続け_どちらにも入らなければ画面に詰める() {
+        let work = rect(0, 0, 1920, 1080);
+        // 上に置いていれば，下に入る位置でも上のまま
+        assert_eq!(
+            position(
+                &rect(100, 800, 102, 820),
+                &work,
+                200,
+                150,
+                2,
+                Some(Side::Above)
+            ),
+            (100, 648, Side::Above)
+        );
+        // 上に入らなくなったら下へ
+        assert_eq!(
+            position(
+                &rect(100, 100, 102, 120),
+                &work,
+                200,
+                150,
+                2,
+                Some(Side::Above)
+            )
+            .2,
+            Side::Below
+        );
+        // どちらにも入らない(画面より高い窓)なら画面の中に詰める
+        let (_, y, _) = position(&rect(100, 500, 102, 520), &work, 200, 1200, 2, None);
+        assert_eq!(y, 0);
     }
 
     #[test]

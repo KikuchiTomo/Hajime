@@ -158,6 +158,8 @@ struct Wizard {
     error: Option<&'static str>,
     preview: Option<candidate_ui::app::preview::Preview>,
     popup_pixels: Option<(String, PreviewPixels)>,
+    /// 描いた候補の窓の画像(中身と見た目の鍵と画素)．実演は繰り返すので，同じ窓は描き直さない
+    popup_cache: Vec<(String, Vec<u8>)>,
     started: Instant,
 }
 
@@ -230,6 +232,7 @@ pub fn open(
         error: None,
         preview: None,
         popup_pixels: None,
+        popup_cache: Vec::new(),
         started: options.started,
     };
     WIZARD.with(|cell| *cell.borrow_mut() = Some(wizard));
@@ -334,6 +337,7 @@ impl Wizard {
         ffi::set_dark_title_bar(self.window, self.theme.dark);
         self.mica = ffi::set_mica(self.window, !self.theme.high_contrast);
         self.popup_pixels = None;
+        self.popup_cache.clear();
     }
 
     fn reload_theme(&mut self, dpi: u32) {
@@ -783,15 +787,44 @@ impl Wizard {
         };
         let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
         let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        let font_size = self
+            .model
+            .as_ref()
+            .and_then(|model| model.value("candidateFontSize"))
+            .and_then(serde_json::Value::as_f64)
+            .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
+        // 窓の中身そのものを鍵にする(台本を始め直しても，同じ窓なら描き直さない)
         let key = format!(
-            "{:?}|{}|{}|{theme_name}|{}|{}|{width}x{height}",
-            self.step, frame.popup_id, self.demo_started, self.theme.dark, self.theme.dpi
+            "{theme_name}|{}|{}|{width}x{height}|{font_size}|{popup:?}",
+            self.theme.dark, self.theme.dpi
         );
         if self
             .popup_pixels
             .as_ref()
             .is_some_and(|(current, _)| *current == key)
         {
+            return;
+        }
+        let generation = self
+            .popup_pixels
+            .as_ref()
+            .map_or(1, |(_, pixels)| pixels.generation + 1);
+        if let Some(position) = self
+            .popup_cache
+            .iter()
+            .position(|(cached, _)| *cached == key)
+        {
+            let entry = self.popup_cache.remove(position);
+            self.popup_pixels = Some((
+                key,
+                PreviewPixels {
+                    generation,
+                    width,
+                    height,
+                    pixels: entry.1.clone(),
+                },
+            ));
+            self.popup_cache.push(entry);
             return;
         }
         if self.preview.is_none() {
@@ -805,12 +838,6 @@ impl Wizard {
             backdrop: false,
         };
         let resolved = candidate_ui::theme::ResolvedTheme::resolve(&theme_name, None, &look);
-        let font_size = self
-            .model
-            .as_ref()
-            .and_then(|model| model.value("candidateFontSize"))
-            .and_then(serde_json::Value::as_f64)
-            .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
         let shown = match &popup {
             Popup::Branch(map) => candidate_ui::app::preview::Shown::Branch(map),
             Popup::List(list) => candidate_ui::app::preview::Shown::List(list),
@@ -829,10 +856,10 @@ impl Wizard {
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
             return;
         };
-        let generation = self
-            .popup_pixels
-            .as_ref()
-            .map_or(1, |(_, pixels)| pixels.generation + 1);
+        if self.popup_cache.len() >= POPUP_CACHE {
+            self.popup_cache.remove(0);
+        }
+        self.popup_cache.push((key.clone(), pixels.clone()));
         self.popup_pixels = Some((
             key,
             PreviewPixels {
@@ -1580,6 +1607,9 @@ fn spotlight_glyph(path: &str) -> &'static str {
         _ => "\u{E946}",
     }
 }
+
+/// 覚えておく候補の窓の画像の数(1 つの台本の窓が収まる数)
+const POPUP_CACHE: usize = 24;
 
 /// 説明の札の絵の丸の大きさ
 const CAPTION_ICON: f32 = size::CONTROL_HEIGHT;

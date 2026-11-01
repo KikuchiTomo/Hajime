@@ -6,6 +6,7 @@
 
 mod association;
 mod branch;
+mod fitting;
 mod homophone;
 mod list;
 mod paint;

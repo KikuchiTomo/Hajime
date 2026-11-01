@@ -93,13 +93,41 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let padding = candidate::PADDING_X;
     let footer = footer(list);
 
+    // 長い文の候補は，窓の幅の上限に収まるよう省く．ほかの候補と違うところの少し手前から見せる
+    // (頭が同じ文が並ぶので，末尾を省くと見分けられない．macOS の CandidateView と同じ)
+    let text_limit =
+        candidate::MAX_WIDTH - metrics.lead - padding * 2.0 - metrics.inset * 2.0 - metrics.shadow;
+    let shown: Vec<String> = list
+        .entries
+        .iter()
+        .map(|entry| {
+            let annotation = entry
+                .annotation
+                .as_deref()
+                .map_or(0.0, |note| painter.tag_width(note) + padding)
+                + entry.command.map_or(0.0, |_| Painter::command_width());
+            let available = (text_limit - annotation).max(0.0);
+            let measure = |text: &str| painter.width(text, Font::Candidate);
+            if measure(&entry.text) <= available {
+                return entry.text.clone();
+            }
+            let shared = super::fitting::shared_prefix_length(
+                &entry.text,
+                list.entries.iter().map(|other| other.text.as_str()),
+            )
+            .saturating_sub(candidate::TRUNCATION_CONTEXT as usize);
+            super::fitting::truncated_keeping(&entry.text, available, shared, &measure)
+        })
+        .collect();
+
     // 大きさ
     let entry_width = list
         .entries
         .iter()
-        .map(|entry| {
+        .zip(&shown)
+        .map(|(entry, text)| {
             entry.command.map_or(0.0, |_| Painter::command_width())
-                + painter.width(&entry.text, Font::Candidate)
+                + painter.width(text, Font::Candidate)
                 + entry
                     .annotation
                     .as_deref()
@@ -232,12 +260,16 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 glass::BADGE_SIZE,
                 Font::Key,
             );
-            painter.text(&entry.text, Font::Candidate, text_color, text_x, row);
+            painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         } else {
             painter.text(&number, Font::Label, muted_color, row.x + padding, row);
-            painter.text(&entry.text, Font::Candidate, text_color, text_x, row);
+            painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         }
-        if let (Some(start), Some(length)) = (entry.corrected_start, entry.corrected_length) {
+        // 省いたときは補正の下線を引かない(位置が合わない)
+        let whole = shown[index] == entry.text;
+        if let (true, Some(start), Some(length)) =
+            (whole, entry.corrected_start, entry.corrected_length)
+        {
             // 打ち間違いを直した語句に，入力中の文字と同じ補正の点線を引く．位置は char の数で届く
             let before: String = entry.text.chars().take(start as usize).collect();
             let corrected: String = entry
