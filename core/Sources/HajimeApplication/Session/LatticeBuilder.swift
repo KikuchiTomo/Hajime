@@ -317,7 +317,8 @@ struct LatticeBuilder {
         // エンジンの文節全体の候補だけでは先頭の語を選び直せないことがある(ごくでしょうが → 語句でしょうが が無い)．
         // 先頭の語の候補の順(エンジンがその語をどれだけ確からしいとみたか)に先に並べ，そのあとに文節全体の候補を並べる．
         // 文節全体の候補の順は，先頭の語の読みを別の語に読み替えたもの(ごく → 石)が上に来ることがあるため
-        headWordAlternatives(of: slice).forEach(append)
+        // 同じ字のエンジンの候補(文節全体の候補)があれば，そちらを並べる(確定したときに文節ごと学習できる)
+        headWordAlternatives(of: slice).forEach { alternative in append(pool.first { $0.text == alternative.text } ?? alternative) }
         pool.forEach(append)
         if candidates.isEmpty {
             append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
@@ -344,7 +345,12 @@ struct LatticeBuilder {
         return converter.dictionaryCandidates(for: headReading)
             .filter { $0.readingCount == head.readingCount }
             .prefix(DefaultSettings.headWordAlternativeCount)
-            .map { Candidate(text: $0.text + tail, readingCount: slice.count, origin: .combined) }
+            .map { word in
+                var candidate = Candidate(text: word.text + tail, readingCount: slice.count, origin: .combined)
+                // 確定したら先頭の語を学ぶ
+                candidate.learnedParts = [word]
+                return candidate
+            }
     }
 
     /// 上の枝に出す字種．エンジンが出さなくても選べるようにする

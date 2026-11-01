@@ -102,8 +102,25 @@ public final class AzooKeyConverterEngine {
     /// 学習データをファイルに書き出す．入力欄からフォーカスが外れたときなどに呼ぶ
     public func flushLearning() {
         guard learningType == .inputAndOutput else { return }
+        restoreLearningConfig(converter)
+        converter.stopComposition()
         converter.commitUpdateLearningData()
     }
+
+    /// azooKey は学習の設定を変換器に 1 つだけ持ち，変換を求めるたびにその要求の設定で上書きする．学習を使わない要求
+    /// (plausibility・語の区切り・辞書の候補)のあとに学習を書くと，「学習しない」設定のまま捨てられ，ファイルにも書き出されない
+    /// (確定した語が次の変換で上に来ない)．学習を書く・忘れる・書き出す前に，今の学習の設定で 1 文字の軽い要求を通して設定を戻す
+    fileprivate func restoreLearningConfig(_ converter: KanaKanjiConverter) {
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(Self.learningConfigReading, inputStyle: .direct)
+        var options = options(leftContext: nil, usesZenzai: false, candidateCount: 1)
+        options.textReplacer = .empty
+        options.specialCandidateProviders = []
+        options.typoCorrectionMode = .disabled
+        _ = converter.requestCandidates(composing, options: options)
+    }
+
+    private static let learningConfigReading = "あ"
 
     /// 学んだことをすべて消す
     public func resetLearning() {
@@ -514,8 +531,15 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     }
 
     func didCommit(_ candidate: HajimeDomain.Candidate) {
-        guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else { return }
+        guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else {
+            // つないだ候補は，元の語(エンジンの候補)を学ぶ
+            learn(candidate.learnedParts.compactMap { part in
+                if case .engine(let id) = part.origin { engineCandidates[id] } else { nil }
+            })
+            return
+        }
         let learns = !learningSuspended
+        if learns { restoreLearningConfig() }
         _ = engine.withSession(sessionID) { converter in
             converter.setCompletedData(engineCandidate)
             if learns { converter.updateLearningData(engineCandidate) }
@@ -525,14 +549,33 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         cache = [:]
     }
 
+    private func learn(_ parts: [KanaKanjiConverterModule.Candidate]) {
+        guard !parts.isEmpty, !learningSuspended else { return }
+        restoreLearningConfig()
+        _ = engine.withSession(sessionID) { converter in parts.forEach(converter.updateLearningData) }
+        committedInComposition.append(contentsOf: parts)
+        cache = [:]
+    }
+
+    /// 学習の設定を戻す(AzooKeyConverterEngine.restoreLearningConfig)．表示の変換の状態を捨てないよう，採点用の変換器で行う
+    private func restoreLearningConfig() {
+        _ = engine.withSession(scoringSessionID) { converter in
+            converter.stopComposition()
+            defer { converter.stopComposition() }
+            engine.restoreLearningConfig(converter)
+        }
+    }
+
     func forget(_ candidate: HajimeDomain.Candidate) {
         guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else { return }
+        restoreLearningConfig()
         _ = engine.withSession(sessionID) { $0.forgetMemory(engineCandidate) }
         cache = [:]
     }
 
     func forget(_ candidate: HajimeDomain.Candidate, readingRange range: Range<Int>) {
         guard case .engine(let id) = candidate.origin, var engineCandidate = engineCandidates[id] else { return }
+        restoreLearningConfig()
         // 読みの range に掛かる語だけを残す(語の読みはカタカナで，字の数はひらがなの読みと同じ)
         var start = 0
         engineCandidate.data = engineCandidate.data.filter { element in

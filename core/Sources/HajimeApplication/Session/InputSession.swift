@@ -1120,7 +1120,7 @@ public final class InputSession {
             if lattice.segments.count == 1, let id = lattice.segments[0].selected.commandID {
                 return commandActions(id: id)
             }
-            for segment in lattice.segments where segment.selected.isFromEngine {
+            for segment in lattice.segments where segment.selected.isLearnable {
                 converter.didCommit(segment.selected)
             }
             // 選び直した文節は，確定したときに第 1 候補でないもので数える(触って元に戻したものは数えない)
@@ -1863,7 +1863,7 @@ public final class InputSession {
     private func commitFirstSegment(context: InputContext) -> KeyResult {
         guard case .lattice(var lattice) = phase, lattice.segments.count > 1 else { return KeyResult(handled: true, actions: commitAll()) }
         let first = lattice.segments.removeFirst()
-        if first.selected.isFromEngine { converter.didCommit(first.selected) }
+        if first.selected.isLearnable { converter.didCommit(first.selected) }
         usage?.record(.committed(changedSegments: first.choice == .candidate(0) ? 0 : 1, viaConversion: true))
         composition.dropReadingPrefix(first.readingLength)
         for index in lattice.segments.indices { lattice.segments[index].readingStart -= first.readingLength }

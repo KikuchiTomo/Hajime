@@ -223,6 +223,7 @@ func run() -> Int32 {
             _ = command
             #endif
         },
+        flushLearning: { [engine] in engine.flushLearning() },
         log: { message in
             #if os(Windows)
             EngineProcess.debugLog(message)

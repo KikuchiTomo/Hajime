@@ -77,6 +77,9 @@ public struct Candidate: Sendable, Equatable {
     public var trailingWord: TrailingWord?
     /// 候補を作る語の並び(エンジンが語の区切りを教えるときだけ)．文節に分けるのに使う(ClauseSplitter)
     public var words: [Word]
+    /// 確定したときに代わりに学習する元の語(エンジンの候補)．先頭の語を選び直して残りをつないだ候補(origin が combined)は，
+    /// それ自体はエンジンの候補でないので，元の語を学ぶ(「にちじを」で 日児を を選んだら 日児 を学ぶ)
+    public var learnedParts: [Candidate] = []
 
     public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0, trailingWord: TrailingWord? = nil, words: [Word] = []) {
         self.text = text
@@ -91,6 +94,9 @@ public struct Candidate: Sendable, Equatable {
     public var isFromEngine: Bool {
         if case .engine = origin { true } else { false }
     }
+
+    /// 確定したときに学習に渡すものがあるか(エンジンの候補か，学習する元の語を持つ)
+    public var isLearnable: Bool { isFromEngine || learnedParts.contains(where: \.isFromEngine) }
 
     /// コマンドの候補なら，そのコマンドの id
     public var commandID: String? {

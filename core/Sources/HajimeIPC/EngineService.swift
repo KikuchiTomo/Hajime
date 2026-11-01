@@ -107,13 +107,17 @@ public final class EngineService {
     /// 候補ウィンドウでマウスで押した候補(押したときに出ていたセッションと対象)
     private var chosen: (session: UInt32, target: WirePointerTarget)?
 
+    /// 学んだことをファイルに書き出す(AzooKeyConverterEngine.flushLearning)
+    private let flushLearning: () -> Void
+
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
-                log: @escaping (String) -> Void = { _ in }) {
+                flushLearning: @escaping () -> Void = {}, log: @escaping (String) -> Void = { _ in }) {
         self.runCommand = runCommand
+        self.flushLearning = flushLearning
         self.services = services
         self.log = log
         self.typoService = typoService
@@ -254,6 +258,8 @@ public final class EngineService {
             ui(.hide)
             // 入力先から外れたら手書きの窓も閉じる．選んだ文字が別の入力欄に入らないように
             closeHandwriting(ofSession: session)
+            // 入力欄から外れたら，学んだことをファイルに書き出す(macOS の入力コントローラの deactivateServer と同じ)
+            flushLearning()
             return edit(actions, handled: true, session: session, anchor: lastAnchor)
         case .wake(let session, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
