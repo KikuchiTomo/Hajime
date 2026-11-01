@@ -92,6 +92,19 @@ enum GlassDrawing {
         return hints.map { hintWidth($0, theme: theme) }.reduce(0, +) + Glass.hintGap * CGFloat(hints.count - 1)
     }
 
+    /// 幅に収まるだけの案内(先頭から)．窓の幅に上限があるので(長い文)，入らない案内は後ろから省く
+    static func hints(_ hints: [KeyHint], fitting width: CGFloat, theme: ResolvedTheme) -> [KeyHint] {
+        var used: CGFloat = 0
+        var result: [KeyHint] = []
+        for hint in hints {
+            let next = used + (result.isEmpty ? 0 : Glass.hintGap) + hintWidth(hint, theme: theme)
+            guard next <= width else { break }
+            used = next
+            result.append(hint)
+        }
+        return result
+    }
+
     /// キーキャップの札とその説明を左から並べる．キーは文字ではなく SF Symbols のアイコンで描く(KeyHint.Part)．
     /// 札の形はテーマに合わせる: 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
     static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {

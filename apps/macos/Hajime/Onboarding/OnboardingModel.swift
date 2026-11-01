@@ -7,7 +7,11 @@ import SwiftUI
 @MainActor
 final class OnboardingModel: ObservableObject {
     @Published var draft: HajimeDomain.Settings
-    @Published var page = OnboardingPage.allCases[0]
+    @Published var page = OnboardingPage.allCases[0] {
+        didSet { if page != oldValue { spotlight = OnboardingSpotlight.items(on: page).first } }
+    }
+    /// 機能のページで，左の実演と説明に見せている機能(項目の上にポインタを置いたもの)．ほかのページでは nil
+    @Published var spotlight: OnboardingSpotlight?
 
     private let store: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "onboarding")
@@ -78,5 +82,9 @@ final class OnboardingModel: ObservableObject {
         settings.calculation = draft.calculation
         settings.postalCodeConversion = draft.postalCodeConversion
         settings.dateConversion = draft.dateConversion
+        // 試験的な機能(既定ではオフ)．ここで写さないと，初期設定でオンにしても保存されない
+        for spotlight in OnboardingSpotlight.allCases {
+            settings[keyPath: spotlight.setting] = draft[keyPath: spotlight.setting]
+        }
     }
 }

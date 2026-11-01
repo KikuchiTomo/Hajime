@@ -50,6 +50,16 @@ enum SnapshotRenderer {
                 render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
+        // 長い文: 窓は幅の上限に収め，一覧は末尾を省き，分岐図は注目している文節が見えるように幹をずらす
+        for look in looks where ["glass-dark", "platinum"].contains(look.name) {
+            let appearance = NSAppearance(named: look.appearance)
+            (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
+                for focus in [0, 6, 13] {
+                    render(longLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-long-\(focus)-\(look.name)", to: output, appearance: appearance)
+                }
+                render(longListView(theme: look.theme, appearance: appearance), name: "list-long-\(look.name)", to: output, appearance: appearance)
+            }
+        }
         for (appearance, name) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
             let look = NSAppearance(named: appearance)
             (look ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
@@ -374,6 +384,40 @@ enum SnapshotRenderer {
                 print("押した位置の確かめ(\(name)・\(view === branch ? "分岐図" : "一覧")): \(ok ? "ok" : "合わない \(found)")")
             }
         }
+    }
+
+    private static let longSentence = ["今日は", "朝から", "とても", "良い", "天気だったので", "近所の", "公園まで", "散歩に", "出かけて", "久しぶりに",
+                                       "友達と", "ゆっくり", "話を", "しました"]
+
+    /// 幅の上限を超える長い文の分岐図．focus の文節に注目する
+    private static func longLatticeView(theme: ThemeChoice, appearance: NSAppearance?, focus: Int) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        view.maximumWidth = DesignTokens.Size.Candidate.maxWidth
+        // 前の文節から順に注目を移したときの幹のずれを再現する
+        for index in 0...focus {
+            view.panel = LatticePanel(columns: longSentence.enumerated().map { column, text in
+                column == index ? .init(text: text, alternatives: [text, text + "候補", "ひらがなの" + text], selectedAlternative: 0, isFocused: true, isUncertain: false)
+                    : .init(text: text, isFocused: false, isUncertain: false)
+            }, position: 1, total: 3)
+        }
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: view.panel!))
+        return backdropped(view)
+    }
+
+    /// 幅の上限を超える長い文の一覧
+    private static func longListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let sentence = longSentence.joined()
+        let entries = [sentence, sentence.replacingOccurrences(of: "話", with: "噺"), "短い候補"]
+        let panel = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 0, focus: .candidate, position: 1, total: entries.count, note: nil)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
     }
 
     private static func latticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {

@@ -14,6 +14,8 @@ final class CandidatePanelController {
     /// 前に出した一覧と分岐図．あとから届いた候補で中身だけが変わったか(選んでいるものは同じか)を見分ける
     private var shownList: CandidatePanel?
     private var shownLattice: LatticePanel?
+    /// 窓を入力位置の上と下のどちらに置いているか．出しているあいだは同じ側に保ち，隠したら決め直す
+    private var side: PanelPlacement.Side?
 
     /// 候補をマウスで押したときに知らせる先．押した対象(PointerTarget)を渡す
     var onChoose: ((PointerTarget) -> Void)? {
@@ -33,6 +35,7 @@ final class CandidatePanelController {
         view.keys = keys
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
+        view.maximumWidth = Self.maximumWidth(caret: caret)
         // 選んでいる候補が同じまま中身が変わったときは，あとから届いた候補なので重ねて変える(選び直しはすぐ見せる)
         let arrived = shownList.map { $0 != panel && $0.selectedEntry == panel.selectedEntry && $0.focus == panel.focus } ?? false
         shownList = panel
@@ -47,6 +50,7 @@ final class CandidatePanelController {
         branchView.showsHints = showsHints
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
+        branchView.maximumWidth = Self.maximumWidth(caret: caret)
         let arrived = shownLattice.map { shown in
             shown != panel && shown.columns.map(\.text) == panel.columns.map(\.text)
                 && shown.columns.firstIndex(where: \.isFocused) == panel.columns.firstIndex(where: \.isFocused)
@@ -61,14 +65,24 @@ final class CandidatePanelController {
         }
     }
 
+    /// 窓の幅の上限．トークンの上限と，入力位置がある画面の幅(左右に余白を空ける)の狭い方
+    private static func maximumWidth(caret: NSRect) -> CGFloat {
+        let screen = FloatingPanel.visibleFrame(for: caret).width - DesignTokens.Size.Candidate.screenMargin * 2
+        return min(DesignTokens.Size.Candidate.maxWidth, screen)
+    }
+
     /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．
     /// 出ている窓の大きさが変わるときは縁を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
     /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)
     private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false) {
         let glass = theme.isRounded
         backdrop.cornerRadius = theme.cornerRadius
+        // 一覧と分岐図を切り替えたときも，窓が出たままなら同じ側に置く
+        let wasOnScreen = window.isVisible
         let wasVisible = FloatingPanel.attach(content, to: window, backdrop: glass ? backdrop : nil)
-        let frame = NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size)
+        let placed = FloatingPanel.place(size, caret: caret, keeping: wasOnScreen ? side : nil)
+        side = placed.side
+        let frame = NSRect(origin: placed.origin, size: size)
         if wasVisible, crossfades, let root = window.contentView {
             root.wantsLayer = true
             let transition = CATransition()
@@ -106,6 +120,7 @@ final class CandidatePanelController {
         lastAnnounced = nil
         shownList = nil
         shownLattice = nil
+        side = nil
         window.orderOut(nil)
     }
 
@@ -188,15 +203,31 @@ enum FloatingPanel {
 
     /// 入力位置の行の長方形から，ウィンドウの左下の座標を決める．規則は core の PanelPlacement
     static func origin(for size: NSSize, caret: NSRect) -> NSPoint {
-        // 入力位置を教えないアプリでは，マウスの位置の近くに出す
-        let anchor = caret == .zero ? NSRect(origin: NSEvent.mouseLocation, size: .zero) : caret
+        place(size, caret: caret, keeping: nil).origin
+    }
+
+    /// 入力位置を教えないアプリでは，マウスの位置の近くに出す
+    private static func anchor(for caret: NSRect) -> NSRect {
+        caret == .zero ? NSRect(origin: NSEvent.mouseLocation, size: .zero) : caret
+    }
+
+    /// 入力位置がある画面の，使える範囲
+    static func visibleFrame(for caret: NSRect) -> NSRect {
+        let anchor = anchor(for: caret)
         let screen = NSScreen.screens.first { $0.frame.contains(anchor.origin) } ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let origin = PanelPlacement.origin(
+        return screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+    }
+
+    /// 前に置いた側(keeping)をなるべく保って置く(PanelPlacement.place)
+    static func place(_ size: NSSize, caret: NSRect, keeping side: PanelPlacement.Side?) -> (origin: NSPoint, side: PanelPlacement.Side) {
+        let anchor = anchor(for: caret)
+        let visible = visibleFrame(for: caret)
+        let placed = PanelPlacement.place(
             caret: Rect(x: anchor.minX, y: anchor.minY, width: anchor.width, height: anchor.height),
             size: Rect(x: 0, y: 0, width: size.width, height: size.height),
-            screen: Rect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height)
+            screen: Rect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height),
+            keeping: side
         )
-        return NSPoint(x: origin.x.rounded(), y: origin.y.rounded())
+        return (NSPoint(x: placed.x.rounded(), y: placed.y.rounded()), placed.side)
     }
 }

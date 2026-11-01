@@ -18,6 +18,8 @@ final class CandidateView: NSView {
     var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
     /// glass の面を自分で塗るか．ぼかしの地(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
+    /// 窓の幅の上限．長い文の候補は末尾を「…」で省いてこの幅に収める(CandidatePanelController が画面の幅から決める)
+    var maximumWidth = DesignTokens.Size.Candidate.maxWidth { didSet { needsDisplay = true } }
 
     override var isFlipped: Bool { true }
 
@@ -52,7 +54,8 @@ final class CandidateView: NSView {
         let contentWidth = max(Size.minWidth, lead + entryWidth + Size.paddingX * 2, variantsWidth + Size.paddingX * 2, footerWidth, headingWidth)
         var height = CGFloat(panel.entries.count) * rowHeight + sectionHeight + Size.frameWidth
         if !panel.variants.isEmpty || panel.association != nil { height += sectionHeight + Size.frameWidth }
-        return NSSize(width: (contentWidth + inset * 2 + dropShadowOffset).rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
+        let width = min(contentWidth + inset * 2 + dropShadowOffset, max(maximumWidth, Size.minWidth))
+        return NSSize(width: width.rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
     }
 
     // MARK: - 押した位置
@@ -195,8 +198,16 @@ final class CandidateView: NSView {
             drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
             textX = rect.minX + Size.paddingX + lead
         }
-        drawText(entry.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: textX, in: rect)
-        if let corrected = entry.corrected {
+        let annotationWidth = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
+        let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: textColor]
+        let available = rect.maxX - Size.paddingX - annotationWidth - textX
+        // 長い文の候補は，ほかの候補と違うところの少し手前から見せる(頭が同じ文が並ぶので，末尾を省くと見分けられない)
+        let shared = entry.text.count > Int(available / max(candidateFont.pointSize, 1))
+            ? max(TextFitting.sharedPrefixLength(of: entry.text, among: panel.entries.map(\.text)) - Int(DesignTokens.Size.Candidate.truncationContext), 0) : 0
+        let shown = TextFitting.truncated(entry.text, attributes: textAttributes, width: available, keeping: shared)
+        drawText(shown, attributes: textAttributes, x: textX, in: rect)
+        // 省いたときは下線を引く範囲を，見えている文字(「…」を除く)までにする
+        if let corrected = entry.corrected, shown == entry.text {
             // 打ち間違いを直した語句に，入力中の文字と同じ補正の点線の下線を引く．選んでいる行は選択の文字の色にする
             let characters = Array(entry.text)
             let start = min(corrected.lowerBound, characters.count), end = min(corrected.upperBound, characters.count)

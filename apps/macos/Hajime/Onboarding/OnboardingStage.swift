@@ -7,13 +7,17 @@ import SwiftUI
 struct OnboardingStage: NSViewRepresentable {
     let page: OnboardingPage
     let settings: HajimeDomain.Settings
+    var spotlight: OnboardingSpotlight?
 
     func makeNSView(context: Context) -> DemoStageView {
         DemoStageView()
     }
 
     func updateNSView(_ view: DemoStageView, context: Context) {
-        view.play(DemoScripts.frames(for: page, settings: settings), settings: settings)
+        // 台本は時刻を含むことがある(日付の実演)ので，ページ・見せている機能・設定が変わったときだけ作り直す
+        let key = "\(page.rawValue)-\(spotlight?.rawValue ?? -1)"
+        guard view.needsReplay(key: key, settings: settings) else { return }
+        view.play(DemoScripts.frames(for: page, settings: settings, spotlight: spotlight), settings: settings, key: key)
     }
 }
 
@@ -51,9 +55,16 @@ final class DemoStageView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    /// 台本を始める．同じ台本と設定なら，続きから流す
-    func play(_ frames: [DemoFrame], settings: HajimeDomain.Settings) {
-        guard frames != self.frames || settings != self.settings else { return }
+    private var key = ""
+
+    /// ページ・見せている機能(key)か設定が変わり，台本を始め直すか
+    func needsReplay(key: String, settings: HajimeDomain.Settings) -> Bool {
+        key != self.key || settings != self.settings
+    }
+
+    /// 台本を始める
+    func play(_ frames: [DemoFrame], settings: HajimeDomain.Settings, key: String) {
+        self.key = key
         self.frames = frames
         self.settings = settings
         timer?.invalidate()

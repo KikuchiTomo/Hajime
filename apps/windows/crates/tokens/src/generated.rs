@@ -249,6 +249,9 @@ pub mod size {
         pub const SECTION_PADDING_Y: f32 = 3.0;
         pub const MIN_WIDTH: f32 = 180.0;
         pub const VARIANT_INSET_Y: f32 = 1.0;
+        pub const MAX_WIDTH: f32 = 720.0;
+        pub const SCREEN_MARGIN: f32 = 16.0;
+        pub const TRUNCATION_CONTEXT: f32 = 4.0;
     }
     pub mod mode_indicator {
         pub const FONT_SIZE: f32 = 14.0;

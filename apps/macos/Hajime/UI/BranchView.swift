@@ -20,7 +20,22 @@ final class BranchView: NSView {
     private typealias Branch = DesignTokens.Size.Branch
     private typealias Glass = DesignTokens.Size.Glass
 
-    var panel: LatticePanel? { didSet { needsDisplay = true } }
+    var panel: LatticePanel? {
+        didSet {
+            updateTrunkOffset()
+            needsDisplay = true
+        }
+    }
+    /// 窓の幅の上限(CandidatePanelController が画面の幅から決める)．幹がこれより長い文では，幹を横にずらして注目している文節を見せる
+    var maximumWidth = DesignTokens.Size.Candidate.maxWidth {
+        didSet {
+            updateTrunkOffset()
+            needsDisplay = true
+        }
+    }
+    /// 幹が窓に収まらないときに，幹を左へずらす量．注目している文節が窓から出るときだけ，出ない分だけずらす
+    /// (文節を移るたびに幹が動かないよう，入る限り前の量を保つ)
+    private var trunkOffset: CGFloat = 0
     /// 足元の案内に出すキーの割り当て
     var keys = KeymapPreset.standard.keymap { didSet { needsDisplay = true } }
     /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
@@ -81,6 +96,11 @@ final class BranchView: NSView {
         var trunkY: CGFloat
         var branchWidth: CGFloat
         var size: NSSize
+        /// 幹をずらしたとき，文字を描いてよい左右の範囲(窓の内側)．ずらしていなければ nil
+        var clip: ClosedRange<CGFloat>? = nil
+        /// 幹の右端(ずらす前)と，注目している文節の左右の端(ずらす前．枝を含む)
+        var trunkRight: CGFloat = 0
+        var focusSpan: ClosedRange<CGFloat>? = nil
     }
 
     private func textWidth(_ text: String, font: NSFont) -> CGFloat {
@@ -92,7 +112,8 @@ final class BranchView: NSView {
         NoteDrawing.tagWidth(UIStrings.Branch.corrected, theme: theme) + Size.paddingX / 2
     }
 
-    private func layout(for panel: LatticePanel) -> Layout {
+    /// offset を渡さなければ，今の幹のずれ(trunkOffset)を使う
+    private func layout(for panel: LatticePanel, offset: CGFloat? = nil) -> Layout {
         let metrics = metrics
         var x = metrics.inset
         var trunkX: [CGFloat] = []
@@ -121,14 +142,49 @@ final class BranchView: NSView {
         let note = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) }]
             .compactMap { $0.map { $0 + Size.paddingX * 2 } }.max() ?? 0
         let heading = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + metrics.inset * 2 } ?? 0
-        let width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2, heading)
+        var width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2, heading)
+        let focusSpan = focused.map { trunkX[$0]...max(trunkX[$0] + trunkWidths[$0], branchRight) }
+        var shiftedX = trunkX
+        var shownBranchWidth = branchWidth
+        var clip: ClosedRange<CGFloat>?
+        let limit = max(maximumWidth, Size.minWidth)
+        if width > limit {
+            // 長い文は窓を画面に収め，幹をずらして注目している文節と枝を見せる
+            let offset = min(max(offset ?? trunkOffset, 0), max(max(trunkRight, branchRight) + metrics.inset - limit, 0))
+            shiftedX = trunkX.map { $0 - offset }
+            width = limit
+            let right = limit - metrics.inset
+            if let focused { shownBranchWidth = max(min(branchWidth, right - shiftedX[focused]), 0) }
+            clip = metrics.inset...right
+        }
         let trunkY = metrics.inset + headingHeight(panel) + CGFloat(upperRows) * metrics.rowHeight
         let height = trunkY + metrics.rowHeight * CGFloat(1 + lowerRows) + Size.frameWidth + metrics.footerHeight
             + (column?.usageNote == nil ? 0 : metrics.footerHeight)
             + (panel.note == nil ? 0 : metrics.footerHeight)
             + (theme.isRounded ? 0 : metrics.inset)
-        return Layout(trunkX: trunkX, trunkWidths: trunkWidths, lowerRows: lowerRows, trunkY: trunkY,
-                      branchWidth: branchWidth, size: NSSize(width: width.rounded(.up), height: height.rounded(.up)))
+        return Layout(trunkX: shiftedX, trunkWidths: trunkWidths, lowerRows: lowerRows, trunkY: trunkY,
+                      branchWidth: shownBranchWidth, size: NSSize(width: width.rounded(.up), height: height.rounded(.up)),
+                      clip: clip, trunkRight: trunkRight, focusSpan: focusSpan)
+    }
+
+    /// 注目している文節(枝を含む)が窓の内側に入るよう，幹をずらす量を決め直す．入っていれば前の量のまま
+    private func updateTrunkOffset() {
+        guard let panel else {
+            trunkOffset = 0
+            return
+        }
+        let natural = layout(for: panel, offset: 0)
+        guard natural.clip != nil, let span = natural.focusSpan else {
+            trunkOffset = 0
+            return
+        }
+        let inset = metrics.inset
+        let visible = max(maximumWidth, Size.minWidth) - inset * 2
+        var offset = trunkOffset
+        // 左に出たら左端に，右に出たら右端にそろえる．枝が窓より広いときは文節の左端を優先する
+        if span.upperBound - offset > inset + visible { offset = span.upperBound - inset - visible }
+        if span.lowerBound - offset < inset { offset = span.lowerBound - inset }
+        trunkOffset = max(offset, 0)
     }
 
     /// 連想の一覧の見出しの行の高さ(区切りの線を含む)．連想でなければ 0
@@ -204,8 +260,12 @@ final class BranchView: NSView {
         let focusedIndex = panel.columns.firstIndex(where: \.isFocused)
         // 注目している文節の枝が重なる範囲には，ほかの文節の添え書きを描かない
         let branchRange = focusedIndex.map { layout.trunkX[$0]...(layout.trunkX[$0] + layout.branchWidth) }
+        // 幹をずらしたときは，窓の内側の外に出た文節を描かない(窓の縁に重ねない)
+        NSGraphicsContext.saveGraphicsState()
+        if let clip = layout.clip { NSRect(x: clip.lowerBound, y: 0, width: clip.upperBound - clip.lowerBound, height: body.height).clip() }
         for (index, column) in panel.columns.enumerated() {
             let node = NSRect(x: layout.trunkX[index], y: layout.trunkY, width: layout.trunkWidths[index], height: metrics.rowHeight)
+            if let clip = layout.clip, node.maxX < clip.lowerBound || node.minX > clip.upperBound { continue }
             drawTrunkNode(column, in: node)
             if !theme.isRounded, index < panel.columns.count - 1 {
                 // glass は文節の間を空けるだけにし，文として読めるようにする
@@ -221,6 +281,7 @@ final class BranchView: NSView {
                 drawPreview(preview, under: node, maxX: limit)
             }
         }
+        NSGraphicsContext.restoreGraphicsState()
         var footerY = layout.trunkY + metrics.rowHeight * CGFloat(1 + layout.lowerRows)
         if let note = panel.columns.first(where: \.isFocused)?.usageNote {
             let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)
@@ -434,17 +495,7 @@ final class BranchView: NSView {
             textX = stemX + metrics.branchIndent / 2 + Size.paddingX / 2
         }
         let attributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: color]
-        drawText(Self.truncated(text, attributes: attributes, width: maxX - textX), attributes: attributes, x: textX, in: row)
-    }
-
-    /// 幅に収まるよう末尾を「…」で省く
-    private static func truncated(_ text: String, attributes: [NSAttributedString.Key: Any], width: CGFloat) -> String {
-        guard text.size(withAttributes: attributes).width > width else { return text }
-        var characters = Array(text)
-        while !characters.isEmpty, (String(characters) + "…").size(withAttributes: attributes).width > width {
-            characters.removeLast()
-        }
-        return characters.isEmpty ? "" : String(characters) + "…"
+        drawText(TextFitting.truncated(text, attributes: attributes, width: maxX - textX), attributes: attributes, x: textX, in: row)
     }
 
     // MARK: - 足元
@@ -477,16 +528,20 @@ final class BranchView: NSView {
         }
         let footer = NSRect(x: metrics.inset, y: y + Size.frameWidth, width: width - metrics.inset * 2, height: metrics.footerHeight)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
+        let position = showsPosition(panel) ? position(of: panel) : ""
+        // 右の位置と辞書の名前，連想の知らせを先に取り，残りの幅に入るキーの案内だけを出す
+        let reserved = footerWidth(panel) - (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0)
+            + (position.isEmpty ? 0 : textWidth(position, font: labelFont) + Size.paddingX)
         var hintsEnd = footer.minX
         if showsHints {
-            GlassDrawing.drawHints(hints, x: footer.minX, midY: footer.midY, theme: theme)
-            hintsEnd += GlassDrawing.hintsWidth(hints, theme: theme) + Size.paddingX
+            let shown = GlassDrawing.hints(hints, fitting: footer.width - reserved, theme: theme)
+            GlassDrawing.drawHints(shown, x: footer.minX, midY: footer.midY, theme: theme)
+            if !shown.isEmpty { hintsEnd += GlassDrawing.hintsWidth(shown, theme: theme) + Size.paddingX }
         }
         if let hint = panel.associationHint {
             // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
             drawText(hint, attributes: muted, x: hintsEnd, in: footer)
         }
-        let position = showsPosition(panel) ? position(of: panel) : ""
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
         if let source = panel.columns.first(where: \.isFocused)?.sourceName {
             // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を位置の左に小さく出す(R-16)

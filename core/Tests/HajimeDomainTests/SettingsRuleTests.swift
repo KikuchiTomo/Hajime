@@ -197,6 +197,31 @@ struct PanelPlacementTests {
         let origin = PanelPlacement.origin(caret: Rect(x: 950, y: 500, width: 2, height: 20), size: size, screen: screen)
         #expect(origin.x == 800)
     }
+
+    @Test("一度上に移ったら，窓が低くなって下に入るようになっても上のまま")
+    func staysAbove() {
+        // 下に 100 しか空いていないので，高さ 150 の窓は上に置く．高さ 80 なら下に入るが，上のまま
+        let caret = Rect(x: 100, y: 100, width: 2, height: 20)
+        let tall = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: .below)
+        #expect(tall.side == .above)
+        let short = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 200, height: 80), screen: screen, keeping: tall.side)
+        #expect(short.side == .above)
+        #expect(short.y == caret.maxY + PanelPlacement.gap)
+    }
+
+    @Test("下に置いているあいだは，入る限り下のまま")
+    func staysBelow() {
+        let caret = Rect(x: 100, y: 500, width: 2, height: 20)
+        let first = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: nil)
+        #expect(first.side == .below)
+        #expect(PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 200, height: 400), screen: screen, keeping: first.side).side == .below)
+    }
+
+    @Test("上に置いていて上に入らなければ下に戻す")
+    func returnsBelowWhenAboveIsFull() {
+        let caret = Rect(x: 100, y: 700, width: 2, height: 20)
+        #expect(PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: .above).side == .below)
+    }
 }
 
 @Suite("設定の読み込み")
