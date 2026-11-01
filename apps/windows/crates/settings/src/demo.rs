@@ -436,6 +436,7 @@ fn column(text: &str) -> BranchColumn {
         shorter: None,
         longer: None,
         usage_note: None,
+        homophone: None,
         alternative_notes: vec![],
         source_name: None,
         split: None,
@@ -505,6 +506,7 @@ fn list(entries: &[&str], selected: usize, association: Option<&str>) -> Popup {
             group_count: 1,
         }),
         association_hint: None,
+        homophone: None,
     })
 }
 

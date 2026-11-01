@@ -12,9 +12,12 @@ struct UsageDictionaryFileTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("data/usage/usage_dict.txt")
         let dictionary = try #require(UsageDictionaryFile(url: url).usageDictionary)
-        #expect(dictionary.note(for: "撮った", reading: "とった")?.hasPrefix("撮る: ") == true)
-        #expect(dictionary.note(for: "会う", reading: "あう")?.contains("ほかに") == true)
-        #expect(dictionary.note(for: "精算", reading: "せいさん")?.hasPrefix("精算: ") == true)
+        #expect(dictionary.note(for: "撮った", reading: "とった")?.word == "撮る")
+        // 説明の頭の注記(〈「取る」とも〉)は意味にしない
+        #expect(dictionary.note(for: "採る", reading: "とる")?.meaning == "(人を)採用する")
+        #expect(dictionary.note(for: "採る", reading: "とる")?.example == "新人を採る")
+        #expect(dictionary.note(for: "会う", reading: "あう")?.others.isEmpty == false)
+        #expect(dictionary.note(for: "精算", reading: "せいさん")?.word == "精算")
     }
 
     @Test("Mozc の辞書から作った辞書も続けて読み，元の辞書に無い読みの語に使い分けを示す")
@@ -25,8 +28,8 @@ struct UsageDictionaryFileTests {
         let base = usage.appendingPathComponent("usage_dict.txt")
         let extra = usage.appendingPathComponent("usage_dict_extra.tsv")
         let dictionary = try #require(UsageDictionaryFile(urls: [base, extra]).usageDictionary)
-        #expect(dictionary.note(for: "撮った", reading: "とった")?.hasPrefix("撮る: ") == true)
-        #expect(dictionary.note(for: "機械", reading: "きかい")?.contains("機会") == true)
+        #expect(dictionary.note(for: "撮った", reading: "とった")?.word == "撮る")
+        #expect(dictionary.note(for: "機械", reading: "きかい")?.others.contains("機会") == true)
         #expect(UsageDictionaryFile(url: base).usageDictionary?.note(for: "機械", reading: "きかい") == nil)
     }
 
@@ -36,7 +39,7 @@ struct UsageDictionaryFileTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("data/usage/usage_dict.txt")
         let dictionary = try #require(UsageDictionaryFile(urls: [URL(fileURLWithPath: "/nonexistent/usage_dict_extra.tsv"), url]).usageDictionary)
-        #expect(dictionary.note(for: "撮った", reading: "とった")?.hasPrefix("撮る: ") == true)
+        #expect(dictionary.note(for: "撮った", reading: "とった")?.word == "撮る")
     }
 
     @Test("無いファイルは nil")

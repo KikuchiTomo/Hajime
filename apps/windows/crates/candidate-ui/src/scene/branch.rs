@@ -174,6 +174,9 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
             .and_then(|column| column.usage_note.as_deref())
             .map(|text| painter.width(text, Font::Label)),
         map.note.as_ref().map(|note| painter.note_width(note)),
+        column
+            .and_then(|column| column.homophone.as_ref())
+            .map(|note| super::homophone::width(painter, note)),
     ]
     .into_iter()
     .flatten()
@@ -193,9 +196,15 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         metrics.inset + heading_height(map, metrics) + upper_rows as f32 * metrics.row_height;
     let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
         + usize::from(map.note.is_some());
+    let homophone_height = if column.is_some_and(|column| column.homophone.is_some()) {
+        super::homophone::height()
+    } else {
+        0.0
+    };
     let height = trunk_y
         + metrics.row_height * (1 + lower_rows) as f32
         + candidate::FRAME_WIDTH
+        + homophone_height
         + metrics.footer_height * (1 + extra_rows) as f32
         + if painter.theme.is_rounded() {
             0.0
@@ -358,6 +367,16 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     }
     let mut footer_y = layout.trunk_y + metrics.row_height * (1 + layout.lower_rows) as f32;
     let content_width = body.width - metrics.inset * 2.0;
+    if let Some(note) = focused(map).and_then(|(_, column)| column.homophone.as_ref()) {
+        let area = Frame::new(
+            metrics.inset,
+            footer_y,
+            content_width,
+            super::homophone::height(),
+        );
+        super::homophone::draw(&mut painter, note, area);
+        footer_y += super::homophone::height();
+    }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
         let row = Frame::new(
             metrics.inset,
@@ -810,6 +829,7 @@ mod tests {
             shorter: None,
             longer: None,
             usage_note: None,
+            homophone: None,
             alternative_notes: vec![None, Some("修正".into())],
             source_name: None,
             split: None,

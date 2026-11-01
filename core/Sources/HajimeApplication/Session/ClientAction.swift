@@ -139,6 +139,8 @@ public struct CandidatePanel: Sendable, Equatable {
     /// 窓の左端をそろえる，組み立て中の文字の位置(UTF-16 の数)．nil なら組み立て中の文字の頭．
     /// 打っているあいだに最後の文節だけの候補を出すときは，その文節の頭にそろえる
     public var anchor: Int?
+    /// 選んでいる候補の同音異義語の使い分け(R-08)．候補と足元のあいだに出す
+    public var homophone: HomophoneNote?
 
     public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: Note?) {
         self.variants = variants
@@ -177,8 +179,10 @@ public struct LatticePanel: Sendable, Equatable {
         /// 注目している文節を 1 文字短く・長くしたときの文節(足元に「⇧← 入れ　⇧→ 入れると」と見せる)
         public var shorter: String?
         public var longer: String?
-        /// 選んでいる候補の使い分けや誤用の注釈(R-08)
+        /// 選んでいる候補の誤用や文の直し方の注釈(R-08)
         public var usageNote: String?
+        /// 選んでいる候補の同音異義語の使い分け(R-08)
+        public var homophone: HomophoneNote?
         /// 下の枝の候補ごとの添え書き(alternatives と同じ数)．打ったままの候補は「入力のまま」，直した候補は「修正」
         public var alternativeNotes: [String?] = []
         /// 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前(分野)．足元に小さく出す(R-16)

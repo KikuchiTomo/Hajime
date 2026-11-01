@@ -354,6 +354,7 @@ impl ResolvedTheme {
                 font_size,
             ),
             Font::Label => (self.label_face(), Weight::Medium, label_size),
+            Font::Emphasis => (self.label_face(), Weight::Semibold, label_size),
             Font::Note => (
                 self.label_face(),
                 Weight::Medium,
@@ -453,6 +454,8 @@ pub enum Font {
     Trunk,
     /// 番号・案内・位置
     Label,
+    /// 案内の中で強める語(使い分けの語)．Label と同じ大きさで太い
+    Emphasis,
     /// 入力位置の下の案内(どのテーマでも glass の大きさ)
     Note,
     /// 番号の丸とキーキャップの中

@@ -1532,6 +1532,25 @@ extension WireAssociationHeading: CustomStringConvertible, CustomDebugStringConv
     public var debugDescription: String { description }
 }
 
+public struct WireHomophoneNote: Sendable, Equatable, Codable {
+    public var word: String
+    public var meaning: String
+    public var example: String?
+    public var others: [String]
+
+    public init(word: String, meaning: String, example: String? = nil, others: [String]) {
+        self.word = word
+        self.meaning = meaning
+        self.example = example
+        self.others = others
+    }
+}
+
+extension WireHomophoneNote: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireHomophoneNote" }
+    public var debugDescription: String { description }
+}
+
 public struct WireCandidateList: Sendable, Equatable, Codable {
     public var variants: [WireCandidateVariant]
     public var selectedVariant: UInt32?
@@ -1543,8 +1562,9 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var note: WireNote?
     public var association: WireAssociationHeading?
     public var associationHint: String?
+    public var homophone: WireHomophoneNote?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, homophone: WireHomophoneNote? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1555,6 +1575,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.note = note
         self.association = association
         self.associationHint = associationHint
+        self.homophone = homophone
     }
 }
 
@@ -1577,11 +1598,12 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var shorter: String?
     public var longer: String?
     public var usageNote: String?
+    public var homophone: WireHomophoneNote?
     public var alternativeNotes: [String?]
     public var sourceName: String?
     public var split: WireBranchSplit?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], sourceName: String? = nil, split: WireBranchSplit? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -1595,6 +1617,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.shorter = shorter
         self.longer = longer
         self.usageNote = usageNote
+        self.homophone = homophone
         self.alternativeNotes = alternativeNotes
         self.sourceName = sourceName
         self.split = split

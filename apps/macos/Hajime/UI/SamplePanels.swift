@@ -11,6 +11,9 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
     )
 
+    /// 同音異義語の使い分け(R-08)
+    static let homophone = HomophoneNote(word: "撮る", meaning: "撮影する", example: "写真を撮る", others: ["取る", "採る", "執る", "捕る"])
+
     static let lattice = LatticePanel(columns: [
         .init(text: "私の", isFocused: false, isUncertain: false),
         .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),

@@ -225,6 +225,10 @@ enum DesignTokens {
             static let tagRadius: CGFloat = 8
             static let noteIconSize: CGFloat = 18
             static let noteGap: CGFloat = 6
+            static let usageMaxWidth: CGFloat = 360
+            static let usageRowHeight: CGFloat = 22
+            static let usagePaddingY: CGFloat = 4
+            static let usageTagGap: CGFloat = 4
         }
         enum Handwriting {
             static let width: CGFloat = 284

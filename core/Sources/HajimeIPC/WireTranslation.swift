@@ -184,8 +184,15 @@ extension WireCandidateList {
             total: UInt32(clamping: panel.total),
             note: panel.note.map(WireNote.init),
             association: panel.association.map(WireAssociationHeading.init),
-            associationHint: panel.associationHint
+            associationHint: panel.associationHint,
+            homophone: panel.homophone.map(WireHomophoneNote.init)
         )
+    }
+}
+
+extension WireHomophoneNote {
+    public init(_ note: HomophoneNote) {
+        self.init(word: note.word, meaning: note.meaning, example: note.example, others: note.others)
     }
 }
 
@@ -214,6 +221,7 @@ extension WireBranchMap {
                     shorter: column.shorter,
                     longer: column.longer,
                     usageNote: column.usageNote,
+                    homophone: column.homophone.map(WireHomophoneNote.init),
                     alternativeNotes: column.alternativeNotes,
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) }

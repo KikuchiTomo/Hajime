@@ -337,6 +337,10 @@ pub mod size {
         pub const TAG_RADIUS: f32 = 8.0;
         pub const NOTE_ICON_SIZE: f32 = 18.0;
         pub const NOTE_GAP: f32 = 6.0;
+        pub const USAGE_MAX_WIDTH: f32 = 360.0;
+        pub const USAGE_ROW_HEIGHT: f32 = 22.0;
+        pub const USAGE_PADDING_Y: f32 = 4.0;
+        pub const USAGE_TAG_GAP: f32 = 4.0;
     }
     pub mod handwriting {
         pub const WIDTH: f32 = 284.0;
