@@ -101,8 +101,12 @@ fn render_all(output: &Path) -> Result<()> {
         let font_size = tokens::size::candidate::FONT_SIZE;
         let measure = renderer.measure(&theme, font_size)?;
         let look = Look::new(&theme, font_size);
-        let scenes: [(&str, Scene); 7] = [
+        let scenes: [(&str, Scene); 8] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
+            (
+                "homophone-list",
+                scene::candidate_list(&homophone_list(), &look, &measure),
+            ),
             (
                 "correction",
                 scene::candidate_list(&correction(), &look, &measure),
@@ -236,6 +240,7 @@ fn list() -> CandidateList {
     CandidateList {
         association: None,
         association_hint: None,
+        homophone: None,
         variants: variants(),
         selected_variant: None,
         entries: entries(&["変換", "返還", "偏官", "へんかん", "ヘンカン"]),
@@ -247,12 +252,31 @@ fn list() -> CandidateList {
     }
 }
 
+/// 同音異義語の使い分け(R-08)を一覧で出したところ(macOS の homophoneListView)
+fn homophone_list() -> CandidateList {
+    CandidateList {
+        variants: vec![],
+        entries: entries(&["撮る", "取る", "採る", "執る"]),
+        selected_entry: Some(0),
+        position: 1,
+        total: 6,
+        homophone: Some(ipc::HomophoneNote {
+            word: "撮る".into(),
+            meaning: "撮影する".into(),
+            example: Some("写真を撮る".into()),
+            others: strings(&["取る", "採る", "執る", "捕る"]),
+        }),
+        ..list()
+    }
+}
+
 fn correction() -> CandidateList {
     let mut entries = entries(&["python", "pyてょn", "Python"]);
     entries[1].annotation = Some("入力のまま".into());
     CandidateList {
         association: None,
         association_hint: None,
+        homophone: None,
         variants: variants(),
         selected_variant: None,
         entries,
@@ -286,6 +310,7 @@ fn column(text: &str) -> BranchColumn {
         shorter: None,
         longer: None,
         usage_note: None,
+        homophone: None,
         alternative_notes: vec![],
         source_name: None,
         split: None,

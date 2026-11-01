@@ -48,6 +48,8 @@ enum SnapshotRenderer {
                 render(modeView(theme: look.theme, appearance: appearance), name: "mode-\(look.name)", to: output, appearance: appearance)
                 render(associationListView(theme: look.theme, appearance: appearance), name: "association-list-\(look.name)", to: output, appearance: appearance)
                 render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
+                render(homophoneListView(theme: look.theme, appearance: appearance), name: "homophone-list-\(look.name)", to: output, appearance: appearance)
+                render(homophoneBranchView(theme: look.theme, appearance: appearance), name: "homophone-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
         // 長い文: 窓は幅の上限に収め，一覧は末尾を省き，分岐図は注目している文節が見えるように幹をずらす
@@ -483,6 +485,33 @@ enum SnapshotRenderer {
             .init(text: "景色", isFocused: false, isUncertain: false),
         ], position: 1, total: 4)
         panel.association = AssociationHeading(headword: "美しい", label: "見た目が快い", group: 1, groupCount: 3)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 同音異義語の使い分け(R-08)を一覧で出したところ
+    private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["撮る", "取る", "採る", "執る"].map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 0, focus: .candidate, position: 1, total: 6, note: nil)
+        panel.homophone = SamplePanels.homophone
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 同音異義語の使い分けを分岐図で出したところ．意味が長く，欄の幅の上限で省く
+    private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var column = LatticePanel.Column(text: "取る", alternatives: ["取る", "撮る", "採る"], selectedAlternative: 0, isFocused: true, isUncertain: true)
+        column.homophone = HomophoneNote(word: "取る", meaning: "手でつかむ。自分のものにする。確保する。なくす。取り除く。さまざまな単語と組み合わせて使う",
+                                         example: "ボールを取る", others: ["撮る", "採る", "執る", "捕る", "摂る", "盗る", "録る"])
+        let panel = LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

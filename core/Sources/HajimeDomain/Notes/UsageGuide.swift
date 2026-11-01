@@ -3,10 +3,42 @@
 ///
 /// - 同音異義語: 同じ読みで意味の違う語の使い分け(「撮る」写真や動画を写す，など)．既定で出す
 /// - 誤用: 本来とは違う形で広まっている言い回し(「汚名挽回」→「汚名返上」「名誉挽回」)．既定では出さない
+/// 同音異義語の使い分けの注釈．候補の窓は語・意味・ほかの語を描き分ける(語を強く，意味を控えめに，ほかの語を札に)
+public struct HomophoneNote: Sendable, Equatable {
+    /// 選んでいる候補に当たる語(「撮る」)
+    public var word: String
+    /// その語の意味(句点を除く)
+    public var meaning: String
+    /// 使い方の例(「写真を撮る」．かぎ括弧を除く)．無ければ nil
+    public var example: String?
+    /// 同じ読みのほかの語(「取る」「採る」)
+    public var others: [String]
+
+    public init(word: String, meaning: String, example: String? = nil, others: [String]) {
+        self.word = word
+        self.meaning = meaning
+        self.example = example
+        self.others = others
+    }
+
+    /// 1 行の文にしたもの(読み上げなど)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」
+    public var text: String {
+        let example = example.map { "。例「\($0)」" } ?? ""
+        return "\(word): \(meaning)\(example)　ほかに \(others.joined(separator: "・"))"
+    }
+}
+
+extension HomophoneNote: CustomStringConvertible, CustomDebugStringConvertible {
+    // 語は入力内容なので，ログには数だけを出す
+    public var description: String { "HomophoneNote(others: \(others.count))" }
+    public var debugDescription: String { description }
+}
+
 public enum UsageGuide {
     public struct Homophone: Sendable, Equatable {
         public var word: String
         public var meaning: String
+        public var example: String?
 
         /// 語の漢字の部分(送り仮名を除いたもの)．「撮る」→「撮」，「清算」→「清算」
         var stem: String { String(word.prefix { !$0.isHiragana }) }
@@ -29,13 +61,12 @@ public enum UsageGuide {
     /// 文節の候補に当てはまる同音異義語の使い分け．同梱の辞書(dictionary)を先に引き，無ければこのリポジトリで書いた組を引く．
     /// 当てはまらなければ nil．
     /// 活用した形(「撮った」)にも当てはまるよう，語の漢字の部分(「撮」)が候補にあり，文節の読みが組の読み(「と」)で始まるものを探す．
-    /// 例: 「撮った」(読み「とった」)→「撮る: 写真や動画を写す　ほかに 取る・採る・執る・捕る」
-    public static func homophoneNote(for text: String, reading: String, dictionary: UsageDictionary? = nil) -> String? {
+    /// 例: 「撮った」(読み「とった」)→「撮る」写真や動画を写す，ほかに「取る」「採る」「執る」「捕る」
+    public static func homophoneNote(for text: String, reading: String, dictionary: UsageDictionary? = nil) -> HomophoneNote? {
         if let note = dictionary?.note(for: text, reading: reading) { return note }
         for group in homophoneGroups where reading.hasPrefix(group.reading) {
             guard let hit = group.words.first(where: { $0.matches(text) }) else { continue }
-            let others = group.words.filter { $0.word != hit.word }.map(\.word).joined(separator: "・")
-            return "\(hit.word): \(hit.meaning)　ほかに \(others)"
+            return HomophoneNote(word: hit.word, meaning: hit.meaning, example: hit.example, others: group.words.filter { $0.word != hit.word }.map(\.word))
         }
         return nil
     }

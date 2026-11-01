@@ -525,7 +525,7 @@ struct UsageGuideTests {
         ("精算", "せいさん", "精算: 料金などを細かく計算し直す　ほかに 清算・成算"),
     ])
     func homophone(text: String, reading: String, expected: String) {
-        #expect(UsageGuide.homophoneNote(for: text, reading: reading) == expected)
+        #expect(UsageGuide.homophoneNote(for: text, reading: reading)?.text == expected)
     }
 
     @Test("送り仮名のある語は，漢字の部分のあとが送り仮名のときだけ当てはめる(「取引」には出さない)")

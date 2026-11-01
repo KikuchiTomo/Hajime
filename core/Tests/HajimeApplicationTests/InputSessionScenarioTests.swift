@@ -959,13 +959,14 @@ struct BranchMapControlTests {
         let harness = Harness(converter: converter)
         harness.type("totta")
         harness.press(.space)
-        #expect(harness.lattice?.columns.first?.usageNote?.hasPrefix("撮る: ") == true)
+        #expect(harness.lattice?.columns.first?.homophone?.word == "撮る")
+        #expect(harness.lattice?.columns.first?.usageNote == nil)
         var off = DefaultSettings.settings
         off.homophoneNotes = false
         let quiet = Harness(converter: converter, settings: off)
         quiet.type("totta")
         quiet.press(.space)
-        #expect(quiet.lattice?.columns.first?.usageNote == nil)
+        #expect(quiet.lattice?.columns.first?.homophone == nil)
     }
 
     @Test("上の枝にあるひらがな・カタカナは，下の枝に重ねて出さない")

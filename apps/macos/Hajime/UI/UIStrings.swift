@@ -8,6 +8,10 @@ enum UIStrings {
         static let variantsHints = [KeyHint(key: "←→", label: "選択"), KeyHint(key: "↓", label: "候補")]
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
+        /// 使い分けの欄で，同じ読みのほかの語の前に置く
+        static let homophoneOthers = "ほかに"
+        /// 使い分けの欄に入らなかったほかの語の数
+        static func more(_ count: Int) -> String { "+\(count)" }
     }
 
     /// 連想変換(R-18)

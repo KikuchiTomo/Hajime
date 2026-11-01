@@ -64,7 +64,7 @@ final class CandidatePanelController {
         branchView.panel = panel
         present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived)
         if let focused = panel.columns.first(where: \.isFocused) {
-            announce(focused.text)
+            announce(focused.homophone.map { "\(focused.text)、\($0.text)" } ?? focused.text)
         }
     }
 
@@ -179,7 +179,8 @@ final class CandidatePanelController {
         case .candidate: panel.selectedEntry.flatMap { panel.entries.indices.contains($0) ? panel.entries[$0].text : nil }
         case .variants: panel.selectedVariant.flatMap { panel.variants.indices.contains($0) ? panel.variants[$0].label : nil }
         }
-        announce(text)
+        // 使い分けがあれば続けて読む(語・意味・例・ほかの語)
+        announce(text.map { text in panel.homophone.map { "\(text)、\($0.text)" } ?? text })
     }
 
     private func announce(_ text: String?) {

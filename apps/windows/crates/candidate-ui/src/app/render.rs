@@ -83,10 +83,11 @@ pub struct TextMeasure {
     formats: HashMap<Font, IDWriteTextFormat>,
 }
 
-const FONTS: [Font; 7] = [
+const FONTS: [Font; 8] = [
     Font::Candidate,
     Font::Trunk,
     Font::Label,
+    Font::Emphasis,
     Font::Note,
     Font::Key,
     Font::SplitKey,

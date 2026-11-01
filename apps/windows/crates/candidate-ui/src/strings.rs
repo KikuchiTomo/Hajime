@@ -31,6 +31,14 @@ pub fn variants_position(index: u32, total: u32) -> String {
 /// 連想の一覧の見出しの前に置く言葉(macOS の UIStrings.Association.headingPrefix)
 pub const ASSOCIATION_PREFIX: &str = "連想";
 
+/// 使い分けの欄で，同じ読みのほかの語の前に置く(macOS の UIStrings.Candidate.homophoneOthers)
+pub const HOMOPHONE_OTHERS: &str = "ほかに";
+
+/// 使い分けの欄に入らなかったほかの語の数
+pub fn more(count: usize) -> String {
+    format!("+{count}")
+}
+
 /// 連想の意味のまとまりの位置
 pub fn association_position(index: u32, total: u32) -> String {
     format!("{index} / {total}")

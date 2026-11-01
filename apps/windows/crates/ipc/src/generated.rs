@@ -1364,6 +1364,26 @@ impl fmt::Debug for AssociationHeading {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct HomophoneNote {
+    pub word: String,
+    pub meaning: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub example: Option<String>,
+    pub others: Vec<String>,
+}
+
+impl fmt::Debug for HomophoneNote {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HomophoneNote")
+            .field("word", &REDACTED)
+            .field("meaning", &REDACTED)
+            .field("example", &REDACTED)
+            .field("others", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidateList {
     pub variants: Vec<CandidateVariant>,
     #[serde(rename = "selectedVariant")]
@@ -1383,6 +1403,8 @@ pub struct CandidateList {
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association_hint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homophone: Option<HomophoneNote>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1398,6 +1420,7 @@ impl fmt::Debug for CandidateList {
             .field("note", &self.note)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
+            .field("homophone", &self.homophone)
             .finish()
     }
 }
@@ -1431,6 +1454,8 @@ pub struct BranchColumn {
     #[serde(rename = "usageNote")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homophone: Option<HomophoneNote>,
     #[serde(rename = "alternativeNotes")]
     pub alternative_notes: Vec<Option<String>>,
     #[serde(rename = "sourceName")]
@@ -1456,6 +1481,7 @@ impl fmt::Debug for BranchColumn {
             .field("shorter", &REDACTED)
             .field("longer", &REDACTED)
             .field("usageNote", &REDACTED)
+            .field("homophone", &self.homophone)
             .field("alternativeNotes", &REDACTED)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)

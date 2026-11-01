@@ -1445,6 +1445,7 @@ public final class InputSession {
                 panel.columns[focused].shorter = preview.shorter
                 panel.columns[focused].longer = preview.longer
                 panel.columns[focused].usageNote = usageNote(for: lattice)
+                panel.columns[focused].homophone = homophone(for: lattice)
                 let segment = lattice.focused
                 let segmentReading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
@@ -1478,6 +1479,7 @@ public final class InputSession {
             panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
         }
         if let usage = usageNote(for: lattice) { panel.note = .info(usage) }
+        panel.homophone = homophone(for: lattice)
         if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
         if let pendingNote { panel.note = pendingNote }
         return panel
@@ -1528,18 +1530,21 @@ public final class InputSession {
         converter.setLeftContext(text)
     }
 
-    /// 注目している文節で選んでいる候補の使い分けと誤用の注釈(設定でオンのものだけ)
+    /// 変換している文の誤用と文の直し方の注釈(設定でオンのものだけ)
     private func usageNote(for lattice: SegmentLattice) -> String? {
-        let segment = lattice.focused
-        let text = segment.selected.text
-        let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
         let notes = [
             settings.current.misuseNotes ? UsageGuide.misuseNote(for: lattice.text) : nil,
             settings.current.proofreading ? Proofreading.note(for: lattice.text) : nil,
-            settings.current.homophoneNotes
-                ? UsageGuide.homophoneNote(for: text, reading: reading, dictionary: usageDictionary?.usageDictionary) : nil,
         ].compactMap { $0 }
         return notes.isEmpty ? nil : notes.joined(separator: "　")
+    }
+
+    /// 注目している文節で選んでいる候補の同音異義語の使い分け(設定でオンのときだけ)
+    private func homophone(for lattice: SegmentLattice) -> HomophoneNote? {
+        guard settings.current.homophoneNotes else { return nil }
+        let segment = lattice.focused
+        let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+        return UsageGuide.homophoneNote(for: segment.selected.text, reading: reading, dictionary: usageDictionary?.usageDictionary)
     }
 
     // MARK: - 分岐図と一覧の操作(キー設定の表のコマンド)

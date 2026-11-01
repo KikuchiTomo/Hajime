@@ -1571,6 +1571,28 @@
       ]
     },
     {
+      "name": "HomophoneNote",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "word",
+          "type": "string"
+        },
+        {
+          "name": "meaning",
+          "type": "string"
+        },
+        {
+          "name": "example",
+          "type": "string?"
+        },
+        {
+          "name": "others",
+          "type": "[string]"
+        }
+      ]
+    },
+    {
       "name": "CandidateList",
       "kind": "struct",
       "fields": [
@@ -1613,6 +1635,10 @@
         {
           "name": "associationHint",
           "type": "string?"
+        },
+        {
+          "name": "homophone",
+          "type": "HomophoneNote?"
         }
       ]
     },
@@ -1671,6 +1697,10 @@
         {
           "name": "usageNote",
           "type": "string?"
+        },
+        {
+          "name": "homophone",
+          "type": "HomophoneNote?"
         },
         {
           "name": "alternativeNotes",

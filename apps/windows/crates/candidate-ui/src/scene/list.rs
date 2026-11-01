@@ -128,10 +128,14 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .association
         .as_ref()
         .map_or(0.0, |heading| super::association::width(&painter, heading));
+    let homophone_width = list.homophone.as_ref().map_or(0.0, |note| {
+        super::homophone::width(&painter, note) + padding * 2.0
+    });
     let content_width = candidate::MIN_WIDTH
         .max(metrics.lead + entry_width + padding * 2.0)
         .max(variants_width + padding * 2.0)
         .max(heading_width)
+        .max(homophone_width)
         .max(footer_width);
     let mut content_height = list.entries.len() as f32 * metrics.row_height
         + metrics.section_height
@@ -139,6 +143,9 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     // 連想の一覧では，文字種の行の代わりに見出しの行を出す
     if !list.variants.is_empty() || list.association.is_some() {
         content_height += metrics.section_height + candidate::FRAME_WIDTH;
+    }
+    if list.homophone.is_some() {
+        content_height += super::homophone::height() + candidate::FRAME_WIDTH;
     }
     let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
     let height = (content_height + metrics.inset * 2.0 + metrics.shadow).ceil();
@@ -258,6 +265,22 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
             );
         }
         y += metrics.row_height;
+    }
+    if let Some(note) = &list.homophone {
+        // 使い分けは候補と足元のあいだに出す．足元のキーの案内は消さない
+        separator(&mut painter, y, content.x, content.max_x());
+        y += candidate::FRAME_WIDTH;
+        super::homophone::draw(
+            &mut painter,
+            note,
+            Frame::new(
+                content.x + padding,
+                y,
+                content.width - padding * 2.0,
+                super::homophone::height(),
+            ),
+        );
+        y += super::homophone::height();
     }
     separator(&mut painter, y, content.x, content.max_x());
     y += candidate::FRAME_WIDTH;
@@ -406,6 +429,7 @@ mod tests {
         CandidateList {
             association: None,
             association_hint: None,
+            homophone: None,
             variants: vec![CandidateVariant {
                 label: "カタカナ".into(),
                 is_available: true,
@@ -476,6 +500,59 @@ mod tests {
             hinted.association_hint = Some("Ctrl+Tab 連想".into());
             let scene = candidate_list(&hinted, &Look::new(&theme, 15.0), &Fixed);
             assert!(texts_of(&scene).contains(&"Ctrl+Tab 連想".to_string()));
+        }
+    }
+
+    #[test]
+    fn 使い分けは候補と足元のあいだに出し_長い意味と多いほかの語は欄の幅に収める() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut short = list(Some(0));
+            short.homophone = Some(ipc::HomophoneNote {
+                word: "撮る".into(),
+                meaning: "撮影する".into(),
+                example: Some("写真を撮る".into()),
+                others: vec!["取る".into(), "採る".into()],
+            });
+            let scene = candidate_list(&short, &Look::new(&theme, 15.0), &Fixed);
+            let texts = texts_of(&scene);
+            for text in [
+                "撮る",
+                "撮影する",
+                "「写真を撮る」",
+                "ほかに",
+                "取る",
+                "採る",
+            ] {
+                assert!(texts.contains(&text.to_string()), "{text}");
+            }
+            // 足元のキーの案内は消さない
+            assert!(texts.contains(&"2 / 30".to_string()));
+
+            let mut long = short.clone();
+            if let Some(note) = long.homophone.as_mut() {
+                note.meaning = "意".repeat(80);
+                note.others = (0..30).map(|index| format!("語{index}")).collect();
+            }
+            let scene = candidate_list(&long, &Look::new(&theme, 15.0), &Fixed);
+            let without = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
+            assert!(
+                scene.width
+                    <= without
+                        .width
+                        .max(glass::USAGE_MAX_WIDTH + candidate::PADDING_X * 2.0 + 40.0)
+            );
+            let texts = texts_of(&scene);
+            assert!(!texts.contains(&"「写真を撮る」".to_string()));
+            assert!(texts
+                .iter()
+                .any(|text| text.starts_with('意') && text.ends_with('…')));
+            assert!(texts.iter().any(|text| text.starts_with('+')));
+            for draw in &scene.draws {
+                if let Draw::Text { frame, .. } = draw {
+                    assert!(frame.x >= 0.0 && frame.x < scene.body.max_x(), "{draw:?}");
+                }
+            }
         }
     }
 

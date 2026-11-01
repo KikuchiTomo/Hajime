@@ -139,7 +139,8 @@ final class BranchView: NSView {
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
         let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Size.paddingX * 3
         // 使い分けや誤用の注釈と，IME からの知らせ(直したことなど)は，枝と足元のあいだに 1 行ずつ出す．キーの案内は消さない
-        let note = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) }]
+        let note = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) },
+                    column?.homophone.map { HomophoneDrawing.width($0, theme: theme, font: labelFont) }]
             .compactMap { $0.map { $0 + Size.paddingX * 2 } }.max() ?? 0
         let heading = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + metrics.inset * 2 } ?? 0
         var width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2, heading)
@@ -159,6 +160,7 @@ final class BranchView: NSView {
         }
         let trunkY = metrics.inset + headingHeight(panel) + CGFloat(upperRows) * metrics.rowHeight
         let height = trunkY + metrics.rowHeight * CGFloat(1 + lowerRows) + Size.frameWidth + metrics.footerHeight
+            + (column?.homophone == nil ? 0 : HomophoneDrawing.height)
             + (column?.usageNote == nil ? 0 : metrics.footerHeight)
             + (panel.note == nil ? 0 : metrics.footerHeight)
             + (theme.isRounded ? 0 : metrics.inset)
@@ -283,6 +285,11 @@ final class BranchView: NSView {
         }
         NSGraphicsContext.restoreGraphicsState()
         var footerY = layout.trunkY + metrics.rowHeight * CGFloat(1 + layout.lowerRows)
+        if let homophone = panel.columns.first(where: \.isFocused)?.homophone {
+            let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: HomophoneDrawing.height)
+            HomophoneDrawing.draw(homophone, in: row, theme: theme, font: labelFont)
+            footerY += HomophoneDrawing.height
+        }
         if let note = panel.columns.first(where: \.isFocused)?.usageNote {
             let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)
             drawText(note, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: row.minX, in: row)
