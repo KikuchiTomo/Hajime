@@ -751,7 +751,7 @@ pub mod wizard {
     pub const FEATURES_TITLE: &str = "便利な機能";
     pub const FEATURES_TEXT: &str = "変換するだけで使える機能です。使わないものはオフにできます。";
     pub const ASSOCIATION: &str = "連想";
-    pub const ASSOCIATION_NOTE: &str = "変換中に Shift+↑ で、選んだ語に続く語を出します。";
+    pub const ASSOCIATION_NOTE: &str = "変換中に Shift+↑ で、似た意味の語を出します。";
     pub const CALCULATION: &str = "計算";
     pub const CALCULATION_NOTE: &str = "「1+2*3=」のように式を打って変換すると、答えを出します。";
     pub const POSTAL_CODE: &str = "郵便番号";
@@ -764,6 +764,20 @@ pub mod wizard {
     pub const MACROS: &str = "変換マクロ";
     pub const DYNAMIC_DICTIONARY: &str = "動的なユーザー辞書";
     pub const COMMANDS: &str = "コマンド";
+    /// 機能ごとの実演の説明(macOS の UIStrings.Onboarding の Detail)
+    pub const MACROS_DETAIL: &str =
+        "連想変換と同じ Shift+↑ で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
+    pub const DYNAMIC_DICTIONARY_DETAIL: &str =
+        "単語に {datetime:YYYY/MM/DD} などを書くと、入力したときの値にします。";
+    pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。";
+    /// コマンドの実演の候補(macOS の UIStrings.Onboarding.commandsExample)
+    pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
+    /// コマンドの候補の頭の印(core の DefaultSettings.commandCandidateMark)
+    pub const COMMAND_MARK: &str = "▶ ";
+    /// 変換マクロの見出しの種類(core の DefaultSettings.macroGroupLabel)
+    pub const MACRO_LABEL: &str = "整形";
+    /// 機能の紹介のページの案内(macOS の UIStrings.Onboarding.spotlightHint．実演は右に出す)
+    pub const SPOTLIGHT_HINT: &str = "項目にポインターを置くと、右に使い方を出します。";
     pub const APPEARANCE_TITLE: &str = "外観";
     pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
     pub const DONE_TITLE: &str = "準備ができました";
@@ -785,6 +799,7 @@ pub mod wizard {
     pub const KEY_RIGHT: &str = "→";
     pub const KEY_LEFT: &str = "←";
     pub const KEY_ASSOCIATE: &str = "Shift+↑";
+    pub const KEY_ESCAPE: &str = "Esc";
 
     /// 実演の説明
     pub const CAPTION_ENGLISH: &str = "英語で入力";
@@ -801,6 +816,8 @@ pub mod wizard {
     pub const CAPTION_CORRECTED: &str = "補正して「ありがとう」に";
     pub const CAPTION_NOT_CORRECTED: &str = "打ったとおりに変換";
     pub const CAPTION_OFF: &str = "オフにしているので出ません";
+    pub const CAPTION_HAND_SHIFT: &str = "ずれたまま打った文を「こんにちは」に";
+    pub const CAPTION_COMMAND: &str = "選んで Enter でアプリを開く";
 }
 
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．

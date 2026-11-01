@@ -98,7 +98,11 @@ struct Layout {
     title: Rect,
     description: Rect,
     groups: Vec<GroupLayout>,
+    /// 機能の紹介のページの案内(項目にポインターを置くと実演を出す)
+    hint: Option<Rect>,
     demo: Rect,
+    /// 見せている機能の説明の札(実演の下)
+    caption: Option<Rect>,
     buttons: Vec<(Button, Rect)>,
 }
 
@@ -144,6 +148,9 @@ struct Wizard {
     direction: f32,
     /// 進み具合の帯
     progress: Tween,
+    /// 機能の紹介のページで見せている機能(項目)と，その説明の札を出す動き(0 から 1)
+    spotlight: Option<&'static str>,
+    caption: Tween,
     focus: Focus,
     focus_visible: bool,
     hover: Option<Target>,
@@ -214,6 +221,8 @@ pub fn open(
         enter: Tween::fixed(1.0),
         direction: 1.0,
         progress: Tween::fixed(progress_of(step)),
+        spotlight: wizard::spotlight_items(step).first().map(|(path, _)| *path),
+        caption: Tween::fixed(1.0),
         focus: Focus::Button(Button::Next),
         focus_visible: false,
         hover: None,
@@ -395,7 +404,10 @@ impl Wizard {
     // MARK: - ページ
 
     fn restart_demo(&mut self) {
-        self.script = demo::script(self.step, &self.choices, self.today);
+        self.script = match self.spotlight {
+            Some(path) => demo::spotlight(path, &self.choices, self.today),
+            None => demo::script(self.step, &self.choices, self.today),
+        };
         self.demo_started = self.now();
         self.popup_pixels = None;
         ffi::kill_timer(self.window, DEMO_TIMER);
@@ -450,6 +462,15 @@ impl Wizard {
             Easing::DECELERATE,
         );
         self.hover = None;
+        // ページを替えたら最初の機能を見せる(macOS と同じ)
+        self.spotlight = wizard::spotlight_items(step).first().map(|(path, _)| *path);
+        self.caption = Tween::new(
+            0.0,
+            1.0,
+            now,
+            self.duration(motion::WIZARD_PAGE * CAPTION_MOTION),
+            Easing::DECELERATE,
+        );
         self.focus = Focus::Button(if step == Step::Done {
             Button::Finish
         } else {
@@ -536,6 +557,26 @@ impl Wizard {
         }
     }
 
+    /// 見せる機能を group 番目の項目にする(機能の紹介のページだけ)．変わったら実演を始め直し，説明の札を浮かべ直す
+    fn spotlight_group(&mut self, group: usize) {
+        let Some((path, _)) = wizard::spotlight_items(self.step).get(group) else {
+            return;
+        };
+        if self.spotlight == Some(*path) {
+            return;
+        }
+        self.spotlight = Some(*path);
+        let now = self.now();
+        self.caption = Tween::new(
+            0.0,
+            1.0,
+            now,
+            self.duration(motion::WIZARD_PAGE * CAPTION_MOTION),
+            Easing::DECELERATE,
+        );
+        self.restart_demo();
+    }
+
     fn press(&mut self, target: Target) {
         if !self.ready() && !matches!(target, Target::Button(_)) {
             return;
@@ -619,7 +660,15 @@ impl Wizard {
                     }
                 }
                 GroupKind::Toggle => {
-                    let row_height = size::WIZARD_OPTION_NOTE_HEIGHT;
+                    let note = match group.field {
+                        Field::Path(path) => toggle_note(path).is_some(),
+                        _ => false,
+                    };
+                    let row_height = if note {
+                        size::WIZARD_OPTION_NOTE_HEIGHT
+                    } else {
+                        size::WIZARD_OPTION_HEIGHT
+                    };
                     rows.push(Rect::new(x, y, column, row_height));
                     y += row_height + size::WIZARD_OPTION_GAP;
                 }
@@ -627,14 +676,32 @@ impl Wizard {
             y += size::CONTROL_GAP;
             groups.push(GroupLayout { group, title, rows });
         }
+        let hint = (!wizard::spotlight_items(self.step).is_empty()).then(|| {
+            let height = measure.wrapped_height(text::SPOTLIGHT_HINT, TextStyle::Caption, column);
+            Rect::new(x, y, column, height)
+        });
         let footer = height - size::WIZARD_FOOTER_HEIGHT;
         let demo_x = padding * 2.0 + column;
-        let demo = Rect::new(
+        let mut demo = Rect::new(
             demo_x,
             size::WIZARD_STEP_BAR + padding,
             (width - padding - demo_x).max(0.0),
             (footer - size::WIZARD_STEP_BAR - padding).max(0.0),
         );
+        // 説明の札は実演の下に置き，実演の欄をその分だけ縮める
+        let caption = self
+            .spotlight
+            .and_then(wizard::spotlight_detail)
+            .map(|detail| {
+                let inner = demo.width - size::CARD_PADDING_X * 3.0 - CAPTION_ICON;
+                let text = size::BODY_LINE_HEIGHT
+                    + size::CARD_GAP
+                    + measure.wrapped_height(detail, TextStyle::Caption, inner);
+                let height = text.max(CAPTION_ICON) + size::CARD_PADDING_X * 2.0;
+                let rect = Rect::new(demo.x, demo.max_y() - height, demo.width, height);
+                demo.height = (demo.height - height - size::CONTROL_GAP).max(0.0);
+                rect
+            });
         let button_y = footer + (size::WIZARD_FOOTER_HEIGHT - size::CONTROL_HEIGHT) / 2.0;
         let mut buttons = Vec::new();
         let mut right = width - padding;
@@ -655,7 +722,9 @@ impl Wizard {
             title,
             description,
             groups,
+            hint,
             demo,
+            caption,
             buttons,
         }
     }
@@ -816,7 +885,8 @@ impl Wizard {
 
     /// 次に描く時を決める．動いているあいだは画面の更新に合わせ，止まっているコマでは次のコマまで時計で待つ
     fn schedule(&self, now: f64) {
-        let tweens = self.enter.running(now) || self.progress.running(now);
+        let tweens =
+            self.enter.running(now) || self.progress.running(now) || self.caption.running(now);
         let loading = !self.ready() && !self.step.groups().is_empty();
         let demo = self.demo_frame(now);
         let moving = demo.is_some_and(|(frame, position)| {
@@ -960,6 +1030,9 @@ impl Wizard {
             key if key == VK_ESCAPE.0 => self.activate(Button::Later),
             _ => return false,
         }
+        if let Focus::Group(group) = self.focus {
+            self.spotlight_group(group);
+        }
         if WIZARD_ALIVE.with(|alive| alive.get()) {
             self.focus_visible = true;
             uia::focus_changed(self.window, self.focus_node());
@@ -979,6 +1052,9 @@ impl Wizard {
     fn mouse_move(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
         let hover = self.target_at(x, y);
+        if let Some(Target::Toggle(group)) = hover {
+            self.spotlight_group(group);
+        }
         if hover != self.hover {
             self.hover = hover;
             ffi::track_leave(self.window);
@@ -1092,7 +1168,13 @@ impl Wizard {
                                 ..node(
                                     NODE_TOGGLE + index as i32,
                                     uia::Role::CheckBox,
-                                    group.group.title.unwrap_or_default().to_string(),
+                                    match wizard::spotlight_detail(path) {
+                                        Some(detail) => format!(
+                                            "{} {detail}",
+                                            group.group.title.unwrap_or_default()
+                                        ),
+                                        None => group.group.title.unwrap_or_default().to_string(),
+                                    },
                                     rect,
                                 )
                             });
@@ -1300,7 +1382,17 @@ fn paint_window(canvas: &mut dyn Canvas, state: &PaintState) {
     canvas.translate(offset, 0.0);
     canvas.set_opacity(enter);
     paint_text_column(canvas, state);
+    if let (Some(hint), true) = (state.layout.hint, wizard.ready()) {
+        canvas.text(
+            hint,
+            text::SPOTLIGHT_HINT,
+            TextStyle::Caption,
+            Color::from(palette.text_secondary),
+            TextLayout::WRAP,
+        );
+    }
     paint_demo(canvas, state);
+    paint_caption(canvas, state);
     canvas.set_opacity(1.0);
     canvas.translate(-offset, 0.0);
 }
@@ -1400,7 +1492,9 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
                 };
                 let target = Target::Toggle(index);
                 let hover = wizard.hover == Some(target);
-                let fill = if hover {
+                // 実演と説明を出している機能の行は強調する
+                let lit = wizard.spotlight == Some(path);
+                let fill = if hover || lit {
                     palette.control_hover
                 } else {
                     palette.card
@@ -1410,7 +1504,11 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
                     *rect,
                     size::CARD_RADIUS,
                     1.0,
-                    Color::from(palette.card_stroke),
+                    if lit {
+                        Color::from(palette.accent)
+                    } else {
+                        Color::from(palette.card_stroke)
+                    },
                 );
                 let inner = Rect::new(
                     rect.x + size::CARD_PADDING_X,
@@ -1458,15 +1556,102 @@ fn paint_text_column(canvas: &mut dyn Canvas, state: &PaintState) {
     }
 }
 
+/// オン・オフの行の説明．機能の紹介のページの項目は説明を実演の下の札に出すので，行には出さない(macOS と同じ)
 fn toggle_note(path: &str) -> Option<&'static str> {
     match path {
         "remembersRejectedCorrections" => Some(text::REMEMBERS_REJECTED_NOTE),
-        "association" => Some(text::ASSOCIATION_NOTE),
-        "calculation" => Some(text::CALCULATION_NOTE),
-        "postalCodeConversion" => Some(text::POSTAL_CODE_NOTE),
-        "dateConversion" => Some(text::DATE_NOTE),
         _ => None,
     }
+}
+
+/// 説明の札の絵(Segoe Fluent Icons．macOS の OnboardingSpotlight.symbol に近いもの)
+fn spotlight_glyph(path: &str) -> &'static str {
+    match path {
+        "association" => "\u{E71B}",
+        "calculation" => "\u{E8EF}",
+        "postalCodeConversion" => "\u{E715}",
+        "dateConversion" => "\u{E787}",
+        "looseReadings" => "\u{E897}",
+        "phoneticSpelling" => "\u{E767}",
+        "handShiftCorrection" => "\u{E765}",
+        "conversionMacros" => "\u{E70F}",
+        "dynamicDictionary" => "\u{E81C}",
+        "launcherCommands" => "\u{E768}",
+        _ => "\u{E946}",
+    }
+}
+
+/// 説明の札の絵の丸の大きさ
+const CAPTION_ICON: f32 = size::CONTROL_HEIGHT;
+/// 説明の札を浮かべる動きの長さ(ページを替える動きの何倍か．macOS は少し弾む動き)
+const CAPTION_MOTION: f32 = 1.6;
+
+/// 機能の紹介のページの，見せている機能の説明の札．下から浮かび上がる(macOS の SpotlightCaption)
+fn paint_caption(canvas: &mut dyn Canvas, state: &PaintState) {
+    let wizard = state.wizard;
+    let theme = &wizard.theme;
+    let palette = &theme.palette;
+    let (Some(rect), Some(path)) = (state.layout.caption, wizard.spotlight) else {
+        return;
+    };
+    let Some(detail) = wizard::spotlight_detail(path) else {
+        return;
+    };
+    let title = wizard::spotlight_items(wizard.step)
+        .iter()
+        .find(|(candidate, _)| *candidate == path)
+        .map_or("", |(_, title)| *title);
+    let shown = wizard.caption.value(state.now);
+    let lift = (1.0 - shown) * size::CARD_GAP * 3.0;
+    let opacity = wizard.enter.value(state.now);
+    canvas.set_opacity(opacity * shown);
+    canvas.translate(0.0, lift);
+    canvas.fill_round(rect, size::CARD_RADIUS, Color::from(palette.card));
+    canvas.stroke_round(
+        rect,
+        size::CARD_RADIUS,
+        1.0,
+        Color::from(palette.card_stroke),
+    );
+    let padding = size::CARD_PADDING_X;
+    let icon = Rect::new(
+        rect.x + padding,
+        rect.y + padding,
+        CAPTION_ICON,
+        CAPTION_ICON,
+    );
+    canvas.fill_round(icon, CAPTION_ICON / 2.0, Color::from(palette.accent));
+    canvas.text(
+        icon,
+        spotlight_glyph(path),
+        TextStyle::IconSmall,
+        Color::from(palette.accent_text),
+        TextLayout::CENTER,
+    );
+    let text_x = icon.max_x() + padding;
+    let text_width = rect.max_x() - padding - text_x;
+    canvas.text(
+        Rect::new(text_x, rect.y + padding, text_width, size::BODY_LINE_HEIGHT),
+        title,
+        TextStyle::Section,
+        Color::from(palette.text),
+        TextLayout::LINE,
+    );
+    let detail_top = rect.y + padding + size::BODY_LINE_HEIGHT + size::CARD_GAP;
+    canvas.text(
+        Rect::new(
+            text_x,
+            detail_top,
+            text_width,
+            rect.max_y() - padding - detail_top,
+        ),
+        detail,
+        TextStyle::Caption,
+        Color::from(palette.text_secondary),
+        TextLayout::WRAP,
+    );
+    canvas.translate(0.0, -lift);
+    canvas.set_opacity(opacity);
 }
 
 struct OptionLook<'a> {

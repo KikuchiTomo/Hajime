@@ -155,6 +155,8 @@ pub struct Today {
     pub month: u16,
     pub day: u16,
     pub weekday: u16,
+    pub hour: u16,
+    pub minute: u16,
 }
 
 /// 令和 n 年は西暦 n + 2018 年(core の DateExpressions と同じ)
@@ -164,7 +166,7 @@ const WEEKDAYS: [&str; 7] = ["日", "月", "火", "水", "木", "金", "土"];
 impl Today {
     /// 年・月・日(とそれより後ろ)から．曜日は暦から求める
     pub fn from_fields(fields: [u16; 6]) -> Self {
-        let [year, month, day, ..] = fields;
+        let [year, month, day, hour, minute, _] = fields;
         let days = days_from_civil(i64::from(year), i64::from(month), i64::from(day));
         // 1970/1/1 は木曜
         let weekday = (days + 4).rem_euclid(7) as u16;
@@ -173,6 +175,8 @@ impl Today {
             month,
             day,
             weekday,
+            hour,
+            minute,
         }
     }
 }
@@ -247,6 +251,32 @@ const ARIGATOU_TYPO: &[Unit] = &[
 ];
 const TOUKYOU: &[Unit] = &[("to", "と"), ("u", "う"), ("kyo", "きょ"), ("u", "う")];
 const KYOU: &[Unit] = &[("kyo", "きょ"), ("u", "う")];
+const KAWAII: &[Unit] = &[("ka", "か"), ("wa", "わ"), ("i", "い"), ("i", "い")];
+const SHUMIRESHON: &[Unit] = &[
+    ("shu", "しゅ"),
+    ("mi", "み"),
+    ("re", "れ"),
+    ("-", "ー"),
+    ("sho", "しょ"),
+    ("nn", "ん"),
+];
+const FOTO: &[Unit] = &[("fo", "ふぉ"), ("to", "と")];
+const KURODO: &[Unit] = &[("ku", "く"), ("ro", "ろ"), ("-", "ー"), ("do", "ど")];
+/// 右手も左手も 1 キー右にずれたまま「konnichiha」と打った(QWERTY)
+const HAND_SHIFTED: &[Unit] = &[
+    ("l", "l"),
+    ("p", "p"),
+    ("m", "m"),
+    ("m", "m"),
+    ("o", "o"),
+    ("v", "v"),
+    ("j", "j"),
+    ("o", "o"),
+    ("j", "j"),
+    ("s", "s"),
+];
+/// 動的なユーザー辞書の実演で打つ読み(英字のまま)
+const TS: &[Unit] = &[("t", "t"), ("s", "s")];
 const CALCULATION: &[Unit] = &[
     ("1", "1"),
     ("+", "+"),
@@ -483,6 +513,11 @@ fn branch(columns: &[&str], focused: usize, alternatives: &[&str], selected: usi
 }
 
 fn list(entries: &[&str], selected: usize, association: Option<&str>) -> Popup {
+    headed_list(entries, selected, association, text::ASSOCIATION_LABEL)
+}
+
+/// 見出し(連想の語と，連想・整形などの種類)の付いた一覧
+fn headed_list(entries: &[&str], selected: usize, association: Option<&str>, label: &str) -> Popup {
     Popup::List(CandidateList {
         variants: vec![],
         selected_variant: None,
@@ -503,7 +538,7 @@ fn list(entries: &[&str], selected: usize, association: Option<&str>) -> Popup {
         note: None,
         association: association.map(|headword| AssociationHeading {
             headword: headword.into(),
-            label: text::ASSOCIATION_LABEL.into(),
+            label: label.into(),
             group: 0,
             group_count: 1,
         }),
@@ -753,35 +788,147 @@ pub fn script(step: Step, choices: &Choices, today: Today) -> Script {
             }
             b.hold();
         }
-        Step::Features => features(&mut b, choices, today, branch_map),
-        Step::Extras | Step::Done => {}
+        Step::Features | Step::Extras => features(&mut b, choices, today, branch_map, step),
+        Step::Done => {}
     }
     b.finish()
 }
 
-/// 便利な機能を順に見せる(オフの機能は，変換しても出ないことを見せる)
-fn features(b: &mut Builder, choices: &Choices, today: Today, branch_map: bool) {
-    let on = |path| choices.is_on(path);
-    // 連想: 変換した語から ⇧↑ で続く語を出す
-    b.caption(text::ASSOCIATION);
-    b.type_units(TOUKYOU);
+/// 便利な機能・試験的な機能を順に見せる(オフの機能は，変換しても出ないことを見せる)
+fn features(b: &mut Builder, choices: &Choices, today: Today, branch_map: bool, step: Step) {
+    let items = if step == Step::Features {
+        crate::wizard::FEATURES
+    } else {
+        crate::wizard::EXTRAS
+    };
+    for (index, (path, title)) in items.iter().enumerate() {
+        if index > 0 {
+            b.frame.runs.clear();
+            b.pause(motion::WIZARD_PAUSE);
+        }
+        b.caption(title);
+        feature(b, path, choices.is_on(path), today, branch_map);
+    }
+}
+
+/// 1 つの機能だけの実演(項目にポインターを置いたとき．macOS の OnboardingSpotlight)．オンかどうかによらず，
+/// その機能が何をするかを見せる
+pub fn spotlight(path: &str, choices: &Choices, today: Today) -> Script {
+    let keys = if choices.value(Field::Path("inputStyle")) == "kana" {
+        Keys::Kana
+    } else {
+        Keys::Romaji
+    };
+    let branch_map = choices.value(Field::Path("candidatePresentation")) == "automatic";
+    let mut b = Builder::new(keys);
+    feature(&mut b, path, true, today, branch_map);
+    b.finish()
+}
+
+/// 1 つの機能の実演．on でなければ，変換しても出ないことを見せる
+fn feature(b: &mut Builder, path: &str, on: bool, today: Today, branch_map: bool) {
+    match path {
+        "association" => association(b, on, branch_map),
+        "calculation" => converted_to(b, CALCULATION, on, &["7", "1+2*3=7", "1+2*3="], "1+2*3="),
+        "postalCodeConversion" => converted_to(
+            b,
+            POSTAL,
+            on,
+            &["東京都千代田区千代田", "100-0001"],
+            "100-0001",
+        ),
+        "dateConversion" => date(b, on, today),
+        "looseReadings" => choose(
+            b,
+            SHUMIRESHON,
+            on,
+            &["シュミレーション", "シミュレーション", "趣味レーション"],
+        ),
+        "phoneticSpelling" => choose(b, FOTO, on, &["フォト", "photo", "ふぉと"]),
+        "handShiftCorrection" => hand_shift(b, on),
+        "conversionMacros" => macros(b, on),
+        "dynamicDictionary" => {
+            let stamp = format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}",
+                today.year, today.month, today.day, today.hour, today.minute
+            );
+            converted_to(b, TS, on, &[stamp.as_str(), "ts", "TS"], "ts");
+        }
+        "launcherCommands" => commands(b, on),
+        _ => {}
+    }
+}
+
+/// 打って変換すると entries の最初の候補になる(オフなら off の文字のまま)．結果を見せて確定する
+fn converted_to(b: &mut Builder, units: &[Unit], on: bool, entries: &[&str], off: &str) {
+    b.type_units(units);
     b.key(text::KEY_SPACE);
-    b.replace_composition(&segments(&["東京"], 0));
+    if on {
+        b.replace_composition(&segments(&[entries[0]], 0));
+        b.popup(Some(list(entries, 0, None)));
+        b.hold();
+    } else {
+        b.replace_composition(&segments(&[off], 0));
+        b.caption(text::CAPTION_OFF);
+        b.pause(motion::WIZARD_HOLD);
+    }
+    b.key(text::KEY_ENTER);
+    b.commit();
+}
+
+/// 打って変換し，2 番目の候補を選んで確定する(オフなら 2 番目の候補は出ない)
+fn choose(b: &mut Builder, units: &[Unit], on: bool, entries: &[&str]) {
+    b.type_units(units);
+    b.key(text::KEY_SPACE);
+    b.replace_composition(&segments(&[entries[0]], 0));
+    if !on {
+        let shown: Vec<&str> = entries
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| *index != 1)
+            .map(|(_, entry)| *entry)
+            .collect();
+        b.popup(Some(list(&shown, 0, None)));
+        b.caption(text::CAPTION_OFF);
+        b.pause(motion::WIZARD_HOLD);
+        b.key(text::KEY_ENTER);
+        b.commit();
+        return;
+    }
+    b.popup(Some(list(entries, 0, None)));
+    b.pause(motion::WIZARD_PAUSE);
+    b.key(text::KEY_DOWN);
+    b.replace_composition(&segments(&[entries[1]], 0));
+    b.popup(Some(list(entries, 1, None)));
+    b.hold();
+    b.key(text::KEY_ENTER);
+    b.commit();
+}
+
+/// 連想: 変換した語から似た意味の語を出す(macOS と同じ例)
+fn association(b: &mut Builder, on: bool, branch_map: bool) {
+    let words = ["愛らしい", "可憐", "愛くるしい", "キュート"];
+    b.type_units(KAWAII);
+    b.key(text::KEY_SPACE);
+    b.replace_composition(&segments(&["可愛い"], 0));
     b.popup(Some(candidates(
         branch_map,
-        &["東京"],
+        &["可愛い"],
         0,
-        &["東京", "今日"],
+        &["可愛い", "かわいい", "カワイイ"],
         0,
     )));
     b.pause(motion::WIZARD_PAUSE);
-    if on("association") {
+    if on {
         b.key(text::KEY_ASSOCIATE);
-        b.popup(Some(list(&["タワー", "駅", "都", "大学"], 0, Some("東京"))));
+        b.replace_composition(&[(words[0], Style::Focused)]);
+        b.popup(Some(list(&words, 0, Some("可愛い"))));
         b.pause(motion::WIZARD_PAUSE);
-        b.key(text::KEY_DOWN);
-        b.replace_composition(&[("東京", Style::Converted), ("駅", Style::Focused)]);
-        b.popup(Some(list(&["タワー", "駅", "都", "大学"], 1, Some("東京"))));
+        for selected in 1..words.len() {
+            b.key(text::KEY_DOWN);
+            b.replace_composition(&[(words[selected], Style::Focused)]);
+            b.popup(Some(list(&words, selected, Some("可愛い"))));
+        }
         b.hold();
     } else {
         b.caption(text::CAPTION_OFF);
@@ -789,55 +936,21 @@ fn features(b: &mut Builder, choices: &Choices, today: Today, branch_map: bool) 
     }
     b.key(text::KEY_ENTER);
     b.commit();
-    b.frame.runs.clear();
-    b.pause(motion::WIZARD_PAUSE);
+}
 
-    // 計算: 式を打って「=」で答え
-    b.caption(text::CALCULATION);
-    b.type_units(CALCULATION);
-    b.key(text::KEY_SPACE);
-    if on("calculation") {
-        b.replace_composition(&segments(&["7"], 0));
-        b.popup(Some(list(&["7", "1+2*3=7", "1+2*3="], 0, None)));
-    } else {
-        b.replace_composition(&segments(&["1+2*3="], 0));
-        b.caption(text::CAPTION_OFF);
-    }
-    b.pause(motion::WIZARD_HOLD);
-    b.key(text::KEY_ENTER);
-    b.commit();
-    b.frame.runs.clear();
-    b.pause(motion::WIZARD_PAUSE);
-
-    // 郵便番号: 区切りのある番号を住所に
-    b.caption(text::POSTAL_CODE);
-    b.type_units(POSTAL);
-    b.key(text::KEY_SPACE);
-    if on("postalCodeConversion") {
-        b.replace_composition(&segments(&["東京都千代田区千代田"], 0));
-        b.popup(Some(list(&["東京都千代田区千代田", "100-0001"], 0, None)));
-    } else {
-        b.replace_composition(&segments(&["100-0001"], 0));
-        b.caption(text::CAPTION_OFF);
-    }
-    b.pause(motion::WIZARD_HOLD);
-    b.key(text::KEY_ENTER);
-    b.commit();
-    b.frame.runs.clear();
-    b.pause(motion::WIZARD_PAUSE);
-
-    // 日付: 「きょう」を今日の日付に
-    b.caption(text::DATE);
+/// 日付: 「きょう」を今日の日付に
+fn date(b: &mut Builder, on: bool, today: Today) {
     b.type_units(KYOU);
     b.key(text::KEY_SPACE);
     b.replace_composition(&segments(&["今日"], 0));
     let mut dates = vec!["今日".to_string(), "京".to_string()];
-    if on("dateConversion") {
+    if on {
         let Today {
             year,
             month,
             day,
             weekday,
+            ..
         } = today;
         dates.extend([
             format!("{year}/{month}/{day}"),
@@ -855,7 +968,7 @@ fn features(b: &mut Builder, choices: &Choices, today: Today, branch_map: bool) 
     let entries: Vec<&str> = dates.iter().map(String::as_str).collect();
     b.popup(Some(list(&entries, 0, None)));
     b.pause(motion::WIZARD_PAUSE);
-    if on("dateConversion") {
+    if on {
         for selected in [1, 2, 3] {
             b.key(text::KEY_DOWN);
             let shown = entries[selected + 1];
@@ -869,6 +982,91 @@ fn features(b: &mut Builder, choices: &Choices, today: Today, branch_map: bool) 
     }
     b.key(text::KEY_ENTER);
     b.commit();
+}
+
+/// 手のずれ: 1 キー横にずれたまま打った文を直す
+fn hand_shift(b: &mut Builder, on: bool) {
+    b.type_units(HAND_SHIFTED);
+    b.pause(motion::WIZARD_PAUSE);
+    if on {
+        b.replace_composition(&[("こんにちは", Style::Corrected)]);
+        b.caption(text::CAPTION_HAND_SHIFT);
+        b.hold();
+    } else {
+        b.caption(text::CAPTION_OFF);
+        b.pause(motion::WIZARD_HOLD);
+    }
+    b.key(text::KEY_ENTER);
+    b.commit();
+}
+
+/// 変換マクロ: 変換した語を整えた形を連想変換と同じキーで出す
+fn macros(b: &mut Builder, on: bool) {
+    let shaped = [
+        "「東京」",
+        "『東京』",
+        "【東京】",
+        "（東京）",
+        "東京（とうきょう）",
+    ];
+    b.type_units(TOUKYOU);
+    b.key(text::KEY_SPACE);
+    b.replace_composition(&segments(&["東京"], 0));
+    b.popup(Some(list(&["東京", "とうきょう", "トウキョウ"], 0, None)));
+    b.pause(motion::WIZARD_PAUSE);
+    if on {
+        b.key(text::KEY_ASSOCIATE);
+        b.replace_composition(&[(shaped[0], Style::Focused)]);
+        b.popup(Some(headed_list(
+            &shaped,
+            0,
+            Some("東京"),
+            text::MACRO_LABEL,
+        )));
+        for selected in 1..shaped.len() {
+            b.key(text::KEY_DOWN);
+            b.replace_composition(&[(shaped[selected], Style::Focused)]);
+            b.popup(Some(headed_list(
+                &shaped,
+                selected,
+                Some("東京"),
+                text::MACRO_LABEL,
+            )));
+        }
+        b.hold();
+    } else {
+        b.caption(text::CAPTION_OFF);
+        b.pause(motion::WIZARD_HOLD);
+    }
+    b.key(text::KEY_ENTER);
+    b.commit();
+}
+
+/// コマンド: 読みを変換すると 2 番目の候補にコマンドが並ぶ．選んで確定したときだけ動く(文字は入らない)
+fn commands(b: &mut Builder, on: bool) {
+    let command = format!("{}{}", text::COMMAND_MARK, text::COMMANDS_EXAMPLE);
+    let entries = if on {
+        vec!["クロード", command.as_str(), "黒戸"]
+    } else {
+        vec!["クロード", "黒戸"]
+    };
+    b.type_units(KURODO);
+    b.key(text::KEY_SPACE);
+    b.replace_composition(&segments(&["クロード"], 0));
+    b.popup(Some(list(&entries, 0, None)));
+    b.pause(motion::WIZARD_PAUSE);
+    if on {
+        b.key(text::KEY_DOWN);
+        b.popup(Some(list(&entries, 1, None)));
+        b.caption(text::CAPTION_COMMAND);
+        b.hold();
+    } else {
+        b.caption(text::CAPTION_OFF);
+        b.pause(motion::WIZARD_HOLD);
+    }
+    b.key(text::KEY_ESCAPE);
+    b.frame.runs.clear();
+    b.popup(None);
 }
 
 #[cfg(test)]
@@ -894,6 +1092,8 @@ mod tests {
         month: 10,
         day: 28,
         weekday: 3,
+        hour: 0,
+        minute: 0,
     };
 
     fn choices() -> Choices {
@@ -1064,6 +1264,44 @@ mod tests {
             script.result().map(|frame| frame.mode),
             Some(Mode::Japanese)
         );
+    }
+
+    #[test]
+    fn 機能ごとの実演はオフでもその機能を見せる() {
+        let mut choices = choices();
+        for (path, _) in crate::wizard::FEATURES.iter().chain(crate::wizard::EXTRAS) {
+            choices.set_toggle(path, false);
+            let script = spotlight(path, &choices, TODAY);
+            assert!(!script.is_empty(), "{path}");
+            assert!(
+                !script
+                    .beats
+                    .iter()
+                    .any(|beat| beat.frame.caption == Some(text::CAPTION_OFF)),
+                "{path}"
+            );
+        }
+        let looks = spotlight("looseReadings", &choices, TODAY);
+        assert!(looks
+            .beats
+            .iter()
+            .any(|beat| text_of(&beat.frame) == "シミュレーション"));
+    }
+
+    #[test]
+    fn 試験的な機能はオンにしたものを見せる() {
+        let mut choices = choices();
+        for (path, _) in crate::wizard::EXTRAS {
+            choices.set_toggle(path, false);
+        }
+        let off = script(Step::Extras, &choices, TODAY);
+        assert!(off
+            .beats
+            .iter()
+            .all(|beat| !text_of(&beat.frame).contains("photo")));
+        choices.set_toggle("phoneticSpelling", true);
+        let on = script(Step::Extras, &choices, TODAY);
+        assert!(on.beats.iter().any(|beat| text_of(&beat.frame) == "photo"));
     }
 
     #[test]

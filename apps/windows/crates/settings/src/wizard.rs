@@ -219,6 +219,34 @@ const CORRECTION: &[Choice] = &[
     ("aggressive", text::CORRECTION_AGGRESSIVE),
 ];
 
+/// 機能の紹介のページ(便利な機能・試験的な機能)なら，並べる機能(項目と名前)．項目にポインターを置くと，
+/// その機能だけの実演と説明を出す(macOS の OnboardingSpotlight)
+pub fn spotlight_items(step: Step) -> &'static [(&'static str, &'static str)] {
+    match step {
+        Step::Features => FEATURES,
+        Step::Extras => EXTRAS,
+        _ => &[],
+    }
+}
+
+/// 機能の説明(実演の下の札に出す)
+pub fn spotlight_detail(path: &str) -> Option<&'static str> {
+    use crate::strings::extras;
+    Some(match path {
+        "association" => text::ASSOCIATION_NOTE,
+        "calculation" => text::CALCULATION_NOTE,
+        "postalCodeConversion" => text::POSTAL_CODE_NOTE,
+        "dateConversion" => text::DATE_NOTE,
+        "looseReadings" => extras::LOOSE_READINGS_NOTE,
+        "phoneticSpelling" => extras::PHONETIC_SPELLING_NOTE,
+        "handShiftCorrection" => extras::HAND_SHIFT_NOTE,
+        "conversionMacros" => text::MACROS_DETAIL,
+        "dynamicDictionary" => text::DYNAMIC_DICTIONARY_DETAIL,
+        "launcherCommands" => text::COMMANDS_DETAIL,
+        _ => return None,
+    })
+}
+
 /// 紹介する便利な機能(項目と名前)
 pub const FEATURES: &[(&str, &str)] = &[
     ("association", text::ASSOCIATION),
