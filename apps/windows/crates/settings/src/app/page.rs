@@ -1263,6 +1263,14 @@ impl PageView {
         self.rows.get(element.row)?.part_rect(element.part)
     }
 
+    /// ポインターを載せたときに出す説明(絵だけのボタン．macOS の .help)
+    pub fn tooltip(&self, element: Element) -> Option<&'static str> {
+        match element.part {
+            Part::Reset => Some(features::RESTORE_DEFAULT),
+            _ => None,
+        }
+    }
+
     /// 部品の名前(読み上げ)
     pub fn name(&self, element: Element) -> String {
         let Some(row) = self.rows.get(element.row) else {

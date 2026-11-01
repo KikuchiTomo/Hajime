@@ -51,6 +51,10 @@ const ID_SEARCH: u16 = 1;
 const WARM_ID: u16 = 50;
 /// つなぎ直しの時計の番号
 const RECONNECT_TIMER: usize = 1;
+/// 説明の吹き出しを出すまでの時計の番号
+const TOOLTIP_TIMER: usize = 2;
+/// ポインターを載せてから説明の吹き出しを出すまで(ミリ秒．OS のツールチップと同じくらい)
+const TOOLTIP_DELAY: u32 = 500;
 /// 読み込みのスレッドが終わった知らせ
 const WM_LOADED: u32 = WM_APP + 20;
 /// 測る手順を 1 つ進める知らせ(--measure)
@@ -154,6 +158,8 @@ pub struct App {
     focus_visible: bool,
     focused_edit: Option<Window>,
     hover: Option<Target>,
+    /// 説明の吹き出し(文と，ポインターの位置と，載せた時刻)
+    tooltip: Option<(&'static str, f32, f32, f64)>,
     pressed: Option<Target>,
     flyout: Option<Flyout>,
     started: Instant,
@@ -245,6 +251,7 @@ pub fn open(
         focus_visible: false,
         focused_edit: None,
         hover: None,
+        tooltip: None,
         pressed: None,
         flyout: None,
         started,
@@ -662,12 +669,18 @@ impl App {
             search: self.search_rect(),
             nav_top: self.nav_top(),
         };
+        let tooltip = self.tooltip.filter(|(.., since)| {
+            now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
+        });
         let mut cpu = 0.0;
         let drawn = self
             .surface
             .draw(graphics, size, theme.dpi, clear, preview, |canvas| {
                 let start = Instant::now();
                 paint_window(canvas, &state, nav, nav_scroll, view, scroll);
+                if let Some((text, x, y, _)) = tooltip {
+                    paint_tooltip(canvas, &theme, text, (x, y), (width, height));
+                }
                 cpu = start.elapsed().as_secs_f64() * 1000.0;
             });
         if drawn.is_err() {
@@ -861,6 +874,15 @@ impl App {
         let target = self.target_at(x, y);
         if target != self.hover {
             self.hover = target;
+            self.tooltip = match target {
+                Some(Target::Page(element)) => {
+                    self.view.tooltip(element).map(|text| (text, x, y, now))
+                }
+                _ => None,
+            };
+            if self.tooltip.is_some() {
+                ffi::set_timer(self.window, TOOLTIP_TIMER, TOOLTIP_DELAY);
+            }
             for (index, tween) in self.nav_hover.iter_mut().enumerate() {
                 let on = target == Some(Target::Nav(index));
                 tween.retarget(
@@ -906,6 +928,7 @@ impl App {
     fn mouse_leave(&mut self) {
         let now = self.now();
         self.hover = None;
+        self.tooltip = None;
         for tween in &mut self.nav_hover {
             tween.retarget(0.0, now, f64::from(motion::HOVER), Easing::LINEAR);
         }
@@ -2030,6 +2053,44 @@ fn paint_flyout_items(
     page::scrollbar(canvas, theme, body, scroll, now);
 }
 
+/// 説明の吹き出し．ポインターの右下に出し，窓からはみ出さないよう詰める
+fn paint_tooltip(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    text: &str,
+    (x, y): (f32, f32),
+    (width, height): (f32, f32),
+) {
+    let palette = &theme.palette;
+    let padding = size::FIELD_PADDING_X;
+    let bubble_width = canvas.width(text, TextStyle::Caption) + padding * 2.0;
+    let bubble_height = size::NOTE_LINE_HEIGHT + padding;
+    let left = (x + padding)
+        .min(width - bubble_width - size::CARD_GAP)
+        .max(0.0);
+    let below = y + size::CONTROL_HEIGHT * 0.75;
+    let top = if below + bubble_height > height {
+        y - bubble_height - size::CARD_GAP
+    } else {
+        below
+    };
+    let rect = Rect::new(left, top, bubble_width, bubble_height);
+    canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.card));
+    canvas.stroke_round(
+        rect,
+        size::CONTROL_RADIUS,
+        1.0,
+        Color::from(palette.control_strong_stroke),
+    );
+    canvas.text(
+        rect,
+        text,
+        TextStyle::Caption,
+        Color::from(palette.text),
+        TextLayout::CENTER,
+    );
+}
+
 // MARK: - 窓の手続き
 
 /// ページの部品の読み上げの番号の始まり(左の一覧の項目と分ける)
@@ -2109,6 +2170,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         WM_WARM => {
             with_app(App::warm_fields);
             Some(LRESULT(0))
+        }
+        WM_TIMER if wparam.0 == TOOLTIP_TIMER => {
+            ffi::kill_timer(window, TOOLTIP_TIMER);
+            ffi::invalidate(window);
+            None
         }
         WM_TIMER if wparam.0 == RECONNECT_TIMER => {
             with_app(|app| {
