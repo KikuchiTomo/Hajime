@@ -64,7 +64,12 @@ final class CandidatePanelController {
         branchView.panel = panel
         present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived)
         if let focused = panel.columns.first(where: \.isFocused) {
-            announce(focused.homophone.map { "\(focused.text)、\($0.text)" } ?? focused.text)
+            // コマンドの候補を選んでいれば，その名前を「コマンド」と続けて読む(幹の文字には印が付いている)
+            let command = focused.selectedAlternative.flatMap { index in
+                focused.alternativeCommands.indices.contains(index) && focused.alternativeCommands[index] != nil ? focused.alternatives[index] : nil
+            }
+            let text = command.map(UIStrings.Candidate.commandAnnouncement) ?? focused.text
+            announce(focused.homophone.map { "\(text)、\($0.text)" } ?? text)
         }
     }
 
@@ -176,7 +181,11 @@ final class CandidatePanelController {
     /// VoiceOver が動いているときだけ，選んでいる候補を読み上げる
     private func announceSelection(_ panel: CandidatePanel) {
         let text: String? = switch panel.focus {
-        case .candidate: panel.selectedEntry.flatMap { panel.entries.indices.contains($0) ? panel.entries[$0].text : nil }
+        case .candidate: panel.selectedEntry.flatMap { index in
+            guard panel.entries.indices.contains(index) else { return nil }
+            let entry = panel.entries[index]
+            return entry.command == nil ? entry.text : UIStrings.Candidate.commandAnnouncement(entry.text)
+        }
         case .variants: panel.selectedVariant.flatMap { panel.variants.indices.contains($0) ? panel.variants[$0].label : nil }
         }
         // 使い分けがあれば続けて読む(語・意味・例・ほかの語)

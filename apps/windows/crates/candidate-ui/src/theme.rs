@@ -163,6 +163,15 @@ impl ResolvedTheme {
         })
     }
 
+    /// アクセントの色を薄く敷いた地(コマンドの候補の札と，種類のアイコンの四角)
+    pub fn command_tint(&self) -> Color {
+        self.selection.with_alpha(if self.kind == Kind::Contrast {
+            opacity::glass::COMMAND_TAG_CONTRAST
+        } else {
+            opacity::glass::COMMAND_TAG
+        })
+    }
+
     /// 設定から描き方を決める．カスタムテーマを使っていれば，元のテーマの描き方に色・書体・形を重ねる
     pub fn resolve(theme: &str, custom: Option<&CustomTheme>, look: &SystemLook) -> Self {
         let Some(custom) = custom else {

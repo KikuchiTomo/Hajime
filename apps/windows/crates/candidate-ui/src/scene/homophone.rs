@@ -4,7 +4,7 @@
 //! 上の行に語(強く)と意味と使い方の例(控えめ)，下の行に「ほかに」と同じ読みのほかの語の札を並べる．
 //! 欄の幅は USAGE_MAX_WIDTH までにし，入らない分は例，意味の順に省く(意味が長くても窓を広げすぎない)
 
-use super::paint::Painter;
+use super::paint::{Painter, TagStyle};
 use super::Frame;
 use crate::strings;
 use crate::theme::Font;
@@ -102,6 +102,6 @@ pub fn draw(painter: &mut Painter, note: &HomophoneNote, area: Frame) {
             break;
         }
         x += glass::USAGE_TAG_GAP + tag;
-        painter.tag(word, x, bottom.mid_y(), false, false);
+        painter.tag(word, x, bottom.mid_y(), false, TagStyle::Plain);
     }
 }

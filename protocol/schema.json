@@ -1480,6 +1480,16 @@
       ]
     },
     {
+      "name": "CommandKind",
+      "kind": "enum",
+      "cases": [
+        "openApplication",
+        "openURL",
+        "openFile",
+        "runShortcut"
+      ]
+    },
+    {
       "name": "CandidateEntry",
       "kind": "struct",
       "fields": [
@@ -1498,6 +1508,10 @@
         {
           "name": "correctedLength",
           "type": "u32?"
+        },
+        {
+          "name": "command",
+          "type": "CommandKind?"
         }
       ]
     },
@@ -1705,6 +1719,10 @@
         {
           "name": "alternativeNotes",
           "type": "[string?]"
+        },
+        {
+          "name": "alternativeCommands",
+          "type": "[CommandKind?]?"
         },
         {
           "name": "sourceName",

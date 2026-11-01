@@ -212,15 +212,23 @@ enum DemoScripts {
 
     // MARK: - 機能ごとの実演
 
-    /// 候補の一覧のコマ．選んでいる候補を from から to まで 1 つずつ動かし，最後に確定する(commit が nil なら確定しない)
+    /// 候補の一覧のコマ．選んでいる候補を from から to まで 1 つずつ動かし，最後に確定する(commit が nil なら確定しない)．
+    /// command はコマンドの候補の位置と種類．一覧では種類のアイコンと札を付け，選んでいるあいだは確定のキーで動くことを出す
     private static func choosing(_ entries: [String], from: Int = 0, to: Int, heading: AssociationHeading? = nil, marked: [(String, MarkedText.Style)]? = nil,
-                                 commit: String? = nil) -> [DemoFrame] {
+                                 command: (index: Int, kind: LauncherCommand.Kind)? = nil, commit: String? = nil) -> [DemoFrame] {
         var frames: [DemoFrame] = []
+        let rows = entries.enumerated().map { index, text in
+            index == command?.index ? CandidatePanel.Entry(text: text, annotation: CandidatePanel.commandAnnotation, command: command?.kind)
+                : CandidatePanel.Entry(text: text, annotation: nil)
+        }
         for selected in from...max(from, to) {
-            var list = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },
-                                      selectedEntry: selected, focus: .candidate, position: selected + 1, total: entries.count, note: nil)
+            let choosesCommand = selected == command?.index
+            var list = CandidatePanel(variants: [], selectedVariant: nil, entries: rows, selectedEntry: selected, focus: .candidate,
+                                      position: selected + 1, total: entries.count,
+                                      note: choosesCommand ? Note(tone: .info, title: "", key: "Enter", keyAction: "実行") : nil)
             list.association = heading
-            var frame = converted(marked ?? [(entries[selected], .focused)], panel: .list(list))
+            let shown = choosesCommand ? DefaultSettings.commandCandidateMark + entries[selected] : entries[selected]
+            var frame = converted(marked ?? [(shown, .focused)], panel: .list(list))
             // 選んでいる候補を動かすあいだは短く，最後の候補は長く見せる
             frame.duration = selected == max(from, to) ? hold : hold / 2
             frames.append(frame)
@@ -271,7 +279,7 @@ enum DemoScripts {
             return typingLiterally("ts") + choosing([stamp, "ts", "TS"], to: 0, commit: stamp)
         case .commands:
             // 第 1 候補は語のまま．コマンドは 2 番目に並び，選んで確定したときだけ動く(文字は入らない)
-            return typing("kuro-do") + choosing(["クロード", DefaultSettings.commandCandidateMark + UIStrings.Onboarding.commandsExample, "黒戸"], to: 1)
+            return typing("kuro-do") + choosing(["クロード", UIStrings.Onboarding.commandsExample, "黒戸"], to: 1, command: (1, .openApplication))
                 + [DemoFrame(duration: hold)]
         }
     }

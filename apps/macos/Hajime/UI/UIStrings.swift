@@ -12,6 +12,8 @@ enum UIStrings {
         static let homophoneOthers = "ほかに"
         /// 使い分けの欄に入らなかったほかの語の数
         static func more(_ count: Int) -> String { "+\(count)" }
+        /// コマンドの候補を読み上げる文(「コマンド、Claude を開く」)
+        static func commandAnnouncement(_ title: String) -> String { "\(CandidatePanel.commandAnnotation)、\(title)" }
     }
 
     /// 連想変換(R-18)
@@ -51,7 +53,7 @@ enum UIStrings {
         static let commandsPage = "コマンド"
         static let commandsSection = "コマンド"
         static let launcherCommands = "読みでコマンドを呼び出す"
-        static let commandsNote = "読みを変換すると、候補の一覧に「▶ 名前」が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
+        static let commandsNote = "読みを変換すると、候補の一覧に「コマンド」の札を付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
         static let commandReading = "読み"
         static let commandTitle = "名前"
         static let commandKind = "動作"

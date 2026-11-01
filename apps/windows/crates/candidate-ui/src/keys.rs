@@ -21,6 +21,14 @@ pub enum Icon {
     Sparkle,
     /// 案内の頭のアイコン．「もしかして」(macOS の lightbulb)
     Lightbulb,
+    /// コマンドの種類．アプリを開く(macOS の macwindow)
+    Window,
+    /// コマンドの種類．Web のページを開く(macOS の globe)
+    Globe,
+    /// コマンドの種類．ファイルを開く(macOS の doc)
+    Document,
+    /// コマンドの種類．ショートカットを動かす(macOS の square.2.layers.3d)
+    Layers,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

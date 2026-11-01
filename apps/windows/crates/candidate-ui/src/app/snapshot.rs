@@ -101,11 +101,15 @@ fn render_all(output: &Path) -> Result<()> {
         let font_size = tokens::size::candidate::FONT_SIZE;
         let measure = renderer.measure(&theme, font_size)?;
         let look = Look::new(&theme, font_size);
-        let scenes: [(&str, Scene); 8] = [
+        let scenes: [(&str, Scene); 9] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "homophone-list",
                 scene::candidate_list(&homophone_list(), &look, &measure),
+            ),
+            (
+                "command-list",
+                scene::candidate_list(&command_list(), &look, &measure),
             ),
             (
                 "correction",
@@ -222,6 +226,7 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
             annotation: None,
             corrected_start: None,
             corrected_length: None,
+            command: None,
         })
         .collect()
 }
@@ -270,6 +275,34 @@ fn homophone_list() -> CandidateList {
     }
 }
 
+/// コマンドの候補(R-22)を含む一覧で，アプリを開くコマンドを選んだところ(macOS の command-list-selected)
+fn command_list() -> CandidateList {
+    let mut entries = entries(&["クロード", "Claude を開く", "Claude のサイト", "黒戸"]);
+    for (entry, kind) in entries[1..3]
+        .iter_mut()
+        .zip([ipc::CommandKind::OpenApplication, ipc::CommandKind::OpenURL])
+    {
+        entry.annotation = Some(crate::strings::COMMAND.into());
+        entry.command = Some(kind);
+    }
+    CandidateList {
+        variants: vec![],
+        entries,
+        selected_entry: Some(1),
+        position: 2,
+        total: 4,
+        note: Some(ipc::Note {
+            tone: ipc::NoteTone::Info,
+            title: String::new(),
+            subject: None,
+            key: Some("Enter".into()),
+            key_action: Some("実行".into()),
+            text: "Enter 実行".into(),
+        }),
+        ..list()
+    }
+}
+
 fn correction() -> CandidateList {
     let mut entries = entries(&["python", "pyてょn", "Python"]);
     entries[1].annotation = Some("入力のまま".into());
@@ -312,6 +345,7 @@ fn column(text: &str) -> BranchColumn {
         usage_note: None,
         homophone: None,
         alternative_notes: vec![],
+        alternative_commands: None,
         source_name: None,
         split: None,
     }

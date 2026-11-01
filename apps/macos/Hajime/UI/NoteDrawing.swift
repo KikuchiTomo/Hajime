@@ -81,15 +81,15 @@ enum NoteDrawing {
         (text.size(withAttributes: [.font: theme.labelFont(size: Glass.labelFontSize)]).width + Glass.tagPaddingX * 2).rounded(.up)
     }
 
-    /// 候補の横の札(「修正」「入力のまま」，取り込んだ辞書の名前)．「修正」は補正の色の地，ほかは控えめな地．
-    /// selected は選んでいる行の上(アクセント色の地)に描くとき
-    static func drawTag(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool) {
+    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前)．「修正」は補正の色の地，
+    /// コマンドの候補(command)はアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(アクセント色の地)に描くとき
+    static func drawTag(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool, command: Bool = false) {
         let width = tagWidth(text, theme: theme)
         let rect = NSRect(x: (maxX - width).rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: width, height: Glass.tagHeight)
         let corrected = text == CandidatePanel.correctedAnnotation
         let fill: NSColor = selected ? theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected)
-            : corrected ? theme.correctionTint : theme.badge
-        let color: NSColor = selected ? theme.selectionText : corrected ? theme.correction : theme.textMuted
+            : command ? theme.commandTint : corrected ? theme.correctionTint : theme.badge
+        let color: NSColor = selected ? theme.selectionText : command ? theme.selection : corrected ? theme.correction : theme.textMuted
         fill.setFill()
         let radius = theme.isRounded ? Glass.tagRadius : 0
         NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()

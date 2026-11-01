@@ -80,6 +80,22 @@ struct WireTranslationTests {
         #expect(map.columns.first?.alternativeNotes == [nil, "修正"])
         #expect(map.columns.first?.sourceName == "医療")
         #expect(map.columns.first?.isCorrected == true)
+        // コマンドの候補が無い文節では，種類の並びを送らない
+        #expect(map.columns.first?.alternativeCommands == nil)
+    }
+
+    @Test("コマンドの候補の種類を，一覧の行と分岐図の枝ごとに運ぶ")
+    func commandKinds() {
+        let entries = [CandidatePanel.Entry(text: "クロード", annotation: nil),
+                       CandidatePanel.Entry(text: "Claude を開く", annotation: CandidatePanel.commandAnnotation, command: .openApplication)]
+        let list = WireCandidateList(CandidatePanel(variants: [], selectedVariant: nil, entries: entries, selectedEntry: 0, focus: .candidate,
+                                                    position: 1, total: 2, note: nil))
+        #expect(list.entries.map(\.command) == [nil, .openApplication])
+        var column = LatticePanel.Column(text: "クロード", alternatives: ["クロード", "サイトを開く"], selectedAlternative: 0, isFocused: true, isUncertain: false)
+        column.alternativeCommands = [nil, .openURL]
+        let map = WireBranchMap(LatticePanel(columns: [column]), hints: [])
+        #expect(map.columns.first?.alternativeCommands == [nil, .openURL])
+        #expect(LauncherCommand.Kind.allCases.map { WireCommandKind($0).rawValue } == LauncherCommand.Kind.allCases.map(\.rawValue))
     }
 
     @Test("候補の中の直した部分の位置は，Unicode のスカラー値の数で運ぶ(Rust の char と合わせる)")

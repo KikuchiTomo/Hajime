@@ -137,6 +137,9 @@ struct InputExtrasTests {
         #expect(!LauncherCommand(id: "../x", reading: "くろーど", title: "x", kind: .openURL, target: "https://a.b").isValid)
         #expect(!LauncherCommand(reading: "くろーど", title: " ", kind: .openURL, target: "https://a.b").isValid)
         #expect(command().candidateText.hasPrefix(DefaultSettings.commandCandidateMark))
+        // 候補の窓では印を除いた名前を出す．印の無い文字列はそのまま
+        #expect(LauncherCommand.title(ofCandidateText: command().candidateText) == command().title)
+        #expect(LauncherCommand.title(ofCandidateText: "クロード") == "クロード")
     }
 
     @Test("R-22: 読みで引くときはローマ字の読みもそろえ，使わないコマンドは引かない")

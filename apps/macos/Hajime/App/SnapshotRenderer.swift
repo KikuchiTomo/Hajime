@@ -50,6 +50,9 @@ enum SnapshotRenderer {
                 render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
                 render(homophoneListView(theme: look.theme, appearance: appearance), name: "homophone-list-\(look.name)", to: output, appearance: appearance)
                 render(homophoneBranchView(theme: look.theme, appearance: appearance), name: "homophone-branch-\(look.name)", to: output, appearance: appearance)
+                render(commandListView(theme: look.theme, appearance: appearance, selected: 0), name: "command-list-\(look.name)", to: output, appearance: appearance)
+                render(commandListView(theme: look.theme, appearance: appearance, selected: 1), name: "command-list-selected-\(look.name)", to: output, appearance: appearance)
+                render(commandBranchView(theme: look.theme, appearance: appearance), name: "command-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
         // 長い文: 窓は幅の上限に収め，一覧は末尾を省き，分岐図は注目している文節が見えるように幹をずらす
@@ -512,6 +515,33 @@ enum SnapshotRenderer {
         column.homophone = HomophoneNote(word: "取る", meaning: "手でつかむ。自分のものにする。確保する。なくす。取り除く。さまざまな単語と組み合わせて使う",
                                          example: "ボールを取る", others: ["撮る", "採る", "執る", "捕る", "摂る", "盗る", "録る"])
         let panel = LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// コマンドの候補(R-22)を一覧で出したところ．selected は選んでいる行
+    private static func commandListView(theme: ThemeChoice, appearance: NSAppearance?, selected: Int) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = SamplePanels.commands(selected: selected)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// コマンドの候補を分岐図で出し，Web のページを開くコマンドを選んだところ(幹は入力中の文字と同じく印を付けた名前)
+    private static func commandBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let list = SamplePanels.commands(selected: 2)
+        var column = LatticePanel.Column(text: DefaultSettings.commandCandidateMark + list.entries[2].text, alternatives: list.entries.map(\.text),
+                                         selectedAlternative: 2, isFocused: true, isUncertain: false)
+        column.alternativeNotes = list.entries.map(\.annotation)
+        column.alternativeCommands = list.entries.map(\.command)
+        let panel = LatticePanel(columns: [column], position: 1, total: list.entries.count, note: list.note)
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

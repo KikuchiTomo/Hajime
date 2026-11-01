@@ -8,6 +8,9 @@ pub const VARIANT_BADGE: &str = "↑";
 /// 打ち間違いを直した文節の幹に添える札
 pub const CORRECTED: &str = "修正";
 
+/// コマンドの候補を読み上げるときの前置き(core の CandidatePanel.commandAnnotation)
+pub const COMMAND: &str = "コマンド";
+
 pub fn mode(mode: InputMode) -> &'static str {
     match mode {
         InputMode::Japanese => "あ",

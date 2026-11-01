@@ -11,6 +11,19 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
     )
 
+    /// コマンドの候補(R-22)を含む一覧．selected は選んでいる行．コマンドを選んでいれば，確定のキーで動くことを足元に出す
+    static func commands(selected: Int) -> CandidatePanel {
+        let entries: [CandidatePanel.Entry] = [
+            .init(text: "クロード", annotation: nil),
+            .init(text: "Claude を開く", annotation: CandidatePanel.commandAnnotation, command: .openApplication),
+            .init(text: "Claude のサイト", annotation: CandidatePanel.commandAnnotation, command: .openURL),
+            .init(text: "黒戸", annotation: nil),
+        ]
+        let note = entries[selected].command == nil ? nil : Note(tone: .info, title: "", key: "Enter", keyAction: "実行")
+        return CandidatePanel(variants: [], selectedVariant: nil, entries: entries, selectedEntry: selected, focus: .candidate,
+                              position: selected + 1, total: entries.count, note: note)
+    }
+
     /// 同音異義語の使い分け(R-08)
     static let homophone = HomophoneNote(word: "撮る", meaning: "撮影する", example: "写真を撮る", others: ["取る", "採る", "執る", "捕る"])
 

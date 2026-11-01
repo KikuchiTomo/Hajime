@@ -43,7 +43,8 @@ final class CandidateView: NSView {
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         let entryWidth = panel.entries.map { entry in
             let annotation = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
-            return entry.text.size(withAttributes: textAttributes).width + annotation
+            let icon = entry.command == nil ? 0 : CommandDrawing.width
+            return icon + entry.text.size(withAttributes: textAttributes).width + annotation
         }.max() ?? 0
         let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
             width + variant.label.size(withAttributes: labelAttributes).width + Size.variantPaddingX * 2
@@ -199,7 +200,7 @@ final class CandidateView: NSView {
         let textColor = (isSelected ? theme.selectionText : theme.text).withAlphaComponent(opacity)
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
         let number = "\(index + 1)"
-        let textX: CGFloat
+        var textX: CGFloat
         if theme.isRounded {
             let center = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity)
@@ -207,6 +208,11 @@ final class CandidateView: NSView {
         } else {
             drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
             textX = rect.minX + Size.paddingX + lead
+        }
+        if let kind = entry.command {
+            // コマンドの候補は，文字の前に種類のアイコンを置く
+            CommandDrawing.drawIcon(kind, x: textX, midY: rect.midY, theme: theme, selected: isSelected, opacity: opacity)
+            textX += CommandDrawing.width
         }
         let annotationWidth = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
         let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: textColor]
@@ -229,7 +235,8 @@ final class CandidateView: NSView {
             GlassDrawing.drawUnderline(from: from, to: to, y: rect.maxY - offset, color: color, dotted: true, theme: theme)
         }
         if let annotation = entry.annotation {
-            NoteDrawing.drawTag(annotation, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: isSelected)
+            NoteDrawing.drawTag(annotation, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: isSelected,
+                                command: entry.command != nil)
         }
     }
 

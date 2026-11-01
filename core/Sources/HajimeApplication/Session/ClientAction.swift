@@ -106,11 +106,14 @@ public struct CandidatePanel: Sendable, Equatable {
         public var annotation: String?
         /// 打ち間違いを直した部分(text の中の文字の位置)．補正の点線の下線を引く．直していなければ nil
         public var corrected: Range<Int>?
+        /// コマンドの候補なら，その種類．描く側は種類のアイコンを文字の前に添え，札(annotation)をアクセントの色にする
+        public var command: LauncherCommand.Kind?
 
-        public init(text: String, annotation: String?, corrected: Range<Int>? = nil) {
+        public init(text: String, annotation: String?, corrected: Range<Int>? = nil, command: LauncherCommand.Kind? = nil) {
             self.text = text
             self.annotation = annotation
             self.corrected = corrected
+            self.command = command
         }
     }
 
@@ -183,8 +186,10 @@ public struct LatticePanel: Sendable, Equatable {
         public var usageNote: String?
         /// 選んでいる候補の同音異義語の使い分け(R-08)
         public var homophone: HomophoneNote?
-        /// 下の枝の候補ごとの添え書き(alternatives と同じ数)．打ったままの候補は「入力のまま」，直した候補は「修正」
+        /// 下の枝の候補ごとの添え書き(alternatives と同じ数)．打ったままの候補は「入力のまま」，直した候補は「修正」，コマンドは「コマンド」
         public var alternativeNotes: [String?] = []
+        /// 下の枝の候補ごとのコマンドの種類(alternatives と同じ数)．コマンドでない候補は nil
+        public var alternativeCommands: [LauncherCommand.Kind?] = []
         /// 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前(分野)．足元に小さく出す(R-16)
         public var sourceName: String?
         /// 文節を区切っているとき(⇧↓)の，区切れる位置で分けた文節．区切っていなければ nil
@@ -296,7 +301,7 @@ public struct Note: Sendable, Equatable {
         var parts = [title]
         if let subject { parts.append("「\(subject)」") }
         var line = parts.joined()
-        if let key, let keyAction { line += "　\(key) \(keyAction)" }
+        if let key, let keyAction { line += (line.isEmpty ? "" : "　") + "\(key) \(keyAction)" }
         return line
     }
 }
@@ -304,4 +309,6 @@ public struct Note: Sendable, Equatable {
 extension CandidatePanel {
     /// 打ち間違いを直した候補の添え書き．描く側で補正の色の札にする
     public static let correctedAnnotation = "修正"
+    /// コマンドの候補の添え書き．描く側でアクセントの色の札にする
+    public static let commandAnnotation = "コマンド"
 }

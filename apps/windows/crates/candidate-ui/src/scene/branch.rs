@@ -9,11 +9,11 @@
 //!
 //! 角丸のテーマは曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
 
-use super::paint::Painter;
+use super::paint::{Painter, TagStyle};
 use super::{Draw, Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
-use ipc::{BranchColumn, BranchMap, BranchSplit};
+use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind};
 use tokens::size::{branch, candidate, glass};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
@@ -126,7 +126,10 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     let mut trunk_width = Vec::new();
     for column in &map.columns {
         let text = column.split.as_ref().map_or_else(
-            || painter.width(&column.text, Font::Trunk),
+            || match trunk_command(column) {
+                Some((_, title)) => Painter::command_width() + painter.width(title, Font::Trunk),
+                None => painter.width(&column.text, Font::Trunk),
+            },
             |split| split_pieces(split, painter).width,
         );
         let width = text + padding * 2.0 + corrected_label_width(column, painter);
@@ -137,13 +140,27 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     let trunk_right = x - metrics.trunk_gap;
     let focused = focused(map);
     let column = focused.map(|(_, column)| column);
+    // コマンドの候補は文字の前に種類のアイコンを置くので，その幅も足す
     let label_width = column
-        .map(|column| column.alternatives.iter().chain(column.variants.iter()))
+        .map(|column| {
+            lower_rows(column, 1.0)
+                .into_iter()
+                .map(|row| {
+                    painter.width(&row.text, Font::Candidate)
+                        + row.command.map_or(0.0, |_| Painter::command_width())
+                })
+                .chain(
+                    column
+                        .variants
+                        .iter()
+                        .map(|label| painter.width(label, Font::Candidate)),
+                )
+                .collect::<Vec<_>>()
+        })
         .into_iter()
         .flatten()
-        .map(|label| painter.width(label, Font::Candidate))
         .fold(0.0, f32::max);
-    // 打ったまま・修正の添え書きの幅も足す
+    // 打ったまま・修正・コマンドの添え書きの幅も足す
     let note_width = column
         .and_then(|column| {
             column
@@ -411,6 +428,13 @@ fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
     }
 }
 
+/// 幹の文節で選んでいるコマンドの種類と名前．コマンドを選んでいなければ None
+fn trunk_command(column: &BranchColumn) -> Option<(CommandKind, &str)> {
+    let index = column.selected_alternative? as usize;
+    let kind = (*column.alternative_commands.as_ref()?.get(index)?)?;
+    Some((kind, column.alternatives.get(index)?))
+}
+
 fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     let theme = painter.theme;
     let rounded = theme.is_rounded();
@@ -426,9 +450,21 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     } else {
         theme.text
     };
-    match &column.split {
-        Some(split) => draw_split(painter, split, node, color),
-        None => painter.text(
+    match (&column.split, trunk_command(column)) {
+        (Some(split), _) => draw_split(painter, split, node, color),
+        (None, Some((kind, title))) => {
+            // コマンドを選んでいれば，幹も枝と同じく種類のアイコンと名前で見せる(入力中の文字には印を付けた名前が出る)
+            let x = node.x + candidate::PADDING_X;
+            painter.command(kind, x, node.mid_y(), !rounded && column.is_focused, 1.0);
+            painter.text(
+                title,
+                Font::Trunk,
+                color,
+                x + Painter::command_width(),
+                node,
+            );
+        }
+        (None, None) => painter.text(
             &column.text,
             Font::Trunk,
             color,
@@ -452,7 +488,7 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
             node.max_x() - candidate::PADDING_X / 2.0,
             node.mid_y(),
             !rounded && column.is_focused,
-            true,
+            TagStyle::Corrected,
         );
     }
     if column.is_decided {
@@ -499,8 +535,10 @@ struct Row {
     badge: String,
     selected: bool,
     opacity: f32,
-    /// 打ったまま・修正の添え書き
+    /// 打ったまま・修正・コマンドの添え書き
     note: Option<String>,
+    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
+    command: Option<CommandKind>,
 }
 
 /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
@@ -515,6 +553,10 @@ fn lower_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
             selected: column.selected_alternative == Some(index as u32),
             opacity: if index == 0 { 1.0 } else { rest },
             note: column.alternative_notes.get(index).cloned().flatten(),
+            command: column
+                .alternative_commands
+                .as_ref()
+                .and_then(|kinds| kinds.get(index).copied().flatten()),
         })
         .collect()
 }
@@ -531,6 +573,7 @@ fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
             selected: column.selected_variant == Some(index as u32),
             opacity: rest,
             note: None,
+            command: None,
         })
         .collect()
 }
@@ -704,20 +747,20 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
             Font::Key,
         );
     }
-    painter.text(
-        &row.text,
-        Font::Candidate,
-        text_color,
-        frame.x + padding / 2.0 + metrics.lead,
-        frame,
-    );
+    let mut text_x = frame.x + padding / 2.0 + metrics.lead;
+    if let Some(kind) = row.command {
+        // コマンドの候補は，文字の前に種類のアイコンを置く
+        painter.command(kind, text_x, frame.mid_y(), row.selected, opacity);
+        text_x += Painter::command_width();
+    }
+    painter.text(&row.text, Font::Candidate, text_color, text_x, frame);
     if let Some(note) = row.note.as_deref() {
         painter.tag(
             note,
             frame.max_x() - padding / 2.0,
             frame.mid_y(),
             row.selected,
-            note == strings::CORRECTED,
+            TagStyle::of(note, row.command.is_some()),
         );
     }
 }
@@ -831,6 +874,7 @@ mod tests {
             usage_note: None,
             homophone: None,
             alternative_notes: vec![None, Some("修正".into())],
+            alternative_commands: None,
             source_name: None,
             split: None,
         }
@@ -855,6 +899,61 @@ mod tests {
                 keys: "Space".into(),
                 label: "候補".into(),
             }],
+        }
+    }
+
+    /// 読み全体の 1 つの文節で，下の枝の 2 番目に Web のページを開くコマンドがある分岐図．selected は選んでいる枝
+    fn command_map(selected: u32) -> BranchMap {
+        let mut focused = column("▶ サイト", true);
+        focused.alternatives = vec!["クロード".into(), "サイト".into()];
+        focused.selected_alternative = Some(selected);
+        focused.alternative_notes = vec![None, Some(strings::COMMAND.into())];
+        focused.alternative_commands = Some(vec![None, Some(CommandKind::OpenURL)]);
+        if selected == 0 {
+            focused.text = "クロード".into();
+        }
+        BranchMap {
+            columns: vec![focused],
+            ..map()
+        }
+    }
+
+    #[test]
+    fn コマンドの枝は種類のアイコンと札を付け_選ぶと幹も印の代わりにアイコンで見せる() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let globes = |scene: &Scene| {
+                scene
+                    .draws
+                    .iter()
+                    .filter(|draw| {
+                        matches!(
+                            draw,
+                            Draw::Icon {
+                                icon: crate::keys::Icon::Globe,
+                                ..
+                            }
+                        )
+                    })
+                    .count()
+            };
+            let unselected = branch_map(&command_map(0), &look, &Fixed);
+            assert_eq!(globes(&unselected), 1);
+            assert!(texts(&unselected).contains(&(strings::COMMAND.into(), theme.selection)));
+            let chosen = branch_map(&command_map(1), &look, &Fixed);
+            // 枝と幹の 2 か所．幹の文字は印を除いた名前
+            assert_eq!(globes(&chosen), 2);
+            assert!(text_frame(&chosen, "▶ サイト").is_none());
+            let trunk = chosen
+                .draws
+                .iter()
+                .filter_map(|draw| match draw {
+                    Draw::Text { text, frame, .. } if text == "サイト" => Some(frame.y),
+                    _ => None,
+                })
+                .fold(f32::MAX, f32::min);
+            assert!(trunk < text_frame(&chosen, "クロード").unwrap().y);
         }
     }
 

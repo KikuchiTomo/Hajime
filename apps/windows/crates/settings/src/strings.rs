@@ -174,7 +174,7 @@ pub mod extras {
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
-    pub const COMMANDS_NOTE: &str = "読みを変換すると、候補の一覧に「▶ 名前」が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
+    pub const COMMANDS_NOTE: &str = "読みを変換すると、候補の一覧に「コマンド」の札を付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
     pub const COMMAND_READING: &str = "読み";
     pub const COMMAND_TITLE: &str = "名前";
     pub const COMMAND_KIND: &str = "動作";

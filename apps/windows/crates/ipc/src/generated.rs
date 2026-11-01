@@ -1277,6 +1277,15 @@ impl fmt::Debug for CandidateVariant {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommandKind {
+    OpenApplication,
+    OpenURL,
+    OpenFile,
+    RunShortcut,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidateEntry {
     pub text: String,
@@ -1288,6 +1297,8 @@ pub struct CandidateEntry {
     #[serde(rename = "correctedLength")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corrected_length: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<CommandKind>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -1297,6 +1308,7 @@ impl fmt::Debug for CandidateEntry {
             .field("annotation", &REDACTED)
             .field("correctedStart", &self.corrected_start)
             .field("correctedLength", &self.corrected_length)
+            .field("command", &self.command)
             .finish()
     }
 }
@@ -1458,6 +1470,9 @@ pub struct BranchColumn {
     pub homophone: Option<HomophoneNote>,
     #[serde(rename = "alternativeNotes")]
     pub alternative_notes: Vec<Option<String>>,
+    #[serde(rename = "alternativeCommands")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternative_commands: Option<Vec<Option<CommandKind>>>,
     #[serde(rename = "sourceName")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>,
@@ -1483,6 +1498,7 @@ impl fmt::Debug for BranchColumn {
             .field("usageNote", &REDACTED)
             .field("homophone", &self.homophone)
             .field("alternativeNotes", &REDACTED)
+            .field("alternativeCommands", &self.alternative_commands)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)
             .finish()

@@ -18,8 +18,9 @@ public enum CandidateOrigin: Sendable, Equatable {
     case userDictionary
     /// 連想変換の一覧から選んだ語(R-18)．学習には使わない
     case association
-    /// 読みで呼び出すコマンド(LauncherCommand の id)．選んで確定すると文字を入れずにコマンドを動かす．第 1 候補にはしない
-    case command(id: String)
+    /// 読みで呼び出すコマンド(LauncherCommand の id と種類)．選んで確定すると文字を入れずにコマンドを動かす．第 1 候補にはしない．
+    /// 種類は候補の窓でアイコンを描き分けるのに使う
+    case command(id: String, kind: LauncherCommand.Kind)
 }
 
 /// 候補ひとつ．readingCount は，この候補が読みの先頭から何文字ぶんを置き換えるか．
@@ -100,7 +101,12 @@ public struct Candidate: Sendable, Equatable {
 
     /// コマンドの候補なら，そのコマンドの id
     public var commandID: String? {
-        if case .command(let id) = origin { id } else { nil }
+        if case .command(let id, _) = origin { id } else { nil }
+    }
+
+    /// コマンドの候補なら，そのコマンドの種類
+    public var commandKind: LauncherCommand.Kind? {
+        if case .command(_, let kind) = origin { kind } else { nil }
     }
 }
 
