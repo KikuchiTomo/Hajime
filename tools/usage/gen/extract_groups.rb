@@ -21,7 +21,7 @@ opts = {
   mozc_dir: "data",
   usage_dict: "data/usage_dict.txt",
   out: "work/groups.jsonl",
-  max_cost: 8000,
+  max_cost: 10000,
   min_candidates: 2,
   include_partial: false,
   limit: nil,
@@ -31,7 +31,7 @@ OptionParser.new do |o|
   o.on("--mozc-dir DIR", "Directory with dictionary0*.txt and id.def") { |v| opts[:mozc_dir] = v }
   o.on("--usage-dict FILE", "Existing usage_dict.txt (to skip covered readings)") { |v| opts[:usage_dict] = v }
   o.on("-o", "--out FILE", "Output JSONL") { |v| opts[:out] = v }
-  o.on("--max-cost N", Integer, "Max Mozc cost for a spelling (lower = more common, default 8000)") { |v| opts[:max_cost] = v }
+  o.on("--max-cost N", Integer, "Max Mozc cost for a spelling (lower = more common, default 10000)") { |v| opts[:max_cost] = v }
   o.on("--min-candidates N", Integer, "Min kanji spellings per group (default 2)") { |v| opts[:min_candidates] = v }
   o.on("--include-partial", "Keep readings already in usage_dict if some spellings are missing") { opts[:include_partial] = true }
   o.on("--limit N", Integer, "Write only the top N groups") { |v| opts[:limit] = v }
