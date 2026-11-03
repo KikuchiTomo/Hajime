@@ -76,6 +76,11 @@ public struct TypoCorrectionRule: Sendable {
         wordsAfterEnglish.contains(where: reading.hasPrefix)
     }
 
+    /// 読みが，文の中の英単語のすぐあとによく続く語そのものか(「から」「まで」)
+    public static func isWordAfterEnglish(_ reading: String) -> Bool {
+        wordsAfterEnglish.contains(reading)
+    }
+
     /// 綴りの誤りとみなす部分の後ろが，英字のあとに続く日本語として読めるか(「pc」+「から」，「sns」+「を」，「ok」+「です」)．
     /// 英字の略語などをそのまま打ち，続けて助詞を打ったものなので，後ろの日本語まで英単語に飲み込んで直さない(「pcka」→ pika)．
     /// 後ろは英字のあとのいちばん長い，かなになり切る部分で，打ちかけのとき(「か」)は続く語の頭でもよい
