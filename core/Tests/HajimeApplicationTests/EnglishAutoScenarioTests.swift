@@ -210,6 +210,61 @@ struct EnglishAutoScenarioTests {
         #expect(harness.committed == expected)
     }
 
+    @Test("R-02: ローマ字入力で，英字の語に空白を挟まずに続けた語は，日本語の文の語として見分ける", arguments: [
+        "PC", "これはPC",
+    ])
+    func romajiAfterEnglishTerm(preceding: String) {
+        let harness = harness(.romaji, converter: converter)
+        harness.context = InputContext(precedingText: preceding)
+        harness.settings.current.liveConversionSkipLength = 0
+        harness.type("make")
+        harness.settle()
+        #expect(harness.marked.text == "負け")
+        harness.press(.enter)
+        #expect(harness.committed == "負け")
+    }
+
+    @Test("R-02: ローマ字入力で，英字の語のあとによく続く語(「kara」→ から)は前が英語でも英単語にしない", arguments: [
+        "PC ", "Let's ",
+    ])
+    func romajiParticleAfterEnglish(preceding: String) {
+        let converter = FakeConverter(["から": [("から", nil), ("空", nil)]])
+        let harness = harness(.romaji, converter: converter, lexicon: ["kara"])
+        harness.context = InputContext(precedingText: preceding)
+        harness.settings.current.liveConversionSkipLength = 0
+        harness.type("kara")
+        harness.settle()
+        #expect(harness.marked.text == "から")
+        harness.press(.enter)
+        #expect(harness.committed == "から")
+    }
+
+    @Test("R-02: 打鍵が止まって英単語にした読みも，続けてローマ字を打てば語の途中だったので打ったままに戻して続ける")
+    func romajiContinuesAfterPause() {
+        let converter = FakeConverter(["さんたんし": [("三端子", nil)]])
+        let harness = harness(.romaji, converter: converter, lexicon: ["san"])
+        harness.context = InputContext(precedingText: "Let's ")
+        harness.type("san")
+        harness.settle()
+        #expect(harness.marked.text == "san")
+        harness.type("ntannsi")
+        harness.settle()
+        #expect(harness.marked.text == "三端子")
+        harness.press(.enter)
+        #expect(harness.committed == "三端子")
+    }
+
+    @Test("R-02: 打鍵が止まって英単語にした読みは，Enter・Space・記号で語を終えればそのまま英単語にする")
+    func romajiKeepsWordEndedAfterPause() {
+        let harness = harness(.romaji, converter: converter)
+        harness.context = InputContext(precedingText: "Let's ")
+        harness.type("make")
+        harness.settle()
+        harness.type(",")
+        harness.press(.enter)
+        #expect(harness.committed.hasPrefix("make"))
+    }
+
     @Test("R-02: ローマ字入力でも，利用者が「いつも英語」にした語は英語にする")
     func romajiUserEnglish() {
         let harness = harness(.romaji, converter: converter) { $0.wordLanguage.englishWords = ["make"] }

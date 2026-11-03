@@ -88,6 +88,9 @@ public final class InputSession {
     private var reconverting: String?
     /// 組み立てを始めたときの，入力位置の前の文字列(打ち間違いの訂正の手がかり)
     private var compositionLeftContext: String?
+    /// 打鍵が止まったときに読み全体を英単語として確定させる前の読み．止まったところが語の終わりとは限らないので，
+    /// 続けてローマ字を打ったら(「san」で止まって「ntannsi」と続けたら)この読みに戻してから足す．次のキーを処理したら捨てる
+    private var typedBeforeEnglishWord: Composition?
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
@@ -148,6 +151,7 @@ public final class InputSession {
         let hidesNote = showsTransientNote
         showsTransientNote = false
         var result = route(event, context: context)
+        typedBeforeEnglishWord = nil
         // 入力文字なしで出した案内(学習の取り消し)は，次のキーで消す
         if hidesNote { result.actions.insert(.hideCandidates, at: 0) }
         // ターミナルの行には，どの経路で確定した文字もアプリに渡ったキーも，ここで 1 か所で数える
@@ -331,7 +335,8 @@ public final class InputSession {
     public func settle(context: InputContext) -> [ClientAction] {
         guard awaitsSettle else { return [] }
         isSettled = true
-        freezeWordsReadAsRomaji()
+        let typed = composition
+        if freezeWordsReadAsRomaji() == .wholeReading { typedBeforeEnglishWord = typed }
         return render(context: context)
     }
 
@@ -811,6 +816,11 @@ public final class InputSession {
                 // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
                 || (composition.pending == "z" && Self.zSymbolKeys.contains(character)))
         if isRomaji {
+            if let typed = typedBeforeEnglishWord {
+                // 打鍵が止まったときに英単語にした読みは，語がまだ続いていたので打ったままに戻す
+                composition = typed
+                readingCorrector.forgetReview()
+            }
             composition.insertRomaji(character)
             NasalReadingResolver(converter: converter).resolve(&composition)
             readingCorrector.didType(character)
@@ -991,14 +1001,31 @@ public final class InputSession {
         return lattice
     }
 
+    /// 英単語として確定させた部分
+    private enum FrozenEnglish {
+        /// 読み全体(「Let's 」+「make」)
+        case wholeReading
+        /// 読みの中の英単語(「gitwotukau」の git)
+        case wordInReading
+    }
+
     /// ローマ字として読めてしまう英単語を英単語にする(「gitwotukau」→「gitを使う」)．打ち間違いを直して見せているときはしない
-    private func freezeWordsReadAsRomaji() {
-        guard phase == .composing, !readingCorrector.isApplied else { return }
+    @discardableResult
+    private func freezeWordsReadAsRomaji() -> FrozenEnglish? {
+        guard phase == .composing, !readingCorrector.isApplied else { return nil }
         // 英語にも日本語にも読める語(「make」)は，前が英語のときや利用者が決めた語なら英語にする
         let context = WordLanguageContext.of(precedingText: compositionLeftContext)
-        guard corrector.freezeEnglishWord(in: &composition, context: context) || corrector.freezeWordReadAsRomaji(in: &composition) else { return }
+        let frozen: FrozenEnglish
+        if corrector.freezeEnglishWord(in: &composition, context: context) {
+            frozen = .wholeReading
+        } else if corrector.freezeWordReadAsRomaji(in: &composition) {
+            frozen = .wordInReading
+        } else {
+            return nil
+        }
         readingCorrector.forgetReview()
         usage?.record(.englishCorrected)
+        return frozen
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
@@ -1192,6 +1219,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         convertedFromEnglish = nil
+        typedBeforeEnglishWord = nil
         reconverting = nil
         forcedBoundaries = []
         splitMode = false

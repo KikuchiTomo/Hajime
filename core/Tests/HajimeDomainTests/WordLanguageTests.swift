@@ -35,6 +35,20 @@ struct WordLanguageTests {
         #expect(WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst).decide(evidence("no", english: true, reading: "の"), context: .afterEnglish) == .english)
     }
 
+    @Test("R-02: ローマ字入力では，英字の語のあとによく続く日本語の語(「から」「まで」)は前が英語でも日本語にする")
+    func wordAfterEnglish() {
+        let judge = WordLanguageJudge(settings: WordLanguageSettings(), mode: .japaneseFirst)
+        #expect(judge.decide(evidence("kara", english: true, reading: "から"), context: .afterEnglish) == .japanese)
+        #expect(judge.decide(evidence("made", english: true, reading: "まで"), context: .afterEnglish) == .japanese)
+        // 助詞などで始まるだけの語(「game」→ がめ)は前の語で見分ける
+        #expect(judge.decide(evidence("game", english: true, reading: "がめ"), context: .afterEnglish) == .english)
+        // 利用者が英語に決めた語と，英字入力(自動)は今までどおり
+        var settings = WordLanguageSettings()
+        settings.englishWords = ["kara"]
+        #expect(WordLanguageJudge(settings: settings, mode: .japaneseFirst).decide(evidence("kara", english: true, reading: "から"), context: .afterEnglish) == .english)
+        #expect(WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst).decide(evidence("made", english: true, reading: "まで"), context: .afterEnglish) == .english)
+    }
+
     @Test("R-02: 読みが英単語にしない文字数以下の語は，前が英語でなければ日本語にする")
     func shortReading() {
         let judge = WordLanguageJudge(settings: WordLanguageSettings(), mode: .englishFirst, japaneseReadingLength: 2)
@@ -75,8 +89,10 @@ struct WordLanguageTests {
     }
 
     @Test("前の文字列から手がかりを決める", arguments: [
-        (nil, WordLanguageContext.sentenceStart), ("", .sentenceStart), ("Let's ", .afterEnglish), ("v2", .afterEnglish),
+        (nil, WordLanguageContext.sentenceStart), ("", .sentenceStart), ("Let's ", .afterEnglish), ("v2 ", .afterEnglish),
         ("試合に", .afterJapanese), ("カタカナ　", .afterJapanese), ("「", .sentenceStart),
+        // 空白を挟まずに英字の語に続けて打つ語は，日本語の文で英字の語に付けた助詞など(「PC」+「から」)
+        ("PC", .afterJapanese), ("v2", .afterJapanese), ("これは PC", .afterJapanese), ("Let's\n", .sentenceStart),
     ] as [(String?, WordLanguageContext)])
     func context(text: String?, expected: WordLanguageContext) {
         #expect(WordLanguageContext.of(precedingText: text) == expected)

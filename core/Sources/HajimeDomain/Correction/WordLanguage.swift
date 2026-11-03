@@ -13,13 +13,22 @@ public enum WordLanguageContext: String, Sendable, Equatable, Codable, CaseItera
     /// 前が日本語
     case afterJapanese
 
-    /// 入力位置の前の文字列から決める．空白を飛ばした最後の文字が英数字なら英語，かな・漢字なら日本語，
-    /// 何も無いか改行なら文の頭．記号は手がかりにならないので文の頭として扱う
+    /// 入力位置の前の文字列から決める．空白を飛ばした最後の文字がかな・漢字なら日本語，何も無いか改行なら文の頭．
+    /// 記号は手がかりにならないので文の頭として扱う．
+    ///
+    /// 最後の文字が英数字のときは，空白を挟んで続ける語(「Let's 」のあと)だけを英語にする．
+    /// 空白を挟まずに続けて打つ語は，日本語の文で英字の語に付けた助詞など(「PC」+「から」，「AAA」+「まで」)．
+    /// 英語は語の間に空白を入れるので，英語の文の続きではない．前が日本語と同じに扱う
     public static func of(precedingText text: String?) -> WordLanguageContext {
-        guard let last = text?.last(where: { $0 != " " && $0 != "\u{3000}" && $0 != "\t" }) else { return .sentenceStart }
-        if last.isASCII, last.isLetter || last.isNumber { return .afterEnglish }
+        guard let text, let index = text.lastIndex(where: { !Self.isSpace($0) }) else { return .sentenceStart }
+        let last = text[index]
         if WordLanguageJudge.isJapanese(last) { return .afterJapanese }
-        return .sentenceStart
+        guard last.isASCII, last.isLetter || last.isNumber else { return .sentenceStart }
+        return text.index(after: index) < text.endIndex ? .afterEnglish : .afterJapanese
+    }
+
+    private static func isSpace(_ character: Character) -> Bool {
+        character == " " || character == "\u{3000}" || character == "\t"
     }
 }
 
@@ -162,7 +171,8 @@ public struct WordLanguageJudge: Sendable {
     /// 1. 利用者が足した「いつも英語」「いつも日本語」の語(英字入力のライブ変換では 3 のあと，英語の辞書の語は英語)
     /// 2. 利用者が足した見分け方の決まり(語と前の手がかり)
     /// 3. ローマ字として読めなければ英語
-    /// 3a. 読みが短い語(設定の英単語にしない文字数以下．「make」→ まけ)は，前が英語でなければ日本語
+    /// 3a. 読みが短い語(設定の英単語にしない文字数以下．「make」→ まけ)は，前が英語でなければ日本語．
+    ///     ローマ字入力では，2 文字以下の語と，英字の語のあとによく続く日本語の語(「から」「まで」)は前が英語でも日本語
     /// 4. 英語の辞書にない語は，英字入力(自動)では日本語らしければ日本語(読みのもっともらしさ)，ローマ字入力では日本語
     /// 5. 英語にも日本語にも読める語(「make」「shine」)は，前の語で見分ける(設定)．前が英語なら英語，前が日本語なら日本語
     /// 6. 手がかりが無ければ，不適切な語(「しね」)は英語にし，ほかは入力方式の主な言語にする
@@ -175,6 +185,11 @@ public struct WordLanguageJudge: Sendable {
         if mode == .dictionaryOnly { return evidence.isEnglishWord ? .english : .japanese }
         // ローマ字入力では，短い語(「no」)は前が英語でも日本語にする
         if mode == .japaneseFirst, word.count <= DefaultSettings.maximumJapaneseFirstShortWordLength, !evidence.isOffensive { return .japanese }
+        // ローマ字入力では，英字の語のあとによく続く日本語の語(「kara」→ から，「made」→ まで)も前が英語でも日本語にする．
+        // 英字の語に助詞などを付けるのは日本語の文の形なので，前が英語であることは英語の手がかりにならない(「PC 」+「kara」)
+        if mode == .japaneseFirst, let reading = evidence.reading, TypoCorrectionRule.isWordAfterEnglish(reading), !evidence.isOffensive {
+            return .japanese
+        }
         // 読みが短い語(「make」→ まけ)は，前が英語でなければ日本語にする(設定)．前が英語なら下の前の語の見分けに任せる
         if let reading = evidence.reading, reading.count <= japaneseReadingLength, !evidence.isOffensive,
            !(settings.usesContext && context == .afterEnglish) { return .japanese }
