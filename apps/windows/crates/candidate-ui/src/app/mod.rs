@@ -523,7 +523,10 @@ impl App {
             (Some(scene), Some(anchor)) => {
                 self.window()
                     .set_chrome(theme.backdrop, look.dark, theme.frame);
-                self.window().place(&anchor, scene, ANCHOR_GAP);
+                // 候補を選んでいるあいだ(一覧で選んでいるときと分岐図)は，候補が並び始める辺を動かさない．
+                // 打っているあいだの一覧は入力位置に寄せて置き直す(macOS と同じ)
+                self.window()
+                    .place(&anchor, scene, ANCHOR_GAP, is_list && !typing);
                 let opacity = self.opacity;
                 let below = self
                     .crossfade
