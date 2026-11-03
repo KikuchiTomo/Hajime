@@ -16,6 +16,8 @@ final class CandidatePanelController {
     private var shownLattice: LatticePanel?
     /// 窓を入力位置の上と下のどちらに置いているか．出しているあいだは同じ側に保ち，隠したら決め直す
     private var side: PanelPlacement.Side?
+    /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
+    private var held: PanelPlacement.Placement?
     /// 窓の縁を動かしている途中か
     private var isAnimatingFrame = false
 
@@ -43,8 +45,10 @@ final class CandidatePanelController {
         shownList = panel
         shownLattice = nil
         view.panel = panel
-        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える
-        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: panel.selectedEntry != nil)
+        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える．
+        // 窓は入力位置に寄せて置き直す
+        let choosing = panel.selectedEntry != nil
+        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: choosing, holdsEdges: choosing)
         announceSelection(panel)
     }
 
@@ -62,7 +66,7 @@ final class CandidatePanelController {
         shownLattice = panel
         shownList = nil
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
         if let focused = panel.columns.first(where: \.isFocused) {
             // コマンドの候補を選んでいれば，その名前を「コマンド」と続けて読む(幹の文字には印が付いている)
             let command = focused.selectedAlternative.flatMap { index in
@@ -81,16 +85,18 @@ final class CandidatePanelController {
 
     /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．
     /// 出ている窓の大きさが変わるときは縁を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
-    /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)
-    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false, animatesFrame: Bool = true) {
+    /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)．
+    /// holdsEdges なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(PanelPlacement.place)
+    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false, animatesFrame: Bool = true, holdsEdges: Bool) {
         let glass = theme.isRounded
         backdrop.cornerRadius = theme.cornerRadius
         // 一覧と分岐図を切り替えたときも，窓が出たままなら同じ側に置く
         let wasOnScreen = window.isVisible
         let wasVisible = FloatingPanel.attach(content, to: window, backdrop: glass ? backdrop : nil)
-        let placed = FloatingPanel.place(size, caret: caret, keeping: wasOnScreen ? side : nil)
+        let placed = FloatingPanel.place(size, caret: caret, keeping: wasOnScreen ? side : nil, holding: wasOnScreen && holdsEdges ? held : nil)
         side = placed.side
-        let frame = NSRect(origin: placed.origin, size: size)
+        held = holdsEdges ? placed : nil
+        let frame = NSRect(x: placed.frame.x, y: placed.frame.y, width: placed.frame.width, height: placed.frame.height)
         if wasVisible, crossfades, let root = window.contentView {
             root.wantsLayer = true
             let transition = CATransition()
@@ -98,12 +104,13 @@ final class CandidatePanelController {
             transition.duration = DesignTokens.Motion.CandidateWindow.update / 1000
             root.layer?.add(transition, forKey: "arrived")
         }
-        // 動かすのは，左端と入力位置の側の辺(下に置くなら上の辺)がそのままで，大きさだけが変わるときに限る．
+        // 動かすのは，左右と上下のそれぞれで片方の辺がそのままで，大きさだけが変わるときに限る(上の辺を保って下の辺が動く，など)．
         // 窓ごと動くとき(入力位置が移った)は滑らせずにすぐ移す．動いている途中に次の大きさが届くと縁が揺れて見えるため，
         // 動いている途中なら今の動きを止めてすぐ移す
         let current = window.frame
-        let anchoredEdgeStays = placed.side == .below ? abs(frame.maxY - current.maxY) < 1 : abs(frame.minY - current.minY) < 1
-        let animates = wasVisible && animatesFrame && frame != current && anchoredEdgeStays && abs(frame.minX - current.minX) < 1 && !isAnimatingFrame
+        let verticalEdgeStays = abs(frame.maxY - current.maxY) < 1 || abs(frame.minY - current.minY) < 1
+        let horizontalEdgeStays = abs(frame.minX - current.minX) < 1 || abs(frame.maxX - current.maxX) < 1
+        let animates = wasVisible && animatesFrame && frame != current && verticalEdgeStays && horizontalEdgeStays && !isAnimatingFrame
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if animates {
             isAnimatingFrame = true
@@ -143,6 +150,7 @@ final class CandidatePanelController {
         shownList = nil
         shownLattice = nil
         side = nil
+        held = nil
         window.orderOut(nil)
     }
 
@@ -230,7 +238,8 @@ enum FloatingPanel {
 
     /// 入力位置の行の長方形から，ウィンドウの左下の座標を決める．規則は core の PanelPlacement
     static func origin(for size: NSSize, caret: NSRect) -> NSPoint {
-        place(size, caret: caret, keeping: nil).origin
+        let frame = place(size, caret: caret, keeping: nil, holding: nil).frame
+        return NSPoint(x: frame.x, y: frame.y)
     }
 
     /// 入力位置を教えないアプリでは，マウスの位置の近くに出す
@@ -245,16 +254,20 @@ enum FloatingPanel {
         return screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
     }
 
-    /// 前に置いた側(keeping)をなるべく保って置く(PanelPlacement.place)
-    static func place(_ size: NSSize, caret: NSRect, keeping side: PanelPlacement.Side?) -> (origin: NSPoint, side: PanelPlacement.Side) {
+    /// 前に置いた側(keeping)をなるべく保ち，holding を渡したら候補が並び始める辺も保って置く(PanelPlacement.place)．
+    /// 座標は整数に丸める
+    static func place(_ size: NSSize, caret: NSRect, keeping side: PanelPlacement.Side?, holding held: PanelPlacement.Placement?) -> PanelPlacement.Placement {
         let anchor = anchor(for: caret)
         let visible = visibleFrame(for: caret)
-        let placed = PanelPlacement.place(
+        var placed = PanelPlacement.place(
             caret: Rect(x: anchor.minX, y: anchor.minY, width: anchor.width, height: anchor.height),
             size: Rect(x: 0, y: 0, width: size.width, height: size.height),
             screen: Rect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height),
-            keeping: side
+            keeping: side,
+            holding: held
         )
-        return (NSPoint(x: placed.x.rounded(), y: placed.y.rounded()), placed.side)
+        placed.frame.x = placed.frame.x.rounded()
+        placed.frame.y = placed.frame.y.rounded()
+        return placed
     }
 }

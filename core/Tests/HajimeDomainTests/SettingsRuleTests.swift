@@ -206,7 +206,7 @@ struct PanelPlacementTests {
         #expect(tall.side == .above)
         let short = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 200, height: 80), screen: screen, keeping: tall.side)
         #expect(short.side == .above)
-        #expect(short.y == caret.maxY + PanelPlacement.gap)
+        #expect(short.frame.y == caret.maxY + PanelPlacement.gap)
     }
 
     @Test("下に置いているあいだは，入る限り下のまま")
@@ -221,6 +221,63 @@ struct PanelPlacementTests {
     func returnsBelowWhenAboveIsFull() {
         let caret = Rect(x: 100, y: 700, width: 2, height: 20)
         #expect(PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: .above).side == .below)
+    }
+
+    @Test("候補を選んでいるあいだは，上に置いた窓の上の辺を保つ")
+    func holdsTopEdgeAbove() {
+        // 下に 100 しか空いていないので上に置く．窓の上の辺は 120 + 4 + 150 = 274
+        let caret = Rect(x: 100, y: 100, width: 2, height: 20)
+        let first = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: nil)
+        #expect(first.side == .above)
+        #expect(first.frame.maxY == 274)
+        // 低くなっても上の辺は動かず，候補の行は同じ位置に並ぶ(窓の下と入力位置の行のあいだが空く)
+        let short = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 200, height: 80), screen: screen, keeping: first.side, holding: first)
+        #expect(short.frame.maxY == 274)
+        #expect(short.frame.y == 194)
+        // 前より高くならないあいだは，上の辺を保ったまま下に伸ばす
+        let back = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: short.side, holding: short)
+        #expect(back.frame.maxY == 274)
+        // 入力位置の行に重なるほど高くなったら，下の辺を入力位置の行の上に付けて上に伸ばす
+        let tall = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 200, height: 200), screen: screen, keeping: back.side, holding: back)
+        #expect(tall.frame.y == caret.maxY + PanelPlacement.gap)
+        #expect(tall.frame.maxY == 324)
+    }
+
+    @Test("上の辺を保たないとき(打っているあいだ)と，入力位置の行が上下に動いたときは，入力位置の行に寄せる")
+    func dropsToCaretWithoutHolding() {
+        let caret = Rect(x: 100, y: 100, width: 2, height: 20)
+        let first = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: nil)
+        let short = Rect(x: 0, y: 0, width: 200, height: 80)
+        #expect(PanelPlacement.place(caret: caret, size: short, screen: screen, keeping: first.side).frame.y == caret.maxY + PanelPlacement.gap)
+        let moved = Rect(x: 100, y: 80, width: 2, height: 20)
+        #expect(PanelPlacement.place(caret: moved, size: short, screen: screen, keeping: first.side, holding: first).frame.y == moved.maxY + PanelPlacement.gap)
+    }
+
+    @Test("下に置いた窓は，保っても保たなくても上の辺が入力位置の行の下にある")
+    func holdingBelowKeepsTopEdge() {
+        let caret = Rect(x: 100, y: 500, width: 2, height: 20)
+        let first = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: nil)
+        let short = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 200, height: 80), screen: screen, keeping: first.side, holding: first)
+        #expect(short.side == .below)
+        #expect(short.frame.maxY == first.frame.maxY)
+        #expect(short.frame.maxY == caret.y - PanelPlacement.gap)
+    }
+
+    @Test("候補を選んでいるあいだは，右端に寄せた窓の左の辺を保つ")
+    func holdsLeftEdgeAtRightEdge() {
+        // 右端に寄せて左の辺は 800
+        let caret = Rect(x: 950, y: 500, width: 2, height: 20)
+        let first = PanelPlacement.place(caret: caret, size: size, screen: screen, keeping: nil)
+        #expect(first.frame.x == 800)
+        // 狭くなっても左の辺は動かない
+        let narrow = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 120, height: 150), screen: screen, keeping: first.side, holding: first)
+        #expect(narrow.frame.x == 800)
+        // 右からはみ出すほど広くなったら左に寄せる
+        let wide = PanelPlacement.place(caret: caret, size: Rect(x: 0, y: 0, width: 300, height: 150), screen: screen, keeping: narrow.side, holding: narrow)
+        #expect(wide.frame.x == 700)
+        // 入力位置が左右に動いたら(文節を移った)，入力位置に寄せて置き直す
+        let moved = Rect(x: 600, y: 500, width: 2, height: 20)
+        #expect(PanelPlacement.place(caret: moved, size: size, screen: screen, keeping: wide.side, holding: wide).frame.x == 600)
     }
 }
 

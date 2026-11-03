@@ -82,6 +82,8 @@ pub struct Window {
     /// 出している窓を入力位置の上と下のどちらに置いたか．出しているあいだは同じ側に置き続ける
     /// (打つたびに窓が上下に跳ねないように．macOS の PanelPlacement と同じ)
     side: std::cell::Cell<Option<Side>>,
+    /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
+    held: std::cell::Cell<Option<Placed>>,
 }
 
 /// 入力位置に対して窓を置いた側
@@ -89,6 +91,17 @@ pub struct Window {
 enum Side {
     Above,
     Below,
+}
+
+/// 置いた窓の本体．次に置くときに，候補が並び始める辺を保つのに使う(macOS の PanelPlacement.Placement と同じ)
+#[derive(Debug, Clone, Copy)]
+struct Placed {
+    /// 本体の左上
+    x: i32,
+    y: i32,
+    side: Side,
+    /// 置いたときの入力位置の行
+    anchor: RECT,
 }
 
 pub struct Notifier {
@@ -213,6 +226,7 @@ impl Window {
             hwnd,
             target: None,
             side: std::cell::Cell::new(None),
+            held: std::cell::Cell::new(None),
         })
     }
 
@@ -280,8 +294,9 @@ impl Window {
         let _ = unsafe { KillTimer(Some(self.hwnd), timer as usize) };
     }
 
-    /// 本体(scene.body)を入力位置の下(入らなければ上)に置く．影や余白はそのまわりにはみ出す
-    pub fn place(&self, anchor: &Rect, scene: &Scene, gap: i32) {
+    /// 本体(scene.body)を入力位置の下(入らなければ上)に置く．影や余白はそのまわりにはみ出す．
+    /// holds なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(position)
+    pub fn place(&self, anchor: &Rect, scene: &Scene, gap: i32, holds: bool) {
         let scale = self.scale();
         let anchor_rect = RECT {
             left: anchor.x,
@@ -307,6 +322,7 @@ impl Window {
             }
         };
         let pixels = |value: f32| (value * scale).round() as i32;
+        let held = if holds { self.held.get() } else { None };
         let (x, y, side) = position(
             &anchor_rect,
             &work,
@@ -314,8 +330,15 @@ impl Window {
             pixels(scene.body.height),
             gap,
             self.side.get(),
+            held.as_ref(),
         );
         self.side.set(Some(side));
+        self.held.set(holds.then_some(Placed {
+            x,
+            y,
+            side,
+            anchor: anchor_rect,
+        }));
         // SAFETY: hwnd はこの窓
         let _ = unsafe {
             SetWindowPos(
@@ -350,6 +373,7 @@ impl Window {
 
     pub fn hide(&self) {
         self.side.set(None);
+        self.held.set(None);
         // SAFETY: hwnd はこの窓
         let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
     }
@@ -437,7 +461,10 @@ impl Window {
 }
 
 /// 窓の左上と置いた側．下に入れば下，入らなければ上に置く．keeping の側に置いていたら，入るかぎりその側に置き続ける．
-/// どちらにも入らなければ画面の中に詰める(core の PanelPlacement と同じ決まり)
+/// どちらにも入らなければ画面の中に詰める．
+/// held に前の窓を渡すと，候補が並び始める辺(上と左)を動かさない．上に置くときは，入力位置の行が上下に動いていなければ
+/// 上の辺を保ち，入力位置の行に重なるほど高くなったときだけ上に伸ばす．入力位置が左右に動いていなければ左の辺を保ち，
+/// 画面の右からはみ出すときだけ左に寄せる(core の PanelPlacement と同じ決まり)
 fn position(
     anchor: &RECT,
     work: &RECT,
@@ -445,6 +472,7 @@ fn position(
     height: i32,
     gap: i32,
     keeping: Option<Side>,
+    held: Option<&Placed>,
 ) -> (i32, i32, Side) {
     let below = anchor.bottom + gap;
     let above = anchor.top - gap - height;
@@ -456,12 +484,19 @@ fn position(
         _ if fits_below => Side::Below,
         _ => Side::Above,
     };
-    let y = match side {
-        Side::Below => below,
-        Side::Above => above,
+    let y = match (side, held) {
+        (Side::Below, _) => below,
+        (Side::Above, Some(held)) if held.side == Side::Above && held.anchor.top == anchor.top => {
+            held.y.min(above)
+        }
+        (Side::Above, _) => above,
     };
     let y = y.min(work.bottom - height).max(work.top);
-    let x = anchor.left.min(work.right - width).max(work.left);
+    let x = match held {
+        Some(held) if held.anchor.left == anchor.left => held.x,
+        _ => anchor.left,
+    };
+    let x = x.min(work.right - width).max(work.left);
     (x, y, side)
 }
 
@@ -541,7 +576,7 @@ mod tests {
     fn 入力位置の下に出す() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
-            position(&rect(100, 100, 102, 120), &work, 200, 150, 2, None),
+            position(&rect(100, 100, 102, 120), &work, 200, 150, 2, None, None),
             (100, 122, Side::Below)
         );
     }
@@ -550,7 +585,7 @@ mod tests {
     fn 画面の下にはみ出すなら上に出す() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
-            position(&rect(100, 1000, 102, 1020), &work, 200, 150, 2, None),
+            position(&rect(100, 1000, 102, 1020), &work, 200, 150, 2, None, None),
             (100, 848, Side::Above)
         );
     }
@@ -559,7 +594,7 @@ mod tests {
     fn 画面の右にはみ出さない() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
-            position(&rect(1900, 100, 1902, 120), &work, 200, 150, 2, None).0,
+            position(&rect(1900, 100, 1902, 120), &work, 200, 150, 2, None, None).0,
             1720
         );
     }
@@ -575,7 +610,8 @@ mod tests {
                 200,
                 150,
                 2,
-                Some(Side::Above)
+                Some(Side::Above),
+                None
             ),
             (100, 648, Side::Above)
         );
@@ -587,14 +623,82 @@ mod tests {
                 200,
                 150,
                 2,
-                Some(Side::Above)
+                Some(Side::Above),
+                None
             )
             .2,
             Side::Below
         );
         // どちらにも入らない(画面より高い窓)なら画面の中に詰める
-        let (_, y, _) = position(&rect(100, 500, 102, 520), &work, 200, 1200, 2, None);
+        let (_, y, _) = position(&rect(100, 500, 102, 520), &work, 200, 1200, 2, None, None);
         assert_eq!(y, 0);
+    }
+
+    fn placed(anchor: RECT, (x, y, side): (i32, i32, Side)) -> Placed {
+        Placed { x, y, side, anchor }
+    }
+
+    #[test]
+    fn 候補を選んでいるあいだは上に置いた窓の上の辺を保つ() {
+        let work = rect(0, 0, 1920, 1080);
+        let anchor = rect(100, 1000, 102, 1020);
+        let first = placed(anchor, position(&anchor, &work, 200, 150, 2, None, None));
+        assert_eq!((first.y, first.side), (848, Side::Above));
+        // 低くなっても上の辺は動かない(窓の下と入力位置の行のあいだが空く)
+        let short = placed(
+            anchor,
+            position(&anchor, &work, 200, 80, 2, Some(first.side), Some(&first)),
+        );
+        assert_eq!(short.y, 848);
+        // 入力位置の行に重なるほど高くなったら，下の辺を入力位置の行の上に付けて上に伸ばす
+        assert_eq!(
+            position(&anchor, &work, 200, 200, 2, Some(short.side), Some(&short)).1,
+            798
+        );
+        // 保たないとき(打っているあいだ)と，入力位置の行が上下に動いたときは，入力位置の行に寄せる
+        assert_eq!(
+            position(&anchor, &work, 200, 80, 2, Some(first.side), None).1,
+            918
+        );
+        let moved = rect(100, 990, 102, 1010);
+        assert_eq!(
+            position(&moved, &work, 200, 80, 2, Some(first.side), Some(&first)).1,
+            908
+        );
+    }
+
+    #[test]
+    fn 候補を選んでいるあいだは右端に寄せた窓の左の辺を保つ() {
+        let work = rect(0, 0, 1920, 1080);
+        let anchor = rect(1900, 100, 1902, 120);
+        let first = placed(anchor, position(&anchor, &work, 200, 150, 2, None, None));
+        assert_eq!(first.x, 1720);
+        // 狭くなっても左の辺は動かない
+        let narrow = placed(
+            anchor,
+            position(&anchor, &work, 120, 150, 2, Some(first.side), Some(&first)),
+        );
+        assert_eq!(narrow.x, 1720);
+        // 右からはみ出すほど広くなったら左に寄せる
+        assert_eq!(
+            position(
+                &anchor,
+                &work,
+                300,
+                150,
+                2,
+                Some(narrow.side),
+                Some(&narrow)
+            )
+            .0,
+            1620
+        );
+        // 入力位置が左右に動いたら(文節を移った)，入力位置に寄せて置き直す
+        let moved = rect(1500, 100, 1502, 120);
+        assert_eq!(
+            position(&moved, &work, 200, 150, 2, Some(first.side), Some(&first)).0,
+            1500
+        );
     }
 
     #[test]
