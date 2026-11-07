@@ -22,7 +22,6 @@ enum NSEventKeyTranslator {
         static let up: UInt16 = 126
         static let jisEisu: UInt16 = 102
         static let jisKana: UInt16 = 104
-        static let jisYen: UInt16 = 93
         /// F1〜F20(キー設定の表で割り当てられる．R-17)
         static let functionKeys: [UInt16: Int] = [
             122: 1, 120: 2, 99: 3, 118: 4, 96: 5, 97: 6, 98: 7, 100: 8, 101: 9, 109: 10,
@@ -35,6 +34,7 @@ enum NSEventKeyTranslator {
     static func translate(_ event: NSEvent) -> KeyEvent? {
         guard event.type == .keyDown else { return nil }
         let modifiers = translateModifiers(event.modifierFlags)
+        let shifted = shiftedCharacters(of: event)
         let key: KeyEvent.Key? = switch event.keyCode {
         case KeyCode.returnKey, KeyCode.keypadEnter: .enter
         case KeyCode.tab: .tab
@@ -52,10 +52,10 @@ enum NSEventKeyTranslator {
         case KeyCode.up: .up
         case KeyCode.jisEisu: .eisu
         case KeyCode.jisKana: .kana
-        // charactersIgnoringModifiers は Shift だけを効かせた文字(Option で変わる前)．Shift+¥ の | は配列の文字のまま使う
-        case KeyCode.jisYen where YenKeyPolicy.isChoosable(event.charactersIgnoringModifiers ?? ""): .yen
+        // キー配列が ¥ を入れるときだけ，¥ キーの設定で決める．Shift+¥ の | など，ほかの文字はキー配列の文字のまま使う
+        case _ where YenKeyPolicy.isChoosable(shifted ?? ""): .yen
         case let code where KeyCode.functionKeys[code] != nil: KeyCode.functionKeys[code].map(KeyEvent.Key.function)
-        default: character(from: event, modifiers: modifiers).map(KeyEvent.Key.character)
+        default: character(from: event, shifted: shifted, modifiers: modifiers).map(KeyEvent.Key.character)
         }
         return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode], isKeypad: KeyCode.keypad.contains(event.keyCode)) }
     }
@@ -83,11 +83,17 @@ enum NSEventKeyTranslator {
         return labels
     }()
 
-    private static func character(from event: NSEvent, modifiers: KeyEvent.Modifiers) -> Character? {
+    /// キー配列が Shift だけを効かせて入れる文字(Option・Control・Command で変わる前)．
+    /// IME が受けるイベントの charactersIgnoringModifiers には Shift も効いていない(Shift+¥ が ¥ になる)ので，キー配列から引き直す
+    private static func shiftedCharacters(of event: NSEvent) -> String? {
+        event.characters(byApplyingModifiers: event.modifierFlags.intersection(.shift)) ?? event.charactersIgnoringModifiers
+    }
+
+    private static func character(from event: NSEvent, shifted: String?, modifiers: KeyEvent.Modifiers) -> Character? {
         // Control・Option・Command を押しているときは，それで変わる前の文字で判断する(Control+K，Option+Z など．キー設定の表で引く)．
         // Option で入る特殊な文字(å)は，表に無ければ InputSession がアプリに渡し，アプリが元のキーから入れる
         let changesCharacter = modifiers.contains(.control) || modifiers.contains(.option) || modifiers.contains(.command)
-        let text = changesCharacter ? event.charactersIgnoringModifiers : event.characters
+        let text = changesCharacter ? shifted : event.characters
         guard let text, text.count == 1, let character = text.first else { return nil }
         // 制御文字(矢印などの機能キーは私用領域の文字で来る)は扱わない
         guard let scalar = character.unicodeScalars.first,
