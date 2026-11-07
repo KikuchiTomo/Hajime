@@ -103,6 +103,8 @@ enum SnapshotRenderer {
                                      ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .terminal),
                                      ProfileRule(applicationPrefix: "com.apple.Notes", profile: .remembersMode),
                                      ProfileRule(applicationPrefix: "com.tinyspeck.slackmacgap", profile: .imeOn)]
+            settings.commands = [LauncherCommand(reading: "めも", title: "メモ", kind: .openApplication, target: "/System/Applications/Notes.app"),
+                                 LauncherCommand(reading: "はじめ", title: "はじめのサイト", kind: .openURL, target: "https://haji.men/")]
         }
         for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
             NSApp.appearance = NSAppearance(named: appearance)
