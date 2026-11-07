@@ -15,10 +15,10 @@ struct YenKeyPolicyTests {
         #expect(YenKeyPolicy.alwaysYen.character(profile: .standard, optionPressed: true) == "\\")
     }
 
-    @Test("R-04: 設定で決めるのは ¥ と \\ だけ．配列が入れるほかの文字(Shift+¥ の |)はそのまま")
+    @Test("R-04: 設定で決めるのは配列が入れる ¥ だけ．ほかの文字(Shift+¥ の |，US 配列の \\)はそのまま")
     func choosableCharacters() {
         #expect(YenKeyPolicy.isChoosable("¥"))
-        #expect(YenKeyPolicy.isChoosable("\\"))
+        #expect(!YenKeyPolicy.isChoosable("\\"))
         #expect(!YenKeyPolicy.isChoosable("|"))
         #expect(!YenKeyPolicy.isChoosable(""))
     }

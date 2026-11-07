@@ -528,10 +528,10 @@ public enum YenKeyPolicy: String, Sendable, Equatable, Codable, CaseIterable {
     public static let backslash = "\\"
     public static let yen = "¥"
 
-    /// ¥ キーが配列の設定で入れる文字が，この設定で選べる文字(¥ か \\)か．
-    /// 選べる文字のときだけ設定で決め，Shift などで配列が別の文字(JIS 配列の Shift+¥ の |)を入れるときは，その文字をそのまま使う
+    /// キー配列が入れる文字(Shift だけを効かせた文字)を，この設定で決めるか．¥ のときだけ決める．
+    /// Shift などで配列が別の文字(JIS 配列の Shift+¥ の |)を入れるときと，配列がもともと入れる \\ は，その文字をそのまま使う
     public static func isChoosable(_ text: String) -> Bool {
-        text == backslash || text == yen
+        text == yen
     }
 
     /// Option を押しているときは逆の文字にする
