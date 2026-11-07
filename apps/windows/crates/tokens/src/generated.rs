@@ -282,6 +282,9 @@ pub mod size {
         pub const RULE_SEARCH_WIDTH: f32 = 160.0;
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;
+        pub const COMMAND_READING_COLUMN_WIDTH: f32 = 110.0;
+        pub const COMMAND_TITLE_COLUMN_WIDTH: f32 = 120.0;
+        pub const COMMAND_KIND_COLUMN_WIDTH: f32 = 130.0;
         pub const RULE_PROFILE_COLUMN_WIDTH: f32 = 210.0;
         pub const TABLE_HEADER_INSET: f32 = 10.0;
         pub const TABLE_COLUMN_SPACING: f32 = 17.0;

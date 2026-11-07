@@ -170,6 +170,9 @@ enum DesignTokens {
             static let ruleSearchWidth: CGFloat = 160
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
+            static let commandReadingColumnWidth: CGFloat = 110
+            static let commandTitleColumnWidth: CGFloat = 120
+            static let commandKindColumnWidth: CGFloat = 130
             static let ruleProfileColumnWidth: CGFloat = 210
             static let tableHeaderInset: CGFloat = 10
             static let tableColumnSpacing: CGFloat = 17

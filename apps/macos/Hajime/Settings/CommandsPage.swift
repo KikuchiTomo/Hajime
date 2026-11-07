@@ -13,6 +13,13 @@ struct CommandsPage: View {
         Form {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.launcherCommands, keyPath: \.launcherCommands)
+                // 列の見出しは表の外に描く(FormTableHeader)．表の見出しは Form の中では行に重なる
+                FormTableHeader(columns: [
+                    .init(title: UIStrings.Extras.commandReading, width: DesignTokens.Size.Settings.commandReadingColumnWidth),
+                    .init(title: UIStrings.Extras.commandTitle, width: DesignTokens.Size.Settings.commandTitleColumnWidth),
+                    .init(title: UIStrings.Extras.commandKind, width: DesignTokens.Size.Settings.commandKindColumnWidth),
+                    .init(title: UIStrings.Extras.commandTarget),
+                ])
                 commandTable
                 HStack {
                     Button(UIStrings.Extras.addCommand) { editing = CommandDraft() }
@@ -63,19 +70,24 @@ struct CommandsPage: View {
 
     private var commandTable: some View {
         FormTableHost {
+            // 列の幅は表の外の見出し(FormTableHeader)とそろえる．最後の列は残りの幅
             Table(model.settings.commands, selection: $selection) {
-                TableColumn(UIStrings.Extras.commandReading, value: \.reading)
-                TableColumn(UIStrings.Extras.commandTitle, value: \.title)
-                TableColumn(UIStrings.Extras.commandKind) { Text(UIStrings.Extras.label(for: $0.kind)) }
-                TableColumn(UIStrings.Extras.commandTarget, value: \.target)
+                TableColumn(UIStrings.Extras.commandReading) { Text($0.reading).lineLimit(1) }
+                    .width(DesignTokens.Size.Settings.commandReadingColumnWidth)
+                TableColumn(UIStrings.Extras.commandTitle) { Text($0.title).lineLimit(1) }
+                    .width(DesignTokens.Size.Settings.commandTitleColumnWidth)
+                TableColumn(UIStrings.Extras.commandKind) { Text(UIStrings.Extras.label(for: $0.kind)).lineLimit(1) }
+                    .width(DesignTokens.Size.Settings.commandKindColumnWidth)
+                TableColumn(UIStrings.Extras.commandTarget) { Text($0.target).lineLimit(1).truncationMode(.middle) }
             }
+            .tableColumnHeaders(.hidden)
             .contextMenu(forSelectionType: LauncherCommand.ID.self) { _ in
             } primaryAction: { ids in
                 if let id = ids.first, let command = model.settings.commands.first(where: { $0.id == id }) { editing = CommandDraft(command) }
             }
             .overlay {
                 if model.settings.commands.isEmpty {
-                    Text(UIStrings.Extras.commandsEmpty).foregroundStyle(.secondary)
+                    EmptyListLabel(text: UIStrings.Extras.commandsEmpty)
                 }
             }
         }
