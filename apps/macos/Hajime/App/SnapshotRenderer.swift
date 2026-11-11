@@ -59,6 +59,9 @@ enum SnapshotRenderer {
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 0), name: "command-list-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 1), name: "command-list-selected-\(look.name)", to: output, appearance: appearance)
                 render(commandBranchView(theme: look.theme, appearance: appearance), name: "command-branch-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.emoji, theme: look.theme, appearance: appearance), name: "palette-emoji-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.search, theme: look.theme, appearance: appearance), name: "palette-search-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.symbol, theme: look.theme, appearance: appearance), name: "palette-symbol-\(look.name)", to: output, appearance: appearance)
             }
         }
         // 長い文: 窓は幅の上限に収め，一覧は末尾を省き，分岐図は注目している文節が見えるように幹をずらす
@@ -353,6 +356,16 @@ enum SnapshotRenderer {
     }
 
     /// 入力位置の下に出す案内の窓．tone は直したときと「もしかして」と示すとき
+    /// 絵文字と記号のパレット(R-26)
+    private static func paletteView(_ panel: PalettePanel, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = PaletteView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
     private static func noteView(_ note: Note, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = NoteView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)

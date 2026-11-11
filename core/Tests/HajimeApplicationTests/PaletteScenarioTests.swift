@@ -4,7 +4,7 @@ import HajimeDomain
 import HajimeTestSupport
 import Testing
 
-/// 絵文字と記号のパレット(R-25)．キーとマウスの操作から，出すパレットと入れる文字を確かめる
+/// 絵文字と記号のパレット(R-26)．キーとマウスの操作から，出すパレットと入れる文字を確かめる
 @MainActor
 @Suite("絵文字と記号のパレット")
 struct PaletteScenarioTests {
@@ -52,7 +52,7 @@ struct PaletteScenarioTests {
         panel?.rows.map { $0.cells.map(\.text) } ?? []
     }
 
-    @Test("R-25: ⌃⌥E で絵文字のパレットを開き，組み立て中の文字は先に確定する")
+    @Test("R-26: ⌃⌥E で絵文字のパレットを開き，組み立て中の文字は先に確定する")
     func opens() throws {
         let harness = harness()
         harness.type("kana")
@@ -76,7 +76,7 @@ struct PaletteScenarioTests {
         #expect(hidden.palette?.showsPreview == false)
     }
 
-    @Test("R-25: ローマ字で打つとかなにして探し，Enter で先頭の文字を入れて閉じる")
+    @Test("R-26: ローマ字で打つとかなにして探し，Enter で先頭の文字を入れて閉じる")
     func searchAndInsert() throws {
         let harness = harness()
         openEmoji(harness)
@@ -91,7 +91,7 @@ struct PaletteScenarioTests {
         #expect(harness.lastResult.handled)
     }
 
-    @Test("R-25: 英語の綴りは打ったままを見せ，英語の名前とショートコードで探す")
+    @Test("R-26: 英語の綴りは打ったままを見せ，英語の名前とショートコードで探す")
     func englishQuery() {
         let harness = harness()
         openEmoji(harness)
@@ -100,7 +100,7 @@ struct PaletteScenarioTests {
         #expect(texts(harness.palette).first?.first == "👍")
     }
 
-    @Test("R-25: 「:bow:」と閉じたショートコードは，そのまま入れる")
+    @Test("R-26: 「:bow:」と閉じたショートコードは，そのまま入れる")
     func closedShortcode() {
         let harness = harness()
         openEmoji(harness)
@@ -109,7 +109,7 @@ struct PaletteScenarioTests {
         #expect(harness.palette == nil)
     }
 
-    @Test("R-25: Esc は探す語を消し，次の Esc で閉じる．⌫ は 1 文字ずつ消す")
+    @Test("R-26: Esc は探す語を消し，次の Esc で閉じる．⌫ は 1 文字ずつ消す")
     func escapeAndBackspace() {
         let harness = harness()
         openEmoji(harness)
@@ -125,7 +125,7 @@ struct PaletteScenarioTests {
         #expect(harness.committed == "")
     }
 
-    @Test("R-25: 矢印で動き，見えない行に動いたらスクロールする．Tab で次のまとまりの頭へ")
+    @Test("R-26: 矢印で動き，見えない行に動いたらスクロールする．Tab で次のまとまりの頭へ")
     func navigation() {
         let harness = harness { $0.paletteRows = 2 }
         openEmoji(harness)
@@ -153,7 +153,7 @@ struct PaletteScenarioTests {
         #expect(harness.palette?.selection == PalettePanel.Position(row: 2, column: 2))
     }
 
-    @Test("R-25: ⌃Tab と ⌃⌥K で記号に切り替え，開いている種類のキーで閉じる")
+    @Test("R-26: ⌃Tab と ⌃⌥K で記号に切り替え，開いている種類のキーで閉じる")
     func switchKind() {
         let harness = harness()
         openEmoji(harness)
@@ -170,7 +170,7 @@ struct PaletteScenarioTests {
         #expect(harness.committed == "※")
     }
 
-    @Test("R-25: 探しているときは，今見ている種類の文字を先に出す")
+    @Test("R-26: 探しているときは，今見ている種類の文字を先に出す")
     func searchPrefersKind() {
         let harness = harness()
         harness.press(.character("k"), [.control, .option])
@@ -178,7 +178,7 @@ struct PaletteScenarioTests {
         #expect(texts(harness.palette).first?.first == "※")
     }
 
-    @Test("R-25: ⇧Enter は閉じずに続けて入れる．閉じない設定なら Enter でも閉じない")
+    @Test("R-26: ⇧Enter は閉じずに続けて入れる．閉じない設定なら Enter でも閉じない")
     func insertAndContinue() {
         let harness = harness()
         openEmoji(harness)
@@ -195,7 +195,7 @@ struct PaletteScenarioTests {
         #expect(keeps.palette != nil)
     }
 
-    @Test("R-25: ⌥Enter で肌の色の帯を開き，選んだ肌の色で入れて，その絵文字の肌の色として覚える")
+    @Test("R-26: ⌥Enter で肌の色の帯を開き，選んだ肌の色で入れて，その絵文字の肌の色として覚える")
     func skinTone() throws {
         let usage = FakePaletteUsageStore()
         let harness = harness(usage: usage)
@@ -219,7 +219,7 @@ struct PaletteScenarioTests {
         #expect(usage.usage.score(of: "🙇", at: start) == 2)
     }
 
-    @Test("R-25: 肌の色を変えられない絵文字では帯を開かない．既定の肌の色は足元のボタンで変える")
+    @Test("R-26: 肌の色を変えられない絵文字では帯を開かない．既定の肌の色は足元のボタンで変える")
     func defaultSkinTone() {
         let usage = FakePaletteUsageStore()
         let harness = harness(usage: usage)
@@ -235,7 +235,7 @@ struct PaletteScenarioTests {
         #expect(texts(harness.palette).last == ["🙇🏿", "👍🏿", "👋🏿"])
     }
 
-    @Test("R-25: よく使う文字の行は開いたときに作り，表の上に出す")
+    @Test("R-26: よく使う文字の行は開いたときに作り，表の上に出す")
     func frequentRow() {
         let usage = FakePaletteUsageStore()
         let harness = harness(usage: usage)
@@ -252,7 +252,7 @@ struct PaletteScenarioTests {
         #expect(off.palette?.tabs.first?.title == "顔と感情")
     }
 
-    @Test("R-25: ⌃D でピン留めし，ピン留めの行を先頭に出す．もう一度押すと外す")
+    @Test("R-26: ⌃D でピン留めし，ピン留めの行を先頭に出す．もう一度押すと外す")
     func pin() {
         let usage = FakePaletteUsageStore()
         let harness = harness(usage: usage)
@@ -267,7 +267,7 @@ struct PaletteScenarioTests {
         #expect(usage.usage.pinned.isEmpty)
     }
 
-    @Test("R-25: マウスで押した文字を入れ，ポインタを置いた文字を選ぶ．タブで飛び，ホイールでスクロールする")
+    @Test("R-26: マウスで押した文字を入れ，ポインタを置いた文字を選ぶ．タブで飛び，ホイールでスクロールする")
     func pointer() {
         let harness = harness { $0.paletteRows = 2 }
         openEmoji(harness)
@@ -285,7 +285,7 @@ struct PaletteScenarioTests {
         #expect(harness.palette == nil)
     }
 
-    @Test("R-25: ⌘ との組み合わせはパレットを閉じてアプリに渡す．入力先から外れたら閉じる")
+    @Test("R-26: ⌘ との組み合わせはパレットを閉じてアプリに渡す．入力先から外れたら閉じる")
     func closesForCommandAndFocus() {
         let harness = harness()
         openEmoji(harness)
@@ -297,7 +297,7 @@ struct PaletteScenarioTests {
         #expect(!harness.session.isPaletteOpen)
     }
 
-    @Test("R-25: 英数入力では探す欄に打ったままを見せる．かなにした読みでも探す")
+    @Test("R-26: 英数入力では探す欄に打ったままを見せる．かなにした読みでも探す")
     func directMode() {
         let harness = harness()
         harness.press(.eisu)
@@ -307,7 +307,7 @@ struct PaletteScenarioTests {
         #expect(texts(harness.palette).first?.first == "🙇")
     }
 
-    @Test("R-25: パレットを使わない設定か，アプリがパレットを描けないときは，キーを受けずにアプリに渡す")
+    @Test("R-26: パレットを使わない設定か，アプリがパレットを描けないときは，キーを受けずにアプリに渡す")
     func unavailable() {
         let off = harness { $0.palette = false }
         openEmoji(off)
@@ -319,7 +319,7 @@ struct PaletteScenarioTests {
         #expect(unsupported.session.openPalette().isEmpty)
     }
 
-    @Test("R-25: 表を読み込んでいるあいだは知らせを出し，見つからなければそう知らせる")
+    @Test("R-26: 表を読み込んでいるあいだは知らせを出し，見つからなければそう知らせる")
     func messages() {
         let catalog = FakePaletteCatalog(Self.table)
         catalog.index = nil
@@ -334,7 +334,7 @@ struct PaletteScenarioTests {
         #expect(harness.committed == "")
     }
 
-    @Test("R-25: 探して選んだ文字は，次に同じ語で探したときに先に出す．履歴を残さない設定なら並びを変えない")
+    @Test("R-26: 探して選んだ文字は，次に同じ語で探したときに先に出す．履歴を残さない設定なら並びを変えない")
     func learnsChoice() {
         let usage = FakePaletteUsageStore()
         let harness = harness(usage: usage)

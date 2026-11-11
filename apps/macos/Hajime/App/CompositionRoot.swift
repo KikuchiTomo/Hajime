@@ -92,6 +92,8 @@ final class CompositionRoot {
                                    associations: associations)
         // 語の意味の辞書も，注釈を出す設定なら起動したら裏で読み始める(初めての変換で意味が出ないことを減らす)
         if settings.current.homophoneNotes { root.usageDictionary?.preload() }
+        // パレットの表も，使う設定なら起動したら裏で読み始める(初めて開いたときに待たせない)
+        if settings.current.palette { root.paletteCatalog?.preload() }
         installed = root
     }
 
@@ -125,7 +127,7 @@ final class CompositionRoot {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                          lexicon: lexicon, englishTerms: englishTerms),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                     rejections: correctionRejections, usageDictionary: usageDictionary)
+                     rejections: correctionRejections, usageDictionary: usageDictionary, palette: paletteServices)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)
@@ -180,7 +182,7 @@ final class CompositionRoot {
 
     func makePresenter(session: InputSession) -> ClientActionPresenter {
         ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
-                              openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting,
+                              openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting, palette: palette,
                               runCommand: { [unowned self] in self.commandLauncher.run($0) })
     }
 
@@ -202,6 +204,22 @@ final class CompositionRoot {
 
     /// 手書きの窓(R-14)．開くたびに作らず使い回す
     private(set) lazy var handwriting = HandwritingController(recognizer: VisionHandwritingRecognizer(), settings: settings)
+
+    /// 絵文字と記号のパレットの表(R-26)．同梱の表を裏で読み，OS の絵文字の書体で描けない新しい絵文字を除く
+    private(set) lazy var paletteCatalog: PaletteCatalogFile? = Bundle.main.resourceURL
+        .map { PaletteCatalogFile(url: $0.appendingPathComponent(DefaultSettings.bundledPaletteFileName), canRender: EmojiRendering.canRender) }
+    /// パレットで使った文字(よく使う文字・ピン留め・肌の色)．使い方の記録と同じフォルダに置き，同期しない
+    private lazy var paletteUsage: FilePaletteUsageStore? = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                                                                            appropriateFor: nil, create: true))
+        .map { FilePaletteUsageStore(fileURL: $0.appendingPathComponent(AppIdentity.supportDirectoryName, isDirectory: true)
+            .appendingPathComponent(DefaultSettings.paletteUsageFileName)) }
+    /// 入力欄ごとのセッションで共有する，パレットに使うもの．表か使い方の置き場所が無ければパレットを開かない
+    private lazy var paletteServices: PaletteServices? = {
+        guard let paletteCatalog, let paletteUsage else { return nil }
+        return PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: Date.init)
+    }()
+    /// パレットの窓．開くたびに作らず使い回す
+    private(set) lazy var palette = PaletteController()
 }
 
 /// 本番と開発版(Debug)で変わる値．どちらも Info.plist から読む(apps/macos/project.yml の configs)

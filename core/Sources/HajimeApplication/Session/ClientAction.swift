@@ -22,7 +22,7 @@ public enum ClientAction: Sendable, Equatable {
     case toggleLiveConversion
     /// 手書きで文字を探す窓を出す(R-14)．選んだ文字は commit と同じく入力先に入れる
     case showHandwriting
-    /// 絵文字と記号のパレットを出す(出していれば中身を替える．R-25)．窓はフォーカスを奪わず，キーは InputSession が受ける
+    /// 絵文字と記号のパレットを出す(出していれば中身を替える．R-26)．窓はフォーカスを奪わず，キーは InputSession が受ける
     case showPalette(PalettePanel)
     /// パレットを閉じる
     case hidePalette

@@ -80,7 +80,7 @@ public struct Settings: Sendable, Equatable {
     public var postalCodeConversion = true
     /// 手書きで文字を探す窓を使う(キー操作の「手書き」で開く)
     public var handwriting = false
-    /// 絵文字と記号のパレットを使う(キー操作の「絵文字のパレット」「記号のパレット」で開く．R-25)
+    /// 絵文字と記号のパレットを使う(キー操作の「絵文字のパレット」「記号のパレット」で開く．R-26)
     public var palette = true
     /// パレットで文字を入れたら閉じる．⇧Enter はこの設定によらず閉じずに続けて入れる
     public var paletteClosesAfterInsert = true

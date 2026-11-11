@@ -189,7 +189,7 @@ public final class FakeEnglishTermProvider: EnglishTermProviding {
     }
 }
 
-/// 決まった表を渡すパレットの表(R-25)．index を nil にすると読み込み中として振る舞う
+/// 決まった表を渡すパレットの表(R-26)．index を nil にすると読み込み中として振る舞う
 @MainActor
 public final class FakePaletteCatalog: PaletteCatalogProviding {
     public var index: PaletteIndex?

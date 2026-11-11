@@ -58,6 +58,9 @@ targets:
       # 英語の語の辞書(R-24)．このリポジトリで書いた一覧
       - path: ../../data/english/english-terms.txt
         buildPhase: resources
+      # 絵文字と記号のパレットの表(R-26)．data/palette は tools/palette/update.sh で作る
+      - path: ../../data/palette/palette.tsv
+        buildPhase: resources
     postBuildScripts:
       - name: 入力ソースの表示名を書く
         path: ../../tools/macos/write_input_source_names.sh

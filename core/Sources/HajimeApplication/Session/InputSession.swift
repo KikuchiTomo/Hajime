@@ -139,7 +139,7 @@ public final class InputSession {
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
     private let keyNames: KeyNameStyle
-    /// 絵文字と記号のパレットに使うもの(R-25)．パレットを描けないアプリでは nil で，パレットのキーは何もしない
+    /// 絵文字と記号のパレットに使うもの(R-26)．パレットを描けないアプリでは nil で，パレットのキーは何もしない
     private let paletteServices: PaletteServices?
     /// 開いているパレット．開いているあいだのキーはパレットが受ける
     private var palette: PaletteSession?
@@ -149,7 +149,7 @@ public final class InputSession {
     ///   - associations: 取り込んだ連想の辞書を引くもの(R-18)．nil なら連想変換のキーはふつうの変換と同じに動く
     ///   - keyNames: 候補ウィンドウの案内と注記に出すキーの名前の書き方(入力メソッドを動かす OS に合わせる)
     ///   - usageDictionary: 同音異義語の使い分けの辞書(R-08)．nil ならこのリポジトリで書いた組だけを使う
-    ///   - palette: 絵文字と記号のパレットに使うもの(R-25)．パレットを描けるアプリだけが渡す
+    ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
                 rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil,
@@ -583,7 +583,7 @@ public final class InputSession {
         return commitAll() + [.showHandwriting]
     }
 
-    // MARK: - 絵文字と記号のパレット(R-25)
+    // MARK: - 絵文字と記号のパレット(R-26)
 
     /// パレットを開いているか
     public var isPaletteOpen: Bool { palette != nil }

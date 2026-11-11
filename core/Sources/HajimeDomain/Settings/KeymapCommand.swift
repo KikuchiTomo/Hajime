@@ -129,7 +129,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case toggleLiveConversion
     /// 手書きで文字を探す窓を開く(設定の「手書き入力」がオンのときだけ．R-14)
     case handwriting
-    /// 絵文字のパレットを開く．開いているときは閉じる(設定の「絵文字と記号のパレット」がオンのときだけ．R-25)
+    /// 絵文字のパレットを開く．開いているときは閉じる(設定の「絵文字と記号のパレット」がオンのときだけ．R-26)
     case emojiPalette
     /// 記号のパレットを開く．開いているときは閉じる
     case symbolPalette

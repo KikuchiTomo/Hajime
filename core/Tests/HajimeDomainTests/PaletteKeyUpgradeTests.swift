@@ -15,7 +15,7 @@ struct PaletteKeyUpgradeTests {
     private let emoji = KeyStroke(.character("e"), control: true, option: true)
     private let symbol = KeyStroke(.character("k"), control: true, option: true)
 
-    @Test("R-25: 標準のまま保存した表は，今の標準の表にする(⌃⌥E と ⌃⌥K でパレットを開く)")
+    @Test("R-26: 標準のまま保存した表は，今の標準の表にする(⌃⌥E と ⌃⌥K でパレットを開く)")
     func standard() throws {
         #expect(!PaletteKeyUpgrade.previousStandard.entries.contains { $0.command == .emojiPalette })
         let result = try upgraded(PaletteKeyUpgrade.previousStandard)
@@ -24,7 +24,7 @@ struct PaletteKeyUpgradeTests {
         #expect(result.command(for: symbol, in: .direct) == .symbolPalette)
     }
 
-    @Test("R-25: 変えた表には，キーが空いていれば足す．どこかの状態でキーを使っていれば変えない")
+    @Test("R-26: 変えた表には，キーが空いていれば足す．どこかの状態でキーを使っていれば変えない")
     func custom() throws {
         var custom = PaletteKeyUpgrade.previousStandard
         custom.entries.append(KeymapEntry(.idle, KeyStroke(.henkan), .directMode))
@@ -37,7 +37,7 @@ struct PaletteKeyUpgradeTests {
         #expect(result.command(for: symbol, in: .idle) == .symbolPalette)
     }
 
-    @Test("R-25: ほかのひな形にもパレットのキーがある")
+    @Test("R-26: ほかのひな形にもパレットのキーがある")
     func presets() {
         for preset in KeymapPreset.allCases {
             #expect(preset.keymap.command(for: emoji, in: .idle) == .emojiPalette)

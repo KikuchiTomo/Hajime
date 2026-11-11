@@ -18,7 +18,7 @@ public protocol PaletteCatalogProviding: AnyObject {
     var index: PaletteIndex? { get }
 }
 
-/// パレットに使うもの(R-25)．パレットを描けるアプリだけが組み立てて InputSession に渡す．
+/// パレットに使うもの(R-26)．パレットを描けるアプリだけが組み立てて InputSession に渡す．
 /// 渡さなければパレットのキーは何もしない(キーを奪って何も見せない，ということを起こさない)
 @MainActor
 public final class PaletteServices {
