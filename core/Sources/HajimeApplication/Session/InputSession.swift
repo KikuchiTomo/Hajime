@@ -1411,7 +1411,9 @@ public final class InputSession {
     /// 続く語句の予測は入れない(変換とは別の操作なので，変換の候補に混ぜない)
     private var latticeBuilder: LatticeBuilder {
         _ = newComposition()
-        return LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
+        var builder = LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
+        if settings.current.contextualSegmentCandidates { builder.contextRanker = SegmentContextRanker(converter: converter) }
+        return builder
     }
 
     /// 空の読み．利用者が足したローマ字の綴りを使う
@@ -1778,6 +1780,14 @@ public final class InputSession {
             if lattice.focused.isPending {
                 fillPendingSegments(only: lattice.focusedIndex)
                 if case .lattice(let filled) = phase { lattice = filled }
+            }
+            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)
+            if !lattice.focused.isContextRanked {
+                let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading)
+                if ranked.isContextRanked {
+                    lattice.segments[lattice.focusedIndex] = ranked
+                    phase = .lattice(lattice)
+                }
             }
             // 打ち間違いを直した文節は，注目していなければ点線の下線にする
             let corrected = correctedRange(of: \.conversionReading)

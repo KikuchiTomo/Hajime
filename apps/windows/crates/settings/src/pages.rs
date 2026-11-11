@@ -924,6 +924,11 @@ fn conversion() -> Vec<Section> {
                     "listCandidatesPerPage",
                     RangeKind::CandidatesPerPage,
                 ),
+                Row::toggle(
+                    more::CONTEXTUAL_SEGMENT_CANDIDATES,
+                    "contextualSegmentCandidates",
+                ),
+                Row::note(more::CONTEXTUAL_SEGMENT_CANDIDATES_NOTE),
             ],
         ),
         Section::new(

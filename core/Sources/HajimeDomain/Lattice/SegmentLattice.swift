@@ -28,6 +28,8 @@ public struct SegmentLattice: Sendable, Equatable {
         public var confidenceGap: Double
         /// 候補をまだ求めていないか．Space ですぐ分岐図を出すため，見えている文字(幹)だけを持たせ，候補はあとから求める
         public var isPending: Bool
+        /// 候補を前後の文脈で並べ替えたか．並べ替えは候補を見せる文節(注目した文節)だけに，注目したときに行う
+        public var isContextRanked = false
 
         public init(readingStart: Int, readingLength: Int, candidates: [Candidate], variants: [Candidate] = [], choice: Choice = .candidate(0), isConfident: Bool,
                     isDecided: Bool = false, confidenceGap: Double = .infinity, isPending: Bool = false) {
