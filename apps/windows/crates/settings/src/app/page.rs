@@ -451,14 +451,26 @@ impl AcknowledgementLayout {
         top += size::BODY_LINE_HEIGHT + size::CARD_GAP;
         let mut sources = Vec::new();
         for line in &item.sources {
-            let height = measure
-                .wrapped_height(line, TextStyle::Caption, width)
-                .max(size::NOTE_LINE_HEIGHT);
+            let parts = crate::notices::split_url(line);
+            // 前置きと URL が 1 行に収まれば，URL のあとの文はその下に折り返して出す
+            let fits = parts.is_some_and(|(prefix, url, _)| {
+                measure.width(prefix, TextStyle::Caption) + measure.width(url, TextStyle::Caption)
+                    <= width
+            });
+            let height = match parts {
+                Some((_, _, suffix)) if fits && !suffix.trim().is_empty() => {
+                    size::NOTE_LINE_HEIGHT
+                        + measure.wrapped_height(suffix.trim(), TextStyle::Caption, width)
+                }
+                _ => measure
+                    .wrapped_height(line, TextStyle::Caption, width)
+                    .max(size::NOTE_LINE_HEIGHT),
+            };
             let rect = Rect::new(x, top, width, height);
-            let link = crate::notices::split_url(line).map(|(prefix, url)| {
-                let before = measure.width(prefix, TextStyle::Caption);
-                let length = measure.width(url, TextStyle::Caption);
-                if before + length <= width {
+            let link = parts.map(|(prefix, url, _)| {
+                if fits {
+                    let before = measure.width(prefix, TextStyle::Caption);
+                    let length = measure.width(url, TextStyle::Caption);
                     Rect::new(x + before, top, length, size::NOTE_LINE_HEIGHT)
                 } else {
                     rect
@@ -829,7 +841,7 @@ impl RowState {
                 .notice()
                 .and_then(|item| item.sources.get(index))
                 .and_then(|line| crate::notices::split_url(line))
-                .map_or("", |(_, url)| url),
+                .map_or("", |(_, url, _)| url),
             Part::Expand => more::LICENSE_TEXT,
             Part::PreviewAdd(0) => text::ADD_TO_ENGLISH,
             Part::PreviewAdd(_) => text::ADD_TO_JAPANESE,
@@ -1502,7 +1514,7 @@ impl PageView {
                     .notice()
                     .and_then(|item| item.sources.get(index))
                     .and_then(|line| crate::notices::split_url(line))
-                    .map(|(_, url)| url.to_string())?;
+                    .map(|(_, url, _)| url.to_string())?;
                 return Some(Event::OpenUrl(url));
             }
             (Control::Preview, Part::PreviewAdd(index)) => {
@@ -2483,7 +2495,9 @@ impl PageView {
         {
             match (crate::notices::split_url(line), link) {
                 // URL の前置きは文字で，URL は押せる色で出す(macOS の Link)
-                (Some((prefix, url)), Some(link)) if link.height <= size::NOTE_LINE_HEIGHT => {
+                (Some((prefix, url, suffix)), Some(link))
+                    if link.height <= size::NOTE_LINE_HEIGHT =>
+                {
                     if !prefix.is_empty() {
                         canvas.text(
                             *rect,
@@ -2506,6 +2520,21 @@ impl PageView {
                         Rect::new(link.x, link.max_y() - 2.0, link.width, 1.0),
                         color.with_alpha(0.4 + 0.6 * state.hover),
                     );
+                    // URL のあとの文(「(v0.2.0)」など)は，リンクにせず下に折り返して出す
+                    if !suffix.trim().is_empty() {
+                        canvas.text(
+                            Rect::new(
+                                rect.x,
+                                rect.y + size::NOTE_LINE_HEIGHT,
+                                rect.width,
+                                rect.height - size::NOTE_LINE_HEIGHT,
+                            ),
+                            suffix.trim(),
+                            TextStyle::Caption,
+                            secondary,
+                            TextLayout::WRAP,
+                        );
+                    }
                     if state.focus_visible {
                         paint::focus_ring(canvas, theme, *link, size::CONTROL_RADIUS);
                     }
