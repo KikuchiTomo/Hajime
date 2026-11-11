@@ -90,8 +90,10 @@ pub enum Check {
 pub enum CheckError {
     #[error("latest.json を読めない")]
     Malformed,
-    #[error("この OS の配布物が無いか，場所や SHA-256 の形が違う")]
-    NoPackage,
+    /// 新しいバージョンはあるが，この OS の配布物が無いか，場所や SHA-256 が無い・形が違う．
+    /// 前の形の latest.json(sha256 と releases が無い)もこれになり，配布物は取らずにページを開いてもらう
+    #[error("v{0} の配布物を確かめられない")]
+    NoPackage(Version),
     #[error("今のバージョンを読めない")]
     UnknownCurrentVersion,
 }
@@ -110,13 +112,14 @@ pub fn check(
     if latest <= current {
         return Ok(Check::UpToDate);
     }
-    let path = manifest.files.get(PLATFORM).ok_or(CheckError::NoPackage)?;
-    let file_name = package_name(path, latest).ok_or(CheckError::NoPackage)?;
+    let unverifiable = CheckError::NoPackage(latest);
+    let path = manifest.files.get(PLATFORM).ok_or(unverifiable)?;
+    let file_name = package_name(path, latest).ok_or(unverifiable)?;
     let sha256 = manifest
         .sha256
         .get(PLATFORM)
         .and_then(|digest| normalized_digest(digest))
-        .ok_or(CheckError::NoPackage)?;
+        .ok_or(unverifiable)?;
     Ok(Check::Available(Offer {
         version: latest,
         url: format!("{base_url}{path}"),
@@ -295,7 +298,7 @@ mod tests {
             let body = manifest("0.2.8", path, DIGEST);
             assert_eq!(
                 check(&body, "0.2.6", BASE, 1000),
-                Err(CheckError::NoPackage),
+                Err(CheckError::NoPackage(Version::parse("0.2.8").unwrap())),
                 "{path}"
             );
         }
@@ -307,7 +310,7 @@ mod tests {
             let body = manifest("0.2.8", "v0.2.8/Hajime-0.2.8.msi", digest);
             assert_eq!(
                 check(&body, "0.2.6", BASE, 1000),
-                Err(CheckError::NoPackage)
+                Err(CheckError::NoPackage(Version::parse("0.2.8").unwrap()))
             );
         }
     }
@@ -351,6 +354,37 @@ mod tests {
     #[test]
     fn ハッシュを小文字の_16_進にする() {
         assert_eq!(hex(&[0x00, 0xab, 0x0f]), "00ab0f");
+    }
+
+    #[test]
+    fn 前の形の_latest_json_でも最新かどうかは決められる() {
+        // sha256 と releases の無い形(v0.2.6 までの upload_downloads.sh が書いたもの)
+        let body = br#"{"version":"0.2.6","files":{"macos":"v0.2.6/Hajime-0.2.6.pkg","windows":"v0.2.6/Hajime-0.2.6.msi"}}"#;
+        assert_eq!(check(body, "0.2.6", BASE, 1000), Ok(Check::UpToDate));
+        assert_eq!(check(body, "0.3.0", BASE, 1000), Ok(Check::UpToDate));
+    }
+
+    #[test]
+    fn 前の形の_latest_json_で新しければ配布物を取らない() {
+        let body = br#"{"version":"0.2.6","files":{"macos":"v0.2.6/Hajime-0.2.6.pkg","windows":"v0.2.6/Hajime-0.2.6.msi"}}"#;
+        assert_eq!(
+            check(body, "0.2.5", BASE, 1000),
+            Err(CheckError::NoPackage(Version::parse("0.2.6").unwrap()))
+        );
+    }
+
+    #[test]
+    fn releases_が無くても配布物は取れ_変更点は空にする() {
+        let body = serde_json::json!({
+            "version": "0.2.8",
+            "files": { "windows": "v0.2.8/Hajime-0.2.8.msi" },
+            "sha256": { "windows": DIGEST }
+        })
+        .to_string();
+        let Ok(Check::Available(offer)) = check(body.as_bytes(), "0.2.6", BASE, 1000) else {
+            panic!("新しいバージョンがあるはず");
+        };
+        assert_eq!(offer.notes, "");
     }
 
     #[test]

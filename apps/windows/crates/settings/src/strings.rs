@@ -879,6 +879,11 @@ pub mod update {
     }
 
     pub const CHECK_FAILED: &str = "更新を確認できませんでした。";
+
+    /// 新しいバージョンはあるが，配布物を確かめられない(SHA-256 が公開されていないなど)
+    pub fn unverifiable(latest: &str) -> String {
+        format!("Hajime v{latest} がありますが、自動では更新できません。")
+    }
     pub const DOWNLOAD_FAILED: &str = "ダウンロードできませんでした。";
     pub const VERIFY_FAILED: &str = "ダウンロードしたファイルが公開されているものと一致しません。";
     pub const INSTALL_FAILED: &str = "インストーラーを起動できませんでした。";

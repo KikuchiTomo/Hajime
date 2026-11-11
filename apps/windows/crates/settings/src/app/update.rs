@@ -36,6 +36,8 @@ enum Stage {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Failure {
     Check,
+    /// 新しいバージョンはあるが，配布物を確かめられない(SHA-256 が無いなど)．取らずにページを開いてもらう
+    Unverifiable(update::Version),
     Download,
     Verify,
     Install,
@@ -102,7 +104,12 @@ pub(super) fn start_check(app: &mut App) {
                     &catalog.update.download_base_url,
                     catalog.update.notes_length,
                 )
-                .map_err(|_| Failure::Check)
+                .map_err(|error| match error {
+                    update::CheckError::NoPackage(version) => Failure::Unverifiable(version),
+                    update::CheckError::Malformed | update::CheckError::UnknownCurrentVersion => {
+                        Failure::Check
+                    }
+                })
             });
             deliver(&inbox, window, Message::Checked(result));
         });
@@ -294,10 +301,11 @@ fn fail(window: Window, failure: Failure) {
         app.catalog.latest_release_url.clone()
     });
     let reason = match failure {
-        Failure::Check => text::CHECK_FAILED,
-        Failure::Download => text::DOWNLOAD_FAILED,
-        Failure::Verify => text::VERIFY_FAILED,
-        Failure::Install => text::INSTALL_FAILED,
+        Failure::Check => text::CHECK_FAILED.to_string(),
+        Failure::Unverifiable(version) => text::unverifiable(&version.to_string()),
+        Failure::Download => text::DOWNLOAD_FAILED.to_string(),
+        Failure::Verify => text::VERIFY_FAILED.to_string(),
+        Failure::Install => text::INSTALL_FAILED.to_string(),
     };
     let question = format!("{reason}\n{}", text::OPEN_DOWNLOAD_PAGE);
     if ffi::ask(window, text::TITLE, &question) {
