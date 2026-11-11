@@ -115,6 +115,7 @@ mod tests {
         CandidateList {
             association: None,
             association_hint: None,
+            association_key: None,
             homophone: None,
             shows_numbers: None,
             variants: vec![CandidateVariant {
@@ -226,6 +227,7 @@ mod tests {
         let map = BranchMap {
             association: None,
             association_hint: None,
+            association_key: None,
             columns: vec![column("今日は", false), column("晴れ", true)],
             position: 1,
             total: 1,

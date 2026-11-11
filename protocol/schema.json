@@ -1704,6 +1704,10 @@
           "type": "string?"
         },
         {
+          "name": "associationKey",
+          "type": "string?"
+        },
+        {
           "name": "homophone",
           "type": "HomophoneNote?"
         },
@@ -1849,6 +1853,10 @@
         },
         {
           "name": "associationHint",
+          "type": "string?"
+        },
+        {
+          "name": "associationKey",
           "type": "string?"
         },
         {

@@ -1467,6 +1467,9 @@ pub struct CandidateList {
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association_hint: Option<String>,
+    #[serde(rename = "associationKey")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homophone: Option<HomophoneNote>,
     #[serde(rename = "showsNumbers")]
@@ -1490,6 +1493,7 @@ impl fmt::Debug for CandidateList {
             .field("note", &self.note)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
+            .field("associationKey", &REDACTED)
             .field("homophone", &self.homophone)
             .field("showsNumbers", &self.shows_numbers)
             .field("meaningPlacement", &self.meaning_placement)
@@ -1606,6 +1610,9 @@ pub struct BranchMap {
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association_hint: Option<String>,
+    #[serde(rename = "associationKey")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association_key: Option<String>,
     #[serde(rename = "meaningPlacement")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meaning_placement: Option<MeaningPlacement>,
@@ -1621,6 +1628,7 @@ impl fmt::Debug for BranchMap {
             .field("hints", &self.hints)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
+            .field("associationKey", &REDACTED)
             .field("meaningPlacement", &self.meaning_placement)
             .finish()
     }

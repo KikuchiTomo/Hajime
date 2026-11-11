@@ -185,7 +185,8 @@ extension WireCandidateList {
             total: UInt32(clamping: panel.total),
             note: panel.note.map(WireNote.init),
             association: panel.association.map(WireAssociationHeading.init),
-            associationHint: panel.associationHint,
+            associationHint: panel.associationHint?.label,
+            associationKey: panel.associationHint?.key,
             homophone: panel.homophone.map(WireHomophoneNote.init),
             // 振るとき(ふつうの一覧)は送らない
             showsNumbers: panel.showsNumbers ? nil : false,
@@ -277,7 +278,8 @@ extension WireBranchMap {
             note: panel.note.map(WireNote.init),
             hints: hints,
             association: panel.association.map(WireAssociationHeading.init),
-            associationHint: panel.associationHint,
+            associationHint: panel.associationHint?.label,
+            associationKey: panel.associationHint?.key,
             // 注目している文節に意味が無ければ送らない
             meaningPlacement: panel.columns.contains { $0.homophone != nil } ? WireMeaningPlacement(panel.meaningPlacement) : nil
         )

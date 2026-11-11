@@ -62,6 +62,8 @@ enum SnapshotRenderer {
                 render(paletteView(SamplePalettes.emoji, theme: look.theme, appearance: appearance), name: "palette-emoji-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.search, theme: look.theme, appearance: appearance), name: "palette-search-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.symbol, theme: look.theme, appearance: appearance), name: "palette-symbol-\(look.name)", to: output, appearance: appearance)
+                render(associationHintListView(theme: look.theme, appearance: appearance), name: "association-hint-list-\(look.name)", to: output, appearance: appearance)
+                render(associationHintBranchView(theme: look.theme, appearance: appearance), name: "association-hint-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
         // 長い文: 窓は幅の上限に収め，一覧は末尾を省き，分岐図は注目している文節が見えるように幹をずらす
@@ -318,6 +320,30 @@ enum SnapshotRenderer {
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
         let panel = SamplePanels.suggestion
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 選んでいる候補に連想がある一覧．連想変換のキーをキーキャップで出す
+    private static func associationHintListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = SamplePanels.list
+        panel.associationHint = AssociationHint(key: "⌃Tab", label: "連想")
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 選んでいる候補に連想がある分岐図
+    private static func associationHintBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = SamplePanels.lattice
+        panel.associationHint = AssociationHint(key: "⌃Tab", label: "連想")
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

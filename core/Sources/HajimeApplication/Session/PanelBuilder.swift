@@ -128,7 +128,7 @@ enum PanelBuilder {
     }
 
     /// 選んでいる候補に連想があるときの知らせ．key は連想変換のキー
-    static func associationHint(key: String?) -> String { key.map { "\($0) 連想" } ?? "連想" }
+    static func associationHint(key: String?) -> AssociationHint { AssociationHint(key: key, label: "連想") }
 
     // MARK: 連想(R-18)
 

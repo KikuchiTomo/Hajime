@@ -509,6 +509,7 @@ fn branch(columns: &[&str], focused: usize, alternatives: &[&str], selected: usi
         hints: hints(),
         association: None,
         association_hint: None,
+        association_key: None,
         meaning_placement: None,
     })
 }
@@ -544,6 +545,7 @@ fn headed_list(entries: &[&str], selected: usize, association: Option<&str>, lab
             group_count: 1,
         }),
         association_hint: None,
+        association_key: None,
         homophone: None,
         shows_numbers: None,
         meaning_placement: None,
