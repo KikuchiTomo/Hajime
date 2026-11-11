@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! 足元の案内のキー(「Shift+←」「Ctrl+Tab」「1–2」)を，キーキャップの中に並べる部品に分ける．
+//! 足元の案内のキー(「Shift+←」「Ctrl+Tab」「1–2」「↓ Tab」)を，キーキャップごとに分け，その中に並べる部品に分ける．
 //! 矢印や Shift などはアイコンで描き(macOS の SF Symbols に当たる)，Ctrl・Alt・文字は文字で描く
 
 /// キーキャップや番号の丸の中に描くアイコン．形は icon::figures が決める
@@ -60,11 +60,22 @@ pub fn icon(name: &str) -> Option<Icon> {
         .map(|(_, icon)| *icon)
 }
 
+/// 1 つの案内に複数のキーを並べるときの区切り(core の IndicatorLabels.keySeparator と同じ)
+const KEY_SEPARATOR: char = ' ';
+
 /// 「+」でつないだキーを部品に分ける．アイコンでないキーは文字のまま(「Ctrl」「F7」「変換」「1–2」)
 pub fn parts(keys: &str) -> Vec<Part> {
     keys.split('+')
         .filter(|key| !key.is_empty())
         .map(|key| icon(key).map_or_else(|| Part::Text(key.to_string()), Part::Icon))
+        .collect()
+}
+
+/// 案内のキーをキーキャップごとの部品に分ける．複数のキー(「↓ Tab」)はキーごとに札を分ける
+pub fn keycaps(keys: &str) -> Vec<Vec<Part>> {
+    keys.split(KEY_SEPARATOR)
+        .filter(|key| !key.is_empty())
+        .map(parts)
         .collect()
 }
 
@@ -81,6 +92,18 @@ mod tests {
         assert_eq!(parts("Shift+←→").last(), Some(&Part::Icon(Icon::LeftRight)));
         assert_eq!(parts("↓"), vec![Part::Icon(Icon::Down)]);
         assert_eq!(parts("Esc"), vec![Part::Icon(Icon::Escape)]);
+    }
+
+    #[test]
+    fn 複数のキーはキーごとに札を分ける() {
+        assert_eq!(
+            keycaps("↓ Tab"),
+            vec![vec![Part::Icon(Icon::Down)], vec![Part::Icon(Icon::Tab)]]
+        );
+        assert_eq!(
+            keycaps("Shift+←→"),
+            vec![vec![Part::Icon(Icon::Shift), Part::Icon(Icon::LeftRight)]]
+        );
     }
 
     #[test]

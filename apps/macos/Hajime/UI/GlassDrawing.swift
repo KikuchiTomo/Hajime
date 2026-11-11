@@ -1,4 +1,5 @@
 import AppKit
+import HajimeApplication
 
 /// すりガラスの見た目(glass)の部品を描く．地のぼかしは GlassBackdrop が受け持ち，ここでは縁と中身だけを描く
 @MainActor
@@ -106,27 +107,30 @@ enum GlassDrawing {
     }
 
     /// キーキャップの札とその説明を左から並べる．キーは文字ではなく SF Symbols のアイコンで描く(KeyHint.Part)．
+    /// 1 つの案内に複数のキーがあれば(「↓ Tab」)，キーごとに札を並べてから説明を書く．
     /// 札の形はテーマに合わせる: 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
     static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
         var x = x
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: theme.textMuted]
         for hint in hints {
-            let cap = NSRect(x: x, y: (midY - Glass.keycapHeight / 2).rounded(), width: keycapWidth(hint, theme: theme), height: Glass.keycapHeight)
-            drawKeycap(cap, theme: theme)
-            var partX = cap.minX + Glass.keycapPaddingX
-            for part in hint.parts {
-                let width = partWidth(part, theme: theme)
-                drawPart(part, in: NSRect(x: partX, y: cap.minY, width: width, height: cap.height), theme: theme)
-                partX += width + partGap
+            var capX = x
+            for parts in hint.keycaps {
+                let cap = NSRect(x: capX, y: (midY - Glass.keycapHeight / 2).rounded(), width: keycapWidth(parts, theme: theme), height: Glass.keycapHeight)
+                drawKeycap(cap, theme: theme)
+                var partX = cap.minX + Glass.keycapPaddingX
+                for part in parts {
+                    let width = partWidth(part, theme: theme)
+                    drawPart(part, in: NSRect(x: partX, y: cap.minY, width: width, height: cap.height), theme: theme)
+                    partX += width + Glass.keycapPartGap
+                }
+                capX = cap.maxX + Glass.keycapGap
             }
             let labelSize = hint.label.size(withAttributes: labelAttributes)
-            hint.label.draw(at: NSPoint(x: cap.maxX + Glass.keycapPaddingX, y: (midY - labelSize.height / 2).rounded()), withAttributes: labelAttributes)
+            hint.label.draw(at: NSPoint(x: x + keycapsWidth(hint, theme: theme) + Glass.keycapPaddingX, y: (midY - labelSize.height / 2).rounded()),
+                            withAttributes: labelAttributes)
             x += hintWidth(hint, theme: theme) + Glass.hintGap
         }
     }
-
-    /// キーの部品のあいだの空き
-    private static let partGap: CGFloat = 1
 
     private static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
         switch theme.kind {
@@ -183,14 +187,20 @@ enum GlassDrawing {
         }
     }
 
-    private static func keycapWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
-        let parts = hint.parts.map { partWidth($0, theme: theme) }.reduce(0, +) + partGap * CGFloat(max(hint.parts.count - 1, 0))
-        return max(Glass.keycapHeight, (parts + Glass.keycapPaddingX * 2).rounded(.up))
+    private static func keycapWidth(_ parts: [KeyHint.Part], theme: ResolvedTheme) -> CGFloat {
+        let content = parts.map { partWidth($0, theme: theme) }.reduce(0, +) + Glass.keycapPartGap * CGFloat(max(parts.count - 1, 0))
+        return max(Glass.keycapHeight, (content + Glass.keycapPaddingX * 2).rounded(.up))
+    }
+
+    /// 案内の札を並べた幅(説明を除く)
+    private static func keycapsWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
+        let caps = hint.keycaps
+        return caps.map { keycapWidth($0, theme: theme) }.reduce(0, +) + Glass.keycapGap * CGFloat(max(caps.count - 1, 0))
     }
 
     private static func hintWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
         let label = hint.label.size(withAttributes: [.font: theme.labelFont(size: Glass.labelFontSize)]).width
-        return keycapWidth(hint, theme: theme) + Glass.keycapPaddingX + label.rounded(.up)
+        return keycapsWidth(hint, theme: theme) + Glass.keycapPaddingX + label.rounded(.up)
     }
 
     // MARK: - 部品
@@ -202,7 +212,8 @@ enum GlassDrawing {
 }
 
 /// 足元に出す操作の案内．キーと，そのキーで何をするか．
-/// key は macOS のメニューと同じ記号で書いた名前(「⇧←」「←→」「Tab」「⌃⌥L」)．描くときはアイコンの部品に分ける
+/// key は macOS のメニューと同じ記号で書いた名前(「⇧←」「←→」「Tab」「⌃⌥L」)．複数のキーは区切りでつなぐ(「↓ Tab」)．
+/// 描くときはキーごとのキーキャップに分け，その中をアイコンの部品に分ける
 struct KeyHint: Equatable {
     var key: String
     var label: String
@@ -213,7 +224,10 @@ struct KeyHint: Equatable {
         case text(String)
     }
 
-    var parts: [Part] { Self.parts(of: key) }
+    /// キーキャップごとの部品
+    var keycaps: [[Part]] {
+        key.components(separatedBy: IndicatorLabels.keySeparator).filter { !$0.isEmpty }.map(Self.parts(of:))
+    }
 
     /// 記号と SF Symbols の名前
     private static let symbols: [Character: String] = [

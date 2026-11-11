@@ -474,43 +474,47 @@ impl<'a> Painter<'a> {
             + glass::HINT_GAP * (hints.len() - 1) as f32
     }
 
-    /// キーキャップの札とその説明を左から並べる．札の形はテーマに合わせる:
+    /// キーキャップの札とその説明を左から並べる．1 つの案内に複数のキーがあれば(「↓ Tab」)，
+    /// キーごとに札を並べてから説明を書く．札の形はテーマに合わせる:
     /// 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
     pub fn hints(&mut self, hints: &[KeyHint], x: f32, mid_y: f32) {
         let mut x = x;
         for hint in hints {
-            let parts = keys::parts(&hint.keys);
-            let cap = Frame::new(
-                x,
-                (mid_y - glass::KEYCAP_HEIGHT / 2.0).round(),
-                self.keycap_width(&parts),
-                glass::KEYCAP_HEIGHT,
-            );
-            self.keycap(cap);
-            let mut part_x = cap.x + glass::KEYCAP_PADDING_X;
-            for part in &parts {
-                let width = self.part_width(part);
-                let frame = Frame::new(part_x, cap.y, width, cap.height);
-                match part {
-                    Part::Icon(icon) => {
-                        let side = glass::KEY_FONT_SIZE;
-                        self.icon(
-                            *icon,
-                            Frame::square(Point::new(frame.mid_x(), frame.mid_y()), side),
-                            self.theme.text,
-                        );
+            let mut cap_x = x;
+            for parts in keys::keycaps(&hint.keys) {
+                let cap = Frame::new(
+                    cap_x,
+                    (mid_y - glass::KEYCAP_HEIGHT / 2.0).round(),
+                    self.keycap_width(&parts),
+                    glass::KEYCAP_HEIGHT,
+                );
+                self.keycap(cap);
+                let mut part_x = cap.x + glass::KEYCAP_PADDING_X;
+                for part in &parts {
+                    let width = self.part_width(part);
+                    let frame = Frame::new(part_x, cap.y, width, cap.height);
+                    match part {
+                        Part::Icon(icon) => {
+                            let side = glass::KEY_FONT_SIZE;
+                            self.icon(
+                                *icon,
+                                Frame::square(Point::new(frame.mid_x(), frame.mid_y()), side),
+                                self.theme.text,
+                            );
+                        }
+                        Part::Text(text) => self.centered(text, Font::Key, self.theme.text, frame),
                     }
-                    Part::Text(text) => self.centered(text, Font::Key, self.theme.text, frame),
+                    part_x += width + glass::KEYCAP_PART_GAP;
                 }
-                part_x += width + glass::KEYCAP_PART_GAP;
+                cap_x = cap.max_x() + glass::KEYCAP_GAP;
             }
             self.text(
                 &hint.label,
                 Font::Label,
                 self.theme.text_muted,
-                cap.max_x() + glass::KEYCAP_PADDING_X,
+                x + self.keycaps_width(&hint.keys) + glass::KEYCAP_PADDING_X,
                 Frame::new(
-                    cap.x,
+                    x,
                     (mid_y - glass::FOOTER_HEIGHT / 2.0).round(),
                     0.0,
                     glass::FOOTER_HEIGHT,
@@ -558,8 +562,17 @@ impl<'a> Painter<'a> {
         glass::KEYCAP_HEIGHT.max((content + glass::KEYCAP_PADDING_X * 2.0).ceil())
     }
 
+    /// 案内の札を並べた幅(説明を除く)
+    fn keycaps_width(&self, keys: &str) -> f32 {
+        let caps = keys::keycaps(keys);
+        caps.iter()
+            .map(|parts| self.keycap_width(parts))
+            .sum::<f32>()
+            + glass::KEYCAP_GAP * caps.len().saturating_sub(1) as f32
+    }
+
     fn hint_width(&self, hint: &KeyHint) -> f32 {
-        self.keycap_width(&keys::parts(&hint.keys))
+        self.keycaps_width(&hint.keys)
             + glass::KEYCAP_PADDING_X
             + self.width(&hint.label, Font::Label)
     }

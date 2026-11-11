@@ -25,6 +25,7 @@ enum PanelBuilder {
     private static let suggestionTitle = "もしかして"
     private static let revertAction = "戻す"
     private static let applyAction = "修正"
+    private static let selectAction = "選択"
 
     // 案内に出すキーは，キー設定の表でそのコマンドに割り当てた最初のキー(R-17)．キーが無ければキーの部分を出さない
 
@@ -33,8 +34,11 @@ enum PanelBuilder {
         Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
     }
 
-    /// 打っているあいだの候補の窓の案内．keys は候補を選び始めるキー(無いものは除いてある)
-    static func suggestionNote(keys: [String]) -> Note? { keys.isEmpty ? nil : .info("\(keys.joined(separator: "・")) で選ぶ") }
+    /// 打っているあいだの候補の窓の案内．keys は候補を選び始めるキー(無いものは除いてある)．
+    /// キーは文字で書かず，描く側でキーごとのキーキャップの札にする
+    static func suggestionNote(keys: [String]) -> Note? {
+        keys.isEmpty ? nil : Note(tone: .info, title: "", key: keys.joined(separator: IndicatorLabels.keySeparator), keyAction: selectAction)
+    }
 
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
     /// 文節をその場で打ち直しているときの案内．subject は打ち直す前の文節，key は打ち直した読みを変換するキー

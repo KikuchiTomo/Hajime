@@ -33,6 +33,6 @@ public enum BranchHints {
         if let a = first.last, let b = second.last, arrows.contains(a), arrows.contains(b), first.dropLast() == second.dropLast() {
             return String(first.dropLast()) + "←→"
         }
-        return [first, second].filter { !$0.isEmpty }.joined(separator: " ")
+        return [first, second].filter { !$0.isEmpty }.joined(separator: IndicatorLabels.keySeparator)
     }
 }

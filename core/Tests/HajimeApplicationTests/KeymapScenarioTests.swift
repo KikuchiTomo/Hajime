@@ -404,6 +404,36 @@ struct KeymapScenarioTests {
         #expect(harness.panel?.note?.text == "修正　⌃N 入力のままに戻す")
     }
 
+    @Test("R-17: 入力中の候補の窓の案内は，選び始めるキーを表で変えるとそのキーを出し，キーの案内を出さない設定では出さない")
+    func suggestionNoteFollowsKeymap() {
+        let converter = FakeConverter(["あぴ": [("あぴ", nil), ("アピ", nil)]])
+        converter.predictionTexts["あぴ"] = ["アピール"]
+        var custom = settings()
+        custom.suggestionDisplay = .always
+        // ↓ の代わりに ⌃N，Tab の代わりに ⌃J で選び始める
+        custom.keymap.entries.removeAll { $0.command == .nextCandidate || $0.command == .acceptSuggestion }
+        custom.keymap.entries += [
+            KeymapEntry(.composing, KeyStroke(.character("n"), control: true), .nextCandidate),
+            KeymapEntry(.composing, KeyStroke(.character("j"), control: true), .acceptSuggestion),
+        ]
+        let harness = Harness(converter: converter, settings: custom)
+        harness.type("api")
+        #expect(harness.panel?.note?.key == "⌃N ⌃J")
+        #expect(harness.panel?.note?.keyAction == "選択")
+
+        // 片方のキーを外すと，残ったキーだけを出す
+        custom.keymap.entries.removeAll { $0.command == .acceptSuggestion }
+        let single = Harness(converter: converter, settings: custom)
+        single.type("api")
+        #expect(single.panel?.note?.key == "⌃N")
+
+        custom.showsKeyHints = false
+        let hidden = Harness(converter: converter, settings: custom)
+        hidden.type("api")
+        #expect(hidden.panel?.entries.isEmpty == false)
+        #expect(hidden.panel?.note == nil)
+    }
+
     @Test("R-17: 英字入力では，読みを組み立てていないとき表の入力中・入力文字なしの行を使わない")
     func englishInputKeepsEnglishBehavior() {
         var english = settings()

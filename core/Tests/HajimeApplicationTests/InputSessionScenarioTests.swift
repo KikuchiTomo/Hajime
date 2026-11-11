@@ -402,7 +402,10 @@ struct InputSessionScenarioTests {
         typed.type("api")
         #expect(typed.panel?.entries.map(\.text) == ["あぴ", "アピ", "アピール", "アピールポイント"])
         #expect(typed.panel?.showsNumbers == false)
-        #expect(typed.panel?.note?.text == "↓・Tab で選ぶ")
+        // キーは文字で書かず，キーごとのキーキャップの札で描けるよう，キーとできることに分けて渡す
+        #expect(typed.panel?.note?.key == "↓ Tab")
+        #expect(typed.panel?.note?.keyAction == "選択")
+        #expect(typed.panel?.note?.text == "↓ Tab 選択")
         typed.type("2")
         #expect(typed.committed.isEmpty)
         #expect(typed.marked.text == "あぴ2")

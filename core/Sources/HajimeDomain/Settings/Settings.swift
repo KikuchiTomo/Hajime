@@ -104,7 +104,7 @@ public struct Settings: Sendable, Equatable {
     public var prefersKatakana = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
-    /// 分岐図の足元にキーの案内(候補・文節・文節の長さ・区切り)を出す
+    /// 分岐図の足元にキーの案内(候補・文節・文節の長さ・区切り)を出す．入力中の候補の窓の，選び始めるキーの案内も
     public var showsKeyHints = true
     /// 番号キーで候補を選ぶ
     public var numberKeySelection = true

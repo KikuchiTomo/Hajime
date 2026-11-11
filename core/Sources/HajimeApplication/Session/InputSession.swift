@@ -1422,7 +1422,10 @@ public final class InputSession {
             focus: .candidate,
             position: 0,
             total: suggestions.count,
-            note: PanelBuilder.suggestionNote(keys: [keyLabel(.nextCandidate, in: .composing), keyLabel(.acceptSuggestion, in: .composing)].compactMap { $0 })
+            // 選び始めるキーの案内．キーの案内を出さない設定では出さない
+            note: settings.current.showsKeyHints
+                ? PanelBuilder.suggestionNote(keys: [keyLabel(.nextCandidate, in: .composing), keyLabel(.acceptSuggestion, in: .composing)].compactMap { $0 })
+                : nil
         )
         panel.showsNumbers = false
         // 窓を今打っている文節の下にそろえる
