@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Hajime は azooKey をもとにした macOS / Windows 向けの日本語入力システム．
+Hajime IME は azooKey をもとにした macOS / Windows 向けの日本語入力システム．
 
 作業の前に `docs/dev/ARCHITECTURE.md` と `docs/dev/GUIDELINES.md` を読み，配置・命名・層の決まりに従うこと．
 要件は `docs/specs/REQUIREMENTS.md`(R-xx)．設計の判断は `docs/dev/adr/`．
@@ -23,6 +23,7 @@ Hajime は azooKey をもとにした macOS / Windows 向けの日本語入力�
 
 ## 決まり(抜粋)
 
+- 製品名は「Hajime IME」と書く(文書・画面の文言・インストーラー・PR のすべて)．「はじめ」「Hajime」だけでは呼ばない
 - 入力した文字列・読み・候補をログや通信に出さない．既定では一切通信しない
 - 値をコードに直接書かない(色と寸法は `design/tokens/`，既定値は `DefaultSettings.swift`)
 - 具象の組み立ては composition root だけ．シングルトンを作らない

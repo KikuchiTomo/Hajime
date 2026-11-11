@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://haji.men"><img src="docs/assets/hajime-logo.png" alt="Hajime" width="560"></a>
+  <a href="https://haji.men"><img src="docs/assets/hajime-logo.png" alt="Hajime IME" width="560"></a>
 </p>
 
 [![Website](https://img.shields.io/badge/website-haji.men-f2240f.svg)](https://haji.men)
@@ -10,7 +10,7 @@
 
 A Japanese input method for macOS and Windows. Kana-kanji conversion uses the [azooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) engine and the Zenzai neural language model.
 
-Hajime is under active development, and its behavior may change.
+Hajime IME is under active development, and its behavior may change.
 
 ## Features
 
@@ -43,7 +43,7 @@ We recommend restarting your PC after installation.
 
 MIT License ([LICENSE](LICENSE)).
 
-Hajime uses azooKey (MIT) and the Zenzai model (Apache-2.0). Copyright notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and on the About page of the app's settings.
+Hajime IME uses azooKey (MIT) and the Zenzai model (Apache-2.0). Copyright notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and on the About page of the app's settings.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 

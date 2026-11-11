@@ -1,9 +1,9 @@
 ---
 name: hajime-design
-description: Hajime の見た目(候補ウィンドウ，種類の行，補正の下線，モードの札，設定アプリ，ドキュメントサイト，アイコン，モックアップ)を設計・実装・レビューするときの決まり．テーマ(glass・platinum・desk)，デザイントークン(design/tokens/tokens.json)，漢字Talk 7 のプラチナ外観を描画で再現する方法，アクセシビリティを含む．色・寸法・書体・動き・UI の配置に触れるとき，SwiftUI / AppKit / Direct2D / CSS で画面を作るとき，「デザイン」「見た目」「UI」「テーマ」と言われたときは必ず使う．Use for any visual, UI, theme, token or mockup work.
+description: Hajime IME の見た目(候補ウィンドウ，種類の行，補正の下線，モードの札，設定アプリ，ドキュメントサイト，アイコン，モックアップ)を設計・実装・レビューするときの決まり．テーマ(glass・platinum・desk)，デザイントークン(design/tokens/tokens.json)，漢字Talk 7 のプラチナ外観を描画で再現する方法，アクセシビリティを含む．色・寸法・書体・動き・UI の配置に触れるとき，SwiftUI / AppKit / Direct2D / CSS で画面を作るとき，「デザイン」「見た目」「UI」「テーマ」と言われたときは必ず使う．Use for any visual, UI, theme, token or mockup work.
 ---
 
-# Hajime のデザイン
+# Hajime IME のデザイン
 
 決まりの本体は `docs/dev/DESIGN-SYSTEM.md`．値は `design/tokens/tokens.json` だけにある．
 
