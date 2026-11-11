@@ -1578,8 +1578,9 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var association: WireAssociationHeading?
     public var associationHint: String?
     public var homophone: WireHomophoneNote?
+    public var showsNumbers: Bool?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, homophone: WireHomophoneNote? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1591,6 +1592,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.association = association
         self.associationHint = associationHint
         self.homophone = homophone
+        self.showsNumbers = showsNumbers
     }
 }
 

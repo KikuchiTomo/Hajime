@@ -186,7 +186,9 @@ extension WireCandidateList {
             note: panel.note.map(WireNote.init),
             association: panel.association.map(WireAssociationHeading.init),
             associationHint: panel.associationHint,
-            homophone: panel.homophone.map(WireHomophoneNote.init)
+            homophone: panel.homophone.map(WireHomophoneNote.init),
+            // 振るとき(ふつうの一覧)は送らない
+            showsNumbers: panel.showsNumbers ? nil : false
         )
     }
 }

@@ -348,6 +348,62 @@ struct InputSessionScenarioTests {
         #expect(converter.committed.flatMap(\.learnedParts).map(\.text) == ["飴"])
     }
 
+    @Test("入力中の候補の窓は，選び始めるまで番号を振らず，番号キーはそのまま数字を打つ．↓ か Tab で選び始めると番号キーで選べる",
+          arguments: [CandidatePresentation.automatic, .segmentList, .list])
+    func suggestionWindowSelection(presentation: CandidatePresentation) {
+        let converter = FakeConverter(["あぴ": [("あぴ", nil), ("アピ", nil)]])
+        converter.predictionTexts["あぴ"] = ["アピール", "アピールポイント"]
+        var settings = DefaultSettings.settings
+        settings.suggestionDisplay = .always
+        settings.candidatePresentation = presentation
+        let typed = Harness(converter: converter, settings: settings)
+        typed.type("api")
+        #expect(typed.panel?.entries.map(\.text) == ["あぴ", "アピ", "アピール", "アピールポイント"])
+        #expect(typed.panel?.showsNumbers == false)
+        #expect(typed.panel?.note?.text == "↓・Tab で選ぶ")
+        typed.type("2")
+        #expect(typed.committed.isEmpty)
+        #expect(typed.marked.text == "あぴ2")
+        for key in [KeyEvent.Key.down, .tab] {
+            let harness = Harness(converter: converter, settings: settings)
+            harness.type("api")
+            harness.press(key)
+            #expect(harness.panel?.selectedEntry == 0)
+            #expect(harness.panel?.showsNumbers == true)
+            harness.type("3")
+            #expect(harness.committed == "アピール")
+        }
+    }
+
+    @Test("入力中の候補の窓で ↑ を押すと，一覧の先頭から上に動かしたのと同じに字種の行から選ぶ(行を出さない設定なら末尾の候補)")
+    func suggestionWindowUpKey() {
+        let converter = FakeConverter(["あぴ": [("あぴ", nil), ("アピ", nil)]])
+        converter.predictionTexts["あぴ"] = ["アピール"]
+        var settings = DefaultSettings.settings
+        settings.suggestionDisplay = .always
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("api")
+        harness.press(.up)
+        #expect(harness.panel?.focus == .variants)
+        #expect(harness.lattice == nil)
+        settings.showsVariantRow = false
+        let noRow = Harness(converter: converter, settings: settings)
+        noRow.type("api")
+        noRow.press(.up)
+        #expect(noRow.panel?.selectedEntry == 2)
+        #expect(noRow.marked.text == "アピール")
+    }
+
+    @Test("入力中の候補の窓を出していないときの Tab は何もしない(変換を始めない)")
+    func tabWithoutSuggestionWindow() {
+        let harness = Harness(converter: FakeConverter(["あぴ": [("あぴ", nil)]]))
+        harness.type("api")
+        harness.press(.tab)
+        #expect(harness.panel == nil)
+        #expect(harness.lattice == nil)
+        #expect(harness.marked.text == "あぴ")
+    }
+
     @Test("英数のときも ⌃⌥, で設定を開き，⌃⌥L でライブ変換を切り替える(ターミナルでは英数で打っていることが多い)")
     func toolsInDirectMode() {
         let harness = Harness()

@@ -544,6 +544,7 @@ fn headed_list(entries: &[&str], selected: usize, association: Option<&str>, lab
         }),
         association_hint: None,
         homophone: None,
+        shows_numbers: None,
     })
 }
 

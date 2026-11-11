@@ -582,8 +582,12 @@ public final class InputSession {
             if position > 0, !forcedBoundaries.contains(position) { forcedBoundaries.append(position) }
             return KeyResult(handled: true, actions: render(context: context))
         case .acceptSuggestion:
-            // 「もしかして」と示していた読みに直す
-            guard phase == .composing, readingCorrector.acceptSuggestion(&composition) else { return KeyResult(handled: true) }
+            guard phase == .composing else { return KeyResult(handled: true) }
+            // 「もしかして」と示していた読みに直す．示していなければ，出している入力中の候補の窓から選び始める(↓ と同じ)
+            guard readingCorrector.acceptSuggestion(&composition) else {
+                guard shownSuggestionPanel != nil, suggestionsShown else { return KeyResult(handled: true) }
+                return moveCandidate(.next, context: context)
+            }
             usage?.record(.readingCorrected)
             showsCorrectionNote = true
             return KeyResult(handled: true, actions: render(context: context))
@@ -1375,7 +1379,8 @@ public final class InputSession {
         return (Array(candidates), prefix)
     }
 
-    /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ で選ぶ
+    /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ か Tab で選び始める(↑ は字種の行から)．
+    /// 番号キーは読みに数字を打つキーなので，選び始めるまでは番号を振らない(選び始めると一覧と同じに番号で選べる)
     private func suggestionPanel() -> CandidatePanel? {
         let (suggestions, prefix) = suggestionCandidates()
         guard !suggestions.isEmpty else { return nil }
@@ -1387,8 +1392,9 @@ public final class InputSession {
             focus: .candidate,
             position: 0,
             total: suggestions.count,
-            note: PanelBuilder.suggestionNote(key: keyLabel(.nextCandidate, in: .composing))
+            note: PanelBuilder.suggestionNote(keys: [keyLabel(.nextCandidate, in: .composing), keyLabel(.acceptSuggestion, in: .composing)].compactMap { $0 })
         )
+        panel.showsNumbers = false
         // 窓を今打っている文節の下にそろえる
         panel.anchor = prefix.map { $0.text.utf16.count }
         return panel
@@ -1614,8 +1620,9 @@ public final class InputSession {
         switch phase {
         case .composing:
             alphabetRun = false
-            // 打っているあいだの候補を出しているときは，↓ でその候補から選ぶ
-            let (suggestions, prefix) = move == .next ? suggestionCandidates(waitsForPredictions: true) : ([], nil)
+            // 打っているあいだの候補を出しているときは，↓ でその候補の先頭から選ぶ．↑ は一覧の先頭からさらに上へ動かしたのと同じに，
+            // 字種の行(出さない設定なら末尾の候補)から選ぶ．窓を出していなければ変換を始める
+            let (suggestions, prefix) = move == .next || move == .previous ? suggestionCandidates(waitsForPredictions: true) : ([], nil)
             if suggestions.isEmpty {
                 enterConversion()
             } else {
@@ -1624,6 +1631,7 @@ public final class InputSession {
                 var selection = CandidateSelection(candidates: candidates, annotations: suggestions.map { _ in nil }, focus: .candidate(0))
                 selection.shownPrefix = prefix?.text ?? ""
                 phase = .selecting(selection)
+                if move == .previous { return moveCandidate(.previous, context: context) }
             }
         case .lattice(var lattice):
             let perPage = latticePerPage

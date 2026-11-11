@@ -74,8 +74,8 @@ fn footer(list: &CandidateList) -> Footer {
         };
     }
     Footer {
-        // 連想の一覧には文字種の行が無いので，文字種の案内を出さない
-        hints: if list.association.is_some() {
+        // 文字種の行が無い一覧(連想の一覧や，文字種の行を出さない設定)では，文字種の案内を出さない
+        hints: if list.association.is_some() || list.variants.is_empty() {
             Vec::new()
         } else {
             strings::candidates_hints()
@@ -250,19 +250,27 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
             painter.command(kind, text_x, row.mid_y(), selected, opacity);
             text_x += Painter::command_width();
         }
+        // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
+        // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
+        let numbered = list.shows_numbers.unwrap_or(true);
         if theme.is_rounded() {
-            let center = Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
-            painter.badge(
-                &number,
-                center,
-                selected,
-                opacity,
-                glass::BADGE_SIZE,
-                Font::Key,
-            );
+            if numbered {
+                let center =
+                    Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
+                painter.badge(
+                    &number,
+                    center,
+                    selected,
+                    opacity,
+                    glass::BADGE_SIZE,
+                    Font::Key,
+                );
+            }
             painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         } else {
-            painter.text(&number, Font::Label, muted_color, row.x + padding, row);
+            if numbered {
+                painter.text(&number, Font::Label, muted_color, row.x + padding, row);
+            }
             painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         }
         // 省いたときは補正の下線を引かない(位置が合わない)
@@ -468,6 +476,7 @@ mod tests {
             association: None,
             association_hint: None,
             homophone: None,
+            shows_numbers: None,
             variants: vec![CandidateVariant {
                 label: "カタカナ".into(),
                 is_available: true,
@@ -598,6 +607,32 @@ mod tests {
 
     fn texts_of(scene: &Scene) -> Vec<String> {
         texts(scene).into_iter().map(|(text, _)| text).collect()
+    }
+
+    #[test]
+    fn 番号キーで選べない窓は番号を振らず_文字種の行が無ければ文字種の案内を出さない() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let numbered = texts_of(&candidate_list(&list(Some(0)), &look, &Fixed));
+            assert!(numbered.contains(&"1".to_string()));
+            assert!(numbered.contains(&"文字種".to_string()));
+            let mut browsing = list(None);
+            browsing.shows_numbers = Some(false);
+            browsing.variants.clear();
+            let scene = candidate_list(&browsing, &look, &Fixed);
+            let texts = texts_of(&scene);
+            assert!(texts.contains(&"変換".to_string()));
+            assert!(!texts.contains(&"1".to_string()));
+            assert!(!texts.contains(&"2".to_string()));
+            assert!(!texts.contains(&"文字種".to_string()));
+            // 番号を振らなくても，候補の文字の位置は変えない
+            let natural = candidate_list(&list(None), &look, &Fixed);
+            assert_eq!(
+                text_frame(&scene, "変換").map(|frame| frame.x),
+                text_frame(&natural, "変換").map(|frame| frame.x)
+            );
+        }
     }
 
     #[test]
