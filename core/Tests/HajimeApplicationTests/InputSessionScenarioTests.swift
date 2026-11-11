@@ -1499,6 +1499,59 @@ struct ReadingCorrectionScenarioTests {
         return harness
     }
 
+    /// 「ubuntu」を「うぶんと」に直す変換．直した読みは「宇文｜都」の 2 文節，打ったままの読みは「ウブンツ」の 1 語
+    private func typedWordHarness(settings: Settings = DefaultSettings.settings) -> Harness {
+        let converter = FakeConverter([
+            "うぶんと": [("宇文都", nil), ("ウブント", nil)],
+            "うぶん": [("宇文", nil)],
+            "と": [("都", nil), ("と", nil)],
+            "うぶんつ": [("ウブンツ", nil), ("Ubuntu", nil), ("宇文つ", nil), ("宇文津", nil)],
+        ])
+        let corrected = [Candidate.Word(text: "宇文", readingCount: 3, startsWithNoun: true), Candidate.Word(text: "都", readingCount: 1, startsWithNoun: true)]
+        converter.candidateWords["宇文都"] = corrected
+        converter.words["うぶんと"] = corrected
+        converter.words["うぶんつ"] = [Candidate.Word(text: "ウブンツ", readingCount: 4, startsWithNoun: true)]
+        converter.corrections["ubuntu"] = [
+            ReadingCorrection(keys: "ubunto", reading: "ウブント", score: 2, cost: 2.5),
+            ReadingCorrection(keys: "ubuntu", reading: "ウブンツ", score: -9, cost: 0),
+        ]
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("ubuntu")
+        harness.settle()
+        return harness
+    }
+
+    @Test("R-02: 直したあとの分岐図でも，打ったままの読みの語全体の候補を選べる．上位は直した候補のすぐ後ろに並べる")
+    func typedWordInLattice() {
+        let harness = typedWordHarness()
+        #expect(harness.marked.segments.contains { $0.style == .correction })
+        harness.press(.space)
+        // 直した「と」だけでなく，打ったままの読みの語(うぶんつ)全体を 1 つの文節にする
+        #expect(harness.lattice?.columns.count == 1)
+        #expect(harness.lattice?.columns.first?.alternatives.prefix(3) == ["宇文都", "ウブンツ", "Ubuntu"])
+        #expect(harness.lattice?.columns.first?.alternativeNotes.prefix(3) == [nil, "入力のまま", "入力のまま"])
+    }
+
+    @Test("R-02: 直したあとの一覧でも，打ったままの読みの候補をすべて選べる．上位は直した候補のすぐ後ろ，残りは末尾")
+    func typedCandidatesInList() {
+        let harness = typedWordHarness(settings: .listPresentation)
+        harness.press(.space)
+        #expect(harness.panel?.entries.map(\.text) == ["宇文都", "ウブンツ", "Ubuntu", "ウブント", "宇文つ", "宇文津"])
+        #expect(harness.panel?.entries.map(\.annotation) == [nil, "入力のまま", "入力のまま", nil, "入力のまま", "入力のまま"])
+        harness.type("3")
+        #expect(harness.committed == "Ubuntu")
+    }
+
+    @Test("R-02: 直したあとの入力中の候補にも，打ったままの読みの候補を出す")
+    func typedCandidatesInSuggestions() {
+        var settings = DefaultSettings.settings
+        settings.suggestionDisplay = .always
+        let harness = typedWordHarness(settings: settings)
+        harness.press(.down)
+        #expect(harness.panel?.entries.map(\.text).prefix(4) == ["宇文都", "ウブンツ", "Ubuntu", "ウブント"])
+        #expect(harness.panel?.entries[1].annotation == "入力のまま")
+    }
+
     @Test("R-02: 直したあとの Enter は直した文を確定する")
     func commitCorrected() {
         let harness = correctingHarness()

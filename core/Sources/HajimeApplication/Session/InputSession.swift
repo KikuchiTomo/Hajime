@@ -1324,6 +1324,14 @@ public final class InputSession {
             candidates.append(Candidate(text: composition.conversionReading, readingCount: whole, origin: .variant(.hiragana)))
             annotations.append(nil)
         }
+        // 打ち間違いを直したときも，打ったままの読みの候補を並べる．上位は直した第 1 候補のすぐ後ろに，残りは末尾に置く．
+        // 直すかどうかは利用者が選ぶので，直した読みの候補だけに絞らない
+        let typedAlternatives = typedReadingAlternatives(readingCount: whole, listing: true)
+        for (offset, candidate) in typedAlternatives.enumerated() where !candidates.contains(where: { $0.text == candidate.text }) {
+            let index = offset < DefaultSettings.typedAlternativeCount ? min(1 + offset, candidates.count) : candidates.count
+            candidates.insert(candidate, at: index)
+            annotations.insert(PanelBuilder.asTypedNote, at: index)
+        }
         // 英単語にした語(「demo」)を，打ったキーをローマ字として読んだかな(でも)でも変換して後ろに並べる．
         // 前の語から英語と見分けても，日本語のつもりで打ったときに選び直せるようにするため
         if let romaji = composition.conversionReadingWithFrozenWordsAsKana {
@@ -1340,6 +1348,17 @@ public final class InputSession {
     private var showsSuggestions: Bool {
         let display = settings.current.suggestionDisplay
         return display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion)
+    }
+
+    /// 打ち間違いを直しているときの，打ったままの読み全体の候補(readingCount は今の読みの文字数にそろえる)．直していなければ空．
+    /// listing なら一覧と同じ候補(記号や絵文字などを足したもの)を使う
+    private func typedReadingAlternatives(readingCount: Int, listing: Bool) -> [Candidate] {
+        guard readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) else { return [] }
+        let reading = typed.conversionReading
+        guard reading != composition.conversionReading else { return [] }
+        return (listing ? converter.listCandidates(for: reading) : converter.candidates(for: reading))
+            .filter { $0.readingCount == reading.count && $0.commandID == nil }
+            .map { Candidate(text: $0.text, readingCount: readingCount, origin: .asTyped) }
     }
 
     /// 打っているあいだに候補の窓を出す設定で，読みが出すのに足りる長さか
@@ -1381,7 +1400,10 @@ public final class InputSession {
         let whole = (prefix == nil ? converter.candidates(for: reading) : converter.segmentCandidates(for: reading))
             .filter { $0.readingCount == reading.count && $0.commandID == nil }
         let leading = DefaultSettings.suggestionLeadingConversions
-        let candidates = (Array(whole.prefix(leading)) + predictions + Array(whole.dropFirst(leading)))
+        // 打ち間違いを直しているときは，直した第 1 候補のすぐ後ろに打ったままの読みの候補を出す(一覧と同じ)
+        let typed = prefix == nil ? Array(typedReadingAlternatives(readingCount: reading.count, listing: false).prefix(DefaultSettings.typedAlternativeCount)) : []
+        let head = typed.isEmpty ? Array(whole.prefix(leading)) : Array(whole.prefix(1)) + typed + Array(whole.dropFirst(1).prefix(max(leading - 1, 0)))
+        let candidates = (head + predictions + Array(whole.dropFirst(leading)))
             .filter { seen.insert($0.text).inserted }
             .prefix(DefaultSettings.suggestionCount)
         return (Array(candidates), prefix)
@@ -1395,7 +1417,7 @@ public final class InputSession {
         var panel = CandidatePanel(
             variants: [],
             selectedVariant: nil,
-            entries: suggestions.map { CandidatePanel.Entry(text: $0.text, annotation: nil) },
+            entries: suggestions.map { CandidatePanel.Entry(text: $0.text, annotation: $0.origin == .asTyped ? PanelBuilder.asTypedNote : nil) },
             selectedEntry: nil,
             focus: .candidate,
             position: 0,
@@ -1636,7 +1658,8 @@ public final class InputSession {
             } else {
                 // 最後の文節の候補は，前の文節(見えている変換)とつないだ読み全体の候補にして選ぶ．一覧には文節の部分だけを出す
                 let candidates = prefix.map { prefix in suggestions.map { prefix.joined(with: $0, readingCount: composition.conversionReading.count) } } ?? suggestions
-                var selection = CandidateSelection(candidates: candidates, annotations: suggestions.map { _ in nil }, focus: .candidate(0))
+                var selection = CandidateSelection(candidates: candidates, annotations: suggestions.map { $0.origin == .asTyped ? PanelBuilder.asTypedNote : nil },
+                                                   focus: .candidate(0))
                 selection.shownPrefix = prefix?.text ?? ""
                 phase = .selecting(selection)
                 if move == .previous { return moveCandidate(.previous, context: context) }
