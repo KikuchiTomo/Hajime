@@ -76,6 +76,9 @@ struct SettingsCatalogTests {
                 "symbolSequenceMinimum": limit(DefaultSettings.symbolSequenceInputLength.lowerBound),
                 "symbolInputLength": limit(DefaultSettings.symbolSequenceInputLength.upperBound),
                 "symbolOutputLength": limit(DefaultSettings.maximumSymbolOutputLength),
+                "englishTerms": limit(DefaultSettings.maximumEnglishTerms),
+                "englishTermMinimum": limit(DefaultSettings.englishTermLengthRange.lowerBound),
+                "englishTermMaximum": limit(DefaultSettings.englishTermLengthRange.upperBound),
             ]),
             "timing": .object([
                 "responseTimeout": .number(DefaultSettings.settingsAppResponseTimeout),

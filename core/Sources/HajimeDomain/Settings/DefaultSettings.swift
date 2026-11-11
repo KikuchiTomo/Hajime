@@ -410,6 +410,16 @@ public enum DefaultSettings {
     /// 発音どおりの綴りから見つけた英単語を出す数と位置
     public static let maximumPhoneticWords = 2
     public static let phoneticCandidateOffset = 2
+    /// 英語の語の辞書(R-24)の語の長さ．1 文字の語(「C」)は英字 1 つの打ち始めと見分けられないので入れない
+    public static let englishTermLengthRange = 2...32
+    /// 利用者が足せる英語の語の数の上限
+    public static let maximumEnglishTerms = 2_000
+    /// 同梱の英語の語の辞書のファイルの名前(アプリの中・Windows のインストール先に置く)
+    public static let bundledEnglishTermFileName = "english-terms.txt"
+    /// 同梱の英語の語の辞書のファイルの大きさの上限．壊れた大きなファイルを読み込まないため
+    public static let maximumEnglishTermFileBytes = 1024 * 1024
+    /// 英語の語を，読み全体がふつうの日本語の語になるとき(「そら」→ 空)に出す位置．第 1 候補は日本語のままにする
+    public static let englishTermCandidateOffset = 1
     /// 動的なユーザー辞書の語(TextTemplate)を置き換えた文字列の長さの上限
     public static let maximumTemplateOutputLength = 256
     /// `{random:a-b}` の範囲の幅の上限

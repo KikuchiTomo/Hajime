@@ -187,6 +187,13 @@ public protocol UsageDictionaryProviding: AnyObject {
     var usageDictionary: UsageDictionary? { get }
 }
 
+/// 同梱の英語の語の辞書を渡すポート(R-24)．辞書は端末の中にあり，通信しない
+@MainActor
+public protocol EnglishTermProviding: AnyObject {
+    /// 同梱の英語の語の辞書．読めなければ nil(利用者が足した語だけを使う)
+    var englishTerms: EnglishTermDictionary? { get }
+}
+
 /// 読みから絵文字を引くポート(「なく」→ 😢)．表は端末の中にあり，通信しない
 @MainActor
 public protocol EmojiLooking: AnyObject {

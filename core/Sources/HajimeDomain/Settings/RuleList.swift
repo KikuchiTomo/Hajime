@@ -26,6 +26,8 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
     case symbolSequences
     /// 読みから引く記号
     case symbolReadings
+    /// 利用者が足した英語の語(R-24)．1 行に 1 語で，同梱の辞書(data/english/english-terms.txt)と同じ形
+    case englishTerms
 
     /// 書き出すファイルの既定の名前
     public var exportFileName: String {
@@ -37,6 +39,7 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
         case .romaji: "romaji.tsv"
         case .symbolSequences: "symbol-sequences.tsv"
         case .symbolReadings: "symbol-readings.tsv"
+        case .englishTerms: "english-terms.txt"
         }
     }
 
@@ -50,6 +53,7 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
         case .romaji: settings.customRomaji.map { RuleListRow(key: $0.keys, value: $0.kana) }
         case .symbolSequences, .symbolReadings:
             SymbolRuleEditing.items(symbolKind, rules: settings.symbolRules).filter(\.isEnabled).map { RuleListRow(key: $0.input, value: $0.output) }
+        case .englishTerms: settings.englishTerms.map { RuleListRow(key: $0, value: "") }
         }
     }
 
@@ -75,6 +79,10 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
             rows.reduce(0) { count, row in
                 SymbolRuleEditing.save(SymbolRule(kind: symbolKind, input: row.key, output: row.value), in: &settings.symbolRules) ? count + 1 : count
             }
+        case .englishTerms:
+            // 書き方そのものが語なので，大文字小文字はそのまま比べる
+            RuleListEditing.merge(rows.map(\.key.trimmed), key: { $0 }, isValid: EnglishTermDictionary.isValidTerm,
+                                  limit: DefaultSettings.maximumEnglishTerms, into: &settings.englishTerms)
         }
     }
 

@@ -48,6 +48,8 @@ enum UIStrings {
         static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。"
         static let phoneticSpelling = "発音どおりに綴った英単語の候補"
         static let phoneticSpellingNote = "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。"
+        static let englishTermCandidates = "英語の語の辞書を使う"
+        static let englishTerms = "英語の語の辞書に足した語"
         static let dynamicDictionary = "単語の {datetime:…} などを入力時の値にする"
         static let dynamicDictionaryNote = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。"
         static let commandsPage = "コマンド"
@@ -949,6 +951,7 @@ extension UIStrings {
             "handShiftCorrection": Extras.handShift, "looseReadings": Extras.looseReadings, "phoneticSpelling": Extras.phoneticSpelling,
             "dynamicDictionary": Extras.dynamicDictionary, "conversionMacros": Extras.conversionMacros, "macros": Extras.macrosSection,
             "launcherCommands": Extras.launcherCommands, "commands": Extras.commandsPage,
+            "englishTermCandidates": Extras.englishTermCandidates, "englishTerms": Extras.englishTerms,
         ]
 
         static func label(for scope: SyncScope) -> String {
