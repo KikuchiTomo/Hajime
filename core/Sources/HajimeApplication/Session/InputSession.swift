@@ -1212,12 +1212,10 @@ public final class InputSession {
     }
 
     /// 分岐図を作るもの．上の枝で英字をかなにするときも，利用者が足したローマ字の綴りを使う．
-    /// 入力中の候補の窓を出す設定なら，最後の文節に窓と同じ予測を入れる
+    /// 続く語句の予測は入れない(変換とは別の操作なので，変換の候補に混ぜない)
     private var latticeBuilder: LatticeBuilder {
         _ = newComposition()
-        var builder = LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
-        builder.predictsLastSegment = showsSuggestions
-        return builder
+        return LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
     }
 
     /// 空の読み．利用者が足したローマ字の綴りを使う

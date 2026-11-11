@@ -10,9 +10,6 @@ struct LatticeBuilder {
     let converter: any KanaKanjiConverting
     /// 上の枝(字種)を作るときに，読みに残った英字(英語と判定した語)をかなにするローマ字の表
     var romajiTable: RomajiTable = .standard
-    /// 読みの末尾までの文節(今打っている文節)の下の枝に，続く語句の予測を入れるか．入力中の候補の窓を出す設定のとき入れ，
-    /// 窓に出していた予測を Space で出した分岐図からも選べるようにする
-    var predictsLastSegment = false
 
     func build(reading: String, focus: InitialFocus = .automatic) -> SegmentLattice {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
@@ -365,21 +362,8 @@ struct LatticeBuilder {
         let best = engineCandidates.first, second = engineCandidates.dropFirst().first
         let confident = SegmentLattice.isConfident(best: best, second: second)
         let gap = best.flatMap { best in second.map { best.score - $0.score } } ?? .infinity
-        if predictsLastSegment, length == rest.count {
-            // 予測は，枝を見せるか・自動で選ぶ文節かの計算(confident・gap)には入れない(変換の確からしさではないため)
-            let predictions = predictions(of: slice).filter { prediction in
-                !variantTexts.contains(prediction.text) && !candidates.contains { $0.text == prediction.text }
-            }
-            candidates.insert(contentsOf: predictions, at: min(DefaultSettings.suggestionLeadingConversions, candidates.count))
-        }
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
                                       variants: variants(of: slice), isConfident: confident, confidenceGap: gap)
-    }
-
-    /// 文節の読みに続く語句の予測．入力中の候補の窓と同じく，短い読みでは求めない
-    private func predictions(of slice: String) -> [Candidate] {
-        guard slice.count >= DefaultSettings.minimumSuggestionReading else { return [] }
-        return converter.predictions(for: slice).filter { $0.readingCount == slice.count && $0.commandID == nil }
     }
 
     /// 文節の先頭の語を別の候補に変え，残りの部分はそのままつないだ候補(ごくでしょうが → 語句でしょうが・極でしょうが)．
