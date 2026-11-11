@@ -80,6 +80,12 @@ public struct Settings: Sendable, Equatable {
     public var postalCodeConversion = true
     /// 手書きで文字を探す窓を使う(キー操作の「手書き」で開く)
     public var handwriting = false
+    /// 絵文字と記号のパレットを使う(キー操作の「絵文字のパレット」「記号のパレット」で開く．R-25)
+    public var palette = true
+    /// パレットで文字を入れたら閉じる．⇧Enter はこの設定によらず閉じずに続けて入れる
+    public var paletteClosesAfterInsert = true
+    /// パレットで選んだ文字を覚え，よく使う文字の行と探したときの並びに使う(端末の中にだけ保存する)
+    public var paletteRecordsHistory = true
     /// よくある読み違い(「ふいんき」→ 雰囲気)の正しい語を候補に出し，「もしかして」で示す
     public var misreadings = true
     /// 手の置き場所が横にずれたまま打った並びを直す(HandShift．試験的)
@@ -161,6 +167,16 @@ public struct Settings: Sendable, Equatable {
     public var showsModeIndicator = true
     /// モードの表示を出しておく時間(秒)
     public var modeIndicatorDuration = 0.8
+    /// パレットの列の数
+    public var paletteColumns = DefaultSettings.paletteColumns
+    /// パレットに一度に見せる行の数
+    public var paletteRows = DefaultSettings.paletteRows
+    /// パレットのマスの一辺(pt)．文字の大きさはこれに合わせる
+    public var paletteCellSize = DefaultSettings.paletteCellSize
+    /// パレットの下に，選んでいる文字の名前・読み・ショートコードを出す
+    public var paletteShowsPreview = true
+    /// パレットのよく使う文字の行の数．0 なら出さない
+    public var paletteFrequentRows = DefaultSettings.paletteFrequentRows
     /// 保存したカスタムテーマ
     public var customThemes: [CustomTheme] = []
     /// 使っているカスタムテーマの ID．nil なら theme の既成のテーマ
@@ -214,6 +230,10 @@ public struct Settings: Sendable, Equatable {
         lateCorrectionTimeout = clamp(lateCorrectionTimeout.isFinite ? lateCorrectionTimeout : DefaultSettings.lateCorrectionTimeout, DefaultSettings.lateCorrectionTimeoutRange)
         modeIndicatorDuration = clamp(modeIndicatorDuration.isFinite ? modeIndicatorDuration : 0.8, DefaultSettings.modeIndicatorDurationRange)
         candidateFontSize = clamp(candidateFontSize.isFinite ? candidateFontSize : 15, DefaultSettings.candidateFontSizeRange)
+        paletteColumns = clamp(paletteColumns, DefaultSettings.paletteColumnsRange)
+        paletteRows = clamp(paletteRows, DefaultSettings.paletteRowsRange)
+        paletteCellSize = clamp(paletteCellSize.isFinite ? paletteCellSize : DefaultSettings.paletteCellSize, DefaultSettings.paletteCellSizeRange)
+        paletteFrequentRows = clamp(paletteFrequentRows, DefaultSettings.paletteFrequentRowsRange)
         var themeIDs = Set<String>()
         customThemes = Array(customThemes.filter { $0.isValid && themeIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCustomThemes))
         if activeCustomTheme == nil { customThemeID = nil }
@@ -300,6 +320,7 @@ extension Settings: Codable {
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
         case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, launcherCommands, commands
         case englishTermCandidates, englishTerms
+        case palette, paletteClosesAfterInsert, paletteRecordsHistory, paletteColumns, paletteRows, paletteCellSize, paletteShowsPreview, paletteFrequentRows
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -410,6 +431,14 @@ extension Settings: Codable {
         readList(.commands, into: \.commands)
         read(.englishTermCandidates, into: \.englishTermCandidates)
         readList(.englishTerms, into: \.englishTerms)
+        read(.palette, into: \.palette)
+        read(.paletteClosesAfterInsert, into: \.paletteClosesAfterInsert)
+        read(.paletteRecordsHistory, into: \.paletteRecordsHistory)
+        read(.paletteColumns, into: \.paletteColumns)
+        read(.paletteRows, into: \.paletteRows)
+        read(.paletteCellSize, into: \.paletteCellSize)
+        read(.paletteShowsPreview, into: \.paletteShowsPreview)
+        read(.paletteFrequentRows, into: \.paletteFrequentRows)
         // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
@@ -509,6 +538,14 @@ extension Settings: Codable {
         try container.encode(commands, forKey: .commands)
         try container.encode(englishTermCandidates, forKey: .englishTermCandidates)
         try container.encode(englishTerms, forKey: .englishTerms)
+        try container.encode(palette, forKey: .palette)
+        try container.encode(paletteClosesAfterInsert, forKey: .paletteClosesAfterInsert)
+        try container.encode(paletteRecordsHistory, forKey: .paletteRecordsHistory)
+        try container.encode(paletteColumns, forKey: .paletteColumns)
+        try container.encode(paletteRows, forKey: .paletteRows)
+        try container.encode(paletteCellSize, forKey: .paletteCellSize)
+        try container.encode(paletteShowsPreview, forKey: .paletteShowsPreview)
+        try container.encode(paletteFrequentRows, forKey: .paletteFrequentRows)
         var others = encoder.container(keyedBy: AnyKey.self)
         try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))
         for (key, value) in unknownFields where !Self.fieldNames.contains(key) && key != SettingsSchema.versionKey {

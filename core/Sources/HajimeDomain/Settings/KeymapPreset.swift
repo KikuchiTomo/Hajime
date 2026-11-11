@@ -39,6 +39,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         anywhere\tCtrl Option ,\topenSettings
         anywhere\tCtrl Option l\ttoggleLiveConversion
         anywhere\tCtrl Option h\thandwriting
+        anywhere\tCtrl Option e\temojiPalette
+        anywhere\tCtrl Option k\tsymbolPalette
         anywhere\tEisu\tdirectMode
         anywhere\tKana\tjapaneseMode
         anywhere\tHankaku/Zenkaku\ttoggleMode

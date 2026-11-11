@@ -22,6 +22,10 @@ public enum ClientAction: Sendable, Equatable {
     case toggleLiveConversion
     /// 手書きで文字を探す窓を出す(R-14)．選んだ文字は commit と同じく入力先に入れる
     case showHandwriting
+    /// 絵文字と記号のパレットを出す(出していれば中身を替える．R-25)．窓はフォーカスを奪わず，キーは InputSession が受ける
+    case showPalette(PalettePanel)
+    /// パレットを閉じる
+    case hidePalette
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
     case showNote(Note)
     /// 打ち間違いの訂正を求め終わるまで変換を待つ．入力コントローラは訂正を求めて渡し(provideCorrections)，

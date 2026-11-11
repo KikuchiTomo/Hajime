@@ -188,3 +188,30 @@ public final class FakeEnglishTermProvider: EnglishTermProviding {
         self.englishTerms = EnglishTermDictionary(terms: terms)
     }
 }
+
+/// 決まった表を渡すパレットの表(R-25)．index を nil にすると読み込み中として振る舞う
+@MainActor
+public final class FakePaletteCatalog: PaletteCatalogProviding {
+    public var index: PaletteIndex?
+
+    public init(_ text: String) {
+        self.index = PaletteIndex(catalog: PaletteCatalog(text: text))
+    }
+}
+
+/// メモリの中だけに持つパレットの使い方
+@MainActor
+public final class FakePaletteUsageStore: PaletteUsageStoring {
+    public private(set) var usage: PaletteUsage
+    public private(set) var saveCount = 0
+
+    public init(_ usage: PaletteUsage = PaletteUsage()) {
+        self.usage = usage
+    }
+
+    public func update(_ change: (inout PaletteUsage) -> Void) {
+        let before = usage
+        change(&usage)
+        if usage != before { saveCount += 1 }
+    }
+}

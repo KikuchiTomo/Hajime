@@ -34,11 +34,12 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
              "association", "associationLimit", "showsAssociationHint", "handShiftCorrection", "looseReadings", "phoneticSpelling", "dynamicDictionary",
              "conversionMacros", "zenzaiModel", "englishTermCandidates"]
         case .correction: ["correction", "wordLanguage"]
-        case .symbols: ["symbolRules", "macros"]
+        case .symbols: ["symbolRules", "macros", "palette", "paletteClosesAfterInsert", "paletteRecordsHistory"]
         case .dictionary: ["userDictionary", "englishTerms"]
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
-        case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]
+        case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID",
+                           "paletteColumns", "paletteRows", "paletteCellSize", "paletteShowsPreview", "paletteFrequentRows"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "restrainsLiveConversionInCode", "profileRules"]
         case .usage: ["recordsUsage"]
         case .commands: ["launcherCommands", "commands"]

@@ -139,15 +139,22 @@ public final class InputSession {
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
     private let keyNames: KeyNameStyle
+    /// 絵文字と記号のパレットに使うもの(R-25)．パレットを描けないアプリでは nil で，パレットのキーは何もしない
+    private let paletteServices: PaletteServices?
+    /// 開いているパレット．開いているあいだのキーはパレットが受ける
+    private var palette: PaletteSession?
 
     /// - Parameters:
     ///   - typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
     ///   - associations: 取り込んだ連想の辞書を引くもの(R-18)．nil なら連想変換のキーはふつうの変換と同じに動く
     ///   - keyNames: 候補ウィンドウの案内と注記に出すキーの名前の書き方(入力メソッドを動かす OS に合わせる)
     ///   - usageDictionary: 同音異義語の使い分けの辞書(R-08)．nil ならこのリポジトリで書いた組だけを使う
+    ///   - palette: 絵文字と記号のパレットに使うもの(R-25)．パレットを描けるアプリだけが渡す
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
-                rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil) {
+                rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil,
+                palette: PaletteServices? = nil) {
+        self.paletteServices = palette
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
         self.rejections = rejections
@@ -174,6 +181,13 @@ public final class InputSession {
         if context.isSecure {
             // パスワード欄では何もしない(docs/dev/SECURITY-MODEL.md)
             return .passThrough
+        }
+        if let palette {
+            // パレットを開いているあいだのキーはパレットが受ける
+            profile = context.profile
+            let result = handlePalette(event, palette: palette, context: context)
+            if context.profile == .terminal { terminal.didHandle(event, result: result) }
+            return result
         }
         showsCorrectionNote = false
         profile = context.profile
@@ -245,7 +259,7 @@ public final class InputSession {
     /// 入力欄からフォーカスが外れた．組み立て中の文字は確定する
     /// OS が commitComposition と deactivateServer の両方で呼ぶことがあるので，何度呼んでも同じ結果になるようにする
     public func deactivate() -> [ClientAction] {
-        let actions = commitAll()
+        let actions = closePalette() + commitAll()
         terminal.didLeave(committing: actions)
         return actions
     }
@@ -546,6 +560,8 @@ public final class InputSession {
         if settings.current.inputStyle.typesLetters, composition.isEmpty, !command.changesMode, !command.isTool { return nil }
         // 手書き入力は設定でオンにしたときだけ
         if command == .handwriting, !settings.current.handwriting { return nil }
+        // パレットは設定でオンにしていて，アプリがパレットを描けるときだけ(描けないのに開くと，キーを受けたまま何も見せなくなる)
+        if command == .emojiPalette || command == .symbolPalette, !settings.current.palette || paletteServices == nil { return nil }
         return command
     }
 
@@ -567,6 +583,69 @@ public final class InputSession {
         return commitAll() + [.showHandwriting]
     }
 
+    // MARK: - 絵文字と記号のパレット(R-25)
+
+    /// パレットを開いているか
+    public var isPaletteOpen: Bool { palette != nil }
+
+    /// パレットを開く(入力メニューから開くときは kind を nil にし，前に見ていた種類で開く)．組み立て中の文字は確定する．
+    /// パレットを使わない設定か，アプリがパレットを描けないなら何もしない
+    public func openPalette(_ kind: PaletteItem.Kind? = nil) -> [ClientAction] {
+        guard settings.current.palette, let paletteServices else { return [] }
+        let actions = commitAll()
+        let session = PaletteSession(kind: kind ?? paletteServices.usage.usage.lastKind ?? .emoji, inputMode: mode, services: paletteServices,
+                                     settings: settings, keyNames: keyNames, makeComposition: { [unowned self] in newComposition() })
+        palette = session
+        return actions + [.hideCandidates, .showPalette(session.panel())]
+    }
+
+    /// パレットの窓をマウスで操作した
+    public func palette(_ target: PaletteTarget, context: InputContext) -> [ClientAction] {
+        guard let palette else { return [] }
+        return paletteActions(palette.perform(target), palette: palette)
+    }
+
+    private func handlePalette(_ event: KeyEvent, palette: PaletteSession, context: InputContext) -> KeyResult {
+        if let command = lookUp(event) {
+            switch command {
+            case .emojiPalette, .symbolPalette:
+                // 開いている種類のキーで閉じ，もう一方のキーで切り替える
+                let kind: PaletteItem.Kind = command == .emojiPalette ? .emoji : .symbol
+                guard palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
+                return KeyResult(handled: true, actions: paletteActions(palette.perform(.mode(kind)), palette: palette))
+            case _ where command.changesMode:
+                // 日本語入力と英数入力の切り替えは効かせ，探す欄の見せ方を合わせる
+                let result = perform(command, event: event, context: context)
+                palette.inputMode = mode
+                return KeyResult(handled: true, actions: result.actions + [.showPalette(palette.panel())])
+            case _ where command.isTool:
+                // 設定を開く・手書きなどは，パレットを閉じてから行う
+                let closing = closePalette()
+                return KeyResult(handled: true, actions: closing + perform(command, event: event, context: context).actions)
+            default:
+                break
+            }
+        }
+        let outcome = palette.handle(event)
+        if outcome == .closeAndPassThrough { return KeyResult(handled: false, actions: closePalette()) }
+        return KeyResult(handled: true, actions: paletteActions(outcome, palette: palette))
+    }
+
+    private func paletteActions(_ outcome: PaletteSession.Outcome, palette: PaletteSession) -> [ClientAction] {
+        switch outcome {
+        case .render: [.showPalette(palette.panel())]
+        case .insert(let text, let keepsOpen): [.commit(text)] + (keepsOpen ? [.showPalette(palette.panel())] : closePalette())
+        case .close, .closeAndPassThrough: closePalette()
+        case .none: []
+        }
+    }
+
+    private func closePalette() -> [ClientAction] {
+        guard palette != nil else { return [] }
+        palette = nil
+        return [.hidePalette]
+    }
+
     private func perform(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult {
         if case .association(let list, let origin) = phase, let result = performInAssociation(command, list: list, origin: origin, context: context) {
             return result
@@ -576,6 +655,8 @@ public final class InputSession {
         case .openSettings: return KeyResult(handled: true, actions: commitAll() + [.openSettings])
         case .toggleLiveConversion: return KeyResult(handled: true, actions: commitAll() + [.toggleLiveConversion])
         case .handwriting: return KeyResult(handled: true, actions: commitAll() + [.showHandwriting])
+        case .emojiPalette: return KeyResult(handled: true, actions: openPalette(.emoji))
+        case .symbolPalette: return KeyResult(handled: true, actions: openPalette(.symbol))
         // 入力モード
         case .japaneseMode: return switchMode(to: .japanese)
         case .directMode: return switchMode(to: .direct)

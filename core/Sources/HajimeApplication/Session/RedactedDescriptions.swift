@@ -18,6 +18,8 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .openSettings: "openSettings"
         case .toggleLiveConversion: "toggleLiveConversion"
         case .showHandwriting: "showHandwriting"
+        case .showPalette(let panel): "showPalette(\(panel))"
+        case .hidePalette: "hidePalette"
         case .awaitCorrections: "awaitCorrections"
         case .requestReconversion: "requestReconversion"
         case .runCommand(let command): "runCommand(\(command))"
