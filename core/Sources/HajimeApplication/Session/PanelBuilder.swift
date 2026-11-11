@@ -33,8 +33,8 @@ enum PanelBuilder {
         Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
     }
 
-    /// 打っているあいだの候補の窓の案内．key は候補に入るキー
-    static func suggestionNote(key: String?) -> Note? { key.map { .info("\($0) で選ぶ") } }
+    /// 打っているあいだの候補の窓の案内．keys は候補を選び始めるキー(無いものは除いてある)
+    static func suggestionNote(keys: [String]) -> Note? { keys.isEmpty ? nil : .info("\(keys.joined(separator: "・")) で選ぶ") }
 
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
     /// 文節をその場で打ち直しているときの案内．subject は打ち直す前の文節，key は打ち直した読みを変換するキー

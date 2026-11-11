@@ -101,6 +101,7 @@ mod tests {
             association: None,
             association_hint: None,
             homophone: None,
+            shows_numbers: None,
             variants: vec![CandidateVariant {
                 label: "カタカナ".into(),
                 is_available: true,

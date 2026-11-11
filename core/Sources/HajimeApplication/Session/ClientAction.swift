@@ -144,6 +144,9 @@ public struct CandidatePanel: Sendable, Equatable {
     public var anchor: Int?
     /// 選んでいる候補の同音異義語の使い分け(R-08)．候補と足元のあいだに出す
     public var homophone: HomophoneNote?
+    /// 候補に番号を振るか．番号キーで選べない窓(選び始める前の入力中の候補の窓など)では振らない．
+    /// 番号キーはそのまま文字になるので，振ると選べるように見えてしまう
+    public var showsNumbers = true
 
     public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: Note?) {
         self.variants = variants

@@ -201,12 +201,16 @@ final class CandidateView: NSView {
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
         let number = "\(index + 1)"
         var textX: CGFloat
+        // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
+        // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
         if theme.isRounded {
             let center = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
-            GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity)
+            if panel.showsNumbers { GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity) }
             textX = rect.minX + Size.paddingX / 2 + lead
         } else {
-            drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
+            if panel.showsNumbers {
+                drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
+            }
             textX = rect.minX + Size.paddingX + lead
         }
         if let kind = entry.command {
@@ -258,8 +262,9 @@ final class CandidateView: NSView {
             let position = UIStrings.Candidate.variantsPosition(panel.selectedVariant.map { $0 + 1 } ?? 1, panel.variants.count)
             return Footer(hints: UIStrings.Candidate.variantsHints, note: panel.note, position: position)
         }
-        return Footer(hints: UIStrings.Candidate.candidatesHints, note: panel.note, position: UIStrings.Candidate.position(panel.position, panel.total),
-                      associationHint: panel.associationHint)
+        // 文字種の行が無い一覧(文字種の行を出さない設定など)では，文字種の案内を出さない
+        return Footer(hints: panel.variants.isEmpty ? [] : UIStrings.Candidate.candidatesHints, note: panel.note,
+                      position: UIStrings.Candidate.position(panel.position, panel.total), associationHint: panel.associationHint)
     }
 
     private func hintsWidth(_ footer: Footer) -> CGFloat {

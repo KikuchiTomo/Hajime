@@ -1421,6 +1421,9 @@ pub struct CandidateList {
     pub association_hint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homophone: Option<HomophoneNote>,
+    #[serde(rename = "showsNumbers")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shows_numbers: Option<bool>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1437,6 +1440,7 @@ impl fmt::Debug for CandidateList {
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
             .field("homophone", &self.homophone)
+            .field("showsNumbers", &self.shows_numbers)
             .finish()
     }
 }

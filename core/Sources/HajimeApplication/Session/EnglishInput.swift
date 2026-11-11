@@ -117,14 +117,17 @@ final class EnglishInput: InputStyleHandling {
         guard isComposing else { return [.setMarkedText(.empty), .hideCandidates] }
         if showsJapanese, let suggestion {
             // 日本語にして見せ，英字を候補に添える
-            let panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: typed, annotation: nil)],
+            var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: typed, annotation: nil)],
                                        selectedEntry: nil, focus: .candidate, position: 1, total: 1, note: PanelBuilder.englishInputJapaneseNote)
+            // 番号キーでは選べない(数字を打つ)ので番号を振らない
+            panel.showsNumbers = false
             return [.setMarkedText(MarkedText([.init(suggestion.text, style: .converted)])), .showCandidates(panel)]
         }
         let marked = MarkedText([.init(typed, style: .reading)])
         guard let suggestion, suggestion.text != typed else { return [.setMarkedText(marked), .hideCandidates] }
-        let panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: suggestion.text, annotation: nil)],
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: suggestion.text, annotation: nil)],
                                    selectedEntry: nil, focus: .candidate, position: 1, total: 1, note: PanelBuilder.englishInputNote)
+        panel.showsNumbers = false
         return [.setMarkedText(marked), .showCandidates(panel)]
     }
 
