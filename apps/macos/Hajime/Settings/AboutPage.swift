@@ -30,12 +30,22 @@ struct AboutPage: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent(UIStrings.More.version) {
-                    HStack {
-                        Text(model.versionString)
-                        if let open = model.openLatestRelease {
-                            Button(UIStrings.More.checkForUpdates, action: open)
-                        }
+                // Hajime のアイコンと名前・バージョンを並べ，右に「更新を確認」を置く
+                HStack(alignment: .center) {
+                    Image(nsImage: model.appIcon)
+                        .resizable()
+                        .frame(width: DesignTokens.Size.Settings.aboutIcon, height: DesignTokens.Size.Settings.aboutIcon)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading) {
+                        Text(model.appName).font(.title2.weight(.semibold))
+                        LabeledContent(UIStrings.More.version, value: model.versionString)
+                            .labelsHidden()
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                    if let check = model.checkForUpdates {
+                        Button(UIStrings.More.checkForUpdates, action: check)
                     }
                 }
                 if let open = model.openOnboarding {

@@ -17,6 +17,9 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
+    # IME の本体と更新用のアプリで同じバージョンにする(tools/release/bump_version.sh が書き換える)
+    MARKETING_VERSION: "0.2.6"
+    CURRENT_PROJECT_VERSION: "24"
 packages:
   HajimeCore:
     path: ../../core
@@ -77,6 +80,13 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Dictionary/SHA256SUMS
     dependencies:
+      # 更新用のアプリを Contents/Helpers に入れる(R-19)
+      - target: HajimeUpdater
+        embed: true
+        codeSign: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       - package: HajimeCore
         product: HajimeDomain
       - package: HajimeCore
@@ -111,8 +121,6 @@ targets:
         HAJIME_DISPLAY_NAME: "はじめ"
         # 英字の入力モードの名前
         HAJIME_DISPLAY_NAME_EN: "Hajime"
-        MARKETING_VERSION: "0.2.6"
-        CURRENT_PROJECT_VERSION: "24"
         GENERATE_INFOPLIST_FILE: NO
         COMBINE_HIDPI_IMAGES: YES
       # Dev と Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる．
@@ -137,6 +145,36 @@ targets:
           HAJIME_DISPLAY_NAME_EN: "Hajime Debug"
 # スキームを書いておく．書かないと xcodebuild が自動で作るスキームで実行先の機種が決まらず，
 # 「Supported platforms for the buildables in the current scheme is empty」と出る
+  # 更新用のアプリ(R-19)．IME の本体はサンドボックスの中で通信できないので，更新の確認・ダウンロード・インストールはこのアプリが行う．
+  # キー入力は受け取らない．管理者の権限で OS のインストーラーを動かすため，サンドボックスには入れない(ハードンドランタイムは付ける)
+  HajimeUpdater:
+    type: application
+    platform: macOS
+    sources:
+      - path: HajimeUpdater
+        excludes:
+          - "Info.plist"
+      # 更新の窓に Hajime のアイコンを出す(tools/icons/make_app_icon.sh)
+      - path: Hajime/Resources/Hajime.icns
+        buildPhase: resources
+    dependencies:
+      - package: HajimeCore
+        product: HajimeDomain
+    settings:
+      base:
+        PRODUCT_NAME: "Hajime Updater"
+        PRODUCT_MODULE_NAME: HajimeUpdater
+        PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.Hajime.Updater
+        INFOPLIST_FILE: HajimeUpdater/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        SKIP_INSTALL: YES
+      configs:
+        Dev:
+          PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.develop.Updater
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.debug.Updater
 schemes:
   Hajime:
     build:

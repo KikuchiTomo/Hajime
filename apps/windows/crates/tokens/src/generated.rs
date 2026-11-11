@@ -298,6 +298,7 @@ pub mod size {
         pub const SECONDS_SLIDER_WIDTH: f32 = 180.0;
         pub const SECONDS_LABEL_WIDTH: f32 = 52.0;
         pub const THEME_SWATCH_WIDTH: f32 = 40.0;
+        pub const ABOUT_ICON: f32 = 64.0;
         pub const THEME_SWATCH_HEIGHT: f32 = 20.0;
         pub const THEME_SWATCH_GAP: f32 = 3.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;

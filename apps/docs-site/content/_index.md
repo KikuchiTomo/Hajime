@@ -84,7 +84,7 @@ layout: hextra-home
   >}}
   {{< hajime/feature
     title="外部通信不要"
-    subtitle="AI補正などもすべてローカルで実施します．"
+    subtitle="AI補正などもすべてローカルで実施します．通信するのは「更新を確認」を押したときだけです．"
     link="privacy/"
   >}}
 {{< /hajime/features >}}

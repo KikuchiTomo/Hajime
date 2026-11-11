@@ -4,6 +4,8 @@
 <dict>
 	<key>LSUIElement</key>
 	<true/>
+	<key>CFBundleIconFile</key>
+	<string>Hajime</string>
 	<key>ComponentInputModeDict</key>
 	<dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
