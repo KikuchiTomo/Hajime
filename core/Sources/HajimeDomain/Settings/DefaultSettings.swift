@@ -399,6 +399,27 @@ public enum DefaultSettings {
     /// 更新を勧めるときに出す変更点の長さの上限(文字数)．長いと確かめる窓が画面に収まらない
     public static let maximumUpdateNotesLength = 1200
 
+    // MARK: 絵文字と記号のパレット
+
+    /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える
+    public static let maximumPaletteTextLength = 4
+    /// パレットで探したときに並べる項目の数の上限
+    public static let maximumPaletteSearchResults = 400
+    /// あいまいな照合(FuzzyMatch)の点．当たった 1 文字の点，飛ばし始めと飛ばし続けの減点，
+    /// 文字列の頭か空白のあと・区切りの記号のあとで当たったときの加点，続けて当たったときの加点，最初の文字の加点の倍率
+    public static let fuzzyMatchScores = (match: 16, gapStart: -3, gapExtension: -1, boundaryWhite: 10, boundary: 8, consecutive: 4,
+                                          firstCharacterMultiplier: 2)
+    /// 飛び飛びの当たりとして出す点の下限(打った 1 文字あたり)．これより低い当たりは，散らばりすぎていて探した語と関係が薄い
+    public static let minimumScatteredMatchScorePerCharacter = 14
+    /// 飛び飛びの当たりを出す，打った英数字の長さの下限
+    public static let minimumScatteredPaletteQueryLength = 3
+    /// 名前(名前の読み・ショートコード)で当たったときの加点．読みやキーワードで当たった項目より先にする
+    public static let paletteNameMatchBonus = 3
+    /// よく使う度合いの加点(scale × log2(1 + 度合い) を maximum で止める)．同じ段の中の並びだけを変える
+    public static let paletteUsageBonus = (scale: 20.0, maximum: 60.0)
+    /// ピン留めした項目の加点
+    public static let palettePinnedBonus = 40.0
+
     // MARK: 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ
 
     /// 手の置き場所のずれを戻した並び(HandShift)に足す手間．ずれは 1 回の誤りなので，同じキーの重なり(repeatedKeyCost)と同じ重さにする
