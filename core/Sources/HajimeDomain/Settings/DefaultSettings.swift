@@ -394,6 +394,8 @@ public enum DefaultSettings {
     public static let updateVerificationTimeout = 120.0
     /// インストールを終えるまでの待ち時間の上限(秒)．管理者のパスワードの入力を待つ時間を含む(macOS)
     public static let updateInstallTimeout = 1800.0
+    /// 更新を勧めるときに出す変更点の長さの上限(文字数)．長いと確かめる窓が画面に収まらない
+    public static let maximumUpdateNotesLength = 1200
 
     // MARK: 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ
 

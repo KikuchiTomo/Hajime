@@ -17,6 +17,7 @@ pub mod strings;
 pub mod sync;
 pub mod themes;
 pub mod ui;
+pub mod update;
 pub mod usage;
 pub mod wizard;
 

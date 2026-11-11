@@ -1025,6 +1025,17 @@ impl PageView {
     }
 
     /// 標準の EDIT の窓を隠して pool に返す(次のページで使い回す)
+    /// バージョンの行に，更新の進み具合(None ならバージョン)を出す
+    pub fn set_version_status(&mut self, status: Option<String>) {
+        for row in &mut self.rows {
+            if row.row.control == Control::Version {
+                row.text = status
+                    .clone()
+                    .unwrap_or_else(|| text::version(env!("CARGO_PKG_VERSION")));
+            }
+        }
+    }
+
     pub fn release(self, pool: &mut Vec<Window>) {
         for window in self.windows() {
             ffi::show(window, false);
@@ -1484,7 +1495,7 @@ impl PageView {
                 return Some(Event::Action(*action))
             }
             (Control::Version, Part::Action) => {
-                return Some(Event::Action(Action::OpenLatestRelease))
+                return Some(Event::Action(Action::CheckForUpdates))
             }
             (Control::Acknowledgement(_), Part::Link(index)) => {
                 let url = row

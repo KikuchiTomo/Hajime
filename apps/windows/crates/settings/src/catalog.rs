@@ -145,6 +145,18 @@ pub struct Update {
     pub manifest_timeout: f64,
     /// 秒
     pub download_timeout: f64,
+    /// 更新を勧めるときに出す変更点の長さの上限(文字数)
+    pub notes_length: usize,
+}
+
+impl Update {
+    pub fn manifest_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs_f64(self.manifest_timeout.max(0.0))
+    }
+
+    pub fn download_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs_f64(self.download_timeout.max(0.0))
+    }
 }
 
 impl Catalog {
