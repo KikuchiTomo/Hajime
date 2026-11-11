@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! キーのアイコンの形．macOS の SF Symbols(arrow.up・shift・arrow.right.to.line・escape など)に当たる線画を，
+//! キーなどのアイコンの形．macOS の SF Symbols(arrow.up・shift・arrow.right.to.line・escape など)に当たる線画を，
 //! 正方形の枠の中の折れ線で決める．描く層は折れ線を同じ太さの線でなぞるだけにし，形をここで確かめられるようにする
 
 use crate::geometry::{Frame, Point};
@@ -108,10 +108,37 @@ const DOCUMENT_FOLD: &[Unit] = &[&[(0.6, 0.06), (0.6, 0.28), (0.82, 0.28)]];
 /// 重なった 2 枚の板(上の板と，下の板の見える縁)
 const LAYERS_TOP: Unit = &[(0.5, 0.1), (0.94, 0.34), (0.5, 0.58), (0.06, 0.34)];
 const LAYERS_BOTTOM: &[Unit] = &[&[(0.06, 0.6), (0.5, 0.84), (0.94, 0.6)]];
+/// 閉じた本(表紙の外枠と，小口の線，背の線)．表紙に「あ」を入れた辞書のアイコンは線画では小さすぎて読めないので，本の形だけにする
+const BOOK_COVER: Unit = &[(0.18, 0.06), (0.84, 0.06), (0.84, 0.94), (0.18, 0.94)];
+const BOOK_LINES: &[Unit] = &[&[(0.18, 0.76), (0.84, 0.76)], &[(0.34, 0.06), (0.34, 0.76)]];
+/// 耳の外側の弧の中心と半径，弧を描く角度(度．右が 0 で時計回り)と，耳たぶへ下りる線
+const EAR_CENTER: (f32, f32) = (0.52, 0.4);
+const EAR_RADIUS: f32 = 0.32;
+const EAR_FROM: f32 = 170.0;
+const EAR_TO: f32 = 420.0;
+const EAR_LOBE: Unit = &[(0.58, 0.86), (0.44, 0.94), (0.32, 0.86)];
+/// 耳の内側の渦の半径と角度，渦の先の線
+const EAR_INNER_RADIUS: f32 = 0.14;
+const EAR_INNER_FROM: f32 = 180.0;
+const EAR_INNER_TO: f32 = 380.0;
+const EAR_INNER_TAIL: (f32, f32) = (0.56, 0.62);
 
 pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
     let place =
         |(x, y): (f32, f32)| Point::new(frame.x + x * frame.width, frame.y + y * frame.height);
+    // center を中心に，from から to の角度(度)までの弧の点
+    let arc = |center: (f32, f32), radius: f32, from: f32, to: f32| -> Vec<Point> {
+        (0..=CIRCLE_STEPS)
+            .map(|step| {
+                let degrees = from + (to - from) * step as f32 / CIRCLE_STEPS as f32;
+                let radians = degrees * PI / 180.0;
+                place((
+                    center.0 + radius * radians.cos(),
+                    center.1 + radius * radians.sin(),
+                ))
+            })
+            .collect()
+    };
     let open = |lines: &[Unit], turn: fn((f32, f32)) -> (f32, f32)| {
         lines
             .iter()
@@ -211,6 +238,31 @@ pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
             figures.extend(open(LAYERS_BOTTOM, |p| p));
             figures
         }
+        Icon::Book => {
+            let mut figures = vec![Figure {
+                points: BOOK_COVER.iter().map(|point| place(*point)).collect(),
+                closed: true,
+            }];
+            figures.extend(open(BOOK_LINES, |p| p));
+            figures
+        }
+        Icon::Ear => {
+            // 外側の弧から耳たぶへ下り，内側の渦を別に描く
+            let mut outer = arc(EAR_CENTER, EAR_RADIUS, EAR_FROM, EAR_TO);
+            outer.extend(EAR_LOBE.iter().map(|point| place(*point)));
+            let mut inner = arc(EAR_CENTER, EAR_INNER_RADIUS, EAR_INNER_FROM, EAR_INNER_TO);
+            inner.push(place(EAR_INNER_TAIL));
+            vec![
+                Figure {
+                    points: outer,
+                    closed: false,
+                },
+                Figure {
+                    points: inner,
+                    closed: false,
+                },
+            ]
+        }
         Icon::Escape => {
             let span = 360.0 - (ESCAPE_GAP_TO - ESCAPE_GAP_FROM);
             let arc = (0..=CIRCLE_STEPS)
@@ -237,7 +289,7 @@ pub fn figures(icon: Icon, frame: Frame) -> Vec<Figure> {
 mod tests {
     use super::*;
 
-    const ALL: [Icon; 17] = [
+    const ALL: [Icon; 19] = [
         Icon::Up,
         Icon::Down,
         Icon::Left,
@@ -255,6 +307,8 @@ mod tests {
         Icon::Globe,
         Icon::Document,
         Icon::Layers,
+        Icon::Book,
+        Icon::Ear,
     ];
 
     #[test]

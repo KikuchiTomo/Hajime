@@ -232,9 +232,6 @@ enum DesignTokens {
             static let commandIconSize: CGFloat = 18
             static let commandIconRadius: CGFloat = 5
             static let noteGap: CGFloat = 6
-            static let usageMaxWidth: CGFloat = 360
-            static let usageRowHeight: CGFloat = 22
-            static let usagePaddingY: CGFloat = 4
             static let usageTagGap: CGFloat = 4
             static let meaningCardWidth: CGFloat = 280
             static let meaningBranchWidth: CGFloat = 300

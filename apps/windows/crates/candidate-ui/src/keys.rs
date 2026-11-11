@@ -3,7 +3,7 @@
 //! 足元の案内のキー(「Shift+←」「Ctrl+Tab」「1–2」「↓ Tab」)を，キーキャップごとに分け，その中に並べる部品に分ける．
 //! 矢印や Shift などはアイコンで描き(macOS の SF Symbols に当たる)，Ctrl・Alt・文字は文字で描く
 
-/// キーキャップや番号の丸の中に描くアイコン．形は icon::figures が決める
+/// キーキャップや番号の丸の中などに描くアイコン．形は icon::figures が決める
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Icon {
     Up,
@@ -29,6 +29,10 @@ pub enum Icon {
     Document,
     /// コマンドの種類．ショートカットを動かす(macOS の square.2.layers.3d)
     Layers,
+    /// 語の意味のカードの見出し(macOS の character.book.closed.ja に当たる閉じた本)
+    Book,
+    /// 語の意味のカードの同音語の行(macOS の ear)
+    Ear,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

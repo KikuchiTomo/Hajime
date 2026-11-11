@@ -172,6 +172,24 @@ impl ResolvedTheme {
         })
     }
 
+    /// 語の意味のカードの地(文字の色を薄く敷く)
+    pub fn meaning_card_fill(&self) -> Color {
+        self.text.with_alpha(if self.kind == Kind::Contrast {
+            opacity::glass::MEANING_CARD_CONTRAST
+        } else {
+            opacity::glass::MEANING_CARD
+        })
+    }
+
+    /// 意味の番号と品詞の札の地(アクセントの色を薄く敷く)
+    pub fn meaning_tint(&self) -> Color {
+        self.selection.with_alpha(if self.kind == Kind::Contrast {
+            opacity::glass::MEANING_BADGE_CONTRAST
+        } else {
+            opacity::glass::MEANING_BADGE
+        })
+    }
+
     /// 設定から描き方を決める．カスタムテーマを使っていれば，元のテーマの描き方に色・書体・形を重ねる
     pub fn resolve(theme: &str, custom: Option<&CustomTheme>, look: &SystemLook) -> Self {
         let Some(custom) = custom else {
@@ -343,16 +361,14 @@ impl ResolvedTheme {
         } else {
             size::candidate::LABEL_FONT_SIZE
         };
+        // 長めの文(候補，語の意味と使い方の例)は細めにする
+        let body = if contrast {
+            Weight::Medium
+        } else {
+            Weight::Regular
+        };
         let (face, weight, size) = match font {
-            Font::Candidate => (
-                self.face(),
-                if contrast {
-                    Weight::Medium
-                } else {
-                    Weight::Regular
-                },
-                font_size,
-            ),
+            Font::Candidate => (self.face(), body, font_size),
             Font::Trunk => (
                 self.face(),
                 if contrast {
@@ -391,14 +407,7 @@ impl ResolvedTheme {
             ),
             Font::Sized(role, points) => {
                 let (face, weight) = match role {
-                    Role::Candidate => (
-                        self.face(),
-                        if contrast {
-                            Weight::Medium
-                        } else {
-                            Weight::Regular
-                        },
-                    ),
+                    Role::Candidate => (self.face(), body),
                     Role::Label => (self.label_face(), Weight::Medium),
                     Role::Emphasis => (self.label_face(), Weight::Semibold),
                     Role::Code => (Face::Monospaced, Weight::Regular),
@@ -407,6 +416,28 @@ impl ResolvedTheme {
                 };
                 (face, weight, f32::from(points))
             }
+            Font::MeaningHeadword => (
+                self.face(),
+                Weight::Semibold,
+                size::glass::MEANING_HEADWORD_FONT_SIZE,
+            ),
+            Font::MeaningBody => (self.face(), body, size::glass::MEANING_BODY_FONT_SIZE),
+            Font::MeaningExample => (self.face(), body, size::glass::MEANING_EXAMPLE_FONT_SIZE),
+            Font::MeaningExampleStrong => (
+                self.face(),
+                Weight::Semibold,
+                size::glass::MEANING_EXAMPLE_FONT_SIZE,
+            ),
+            Font::MeaningTag => (
+                self.label_face(),
+                Weight::Medium,
+                size::glass::MEANING_POS_FONT_SIZE,
+            ),
+            Font::MeaningNumber => (
+                self.key_face(),
+                Weight::Semibold,
+                size::glass::MEANING_BADGE_FONT_SIZE,
+            ),
         };
         FontSpec { face, weight, size }
     }
@@ -491,11 +522,41 @@ pub enum Font {
     SplitKey,
     /// モードの札
     Mode,
+    /// 語の意味のカードの見出しの語
+    MeaningHeadword,
+    /// 語の意味の文
+    MeaningBody,
+    /// 使い方の例
+    MeaningExample,
+    /// 使い方の例の中で強める見出しの語．MeaningExample と同じ大きさで太い
+    MeaningExampleStrong,
+    /// 品詞の札
+    MeaningTag,
+    /// 意味の番号(角丸の四角の中)
+    MeaningNumber,
     /// 大きさを決めて描く文字(パレット．macOS の candidateFont(size:)・labelFont(size:) などに当たる)．大きさは DIP を整数に丸めたもの
     Sized(Role, u16),
 }
 
 impl Font {
+    /// 大きさの決まった種類すべて(Sized を除く)．描く層が書体を前もって作るときに使う
+    pub const ALL: [Self; 14] = [
+        Self::Candidate,
+        Self::Trunk,
+        Self::Label,
+        Self::Emphasis,
+        Self::Note,
+        Self::Key,
+        Self::SplitKey,
+        Self::Mode,
+        Self::MeaningHeadword,
+        Self::MeaningBody,
+        Self::MeaningExample,
+        Self::MeaningExampleStrong,
+        Self::MeaningTag,
+        Self::MeaningNumber,
+    ];
+
     /// 大きさを決めて描く文字．大きさは整数に丸める(macOS のパレットも丸めた大きさで描く)
     pub fn sized(role: Role, size: f32) -> Self {
         Self::Sized(role, size.round().clamp(1.0, f32::from(u16::MAX)) as u16)
