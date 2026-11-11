@@ -44,7 +44,7 @@ jobs:
           echo "使う Xcode: $xcode"
           sudo xcode-select -s "$xcode"
       # xcodegen の版は mise.toml で固定している
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           install_args: xcodegen
       # Zenzai のモデルとかな漢字変換の辞書は .pkg に入れる．取得元とハッシュは fetch_zenzai.sh・fetch_dictionary.sh にあり，package.sh が取って確かめる
