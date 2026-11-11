@@ -71,7 +71,8 @@
     { "id": 93, "body": { "type": "removeAssociationDictionary", "id": "5B1E0C3A-0000-4000-8000-000000000001" } },
     { "id": 91, "body": { "type": "removeSymbolRules", "kind": "sequence", "inputs": ["->"] } },
     { "id": 37, "body": { "type": "importUserDictionary", "path": "C:\\user-dictionary.txt" } },
-    { "id": 38, "body": { "type": "exportUserDictionary", "path": "C:\\user-dictionary.txt" } }
+    { "id": 38, "body": { "type": "exportUserDictionary", "path": "C:\\user-dictionary.txt" } },
+    { "id": 39, "body": { "type": "importRuleList", "list": "englishTerms", "path": "C:\\english-terms.txt" } }
   ],
   "responses": [
     { "id": 1, "body": { "type": "hello", "protocolVersion": 1 } },

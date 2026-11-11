@@ -403,6 +403,7 @@ pub enum RuleList {
     Romaji,
     SymbolSequences,
     SymbolReadings,
+    EnglishTerms,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

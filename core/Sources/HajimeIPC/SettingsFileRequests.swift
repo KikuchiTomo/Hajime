@@ -163,6 +163,7 @@ extension RuleList {
         case .romaji: self = .romaji
         case .symbolSequences: self = .symbolSequences
         case .symbolReadings: self = .symbolReadings
+        case .englishTerms: self = .englishTerms
         }
     }
 }
