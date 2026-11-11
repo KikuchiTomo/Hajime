@@ -17,5 +17,5 @@
     <choice id="@BUNDLE_ID@" visible="false">
         <pkg-ref id="@BUNDLE_ID@"/>
     </choice>
-    <pkg-ref id="@BUNDLE_ID@" version="@VERSION@" onConclusion="RequireLogout">component.pkg</pkg-ref>
+    <pkg-ref id="@BUNDLE_ID@" version="@VERSION@" onConclusion="None">component.pkg</pkg-ref>
 </installer-gui-script>

@@ -34,7 +34,12 @@ if [ "$identity" != "-" ]; then
   # ビルドはアドホック署名で行い，できたアプリだけを証明書で署名し直す．
   # xcodebuild に証明書を渡すと，依存パッケージのリソースにまでチームの指定を求められるため
   entitlements=$(find build/Build/Intermediates.noindex -path "*$configuration*" -name "$app_name.app.xcent" | head -1)
-  codesign --force --deep --options runtime --timestamp=none --entitlements "$entitlements" --sign "$identity" "$built"
+  # 中の部品から順に署名する．--deep で外側の権限(サンドボックス)を付けると，更新用のアプリまでサンドボックスに入り，インストールできなくなる
+  for nested in "$built/Contents/Frameworks/"* "$built/Contents/Helpers/"*.app; do
+    [ -e "$nested" ] || continue
+    codesign --force --options runtime --timestamp=none --sign "$identity" "$nested"
+  done
+  codesign --force --options runtime --timestamp=none --entitlements "$entitlements" --sign "$identity" "$built"
 fi
 
 # 動いている古いバージョンを止めてから入れ替える．次にキーを打ったとき OS が新しいバージョンを起こす

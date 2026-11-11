@@ -186,6 +186,7 @@ enum DesignTokens {
             static let secondsSliderWidth: CGFloat = 180
             static let secondsLabelWidth: CGFloat = 52
             static let themeSwatchWidth: CGFloat = 40
+            static let aboutIcon: CGFloat = 64
             static let themeSwatchHeight: CGFloat = 20
             static let themeSwatchGap: CGFloat = 3
             static let themeSwatchFontSize: CGFloat = 11

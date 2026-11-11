@@ -366,6 +366,7 @@ enum UIStrings {
 
     enum Settings {
         static let windowTitle = "はじめの設定"
+        static let appName = "はじめ"
         static let ok = "OK"
         static let cancel = "キャンセル"
         static let save = "保存"

@@ -137,7 +137,7 @@ final class CompositionRoot {
                                                   previewLanguage: { preview.preview($0, precedingText: $1) })
         controller.noteSetAsideFile(settings.setAsideFile)
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
-        controller.setOpenLatestRelease(Self.openLatestRelease)
+        controller.setCheckForUpdates(Self.checkForUpdates)
         return controller
     }()
 
@@ -146,9 +146,28 @@ final class CompositionRoot {
 
     /// 入力メニュー．入力欄ごとのコントローラで 1 つを共有する(InputMenuBuilder の説明)
     private(set) lazy var inputMenu = InputMenuBuilder(settings: settings, openSettings: { [unowned self] in self.settingsWindow.show() },
-                                                       checkForUpdates: Self.openLatestRelease)
+                                                       checkForUpdates: Self.checkForUpdates)
 
-    /// 最新のリリースのページを既定のブラウザで開く．アプリは通信しない(SECURITY-MODEL.md の通信)
+    /// 「更新を確認」(R-19)．Contents/Helpers の更新用のアプリを起動し，確認・ダウンロード・インストールはそちらに任せる．
+    /// この IME はサンドボックスの中で通信の権限を持たないまま(SECURITY-MODEL.md の通信)．
+    /// 更新用のアプリが無いか起動できなければ，最新のリリースのページをブラウザで開く
+    private static func checkForUpdates() {
+        let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "update")
+        let updater = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/\(AppIdentity.updaterName).app", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: updater.path) else {
+            logger.notice("更新用のアプリが無いので，最新のリリースのページを開きます")
+            openLatestRelease()
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: updater, configuration: configuration) { _, error in
+            guard let error else { return }
+            logger.error("更新用のアプリを起動できませんでした: \(String(describing: error), privacy: .public)")
+            Task { @MainActor in openLatestRelease() }
+        }
+    }
+
     private static func openLatestRelease() {
         guard let url = URL(string: DefaultSettings.latestReleaseURL) else { return }
         NSWorkspace.shared.open(url)
@@ -187,6 +206,8 @@ enum AppIdentity {
     /// Info.plist の ComponentInputModeDict のキー．OS は setValue でこの値を渡してくる
     static let japaneseModeKey = "com.apple.inputmethod.Japanese"
     static let directModeKey = "com.apple.inputmethod.Roman"
+    /// Contents/Helpers に入れた更新用のアプリの名前(apps/macos/project.yml の HajimeUpdater の PRODUCT_NAME)
+    static let updaterName = "Hajime Updater"
 
     static var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"

@@ -390,6 +390,10 @@ public enum DefaultSettings {
     public static let updateManifestTimeout = 30.0
     /// 配布物を取るときの待ち時間の上限(秒)．遅い回線でも 160MB を取り切れる長さにする
     public static let updateDownloadTimeout = 1800.0
+    /// 取った配布物の署名と公証を確かめるときの待ち時間の上限(秒)．公証の確かめに Apple へ問い合わせることがある(macOS)
+    public static let updateVerificationTimeout = 120.0
+    /// インストールを終えるまでの待ち時間の上限(秒)．管理者のパスワードの入力を待つ時間を含む(macOS)
+    public static let updateInstallTimeout = 1800.0
 
     // MARK: 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ
 

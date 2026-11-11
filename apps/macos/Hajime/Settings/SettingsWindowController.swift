@@ -28,9 +28,9 @@ final class SettingsWindowController {
         model.openOnboarding = open
     }
 
-    /// 「更新を確認」で最新のリリースのページを開く処理を渡す
-    func setOpenLatestRelease(_ open: @escaping () -> Void) {
-        model.openLatestRelease = open
+    /// 「更新を確認」で更新用のアプリを起動する処理を渡す
+    func setCheckForUpdates(_ check: @escaping () -> Void) {
+        model.checkForUpdates = check
     }
 
     /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
@@ -90,8 +90,8 @@ final class SettingsModel: ObservableObject {
     private let resetLearningAction: () -> Void
     /// 「初期設定をやり直す」で初期設定の窓を開く．無ければ情報のページにボタンを出さない
     var openOnboarding: (() -> Void)?
-    /// 「更新を確認」で最新のリリースのページをブラウザで開く．無ければ情報のページにボタンを出さない
-    var openLatestRelease: (() -> Void)?
+    /// 「更新を確認」で更新用のアプリを起動する(R-19)．無ければ情報のページにボタンを出さない
+    var checkForUpdates: (() -> Void)?
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 辞書の取り込み・バックアップ・CSV・決まりの一覧の読み書き(Windows のエンジンと同じもの)．無ければ辞書を取り込めない
     let files: (any SettingsFileHandling)?
@@ -413,6 +413,17 @@ final class SettingsModel: ObservableObject {
     }
 
     // MARK: 情報
+
+    /// 情報のページに出す名前(入力メニューに出す名前と同じ．開発版は「はじめ Dev」)
+    var appName: String {
+        (Bundle.main.localizedInfoDictionary?["CFBundleDisplayName"] ?? Bundle.main.infoDictionary?["CFBundleDisplayName"]) as? String
+            ?? UIStrings.Settings.appName
+    }
+
+    /// 情報のページに出す Hajime のアイコン(Resources/Hajime.icns．tools/icons/make_app_icon.sh)
+    var appIcon: NSImage {
+        NSImage(named: "Hajime") ?? NSApp.applicationIconImage
+    }
 
     var versionString: String {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String).map(UIStrings.More.versionValue) ?? "-"

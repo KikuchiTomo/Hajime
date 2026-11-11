@@ -81,9 +81,9 @@ final class InputMenuBuilder {
         }
     }
 
-    /// 最新のリリースのページをブラウザで開く(アプリは通信しない)
+    /// 更新用のアプリを起動する(R-19)
     func handleCheckForUpdates() {
-        logger.notice("入力メニュー: 最新のリリースのページを開きます")
+        logger.notice("入力メニュー: 更新を確認します")
         checkForUpdates()
     }
 
