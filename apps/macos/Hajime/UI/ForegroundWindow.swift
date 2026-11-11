@@ -14,7 +14,7 @@ enum ForegroundWindow {
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { notification in
             MainActor.assumeIsolated {
-                // ほかのはじめの窓がまだ開いていれば，前面に出られるままにする(閉じると残りの窓が後ろに隠れる)
+                // ほかの Hajime IME の窓がまだ開いていれば，前面に出られるままにする(閉じると残りの窓が後ろに隠れる)
                 let closing = notification.object as? NSWindow
                 let othersOpen = NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.level == .floating && $0.styleMask.contains(.titled) }
                 if !othersOpen { _ = NSApp.setActivationPolicy(.prohibited) }

@@ -30,7 +30,7 @@ struct AboutPage: View {
     var body: some View {
         Form {
             Section {
-                // Hajime のアイコンと名前・バージョンを並べ，右に「更新を確認」を置く
+                // Hajime IME のアイコンと名前・バージョンを並べ，右に「更新を確認」を置く
                 HStack(alignment: .center) {
                     Image(nsImage: model.appIcon)
                         .resizable()

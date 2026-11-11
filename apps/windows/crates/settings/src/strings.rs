@@ -5,7 +5,7 @@
 
 /// UIStrings.Settings
 pub mod settings {
-    pub const WINDOW_TITLE: &str = "はじめの設定";
+    pub const WINDOW_TITLE: &str = "Hajime IME の設定";
     pub const IMPORT_DICTIONARY: &str = "インポート…";
     pub const EXPORT_DICTIONARY: &str = "エクスポート…";
     pub const EXPORT_FILE_NAME: &str = "hajime-user-dictionary.txt";
@@ -286,14 +286,14 @@ pub mod more {
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
     pub const SETTINGS_IMPORT_FAILED: &str =
-        "読み込めませんでした。はじめの設定ファイルではないか、大きすぎます";
+        "読み込めませんでした。Hajime IME の設定ファイルではないか、大きすぎます";
     pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
     pub const ABOUT: &str = "情報";
     pub const VERSION: &str = "バージョン";
     pub const CHECK_FOR_UPDATES: &str = "更新を確認";
     pub const ACKNOWLEDGEMENTS: &str = "謝辞";
     pub const ACKNOWLEDGEMENTS_NOTE: &str =
-        "はじめは上記のソフトウェア・モデル・データを利用しています。";
+        "Hajime IME は上記のソフトウェア・モデル・データを利用しています。";
     pub const NOTICES_MISSING: &str = "謝辞のファイルが見つかりません";
     /// 謝辞の項目のライセンスの全文を開く(macOS の UIStrings.More.licenseText)
     pub const LICENSE_TEXT: &str = "ライセンス全文";
@@ -697,7 +697,7 @@ pub mod windows {
 
 /// 初期設定ウィザード(Windows だけ．macOS 版はまだ無い)
 pub mod wizard {
-    pub const WINDOW_TITLE: &str = "はじめの初期設定";
+    pub const WINDOW_TITLE: &str = "Hajime IME の初期設定";
     pub const RECOMMENDED: &str = "推奨";
     pub const BACK: &str = "戻る";
     pub const NEXT: &str = "次へ";
@@ -720,7 +720,7 @@ pub mod wizard {
     }
 
     pub const WELCOME_TITLE: &str = "ようこそ";
-    pub const WELCOME_TEXT: &str = "はじめをインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
+    pub const WELCOME_TEXT: &str = "Hajime IME をインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
     pub const SWITCH_TITLE: &str = "英語と日本語の切り替え";
     pub const SWITCH_TEXT: &str = "英語と日本語を切り替えるキーを選びます。";
     pub const APP_MODES_TITLE: &str = "アプリごとの入力モード";
@@ -809,7 +809,7 @@ pub mod wizard {
     pub const APPEARANCE_TITLE: &str = "外観";
     pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
     pub const DONE_TITLE: &str = "準備ができました";
-    pub const DONE_TEXT: &str = "選んだ設定で使い始められます。設定はあとから「はじめの設定」でいつでも変えられます。タスクバーの入力モードのアイコンを右クリックしても開けます。";
+    pub const DONE_TEXT: &str = "選んだ設定で使い始められます。設定はあとから「Hajime IME の設定」でいつでも変えられます。タスクバーの入力モードのアイコンを右クリックしても開けます。";
 
     /// 候補ウィンドウの足元の案内(実演)
     pub const HINTS: &[(&str, &str)] = &[("↓", "候補"), ("←→", "文節"), ("Shift+↑", "連想")];
@@ -863,13 +863,13 @@ pub mod update {
     }
 
     pub fn up_to_date(version: &str) -> String {
-        format!("Hajime v{version} は最新のバージョンです。")
+        format!("Hajime IME v{version} は最新のバージョンです。")
     }
 
     /// 新しいバージョンがあるときの問い．変更点があれば後ろに付ける
     pub fn available(latest: &str, current: &str, notes: &str) -> String {
         let question = format!(
-            "Hajime v{latest} があります。今のバージョンは v{current} です。\n更新しますか？\n\nダウンロードしたあと、インストーラーが管理者の権限を求めます。"
+            "Hajime IME v{latest} があります。今のバージョンは v{current} です。\n更新しますか？\n\nダウンロードしたあと、インストーラーが管理者の権限を求めます。"
         );
         if notes.is_empty() {
             question
@@ -882,7 +882,7 @@ pub mod update {
 
     /// 新しいバージョンはあるが，配布物を確かめられない(SHA-256 が公開されていないなど)
     pub fn unverifiable(latest: &str) -> String {
-        format!("Hajime v{latest} がありますが、自動では更新できません。")
+        format!("Hajime IME v{latest} がありますが、自動では更新できません。")
     }
     pub const DOWNLOAD_FAILED: &str = "ダウンロードできませんでした。";
     pub const VERIFY_FAILED: &str = "ダウンロードしたファイルが公開されているものと一致しません。";

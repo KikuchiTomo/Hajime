@@ -397,7 +397,7 @@ fn registry_dword(name: PCWSTR) -> Option<u32> {
 const USER_KEY: PCWSTR = w!("Software\\haji.men\\IME");
 /// 初期設定ウィザードを済ませた印
 const SETUP_VALUE: PCWSTR = w!("SetupCompleted");
-/// 利用者の入力方式に Hajime を加えた印．一度だけ加え，利用者があとで外したら加え直さない
+/// 利用者の入力方式に Hajime IME を加えた印．一度だけ加え，利用者があとで外したら加え直さない
 const INPUT_METHOD_VALUE: PCWSTR = w!("InputMethodAdded");
 
 /// 初期設定ウィザードを済ませたか
@@ -410,7 +410,7 @@ pub fn set_setup_completed() -> bool {
     set_user_flag(SETUP_VALUE)
 }
 
-/// この利用者の入力方式に Hajime をまだ加えていなければ加える(既定の入力方式の上書きの一覧に出すため)
+/// この利用者の入力方式に Hajime IME をまだ加えていなければ加える(既定の入力方式の上書きの一覧に出すため)
 pub fn add_input_method_once() {
     if !user_flag(INPUT_METHOD_VALUE) && hajime_tsf::add_to_user_input_methods() {
         set_user_flag(INPUT_METHOD_VALUE);

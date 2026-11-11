@@ -1,6 +1,6 @@
 import HajimeDomain
 
-/// 更新用のアプリ(Hajime Updater)の画面に出す文言
+/// 更新用のアプリ(Hajime IME Updater)の画面に出す文言
 enum UIStrings {
     static let checking = "更新を確認しています…"
     static let downloading = "ダウンロードしています…"
@@ -10,9 +10,9 @@ enum UIStrings {
     static let cancel = "キャンセル"
 
     static let upToDate = "最新のバージョンです"
-    static func upToDateDetail(_ version: ReleaseVersion) -> String { "Hajime v\(version) は最新のバージョンです。" }
+    static func upToDateDetail(_ version: ReleaseVersion) -> String { "Hajime IME v\(version) は最新のバージョンです。" }
 
-    static func available(_ version: ReleaseVersion) -> String { "Hajime v\(version) があります" }
+    static func available(_ version: ReleaseVersion) -> String { "Hajime IME v\(version) があります" }
     static func availableDetail(current: ReleaseVersion) -> String {
         "今のバージョンは v\(current) です。ダウンロードしてインストールしますか？インストールには管理者のパスワードが必要です。"
     }
@@ -20,7 +20,7 @@ enum UIStrings {
     static let later = "あとで"
     static func noteHeading(_ note: ReleaseNote) -> String { "v\(note.version) (\(note.date))" }
 
-    static func updated(_ version: ReleaseVersion) -> String { "Hajime v\(version) に更新しました" }
+    static func updated(_ version: ReleaseVersion) -> String { "Hajime IME v\(version) に更新しました" }
     static let updatedDetail = "次に文字を入力したときから新しいバージョンで動きます。"
 
     static let failed = "更新できませんでした"

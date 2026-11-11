@@ -1,5 +1,5 @@
 #!/bin/sh
-# macOS のアプリのアイコン(Hajime.icns)を，公式サイトの Hajime のマーク(512px の PNG)から作る．
+# macOS のアプリのアイコン(Hajime.icns)を，公式サイトの Hajime IME のマーク(512px の PNG)から作る．
 # IME の本体と更新用のアプリの Info.plist の CFBundleIconFile が指し，設定の画面の「情報」と更新の窓に出る．
 # マークを差し替えたら作り直してコミットする．元が 512px なので，512@2x(1024px)は作らない
 # 使い方: tools/icons/make_app_icon.sh

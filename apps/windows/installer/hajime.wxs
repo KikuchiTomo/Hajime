@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="はじめ" Manufacturer="haji.men" Version="$(Version)" UpgradeCode="08481E5D-EF2E-4129-9B02-0DB3228DF9D5" Scope="perMachine" Language="1041" Codepage="932">
+  <Package Name="Hajime IME" Manufacturer="haji.men" Version="$(Version)" UpgradeCode="08481E5D-EF2E-4129-9B02-0DB3228DF9D5" Scope="perMachine" Language="1041" Codepage="932">
     <!-- 同じ版でも上書きできるようにする(試しに入れた版の上から入れ直すとき) -->
-    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="新しいバージョンのはじめが入っています" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="新しいバージョンの Hajime IME が入っています" />
     <MediaTemplate EmbedCab="yes" />
     <!-- 上書きのときに，TSF の DLL を読み込んでいるアプリ(ほぼすべてのアプリ)を閉じさせない．
          古い DLL は読み込まれたまま残り，次の再起動で消える(下の TSFVERSIONFOLDER の説明) -->
@@ -36,7 +36,7 @@
 
     <StandardDirectory Id="ProgramMenuFolder">
       <Component Id="SettingsShortcut" Guid="E72997F4-1CBF-4197-9A65-1B1CC20FA1E2">
-        <Shortcut Id="SettingsShortcut" Name="はじめの設定" Target="[INSTALLFOLDER]hajime-settings.exe" WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="SettingsShortcut" Name="Hajime IME の設定" Target="[INSTALLFOLDER]hajime-settings.exe" WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKLM" Key="Software\haji.men\IME" Name="SettingsShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </StandardDirectory>

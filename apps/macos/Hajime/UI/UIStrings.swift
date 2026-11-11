@@ -365,8 +365,8 @@ enum UIStrings {
     }
 
     enum Settings {
-        static let windowTitle = "はじめの設定"
-        static let appName = "はじめ"
+        static let windowTitle = "Hajime IME の設定"
+        static let appName = "Hajime IME"
         static let ok = "OK"
         static let cancel = "キャンセル"
         static let save = "保存"
@@ -488,7 +488,7 @@ enum UIStrings {
 
     /// 初期設定(初めて使うときに 1 回だけ開く案内)
     enum Onboarding {
-        static let windowTitle = "はじめへようこそ"
+        static let windowTitle = "Hajime IME へようこそ"
         static let recommended = "推奨"
         static let back = "戻る"
         static let next = "次へ"
@@ -892,7 +892,7 @@ enum UIStrings {
         static let importSettings = "設定をインポート…"
         static let exportSettingsFileName = "hajime-settings.json"
         static let settingsImported = "設定を読み込みました"
-        static let settingsImportFailed = "読み込めませんでした。はじめの設定ファイルではないか、大きすぎます"
+        static let settingsImportFailed = "読み込めませんでした。Hajime IME の設定ファイルではないか、大きすぎます"
         static let settingsExportFailed = "書き出せませんでした"
 
         // 情報
@@ -902,7 +902,7 @@ enum UIStrings {
         static func versionValue(_ version: String) -> String { "v\(version) (macOS)" }
         static let checkForUpdates = "更新を確認"
         static let acknowledgements = "謝辞"
-        static let acknowledgementsNote = "はじめは上記のソフトウェア・モデル・データを利用しています。"
+        static let acknowledgementsNote = "Hajime IME は上記のソフトウェア・モデル・データを利用しています。"
         static let noticesMissing = "謝辞のファイルが見つかりません"
         static let licenseText = "ライセンス全文"
     }

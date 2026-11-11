@@ -1,4 +1,4 @@
-// はじめの Fcitx 5 のアドオン．キーを Rust の橋渡し(bridge/)に渡し，返ってきた入力中の文字・確定・候補の一覧を Fcitx 5 に出す．
+// Hajime IME の Fcitx 5 のアドオン．キーを Rust の橋渡し(bridge/)に渡し，返ってきた入力中の文字・確定・候補の一覧を Fcitx 5 に出す．
 // 入力の状態・候補・補正はすべてエンジン(hajime-engine-host)が決める(docs/dev/adr/0012-linux.md)
 #ifndef HAJIME_FCITX5_ENGINE_H
 #define HAJIME_FCITX5_ENGINE_H

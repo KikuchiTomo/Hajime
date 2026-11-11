@@ -1,4 +1,4 @@
-// アプリのアイコン(apps/windows/resources/はじめ.ico)を，実行ファイル・DLL のリソースにする．
+// アプリのアイコン(apps/windows/resources/hajime.ico)を，実行ファイル・DLL のリソースにする．
 // 各 crate の build.rs から include! で読み込む．rc.exe や依存の crate を使わず，リソースのファイル(.res)を
 // ここで書いてリンカーに渡す(link.exe は .res をそのまま受け取る)．
 // アイコンの組(RT_GROUP_ICON)の番号は 1．入力の一覧に出すアイコン(RegisterProfile の 0 番目)と窓のアイコンに使う

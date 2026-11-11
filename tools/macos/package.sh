@@ -2,7 +2,7 @@
 # 配布物(.pkg)を作る．Zenzai のモデルを入れた本番のアプリを /Library/Input Methods に入れる .pkg になる．
 #
 # 使い方: tools/macos/package.sh
-# 出力:   apps/macos/build/dist/Hajime-<バージョン>.pkg
+# 出力:   apps/macos/build/dist/Hajime-IME-<バージョン>.pkg
 #
 # 署名と公証は，使える証明書と設定があるときだけ行う．
 #   HAJIME_APP_IDENTITY        アプリの署名(名前か SHA-1)．無ければ，公証するときは Developer ID Application，
@@ -167,7 +167,7 @@ plutil -replace 0.BundleIsRelocatable -bool NO "$work/component.plist"
 COPYFILE_DISABLE=1 pkgbuild --root "$work/root" --component-plist "$work/component.plist" --scripts "$work/scripts" \
   --identifier "$bundle_id" --version "$version" --install-location "$destination" "$work/component.pkg"
 sed -e "s/@VERSION@/$version/g" -e "s/@BUNDLE_ID@/$bundle_id/g" "$root/tools/macos/pkg/distribution.xml" > "$work/distribution.xml"
-output="build/dist/Hajime-$version.pkg"
+output="build/dist/Hajime-IME-$version.pkg"
 rm -f "$output"
 if [ -n "$installer_identity" ]; then
   productbuild --distribution "$work/distribution.xml" --package-path "$work" --sign "$installer_identity" "$output"

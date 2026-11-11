@@ -10,5 +10,5 @@ for pattern in '*.pkg' '*.msi'; do
   fi
 done
 files=$(find "$dist" -maxdepth 1 -type f \( -name '*.pkg' -o -name '*.msi' \) -exec basename {} \; | sort)
-# shellcheck disable=SC2086 # ファイル名に空白は無い(Hajime-<バージョン>.pkg・.msi)
+# shellcheck disable=SC2086 # ファイル名に空白は無い(Hajime-IME-<バージョン>.pkg・.msi)
 (cd "$dist" && sha256sum $files > SHA256SUMS.txt)

@@ -1,4 +1,4 @@
-# はじめの Fcitx 5 のアドオン(docs/dev/adr/0012-linux.md)．
+# Hajime IME の Fcitx 5 のアドオン(docs/dev/adr/0012-linux.md)．
 # C++ の薄い口(src/)と，エンジンと話す Rust の橋渡し(bridge/．静的ライブラリ)を 1 つのモジュールにする．
 #   cmake -S apps/linux/fcitx5 -B build && cmake --build build && cmake --install build
 cmake_minimum_required(VERSION 3.16)

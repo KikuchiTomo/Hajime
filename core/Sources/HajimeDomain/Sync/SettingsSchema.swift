@@ -4,7 +4,7 @@
 /// - バージョン 2: `schemaVersion` を書くようにした．項目の形はバージョン 1 と同じ
 /// - バージョン 3: キーの設定 `conversionKeys`(変換中のキー)と `modeKeys`(切り替えのキー)を，キー設定の表 `keymap` にまとめた(R-17)
 /// - バージョン 4: 入力方式 `inputStyle` に英字入力(自動)`englishAuto` を足し，`englishInputLiveConversion` と `wordLanguage` を足した．
-///   移し替えは要らない．バージョン 3 までのはじめは `englishAuto` を読めずにローマ字入力として読む
+///   移し替えは要らない．バージョン 3 までの Hajime IME は `englishAuto` を読めずにローマ字入力として読む
 /// - バージョン 5: 連想変換(R-18)の項目と，キー設定の表のコマンド `associate` を足した．表に連想変換のキーを足す(AssociationKeyUpgrade)
 /// - バージョン 6: キー設定の表のコマンド `reconvert`(再変換)を足した．表に再変換のキーを足す(ReconversionKeyUpgrade)
 /// - バージョン 7: 変換中の Tab を文節の移動にし，連想変換の Ctrl+Tab を変換中の Shift+↑ にした(NavigationKeyUpgrade)

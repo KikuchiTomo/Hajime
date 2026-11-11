@@ -414,13 +414,13 @@ final class SettingsModel: ObservableObject {
 
     // MARK: 情報
 
-    /// 情報のページに出す名前(入力メニューに出す名前と同じ．開発版は「はじめ Dev」)
+    /// 情報のページに出す名前(入力メニューに出す名前と同じ．開発版は「Hajime IME Dev」)
     var appName: String {
         (Bundle.main.localizedInfoDictionary?["CFBundleDisplayName"] ?? Bundle.main.infoDictionary?["CFBundleDisplayName"]) as? String
             ?? UIStrings.Settings.appName
     }
 
-    /// 情報のページに出す Hajime のアイコン(Resources/Hajime.icns．tools/icons/make_app_icon.sh)
+    /// 情報のページに出す Hajime IME のアイコン(Resources/Hajime.icns．tools/icons/make_app_icon.sh)
     var appIcon: NSImage {
         NSImage(named: "Hajime") ?? NSApp.applicationIconImage
     }
