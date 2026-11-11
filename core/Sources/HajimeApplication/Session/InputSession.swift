@@ -2203,7 +2203,7 @@ public final class InputSession {
     }
 
     /// 選んでいる候補に連想があるときの知らせ．知らせない設定か，連想が無ければ nil
-    private func associationHint(text: String, reading: String) -> String? {
+    private func associationHint(text: String, reading: String) -> AssociationHint? {
         guard settings.current.showsAssociationHint, associationFinder.hasDictionaries,
             associationFinder.find(text: text, reading: reading, includesMacros: false) != nil else { return nil }
         return PanelBuilder.associationHint(key: keyLabel(.associate, in: .converting))

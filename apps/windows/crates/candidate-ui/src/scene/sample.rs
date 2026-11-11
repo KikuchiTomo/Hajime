@@ -43,6 +43,7 @@ pub fn branch() -> BranchMap {
     BranchMap {
         association: None,
         association_hint: None,
+        association_key: None,
         columns: vec![
             column("私の"),
             BranchColumn {

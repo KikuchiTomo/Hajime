@@ -59,7 +59,8 @@ struct Footer {
     hints: Vec<KeyHint>,
     note: Option<ipc::Note>,
     position: String,
-    /// 選んでいる候補に連想があることの知らせ(「Ctrl+Tab 連想」)
+    /// 選んでいる候補に連想があることの知らせ(R-18)のうち，キーの割り当てが無いときの語．
+    /// キーがあればキーキャップの札として hints に入れる(キーを文字で書かない)
     association_hint: Option<String>,
 }
 
@@ -73,16 +74,32 @@ fn footer(list: &CandidateList) -> Footer {
             association_hint: None,
         };
     }
+    // 文字種の行が無い一覧(連想の一覧や，文字種の行を出さない設定)では，文字種の案内を出さない
+    let mut hints = if list.association.is_some() || list.variants.is_empty() {
+        Vec::new()
+    } else {
+        strings::candidates_hints()
+    };
+    let mut association_hint = None;
+    if let Some(label) = &list.association_hint {
+        match &list.association_key {
+            Some(key) => hints.push(KeyHint {
+                keys: key.clone(),
+                label: label.clone(),
+            }),
+            None => association_hint = Some(label.clone()),
+        }
+    }
     Footer {
-        // 文字種の行が無い一覧(連想の一覧や，文字種の行を出さない設定)では，文字種の案内を出さない
-        hints: if list.association.is_some() || list.variants.is_empty() {
-            Vec::new()
-        } else {
-            strings::candidates_hints()
-        },
+        hints,
         note: list.note.clone(),
-        position: strings::position(list.position, list.position, list.total),
-        association_hint: list.association_hint.clone(),
+        // まだ選んでいない(入力中の候補の窓で選び始める前の)ときは，何番目かを出さない
+        position: if list.position == 0 {
+            String::new()
+        } else {
+            strings::position(list.position, list.position, list.total)
+        },
+        association_hint,
     }
 }
 
@@ -145,7 +162,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         Some(note) => painter.note_width(note),
         None => painter.hints_width(&footer.hints),
     };
-    let association_hint = list
+    let association_hint = footer
         .association_hint
         .as_deref()
         .map_or(0.0, |hint| painter.width(hint, Font::Label) + padding);
@@ -475,6 +492,7 @@ mod tests {
         CandidateList {
             association: None,
             association_hint: None,
+            association_key: None,
             homophone: None,
             shows_numbers: None,
             variants: vec![CandidateVariant {
@@ -546,10 +564,18 @@ mod tests {
             assert!(texts.contains(&"速い".to_string()));
             assert!(texts.contains(&"1 / 3".to_string()));
             assert!(!texts.contains(&"カタカナ".to_string()));
+            // 連想変換のキーは文字ではなくキーキャップで描き，語だけを文字にする
             let mut hinted = list(Some(0));
-            hinted.association_hint = Some("Ctrl+Tab 連想".into());
+            hinted.association_hint = Some("連想".into());
+            hinted.association_key = Some("Ctrl+Tab".into());
             let scene = candidate_list(&hinted, &Look::new(&theme, 15.0), &Fixed);
-            assert!(texts_of(&scene).contains(&"Ctrl+Tab 連想".to_string()));
+            let hinted_texts = texts_of(&scene);
+            assert!(hinted_texts.contains(&"連想".to_string()));
+            assert!(!hinted_texts.iter().any(|text| text.contains("Tab")));
+            // キーが割り当てられていなければ語だけ
+            hinted.association_key = None;
+            let scene = candidate_list(&hinted, &Look::new(&theme, 15.0), &Fixed);
+            assert!(texts_of(&scene).contains(&"連想".to_string()));
         }
     }
 

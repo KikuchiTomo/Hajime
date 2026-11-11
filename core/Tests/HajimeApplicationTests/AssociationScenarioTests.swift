@@ -180,7 +180,7 @@ struct AssociationScenarioTests {
         let harness = harness()
         harness.type("utukusii")
         harness.press(.space)
-        #expect(harness.lattice?.associationHint == "⇧↑ 連想")
+        #expect(harness.lattice?.associationHint == AssociationHint(key: "⇧↑", label: "連想"))
         harness.press(.down)
         #expect(harness.lattice?.associationHint == nil)
 
@@ -188,7 +188,7 @@ struct AssociationScenarioTests {
         let windows = self.harness(keyNames: .windows)
         windows.type("utukusii")
         windows.press(.space)
-        #expect(windows.lattice?.associationHint == "Shift+↑ 連想")
+        #expect(windows.lattice?.associationHint == AssociationHint(key: "Shift+↑", label: "連想"))
 
         let quiet = self.harness(makeSettings { $0.showsAssociationHint = false })
         quiet.type("utukusii")

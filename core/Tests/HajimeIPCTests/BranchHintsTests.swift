@@ -29,12 +29,13 @@ struct BranchHintsTests {
     func association() {
         var association = panel
         association.association = AssociationHeading(headword: "速い", label: "速度", group: 1, groupCount: 3)
-        association.associationHint = "Ctrl+Tab 連想"
+        association.associationHint = AssociationHint(key: "Ctrl+Tab", label: "連想")
         let hints = BranchHints.make(for: association, settings: DefaultSettings.settings)
         #expect(hints.map(\.label) == ["選択", "意味", "戻る"])
         let map = WireBranchMap(association, hints: hints)
         #expect(map.association == WireAssociationHeading(headword: "速い", label: "速度", group: 1, groupCount: 3))
-        #expect(map.associationHint == "Ctrl+Tab 連想")
+        #expect(map.associationHint == "連想")
+        #expect(map.associationKey == "Ctrl+Tab")
     }
 
     @Test("文節を区切っているときは区切る操作だけを案内する")
