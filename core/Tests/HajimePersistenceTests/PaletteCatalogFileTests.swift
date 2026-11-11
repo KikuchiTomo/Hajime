@@ -40,3 +40,23 @@ struct PaletteCatalogFileTests {
         #expect(await missing.waitForLoad() == nil)
     }
 }
+
+@Suite("Windows の絵文字のバージョン")
+@MainActor
+struct WindowsEmojiVersionTests {
+    @Test("R-26: Windows のビルドから，描ける絵文字のバージョンを決める", arguments: [
+        (19045, "12.0"), (22000, "13.1"), (22631, "15.0"), (26100, "16.0"), (26200, "16.0"), (0, "12.0"),
+    ])
+    func versions(build: Int, expected: String) {
+        #expect(EmojiVersion.supportedOnWindows(build: build).description == expected)
+    }
+
+    @Test("R-26: 決めたバージョンまでの絵文字に絞って読む")
+    func limitsToVersion() async throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("data/palette").appendingPathComponent(DefaultSettings.bundledPaletteFileName)
+        let index = try #require(await PaletteCatalogFile(url: url, maximumVersion: EmojiVersion(major: 13, minor: 1)).waitForLoad())
+        #expect(index.catalog.items.allSatisfy { $0.version.map { $0 <= EmojiVersion(major: 13, minor: 1) } ?? true })
+        #expect(index.catalog.items.contains { $0.version == EmojiVersion(major: 13, minor: 1) })
+    }
+}

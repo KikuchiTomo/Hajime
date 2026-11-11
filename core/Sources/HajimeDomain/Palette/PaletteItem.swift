@@ -166,3 +166,11 @@ public enum PaletteCategory: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 }
+
+extension EmojiVersion {
+    /// Windows のこのビルドの絵文字の書体が描けるバージョン(DefaultSettings.windowsEmojiVersions)
+    public static func supportedOnWindows(build: Int) -> EmojiVersion {
+        let table = DefaultSettings.windowsEmojiVersions
+        return table.last { build >= $0.build }?.version ?? table.first?.version ?? EmojiVersion(major: 0, minor: 0)
+    }
+}

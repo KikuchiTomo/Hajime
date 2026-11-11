@@ -421,6 +421,15 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．
+    /// Windows のエンジンのプロセスは書体を確かめられない(描くのは候補ウィンドウ)ので，この表でパレットに出す絵文字を絞る(R-26)．
+    /// 古い順に並べる．どれにも当たらなければ先頭の版にする
+    public static let windowsEmojiVersions: [(build: Int, version: EmojiVersion)] = [
+        (0, EmojiVersion(major: 12, minor: 0)),
+        (22000, EmojiVersion(major: 13, minor: 1)),
+        (22621, EmojiVersion(major: 15, minor: 0)),
+        (26100, EmojiVersion(major: 16, minor: 0)),
+    ]
     /// Windows でパレットを出しているあいだ，候補ウィンドウでマウスで操作した対象をためておく数の上限．
     /// DLL が取りに来る(wake)までのあいだのポインタの動きとホイールを落とさずに渡す．超えたら古いものから捨てる
     public static let maximumPendingPaletteTargets = 32

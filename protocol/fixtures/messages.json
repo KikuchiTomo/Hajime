@@ -39,6 +39,7 @@
     { "id": 16, "body": { "type": "readKeymapPreset", "preset": "vim" } },
     { "id": 17, "body": { "type": "checkKeymap", "values": "{\"keymap\":[]}" } },
     { "id": 21, "body": { "type": "resetLearning" } },
+    { "id": 21, "body": { "type": "resetPaletteHistory" } },
     { "id": 22, "body": { "type": "readUsage" } },
     { "id": 23, "body": { "type": "resetUsage" } },
     { "id": 24, "body": { "type": "previewLanguage", "text": "make sushi", "precedingText": "I" } },
