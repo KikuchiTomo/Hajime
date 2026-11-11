@@ -389,6 +389,24 @@ impl ResolvedTheme {
                 Weight::Medium,
                 size::mode_indicator::FONT_SIZE,
             ),
+            Font::Sized(role, points) => {
+                let (face, weight) = match role {
+                    Role::Candidate => (
+                        self.face(),
+                        if contrast {
+                            Weight::Medium
+                        } else {
+                            Weight::Regular
+                        },
+                    ),
+                    Role::Label => (self.label_face(), Weight::Medium),
+                    Role::Emphasis => (self.label_face(), Weight::Semibold),
+                    Role::Code => (Face::Monospaced, Weight::Regular),
+                    Role::Emoji => (Face::Emoji, Weight::Regular),
+                    Role::Icon => (Face::Icon, Weight::Regular),
+                };
+                (face, weight, f32::from(points))
+            }
         };
         FontSpec { face, weight, size }
     }
@@ -473,6 +491,32 @@ pub enum Font {
     SplitKey,
     /// モードの札
     Mode,
+    /// 大きさを決めて描く文字(パレット．macOS の candidateFont(size:)・labelFont(size:) などに当たる)．大きさは DIP を整数に丸めたもの
+    Sized(Role, u16),
+}
+
+impl Font {
+    /// 大きさを決めて描く文字．大きさは整数に丸める(macOS のパレットも丸めた大きさで描く)
+    pub fn sized(role: Role, size: f32) -> Self {
+        Self::Sized(role, size.round().clamp(1.0, f32::from(u16::MAX)) as u16)
+    }
+}
+
+/// 大きさを決めて描く文字の書体と太さ
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Role {
+    /// 候補と同じ書体(探す欄の文字と記号)
+    Candidate,
+    /// 番号と案内の書体
+    Label,
+    /// 強める語(文字の名前)
+    Emphasis,
+    /// 等幅(英語の名前と符号位置)
+    Code,
+    /// 色の付いた絵文字の書体
+    Emoji,
+    /// アイコンの書体
+    Icon,
 }
 
 /// 書体の系統．書体の名前はアプリの層が OS ごとに決める
@@ -487,6 +531,10 @@ pub enum Face {
     Rounded,
     /// カスタムテーマで選んだ書体
     Named(String),
+    /// 色の付いた絵文字の書体
+    Emoji,
+    /// アイコンの書体(macOS の SF Symbols に当たる)
+    Icon,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -629,6 +677,33 @@ mod tests {
         assert_eq!(washi.typeface, Typeface::Mincho);
         let desk = ResolvedTheme::resolve("automatic", Some(&custom("desk")), &look());
         assert!(!desk.is_rounded());
+    }
+
+    #[test]
+    fn 大きさを決めた文字はテーマの書体と絵文字とアイコンの書体() {
+        let washi = ResolvedTheme::resolve("washi", None, &look());
+        let symbol = washi.font(Font::sized(Role::Candidate, 19.8), 15.0);
+        assert_eq!((symbol.face, symbol.size), (Face::Mincho, 20.0));
+        assert_eq!(
+            washi.font(Font::sized(Role::Emoji, 25.2), 15.0).face,
+            Face::Emoji
+        );
+        assert_eq!(
+            washi.font(Font::sized(Role::Icon, 14.0), 15.0).face,
+            Face::Icon
+        );
+        assert_eq!(
+            washi.font(Font::sized(Role::Emphasis, 13.0), 15.0).weight,
+            Weight::Semibold
+        );
+        let contrast = ResolvedTheme::resolve("contrast", None, &look());
+        assert_eq!(
+            contrast
+                .font(Font::sized(Role::Candidate, 14.0), 15.0)
+                .weight,
+            Weight::Medium
+        );
+        assert_eq!(Font::sized(Role::Label, 0.0), Font::Sized(Role::Label, 1));
     }
 
     #[test]

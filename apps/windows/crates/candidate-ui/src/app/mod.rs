@@ -2,10 +2,10 @@
 
 pub mod fonts;
 pub mod preview;
-mod render;
+pub(crate) mod render;
 #[cfg(debug_assertions)]
 mod snapshot;
-mod system;
+pub(crate) mod system;
 mod window;
 
 use crate::announce::{self, Announcer};
@@ -166,6 +166,8 @@ fn read_commands(inbox: &Inbox, notifier: &window::Notifier) {
             }
             if let Ok(mut queue) = inbox.lock() {
                 queue.push_back(UiCommand::Hide);
+                // パレットを出したセッションはもう無く，閉じる指示も届かないので消す
+                queue.push_back(UiCommand::HidePalette);
             }
             notifier.notify();
         }
@@ -289,8 +291,16 @@ impl App {
                 );
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
-            // パレット(R-26)の窓はまだ描かない．エンジンのプロセスはパレットに使うものを渡していないので，この指示は届かない
-            UiCommand::ShowPalette { .. } | UiCommand::HidePalette => {}
+            UiCommand::ShowPalette { panel, anchor } => {
+                // パレット(R-26)は別の窓に出す(候補・案内・モードの札に置き換わらないように)．すりガラスにはしない
+                let theme = ResolvedTheme::resolve(
+                    &self.presentation.theme,
+                    self.presentation.custom_theme.as_ref(),
+                    &system::look(false),
+                );
+                crate::palette::ffi::show(panel, anchor.or(self.anchor.clone()), theme, ANCHOR_GAP);
+            }
+            UiCommand::HidePalette => crate::palette::ffi::hide(),
             UiCommand::Move { anchor } => self.anchor = Some(anchor),
             // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
             // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)
