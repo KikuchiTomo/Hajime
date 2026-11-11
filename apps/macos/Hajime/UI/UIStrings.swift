@@ -731,6 +731,17 @@ enum UIStrings {
         static let cellSize = "パレットのマスの大きさ"
         static let showsPreview = "パレットに文字の説明を表示"
         static let frequentRows = "よく使う文字の行数"
+        static let page = "絵文字と記号"
+        static let behavior = "パレット"
+        static let look = "パレットの見た目"
+        static let emojiKey = "絵文字のパレットを開くキー"
+        static let symbolKey = "記号のパレットを開くキー"
+        static let noKey = "なし"
+        static let clearHistory = "使った文字の記録を消去"
+        static let clearHistoryQuestion = "使った文字の記録を消去しますか？"
+        static let clearHistoryNote = "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。"
+        static let themeNote = "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。"
+        static func cellSizeValue(_ size: Int) -> String { "\(cellSize)：\(size) pt" }
     }
 
     enum Features {

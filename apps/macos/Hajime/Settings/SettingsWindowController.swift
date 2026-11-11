@@ -33,6 +33,11 @@ final class SettingsWindowController {
         model.checkForUpdates = check
     }
 
+    /// パレットの「使った文字の記録を消去」で記録を消す処理を渡す(R-26)
+    func setClearPaletteHistory(_ clear: @escaping () -> Void) {
+        model.clearPaletteHistory = clear
+    }
+
     /// 起動したときに読めず脇に置いた設定のファイルがあれば，最初に画面を開いたときに一度だけ知らせる
     func noteSetAsideFile(_ url: URL?) {
         guard let url else { return }
@@ -92,6 +97,8 @@ final class SettingsModel: ObservableObject {
     var openOnboarding: (() -> Void)?
     /// 「更新を確認」で更新用のアプリを起動する(R-19)．無ければ情報のページにボタンを出さない
     var checkForUpdates: (() -> Void)?
+    /// パレットで使った文字の記録を消す(R-26)．無ければボタンを出さない
+    var clearPaletteHistory: (() -> Void)?
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 辞書の取り込み・バックアップ・CSV・決まりの一覧の読み書き(Windows のエンジンと同じもの)．無ければ辞書を取り込めない
     let files: (any SettingsFileHandling)?

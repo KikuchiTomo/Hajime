@@ -145,6 +145,7 @@ final class CompositionRoot {
         controller.noteSetAsideFile(settings.setAsideFile)
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
         controller.setCheckForUpdates(Self.checkForUpdates)
+        controller.setClearPaletteHistory { [weak self] in self?.paletteUsage?.update { $0.clearHistory() } }
         return controller
     }()
 
