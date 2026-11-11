@@ -1,8 +1,15 @@
 import AppKit
+import Carbon
 import HajimeDomain
+import os
 
 /// NSEvent を OS に依存しない KeyEvent に変える．判断はしない．
 enum NSEventKeyTranslator {
+    /// 英字の配列で引き直したことの記録．打った文字は記録せず，起きたことと配列の ID だけを残す(docs/dev/SECURITY-MODEL.md)
+    private static let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "input")
+    /// 引き直したことを最後に記録した時刻．打つたびに記録しないよう，間を空ける
+    private static var lastFallbackLog: ContinuousClock.Instant?
+
     // macOS の仮想キーコード(HIToolbox の kVK_*)
     private enum KeyCode {
         static let returnKey: UInt16 = 36
@@ -99,7 +106,45 @@ enum NSEventKeyTranslator {
         guard let scalar = character.unicodeScalars.first,
             !CharacterSet.controlCharacters.contains(scalar),
             !(0xF700...0xF8FF).contains(scalar.value) else { return nil }
+        // 英字・数字・記号のキーなのに英字でない文字で来たときは，OS の英字の配列で引き直す．
+        // 入力先の配列を OS が見つけられないと，英字のキーが英字でない文字で届き，日本語のモードのまま英字しか入らなくなる
+        if !changesCharacter, !character.isASCII, jisLabels[event.keyCode] != nil,
+           let ascii = asciiCharacter(keyCode: event.keyCode, shift: modifiers.contains(.shift)) {
+            logFallback()
+            return ascii
+        }
         return character
+    }
+
+    /// 同じキーを OS で最後に使った英字の配列で打ったときの文字．英字の配列が無いか，英字でなければ nil
+    private static func asciiCharacter(keyCode: UInt16, shift: Bool) -> Character? {
+        guard let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let data = Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue()
+        guard let bytes = CFDataGetBytePtr(data) else { return nil }
+        let layout = UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
+        var deadKeyState: UInt32 = 0
+        var length = 0
+        var characters = [UniChar](repeating: 0, count: 4)
+        let modifierState = shift ? UInt32(shiftKey >> 8) & 0xFF : 0
+        let status = UCKeyTranslate(layout, keyCode, UInt16(kUCKeyActionDown), modifierState, UInt32(LMGetKbdType()),
+                                    OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters)
+        guard status == noErr, length == 1, let scalar = Unicode.Scalar(characters[0]), scalar.isASCII,
+              !CharacterSet.controlCharacters.contains(scalar) else { return nil }
+        return Character(scalar)
+    }
+
+    /// 英字の配列で引き直したことを記録する．入力先の配列(TISInputSourceID)も残し，どの配列で英字でない文字が来たかを後で調べられるようにする
+    private static func logFallback() {
+        let now = ContinuousClock.now
+        if let last = lastFallbackLog, now - last < .seconds(DefaultSettings.inputDiagnosticLogInterval) { return }
+        lastFallbackLog = now
+        var layout = "不明"
+        if let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+           let property = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) {
+            layout = Unmanaged<CFString>.fromOpaque(property).takeUnretainedValue() as String
+        }
+        logger.notice("英字のキーが英字でない文字で届いたので，英字の配列で読み直しました(入力先の配列: \(layout, privacy: .public))")
     }
 
     private static func translateModifiers(_ flags: NSEvent.ModifierFlags) -> KeyEvent.Modifiers {
