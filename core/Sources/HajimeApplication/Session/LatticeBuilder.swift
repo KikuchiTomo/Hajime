@@ -182,13 +182,17 @@ struct LatticeBuilder {
                            count: DefaultSettings.romajiReadingCandidateCount, includesKana: false)
     }
 
-    /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．違う部分が複数の文節にまたがるときは 1 つにまとめる．
-    /// 入れるのは別の読みの候補 count 個と，includesKana なら別の読みのかなそのもの
+    /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．
+    /// 違う部分は別の読みの語の区切りまで広げ(「うぶんと」の「と」を直す前の「うぶんつ」全体)，複数の文節にまたがるときは 1 つにまとめる．
+    /// 別の読みの候補は，上から count 個を 2 番目から入れ，残りは末尾に並べる．どちらの読みにするかは利用者が選ぶので，候補を絞らない．
+    /// includesKana なら別の読みのかなそのものも入れる
     private func addingAlternatives(_ lattice: SegmentLattice, otherReading: String, reading: String, origin: CandidateOrigin,
                                     count: Int = DefaultSettings.typedAlternativeCount, includesKana: Bool = true) -> SegmentLattice {
         let typed = Array(otherReading), corrected = Array(reading)
         guard let changed = CorrectedSpan.changedRange(from: otherReading, to: reading) else { return lattice }
-        let prefix = changed.lowerBound, changedEnd = changed.upperBound
+        let delta = typed.count - corrected.count
+        let word = wordRange(in: otherReading, covering: changed.lowerBound..<(changed.upperBound + delta))
+        let prefix = word.lowerBound, changedEnd = max(word.upperBound - delta, changed.upperBound)
         guard let first = lattice.segments.firstIndex(where: { $0.readingStart + $0.readingLength > prefix }),
             let last = lattice.segments.lastIndex(where: { $0.readingStart < changedEnd }) else { return lattice }
         var result = lattice
@@ -200,11 +204,12 @@ struct LatticeBuilder {
         var segment = filled(result.segments[first], reading: reading)
         let start = segment.readingStart, length = segment.readingLength
         // 文節の読みの，直した部分を打ったままの読みに置き換える
-        let typedEnd = start + length + typed.count - corrected.count
+        let typedEnd = start + length + delta
         guard start <= prefix, typedEnd > start, typedEnd <= typed.count else { return lattice }
         let typedSlice = String(typed[start..<typedEnd])
-        var additions = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count }.prefix(count)
+        let pool = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count && $0.commandID == nil }
             .map { Candidate(text: $0.text, readingCount: length, origin: origin) }
+        var additions = Array(pool.prefix(count))
         if includesKana {
             additions.append(Candidate(text: typedSlice, readingCount: length, origin: origin))
         } else {
@@ -215,10 +220,22 @@ struct LatticeBuilder {
         for (offset, candidate) in additions.enumerated() where !segment.candidates.contains(where: { $0.text == candidate.text }) {
             segment.candidates.insert(candidate, at: min(1 + offset, segment.candidates.count))
         }
+        for candidate in pool.dropFirst(count) where !segment.candidates.contains(where: { $0.text == candidate.text }) {
+            segment.candidates.append(candidate)
+        }
         segment.isConfident = false
         segment.confidenceGap = -.infinity
         result.segments[first] = segment
         return result
+    }
+
+    /// reading の range を，reading の語の区切りまで広げた範囲．語の並びが読み全体を覆わなければ range のまま
+    private func wordRange(in reading: String, covering range: Range<Int>) -> Range<Int> {
+        let boundaries = [0] + wordBoundaries(of: reading)
+        guard boundaries.count > 1, range.lowerBound <= range.upperBound else { return range }
+        let start = boundaries.last { $0 <= range.lowerBound } ?? range.lowerBound
+        let end = boundaries.first { $0 >= range.upperBound } ?? range.upperBound
+        return start..<end
     }
 
     /// index の文節の読みを slice に替える(その場で打ち直す)．ほかの文節は選んだ候補ごと残し，後ろの文節は位置だけずらす．
