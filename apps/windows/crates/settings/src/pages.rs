@@ -7,7 +7,7 @@ use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
 use crate::strings::{
-    association, choice, dictionaries, extras, features, keys, menu, more, settings, sync,
+    association, choice, dictionaries, extras, features, keys, menu, more, palette, settings, sync,
 };
 use ipc::{RuleList, SymbolKind};
 
@@ -53,6 +53,7 @@ pub enum Page {
     Apps,
     Dictionary,
     Symbols,
+    Palette,
     Commands,
     Appearance,
     Usage,
@@ -62,7 +63,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 15] = [
+    pub const ALL: [Page; 16] = [
         Page::Input,
         Page::Conversion,
         Page::Correction,
@@ -72,6 +73,7 @@ impl Page {
         Page::Apps,
         Page::Dictionary,
         Page::Symbols,
+        Page::Palette,
         Page::Commands,
         Page::Appearance,
         Page::Usage,
@@ -89,7 +91,7 @@ impl Page {
             | Page::Romaji
             | Page::Keys
             | Page::Apps => Group::Input,
-            Page::Dictionary | Page::Symbols | Page::Commands => Group::Dictionary,
+            Page::Dictionary | Page::Symbols | Page::Palette | Page::Commands => Group::Dictionary,
             Page::Appearance => Group::Appearance,
             Page::Usage | Page::Sync | Page::Backup => Group::Data,
             Page::About => Group::About,
@@ -103,6 +105,7 @@ impl Page {
             Page::Correction => features::CORRECTION_PAGE,
             Page::Language => features::LANGUAGE_PAGE,
             Page::Symbols => features::SYMBOLS_PAGE,
+            Page::Palette => palette::PAGE,
             Page::Keys => keys::TAB,
             Page::Dictionary => settings::DICTIONARY_TAB,
             Page::Commands => extras::COMMANDS_PAGE,
@@ -128,6 +131,7 @@ impl Page {
             Page::Apps => '\u{ECE4}',       // 禁止
             Page::Dictionary => '\u{E82D}', // 辞書
             Page::Symbols => '\u{E8D2}',    // 記号
+            Page::Palette => '\u{E76E}',    // 絵文字
             Page::Commands => '\u{E945}',   // 稲妻
             Page::Appearance => '\u{E790}', // 色
             Page::Usage => '\u{E9D2}',      // グラフ
@@ -180,6 +184,16 @@ impl Page {
                 extras::ENGLISH_TERMS,
             ],
             Page::Symbols => vec![features::SEQUENCES, features::READINGS],
+            Page::Palette => vec![
+                palette::ENABLED,
+                palette::CLOSES_AFTER_INSERT,
+                palette::RECORDS_HISTORY,
+                palette::COLUMNS,
+                palette::ROWS,
+                palette::CELL_SIZE,
+                palette::FREQUENT_ROWS,
+                palette::SHOWS_PREVIEW,
+            ],
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             Page::Keys => std::iter::once(keys::PRESET_MENU)
                 .chain(keys::COMMANDS.iter().map(|(_, label)| *label))
@@ -338,6 +352,8 @@ impl LimitKind {
 pub enum Action {
     ResetLearning,
     ResetUsage,
+    /// パレットで使った文字の記録を消す(R-26)
+    ResetPaletteHistory,
     RestoreDefaults,
     /// キー設定の表を標準のひな形に戻す
     RestoreKeymap,
@@ -568,6 +584,10 @@ pub enum RangeKind {
     AssociationLimit,
     CustomThemeCornerRadius,
     MeaningSenseLimit,
+    PaletteColumns,
+    PaletteRows,
+    PaletteCellSize,
+    PaletteFrequentRows,
 }
 
 impl RangeKind {
@@ -587,6 +607,10 @@ impl RangeKind {
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
             RangeKind::MeaningSenseLimit => ranges.meaning_sense_limit,
+            RangeKind::PaletteColumns => ranges.palette_columns,
+            RangeKind::PaletteRows => ranges.palette_rows,
+            RangeKind::PaletteCellSize => ranges.palette_cell_size,
+            RangeKind::PaletteFrequentRows => ranges.palette_frequent_rows,
         }
     }
 
@@ -604,6 +628,7 @@ impl RangeKind {
     pub fn step(self, catalog: &crate::catalog::Catalog) -> f64 {
         match self {
             RangeKind::AssociationLimit => catalog.association_limit_step,
+            RangeKind::PaletteCellSize => catalog.palette_cell_size_step,
             _ => 1.0,
         }
     }
@@ -757,6 +782,7 @@ pub fn sections(page: Page) -> Option<Vec<Section>> {
         Page::Keys => Some(keymap()),
         Page::Dictionary => Some(dictionary()),
         Page::Symbols => Some(symbols()),
+        Page::Palette => Some(palette_page()),
         Page::Commands => Some(commands()),
         Page::Sync => Some(sync_page()),
         Page::Appearance => Some(appearance()),
@@ -1397,6 +1423,51 @@ fn dictionary() -> Vec<Section> {
 }
 
 /// 記号のページ(macOS の SymbolsPage)．既定の決まりは変えず，変えた分だけを設定に重ねる
+/// 絵文字と記号のパレットのページ(R-26．macOS の PalettePage)
+fn palette_page() -> Vec<Section> {
+    use Condition::*;
+    vec![
+        Section::new(
+            palette::BEHAVIOR,
+            vec![
+                Row::toggle(palette::ENABLED, "palette"),
+                Row::toggle(palette::CLOSES_AFTER_INSERT, "paletteClosesAfterInsert")
+                    .enabled_when(On("palette")),
+                Row::toggle(palette::RECORDS_HISTORY, "paletteRecordsHistory")
+                    .enabled_when(On("palette")),
+                Row::action(palette::CLEAR_HISTORY, Action::ResetPaletteHistory)
+                    .enabled_when(On("palette")),
+                Row::note(palette::CLEAR_HISTORY_NOTE),
+                Row::note(crate::strings::windows::PALETTE_KEYS_NOTE),
+            ],
+        ),
+        Section::new(
+            palette::LOOK,
+            vec![
+                Row::stepper(
+                    palette::COLUMNS,
+                    "paletteColumns",
+                    RangeKind::PaletteColumns,
+                ),
+                Row::stepper(palette::ROWS, "paletteRows", RangeKind::PaletteRows),
+                Row::stepper(
+                    palette::CELL_SIZE,
+                    "paletteCellSize",
+                    RangeKind::PaletteCellSize,
+                ),
+                Row::stepper(
+                    palette::FREQUENT_ROWS,
+                    "paletteFrequentRows",
+                    RangeKind::PaletteFrequentRows,
+                )
+                .enabled_when(On("paletteRecordsHistory")),
+                Row::toggle(palette::SHOWS_PREVIEW, "paletteShowsPreview"),
+                Row::note(palette::THEME_NOTE),
+            ],
+        ),
+    ]
+}
+
 fn symbols() -> Vec<Section> {
     let section = |title, kind, fields, invalid, file| {
         let mut rows = vec![Row::new(
