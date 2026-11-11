@@ -30,6 +30,7 @@ use windows::Win32::UI::TextServices::{
     ITfKeystrokeMgr, ITfRange, ITfSource, ITfTextInputProcessor, ITfTextInputProcessorEx,
     ITfTextInputProcessorEx_Impl, ITfTextInputProcessor_Impl, ITfThreadFocusSink,
     ITfThreadFocusSink_Impl, ITfThreadMgr, ITfThreadMgrEventSink, ITfThreadMgrEventSink_Impl,
+    GUID_COMPARTMENT_EMPTYCONTEXT, GUID_COMPARTMENT_KEYBOARD_DISABLED,
     GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE,
     GUID_PROP_ATTRIBUTE, GUID_PROP_INPUTSCOPE, INSERT_TEXT_AT_SELECTION_FLAGS, IS_NUMERIC_PASSWORD,
     IS_NUMERIC_PIN, IS_PASSWORD, TF_AE_NONE, TF_ANCHOR_END, TF_ANCHOR_START,
@@ -196,6 +197,42 @@ impl ITfTextInputProcessorEx_Impl for TextService_Impl {
     }
 }
 
+/// キーを受け取ってよい入力先の文脈．文脈が無いとき・入力先が IME を切っているときは None．
+/// ゲームは遊んでいるあいだ，キーボードを無効にした文脈(GUID_COMPARTMENT_KEYBOARD_DISABLED)や空の文脈
+/// (GUID_COMPARTMENT_EMPTYCONTEXT)に入力先を移して IME を切る(Unreal Engine で作った VALORANT など)．
+/// それでも日本語の入力でキーを受け取ると，移動の WASD などがゲームに届かず遊べなくなる
+fn key_target<'a>(pic: &'a Ref<ITfContext>) -> Option<&'a ITfContext> {
+    let context = pic.as_ref()?;
+    let Ok(compartments) = context.cast::<ITfCompartmentMgr>() else {
+        return Some(context);
+    };
+    let disabled = [
+        GUID_COMPARTMENT_KEYBOARD_DISABLED,
+        GUID_COMPARTMENT_EMPTYCONTEXT,
+    ]
+    .iter()
+    .any(|guid| {
+        // SAFETY: guid は呼び出しのあいだ生きている．compartment は無ければ空の値で作られるだけで，入力先は変わらない
+        unsafe { compartments.GetCompartment(guid) }
+            .ok()
+            .and_then(|compartment| compartment_i32(&compartment))
+            .is_some_and(|value| value != 0)
+    });
+    (!disabled).then_some(context)
+}
+
+/// compartment の値(VT_I4 のときだけ)
+fn compartment_i32(compartment: &ITfCompartment) -> Option<i32> {
+    // SAFETY: GetValue が返した VARIANT は，型(vt)を確かめてから読み，読んだあと VariantClear で放す
+    unsafe {
+        let mut value = compartment.GetValue().ok()?;
+        let inner = &value.Anonymous.Anonymous;
+        let number = (inner.vt == VT_I4).then(|| inner.Anonymous.lVal);
+        let _ = VariantClear(&mut value);
+        number
+    }
+}
+
 fn register_attributes() -> Result<Vec<(TextStyle, u32)>> {
     let categories: ITfCategoryMgr =
         unsafe { CoCreateInstance(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)? };
@@ -213,8 +250,14 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         Ok(())
     }
 
-    fn OnTestKeyDown(&self, _pic: Ref<ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
-        guard(|| Ok(self.wants(wparam, lparam).is_some().into()))
+    fn OnTestKeyDown(&self, pic: Ref<ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
+        guard(|| {
+            // OnKeyDown で受け取らないキーを，ここで受け取ると答えない(答えると，アプリにキーが届かないことがある)
+            if key_target(&pic).is_none() {
+                return Ok(false.into());
+            }
+            Ok(self.wants(wparam, lparam).is_some().into())
+        })
     }
 
     fn OnTestKeyUp(&self, _pic: Ref<ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
@@ -223,10 +266,10 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
     fn OnKeyDown(&self, pic: Ref<ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         guard(|| {
-            let Some(input) = self.wants(wparam, lparam) else {
+            let Some(context) = key_target(&pic) else {
                 return Ok(false.into());
             };
-            let Ok(context) = pic.ok() else {
+            let Some(input) = self.wants(wparam, lparam) else {
                 return Ok(false.into());
             };
             // コマンドの候補を確定すると，エンジンがアプリやページを開く．エンジンは裏のプロセスで窓を前に出せないので，
@@ -1025,14 +1068,8 @@ impl TextService_Impl {
             .mode_cookie
             .as_ref()
             .map(|(compartment, _)| compartment.clone())?;
-        let mut value = unsafe { compartment.GetValue().ok()? };
-        let open = unsafe {
-            let inner = &value.Anonymous.Anonymous;
-            (inner.vt == VT_I4).then(|| inner.Anonymous.lVal != 0)
-        };
-        let _ = unsafe { VariantClear(&mut value) };
-        open.map(|open| {
-            if open {
+        compartment_i32(&compartment).map(|open| {
+            if open != 0 {
                 InputMode::Japanese
             } else {
                 InputMode::Direct

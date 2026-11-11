@@ -30,6 +30,8 @@ apps/windows/
 - `OnTestKeyDown` は IME が処理するかどうかだけを素早く返す．ここでエンジンと通信しない．判断に要る状態(変換中か，入力方式)は DLL の中に写しを持つ
 - エンジンとの通信には時間の上限(既定 50ms)を設け，超えたら読みのまま返して後から結果を反映する
 - InputScope がパスワードのときは composition を始めない
+- 入力先の文脈が無いとき，文脈の `GUID_COMPARTMENT_KEYBOARD_DISABLED` か `GUID_COMPARTMENT_EMPTYCONTEXT` が 0 でないときはキーを受け取らない．ゲームは遊んでいるあいだこれで IME を切る
+- `OnTestKeyDown` と `OnKeyDown` の答えを揃える．`OnTestKeyDown` で受け取ると答えたキーを `OnKeyDown` で受け取らないと，アプリにキーが届かないことがある
 - 書き込みは `ITfEditSession` の中だけ．`RequestEditSession` は `TF_ES_READWRITE | TF_ES_ASYNCDONTCARE`
 
 ## unsafe
