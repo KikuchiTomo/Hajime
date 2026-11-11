@@ -55,6 +55,7 @@
     "launcherCommands",
     "learning",
     "listCandidatesPerPage",
+    "listSegmentAlternatives",
     "liveConversion",
     "liveConversionDelay",
     "liveConversionSkipLength",
