@@ -424,6 +424,21 @@ public enum DefaultSettings {
     public static let paletteUsageBonus = (scale: 20.0, maximum: 60.0)
     /// ピン留めした項目の加点
     public static let palettePinnedBonus = 40.0
+    /// パレットで使った度合いが半分になるまでの時間(秒)．14 日
+    public static let paletteUsageHalfLife = 14.0 * 24 * 60 * 60
+    /// 同じ語で何回選んだら，その語で探したときに先頭に出すか
+    public static let paletteLearnedChoiceCount = 2
+    /// よく使う行の文字を入れ替えるのは，新しい文字の度合いが外れる文字のこの倍を超えたときだけ
+    public static let paletteFrequentReplacementRatio = 1.2
+    /// パレットの使い方として覚える文字の数と，探した語の数の上限
+    public static let maximumPaletteUsageRecords = 500
+    public static let maximumPaletteLearnedQueries = 300
+    /// ピン留めできる文字の数の上限
+    public static let maximumPalettePins = 36
+    /// パレットの使い方のファイルの大きさの上限．壊れた大きなファイルを読み込まないため
+    public static let maximumPaletteUsageFileBytes = 1024 * 1024
+    /// パレットの使い方のファイルの名前．使い方の記録(usage.json)と同じフォルダに置き，同期しない
+    public static let paletteUsageFileName = "palette-usage.json"
 
     // MARK: 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ
 

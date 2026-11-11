@@ -207,6 +207,14 @@ public protocol EmojiLooking: AnyObject {
     func emoji(for reading: String) -> [String]
 }
 
+/// パレットで選んだ文字の使い方(PaletteUsage)を読み書きするポート．端末の中にだけ保存し，同期しない
+@MainActor
+public protocol PaletteUsageStoring: AnyObject {
+    var usage: PaletteUsage { get }
+    /// 使い方を変えて保存する．保存に失敗しても，変えた使い方はこのプロセスの中では使い続ける
+    func update(_ change: (inout PaletteUsage) -> Void)
+}
+
 /// 手書きの線から文字を探すポート(R-14)．端末の中だけで認識し，通信しない
 public protocol HandwritingRecognizing: Sendable {
     /// 線(点の並び．左上が原点)を認識して，よさそうな順に文字列を返す
