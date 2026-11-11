@@ -83,7 +83,8 @@ extension SettingsView {
         /// 検索で見つけるための言葉．ページの名前に加え，そのページにある項目の名前
         var keywords: [String] {
             switch self {
-            case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect]
+            case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect,
+                          UIStrings.Settings.numberSeparators, UIStrings.Settings.alphanumericHyphen]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana, UIStrings.Features.prefersKatakana,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Settings.latexConversion,

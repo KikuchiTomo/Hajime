@@ -129,6 +129,8 @@ private struct InputTab: View {
                 ResettablePicker(model: model, title: UIStrings.Settings.numberWidth, keyPath: \.numberWidth, label: UIStrings.Settings.label(for:))
                 ResettablePicker(model: model, title: UIStrings.More.alphabetWidth, keyPath: \.alphabetWidth, label: UIStrings.Settings.label(for:))
                 ResettableToggle(model: model, title: UIStrings.More.shiftStartsAlphabet, keyPath: \.shiftStartsAlphabet)
+                ResettableToggle(model: model, title: UIStrings.Settings.numberSeparators, keyPath: \.numberSeparators)
+                ResettableToggle(model: model, title: UIStrings.Settings.alphanumericHyphen, keyPath: \.alphanumericHyphen)
                 ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
             }
             Section(UIStrings.Settings.keys) {

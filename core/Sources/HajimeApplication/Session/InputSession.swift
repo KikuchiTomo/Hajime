@@ -956,9 +956,13 @@ public final class InputSession {
         if startsAlphabet { alphabetRun = true }
         // 英字の中の「-」(Wi-Fi)は英字の続き
         if alphabetRun, !(character.isASCII && (character.isLetter || character == "-")) { alphabetRun = false }
+        // 直前の文字．ローマ字を打ちかけていれば(「z」+「.」→「…」など)，記号はローマ字の続きにする
+        let previous = composition.pending.isEmpty ? composition.kana.last : nil
+        // 英数字のあとの「-」は長音でなくハイフン(「A-1」「3-4」．設定)
+        let hyphen = character == "-" && !alphabetRun ? SymbolTable.hyphen(after: previous, settings: settings.current) : nil
         let isRomaji = !alphabetRun && (
             (character.isASCII && character.isLetter && character.isLowercase)
-                || character == "-"
+                || (character == "-" && hyphen == nil)
                 || (character == "'" && composition.pending == "n")
                 // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
                 || (composition.pending == "z" && Self.zSymbolKeys.contains(character)))
@@ -974,13 +978,22 @@ public final class InputSession {
             if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
-        } else if character.isASCII && (character.isLetter || character.isNumber || (alphabetRun && character == "-")) {
+        } else if character.isASCII && (character.isLetter || character.isNumber || (alphabetRun && character == "-")) || hyphen != nil {
             // 英単語に続けて打った大文字と数字は識別子の続き(「userName」「v2」)なので，綴りを直さず打ったとおりにする(R-06)
             corrector.commitAsTyped(into: &composition)
             readingCorrector.didInsertLiteral()
             let width = character.isNumber ? settings.current.numberWidth : settings.current.alphabetWidth
-            let text = width == .fullwidth ? KanaWidth.fullwidthASCII(from: String(character)) : String(character)
+            let text = hyphen ?? (width == .fullwidth ? KanaWidth.fullwidthASCII(from: String(character)) : String(character))
+            // 読みの先頭の「-」に数字を続けたら，長音を符号にする(「-3」)
+            if let digit = text.first, let sign = SymbolTable.sign(before: digit, settings: settings.current) {
+                composition.replaceLeadingLongVowel(with: sign)
+            }
             composition.insertLiteral(text, rawKey: character)
+        } else if let separator = SymbolTable.numberSeparator(for: character, after: previous, settings: settings.current) {
+            // 数字のあとの「.」「,」は小数点と桁区切り(「3.14」「1,000」．設定)．句読点ではないので，句読点で確定しない
+            corrector.commitAsTyped(into: &composition)
+            readingCorrector.didInsertLiteral()
+            composition.insertLiteral(separator, rawKey: nil)
         } else {
             let text = SymbolTable.text(for: character, profile: context.profile, settings: settings.current)
             if !isComposing && text == String(character) {

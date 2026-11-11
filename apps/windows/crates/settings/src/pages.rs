@@ -149,6 +149,8 @@ impl Page {
                 choice::KEYBOARD_LAYOUT,
                 settings::PUNCTUATION,
                 features::KEYPAD_DIRECT,
+                settings::NUMBER_SEPARATORS,
+                settings::ALPHANUMERIC_HYPHEN,
             ],
             Page::Conversion => vec![
                 menu::LIVE_CONVERSION,
@@ -828,6 +830,8 @@ fn input() -> Vec<Section> {
                 Row::choice(settings::NUMBER_WIDTH, "numberWidth", options::WIDTHS),
                 Row::choice(more::ALPHABET_WIDTH, "alphabetWidth", options::WIDTHS),
                 Row::toggle(more::SHIFT_STARTS_ALPHABET, "shiftStartsAlphabet"),
+                Row::toggle(settings::NUMBER_SEPARATORS, "numberSeparators"),
+                Row::toggle(settings::ALPHANUMERIC_HYPHEN, "alphanumericHyphen"),
                 Row::toggle(features::KEYPAD_DIRECT, "keypadDirect"),
             ],
         ),
@@ -1930,6 +1934,6 @@ mod tests {
         let page = sections(Page::Input).unwrap();
         let titles: Vec<_> = page.iter().map(|section| section.title).collect();
         assert_eq!(titles, vec![Some("入力方式"), Some("文字"), Some("動作")]);
-        assert_eq!(page[1].rows.len(), 9);
+        assert_eq!(page[1].rows.len(), 11);
     }
 }
