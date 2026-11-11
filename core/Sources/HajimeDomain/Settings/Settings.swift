@@ -28,6 +28,10 @@ public struct Settings: Sendable, Equatable {
     public var alphabetWidth = CharacterWidth.halfwidth
     /// Shift を押して英字を打ったら，Space か記号を打つまで英字のまま入れる(「Python」と打てる)
     public var shiftStartsAlphabet = false
+    /// 数字のあとの「.」「,」を句読点にせず，ピリオドとカンマで入れる(「3.14」「1,000」)．幅は直前の数字に合わせる
+    public var numberSeparators = true
+    /// 英数字のあとの「-」を長音にせず，ハイフンで入れる(「A-1」「3-4」)．読みの先頭の「-」に数字を続けたとき(「-3」)も
+    public var alphanumericHyphen = true
     /// 句読点を打ったら，その句読点まで確定する
     public var punctuationCommits = false
     /// キー設定の表(R-17)．状態 × キー × コマンドの行．切り替えのキーも変換中のキーもここに書く
@@ -334,7 +338,7 @@ extension Settings: Codable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
-        case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
+        case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
@@ -395,6 +399,8 @@ extension Settings: Codable {
         read(.prefersKatakana, into: \.prefersKatakana)
         read(.alphabetWidth, into: \.alphabetWidth)
         read(.shiftStartsAlphabet, into: \.shiftStartsAlphabet)
+        read(.numberSeparators, into: \.numberSeparators)
+        read(.alphanumericHyphen, into: \.alphanumericHyphen)
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
         read(.branchCandidatesPerPage, into: \.branchCandidatesPerPage)
         read(.liveConversionDelay, into: \.liveConversionDelay)
@@ -513,6 +519,8 @@ extension Settings: Codable {
         try container.encode(prefersKatakana, forKey: .prefersKatakana)
         try container.encode(alphabetWidth, forKey: .alphabetWidth)
         try container.encode(shiftStartsAlphabet, forKey: .shiftStartsAlphabet)
+        try container.encode(numberSeparators, forKey: .numberSeparators)
+        try container.encode(alphanumericHyphen, forKey: .alphanumericHyphen)
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
         try container.encode(branchCandidatesPerPage, forKey: .branchCandidatesPerPage)
         try container.encode(liveConversionDelay, forKey: .liveConversionDelay)

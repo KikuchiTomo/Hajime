@@ -13,6 +13,7 @@
   },
   "fields" : [
     "alphabetWidth",
+    "alphanumericHyphen",
     "association",
     "associationDictionaries",
     "associationLimit",
@@ -67,6 +68,7 @@
     "numberFormParenthesized",
     "numberFormRoman",
     "numberKeySelection",
+    "numberSeparators",
     "numberWidth",
     "okuriganaStyle",
     "palette",

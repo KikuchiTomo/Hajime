@@ -347,6 +347,14 @@ public struct Composition: Sendable, Equatable {
         }
     }
 
+    /// 読みが「-」で打った長音 1 文字だけなら，それを text(数字の前の符号)に置き換える．置き換えたら true
+    @discardableResult
+    public mutating func replaceLeadingLongVowel(with text: String) -> Bool {
+        guard kana == "ー", pending.isEmpty, rawKeys == "-" else { return false }
+        kana = text
+        return true
+    }
+
     /// かな入力のかなを足す(R-05)．濁点・半濁点は前のかなと合わせる．打ったキーはローマ字ではないので覚えない
     public mutating func insertKana(_ text: String) {
         flushPending()
