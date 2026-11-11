@@ -239,7 +239,7 @@ pub mod more {
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES_NOTE: &str =
-        "分岐図と文節ごとの一覧で、前後の語句とのつながりがよい候補を上に表示します。";
+        "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。";
     pub const LIST_SEGMENT_ALTERNATIVES: &str = "一覧に文節を入れ替えた候補を表示";
     pub const LIST_SEGMENT_ALTERNATIVES_NOTE: &str =
         "一覧で、文節を 1 か所だけほかの候補に替えた文を、迷う文節から順に表示します。";
