@@ -188,13 +188,69 @@ struct FeatureScenarioTests {
         #expect(candidates == ["ラムダ", "らむだ", "λ", "Λ", "\\lambda", "\\Lambda"])
     }
 
+    @Test("R-27: 読みが数字だけなら，丸数字・漢数字・ローマ数字を記号と同じ位置に差し込み，第 1 候補は変えない")
+    func numberForms() {
+        let base = FakeConverter(["21": [("21", nil), ("二十一", nil), ("２１", nil), ("2", 1)]])
+        let candidates = SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar()).candidates(for: "21").map(\.text)
+        // エンジンの出した二十一は重ねない
+        #expect(candidates == ["21", "二十一", "２１", "㉑", "二一", "弐拾壱", "ⅩⅩⅠ", "ⅹⅹⅰ", "2"])
+    }
+
+    @Test("R-27: エンジンが出した丸数字などは重ねず，足りない書き方だけを足す")
+    func numberFormsWithoutDuplicates() {
+        let base = FakeConverter(["1": [("1", nil), ("一", nil), ("①", nil)]])
+        let candidates = SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar()).candidates(for: "1").map(\.text)
+        #expect(candidates == ["1", "一", "①", "❶", "⑴", "⒈", "壱", "Ⅰ", "ⅰ"])
+    }
+
+    @Test("R-27: 書き換えをオフにすると出さず，書き方を選ぶとその書き方だけを出す")
+    func numberFormSettings() {
+        let base = FakeConverter(["5": [("5", nil)]])
+        var off = DefaultSettings.settings
+        off.numberFormConversion = false
+        #expect(SupplementedConverter(base, settings: FakeSettings(off), calendar: FakeCalendar()).candidates(for: "5").map(\.text) == ["5"])
+        var circledOnly = DefaultSettings.settings
+        circledOnly.numberFormParenthesized = false
+        circledOnly.numberFormKanji = false
+        circledOnly.numberFormRoman = false
+        #expect(SupplementedConverter(base, settings: FakeSettings(circledOnly), calendar: FakeCalendar()).candidates(for: "5").map(\.text) == ["5", "⑤", "❺"])
+    }
+
+    @Test("R-27: 0 で始まる数・小数・符号の付いた数は書き換えない", arguments: ["01", "1.5", "-3", "５０１ー"])
+    func numberFormsSkipNonNumbers(reading: String) {
+        let base = FakeConverter([reading: [(reading, nil)]])
+        #expect(SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar()).candidates(for: reading).map(\.text) == [reading])
+    }
+
+    @Test("R-27: 打っているあいだは数字のままで，一覧と分岐図の文節の候補に丸数字が出る")
+    func numberFormsInSession() throws {
+        let table: [String: [(text: String, readingCount: Int?)]] = ["21": [("21", nil), ("二十一", nil), ("２１", nil)]]
+        let list = Harness(converter: FakeConverter(table), settings: .listPresentation,
+                           wrap: { SupplementedConverter($0, settings: $1, calendar: FakeCalendar()) })
+        list.settings.current.liveConversionSkipLength = 0
+        list.type("21")
+        list.settle()
+        #expect(list.marked.text == "21")
+        list.press(.space)
+        let entries = try #require(list.panel).entries.map(\.text)
+        #expect(entries.prefix(4) == ["21", "二十一", "２１", "㉑"])
+
+        let lattice = Harness(converter: FakeConverter(table, clauses: ["21": [("21", 2), ("二十一", 2)]]),
+                              wrap: { SupplementedConverter($0, settings: $1, calendar: FakeCalendar()) })
+        lattice.type("21")
+        lattice.press(.space)
+        let column = try #require(lattice.lattice?.columns.first)
+        #expect(column.alternatives.contains("㉑"))
+    }
+
     @Test("R-13: 郵便番号は住所を候補に出す．区切りがあれば先頭に，無ければ 2 番目に")
     func postalCode() {
         let postal = FakePostalCodes(["1000001": ["東京都千代田区千代田"]])
         let separated = SupplementedConverter(FakeConverter(["100ー0001": [("100ー0001", nil)]]), settings: FakeSettings(), calendar: FakeCalendar(), postalCodes: postal)
         #expect(separated.candidates(for: "100ー0001").first?.text == "東京都千代田区千代田")
         let plain = SupplementedConverter(FakeConverter(["1000001": [("1000001", nil)]]), settings: FakeSettings(), calendar: FakeCalendar(), postalCodes: postal)
-        #expect(plain.candidates(for: "1000001").map(\.text) == ["1000001", "東京都千代田区千代田"])
+        // 7 桁の数字なので，住所のあとに漢数字(百万一)も並ぶ
+        #expect(plain.candidates(for: "1000001").map(\.text).prefix(2) == ["1000001", "東京都千代田区千代田"])
         var off = DefaultSettings.settings
         off.postalCodeConversion = false
         let disabled = SupplementedConverter(FakeConverter(), settings: FakeSettings(off), calendar: FakeCalendar(), postalCodes: postal)

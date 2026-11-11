@@ -8,6 +8,7 @@ import HajimeDomain
 ///   たどらないので，辞書に無い読みの語は出ない．読み全体が一致する語はここで確実に出す(同じ語は重ねない)
 /// - 記号(SymbolDictionary): 「やじるし」→「→」など
 /// - 日付と時刻(DateExpressions): 「きょう」→「2026/10/26」など
+/// - 数字の書き方(NumberForms): 「21」→「㉑」，「2026」→「二〇二六」など．読みが数字だけのとき
 /// - 計算(Calculator): 「1+2*3=」→「7」「1+2*3=7」．結果を先頭に置く(式を打って「=」を打つのは計算したいときなので)
 /// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
@@ -28,7 +29,7 @@ import HajimeDomain
 /// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
 ///   どの辞書を効かせるかは DictionaryActivation が決める(アプリの条件，文脈の条件)
 ///
-/// 記号と日付は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
+/// 記号・日付・数字の書き方は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
 /// 第 1 候補(ライブ変換で見える文字)は変えず，よく使う語より前に並ばないようにする
 @MainActor
 public final class SupplementedConverter: KanaKanjiConverting {
@@ -203,6 +204,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         if current.dateConversion {
             extra += DateExpressions.candidates(for: reading, now: calendar.now(), day: calendar.day(offsetFromToday:))
         }
+        extra += NumberForms.candidates(for: reading, kinds: current.numberFormKinds)
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
         if current.emojiConversion, let emoji {
             insert(Array(emoji.emoji(for: reading).prefix(DefaultSettings.emojiCandidateCount)), into: &result,

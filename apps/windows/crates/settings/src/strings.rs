@@ -57,6 +57,12 @@ pub mod settings {
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
     pub const EMOJI_CONVERSION: &str = "絵文字に変換";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
+    pub const NUMBER_FORMS: &str = "数字の書き方";
+    pub const NUMBER_FORM_CONVERSION: &str = "数字を丸数字などに変換";
+    pub const NUMBER_FORM_CIRCLED: &str = "丸数字";
+    pub const NUMBER_FORM_PARENTHESIZED: &str = "括弧付きとピリオド付きの数字";
+    pub const NUMBER_FORM_KANJI: &str = "漢数字";
+    pub const NUMBER_FORM_ROMAN: &str = "ローマ数字";
     pub const LEARNING: &str = "学習";
     pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
     pub const ZENZAI_MODEL_NOTE: &str =
@@ -649,6 +655,11 @@ pub mod sync {
         ("symbolConversion", "記号に変換"),
         ("emojiConversion", "絵文字に変換"),
         ("latexConversion", "LaTeX のコマンドに変換"),
+        ("numberFormConversion", "数字を丸数字などに変換"),
+        ("numberFormCircled", "丸数字"),
+        ("numberFormParenthesized", "括弧付きとピリオド付きの数字"),
+        ("numberFormKanji", "漢数字"),
+        ("numberFormRoman", "ローマ数字"),
         ("learning", "学習"),
         ("zenzaiModel", "Zenzai のモデル"),
         ("theme", "テーマ"),

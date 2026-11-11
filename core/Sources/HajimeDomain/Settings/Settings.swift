@@ -142,6 +142,16 @@ public struct Settings: Sendable, Equatable {
     public var emojiConversion = true
     /// 読み(「らむだ」)から LaTeX のコマンド(「\lambda」)の候補を出す
     public var latexConversion = false
+    /// 読みが数字だけのとき(「21」)，丸数字などに書き換えた候補(「㉑」)を出す(NumberForms)．出す書き方は下の 4 つで選ぶ
+    public var numberFormConversion = true
+    /// 丸数字(⓪〜㊿)と黒丸の数字(⓿〜⓴)
+    public var numberFormCircled = true
+    /// 括弧付き(⑴〜⒇)とピリオド付き(⒈〜⒛)の数字
+    public var numberFormParenthesized = true
+    /// 漢数字(位取りの二〇二六，位付きの二千二十六，大字の弐千弐拾六)
+    public var numberFormKanji = true
+    /// ローマ数字(Ⅰ〜Ⅻ，ⅩⅢ など)
+    public var numberFormRoman = true
     /// 連想変換(R-18)．オフなら連想変換のキーはふつうの変換と同じに動く
     public var association = true
     /// 連想の一覧に出す語の数
@@ -259,6 +269,15 @@ public struct Settings: Sendable, Equatable {
         wordLanguage.clampToValidRanges()
     }
 
+    /// 数字を書き換える書き方(NumberForms)．数字の書き換えがオフなら空
+    public var numberFormKinds: Set<NumberForms.Kind> {
+        guard numberFormConversion else { return [] }
+        let kinds: [(NumberForms.Kind, Bool)] = [
+            (.circled, numberFormCircled), (.parenthesized, numberFormParenthesized), (.kanji, numberFormKanji), (.roman, numberFormRoman),
+        ]
+        return Set(kinds.filter(\.1).map(\.0))
+    }
+
     /// コマンド(SyncGroup.commands の項目)だけを current のものにした設定．
     /// 設定のファイルの読み込みや，設定の画面でない接続からの書き込みで，コマンドを書き換えさせないために使う
     public func keepingCommands(of current: Settings) -> Settings {
@@ -319,6 +338,7 @@ extension Settings: Codable {
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -413,6 +433,11 @@ extension Settings: Codable {
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
         read(.latexConversion, into: \.latexConversion)
+        read(.numberFormConversion, into: \.numberFormConversion)
+        read(.numberFormCircled, into: \.numberFormCircled)
+        read(.numberFormParenthesized, into: \.numberFormParenthesized)
+        read(.numberFormKanji, into: \.numberFormKanji)
+        read(.numberFormRoman, into: \.numberFormRoman)
         read(.association, into: \.association)
         read(.associationLimit, into: \.associationLimit)
         read(.showsAssociationHint, into: \.showsAssociationHint)
@@ -524,6 +549,11 @@ extension Settings: Codable {
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(latexConversion, forKey: .latexConversion)
+        try container.encode(numberFormConversion, forKey: .numberFormConversion)
+        try container.encode(numberFormCircled, forKey: .numberFormCircled)
+        try container.encode(numberFormParenthesized, forKey: .numberFormParenthesized)
+        try container.encode(numberFormKanji, forKey: .numberFormKanji)
+        try container.encode(numberFormRoman, forKey: .numberFormRoman)
         try container.encode(association, forKey: .association)
         try container.encode(associationLimit, forKey: .associationLimit)
         try container.encode(showsAssociationHint, forKey: .showsAssociationHint)

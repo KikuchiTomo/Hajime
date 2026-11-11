@@ -455,6 +455,12 @@ enum UIStrings {
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
         static let latexConversion = "LaTeX のコマンドに変換"
+        static let numberForms = "数字の書き方"
+        static let numberFormConversion = "数字を丸数字などに変換"
+        static let numberFormCircled = "丸数字"
+        static let numberFormParenthesized = "括弧付きとピリオド付きの数字"
+        static let numberFormKanji = "漢数字"
+        static let numberFormRoman = "ローマ数字"
         static let learning = "学習"
         static let zenzaiModel = "Zenzai のモデル"
         static let zenzaiModelNote = "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。"
@@ -1008,7 +1014,10 @@ extension UIStrings {
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion,
-            "latexConversion": UIStrings.Settings.latexConversion, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
+            "latexConversion": UIStrings.Settings.latexConversion,
+            "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
+            "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,
+            "numberFormRoman": UIStrings.Settings.numberFormRoman, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
             "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,

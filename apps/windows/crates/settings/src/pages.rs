@@ -162,6 +162,7 @@ impl Page {
                 settings::DATE_CONVERSION,
                 settings::EMOJI_CONVERSION,
                 settings::LATEX_CONVERSION,
+                settings::NUMBER_FORM_CONVERSION,
                 settings::MEANING,
                 settings::SHOWS_PART_OF_SPEECH,
             ],
@@ -1001,6 +1002,23 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
                 Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
                 Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
+            ],
+        ),
+        Section::new(
+            settings::NUMBER_FORMS,
+            vec![
+                Row::toggle(settings::NUMBER_FORM_CONVERSION, "numberFormConversion"),
+                Row::toggle(settings::NUMBER_FORM_CIRCLED, "numberFormCircled")
+                    .enabled_when(On("numberFormConversion")),
+                Row::toggle(
+                    settings::NUMBER_FORM_PARENTHESIZED,
+                    "numberFormParenthesized",
+                )
+                .enabled_when(On("numberFormConversion")),
+                Row::toggle(settings::NUMBER_FORM_KANJI, "numberFormKanji")
+                    .enabled_when(On("numberFormConversion")),
+                Row::toggle(settings::NUMBER_FORM_ROMAN, "numberFormRoman")
+                    .enabled_when(On("numberFormConversion")),
             ],
         ),
         Section::new(
