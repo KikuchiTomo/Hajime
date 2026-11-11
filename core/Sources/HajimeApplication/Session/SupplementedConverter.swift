@@ -204,7 +204,12 @@ public final class SupplementedConverter: KanaKanjiConverting {
         if current.dateConversion {
             extra += DateExpressions.candidates(for: reading, now: calendar.now(), day: calendar.day(offsetFromToday:))
         }
-        extra += NumberForms.candidates(for: reading, kinds: current.numberFormKinds)
+        let numberForms = NumberForms.candidates(for: reading, kinds: current.numberFormKinds)
+        if !numberForms.isEmpty, result.isEmpty {
+            // 書き換えた数字を第 1 候補にしない．エンジンが候補を出さなかったときも，打った数字を先頭に置く
+            result.append(Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana)))
+        }
+        extra += numberForms
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
         if current.emojiConversion, let emoji {
             insert(Array(emoji.emoji(for: reading).prefix(DefaultSettings.emojiCandidateCount)), into: &result,

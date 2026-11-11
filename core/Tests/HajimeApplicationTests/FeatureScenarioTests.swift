@@ -203,6 +203,12 @@ struct FeatureScenarioTests {
         #expect(candidates == ["1", "一", "①", "❶", "⑴", "⒈", "壱", "Ⅰ", "ⅰ"])
     }
 
+    @Test("R-27: エンジンが候補を出さない数字の読みでも，第 1 候補は打った数字のまま")
+    func numberFormsKeepTypedDigitsFirst() {
+        let candidates = SupplementedConverter(FakeConverter(), settings: FakeSettings(), calendar: FakeCalendar()).candidates(for: "120").map(\.text)
+        #expect(candidates == ["120", "一二〇", "百二十", "壱百弐拾", "ⅭⅩⅩ", "ⅽⅹⅹ"])
+    }
+
     @Test("R-27: 書き換えをオフにすると出さず，書き方を選ぶとその書き方だけを出す")
     func numberFormSettings() {
         let base = FakeConverter(["5": [("5", nil)]])
