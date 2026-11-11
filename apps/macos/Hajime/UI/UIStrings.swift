@@ -249,6 +249,8 @@ enum UIStrings {
             case .openSettings: "設定を開く"
             case .toggleLiveConversion: "ライブ変換の切り替え"
             case .handwriting: "手書き入力"
+            case .emojiPalette: "絵文字のパレット"
+            case .symbolPalette: "記号のパレット"
             }
         }
 
@@ -279,6 +281,7 @@ enum UIStrings {
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
+            case .emojiPalette, .symbolPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
@@ -717,6 +720,18 @@ enum UIStrings {
 
     /// 設定の画面で足したページと項目
     /// 足した機能の項目の名前(テンキー・記号・補正・送り仮名・計算・読み違い)
+    /// 絵文字と記号のパレット(R-25)の設定の項目
+    enum Palette {
+        static let enabled = "絵文字と記号のパレット"
+        static let closesAfterInsert = "入力したらパレットを閉じる"
+        static let recordsHistory = "パレットで使った文字を記録"
+        static let columns = "パレットの列数"
+        static let rows = "パレットの行数"
+        static let cellSize = "パレットのマスの大きさ"
+        static let showsPreview = "パレットに文字の説明を表示"
+        static let frequentRows = "よく使う文字の行数"
+    }
+
     enum Features {
         static let keypadDirect = "テンキーの数字を半角で確定"
 
@@ -986,6 +1001,9 @@ extension UIStrings {
             "dynamicDictionary": Extras.dynamicDictionary, "conversionMacros": Extras.conversionMacros, "macros": Extras.macrosSection,
             "launcherCommands": Extras.launcherCommands, "commands": Extras.commandsPage,
             "englishTermCandidates": Extras.englishTermCandidates, "englishTerms": Extras.englishTerms,
+            "palette": Palette.enabled, "paletteClosesAfterInsert": Palette.closesAfterInsert, "paletteRecordsHistory": Palette.recordsHistory,
+            "paletteColumns": Palette.columns, "paletteRows": Palette.rows, "paletteCellSize": Palette.cellSize,
+            "paletteShowsPreview": Palette.showsPreview, "paletteFrequentRows": Palette.frequentRows,
         ]
 
         static func label(for scope: SyncScope) -> String {

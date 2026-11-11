@@ -407,6 +407,22 @@ public enum DefaultSettings {
 
     // MARK: 絵文字と記号のパレット
 
+    /// パレットの列の数と，選べる範囲
+    public static let paletteColumns = 9
+    public static let paletteColumnsRange = 6...14
+    /// パレットに一度に見せる行の数と，選べる範囲
+    public static let paletteRows = 6
+    public static let paletteRowsRange = 3...12
+    /// パレットのマスの一辺(pt)と，選べる範囲
+    public static let paletteCellSize = 36.0
+    public static let paletteCellSizeRange = 28.0...64.0
+    /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
+    public static let paletteFrequentRows = 1
+    public static let paletteFrequentRowsRange = 0...4
+    /// パレットの探す欄に打てる長さの上限(文字数)
+    public static let maximumPaletteQueryLength = 32
+    /// パレットの説明に出す読みの数
+    public static let palettePreviewReadings = 4
     /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える
     public static let maximumPaletteTextLength = 4
     /// パレットで探したときに並べる項目の数の上限

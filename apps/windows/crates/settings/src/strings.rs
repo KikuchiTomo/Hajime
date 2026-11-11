@@ -428,6 +428,8 @@ pub mod keys {
         ("openSettings", "設定を開く"),
         ("toggleLiveConversion", "ライブ変換の切り替え"),
         ("handwriting", "手書き入力"),
+        ("emojiPalette", "絵文字のパレット"),
+        ("symbolPalette", "記号のパレット"),
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
     ];
@@ -461,6 +463,8 @@ pub mod keys {
         ("forgetCandidate", "選択中の候補を学習から削除します"),
         ("forgetLastCommit", "最後に確定した語句の学習を取り消します。入力した文字は削除しません"),
         ("handwriting", "「手書き入力」の設定がオンのときに使えます"),
+        ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
+        ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"),
         ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
     ];
@@ -639,6 +643,14 @@ pub mod sync {
         ("associationDictionaries", "連想の辞書"),
         ("englishTermCandidates", "英語の語の辞書を使う"),
         ("englishTerms", "英語の語の辞書に足した語"),
+        ("palette", "絵文字と記号のパレット"),
+        ("paletteClosesAfterInsert", "入力したらパレットを閉じる"),
+        ("paletteRecordsHistory", "パレットで使った文字を記録"),
+        ("paletteColumns", "パレットの列数"),
+        ("paletteRows", "パレットの行数"),
+        ("paletteCellSize", "パレットのマスの大きさ"),
+        ("paletteShowsPreview", "パレットに文字の説明を表示"),
+        ("paletteFrequentRows", "よく使う文字の行数"),
     ];
 
     pub fn field_label(name: &str) -> &str {

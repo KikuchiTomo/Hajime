@@ -25,6 +25,8 @@ final class Harness {
     private(set) var panel: CandidatePanel?
     private(set) var lattice: LatticePanel?
     private(set) var note: String?
+    /// 出しているパレット．閉じていれば nil
+    private(set) var palette: PalettePanel?
     private(set) var lastResult = KeyResult.passThrough
     /// キーのあとで，あとから求めて足す処理(InputSession.followUps)を動かすか．アプリは次のキーが来るまで動かす．
     /// false にすると，キーに反応してすぐ出した画面を確かめられる
@@ -36,7 +38,8 @@ final class Harness {
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
          associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
-         wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil) {
+         wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
+         palette: ((FakeSettings) -> PaletteServices)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
@@ -44,7 +47,7 @@ final class Harness {
         self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
                                     associations: associations, keyNames: keyNames,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
-                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init))
+                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store))
     }
 
     func type(_ text: String) {
@@ -81,6 +84,11 @@ final class Harness {
         if runsFollowUps { followUp() }
     }
 
+    /// パレットの窓をマウスで押す
+    func click(_ target: PaletteTarget) {
+        apply(session.palette(target, context: context))
+    }
+
     /// あとから求めて足す処理を，アプリと同じく 1 つずつ動かして出す
     func followUp() {
         for step in session.followUps(context: context) { apply(step()) }
@@ -99,6 +107,8 @@ final class Harness {
                 lattice = nil
                 note = nil
             case .runCommand(let command): ranCommands.append(command)
+            case .showPalette(let value): palette = value
+            case .hidePalette: palette = nil
             case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting, .awaitCorrections, .requestReconversion: break
             }
         }

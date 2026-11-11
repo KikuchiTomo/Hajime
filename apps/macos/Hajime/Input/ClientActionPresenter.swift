@@ -79,6 +79,9 @@ final class ClientActionPresenter {
                     guard let self else { return }
                     self.apply(self.session.insert(text), to: client)
                 }
+            case .showPalette, .hidePalette:
+                // パレットの窓は composition root が PaletteServices を渡したときだけ開く．まだ渡していないので来ない
+                break
             case .toggleLiveConversion:
                 do {
                     try settings.update { $0.liveConversion.toggle() }

@@ -129,6 +129,10 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case toggleLiveConversion
     /// 手書きで文字を探す窓を開く(設定の「手書き入力」がオンのときだけ．R-14)
     case handwriting
+    /// 絵文字のパレットを開く．開いているときは閉じる(設定の「絵文字と記号のパレット」がオンのときだけ．R-25)
+    case emojiPalette
+    /// 記号のパレットを開く．開いているときは閉じる
+    case symbolPalette
 
     /// 設定の画面でコマンドを並べるまとまり
     public enum Group: String, Sendable, CaseIterable {
@@ -156,7 +160,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit: .commit
         case .forgetCandidate, .forgetLastCommit: .learning
-        case .openSettings, .toggleLiveConversion, .handwriting: .tools
+        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette: .tools
         }
     }
 
@@ -166,7 +170,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
         // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
-             .openSettings, .toggleLiveConversion, .handwriting:
+             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]

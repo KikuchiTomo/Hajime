@@ -339,6 +339,9 @@ public struct RoutedActions: Sendable, Equatable {
                 host.append(.toggleLiveConversion)
             case .showHandwriting:
                 host.append(.showHandwriting)
+            case .showPalette, .hidePalette:
+                // パレットはまだ Windows の候補の窓で描けないので，エンジンのプロセスでは PaletteServices を渡さず開かない
+                break
             case .runCommand(let command):
                 host.append(.runCommand(command))
             }

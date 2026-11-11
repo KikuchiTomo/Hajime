@@ -11,11 +11,12 @@
 /// - バージョン 8: 標準の表に，変換中の ⌃⌫ で学習から消すキーを足した(ForgetKeyUpgrade)
 /// - バージョン 9: キー設定の表のコマンド(文節だけの字種・直前の変更の取り消し・読みに戻して打ち続ける)を足し，
 ///   標準の表に変換中のページ送り・先頭と末尾の文節・文節の字種・取り消し・打ち続けるキーを足した(ConversionKeysUpgrade)
+/// - バージョン 10: 絵文字と記号のパレットを開くキー(⌃⌥E・⌃⌥K)を足した(PaletteKeyUpgrade)
 ///
 /// 項目の名前や形を変えるときは，バージョンを 1 つ上げ，`migrations` に移し替えを足す．移し替えは JSON のまま行い，
 /// 読み込む前に古いバージョンから順に当てる．新しいバージョンのファイルを古いバージョンで開いたときは移し替えず，知らない項目を残す(Settings.unknownFields)
 public enum SettingsSchema {
-    public static let currentVersion = 9
+    public static let currentVersion = 10
     public static let versionKey = "schemaVersion"
 
     /// バージョン n から n+1 への移し替え．添字 0 がバージョン 1 → 2
@@ -28,6 +29,7 @@ public enum SettingsSchema {
         { NavigationKeyUpgrade.upgrade(&$0) },
         { ForgetKeyUpgrade.upgrade(&$0) },
         { ConversionKeysUpgrade.upgrade(&$0) },
+        { PaletteKeyUpgrade.upgrade(&$0) },
     ]
 
     /// ファイルのバージョンを読み，今のバージョンまで移し替える．今より新しいバージョンはそのまま

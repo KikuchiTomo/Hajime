@@ -42,8 +42,8 @@ enum ConversionKeysUpgrade {
         KeymapEntry(.converting, KeyStroke(.delete), .resumeEditing),
     ]
 
-    /// バージョン 8 の標準の表．今の標準の表から足した行を除いたもの
+    /// バージョン 8 の標準の表．バージョン 9 の標準の表から足した行を除いたもの
     static var previousStandard: Keymap {
-        Keymap(KeymapPreset.standard.keymap.entries.filter { !added.contains($0) })
+        Keymap(PaletteKeyUpgrade.previousStandard.entries.filter { !added.contains($0) })
     }
 }
