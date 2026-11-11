@@ -306,7 +306,9 @@ public struct RoutedActions: Sendable, Equatable {
         self.host = host
     }
 
-    public init(_ actions: [ClientAction], anchor: WireRect?, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] }) {
+    /// paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
+    public init(_ actions: [ClientAction], anchor: WireRect?, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
+                paletteCellSize: Double = DefaultSettings.paletteCellSize) {
         for action in actions {
             switch action {
             case .commit(let text):
@@ -341,9 +343,10 @@ public struct RoutedActions: Sendable, Equatable {
                 host.append(.toggleLiveConversion)
             case .showHandwriting:
                 host.append(.showHandwriting)
-            case .showPalette, .hidePalette:
-                // パレットはまだ Windows の候補の窓で描けないので，エンジンのプロセスでは PaletteServices を渡さず開かない
-                break
+            case .showPalette(let panel):
+                ui.append(.showPalette(panel: WirePalettePanel(panel, cellSize: paletteCellSize), anchor: anchor))
+            case .hidePalette:
+                ui.append(.hidePalette)
             case .runCommand(let command):
                 host.append(.runCommand(command))
             }

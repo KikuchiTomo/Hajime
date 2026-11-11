@@ -49,6 +49,12 @@
     { "id": 30, "body": { "type": "handwritingClosed" } },
     { "id": 31, "body": { "type": "chooseCandidate", "target": { "type": "alternative", "index": 2 } } },
     { "id": 32, "body": { "type": "chooseCandidate", "target": { "type": "listVariant", "index": 0 } } },
+    { "id": 33, "body": { "type": "choosePalette", "target": { "type": "cell", "row": 3, "column": 1 } } },
+    { "id": 34, "body": { "type": "choosePalette", "target": { "type": "tab", "section": "smileys" } } },
+    { "id": 35, "body": { "type": "choosePalette", "target": { "type": "scroll", "rows": -2 } } },
+    { "id": 36, "body": { "type": "choosePalette", "target": { "type": "skinTone", "tone": "mediumDark" } } },
+    { "id": 37, "body": { "type": "choosePalette", "target": { "type": "mode", "kind": "symbol" } } },
+    { "id": 38, "body": { "type": "choosePalette", "target": { "type": "close" } } },
     { "id": 21, "body": { "type": "readSync" } },
     { "id": 22, "body": { "type": "setSyncFolder", "path": "C:\\Users\\a\\OneDrive\\hajime" } },
     { "id": 23, "body": { "type": "setSyncEnabled", "enabled": false } },
@@ -220,6 +226,30 @@
     { "type": "showMode", "mode": "japanese", "label": "ローマ字" },
     { "type": "showHandwriting", "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }, "recognitionDelayMilliseconds": 600, "recognitionTimeoutMilliseconds": 3000 },
     { "type": "hideHandwriting" },
+    {
+      "type": "showPalette",
+      "panel": {
+        "modes": [{ "kind": "emoji", "title": "絵文字", "isSelected": true }, { "kind": "symbol", "title": "記号", "isSelected": false }],
+        "query": "おじぎ",
+        "placeholder": "絵文字を検索",
+        "tabs": [{ "section": "frequent", "title": "よく使う", "symbol": "🕘", "isSelected": false }],
+        "heading": "検索結果　1 件",
+        "rows": [{ "index": 0, "cells": [{ "text": "🙇", "name": "おじぎする人", "isPinned": true }], "startsSection": true, "sectionTitle": "検索結果" }],
+        "rowCount": 1,
+        "firstRow": 0,
+        "columns": 9,
+        "visibleRows": 6,
+        "selection": { "row": 0, "column": 0 },
+        "preview": { "text": "🙇", "japaneseName": "おじぎする人", "englishName": "person bowing", "shortcodes": [":bow:"], "readings": ["おじぎ"], "codePoints": "U+1F647", "isPinned": true },
+        "showsPreview": true,
+        "skinTone": "none",
+        "skinTonePicker": { "options": ["🙇", "🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"], "selected": 2 },
+        "hints": [{ "keys": "Enter", "label": "入力" }],
+        "cellSize": 36.5
+      },
+      "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
+    },
+    { "type": "hidePalette" },
     { "type": "move", "anchor": { "x": 5, "y": 6, "width": 7, "height": 8 } },
     { "type": "hide" }
   ]
