@@ -8,7 +8,7 @@ BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.2.0/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
-.PHONY: fetch-models fetch-evaluation evaluate setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
+.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
 
 setup:
 	mise install
@@ -99,6 +99,22 @@ evaluate:
 	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv" core/Evaluation/vocabulary-*.tsv; do \
 		echo "== $$file"; \
 		"$$bin/hajime-playground" --evaluate "$$file" $$options 2>/dev/null | tail -1; \
+	done
+
+# 期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合を，文(conversion-basic と AJIMEE-Bench)で測る(R-25)．
+# 候補の出し方ごとに，同梱の辞書と Zenzai のモデルで測る．PRESENTATION=automatic,segmentList,list で出し方を選べる．
+# ZENZAI_MODEL に xsmall のモデルを渡すときは ZENZAI_VARIANT=xsmall も付ける
+PRESENTATION ?= automatic,segmentList,list
+ZENZAI_VARIANT ?= small
+evaluate-operations:
+	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
+	swift build --package-path core -c release --product hajime-playground
+	@options="--presentation $(PRESENTATION)"; if [ -f "$(ZENZAI_MODEL)" ]; then options="$$options --zenzai $(abspath $(ZENZAI_MODEL)) --zenzai-variant $(ZENZAI_VARIANT)"; fi; \
+	dictionary=$${DICTIONARY:-$(BUNDLED_DICTIONARY)}; if [ -d "$$dictionary" ]; then options="$$options --dictionary $$(cd "$$dictionary" && pwd)"; fi; \
+	bin=$$(swift build --package-path core -c release --show-bin-path); \
+	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv"; do \
+		echo "== $$file"; \
+		"$$bin/hajime-playground" --evaluate-operations "$$file" $$options 2>/dev/null | grep -E '^(==|第 1 候補)'; \
 	done
 
 tokens:
