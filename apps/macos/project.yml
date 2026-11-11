@@ -52,6 +52,9 @@ targets:
       # Mozc の辞書から抜き出した同音異義語に，Claude で説明と用例を付けた辞書．tools/usage/gen で作る
       - path: ../../data/usage/usage_dict_extra.tsv
         buildPhase: resources
+      # Mozc の辞書から抜き出した，同音異義語の無いよく使う語に，Claude で意味と用例を付けた辞書．tools/usage/gen で作る
+      - path: ../../data/usage/usage_dict_words.tsv
+        buildPhase: resources
       # 英語の語の辞書(R-24)．このリポジトリで書いた一覧
       - path: ../../data/english/english-terms.txt
         buildPhase: resources

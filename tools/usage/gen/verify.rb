@@ -20,6 +20,7 @@ opts = {
   batch: 10,
   jobs: 2,
   limit: nil,
+  system: "verify_system.md",
 }
 OptionParser.new do |o|
   o.banner = "Usage: ruby verify.rb [options]"
@@ -28,6 +29,7 @@ OptionParser.new do |o|
   o.on("--model NAME", "default: sonnet") { |v| opts[:model] = v }
   o.on("--batch N", Integer) { |v| opts[:batch] = v }
   o.on("-j", "--jobs N", Integer) { |v| opts[:jobs] = v }
+  o.on("--system FILE", "System prompt in prompts/ (default: verify_system.md)") { |v| opts[:system] = v }
   o.on("--limit N", Integer) { |v| opts[:limit] = v }
 end.parse!
 
@@ -69,7 +71,7 @@ todo = todo.first(opts[:limit]) if opts[:limit]
 warn "generated: #{generated.size}, verified: #{done.size}, to verify: #{todo.size}"
 exit if todo.empty?
 
-system_prompt = UsageGen.prompt_file("verify_system.md")
+system_prompt = UsageGen.prompt_file(opts[:system])
 
 def build_prompt(batch)
   payload = batch.each_with_index.map do |g, i|

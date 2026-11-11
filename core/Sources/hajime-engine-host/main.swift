@@ -153,9 +153,11 @@ func run() -> Int32 {
     associations.preloadBundled()
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil
-    let usageTables = ["usage_dict.txt", "usage_dict_extra.tsv"].map { HostPaths.installation.appendingPathComponent($0) }
+    let usageTables = ["usage_dict.txt", "usage_dict_extra.tsv", "usage_dict_words.tsv"].map { HostPaths.installation.appendingPathComponent($0) }
         .filter { FileManager.default.fileExists(atPath: $0.path) }
     let usageDictionary = usageTables.isEmpty ? nil : UsageDictionaryFile(urls: usageTables)
+    // 語の意味の辞書は数 MB あるので，注釈を出す設定なら起動したら裏で読み始める
+    if settings.current.homophoneNotes { usageDictionary?.preload() }
     // 英語の語の辞書(R-24)．インストール先の english-terms.txt と設定で足した語をまとめて引き，変換の候補と英単語の補正で共有する
     let englishTerms = EnglishTerms(bundled: EnglishTermFile(url: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledEnglishTermFileName)),
                                     settings: settings)

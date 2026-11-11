@@ -186,10 +186,10 @@ public protocol PostalCodeLooking: AnyObject {
     func addresses(for code: String) -> [String]
 }
 
-/// 同音異義語の使い分けの辞書を渡すポート(R-08)．辞書は端末の中にあり，通信しない
+/// 語の意味と同音異義語の使い分けの辞書を渡すポート(R-08)．辞書は端末の中にあり，通信しない
 @MainActor
 public protocol UsageDictionaryProviding: AnyObject {
-    /// 使い分けの辞書．読めなければ nil(このリポジトリで書いた組だけを使う)
+    /// 意味と使い分けの辞書．読めないか読み終わっていなければ nil(このリポジトリで書いた組だけを使う)．待たずに返す
     var usageDictionary: UsageDictionary? { get }
 }
 

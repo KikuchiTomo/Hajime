@@ -23,6 +23,7 @@ opts = {
   out: "work/groups.jsonl",
   max_cost: 10000,
   min_candidates: 2,
+  max_candidates: nil,
   include_partial: false,
   limit: nil,
 }
@@ -33,6 +34,7 @@ OptionParser.new do |o|
   o.on("-o", "--out FILE", "Output JSONL") { |v| opts[:out] = v }
   o.on("--max-cost N", Integer, "Max Mozc cost for a spelling (lower = more common, default 10000)") { |v| opts[:max_cost] = v }
   o.on("--min-candidates N", Integer, "Min kanji spellings per group (default 2)") { |v| opts[:min_candidates] = v }
+  o.on("--max-candidates N", Integer, "Max kanji spellings per group (1 = words without homophones)") { |v| opts[:max_candidates] = v }
   o.on("--include-partial", "Keep readings already in usage_dict if some spellings are missing") { opts[:include_partial] = true }
   o.on("--limit N", Integer, "Write only the top N groups") { |v| opts[:limit] = v }
 end.parse!
@@ -208,6 +210,7 @@ groups.each do |(reading, pos), surfaces|
     skipped_variants += 1
     next
   end
+  next if opts[:max_candidates] && cands.size > opts[:max_candidates]
 
   existing = covered.key?(reading) ? covered[reading] : []
   missing = cands.reject { |c| existing.include?(c["surface"]) }
@@ -219,8 +222,9 @@ groups.each do |(reading, pos), surfaces|
   end
 
   # Priority: how common the 2nd-best spelling is. If even the runner-up is
-  # common, users really do have to choose.
-  priority = cands[1]["cost"]
+  # common, users really do have to choose. A word without homophones is
+  # ranked by its own cost.
+  priority = (cands[1] || cands[0])["cost"]
   out << {
     "reading" => reading, "pos" => pos, "conj" => conj,
     "priority" => priority, "candidates" => cands,
