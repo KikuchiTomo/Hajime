@@ -1,10 +1,10 @@
 #![forbid(unsafe_code)]
 
 //! ナレーターに読み上げてもらう文(macOS の CandidatePanelController が VoiceOver に渡すものと同じ)．
-//! 候補の一覧は選んでいる候補か文字種，分岐図は注目している文節，案内はその文
+//! 候補の一覧は選んでいる候補か文字種，分岐図は注目している文節，案内はその文，パレットは選んでいる文字の名前と知らせ
 
 use crate::strings;
-use ipc::{BranchMap, CandidateFocus, CandidateList, HomophoneNote};
+use ipc::{BranchMap, CandidateFocus, CandidateList, HomophoneNote, PalettePanel};
 
 /// 意味と使い分けを 1 行の文にしたもの(macOS の HomophoneNote.text)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」．
 /// 意味が 2 つ以上なら「1. 」「2. 」と番号を付ける．ほかの語が無ければ「ほかに」を付けない
@@ -82,6 +82,24 @@ pub fn branch_map(map: &BranchMap) -> Option<String> {
             let text = chosen.map_or_else(|| column.text.clone(), |title| command(title));
             with_homophone(text, column.homophone.as_ref())
         })
+}
+
+/// パレットで選んでいる文字の名前と，文字が無いときの知らせ(macOS の PaletteController.announce と同じ)
+pub fn palette(panel: &PalettePanel) -> Option<String> {
+    let selected = panel.selection.as_ref().and_then(|position| {
+        panel
+            .rows
+            .iter()
+            .find(|row| row.index == position.row)?
+            .cells
+            .get(position.column as usize)
+            .map(|cell| cell.name.as_str())
+    });
+    let parts: Vec<&str> = selected
+        .into_iter()
+        .chain(panel.message.as_deref())
+        .collect();
+    (!parts.is_empty()).then(|| parts.join("、"))
 }
 
 /// 同じ文を続けて読ませない．出したものを覚えておき，窓を消したら忘れる
@@ -269,5 +287,21 @@ mod tests {
         announcer.reset();
         assert_eq!(announcer.next(Some("変換".into())).as_deref(), Some("変換"));
         assert_eq!(announcer.next(None), None);
+    }
+
+    #[test]
+    fn パレットは選んでいる文字の名前と知らせを読む() {
+        let mut panel = crate::palette::sample::search();
+        panel.rows[0].cells[0].name = "おじぎする人".into();
+        assert_eq!(palette(&panel).as_deref(), Some("おじぎする人"));
+        panel.message = Some("読み込んでいます".into());
+        assert_eq!(
+            palette(&panel).as_deref(),
+            Some("おじぎする人、読み込んでいます")
+        );
+        panel.selection = None;
+        assert_eq!(palette(&panel).as_deref(), Some("読み込んでいます"));
+        panel.message = None;
+        assert_eq!(palette(&panel), None);
     }
 }

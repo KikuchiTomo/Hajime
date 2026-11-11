@@ -45,6 +45,9 @@ fn families(face: &Face) -> &'static [&'static str] {
         Face::Ui => &["Segoe UI"],
         Face::Mincho => &["Yu Mincho"],
         Face::Monospaced => &["BIZ UDGothic", "MS Gothic"],
+        Face::Emoji => &["Segoe UI Emoji"],
+        // Windows 11 は Segoe Fluent Icons，Windows 10 は Segoe MDL2 Assets(同じ字の番号でアイコンを持つ)
+        Face::Icon => &["Segoe Fluent Icons", "Segoe MDL2 Assets"],
     }
 }
 
@@ -81,6 +84,8 @@ pub struct Renderer {
 pub struct TextMeasure {
     dwrite: IDWriteFactory,
     formats: HashMap<Font, IDWriteTextFormat>,
+    /// OS の書体の集まり．書式が書体の集まりを持たないときに字を探す
+    system: Option<IDWriteFontCollection>,
 }
 
 const FONTS: [Font; 8] = [
@@ -124,6 +129,41 @@ impl Measure for TextMeasure {
     fn height(&self, font: Font) -> f32 {
         self.metrics("あ", font)
             .map_or(0.0, |metrics| metrics.height)
+    }
+
+    fn has_glyph(&self, font: Font, glyph: char) -> bool {
+        let Some(format) = self.format(font) else {
+            return false;
+        };
+        // SAFETY: format と書体の集まりは生きている COM の参照．name は長さを尋ねてから確保した領域
+        unsafe {
+            let length = format.GetFontFamilyNameLength() as usize;
+            let mut name = vec![0u16; length + 1];
+            if format.GetFontFamilyName(&mut name).is_err() {
+                return false;
+            }
+            let Some(collection) = format.GetFontCollection().ok().or(self.system.clone()) else {
+                return false;
+            };
+            let family = String::from_utf16_lossy(&name[..length]);
+            let mut index = 0;
+            let mut exists = BOOL(0);
+            let found = collection.FindFamilyName(&HSTRING::from(family), &mut index, &mut exists);
+            if found.is_err() || !exists.as_bool() {
+                return false;
+            }
+            collection
+                .GetFontFamily(index)
+                .and_then(|family| {
+                    family.GetFirstMatchingFont(
+                        format.GetFontWeight(),
+                        format.GetFontStretch(),
+                        format.GetFontStyle(),
+                    )
+                })
+                .and_then(|matched| matched.HasCharacter(u32::from(glyph)))
+                .is_ok_and(|has| has.as_bool())
+        }
     }
 }
 
@@ -212,13 +252,24 @@ impl Renderer {
 
     /// テーマの書体で，文字を測り描くための書体の組を作る
     pub fn measure(&self, theme: &ResolvedTheme, font_size: f32) -> Result<TextMeasure> {
+        self.measure_with(theme, font_size, &[])
+    }
+
+    /// measure に，大きさを決めて描く文字(パレット)の書体 sized を足す
+    pub fn measure_with(
+        &self,
+        theme: &ResolvedTheme,
+        font_size: f32,
+        sized: &[Font],
+    ) -> Result<TextMeasure> {
         let mut formats = HashMap::new();
-        for font in FONTS {
-            formats.insert(font, self.format(&theme.font(font, font_size))?);
+        for font in FONTS.iter().chain(sized) {
+            formats.insert(*font, self.format(&theme.font(*font, font_size))?);
         }
         Ok(TextMeasure {
             dwrite: self.dwrite.clone(),
             formats,
+            system: self.fonts.clone(),
         })
     }
 

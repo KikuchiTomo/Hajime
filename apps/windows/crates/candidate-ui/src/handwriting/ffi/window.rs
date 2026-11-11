@@ -15,7 +15,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows_core::{w, Result};
 
-use crate::handwriting::layout::Bounds;
+use crate::geometry::Bounds;
 
 const CLASS: windows_core::PCWSTR = w!("hajime.handwriting");
 const WM_RECOGNIZED: u32 = WM_APP + 2;

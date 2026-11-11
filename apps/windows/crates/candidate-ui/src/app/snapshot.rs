@@ -1,9 +1,13 @@
-//! 候補ウィンドウの見た目を PNG に書き出す(デバッグビルドだけ)．macOS の SnapshotRenderer と同じ見本・同じ名前で書き出し，
+//! 候補ウィンドウとパレットの見た目を PNG に書き出す(デバッグビルドだけ)．macOS の SnapshotRenderer と同じ見本・同じ名前で書き出し，
 //! 2 つの OS の絵を見比べられるようにする．CI の Windows のジョブが成果物にする
 //!
 //! 使い方: hajime-candidate-ui.exe --render-snapshots <書き出し先のディレクトリ>
 
 use super::render::Renderer;
+use crate::palette::{
+    self,
+    layout::{cell_size, Fonts, Layout},
+};
 use crate::scene::{self, Look, Scene, Surround};
 use crate::theme::{ResolvedTheme, SystemLook};
 use ipc::{
@@ -143,6 +147,20 @@ fn render_all(output: &Path) -> Result<()> {
             ),
         ];
         for (kind, scene) in scenes {
+            let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });
+            let path = output.join(format!("{kind}-{name}.png"));
+            write_png(&imaging, &renderer, &scene, &measure, &path)?;
+        }
+        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-symbol と同じ見本
+        for (kind, panel) in [
+            ("palette-emoji", palette::sample::emoji()),
+            ("palette-search", palette::sample::search()),
+            ("palette-symbol", palette::sample::symbol()),
+        ] {
+            let fonts = Fonts::new(cell_size(&panel));
+            let measure = renderer.measure_with(&theme, font_size, &fonts.all())?;
+            let layout = Layout::new(&panel, &theme, &measure);
+            let scene = palette::scene::palette(&panel, &layout, &look, &measure);
             let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });
             let path = output.join(format!("{kind}-{name}.png"));
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
