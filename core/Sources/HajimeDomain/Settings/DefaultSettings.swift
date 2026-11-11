@@ -282,9 +282,9 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限
     public static let maximumRuleListFileBytes = 1024 * 1024
-    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.1.1 は 4086 行で約 340KB
+    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.2.0 は 4239 行で約 350KB
     public static let maximumBundledDictionaryManifestBytes = 4 * 1024 * 1024
-    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.1.1 でいちばん大きいファイルは約 1MB
+    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.2.0 でいちばん大きいファイルは約 1MB
     public static let maximumBundledDictionaryFileBytes = 64 * 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024

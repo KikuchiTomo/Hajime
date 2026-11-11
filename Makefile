@@ -4,7 +4,7 @@ PYTHON ?= python3 -I
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
 # かな漢字変換の辞書(hajime-dictionary)．tools/dictionary/fetch_dictionary.sh が MODELS_DIR に展開する
-BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.1.1/Dictionary
+BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.2.0/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
