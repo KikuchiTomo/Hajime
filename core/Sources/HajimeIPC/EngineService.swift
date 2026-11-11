@@ -106,6 +106,10 @@ public final class EngineService {
     private var shownCandidates: UInt32?
     /// 候補ウィンドウでマウスで押した候補(押したときに出ていたセッションと対象)
     private var chosen: (session: UInt32, target: WirePointerTarget)?
+    /// パレット(R-26)を出しているセッション．候補ウィンドウでパレットを操作した対象は，このセッションの次の wake で行う
+    private var shownPalette: UInt32?
+    /// 候補ウィンドウでパレットを操作した対象(届いた順)．ポインタを動かした・ホイールを回したものも順に渡す
+    private var paletteTargets: [(session: UInt32, target: PaletteTarget)] = []
 
     /// 学んだことをファイルに書き出す(AzooKeyConverterEngine.flushLearning)
     private let flushLearning: () -> Void
@@ -145,6 +149,7 @@ public final class EngineService {
             removed?.correction?.task.cancel()
             removed?.prefetch?.cancel()
             closeHandwriting(ofSession: session)
+            closePalette(ofSession: session)
         }
         if !connection.sessions.isEmpty { ui(.hide) }
     }
@@ -223,6 +228,7 @@ public final class EngineService {
             connection.sessions.remove(session)
             connections[id] = connection
             closeHandwriting(ofSession: session)
+            closePalette(ofSession: session)
             return .done
         case .key(let session, let input, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
@@ -288,6 +294,13 @@ public final class EngineService {
             // 候補ウィンドウで候補を押した．押したときに候補を出していたセッションの次の wake で，キーで選んだのと同じに処理する
             guard connection.isCandidateWindow, let session = shownCandidates else { return .error(code: .malformed) }
             chosen = (session, target)
+            return .done
+        case .choosePalette(let target):
+            // 候補ウィンドウでパレットを操作した．出していたセッションの次の wake で，キーと同じに処理する
+            guard connection.isCandidateWindow, let session = shownPalette else { return .error(code: .malformed) }
+            guard let target = PaletteTarget(target) else { return .done }
+            paletteTargets.append((session, target))
+            if paletteTargets.count > DefaultSettings.maximumPendingPaletteTargets { paletteTargets.removeFirst() }
             return .done
         case .handwritingClosed:
             guard connection.isCandidateWindow else { return .error(code: .malformed) }
@@ -492,6 +505,11 @@ public final class EngineService {
             handwriting = nil
             actions += current.input.insert(text)
         }
+        let targets = paletteTargets.filter { $0.session == session }
+        paletteTargets.removeAll { $0.session == session }
+        for pending in targets {
+            actions += current.input.palette(pending.target, context: context)
+        }
         if let choice = chosen, choice.session == session {
             chosen = nil
             actions += current.input.choose(PointerTarget(choice.target), context: context)
@@ -597,7 +615,7 @@ public final class EngineService {
 
     private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?) -> WireResponseBody {
         let current = settings.current
-        let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) })
+        let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) }, paletteCellSize: current.paletteCellSize)
         routed.ui.forEach(ui)
         for command in routed.ui {
             switch command {
@@ -605,6 +623,10 @@ public final class EngineService {
             case .hide where shownCandidates == session:
                 shownCandidates = nil
                 chosen = nil
+            case .showPalette: shownPalette = session
+            case .hidePalette where shownPalette == session:
+                shownPalette = nil
+                paletteTargets.removeAll { $0.session == session }
             default: break
             }
         }
@@ -625,7 +647,7 @@ public final class EngineService {
     private func wakeAfter(_ session: UInt32) -> UInt32? {
         let typing = typingWakeAfter(session)
         var interval = typing
-        if shownCandidates == session { interval = min(interval ?? .max, Self.candidateClickPollMilliseconds) }
+        if shownCandidates == session || shownPalette == session { interval = min(interval ?? .max, Self.candidateClickPollMilliseconds) }
         guard handwriting?.session == session else { return interval }
         return min(interval ?? .max, Self.handwritingPollMilliseconds)
     }
@@ -682,6 +704,14 @@ public final class EngineService {
                             recognitionTimeoutMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionTimeout)))
     }
 
+    /// セッションが無くなったら，そのセッションが出していたパレットを閉じる
+    private func closePalette(ofSession session: UInt32) {
+        guard shownPalette == session else { return }
+        shownPalette = nil
+        paletteTargets.removeAll { $0.session == session }
+        ui(.hidePalette)
+    }
+
     private func closeHandwriting(ofSession session: UInt32) {
         guard handwriting?.session == session else { return }
         handwriting = nil
@@ -703,7 +733,8 @@ public final class EngineService {
     }
 
     private func state(of input: InputSession, wakeAfter: UInt32?) -> WireSessionState {
-        WireSessionState(mode: input.mode, isComposing: input.isComposing, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter,
+        // パレットを開いているあいだは，DLL にすべてのキーを送ってもらう(探す欄に打つ文字・矢印・Esc をアプリに渡さない)
+        WireSessionState(mode: input.mode, isComposing: input.isComposing || input.isPaletteOpen, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter,
                          keyboardLayout: WireSessionState.keyboardLayout(for: settings.current))
     }
 

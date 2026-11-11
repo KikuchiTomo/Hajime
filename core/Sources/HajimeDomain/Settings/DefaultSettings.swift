@@ -419,6 +419,9 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// Windows でパレットを出しているあいだ，候補ウィンドウでマウスで操作した対象をためておく数の上限．
+    /// DLL が取りに来る(wake)までのあいだのポインタの動きとホイールを落とさずに渡す．超えたら古いものから捨てる
+    public static let maximumPendingPaletteTargets = 32
     /// パレットの探す欄に打てる長さの上限(文字数)
     public static let maximumPaletteQueryLength = 32
     /// パレットの説明に出す読みの数

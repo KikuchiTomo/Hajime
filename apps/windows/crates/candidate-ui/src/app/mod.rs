@@ -289,6 +289,8 @@ impl App {
                 );
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
+            // パレット(R-26)の窓はまだ描かない．エンジンのプロセスはパレットに使うものを渡していないので，この指示は届かない
+            UiCommand::ShowPalette { .. } | UiCommand::HidePalette => {}
             UiCommand::Move { anchor } => self.anchor = Some(anchor),
             // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
             // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)

@@ -1,5 +1,5 @@
 public enum WireProtocol {
-    public static let version: UInt32 = 3
+    public static let version: UInt32 = 4
     public static let maximumMessageBytes = 262144
     public static let keyResponseMilliseconds = 50
     public static let conversionResponseMilliseconds = 250
@@ -861,6 +861,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case handwritingChosen(text: String)
     case handwritingClosed
     case chooseCandidate(target: WirePointerTarget)
+    case choosePalette(target: WirePaletteTarget)
     case readSettingsFields(names: [String], defaults: Bool)
     case writeSettingsFields(values: String)
     case readKeymapPreset(preset: String)
@@ -959,6 +960,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = .handwritingClosed
         case "chooseCandidate":
             self = try .chooseCandidate(target: container.decode(WirePointerTarget.self, forKey: .target))
+        case "choosePalette":
+            self = try .choosePalette(target: container.decode(WirePaletteTarget.self, forKey: .target))
         case "readSettingsFields":
             self = try .readSettingsFields(names: container.decode([String].self, forKey: .names), defaults: container.decode(Bool.self, forKey: .defaults))
         case "writeSettingsFields":
@@ -1123,6 +1126,9 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .chooseCandidate(let target):
             try container.encode("chooseCandidate", forKey: .type)
             try container.encode(target, forKey: .target)
+        case .choosePalette(let target):
+            try container.encode("choosePalette", forKey: .type)
+            try container.encode(target, forKey: .target)
         case .readSettingsFields(let names, let defaults):
             try container.encode("readSettingsFields", forKey: .type)
             try container.encode(names, forKey: .names)
@@ -1207,6 +1213,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .handwritingChosen: "WireRequestBody.handwritingChosen"
         case .handwritingClosed: "WireRequestBody.handwritingClosed"
         case .chooseCandidate: "WireRequestBody.chooseCandidate"
+        case .choosePalette: "WireRequestBody.choosePalette"
         case .readSettingsFields: "WireRequestBody.readSettingsFields"
         case .writeSettingsFields: "WireRequestBody.writeSettingsFields"
         case .readKeymapPreset: "WireRequestBody.readKeymapPreset"
@@ -1750,6 +1757,296 @@ extension WireBranchMap: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+public enum WirePaletteKind: String, Sendable, Equatable, Codable, CaseIterable {
+    case emoji
+    case symbol
+}
+
+extension WirePaletteKind: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteKind.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireSkinTone: String, Sendable, Equatable, Codable, CaseIterable {
+    case none
+    case light
+    case mediumLight
+    case medium
+    case mediumDark
+    case dark
+}
+
+extension WireSkinTone: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireSkinTone.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePaletteMode: Sendable, Equatable, Codable {
+    public var kind: WirePaletteKind
+    public var title: String
+    public var isSelected: Bool
+
+    public init(kind: WirePaletteKind, title: String, isSelected: Bool) {
+        self.kind = kind
+        self.title = title
+        self.isSelected = isSelected
+    }
+}
+
+extension WirePaletteMode: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteMode" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePaletteTab: Sendable, Equatable, Codable {
+    public var section: String
+    public var title: String
+    public var symbol: String
+    public var isSelected: Bool
+
+    public init(section: String, title: String, symbol: String, isSelected: Bool) {
+        self.section = section
+        self.title = title
+        self.symbol = symbol
+        self.isSelected = isSelected
+    }
+}
+
+extension WirePaletteTab: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteTab" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePaletteCell: Sendable, Equatable, Codable {
+    public var text: String
+    public var name: String
+    public var isPinned: Bool
+
+    public init(text: String, name: String, isPinned: Bool) {
+        self.text = text
+        self.name = name
+        self.isPinned = isPinned
+    }
+}
+
+extension WirePaletteCell: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteCell" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePaletteRow: Sendable, Equatable, Codable {
+    public var index: UInt32
+    public var cells: [WirePaletteCell]
+    public var startsSection: Bool
+    public var sectionTitle: String
+
+    public init(index: UInt32, cells: [WirePaletteCell], startsSection: Bool, sectionTitle: String) {
+        self.index = index
+        self.cells = cells
+        self.startsSection = startsSection
+        self.sectionTitle = sectionTitle
+    }
+}
+
+extension WirePaletteRow: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteRow" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePalettePosition: Sendable, Equatable, Codable {
+    public var row: UInt32
+    public var column: UInt32
+
+    public init(row: UInt32, column: UInt32) {
+        self.row = row
+        self.column = column
+    }
+}
+
+extension WirePalettePosition: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePalettePosition" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePalettePreview: Sendable, Equatable, Codable {
+    public var text: String
+    public var japaneseName: String
+    public var englishName: String
+    public var shortcodes: [String]
+    public var readings: [String]
+    public var codePoints: String
+    public var isPinned: Bool
+
+    public init(text: String, japaneseName: String, englishName: String, shortcodes: [String], readings: [String], codePoints: String, isPinned: Bool) {
+        self.text = text
+        self.japaneseName = japaneseName
+        self.englishName = englishName
+        self.shortcodes = shortcodes
+        self.readings = readings
+        self.codePoints = codePoints
+        self.isPinned = isPinned
+    }
+}
+
+extension WirePalettePreview: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePalettePreview" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePaletteSkinTonePicker: Sendable, Equatable, Codable {
+    public var options: [String]
+    public var selected: UInt32
+
+    public init(options: [String], selected: UInt32) {
+        self.options = options
+        self.selected = selected
+    }
+}
+
+extension WirePaletteSkinTonePicker: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteSkinTonePicker" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePalettePanel: Sendable, Equatable, Codable {
+    public var modes: [WirePaletteMode]
+    public var query: String
+    public var placeholder: String
+    public var tabs: [WirePaletteTab]
+    public var heading: String
+    public var rows: [WirePaletteRow]
+    public var rowCount: UInt32
+    public var firstRow: UInt32
+    public var columns: UInt32
+    public var visibleRows: UInt32
+    public var selection: WirePalettePosition?
+    public var preview: WirePalettePreview?
+    public var showsPreview: Bool
+    public var skinTone: WireSkinTone
+    public var skinTonePicker: WirePaletteSkinTonePicker?
+    public var message: String?
+    public var hints: [WireKeyHint]
+    public var cellSize: Double
+
+    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double) {
+        self.modes = modes
+        self.query = query
+        self.placeholder = placeholder
+        self.tabs = tabs
+        self.heading = heading
+        self.rows = rows
+        self.rowCount = rowCount
+        self.firstRow = firstRow
+        self.columns = columns
+        self.visibleRows = visibleRows
+        self.selection = selection
+        self.preview = preview
+        self.showsPreview = showsPreview
+        self.skinTone = skinTone
+        self.skinTonePicker = skinTonePicker
+        self.message = message
+        self.hints = hints
+        self.cellSize = cellSize
+    }
+}
+
+extension WirePalettePanel: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePalettePanel" }
+    public var debugDescription: String { description }
+}
+
+public enum WirePaletteTarget: Sendable, Equatable, Codable {
+    case cell(row: UInt32, column: UInt32)
+    case hover(row: UInt32, column: UInt32)
+    case tab(section: String)
+    case mode(kind: WirePaletteKind)
+    case scroll(rows: Int32)
+    case skinTone(tone: WireSkinTone)
+    case skinToneButton
+    case pin
+    case close
+
+    private enum CodingKeys: String, CodingKey {
+        case type, row, column, section, kind, rows, tone
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .type)
+        switch kind {
+        case "cell":
+            self = try .cell(row: container.decode(UInt32.self, forKey: .row), column: container.decode(UInt32.self, forKey: .column))
+        case "hover":
+            self = try .hover(row: container.decode(UInt32.self, forKey: .row), column: container.decode(UInt32.self, forKey: .column))
+        case "tab":
+            self = try .tab(section: container.decode(String.self, forKey: .section))
+        case "mode":
+            self = try .mode(kind: container.decode(WirePaletteKind.self, forKey: .kind))
+        case "scroll":
+            self = try .scroll(rows: container.decode(Int32.self, forKey: .rows))
+        case "skinTone":
+            self = try .skinTone(tone: container.decode(WireSkinTone.self, forKey: .tone))
+        case "skinToneButton":
+            self = .skinToneButton
+        case "pin":
+            self = .pin
+        case "close":
+            self = .close
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .cell(let row, let column):
+            try container.encode("cell", forKey: .type)
+            try container.encode(row, forKey: .row)
+            try container.encode(column, forKey: .column)
+        case .hover(let row, let column):
+            try container.encode("hover", forKey: .type)
+            try container.encode(row, forKey: .row)
+            try container.encode(column, forKey: .column)
+        case .tab(let section):
+            try container.encode("tab", forKey: .type)
+            try container.encode(section, forKey: .section)
+        case .mode(let kind):
+            try container.encode("mode", forKey: .type)
+            try container.encode(kind, forKey: .kind)
+        case .scroll(let rows):
+            try container.encode("scroll", forKey: .type)
+            try container.encode(rows, forKey: .rows)
+        case .skinTone(let tone):
+            try container.encode("skinTone", forKey: .type)
+            try container.encode(tone, forKey: .tone)
+        case .skinToneButton:
+            try container.encode("skinToneButton", forKey: .type)
+        case .pin:
+            try container.encode("pin", forKey: .type)
+        case .close:
+            try container.encode("close", forKey: .type)
+        }
+    }
+}
+
+extension WirePaletteTarget: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        switch self {
+        case .cell: "WirePaletteTarget.cell"
+        case .hover: "WirePaletteTarget.hover"
+        case .tab: "WirePaletteTarget.tab"
+        case .mode: "WirePaletteTarget.mode"
+        case .scroll: "WirePaletteTarget.scroll"
+        case .skinTone: "WirePaletteTarget.skinTone"
+        case .skinToneButton: "WirePaletteTarget.skinToneButton"
+        case .pin: "WirePaletteTarget.pin"
+        case .close: "WirePaletteTarget.close"
+        }
+    }
+    public var debugDescription: String { description }
+}
+
 public struct WireColor: Sendable, Equatable, Codable {
     public var red: UInt8
     public var green: UInt8
@@ -1828,11 +2125,13 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case showMode(mode: WireInputMode, anchor: WireRect?, label: String?)
     case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32, recognitionTimeoutMilliseconds: UInt32)
     case hideHandwriting
+    case showPalette(panel: WirePalettePanel, anchor: WireRect?)
+    case hidePalette
     case move(anchor: WireRect)
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, note, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds
+        case type, protocolVersion, presentation, list, anchor, map, note, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds, panel
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1855,6 +2154,10 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             self = try .showHandwriting(anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), recognitionDelayMilliseconds: container.decode(UInt32.self, forKey: .recognitionDelayMilliseconds), recognitionTimeoutMilliseconds: container.decode(UInt32.self, forKey: .recognitionTimeoutMilliseconds))
         case "hideHandwriting":
             self = .hideHandwriting
+        case "showPalette":
+            self = try .showPalette(panel: container.decode(WirePalettePanel.self, forKey: .panel), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
+        case "hidePalette":
+            self = .hidePalette
         case "move":
             self = try .move(anchor: container.decode(WireRect.self, forKey: .anchor))
         case "hide":
@@ -1897,6 +2200,12 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode(recognitionTimeoutMilliseconds, forKey: .recognitionTimeoutMilliseconds)
         case .hideHandwriting:
             try container.encode("hideHandwriting", forKey: .type)
+        case .showPalette(let panel, let anchor):
+            try container.encode("showPalette", forKey: .type)
+            try container.encode(panel, forKey: .panel)
+            try container.encodeIfPresent(anchor, forKey: .anchor)
+        case .hidePalette:
+            try container.encode("hidePalette", forKey: .type)
         case .move(let anchor):
             try container.encode("move", forKey: .type)
             try container.encode(anchor, forKey: .anchor)
@@ -1917,6 +2226,8 @@ extension WireUiCommand: CustomStringConvertible, CustomDebugStringConvertible {
         case .showMode: "WireUiCommand.showMode"
         case .showHandwriting: "WireUiCommand.showHandwriting"
         case .hideHandwriting: "WireUiCommand.hideHandwriting"
+        case .showPalette: "WireUiCommand.showPalette"
+        case .hidePalette: "WireUiCommand.hidePalette"
         case .move: "WireUiCommand.move"
         case .hide: "WireUiCommand.hide"
         }
