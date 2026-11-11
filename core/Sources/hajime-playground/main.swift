@@ -17,6 +17,7 @@ import HajimeEngine
 //   hajime-playground --split <読み,読み,…>                      文節を区切るときに区切れる位置
 //   hajime-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
+//   hajime-playground --english-terms <ファイル>                  英語の語の辞書(R-24)の語ごとの読み・語の並び・もっともらしさ・候補の先頭
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
@@ -43,6 +44,9 @@ MainActor.assumeIsolated {
             try Evaluation.language(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {
             try Evaluation.correctionFeatures(file: file, engine: playground.engine, service: playground.typoService)
+        } else if let file = arguments.value(of: "--english-terms") {
+            // 英語の語の辞書の語を打ったときの読みと候補．日本語の語を打った人に英語の語が先に出ないか確かめる(make english-terms)
+            try EnglishTermCheck.run(file: file, engine: playground.engine)
         } else if let readings = arguments.value(of: "--words") {
             // 読みを変換したときの語の並び(文節の区切りと，先頭の語の候補を作るのに使う)
             let session = playground.engine.makeSession()

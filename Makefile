@@ -8,7 +8,7 @@ BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.1.1/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
-.PHONY: fetch-models fetch-evaluation evaluate setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try
+.PHONY: fetch-models fetch-evaluation evaluate setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
 
 setup:
 	mise install
@@ -80,6 +80,10 @@ uninstall-dev-macos:
 # 入力メソッドとして入れずに，ターミナルで変換を試す
 try:
 	swift run --package-path core -c release hajime-playground
+
+# 英語の語の辞書(R-24)の語ごとに，小文字で打ったときの読みと候補の先頭を出す．語を足したら，日本語の語を打った人に英語の語が先に出ないか見る
+english-terms:
+	@swift run --package-path core -c release hajime-playground --english-terms data/english/english-terms.txt 2>/dev/null
 
 # AJIMEE-Bench を取得してハッシュを確かめ，評価用の TSV にする
 fetch-evaluation:
