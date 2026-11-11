@@ -72,12 +72,16 @@ struct BundledDictionaryTests {
     func acceptsRealDictionary() throws {
         let path = try #require(ProcessInfo.processInfo.environment["HAJIME_BUNDLED_DICTIONARY"])
         let url = URL(fileURLWithPath: path, isDirectory: true)
-        var dictionary: BundledDictionary?
-        let elapsed = try ContinuousClock().measure { dictionary = try BundledDictionary.verified(at: url) }
-        #expect(dictionary?.url == url)
+        // ほかのビルドで手一杯の機械では，ファイルの読み込みを待って 1 回ごとの時間が大きく揺れる．
+        // LatencyProbeTests と同じく何回か測り，最も速い回で比べる
+        var elapsed: [Duration] = []
+        for _ in 0..<3 {
+            var dictionary: BundledDictionary?
+            elapsed.append(try ContinuousClock().measure { dictionary = try BundledDictionary.verified(at: url) })
+            #expect(dictionary?.url == url)
+        }
         print("同梱の辞書の確認にかかった時間: \(elapsed)")
-        // v0.3.0 は約 190MB で，負荷の少ない機械では 1 秒かからない．ほかのビルドで手一杯の機械ではファイルの読み込みを待って 2 秒を超えることがあるので，余裕を持たせる
-        #expect(elapsed < .seconds(4))
+        #expect(elapsed.min()! < .seconds(2), "どの回も 2 秒を超えた: \(elapsed)")
     }
 
     @Test("ディレクトリの外を指すパスや形の正しくない行を受け付けない", arguments: [
