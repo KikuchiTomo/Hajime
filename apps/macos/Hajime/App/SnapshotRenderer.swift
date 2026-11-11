@@ -52,6 +52,10 @@ enum SnapshotRenderer {
                 render(homophoneListView(theme: look.theme, appearance: appearance), name: "homophone-list-\(look.name)", to: output, appearance: appearance)
                 render(homophoneBranchView(theme: look.theme, appearance: appearance), name: "homophone-branch-\(look.name)", to: output, appearance: appearance)
                 render(meaningListView(theme: look.theme, appearance: appearance), name: "meaning-list-\(look.name)", to: output, appearance: appearance)
+                render(homophoneListView(theme: look.theme, appearance: appearance, placement: .below), name: "homophone-list-below-\(look.name)", to: output, appearance: appearance)
+                render(homophoneBranchView(theme: look.theme, appearance: appearance, placement: .below), name: "homophone-branch-below-\(look.name)", to: output, appearance: appearance)
+                render(meaningEmptyListView(theme: look.theme, appearance: appearance), name: "meaning-list-empty-\(look.name)", to: output, appearance: appearance)
+                render(homophoneBranchView(theme: look.theme, appearance: appearance, selected: 2), name: "homophone-branch-empty-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 0), name: "command-list-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 1), name: "command-list-selected-\(look.name)", to: output, appearance: appearance)
                 render(commandBranchView(theme: look.theme, appearance: appearance), name: "command-branch-\(look.name)", to: output, appearance: appearance)
@@ -508,25 +512,27 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 同音異義語の使い分け(R-08)を一覧で出したところ
-    private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    /// 同音異義語の使い分け(R-08)を一覧で出したところ．既定では候補の右のカードにし，選んでいる候補を三角で指す
+    private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
         var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["撮る", "取る", "採る", "執る"].map { .init(text: $0, annotation: nil) },
                                    selectedEntry: 0, focus: .candidate, position: 1, total: 6, note: nil)
         panel.homophone = SamplePanels.homophone
+        panel.meaningPlacement = placement
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
     }
 
-    /// 同音異義語の無い語の意味を一覧で出したところ．ほかの語の行を出さない
+    /// 同音異義語の無い語の意味を一覧で出したところ．同音語の行を出さず，長い意味は折り返す
     private static func meaningListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
-        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["動く", "うごく", "ウゴク"].map { .init(text: $0, annotation: nil) },
+        var panel = CandidatePanel(variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) }, selectedVariant: nil,
+                                   entries: ["動く", "うごく", "ウゴク"].map { .init(text: $0, annotation: nil) },
                                    selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: nil)
         panel.homophone = SamplePanels.meaning
         view.panel = panel
@@ -534,16 +540,41 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 同音異義語の使い分けを分岐図で出したところ．意味が長く，欄の幅の上限で省く
-    private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    /// 意味のある候補から意味の無い候補(ひらがな)に移ったところ．カードの場所は空けたままにし，窓の大きさを変えない
+    private static func meaningEmptyListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = CandidatePanel(variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) }, selectedVariant: nil,
+                                   entries: ["動く", "うごく", "ウゴク"].map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: nil)
+        panel.homophone = SamplePanels.meaning
+        view.panel = panel
+        panel.homophone = nil
+        panel.selectedEntry = 1
+        panel.position = 2
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 同音異義語の使い分けを分岐図で出したところ．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
+    /// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補にすると，カードの場所を空けたままにする
+    private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
-        var column = LatticePanel.Column(text: "取る", alternatives: ["取る", "撮る", "採る"], selectedAlternative: 0, isFocused: true, isUncertain: true)
-        column.homophone = HomophoneNote(word: "取る", meaning: "手でつかむ。自分のものにする。確保する。なくす。取り除く。さまざまな単語と組み合わせて使う",
-                                         example: "ボールを取る", others: ["撮る", "採る", "執る", "捕る", "摂る", "盗る", "録る"])
-        let panel = LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7)
+        var column = LatticePanel.Column(text: "撮る", alternatives: ["取る", "撮る", "とる", "採る"], selectedAlternative: 1, isFocused: true, isUncertain: true)
+        column.homophone = SamplePanels.homophone
+        var panel = LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7)
+        panel.meaningPlacement = placement
         view.panel = panel
+        if selected != 1 {
+            panel.columns[1].selectedAlternative = selected
+            panel.columns[1].text = panel.columns[1].alternatives[selected]
+            panel.columns[1].homophone = nil
+            view.panel = panel
+        }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
     }

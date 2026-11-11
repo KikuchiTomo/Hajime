@@ -236,6 +236,33 @@ enum DesignTokens {
             static let usageRowHeight: CGFloat = 22
             static let usagePaddingY: CGFloat = 4
             static let usageTagGap: CGFloat = 4
+            static let meaningCardWidth: CGFloat = 280
+            static let meaningBranchWidth: CGFloat = 300
+            static let meaningPadding: CGFloat = 10
+            static let meaningGap: CGFloat = 14
+            static let meaningNotch: CGFloat = 6
+            static let meaningRadius: CGFloat = 10
+            static let meaningHeadwordFontSize: CGFloat = 15
+            static let meaningBodyFontSize: CGFloat = 13
+            static let meaningExampleFontSize: CGFloat = 12
+            static let meaningPosFontSize: CGFloat = 10.5
+            static let meaningPosHeight: CGFloat = 17
+            static let meaningPosPaddingX: CGFloat = 7
+            static let meaningIconSize: CGFloat = 13
+            static let meaningEmptyIconSize: CGFloat = 24
+            static let meaningBadgeSize: CGFloat = 17
+            static let meaningBadgeRadius: CGFloat = 5
+            static let meaningBadgeFontSize: CGFloat = 10.5
+            static let meaningLineSpacing: CGFloat = 2
+            static let meaningHeaderGap: CGFloat = 8
+            static let meaningSenseGap: CGFloat = 9
+            static let meaningExampleGap: CGFloat = 3
+            static let meaningExampleBarWidth: CGFloat = 2
+            static let meaningExampleIndent: CGFloat = 8
+            static let meaningOthersGap: CGFloat = 8
+            static let meaningDotSize: CGFloat = 6
+            static let meaningMeaningLines: CGFloat = 3
+            static let meaningExampleLines: CGFloat = 2
         }
         enum Handwriting {
             static let width: CGFloat = 284
@@ -407,6 +434,12 @@ enum DesignTokens {
             static let correctionTagContrast: CGFloat = 0.3
             static let commandTag: CGFloat = 0.16
             static let commandTagContrast: CGFloat = 0.3
+            static let meaningCard: CGFloat = 0.06
+            static let meaningCardContrast: CGFloat = 0.12
+            static let meaningBadge: CGFloat = 0.16
+            static let meaningBadgeContrast: CGFloat = 0.3
+            static let meaningExampleBar: CGFloat = 0.5
+            static let meaningEmptyIcon: CGFloat = 0.25
         }
         enum Rounded {
             static let badge: CGFloat = 0.12
