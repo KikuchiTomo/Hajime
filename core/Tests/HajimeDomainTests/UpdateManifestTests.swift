@@ -70,9 +70,9 @@ struct UpdateManifestTests {
         #expect(manifest.releases.count == 3)
     }
 
-    @Test("変更点が無くても読める")
+    @Test("SHA-256 と変更点の無い前の形の知らせも読めるが，配布物は取らない")
     func readsWithoutReleases() throws {
-        let data = Data(#"{"version":"0.2.7","files":{},"sha256":{}}"#.utf8)
+        let data = Data(#"{"version":"0.2.7","files":{"macos":"v0.2.7/Hajime-0.2.7.pkg"}}"#.utf8)
         let manifest = try UpdateManifest.decode(data)
         #expect(manifest.releases.isEmpty)
         #expect(manifest.package(for: .macos, baseURL: Self.base) == nil)

@@ -416,7 +416,8 @@ final class SettingsModel: ObservableObject {
 
     /// 情報のページに出す名前(入力メニューに出す名前と同じ．開発版は「はじめ Dev」)
     var appName: String {
-        Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String ?? UIStrings.Settings.appName
+        (Bundle.main.localizedInfoDictionary?["CFBundleDisplayName"] ?? Bundle.main.infoDictionary?["CFBundleDisplayName"]) as? String
+            ?? UIStrings.Settings.appName
     }
 
     /// 情報のページに出す Hajime のアイコン(Resources/Hajime.icns．tools/icons/make_app_icon.sh)

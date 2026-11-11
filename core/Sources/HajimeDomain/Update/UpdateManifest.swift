@@ -94,7 +94,7 @@ public struct UpdateManifest: Sendable, Equatable {
         let releases = (raw.releases ?? []).compactMap { note in
             ReleaseVersion(note.version).map { ReleaseNote(version: $0, date: note.date, notes: note.notes) }
         }
-        return UpdateManifest(version: version, files: raw.files, sha256: raw.sha256, releases: releases.sorted { $0.version > $1.version })
+        return UpdateManifest(version: version, files: raw.files, sha256: raw.sha256 ?? [:], releases: releases.sorted { $0.version > $1.version })
     }
 
     /// その OS の配布物．場所が「v<バージョン>/<ファイル名>」の形でないか，SHA-256 が 16 進 64 桁でなければ nil
@@ -133,7 +133,8 @@ public struct UpdateManifest: Sendable, Equatable {
     private struct Raw: Decodable {
         var version: String
         var files: [String: String]
-        var sha256: [String: String]
+        /// v0.2.6 までの latest.json には無い．無ければ配布物を取らない(最新かどうかだけを確かめられる)
+        var sha256: [String: String]?
         var releases: [RawNote]?
     }
 
