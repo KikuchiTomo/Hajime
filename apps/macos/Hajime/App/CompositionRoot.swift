@@ -38,6 +38,8 @@ final class CompositionRoot {
     let transcriber = SystemReadingTranscriber()
     /// アプリごとに最後に使ったモード(除外設定の「IME のオンオフを記憶」)．入力欄ごとのコントローラーで共有する
     var modeMemory = AppModeMemory()
+    /// 日本語のモードで英字のキーをアプリに渡した理由の記録．入力欄ごとのコントローラーで共有し，同じ理由を続けて記録しない
+    let passThroughDiagnostics = PassThroughDiagnostics()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
                  dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {

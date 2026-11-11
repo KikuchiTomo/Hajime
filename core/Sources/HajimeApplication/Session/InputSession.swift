@@ -98,6 +98,38 @@ public final class InputSession {
     private var pendingNote: Note?
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
+    /// 変換中の候補の選択(表記)と文節の区切りの変更．直前の変更の取り消し(KeymapCommand.undoConversionEdit)で戻す
+    private var conversionHistory = ConversionHistory<ConversionSnapshot>(depth: DefaultSettings.conversionUndoDepth)
+    /// 全文を読みに戻したときの読み(KeymapCommand.backToReading)．読みを変えるまでは，ライブ変換がオンでも読みのまま見せ，
+    /// 読みのまま確定する
+    private var heldReading: Composition?
+
+    /// 取り消しの段．変える前の表示と，そのときの読み(読みが変わったら戻さない)
+    private struct ConversionSnapshot {
+        var phase: Phase
+        var reading: String
+    }
+
+    /// 変換中のキーを処理する前の状態．処理したあとと比べ，候補の選択や文節の区切りが変わっていれば取り消しの段にする
+    private struct EditBaseline {
+        var snapshot: ConversionSnapshot
+        var look: EditLook
+        var run: ConversionHistory<ConversionSnapshot>.Run?
+        var undoes: Bool
+    }
+
+    /// 取り消しの段を作るかを決めるための見た目．文節の区切りと選んでいる文字だけを比べ，注目している文節の位置は比べない
+    private enum EditLook: Equatable {
+        case lattice([Piece])
+        case list(text: String, readingCount: Int)
+        case none
+
+        struct Piece: Equatable {
+            var start: Int
+            var length: Int
+            var text: String
+        }
+    }
 
     /// 使い方の記録(回数だけ)．記録しないときは nil
     private let usage: (any UsageRecording)?
@@ -150,7 +182,11 @@ public final class InputSession {
         lateCorrection = nil
         let hidesNote = showsTransientNote
         showsTransientNote = false
+        let baseline = editBaseline(command: phase == .composing ? nil : lookUp(event))
         var result = route(event, context: context)
+        trackConversionEdit(from: baseline)
+        // 読みを変えたら，読みのまま見せるのをやめる(打ち足した読みはライブ変換で見せる)
+        if heldReading != composition { heldReading = nil }
         typedBeforeEnglishWord = nil
         // 入力文字なしで出した案内(学習の取り消し)は，次のキーで消す
         if hidesNote { result.actions.insert(.hideCandidates, at: 0) }
@@ -598,6 +634,9 @@ public final class InputSession {
         case .toFullwidthAlphanumeric: return selectVariant(.fullwidthRoman, context: context)
         case .toHalfwidthAlphanumeric: return selectVariant(.halfwidthRoman, context: context)
         case .switchKanaType: return selectVariant(nextKanaType(), context: context)
+        case .segmentToHiragana: return selectSegmentVariant(.hiragana, context: context)
+        case .segmentToKatakana: return selectSegmentVariant(.katakana, context: context)
+        case .segmentToHalfwidthKatakana: return selectSegmentVariant(.halfwidthKatakana, context: context)
         // 候補
         case .nextCandidate: return moveCandidate(.next, context: context)
         case .previousCandidate: return moveCandidate(.previous, context: context)
@@ -624,8 +663,16 @@ public final class InputSession {
         case .commitFirstSegment: return commitFirstSegment(context: context)
         case .cancel: return handleEscape(context: context)
         case .backToReading:
+            // 全文を読みに戻す．読みを変えるまでは読みのまま見せる(ライブ変換で文に戻さない)
             phase = .composing
+            heldReading = composition
             return KeyResult(handled: true, actions: render(context: context))
+        case .resumeEditing:
+            // 読みに戻し，読みの末尾から打ち続ける．打っている途中と同じに見せる(ライブ変換がオンなら変換して見せる)
+            phase = .composing
+            heldReading = nil
+            return KeyResult(handled: true, actions: render(context: context))
+        case .undoConversionEdit: return undoConversionEdit(context: context)
         // 学習
         case .forgetCandidate:
             switch phase {
@@ -783,6 +830,15 @@ public final class InputSession {
     private func selectVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
         guard variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
         phase = .selecting(makeSelection(focus: .variant(variant)))
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 分岐図(文節ごとの一覧)で，注目している文節だけを字種に変える(上の枝の字種を選ぶ)．ほかの文節の選んだ候補は変えない．
+    /// 文全体の一覧では文節が 1 つなので，読み全体を字種に変える
+    private func selectSegmentVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
+        guard case .lattice(var lattice) = phase else { return selectVariant(variant, context: context) }
+        guard let index = segmentVariantIndex(variant, in: lattice.focused), lattice.selectVariant(at: index) else { return KeyResult(handled: true) }
+        phase = .lattice(lattice)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -968,6 +1024,8 @@ public final class InputSession {
     /// 英単語を補正しているときは，直した英単語を読みの中に確定させてから分岐図にする(打ったままに戻すのは補正の直後の Space)
     private func enterConversion(recordsUsage: Bool = true) {
         if recordsUsage { usage?.record(.conversionOpened) }
+        conversionHistory.clear()
+        heldReading = nil
         freezeWordsReadAsRomaji()
         reviewReading(final: true)
         guard settings.current.candidatePresentation.segmentsReading else {
@@ -1088,7 +1146,8 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
-    private func handleEscape(context: InputContext) -> KeyResult {
+    /// holdsReading なら，読みに戻したあと読みを変えるまで読みのまま見せる(全文を読みに戻す)
+    private func handleEscape(context: InputContext, holdsReading: Bool = false) -> KeyResult {
         guard isComposing else {
             // Vim のノーマルモードに戻る Escape で英数にする(設定)．Escape そのものはアプリに渡す
             guard settings.current.escapeSwitchesToDirect else { return .passThrough }
@@ -1106,7 +1165,9 @@ public final class InputSession {
             return KeyResult(handled: true, actions: handler.render())
         }
         phase = .composing
-        if readingCorrector.revert(&composition) {
+        let reverted = readingCorrector.revert(&composition)
+        if holdsReading { heldReading = composition }
+        if reverted {
             // 打ち間違いを直していたら，打ったままの読みに戻す．
             // 設定(自動修正のキャンセルを学習)がオンなら，わざとそう打った語句として覚え，次から直さない
             usage?.record(.readingCorrectionUndone)
@@ -1228,6 +1289,8 @@ public final class InputSession {
     }
 
     private func reset() -> [ClientAction] {
+        conversionHistory.clear()
+        heldReading = nil
         convertedFromEnglish = nil
         typedBeforeEnglishWord = nil
         reconverting = nil
@@ -1270,6 +1333,10 @@ public final class InputSession {
         case .lattice(let lattice):
             return Candidate(text: lattice.text, readingCount: whole, origin: .combined)
         case .composing:
+            if let heldReading, heldReading == composition {
+                // 全文を読みに戻したあとは，見せている読みのまま確定する
+                return Candidate(text: composition.displayReading, readingCount: whole, origin: .variant(.hiragana))
+            }
             if let correction = corrector.active {
                 let following = corrector.followingReading(in: composition).conversionReading
                 return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + following, readingCount: whole, origin: .correction)
@@ -1492,7 +1559,7 @@ public final class InputSession {
                                                perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
                                                corrected: correctedRange(of: \.conversionReading))
             if case .candidate = selection.focus, candidate.commandID != nil, let note = commandNote { panel.note = note }
-            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
+            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
             if let pendingNote { panel.note = pendingNote }
             if !selection.shownPrefix.isEmpty { panel.anchor = selection.shownPrefix.utf16.count }
             if case .candidate = selection.focus {
@@ -1532,7 +1599,7 @@ public final class InputSession {
                 panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
             if let note = commandNote(for: lattice) { panel.note = note }
-            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
+            if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
             if splitMode {
                 panel = PanelBuilder.splitting(panel, pieces: focusedSplit(lattice).pieces)
             }
@@ -1562,7 +1629,7 @@ public final class InputSession {
         if let usage = usageNote(for: lattice) { panel.note = .info(usage) }
         if let note = commandNote(for: lattice) { panel.note = note }
         panel.homophone = homophone(for: lattice)
-        if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: keyLabel(.cancel, in: .converting)) }
+        if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
         if let pendingNote { panel.note = pendingNote }
         return panel
     }
@@ -1580,6 +1647,12 @@ public final class InputSession {
     private func commandNote(for lattice: SegmentLattice) -> Note? {
         guard lattice.segments.count == 1, lattice.focused.selected.commandID != nil, case .candidate = lattice.focused.choice else { return nil }
         return commandNote
+    }
+
+    /// 変換中に読みに戻すキーの名前(打ち間違いを直したときの案内に出す)．
+    /// 取り消しのキーが無ければ，直前の変更の取り消しのキー(取り消すものが無ければ読みに戻す)
+    private var conversionCancelKeyLabel: String? {
+        keyLabel(.cancel, in: .converting) ?? keyLabel(.undoConversionEdit, in: .converting)
     }
 
     /// キー設定の表で，その状態のそのコマンドに割り当てた最初のキーの名前(案内に出す)．無ければ nil
@@ -1764,6 +1837,68 @@ public final class InputSession {
         }
     }
 
+    // MARK: - 直前の変更の取り消し
+
+    /// 直前の候補の選択や文節の区切りの変更を取り消す．取り消すものが無ければ，取り消しと同じに全文を読みに戻し，読みのまま見せる
+    private func undoConversionEdit(context: InputContext) -> KeyResult {
+        if let snapshot = conversionHistory.undo(), snapshot.reading == composition.conversionReading {
+            splitMode = false
+            phase = snapshot.phase
+            return KeyResult(handled: true, actions: render(context: context))
+        }
+        conversionHistory.clear()
+        return handleEscape(context: context, holdsReading: true)
+    }
+
+    /// 変換中なら，キーを処理する前の状態．連想の一覧を見ているときは，連想に切り替える前の変換を段にする
+    private func editBaseline(command: KeymapCommand?) -> EditBaseline? {
+        guard phase != .composing, !composition.isEmpty else { return nil }
+        let base: Phase = if case .association(_, let origin) = phase { origin } else { phase }
+        let segment: Int = if case .lattice(let lattice) = base { lattice.focusedIndex } else { 0 }
+        return EditBaseline(snapshot: ConversionSnapshot(phase: base, reading: composition.conversionReading), look: editLook(of: base),
+                            run: ConversionHistory<ConversionSnapshot>.Run(command, segment: segment), undoes: command == .undoConversionEdit)
+    }
+
+    /// キーを処理したあと，候補の選択や文節の区切りが変わっていれば，変える前の状態を取り消しの段にする．
+    /// 変換を終えたときと，読みが変わったとき(打ち直した・先頭の文節を確定した)は，段を捨てる
+    private func trackConversionEdit(from baseline: EditBaseline?) {
+        guard let baseline else { return }
+        guard phase != .composing, !composition.isEmpty, composition.conversionReading == baseline.snapshot.reading else {
+            conversionHistory.clear()
+            return
+        }
+        guard !baseline.undoes else { return }
+        // 連想の一覧を見ているあいだは，まだ語を選んでいない(一覧を閉じて語を入れたときに段にする)
+        if case .association = phase {
+            conversionHistory.breakRun()
+            return
+        }
+        guard editLook(of: phase) != baseline.look else {
+            conversionHistory.breakRun()
+            return
+        }
+        conversionHistory.record(before: baseline.snapshot, run: baseline.run)
+        // 続けた変更で元に戻ったら(候補を送って戻した)，その段は取り消しても何も変わらないので捨てる
+        if let latest = conversionHistory.steps.last, latest.reading == composition.conversionReading,
+            editLook(of: latest.phase) == editLook(of: phase) {
+            conversionHistory.discardLatest()
+        }
+    }
+
+    private func editLook(of phase: Phase) -> EditLook {
+        switch phase {
+        case .composing:
+            return .none
+        case .lattice(let lattice):
+            return .lattice(lattice.segments.map { EditLook.Piece(start: $0.readingStart, length: $0.readingLength, text: $0.selected.text) })
+        case .selecting:
+            let candidate = candidate(in: phase)
+            return .list(text: candidate.text, readingCount: candidate.readingCount)
+        case .association(let list, let origin):
+            return editLook(of: applying(list, to: origin))
+        }
+    }
+
     // MARK: - その場で打ち直す
 
     /// 分岐図で注目している文節を消し，その場で読みを打ち直し始める．分岐図でなければ何もしない
@@ -1908,7 +2043,7 @@ public final class InputSession {
         // 左右(と迷う文節へ移るキー)で意味のまとまりを移る
         case .nextSegment, .nextUncertainSegment: list.moveGroup(by: 1)
         case .previousSegment, .previousUncertainSegment: list.moveGroup(by: -1)
-        case .cancel, .backToReading, .associate:
+        case .cancel, .backToReading, .associate, .undoConversionEdit:
             // 元の変換に戻る
             phase = origin
             return KeyResult(handled: true, actions: render(context: context))
@@ -2068,6 +2203,12 @@ public final class InputSession {
     /// 分岐図の幹は文節を選び(←→)，枝は番号キーで選んだのと同じ(迷う文節へ進むか確定)，一覧の行は選んで確定する(番号 → Enter)．
     /// 押した対象が今の状態に無ければ何もしない
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
+        let baseline = editBaseline(command: nil)
+        defer { trackConversionEdit(from: baseline) }
+        return pick(target, context: context)
+    }
+
+    private func pick(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
         if inlineEdit != nil, !finishInlineEdit() { return reset() }
         switch (phase, target) {
         case (.lattice(var lattice), .segment(let index)):
@@ -2134,6 +2275,10 @@ public final class InputSession {
     }
 
     private func composingMarkedText() -> MarkedText {
+        if let heldReading, heldReading == composition {
+            // 全文を読みに戻したあとは，読みを変えるまで読みのまま見せる
+            return MarkedText([.init(composition.displayReading, style: .reading)])
+        }
         if let correction = corrector.active {
             return MarkedText([
                 .init(livePrefix(upTo: correction.kanaStart), style: .converted),

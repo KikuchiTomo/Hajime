@@ -131,12 +131,14 @@ public struct Keymap: Sendable, Equatable {
         return .partlyHidden(states: lostStates, by: winners)
     }
 
-    /// 確定・取り消しのように，無いと入力を終えられなくなるコマンドのうち，キーの無いもの(状態とコマンドの組)
+    /// 確定・取り消しのように，無いと入力を終えられなくなるコマンドのうち，キーの無いもの(状態とコマンドの組)．
+    /// 変換中の取り消しは，直前の変更の取り消し(続けて押すと読みに戻る)のキーがあれば足りる
     public var missingEssentials: [(state: KeymapState, command: KeymapCommand)] {
         var missing: [(KeymapState, KeymapCommand)] = []
         for state in [KeymapState.composing, .converting] {
-            for command in [KeymapCommand.commit, .cancel] where strokes(for: command, in: state).isEmpty {
-                missing.append((state, command))
+            for command in [KeymapCommand.commit, .cancel] {
+                let substitutes: [KeymapCommand] = state == .converting && command == .cancel ? [command, .undoConversionEdit] : [command]
+                if substitutes.allSatisfy({ strokes(for: $0, in: state).isEmpty }) { missing.append((state, command)) }
             }
         }
         return missing

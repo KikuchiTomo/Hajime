@@ -1,5 +1,5 @@
 {
-  "schemaVersion" : 9,
+  "schemaVersion" : 99,
   "inputStyle" : "romaji",
   "liveConversion" : true,
   "futureOption" : { "enabled" : true, "level" : 3 },

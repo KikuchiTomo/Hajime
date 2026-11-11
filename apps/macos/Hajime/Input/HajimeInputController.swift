@@ -52,6 +52,9 @@ final class HajimeInputController: IMKInputController {
         followUpTask = nil
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
         let result = session.handle(key, context: context)
+        if !result.handled {
+            root.passThroughDiagnostics.recordPassThrough(key, mode: session.mode, context: context)
+        }
         presenter.context = context
         presenter.apply(result.actions, to: client)
         runFollowUps(client: client, context: context)
