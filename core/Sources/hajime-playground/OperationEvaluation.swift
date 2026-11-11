@@ -179,6 +179,9 @@ enum OperationEvaluation {
             settings.candidatePresentation = presentation
             // 打つたびに変換すると遅いので，ライブ変換を切って打つ．Space の変換は読み全体から求めるので結果は変わらない
             settings.liveConversion = false
+            // 打っている間の変換(入力中の候補の窓)も出さない．打っている間に Zenzai を使うかはそのときの処理の速さで決まり，
+            // それによって Space の変換の結果まで変わるので，マシンの負荷で数が揺れる
+            settings.suggestionDisplay = .off
             let store = StaticSettings(settings)
             // 英語の語の辞書(R-24)は，リポジトリの頭で動かしたときに data/ から読む(make try と同じ)
             let terms = EnglishTerms(bundled: EnglishTermFile(url: EnglishTermCheck.bundledURL), settings: store)
