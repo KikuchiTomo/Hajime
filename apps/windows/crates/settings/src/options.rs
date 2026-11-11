@@ -55,6 +55,8 @@ pub const PRESENTATIONS: &[Choice] = &[
     ("list", "文全体の一覧"),
 ];
 
+pub const MEANING_PLACEMENTS: &[Choice] = &[("side", "候補の右"), ("below", "候補の下")];
+
 pub const INITIAL_FOCUS: &[Choice] = &[("start", "先頭"), ("end", "末尾"), ("automatic", "自動")];
 
 pub const SUGGESTION_DISPLAY: &[Choice] = &[

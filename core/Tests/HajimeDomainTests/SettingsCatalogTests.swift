@@ -40,6 +40,7 @@ struct SettingsCatalogTests {
                 "candidateFontSize": range(DefaultSettings.candidateFontSizeRange),
                 "customThemeCornerRadius": range(DefaultSettings.customThemeCornerRadiusRange),
                 "associationLimit": range(DefaultSettings.associationLimitRange),
+                "meaningSenseLimit": range(DefaultSettings.meaningSenseLimitRange),
             ]),
             "associationLimitStep": .number(Double(DefaultSettings.associationLimitStep)),
             "secondsStep": .number(DefaultSettings.secondsStep),

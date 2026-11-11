@@ -437,6 +437,12 @@ enum UIStrings {
         static let specialConversion = "特殊変換"
         static let dateConversion = "日付と時刻に変換"
         static let homophoneNotes = "語の意味と使い分けを表示"
+        static let meaning = "語の意味"
+        static let meaningPlacement = "意味の位置"
+        static let meaningSenseLimit = "意味の数"
+        static let showsPartOfSpeech = "品詞を表示"
+        static let showsUsageExamples = "使い方の例を表示"
+        static let showsHomophones = "同音語を表示"
         static let misuseNotes = "誤用の注釈を表示"
         static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
@@ -466,6 +472,13 @@ enum UIStrings {
         static func imported(_ count: Int) -> String { "\(count) 件を追加しました" }
         static let fontSizeName = "候補の文字サイズ"
         static func fontSize(_ size: Int) -> String { "\(fontSizeName): \(size)" }
+
+        static func label(for placement: MeaningPlacement) -> String {
+            switch placement {
+            case .side: "候補の右"
+            case .below: "候補の下"
+            }
+        }
 
         static func label(for style: PunctuationStyle) -> String { style.comma + style.period }
         static func label(for style: BracketStyle) -> String { style.open + style.close }
@@ -953,6 +966,9 @@ extension UIStrings {
             "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,
             "calculation": Features.calculation, "postalCodeConversion": Features.postalCode,
             "handwriting": Features.handwriting, "homophoneNotes": UIStrings.Settings.homophoneNotes, "misuseNotes": UIStrings.Settings.misuseNotes,
+            "meaningPlacement": UIStrings.Settings.meaningPlacement, "meaningSenseLimit": UIStrings.Settings.meaningSenseLimit,
+            "showsPartOfSpeech": UIStrings.Settings.showsPartOfSpeech, "showsUsageExamples": UIStrings.Settings.showsUsageExamples,
+            "showsHomophones": UIStrings.Settings.showsHomophones,
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,

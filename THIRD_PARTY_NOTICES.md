@@ -1598,7 +1598,7 @@ https://github.com/KikuchiTomo/hajime-dictionary
 かな漢字変換の辞書として，hajime-dictionary v0.2.0 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
 Wikidata: https://www.wikidata.org/
 品詞の番号の対応には，mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使用しています．
-同音異義語の使い分けの辞書(data/usage/usage_dict_extra.tsv)と，語の意味の辞書(data/usage/usage_dict_words.tsv)の読みと表記も，同じ dictionary_oss から抜き出しています．
+同音異義語の使い分けの辞書(data/usage/usage_dict_extra.tsv)と，語の意味の辞書(data/usage/usage_dict_words.tsv)の読みと表記も，同じ dictionary_oss から抜き出しています．この 2 つと data/usage/usage_dict.txt の品詞の列も，dictionary_oss の品詞から付けています．
 Mozc の著作権表示とライセンスは，上の Mozc の節と同じです．辞書の語の多くは IPAdic に由来するため，dictionary_oss の README.txt に従って次の表示を載せています．
 
 ```
@@ -1741,7 +1741,7 @@ Technology and LICENSEE agrees to preserve same.
 
 japanese-usage-dictionary(hiroyuki-komatsu/japanese-usage-dictionary の 38d34621238afe66e8e669ff0a37bc84039b6b93)
 https://github.com/hiroyuki-komatsu/japanese-usage-dictionary
-同音異義語の使い分けの注釈(data/usage/usage_dict.txt)に使っています．手を加えずに同梱しています．
+同音異義語の使い分けの注釈(data/usage/usage_dict.txt)に使っています．各行の末尾に，Mozc の dictionary_oss から求めた品詞の列を足して同梱しています．
 
 ```
 Copyright (c) 2011, Hiroyuki Komatsu, Shoji Ogura, Tsuyoshi Horo

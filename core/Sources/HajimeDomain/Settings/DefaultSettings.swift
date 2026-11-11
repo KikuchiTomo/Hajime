@@ -246,8 +246,9 @@ public enum DefaultSettings {
     public static let settingsFileTaskTimeout = 300.0
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024
-    /// 語の意味の注釈(R-08)に出す意味の数の上限．辞書の順に出す．多いと候補の窓が縦に長くなる
-    public static let maximumUsageSenses = 3
+    /// 語の意味の注釈(R-08)に出す意味の数(既定)と，選べる範囲．辞書の順に出す．多いと候補の窓が縦に長くなる
+    public static let meaningSenseLimit = 3
+    public static let meaningSenseLimitRange = 1...5
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
     public static let maximumUserDictionaryEntries = 10_000
     /// アプリの扱いの規則の上限(CSV で取り込むとき)

@@ -1593,6 +1593,7 @@ public final class InputSession {
                 panel.columns[focused].longer = preview.longer
                 panel.columns[focused].usageNote = usageNote(for: lattice)
                 panel.columns[focused].homophone = homophone(for: lattice)
+                panel.meaningPlacement = settings.current.meaningPlacement
                 let segment = lattice.focused
                 let segmentReading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
@@ -1629,6 +1630,7 @@ public final class InputSession {
         if let usage = usageNote(for: lattice) { panel.note = .info(usage) }
         if let note = commandNote(for: lattice) { panel.note = note }
         panel.homophone = homophone(for: lattice)
+        panel.meaningPlacement = settings.current.meaningPlacement
         if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
         if let pendingNote { panel.note = pendingNote }
         return panel
@@ -1703,12 +1705,16 @@ public final class InputSession {
         return notes.isEmpty ? nil : notes.joined(separator: "　")
     }
 
-    /// 注目している文節で選んでいる候補の同音異義語の使い分け(設定でオンのときだけ)
+    /// 注目している文節で選んでいる候補の語の意味と同音異義語の使い分け(設定でオンのときだけ)．
+    /// 意味の数・品詞・使い方の例・ほかの語は設定に合わせて絞る
     private func homophone(for lattice: SegmentLattice) -> HomophoneNote? {
-        guard settings.current.homophoneNotes else { return nil }
+        let current = settings.current
+        guard current.homophoneNotes else { return nil }
         let segment = lattice.focused
         let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
-        return UsageGuide.homophoneNote(for: segment.selected.text, reading: reading, dictionary: usageDictionary?.usageDictionary)
+        return UsageGuide.homophoneNote(for: segment.selected.text, reading: reading, dictionary: usageDictionary?.usageDictionary)?
+            .limited(senseLimit: current.meaningSenseLimit, partOfSpeech: current.showsPartOfSpeech,
+                     examples: current.showsUsageExamples, homophones: current.showsHomophones)
     }
 
     // MARK: - 分岐図と一覧の操作(キー設定の表のコマンド)

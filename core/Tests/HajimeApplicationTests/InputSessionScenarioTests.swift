@@ -36,14 +36,15 @@ final class Harness {
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
          associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
-         wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil) {
+         wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
         self.settings = store
         self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
                                     associations: associations, keyNames: keyNames,
-                                    rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil)
+                                    rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
+                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init))
     }
 
     func type(_ text: String) {
@@ -1053,6 +1054,40 @@ struct BranchMapControlTests {
         quiet.type("totta")
         quiet.press(.space)
         #expect(quiet.lattice?.columns.first?.homophone == nil)
+    }
+
+    @Test("R-08: 語の意味は，設定に合わせて意味の数・品詞・使い方の例・ほかの語を絞り，出す位置を窓に載せる",
+          arguments: [CandidatePresentation.automatic, .segmentList])
+    func meaningSettings(presentation: CandidatePresentation) {
+        let converter = FakeConverter(["とった": [("撮った", nil), ("取った", nil)]])
+        let dictionary = UsageDictionary(text: """
+            とる\t撮る\t五段・ラ行\t1. 写真を写す。「写真を撮る」\\n2. 映画を撮影する。「映画を撮る」\\n3. 録音する。\t動詞
+            とる\t取る\t五段・ラ行\t手に持つ。\t動詞
+            """)
+        func note(_ change: (inout Settings) -> Void) -> (HomophoneNote?, MeaningPlacement?) {
+            var settings = DefaultSettings.settings
+            settings.candidatePresentation = presentation
+            change(&settings)
+            let harness = Harness(converter: converter, settings: settings, usageDictionary: dictionary)
+            harness.type("totta")
+            harness.press(.space)
+            if presentation == .segmentList { return (harness.panel?.homophone, harness.panel?.meaningPlacement) }
+            return (harness.lattice?.columns.first(where: \.isFocused)?.homophone, harness.lattice?.meaningPlacement)
+        }
+        let full = note { _ in }
+        #expect(full.0 == HomophoneNote(word: "撮る", partOfSpeech: .verb, senses: [
+            .init(meaning: "写真を写す", example: "写真を撮る"), .init(meaning: "映画を撮影する", example: "映画を撮る"), .init(meaning: "録音する"),
+        ], others: ["取る"]))
+        #expect(full.1 == .side)
+        let trimmed = note {
+            $0.meaningSenseLimit = 1
+            $0.showsPartOfSpeech = false
+            $0.showsUsageExamples = false
+            $0.showsHomophones = false
+            $0.meaningPlacement = .below
+        }
+        #expect(trimmed.0 == HomophoneNote(word: "撮る", meaning: "写真を写す", others: []))
+        #expect(trimmed.1 == .below)
     }
 
     @Test("上の枝にあるひらがな・カタカナは，下の枝に重ねて出さない")

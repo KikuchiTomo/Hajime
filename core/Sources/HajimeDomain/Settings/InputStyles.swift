@@ -41,6 +41,14 @@ public enum InitialFocus: String, Sendable, Equatable, Codable, CaseIterable {
     case automatic
 }
 
+/// 語の意味(R-08)を候補の窓のどこに出すか
+public enum MeaningPlacement: String, Sendable, Equatable, Codable, CaseIterable {
+    /// 候補の右．一覧は選んでいる候補を指すカードにし，分岐図は選んでいる候補の先に意味の枝を伸ばす
+    case side
+    /// 候補の下(足元の上)
+    case below
+}
+
 /// 打っているあいだに候補(変換と予測)の窓を出すか
 public enum SuggestionDisplay: String, Sendable, Equatable, Codable, CaseIterable {
     case off

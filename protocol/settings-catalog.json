@@ -56,6 +56,8 @@
     "liveConversionSkipLength",
     "looseReadings",
     "macros",
+    "meaningPlacement",
+    "meaningSenseLimit",
     "misreadings",
     "misuseNotes",
     "modeIndicatorDuration",
@@ -75,9 +77,12 @@
     "reviewCorrectionTimeout",
     "shiftStartsAlphabet",
     "showsAssociationHint",
+    "showsHomophones",
     "showsKeyHints",
     "showsModeIndicator",
+    "showsPartOfSpeech",
     "showsSuggestions",
+    "showsUsageExamples",
     "showsVariantRow",
     "slash",
     "spaceWidth",
@@ -165,6 +170,10 @@
     "liveConversionSkipLength" : [
       0,
       10
+    ],
+    "meaningSenseLimit" : [
+      1,
+      5
     ],
     "modeIndicatorDuration" : [
       0.3,

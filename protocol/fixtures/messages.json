@@ -144,7 +144,8 @@
         "position": 2,
         "total": 30,
         "note": { "tone": "correction", "title": "修正", "subject": "ようですね", "key": "Esc", "keyAction": "戻す", "text": "修正「ようですね」　Esc 戻す" },
-        "homophone": { "word": "撮る", "senses": [{ "meaning": "写真を写す", "example": "写真を撮る" }, { "meaning": "撮影する" }], "others": ["取る", "採る"] }
+        "homophone": { "word": "撮る", "partOfSpeech": "verb", "senses": [{ "meaning": "写真を写す", "example": "写真を撮る" }, { "meaning": "撮影する" }], "others": ["取る", "採る"] },
+        "meaningPlacement": "side"
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },
@@ -181,14 +182,15 @@
             "preview": "腫れ",
             "longer": "晴れる",
             "alternativeNotes": [],
-            "homophone": { "word": "晴れ", "senses": [{ "meaning": "空が晴れていること" }], "others": [] },
+            "homophone": { "word": "晴れ", "partOfSpeech": "adjectivalNoun", "senses": [{ "meaning": "空が晴れていること" }], "others": [] },
             "split": { "pieces": ["晴", "れ"] }
           }
         ],
         "position": 1,
         "total": 2,
         "note": { "tone": "info", "title": "案内", "text": "案内" },
-        "hints": [{ "keys": "Shift+←", "label": "今日" }]
+        "hints": [{ "keys": "Shift+←", "label": "今日" }],
+        "meaningPlacement": "below"
       }
     },
     { "type": "setPresentation", "presentation": { "theme": "platinum", "fontSize": 15.5, "modeIndicatorMilliseconds": 800 } },

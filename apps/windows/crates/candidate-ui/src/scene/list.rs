@@ -503,6 +503,7 @@ mod tests {
             position: 2,
             total: 30,
             note: None,
+            meaning_placement: None,
         }
     }
 
@@ -564,6 +565,7 @@ mod tests {
                     example: Some("写真を撮る".into()),
                 }],
                 others: vec!["取る".into(), "採る".into()],
+                part_of_speech: None,
             });
             let scene = candidate_list(&short, &Look::new(&theme, 15.0), &Fixed);
             let texts = texts_of(&scene);
@@ -619,6 +621,7 @@ mod tests {
                 example: Some("車が動く".into()),
             }],
             others: vec![],
+            part_of_speech: None,
         });
         let single = candidate_list(&one, &look, &Fixed);
         let texts = texts_of(&single);

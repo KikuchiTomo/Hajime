@@ -1380,6 +1380,29 @@ impl fmt::Debug for AssociationHeading {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PartOfSpeech {
+    Noun,
+    Verb,
+    Adjective,
+    AdjectivalNoun,
+    Adverb,
+    Prenominal,
+    Conjunction,
+    Interjection,
+    Pronoun,
+    Prefix,
+    Suffix,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MeaningPlacement {
+    Side,
+    Below,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct HomophoneSense {
     pub meaning: String,
@@ -1399,6 +1422,9 @@ impl fmt::Debug for HomophoneSense {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct HomophoneNote {
     pub word: String,
+    #[serde(rename = "partOfSpeech")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_of_speech: Option<PartOfSpeech>,
     pub senses: Vec<HomophoneSense>,
     pub others: Vec<String>,
 }
@@ -1407,6 +1433,7 @@ impl fmt::Debug for HomophoneNote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HomophoneNote")
             .field("word", &REDACTED)
+            .field("partOfSpeech", &self.part_of_speech)
             .field("senses", &self.senses)
             .field("others", &REDACTED)
             .finish()
@@ -1438,6 +1465,9 @@ pub struct CandidateList {
     #[serde(rename = "showsNumbers")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shows_numbers: Option<bool>,
+    #[serde(rename = "meaningPlacement")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning_placement: Option<MeaningPlacement>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1455,6 +1485,7 @@ impl fmt::Debug for CandidateList {
             .field("associationHint", &REDACTED)
             .field("homophone", &self.homophone)
             .field("showsNumbers", &self.shows_numbers)
+            .field("meaningPlacement", &self.meaning_placement)
             .finish()
     }
 }
@@ -1568,6 +1599,9 @@ pub struct BranchMap {
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association_hint: Option<String>,
+    #[serde(rename = "meaningPlacement")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning_placement: Option<MeaningPlacement>,
 }
 
 impl fmt::Debug for BranchMap {
@@ -1580,6 +1614,7 @@ impl fmt::Debug for BranchMap {
             .field("hints", &self.hints)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
+            .field("meaningPlacement", &self.meaning_placement)
             .finish()
     }
 }

@@ -216,12 +216,26 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
                 ResettableToggle(model: model, title: UIStrings.Features.handwriting, keyPath: \.handwriting)
                 ResettableToggle(model: model, title: UIStrings.Settings.dateConversion, keyPath: \.dateConversion)
-                ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
                 ResettableToggle(model: model, title: UIStrings.Settings.misuseNotes, keyPath: \.misuseNotes)
                 ResettableToggle(model: model, title: UIStrings.Settings.proofreading, keyPath: \.proofreading)
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
+            }
+            Section(UIStrings.Settings.meaning) {
+                ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
+                Group {
+                    ResettablePicker(model: model, title: UIStrings.Settings.meaningPlacement, keyPath: \.meaningPlacement, label: UIStrings.Settings.label(for:))
+                    ResettableRow(model: model, keyPath: \.meaningSenseLimit) {
+                        Stepper(value: model.binding(\.meaningSenseLimit), in: DefaultSettings.meaningSenseLimitRange) {
+                            LabeledContent(UIStrings.Settings.meaningSenseLimit, value: "\(model.settings.meaningSenseLimit)")
+                        }
+                    }
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsPartOfSpeech, keyPath: \.showsPartOfSpeech)
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsUsageExamples, keyPath: \.showsUsageExamples)
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsHomophones, keyPath: \.showsHomophones)
+                }
+                .disabled(!model.settings.homophoneNotes)
             }
             Section {
                 ResettablePicker(model: model, title: UIStrings.Settings.zenzaiModel, keyPath: \.zenzaiModel, label: UIStrings.Settings.label(for:))

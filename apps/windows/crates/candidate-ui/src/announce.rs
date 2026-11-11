@@ -143,6 +143,7 @@ mod tests {
             position: 2,
             total: 2,
             note: None,
+            meaning_placement: None,
         }
     }
 
@@ -168,6 +169,7 @@ mod tests {
                 example: Some("領土を返還する".into()),
             }],
             others: vec!["変換".into(), "偏官".into()],
+            part_of_speech: None,
         });
         assert_eq!(
             candidates(&list).as_deref(),
@@ -191,6 +193,7 @@ mod tests {
                 },
             ],
             others: vec![],
+            part_of_speech: None,
         });
         assert_eq!(
             candidates(&list).as_deref(),
@@ -228,6 +231,7 @@ mod tests {
             total: 1,
             note: None,
             hints: vec![],
+            meaning_placement: None,
         };
         assert_eq!(branch_map(&map).as_deref(), Some("晴れ"));
 

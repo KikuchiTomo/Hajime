@@ -12,7 +12,9 @@ struct UsageDictionaryTests {
         あいず\t合図\t*\t知らせ。
         うごく\t動く\t五段・カ行イ音便\t位置が変わる。「車が動く」
         うごかす\t動かす\t五段・サ行\t位置を変える。「机を動かす」
-        よぶ\t呼ぶ\t五段・バ行\t1. 声をかける。「名前を呼ぶ」\\n2. 来させる。\\n3. 名付ける。\\n4. 集める。
+        よぶ\t呼ぶ\t五段・バ行\t1. 声をかける。「名前を呼ぶ」\\n2. 来させる。\\n3. 名付ける。\\n4. 集める。\\n5. 招く。\\n6. 引き起こす。\t動詞
+        しずか\t静か\t*\t音がしないさま。\t形容動詞
+        けっこう\t結構\t*\t十分なさま。\t知らない品詞
         壊れた行
         """)
 
@@ -36,11 +38,43 @@ struct UsageDictionaryTests {
         #expect(UsageDictionary.senses(of: Substring(description)) == expected)
     }
 
-    @Test("意味は辞書の順に上限の数まで出す")
+    @Test("意味は辞書の順に，設定で選べる数の上限まで読む")
     func limitsSenses() throws {
         let note = try #require(dictionary.note(for: "呼ぶ", reading: "よぶ"))
-        #expect(note.senses.count == DefaultSettings.maximumUsageSenses)
+        #expect(note.senses.count == DefaultSettings.meaningSenseLimitRange.upperBound)
         #expect(note.senses.first?.meaning == "声をかける")
+    }
+
+    @Test("5 列目の品詞を読む．列が無いか知らない名前なら品詞を付けない", arguments: [
+        ("呼ぶ", "よぶ", PartOfSpeech?.some(.verb)),
+        ("静か", "しずか", .adjectivalNoun),
+        ("結構", "けっこう", nil),
+        ("合図", "あいず", nil),
+    ])
+    func partOfSpeech(text: String, reading: String, expected: PartOfSpeech?) {
+        #expect(dictionary.note(for: text, reading: reading)?.partOfSpeech == expected)
+    }
+
+    @Test("品詞の名前を読み戻せる")
+    func partOfSpeechNames() {
+        for partOfSpeech in PartOfSpeech.allCases { #expect(PartOfSpeech(name: partOfSpeech.name) == partOfSpeech) }
+        #expect(PartOfSpeech(name: "") == nil)
+    }
+
+    @Test("設定に合わせて絞る．意味は 1 つは残す")
+    func limited() {
+        let note = HomophoneNote(word: "撮る", partOfSpeech: .verb, senses: [.init(meaning: "写す", example: "写真を撮る"), .init(meaning: "撮影する")],
+                                 others: ["取る"])
+        #expect(note.limited(senseLimit: 5, partOfSpeech: true, examples: true, homophones: true) == note)
+        #expect(note.limited(senseLimit: 0, partOfSpeech: false, examples: false, homophones: false)
+            == HomophoneNote(word: "撮る", meaning: "写す", others: []))
+        #expect(note.limited(senseLimit: 2, partOfSpeech: true, examples: false, homophones: true).senses.map(\.example) == [nil, nil])
+    }
+
+    @Test("読み上げの文に品詞を括弧で添える")
+    func text() {
+        let note = HomophoneNote(word: "撮る", partOfSpeech: .verb, meaning: "写す", example: "写真を撮る", others: ["取る"])
+        #expect(note.text == "撮る(動詞): 写す。例「写真を撮る」　ほかに 取る")
     }
 
     @Test("同じ読みの語が 1 つだけの語(動く)にも，意味だけを示す")

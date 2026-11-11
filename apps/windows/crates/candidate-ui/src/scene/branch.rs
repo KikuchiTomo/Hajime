@@ -897,6 +897,7 @@ mod tests {
                 keys: "Space".into(),
                 label: "候補".into(),
             }],
+            meaning_placement: None,
         }
     }
 
@@ -1103,6 +1104,7 @@ mod tests {
                 total: 4,
                 note: None,
                 hints: vec![],
+                meaning_placement: None,
             };
             let scene = branch_map(&split, &Look::new(&theme, 15.0), &Fixed);
             let texts = texts(&scene);

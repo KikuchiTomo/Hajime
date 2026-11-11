@@ -3,7 +3,35 @@
 ///
 /// - 同音異義語: 同じ読みで意味の違う語の使い分け(「撮る」写真や動画を写す，など)．同音異義語の無い語も辞書にあれば意味を出す．既定で出す
 /// - 誤用: 本来とは違う形で広まっている言い回し(「汚名挽回」→「汚名返上」「名誉挽回」)．既定では出さない
-/// 語の意味と同音異義語の使い分けの注釈．候補の窓は語・意味・ほかの語を描き分ける(語を強く，意味を控えめに，ほかの語を札に)．
+/// 語の品詞．意味の辞書の 5 列目に書いた名前(「名詞」)から読み，候補の窓で意味の見出しに添える
+public enum PartOfSpeech: String, Sendable, Equatable, CaseIterable {
+    case noun, verb, adjective, adjectivalNoun, adverb, prenominal, conjunction, interjection, pronoun, prefix, suffix
+
+    /// 品詞の名前(「名詞」「形容動詞」)．辞書の列と候補の窓で同じ名前を使う
+    public var name: String {
+        switch self {
+        case .noun: "名詞"
+        case .verb: "動詞"
+        case .adjective: "形容詞"
+        case .adjectivalNoun: "形容動詞"
+        case .adverb: "副詞"
+        case .prenominal: "連体詞"
+        case .conjunction: "接続詞"
+        case .interjection: "感動詞"
+        case .pronoun: "代名詞"
+        case .prefix: "接頭辞"
+        case .suffix: "接尾辞"
+        }
+    }
+
+    /// 辞書に書いた名前から．空や知らない名前なら nil
+    public init?(name: some StringProtocol) {
+        guard let match = Self.allCases.first(where: { $0.name == name }) else { return nil }
+        self = match
+    }
+}
+
+/// 語の意味と同音異義語の使い分けの注釈．候補の窓は語・品詞・意味・使い方の例・ほかの語を描き分ける．
 /// 同じ読みのほかの語が無い語(「動く」)にも，意味だけを出す
 public struct HomophoneNote: Sendable, Equatable {
     /// 語の 1 つの意味と，その使い方の例
@@ -21,24 +49,37 @@ public struct HomophoneNote: Sendable, Equatable {
 
     /// 選んでいる候補に当たる語(「撮る」)
     public var word: String
-    /// 語の意味．辞書の順に DefaultSettings.maximumUsageSenses まで．1 つ以上
+    /// 語の品詞．辞書に無ければ nil
+    public var partOfSpeech: PartOfSpeech?
+    /// 語の意味．辞書の順に DefaultSettings.meaningSenseLimitRange の上限まで．1 つ以上
     public var senses: [Sense]
     /// 同じ読みのほかの語(「取る」「採る」)．同音異義語の無い語なら空
     public var others: [String]
 
-    public init(word: String, senses: [Sense], others: [String]) {
+    public init(word: String, partOfSpeech: PartOfSpeech? = nil, senses: [Sense], others: [String]) {
         self.word = word
+        self.partOfSpeech = partOfSpeech
         self.senses = senses
         self.others = others
     }
 
     /// 意味が 1 つの注釈
-    public init(word: String, meaning: String, example: String? = nil, others: [String]) {
-        self.init(word: word, senses: [Sense(meaning: meaning, example: example)], others: others)
+    public init(word: String, partOfSpeech: PartOfSpeech? = nil, meaning: String, example: String? = nil, others: [String]) {
+        self.init(word: word, partOfSpeech: partOfSpeech, senses: [Sense(meaning: meaning, example: example)], others: others)
     }
 
-    /// 1 行の文にしたもの(読み上げなど)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」．
-    /// 意味が 2 つ以上なら「1. 」「2. 」と番号を付ける．ほかの語が無ければ「ほかに」を付けない
+    /// 設定に合わせて絞った注釈．意味は senseLimit まで(1 つは残す)，例・品詞・ほかの語は出さない設定なら除く
+    public func limited(senseLimit: Int, partOfSpeech showsPartOfSpeech: Bool, examples showsExamples: Bool, homophones showsHomophones: Bool) -> HomophoneNote {
+        var note = self
+        note.senses = Array(senses.prefix(max(senseLimit, 1)))
+        if !showsExamples { note.senses = note.senses.map { Sense(meaning: $0.meaning) } }
+        if !showsPartOfSpeech { note.partOfSpeech = nil }
+        if !showsHomophones { note.others = [] }
+        return note
+    }
+
+    /// 1 行の文にしたもの(読み上げなど)．「撮る(動詞): 撮影する。例「写真を撮る」　ほかに 取る・採る」．
+    /// 意味が 2 つ以上なら「1. 」「2. 」と番号を付ける．品詞が無ければ括弧を付けず，ほかの語が無ければ「ほかに」を付けない
     public var text: String {
         let senses = senses.enumerated().map { index, sense in
             let number = self.senses.count > 1 ? "\(index + 1). " : ""
@@ -46,7 +87,8 @@ public struct HomophoneNote: Sendable, Equatable {
             return number + sense.meaning + example
         }
         let others = others.isEmpty ? "" : "　ほかに \(self.others.joined(separator: "・"))"
-        return "\(word): \(senses.joined(separator: "　"))\(others)"
+        let heading = partOfSpeech.map { "\(word)(\($0.name))" } ?? word
+        return "\(heading): \(senses.joined(separator: "　"))\(others)"
     }
 }
 
@@ -59,6 +101,7 @@ extension HomophoneNote: CustomStringConvertible, CustomDebugStringConvertible {
 public enum UsageGuide {
     public struct Homophone: Sendable, Equatable {
         public var word: String
+        public var partOfSpeech: PartOfSpeech? = nil
         public var senses: [HomophoneNote.Sense]
 
         /// 語の漢字の部分(送り仮名を除いたもの)．「撮る」→「撮」，「清算」→「清算」
@@ -87,7 +130,8 @@ public enum UsageGuide {
         if let note = dictionary?.note(for: text, reading: reading) { return note }
         for group in homophoneGroups where reading.hasPrefix(group.reading) {
             guard let hit = group.words.first(where: { $0.matches(text) }) else { continue }
-            return HomophoneNote(word: hit.word, senses: hit.senses, others: group.words.filter { $0.word != hit.word }.map(\.word))
+            return HomophoneNote(word: hit.word, partOfSpeech: hit.partOfSpeech, senses: hit.senses,
+                                 others: group.words.filter { $0.word != hit.word }.map(\.word))
         }
         return nil
     }

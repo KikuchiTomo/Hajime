@@ -1590,6 +1590,31 @@
       ]
     },
     {
+      "name": "PartOfSpeech",
+      "kind": "enum",
+      "cases": [
+        "noun",
+        "verb",
+        "adjective",
+        "adjectivalNoun",
+        "adverb",
+        "prenominal",
+        "conjunction",
+        "interjection",
+        "pronoun",
+        "prefix",
+        "suffix"
+      ]
+    },
+    {
+      "name": "MeaningPlacement",
+      "kind": "enum",
+      "cases": [
+        "side",
+        "below"
+      ]
+    },
+    {
       "name": "HomophoneSense",
       "kind": "struct",
       "fields": [
@@ -1610,6 +1635,10 @@
         {
           "name": "word",
           "type": "string"
+        },
+        {
+          "name": "partOfSpeech",
+          "type": "PartOfSpeech?"
         },
         {
           "name": "senses",
@@ -1672,6 +1701,10 @@
         {
           "name": "showsNumbers",
           "type": "bool?"
+        },
+        {
+          "name": "meaningPlacement",
+          "type": "MeaningPlacement?"
         }
       ]
     },
@@ -1808,6 +1841,10 @@
         {
           "name": "associationHint",
           "type": "string?"
+        },
+        {
+          "name": "meaningPlacement",
+          "type": "MeaningPlacement?"
         }
       ]
     },
