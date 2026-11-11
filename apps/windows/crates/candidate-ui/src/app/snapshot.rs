@@ -259,6 +259,7 @@ fn list() -> CandidateList {
         position: 2,
         total: 12,
         note: None,
+        meaning_placement: None,
     }
 }
 
@@ -283,6 +284,7 @@ fn homophone_list() -> CandidateList {
                 },
             ],
             others: strings(&["取る", "採る", "執る", "捕る"]),
+            part_of_speech: None,
         }),
         ..list()
     }
@@ -303,6 +305,7 @@ fn meaning_list() -> CandidateList {
                 example: Some("車が動く".into()),
             }],
             others: vec![],
+            part_of_speech: None,
         }),
         ..list()
     }
@@ -359,6 +362,7 @@ fn correction() -> CandidateList {
             key_action: Some("入力のままに戻す".into()),
             text: "修正　Space 入力のままに戻す".into(),
         }),
+        meaning_placement: None,
     }
 }
 
@@ -423,6 +427,7 @@ fn preview() -> BranchMap {
             hint("Alt+→", "誤りやすい文節"),
             hint("Shift+←→", "区切り調整"),
         ],
+        meaning_placement: None,
     }
 }
 
@@ -446,5 +451,6 @@ fn split() -> BranchMap {
         total: 4,
         note: None,
         hints: vec![hint("1–2", "区切り"), hint("Esc", "取り消し")],
+        meaning_placement: None,
     }
 }

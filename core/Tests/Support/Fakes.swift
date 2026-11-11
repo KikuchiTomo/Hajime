@@ -169,6 +169,16 @@ public final class FakeAssociationLookup: AssociationLookup {
     }
 }
 
+/// 決まった意味の辞書を返す(R-08)
+@MainActor
+public final class FakeUsageDictionaryProvider: UsageDictionaryProviding {
+    public let usageDictionary: UsageDictionary?
+
+    public init(_ dictionary: UsageDictionary?) {
+        usageDictionary = dictionary
+    }
+}
+
 /// 決まった語を返す同梱の英語の語の辞書(R-24)
 @MainActor
 public final class FakeEnglishTermProvider: EnglishTermProviding {

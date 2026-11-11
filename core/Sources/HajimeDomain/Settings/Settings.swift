@@ -110,8 +110,18 @@ public struct Settings: Sendable, Equatable {
     public var numberKeySelection = true
     /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
     public var dateConversion = true
-    /// 同音異義語の使い分けを分岐図に添える
+    /// 語の意味と同音異義語の使い分けを候補の窓に添える(R-08)
     public var homophoneNotes = true
+    /// 語の意味を候補の右に出すか，下に出すか
+    public var meaningPlacement = MeaningPlacement.side
+    /// 語の意味をいくつまで出すか(辞書の順)
+    public var meaningSenseLimit = DefaultSettings.meaningSenseLimit
+    /// 語の意味の見出しに品詞(「動詞」)を添える
+    public var showsPartOfSpeech = true
+    /// 意味ごとに使い方の例(「写真を撮る」)を添える
+    public var showsUsageExamples = true
+    /// 同じ読みのほかの語(同音語)を添える
+    public var showsHomophones = true
     /// 誤用とされる言い回しに注釈を添える
     public var misuseNotes = false
     /// ら抜き言葉・さ入れ言葉・二重敬語・重言に注釈を添える(校正支援)
@@ -186,6 +196,7 @@ public struct Settings: Sendable, Equatable {
         listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
         branchCandidatesPerPage = clamp(branchCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
         associationLimit = clamp(associationLimit, DefaultSettings.associationLimitRange)
+        meaningSenseLimit = clamp(meaningSenseLimit, DefaultSettings.meaningSenseLimitRange)
         var associationIDs = Set<String>()
         associationDictionaries = associationDictionaries.filter { $0.hasValidIdentity && associationIDs.insert($0.id).inserted }
             // 同梱の辞書は 1 つだけで，一覧から外れていたら先頭に戻す(消せない．使わないときはオフにする)
@@ -282,7 +293,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case association, associationLimit, showsAssociationHint, zenzaiModel
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -362,6 +373,11 @@ extension Settings: Codable {
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
         read(.homophoneNotes, into: \.homophoneNotes)
+        read(.meaningPlacement, into: \.meaningPlacement)
+        read(.meaningSenseLimit, into: \.meaningSenseLimit)
+        read(.showsPartOfSpeech, into: \.showsPartOfSpeech)
+        read(.showsUsageExamples, into: \.showsUsageExamples)
+        read(.showsHomophones, into: \.showsHomophones)
         read(.misuseNotes, into: \.misuseNotes)
         read(.proofreading, into: \.proofreading)
         read(.symbolConversion, into: \.symbolConversion)
@@ -458,6 +474,11 @@ extension Settings: Codable {
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)
         try container.encode(homophoneNotes, forKey: .homophoneNotes)
+        try container.encode(meaningPlacement, forKey: .meaningPlacement)
+        try container.encode(meaningSenseLimit, forKey: .meaningSenseLimit)
+        try container.encode(showsPartOfSpeech, forKey: .showsPartOfSpeech)
+        try container.encode(showsUsageExamples, forKey: .showsUsageExamples)
+        try container.encode(showsHomophones, forKey: .showsHomophones)
         try container.encode(misuseNotes, forKey: .misuseNotes)
         try container.encode(proofreading, forKey: .proofreading)
         try container.encode(symbolConversion, forKey: .symbolConversion)

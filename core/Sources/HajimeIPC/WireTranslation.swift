@@ -188,7 +188,9 @@ extension WireCandidateList {
             associationHint: panel.associationHint,
             homophone: panel.homophone.map(WireHomophoneNote.init),
             // 振るとき(ふつうの一覧)は送らない
-            showsNumbers: panel.showsNumbers ? nil : false
+            showsNumbers: panel.showsNumbers ? nil : false,
+            // 意味が無ければ送らない
+            meaningPlacement: panel.homophone == nil ? nil : WireMeaningPlacement(panel.meaningPlacement)
         )
     }
 }
@@ -206,7 +208,35 @@ extension WireCommandKind {
 
 extension WireHomophoneNote {
     public init(_ note: HomophoneNote) {
-        self.init(word: note.word, senses: note.senses.map { WireHomophoneSense(meaning: $0.meaning, example: $0.example) }, others: note.others)
+        self.init(word: note.word, partOfSpeech: note.partOfSpeech.map(WirePartOfSpeech.init), senses: note.senses.map { WireHomophoneSense(meaning: $0.meaning, example: $0.example) },
+                  others: note.others)
+    }
+}
+
+extension WirePartOfSpeech {
+    public init(_ partOfSpeech: PartOfSpeech) {
+        switch partOfSpeech {
+        case .noun: self = .noun
+        case .verb: self = .verb
+        case .adjective: self = .adjective
+        case .adjectivalNoun: self = .adjectivalNoun
+        case .adverb: self = .adverb
+        case .prenominal: self = .prenominal
+        case .conjunction: self = .conjunction
+        case .interjection: self = .interjection
+        case .pronoun: self = .pronoun
+        case .prefix: self = .prefix
+        case .suffix: self = .suffix
+        }
+    }
+}
+
+extension WireMeaningPlacement {
+    public init(_ placement: MeaningPlacement) {
+        switch placement {
+        case .side: self = .side
+        case .below: self = .below
+        }
     }
 }
 
@@ -247,7 +277,9 @@ extension WireBranchMap {
             note: panel.note.map(WireNote.init),
             hints: hints,
             association: panel.association.map(WireAssociationHeading.init),
-            associationHint: panel.associationHint
+            associationHint: panel.associationHint,
+            // 注目している文節に意味が無ければ送らない
+            meaningPlacement: panel.columns.contains { $0.homophone != nil } ? WireMeaningPlacement(panel.meaningPlacement) : nil
         )
     }
 }

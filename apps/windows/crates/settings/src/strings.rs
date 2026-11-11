@@ -46,6 +46,12 @@ pub mod settings {
     pub const SPECIAL_CONVERSION: &str = "特殊変換";
     pub const DATE_CONVERSION: &str = "日付と時刻に変換";
     pub const HOMOPHONE_NOTES: &str = "語の意味と使い分けを表示";
+    pub const MEANING: &str = "語の意味";
+    pub const MEANING_PLACEMENT: &str = "意味の位置";
+    pub const MEANING_SENSE_LIMIT: &str = "意味の数";
+    pub const SHOWS_PART_OF_SPEECH: &str = "品詞を表示";
+    pub const SHOWS_USAGE_EXAMPLES: &str = "使い方の例を表示";
+    pub const SHOWS_HOMOPHONES: &str = "同音語を表示";
     pub const MISUSE_NOTES: &str = "誤用の注釈を表示";
     pub const PROOFREADING: &str = "校正支援";
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
@@ -590,6 +596,11 @@ pub mod sync {
         ("postalCodeConversion", "郵便番号から住所に変換"),
         ("handwriting", "手書き入力"),
         ("homophoneNotes", "語の意味と使い分けを表示"),
+        ("meaningPlacement", "意味の位置"),
+        ("meaningSenseLimit", "意味の数"),
+        ("showsPartOfSpeech", "品詞を表示"),
+        ("showsUsageExamples", "使い方の例を表示"),
+        ("showsHomophones", "同音語を表示"),
         ("misuseNotes", "誤用の注釈を表示"),
         ("proofreading", "校正支援"),
         ("misreadings", "読み違いの候補"),

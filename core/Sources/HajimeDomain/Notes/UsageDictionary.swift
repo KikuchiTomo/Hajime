@@ -1,6 +1,7 @@
 /// 語の意味と同音異義語の使い分けの辞書(R-08)．japanese-usage-dictionary(data/usage/usage_dict.txt)の行を読む．
 ///
-/// 行は「読み<タブ>語<タブ>活用<タブ>説明」．説明の中の意味の区切りは「\n」の 2 文字で書かれている．
+/// 行は「読み<タブ>語<タブ>活用<タブ>説明<タブ>品詞」．品詞の列は無くてもよい(tools/usage/gen/annotate_pos.rb が足す)．
+/// 説明の中の意味の区切りは「\n」の 2 文字で書かれている．
 /// 同じ読みの語が 1 つだけの行(同音異義語の無い語)は，意味だけを示す．
 /// 活用した形(「撮った」)にも当てはまるよう，語の漢字の部分(「撮」)と，送り仮名を除いた読み(「と」)で引く(UsageGuide.Homophone)
 public struct UsageDictionary: Sendable, Equatable {
@@ -24,7 +25,8 @@ public struct UsageDictionary: Sendable, Equatable {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard fields.count >= 4, !fields[0].isEmpty, !fields[1].isEmpty else { continue }
             let reading = String(fields[0])
-            let homophone = UsageGuide.Homophone(word: String(fields[1]), senses: Self.senses(of: fields[3]))
+            let homophone = UsageGuide.Homophone(word: String(fields[1]), partOfSpeech: fields.count > 4 ? PartOfSpeech(name: fields[4]) : nil,
+                                                 senses: Self.senses(of: fields[3]))
             // 送り仮名の分だけ読みの後ろを除く(「撮る」「とる」→「と」)．語より読みが短い(当て字など)ときは読みのまま
             let okurigana = homophone.word.count - homophone.stem.count
             let stemReading = reading.count > okurigana ? String(reading.dropLast(okurigana)) : reading
@@ -52,7 +54,7 @@ public struct UsageDictionary: Sendable, Equatable {
         }
         guard let hit = best?.entry, let group = groups[hit.groupReading] else { return nil }
         let others = group.filter { $0.word != hit.homophone.word }.map(\.word)
-        return HomophoneNote(word: hit.homophone.word, senses: hit.homophone.senses, others: others)
+        return HomophoneNote(word: hit.homophone.word, partOfSpeech: hit.homophone.partOfSpeech, senses: hit.homophone.senses, others: others)
     }
 
     /// 候補の漢字の部分の後ろ(rest)が語の形として合うとき，送り仮名の合う長さ．合わなければ nil．
@@ -77,12 +79,12 @@ public struct UsageDictionary: Sendable, Equatable {
         "ぬ": "なにぬねの", "ぶ": "ばびぶべぼ", "む": "まみむめも", "る": "らりるれろ",
     ]
 
-    /// 説明の意味と，それぞれの使い方の例．辞書の順に DefaultSettings.maximumUsageSenses まで．
+    /// 説明の意味と，それぞれの使い方の例．辞書の順に，設定で選べる数の上限(DefaultSettings.meaningSenseLimitRange)まで．
     /// 説明の頭の注記(「〈「取る」とも〉」)と番号(「1. 」)を除き，意味のあとのかぎ括弧(「写真を撮る」)を例として分ける．
     /// 意味の終わりの句点は除く．「※」で始まる補足の行は飛ばす．意味が 1 つも取れなければ説明をそのまま意味にする
     static func senses(of description: Substring) -> [HomophoneNote.Sense] {
         var senses: [HomophoneNote.Sense] = []
-        for line in description.components(separatedBy: "\\n") where senses.count < DefaultSettings.maximumUsageSenses {
+        for line in description.components(separatedBy: "\\n") where senses.count < DefaultSettings.meaningSenseLimitRange.upperBound {
             var text = Substring(line)
             if text.hasPrefix("〈"), let end = text.firstIndex(of: "〉") { text = text[text.index(after: end)...] }
             let digits = text.prefix { $0.isASCII && $0.isNumber }

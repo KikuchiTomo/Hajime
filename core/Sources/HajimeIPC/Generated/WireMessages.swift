@@ -1548,6 +1548,35 @@ extension WireAssociationHeading: CustomStringConvertible, CustomDebugStringConv
     public var debugDescription: String { description }
 }
 
+public enum WirePartOfSpeech: String, Sendable, Equatable, Codable, CaseIterable {
+    case noun
+    case verb
+    case adjective
+    case adjectivalNoun
+    case adverb
+    case prenominal
+    case conjunction
+    case interjection
+    case pronoun
+    case prefix
+    case suffix
+}
+
+extension WirePartOfSpeech: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePartOfSpeech.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireMeaningPlacement: String, Sendable, Equatable, Codable, CaseIterable {
+    case side
+    case below
+}
+
+extension WireMeaningPlacement: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireMeaningPlacement.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
 public struct WireHomophoneSense: Sendable, Equatable, Codable {
     public var meaning: String
     public var example: String?
@@ -1565,11 +1594,13 @@ extension WireHomophoneSense: CustomStringConvertible, CustomDebugStringConverti
 
 public struct WireHomophoneNote: Sendable, Equatable, Codable {
     public var word: String
+    public var partOfSpeech: WirePartOfSpeech?
     public var senses: [WireHomophoneSense]
     public var others: [String]
 
-    public init(word: String, senses: [WireHomophoneSense], others: [String]) {
+    public init(word: String, partOfSpeech: WirePartOfSpeech? = nil, senses: [WireHomophoneSense], others: [String]) {
         self.word = word
+        self.partOfSpeech = partOfSpeech
         self.senses = senses
         self.others = others
     }
@@ -1593,8 +1624,9 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var associationHint: String?
     public var homophone: WireHomophoneNote?
     public var showsNumbers: Bool?
+    public var meaningPlacement: WireMeaningPlacement?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1607,6 +1639,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.associationHint = associationHint
         self.homophone = homophone
         self.showsNumbers = showsNumbers
+        self.meaningPlacement = meaningPlacement
     }
 }
 
@@ -1698,8 +1731,9 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var hints: [WireKeyHint]
     public var association: WireAssociationHeading?
     public var associationHint: String?
+    public var meaningPlacement: WireMeaningPlacement?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, meaningPlacement: WireMeaningPlacement? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -1707,6 +1741,7 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
         self.hints = hints
         self.association = association
         self.associationHint = associationHint
+        self.meaningPlacement = meaningPlacement
     }
 }
 

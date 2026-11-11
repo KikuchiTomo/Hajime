@@ -39,6 +39,7 @@ pub struct Ranges {
     pub candidate_font_size: Range,
     pub custom_theme_corner_radius: Range,
     pub association_limit: Range,
+    pub meaning_sense_limit: Range,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

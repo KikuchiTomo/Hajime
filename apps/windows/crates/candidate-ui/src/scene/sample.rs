@@ -70,5 +70,6 @@ pub fn branch() -> BranchMap {
             hint("Alt+→", "誤りやすい文節"),
             hint("Shift+←→", "区切り調整"),
         ],
+        meaning_placement: None,
     }
 }

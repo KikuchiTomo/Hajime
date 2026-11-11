@@ -142,8 +142,10 @@ public struct CandidatePanel: Sendable, Equatable {
     /// 窓の左端をそろえる，組み立て中の文字の位置(UTF-16 の数)．nil なら組み立て中の文字の頭．
     /// 打っているあいだに最後の文節だけの候補を出すときは，その文節の頭にそろえる
     public var anchor: Int?
-    /// 選んでいる候補の同音異義語の使い分け(R-08)．候補と足元のあいだに出す
+    /// 選んでいる候補の語の意味と同音異義語の使い分け(R-08)
     public var homophone: HomophoneNote?
+    /// 語の意味を候補の右に出すか，下に出すか(設定)
+    public var meaningPlacement = MeaningPlacement.side
     /// 候補に番号を振るか．番号キーで選べない窓(選び始める前の入力中の候補の窓など)では振らない．
     /// 番号キーはそのまま文字になるので，振ると選べるように見えてしまう
     public var showsNumbers = true
@@ -234,6 +236,8 @@ public struct LatticePanel: Sendable, Equatable {
     public var association: AssociationHeading?
     /// 注目している文節で選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
     public var associationHint: String?
+    /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
+    public var meaningPlacement = MeaningPlacement.side
 
     public init(columns: [Column], position: Int = 1, total: Int = 0, note: Note? = nil) {
         self.columns = columns

@@ -52,6 +52,10 @@ struct UsageDictionaryFileTests {
         #expect(moved.word == "動く")
         #expect(moved.others.isEmpty)
         #expect(moved.senses.count >= 1)
+        // 3 つのファイルとも 5 列目の品詞を読む
+        #expect(moved.partOfSpeech == .verb)
+        #expect(dictionary.note(for: "撮った", reading: "とった")?.partOfSpeech == .verb)
+        #expect(dictionary.note(for: "機械", reading: "きかい")?.partOfSpeech == .noun)
         // 元の辞書と同音異義語の辞書の語はそのまま
         #expect(dictionary.note(for: "撮った", reading: "とった")?.word == "撮る")
         #expect(dictionary.note(for: "機械", reading: "きかい")?.others.contains("機会") == true)

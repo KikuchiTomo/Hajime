@@ -158,6 +158,8 @@ impl Page {
                 settings::DATE_CONVERSION,
                 settings::EMOJI_CONVERSION,
                 settings::LATEX_CONVERSION,
+                settings::MEANING,
+                settings::SHOWS_PART_OF_SPEECH,
             ],
             Page::Correction => vec![
                 features::EXCEPTIONS,
@@ -564,6 +566,7 @@ pub enum RangeKind {
     CandidateFontSize,
     AssociationLimit,
     CustomThemeCornerRadius,
+    MeaningSenseLimit,
 }
 
 impl RangeKind {
@@ -581,6 +584,7 @@ impl RangeKind {
             RangeKind::CandidateFontSize => ranges.candidate_font_size,
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
+            RangeKind::MeaningSenseLimit => ranges.meaning_sense_limit,
         }
     }
 
@@ -953,12 +957,35 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(features::POSTAL_CODE, "postalCodeConversion"),
                 Row::toggle(features::HANDWRITING, "handwriting"),
                 Row::toggle(settings::DATE_CONVERSION, "dateConversion"),
-                Row::toggle(settings::HOMOPHONE_NOTES, "homophoneNotes"),
                 Row::toggle(settings::MISUSE_NOTES, "misuseNotes"),
                 Row::toggle(settings::PROOFREADING, "proofreading"),
                 Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
                 Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
                 Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
+            ],
+        ),
+        Section::new(
+            settings::MEANING,
+            vec![
+                Row::toggle(settings::HOMOPHONE_NOTES, "homophoneNotes"),
+                Row::choice(
+                    settings::MEANING_PLACEMENT,
+                    "meaningPlacement",
+                    options::MEANING_PLACEMENTS,
+                )
+                .enabled_when(On("homophoneNotes")),
+                Row::stepper(
+                    settings::MEANING_SENSE_LIMIT,
+                    "meaningSenseLimit",
+                    RangeKind::MeaningSenseLimit,
+                )
+                .enabled_when(On("homophoneNotes")),
+                Row::toggle(settings::SHOWS_PART_OF_SPEECH, "showsPartOfSpeech")
+                    .enabled_when(On("homophoneNotes")),
+                Row::toggle(settings::SHOWS_USAGE_EXAMPLES, "showsUsageExamples")
+                    .enabled_when(On("homophoneNotes")),
+                Row::toggle(settings::SHOWS_HOMOPHONES, "showsHomophones")
+                    .enabled_when(On("homophoneNotes")),
             ],
         ),
         Section::new(

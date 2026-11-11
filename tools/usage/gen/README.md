@@ -60,6 +60,17 @@ ruby build_tsv.rb --from work/meaning_verified.jsonl --keep-single -o out/usage_
 
 `--max-cost 6500` で約 29,700 語です．
 
+## 品詞
+
+候補の窓で意味の見出しに添える品詞(5 列目)は，Mozc の dictionary_oss の同じ読みと表記の語から付けます．
+3 つのファイルを作り直したり行を足したりしたら，最後に付け直します．
+
+```sh
+ruby annotate_pos.rb --mozc-dir data ../../../data/usage/usage_dict.txt ../../../data/usage/usage_dict_extra.tsv ../../../data/usage/usage_dict_words.tsv
+```
+
+品詞は右の品詞の番号から取るので，複合語は最後の語の品詞になります(「お化粧」は名詞)．活用の列と合う品詞を先に選び，接頭辞・接尾辞より自立した語の品詞を選びます．Mozc に無い語は活用の列から動詞か形容詞にし，それでも決まらなければ空にします．
+
 ## 抽出の仕組み
 
 extract_groups.rb は Mozc の辞書から，同じ読みと品詞で漢字表記が2つ以上あるものを集めます．対象は一般名詞，サ変名詞，形容動詞語幹などの名詞と，動詞と形容詞の基本形です．`--max-cost` は Mozc のコスト値で，小さいほどよく使われる語だけに絞られます．現在の辞書で試した件数は次のとおりです．
