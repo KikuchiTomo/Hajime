@@ -1526,7 +1526,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 ## Mozc
 
-https://github.com/google/mozc (the "Windows 風" and "Mac 風" key setting presets in `core/Sources/HajimeDomain/Settings/KeymapPreset.swift` are derived from the key setting tables in `src/data/keymap/`, commit c4b2aef7c65e61be394bacadaec200eb5b97f91c)
+https://github.com/google/mozc
+キー設定のひな形「Windows 風」「Mac 風」は，Mozc の src/data/keymap/ のキー設定の表(コミット c4b2aef7c65e61be394bacadaec200eb5b97f91c)をもとに作っています．
 
 ```
 Copyright 2010-2018, Google Inc.
@@ -1561,9 +1562,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## hajime-dictionary(Mozc の辞書 dictionary_oss の語)
 
-https://github.com/KikuchiTomo/hajime-dictionary(v0.2.0)．かな漢字変換の辞書として同梱する．azooKey_dictionary_storage(上の節，Apache License 2.0)の辞書に，Mozc の src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0，https://www.wikidata.org/)の項目の日本語の名前と英語の名前から作った外来語の英字の綴りを追加したもの．品詞の番号の対応に mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使った．Mozc の著作権表示とライセンスは上の Mozc の節と同じ．辞書の語の多くは IPAdic に由来し，次の表示が求められる(dictionary_oss の README.txt より)．
-
-同音異義語の使い分けの辞書 data/usage/usage_dict_extra.tsv の読みと表記も，同じ dictionary_oss から抜き出した(tools/usage/gen)．説明と用例は Claude で書いた．
+https://github.com/KikuchiTomo/hajime-dictionary
+かな漢字変換の辞書として，hajime-dictionary v0.2.0 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
+Wikidata: https://www.wikidata.org/
+品詞の番号の対応には，mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使用しています．
+同音異義語の使い分けの辞書(data/usage/usage_dict_extra.tsv)の読みと表記も，同じ dictionary_oss から抜き出しています．
+Mozc の著作権表示とライセンスは，上の Mozc の節と同じです．辞書の語の多くは IPAdic に由来するため，dictionary_oss の README.txt に従って次の表示を載せています．
 
 ```
 IPAdic is licensed as follows:
