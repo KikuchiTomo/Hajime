@@ -80,6 +80,22 @@ struct WordLanguagePage: View {
             } footer: {
                 Text(UIStrings.Features.languageNote).font(.caption).foregroundStyle(.secondary)
             }
+            Section {
+                ResettableToggle(model: model, title: UIStrings.Extras.englishTermCandidates, keyPath: \.englishTermCandidates)
+            } header: {
+                Text(UIStrings.Extras.englishTermsSection)
+            } footer: {
+                Text(UIStrings.Extras.englishTermCandidatesNote).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                RuleListEditor(model: model, spec: .englishTerms, labels: .init(
+                    key: UIStrings.Extras.englishTermPlaceholder, value: nil, empty: UIStrings.Extras.englishTermsEmpty))
+                    .disabled(!model.settings.englishTermCandidates)
+            } header: {
+                Text(UIStrings.Extras.englishTerms)
+            } footer: {
+                Text(UIStrings.Extras.englishTermsNote).font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

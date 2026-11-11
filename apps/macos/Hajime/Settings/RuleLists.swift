@@ -35,6 +35,14 @@ struct RuleListSpec<Rule> {
             invalidMessage: UIStrings.Features.invalidWord, file: language == .english ? .englishWords : .japaneseWords)
     }
 
+    /// 英語の語の辞書に足した語(R-24)．書き方どおりに比べる
+    static var englishTerms: RuleListSpec<String> {
+        RuleListSpec<String>(
+            list: \.englishTerms, key: { $0 }, value: { _ in "" }, make: { key, _ in key.trimmingCharacters(in: .whitespaces) },
+            isValid: EnglishTermDictionary.isValidTerm, limit: DefaultSettings.maximumEnglishTerms,
+            invalidMessage: UIStrings.Extras.invalidEnglishTerm, file: .englishTerms)
+    }
+
     static var romaji: RuleListSpec<RomajiRule> {
         RuleListSpec<RomajiRule>(
             list: \.customRomaji, key: \.keys, value: \.kana, make: RuleListEditing.romajiRule(keys:kana:), isValid: \.isValid,

@@ -17,7 +17,10 @@ final class CompositionRoot {
     let settings: FileSettingsStore
     let engine: AzooKeyConverterEngine
     let usage: FileUsageStore
-    let lexicon: SpellCheckerLexicon
+    /// 英語の語の辞書(R-24)．同梱の辞書と設定で足した語をまとめて引く．変換の候補と英単語の補正で共有する
+    let englishTerms: EnglishTerms
+    /// 英単語の辞書．macOS のスペルチェッカーに英語の語の辞書を重ねる
+    let lexicon: EnglishTermLexicon
     let candidatePanel: CandidatePanelController
     let modeIndicator: ModeIndicatorController
     let note: NoteController
@@ -45,7 +48,10 @@ final class CompositionRoot {
         self.sync = sync
         self.dictionaries = dictionaries
         self.associations = associations
-        self.lexicon = SpellCheckerLexicon()
+        let englishTerms = EnglishTerms(bundled: Bundle.main.resourceURL.map { EnglishTermFile(url: $0.appendingPathComponent(DefaultSettings.bundledEnglishTermFileName)) },
+                                        settings: settings)
+        self.englishTerms = englishTerms
+        self.lexicon = EnglishTermLexicon(SpellCheckerLexicon(), terms: englishTerms)
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
         self.note = NoteController()
@@ -112,7 +118,7 @@ final class CompositionRoot {
 
     func makeSession() -> InputSession {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
-                                                         lexicon: lexicon),
+                                                         lexicon: lexicon, englishTerms: englishTerms),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                      rejections: correctionRejections, usageDictionary: usageDictionary)
     }
@@ -123,7 +129,7 @@ final class CompositionRoot {
     /// 設定の画面．開くたびに作らず使い回す
     private(set) lazy var settingsWindow: SettingsWindowController = {
         // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける
-        let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
+        let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, englishTerms: englishTerms),
                                           lexicon: lexicon, settings: settings)
         let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, files: SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations), associations: associations,
                                                   commandBookmarks: commandBookmarks,
