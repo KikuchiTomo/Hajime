@@ -4,8 +4,6 @@ import HajimeDomain
 /// 画面に出す文言の置き場所．多言語にするときは Localizable.xcstrings に移す
 enum UIStrings {
     enum Candidate {
-        static let candidatesHints = [KeyHint(key: "↑", label: "文字種")]
-        static let variantsHints = [KeyHint(key: "←→", label: "選択"), KeyHint(key: "↓", label: "候補")]
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
         /// 語の意味のカードで，同音語の札の前に置く名前

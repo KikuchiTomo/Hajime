@@ -84,6 +84,7 @@ public final class EngineService {
     /// コマンドを動かす(R-22)．エンジンのプロセスで動かし，DLL(入力先のアプリの中)には任せない
     private let runCommand: (LauncherCommand) -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
+    private let listHints: (CandidatePanel, Settings) -> [WireKeyHint]
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
@@ -116,6 +117,7 @@ public final class EngineService {
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
+                listHints: @escaping (CandidatePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
@@ -133,6 +135,7 @@ public final class EngineService {
         self.ui = ui
         self.openSettings = openSettings
         self.hints = hints
+        self.listHints = listHints
     }
 
     public func connect(isCandidateWindow: Bool = false, isSettingsApp: Bool = false) -> ConnectionID {
@@ -615,7 +618,8 @@ public final class EngineService {
 
     private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?) -> WireResponseBody {
         let current = settings.current
-        let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) }, paletteCellSize: current.paletteCellSize)
+        let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) },
+                                   listHints: { [listHints] in listHints($0, current) }, paletteCellSize: current.paletteCellSize)
         routed.ui.forEach(ui)
         for command in routed.ui {
             switch command {

@@ -145,6 +145,7 @@ mod tests {
             total: 2,
             note: None,
             meaning_placement: None,
+            hints: None,
         }
     }
 

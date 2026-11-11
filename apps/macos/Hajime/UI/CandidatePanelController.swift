@@ -35,8 +35,9 @@ final class CandidatePanelController {
         window.ignoresMouseEvents = false
     }
 
-    func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double, keys: Keymap) {
+    func show(_ panel: CandidatePanel, caret: NSRect, theme: ThemeChoice, fontSize: Double, keys: Keymap, showsHints: Bool) {
         view.keys = keys
+        view.showsHints = showsHints
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.maximumWidth = Self.maximumWidth(caret: caret)
