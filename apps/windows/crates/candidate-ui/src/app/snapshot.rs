@@ -249,6 +249,7 @@ fn list() -> CandidateList {
     CandidateList {
         association: None,
         association_hint: None,
+        association_key: None,
         homophone: None,
         shows_numbers: None,
         variants: variants(),
@@ -345,6 +346,7 @@ fn correction() -> CandidateList {
     CandidateList {
         association: None,
         association_hint: None,
+        association_key: None,
         homophone: None,
         shows_numbers: None,
         variants: variants(),
@@ -401,6 +403,7 @@ fn preview() -> BranchMap {
     BranchMap {
         association: None,
         association_hint: None,
+        association_key: None,
         columns: vec![
             column("Cloudflareで"),
             BranchColumn {
@@ -435,6 +438,7 @@ fn split() -> BranchMap {
     BranchMap {
         association: None,
         association_hint: None,
+        association_key: None,
         columns: vec![
             column("それは"),
             BranchColumn {

@@ -13,7 +13,7 @@ use super::paint::{Painter, TagStyle};
 use super::{Draw, Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
-use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind};
+use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint};
 use tokens::size::{branch, candidate, glass};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
@@ -244,9 +244,22 @@ fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
             painter.width(&strings::dictionary_source(name), Font::Label) + candidate::PADDING_X
         });
     let association = map.association_hint.as_deref().map_or(0.0, |hint| {
-        painter.width(hint, Font::Label) + candidate::PADDING_X
+        let width = association_key_hint(map).map_or_else(
+            || painter.width(hint, Font::Label),
+            |key_hint| painter.hints_width(&[key_hint]),
+        );
+        width + candidate::PADDING_X
     });
     painter.hints_width(&map.hints) + source + association
+}
+
+/// 連想の知らせ(R-18)のキーキャップの札．キーが割り当てられていなければ None(語だけを文字で出す)
+fn association_key_hint(map: &BranchMap) -> Option<KeyHint> {
+    let label = map.association_hint.as_ref()?;
+    map.association_key.as_ref().map(|key| KeyHint {
+        keys: key.clone(),
+        label: label.clone(),
+    })
 }
 
 /// 連想の一覧の見出しの行の高さ(区切りの線を含む)．連想でなければ 0
@@ -819,9 +832,12 @@ fn footer(painter: &mut Painter, map: &BranchMap, y: f32, width: f32, metrics: &
     );
     painter.hints(&map.hints, footer.x, footer.mid_y());
     if let Some(hint) = map.association_hint.as_deref() {
-        // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
+        // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く
         let x = footer.x + painter.hints_width(&map.hints) + candidate::PADDING_X;
-        painter.text(hint, Font::Label, theme.text_muted, x, footer);
+        match association_key_hint(map) {
+            Some(key_hint) => painter.hints(&[key_hint], x, footer.mid_y()),
+            None => painter.text(hint, Font::Label, theme.text_muted, x, footer),
+        }
     }
     let position = position(map);
     let position_width = painter.width(&position, Font::Label);
@@ -845,7 +861,6 @@ mod tests {
     use super::super::testing::*;
     use super::*;
     use crate::theme::{ResolvedTheme, SystemLook};
-    use ipc::KeyHint;
 
     fn column(text: &str, focused: bool) -> BranchColumn {
         BranchColumn {
@@ -882,6 +897,7 @@ mod tests {
         BranchMap {
             association: None,
             association_hint: None,
+            association_key: None,
             columns: vec![column("今日は", true), column("晴れ", false)],
             position: 1,
             total: 2,
@@ -1099,6 +1115,7 @@ mod tests {
             let split = BranchMap {
                 association: None,
                 association_hint: None,
+                association_key: None,
                 columns: vec![focused],
                 position: 1,
                 total: 4,

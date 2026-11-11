@@ -142,7 +142,7 @@ public struct CandidatePanel: Sendable, Equatable {
     /// 連想の一覧を出しているときの見出し(R-18)．ふつうの候補なら nil
     public var association: AssociationHeading?
     /// 選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
-    public var associationHint: String?
+    public var associationHint: AssociationHint?
     /// 窓の左端をそろえる，組み立て中の文字の位置(UTF-16 の数)．nil なら組み立て中の文字の頭．
     /// 打っているあいだに最後の文節だけの候補を出すときは，その文節の頭にそろえる
     public var anchor: Int?
@@ -239,7 +239,7 @@ public struct LatticePanel: Sendable, Equatable {
     /// 連想の一覧を出しているときの見出し(R-18)．注目している文節の下の枝が連想の語になる．ふつうの分岐図なら nil
     public var association: AssociationHeading?
     /// 注目している文節で選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
-    public var associationHint: String?
+    public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
 
@@ -248,6 +248,19 @@ public struct LatticePanel: Sendable, Equatable {
         self.position = position
         self.total = total
         self.note = note
+    }
+}
+
+/// 選んでいる候補に連想があるときの知らせ(R-18)．描く側はキーを文字ではなくキーキャップのアイコンで描く
+public struct AssociationHint: Sendable, Equatable {
+    /// 連想変換のキーの名前．キーが割り当てられていなければ nil(知らせの語だけを出す)
+    public var key: String?
+    /// 知らせの語(「連想」)
+    public var label: String
+
+    public init(key: String?, label: String) {
+        self.key = key
+        self.label = label
     }
 }
 
