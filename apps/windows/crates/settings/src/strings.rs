@@ -850,6 +850,42 @@ pub mod wizard {
 
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．
 /// macOS の UIStrings も同じ文に DefaultSettings の値を差し込む
+/// 更新の確認(R-19)．Windows だけ(macOS は同梱の更新のアプリが自分の文言を持つ)
+pub mod update {
+    pub const TITLE: &str = "更新を確認";
+    pub const CHECKING: &str = "確認中…";
+    pub const INSTALLING: &str = "インストール中…";
+
+    pub fn downloading(percent: Option<u8>) -> String {
+        match percent {
+            Some(percent) => format!("ダウンロード中… {percent}%"),
+            None => "ダウンロード中…".to_string(),
+        }
+    }
+
+    pub fn up_to_date(version: &str) -> String {
+        format!("Hajime v{version} は最新のバージョンです。")
+    }
+
+    /// 新しいバージョンがあるときの問い．変更点があれば後ろに付ける
+    pub fn available(latest: &str, current: &str, notes: &str) -> String {
+        let question = format!(
+            "Hajime v{latest} があります。今のバージョンは v{current} です。\n更新しますか？\n\nダウンロードしたあと、インストーラーが管理者の権限を求めます。"
+        );
+        if notes.is_empty() {
+            question
+        } else {
+            format!("{question}\n\n変更点\n{notes}")
+        }
+    }
+
+    pub const CHECK_FAILED: &str = "更新を確認できませんでした。";
+    pub const DOWNLOAD_FAILED: &str = "ダウンロードできませんでした。";
+    pub const VERIFY_FAILED: &str = "ダウンロードしたファイルが公開されているものと一致しません。";
+    pub const INSTALL_FAILED: &str = "インストーラーを起動できませんでした。";
+    pub const OPEN_DOWNLOAD_PAGE: &str = "ダウンロードのページをブラウザで開きますか？";
+}
+
 pub mod limited {
     use crate::catalog::Limits;
 

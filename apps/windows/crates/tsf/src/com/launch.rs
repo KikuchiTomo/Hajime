@@ -10,21 +10,10 @@ use windows::Win32::System::Threading::{
 use windows_core::{Result, HSTRING, PWSTR};
 
 pub const SETTINGS_FILE: &str = "hajime-settings.exe";
-/// 32 ビットの DLL を置くフォルダ(インストール先の下)
-const X86_FOLDER: &str = "x86";
 
-/// インストール先のフォルダ．32 ビットの DLL は x86\ にあるので 1 つ上にする
+/// インストール先のフォルダ．DLL はバージョンごとのフォルダにあるので上にたどる(crate::install)
 fn installation() -> Option<PathBuf> {
-    let module = PathBuf::from(module_path().ok()?);
-    let folder = module.parent()?;
-    if folder
-        .file_name()
-        .is_some_and(|name| name.eq_ignore_ascii_case(X86_FOLDER))
-    {
-        folder.parent().map(PathBuf::from)
-    } else {
-        Some(folder.to_path_buf())
-    }
+    crate::install::installation_folder(&PathBuf::from(module_path().ok()?))
 }
 
 /// インストール先の file を起動する

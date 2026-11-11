@@ -337,8 +337,9 @@ impl App {
             Event::Action(Action::SyncNow) => return self.request_sync(RequestBody::SyncNow),
             Event::Action(Action::ChooseSyncFolder) => return Some(After::ChooseSyncFolder),
             Event::Action(Action::OpenSetup) => return Some(After::OpenSetup),
-            Event::Action(Action::OpenLatestRelease) => {
-                return Some(After::OpenUrl(self.catalog.latest_release_url.clone()))
+            Event::Action(Action::CheckForUpdates) => {
+                super::update::start_check(self);
+                return None;
             }
             Event::SyncToggleFields(indices) => {
                 let changes: Vec<RequestBody> = indices
@@ -394,7 +395,7 @@ impl App {
                 Action::SyncNow
                 | Action::ChooseSyncFolder
                 | Action::OpenSetup
-                | Action::OpenLatestRelease,
+                | Action::CheckForUpdates,
             ) => return None,
             Event::DictionaryAdd { item, replacing } => {
                 let entry = DictionaryEntry {

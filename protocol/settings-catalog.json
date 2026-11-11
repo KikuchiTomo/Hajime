@@ -187,6 +187,7 @@
     "manifestBytes" : 262144,
     "manifestTimeout" : 30,
     "manifestURL" : "https://haji.men/download/latest.json",
+    "notesLength" : 1200,
     "packageBytes" : 1073741824
   }
 }

@@ -41,8 +41,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetMessageW, GetWindowTextLengthW, GetWindowTextW, KillTimer, LoadCursorW, LoadIconW,
     MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW, SetTimer,
     SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, CS_DBLCLKS,
-    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MINMAXINFO, MSG,
+    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK, IDYES, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MB_YESNO, MINMAXINFO, MSG,
     SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
     SW_HIDE, SW_SHOW, SW_SHOWNA, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
     WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW, WNDPROC,
@@ -683,6 +683,55 @@ pub fn open_url(url: &str) {
     unsafe {
         ShellExecuteW(None, w!("open"), &url, None, None, SW_SHOWNORMAL);
     }
+}
+
+/// Windows Installer で path の MSI を入れる．進み具合だけを出し(/passive)，終わっても再起動しない(/norestart)．
+/// 動いているアプリが DLL を読んでいても閉じさせない(MSIRESTARTMANAGERCONTROL=Disable)．
+/// 管理者の権限は msiexec が UAC で求める．起動できたら true
+pub fn run_installer(path: &std::path::Path) -> bool {
+    use std::os::windows::ffi::OsStringExt;
+    let mut buffer = [0u16; 260];
+    // SAFETY: buffer の大きさを渡し，書かれた長さだけを読む
+    let length = unsafe {
+        windows::Win32::System::SystemInformation::GetSystemDirectoryW(Some(&mut buffer))
+    } as usize;
+    if length == 0 || length >= buffer.len() {
+        return false;
+    }
+    // 探す場所に置かれた別の msiexec を起動しないよう，システムのフォルダのものを場所で指す
+    let msiexec = std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length]))
+        .join("msiexec.exe");
+    let parameters = format!(
+        "/i \"{}\" /passive /norestart MSIRESTARTMANAGERCONTROL=Disable",
+        path.display()
+    );
+    // SAFETY: 文字列は呼び出しの間生きている
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            w!("open"),
+            &HSTRING::from(msiexec.as_os_str()),
+            &HSTRING::from(parameters),
+            None,
+            SW_SHOWNORMAL,
+        )
+    };
+    // 32 より大きければ起動できた(ShellExecuteW の決まり)
+    result.0 as isize > 32
+}
+
+/// はい・いいえで尋ねる窓．はいなら true
+pub fn ask(owner: HWND, title: &str, text: &str) -> bool {
+    // SAFETY: owner はこのスレッドの窓．文字列は呼び出しの間生きている
+    let result = unsafe {
+        MessageBoxW(
+            Some(owner),
+            &HSTRING::from(text),
+            &HSTRING::from(title),
+            MB_YESNO | MB_ICONQUESTION,
+        )
+    };
+    result == IDYES
 }
 
 /// 確かめる窓(OK とキャンセル)．OK なら true

@@ -169,6 +169,8 @@ pub struct App {
     /// ページを開く時間の内わけ(部品を作る・エンジンから読む・値を映して置く．測るとき)
     breakdown: (f64, f64, f64),
     measure: Option<Measurement>,
+    /// 「更新を確認」の進み具合(R-19)
+    pub(super) update: super::update::Updater,
 }
 
 thread_local! {
@@ -259,6 +261,7 @@ pub fn open(
         measuring: options.measure.is_some(),
         breakdown: (0.0, 0.0, 0.0),
         measure: options.measure.map(Measurement::new),
+        update: super::update::Updater::default(),
     };
     APP.with(|cell| *cell.borrow_mut() = Some(app));
     uia::install(uia::Hooks {
@@ -478,6 +481,8 @@ impl App {
         );
         std::mem::replace(&mut self.view, view).release(&mut pool);
         self.pool = pool;
+        // 更新を確かめている途中に情報のページを開き直しても，進み具合を出し続ける
+        self.view.set_version_status(self.update.status());
         let built = start.elapsed().as_secs_f64() * 1000.0;
         if let Focus::Page(_) = self.focus {
             self.focus = Focus::Nav;
@@ -2165,6 +2170,10 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         WM_MEASURE => {
             with_app(App::measure_step);
+            Some(LRESULT(0))
+        }
+        super::update::WM_UPDATE => {
+            super::update::receive(window);
             Some(LRESULT(0))
         }
         WM_WARM => {

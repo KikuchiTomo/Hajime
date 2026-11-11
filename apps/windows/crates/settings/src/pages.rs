@@ -349,8 +349,8 @@ pub enum Action {
     OpenSetup,
     /// 今すぐ同期する
     SyncNow,
-    /// 最新のリリースのページを既定のブラウザで開く(アプリは通信しない)
-    OpenLatestRelease,
+    /// 新しいバージョンがあるかを確かめ，あれば尋ねてから入れる(R-19．押したときだけ通信する)
+    CheckForUpdates,
 }
 
 /// 取り込んで使う辞書の一覧の種類

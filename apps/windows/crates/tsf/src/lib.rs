@@ -2,6 +2,7 @@
 
 pub mod filter;
 pub mod icon;
+pub mod install;
 pub mod key;
 pub mod late;
 pub mod layout;

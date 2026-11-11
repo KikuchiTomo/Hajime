@@ -5,6 +5,7 @@ mod ffi;
 mod page;
 mod paint;
 mod theme;
+mod update;
 mod window;
 mod wizard;
 
