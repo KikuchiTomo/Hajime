@@ -46,6 +46,20 @@ generate.rb と verify.rb は途中で止めても，同じコマンドを再実
 
 build_tsv.rb に `--merge data/usage_dict.txt` を付けると，元の usage_dict.txt と合わせた1ファイルを出力します．校閲で修正や除外が入ったものは work/review.tsv に修正前と修正後を並べて出すので，人が目を通すのはこのファイルだけで足ります．
 
+## 同音異義語の無い語の意味
+
+同じ読みの語が無い語(「動く」など)の意味の辞書 data/usage/usage_dict_words.tsv も，同じスクリプトで作ります．表記が 1 つだけのグループを抜き出し，意味を書くためのプロンプトで生成と校閲をします．すでに usage_dict.txt と usage_dict_extra.tsv にある読みは除きます．
+
+```sh
+cat data/usage_dict.txt ../../../data/usage/usage_dict_extra.tsv > work/covered.tsv
+ruby extract_groups.rb --min-candidates 1 --max-candidates 1 --max-cost 6500 --usage-dict work/covered.tsv -o work/meaning_groups.jsonl
+ruby generate.rb --in work/meaning_groups.jsonl --out work/meaning_generated.jsonl --system generate_meaning_system.md --batch 20 -j 6
+ruby verify.rb --in work/meaning_generated.jsonl --out work/meaning_verified.jsonl --system verify_meaning_system.md --batch 20 -j 8
+ruby build_tsv.rb --from work/meaning_verified.jsonl --keep-single -o out/usage_dict_words.tsv --review work/meaning_review.tsv
+```
+
+`--max-cost 6500` で約 29,700 語です．
+
 ## 抽出の仕組み
 
 extract_groups.rb は Mozc の辞書から，同じ読みと品詞で漢字表記が2つ以上あるものを集めます．対象は一般名詞，サ変名詞，形容動詞語幹などの名詞と，動詞と形容詞の基本形です．`--max-cost` は Mozc のコスト値で，小さいほどよく使われる語だけに絞られます．現在の辞書で試した件数は次のとおりです．

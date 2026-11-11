@@ -21,6 +21,7 @@ opts = {
   batch: 10,
   jobs: 2,
   limit: nil,
+  system: "generate_system.md",
   dry_run: false,
 }
 OptionParser.new do |o|
@@ -30,6 +31,7 @@ OptionParser.new do |o|
   o.on("--model NAME", "Model alias or full name (default: haiku)") { |v| opts[:model] = v }
   o.on("--batch N", Integer, "Groups per claude -p call (default 10)") { |v| opts[:batch] = v }
   o.on("-j", "--jobs N", Integer, "Parallel calls (default 2)") { |v| opts[:jobs] = v }
+  o.on("--system FILE", "System prompt in prompts/ (default: generate_system.md)") { |v| opts[:system] = v }
   o.on("--limit N", Integer, "Process only the first N groups (after skipping done ones)") { |v| opts[:limit] = v }
   o.on("--dry-run", "Print the first prompt and exit") { opts[:dry_run] = true }
 end.parse!
@@ -73,7 +75,7 @@ todo = todo.first(opts[:limit]) if opts[:limit]
 warn "groups: #{groups.size} total, #{done.size} done, #{todo.size} to process"
 exit if todo.empty?
 
-system_prompt = UsageGen.prompt_file("generate_system.md")
+system_prompt = UsageGen.prompt_file(opts[:system])
 
 def build_prompt(batch)
   payload = batch.each_with_index.map do |g, i|
@@ -91,7 +93,7 @@ end
 batches = todo.each_slice(opts[:batch]).to_a
 
 if opts[:dry_run]
-  puts "=== system prompt (prompts/generate_system.md) ===", system_prompt
+  puts "=== system prompt (prompts/#{opts[:system]}) ===", system_prompt
   puts "=== prompt (stdin) ===", build_prompt(batches.first)
   puts "=== command ==="
   puts "claude -p --model #{opts[:model]} --output-format json --json-schema '<schema>' " \

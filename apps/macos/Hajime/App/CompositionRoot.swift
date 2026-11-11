@@ -86,8 +86,11 @@ final class CompositionRoot {
             directory: support.appendingPathComponent("associations", isDirectory: true),
             bundledSource: Bundle.main.resourceURL?.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
         associations.preloadBundled()
-        installed = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries,
-                                    associations: associations)
+        let root = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries,
+                                   associations: associations)
+        // 語の意味の辞書も，注釈を出す設定なら起動したら裏で読み始める(初めての変換で意味が出ないことを減らす)
+        if settings.current.homophoneNotes { root.usageDictionary?.preload() }
+        installed = root
     }
 
     /// アプリに入れたかな漢字変換の辞書を確かめて読む．無いか，ハッシュが合わなければ azooKey に同梱の辞書で動く
@@ -186,10 +189,12 @@ final class CompositionRoot {
 
     /// 郵便番号の表(R-13)．入力欄ごとのセッションで共有し，初めて引くときに読み込む
     private(set) lazy var postalCodes: PostalCodeFile? = Bundle.main.url(forResource: "postal-codes", withExtension: "tsv").map(PostalCodeFile.init(url:))
-    /// 同音異義語の使い分けの辞書(R-08)．data/usage/usage_dict.txt と，Mozc の辞書から作った usage_dict_extra.tsv を同梱する
+    /// 語の意味と同音異義語の使い分けの辞書(R-08)．data/usage/usage_dict.txt と，Mozc の辞書から作った
+    /// usage_dict_extra.tsv(同音異義語)と usage_dict_words.tsv(同音異義語の無い語)を同梱する
     private(set) lazy var usageDictionary: UsageDictionaryFile? = {
         let urls = [Bundle.main.url(forResource: "usage_dict", withExtension: "txt"),
-                    Bundle.main.url(forResource: "usage_dict_extra", withExtension: "tsv")].compactMap { $0 }
+                    Bundle.main.url(forResource: "usage_dict_extra", withExtension: "tsv"),
+                    Bundle.main.url(forResource: "usage_dict_words", withExtension: "tsv")].compactMap { $0 }
         return urls.isEmpty ? nil : UsageDictionaryFile(urls: urls)
     }()
 
