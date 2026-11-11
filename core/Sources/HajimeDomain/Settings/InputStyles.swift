@@ -49,7 +49,7 @@ public enum MeaningPlacement: String, Sendable, Equatable, Codable, CaseIterable
     case below
 }
 
-/// 打っているあいだに候補(変換と予測)の窓を出すか
+/// 打っているあいだに窓(入力中の候補・入力中の予測)を出すか
 public enum SuggestionDisplay: String, Sendable, Equatable, Codable, CaseIterable {
     case off
     /// ライブ変換がオフのときだけ出す(ライブ変換で文が見えているときは要らない)

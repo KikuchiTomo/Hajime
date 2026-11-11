@@ -872,6 +872,11 @@ impl RowState {
                 .iter()
                 .map(|number| more::skip_length(*number))
                 .collect(),
+            (Control::Stepper(RangeKind::SuggestionSkipCount), Part::Dropdown) => self
+                .numbers
+                .iter()
+                .map(|number| more::skip_count(*number))
+                .collect(),
             (Control::Stepper(_), Part::Dropdown) => self
                 .numbers
                 .iter()

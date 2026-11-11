@@ -132,6 +132,16 @@ enum GlassDrawing {
         }
     }
 
+    /// キーキャップの札だけ(説明なし)の幅．予測の窓の確定のキーに使う
+    static func keysWidth(_ key: String, theme: ResolvedTheme) -> CGFloat {
+        keycapsWidth(KeyHint(key: key, label: ""), theme: theme)
+    }
+
+    /// キーキャップの札だけ(説明なし)を x から描く
+    static func drawKeys(_ key: String, x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
+        drawHints([KeyHint(key: key, label: "")], x: x, midY: midY, theme: theme)
+    }
+
     private static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
         switch theme.kind {
         case .platinum:

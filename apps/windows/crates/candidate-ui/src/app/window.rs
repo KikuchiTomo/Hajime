@@ -33,11 +33,12 @@ use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer, LoadCursorW,
-    PostMessageW, RegisterClassExW, SetTimer, SetWindowPos, ShowWindow, TranslateMessage,
-    CS_DROPSHADOW, HWND_TOPMOST, IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW,
-    SW_HIDE, WM_APP, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_PAINT, WM_TIMER, WNDCLASSEXW,
-    WNDCLASS_STYLES, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW, KillTimer,
+    LoadCursorW, PostMessageW, RegisterClassExW, SetTimer, SetWindowLongPtrW, SetWindowPos,
+    ShowWindow, TranslateMessage, CS_DROPSHADOW, GWLP_USERDATA, HTTRANSPARENT, HWND_TOPMOST,
+    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_LBUTTONDOWN,
+    WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use windows_core::{w, Result, BOOL, BSTR, PCWSTR};
 
@@ -45,6 +46,8 @@ const WM_INBOX: u32 = WM_APP + 1;
 const BASE_DPI: f32 = 96.0;
 /// 読み上げの種類の名前．同じ名前の読み上げは新しいものが前のものを置き換える
 const ANNOUNCEMENT_ID: &str = "hajime.candidate";
+/// 押しても受けず，下の窓に通す窓の印(GWLP_USERDATA)
+const CLICK_THROUGH: isize = 1;
 
 /// 時計の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -294,6 +297,45 @@ impl Window {
         let _ = unsafe { KillTimer(Some(self.hwnd), timer as usize) };
     }
 
+    /// この窓を押しても受けず，下の窓(入力先のアプリ)に通す．予測の窓に使う(押した位置を候補の窓のものと取り違えないため)
+    pub fn pass_clicks_through(&self) {
+        // SAFETY: hwnd はこの窓．窓の利用者用の値に印を書くだけ
+        unsafe { SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, CLICK_THROUGH) };
+    }
+
+    /// 本体(scene.body)を anchor(組み立て中の文字)の右端のすぐ右に，縦の中央をそろえて置く．予測の窓に使う．
+    /// 画面の右に入らなければ左へ寄せる．gap は組み立て中の文字とのあいだ(論理ピクセル)
+    pub fn place_beside(&self, anchor: &Rect, scene: &Scene, gap: f32) {
+        let scale = self.scale();
+        let anchor_rect = RECT {
+            left: anchor.x,
+            top: anchor.y,
+            right: anchor.x + anchor.width.max(1),
+            bottom: anchor.y + anchor.height.max(1),
+        };
+        let work = work_area(&anchor_rect);
+        let pixels = |value: f32| (value * scale).round() as i32;
+        let (x, y) = beside(
+            &anchor_rect,
+            &work,
+            pixels(scene.body.width),
+            pixels(scene.body.height),
+            pixels(gap),
+        );
+        // SAFETY: hwnd はこの窓
+        let _ = unsafe {
+            SetWindowPos(
+                self.hwnd,
+                Some(HWND_TOPMOST),
+                x - pixels(scene.body.x),
+                y - pixels(scene.body.y),
+                (scene.width * scale).ceil() as i32,
+                (scene.height * scale).ceil() as i32,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            )
+        };
+    }
+
     /// 本体(scene.body)を入力位置の下(入らなければ上)に置く．影や余白はそのまわりにはみ出す．
     /// holds なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(position)
     pub fn place(&self, anchor: &Rect, scene: &Scene, gap: i32, holds: bool) {
@@ -304,23 +346,7 @@ impl Window {
             right: anchor.x + anchor.width.max(1),
             bottom: anchor.y + anchor.height.max(1),
         };
-        // SAFETY: anchor_rect は有効な RECT
-        let monitor = unsafe { MonitorFromRect(&anchor_rect, MONITOR_DEFAULTTONEAREST) };
-        let mut info = MONITORINFO {
-            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
-            ..Default::default()
-        };
-        // SAFETY: info は cbSize を入れた MONITORINFO
-        let work = if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
-            info.rcWork
-        } else {
-            RECT {
-                left: i32::MIN / 2,
-                top: i32::MIN / 2,
-                right: i32::MAX / 2,
-                bottom: i32::MAX / 2,
-            }
-        };
+        let work = work_area(&anchor_rect);
         let pixels = |value: f32| (value * scale).round() as i32;
         let held = if holds { self.held.get() } else { None };
         let (x, y, side) = position(
@@ -462,6 +488,36 @@ impl Window {
 
 /// 窓の左上と置いた側．下に入れば下，入らなければ上に置く．keeping の側に置いていたら，入るかぎりその側に置き続ける．
 /// どちらにも入らなければ画面の中に詰める．
+/// anchor のある画面の，タスクバーを除いた広さ．分からなければ十分に広い範囲
+fn work_area(anchor: &RECT) -> RECT {
+    // SAFETY: anchor は有効な RECT
+    let monitor = unsafe { MonitorFromRect(anchor, MONITOR_DEFAULTTONEAREST) };
+    let mut info = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: info は cbSize を入れた MONITORINFO
+    if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+        info.rcWork
+    } else {
+        RECT {
+            left: i32::MIN / 2,
+            top: i32::MIN / 2,
+            right: i32::MAX / 2,
+            bottom: i32::MAX / 2,
+        }
+    }
+}
+
+/// 予測の窓の左上．anchor の右端から gap 空けて置き，縦は anchor の中央にそろえる．画面(work)からはみ出す分は内側へ寄せる
+fn beside(anchor: &RECT, work: &RECT, width: i32, height: i32, gap: i32) -> (i32, i32) {
+    let x = (anchor.right + gap).min(work.right - width).max(work.left);
+    let y = (anchor.top + (anchor.bottom - anchor.top - height) / 2)
+        .min(work.bottom - height)
+        .max(work.top);
+    (x, y)
+}
+
 /// held に前の窓を渡すと，候補が並び始める辺(上と左)を動かさない．上に置くときは，入力位置の行が上下に動いていなければ
 /// 上の辺を保ち，入力位置の行に重なるほど高くなったときだけ上に伸ばす．入力位置が左右に動いていなければ左の辺を保ち，
 /// 画面の右からはみ出すときだけ左に寄せる(core の PanelPlacement と同じ決まり)
@@ -541,6 +597,11 @@ unsafe extern "system" fn procedure(
             Some(LRESULT(0))
         }
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),
+        // 押しても受けない窓(予測の窓)は，押した位置を下の窓に通す
+        // SAFETY: hwnd はこの手続きを持つ窓
+        WM_NCHITTEST if unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } == CLICK_THROUGH => {
+            Some(LRESULT(HTTRANSPARENT as isize))
+        }
         // 候補を押して選ぶ．窓は前に出ない(WM_MOUSEACTIVATE で MA_NOACTIVATE)ので，入力先のアプリはフォーカスを持ったまま
         WM_LBUTTONDOWN => {
             let x = (lparam.0 & 0xFFFF) as u16 as i16 as i32;
@@ -632,6 +693,20 @@ mod tests {
         // どちらにも入らない(画面より高い窓)なら画面の中に詰める
         let (_, y, _) = position(&rect(100, 500, 102, 520), &work, 200, 1200, 2, None, None);
         assert_eq!(y, 0);
+    }
+
+    #[test]
+    fn 予測の窓は組み立て中の文字の右に縦の中央をそろえて置き_画面の右に入らなければ左へ寄せる() {
+        let work = rect(0, 0, 1920, 1080);
+        assert_eq!(
+            beside(&rect(100, 500, 300, 520), &work, 120, 30, 6),
+            (306, 495)
+        );
+        assert_eq!(
+            beside(&rect(1800, 500, 1900, 520), &work, 120, 30, 6),
+            (1800, 495)
+        );
+        assert_eq!(beside(&rect(100, 0, 300, 10), &work, 120, 30, 6).1, 0);
     }
 
     fn placed(anchor: RECT, (x, y, side): (i32, i32, Side)) -> Placed {

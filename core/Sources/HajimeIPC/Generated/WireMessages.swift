@@ -833,7 +833,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case wake(session: UInt32, context: WireFieldContext)
     case openHandwriting(session: UInt32, context: WireFieldContext)
     case reconvert(session: UInt32, text: String, reading: String?, context: WireFieldContext)
-    case caret(session: UInt32, rect: WireRect)
+    case caret(session: UInt32, rect: WireRect, composition: WireRect?)
     case readSettings
     case writeSettings(settings: WireSettingsSnapshot)
     case menu(command: WireMenuCommand)
@@ -878,7 +878,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case mergeUserDictionary(entries: [WireDictionaryEntry])
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, text, reading, rect, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, offset, limit, entry, entries
+        case type, protocolVersion, session, input, context, mode, text, reading, rect, composition, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, offset, limit, entry, entries
     }
 
     public init(from decoder: any Decoder) throws {
@@ -906,7 +906,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case "reconvert":
             self = try .reconvert(session: container.decode(UInt32.self, forKey: .session), text: container.decode(String.self, forKey: .text), reading: container.decodeIfPresent(String.self, forKey: .reading), context: container.decode(WireFieldContext.self, forKey: .context))
         case "caret":
-            self = try .caret(session: container.decode(UInt32.self, forKey: .session), rect: container.decode(WireRect.self, forKey: .rect))
+            self = try .caret(session: container.decode(UInt32.self, forKey: .session), rect: container.decode(WireRect.self, forKey: .rect), composition: container.decodeIfPresent(WireRect.self, forKey: .composition))
         case "readSettings":
             self = .readSettings
         case "writeSettings":
@@ -1037,10 +1037,11 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(reading, forKey: .reading)
             try container.encode(context, forKey: .context)
-        case .caret(let session, let rect):
+        case .caret(let session, let rect, let composition):
             try container.encode("caret", forKey: .type)
             try container.encode(session, forKey: .session)
             try container.encode(rect, forKey: .rect)
+            try container.encodeIfPresent(composition, forKey: .composition)
         case .readSettings:
             try container.encode("readSettings", forKey: .type)
         case .writeSettings(let settings):
@@ -1539,6 +1540,23 @@ public struct WireNote: Sendable, Equatable, Codable {
 
 extension WireNote: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "WireNote" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePrediction: Sendable, Equatable, Codable {
+    public var typed: String
+    public var completion: String
+    public var key: String?
+
+    public init(typed: String, completion: String, key: String? = nil) {
+        self.typed = typed
+        self.completion = completion
+        self.key = key
+    }
+}
+
+extension WirePrediction: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePrediction" }
     public var debugDescription: String { description }
 }
 
@@ -2134,16 +2152,17 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
     case showCandidates(list: WireCandidateList, anchor: WireRect?)
     case showBranchMap(map: WireBranchMap, anchor: WireRect?)
     case showNote(note: WireNote, anchor: WireRect?)
+    case showPrediction(prediction: WirePrediction?, anchor: WireRect?)
     case showMode(mode: WireInputMode, anchor: WireRect?, label: String?)
     case showHandwriting(anchor: WireRect?, recognitionDelayMilliseconds: UInt32, recognitionTimeoutMilliseconds: UInt32)
     case hideHandwriting
     case showPalette(panel: WirePalettePanel, anchor: WireRect?)
     case hidePalette
-    case move(anchor: WireRect)
+    case move(anchor: WireRect, composition: WireRect?)
     case hide
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, presentation, list, anchor, map, note, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds, panel
+        case type, protocolVersion, presentation, list, anchor, map, note, prediction, mode, label, recognitionDelayMilliseconds, recognitionTimeoutMilliseconds, panel, composition
     }
 
     public init(from decoder: any Decoder) throws {
@@ -2160,6 +2179,8 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             self = try .showBranchMap(map: container.decode(WireBranchMap.self, forKey: .map), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showNote":
             self = try .showNote(note: container.decode(WireNote.self, forKey: .note), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
+        case "showPrediction":
+            self = try .showPrediction(prediction: container.decodeIfPresent(WirePrediction.self, forKey: .prediction), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor))
         case "showMode":
             self = try .showMode(mode: container.decode(WireInputMode.self, forKey: .mode), anchor: container.decodeIfPresent(WireRect.self, forKey: .anchor), label: container.decodeIfPresent(String.self, forKey: .label))
         case "showHandwriting":
@@ -2171,7 +2192,7 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
         case "hidePalette":
             self = .hidePalette
         case "move":
-            self = try .move(anchor: container.decode(WireRect.self, forKey: .anchor))
+            self = try .move(anchor: container.decode(WireRect.self, forKey: .anchor), composition: container.decodeIfPresent(WireRect.self, forKey: .composition))
         case "hide":
             self = .hide
         default:
@@ -2200,6 +2221,10 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encode("showNote", forKey: .type)
             try container.encode(note, forKey: .note)
             try container.encodeIfPresent(anchor, forKey: .anchor)
+        case .showPrediction(let prediction, let anchor):
+            try container.encode("showPrediction", forKey: .type)
+            try container.encodeIfPresent(prediction, forKey: .prediction)
+            try container.encodeIfPresent(anchor, forKey: .anchor)
         case .showMode(let mode, let anchor, let label):
             try container.encode("showMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
@@ -2218,9 +2243,10 @@ public enum WireUiCommand: Sendable, Equatable, Codable {
             try container.encodeIfPresent(anchor, forKey: .anchor)
         case .hidePalette:
             try container.encode("hidePalette", forKey: .type)
-        case .move(let anchor):
+        case .move(let anchor, let composition):
             try container.encode("move", forKey: .type)
             try container.encode(anchor, forKey: .anchor)
+            try container.encodeIfPresent(composition, forKey: .composition)
         case .hide:
             try container.encode("hide", forKey: .type)
         }
@@ -2235,6 +2261,7 @@ extension WireUiCommand: CustomStringConvertible, CustomDebugStringConvertible {
         case .showCandidates: "WireUiCommand.showCandidates"
         case .showBranchMap: "WireUiCommand.showBranchMap"
         case .showNote: "WireUiCommand.showNote"
+        case .showPrediction: "WireUiCommand.showPrediction"
         case .showMode: "WireUiCommand.showMode"
         case .showHandwriting: "WireUiCommand.showHandwriting"
         case .hideHandwriting: "WireUiCommand.hideHandwriting"

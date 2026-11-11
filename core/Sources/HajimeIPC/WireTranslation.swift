@@ -244,6 +244,12 @@ extension WireMeaningPlacement {
     }
 }
 
+extension WirePrediction {
+    public init(_ prediction: Prediction) {
+        self.init(typed: prediction.typed, completion: prediction.completion, key: prediction.key)
+    }
+}
+
 extension WireAssociationHeading {
     public init(_ heading: AssociationHeading) {
         self.init(headword: heading.headword, label: heading.label,
@@ -309,8 +315,9 @@ public struct RoutedActions: Sendable, Equatable {
         self.host = host
     }
 
+    /// composition は組み立て中の文字全体の位置(予測の窓を置く基準)．知らせない DLL では nil．
     /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
-    public init(_ actions: [ClientAction], anchor: WireRect?, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
+    public init(_ actions: [ClientAction], anchor: WireRect?, composition: WireRect? = nil, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
                 listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, paletteCellSize: Double = DefaultSettings.paletteCellSize) {
         for action in actions {
             switch action {
@@ -332,6 +339,9 @@ public struct RoutedActions: Sendable, Equatable {
                 ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor, label: nil))
             case .showNote(let note):
                 ui.append(.showNote(note: WireNote(note), anchor: anchor))
+            case .showPrediction(let prediction):
+                // 予測の窓は組み立て中の文字の右に置く．組み立て中の文字の位置を知らせない古い DLL では，候補の窓と同じ基準を使う
+                ui.append(.showPrediction(prediction: prediction.map(WirePrediction.init), anchor: composition ?? anchor))
             case .selectInputStyle(let style):
                 host.append(.selectInputStyle(style))
             case .awaitCorrections:

@@ -11,7 +11,7 @@ use tokens::size::{branch, candidate, glass};
 
 /// 候補の横の札の色分け
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum TagStyle {
+pub(crate) enum TagStyle {
     /// 控えめな地(「入力のまま」，取り込んだ辞書の名前)
     Plain,
     /// 補正の色の地(「修正」)
@@ -33,7 +33,7 @@ impl TagStyle {
     }
 }
 
-pub(super) struct Painter<'a> {
+pub(crate) struct Painter<'a> {
     pub theme: &'a ResolvedTheme,
     pub measure: &'a dyn Measure,
     pub draws: Vec<Draw>,
@@ -563,6 +563,23 @@ impl<'a> Painter<'a> {
     }
 
     /// 案内の札を並べた幅(説明を除く)
+    /// キーキャップの札だけ(説明なし)の幅．予測の窓の確定のキーに使う
+    pub fn keys_width(&self, keys: &str) -> f32 {
+        self.keycaps_width(keys)
+    }
+
+    /// キーキャップの札だけ(説明なし)を x から描く
+    pub fn keys(&mut self, keys: &str, x: f32, mid_y: f32) {
+        self.hints(
+            &[KeyHint {
+                keys: keys.to_string(),
+                label: String::new(),
+            }],
+            x,
+            mid_y,
+        );
+    }
+
     fn keycaps_width(&self, keys: &str) -> f32 {
         let caps = keys::keycaps(keys);
         caps.iter()
@@ -575,6 +592,26 @@ impl<'a> Painter<'a> {
         self.keycaps_width(&hint.keys)
             + glass::KEYCAP_PADDING_X
             + self.width(&hint.label, Font::Label)
+    }
+
+    /// 幅に収まる案内．前から並べ，収まらなくなったところから後ろを出さない(macOS の GlassDrawing.hints(fitting:))
+    pub fn hints_fitting(&self, hints: &[KeyHint], width: f32) -> Vec<KeyHint> {
+        let mut used = 0.0;
+        let mut fitting = Vec::new();
+        for hint in hints {
+            let gap = if fitting.is_empty() {
+                0.0
+            } else {
+                glass::HINT_GAP
+            };
+            let next = used + gap + self.hint_width(hint);
+            if next > width {
+                break;
+            }
+            used = next;
+            fitting.push(hint.clone());
+        }
+        fitting
     }
 
     /// 幅に収まるよう末尾を「…」で省く

@@ -2,10 +2,10 @@
 
 pub mod fonts;
 pub mod preview;
-mod render;
+pub(crate) mod render;
 #[cfg(debug_assertions)]
 mod snapshot;
-mod system;
+pub(crate) mod system;
 mod window;
 
 use crate::announce::{self, Announcer};
@@ -58,6 +58,17 @@ struct App {
     /// 地を色で塗る窓と，すりガラスの地の窓(OS が影を付ける)
     plain: Window,
     glass: Window,
+    /// 続く語句の予測の窓(色で塗る窓とすりガラスの窓)．候補の窓とは別に，組み立て中の文字の右に出す．押しても受けない
+    prediction_plain: Window,
+    prediction_glass: Window,
+    /// 出している予測．候補の窓を消しても消さず，showPrediction で出し入れする
+    prediction: Option<ipc::Prediction>,
+    /// 予測の窓を置く基準(組み立て中の文字全体の位置)
+    prediction_anchor: Option<Rect>,
+    prediction_on_glass: bool,
+    prediction_scene: Option<Scene>,
+    /// 予測が変わった(次に描いたときに読み上げる)
+    prediction_changed: bool,
     backdrop: bool,
     inbox: Inbox,
     presentation: Presentation,
@@ -96,12 +107,17 @@ pub fn run() {
     };
     window::make_dpi_aware();
     window::set_callbacks(on_inbox, on_timer, on_paint, on_click);
-    let (Ok(plain), Ok(glass)) = (
+    let (Ok(plain), Ok(glass), Ok(prediction_plain), Ok(prediction_glass)) = (
         Window::create(w!("hajime.candidate"), false),
         Window::create(w!("hajime.candidate.glass"), true),
+        Window::create(w!("hajime.prediction"), false),
+        Window::create(w!("hajime.prediction.glass"), true),
     ) else {
         return;
     };
+    // 予測の窓を押した位置を，候補の窓を押したものと取り違えないよう，押しても受けない
+    prediction_plain.pass_clicks_through();
+    prediction_glass.pass_clicks_through();
     let Ok(renderer) = Renderer::new() else {
         return;
     };
@@ -126,6 +142,13 @@ pub fn run() {
             renderer,
             plain,
             glass,
+            prediction_plain,
+            prediction_glass,
+            prediction: None,
+            prediction_anchor: None,
+            prediction_on_glass: false,
+            prediction_scene: None,
+            prediction_changed: false,
             backdrop,
             inbox,
             presentation,
@@ -166,6 +189,13 @@ fn read_commands(inbox: &Inbox, notifier: &window::Notifier) {
             }
             if let Ok(mut queue) = inbox.lock() {
                 queue.push_back(UiCommand::Hide);
+                // パレットを出したセッションはもう無く，閉じる指示も届かないので消す
+                queue.push_back(UiCommand::HidePalette);
+                // エンジンが切れたら予測も消す(予測の窓は Hide では消えない)
+                queue.push_back(UiCommand::ShowPrediction {
+                    prediction: None,
+                    anchor: None,
+                });
             }
             notifier.notify();
         }
@@ -255,6 +285,11 @@ impl App {
                 self.content = Content::Note(note);
                 self.anchor = anchor.or(self.anchor.take());
             }
+            UiCommand::ShowPrediction { prediction, anchor } => {
+                self.prediction_changed = prediction.is_some() && prediction != self.prediction;
+                self.prediction = prediction;
+                self.prediction_anchor = anchor.or(self.prediction_anchor.take());
+            }
             UiCommand::ShowMode {
                 mode,
                 anchor,
@@ -289,9 +324,24 @@ impl App {
                 );
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
-            // パレット(R-26)の窓はまだ描かない．エンジンのプロセスはパレットに使うものを渡していないので，この指示は届かない
-            UiCommand::ShowPalette { .. } | UiCommand::HidePalette => {}
-            UiCommand::Move { anchor } => self.anchor = Some(anchor),
+            UiCommand::ShowPalette { panel, anchor } => {
+                // パレット(R-26)は別の窓に出す(候補・案内・モードの札に置き換わらないように)．すりガラスにはしない
+                let theme = ResolvedTheme::resolve(
+                    &self.presentation.theme,
+                    self.presentation.custom_theme.as_ref(),
+                    &system::look(false),
+                );
+                crate::palette::ffi::show(panel, anchor.or(self.anchor.clone()), theme, ANCHOR_GAP);
+            }
+            UiCommand::HidePalette => crate::palette::ffi::hide(),
+            UiCommand::Move {
+                anchor,
+                composition,
+            } => {
+                // 予測の窓は組み立て中の文字全体の右に置く．全体の位置を知らせない DLL では候補の窓と同じ基準にする
+                self.prediction_anchor = Some(composition.unwrap_or_else(|| anchor.clone()));
+                self.anchor = Some(anchor);
+            }
             // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
             // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)
             UiCommand::Hide => {
@@ -409,7 +459,7 @@ impl App {
     }
 
     fn repaint(&mut self) {
-        let (Some(scene), Some(theme)) = (self.scene.clone(), self.theme.clone()) else {
+        let Some(theme) = self.theme.clone() else {
             return;
         };
         let Ok(measure) = self
@@ -418,13 +468,73 @@ impl App {
         else {
             return;
         };
-        let opacity = self.opacity;
-        let window = if self.on_glass {
-            &mut self.glass
+        if let Some(scene) = self.scene.clone() {
+            let opacity = self.opacity;
+            let window = if self.on_glass {
+                &mut self.glass
+            } else {
+                &mut self.plain
+            };
+            let _ = window.draw(&self.renderer, &scene, &measure, opacity);
+        }
+        if let Some(scene) = self.prediction_scene.clone() {
+            let window = if self.prediction_on_glass {
+                &mut self.prediction_glass
+            } else {
+                &mut self.prediction_plain
+            };
+            let _ = window.draw(&self.renderer, &scene, &measure, 1.0);
+        }
+    }
+
+    fn prediction_window(&self) -> &Window {
+        if self.prediction_on_glass {
+            &self.prediction_glass
         } else {
-            &mut self.plain
-        };
-        let _ = window.draw(&self.renderer, &scene, &measure, opacity);
+            &self.prediction_plain
+        }
+    }
+
+    /// 予測の窓を描き直す．候補の窓とは別の窓で，組み立て中の文字の右に置く(候補の窓の出し入れとは関わらない)
+    fn refresh_prediction(
+        &mut self,
+        theme: &ResolvedTheme,
+        dark: bool,
+        measure: &render::TextMeasure,
+    ) {
+        let style = Look::new(theme, self.presentation.font_size as f32);
+        let scene = self.prediction.as_ref().map(|prediction| {
+            scene::surround(
+                scene::prediction(prediction, &style, measure),
+                theme,
+                Surround::Shadow,
+            )
+        });
+        if theme.backdrop != self.prediction_on_glass {
+            self.prediction_window().hide();
+            self.prediction_on_glass = theme.backdrop;
+        }
+        match (&scene, self.prediction_anchor.clone()) {
+            (Some(scene), Some(anchor)) => {
+                let window = if self.prediction_on_glass {
+                    &mut self.prediction_glass
+                } else {
+                    &mut self.prediction_plain
+                };
+                window.set_chrome(theme.backdrop, dark, theme.frame);
+                window.place_beside(&anchor, scene, tokens::size::prediction::GAP);
+                let _ = window.draw(&self.renderer, scene, measure, 1.0);
+                if std::mem::take(&mut self.prediction_changed) && system::screen_reader() {
+                    if let Some(prediction) = &self.prediction {
+                        let text = format!("{}{}", prediction.typed, prediction.completion);
+                        self.prediction_window()
+                            .announce(&strings::prediction(&text));
+                    }
+                }
+            }
+            _ => self.prediction_window().hide(),
+        }
+        self.prediction_scene = scene;
     }
 
     /// ナレーターが動いているときだけ，選んでいる候補・注目している文節・案内を読み上げる
@@ -454,6 +564,7 @@ impl App {
         let Ok(measure) = self.renderer.measure(&theme, font_size) else {
             return;
         };
+        self.refresh_prediction(&theme, look.dark, &measure);
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
         let build = |content: &Content, style: &Look| match content {
