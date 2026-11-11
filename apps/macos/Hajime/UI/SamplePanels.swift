@@ -57,3 +57,80 @@ enum SamplePanels {
               variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true, shorter: "中野で", longer: nil),
     ], position: 1, total: 8)
 }
+
+/// 見本のパレット(R-26)．設定の画面の外観のプレビューと，見本の画像(SnapshotRenderer)で使う
+enum SamplePalettes {
+    private static let emojiRows: [[String]] = [
+        ["👍", "🙇", "😂", "🎉", "🙏", "✨", "👀", "🔥", "💯"],
+        ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂"],
+        ["🙃", "🫠", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘"],
+        ["😗", "☺️", "😚", "😙", "🥲", "😋", "😛", "😜", "🤪"],
+        ["😝", "🤑", "🤗", "🤭", "🫢", "🫣", "🤫", "🤔", "🫡"],
+        ["🤐", "🤨", "😐", "😑", "😶", "🫥", "😏", "😒", "🙄"],
+    ]
+    private static let symbolRows: [[String]] = [
+        ["※", "→", "★", "〒", "①", "℃"],
+        ["→", "←", "↑", "↓", "↔", "↕", "↗", "↘", "↙"],
+        ["↖", "⇒", "⇐", "⇑", "⇓", "⇔", "⇕", "⟶", "⟵"],
+        ["⟷", "⟹", "⟸", "⟺", "↦", "↤", "↩", "↪", "↺"],
+        ["↻", "⤴", "⤵", "↰", "↱", "↲", "↳", "↴", "↵"],
+        ["⇄", "⇅", "⇆", "⇇", "⇈", "⇉", "⇊", "⇋", "⇌"],
+    ]
+
+    private static let hints: [PalettePanel.Hint] = [
+        .init(key: "Enter", action: PaletteStrings.insert), .init(key: "Tab", action: PaletteStrings.category),
+        .init(key: "⌃Tab", action: PaletteStrings.switchKind), .init(key: "⇧Enter", action: PaletteStrings.insertAndContinue),
+        .init(key: "⌥Enter", action: PaletteStrings.skinTone), .init(key: "⌃D", action: PaletteStrings.pin), .init(key: "Esc", action: PaletteStrings.close),
+    ]
+
+    private static func modes(_ kind: PaletteItem.Kind) -> [PalettePanel.Mode] {
+        PaletteItem.Kind.allCases.map { .init(kind: $0, title: PaletteStrings.title(of: $0), isSelected: $0 == kind) }
+    }
+
+    private static func rows(_ texts: [[String]], titles: [String], starts: Set<Int>) -> [PalettePanel.Row] {
+        texts.enumerated().map { index, row in
+            PalettePanel.Row(index: index, cells: row.map { .init(text: $0, name: $0) }, startsSection: starts.contains(index), sectionTitle: titles[index])
+        }
+    }
+
+    /// 絵文字のパレットを開いたところ．よく使う文字の行の下に表のまとまりが続く
+    static let emoji: PalettePanel = {
+        let titles = [PaletteStrings.frequent] + Array(repeating: PaletteCategory.smileys.title, count: 5)
+        let tabs: [PalettePanel.Tab] = [.init(section: .frequent, title: PaletteStrings.frequent, symbol: PaletteStrings.frequentSymbol, isSelected: false)]
+            + PaletteCategory.allCases.filter { $0.kind == .emoji }.map { .init(section: .category($0), title: $0.title, symbol: $0.symbol, isSelected: $0 == .smileys) }
+        return PalettePanel(
+            modes: modes(.emoji), query: "", placeholder: PaletteStrings.emojiPlaceholder, tabs: tabs, heading: PaletteStrings.frequent,
+            rows: rows(emojiRows, titles: titles, starts: [0, 1]), rowCount: 210, firstRow: 0, columns: 9, visibleRows: 6,
+            selection: .init(row: 1, column: 2),
+            preview: .init(text: "😄", japaneseName: "目も笑っている笑顔", englishName: "grinning face with smiling eyes", shortcodes: [":smile:"],
+                           readings: ["めもわらっているえがお", "えがお", "すまいる"], codePoints: "U+1F604", isPinned: false),
+            showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
+    }()
+
+    /// 「ojigi」と打って探したところ．肌の色の帯を開いている
+    static let search: PalettePanel = {
+        let options = SkinTone.allCases.map { PaletteItem(kind: .emoji, category: .people, text: "🙇", skinTones: ["🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"]).text(skinTone: $0) }
+        return PalettePanel(
+            modes: modes(.emoji), query: "おじぎ", placeholder: PaletteStrings.emojiPlaceholder, tabs: [],
+            heading: PaletteStrings.results + "　" + PaletteStrings.resultCount(3),
+            rows: rows([["🙇", "🙇‍♂️", "🙇‍♀️"]], titles: [PaletteStrings.results], starts: [0]), rowCount: 1, firstRow: 0, columns: 9, visibleRows: 6,
+            selection: .init(row: 0, column: 0),
+            preview: .init(text: "🙇", japaneseName: "おじぎする人", englishName: "person bowing", shortcodes: [":bow:"],
+                           readings: ["おじぎするひと", "おじぎ", "ごめんなさい", "どげざ"], codePoints: "U+1F647", isPinned: true),
+            showsPreview: true, skinTone: .none, skinTonePicker: .init(options: options, selected: 2), message: nil, hints: hints)
+    }()
+
+    /// 記号のパレット．ピン留めの行の下に矢印のまとまり
+    static let symbol: PalettePanel = {
+        let titles = [PaletteStrings.pinned] + Array(repeating: PaletteCategory.arrows.title, count: 5)
+        let tabs: [PalettePanel.Tab] = [.init(section: .pinned, title: PaletteStrings.pinned, symbol: PaletteStrings.pinnedSymbol, isSelected: false)]
+            + PaletteCategory.allCases.filter { $0.kind == .symbol }.map { .init(section: .category($0), title: $0.title, symbol: $0.symbol, isSelected: $0 == .arrows) }
+        return PalettePanel(
+            modes: modes(.symbol), query: "", placeholder: PaletteStrings.symbolPlaceholder, tabs: tabs, heading: PaletteCategory.arrows.title,
+            rows: rows(symbolRows, titles: titles, starts: [0, 1]), rowCount: 160, firstRow: 0, columns: 9, visibleRows: 6,
+            selection: .init(row: 2, column: 1),
+            preview: .init(text: "⇒", japaneseName: "右向き二重矢印", englishName: "rightwards double arrow", shortcodes: [],
+                           readings: ["みぎむきにじゅうやじるし", "ならば", "やじるし"], codePoints: "U+21D2", isPinned: false),
+            showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
+    }()
+}

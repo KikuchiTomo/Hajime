@@ -2,7 +2,7 @@ import Foundation
 import HajimeApplication
 import HajimeDomain
 
-/// アプリに同梱した絵文字と記号のパレットの表(data/palette/palette.tsv)を裏で読む(R-25)．通信しない．
+/// アプリに同梱した絵文字と記号のパレットの表(data/palette/palette.tsv)を裏で読む(R-26)．通信しない．
 ///
 /// 読むときに次のことをする．どれも数十ミリ秒かかるので，打鍵を止めないよう裏で行い，読み終わるまでは表が無いものとして扱う
 /// - OS が描けない新しい絵文字を除く．バージョンごとの見本の絵文字を canRender で描けるか確かめ，描ける最も新しいバージョンまでを使う

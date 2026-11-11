@@ -14,14 +14,16 @@ final class ClientActionPresenter {
     private let note: NoteController
     private let openSettings: () -> Void
     private let handwriting: HandwritingController
+    private let palette: PaletteController
     private let settings: any SettingsStoring
     /// コマンドの候補を選んで確定したときに動かす(R-22)
     private let runCommand: (LauncherCommand) -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
     init(session: InputSession, candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
-         openSettings: @escaping () -> Void, handwriting: HandwritingController, runCommand: @escaping (LauncherCommand) -> Void) {
+         openSettings: @escaping () -> Void, handwriting: HandwritingController, palette: PaletteController, runCommand: @escaping (LauncherCommand) -> Void) {
         self.session = session
+        self.palette = palette
         self.runCommand = runCommand
         self.openSettings = openSettings
         self.handwriting = handwriting
@@ -79,9 +81,15 @@ final class ClientActionPresenter {
                     guard let self else { return }
                     self.apply(self.session.insert(text), to: client)
                 }
-            case .showPalette, .hidePalette:
-                // パレットの窓は composition root が PaletteServices を渡したときだけ開く．まだ渡していないので来ない
-                break
+            case .showPalette(let shown):
+                // パレットの窓はアプリで 1 つなので，マウスの操作は今キーを受けている入力先のセッションに渡す
+                palette.onTarget = { [weak self, weak client = client as AnyObject] target in
+                    guard let self, let client = client as? any IMKTextInput else { return }
+                    self.apply(self.session.palette(target, context: self.context), to: client)
+                }
+                palette.show(shown, caret: caretRect(of: client), theme: ThemeChoice(settings.current), cellSize: settings.current.paletteCellSize)
+            case .hidePalette:
+                palette.hide()
             case .toggleLiveConversion:
                 do {
                     try settings.update { $0.liveConversion.toggle() }

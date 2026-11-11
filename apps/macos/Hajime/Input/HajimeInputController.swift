@@ -268,7 +268,8 @@ final class HajimeInputController: IMKInputController {
     @MainActor
     override func menu() -> NSMenu! {
         menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), handwriting: #selector(openHandwriting(_:)),
-                                        openSettings: #selector(showPreferences(_:)), checkForUpdates: #selector(checkForUpdates(_:))))
+                                        palette: #selector(openPalette(_:)), openSettings: #selector(showPreferences(_:)),
+                                        checkForUpdates: #selector(checkForUpdates(_:))))
     }
 
     /// 再変換．入力先で選んでいる文字を読み，読みに戻して変換する．選んでいなければ何もしない．
@@ -290,6 +291,12 @@ final class HajimeInputController: IMKInputController {
     @MainActor @objc func openHandwriting(_ sender: Any) {
         guard let client = client() else { return }
         presenter.apply(session.openHandwriting(), to: client)
+    }
+
+    /// 入力メニューの「絵文字と記号」．前に見ていた種類(絵文字か記号か)で開く
+    @MainActor @objc func openPalette(_ sender: Any) {
+        guard let client = client() else { return }
+        presenter.apply(session.openPalette(), to: client)
     }
 
     @MainActor @objc func toggleLiveConversion(_ sender: Any) {

@@ -14,6 +14,7 @@ final class InputMenuBuilder {
     struct Actions {
         var toggleLiveConversion: Selector
         var handwriting: Selector
+        var palette: Selector
         var openSettings: Selector
         var checkForUpdates: Selector
     }
@@ -39,11 +40,13 @@ final class InputMenuBuilder {
     private var cachedMenu: NSMenu?
     private var liveConversionItem: NSMenuItem?
     private var handwritingItem: NSMenuItem?
+    private var paletteItem: NSMenuItem?
 
     func menu(actions: Actions) -> NSMenu {
         if let cachedMenu {
             liveConversionItem?.state = settings.current.liveConversion ? .on : .off
             syncHandwritingItem(in: cachedMenu)
+            syncPaletteItem(in: cachedMenu)
             return cachedMenu
         }
         let menu = NSMenu()
@@ -56,7 +59,9 @@ final class InputMenuBuilder {
         cachedMenu = menu
         liveConversionItem = live
         handwritingItem = NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")
+        paletteItem = NSMenuItem(title: UIStrings.Menu.palette, action: actions.palette, keyEquivalent: "")
         syncHandwritingItem(in: menu)
+        syncPaletteItem(in: menu)
         return menu
     }
 
@@ -69,6 +74,18 @@ final class InputMenuBuilder {
             menu.insertItem(handwritingItem, at: 1)
         } else if !settings.current.handwriting, present {
             menu.removeItem(handwritingItem)
+        }
+    }
+
+    /// 絵文字と記号のパレット(R-26)は設定で使うときだけ，ライブ変換と手書き入力の次に置く(外し方は手書き入力と同じ)
+    private func syncPaletteItem(in menu: NSMenu) {
+        guard let paletteItem else { return }
+        let present = menu.index(of: paletteItem) >= 0
+        if settings.current.palette, !present {
+            let afterHandwriting = handwritingItem.map { menu.index(of: $0) >= 0 } ?? false
+            menu.insertItem(paletteItem, at: afterHandwriting ? 2 : 1)
+        } else if !settings.current.palette, present {
+            menu.removeItem(paletteItem)
         }
     }
 

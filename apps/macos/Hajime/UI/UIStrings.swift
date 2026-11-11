@@ -620,6 +620,7 @@ enum UIStrings {
         static let openSettings = "設定を開く…"
         static let liveConversion = "ライブ変換"
         static let handwriting = "手書き入力"
+        static let palette = "絵文字と記号"
         static let checkForUpdates = "更新を確認"
     }
 
@@ -720,7 +721,7 @@ enum UIStrings {
 
     /// 設定の画面で足したページと項目
     /// 足した機能の項目の名前(テンキー・記号・補正・送り仮名・計算・読み違い)
-    /// 絵文字と記号のパレット(R-25)の設定の項目
+    /// 絵文字と記号のパレット(R-26)の設定の項目
     enum Palette {
         static let enabled = "絵文字と記号のパレット"
         static let closesAfterInsert = "入力したらパレットを閉じる"

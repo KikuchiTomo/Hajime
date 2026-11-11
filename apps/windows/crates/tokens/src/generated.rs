@@ -388,6 +388,36 @@ pub mod size {
         pub const CANDIDATE_GAP: f32 = 6.0;
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
     }
+    pub mod palette {
+        pub const PADDING: f32 = 8.0;
+        pub const GAP: f32 = 6.0;
+        pub const SEARCH_HEIGHT: f32 = 30.0;
+        pub const SEARCH_RADIUS: f32 = 8.0;
+        pub const SEARCH_FONT_SIZE: f32 = 14.0;
+        pub const SEARCH_ICON_SIZE: f32 = 13.0;
+        pub const MODE_FONT_SIZE: f32 = 12.0;
+        pub const MODE_PADDING_X: f32 = 10.0;
+        pub const TAB_HEIGHT: f32 = 28.0;
+        pub const TAB_ICON_SIZE: f32 = 14.0;
+        pub const HEADING_HEIGHT: f32 = 20.0;
+        pub const HEADING_FONT_SIZE: f32 = 11.0;
+        pub const CELL_RADIUS: f32 = 6.0;
+        pub const EMOJI_SCALE: f32 = 0.7;
+        pub const SYMBOL_SCALE: f32 = 0.55;
+        pub const SELECTION_STROKE: f32 = 2.0;
+        pub const SCROLLBAR_WIDTH: f32 = 3.0;
+        pub const SCROLLBAR_GUTTER: f32 = 9.0;
+        pub const SCROLLBAR_MIN_LENGTH: f32 = 16.0;
+        pub const PREVIEW_HEIGHT: f32 = 60.0;
+        pub const PREVIEW_GLYPH_SIZE: f32 = 40.0;
+        pub const PREVIEW_GAP: f32 = 10.0;
+        pub const NAME_FONT_SIZE: f32 = 13.0;
+        pub const DETAIL_FONT_SIZE: f32 = 11.0;
+        pub const CODE_FONT_SIZE: f32 = 10.0;
+        pub const FOOTER_HEIGHT: f32 = 28.0;
+        pub const PICKER_CELL_SIZE: f32 = 36.0;
+        pub const PROBE_FONT_SIZE: f32 = 20.0;
+    }
     pub mod snapshot {
         pub const MARGIN: f32 = 16.0;
         pub const SCALE: f32 = 2.0;
@@ -585,5 +615,8 @@ pub mod opacity {
         pub const CARD_SELECTED: f32 = 0.12;
         pub const CARD_IDLE: f32 = 0.05;
         pub const FIELD: f32 = 0.82;
+    }
+    pub mod palette {
+        pub const SCROLLBAR: f32 = 0.45;
     }
 }

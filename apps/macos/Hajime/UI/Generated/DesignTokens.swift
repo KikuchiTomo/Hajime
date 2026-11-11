@@ -276,6 +276,36 @@ enum DesignTokens {
             static let candidateGap: CGFloat = 6
             static let candidateFontSize: CGFloat = 18
         }
+        enum Palette {
+            static let padding: CGFloat = 8
+            static let gap: CGFloat = 6
+            static let searchHeight: CGFloat = 30
+            static let searchRadius: CGFloat = 8
+            static let searchFontSize: CGFloat = 14
+            static let searchIconSize: CGFloat = 13
+            static let modeFontSize: CGFloat = 12
+            static let modePaddingX: CGFloat = 10
+            static let tabHeight: CGFloat = 28
+            static let tabIconSize: CGFloat = 14
+            static let headingHeight: CGFloat = 20
+            static let headingFontSize: CGFloat = 11
+            static let cellRadius: CGFloat = 6
+            static let emojiScale: CGFloat = 0.7
+            static let symbolScale: CGFloat = 0.55
+            static let selectionStroke: CGFloat = 2
+            static let scrollbarWidth: CGFloat = 3
+            static let scrollbarGutter: CGFloat = 9
+            static let scrollbarMinLength: CGFloat = 16
+            static let previewHeight: CGFloat = 60
+            static let previewGlyphSize: CGFloat = 40
+            static let previewGap: CGFloat = 10
+            static let nameFontSize: CGFloat = 13
+            static let detailFontSize: CGFloat = 11
+            static let codeFontSize: CGFloat = 10
+            static let footerHeight: CGFloat = 28
+            static let pickerCellSize: CGFloat = 36
+            static let probeFontSize: CGFloat = 20
+        }
         enum Snapshot {
             static let margin: CGFloat = 16
             static let scale: CGFloat = 2
@@ -471,6 +501,9 @@ enum DesignTokens {
             static let cardSelected: CGFloat = 0.12
             static let cardIdle: CGFloat = 0.05
             static let field: CGFloat = 0.82
+        }
+        enum Palette {
+            static let scrollbar: CGFloat = 0.45
         }
     }
 }

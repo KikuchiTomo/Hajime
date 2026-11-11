@@ -1,6 +1,6 @@
 import HajimeDomain
 
-/// パレットの窓に出す内容(R-25)．描く側はこれをそのまま描き，判断はしない．
+/// パレットの窓に出す内容(R-26)．描く側はこれをそのまま描き，判断はしない．
 ///
 /// 窓は上から，探す欄・種類の切り替え(絵文字と記号)・まとまりのタブ・見出し・文字のマス目・選んでいる文字の説明・キーの案内．
 /// マス目は見えている行だけを渡す．全体の行の数と先頭の行の位置で，描く側はスクロールバーを描く
@@ -233,8 +233,8 @@ public enum PaletteStrings {
     public static let pinned = "ピン留め"
     public static let frequent = "よく使う"
     public static let results = "検索結果"
-    public static let emojiPlaceholder = "絵文字を検索　:bow: のようなショートコードでも探せます"
-    public static let symbolPlaceholder = "記号を検索　やじるし、まるいち など"
+    public static let emojiPlaceholder = "絵文字を検索"
+    public static let symbolPlaceholder = "記号を検索"
     public static let notFound = "見つかりません。英語の名前やショートコードでも探せます"
     public static let loading = "読み込んでいます"
     public static let insert = "入力"
