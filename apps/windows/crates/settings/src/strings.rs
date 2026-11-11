@@ -854,7 +854,6 @@ pub mod wizard {
 pub mod update {
     pub const TITLE: &str = "更新を確認";
     pub const CHECKING: &str = "確認中…";
-    pub const INSTALLING: &str = "インストール中…";
 
     pub fn downloading(percent: Option<u8>) -> String {
         match percent {

@@ -31,7 +31,6 @@ enum Stage {
     Idle,
     Checking,
     Downloading(Option<u8>),
-    Installing,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +68,6 @@ impl Updater {
             Stage::Idle => None,
             Stage::Checking => Some(text::CHECKING.to_string()),
             Stage::Downloading(percent) => Some(text::downloading(percent)),
-            Stage::Installing => Some(text::INSTALLING.to_string()),
         }
     }
 }
@@ -278,8 +276,9 @@ pub(super) fn receive(window: Window) {
             }
             Message::Downloaded(Ok(path)) => {
                 if ffi::run_installer(&path) {
-                    // インストーラーが動いている設定の画面を止める(hajime.wxs の StopRunning)ので，そのまま待つ
-                    with_app(|app| set_stage(app, Stage::Installing));
+                    // 入れ始めるとインストーラーがこの画面を閉じる(hajime.wxs の StopRunning)．
+                    // UAC で取り消したときに表示が残らないよう，バージョンの表示に戻しておく
+                    with_app(|app| set_stage(app, Stage::Idle));
                 } else {
                     fail(window, Failure::Install);
                 }
