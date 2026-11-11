@@ -135,8 +135,8 @@ enum OperationEvaluation {
         return nil
     }
 
-    /// 読みを打つキー．かなはローマ字に，ローマ字表にある記号(、。ー「」・)はそのキーに，ほかの字はそのまま打つ．
-    /// ローマ字で打てない並びがあれば nil
+    /// 読みを打つキー．かなはローマ字に，記号はその記号になるキー(「（」は「(」，「…」は「z.」)に，ほかの字はそのまま打つ．
+    /// 「ん」は「xn」で打つ(「nn」のあとの母音は「んな」行にも読まれるため)．ローマ字で打てない並びがあれば nil
     static func typingKeys(for reading: String) -> [KeyEvent]? {
         var keys: [KeyEvent] = []
         var run = ""
@@ -148,18 +148,22 @@ enum OperationEvaluation {
             return true
         }
         for character in reading {
-            if character.unicodeScalars.allSatisfy({ (0x3041...0x309F).contains($0.value) }) || character == "ー" {
+            if character != "ん", character == "ー" || character.unicodeScalars.allSatisfy({ (0x3041...0x309F).contains($0.value) }) {
                 run.append(character)
                 continue
             }
             guard flush() else { return nil }
-            keys.append(KeyEvent(.character(symbolKeys[character] ?? character)))
+            let typed = character == "ん" ? "xn" : symbolKeys[character] ?? String(character)
+            keys += typed.map { KeyEvent(.character($0)) }
         }
         return flush() ? keys : nil
     }
 
-    /// ローマ字表で記号になるキー
-    private static let symbolKeys: [Character: Character] = ["、": ",", "。": ".", "「": "[", "」": "]", "・": "/", "？": "?", "！": "!"]
+    /// 記号になるキー(ローマ字表と記号の表を逆に引いたもの)
+    private static let symbolKeys: [Character: String] = [
+        "、": ",", "。": ".", "「": "[", "」": "]", "・": "/", "…": "z.", "‥": "z,", "『": "z[", "』": "z]", "〜": "~",
+        "！": "!", "？": "?", "（": "(", "）": ")", "：": ":", "；": ";", "＆": "&", "％": "%", "＃": "#", "＝": "=", "＋": "+",
+    ]
 
     /// アプリと同じ InputSession にキーを押し，組み立て中の文字を覚える
     @MainActor
