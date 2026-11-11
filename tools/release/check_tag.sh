@@ -1,5 +1,6 @@
 #!/bin/sh
 # リリースのタグ(v0.1.1)からバージョンを読み，リポジトリに書いた macOS と Windows のバージョンがどちらも同じかを確かめる．
+# リリースノートにする CHANGELOG.md の節があるかも確かめる．
 # 出力は GitHub Actions の出力の形(version=…・tag=…)
 # 使い方: tools/release/check_tag.sh <タグ>
 set -eu
@@ -17,4 +18,8 @@ for platform in macos windows; do
     exit 1
   fi
 done
+if ! python3 -I "$root/tools/release/changelog.py" section "$version" > /dev/null; then
+  echo "CHANGELOG.md に v$version の節がありません．tools/release/bump_version.sh で上げると「未リリース」が移ります" >&2
+  exit 1
+fi
 printf 'version=%s\ntag=%s\n' "$version" "$tag"

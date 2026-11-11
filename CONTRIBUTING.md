@@ -12,8 +12,9 @@
 1. Issue で何をするかを相談する(小さな修正は不要)．Issue はテンプレートから作る
 2. ブランチを切る．名前は `<種類>/<内容>`(例: `feat/yen-key-policy`)
 3. `make fetch-models` で Zenzai のモデルを取得し，`make check` と `make test` を通す(モデルが無いと本物の Zenzai のテストを飛ばす)
-4. PR のテンプレートに沿って説明を書き，`type:` のラベルを付ける
-5. 検査が通ったらスカッシュマージする
+4. 利用者から見える変更なら，[CHANGELOG.md](CHANGELOG.md) の「未リリース」に 1 行で書く(リリースノートとアプリの「更新を確認」の変更点になる)
+5. PR のテンプレートに沿って説明を書き，`type:` のラベルを付ける
+6. 検査が通ったらスカッシュマージする
 
 main には直接 push できません．決まりの詳細は [docs/dev/REPOSITORY.md](docs/dev/REPOSITORY.md) にあります．
 

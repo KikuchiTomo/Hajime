@@ -25,6 +25,7 @@ check:
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/protocol/generate.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check
+	$(PYTHON) tools/release/changelog.py check
 
 # モデルがあれば本物の Zenzai のテストも動かす．無ければ飛ばしたことを最後に出す
 test: test-debug

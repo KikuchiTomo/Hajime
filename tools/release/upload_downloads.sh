@@ -1,6 +1,8 @@
 #!/bin/sh
 # 作った配布物を Cloudflare R2 に置き，https://haji.men/download/ から配る(apps/docs-site/worker/downloads.js)．
 # バージョンのフォルダ(v<バージョン>/)に配布物と SHA256SUMS.txt を置いてから，最新のバージョン(latest.json)を書き換える．
+# latest.json はアプリの「更新を確認」も読む(https://haji.men/download/latest.json)．配布物の場所と SHA-256，
+# CHANGELOG.md の新しい節(更新を勧めるときに変更点として出す)を書く
 # 使い方: tools/release/upload_downloads.sh <バージョン> <配布物の置き場所>
 # R2 の S3 互換 API に AWS CLI で送る．AWS_ACCESS_KEY_ID と AWS_SECRET_ACCESS_KEY(このバケットだけに書ける R2 のアクセスキー)と
 # CLOUDFLARE_ACCOUNT_ID が要る
@@ -9,6 +11,8 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 version=$1
 dist=$(cd "$2" && pwd)
 site="$root/apps/docs-site"
+# latest.json に載せる変更点の数(古いバージョンから上げる人にも，飛ばしたバージョンの変更点を見せる)
+recent_releases=10
 # バケットの名前は Worker の設定(wrangler.jsonc の r2_buckets)と同じものを使う
 bucket=$(sed -n 's/^ *"bucket_name": *"\([^"]*\)".*/\1/p' "$site/wrangler.jsonc")
 if [ -z "$bucket" ] || [ "$(printf '%s\n' "$bucket" | wc -l | tr -d ' ')" -ne 1 ]; then
@@ -38,7 +42,13 @@ put "$folder/SHA256SUMS.txt" "$dist/SHA256SUMS.txt" "text/plain; charset=utf-8"
 
 # 配布物をすべて置いてから最新のバージョンを切り替える(途中で失敗しても，前のバージョンへの転送が残る)
 latest="$dist/latest.json"
-printf '{"version":"%s","files":{"macos":"%s/%s","windows":"%s/%s"}}\n' \
-  "$version" "$folder" "$(basename "$pkg")" "$folder" "$(basename "$msi")" > "$latest"
+digest() { (cd "$dist" && sha256sum "$(basename "$1")" | cut -d ' ' -f 1); }
+releases=$(python3 -I "$root/tools/release/changelog.py" recent "$version" "$recent_releases")
+jq -n --arg version "$version" \
+  --arg macos "$folder/$(basename "$pkg")" --arg windows "$folder/$(basename "$msi")" \
+  --arg macos_sha256 "$(digest "$pkg")" --arg windows_sha256 "$(digest "$msi")" \
+  --argjson releases "$releases" \
+  '{version: $version, files: {macos: $macos, windows: $windows}, sha256: {macos: $macos_sha256, windows: $windows_sha256}, releases: $releases}' \
+  > "$latest"
 put latest.json "$latest" application/json
 echo "置きました: https://haji.men/download/$folder/"

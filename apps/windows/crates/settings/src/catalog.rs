@@ -119,9 +119,29 @@ pub struct Catalog {
     pub timing: Timing,
     /// 一覧を書き出すファイルの既定の名前(RuleList の名前ごと)
     pub export_file_names: std::collections::BTreeMap<String, String>,
-    /// 「更新を確認」で開く最新のリリースのページ(DefaultSettings.latestReleaseURL)
+    /// 自動で更新できないときに開く最新のリリースのページ(DefaultSettings.latestReleaseURL)
     #[serde(rename = "latestReleaseURL")]
     pub latest_release_url: String,
+    /// 更新の確認(R-19)
+    pub update: Update,
+}
+
+/// 更新の確認に使う場所と上限(DefaultSettings の updateManifestURL など)
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Update {
+    /// 最新のバージョンと配布物の場所・SHA-256・変更点(latest.json)
+    #[serde(rename = "manifestURL")]
+    pub manifest_url: String,
+    /// 配布物の場所(latest.json の files の値)の前に付ける URL
+    #[serde(rename = "downloadBaseURL")]
+    pub download_base_url: String,
+    pub manifest_bytes: u64,
+    pub package_bytes: u64,
+    /// 秒
+    pub manifest_timeout: f64,
+    /// 秒
+    pub download_timeout: f64,
 }
 
 impl Catalog {
@@ -155,6 +175,10 @@ mod tests {
     fn 更新を確認で開くページは_https() {
         let catalog = Catalog::load().unwrap();
         assert!(catalog.latest_release_url.starts_with("https://"));
+        assert!(catalog.update.manifest_url.starts_with("https://"));
+        assert!(catalog.update.download_base_url.starts_with("https://"));
+        assert!(catalog.update.download_base_url.ends_with('/'));
+        assert!(catalog.update.manifest_bytes > 0 && catalog.update.package_bytes > 0);
     }
 
     #[test]

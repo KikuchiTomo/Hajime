@@ -174,5 +174,13 @@
     "fileTimeout" : 60,
     "reconnectInterval" : 3,
     "responseTimeout" : 2
+  },
+  "update" : {
+    "downloadBaseURL" : "https://haji.men/download/",
+    "downloadTimeout" : 1800,
+    "manifestBytes" : 262144,
+    "manifestTimeout" : 30,
+    "manifestURL" : "https://haji.men/download/latest.json",
+    "packageBytes" : 1073741824
   }
 }

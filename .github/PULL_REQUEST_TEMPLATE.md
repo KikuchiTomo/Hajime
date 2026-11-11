@@ -21,6 +21,7 @@
 
 - [ ] `make check`
 - [ ] `make test`
+- [ ] 利用者から見える変更なら CHANGELOG.md の「未リリース」に書いた
 - [ ] 入力内容をログ・通信に出していない
 - [ ] 値をコードに直接書いていない
 - [ ] 必要な文書(ARCHITECTURE・SECURITY-MODEL・DESIGN-SYSTEM・ADR)を更新した
