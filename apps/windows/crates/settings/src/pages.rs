@@ -174,6 +174,8 @@ impl Page {
                 features::LANGUAGE_RULES,
                 features::TRY_LANGUAGE,
                 options::INPUT_STYLES[3].1,
+                extras::ENGLISH_TERMS_SECTION,
+                extras::ENGLISH_TERMS,
             ],
             Page::Symbols => vec![features::SEQUENCES, features::READINGS],
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
@@ -310,6 +312,7 @@ pub enum LimitKind {
     KeymapEntries,
     Commands,
     Macros,
+    EnglishTerms,
 }
 
 impl LimitKind {
@@ -323,6 +326,7 @@ impl LimitKind {
             LimitKind::KeymapEntries => catalog.limits.keymap_entries,
             LimitKind::Commands => catalog.limits.commands,
             LimitKind::Macros => catalog.limits.macros,
+            LimitKind::EnglishTerms => catalog.limits.english_terms,
         }
     }
 }
@@ -988,6 +992,7 @@ const ROMAJI_FIELDS: &[Field] = &[
     Field::named("kana", settings::ROMAJI_KANA, false),
 ];
 const WORD_FIELDS: &[Field] = &[Field::text(features::WORD_PLACEHOLDER)];
+const ENGLISH_TERM_FIELDS: &[Field] = &[Field::text(extras::ENGLISH_TERM_PLACEHOLDER)];
 const LANGUAGE_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::LANGUAGE_RULE_WORD, true),
     Field::choice(
@@ -1133,6 +1138,37 @@ fn language() -> Vec<Section> {
                 LimitKind::WordLanguageEntries,
             )],
             footer: Some(crate::strings::windows::LANGUAGE_NOTE),
+            footer_variants: &[],
+        },
+        Section {
+            title: Some(extras::ENGLISH_TERMS_SECTION),
+            rows: vec![Row::toggle(
+                extras::ENGLISH_TERM_CANDIDATES,
+                "englishTermCandidates",
+            )],
+            footer: Some(extras::ENGLISH_TERM_CANDIDATES_NOTE),
+            footer_variants: &[],
+        },
+        Section {
+            title: Some(extras::ENGLISH_TERMS),
+            rows: with_files(
+                Row::list(
+                    ListSpec {
+                        path: "englishTerms",
+                        fields: ENGLISH_TERM_FIELDS,
+                        empty: extras::ENGLISH_TERMS_EMPTY,
+                        invalid: crate::strings::Text::Limited(
+                            crate::strings::LimitedText::EnglishTerm,
+                        ),
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::EnglishTerms,
+                )
+                .enabled_when(Condition::On("englishTermCandidates")),
+                RuleList::EnglishTerms,
+            ),
+            footer: Some(extras::ENGLISH_TERMS_NOTE),
             footer_variants: &[],
         },
     ]

@@ -169,6 +169,13 @@ pub mod extras {
     pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
     pub const PHONETIC_SPELLING_NOTE: &str =
         "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。";
+    pub const ENGLISH_TERM_CANDIDATES: &str = "英語の語の辞書を使う";
+    pub const ENGLISH_TERMS: &str = "英語の語の辞書に足した語";
+    pub const ENGLISH_TERMS_SECTION: &str = "英語の語の辞書";
+    pub const ENGLISH_TERM_CANDIDATES_NOTE: &str = "ローマ字で打った「api」を「API」に、「openai」を「OpenAI」にするように、書き方の決まった英語の語を候補に出します。「sora」のように読みが日本語の語（空）になるときは、日本語を先に出します。";
+    pub const ENGLISH_TERM_PLACEHOLDER: &str = "書き方どおりの語（例: OpenAI）";
+    pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
+    pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語の {datetime:…} などを入力時の値にする";
     pub const DYNAMIC_DICTIONARY_NOTE: &str = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。";
     pub const COMMANDS_PAGE: &str = "コマンド";
@@ -608,6 +615,8 @@ pub mod sync {
         ("userDictionary", "ユーザー辞書"),
         ("importedDictionaries", "取り込んだ辞書"),
         ("associationDictionaries", "連想の辞書"),
+        ("englishTermCandidates", "英語の語の辞書を使う"),
+        ("englishTerms", "英語の語の辞書に足した語"),
     ];
 
     pub fn field_label(name: &str) -> &str {
@@ -888,6 +897,13 @@ pub mod limited {
         )
     }
 
+    pub fn invalid_english_term(limits: &Limits) -> String {
+        format!(
+            "語は {}〜{} 文字の英字にしてください",
+            limits.english_term_minimum, limits.english_term_maximum
+        )
+    }
+
     pub fn invalid_reading_symbol(limits: &Limits) -> String {
         format!(
             "読みは {} 文字まで、記号は {} 文字までにしてください",
@@ -913,6 +929,7 @@ pub enum LimitedText {
     Exception,
     Symbol,
     ReadingSymbol,
+    EnglishTerm,
 }
 
 impl Text {
@@ -926,6 +943,7 @@ impl Text {
             Text::Limited(LimitedText::Exception) => limited::invalid_exception,
             Text::Limited(LimitedText::Symbol) => limited::invalid_symbol,
             Text::Limited(LimitedText::ReadingSymbol) => limited::invalid_reading_symbol,
+            Text::Limited(LimitedText::EnglishTerm) => limited::invalid_english_term,
         };
         make(limits).into()
     }

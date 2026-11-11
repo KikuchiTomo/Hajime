@@ -75,6 +75,9 @@ pub struct Limits {
     pub symbol_sequence_minimum: usize,
     pub symbol_input_length: usize,
     pub symbol_output_length: usize,
+    pub english_terms: usize,
+    pub english_term_minimum: usize,
+    pub english_term_maximum: usize,
 }
 
 /// 設定の画面がエンジンを待つ時間(秒)

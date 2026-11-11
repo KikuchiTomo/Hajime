@@ -156,16 +156,20 @@ func run() -> Int32 {
     let usageTables = ["usage_dict.txt", "usage_dict_extra.tsv"].map { HostPaths.installation.appendingPathComponent($0) }
         .filter { FileManager.default.fileExists(atPath: $0.path) }
     let usageDictionary = usageTables.isEmpty ? nil : UsageDictionaryFile(urls: usageTables)
+    // 英語の語の辞書(R-24)．インストール先の english-terms.txt と設定で足した語をまとめて引き，変換の候補と英単語の補正で共有する
+    let englishTerms = EnglishTerms(bundled: EnglishTermFile(url: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledEnglishTermFileName)),
+                                    settings: settings)
     // 英単語の辞書は Windows のスペルチェッカー(macOS の NSSpellChecker と同じ役)
     #if os(Windows)
-    let lexicon = WindowsSpellCheckerLexicon()
-    if !lexicon.isAvailable {
-        // 英単語の綴りの補正だけを止めて，入力は続ける
-        FileHandle.standardError.write(Data("英語のスペルチェッカーを使えません(\(lexicon.openStatus))．英単語の綴りの補正をしません\n".utf8))
+    let spellChecker = WindowsSpellCheckerLexicon()
+    if !spellChecker.isAvailable {
+        // 英単語の綴りの補正だけを止めて，入力は続ける(英語の語の辞書の語は補正する)
+        FileHandle.standardError.write(Data("英語のスペルチェッカーを使えません(\(spellChecker.openStatus))．英単語の綴りの補正をしません\n".utf8))
     }
     #else
-    let lexicon = UnavailableEnglishLexicon()
+    let spellChecker = UnavailableEnglishLexicon()
     #endif
+    let lexicon = EnglishTermLexicon(spellChecker, terms: englishTerms)
     // 打ち間違いの訂正は時間がかかるので，別の変換器で裏で求める(Zenzai があるときだけ．macOS の CompositionRoot と同じ)
     let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: HostPaths.versionString) }
     // 候補の指示は，Windows は候補ウィンドウ(hajime-candidate-ui.exe)，Linux は Fcitx 5 のアドオンが受け取る
@@ -187,14 +191,14 @@ func run() -> Int32 {
     let files = SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations)
 
     // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
-    let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar),
+    let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, englishTerms: englishTerms),
                                       lexicon: lexicon, settings: settings)
     // 戻した補正を設定の「直さない語句」に覚える(macOS の CompositionRoot と同じ)
     let rejections = SettingsCorrectionRejections(settings: settings)
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
-                                                          lexicon: lexicon),
+                                                          lexicon: lexicon, englishTerms: englishTerms),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                          keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary)
         },
