@@ -42,11 +42,20 @@ pub fn parse(markdown: &str) -> Vec<Acknowledgement> {
     items
 }
 
-/// 出どころの行を，前置き(「改変したもの: 」など)と URL に分ける．URL が無ければ None
-pub fn split_url(line: &str) -> Option<(&str, &str)> {
-    let start = line.find("https://")?;
-    let url = line[start..].split_whitespace().next()?;
-    Some((&line[..start], url))
+/// 出どころの行を，前置き(「改変したもの: 」など)・URL・後ろの文に分ける．URL が無ければ None．
+/// URL は「https://」から，空白・ASCII でない文字・括弧の手前までとし，末尾の句読点は含めない
+/// (「…/hajime-dictionary(v0.1.1)．」の括弧や句点まで URL にしない)．macOS の Acknowledgement.urlRange と同じ決まり
+pub fn split_url(line: &str) -> Option<(&str, &str, &str)> {
+    const SCHEME: &str = "https://";
+    let start = line.find(SCHEME)?;
+    let rest = &line[start..];
+    let mut end = rest
+        .find(|c: char| !c.is_ascii() || c.is_whitespace() || "()<>\"'`".contains(c))
+        .unwrap_or(rest.len());
+    while rest[..end].ends_with(|c: char| ".,;:!?".contains(c)) {
+        end -= 1;
+    }
+    (end > SCHEME.len()).then(|| (&line[..start], &rest[..end], &rest[end..]))
 }
 
 /// 配布物に入れた謝辞の項目(実行ファイルと同じディレクトリ．tools/windows/stage.ps1)．読めなければ空．
@@ -87,13 +96,34 @@ mod tests {
     fn 行の中の_url_を分ける() {
         assert_eq!(
             split_url("改変したもの: https://example.com/b"),
-            Some(("改変したもの: ", "https://example.com/b"))
+            Some(("改変したもの: ", "https://example.com/b", ""))
         );
         assert_eq!(
             split_url("https://example.com"),
-            Some(("", "https://example.com"))
+            Some(("", "https://example.com", ""))
         );
         assert_eq!(split_url("MIT License"), None);
+    }
+
+    #[test]
+    fn url_に続く括弧や文は_url_にしない() {
+        assert_eq!(
+            split_url("https://github.com/a/b(v0.1.1)．辞書として同梱"),
+            Some(("", "https://github.com/a/b", "(v0.1.1)．辞書として同梱"))
+        );
+        assert_eq!(
+            split_url("https://github.com/google/mozc (the presets)"),
+            Some(("", "https://github.com/google/mozc", " (the presets)"))
+        );
+        assert_eq!(
+            split_url("Wikidata(https://www.wikidata.org/)．"),
+            Some(("Wikidata(", "https://www.wikidata.org/", ")．"))
+        );
+        assert_eq!(
+            split_url("詳しくは https://example.com/a."),
+            Some(("詳しくは ", "https://example.com/a", "."))
+        );
+        assert_eq!(split_url("https://"), None);
     }
 
     #[test]
@@ -103,5 +133,16 @@ mod tests {
         assert!(items.len() >= 10);
         assert!(items.iter().all(|item| !item.name.is_empty()));
         assert!(items.iter().any(|item| item.license.is_some()));
+        // 出どころの URL は，空白や括弧や全角の文字を含まない
+        for (_, url, _) in items
+            .iter()
+            .flat_map(|item| item.sources.iter().filter_map(|line| split_url(line)))
+        {
+            assert!(
+                url.chars()
+                    .all(|c| c.is_ascii_graphic() && !"()".contains(c)),
+                "{url}"
+            );
+        }
     }
 }
