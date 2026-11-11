@@ -156,6 +156,13 @@ private struct ConversionTab: View {
                 ResettablePicker(model: model, title: UIStrings.Choice.presentation, keyPath: \.candidatePresentation, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.initialFocus, keyPath: \.initialFocus, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.suggestionDisplay, keyPath: \.suggestionDisplay, label: UIStrings.Choice.label(for:))
+                ResettableRow(model: model, keyPath: \.suggestionSkipCount) {
+                    Stepper(value: model.binding(\.suggestionSkipCount), in: DefaultSettings.suggestionSkipCountRange) {
+                        LabeledContent(UIStrings.More.suggestionSkipCount, value: UIStrings.More.skipCount(model.settings.suggestionSkipCount))
+                    }
+                }
+                .disabled(model.settings.suggestionDisplay == .off)
+                ResettablePicker(model: model, title: UIStrings.Choice.predictionDisplay, keyPath: \.predictionDisplay, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
                 ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
                 ResettableRow(model: model, keyPath: \.liveConversionDelay) {

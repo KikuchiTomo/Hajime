@@ -110,6 +110,7 @@ pub mod choice {
     pub const PRESENTATION: &str = "候補の表示";
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const SUGGESTION_DISPLAY: &str = "入力中の候補";
+    pub const PREDICTION_DISPLAY: &str = "入力中の予測";
 }
 
 /// UIStrings.Features
@@ -228,6 +229,7 @@ pub mod more {
     pub const LIVE_CONVERSION_DELAY: &str = "漢字にするまでの待ち時間";
     pub const LIVE_CONVERSION_SKIP_LENGTH: &str = "ライブ変換しない文字数";
     pub const ENGLISH_SKIP_LENGTH: &str = "英単語にしない文字数";
+    pub const SUGGESTION_SKIP_COUNT: &str = "入力中の候補を表示しない件数";
     pub const TYPO: &str = "タイプミス";
     pub const CORRECTION_SENSITIVITY: &str = "修正の基準";
     pub const SHOWS_SUGGESTIONS: &str = "「もしかして」を表示";
@@ -316,6 +318,15 @@ pub mod more {
             format!("{value} 文字以下")
         }
     }
+
+    /// 入力中の候補を表示しない件数の表示．0 はオフ(macOS の UIStrings.More.skipCount)
+    pub fn skip_count(value: f64) -> String {
+        if value == 0.0 {
+            "オフ".to_string()
+        } else {
+            format!("{value} 件以下")
+        }
+    }
 }
 
 /// UIStrings.Keys(キー設定のページの名前と，検索に使うコマンド・状態・ひな形の名前)
@@ -388,7 +399,7 @@ pub mod keys {
         ("convertWithoutLearning", "学習を使わずに変換"),
         ("deleteBackward", "左の文字を削除"),
         ("insertBoundary", "ここで区切る"),
-        ("acceptSuggestion", "「もしかして」に修正"),
+        ("acceptSuggestion", "「もしかして」に修正・予測を確定"),
         ("toHiragana", "全文をひらがなに変換"),
         ("toKatakana", "全文を全角カタカナに変換"),
         ("toHalfwidthKatakana", "全文を半角カタカナに変換"),
@@ -442,7 +453,7 @@ pub mod keys {
         ("convert", "英単語を修正した直後は、修正前に戻します"),
         ("convertWithoutLearning", "学習した順位を使わずに変換し、確定しても学習しません"),
         ("insertBoundary", "入力中に、現在の位置で文節を区切ります"),
-        ("acceptSuggestion", "「もしかして」で示した読みに修正します。示していないときは、入力中の候補から選択します"),
+        ("acceptSuggestion", "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"),
         ("switchKanaType", "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"),
         ("nextCandidate", "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"),
         ("previousCandidate", "入力中に押すと変換を始めます。入力中の候補を表示しているときは、文字種から選択します。分岐図では上の枝の文字種へ進みます"),
@@ -583,6 +594,8 @@ pub mod sync {
         ("candidatePresentation", "候補の表示"),
         ("initialFocus", "最初に選択する文節"),
         ("suggestionDisplay", "入力中の候補"),
+        ("predictionDisplay", "入力中の予測"),
+        ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
         ("liveConversionDelay", "漢字にするまでの待ち時間"),

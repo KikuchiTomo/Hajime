@@ -63,6 +63,7 @@ enum SnapshotRenderer {
                 render(paletteView(SamplePalettes.search, theme: look.theme, appearance: appearance), name: "palette-search-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.symbol, theme: look.theme, appearance: appearance), name: "palette-symbol-\(look.name)", to: output, appearance: appearance)
                 render(associationHintListView(theme: look.theme, appearance: appearance), name: "association-hint-list-\(look.name)", to: output, appearance: appearance)
+                render(predictionView(theme: look.theme, appearance: appearance), name: "prediction-\(look.name)", to: output, appearance: appearance)
                 render(associationHintBranchView(theme: look.theme, appearance: appearance), name: "association-hint-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
@@ -322,6 +323,16 @@ enum SnapshotRenderer {
         let panel = SamplePanels.suggestion
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 打っているあいだの続く語句の予測の窓．打った部分(エピ)はふつうの色，補う部分(ソード)は薄い色で，確定のキーを添える
+    private static func predictionView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = PredictionView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        view.prediction = Prediction(typed: "エピ", completion: "ソード", key: "Tab")
+        view.frame = NSRect(origin: .zero, size: view.fittingSize)
         return backdropped(view)
     }
 

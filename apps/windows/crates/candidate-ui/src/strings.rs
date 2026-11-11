@@ -18,6 +18,11 @@ pub fn mode(mode: InputMode) -> &'static str {
     }
 }
 
+/// 予測の窓を読み上げる文(macOS の UIStrings.Prediction.announcement)
+pub fn prediction(text: &str) -> String {
+    format!("予測 {text}")
+}
+
 pub fn position(first: u32, last: u32, total: u32) -> String {
     if first == last {
         format!("{first} / {total}")

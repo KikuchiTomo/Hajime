@@ -31,6 +31,7 @@ pub struct Ranges {
     pub candidates_per_page: Range,
     pub live_conversion_delay: Range,
     pub live_conversion_skip_length: Range,
+    pub suggestion_skip_count: Range,
     pub english_skip_length: Range,
     pub correction_delay: Range,
     pub review_correction_timeout: Range,

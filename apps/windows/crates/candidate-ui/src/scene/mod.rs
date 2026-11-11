@@ -17,7 +17,7 @@ pub use crate::geometry::{Frame, Point};
 pub use crate::theme::{Color, Font, ResolvedTheme};
 pub use branch::branch_map;
 pub use list::candidate_list;
-pub use small::{mode, note};
+pub use small::{mode, note, prediction};
 
 use crate::keys::Icon;
 use tokens::size;
