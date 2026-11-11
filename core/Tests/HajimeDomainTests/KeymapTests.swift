@@ -80,14 +80,16 @@ struct KeymapTests {
         #expect(standard.strokes(for: .cancel, in: .composing) == [KeyStroke(.escape)])
     }
 
-    @Test("R-17: 確定と取り消しのキーが無ければ知らせる")
+    @Test("R-17: 確定と取り消しのキーが無ければ知らせる．変換中は直前の変更の取り消しのキーがあれば足りる")
     func missingEssentials() {
         #expect(standard.missingEssentials.isEmpty)
         var keymap = standard
-        keymap.entries.removeAll { $0.command == .cancel }
+        keymap.entries.removeAll { $0.command == .cancel || $0.command == .undoConversionEdit }
         #expect(keymap.missingEssentials.map(\.command) == [.cancel, .cancel])
         keymap.entries.append(KeymapEntry(.composing, KeyStroke(.escape), .cancel))
         #expect(keymap.missingEssentials.map(\.state) == [.converting])
+        keymap.entries.append(KeymapEntry(.converting, KeyStroke(.escape), .undoConversionEdit))
+        #expect(keymap.missingEssentials.isEmpty)
     }
 
     @Test("R-17: キーは「Ctrl Shift Space」の形で書き，読み戻せる")
@@ -191,11 +193,40 @@ struct KeymapPresetTests {
             }
         }
         #expect(vim.command(for: KeyEvent(.escape), in: .idle) == nil)
-        for keymap in [windows, mac, emacs, vim] {
+        let atok = KeymapPreset.atok.keymap
+        #expect(atok.command(for: KeyEvent(.character("@"), modifiers: .control), in: .composing) == .toHalfwidthAlphanumeric)
+        #expect(atok.command(for: KeyEvent(.character("i"), modifiers: .control), in: .composing) == .toKatakana)
+        #expect(atok.command(for: KeyEvent(.character("i"), modifiers: .control), in: .converting) == .segmentToKatakana)
+        #expect(atok.command(for: KeyEvent(.right), in: .converting) == .extendSegment)
+        #expect(atok.command(for: KeyEvent(.right, modifiers: .shift), in: .converting) == .nextSegment)
+        #expect(atok.command(for: KeyEvent(.left, modifiers: .control), in: .converting) == .firstSegment)
+        #expect(atok.command(for: KeyEvent(.down), in: .converting) == .commitFirstSegment)
+        #expect(atok.command(for: KeyEvent(.henkan), in: .converting) == .nextCandidatePage)
+        #expect(atok.command(for: KeyEvent(.henkan, modifiers: .shift), in: .idle) == .reconvert)
+        for keymap in [windows, mac, emacs, vim, atok] {
             // どのひな形にも切り替えのキーと設定を開くキーがある
             #expect(keymap.command(for: KeyEvent(.eisu), in: .composing) == .directMode)
             #expect(keymap.command(for: KeyEvent(.character(","), modifiers: [.control, .option]), in: .idle) == .openSettings)
         }
+    }
+}
+
+@Suite("標準の表の変換中のキー(R-17)")
+struct StandardConversionKeysTests {
+    private let standard = KeymapPreset.standard.keymap
+
+    @Test("変換中の F6〜F8 は文節だけの字種，F9・F10 と入力中は全文．Esc は直前の変更の取り消し，Backspace は読みに戻す，Delete は打ち続ける")
+    func conversionKeys() {
+        #expect(standard.command(for: KeyEvent(.function(7)), in: .converting) == .segmentToKatakana)
+        #expect(standard.command(for: KeyEvent(.function(7)), in: .composing) == .toKatakana)
+        #expect(standard.command(for: KeyEvent(.function(9)), in: .converting) == .toFullwidthAlphanumeric)
+        #expect(standard.command(for: KeyEvent(.escape), in: .converting) == .undoConversionEdit)
+        #expect(standard.command(for: KeyEvent(.escape), in: .composing) == .cancel)
+        #expect(standard.command(for: KeyEvent(.backspace), in: .converting) == .backToReading)
+        #expect(standard.command(for: KeyEvent(.delete), in: .converting) == .resumeEditing)
+        #expect(standard.command(for: KeyEvent(.pageDown), in: .converting) == .nextCandidatePage)
+        #expect(standard.command(for: KeyEvent(.home), in: .converting) == .firstSegment)
+        #expect(standard.command(for: KeyEvent(.end), in: .converting) == .lastSegment)
     }
 }
 

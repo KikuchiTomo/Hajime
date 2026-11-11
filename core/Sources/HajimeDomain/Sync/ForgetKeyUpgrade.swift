@@ -13,7 +13,8 @@ enum ForgetKeyUpgrade {
 
     static func upgraded(_ keymap: Keymap) -> Keymap {
         if keymap.entries == previousStandard.entries {
-            var standard = KeymapPreset.standard.keymap
+            // バージョン 8 の標準の表にする(その先はあとの移し替えが今の標準の表にする)
+            var standard = ConversionKeysUpgrade.previousStandard
             standard.unknownEntries = keymap.unknownEntries
             return standard
         }
@@ -28,8 +29,8 @@ enum ForgetKeyUpgrade {
     /// バージョン 8 で標準の表に足した行
     static let added: [KeymapEntry] = [KeymapEntry(.converting, KeyStroke(.backspace, control: true), .forgetCandidate)]
 
-    /// バージョン 7 の標準の表．今の標準の表から足した行を除いたもの
+    /// バージョン 7 の標準の表．バージョン 8 の標準の表から足した行を除いたもの
     static var previousStandard: Keymap {
-        Keymap(KeymapPreset.standard.keymap.entries.filter { !added.contains($0) })
+        Keymap(ConversionKeysUpgrade.previousStandard.entries.filter { !added.contains($0) })
     }
 }

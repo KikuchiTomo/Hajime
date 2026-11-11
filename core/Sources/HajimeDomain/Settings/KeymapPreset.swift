@@ -1,7 +1,7 @@
 /// キー設定の表のひな形．読み込むと表をひな形の行で置き換える．
 ///
 /// 行は「状態<タブ>キー<タブ>コマンド」の形で書く(Keymap.rows(from:))．
-/// Windows 風と Mac 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行を Hajime IME の状態とコマンドに置き換えて作った．
+/// Windows 風・Mac 風・ATOK 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行を Hajime IME の状態とコマンドに置き換えて作った．
 /// Hajime IME に無いコマンドの行(読みの中のカーソル移動・予測・再変換・確定の取り消しなど)は除き，
 /// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Option+↑ を足してある(Ctrl+Tab はアプリのタブの切り替えとぶつかる)
 public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
@@ -11,6 +11,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     case mac
     case emacs
     case vim
+    case atok
 
     public var keymap: Keymap {
         Keymap(Keymap.rows(from: source))
@@ -24,6 +25,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         case .mac: Self.common + "\n" + Self.macRows
         case .emacs: Self.common + "\n" + Self.standardRows + "\n" + Self.emacsRows
         case .vim: Self.common + "\n" + Self.standardRows + "\n" + Self.vimRows
+        case .atok: Self.common + "\n" + Self.atokRows
         }
     }
 
@@ -46,7 +48,9 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         """
 
     /// 既定．↓ と Space で次の候補，Shift+←→ で文節の長さ，Tab と → で次の文節へ，Option+→ で誤りやすい文節へ．
-    /// 入力中の Shift+Space と，変換中の Shift+↑ で連想変換(R-18)
+    /// 入力中の Shift+Space と，変換中の Shift+↑ で連想変換(R-18)．
+    /// 変換中の F6〜F8 は選んでいる文節だけの字種(F9・F10 は全文)，Esc は直前の変更の取り消し(続けて押すと全文を読みに戻す)，
+    /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける
     static let standardRows = """
         anywhere\tEnter\tcommit
         anywhere\tEscape\tcancel
@@ -90,6 +94,15 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tShift Backspace\teditSegment
         converting\tBackspace\tbackToReading
         converting\tCtrl Backspace\tforgetCandidate
+        converting\tPageDown\tnextCandidatePage
+        converting\tPageUp\tpreviousCandidatePage
+        converting\tHome\tfirstSegment
+        converting\tEnd\tlastSegment
+        converting\tF6\tsegmentToHiragana
+        converting\tF7\tsegmentToKatakana
+        converting\tF8\tsegmentToHalfwidthKatakana
+        converting\tEscape\tundoConversionEdit
+        converting\tDelete\tresumeEditing
         """
 
     /// Emacs 風．標準に加えて Control+N・P で候補，Control+F・B で文節，Control+G で取り消す
@@ -314,6 +327,79 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tShift Up\tpreviousCandidatePage
         converting\tSpace\tnextCandidate
         converting\tUp\tpreviousCandidate
+        converting\tCtrl Delete\tforgetCandidate
+        composing\tTab\tacceptSuggestion
+        composing\tOption Up\tassociate
+        converting\tOption Up\tassociate
+        """
+
+    /// ATOK 風．入力中の Ctrl+U・I・O・P・@ で字種，変換中の ←→ で文節の長さ，Shift+←→ で文節を移り，Ctrl+←→ で先頭・末尾の文節へ，
+    /// ↓ で先頭の文節だけ確定し，変換のキーで候補のページを送る．変換中の Ctrl+U・I・O と F6〜F8 は選んでいる文節だけの字種にする
+    static let atokRows = """
+        idle\tShift Space\tinsertAlternateSpace
+        idle\tSpace\tinsertSpace
+        idle\tShift Henkan\treconvert
+        idle\tCtrl F12\topenSettings
+        composing\tBackspace\tdeleteBackward
+        composing\tCtrl h\tdeleteBackward
+        composing\tCtrl [\tcancel
+        composing\tEscape\tcancel
+        composing\tCtrl @\ttoHalfwidthAlphanumeric
+        composing\tCtrl i\ttoKatakana
+        composing\tCtrl o\ttoHalfwidthKatakana
+        composing\tCtrl p\ttoFullwidthAlphanumeric
+        composing\tCtrl u\ttoHiragana
+        composing\tCtrl m\tcommit
+        composing\tCtrl n\tcommit
+        composing\tDown\tcommit
+        composing\tEnter\tcommit
+        composing\tCtrl Space\tconvert
+        composing\tCtrl Down\tconvert
+        composing\tHenkan\tconvert
+        composing\tShift Henkan\tconvert
+        composing\tShift Space\tconvert
+        composing\tSpace\tconvert
+        composing\tF2\tconvertWithoutLearning
+        composing\tF6\ttoHiragana
+        composing\tF7\ttoKatakana
+        composing\tF8\ttoHalfwidthKatakana
+        composing\tF9\ttoFullwidthAlphanumeric
+        composing\tF10\ttoHalfwidthAlphanumeric
+        converting\tBackspace\tbackToReading
+        converting\tCtrl h\tcancel
+        converting\tCtrl [\tcancel
+        converting\tEscape\tcancel
+        converting\tCtrl @\ttoHalfwidthAlphanumeric
+        converting\tCtrl i\tsegmentToKatakana
+        converting\tCtrl o\tsegmentToHalfwidthKatakana
+        converting\tCtrl p\ttoFullwidthAlphanumeric
+        converting\tCtrl u\tsegmentToHiragana
+        converting\tF6\tsegmentToHiragana
+        converting\tF7\tsegmentToKatakana
+        converting\tF8\tsegmentToHalfwidthKatakana
+        converting\tF9\ttoFullwidthAlphanumeric
+        converting\tF10\ttoHalfwidthAlphanumeric
+        converting\tCtrl k\tshrinkSegment
+        converting\tCtrl l\textendSegment
+        converting\tLeft\tshrinkSegment
+        converting\tRight\textendSegment
+        converting\tCtrl Shift Left\tshrinkSegment
+        converting\tCtrl Shift Right\textendSegment
+        converting\tShift Left\tpreviousSegment
+        converting\tShift Right\tnextSegment
+        converting\tCtrl Left\tfirstSegment
+        converting\tCtrl Right\tlastSegment
+        converting\tCtrl m\tcommit
+        converting\tEnter\tcommit
+        converting\tCtrl n\tcommitFirstSegment
+        converting\tDown\tcommitFirstSegment
+        converting\tSpace\tnextCandidate
+        converting\tShift Space\tnextCandidate
+        converting\tCtrl Space\tnextCandidate
+        converting\tUp\tpreviousCandidate
+        converting\tShift Tab\tpreviousCandidate
+        converting\tHenkan\tnextCandidatePage
+        converting\tShift Henkan\tpreviousCandidatePage
         converting\tCtrl Delete\tforgetCandidate
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate

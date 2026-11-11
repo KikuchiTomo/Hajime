@@ -24,18 +24,28 @@ public enum IndicatorLabels {
     public struct Hint: Sendable, Equatable {
         public let first: KeymapCommand
         public let second: KeymapCommand?
+        /// first にキーが無いときに代わりに案内するコマンド
+        public let fallback: KeymapCommand?
         public let label: String
 
         init(_ first: KeymapCommand, _ second: KeymapCommand, _ label: String) {
             self.first = first
             self.second = second
+            self.fallback = nil
             self.label = label
         }
 
-        init(_ command: KeymapCommand, _ label: String) {
+        init(_ command: KeymapCommand, _ label: String, fallback: KeymapCommand? = nil) {
             first = command
             second = nil
+            self.fallback = fallback
             self.label = label
+        }
+
+        /// 変換中に first(キーが無ければ fallback)と second に割り当てた最初のキー
+        public func strokes(in keymap: Keymap) -> (first: KeyStroke?, second: KeyStroke?) {
+            func stroke(_ command: KeymapCommand?) -> KeyStroke? { command.flatMap { keymap.strokes(for: $0, in: .converting).first } }
+            return (stroke(first) ?? stroke(fallback), stroke(second))
         }
     }
 
@@ -58,7 +68,8 @@ public enum IndicatorLabels {
     public static let associationHints: [Hint] = [
         Hint(.nextCandidate, "選択"),
         Hint(.previousSegment, .nextSegment, "意味"),
-        Hint(.cancel, "戻る"),
+        // 変換中の Esc を直前の変更の取り消しにした表では，そのキーで戻る
+        Hint(.cancel, "戻る", fallback: .undoConversionEdit),
     ]
 
     /// 文節を区切っているときの案内(数字で区切る位置を選び，Esc でやめる)．count は区切れる位置の数
