@@ -8,6 +8,8 @@ import HajimeEngine
 //   hajime-playground [--zenzai <モデル>]                         ローマ字を打って結果を見る
 //   hajime-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
 //   hajime-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
+//   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--zenzai <モデル>]
+//                                                                期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合
 //   hajime-playground --evaluate-typo <TSV> [--zenzai <モデル>] [--typing-interval <秒>]
 //                                                                打ち間違いの補正(直した・示した・直さなかった)．
 //                                                                --typing-interval を付けると，その間隔で打ったときのように打鍵の合間に訂正を前もって求める
@@ -35,6 +37,15 @@ MainActor.assumeIsolated {
         print("Zenzai: \(playground.engine.usesZenzai ? "あり" : "なし")")
         if let file = arguments.value(of: "--evaluate") {
             Evaluation.conversion(cases: try EvaluationCase.load(from: file), engine: playground.engine)
+        } else if let file = arguments.value(of: "--evaluate-operations") {
+            let presentations = (arguments.value(of: "--presentation") ?? CandidatePresentation.allCases.map(\.rawValue).joined(separator: ","))
+                .split(separator: ",").compactMap { CandidatePresentation(rawValue: String($0)) }
+            // --shard k/n で n 個に分けた k 番目(0 から)だけを測る．分けて並べて動かし，結果をつなげる(1 文に数秒かかるため)
+            var cases = try EvaluationCase.load(from: file)
+            if let shard = arguments.value(of: "--shard")?.split(separator: "/").compactMap({ Int($0) }), shard.count == 2, shard[1] > 0 {
+                cases = cases.enumerated().filter { $0.offset % shard[1] == shard[0] }.map(\.element)
+            }
+            OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations)
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {
