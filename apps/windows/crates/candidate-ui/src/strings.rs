@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use ipc::{InputMode, KeyHint};
+use ipc::InputMode;
 
 /// 上の枝(文字種)の丸に入れる印
 pub const VARIANT_BADGE: &str = "↑";
@@ -16,6 +16,11 @@ pub fn mode(mode: InputMode) -> &'static str {
         InputMode::Japanese => "あ",
         InputMode::Direct => "A",
     }
+}
+
+/// 予測の窓を読み上げる文(macOS の UIStrings.Prediction.announcement)
+pub fn prediction(text: &str) -> String {
+    format!("予測 {text}")
 }
 
 pub fn position(first: u32, last: u32, total: u32) -> String {
@@ -54,21 +59,4 @@ pub fn association_position(index: u32, total: u32) -> String {
 
 pub fn dictionary_source(name: &str) -> String {
     format!("辞書: {name}")
-}
-
-fn hint(keys: &str, label: &str) -> KeyHint {
-    KeyHint {
-        keys: keys.into(),
-        label: label.into(),
-    }
-}
-
-/// 候補の一覧の足元の案内
-pub fn candidates_hints() -> Vec<KeyHint> {
-    vec![hint("↑", "文字種")]
-}
-
-/// 文字種の行を選んでいるときの足元の案内
-pub fn variants_hints() -> Vec<KeyHint> {
-    vec![hint("←→", "選択"), hint("↓", "候補")]
 }

@@ -10,15 +10,29 @@ import HajimeDomain
 /// - 検索の仕組み(PaletteSearch)を作る
 @MainActor
 public final class PaletteCatalogFile: PaletteCatalogProviding {
+    /// OS が描ける絵文字の決め方
+    enum Limit: Sendable {
+        /// 見本の絵文字を描けるか確かめる(macOS．アプリが OS の書体で確かめる)
+        case probe(@Sendable (String) -> Bool)
+        /// このバージョンまでを出す(Windows のエンジンのプロセス．書体を確かめられない)
+        case upTo(EmojiVersion)
+    }
+
     private let url: URL
-    private let canRender: @Sendable (String) -> Bool
+    private let limit: Limit
     private var loaded: PaletteIndex??
     private var loading: Task<PaletteIndex?, Never>?
 
     /// - Parameter canRender: OS がその絵文字を 1 つの字として描けるか．アプリが OS の書体で確かめる
     public init(url: URL, canRender: @escaping @Sendable (String) -> Bool) {
         self.url = url
-        self.canRender = canRender
+        self.limit = .probe(canRender)
+    }
+
+    /// 書体を確かめられないところ(Windows のエンジンのプロセス)で使う．maximumVersion までの絵文字を出す
+    public init(url: URL, maximumVersion: EmojiVersion) {
+        self.url = url
+        self.limit = .upTo(maximumVersion)
     }
 
     /// 読み終わった表．まだなら裏で読み始めて nil を返す
@@ -32,8 +46,8 @@ public final class PaletteCatalogFile: PaletteCatalogProviding {
     public func preload() {
         guard loaded == nil, loading == nil else { return }
         let url = url
-        let canRender = canRender
-        let task = Task.detached(priority: .utility) { Self.load(url, canRender: canRender) }
+        let limit = limit
+        let task = Task.detached(priority: .utility) { Self.load(url, limit: limit) }
         loading = task
         Task { [weak self] in
             let index = await task.value
@@ -50,13 +64,21 @@ public final class PaletteCatalogFile: PaletteCatalogProviding {
         return index
     }
 
-    nonisolated static func load(_ url: URL, canRender: @Sendable (String) -> Bool) -> PaletteIndex? {
+    nonisolated private static func read(_ url: URL) -> String? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attributes[.size] as? Int, size <= DefaultSettings.maximumPaletteFileBytes,
-              let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { return nil }
+              let data = try? Data(contentsOf: url) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    nonisolated static func load(_ url: URL, limit: Limit) -> PaletteIndex? {
+        guard let text = read(url) else { return nil }
         var catalog = PaletteCatalog(text: text)
         guard !catalog.items.isEmpty else { return nil }
-        if let version = newestRenderableVersion(of: catalog, canRender: canRender) {
+        switch limit {
+        case .probe(let canRender):
+            if let version = newestRenderableVersion(of: catalog, canRender: canRender) { catalog = catalog.limited(to: version) }
+        case .upTo(let version):
             catalog = catalog.limited(to: version)
         }
         catalog = catalog.addingReadings(SymbolDictionary.defaultEntries)

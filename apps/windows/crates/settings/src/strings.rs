@@ -57,6 +57,12 @@ pub mod settings {
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
     pub const EMOJI_CONVERSION: &str = "絵文字に変換";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
+    pub const NUMBER_FORMS: &str = "数字の書き方";
+    pub const NUMBER_FORM_CONVERSION: &str = "数字を丸数字などに変換";
+    pub const NUMBER_FORM_CIRCLED: &str = "丸数字";
+    pub const NUMBER_FORM_PARENTHESIZED: &str = "括弧付きとピリオド付きの数字";
+    pub const NUMBER_FORM_KANJI: &str = "漢数字";
+    pub const NUMBER_FORM_ROMAN: &str = "ローマ数字";
     pub const LEARNING: &str = "学習";
     pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
     pub const ZENZAI_MODEL_NOTE: &str =
@@ -110,6 +116,7 @@ pub mod choice {
     pub const PRESENTATION: &str = "候補の表示";
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const SUGGESTION_DISPLAY: &str = "入力中の候補";
+    pub const PREDICTION_DISPLAY: &str = "入力中の予測";
 }
 
 /// UIStrings.Features
@@ -228,6 +235,7 @@ pub mod more {
     pub const LIVE_CONVERSION_DELAY: &str = "漢字にするまでの待ち時間";
     pub const LIVE_CONVERSION_SKIP_LENGTH: &str = "ライブ変換しない文字数";
     pub const ENGLISH_SKIP_LENGTH: &str = "英単語にしない文字数";
+    pub const SUGGESTION_SKIP_COUNT: &str = "入力中の候補を表示しない件数";
     pub const TYPO: &str = "タイプミス";
     pub const CORRECTION_SENSITIVITY: &str = "修正の基準";
     pub const SHOWS_SUGGESTIONS: &str = "「もしかして」を表示";
@@ -316,6 +324,15 @@ pub mod more {
             format!("{value} 文字以下")
         }
     }
+
+    /// 入力中の候補を表示しない件数の表示．0 はオフ(macOS の UIStrings.More.skipCount)
+    pub fn skip_count(value: f64) -> String {
+        if value == 0.0 {
+            "オフ".to_string()
+        } else {
+            format!("{value} 件以下")
+        }
+    }
 }
 
 /// UIStrings.Keys(キー設定のページの名前と，検索に使うコマンド・状態・ひな形の名前)
@@ -388,7 +405,7 @@ pub mod keys {
         ("convertWithoutLearning", "学習を使わずに変換"),
         ("deleteBackward", "左の文字を削除"),
         ("insertBoundary", "ここで区切る"),
-        ("acceptSuggestion", "「もしかして」に修正"),
+        ("acceptSuggestion", "「もしかして」に修正・予測を確定"),
         ("toHiragana", "全文をひらがなに変換"),
         ("toKatakana", "全文を全角カタカナに変換"),
         ("toHalfwidthKatakana", "全文を半角カタカナに変換"),
@@ -442,7 +459,7 @@ pub mod keys {
         ("convert", "英単語を修正した直後は、修正前に戻します"),
         ("convertWithoutLearning", "学習した順位を使わずに変換し、確定しても学習しません"),
         ("insertBoundary", "入力中に、現在の位置で文節を区切ります"),
-        ("acceptSuggestion", "「もしかして」で示した読みに修正します。示していないときは、入力中の候補から選択します"),
+        ("acceptSuggestion", "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"),
         ("switchKanaType", "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"),
         ("nextCandidate", "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"),
         ("previousCandidate", "入力中に押すと変換を始めます。入力中の候補を表示しているときは、文字種から選択します。分岐図では上の枝の文字種へ進みます"),
@@ -522,6 +539,26 @@ pub mod dictionaries {
     }
 }
 
+/// UIStrings.Palette(絵文字と記号のパレット．R-26)
+pub mod palette {
+    pub const PAGE: &str = "絵文字と記号";
+    pub const BEHAVIOR: &str = "パレット";
+    pub const LOOK: &str = "パレットの見た目";
+    pub const ENABLED: &str = "絵文字と記号のパレット";
+    pub const CLOSES_AFTER_INSERT: &str = "入力したらパレットを閉じる";
+    pub const RECORDS_HISTORY: &str = "パレットで使った文字を記録";
+    pub const COLUMNS: &str = "パレットの列数";
+    pub const ROWS: &str = "パレットの行数";
+    pub const CELL_SIZE: &str = "パレットのマスの大きさ";
+    pub const SHOWS_PREVIEW: &str = "パレットに文字の説明を表示";
+    pub const FREQUENT_ROWS: &str = "よく使う文字の行数";
+    pub const CLEAR_HISTORY: &str = "使った文字の記録を消去";
+    pub const CLEAR_HISTORY_NOTE: &str =
+        "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。";
+    pub const THEME_NOTE: &str =
+        "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。";
+}
+
 /// UIStrings.Association
 pub mod association {
     pub const SECTION: &str = "連想変換";
@@ -583,6 +620,8 @@ pub mod sync {
         ("candidatePresentation", "候補の表示"),
         ("initialFocus", "最初に選択する文節"),
         ("suggestionDisplay", "入力中の候補"),
+        ("predictionDisplay", "入力中の予測"),
+        ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
         ("liveConversionDelay", "漢字にするまでの待ち時間"),
@@ -616,6 +655,11 @@ pub mod sync {
         ("symbolConversion", "記号に変換"),
         ("emojiConversion", "絵文字に変換"),
         ("latexConversion", "LaTeX のコマンドに変換"),
+        ("numberFormConversion", "数字を丸数字などに変換"),
+        ("numberFormCircled", "丸数字"),
+        ("numberFormParenthesized", "括弧付きとピリオド付きの数字"),
+        ("numberFormKanji", "漢数字"),
+        ("numberFormRoman", "ローマ数字"),
         ("learning", "学習"),
         ("zenzaiModel", "Zenzai のモデル"),
         ("theme", "テーマ"),
@@ -663,6 +707,11 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
+    pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
+    /// 絵文字と記号のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
+    pub const PALETTE_KEYS_NOTE: &str =
+        "既定では Ctrl+Alt+E で絵文字、Ctrl+Alt+K で記号のパレットを開きます。";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
     pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
     pub const ON: &str = "オン";

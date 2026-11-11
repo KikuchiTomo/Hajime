@@ -9,7 +9,7 @@ mod branch;
 mod fitting;
 mod homophone;
 mod list;
-mod paint;
+pub(crate) mod paint;
 pub mod sample;
 mod small;
 
@@ -17,7 +17,7 @@ pub use crate::geometry::{Frame, Point};
 pub use crate::theme::{Color, Font, ResolvedTheme};
 pub use branch::branch_map;
 pub use list::candidate_list;
-pub use small::{mode, note};
+pub use small::{mode, note, prediction};
 
 use crate::keys::Icon;
 use tokens::size;
@@ -204,6 +204,11 @@ impl Scene {
 pub trait Measure {
     fn width(&self, text: &str, font: Font) -> f32;
     fn height(&self, font: Font) -> f32;
+
+    /// font の書体に glyph の字があるか(パレットのアイコン)．無ければ代わりの文字を描く
+    fn has_glyph(&self, _font: Font, _glyph: char) -> bool {
+        false
+    }
 }
 
 /// どう描くか．テーマと文字の大きさと，出し始めの濃さ

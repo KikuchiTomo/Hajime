@@ -509,6 +509,7 @@ fn branch(columns: &[&str], focused: usize, alternatives: &[&str], selected: usi
         hints: hints(),
         association: None,
         association_hint: None,
+        association_key: None,
         meaning_placement: None,
     })
 }
@@ -537,6 +538,7 @@ fn headed_list(entries: &[&str], selected: usize, association: Option<&str>, lab
         position: selected as u32 + 1,
         total: entries.len() as u32,
         note: None,
+        hints: None,
         association: association.map(|headword| AssociationHeading {
             headword: headword.into(),
             label: label.into(),
@@ -544,6 +546,7 @@ fn headed_list(entries: &[&str], selected: usize, association: Option<&str>, lab
             group_count: 1,
         }),
         association_hint: None,
+        association_key: None,
         homophone: None,
         shows_numbers: None,
         meaning_placement: None,

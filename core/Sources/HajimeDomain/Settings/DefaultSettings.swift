@@ -49,10 +49,8 @@ public enum DefaultSettings {
     public static let candidatesPerPage = 9
     /// エンジンに求める候補の数
     public static let engineCandidateCount = 20
-    /// 打っているあいだに出す候補(変換と予測)の数
+    /// 打っているあいだに出す変換の候補の数．続く語句の予測を求める数も同じ
     public static let suggestionCount = 5
-    /// 入力中の候補で，続く語句の予測より前に並べる読みの変換の数
-    public static let suggestionLeadingConversions = 2
     /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
     public static let headWordAlternativeCount = 8
     /// 打ち間違いを直した文節に入れる，打ったままの読みの候補(LatticeBuilder.addingTyped)の数
@@ -210,6 +208,8 @@ public enum DefaultSettings {
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
     public static let symbolCandidateOffset = 3
+    /// 丸数字・漢数字などに書き換える数の桁数の上限(NumberForms)．位付きの漢数字は「兆」の位(16 桁)まで書ける
+    public static let maximumNumberFormDigits = 16
     /// 読みで引いた絵文字を差し込む位置と，差し込む数．よく使う語のあとに並べ，候補の一覧の 1 ページに収める
     public static let emojiCandidateOffset = 5
     public static let emojiCandidateCount = 3
@@ -272,6 +272,8 @@ public enum DefaultSettings {
     public static let liveConversionDelayRange = 0.1...1.5
     /// ライブ変換しない読みの長さを選べる範囲(文字)．0 はすべてライブ変換する
     public static let liveConversionSkipLengthRange = 0...10
+    /// 入力中の候補を出さない件数(この件数以下なら窓を出さない)の範囲．0 なら候補があれば出す．上は出せる候補の数の 1 つ手前まで
+    public static let suggestionSkipCountRange = 0...(suggestionCount - 1)
     /// 英単語にしない読みの長さを選べる範囲(文字)．0 は長さで区別しない
     public static let englishSkipLengthRange = 0...10
     public static let correctionDelayRange = 0.4...3.0
@@ -288,9 +290,9 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限
     public static let maximumRuleListFileBytes = 1024 * 1024
-    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.2.0 は 4239 行で約 350KB
+    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.3.0 は 6526 行で約 560KB
     public static let maximumBundledDictionaryManifestBytes = 4 * 1024 * 1024
-    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.2.0 でいちばん大きいファイルは約 1MB
+    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.3.0 でいちばん大きいファイルは約 1MB
     public static let maximumBundledDictionaryFileBytes = 64 * 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
@@ -416,9 +418,23 @@ public enum DefaultSettings {
     /// パレットのマスの一辺(pt)と，選べる範囲
     public static let paletteCellSize = 36.0
     public static let paletteCellSizeRange = 28.0...64.0
+    /// 設定の画面でパレットのマスの大きさを変える刻み(pt)
+    public static let paletteCellSizeStep = 2.0
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．
+    /// Windows のエンジンのプロセスは書体を確かめられない(描くのは候補ウィンドウ)ので，この表でパレットに出す絵文字を絞る(R-26)．
+    /// 古い順に並べる．どれにも当たらなければ先頭の版にする
+    public static let windowsEmojiVersions: [(build: Int, version: EmojiVersion)] = [
+        (0, EmojiVersion(major: 12, minor: 0)),
+        (22000, EmojiVersion(major: 13, minor: 1)),
+        (22621, EmojiVersion(major: 15, minor: 0)),
+        (26100, EmojiVersion(major: 16, minor: 0)),
+    ]
+    /// Windows でパレットを出しているあいだ，候補ウィンドウでマウスで操作した対象をためておく数の上限．
+    /// DLL が取りに来る(wake)までのあいだのポインタの動きとホイールを落とさずに渡す．超えたら古いものから捨てる
+    public static let maximumPendingPaletteTargets = 32
     /// パレットの探す欄に打てる長さの上限(文字数)
     public static let maximumPaletteQueryLength = 32
     /// パレットの説明に出す読みの数

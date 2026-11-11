@@ -14,8 +14,10 @@ final class CandidateView: NSView {
             needsDisplay = true
         }
     }
-    /// 足元の案内に出すキーの割り当て(連想の一覧のとき)
+    /// 足元の案内に出すキーの割り当て
     var keys = KeymapPreset.standard.keymap { didSet { needsDisplay = true } }
+    /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
+    var showsHints = true { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
     /// 第 1 候補と選んでいる候補以外の濃さ．出した直後は薄くし，すぐに濃くする(ephemeral adaptation)．
@@ -360,21 +362,30 @@ final class CandidateView: NSView {
         var hints: [KeyHint]
         var note: Note?
         var position: String
-        /// 選んでいる候補に連想があるときの知らせ(R-18)．キーの案内のあとに小さく出す
+        /// 選んでいる候補に連想があるときの知らせ(R-18)のうち，キーの割り当てが無いときの語．キーがあればキーキャップの札として hints に入れる
         var associationHint: String?
     }
 
+    /// 何番目の候補か．まだ選んでいない(入力中の候補の窓で選び始める前の)ときは出さない
+    private func position(of panel: CandidatePanel) -> String {
+        panel.position == 0 ? "" : UIStrings.Candidate.position(panel.position, panel.total)
+    }
+
     private func footerContent(for panel: CandidatePanel) -> Footer {
+        // キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキー(R-17)．どの案内を出すかは core の表(IndicatorLabels)
+        var hints = showsHints ? KeyHint.make(IndicatorLabels.listHints(for: panel), keymap: keys) : []
         if panel.association != nil {
-            return Footer(hints: UIStrings.Association.hints(for: keys), note: panel.note, position: UIStrings.Candidate.position(panel.position, panel.total))
+            return Footer(hints: hints, note: panel.note, position: position(of: panel))
         }
         if panel.focus == .variants {
             let position = UIStrings.Candidate.variantsPosition(panel.selectedVariant.map { $0 + 1 } ?? 1, panel.variants.count)
-            return Footer(hints: UIStrings.Candidate.variantsHints, note: panel.note, position: position)
+            return Footer(hints: hints, note: panel.note, position: position)
         }
-        // 文字種の行が無い一覧(文字種の行を出さない設定など)では，文字種の案内を出さない
-        return Footer(hints: panel.variants.isEmpty ? [] : UIStrings.Candidate.candidatesHints, note: panel.note,
-                      position: UIStrings.Candidate.position(panel.position, panel.total), associationHint: panel.associationHint)
+        var associationText: String?
+        if let hint = panel.associationHint {
+            if let key = hint.key { hints.append(KeyHint(key: key, label: hint.label)) } else { associationText = hint.label }
+        }
+        return Footer(hints: hints, note: panel.note, position: position(of: panel), associationHint: associationText)
     }
 
     private func hintsWidth(_ footer: Footer) -> CGFloat {

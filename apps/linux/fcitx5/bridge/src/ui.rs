@@ -171,6 +171,7 @@ mod tests {
                 }],
                 association: None,
                 association_hint: None,
+                association_key: None,
             },
             anchor: None,
         });
@@ -199,8 +200,10 @@ mod tests {
                 position: 1,
                 total: 1,
                 note: None,
+                hints: None,
                 association: None,
                 association_hint: None,
+                association_key: None,
             },
             anchor: None,
         });

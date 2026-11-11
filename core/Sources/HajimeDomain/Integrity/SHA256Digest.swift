@@ -60,9 +60,22 @@ public struct SHA256Digest: Sendable {
 
     /// 求めた値を 16 進の小文字で
     public mutating func finalizeHex() -> String {
-        let digits = Array("0123456789abcdef")
-        return String(finalize().flatMap { [digits[Int($0 >> 4)], digits[Int($0 & 0x0f)]] })
+        Self.lowercaseHex(finalize())
     }
+
+    /// ハッシュの値のバイト列を 16 進の小文字にする．CryptoKit で求めた値にも使う．
+    /// 同梱の辞書はファイルが数千あり起動のたびに確かめるので，String(format:) を 1 バイトずつ呼ぶより速い表引きで作る
+    public static func lowercaseHex(_ bytes: some Sequence<UInt8>) -> String {
+        var text: [UInt8] = []
+        text.reserveCapacity(64)
+        for byte in bytes {
+            text.append(hexDigits[Int(byte >> 4)])
+            text.append(hexDigits[Int(byte & 0x0f)])
+        }
+        return String(decoding: text, as: UTF8.self)
+    }
+
+    private static let hexDigits = Array("0123456789abcdef".utf8)
 
     private static let blockSize = 64
 

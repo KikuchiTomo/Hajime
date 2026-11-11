@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 pub const MAXIMUM_MESSAGE_BYTES: usize = 262144;
 
 /// 待つ時間と，返事の遅れを許す数(schema.json の timing)
@@ -726,6 +726,8 @@ pub enum RequestBody {
     Caret {
         session: u32,
         rect: Rect,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        composition: Option<Rect>,
     },
     ReadSettings,
     WriteSettings {
@@ -816,6 +818,9 @@ pub enum RequestBody {
     ChooseCandidate {
         target: PointerTarget,
     },
+    ChoosePalette {
+        target: PaletteTarget,
+    },
     ReadSettingsFields {
         names: Vec<String>,
         defaults: bool,
@@ -835,6 +840,7 @@ pub enum RequestBody {
     ResetLearning,
     ReadUsage,
     ResetUsage,
+    ResetPaletteHistory,
     PreviewLanguage {
         text: String,
         #[serde(rename = "precedingText")]
@@ -905,10 +911,11 @@ impl fmt::Debug for RequestBody {
                 .field("reading", &REDACTED)
                 .field("context", context)
                 .finish(),
-            Self::Caret { session, rect, .. } => f
+            Self::Caret { session, rect, composition, .. } => f
                 .debug_struct("Caret")
                 .field("session", session)
                 .field("rect", rect)
+                .field("composition", composition)
                 .finish(),
             Self::ReadSettings => f.write_str("ReadSettings"),
             Self::WriteSettings { settings, .. } => f
@@ -1017,6 +1024,10 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("ChooseCandidate")
                 .field("target", target)
                 .finish(),
+            Self::ChoosePalette { target, .. } => f
+                .debug_struct("ChoosePalette")
+                .field("target", target)
+                .finish(),
             Self::ReadSettingsFields { defaults, .. } => f
                 .debug_struct("ReadSettingsFields")
                 .field("names", &REDACTED)
@@ -1041,6 +1052,7 @@ impl fmt::Debug for RequestBody {
             Self::ResetLearning => f.write_str("ResetLearning"),
             Self::ReadUsage => f.write_str("ReadUsage"),
             Self::ResetUsage => f.write_str("ResetUsage"),
+            Self::ResetPaletteHistory => f.write_str("ResetPaletteHistory"),
             Self::PreviewLanguage { .. } => f
                 .debug_struct("PreviewLanguage")
                 .field("text", &REDACTED)
@@ -1361,6 +1373,24 @@ impl fmt::Debug for Note {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct Prediction {
+    pub typed: String,
+    pub completion: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+}
+
+impl fmt::Debug for Prediction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Prediction")
+            .field("typed", &REDACTED)
+            .field("completion", &REDACTED)
+            .field("key", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssociationHeading {
     pub headword: String,
     pub label: String,
@@ -1456,10 +1486,15 @@ pub struct CandidateList {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<Note>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hints: Option<Vec<KeyHint>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association: Option<AssociationHeading>,
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association_hint: Option<String>,
+    #[serde(rename = "associationKey")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homophone: Option<HomophoneNote>,
     #[serde(rename = "showsNumbers")]
@@ -1481,8 +1516,10 @@ impl fmt::Debug for CandidateList {
             .field("position", &self.position)
             .field("total", &self.total)
             .field("note", &self.note)
+            .field("hints", &self.hints)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
+            .field("associationKey", &REDACTED)
             .field("homophone", &self.homophone)
             .field("showsNumbers", &self.shows_numbers)
             .field("meaningPlacement", &self.meaning_placement)
@@ -1599,6 +1636,9 @@ pub struct BranchMap {
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association_hint: Option<String>,
+    #[serde(rename = "associationKey")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub association_key: Option<String>,
     #[serde(rename = "meaningPlacement")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meaning_placement: Option<MeaningPlacement>,
@@ -1614,8 +1654,285 @@ impl fmt::Debug for BranchMap {
             .field("hints", &self.hints)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
+            .field("associationKey", &REDACTED)
             .field("meaningPlacement", &self.meaning_placement)
             .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PaletteKind {
+    Emoji,
+    Symbol,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SkinTone {
+    None,
+    Light,
+    MediumLight,
+    Medium,
+    MediumDark,
+    Dark,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaletteMode {
+    pub kind: PaletteKind,
+    pub title: String,
+    #[serde(rename = "isSelected")]
+    pub is_selected: bool,
+}
+
+impl fmt::Debug for PaletteMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PaletteMode")
+            .field("kind", &self.kind)
+            .field("title", &REDACTED)
+            .field("isSelected", &self.is_selected)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaletteTab {
+    pub section: String,
+    pub title: String,
+    pub symbol: String,
+    #[serde(rename = "isSelected")]
+    pub is_selected: bool,
+}
+
+impl fmt::Debug for PaletteTab {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PaletteTab")
+            .field("section", &REDACTED)
+            .field("title", &REDACTED)
+            .field("symbol", &REDACTED)
+            .field("isSelected", &self.is_selected)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaletteCell {
+    pub text: String,
+    pub name: String,
+    #[serde(rename = "isPinned")]
+    pub is_pinned: bool,
+}
+
+impl fmt::Debug for PaletteCell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PaletteCell")
+            .field("text", &REDACTED)
+            .field("name", &REDACTED)
+            .field("isPinned", &self.is_pinned)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaletteRow {
+    pub index: u32,
+    pub cells: Vec<PaletteCell>,
+    #[serde(rename = "startsSection")]
+    pub starts_section: bool,
+    #[serde(rename = "sectionTitle")]
+    pub section_title: String,
+}
+
+impl fmt::Debug for PaletteRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PaletteRow")
+            .field("index", &self.index)
+            .field("cells", &self.cells)
+            .field("startsSection", &self.starts_section)
+            .field("sectionTitle", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PalettePosition {
+    pub row: u32,
+    pub column: u32,
+}
+
+impl fmt::Debug for PalettePosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PalettePosition")
+            .field("row", &self.row)
+            .field("column", &self.column)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PalettePreview {
+    pub text: String,
+    #[serde(rename = "japaneseName")]
+    pub japanese_name: String,
+    #[serde(rename = "englishName")]
+    pub english_name: String,
+    pub shortcodes: Vec<String>,
+    pub readings: Vec<String>,
+    #[serde(rename = "codePoints")]
+    pub code_points: String,
+    #[serde(rename = "isPinned")]
+    pub is_pinned: bool,
+}
+
+impl fmt::Debug for PalettePreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PalettePreview")
+            .field("text", &REDACTED)
+            .field("japaneseName", &REDACTED)
+            .field("englishName", &REDACTED)
+            .field("shortcodes", &REDACTED)
+            .field("readings", &REDACTED)
+            .field("codePoints", &REDACTED)
+            .field("isPinned", &self.is_pinned)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaletteSkinTonePicker {
+    pub options: Vec<String>,
+    pub selected: u32,
+}
+
+impl fmt::Debug for PaletteSkinTonePicker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PaletteSkinTonePicker")
+            .field("options", &REDACTED)
+            .field("selected", &self.selected)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PalettePanel {
+    pub modes: Vec<PaletteMode>,
+    pub query: String,
+    pub placeholder: String,
+    pub tabs: Vec<PaletteTab>,
+    pub heading: String,
+    pub rows: Vec<PaletteRow>,
+    #[serde(rename = "rowCount")]
+    pub row_count: u32,
+    #[serde(rename = "firstRow")]
+    pub first_row: u32,
+    pub columns: u32,
+    #[serde(rename = "visibleRows")]
+    pub visible_rows: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<PalettePosition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<PalettePreview>,
+    #[serde(rename = "showsPreview")]
+    pub shows_preview: bool,
+    #[serde(rename = "skinTone")]
+    pub skin_tone: SkinTone,
+    #[serde(rename = "skinTonePicker")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skin_tone_picker: Option<PaletteSkinTonePicker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    pub hints: Vec<KeyHint>,
+    #[serde(rename = "cellSize")]
+    pub cell_size: f64,
+}
+
+impl fmt::Debug for PalettePanel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PalettePanel")
+            .field("modes", &self.modes)
+            .field("query", &REDACTED)
+            .field("placeholder", &REDACTED)
+            .field("tabs", &self.tabs)
+            .field("heading", &REDACTED)
+            .field("rows", &self.rows)
+            .field("rowCount", &self.row_count)
+            .field("firstRow", &self.first_row)
+            .field("columns", &self.columns)
+            .field("visibleRows", &self.visible_rows)
+            .field("selection", &self.selection)
+            .field("preview", &self.preview)
+            .field("showsPreview", &self.shows_preview)
+            .field("skinTone", &self.skin_tone)
+            .field("skinTonePicker", &self.skin_tone_picker)
+            .field("message", &REDACTED)
+            .field("hints", &self.hints)
+            .field("cellSize", &self.cell_size)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PaletteTarget {
+    Cell {
+        row: u32,
+        column: u32,
+    },
+    Hover {
+        row: u32,
+        column: u32,
+    },
+    Tab {
+        section: String,
+    },
+    Mode {
+        kind: PaletteKind,
+    },
+    Scroll {
+        rows: i32,
+    },
+    SkinTone {
+        tone: SkinTone,
+    },
+    SkinToneButton,
+    Pin,
+    Close,
+}
+
+impl fmt::Debug for PaletteTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cell { row, column, .. } => f
+                .debug_struct("Cell")
+                .field("row", row)
+                .field("column", column)
+                .finish(),
+            Self::Hover { row, column, .. } => f
+                .debug_struct("Hover")
+                .field("row", row)
+                .field("column", column)
+                .finish(),
+            Self::Tab { .. } => f
+                .debug_struct("Tab")
+                .field("section", &REDACTED)
+                .finish(),
+            Self::Mode { kind, .. } => f
+                .debug_struct("Mode")
+                .field("kind", kind)
+                .finish(),
+            Self::Scroll { rows, .. } => f
+                .debug_struct("Scroll")
+                .field("rows", rows)
+                .finish(),
+            Self::SkinTone { tone, .. } => f
+                .debug_struct("SkinTone")
+                .field("tone", tone)
+                .finish(),
+            Self::SkinToneButton => f.write_str("SkinToneButton"),
+            Self::Pin => f.write_str("Pin"),
+            Self::Close => f.write_str("Close"),
+        }
     }
 }
 
@@ -1723,6 +2040,12 @@ pub enum UiCommand {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
     },
+    ShowPrediction {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prediction: Option<Prediction>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        anchor: Option<Rect>,
+    },
     ShowMode {
         mode: InputMode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1739,8 +2062,16 @@ pub enum UiCommand {
         recognition_timeout_milliseconds: u32,
     },
     HideHandwriting,
+    ShowPalette {
+        panel: PalettePanel,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        anchor: Option<Rect>,
+    },
+    HidePalette,
     Move {
         anchor: Rect,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        composition: Option<Rect>,
     },
     Hide,
 }
@@ -1771,6 +2102,11 @@ impl fmt::Debug for UiCommand {
                 .field("note", note)
                 .field("anchor", anchor)
                 .finish(),
+            Self::ShowPrediction { prediction, anchor, .. } => f
+                .debug_struct("ShowPrediction")
+                .field("prediction", prediction)
+                .field("anchor", anchor)
+                .finish(),
             Self::ShowMode { mode, anchor, .. } => f
                 .debug_struct("ShowMode")
                 .field("mode", mode)
@@ -1784,9 +2120,16 @@ impl fmt::Debug for UiCommand {
                 .field("recognitionTimeoutMilliseconds", recognition_timeout_milliseconds)
                 .finish(),
             Self::HideHandwriting => f.write_str("HideHandwriting"),
-            Self::Move { anchor, .. } => f
+            Self::ShowPalette { panel, anchor, .. } => f
+                .debug_struct("ShowPalette")
+                .field("panel", panel)
+                .field("anchor", anchor)
+                .finish(),
+            Self::HidePalette => f.write_str("HidePalette"),
+            Self::Move { anchor, composition, .. } => f
                 .debug_struct("Move")
                 .field("anchor", anchor)
+                .field("composition", composition)
                 .finish(),
             Self::Hide => f.write_str("Hide"),
         }

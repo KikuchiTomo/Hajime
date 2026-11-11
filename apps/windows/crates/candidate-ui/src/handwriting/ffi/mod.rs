@@ -5,8 +5,9 @@ mod render;
 mod window;
 
 use super::ink::{Ink, Point};
-use super::layout::{origin, Bounds, Hit, Layout};
+use super::layout::{Hit, Layout};
 use super::strings;
+use crate::geometry::{origin, Bounds};
 use crate::theme::ResolvedTheme;
 use ipc::windows::{pipe_name, EngineClient};
 use ipc::{Rect, RequestBody};

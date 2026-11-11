@@ -71,3 +71,70 @@ impl Frame {
         Self::new(center.x - side / 2.0, center.y - side / 2.0, side, side)
     }
 }
+
+/// 画面の上の四角(ピクセル)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+}
+
+/// 窓を置く位置(手書きの窓とパレットの窓)．入力位置の下に置き，画面の下にはみ出すなら上に置く．作業領域の外には出さない
+pub fn origin(caret: Bounds, work: Bounds, width: i32, height: i32, gap: i32) -> (i32, i32) {
+    let below = caret.bottom + gap;
+    let y = if below + height > work.bottom && caret.top - gap - height >= work.top {
+        caret.top - gap - height
+    } else {
+        below
+    };
+    let x = caret.left.min(work.right - width).max(work.left);
+    (x, y.min(work.bottom - height).max(work.top))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 入力位置の下に置き下にはみ出すなら上に置く() {
+        let work = Bounds {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1080,
+        };
+        let caret = Bounds {
+            left: 100,
+            top: 100,
+            right: 102,
+            bottom: 120,
+        };
+        assert_eq!(origin(caret, work, 300, 400, 4), (100, 124));
+        let low = Bounds {
+            left: 1800,
+            top: 900,
+            right: 1802,
+            bottom: 920,
+        };
+        assert_eq!(origin(low, work, 300, 400, 4), (1620, 496));
+    }
+
+    #[test]
+    fn 上にも下にも収まらなければ作業領域の中に留める() {
+        let work = Bounds {
+            left: 0,
+            top: 0,
+            right: 800,
+            bottom: 500,
+        };
+        let caret = Bounds {
+            left: 10,
+            top: 200,
+            right: 12,
+            bottom: 220,
+        };
+        assert_eq!(origin(caret, work, 300, 400, 4), (10, 100));
+    }
+}

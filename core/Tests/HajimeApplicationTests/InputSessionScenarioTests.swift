@@ -27,6 +27,8 @@ final class Harness {
     private(set) var note: String?
     /// 出しているパレット．閉じていれば nil
     private(set) var palette: PalettePanel?
+    /// 予測の窓に出している予測．候補の窓を消しても消えず，showPrediction(nil) で消える
+    private(set) var prediction: Prediction?
     private(set) var lastResult = KeyResult.passThrough
     /// キーのあとで，あとから求めて足す処理(InputSession.followUps)を動かすか．アプリは次のキーが来るまで動かす．
     /// false にすると，キーに反応してすぐ出した画面を確かめられる
@@ -102,6 +104,7 @@ final class Harness {
             case .showCandidates(let value): panel = value
             case .showLattice(let value): lattice = value
             case .showNote(let shown): note = shown.text
+            case .showPrediction(let shown): prediction = shown
             case .hideCandidates:
                 panel = nil
                 lattice = nil
@@ -281,7 +284,7 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.first?.split == LatticePanel.Column.Split(pieces: ["問題", "が", "或る"]))
     }
 
-    @Test("ライブ変換がオフのときは，打っているあいだに変換と予測の候補の窓を出し，↓ で選んで Enter で確定する")
+    @Test("ライブ変換がオフのときは，打っているあいだに変換の候補の窓と，続く語句の予測の窓を別に出す．↓ で変換の候補を選び，Tab で予測を確定する")
     func suggestionWindow() {
         let converter = FakeConverter(["きょう": [("今日", nil), ("京", nil)]])
         converter.predictionTexts["きょう"] = ["今日は", "教室"]
@@ -289,14 +292,26 @@ struct InputSessionScenarioTests {
         settings.liveConversion = false
         let harness = Harness(converter: converter, settings: settings)
         harness.type("kyou")
-        #expect(harness.panel?.entries.map(\.text) == ["今日", "京", "今日は", "教室"])
+        // 予測は変換の候補の窓に混ぜない
+        #expect(harness.panel?.entries.map(\.text) == ["今日", "京"])
         #expect(harness.panel?.selectedEntry == nil)
         #expect(harness.marked.text == "きょう")
+        // 見えている字はかなでも，変換の候補(今日)と頭が重なる部分を打った部分にする
+        #expect(harness.prediction == Prediction(typed: "今日", completion: "は", key: "Tab"))
+        // 予測の窓を出しているあいだは Tab が予測の確定になるので，変換の候補の窓には ↓ だけを案内する
+        #expect(harness.panel?.note?.key == "↓")
         harness.press(.down)
         harness.press(.down)
-        harness.press(.down)
+        // 変換の候補を選び始めたら予測の窓は消す
+        #expect(harness.prediction == nil)
         harness.press(.enter)
-        #expect(harness.committed == "今日は")
+        #expect(harness.committed == "京")
+        let predicted = Harness(converter: converter, settings: settings)
+        predicted.type("kyou")
+        predicted.press(.tab)
+        #expect(predicted.committed == "今日は")
+        #expect(predicted.prediction == nil)
+        #expect(predicted.panel == nil)
     }
 
     @Test("ライブ変換しない文字数(既定 2)以下の読みは，打鍵が止まってもかなのまま見せ，Enter でかなのまま確定する")
@@ -389,14 +404,16 @@ struct InputSessionScenarioTests {
     @Test("入力中の候補の窓は，選び始めるまで番号を振らず，番号キーはそのまま数字を打つ．↓ か Tab で選び始めると番号キーで選べる",
           arguments: [CandidatePresentation.automatic, .segmentList, .list])
     func suggestionWindowSelection(presentation: CandidatePresentation) {
-        let converter = FakeConverter(["あぴ": [("あぴ", nil), ("アピ", nil)]])
-        converter.predictionTexts["あぴ"] = ["アピール", "アピールポイント"]
+        // 予測の窓を出さない設定(既定)では，Tab も変換の候補を選び始めるキーになる
+        let converter = FakeConverter(["あぴ": [("あぴ", nil), ("アピ", nil), ("アピール", nil)]])
+        converter.predictionTexts["あぴ"] = ["アピールポイント"]
         var settings = DefaultSettings.settings
         settings.suggestionDisplay = .always
         settings.candidatePresentation = presentation
         let typed = Harness(converter: converter, settings: settings)
         typed.type("api")
-        #expect(typed.panel?.entries.map(\.text) == ["あぴ", "アピ", "アピール", "アピールポイント"])
+        #expect(typed.panel?.entries.map(\.text) == ["あぴ", "アピ", "アピール"])
+        #expect(typed.prediction == nil)
         #expect(typed.panel?.showsNumbers == false)
         // キーは文字で書かず，キーごとのキーキャップの札で描けるよう，キーとできることに分けて渡す
         #expect(typed.panel?.note?.key == "↓ Tab")
@@ -431,8 +448,8 @@ struct InputSessionScenarioTests {
         let noRow = Harness(converter: converter, settings: settings)
         noRow.type("api")
         noRow.press(.up)
-        #expect(noRow.panel?.selectedEntry == 2)
-        #expect(noRow.marked.text == "アピール")
+        #expect(noRow.panel?.selectedEntry == 1)
+        #expect(noRow.marked.text == "アピ")
     }
 
     @Test("入力中の候補の窓を出していないときの Tab は何もしない(変換を始めない)")

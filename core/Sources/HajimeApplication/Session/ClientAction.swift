@@ -28,6 +28,10 @@ public enum ClientAction: Sendable, Equatable {
     case hidePalette
     /// 入力位置の近くに短い案内を出す(打ち間違いを直したこと・「もしかして」)．hideCandidates で一緒に消える
     case showNote(Note)
+    /// 組み立て中の文字のすぐ右に，打っている語句に続く予測を出す．変換の候補の窓とは別の小さな窓．nil なら消す．
+    /// 候補の窓を出す・消す操作(showCandidates・showLattice・hideCandidates)では消えない．InputSession は予測が変わったときだけ送り，
+    /// 打ち終わったときと分岐図・一覧で選び始めたときに nil を送る
+    case showPrediction(Prediction?)
     /// 打ち間違いの訂正を求め終わるまで変換を待つ．入力コントローラは訂正を求めて渡し(provideCorrections)，
     /// resumeConversion で変換を続ける．訂正を求めない作りなら resumeConversion をすぐ呼ぶ
     case awaitCorrections
@@ -142,7 +146,7 @@ public struct CandidatePanel: Sendable, Equatable {
     /// 連想の一覧を出しているときの見出し(R-18)．ふつうの候補なら nil
     public var association: AssociationHeading?
     /// 選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
-    public var associationHint: String?
+    public var associationHint: AssociationHint?
     /// 窓の左端をそろえる，組み立て中の文字の位置(UTF-16 の数)．nil なら組み立て中の文字の頭．
     /// 打っているあいだに最後の文節だけの候補を出すときは，その文節の頭にそろえる
     public var anchor: Int?
@@ -239,7 +243,7 @@ public struct LatticePanel: Sendable, Equatable {
     /// 連想の一覧を出しているときの見出し(R-18)．注目している文節の下の枝が連想の語になる．ふつうの分岐図なら nil
     public var association: AssociationHeading?
     /// 注目している文節で選んでいる候補に連想があるときの知らせ(「⌃Tab 連想」)．無ければ nil
-    public var associationHint: String?
+    public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
 
@@ -248,6 +252,39 @@ public struct LatticePanel: Sendable, Equatable {
         self.position = position
         self.total = total
         self.note = note
+    }
+}
+
+/// 打っているあいだに，打っている語句に続くと予測した語句．変換の候補とは体験が違うので，候補の窓に混ぜず別の窓に出す．
+/// 打った部分(typed)はふつうの文字の色，予測で補う部分(completion)は薄い色で描き，確定のキーをキーキャップで添える
+public struct Prediction: Sendable, Equatable {
+    /// 予測した語句のうち，打った(組み立て中の文字に見えている)部分．見えている字と頭が重ならなければ空
+    public var typed: String
+    /// 予測で補う部分
+    public var completion: String
+    /// 予測を確定するキーの名前．キーの案内を出さない設定なら nil
+    public var key: String?
+
+    public init(typed: String, completion: String, key: String?) {
+        self.typed = typed
+        self.completion = completion
+        self.key = key
+    }
+
+    /// 予測した語句の全体
+    public var text: String { typed + completion }
+}
+
+/// 選んでいる候補に連想があるときの知らせ(R-18)．描く側はキーを文字ではなくキーキャップのアイコンで描く
+public struct AssociationHint: Sendable, Equatable {
+    /// 連想変換のキーの名前．キーが割り当てられていなければ nil(知らせの語だけを出す)
+    public var key: String?
+    /// 知らせの語(「連想」)
+    public var label: String
+
+    public init(key: String?, label: String) {
+        self.key = key
+        self.label = label
     }
 }
 

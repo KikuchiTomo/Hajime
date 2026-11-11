@@ -51,18 +51,21 @@ struct RespondFirstScenarioTests {
         #expect(harness.committed == "今日は雨")
     }
 
-    @Test("入力中の候補の窓は，読みの変換を先に出し，続く語の予測はあとから足す")
+    @Test("入力中の候補の窓は読みの変換をすぐに出し，続く語の予測はあとから求めて予測の窓に出す(候補の窓には足さない)")
     func suggestionPredictionsLater() {
         let converter = FakeConverter(["きょう": [("今日", nil), ("京", nil)]])
         converter.predictionTexts["きょう"] = ["今日は", "教室"]
         var settings = DefaultSettings.settings
         settings.suggestionDisplay = .always
+        settings.predictionDisplay = .always
         let harness = Harness(converter: converter, settings: settings)
         harness.runsFollowUps = false
         harness.type("kyou")
         #expect(harness.panel?.entries.map(\.text) == ["今日", "京"])
+        #expect(harness.prediction == nil)
         harness.followUp()
-        #expect(harness.panel?.entries.map(\.text) == ["今日", "京", "今日は", "教室"])
+        #expect(harness.panel?.entries.map(\.text) == ["今日", "京"])
+        #expect(harness.prediction == Prediction(typed: "今日", completion: "は", key: "Tab"))
     }
 
     @Test("入力中の候補の窓は，ローマ字を打ちかけているあいだも消さずに出しておく")

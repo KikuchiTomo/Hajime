@@ -162,7 +162,9 @@ extension WireTextStyle {
 }
 
 extension WireCandidateList {
-    public init(_ panel: CandidatePanel) {
+    /// hints は足元のキーの案内(FooterHints)．キーの名前は OS の書き方なのでエンジンの側で作って渡す．
+    /// 案内が無ければ送らない(案内を知らない前の版の候補ウィンドウとも話せるよう，省ける項目にしてある)
+    public init(_ panel: CandidatePanel, hints: [WireKeyHint] = []) {
         self.init(
             variants: panel.variants.map { WireCandidateVariant(label: $0.label, isAvailable: $0.isAvailable) },
             selectedVariant: panel.selectedVariant.map(UInt32.init(clamping:)),
@@ -184,8 +186,10 @@ extension WireCandidateList {
             position: UInt32(clamping: panel.position),
             total: UInt32(clamping: panel.total),
             note: panel.note.map(WireNote.init),
+            hints: hints.isEmpty ? nil : hints,
             association: panel.association.map(WireAssociationHeading.init),
-            associationHint: panel.associationHint,
+            associationHint: panel.associationHint?.label,
+            associationKey: panel.associationHint?.key,
             homophone: panel.homophone.map(WireHomophoneNote.init),
             // 振るとき(ふつうの一覧)は送らない
             showsNumbers: panel.showsNumbers ? nil : false,
@@ -240,6 +244,12 @@ extension WireMeaningPlacement {
     }
 }
 
+extension WirePrediction {
+    public init(_ prediction: Prediction) {
+        self.init(typed: prediction.typed, completion: prediction.completion, key: prediction.key)
+    }
+}
+
 extension WireAssociationHeading {
     public init(_ heading: AssociationHeading) {
         self.init(headword: heading.headword, label: heading.label,
@@ -277,7 +287,8 @@ extension WireBranchMap {
             note: panel.note.map(WireNote.init),
             hints: hints,
             association: panel.association.map(WireAssociationHeading.init),
-            associationHint: panel.associationHint,
+            associationHint: panel.associationHint?.label,
+            associationKey: panel.associationHint?.key,
             // 注目している文節に意味が無ければ送らない
             meaningPlacement: panel.columns.contains { $0.homophone != nil } ? WireMeaningPlacement(panel.meaningPlacement) : nil
         )
@@ -304,7 +315,10 @@ public struct RoutedActions: Sendable, Equatable {
         self.host = host
     }
 
-    public init(_ actions: [ClientAction], anchor: WireRect?, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] }) {
+    /// composition は組み立て中の文字全体の位置(予測の窓を置く基準)．知らせない DLL では nil．
+    /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
+    public init(_ actions: [ClientAction], anchor: WireRect?, composition: WireRect? = nil, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
+                listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, paletteCellSize: Double = DefaultSettings.paletteCellSize) {
         for action in actions {
             switch action {
             case .commit(let text):
@@ -316,7 +330,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .selectMode(let mode):
                 edits.append(.selectMode(mode: WireInputMode(mode)))
             case .showCandidates(let panel):
-                ui.append(.showCandidates(list: WireCandidateList(panel), anchor: anchor))
+                ui.append(.showCandidates(list: WireCandidateList(panel, hints: listHints(panel)), anchor: anchor))
             case .showLattice(let panel):
                 ui.append(.showBranchMap(map: WireBranchMap(panel, hints: hints(panel)), anchor: anchor))
             case .hideCandidates:
@@ -325,6 +339,9 @@ public struct RoutedActions: Sendable, Equatable {
                 ui.append(.showMode(mode: WireInputMode(mode), anchor: anchor, label: nil))
             case .showNote(let note):
                 ui.append(.showNote(note: WireNote(note), anchor: anchor))
+            case .showPrediction(let prediction):
+                // 予測の窓は組み立て中の文字の右に置く．組み立て中の文字の位置を知らせない古い DLL では，候補の窓と同じ基準を使う
+                ui.append(.showPrediction(prediction: prediction.map(WirePrediction.init), anchor: composition ?? anchor))
             case .selectInputStyle(let style):
                 host.append(.selectInputStyle(style))
             case .awaitCorrections:
@@ -339,9 +356,10 @@ public struct RoutedActions: Sendable, Equatable {
                 host.append(.toggleLiveConversion)
             case .showHandwriting:
                 host.append(.showHandwriting)
-            case .showPalette, .hidePalette:
-                // パレットはまだ Windows の候補の窓で描けないので，エンジンのプロセスでは PaletteServices を渡さず開かない
-                break
+            case .showPalette(let panel):
+                ui.append(.showPalette(panel: WirePalettePanel(panel, cellSize: paletteCellSize), anchor: anchor))
+            case .hidePalette:
+                ui.append(.hidePalette)
             case .runCommand(let command):
                 host.append(.runCommand(command))
             }

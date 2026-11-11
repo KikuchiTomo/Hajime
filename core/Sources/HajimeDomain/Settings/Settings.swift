@@ -44,8 +44,12 @@ public struct Settings: Sendable, Equatable {
     public var candidatePresentation = CandidatePresentation.automatic
     /// Space で変換したときに最初に選ぶ文節
     public var initialFocus = InitialFocus.start
-    /// 打っているあいだに候補の窓を出すか
+    /// 打っているあいだに，読みを変換した候補の窓を出すか
     public var suggestionDisplay = SuggestionDisplay.whenLiveConversionOff
+    /// 打っているあいだに，打っている語句に続く予測を，変換の候補とは別の小さな窓に出すか
+    public var predictionDisplay = SuggestionDisplay.whenLiveConversionOff
+    /// 入力中の候補がこの件数以下なら窓を出さない．0 なら候補があれば出す
+    public var suggestionSkipCount = 0
     /// 一覧の 1 ページの候補の数
     public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
     /// 分岐図の下の枝に出す候補の数
@@ -110,7 +114,7 @@ public struct Settings: Sendable, Equatable {
     public var prefersKatakana = true
     /// 一覧の上に字種の行を出す(R-03)
     public var showsVariantRow = true
-    /// 分岐図の足元にキーの案内(候補・文節・文節の長さ・区切り)を出す．入力中の候補の窓の，選び始めるキーの案内も
+    /// 候補ウィンドウの足元にキーの案内を出す(分岐図の候補・文節・文節の長さ・区切り，一覧の文字種，入力中の候補の窓の選び始めるキー)
     public var showsKeyHints = true
     /// 番号キーで候補を選ぶ
     public var numberKeySelection = true
@@ -138,6 +142,16 @@ public struct Settings: Sendable, Equatable {
     public var emojiConversion = true
     /// 読み(「らむだ」)から LaTeX のコマンド(「\lambda」)の候補を出す
     public var latexConversion = false
+    /// 読みが数字だけのとき(「21」)，丸数字などに書き換えた候補(「㉑」)を出す(NumberForms)．出す書き方は下の 4 つで選ぶ
+    public var numberFormConversion = true
+    /// 丸数字(⓪〜㊿)と黒丸の数字(⓿〜⓴)
+    public var numberFormCircled = true
+    /// 括弧付き(⑴〜⒇)とピリオド付き(⒈〜⒛)の数字
+    public var numberFormParenthesized = true
+    /// 漢数字(位取りの二〇二六，位付きの二千二十六，大字の弐千弐拾六)
+    public var numberFormKanji = true
+    /// ローマ数字(Ⅰ〜Ⅻ，ⅩⅢ など)
+    public var numberFormRoman = true
     /// 連想変換(R-18)．オフなら連想変換のキーはふつうの変換と同じに動く
     public var association = true
     /// 連想の一覧に出す語の数
@@ -222,6 +236,7 @@ public struct Settings: Sendable, Equatable {
         }
         associationDictionaries = Array(associationDictionaries.prefix(DefaultSettings.maximumAssociationDictionaries))
         liveConversionSkipLength = clamp(liveConversionSkipLength, DefaultSettings.liveConversionSkipLengthRange)
+        suggestionSkipCount = clamp(suggestionSkipCount, DefaultSettings.suggestionSkipCountRange)
         englishSkipLength = clamp(englishSkipLength, DefaultSettings.englishSkipLengthRange)
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
@@ -252,6 +267,15 @@ public struct Settings: Sendable, Equatable {
         englishTerms = Array(englishTerms.filter { EnglishTermDictionary.isValidTerm($0) && terms.insert($0).inserted }.prefix(DefaultSettings.maximumEnglishTerms))
         keymap.clampToValidRanges()
         wordLanguage.clampToValidRanges()
+    }
+
+    /// 数字を書き換える書き方(NumberForms)．数字の書き換えがオフなら空
+    public var numberFormKinds: Set<NumberForms.Kind> {
+        guard numberFormConversion else { return [] }
+        let kinds: [(NumberForms.Kind, Bool)] = [
+            (.circled, numberFormCircled), (.parenthesized, numberFormParenthesized), (.kanji, numberFormKanji), (.roman, numberFormRoman),
+        ]
+        return Set(kinds.filter(\.1).map(\.0))
     }
 
     /// コマンド(SyncGroup.commands の項目)だけを current のものにした設定．
@@ -313,7 +337,8 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -389,6 +414,10 @@ extension Settings: Codable {
         read(.candidatePresentation, into: \.candidatePresentation)
         read(.initialFocus, into: \.initialFocus)
         read(.suggestionDisplay, into: \.suggestionDisplay)
+        // 予測を別の窓に分ける前の設定のファイルには無い．それまでは入力中の候補の窓に予測を混ぜていたので，同じ設定にする
+        settings.predictionDisplay = settings.suggestionDisplay
+        read(.predictionDisplay, into: \.predictionDisplay)
+        read(.suggestionSkipCount, into: \.suggestionSkipCount)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
         read(.numberKeySelection, into: \.numberKeySelection)
@@ -404,6 +433,11 @@ extension Settings: Codable {
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
         read(.latexConversion, into: \.latexConversion)
+        read(.numberFormConversion, into: \.numberFormConversion)
+        read(.numberFormCircled, into: \.numberFormCircled)
+        read(.numberFormParenthesized, into: \.numberFormParenthesized)
+        read(.numberFormKanji, into: \.numberFormKanji)
+        read(.numberFormRoman, into: \.numberFormRoman)
         read(.association, into: \.association)
         read(.associationLimit, into: \.associationLimit)
         read(.showsAssociationHint, into: \.showsAssociationHint)
@@ -498,6 +532,8 @@ extension Settings: Codable {
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
         try container.encode(initialFocus, forKey: .initialFocus)
         try container.encode(suggestionDisplay, forKey: .suggestionDisplay)
+        try container.encode(predictionDisplay, forKey: .predictionDisplay)
+        try container.encode(suggestionSkipCount, forKey: .suggestionSkipCount)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
@@ -513,6 +549,11 @@ extension Settings: Codable {
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(latexConversion, forKey: .latexConversion)
+        try container.encode(numberFormConversion, forKey: .numberFormConversion)
+        try container.encode(numberFormCircled, forKey: .numberFormCircled)
+        try container.encode(numberFormParenthesized, forKey: .numberFormParenthesized)
+        try container.encode(numberFormKanji, forKey: .numberFormKanji)
+        try container.encode(numberFormRoman, forKey: .numberFormRoman)
         try container.encode(association, forKey: .association)
         try container.encode(associationLimit, forKey: .associationLimit)
         try container.encode(showsAssociationHint, forKey: .showsAssociationHint)

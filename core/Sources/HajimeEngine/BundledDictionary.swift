@@ -1,7 +1,7 @@
 import Foundation
 import HajimeDomain
 
-/// アプリに入れるかな漢字変換の辞書(hajime-dictionary．azooKey の辞書に Mozc の語を足したもの)のディレクトリ．
+/// アプリに入れるかな漢字変換の辞書(hajime-dictionary．azooKey の辞書に Mozc と Mozc UT 辞書の語を足したもの)のディレクトリ．
 ///
 /// 外から取得するファイルなので，辞書に入っているファイルごとの SHA-256 の一覧(SHA256SUMS)の SHA-256 をここに書き，
 /// 一覧と，一覧にあるすべてのファイルが一致したものだけを使う(docs/dev/SECURITY-MODEL.md)．
@@ -23,9 +23,9 @@ public struct BundledDictionary: Sendable, Equatable {
         case hashMismatch
     }
 
-    /// https://github.com/KikuchiTomo/hajime-dictionary の v0.2.0
-    public static let version = "0.2.0"
-    public static let expectedManifestSHA256 = "23f59259b3d10b194031eb6635aa0de2b7f916b4934879ca3b945a03558077b0"
+    /// https://github.com/KikuchiTomo/hajime-dictionary の v0.3.0
+    public static let version = "0.3.0"
+    public static let expectedManifestSHA256 = "547bcbc48b73e9c79cfc917c428d3b62e9fb6ec2828d9f1d69ed1cb9bc931c17"
     /// アプリの中で辞書を置くディレクトリの名前
     public static let directoryName = "Dictionary"
     static let manifestName = "SHA256SUMS"

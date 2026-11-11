@@ -633,8 +633,18 @@ final class BranchView: NSView {
     private func footerWidth(_ panel: LatticePanel) -> CGFloat {
         let source = panel.columns.first(where: \.isFocused)?.sourceName
             .map { textWidth(UIStrings.Branch.dictionarySource($0), font: labelFont) + Size.paddingX } ?? 0
-        let association = panel.associationHint.map { textWidth($0, font: labelFont) + Size.paddingX } ?? 0
-        return (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0) + source + association
+        return (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0) + source + associationWidth(panel)
+    }
+
+    /// 連想の知らせ(R-18)．キーが割り当てられていればキーキャップの札，無ければ語だけ
+    private func associationKeyHint(_ panel: LatticePanel) -> KeyHint? {
+        panel.associationHint.flatMap { hint in hint.key.map { KeyHint(key: $0, label: hint.label) } }
+    }
+
+    private func associationWidth(_ panel: LatticePanel) -> CGFloat {
+        guard let hint = panel.associationHint else { return 0 }
+        let width = associationKeyHint(panel).map { GlassDrawing.hintsWidth([$0], theme: theme) } ?? textWidth(hint.label, font: labelFont)
+        return width + Size.paddingX
     }
 
     private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat) {
@@ -659,8 +669,12 @@ final class BranchView: NSView {
             if !shown.isEmpty { hintsEnd += GlassDrawing.hintsWidth(shown, theme: theme) + Size.paddingX }
         }
         if let hint = panel.associationHint {
-            // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
-            drawText(hint, attributes: muted, x: hintsEnd, in: footer)
+            // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く
+            if let keyHint = associationKeyHint(panel) {
+                GlassDrawing.drawHints([keyHint], x: hintsEnd, midY: footer.midY, theme: theme)
+            } else {
+                drawText(hint.label, attributes: muted, x: hintsEnd, in: footer)
+            }
         }
         drawText(position, attributes: muted, x: footer.maxX - textWidth(position, font: labelFont), in: footer)
         if let source = panel.columns.first(where: \.isFocused)?.sourceName {

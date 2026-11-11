@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "maximumMessageBytes": 262144,
   "timing": {
     "keyResponseMilliseconds": 50,
@@ -849,6 +849,10 @@
             {
               "name": "rect",
               "type": "Rect"
+            },
+            {
+              "name": "composition",
+              "type": "Rect?"
             }
           ]
         },
@@ -1116,6 +1120,15 @@
           ]
         },
         {
+          "name": "choosePalette",
+          "fields": [
+            {
+              "name": "target",
+              "type": "PaletteTarget"
+            }
+          ]
+        },
+        {
           "name": "readSettingsFields",
           "fields": [
             {
@@ -1172,6 +1185,9 @@
         },
         {
           "name": "resetUsage"
+        },
+        {
+          "name": "resetPaletteHistory"
         },
         {
           "name": "previewLanguage",
@@ -1568,6 +1584,24 @@
       ]
     },
     {
+      "name": "Prediction",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "typed",
+          "type": "string"
+        },
+        {
+          "name": "completion",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string?"
+        }
+      ]
+    },
+    {
       "name": "AssociationHeading",
       "kind": "struct",
       "fields": [
@@ -1687,11 +1721,19 @@
           "type": "Note?"
         },
         {
+          "name": "hints",
+          "type": "[KeyHint]?"
+        },
+        {
           "name": "association",
           "type": "AssociationHeading?"
         },
         {
           "name": "associationHint",
+          "type": "string?"
+        },
+        {
+          "name": "associationKey",
           "type": "string?"
         },
         {
@@ -1843,8 +1885,330 @@
           "type": "string?"
         },
         {
+          "name": "associationKey",
+          "type": "string?"
+        },
+        {
           "name": "meaningPlacement",
           "type": "MeaningPlacement?"
+        }
+      ]
+    },
+    {
+      "name": "PaletteKind",
+      "kind": "enum",
+      "cases": [
+        "emoji",
+        "symbol"
+      ]
+    },
+    {
+      "name": "SkinTone",
+      "kind": "enum",
+      "cases": [
+        "none",
+        "light",
+        "mediumLight",
+        "medium",
+        "mediumDark",
+        "dark"
+      ]
+    },
+    {
+      "name": "PaletteMode",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "PaletteKind"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "isSelected",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "PaletteTab",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "isSelected",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "PaletteCell",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "isPinned",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "PaletteRow",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "index",
+          "type": "u32"
+        },
+        {
+          "name": "cells",
+          "type": "[PaletteCell]"
+        },
+        {
+          "name": "startsSection",
+          "type": "bool"
+        },
+        {
+          "name": "sectionTitle",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "PalettePosition",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "row",
+          "type": "u32"
+        },
+        {
+          "name": "column",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "PalettePreview",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "japaneseName",
+          "type": "string"
+        },
+        {
+          "name": "englishName",
+          "type": "string"
+        },
+        {
+          "name": "shortcodes",
+          "type": "[string]"
+        },
+        {
+          "name": "readings",
+          "type": "[string]"
+        },
+        {
+          "name": "codePoints",
+          "type": "string"
+        },
+        {
+          "name": "isPinned",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "PaletteSkinTonePicker",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "options",
+          "type": "[string]"
+        },
+        {
+          "name": "selected",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "PalettePanel",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "modes",
+          "type": "[PaletteMode]"
+        },
+        {
+          "name": "query",
+          "type": "string"
+        },
+        {
+          "name": "placeholder",
+          "type": "string"
+        },
+        {
+          "name": "tabs",
+          "type": "[PaletteTab]"
+        },
+        {
+          "name": "heading",
+          "type": "string"
+        },
+        {
+          "name": "rows",
+          "type": "[PaletteRow]"
+        },
+        {
+          "name": "rowCount",
+          "type": "u32"
+        },
+        {
+          "name": "firstRow",
+          "type": "u32"
+        },
+        {
+          "name": "columns",
+          "type": "u32"
+        },
+        {
+          "name": "visibleRows",
+          "type": "u32"
+        },
+        {
+          "name": "selection",
+          "type": "PalettePosition?"
+        },
+        {
+          "name": "preview",
+          "type": "PalettePreview?"
+        },
+        {
+          "name": "showsPreview",
+          "type": "bool"
+        },
+        {
+          "name": "skinTone",
+          "type": "SkinTone"
+        },
+        {
+          "name": "skinTonePicker",
+          "type": "PaletteSkinTonePicker?"
+        },
+        {
+          "name": "message",
+          "type": "string?"
+        },
+        {
+          "name": "hints",
+          "type": "[KeyHint]"
+        },
+        {
+          "name": "cellSize",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PaletteTarget",
+      "kind": "union",
+      "tag": "type",
+      "cases": [
+        {
+          "name": "cell",
+          "fields": [
+            {
+              "name": "row",
+              "type": "u32"
+            },
+            {
+              "name": "column",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "hover",
+          "fields": [
+            {
+              "name": "row",
+              "type": "u32"
+            },
+            {
+              "name": "column",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "tab",
+          "fields": [
+            {
+              "name": "section",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "mode",
+          "fields": [
+            {
+              "name": "kind",
+              "type": "PaletteKind"
+            }
+          ]
+        },
+        {
+          "name": "scroll",
+          "fields": [
+            {
+              "name": "rows",
+              "type": "i32"
+            }
+          ]
+        },
+        {
+          "name": "skinTone",
+          "fields": [
+            {
+              "name": "tone",
+              "type": "SkinTone"
+            }
+          ]
+        },
+        {
+          "name": "skinToneButton"
+        },
+        {
+          "name": "pin"
+        },
+        {
+          "name": "close"
         }
       ]
     },
@@ -2001,6 +2365,19 @@
           ]
         },
         {
+          "name": "showPrediction",
+          "fields": [
+            {
+              "name": "prediction",
+              "type": "Prediction?"
+            },
+            {
+              "name": "anchor",
+              "type": "Rect?"
+            }
+          ]
+        },
+        {
           "name": "showMode",
           "fields": [
             {
@@ -2038,11 +2415,31 @@
           "name": "hideHandwriting"
         },
         {
+          "name": "showPalette",
+          "fields": [
+            {
+              "name": "panel",
+              "type": "PalettePanel"
+            },
+            {
+              "name": "anchor",
+              "type": "Rect?"
+            }
+          ]
+        },
+        {
+          "name": "hidePalette"
+        },
+        {
           "name": "move",
           "fields": [
             {
               "name": "anchor",
               "type": "Rect"
+            },
+            {
+              "name": "composition",
+              "type": "Rect?"
             }
           ]
         },

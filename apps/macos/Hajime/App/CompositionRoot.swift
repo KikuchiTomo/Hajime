@@ -24,6 +24,7 @@ final class CompositionRoot {
     let candidatePanel: CandidatePanelController
     let modeIndicator: ModeIndicatorController
     let note: NoteController
+    let prediction: PredictionController
     let contextProvider: InputContextProvider
     let calendar = SystemCalendar(clock: { Date() })
     let sync: SyncCoordinator
@@ -57,6 +58,7 @@ final class CompositionRoot {
         self.candidatePanel = CandidatePanelController()
         self.modeIndicator = ModeIndicatorController()
         self.note = NoteController()
+        self.prediction = PredictionController()
         self.contextProvider = InputContextProvider(settings: settings)
     }
 
@@ -145,6 +147,7 @@ final class CompositionRoot {
         controller.noteSetAsideFile(settings.setAsideFile)
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
         controller.setCheckForUpdates(Self.checkForUpdates)
+        controller.setClearPaletteHistory { [weak self] in self?.paletteUsage?.update { $0.clearHistory() } }
         return controller
     }()
 
@@ -181,7 +184,7 @@ final class CompositionRoot {
     }
 
     func makePresenter(session: InputSession) -> ClientActionPresenter {
-        ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, settings: settings,
+        ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, prediction: prediction, settings: settings,
                               openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting, palette: palette,
                               runCommand: { [unowned self] in self.commandLauncher.run($0) })
     }

@@ -11,12 +11,13 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
     )
 
-    /// 打っているあいだの候補の窓．選び始めるまで番号を振らず，足元に選び始めるキーを出す
+    /// 打っているあいだの候補の窓．読みの変換の候補だけを並べ(続く語句の予測は別の窓)，選び始めるまで番号を振らず，
+    /// 足元に選び始めるキーを出す．予測の窓を出していないときは Tab でも選び始める
     static let suggestion: CandidatePanel = {
         var panel = CandidatePanel(
             variants: [], selectedVariant: nil,
-            entries: ["あぴ", "アピ", "アピール", "アピールポイント"].map { .init(text: $0, annotation: nil) },
-            selectedEntry: nil, focus: .candidate, position: 0, total: 4,
+            entries: ["なんだ", "何だ", "なんだ？"].map { .init(text: $0, annotation: nil) },
+            selectedEntry: nil, focus: .candidate, position: 0, total: 3,
             note: Note(tone: .info, title: "", key: ["↓", "Tab"].joined(separator: IndicatorLabels.keySeparator), keyAction: "選択")
         )
         panel.showsNumbers = false
@@ -91,6 +92,38 @@ enum SamplePalettes {
         texts.enumerated().map { index, row in
             PalettePanel.Row(index: index, cells: row.map { .init(text: $0, name: $0) }, startsSection: starts.contains(index), sectionTitle: titles[index])
         }
+    }
+
+    private static let frequentSample = ["👍", "🙇", "😂", "🎉", "🙏", "✨", "👀", "🔥", "💯", "❤️", "🙌", "😊", "🥺", "😭", "👏", "🤔", "😅", "🍣",
+                                         "☕️", "🎂", "🌸", "🐱", "🚀", "💡", "📌", "✅", "⚠️", "🆗"]
+    private static let smileySample = ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "🫠", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘",
+                                       "😗", "☺️", "😚", "😙", "🥲", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🫢", "🫣", "🤫", "🤔", "🫡",
+                                       "🤐", "🤨", "😐", "😑", "😶", "🫥", "😏", "😒", "🙄", "😬", "😮‍💨", "🤥", "🫨", "😌", "😔", "😪", "🤤", "😴",
+                                       "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "🥵", "🥶", "🥴", "😵", "🤯", "🤠", "🥳", "🥸", "😎", "🤓", "🧐", "😕",
+                                       "🫤", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "🥹", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖",
+                                       "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡", "😠", "🤬", "😈", "👿", "💀", "☠️", "💩", "🤡", "👹", "👺"]
+
+    /// 設定の画面の見本．設定の列数・行数・よく使う文字の行数・説明のとおりに並べる
+    static func preview(columns: Int, rows visibleRows: Int, frequentRows: Int, showsPreview: Bool) -> PalettePanel {
+        let columns = max(columns, 1)
+        let frequent = Array(frequentSample.prefix(frequentRows * columns))
+        var rows: [PalettePanel.Row] = []
+        func append(_ texts: [String], title: String) {
+            for start in stride(from: 0, to: texts.count, by: columns) {
+                let cells = texts[start..<min(start + columns, texts.count)].map { PalettePanel.Cell(text: $0, name: $0) }
+                rows.append(PalettePanel.Row(index: rows.count, cells: cells, startsSection: start == 0, sectionTitle: title))
+            }
+        }
+        append(frequent, title: PaletteStrings.frequent)
+        let smileyStart = rows.count
+        append(smileySample, title: PaletteCategory.smileys.title)
+        let tabs: [PalettePanel.Tab] = (frequent.isEmpty ? [] : [.init(section: .frequent, title: PaletteStrings.frequent, symbol: PaletteStrings.frequentSymbol, isSelected: false)])
+            + PaletteCategory.allCases.filter { $0.kind == .emoji }.map { .init(section: .category($0), title: $0.title, symbol: $0.symbol, isSelected: $0 == .smileys) }
+        let selected = smileyStart < rows.count ? PalettePanel.Position(row: smileyStart, column: min(2, rows[smileyStart].cells.count - 1)) : nil
+        return PalettePanel(
+            modes: modes(.emoji), query: "", placeholder: PaletteStrings.emojiPlaceholder, tabs: tabs, heading: rows.first?.sectionTitle ?? "",
+            rows: Array(rows.prefix(visibleRows)), rowCount: rows.count, firstRow: 0, columns: columns, visibleRows: visibleRows, selection: selected,
+            preview: showsPreview ? emoji.preview : nil, showsPreview: showsPreview, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }
 
     /// 絵文字のパレットを開いたところ．よく使う文字の行の下に表のまとまりが続く

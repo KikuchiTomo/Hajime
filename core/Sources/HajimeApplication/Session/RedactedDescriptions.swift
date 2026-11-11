@@ -15,6 +15,7 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .selectMode(let mode): "selectMode(\(mode))"
         case .selectInputStyle(let style): "selectInputStyle(\(style))"
         case .showNote(let note): "showNote(\(note.tone.rawValue), length: \(note.text.count))"
+        case .showPrediction(let prediction): "showPrediction(\(prediction.map(String.init(describing:)) ?? "nil"))"
         case .openSettings: "openSettings"
         case .toggleLiveConversion: "toggleLiveConversion"
         case .showHandwriting: "showHandwriting"
@@ -31,6 +32,11 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
 
 extension KeyResult: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "KeyResult(handled: \(handled), actions: \(actions))" }
+    public var debugDescription: String { description }
+}
+
+extension Prediction: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "Prediction(typed: \(typed.count), completion: \(completion.count))" }
     public var debugDescription: String { description }
 }
 

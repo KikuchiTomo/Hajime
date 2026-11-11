@@ -1,9 +1,13 @@
-//! 候補ウィンドウの見た目を PNG に書き出す(デバッグビルドだけ)．macOS の SnapshotRenderer と同じ見本・同じ名前で書き出し，
+//! 候補ウィンドウとパレットの見た目を PNG に書き出す(デバッグビルドだけ)．macOS の SnapshotRenderer と同じ見本・同じ名前で書き出し，
 //! 2 つの OS の絵を見比べられるようにする．CI の Windows のジョブが成果物にする
 //!
 //! 使い方: hajime-candidate-ui.exe --render-snapshots <書き出し先のディレクトリ>
 
 use super::render::Renderer;
+use crate::palette::{
+    self,
+    layout::{cell_size, Fonts, Layout},
+};
 use crate::scene::{self, Look, Scene, Surround};
 use crate::theme::{ResolvedTheme, SystemLook};
 use ipc::{
@@ -147,6 +151,20 @@ fn render_all(output: &Path) -> Result<()> {
             let path = output.join(format!("{kind}-{name}.png"));
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
         }
+        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-symbol と同じ見本
+        for (kind, panel) in [
+            ("palette-emoji", palette::sample::emoji()),
+            ("palette-search", palette::sample::search()),
+            ("palette-symbol", palette::sample::symbol()),
+        ] {
+            let fonts = Fonts::new(cell_size(&panel));
+            let measure = renderer.measure_with(&theme, font_size, &fonts.all())?;
+            let layout = Layout::new(&panel, &theme, &measure);
+            let scene = palette::scene::palette(&panel, &layout, &look, &measure);
+            let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });
+            let path = output.join(format!("{kind}-{name}.png"));
+            write_png(&imaging, &renderer, &scene, &measure, &path)?;
+        }
     }
     Ok(())
 }
@@ -249,6 +267,7 @@ fn list() -> CandidateList {
     CandidateList {
         association: None,
         association_hint: None,
+        association_key: None,
         homophone: None,
         shows_numbers: None,
         variants: variants(),
@@ -260,6 +279,8 @@ fn list() -> CandidateList {
         total: 12,
         note: None,
         meaning_placement: None,
+        // 既定のキー設定で，一覧の先頭から文字種の行へ移るキー(エンジンの FooterHints が送るもの)
+        hints: Some(vec![hint("Shift+Space", "文字種")]),
     }
 }
 
@@ -268,6 +289,7 @@ fn homophone_list() -> CandidateList {
     CandidateList {
         variants: vec![],
         entries: entries(&["撮る", "取る", "採る", "執る"]),
+        hints: None,
         selected_entry: Some(0),
         position: 1,
         total: 6,
@@ -295,6 +317,7 @@ fn meaning_list() -> CandidateList {
     CandidateList {
         variants: vec![],
         entries: entries(&["動く", "うごく", "ウゴク"]),
+        hints: None,
         selected_entry: Some(0),
         position: 1,
         total: 3,
@@ -324,6 +347,7 @@ fn command_list() -> CandidateList {
     CandidateList {
         variants: vec![],
         entries,
+        hints: None,
         selected_entry: Some(1),
         position: 2,
         total: 4,
@@ -345,6 +369,7 @@ fn correction() -> CandidateList {
     CandidateList {
         association: None,
         association_hint: None,
+        association_key: None,
         homophone: None,
         shows_numbers: None,
         variants: variants(),
@@ -363,6 +388,7 @@ fn correction() -> CandidateList {
             text: "修正　Space 入力のままに戻す".into(),
         }),
         meaning_placement: None,
+        hints: Some(vec![hint("Shift+Space", "文字種")]),
     }
 }
 
@@ -401,6 +427,7 @@ fn preview() -> BranchMap {
     BranchMap {
         association: None,
         association_hint: None,
+        association_key: None,
         columns: vec![
             column("Cloudflareで"),
             BranchColumn {
@@ -435,6 +462,7 @@ fn split() -> BranchMap {
     BranchMap {
         association: None,
         association_hint: None,
+        association_key: None,
         columns: vec![
             column("それは"),
             BranchColumn {
