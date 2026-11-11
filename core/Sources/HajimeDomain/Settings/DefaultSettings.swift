@@ -208,6 +208,8 @@ public enum DefaultSettings {
     public static let usageSaveInterval = 20
     /// 読みから引いた記号を，候補の上から何番目に差し込むか
     public static let symbolCandidateOffset = 3
+    /// 丸数字・漢数字などに書き換える数の桁数の上限(NumberForms)．位付きの漢数字は「兆」の位(16 桁)まで書ける
+    public static let maximumNumberFormDigits = 16
     /// 読みで引いた絵文字を差し込む位置と，差し込む数．よく使う語のあとに並べ，候補の一覧の 1 ページに収める
     public static let emojiCandidateOffset = 5
     public static let emojiCandidateCount = 3

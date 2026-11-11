@@ -230,6 +230,16 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
             }
+            Section(UIStrings.Settings.numberForms) {
+                ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
+                Group {
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormCircled, keyPath: \.numberFormCircled)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormParenthesized, keyPath: \.numberFormParenthesized)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormKanji, keyPath: \.numberFormKanji)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormRoman, keyPath: \.numberFormRoman)
+                }
+                .disabled(!model.settings.numberFormConversion)
+            }
             Section(UIStrings.Settings.meaning) {
                 ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
                 Group {
