@@ -55,7 +55,7 @@ final class ClientActionPresenter {
             case .showCandidates(let panel):
                 note.hide()
                 candidatePanel.show(panel, caret: panelAnchor(of: client, at: panel.anchor), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
-                                    keys: settings.current.keymap)
+                                    keys: settings.current.keymap, showsHints: settings.current.showsKeyHints)
             case .showLattice(let panel):
                 note.hide()
                 candidatePanel.showLattice(panel, caret: panelAnchor(of: client, at: nil), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,

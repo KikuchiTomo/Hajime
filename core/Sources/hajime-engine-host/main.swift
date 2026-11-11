@@ -212,7 +212,8 @@ func run() -> Int32 {
             process.executableURL = settingsApp
             try? process.run()
         },
-        hints: { BranchHints.make(for: $0, settings: $1) },
+        hints: { FooterHints.make(for: $0, settings: $1) },
+        listHints: { FooterHints.make(for: $0, settings: $1) },
         typoService: typoService,
         sync: sync,
         files: files,

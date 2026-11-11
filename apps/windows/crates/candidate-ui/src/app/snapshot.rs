@@ -279,6 +279,8 @@ fn list() -> CandidateList {
         total: 12,
         note: None,
         meaning_placement: None,
+        // 既定のキー設定で，一覧の先頭から文字種の行へ移るキー(エンジンの FooterHints が送るもの)
+        hints: Some(vec![hint("Shift+Space", "文字種")]),
     }
 }
 
@@ -287,6 +289,7 @@ fn homophone_list() -> CandidateList {
     CandidateList {
         variants: vec![],
         entries: entries(&["撮る", "取る", "採る", "執る"]),
+        hints: None,
         selected_entry: Some(0),
         position: 1,
         total: 6,
@@ -314,6 +317,7 @@ fn meaning_list() -> CandidateList {
     CandidateList {
         variants: vec![],
         entries: entries(&["動く", "うごく", "ウゴク"]),
+        hints: None,
         selected_entry: Some(0),
         position: 1,
         total: 3,
@@ -343,6 +347,7 @@ fn command_list() -> CandidateList {
     CandidateList {
         variants: vec![],
         entries,
+        hints: None,
         selected_entry: Some(1),
         position: 2,
         total: 4,
@@ -383,6 +388,7 @@ fn correction() -> CandidateList {
             text: "修正　Space 入力のままに戻す".into(),
         }),
         meaning_placement: None,
+        hints: Some(vec![hint("Shift+Space", "文字種")]),
     }
 }
 

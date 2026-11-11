@@ -1627,6 +1627,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var position: UInt32
     public var total: UInt32
     public var note: WireNote?
+    public var hints: [WireKeyHint]?
     public var association: WireAssociationHeading?
     public var associationHint: String?
     public var associationKey: String?
@@ -1634,7 +1635,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var showsNumbers: Bool?
     public var meaningPlacement: WireMeaningPlacement?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint]? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1643,6 +1644,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.position = position
         self.total = total
         self.note = note
+        self.hints = hints
         self.association = association
         self.associationHint = associationHint
         self.associationKey = associationKey
