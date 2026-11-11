@@ -32,15 +32,17 @@ final class Harness {
     /// 動かすよう頼まれたコマンド(R-22)
     private(set) var ranCommands: [LauncherCommand] = []
 
-    /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)
+    /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)．wrapLexicon は英単語の辞書を包むもの(EnglishTermLexicon)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
          associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false,
-         wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil) {
+         wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
+         wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
         self.settings = store
-        self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: lexicon, settings: store, associations: associations, keyNames: keyNames,
+        self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
+                                    associations: associations, keyNames: keyNames,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil)
     }
 

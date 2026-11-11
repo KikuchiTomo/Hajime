@@ -1,6 +1,7 @@
 import HajimeDomain
 
 /// 読みの末尾に打った英単語を見つけて直す(R-02)．「pyてょn」→「python」，「pthon」→「python」．
+/// 英語の語の辞書(R-24)にある語は，辞書の書き方にする(「chatgpt」→「ChatGPT」．EnglishLexicon.spelling)．
 ///
 /// 文の途中の英単語(「このばーじょんの」+「python」)も対象にする．
 /// 直した英単語のあとに日本語を続けて打つと，英単語を読みの中に確定させる(「python」+「ha」→「pythonは」)．
@@ -103,7 +104,7 @@ final class EnglishWordCorrector {
         if let tail = tails.first(where: { lexicon.isWord($0.keys) }),
             let word = rule.correction(for: tail.keys, isWord: true, suggestions: []) {
             return misspelling(startingBefore: tail.rawStart)
-                ?? Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: word)
+                ?? Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: tail.keys, word: lexicon.spelling(of: word) ?? word)
         }
         // 2. 英単語の終わりが次の日本語の綴りにかかったもの(「react」+「wo」)．綴りの誤りより先に調べる
         //    (「reactwo」の「ctwo」に two を返す綴りの候補で，react を two にしないため)
@@ -123,7 +124,7 @@ final class EnglishWordCorrector {
             composition.pending.isEmpty || composition.pending == "n",
             WordLanguageClassifier.reading(of: keys) != nil,
             classifier.language(of: keys, context: context, mode: .japaneseFirst) == .english else { return false }
-        active = Correction(rawStart: 0, kanaStart: 0, keys: keys, word: keys)
+        active = Correction(rawStart: 0, kanaStart: 0, keys: keys, word: lexicon.spelling(of: keys) ?? keys)
         commit(into: &composition)
         return true
     }
@@ -183,7 +184,7 @@ final class EnglishWordCorrector {
                 guard rule.readsAsEnglish(endsOnBoundary: false, japanese: whole, following: score, followingReading: following.conversionReading) else { continue }
                 let gain = score - whole
                 if best.map({ gain > $0.gain }) ?? true {
-                    best = (gain, Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: word, word: word))
+                    best = (gain, Correction(rawStart: tail.rawStart, kanaStart: tail.kanaStart, keys: word, word: lexicon.spelling(of: word) ?? word))
                 }
             }
         }
@@ -216,7 +217,7 @@ final class EnglishWordCorrector {
         // 「s」のように英単語の続きかもしれないキーは，英単語として読めるならそちらを優先する
         let extended = current.keys + followingKeys(in: composition)
         if lexicon.isWord(extended), !readsAsShortJapanese(extended) {
-            active = Correction(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: extended, word: extended)
+            active = Correction(rawStart: current.rawStart, kanaStart: current.kanaStart, keys: extended, word: lexicon.spelling(of: extended) ?? extended)
         }
         // 続けて打ったキーまで含めると，いま直している部分より前から始まる英単語になることがある．
         // 「jvascri」の「scri」を直したあとに「pt」と打つと，「jvascript」全体を javascript に直せる．
