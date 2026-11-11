@@ -19,6 +19,9 @@ public struct Composition: Sendable, Equatable {
     /// 英字として入れた部分(確定させた英単語と，Shift で打った大文字・数字)の終わり(かなの文字数)．
     /// ローマ字として読めずに残った英字(打ち間違い)は含めない
     private var englishKanaEnd = 0
+    /// 確定させた英単語のうち，打ったキーがローマ字としても読めるもの(「demo」→ でも)．
+    /// 英単語にしたあとも，ローマ字として読んだ日本語の候補を選べるようにするため
+    private var frozenWords: [FrozenWord] = []
     /// 「nn」のあとの母音の位置．語によって「ん+あ行」(hannei → はんえい)か「ん+な行」(onna → おんな)かが
     /// 変わるので，どちらの読みにも切り替えられるようにしておく．どちらにするかは変換の点数で決める(NasalReadingResolver)
     public private(set) var nasalAmbiguities: [NasalAmbiguity] = []
@@ -66,6 +69,15 @@ public struct Composition: Sendable, Equatable {
         ("や", "にゃ"), ("ゆ", "にゅ"), ("よ", "にょ"),
     ]
 
+    /// 確定させた英単語 1 つ．kanaStart は読みの中で英単語が始まる位置，romajiReading は打ったキーをローマ字として読んだかな
+    private struct FrozenWord: Sendable, Equatable {
+        var kanaStart: Int
+        var word: String
+        var romajiReading: String
+
+        var kanaEnd: Int { kanaStart + word.count }
+    }
+
     public struct Boundary: Sendable, Equatable {
         public var rawCount: Int
         public var kanaCount: Int
@@ -101,6 +113,26 @@ public struct Composition: Sendable, Equatable {
 
     /// 変換エンジンに渡す読み．末尾の「n」は「ん」として扱う
     public var conversionReading: String { kana + Self.finalize(pending) }
+
+    /// 変換エンジンに渡す読みの，確定させた英単語をローマ字として読んだかなに置き換えたもの(「demo」+「は」→「でもは」)．
+    /// ローマ字としても読める英単語が無ければ nil
+    public var conversionReadingWithFrozenWordsAsKana: String? {
+        guard !frozenWords.isEmpty else { return nil }
+        var characters = Array(conversionReading)
+        for word in frozenWords.reversed() where word.kanaEnd <= characters.count {
+            characters.replaceSubrange(word.kanaStart..<word.kanaEnd, with: Array(word.romajiReading))
+        }
+        return String(characters)
+    }
+
+    /// キーの並びをローマ字として読んだかな．読めない並び(「git」の t)があれば nil
+    private static func romajiReading(of keys: String, table: RomajiTable) -> String? {
+        var composition = Composition(table: table)
+        for key in keys { composition.insertRomaji(key) }
+        guard !composition.containsInvalidRomaji, composition.pending.isEmpty || composition.pending == "n" else { return nil }
+        let reading = composition.conversionReading
+        return reading.isEmpty ? nil : reading
+    }
 
     // MARK: - 入力
 
@@ -142,6 +174,7 @@ public struct Composition: Sendable, Equatable {
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
         frozenKanaEnd = min(frozenKanaEnd, kana.count)
         englishKanaEnd = min(englishKanaEnd, kana.count)
+        frozenWords = frozenWords.filter { $0.kanaEnd <= kana.count }
     }
 
     /// 「nn」の直後にかなになった文字が母音(や行を含む)なら，両方の読みを持てるように記録する
@@ -183,6 +216,9 @@ public struct Composition: Sendable, Equatable {
             boundaries[i].kanaCount += delta
         }
         if frozenKanaEnd > ambiguity.kanaIndex { frozenKanaEnd += delta }
+        for i in frozenWords.indices where frozenWords[i].kanaStart > ambiguity.kanaIndex {
+            frozenWords[i].kanaStart += delta
+        }
         if englishKanaEnd > ambiguity.kanaIndex { englishKanaEnd += delta }
     }
 
@@ -226,6 +262,10 @@ public struct Composition: Sendable, Equatable {
         nasalWatchIndex = nil
         resolvedByLastKey = nil
         frozenKanaEnd = kana.count
+        frozenWords = frozenWords.filter { $0.kanaEnd <= kanaStart }
+        if word.lowercased() == keys.lowercased(), let reading = Self.romajiReading(of: keys, table: table) {
+            frozenWords.append(FrozenWord(kanaStart: kanaStart, word: word, romajiReading: reading))
+        }
         // 打ったとおりの英単語(「python」)は英字として入れたものとみなす．綴りを直した語(「sride」→「bride」)は，
         // 日本語の打ち間違いを英単語と取り違えたことがあるので，日本語の打ち間違いの見直しで読み直せるようにしておく
         if word.lowercased() == keys.lowercased() {
@@ -278,6 +318,7 @@ public struct Composition: Sendable, Equatable {
         if boundary.kanaCount < frozenKanaEnd { copy.correctedWordKeyEdits = nil }
         copy.frozenKanaEnd = min(frozenKanaEnd, boundary.kanaCount)
         copy.englishKanaEnd = min(englishKanaEnd, boundary.kanaCount)
+        copy.frozenWords = frozenWords.filter { $0.kanaEnd <= boundary.kanaCount }
         return copy
     }
 
@@ -336,6 +377,7 @@ public struct Composition: Sendable, Equatable {
             kana.removeLast()
         }
         if pending.isEmpty { reopenTrailingLetters() }
+        frozenWords = frozenWords.filter { $0.kanaEnd <= kana.count }
         // 消した文字にかかっていた「nn」の読みの記録は外す．残った分は，あとの文字が変わったので比べ直す
         nasalAmbiguities = nasalAmbiguities.filter { $0.kanaIndex + $0.currentForm.count <= kana.count }
         for i in nasalAmbiguities.indices { nasalAmbiguities[i].evaluatedFollowingText = nil }
@@ -346,6 +388,7 @@ public struct Composition: Sendable, Equatable {
             frozenKanaEnd = 0
             englishKanaEnd = 0
             correctedWordKeyEdits = nil
+            frozenWords = []
         }
     }
 
@@ -359,6 +402,12 @@ public struct Composition: Sendable, Equatable {
         }
         if readingCount <= kana.count {
             kana = String(kana.dropFirst(readingCount))
+            frozenWords = frozenWords.compactMap { word in
+                guard word.kanaStart >= readingCount else { return nil }
+                var shifted = word
+                shifted.kanaStart -= readingCount
+                return shifted
+            }
             nasalAmbiguities = nasalAmbiguities.compactMap { ambiguity in
                 guard ambiguity.kanaIndex >= readingCount else { return nil }
                 var shifted = ambiguity
@@ -370,6 +419,7 @@ public struct Composition: Sendable, Equatable {
             kana = ""
             pending = ""
             nasalAmbiguities = []
+            frozenWords = []
         }
         rawKeys = nil
         containsInvalidRomaji = false

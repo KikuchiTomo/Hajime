@@ -53,6 +53,10 @@ public enum DefaultSettings {
     public static let suggestionCount = 5
     /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
     public static let headWordAlternativeCount = 8
+    /// 打ち間違いを直した文節に入れる，打ったままの読みの候補(LatticeBuilder.addingTyped)の数
+    public static let typedAlternativeCount = 2
+    /// 英単語にした語の文節に入れる，ローマ字として読んだかなの候補(LatticeBuilder.addingRomajiReading)の数
+    public static let romajiReadingCandidateCount = 8
     /// 打っているあいだの候補を出し始める読みの長さ(1 文字では候補が多すぎて役に立たない)
     public static let minimumSuggestionReading = 2
     /// タイプミスの補正を試す最短の長さ．短い並びは英単語と偶然一致しやすい

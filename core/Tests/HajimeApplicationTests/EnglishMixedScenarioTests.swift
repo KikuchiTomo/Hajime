@@ -29,6 +29,36 @@ struct EnglishMixedScenarioTests {
         #expect(harness.committed == "pythonがすごい")
     }
 
+    private func demoConverter() -> FakeConverter {
+        FakeConverter(["でも": [("でも", nil), ("デモ", nil), ("手も", nil)], "demo": [("demo", nil)]])
+    }
+
+    @Test("R-02: 前が英語で英単語にした語(「demo」)も，一覧でローマ字として読んだ日本語(でも・手も)を選べる")
+    func frozenWordKeepsJapaneseInList() {
+        let harness = Harness(converter: demoConverter(), lexicon: FakeLexicon(words: ["demo"]), settings: .listPresentation)
+        harness.context = InputContext(precedingText: "Let's ")
+        harness.type("demo")
+        harness.settle()
+        #expect(harness.marked.text == "demo")
+        harness.press(.space)
+        #expect(harness.panel?.entries.map(\.text) == ["demo", "でも", "デモ", "手も"])
+        harness.type("4")
+        #expect(harness.committed == "手も")
+    }
+
+    @Test("R-02: 前が英語で英単語にした語(「demo」)も，分岐図でローマ字として読んだ日本語を選べる．かなは上の枝に出す")
+    func frozenWordKeepsJapaneseInLattice() {
+        let harness = Harness(converter: demoConverter(), lexicon: FakeLexicon(words: ["demo"]))
+        harness.context = InputContext(precedingText: "Let's ")
+        harness.type("demo")
+        harness.settle()
+        harness.press(.space)
+        let column = harness.lattice?.columns.first
+        #expect(column?.text == "demo")
+        #expect(column?.alternatives == ["demo", "手も"])
+        #expect(column?.variants == ["でも", "デモ", "ﾃﾞﾓ"])
+    }
+
     @Test("R-02: 英単語より後ろの日本語の打ち間違いは直し，Esc で打ったままに戻せる")
     func reviewsJapaneseAfterEnglish() {
         let converter = FakeConverter()
