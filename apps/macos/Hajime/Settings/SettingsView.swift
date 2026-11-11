@@ -37,6 +37,7 @@ struct SettingsView: View {
         case .correction: CorrectionPage(model: model)
         case .language: WordLanguagePage(model: model)
         case .symbols: SymbolsPage(model: model)
+        case .palette: PalettePage(model: model)
         case .keys: KeymapPage(model: model)
         case .dictionary: DictionaryPage(model: model)
         case .commands: CommandsPage(model: model, bookmarks: model.commandBookmarks)

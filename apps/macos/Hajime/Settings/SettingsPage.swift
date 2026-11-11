@@ -20,12 +20,12 @@ extension SettingsView {
 
     /// 左の一覧の項目．システム設定と同じく，左で選んだ項目を右に出す(上のタブには収まらない)．並びは左の一覧の並び
     enum Page: CaseIterable, Hashable {
-        case input, conversion, correction, language, romaji, keys, apps, dictionary, symbols, commands, appearance, usage, sync, backup, about
+        case input, conversion, correction, language, romaji, keys, apps, dictionary, symbols, palette, commands, appearance, usage, sync, backup, about
 
         var group: Group {
             switch self {
             case .input, .conversion, .correction, .language, .romaji, .keys, .apps: .input
-            case .dictionary, .symbols, .commands: .dictionary
+            case .dictionary, .symbols, .palette, .commands: .dictionary
             case .appearance: .appearance
             case .usage, .sync, .backup: .data
             case .about: .about
@@ -39,6 +39,7 @@ extension SettingsView {
             case .correction: UIStrings.Features.correctionPage
             case .language: UIStrings.Features.languagePage
             case .symbols: UIStrings.Features.symbolsPage
+            case .palette: UIStrings.Palette.page
             case .keys: UIStrings.Keys.tab
             case .dictionary: UIStrings.Settings.dictionaryTab
             case .commands: UIStrings.Extras.commandsPage
@@ -65,6 +66,7 @@ extension SettingsView {
             case .correction: "wand.and.stars"
             case .language: "character.bubble"
             case .symbols: "arrow.right.square"
+            case .palette: "face.smiling"
             case .keys: "command"
             case .dictionary: "text.book.closed"
             case .commands: "bolt.horizontal"
@@ -92,6 +94,9 @@ extension SettingsView {
                              UIStrings.Features.tryLanguage, UIStrings.Choice.label(for: .englishAuto), UIStrings.Extras.englishTermsSection,
                              UIStrings.Extras.englishTerms]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
+            case .palette: [UIStrings.Palette.enabled, UIStrings.Palette.emojiKey, UIStrings.Palette.symbolKey, UIStrings.Palette.closesAfterInsert,
+                            UIStrings.Palette.recordsHistory, UIStrings.Palette.clearHistory, UIStrings.Palette.columns, UIStrings.Palette.rows,
+                            UIStrings.Palette.cellSize, UIStrings.Palette.frequentRows, UIStrings.Palette.showsPreview]
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             case .keys: [UIStrings.Keys.presetMenu] + KeymapCommand.allCases.map(UIStrings.Keys.label(for:))
                 + KeymapState.allCases.map(UIStrings.Keys.label(for:)) + KeymapPreset.allCases.map(UIStrings.Keys.label(for:))

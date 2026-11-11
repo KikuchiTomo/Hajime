@@ -239,16 +239,18 @@ final class PaletteView: NSView {
 
     private func drawTabs(_ panel: PalettePanel, in rects: [NSRect]) {
         for (tab, rect) in zip(panel.tabs, rects) {
-            var color = tab.isSelected ? theme.text : theme.textMuted
+            let color = tab.isSelected ? theme.text : theme.textMuted
             if tab.isSelected, theme.isRounded {
                 // 角丸のテーマは薄い地と下の線で示す
                 fill(rect.insetBy(dx: 2, dy: 2), color: theme.focusTint, radius: Glass.selectionRadius)
                 theme.selection.setFill()
                 NSRect(x: rect.minX + 4, y: rect.maxY - Size.selectionStroke, width: rect.width - 8, height: Size.selectionStroke).fill()
             } else if tab.isSelected {
-                // platinum と desk は選択の色で塗り，アイコンを選択の文字の色にする
-                fill(rect.insetBy(dx: 2, dy: 2), color: theme.selection, radius: 0)
-                color = theme.selectionText
+                // platinum と desk は選択の色の枠と下の線で示す．塗ってアイコンを選択の文字の色にすると，
+                // 選択の文字の色が暗いテーマ(desk)では SF Symbols の顔の中まで塗られて見分けられない
+                stroke(rect.insetBy(dx: 2, dy: 2), color: theme.selection, radius: 0, width: 1)
+                theme.selection.setFill()
+                NSRect(x: rect.minX + 4, y: rect.maxY - Size.selectionStroke - 2, width: rect.width - 8, height: Size.selectionStroke).fill()
             }
             if let name = PaletteIcons.symbolName(for: tab.section),
                let image = SymbolImageCache.image(name, pointSize: Size.tabIconSize, weight: tab.isSelected ? .semibold : .regular, color: color) {
@@ -391,7 +393,7 @@ enum PaletteIcons {
         case .results: "magnifyingglass"
         case .category(let category):
             switch category {
-            case .smileys: "smiley"
+            case .smileys: "theatermasks"
             case .people: "hand.raised"
             case .nature: "pawprint"
             case .food: "fork.knife"
