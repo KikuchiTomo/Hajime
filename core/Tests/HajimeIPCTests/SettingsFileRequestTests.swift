@@ -151,6 +151,8 @@ struct SettingsFileRequestTests {
         #expect(await answer(.exportUserDictionary(path: "/d/u.txt"), from: id) == .done)
         #expect(files.calls.contains("importRuleList symbolReadings /d/s.tsv"))
         #expect(files.calls.contains("exportRuleList romaji /d/r.tsv"))
+        #expect(await answer(.importRuleList(list: .englishTerms, path: "/d/e.txt"), from: id) == .imported(added: 5, skipped: 0))
+        #expect(files.calls.contains("importRuleList englishTerms /d/e.txt"))
     }
 
     @Test("挨拶の前のファイルの要求は断り，読み書きはしない")

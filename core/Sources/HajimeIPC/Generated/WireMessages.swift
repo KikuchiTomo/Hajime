@@ -534,6 +534,7 @@ public enum WireRuleList: String, Sendable, Equatable, Codable, CaseIterable {
     case romaji
     case symbolSequences
     case symbolReadings
+    case englishTerms
 }
 
 extension WireRuleList: CustomStringConvertible, CustomDebugStringConvertible {

@@ -425,7 +425,8 @@
         "japaneseWords",
         "romaji",
         "symbolSequences",
-        "symbolReadings"
+        "symbolReadings",
+        "englishTerms"
       ]
     },
     {
