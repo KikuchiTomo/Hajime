@@ -15,9 +15,10 @@
 - UnicodeData.txt: 記号の英語の名前
 
 出力は 1 行に 1 項目で，列はタブで区切る(HajimeDomain の PaletteCatalog が読む)．
-    種類  まとまり  文字  絵文字のバージョン  日本語の名前  英語の名前  読み  キーワード  ショートコード  肌の色の形
+    種類  まとまり  文字  絵文字のバージョン  日本語の名前  名前の読み  英語の名前  読み  キーワード  ショートコード  肌の色の形
 - 種類は emoji か symbol．まとまりは PaletteCategory の id
 - 読み・キーワード・ショートコード・肌の色の形は | で区切る．読みはひらがな．肌の色の形は明るい順に 5 つ
+- 名前の読みは日本語の名前の読み(ひらがな)．探したときに，名前で当たった項目を読みやキーワードで当たった項目より先にするのに使う
 - 絵文字は emoji-test.txt の並び，記号は symbols.txt の並び．肌の色を変えた形と部品(Component)は項目にしない
 外から来る XML なので，外部の実体を読まない ElementTree で読む
 """
@@ -277,13 +278,14 @@ def generated_symbol_names(character, unicode_name):
             letter = name[len(prefix):]
             if letter in LETTERS:
                 return f"{label}{letter.lower() if small else letter}", [head + LETTERS[letter], LETTERS[letter]]
-    for prefix, label in (("GREEK CAPITAL LETTER ", "大文字の"), ("GREEK SMALL LETTER ", ""), ("GREEK ", "")):
+    for prefix, label, head in (("GREEK CAPITAL LETTER ", "大文字の", "おおもじの"), ("GREEK SMALL LETTER ", "", ""), ("GREEK ", "", "")):
         if name.startswith(prefix):
             words = name[len(prefix):].replace("FINAL ", "").replace(" SYMBOL", "").replace("LUNATE ", "").split()
             letter = words[-1]
             if letter in GREEK:
                 reading = GREEK[letter]
-                return f"{label}{to_katakana(reading)}", [reading]
+                # 大文字は名前の読みを「おおもじの…」にし，読みだけで探したときは小文字を先に出す
+                return f"{label}{to_katakana(reading)}", ([head + reading] if head else []) + [reading]
     if name.startswith("CYRILLIC "):
         return f"キリル文字の{character}", ["きりるもじ"]
     if name.startswith("BOX DRAWINGS "):
@@ -316,6 +318,19 @@ def inner_text(character):
     return None
 
 
+def name_core(name):
+    """名前の読みを求める部分．「旗: 日本」のように分類を前に付けた名前は，後ろの部分にする"""
+    return name.split(": ", 1)[1] if ": " in name else name
+
+
+def name_reading(name, transcriptions):
+    """日本語の名前の読み(ひらがな)．求められなければ空"""
+    core = name_core(name)
+    if is_kana(core):
+        return to_hiragana(core).replace("・", "")
+    return transcriptions.get(core, "")
+
+
 def split_japanese(words):
     """日本語の語を，かなだけの読みと，漢字を含むキーワードに分ける"""
     readings = []
@@ -337,8 +352,8 @@ def collect(source, symbols_path):
     words = set()
     for _, text, _, _ in entries:
         k = key(text)
-        names = [ja_names.get(k) or derived_names.get(k) or ""]
-        for word in names + ja_keywords.get(k, derived_keywords.get(k, [])) + azookey.get(k, []):
+        name = ja_names.get(k) or derived_names.get(k) or ""
+        for word in [name, name_core(name)] + ja_keywords.get(k, derived_keywords.get(k, [])) + azookey.get(k, []):
             if word and not is_kana(word) and has_japanese(word):
                 words.add(word)
     for _, character in read_symbols(symbols_path):
@@ -401,7 +416,7 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
             readings += reading_of(word)
         english_words = en_keywords.get(k, derived_en_keywords.get(k, [])) + [word for word in azookey.get(k, []) if word.isascii()]
         variants = [tones[k][tone] for tone in SKIN_TONES if tone in tones.get(k, {})] if len(tones.get(k, {})) == len(SKIN_TONES) else []
-        lines.append(["emoji", category, text, version, name_ja, name_en, clean(readings), clean(keywords + [word.lower() for word in english_words]),
+        lines.append(["emoji", category, text, version, name_ja, name_reading(name_ja, transcriptions), name_en, clean(readings), clean(keywords + [word.lower() for word in english_words]),
                       clean(shortcodes.get(k, [])), clean(variants)])
 
     for category, character in read_symbols(symbols_path):
@@ -422,12 +437,14 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
         readings += generated_readings
         if not name_ja and inner:
             name_ja = inner
+        # 名前の読み．CLDR の名前があればその読み，無ければ names.txt か Unicode の名前の形から作った読みの先頭
+        reading = name_reading(name_ja, transcriptions) if ja_names.get(k) else (generated_readings[:1] or [name_reading(name_ja, transcriptions)])[0]
         english_words = en_keywords.get(k, []) + ([unicode_name.lower()] if unicode_name else [])
-        lines.append(["symbol", category, character, "", name_ja, name_en, clean(readings), clean(keywords + english_words), "", ""])
+        lines.append(["symbol", category, character, "", name_ja, reading, name_en, clean(readings), clean(keywords + english_words), "", ""])
 
     with open(destination, "w", encoding="utf-8", newline="\n") as output:
         output.write("# 絵文字と記号のパレットの表．tools/palette/update.sh が作る．手で書き換えない\n")
-        output.write("# 種類\tまとまり\t文字\t絵文字のバージョン\t日本語の名前\t英語の名前\t読み\tキーワード\tショートコード\t肌の色の形\n")
+        output.write("# 種類\tまとまり\t文字\t絵文字のバージョン\t日本語の名前\t名前の読み\t英語の名前\t読み\tキーワード\tショートコード\t肌の色の形\n")
         for columns in lines:
             output.write("\t".join(columns) + "\n")
     print(f"絵文字 {len(entries)} 個，記号 {len(lines) - len(entries)} 個", file=sys.stderr)
