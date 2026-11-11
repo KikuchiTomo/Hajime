@@ -31,4 +31,23 @@ struct EnglishTermFileTests {
         defer { try? FileManager.default.removeItem(at: large) }
         #expect(EnglishTermFile(url: large).englishTerms == nil)
     }
+
+    @Test("R-24: 同梱する辞書を読み，どの行も語になり，同じ語を重ねていない")
+    func bundledDictionary() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("data/english").appendingPathComponent(DefaultSettings.bundledEnglishTermFileName)
+        let dictionary = try #require(EnglishTermFile(url: url).englishTerms)
+        #expect(dictionary.terms(forReading: "あぴ") == ["API"])
+        #expect(dictionary.terms(forReading: "おぺない") == ["OpenAI"])
+        #expect(dictionary.terms(forReading: KeyEditSearch.rawReading(of: "github")) == ["GitHub"])
+        #expect(dictionary.terms(forReading: "python") == ["Python"])
+        // ローマ字で読むとふつうの日本語の語になる語は入れない
+        #expect(dictionary.terms(forReading: "ので").isEmpty)
+        #expect(dictionary.terms(forReading: "めた").isEmpty)
+        let lines = try String(contentsOf: url, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") }.map(String.init)
+        #expect(lines.allSatisfy(EnglishTermDictionary.isValidTerm))
+        #expect(Set(lines).count == lines.count)
+        #expect(dictionary.count == lines.count)
+    }
 }

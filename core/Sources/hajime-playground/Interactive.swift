@@ -13,7 +13,11 @@ enum Interactive {
             var settings = DefaultSettings.settings
             settings.candidatePresentation = presentation
             let store = StaticSettings(settings)
-            return InputSession(converter: SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: engine), lexicon: lexicon, settings: store)
+            // 英語の語の辞書(R-24)は，リポジトリの頭で動かしたときに data/ から読む(make try)
+            let terms = EnglishTerms(bundled: EnglishTermFile(url: EnglishTermCheck.bundledURL), settings: store)
+            return InputSession(converter: SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: engine,
+                                                                 englishTerms: terms),
+                                lexicon: lexicon, settings: store)
         }
 
         print("ローマ字を打って Enter．空の行で終わります．例: kyouhaiitenkidesune / pthon / konnnitiha")
