@@ -1687,6 +1687,8 @@ Public Domain Dataです。使用・変更・配布に関しては一切の制�
 
 日本郵便株式会社
 https://www.post.japanpost.jp/service/search/zipcode/download/
+郵便番号変換の表(data/postal/postal-codes.tsv)に使っています．郵便番号データ(UTF-8 形式)と大口事業所個別番号データを整えたものです．
+日本郵便株式会社は，どちらのデータの著作権も主張していません．
 
 ## 日本語 WordNet
 
