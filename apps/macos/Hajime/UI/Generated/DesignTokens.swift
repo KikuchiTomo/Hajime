@@ -276,6 +276,12 @@ enum DesignTokens {
             static let candidateGap: CGFloat = 6
             static let candidateFontSize: CGFloat = 18
         }
+        enum Prediction {
+            static let gap: CGFloat = 6
+            static let paddingX: CGFloat = 8
+            static let paddingY: CGFloat = 3
+            static let keyGap: CGFloat = 6
+        }
         enum Palette {
             static let padding: CGFloat = 8
             static let gap: CGFloat = 6

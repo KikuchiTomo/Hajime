@@ -44,8 +44,12 @@ public struct Settings: Sendable, Equatable {
     public var candidatePresentation = CandidatePresentation.automatic
     /// Space で変換したときに最初に選ぶ文節
     public var initialFocus = InitialFocus.start
-    /// 打っているあいだに候補の窓を出すか
+    /// 打っているあいだに，読みを変換した候補の窓を出すか
     public var suggestionDisplay = SuggestionDisplay.whenLiveConversionOff
+    /// 打っているあいだに，打っている語句に続く予測を，変換の候補とは別の小さな窓に出すか
+    public var predictionDisplay = SuggestionDisplay.whenLiveConversionOff
+    /// 入力中の候補がこの件数以下なら窓を出さない．0 なら候補があれば出す
+    public var suggestionSkipCount = 0
     /// 一覧の 1 ページの候補の数
     public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
     /// 分岐図の下の枝に出す候補の数
@@ -222,6 +226,7 @@ public struct Settings: Sendable, Equatable {
         }
         associationDictionaries = Array(associationDictionaries.prefix(DefaultSettings.maximumAssociationDictionaries))
         liveConversionSkipLength = clamp(liveConversionSkipLength, DefaultSettings.liveConversionSkipLengthRange)
+        suggestionSkipCount = clamp(suggestionSkipCount, DefaultSettings.suggestionSkipCountRange)
         englishSkipLength = clamp(englishSkipLength, DefaultSettings.englishSkipLengthRange)
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
@@ -313,7 +318,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case association, associationLimit, showsAssociationHint, zenzaiModel
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
@@ -389,6 +394,10 @@ extension Settings: Codable {
         read(.candidatePresentation, into: \.candidatePresentation)
         read(.initialFocus, into: \.initialFocus)
         read(.suggestionDisplay, into: \.suggestionDisplay)
+        // 予測を別の窓に分ける前の設定のファイルには無い．それまでは入力中の候補の窓に予測を混ぜていたので，同じ設定にする
+        settings.predictionDisplay = settings.suggestionDisplay
+        read(.predictionDisplay, into: \.predictionDisplay)
+        read(.suggestionSkipCount, into: \.suggestionSkipCount)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
         read(.numberKeySelection, into: \.numberKeySelection)
@@ -498,6 +507,8 @@ extension Settings: Codable {
         try container.encode(candidatePresentation, forKey: .candidatePresentation)
         try container.encode(initialFocus, forKey: .initialFocus)
         try container.encode(suggestionDisplay, forKey: .suggestionDisplay)
+        try container.encode(predictionDisplay, forKey: .predictionDisplay)
+        try container.encode(suggestionSkipCount, forKey: .suggestionSkipCount)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)

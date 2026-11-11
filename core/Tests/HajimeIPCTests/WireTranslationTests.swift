@@ -61,6 +61,18 @@ struct WireTranslationTests {
         #expect(routed.host == [.toggleLiveConversion])
     }
 
+    @Test("予測の窓は組み立て中の文字全体の位置を基準に送り，知らせない DLL では候補の窓と同じ基準にする．nil は窓を消す")
+    func prediction() {
+        let anchor = WireRect(x: 1, y: 2, width: 3, height: 4)
+        let composition = WireRect(x: 1, y: 2, width: 40, height: 4)
+        let prediction = Prediction(typed: "エピ", completion: "ソード", key: "Tab")
+        #expect(RoutedActions([.showPrediction(prediction)], anchor: anchor, composition: composition).ui
+            == [.showPrediction(prediction: WirePrediction(typed: "エピ", completion: "ソード", key: "Tab"), anchor: composition)])
+        #expect(RoutedActions([.showPrediction(prediction)], anchor: anchor).ui
+            == [.showPrediction(prediction: WirePrediction(typed: "エピ", completion: "ソード", key: "Tab"), anchor: anchor)])
+        #expect(RoutedActions([.showPrediction(nil)], anchor: anchor).ui == [.showPrediction(prediction: nil, anchor: anchor)])
+    }
+
     @Test("候補の窓を文節にそろえる位置は，組み立て中の文字の書き換えに添えて DLL に送る")
     func panelAnchor() {
         var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: "仮名", annotation: nil)], selectedEntry: nil,

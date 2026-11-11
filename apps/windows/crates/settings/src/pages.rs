@@ -558,6 +558,7 @@ pub enum RangeKind {
     CandidatesPerPage,
     LiveConversionDelay,
     LiveConversionSkipLength,
+    SuggestionSkipCount,
     EnglishSkipLength,
     CorrectionDelay,
     ReviewCorrectionTimeout,
@@ -576,6 +577,7 @@ impl RangeKind {
             RangeKind::CandidatesPerPage => ranges.candidates_per_page,
             RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
             RangeKind::LiveConversionSkipLength => ranges.live_conversion_skip_length,
+            RangeKind::SuggestionSkipCount => ranges.suggestion_skip_count,
             RangeKind::EnglishSkipLength => ranges.english_skip_length,
             RangeKind::CorrectionDelay => ranges.correction_delay,
             RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
@@ -840,6 +842,17 @@ fn conversion() -> Vec<Section> {
                 Row::choice(
                     choice::SUGGESTION_DISPLAY,
                     "suggestionDisplay",
+                    options::SUGGESTION_DISPLAY,
+                ),
+                Row::stepper(
+                    more::SUGGESTION_SKIP_COUNT,
+                    "suggestionSkipCount",
+                    RangeKind::SuggestionSkipCount,
+                )
+                .enabled_when(IsNot("suggestionDisplay", "off")),
+                Row::choice(
+                    choice::PREDICTION_DISPLAY,
+                    "predictionDisplay",
                     options::SUGGESTION_DISPLAY,
                 ),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
@@ -1792,6 +1805,35 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn 変換のページで入力中の予測と入力中の候補を表示しない件数を選べる() {
+        let catalog = crate::catalog::Catalog::load().unwrap();
+        let rows: Vec<_> = sections(Page::Conversion)
+            .unwrap()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .collect();
+        let prediction = rows
+            .iter()
+            .find(|row| row.path == "predictionDisplay")
+            .unwrap();
+        assert!(
+            matches!(prediction.control, Control::Choice(choices) if choices == options::SUGGESTION_DISPLAY)
+        );
+        let skip = rows
+            .iter()
+            .find(|row| row.path == "suggestionSkipCount")
+            .unwrap();
+        assert!(matches!(
+            skip.control,
+            Control::Stepper(RangeKind::SuggestionSkipCount)
+        ));
+        let range = RangeKind::SuggestionSkipCount.range(&catalog);
+        assert_eq!((range.lower(), range.upper()), (0.0, 4.0));
+        assert_eq!(crate::strings::more::skip_count(0.0), "オフ");
+        assert_eq!(crate::strings::more::skip_count(2.0), "2 件以下");
     }
 
     #[test]

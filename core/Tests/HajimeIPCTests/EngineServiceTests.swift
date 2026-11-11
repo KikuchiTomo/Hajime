@@ -74,6 +74,19 @@ struct EngineServiceTests {
         #expect(response == WireResponse(id: 3, body: .hello(protocolVersion: WireProtocol.version)))
     }
 
+    @Test("DLL が知らせた組み立て中の文字全体の位置を，候補ウィンドウに送る(予測の窓を組み立て中の文字の右に置くため)")
+    func compositionRect() throws {
+        let id = greeted()
+        let session = try open(id)
+        let rect = WireRect(x: 30, y: 20, width: 12, height: 16)
+        let composition = WireRect(x: 10, y: 20, width: 60, height: 16)
+        #expect(service.handle(WireRequest(id: 5, body: .caret(session: session, rect: rect, composition: composition)), from: id).body == .done)
+        #expect(sent.value.last == .move(anchor: rect, composition: composition))
+        // 全体の位置を知らせない古い DLL でも動く
+        _ = service.handle(WireRequest(id: 6, body: .caret(session: session, rect: rect, composition: nil)), from: id)
+        #expect(sent.value.last == .move(anchor: rect, composition: nil))
+    }
+
     @Test("打った読みを組み立て中の文字にし，変換して確定する")
     func compose() throws {
         let id = greeted()

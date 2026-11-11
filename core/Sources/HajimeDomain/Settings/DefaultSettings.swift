@@ -49,10 +49,8 @@ public enum DefaultSettings {
     public static let candidatesPerPage = 9
     /// エンジンに求める候補の数
     public static let engineCandidateCount = 20
-    /// 打っているあいだに出す候補(変換と予測)の数
+    /// 打っているあいだに出す変換の候補の数．続く語句の予測を求める数も同じ
     public static let suggestionCount = 5
-    /// 入力中の候補で，続く語句の予測より前に並べる読みの変換の数
-    public static let suggestionLeadingConversions = 2
     /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
     public static let headWordAlternativeCount = 8
     /// 打ち間違いを直した文節に入れる，打ったままの読みの候補(LatticeBuilder.addingTyped)の数
@@ -272,6 +270,8 @@ public enum DefaultSettings {
     public static let liveConversionDelayRange = 0.1...1.5
     /// ライブ変換しない読みの長さを選べる範囲(文字)．0 はすべてライブ変換する
     public static let liveConversionSkipLengthRange = 0...10
+    /// 入力中の候補を出さない件数(この件数以下なら窓を出さない)の範囲．0 なら候補があれば出す．上は出せる候補の数の 1 つ手前まで
+    public static let suggestionSkipCountRange = 0...(suggestionCount - 1)
     /// 英単語にしない読みの長さを選べる範囲(文字)．0 は長さで区別しない
     public static let englishSkipLengthRange = 0...10
     public static let correctionDelayRange = 0.4...3.0

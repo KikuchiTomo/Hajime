@@ -12,6 +12,7 @@ final class ClientActionPresenter {
     private let candidatePanel: CandidatePanelController
     private let modeIndicator: ModeIndicatorController
     private let note: NoteController
+    private let prediction: PredictionController
     private let openSettings: () -> Void
     private let handwriting: HandwritingController
     private let palette: PaletteController
@@ -20,7 +21,8 @@ final class ClientActionPresenter {
     private let runCommand: (LauncherCommand) -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(session: InputSession, candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController, settings: any SettingsStoring,
+    init(session: InputSession, candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController,
+         prediction: PredictionController, settings: any SettingsStoring,
          openSettings: @escaping () -> Void, handwriting: HandwritingController, palette: PaletteController, runCommand: @escaping (LauncherCommand) -> Void) {
         self.session = session
         self.palette = palette
@@ -30,6 +32,7 @@ final class ClientActionPresenter {
         self.candidatePanel = candidatePanel
         self.modeIndicator = modeIndicator
         self.note = note
+        self.prediction = prediction
         self.settings = settings
     }
 
@@ -52,6 +55,8 @@ final class ClientActionPresenter {
                 let attributed = Self.attributedString(for: marked)
                 markedLength = (marked.text as NSString).length
                 client.setMarkedText(attributed, selectionRange: NSRange(location: (marked.textBeforeCaret as NSString).length, length: 0), replacementRange: takeReplacement())
+                // 予測の窓は組み立て中の文字の右端に付いていく
+                prediction.move(end: compositionEnd(of: client))
             case .showCandidates(let panel):
                 note.hide()
                 candidatePanel.show(panel, caret: panelAnchor(of: client, at: panel.anchor), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
@@ -98,6 +103,13 @@ final class ClientActionPresenter {
                 }
             case .showNote(let shown):
                 note.show(shown, caret: caretRect(of: client), theme: ThemeChoice(settings.current))
+            case .showPrediction(let shown):
+                // 候補の窓を出す・消す操作では触らず，これだけで出し入れする
+                if let shown {
+                    prediction.show(shown, end: compositionEnd(of: client), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize)
+                } else {
+                    prediction.hide()
+                }
             case .showModeIndicator(let mode):
                 modeIndicator.show(mode, caret: caretRect(of: client), theme: ThemeChoice(settings.current), duration: settings.current.modeIndicatorDuration)
             case .selectMode(let mode):
@@ -119,6 +131,7 @@ final class ClientActionPresenter {
     func hideWindows() {
         candidatePanel.hide()
         note.hide()
+        prediction.hide()
     }
 
     /// この入力先で開いた手書きの窓を閉じる
@@ -146,6 +159,11 @@ final class ClientActionPresenter {
 
     /// 最後に出した組み立て中の文字の長さ(UTF-16)
     private var markedLength = 0
+
+    /// 組み立て中の文字の最後の字の行の長方形(予測の窓を右に置く基準)．組み立て中の文字が無ければ入力位置
+    private func compositionEnd(of client: any IMKTextInput) -> NSRect {
+        markedLength > 0 ? lineRect(of: client, at: markedLength - 1) : caretRect(of: client)
+    }
 
     /// 候補の窓を置く基準．左端は anchor の字(無ければ組み立て中の文字の頭)，上の辺は頭の行の上，下の辺は最後の行の下．
     /// 組み立て中の文字が何行かに折り返しても，窓を文字に重ねない(下に置くときは最後の行の下，上に置くときは頭の行の上)

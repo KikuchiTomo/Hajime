@@ -102,6 +102,8 @@ public final class EngineService {
     /// アプリごとに最後に使ったモード．セッション(DLL を読み込んだアプリ)をまたいでモードを揃えるのにも使う
     private var modeMemory = AppModeMemory()
     private var lastAnchor: WireRect?
+    /// 組み立て中の文字全体の位置(DLL が caret で知らせる)．予測の窓を組み立て中の文字の右に置くのに使う．知らせない古い DLL では nil
+    private var lastComposition: WireRect?
     private var handwriting: Handwriting?
     /// 候補の窓を出しているセッション．候補ウィンドウで押した候補は，このセッションの次の wake で選ぶ
     private var shownCandidates: UInt32?
@@ -284,10 +286,11 @@ public final class EngineService {
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             if let caret = context.caret { lastAnchor = caret }
             return edit(current.input.openHandwriting(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
-        case .caret(let session, let rect):
+        case .caret(let session, let rect, let composition):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
             lastAnchor = rect
-            ui(.move(anchor: rect))
+            lastComposition = composition
+            ui(.move(anchor: rect, composition: composition))
             return .done
         case .handwritingChosen(let text):
             guard connection.isCandidateWindow, Self.isValidHandwritingText(text) else { return .error(code: .malformed) }
@@ -618,7 +621,7 @@ public final class EngineService {
 
     private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?) -> WireResponseBody {
         let current = settings.current
-        let routed = RoutedActions(actions, anchor: anchor, hints: { [hints] in hints($0, current) },
+        let routed = RoutedActions(actions, anchor: anchor, composition: lastComposition, hints: { [hints] in hints($0, current) },
                                    listHints: { [listHints] in listHints($0, current) }, paletteCellSize: current.paletteCellSize)
         routed.ui.forEach(ui)
         for command in routed.ui {

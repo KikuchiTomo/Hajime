@@ -74,6 +74,7 @@
     "paletteShowsPreview",
     "phoneticSpelling",
     "postalCodeConversion",
+    "predictionDisplay",
     "prefersKatakana",
     "profileRules",
     "proofreading",
@@ -95,6 +96,7 @@
     "slash",
     "spaceWidth",
     "suggestionDisplay",
+    "suggestionSkipCount",
     "symbolConversion",
     "symbolRules",
     "terminalCommands",
@@ -190,6 +192,10 @@
     "reviewCorrectionTimeout" : [
       5,
       60
+    ],
+    "suggestionSkipCount" : [
+      0,
+      4
     ]
   },
   "secondsStep" : 0.1,

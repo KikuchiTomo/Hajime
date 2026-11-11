@@ -11,12 +11,13 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
     )
 
-    /// 打っているあいだの候補の窓．選び始めるまで番号を振らず，足元に選び始めるキーを出す
+    /// 打っているあいだの候補の窓．読みの変換の候補だけを並べ(続く語句の予測は別の窓)，選び始めるまで番号を振らず，
+    /// 足元に選び始めるキーを出す．予測の窓を出していないときは Tab でも選び始める
     static let suggestion: CandidatePanel = {
         var panel = CandidatePanel(
             variants: [], selectedVariant: nil,
-            entries: ["あぴ", "アピ", "アピール", "アピールポイント"].map { .init(text: $0, annotation: nil) },
-            selectedEntry: nil, focus: .candidate, position: 0, total: 4,
+            entries: ["なんだ", "何だ", "なんだ？"].map { .init(text: $0, annotation: nil) },
+            selectedEntry: nil, focus: .candidate, position: 0, total: 3,
             note: Note(tone: .info, title: "", key: ["↓", "Tab"].joined(separator: IndicatorLabels.keySeparator), keyAction: "選択")
         )
         panel.showsNumbers = false

@@ -3,6 +3,12 @@ import HajimeDomain
 
 /// 画面に出す文言の置き場所．多言語にするときは Localizable.xcstrings に移す
 enum UIStrings {
+    /// 打っているあいだの続く語句の予測の窓
+    enum Prediction {
+        /// VoiceOver で読み上げる文
+        static func announcement(_ text: String) -> String { "予測 \(text)" }
+    }
+
     enum Candidate {
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
@@ -206,7 +212,7 @@ enum UIStrings {
             case .convertWithoutLearning: "学習を使わずに変換"
             case .deleteBackward: "左の文字を削除"
             case .insertBoundary: "ここで区切る"
-            case .acceptSuggestion: "「もしかして」に修正"
+            case .acceptSuggestion: "「もしかして」に修正・予測を確定"
             case .reconvert: "再変換"
             case .toHiragana: "全文をひらがなに変換"
             case .toKatakana: "全文を全角カタカナに変換"
@@ -261,7 +267,7 @@ enum UIStrings {
             case .convert: "英単語を修正した直後は、修正前に戻します"
             case .convertWithoutLearning: "学習した順位を使わずに変換し、確定しても学習しません"
             case .insertBoundary: "入力中に、現在の位置で文節を区切ります"
-            case .acceptSuggestion: "「もしかして」で示した読みに修正します。示していないときは、入力中の候補から選択します"
+            case .acceptSuggestion: "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"
             case .reconvert: "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"
             case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
             case .nextCandidate: "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"
@@ -659,6 +665,7 @@ enum UIStrings {
         static let presentation = "候補の表示"
         static let initialFocus = "最初に選択する文節"
         static let suggestionDisplay = "入力中の候補"
+        static let predictionDisplay = "入力中の予測"
 
         static func label(for display: SuggestionDisplay) -> String {
             switch display {
@@ -850,6 +857,8 @@ enum UIStrings {
         static let liveConversionSkipLength = "ライブ変換しない文字数"
         static let englishSkipLength = "英単語にしない文字数"
         static func skipLength(_ value: Int) -> String { value == 0 ? "オフ" : "\(value) 文字以下" }
+        static let suggestionSkipCount = "入力中の候補を表示しない件数"
+        static func skipCount(_ value: Int) -> String { value == 0 ? "オフ" : "\(value) 件以下" }
         static let typo = "タイプミス"
         static let correctionSensitivity = "修正の基準"
         static let showsSuggestions = "「もしかして」を表示"
@@ -985,7 +994,8 @@ extension UIStrings {
             "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet, "punctuationCommits": UIStrings.Settings.punctuationCommits,
             "keypadDirect": Features.keypadDirect,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
-            "suggestionDisplay": Choice.suggestionDisplay, "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
+            "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
+            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,
             "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,

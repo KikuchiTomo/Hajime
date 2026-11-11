@@ -388,6 +388,12 @@ pub mod size {
         pub const CANDIDATE_GAP: f32 = 6.0;
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
     }
+    pub mod prediction {
+        pub const GAP: f32 = 6.0;
+        pub const PADDING_X: f32 = 8.0;
+        pub const PADDING_Y: f32 = 3.0;
+        pub const KEY_GAP: f32 = 6.0;
+    }
     pub mod palette {
         pub const PADDING: f32 = 8.0;
         pub const GAP: f32 = 6.0;
