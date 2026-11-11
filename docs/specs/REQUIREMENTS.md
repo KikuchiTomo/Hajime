@@ -1,6 +1,6 @@
 # 要件
 
-Hajime が満たす要件の一覧です．機能の仕様書(`docs/specs/<id>-*.md`)はここにある ID を参照して書きます．
+Hajime IME が満たす要件の一覧です．機能の仕様書(`docs/specs/<id>-*.md`)はここにある ID を参照して書きます．
 受け入れ条件は，テストか手動の確認手順に落とせる粒度で書きます．
 
 対象は macOS と Windows です．Linux などは後で足す前提で，プラットフォームに依存しない部分を `core/` に寄せます(`docs/dev/ARCHITECTURE.md`)．
@@ -32,7 +32,7 @@ Hajime が満たす要件の一覧です．機能の仕様書(`docs/specs/<id>-*
   - 日本語のローマ字の打ち間違い: `konnnitiha` の `nnn` のような重複，隣のキーの押し間違い，母音の打ち間違い(`kyounotenkihayoudesune` → 今日の天気は良いですね)
 - 日本語の打ち間違いの直し方
   - ライブ変換で打鍵が `DefaultSettings.liveCorrectionDelay`(0.8 秒)止まったときと，Space で変換を始めるときに，Zenzai で打ったキー全体を見直す．打鍵ごとには見直さない(1 文 0.1〜0.7 秒かかるため)
-  - 打ち間違いの種類: 近くのキーの押し間違い，余分なキー，2 つのキーの入れ替わり(azooKey の訂正)に加え，Hajime の azooKey のフォークで，ローマ字の母音の取り違え(`onagai` → お願い)，同じキーの重なり(`koonnnitiha`)，余分な母音(`tututa` → 釣った)，打ち忘れ(母音と，同じキーの 2 回目．`haitenki` → いい天気)を扱う．文の末尾の重なりはフォークの訂正が扱わないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
+  - 打ち間違いの種類: 近くのキーの押し間違い，余分なキー，2 つのキーの入れ替わり(azooKey の訂正)に加え，Hajime IME の azooKey のフォークで，ローマ字の母音の取り違え(`onagai` → お願い)，同じキーの重なり(`koonnnitiha`)，余分な母音(`tututa` → 釣った)，打ち忘れ(母音と，同じキーの 2 回目．`haitenki` → いい天気)を扱う．文の末尾の重なりはフォークの訂正が扱わないので，重なりを 1 回にした並びも見直して比べる(手間 `DefaultSettings.repeatedKeyCost`)
   - 誤りの種類を決め打ちしない訂正(`KeyEditSearch`): 打ったキーの 1 か所を，どのキーとの取り違え・打ち忘れ・余分な 1 打・隣どうしの入れ替えに変えた並びを全部作る．変わったところの前後の変換のもっともらしさで上位 `DefaultSettings.keyEditCandidateCount` 件に絞り，Zenzai で採点して上の訂正の候補と合わせる．音の変わらない書き誤り(ず/づ・じ/ぢ・わ/は・え/へ・お/を・おう/おお)は聞いたとおりに書いた誤りとして手間を小さくする(`見ずらい` → 見づらい，`いいずらい` → 言いづらい，`とうり` → 通り)．前に見直した部分は探し直さない
   - 直すかどうかは，言語モデルの点数・読みを変換したときのもっともらしさの差・手間を合わせた点数(`ReadingCorrection.rank`．重みは `DefaultSettings.correctionPlausibilityWeight`・`correctionCostWeight`)で比べる．言語モデルはかなの並びを見るので書き分けの誤りを見分けにくく，変換のもっともらしさで補う．重みと境目は評価の文で，正しい文を誤って直さない範囲で直せる文が最も多くなるように決めた
   - 直した読みが打ったままの読みより十分にもっともらしいとき(点数の差が `DefaultSettings.readingCorrectionMargin` 以上)は直して見せる．差がそれより小さく `DefaultSettings.readingSuggestionMargin` 以上なら直さず「もしかして」と示し，Tab で直せるようにする(打ち間違いと決めつけない)
@@ -200,10 +200,10 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
 
 ## R-19 更新の確認
 
-- 設定の画面の「情報」(Hajime のアイコン・名前・バージョンの横)と，macOS の入力メニューに「更新を確認」を置く．Windows は設定の画面の「情報」に置く
+- 設定の画面の「情報」(Hajime IME のアイコン・名前・バージョンの横)と，macOS の入力メニューに「更新を確認」を置く．Windows は設定の画面の「情報」に置く
 - 押したときだけ https://haji.men/download/latest.json(`DefaultSettings.updateManifestURL`)を取り，今のバージョンより新しければ，飛ばしたバージョンも含めた変更点(CHANGELOG.md の節)を見せて更新するかを聞く．新しくなければ最新であることを知らせる
 - 「更新する」を選ぶと，配布物を https://haji.men/download/ の下からだけ取り，latest.json の SHA-256 と合うかを確かめてから入れる．大きさと待ち時間に上限を設ける(`DefaultSettings` の update で始まる値)
-  - macOS: IME の本体はサンドボックスの中で通信の権限を持たないまま，Contents/Helpers の更新用のアプリ(Hajime Updater)が通信とインストールを行う．.pkg が Apple の公証を通り，本体と同じチームの Developer ID で署名されているかを `spctl` で確かめ，管理者のパスワードを聞いて OS のインストーラーで入れる．入れたあとはログアウトを求めず，postinstall が古い本体を止めて次の入力から新しいバージョンで動く
+  - macOS: IME の本体はサンドボックスの中で通信の権限を持たないまま，Contents/Helpers の更新用のアプリ(Hajime IME Updater)が通信とインストールを行う．.pkg が Apple の公証を通り，本体と同じチームの Developer ID で署名されているかを `spctl` で確かめ，管理者のパスワードを聞いて OS のインストーラーで入れる．入れたあとはログアウトを求めず，postinstall が古い本体を止めて次の入力から新しいバージョンで動く
   - Windows: 設定の画面のアプリが通信し，`msiexec` で .msi を入れる．TSF の DLL をバージョンごとのフォルダに置き，上書きのときは再起動を求めない
 - 送るのは GET の要求(User-Agent に名前とバージョンと OS)だけで，入力の中身・設定・識別子は送らない．自動では確かめない
 - 確かめられないとき(通信の失敗，形の違う知らせ，ハッシュや署名の不一致，署名の無い開発版)は入れずに理由を出し，最新のリリースのページ(`DefaultSettings.latestReleaseURL`)を開けるようにする

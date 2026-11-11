@@ -1,6 +1,6 @@
 ---
 name: hajime-docs
-description: Hajime のドキュメント(サイトに載せる使う人向けの文書・docs/ 以下の開発者向けの文書・要件・仕様・ADR，README，CONTRIBUTING，SECURITY，コードのコメント，PR の説明)を書く・直すときの決まり．Diátaxis による分け方，frontmatter，ドキュメントサイト(apps/docs-site)に載せるための書き方，日本語の文体を含む．Markdown を書くとき，設計を変えて文書の更新が要るとき，ADR や仕様を書くとき，「ドキュメント」「説明を書いて」「README」と言われたときは必ず使う．Use for any documentation, spec, ADR, README or comment writing in this repository.
+description: Hajime IME のドキュメント(サイトに載せる使う人向けの文書・docs/ 以下の開発者向けの文書・要件・仕様・ADR，README，CONTRIBUTING，SECURITY，コードのコメント，PR の説明)を書く・直すときの決まり．Diátaxis による分け方，frontmatter，ドキュメントサイト(apps/docs-site)に載せるための書き方，日本語の文体を含む．Markdown を書くとき，設計を変えて文書の更新が要るとき，ADR や仕様を書くとき，「ドキュメント」「説明を書いて」「README」と言われたときは必ず使う．Use for any documentation, spec, ADR, README or comment writing in this repository.
 ---
 
 # ドキュメントの決まり
@@ -30,6 +30,7 @@ description: Hajime のドキュメント(サイトに載せる使う人向け�
   - 句読点は「，」と「．」
   - README と使う人向けの文書は「です・ます」，`docs/dev/` とスキルとコードのコメントは「だ・である」か体言止め
   - 比喩・誇張(非常に，極めて)・記号の多用を避け，何がどうなるかを具体的に書く
+- 製品名は「Hajime IME」と書く．文書・画面の文言・インストーラー・PR の説明のどこでも，「はじめ」や「Hajime」だけでは呼ばない．バンドル ID・パス・リポジトリ名・型やモジュールの名前(`men.haji.inputmethod.Hajime`，`Hajime.app`，`KikuchiTomo/Hajime`，`HajimeCore`)は名前ではなく識別子なので変えない
 - `CHANGELOG.md` の行は利用者が書く．エージェントは書き換えず，会話で更新内容を簡潔に伝えて頼む．書きぶりは次のとおりで，Discord の更新履歴を手本に遊んでよい．ほとんどの行は「〜できるようになりました」「〜の不具合を修正しました」の普通の文で書き，ネタのある項目にだけ短い一言を添える(全部の行にオチを付けない)．何が変わったかを最初の文で書き，冗談のために事実を曲げない．用語は画面の表記に合わせ，熟語を使うところを和語に言い換えない(「配る」ではなく「配布する」)．節の中は「追加」「変更」「修正」に分け，片方の OS だけの変更は行の頭に「macOS:」「Windows:」を付ける．`CHANGELOG.md` は利用者が読むので，前書きに書き手への決まりや手順を書かない(決まりは CONTRIBUTING.md とこのスキルに置く)
 - コードのコメントは「なぜそうするか」を書く．何をしているかはコードで読めるようにする
 - 文書の中の値(色・寸法・既定値)は，置き場所のファイルを示して抜粋にとどめる．値を二重に持たないため
