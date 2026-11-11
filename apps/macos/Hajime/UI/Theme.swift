@@ -187,6 +187,11 @@ struct ResolvedTheme {
         font(size: size, weight: .medium)
     }
 
+    /// 長めの文(語の意味と使い方の例)の書体．折り返して読むので細めにする
+    func bodyFont(size: CGFloat) -> NSFont {
+        font(size: size, weight: kind == .contrast ? .medium : .regular)
+    }
+
     /// 案内の主な語(「修正」「もしかして」)の書体
     func emphasisFont(size: CGFloat) -> NSFont {
         font(size: size, weight: .semibold)

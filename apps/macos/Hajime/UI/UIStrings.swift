@@ -8,12 +8,12 @@ enum UIStrings {
         static let variantsHints = [KeyHint(key: "←→", label: "選択"), KeyHint(key: "↓", label: "候補")]
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
-        /// 使い分けの欄で，同じ読みのほかの語の前に置く
-        static let homophoneOthers = "ほかに"
-        /// 使い分けの欄に入らなかったほかの語の数
+        /// 語の意味のカードで，同音語の札の前に置く名前
+        static let homophoneOthers = "同音語"
+        /// 語の意味のカードに入らなかった同音語の数
         static func more(_ count: Int) -> String { "+\(count)" }
-        /// 意味が 2 つ以上あるときの，意味の番号
-        static func senseNumber(_ number: Int) -> String { "\(number)." }
+        /// 意味が 2 つ以上あるときの，意味の番号(語の意味のカードの角丸の四角に入れる)
+        static func senseNumber(_ number: Int) -> String { "\(number)" }
         /// コマンドの候補を読み上げる文(「コマンド、Claude を開く」)
         static func commandAnnouncement(_ title: String) -> String { "\(CandidatePanel.commandAnnotation)、\(title)" }
     }

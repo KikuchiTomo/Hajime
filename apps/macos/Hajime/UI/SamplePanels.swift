@@ -38,11 +38,17 @@ enum SamplePanels {
 
     /// 同音異義語の使い分け(R-08)．意味が 2 つあるもの
     static let homophone = HomophoneNote(
-        word: "撮る", senses: [.init(meaning: "写真や動画を写す", example: "写真を撮る"), .init(meaning: "映画などを撮影する", example: "映画を撮る")],
+        word: "撮る", partOfSpeech: .verb,
+        senses: [.init(meaning: "写真や動画を写す", example: "記念写真を撮った"), .init(meaning: "映画やテレビ番組などを撮影する", example: "ドラマを撮る")],
         others: ["取る", "採る", "執る", "捕る"])
 
-    /// 同音異義語の無い語の意味(R-08)．ほかの語の行を出さない
-    static let meaning = HomophoneNote(word: "動く", meaning: "位置や状態が変わる", example: "車が動く", others: [])
+    /// 同音異義語の無い語の意味(R-08)．同音語の行を出さない．意味が長く，カードの幅で折り返す
+    static let meaning = HomophoneNote(
+        word: "動く", partOfSpeech: .verb,
+        senses: [.init(meaning: "位置や姿勢が変わる。止まっていたものが移る", example: "車がゆっくり動く"),
+                 .init(meaning: "機械などが作動する", example: "時計が動き始める"),
+                 .init(meaning: "気持ちが変わる。心が揺れる", example: "心が動く")],
+        others: [])
 
     static let lattice = LatticePanel(columns: [
         .init(text: "私の", isFocused: false, isUncertain: false),
