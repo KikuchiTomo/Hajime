@@ -32,10 +32,10 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
              "liveConversionDelay", "liveConversionSkipLength", "englishSkipLength", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "remembersRejectedCorrections", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "misuseNotes", "proofreading",
              "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "latexConversion", "learning",
              "association", "associationLimit", "showsAssociationHint", "handShiftCorrection", "looseReadings", "phoneticSpelling", "dynamicDictionary",
-             "conversionMacros", "zenzaiModel"]
+             "conversionMacros", "zenzaiModel", "englishTermCandidates"]
         case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules", "macros"]
-        case .dictionary: ["userDictionary"]
+        case .dictionary: ["userDictionary", "englishTerms"]
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID"]

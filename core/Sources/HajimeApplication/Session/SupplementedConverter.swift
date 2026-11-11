@@ -21,6 +21,10 @@ import HajimeDomain
 /// - うろ覚えの語(LooseReadings): 「しゅみれーしょん」→「シミュレーション」
 /// - 発音どおりに綴った英単語(PhoneticSpelling): 「ふぉと」→「photo」
 ///
+/// - 英語の語の辞書の語(R-24．EnglishTerms): 「api」と打った読み「あぴ」→「API」，英字のまま確定させた「githubを使う」→「GitHubを使う」．
+///   ローマ字として読めてしまった英語の語を英語で入れられるよう，読み全体がふつうの日本語の語(「そら」→ 空)でなければ第 1 候補にする．
+///   ユーザー辞書と取り込んだ辞書の語(他の IME から取り込んだものを含む)よりは前に出さない
+///
 /// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
 ///   どの辞書を効かせるかは DictionaryActivation が決める(アプリの条件，文脈の条件)
 ///
@@ -35,6 +39,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let emoji: (any EmojiLooking)?
     /// 発音どおりに綴った英単語を確かめる英単語の辞書．無ければ探さない
     private let lexicon: (any EnglishLexicon)?
+    /// 英語の語の辞書(R-24)．無ければ英語の語を足さない
+    private let englishTerms: EnglishTerms?
     /// 読みごとに見つけたうろ覚えの語と英単語．入力を終えたときに捨てる
     private var listExtrasCache: [String: (loose: [String], phonetic: [String])] = [:]
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
@@ -62,9 +68,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading,
                 postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil, emoji: (any EmojiLooking)? = nil,
-                lexicon: (any EnglishLexicon)? = nil) {
+                lexicon: (any EnglishLexicon)? = nil, englishTerms: EnglishTerms? = nil) {
         self.base = base
         self.lexicon = lexicon
+        self.englishTerms = englishTerms
         self.settings = settings
         self.calendar = calendar
         self.postalCodes = postalCodes
@@ -212,6 +219,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
         }
         if current.prefersKatakana { Self.preferKatakana(&result, reading: reading) }
         if current.wordLanguage.avoidsOffensive { Self.demoteOffensive(&result, reading: reading) }
+        // カタカナを先に出す並べ替え(かなで打った外来語のため)のあとに足す．ローマ字で打った「api」の「アピ」を「API」より先にしない
+        if let dictionary = englishTerms?.dictionary { addEnglishTerms(from: dictionary, to: &result, reading: reading, settings: current) }
         if forList { addListExtras(to: &result, reading: reading, settings: current) }
         return result
     }
@@ -261,6 +270,66 @@ public final class SupplementedConverter: KanaKanjiConverting {
         guard let lexicon, let keys = KanaRomanizer.keys(for: reading) else { return [] }
         if lexicon.isWord(keys) { return [] }
         return Array(PhoneticSpelling.variants(of: keys).lazy.filter { lexicon.isWord($0) }.prefix(DefaultSettings.maximumPhoneticWords))
+    }
+
+    /// 英語の語の辞書の語を足す(R-24)．
+    /// 1. 読み全体が辞書の語になれば(「あぴ」→ API，「ぎてゅb」→ GitHub)，その語を足す．英字の残る読みは英語として打ったものなので第 1 候補に，
+    ///    かなになり切った読みは，ふつうの日本語の語でなければ(「そら」→ 空 は日本語)第 1 候補にする．
+    ///    設定の「いつも日本語にする語」「いつも英語にする語」に入れた語はそれに従う
+    /// 2. 第 1 候補の中の，小文字の英字のまま確定させた語(「githubを使う」)を辞書の書き方にした候補を先に出す
+    /// どちらも，先頭のユーザー辞書と取り込んだ辞書の語より後ろに置く．打ったままの候補(あぴ・アピ・github)は消さない
+    private func addEnglishTerms(from dictionary: EnglishTermDictionary, to result: inout [Candidate], reading: String, settings current: Settings) {
+        let head = result.prefix { $0.origin == .userDictionary }.count
+        let terms = dictionary.terms(forReading: reading, includesRomajiReadings: current.inputStyle != .kana)
+        if let keys = terms.first?.lowercased() {
+            let words = current.wordLanguage
+            let japaneseFirst = words.japaneseWords.contains(keys)
+                || (!words.englishWords.contains(keys) && !reading.contains(where: Self.isLatinLetter) && readsAsJapaneseWord(reading))
+            // エンジンがすでに出している語(「あい」→ AI)は，学習に使えるようエンジンの候補のまま前に移す
+            var added: [Candidate] = []
+            for term in terms where !result.prefix(head).contains(where: { $0.text == term }) {
+                if let index = result.firstIndex(where: { $0.text == term && $0.readingCount == reading.count }) {
+                    added.append(result.remove(at: index))
+                } else {
+                    added.append(Candidate(text: term, readingCount: reading.count, origin: .symbol))
+                }
+            }
+            result.insert(contentsOf: added, at: min(head + (japaneseFirst ? DefaultSettings.englishTermCandidateOffset : 0), result.count))
+        }
+        guard result.indices.contains(head), let applied = dictionary.applyingTerms(to: result[head].text) else { return }
+        var candidate = result[head]
+        candidate.text = applied
+        candidate.origin = .symbol
+        candidate.words = Self.words(candidate.words, renamedTo: applied)
+        candidate.learnedParts = []
+        guard !result.contains(where: { $0.text == applied }) else { return }
+        result.insert(candidate, at: head)
+    }
+
+    /// 読み全体が，漢字を含む辞書の 1 語になるか(「そら」→ 空，「あい」→ 愛)．英語の語を日本語の語より後ろに出すかを決める．
+    /// カタカナだけの語(「アピ」)は英語の語を書き換えた外来語のことが多いので，日本語の語とはみなさない
+    private func readsAsJapaneseWord(_ reading: String) -> Bool {
+        base.dictionaryCandidates(for: reading).contains { candidate in
+            candidate.readingCount == reading.count && candidate.words.count == 1 && candidate.words[0].readingCount == reading.count
+                && candidate.text.unicodeScalars.contains(where: Self.isKanji)
+        }
+    }
+
+    private static func isKanji(_ scalar: Unicode.Scalar) -> Bool {
+        (0x4E00...0x9FFF).contains(scalar.value) || (0x3400...0x4DBF).contains(scalar.value) || scalar == "々"
+    }
+
+    /// 語の並びの文字を，文字数の同じ text の文字に置き換える(英字の大文字小文字だけを変えた候補の語の並び)．
+    /// 語をつないだものが text と同じ長さでなければ空にする
+    private static func words(_ words: [Candidate.Word], renamedTo text: String) -> [Candidate.Word] {
+        guard words.reduce(0, { $0 + $1.text.count }) == text.count else { return [] }
+        var rest = Substring(text)
+        return words.map { word in
+            var renamed = word
+            renamed.text = String(rest.prefix(word.text.count))
+            rest = rest.dropFirst(word.text.count)
+            return renamed
+        }
     }
 
     /// 入れるときに中身を決める語(TextTemplate)に渡す値

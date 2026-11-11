@@ -168,3 +168,13 @@ public final class FakeAssociationLookup: AssociationLookup {
         return groups[dictionary.id]?[word] ?? []
     }
 }
+
+/// 決まった語を返す同梱の英語の語の辞書(R-24)
+@MainActor
+public final class FakeEnglishTermProvider: EnglishTermProviding {
+    public let englishTerms: EnglishTermDictionary?
+
+    public init(_ terms: [String]) {
+        self.englishTerms = EnglishTermDictionary(terms: terms)
+    }
+}

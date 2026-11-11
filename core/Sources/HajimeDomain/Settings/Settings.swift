@@ -88,6 +88,10 @@ public struct Settings: Sendable, Equatable {
     public var looseReadings = false
     /// 発音どおりに綴った英単語(foto → photo)を候補に出す(PhoneticSpelling)
     public var phoneticSpelling = false
+    /// 英語の語の辞書(R-24)の語を，決まった書き方(api → API，openai → OpenAI)で候補に出す
+    public var englishTermCandidates = true
+    /// 利用者が足した英語の語(同梱の辞書に無い語)．決まった書き方で書く
+    public var englishTerms: [String] = []
     /// ユーザー辞書の語の `{datetime:...}` などを，入れるときの値に置き換える(TextTemplate)
     public var dynamicDictionary = false
     /// 連想変換のキーで出す一覧に，選んでいる語を整えた形(変換マクロ)を並べる
@@ -213,6 +217,8 @@ public struct Settings: Sendable, Equatable {
         macros = Array(macros.filter { $0.isValid && macroIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumMacros))
         var commandIDs = Set<String>()
         commands = Array(commands.filter { $0.isValid && commandIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCommands))
+        var terms = Set<String>()
+        englishTerms = Array(englishTerms.filter { EnglishTermDictionary.isValidTerm($0) && terms.insert($0).inserted }.prefix(DefaultSettings.maximumEnglishTerms))
         keymap.clampToValidRanges()
         wordLanguage.clampToValidRanges()
     }
@@ -282,6 +288,7 @@ extension Settings: Codable {
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
         case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, launcherCommands, commands
+        case englishTermCandidates, englishTerms
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -385,6 +392,8 @@ extension Settings: Codable {
         readList(.macros, into: \.macros)
         read(.launcherCommands, into: \.launcherCommands)
         readList(.commands, into: \.commands)
+        read(.englishTermCandidates, into: \.englishTermCandidates)
+        readList(.englishTerms, into: \.englishTerms)
         // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
@@ -477,6 +486,8 @@ extension Settings: Codable {
         try container.encode(macros, forKey: .macros)
         try container.encode(launcherCommands, forKey: .launcherCommands)
         try container.encode(commands, forKey: .commands)
+        try container.encode(englishTermCandidates, forKey: .englishTermCandidates)
+        try container.encode(englishTerms, forKey: .englishTerms)
         var others = encoder.container(keyedBy: AnyKey.self)
         try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))
         for (key, value) in unknownFields where !Self.fieldNames.contains(key) && key != SettingsSchema.versionKey {
