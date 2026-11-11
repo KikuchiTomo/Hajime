@@ -12,6 +12,8 @@ enum UIStrings {
         static let homophoneOthers = "ほかに"
         /// 使い分けの欄に入らなかったほかの語の数
         static func more(_ count: Int) -> String { "+\(count)" }
+        /// 意味が 2 つ以上あるときの，意味の番号
+        static func senseNumber(_ number: Int) -> String { "\(number)." }
         /// コマンドの候補を読み上げる文(「コマンド、Claude を開く」)
         static func commandAnnouncement(_ title: String) -> String { "\(CandidatePanel.commandAnnotation)、\(title)" }
     }
@@ -418,7 +420,7 @@ enum UIStrings {
         static let conversion = "変換"
         static let specialConversion = "特殊変換"
         static let dateConversion = "日付と時刻に変換"
-        static let homophoneNotes = "同音異義語の使い分けを表示"
+        static let homophoneNotes = "語の意味と使い分けを表示"
         static let misuseNotes = "誤用の注釈を表示"
         static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"

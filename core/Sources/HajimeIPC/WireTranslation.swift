@@ -206,7 +206,7 @@ extension WireCommandKind {
 
 extension WireHomophoneNote {
     public init(_ note: HomophoneNote) {
-        self.init(word: note.word, meaning: note.meaning, example: note.example, others: note.others)
+        self.init(word: note.word, senses: note.senses.map { WireHomophoneSense(meaning: $0.meaning, example: $0.example) }, others: note.others)
     }
 }
 

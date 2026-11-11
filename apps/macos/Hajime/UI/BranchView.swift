@@ -163,7 +163,7 @@ final class BranchView: NSView {
         }
         let trunkY = metrics.inset + headingHeight(panel) + CGFloat(upperRows) * metrics.rowHeight
         let height = trunkY + metrics.rowHeight * CGFloat(1 + lowerRows) + Size.frameWidth + metrics.footerHeight
-            + (column?.homophone == nil ? 0 : HomophoneDrawing.height)
+            + (column?.homophone.map(HomophoneDrawing.height) ?? 0)
             + (column?.usageNote == nil ? 0 : metrics.footerHeight)
             + (panel.note == nil ? 0 : metrics.footerHeight)
             + (theme.isRounded ? 0 : metrics.inset)
@@ -289,9 +289,9 @@ final class BranchView: NSView {
         NSGraphicsContext.restoreGraphicsState()
         var footerY = layout.trunkY + metrics.rowHeight * CGFloat(1 + layout.lowerRows)
         if let homophone = panel.columns.first(where: \.isFocused)?.homophone {
-            let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: HomophoneDrawing.height)
+            let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: HomophoneDrawing.height(homophone))
             HomophoneDrawing.draw(homophone, in: row, theme: theme, font: labelFont)
-            footerY += HomophoneDrawing.height
+            footerY += HomophoneDrawing.height(homophone)
         }
         if let note = panel.columns.first(where: \.isFocused)?.usageNote {
             let row = NSRect(x: metrics.inset, y: footerY, width: body.width - metrics.inset * 2, height: metrics.footerHeight)

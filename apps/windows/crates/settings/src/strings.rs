@@ -45,7 +45,7 @@ pub mod settings {
     pub const CONVERSION: &str = "変換";
     pub const SPECIAL_CONVERSION: &str = "特殊変換";
     pub const DATE_CONVERSION: &str = "日付と時刻に変換";
-    pub const HOMOPHONE_NOTES: &str = "同音異義語の使い分けを表示";
+    pub const HOMOPHONE_NOTES: &str = "語の意味と使い分けを表示";
     pub const MISUSE_NOTES: &str = "誤用の注釈を表示";
     pub const PROOFREADING: &str = "校正支援";
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
@@ -571,7 +571,7 @@ pub mod sync {
         ("calculation", "計算"),
         ("postalCodeConversion", "郵便番号から住所に変換"),
         ("handwriting", "手書き入力"),
-        ("homophoneNotes", "同音異義語の使い分けを表示"),
+        ("homophoneNotes", "語の意味と使い分けを表示"),
         ("misuseNotes", "誤用の注釈を表示"),
         ("proofreading", "校正支援"),
         ("misreadings", "読み違いの候補"),

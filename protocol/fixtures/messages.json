@@ -142,7 +142,8 @@
         "focus": "candidate",
         "position": 2,
         "total": 30,
-        "note": { "tone": "correction", "title": "修正", "subject": "ようですね", "key": "Esc", "keyAction": "戻す", "text": "修正「ようですね」　Esc 戻す" }
+        "note": { "tone": "correction", "title": "修正", "subject": "ようですね", "key": "Esc", "keyAction": "戻す", "text": "修正「ようですね」　Esc 戻す" },
+        "homophone": { "word": "撮る", "senses": [{ "meaning": "写真を写す", "example": "写真を撮る" }, { "meaning": "撮影する" }], "others": ["取る", "採る"] }
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },
@@ -179,6 +180,7 @@
             "preview": "腫れ",
             "longer": "晴れる",
             "alternativeNotes": [],
+            "homophone": { "word": "晴れ", "senses": [{ "meaning": "空が晴れていること" }], "others": [] },
             "split": { "pieces": ["晴", "れ"] }
           }
         ],

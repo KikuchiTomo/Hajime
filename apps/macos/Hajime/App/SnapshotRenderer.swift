@@ -50,6 +50,7 @@ enum SnapshotRenderer {
                 render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
                 render(homophoneListView(theme: look.theme, appearance: appearance), name: "homophone-list-\(look.name)", to: output, appearance: appearance)
                 render(homophoneBranchView(theme: look.theme, appearance: appearance), name: "homophone-branch-\(look.name)", to: output, appearance: appearance)
+                render(meaningListView(theme: look.theme, appearance: appearance), name: "meaning-list-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 0), name: "command-list-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 1), name: "command-list-selected-\(look.name)", to: output, appearance: appearance)
                 render(commandBranchView(theme: look.theme, appearance: appearance), name: "command-branch-\(look.name)", to: output, appearance: appearance)
@@ -503,6 +504,19 @@ enum SnapshotRenderer {
         var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["撮る", "取る", "採る", "執る"].map { .init(text: $0, annotation: nil) },
                                    selectedEntry: 0, focus: .candidate, position: 1, total: 6, note: nil)
         panel.homophone = SamplePanels.homophone
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 同音異義語の無い語の意味を一覧で出したところ．ほかの語の行を出さない
+    private static func meaningListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["動く", "うごく", "ウゴク"].map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: nil)
+        panel.homophone = SamplePanels.meaning
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

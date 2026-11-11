@@ -1,30 +1,52 @@
 /// 変換の候補に添える使い分けと誤用の注釈(R-08)．同音異義語は同梱の辞書(UsageDictionary)を先に使い，
 /// 辞書に無い語はこのリポジトリで書いた組で補う．誤用の文はすべてこのリポジトリで書いたもの．
 ///
-/// - 同音異義語: 同じ読みで意味の違う語の使い分け(「撮る」写真や動画を写す，など)．既定で出す
+/// - 同音異義語: 同じ読みで意味の違う語の使い分け(「撮る」写真や動画を写す，など)．同音異義語の無い語も辞書にあれば意味を出す．既定で出す
 /// - 誤用: 本来とは違う形で広まっている言い回し(「汚名挽回」→「汚名返上」「名誉挽回」)．既定では出さない
-/// 同音異義語の使い分けの注釈．候補の窓は語・意味・ほかの語を描き分ける(語を強く，意味を控えめに，ほかの語を札に)
+/// 語の意味と同音異義語の使い分けの注釈．候補の窓は語・意味・ほかの語を描き分ける(語を強く，意味を控えめに，ほかの語を札に)．
+/// 同じ読みのほかの語が無い語(「動く」)にも，意味だけを出す
 public struct HomophoneNote: Sendable, Equatable {
+    /// 語の 1 つの意味と，その使い方の例
+    public struct Sense: Sendable, Equatable {
+        /// 意味(句点を除く)
+        public var meaning: String
+        /// 使い方の例(「写真を撮る」．かぎ括弧を除く)．無ければ nil
+        public var example: String?
+
+        public init(meaning: String, example: String? = nil) {
+            self.meaning = meaning
+            self.example = example
+        }
+    }
+
     /// 選んでいる候補に当たる語(「撮る」)
     public var word: String
-    /// その語の意味(句点を除く)
-    public var meaning: String
-    /// 使い方の例(「写真を撮る」．かぎ括弧を除く)．無ければ nil
-    public var example: String?
-    /// 同じ読みのほかの語(「取る」「採る」)
+    /// 語の意味．辞書の順に DefaultSettings.maximumUsageSenses まで．1 つ以上
+    public var senses: [Sense]
+    /// 同じ読みのほかの語(「取る」「採る」)．同音異義語の無い語なら空
     public var others: [String]
 
-    public init(word: String, meaning: String, example: String? = nil, others: [String]) {
+    public init(word: String, senses: [Sense], others: [String]) {
         self.word = word
-        self.meaning = meaning
-        self.example = example
+        self.senses = senses
         self.others = others
     }
 
-    /// 1 行の文にしたもの(読み上げなど)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」
+    /// 意味が 1 つの注釈
+    public init(word: String, meaning: String, example: String? = nil, others: [String]) {
+        self.init(word: word, senses: [Sense(meaning: meaning, example: example)], others: others)
+    }
+
+    /// 1 行の文にしたもの(読み上げなど)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」．
+    /// 意味が 2 つ以上なら「1. 」「2. 」と番号を付ける．ほかの語が無ければ「ほかに」を付けない
     public var text: String {
-        let example = example.map { "。例「\($0)」" } ?? ""
-        return "\(word): \(meaning)\(example)　ほかに \(others.joined(separator: "・"))"
+        let senses = senses.enumerated().map { index, sense in
+            let number = self.senses.count > 1 ? "\(index + 1). " : ""
+            let example = sense.example.map { "。例「\($0)」" } ?? ""
+            return number + sense.meaning + example
+        }
+        let others = others.isEmpty ? "" : "　ほかに \(self.others.joined(separator: "・"))"
+        return "\(word): \(senses.joined(separator: "　"))\(others)"
     }
 }
 
@@ -37,8 +59,7 @@ extension HomophoneNote: CustomStringConvertible, CustomDebugStringConvertible {
 public enum UsageGuide {
     public struct Homophone: Sendable, Equatable {
         public var word: String
-        public var meaning: String
-        public var example: String?
+        public var senses: [HomophoneNote.Sense]
 
         /// 語の漢字の部分(送り仮名を除いたもの)．「撮る」→「撮」，「清算」→「清算」
         var stem: String { String(word.prefix { !$0.isHiragana }) }
@@ -66,7 +87,7 @@ public enum UsageGuide {
         if let note = dictionary?.note(for: text, reading: reading) { return note }
         for group in homophoneGroups where reading.hasPrefix(group.reading) {
             guard let hit = group.words.first(where: { $0.matches(text) }) else { continue }
-            return HomophoneNote(word: hit.word, meaning: hit.meaning, example: hit.example, others: group.words.filter { $0.word != hit.word }.map(\.word))
+            return HomophoneNote(word: hit.word, senses: hit.senses, others: group.words.filter { $0.word != hit.word }.map(\.word))
         }
         return nil
     }
@@ -77,7 +98,7 @@ public enum UsageGuide {
     }
 
     private static func group(_ reading: String, _ entries: [(String, String)]) -> Group {
-        Group(reading: reading, words: entries.map { Homophone(word: $0.0, meaning: $0.1) })
+        Group(reading: reading, words: entries.map { Homophone(word: $0.0, senses: [HomophoneNote.Sense(meaning: $0.1)]) })
     }
 
     /// 同じ読みの語の組

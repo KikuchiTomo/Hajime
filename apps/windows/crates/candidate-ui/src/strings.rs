@@ -42,6 +42,11 @@ pub fn more(count: usize) -> String {
     format!("+{count}")
 }
 
+/// 意味が 2 つ以上あるときの，意味の番号(macOS の UIStrings.Candidate.senseNumber)
+pub fn sense_number(number: usize) -> String {
+    format!("{number}.")
+}
+
 /// 連想の意味のまとまりの位置
 pub fn association_position(index: u32, total: u32) -> String {
     format!("{index} / {total}")

@@ -56,7 +56,7 @@ final class CandidateView: NSView {
         let contentWidth = max(Size.minWidth, lead + entryWidth + Size.paddingX * 2, variantsWidth + Size.paddingX * 2, footerWidth, headingWidth, homophoneWidth)
         var height = CGFloat(panel.entries.count) * rowHeight + sectionHeight + Size.frameWidth
         if !panel.variants.isEmpty || panel.association != nil { height += sectionHeight + Size.frameWidth }
-        if panel.homophone != nil { height += HomophoneDrawing.height + Size.frameWidth }
+        if let homophone = panel.homophone { height += HomophoneDrawing.height(homophone) + Size.frameWidth }
         let width = min(contentWidth + inset * 2 + dropShadowOffset, max(maximumWidth, Size.minWidth))
         return NSSize(width: width.rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
     }
@@ -147,12 +147,12 @@ final class CandidateView: NSView {
             y += rowHeight
         }
         if let homophone = panel.homophone {
-            // 使い分けは候補と足元のあいだに出す．足元のキーの案内は消さない
+            // 意味と使い分けは候補と足元のあいだに出す．足元のキーの案内は消さない
             drawSeparator(y: y, from: content.minX, to: content.maxX)
             y += Size.frameWidth
-            let row = NSRect(x: content.minX + Size.paddingX, y: y, width: content.width - Size.paddingX * 2, height: HomophoneDrawing.height)
+            let row = NSRect(x: content.minX + Size.paddingX, y: y, width: content.width - Size.paddingX * 2, height: HomophoneDrawing.height(homophone))
             HomophoneDrawing.draw(homophone, in: row, theme: theme, font: labelFont)
-            y += HomophoneDrawing.height
+            y += HomophoneDrawing.height(homophone)
         }
         drawSeparator(y: y, from: content.minX, to: content.maxX)
         y += Size.frameWidth

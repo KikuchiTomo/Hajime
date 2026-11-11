@@ -6,18 +6,33 @@
 use crate::strings;
 use ipc::{BranchMap, CandidateFocus, CandidateList, HomophoneNote};
 
-/// 使い分けを 1 行の文にしたもの(macOS の HomophoneNote.text)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」
+/// 意味と使い分けを 1 行の文にしたもの(macOS の HomophoneNote.text)．「撮る: 撮影する。例「写真を撮る」　ほかに 取る・採る」．
+/// 意味が 2 つ以上なら「1. 」「2. 」と番号を付ける．ほかの語が無ければ「ほかに」を付けない
 fn homophone(note: &HomophoneNote) -> String {
-    let example = note
-        .example
-        .as_deref()
-        .map_or(String::new(), |text| format!("。例「{text}」"));
-    format!(
-        "{}: {}{example}　ほかに {}",
-        note.word,
-        note.meaning,
-        note.others.join("・")
-    )
+    let senses = note
+        .senses
+        .iter()
+        .enumerate()
+        .map(|(index, sense)| {
+            let number = if note.senses.len() > 1 {
+                format!("{}. ", index + 1)
+            } else {
+                String::new()
+            };
+            let example = sense
+                .example
+                .as_deref()
+                .map_or(String::new(), |text| format!("。例「{text}」"));
+            format!("{number}{}{example}", sense.meaning)
+        })
+        .collect::<Vec<_>>()
+        .join("　");
+    let others = if note.others.is_empty() {
+        String::new()
+    } else {
+        format!("　ほかに {}", note.others.join("・"))
+    };
+    format!("{}: {senses}{others}", note.word)
 }
 
 /// 選んでいるものの文に，使い分けがあれば続ける
@@ -94,7 +109,7 @@ impl Announcer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ipc::{BranchColumn, CandidateEntry, CandidateVariant};
+    use ipc::{BranchColumn, CandidateEntry, CandidateVariant, HomophoneSense};
 
     fn list(focus: CandidateFocus) -> CandidateList {
         CandidateList {
@@ -148,13 +163,38 @@ mod tests {
         let mut list = list(CandidateFocus::Candidate);
         list.homophone = Some(HomophoneNote {
             word: "返還".into(),
-            meaning: "元の持ち主に返す".into(),
-            example: Some("領土を返還する".into()),
+            senses: vec![HomophoneSense {
+                meaning: "元の持ち主に返す".into(),
+                example: Some("領土を返還する".into()),
+            }],
             others: vec!["変換".into(), "偏官".into()],
         });
         assert_eq!(
             candidates(&list).as_deref(),
             Some("返還、返還: 元の持ち主に返す。例「領土を返還する」　ほかに 変換・偏官")
+        );
+    }
+
+    #[test]
+    fn 意味が2つ以上なら番号を付けほかの語が無ければほかにを付けない() {
+        let mut list = list(CandidateFocus::Candidate);
+        list.homophone = Some(HomophoneNote {
+            word: "動く".into(),
+            senses: vec![
+                HomophoneSense {
+                    meaning: "位置が変わる".into(),
+                    example: Some("車が動く".into()),
+                },
+                HomophoneSense {
+                    meaning: "働く".into(),
+                    example: None,
+                },
+            ],
+            others: vec![],
+        });
+        assert_eq!(
+            candidates(&list).as_deref(),
+            Some("返還、動く: 1. 位置が変わる。例「車が動く」　2. 働く")
         );
     }
 

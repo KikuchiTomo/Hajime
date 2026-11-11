@@ -173,8 +173,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     if !list.variants.is_empty() || list.association.is_some() {
         content_height += metrics.section_height + candidate::FRAME_WIDTH;
     }
-    if list.homophone.is_some() {
-        content_height += super::homophone::height() + candidate::FRAME_WIDTH;
+    if let Some(note) = &list.homophone {
+        content_height += super::homophone::height(note) + candidate::FRAME_WIDTH;
     }
     let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
     let height = (content_height + metrics.inset * 2.0 + metrics.shadow).ceil();
@@ -313,7 +313,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         y += metrics.row_height;
     }
     if let Some(note) = &list.homophone {
-        // 使い分けは候補と足元のあいだに出す．足元のキーの案内は消さない
+        // 意味と使い分けは候補と足元のあいだに出す．足元のキーの案内は消さない
         separator(&mut painter, y, content.x, content.max_x());
         y += candidate::FRAME_WIDTH;
         super::homophone::draw(
@@ -323,10 +323,10 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 content.x + padding,
                 y,
                 content.width - padding * 2.0,
-                super::homophone::height(),
+                super::homophone::height(note),
             ),
         );
-        y += super::homophone::height();
+        y += super::homophone::height(note);
     }
     separator(&mut painter, y, content.x, content.max_x());
     y += candidate::FRAME_WIDTH;
@@ -559,8 +559,10 @@ mod tests {
             let mut short = list(Some(0));
             short.homophone = Some(ipc::HomophoneNote {
                 word: "撮る".into(),
-                meaning: "撮影する".into(),
-                example: Some("写真を撮る".into()),
+                senses: vec![ipc::HomophoneSense {
+                    meaning: "撮影する".into(),
+                    example: Some("写真を撮る".into()),
+                }],
                 others: vec!["取る".into(), "採る".into()],
             });
             let scene = candidate_list(&short, &Look::new(&theme, 15.0), &Fixed);
@@ -580,7 +582,7 @@ mod tests {
 
             let mut long = short.clone();
             if let Some(note) = long.homophone.as_mut() {
-                note.meaning = "意".repeat(80);
+                note.senses[0].meaning = "意".repeat(80);
                 note.others = (0..30).map(|index| format!("語{index}")).collect();
             }
             let scene = candidate_list(&long, &Look::new(&theme, 15.0), &Fixed);
@@ -603,6 +605,44 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn 意味が2つ以上なら番号を付けて1行ずつ並べ_ほかの語が無ければほかにの行を出さない() {
+        let theme = theme("platinum");
+        let look = Look::new(&theme, 15.0);
+        let mut one = list(Some(0));
+        one.homophone = Some(ipc::HomophoneNote {
+            word: "動く".into(),
+            senses: vec![ipc::HomophoneSense {
+                meaning: "位置が変わる".into(),
+                example: Some("車が動く".into()),
+            }],
+            others: vec![],
+        });
+        let single = candidate_list(&one, &look, &Fixed);
+        let texts = texts_of(&single);
+        assert!(texts.contains(&"位置が変わる".to_string()));
+        assert!(!texts.contains(&"ほかに".to_string()));
+        assert!(!texts.contains(&"1.".to_string()));
+
+        let mut two = one.clone();
+        if let Some(note) = two.homophone.as_mut() {
+            note.senses.push(ipc::HomophoneSense {
+                meaning: "働く".into(),
+                example: None,
+            });
+        }
+        let double = candidate_list(&two, &look, &Fixed);
+        let texts = texts_of(&double);
+        for text in ["1.", "位置が変わる", "2.", "働く"] {
+            assert!(texts.contains(&text.to_string()), "{text}");
+        }
+        // 意味の行が 1 つ増えた分だけ高くなる
+        assert_eq!(
+            double.height - single.height,
+            glass::USAGE_ROW_HEIGHT.ceil()
+        );
     }
 
     fn texts_of(scene: &Scene) -> Vec<String> {
