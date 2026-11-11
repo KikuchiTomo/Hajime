@@ -5,7 +5,7 @@ import HajimeApplication
 /// 初めて引くときに読み込む(郵便番号を打たない人には読み込む手間をかけない)．通信しない
 @MainActor
 public final class PostalCodeFile: PostalCodeLooking {
-    /// 表の大きさの上限．同梱の表は 5MB ほど．壊れた大きなファイルを読み込まないため
+    /// 表の大きさの上限．同梱の表は 10MB ほど(町域と大口事業所の郵便番号)．壊れた大きなファイルを読み込まないため
     static let maximumBytes = 32 * 1024 * 1024
 
     private let url: URL
