@@ -35,6 +35,7 @@ enum SnapshotRenderer {
             // 色を今の外観で決める部品があるので，その外観を描くときの外観にして組み立てる
             (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
+                render(suggestionView(theme: look.theme, appearance: appearance), name: "suggestion-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
@@ -299,6 +300,17 @@ enum SnapshotRenderer {
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
         let panel = SamplePanels.list
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 打っているあいだの候補の窓．選び始めるキーをキーごとのキーキャップで足元に出す
+    private static func suggestionView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = SamplePanels.suggestion
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

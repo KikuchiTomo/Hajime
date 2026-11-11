@@ -39,6 +39,9 @@ public enum IndicatorLabels {
         }
     }
 
+    /// 1 つの案内に複数のキーを並べるときの区切り(「↓ Tab」)．描く側でキーごとのキーキャップに分ける
+    public static let keySeparator = " "
+
     /// 分岐図の足元の案内
     public static let branchHints: [Hint] = [
         Hint(.nextCandidate, "候補"),

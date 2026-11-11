@@ -11,6 +11,18 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
     )
 
+    /// 打っているあいだの候補の窓．選び始めるまで番号を振らず，足元に選び始めるキーを出す
+    static let suggestion: CandidatePanel = {
+        var panel = CandidatePanel(
+            variants: [], selectedVariant: nil,
+            entries: ["あぴ", "アピ", "アピール", "アピールポイント"].map { .init(text: $0, annotation: nil) },
+            selectedEntry: nil, focus: .candidate, position: 0, total: 4,
+            note: Note(tone: .info, title: "", key: ["↓", "Tab"].joined(separator: IndicatorLabels.keySeparator), keyAction: "選択")
+        )
+        panel.showsNumbers = false
+        return panel
+    }()
+
     /// コマンドの候補(R-22)を含む一覧．selected は選んでいる行．コマンドを選んでいれば，確定のキーで動くことを足元に出す
     static func commands(selected: Int) -> CandidatePanel {
         let entries: [CandidatePanel.Entry] = [

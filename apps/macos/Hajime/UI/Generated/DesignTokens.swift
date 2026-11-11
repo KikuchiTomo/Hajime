@@ -222,6 +222,7 @@ enum DesignTokens {
             static let curveBend: CGFloat = 0.35
             static let dotPitch: CGFloat = 5
             static let keycapPartGap: CGFloat = 1
+            static let keycapGap: CGFloat = 3
             static let shadowRadius: CGFloat = 12
             static let shadowOffsetY: CGFloat = 3
             static let tagHeight: CGFloat = 16

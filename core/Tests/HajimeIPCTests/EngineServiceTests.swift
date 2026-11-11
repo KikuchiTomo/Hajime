@@ -318,6 +318,28 @@ struct EngineServiceTests {
         #expect(settings.current.theme == .washi)
     }
 
+    @Test("設定の画面で選び始めるキーとキーの案内の表示を変えると，入力中の候補の窓の案内が変わる")
+    func suggestionNoteFollowsWrittenSettings() throws {
+        let id = greeted()
+        func suggestionNote() throws -> WireNote? {
+            sent.value.removeAll()
+            _ = type("kana", session: try open(id), from: id)
+            let lists = sent.value.compactMap { if case .showCandidates(let list, _) = $0 { list } else { nil } }
+            #expect(!lists.isEmpty)
+            return lists.last?.note
+        }
+        let initial = try suggestionNote()
+        #expect(initial?.key == "↓ Tab")
+        #expect(initial?.keyAction == "選択")
+
+        _ = fields(.writeSettingsFields(values: #"{"keymap":[{"state":"composing","key":"Ctrl n","command":"nextCandidate"},{"state":"composing","key":"Ctrl j","command":"acceptSuggestion"}]}"#),
+                   from: id)
+        #expect(try suggestionNote()?.key == "⌃N ⌃J")
+
+        _ = fields(.writeSettingsFields(values: #"{"showsKeyHints":false}"#), from: id)
+        #expect(try suggestionNote() == nil)
+    }
+
     @Test("送れない大きさの設定は tooLarge で断る")
     func settingsFieldsTooLarge() {
         let id = greeted()

@@ -334,6 +334,7 @@ pub mod size {
         pub const CURVE_BEND: f32 = 0.35;
         pub const DOT_PITCH: f32 = 5.0;
         pub const KEYCAP_PART_GAP: f32 = 1.0;
+        pub const KEYCAP_GAP: f32 = 3.0;
         pub const SHADOW_RADIUS: f32 = 12.0;
         pub const SHADOW_OFFSET_Y: f32 = 3.0;
         pub const TAG_HEIGHT: f32 = 16.0;
