@@ -64,7 +64,9 @@ enum NSEventKeyTranslator {
         case let code where KeyCode.functionKeys[code] != nil: KeyCode.functionKeys[code].map(KeyEvent.Key.function)
         default: character(from: event, shifted: shifted, modifiers: modifiers).map(KeyEvent.Key.character)
         }
-        return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode], isKeypad: KeyCode.keypad.contains(event.keyCode)) }
+        // テンキーの Enter もテンキーのキーとして渡す(テンキーの Enter で計算する設定)
+        let isKeypad = KeyCode.keypad.contains(event.keyCode) || event.keyCode == KeyCode.keypadEnter
+        return key.map { KeyEvent($0, modifiers: modifiers, keyLabel: jisLabels[event.keyCode], isKeypad: isKeypad) }
     }
 
     /// 仮想キーコードから，JIS キーボードのその位置の刻印を引く．かな入力でかなを引くのに使う(KanaLayout)．

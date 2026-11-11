@@ -42,6 +42,9 @@ pub mod settings {
     pub const ALPHANUMERIC_HYPHEN: &str = "英数字のあとの長音をハイフンに";
     pub const KEYS: &str = "動作";
     pub const PUNCTUATION_COMMITS: &str = "句読点で確定";
+    pub const QUESTION_EXCLAMATION_COMMITS: &str = "？と！で確定";
+    pub const KEYPAD_CALCULATION: &str = "テンキーの Enter で計算";
+    pub const CYCLES_LETTER_CASE: &str = "英数に変えるキーで大文字と小文字を切り替え";
     pub const NUMBER_KEY_SELECTION: &str = "番号キーで候補を選択";
     pub const SHOWS_MODE_INDICATOR: &str = "入力モードの切り替えを表示";
     pub const CONVERSION: &str = "変換";
@@ -620,6 +623,12 @@ pub mod sync {
         ("alphanumericHyphen", "英数字のあとの長音をハイフンに"),
         ("punctuationCommits", "句読点で確定"),
         ("keypadDirect", "テンキーの数字を半角で確定"),
+        ("questionExclamationCommits", "？と！で確定"),
+        ("keypadCalculation", "テンキーの Enter で計算"),
+        (
+            "cyclesLetterCase",
+            "英数に変えるキーで大文字と小文字を切り替え",
+        ),
         ("typoCorrection", "タイプミスの修正"),
         ("candidatePresentation", "候補の表示"),
         ("initialFocus", "最初に選択する文節"),

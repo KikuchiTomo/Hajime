@@ -7,6 +7,8 @@ struct CandidateSelection: Equatable {
     var focus: Focus
     /// 候補の頭の，一覧に出さない字(打っているあいだに最後の文節だけを選ぶときの，前の文節)．一覧には残りだけを出す
     var shownPrefix = ""
+    /// 英数の種類を選んでいるときの大文字と小文字．英数に変えるキーを続けて押すと変わる
+    var letterCase = LetterCase.asTyped
 
     enum Focus: Equatable {
         case candidate(Int)

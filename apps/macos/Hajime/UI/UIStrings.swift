@@ -440,6 +440,9 @@ enum UIStrings {
         static let alphanumericHyphen = "英数字のあとの長音をハイフンに"
         static let keys = "動作"
         static let punctuationCommits = "句読点で確定"
+        static let questionExclamationCommits = "？と！で確定"
+        static let keypadCalculation = "テンキーの Enter で計算"
+        static let cyclesLetterCase = "英数に変えるキーで大文字と小文字を切り替え"
         static let numberKeySelection = "番号キーで候補を選択"
         static let showsModeIndicator = "入力モードの切り替えを表示"
         static let conversion = "変換"
@@ -1002,7 +1005,8 @@ extension UIStrings {
             "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet,
             "numberSeparators": UIStrings.Settings.numberSeparators, "alphanumericHyphen": UIStrings.Settings.alphanumericHyphen,
             "punctuationCommits": UIStrings.Settings.punctuationCommits,
-            "keypadDirect": Features.keypadDirect,
+            "keypadDirect": Features.keypadDirect, "questionExclamationCommits": UIStrings.Settings.questionExclamationCommits,
+            "keypadCalculation": UIStrings.Settings.keypadCalculation, "cyclesLetterCase": UIStrings.Settings.cyclesLetterCase,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,

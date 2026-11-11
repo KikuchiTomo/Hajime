@@ -24,7 +24,8 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         switch self {
         case .input:
             ["inputStyle", "customRomaji", "liveConversion", "englishInputLiveConversion", "yenKey", "punctuation", "brackets", "slash", "spaceWidth", "numberWidth",
-             "alphabetWidth", "shiftStartsAlphabet", "numberSeparators", "alphanumericHyphen", "punctuationCommits", "keypadDirect"]
+             "alphabetWidth", "shiftStartsAlphabet", "numberSeparators", "alphanumericHyphen", "punctuationCommits", "keypadDirect",
+             "questionExclamationCommits", "keypadCalculation", "cyclesLetterCase"]
         case .keyboard: ["keyboardLayout"]
         case .keys: ["keymap"]
         case .conversion:

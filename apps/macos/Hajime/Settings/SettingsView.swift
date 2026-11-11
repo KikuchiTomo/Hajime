@@ -132,9 +132,12 @@ private struct InputTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.numberSeparators, keyPath: \.numberSeparators)
                 ResettableToggle(model: model, title: UIStrings.Settings.alphanumericHyphen, keyPath: \.alphanumericHyphen)
                 ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
+                ResettableToggle(model: model, title: UIStrings.Settings.keypadCalculation, keyPath: \.keypadCalculation)
             }
             Section(UIStrings.Settings.keys) {
                 ResettableToggle(model: model, title: UIStrings.Settings.punctuationCommits, keyPath: \.punctuationCommits)
+                ResettableToggle(model: model, title: UIStrings.Settings.questionExclamationCommits, keyPath: \.questionExclamationCommits)
+                ResettableToggle(model: model, title: UIStrings.Settings.cyclesLetterCase, keyPath: \.cyclesLetterCase)
                 ResettableToggle(model: model, title: UIStrings.Settings.numberKeySelection, keyPath: \.numberKeySelection)
                 ResettableToggle(model: model, title: UIStrings.Settings.showsModeIndicator, keyPath: \.showsModeIndicator)
                 ResettableRow(model: model, keyPath: \.modeIndicatorDuration) {

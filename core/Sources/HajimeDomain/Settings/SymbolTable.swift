@@ -32,6 +32,15 @@ public enum SymbolTable {
         text == settings.punctuation.comma || text == settings.punctuation.period
     }
 
+    /// 打った記号まで確定するか．「句読点で確定」(punctuationCommits)と「？と！で確定」(questionExclamationCommits)の設定に従う
+    public static func commitsComposition(after text: String, settings: Settings) -> Bool {
+        (settings.punctuationCommits && isPunctuation(text, settings: settings))
+            || (settings.questionExclamationCommits && sentenceEndMarks.contains(text))
+    }
+
+    /// 「？と！で確定」で確定する記号．エディタとターミナルでは半角のまま読みに入るので，半角も含める
+    private static let sentenceEndMarks: Set<String> = ["？", "！", "?", "!"]
+
     /// 数字のあとの「.」「,」(小数点と桁区切り．「3.14」「1,000」)．設定(numberSeparators)がオンで直前の文字が数字なら，
     /// その数字と同じ幅の「.」「,」(全角なら「．」「，」)．そうでなければ nil で，句読点にする
     public static func numberSeparator(for character: Character, after previous: Character?, settings: Settings) -> String? {

@@ -151,6 +151,9 @@ impl Page {
                 features::KEYPAD_DIRECT,
                 settings::NUMBER_SEPARATORS,
                 settings::ALPHANUMERIC_HYPHEN,
+                settings::QUESTION_EXCLAMATION_COMMITS,
+                settings::KEYPAD_CALCULATION,
+                settings::CYCLES_LETTER_CASE,
             ],
             Page::Conversion => vec![
                 menu::LIVE_CONVERSION,
@@ -833,12 +836,18 @@ fn input() -> Vec<Section> {
                 Row::toggle(settings::NUMBER_SEPARATORS, "numberSeparators"),
                 Row::toggle(settings::ALPHANUMERIC_HYPHEN, "alphanumericHyphen"),
                 Row::toggle(features::KEYPAD_DIRECT, "keypadDirect"),
+                Row::toggle(settings::KEYPAD_CALCULATION, "keypadCalculation"),
             ],
         ),
         Section::new(
             settings::KEYS,
             vec![
                 Row::toggle(settings::PUNCTUATION_COMMITS, "punctuationCommits"),
+                Row::toggle(
+                    settings::QUESTION_EXCLAMATION_COMMITS,
+                    "questionExclamationCommits",
+                ),
+                Row::toggle(settings::CYCLES_LETTER_CASE, "cyclesLetterCase"),
                 Row::toggle(settings::NUMBER_KEY_SELECTION, "numberKeySelection"),
                 Row::toggle(settings::SHOWS_MODE_INDICATOR, "showsModeIndicator"),
                 Row::seconds(
@@ -1934,6 +1943,6 @@ mod tests {
         let page = sections(Page::Input).unwrap();
         let titles: Vec<_> = page.iter().map(|section| section.title).collect();
         assert_eq!(titles, vec![Some("入力方式"), Some("文字"), Some("動作")]);
-        assert_eq!(page[1].rows.len(), 11);
+        assert_eq!(page[1].rows.len(), 12);
     }
 }

@@ -236,6 +236,19 @@ public final class InputSession {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
             return KeyResult(handled: false, actions: commitAll())
         }
+        if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadCalculation, phase == .composing || !isComposing,
+            case .character(let character) = event.key {
+            // テンキーで式を打てるよう，数字と記号を半角のまま読みに入れる(テンキーの Enter で計算する設定)
+            return insertKeypadCharacter(character, context: context)
+        }
+        if mode == .japanese, event.isKeypad, event.key == .enter, event.modifiers.isEmpty, settings.current.keypadCalculation,
+            settings.current.calculation, phase == .composing, Calculator.evaluate(reading: composition.conversionReading + "=") != nil {
+            // テンキーの Enter で式を計算する(設定)．「=」を足して変換し，計算の結果を第 1 候補にする．式でなければふつうの Enter
+            corrector.commitAsTyped(into: &composition)
+            readingCorrector.didInsertLiteral()
+            composition.insertLiteral("=", rawKey: nil)
+            return convert(withoutLearning: false, context: context)
+        }
         if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadDirect, phase == .composing || !isComposing,
             case .character(let character) = event.key {
             // テンキーの数字と記号は，組み立て中の文字を確定してから半角のまま確定する(設定)．
@@ -897,7 +910,7 @@ public final class InputSession {
                 converter.setApplication(context.applicationID)
             }
             composition.insertKana(kana)
-            if settings.current.punctuationCommits, SymbolTable.isPunctuation(kana, settings: settings.current) {
+            if SymbolTable.commitsComposition(after: kana, settings: settings.current) {
                 return KeyResult(handled: true, actions: actions + commitAll())
             }
             return KeyResult(handled: true, actions: actions + render(context: context))
@@ -913,10 +926,17 @@ public final class InputSession {
         return KeyResult(handled: true)
     }
 
-    /// 読み全体を字種に変えて選ぶ(既定では F6〜F10 と Ctrl+J/K/;/L/:．R-03)
+    /// 読み全体を字種に変えて選ぶ(既定では F6〜F10 と Ctrl+J/K/;/L/:．R-03)．
+    /// 英数を選んでいるときに同じキーをまた押すと，英字の大文字と小文字を順に変える(設定)
     private func selectVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
-        guard variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
-        phase = .selecting(makeSelection(focus: .variant(variant)))
+        guard let text = variant.apply(to: composition) else { return KeyResult(handled: true) }
+        var letterCase = LetterCase.asTyped
+        if settings.current.cyclesLetterCase, variant.isAlphanumeric, case .selecting(let current) = phase, current.focus == .variant(variant) {
+            letterCase = current.letterCase.next(for: text)
+        }
+        var selection = makeSelection(focus: .variant(variant))
+        selection.letterCase = letterCase
+        phase = .selecting(selection)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -1008,13 +1028,27 @@ public final class InputSession {
             }
             readingCorrector.didInsertLiteral()
             composition.insertLiteral(text, rawKey: nil)
-            if settings.current.punctuationCommits, SymbolTable.isPunctuation(text, settings: settings.current) {
-                // 句読点を打ったら，その句読点まで確定する(設定)
+            if SymbolTable.commitsComposition(after: text, settings: settings.current) {
+                // 句読点(と ？ ！)を打ったら，その記号まで確定する(設定)
                 return KeyResult(handled: true, actions: actions + commitAll())
             }
         }
         updateCorrection()
         return KeyResult(handled: true, actions: actions + render(context: context))
+    }
+
+    /// テンキーの数字と記号を，半角のまま読みに入れる(テンキーの Enter で計算する設定のとき)
+    private func insertKeypadCharacter(_ character: Character, context: InputContext) -> KeyResult {
+        if !isComposing {
+            composition = newComposition()
+            setLeftContext(context.precedingText)
+            converter.setApplication(context.applicationID)
+        }
+        corrector.commitAsTyped(into: &composition)
+        readingCorrector.didInsertLiteral()
+        composition.insertLiteral(String(character), rawKey: character.isNumber ? character : nil)
+        updateCorrection()
+        return KeyResult(handled: true, actions: render(context: context))
     }
 
     private func insertLiteral(_ text: String, rawKey: Character?, context: InputContext) -> KeyResult {
@@ -1222,6 +1256,7 @@ public final class InputSession {
         guard let index = available.firstIndex(of: current) else { return KeyResult(handled: true) }
         let next = available[(index + (forward ? 1 : available.count - 1)) % available.count]
         selection.focus = .variant(next)
+        selection.letterCase = .asTyped
         phase = .selecting(selection)
         return KeyResult(handled: true, actions: render(context: context))
     }
@@ -1428,7 +1463,7 @@ public final class InputSession {
                 break
             case .variant(let variant):
                 if let text = variant.apply(to: composition) {
-                    return Candidate(text: text, readingCount: whole, origin: .variant(variant))
+                    return Candidate(text: selection.letterCase.apply(to: text), readingCount: whole, origin: .variant(variant))
                 }
             }
         case .lattice(let lattice):
