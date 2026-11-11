@@ -2,9 +2,11 @@
 //
 //   /download/v0.1.13/Hajime-0.1.13.msi  そのバージョンの配布物．あとから中身を変えない(Microsoft Store はこの URL を登録する)
 //   /download/macos・/download/windows   最新のバージョンの配布物へ転送する．R2 にまだ無ければ DOWNLOADS_FALLBACK(wrangler.jsonc)へ転送する
+//   /download/latest.json               最新のバージョン．アプリの「更新を確認」が読む．覚えさせない
 //
 // R2 には tools/release/upload_downloads.sh が置く．最新のバージョンは latest.json に書く:
-//   { "version": "0.1.13", "files": { "macos": "v0.1.13/Hajime-0.1.13.pkg", "windows": "v0.1.13/Hajime-0.1.13.msi" } }
+//   { "version": "0.1.13", "files": { "macos": "v0.1.13/Hajime-0.1.13.pkg", "windows": "v0.1.13/Hajime-0.1.13.msi" },
+//     "sha256": { "macos": "…", "windows": "…" }, "releases": [{ "version": "0.1.13", "date": "2026-10-31", "notes": "…" }] }
 
 const PREFIX = "/download/";
 const LATEST = "latest.json";
@@ -24,6 +26,9 @@ export default {
     if (VERSIONED.test(key)) {
       return serve(request, env.DOWNLOADS, key);
     }
+    if (key === LATEST) {
+      return serveLatest(request, env.DOWNLOADS);
+    }
     return redirectToLatest(env, key, request.url);
   },
 };
@@ -40,6 +45,20 @@ async function redirectToLatest(env, platform, base) {
     return notFound();
   }
   return redirect(new URL(PREFIX + key, base).toString());
+}
+
+async function serveLatest(request, bucket) {
+  const object = await bucket.get(LATEST);
+  if (object === null) {
+    return notFound();
+  }
+  // 新しいバージョンを出したらすぐ知らせられるよう，覚えさせない
+  const headers = new Headers({ "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  if (request.method === "HEAD") {
+    headers.set("Content-Length", String(object.size));
+    return new Response(null, { headers });
+  }
+  return new Response(object.body, { headers });
 }
 
 function redirect(location) {

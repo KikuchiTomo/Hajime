@@ -370,9 +370,24 @@ public enum DefaultSettings {
     public static let followUpPollInterval = 0.001
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
-    /// 「更新を確認」で開く最新のリリースのページ．アプリは通信せず，ブラウザで開くだけにする(SECURITY-MODEL.md の通信)．
+    /// 最新のリリースのページ．自動で更新できないとき(署名の無い開発版，確かめられない配布物，通信の失敗)にブラウザで開く．
     /// macOS と Windows の配布物は同じリリースに置く
     public static let latestReleaseURL = "https://github.com/KikuchiTomo/Hajime/releases/latest"
+
+    // MARK: 更新の確認(R-19)．利用者が「更新を確認」を押したときだけ通信する(SECURITY-MODEL.md の通信)
+
+    /// 最新のバージョンと配布物の場所・SHA-256・変更点(tools/release/upload_downloads.sh が書く)
+    public static let updateManifestURL = "https://haji.men/download/latest.json"
+    /// 配布物の場所(latest.json の files の値)の前に付ける URL．ほかの場所からは取らない
+    public static let updateDownloadBaseURL = "https://haji.men/download/"
+    /// latest.json の大きさの上限(バイト)．変更点を 10 バージョン分載せても収まる
+    public static let maximumUpdateManifestBytes = 256 * 1024
+    /// 配布物の大きさの上限(バイト)．今の配布物は Zenzai のモデルと辞書を入れて 160MB ほど
+    public static let maximumUpdatePackageBytes = 1024 * 1024 * 1024
+    /// latest.json を取るときの待ち時間の上限(秒)
+    public static let updateManifestTimeout = 30.0
+    /// 配布物を取るときの待ち時間の上限(秒)．遅い回線でも 160MB を取り切れる長さにする
+    public static let updateDownloadTimeout = 1800.0
 
     // MARK: 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ
 

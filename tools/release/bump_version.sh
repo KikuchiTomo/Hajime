@@ -1,6 +1,7 @@
 #!/bin/sh
 # macOS と Windows のバージョンの PATCH か MINOR をそろえて 1 つ上げ，ビルド番号も 1 つ上げる(docs/dev/adr/0008-versioning.md)．
-# MINOR を上げるときは PATCH を 0 に戻す．両方のバージョンは同じでなければならない
+# MINOR を上げるときは PATCH を 0 に戻す．両方のバージョンは同じでなければならない．
+# CHANGELOG.md の「未リリース」に書いた変更点は，新しいバージョンの節に移す(空なら上げない)
 # 使い方: tools/release/bump_version.sh [patch|minor]
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -19,6 +20,9 @@ fi
 major=${version%%.*}; rest=${version#*.}; minor=${rest%%.*}; patch=${rest#*.}
 case "$major$minor$patch" in *[!0-9]*|"") echo "バージョンの書き方が読めません: $version" >&2; exit 1 ;; esac
 if [ "$level" = minor ]; then next="$major.$((minor + 1)).0"; else next="$major.$minor.$((patch + 1))"; fi
+
+# リリースノートになる変更点が書いてあるかを最初に確かめる(書いていなければ何も変えずに止まる)
+python3 -I "$root/tools/release/changelog.py" release "$next" "$(date +%Y-%m-%d)"
 
 # ビルド番号は OS ごとに数える
 file="$root/apps/macos/project.yml"
