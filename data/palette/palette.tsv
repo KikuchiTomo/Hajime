@@ -1946,8 +1946,8 @@ symbol	punctuation	‘		左アポストロフィ	ひだりあぽすとろふぃ	
 symbol	punctuation	’		右アポストロフィ	みぎあぽすとろふぃ	right apostrophe	あぽすとろふぃ|すまーとくぉーと|みぎあぽすとろふぃ|いちじゅういんようふ|いんようふ	右アポストロフィ|一重引用符|引用符|apostrophe|quote|right|single|smart|right single quotation mark		
 symbol	punctuation	“		左二重引用符	ひだりにじゅういんようふ	left quotation mark	くおーてーしょんまーく|すまーとくぉーと|ひだりにじゅういんようふ|にじゅういんようふ|いんようふ	左二重引用符|二重引用符|引用符|double|left|mark|quotation|quote|smart|left double quotation mark		
 symbol	punctuation	”		右二重引用符	みぎにじゅういんようふ	right quotation mark	くおーてーしょんまーく|すまーとくぉーと|みぎにじゅういんようふ|にじゅういんようふ|いんようふ	右二重引用符|二重引用符|引用符|double|mark|quotation|quote|right|smart|right double quotation mark		
-symbol	punctuation	〝		ダブルミニュート	かっこ	reversed double prime quotation mark	だぶるみにゅーと|かっこ|いんよう	reversed double prime quotation mark		
-symbol	punctuation	〟		ダブルミニュート	かっこ	low double prime quotation mark	だぶるみにゅーと|かっこ|いんよう	low double prime quotation mark		
+symbol	punctuation	〝		ダブルミニュート	かっこ	reversed double prime quotation mark	だぶるみにゅーと|かっこ|いんよう|いんようふ	reversed double prime quotation mark		
+symbol	punctuation	〟		ダブルミニュート	かっこ	low double prime quotation mark	だぶるみにゅーと|かっこ|いんよう|いんようふ	low double prime quotation mark		
 symbol	punctuation	ヽ		片仮名繰り返し記号	くりかえし	katakana iteration mark	くりかえし|おなじ	片仮名繰り返し記号|katakana iteration mark		
 symbol	punctuation	ヾ		片仮名繰り返し記号 濁点	くりかえし	katakana voiced iteration mark	くりかえし|おなじ	片仮名繰り返し記号 濁点|katakana voiced iteration mark		
 symbol	punctuation	ゝ		平仮名繰り返し記号	くりかえし	hiragana iteration mark	くりかえし|おなじ	平仮名繰り返し記号|hiragana iteration mark		
@@ -2017,32 +2017,32 @@ symbol	brackets	＜		小なり	こなり	less-than	こなり|よりちいさい|
 symbol	brackets	＞		大なり	おおなり	greater-than	おおなり|よりおおきい|ふとうごう|とじたぐ|きごう	大なり|より大きい|不等号|閉じタグ|close|greater|greater-than|tag|than|fullwidth greater-than sign		
 symbol	brackets	≪		非常に小さい	ひじょうにちいさい	much less-than	ひじょうにちいさい|ふとうごう|すうがくきごう	非常に小さい|不等号|数学記号|inequality|less-than|mathematics|much|much less-than		
 symbol	brackets	≫		非常に大きい	ひじょうにおおきい	much greater-than	ひじょうにおおきい|ふとうごう|すうがくきごう	非常に大きい|不等号|数学記号|greater-than|inequality|mathematics|much|much greater-than		
-symbol	brackets	｟		括弧	かっこ	fullwidth left white parenthesis	かっこ	括弧|fullwidth left white parenthesis		
-symbol	brackets	｠		括弧	かっこ	fullwidth right white parenthesis	かっこ	括弧|fullwidth right white parenthesis		
+symbol	brackets	｟		括弧		fullwidth left white parenthesis	かっこ	括弧|fullwidth left white parenthesis		
+symbol	brackets	｠		括弧		fullwidth right white parenthesis	かっこ	括弧|fullwidth right white parenthesis		
 symbol	brackets	«		左山括弧	ひだりやまかっこ	left guillemet	かっこ|ひだりやまかっこ|にじゅうぎゅめ|やまぱーれん|ひだりぎゅめ|いんようふ	左山括弧|二重ギュメ|山パーレン|左ギュメ|引用符|angle|brackets|carets|chevron|guillemet|left|quote|left-pointing double angle quotation mark		
 symbol	brackets	»		右山括弧	みぎやまかっこ	right guillemet	かっこ|みぎやまかっこ|にじゅうぎゅめ|みぎぎゅめ|やまぱーれん|いんようふ	右山括弧|二重ギュメ|右ギュメ|山パーレン|引用符|angle|brackets|carets|chevron|guillemet|quote|right|right-pointing double angle quotation mark		
-symbol	brackets	‹		引用符	いんようふ	single left-pointing angle quotation mark	いんようふ	引用符|single left-pointing angle quotation mark		
-symbol	brackets	›		引用符	いんようふ	single right-pointing angle quotation mark	いんようふ	引用符|single right-pointing angle quotation mark		
-symbol	brackets	⟨		括弧	かっこ	mathematical left angle bracket	かっこ	括弧|mathematical left angle bracket		
-symbol	brackets	⟩		括弧	かっこ	mathematical right angle bracket	かっこ	括弧|mathematical right angle bracket		
-symbol	brackets	⟦		括弧	かっこ	mathematical left white square bracket	かっこ	括弧|mathematical left white square bracket		
-symbol	brackets	⟧		括弧	かっこ	mathematical right white square bracket	かっこ	括弧|mathematical right white square bracket		
-symbol	brackets	⦅		括弧	かっこ	left white parenthesis	かっこ	括弧|left white parenthesis		
-symbol	brackets	⦆		括弧	かっこ	right white parenthesis	かっこ	括弧|right white parenthesis		
-symbol	brackets	❨		括弧	かっこ	medium left parenthesis ornament	かっこ	括弧|medium left parenthesis ornament		
-symbol	brackets	❩		括弧	かっこ	medium right parenthesis ornament	かっこ	括弧|medium right parenthesis ornament		
-symbol	brackets	❪		括弧	かっこ	medium flattened left parenthesis ornament	かっこ	括弧|medium flattened left parenthesis ornament		
-symbol	brackets	❫		括弧	かっこ	medium flattened right parenthesis ornament	かっこ	括弧|medium flattened right parenthesis ornament		
-symbol	brackets	❬		括弧	かっこ	medium left-pointing angle bracket ornament	かっこ	括弧|medium left-pointing angle bracket ornament		
-symbol	brackets	❭		括弧	かっこ	medium right-pointing angle bracket ornament	かっこ	括弧|medium right-pointing angle bracket ornament		
-symbol	brackets	❮		引用符	いんようふ	heavy left-pointing angle quotation mark ornament	いんようふ	引用符|heavy left-pointing angle quotation mark ornament		
-symbol	brackets	❯		引用符	いんようふ	heavy right-pointing angle quotation mark ornament	いんようふ	引用符|heavy right-pointing angle quotation mark ornament		
-symbol	brackets	❰		括弧	かっこ	heavy left-pointing angle bracket ornament	かっこ	括弧|heavy left-pointing angle bracket ornament		
-symbol	brackets	❱		括弧	かっこ	heavy right-pointing angle bracket ornament	かっこ	括弧|heavy right-pointing angle bracket ornament		
-symbol	brackets	❲		括弧	かっこ	light left tortoise shell bracket ornament	かっこ	括弧|light left tortoise shell bracket ornament		
-symbol	brackets	❳		括弧	かっこ	light right tortoise shell bracket ornament	かっこ	括弧|light right tortoise shell bracket ornament		
-symbol	brackets	❴		括弧	かっこ	medium left curly bracket ornament	かっこ	括弧|medium left curly bracket ornament		
-symbol	brackets	❵		括弧	かっこ	medium right curly bracket ornament	かっこ	括弧|medium right curly bracket ornament		
+symbol	brackets	‹		引用符		single left-pointing angle quotation mark	いんようふ	引用符|single left-pointing angle quotation mark		
+symbol	brackets	›		引用符		single right-pointing angle quotation mark	いんようふ	引用符|single right-pointing angle quotation mark		
+symbol	brackets	⟨		括弧		mathematical left angle bracket	かっこ	括弧|mathematical left angle bracket		
+symbol	brackets	⟩		括弧		mathematical right angle bracket	かっこ	括弧|mathematical right angle bracket		
+symbol	brackets	⟦		括弧		mathematical left white square bracket	かっこ	括弧|mathematical left white square bracket		
+symbol	brackets	⟧		括弧		mathematical right white square bracket	かっこ	括弧|mathematical right white square bracket		
+symbol	brackets	⦅		括弧		left white parenthesis	かっこ	括弧|left white parenthesis		
+symbol	brackets	⦆		括弧		right white parenthesis	かっこ	括弧|right white parenthesis		
+symbol	brackets	❨		括弧		medium left parenthesis ornament	かっこ	括弧|medium left parenthesis ornament		
+symbol	brackets	❩		括弧		medium right parenthesis ornament	かっこ	括弧|medium right parenthesis ornament		
+symbol	brackets	❪		括弧		medium flattened left parenthesis ornament	かっこ	括弧|medium flattened left parenthesis ornament		
+symbol	brackets	❫		括弧		medium flattened right parenthesis ornament	かっこ	括弧|medium flattened right parenthesis ornament		
+symbol	brackets	❬		括弧		medium left-pointing angle bracket ornament	かっこ	括弧|medium left-pointing angle bracket ornament		
+symbol	brackets	❭		括弧		medium right-pointing angle bracket ornament	かっこ	括弧|medium right-pointing angle bracket ornament		
+symbol	brackets	❮		引用符		heavy left-pointing angle quotation mark ornament	いんようふ	引用符|heavy left-pointing angle quotation mark ornament		
+symbol	brackets	❯		引用符		heavy right-pointing angle quotation mark ornament	いんようふ	引用符|heavy right-pointing angle quotation mark ornament		
+symbol	brackets	❰		括弧		heavy left-pointing angle bracket ornament	かっこ	括弧|heavy left-pointing angle bracket ornament		
+symbol	brackets	❱		括弧		heavy right-pointing angle bracket ornament	かっこ	括弧|heavy right-pointing angle bracket ornament		
+symbol	brackets	❲		括弧		light left tortoise shell bracket ornament	かっこ	括弧|light left tortoise shell bracket ornament		
+symbol	brackets	❳		括弧		light right tortoise shell bracket ornament	かっこ	括弧|light right tortoise shell bracket ornament		
+symbol	brackets	❴		括弧		medium left curly bracket ornament	かっこ	括弧|medium left curly bracket ornament		
+symbol	brackets	❵		括弧		medium right curly bracket ornament	かっこ	括弧|medium right curly bracket ornament		
 symbol	arrows	→		右向矢印	みぎむきやじるし	right-pointing arrow	みぎむきやじるし|みぎ|みぎやじるし|やじるし	右向矢印|右|右矢印|矢印|arrow|right|right-pointing|rightwards arrow		
 symbol	arrows	←		左向矢印	ひだりむきやじるし	left-pointing arrow	ひだりむきやじるし|ひだり|ひだりやじるし|やじるし	左向矢印|左|左矢印|矢印|arrow|left|left-pointing|leftwards arrow		
 symbol	arrows	↑		上向矢印	じょうこうやじるし	up-pointing arrow	じょうこうやじるし|うえ|うえやじるし|やじるし	上向矢印|上|上矢印|矢印|arrow|up|up-pointing|upwards arrow		
@@ -2058,26 +2058,26 @@ symbol	arrows	⇐		左向き二重矢印	ひだりむきにじゅうやじるし
 symbol	arrows	⇑		上向き二重矢印	うわむきにじゅうやじるし	upwards double arrow	うわむきにじゅうやじるし|やじるし	上向き二重矢印|arrow|double|upwards|upwards double arrow		
 symbol	arrows	⇓		下向き二重矢印	したむきにじゅうやじるし	downwards double arrow	したむきにじゅうやじるし|やじるし	下向き二重矢印|arrow|double|downwards|downwards double arrow		
 symbol	arrows	⇔		二重両矢印	にじゅうりょうやじるし	left right double arrow	にじゅうりょうやじるし|やじるし	二重両矢印|arrow|double|left|right|left right double arrow		
-symbol	arrows	⇕		矢印	やじるし	up down double arrow	やじるし	矢印|up down double arrow		
+symbol	arrows	⇕		矢印		up down double arrow	やじるし	矢印|up down double arrow		
 symbol	arrows	⇗		北東二重矢印	ほくとうにじゅうやじるし	north east double arrow	ほくとうにじゅうやじるし|やじるし	北東二重矢印|arrow|double|east|north|north east double arrow		
 symbol	arrows	⇘		南東二重矢印	なんとうにじゅうやじるし	south east double arrow	なんとうにじゅうやじるし|やじるし	南東二重矢印|arrow|double|east|south|south east double arrow		
 symbol	arrows	⇙		南西二重矢印	なんせいにじゅうやじるし	south west double arrow	なんせいにじゅうやじるし|やじるし	南西二重矢印|arrow|double|south|west|south west double arrow		
 symbol	arrows	⇖		北西二重矢印	ほくせいにじゅうやじるし	north west double arrow	ほくせいにじゅうやじるし|やじるし	北西二重矢印|arrow|double|north|west|north west double arrow		
-symbol	arrows	⟶		矢印	やじるし	long rightwards arrow	やじるし	矢印|long rightwards arrow		
-symbol	arrows	⟵		矢印	やじるし	long leftwards arrow	やじるし	矢印|long leftwards arrow		
-symbol	arrows	⟷		矢印	やじるし	long left right arrow	やじるし	矢印|long left right arrow		
-symbol	arrows	⟹		矢印	やじるし	long rightwards double arrow	やじるし	矢印|long rightwards double arrow		
-symbol	arrows	⟸		矢印	やじるし	long leftwards double arrow	やじるし	矢印|long leftwards double arrow		
-symbol	arrows	⟺		矢印	やじるし	long left right double arrow	やじるし	矢印|long left right double arrow		
+symbol	arrows	⟶		矢印		long rightwards arrow	やじるし	矢印|long rightwards arrow		
+symbol	arrows	⟵		矢印		long leftwards arrow	やじるし	矢印|long leftwards arrow		
+symbol	arrows	⟷		矢印		long left right arrow	やじるし	矢印|long left right arrow		
+symbol	arrows	⟹		矢印		long rightwards double arrow	やじるし	矢印|long rightwards double arrow		
+symbol	arrows	⟸		矢印		long leftwards double arrow	やじるし	矢印|long leftwards double arrow		
+symbol	arrows	⟺		矢印		long left right double arrow	やじるし	矢印|long left right double arrow		
 symbol	arrows	↦		棒からの右向き矢印	ぼうからのみぎむきやじるし	rightwards arrow from bar	ぼうからのみぎむきやじるし|やじるし	棒からの右向き矢印|arrow|bar|from|rightwards|rightwards arrow from bar		
 symbol	arrows	↤		棒からの左向き矢印	ぼうからのひだりむきやじるし	leftwards arrow from bar	ぼうからのひだりむきやじるし|やじるし	棒からの左向き矢印|arrow|bar|from|leftwards|leftwards arrow from bar		
-symbol	arrows	⟼		矢印	やじるし	long rightwards arrow from bar	やじるし	矢印|long rightwards arrow from bar		
+symbol	arrows	⟼		矢印		long rightwards arrow from bar	やじるし	矢印|long rightwards arrow from bar		
 symbol	arrows	↩		右カーブ矢印	みぎかーぶやじるし	right arrow curving left	かーぶ|みぎかーぶやじるし|ひだり|きょくせん|やじるし	右カーブ矢印|左|曲線|矢印|arrow|curving|left|right|leftwards arrow with hook		
 symbol	arrows	↪		左カーブ矢印	ひだりかーぶやじるし	left arrow curving right	かーぶ|ひだりかーぶやじるし|みぎ|きょくせん|やじるし	左カーブ矢印|右|曲線|矢印|arrow|curving|left|right|rightwards arrow with hook		
 symbol	arrows	↺		反時計回りの開いた円矢印	はんとけいまわりのひらいたえんやじるし	anticlockwise open circle arrow	はんとけいまわりのひらいたえんやじるし|やじるし	反時計回りの開いた円矢印|anticlockwise|arrow|circle|open|anticlockwise open circle arrow		
 symbol	arrows	↻		時計回りの開いた円矢印	とけいまわりのひらいたえんやじるし	clockwise open circle arrow	とけいまわりのひらいたえんやじるし|やじるし	時計回りの開いた円矢印|arrow|circle|clockwise|open|clockwise open circle arrow		
-symbol	arrows	⟲		矢印	やじるし	anticlockwise gapped circle arrow	やじるし	矢印|anticlockwise gapped circle arrow		
-symbol	arrows	⟳		矢印	やじるし	clockwise gapped circle arrow	やじるし	矢印|clockwise gapped circle arrow		
+symbol	arrows	⟲		矢印		anticlockwise gapped circle arrow	やじるし	矢印|anticlockwise gapped circle arrow		
+symbol	arrows	⟳		矢印		clockwise gapped circle arrow	やじるし	矢印|clockwise gapped circle arrow		
 symbol	arrows	⤴		上カーブ矢印	うえかーぶやじるし	right arrow curving up	かーぶ|うえかーぶやじるし|うえ|きょくせん|やじるし	上カーブ矢印|上|曲線|矢印|arrow|curving|right|up|arrow pointing rightwards then curving upwards		
 symbol	arrows	⤵		下カーブ矢印	したかーぶやじるし	right arrow curving down	かーぶ|したかーぶやじるし|した|きょくせん|やじるし	下カーブ矢印|下|曲線|矢印|arrow|curving|down|right|arrow pointing rightwards then curving downwards		
 symbol	arrows	↰		上向き左折矢印	うわむきさせつやじるし	upwards arrow tip leftwards	うわむきさせつやじるし|やじるし	上向き左折矢印|arrow|leftwards|tip|upwards|upwards arrow with tip leftwards		
@@ -2119,46 +2119,46 @@ symbol	arrows	⇠		左向き破線矢印	ひだりむきはせんやじるし	le
 symbol	arrows	⇡		上向き破線矢印	うわむきはせんやじるし	upwards dashed arrow	うわむきはせんやじるし|やじるし	上向き破線矢印|arrow|dashed|upwards|upwards dashed arrow		
 symbol	arrows	⇢		右向き破線矢印	みぎむきはせんやじるし	rightwards dashed arrow	みぎむきはせんやじるし|やじるし	右向き破線矢印|arrow|dashed|rightwards|rightwards dashed arrow		
 symbol	arrows	⇣		下向き破線矢印	したむきはせんやじるし	downwards dashed arrow	したむきはせんやじるし|やじるし	下向き破線矢印|arrow|dashed|downwards|downwards dashed arrow		
-symbol	arrows	➔		矢印	やじるし	heavy wide-headed rightwards arrow	やじるし	矢印|heavy wide-headed rightwards arrow		
-symbol	arrows	➜		矢印	やじるし	heavy round-tipped rightwards arrow	やじるし	矢印|heavy round-tipped rightwards arrow		
-symbol	arrows	➝		矢印	やじるし	triangle-headed rightwards arrow	やじるし	矢印|triangle-headed rightwards arrow		
-symbol	arrows	➞		矢印	やじるし	heavy triangle-headed rightwards arrow	やじるし	矢印|heavy triangle-headed rightwards arrow		
-symbol	arrows	➟		矢印	やじるし	dashed triangle-headed rightwards arrow	やじるし	矢印|dashed triangle-headed rightwards arrow		
-symbol	arrows	➠		矢印	やじるし	heavy dashed triangle-headed rightwards arrow	やじるし	矢印|heavy dashed triangle-headed rightwards arrow		
+symbol	arrows	➔		矢印		heavy wide-headed rightwards arrow	やじるし	矢印|heavy wide-headed rightwards arrow		
+symbol	arrows	➜		矢印		heavy round-tipped rightwards arrow	やじるし	矢印|heavy round-tipped rightwards arrow		
+symbol	arrows	➝		矢印		triangle-headed rightwards arrow	やじるし	矢印|triangle-headed rightwards arrow		
+symbol	arrows	➞		矢印		heavy triangle-headed rightwards arrow	やじるし	矢印|heavy triangle-headed rightwards arrow		
+symbol	arrows	➟		矢印		dashed triangle-headed rightwards arrow	やじるし	矢印|dashed triangle-headed rightwards arrow		
+symbol	arrows	➠		矢印		heavy dashed triangle-headed rightwards arrow	やじるし	矢印|heavy dashed triangle-headed rightwards arrow		
 symbol	arrows	➡		右矢印	みぎやじるし	right arrow	みぎやじるし|みぎ|ひがし|やじるし	右矢印|右|東|矢印|arrow|cardinal|direction|east|right|black rightwards arrow		
 symbol	arrows	⬅		左矢印	ひだりやじるし	left arrow	ひだりやじるし|ひだり|やじるし|にし	左矢印|左|矢印|西|arrow|cardinal|direction|left|west|leftwards black arrow		
 symbol	arrows	⬆		上矢印	うえやじるし	up arrow	うえやじるし|うえ|きた|やじるし	上矢印|上|北|矢印|arrow|cardinal|direction|north|up|upwards black arrow		
 symbol	arrows	⬇		下矢印	したやじるし	down arrow	したやじるし|した|みなみ|やじるし	下矢印|下|南|矢印|arrow|cardinal|direction|down|south|downwards black arrow		
-symbol	arrows	⬈		矢印	やじるし	north east black arrow	やじるし	矢印|north east black arrow		
-symbol	arrows	⬉		矢印	やじるし	north west black arrow	やじるし	矢印|north west black arrow		
-symbol	arrows	⬊		矢印	やじるし	south east black arrow	やじるし	矢印|south east black arrow		
-symbol	arrows	⬋		矢印	やじるし	south west black arrow	やじるし	矢印|south west black arrow		
-symbol	arrows	⬌		矢印	やじるし	left right black arrow	やじるし	矢印|left right black arrow		
-symbol	arrows	⬍		矢印	やじるし	up down black arrow	やじるし	矢印|up down black arrow		
-symbol	arrows	➤		矢印	やじるし	black rightwards arrowhead	やじるし	矢印|black rightwards arrowhead		
-symbol	arrows	➢		矢印	やじるし	three-d top-lighted rightwards arrowhead	やじるし	矢印|three-d top-lighted rightwards arrowhead		
-symbol	arrows	➣		矢印	やじるし	three-d bottom-lighted rightwards arrowhead	やじるし	矢印|three-d bottom-lighted rightwards arrowhead		
-symbol	arrows	➥		矢印	やじるし	heavy black curved downwards and rightwards arrow	やじるし	矢印|heavy black curved downwards and rightwards arrow		
-symbol	arrows	➦		矢印	やじるし	heavy black curved upwards and rightwards arrow	やじるし	矢印|heavy black curved upwards and rightwards arrow		
-symbol	arrows	➧		矢印	やじるし	squat black rightwards arrow	やじるし	矢印|squat black rightwards arrow		
-symbol	arrows	➨		矢印	やじるし	heavy concave-pointed black rightwards arrow	やじるし	矢印|heavy concave-pointed black rightwards arrow		
-symbol	arrows	➩		矢印	やじるし	right-shaded white rightwards arrow	やじるし	矢印|right-shaded white rightwards arrow		
-symbol	arrows	➪		矢印	やじるし	left-shaded white rightwards arrow	やじるし	矢印|left-shaded white rightwards arrow		
-symbol	arrows	➫		矢印	やじるし	back-tilted shadowed white rightwards arrow	やじるし	矢印|back-tilted shadowed white rightwards arrow		
-symbol	arrows	➬		矢印	やじるし	front-tilted shadowed white rightwards arrow	やじるし	矢印|front-tilted shadowed white rightwards arrow		
-symbol	arrows	➭		矢印	やじるし	heavy lower right-shadowed white rightwards arrow	やじるし	矢印|heavy lower right-shadowed white rightwards arrow		
-symbol	arrows	➮		矢印	やじるし	heavy upper right-shadowed white rightwards arrow	やじるし	矢印|heavy upper right-shadowed white rightwards arrow		
-symbol	arrows	➯		矢印	やじるし	notched lower right-shadowed white rightwards arrow	やじるし	矢印|notched lower right-shadowed white rightwards arrow		
-symbol	arrows	➱		矢印	やじるし	notched upper right-shadowed white rightwards arrow	やじるし	矢印|notched upper right-shadowed white rightwards arrow		
-symbol	arrows	➲		矢印	やじるし	circled heavy white rightwards arrow	やじるし	矢印|circled heavy white rightwards arrow		
-symbol	arrows	➳		矢印	やじるし	white-feathered rightwards arrow	やじるし	矢印|white-feathered rightwards arrow		
-symbol	arrows	➵		矢印	やじるし	black-feathered rightwards arrow	やじるし	矢印|black-feathered rightwards arrow		
-symbol	arrows	➸		矢印	やじるし	heavy black-feathered rightwards arrow	やじるし	矢印|heavy black-feathered rightwards arrow		
-symbol	arrows	➺		矢印	やじるし	teardrop-barbed rightwards arrow	やじるし	矢印|teardrop-barbed rightwards arrow		
-symbol	arrows	➻		矢印	やじるし	heavy teardrop-shanked rightwards arrow	やじるし	矢印|heavy teardrop-shanked rightwards arrow		
-symbol	arrows	➼		矢印	やじるし	wedge-tailed rightwards arrow	やじるし	矢印|wedge-tailed rightwards arrow		
-symbol	arrows	➽		矢印	やじるし	heavy wedge-tailed rightwards arrow	やじるし	矢印|heavy wedge-tailed rightwards arrow		
-symbol	arrows	➾		矢印	やじるし	open-outlined rightwards arrow	やじるし	矢印|open-outlined rightwards arrow		
+symbol	arrows	⬈		矢印		north east black arrow	やじるし	矢印|north east black arrow		
+symbol	arrows	⬉		矢印		north west black arrow	やじるし	矢印|north west black arrow		
+symbol	arrows	⬊		矢印		south east black arrow	やじるし	矢印|south east black arrow		
+symbol	arrows	⬋		矢印		south west black arrow	やじるし	矢印|south west black arrow		
+symbol	arrows	⬌		矢印		left right black arrow	やじるし	矢印|left right black arrow		
+symbol	arrows	⬍		矢印		up down black arrow	やじるし	矢印|up down black arrow		
+symbol	arrows	➤		矢印		black rightwards arrowhead	やじるし	矢印|black rightwards arrowhead		
+symbol	arrows	➢		矢印		three-d top-lighted rightwards arrowhead	やじるし	矢印|three-d top-lighted rightwards arrowhead		
+symbol	arrows	➣		矢印		three-d bottom-lighted rightwards arrowhead	やじるし	矢印|three-d bottom-lighted rightwards arrowhead		
+symbol	arrows	➥		矢印		heavy black curved downwards and rightwards arrow	やじるし	矢印|heavy black curved downwards and rightwards arrow		
+symbol	arrows	➦		矢印		heavy black curved upwards and rightwards arrow	やじるし	矢印|heavy black curved upwards and rightwards arrow		
+symbol	arrows	➧		矢印		squat black rightwards arrow	やじるし	矢印|squat black rightwards arrow		
+symbol	arrows	➨		矢印		heavy concave-pointed black rightwards arrow	やじるし	矢印|heavy concave-pointed black rightwards arrow		
+symbol	arrows	➩		矢印		right-shaded white rightwards arrow	やじるし	矢印|right-shaded white rightwards arrow		
+symbol	arrows	➪		矢印		left-shaded white rightwards arrow	やじるし	矢印|left-shaded white rightwards arrow		
+symbol	arrows	➫		矢印		back-tilted shadowed white rightwards arrow	やじるし	矢印|back-tilted shadowed white rightwards arrow		
+symbol	arrows	➬		矢印		front-tilted shadowed white rightwards arrow	やじるし	矢印|front-tilted shadowed white rightwards arrow		
+symbol	arrows	➭		矢印		heavy lower right-shadowed white rightwards arrow	やじるし	矢印|heavy lower right-shadowed white rightwards arrow		
+symbol	arrows	➮		矢印		heavy upper right-shadowed white rightwards arrow	やじるし	矢印|heavy upper right-shadowed white rightwards arrow		
+symbol	arrows	➯		矢印		notched lower right-shadowed white rightwards arrow	やじるし	矢印|notched lower right-shadowed white rightwards arrow		
+symbol	arrows	➱		矢印		notched upper right-shadowed white rightwards arrow	やじるし	矢印|notched upper right-shadowed white rightwards arrow		
+symbol	arrows	➲		矢印		circled heavy white rightwards arrow	やじるし	矢印|circled heavy white rightwards arrow		
+symbol	arrows	➳		矢印		white-feathered rightwards arrow	やじるし	矢印|white-feathered rightwards arrow		
+symbol	arrows	➵		矢印		black-feathered rightwards arrow	やじるし	矢印|black-feathered rightwards arrow		
+symbol	arrows	➸		矢印		heavy black-feathered rightwards arrow	やじるし	矢印|heavy black-feathered rightwards arrow		
+symbol	arrows	➺		矢印		teardrop-barbed rightwards arrow	やじるし	矢印|teardrop-barbed rightwards arrow		
+symbol	arrows	➻		矢印		heavy teardrop-shanked rightwards arrow	やじるし	矢印|heavy teardrop-shanked rightwards arrow		
+symbol	arrows	➼		矢印		wedge-tailed rightwards arrow	やじるし	矢印|wedge-tailed rightwards arrow		
+symbol	arrows	➽		矢印		heavy wedge-tailed rightwards arrow	やじるし	矢印|heavy wedge-tailed rightwards arrow		
+symbol	arrows	➾		矢印		open-outlined rightwards arrow	やじるし	矢印|open-outlined rightwards arrow		
 symbol	math	＋		プラス記号	ぷらすきごう	plus sign	ぷらすきごう|かさん|せいふごう|たす|きごう	プラス記号|加算|正符号|足す|add|plus|sign|fullwidth plus sign		
 symbol	math	－		ハイフンマイナス	はいふんまいなす	hyphen-minus	はいふんまいなす|だっしゅ|まいなす|きごう	記号|dash|hyphen|hyphen-minus|minus|fullwidth hyphen-minus		
 symbol	math	±		プラスマイナス	ぷらすまいなす	plus-minus	ぷらすまいなす|ふくごう|きごう	複号|plus-minus|plus-minus sign		
@@ -2169,7 +2169,7 @@ symbol	math	≠		等号否定	とうごうひてい	not equal	のっといこー
 symbol	math	≒		ほとんど等しい	ほとんどひとしい	approximately equal the image	ほとんどひとしい	ほとんど等しい|approximately|equal|image|the|approximately equal to or the image of		
 symbol	math	≈		ほぼ等しい	ほぼひとしい	almost equal	ほぼひとしい|おおよそひとしい|やく|きんじ	ほぼ等しい|おおよそ等しい|約|近似|almost|approximate|approximation|equal|almost equal to		
 symbol	math	≡		常に等しい	つねにひとしい	identical to	つねにひとしい|ごうどう|ごうどうきごう|こうとうしき	常に等しい|3本線|合同|合同記号|恒等式|exact|identical|to|triple|identical to		
-symbol	math	≢		合同	ごうどう	not identical to	ごうどう	合同|not identical to		
+symbol	math	≢		合同		not identical to	ごうどう	合同|not identical to		
 symbol	math	≃		漸進的に等しい	ぜんしんてきにひとしい	asymptotically equal	ぜんしんてきにひとしい|すうがくきごう|ぜんきんせん	漸進的に等しい|数学記号|漸近線|asymptote|asymptotically|equal|mathematics|asymptotically equal to		
 symbol	math	≅		およそ等しい	およそひとしい	approximately equal	およそひとしい|ごうどう|どうけいしゃぞう|すうがくきごう|とうか	およそ等しい|合同|同型写像|数学記号|等価|approximately|congruence|equal|equality|isomorphism|mathematics|approximately equal to		
 symbol	math	∼		チルダ演算子	ちるだえんざんし	tilde operator	ちるだえんざんし|えんざんし	チルダ演算子|演算子|operator|tilde|tilde operator		
@@ -2186,13 +2186,13 @@ symbol	math	∴		ゆえに	ゆえに	therefore	ゆえに|ろんり	論理|logic|
 symbol	math	∵		なぜならば	なぜならば	because	なぜならば|ろんり	論理|because|logic		
 symbol	math	∷		比率	ひりつ	proportion	ひりつ	比率|proportion|proportionality		
 symbol	math	√		平方根	へいほうね	square root	るーと|へいほうね|にじょうこん|こんごう|しかく	平方根|二乗根|根号|radical|radix|root|square|surd|square root		
-symbol	math	∛		根号	るーと	cube root	こんごう|るーと	根号|cube root		
-symbol	math	∜		根号	るーと	fourth root	こんごう|るーと	根号|fourth root		
+symbol	math	∛		根号		cube root	こんごう|るーと	根号|cube root		
+symbol	math	∜		根号		fourth root	こんごう|るーと	根号|fourth root		
 symbol	math	∫		積分	せきぶん	integral	せきぶん|びせきぶんがく	積分|微積分学|calculus|integral		
 symbol	math	∬		二重積分	にじゅうせきぶん	double integral	にじゅうせきぶん|びせきぶんがく|せきぶん	二重積分|微積分学|calculus|double|integral|double integral		
-symbol	math	∭		積分	せきぶん	triple integral	せきぶん	積分|triple integral		
+symbol	math	∭		積分		triple integral	せきぶん	積分|triple integral		
 symbol	math	∮		線積分	せんせきぶん	contour integral	せんせきぶん|せきぶん	線積分|contour|integral|contour integral		
-symbol	math	∯		積分	せきぶん	surface integral	せきぶん	積分|surface integral		
+symbol	math	∯		積分		surface integral	せきぶん	積分|surface integral		
 symbol	math	∑		総和	そうわ	n-ary summation	そうわ|わ|すうがくきごう	総和|和|数学記号|mathematics|n-ary|summation|n-ary summation		
 symbol	math	∏		総乗	そうじょう	n-ary product	そうじょう|そうせき|ろんり	総乗|総積|論理|logic|n-ary|product|n-ary product		
 symbol	math	∐				n-ary coproduct		n-ary coproduct		
@@ -2207,24 +2207,24 @@ symbol	math	⊂		真部分集合	まぶぶんしゅうごう	subset of	まぶぶ
 symbol	math	⊃		上位集合	じょういしゅうごう	superset	じょういしゅうごう|すうがくきごう|しゅうごうえんざんし	上位集合|数学記号|集合演算子|mathematics|operator|set|superset|superset of		
 symbol	math	⊆		部分集合	ぶぶんしゅうごう	subset equal	ぶぶんしゅうごう	部分集合|equal|subset|subset of or equal to		
 symbol	math	⊇		部分集合（逆方向）		superset equal	すうがくきごう|しゅうごうえんざんし|じょういしゅうごう	部分集合（逆方向）|数学記号|集合演算子|equal|equality|mathematics|superset|superset of or equal to		
-symbol	math	⊄		部分集合	ぶぶんしゅうごう	not a subset of	ぶぶんしゅうごう	部分集合|not a subset of		
-symbol	math	⊅		上位集合	じょういしゅうごう	not a superset of	じょういしゅうごう	上位集合|not a superset of		
-symbol	math	⊊		部分集合	ぶぶんしゅうごう	subset of with not equal to	ぶぶんしゅうごう	部分集合|subset of with not equal to		
-symbol	math	⊋		上位集合	じょういしゅうごう	superset of with not equal to	じょういしゅうごう	上位集合|superset of with not equal to		
+symbol	math	⊄		部分集合		not a subset of	ぶぶんしゅうごう	部分集合|not a subset of		
+symbol	math	⊅		上位集合		not a superset of	じょういしゅうごう	上位集合|not a superset of		
+symbol	math	⊊		部分集合		subset of with not equal to	ぶぶんしゅうごう	部分集合|subset of with not equal to		
+symbol	math	⊋		上位集合		superset of with not equal to	じょういしゅうごう	上位集合|superset of with not equal to		
 symbol	math	∪		和集合	わしゅうごう	union	わしゅうごう|がっぺいしゅうごう|しゅうごう	和集合|合併集合|集合|collection|set|union		
 symbol	math	∩		積集合	せきしゅうごう	intersection	せきしゅうごう|きょうつうぶぶん|しゅうごう	積集合|共通部分|集合|intersection|set		
 symbol	math	∅		空集合	そらしゅうごう	empty set	そらしゅうごう|すうがく|しゅうごうえんざんし	空集合|数学|集合演算子|empty|mathematics|operator|set|empty set		
 symbol	math	∧		論理積	ろんりせき	logical and	ろんりせき	論理積|ac|and|atque|logical|wedge|logical and		
-symbol	math	∨		または	または	logical or	または	logical or		
+symbol	math	∨		または		logical or	または	logical or		
 symbol	math	￢		否定	ひてい	negation	でない|ひてい|ひていきごう|きごう	否定|否定記号|negation|not|fullwidth not sign		
 symbol	math	¬		否定	ひてい	negation	でない|ひてい|ひていきごう|きごう	否定|否定記号|negation|not|not sign		
 symbol	math	⊻				xor		xor		
 symbol	math	∀		全称記号	ぜんしょうきごう	for all	すべての|すべてのための|ぜんしょうきごう|にんいの	全称記号|任意の|all|any|for|given|universal|for all		
 symbol	math	∃		存在記号	そんざいきごう	there exists	そんざいきごう	存在記号|exists|there|there exists		
 symbol	math	∄				there does not exist		there does not exist		
-symbol	math	⊢		記号	きごう	right tack	きごう	記号|right tack		
-symbol	math	⊣		記号	きごう	left tack	きごう	記号|left tack		
-symbol	math	⊤		記号	きごう	down tack	きごう	記号|down tack		
+symbol	math	⊢		記号		right tack	きごう	記号|right tack		
+symbol	math	⊣		記号		left tack	きごう	記号|left tack		
+symbol	math	⊤		記号		down tack	きごう	記号|down tack		
 symbol	math	⊥		垂直記号	すいちょくきごう	up tack	すいちょくきごう|きごう	垂直記号|eet|falsum|tack|up|up tack		
 symbol	math	⊨				true		true		
 symbol	math	∠		角	かく	angle	かく|かくど	角|角度|acute|angle		
@@ -2249,7 +2249,7 @@ symbol	math	⋰		右上がり斜め三点リーダー	みぎあがりななめ�
 symbol	math	⋱		右下がり斜め三点リーダー	みぎさがりななめさんてんりーだー	down right diagonal ellipsis	みぎさがりななめさんてんりーだー	右下がり斜め三点リーダー|diagonal|down|ellipsis|mathematics|right|down right diagonal ellipsis		
 symbol	math	°		度	ど	degree	ど|じかん|おんど|かくど|きごう	度|時間|温度|角度|degree|hour|proof|degree sign		
 symbol	math	‰		パーミル	ぱーみる	per mille	ぱーみる|わりあい|せんふんりつ|きごう	割合|千分率|記号|mil|mille|per|permil|permille|per mille sign		
-symbol	math	‱		記号	きごう	per ten thousand sign	きごう	記号|per ten thousand sign		
+symbol	math	‱		記号		per ten thousand sign	きごう	記号|per ten thousand sign		
 symbol	math	ℵ				alef symbol		alef symbol		
 symbol	math	ℏ				planck constant over two pi		planck constant over two pi		
 symbol	math	ℓ		リットル	りっとる	script small l	りっとる	script small l		
@@ -2261,10 +2261,10 @@ symbol	math	ℂ				double-struck capital c		double-struck capital c
 symbol	math	ℙ				double-struck capital p		double-struck capital p		
 symbol	math	℮				estimated symbol		estimated symbol		
 symbol	math	∎		墓石記号	はかいしきごう	end proof	はるもす|はかいしきごう|しょうめいのおわり|しょうめいしゅうりょう	墓石記号|Q.E.D.|証明の終わり|証明終了|end|halmos|proof|q.e.d.|qed|tombstone|end of proof		
-symbol	math	⌈		天井関数	てんじょう	left ceiling	てんじょう	天井関数|left ceiling		
-symbol	math	⌉		天井関数	てんじょう	right ceiling	てんじょう	天井関数|right ceiling		
-symbol	math	⌊		床関数	ゆか	left floor	ゆか	床関数|left floor		
-symbol	math	⌋		床関数	ゆか	right floor	ゆか	床関数|right floor		
+symbol	math	⌈		天井関数		left ceiling	てんじょう	天井関数|left ceiling		
+symbol	math	⌉		天井関数		right ceiling	てんじょう	天井関数|right ceiling		
+symbol	math	⌊		床関数		left floor	ゆか	床関数|left floor		
+symbol	math	⌋		床関数		right floor	ゆか	床関数|right floor		
 symbol	math	⟂				perpendicular		perpendicular		
 symbol	math	½		1/2	にぶんのいち	vulgar fraction one half	にぶんのいち|ぶんすう	1/2|vulgar fraction one half		
 symbol	math	⅓		1/3	さんぶんのいち	vulgar fraction one third	さんぶんのいち|ぶんすう	1/3|vulgar fraction one third		
@@ -2598,28 +2598,28 @@ symbol	units	¢		セント	せんと	cent	せんと|くぉーたー|だいむ|�
 symbol	units	₩		ウォン	うぉん	won	うぉん|きたちょうせんうぉん|つうか|かんこくうぉん|きごう	KPW|KRW|北朝鮮ウォン|通貨|韓国ウォン|won|won sign		
 symbol	units	₹		インドルピー	いんどるぴー	indian rupee	いんどるぴー|るぴー|つうか|きごう	通貨|currency|indian|rupee|indian rupee sign		
 symbol	units	₽		ルーブル	るーぶる	ruble	るーぶる|ろしあるーぶる|つうか|きごう	通貨|currency|ruble|ruble sign		
-symbol	units	₺		記号	きごう	turkish lira sign	きごう	記号|turkish lira sign		
-symbol	units	₫		記号	きごう	dong sign	きごう	記号|dong sign		
+symbol	units	₺		記号		turkish lira sign	きごう	記号|turkish lira sign		
+symbol	units	₫		記号		dong sign	きごう	記号|dong sign		
 symbol	units	₱		ペソ	ぺそ	peso	ぺそ|ふぃりぴんぺそ|めきしこぺそ|つうか|きごう	通貨|peso|peso sign		
-symbol	units	₪		記号	きごう	new sheqel sign	きごう	記号|new sheqel sign		
-symbol	units	₦		記号	きごう	naira sign	きごう	記号|naira sign		
-symbol	units	₴		記号	きごう	hryvnia sign	きごう	記号|hryvnia sign		
-symbol	units	₸		記号	きごう	tenge sign	きごう	記号|tenge sign		
-symbol	units	₼		記号	きごう	manat sign	きごう	記号|manat sign		
-symbol	units	₾		記号	きごう	lari sign	きごう	記号|lari sign		
+symbol	units	₪		記号		new sheqel sign	きごう	記号|new sheqel sign		
+symbol	units	₦		記号		naira sign	きごう	記号|naira sign		
+symbol	units	₴		記号		hryvnia sign	きごう	記号|hryvnia sign		
+symbol	units	₸		記号		tenge sign	きごう	記号|tenge sign		
+symbol	units	₼		記号		manat sign	きごう	記号|manat sign		
+symbol	units	₾		記号		lari sign	きごう	記号|lari sign		
 symbol	units	₿		ビットコイン	びっとこいん	bitcoin	びっとこいん|かそうつうか|つうか|きごう	BTC|仮想通貨|通貨|bitcoin|bitcoin sign		
-symbol	units	฿		通貨	つうか	thai currency symbol baht	つうか	通貨|thai currency symbol baht		
-symbol	units	₡		記号	きごう	colon sign	きごう	記号|colon sign		
-symbol	units	₲		記号	きごう	guarani sign	きごう	記号|guarani sign		
-symbol	units	₵		記号	きごう	cedi sign	きごう	記号|cedi sign		
-symbol	units	₭		記号	きごう	kip sign	きごう	記号|kip sign		
-symbol	units	₮		記号	きごう	tugrik sign	きごう	記号|tugrik sign		
+symbol	units	฿		通貨		thai currency symbol baht	つうか	通貨|thai currency symbol baht		
+symbol	units	₡		記号		colon sign	きごう	記号|colon sign		
+symbol	units	₲		記号		guarani sign	きごう	記号|guarani sign		
+symbol	units	₵		記号		cedi sign	きごう	記号|cedi sign		
+symbol	units	₭		記号		kip sign	きごう	記号|kip sign		
+symbol	units	₮		記号		tugrik sign	きごう	記号|tugrik sign		
 symbol	units	₣		フランスフラン	ふらんすふらん	french franc	ふらんすふらん|ふらん|つうか|きごう	通貨|currency|franc|french|french franc sign		
 symbol	units	₤		リラ	りら	lira	りら|つうか|きごう	通貨|currency|lira|lira sign		
-symbol	units	₧		記号	きごう	peseta sign	きごう	記号|peseta sign		
+symbol	units	₧		記号		peseta sign	きごう	記号|peseta sign		
 symbol	units	₨		ルピー	るぴー	rupee	るぴー|つうか|きごう	通貨|currency|rupee|rupee sign		
-symbol	units	₠		記号	きごう	euro-currency sign	きごう	記号|euro-currency sign		
-symbol	units	¤		記号	きごう	currency sign	きごう	記号|currency sign		
+symbol	units	₠		記号		euro-currency sign	きごう	記号|euro-currency sign		
+symbol	units	¤		記号		currency sign	きごう	記号|currency sign		
 symbol	units	﷼		リヤル	りやる	rial	りやる|つうか|きごう	通貨|currency|rial|rial sign		
 symbol	enclosed	①		丸数字1	まるいち	circled digit one	まるいち|いち	丸数字1|circled digit one		
 symbol	enclosed	②		丸数字2	まるに	circled digit two	まるに|に	丸数字2|circled digit two		
@@ -2850,13 +2850,13 @@ symbol	enclosed	㊆		七	なな	circled ideograph seven	なな	七|circled ideog
 symbol	enclosed	㊇		八	はち	circled ideograph eight	はち	八|circled ideograph eight		
 symbol	enclosed	㊈		九	きゅう	circled ideograph nine	きゅう	九|circled ideograph nine		
 symbol	enclosed	㊉		十	じゅう	circled ideograph ten	じゅう	十|circled ideograph ten		
-symbol	enclosed	㊊		月	つき	circled ideograph moon	つき	月|circled ideograph moon		
+symbol	enclosed	㊊		月		circled ideograph moon	つき	月|circled ideograph moon		
 symbol	enclosed	㊋		火	ひ	circled ideograph fire	ひ	火|circled ideograph fire		
 symbol	enclosed	㊌		水	みず	circled ideograph water	みず	水|circled ideograph water		
 symbol	enclosed	㊍		木	き	circled ideograph wood	き	木|circled ideograph wood		
 symbol	enclosed	㊎		金	きん	circled ideograph metal	きん	金|circled ideograph metal		
-symbol	enclosed	㊏		地球	ちきゅう	circled ideograph earth	ちきゅう|つち	地球|土|circled ideograph earth		
-symbol	enclosed	㊐		太陽	たいよう	circled ideograph sun	たいよう|ひ	太陽|日|circled ideograph sun		
+symbol	enclosed	㊏		地球		circled ideograph earth	ちきゅう|つち	地球|土|circled ideograph earth		
+symbol	enclosed	㊐		太陽		circled ideograph sun	たいよう|ひ	太陽|日|circled ideograph sun		
 symbol	enclosed	㊑		株	かぶ	circled ideograph stock	かぶ	株|circled ideograph stock		
 symbol	enclosed	㊒		有	ゆう	circled ideograph have	ゆう	有|circled ideograph have		
 symbol	enclosed	㊓		社	しゃ	circled ideograph society	しゃ	社|circled ideograph society		
@@ -2866,8 +2866,8 @@ symbol	enclosed	㊖		財	ざい	circled ideograph financial	ざい	財|circled i
 symbol	enclosed	㊗		祝マーク	しゅくまーく	Japanese “congratulations” button	おめでとう|しゅくまーく|おいわい|しゅく	祝マーク|お祝い|祝|button|congratulations|ideograph|Japanese|circled ideograph congratulation		
 symbol	enclosed	㊘		労	ろう	circled ideograph labor	ろう	労|circled ideograph labor		
 symbol	enclosed	㊙		マル秘	まるひ	Japanese “secret” button	まるひ|ごくひ|しゃがいひ|ひ|ひみつ	マル秘|極秘|社外秘|秘|秘密|button|ideograph|Japanese|secret|circled ideograph secret		
-symbol	enclosed	㊚		男性	おとこ	circled ideograph male	だんせい|おとこ	男性|男|circled ideograph male		
-symbol	enclosed	㊛		女性	おんな	circled ideograph female	じょせい|おんな	女性|女|circled ideograph female		
+symbol	enclosed	㊚		男性		circled ideograph male	だんせい|おとこ	男性|男|circled ideograph male		
+symbol	enclosed	㊛		女性		circled ideograph female	じょせい|おんな	女性|女|circled ideograph female		
 symbol	enclosed	㊜		適	てき	circled ideograph suitable	てき	適|circled ideograph suitable		
 symbol	enclosed	㊝		優	ゆう	circled ideograph excellent	ゆう	優|circled ideograph excellent		
 symbol	enclosed	㊞		印	しるし	circled ideograph print	しるし	印|circled ideograph print		
@@ -2894,13 +2894,13 @@ symbol	enclosed	㈦		七	なな	parenthesized ideograph seven	なな	七|parenth
 symbol	enclosed	㈧		八	はち	parenthesized ideograph eight	はち	八|parenthesized ideograph eight		
 symbol	enclosed	㈨		九	きゅう	parenthesized ideograph nine	きゅう	九|parenthesized ideograph nine		
 symbol	enclosed	㈩		十	じゅう	parenthesized ideograph ten	じゅう	十|parenthesized ideograph ten		
-symbol	enclosed	㈪		月	つき	parenthesized ideograph moon	つき	月|parenthesized ideograph moon		
+symbol	enclosed	㈪		月		parenthesized ideograph moon	つき	月|parenthesized ideograph moon		
 symbol	enclosed	㈫		火	ひ	parenthesized ideograph fire	ひ	火|parenthesized ideograph fire		
 symbol	enclosed	㈬		水	みず	parenthesized ideograph water	みず	水|parenthesized ideograph water		
 symbol	enclosed	㈭		木	き	parenthesized ideograph wood	き	木|parenthesized ideograph wood		
 symbol	enclosed	㈮		金	きん	parenthesized ideograph metal	きん	金|parenthesized ideograph metal		
-symbol	enclosed	㈯		地球	ちきゅう	parenthesized ideograph earth	ちきゅう|つち	地球|土|parenthesized ideograph earth		
-symbol	enclosed	㈰		太陽	たいよう	parenthesized ideograph sun	たいよう|ひ	太陽|日|parenthesized ideograph sun		
+symbol	enclosed	㈯		地球		parenthesized ideograph earth	ちきゅう|つち	地球|土|parenthesized ideograph earth		
+symbol	enclosed	㈰		太陽		parenthesized ideograph sun	たいよう|ひ	太陽|日|parenthesized ideograph sun		
 symbol	enclosed	㈱		株	かぶ	parenthesized ideograph stock	かぶ	株|parenthesized ideograph stock		
 symbol	enclosed	㈲		有	ゆう	parenthesized ideograph have	ゆう	有|parenthesized ideograph have		
 symbol	enclosed	㈳		社	しゃ	parenthesized ideograph society	しゃ	社|parenthesized ideograph society		
@@ -2926,10 +2926,10 @@ symbol	enclosed	㍼		昭和	しょうわ	square era name syouwa	しょうわ	昭
 symbol	enclosed	㍻		平成	へいせい	square era name heisei	へいせい	平成|square era name heisei		
 symbol	enclosed	㋿		令和	れいわ	square era name reiwa	れいわ	令和|square era name reiwa		
 symbol	enclosed	㍿		株式会社	かぶしきかいしゃ	square corporation	かぶしきかいしゃ	株式会社|square corporation		
-symbol	enclosed	№		ナンバー	なんばー	numero sign	なんばー|ばんごう	numero sign		
+symbol	enclosed	№		ナンバー	なんばー	numero sign	なんばー|ばんごう|きごう	numero sign		
 symbol	enclosed	℡		電話	でんわ	telephone sign	でんわ|でんわばんごう	電話|telephone sign		
 symbol	enclosed	㏍		株式会社	かぶしきがいしゃ	square kk	かぶしきかいしゃ|かぶしきがいしゃ	株式会社|square kk		
-symbol	enclosed	℻		ファクス	ふぁっくす	facsimile sign	ふぁくす|ふぁっくす	facsimile sign		
+symbol	enclosed	℻		ファクス	ふぁっくす	facsimile sign	ふぁくす|ふぁっくす|きごう	facsimile sign		
 symbol	enclosed	™		商標マーク	しょうひょうまーく	trade mark	とれーどまーく|しょうひょうまーく|しょうひょう|きごう	商標マーク|TMマーク|商標|記号|mark|TM|trade|trademark|trade mark sign		
 symbol	enclosed	©		著作権マーク	ちょさくけんまーく	copyright	こぴーらいと|ちょさくけんまーく|ちょさくけん|きごう	著作権マーク|Cマーク|著作権|記号|C|copyright|copyright sign		
 symbol	enclosed	®		登録商標マーク	とうろくしょうひょうまーく	registered	とうろくしょうひょうまーく|とうろくしょうひょう|きごう	登録商標マーク|Rマーク|登録商標|記号|R|registered|registered sign		
@@ -2974,21 +2974,21 @@ symbol	shapes	▫		白四角小	しろしかくしょう	white small square	し�
 symbol	shapes	▬		黒い長方形	くろいちょうほうけい	filled rectangle	くろいちょうほうけい|しかく	黒い長方形|filled|rectangle|black rectangle		
 symbol	shapes	▭		白い長方形	しろいちょうほうけい	hollow rectangle	しろいちょうほうけい|しかく	白い長方形|hollow|rectangle|white rectangle		
 symbol	shapes	▮		縦長の黒い長方形	たてながのくろいちょうほうけい	filled vertical rectangle	たてながのくろいちょうほうけい|しかく	縦長の黒い長方形|filled|rectangle|vertical|black vertical rectangle		
-symbol	shapes	▯		四角	しかく	white vertical rectangle	しかく	四角|white vertical rectangle		
+symbol	shapes	▯		四角		white vertical rectangle	しかく	四角|white vertical rectangle		
 symbol	shapes	▰		黒い平行四辺形	くろいへいこうしへんけい	filled parallelogram	くろいへいこうしへんけい|へいこうしへんけい	黒い平行四辺形|filled|parallelogram|black parallelogram		
-symbol	shapes	▱		平行四辺形	へいこうしへんけい	white parallelogram	へいこうしへんけい	平行四辺形|white parallelogram		
+symbol	shapes	▱		平行四辺形		white parallelogram	へいこうしへんけい	平行四辺形|white parallelogram		
 symbol	shapes	◘		反転ビュレット	はんてんびゅれっと	inverse bullet	はんてんびゅれっと	反転ビュレット|bullet|inverse|inverse bullet		
 symbol	shapes	◙		黒四角の中に白丸	くろしかくのなかにしろまる	filled square containing hollow circle	くろしかくのなかにしろまる|まる	黒四角の中に白丸|circle|containing|filled|hollow|inverse|square|inverse white circle		
 symbol	shapes	◇		白ひし形	しろひしがた	hollow diamond	しろひしがた|ひしがた	白ひし形|diamond|hollow|white diamond		
 symbol	shapes	◆		黒ひし形	くろひしがた	filled diamond	くろひしがた|ひしがた	黒ひし形|diamond|filled|black diamond		
 symbol	shapes	◈		白ひし形の中に黒ひし形	しろひしがたのなかにくろひしがた	hollow diamond containing filled diamond	しろひしがたのなかにくろひしがた|ひしがた	白ひし形の中に黒ひし形|containing|diamond|filled|hollow|white diamond containing black small diamond		
 symbol	shapes	◊		ひし形	ひしがた	lozenge	だいあ|だいや|ひしがた|しかく	ひし形|四角|diamond|lozenge|rhombus		
-symbol	shapes	⬦		ひし形	ひしがた	white medium diamond	ひしがた	ひし形|white medium diamond		
-symbol	shapes	⬧		ひし形	ひしがた	black medium lozenge	ひしがた	ひし形|black medium lozenge		
-symbol	shapes	⬥		ひし形	ひしがた	black medium diamond	ひしがた	ひし形|black medium diamond		
-symbol	shapes	⬩		ひし形	ひしがた	black small diamond	ひしがた	ひし形|black small diamond		
-symbol	shapes	⬪		ひし形	ひしがた	black small lozenge	ひしがた	ひし形|black small lozenge		
-symbol	shapes	⬫		ひし形	ひしがた	white small lozenge	ひしがた	ひし形|white small lozenge		
+symbol	shapes	⬦		ひし形		white medium diamond	ひしがた	ひし形|white medium diamond		
+symbol	shapes	⬧		ひし形		black medium lozenge	ひしがた	ひし形|black medium lozenge		
+symbol	shapes	⬥		ひし形		black medium diamond	ひしがた	ひし形|black medium diamond		
+symbol	shapes	⬩		ひし形		black small diamond	ひしがた	ひし形|black small diamond		
+symbol	shapes	⬪		ひし形		black small lozenge	ひしがた	ひし形|black small lozenge		
+symbol	shapes	⬫		ひし形		white small lozenge	ひしがた	ひし形|white small lozenge		
 symbol	shapes	△		上向き白三角	うわむきしろさんかく	hollow up-pointing triangle	うわむきしろさんかく|さんかく	上向き白三角|hollow|triangle|up-pointing|white up-pointing triangle		
 symbol	shapes	▲		上向黒三角	じょうこうくろさんかく	filled up-pointing triangle	じょうこうくろさんかく|さんかく|うえ|ぬりつぶし|やじるし|くろさんかく	上向黒三角|三角|上|塗りつぶし|矢印|黒三角|arrow|filled|triangle|up|up-pointing|black up-pointing triangle		
 symbol	shapes	▽		下向き白三角	したむきしろさんかく	hollow down-pointing triangle	したむきしろさんかく|さんかく	下向き白三角|down-pointing|hollow|triangle|white down-pointing triangle		
@@ -3013,59 +3013,59 @@ symbol	shapes	◢		黒い右下三角	くろいみぎしたさんかく	filled l
 symbol	shapes	◣		黒い左下三角	くろいひだりしたさんかく	filled lower left triangle	くろいひだりしたさんかく|さんかく	黒い左下三角|filled|left|lower|triangle|black lower left triangle		
 symbol	shapes	◤		黒い左上三角	くろいひだりうえさんかく	filled upper left triangle	くろいひだりうえさんかく|さんかく	黒い左上三角|filled|left|triangle|upper|black upper left triangle		
 symbol	shapes	◥		黒い右上三角	くろいみぎうえさんかく	filled upper right triangle	くろいみぎうえさんかく|さんかく	黒い右上三角|filled|right|triangle|upper|black upper right triangle		
-symbol	shapes	◸		三角	さんかく	upper left triangle	さんかく	三角|upper left triangle		
-symbol	shapes	◹		三角	さんかく	upper right triangle	さんかく	三角|upper right triangle		
-symbol	shapes	◺		三角	さんかく	lower left triangle	さんかく	三角|lower left triangle		
+symbol	shapes	◸		三角		upper left triangle	さんかく	三角|upper left triangle		
+symbol	shapes	◹		三角		upper right triangle	さんかく	三角|upper right triangle		
+symbol	shapes	◺		三角		lower left triangle	さんかく	三角|lower left triangle		
 symbol	shapes	◿		右下三角	みぎしたさんかく	lower right triangle	みぎしたさんかく|さんかく	右下三角|lower|right|triangle|lower right triangle		
 symbol	shapes	☆		白星	ほし	white star	ほし|しろぼし|すたー	白星|white star		
 symbol	shapes	★		黒星	ほし	black star	ほし|くろぼし|すたー	黒星|black star		
-symbol	shapes	✩		星	ほし	stress outlined white star	ほし	星|stress outlined white star		
-symbol	shapes	✪		星	ほし	circled white star	ほし	星|circled white star		
-symbol	shapes	✫		星	ほし	open centre black star	ほし	星|open centre black star		
-symbol	shapes	✬		星	ほし	black centre white star	ほし	星|black centre white star		
-symbol	shapes	✭		星	ほし	outlined black star	ほし	星|outlined black star		
-symbol	shapes	✮		星	ほし	heavy outlined black star	ほし	星|heavy outlined black star		
-symbol	shapes	✯		星	ほし	pinwheel star	ほし	星|pinwheel star		
-symbol	shapes	✰		星	ほし	shadowed white star	ほし	星|shadowed white star		
+symbol	shapes	✩		星		stress outlined white star	ほし	星|stress outlined white star		
+symbol	shapes	✪		星		circled white star	ほし	星|circled white star		
+symbol	shapes	✫		星		open centre black star	ほし	星|open centre black star		
+symbol	shapes	✬		星		black centre white star	ほし	星|black centre white star		
+symbol	shapes	✭		星		outlined black star	ほし	星|outlined black star		
+symbol	shapes	✮		星		heavy outlined black star	ほし	星|heavy outlined black star		
+symbol	shapes	✯		星		pinwheel star	ほし	星|pinwheel star		
+symbol	shapes	✰		星		shadowed white star	ほし	星|shadowed white star		
 symbol	shapes	✡		ダビデの星	だびでのほし	star of David	だびでのほし|ゆだやきょう|ろくぼうせい|しゅうきょう|ほし	ダビデの星|ユダヤ教|六芒星|宗教|星|David|Jew|Jewish|judaism|religion|star|star of david		
-symbol	shapes	✦		星	ほし	black four pointed star	ほし	星|black four pointed star		
-symbol	shapes	✧		星	ほし	white four pointed star	ほし	星|white four pointed star		
-symbol	shapes	✱		アスタリスク	あすたりすく	heavy asterisk	あすたりすく	heavy asterisk		
-symbol	shapes	✲		アスタリスク	あすたりすく	open centre asterisk	あすたりすく	open centre asterisk		
+symbol	shapes	✦		星		black four pointed star	ほし	星|black four pointed star		
+symbol	shapes	✧		星		white four pointed star	ほし	星|white four pointed star		
+symbol	shapes	✱		アスタリスク		heavy asterisk	あすたりすく	heavy asterisk		
+symbol	shapes	✲		アスタリスク		open centre asterisk	あすたりすく	open centre asterisk		
 symbol	shapes	✳		八角アスタリスク	はっかくあすたりすく	eight-spoked asterisk	あすたりすく|はっかくあすたりすく|やくもの|きごう	八角アスタリスク|約物|記号|*|asterisk|eight-spoked|eight spoked asterisk		
 symbol	shapes	✴		八角星	はっかくせい	eight-pointed star	はっかくせい|ほし|やくもの|きごう	八角星|星|約物|記号|*|eight-pointed|star|eight pointed black star		
-symbol	shapes	✵		星	ほし	eight pointed pinwheel star	ほし	星|eight pointed pinwheel star		
-symbol	shapes	✶		星	ほし	six pointed black star	ほし	星|six pointed black star		
-symbol	shapes	✷		星	ほし	eight pointed rectilinear black star	ほし	星|eight pointed rectilinear black star		
-symbol	shapes	✸		星	ほし	heavy eight pointed rectilinear black star	ほし	星|heavy eight pointed rectilinear black star		
-symbol	shapes	✹		星	ほし	twelve pointed black star	ほし	星|twelve pointed black star		
-symbol	shapes	✺		アスタリスク	あすたりすく	sixteen pointed asterisk	あすたりすく	sixteen pointed asterisk		
-symbol	shapes	✻		アスタリスク	あすたりすく	teardrop-spoked asterisk	あすたりすく	teardrop-spoked asterisk		
-symbol	shapes	✼		アスタリスク	あすたりすく	open centre teardrop-spoked asterisk	あすたりすく	open centre teardrop-spoked asterisk		
-symbol	shapes	✽		アスタリスク	あすたりすく	heavy teardrop-spoked asterisk	あすたりすく	heavy teardrop-spoked asterisk		
-symbol	shapes	✾		花	はな	six petalled black and white florette	はな	花|six petalled black and white florette		
-symbol	shapes	✿		花	はな	black florette	はな	花|black florette		
-symbol	shapes	❀		花	はな	white florette	はな	花|white florette		
-symbol	shapes	❁		花	はな	eight petalled outlined black florette	はな	花|eight petalled outlined black florette		
-symbol	shapes	❂		星	ほし	circled open centre eight pointed star	ほし	星|circled open centre eight pointed star		
-symbol	shapes	❃		アスタリスク	あすたりすく	heavy teardrop-spoked pinwheel asterisk	あすたりすく	heavy teardrop-spoked pinwheel asterisk		
+symbol	shapes	✵		星		eight pointed pinwheel star	ほし	星|eight pointed pinwheel star		
+symbol	shapes	✶		星		six pointed black star	ほし	星|six pointed black star		
+symbol	shapes	✷		星		eight pointed rectilinear black star	ほし	星|eight pointed rectilinear black star		
+symbol	shapes	✸		星		heavy eight pointed rectilinear black star	ほし	星|heavy eight pointed rectilinear black star		
+symbol	shapes	✹		星		twelve pointed black star	ほし	星|twelve pointed black star		
+symbol	shapes	✺		アスタリスク		sixteen pointed asterisk	あすたりすく	sixteen pointed asterisk		
+symbol	shapes	✻		アスタリスク		teardrop-spoked asterisk	あすたりすく	teardrop-spoked asterisk		
+symbol	shapes	✼		アスタリスク		open centre teardrop-spoked asterisk	あすたりすく	open centre teardrop-spoked asterisk		
+symbol	shapes	✽		アスタリスク		heavy teardrop-spoked asterisk	あすたりすく	heavy teardrop-spoked asterisk		
+symbol	shapes	✾		花		six petalled black and white florette	はな	花|six petalled black and white florette		
+symbol	shapes	✿		花		black florette	はな	花|black florette		
+symbol	shapes	❀		花		white florette	はな	花|white florette		
+symbol	shapes	❁		花		eight petalled outlined black florette	はな	花|eight petalled outlined black florette		
+symbol	shapes	❂		星		circled open centre eight pointed star	ほし	星|circled open centre eight pointed star		
+symbol	shapes	❃		アスタリスク		heavy teardrop-spoked pinwheel asterisk	あすたりすく	heavy teardrop-spoked pinwheel asterisk		
 symbol	shapes	❄		雪の結晶	ゆきのけっしょう	snowflake	ゆきのけっしょう|てんき|けっしょう|ゆき	雪の結晶|天気|結晶|雪|cold|snow|snowflake|weather		
-symbol	shapes	❅		雪の結晶	ゆき	tight trifoliate snowflake	ゆきのけっしょう|ゆき	雪の結晶|tight trifoliate snowflake		
-symbol	shapes	❆		雪の結晶	ゆき	heavy chevron snowflake	ゆきのけっしょう|ゆき	雪の結晶|heavy chevron snowflake		
+symbol	shapes	❅		雪の結晶		tight trifoliate snowflake	ゆきのけっしょう|ゆき	雪の結晶|tight trifoliate snowflake		
+symbol	shapes	❆		雪の結晶		heavy chevron snowflake	ゆきのけっしょう|ゆき	雪の結晶|heavy chevron snowflake		
 symbol	shapes	❇		スパークル	すぱーくる	sparkle	すぱーくる|あすたりすく|きらきら|やくもの|きごう	約物|記号|*|sparkle		
-symbol	shapes	❈		きらめき	きらきら	heavy sparkle	きらめき|きらきら	heavy sparkle		
-symbol	shapes	❉		アスタリスク	あすたりすく	balloon-spoked asterisk	あすたりすく	balloon-spoked asterisk		
-symbol	shapes	❊		アスタリスク	あすたりすく	eight teardrop-spoked propeller asterisk	あすたりすく	eight teardrop-spoked propeller asterisk		
-symbol	shapes	❋		アスタリスク	あすたりすく	heavy eight teardrop-spoked propeller asterisk	あすたりすく	heavy eight teardrop-spoked propeller asterisk		
+symbol	shapes	❈		きらめき		heavy sparkle	きらめき|きらきら	heavy sparkle		
+symbol	shapes	❉		アスタリスク		balloon-spoked asterisk	あすたりすく	balloon-spoked asterisk		
+symbol	shapes	❊		アスタリスク		eight teardrop-spoked propeller asterisk	あすたりすく	eight teardrop-spoked propeller asterisk		
+symbol	shapes	❋		アスタリスク		heavy eight teardrop-spoked propeller asterisk	あすたりすく	heavy eight teardrop-spoked propeller asterisk		
 symbol	shapes	♡		白ハート	はーと	white heart suit	はーと|しろはーと	白ハート|white heart suit		
 symbol	shapes	♥		ハート	はーと	heart suit	はーと|かーど|とらんぷ	card|emotion|game|heart|hearts|suit|black heart suit		
 symbol	shapes	❤		赤いハート	あかいはーと	red heart	はーと|あかいはーと|あい|あか	赤いハート|愛|赤|emotion|heart|love|red|heavy black heart		
-symbol	shapes	❥		ハート	はーと	rotated heavy black heart bullet	はーと	rotated heavy black heart bullet		
-symbol	shapes	❦		ハート	はーと	floral heart	はーと	floral heart		
-symbol	shapes	❧		ハート	はーと	rotated floral heart bullet	はーと	rotated floral heart bullet		
+symbol	shapes	❥		ハート		rotated heavy black heart bullet	はーと	rotated heavy black heart bullet		
+symbol	shapes	❦		ハート		floral heart	はーと	floral heart		
+symbol	shapes	❧		ハート		rotated floral heart bullet	はーと	rotated floral heart bullet		
 symbol	shapes	♤		白スペード	すぺーど	white spade suit	すぺーど|とらんぷ	白スペード|white spade suit		
 symbol	shapes	♠		スペード	すぺーど	spade suit	すぺーど|かーど|とらんぷ	card|game|spade|suit|black spade suit		
-symbol	shapes	♢		白ダイヤ	だいや	white diamond suit	だいや|とらんぷ	白ダイヤ|white diamond suit		
+symbol	shapes	♢		白ダイヤ	だいや	white diamond suit	だいや|とらんぷ|ひしがた	白ダイヤ|white diamond suit		
 symbol	shapes	♦		ダイヤ	だいや	diamond suit	だいや|かーど|だいあ|とらんぷ|ひしがた	card|diamond|game|suit|black diamond suit		
 symbol	shapes	♧		白クラブ	くらぶ	white club suit	くらぶ|とらんぷ	白クラブ|white club suit		
 symbol	shapes	♣		クラブ	くらぶ	club suit	くらぶ|かーど|くろーばー|とらんぷ	card|club|clubs|game|suit|black club suit		
@@ -3073,15 +3073,15 @@ symbol	shapes	✓		チェックマーク	ちぇっく	check mark	ちぇっくま
 symbol	shapes	✔		太字のチェック	ふとじのちぇっく	check mark	ちぇっく|ちぇっくまーく|ふとじのちぇっく|すみ|きごう	太字のチェック|済|記号|✓|check|checked|checkmark|done|heavy|mark|tick|heavy check mark		
 symbol	shapes	✕		バツ	ばつ	multiplication x	ばつ|かける	multiplication x		
 symbol	shapes	✖		掛け算	かけざん	multiply	きゃんせる|ばつ|ぺけ|かけざん|じょうざん|きごう|かける	掛け算|乗算|記号|×|cancel|multiplication|multiply|sign|x|heavy multiplication x		
-symbol	shapes	✗		バツ	ばつ	ballot x	ばつ	ballot x		
-symbol	shapes	✘		バツ	ばつ	heavy ballot x	ばつ	heavy ballot x		
+symbol	shapes	✗		バツ	ばつ	ballot x	ばつ|ちぇっくぼっくす	ballot x		
+symbol	shapes	✘		バツ	ばつ	heavy ballot x	ばつ|ちぇっくぼっくす	heavy ballot x		
 symbol	shapes	☐		チェックボックス	ちぇっくぼっくす	ballot box	ちぇっくぼっくす|しかく	ballot box		
 symbol	shapes	☑		チェックボックス	ちぇっくぼっくす	check box with check	ちぇっくぼっくす|ちぇっく|ちぇっくまーく|すみ|きごう	済|記号|✓|ballot|box|check|checked|done|off|tick|ballot box with check		
 symbol	shapes	☒		バツ付きチェックボックス	ちぇっくぼっくす	ballot box with x	ちぇっくぼっくす|ばつ	バツ付きチェックボックス|ballot box with x		
-symbol	shapes	⬚		四角	しかく	dotted square	しかく	四角|dotted square		
+symbol	shapes	⬚		四角		dotted square	しかく	四角|dotted square		
 symbol	shapes	⬛		黒四角特大	くろしかくとくだい	black large square	くろしかくとくだい|しかく|せいほうけい|くろ	黒四角特大|四角|正方形|黒|black|geometric|large|square|black large square		
 symbol	shapes	⬜		白四角特大	しろしかくとくだい	white large square	しろしかくとくだい|しかく|せいほうけい|しろ	白四角特大|四角|正方形|白|geometric|large|square|white|white large square		
-symbol	shapes	⬤		丸	まる	black large circle	まる	丸|black large circle		
+symbol	shapes	⬤		丸		black large circle	まる	丸|black large circle		
 symbol	shapes	⭐		スター	すたー	star	すたー|てんもんがく|ほし	天文学|星|astronomy|medium|star|stars|white|white medium star		
 symbol	shapes	⭕		太い丸	ふといまる	hollow red circle	ふといまる|えん|きごう|あかいまる|わ|まる	太い丸|円|記号|赤い丸|輪|circle|heavy|hollow|large|o|red|heavy large circle		
 symbol	lines	─		罫線	けいせん	box drawings light horizontal	けいせん	罫線|box drawings light horizontal		
@@ -3245,7 +3245,7 @@ symbol	misc	♫		連桁付き八分音符	おんぷ	beamed eighth notes	おん�
 symbol	misc	♬		連桁付き十六分音符	おんぷ	beamed sixteenth notes	おんぷ	連桁付き十六分音符|beamed sixteenth notes		
 symbol	misc	♩		四分音符	おんぷ	quarter note	おんぷ	四分音符|quarter note		
 symbol	misc	♭		フラット	ふらっと	flat	ふらっと|きごう|おんがく|おんぷ	記号|音楽|音符|bemolle|flat|music|note|music flat sign		
-symbol	misc	♮		ナチュラル	なちゅらる	music natural sign	なちゅらる	music natural sign		
+symbol	misc	♮		ナチュラル	なちゅらる	music natural sign	なちゅらる|きごう	music natural sign		
 symbol	misc	♯		シャープ	しゃーぷ	sharp	しゃーぷ|きごう|おんがく|おんぷ	記号|音楽|音符|dièse|diesis|music|note|sharp|music sharp sign		
 symbol	misc	𝄞		ト音記号	とおんきごう	musical symbol g clef	とおんきごう	ト音記号|musical symbol g clef		
 symbol	misc	𝄢		ヘ音記号	へおんきごう	musical symbol f clef	へおんきごう	ヘ音記号|musical symbol f clef		
@@ -3254,53 +3254,53 @@ symbol	misc	☁		雲	くも	cloud	くも|てんき|くもり	雲|天気|曇り|c
 symbol	misc	☂		傘	かさ	umbrella	かさ|てんき|もちもの|あめ	傘|天気|持ち物|雨|clothing|rain|umbrella		
 symbol	misc	☃		雪だるまと雪	ゆきだるまとゆき	snowman	ゆきだるまとゆき|ゆき|ゆきだるま	雪だるまと雪|雪|雪だるま|cold|man|snow|snowman		
 symbol	misc	☄		彗星	すいせい	comet	すいせい|うちゅう	彗星|すい星|宇宙|comet|space		
-symbol	misc	☼		太陽	たいよう	white sun with rays	たいよう	太陽|white sun with rays		
-symbol	misc	☽		月	つき	first quarter moon	つき	月|first quarter moon		
-symbol	misc	☾		月	つき	last quarter moon	つき	月|last quarter moon		
-symbol	misc	♁		地球	ちきゅう	earth	ちきゅう	地球|earth		
-symbol	misc	☉		太陽	たいよう	sun	たいよう	太陽|sun		
+symbol	misc	☼		太陽		white sun with rays	たいよう	太陽|white sun with rays		
+symbol	misc	☽		月		first quarter moon	つき	月|first quarter moon		
+symbol	misc	☾		月		last quarter moon	つき	月|last quarter moon		
+symbol	misc	♁		地球		earth	ちきゅう	地球|earth		
+symbol	misc	☉		太陽		sun	たいよう	太陽|sun		
 symbol	misc	☎		固定電話	こていでんわ	telephone	こていでんわ|ぼたんしきでんわ|おやき|でんわ|くろでんわ	固定電話|ボタン式電話|親機|電話|黒電話|phone|telephone|black telephone		
 symbol	misc	☏		白電話	でんわ	white telephone	でんわ	白電話|white telephone		
-symbol	misc	✆		電話	でんわ	telephone location sign	でんわ	電話|telephone location sign		
+symbol	misc	✆		電話		telephone location sign	でんわ	電話|telephone location sign		
 symbol	misc	✉		封筒	ふうとう	envelope	めーる|ふうとう|てがみ|ゆうびん|でんしめーる	封筒|Eメール|手紙|郵便|電子メール|e-mail|email|envelope|letter		
 symbol	misc	✂		はさみ	はさみ	scissors	はさみ|かっと|きる|ぶんぐ|ぶんぼうぐ	切る|文具|文房具|cut|cutting|paper|scissors|tool|black scissors		
-symbol	misc	✄		はさみ	はさみ	white scissors	はさみ	white scissors		
+symbol	misc	✄		はさみ		white scissors	はさみ	white scissors		
 symbol	misc	✈		飛行機	ひこうき	airplane	ひこうき|じぇっとき|のりもの|りょこう|こうくうき	飛行機|ジェット機|乗り物|旅行|航空機|aeroplane|airplane|fly|flying|jet|plane|travel		
-symbol	misc	✎		鉛筆	えんぴつ	lower right pencil	えんぴつ	鉛筆|lower right pencil		
+symbol	misc	✎		鉛筆		lower right pencil	えんぴつ	鉛筆|lower right pencil		
 symbol	misc	✏		鉛筆	えんぴつ	pencil	えんぴつ|ぶんぐ|ぶんぼうぐ	鉛筆|文具|文房具|pencil		
-symbol	misc	✐		鉛筆	えんぴつ	upper right pencil	えんぴつ	鉛筆|upper right pencil		
-symbol	misc	✑		ペン	ぺん	white nib	ぺん	white nib		
+symbol	misc	✐		鉛筆		upper right pencil	えんぴつ	鉛筆|upper right pencil		
+symbol	misc	✑		ペン		white nib	ぺん	white nib		
 symbol	misc	✒		ペン先	ぺんさき	black nib	ぺんさき|まんねんひつ|ぶんぐ|ぶんぼうぐ|ぺん	ペン先|万年筆|文具|文房具|black|nib|pen|black nib		
-symbol	misc	☚		指	ゆび	black left pointing index	ゆび	指|black left pointing index		
-symbol	misc	☛		指	ゆび	black right pointing index	ゆび	指|black right pointing index		
-symbol	misc	☜		指	ゆび	white left pointing index	ゆび	指|white left pointing index		
+symbol	misc	☚		指		black left pointing index	ゆび	指|black left pointing index		
+symbol	misc	☛		指		black right pointing index	ゆび	指|black right pointing index		
+symbol	misc	☜		指		white left pointing index	ゆび	指|white left pointing index		
 symbol	misc	☝		上指差し	うえゆびさし	index pointing up	うえゆびさし|うえ|て|ゆびさし|ゆび	上指差し|上|手|指差し|finger|hand|index|point|pointing|this|up|white up pointing index		
-symbol	misc	☞		指	ゆび	white right pointing index	ゆび	指|white right pointing index		
-symbol	misc	☟		指	ゆび	white down pointing index	ゆび	指|white down pointing index		
+symbol	misc	☞		指		white right pointing index	ゆび	指|white right pointing index		
+symbol	misc	☟		指		white down pointing index	ゆび	指|white down pointing index		
 symbol	misc	✌		Vサイン		victory hand	ちょき|ぴーす|て|ゆび	Vサイン|手|指|hand|peace|v|victory|victory hand		
 symbol	misc	✍		書いている手	かいているて	writing hand	かいているて|て|てでかく|てがき	書いている手|手|手で書く|手書き|hand|write|writing|writing hand		
 symbol	misc	♂		男性のマーク	だんせいのまーく	male sign	しんぼる|だんせいのまーく|おとこ|だんせい|きごう	男性のマーク|男|男性|male|man|sign|male sign		
 symbol	misc	♀		女性のマーク	じょせいのまーく	female sign	しんぼる|じょせいのまーく|おんな|じょせい|きごう	女性のマーク|女|女性|female|sign|woman|female sign		
-symbol	misc	⚥		記号	きごう	male and female sign	きごう	記号|male and female sign		
-symbol	misc	⚢		記号	きごう	doubled female sign	きごう	記号|doubled female sign		
-symbol	misc	⚣		記号	きごう	doubled male sign	きごう	記号|doubled male sign		
-symbol	misc	⚤		記号	きごう	interlocked female and male sign	きごう	記号|interlocked female and male sign		
+symbol	misc	⚥		記号		male and female sign	きごう	記号|male and female sign		
+symbol	misc	⚢		記号		doubled female sign	きごう	記号|doubled female sign		
+symbol	misc	⚣		記号		doubled male sign	きごう	記号|doubled male sign		
+symbol	misc	⚤		記号		interlocked female and male sign	きごう	記号|interlocked female and male sign		
 symbol	misc	☯		陰陽	おんみょう	yin yang	いんやん|おんみょう|しゅうきょう|どうきょう	陰陽|宗教|道教|difficult|lives|religion|tao|taoist|total|yang|yin|yinyang|yin yang		
 symbol	misc	☮		ピースマーク	ぴーすまーく	peace symbol	ぴーすまーく|へいわ|へいわのしんぼる	平和|平和のシンボル|healing|peace|peaceful|symbol|peace symbol		
 symbol	misc	☸		法輪	ほうりん	wheel of dharma	ほうりん|ぶっきょう|しゅうきょう|てんほうりん	法輪|仏教|宗教|転法輪|Buddhist|dharma|religion|wheel|wheel of dharma		
-symbol	misc	♲		リサイクル	りさいくる	universal recycling symbol	りさいくる	universal recycling symbol		
+symbol	misc	♲		リサイクル		universal recycling symbol	りさいくる	universal recycling symbol		
 symbol	misc	♻		リサイクルマーク	りさいくるまーく	recycling symbol	りさいくるまーく|りさいくる|さいりよう|さいせい	再利用|再生|recycle|recycling|symbol|black universal recycling symbol		
-symbol	misc	⚐		旗	はた	white flag	はた	旗|white flag		
-symbol	misc	⚑		旗	はた	black flag	はた	旗|black flag		
+symbol	misc	⚐		旗		white flag	はた	旗|white flag		
+symbol	misc	⚑		旗		black flag	はた	旗|black flag		
 symbol	misc	⚠		警告	けいこく	warning	けいこく|ひょうしき|ちゅうい|きごう	警告|標識|注意|caution|warning|warning sign		
 symbol	misc	⚡		高電圧	こうでんあつ	high voltage	こうでんあつ|きけん|いなずま|かみなり|でんき|きごう	高電圧|危険|稲妻|雷|電気|danger|electric|electricity|high|lightning|nature|thunder|thunderbolt|voltage|zap|high voltage sign		
 symbol	misc	☠		ドクロと骨	どくろとほね	skull and crossbones	すかる|どくろ|どくろとほね|し|かお|ほね|がいこつ	ドクロと骨|死|顔|骨|骸骨|bone|crossbones|dead|death|face|monster|skull|skull and crossbones		
 symbol	misc	☢		放射能	ほうしゃのう	radioactive	ほうしゃのう|きけん|ほうしゃせい|ほうしゃせん|きごう	放射能|危険|放射性|放射線|radioactive|sign|radioactive sign		
 symbol	misc	☣		バイオハザード	ばいおはざーど	biohazard	ばいおはざーど|きけん|ゆうがいぶっしつ|きごう	危険|有害物質|biohazard|sign|biohazard sign		
-symbol	misc	⌘		コマンドキー	こまんど	place of interest sign	こまんどきー|こまんど|きー	place of interest sign		
+symbol	misc	⌘		コマンドキー	こまんど	place of interest sign	こまんどきー|こまんど|きー|きごう	place of interest sign		
 symbol	misc	⌥		オプションキー	おぷしょん	option key	おぷしょんきー|おぷしょん|きー	option key		
-symbol	misc	⌃		コントロールキー	こんとろーる	up arrowhead	こんとろーるきー|こんとろーる|きー	up arrowhead		
-symbol	misc	⎋		エスケープキー	えすけーぷ	broken circle with northwest arrow	えすけーぷきー|えすけーぷ|きー	broken circle with northwest arrow		
+symbol	misc	⌃		コントロールキー	こんとろーる	up arrowhead	こんとろーるきー|こんとろーる|きー|やじるし	up arrowhead		
+symbol	misc	⎋		エスケープキー	えすけーぷ	broken circle with northwest arrow	えすけーぷきー|えすけーぷ|きー|やじるし	broken circle with northwest arrow		
 symbol	misc	⏎		リターンキー	りたーん	return symbol	りたーんきー|りたーん|えんたー|きー	return symbol		
 symbol	misc	⌫		バックスペースキー	ばっくすぺーす	erase to the left	ばっくすぺーすきー|ばっくすぺーす|きー	erase to the left		
 symbol	misc	⌦		デリートキー	でりーと	erase to the right	でりーときー|でりーと|きー	erase to the right		
@@ -3317,33 +3317,33 @@ symbol	misc	⚓		錨	いかり	anchor	いかり|ふね	錨|碇|船|anchor|ship|t
 symbol	misc	⚙		歯車	はぐるま	gear	ぎあ|はぐるま|こうぐ	歯車|工具|cog|cogwheel|gear|tool		
 symbol	misc	⚖		天秤	てんびん	balance scale	はかり|ばらんす|てんびん|かがく|てんびんざ|じっけん|せいざ	天秤|化学|天秤座|実験|星座|balance|justice|Libra|scale|scales|tool|weight|zodiac		
 symbol	misc	⚗		蒸留器	じょうりゅうき	alembic	じょうりゅうき|かがく|じっけん	蒸留器|化学|実験|alembic|chemistry|tool		
-symbol	misc	⚘		花	はな	flower	はな	花|flower		
+symbol	misc	⚘		花		flower	はな	花|flower		
 symbol	misc	⚜		フルール・ド・リス	ふるーるどりす	fleur-de-lis	ふるーるどりす|えんぶれむ|ゆり|ふらんすおうけ|もんしょう	フランス王家|紋章|fleur-de-lis|knights		
 symbol	misc	⚛		原子のシンボル	げんしのしんぼる	atom symbol	げんしのしんぼる|げんそ|ぶんし|げんし|むしんろん	原子のシンボル|元素|分子|原子|無神論|atheist|atom|symbol|atom symbol		
-symbol	misc	⚝		星	ほし	outlined white star	ほし	星|outlined white star		
-symbol	misc	⚬		丸	まる	medium small white circle	まる	丸|medium small white circle		
+symbol	misc	⚝		星		outlined white star	ほし	星|outlined white star		
+symbol	misc	⚬		丸		medium small white circle	まる	丸|medium small white circle		
 symbol	misc	⚭				marriage symbol		marriage symbol		
 symbol	misc	⚮				divorce symbol		divorce symbol		
 symbol	misc	⚯				unmarried partnership symbol		unmarried partnership symbol		
-symbol	misc	☊		交点	こうてん	ascending node	こうてん	交点|ascending node		
-symbol	misc	☋		交点	こうてん	descending node	こうてん	交点|descending node		
-symbol	misc	☌		合	ごう	conjunction	あわせ|ごう	合|conjunction		
+symbol	misc	☊		交点		ascending node	こうてん	交点|ascending node		
+symbol	misc	☋		交点		descending node	こうてん	交点|descending node		
+symbol	misc	☌		合		conjunction	あわせ|ごう	合|conjunction		
 symbol	misc	☍				opposition		opposition		
-symbol	misc	♔		チェス	ちぇす	white chess king	ちぇす	white chess king		
-symbol	misc	♕		チェス	ちぇす	white chess queen	ちぇす	white chess queen		
-symbol	misc	♖		チェス	ちぇす	white chess rook	ちぇす	white chess rook		
-symbol	misc	♗		チェス	ちぇす	white chess bishop	ちぇす	white chess bishop		
-symbol	misc	♘		チェス	ちぇす	white chess knight	ちぇす	white chess knight		
-symbol	misc	♙		チェス	ちぇす	white chess pawn	ちぇす	white chess pawn		
-symbol	misc	♚		チェス	ちぇす	black chess king	ちぇす	black chess king		
-symbol	misc	♛		チェス	ちぇす	black chess queen	ちぇす	black chess queen		
-symbol	misc	♜		チェス	ちぇす	black chess rook	ちぇす	black chess rook		
-symbol	misc	♝		チェス	ちぇす	black chess bishop	ちぇす	black chess bishop		
-symbol	misc	♞		チェス	ちぇす	black chess knight	ちぇす	black chess knight		
+symbol	misc	♔		チェス		white chess king	ちぇす	white chess king		
+symbol	misc	♕		チェス		white chess queen	ちぇす	white chess queen		
+symbol	misc	♖		チェス		white chess rook	ちぇす	white chess rook		
+symbol	misc	♗		チェス		white chess bishop	ちぇす	white chess bishop		
+symbol	misc	♘		チェス		white chess knight	ちぇす	white chess knight		
+symbol	misc	♙		チェス		white chess pawn	ちぇす	white chess pawn		
+symbol	misc	♚		チェス		black chess king	ちぇす	black chess king		
+symbol	misc	♛		チェス		black chess queen	ちぇす	black chess queen		
+symbol	misc	♜		チェス		black chess rook	ちぇす	black chess rook		
+symbol	misc	♝		チェス		black chess bishop	ちぇす	black chess bishop		
+symbol	misc	♞		チェス		black chess knight	ちぇす	black chess knight		
 symbol	misc	♟		チェスの駒	ちぇすのこま	chess pawn	ちぇす|ちぇすのこま|すてごま|こま	チェスの駒|捨て駒|駒|chess|dupe|expendable|pawn|black chess pawn		
-symbol	misc	⚀		さいころ	さいころ	die face-1	さいころ	die face-1		
-symbol	misc	⚁		さいころ	さいころ	die face-2	さいころ	die face-2		
-symbol	misc	⚂		さいころ	さいころ	die face-3	さいころ	die face-3		
-symbol	misc	⚃		さいころ	さいころ	die face-4	さいころ	die face-4		
-symbol	misc	⚄		さいころ	さいころ	die face-5	さいころ	die face-5		
-symbol	misc	⚅		さいころ	さいころ	die face-6	さいころ	die face-6		
+symbol	misc	⚀		さいころ		die face-1	さいころ	die face-1		
+symbol	misc	⚁		さいころ		die face-2	さいころ	die face-2		
+symbol	misc	⚂		さいころ		die face-3	さいころ	die face-3		
+symbol	misc	⚃		さいころ		die face-4	さいころ	die face-4		
+symbol	misc	⚄		さいころ		die face-5	さいころ	die face-5		
+symbol	misc	⚅		さいころ		die face-6	さいころ	die face-6		

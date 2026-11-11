@@ -292,10 +292,16 @@ def generated_symbol_names(character, unicode_name):
         return "罫線", ["けいせん"]
     if " BLOCK" in name or name.startswith("QUADRANT ") or name in ("LIGHT SHADE", "MEDIUM SHADE", "DARK SHADE"):
         return "ブロック", ["ぶろっく"]
-    if unicodedata.normalize("NFKC", character) != character and name.startswith("SQUARE "):
+    return None, []
+
+
+def hinted_symbol_names(character, unicode_name):
+    """英語の名前に含まれる語から付ける，大まかな名前と読み(ARROW → 矢印)．
+    同じ名前が多くの記号に付くので，名前の読みには使わない(読みだけで探したときに，よく使う記号より先に出さないため)"""
+    if unicodedata.normalize("NFKC", character) != character and unicode_name.startswith("SQUARE "):
         # 組文字(㎜ ㌔)の SQUARE は四角の形ではない
         return None, []
-    words = f" {name.replace('-', ' ')} "
+    words = f" {unicode_name.replace('-', ' ')} "
     for english, label, reading in ENGLISH_HINTS:
         if f" {english} " in words:
             return label, [reading]
@@ -423,22 +429,31 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
         k = annotated_key(character, ja_names)
         unicode_name = unicode_names.get(character, "")
         generated_name, generated_readings = generated_symbol_names(character, unicode_name)
+        hinted_name, hinted_readings = (None, []) if generated_name else hinted_symbol_names(character, unicode_name)
         curated_name, curated_readings = curated.get(character, (None, []))
         if curated_name:
             generated_name, generated_readings = curated_name, []
         generated_readings = curated_readings + generated_readings
-        name_ja = ja_names.get(k) or curated_name or generated_name or ""
+        name_ja = ja_names.get(k) or curated_name or generated_name or hinted_name or ""
         name_en = en_names.get(k) or unicode_name.lower()
         inner = inner_text(character)
         japanese = [name_ja] + ja_keywords.get(k, []) + ([inner] if inner else [])
         readings, keywords = split_japanese(japanese)
         for word in keywords:
             readings += reading_of(word)
-        readings += generated_readings
+        readings += generated_readings + hinted_readings
         if not name_ja and inner:
             name_ja = inner
         # 名前の読み．CLDR の名前があればその読み，無ければ names.txt か Unicode の名前の形から作った読みの先頭
-        reading = name_reading(name_ja, transcriptions) if ja_names.get(k) else (generated_readings[:1] or [name_reading(name_ja, transcriptions)])[0]
+        # 英語の名前から推した大まかな名前(hinted_name)には付けない
+        if ja_names.get(k):
+            reading = name_reading(name_ja, transcriptions)
+        elif generated_readings:
+            reading = generated_readings[0]
+        elif name_ja == hinted_name:
+            reading = ""
+        else:
+            reading = name_reading(name_ja, transcriptions)
         english_words = en_keywords.get(k, []) + ([unicode_name.lower()] if unicode_name else [])
         lines.append(["symbol", category, character, "", name_ja, reading, name_en, clean(readings), clean(keywords + english_words), "", ""])
 
