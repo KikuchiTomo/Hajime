@@ -38,6 +38,8 @@ pub mod settings {
     pub const SLASH: &str = "/ キーで入力する文字";
     pub const SPACE_WIDTH: &str = "スペース幅";
     pub const NUMBER_WIDTH: &str = "数字幅";
+    pub const NUMBER_SEPARATORS: &str = "数字のあとの句読点をピリオドとカンマに";
+    pub const ALPHANUMERIC_HYPHEN: &str = "英数字のあとの長音をハイフンに";
     pub const KEYS: &str = "動作";
     pub const PUNCTUATION_COMMITS: &str = "句読点で確定";
     pub const NUMBER_KEY_SELECTION: &str = "番号キーで候補を選択";
@@ -614,6 +616,8 @@ pub mod sync {
         ("numberWidth", "数字幅"),
         ("alphabetWidth", "英字幅"),
         ("shiftStartsAlphabet", "Shift で英字入力"),
+        ("numberSeparators", "数字のあとの句読点をピリオドとカンマに"),
+        ("alphanumericHyphen", "英数字のあとの長音をハイフンに"),
         ("punctuationCommits", "句読点で確定"),
         ("keypadDirect", "テンキーの数字を半角で確定"),
         ("typoCorrection", "タイプミスの修正"),

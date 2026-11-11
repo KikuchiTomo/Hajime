@@ -436,6 +436,8 @@ enum UIStrings {
         static let slash = "/ キーで入力する文字"
         static let spaceWidth = "スペース幅"
         static let numberWidth = "数字幅"
+        static let numberSeparators = "数字のあとの句読点をピリオドとカンマに"
+        static let alphanumericHyphen = "英数字のあとの長音をハイフンに"
         static let keys = "動作"
         static let punctuationCommits = "句読点で確定"
         static let numberKeySelection = "番号キーで候補を選択"
@@ -997,7 +999,9 @@ extension UIStrings {
             "englishInputLiveConversion": Choice.englishInputLiveConversion, "wordLanguage": Features.languagePage, "yenKey": Choice.yenKey,
             "punctuation": UIStrings.Settings.punctuation, "brackets": UIStrings.Settings.brackets, "slash": UIStrings.Settings.slash,
             "spaceWidth": UIStrings.Settings.spaceWidth, "numberWidth": UIStrings.Settings.numberWidth,
-            "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet, "punctuationCommits": UIStrings.Settings.punctuationCommits,
+            "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet,
+            "numberSeparators": UIStrings.Settings.numberSeparators, "alphanumericHyphen": UIStrings.Settings.alphanumericHyphen,
+            "punctuationCommits": UIStrings.Settings.punctuationCommits,
             "keypadDirect": Features.keypadDirect,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
