@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "maximumMessageBytes": 262144,
   "timing": {
     "keyResponseMilliseconds": 50,
@@ -1589,6 +1589,20 @@
       ]
     },
     {
+      "name": "HomophoneSense",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "meaning",
+          "type": "string"
+        },
+        {
+          "name": "example",
+          "type": "string?"
+        }
+      ]
+    },
+    {
       "name": "HomophoneNote",
       "kind": "struct",
       "fields": [
@@ -1597,12 +1611,8 @@
           "type": "string"
         },
         {
-          "name": "meaning",
-          "type": "string"
-        },
-        {
-          "name": "example",
-          "type": "string?"
+          "name": "senses",
+          "type": "[HomophoneSense]"
         },
         {
           "name": "others",

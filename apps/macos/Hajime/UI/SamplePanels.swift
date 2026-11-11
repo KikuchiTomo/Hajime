@@ -24,8 +24,13 @@ enum SamplePanels {
                               position: selected + 1, total: entries.count, note: note)
     }
 
-    /// 同音異義語の使い分け(R-08)
-    static let homophone = HomophoneNote(word: "撮る", meaning: "撮影する", example: "写真を撮る", others: ["取る", "採る", "執る", "捕る"])
+    /// 同音異義語の使い分け(R-08)．意味が 2 つあるもの
+    static let homophone = HomophoneNote(
+        word: "撮る", senses: [.init(meaning: "写真や動画を写す", example: "写真を撮る"), .init(meaning: "映画などを撮影する", example: "映画を撮る")],
+        others: ["取る", "採る", "執る", "捕る"])
+
+    /// 同音異義語の無い語の意味(R-08)．ほかの語の行を出さない
+    static let meaning = HomophoneNote(word: "動く", meaning: "位置や状態が変わる", example: "車が動く", others: [])
 
     static let lattice = LatticePanel(columns: [
         .init(text: "私の", isFocused: false, isUncertain: false),

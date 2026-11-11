@@ -101,11 +101,15 @@ fn render_all(output: &Path) -> Result<()> {
         let font_size = tokens::size::candidate::FONT_SIZE;
         let measure = renderer.measure(&theme, font_size)?;
         let look = Look::new(&theme, font_size);
-        let scenes: [(&str, Scene); 9] = [
+        let scenes: [(&str, Scene); 10] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "homophone-list",
                 scene::candidate_list(&homophone_list(), &look, &measure),
+            ),
+            (
+                "meaning-list",
+                scene::candidate_list(&meaning_list(), &look, &measure),
             ),
             (
                 "command-list",
@@ -268,9 +272,37 @@ fn homophone_list() -> CandidateList {
         total: 6,
         homophone: Some(ipc::HomophoneNote {
             word: "撮る".into(),
-            meaning: "撮影する".into(),
-            example: Some("写真を撮る".into()),
+            senses: vec![
+                ipc::HomophoneSense {
+                    meaning: "写真や動画を写す".into(),
+                    example: Some("写真を撮る".into()),
+                },
+                ipc::HomophoneSense {
+                    meaning: "映画などを撮影する".into(),
+                    example: Some("映画を撮る".into()),
+                },
+            ],
             others: strings(&["取る", "採る", "執る", "捕る"]),
+        }),
+        ..list()
+    }
+}
+
+/// 同音異義語の無い語の意味(R-08)を一覧で出したところ(macOS の meaningListView)．ほかの語の行を出さない
+fn meaning_list() -> CandidateList {
+    CandidateList {
+        variants: vec![],
+        entries: entries(&["動く", "うごく", "ウゴク"]),
+        selected_entry: Some(0),
+        position: 1,
+        total: 3,
+        homophone: Some(ipc::HomophoneNote {
+            word: "動く".into(),
+            senses: vec![ipc::HomophoneSense {
+                meaning: "位置や状態が変わる".into(),
+                example: Some("車が動く".into()),
+            }],
+            others: vec![],
         }),
         ..list()
     }

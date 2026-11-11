@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 pub const MAXIMUM_MESSAGE_BYTES: usize = 262144;
 
 /// 待つ時間と，返事の遅れを許す数(schema.json の timing)
@@ -1380,11 +1380,25 @@ impl fmt::Debug for AssociationHeading {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct HomophoneNote {
-    pub word: String,
+pub struct HomophoneSense {
     pub meaning: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub example: Option<String>,
+}
+
+impl fmt::Debug for HomophoneSense {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HomophoneSense")
+            .field("meaning", &REDACTED)
+            .field("example", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct HomophoneNote {
+    pub word: String,
+    pub senses: Vec<HomophoneSense>,
     pub others: Vec<String>,
 }
 
@@ -1392,8 +1406,7 @@ impl fmt::Debug for HomophoneNote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HomophoneNote")
             .field("word", &REDACTED)
-            .field("meaning", &REDACTED)
-            .field("example", &REDACTED)
+            .field("senses", &self.senses)
             .field("others", &REDACTED)
             .finish()
     }

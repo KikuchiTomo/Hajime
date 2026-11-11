@@ -1,6 +1,7 @@
-/// 同音異義語の使い分けの辞書(R-08)．japanese-usage-dictionary(data/usage/usage_dict.txt)の行を読む．
+/// 語の意味と同音異義語の使い分けの辞書(R-08)．japanese-usage-dictionary(data/usage/usage_dict.txt)の行を読む．
 ///
 /// 行は「読み<タブ>語<タブ>活用<タブ>説明」．説明の中の意味の区切りは「\n」の 2 文字で書かれている．
+/// 同じ読みの語が 1 つだけの行(同音異義語の無い語)は，意味だけを示す．
 /// 活用した形(「撮った」)にも当てはまるよう，語の漢字の部分(「撮」)と，送り仮名を除いた読み(「と」)で引く(UsageGuide.Homophone)
 public struct UsageDictionary: Sendable, Equatable {
     struct Entry: Sendable, Equatable {
@@ -8,6 +9,8 @@ public struct UsageDictionary: Sendable, Equatable {
         var reading: String
         /// 辞書の読み(同じ読みの語の組の見出し)
         var groupReading: String
+        /// 活用の型(「五段・カ行イ音便」．活用しない語は「*」)
+        var conjugation: String
         var homophone: UsageGuide.Homophone
     }
 
@@ -21,38 +24,65 @@ public struct UsageDictionary: Sendable, Equatable {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard fields.count >= 4, !fields[0].isEmpty, !fields[1].isEmpty else { continue }
             let reading = String(fields[0])
-            let meaning = Self.firstMeaning(of: fields[3])
-            let homophone = UsageGuide.Homophone(word: String(fields[1]), meaning: meaning.meaning, example: meaning.example)
+            let homophone = UsageGuide.Homophone(word: String(fields[1]), senses: Self.senses(of: fields[3]))
             // 送り仮名の分だけ読みの後ろを除く(「撮る」「とる」→「と」)．語より読みが短い(当て字など)ときは読みのまま
             let okurigana = homophone.word.count - homophone.stem.count
             let stemReading = reading.count > okurigana ? String(reading.dropLast(okurigana)) : reading
             groups[reading, default: []].append(homophone)
             guard let initial = stemReading.first else { continue }
-            entriesByInitial[initial, default: []].append(Entry(reading: stemReading, groupReading: reading, homophone: homophone))
+            entriesByInitial[initial, default: []].append(
+                Entry(reading: stemReading, groupReading: reading, conjugation: String(fields[2]), homophone: homophone))
         }
     }
 
     public var isEmpty: Bool { groups.isEmpty }
 
-    /// 文節の候補 text(読み reading)に当てはまる語の使い分け．同じ読みの語が 1 つだけなら出さない．
-    /// 候補が語の漢字の部分で始まり，その後ろ(送り仮名や助詞)が読みの後ろと同じときだけ当てはめる
-    /// (「撮った」「とった」は「撮る」に当て，「足跡」「あしあと」は「足」に当てない)
+    /// 文節の候補 text(読み reading)に当てはまる語の意味と使い分け．同じ読みのほかの語が無ければ others は空．
+    /// 候補が語の漢字の部分で始まり，その後ろ(送り仮名や助詞)が読みの後ろと同じで，語の活用した形として合うときだけ当てはめる
+    /// (「撮った」「とった」は「撮る」に当て，「足跡」「あしあと」は「足」に当てない)．
+    /// 漢字の部分が同じ語がいくつか当てはまるときは，送り仮名が長く合う語にする(「動かした」は「動かす」，「動かない」は「動く」)
     public func note(for text: String, reading: String) -> HomophoneNote? {
         guard let initial = reading.first, let entries = entriesByInitial[initial] else { return nil }
-        let hit = entries.first { entry in
-            text.hasPrefix(entry.homophone.stem) && reading.hasPrefix(entry.reading)
-                && text.dropFirst(entry.homophone.stem.count) == reading.dropFirst(entry.reading.count)
+        var best: (entry: Entry, match: Int)?
+        for entry in entries where text.hasPrefix(entry.homophone.stem) && reading.hasPrefix(entry.reading) {
+            let rest = text.dropFirst(entry.homophone.stem.count)
+            guard rest == reading.dropFirst(entry.reading.count), let match = Self.okuriganaMatch(entry, rest: rest) else { continue }
+            // 同じ長さなら先の行
+            if match > best?.match ?? -1 { best = (entry, match) }
         }
-        guard let hit, let group = groups[hit.groupReading] else { return nil }
+        guard let hit = best?.entry, let group = groups[hit.groupReading] else { return nil }
         let others = group.filter { $0.word != hit.homophone.word }.map(\.word)
-        guard !others.isEmpty else { return nil }
-        return HomophoneNote(word: hit.homophone.word, meaning: hit.homophone.meaning, example: hit.homophone.example, others: others)
+        return HomophoneNote(word: hit.homophone.word, senses: hit.homophone.senses, others: others)
     }
 
-    /// 説明の最初の意味と，その使い方の例．説明の頭の注記(「〈「取る」とも〉」)と番号(「1. 」)を除き，
-    /// 意味のあとのかぎ括弧(「写真を撮る」)を例として分ける．意味の終わりの句点は除く．「※」で始まる補足の行は飛ばす
-    static func firstMeaning(of description: Substring) -> (meaning: String, example: String?) {
-        for line in description.components(separatedBy: "\\n") {
+    /// 候補の漢字の部分の後ろ(rest)が語の形として合うとき，送り仮名の合う長さ．合わなければ nil．
+    /// 活用しない語は送り仮名がすべて rest の頭にあるときに合う．活用する語は送り仮名の最後の字を除いた部分(「動かす」の「か」)が
+    /// rest の頭にあるときに合い，五段の動詞なら次の字が最後の字と同じ行(「動く」なら「か」「き」…)か音便(い・っ・ん)のときだけにする
+    private static func okuriganaMatch(_ entry: Entry, rest: Substring) -> Int? {
+        let okurigana = entry.homophone.word.dropFirst(entry.homophone.stem.count)
+        guard let last = okurigana.last else { return 0 }
+        guard entry.conjugation != "*" else { return rest.hasPrefix(okurigana) ? okurigana.count : nil }
+        let fixed = okurigana.dropLast()
+        guard rest.hasPrefix(fixed) else { return nil }
+        if entry.conjugation.hasPrefix("五段"), let next = rest.dropFirst(fixed.count).first, let row = godanRows[last],
+           !row.contains(next), !"いっん".contains(next) {
+            return nil
+        }
+        return fixed.count
+    }
+
+    /// 五段の動詞の終わりの字ごとの，活用で続く字の行(「う」はワ行で活用する．「会わない」)
+    private static let godanRows: [Character: String] = [
+        "う": "わいうえお", "く": "かきくけこ", "ぐ": "がぎぐげご", "す": "さしすせそ", "つ": "たちつてと",
+        "ぬ": "なにぬねの", "ぶ": "ばびぶべぼ", "む": "まみむめも", "る": "らりるれろ",
+    ]
+
+    /// 説明の意味と，それぞれの使い方の例．辞書の順に DefaultSettings.maximumUsageSenses まで．
+    /// 説明の頭の注記(「〈「取る」とも〉」)と番号(「1. 」)を除き，意味のあとのかぎ括弧(「写真を撮る」)を例として分ける．
+    /// 意味の終わりの句点は除く．「※」で始まる補足の行は飛ばす．意味が 1 つも取れなければ説明をそのまま意味にする
+    static func senses(of description: Substring) -> [HomophoneNote.Sense] {
+        var senses: [HomophoneNote.Sense] = []
+        for line in description.components(separatedBy: "\\n") where senses.count < DefaultSettings.maximumUsageSenses {
             var text = Substring(line)
             if text.hasPrefix("〈"), let end = text.firstIndex(of: "〉") { text = text[text.index(after: end)...] }
             let digits = text.prefix { $0.isASCII && $0.isNumber }
@@ -68,9 +98,9 @@ public struct UsageDictionary: Sendable, Equatable {
             }
             while meaning.last == "。" || meaning.last == " " { meaning = meaning.dropLast() }
             guard !meaning.isEmpty else { continue }
-            return (String(meaning), example)
+            senses.append(HomophoneNote.Sense(meaning: String(meaning), example: example))
         }
-        return (String(description), nil)
+        return senses.isEmpty ? [HomophoneNote.Sense(meaning: String(description))] : senses
     }
 
     /// text の頭の「に対応する」の位置．中に入れ子のかぎ括弧があっても数えて合わせる

@@ -213,11 +213,9 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         metrics.inset + heading_height(map, metrics) + upper_rows as f32 * metrics.row_height;
     let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
         + usize::from(map.note.is_some());
-    let homophone_height = if column.is_some_and(|column| column.homophone.is_some()) {
-        super::homophone::height()
-    } else {
-        0.0
-    };
+    let homophone_height = column
+        .and_then(|column| column.homophone.as_ref())
+        .map_or(0.0, super::homophone::height);
     let height = trunk_y
         + metrics.row_height * (1 + lower_rows) as f32
         + candidate::FRAME_WIDTH
@@ -389,10 +387,10 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             metrics.inset,
             footer_y,
             content_width,
-            super::homophone::height(),
+            super::homophone::height(note),
         );
         super::homophone::draw(&mut painter, note, area);
-        footer_y += super::homophone::height();
+        footer_y += super::homophone::height(note);
     }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
         let row = Frame::new(

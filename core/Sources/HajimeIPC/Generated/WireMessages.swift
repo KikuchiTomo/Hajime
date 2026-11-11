@@ -1,5 +1,5 @@
 public enum WireProtocol {
-    public static let version: UInt32 = 2
+    public static let version: UInt32 = 3
     public static let maximumMessageBytes = 262144
     public static let keyResponseMilliseconds = 50
     public static let conversionResponseMilliseconds = 250
@@ -1547,16 +1547,29 @@ extension WireAssociationHeading: CustomStringConvertible, CustomDebugStringConv
     public var debugDescription: String { description }
 }
 
-public struct WireHomophoneNote: Sendable, Equatable, Codable {
-    public var word: String
+public struct WireHomophoneSense: Sendable, Equatable, Codable {
     public var meaning: String
     public var example: String?
-    public var others: [String]
 
-    public init(word: String, meaning: String, example: String? = nil, others: [String]) {
-        self.word = word
+    public init(meaning: String, example: String? = nil) {
         self.meaning = meaning
         self.example = example
+    }
+}
+
+extension WireHomophoneSense: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireHomophoneSense" }
+    public var debugDescription: String { description }
+}
+
+public struct WireHomophoneNote: Sendable, Equatable, Codable {
+    public var word: String
+    public var senses: [WireHomophoneSense]
+    public var others: [String]
+
+    public init(word: String, senses: [WireHomophoneSense], others: [String]) {
+        self.word = word
+        self.senses = senses
         self.others = others
     }
 }

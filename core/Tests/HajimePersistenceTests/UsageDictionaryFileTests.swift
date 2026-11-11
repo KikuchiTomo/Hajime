@@ -3,7 +3,7 @@ import HajimeDomain
 import HajimePersistence
 import Testing
 
-@Suite("同梱の同音異義語の使い分けの辞書")
+@Suite("同梱の語の意味と同音異義語の使い分けの辞書")
 @MainActor
 struct UsageDictionaryFileTests {
     @Test("同梱する辞書を読み，活用した形と名詞の語に使い分けを示す")
@@ -14,8 +14,12 @@ struct UsageDictionaryFileTests {
         let dictionary = try #require(UsageDictionaryFile(url: url).usageDictionary)
         #expect(dictionary.note(for: "撮った", reading: "とった")?.word == "撮る")
         // 説明の頭の注記(〈「取る」とも〉)は意味にしない
-        #expect(dictionary.note(for: "採る", reading: "とる")?.meaning == "(人を)採用する")
-        #expect(dictionary.note(for: "採る", reading: "とる")?.example == "新人を採る")
+        #expect(dictionary.note(for: "採る", reading: "とる")?.senses.first?.meaning == "(人を)採用する")
+        #expect(dictionary.note(for: "採る", reading: "とる")?.senses.first?.example == "新人を採る")
+        // 同じ読みの語が無い語(並ぶ)には，意味だけを辞書の順に示す
+        let line = try #require(dictionary.note(for: "並んだ", reading: "ならんだ"))
+        #expect(line.others.isEmpty)
+        #expect(line.senses.map(\.meaning) == ["列をつくる", "同等になる"])
         #expect(dictionary.note(for: "会う", reading: "あう")?.others.isEmpty == false)
         #expect(dictionary.note(for: "精算", reading: "せいさん")?.word == "精算")
     }
