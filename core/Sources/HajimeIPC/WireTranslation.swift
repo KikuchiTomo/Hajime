@@ -162,7 +162,9 @@ extension WireTextStyle {
 }
 
 extension WireCandidateList {
-    public init(_ panel: CandidatePanel) {
+    /// hints は足元のキーの案内(FooterHints)．キーの名前は OS の書き方なのでエンジンの側で作って渡す．
+    /// 案内が無ければ送らない(案内を知らない前の版の候補ウィンドウとも話せるよう，省ける項目にしてある)
+    public init(_ panel: CandidatePanel, hints: [WireKeyHint] = []) {
         self.init(
             variants: panel.variants.map { WireCandidateVariant(label: $0.label, isAvailable: $0.isAvailable) },
             selectedVariant: panel.selectedVariant.map(UInt32.init(clamping:)),
@@ -184,6 +186,7 @@ extension WireCandidateList {
             position: UInt32(clamping: panel.position),
             total: UInt32(clamping: panel.total),
             note: panel.note.map(WireNote.init),
+            hints: hints.isEmpty ? nil : hints,
             association: panel.association.map(WireAssociationHeading.init),
             associationHint: panel.associationHint?.label,
             associationKey: panel.associationHint?.key,
@@ -306,9 +309,9 @@ public struct RoutedActions: Sendable, Equatable {
         self.host = host
     }
 
-    /// paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
+    /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
     public init(_ actions: [ClientAction], anchor: WireRect?, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
-                paletteCellSize: Double = DefaultSettings.paletteCellSize) {
+                listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, paletteCellSize: Double = DefaultSettings.paletteCellSize) {
         for action in actions {
             switch action {
             case .commit(let text):
@@ -320,7 +323,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .selectMode(let mode):
                 edits.append(.selectMode(mode: WireInputMode(mode)))
             case .showCandidates(let panel):
-                ui.append(.showCandidates(list: WireCandidateList(panel), anchor: anchor))
+                ui.append(.showCandidates(list: WireCandidateList(panel, hints: listHints(panel)), anchor: anchor))
             case .showLattice(let panel):
                 ui.append(.showBranchMap(map: WireBranchMap(panel, hints: hints(panel)), anchor: anchor))
             case .hideCandidates:

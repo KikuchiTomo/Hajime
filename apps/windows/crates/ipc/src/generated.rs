@@ -1463,6 +1463,8 @@ pub struct CandidateList {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<Note>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hints: Option<Vec<KeyHint>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub association: Option<AssociationHeading>,
     #[serde(rename = "associationHint")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1491,6 +1493,7 @@ impl fmt::Debug for CandidateList {
             .field("position", &self.position)
             .field("total", &self.total)
             .field("note", &self.note)
+            .field("hints", &self.hints)
             .field("association", &self.association)
             .field("associationHint", &REDACTED)
             .field("associationKey", &REDACTED)

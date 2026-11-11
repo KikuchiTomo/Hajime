@@ -1696,6 +1696,10 @@
           "type": "Note?"
         },
         {
+          "name": "hints",
+          "type": "[KeyHint]?"
+        },
+        {
           "name": "association",
           "type": "AssociationHeading?"
         },

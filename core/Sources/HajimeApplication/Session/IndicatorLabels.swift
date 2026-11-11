@@ -1,6 +1,6 @@
 import HajimeDomain
 
-/// モードの札と足元の案内の文言．macOS の候補ウィンドウと Windows のエンジン(BranchHints)が同じ表を使う
+/// モードの札と足元の案内の文言．macOS の候補ウィンドウと Windows のエンジン(FooterHints)が同じ表を使う
 public enum IndicatorLabels {
     /// 日本語入力と英数のモードの札
     public static func label(for mode: InputMode) -> String {
@@ -71,6 +71,25 @@ public enum IndicatorLabels {
         // 変換中の Esc を直前の変更の取り消しにした表では，そのキーで戻る
         Hint(.cancel, "戻る", fallback: .undoConversionEdit),
     ]
+
+    /// 一覧で候補を選んでいるときの足元の案内．先頭から前の候補へ進むと文字種の行に移る(R-03)
+    public static let candidateHints: [Hint] = [
+        Hint(.previousCandidate, "文字種"),
+    ]
+
+    /// 一覧で文字種の行を選んでいるときの足元の案内．左右で字種を選び，次の候補で候補に戻る
+    public static let variantHints: [Hint] = [
+        Hint(.previousSegment, .nextSegment, "選択"),
+        Hint(.nextCandidate, "候補"),
+    ]
+
+    /// 一覧の足元の案内．連想の一覧は連想の案内，文字種の行にいれば字種を選ぶ案内，候補にいれば文字種の行へ移る案内．
+    /// 文字種の行が無い一覧(文字種の行を出さない設定，入力中の候補の窓)では，文字種の案内を出さない
+    public static func listHints(for panel: CandidatePanel) -> [Hint] {
+        if panel.association != nil { return associationHints }
+        if panel.focus == .variants { return variantHints }
+        return panel.variants.isEmpty ? [] : candidateHints
+    }
 
     /// 文節を区切っているときの案内(数字で区切る位置を選び，Esc でやめる)．count は区切れる位置の数
     public static func splitHints(count: Int) -> [(key: String, label: String)] {

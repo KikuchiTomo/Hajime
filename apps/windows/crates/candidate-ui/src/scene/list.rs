@@ -68,18 +68,14 @@ fn footer(list: &CandidateList) -> Footer {
     if list.focus == CandidateFocus::Variants {
         let index = list.selected_variant.map_or(1, |index| index + 1);
         return Footer {
-            hints: strings::variants_hints(),
+            hints: list.hints.clone().unwrap_or_default(),
             note: list.note.clone(),
             position: strings::variants_position(index, list.variants.len() as u32),
             association_hint: None,
         };
     }
-    // 文字種の行が無い一覧(連想の一覧や，文字種の行を出さない設定)では，文字種の案内を出さない
-    let mut hints = if list.association.is_some() || list.variants.is_empty() {
-        Vec::new()
-    } else {
-        strings::candidates_hints()
-    };
+    // キーの案内はエンジンが，キー設定の表と「キーの案内を表示」の設定に従って作る(FooterHints)
+    let mut hints = list.hints.clone().unwrap_or_default();
     let mut association_hint = None;
     if let Some(label) = &list.association_hint {
         match &list.association_key {
@@ -522,6 +518,14 @@ mod tests {
             total: 30,
             note: None,
             meaning_placement: None,
+            hints: Some(vec![hint("↑", "文字種")]),
+        }
+    }
+
+    fn hint(keys: &str, label: &str) -> KeyHint {
+        KeyHint {
+            keys: keys.into(),
+            label: label.into(),
         }
     }
 
@@ -689,6 +693,8 @@ mod tests {
             let mut browsing = list(None);
             browsing.shows_numbers = Some(false);
             browsing.variants.clear();
+            // 文字種の行が無い一覧には，エンジンが文字種の案内を送らない(FooterHints)
+            browsing.hints = None;
             let scene = candidate_list(&browsing, &look, &Fixed);
             let texts = texts_of(&scene);
             assert!(texts.contains(&"変換".to_string()));
@@ -878,6 +884,7 @@ mod tests {
         let mut variants = list(None);
         variants.focus = CandidateFocus::Variants;
         variants.selected_variant = Some(0);
+        variants.hints = Some(vec![hint("←→", "選択"), hint("Space", "候補")]);
         let scene = candidate_list(&variants, &Look::new(&theme, 15.0), &Fixed);
         let texts = texts(&scene);
         assert!(texts.contains(&("文字種 1 / 1".into(), theme.text_muted)));
