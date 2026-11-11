@@ -346,6 +346,9 @@ public final class EngineService {
         case .resetUsage:
             services.usage?.reset()
             return usage
+        case .resetPaletteHistory:
+            services.resetPaletteHistory()
+            return .done
         case .previewLanguage(let text, let precedingText):
             let words = services.previewLanguage(text, precedingText)
             return .languagePreview(words: words.map { WirePreviewWord(typed: $0.typed, shown: $0.shown, language: $0.language.rawValue) })

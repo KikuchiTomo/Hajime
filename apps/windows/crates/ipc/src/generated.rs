@@ -838,6 +838,7 @@ pub enum RequestBody {
     ResetLearning,
     ReadUsage,
     ResetUsage,
+    ResetPaletteHistory,
     PreviewLanguage {
         text: String,
         #[serde(rename = "precedingText")]
@@ -1048,6 +1049,7 @@ impl fmt::Debug for RequestBody {
             Self::ResetLearning => f.write_str("ResetLearning"),
             Self::ReadUsage => f.write_str("ReadUsage"),
             Self::ResetUsage => f.write_str("ResetUsage"),
+            Self::ResetPaletteHistory => f.write_str("ResetPaletteHistory"),
             Self::PreviewLanguage { .. } => f
                 .debug_struct("PreviewLanguage")
                 .field("text", &REDACTED)

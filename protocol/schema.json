@@ -1183,6 +1183,9 @@
           "name": "resetUsage"
         },
         {
+          "name": "resetPaletteHistory"
+        },
+        {
           "name": "previewLanguage",
           "fields": [
             {

@@ -197,12 +197,26 @@ func run() -> Int32 {
                                       lexicon: lexicon, settings: settings)
     // 戻した補正を設定の「直さない語句」に覚える(macOS の CompositionRoot と同じ)
     let rejections = SettingsCorrectionRejections(settings: settings)
+    // 絵文字と記号のパレット(R-26)．描くのは Windows の候補ウィンドウだけ(Linux のアドオンはパレットを描かないので渡さない)．
+    // エンジンのプロセスは書体を確かめられないので，Windows のビルド番号から描ける絵文字のバージョンを決める
+    #if os(Windows)
+    let paletteCatalog = PaletteCatalogFile(
+        url: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledPaletteFileName),
+        maximumVersion: .supportedOnWindows(build: ProcessInfo.processInfo.operatingSystemVersion.patchVersion))
+    if settings.current.palette { paletteCatalog.preload() }
+    let paletteUsage = FilePaletteUsageStore(fileURL: HostPaths.local.appendingPathComponent(DefaultSettings.paletteUsageFileName))
+    let palette: PaletteServices? = PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: { Date() })
+    let resetPaletteHistory: () -> Void = { paletteUsage.update { $0.clearHistory() } }
+    #else
+    let palette: PaletteServices? = nil
+    let resetPaletteHistory: () -> Void = {}
+    #endif
     let service = EngineService(
         makeSession: {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                           lexicon: lexicon, englishTerms: englishTerms),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                         keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary)
+                         keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary, palette: palette)
         },
         settings: settings,
         ui: sendToWindow,
@@ -220,6 +234,7 @@ func run() -> Int32 {
         services: SettingsServices(
             resetLearning: { [engine] in engine.resetLearning() },
             usage: usage,
+            resetPaletteHistory: resetPaletteHistory,
             previewLanguage: { preview.preview($0, precedingText: $1) }
         ),
         runCommand: { command in

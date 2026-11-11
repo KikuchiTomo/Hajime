@@ -870,6 +870,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case resetLearning
     case readUsage
     case resetUsage
+    case resetPaletteHistory
     case previewLanguage(text: String, precedingText: String?)
     case readUserDictionary(offset: UInt32, limit: UInt32)
     case addUserDictionaryEntry(entry: WireDictionaryEntry)
@@ -978,6 +979,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = .readUsage
         case "resetUsage":
             self = .resetUsage
+        case "resetPaletteHistory":
+            self = .resetPaletteHistory
         case "previewLanguage":
             self = try .previewLanguage(text: container.decode(String.self, forKey: .text), precedingText: container.decodeIfPresent(String.self, forKey: .precedingText))
         case "readUserDictionary":
@@ -1151,6 +1154,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("readUsage", forKey: .type)
         case .resetUsage:
             try container.encode("resetUsage", forKey: .type)
+        case .resetPaletteHistory:
+            try container.encode("resetPaletteHistory", forKey: .type)
         case .previewLanguage(let text, let precedingText):
             try container.encode("previewLanguage", forKey: .type)
             try container.encode(text, forKey: .text)
@@ -1222,6 +1227,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .resetLearning: "WireRequestBody.resetLearning"
         case .readUsage: "WireRequestBody.readUsage"
         case .resetUsage: "WireRequestBody.resetUsage"
+        case .resetPaletteHistory: "WireRequestBody.resetPaletteHistory"
         case .previewLanguage: "WireRequestBody.previewLanguage"
         case .readUserDictionary: "WireRequestBody.readUserDictionary"
         case .addUserDictionaryEntry: "WireRequestBody.addUserDictionaryEntry"
