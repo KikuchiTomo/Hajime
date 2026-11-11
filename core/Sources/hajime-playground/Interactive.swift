@@ -58,7 +58,7 @@ enum Interactive {
             }
             // 後ろの文節へ移りながら，文節ごとの候補を出す(あとから求める候補も求めてから出す)
             var shown = Set<Int>()
-            for _ in 0..<reading(line).count {
+            for _ in 0..<line.count {
                 var grid: LatticePanel?
                 for action in lattice.handle(KeyEvent(.right), context: InputContext()).actions {
                     if case .showLattice(let value) = action { grid = value }
@@ -72,9 +72,6 @@ enum Interactive {
             }
         }
     }
-
-    /// 打ったローマ字の行の長さの目安(文節の数より多ければよい)
-    private static func reading(_ line: String) -> String { line }
 
     private static func markedText(in result: KeyResult) -> MarkedText? {
         result.actions.compactMap { action -> MarkedText? in

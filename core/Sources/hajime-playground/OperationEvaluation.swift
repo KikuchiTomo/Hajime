@@ -23,6 +23,8 @@ enum OperationEvaluation {
     static let maximumOperations = 60
 
     static func run(cases: [EvaluationCase], engine: AzooKeyConverterEngine, presentations: [CandidatePresentation]) {
+        // 単語の一覧の読み込みは重いので，文ごとに作らず使い回す
+        let lexicon = WordListLexicon()
         for presentation in presentations {
             print("== 候補の出し方: \(presentation.rawValue)")
             var counts: [Int?] = []
@@ -31,7 +33,7 @@ enum OperationEvaluation {
                     print("-  \(item.reading)  打てない文字を含むので飛ばす")
                     continue
                 }
-                let driver = Driver(engine: engine, presentation: presentation, leftContext: item.leftContext)
+                let driver = Driver(engine: engine, lexicon: lexicon, presentation: presentation, leftContext: item.leftContext)
                 for key in keys { driver.press(key) }
                 // ライブ変換を切って打つので，組み立て中の文字がそのまま読み
                 guard driver.text == item.reading else {
@@ -172,7 +174,7 @@ enum OperationEvaluation {
         private var context: InputContext
         private(set) var marked = MarkedText.empty
 
-        init(engine: AzooKeyConverterEngine, presentation: CandidatePresentation, leftContext: String?) {
+        init(engine: AzooKeyConverterEngine, lexicon: WordListLexicon, presentation: CandidatePresentation, leftContext: String?) {
             var settings = DefaultSettings.settings
             settings.candidatePresentation = presentation
             // 打つたびに変換すると遅いので，ライブ変換を切って打つ．Space の変換は読み全体から求めるので結果は変わらない
@@ -182,7 +184,7 @@ enum OperationEvaluation {
             let terms = EnglishTerms(bundled: EnglishTermFile(url: EnglishTermCheck.bundledURL), settings: store)
             let converter = SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: engine,
                                                   englishTerms: terms)
-            session = InputSession(converter: converter, lexicon: WordListLexicon(), settings: store)
+            session = InputSession(converter: converter, lexicon: lexicon, settings: store)
             context = InputContext(precedingText: leftContext)
         }
 
