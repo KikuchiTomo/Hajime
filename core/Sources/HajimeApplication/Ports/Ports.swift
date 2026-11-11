@@ -127,6 +127,12 @@ public protocol EnglishLexicon: AnyObject {
     func isWord(_ text: String) -> Bool
     /// 綴りを誤った単語に近い単語を，よさそうな順に返す
     func suggestions(for text: String) -> [String]
+    /// 小文字で打った単語の決まった書き方(「openai」→ OpenAI．R-24)．決まっていなければ nil(打ったとおりにする)
+    func spelling(of word: String) -> String?
+}
+
+extension EnglishLexicon {
+    public func spelling(of word: String) -> String? { nil }
 }
 
 @MainActor

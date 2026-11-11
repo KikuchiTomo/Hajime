@@ -106,4 +106,53 @@ struct EnglishTermScenarioTests {
         harness.press(.enter)
         #expect(harness.committed == "オペ内")
     }
+
+    // MARK: 英単語の補正(R-02)
+
+    private func lexicon(_ change: (inout Settings) -> Void = { _ in }) -> EnglishTermLexicon {
+        var settings = DefaultSettings.settings
+        change(&settings)
+        let store = FakeSettings(settings)
+        return EnglishTermLexicon(FakeLexicon(words: ["python"]), terms: EnglishTerms(bundled: FakeEnglishTermProvider(Self.bundled), settings: store))
+    }
+
+    @Test("R-24: 英語の語の辞書の語も英単語とみなし，小文字で打った語だけを辞書の書き方にする")
+    func termLexicon() {
+        let lexicon = lexicon()
+        #expect(lexicon.isWord("openai") && lexicon.isWord("OpenAI") && lexicon.isWord("python"))
+        #expect(!lexicon.isWord("opena"))
+        #expect(lexicon.spelling(of: "openai") == "OpenAI")
+        #expect(lexicon.spelling(of: "Openai") == nil)
+        #expect(lexicon.spelling(of: "python") == nil)
+        let off = self.lexicon { $0.englishTermCandidates = false }
+        #expect(!off.isWord("openai") && off.isWord("python"))
+        #expect(off.spelling(of: "openai") == nil)
+    }
+
+    private func correctingHarness(_ table: [String: [(text: String, readingCount: Int?)]] = [:]) -> Harness {
+        var settings = DefaultSettings.settings
+        settings.liveConversionSkipLength = 0
+        let terms = Self.bundled + ["ChatGPT", "Claude"]
+        return Harness(converter: FakeConverter(table), settings: settings,
+                       wrap: { SupplementedConverter($0, settings: $1, calendar: FakeCalendar(), englishTerms: EnglishTerms(bundled: FakeEnglishTermProvider(terms), settings: $1)) },
+                       wrapLexicon: { EnglishTermLexicon($0, terms: EnglishTerms(bundled: FakeEnglishTermProvider(terms), settings: $1)) })
+    }
+
+    @Test("R-24: スペルチェッカーが知らない語(claude)も英単語の補正で辞書の書き方にする")
+    func correctsToTermSpelling() {
+        let harness = correctingHarness()
+        harness.type("claude")
+        #expect(harness.marked.segments == [.init("Claude", style: .correction)])
+    }
+
+    @Test("R-24: 英単語にした語に日本語を続けると，辞書の書き方のまま文の中に確定させる")
+    func termInSentence() {
+        // 「chatgpt」+「wo」は「two」がとぉと読めてしまう．後ろだけを日本語として読んだ方がもっともらしいので英単語にする
+        let harness = correctingHarness(["を": [("を", nil)], "ChatGPTをつかう": [("ChatGPTを使う", nil)]])
+        harness.type("chatgptwotukau")
+        harness.settle()
+        #expect(harness.marked.text == "ChatGPTを使う")
+        harness.press(.enter)
+        #expect(harness.committed == "ChatGPTを使う")
+    }
 }
