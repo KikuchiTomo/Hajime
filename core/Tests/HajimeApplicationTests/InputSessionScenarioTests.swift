@@ -68,6 +68,12 @@ final class Harness {
         if runsFollowUps { followUp() }
     }
 
+    /// 注目している文節の下の枝の候補．分岐図なら枝，文節ごとの一覧なら一覧の候補(今のページ)
+    var focusedAlternatives: [String]? {
+        if let column = lattice?.columns.first(where: \.isFocused) { return [column.text] + column.alternatives.filter { $0 != column.text } }
+        return panel?.entries.map(\.text)
+    }
+
     /// 候補の窓をマウスで押す
     func click(_ target: PointerTarget) {
         apply(session.choose(target, context: context))
@@ -114,6 +120,40 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.text) == ["今日", "は"])
         harness.press(.enter)
         #expect(harness.committed == "今日は")
+    }
+
+    @Test("入力中の候補の窓を出す設定では，分岐図の最後の文節(今打っている文節)にも窓と同じ予測を，第 2 候補のあとに入れる",
+          arguments: [CandidatePresentation.automatic, .segmentList])
+    func predictionsInLastSegment(presentation: CandidatePresentation) {
+        let converter = FakeConverter(["きょうあめ": [("今日雨", nil)], "きょう": [("今日", nil), ("京", nil)], "あめ": [("雨", nil), ("飴", nil), ("アメ", nil), ("天", nil)]])
+        converter.predictionTexts["きょう"] = ["今日は"]
+        converter.predictionTexts["あめ"] = ["雨具", "アメ", "飴玉", "雨"]
+        var settings = DefaultSettings.settings
+        settings.candidatePresentation = presentation
+        settings.suggestionDisplay = .always
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyou")
+        harness.press(.space, .option)
+        harness.type("ame")
+        harness.press(.space)
+        // 最後でない文節には入れない
+        #expect(harness.focusedAlternatives == ["今日", "京"])
+        harness.press(.right)
+        // 字種の枝にあるもの(アメ)と，変換の候補と重なるもの(雨)は入れない
+        #expect(harness.focusedAlternatives == ["雨", "飴", "雨具", "飴玉", "天"])
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.enter)
+        #expect(harness.committed == "今日雨具")
+        // 窓を出さない設定では入れない
+        settings.suggestionDisplay = .off
+        let off = Harness(converter: converter, settings: settings)
+        off.type("kyou")
+        off.press(.space, .option)
+        off.type("ame")
+        off.press(.space)
+        off.press(.right)
+        #expect(off.focusedAlternatives == ["雨", "飴", "天"])
     }
 
     @Test("見えている文の語の並びが語の途中で切れているとき(Zenzai が書き換えた文の「天｜気ですね」)は，その区切りを使わない")
