@@ -52,6 +52,8 @@ pub struct RawKey {
     pub label: Option<char>,
     /// キーの位置(スキャンコード)
     pub scan: u16,
+    /// 拡張キーか(テンキーの Enter は，Enter と同じ仮想キーで拡張キーになる)
+    pub extended: bool,
     pub caps_lock: bool,
 }
 
@@ -170,7 +172,9 @@ pub fn translate(raw: &RawKey) -> Option<KeyInput> {
         }),
         _ => None,
     };
-    let is_keypad = (VK_NUMPAD0..=VK_DIVIDE).contains(&raw.vk);
+    // テンキーの Enter もテンキーのキーとして渡す(テンキーの Enter で計算する設定)
+    let is_keypad =
+        (VK_NUMPAD0..=VK_DIVIDE).contains(&raw.vk) || (raw.vk == VK_RETURN && raw.extended);
     let key = match named {
         Some(key) => key,
         None => {
@@ -204,6 +208,7 @@ mod tests {
             japanese_layout: true,
             label: text,
             scan: 0,
+            extended: false,
             caps_lock: false,
         }
     }
@@ -309,6 +314,13 @@ mod tests {
         );
         let keypad = translate(&raw(VK_NUMPAD0 + 1, Some('1'))).unwrap();
         assert!(keypad.is_keypad);
+        // テンキーの Enter は Enter と同じ仮想キーで，拡張キーになる
+        let mut keypad_enter = raw(VK_RETURN, None);
+        keypad_enter.extended = true;
+        let keypad_enter = translate(&keypad_enter).unwrap();
+        assert_eq!(keypad_enter.key, Key::Enter);
+        assert!(keypad_enter.is_keypad);
+        assert!(!translate(&raw(VK_RETURN, None)).unwrap().is_keypad);
         assert_eq!(keypad.key, Key::Character { text: "1".into() });
     }
 

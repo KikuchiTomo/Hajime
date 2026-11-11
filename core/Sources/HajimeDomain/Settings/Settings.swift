@@ -34,10 +34,17 @@ public struct Settings: Sendable, Equatable {
     public var alphanumericHyphen = true
     /// 句読点を打ったら，その句読点まで確定する
     public var punctuationCommits = false
+    /// ？ と ！ を打ったら，その記号まで確定する
+    public var questionExclamationCommits = false
     /// キー設定の表(R-17)．状態 × キー × コマンドの行．切り替えのキーも変換中のキーもここに書く
     public var keymap = KeymapPreset.standard.keymap
     /// テンキーで打った数字と記号は，日本語のモードでも半角で，組み立てずにそのまま確定する
     public var keypadDirect = true
+    /// テンキーの数字と記号を半角のまま読みに入れ，テンキーの Enter で式を計算する(計算の結果を第 1 候補にして変換する)．
+    /// オンのときは keypadDirect の「そのまま確定」より先に効く
+    public var keypadCalculation = false
+    /// 英数に変えるキー(F9・F10 など)を続けて押すと，英字を 入力どおり → 大文字 → 小文字 → 先頭だけ大文字 の順に変える
+    public var cyclesLetterCase = true
     /// 利用者が変えた記号の決まり(「->」→「→」，「やじるし」→「→」)．既定の決まりに重ねる
     public var symbolRules: [SymbolRule] = []
 
@@ -337,7 +344,7 @@ extension Settings: Codable {
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
-        case keypadDirect, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
+        case keypadDirect, questionExclamationCommits, keypadCalculation, cyclesLetterCase, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
@@ -389,6 +396,9 @@ extension Settings: Codable {
         read(.punctuationCommits, into: \.punctuationCommits)
         read(.keymap, into: \.keymap)
         read(.keypadDirect, into: \.keypadDirect)
+        read(.questionExclamationCommits, into: \.questionExclamationCommits)
+        read(.keypadCalculation, into: \.keypadCalculation)
+        read(.cyclesLetterCase, into: \.cyclesLetterCase)
         readList(.symbolRules, into: \.symbolRules)
         read(.correction, into: \.correction)
         read(.okuriganaStyle, into: \.okuriganaStyle)
@@ -509,6 +519,9 @@ extension Settings: Codable {
         try container.encode(punctuationCommits, forKey: .punctuationCommits)
         try container.encode(keymap, forKey: .keymap)
         try container.encode(keypadDirect, forKey: .keypadDirect)
+        try container.encode(questionExclamationCommits, forKey: .questionExclamationCommits)
+        try container.encode(keypadCalculation, forKey: .keypadCalculation)
+        try container.encode(cyclesLetterCase, forKey: .cyclesLetterCase)
         try container.encode(symbolRules, forKey: .symbolRules)
         try container.encode(correction, forKey: .correction)
         try container.encode(okuriganaStyle, forKey: .okuriganaStyle)

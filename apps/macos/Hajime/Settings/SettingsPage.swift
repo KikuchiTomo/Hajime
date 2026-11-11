@@ -84,7 +84,8 @@ extension SettingsView {
         var keywords: [String] {
             switch self {
             case .input: [UIStrings.Choice.inputStyle, UIStrings.Choice.keyboardLayout, UIStrings.Settings.punctuation, UIStrings.Features.keypadDirect,
-                          UIStrings.Settings.numberSeparators, UIStrings.Settings.alphanumericHyphen]
+                          UIStrings.Settings.numberSeparators, UIStrings.Settings.alphanumericHyphen, UIStrings.Settings.questionExclamationCommits,
+                          UIStrings.Settings.keypadCalculation, UIStrings.Settings.cyclesLetterCase]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana, UIStrings.Features.prefersKatakana,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Settings.latexConversion,

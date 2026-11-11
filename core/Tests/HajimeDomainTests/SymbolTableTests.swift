@@ -60,4 +60,16 @@ struct SymbolTableTests {
         #expect(!replacedLonger)
         #expect(longer.conversionReading == "らー")
     }
+
+    @Test("「？と！で確定」は ？ と ！ だけ，「句読点で確定」は句読点だけで確定する")
+    func commitsComposition() {
+        var settings = DefaultSettings.settings
+        #expect(!SymbolTable.commitsComposition(after: "？", settings: settings))
+        settings.questionExclamationCommits = true
+        #expect(SymbolTable.commitsComposition(after: "？", settings: settings))
+        #expect(SymbolTable.commitsComposition(after: "!", settings: settings))
+        #expect(!SymbolTable.commitsComposition(after: "。", settings: settings))
+        settings.punctuationCommits = true
+        #expect(SymbolTable.commitsComposition(after: "。", settings: settings))
+    }
 }
