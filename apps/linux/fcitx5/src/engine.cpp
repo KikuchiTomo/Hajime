@@ -150,7 +150,7 @@ uint64_t after(uint32_t milliseconds) {
 Engine::Engine(fcitx::Instance *instance) : instance_(instance) {
     bridge_ = hajime_bridge_new(HAJIME_ENGINE_PATH);
     if (bridge_ == nullptr) {
-        FCITX_ERROR() << "はじめ: エンジンへの橋渡しを作れません．キーはそのままアプリに渡します";
+        FCITX_ERROR() << "Hajime IME: エンジンへの橋渡しを作れません．キーはそのままアプリに渡します";
         return;
     }
     const int fd = hajime_bridge_notify_fd(bridge_);

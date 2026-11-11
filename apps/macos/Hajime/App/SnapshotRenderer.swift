@@ -97,7 +97,7 @@ enum SnapshotRenderer {
             settings.correction.rules = [CorrectionRule(typed: "teh", word: "the"), CorrectionRule(typed: "recieve", word: "receive"),
                                          CorrectionRule(typed: "adn", word: "and")]
             settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "wye", kana: "ゑ")]
-            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "はじめ"), UserDictionaryEntry(reading: "かいしゃ", word: "会社")]
+            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME"), UserDictionaryEntry(reading: "かいしゃ", word: "会社")]
             settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
                                     SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]
             settings.profileRules = [ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .imeOff),
@@ -105,7 +105,7 @@ enum SnapshotRenderer {
                                      ProfileRule(applicationPrefix: "com.apple.Notes", profile: .remembersMode),
                                      ProfileRule(applicationPrefix: "com.tinyspeck.slackmacgap", profile: .imeOn)]
             settings.commands = [LauncherCommand(reading: "めも", title: "メモ", kind: .openApplication, target: "/System/Applications/Notes.app"),
-                                 LauncherCommand(reading: "はじめ", title: "はじめのサイト", kind: .openURL, target: "https://haji.men/")]
+                                 LauncherCommand(reading: "はじめ", title: "Hajime IME のサイト", kind: .openURL, target: "https://haji.men/")]
         }
         for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
             NSApp.appearance = NSAppearance(named: appearance)

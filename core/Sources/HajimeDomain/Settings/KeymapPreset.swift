@@ -1,11 +1,11 @@
 /// キー設定の表のひな形．読み込むと表をひな形の行で置き換える．
 ///
 /// 行は「状態<タブ>キー<タブ>コマンド」の形で書く(Keymap.rows(from:))．
-/// Windows 風と Mac 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行をはじめの状態とコマンドに置き換えて作った．
-/// はじめに無いコマンドの行(読みの中のカーソル移動・予測・再変換・確定の取り消しなど)は除き，
+/// Windows 風と Mac 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行を Hajime IME の状態とコマンドに置き換えて作った．
+/// Hajime IME に無いコマンドの行(読みの中のカーソル移動・予測・再変換・確定の取り消しなど)は除き，
 /// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Option+↑ を足してある(Ctrl+Tab はアプリのタブの切り替えとぶつかる)
 public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
-    /// はじめの既定
+    /// Hajime IME の既定
     case standard
     case windows
     case mac

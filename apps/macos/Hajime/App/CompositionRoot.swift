@@ -212,7 +212,7 @@ enum AppIdentity {
     static let japaneseModeKey = "com.apple.inputmethod.Japanese"
     static let directModeKey = "com.apple.inputmethod.Roman"
     /// Contents/Helpers に入れた更新用のアプリの名前(apps/macos/project.yml の HajimeUpdater の PRODUCT_NAME)
-    static let updaterName = "Hajime Updater"
+    static let updaterName = "Hajime IME Updater"
 
     static var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"

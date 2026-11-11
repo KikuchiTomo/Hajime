@@ -7,7 +7,7 @@ use windows_core::{s, w, BOOL, PCWSTR};
 /// input.dll の InstallLayoutOrTip(windows クレートに無いので，実行時に引く)
 type InstallLayoutOrTip = unsafe extern "system" fn(PCWSTR, u32) -> BOOL;
 
-/// この利用者の入力方式(設定 > 時刻と言語 > 言語と地域 の日本語のキーボード)に Hajime を加える．
+/// この利用者の入力方式(設定 > 時刻と言語 > 言語と地域 の日本語のキーボード)に Hajime IME を加える．
 /// RegisterProfile だけでは入力の切り替え(Win+Space)には出ても，利用者の一覧に入らず，
 /// 既定の入力方式の上書きの一覧に出ない(Microsoft の IME の要件)．利用者として動くプロセスから呼ぶ
 pub fn add_to_user_input_methods() -> bool {

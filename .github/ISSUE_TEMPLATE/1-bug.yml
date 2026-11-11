@@ -44,7 +44,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: はじめのバージョンかコミット
+      label: Hajime IME のバージョンかコミット
   - type: input
     id: app
     attributes:

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
-    <title>Hajime</title>
+    <title>Hajime IME</title>
     <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
     <volume-check>
         <allowed-os-versions>
