@@ -481,6 +481,15 @@ impl App {
             }
             Event::Action(Action::OpenSettingsFile) => return Some(After::OpenSettingsFile),
             Event::Action(Action::File(task)) => return Some(After::File(task)),
+            Event::Action(Action::ResetPaletteHistory) => {
+                if let Err(error) = model.store().reset_palette_history() {
+                    return self.failure(error);
+                }
+                return Some(After::Message {
+                    text: text::PALETTE_HISTORY_CLEARED.into(),
+                    warning: false,
+                });
+            }
             Event::Action(Action::ResetUsage) => {
                 if let Err(error) = model.store().reset_usage() {
                     return self.failure(error);

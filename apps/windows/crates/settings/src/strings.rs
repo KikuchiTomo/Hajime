@@ -533,6 +533,26 @@ pub mod dictionaries {
     }
 }
 
+/// UIStrings.Palette(絵文字と記号のパレット．R-26)
+pub mod palette {
+    pub const PAGE: &str = "絵文字と記号";
+    pub const BEHAVIOR: &str = "パレット";
+    pub const LOOK: &str = "パレットの見た目";
+    pub const ENABLED: &str = "絵文字と記号のパレット";
+    pub const CLOSES_AFTER_INSERT: &str = "入力したらパレットを閉じる";
+    pub const RECORDS_HISTORY: &str = "パレットで使った文字を記録";
+    pub const COLUMNS: &str = "パレットの列数";
+    pub const ROWS: &str = "パレットの行数";
+    pub const CELL_SIZE: &str = "パレットのマスの大きさ";
+    pub const SHOWS_PREVIEW: &str = "パレットに文字の説明を表示";
+    pub const FREQUENT_ROWS: &str = "よく使う文字の行数";
+    pub const CLEAR_HISTORY: &str = "使った文字の記録を消去";
+    pub const CLEAR_HISTORY_NOTE: &str =
+        "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。";
+    pub const THEME_NOTE: &str =
+        "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。";
+}
+
 /// UIStrings.Association
 pub mod association {
     pub const SECTION: &str = "連想変換";
@@ -676,6 +696,11 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
+    pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
+    /// 絵文字と記号のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
+    pub const PALETTE_KEYS_NOTE: &str =
+        "既定では Ctrl+Alt+E で絵文字、Ctrl+Alt+K で記号のパレットを開きます。";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
     pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
     pub const ON: &str = "オン";

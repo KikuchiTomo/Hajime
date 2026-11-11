@@ -41,6 +41,10 @@ pub struct Ranges {
     pub custom_theme_corner_radius: Range,
     pub association_limit: Range,
     pub meaning_sense_limit: Range,
+    pub palette_columns: Range,
+    pub palette_rows: Range,
+    pub palette_cell_size: Range,
+    pub palette_frequent_rows: Range,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -120,6 +124,8 @@ pub struct Catalog {
     pub correction_timeout_step: f64,
     /// 連想の候補数を選ぶ刻み(DefaultSettings.associationLimitStep)
     pub association_limit_step: f64,
+    /// パレットのマスの大きさを選ぶ刻み(DefaultSettings.paletteCellSizeStep)
+    pub palette_cell_size_step: f64,
     pub limits: Limits,
     pub timing: Timing,
     /// 一覧を書き出すファイルの既定の名前(RuleList の名前ごと)
