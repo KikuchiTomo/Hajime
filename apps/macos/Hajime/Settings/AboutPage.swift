@@ -97,6 +97,18 @@ struct Acknowledgement: Identifiable, Equatable {
         }
         return items
     }
+
+    /// 行の中の URL の範囲．URL は「https://」から，空白・ASCII でない文字・括弧の手前までとし，末尾の句読点は含めない
+    /// (「…/hajime-dictionary(v0.1.1)．」の括弧や句点まで URL にしない)．Windows の notices::split_url と同じ決まり
+    static func urlRange(in text: String) -> Range<String.Index>? {
+        let scheme = "https://"
+        guard let start = text.range(of: scheme)?.lowerBound else { return nil }
+        var end = text[start...].firstIndex { !$0.isASCII || $0.isWhitespace || "()<>\"'`".contains($0) } ?? text.endIndex
+        while end > start, let last = text[start..<end].last, ".,;:!?".contains(last) {
+            end = text.index(before: end)
+        }
+        return text.distance(from: start, to: end) > scheme.count ? start..<end : nil
+    }
 }
 
 private struct AcknowledgementRow: View {
@@ -121,16 +133,29 @@ private struct AcknowledgementRow: View {
         .padding(.vertical, 4)
     }
 
-    /// 行の中の URL は押せるようにする(「改変したもの: https://…」のような前置きはそのまま文字で出す)
+    /// 行の中の URL だけを押せるようにする．前置き(「改変したもの: 」)と URL のあとの文はそのまま文字で出し，左にそろえて折り返す
     @ViewBuilder
     private func value(_ text: String) -> some View {
-        if let start = text.range(of: "https://")?.lowerBound, let url = URL(string: String(text[start...])) {
-            HStack(spacing: 4) {
-                if start > text.startIndex { Text(text[..<start]).foregroundStyle(.secondary) }
-                Link(String(text[start...]), destination: url)
-            }
+        if let range = Acknowledgement.urlRange(in: text), let url = URL(string: String(text[range])) {
+            Text(Self.linked(text, range: range, url: url))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         } else {
-            Text(text).foregroundStyle(.secondary).textSelection(.enabled)
+            Text(text)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// range の部分だけにリンクを付けた文字列．リンクの部分はアクセントの色になる
+    private static func linked(_ text: String, range: Range<String.Index>, url: URL) -> AttributedString {
+        var attributed = AttributedString(text)
+        if let lower = AttributedString.Index(range.lowerBound, within: attributed),
+           let upper = AttributedString.Index(range.upperBound, within: attributed) {
+            attributed[lower..<upper].link = url
+        }
+        return attributed
     }
 }
