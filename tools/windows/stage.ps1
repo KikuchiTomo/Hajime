@@ -59,7 +59,7 @@ Copy-Item (Join-Path $Dictionary 'LICENSES\*') (Join-Path $Output 'LICENSES\haji
 
 $required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv', 'usage_dict.txt', 'usage_dict_extra.tsv', 'usage_dict_words.tsv', 'english-terms.txt',
     'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'Zenzai\zenz-v3.2-xsmall-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
-    'Dictionary\SHA256SUMS', 'Dictionary\louds\charID.chid', 'LICENSES\hajime-dictionary\NOTICE.md', 'LICENSES\hajime-dictionary\Mozc-LICENSE.txt',
+    'Dictionary\SHA256SUMS', 'Dictionary\louds\charID.chid', 'LICENSES\hajime-dictionary\NOTICE.md', 'LICENSES\hajime-dictionary\Mozc-LICENSE.txt', 'LICENSES\hajime-dictionary\mozcdic-ut-LICENSE.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
 foreach ($file in $required) {
     if (-not (Test-Path (Join-Path $Output $file))) { throw "$file がありません" }

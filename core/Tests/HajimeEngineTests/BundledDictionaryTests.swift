@@ -76,7 +76,8 @@ struct BundledDictionaryTests {
         let elapsed = try ContinuousClock().measure { dictionary = try BundledDictionary.verified(at: url) }
         #expect(dictionary?.url == url)
         print("同梱の辞書の確認にかかった時間: \(elapsed)")
-        #expect(elapsed < .seconds(2))
+        // v0.3.0 は約 190MB で，負荷の少ない機械では 1 秒かからない．ほかのビルドで手一杯の機械ではファイルの読み込みを待って 2 秒を超えることがあるので，余裕を持たせる
+        #expect(elapsed < .seconds(4))
     }
 
     @Test("ディレクトリの外を指すパスや形の正しくない行を受け付けない", arguments: [

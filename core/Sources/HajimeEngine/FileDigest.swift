@@ -48,7 +48,7 @@ enum FileDigest {
     /// 読み終えた中身の SHA-256(小文字の 16 進)
     static func sha256(of data: Data) -> String {
         #if canImport(CryptoKit)
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return HajimeDomain.SHA256Digest.lowercaseHex(SHA256.hash(data: data))
         #else
         var hasher = SHA256Digest()
         hasher.update(data)
@@ -76,7 +76,7 @@ enum FileDigest {
             #endif
         }
         #if canImport(CryptoKit)
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return HajimeDomain.SHA256Digest.lowercaseHex(hasher.finalize())
         #else
         return hasher.finalizeHex()
         #endif
