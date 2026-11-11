@@ -195,6 +195,9 @@ public enum DefaultSettings {
     public static let maximumRomajiRules = 500
     /// キー設定の表の行の上限(R-17)．ひな形はどれも 150 行ほど
     public static let maximumKeymapEntries = 500
+    /// 変換中に取り消せる，候補の選択(表記)と文節の区切りの変更の段の数(KeymapCommand.undoConversionEdit)．
+    /// 続けて押した同じ種類の変更(Space の連打，同じ字種のキーの連打)は 1 段に数える
+    public static let conversionUndoDepth = 8
     /// Windows の設定の画面がエンジンの応答を待つ時間(秒)．入力を止めない画面なので DLL より長く待つ
     public static let settingsAppResponseTimeout = 2.0
     /// 設定の画面がファイルの読み込み・書き出しを待つ時間(秒)．大きな辞書のファイルも読み終えられる長さにする

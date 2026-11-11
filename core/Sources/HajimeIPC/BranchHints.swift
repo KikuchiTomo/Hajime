@@ -5,16 +5,15 @@ public enum BranchHints {
     public static func make(for panel: LatticePanel, settings: Settings) -> [WireKeyHint] {
         guard settings.showsKeyHints else { return [] }
         let keymap = settings.keymap
-        func first(_ command: KeymapCommand) -> String {
-            keymap.strokes(for: command, in: .converting).first.map(label(of:)) ?? ""
-        }
         // 文言とコマンドの並びは macOS と同じ表(IndicatorLabels)．連想の一覧では，単語を選ぶ・意味を移る・戻るだけを案内する
         if let split = panel.columns.first(where: \.isFocused)?.split, panel.association == nil {
             return splitHints(count: split.pieces.count - 1)
         }
         let table = panel.association == nil ? IndicatorLabels.branchHints : IndicatorLabels.associationHints
         return table.map { hint in
-            WireKeyHint(keys: hint.second.map { pair(first(hint.first), first($0)) } ?? first(hint.first), label: hint.label)
+            let strokes = hint.strokes(in: keymap)
+            let first = strokes.first.map(label(of:)) ?? ""
+            return WireKeyHint(keys: hint.second == nil ? first : pair(first, strokes.second.map(label(of:)) ?? ""), label: hint.label)
         }
         .filter { !$0.keys.isEmpty }
     }

@@ -28,14 +28,14 @@ struct SettingsSchemaTests {
 
     @Test("新しいバージョンで書いた設定を開いて保存しても，知らない項目とバージョンを失わない")
     func keepsUnknownFields() throws {
-        let settings = try SettingsCoding.decode(fixture("settings-v9.json"))
-        #expect(settings.schemaVersion == 9)
+        let settings = try SettingsCoding.decode(fixture("settings-v99.json"))
+        #expect(settings.schemaVersion == 99)
         #expect(settings.unknownFields["futureOption"] == .object(["enabled": .bool(true), "level": .number(3)]))
         var changed = settings
         changed.liveConversion = false
         let again = try SettingsCoding.decode(SettingsCoding.encode(changed))
         #expect(again.unknownFields == settings.unknownFields)
-        #expect(again.schemaVersion == 9)
+        #expect(again.schemaVersion == 99)
         #expect(again.liveConversion == false)
     }
 
@@ -44,9 +44,9 @@ struct SettingsSchemaTests {
         var old: [String: JSONValue] = ["inputStyle": .string("kana")]
         SettingsSchema.migrate(&old)
         #expect(old[SettingsSchema.versionKey] == .number(Double(SettingsSchema.currentVersion)))
-        var future: [String: JSONValue] = [SettingsSchema.versionKey: .number(9)]
+        var future: [String: JSONValue] = [SettingsSchema.versionKey: .number(99)]
         SettingsSchema.migrate(&future)
-        #expect(future[SettingsSchema.versionKey] == .number(9))
+        #expect(future[SettingsSchema.versionKey] == .number(99))
     }
 
     @Test("設定の項目はどれも，同期のまとまりのどれか 1 つだけに入る")

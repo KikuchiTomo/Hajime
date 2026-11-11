@@ -210,12 +210,15 @@ enum UIStrings {
             case .insertBoundary: "ここで区切る"
             case .acceptSuggestion: "「もしかして」に修正"
             case .reconvert: "再変換"
-            case .toHiragana: "ひらがなに変換"
-            case .toKatakana: "全角カタカナに変換"
-            case .toHalfwidthKatakana: "半角カタカナに変換"
-            case .toFullwidthAlphanumeric: "全角英数に変換"
-            case .toHalfwidthAlphanumeric: "半角英数に変換"
+            case .toHiragana: "全文をひらがなに変換"
+            case .toKatakana: "全文を全角カタカナに変換"
+            case .toHalfwidthKatakana: "全文を半角カタカナに変換"
+            case .toFullwidthAlphanumeric: "全文を全角英数に変換"
+            case .toHalfwidthAlphanumeric: "全文を半角英数に変換"
             case .switchKanaType: "かなの種類を切り替え"
+            case .segmentToHiragana: "文節をひらがなに変換"
+            case .segmentToKatakana: "文節を全角カタカナに変換"
+            case .segmentToHalfwidthKatakana: "文節を半角カタカナに変換"
             case .nextCandidate: "次の候補"
             case .previousCandidate: "前の候補"
             case .nextCandidatePage: "次の候補のページ"
@@ -238,7 +241,9 @@ enum UIStrings {
             case .commit: "確定"
             case .commitFirstSegment: "先頭の文節だけ確定"
             case .cancel: "取り消し"
-            case .backToReading: "読みに戻す"
+            case .backToReading: "全文を読みに戻す"
+            case .resumeEditing: "読みに戻して末尾から編集"
+            case .undoConversionEdit: "直前の変更を取り消し"
             case .forgetCandidate: "候補を学習から削除"
             case .forgetLastCommit: "最後の学習を取り消し"
             case .openSettings: "設定を開く"
@@ -267,7 +272,10 @@ enum UIStrings {
             case .editSegment: "選んでいる文節を消して読みを打ち直します。文節を移ると変換します"
             case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
             case .cancel: "変換中は読みに戻し、修正した読みは入力したままに戻します。入力中は読みを削除します"
-            case .backToReading: "変換をやめて読みに戻ります"
+            case .backToReading: "変換をやめて全文を読みに戻します。ライブ変換がオンでも、読みを変更するまで読みのまま表示します"
+            case .resumeEditing: "変換をやめて読みに戻り、末尾から入力を続けます"
+            case .undoConversionEdit: "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"
+            case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
@@ -288,6 +296,7 @@ enum UIStrings {
             case .mac: "Mac 風"
             case .emacs: "Emacs 風"
             case .vim: "Vim 風"
+            case .atok: "ATOK 風"
             }
         }
 
@@ -993,9 +1002,10 @@ extension UIStrings {
 extension KeyHint {
     /// 共通の案内の表(IndicatorLabels)から，キー設定の表で変換中にそのコマンドに割り当てた最初のキーを入れて作る．キーの無い案内は出さない
     static func make(_ table: [IndicatorLabels.Hint], keymap: Keymap) -> [KeyHint] {
-        func first(_ command: KeymapCommand) -> String { keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:)) ?? "" }
-        return table.map { hint in
-            KeyHint(key: hint.second.map { UIStrings.Keys.pair(first(hint.first), first($0)) } ?? first(hint.first), label: hint.label)
+        table.map { hint in
+            let strokes = hint.strokes(in: keymap)
+            let first = strokes.first.map(UIStrings.Keys.name(of:)) ?? ""
+            return KeyHint(key: hint.second == nil ? first : UIStrings.Keys.pair(first, strokes.second.map(UIStrings.Keys.name(of:)) ?? ""), label: hint.label)
         }
         .filter { !$0.key.isEmpty }
     }

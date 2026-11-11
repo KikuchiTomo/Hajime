@@ -202,7 +202,8 @@ enum PanelBuilder {
                 alternatives: page.map { $0.commandKind == nil ? $0.text : LauncherCommand.title(ofCandidateText: $0.text) },
                 selectedAlternative: selectedCandidate.map { $0 - pageStart },
                 variants: showsVariants ? segment.variants.map(\.text) : [],
-                selectedVariant: selectedVariant,
+                // 字種の行を出さない設定でも，キー(文節だけの字種)で字種を選べる．出さない行の位置は渡さない
+                selectedVariant: showsVariants ? selectedVariant : nil,
                 isFocused: true,
                 isUncertain: !segment.isConfident,
                 isDecided: segment.isDecided
@@ -252,7 +253,7 @@ enum PanelBuilder {
             return CandidatePanel.Entry(text: candidate.text, annotation: annotation, corrected: range)
         }
         let variantIndex = selectedVariant.flatMap { index -> Int? in
-            guard case .variant(let variant) = segment.variants[index].origin else { return nil }
+            guard showsVariants, case .variant(let variant) = segment.variants[index].origin else { return nil }
             return ScriptVariant.allCases.firstIndex(of: variant)
         }
         return CandidatePanel(
