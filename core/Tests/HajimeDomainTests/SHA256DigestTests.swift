@@ -17,6 +17,12 @@ struct SHA256DigestTests {
             == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0")
     }
 
+    @Test("ハッシュの値を 16 進の小文字にする")
+    func lowercaseHex() {
+        #expect(SHA256Digest.lowercaseHex([0x00, 0x0f, 0x10, 0xa5, 0xff]) == "000f10a5ff")
+        #expect(SHA256Digest.lowercaseHex([]).isEmpty)
+    }
+
     @Test("少しずつ渡しても，一度に渡したときと同じ値になる")
     func incremental() {
         let bytes = (0..<1000).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ 7) }

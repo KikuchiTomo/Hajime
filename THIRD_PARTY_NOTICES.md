@@ -1595,7 +1595,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## hajime-dictionary(Mozc の辞書 dictionary_oss の語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-かな漢字変換の辞書として，hajime-dictionary v0.2.0 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
+かな漢字変換の辞書として，hajime-dictionary v0.3.0 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
 Wikidata: https://www.wikidata.org/
 品詞の番号の対応には，mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使用しています．
 同音異義語の使い分けの辞書(data/usage/usage_dict_extra.tsv)と，語の意味の辞書(data/usage/usage_dict_words.tsv)の読みと表記も，同じ dictionary_oss から抜き出しています．この 2 つと data/usage/usage_dict.txt の品詞の列も，dictionary_oss の品詞から付けています．
@@ -1681,6 +1681,244 @@ Okinawa dictionary is licensed as follows
 Public Domain Dataです。使用・変更・配布に関しては一切の制限をつけません。
 商品などに組み込むことも自由に行なってください。すでにいくつかの辞書には沖縄辞書が採用されています。
 勝手ながら、沖縄辞書に寄贈された辞書も in the Public Domain' 扱いとさせていただきます。
+```
+
+## hajime-dictionary(Mozc UT 辞書の語)
+
+https://github.com/KikuchiTomo/hajime-dictionary
+hajime-dictionary v0.3.0 には，Mozc UT 辞書(作者: UTUMI Hirosi．https://github.com/utuhiro78)の次の 4 つから選んだ語の読みと表記を追加しています．品詞と出やすさは hajime-dictionary で決めています．
+mozcdic-ut-sudachidict(コミット 13129ddebe1cb8eabb63feccbe157adec4e1de01): SudachiDict の名詞から作られた辞書．Apache License 2.0(下の SudachiDict の節)
+mozcdic-ut-neologd(コミット d8307abf02b830b185c9320822cffa0d0787c54e): mecab-ipadic-NEologd の名詞から作られた辞書．Apache License 2.0(下の mecab-ipadic-NEologd の節)
+mozcdic-ut-personal-names(コミット 3da38e0187c5db754c420a5733ae95640652323c): 人名の辞書．Apache License 2.0
+mozcdic-ut-place-names(コミット 7e2b4422837846ea2e78d1a34856d95001d5941a): 日本郵便株式会社の郵便番号データから作られた地名の辞書．郵便番号データに限っては日本郵便株式会社は著作権を主張しません
+Apache License 2.0 の全文は LICENSES/Apache-2.0.txt にあります．
+
+## SudachiDict(hajime-dictionary の Mozc UT 辞書の語)
+
+https://github.com/WorksApplications/SudachiDict
+hajime-dictionary v0.3.0 に追加した mozcdic-ut-sudachidict の語は，SudachiDict の名詞から作られています．SudachiDict の LEGAL(コミット 830bf9e1313f6f75235ba87ee041e144dbcad8c1)を載せます．
+
+```
+LEGAL NOTICE INFORMATION
+========================
+
+- All the files in this distribution are covered under the Apache License
+version 2.0. (see the file LICENSE-2.0.txt)
+
+
+- src/main/text/small_lex.csv contains a part
+  of UniDic (https://unidic.ninjal.ac.jp/).
+- src/main/text/matrix.def.zip is a part of UniDic.
+
+Copyright (c) 2011-2013, The UniDic Consortium
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+ * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+ * Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the
+   distribution.
+
+ * Neither the name of the UniDic Consortium nor the names of its
+   contributors may be used to endorse or promote products derived
+   from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+- src/main/text/core_lex.csv and src/main/text/notcore_lex.csv contain
+a part of NEologd (https://github.com/neologd/mecab-unidic-neologd).
+
+Copyright (C) 2015-2019 Toshinori Sato (@overlast)
+
+      https://github.com/neologd/mecab-unidic-neologd
+
+    i. 本データは、株式会社はてなが提供するはてなキーワード一覧ファイル
+       中の表記、及び、読み仮名の大半を使用している。
+
+       はてなキーワード一覧ファイルの著作権は、株式会社はてなにある。
+
+       はてなキーワード一覧ファイルの使用条件に基づき、また、
+       データ使用の許可を頂いたことに対する感謝の意を込めて、
+       以下に株式会社はてなおよびはてなキーワードへの参照をURLで示す。
+
+       株式会社はてな : http://hatenacorp.jp/information/outline
+
+       はてなキーワード :
+       http://developer.hatena.ne.jp/ja/documents/keyword/misc/catalog
+
+   ii. 本データは、日本郵便株式会社が提供する郵便番号データ中の表記、
+       及び、読み仮名を使用している。
+
+       日本郵便株式会社は、郵便番号データに限っては著作権を主張しないと
+       述べている。
+
+       日本郵便株式会社の郵便番号データに対する感謝の意を込めて、
+       以下に日本郵便株式会社および郵便番号データへの参照をURLで示す。
+
+       日本郵便株式会社 :
+         http://www.post.japanpost.jp/about/profile.html
+
+       郵便番号データ :
+         http://www.post.japanpost.jp/zipcode/dl/readme.html
+
+  iii. 本データは、スナフキん氏が提供する日本全国駅名一覧中の表記、及び
+       読み仮名を使用している。
+
+       日本全国駅名一覧の著作権は、スナフキん氏にある。
+
+       スナフキん氏は 「このデータを利用されるのは自由ですが、その際に
+       不利益を被ったりした場合でも、スナフキんは一切責任は負えません
+       ことをご承知おき下さい」と述べている。
+
+       スナフキん氏に対する感謝の意を込めて、
+       以下に日本全国駅名一覧のコーナーへの参照をURLで示す。
+
+       日本全国駅名一覧のコーナー :
+         http://www5a.biglobe.ne.jp/~harako/data/station.htm
+
+   iv. 本データは、工藤拓氏が提供する人名(姓/名)エントリデータ中の、
+       漢字表記の姓・名とそれに対応する読み仮名を使用している。
+
+       人名(姓/名)エントリデータは被災者・安否不明者の人名の
+       表記揺れ対策として、Mozcの人名辞書を活用できるという
+       工藤氏の考えによって提供されている。
+
+       工藤氏に対する感謝の意を込めて、
+       以下にデータ本体と経緯が分かる情報への参照をURLで示す。
+
+       人名(姓/名)エントリデータ :
+         http://chasen.org/~taku/software/misc/personal_name.zip
+
+       上記データが提供されることになった経緯
+         http://togetter.com/li/111529
+
+    v. 本データは、Web上からクロールした大量の文書データから抽出した
+       表記とそれに対応する読み仮名のデータを含んでいる。
+
+       抽出した表記とそれに対応する読み仮名の組は、上記の i. から iv.
+       の言語資源の組み合わせによって得られる組のみを採録した。
+
+       Web 上に文書データを公開して下さっている皆様に感謝いたします。
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+## mecab-ipadic-NEologd(hajime-dictionary の Mozc UT 辞書の語)
+
+https://github.com/neologd/mecab-ipadic-neologd
+hajime-dictionary v0.3.0 に追加した mozcdic-ut-neologd の語は，mecab-ipadic-NEologd の名詞から作られています．mecab-ipadic-NEologd の COPYING(コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)を載せます．
+
+```
+Copyright (C) 2015-2019 Toshinori Sato (@overlast)
+
+      https://github.com/neologd/mecab-ipadic-neologd
+
+    i. 本データは、株式会社はてなが提供するはてなキーワード一覧ファイル
+       中の表記、及び、読み仮名の大半を使用している。
+
+       はてなキーワード一覧ファイルの著作権は、株式会社はてなにある。
+
+       はてなキーワード一覧ファイルの使用条件に基づき、また、
+       データ使用の許可を頂いたことに対する感謝の意を込めて、
+       以下に株式会社はてなおよびはてなキーワードへの参照をURLで示す。
+
+       株式会社はてな : http://hatenacorp.jp/information/outline
+
+       はてなキーワード :
+       http://developer.hatena.ne.jp/ja/documents/keyword/misc/catalog
+
+   ii. 本データは、日本郵便株式会社が提供する郵便番号データ中の表記、
+       及び、読み仮名を使用している。
+
+       日本郵便株式会社は、郵便番号データに限っては著作権を主張しないと
+       述べている。
+
+       日本郵便株式会社の郵便番号データに対する感謝の意を込めて、
+       以下に日本郵便株式会社および郵便番号データへの参照をURLで示す。
+
+       日本郵便株式会社 :
+         http://www.post.japanpost.jp/about/profile.html
+
+       郵便番号データ :
+         http://www.post.japanpost.jp/zipcode/dl/readme.html
+
+  iii. 本データは、スナフキん氏が提供する日本全国駅名一覧中の表記、及び
+       読み仮名を使用している。
+
+       日本全国駅名一覧の著作権は、スナフキん氏にある。
+
+       スナフキん氏は 「このデータを利用されるのは自由ですが、その際に
+       不利益を被ったりした場合でも、スナフキんは一切責任は負えません
+       ことをご承知おき下さい」と述べている。
+
+       スナフキん氏に対する感謝の意を込めて、
+       以下に日本全国駅名一覧のコーナーへの参照をURLで示す。
+
+       日本全国駅名一覧のコーナー :
+         http://www5a.biglobe.ne.jp/~harako/data/station.htm
+
+   iv. 本データは、工藤拓氏が提供する人名(姓/名)エントリデータ中の、
+       漢字表記の姓・名とそれに対応する読み仮名を使用している。
+
+       人名(姓/名)エントリデータは被災者・安否不明者の人名の
+       表記揺れ対策として、Mozcの人名辞書を活用できるという
+       工藤氏の考えによって提供されている。
+
+       工藤氏に対する感謝の意を込めて、
+       以下にデータ本体と経緯が分かる情報への参照をURLで示す。
+
+       人名(姓/名)エントリデータ :
+         http://chasen.org/~taku/software/misc/personal_name.zip
+
+       上記データが提供されることになった経緯
+         http://togetter.com/li/111529
+
+    v. 本データは、Web上からクロールした大量の文書データから抽出した
+       表記とそれに対応する読み仮名のデータを含んでいる。
+
+       抽出した表記とそれに対応する読み仮名の組は、上記の i. から iv.
+       の言語資源の組み合わせによって得られる組のみを採録した。
+
+       Web 上に文書データを公開して下さっている皆様に感謝いたします。
+
+Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 ```
 
 ## 郵便番号データ
