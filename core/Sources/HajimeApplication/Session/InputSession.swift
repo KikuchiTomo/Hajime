@@ -1211,10 +1211,13 @@ public final class InputSession {
         return reset() + [.runCommand(command)]
     }
 
-    /// 分岐図を作るもの．上の枝で英字をかなにするときも，利用者が足したローマ字の綴りを使う
+    /// 分岐図を作るもの．上の枝で英字をかなにするときも，利用者が足したローマ字の綴りを使う．
+    /// 入力中の候補の窓を出す設定なら，最後の文節に窓と同じ予測を入れる
     private var latticeBuilder: LatticeBuilder {
         _ = newComposition()
-        return LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
+        var builder = LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
+        builder.predictsLastSegment = showsSuggestions
+        return builder
     }
 
     /// 空の読み．利用者が足したローマ字の綴りを使う
@@ -1333,11 +1336,15 @@ public final class InputSession {
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
+    /// 打っているあいだに候補(読みの変換と続く語句の予測)の窓を出す設定か
+    private var showsSuggestions: Bool {
+        let display = settings.current.suggestionDisplay
+        return display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion)
+    }
+
     /// 打っているあいだに候補の窓を出す設定で，読みが出すのに足りる長さか
     private var suggestionsEnabled: Bool {
-        let display = settings.current.suggestionDisplay
-        return (display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion))
-            && composition.conversionReading.count >= DefaultSettings.minimumSuggestionReading
+        showsSuggestions && composition.conversionReading.count >= DefaultSettings.minimumSuggestionReading
     }
 
     /// 今の読みで候補を求めるか．打ちかけのローマ字(「ky」)があるあいだは求めない(かなになってから求める)
@@ -1373,7 +1380,8 @@ public final class InputSession {
         // 文節の候補は，ライブ変換と別の変換の状態で Zenzai を使わずに求める(打つたびに求めるため．分岐図の文節と同じ)
         let whole = (prefix == nil ? converter.candidates(for: reading) : converter.segmentCandidates(for: reading))
             .filter { $0.readingCount == reading.count && $0.commandID == nil }
-        let candidates = (Array(whole.prefix(2)) + predictions + Array(whole.dropFirst(2)))
+        let leading = DefaultSettings.suggestionLeadingConversions
+        let candidates = (Array(whole.prefix(leading)) + predictions + Array(whole.dropFirst(leading)))
             .filter { seen.insert($0.text).inserted }
             .prefix(DefaultSettings.suggestionCount)
         return (Array(candidates), prefix)
