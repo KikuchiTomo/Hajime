@@ -172,8 +172,17 @@ struct LatticeBuilder {
         addingAlternatives(lattice, otherReading: correctedReading, reading: reading, origin: .correction)
     }
 
-    /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．違う部分が複数の文節にまたがるときは 1 つにまとめる
-    private func addingAlternatives(_ lattice: SegmentLattice, otherReading: String, reading: String, origin: CandidateOrigin) -> SegmentLattice {
+    /// 英単語にした語(「demo」)を含む文節の 2 番目から，打ったキーをローマ字として読んだかな(でも)の候補を入れる．
+    /// 前の語から英語と見分けても，日本語のつもりで打ったときに選び直せるようにするため．かなの字種は上の枝にあるので入れない
+    func addingRomajiReading(_ lattice: SegmentLattice, romajiReading: String, reading: String) -> SegmentLattice {
+        addingAlternatives(lattice, otherReading: romajiReading, reading: reading, origin: .romajiReading,
+                           count: DefaultSettings.romajiReadingCandidateCount, includesKana: false)
+    }
+
+    /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．違う部分が複数の文節にまたがるときは 1 つにまとめる．
+    /// 入れるのは別の読みの候補 count 個と，includesKana なら別の読みのかなそのもの
+    private func addingAlternatives(_ lattice: SegmentLattice, otherReading: String, reading: String, origin: CandidateOrigin,
+                                    count: Int = DefaultSettings.typedAlternativeCount, includesKana: Bool = true) -> SegmentLattice {
         let typed = Array(otherReading), corrected = Array(reading)
         guard let changed = CorrectedSpan.changedRange(from: otherReading, to: reading) else { return lattice }
         let prefix = changed.lowerBound, changedEnd = changed.upperBound
@@ -191,9 +200,15 @@ struct LatticeBuilder {
         let typedEnd = start + length + typed.count - corrected.count
         guard start <= prefix, typedEnd > start, typedEnd <= typed.count else { return lattice }
         let typedSlice = String(typed[start..<typedEnd])
-        var additions = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count }.prefix(2)
+        var additions = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count }.prefix(count)
             .map { Candidate(text: $0.text, readingCount: length, origin: origin) }
-        additions.append(Candidate(text: typedSlice, readingCount: length, origin: origin))
+        if includesKana {
+            additions.append(Candidate(text: typedSlice, readingCount: length, origin: origin))
+        } else {
+            // かなの字種は上の枝にあるので，下の枝に重ねて出さない(makeSegment と同じ)
+            let variantTexts = Set(segment.variants.map(\.text))
+            additions.removeAll { variantTexts.contains($0.text) }
+        }
         for (offset, candidate) in additions.enumerated() where !segment.candidates.contains(where: { $0.text == candidate.text }) {
             segment.candidates.insert(candidate, at: min(1 + offset, segment.candidates.count))
         }

@@ -6,6 +6,8 @@ public enum CandidateOrigin: Sendable, Equatable {
     case correction
     /// 打ったままの文字列(補正を取り消すときの候補)
     case asTyped
+    /// 英単語にした語(「demo」)を，打ったキーをローマ字として読んだかな(でも)で変換したもの．学習には使わない
+    case romajiReading
     /// 文字の種類の変換(R-03)
     case variant(ScriptVariant)
     /// 文全体の候補から切り出した文節．学習には使わない

@@ -168,6 +168,36 @@ struct NasalAmbiguityTests {
         #expect(exact.correctedWordKeyEdits == nil)
     }
 
+    @Test("R-02: ローマ字としても読める英単語を確定させたら，ローマ字として読んだかなに置き換えた読みを返す")
+    func frozenWordsAsKana() {
+        var composition = compose("demoha")
+        composition.freeze(rawStart: 0, kanaStart: 0, keys: "demo", as: "demo", replaying: "ha")
+        #expect(composition.conversionReading == "demoは")
+        #expect(composition.conversionReadingWithFrozenWordsAsKana == "でもは")
+        // 英単語まで消したら，置き換える語は残らない
+        for _ in 0..<2 { composition.deleteBackward() }
+        #expect(composition.conversionReadingWithFrozenWordsAsKana == nil)
+    }
+
+    @Test("R-02: ローマ字として読めない英単語(「git」)と，綴りを直した英単語は置き換えない")
+    func frozenWordsNotReadable() {
+        var git = compose("gitwo")
+        git.freeze(rawStart: 0, kanaStart: 0, keys: "git", as: "git", replaying: "wo")
+        #expect(git.conversionReadingWithFrozenWordsAsKana == nil)
+        var corrected = compose("sride")
+        corrected.freeze(rawStart: 0, kanaStart: 0, keys: "sride", as: "bride", replaying: "")
+        #expect(corrected.conversionReadingWithFrozenWordsAsKana == nil)
+    }
+
+    @Test("R-02: 読みの先頭を確定したら，確定させた英単語の位置をずらす")
+    func frozenWordsAfterDroppingPrefix() {
+        var composition = compose("kyoudemo")
+        composition.freeze(rawStart: 4, kanaStart: 3, keys: "demo", as: "demo", replaying: "")
+        #expect(composition.conversionReadingWithFrozenWordsAsKana == "きょうでも")
+        composition.dropReadingPrefix(3)
+        #expect(composition.conversionReadingWithFrozenWordsAsKana == "でも")
+    }
+
     @Test("nny は や と にゃ を切り替え，後ろの位置をずらす")
     func yRow() {
         var composition = compose("konnyakuminna")

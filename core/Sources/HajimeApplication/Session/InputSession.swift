@@ -998,6 +998,11 @@ public final class InputSession {
             lattice = builder.addingTyped(lattice, typedReading: typed.conversionReading, reading: composition.conversionReading)
             lattice.focusedIndex = lattice.initialFocus(focus)
         }
+        if let romaji = composition.conversionReadingWithFrozenWordsAsKana {
+            // 英単語にした語(「demo」)の文節に，ローマ字として読んだかな(でも)の候補を入れる
+            lattice = builder.addingRomajiReading(lattice, romajiReading: romaji, reading: composition.conversionReading)
+            lattice.focusedIndex = lattice.initialFocus(focus)
+        }
         return lattice
     }
 
@@ -1311,6 +1316,15 @@ public final class InputSession {
         if candidates.isEmpty {
             candidates.append(Candidate(text: composition.conversionReading, readingCount: whole, origin: .variant(.hiragana)))
             annotations.append(nil)
+        }
+        // 英単語にした語(「demo」)を，打ったキーをローマ字として読んだかな(でも)でも変換して後ろに並べる．
+        // 前の語から英語と見分けても，日本語のつもりで打ったときに選び直せるようにするため
+        if let romaji = composition.conversionReadingWithFrozenWordsAsKana {
+            for candidate in converter.listCandidates(for: romaji)
+            where candidate.readingCount == romaji.count && candidate.commandID == nil && !candidates.contains(where: { $0.text == candidate.text }) {
+                candidates.append(Candidate(text: candidate.text, readingCount: whole, origin: .romajiReading))
+                annotations.append(nil)
+            }
         }
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
