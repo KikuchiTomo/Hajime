@@ -423,6 +423,10 @@ public enum DefaultSettings {
     public static let maximumPaletteQueryLength = 32
     /// パレットの説明に出す読みの数
     public static let palettePreviewReadings = 4
+    /// 同梱のパレットの表のファイルの名前(アプリの中・Windows のインストール先に置く)
+    public static let bundledPaletteFileName = "palette.tsv"
+    /// パレットの表のファイルの大きさの上限．同梱の表は 600KB ほど．壊れた大きなファイルを読み込まないため
+    public static let maximumPaletteFileBytes = 4 * 1024 * 1024
     /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える
     public static let maximumPaletteTextLength = 4
     /// パレットで探したときに並べる項目の数の上限
