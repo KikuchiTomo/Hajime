@@ -660,10 +660,11 @@ pub mod size {
     pub mod bubble {
         pub const WIDTH: f32 = 288.0;
         pub const PADDING: f32 = 12.0;
-        pub const RADIUS: f32 = 8.0;
+        pub const RADIUS: f32 = 12.0;
         pub const POINTER_LENGTH: f32 = 8.0;
         pub const POINTER_WIDTH: f32 = 16.0;
         pub const GAP: f32 = 4.0;
+        pub const SCREEN_MARGIN: f32 = 12.0;
     }
 }
 

@@ -14,9 +14,9 @@
 use super::card_layout::{self, Placement as CardPlacement};
 use super::meaning::{self, Card};
 use super::paint::Painter;
-use super::{Draw, Figure, Frame, Look, Measure, Point, Scene, Segment};
+use super::{Color, Draw, Figure, Frame, Look, Measure, Point, Scene, Segment};
 use ipc::HomophoneNote;
-use tokens::size::{bubble, part};
+use tokens::size::{bubble, glass, part};
 
 /// 吹き出しを候補の窓のどちら側に出すか
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +36,8 @@ pub struct Metrics {
     pub pointer_width: f32,
     /// 候補の窓の縁と先の頂点のあいだ
     pub gap: f32,
+    /// 画面の端に寄せたときの，吹き出しの縁と画面の端のあいだ
+    pub screen_margin: f32,
 }
 
 impl Metrics {
@@ -48,6 +50,7 @@ impl Metrics {
             pointer_length: bubble::POINTER_LENGTH,
             pointer_width: bubble::POINTER_WIDTH,
             gap: bubble::GAP,
+            screen_margin: bubble::SCREEN_MARGIN,
         }
     }
 }
@@ -76,6 +79,8 @@ pub fn place(
     metrics: &Metrics,
 ) -> Placement {
     let (width, height) = size;
+    // 画面の端から screen_margin の内側に収める
+    let screen = screen.inset(metrics.screen_margin, metrics.screen_margin);
     let window_width = width + metrics.pointer_length;
     let reach = metrics.gap + window_width;
     let fits_right = anchor.max_x() + reach <= screen.max_x();
@@ -201,7 +206,9 @@ pub fn bubble(
     }
 }
 
-/// 置き方の決まった吹き出しの窓を描く．地と縁は候補の窓と同じ色で，先まで 1 本の線で縁取る
+/// 置き方の決まった吹き出しの窓を描く．地と縁は候補の窓と同じ色で，先まで 1 本の線で縁取る．
+/// 角丸のテーマは，候補の窓(scene::surround)と同じぼかした影を本体の下に付け，そのぶん窓のまわりを空ける．
+/// 返す場面の body が吹き出し(本体と先)の枠なので，窓は placement.window の左上から body の分だけずらして置く
 pub fn bubble_scene(
     bubble: &Bubble,
     placement: &Placement,
@@ -211,19 +218,47 @@ pub fn bubble_scene(
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
     let metrics = Metrics::tokens(theme.is_rounded());
-    painter.draws.push(Draw::Shape {
-        figure: outline(placement, &metrics, part::STROKE),
-        fill: Some(theme.surface),
-        stroke: Some((theme.frame, part::STROKE)),
-    });
-    let content = Frame::new(
+    let (margin, offset) = if theme.is_rounded() {
+        (glass::SHADOW_RADIUS, glass::SHADOW_OFFSET_Y)
+    } else {
+        (0.0, 0.0)
+    };
+    let shift = |frame: Frame| frame.offset(margin, margin);
+    if theme.is_rounded() {
+        painter.draws.push(Draw::Shadow {
+            frame: shift(placement.body).offset(0.0, offset),
+            radius: metrics.radius,
+            blur: margin,
+            color: Color::rgb(tokens::GLASS_SHADOW).with_alpha(tokens::opacity::shadow::WINDOW),
+        });
+    }
+    let shape = outline(placement, &metrics, part::STROKE);
+    painter.draws.push(
+        Draw::Shape {
+            figure: shape,
+            fill: Some(theme.surface),
+            stroke: Some((theme.frame, part::STROKE)),
+        }
+        .offset(margin, margin),
+    );
+    let content = shift(Frame::new(
         placement.body.x + metrics.padding,
         placement.body.y + metrics.padding,
         bubble.card.width,
         bubble.card.height,
-    );
+    ));
     meaning::draw(&mut painter, Some(&bubble.card), content, bubble.position);
-    painter.finish(placement.window.width, placement.window.height)
+    let mut scene = painter.finish(
+        placement.window.width + margin * 2.0,
+        placement.window.height + margin * 2.0 + offset,
+    );
+    scene.body = Frame::new(
+        margin,
+        margin,
+        placement.window.width,
+        placement.window.height,
+    );
+    scene
 }
 
 #[cfg(test)]
@@ -237,6 +272,7 @@ mod tests {
         pointer_length: 8.0,
         pointer_width: 16.0,
         gap: 4.0,
+        screen_margin: 12.0,
     };
     const SCREEN: Frame = Frame {
         x: 0.0,
@@ -287,15 +323,19 @@ mod tests {
     #[test]
     fn 画面の下に入らなければ上へ寄せ_先は行を指し続ける() {
         let placed = place(
-            anchor(100.0, 600.0),
-            780.0,
+            anchor(100.0, 580.0),
+            760.0,
             (288.0, 160.0),
             20.0,
             SCREEN,
             &METRICS,
         );
-        assert_eq!(placed.window.max_y(), SCREEN.max_y());
-        assert_eq!(placed.window.y + placed.pointer_y, 780.0);
+        // 画面の下の端から screen_margin だけ離す
+        assert_eq!(
+            placed.window.max_y(),
+            SCREEN.max_y() - METRICS.screen_margin
+        );
+        assert_eq!(placed.window.y + placed.pointer_y, 760.0);
         // 先は角の丸みにかからない
         assert!(placed.pointer_y <= 160.0 - METRICS.radius - METRICS.pointer_width / 2.0);
     }
@@ -310,7 +350,7 @@ mod tests {
             SCREEN,
             &METRICS,
         );
-        assert_eq!(placed.window.y, SCREEN.y);
+        assert_eq!(placed.window.y, SCREEN.y + METRICS.screen_margin);
         // 行が角の丸みより上なら，先は角の丸みのすぐ下で止める
         assert_eq!(
             placed.pointer_y,

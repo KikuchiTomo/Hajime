@@ -617,6 +617,17 @@ mod tests {
             let last_row = row(&last_scene, ipc::PointerTarget::Entry { index: 3 });
             let branch_row = row(&branch_scene, ipc::PointerTarget::Alternative { index: 1 });
             let shown = bubble::bubble(&homophone(), homophone().others, &look, &measure);
+            // いちばん下の「執る」を選んだときは「執る」の意味
+            let held = HomophoneNote {
+                word: "執る".into(),
+                part_of_speech: Some(PartOfSpeech::Verb),
+                senses: vec![HomophoneSense {
+                    meaning: "仕事や事務を取り扱う".into(),
+                    example: Some("指揮を執る".into()),
+                }],
+                others: strings(&["取る", "撮る", "採る", "捕る"]),
+            };
+            let last_bubble = bubble::bubble(&held, held.others.clone(), &look, &measure);
             let branch_bubble =
                 bubble::bubble(&homophone(), strings(&["執る", "捕る"]), &look, &measure);
             // (名前，候補の窓，選んでいる行，吹き出し，画面の大きさ，候補の窓の位置)
@@ -641,7 +652,7 @@ mod tests {
                     "list-bottom",
                     &last_scene,
                     last_row,
-                    &shown,
+                    &last_bubble,
                     (900.0, 320.0),
                     (40.0, 320.0 - last_scene.height - 8.0),
                 ),
@@ -680,7 +691,12 @@ mod tests {
                     background,
                     &[
                         (window, x, y, true),
-                        (&drawn, placement.window.x, placement.window.y, false),
+                        (
+                            &drawn,
+                            placement.window.x - drawn.body.x,
+                            placement.window.y - drawn.body.y,
+                            false,
+                        ),
                     ],
                     &theme,
                     font_size,

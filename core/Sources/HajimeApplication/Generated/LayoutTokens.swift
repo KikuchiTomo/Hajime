@@ -423,9 +423,10 @@ public enum LayoutTokens {
     public enum Bubble {
         public static let width: Double = 288
         public static let padding: Double = 12
-        public static let radius: Double = 8
+        public static let radius: Double = 12
         public static let pointerLength: Double = 8
         public static let pointerWidth: Double = 16
         public static let gap: Double = 4
+        public static let screenMargin: Double = 12
     }
 }

@@ -542,10 +542,11 @@ enum DesignTokens {
         enum Bubble {
             static let width: CGFloat = 288
             static let padding: CGFloat = 12
-            static let radius: CGFloat = 8
+            static let radius: CGFloat = 12
             static let pointerLength: CGFloat = 8
             static let pointerWidth: CGFloat = 16
             static let gap: CGFloat = 4
+            static let screenMargin: CGFloat = 12
         }
     }
     enum Motion {
