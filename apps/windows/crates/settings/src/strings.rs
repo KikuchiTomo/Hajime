@@ -444,6 +444,8 @@ pub mod keys {
     /// 絞り込んで行が無くなったとき
     pub const NO_MATCHES: &str = "当てはまる行はありません";
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
+    pub const SEARCH_BY_KEY: &str = "キーで検索";
+    pub const SEARCH_BY_KEY_HELP: &str = "押したキーの行だけを表示します";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const CUSTOM_PRESET: &str = "カスタム";

@@ -800,7 +800,8 @@ fn place_list(
     let x = frame.inner_left();
     let card_top = frame.y + size::CARD_PADDING_Y;
     let inner = frame.inner_width();
-    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に絞り込みを置く
+    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に「キーで検索」のボタンと絞り込みを置く(macOS の KeymapPage)
+    let mut key_search = None;
     let (toolbar_search, toolbar_filter, top) = if buttons.toolbar {
         let filter = buttons.filter.then(|| {
             Rect::new(
@@ -810,7 +811,16 @@ fn place_list(
                 size::CONTROL_HEIGHT,
             )
         });
-        let search_right = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let filter_left = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let key_width = button_width(crate::strings::keys::SEARCH_BY_KEY, metrics);
+        let key = Rect::new(
+            filter_left - key_width,
+            card_top,
+            key_width,
+            size::CONTROL_HEIGHT,
+        );
+        key_search = Some(key);
+        let search_right = key.x - size::CONTROL_GAP;
         let search = buttons.search.then(|| {
             Rect::new(
                 x,
@@ -975,6 +985,8 @@ fn place_list(
     parts.extend(leading_rects);
     parts.extend(right_buttons);
     parts.extend(trailing_iter);
+    // 「キーで検索」のボタンは最後に入れる(part_rect は最後の部品を引く)
+    parts.extend(key_search);
     let lines = leading_lines
         .len()
         .max(trailing_line.map_or(0, |line| line + 1));
