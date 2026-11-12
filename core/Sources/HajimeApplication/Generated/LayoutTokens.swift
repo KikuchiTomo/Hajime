@@ -102,7 +102,7 @@ public enum LayoutTokens {
         public static let previewChipPaddingX: Double = 8
         public static let previewChipPaddingY: Double = 4
         public static let previewChipRadius: Double = 6
-        public static let previewChipGap: Double = 6
+        public static let previewChipGap: Double = 4
         public static let ruleCheckColumnWidth: Double = 40
         public static let ruleKeyColumnWidth: Double = 160
         public static let ruleValueColumnWidth: Double = 150
@@ -126,7 +126,7 @@ public enum LayoutTokens {
         public static let themeSwatchWidth: Double = 40
         public static let aboutIcon: Double = 64
         public static let themeSwatchHeight: Double = 20
-        public static let themeSwatchGap: Double = 3
+        public static let themeSwatchGap: Double = 4
         public static let themeSwatchFontSize: Double = 11
         public static let themeSwatchSelectionWidth: Double = 12
         public static let themeSwatchSelectionHeight: Double = 10
@@ -333,6 +333,7 @@ public enum LayoutTokens {
         public static let navHeaderFontSize: Double = 12
         public static let controlRadius: Double = 4
         public static let fieldPaddingX: Double = 11
+        public static let fieldPaddingY: Double = 5
         public static let focusStroke: Double = 2
         public static let chevronSize: Double = 12
         public static let flyoutPadding: Double = 4
@@ -342,7 +343,7 @@ public enum LayoutTokens {
         public static let tableHeaderHeight: Double = 32
         public static let scrollbarThin: Double = 2
         public static let scrollbarWide: Double = 6
-        public static let scrollbarMargin: Double = 3
+        public static let scrollbarMargin: Double = 2
         public static let scrollbarHit: Double = 14
         public static let scrollbarMinThumb: Double = 24
         public static let progressRingSize: Double = 32
@@ -352,12 +353,10 @@ public enum LayoutTokens {
         public static let wizardWidth: Double = 920
         public static let wizardHeight: Double = 640
         public static let wizardTextWidth: Double = 380
-        public static let wizardPadding: Double = 32
         public static let wizardFooterHeight: Double = 72
         public static let wizardStepBar: Double = 4
         public static let wizardOptionHeight: Double = 44
         public static let wizardOptionNoteHeight: Double = 64
-        public static let wizardOptionGap: Double = 6
         public static let wizardRadioSize: Double = 20
         public static let wizardDemoFontSize: Double = 20
         public static let wizardDemoLineHeight: Double = 34
@@ -379,7 +378,7 @@ public enum LayoutTokens {
         public static let radioDot: Double = 10
         public static let themeSwatchWidth: Double = 40
         public static let themeSwatchHeight: Double = 20
-        public static let themeSwatchGap: Double = 3
+        public static let themeSwatchGap: Double = 4
         public static let themeSwatchSelectionWidth: Double = 12
         public static let themeSwatchSelectionHeight: Double = 10
         public static let themeSwatchRadius: Double = 6
