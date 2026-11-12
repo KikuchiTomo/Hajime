@@ -140,6 +140,10 @@ pub struct Catalog {
     pub latest_release_url: String,
     /// 更新の確認(R-19)
     pub update: Update,
+    /// キー設定のコマンドを置ける状態(KeymapCommand.states．「いつでも」はどのコマンドも置ける)．
+    /// 無ければどのコマンドもどの状態に置ける
+    #[serde(default)]
+    pub keymap_command_states: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// 更新の確認に使う場所と上限(DefaultSettings の updateManifestURL など)
@@ -214,5 +218,17 @@ mod tests {
         let range = Range(0.1, 1.5);
         assert_eq!(range.clamp(3.0), 1.5);
         assert_eq!(range.clamp(-1.0), 0.1);
+    }
+
+    #[test]
+    fn キー設定のコマンドを置ける状態を読む() {
+        let catalog = Catalog::load().unwrap();
+        // 変換は入力中だけ，確定は入力中と変換中(KeymapCommand.states)
+        assert_eq!(
+            catalog.keymap_command_states.get("convert"),
+            Some(&vec!["composing".to_string()])
+        );
+        assert!(catalog.keymap_command_states["commit"].contains(&"converting".to_string()));
+        assert!(!catalog.keymap_command_states["commit"].contains(&"idle".to_string()));
     }
 }
