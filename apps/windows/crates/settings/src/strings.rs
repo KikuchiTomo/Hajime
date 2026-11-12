@@ -100,6 +100,7 @@ pub mod settings {
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const WORD_CLASS: &str = "品詞";
     pub const COMMENT: &str = "コメント";
+    pub const COMMENT_PROMPT: &str = "コメント(省略可)";
     pub const ABBREVIATION_NOTE: &str =
         "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
 

@@ -21,6 +21,8 @@ pub struct Field {
     pub notation: bool,
     /// 空のままでも足せる欄(ユーザー辞書のコメント)
     pub optional: bool,
+    /// 入力欄の案内(None なら label)．表の見出しは label のまま
+    pub prompt: Option<&'static str>,
 }
 
 impl Field {
@@ -33,6 +35,7 @@ impl Field {
             key: true,
             notation: false,
             optional: false,
+            prompt: None,
         }
     }
 
@@ -44,6 +47,7 @@ impl Field {
             key,
             notation: false,
             optional: false,
+            prompt: None,
         }
     }
 
@@ -60,6 +64,7 @@ impl Field {
             key,
             notation: false,
             optional: false,
+            prompt: None,
         }
     }
 
@@ -72,6 +77,7 @@ impl Field {
             key,
             notation: true,
             optional: false,
+            prompt: None,
         }
     }
 
@@ -79,6 +85,14 @@ impl Field {
     pub const fn optional(self) -> Self {
         Self {
             optional: true,
+            ..self
+        }
+    }
+
+    /// 入力欄の案内を label と別にする(「コメント(省略可)」)
+    pub const fn prompt(self, prompt: &'static str) -> Self {
+        Self {
+            prompt: Some(prompt),
             ..self
         }
     }
