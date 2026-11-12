@@ -76,6 +76,9 @@ public final class InputSession {
     private var settledLive: (candidate: Candidate, reading: String)?
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
+    /// 読みの先頭の「:」から打ったキー(「:bow」)．「:」で閉じたショートコードを絵文字にするのに使う(R-26)．
+    /// 打ったキーと読みが対応しなくなったら(文字のキー以外を押したら)nil にする
+    private var typedShortcode: String?
     /// Space で変換したときに，まだ求め終わっていなかった訂正のキーの並びと左の文脈．
     /// 訂正が届いたら applyLateCorrections で変換を直す．次のキーが来たら捨てる
     private var lateCorrection: (keys: [String], leftContext: String?)?
@@ -534,6 +537,9 @@ public final class InputSession {
     /// 6. 入力方式ごとの処理(EN 入力・かな入力)
     /// 7. ローマ字入力と共通の処理．文字は読みに足し，表に無いほかのキーは，組み立て中なら何もせず，組み立てていなければアプリに渡す
     private func routeJapanese(_ event: KeyEvent, command: KeymapCommand?, context: InputContext) -> KeyResult {
+        // 文字のキー以外(⌫ など)を押したら，打ったキーと読みが対応しなくなるので，ショートコードを追うのをやめる
+        let typesCharacter = if case .character = event.key { command == nil } else { false }
+        if !typesCharacter { typedShortcode = nil }
         if context.profile == .terminal, settings.current.terminalCommands, let result = applyTerminal(event) {
             return result
         }
@@ -586,7 +592,7 @@ public final class InputSession {
         // 手書き入力は設定でオンにしたときだけ
         if command == .handwriting, !settings.current.handwriting { return nil }
         // パレットは設定でオンにしていて，アプリがパレットを描けるときだけ(描けないのに開くと，キーを受けたまま何も見せなくなる)
-        if command == .emojiPalette || command == .symbolPalette, !settings.current.palette || paletteServices == nil { return nil }
+        if command.paletteKind != nil, !settings.current.palette || paletteServices == nil { return nil }
         return command
     }
 
@@ -633,10 +639,9 @@ public final class InputSession {
     private func handlePalette(_ event: KeyEvent, palette: PaletteSession, context: InputContext) -> KeyResult {
         if let command = lookUp(event) {
             switch command {
-            case .emojiPalette, .symbolPalette:
-                // 開いている種類のキーで閉じ，もう一方のキーで切り替える
-                let kind: PaletteItem.Kind = command == .emojiPalette ? .emoji : .symbol
-                guard palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
+            case .emojiPalette, .symbolPalette, .kaomojiPalette:
+                // 開いている種類のキーで閉じ，ほかの種類のキーで切り替える
+                guard let kind = command.paletteKind, palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
                 return KeyResult(handled: true, actions: paletteActions(palette.perform(.mode(kind)), palette: palette))
             case _ where command.changesMode:
                 // 日本語入力と英数入力の切り替えは効かせ，探す欄の見せ方を合わせる
@@ -682,6 +687,7 @@ public final class InputSession {
         case .handwriting: return KeyResult(handled: true, actions: commitAll() + [.showHandwriting])
         case .emojiPalette: return KeyResult(handled: true, actions: openPalette(.emoji))
         case .symbolPalette: return KeyResult(handled: true, actions: openPalette(.symbol))
+        case .kaomojiPalette: return KeyResult(handled: true, actions: openPalette(.kaomoji))
         // 入力モード
         case .japaneseMode: return switchMode(to: .japanese)
         case .directMode: return switchMode(to: .direct)
@@ -959,7 +965,43 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
+    /// 文字を読みに足す．「:bow:」のように読みの先頭の「:」から打ったショートコードを「:」で閉じたら，読みに替えて絵文字を確定する(R-26)
     private func insertCharacter(_ character: Character, context: InputContext) -> KeyResult {
+        let tracked = phase == .composing ? typedShortcode : nil
+        typedShortcode = nil
+        if character == ":", let tracked, let emoji = shortcodeEmoji(String(tracked.dropFirst())) {
+            return KeyResult(handled: true, actions: reset() + [.commit(emoji)])
+        }
+        let startsShortcode = character == ":" && !isComposing && shortcodeInputAvailable
+        let result = insertComposedCharacter(character, context: context)
+        guard isComposing, phase == .composing else { return result }
+        if startsShortcode {
+            typedShortcode = ":"
+        } else if let tracked, PaletteSearch.Query.isShortcodeCharacter(character) {
+            typedShortcode = tracked + String(character)
+        }
+        return result
+    }
+
+    /// 打っているショートコードを絵文字にできるか．パレットを使う設定で，ローマ字入力のときだけ
+    /// (かな入力の「:」のキーは「け」，EN 入力は英字をそのまま入れる)
+    private var shortcodeInputAvailable: Bool {
+        settings.current.palette && settings.current.inputStyle == .romaji && paletteServices?.catalog.index != nil
+    }
+
+    /// ショートコード(「bow」)の絵文字を，既定の肌の色にして返す．使った記録も残す．無ければ nil
+    private func shortcodeEmoji(_ name: String) -> String? {
+        guard shortcodeInputAvailable, !name.isEmpty, let paletteServices, let index = paletteServices.catalog.index,
+              let item = index.catalog.item(forShortcode: name) else { return nil }
+        let usage = paletteServices.usage
+        if settings.current.paletteRecordsHistory {
+            let now = paletteServices.now()
+            usage.update { $0.record(item.text, at: now) }
+        }
+        return item.text(skinTone: usage.usage.effectiveSkinTone(for: item.text))
+    }
+
+    private func insertComposedCharacter(_ character: Character, context: InputContext) -> KeyResult {
         var actions: [ClientAction] = []
         if case .selecting = phase, let number = numberKey(character) {
             // 候補を選んでいるときの番号キーは，その候補を確定する．その番号の候補が無ければ何もしない(打ち損じで確定しない)
@@ -1437,6 +1479,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         conversionHistory.clear()
+        typedShortcode = nil
         heldReading = nil
         convertedFromEnglish = nil
         typedBeforeEnglishWord = nil

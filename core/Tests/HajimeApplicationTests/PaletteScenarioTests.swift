@@ -13,7 +13,7 @@ struct PaletteScenarioTests {
         [kind, category, text, kind == "emoji" ? "0.6" : "", name, nameReading, english, readings, keywords, shortcodes, tones].joined(separator: "\t")
     }
 
-    /// 顔が 7 個(2 行)，人が 3 個，記号が 2 個
+    /// 顔が 7 個(2 行)，人が 3 個，記号が 2 個，顔文字が 5 個
     static let table = [
         line("emoji", "smileys", "😀", "にっこり笑う", "にっこりわらう", "grinning face", readings: "えがお", shortcodes: "grinning"),
         line("emoji", "smileys", "😃", "大きな目で笑う", "おおきなめでわらう", "grinning face with big eyes", readings: "えがお", shortcodes: "smiley"),
@@ -29,6 +29,12 @@ struct PaletteScenarioTests {
         line("emoji", "people", "👋", "手を振る", "てをふる", "waving hand", readings: "ばいばい", shortcodes: "wave", tones: "👋🏻|👋🏼|👋🏽|👋🏾|👋🏿"),
         line("symbol", "arrows", "→", "右向矢印", "みぎむきやじるし", "rightwards arrow", readings: "やじるし|みぎ"),
         line("symbol", "punctuation", "※", "米印", "こめじるし", "reference mark", readings: "こめ"),
+        // 顔文字は笑顔が 3 個，悲しみと挨拶が 1 個ずつ．絵文字と同じ読み(えがお・おじぎ)を持たせ，探した結果に混ざらないことを確かめる
+        line("kaomoji", "joy", "(^o^)", "にこにこ", "にこにこ", "", readings: "にこにこ|えがお"),
+        line("kaomoji", "joy", "(*^^*)", "てれ", "てれ", "", readings: "てれ|にこにこ"),
+        line("kaomoji", "joy", "＼(^o^)／", "ばんざい", "ばんざい", "", readings: "ばんざい"),
+        line("kaomoji", "sorrow", "(T_T)", "しくしく", "しくしく", "", readings: "しくしく|なみだ"),
+        line("kaomoji", "greeting", "m(_ _)m", "ぺこり", "ぺこり", "", readings: "ぺこり|おじぎ"),
     ].joined(separator: "\n")
 
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
@@ -109,6 +115,41 @@ struct PaletteScenarioTests {
         #expect(harness.palette == nil)
     }
 
+    @Test("R-26: パレットを開かずに「:bow:」と打っても，読みに替えて絵文字を確定し，使った記録に残す")
+    func inlineShortcode() {
+        let usage = FakePaletteUsageStore()
+        let harness = harness(usage: usage)
+        harness.type(":bow:")
+        #expect(harness.committed == "🙇")
+        #expect(harness.palette == nil)
+        #expect(harness.marked == .empty)
+        #expect(usage.usage.score(of: "🙇", at: start) > 0)
+        // 既定の肌の色にする
+        usage.update { $0.defaultSkinTone = .medium }
+        harness.type(":wave:")
+        #expect(harness.committed == "🙇👋🏽")
+    }
+
+    @Test("R-26: 絵文字にするのは，読みの先頭の「:」から打ったショートコードを「:」で閉じたときだけ")
+    func inlineShortcodeOnlyWhenClosed() {
+        // 知らないショートコード・途中から始めた「:」・⌫ で打ち直したものは，読みのまま
+        for keys in [":bowx:", "kana:bow:", ":Bow:"] {
+            let harness = harness()
+            harness.type(keys)
+            #expect(harness.committed == "", "\(keys)")
+            #expect(harness.marked != .empty, "\(keys)")
+        }
+        let edited = harness()
+        edited.type(":bowx")
+        edited.press(.backspace)
+        edited.type(":")
+        #expect(edited.committed == "")
+        // パレットを使わない設定なら絵文字にしない
+        let off = harness { $0.palette = false }
+        off.type(":bow:")
+        #expect(off.committed == "")
+    }
+
     @Test("R-26: Esc は探す語を消し，次の Esc で閉じる．⌫ は 1 文字ずつ消す")
     func escapeAndBackspace() {
         let harness = harness()
@@ -168,6 +209,93 @@ struct PaletteScenarioTests {
         harness.press(.character("k"), [.control, .option])
         harness.press(.enter)
         #expect(harness.committed == "※")
+    }
+
+    @Test("R-26: ⌃Tab で絵文字・記号・顔文字の順に切り替え，顔文字は広いマスに並べる")
+    func kaomoji() throws {
+        let harness = harness { $0.paletteRows = 4 }
+        openEmoji(harness)
+        harness.press(.tab, .control)
+        harness.press(.tab, .control)
+        let panel = try #require(harness.palette)
+        #expect(panel.modes.map(\.kind) == [.emoji, .symbol, .kaomoji])
+        #expect(panel.modes.first { $0.isSelected }?.kind == .kaomoji)
+        // 窓の幅(列の数)は変えず，1 行に 6 / 3 = 2 個の広いマスを並べる
+        #expect(panel.columns == 6)
+        #expect(panel.cellsPerRow == 2)
+        #expect(texts(panel) == [["(^o^)", "(*^^*)"], ["＼(^o^)／"], ["(T_T)"], ["m(_ _)m"]])
+        #expect(panel.tabs.map(\.title) == ["笑顔", "悲しみ", "挨拶と動作"])
+        #expect(panel.placeholder == "顔文字を検索")
+        #expect(panel.preview?.japaneseName == "にこにこ")
+        // 名前と同じ読みは説明の読みに重ねて出さない
+        #expect(panel.preview?.readings == ["えがお"])
+        // 符号位置は長いだけなので出さない
+        #expect(panel.preview?.codePoints == "")
+        harness.press(.right)
+        harness.press(.down)
+        #expect(harness.palette?.selection == PalettePanel.Position(row: 1, column: 0))
+        harness.press(.enter)
+        #expect(harness.committed == "＼(^o^)／")
+        // 前に見ていた顔文字で開き，⌃Tab で絵文字に戻る
+        harness.press(.character("e"), [.control, .option])
+        harness.press(.tab, .control)
+        harness.press(.tab, .control)
+        harness.press(.tab, .control)
+        #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .emoji)
+        #expect(harness.palette?.cellsPerRow == 6)
+    }
+
+    @Test("R-26: 顔文字のパレットのキーは既定では割り当てず，割り当てれば顔文字で開き，もう一度押すと閉じる")
+    func kaomojiKey() {
+        #expect(KeymapPreset.allCases.allSatisfy { $0.keymap.strokes(for: .kaomojiPalette, in: .idle).isEmpty })
+        let harness = harness { $0.keymap.entries.append(KeymapEntry(.anywhere, KeyStroke(.character("j"), control: true, option: true), .kaomojiPalette)) }
+        harness.press(.character("j"), [.control, .option])
+        #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .kaomoji)
+        // ほかの種類のキーで切り替え，開いている種類のキーで閉じる
+        harness.press(.character("e"), [.control, .option])
+        #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .emoji)
+        harness.press(.character("j"), [.control, .option])
+        harness.press(.character("j"), [.control, .option])
+        #expect(harness.palette == nil)
+    }
+
+    @Test("R-26: 顔文字は顔文字のパレットでだけ探し，絵文字と記号の結果には混ぜない")
+    func kaomojiSearch() {
+        let harness = harness()
+        openEmoji(harness)
+        harness.type("ojigi")
+        #expect(texts(harness.palette) == [["🙇"]])
+        harness.click(.mode(.kaomoji))
+        #expect(texts(harness.palette) == [["m(_ _)m"]])
+        harness.press(.enter)
+        #expect(harness.committed == "m(_ _)m")
+    }
+
+    @Test("R-26: ピン留めとよく使う文字は，マスの形が同じ種類のパレットにだけ出す")
+    func kaomojiShortcuts() {
+        let usage = FakePaletteUsageStore()
+        let harness = harness(usage: usage)
+        openEmoji(harness)
+        harness.type("thumbsup")
+        harness.press(.enter)
+        openEmoji(harness)
+        harness.click(.mode(.kaomoji))
+        harness.type("shikushiku")
+        harness.press(.enter)
+        #expect(harness.committed == "👍(T_T)")
+
+        openEmoji(harness)
+        #expect(texts(harness.palette).first == ["👍"])
+        harness.click(.mode(.kaomoji))
+        #expect(harness.palette?.tabs.first?.title == "よく使う")
+        #expect(texts(harness.palette).first == ["(T_T)"])
+        // 顔文字をピン留めしても，絵文字のパレットには出さない
+        harness.press(.down)
+        harness.press(.character("d"), .control)
+        #expect(usage.usage.pinned == ["(^o^)"])
+        #expect(harness.palette?.tabs.first?.title == "ピン留め")
+        harness.click(.mode(.emoji))
+        #expect(harness.palette?.tabs.map(\.title).contains("ピン留め") == false)
     }
 
     @Test("R-26: 探しているときは，今見ている種類の文字を先に出す")

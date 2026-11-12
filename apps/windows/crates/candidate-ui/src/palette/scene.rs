@@ -37,7 +37,7 @@ const PIN_FALLBACK: &str = "📌";
 const SEPARATOR: &str = "  ";
 
 /// まとまりのタブのアイコン．絵文字のまとまりとピン留め・よく使う文字・探した結果はアイコンで描き，
-/// 記号のまとまりは代表の文字で描く(macOS の PaletteIcons.symbolName)．名前は core の PaletteSection.Kind.wireName
+/// 記号と顔文字のまとまりは代表の文字で描く(macOS の PaletteIcons.symbolName)．名前は core の PaletteSection.Kind.wireName
 fn tab_glyph(section: &str) -> Option<char> {
     Some(match section {
         "pinned" => glyph::PIN,
@@ -178,6 +178,18 @@ impl Drawing<'_> {
     // MARK: - 部品
 
     /// 探す欄．虫めがね・探す語(空なら案内を薄く)・打った文字が入る位置の縦の線
+    /// font で rect の幅に収まれば真ん中に描き，収まらなければ顔文字の下限の大きさ(kaomoji_small)に縮める．
+    /// それでも収まらなければ末尾を省く(macOS の PaletteView.drawFitted．書体は前もって作るので 2 段で縮める)
+    fn fitted(&mut self, text: &str, font: Font, color: Color, rect: Frame) {
+        if self.painter.width(text, font) <= rect.width {
+            self.painter.centered(text, font, color, rect);
+            return;
+        }
+        let small = self.layout.fonts.kaomoji_small;
+        let shown = self.painter.truncated(text, small, rect.width);
+        self.painter.centered(&shown, small, color, rect);
+    }
+
     fn search(&mut self) {
         let theme = self.theme;
         let fonts = self.layout.fonts;
@@ -291,9 +303,13 @@ impl Drawing<'_> {
                     color,
                     *frame,
                 ),
-                None => self
-                    .painter
-                    .centered(&tab.symbol, fonts.tab_symbol, color, *frame),
+                // 顔文字のまとまりの短い顔はタブの幅に収まるよう縮める
+                None => self.fitted(
+                    &tab.symbol,
+                    fonts.tab_symbol,
+                    color,
+                    frame.inset(palette::SELECTION_STROKE, 0.0),
+                ),
             }
         }
     }
@@ -343,16 +359,26 @@ impl Drawing<'_> {
                 if selected {
                     self.selection(frame);
                 }
-                let font = if is_emoji(&cell.text) {
-                    fonts.cell_emoji
-                } else {
-                    fonts.cell_symbol
-                };
                 // platinum と desk の選んでいるマスは選択の色で塗るので，記号は選択の文字の色にする
                 let color = if selected && !theme.is_rounded() {
                     theme.selection_text
                 } else {
                     theme.text
+                };
+                if layout.wide {
+                    // 顔文字は絵文字を含んでいても候補の書体で描く(顔の形を崩さない)
+                    self.fitted(
+                        &cell.text,
+                        fonts.cell_kaomoji,
+                        color,
+                        frame.inset(palette::KAOMOJI_PADDING_X, 0.0),
+                    );
+                    continue;
+                }
+                let font = if is_emoji(&cell.text) {
+                    fonts.cell_emoji
+                } else {
+                    fonts.cell_symbol
                 };
                 self.painter.centered(&cell.text, font, color, frame);
             }
@@ -400,19 +426,36 @@ impl Drawing<'_> {
         let fonts = self.layout.fonts;
         let size = palette::PREVIEW_GLYPH_SIZE;
         let padding = palette::SELECTION_STROKE * 2.0;
-        let tile = Frame::new(
+        let mut tile = Frame::new(
             rect.x,
             (rect.mid_y() - size / 2.0 - padding).round(),
             size + padding * 2.0,
             size + padding * 2.0,
         );
-        self.fill(tile, theme.badge, palette::CELL_RADIUS);
-        let font = if is_emoji(&shown.text) {
-            fonts.preview_emoji
+        if self.layout.wide {
+            // 顔文字は横に長いので，文字の幅に合わせて枠を広げる(説明の欄の幅の一定の割合まで)
+            let width = self.painter.width(&shown.text, fonts.preview_kaomoji)
+                + palette::KAOMOJI_PADDING_X * 4.0;
+            tile.width = tile
+                .width
+                .max(width.ceil())
+                .min((rect.width * palette::PREVIEW_KAOMOJI_WIDTH).round());
+            self.fill(tile, theme.badge, palette::CELL_RADIUS);
+            self.fitted(
+                &shown.text,
+                fonts.preview_kaomoji,
+                theme.text,
+                tile.inset(palette::KAOMOJI_PADDING_X, 0.0),
+            );
         } else {
-            fonts.preview_symbol
-        };
-        self.painter.centered(&shown.text, font, theme.text, tile);
+            self.fill(tile, theme.badge, palette::CELL_RADIUS);
+            let font = if is_emoji(&shown.text) {
+                fonts.preview_emoji
+            } else {
+                fonts.preview_symbol
+            };
+            self.painter.centered(&shown.text, font, theme.text, tile);
+        }
         let text_x = tile.max_x() + palette::PREVIEW_GAP;
         let width = rect.max_x() - text_x - palette::FOOTER_HEIGHT;
         let name = if shown.japanese_name.is_empty() {
@@ -575,7 +618,12 @@ mod tests {
 
     #[test]
     fn 使う書体はすべて前もって作る書体の中にある() {
-        for panel in [sample::emoji(), sample::search(), sample::symbol()] {
+        for panel in [
+            sample::emoji(),
+            sample::search(),
+            sample::symbol(),
+            sample::kaomoji(),
+        ] {
             for measure in [&Fixed as &dyn Measure, &WithIcons] {
                 let (layout, scene) = draw(&panel, "automatic", measure);
                 let prepared = layout.fonts.all();
@@ -587,6 +635,28 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn 顔文字は広いマスに候補の書体で描き収まらなければ縮めて省く() {
+        let (layout, scene) = draw(&sample::kaomoji(), "automatic", &Fixed);
+        let fonts = fonts_of(&scene);
+        assert!(layout.wide);
+        assert!(fonts.contains(&("(^o^)".into(), layout.fonts.cell_kaomoji)));
+        // 絵文字の字(✧)を含む顔文字も絵文字の書体にしない
+        assert!(!fonts
+            .iter()
+            .any(|(text, font)| text.contains('✧') && *font == layout.fonts.cell_emoji));
+        // 広いマス(幅 108 から余白を除いた 100)に収まらない 23 文字の顔文字は，下限の大きさにして末尾を省く
+        let long = fonts
+            .iter()
+            .find(|(text, _)| text.starts_with("((((((((("))
+            .expect("長い顔文字");
+        assert_eq!(long.1, layout.fonts.kaomoji_small);
+        assert!(long.0.ends_with('…'));
+        // 説明の大きな顔文字と，タブの短い顔
+        assert!(fonts.contains(&("(´・ω・｀)".into(), layout.fonts.preview_kaomoji)));
+        assert!(fonts.contains(&("T_T".into(), layout.fonts.tab_symbol)));
     }
 
     #[test]

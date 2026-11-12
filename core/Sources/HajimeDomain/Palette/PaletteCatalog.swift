@@ -16,7 +16,7 @@ public struct PaletteCatalog: Sendable, Equatable {
         for line in text.split(whereSeparator: \.isNewline) where !line.hasPrefix("#") {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard fields.count >= 11, let kind = PaletteItem.Kind(rawValue: String(fields[0])), let category = PaletteCategory(rawValue: String(fields[1])),
-                  category.kind == kind, !fields[2].isEmpty, fields[2].count <= DefaultSettings.maximumPaletteTextLength else { continue }
+                  category.kind == kind, !fields[2].isEmpty, fields[2].count <= Self.maximumTextLength(of: kind) else { continue }
             let text = String(fields[2])
             guard seen.insert("\(kind.rawValue):\(text)").inserted else { continue }
             let skinTones = Self.list(fields[10])
@@ -27,6 +27,11 @@ public struct PaletteCatalog: Sendable, Equatable {
                 skinTones: skinTones.count == SkinTone.allTones.count ? skinTones : []))
         }
         self.items = items
+    }
+
+    /// 1 つの項目の文字の長さの上限．顔文字は何文字もあるので別に決める
+    private static func maximumTextLength(of kind: PaletteItem.Kind) -> Int {
+        kind == .kaomoji ? DefaultSettings.maximumKaomojiTextLength : DefaultSettings.maximumPaletteTextLength
     }
 
     private static func list(_ field: Substring) -> [String] {
@@ -46,6 +51,12 @@ public struct PaletteCatalog: Sendable, Equatable {
     /// この文字の項目．肌の色を変えた形からも引く
     public func item(for text: String) -> PaletteItem? {
         items.first { $0.text == text || $0.skinTones.contains(text) }
+    }
+
+    /// このショートコード(「:bow:」のコロンを除いた「bow」)の項目．大文字と小文字は区別しない
+    public func item(forShortcode name: String) -> PaletteItem? {
+        let name = name.lowercased()
+        return items.first { $0.shortcodes.contains(name) }
     }
 
     /// 記号に，読みから引く記号の辞書(SymbolDictionary)の読みを足したもの．変換で出る記号はパレットでも同じ読みで探せるようにする

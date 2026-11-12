@@ -133,6 +133,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case emojiPalette
     /// 記号のパレットを開く．開いているときは閉じる
     case symbolPalette
+    /// 顔文字のパレットを開く．開いているときは閉じる．既定ではキーを割り当てない(⌃Tab でパレットの種類を切り替えても開ける)
+    case kaomojiPalette
 
     /// 設定の画面でコマンドを並べるまとまり
     public enum Group: String, Sendable, CaseIterable {
@@ -160,7 +162,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit: .commit
         case .forgetCandidate, .forgetLastCommit: .learning
-        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette: .tools
+        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette: .tools
         }
     }
 
@@ -170,7 +172,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
         // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
-             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette:
+             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]
@@ -197,6 +199,16 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .kanaStyle: .kana
         case .englishStyle: .english
         case .englishAutoStyle: .englishAuto
+        default: nil
+        }
+    }
+
+    /// パレットを開くコマンドなら，開くパレットの種類
+    public var paletteKind: PaletteItem.Kind? {
+        switch self {
+        case .emojiPalette: .emoji
+        case .symbolPalette: .symbol
+        case .kaomojiPalette: .kaomoji
         default: nil
         }
     }
