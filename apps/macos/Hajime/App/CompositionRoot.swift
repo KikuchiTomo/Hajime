@@ -41,6 +41,8 @@ final class CompositionRoot {
     var modeMemory = AppModeMemory()
     /// 日本語のモードで英字のキーをアプリに渡した理由の記録．入力欄ごとのコントローラーで共有し，同じ理由を続けて記録しない
     let passThroughDiagnostics = PassThroughDiagnostics()
+    /// 入力ソースから外れたときに登録し直す．入力欄ごとのコントローラーで共有し，確かめる間隔を空ける
+    let inputSourceRegistration = InputSourceRegistration()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
                  dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {
