@@ -131,7 +131,7 @@ layout: hextra-home
     subtitle="アプリを切り替えたときに日本語入力にするか英数にするかを，アプリごとに決められます．"
     link="docs/settings/#除外設定"
     image="images/features/app-modes.webp"
-    alt="初期設定のアプリごとの入力モードの画面．IME をオフを選び，ターミナルに切り替えると英数(A)になる実演を出している"
+    alt="初期設定のアプリごとの入力モードの画面．IME オフを選び，ターミナルに切り替えると英数(A)になる実演を出している"
   >}}
   {{< hajime/feature
     title="外部通信不要"
@@ -152,14 +152,14 @@ layout: hextra-home
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="変換" >}}
     {{< hajime/catalog-item title="文節の操作" link="docs/usage/#文節の操作" >}}文節の区切りを 1 文字単位や単語の切れ目で変えられ，1 つの文節だけを打ち直すこともできます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="候補を表に広げる" link="docs/usage/#候補を表に広げる" >}}Option+↓ で候補を表に広げると，候補の多い読みでも 36 個を一度に見渡せます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="候補を表に展開" link="docs/usage/#候補を表に展開" >}}Option+↓ で候補を表に展開すると，候補の多い読みでも 36 個を一度に見渡せます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="Esc で元に戻す" link="docs/usage/#変換と確定" >}}候補や文節の区切りの変更を，8 回までさかのぼって取り消せます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="確定の取り消し" link="docs/usage/#確定の取り消し" >}}確定した直後に Control+Backspace を押すと，確定前の変換に戻って選び直せます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="誤りやすい文節へ移動" link="docs/usage/#変換と確定" >}}Option+→ で，誤変換の可能性が高い文節へ移動します．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="前後の文脈で並べ替え" link="docs/settings/#変換" >}}「Pythonでプログラムをかこう」なら「加工」より「書こう」が先に出るように，前後の文に合う順に候補を並べます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="再変換" link="docs/usage/#再変換" >}}確定した文字を選んで Control+Shift+R を押すと，読みに戻して変換し直せます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="文字種の変換" link="docs/usage/#変換と確定" >}}F6〜F10 で，ひらがな・カタカナ・全角英数・半角英数に変換します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="数字の書き方" link="docs/settings/#変換" >}}21 を ㉑・二一・弐拾壱・ⅩⅩⅠ に変換できます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="数字の表記" link="docs/settings/#変換" >}}21 を ㉑・二一・弐拾壱・ⅩⅩⅠ に変換できます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="校正支援" link="docs/settings/#変換" >}}ら抜き言葉・さ入れ言葉・二重敬語・重言に，本来の形を添えます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="送り仮名" link="docs/settings/#変換" >}}送り仮名を本則・許容から選べます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="学習" link="docs/settings/#変換" >}}選んだ語は次から先に出るようになり，不要な学習は Control+Backspace で削除できます．{{< /hajime/catalog-item >}}
@@ -167,7 +167,7 @@ layout: hextra-home
     {{< hajime/catalog-item title="Zenzai のモデル" link="docs/settings/#変換" >}}精度を優先・速さを優先・併用から選べ，併用では打っている間だけ小さなモデルで速く表示します．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="補正" >}}
-    {{< hajime/catalog-item title="同じキーの重なり" link="docs/settings/#補正" >}}「koonnnitiha」を「こんにちは」に補正します．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="キーの二重入力" link="docs/settings/#補正" >}}「koonnnitiha」を「こんにちは」に補正します．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="読み違い" link="docs/settings/#補正" >}}「ふいんき」でも「雰囲気」が候補に出ます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="うろ覚えのカタカナ語" link="docs/settings/#補正" >}}「しゅみれーしょん」でも「シミュレーション」が候補に出ます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="発音どおりに綴った英単語" link="docs/settings/#補正" >}}「ふぉと」で「photo」が候補に出ます．{{< /hajime/catalog-item >}}
@@ -176,8 +176,8 @@ layout: hextra-home
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="英語と日本語" >}}
     {{< hajime/catalog-item title="外来語の英字表記" link="docs/settings/#英語と日本語" >}}約 13 万語の英字表記を収録しており，「れっどはっと」で Red Hat，「にゅーらる」で neural が候補に出ます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="前の単語で判別" link="docs/settings/#英語と日本語" >}}「make」のように英語にも日本語にも読める語を，前の単語に合わせて判別します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="英語にする単語・日本語にする単語" link="docs/settings/#英語と日本語" >}}常に英語にする単語と，常に日本語にする単語を登録できます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="直前の単語で判別" link="docs/settings/#英語と日本語" >}}「make」のように英語にも日本語にも読める語を，前の単語に合わせて判別します．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="英語にする単語・日本語にする単語" link="docs/settings/#英語と日本語" >}}常に英語で入力する単語と，常に日本語に変換する単語を登録できます．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="辞書・マクロ・コマンド" >}}
     {{< hajime/catalog-item title="ユーザー辞書" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}10,000 語まで登録でき，「gh」で GitHub のように英字の読みも使えます．{{< /hajime/catalog-item >}}

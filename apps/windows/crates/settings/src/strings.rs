@@ -9,11 +9,10 @@ pub mod settings {
     pub const IMPORT_DICTIONARY: &str = "インポート…";
     pub const EXPORT_DICTIONARY: &str = "エクスポート…";
     pub const EXPORT_FILE_NAME: &str = "hajime-user-dictionary.txt";
-    pub const IMPORT_FAILED: &str =
-        "インポートできませんでした。ファイルが大きすぎるか、テキストファイルではありません";
+    pub const IMPORT_FAILED: &str = "インポートできませんでした。サイズか形式のエラーです";
     pub const EXPORT_FAILED: &str = "エクスポートできませんでした";
     pub fn imported(count: u32) -> String {
-        format!("{count} 件を追加しました")
+        format!("{} 単語を追加しました", super::thousands(count))
     }
     pub const OK: &str = "OK";
     pub const CANCEL: &str = "キャンセル";
@@ -38,14 +37,14 @@ pub mod settings {
     pub const SLASH: &str = "/ キーで入力する文字";
     pub const SPACE_WIDTH: &str = "スペース幅";
     pub const NUMBER_WIDTH: &str = "数字幅";
-    pub const NUMBER_SEPARATORS: &str = "数字のあとの句読点をピリオドとカンマに";
-    pub const ALPHANUMERIC_HYPHEN: &str = "英数字のあとの長音をハイフンに";
+    pub const NUMBER_SEPARATORS: &str = "数字のあとはピリオドとカンマ";
+    pub const ALPHANUMERIC_HYPHEN: &str = "英数字のあとはハイフン";
     pub const KEYS: &str = "動作";
     pub const PUNCTUATION_COMMITS: &str = "句読点で確定";
     pub const QUESTION_EXCLAMATION_COMMITS: &str = "？と！で確定";
     pub const KEYPAD_CALCULATION: &str = "テンキーの Enter で計算";
-    pub const CYCLES_LETTER_CASE: &str = "英数に変えるキーで大文字と小文字を切り替え";
-    pub const NUMBER_KEY_SELECTION: &str = "番号キーで候補を選択";
+    pub const CYCLES_LETTER_CASE: &str = "英数キーで大文字・小文字を切り替え";
+    pub const NUMBER_KEY_SELECTION: &str = "数字キーで候補を選択";
     pub const SHOWS_MODE_INDICATOR: &str = "入力モードの切り替えを表示";
     pub const CONVERSION: &str = "変換";
     pub const SPECIAL_CONVERSION: &str = "特殊変換";
@@ -62,7 +61,7 @@ pub mod settings {
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
     pub const EMOJI_SECTION: &str = "絵文字";
     pub const EMOJI_CONVERSION: &str = "文節を絵文字に変換";
-    pub const EMOJI_WORD_CONVERSION: &str = "語を絵文字に変換";
+    pub const EMOJI_WORD_CONVERSION: &str = "単語を絵文字に変換";
     /// 項目名の横に出す，その設定で出る候補の見本(読みと候補)
     pub const EMOJI_CONVERSION_EXAMPLE: (&str, &str) = ("びーる", "🍺");
     pub const EMOJI_WORD_CONVERSION_EXAMPLE: (&str, &str) = ("ねこが", "🐈が");
@@ -70,7 +69,7 @@ pub mod settings {
     pub const EMOJI_CANDIDATE_COUNT: &str = "絵文字の数";
     pub const SHOWS_EMOJI_NAMES: &str = "絵文字の名前を表示";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
-    pub const NUMBER_FORMS: &str = "数字の書き方";
+    pub const NUMBER_FORMS: &str = "数字の表記";
     pub const NUMBER_FORM_CONVERSION: &str = "数字を丸数字などに変換";
     pub const NUMBER_FORM_CIRCLED: &str = "丸数字";
     pub const NUMBER_FORM_PARENTHESIZED: &str = "括弧付きとピリオド付きの数字";
@@ -80,16 +79,16 @@ pub mod settings {
     pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
     /// 併用を選んだときに出す，入力中と変換で使うモデル
     pub const ZENZAI_COMBINED_NOTE: &str = "入力中: 速さを優先 / 変換: 精度を優先";
-    pub const CANDIDATE_RERANKING: &str = "2 番目以降の候補を Zenzai で並べ替え";
+    pub const CANDIDATE_RERANKING: &str = "Zenzai で候補を並べ替え";
     pub const JINEN_MODEL: &str = "jinen のモデル";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
     pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
     pub const LEARNING_RESET: &str = "学習結果を消去しました";
     pub const RECORDS_USAGE: &str = "入力の統計を記録";
-    pub const USAGE_NOTE: &str = "入力した文字は記録しません。";
+    pub const USAGE_NOTE: &str = "入力した文字は記録しません";
     pub const FIRST_CANDIDATE_RATE: &str = "第 1 候補のまま確定した割合";
-    pub const COMMITS: &str = "確定した回数";
+    pub const COMMITS: &str = "確定回数";
     pub const CONVERSIONS_OPENED: &str = "Space で変換した回数";
     pub const SEGMENTS_CHANGED: &str = "選び直した文節の数";
     pub const READING_CORRECTIONS: &str = "タイプミスを修正した回数 / 取り消した回数";
@@ -109,7 +108,7 @@ pub mod settings {
 
     /// UIStrings.Settings.fontSize(スライダーの名前に今の値を付ける)
     pub fn font_size(size: f64) -> String {
-        format!("{FONT_SIZE_NAME}: {}", size.round() as i64)
+        format!("{FONT_SIZE_NAME}: {} pt", size.round() as i64)
     }
     pub const ADD: &str = "追加";
     pub const ESCAPE_SWITCHES_TO_DIRECT: &str = "Esc で英数に切り替え";
@@ -118,7 +117,7 @@ pub mod settings {
     pub const WORD: &str = "単語";
     pub const DICTIONARY_EMPTY: &str = "登録した単語はありません";
     pub const ROMAJI_KANA: &str = "出力";
-    pub const ROMAJI_EMPTY: &str = "追加した組み合わせはありません";
+    pub const ROMAJI_EMPTY: &str = "追加したローマ字はありません";
     pub const REMOVE: &str = "削除";
 }
 
@@ -144,8 +143,8 @@ pub mod choice {
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const SUGGESTION_DISPLAY: &str = "入力中の候補";
     pub const PREDICTION_DISPLAY: &str = "入力中の予測";
-    pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴にある予測を優先";
-    pub const PREDICTION_FROM_CORRECTION: &str = "打ち間違いを直した読みからも予測";
+    pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴の予測を優先";
+    pub const PREDICTION_FROM_CORRECTION: &str = "タイプミス修正後の読みからも予測";
     pub const HIDDEN_PREDICTIONS: &str = "予測に表示しない語句";
     pub const HIDDEN_PREDICTION_PLACEHOLDER: &str = "語句";
     pub const HIDDEN_PREDICTIONS_EMPTY: &str = "予測に表示しない語句はありません";
@@ -162,30 +161,30 @@ pub mod features {
     pub const HANDWRITING: &str = "手書き入力";
     pub const MISREADINGS: &str = "読み違いの候補";
     pub const LANGUAGE_PAGE: &str = "英語と日本語";
-    pub const ENGLISH_WORDS: &str = "常に英語にする単語";
-    pub const JAPANESE_WORDS: &str = "常に日本語にする単語";
+    pub const ENGLISH_WORDS: &str = "常に英語で入力する単語";
+    pub const JAPANESE_WORDS: &str = "常に日本語に変換する単語";
     pub const LANGUAGE_RULES: &str = "判別ルール";
     pub const TRY_LANGUAGE: &str = "試す";
     pub const LANGUAGE_JUDGING: &str = "判別方法";
-    pub const USES_CONTEXT: &str = "前の単語で判別";
+    pub const USES_CONTEXT: &str = "直前の単語で判別";
     /// 「前の単語で判別」の横に出す見本(前が日本語なら英字の語も日本語にする．macOS の UIStrings.Features.usesContextExample)
     pub const USES_CONTEXT_EXAMPLE: (&str, &str) = ("試合に make", "試合に負け");
     pub const AVOIDS_OFFENSIVE: &str = "不適切な変換を避ける";
     pub const WORD_PLACEHOLDER: &str = "英字の単語";
     pub const LANGUAGE_RULE_WORD: &str = "単語";
-    pub const LANGUAGE_RULE_CONTEXT: &str = "前";
+    pub const LANGUAGE_RULE_CONTEXT: &str = "直前";
     pub const LANGUAGE_RULE_RESULT: &str = "結果";
     pub const TRY_PLACEHOLDER: &str = "英字の文";
-    pub const TRY_PRECEDING: &str = "前の文字列";
-    pub const ENGLISH_WORDS_EMPTY: &str = "常に英語にする単語はありません";
-    pub const JAPANESE_WORDS_EMPTY: &str = "常に日本語にする単語はありません";
+    pub const TRY_PRECEDING: &str = "直前の文字列";
+    pub const ENGLISH_WORDS_EMPTY: &str = "常に英語で入力する単語はありません";
+    pub const JAPANESE_WORDS_EMPTY: &str = "常に日本語に変換する単語はありません";
     pub const CORRECTION_PAGE: &str = "補正";
     pub const CORRECTS_ENGLISH: &str = "英単語";
     pub const EXCEPTIONS: &str = "修正しない語句";
     pub const RULES: &str = "置き換え";
     pub const SYMBOLS_PAGE: &str = "記号";
-    pub const SEQUENCES: &str = "連続入力によるサジェスト";
-    pub const READINGS: &str = "読み仮名入力によるサジェスト";
+    pub const SEQUENCES: &str = "連続入力";
+    pub const READINGS: &str = "読み入力";
     pub const SEARCH: &str = "検索";
     pub const INPUT: &str = "入力";
     pub const OUTPUT: &str = "記号";
@@ -196,7 +195,7 @@ pub mod features {
     pub const ADDED: &str = "追加";
     pub const CORRECTION_KINDS: &str = "修正の対象";
     pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
-    pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
+    pub const CORRECTS_REPEATED_KEYS: &str = "キーの二重入力";
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
     pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";
@@ -207,7 +206,7 @@ pub mod features {
 
 /// UIStrings.Extras
 pub mod extras {
-    pub const HAND_SHIFT: &str = "手の位置のずれを修正（試験的）";
+    pub const HAND_SHIFT: &str = "手の位置のずれを修正(試験的)";
     pub const HAND_SHIFT_NOTE: &str = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。";
     pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
     pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。";
@@ -220,27 +219,27 @@ pub mod extras {
     pub const ENGLISH_TERM_CANDIDATES_EXAMPLE: (&str, &str) = ("api", "API");
     pub const PHONETIC_SPELLING_NOTE: &str =
         "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。";
-    pub const ENGLISH_TERM_CANDIDATES: &str = "英語の語の辞書を使う";
-    pub const ENGLISH_TERMS: &str = "英語の語の辞書に足した語";
-    pub const ENGLISH_TERMS_SECTION: &str = "英語の語の辞書";
-    pub const ENGLISH_TERM_PLACEHOLDER: &str = "書き方どおりの語";
+    pub const ENGLISH_TERM_CANDIDATES: &str = "英単語辞書を使用";
+    pub const ENGLISH_TERMS: &str = "追加した単語";
+    pub const ENGLISH_TERMS_SECTION: &str = "英単語辞書";
+    pub const ENGLISH_TERM_PLACEHOLDER: &str = "表記どおりの単語";
     pub const ENGLISH_TERM_PROMPT: &str = "例: OpenAI";
-    pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
-    pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
+    pub const ENGLISH_TERMS_EMPTY: &str = "追加した単語はありません";
+    pub const DYNAMIC_DICTIONARY: &str = "書式の展開";
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
-    pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
+    pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを実行";
     pub const COMMAND_READING: &str = "読み";
     pub const COMMAND_TITLE: &str = "名前";
     pub const COMMAND_KIND: &str = "動作";
-    pub const COMMAND_TARGET: &str = "行き先";
+    pub const COMMAND_TARGET: &str = "対象";
     pub const COMMANDS_EMPTY: &str = "コマンドはありません";
     pub const ADD_COMMAND: &str = "コマンドを追加…";
     pub const EDIT_COMMAND: &str = "編集…";
     pub const REMOVE_COMMAND: &str = "削除";
     pub const CHOOSE_APPLICATION: &str = "アプリを選択…";
     pub const CHOOSE_FILE: &str = "ファイルを選択…";
-    pub const INVALID_COMMAND: &str = "読み・名前・行き先を確認してください";
+    pub const INVALID_COMMAND: &str = "読み・名前・対象を確認してください";
     pub const TOO_MANY_COMMANDS: &str = "これ以上コマンドを追加できません";
     pub const SAVE: &str = "保存";
     pub const CANCEL: &str = "キャンセル";
@@ -248,12 +247,12 @@ pub mod extras {
     pub const TARGET_PLACEHOLDER_SHORTCUT: &str = "ショートカットの名前";
     pub const MACROS_SECTION: &str = "変換マクロ";
     pub const CONVERSION_MACROS: &str = "連想変換のキーで変換マクロを表示";
-    pub const MACRO_PATTERN: &str = "形";
-    pub const MACROS_EMPTY: &str = "マクロはありません";
+    pub const MACRO_PATTERN: &str = "書式";
+    pub const MACROS_EMPTY: &str = "変換マクロはありません";
     pub const INVALID_MACRO: &str = "{text} か {reading} を含めてください";
-    pub const MACRO_SKIPS_SAME_READING: &str = "かなの語には読みを添える形を出さない";
+    pub const MACRO_SKIPS_SAME_READING: &str = "かなの単語は読み付きを省略";
     pub const TRY_MACROS: &str = "変換マクロを試す";
-    pub const TRY_MACRO_WORD: &str = "試す語";
+    pub const TRY_MACRO_WORD: &str = "試す単語";
     pub const TRY_MACRO_READING: &str = "読み";
 }
 
@@ -276,13 +275,13 @@ pub mod import_preview {
 
     pub const LINE: &str = "行";
     pub const ALL: &str = "すべて";
-    pub const DEFAULTED: &str = "名詞にする";
-    pub const UNREADABLE: &str = "読めない";
+    pub const DEFAULTED: &str = "名詞で登録";
+    pub const UNREADABLE: &str = "形式エラー";
     pub const MEANING: &str = "意味";
-    pub const WORDS: &str = "語";
+    pub const WORDS: &str = "単語";
     /// 品詞の列が無い・知らない品詞の行に添えるツールチップ
-    pub const DEFAULTED_HELP: &str = "品詞が無いため名詞として登録します";
-    pub const UNREADABLE_HELP: &str = "読めないため取り込みません";
+    pub const DEFAULTED_HELP: &str = "品詞がないため名詞で登録";
+    pub const UNREADABLE_HELP: &str = "形式エラーのためスキップ";
 
     pub fn filter(name: &str, count: u32) -> String {
         format!("{name} {}", super::thousands(count))
@@ -298,7 +297,7 @@ pub mod import_preview {
     pub fn format(format: ImportFormat) -> &'static str {
         match format {
             ImportFormat::TabSeparated => "タブ区切り",
-            ImportFormat::CommaSeparated => "「,」区切り",
+            ImportFormat::CommaSeparated => "カンマ区切り",
             ImportFormat::Skk => "SKK",
             ImportFormat::PropertyList => "macOS のユーザ辞書",
         }
@@ -307,9 +306,9 @@ pub mod import_preview {
     pub fn import_button(count: u32, kind: ImportKind) -> String {
         let count = super::thousands(count);
         if kind == ImportKind::Association {
-            format!("{count} 件を取り込む")
+            format!("{count} 件をインポート")
         } else {
-            format!("{count} 語を取り込む")
+            format!("{count} 単語をインポート")
         }
     }
 }
@@ -320,8 +319,8 @@ pub mod templates {
     use crate::template_reference::{Group, Item, Kind};
 
     /// 欄の右の「{ }」のボタン(チップを開け閉めする)の読み上げとツールチップ
-    pub const BUTTON: &str = "書き方";
-    pub const BUTTON_HELP: &str = "日付・時刻・乱数などの書き方";
+    pub const BUTTON: &str = "書式";
+    pub const BUTTON_HELP: &str = "日付・時刻・乱数などの書式";
 
     /// 単語に書ける書き方(ユーザー辞書)
     pub const WORD: &[Group] = &[
@@ -333,10 +332,10 @@ pub mod templates {
     ];
 
     const TEXT: Group = Group {
-        title: "語",
+        title: "単語",
         kind: Kind::Syntax,
         items: &[
-            Item::new("{text}", "選んでいる語", "東京"),
+            Item::new("{text}", "選択中の単語", "東京"),
             Item::new("{reading}", "読み", "とうきょう"),
             Item::new("{reading|katakana}", "読みのカタカナ", "トウキョウ"),
             Item::new("{reading|romaji}", "読みのローマ字", "toukyou"),
@@ -349,14 +348,14 @@ pub mod templates {
             Item::new("{date}", "今日の日付", "2026/04/01"),
             Item::new("{time}", "今の時刻", "09:30"),
             Item::new("{datetime}", "今の日時", "2026/04/01 09:30:15"),
-            Item::new("{date:M月D日(ddd)}", "書式を決めた日付", "4月1日(水)"),
-            Item::new("{time:A K時m分}", "書式を決めた時刻", "午前 9時30分"),
+            Item::new("{date:M月D日(ddd)}", "書式指定の日付", "4月1日(水)"),
+            Item::new("{time:A K時m分}", "書式指定の時刻", "午前 9時30分"),
             Item::new("{utc}", "協定世界時の日時", "2026-04-01T00:30:15Z"),
             Item::new("{unixtime}", "UNIX 時間（秒）", "1775003415"),
         ],
     };
     const SHIFT: Group = Group {
-        title: "ずらす",
+        title: "日時の計算",
         kind: Kind::Syntax,
         items: &[
             Item::new("{date+1d}", "明日", "2026/04/02"),
@@ -430,7 +429,7 @@ pub mod templates {
             Item::new("{random:1-6}", "1〜6 の整数", "4"),
             Item::new("{alnum:8}", "英数字 8 文字", "8TYwkwUz").code_value(),
             Item::new("{hex:8}", "16 進数 8 桁", "68e2aff0").code_value(),
-            Item::new("{pick:はい,いいえ}", "並べたうちのどれか", "はい"),
+            Item::new("{pick:はい,いいえ}", "ランダムに 1 つ", "はい"),
         ],
     };
     const BRACES: Group = Group {
@@ -486,35 +485,35 @@ pub mod templates {
             ),
             Item::with_sample(
                 "|snake",
-                "小文字を _ でつなぐ",
+                "スネークケース",
                 "{date:MMMM EEEE|snake}",
                 "april_wednesday",
             )
             .code_value(),
             Item::with_sample(
                 "|camel",
-                "2 語目から先頭を大文字にしてつなぐ",
+                "キャメルケース",
                 "{date:MMMM EEEE|camel}",
                 "aprilWednesday",
             )
             .code_value(),
             Item::with_sample(
                 "|pascal",
-                "語の先頭を大文字にしてつなぐ",
+                "パスカルケース",
                 "{date:MMMM EEEE|pascal}",
                 "AprilWednesday",
             )
             .code_value(),
             Item::with_sample(
                 "|kebab",
-                "小文字を - でつなぐ",
+                "ケバブケース",
                 "{date:MMMM EEEE|kebab}",
                 "april-wednesday",
             )
             .code_value(),
             Item::with_sample(
                 "|url",
-                "URL に入れる形",
+                "URL エンコード",
                 "{date:NN|url}",
                 "%E5%8D%AF%E6%9C%88",
             )
@@ -523,20 +522,20 @@ pub mod templates {
             Item::with_sample("|kansuji", "漢数字", "{date:YYYY|kansuji}", "二千二十六"),
             Item::with_sample(
                 "|kanjidigits",
-                "1 字ずつの漢数字",
+                "漢数字(位取りなし)",
                 "{date:YYYY|kanjidigits}",
                 "二〇二六",
             ),
             Item::with_sample("|daiji", "大字", "{date:YYYY|daiji}", "弐千弐拾六"),
             Item::with_sample("|comma", "3 桁区切り", "{unixtime|comma}", "1,775,003,415"),
             Item::with_sample("|circled", "丸数字", "{date:D|circled}", "①"),
-            Item::with_sample("|html", "HTML に入れる形", "{pick:<b>|html}", "&lt;b&gt;")
+            Item::with_sample("|html", "HTML エスケープ", "{pick:<b>|html}", "&lt;b&gt;")
                 .code_value(),
             Item::with_sample("|base64", "Base64", "{date|base64}", "MjAyNi8wNC8wMQ==")
                 .code_value(),
             Item::with_sample(
                 "|upper|fullwidth",
-                "左から順にかける",
+                "左から順に適用",
                 "{date:MMM|upper|fullwidth}",
                 "ＡＰＲ",
             ),
@@ -581,7 +580,7 @@ pub mod templates {
             Item::with_sample("W", "週番号", "{date:W}", "14"),
             Item::with_sample("Q", "四半期", "{date:Q}", "2"),
             Item::with_sample("ZZ", "時間帯", "{time:ZZ}", "+09:00"),
-            Item::with_sample("'Q'", "' で囲んだ文字はそのまま入る", "{date:'Q'Q}", "Q2"),
+            Item::with_sample("'Q'", "' で囲んだ文字はそのまま出力", "{date:'Q'Q}", "Q2"),
         ],
     };
 }
@@ -590,7 +589,7 @@ pub mod templates {
 pub mod more {
     pub const ALPHABET_WIDTH: &str = "英字幅";
     pub const SHIFT_STARTS_ALPHABET: &str = "Shift で英字入力";
-    pub const MODE_INDICATOR_DURATION: &str = "モードの表示時間";
+    pub const MODE_INDICATOR_DURATION: &str = "入力モードの表示時間";
     pub const CANDIDATES: &str = "候補";
     pub const EXCLUSIONS_EMPTY: &str = "アプリはありません";
     pub const TERMINAL_COMMANDS: &str = "ターミナルでコマンドを英字で入力";
@@ -600,28 +599,28 @@ pub mod more {
     pub const BRANCH_CANDIDATES: &str = "分岐図の候補数";
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
     pub const GRID_COLUMNS: &str = "表の列数";
-    pub const EXPANDS_GRID_ON_PAGING: &str = "候補を送り続けたら表に広げる";
+    pub const EXPANDS_GRID_ON_PAGING: &str = "ページ送りで表に展開";
     /// 表に広げたときの大きさ(一覧の候補数の行 × 列数．UIStrings.More.gridSize)
     pub fn grid_size(rows: f64, columns: f64) -> String {
         format!("{rows} 行 × {columns} 列")
     }
-    pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
-    pub const LIST_SEGMENT_ALTERNATIVES: &str = "一覧に文節を入れ替えた候補を表示";
+    pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "文脈で候補を並べ替え";
+    pub const LIST_SEGMENT_ALTERNATIVES: &str = "文節違いの候補を表示";
     pub const LIST_SEGMENT_ALTERNATIVES_EXAMPLE: (&str, &str) = ("資料を送る", "資料を贈る");
-    pub const LIVE_CONVERSION_DELAY: &str = "漢字にするまでの待ち時間";
+    pub const LIVE_CONVERSION_DELAY: &str = "変換までの待ち時間";
     pub const LIVE_CONVERSION_SKIP_LENGTH: &str = "ライブ変換しない文字数";
-    pub const ENGLISH_SKIP_LENGTH: &str = "英単語にしない文字数";
-    pub const SUGGESTION_SKIP_COUNT: &str = "入力中の候補を表示しない件数";
+    pub const ENGLISH_SKIP_LENGTH: &str = "英単語に変換しない文字数";
+    pub const SUGGESTION_SKIP_COUNT: &str = "入力中の候補を省略する件数";
     pub const TYPO: &str = "タイプミス";
     pub const CORRECTION_SENSITIVITY: &str = "修正の基準";
     pub const SHOWS_SUGGESTIONS: &str = "「もしかして」を表示";
-    pub const CORRECTION_DELAY: &str = "見直すまでの待ち時間";
+    pub const CORRECTION_DELAY: &str = "見直しまでの待ち時間";
     pub const REVIEW_CORRECTION_TIMEOUT: &str = "見直しの時間の上限";
-    pub const LATE_CORRECTION_TIMEOUT: &str = "変換後の補正の時間の上限";
+    pub const LATE_CORRECTION_TIMEOUT: &str = "変換後の修正の時間の上限";
     pub const REMEMBERS_REJECTED_CORRECTIONS: &str = "自動修正のキャンセルを学習";
     pub const THEME: &str = "テーマ";
     pub const CUSTOM_THEMES: &str = "カスタムテーマ";
-    pub const DUPLICATE: &str = "今のテーマを複製";
+    pub const DUPLICATE: &str = "現在のテーマを複製";
     pub const DELETE_THEME: &str = "削除";
     pub const THEME_NAME: &str = "名前";
     pub const COLORS: &str = "色";
@@ -630,11 +629,11 @@ pub mod more {
     pub const TEXT_MUTED: &str = "補助の文字";
     pub const SELECTION: &str = "選択";
     pub const SELECTION_TEXT: &str = "選択中の文字";
-    pub const CORRECTION: &str = "修正の印";
-    pub const LINE: &str = "線";
+    pub const CORRECTION: &str = "修正の下線";
+    pub const LINE: &str = "枠線と分岐図の線";
     pub const SHAPE: &str = "形";
-    pub const CORNER_RADIUS: &str = "角の丸さ";
-    pub const BRANCH_STYLE: &str = "枝";
+    pub const CORNER_RADIUS: &str = "角の丸み";
+    pub const BRANCH_STYLE: &str = "分岐図の線";
     pub const THEME_FONT: &str = "テーマに合わせる";
     pub const FONT_STYLE: &str = "スタイル";
     pub const DUPLICATE_THEME: &str = "複製";
@@ -642,7 +641,7 @@ pub mod more {
     pub const EDIT_THEME: &str = "編集…";
     pub const NEW_THEME_NAME: &str = "新しいテーマ";
     pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
-    pub const PREVIEW: &str = "見本";
+    pub const PREVIEW: &str = "プレビュー";
     pub const READABILITY: &str = "読みやすさ";
     pub const INVALID_THEME: &str = "名前を入力してください";
 
@@ -660,9 +659,9 @@ pub mod more {
 
     /// 読みにくい組み合わせの知らせ(UIStrings.More.lowContrast と同じ文)
     pub fn low_contrast(name: &str, ground: &str, ratio: f64, minimum: f64) -> String {
-        format!("{name}と{ground} {ratio:.1} : 1(目安 {minimum:.1} : 1 以上)")
+        format!("{name}と{ground} {ratio:.1}:1(推奨 {minimum:.1}:1 以上)")
     }
-    pub const FONT: &str = "書体";
+    pub const FONT: &str = "フォント";
     pub const BACKUP: &str = "バックアップ";
     pub const ADD_APPS: &str = "アプリを追加…";
     pub const IMPORT_CSV: &str = "CSV をインポート…";
@@ -671,15 +670,15 @@ pub mod more {
     pub fn imported_rules(count: u32) -> String {
         format!("{count} 件を追加しました")
     }
-    pub const CSV_FAILED: &str = "読み込めませんでした。CSV のファイルではないか、大きすぎます";
+    pub const CSV_FAILED: &str = "インポートできませんでした。CSV の形式かサイズのエラーです";
     pub const EXPORT_SETTINGS: &str = "設定をエクスポート…";
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
-    pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
-    pub const SETTINGS_EXPORTED: &str = "設定を書き出しました";
+    pub const SETTINGS_IMPORTED: &str = "設定をインポートしました";
+    pub const SETTINGS_EXPORTED: &str = "設定をエクスポートしました";
     pub const SETTINGS_IMPORT_FAILED: &str =
-        "読み込めませんでした。Hajime IME の設定ファイルではないか、大きすぎます";
-    pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
+        "インポートできませんでした。Hajime IME の設定ファイルではないか、サイズのエラーです";
+    pub const SETTINGS_EXPORT_FAILED: &str = "エクスポートできませんでした";
     pub const ABOUT: &str = "情報";
     pub const VERSION: &str = "バージョン";
     pub const CHECK_FOR_UPDATES: &str = "更新を確認";
@@ -714,10 +713,10 @@ pub mod more {
 /// UIStrings.Keys(キー設定のページの名前と，検索に使うコマンド・状態・ひな形の名前)
 pub mod keys {
     /// 絞り込んで行が無くなったとき
-    pub const NO_MATCHES: &str = "当てはまる行はありません";
+    pub const NO_MATCHES: &str = "一致する行はありません";
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const SEARCH_BY_KEY: &str = "キーで検索";
-    pub const SEARCH_BY_KEY_HELP: &str = "押したキーの行だけを表示します";
+    pub const SEARCH_BY_KEY_HELP: &str = "押したキーで絞り込み";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const CUSTOM_PRESET: &str = "カスタム";
@@ -749,15 +748,15 @@ pub mod keys {
     pub const ADD_STANDARD_KEYS: &str = "既定のキーを追加";
 
     pub fn load_preset_message(name: &str) -> String {
-        format!("今の表を「{name}」の行で置き換えます。")
+        format!("現在のキー設定を「{name}」で置き換えます。")
     }
 
     pub fn hidden(winners: &str) -> String {
-        format!("同じキーの行があるため使われません: {winners}")
+        format!("同じキーの行があるため無効: {winners}")
     }
 
     pub fn partly_hidden(states: &str, winners: &str) -> String {
-        format!("{states}では次の行を使います: {winners}")
+        format!("{states}では次の行が優先: {winners}")
     }
 
     pub fn missing(state: &str, command: &str) -> String {
@@ -767,7 +766,7 @@ pub mod keys {
     /// 状態(KeymapState)の値と名前
     pub const STATES: &[(&str, &str)] = &[
         ("anywhere", "いつでも"),
-        ("idle", "入力文字なし"),
+        ("idle", "未入力"),
         ("composing", "入力中"),
         ("converting", "変換中"),
         ("direct", "英数"),
@@ -798,7 +797,7 @@ pub mod keys {
         ("convert", "変換"),
         ("convertWithoutLearning", "学習を使わずに変換"),
         ("deleteBackward", "左の文字を削除"),
-        ("insertBoundary", "ここで区切る"),
+        ("insertBoundary", "現在位置で区切る"),
         ("acceptSuggestion", "「もしかして」に修正・予測を確定"),
         ("toHiragana", "全文をひらがなに変換"),
         ("toKatakana", "全文を全角カタカナに変換"),
@@ -811,8 +810,8 @@ pub mod keys {
         ("segmentToHalfwidthKatakana", "文節を半角カタカナに変換"),
         ("nextCandidate", "次の候補"),
         ("previousCandidate", "前の候補"),
-        ("nextCandidatePage", "次の候補のページ"),
-        ("previousCandidatePage", "前の候補のページ"),
+        ("nextCandidatePage", "次の候補ページ"),
+        ("previousCandidatePage", "前の候補ページ"),
         ("firstCandidate", "先頭の候補"),
         ("lastCandidate", "末尾の候補"),
         ("nextSegment", "右の文節"),
@@ -821,16 +820,16 @@ pub mod keys {
         ("lastSegment", "末尾の文節"),
         ("nextUncertainSegment", "誤りやすい次の文節"),
         ("previousUncertainSegment", "誤りやすい前の文節"),
-        ("extendSegment", "文節を長く"),
-        ("shrinkSegment", "文節を短く"),
-        ("extendSegmentToWord", "文節を単語ごとに長く"),
-        ("shrinkSegmentToWord", "文節を単語ごとに短く"),
+        ("extendSegment", "文節を伸ばす"),
+        ("shrinkSegment", "文節を縮める"),
+        ("extendSegmentToWord", "文節を単語単位で伸ばす"),
+        ("shrinkSegmentToWord", "文節を単語単位で縮める"),
         ("splitSegment", "文節を区切る"),
         ("editSegment", "文節を打ち直す"),
         ("commit", "確定"),
         ("commitFirstSegment", "先頭の文節だけ確定"),
         ("cancel", "取り消し"),
-        ("cancelAndDirectMode", "取り消して英数入力に"),
+        ("cancelAndDirectMode", "取り消して英数入力に切り替え"),
         ("backToReading", "全文を読みに戻す"),
         ("resumeEditing", "読みに戻して末尾から編集"),
         ("undoConversionEdit", "直前の変更を取り消し"),
@@ -838,7 +837,7 @@ pub mod keys {
         ("undoCommit", "確定を取り消し"),
         ("forgetCandidate", "候補を学習から削除"),
         ("forgetLastCommit", "最後の学習を取り消し"),
-        ("hidePrediction", "予測に表示しない"),
+        ("hidePrediction", "予測から除外"),
         ("openSettings", "設定を開く"),
         ("toggleLiveConversion", "ライブ変換の切り替え"),
         ("handwriting", "手書き入力"),
@@ -850,12 +849,12 @@ pub mod keys {
         ("openMenu", "入力メニューを開く"),
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
-        ("expandCandidates", "候補を表に広げる"),
+        ("expandCandidates", "候補を表に展開"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
         ("nextInputStyle", "ローマ字 → かな → 英字 → 英字(自動)"),
-        ("englishAutoStyle", "kyou no meeting → 今日の meeting"),
+        ("englishAutoStyle", "zoom dekaigi → zoom で会議"),
         ("insertSpace", "「スペース幅」の幅の空白を入力します"),
         (
             "insertAlternateSpace",
@@ -922,7 +921,7 @@ pub mod keys {
         ("associate", "選択中の文節を似た意味の単語の一覧にします"),
         ("registerWord", "選択中の文字でユーザー辞書の登録を開きます"),
         ("openMenu", "入力メニューを入力位置に表示します"),
-        ("expandCandidates", "候補を表に広げます"),
+        ("expandCandidates", "候補を表に展開します"),
     ];
 }
 
@@ -931,12 +930,11 @@ pub mod rule_list {
     pub const UPDATE: &str = "更新";
     pub const ENABLED: &str = "有効";
     pub const RESULT: &str = "結果";
-    pub const FULL: &str = "これ以上は追加できません。";
-    pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
-    pub const CHANGES_KIND: &str =
-        "すでに登録されています。追加すると品詞とコメントを書き換えます。";
+    pub const FULL: &str = "これ以上は追加できません";
+    pub const ALREADY_REGISTERED: &str = "すでに登録されています";
+    pub const CHANGES_KIND: &str = "登録済みの単語の品詞とコメントを書き換えます";
     pub fn overwrites(key: &str) -> String {
-        format!("「{key}」はすでにあります。追加すると上書きします。")
+        format!("「{key}」を上書きします")
     }
     pub const NO_MATCHES: &str = "一致する項目はありません";
     pub const EDIT: &str = "編集";
@@ -944,9 +942,8 @@ pub mod rule_list {
 
 /// UIStrings.Terms
 pub mod terms {
-    pub const ENABLED: &str = "専門用語の辞書を使う";
-    pub const FIELDS: &str = "使う分野";
-    pub const NOTE: &str = "通常の辞書にもある語は、分野をオフにしても出ます";
+    pub const ENABLED: &str = "専門用語辞書を使用";
+    pub const FIELDS: &str = "分野";
 
     /// 分野の id と名前(core の TermField と同じ並びと名前．tools/check/check_strings.py が確かめる)
     pub const FIELD_NAMES: &[(&str, &str)] = &[
@@ -980,9 +977,9 @@ pub mod terms {
 /// UIStrings.Dictionaries
 pub mod dictionaries {
     pub const USER_WORDS: &str = "登録した単語";
-    pub const IMPORTED: &str = "取り込んだ辞書";
+    pub const IMPORTED: &str = "インポートした辞書";
     pub const TERMS: &str = "専門用語";
-    pub const EMPTY: &str = "取り込んだ辞書はありません";
+    pub const EMPTY: &str = "インポートした辞書はありません";
     pub const IMPORT_FILE: &str = "辞書をインポート…";
     pub const REIMPORT: &str = "再読み込み…";
     pub const NAME: &str = "名前";
@@ -990,23 +987,22 @@ pub mod dictionaries {
     pub const FIELD_PROMPT: &str = "電気・法律など";
     pub const CONDITION: &str = "使う場面";
     pub const ALWAYS: &str = "常に";
-    pub const APPS: &str = "選んだアプリ";
-    pub const CONTEXT: &str = "文脈に合わせる";
+    pub const APPS: &str = "指定したアプリ";
+    pub const CONTEXT: &str = "文脈に応じて";
     pub const ADD_APP: &str = "アプリを追加…";
     pub const MOVE_UP: &str = "優先度を上げる";
     pub const MOVE_DOWN: &str = "優先度を下げる";
     pub const SHOW_DETAILS: &str = "詳細を表示";
     pub const HIDE_DETAILS: &str = "詳細を隠す";
-    pub const IMPORT_FAILED: &str =
-        "辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
+    pub const IMPORT_FAILED: &str = "辞書をインポートできませんでした。サイズか形式のエラーです";
     pub const NOTE: &str = "上の辞書ほど優先";
 
     pub fn too_many(limit: usize) -> String {
-        format!("取り込める辞書は {limit} 個までです")
+        format!("インポートできる辞書は {limit} 個までです")
     }
 
     pub fn imported(count: u32) -> String {
-        format!("{count} 件を取り込みました")
+        format!("{} 単語をインポートしました", super::thousands(count))
     }
 
     /// 一覧の内容の列(分野・語の数・使う場面)．UIStrings.Dictionaries.summary と同じ形
@@ -1016,7 +1012,10 @@ pub mod dictionaries {
         } else {
             format!("{field}・")
         };
-        format!("{field}{words} 件・{condition}")
+        format!(
+            "{field}{} 単語・{condition}",
+            super::thousands(u32::try_from(words).unwrap_or(u32::MAX))
+        )
     }
 
     /// 選んだアプリの使う場面(「選んだアプリ 2 個」)
@@ -1029,10 +1028,10 @@ pub mod dictionaries {
 pub mod palette {
     pub const PAGE: &str = "絵文字と記号";
     pub const BEHAVIOR: &str = "パレット";
-    pub const LOOK: &str = "パレットの見た目";
+    pub const LOOK: &str = "パレットの外観";
     pub const ENABLED: &str = "絵文字と記号のパレット";
-    pub const CLOSES_AFTER_INSERT: &str = "入力したらパレットを閉じる";
-    pub const RECORDS_HISTORY: &str = "パレットで使った文字を記録";
+    pub const CLOSES_AFTER_INSERT: &str = "入力後にパレットを閉じる";
+    pub const RECORDS_HISTORY: &str = "使用履歴を記録";
     pub const COLUMNS: &str = "パレットの列数";
     pub const ROWS: &str = "パレットの行数";
     pub const CELL_SIZE: &str = "パレットのマスの大きさ";
@@ -1042,18 +1041,18 @@ pub mod palette {
     pub const SHOWS_SHORTCODES: &str = "説明にショートコードを表示";
     pub const SHOWS_CODE_POINTS: &str = "説明にコードポイントを表示";
     pub const FREQUENT_ROWS: &str = "よく使う文字の行数";
-    pub const CLEAR_HISTORY: &str = "使った文字の記録を消去";
-    pub const CLEAR_HISTORY_QUESTION: &str = "使った文字の記録を消去しますか？";
+    pub const CLEAR_HISTORY: &str = "使用履歴を消去";
+    pub const CLEAR_HISTORY_QUESTION: &str = "使用履歴を消去しますか？";
     pub const EMOJI_KEY: &str = "絵文字のパレットを開くキー";
     pub const SYMBOL_KEY: &str = "記号のパレットを開くキー";
     pub const KAOMOJI_KEY: &str = "顔文字のパレットを開くキー";
     pub const NO_KEY: &str = "なし";
-    pub const CLEAR_HISTORY_NOTE: &str = "ピン留めと肌の色は残ります";
+    pub const CLEAR_HISTORY_NOTE: &str = "ピン留めと肌の色の設定は残ります";
     pub const OPEN_KEYS: &str = "キー設定を開く";
 
     /// UIStrings.Palette.cellSizeValue(スライダーの名前に今の値を付ける)
     pub fn cell_size_value(size: f64) -> String {
-        format!("{CELL_SIZE}：{} pt", size.round() as i64)
+        format!("{CELL_SIZE}: {} pt", size.round() as i64)
     }
 }
 
@@ -1063,25 +1062,28 @@ pub mod association {
     pub const ENABLED: &str = "連想変換";
     pub const LIMIT: &str = "連想の候補数";
     pub const HINT: &str = "連想の案内を表示";
-    pub const DICTIONARIES: &str = "連想の辞書";
-    pub const EMPTY: &str = "連想の辞書はありません";
-    pub const IMPORT_FILE: &str = "連想の辞書をインポート…";
+    pub const DICTIONARIES: &str = "連想辞書";
+    pub const EMPTY: &str = "連想辞書はありません";
+    pub const IMPORT_FILE: &str = "連想辞書をインポート…";
     pub const IMPORT_FAILED: &str =
-        "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
+        "連想辞書をインポートできませんでした。サイズか形式のエラーです";
     pub const NOTE: &str = "上の辞書ほど優先";
     /// 読み込めるファイルの例の行(同じ意味の単語を「,」で区切った 1 行)
     pub const FILE_EXAMPLE: &str = "美しい,綺麗,麗しい";
 
     pub fn too_many(limit: usize) -> String {
-        format!("取り込める連想の辞書は {limit} 個までです")
+        format!("インポートできる連想辞書は {limit} 個までです")
     }
 
     pub fn imported(count: u32) -> String {
-        format!("{count} 件の意味を取り込みました")
+        format!("{} 件をインポートしました", super::thousands(count))
     }
 
     pub fn summary(groups: u64) -> String {
-        format!("{groups} 件の意味")
+        format!(
+            "{} 件",
+            super::thousands(u32::try_from(groups).unwrap_or(u32::MAX))
+        )
     }
 }
 
@@ -1092,7 +1094,7 @@ pub mod sync {
     pub const FOLDER: &str = "フォルダ";
     pub const NO_FOLDER: &str = "未選択";
     pub const CHOOSE_FOLDER: &str = "フォルダを選択…";
-    pub const LAST_SYNCED: &str = "最後に同期した時刻";
+    pub const LAST_SYNCED: &str = "最終同期";
     pub const SYNC_NOW: &str = "今すぐ同期";
     pub const SCOPES: &str = "同期する項目";
     pub const FAILED: &str = "同期できませんでした";
@@ -1114,43 +1116,37 @@ pub mod sync {
         ("numberWidth", "数字幅"),
         ("alphabetWidth", "英字幅"),
         ("shiftStartsAlphabet", "Shift で英字入力"),
-        ("numberSeparators", "数字のあとの句読点をピリオドとカンマに"),
-        ("alphanumericHyphen", "英数字のあとの長音をハイフンに"),
+        ("numberSeparators", "数字のあとはピリオドとカンマ"),
+        ("alphanumericHyphen", "英数字のあとはハイフン"),
         ("punctuationCommits", "句読点で確定"),
         ("keypadDirect", "テンキーの数字を半角で確定"),
         ("questionExclamationCommits", "？と！で確定"),
         ("keypadCalculation", "テンキーの Enter で計算"),
-        (
-            "cyclesLetterCase",
-            "英数に変えるキーで大文字と小文字を切り替え",
-        ),
+        ("cyclesLetterCase", "英数キーで大文字・小文字を切り替え"),
         ("typoCorrection", "タイプミスの修正"),
         ("candidatePresentation", "候補の表示"),
         ("initialFocus", "最初に選択する文節"),
         ("suggestionDisplay", "入力中の候補"),
         ("predictionDisplay", "入力中の予測"),
-        ("predictionPrefersHistory", "入力履歴にある予測を優先"),
+        ("predictionPrefersHistory", "入力履歴の予測を優先"),
         ("hiddenPredictions", "予測に表示しない語句"),
         (
             "predictionFromCorrection",
-            "打ち間違いを直した読みからも予測",
+            "タイプミス修正後の読みからも予測",
         ),
-        ("suggestionSkipCount", "入力中の候補を表示しない件数"),
+        ("suggestionSkipCount", "入力中の候補を省略する件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
         ("candidateGridColumns", "表の列数"),
-        ("expandsGridOnPaging", "候補を送り続けたら表に広げる"),
-        ("contextualSegmentCandidates", "前後の文脈で候補を並べ替え"),
-        (
-            "listSegmentAlternatives",
-            "一覧に文節を入れ替えた候補を表示",
-        ),
-        ("liveConversionDelay", "漢字にするまでの待ち時間"),
+        ("expandsGridOnPaging", "ページ送りで表に展開"),
+        ("contextualSegmentCandidates", "文脈で候補を並べ替え"),
+        ("listSegmentAlternatives", "文節違いの候補を表示"),
+        ("liveConversionDelay", "変換までの待ち時間"),
         ("liveConversionSkipLength", "ライブ変換しない文字数"),
-        ("englishSkipLength", "英単語にしない文字数"),
-        ("correctionDelay", "見直すまでの待ち時間"),
+        ("englishSkipLength", "英単語に変換しない文字数"),
+        ("correctionDelay", "見直しまでの待ち時間"),
         ("reviewCorrectionTimeout", "見直しの時間の上限"),
-        ("lateCorrectionTimeout", "変換後の補正の時間の上限"),
+        ("lateCorrectionTimeout", "変換後の修正の時間の上限"),
         ("remembersRejectedCorrections", "自動修正のキャンセルを学習"),
         ("correctionSensitivity", "修正の基準"),
         ("showsSuggestions", "「もしかして」を表示"),
@@ -1171,11 +1167,11 @@ pub mod sync {
         ("prefersKatakana", "カタカナ語を優先"),
         ("showsVariantRow", "候補の上に文字種の行を表示"),
         ("showsKeyHints", "キーの案内を表示"),
-        ("numberKeySelection", "番号キーで候補を選択"),
+        ("numberKeySelection", "数字キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
         ("emojiConversion", "文節を絵文字に変換"),
-        ("emojiWordConversion", "語を絵文字に変換"),
+        ("emojiWordConversion", "単語を絵文字に変換"),
         ("emojiCandidatePosition", "絵文字の位置"),
         ("emojiCandidateCount", "絵文字の数"),
         ("showsEmojiNames", "絵文字の名前を表示"),
@@ -1187,12 +1183,12 @@ pub mod sync {
         ("numberFormRoman", "ローマ数字"),
         ("learning", "学習"),
         ("zenzaiModel", "Zenzai のモデル"),
-        ("candidateReranking", "2 番目以降の候補を Zenzai で並べ替え"),
+        ("candidateReranking", "Zenzai で候補を並べ替え"),
         ("jinenModel", "jinen のモデル"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),
         ("showsModeIndicator", "入力モードの切り替えを表示"),
-        ("modeIndicatorDuration", "モードの表示時間"),
+        ("modeIndicatorDuration", "入力モードの表示時間"),
         ("customThemes", "カスタムテーマ"),
         ("customThemeID", "使用するカスタムテーマ"),
         ("escapeSwitchesToDirect", "Esc で英数に切り替え"),
@@ -1210,19 +1206,16 @@ pub mod sync {
         ("keymap", "キー設定"),
         ("symbolRules", "記号"),
         ("userDictionary", "ユーザー辞書"),
-        ("importedDictionaries", "取り込んだ辞書"),
-        ("associationDictionaries", "連想の辞書"),
-        ("termDictionary", "専門用語の辞書を使う"),
-        ("termFields", "専門用語の辞書の分野"),
-        (
-            "macroSkipsSameReading",
-            "かなの語には読みを添える形を出さない",
-        ),
-        ("englishTermCandidates", "英語の語の辞書を使う"),
-        ("englishTerms", "英語の語の辞書に足した語"),
+        ("importedDictionaries", "インポートした辞書"),
+        ("associationDictionaries", "連想辞書"),
+        ("termDictionary", "専門用語辞書を使用"),
+        ("termFields", "専門用語辞書の分野"),
+        ("macroSkipsSameReading", "かなの単語は読み付きを省略"),
+        ("englishTermCandidates", "英単語辞書を使用"),
+        ("englishTerms", "追加した単語"),
         ("palette", "絵文字と記号のパレット"),
-        ("paletteClosesAfterInsert", "入力したらパレットを閉じる"),
-        ("paletteRecordsHistory", "パレットで使った文字を記録"),
+        ("paletteClosesAfterInsert", "入力後にパレットを閉じる"),
+        ("paletteRecordsHistory", "使用履歴を記録"),
         ("paletteColumns", "パレットの列数"),
         ("paletteRows", "パレットの行数"),
         ("paletteCellSize", "パレットのマスの大きさ"),
@@ -1253,7 +1246,7 @@ pub mod windows {
     /// jinen のモデルを「自動」にしたときに，エンジンが決めた結果を添える名前の頭(「自動(small)」．macOS の UIStrings.Settings.label(for:automaticResult:))
     pub const JINEN_AUTOMATIC_WITH: &str = "自動";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
-    pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
+    pub const PALETTE_HISTORY_CLEARED: &str = "使用履歴を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)
     pub const APP_NAME: &str = "Hajime IME";
     /// 数を 1 段ずつ変えるボタン(読み上げの名前．macOS の Stepper の矢印)
@@ -1262,14 +1255,14 @@ pub mod windows {
     pub const JAPANESE_MODE: &str = "あ";
     pub const INCREASE: &str = "増やす";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
-    pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
+    pub const ASSOCIATION_BUNDLED: &str = "同梱";
     pub const ON: &str = "オン";
     pub const OFF: &str = "オフ";
     pub const OPEN_SETTINGS_FILE: &str = "設定ファイルを開く";
     /// 項目ごとの同期の表の列(macOS は項目ごとのスイッチ)
     pub const SYNC_FIELD: &str = "項目";
     /// 項目ごとの同期の表のまとまりの列
-    pub const SYNC_GROUP: &str = "まとまり";
+    pub const SYNC_GROUP: &str = "分類";
     pub const SYNC_SCOPE: &str = "範囲";
     pub const TOGGLE_SYNC_SCOPE: &str = "範囲の切り替え";
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
@@ -1293,20 +1286,20 @@ pub mod windows {
     /// キーの欄の例の値(macOS は押して記録するだけなので無い．Windows は打って書くこともできる)
     pub const KEY_EXAMPLE: &str = "Ctrl+Shift+Space";
     /// 読めないキーの書き方
-    pub const INVALID_KEY: &str = "キーの書き方が正しくありません";
+    pub const INVALID_KEY: &str = "キーの表記が正しくありません";
     /// 除外設定の一覧の並びの意味を示す 1 行(macOS の UIStrings.More.exclusionsOrder)
     pub const EXCLUSIONS_ORDER: &str = "上の行ほど優先";
     /// コマンドを同期しないことを示す 1 行(macOS の UIStrings.Extras.commandsStoredLocally の Mac を PC にしたもの)
     pub const COMMANDS_STORED_LOCALLY: &str = "この PC だけに保存";
     /// 不正な実行ファイルの名前(macOS はアプリを選んで足すので無い)
-    pub const INVALID_APP: &str = "実行ファイルの名前に使えない文字が含まれています";
+    pub const INVALID_APP: &str = "実行ファイル名に使えない文字があります";
     /// 見分け方の決まりが無いとき(macOS は空の一覧を出すだけ)
     pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
     /// 変換エンジン(hajime-engine-host)に設定を頼めないとき
-    pub const ENGINE_UNAVAILABLE: &str = "変換エンジンが動いていないため、設定を読み込めません";
+    pub const ENGINE_UNAVAILABLE: &str = "変換エンジンに接続できません";
     /// 変換エンジンにつながらないときの案内(設定の画面がエンジンを起動し，つながるまでつなぎ直す)
     pub const ENGINE_UNAVAILABLE_DETAIL: &str =
-        "変換エンジンが動いていないため、設定を読み込めません。エンジンを起動して、つながるまで待っています。しばらくしても変わらないときは、サインインし直してください。";
+        "変換エンジンを起動しています。接続できない場合は、サインインし直してください";
 }
 
 /// UIStrings.Onboarding(初期設定．macOS と同じ文言)
@@ -1517,7 +1510,7 @@ pub mod limited {
 
     pub fn invalid_english_term(limits: &Limits) -> String {
         format!(
-            "語は {}〜{} 文字の英字にしてください",
+            "単語は {}〜{} 文字の英字にしてください",
             limits.english_term_minimum, limits.english_term_maximum
         )
     }

@@ -249,9 +249,9 @@ mod tests {
         assert_eq!(
             summaries,
             vec![
-                "電気・3 件・常に",
-                "12 件・選んだアプリ 1 個",
-                "医療・5 件・文脈に合わせる"
+                "電気・3 単語・常に",
+                "12 単語・指定したアプリ 1 個",
+                "医療・5 単語・文脈に応じて"
             ]
         );
         let association = json!([
@@ -264,10 +264,7 @@ mod tests {
             summary(DictionaryList::Association, &entries[0]),
             windows::ASSOCIATION_BUNDLED
         );
-        assert_eq!(
-            summary(DictionaryList::Association, &entries[1]),
-            "42 件の意味"
-        );
+        assert_eq!(summary(DictionaryList::Association, &entries[1]), "42 件");
         // 形の合わない要素(id の無いもの)は飛ばし，配列でなければ空
         let broken = json!([{"name": "id なし"}, {"id": "y", "name": "ok"}]);
         assert_eq!(entries_len(&broken), 1);

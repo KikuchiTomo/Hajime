@@ -43,8 +43,8 @@ OPTION_TABLES = {
     "BRANCH_STYLES": ("More", "CustomTheme.BranchStyle"),
     "WORD_CLASSES": ("Settings", "WordClass"),
 }
-# Windows で名前を変える選択肢(macOS の Command のキーを，Windows では Ctrl のキーにする)
-WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOPES", "local")}
+# Windows で名前を変える選択肢(macOS の Command のキーを Windows では Ctrl のキーにし，OS の設定のアプリの名前「システム設定」を Windows では「システムの設定」にする)
+WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("KEYBOARD_LAYOUTS", "system"), ("SYNC_SCOPES", "local")}
 SYNC_MODEL = ROOT / "core/Sources/HajimeDomain/Sync/SyncModel.swift"
 # 専門用語の辞書の分野の名前(core の TermField.name)．Windows の設定の画面は strings.rs の terms::FIELD_NAMES
 TERM_FIELDS = ROOT / "core/Sources/HajimeDomain/Dictionary/TermDictionary.swift"
