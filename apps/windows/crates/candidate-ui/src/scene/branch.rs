@@ -403,6 +403,8 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             metrics.row_height,
         );
         trunk_node(&mut painter, column, node);
+        // 語の意味の吹き出しは幹の文節を覆わない
+        painter.keep_clear.push(node);
         painter.hit(
             node,
             ipc::PointerTarget::Segment {
@@ -424,6 +426,29 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             }
         }
         if column.is_focused {
+            // 吹き出しは選んでいない枝の行を覆わない
+            let lower = lower_rows(column, look.rest_opacity).len();
+            let upper = upper_rows(column, look.rest_opacity).len();
+            for index in
+                (0..lower).filter(|index| column.selected_alternative != Some(*index as u32))
+            {
+                painter.keep_clear.push(branch_row(
+                    node,
+                    layout.branch_width,
+                    index,
+                    true,
+                    &metrics,
+                ));
+            }
+            for index in 0..upper {
+                painter.keep_clear.push(branch_row(
+                    node,
+                    layout.branch_width,
+                    index,
+                    false,
+                    &metrics,
+                ));
+            }
             // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
             let pressable = column.split.is_none();
             branches(
@@ -496,6 +521,13 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         }
     }
     let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
+    // 吹き出しは枝の下の注釈・候補の下の語の意味・足元を覆わない
+    painter.keep_clear.push(Frame::new(
+        body.x,
+        footer_y,
+        body.width,
+        body.max_y() - footer_y,
+    ));
     let content_width = body.width - metrics.text_inset() * 2.0;
     if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
         // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す

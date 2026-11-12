@@ -399,18 +399,19 @@ enum SnapshotRenderer {
     /// 候補の窓と，その横に出す語の意味の吹き出しを並べる(吹き出しは MeaningBubbleController と同じ置き方．画面は十分に広いとみなす)．
     /// row は選んでいる候補の行(候補の窓の座標．上が y の小さい側)
     /// nearRightEdge なら，候補の窓が画面の右の端にあるとみなす(吹き出しは左に出る)
-    private static func withBubble(_ view: NSView, note: HomophoneNote, others: [String], row: NSRect?, theme: ResolvedTheme,
+    private static func withBubble(_ view: NSView, note: HomophoneNote, others: [String], row: NSRect?, obstacles: [NSRect], theme: ResolvedTheme,
                                    nearRightEdge: Bool = false) -> NSView {
         guard let row else { return backdropped(view) }
         let metrics = MeaningBubbleLayout.Metrics.tokens(rounded: theme.isRounded)
         let header = MeaningCardDrawing.headerHeight(theme: theme)
         let content = MeaningCardDrawing.layout(note, others: others, width: metrics.width - metrics.padding * 2,
                                                 placement: .init(left: 0, headerMidY: header / 2), theme: theme)
+        let box = { (rect: NSRect) in MeaningBubbleLayout.Box(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height) }
         let placement = MeaningBubbleLayout(
-            anchor: .init(x: 0, y: 0, width: view.frame.width, height: view.frame.height), targetY: row.midY,
+            row: box(row), window: .init(x: 0, y: 0, width: view.frame.width, height: view.frame.height),
             size: (metrics.width, content.size.height + metrics.padding * 2), preferredPointer: metrics.padding + header / 2,
             screen: .init(x: -1000, y: -1000, width: nearRightEdge ? 1000 + Double(view.frame.width) + metrics.screenMargin : 4000, height: 4000),
-            metrics: metrics)
+            obstacles: obstacles.map(box), metrics: metrics)
         let bubble = MeaningBubbleView()
         bubble.fillsSurface = true
         bubble.configure(content: content, placement: placement, metrics: metrics, theme: theme)
@@ -790,7 +791,8 @@ enum SnapshotRenderer {
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         guard placement == .side else { return backdropped(view) }
         return withBubble(view, note: SamplePanels.homophone, others: SamplePanels.homophone.others,
-                          row: view.selectedRowRect(size: view.frame.size), theme: view.theme, nearRightEdge: nearRightEdge)
+                          row: view.selectedRowRect(size: view.frame.size), obstacles: view.bubbleObstacles(size: view.frame.size), theme: view.theme,
+                          nearRightEdge: nearRightEdge)
     }
 
     /// 同音異義語の無い語の意味を一覧で出したところ．同音語の行を出さず，長い意味は折り返す
@@ -805,7 +807,7 @@ enum SnapshotRenderer {
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return withBubble(view, note: SamplePanels.meaning, others: SamplePanels.meaning.others,
-                          row: view.selectedRowRect(size: view.frame.size), theme: view.theme)
+                          row: view.selectedRowRect(size: view.frame.size), obstacles: view.bubbleObstacles(size: view.frame.size), theme: view.theme)
     }
 
     /// 意味のある候補から意味の無い候補(ひらがな)に移ったところ．吹き出しを出さず，候補の窓の大きさは変えない
@@ -846,7 +848,7 @@ enum SnapshotRenderer {
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         guard placement == .side, let note = panel.columns[1].homophone else { return backdropped(view) }
         return withBubble(view, note: note, others: BranchView.others(of: note, in: panel.columns[1]), row: view.selectedRowRect(),
-                          theme: view.theme)
+                          obstacles: view.bubbleObstacles(), theme: view.theme)
     }
 
     /// コマンドの候補(R-22)を一覧で出したところ．selected は選んでいる行

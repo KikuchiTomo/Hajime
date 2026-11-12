@@ -67,45 +67,71 @@ pub struct Placement {
     pub pointer_y: f32,
 }
 
-/// 吹き出しの窓の置き方を決める．
-/// anchor は候補の窓の本体の枠，target_y は選んでいる行の縦の真ん中，size は本体の大きさ，
-/// preferred は本体の上の端から先までの長さ(見出しの行の真ん中)，screen は画面の使える範囲(どれも画面の座標)
+/// 吹き出しの窓の置き方を決める(core の MeaningBubbleLayout と同じ決め方)．
+/// 先の頂点は選んでいる行 row の右の端から gap(inline)の所に置き，行の縦の真ん中を指す．
+/// 候補の窓 window の空いている所に重ねてよいが，obstacles(ほかの候補・幹の文節・足元の案内・入力中の文字)は覆わない．
+/// 覆ってしまう物があれば上か下へ寄せ，行の横に置けなければ候補の窓の右の外，それも無理なら窓の左の外に置く．
+/// size は本体の大きさ，preferred は本体の上の端から先までの長さ(見出しの行の真ん中)，screen は画面の使える範囲(どれも画面の座標)
 pub fn place(
-    anchor: Frame,
-    target_y: f32,
+    row: Frame,
+    window: Frame,
     size: (f32, f32),
     preferred: f32,
     screen: Frame,
+    obstacles: &[Frame],
     metrics: &Metrics,
 ) -> Placement {
     let (width, height) = size;
     // 画面の端から screen_margin の内側に収める
     let screen = screen.inset(metrics.screen_margin, metrics.screen_margin);
     let window_width = width + metrics.pointer_length;
-    let reach = metrics.gap + window_width;
-    let fits_right = anchor.max_x() + reach <= screen.max_x();
-    let fits_left = anchor.x - reach >= screen.x;
-    // 右に入らなければ左．どちらにも入らなければ右に出し，画面の中へ寄せる
-    let side = if fits_right || !fits_left {
-        Side::Right
-    } else {
-        Side::Left
-    };
-    let x = match side {
-        Side::Right => anchor.max_x() + metrics.gap,
-        Side::Left => anchor.x - reach,
-    }
-    .min(screen.max_x() - window_width)
-    .max(screen.x);
-    // 縦: 先が行を指す位置にし，画面の上下に収める
-    let y = (target_y - preferred)
-        .min(screen.max_y() - height)
-        .max(screen.y);
-    // 先は角の丸みにかからない範囲で行を指す
+    let target = row.mid_y();
     let half = metrics.pointer_width / 2.0;
-    let pointer_y = (target_y - y)
-        .max(metrics.radius + half)
-        .min(height - metrics.radius - half);
+    let (lowest, highest) = (metrics.radius + half, height - metrics.radius - half);
+    // 窓の左の端を x に置いたときの縦の位置と先の位置．覆う物があれば上か下へ寄せる．置けなければ None
+    let vertical = |x: f32| -> Option<(f32, f32)> {
+        if x < screen.x || x + window_width > screen.max_x() {
+            return None;
+        }
+        let (mut top, mut bottom) = (screen.y, screen.max_y());
+        for obstacle in obstacles
+            .iter()
+            .filter(|obstacle| obstacle.x < x + window_width && x < obstacle.max_x())
+        {
+            if obstacle.y >= target {
+                bottom = bottom.min(obstacle.y - metrics.gap);
+            } else if obstacle.max_y() <= target {
+                top = top.max(obstacle.max_y() + metrics.gap);
+            } else {
+                return None;
+            }
+        }
+        if bottom - top < height {
+            return None;
+        }
+        let y = (target - preferred).max(top).min(bottom - height);
+        let pointer = target - y;
+        (lowest..=highest)
+            .contains(&pointer)
+            .then_some((y, pointer))
+    };
+    let beside_row = (Side::Right, row.max_x() + metrics.gap);
+    let outside_right = (Side::Right, window.max_x() + metrics.gap);
+    let outside_left = (Side::Left, window.x - metrics.gap - window_width);
+    let found = [beside_row, outside_right, outside_left]
+        .into_iter()
+        .find_map(|(side, x)| vertical(x).map(|(y, pointer)| (side, x, y, pointer)));
+    // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(先は角の丸みにかけない範囲で行を指す)
+    let (side, x, y, pointer) = found.unwrap_or_else(|| {
+        let x = outside_right
+            .1
+            .min(screen.max_x() - window_width)
+            .max(screen.x);
+        let y = (target - preferred)
+            .min(screen.max_y() - height)
+            .max(screen.y);
+        (Side::Right, x, y, (target - y).max(lowest).min(highest))
+    });
     let body_x = match side {
         Side::Right => metrics.pointer_length,
         Side::Left => 0.0,
@@ -114,7 +140,7 @@ pub fn place(
         side,
         window: Frame::new(x.round(), y.round(), window_width, height),
         body: Frame::new(body_x, 0.0, width, height),
-        pointer_y: pointer_y.round(),
+        pointer_y: pointer.round(),
     }
 }
 
@@ -316,11 +342,12 @@ pub fn beside(
 ) -> Scene {
     let shown = bubble(note, others, look, measure);
     let placement = place(
+        row,
         window.body,
-        row.mid_y(),
         (shown.width, shown.height),
         shown.preferred_pointer,
         Frame::new(-10000.0, -10000.0, 20000.0, 20000.0),
+        &window.keep_clear,
         &Metrics::tokens(look.theme.is_rounded()),
     );
     let drawn = bubble_scene(&shown, &placement, look, measure);
@@ -347,6 +374,7 @@ pub fn beside(
         body: Frame::new(0.0, 0.0, width, height),
         draws,
         hits: Vec::new(),
+        keep_clear: Vec::new(),
     }
 }
 
@@ -357,7 +385,7 @@ mod tests {
     const METRICS: Metrics = Metrics {
         width: 288.0,
         padding: 12.0,
-        radius: 8.0,
+        radius: 12.0,
         pointer_length: 8.0,
         pointer_width: 16.0,
         gap: 4.0,
@@ -370,97 +398,136 @@ mod tests {
         height: 800.0,
     };
 
-    fn anchor(x: f32, y: f32) -> Frame {
-        Frame::new(x, y, 300.0, 200.0)
+    /// 窓・選んでいる行・覆わない物
+    type Setup = (Frame, Frame, Vec<Frame>);
+
+    /// 一覧の窓(幅 300)．行の地は窓の左右の余白 12 の内側
+    fn list(x: f32, y: f32, selected: usize) -> Setup {
+        let window = Frame::new(x, y, 300.0, 200.0);
+        let rows: Vec<Frame> = (0..4)
+            .map(|index| Frame::new(x + 12.0, y + 12.0 + 28.0 * index as f32, 276.0, 24.0))
+            .collect();
+        let footer = Frame::new(x + 12.0, y + 160.0, 276.0, 28.0);
+        let mut obstacles: Vec<Frame> = (0..4)
+            .filter(|index| *index != selected)
+            .map(|index| rows[index])
+            .collect();
+        obstacles.push(footer);
+        (window, rows[selected], obstacles)
+    }
+
+    /// 足元の案内が長くて横に広い分岐図の窓(幅 800)．枝の行は左に寄り，足元は窓の幅いっぱい
+    fn wide_branch(selected: usize) -> Setup {
+        let window = Frame::new(100.0, 100.0, 800.0, 220.0);
+        let rows: Vec<Frame> = (0..4)
+            .map(|index| Frame::new(220.0, 140.0 + 28.0 * index as f32, 120.0, 24.0))
+            .collect();
+        let mut obstacles = vec![
+            Frame::new(112.0, 112.0, 60.0, 24.0),
+            Frame::new(180.0, 112.0, 60.0, 24.0),
+        ];
+        obstacles.extend(
+            (0..4)
+                .filter(|index| *index != selected)
+                .map(|index| rows[index]),
+        );
+        obstacles.push(Frame::new(112.0, 270.0, 776.0, 38.0));
+        (window, rows[selected], obstacles)
+    }
+
+    fn placed(setup: &Setup, size: (f32, f32), screen: Frame) -> Placement {
+        place(setup.1, setup.0, size, 20.0, screen, &setup.2, &METRICS)
+    }
+
+    fn body(placement: &Placement) -> Frame {
+        Frame::new(
+            placement.window.x + placement.body.x,
+            placement.window.y,
+            placement.body.width,
+            placement.body.height,
+        )
+    }
+
+    /// 先の頂点(画面の座標)
+    fn tip(placement: &Placement) -> Point {
+        let x = match placement.side {
+            Side::Right => placement.window.x,
+            Side::Left => placement.window.max_x(),
+        };
+        Point::new(x, placement.window.y + placement.pointer_y)
+    }
+
+    fn intersects(a: Frame, b: Frame) -> bool {
+        a.x < b.max_x() && b.x < a.max_x() && a.y < b.max_y() && b.y < a.max_y()
     }
 
     #[test]
-    fn 右に入れば右に出し_先は選んでいる行を指す() {
-        let placed = place(
-            anchor(100.0, 100.0),
-            150.0,
-            (288.0, 160.0),
-            20.0,
-            SCREEN,
-            &METRICS,
-        );
-        assert_eq!(placed.side, Side::Right);
-        // 先の頂点は候補の窓の右の縁から gap だけ離れる
-        assert_eq!(placed.window.x, 100.0 + 300.0 + METRICS.gap);
-        assert_eq!(placed.body.x, METRICS.pointer_length);
-        assert_eq!(placed.window.y + placed.pointer_y, 150.0);
-        // 先は見出しの行の高さ
-        assert_eq!(placed.pointer_y, 20.0);
+    fn 先の頂点は選んでいる行の右の端から_inline_の所で行の縦の真ん中を指す() {
+        let setup = list(100.0, 100.0, 1);
+        let placement = placed(&setup, (288.0, 160.0), SCREEN);
+        assert_eq!(placement.side, Side::Right);
+        assert_eq!(tip(&placement).x - setup.1.max_x(), METRICS.gap);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
+        assert_eq!(placement.pointer_y, 20.0);
     }
 
     #[test]
-    fn 画面の右の端に入らなければ左に出す() {
-        let placed = place(
-            anchor(800.0, 100.0),
-            150.0,
-            (288.0, 160.0),
-            20.0,
-            SCREEN,
-            &METRICS,
-        );
-        assert_eq!(placed.side, Side::Left);
-        assert_eq!(placed.window.max_x(), 800.0 - METRICS.gap);
-        assert_eq!(placed.body.x, 0.0);
-        assert_eq!(placed.window.y + placed.pointer_y, 150.0);
+    fn 広い窓でも先は選んでいる行のすぐ横で_ほかの候補と幹と足元を覆わない() {
+        for selected in 0..4 {
+            let setup = wide_branch(selected);
+            let placement = placed(&setup, (288.0, 110.0), SCREEN);
+            assert_eq!(
+                tip(&placement).x - setup.1.max_x(),
+                METRICS.gap,
+                "{selected}"
+            );
+            assert_eq!(tip(&placement).y, setup.1.mid_y(), "{selected}");
+            for obstacle in &setup.2 {
+                assert!(
+                    !intersects(body(&placement), *obstacle),
+                    "{selected}: {obstacle:?}"
+                );
+            }
+        }
     }
 
     #[test]
-    fn 画面の下に入らなければ上へ寄せ_先は行を指し続ける() {
-        let placed = place(
-            anchor(100.0, 580.0),
-            760.0,
-            (288.0, 160.0),
-            20.0,
-            SCREEN,
-            &METRICS,
-        );
-        // 画面の下の端から screen_margin だけ離す
-        assert_eq!(
-            placed.window.max_y(),
-            SCREEN.max_y() - METRICS.screen_margin
-        );
-        assert_eq!(placed.window.y + placed.pointer_y, 760.0);
-        // 先は角の丸みにかからない
-        assert!(placed.pointer_y <= 160.0 - METRICS.radius - METRICS.pointer_width / 2.0);
+    fn 足元を覆う高さなら上へ寄せ_先は行を指したまま() {
+        let setup = wide_branch(3);
+        let placement = placed(&setup, (288.0, 110.0), SCREEN);
+        let footer = *setup.2.last().expect("足元");
+        assert!(body(&placement).max_y() <= footer.y - METRICS.gap);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
     }
 
     #[test]
-    fn 画面の上に入らなければ下へ寄せる() {
-        let placed = place(
-            anchor(100.0, 0.0),
-            6.0,
-            (288.0, 160.0),
-            20.0,
-            SCREEN,
-            &METRICS,
+    fn 行の横に入らなければ窓の外の右_画面に入らなければ左に出す() {
+        let tall = placed(
+            &wide_branch(1),
+            (288.0, 400.0),
+            Frame::new(0.0, 0.0, 1400.0, 800.0),
         );
-        assert_eq!(placed.window.y, SCREEN.y + METRICS.screen_margin);
-        // 行が角の丸みより上なら，先は角の丸みのすぐ下で止める
-        assert_eq!(
-            placed.pointer_y,
-            METRICS.radius + METRICS.pointer_width / 2.0
-        );
+        assert_eq!(tall.side, Side::Right);
+        assert_eq!(tall.window.x, 100.0 + 800.0 + METRICS.gap);
+        let near_edge = placed(&list(880.0, 100.0, 0), (288.0, 160.0), SCREEN);
+        assert_eq!(near_edge.side, Side::Left);
+        assert_eq!(near_edge.window.max_x(), 880.0 - METRICS.gap);
+        assert_eq!(tip(&near_edge).y, 100.0 + 12.0 + 12.0);
+    }
+
+    #[test]
+    fn 画面の下に入らなければ上へ寄せ_画面の端とのあいだを空ける() {
+        let setup = list(100.0, 590.0, 3);
+        let placement = placed(&setup, (288.0, 160.0), SCREEN);
+        assert!(placement.window.max_y() <= SCREEN.max_y() - METRICS.screen_margin);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
     }
 
     #[test]
     fn 縁の線は先まで途切れずにつながる() {
-        for side in [Side::Right, Side::Left] {
-            let x = if side == Side::Right { 100.0 } else { 800.0 };
-            let placed = place(
-                anchor(x, 100.0),
-                150.0,
-                (288.0, 160.0),
-                20.0,
-                SCREEN,
-                &METRICS,
-            );
-            assert_eq!(placed.side, side);
-            let figure = outline(&placed, &METRICS, 1.0);
+        for x in [100.0, 880.0] {
+            let placement = placed(&list(x, 100.0, 1), (288.0, 160.0), SCREEN);
+            let figure = outline(&placement, &METRICS, 1.0);
             let points: Vec<Point> = figure
                 .segments
                 .iter()
@@ -468,21 +535,14 @@ mod tests {
                     Segment::Line(to) | Segment::Arc { to, .. } => *to,
                 })
                 .collect();
-            // 最後の点で始まりに戻る(閉じた 1 本の線)
             assert_eq!(*points.last().expect("点"), figure.start);
-            // 先の頂点は窓の端
-            let tip = points
+            let tip_x = match placement.side {
+                Side::Right => 0.5,
+                Side::Left => placement.window.width - 0.5,
+            };
+            assert!(points
                 .iter()
-                .copied()
-                .find(|point| {
-                    point.y == placed.pointer_y
-                        && (point.x < 1.0 || point.x > placed.window.width - 1.0)
-                })
-                .expect("先の頂点");
-            match side {
-                Side::Right => assert_eq!(tip.x, 0.5),
-                Side::Left => assert_eq!(tip.x, placed.window.width - 0.5),
-            }
+                .any(|point| point.x == tip_x && point.y == placement.pointer_y));
         }
     }
 }

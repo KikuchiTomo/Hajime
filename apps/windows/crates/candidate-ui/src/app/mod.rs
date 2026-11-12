@@ -610,13 +610,29 @@ impl App {
             )
         };
         let anchor = dips(&body);
+        let screen = dips(&work);
+        // 候補の窓の場面の座標(本体が原点)を，画面の論理ピクセルに直す
+        let on_screen = |frame: &scene::Frame| frame.offset(anchor.x, anchor.y);
+        let mut keep_clear: Vec<scene::Frame> = window
+            .map(|window| window.keep_clear.iter().map(on_screen).collect())
+            .unwrap_or_default();
+        // 入力中の文字の行も覆わない
+        if let Some(caret) = &self.anchor {
+            keep_clear.push(scene::Frame::new(
+                screen.x,
+                caret.y as f32 / scale,
+                screen.width,
+                (caret.height.max(1) as f32) / scale,
+            ));
+        }
         let bubble = scene::bubble::bubble(&note, others, &style, &measure);
         let placement = scene::bubble::place(
+            on_screen(&row),
             anchor,
-            anchor.y + row.mid_y(),
             (bubble.width, bubble.height),
             bubble.preferred_pointer,
-            dips(&work),
+            screen,
+            &keep_clear,
             &scene::bubble::Metrics::tokens(theme.is_rounded()),
         );
         let drawn = scene::bubble::bubble_scene(&bubble, &placement, &style, &measure);

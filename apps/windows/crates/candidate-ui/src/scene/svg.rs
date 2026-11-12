@@ -554,12 +554,18 @@ mod tests {
                     Some((note, others, row)) => {
                         let margin = 16.0;
                         let shown = super::super::bubble::bubble(&note, others, &look, &measure);
+                        let keep_clear: Vec<Frame> = drawn
+                            .keep_clear
+                            .iter()
+                            .map(|frame| frame.offset(margin, margin))
+                            .collect();
                         let placement = super::super::bubble::place(
+                            row.offset(margin, margin),
                             drawn.body.offset(margin, margin),
-                            margin + row.mid_y(),
                             (shown.width, shown.height),
                             shown.preferred_pointer,
                             Frame::new(-1000.0, -1000.0, 4000.0, 4000.0),
+                            &keep_clear,
                             &super::super::bubble::Metrics::tokens(theme.is_rounded()),
                         );
                         let bubble =
@@ -713,13 +719,18 @@ mod tests {
             ];
             for (kind, window, selected, shown, (width, height), (x, y)) in cases {
                 let metrics = bubble::Metrics::tokens(theme.is_rounded());
-                let anchor = window.body.offset(x, y);
+                let keep_clear: Vec<Frame> = window
+                    .keep_clear
+                    .iter()
+                    .map(|frame| frame.offset(x, y))
+                    .collect();
                 let placement = bubble::place(
-                    anchor,
-                    y + selected.mid_y(),
+                    selected.offset(x, y),
+                    window.body.offset(x, y),
                     (shown.width, shown.height),
                     shown.preferred_pointer,
                     Frame::new(0.0, 0.0, width, height),
+                    &keep_clear,
                     &metrics,
                 );
                 let drawn = bubble::bubble_scene(shown, &placement, &look, &measure);

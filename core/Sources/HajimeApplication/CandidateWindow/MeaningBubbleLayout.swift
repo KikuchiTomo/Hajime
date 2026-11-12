@@ -1,8 +1,10 @@
-/// 語の意味の吹き出し(R-08)の置き方と形．候補の窓の外に出す小さな窓で，先(三角)で選んでいる候補の行の縦の真ん中を指す．
+/// 語の意味の吹き出し(R-08)の置き方と形．候補の窓とは別の小さな窓で，先(三角)で選んでいる候補の行の縦の真ん中を指す．
 ///
-/// - 候補の窓の右に出す．画面の右の端に入らなければ左に出す．どちらにも入らなければ右に出し，画面の中へ寄せる
-/// - 縦は，先が選んでいる行を指す位置(先は見出しの行の高さ)にし，画面の上下の端から screenMargin の内側に収める．
+/// - 先の頂点は，選んでいる行の右の端から gap(inline)の所に置く．吹き出しは候補の窓の空いている所に重ねてよいが，
+///   ほかの候補・幹の文節・足元の案内・入力中の文字(obstacles)は覆わない
+/// - 縦は，先が行を指す位置(先は見出しの行の高さ)にし，覆ってしまう物があれば上か下へ寄せる．画面の上下の端からは screenMargin の内側．
 ///   寄せた分だけ先の位置をずらし，行を指し続ける．先は角の丸みにはかけない
+/// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・先が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
 /// - 縁の線は本体と先を 1 本でなぞる(outline)
 ///
 /// 座標は上が y の小さい側(画面の上の端が 0 に近い)．macOS は画面の座標(下が y の小さい側)から直して使う．
@@ -56,24 +58,50 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     public var pointerY: Double
 
     /// - Parameters:
-    ///   - anchor: 候補の窓の本体の枠(画面の座標)
-    ///   - targetY: 選んでいる行の縦の真ん中(画面の座標)
+    ///   - row: 選んでいる候補の行の地(画面の座標)．先はこの行の縦の真ん中を指す
+    ///   - window: 候補の窓の本体の枠(画面の座標)
     ///   - size: 本体の大きさ
     ///   - preferredPointer: 本体の上の端から先までの長さ(見出しの行の真ん中)
     ///   - screen: 画面の使える範囲
-    public init(anchor: Box, targetY: Double, size: (width: Double, height: Double), preferredPointer: Double, screen: Box, metrics: Metrics) {
+    ///   - obstacles: 覆わない物(ほかの候補・幹の文節・足元の案内・入力中の文字．画面の座標)
+    public init(row: Box, window candidate: Box, size: (width: Double, height: Double), preferredPointer: Double, screen: Box, obstacles: [Box],
+                metrics: Metrics) {
         let screen = Box(x: screen.x + metrics.screenMargin, y: screen.y + metrics.screenMargin,
                          width: screen.width - metrics.screenMargin * 2, height: screen.height - metrics.screenMargin * 2)
         let windowWidth = size.width + metrics.pointerLength
-        let reach = metrics.gap + windowWidth
-        let fitsRight = anchor.maxX + reach <= screen.maxX
-        let fitsLeft = anchor.x - reach >= screen.x
-        side = fitsRight || !fitsLeft ? .right : .left
-        let x = max(min(side == .right ? anchor.maxX + metrics.gap : anchor.x - reach, screen.maxX - windowWidth), screen.x)
-        let y = max(min(targetY - preferredPointer, screen.maxY - size.height), screen.y)
+        let targetY = row.midY
         let half = metrics.pointerWidth / 2
-        let pointer = min(max(targetY - y, metrics.radius + half), size.height - metrics.radius - half)
-        window = Box(x: x.rounded(), y: y.rounded(), width: windowWidth, height: size.height)
+        let pointerRange = (metrics.radius + half)...(size.height - metrics.radius - half)
+        // x(窓の左の端)に置いたときの縦の位置と先の位置．覆う物があれば上か下へ寄せる．置けなければ nil
+        func vertical(at x: Double) -> (y: Double, pointer: Double)? {
+            guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
+            var top = screen.y, bottom = screen.maxY
+            for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX {
+                if obstacle.y >= targetY {
+                    bottom = min(bottom, obstacle.y - metrics.gap)
+                } else if obstacle.maxY <= targetY {
+                    top = max(top, obstacle.maxY + metrics.gap)
+                } else {
+                    return nil
+                }
+            }
+            guard bottom - top >= size.height else { return nil }
+            let y = min(max(targetY - preferredPointer, top), bottom - size.height)
+            guard pointerRange.contains(targetY - y) else { return nil }
+            return (y, targetY - y)
+        }
+        let besideRow = (Side.right, row.maxX + metrics.gap)
+        let outsideRight = (Side.right, candidate.maxX + metrics.gap)
+        let outsideLeft = (Side.left, candidate.x - metrics.gap - windowWidth)
+        let found = [besideRow, outsideRight, outsideLeft].lazy.compactMap { side, x in vertical(at: x).map { (side, x, $0.y, $0.pointer) } }.first
+        // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(先は角の丸みにかけない範囲で行を指す)
+        let (side, x, y, pointer) = found ?? {
+            let x = max(min(outsideRight.1, screen.maxX - windowWidth), screen.x)
+            let y = max(min(targetY - preferredPointer, screen.maxY - size.height), screen.y)
+            return (Side.right, x, y, min(max(targetY - y, pointerRange.lowerBound), pointerRange.upperBound))
+        }()
+        self.side = side
+        self.window = Box(x: x.rounded(), y: y.rounded(), width: windowWidth, height: size.height)
         body = Box(x: side == .right ? metrics.pointerLength : 0, y: 0, width: size.width, height: size.height)
         pointerY = pointer.rounded()
     }

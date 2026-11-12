@@ -38,6 +38,8 @@ pub(crate) struct Painter<'a> {
     pub measure: &'a dyn Measure,
     pub draws: Vec<Draw>,
     pub hits: Vec<super::Hit>,
+    /// 語の意味の吹き出しに覆わせない範囲
+    pub keep_clear: Vec<Frame>,
 }
 
 impl<'a> Painter<'a> {
@@ -47,6 +49,7 @@ impl<'a> Painter<'a> {
             measure,
             draws: Vec::new(),
             hits: Vec::new(),
+            keep_clear: Vec::new(),
         }
     }
 
@@ -57,6 +60,7 @@ impl<'a> Painter<'a> {
             body: Frame::new(0.0, 0.0, width, height),
             draws: self.draws,
             hits: self.hits,
+            keep_clear: self.keep_clear,
         }
     }
 

@@ -19,21 +19,24 @@ final class MeaningBubbleController {
         window = FloatingPanel.make(contentView: view)
     }
 
-    /// note を anchor(候補の窓の枠)の横に出し，先で rowMidY の高さを指す．座標はどれも画面の座標．
-    /// others は同音語の札に出す語，screen は画面の使える範囲
-    func show(_ note: HomophoneNote, others: [String], theme: ResolvedTheme, anchor: NSRect, rowMidY: CGFloat, screen: NSRect, parent: NSWindow) {
+    /// note を，選んでいる候補の行 row のすぐ横(行の右の端から inline)に出し，先で行の縦の真ん中を指す．
+    /// 候補の窓 anchor の空いている所に重ねてよいが，obstacles(ほかの候補・幹の文節・足元の案内・入力中の文字)は覆わない．
+    /// 座標はどれも画面の座標．others は同音語の札に出す語，screen は画面の使える範囲
+    func show(_ note: HomophoneNote, others: [String], theme: ResolvedTheme, row: NSRect, anchor: NSRect, obstacles: [NSRect], screen: NSRect,
+              parent: NSWindow) {
         let metrics = MeaningBubbleLayout.Metrics.tokens(rounded: theme.isRounded)
         let header = MeaningCardDrawing.headerHeight(theme: theme)
         let content = MeaningCardDrawing.layout(note, others: others, width: metrics.width - metrics.padding * 2,
                                                 placement: .init(left: 0, headerMidY: header / 2), theme: theme)
         // core の配置は上が y の小さい座標なので，画面の上の端から測り直す
         let top = screen.maxY
+        let box = { (rect: NSRect) in MeaningBubbleLayout.Box(x: rect.minX, y: top - rect.maxY, width: rect.width, height: rect.height) }
         let placement = MeaningBubbleLayout(
-            anchor: .init(x: anchor.minX, y: top - anchor.maxY, width: anchor.width, height: anchor.height),
-            targetY: top - rowMidY,
+            row: box(row), window: box(anchor),
             size: (metrics.width, content.size.height + metrics.padding * 2),
             preferredPointer: metrics.padding + header / 2,
             screen: .init(x: screen.minX, y: 0, width: screen.width, height: screen.height),
+            obstacles: obstacles.map(box),
             metrics: metrics
         )
         let frame = NSRect(x: placement.window.x, y: top - placement.window.maxY, width: placement.window.width, height: placement.window.height)

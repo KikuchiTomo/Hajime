@@ -208,6 +208,17 @@ final class CandidateView: NSView {
         return rows.indices.contains(selected) ? rows[selected] : nil
     }
 
+    /// 語の意味の吹き出しが覆わない物(この view の座標)．選んでいない候補の行(表ではほかの列も)・文字種の行・足元の区切りの線から下
+    func bubbleObstacles(size: NSSize) -> [NSRect] {
+        guard let panel else { return [] }
+        let layout = placement(for: panel, size: size).layout
+        let rows = cells(for: panel, layout: layout).rows
+        let others = rows.indices.filter { $0 != panel.selectedEntry || panel.focus != .candidate }.map { rows[$0] }
+        let body = NSRect(layout.body)
+        let footer = NSRect(x: body.minX, y: layout.footerSeparator.y, width: body.width, height: body.maxY - layout.footerSeparator.y)
+        return others + [layout.header.map(NSRect.init), footer].compactMap { $0 }
+    }
+
     func target(at point: NSPoint) -> PointerTarget? {
         guard let panel else { return nil }
         let layout = placement(for: panel, size: bounds.size).layout

@@ -331,6 +331,22 @@ final class BranchView: NSView {
         return branchRowRect(selected, from: node, width: layout.branchWidth, downward: true, metrics: metrics)
     }
 
+    /// 語の意味の吹き出しが覆わない物(この view の座標)．幹の文節・選んでいない枝の行・枝の下の注釈と足元
+    func bubbleObstacles() -> [NSRect] {
+        guard let panel, let focused = panel.columns.firstIndex(where: \.isFocused) else { return [] }
+        let layout = layout(for: panel)
+        let metrics = metrics
+        let nodes = panel.columns.indices.map { NSRect(x: layout.trunkX[$0], y: layout.trunkY, width: layout.trunkWidths[$0], height: metrics.rowHeight) }
+        let column = panel.columns[focused]
+        let node = nodes[focused]
+        let lower = lowerRows(column).indices.filter { $0 != column.selectedAlternative }
+            .map { branchRowRect($0, from: node, width: layout.branchWidth, downward: true, metrics: metrics) }
+        let upper = upperRows(column).indices.map { branchRowRect($0, from: node, width: layout.branchWidth, downward: false, metrics: metrics) }
+        let footerTop = layout.trunkY + metrics.rowHeight + layout.lowerHeight
+        let footer = NSRect(x: 0, y: footerTop, width: layout.size.width, height: layout.size.height - footerTop)
+        return nodes + lower + upper + [footer]
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard let panel else { return }
         let layout = layout(for: panel)

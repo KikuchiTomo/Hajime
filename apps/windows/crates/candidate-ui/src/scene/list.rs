@@ -523,6 +523,24 @@ fn draw_list(
         }
         meaning::draw(painter, &slot.card, card);
     }
+    // 語の意味の吹き出しは，選んでいない候補・文字種の行・候補の下の語の意味・足元の区切りの線から下を覆わない
+    let selected = (list.focus == CandidateFocus::Candidate)
+        .then_some(list.selected_entry)
+        .flatten();
+    for (index, row) in cells.rows.iter().enumerate() {
+        if selected != Some(index as u32) {
+            painter.keep_clear.push(*row);
+        }
+    }
+    painter.keep_clear.extend(layout.header);
+    painter.keep_clear.extend(layout.card);
+    let footer_top = layout.footer_separator.y;
+    painter.keep_clear.push(Frame::new(
+        layout.body.x,
+        footer_top,
+        layout.body.width,
+        layout.body.max_y() - footer_top,
+    ));
     painter.rect(layout.footer_separator, theme.line);
     footer_section(painter, footer, layout.footer, metrics.row_padding_x);
 }

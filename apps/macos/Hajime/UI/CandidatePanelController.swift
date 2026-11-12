@@ -54,7 +54,8 @@ final class CandidatePanelController {
         let frame = present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: choosing, holdsEdges: choosing)
         // 語の意味は，候補の右に出す設定なら窓の外の吹き出しに出す(候補の窓の大きさは意味の有無で変えない)
         if panel.meaningPlacement == .side, let note = panel.homophone, let row = view.selectedRowRect(size: frame.size) {
-            bubble.show(note, others: note.others, theme: view.theme, anchor: frame, rowMidY: frame.maxY - row.midY,
+            bubble.show(note, others: note.others, theme: view.theme, row: Self.screenRect(row, in: frame), anchor: frame,
+                        obstacles: view.bubbleObstacles(size: frame.size).map { Self.screenRect($0, in: frame) } + [Self.caretLine(caret)],
                         screen: FloatingPanel.visibleFrame(for: caret), parent: window)
         } else {
             bubble.hide()
@@ -79,8 +80,9 @@ final class CandidatePanelController {
         let frame = present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
         if panel.meaningPlacement == .side, let column = panel.columns.first(where: \.isFocused), let note = column.homophone,
            let row = branchView.selectedRowRect() {
-            bubble.show(note, others: BranchView.others(of: note, in: column), theme: branchView.theme, anchor: frame,
-                        rowMidY: frame.maxY - row.midY, screen: FloatingPanel.visibleFrame(for: caret), parent: window)
+            bubble.show(note, others: BranchView.others(of: note, in: column), theme: branchView.theme, row: Self.screenRect(row, in: frame),
+                        anchor: frame, obstacles: branchView.bubbleObstacles().map { Self.screenRect($0, in: frame) } + [Self.caretLine(caret)],
+                        screen: FloatingPanel.visibleFrame(for: caret), parent: window)
         } else {
             bubble.hide()
         }
@@ -95,6 +97,17 @@ final class CandidatePanelController {
             let text = comment.map { UIStrings.Candidate.commentAnnouncement(named, comment: $0) } ?? named
             announce(focused.homophone.map { "\(text)、\($0.text)" } ?? text)
         }
+    }
+
+    /// 候補の窓の中の rect(上下が反転した view の座標)を，枠 frame の窓の画面の座標にする
+    private static func screenRect(_ rect: NSRect, in frame: NSRect) -> NSRect {
+        NSRect(x: frame.minX + rect.minX, y: frame.maxY - rect.maxY, width: rect.width, height: rect.height)
+    }
+
+    /// 入力中の文字の行(画面の幅いっぱい)．吹き出しはこれを覆わない
+    private static func caretLine(_ caret: NSRect) -> NSRect {
+        let screen = FloatingPanel.visibleFrame(for: caret)
+        return NSRect(x: screen.minX, y: caret.minY, width: screen.width, height: max(caret.height, 1))
     }
 
     /// 窓の幅の上限．トークンの上限(候補を表に広げていれば表の上限)と，入力位置がある画面の幅(左右に余白を空ける)の狭い方

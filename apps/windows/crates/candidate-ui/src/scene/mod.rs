@@ -283,7 +283,8 @@ impl Draw {
 }
 
 /// 描く部品の並び．width・height はウィンドウの大きさ，body はその中の候補ウィンドウの本体(影や余白を除いた部分)．
-/// hits はマウスで押せる範囲と押したときの対象．描く位置と同じ計算で決める
+/// hits はマウスで押せる範囲と押したときの対象．描く位置と同じ計算で決める．
+/// keep_clear は語の意味の吹き出しに覆わせない範囲(選んでいない候補・幹の文節・足元の案内など)
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
     pub width: f32,
@@ -291,6 +292,7 @@ pub struct Scene {
     pub body: Frame,
     pub draws: Vec<Draw>,
     pub hits: Vec<Hit>,
+    pub keep_clear: Vec<Frame>,
 }
 
 /// マウスで押せる範囲と，押したときの対象(macOS の BranchView・CandidateView の target(at:) と同じ)
@@ -480,6 +482,11 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
                 frame: hit.frame.offset(margin_x, margin_top),
                 target: hit.target,
             })
+            .collect(),
+        keep_clear: scene
+            .keep_clear
+            .into_iter()
+            .map(|frame| frame.offset(margin_x, margin_top))
             .collect(),
     }
 }
