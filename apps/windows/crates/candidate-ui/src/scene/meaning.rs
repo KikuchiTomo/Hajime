@@ -1,14 +1,15 @@
 #![forbid(unsafe_code)]
 
-//! 語の意味のカード(R-08．macOS の MeaningCardDrawing)．一覧(list)と分岐図(branch)で同じものを使う．
+//! 語の意味(R-08．macOS の MeaningCardDrawing)．一覧(list)と分岐図(branch)で同じものを使う．
 //!
+//! 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．
 //! 上から順に，見出し(辞書のアイコン・語・品詞の札)，意味，使い方の例，同音語を並べる．
 //! - 意味が 2 つ以上なら，頭に角丸の四角の番号を付ける(候補の番号の丸と形を変え，番号キーで選ぶものと見分ける)
-//! - 意味と例はカードの幅で折り返す(行の頭に句読点や小さいかなを置かない)．行数の上限を超える分は「…」で省く
+//! - 意味と例は語の意味の幅で折り返す(行の頭に句読点や小さいかなを置かない)．行数の上限を超える分は「…」で省く
 //! - 使い方の例は左に縦の線を引いて控えめな色で出し，例の中の見出しの語だけを強める
-//! - 同音語は区切りの線の下に，耳のアイコンと札で並べる．入らない札は「+n」にまとめる
+//! - 同音語は区切りの線の下に，耳のアイコンと札だけで並べる．入らない札は「+n」にまとめる
 //!
-//! 候補の右に出すときは，一覧では選んでいる候補を指す三角を左の辺に付け，分岐図では選んでいる候補からカードへ線を引く
+//! 候補の右に出すときは，一覧でも分岐図でも，選んでいる候補から見出しへ線を引く(アクセントの色はこの線だけに使う)
 
 use super::card_layout::{self, CardLayout, Content, Placement, SenseLines};
 use super::paint::Painter;
@@ -44,7 +45,7 @@ struct Line {
     runs: Vec<Run>,
 }
 
-/// 配置を決めたカード(配置は card_layout)．width・height は内側の余白を含む
+/// 配置を決めた語の意味(配置は card_layout)
 pub(super) struct Card {
     /// 意味ごとの，折り返した意味の行と例の行
     meaning: Vec<Vec<Line>>,
@@ -364,7 +365,7 @@ pub(super) fn connector(painter: &mut Painter, start: Point, end: Point) {
 
 // MARK: - 中身
 
-/// rect(カードの枠．地は描かない)の中に，配置のとおりに見出し・意味・例・同音語を描く
+/// rect(語の意味の場所．箱は描かない)の中に，配置のとおりに見出し・意味・例・同音語を描く
 fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     let theme = painter.theme;
     let layout = &card.layout;

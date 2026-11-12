@@ -1478,7 +1478,7 @@ mod tests {
                 assert!(scene.draws.iter().any(|draw| matches!(draw,
                     Draw::Curve { from, to, .. } if from.x == branch.max_x().round() && to.x == dot.mid_x())), "{name}");
             }
-            // 一覧と違って三角で指さない
+            // 三角で指さない
             assert!(
                 !scene
                     .draws

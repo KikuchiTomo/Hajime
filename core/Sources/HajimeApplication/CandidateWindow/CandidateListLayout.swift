@@ -24,7 +24,7 @@ public struct CandidateListLayout: Sendable, Equatable {
 
     /// 語の意味のカード
     public enum Card: Sendable, Equatable {
-        /// 候補の右．width・height はカードの大きさ(内側の余白を含む)
+        /// 候補の右．width・height は語の意味の場所の大きさ
         case side(width: Double, height: Double)
         /// 候補の下．width は窓の中身の幅の下限(belowCardWidth)で，カードは窓の中身の幅いっぱいに置く
         case below(width: Double, height: Double)

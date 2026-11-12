@@ -28,7 +28,7 @@ pub(super) enum Style {
 /// 語の意味のカード
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) enum Card {
-    /// 候補の右．カードの大きさ(内側の余白を含む)
+    /// 候補の右．語の意味の場所の大きさ
     Side { width: f32, height: f32 },
     /// 候補の下．幅は窓の中身の幅の下限(below_card_width)で，カードは窓の中身の幅いっぱいに置く
     Below { width: f32, height: f32 },

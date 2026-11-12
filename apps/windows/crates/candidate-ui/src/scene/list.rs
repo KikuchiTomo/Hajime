@@ -926,7 +926,7 @@ mod tests {
         }
     }
 
-    /// 描いた多角形(一覧のカードが選んでいる候補を指す三角)
+    /// 描いた多角形(語の意味は三角で指さないので，無いことを確かめる)
     fn polygons(scene: &Scene) -> Vec<Vec<Point>> {
         scene
             .draws
