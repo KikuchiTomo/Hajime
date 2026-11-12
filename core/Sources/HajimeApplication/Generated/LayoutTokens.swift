@@ -29,6 +29,7 @@ public enum LayoutTokens {
         public static let gridMaxWidth: Double = 960
         public static let screenMargin: Double = 16
         public static let truncationContext: Double = 4
+        public static let detailGap: Double = 8
     }
     public enum ModeIndicator {
         public static let fontSize: Double = 14
@@ -332,6 +333,7 @@ public enum LayoutTokens {
         public static let titleBarIconSize: Double = 16
         public static let titleBarPaddingX: Double = 16
         public static let aboutTitleFontSize: Double = 20
+        public static let emojiPreviewHeight: Double = 260
         public static let palettePreviewHeight: Double = 300
         public static let switchKnobOff: Double = 12
         public static let switchKnobOn: Double = 14

@@ -71,7 +71,7 @@ enum PanelBuilder {
         case .correction: return true
         // 打ったままと，連想で選び直した単語は，打ち間違いを直したものではない
         case .asTyped, .association, .command, .romajiReading: return false
-        case .engine, .variant, .sentencePart, .combined, .symbol, .userDictionary:
+        case .engine, .variant, .sentencePart, .combined, .symbol, .emoji, .userDictionary:
             guard let changed else { return false }
             return (segment.readingStart..<(segment.readingStart + segment.readingLength)).overlaps(changed)
         }
@@ -80,8 +80,10 @@ enum PanelBuilder {
     /// - Parameters:
     ///   - nextKey: 次の候補のキーの名前(英単語を直した候補の案内に出す)
     ///   - corrected: 打ち間違いを直した読みの部分(読みの先頭からの文字数)．候補の中の当たる語句に補正の下線を引く
+    ///   - detail: 候補の文字のあとに控えめに添える説明(絵文字の名前)．無ければ nil
     static func listPanel(for selection: CandidateSelection, composition: Composition, showsVariants: Bool,
-                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil, corrected: Range<Int>? = nil) -> CandidatePanel {
+                          perPage: Int = DefaultSettings.candidatesPerPage, nextKey: String? = nil, corrected: Range<Int>? = nil,
+                          detail: (Candidate) -> String? = { _ in nil }) -> CandidatePanel {
         let variants = showsVariants
             ? ScriptVariant.allCases.map { CandidatePanel.Variant(label: $0.label, isAvailable: $0.apply(to: composition) != nil) }
             : []
@@ -107,7 +109,8 @@ enum PanelBuilder {
                 ? String(candidate.text.dropFirst(selection.shownPrefix.count)) : candidate.text
             let annotation = selection.annotations[index]
             return CandidatePanel.Entry(text: text, annotation: annotation ?? candidate.comment.map(commentTag),
-                                        corrected: selection.shownPrefix.isEmpty ? range : nil, hasComment: annotation == nil && candidate.comment != nil)
+                                        corrected: selection.shownPrefix.isEmpty ? range : nil, hasComment: annotation == nil && candidate.comment != nil,
+                                        detail: detail(candidate))
         }
         let isCorrected = selection.candidates.first?.origin == .correction
         return CandidatePanel(
@@ -184,6 +187,7 @@ enum PanelBuilder {
             panel.columns[focused].selectedAlternative = page.selected
             panel.columns[focused].alternativeNotes = []
             panel.columns[focused].alternativeCommands = []
+            panel.columns[focused].alternativeDetails = []
             panel.columns[focused].isUncertain = false
         }
         panel.position = list.indexInGroup - page.selected + 1
@@ -194,8 +198,9 @@ enum PanelBuilder {
 
     /// showsVariants が false なら上の枝(字種)を出さない(設定の「候補の上に文字種の行を表示」)
     /// corrected は打ち間違いを直した読みの部分．かかる文節に補正の印を付ける(isCorrected)
+    /// detail は候補の文字のあとに控えめに添える説明(絵文字の名前)
     static func latticePanel(for lattice: SegmentLattice, perPage perSegment: Int = DefaultSettings.latticeCandidatesPerSegment,
-                             showsVariants: Bool = true, corrected: Range<Int>? = nil) -> LatticePanel {
+                             showsVariants: Bool = true, corrected: Range<Int>? = nil, detail: (Candidate) -> String? = { _ in nil }) -> LatticePanel {
         var position = 1
         var total = 0
         let columns = lattice.segments.enumerated().map { index, segment -> LatticePanel.Column in
@@ -240,6 +245,9 @@ enum PanelBuilder {
             if page.contains(where: hasComment) { column.alternativeComments = page.map(hasComment) }
             // コマンドの候補が無いページでは送らない
             if page.contains(where: { $0.commandKind != nil }) { column.alternativeCommands = page.map(\.commandKind) }
+            // 添える説明が無いページでは送らない
+            let details = page.map(detail)
+            if details.contains(where: { $0 != nil }) { column.alternativeDetails = details }
             return column
         }
         return LatticePanel(columns: columns, position: position, total: total)
@@ -247,7 +255,7 @@ enum PanelBuilder {
 
     /// 文節ごとの一覧．注目している文節の候補を縦に並べ，字種は上の種類の行に出す(分岐図の下の枝と上の枝にあたる)
     static func segmentListPanel(for lattice: SegmentLattice, perPage: Int, showsVariants: Bool, corrected: Range<Int>? = nil,
-                                 reading: String) -> CandidatePanel {
+                                 reading: String, detail: (Candidate) -> String? = { _ in nil }) -> CandidatePanel {
         let segment = lattice.focused
         let selectedCandidate: Int? = if case .candidate(let value) = segment.choice { value } else { nil }
         let selectedVariant: Int? = if case .variant(let value) = segment.choice { value } else { nil }
@@ -271,7 +279,8 @@ enum PanelBuilder {
             case .correction: correctedNote
             default: candidate.comment.map(commentTag)
             }
-            return CandidatePanel.Entry(text: candidate.text, annotation: annotation, corrected: range, hasComment: hasComment(candidate))
+            return CandidatePanel.Entry(text: candidate.text, annotation: annotation, corrected: range, hasComment: hasComment(candidate),
+                                        detail: detail(candidate))
         }
         let variantIndex = selectedVariant.flatMap { index -> Int? in
             guard showsVariants, case .variant(let variant) = segment.variants[index].origin else { return nil }

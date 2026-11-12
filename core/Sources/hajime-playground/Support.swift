@@ -97,3 +97,39 @@ struct Arguments {
         return values[index + 1]
     }
 }
+
+/// 試す・測るときの絵文字の引き方．アプリと同じくパレットの表(data/palette/palette.tsv．リポジトリの頭で動かしたときに読む)から引き，
+/// 選んだ記録はこのプロセスの中にだけ持つ．--emoji-source azookey なら，パレットの表を持たない作り(Linux)と同じく azooKey の絵文字の辞書から引く
+@MainActor
+enum PlaygroundEmoji {
+    static let paletteURL = URL(fileURLWithPath: "data/palette").appendingPathComponent(DefaultSettings.bundledPaletteFileName)
+
+    static func lookup(engine: AzooKeyConverterEngine, arguments: Arguments) -> any EmojiLooking {
+        if arguments.value(of: "--emoji-source") == "azookey" { return engine }
+        let text = (try? String(contentsOf: paletteURL, encoding: .utf8)) ?? ""
+        return PaletteEmojiLookup(catalog: LoadedPalette(PaletteIndex(catalog: PaletteCatalog(text: text))), usage: MemoryPaletteUsage(),
+                                  settings: StaticSettings(DefaultSettings.settings), now: { Date() })
+    }
+
+    /// 引数で変える絵文字の設定(--no-emoji で文節全体と文節の中の語の両方を切る・--emoji-position <何番目>・--emoji-count <数>)
+    static func adjust(_ settings: inout Settings, arguments: Arguments) {
+        if CommandLine.arguments.contains("--no-emoji") {
+            settings.emojiConversion = false
+            settings.emojiWordConversion = false
+        }
+        if let position = arguments.value(of: "--emoji-position").flatMap(Int.init) { settings.emojiCandidatePosition = position }
+        if let count = arguments.value(of: "--emoji-count").flatMap(Int.init) { settings.emojiCandidateCount = count }
+    }
+}
+
+@MainActor
+private final class LoadedPalette: PaletteCatalogProviding {
+    let index: PaletteIndex?
+    init(_ index: PaletteIndex) { self.index = index }
+}
+
+@MainActor
+private final class MemoryPaletteUsage: PaletteUsageStoring {
+    private(set) var usage = PaletteUsage()
+    func update(_ change: (inout PaletteUsage) -> Void) { change(&usage) }
+}

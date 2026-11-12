@@ -57,9 +57,33 @@ public final class AzooKeyConverterEngine {
         self.converter = dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary()
     }
 
-    /// 読みに合う絵文字(EmojiLooking)．肌の色などを変えた形は除く
-    public func emoji(for reading: String) -> [String] {
-        emojiReplacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true).map(\.text)
+    /// 読みに合う絵文字(EmojiLooking)．肌の色などを変えた形は除く．パレットの表を持たない作り(Linux)で使う．
+    /// azooKey の絵文字の辞書は，どの絵文字にも絵文字の形を選ぶ印(U+FE0F)を後ろに付けている(「😀」の後ろにも付き，
+    /// 「🖐」には 2 つ付く)．同じ絵文字のエンジンの辞書の語と重なって見えたり，確定した文字に余計な印が入ったりしないよう，
+    /// 要らない印を除く
+    public func emoji(for reading: String, limit: Int) -> [String] {
+        var seen = Set<String>()
+        return emojiReplacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true)
+            .map { Self.withoutExtraEmojiStyle($0.text) }
+            .filter { seen.insert($0).inserted }
+            .prefix(max(limit, 0)).map { $0 }
+    }
+
+    /// 名前は持たない(パレットの表に名前がある)
+    public func name(of emoji: String) -> String? { nil }
+
+    /// 選んだ絵文字は覚えない(覚えるのはパレットの表を使うとき)
+    public func didCommit(_ emoji: String, reading: String) {}
+
+    /// 絵文字の形で描く字(Emoji_Presentation)のあとの U+FE0F と，続けて重なった U+FE0F を除く
+    static func withoutExtraEmojiStyle(_ text: String) -> String {
+        let style: Unicode.Scalar = "\u{FE0F}"
+        var scalars = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            if scalar == style, let previous = scalars.last, previous == style || previous.properties.isEmojiPresentation { continue }
+            scalars.append(scalar)
+        }
+        return String(scalars)
     }
 
     /// 入力欄ひとつぶんの変換．検証木の採点(CandidateScoring)も同じものが受け持つ
@@ -529,7 +553,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
                   endsWithParticle: CIDData.isJoshi(cid: element.rcid), startsWithNoun: nounIDs.contains(element.lcid),
                   startsWithPredicate: predicateIDs.contains { $0.contains(element.lcid) },
                   startsWithConjunctiveParticle: conjunctiveParticleIDs.contains(element.lcid),
-                  endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid))
+                  endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid),
+                  isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid))
         }
     }
 

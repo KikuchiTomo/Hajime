@@ -1434,6 +1434,8 @@ pub struct CandidateEntry {
     #[serde(rename = "hasComment")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub has_comment: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -1445,6 +1447,7 @@ impl fmt::Debug for CandidateEntry {
             .field("correctedLength", &self.corrected_length)
             .field("command", &self.command)
             .field("hasComment", &self.has_comment)
+            .field("detail", &REDACTED)
             .finish()
     }
 }
@@ -1689,6 +1692,9 @@ pub struct BranchColumn {
     #[serde(rename = "alternativeComments")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternative_comments: Option<Vec<bool>>,
+    #[serde(rename = "alternativeDetails")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternative_details: Option<Vec<Option<String>>>,
     #[serde(rename = "sourceName")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>,
@@ -1716,6 +1722,7 @@ impl fmt::Debug for BranchColumn {
             .field("alternativeNotes", &REDACTED)
             .field("alternativeCommands", &self.alternative_commands)
             .field("alternativeComments", &self.alternative_comments)
+            .field("alternativeDetails", &REDACTED)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)
             .finish()

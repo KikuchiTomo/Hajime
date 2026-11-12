@@ -116,7 +116,7 @@ final class CandidateView: NSView {
         let entryWidth = panel.entries.map { entry in
             let annotation = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
             let icon = entry.command == nil ? 0 : CommandDrawing.width
-            return icon + entry.text.size(withAttributes: textAttributes).width + annotation
+            return icon + entry.text.size(withAttributes: textAttributes).width + CandidateDetailDrawing.width(entry.detail, font: labelFont) + annotation
         }.max() ?? 0
         let natural = lead + entryWidth + Size.paddingX * 2
         guard panel.columnLength != nil else { return natural }
@@ -387,12 +387,16 @@ final class CandidateView: NSView {
         }
         let annotationWidth = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
         let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: textColor]
-        let available = rect.maxX - Size.paddingX - annotationWidth - textX
+        let detailWidth = CandidateDetailDrawing.width(entry.detail, font: labelFont)
+        let available = rect.maxX - Size.paddingX - annotationWidth - detailWidth - textX
         // 長い文の候補は，ほかの候補と違うところの少し手前から見せる(頭が同じ文が並ぶので，末尾を省くと見分けられない)
         let shared = entry.text.count > Int(available / max(candidateFont.pointSize, 1))
             ? max(TextFitting.sharedPrefixLength(of: entry.text, among: panel.entries.map(\.text)) - Int(DesignTokens.Size.Candidate.truncationContext), 0) : 0
         let shown = TextFitting.truncated(entry.text, attributes: textAttributes, width: available, keeping: shared)
-        drawText(shown, attributes: textAttributes, x: textX, in: rect)
+        // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
+        CandidateDetailDrawing.draw(CandidateDetailDrawing.line(shown, attributes: textAttributes, detail: entry.detail,
+                                                                detailAttributes: [.font: labelFont, .foregroundColor: mutedColor]),
+                                    x: textX, in: rect)
         // 省いたときは下線を引く範囲を，見えている文字(「…」を除く)までにする
         if let corrected = entry.corrected, shown == entry.text {
             // 打ち間違いを直した語句に，入力中の文字と同じ補正の点線の下線を引く．選んでいる行は選択の文字の色にする

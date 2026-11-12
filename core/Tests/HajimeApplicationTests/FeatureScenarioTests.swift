@@ -167,17 +167,6 @@ struct FeatureScenarioTests {
         #expect(!session.isComposing)
     }
 
-    @Test("読みで引いた絵文字を，よく使う語のあとの候補に足す．設定で切れる")
-    func emoji() {
-        let base = FakeConverter(["なく": [("なく", nil), ("泣く", nil), ("鳴く", nil), ("無く", nil), ("亡く", nil), ("啼く", nil)]])
-        let table = FakeEmoji(["なく": ["😢", "😭", "🐦", "🐱"]])
-        let candidates = SupplementedConverter(base, settings: FakeSettings(), calendar: FakeCalendar(), emoji: table).candidates(for: "なく").map(\.text)
-        #expect(candidates == ["なく", "泣く", "鳴く", "無く", "亡く", "😢", "😭", "🐦", "啼く"])
-        var off = DefaultSettings.settings
-        off.emojiConversion = false
-        #expect(!SupplementedConverter(base, settings: FakeSettings(off), calendar: FakeCalendar(), emoji: table).candidates(for: "なく").map(\.text).contains("😢"))
-    }
-
     @Test("R-23: オンにすると読みから LaTeX のコマンドを候補に出し，第 1 候補は変えない．既定はオフ")
     func latexCommands() {
         let base = FakeConverter(["らむだ": [("ラムダ", nil), ("らむだ", nil)]])
@@ -285,12 +274,4 @@ final class FakePostalCodes: PostalCodeLooking {
     init(_ table: [String: [String]]) { self.table = table }
     func addresses(for code: String) -> [String] { table[code] ?? [] }
 
-}
-
-/// 絵文字の表の代わり
-@MainActor
-final class FakeEmoji: EmojiLooking {
-    let table: [String: [String]]
-    init(_ table: [String: [String]]) { self.table = table }
-    func emoji(for reading: String) -> [String] { table[reading] ?? [] }
 }

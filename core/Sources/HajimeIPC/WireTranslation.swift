@@ -190,7 +190,7 @@ extension WireCandidateList {
                                           correctedLength: corrected.map { UInt32(clamping: $0.length) },
                                           command: entry.command.map(WireCommandKind.init),
                                           // コメントでなければ送らない
-                                          hasComment: entry.hasComment ? true : nil)
+                                          hasComment: entry.hasComment ? true : nil, detail: entry.detail)
             },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
@@ -305,6 +305,7 @@ extension WireBranchMap {
                     alternativeNotes: column.alternativeNotes,
                     alternativeCommands: column.alternativeCommands.isEmpty ? nil : column.alternativeCommands.map { $0.map(WireCommandKind.init) },
                     alternativeComments: column.alternativeComments.isEmpty ? nil : column.alternativeComments,
+                    alternativeDetails: column.alternativeDetails.isEmpty ? nil : column.alternativeDetails,
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
                 )

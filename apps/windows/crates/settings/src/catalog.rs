@@ -42,6 +42,8 @@ pub struct Ranges {
     pub custom_theme_corner_radius: Range,
     pub association_limit: Range,
     pub meaning_sense_limit: Range,
+    pub emoji_candidate_position: Range,
+    pub emoji_candidate_count: Range,
     pub palette_columns: Range,
     pub palette_rows: Range,
     pub palette_cell_size: Range,

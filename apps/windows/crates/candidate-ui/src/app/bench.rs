@@ -46,6 +46,7 @@ fn list(step: usize) -> CandidateList {
             corrected_length: None,
             command: None,
             has_comment: None,
+            detail: None,
         })
         .collect();
     CandidateList {

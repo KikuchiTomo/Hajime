@@ -168,6 +168,12 @@ final class BranchView: NSView {
         var lowerHeight: CGFloat = 0
     }
 
+    /// 下の枝の候補の行の幅(コマンドのアイコンと，文字のあとに添える説明を含む)
+    private func lowerRowWidth(_ row: Row) -> CGFloat {
+        let icon: CGFloat = row.command == nil ? 0 : CommandDrawing.width
+        return textWidth(row.text, font: candidateFont) + icon + CandidateDetailDrawing.width(row.detail, font: labelFont)
+    }
+
     private func textWidth(_ text: String, font: NSFont) -> CGFloat {
         text.size(withAttributes: [.font: font]).width.rounded(.up)
     }
@@ -195,8 +201,7 @@ final class BranchView: NSView {
         let focused = panel.columns.firstIndex(where: \.isFocused)
         let column = focused.map { panel.columns[$0] }
         // コマンドの候補は文字の前に種類のアイコンを置くので，その幅も足す
-        let labelWidths = (column.map(lowerRows) ?? []).map { textWidth($0.text, font: candidateFont) + ($0.command == nil ? 0 : CommandDrawing.width) }
-            + (column?.variants ?? []).map { textWidth($0, font: candidateFont) }
+        let labelWidths = (column.map(lowerRows) ?? []).map(lowerRowWidth) + (column?.variants ?? []).map { textWidth($0, font: candidateFont) }
         // 打ったまま・修正・コマンドの添え書きの幅も足す
         let noteWidth = (column?.alternativeNotes.compactMap { $0 }.map { textWidth($0, font: labelFont) }.max()).map { $0 + Size.paddingX * 2 } ?? 0
         let branchWidth = metrics.stemX + metrics.branchIndent + metrics.lead
@@ -506,6 +511,8 @@ final class BranchView: NSView {
         var note: String? = nil
         /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
         var command: LauncherCommand.Kind? = nil
+        /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
+        var detail: String? = nil
     }
 
     /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
@@ -513,7 +520,8 @@ final class BranchView: NSView {
         column.alternatives.enumerated().map { index, text in
             Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative, opacity: index == 0 ? 1 : restOpacity,
                 note: column.alternativeNotes.indices.contains(index) ? column.alternativeNotes[index] : nil,
-                command: column.alternativeCommands.indices.contains(index) ? column.alternativeCommands[index] : nil)
+                command: column.alternativeCommands.indices.contains(index) ? column.alternativeCommands[index] : nil,
+                detail: column.alternativeDetails.indices.contains(index) ? column.alternativeDetails[index] : nil)
         }
     }
 
@@ -605,7 +613,11 @@ final class BranchView: NSView {
             CommandDrawing.drawIcon(kind, x: textX, midY: rect.midY, theme: theme, selected: row.isSelected, opacity: row.isSelected ? 1 : row.opacity)
             textX += CommandDrawing.width
         }
-        drawText(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: textX, in: rect)
+        // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
+        let detailColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
+        CandidateDetailDrawing.draw(CandidateDetailDrawing.line(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], detail: row.detail,
+                                                                detailAttributes: [.font: labelFont, .foregroundColor: detailColor]),
+                                    x: textX, in: rect)
         if let note = row.note {
             NoteDrawing.drawTag(note, maxX: tagMaxX(in: rect), midY: rect.midY, theme: theme, selected: row.isSelected, command: row.command != nil)
         }

@@ -608,6 +608,9 @@ impl RowState {
                 RangeKind::LiveConversionSkipLength | RangeKind::EnglishSkipLength,
             ) => more::skip_length(value),
             Control::Stepper(RangeKind::SuggestionSkipCount) => more::skip_count(value),
+            Control::Stepper(RangeKind::EmojiCandidatePosition) => {
+                settings::emoji_candidate_position(value)
+            }
             Control::Seconds(_) => more::seconds(value),
             _ => format!("{value}"),
         }
@@ -2392,6 +2395,7 @@ impl PageView {
             match row.row.control {
                 Control::ThemePreview => Some((PreviewKind::Theme, card.control)),
                 Control::PalettePreview => Some((PreviewKind::Palette, card.control)),
+                Control::EmojiPreview => Some((PreviewKind::Emoji, card.control)),
                 Control::Version => Some((PreviewKind::Icon, card.icon)),
                 _ => None,
             }
@@ -2549,6 +2553,9 @@ impl PageView {
                 Color::from(label_color),
                 layout,
             );
+        }
+        if let Some(example) = row.row.example {
+            example_chip(canvas, theme, card.icon, example, row.enabled);
         }
         for (position, rect) in &card.descriptions {
             let Some(note) = self
@@ -2723,7 +2730,7 @@ impl PageView {
                     );
                 }
             }
-            Control::PalettePreview => canvas.preview(card.control),
+            Control::PalettePreview | Control::EmojiPreview => canvas.preview(card.control),
             Control::Choice(_) | Control::ThemeFont(_) | Control::Preset => {
                 let dropdown = element(Part::Dropdown);
                 let items = row.dropdown_items(Part::Dropdown);
@@ -3361,6 +3368,56 @@ impl PageView {
     }
 }
 
+/// 名前の横の候補の見本の札(「びーる → 🍺」)．読みと矢印は薄い色，候補はふつうの色で，名前と同じ大きさの文字で書く
+fn example_chip(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    example: (&str, &str),
+    enabled: bool,
+) {
+    use tokens::size::settings::{PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS};
+    if rect.width <= 0.0 {
+        return;
+    }
+    let palette = &theme.palette;
+    let (secondary, primary) = if enabled {
+        (palette.text_secondary, palette.text)
+    } else {
+        (palette.text_disabled, palette.text_disabled)
+    };
+    // 札は試す欄の結果の札と同じ地と枠にする
+    canvas.fill_round(rect, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
+    canvas.stroke_round(
+        rect,
+        PREVIEW_CHIP_RADIUS,
+        1.0,
+        Color::from(palette.control_stroke),
+    );
+    let parts = crate::layout::example_parts(example, |text| canvas.width(text, TextStyle::Body));
+    let texts = [
+        (example.0, secondary),
+        (crate::layout::EXAMPLE_ARROW, secondary),
+        (example.1, primary),
+    ];
+    canvas.push_clip(rect);
+    for ((x, width), (text, color)) in parts.into_iter().zip(texts) {
+        canvas.text(
+            Rect::new(
+                rect.x + x,
+                rect.y + PREVIEW_CHIP_PADDING_Y,
+                width.ceil(),
+                size::BODY_LINE_HEIGHT,
+            ),
+            text,
+            TextStyle::Body,
+            Color::from(color),
+            TextLayout::LINE,
+        );
+    }
+    canvas.pop_clip();
+}
+
 /// 表の行を見せる高さ
 /// 試した結果を rect の中に描く．語は札にして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
 /// 札にしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出す札は描かない
@@ -3700,6 +3757,8 @@ pub enum PreviewKind {
     Theme,
     /// パレットの見本
     Palette,
+    /// 絵文字の候補の見本(候補の一覧)
+    Emoji,
     /// 情報のページのアイコン
     Icon,
 }

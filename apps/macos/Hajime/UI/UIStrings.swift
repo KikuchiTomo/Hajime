@@ -524,7 +524,17 @@ enum UIStrings {
         static let misuseNotes = "誤用の注釈を表示"
         static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
-        static let emojiConversion = "絵文字に変換"
+        static let emojiSection = "絵文字"
+        static let emojiConversion = "文節を絵文字に変換"
+        static let emojiWordConversion = "語を絵文字に変換"
+        /// 項目名の横に出す，その設定で出る候補の見本(読みと候補)
+        static let emojiConversionExample = (reading: "びーる", candidate: "🍺")
+        static let emojiWordConversionExample = (reading: "ねこが", candidate: "🐈が")
+        static let emojiCandidatePosition = "絵文字の位置"
+        static let emojiCandidateCount = "絵文字の数"
+        static let showsEmojiNames = "絵文字の名前を表示"
+        /// 絵文字の位置の値(「4 番目」)
+        static func emojiCandidatePositionValue(_ position: Int) -> String { "\(position) 番目" }
         static let latexConversion = "LaTeX のコマンドに変換"
         static let numberForms = "数字の書き方"
         static let numberFormConversion = "数字を丸数字などに変換"
@@ -1142,7 +1152,9 @@ extension UIStrings {
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
-            "emojiConversion": UIStrings.Settings.emojiConversion,
+            "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
+            "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,
+            "emojiCandidateCount": UIStrings.Settings.emojiCandidateCount, "showsEmojiNames": UIStrings.Settings.showsEmojiNames,
             "latexConversion": UIStrings.Settings.latexConversion,
             "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
             "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,

@@ -23,6 +23,9 @@ import HajimeEngine
 //   hajime-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
 //   hajime-playground --split <読み,読み,…>                      文節を区切るときに区切れる位置
 //   hajime-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
+//   hajime-playground --panels <読み,読み,…> [--zenzai <モデル>] 読みを打ったときに候補の窓(入力中の候補の窓・分岐図・文節ごとの一覧・文全体の一覧)に出る候補．
+//                                                                絵文字に印を付け，1 ページに見える数で区切る．--no-reranking で検証木の並べ替えを，
+//                                                                --no-context で文節の候補の前後の文脈での並べ替えを切る
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 //   hajime-playground --english-terms <ファイル>                  英語の語の辞書(R-24)の語ごとの読み・語の並び・もっともらしさ・候補の先頭
 //   hajime-playground --startup <同梱の辞書> [--zenzai <モデル>] [--zenzai-fast <xsmall のモデル>]
@@ -33,6 +36,8 @@ import HajimeEngine
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
 // --zenzai-fast <xsmall のモデル> と --zenzai-model accurate|fast|combined で，設定の「Zenzai のモデル」を試す
 // --dictionary の辞書に専門用語の辞書(terms.tsv．R-29)があれば，アプリと同じく既定の設定(すべての分野)で使う．--no-terms を付けると使わない
+// 絵文字の候補は，アプリと同じくパレットの表(data/palette/palette.tsv)から引く．--emoji-source azookey で azooKey の絵文字の辞書から引き(Linux と同じ)，
+// --evaluate-operations と --panels では --no-emoji・--emoji-position <何番目>・--emoji-count <数> で絵文字の設定を変える
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
@@ -69,7 +74,8 @@ MainActor.assumeIsolated {
             }
             OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations,
                                     warmsBeforeSpace: CommandLine.arguments.contains("--warm-before-space"),
-                                    reranking: !CommandLine.arguments.contains("--no-reranking"))
+                                    reranking: !CommandLine.arguments.contains("--no-reranking"),
+                                    emoji: PlaygroundEmoji.lookup(engine: playground.engine, arguments: arguments)) { PlaygroundEmoji.adjust(&$0, arguments: arguments) }
         } else if let file = arguments.value(of: "--bench-scoring") {
             Evaluation.benchScoring(cases: try EvaluationCase.load(from: file), engine: playground.engine,
                                     repeats: arguments.value(of: "--repeat").flatMap(Int.init) ?? 5)
@@ -87,6 +93,13 @@ MainActor.assumeIsolated {
         } else if let file = arguments.value(of: "--english-terms") {
             // 英語の語の辞書の語を打ったときの読みと候補．日本語の語を打った人に英語の語が先に出ないか確かめる(make english-terms)
             try EnglishTermCheck.run(file: file, engine: playground.engine)
+        } else if let readings = arguments.value(of: "--panels") {
+            PanelDump.run(readings: readings.split(separator: ",").map(String.init), engine: playground.engine,
+                          emoji: PlaygroundEmoji.lookup(engine: playground.engine, arguments: arguments)) { settings in
+                if CommandLine.arguments.contains("--no-reranking") { settings.candidateReranking = false }
+                if CommandLine.arguments.contains("--no-context") { settings.contextualSegmentCandidates = false }
+                PlaygroundEmoji.adjust(&settings, arguments: arguments)
+            }
         } else if let readings = arguments.value(of: "--words") {
             // 読みを変換したときの語の並び(文節の区切りと，先頭の語の候補を作るのに使う)
             let session = playground.engine.makeSession()
@@ -126,7 +139,7 @@ MainActor.assumeIsolated {
                              correction.keys, correction.reading))
             }
         } else {
-            Interactive.run(engine: playground.engine)
+            Interactive.run(engine: playground.engine, emoji: PlaygroundEmoji.lookup(engine: playground.engine, arguments: arguments))
         }
     } catch {
         print("起動できませんでした: \(error)")

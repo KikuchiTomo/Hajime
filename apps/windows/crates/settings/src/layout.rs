@@ -7,7 +7,9 @@
 
 use crate::pages::{Control, ListButtons, Row, Section, TryKind};
 use crate::strings::{keys, more};
+use tokens::size::settings as size_settings;
 use tokens::size::settings_windows as size;
+use tokens::size::space as size_space;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Rect {
@@ -70,7 +72,7 @@ pub struct CardLayout {
     pub reset: Rect,
     /// 部品の中のボタン・入力欄(一覧は 左の欄・右の欄・上のボタン・検索欄・絞り込み・下のボタンの順)
     pub parts: Vec<Rect>,
-    /// 絵(情報のページのアイコン・テーマの見本の札)．無ければ幅 0
+    /// 絵(情報のページのアイコン・テーマの見本の札・名前の横の候補の見本の札)．無ければ幅 0
     pub icon: Rect,
 }
 
@@ -301,6 +303,14 @@ fn place(
             size::PALETTE_PREVIEW_HEIGHT,
             metrics,
         ),
+        Control::EmojiPreview => place_inputs(
+            position,
+            0,
+            NO_BUTTONS,
+            frame,
+            size::EMOJI_PREVIEW_HEIGHT,
+            metrics,
+        ),
         // 謝辞は中身(名前・出どころ・ライセンスの全文)を画面の側で測って置く．部品の欄はカードの中の全体
         Control::Acknowledgement(_) => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
@@ -345,6 +355,18 @@ fn place_labeled(
     } else {
         metrics.lines(row.title, TextKind::Body, label_width)
     };
+    // 名前の横の候補の見本の札．名前の 1 行目の横に収まらなければ，名前の下の行に置く
+    let example = row
+        .example
+        .map(|example| (example_width(example, metrics).min(label_width), example));
+    let example_beside = example.is_some_and(|(width, _)| {
+        label_lines == 1
+            && metrics.width(row.title, TextKind::Body) + size_space::SM + width <= label_width
+    });
+    let example_below = match example {
+        Some(_) if !example_beside => size_space::XS + example_height(),
+        _ => 0.0,
+    };
     let label_height = label_lines as f32 * size::BODY_LINE_HEIGHT;
     let note_heights: Vec<f32> = notes
         .iter()
@@ -352,7 +374,7 @@ fn place_labeled(
             metrics.lines(text, TextKind::Caption, label_width) as f32 * size::NOTE_LINE_HEIGHT
         })
         .collect();
-    let text_height = label_height + note_heights.iter().sum::<f32>();
+    let text_height = label_height + example_below + note_heights.iter().sum::<f32>();
     let (height, text_top, control_top, trailing_x) = if stacked {
         let height =
             size::CARD_PADDING_Y * 2.0 + text_height + size::CONTROL_GAP + size::CONTROL_HEIGHT;
@@ -379,7 +401,23 @@ fn place_labeled(
     // 狭い窓で部品の幅が足りなければ縮める
     let trailing = trailing.min((frame.inner_width() - reset_space).max(0.0));
     let label = Rect::new(left, text_top, label_width.max(0.0), label_height);
-    let mut y = label.max_y();
+    // 札は名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
+    let icon = match example {
+        Some((width, _)) if example_beside => Rect::new(
+            left + metrics.width(row.title, TextKind::Body) + size_space::SM,
+            label.y + (size::BODY_LINE_HEIGHT - example_height()) / 2.0,
+            width,
+            example_height(),
+        ),
+        Some((width, _)) => Rect::new(
+            left,
+            label.max_y() + size_space::XS,
+            width,
+            example_height(),
+        ),
+        None => Rect::new(left, frame.y, 0.0, 0.0),
+    };
+    let mut y = label.max_y() + example_below;
     let descriptions = notes
         .iter()
         .zip(&note_heights)
@@ -428,8 +466,34 @@ fn place_labeled(
         control,
         reset,
         parts,
-        icon: Rect::new(left, frame.y, 0.0, 0.0),
+        icon,
     }
+}
+
+/// 候補の見本の札の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
+pub fn example_height() -> f32 {
+    size::BODY_LINE_HEIGHT + size_settings::PREVIEW_CHIP_PADDING_Y * 2.0
+}
+
+/// 候補の見本の札の中身(読み・矢印・候補)の並び．札の左の端からの位置と幅を返す(描く側と同じ並べ方)
+pub fn example_parts(example: (&str, &str), width: impl Fn(&str) -> f32) -> [(f32, f32); 3] {
+    let (reading, candidate) = example;
+    let mut x = size_settings::PREVIEW_CHIP_PADDING_X;
+    let mut parts = [(0.0, 0.0); 3];
+    for (index, text) in [reading, EXAMPLE_ARROW, candidate].into_iter().enumerate() {
+        let part = width(text);
+        parts[index] = (x, part);
+        x += part + size_space::XS;
+    }
+    parts
+}
+
+/// 読みと候補のあいだの矢印
+pub const EXAMPLE_ARROW: &str = "→";
+
+fn example_width(example: (&str, &str), metrics: &dyn Metrics) -> f32 {
+    let [.., (x, width)] = example_parts(example, |text| metrics.width(text, TextKind::Body));
+    (x + width + size_settings::PREVIEW_CHIP_PADDING_X).ceil()
 }
 
 /// 操作のボタンの行．名前を持たず，カードの左にボタンを置く．説明はボタンの下に置く
@@ -843,6 +907,50 @@ mod tests {
             assert!(card.control.y >= card.label.max_y());
             assert!(card.control.max_y() <= card.card.max_y());
             assert!(card.control.max_x() <= card.card.max_x());
+        }
+    }
+
+    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本の札を添える行)
+    fn example_cards(width: f32) -> Vec<CardLayout> {
+        let page = sections(Page::Conversion).unwrap();
+        let layout = layout(&page, width, |_| true, &Estimate);
+        page.iter()
+            .zip(&layout.sections)
+            .flat_map(|(section, placed)| {
+                placed
+                    .cards
+                    .iter()
+                    .filter(|card| section.rows[card.row].example.is_some())
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn 候補の見本の札は名前の横に置き_名前と同じ行の真ん中にそろえる() {
+        let cards = example_cards(900.0);
+        assert_eq!(cards.len(), 2);
+        for card in &cards {
+            assert!(card.icon.width > 0.0);
+            assert!(card.icon.x > card.label.x);
+            assert!(card.icon.max_x() <= card.label.max_x());
+            let center = card.label.y + size::BODY_LINE_HEIGHT / 2.0;
+            assert!((card.icon.y + card.icon.height / 2.0 - center).abs() < 0.01);
+            assert!(card.icon.max_y() <= card.card.max_y());
+        }
+    }
+
+    #[test]
+    fn 名前の横に収まらない窓では候補の見本の札を名前の下に置く() {
+        let cards = example_cards(260.0);
+        assert_eq!(cards.len(), 2);
+        for card in cards {
+            assert!(card.icon.width > 0.0);
+            assert_eq!(card.icon.x, card.label.x);
+            assert!(card.icon.y >= card.label.max_y());
+            assert!(card.icon.max_y() <= card.card.max_y() - size::CARD_PADDING_Y + 0.01);
+            assert!(card.control.y >= card.icon.max_y() || card.control.x > card.icon.max_x());
         }
     }
 

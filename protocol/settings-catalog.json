@@ -37,7 +37,10 @@
     "cyclesLetterCase",
     "dateConversion",
     "dynamicDictionary",
+    "emojiCandidateCount",
+    "emojiCandidatePosition",
     "emojiConversion",
+    "emojiWordConversion",
     "englishInputLiveConversion",
     "englishSkipLength",
     "englishTermCandidates",
@@ -110,6 +113,7 @@
     "reviewCorrectionTimeout",
     "shiftStartsAlphabet",
     "showsAssociationHint",
+    "showsEmojiNames",
     "showsHomophones",
     "showsKeyHints",
     "showsModeIndicator",
@@ -197,6 +201,14 @@
     "customThemeCornerRadius" : [
       0,
       24
+    ],
+    "emojiCandidateCount" : [
+      1,
+      5
+    ],
+    "emojiCandidatePosition" : [
+      2,
+      9
     ],
     "englishSkipLength" : [
       0,

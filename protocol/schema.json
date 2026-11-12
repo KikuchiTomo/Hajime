@@ -1677,6 +1677,10 @@
         {
           "name": "hasComment",
           "type": "bool?"
+        },
+        {
+          "name": "detail",
+          "type": "string?"
         }
       ]
     },
@@ -1969,6 +1973,10 @@
         {
           "name": "alternativeComments",
           "type": "[bool]?"
+        },
+        {
+          "name": "alternativeDetails",
+          "type": "[string?]?"
         },
         {
           "name": "sourceName",
