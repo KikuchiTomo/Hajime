@@ -5,7 +5,7 @@
 
 use crate::model::SettingsModel;
 use crate::store::{Fields, SettingsStore, StoreError};
-use crate::strings::{more, windows};
+use crate::strings::more;
 use serde_json::{json, Map, Value};
 
 pub const THEMES: &str = "customThemes";
@@ -17,6 +17,10 @@ pub const BASE_THEME: &str = "theme";
 pub const ID: &str = "customTheme.id";
 /// 読みにくい組み合わせの知らせ(無ければ空)
 pub const READABILITY: &str = "customTheme.readability";
+/// カスタムテーマが 1 つも無い(一覧の代わりに知らせを出す)
+pub const EMPTY: &str = "customTheme.empty";
+/// まだ作れる(上限まで作っていない)
+pub const ROOM: &str = "customTheme.room";
 const PREFIX: &str = "customTheme.";
 
 /// 編集できる値(道筋の後ろと設定のファイルの名前が同じ)
@@ -84,19 +88,12 @@ pub fn unique_name(base: &str, entries: &[Entry]) -> String {
         .unwrap_or_else(|| base.to_string())
 }
 
-/// 表の行(名前・状態)
-pub fn table(entries: &[Entry], active: Option<&str>) -> Vec<Vec<String>> {
-    entries
-        .iter()
-        .map(|entry| {
-            let state = if active == Some(entry.id.as_str()) {
-                windows::IN_USE
-            } else {
-                ""
-            };
-            vec![entry.name.clone(), state.to_string()]
-        })
-        .collect()
+/// 一覧の値(「customTheme.」の道筋)．count は今あるテーマの数，limit は作れる数の上限
+pub fn list_values(count: usize, limit: usize) -> Fields {
+    let mut values = Fields::new();
+    values.insert(EMPTY.into(), Value::Bool(count == 0));
+    values.insert(ROOM.into(), Value::Bool(count < limit));
+    values
 }
 
 /// 編集しているテーマの値(「customTheme.」の道筋)．テーマを選んでいなければ id だけを空にする
@@ -363,13 +360,10 @@ mod tests {
     #[test]
     fn 一覧と編集の値を読む() {
         let entries = entries(Some(&themes()));
-        assert_eq!(
-            table(&entries, Some("b")),
-            vec![
-                vec!["夕焼け".to_string(), String::new()],
-                vec!["海".to_string(), "使用中".to_string()]
-            ]
-        );
+        assert_eq!(list_values(0, 50)[EMPTY], true);
+        assert_eq!(list_values(2, 50)[EMPTY], false);
+        assert_eq!(list_values(2, 50)[ROOM], true);
+        assert_eq!(list_values(50, 50)[ROOM], false);
         let values = values(entries.get(1), "");
         assert_eq!(values[ID], "b");
         assert_eq!(values["customTheme.surface"], "#FFFFFF");

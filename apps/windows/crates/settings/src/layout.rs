@@ -312,6 +312,7 @@ fn place(
         }
         Control::Version => place_about(position, row.title, frame, metrics),
         Control::ThemeOption(_) => place_option(position, frame),
+        Control::CustomTheme(_) => place_custom_theme(position, frame),
         _ => place_labeled(position, row, notes, frame, metrics),
     }
 }
@@ -705,6 +706,33 @@ fn place_option(position: usize, frame: Frame) -> CardLayout {
     );
     card.parts.push(radio);
     card.control = card.card;
+    card
+}
+
+/// カスタムテーマの行の右の絵のボタンの数(編集・複製・削除．app::page の ThemeAction::ROW と同じ並び)
+const CUSTOM_THEME_BUTTONS: usize = 3;
+
+/// カスタムテーマの行(macOS の CustomThemeRow)．既成のテーマの行と同じく選ぶ印・見本の色・名前を並べ，
+/// 右の端に編集・複製・削除の絵のボタンを置き，名前とボタンのあいだに読みにくい印の場所をとる．
+/// control は選ぶ印，parts はボタン(左から)と印の場所
+fn place_custom_theme(position: usize, frame: Frame) -> CardLayout {
+    let mut card = place_option(position, frame);
+    let center = frame.y + size::ROW_HEIGHT / 2.0;
+    let button = size::RESET_SIZE;
+    let mut right = frame.inner_right();
+    let mut buttons = Vec::new();
+    for _ in 0..CUSTOM_THEME_BUTTONS {
+        right -= button;
+        buttons.push(Rect::new(right, center - button / 2.0, button, button));
+        right -= size_space::INLINE;
+    }
+    buttons.reverse();
+    let icon = size::ICON_FONT_SIZE;
+    let mark = Rect::new(right - icon, center - icon / 2.0, icon, icon);
+    card.control = card.parts.first().copied().unwrap_or(card.control);
+    card.label.width = (mark.x - size::CONTROL_GAP - card.label.x).max(0.0);
+    card.parts = buttons;
+    card.parts.push(mark);
     card
 }
 

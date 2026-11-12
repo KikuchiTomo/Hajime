@@ -358,8 +358,12 @@ pub enum Control {
     SyncFields(ListSpec),
     /// 取り込んだ辞書・連想の辞書の一覧．入力欄で選んだ辞書の名前などを変え，下のボタンで取り込む・並べ替える・切り替える・消す
     Dictionaries(DictionaryList, ListSpec),
-    /// カスタムテーマの一覧．選んだテーマを下の行で編集し，入力欄で名前を変え，下のボタンで作る・複製する・使う・消す
-    CustomThemes(ListSpec),
+    /// カスタムテーマの 1 つ(一覧の番号)．既成のテーマと同じく選ぶ印・見本の色・名前を並べ，読みにくければ印を付け，
+    /// 右のボタンで編集・複製・削除する(macOS の AppearancePage の CustomThemeRow)．
+    /// ページを作るときに上限の数だけ並べ(with_custom_theme_rows)，今あるテーマの数だけ出す
+    CustomTheme(usize),
+    /// 薄い字で出す知らせ(一覧が空のとき．macOS の secondary の Text)
+    Placeholder,
     /// 色を選ぶボタン(「#RRGGBB」の値．押すと色を選ぶ窓を出す)
     Color,
     /// 外観の見本(候補ウィンドウと同じ描き方の分岐図)
@@ -435,6 +439,10 @@ pub enum Action {
     SyncNow,
     /// 新しいバージョンがあるかを確かめ，あれば尋ねてから入れる(R-19．押したときだけ通信する)
     CheckForUpdates,
+    /// 今のテーマを写したカスタムテーマを編集の画面で作る(macOS の AppearancePage の「カスタムテーマを作成…」)
+    CreateTheme,
+    /// 今のテーマを複製してカスタムテーマにし，それを使う
+    DuplicateCurrentTheme,
 }
 
 impl Action {
@@ -640,16 +648,6 @@ impl Control {
                     settings::REMOVE,
                 ],
             ),
-            Control::CustomThemes(_) => (
-                &[rule_list::UPDATE],
-                &[
-                    windows::CREATE_THEME,
-                    more::DUPLICATE,
-                    windows::USE_THEME,
-                    more::DUPLICATE_THEME,
-                    more::DELETE_THEME,
-                ],
-            ),
             Control::Dictionaries(DictionaryList::Association, _) => (
                 &[rule_list::UPDATE],
                 &[
@@ -709,8 +707,7 @@ impl Control {
             | Control::Dictionary(spec)
             | Control::Symbols(_, spec)
             | Control::SyncFields(spec)
-            | Control::Dictionaries(_, spec)
-            | Control::CustomThemes(spec) => Some(spec),
+            | Control::Dictionaries(_, spec) => Some(spec),
             _ => None,
         }
     }
@@ -855,7 +852,6 @@ impl Control {
                 windows::DICTIONARY_SUMMARY,
                 windows::SYMBOL_STATE,
             ],
-            Control::CustomThemes(_) => vec![more::THEME_NAME, windows::SYMBOL_STATE],
             _ => fields().collect(),
         }
     }
@@ -2182,7 +2178,31 @@ fn romaji() -> Vec<Section> {
     ))]
 }
 
-const THEME_FIELDS: &[Field] = &[Field::named("name", more::THEME_NAME, false)];
+/// カスタムテーマの一覧の下のボタン(macOS の AppearancePage の HStack)
+const THEME_BUTTONS: &[(&str, Action)] = &[
+    (more::CREATE_THEME, Action::CreateTheme),
+    (more::DUPLICATE, Action::DuplicateCurrentTheme),
+];
+
+/// カスタムテーマの行(Control::CustomTheme(0))を上限 limit の数だけ並べる．出すのは今あるテーマの数だけ(画面の側で決める)
+pub fn with_custom_theme_rows(mut sections: Vec<Section>, limit: usize) -> Vec<Section> {
+    for section in &mut sections {
+        let Some(position) = section
+            .rows
+            .iter()
+            .position(|row| row.control == Control::CustomTheme(0))
+        else {
+            continue;
+        };
+        let template = section.rows[position].clone();
+        let rows = (1..limit).map(|index| Row {
+            control: Control::CustomTheme(index),
+            ..template.clone()
+        });
+        section.rows.splice(position + 1..position + 1, rows);
+    }
+    sections
+}
 
 /// 外観のページ(macOS の AppearancePage と CustomThemeEditor)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
 /// カスタムテーマは一覧で選んだものを下の行で編集する(値は crate::themes の「customTheme.」の道筋)
@@ -2209,18 +2229,13 @@ fn appearance() -> Vec<Section> {
         Section::new(more::THEME, theme_rows),
         Section::new(
             more::CUSTOM_THEMES,
-            vec![Row::new(
-                "",
-                "",
-                Control::CustomThemes(ListSpec {
-                    path: "customThemes",
-                    fields: THEME_FIELDS,
-                    empty: more::NO_CUSTOM_THEMES,
-                    invalid: crate::strings::Text::Fixed(more::INVALID_THEME),
-                    lowercase: false,
-                    exclusive_with: None,
-                }),
-            )],
+            vec![
+                Row::new(more::NO_CUSTOM_THEMES, "", Control::Placeholder)
+                    .visible_when(On(themes::EMPTY)),
+                Row::new("", "", Control::CustomTheme(0)),
+                // 上限まで作ったら作れない(macOS と同じくボタンを使えなくする)
+                Row::new("", "", Control::Buttons(THEME_BUTTONS)).enabled_when(On(themes::ROOM)),
+            ],
         ),
         Section::new(more::COLORS, colors),
         Section::new(
@@ -2690,5 +2705,34 @@ mod tests {
         let titles: Vec<_> = page.iter().map(|section| section.title).collect();
         assert_eq!(titles, vec![Some("入力方式"), Some("文字"), Some("動作")]);
         assert_eq!(page[1].rows.len(), 12);
+    }
+
+    #[test]
+    fn カスタムテーマの行は上限の数だけ並べる() {
+        let page = with_custom_theme_rows(sections(Page::Appearance).unwrap(), 3);
+        let rows: Vec<&Control> = page
+            .iter()
+            .flat_map(|section| &section.rows)
+            .map(|row| &row.control)
+            .filter(|control| matches!(control, Control::CustomTheme(_)))
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                &Control::CustomTheme(0),
+                &Control::CustomTheme(1),
+                &Control::CustomTheme(2)
+            ]
+        );
+        // 空のときの知らせ・行・作るボタンの順(macOS の AppearancePage と同じ)
+        let custom = page
+            .iter()
+            .find(|section| section.title == Some(more::CUSTOM_THEMES))
+            .unwrap();
+        assert_eq!(custom.rows.first().unwrap().control, Control::Placeholder);
+        assert!(matches!(
+            custom.rows.last().unwrap().control,
+            Control::Buttons(_)
+        ));
     }
 }

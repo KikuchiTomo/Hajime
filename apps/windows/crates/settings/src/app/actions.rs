@@ -333,14 +333,9 @@ impl App {
                 index,
                 name: _,
             } => self.theme_list(action, index),
-            Event::ThemeSelected(index) => {
-                let entries =
-                    crate::themes::entries(self.model.as_ref()?.value(crate::themes::THEMES));
-                self.editing_theme =
-                    index.and_then(|index| entries.get(index).map(|entry| entry.id.clone()));
-                self.check_theme();
-                self.refresh();
-                None
+            Event::Action(Action::CreateTheme) => self.theme_list(ThemeAction::Create, None),
+            Event::Action(Action::DuplicateCurrentTheme) => {
+                self.theme_list(ThemeAction::DuplicateCurrent, None)
             }
             Event::ChooseColor { path, current } => Some(After::ChooseColor { path, current }),
             other => self.handle_other(other),
@@ -407,7 +402,6 @@ impl App {
             | Event::SyncToggleFields(_)
             | Event::DictionaryList { .. }
             | Event::ThemeList { .. }
-            | Event::ThemeSelected(_)
             | Event::ChooseColor { .. }
             | Event::ChooseApp { .. }
             | Event::OpenUrl(_)
@@ -418,7 +412,9 @@ impl App {
                 Action::SyncNow
                 | Action::ChooseSyncFolder
                 | Action::OpenSetup
-                | Action::CheckForUpdates,
+                | Action::CheckForUpdates
+                | Action::CreateTheme
+                | Action::DuplicateCurrentTheme,
             ) => return None,
             Event::DictionaryAdd { item, replacing } => {
                 let entry = DictionaryEntry {
@@ -687,8 +683,19 @@ impl App {
     /// 編集しているカスタムテーマの読みやすさをエンジンに確かめてもらう(macOS の CustomThemeEditor の読みやすさ)
     fn check_theme(&mut self) {
         self.extras.theme_report = String::new();
+        self.extras.theme_warnings.clear();
         let Some(model) = &self.model else { return };
         let entries = crate::themes::entries(model.value(crate::themes::THEMES));
+        // 一覧の行の注意の印(macOS の CustomThemeRow の lowContrastPairs)
+        self.extras.theme_warnings = entries
+            .iter()
+            .map(|entry| {
+                model
+                    .store()
+                    .check_custom_theme(&entry.value)
+                    .is_ok_and(|issues| !issues.is_empty())
+            })
+            .collect();
         let Some(entry) = self
             .editing_theme
             .as_deref()
@@ -734,17 +741,8 @@ impl App {
         let mut changes: Vec<(&'static str, serde_json::Value)> = Vec::new();
         let mut editing = self.editing_theme.clone();
         match action {
-            ThemeAction::Rename(name) => {
-                let id = &chosen?.id;
-                match crate::themes::renamed(themes.as_ref(), id, &name, name_limit) {
-                    Some(changed) => changes.push((crate::themes::THEMES, changed)),
-                    None => {
-                        return Some(After::Message {
-                            text: more::INVALID_THEME.into(),
-                            warning: true,
-                        })
-                    }
-                }
+            ThemeAction::Edit => {
+                editing = Some(chosen?.id.clone());
             }
             ThemeAction::Create | ThemeAction::DuplicateCurrent => {
                 if entries.len() >= limit {
@@ -789,6 +787,7 @@ impl App {
                     crate::themes::ACTIVE,
                     serde_json::Value::String(entry.id.clone()),
                 ));
+                editing = Some(entry.id.clone());
             }
             ThemeAction::Duplicate => {
                 if entries.len() >= limit {

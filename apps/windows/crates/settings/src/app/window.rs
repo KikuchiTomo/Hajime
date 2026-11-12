@@ -638,6 +638,10 @@ impl App {
             let mut extra = self.sync_values.clone();
             extra.extend(self.view_values.clone());
             extra.extend(crate::themes::values(editing, &self.extras.theme_report));
+            extra.extend(crate::themes::list_values(
+                entries.len(),
+                self.catalog.limits.custom_themes,
+            ));
             self.extras.extra = extra;
             let values = page::WithExtras {
                 values: model,

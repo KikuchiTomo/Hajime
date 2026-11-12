@@ -66,6 +66,10 @@ pub struct Glyphs {
     /// 数を 1 段ずつ変えるボタン(減らす・増やす)
     pub minus: &'static str,
     pub plus: &'static str,
+    /// カスタムテーマの行の編集・複製・削除のボタン(macOS の pencil・plus.square.on.square・trash)
+    pub edit: &'static str,
+    pub copy: &'static str,
+    pub delete: &'static str,
 }
 
 pub const GLYPHS: Glyphs = Glyphs {
@@ -79,6 +83,9 @@ pub const GLYPHS: Glyphs = Glyphs {
     warning: "\u{E7BA}",
     minus: "\u{E738}",
     plus: "\u{E710}",
+    edit: "\u{E70F}",
+    copy: "\u{E8C8}",
+    delete: "\u{E74D}",
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
