@@ -237,6 +237,12 @@ pub mod more {
     pub const APPS: &str = "アプリ";
     pub const BRANCH_CANDIDATES: &str = "分岐図の候補数";
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
+    pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
+    pub const CONTEXTUAL_SEGMENT_CANDIDATES_NOTE: &str =
+        "分岐図と文節ごとの一覧で、前後の語句とのつながりがよい候補を上に表示します。";
+    pub const LIST_SEGMENT_ALTERNATIVES: &str = "一覧に文節を入れ替えた候補を表示";
+    pub const LIST_SEGMENT_ALTERNATIVES_NOTE: &str =
+        "一覧で、文節を 1 か所だけほかの候補に替えた文を、迷う文節から順に表示します。";
     pub const LIVE_CONVERSION_DELAY: &str = "漢字にするまでの待ち時間";
     pub const LIVE_CONVERSION_SKIP_LENGTH: &str = "ライブ変換しない文字数";
     pub const ENGLISH_SKIP_LENGTH: &str = "英単語にしない文字数";
@@ -637,6 +643,11 @@ pub mod sync {
         ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
+        ("contextualSegmentCandidates", "前後の文脈で候補を並べ替え"),
+        (
+            "listSegmentAlternatives",
+            "一覧に文節を入れ替えた候補を表示",
+        ),
         ("liveConversionDelay", "漢字にするまでの待ち時間"),
         ("liveConversionSkipLength", "ライブ変換しない文字数"),
         ("englishSkipLength", "英単語にしない文字数"),

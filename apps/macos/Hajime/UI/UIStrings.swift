@@ -864,6 +864,10 @@ enum UIStrings {
         static let candidates = "候補"
         static let branchCandidates = "分岐図の候補数"
         static let listCandidates = "一覧の候補数"
+        static let contextualSegmentCandidates = "前後の文脈で候補を並べ替え"
+        static let contextualSegmentCandidatesNote = "分岐図と文節ごとの一覧で、前後の語句とのつながりがよい候補を上に表示します。"
+        static let listSegmentAlternatives = "一覧に文節を入れ替えた候補を表示"
+        static let listSegmentAlternativesNote = "一覧で、文節を 1 か所だけほかの候補に替えた文を、迷う文節から順に表示します。"
         static let liveConversionDelay = "漢字にするまでの待ち時間"
         static let liveConversionSkipLength = "ライブ変換しない文字数"
         static let englishSkipLength = "英単語にしない文字数"
@@ -1010,6 +1014,7 @@ extension UIStrings {
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
+            "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,
             "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,

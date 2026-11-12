@@ -8,7 +8,7 @@ import HajimeEngine
 //   hajime-playground [--zenzai <モデル>]                         ローマ字を打って結果を見る
 //   hajime-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
 //   hajime-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
-//   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--zenzai <モデル>]
+//   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--warm-before-space] [--zenzai <モデル>]
 //                                                                期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合
 //   hajime-playground --evaluate-typo <TSV> [--zenzai <モデル>] [--typing-interval <秒>]
 //                                                                打ち間違いの補正(直した・示した・直さなかった)．
@@ -20,6 +20,8 @@ import HajimeEngine
 //   hajime-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 //   hajime-playground --english-terms <ファイル>                  英語の語の辞書(R-24)の語ごとの読み・語の並び・もっともらしさ・候補の先頭
+//   hajime-playground --startup <同梱の辞書> [--zenzai <モデル>] [--zenzai-fast <xsmall のモデル>]
+//                                                                起動(モデルと辞書の確認・エンジン・warmUp)から最初の変換までの時間
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
@@ -27,6 +29,15 @@ import HajimeEngine
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
+    if let dictionary = arguments.value(of: "--startup") {
+        do {
+            try StartupProbe.run(zenzaiPath: arguments.value(of: "--zenzai"), fastZenzaiPath: arguments.value(of: "--zenzai-fast"), dictionaryPath: dictionary)
+        } catch {
+            print("起動できませんでした: \(error)")
+            exit(1)
+        }
+        return
+    }
     do {
         let playground = try PlaygroundEngine(zenzaiPath: arguments.value(of: "--zenzai"),
                                               zenzaiVariant: arguments.value(of: "--zenzai-variant").flatMap(ZenzaiModel.Variant.init(rawValue:)) ?? .small,
@@ -45,7 +56,8 @@ MainActor.assumeIsolated {
             if let shard = arguments.value(of: "--shard")?.split(separator: "/").compactMap({ Int($0) }), shard.count == 2, shard[1] > 0 {
                 cases = cases.enumerated().filter { $0.offset % shard[1] == shard[0] }.map(\.element)
             }
-            OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations)
+            OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations,
+                                    warmsBeforeSpace: CommandLine.arguments.contains("--warm-before-space"))
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {

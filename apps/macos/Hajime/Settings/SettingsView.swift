@@ -193,6 +193,10 @@ private struct ConversionTab: View {
                         LabeledContent(UIStrings.More.listCandidates, value: "\(model.settings.listCandidatesPerPage)")
                     }
                 }
+                ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
+                Text(UIStrings.More.contextualSegmentCandidatesNote).font(.caption).foregroundStyle(.secondary)
+                ResettableToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives)
+                Text(UIStrings.More.listSegmentAlternativesNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.More.typo) {
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))

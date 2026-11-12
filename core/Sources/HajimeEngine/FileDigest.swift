@@ -1,6 +1,8 @@
 import Foundation
 #if canImport(CryptoKit)
 import CryptoKit
+#elseif os(Windows)
+import CWindowsHash
 #endif
 import HajimeDomain
 
@@ -47,38 +49,96 @@ enum FileDigest {
 
     /// 読み終えた中身の SHA-256(小文字の 16 進)
     static func sha256(of data: Data) -> String {
-        #if canImport(CryptoKit)
-        return HajimeDomain.SHA256Digest.lowercaseHex(SHA256.hash(data: data))
-        #else
-        var hasher = SHA256Digest()
+        var hasher = Hasher()
         hasher.update(data)
         return hasher.finalizeHex()
-        #endif
     }
 
     /// 決まった大きさを超えたら読むのをやめる．開いたあとでファイルが伸びても，読み続けて止まらないようにする
     static func sha256(of handle: FileHandle, maximumBytes: Int) throws(TooLarge) -> String {
-        #if canImport(CryptoKit)
-        var hasher = SHA256()
-        #else
-        // CryptoKit の無い OS(Windows)では自前の SHA-256 で求める．値が同じことは SHA256DigestTests で確かめる
-        var hasher = SHA256Digest()
-        #endif
+        var hasher = Hasher()
         var total = 0
         // 大きなファイルもあるので，一度に読まずに区切って読む
         while let chunk = try? handle.read(upToCount: min(1 << 20, maximumBytes + 1 - total)), !chunk.isEmpty {
             total += chunk.count
             guard total <= maximumBytes else { throw TooLarge(readBytes: total) }
-            #if canImport(CryptoKit)
-            hasher.update(data: chunk)
-            #else
             hasher.update(chunk)
-            #endif
         }
-        #if canImport(CryptoKit)
-        return HajimeDomain.SHA256Digest.lowercaseHex(hasher.finalize())
-        #else
         return hasher.finalizeHex()
+    }
+
+    /// その OS で速い SHA-256．macOS は CryptoKit，Windows は OS の CNG(開けなければ自前の SHA256Digest)，ほかは自前の SHA256Digest．
+    /// 起動のたびに同梱の辞書と Zenzai のモデル(合わせて 280MB ほど)を確かめるので，CPU の SHA の命令を使える OS の実装を使う
+    private struct Hasher {
+        #if canImport(CryptoKit)
+        private var digest = SHA256()
+
+        mutating func update(_ data: Data) {
+            digest.update(data: data)
+        }
+
+        func finalizeHex() -> String {
+            HajimeDomain.SHA256Digest.lowercaseHex(digest.finalize())
+        }
+        #elseif os(Windows)
+        private let system = WindowsSHA256()
+        private var portable = SHA256Digest()
+
+        mutating func update(_ data: Data) {
+            if let system {
+                system.update(data)
+            } else {
+                portable.update(data)
+            }
+        }
+
+        mutating func finalizeHex() -> String {
+            system?.finalizeHex() ?? portable.finalizeHex()
+        }
+        #else
+        private var digest = SHA256Digest()
+
+        mutating func update(_ data: Data) {
+            digest.update(data)
+        }
+
+        mutating func finalizeHex() -> String {
+            digest.finalizeHex()
+        }
         #endif
     }
+
+    #if os(Windows)
+    /// Windows の CNG(BCrypt)で求める SHA-256．CNG を開けなければ作れない(nil)ので，呼ぶ側は自前の SHA256Digest で求める．
+    /// 途中で CNG が失敗したら空の文字列を返す．どのハッシュとも一致しないので，確かめていないファイルを使わない側に倒れる
+    private final class WindowsSHA256 {
+        private var state: OpaquePointer?
+        private var failed = false
+
+        init?() {
+            guard let state = hajime_sha256_begin() else { return nil }
+            self.state = state
+        }
+
+        deinit {
+            if let state { hajime_sha256_discard(state) }
+        }
+
+        func update(_ data: Data) {
+            guard let state, !failed else { return }
+            let result = data.withUnsafeBytes { bytes in
+                hajime_sha256_update(state, bytes.baseAddress?.assumingMemoryBound(to: UInt8.self), bytes.count)
+            }
+            if result != 0 { failed = true }
+        }
+
+        func finalizeHex() -> String {
+            guard let state else { return "" }
+            self.state = nil
+            var digest = [UInt8](repeating: 0, count: 32)
+            let result = digest.withUnsafeMutableBufferPointer { hajime_sha256_finish(state, $0.baseAddress) }
+            return result == 0 && !failed ? HajimeDomain.SHA256Digest.lowercaseHex(digest) : ""
+        }
+    }
+    #endif
 }

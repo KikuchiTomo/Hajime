@@ -54,6 +54,8 @@ public final class InputSession {
     private var latticeUntouched = false
     /// 注目している文節の長さを変えたときの下見(読みと文節の位置ごと)．分岐図を出してから求めて足す
     private var resizePreviews: [ResizePreviewKey: (shorter: String?, longer: String?)] = [:]
+    /// 一覧に入れる文節を入れ替えた文のために，前後の文脈での並べ替えに使う変換を前もって求め終えた読み
+    private var contextWarmedReading: String?
     /// 予測の窓に出す，続く語句の予測(読みごと)．打った文字を出してから求めて足す
     private var suggestionPredictions: (reading: String, candidates: [Candidate])?
     /// 予測の窓に出している予測．出していなければ nil
@@ -408,7 +410,15 @@ public final class InputSession {
     /// 打鍵が止まったあいだに，Space で分岐図を出すときに求める候補を前もって求める手順(LatticeBuilder.warmingSteps)．
     /// 分岐図を使わない設定(一覧)や，入力中でなければ空
     public var latticeWarmingSteps: [@MainActor () -> Void] {
-        guard phase == .composing, !composition.isEmpty, settings.current.candidatePresentation.segmentsReading else { return [] }
+        guard phase == .composing, !composition.isEmpty else { return [] }
+        guard settings.current.candidatePresentation.segmentsReading else {
+            // 一覧では，文節を入れ替えた文(makeSelection)を作るのに使う文節の候補と，その並べ替えに使う変換だけを前もって求める
+            // (長い文で Space を遅くしないため)
+            guard settings.current.listSegmentAlternatives else { return [] }
+            let builder = latticeBuilder
+            let reading = composition.conversionReading
+            return builder.warmingSteps(reading: reading) + builder.contextWarmingSteps(reading: reading) + [{ [self] in contextWarmedReading = reading }]
+        }
         let builder = latticeBuilder
         let reading = composition.conversionReading
         // 最後に，Space と同じ分岐図(文節が 1 つの文の分け方や訂正を含む)と，足元に出す文節の長さの下見(短く・長く)も，
@@ -1411,7 +1421,9 @@ public final class InputSession {
     /// 続く語句の予測は入れない(変換とは別の操作なので，変換の候補に混ぜない)
     private var latticeBuilder: LatticeBuilder {
         _ = newComposition()
-        return LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
+        var builder = LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
+        if settings.current.contextualSegmentCandidates { builder.contextRanker = SegmentContextRanker(converter: converter) }
+        return builder
     }
 
     /// 空の読み．利用者が足したローマ字の綴りを使う
@@ -1516,8 +1528,22 @@ public final class InputSession {
             ]
             annotations += [nil, PanelBuilder.asTypedNote]
         }
-        for candidate in converter.listCandidates(for: composition.conversionReading)
-        where !candidates.contains(where: { $0.text == candidate.text }) {
+        var listed = converter.listCandidates(for: composition.conversionReading)
+        // 文節を 1 か所だけ替えた文を，エンジンの文全体の候補と交互に並べる(一覧では文節を選び直せないため)
+        if settings.current.listSegmentAlternatives, corrector.active == nil, !readingCorrector.isApplied {
+            var builder = latticeBuilder
+            // 前後の語を含めた変換は，打鍵が止まったあいだに前もって求め終えていれば使う．求めていなければ，求めてある文全体の候補だけで
+            // 並べ替える(Space のときに文節ごとに変換すると遅くなるため)
+            builder.contextRanker?.usesNeighborConversion = contextWarmedReading == composition.conversionReading
+            var lattice = builder.build(reading: composition.conversionReading)
+            // 替えた文に使う文節の候補を，迷う文節から順に前後の文脈で並べ替える(一覧の 1 ページに出る分だけ)
+            let order = lattice.segments.indices.sorted { (lattice.segments[$0].confidenceGap, $0) < (lattice.segments[$1].confidenceGap, $1) }
+            for index in order.prefix(DefaultSettings.listContextRankedSegments) {
+                lattice.segments[index] = builder.rankedByContext(lattice.segments[index], reading: composition.conversionReading)
+            }
+            listed = SegmentSubstitution.interleave(listed, with: SegmentSubstitution.sentences(from: lattice, perSegment: DefaultSettings.listSubstitutionsPerSegment))
+        }
+        for candidate in listed where !candidates.contains(where: { $0.text == candidate.text }) {
             candidates.append(candidate)
             annotations.append(nil)
         }
@@ -1778,6 +1804,14 @@ public final class InputSession {
             if lattice.focused.isPending {
                 fillPendingSegments(only: lattice.focusedIndex)
                 if case .lattice(let filled) = phase { lattice = filled }
+            }
+            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)
+            if !lattice.focused.isContextRanked {
+                let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading)
+                if ranked.isContextRanked {
+                    lattice.segments[lattice.focusedIndex] = ranked
+                    phase = .lattice(lattice)
+                }
             }
             // 打ち間違いを直した文節は，注目していなければ点線の下線にする
             let corrected = correctedRange(of: \.conversionReading)
