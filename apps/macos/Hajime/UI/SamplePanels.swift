@@ -209,4 +209,22 @@ enum SamplePalettes {
             preview: preview(doubleArrow),
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
+
+    /// 動きの途中のコマの見本(SnapshotRenderer)．前の内容・動きを添えた次の内容・描く時刻(主な動きの長さの半分の秒)
+    static var motionSteps: [(from: PalettePanel, to: PalettePanel, time: Double)] {
+        typealias Duration = DesignTokens.Motion.Palette
+        // 選択の枠が右下へ滑り，タブの印も次のまとまりへ滑る
+        var moved = emoji
+        moved.selection = .init(row: 3, column: 6)
+        moved.tabs = moved.tabs.enumerated().map { index, tab in .init(section: tab.section, title: tab.title, symbol: tab.symbol, isSelected: index == 2) }
+        moved.motion = .init(selectionFrom: emoji.selection, tabFrom: .category(.smileys))
+        // 絵文字から記号へ切り替えて，種類の印を滑らせ，中身を左へ送る
+        var switched = symbol
+        switched.motion = .init(modeFrom: .emoji, content: .next)
+        // 肌の色の帯が浮かび上がる
+        var picking = search
+        let before = { var panel = search; panel.skinTonePicker = nil; return panel }()
+        picking.motion = .init(opensPicker: true)
+        return [(emoji, moved, Duration.indicator / 1000 / 2), (emoji, switched, Duration.content / 1000 / 2), (before, picking, Duration.pop / 1000 / 3)]
+    }
 }
