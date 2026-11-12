@@ -25,6 +25,28 @@ struct ResettableRow<Value: Equatable, Content: View>: View {
     }
 }
 
+/// 既定から戻せる，整数を範囲の中で 1 段ずつ選ぶ項目．値はステッパーのすぐ左に置き，選ぶ項目やスライダーの値と同じく右に寄せる
+struct ResettableStepper: View {
+    @ObservedObject var model: SettingsModel
+    let title: String
+    let keyPath: WritableKeyPath<HajimeDomain.Settings, Int>
+    let range: ClosedRange<Int>
+    var step = 1
+    /// 今の値を書いた文字(「4 番目」「2 文字以下」)
+    let value: String
+
+    var body: some View {
+        ResettableRow(model: model, keyPath: keyPath) {
+            LabeledContent(title) {
+                HStack {
+                    Text(value).monospacedDigit()
+                    Stepper(title, value: model.binding(keyPath), in: range, step: step).labelsHidden()
+                }
+            }
+        }
+    }
+}
+
 /// 既定から戻せる，列挙の値を選ぶ項目
 struct ResettablePicker<Value: Hashable & CaseIterable>: View where Value.AllCases: RandomAccessCollection {
     @ObservedObject var model: SettingsModel

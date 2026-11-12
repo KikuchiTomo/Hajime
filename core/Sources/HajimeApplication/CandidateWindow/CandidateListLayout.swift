@@ -98,6 +98,7 @@ public struct CandidateListLayout: Sendable, Equatable {
     /// 語の意味のカード．platinum と desk は枠の無い区画で，cardSeparator で一覧と区切る
     public var card: Box?
     public var cardSeparator: Box?
+    /// 足元の行と，その上の区切りの線．足元を出さないとき(設定の画面の見本)は候補の列の下の端の高さ 0 の区画
     public var footerSeparator: Box
     public var footer: Box
 
@@ -111,8 +112,9 @@ public struct CandidateListLayout: Sendable, Equatable {
     ///   - footerWidth: 足元の中身の幅
     ///   - maximumWidth: 窓の幅の上限．超えるときは候補の列を狭める(長い候補は描く側が末尾を省く)
     ///   - size: 窓の大きさ(影を含む)を外から決めるとき(窓の大きさを変える動きの途中)．幅は候補の列で吸収し，区画は上から積む
+    ///   - hasFooter: 足元の行(案内と位置)を出すか．設定の画面の見本では出さない
     public init(style: Style, listWidth: Double, footerWidth: Double, hasHeader: Bool, rowCount: Int, card: Card?, maximumWidth: Double,
-                metrics: Metrics, size: (width: Double, height: Double)? = nil) {
+                metrics: Metrics, size: (width: Double, height: Double)? = nil, hasFooter: Bool = true) {
         let outer = metrics.edge + metrics.padding
         let gap = metrics.separatorGap
         let line = metrics.separatorWidth
@@ -167,11 +169,17 @@ public struct CandidateListLayout: Sendable, Equatable {
         // 文字種の行と，その下の区切りの線は候補の列の幅
         header = headerBox.map { Box(x: $0.x, y: $0.y, width: listColumn, height: $0.height) }
         headerSeparator = headerLine.map { Box(x: $0.x, y: $0.y, width: listColumn, height: $0.height) }
-        y = listBottom + gap
-        footerSeparator = Box(x: outer, y: y, width: contentWidth, height: line)
-        y += line + gap
-        footer = Box(x: outer, y: y, width: contentWidth, height: metrics.footerHeight)
-        y = footer.maxY + outer
+        if hasFooter {
+            y = listBottom + gap
+            footerSeparator = Box(x: outer, y: y, width: contentWidth, height: line)
+            y += line + gap
+            footer = Box(x: outer, y: y, width: contentWidth, height: metrics.footerHeight)
+            y = footer.maxY + outer
+        } else {
+            footerSeparator = Box(x: outer, y: listBottom, width: contentWidth, height: 0)
+            footer = Box(x: outer, y: listBottom, width: contentWidth, height: 0)
+            y = listBottom + outer
+        }
         body = Box(x: 0, y: 0, width: bodyWidth, height: size.map { $0.height - metrics.shadow } ?? y.rounded(.up))
         content = Box(x: outer, y: outer, width: contentWidth, height: body.height - outer * 2)
         width = body.width + metrics.shadow
