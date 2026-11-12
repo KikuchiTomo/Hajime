@@ -704,6 +704,25 @@
       ]
     },
     {
+      "name": "WordClass",
+      "kind": "enum",
+      "cases": [
+        "noun",
+        "properNoun",
+        "personName",
+        "surname",
+        "givenName",
+        "organization",
+        "place",
+        "symbol",
+        "suruNoun",
+        "adjectivalNoun",
+        "adverb",
+        "interjection",
+        "abbreviation"
+      ]
+    },
+    {
       "name": "DictionaryEntry",
       "kind": "struct",
       "fields": [
@@ -714,6 +733,10 @@
         {
           "name": "word",
           "type": "string"
+        },
+        {
+          "name": "wordClass",
+          "type": "WordClass?"
         }
       ]
     },

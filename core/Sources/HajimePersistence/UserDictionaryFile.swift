@@ -1,8 +1,9 @@
 import Foundation
 import HajimeDomain
 
-/// ユーザー辞書を「読み<タブ>語」の行のテキストで読み書きする．
-/// 「読み<タブ>単語」の行が並んだタブ区切りのテキスト(3 列目以降の品詞やコメントは読まない)．
+/// ユーザー辞書を「読み<タブ>語<タブ>品詞」の行のテキストで読み書きする．
+/// 品詞は Google 日本語入力の品詞の名前で書き，読むときは他の IME の品詞の名前も対応付ける(WordClass(partOfSpeech:))．
+/// 品詞の列が無い行は名詞として読む．4 列目以降(コメント)は読まない．
 /// Google 日本語入力・Microsoft IME(UTF-16)・ATOK の書き出し，Shift_JIS・EUC-JP のファイル，macOS のユーザ辞書の plist，SKK の辞書も読む
 public enum UserDictionaryFile {
     public enum FileError: Error, Equatable {
@@ -36,7 +37,7 @@ public enum UserDictionaryFile {
     /// タブ区切りでないファイル(plist・SKK)を取り込む辞書と同じに読む．形の誤った行は数えない
     private static func fromOtherFormat(_ data: Data) throws -> (entries: [UserDictionaryEntry], skipped: Int) {
         guard let words = try? DictionaryFileReader.parse(data) else { throw FileError.notText }
-        return (words.map { UserDictionaryEntry(reading: $0.reading, word: $0.word) }.filter(\.isValid), 0)
+        return (words.map { UserDictionaryEntry(reading: $0.reading, word: $0.word, wordClass: $0.wordClass) }.filter(\.isValid), 0)
     }
 
     /// UTF-8 か，BOM の付いた UTF-16(Windows の辞書ツールが書き出す形)だけを読む(決まりの一覧のファイル RuleListFile が使う)．
@@ -53,7 +54,8 @@ public enum UserDictionaryFile {
         entryLines(text).compactMap { line in
             let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard columns.count >= 2 else { return nil }
-            let entry = UserDictionaryEntry(reading: String(columns[0]), word: String(columns[1]))
+            let wordClass = columns.count >= 3 ? WordClass(partOfSpeech: String(columns[2])) : DefaultSettings.userWordClass
+            let entry = UserDictionaryEntry(reading: String(columns[0]), word: String(columns[1]), wordClass: wordClass)
             return entry.isValid ? entry : nil
         }
     }
@@ -64,7 +66,7 @@ public enum UserDictionaryFile {
     }
 
     public static func write(_ entries: [UserDictionaryEntry], to url: URL) throws {
-        let text = entries.map { "\($0.reading)\t\($0.word)" }.joined(separator: "\n") + "\n"
+        let text = entries.map { "\($0.reading)\t\($0.word)\t\($0.wordClass.partOfSpeechName)" }.joined(separator: "\n") + "\n"
         try Data(text.utf8).write(to: url, options: .atomic)
     }
 }

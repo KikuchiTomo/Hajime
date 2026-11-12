@@ -66,11 +66,19 @@ struct DictionaryFileReaderTests {
     }
 
     @Test("品詞の名前を対応付け，分からなければ名詞", arguments: [
-        ("名詞", WordClass.noun), ("固有名詞", .properNoun), ("人名", .personName), ("姓", .surname), ("名", .noun),
+        ("名詞", WordClass.noun), ("固有名詞", .properNoun), ("人名", .personName), ("姓", .surname), ("名", .givenName),
         ("地名その他", .place), ("組織", .organization), ("顔文字", .symbol), ("動詞ワ行五段", .noun),
+        ("名詞サ変", .suruNoun), ("さ変名詞", .suruNoun), ("名詞・サ変形動", .suruNoun), ("名詞形動", .adjectivalNoun), ("形容動詞", .adjectivalNoun),
+        ("副詞", .adverb), ("名詞,副詞可能", .noun), ("感動詞", .interjection), ("短縮よみ", .abbreviation), ("短縮読み", .abbreviation),
+        ("固有人名", .personName), ("固有地名", .place), ("固有組織", .organization), ("固有一般", .properNoun),
     ])
     func partOfSpeech(name: String, expected: WordClass) {
         #expect(WordClass(partOfSpeech: name) == expected)
+    }
+
+    @Test("書き出す品詞の名前は，読み戻すと同じ品詞になる", arguments: WordClass.allCases)
+    func partOfSpeechName(wordClass: WordClass) {
+        #expect(WordClass(partOfSpeech: wordClass.partOfSpeechName) == wordClass)
     }
 
     @Test("上限より大きなファイルは読まない")

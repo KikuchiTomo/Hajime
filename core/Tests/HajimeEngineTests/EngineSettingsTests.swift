@@ -22,6 +22,16 @@ struct EngineSettingsTests {
         #expect(texts.contains { $0.hasPrefix("hajime株式会社") })
     }
 
+    @Test("短縮よみの語は，文の中では候補に出さない(読み全体の一致は SupplementedConverter が受け持つ)")
+    func abbreviation() throws {
+        let engine = try makeEngine()
+        var settings = Settings()
+        settings.userDictionary = [UserDictionaryEntry(reading: "かいしゃ", word: "hajime株式会社", wordClass: .abbreviation)]
+        engine.apply(settings)
+        let texts = engine.makeSession().candidates(for: "かいしゃにいく").map(\.text)
+        #expect(!texts.contains { $0.contains("hajime株式会社") })
+    }
+
     @Test("学習を切ると，確定しても順位が変わらない")
     func learningDisabled() throws {
         let engine = try makeEngine()

@@ -669,10 +669,31 @@ impl fmt::Debug for PreviewWord {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WordClass {
+    Noun,
+    ProperNoun,
+    PersonName,
+    Surname,
+    GivenName,
+    Organization,
+    Place,
+    Symbol,
+    SuruNoun,
+    AdjectivalNoun,
+    Adverb,
+    Interjection,
+    Abbreviation,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct DictionaryEntry {
     pub reading: String,
     pub word: String,
+    #[serde(rename = "wordClass")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub word_class: Option<WordClass>,
 }
 
 impl fmt::Debug for DictionaryEntry {
@@ -680,6 +701,7 @@ impl fmt::Debug for DictionaryEntry {
         f.debug_struct("DictionaryEntry")
             .field("reading", &REDACTED)
             .field("word", &REDACTED)
+            .field("wordClass", &self.word_class)
             .finish()
     }
 }

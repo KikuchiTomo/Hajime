@@ -422,6 +422,7 @@ enum UIStrings {
         static let sortHint = "並べ替え"
         static func overwrites(_ key: String) -> String { "「\(key)」はすでにあります。追加すると上書きします。" }
         static let alreadyRegistered = "すでに登録されています。"
+        static let changesKind = "すでに登録されています。追加すると品詞を書き換えます。"
         static let full = "これ以上は追加できません。"
         static let noMatches = "一致する項目はありません"
     }
@@ -525,7 +526,29 @@ enum UIStrings {
         static let importDictionary = "インポート…"
         static let exportDictionary = "エクスポート…"
         static let exportFileName = "hajime-user-dictionary.txt"
-        static let dictionaryNote = "読みと単語をタブで区切ったテキストファイルを読み込めます。"
+        static let dictionaryNote = "読み・単語・品詞をタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。"
+        static let wordClass = "品詞"
+        static let personNameGroup = "人名"
+        static let otherWordClasses = "その他"
+        static let abbreviationNote = "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。"
+
+        static func label(for wordClass: WordClass) -> String {
+            switch wordClass {
+            case .noun: "名詞"
+            case .personName: "人名(姓と名)"
+            case .surname: "人名(姓のみ)"
+            case .givenName: "人名(名のみ)"
+            case .place: "地名"
+            case .symbol: "顔文字・記号"
+            case .abbreviation: "短縮よみ"
+            case .properNoun: "固有名詞"
+            case .organization: "組織名"
+            case .suruNoun: "サ変名詞(〜する)"
+            case .adjectivalNoun: "形容動詞(〜な)"
+            case .adverb: "副詞"
+            case .interjection: "感動詞"
+            }
+        }
         static let appearance = "外観"
         static let restoreDefaults = "すべての設定を既定に戻す"
         static let saveFailed = "設定を保存できませんでした"

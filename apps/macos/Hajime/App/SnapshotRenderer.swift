@@ -100,6 +100,21 @@ enum SnapshotRenderer {
         exit(0)
     }
 
+    /// ページ(Form)を下の端まで送る．表の中のスクロールは動かさない
+    private static func scrollPageToBottom(_ window: NSWindow) {
+        guard let content = window.contentView else { return }
+        var stack: [NSView] = [content]
+        while let view = stack.popLast() {
+            if view is any FormTableContainer { continue }
+            if let scroll = view as? NSScrollView, let document = scroll.documentView, !(document is NSTableView) {
+                let bottom = document.isFlipped ? max(document.frame.height - scroll.contentView.bounds.height, 0) : 0
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: bottom))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            stack.append(contentsOf: view.subviews)
+        }
+    }
+
     /// 一時ディレクトリに置いた設定．利用者の設定に触れない
     private static func snapshotStore(_ name: String) -> FileSettingsStore {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-snapshot-\(name).json")
@@ -116,7 +131,9 @@ enum SnapshotRenderer {
             settings.correction.rules = [CorrectionRule(typed: "teh", word: "the"), CorrectionRule(typed: "recieve", word: "receive"),
                                          CorrectionRule(typed: "adn", word: "and")]
             settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "wye", kana: "ゑ")]
-            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME"), UserDictionaryEntry(reading: "かいしゃ", word: "会社")]
+            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME", wordClass: .properNoun),
+                                       UserDictionaryEntry(reading: "かいしゃ", word: "会社"), UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
+                                       UserDictionaryEntry(reading: "おつ", word: "お疲れさまでした", wordClass: .abbreviation)]
             settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
                                     SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]
             settings.profileRules = [ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .imeOff),
@@ -199,6 +216,21 @@ enum SnapshotRenderer {
         }
         NSApp.appearance = NSAppearance(named: .aqua)
         scrolled.close()
+        // ユーザー辞書の一覧(品詞の列)．一覧はページの下にあるので，ページを下まで送って写す
+        let dictionaryNavigation = SettingsNavigation()
+        let dictionaryWindow = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: dictionaryNavigation)
+        dictionaryNavigation.page = .dictionary
+        dictionaryWindow.orderFrontRegardless()
+        // 組み直しのあとにページの高さが変わることがあるので，落ち着くまで 2 回送る
+        for _ in 0..<2 {
+            SettingsFixture.settle(dictionaryWindow)
+            scrollPageToBottom(dictionaryWindow)
+        }
+        SettingsFixture.settle(dictionaryWindow)
+        if let frame = dictionaryWindow.contentView?.superview {
+            render(frame, name: "settings-dictionary-words", to: output, appearance: NSAppearance(named: .aqua))
+        }
+        dictionaryWindow.close()
         // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
