@@ -14,6 +14,8 @@ struct RuleListSpec<Rule> {
     let invalidMessage: String
     /// ファイルに書き出し・読み込みするときの一覧
     let file: RuleList
+    /// 足した・書き換えた決まりについて，ほかの一覧も合わせて変える(いつも英語にする語といつも日本語にする語は重ねない)
+    var afterSave: ((Rule, inout HajimeDomain.Settings) -> Void)?
 
     static var correctionRules: RuleListSpec<CorrectionRule> {
         RuleListSpec<CorrectionRule>(
@@ -32,7 +34,8 @@ struct RuleListSpec<Rule> {
         RuleListSpec<String>(
             list: language == .english ? \.wordLanguage.englishWords : \.wordLanguage.japaneseWords, key: { $0 }, value: { _ in "" },
             make: { key, _ in RuleList.languageWord(key) }, isValid: WordLanguageSettings.isValidWord, limit: DefaultSettings.maximumWordLanguageEntries,
-            invalidMessage: UIStrings.Features.invalidWord, file: language == .english ? .englishWords : .japaneseWords)
+            invalidMessage: UIStrings.Features.invalidWord, file: language == .english ? .englishWords : .japaneseWords,
+            afterSave: { word, settings in settings.wordLanguage.removeFromOtherList([word], addedTo: language) })
     }
 
     /// 英語の語の辞書に足した語(R-24)．書き方どおりに比べる
@@ -70,7 +73,12 @@ extension RuleListEditor {
             items: rules.map { RuleItem(id: spec.key($0), key: spec.key($0), value: spec.value($0)) },
             problem: { key, value in spec.isValid(spec.make(key, value)) ? nil : spec.invalidMessage },
             save: { key, value, editing in
-                model.editRules(failure: UIStrings.RuleList.full) { upsert(spec.make(key, value), replacing: editing?.key, in: &$0) }
+                model.editRules(failure: UIStrings.RuleList.full) { settings in
+                    let rule = spec.make(key, value)
+                    guard upsert(rule, replacing: editing?.key, in: &settings) else { return false }
+                    spec.afterSave?(rule, &settings)
+                    return true
+                }
             },
             remove: { items in
                 let keys = Set(items.map(\.key))

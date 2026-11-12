@@ -3,6 +3,8 @@
 //! 候補の一覧(macOS の CandidateView)．上から，文字種の行・候補・足元の 3 つの区画．
 //! 語の意味のカードは，候補の右(候補の列と同じ高さ)か，候補と足元のあいだに出す
 
+use super::card_layout::{self, Placement};
+use super::list_layout::{self, ListLayout, Style};
 use super::meaning;
 use super::paint::{Painter, TagStyle};
 use super::{Frame, Look, Measure, Point, Scene};
@@ -10,49 +12,49 @@ use crate::strings;
 use crate::theme::Font;
 use ipc::{CandidateFocus, CandidateList, KeyHint, MeaningPlacement};
 use tokens::opacity;
+use tokens::size::meaning as card_size;
 use tokens::size::{branch, candidate, glass};
 
+/// 区画の寸法(list_layout)と，行の中の寸法
 struct Metrics {
-    row_height: f32,
-    section_height: f32,
-    /// 外枠と立体の縁の太さ．角丸のテーマは余白
-    inset: f32,
-    /// 番号の幅
+    layout: list_layout::Metrics,
+    style: Style,
+    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈の札の右，足元の案内と位置の左右の端をここにそろえる
+    row_padding_x: f32,
+    /// 番号の幅(番号から候補の文字まで)
     lead: f32,
-    shadow: f32,
 }
 
 impl Metrics {
     fn new(look: &Look, measure: &dyn Measure) -> Self {
         let rounded = look.theme.is_rounded();
-        let base_row = if rounded {
-            glass::ROW_HEIGHT
+        let scale = look.font_size / candidate::FONT_SIZE;
+        let label = measure.height(Font::Label).ceil();
+        if rounded {
+            // 足元の行は，キーの札・案内のアイコン・文字の行の箱のいちばん高いもの
+            let footer = glass::KEYCAP_HEIGHT.max(glass::NOTE_ICON_SIZE).max(label);
+            Self {
+                layout: list_layout::Metrics::rounded(
+                    (glass::ROW_HEIGHT * scale).round(),
+                    glass::HEADER_HEIGHT,
+                    footer,
+                ),
+                style: Style::Rounded,
+                row_padding_x: glass::ROW_PADDING_X,
+                lead: glass::BADGE_SIZE + candidate::PADDING_X,
+            }
         } else {
-            candidate::ROW_HEIGHT
-        };
-        Self {
-            row_height: (base_row * look.font_size / candidate::FONT_SIZE).round(),
-            section_height: if rounded {
-                glass::FOOTER_HEIGHT
-            } else {
-                measure.height(Font::Label).ceil().max(glass::KEYCAP_HEIGHT)
-                    + candidate::SECTION_PADDING_Y * 2.0
-            },
-            inset: if rounded {
-                glass::PADDING / 2.0
-            } else {
-                candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
-            },
-            lead: if rounded {
-                glass::BADGE_SIZE + candidate::PADDING_X
-            } else {
-                candidate::INDEX_WIDTH
-            },
-            shadow: if look.theme.has_drop_shadow() {
-                candidate::SHADOW_OFFSET
-            } else {
-                0.0
-            },
+            let section = label.max(glass::KEYCAP_HEIGHT) + candidate::SECTION_PADDING_Y * 2.0;
+            Self {
+                layout: list_layout::Metrics::bevel(
+                    (candidate::ROW_HEIGHT * scale).round(),
+                    section,
+                    look.theme.has_drop_shadow(),
+                ),
+                style: Style::Bevel,
+                row_padding_x: candidate::PADDING_X,
+                lead: candidate::INDEX_WIDTH,
+            }
         }
     }
 }
@@ -101,6 +103,37 @@ fn footer(list: &CandidateList) -> Footer {
     }
 }
 
+/// platinum と desk は区画どうしを線で区切って空きを取らないので，語の意味の上と下に文字の行と同じ余白を足す
+fn section_padding(metrics: &Metrics) -> f32 {
+    match metrics.style {
+        Style::Rounded => 0.0,
+        Style::Bevel => candidate::SECTION_PADDING_Y,
+    }
+}
+
+/// 候補の右の語の意味の置き方(目印の列は場所の左の端，見出しの行は候補の 1 行目の地の真ん中)と，下に足す余白
+pub(super) fn side_position(look: &Look, measure: &dyn Measure) -> (Placement, f32) {
+    let metrics = Metrics::new(look, measure);
+    let row = metrics.layout.row_pitch - metrics.layout.row_inset * 2.0;
+    (
+        Placement {
+            left: 0.0,
+            header_mid_y: row / 2.0,
+        },
+        section_padding(&metrics),
+    )
+}
+
+/// 候補の下の語の意味の置き方．目印の列を候補の番号に，文の列を候補の文字にそろえる
+fn below_position(metrics: &Metrics, theme: &crate::theme::ResolvedTheme) -> Placement {
+    Placement {
+        left: metrics.row_padding_x + metrics.lead
+            - card_size::MARKER_WIDTH
+            - card_size::MARKER_GAP,
+        header_mid_y: section_padding(metrics) + card_layout::header_height(theme) / 2.0,
+    }
+}
+
 /// 候補を表に広げたとき(キー設定の表の「候補を表に広げる」)の 1 列の候補の数．広げていなければ None
 fn column_length(list: &CandidateList) -> Option<usize> {
     list.column_length
@@ -132,47 +165,44 @@ fn entry_number(list: &CandidateList, index: usize) -> Option<usize> {
 pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) -> Scene {
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
-    let theme = look.theme;
     let padding = candidate::PADDING_X;
     let footer = footer(list);
 
-    // 候補の右に出す語の意味のカード．幅は決まっているので，候補の列より先に決める
-    let card_margin = card_margin(look);
+    // 候補の右に出す語の意味．幅は決まっているので，候補の列より先に決める
     let side = (meaning::placement(list.meaning_placement) == MeaningPlacement::Side)
         .then(|| {
+            let (position, bottom) = side_position(look, measure);
             let card = list
                 .homophone
                 .as_ref()
-                .map(|note| meaning::list_card(&painter, note));
-            meaning::side_slot(card, glass::MEANING_CARD_WIDTH, look.reserved_card)
+                .map(|note| meaning::list_card(&painter, note, position));
+            meaning::side_slot(
+                card,
+                card_size::LIST_WIDTH,
+                look.reserved_card,
+                position,
+                bottom,
+            )
         })
-        .flatten()
-        .map(|slot| meaning::Slot {
-            width: slot.width + card_margin,
-            height: slot.height + card_margin * 2.0,
-            ..slot
-        });
-    let side_extent = side
-        .as_ref()
-        .map_or(0.0, |slot| glass::MEANING_GAP + slot.width);
+        .flatten();
+    let side_extent = side.as_ref().map_or(0.0, |slot| {
+        metrics.layout.card_gap.max(metrics.layout.separator_width) + slot.width
+    });
+    let outer = (metrics.layout.edge + metrics.layout.padding) * 2.0 + metrics.layout.shadow;
 
     // 表に広げたときは列の幅をそろえ，窓が表の幅の上限に収まるよう列を狭める(収まらない候補は末尾を省く)
     let grid = column_length(list);
     let columns = column_count(list) as f32;
     let cell_limit = grid.map(|_| {
-        ((candidate::GRID_MAX_WIDTH
-            - metrics.inset * 2.0
-            - metrics.shadow
-            - candidate::FRAME_WIDTH * (columns - 1.0))
-            / columns)
+        ((candidate::GRID_MAX_WIDTH - outer - candidate::FRAME_WIDTH * (columns - 1.0)) / columns)
             .floor()
     });
     // 長い文の候補は，窓の幅の上限に収まるよう省く．ほかの候補と違うところの少し手前から見せる
     // (頭が同じ文が並ぶので，末尾を省くと見分けられない．macOS の CandidateView と同じ)
-    let text_limit = cell_limit
-        .unwrap_or(candidate::MAX_WIDTH - metrics.inset * 2.0 - metrics.shadow - side_extent)
+    let text_limit = cell_limit.unwrap_or(candidate::MAX_WIDTH - outer - side_extent)
         - metrics.lead
-        - padding * 2.0;
+        - metrics.row_padding_x
+        - candidate::PADDING_X;
     let shown: Vec<String> = list
         .entries
         .iter()
@@ -223,150 +253,175 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         Some(note) => painter.note_width(note),
         None => painter.hints_width(&footer.hints),
     };
-    let association_hint = footer
-        .association_hint
-        .as_deref()
-        .map_or(0.0, |hint| painter.width(hint, Font::Label) + padding);
-    let footer_width = hints_width
+    let association_hint = footer.association_hint.as_deref().map_or(0.0, |hint| {
+        painter.width(hint, Font::Label) + glass::HINT_GAP
+    });
+    let footer_width = (hints_width
         + association_hint
         + painter.width(&footer.position, Font::Label)
-        + padding * 3.0;
-    let heading_width = list
-        .association
-        .as_ref()
-        .map_or(0.0, |heading| super::association::width(&painter, heading));
-    // 候補 1 つの枠の幅．表では文字が収まる幅を切り上げ，上限から割った幅を超えない(列の位置を整数にそろえる)
-    let natural_cell = metrics.lead + entry_width + padding * 2.0;
-    let cell_width = cell_limit.map_or(natural_cell, |limit| natural_cell.ceil().min(limit));
-    // 候補の列(文字種の行・候補)の幅と高さ．足元とカードを除く．表なら，すべての列と列のあいだの線を合わせた幅
+        + metrics.row_padding_x * 2.0
+        + glass::HINT_GAP)
+        .ceil();
+    let heading_width = list.association.as_ref().map_or(0.0, |heading| {
+        super::association::width(&painter, heading) - padding * 2.0 + metrics.row_padding_x * 2.0
+    });
+    // 候補 1 つの行の地の幅: 左の余白・番号・文字・右の余白(文字の右は番号の左より広く空ける)．
+    // 表では文字が収まる幅を切り上げ，上限から割った幅を超えない(列の位置を整数にそろえる)
+    let natural_cell = (metrics.row_padding_x + metrics.lead + entry_width + padding).ceil();
+    let cell_width = cell_limit.map_or(natural_cell, |limit| natural_cell.min(limit));
+    // 候補の列(行の地)の幅．表なら，すべての列と列のあいだの線を合わせた幅
     let list_width = candidate::MIN_WIDTH
         .max(cell_width * columns + candidate::FRAME_WIDTH * (columns - 1.0))
-        .max(variants_width + padding * 2.0)
-        .max(heading_width);
+        .max(variants_width + (metrics.row_padding_x - candidate::VARIANT_PADDING_X) * 2.0)
+        .max(heading_width)
+        .ceil();
     // 候補を縦に並べる行の数．表なら 1 列の候補の数(最後のページで候補が少なければその数)
     let rows = grid.map_or(list.entries.len(), |length| list.entries.len().min(length));
-    // 連想の一覧では，文字種の行の代わりに見出しの行を出す
-    let list_height = rows as f32 * metrics.row_height
-        + if !list.variants.is_empty() || list.association.is_some() {
-            metrics.section_height + candidate::FRAME_WIDTH
-        } else {
-            0.0
-        };
-    let footer_height = metrics.section_height + candidate::FRAME_WIDTH;
-    let (content_width, content_height, slot) = match side {
-        Some(slot) => (
-            (list_width + side_extent).max(footer_width),
-            list_height.max(slot.height) + footer_height,
-            Some(slot),
-        ),
+    let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
+    let (slot, card) = match side {
+        Some(slot) => {
+            let card = list_layout::Card::Side {
+                width: slot.width,
+                height: slot.height,
+            };
+            (Some(slot), Some(card))
+        }
         None => {
-            // 候補の下のカードは窓の幅いっぱいにし，その幅で折り返す
+            // 候補の下のカードは窓の中身の幅いっぱいにし，その幅で折り返す
             let below = (list.meaning_placement == Some(MeaningPlacement::Below))
                 .then_some(list.homophone.as_ref())
                 .flatten();
-            let content_width = list_width.max(footer_width).max(below.map_or(0.0, |_| {
-                glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0 + padding
-            }));
             let slot = below.map(|note| {
-                let width = content_width - padding - glass::MEANING_PADDING * 2.0;
-                meaning::below_slot(meaning::Card::new(
-                    &painter,
-                    note,
-                    note.others.clone(),
-                    width,
-                ))
+                let width =
+                    list_layout::below_card_width(list_width, footer_width, card_size::LIST_WIDTH)
+                        .min(limit - outer)
+                        .floor();
+                let position = below_position(&metrics, look.theme);
+                meaning::below_slot(
+                    meaning::Card::new(&painter, note, note.others.clone(), width, position),
+                    position,
+                    section_padding(&metrics),
+                )
             });
-            let below_height = slot
-                .as_ref()
-                .map_or(0.0, |slot| slot.height + below_margin() * 2.0);
-            (
-                content_width,
-                list_height + below_height + footer_height,
-                slot,
-            )
+            let card = slot.as_ref().map(|slot| list_layout::Card::Below {
+                width: slot.width,
+                height: slot.height,
+            });
+            (slot, card)
         }
     };
-    let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
-    let height = (content_height + metrics.inset * 2.0 + metrics.shadow).ceil();
-    let (width, height) = look.sized(width, height);
+    let has_header = !list.variants.is_empty() || list.association.is_some();
+    let layout = list_layout::place(
+        metrics.style,
+        list_width,
+        footer_width,
+        has_header,
+        rows,
+        card,
+        limit,
+        &metrics.layout,
+        look.size,
+    );
+    let cells = cells(list, &layout, cell_width);
+    draw_list(
+        &mut painter,
+        list,
+        &footer,
+        &shown,
+        &metrics,
+        &layout,
+        &cells,
+        slot.as_ref(),
+        look.rest_opacity,
+    );
+    painter.finish(layout.width, layout.height)
+}
 
-    // 描く
-    let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
-    painter.panel(body);
-    let content = body.inset(metrics.inset, metrics.inset);
-    // 候補の右にカードを出すときは，候補の列をカードの分だけ狭める
-    let list_width = match &slot {
-        Some(slot) if slot.placement == MeaningPlacement::Side => {
-            (content.width - glass::MEANING_GAP - slot.width).max(0.0)
-        }
-        _ => content.width,
+/// 候補ごとの行の地と押せる範囲，表の列のあいだの縦の線
+struct Cells {
+    rows: Vec<Frame>,
+    hit_rows: Vec<Frame>,
+    separators: Vec<Frame>,
+}
+
+/// 候補ごとの枠．表では上から下へ詰め，列を左から右へ並べる．列のあいだは 1 ドットの縦の線で区切る．
+/// 表でなければ，配置の候補の行をそのまま使う(macOS の CandidateView.cells と同じ)
+fn cells(list: &CandidateList, layout: &ListLayout, cell_width: f32) -> Cells {
+    let (Some(length), Some(first), Some(last)) =
+        (column_length(list), layout.rows.first(), layout.rows.last())
+    else {
+        return Cells {
+            rows: layout.rows.clone(),
+            hit_rows: layout.hit_rows.clone(),
+            separators: Vec::new(),
+        };
     };
-    let list_max_x = content.x + list_width;
-    let mut y = content.y;
-    if let Some(heading) = &list.association {
-        super::association::draw(
-            &mut painter,
-            heading,
-            Frame::new(content.x, y, list_width, metrics.section_height),
-        );
-        y += metrics.section_height;
-        separator(&mut painter, y, content.x, list_max_x);
-        y += candidate::FRAME_WIDTH;
-    } else if !list.variants.is_empty() {
-        variants(
-            &mut painter,
-            list,
-            Frame::new(content.x, y, list_width, metrics.section_height),
-        );
-        y += metrics.section_height;
-        separator(&mut painter, y, content.x, list_max_x);
-        y += candidate::FRAME_WIDTH;
+    let columns = column_count(list);
+    let gaps = candidate::FRAME_WIDTH * (columns - 1) as f32;
+    let cell = cell_width.min(((first.width - gaps) / columns as f32).floor());
+    let x = |column: usize| first.x + column as f32 * (cell + candidate::FRAME_WIDTH);
+    let place = |row: Frame, index: usize| Frame::new(x(index / length), row.y, cell, row.height);
+    Cells {
+        rows: (0..list.entries.len())
+            .map(|index| place(layout.rows[index % length], index))
+            .collect(),
+        hit_rows: (0..list.entries.len())
+            .map(|index| place(layout.hit_rows[index % length], index))
+            .collect(),
+        // 縦の線は行の地の上の端から下の端まで(角丸のテーマは行と行のあいだの空きの分だけ短くなる)
+        separators: (1..columns)
+            .map(|column| {
+                Frame::new(
+                    x(column) - candidate::FRAME_WIDTH,
+                    first.y,
+                    candidate::FRAME_WIDTH,
+                    last.max_y() - first.y,
+                )
+            })
+            .collect(),
+    }
+}
+
+/// 区画の配置のとおりに描く．rest_opacity は第 1 候補と選んでいる候補以外の濃さ
+#[allow(clippy::too_many_arguments)]
+fn draw_list(
+    painter: &mut Painter,
+    list: &CandidateList,
+    footer: &Footer,
+    shown: &[String],
+    metrics: &Metrics,
+    layout: &ListLayout,
+    cells: &Cells,
+    slot: Option<&meaning::Slot>,
+    rest_opacity: f32,
+) {
+    let theme = painter.theme;
+    painter.panel(layout.body);
+    if let Some(header) = layout.header {
+        match &list.association {
+            Some(heading) => super::association::draw(
+                painter,
+                heading,
+                header.inset(metrics.row_padding_x - candidate::PADDING_X, 0.0),
+            ),
+            None => variants(painter, list, header, metrics.row_padding_x),
+        }
+    }
+    if let Some(line) = layout.header_separator {
+        painter.rect(line, theme.line);
     }
     let mut selected_mid_y = None;
-    let entries_top = y;
-    if let Some(length) = grid {
-        // 表の列のあいだの縦の線．glass は上下を少し空けた細い線，platinum と desk は候補の行の高さいっぱいの線
-        let margin = if theme.is_rounded() {
-            glass::PADDING / 2.0
-        } else {
-            0.0
-        };
-        let height = list.entries.len().min(length) as f32 * metrics.row_height;
-        for column in 1..column_count(list) {
-            let x = (content.x + column as f32 * (cell_width + candidate::FRAME_WIDTH)
-                - candidate::FRAME_WIDTH)
-                .round();
-            painter.rect(
-                Frame::new(
-                    x,
-                    entries_top + margin,
-                    candidate::FRAME_WIDTH,
-                    height - margin * 2.0,
-                ),
-                theme.line,
-            );
-        }
+    for separator in &cells.separators {
+        painter.rect(*separator, theme.line);
     }
     for (index, entry) in list.entries.iter().enumerate() {
-        // 表では上から下へ詰め，列を左から右へ並べる
-        let row = match grid {
-            Some(length) => Frame::new(
-                content.x + (index / length) as f32 * (cell_width + candidate::FRAME_WIDTH),
-                entries_top + (index % length) as f32 * metrics.row_height,
-                cell_width,
-                metrics.row_height,
-            ),
-            None => Frame::new(
-                content.x,
-                entries_top + index as f32 * metrics.row_height,
-                list_width,
-                metrics.row_height,
-            ),
-        };
+        let row = cells.rows[index];
         // コメントの札は行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
         // 札を押すと候補の代わりにコメントを入れる
         if let Some(comment) = super::entry_comment(entry) {
-            let frame = painter.tag_hit_frame(comment, tag_max_x(row), row);
+            // 押せる範囲は，候補の行と同じく行と行のあいだまで
+            let frame =
+                painter.tag_hit_frame(comment, tag_max_x(row, metrics), cells.hit_rows[index]);
             painter.hit(
                 frame,
                 ipc::PointerTarget::Comment {
@@ -375,7 +430,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
             );
         }
         painter.hit(
-            row,
+            cells.hit_rows[index],
             ipc::PointerTarget::Entry {
                 index: index as u32,
             },
@@ -385,7 +440,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         if selected {
             selected_mid_y = Some(row.mid_y());
             if theme.is_rounded() {
-                painter.capsule(row.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
+                painter.capsule(row, theme.selection);
             } else {
                 painter.rect(row, theme.selection);
             }
@@ -394,7 +449,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         let opacity = if selected || index == 0 {
             1.0
         } else {
-            look.rest_opacity
+            rest_opacity
         };
         let text_color = if selected {
             theme.selection_text
@@ -410,11 +465,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .faded(opacity);
         // 表では選んでいる列にだけ番号を振る(番号キーはその列の中で選ぶ)．ほかの列は番号の場所を空けたままにし，列を移っても文字を動かさない
         let number = entry_number(list, index).map(|number| number.to_string());
-        let mut text_x = if theme.is_rounded() {
-            row.x + padding / 2.0 + metrics.lead
-        } else {
-            row.x + padding + metrics.lead
-        };
+        let number_x = row.x + metrics.row_padding_x;
+        let mut text_x = number_x + metrics.lead;
         if let Some(kind) = entry.command {
             // コマンドの候補は，文字の前に種類のアイコンを置く
             painter.command(kind, text_x, row.mid_y(), selected, opacity);
@@ -422,10 +474,9 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         }
         // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
         // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
-        if theme.is_rounded() {
-            if let Some(number) = &number {
-                let center =
-                    Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
+        if let Some(number) = &number {
+            if theme.is_rounded() {
+                let center = Point::new(number_x + glass::BADGE_SIZE / 2.0, row.mid_y());
                 painter.badge(
                     number,
                     center,
@@ -434,14 +485,11 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                     glass::BADGE_SIZE,
                     Font::Key,
                 );
+            } else {
+                painter.text(number, Font::Label, muted_color, number_x, row);
             }
-            painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
-        } else {
-            if let Some(number) = &number {
-                painter.text(number, Font::Label, muted_color, row.x + padding, row);
-            }
-            painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         }
+        painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
         if let Some(detail) = entry.detail.as_deref() {
             painter.detail(
@@ -468,8 +516,9 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 .collect();
             let from = (text_x + painter.width(&before, Font::Candidate)).round();
             let to = (from + painter.width(&corrected, Font::Candidate)).round();
+            // 角丸のテーマの行の地は行の間隔より上下に縮めてあるので，その分を引く
             let offset = if theme.is_rounded() {
-                glass::UNDERLINE_OFFSET
+                glass::UNDERLINE_OFFSET - glass::SELECTION_INSET_Y
             } else {
                 branch::UNDERLINE_OFFSET
             };
@@ -484,89 +533,45 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         if let Some(annotation) = entry.annotation.as_deref() {
             painter.tag(
                 annotation,
-                tag_max_x(row),
+                tag_max_x(row, metrics),
                 row.mid_y(),
                 selected,
                 TagStyle::of(annotation, entry.command.is_some()),
             );
         }
     }
-    y = entries_top + rows as f32 * metrics.row_height;
-    if let Some(slot) = &slot {
-        match slot.placement {
-            MeaningPlacement::Side => {
-                // 候補の右: 候補の列と同じ高さのカードにし，選んでいる候補を左の辺の三角で指す．
-                // platinum と desk はカードの枠を窓の縁から離し，二重の線に見せない
-                y = content.y + list_height.max(slot.height);
-                let card = Frame::new(
-                    list_max_x + glass::MEANING_GAP,
-                    content.y + card_margin,
-                    slot.width - card_margin,
-                    y - content.y - card_margin * 2.0,
-                );
-                meaning::draw(&mut painter, slot.card.as_ref(), card, selected_mid_y);
-            }
-            MeaningPlacement::Below => {
-                // 候補の下: 候補と足元のあいだに，窓の幅いっぱいのカードを出す．足元のキーの案内は消さない
-                y += below_margin();
-                let card = Frame::new(
-                    content.x + padding / 2.0,
-                    y,
-                    content.width - padding,
-                    slot.height,
-                );
-                meaning::draw(&mut painter, slot.card.as_ref(), card, None);
-                y += slot.height + below_margin();
-            }
+    if let (Some(slot), Some(card)) = (slot, layout.card) {
+        if let Some(line) = layout.card_separator {
+            painter.rect(line, theme.line);
+        }
+        meaning::draw(painter, slot.card.as_ref(), card, slot.position);
+        // 候補の右に出すときは，選んでいる候補の行の右の端から語の意味の見出しへ線でつなぐ
+        if let (MeaningPlacement::Side, Some(row_y), Some(content)) =
+            (slot.placement, selected_mid_y, slot.card.as_ref())
+        {
+            // 表では候補の列の右の端から引く(ほかの列の候補にかからないように)
+            let start = Point::new(layout.rows[0].max_x(), row_y.round());
+            let end = Point::new(
+                meaning::connector_end_x(card, slot.position),
+                content.header_mid_y(card),
+            );
+            meaning::connector(painter, start, end);
         }
     }
-    separator(&mut painter, y, content.x, content.max_x());
-    y += candidate::FRAME_WIDTH;
-    footer_section(
-        &mut painter,
-        &footer,
-        Frame::new(content.x, y, content.width, metrics.section_height),
-    );
-    painter.finish(width, height)
+    painter.rect(layout.footer_separator, theme.line);
+    footer_section(painter, footer, layout.footer, metrics.row_padding_x);
 }
 
-/// 候補の行の札の右端
-fn tag_max_x(row: Frame) -> f32 {
-    row.max_x() - candidate::PADDING_X / 2.0
+/// 候補の行の札の右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+fn tag_max_x(row: Frame, metrics: &Metrics) -> f32 {
+    row.max_x() - metrics.row_padding_x
 }
 
-/// platinum と desk は窓の縁に余白が無いので，候補の右のカードを縁から離す空き(上・下・右)．角丸のテーマは 0
-fn card_margin(look: &Look) -> f32 {
-    if look.theme.is_rounded() {
-        0.0
-    } else {
-        candidate::PADDING_X / 2.0
-    }
-}
-
-/// 候補の下に出すカードの上下の空き
-fn below_margin() -> f32 {
-    candidate::PADDING_X / 2.0
-}
-
-fn separator(painter: &mut Painter, y: f32, from: f32, to: f32) {
-    if painter.theme.is_rounded() {
-        let half = candidate::PADDING_X / 2.0;
-        painter.separator(y, from + half, to - half);
-    } else {
-        painter.separator(y, from, to);
-    }
-}
-
-/// 文字種の行．ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)
-fn variants(painter: &mut Painter, list: &CandidateList, section: Frame) {
+/// 文字種の行．ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)．
+/// 最初の文字種の文字を候補の番号の左(行の地の内側の余白 inset)にそろえる
+fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: f32) {
     let theme = painter.theme;
-    let inset_y = if theme.is_rounded() {
-        glass::VARIANT_INSET_Y
-    } else {
-        candidate::VARIANT_INSET_Y
-    };
-    let mut x = section.x + candidate::PADDING_X / 2.0;
+    let mut x = section.x + inset - candidate::VARIANT_PADDING_X;
     for (index, variant) in list.variants.iter().enumerate() {
         let selected =
             list.focus == CandidateFocus::Variants && list.selected_variant == Some(index as u32);
@@ -576,12 +581,7 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame) {
             (false, false) => theme.text_muted.faded(opacity::variant::UNAVAILABLE),
         };
         let width = painter.width(&variant.label, Font::Label) + candidate::VARIANT_PADDING_X * 2.0;
-        let cell = Frame::new(
-            x,
-            section.y + inset_y,
-            width,
-            section.height - inset_y * 2.0,
-        );
+        let cell = Frame::new(x, section.y, width, section.height);
         if variant.is_available {
             painter.hit(
                 cell,
@@ -608,11 +608,12 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame) {
     }
 }
 
-/// 角丸のテーマは案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)
-fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
+/// 角丸のテーマは案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
+/// 左右の端は候補の行の番号の左と注釈の札の右(行の地の内側の余白 inset)にそろえる
+fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame, inset: f32) {
     let theme = painter.theme;
-    let left = section.x + candidate::PADDING_X;
-    let right = section.max_x() - candidate::PADDING_X;
+    let left = section.x + inset;
+    let right = section.max_x() - inset;
     if theme.is_rounded() {
         match &footer.note {
             Some(note) => painter.note(note, left, section.mid_y()),
@@ -620,7 +621,7 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
                 painter.hints(&footer.hints, left, section.mid_y());
                 if let Some(hint) = &footer.association_hint {
                     // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
-                    let x = left + painter.hints_width(&footer.hints) + candidate::PADDING_X;
+                    let x = left + painter.hints_width(&footer.hints) + glass::HINT_GAP;
                     painter.text(hint, Font::Label, theme.text_muted, x, section);
                 }
             }
@@ -650,7 +651,7 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame) {
             let width = painter.hints_width(&footer.hints);
             painter.hints(&footer.hints, right - width, section.mid_y());
             if let Some(hint) = &footer.association_hint {
-                let end = right - width - candidate::PADDING_X;
+                let end = right - width - glass::HINT_GAP;
                 painter.text_right(hint, Font::Label, theme.text_muted, end, section);
             }
         }
@@ -925,7 +926,7 @@ mod tests {
         }
     }
 
-    /// 描いた多角形(一覧のカードが選んでいる候補を指す三角)
+    /// 描いた多角形(語の意味は三角で指さないので，無いことを確かめる)
     fn polygons(scene: &Scene) -> Vec<Vec<Point>> {
         scene
             .draws
@@ -937,20 +938,33 @@ mod tests {
             .collect()
     }
 
+    /// 語の意味とつなぐ線の端の丸
+    fn dots(scene: &Scene) -> Vec<Frame> {
+        scene
+            .draws
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
     #[test]
-    fn 語の意味は候補の右のカードにし_選んでいる候補を三角で指す() {
+    fn 語の意味は候補の右に箱を描かずに置き_選んでいる候補から線でつなぐ() {
         for name in ["platinum", "automatic", "desk"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
             let scene = candidate_list(&with_meaning(MeaningPlacement::Side), &look, &Fixed);
             let texts = texts_of(&scene);
-            for text in ["変換", "名詞", "別の形に変える", "同音語", "返還", "偏官"]
-            {
+            for text in ["変換", "名詞", "別の形に変える", "返還", "偏官"] {
                 assert!(texts.contains(&text.to_string()), "{name}: {text}");
             }
+            // 同音語は耳のアイコンと札だけ．見出しの言葉は置かない
+            assert!(!texts.contains(&"同音語".to_string()), "{name}");
             // 足元のキーの案内は消さない
             assert!(texts.contains(&"2 / 30".to_string()), "{name}");
-            // カードは候補の列の右に置き，候補の行はカードにかからない
+            // 語の意味は候補の列の右に，つなぐ線を引く幅を空けて置く
             let meaning = text_frame(&scene, "別の形に変える").expect("意味を描く");
             let candidate = text_frame(&scene, "へんかん").expect("候補を描く");
             assert!(meaning.x > candidate.max_x(), "{name}");
@@ -960,33 +974,29 @@ mod tests {
                 .find(|hit| hit.target == ipc::PointerTarget::Entry { index: 0 })
                 .map(|hit| hit.frame)
                 .expect("候補の行");
-            assert!(row.max_x() + glass::MEANING_GAP <= meaning.x, "{name}");
-            // 三角は選んでいる候補の行の高さを指す(カードの角にかからない範囲で)
-            let pointers = polygons(&scene);
-            assert_eq!(pointers.len(), 1, "{name}");
+            assert!(row.max_x() + card_size::CARD_GAP <= meaning.x, "{name}");
+            // 三角で指さず，選んでいる候補の行の高さから線を引き，見出しのアイコンの手前の丸で止める
+            assert!(polygons(&scene).is_empty(), "{name}");
+            let dots = dots(&scene);
+            assert_eq!(dots.len(), 1, "{name}");
             assert!(
-                (pointers[0][1].y - row.mid_y()).abs()
-                    <= glass::MEANING_RADIUS + glass::MEANING_NOTCH,
+                dots[0].mid_x() > row.max_x() && dots[0].mid_x() < meaning.x,
                 "{name}"
             );
-            assert!(pointers[0][1].x < meaning.x, "{name}");
             // 意味の無い一覧より広い
             let plain = candidate_list(&list(Some(0)), &look, &Fixed);
-            assert!(
-                scene.width >= plain.width + glass::MEANING_CARD_WIDTH,
-                "{name}"
-            );
+            assert!(scene.width >= plain.width + card_size::LIST_WIDTH, "{name}");
         }
     }
 
     #[test]
-    fn 文字種の行を選んでいるあいだは三角で指さない() {
+    fn 文字種の行を選んでいるあいだはつなぐ線を引かない() {
         let theme = theme("automatic");
         let mut variants = with_meaning(MeaningPlacement::Side);
         variants.focus = CandidateFocus::Variants;
         variants.selected_variant = Some(0);
         let scene = candidate_list(&variants, &Look::new(&theme, 15.0), &Fixed);
-        assert!(polygons(&scene).is_empty());
+        assert!(dots(&scene).is_empty());
         assert!(texts_of(&scene).contains(&"別の形に変える".to_string()));
     }
 
@@ -1004,7 +1014,7 @@ mod tests {
             let scene = candidate_list(&long, &look, &Fixed);
             let texts = texts_of(&scene);
             let lines = texts.iter().filter(|text| text.starts_with('意')).count();
-            assert_eq!(lines, glass::MEANING_MEANING_LINES as usize, "{name}");
+            assert_eq!(lines, card_size::MEANING_LINES as usize, "{name}");
             assert!(texts
                 .iter()
                 .any(|text| text.starts_with('意') && text.ends_with('…')));
@@ -1045,7 +1055,7 @@ mod tests {
             // 三角で指さない
             assert!(polygons(&scene).is_empty(), "{name}");
             // 窓の幅はカードの幅に合わせて広げる
-            assert!(scene.width >= glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0);
+            assert!(scene.width >= card_size::LIST_WIDTH);
             let plain = candidate_list(&list(Some(0)), &look, &Fixed);
             assert!(scene.height > plain.height, "{name}");
         }
@@ -1119,12 +1129,17 @@ mod tests {
         let badges = double
             .draws
             .iter()
-            .filter(|draw| matches!(draw, Draw::RoundRect { radius, .. } if *radius == glass::MEANING_BADGE_RADIUS))
+            .filter(|draw| matches!(draw, Draw::RoundRect { radius, frame, .. }
+                if *radius == card_size::NUMBER_RADIUS && frame.width == card_size::MARKER_WIDTH && frame.height == card_size::MARKER_WIDTH))
             .count();
         assert_eq!(badges, 2);
         assert!(double.height >= single.height);
         // 意味が 1 つなら番号の四角を描かない
-        assert!(!single.draws.iter().any(|draw| matches!(draw, Draw::RoundRect { radius, .. } if *radius == glass::MEANING_BADGE_RADIUS)));
+        assert!(!single
+            .draws
+            .iter()
+            .any(|draw| matches!(draw, Draw::RoundRect { radius, frame, .. }
+            if *radius == card_size::NUMBER_RADIUS && frame.width == card_size::MARKER_WIDTH)));
     }
 
     fn texts_of(scene: &Scene) -> Vec<String> {

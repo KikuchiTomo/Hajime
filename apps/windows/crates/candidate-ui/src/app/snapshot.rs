@@ -156,7 +156,10 @@ fn render_all(output: &Path) -> Result<()> {
             ResolvedTheme::resolve(theme_name, (name == "custom").then_some(&custom), &system);
         let font_size = tokens::size::candidate::FONT_SIZE;
         let measure = renderer.measure(&theme, font_size)?;
-        let look = Look::new(&theme, font_size);
+        let look = Look {
+            pixel_scale: tokens::size::snapshot::SCALE,
+            ..Look::new(&theme, font_size)
+        };
         // 意味のある候補から意味の無い候補に移ったところは，前の窓で空けたカードの場所を引き継ぐ(描く層と同じ手順)
         let mut reservation = CardReservation::default();
         reservation.list(&meaning_list(), &look, &measure);

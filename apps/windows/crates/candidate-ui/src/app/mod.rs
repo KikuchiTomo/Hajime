@@ -576,6 +576,7 @@ impl App {
         self.refresh_prediction(&theme, look.dark, &measure);
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
+        style.pixel_scale = self.window().scale();
         style.reserved_card = match &self.content {
             Content::Candidates(list) => self.meaning.list(list, &style, &measure),
             Content::BranchMap(map) => self.meaning.branch(map, &style, &measure),

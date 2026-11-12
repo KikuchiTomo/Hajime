@@ -29,6 +29,19 @@ struct RuleListTests {
         #expect(RuleList.englishWords.rows(in: settings).contains(RuleListRow(key: "swift", value: "")))
     }
 
+    @Test("いつも英語にする語といつも日本語にする語は重ねない．読み込んだ語はもう一方の一覧から除く(英語が先に効き，足した語が効かなくなるため)")
+    func languageWordsAreExclusive() {
+        var settings = Settings()
+        settings.wordLanguage.englishWords = ["make", "shine"]
+        settings.wordLanguage.japaneseWords = ["kami"]
+        #expect(RuleList.japaneseWords.merge(rows([("Make", ""), ("hashi", "")]), into: &settings) == 2)
+        #expect(settings.wordLanguage.englishWords == ["shine"])
+        #expect(settings.wordLanguage.japaneseWords == ["kami", "make", "hashi"])
+        #expect(RuleList.englishWords.merge(rows([("kami", "")]), into: &settings) == 1)
+        #expect(settings.wordLanguage.japaneseWords == ["make", "hashi"])
+        #expect(settings.wordLanguage.englishWords == ["shine", "kami"])
+    }
+
     @Test("予測に表示しない語句は 1 列で，書き方どおりに比べる．長すぎる語句と重なる語句は足さず，読むときも除く")
     func hiddenPredictions() {
         var settings = Settings()

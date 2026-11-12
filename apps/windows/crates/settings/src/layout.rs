@@ -148,8 +148,9 @@ pub fn layout(
             });
             continue;
         }
+        // まとまりの行は 1 枚のカードに区切り線で並べる(macOS の Form の grouped)．行と行のあいだは空けない
         if shown > 0 {
-            y += size::SECTION_GAP - size::CARD_GAP;
+            y += size::SECTION_GAP;
         }
         shown += 1;
         let title = section.title.map(|_| {
@@ -179,7 +180,7 @@ pub fn layout(
                     reserve,
                 };
                 let card = place(index, row, &notes, frame, metrics);
-                y = card.card.max_y() + size::CARD_GAP;
+                y = card.card.max_y();
                 cards.push(card);
             }
             index = next;
@@ -190,10 +191,10 @@ pub fn layout(
                 .map(|text| metrics.lines(text, TextKind::Caption, width))
                 .max()
                 .unwrap_or(1);
-            y += size::FOOTER_GAP - size::CARD_GAP;
+            y += size::FOOTER_GAP;
             let height = longest as f32 * size::NOTE_LINE_HEIGHT;
             let rect = Rect::new(left, y, width, height);
-            y += height + size::CARD_GAP;
+            y += height;
             rect
         });
         result.push(SectionLayout {
@@ -259,7 +260,12 @@ fn place(
     let control = &row.control;
     if let Some(buttons) = control.list_buttons() {
         let fields = control.list_spec().map_or(0, |spec| spec.fields.len());
-        return place_inputs(position, fields, buttons, frame, size::LIST_HEIGHT, metrics);
+        // キー設定は行が多いので表を高くする
+        let height = match control {
+            Control::List(spec, _) if spec.path == "keymap" => size::KEYMAP_LIST_HEIGHT,
+            _ => size::LIST_HEIGHT,
+        };
+        return place_inputs(position, fields, buttons, frame, height, metrics);
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
@@ -391,11 +397,13 @@ fn place_labeled(
         } else {
             frame.y + (height - size::CONTROL_HEIGHT) / 2.0
         };
+        // 部品はカードの右の端にそろえる．既定に戻すボタンは部品の左に置く(macOS の SettingsRows は
+        // 変えた行だけ部品の左にボタンを出す．空けておく場所は名前の欄から取る)
         (
             height,
             frame.y + (height - text_height) / 2.0,
             control_top,
-            right - reset_space - trailing,
+            right - trailing,
         )
     };
     // 狭い窓で部品の幅が足りなければ縮める
@@ -427,8 +435,14 @@ fn place_labeled(
             (*index, rect)
         })
         .collect();
+    let reset_x = if stacked {
+        // 名前の下に部品を置く狭い窓では，部品の右に置く
+        trailing_x + trailing + size::CONTROL_GAP
+    } else {
+        trailing_x - size::CONTROL_GAP - size::RESET_SIZE
+    };
     let reset = Rect::new(
-        trailing_x + trailing + size::CONTROL_GAP,
+        reset_x,
         control_top + (size::CONTROL_HEIGHT - size::RESET_SIZE) / 2.0,
         size::RESET_SIZE,
         size::RESET_SIZE,
@@ -700,6 +714,9 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     filter: false,
     files: None,
     arrow: false,
+    field_widths: &[],
+    toolbar: false,
+    trailing_bottom: 0,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -709,6 +726,9 @@ const NO_BUTTONS: ListButtons = ListButtons {
     filter: false,
     files: None,
     arrow: false,
+    field_widths: &[],
+    toolbar: false,
+    trailing_bottom: 0,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -724,26 +744,56 @@ fn place_inputs(
     metrics: &dyn Metrics,
 ) -> CardLayout {
     let x = frame.inner_left();
-    let top = frame.y + size::CARD_PADDING_Y;
+    let card_top = frame.y + size::CARD_PADDING_Y;
     let inner = frame.inner_width();
+    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に絞り込みを置く
+    let (toolbar_search, toolbar_filter, top) = if buttons.toolbar {
+        let filter = buttons.filter.then(|| {
+            Rect::new(
+                x + inner - size::STEPPER_WIDTH,
+                card_top,
+                size::STEPPER_WIDTH,
+                size::CONTROL_HEIGHT,
+            )
+        });
+        let search_right = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let search = buttons.search.then(|| {
+            Rect::new(
+                x,
+                card_top,
+                (search_right - x).max(0.0),
+                size::CONTROL_HEIGHT,
+            )
+        });
+        (
+            search,
+            filter,
+            card_top + size::CONTROL_HEIGHT + size::CONTROL_GAP,
+        )
+    } else {
+        (None, None, card_top)
+    };
     let widths: Vec<f32> = buttons
         .top
         .iter()
         .map(|label| button_width(label, metrics))
         .collect();
     let buttons_width: f32 = widths.iter().map(|width| width + size::CONTROL_GAP).sum();
-    let count = fields.max(1) as f32;
+    // 決まった幅の欄(キー設定の状態とキー)を除いた欄で残りを分ける
+    let fixed: Vec<f32> = buttons.field_widths.iter().copied().take(fields).collect();
+    let fixed_total: f32 = fixed.iter().sum();
+    let count = (fields - fixed.len()).max(1) as f32;
     // 矢印を置くときは先頭の 2 つの欄のあいだを広げる
     let arrow = buttons.arrow && fields >= 2;
     let arrow_extra = if arrow { size::LIST_ARROW_WIDTH } else { 0.0 };
-    let field_width = ((inner - buttons_width - size::CONTROL_GAP * (count - 1.0) - arrow_extra)
-        / count)
-        .max(0.0);
+    let gaps = size::CONTROL_GAP * (fields.max(1) - 1) as f32;
+    let field_width = ((inner - buttons_width - gaps - arrow_extra - fixed_total) / count).max(0.0);
     let mut parts = Vec::new();
     let mut cursor = x;
     for index in 0..fields {
-        parts.push(Rect::new(cursor, top, field_width, size::CONTROL_HEIGHT));
-        cursor += field_width + size::CONTROL_GAP;
+        let width = fixed.get(index).copied().unwrap_or(field_width);
+        parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
+        cursor += width + size::CONTROL_GAP;
         if arrow && index == 0 {
             cursor += arrow_extra;
         }
@@ -757,12 +807,18 @@ fn place_inputs(
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
-    // 表の下の帯: 左の組(下のボタン)と右の組(絞り込み・検索欄・ファイルのボタン)
-    let leading: Vec<f32> = buttons
-        .bottom
+    // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
+    let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
+    let leading: Vec<f32> = buttons.bottom[..split]
         .iter()
         .map(|label| button_width(label, metrics))
         .collect();
+    let trailing_buttons: Vec<f32> = buttons.bottom[split..]
+        .iter()
+        .map(|label| button_width(label, metrics))
+        .collect();
+    let bar_search = buttons.search && !buttons.toolbar;
+    let bar_filter = buttons.filter && !buttons.toolbar;
     let search_width = tokens::size::settings::RULE_SEARCH_WIDTH;
     let file_widths: Vec<f32> = buttons
         .files
@@ -774,11 +830,11 @@ fn place_inputs(
                 .collect()
         })
         .unwrap_or_default();
-    let trailing: Vec<f32> = buttons
-        .filter
-        .then_some(size::STEPPER_WIDTH)
-        .into_iter()
-        .chain(buttons.search.then_some(search_width))
+    let trailing: Vec<f32> = trailing_buttons
+        .iter()
+        .copied()
+        .chain(bar_filter.then_some(size::STEPPER_WIDTH))
+        .chain(bar_search.then_some(search_width))
         .chain(file_widths.iter().copied())
         .collect();
     let total = |widths: &[f32]| -> f32 {
@@ -828,13 +884,26 @@ fn place_inputs(
             })
         })
         .collect();
-    // parts の順に入れる: 検索欄・絞り込み・下のボタン・ファイルのボタン
+    // parts の順に入れる: 検索欄・絞り込み・下のボタン(左の組・右の組)・ファイルのボタン
     let mut trailing_iter = trailing_rects.into_iter();
-    let filter_rect = buttons.filter.then(|| trailing_iter.next()).flatten();
-    let search_rect = buttons.search.then(|| trailing_iter.next()).flatten();
+    let right_buttons: Vec<Rect> = trailing_iter
+        .by_ref()
+        .take(trailing_buttons.len())
+        .collect();
+    let filter_rect = if buttons.toolbar {
+        toolbar_filter
+    } else {
+        bar_filter.then(|| trailing_iter.next()).flatten()
+    };
+    let search_rect = if buttons.toolbar {
+        toolbar_search
+    } else {
+        bar_search.then(|| trailing_iter.next()).flatten()
+    };
     parts.extend(search_rect);
     parts.extend(filter_rect);
     parts.extend(leading_rects);
+    parts.extend(right_buttons);
     parts.extend(trailing_iter);
     let lines = leading_lines
         .len()
@@ -898,7 +967,9 @@ mod tests {
                 assert!(card.card.y >= last);
                 assert!(card.control.x > card.label.x);
                 assert!(card.label.max_x() <= card.control.x);
-                assert!(card.reset.x >= card.control.max_x());
+                // 既定に戻すボタンは部品の左で，名前に重ならない
+                assert!(card.reset.max_x() <= card.control.x);
+                assert!(card.label.max_x() <= card.reset.x);
                 last = card.card.max_y();
             }
         }
@@ -906,7 +977,7 @@ mod tests {
     }
 
     #[test]
-    fn 部品と既定に戻すボタンは右の端にそろえる() {
+    fn 部品は右の端にそろえ_既定に戻すボタンは部品の左に置く() {
         for page in [Page::Input, Page::Conversion, Page::Palette] {
             let layout = all(page, 900.0);
             let cards: Vec<&CardLayout> = layout
@@ -915,13 +986,14 @@ mod tests {
                 .flat_map(|section| &section.cards)
                 .filter(|card| card.reset.width > 0.0 && card.label.width > 0.0)
                 .collect();
-            let right = cards[0].reset.max_x();
             for card in &cards {
+                // 部品はカードの右の余白の内側にそろえる(macOS と同じく右の端を空けない)
                 assert!(
-                    (card.reset.max_x() - right).abs() < 0.01,
+                    (card.control.max_x() - (card.card.max_x() - size::CARD_PADDING_X)).abs()
+                        < 0.01,
                     "{page:?} {card:?}"
                 );
-                assert!((card.control.max_x() + size::CONTROL_GAP - card.reset.x).abs() < 0.01);
+                assert!((card.reset.max_x() + size::CONTROL_GAP - card.control.x).abs() < 0.01);
             }
         }
     }

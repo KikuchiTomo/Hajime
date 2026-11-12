@@ -44,13 +44,15 @@ final class NoteView: NSView {
     var note = Note.info("") { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
 
-    private var padding: CGFloat { theme.isRounded ? Glass.padding : Size.paddingX }
-    private var inset: CGFloat { theme.isRounded ? 0 : Size.frameWidth + Size.bevelWidth }
+    /// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．余白はこの内側から測る
+    private var inset: CGFloat { theme.isRounded ? Size.frameWidth : Size.frameWidth + Size.bevelWidth }
 
+    /// 1 行だけの小さな窓の余白(予測の窓・モードの札と同じ)．中身の高さは足元の行と同じ決め方
     override var fittingSize: NSSize {
-        let height = max(Glass.noteIconSize, Glass.keycapHeight, theme.labelFont(size: Glass.labelFontSize).boundingRectForFont.height)
-        return NSSize(width: (NoteDrawing.width(note, theme: theme) + (padding + inset) * 2).rounded(.up),
-                      height: max(Glass.footerHeight, height + (Size.sectionPaddingY + inset) * 2).rounded(.up))
+        let font = theme.labelFont(size: Glass.labelFontSize)
+        let height = max(Glass.noteIconSize, Glass.keycapHeight, (font.ascender - font.descender).rounded(.up))
+        return NSSize(width: (NoteDrawing.width(note, theme: theme) + (Glass.compactPaddingX + inset) * 2).rounded(.up),
+                      height: (height + (Glass.compactPaddingY + inset) * 2).rounded(.up))
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -59,6 +61,6 @@ final class NoteView: NSView {
         } else {
             BevelDrawing.drawPanel(in: bounds, theme: theme)
         }
-        NoteDrawing.draw(note, x: padding + inset, midY: bounds.midY, theme: theme)
+        NoteDrawing.draw(note, x: Glass.compactPaddingX + inset, midY: bounds.midY, theme: theme)
     }
 }
