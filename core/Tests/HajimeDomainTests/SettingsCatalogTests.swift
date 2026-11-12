@@ -43,6 +43,8 @@ struct SettingsCatalogTests {
                 "customThemeCornerRadius": range(DefaultSettings.customThemeCornerRadiusRange),
                 "associationLimit": range(DefaultSettings.associationLimitRange),
                 "meaningSenseLimit": range(DefaultSettings.meaningSenseLimitRange),
+                "emojiCandidatePosition": range(DefaultSettings.emojiCandidatePositionRange),
+                "emojiCandidateCount": range(DefaultSettings.emojiCandidateCountRange),
                 "paletteColumns": range(DefaultSettings.paletteColumnsRange),
                 "paletteRows": range(DefaultSettings.paletteRowsRange),
                 "paletteCellSize": range(DefaultSettings.paletteCellSizeRange),

@@ -16,6 +16,9 @@ struct LatticeBuilder {
     var scorer: (any CandidateScoring)?
     /// 前もって求めた点数だけで並べ替える(採点が遅い環境)．求めていなければ並べ替えない
     var usesPrecomputedScoresOnly = false
+    /// 絵文字の候補の置き場所．文節の候補を作ったり並べ替えたりしたあとに置き直す(並べ替えで見えない位置に押し下げられないように)．
+    /// nil なら置き直さない(絵文字に変換しない設定)
+    var emojiPlacement: EmojiPlacement?
 
     /// 文節の前後にある文字(幹で見えている文字)．文節の候補を文の中で採点するのに使う
     struct SegmentContext: Equatable {
@@ -92,6 +95,8 @@ struct LatticeBuilder {
             }
         }
         result.candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
+        // 並べ替えで押し下げた絵文字を置き場所に置き直す(上の枝と重なる候補を除いたあとの位置で数える)
+        if let emojiPlacement { result.candidates = emojiPlacement.placed(result.candidates) }
         if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
             let moved = result.candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
             result.choice = .candidate(moved)
@@ -273,7 +278,8 @@ struct LatticeBuilder {
         let typedEnd = start + length + delta
         guard start <= prefix, typedEnd > start, typedEnd <= typed.count else { return lattice }
         let typedSlice = String(typed[start..<typedEnd])
-        let pool = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count && $0.commandID == nil }
+        // 打ったままの読みの絵文字は入れない(絵文字は今の読みのものを置き場所に置く)
+        let pool = converter.candidates(for: typedSlice).filter { $0.readingCount == typedSlice.count && $0.commandID == nil && $0.origin != .emoji }
             .map { Candidate(text: $0.text, readingCount: length, origin: origin) }
         var additions = Array(pool.prefix(count))
         if includesKana {
@@ -291,7 +297,19 @@ struct LatticeBuilder {
         }
         segment.isConfident = false
         segment.confidenceGap = -.infinity
-        result.segments[first] = segment
+        result.segments[first] = placingEmoji(segment)
+        return result
+    }
+
+    /// 文節の候補の絵文字を置き場所(emojiPlacement)に置き直す．選んでいる候補は置き直したあとも選んだまま
+    private func placingEmoji(_ segment: SegmentLattice.Segment) -> SegmentLattice.Segment {
+        guard let emojiPlacement else { return segment }
+        var result = segment
+        result.candidates = emojiPlacement.placed(segment.candidates)
+        if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
+            let moved = result.candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
+            result.choice = .candidate(moved)
+        }
         return result
     }
 
@@ -455,6 +473,8 @@ struct LatticeBuilder {
         let best = engineCandidates.first, second = engineCandidates.dropFirst().first
         let confident = SegmentLattice.isConfident(best: best, second: second)
         let gap = best.flatMap { best in second.map { best.score - $0.score } } ?? .infinity
+        // 文節の先頭の語を選び直した候補を前に並べたので，絵文字を置き場所に置き直す
+        if let emojiPlacement { candidates = emojiPlacement.placed(candidates) }
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
                                       variants: variants(of: slice), isConfident: confident, confidenceGap: gap)
     }
@@ -467,8 +487,9 @@ struct LatticeBuilder {
         let tail = words.dropFirst().map(\.text).joined()
         let headReading = String(slice.prefix(head.readingCount))
         // 先頭の語だけを文脈なしで Zenzai にかけると，ふだんの語が下がる(ごく → 語句 が見えなくなる)ので，辞書の変換の順を使う
+        // 辞書の絵文字の語は使わない(語を絵文字にした候補は，読みで引いた絵文字から作る．SupplementedConverter)
         return converter.dictionaryCandidates(for: headReading)
-            .filter { $0.readingCount == head.readingCount }
+            .filter { $0.readingCount == head.readingCount && !EmojiPlacement.containsEmoji($0.text) }
             .prefix(DefaultSettings.headWordAlternativeCount)
             .map { word in
                 var candidate = Candidate(text: word.text + tail, readingCount: slice.count, origin: .combined)

@@ -73,6 +73,25 @@ struct PaletteSearchTests {
         #expect(catalog.categories == [.smileys, .people, .nature, .activities, .objects, .arrows, .enclosed])
     }
 
+    @Test("変換に足す絵文字は読みと同じ読みの絵文字だけ．名前の読みで当たったものを先にし，記号と前方一致は出さない")
+    func emojiForReading() {
+        let search = PaletteSearch(catalog: catalog)
+        #expect(search.emoji(reading: "ねこ", limit: 5).map(\.text) == ["🐈", "🐱"])
+        #expect(search.emoji(reading: "ネコ", limit: 5).map(\.text) == ["🐈", "🐱"])
+        #expect(search.emoji(reading: "ね", limit: 5).isEmpty)
+        #expect(search.emoji(reading: "ねこのか", limit: 5).isEmpty)
+        #expect(search.emoji(reading: "やじるし", limit: 5).isEmpty)
+        #expect(search.emoji(reading: "ねこ", limit: 1).map(\.text) == ["🐈"])
+        #expect(search.emoji(reading: "ねこ", limit: 0).isEmpty)
+    }
+
+    @Test("変換に足す絵文字は，その読みで何度も選んだものとよく使うものを先にする")
+    func emojiForReadingRanking() {
+        let search = PaletteSearch(catalog: catalog)
+        #expect(search.emoji(reading: "ねこ", ranking: .init(learned: ["🐱"]), limit: 5).map(\.text) == ["🐱", "🐈"])
+        #expect(search.emoji(reading: "ねこ", ranking: .init(usage: ["🐱": 3]), limit: 5).map(\.text) == ["🐱", "🐈"])
+    }
+
     @Test("ショートコード・英語の名前・読みのどれでも探せる", arguments: [
         (":bow:", "", "🙇"),
         (":+1", "", "👍"),

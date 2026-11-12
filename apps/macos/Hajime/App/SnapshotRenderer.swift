@@ -78,6 +78,11 @@ enum SnapshotRenderer {
                 }
                 render(associationHintListView(theme: look.theme, appearance: appearance), name: "association-hint-list-\(look.name)", to: output, appearance: appearance)
                 render(predictionView(theme: look.theme, appearance: appearance), name: "prediction-\(look.name)", to: output, appearance: appearance)
+                render(panelView(SamplePanels.emojiList, theme: look.theme, appearance: appearance), name: "emoji-list-\(look.name)", to: output, appearance: appearance)
+                render(panelView(SamplePanels.emojiSuggestion, theme: look.theme, appearance: appearance), name: "emoji-suggestion-\(look.name)", to: output,
+                       appearance: appearance)
+                render(latticeView(SamplePanels.emojiLattice, theme: look.theme, appearance: appearance), name: "emoji-branch-\(look.name)", to: output,
+                       appearance: appearance)
                 render(associationHintBranchView(theme: look.theme, appearance: appearance), name: "association-hint-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
@@ -263,6 +268,34 @@ enum SnapshotRenderer {
             termsWindow.close()
         }
         fixture.model.update { $0.termFields = TermFieldSettings() }
+        // 変換のページの「絵文字」(ページの下のほうにあるので，まとまりだけを描く)．既定(ライトとダーク)と，
+        // 位置と数と名前を変えたとき，文節を絵文字にしない(語だけを絵文字にする)ときに，下の見本の並びが変わるか
+        let emojiCases: [(String, NSAppearance.Name, (inout HajimeDomain.Settings) -> Void)] = [
+            ("", .aqua, { _ in }), ("-dark", .darkAqua, { _ in }),
+            ("-changed", .aqua, { $0.emojiCandidatePosition = 6; $0.emojiCandidateCount = 3; $0.showsEmojiNames = false }),
+            ("-word", .aqua, { $0.emojiConversion = false }),
+            ("-off", .aqua, { $0.emojiConversion = false; $0.emojiWordConversion = false }),
+        ]
+        for (suffix, appearance, change) in emojiCases {
+            NSApp.appearance = NSAppearance(named: appearance)
+            fixture.model.update(change)
+            let emoji = NSHostingView(rootView: Form { EmojiSection(model: fixture.model) }.formStyle(.grouped)
+                .frame(width: SettingsView.size.width - DesignTokens.Size.Settings.sidebarWidth))
+            emoji.frame = NSRect(origin: .zero, size: emoji.fittingSize)
+            let emojiWindow = NSWindow(contentRect: emoji.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            emojiWindow.contentView = emoji
+            emojiWindow.orderFrontRegardless()
+            SettingsFixture.settle(emojiWindow)
+            render(emoji, name: "settings-emoji\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+            emojiWindow.close()
+            fixture.model.update { settings in
+                for keyPath in [\HajimeDomain.Settings.emojiConversion, \.emojiWordConversion, \.showsEmojiNames] {
+                    settings[keyPath: keyPath] = DefaultSettings.settings[keyPath: keyPath]
+                }
+                settings.emojiCandidatePosition = DefaultSettings.emojiCandidatePosition
+                settings.emojiCandidateCount = DefaultSettings.emojiCandidateCount
+            }
+        }
         NSApp.appearance = NSAppearance(named: .aqua)
         // 読みにくい色を選んだカスタムテーマの編集の画面(知らせが出るか)
         var theme = fixture.model.draftCustomTheme()
@@ -631,11 +664,20 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    private static func latticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
-        let panel = SamplePanels.lattice
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 決まった中身の一覧(絵文字の候補など)
+    private static func panelView(_ panel: CandidatePanel, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

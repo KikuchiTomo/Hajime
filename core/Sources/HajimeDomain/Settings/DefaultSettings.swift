@@ -218,9 +218,16 @@ public enum DefaultSettings {
     public static let symbolCandidateOffset = 3
     /// 丸数字・漢数字などに書き換える数の桁数の上限(NumberForms)．位付きの漢数字は「兆」の位(16 桁)まで書ける
     public static let maximumNumberFormDigits = 16
-    /// 読みで引いた絵文字を差し込む位置と，差し込む数．よく使う語のあとに並べ，候補の一覧の 1 ページに収める
-    public static let emojiCandidateOffset = 5
-    public static let emojiCandidateCount = 3
+    /// 読みで引いた絵文字の候補を出す位置(1 から数えた何番目か)と数(EmojiPlacement)．
+    /// 分岐図の見えている枝(latticeCandidatesPerSegment)と一覧の 1 ページ目に入り，第 1 候補にはならない位置にする．
+    /// 決めた根拠は操作の数の評価(R-25)．位置は 2 から，数は 1 から選べる
+    public static let emojiCandidatePosition = 4
+    public static let emojiCandidatePositionRange = 2...9
+    public static let emojiCandidateCount = 2
+    public static let emojiCandidateCountRange = 1...5
+    /// 絵文字の候補を出す読みの長さの下限．1 文字の読み(「は」「に」「し」)は助詞や語の切れ端として文節になりやすく，
+    /// 絵文字(🦷・2️⃣・💀)を出しても本当の候補を押し下げるだけなので出さない
+    public static let minimumEmojiReadingLength = 2
     /// 文節の長さを変えたとき(⇧← ⇧→)に，すぐに分け直す後ろの文節の数．それより後ろは打鍵の合間に分け直す
     public static let resizeResegmentedSegments = 2
     /// 文節格子の列ごとに見せる候補の数

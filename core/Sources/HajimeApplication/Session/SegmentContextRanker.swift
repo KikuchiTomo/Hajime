@@ -44,7 +44,8 @@ struct SegmentContextRanker {
         var seen = Set<String>()
         var texts: [String] = []
         func collect(_ candidates: [Candidate], reading: String, range: Range<Int>) {
-            for candidate in candidates where candidate.readingCount == reading.count && candidate.commandID == nil {
+            // 読みで引いた絵文字は文脈で決まった字ではないので集めない(置き場所は EmojiPlacement が決める)
+            for candidate in candidates where candidate.readingCount == reading.count && candidate.commandID == nil && candidate.origin != .emoji {
                 // 打ち間違いを直した候補などは読みが違う(「かこう」に「書く」)ので，文節の読みと食い違う字は使わない
                 guard let text = CandidateSpan.text(of: candidate, in: range, reading: reading),
                       CandidateSpan.isConsistent(text, with: slice), seen.insert(text).inserted else { continue }

@@ -6,12 +6,16 @@ enum TextFitting {
     /// 日本語の字を代わりの書体で描くと NSString の行の高さが変わり，行の高さで真ん中に置くと字が上下にずれるので，書体の値でベースラインを決める．
     /// ベースラインと x は整数に丸め，文字の輪郭をぼかさない．上下が反転した(isFlipped の)ビューでもそうでないビューでも使える
     static func draw(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, midY: CGFloat) {
-        guard let font = attributes[.font] as? NSFont else { return }
+        draw(NSAttributedString(string: text, attributes: attributes), x: x, midY: midY)
+    }
+
+    /// 書体の違う文字を並べた 1 行(候補の文字と絵文字の名前など)．ベースラインは先頭の文字の書体で決める
+    static func draw(_ line: NSAttributedString, x: CGFloat, midY: CGFloat) {
+        guard line.length > 0, let font = line.attribute(.font, at: 0, effectiveRange: nil) as? NSFont else { return }
         let flipped = NSGraphicsContext.current?.isFlipped ?? true
         let offset = (font.ascender + font.descender) / 2
         let baseline = (flipped ? midY + offset : midY - offset).rounded()
-        NSAttributedString(string: text, attributes: attributes)
-            .draw(with: NSRect(x: x.rounded(), y: baseline, width: CGFloat.greatestFiniteMagnitude, height: 0), options: [], context: nil)
+        line.draw(with: NSRect(x: x.rounded(), y: baseline, width: CGFloat.greatestFiniteMagnitude, height: 0), options: [], context: nil)
     }
 
     /// 幅に収まるよう末尾を「…」で省く．省く位置は二分探索で決め，測る回数を文字数の対数に抑える(長い文でも打鍵を遅らせない)

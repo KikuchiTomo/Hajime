@@ -101,8 +101,8 @@ final class CompositionRoot {
                                    terms: terms, associations: associations)
         // 語の意味の辞書も，注釈を出す設定なら起動したら裏で読み始める(初めての変換で意味が出ないことを減らす)
         if settings.current.homophoneNotes { root.usageDictionary?.preload() }
-        // パレットの表も，使う設定なら起動したら裏で読み始める(初めて開いたときに待たせない)
-        if settings.current.palette { root.paletteCatalog?.preload() }
+        // パレットの表も，使う設定なら起動したら裏で読み始める(初めて開いたときに待たせない．絵文字に変換するときも同じ表から引く)
+        if settings.current.palette || settings.current.emojiConversion { root.paletteCatalog?.preload() }
         installed = root
     }
 
@@ -139,7 +139,7 @@ final class CompositionRoot {
         // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ
         let engineSession = engine.makeSession()
         return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
-                                                             terms: terms, emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
+                                                             terms: terms, emoji: emojiLookup, lexicon: lexicon, englishTerms: englishTerms),
                             lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                             rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
                             calendar: calendar, scorer: engineSession)
@@ -244,6 +244,12 @@ final class CompositionRoot {
     }()
     /// パレットの窓．開くたびに作らず使い回す
     private(set) lazy var palette = PaletteController()
+    /// 変換の候補に足す絵文字を引くもの．パレットと同じ表から引き，OS が描けない絵文字を除き，選んだ肌の色と選んだ記録を使う．
+    /// 表か使い方の置き場所が無ければ azooKey の絵文字の辞書から引く
+    private lazy var emojiLookup: any EmojiLooking = {
+        guard let paletteCatalog, let paletteUsage else { return engine }
+        return PaletteEmojiLookup(catalog: paletteCatalog, usage: paletteUsage, settings: settings, now: Date.init)
+    }()
 }
 
 /// 本番と開発版(Debug)で変わる値．どちらも Info.plist から読む(apps/macos/project.yml の configs)

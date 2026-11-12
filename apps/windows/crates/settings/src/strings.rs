@@ -60,7 +60,15 @@ pub mod settings {
     pub const MISUSE_NOTES: &str = "誤用の注釈を表示";
     pub const PROOFREADING: &str = "校正支援";
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
-    pub const EMOJI_CONVERSION: &str = "絵文字に変換";
+    pub const EMOJI_SECTION: &str = "絵文字";
+    pub const EMOJI_CONVERSION: &str = "文節を絵文字に変換";
+    pub const EMOJI_WORD_CONVERSION: &str = "語を絵文字に変換";
+    /// 項目名の横に出す，その設定で出る候補の見本(読みと候補)
+    pub const EMOJI_CONVERSION_EXAMPLE: (&str, &str) = ("びーる", "🍺");
+    pub const EMOJI_WORD_CONVERSION_EXAMPLE: (&str, &str) = ("ねこが", "🐈が");
+    pub const EMOJI_CANDIDATE_POSITION: &str = "絵文字の位置";
+    pub const EMOJI_CANDIDATE_COUNT: &str = "絵文字の数";
+    pub const SHOWS_EMOJI_NAMES: &str = "絵文字の名前を表示";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
     pub const NUMBER_FORMS: &str = "数字の書き方";
     pub const NUMBER_FORM_CONVERSION: &str = "数字を丸数字などに変換";
@@ -95,6 +103,11 @@ pub mod settings {
     pub const COMMENT: &str = "コメント";
     pub const ABBREVIATION_NOTE: &str =
         "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
+
+    /// 絵文字の位置の値(macOS の UIStrings.Settings.emojiCandidatePositionValue)
+    pub fn emoji_candidate_position(value: f64) -> String {
+        format!("{value} 番目")
+    }
 
     /// UIStrings.Settings.fontSize(スライダーの名前に今の値を付ける)
     pub fn font_size(size: f64) -> String {
@@ -792,7 +805,11 @@ pub mod sync {
         ("numberKeySelection", "番号キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
-        ("emojiConversion", "絵文字に変換"),
+        ("emojiConversion", "文節を絵文字に変換"),
+        ("emojiWordConversion", "語を絵文字に変換"),
+        ("emojiCandidatePosition", "絵文字の位置"),
+        ("emojiCandidateCount", "絵文字の数"),
+        ("showsEmojiNames", "絵文字の名前を表示"),
         ("latexConversion", "LaTeX のコマンドに変換"),
         ("numberFormConversion", "数字を丸数字などに変換"),
         ("numberFormCircled", "丸数字"),

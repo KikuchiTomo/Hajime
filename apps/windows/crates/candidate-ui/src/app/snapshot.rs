@@ -126,7 +126,7 @@ fn render_all(output: &Path) -> Result<()> {
             ),
             ..look
         };
-        let scenes: [(&str, Scene); 16] = [
+        let scenes: [(&str, Scene); 19] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -181,6 +181,18 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::candidate_list(&correction(), &look, &measure),
             ),
             ("branch", scene::branch_map(&lattice(), &look, &measure)),
+            (
+                "emoji-list",
+                scene::candidate_list(&emoji_list(), &look, &measure),
+            ),
+            (
+                "emoji-suggestion",
+                scene::candidate_list(&emoji_suggestion(), &look, &measure),
+            ),
+            (
+                "emoji-branch",
+                scene::branch_map(&emoji_branch(), &look, &measure),
+            ),
             (
                 "branch-preview",
                 scene::branch_map(&preview(), &look, &measure),
@@ -335,6 +347,7 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
             corrected_length: None,
             command: None,
             has_comment: None,
+            detail: None,
         })
         .collect()
 }
@@ -496,6 +509,99 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     }
 }
 
+/// 「ねこがかわいい」の「ねこが」の文節の候補．4・5 番目に語を絵文字にした候補を出す(macOS の SamplePanels.emojiCandidates)
+const EMOJI_CANDIDATES: [&str; 9] = [
+    "猫が",
+    "ネコが",
+    "ネコ画",
+    "🐈が",
+    "😺が",
+    "ねこ画",
+    "猫画",
+    "根子が",
+    "音子が",
+];
+
+/// 絵文字の候補の横に薄く添える名前(CLDR．macOS の SamplePanels.emojiNames)
+fn emoji_name(text: &str) -> Option<String> {
+    match text {
+        "🐈が" => Some("ネコ".into()),
+        "😺が" => Some("にっこり笑う猫".into()),
+        _ => None,
+    }
+}
+
+fn emoji_entries(texts: &[&str]) -> Vec<CandidateEntry> {
+    entries(texts)
+        .into_iter()
+        .map(|entry| CandidateEntry {
+            detail: emoji_name(&entry.text),
+            ..entry
+        })
+        .collect()
+}
+
+/// 文節ごとの一覧で絵文字を選んだところ(macOS の emoji-list)
+fn emoji_list() -> CandidateList {
+    CandidateList {
+        entries: emoji_entries(&EMOJI_CANDIDATES),
+        hints: None,
+        selected_entry: Some(3),
+        position: 4,
+        total: 11,
+        ..list()
+    }
+}
+
+/// 打っているあいだの候補の窓(macOS の emoji-suggestion)．絵文字は変換したときの候補にだけ出すので，ここには出さない
+fn emoji_suggestion() -> CandidateList {
+    CandidateList {
+        variants: vec![],
+        entries: entries(&[
+            "猫が可愛い",
+            "猫がかわいい",
+            "ねこが可愛い",
+            "ネコが可愛い",
+            "ねこがかわいい",
+        ]),
+        shows_numbers: Some(false),
+        selected_entry: None,
+        position: 0,
+        total: 5,
+        hints: Some(vec![hint("↓ Tab", "選択")]),
+        ..list()
+    }
+}
+
+/// 分岐図で語を絵文字にした候補を選んだところ(macOS の emoji-branch)
+fn emoji_branch() -> BranchMap {
+    let alternatives = strings(&EMOJI_CANDIDATES[..5]);
+    BranchMap {
+        association: None,
+        association_hint: None,
+        association_key: None,
+        columns: vec![
+            BranchColumn {
+                selected_alternative: Some(3),
+                variants: strings(&["ねこが", "ネコガ", "ﾈｺｶﾞ"]),
+                is_focused: true,
+                alternative_notes: vec![None; alternatives.len()],
+                alternative_details: Some(
+                    alternatives.iter().map(|text| emoji_name(text)).collect(),
+                ),
+                alternatives,
+                ..column("🐈が")
+            },
+            column("かわいい"),
+        ],
+        position: 1,
+        total: 11,
+        note: None,
+        hints: vec![],
+        meaning_placement: None,
+    }
+}
+
 /// コマンドの候補(R-22)を含む一覧で，アプリを開くコマンドを選んだところ(macOS の command-list-selected)
 fn command_list() -> CandidateList {
     let mut entries = entries(&["クロード", "Claude を開く", "Claude のサイト", "黒戸"]);
@@ -574,6 +680,7 @@ fn column(text: &str) -> BranchColumn {
         alternative_notes: vec![],
         alternative_commands: None,
         alternative_comments: None,
+        alternative_details: None,
         source_name: None,
         split: None,
     }

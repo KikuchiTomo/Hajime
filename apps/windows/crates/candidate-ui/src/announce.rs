@@ -173,6 +173,7 @@ mod tests {
                     corrected_length: None,
                     command: None,
                     has_comment: None,
+                    detail: None,
                 },
                 CandidateEntry {
                     text: "返還".into(),
@@ -181,6 +182,7 @@ mod tests {
                     corrected_length: None,
                     command: None,
                     has_comment: None,
+                    detail: None,
                 },
             ],
             selected_entry: Some(1),
@@ -268,6 +270,7 @@ mod tests {
             alternative_notes: vec![],
             alternative_commands: None,
             alternative_comments: None,
+            alternative_details: None,
             source_name: None,
             split: None,
         };
@@ -341,6 +344,7 @@ mod tests {
             alternative_notes: vec![None, Some("ぴよ".into())],
             alternative_commands: None,
             alternative_comments: Some(vec![false, true]),
+            alternative_details: None,
             source_name: None,
             split: None,
         };

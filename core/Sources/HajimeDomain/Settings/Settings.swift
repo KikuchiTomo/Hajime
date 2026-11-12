@@ -161,8 +161,16 @@ public struct Settings: Sendable, Equatable {
     public var proofreading = true
     /// 「やじるし」などの読みから記号の候補を出す
     public var symbolConversion = true
-    /// 読みから絵文字の候補を出す
+    /// 文節の読みが絵文字の読みと同じとき(「びーる」)，絵文字(🍺)を変換したときの候補に出す(EmojiPlacement)
     public var emojiConversion = true
+    /// 文節が絵文字にできる語と助詞などでできているとき(「ねこが」)，語を絵文字にした候補(🐈が)を変換したときの候補に出す
+    public var emojiWordConversion = true
+    /// 絵文字の候補を出す位置(1 から数えた何番目か)．第 1 候補にはしないので 2 から
+    public var emojiCandidatePosition = DefaultSettings.emojiCandidatePosition
+    /// 絵文字の候補を出す数の上限
+    public var emojiCandidateCount = DefaultSettings.emojiCandidateCount
+    /// 絵文字の候補の横に，絵文字の名前(CLDR の日本語の名前．😄 なら「笑顔」)を控えめに添える
+    public var showsEmojiNames = true
     /// 読み(「らむだ」)から LaTeX のコマンド(「\lambda」)の候補を出す
     public var latexConversion = false
     /// 読みが数字だけのとき(「21」)，丸数字などに書き換えた候補(「㉑」)を出す(NumberForms)．出す書き方は下の 4 つで選ぶ
@@ -255,6 +263,11 @@ public struct Settings: Sendable, Equatable {
 
     public init() {}
 
+    /// 絵文字の候補の置き場所(文節全体と文節の中の語の絵文字に共通)．どちらも絵文字に変換しない設定なら nil
+    public var emojiPlacement: EmojiPlacement? {
+        emojiConversion || emojiWordConversion ? EmojiPlacement(index: emojiCandidatePosition - 1, count: emojiCandidateCount) : nil
+    }
+
     /// この長さの読みをライブ変換するか(ライブ変換がオンで，ライブ変換しない長さより長い)
     public func liveConverts(readingLength: Int) -> Bool {
         liveConversion && readingLength > liveConversionSkipLength
@@ -269,6 +282,8 @@ public struct Settings: Sendable, Equatable {
         candidateGridColumns = clamp(candidateGridColumns, DefaultSettings.candidateGridColumnsRange)
         associationLimit = clamp(associationLimit, DefaultSettings.associationLimitRange)
         meaningSenseLimit = clamp(meaningSenseLimit, DefaultSettings.meaningSenseLimitRange)
+        emojiCandidatePosition = clamp(emojiCandidatePosition, DefaultSettings.emojiCandidatePositionRange)
+        emojiCandidateCount = clamp(emojiCandidateCount, DefaultSettings.emojiCandidateCountRange)
         var associationIDs = Set<String>()
         associationDictionaries = associationDictionaries.filter { $0.hasValidIdentity && associationIDs.insert($0.id).inserted }
             // 同梱の辞書は 1 つだけで，一覧から外れていたら先頭に戻す(消せない．使わないときはオフにする)
@@ -382,7 +397,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking
         case learning, userDictionary, importedDictionaries, associationDictionaries, termDictionary, termFields, recordsUsage
@@ -488,6 +503,10 @@ extension Settings: Codable {
         read(.proofreading, into: \.proofreading)
         read(.symbolConversion, into: \.symbolConversion)
         read(.emojiConversion, into: \.emojiConversion)
+        read(.emojiWordConversion, into: \.emojiWordConversion)
+        read(.emojiCandidatePosition, into: \.emojiCandidatePosition)
+        read(.emojiCandidateCount, into: \.emojiCandidateCount)
+        read(.showsEmojiNames, into: \.showsEmojiNames)
         read(.latexConversion, into: \.latexConversion)
         read(.numberFormConversion, into: \.numberFormConversion)
         read(.numberFormCircled, into: \.numberFormCircled)
@@ -624,6 +643,10 @@ extension Settings: Codable {
         try container.encode(proofreading, forKey: .proofreading)
         try container.encode(symbolConversion, forKey: .symbolConversion)
         try container.encode(emojiConversion, forKey: .emojiConversion)
+        try container.encode(emojiWordConversion, forKey: .emojiWordConversion)
+        try container.encode(emojiCandidatePosition, forKey: .emojiCandidatePosition)
+        try container.encode(emojiCandidateCount, forKey: .emojiCandidateCount)
+        try container.encode(showsEmojiNames, forKey: .showsEmojiNames)
         try container.encode(latexConversion, forKey: .latexConversion)
         try container.encode(numberFormConversion, forKey: .numberFormConversion)
         try container.encode(numberFormCircled, forKey: .numberFormCircled)

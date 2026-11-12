@@ -168,6 +168,10 @@ impl Page {
                 features::HANDWRITING,
                 settings::DATE_CONVERSION,
                 settings::EMOJI_CONVERSION,
+                settings::EMOJI_WORD_CONVERSION,
+                settings::EMOJI_CANDIDATE_POSITION,
+                settings::EMOJI_CANDIDATE_COUNT,
+                settings::SHOWS_EMOJI_NAMES,
                 settings::LATEX_CONVERSION,
                 settings::NUMBER_FORM_CONVERSION,
                 association::ENABLED,
@@ -285,6 +289,8 @@ pub enum Condition {
     On(&'static str),
     /// すべての条件を満たすとき
     All(&'static [Condition]),
+    /// どれかの条件を満たすとき
+    Any(&'static [Condition]),
 }
 
 /// カスタムテーマの書体の欄(macOS の ThemeFontPicker)
@@ -357,6 +363,8 @@ pub enum Control {
     ThemePreview,
     /// パレットの見本(パレットの窓と同じ描き方．列数・行数・マスの大きさは設定のとおり)
     PalettePreview,
+    /// 絵文字の候補の見本(候補の窓と同じ描き方の一覧．絵文字の位置・数・名前は設定のとおり)
+    EmojiPreview,
     /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
     ThemeReport,
 }
@@ -734,6 +742,8 @@ pub enum RangeKind {
     AssociationLimit,
     CustomThemeCornerRadius,
     MeaningSenseLimit,
+    EmojiCandidatePosition,
+    EmojiCandidateCount,
     PaletteColumns,
     PaletteRows,
     PaletteCellSize,
@@ -758,6 +768,8 @@ impl RangeKind {
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
             RangeKind::MeaningSenseLimit => ranges.meaning_sense_limit,
+            RangeKind::EmojiCandidatePosition => ranges.emoji_candidate_position,
+            RangeKind::EmojiCandidateCount => ranges.emoji_candidate_count,
             RangeKind::PaletteColumns => ranges.palette_columns,
             RangeKind::PaletteRows => ranges.palette_rows,
             RangeKind::PaletteCellSize => ranges.palette_cell_size,
@@ -797,6 +809,8 @@ pub struct Row {
     pub visible: Option<Condition>,
     /// 値を変えたときに一緒に空(null)にする項目(テーマを選んだらカスタムテーマを外す)
     pub clears: Option<&'static str>,
+    /// 名前の横に札の形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
+    pub example: Option<(&'static str, &'static str)>,
 }
 
 impl Row {
@@ -857,7 +871,13 @@ impl Row {
             enabled: None,
             visible: None,
             clears: None,
+            example: None,
         }
+    }
+
+    pub fn with_example(mut self, example: (&'static str, &'static str)) -> Self {
+        self.example = Some(example);
+        self
     }
 
     pub fn clearing(mut self, path: &'static str) -> Self {
@@ -1187,8 +1207,30 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(settings::MISUSE_NOTES, "misuseNotes"),
                 Row::toggle(settings::PROOFREADING, "proofreading"),
                 Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
-                Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
                 Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
+            ],
+        ),
+        Section::new(
+            settings::EMOJI_SECTION,
+            vec![
+                Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion")
+                    .with_example(settings::EMOJI_CONVERSION_EXAMPLE),
+                Row::toggle(settings::EMOJI_WORD_CONVERSION, "emojiWordConversion")
+                    .with_example(settings::EMOJI_WORD_CONVERSION_EXAMPLE),
+                Row::stepper(
+                    settings::EMOJI_CANDIDATE_POSITION,
+                    "emojiCandidatePosition",
+                    RangeKind::EmojiCandidatePosition,
+                )
+                .enabled_when(EMOJI_ON),
+                Row::stepper(
+                    settings::EMOJI_CANDIDATE_COUNT,
+                    "emojiCandidateCount",
+                    RangeKind::EmojiCandidateCount,
+                )
+                .enabled_when(EMOJI_ON),
+                Row::toggle(settings::SHOWS_EMOJI_NAMES, "showsEmojiNames").enabled_when(EMOJI_ON),
+                Row::new(more::PREVIEW, "", Control::EmojiPreview).visible_when(EMOJI_ON),
             ],
         ),
         Section::new(
@@ -1290,6 +1332,12 @@ const LANGUAGE_RULE_FIELDS: &[Field] = &[
 ];
 
 /// 日本語のタイプミスを直すとき．修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く
+/// 文節全体か文節の中の語のどちらかを絵文字にする設定のとき(位置・数・名前の表示は両方に共通)
+const EMOJI_ON: Condition = Condition::Any(&[
+    Condition::On("emojiConversion"),
+    Condition::On("emojiWordConversion"),
+]);
+
 const CORRECTS_JAPANESE: Condition = Condition::All(&[
     Condition::Is("typoCorrection", "standard"),
     Condition::On("correction.japanese"),
@@ -2147,6 +2195,9 @@ pub fn holds(
             Condition::All(conditions) => conditions
                 .iter()
                 .all(|condition| check(*condition, text, on)),
+            Condition::Any(conditions) => conditions
+                .iter()
+                .any(|condition| check(*condition, text, on)),
         }
     }
     check(condition, &text, &on)

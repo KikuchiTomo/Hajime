@@ -156,7 +156,7 @@
       "list": {
         "variants": [{ "label": "ひらがな", "isAvailable": true }, { "label": "全角英数", "isAvailable": false }],
         "selectedVariant": 0,
-        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }, { "text": "今日は良い", "correctedStart": 3, "correctedLength": 2 }, { "text": "ピヨ株式会社", "annotation": "本社", "hasComment": true }],
+        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }, { "text": "今日は良い", "correctedStart": 3, "correctedLength": 2 }, { "text": "ピヨ株式会社", "annotation": "本社", "hasComment": true }, { "text": "😄", "detail": "笑顔" }],
         "selectedEntry": 1,
         "focus": "candidate",
         "position": 2,
@@ -189,6 +189,7 @@
             "usageNote": "使い分け",
             "alternativeNotes": [null, "修正"],
             "alternativeComments": [false, false],
+            "alternativeDetails": [null, "笑顔"],
             "sourceName": "医療"
           },
           {

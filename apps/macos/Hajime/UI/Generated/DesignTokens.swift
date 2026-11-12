@@ -147,6 +147,7 @@ enum DesignTokens {
             static let gridMaxWidth: CGFloat = 960
             static let screenMargin: CGFloat = 16
             static let truncationContext: CGFloat = 4
+            static let detailGap: CGFloat = 8
         }
         enum ModeIndicator {
             static let fontSize: CGFloat = 14
@@ -455,6 +456,7 @@ enum DesignTokens {
             static let titleBarIconSize: CGFloat = 16
             static let titleBarPaddingX: CGFloat = 16
             static let aboutTitleFontSize: CGFloat = 20
+            static let emojiPreviewHeight: CGFloat = 260
             static let palettePreviewHeight: CGFloat = 300
             static let switchKnobOff: CGFloat = 12
             static let switchKnobOn: CGFloat = 14

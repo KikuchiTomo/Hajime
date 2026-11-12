@@ -881,10 +881,21 @@ impl App {
                 number("paletteCellSize"),
             )
         });
+        // 絵文字の見本は設定のとおりの位置・数・名前で並べる(macOS の EmojiSection)
+        let emoji = (kind == page::PreviewKind::Emoji).then(|| {
+            use candidate_ui::scene::sample::{emoji_placement, EmojiSettings};
+            emoji_placement(EmojiSettings {
+                whole: on("emojiConversion"),
+                position: number("emojiCandidatePosition") as usize,
+                count: number("emojiCandidateCount") as usize,
+                names: on("showsEmojiNames"),
+                per_page: number("listCandidatesPerPage") as usize,
+            })
+        });
         // カスタムテーマはすべての項目(元のテーマ・色・書体・角の丸み)で見分ける．一部だけで見分けると，
         // ほかの項目を変えても見本を作り直さず，変えたことがすぐ映らない
         let key = format!(
-            "{kind:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
+            "{kind:?}|{:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
             palette.as_ref().map(|panel| (
                 panel.columns,
                 panel.visible_rows,
@@ -898,6 +909,11 @@ impl App {
                 )),
                 panel.rows.len()
             )),
+            emoji.as_ref().map(|list| list
+                .entries
+                .iter()
+                .map(|entry| (entry.text.clone(), entry.detail.clone()))
+                .collect::<Vec<_>>()),
             shown
                 .as_ref()
                 .and_then(|theme| serde_json::to_string(theme).ok())
@@ -935,9 +951,10 @@ impl App {
             dark: self.theme.dark,
             scale,
             background: self.theme.palette.card,
-            shown: match &palette {
-                Some(panel) => candidate_ui::app::preview::Shown::Palette(panel),
-                None => candidate_ui::app::preview::Shown::Sample,
+            shown: match (&palette, &emoji) {
+                (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
+                (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
+                (None, None) => candidate_ui::app::preview::Shown::Sample,
             },
             placement: candidate_ui::app::preview::Placement::Center,
         };

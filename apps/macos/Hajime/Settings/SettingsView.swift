@@ -252,9 +252,9 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.misuseNotes, keyPath: \.misuseNotes)
                 ResettableToggle(model: model, title: UIStrings.Settings.proofreading, keyPath: \.proofreading)
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
-                ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
             }
+            EmojiSection(model: model)
             Section(UIStrings.Settings.numberForms) {
                 ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
                 Group {

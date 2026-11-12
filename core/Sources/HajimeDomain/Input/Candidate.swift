@@ -16,6 +16,9 @@ public enum CandidateOrigin: Sendable, Equatable {
     case combined
     /// 読みから引いた記号(SymbolDictionary)と日付(DateExpressions)
     case symbol
+    /// 読みと同じ読みの絵文字(設定の「絵文字に変換」)．置き場所は EmojiPlacement が決め，第 1 候補にはしない．
+    /// 確定すると，その読みで選んだことを覚える(EmojiLooking.didCommit)
+    case emoji
     /// 利用者が登録した語
     case userDictionary
     /// 連想変換の一覧から選んだ語(R-18)．学習には使わない
@@ -55,11 +58,13 @@ public struct Candidate: Sendable, Equatable {
         public var startsWithConjunctiveParticle: Bool
         /// 文の終わりに付く助詞(終助詞「ね」「よ」「わ」)で終わる語か
         public var endsWithSentenceFinalParticle: Bool
+        /// 助詞と助動詞(付属語)だけでできた語か(「が」「です」「にも」)．文節の中の名詞を絵文字にするとき，後ろが付属語だけかを見る
+        public var isFunctionWord: Bool
 
         public init(
             text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false,
             startsWithNoun: Bool = false, startsWithPredicate: Bool = false,
-            startsWithConjunctiveParticle: Bool = false, endsWithSentenceFinalParticle: Bool = false
+            startsWithConjunctiveParticle: Bool = false, endsWithSentenceFinalParticle: Bool = false, isFunctionWord: Bool = false
         ) {
             self.text = text
             self.readingCount = readingCount
@@ -69,6 +74,7 @@ public struct Candidate: Sendable, Equatable {
             self.startsWithPredicate = startsWithPredicate
             self.startsWithConjunctiveParticle = startsWithConjunctiveParticle
             self.endsWithSentenceFinalParticle = endsWithSentenceFinalParticle
+            self.isFunctionWord = isFunctionWord
         }
     }
 
@@ -102,8 +108,8 @@ public struct Candidate: Sendable, Equatable {
         if case .engine = origin { true } else { false }
     }
 
-    /// 確定したときに学習に渡すものがあるか(エンジンの候補か，学習する元の語を持つ)
-    public var isLearnable: Bool { isFromEngine || learnedParts.contains(where: \.isFromEngine) }
+    /// 確定したときに学習に渡すものがあるか(エンジンの候補か，学習する元の語を持つか，読みで選んだことを覚える絵文字)
+    public var isLearnable: Bool { isFromEngine || origin == .emoji || learnedParts.contains(where: \.isFromEngine) }
 
     /// コマンドの候補なら，そのコマンドの id
     public var commandID: String? {

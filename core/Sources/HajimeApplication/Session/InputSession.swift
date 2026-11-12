@@ -1633,6 +1633,7 @@ public final class InputSession {
         if settings.current.contextualSegmentCandidates { builder.contextRanker = SegmentContextRanker(converter: converter) }
         builder.scorer = rerankingScorer
         builder.usesPrecomputedScoresOnly = rerankingScorer?.prefersPrecomputedScores ?? false
+        builder.emojiPlacement = settings.current.emojiPlacement
         return builder
     }
 
@@ -1814,6 +1815,12 @@ public final class InputSession {
                 annotations.append(nil)
             }
         }
+        // 文節を替えた文や打ったままの読みの候補を間に入れたので，絵文字を置き場所に置き直す
+        if let placement = settings.current.emojiPlacement {
+            let placed = placement.placed(Array(zip(candidates, annotations))) { $0.0.origin == .emoji }
+            candidates = placed.map(\.0)
+            annotations = placed.map(\.1)
+        }
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
@@ -1834,8 +1841,9 @@ public final class InputSession {
         guard readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) else { return [] }
         let reading = typed.conversionReading
         guard reading != composition.conversionReading else { return [] }
+        // 打ったままの読みの絵文字は入れない(絵文字は今の読みのものを置き場所に置く)
         return (listing ? converter.listCandidates(for: reading) : converter.candidates(for: reading))
-            .filter { $0.readingCount == reading.count && $0.commandID == nil }
+            .filter { $0.readingCount == reading.count && $0.commandID == nil && $0.origin != .emoji }
             .map { Candidate(text: $0.text, readingCount: readingCount, origin: .asTyped) }
     }
 
@@ -1886,7 +1894,8 @@ public final class InputSession {
         guard suggestionsShown else { return ([], nil) }
         let (reading, prefix) = suggestionTarget()
         var seen = Set<String>()
-        let whole = conversionCandidates(for: reading, prefix: prefix)
+        // 絵文字は変換したときの候補にだけ出す(打っているあいだの窓には出さない．最後の文節の候補は文節の候補から求めるので，そこに入る絵文字を除く)
+        let whole = conversionCandidates(for: reading, prefix: prefix).filter { $0.origin != .emoji }
         // 打ち間違いを直しているときは，直した第 1 候補のすぐ後ろに打ったままの読みの候補を出す(一覧と同じ)
         let typed = prefix == nil ? Array(typedReadingAlternatives(readingCount: reading.count, listing: false).prefix(DefaultSettings.typedAlternativeCount)) : []
         let candidates = (Array(whole.prefix(1)) + typed + Array(whole.dropFirst(1)))
@@ -2086,7 +2095,9 @@ public final class InputSession {
         var panel = CandidatePanel(
             variants: [],
             selectedVariant: nil,
-            entries: suggestions.map { CandidatePanel.Entry(text: $0.text, annotation: $0.origin == .asTyped ? PanelBuilder.asTypedNote : nil) },
+            entries: suggestions.map {
+                CandidatePanel.Entry(text: $0.text, annotation: $0.origin == .asTyped ? PanelBuilder.asTypedNote : nil, detail: emojiName($0))
+            },
             selectedEntry: nil,
             focus: .candidate,
             position: 0,
@@ -2171,7 +2182,7 @@ public final class InputSession {
                                      .init(remainder, style: .reading)].filter { !$0.text.isEmpty })
             var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
                                                perPage: listPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
-                                               corrected: correctedRange(of: \.conversionReading))
+                                               corrected: correctedRange(of: \.conversionReading), detail: emojiName)
             if expandedCandidates { panel.columnLength = gridRows }
             if case .candidate = selection.focus, candidate.commandID != nil, let note = commandNote { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
@@ -2210,7 +2221,7 @@ public final class InputSession {
             if expandedCandidates, !splitMode { return [.setMarkedText(marked), .showCandidates(gridPanel(lattice, corrected: corrected))] }
             if isSegmentList { return [.setMarkedText(marked), .showCandidates(segmentListPanel(lattice, corrected: corrected))] }
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
-                                                  showsVariants: settings.current.showsVariantRow, corrected: corrected)
+                                                  showsVariants: settings.current.showsVariantRow, corrected: corrected, detail: emojiName)
             // 文節の長さを変えたときの下見は，求めてあれば出す(無ければ followUps で求めて出し直す)
             let preview = resizePreviews[resizePreviewKey(lattice)] ?? (nil, nil)
             if let focused = panel.columns.firstIndex(where: \.isFocused) {
@@ -2268,7 +2279,7 @@ public final class InputSession {
     private func segmentListPanel(_ lattice: SegmentLattice, corrected: Range<Int>?) -> CandidatePanel {
         if splitMode { return PanelBuilder.splittingList(pieces: focusedSplit(lattice).pieces) }
         var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
-                                                  corrected: corrected, reading: composition.conversionReading)
+                                                  corrected: corrected, reading: composition.conversionReading, detail: emojiName)
         let segment = lattice.focused
         let segmentReading = focusedReading(lattice)
         if case .candidate = segment.choice {
@@ -2352,12 +2363,21 @@ public final class InputSession {
         return notes.isEmpty ? nil : notes.joined(separator: "　")
     }
 
+    /// 読みで引いた絵文字の候補の横に控えめに添える名前(CLDR の日本語の名前．😄 なら「笑顔」)．
+    /// 絵文字でない候補と，名前を添えない設定のときは nil
+    private func emojiName(_ candidate: Candidate) -> String? {
+        guard candidate.origin == .emoji, settings.current.showsEmojiNames else { return nil }
+        return converter.emojiName(of: candidate.text)
+    }
+
     /// 注目している文節で選んでいる候補の語の意味と同音異義語の使い分け(設定でオンのときだけ)．
     /// 意味の数・品詞・使い方の例・ほかの語は設定に合わせて絞る
     private func homophone(for lattice: SegmentLattice) -> HomophoneNote? {
         let current = settings.current
         guard current.homophoneNotes else { return nil }
         let segment = lattice.focused
+        // 読みで引いた絵文字は語の意味のカードを開かない(名前は候補の横に添える．emojiName)
+        if segment.selected.origin == .emoji { return nil }
         let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
         return UsageGuide.homophoneNote(for: segment.selected.text, reading: reading, dictionary: usageDictionary?.usageDictionary)?
             .limited(senseLimit: current.meaningSenseLimit, partOfSpeech: current.showsPartOfSpeech,
@@ -2701,12 +2721,12 @@ public final class InputSession {
         let caret = lattice.segments.prefix(edit.index).reduce(0) { $0 + $1.selected.text.count } + edit.typed.displayReading.count
         if isSegmentList {
             var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
-                                                      reading: composition.conversionReading)
+                                                      reading: composition.conversionReading, detail: emojiName)
             panel.note = note
             return [.setMarkedText(MarkedText(segments, caret: caret)), .showCandidates(panel)]
         }
         var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
-                                              showsVariants: settings.current.showsVariantRow, corrected: nil)
+                                              showsVariants: settings.current.showsVariantRow, corrected: nil, detail: emojiName)
         panel.note = note
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }

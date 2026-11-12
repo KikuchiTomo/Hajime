@@ -211,7 +211,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 .annotation
                 .as_deref()
                 .map_or(0.0, |note| painter.tag_width(note) + padding)
-                + entry.command.map_or(0.0, |_| Painter::command_width());
+                + entry.command.map_or(0.0, |_| Painter::command_width())
+                + painter.detail_width(entry.detail.as_deref());
             let available = (text_limit - annotation).max(0.0);
             let measure = |text: &str| painter.width(text, Font::Candidate);
             if measure(&entry.text) <= available {
@@ -234,6 +235,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .map(|(entry, text)| {
             entry.command.map_or(0.0, |_| Painter::command_width())
                 + painter.width(text, Font::Candidate)
+                + painter.detail_width(entry.detail.as_deref())
                 + entry
                     .annotation
                     .as_deref()
@@ -488,6 +490,17 @@ fn draw_list(
             }
         }
         painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
+        // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
+        if let Some(detail) = entry.detail.as_deref() {
+            painter.detail(
+                &shown[index],
+                Font::Candidate,
+                detail,
+                muted_color,
+                text_x,
+                row,
+            );
+        }
         // 省いたときは補正の下線を引かない(位置が合わない)
         let whole = shown[index] == entry.text;
         if let (true, Some(start), Some(length)) =
@@ -690,6 +703,7 @@ mod tests {
                     corrected_length: None,
                     command: None,
                     has_comment: None,
+                    detail: None,
                 },
                 CandidateEntry {
                     text: "へんかん".into(),
@@ -698,6 +712,7 @@ mod tests {
                     corrected_length: None,
                     command: None,
                     has_comment: None,
+                    detail: None,
                 },
             ],
             selected_entry: selected,
@@ -722,6 +737,7 @@ mod tests {
                 corrected_length: None,
                 command: None,
                 has_comment: None,
+                detail: None,
             })
             .collect();
         list.column_length = Some(9);
@@ -1173,6 +1189,30 @@ mod tests {
     }
 
     #[test]
+    fn 絵文字の名前は候補の文字のすぐあとに薄い色で添え_窓をその分広げる() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut emoji = list(Some(0));
+            emoji.entries.push(CandidateEntry {
+                text: "😄".into(),
+                annotation: None,
+                corrected_start: None,
+                corrected_length: None,
+                command: None,
+                has_comment: None,
+                detail: Some("笑顔".into()),
+            });
+            let plain = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
+            let scene = candidate_list(&emoji, &Look::new(&theme, 15.0), &Fixed);
+            let text = text_frame(&scene, "😄").unwrap();
+            let detail = text_frame(&scene, "笑顔").unwrap();
+            assert_eq!(detail.x, (text.x + 10.0 + candidate::DETAIL_GAP).round());
+            assert!(texts(&scene).contains(&("笑顔".into(), theme.text_muted)));
+            assert!(scene.width >= plain.width);
+        }
+    }
+
+    #[test]
     fn コマンドの候補は種類のアイコンを文字の前に置き_札をアクセントの色にする() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
@@ -1184,6 +1224,7 @@ mod tests {
                 corrected_length: None,
                 command: Some(ipc::CommandKind::OpenApplication),
                 has_comment: None,
+                detail: None,
             });
             let plain = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
             let scene = candidate_list(&commands, &Look::new(&theme, 15.0), &Fixed);
@@ -1216,6 +1257,7 @@ mod tests {
             corrected_length: None,
             command: Some(ipc::CommandKind::OpenURL),
             has_comment: None,
+            detail: None,
         });
         let scene = candidate_list(&commands, &Look::new(&theme, 15.0), &Fixed);
         assert!(scene.draws.iter().any(|draw| matches!(draw,
@@ -1234,6 +1276,7 @@ mod tests {
             corrected_length: Some(2),
             command: None,
             has_comment: None,
+            detail: None,
         };
         let scene = candidate_list(&corrected, &Look::new(&theme, 15.0), &Fixed);
         let lines: Vec<(f32, f32)> = scene
@@ -1272,6 +1315,7 @@ mod tests {
             corrected_length: None,
             command: None,
             has_comment: None,
+            detail: None,
         });
         let three = candidate_list(&longer, &look, &Fixed);
         assert_eq!(three.height - two.height, (candidate::ROW_HEIGHT).round());
@@ -1311,6 +1355,7 @@ mod tests {
             corrected_length: None,
             command: None,
             has_comment: None,
+            detail: None,
         });
         three.entries.push(CandidateEntry {
             text: "偏官".into(),
@@ -1319,6 +1364,7 @@ mod tests {
             corrected_length: None,
             command: None,
             has_comment: None,
+            detail: None,
         });
         let texts = texts(&candidate_list(&three, &look, &Fixed));
         let alpha = |wanted: &str| {
