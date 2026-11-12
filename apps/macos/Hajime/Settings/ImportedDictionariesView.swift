@@ -39,7 +39,11 @@ private struct DictionaryRow: View {
     @State private var expanded = false
 
     var body: some View {
-        DisclosureGroup(isExpanded: $expanded) {
+        DictionaryRowHeader(isExpanded: $expanded, isEnabled: binding(\.isEnabled), name: dictionary.name,
+                            summary: UIStrings.Dictionaries.summary(dictionary), isFirst: isFirst, isLast: isLast) {
+            model.moveDictionary(dictionary, by: $0)
+        }
+        if expanded {
             TextField(UIStrings.Dictionaries.name, text: binding(\.name))
             TextField(UIStrings.Dictionaries.field, text: binding(\.field), prompt: Text(UIStrings.Dictionaries.fieldPrompt))
             Picker(UIStrings.Dictionaries.condition, selection: conditionKind) {
@@ -65,21 +69,6 @@ private struct DictionaryRow: View {
                     .disabled(model.isImportingDictionary)
                 Spacer()
                 Button(UIStrings.Settings.remove, role: .destructive) { model.removeDictionary(dictionary) }
-            }
-        } label: {
-            HStack {
-                Toggle(isOn: binding(\.isEnabled)) {
-                    VStack(alignment: .leading) {
-                        Text(dictionary.name)
-                        Text(UIStrings.Dictionaries.summary(dictionary)).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
-                Spacer()
-                Button { model.moveDictionary(dictionary, by: -1) } label: { Image(systemName: "chevron.up") }
-                    .buttonStyle(.borderless).disabled(isFirst).help(UIStrings.Dictionaries.moveUp)
-                Button { model.moveDictionary(dictionary, by: 1) } label: { Image(systemName: "chevron.down") }
-                    .buttonStyle(.borderless).disabled(isLast).help(UIStrings.Dictionaries.moveDown)
             }
         }
     }
