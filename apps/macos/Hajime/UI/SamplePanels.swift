@@ -140,7 +140,7 @@ enum SamplePalettes {
     private static let shobon = PaletteItem(kind: .kaomoji, category: .sorrow, text: "(´・ω・｀)", japaneseName: "しょぼーん", nameReading: "しょぼーん",
                                             readings: ["しょぼーん", "しょんぼり", "がっかり"])
     private static let doubleArrow = PaletteItem(kind: .symbol, category: .arrows, text: "⇒", japaneseName: "右向き二重矢印", nameReading: "みぎむきにじゅうやじるし",
-                                                 englishName: "rightwards double arrow", readings: ["みぎむきにじゅうやじるし", "やじるし"])
+                                                 englishName: "rightwards double arrow", readings: ["みぎむきにじゅうやじるし", "やじるし"], nameSource: .cldr)
 
     private static let nextTrack = PaletteItem(kind: .emoji, category: .symbols, text: "⏭️", japaneseName: "次の曲ボタン", nameReading: "つぎのきょくぼたん",
                                                englishName: "next track button", readings: ["ぼたん", "つぎのきょくぼたん", "つぎのしーん", "つぎのとらっく", "やじるし"],

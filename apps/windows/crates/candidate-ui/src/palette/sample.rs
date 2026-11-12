@@ -482,7 +482,7 @@ pub fn symbol() -> PalettePanel {
         selection: Some(PalettePosition { row: 2, column: 1 }),
         preview: Some(preview(
             "⇒",
-            ("右向き二重矢印", None),
+            ("右向き二重矢印", CLDR),
             ("RIGHTWARDS DOUBLE ARROW", UNICODE),
             &[],
             &["みぎむきにじゅうやじるし", "やじるし"],

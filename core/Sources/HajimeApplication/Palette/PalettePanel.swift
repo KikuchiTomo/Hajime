@@ -330,6 +330,8 @@ public enum PaletteStrings {
     /// 説明の欄で，名前を定めたところ(見出しに添える・Unicode の名前の行を見分ける)
     public static let unicodeSource = "Unicode"
     public static let cldrSource = "CLDR"
+    /// Hajime IME が付けた記号の名前(tools/palette/names.txt など)
+    public static let hajimeSource = "Hajime IME"
     /// 説明の欄で読みを並べるときの区切り
     public static let readingSeparator = "、"
     /// タブにアイコンを描けないときに代わりに見せる文字
