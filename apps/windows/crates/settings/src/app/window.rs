@@ -612,6 +612,7 @@ impl App {
             if self.view.page == Page::Keys {
                 (self.extras.keymap_report, self.extras.keymap_issues) =
                     super::actions::keymap_report(model);
+                self.extras.keymap_preset = super::actions::matching_preset(model);
             }
             // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
             if self.view.page == Page::Dictionary {
