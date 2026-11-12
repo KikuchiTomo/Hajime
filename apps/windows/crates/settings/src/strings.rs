@@ -90,8 +90,9 @@ pub mod settings {
     pub const RESET_USAGE: &str = "統計を消去";
     /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
-    pub const DICTIONARY_NOTE: &str = "読み・単語・品詞をタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。";
+    pub const DICTIONARY_NOTE: &str = "読み・単語・品詞・コメントをタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。コメントは候補の横に出て、押すとコメントを入力します。";
     pub const WORD_CLASS: &str = "品詞";
+    pub const COMMENT: &str = "コメント";
     pub const ABBREVIATION_NOTE: &str =
         "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
 
@@ -489,6 +490,7 @@ pub mod keys {
         ("resumeEditing", "読みに戻して末尾から編集"),
         ("undoConversionEdit", "直前の変更を取り消し"),
         ("undoPrediction", "予測の確定を取り消し"),
+        ("undoCommit", "確定を取り消し"),
         ("forgetCandidate", "候補を学習から削除"),
         ("forgetLastCommit", "最後の学習を取り消し"),
         ("hidePrediction", "予測に表示しない"),
@@ -526,6 +528,7 @@ pub mod keys {
         ("resumeEditing", "変換をやめて読みに戻り、末尾から入力を続けます"),
         ("undoConversionEdit", "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"),
         ("undoPrediction", "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
+        ("undoCommit", "確定した直後に押すと、確定した文字を削除して確定する前の変換に戻します。文節の区切りと選んだ候補も戻るので、そのまま選び直せます。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
         ("segmentToHiragana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("segmentToKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("segmentToHalfwidthKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
@@ -536,7 +539,7 @@ pub mod keys {
         ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("kaomojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
-        ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"),
+        ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します。確定した直後に押すと、確定を取り消して確定する前の変換に戻します"),
         ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
     ];
 }

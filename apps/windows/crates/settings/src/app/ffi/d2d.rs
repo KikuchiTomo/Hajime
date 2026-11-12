@@ -1038,9 +1038,48 @@ fn render_on(
     }
 }
 
-/// 実行ファイルのアイコン(リソースの 1 番)を，窓の DPI のピクセルで width × height の画像にする(情報のページ)．
-/// 透けるところは background の色にする
-pub fn render_icon(width: u32, height: u32, background: tokens::Rgb) -> Option<Vec<u8>> {
+/// 実行ファイルのアイコン(リソースの 1 番)を，窓の DPI のピクセルで width × height の画像にする(情報のページ・タイトルバー)．
+/// 透けるところは background の色にする．None なら透けたまま(アルファを掛けた BGRA)にする
+pub fn render_icon(width: u32, height: u32, background: Option<tokens::Rgb>) -> Option<Vec<u8>> {
+    if let Some(background) = background {
+        return icon_on(width, height, background);
+    }
+    // GDI はアルファを正しく残さないので，黒と白の地に描いた差からアルファを求める．黒の地の色はアルファを掛けた色
+    let black = icon_on(
+        width,
+        height,
+        tokens::Rgb {
+            red: 0,
+            green: 0,
+            blue: 0,
+        },
+    )?;
+    let white = icon_on(
+        width,
+        height,
+        tokens::Rgb {
+            red: 0xFF,
+            green: 0xFF,
+            blue: 0xFF,
+        },
+    )?;
+    let mut pixels = black;
+    for (pixel, light) in pixels.chunks_exact_mut(4).zip(white.chunks_exact(4)) {
+        let spread = (0..3)
+            .map(|channel| u32::from(light[channel].saturating_sub(pixel[channel])))
+            .max()
+            .unwrap_or(0);
+        let alpha = 0xFF - u8::try_from(spread).unwrap_or(0xFF);
+        for value in pixel.iter_mut().take(3) {
+            *value = (*value).min(alpha);
+        }
+        pixel[3] = alpha;
+    }
+    Some(pixels)
+}
+
+/// アイコンを background の地に描いた不透明な画像
+fn icon_on(width: u32, height: u32, background: tokens::Rgb) -> Option<Vec<u8>> {
     use windows::Win32::Graphics::Gdi::{
         CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
         BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,

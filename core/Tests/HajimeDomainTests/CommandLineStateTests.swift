@@ -130,6 +130,21 @@ struct UserDictionaryEditingTests {
         #expect(UserDictionaryEntry(reading: "あ", word: "亜").wordClass == DefaultSettings.userWordClass)
     }
 
+    @Test("コメントは空なら書かずに読み書きし，同じ語を足し直すとコメントも書き換える．タブ・改行・長すぎるコメントは断る")
+    func comment() throws {
+        let plain = UserDictionaryEntry(reading: "あ", word: "亜")
+        #expect(!String(decoding: try JSONEncoder().encode(plain), as: UTF8.self).contains("comment"))
+        let entry = UserDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "本社")
+        #expect(try JSONDecoder().decode(UserDictionaryEntry.self, from: JSONEncoder().encode(entry)) == entry)
+        var entries = [entry]
+        #expect(UserDictionaryEditing.add(reading: "かいしゃ", word: "会社", comment: " 支社 ", to: &entries) == .added)
+        #expect(entries.map(\.comment) == ["支社"])
+        #expect(UserDictionaryEditing.add(reading: "かいしゃ", word: "会社", comment: "支社", to: &entries) == .alreadyRegistered)
+        #expect(!UserDictionaryEntry(reading: "あ", word: "亜", comment: "a\tb").isValid)
+        #expect(!UserDictionaryEntry(reading: "あ", word: "亜", comment: String(repeating: "x", count: DefaultSettings.maximumUserDictionaryCommentLength + 1)).isValid)
+        #expect(!String(describing: entry).contains("本社"))
+    }
+
     @Test("ログに出す表示は中身を伏せる")
     func redacted() {
         let entry = UserDictionaryEntry(reading: "ひみつ", word: "秘密")

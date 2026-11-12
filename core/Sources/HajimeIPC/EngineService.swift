@@ -372,7 +372,9 @@ public final class EngineService {
             var result = UserDictionaryEditing.AddResult.invalid
             do {
                 try settings.update {
-                    result = UserDictionaryEditing.add(reading: entry.reading, word: entry.word, wordClass: entry.entry.wordClass, to: &$0.userDictionary)
+                    let wanted = entry.entry
+                    result = UserDictionaryEditing.add(reading: wanted.reading, word: wanted.word, wordClass: wanted.wordClass, comment: wanted.comment,
+                                                       to: &$0.userDictionary)
                 }
             } catch {
                 return .error(code: .malformed)
@@ -754,7 +756,8 @@ public final class EngineService {
     private func state(of input: InputSession, wakeAfter: UInt32?) -> WireSessionState {
         // パレットを開いているあいだは，DLL にすべてのキーを送ってもらう(探す欄に打つ文字・矢印・Esc をアプリに渡さない)
         WireSessionState(mode: input.mode, isComposing: input.isComposing || input.isPaletteOpen, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter,
-                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current), undoablePrediction: input.hasUndoablePrediction)
+                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current),
+                         undoablePrediction: input.hasUndoablePrediction, undoableCommit: input.hasUndoableCommit)
     }
 
     private func perform(_ action: HostAction) {
@@ -796,6 +799,7 @@ extension PointerTarget {
         case .variant(let index): self = .variant(Int(index))
         case .entry(let index): self = .entry(Int(index))
         case .listVariant(let index): self = .listVariant(Int(index))
+        case .comment(let index): self = .comment(Int(index))
         }
     }
 }

@@ -424,6 +424,15 @@
               "type": "u32"
             }
           ]
+        },
+        {
+          "name": "comment",
+          "fields": [
+            {
+              "name": "index",
+              "type": "u32"
+            }
+          ]
         }
       ]
     },
@@ -737,6 +746,10 @@
         {
           "name": "wordClass",
           "type": "WordClass?"
+        },
+        {
+          "name": "comment",
+          "type": "string?"
         }
       ]
     },
@@ -1608,6 +1621,10 @@
         {
           "name": "command",
           "type": "CommandKind?"
+        },
+        {
+          "name": "hasComment",
+          "type": "bool?"
         }
       ]
     },
@@ -1892,6 +1909,10 @@
         {
           "name": "alternativeCommands",
           "type": "[CommandKind?]?"
+        },
+        {
+          "name": "alternativeComments",
+          "type": "[bool]?"
         },
         {
           "name": "sourceName",

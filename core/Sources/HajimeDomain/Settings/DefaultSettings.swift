@@ -319,6 +319,9 @@ public enum DefaultSettings {
     public static let correctionTimeoutStep = 1.0
     public static let maximumUserDictionaryReadingLength = 32
     public static let maximumUserDictionaryWordLength = 64
+    /// ユーザー辞書の語のコメントの長さの上限．候補の窓では先頭の userDictionaryCommentShownLength 文字だけを出す
+    public static let maximumUserDictionaryCommentLength = 128
+    public static let userDictionaryCommentShownLength = 24
     /// 取り込むユーザー辞書のファイルの大きさの上限
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限

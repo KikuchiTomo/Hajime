@@ -154,15 +154,18 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
     public var reading: String
     public var word: String
     public var wordClass: WordClass
+    /// 利用者が付けたコメント(空なら無し)．候補の窓で語の横に出し，押すとコメントそのものを入れる(住所など)
+    public var comment: String
 
-    public init(reading: String, word: String, wordClass: WordClass = DefaultSettings.userWordClass) {
+    public init(reading: String, word: String, wordClass: WordClass = DefaultSettings.userWordClass, comment: String = "") {
         self.reading = reading
         self.word = word
         self.wordClass = wordClass
+        self.comment = comment
     }
 
     private enum CodingKeys: String, CodingKey {
-        case reading, word, wordClass
+        case reading, word, wordClass, comment
     }
 
     /// 品詞を書いていない語(品詞を選べるようになる前に登録した語)は固有名詞として読む．それまで固有名詞として変換エンジンに渡していたため．
@@ -173,6 +176,16 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
         word = try container.decode(String.self, forKey: .word)
         let name = try container.decodeIfPresent(String.self, forKey: .wordClass)
         wordClass = name.map { WordClass(rawValue: $0) ?? .noun } ?? DefaultSettings.legacyUserWordClass
+        comment = try container.decodeIfPresent(String.self, forKey: .comment) ?? ""
+    }
+
+    /// コメントの無い語は comment を書かない(設定のファイルを大きくしないため)
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(reading, forKey: .reading)
+        try container.encode(word, forKey: .word)
+        try container.encode(wordClass, forKey: .wordClass)
+        if !comment.isEmpty { try container.encode(comment, forKey: .comment) }
     }
 
     /// 同じ語とみなすか(読みと語が同じ)．品詞は比べない
@@ -180,11 +193,14 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
         reading == other.reading && word == other.word
     }
 
-    /// 読みはひらがな・長音か，ローマ字・英字・数字．語は空でなく，どちらも上限の長さ以内
+    /// 読みはひらがな・長音か，ローマ字・英字・数字．語は空でなく，どちらも上限の長さ以内．
+    /// コメントは上限の長さ以内で，タブと改行を含まない(書き出すファイルの区切りのため)
     public var isValid: Bool {
         !reading.isEmpty && !word.isEmpty
             && reading.count <= DefaultSettings.maximumUserDictionaryReadingLength
             && word.count <= DefaultSettings.maximumUserDictionaryWordLength
+            && comment.count <= DefaultSettings.maximumUserDictionaryCommentLength
+            && !comment.contains(where: { $0 == "\t" || $0.isNewline })
             && lookupReading != nil
     }
 
@@ -200,7 +216,9 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
 
 extension UserDictionaryEntry: CustomStringConvertible, CustomDebugStringConvertible {
     // 登録した語は入力内容と同じに扱うので，ログには長さだけを出す(docs/dev/SECURITY-MODEL.md)
-    public var description: String { "UserDictionaryEntry(readingLength: \(reading.count), wordLength: \(word.count), class: \(wordClass))" }
+    public var description: String {
+        "UserDictionaryEntry(readingLength: \(reading.count), wordLength: \(word.count), class: \(wordClass), commentLength: \(comment.count))"
+    }
     public var debugDescription: String { description }
 }
 
@@ -213,14 +231,14 @@ public enum UserDictionaryEditing {
         case full
     }
 
-    /// 前後の空白を除いて 1 語を足す．同じ読みと語がもうあれば，品詞だけを書き換える
-    public static func add(reading: String, word: String, wordClass: WordClass = DefaultSettings.userWordClass,
+    /// 前後の空白を除いて 1 語を足す．同じ読みと語がもうあれば，品詞とコメントだけを書き換える
+    public static func add(reading: String, word: String, wordClass: WordClass = DefaultSettings.userWordClass, comment: String = "",
                            to entries: inout [UserDictionaryEntry]) -> AddResult {
-        let entry = UserDictionaryEntry(reading: reading.trimmed, word: word.trimmed, wordClass: wordClass)
+        let entry = UserDictionaryEntry(reading: reading.trimmed, word: word.trimmed, wordClass: wordClass, comment: comment.trimmed)
         guard entry.isValid else { return .invalid }
         if let index = entries.firstIndex(where: { $0.isSameWord(as: entry) }) {
-            guard entries[index].wordClass != entry.wordClass else { return .alreadyRegistered }
-            entries[index].wordClass = entry.wordClass
+            guard entries[index] != entry else { return .alreadyRegistered }
+            entries[index] = entry
             return .added
         }
         guard entries.count < DefaultSettings.maximumUserDictionaryEntries else { return .full }

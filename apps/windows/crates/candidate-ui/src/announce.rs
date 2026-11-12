@@ -47,6 +47,14 @@ fn with_homophone(text: String, note: Option<&HomophoneNote>) -> String {
     }
 }
 
+/// 選んでいる候補の文に，ユーザー辞書の語のコメントがあれば続ける
+fn with_comment(text: String, comment: Option<&str>) -> String {
+    match comment {
+        Some(comment) => strings::comment_announcement(&text, comment),
+        None => text,
+    }
+}
+
 /// コマンドの候補を読み上げる文(「コマンド、Claude を開く」．macOS の UIStrings.Candidate.commandAnnouncement)
 fn command(title: &str) -> String {
     format!("{}、{title}", strings::COMMAND)
@@ -62,6 +70,8 @@ pub fn candidates(list: &CandidateList) -> Option<String> {
                     Some(_) => command(&entry.text),
                     None => entry.text.clone(),
                 };
+                // ユーザー辞書の語のコメントがあれば続けて読む(札を押すとコメントを入れられる)
+                let text = with_comment(text, crate::scene::entry_comment(entry));
                 with_homophone(text, list.homophone.as_ref())
             }),
         CandidateFocus::Variants => list
@@ -84,7 +94,10 @@ pub fn branch_map(map: &BranchMap) -> Option<String> {
                 column.alternatives.get(index)
             });
             let text = chosen.map_or_else(|| column.text.clone(), |title| command(title));
-            with_homophone(text, column.homophone.as_ref())
+            // ユーザー辞書の語のコメントがあれば続けて読む(札を押すとコメントを入れられる)
+            let comment =
+                selected.and_then(|index| crate::scene::alternative_comment(column, index));
+            with_homophone(with_comment(text, comment), column.homophone.as_ref())
         })
 }
 
@@ -159,6 +172,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    has_comment: None,
                 },
                 CandidateEntry {
                     text: "返還".into(),
@@ -166,6 +180,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    has_comment: None,
                 },
             ],
             selected_entry: Some(1),
@@ -251,6 +266,7 @@ mod tests {
             homophone: None,
             alternative_notes: vec![],
             alternative_commands: None,
+            alternative_comments: None,
             source_name: None,
             split: None,
         };
@@ -288,6 +304,64 @@ mod tests {
             candidates(&list).as_deref(),
             Some("コマンド、Claude を開く")
         );
+    }
+
+    #[test]
+    fn ユーザー辞書の語のコメントは候補に続けて読む() {
+        let mut list = list(CandidateFocus::Candidate);
+        list.entries[1].annotation = Some("千代田区千代田1-1".into());
+        list.entries[1].has_comment = Some(true);
+        assert_eq!(
+            candidates(&list).as_deref(),
+            Some("返還、コメント、千代田区千代田1-1")
+        );
+        // コメントでない札は読まない
+        list.entries[1].has_comment = None;
+        assert_eq!(candidates(&list).as_deref(), Some("返還"));
+    }
+
+    #[test]
+    fn 分岐図で選んでいる枝にコメントがあれば続けて読む() {
+        let mut column = BranchColumn {
+            text: "ピヨ株式会社".into(),
+            alternatives: vec!["会社".into(), "ピヨ株式会社".into()],
+            selected_alternative: Some(1),
+            variants: vec![],
+            selected_variant: None,
+            is_focused: true,
+            is_uncertain: false,
+            is_decided: false,
+            is_corrected: None,
+            preview: None,
+            shorter: None,
+            longer: None,
+            usage_note: None,
+            homophone: None,
+            alternative_notes: vec![None, Some("ぴよ".into())],
+            alternative_commands: None,
+            alternative_comments: Some(vec![false, true]),
+            source_name: None,
+            split: None,
+        };
+        let map = |column: BranchColumn| BranchMap {
+            association: None,
+            association_hint: None,
+            association_key: None,
+            columns: vec![column],
+            position: 1,
+            total: 2,
+            note: None,
+            hints: vec![],
+            meaning_placement: None,
+        };
+        assert_eq!(
+            branch_map(&map(column.clone())).as_deref(),
+            Some("ピヨ株式会社、コメント、ぴよ")
+        );
+        // コメントの無い枝を選んでいれば読まない
+        column.selected_alternative = Some(0);
+        column.text = "会社".into();
+        assert_eq!(branch_map(&map(column)).as_deref(), Some("会社"));
     }
 
     #[test]

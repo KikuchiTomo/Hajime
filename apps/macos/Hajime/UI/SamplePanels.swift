@@ -37,6 +37,28 @@ enum SamplePanels {
                               position: selected + 1, total: entries.count, note: note)
     }
 
+    /// ユーザー辞書の語のコメント(R-21)を札に出した一覧．札を押すと候補の代わりにコメントを入れる．長いコメントは札では先頭だけを出す
+    static let comment = CandidatePanel(
+        variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
+        selectedVariant: nil,
+        entries: [
+            .init(text: "会社", annotation: nil),
+            .init(text: "ピヨ株式会社", annotation: "東京都千代田区千代田1-1 ピヨピヨビル…", hasComment: true),
+            .init(text: "かいしゃ", annotation: nil),
+            .init(text: "カイシャ", annotation: nil),
+        ],
+        selectedEntry: 1, focus: .candidate, position: 2, total: 4, note: nil
+    )
+
+    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図．コメントの無い第 1 候補を選んでいる(選んでいない枝の札の見え方)
+    static let commentLattice: LatticePanel = {
+        var column = LatticePanel.Column(text: "会社", alternatives: ["会社", "ピヨ株式会社", "かいしゃ"], selectedAlternative: 0,
+                                         isFocused: true, isUncertain: false)
+        column.alternativeNotes = [nil, "千代田区千代田1-1", nil]
+        column.alternativeComments = [false, true, false]
+        return LatticePanel(columns: [column, .init(text: "に行く", isFocused: false, isUncertain: false)], position: 1, total: 3)
+    }()
+
     /// 同音異義語の使い分け(R-08)．意味が 2 つあるもの
     static let homophone = HomophoneNote(
         word: "撮る", partOfSpeech: .verb,

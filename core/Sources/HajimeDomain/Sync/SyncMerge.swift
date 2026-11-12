@@ -65,7 +65,7 @@ public enum SyncMerge {
         func add(_ entry: SyncDocument.DictionaryEntry) {
             let key = Self.key(reading: entry.reading, word: entry.word)
             if let existing = entries[key] {
-                // 品詞はあとで登録し直した(品詞を変えた)方を採る
+                // 品詞とコメントは，あとで登録し直した(品詞やコメントを変えた)方を採る
                 if entry.addedAt > existing.addedAt { entries[key] = entry }
             } else {
                 order.append(key)
@@ -73,7 +73,7 @@ public enum SyncMerge {
             }
         }
         for entry in localDictionary(settings) {
-            add(.init(reading: entry.reading, word: entry.word, wordClass: entry.wordClass,
+            add(.init(reading: entry.reading, word: entry.word, wordClass: entry.wordClass, comment: entry.comment,
                       addedAt: ledger.dictionaryAddedAt[key(reading: entry.reading, word: entry.word)] ?? .distantPast))
         }
         remote?.dictionary.forEach(add)
@@ -85,6 +85,7 @@ public enum SyncMerge {
         settings["userDictionary"] = .array(kept.map { entry in
             var fields: [String: JSONValue] = ["reading": .string(entry.reading), "word": .string(entry.word)]
             fields["wordClass"] = entry.wordClass.map(JSONValue.string)
+            fields["comment"] = entry.comment.flatMap { $0.isEmpty ? nil : JSONValue.string($0) }
             return .object(fields)
         })
         ledger.dictionaryAddedAt = Dictionary(kept.map { (key(reading: $0.reading, word: $0.word), $0.addedAt) }, uniquingKeysWith: max)
@@ -101,12 +102,15 @@ public enum SyncMerge {
     /// ユーザー辞書の語を引く鍵
     public static func key(reading: String, word: String) -> String { "\(reading)\t\(word)" }
 
-    private static func localDictionary(_ object: [String: JSONValue]) -> [(reading: String, word: String, wordClass: String?)] {
+    private static func localDictionary(_ object: [String: JSONValue]) -> [(reading: String, word: String, wordClass: String?, comment: String?)] {
         guard case .array(let items)? = object["userDictionary"] else { return [] }
         return items.compactMap { item in
             guard case .object(let fields) = item, case .string(let reading)? = fields["reading"], case .string(let word)? = fields["word"] else { return nil }
-            guard case .string(let wordClass)? = fields["wordClass"] else { return (reading, word, nil) }
-            return (reading, word, wordClass)
+            func text(_ name: String) -> String? {
+                guard case .string(let value)? = fields[name] else { return nil }
+                return value
+            }
+            return (reading, word, text("wordClass"), text("comment"))
         }
     }
 
@@ -122,14 +126,15 @@ public enum SyncMerge {
         // 品詞の無い語(古いバージョンが書いた語)は，読むときと同じ品詞とみなして比べる．
         // 新しいバージョンで保存し直しただけで，すべての語を登録し直したことにしないため
         func classes(_ object: [String: JSONValue]) -> [String: String] {
-            Dictionary(localDictionary(object).map { (key(reading: $0.reading, word: $0.word), $0.wordClass ?? DefaultSettings.legacyUserWordClass.rawValue) },
-                       uniquingKeysWith: { first, _ in first })
+            Dictionary(localDictionary(object).map {
+                (key(reading: $0.reading, word: $0.word), ($0.wordClass ?? DefaultSettings.legacyUserWordClass.rawValue) + "\t" + ($0.comment ?? ""))
+            }, uniquingKeysWith: { first, _ in first })
         }
         let classesBefore = classes(old)
         let classesAfter = classes(new)
         let before = Set(classesBefore.keys)
         let after = Set(classesAfter.keys)
-        // 品詞を変えた語は登録し直したものとして時刻を記す(ほかの Mac の古い品詞で戻さないように)
+        // 品詞やコメントを変えた語は登録し直したものとして時刻を記す(ほかの Mac の古い値で戻さないように)
         let reclassified = after.intersection(before).filter { classesBefore[$0] != classesAfter[$0] }
         for added in after.subtracting(before).union(reclassified) {
             ledger.dictionaryAddedAt[added] = now

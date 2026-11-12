@@ -72,7 +72,7 @@ final class ClientActionPresenter {
                 // 入力コントローラが入力先の選んでいる文字を読んで再変換する(HajimeInputController.reconvert)
                 break
             case .replacePrecedingText(let length):
-                // 予測の確定を取り消す: 入力位置の前の確定した語句を，次に出す組み立て中の文字で置き換える(再変換と同じ置き換え)
+                // 確定を取り消す: 入力位置の前の確定した文字を，次に出す組み立て中の文字で置き換える(再変換と同じ置き換え)
                 let selection = client.selectedRange()
                 if selection.location != NSNotFound, selection.location >= length {
                     replacement = NSRange(location: selection.location - length, length: length + selection.length)

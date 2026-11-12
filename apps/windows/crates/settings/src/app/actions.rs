@@ -247,6 +247,7 @@ impl App {
                                 entry.reading.clone(),
                                 entry.word.clone(),
                                 word_class_label(entry.word_class).to_string(),
+                                entry.comment.clone().unwrap_or_default(),
                             ]
                         })
                         .collect();
@@ -425,6 +426,10 @@ impl App {
                     reading: item.first().cloned().unwrap_or_default(),
                     word: item.get(1).cloned().unwrap_or_default(),
                     word_class: item.get(2).and_then(|value| word_class(value)),
+                    comment: item
+                        .get(3)
+                        .map(|comment| comment.trim().to_string())
+                        .filter(|comment| !comment.is_empty()),
                 };
                 // 書き換えるときは，新しい単語を登録できてから元の単語を消す(登録できなければ元のまま)．
                 // 読みと単語が同じなら，エンジンが品詞を書き換えるので消さない

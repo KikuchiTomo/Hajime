@@ -308,7 +308,15 @@ final class BranchView: NSView {
             return NSRect(x: left, y: y, width: layout.branchWidth, height: metrics.rowHeight)
         }
         let column = panel.columns[focused]
-        if let index = column.alternatives.indices.first(where: { row($0, downward: true).contains(point) }) { return .alternative(index) }
+        if let index = column.alternatives.indices.first(where: { row($0, downward: true).contains(point) }) {
+            // コメントの札は枝の行の中にあるので，行より先に調べる(札を押すと候補の代わりにコメントを入れる)
+            if let comment = column.comment(at: index) {
+                let node = NSRect(x: left, y: layout.trunkY, width: layout.trunkWidths[focused], height: metrics.rowHeight)
+                let rect = branchRowRect(index, from: node, width: layout.branchWidth, downward: true, metrics: metrics)
+                if NoteDrawing.tagHitRect(comment, maxX: tagMaxX(in: rect), row: rect, theme: theme).contains(point) { return .comment(index) }
+            }
+            return .alternative(index)
+        }
         if let index = column.variants.indices.first(where: { row($0, downward: false).contains(point) }) { return .variant(index) }
         return nil
     }
@@ -494,7 +502,7 @@ final class BranchView: NSView {
         var badge: String
         var isSelected: Bool
         var opacity: CGFloat
-        /// 打ったまま・修正・コマンドの添え書き
+        /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
         var note: String? = nil
         /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
         var command: LauncherCommand.Kind? = nil
@@ -516,13 +524,22 @@ final class BranchView: NSView {
         }
     }
 
+    /// 枝の index 番目の行(番号・文字・札を描く枠)．描くときと押した位置を調べるときで同じものを使う
+    private func branchRowRect(_ index: Int, from node: NSRect, width: CGFloat, downward: Bool, metrics: Metrics) -> NSRect {
+        let stemX = (node.minX + metrics.stemX).rounded()
+        let y = downward ? node.maxY + CGFloat(index) * metrics.rowHeight : node.minY - CGFloat(index + 1) * metrics.rowHeight
+        return NSRect(x: stemX + metrics.branchIndent, y: y, width: width - metrics.stemX - metrics.branchIndent, height: metrics.rowHeight)
+    }
+
+    /// 枝の行の札の右端
+    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Size.paddingX / 2 }
+
     private func drawBranches(_ rows: [Row], from node: NSRect, width: CGFloat, downward: Bool) {
         guard !rows.isEmpty else { return }
         let metrics = metrics
         let stemX = (node.minX + metrics.stemX).rounded()
         let rowRect = { (index: Int) -> NSRect in
-            let y = downward ? node.maxY + CGFloat(index) * metrics.rowHeight : node.minY - CGFloat(index + 1) * metrics.rowHeight
-            return NSRect(x: stemX + metrics.branchIndent, y: y, width: width - metrics.stemX - metrics.branchIndent, height: metrics.rowHeight)
+            self.branchRowRect(index, from: node, width: width, downward: downward, metrics: metrics)
         }
         if theme.isRounded, !theme.straightBranches {
             drawCurves(rows, stemX: stemX, stemY: downward ? node.maxY - 2 : node.minY + 2, rowRect: rowRect)
@@ -590,7 +607,7 @@ final class BranchView: NSView {
         }
         drawText(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], x: textX, in: rect)
         if let note = row.note {
-            NoteDrawing.drawTag(note, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: row.isSelected, command: row.command != nil)
+            NoteDrawing.drawTag(note, maxX: tagMaxX(in: rect), midY: rect.midY, theme: theme, selected: row.isSelected, command: row.command != nil)
         }
     }
 
@@ -701,5 +718,13 @@ final class BranchView: NSView {
         let size = text.size(withAttributes: attributes)
         let y = rect.minY + ((rect.height - size.height) / 2).rounded()
         text.draw(at: NSPoint(x: x.rounded(), y: y), withAttributes: attributes)
+    }
+}
+
+extension LatticePanel.Column {
+    /// 下の枝の index 番目の候補に添えたユーザー辞書の語のコメント(札に出す文字．長ければ先頭だけ)．コメントでなければ nil
+    func comment(at index: Int) -> String? {
+        guard alternativeComments.indices.contains(index), alternativeComments[index], alternativeNotes.indices.contains(index) else { return nil }
+        return alternativeNotes[index]
     }
 }

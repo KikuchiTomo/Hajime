@@ -11,6 +11,11 @@ pub const CORRECTED: &str = "修正";
 /// コマンドの候補を読み上げるときの前置き(core の CandidatePanel.commandAnnotation)
 pub const COMMAND: &str = "コマンド";
 
+/// ユーザー辞書の語のコメントを，候補に続けて読み上げる文(macOS の UIStrings.Candidate.commentAnnouncement)
+pub fn comment_announcement(text: &str, comment: &str) -> String {
+    format!("{text}、コメント、{comment}")
+}
+
 pub fn mode(mode: InputMode) -> &'static str {
     match mode {
         InputMode::Japanese => "あ",

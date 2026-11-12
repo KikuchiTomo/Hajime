@@ -330,6 +330,7 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
             corrected_start: None,
             corrected_length: None,
             command: None,
+            has_comment: None,
         })
         .collect()
 }
@@ -549,6 +550,7 @@ fn column(text: &str) -> BranchColumn {
         homophone: None,
         alternative_notes: vec![],
         alternative_commands: None,
+        alternative_comments: None,
         source_name: None,
         split: None,
     }
