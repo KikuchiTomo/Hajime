@@ -487,6 +487,8 @@ enum DesignTokens {
             static let wizardModeSize: CGFloat = 28
             static let wizardHeroSize: CGFloat = 72
             static let stepperButtonWidth: CGFloat = 32
+            static let iconButtonWidth: CGFloat = 40
+            static let dialogRadius: CGFloat = 8
             static let sliderTrackHeight: CGFloat = 4
             static let sliderThumbSize: CGFloat = 20
             static let sliderThumbInner: CGFloat = 12
@@ -663,6 +665,7 @@ enum DesignTokens {
             static let linkHoverMix: CGFloat = 0.35
             static let sliderTrackDisabled: CGFloat = 0.5
             static let tableStripe: CGFloat = 0.035
+            static let smoke: CGFloat = 0.3
         }
     }
 }
