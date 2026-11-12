@@ -30,6 +30,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokens::motion::settings_windows as motion;
 use tokens::size::settings_windows as size;
+use tokens::size::{part, space};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -910,8 +911,9 @@ impl App {
         let line = size::BODY_LINE_HEIGHT;
         let x = rect.x + size::FIELD_PADDING_X;
         let y = rect.y + (rect.height - line) / 2.0;
-        // 右に虫めがねの絵を置く分を空ける
-        let width = rect.width - size::FIELD_PADDING_X * 3.0 - size::CHEVRON_SIZE;
+        // 右に虫めがねの絵を置く分(絵と，その左右の余白)を空ける
+        let glass_left = rect.max_x() - size::FIELD_PADDING_X - size::CHEVRON_SIZE;
+        let width = glass_left - size::FIELD_PADDING_X - x;
         let (left, top) = self.client_px(x, y);
         let (right, bottom) = self.client_px(x + width, y + line);
         ffi::place(self.search, left, top, right - left, bottom - top);
@@ -3452,14 +3454,14 @@ fn paint_nav(
             TextLayout::LINE,
         );
     }
-    let gap = size::CARD_GAP;
     let selected = nav.position(page);
     for (index, item) in nav.items.iter().enumerate() {
+        // 背景は左右を inset，上下を fine だけ縮め，隣の項目の背景と inset あける
         let rect = Rect::new(
-            gap,
-            item.top + gap / 2.0,
-            nav_width - gap * 2.0,
-            item.height - gap,
+            space::INSET,
+            item.top + space::FINE,
+            nav_width - space::INSET * 2.0,
+            item.height - space::FINE * 2.0,
         );
         let hover = state
             .nav_hover
@@ -3510,7 +3512,7 @@ fn paint_nav(
         let indicator = size::NAV_INDICATOR_HEIGHT;
         let top = state.nav_indicator + (item_height - indicator) / 2.0;
         canvas.fill_round(
-            Rect::new(gap, top, size::NAV_INDICATOR_WIDTH, indicator),
+            Rect::new(space::INSET, top, size::NAV_INDICATOR_WIDTH, indicator),
             size::NAV_INDICATOR_WIDTH / 2.0,
             Color::from(palette.accent),
         );
@@ -3554,7 +3556,13 @@ fn paint_flyout_items(
         if top + item < 0.0 || top > height {
             continue;
         }
-        let rect = Rect::new(padding, top + 1.0, width - padding * 2.0, item - 2.0);
+        // 背景は上下を 1 ドットずつ縮め，隣の項目の背景と離す
+        let rect = Rect::new(
+            padding,
+            top + part::STROKE,
+            width - padding * 2.0,
+            item - part::STROKE * 2.0,
+        );
         // 背景は文字の色を薄く重ねる(一覧の背景の明るさによらず見分けられる)
         let subtle = |opacity: f32| Color::from(palette.text).with_alpha(opacity);
         if Some(index) == selected {

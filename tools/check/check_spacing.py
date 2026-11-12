@@ -46,7 +46,8 @@ ALLOWED_TOKENS: dict[str, tuple[str, ...]] = {
     "Windows 11 の設定アプリと標準の部品(WinUI 3 の NavigationView・SettingsCard・TitleBar・TextBox・Button)と同じ寸法にする(ADR 0013)": (
         "settings-windows.page-padding-x", "settings-windows.page-padding-top", "settings-windows.section-gap",
         "settings-windows.card-padding-x", "settings-windows.card-padding-y", "settings-windows.button-padding-x",
-        "settings-windows.field-padding-x", "settings-windows.nav-padding-x", "settings-windows.nav-icon-gap",
+        "settings-windows.field-padding-x", "settings-windows.field-padding-y", "settings-windows.nav-padding-x",
+        "settings-windows.nav-icon-gap",
         "settings-windows.nav-group-gap", "settings-windows.control-gap", "settings-windows.title-bar-padding-x",
         "settings-windows.table-indicator-inset", "handwriting.control-padding-x",
     ),
@@ -75,18 +76,9 @@ SKIPPED_DIRS = {"Generated"}
 # 動きの曲線の式を書くファイル．位置や余白を決めないので見ない
 MOTION_FILES = {"motion.rs", "anim.rs", "PaletteMotion.swift"}
 
-# 決まりを入れる前からの画面で，あとの PR で直すもの(トークンの節とファイル)．直したら外す
-FOLLOW_UP_SETTINGS = "設定の画面の PR で直す(template-ui が作り直し中)"
-PENDING_SECTIONS: dict[str, str] = {
-    "settings": FOLLOW_UP_SETTINGS, "settings-windows": FOLLOW_UP_SETTINGS,
-}
-PENDING_FILES: dict[str, str] = {
-    "apps/macos/Hajime/Settings/AssociationSection.swift": FOLLOW_UP_SETTINGS,
-    "apps/windows/crates/candidate-ui/src/app/preview.rs": FOLLOW_UP_SETTINGS,
-    "apps/windows/crates/settings/src/app/page.rs": FOLLOW_UP_SETTINGS,
-    "apps/windows/crates/settings/src/app/paint.rs": FOLLOW_UP_SETTINGS,
-    "apps/windows/crates/settings/src/app/window.rs": FOLLOW_UP_SETTINGS,
-}
+# 決まりを入れる前からの画面で，あとの PR で直すもの(トークンの節とファイル)．直したら外す．今は無い
+PENDING_SECTIONS: dict[str, str] = {}
+PENDING_FILES: dict[str, str] = {}
 
 NUMBER = r"-?\d+(?:\.\d+)?"
 SPACING_WORD = r"\w*(?:[Pp]adding|PADDING|[Gg]ap|GAP|[Ii]nset|INSET|[Mm]argin|MARGIN|[Ss]pacing|SPACING|[Ii]ndent|INDENT)\w*"
