@@ -9,7 +9,7 @@ use crate::pages::{Control, ListButtons, Row, Section, TryKind};
 use crate::strings::more;
 use tokens::size::settings as size_settings;
 use tokens::size::settings_windows as size;
-use tokens::size::space as size_space;
+use tokens::size::space;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Rect {
@@ -73,7 +73,7 @@ pub struct CardLayout {
     pub reset: Rect,
     /// 部品の中のボタン・入力欄(一覧は 左の欄・右の欄・上のボタン・検索欄・絞り込み・下のボタンの順)
     pub parts: Vec<Rect>,
-    /// 絵(情報のページのアイコン・テーマの見本の札・名前の横の候補の見本の札)．無ければ幅 0
+    /// 絵(情報のページのアイコン・テーマの見本・名前の横の候補の見本)．無ければ幅 0
     pub icon: Rect,
 }
 
@@ -168,6 +168,12 @@ pub fn layout(
         });
         let mut cards: Vec<CardLayout> = Vec::new();
         let rows = &section.rows;
+        // 候補の見本は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
+        let example_title = rows
+            .iter()
+            .filter(|row| row.example.is_some())
+            .map(|row| metrics.width(row.title, TextKind::Body))
+            .fold(0.0, f32::max);
         let mut index = 0;
         while index < rows.len() {
             let row = &rows[index];
@@ -186,6 +192,7 @@ pub fn layout(
                     y,
                     width,
                     reserve,
+                    example_title,
                 };
                 let card = place(index, row, &notes, frame, metrics);
                 y = card.card.max_y();
@@ -229,6 +236,8 @@ struct Frame {
     y: f32,
     width: f32,
     reserve: bool,
+    /// まとまりの中で候補の見本を添える行の，いちばん長い名前の幅(タグの左の端をそろえる)
+    example_title: f32,
 }
 
 impl Frame {
@@ -294,7 +303,7 @@ fn place(
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
-        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果の札(2 行の札)を置く
+        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果のタグ(2 行のタグ)を置く
         Control::Preview(TryKind::Language) => {
             let chip = size::BODY_LINE_HEIGHT
                 + size::NOTE_LINE_HEIGHT
@@ -379,14 +388,28 @@ fn place_dictionaries(
 /// 見本の行(macOS の AppearancePage の ThemePreview)．見本は描いた大きさのまま置き，まわりに見本の余白をとる．
 /// 欄の幅が描いた幅より狭ければ見本ごと同じ比で縮める(高さも縮む)．描いた高さは画面の側で測る(Metrics::height)
 fn place_preview(position: usize, row: &Row, frame: Frame, metrics: &dyn Metrics) -> CardLayout {
-    let padding = size_settings::PREVIEW_PADDING;
-    let width = (frame.width - padding * 2.0).max(0.0);
+    // 絵文字の見本は設定の項目の名前と同じ左の端から，ほかの行と同じカードの余白で置く(macOS の EmojiSection)．
+    // 外観とパレットの見本は欄の真ん中に，まわりに見本の余白をとって置く
+    let (x, width, padding_y) = if row.control == Control::EmojiPreview {
+        (
+            frame.inner_left(),
+            frame.inner_width(),
+            size::CARD_PADDING_Y,
+        )
+    } else {
+        let padding = size_settings::PREVIEW_PADDING;
+        (
+            frame.x + padding,
+            (frame.width - padding * 2.0).max(0.0),
+            padding,
+        )
+    };
     let height = metrics
         .height(row, width)
-        .unwrap_or(size::ROW_HEIGHT - padding * 2.0)
+        .unwrap_or(size::ROW_HEIGHT - padding_y * 2.0)
         .max(0.0);
-    let mut card = empty(frame.card(height + padding * 2.0), position);
-    card.control = Rect::new(frame.x + padding, frame.y + padding, width, height);
+    let mut card = empty(frame.card(height + padding_y * 2.0), position);
+    card.control = Rect::new(x, frame.y + padding_y, width, height);
     card
 }
 
@@ -426,16 +449,16 @@ fn place_labeled(
     } else {
         metrics.lines(row.title, TextKind::Body, label_width)
     };
-    // 名前の横の候補の見本の札．名前の 1 行目の横に収まらなければ，名前の下の行に置く
+    // 名前の横の候補の見本．まとまりの中でいちばん長い名前のあとにそろえて置き，
+    // 名前の 1 行目の横に収まらなければ，名前の下の行に置く
     let example = row
         .example
         .map(|example| (example_width(example, metrics).min(label_width), example));
-    let example_beside = example.is_some_and(|(width, _)| {
-        label_lines == 1
-            && metrics.width(row.title, TextKind::Body) + size_space::SM + width <= label_width
-    });
+    let example_x = left + frame.example_title + space::GROUP;
+    let example_beside = example
+        .is_some_and(|(width, _)| label_lines == 1 && example_x + width <= left + label_width);
     let example_below = match example {
-        Some(_) if !example_beside => size_space::XS + example_height(),
+        Some(_) if !example_beside => space::STACK + example_height(),
         _ => 0.0,
     };
     let label_height = label_lines as f32 * size::BODY_LINE_HEIGHT;
@@ -474,20 +497,15 @@ fn place_labeled(
     // 狭い窓で部品の幅が足りなければ縮める
     let trailing = trailing.min((frame.inner_width() - reset_space).max(0.0));
     let label = Rect::new(left, text_top, label_width.max(0.0), label_height);
-    // 札は名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
+    // タグは名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
     let icon = match example {
         Some((width, _)) if example_beside => Rect::new(
-            left + metrics.width(row.title, TextKind::Body) + size_space::SM,
+            example_x,
             label.y + (size::BODY_LINE_HEIGHT - example_height()) / 2.0,
             width,
             example_height(),
         ),
-        Some((width, _)) => Rect::new(
-            left,
-            label.max_y() + size_space::XS,
-            width,
-            example_height(),
-        ),
+        Some((width, _)) => Rect::new(left, label.max_y() + space::STACK, width, example_height()),
         None => Rect::new(left, frame.y, 0.0, 0.0),
     };
     let mut y = label.max_y() + example_below;
@@ -548,12 +566,12 @@ fn place_labeled(
     }
 }
 
-/// 候補の見本の札の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
+/// 候補の見本の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
 pub fn example_height() -> f32 {
     size::BODY_LINE_HEIGHT + size_settings::PREVIEW_CHIP_PADDING_Y * 2.0
 }
 
-/// 候補の見本の札の中身(読み・矢印・候補)の並び．札の左の端からの位置と幅を返す(描く側と同じ並べ方)
+/// 候補の見本の中身(読み・矢印・候補)の並び．タグの左の端からの位置と幅を返す(描く側と同じ並べ方)
 pub fn example_parts(example: (&str, &str), width: impl Fn(&str) -> f32) -> [(f32, f32); 3] {
     let (reading, candidate) = example;
     let mut x = size_settings::PREVIEW_CHIP_PADDING_X;
@@ -561,7 +579,7 @@ pub fn example_parts(example: (&str, &str), width: impl Fn(&str) -> f32) -> [(f3
     for (index, text) in [reading, EXAMPLE_ARROW, candidate].into_iter().enumerate() {
         let part = width(text);
         parts[index] = (x, part);
-        x += part + size_space::XS;
+        x += part + space::INLINE;
     }
     parts
 }
@@ -737,7 +755,7 @@ fn place_about(position: usize, title: &str, frame: Frame, metrics: &dyn Metrics
     card
 }
 
-/// 既成のテーマの 1 つ．選ぶ印・見本の札・名前を左から並べ，カードのどこを押しても選ぶ
+/// 既成のテーマの 1 つ．選ぶ印・見本・名前を左から並べ，カードのどこを押しても選ぶ
 fn place_option(position: usize, frame: Frame) -> CardLayout {
     let left = frame.inner_left();
     let height = size::ROW_HEIGHT;
@@ -782,7 +800,7 @@ fn place_custom_theme(position: usize, frame: Frame) -> CardLayout {
     for _ in 0..CUSTOM_THEME_BUTTONS {
         right -= button;
         buttons.push(Rect::new(right, center - button / 2.0, button, button));
-        right -= size_space::INLINE;
+        right -= space::INLINE;
     }
     buttons.reverse();
     let icon = size::ICON_FONT_SIZE;
@@ -1118,6 +1136,7 @@ impl Metrics for Estimate {
 mod tests {
     use super::*;
     use crate::pages::{sections, Page};
+    use crate::strings::settings as settings_strings;
 
     fn all(page: Page, width: f32) -> PageLayout {
         layout(&sections(page).unwrap(), width, |_| true, &Estimate)
@@ -1178,7 +1197,7 @@ mod tests {
         }
     }
 
-    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本の札を添える行)
+    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本を添える行)
     fn example_cards(width: f32) -> Vec<CardLayout> {
         let page = sections(Page::Conversion).unwrap();
         let layout = layout(&page, width, |_| true, &Estimate);
@@ -1196,9 +1215,19 @@ mod tests {
     }
 
     #[test]
-    fn 候補の見本の札は名前の横に置き_名前と同じ行の真ん中にそろえる() {
+    fn 候補の見本は名前の横に置き_名前と同じ行の真ん中にそろえる() {
         let cards = example_cards(900.0);
         assert_eq!(cards.len(), 2);
+        // 2 つのタグの左の端は，長いほうの名前のあとにそろえる
+        assert_eq!(cards[0].icon.x, cards[1].icon.x);
+        let longest = [
+            settings_strings::EMOJI_CONVERSION,
+            settings_strings::EMOJI_WORD_CONVERSION,
+        ]
+        .iter()
+        .map(|title| Estimate.width(title, TextKind::Body))
+        .fold(0.0, f32::max);
+        assert_eq!(cards[0].icon.x, cards[0].label.x + longest + space::GROUP);
         for card in &cards {
             assert!(card.icon.width > 0.0);
             assert!(card.icon.x > card.label.x);
@@ -1210,7 +1239,33 @@ mod tests {
     }
 
     #[test]
-    fn 名前の横に収まらない窓では候補の見本の札を名前の下に置く() {
+    fn 絵文字の見本は項目の名前と同じ左の端から置く() {
+        let page = sections(Page::Conversion).unwrap();
+        let layout = layout(&page, 900.0, |_| true, &Estimate);
+        let cards: Vec<(&Row, &CardLayout)> = page
+            .iter()
+            .zip(&layout.sections)
+            .flat_map(|(section, placed)| {
+                placed
+                    .cards
+                    .iter()
+                    .map(move |card| (&section.rows[card.row], card))
+            })
+            .collect();
+        let (_, preview) = cards
+            .iter()
+            .find(|(row, _)| row.control == Control::EmojiPreview)
+            .unwrap();
+        let (_, names) = cards
+            .iter()
+            .find(|(row, _)| row.path == "showsEmojiNames")
+            .unwrap();
+        assert_eq!(preview.control.x, names.label.x);
+        assert_eq!(preview.control.y - preview.card.y, size::CARD_PADDING_Y);
+    }
+
+    #[test]
+    fn 名前の横に収まらない窓では候補の見本を名前の下に置く() {
         let cards = example_cards(260.0);
         assert_eq!(cards.len(), 2);
         for card in cards {

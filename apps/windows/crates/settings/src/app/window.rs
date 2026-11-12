@@ -41,9 +41,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_ACTIVATE, WM_ACTIVATEAPP, WM_APP, WM_CANCELMODE, WM_CAPTURECHANGED, WM_COMMAND,
     WM_CTLCOLOREDIT, WM_CTLCOLORSTATIC, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND, WM_GETMINMAXINFO,
     WM_GETOBJECT, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
-    WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCHITTEST, WM_PAINT, WM_SETTINGCHANGE,
-    WM_SIZE, WM_SYSCOLORCHANGE, WM_SYSKEYDOWN, WM_THEMECHANGED, WM_TIMER, WS_CLIPCHILDREN,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP,
+    WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCHITTEST, WM_PAINT, WM_RBUTTONUP,
+    WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOLORCHANGE, WM_SYSKEYDOWN, WM_THEMECHANGED, WM_TIMER,
+    WS_CLIPCHILDREN, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW,
+    WS_POPUP,
 };
 use windows_core::{w, PCWSTR};
 
@@ -1166,8 +1167,15 @@ impl App {
             scale,
             background: self.theme.palette.card,
             shown: source.shown(),
-            placement: candidate_ui::app::preview::Placement::Fit {
-                ground: self.theme.palette.card,
+            // 絵文字の見本は設定の項目の名前と同じ左の端から置く(layout::place_preview)．ほかの見本は欄の真ん中
+            placement: if source.emoji.is_some() {
+                candidate_ui::app::preview::Placement::TopLeft {
+                    ground: self.theme.palette.card,
+                }
+            } else {
+                candidate_ui::app::preview::Placement::Fit {
+                    ground: self.theme.palette.card,
+                }
             },
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
@@ -1411,6 +1419,27 @@ impl App {
         self.view.set_table_hover(None);
         self.scroll.set_hover(false, now);
         self.nav_scroll.set_hover(false, now);
+        ffi::invalidate(self.window);
+    }
+
+    /// 右クリック．表の行ならその行を選んでメニューを出す
+    fn right_click(&mut self, lparam: LPARAM) {
+        let (x, y) = self.point(lparam);
+        let now = self.now();
+        self.close_flyout();
+        let Some(Target::Page(element)) = self.target_at(x, y) else {
+            return;
+        };
+        if element.part != Part::Table {
+            return;
+        }
+        let page_y = y + self.scroll.offset(now);
+        let Some(position) = self.view.table_position(element.row, page_y, now) else {
+            return;
+        };
+        if self.view.table_menu(element.row, position) {
+            self.open_row_menu(element.row, x, y);
+        }
         ffi::invalidate(self.window);
     }
 
@@ -2102,6 +2131,21 @@ impl App {
     // MARK: - ドロップダウン
 
     fn open_flyout(&mut self, element: Element) {
+        self.open_flyout_at(element, None);
+    }
+
+    /// 表の行のメニューを (x, y)(窓の中の DIP)に出す(macOS の表の contextMenu)
+    fn open_row_menu(&mut self, row: usize, x: f32, y: f32) {
+        let element = Element {
+            row,
+            part: Part::RowMenu,
+        };
+        // メニューの幅は WinUI の MenuFlyout と同じく，項目が短くても最小の幅を取る
+        self.open_flyout_at(element, Some(Rect::new(x, y, size::SEGMENT_MIN_WIDTH, 0.0)));
+    }
+
+    /// 一覧を出す．anchor(窓の中の DIP)があればその下に，無ければ部品の下に出す．下に収まらなければ上に出す
+    fn open_flyout_at(&mut self, element: Element, anchor: Option<Rect>) {
         let now = self.now();
         let (items, selected, left, top, rect) = if element == SHEET_KIND {
             // シートの動作(窓の中の位置)
@@ -2113,6 +2157,9 @@ impl App {
                 return;
             };
             (items, Some(selected), rect.x, rect.y, rect)
+        } else if let Some(anchor) = anchor {
+            let (items, selected) = self.view.dropdown_items(element);
+            (items, selected, anchor.x, anchor.y, anchor)
         } else {
             let (items, selected) = self.view.dropdown_items(element);
             let Some(rect) = self.view.rect(element) else {
@@ -2217,8 +2264,14 @@ impl App {
             self.sheet_choose_kind(index);
             return;
         }
-        let event = self.view.choose(element, index);
+        let event = if element.part == Part::RowMenu {
+            let now = self.now();
+            self.view.choose_row_menu(element.row, index, now)
+        } else {
+            self.view.choose(element, index)
+        };
         self.dispatch(event);
+        ffi::invalidate(self.window);
     }
 
     fn flyout_key(&mut self, key: u16) -> bool {
@@ -2878,7 +2931,8 @@ impl PreviewSource {
     fn shown(&self) -> candidate_ui::app::preview::Shown<'_> {
         match (&self.palette, &self.emoji) {
             (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
-            (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
+            // 絵文字の見本は足元の行を出さない小さな窓にする
+            (None, Some(list)) => candidate_ui::app::preview::Shown::CompactList(list),
             (None, None) => candidate_ui::app::preview::Shown::Sample,
         }
     }
@@ -3425,6 +3479,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         WM_LBUTTONUP => {
             with_app(|app| app.mouse_up(lparam));
+            Some(LRESULT(0))
+        }
+        // 表の行を右クリックしたらメニューを出す(macOS の表の contextMenu)
+        WM_RBUTTONUP => {
+            with_app(|app| app.right_click(lparam));
             Some(LRESULT(0))
         }
         WM_CAPTURECHANGED | WM_CANCELMODE => {

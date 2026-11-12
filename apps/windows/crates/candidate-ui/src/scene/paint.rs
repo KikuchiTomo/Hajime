@@ -9,7 +9,7 @@ use ipc::{CommandKind, KeyHint};
 use tokens::opacity;
 use tokens::size::{branch, candidate, glass};
 
-/// 候補の横の札の色分け
+/// 候補の横のタグの色分け
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TagStyle {
     /// 控えめな地(「入力のまま」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)
@@ -304,7 +304,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    // MARK: - 案内と札(macOS の NoteDrawing と同じ形)
+    // MARK: - 案内とタグ(macOS の NoteDrawing と同じ形)
 
     /// 案内の頭のアイコン．ほかの知らせにはアイコンを付けない
     fn note_icon(tone: ipc::NoteTone) -> Option<Icon> {
@@ -345,7 +345,7 @@ impl<'a> Painter<'a> {
     }
 
     /// 案内を x から左寄せで描く: 頭のアイコン(補正の色の地の丸)，主な語(補正の色)，
-    /// 対象の字(直す前の字は薄く取り消し線，直した字は文字の色)，キーキャップの札とそのキーでできること
+    /// 対象の字(直す前の字は薄く取り消し線，直した字は文字の色)，キーキャップとそのキーでできること
     pub fn note(&mut self, note: &ipc::Note, x: f32, mid_y: f32) {
         let theme = self.theme;
         let mut x = x;
@@ -407,12 +407,12 @@ impl<'a> Painter<'a> {
         }
     }
 
-    /// 候補の横の札の幅
+    /// 候補の横のタグの幅
     pub fn tag_width(&self, text: &str) -> f32 {
         (self.width(text, Font::Label) + glass::TAG_PADDING_X * 2.0).ceil()
     }
 
-    /// 札の枠．描くときと押した位置を調べるときで同じものを使う
+    /// タグの枠．描くときと押した位置を調べるときで同じものを使う
     pub fn tag_frame(&self, text: &str, max_x: f32, mid_y: f32) -> Frame {
         let width = self.tag_width(text);
         Frame::new(
@@ -423,13 +423,13 @@ impl<'a> Painter<'a> {
         )
     }
 
-    /// 札を押せる範囲．札の左右の幅で，行(row)の高さいっぱいにする(背の低い札でも押しやすいように．macOS の NoteDrawing.tagHitRect)
+    /// タグを押せる範囲．タグの左右の幅で，行(row)の高さいっぱいにする(背の低いタグでも押しやすいように．macOS の NoteDrawing.tagHitRect)
     pub fn tag_hit_frame(&self, text: &str, max_x: f32, row: Frame) -> Frame {
         let tag = self.tag_frame(text, max_x, row.mid_y());
         Frame::new(tag.x, row.y, tag.width, row.height)
     }
 
-    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
+    /// 候補の横のタグ(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
     /// コマンドはアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(選択の地)に描くとき
     pub fn tag(&mut self, text: &str, max_x: f32, mid_y: f32, selected: bool, style: TagStyle) {
         let theme = self.theme;
@@ -523,8 +523,8 @@ impl<'a> Painter<'a> {
             + glass::HINT_GAP * (hints.len() - 1) as f32
     }
 
-    /// キーキャップの札とその説明を左から並べる．1 つの案内に複数のキーがあれば(「↓ Tab」)，
-    /// キーごとに札を並べてから説明を書く．札の形はテーマに合わせる:
+    /// キーキャップとその説明を左から並べる．1 つの案内に複数のキーがあれば(「↓ Tab」)，
+    /// キーごとにキーキャップを並べてから説明を書く．タグの形はテーマに合わせる:
     /// 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
     pub fn hints(&mut self, hints: &[KeyHint], x: f32, mid_y: f32) {
         let mut x = x;
@@ -573,12 +573,12 @@ impl<'a> Painter<'a> {
         }
     }
 
-    /// キーキャップの札の地と縁(パレットの肌の色のボタンも同じ形にする)
+    /// キーキャップの地と縁(パレットの肌の色のボタンも同じ形にする)
     pub fn keycap(&mut self, cap: Frame) {
         match self.theme.kind {
             Kind::Platinum => self.bevel(cap, self.theme.surface),
             Kind::Desk => {
-                // 蛍光表示管の琥珀色で縁取った札
+                // 蛍光表示管の琥珀色で縁取ったキーキャップ
                 self.rect(cap, self.theme.text.with_alpha(opacity::keycap::DESK_FILL));
                 self.draws.push(Draw::RoundRect {
                     frame: cap.inset(0.5, 0.5),
@@ -612,13 +612,13 @@ impl<'a> Painter<'a> {
         glass::KEYCAP_HEIGHT.max((content + glass::KEYCAP_PADDING_X * 2.0).ceil())
     }
 
-    /// 案内の札を並べた幅(説明を除く)
-    /// キーキャップの札だけ(説明なし)の幅．予測の窓の確定のキーに使う
+    /// 案内のキーキャップを並べた幅(説明を除く)
+    /// キーキャップだけ(説明なし)の幅．予測の窓の確定のキーに使う
     pub fn keys_width(&self, keys: &str) -> f32 {
         self.keycaps_width(keys)
     }
 
-    /// キーキャップの札だけ(説明なし)を x から描く
+    /// キーキャップだけ(説明なし)を x から描く
     pub fn keys(&mut self, keys: &str, x: f32, mid_y: f32) {
         self.hints(
             &[KeyHint {

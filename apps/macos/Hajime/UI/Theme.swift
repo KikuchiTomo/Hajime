@@ -182,7 +182,7 @@ struct ResolvedTheme {
         }
     }
 
-    /// 番号・案内・札の書体
+    /// 番号・案内・タグの書体
     func labelFont(size: CGFloat) -> NSFont {
         font(size: size, weight: .medium)
     }
@@ -197,13 +197,13 @@ struct ResolvedTheme {
         font(size: size, weight: .semibold)
     }
 
-    /// 補正の色を薄く敷いた地(候補の横の「修正」の札と，案内の頭のアイコンの丸)
+    /// 補正の色を薄く敷いた地(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
     var correctionTint: NSColor {
         let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast || kind == .contrast
         return correction.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.correctionTagContrast : DesignTokens.Opacity.Glass.correctionTag)
     }
 
-    /// アクセントの色を薄く敷いた地(コマンドの候補の札と，種類のアイコンの四角)
+    /// アクセントの色を薄く敷いた地(コマンドの候補のタグと，種類のアイコンの四角)
     var commandTint: NSColor {
         let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast || kind == .contrast
         return selection.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.commandTagContrast : DesignTokens.Opacity.Glass.commandTag)

@@ -745,7 +745,7 @@ impl Control {
     }
 
     /// 表の列(見出し・行のどの値を出すか・幅・描き方)．macOS の RuleListEditor・KeymapPage・ExclusionsPage・CommandsPage と
-    /// 同じ幅にし，打つもの(先頭の列)は等幅の文字で出す．行の値は入力欄と同じ並びで，有効の印・札はその後ろに持つ
+    /// 同じ幅にし，打つもの(先頭の列)は等幅の文字で出す．行の値は入力欄と同じ並びで，有効の印・タグはその後ろに持つ
     pub fn table_layout(&self) -> TableLayout {
         use crate::strings::{rule_list, windows};
         use tokens::size::settings as mac;
@@ -785,7 +785,7 @@ impl Control {
                 .collect()
         };
         let layout = match self {
-            // 記号: 有効の印・入力(等幅)・記号と札(変更あり・追加)．行は入力・記号・有効の印・札
+            // 記号: 有効の印・入力(等幅)・記号とタグ(変更あり・追加)．行は入力・記号・有効の印・タグ
             Control::Symbols(..) => TableLayout {
                 columns: vec![
                     check(2),
@@ -965,7 +965,7 @@ pub struct Column {
     pub source: usize,
     pub width: ColumnWidth,
     pub cell: Cell,
-    /// 右に寄せて小さく出す札(行の値の何番目か．記号の「変更あり」「追加」)
+    /// 右に寄せて小さく出すタグ(行の値の何番目か．記号の「変更あり」「追加」)
     pub badge: Option<usize>,
 }
 
@@ -1134,7 +1134,7 @@ pub struct Row {
     pub danger: bool,
     /// 値を変えたときに一緒に空(null)にする項目(テーマを選んだらカスタムテーマを外す)
     pub clears: Option<&'static str>,
-    /// 名前の横に札の形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
+    /// 名前の横にタグの形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
     pub example: Option<(&'static str, &'static str)>,
 }
 

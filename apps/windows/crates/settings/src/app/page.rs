@@ -403,6 +403,8 @@ pub enum Part {
     Button(usize),
     /// 表の下の状態で絞り込む欄(キー設定)
     Filter,
+    /// 表の行を右クリックしたときのメニュー(macOS の表の contextMenu)
+    RowMenu,
     /// 表の行の中の選ぶ欄(表の中の位置．列は表の選ぶ欄の列．除外設定の動作)
     TableChoice(usize),
     /// 辞書の一覧の辞書の行の部品(辞書の番号と部品)
@@ -474,7 +476,7 @@ struct RowState {
     text: String,
     /// 色のボタンに出す色(「#RRGGBB」)
     color: String,
-    /// カスタムテーマの行のテーマ(見本の色の札に描く)と，読みにくい組み合わせがあるか
+    /// カスタムテーマの行のテーマ(見本の色のタグに描く)と，読みにくい組み合わせがあるか
     custom: Option<ipc::CustomTheme>,
     warns: bool,
     /// まだカスタムテーマを作れる(複製のボタン)
@@ -819,6 +821,31 @@ impl RowState {
         self.list_spec().is_some() && !matches!(self.row.control, Control::SyncFields(_))
     }
 
+    /// 表の行を右クリックしたときのメニューの項目(macOS の RuleListEditor・KeymapPage の contextMenu)．
+    /// 1 行だけ選んでいれば編集，キー設定は複製，選んだ行があれば削除
+    fn row_menu(&self) -> Vec<RowMenuItem> {
+        if !self.has_add_remove() || !self.enabled {
+            return Vec::new();
+        }
+        let selected = self.table.selected_rows();
+        let mut items = Vec::new();
+        if selected.len() == 1 {
+            items.push(RowMenuItem::Edit);
+            if self
+                .row
+                .control
+                .list_spec()
+                .is_some_and(|spec| spec.path == "keymap")
+            {
+                items.push(RowMenuItem::Duplicate);
+            }
+        }
+        if !selected.is_empty() {
+            items.push(RowMenuItem::Remove);
+        }
+        items
+    }
+
     /// 選んだ行を消すボタン(足す一覧の表の下の「削除」)
     pub fn remove_part(&self) -> Option<Part> {
         if !self.has_add_remove() {
@@ -1008,6 +1035,8 @@ impl RowState {
         };
         match part {
             Part::Reset => Some(card.reset),
+            // 行のメニューは押した位置に出すので，部品の欄は持たない
+            Part::RowMenu => None,
             // 更新を確かめるボタン・値の右のボタンは部品の欄の外
             Part::Action
                 if matches!(self.row.control, Control::Version | Control::InfoAction(..)) =>
@@ -1259,6 +1288,13 @@ impl RowState {
 
     /// ドロップダウンの選択肢の名前
     fn dropdown_items(&self, part: Part) -> Vec<String> {
+        if part == Part::RowMenu {
+            return self
+                .row_menu()
+                .iter()
+                .map(|item| item.label().to_string())
+                .collect();
+        }
         match (&self.row.control, part) {
             (Control::ThemeFont(_), Part::Dropdown) => self
                 .font_items
@@ -2118,6 +2154,7 @@ impl PageView {
             Part::Slider => 8,
             Part::Radio => 9,
             Part::Filter => 31,
+            Part::RowMenu => 51,
             Part::Segment(index) => 90 + index,
             Part::Button(index) => 95 + index,
             Part::Field(index) => 10 + index,
@@ -2721,6 +2758,49 @@ impl PageView {
     }
 
     /// 表の行の数(1 ページ分．PageUp・PageDown で動かす数)
+    /// 表の行を右クリックした．その行を選び(選んでいる行の中なら選びをそのままにし)，メニューを出せるなら true
+    pub fn table_menu(&mut self, row_index: usize, position: usize) -> bool {
+        let Some(row) = self.rows.get_mut(row_index) else {
+            return false;
+        };
+        if !row.table.is_selected(position) {
+            row.table.click(position, false, false);
+            self.selection_changed(row_index);
+        }
+        self.rows
+            .get(row_index)
+            .is_some_and(|row| !row.row_menu().is_empty())
+    }
+
+    /// 表の行のメニューで index を選んだ．編集は入力欄に写し，複製と削除は表の下のボタンと同じにする
+    pub fn choose_row_menu(&mut self, row_index: usize, index: usize, now: f64) -> Option<Event> {
+        let row = self.rows.get_mut(row_index)?;
+        let item = *row.row_menu().get(index)?;
+        match item {
+            RowMenuItem::Edit => {
+                let selected = *row.table.selected_rows().first()?;
+                row.fill_inputs(selected);
+                row.editing = Some(selected);
+                self.show_footer_variants();
+                None
+            }
+            RowMenuItem::Duplicate => self.activate(
+                Element {
+                    row: row_index,
+                    part: Part::Bottom(1),
+                },
+                now,
+            ),
+            RowMenuItem::Remove => self.activate(
+                Element {
+                    row: row_index,
+                    part: Part::Bottom(0),
+                },
+                now,
+            ),
+        }
+    }
+
     /// 行の一覧で，選んだ行を消すボタン(足す一覧でなければ None)
     pub fn remove_part(&self, row_index: usize) -> Option<Part> {
         self.rows.get(row_index)?.remove_part()
@@ -4338,7 +4418,7 @@ impl PageView {
     }
 }
 
-/// 名前の横の候補の見本の札(「びーる → 🍺」)．読みと矢印は薄い色，候補はふつうの色で，名前と同じ大きさの文字で書く
+/// 名前の横の候補の見本(「びーる → 🍺」)．読みと矢印は薄い色，候補はふつうの色で，名前と同じ大きさの文字で書く
 fn example_chip(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -4356,7 +4436,7 @@ fn example_chip(
     } else {
         (palette.text_disabled, palette.text_disabled)
     };
-    // 札は試す欄の結果の札と同じ地と枠にする
+    // タグは試す欄の結果のタグと同じ地と枠にする
     canvas.fill_round(rect, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
     canvas.stroke_round(
         rect,
@@ -4389,8 +4469,8 @@ fn example_chip(
 }
 
 /// 表の行を見せる高さ
-/// 試した結果を rect の中に描く．語は札にして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
-/// 札にしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出す札は描かない
+/// 試した結果を rect の中に描く．語はタグにして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
+/// タグにしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出すタグは描かない
 fn preview_chips(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -4410,7 +4490,7 @@ fn preview_chips(
             TextLayout::WRAP,
         );
     }
-    // 札は macOS の resultChip と同じく枠の無い薄い地にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
+    // タグは macOS の resultChip と同じく枠の無い薄い地にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
     let two_lines = shown.labels.iter().any(Option::is_some);
     let height = size::BODY_LINE_HEIGHT
         + if two_lines {
@@ -4721,6 +4801,24 @@ fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
     }
 }
 
+/// 表の行のメニューの項目
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RowMenuItem {
+    Edit,
+    Duplicate,
+    Remove,
+}
+
+impl RowMenuItem {
+    fn label(self) -> &'static str {
+        match self {
+            RowMenuItem::Edit => crate::strings::rule_list::EDIT,
+            RowMenuItem::Duplicate => keys::DUPLICATE,
+            RowMenuItem::Remove => crate::strings::settings::REMOVE,
+        }
+    }
+}
+
 /// キー設定の入力欄のうちコマンドの欄の番号(状態・キー・コマンド)
 const KEYMAP_COMMAND: usize = 2;
 /// キー設定の「いつでも」の状態(KeymapState.anywhere)．どのコマンドも置ける
@@ -4972,7 +5070,7 @@ fn button_kind(action: Action) -> paint::ButtonKind {
     }
 }
 
-/// テーマの見本の札(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
+/// テーマの見本(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
 /// value は既成のテーマの値(カスタムテーマは元のテーマ)，custom はカスタムテーマの色
 fn paint_swatch(
     canvas: &mut dyn Canvas,

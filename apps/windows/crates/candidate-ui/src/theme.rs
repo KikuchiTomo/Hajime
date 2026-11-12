@@ -154,7 +154,7 @@ pub struct ResolvedTheme {
 }
 
 impl ResolvedTheme {
-    /// 補正の色を薄く敷いた地(候補の横の「修正」の札と，案内の頭のアイコンの丸)
+    /// 補正の色を薄く敷いた地(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
     pub fn correction_tint(&self) -> Color {
         self.correction.with_alpha(if self.kind == Kind::Contrast {
             opacity::glass::CORRECTION_TAG_CONTRAST
@@ -163,7 +163,7 @@ impl ResolvedTheme {
         })
     }
 
-    /// アクセントの色を薄く敷いた地(コマンドの候補の札と，種類のアイコンの四角)
+    /// アクセントの色を薄く敷いた地(コマンドの候補のタグと，種類のアイコンの四角)
     pub fn command_tint(&self) -> Color {
         self.selection.with_alpha(if self.kind == Kind::Contrast {
             opacity::glass::COMMAND_TAG_CONTRAST
@@ -447,7 +447,7 @@ impl ResolvedTheme {
         }
     }
 
-    /// 番号・案内・札の書体．glass は欧文の UI の書体
+    /// 番号・案内・タグの書体．glass は欧文の UI の書体
     fn label_face(&self) -> Face {
         if self.kind == Kind::Glass {
             Face::Ui
@@ -513,7 +513,7 @@ pub enum Font {
     Key,
     /// 文節を区切る位置の番号
     SplitKey,
-    /// モードの札
+    /// モード表示
     Mode,
     /// 語の意味のカードの見出しの語
     MeaningHeadword,
@@ -523,7 +523,7 @@ pub enum Font {
     MeaningExample,
     /// 使い方の例の中で強める見出しの語．MeaningExample と同じ大きさで太い
     MeaningExampleStrong,
-    /// 品詞の札
+    /// 品詞のタグ
     MeaningTag,
     /// 意味の番号(角丸の四角の中)
     MeaningNumber,

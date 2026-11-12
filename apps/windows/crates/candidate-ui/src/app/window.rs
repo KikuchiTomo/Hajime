@@ -53,9 +53,9 @@ const CLICK_THROUGH: isize = 1;
 /// 時計の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Timer {
-    /// モードの札を出しておく時間
+    /// モード表示を出しておく時間
     Mode = 1,
-    /// フェード(出し始めの濃さ・モードの札を消す)の 1 コマ
+    /// フェード(出し始めの濃さ・モード表示を消す)の 1 コマ
     Fade = 2,
     /// 窓の大きさの動きと，あとから届いた中身の重ね変わりの 1 コマ
     Motion = 3,

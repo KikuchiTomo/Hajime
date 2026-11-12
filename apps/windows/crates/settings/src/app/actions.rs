@@ -1405,7 +1405,7 @@ fn symbol_row(item: &SymbolItem) -> Vec<String> {
         SymbolOrigin::Changed => Some(features::CHANGED),
         SymbolOrigin::Added => Some(features::ADDED),
     };
-    // 入力・記号・有効の印・札(変更あり・追加)．有効は表の「有効」の列，札は記号の右に小さく出す(macOS と同じ)
+    // 入力・記号・有効の印・タグ(変更あり・追加)．有効は表の「有効」の列，タグは記号の右に小さく出す(macOS と同じ)
     let enabled = if item.is_enabled {
         crate::pages::ENABLED_CELL
     } else {

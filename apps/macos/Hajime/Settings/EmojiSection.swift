@@ -13,35 +13,40 @@ struct EmojiSection: View {
             exampleToggle(UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion, example: UIStrings.Settings.emojiConversionExample)
             exampleToggle(UIStrings.Settings.emojiWordConversion, keyPath: \.emojiWordConversion, example: UIStrings.Settings.emojiWordConversionExample)
             Group {
-                ResettableRow(model: model, keyPath: \.emojiCandidatePosition) {
-                    Stepper(value: model.binding(\.emojiCandidatePosition), in: DefaultSettings.emojiCandidatePositionRange) {
-                        LabeledContent(UIStrings.Settings.emojiCandidatePosition,
-                                       value: UIStrings.Settings.emojiCandidatePositionValue(model.settings.emojiCandidatePosition))
+                ResettableStepper(model: model, title: UIStrings.Settings.emojiCandidatePosition, keyPath: \.emojiCandidatePosition, range: DefaultSettings.emojiCandidatePositionRange,
+                                  value: UIStrings.Settings.emojiCandidatePositionValue(model.settings.emojiCandidatePosition))
+                ResettableStepper(model: model, title: UIStrings.Settings.emojiCandidateCount, keyPath: \.emojiCandidateCount, range: DefaultSettings.emojiCandidateCountRange,
+                                  value: "\(model.settings.emojiCandidateCount)")
+                // 見本は最後の行(名前の表示)のすぐ下に，項目の名前と同じ左の端から置く(足元の行を出さない小さな窓)．
+                // 同じ行に入れて区切りの線を引かず，項目との間は section の余白にする
+                VStack(alignment: .leading, spacing: DesignTokens.Size.Space.section) {
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
+                    if let panel = SamplePanels.emojiPlacement(model.settings) {
+                        CandidatePreview(choice: ThemeChoice(model.settings), fontSize: model.settings.candidateFontSize, panel: panel)
                     }
                 }
-                ResettableRow(model: model, keyPath: \.emojiCandidateCount) {
-                    Stepper(value: model.binding(\.emojiCandidateCount), in: DefaultSettings.emojiCandidateCountRange) {
-                        LabeledContent(UIStrings.Settings.emojiCandidateCount, value: "\(model.settings.emojiCandidateCount)")
-                    }
-                }
-                ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
             }
             .disabled(model.settings.emojiPlacement == nil)
-            if let panel = SamplePanels.emojiPlacement(model.settings) {
-                CandidatePreview(choice: ThemeChoice(model.settings), fontSize: model.settings.candidateFontSize, panel: panel)
-                    .padding(DesignTokens.Size.Settings.previewPadding)
-                    .frame(maxWidth: .infinity)
-            }
         }
     }
 
-    /// オン・オフの項目．名前の横に，その設定で出る候補の見本(「びーる → 🍺」)を札の形で添える
+    /// 2 つの切り替えの名前のうち長いほうの幅(Form の名前と同じ本文の書体で測る)．タグの左の端をそろえる．
+    /// 名前の欄は最小の幅として使うので，測り方の差で名前が欠けることはない
+    private var titleWidth: CGFloat {
+        let font = NSFont.preferredFont(forTextStyle: .body)
+        return [UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiWordConversion]
+            .map { ($0 as NSString).size(withAttributes: [.font: font]).width.rounded(.up) }
+            .max() ?? 0
+    }
+
+    /// オン・オフの項目．名前の横に，その設定で出る候補の見本(「びーる → 🍺」)をタグの形で添える．
+    /// タグは 2 つの名前の長いほうのあとから書き出し，行ごとの左の端をそろえる
     private func exampleToggle(_ title: String, keyPath: WritableKeyPath<HajimeDomain.Settings, Bool>,
                                example: (reading: String, candidate: String)) -> some View {
         ResettableRow(model: model, keyPath: keyPath) {
             Toggle(isOn: model.binding(keyPath)) {
-                HStack(spacing: DesignTokens.Size.Space.sm) {
-                    Text(title)
+                HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.group) {
+                    Text(title).frame(minWidth: titleWidth, alignment: .leading)
                     CandidateExample(reading: example.reading, candidate: example.candidate)
                 }
             }
@@ -49,13 +54,13 @@ struct EmojiSection: View {
     }
 }
 
-/// 読みと，その読みで出る候補を並べた札(「ねこが → 🐈が」)
+/// 読みと，その読みで出る候補を並べたタグ(「ねこが → 🐈が」)
 struct CandidateExample: View {
     let reading: String
     let candidate: String
 
     var body: some View {
-        HStack(spacing: DesignTokens.Size.Space.xs) {
+        HStack(spacing: DesignTokens.Size.Space.inline) {
             Text(reading).foregroundStyle(.secondary)
             Image(systemName: "arrow.right").foregroundStyle(.tertiary).imageScale(.small)
             Text(candidate)
@@ -68,7 +73,7 @@ struct CandidateExample: View {
     }
 }
 
-/// 候補の一覧の見本．テーマ・文字の大きさ・中身を変えると，その場で描き直す(欄が狭ければ同じ比で縮める)
+/// 候補の一覧の見本(足元の行を出さない)．テーマ・文字の大きさ・中身を変えると，その場で描き直す(欄が狭ければ同じ比で縮める)
 struct CandidatePreview: NSViewRepresentable {
     let choice: ThemeChoice
     let fontSize: Double
@@ -77,6 +82,7 @@ struct CandidatePreview: NSViewRepresentable {
     func makeNSView(context: Context) -> ScaledPreview<CandidateView> {
         let view = CandidateView()
         view.fillsSurface = true
+        view.showsFooter = false
         return ScaledPreview(content: view)
     }
 

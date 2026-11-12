@@ -428,7 +428,7 @@ struct InputSessionScenarioTests {
         #expect(typed.panel?.entries.map(\.text) == ["あぴ", "アピ", "アピール"])
         #expect(typed.prediction == nil)
         #expect(typed.panel?.showsNumbers == false)
-        // キーは文字で書かず，キーごとのキーキャップの札で描けるよう，キーとできることに分けて渡す
+        // キーは文字で書かず，キーごとのキーキャップで描けるよう，キーとできることに分けて渡す
         #expect(typed.panel?.note?.key == "↓ Tab")
         #expect(typed.panel?.note?.keyAction == "選択")
         #expect(typed.panel?.note?.text == "↓ Tab 選択")

@@ -79,7 +79,7 @@ pub struct Fonts {
     /// マス目の中の知らせと，説明の Unicode の名前と読み
     pub detail: Font,
     pub name: Font,
-    /// 説明のショートコードとコードポイントの札(等幅)．行に入らない札は code_small に縮める
+    /// 説明のショートコードとコードポイントのチップ(等幅)．行に入らないタグは code_small に縮める
     pub code: Font,
     pub code_small: Font,
     /// 説明の項目名と，見出しに添える名前の出どころ
@@ -119,7 +119,7 @@ impl Fonts {
                 palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * palette::PREVIEW_SYMBOL_BOOST,
             ),
             preview_kaomoji: Font::sized(Role::Candidate, palette::PREVIEW_KAOMOJI_FONT_SIZE),
-            // 札の縁(角丸のテーマと desk は線 1，platinum は外枠と立体の縁 2)の内側から余白を空ける．縁の細いほうで候補を作る
+            // タグの縁(角丸のテーマと desk は線 1，platinum は外枠と立体の縁 2)の内側から余白を空ける．縁の細いほうで候補を作る
             button_emoji: EmojiSizes::new(
                 glass::KEYCAP_HEIGHT
                     - candidate::FRAME_WIDTH * 2.0
@@ -219,9 +219,9 @@ pub struct Layout {
     pub separators: Vec<f32>,
     /// 説明の欄．出さない設定なら None
     pub preview: Option<Frame>,
-    /// 足元の行(キーの札の高さ)
+    /// 足元の行(キーキャップの高さ)
     pub footer: Frame,
-    /// 既定の肌の色のボタン．キーの札と同じ高さの正方形で，中身の右の端に置く
+    /// 既定の肌の色のボタン．キーキャップと同じ高さの正方形で，中身の右の端に置く
     pub skin_tone_button: Frame,
     /// マスの高さ(四角いマスの一辺)
     pub cell: f32,
@@ -695,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn 足元のキーの札と肌の色のボタンは同じ高さと縦の中心で_上下の余白が等しい() {
+    fn 足元のキーキャップと肌の色のボタンは同じ高さと縦の中心で_上下の余白が等しい() {
         for name in ["automatic", "platinum", "desk"] {
             let layout = layout(&sample::emoji(), name);
             let button = layout.skin_tone_button;

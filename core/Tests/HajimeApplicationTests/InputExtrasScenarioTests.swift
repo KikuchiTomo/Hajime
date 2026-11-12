@@ -44,7 +44,7 @@ struct InputExtrasScenarioTests {
         let panel = try #require(harness.panel)
         #expect(panel.entries.first?.text == "クロード")
         #expect(panel.entries.first?.command == nil)
-        // 一覧では印を除いた名前に，種類と「コマンド」の札を付けて見せる
+        // 一覧では印を除いた名前に，種類と「コマンド」のタグを付けて見せる
         let entry = try #require(panel.entries.dropFirst().first)
         #expect(entry.text == Self.claude.title)
         #expect(entry.command == .openApplication)
@@ -94,7 +94,7 @@ struct InputExtrasScenarioTests {
         #expect(harness.committed.isEmpty)
     }
 
-    @Test("R-22: 文節ごとの一覧でも，コマンドに種類と札を付け，選んでいるあいだは確定のキーで動くことを出す")
+    @Test("R-22: 文節ごとの一覧でも，コマンドに種類とタグを付け，選んでいるあいだは確定のキーで動くことを出す")
     func commandInSegmentList() throws {
         let harness = harness(change: {
             withCommands(&$0)
@@ -185,7 +185,7 @@ struct InputExtrasScenarioTests {
         #expect(try #require(off.panel).entries.first?.text == entry.word)
     }
 
-    @Test("R-21: コメントを付けた語は候補の札にコメントを出し，札を押すとコメントを入れる．長いコメントは札では先頭だけを出す")
+    @Test("R-21: コメントを付けた語は候補のタグにコメントを出し，タグを押すとコメントを入れる．長いコメントはタグでは先頭だけを出す")
     func userComment() throws {
         let address = "東京都千代田区千代田1-1 ピヨピヨビル 10 階 受付"
         let harness = harness(.listPresentation, table: ["かいしゃ": [("会社", nil)]]) {

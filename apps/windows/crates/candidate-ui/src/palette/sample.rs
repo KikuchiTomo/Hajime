@@ -415,7 +415,7 @@ pub fn flag() -> PalettePanel {
 }
 
 /// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ(macOS の SamplePalettes.longName)．
-/// 名前は 2 行で「…」にし，長い札は字を縮めて折り返す
+/// 名前は 2 行で「…」にし，長いタグは字を縮めて折り返す
 pub fn long_name() -> PalettePanel {
     PalettePanel {
         query: "つぎ".into(),

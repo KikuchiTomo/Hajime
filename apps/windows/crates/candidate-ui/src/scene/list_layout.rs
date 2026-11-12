@@ -127,7 +127,8 @@ pub(super) fn below_card_width(list_width: f32, footer_width: f32, minimum: f32)
 
 /// list_width は候補の列(行の地)の幅，footer_width は足元の中身の幅．
 /// maximum_width は窓の幅の上限で，超えるときは候補の列を狭める(長い候補は描く側が末尾を省く)．
-/// size は窓の大きさ(影を含む)を外から決めるとき(Look::size)．幅は候補の列で吸収し，区画は上から積む
+/// size は窓の大きさ(影を含む)を外から決めるとき(Look::size)．幅は候補の列で吸収し，区画は上から積む．
+/// has_footer が偽なら足元の行と区切りの線を置かない(設定の画面の見本．区画は候補の列の下の端の高さ 0)
 #[allow(clippy::too_many_arguments)]
 pub(super) fn place(
     style: Style,
@@ -139,6 +140,7 @@ pub(super) fn place(
     maximum_width: f32,
     metrics: &Metrics,
     size: Option<(f32, f32)>,
+    has_footer: bool,
 ) -> ListLayout {
     let outer = metrics.edge + metrics.padding;
     let gap = metrics.separator_gap;
@@ -231,10 +233,20 @@ pub(super) fn place(
     let header = header.map(|frame: Frame| Frame::new(frame.x, frame.y, list_column, frame.height));
     let header_separator = header_separator
         .map(|frame: Frame| Frame::new(frame.x, frame.y, list_column, frame.height));
-    y = list_bottom + gap;
-    let footer_separator = Frame::new(outer, y, content_width, line);
-    y += line + gap;
-    let footer = Frame::new(outer, y, content_width, metrics.footer_height);
+    let (footer_separator, footer) = if has_footer {
+        y = list_bottom + gap;
+        let separator = Frame::new(outer, y, content_width, line);
+        y += line + gap;
+        (
+            separator,
+            Frame::new(outer, y, content_width, metrics.footer_height),
+        )
+    } else {
+        (
+            Frame::new(outer, list_bottom, content_width, 0.0),
+            Frame::new(outer, list_bottom, content_width, 0.0),
+        )
+    };
     let body_height = size.map_or_else(
         || (footer.max_y() + outer).ceil(),
         |(_, height)| height - metrics.shadow,
@@ -328,6 +340,7 @@ mod tests {
                     720.0,
                     &metrics(style),
                     None,
+                    true,
                 );
                 (name, style, card, layout)
             })
@@ -471,6 +484,24 @@ mod tests {
     }
 
     #[test]
+    fn 足元を出さない窓は最後の候補の行の下に縁の内側の余白だけを置く() {
+        for style in [Style::Rounded, Style::Bevel] {
+            let metrics = metrics(style);
+            let with = place(
+                style, 180.0, 0.0, false, 6, None, 720.0, &metrics, None, true,
+            );
+            let without = place(
+                style, 180.0, 0.0, false, 6, None, 720.0, &metrics, None, false,
+            );
+            let last = without.rows.last().copied().unwrap();
+            let outer = metrics.edge + metrics.padding;
+            assert_eq!(without.footer.height, 0.0);
+            assert!((without.body.max_y() - last.max_y() - outer).abs() <= 0.5);
+            assert!(without.height < with.height);
+        }
+    }
+
+    #[test]
     fn 窓の幅の上限を超えるときは候補の列を狭める() {
         let metrics = metrics(Style::Rounded);
         let layout = place(
@@ -486,6 +517,7 @@ mod tests {
             720.0,
             &metrics,
             None,
+            true,
         );
         assert!(layout.width <= 720.0);
         let card = layout.card.expect("カード");

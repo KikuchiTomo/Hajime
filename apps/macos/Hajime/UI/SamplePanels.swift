@@ -51,7 +51,7 @@ enum SamplePanels {
                               position: selected + 1, total: entries.count, note: note)
     }
 
-    /// ユーザー辞書の語のコメント(R-21)を札に出した一覧．札を押すと候補の代わりにコメントを入れる．長いコメントは札では先頭だけを出す
+    /// ユーザー辞書の語のコメント(R-21)をタグに出した一覧．タグを押すと候補の代わりにコメントを入れる．長いコメントはタグでは先頭だけを出す
     static let comment = CandidatePanel(
         variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
         selectedVariant: nil,
@@ -64,7 +64,7 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 4, note: nil
     )
 
-    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図．コメントの無い第 1 候補を選んでいる(選んでいない枝の札の見え方)
+    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図．コメントの無い第 1 候補を選んでいる(選んでいない枝のタグの見え方)
     static let commentLattice: LatticePanel = {
         var column = LatticePanel.Column(text: "会社", alternatives: ["会社", "ピヨ株式会社", "かいしゃ"], selectedAlternative: 0,
                                          isFocused: true, isUncertain: false)
@@ -93,7 +93,8 @@ enum SamplePanels {
     static let emojiNames: [String: String] = ["🐈が": "ネコ", "😺が": "にっこり笑う猫"]
 
     /// 設定の画面の絵文字の見本．位置・数・名前の設定を変えると，その場で並びが変わる．
-    /// 「文節を絵文字に変換」がオンなら「ねこ」の文節全体の絵文字を，オフなら「ねこが」の語を絵文字にした候補を並べる．どちらもオフなら nil
+    /// 「文節を絵文字に変換」がオンなら「ねこ」の文節全体の絵文字を，オフなら「ねこが」の語を絵文字にした候補を並べる．どちらもオフなら nil．
+    /// 位置と数がわかる範囲(絵文字の後ろのふだんの候補 1 つまで．1 ページに収まる分)だけを出す
     static func emojiPlacement(_ settings: HajimeDomain.Settings) -> CandidatePanel? {
         guard let placement = settings.emojiPlacement else { return nil }
         let tail = settings.emojiConversion ? "" : emojiPlacementParticle
@@ -102,7 +103,7 @@ enum SamplePanels {
         let texts = placement.placed(emojiPlacementWords.map { $0 + tail } + emoji.map(\.text)) { names[$0] != nil }
         return CandidatePanel(
             variants: [], selectedVariant: nil,
-            entries: texts.prefix(settings.listCandidatesPerPage).map { .init(text: $0, annotation: nil, detail: settings.showsEmojiNames ? names[$0] : nil) },
+            entries: texts.prefix(min(settings.listCandidatesPerPage, placement.index + placement.count + 1)).map { .init(text: $0, annotation: nil, detail: settings.showsEmojiNames ? names[$0] : nil) },
             selectedEntry: 0, focus: .candidate, position: 1, total: texts.count, note: nil
         )
     }
@@ -288,7 +289,7 @@ enum SamplePalettes {
             selection: .init(row: 0, column: 3), preview: preview(japanFlag), showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 
-    /// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ．名前は 2 行で「…」にし，長い札は字を縮めて折り返す
+    /// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ．名前は 2 行で「…」にし，長いタグは字を縮めて折り返す
     static let longName: PalettePanel = {
         PalettePanel(
             modes: modes(.emoji), query: "つぎ", placeholder: PaletteStrings.emojiPlaceholder, tabs: [],

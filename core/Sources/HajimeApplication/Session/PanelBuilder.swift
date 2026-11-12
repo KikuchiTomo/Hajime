@@ -39,7 +39,7 @@ enum PanelBuilder {
     }
 
     /// 打っているあいだの候補の窓の案内．keys は候補を選び始めるキー(無いものは除いてある)．
-    /// キーは文字で書かず，描く側でキーごとのキーキャップの札にする
+    /// キーは文字で書かず，描く側でキーごとのキーキャップにする
     static func suggestionNote(keys: [String]) -> Note? {
         keys.isEmpty ? nil : Note(tone: .info, title: "", key: keys.joined(separator: IndicatorLabels.keySeparator), keyAction: selectAction)
     }
@@ -125,12 +125,12 @@ enum PanelBuilder {
         )
     }
 
-    /// 候補の窓の札に出すコメント．長いコメント(住所など)は先頭だけを出し，押したときはすべてを入れる
+    /// 候補の窓のタグに出すコメント．長いコメント(住所など)は先頭だけを出し，押したときはすべてを入れる
     static func commentTag(_ comment: String) -> String {
         comment.count <= DefaultSettings.userDictionaryCommentShownLength ? comment : String(comment.prefix(DefaultSettings.userDictionaryCommentShownLength)) + "…"
     }
 
-    /// 札にコメントを出す候補か．打ったまま・直した候補・コマンドの札はコメントより先に出す
+    /// タグにコメントを出す候補か．打ったまま・直した候補・コマンドのタグはコメントより先に出す
     static func hasComment(_ candidate: Candidate) -> Bool {
         switch candidate.origin {
         case .asTyped, .correction, .command: false
@@ -138,7 +138,7 @@ enum PanelBuilder {
         }
     }
 
-    /// コマンドの候補の行．印(▶)の代わりに種類と「コマンド」の札を付け，文字を入れる候補と見分けられるようにする．コマンドでなければ nil
+    /// コマンドの候補の行．印(▶)の代わりに種類と「コマンド」のタグを付け，文字を入れる候補と見分けられるようにする．コマンドでなければ nil
     static func commandEntry(_ candidate: Candidate) -> CandidatePanel.Entry? {
         guard let kind = candidate.commandKind else { return nil }
         return CandidatePanel.Entry(text: LauncherCommand.title(ofCandidateText: candidate.text), annotation: CandidatePanel.commandAnnotation, command: kind)

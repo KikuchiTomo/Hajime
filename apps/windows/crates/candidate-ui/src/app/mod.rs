@@ -41,7 +41,7 @@ enum Content {
     Candidates(ipc::CandidateList),
     BranchMap(ipc::BranchMap),
     Note(ipc::Note),
-    /// モードの札の文字
+    /// モード表示の文字
     Mode(String),
 }
 
@@ -51,7 +51,7 @@ enum Fade {
     None,
     /// 出し始めに，第 1 候補と選んでいる候補のほかを濃くしていく
     Rest(Instant),
-    /// モードの札を消していく
+    /// モード表示を消していく
     ModeOut(Instant),
 }
 
@@ -334,7 +334,7 @@ impl App {
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
             UiCommand::ShowPalette { panel, anchor } => {
-                // パレット(R-26)は別の窓に出す(候補・案内・モードの札に置き換わらないように)．すりガラスにはしない
+                // パレット(R-26)は別の窓に出す(候補・案内・モード表示に置き換わらないように)．すりガラスにはしない
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
                     self.presentation.custom_theme.as_ref(),
@@ -351,8 +351,8 @@ impl App {
                 self.prediction_anchor = Some(composition.unwrap_or_else(|| anchor.clone()));
                 self.anchor = Some(anchor);
             }
-            // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
-            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)
+            // 候補と知らせを消す．モード表示は残し，出しておく時間が過ぎたら消す(macOS と同じくタグは別に扱う．
+            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate でタグが消えないように)
             UiCommand::Hide => {
                 if !matches!(self.content, Content::Mode(_)) {
                     self.content = Content::Hidden;
@@ -386,7 +386,7 @@ impl App {
         self.window().start_timer(Timer::Fade, FRAME_MILLISECONDS);
     }
 
-    /// モードの札を出しておく時間が過ぎた．フェードして消す
+    /// モード表示を出しておく時間が過ぎた．フェードして消す
     fn mode_elapsed(&mut self) {
         self.window().stop_timer(Timer::Mode);
         if !matches!(self.content, Content::Mode(_)) {
