@@ -554,7 +554,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
                   startsWithPredicate: predicateIDs.contains { $0.contains(element.lcid) },
                   startsWithConjunctiveParticle: conjunctiveParticleIDs.contains(element.lcid),
                   endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid),
-                  isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid))
+                  isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid),
+                  isCommonNoun: element.lcid == CIDData.一般名詞.cid)
         }
     }
 
