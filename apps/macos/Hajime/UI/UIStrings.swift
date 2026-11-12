@@ -56,11 +56,11 @@ enum UIStrings {
         static let phoneticSpellingExample = DefaultSettings.phoneticSpellingExample
         static let handShiftExample = DefaultSettings.handShiftExample
         static let englishTermCandidatesExample = DefaultSettings.englishTermCandidatesExample
-        static let handShiftNote = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。"
+        static let handShiftNote = "片手か両手が 1 キー横にずれたまま打った文を修正します。"
         static let looseReadings = "うろ覚えのカタカナ語の候補"
-        static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。"
+        static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている単語を候補に表示します。"
         static let phoneticSpelling = "発音どおりに綴った英単語の候補"
-        static let phoneticSpellingNote = "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。"
+        static let phoneticSpellingNote = "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。"
         static let englishTermCandidates = "英単語辞書を使用"
         static let englishTerms = "追加した単語"
         static let englishTermsSection = "英単語辞書"
@@ -813,35 +813,35 @@ enum UIStrings {
 
         // b. 自動補正
         static let correctionTitle = "自動補正"
-        static let correctionOff = "直さない"
+        static let correctionOff = "修正しない"
         static func detail(for sensitivity: CorrectionSensitivity) -> String {
             switch sensitivity {
-            case .cautious: "確かなときだけ直し、迷うときは「もしかして」で知らせます。"
-            case .standard: "よくある打ち間違いを直します。"
-            case .aggressive: "少しでも打ち間違いらしければ直します。"
+            case .cautious: "確実なときだけ修正し、迷うときは「もしかして」を表示します。"
+            case .standard: "よくあるタイプミスを修正します。"
+            case .aggressive: "タイプミスの可能性があれば修正します。"
             }
         }
 
         // c. 外観
         static let themeTitle = "外観"
-        static let themeDetail = "色や書体は、あとから設定の画面で変えられます。"
+        static let themeDetail = "色やフォントは、あとから設定で変更できます。"
 
         // d. ライブ変換
         static let liveTitle = "ライブ変換"
         static let liveOn = "ライブ変換を使う"
         static let liveOff = "使わない"
-        static let liveDelay = "漢字にするまでの時間"
+        static let liveDelay = "変換までの待ち時間"
 
         // e. 候補の出し方
-        static let presentationTitle = "候補の出し方"
+        static let presentationTitle = "候補の表示"
         static func detail(for presentation: CandidatePresentation) -> String {
             switch presentation {
             case .automatic: "文節ごとに候補を枝分かれさせます。"
-            case .segmentList: "選んでいる文節の候補を縦に並べます。"
+            case .segmentList: "選択中の文節の候補を縦に並べます。"
             case .list: "文全体の候補を縦に並べます。"
             }
         }
-        static let initialFocus = "最初に選ぶ文節"
+        static let initialFocus = "最初に選択する文節"
 
         // f. 入力する文字
         static let charactersTitle = "入力する文字"
@@ -851,20 +851,20 @@ enum UIStrings {
         static let extrasTitle = "試験的な機能"
         static let extrasDetail = "既定ではオフの機能です。"
         static let macros = "変換マクロ"
-        static let macrosDetail = "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。"
-        static let dynamicDictionary = "動的なユーザー辞書"
-        static let dynamicDictionaryDetail = "単語に {datetime:YYYY/MM/DD} などを書くと、入力したときの値にします。"
+        static let macrosDetail = "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。"
+        static let dynamicDictionary = "書式の展開"
+        static let dynamicDictionaryDetail = "単語に {datetime:YYYY/MM/DD} などを書くと、入力時の値に置換します。"
         static let commands = "コマンド"
-        static let commandsDetail = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。"
+        static let commandsDetail = "読みでアプリや Web ページを開きます。候補から選んだときだけ実行します。設定の「コマンド」で登録します。"
         static let commandsExample = "Claude を開く"
         static let association = "連想変換"
-        static let associationDetail = "Shift + Space で、似た意味の語を出します。"
+        static let associationDetail = "Shift + Space で、似た意味の単語を表示します。"
         static let calculation = "計算"
-        static let calculationDetail = "「1+2*3=」と打つと、答えを候補に出します。"
+        static let calculationDetail = "「1+2*3=」と打つと、計算結果を候補に表示します。"
         static let postalCode = "郵便番号"
-        static let postalCodeDetail = "郵便番号から住所を出します。"
+        static let postalCodeDetail = "郵便番号を住所に変換します。"
         static let date = "日付と時刻"
-        static let dateDetail = "「きょう」「いま」「なう」から日付と時刻を出します。"
+        static let dateDetail = "「きょう」「いま」「なう」を日付と時刻に変換します。"
     }
 
     enum Menu {
