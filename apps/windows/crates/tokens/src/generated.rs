@@ -641,6 +641,7 @@ pub mod size {
         pub const ABOUT_ICON: f32 = 64.0;
         pub const TEMPLATE_NOW_WIDTH: f32 = 160.0;
         pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
+        pub const SEGMENT_INSET: f32 = 2.0;
         pub const LIST_ARROW_WIDTH: f32 = 24.0;
         pub const TITLE_BAR_HEIGHT: f32 = 32.0;
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;

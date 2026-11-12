@@ -2791,17 +2791,12 @@ impl PageView {
                     paint::focus_ring(canvas, theme, card.card, size::CARD_RADIUS);
                 }
             }
+            // 切り替えの帯(macOS の segmented の Picker)．溝は薄い灰色で，選んだところだけを浮かせて描く
             Control::Segmented(_) => {
                 canvas.fill_round(
                     card.control,
                     size::CONTROL_RADIUS,
-                    Color::from(palette.control),
-                );
-                canvas.stroke_round(
-                    card.control,
-                    size::CONTROL_RADIUS,
-                    1.0,
-                    Color::from(palette.control_stroke),
+                    Color::from(palette.nav_selected),
                 );
                 for part in row.parts() {
                     if let (Part::Segment(position), Some(rect)) = (part, row.part_rect(part)) {
@@ -3786,7 +3781,7 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
             for field in spec.fields {
                 let input = match field.choices {
                     Some(_) => Input::Choice(0),
-                    None => match fields.take(field.label) {
+                    None => match fields.take(field.prompt.unwrap_or(field.label)) {
                         Some(window) => {
                             // キーの書き方の欄は押したらキーを記録する(macOS の KeyField)
                             edit::set_record_on_click(
