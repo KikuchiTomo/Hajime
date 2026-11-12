@@ -281,6 +281,17 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let mut selected_mid_y = None;
     for (index, entry) in list.entries.iter().enumerate() {
         let row = Frame::new(content.x, y, list_width, metrics.row_height);
+        // コメントの札は行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
+        // 札を押すと候補の代わりにコメントを入れる
+        if let Some(comment) = super::entry_comment(entry) {
+            let frame = painter.tag_hit_frame(comment, tag_max_x(row), row);
+            painter.hit(
+                frame,
+                ipc::PointerTarget::Comment {
+                    index: index as u32,
+                },
+            );
+        }
         painter.hit(
             row,
             ipc::PointerTarget::Entry {
@@ -380,7 +391,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         if let Some(annotation) = entry.annotation.as_deref() {
             painter.tag(
                 annotation,
-                row.max_x() - padding / 2.0,
+                tag_max_x(row),
                 row.mid_y(),
                 selected,
                 TagStyle::of(annotation, entry.command.is_some()),
@@ -424,6 +435,11 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         Frame::new(content.x, y, content.width, metrics.section_height),
     );
     painter.finish(width, height)
+}
+
+/// 候補の行の札の右端
+fn tag_max_x(row: Frame) -> f32 {
+    row.max_x() - candidate::PADDING_X / 2.0
 }
 
 /// platinum と desk は窓の縁に余白が無いので，候補の右のカードを縁から離す空き(上・下・右)．角丸のテーマは 0
@@ -592,6 +608,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    has_comment: None,
                 },
                 CandidateEntry {
                     text: "へんかん".into(),
@@ -599,6 +616,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    has_comment: None,
                 },
             ],
             selected_entry: selected,
@@ -639,6 +657,58 @@ mod tests {
             let frame = text_frame(&scene, "カタカナ").expect("描いた文字がある");
             assert_eq!(scene.target_at(frame.x + 1.0, frame.mid_y()), None);
         }
+    }
+
+    #[test]
+    fn コメントの札を押すとコメント_札の外の行と_コメントでない札は候補() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut commented = list(Some(0));
+            commented.entries[0].annotation = Some("千代田区千代田1-1".into());
+            commented.entries[0].has_comment = Some(true);
+            let scene = candidate_list(&commented, &Look::new(&theme, 15.0), &Fixed);
+            let hit = |target: ipc::PointerTarget| {
+                scene
+                    .hits
+                    .iter()
+                    .find(|hit| hit.target == target)
+                    .map(|hit| hit.frame)
+            };
+            let comment = ipc::PointerTarget::Comment { index: 0 };
+            let tag = text_frame(&scene, "千代田区千代田1-1").expect("札を描く");
+            assert_eq!(
+                scene.target_at(tag.mid_x(), tag.mid_y()),
+                Some(comment.clone())
+            );
+            // 札の上下の空きも，行の高さいっぱいまで札として押せる
+            let row = hit(ipc::PointerTarget::Entry { index: 0 }).expect("候補の行");
+            let area = hit(comment.clone()).expect("札を押せる範囲");
+            assert_eq!((area.y, area.height), (row.y, row.height), "{name}");
+            assert_eq!(scene.target_at(tag.mid_x(), row.y + 1.0), Some(comment));
+            // 札の左(候補の文字の側)は候補
+            assert_eq!(
+                scene.target_at(area.x - 1.0, row.mid_y()),
+                Some(ipc::PointerTarget::Entry { index: 0 })
+            );
+            let text = text_frame(&scene, "変換").expect("描いた文字がある");
+            assert_eq!(
+                scene.target_at(text.x + 1.0, text.mid_y()),
+                Some(ipc::PointerTarget::Entry { index: 0 })
+            );
+            // コメントでない札(入力のまま)は押しても候補
+            let plain = text_frame(&scene, "入力のまま").expect("札を描く");
+            assert_eq!(
+                scene.target_at(plain.mid_x(), plain.mid_y()),
+                Some(ipc::PointerTarget::Entry { index: 1 })
+            );
+        }
+        // コメントの無い一覧には札の押せる範囲を足さない
+        let theme = theme("automatic");
+        let scene = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
+        assert!(!scene
+            .hits
+            .iter()
+            .any(|hit| matches!(hit.target, ipc::PointerTarget::Comment { .. })));
     }
 
     #[test]
@@ -951,6 +1021,7 @@ mod tests {
                 corrected_start: None,
                 corrected_length: None,
                 command: Some(ipc::CommandKind::OpenApplication),
+                has_comment: None,
             });
             let plain = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
             let scene = candidate_list(&commands, &Look::new(&theme, 15.0), &Fixed);
@@ -982,6 +1053,7 @@ mod tests {
             corrected_start: None,
             corrected_length: None,
             command: Some(ipc::CommandKind::OpenURL),
+            has_comment: None,
         });
         let scene = candidate_list(&commands, &Look::new(&theme, 15.0), &Fixed);
         assert!(scene.draws.iter().any(|draw| matches!(draw,
@@ -999,6 +1071,7 @@ mod tests {
             corrected_start: Some(3),
             corrected_length: Some(2),
             command: None,
+            has_comment: None,
         };
         let scene = candidate_list(&corrected, &Look::new(&theme, 15.0), &Fixed);
         let lines: Vec<(f32, f32)> = scene
@@ -1036,6 +1109,7 @@ mod tests {
             corrected_start: None,
             corrected_length: None,
             command: None,
+            has_comment: None,
         });
         let three = candidate_list(&longer, &look, &Fixed);
         assert_eq!(three.height - two.height, (candidate::ROW_HEIGHT).round());
@@ -1074,6 +1148,7 @@ mod tests {
             corrected_start: None,
             corrected_length: None,
             command: None,
+            has_comment: None,
         });
         three.entries.push(CandidateEntry {
             text: "偏官".into(),
@@ -1081,6 +1156,7 @@ mod tests {
             corrected_start: None,
             corrected_length: None,
             command: None,
+            has_comment: None,
         });
         let texts = texts(&candidate_list(&three, &look, &Fixed));
         let alpha = |wanted: &str| {

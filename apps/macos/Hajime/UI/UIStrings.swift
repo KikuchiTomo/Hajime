@@ -20,6 +20,8 @@ enum UIStrings {
         static func senseNumber(_ number: Int) -> String { "\(number)" }
         /// コマンドの候補を読み上げる文(「コマンド、Claude を開く」)
         static func commandAnnouncement(_ title: String) -> String { "\(CandidatePanel.commandAnnotation)、\(title)" }
+        /// ユーザー辞書の語のコメントを，候補に続けて読み上げる文(「ピヨ株式会社、コメント、東京都千代田区…」)
+        static func commentAnnouncement(_ text: String, comment: String) -> String { "\(text)、コメント、\(comment)" }
     }
 
     /// 連想変換(R-18)
