@@ -41,7 +41,7 @@ struct DictionaryPage: View {
 
     private func showUserWordsIfAsked() {
         guard model.showsUserWords else { return }
-        showsImported = false
+        tab = .userWords
         model.showsUserWords = false
     }
 }
