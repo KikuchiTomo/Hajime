@@ -2,8 +2,9 @@
 ///
 /// - 三角の頂点は，選んでいる行の右の端から gap(inline)の所に置く．吹き出しは候補の窓の空いている所に重ねてよいが，
 ///   ほかの候補・幹の文節・足元の案内・入力中の文字(obstacles)は覆わない
-/// - 縦は，三角が行を指す位置(三角は見出しの行の高さ)にし，覆ってしまう物があれば上か下へ寄せる．画面の上下の端からは screenMargin の内側．
-///   寄せた分だけ三角の位置をずらし，行を指し続ける．三角は角の丸みにはかけない
+/// - 縦は，吹き出しの上の端を候補の窓の上の端にそろえ，三角だけを動かして行を指す(候補を移っても吹き出しは動かない)．
+///   三角が行に届かないとき(下のほうの行を選んでいて吹き出しが短いとき)だけ，届くところまで下げる．三角は角の丸みにはかけない
+/// - 覆ってしまう物があれば上か下へ寄せる．ただし候補の窓の上の端より上には出さない．画面の上下の端からは screenMargin の内側
 /// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・三角が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
 /// - 枠線は本体と三角を 1 本でなぞる(outline)
 ///
@@ -61,10 +62,9 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     ///   - row: 選んでいる候補の行の背景(画面の座標)．三角はこの行の縦の真ん中を指す
     ///   - window: 候補の窓の本体の枠(画面の座標)
     ///   - size: 本体の大きさ
-    ///   - preferredPointer: 本体の上の端から三角までの長さ(見出しの行の真ん中)
     ///   - screen: 画面の使える範囲
     ///   - obstacles: 覆わない物(ほかの候補・幹の文節・足元の案内・入力中の文字．画面の座標)
-    public init(row: Box, window candidate: Box, size: (width: Double, height: Double), preferredPointer: Double, screen: Box, obstacles: [Box],
+    public init(row: Box, window candidate: Box, size: (width: Double, height: Double), screen: Box, obstacles: [Box],
                 metrics: Metrics) {
         let screen = Box(x: screen.x + metrics.screenMargin, y: screen.y + metrics.screenMargin,
                          width: screen.width - metrics.screenMargin * 2, height: screen.height - metrics.screenMargin * 2)
@@ -72,10 +72,12 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let targetY = row.midY
         let half = metrics.pointerWidth / 2
         let pointerRange = (metrics.radius + half)...(size.height - metrics.radius - half)
+        // 上の端は候補の窓の上の端．三角が行に届かなければ，届くところまで下げる
+        let preferredY = max(candidate.y, targetY - pointerRange.upperBound)
         // x(窓の左の端)に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ nil
         func vertical(at x: Double) -> (y: Double, pointer: Double)? {
             guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
-            var top = screen.y, bottom = screen.maxY
+            var top = max(screen.y, candidate.y), bottom = screen.maxY
             for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX {
                 if obstacle.y >= targetY {
                     bottom = min(bottom, obstacle.y - metrics.gap)
@@ -86,7 +88,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
                 }
             }
             guard bottom - top >= size.height else { return nil }
-            let y = min(max(targetY - preferredPointer, top), bottom - size.height)
+            let y = min(max(preferredY, top), bottom - size.height)
             guard pointerRange.contains(targetY - y) else { return nil }
             return (y, targetY - y)
         }
@@ -97,7 +99,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
         let (side, x, y, pointer) = found ?? {
             let x = max(min(outsideRight.1, screen.maxX - windowWidth), screen.x)
-            let y = max(min(targetY - preferredPointer, screen.maxY - size.height), screen.y)
+            let y = max(min(preferredY, screen.maxY - size.height), screen.y)
             return (Side.right, x, y, min(max(targetY - y, pointerRange.lowerBound), pointerRange.upperBound))
         }()
         self.side = side

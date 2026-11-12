@@ -51,7 +51,7 @@ const GAP: f32 = glass::SEPARATOR_GAP;
 impl Metrics {
     /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から PADDING_X)にそろえる
     fn text_inset(&self) -> f32 {
-        self.inset + candidate::PADDING_X
+        self.inset + part::ROW_PADDING_X
     }
 
     fn new(look: &Look, measure: &dyn Measure) -> Self {
@@ -170,7 +170,7 @@ fn position(map: &BranchMap) -> String {
 /// 候補の下の語の意味の置き方．目印の列を幹の文字と足元の左の端にそろえる
 fn below_position(painter: &Painter) -> Placement {
     Placement {
-        left: candidate::PADDING_X,
+        left: part::ROW_PADDING_X,
         header_mid_y: card_layout::header_height(painter.theme) / 2.0,
     }
 }
@@ -198,6 +198,8 @@ fn meaning_slot(map: &BranchMap, painter: &Painter, width: f32) -> Option<Slot> 
 
 fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     let padding = candidate::PADDING_X;
+    // 幹の文節の背景の内側と，見出し・注釈・足元の文字の左右の余白(一覧の行と同じ)
+    let edge = part::ROW_PADDING_X;
     let mut x = metrics.inset;
     let mut trunk_x = Vec::new();
     let mut trunk_width = Vec::new();
@@ -209,7 +211,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
             },
             |split| split_pieces(split, painter).width,
         );
-        let width = text + padding * 2.0 + corrected_label_width(column, painter);
+        let width = text + edge * 2.0 + corrected_label_width(column, painter);
         trunk_x.push(x);
         trunk_width.push(width);
         x += width + metrics.trunk_gap;
@@ -263,7 +265,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         .max(preview_rows);
     let footer = footer_width(map, painter)
         + painter.width(&position(map), Font::Label)
-        + padding * 2.0
+        + edge * 2.0
         + glass::HINT_GAP;
     // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す．候補の下のカードは窓の幅をカードの幅まで広げる
     let below = map.meaning_placement == Some(MeaningPlacement::Below)
@@ -277,7 +279,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     ]
     .into_iter()
     .flatten()
-    .map(|width| width + padding * 2.0)
+    .map(|width| width + edge * 2.0)
     .fold(0.0, f32::max);
     let heading = map
         .association
@@ -288,7 +290,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         .max(branch_right + metrics.inset)
         .max(footer + metrics.inset * 2.0)
         .max(note + metrics.inset * 2.0)
-        .max(heading + (metrics.inset + candidate::PADDING_X) * 2.0);
+        .max(heading + metrics.text_inset() * 2.0);
     // いちばん上の行の背景(角丸のテーマは行の上下を縮めて描く)の上の端を，枠線の内側の余白の端にそろえる
     let trunk_y = metrics.inset - metrics.row_inset
         + heading_height(map, metrics)
@@ -521,12 +523,12 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         }
     }
     let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
-    // 吹き出しは枝の下の注釈・候補の下の語の意味・足元を覆わない
+    // 吹き出しは枝の下の注釈・候補の下の語の意味・足元を覆わない．どれも枝から GAP だけ空けた所から始まる
     painter.keep_clear.push(Frame::new(
         body.x,
-        footer_y,
+        footer_y + GAP,
         body.width,
-        body.max_y() - footer_y,
+        body.max_y() - footer_y - GAP,
     ));
     let content_width = body.width - metrics.text_inset() * 2.0;
     if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
@@ -593,7 +595,7 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
         (Some(split), _) => draw_split(painter, split, node, color),
         (None, Some((kind, title))) => {
             // コマンドを選んでいれば，幹も枝と同じく種類のアイコンと名前で見せる(入力中の文字には印を付けた名前が出る)
-            let x = node.x + candidate::PADDING_X;
+            let x = node.x + part::ROW_PADDING_X;
             painter.command(kind, x, node.mid_y(), !rounded && column.is_focused, 1.0);
             painter.text(
                 title,
@@ -607,7 +609,7 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
             &column.text,
             Font::Trunk,
             color,
-            node.x + candidate::PADDING_X,
+            node.x + part::ROW_PADDING_X,
             node,
         ),
     }
@@ -618,8 +620,8 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
         branch::UNDERLINE_OFFSET
     };
     let y = node.max_y() - offset;
-    let from = node.x + candidate::PADDING_X;
-    let to = node.max_x() - candidate::PADDING_X - corrected_label_width(column, painter);
+    let from = node.x + part::ROW_PADDING_X;
+    let to = node.max_x() - part::ROW_PADDING_X - corrected_label_width(column, painter);
     if column.is_corrected == Some(true) {
         // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
         painter.tag(
@@ -651,7 +653,7 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
 /// 区切っている文節の幹．切れ目(「問題｜が｜ある」)に，候補の番号と同じ形の小さな丸で番号を描く
 fn draw_split(painter: &mut Painter, split: &BranchSplit, node: Frame, color: crate::theme::Color) {
     let pieces = split_pieces(split, painter);
-    let left = node.x + candidate::PADDING_X;
+    let left = node.x + part::ROW_PADDING_X;
     for (text, x) in &pieces.runs {
         painter.text(text, Font::Trunk, color, left + x, node);
     }
@@ -1567,8 +1569,9 @@ mod tests {
     fn 添える候補は次の文節の手前で省く() {
         let theme = theme("automatic");
         let mut long = map();
+        // 次の文節までに，省いた候補が 1 字以上入る幅の文節
         long.columns = vec![
-            column("今日は", false),
+            column("今日の空は", false),
             BranchColumn {
                 preview: None,
                 ..column("いい天気", false)

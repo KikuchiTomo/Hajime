@@ -397,7 +397,7 @@ pub mod size {
         pub const COMPACT_PADDING_Y: f32 = 4.0;
         pub const SEPARATOR_GAP: f32 = 12.0;
         pub const ROW_PADDING_X: f32 = 4.0;
-        pub const HEADER_HEIGHT: f32 = 20.0;
+        pub const HEADER_HEIGHT: f32 = 16.0;
         pub const ROW_HEIGHT: f32 = 28.0;
         pub const LABEL_FONT_SIZE: f32 = 11.5;
         pub const KEY_FONT_SIZE: f32 = 10.5;

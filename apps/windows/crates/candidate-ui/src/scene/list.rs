@@ -13,7 +13,7 @@ use crate::theme::Font;
 use ipc::{CandidateFocus, CandidateList, KeyHint, MeaningPlacement};
 use tokens::opacity;
 use tokens::size::meaning as card_size;
-use tokens::size::{branch, candidate, glass};
+use tokens::size::{branch, candidate, glass, part};
 
 /// 区画の寸法(list_layout)と，行の中の寸法
 struct Metrics {
@@ -54,7 +54,7 @@ impl Metrics {
                     look.theme.has_drop_shadow(),
                 ),
                 style: Style::Bevel,
-                row_padding_x: candidate::PADDING_X,
+                row_padding_x: part::ROW_PADDING_X,
                 lead: candidate::INDEX_WIDTH,
             }
         }
@@ -596,54 +596,30 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: 
     }
 }
 
-/// 角丸のテーマは案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
+/// 案内を左，位置を右．どのテーマも同じ並び(テーマで変えるのは形と色だけ)．
 /// 左右の端は候補の行の番号の左と注釈のタグの右(行の背景の内側の余白 inset)にそろえる
 fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame, inset: f32) {
     let theme = painter.theme;
     let left = section.x + inset;
     let right = section.max_x() - inset;
-    if theme.is_rounded() {
-        match &footer.note {
-            Some(note) => painter.note(note, left, section.mid_y()),
-            None => {
-                painter.hints(&footer.hints, left, section.mid_y());
-                if let Some(hint) = &footer.association_hint {
-                    // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
-                    let x = left + painter.hints_width(&footer.hints) + glass::HINT_GAP;
-                    painter.text(hint, Font::Label, theme.text_muted, x, section);
-                }
+    match &footer.note {
+        Some(note) => painter.note(note, left, section.mid_y()),
+        None => {
+            painter.hints(&footer.hints, left, section.mid_y());
+            if let Some(hint) = &footer.association_hint {
+                // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
+                let x = left + painter.hints_width(&footer.hints) + glass::HINT_GAP;
+                painter.text(hint, Font::Label, theme.text_muted, x, section);
             }
         }
-        painter.text_right(
-            &footer.position,
-            Font::Label,
-            theme.text_muted,
-            right,
-            section,
-        );
-        return;
     }
-    painter.text(
+    painter.text_right(
         &footer.position,
         Font::Label,
         theme.text_muted,
-        left,
+        right,
         section,
     );
-    match &footer.note {
-        Some(note) => {
-            let width = painter.note_width(note);
-            painter.note(note, right - width, section.mid_y());
-        }
-        None => {
-            let width = painter.hints_width(&footer.hints);
-            painter.hints(&footer.hints, right - width, section.mid_y());
-            if let Some(hint) = &footer.association_hint {
-                let end = right - width - glass::HINT_GAP;
-                painter.text_right(hint, Font::Label, theme.text_muted, end, section);
-            }
-        }
-    }
 }
 
 #[cfg(test)]

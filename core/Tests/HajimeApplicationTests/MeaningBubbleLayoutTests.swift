@@ -32,7 +32,7 @@ struct MeaningBubbleLayoutTests {
 
     static func place(_ setup: (window: Box, row: Box, obstacles: [Box]), size: (width: Double, height: Double) = size,
                       screen: Box = screen) -> Layout {
-        Layout(row: setup.row, window: setup.window, size: size, preferredPointer: 20, screen: screen, obstacles: setup.obstacles,
+        Layout(row: setup.row, window: setup.window, size: size, screen: screen, obstacles: setup.obstacles,
                metrics: metrics)
     }
 
@@ -53,7 +53,7 @@ struct MeaningBubbleLayoutTests {
         #expect(layout.side == .right)
         #expect(Self.tip(layout).x - setup.row.maxX == Self.metrics.gap)
         #expect(Self.tip(layout).y == setup.row.midY)
-        #expect(layout.pointerY == 20)
+        #expect(layout.window.y == setup.window.y)
     }
 
     @Test("広い窓でも三角は選んでいる行のすぐ横で，ほかの候補・幹の文節・足元を覆わない", arguments: [0, 1, 2, 3])
@@ -92,11 +92,37 @@ struct MeaningBubbleLayoutTests {
 
     @Test("画面の下に入らなければ上へ寄せ，画面の端とのあいだを空け，三角は行を指し続ける")
     func bottom() {
-        let setup = Self.list(x: 100, y: 590, selected: 3)
+        // 窓の上の端にそろえると画面の下に入らない
+        let setup = Self.list(x: 100, y: 650, selected: 3)
         let layout = Self.place(setup)
         #expect(layout.window.maxY <= Self.screen.maxY - Self.metrics.screenMargin)
         #expect(Self.tip(layout).y == setup.row.midY)
         #expect(layout.pointerY <= 160 - Self.metrics.radius - Self.metrics.pointerWidth / 2)
+    }
+
+    @Test("吹き出しの上の端は候補の窓の上の端にそろえ，候補を移っても三角だけが動く", arguments: [0, 1, 2, 3])
+    func alignsWithWindowTop(selected: Int) {
+        let setup = Self.list(x: 100, y: 100, selected: selected)
+        let layout = Self.place(setup)
+        #expect(layout.window.y == setup.window.y)
+        #expect(Self.tip(layout).y == setup.row.midY)
+    }
+
+    @Test("三角が行に届かないときだけ，届くところまで下げる")
+    func lowersToReach() {
+        let setup = Self.list(x: 100, y: 100, selected: 3)
+        let short = Self.place(setup, size: (288, 100))
+        #expect(short.window.y > setup.window.y)
+        #expect(short.pointerY == 100 - Self.metrics.radius - Self.metrics.pointerWidth / 2)
+        #expect(Self.tip(short).y == setup.row.midY)
+    }
+
+    @Test("候補の窓より高い吹き出しも，窓の上の端にそろえる")
+    func tallerThanWindow() {
+        let setup = Self.list(x: 100, y: 100, selected: 1)
+        let layout = Self.place(setup, size: (288, 260))
+        #expect(layout.window.y == setup.window.y)
+        #expect(Self.tip(layout).y == setup.row.midY)
     }
 
     @Test("枠線は本体と三角を 1 本でなぞり，始まりに戻る", arguments: [100.0, 880.0])

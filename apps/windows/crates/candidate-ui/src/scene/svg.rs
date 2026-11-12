@@ -563,7 +563,6 @@ mod tests {
                             row.offset(margin, margin),
                             drawn.body.offset(margin, margin),
                             (shown.width, shown.height),
-                            shown.preferred_pointer,
                             Frame::new(-1000.0, -1000.0, 4000.0, 4000.0),
                             &keep_clear,
                             &super::super::bubble::Metrics::tokens(theme.is_rounded()),
@@ -674,6 +673,30 @@ mod tests {
             let last_bubble = bubble::bubble(&held, held.others.clone(), &look, &measure);
             let branch_bubble =
                 bubble::bubble(&homophone(), strings(&["執る", "捕る"]), &look, &measure);
+            // 分岐図で 1 番目(取る)といちばん下(採る)を選んだところ
+            let picked = |index: u32| {
+                let mut map = plain_branch.clone();
+                map.columns[1].selected_alternative = Some(index);
+                branch_map(&map, &look, &measure)
+            };
+            let first_branch = picked(0);
+            let lower_branch = picked(3);
+            let first_branch_row = row(&first_branch, ipc::PointerTarget::Alternative { index: 0 });
+            let lower_branch_row = row(&lower_branch, ipc::PointerTarget::Alternative { index: 3 });
+            let note = |word: &str, meaning: &str, example: &str| HomophoneNote {
+                word: word.into(),
+                part_of_speech: Some(PartOfSpeech::Verb),
+                senses: vec![HomophoneSense {
+                    meaning: meaning.into(),
+                    example: Some(example.into()),
+                }],
+                others: strings(&["執る", "捕る"]),
+            };
+            let took = note("取る", "手に持つ", "本を手に取る");
+            let adopted = note("採る", "選んで用いる", "新人を採る");
+            let first_branch_bubble = bubble::bubble(&took, took.others.clone(), &look, &measure);
+            let lower_branch_bubble =
+                bubble::bubble(&adopted, adopted.others.clone(), &look, &measure);
             // (名前，候補の窓，選んでいる行，吹き出し，画面の大きさ，候補の窓の位置)
             let cases = [
                 (
@@ -691,6 +714,30 @@ mod tests {
                     &shown,
                     (900.0, 320.0),
                     (560.0, 40.0),
+                ),
+                (
+                    "list-lower",
+                    &last_scene,
+                    last_row,
+                    &last_bubble,
+                    (900.0, 320.0),
+                    (40.0, 40.0),
+                ),
+                (
+                    "branch-first",
+                    &first_branch,
+                    first_branch_row,
+                    &first_branch_bubble,
+                    (1000.0, 340.0),
+                    (40.0, 40.0),
+                ),
+                (
+                    "branch-lower",
+                    &lower_branch,
+                    lower_branch_row,
+                    &lower_branch_bubble,
+                    (1000.0, 340.0),
+                    (40.0, 40.0),
                 ),
                 (
                     "list-bottom",
@@ -728,7 +775,6 @@ mod tests {
                     selected.offset(x, y),
                     window.body.offset(x, y),
                     (shown.width, shown.height),
-                    shown.preferred_pointer,
                     Frame::new(0.0, 0.0, width, height),
                     &keep_clear,
                     &metrics,
@@ -757,7 +803,7 @@ mod tests {
         }
     }
 
-    /// 候補の窓の見本(分岐図・入力中の候補・予測・モード表示・案内)を，標準のテーマと platinum で SVG に書き出す．
+    /// 候補の窓の見本(分岐図・文字種の行のある一覧・入力中の候補・予測・モード表示・案内)を，標準のテーマと platinum で SVG に書き出す．
     /// HAJIME_SCENE_SVG=<ディレクトリ> cargo test -p candidate-ui --lib scene::svg -- --ignored
     #[test]
     #[ignore = "見本を書き出すときだけ動かす"]
@@ -813,11 +859,25 @@ mod tests {
                 key_action: Some("戻す".into()),
                 text: "修正「オン外します」　Esc 戻す".into(),
             };
+            // 文字種の行が先頭の一覧(候補の窓の上の余白と足元の並びを見る)
+            let variants = CandidateList {
+                homophone: None,
+                meaning_placement: None,
+                variants: ["カタカナ", "全角英数", "半角英数"]
+                    .iter()
+                    .map(|label| ipc::CandidateVariant {
+                        label: (*label).into(),
+                        is_available: true,
+                    })
+                    .collect(),
+                ..list()
+            };
             let scenes = [
                 (
                     "branch",
                     branch_map(&super::super::sample::branch(), &look, &measure),
                 ),
+                ("list", candidate_list(&variants, &look, &measure)),
                 ("suggestion", candidate_list(&suggestion, &look, &measure)),
                 ("prediction", prediction(&shown, &look, &measure)),
                 ("mode", mode("あ", &look, &measure)),

@@ -83,8 +83,8 @@ final class BranchView: NSView {
     /// 区切りの線の上と下，カードと枝・区切りの線のあいだの空き
     private var gap: CGFloat { Glass.separatorGap }
 
-    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から paddingX)にそろえる
-    private var textInset: CGFloat { metrics.inset + Size.paddingX }
+    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から行の左右の余白)にそろえる．一覧の行の文字の端と同じ
+    private var textInset: CGFloat { metrics.inset + Part.rowPaddingX }
 
     private var metrics: Metrics {
         let scale = fontSize / Size.fontSize
@@ -119,7 +119,7 @@ final class BranchView: NSView {
 
     /// 候補の下: 目印の列を幹の文字と足元の左の端にそろえる．見出しの行は場所の上の端から
     private var belowPosition: MeaningCardLayout.Placement {
-        .init(left: Size.paddingX, headerMidY: MeaningCardDrawing.headerHeight(theme: theme) / 2)
+        .init(left: Part.rowPaddingX, headerMidY: MeaningCardDrawing.headerHeight(theme: theme) / 2)
     }
 
     /// 同音語のタグに出す語．下の枝に出ていない語だけにする(枝に出ている語は見れば分かる)
@@ -180,7 +180,7 @@ final class BranchView: NSView {
         var trunkWidths: [CGFloat] = []
         for column in panel.columns {
             let text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) } ?? textWidth(column.text, font: trunkFont)
-            let width = (column.split.map { splitPieces($0).width } ?? text) + Size.paddingX * 2
+            let width = (column.split.map { splitPieces($0).width } ?? text) + Part.rowPaddingX * 2
                 + (column.isCorrected ? correctedLabelWidth : 0)
             trunkX.append(x)
             trunkWidths.append(width)
@@ -200,12 +200,12 @@ final class BranchView: NSView {
         let upperRows = column?.variants.count ?? 0
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
         // 足元: 左右の余白と，案内と位置のあいだ(案内と案内のあいだと同じ)
-        let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Size.paddingX * 2 + Glass.hintGap
+        let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Part.rowPaddingX * 2 + Glass.hintGap
         // 使い分けや誤用の注釈と，IME からの知らせ(直したことなど)は，枝と足元のあいだに 1 行ずつ出す．キーの案内は消さない
         let note = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) },
                     panel.meaningPlacement == .below && column?.homophone != nil ? Meaning.listWidth : nil]
-            .compactMap { $0.map { $0 + Size.paddingX * 2 } }.max() ?? 0
-        let heading = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + (metrics.inset + Size.paddingX) * 2 } ?? 0
+            .compactMap { $0.map { $0 + Part.rowPaddingX * 2 } }.max() ?? 0
+        let heading = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + textInset * 2 } ?? 0
         var width = max(Size.minWidth, trunkRight + metrics.inset, branchRight + metrics.inset, footer + metrics.inset * 2, note + metrics.inset * 2, heading)
         let focusSpan = focused.map { trunkX[$0]...max(trunkX[$0] + trunkWidths[$0], branchRight) }
         var shiftedX = trunkX
@@ -343,7 +343,8 @@ final class BranchView: NSView {
         let lower = lowerRows(column).indices.filter { $0 != column.selectedAlternative }
             .map { branchRowRect($0, from: node, width: layout.branchWidth, downward: true, metrics: metrics) }
         let upper = upperRows(column).indices.map { branchRowRect($0, from: node, width: layout.branchWidth, downward: false, metrics: metrics) }
-        let footerTop = layout.trunkY + metrics.rowHeight + layout.lowerHeight
+        // 枝の下の物(注釈・知らせ・候補の下の語の意味・足元の区切りの線)は，枝から gap だけ空けた所から始まる
+        let footerTop = layout.trunkY + metrics.rowHeight + layout.lowerHeight + gap
         let footer = NSRect(x: 0, y: footerTop, width: layout.size.width, height: layout.size.height - footerTop)
         return nodes + lower + upper + [footer]
     }
@@ -426,16 +427,16 @@ final class BranchView: NSView {
             drawSplit(split, in: node, color: color)
         } else if let command = trunkCommand(column) {
             // コマンドを選んでいれば，幹も枝と同じく種類のアイコンと名前で見せる(入力中の文字には印を付けた名前が出る)
-            CommandDrawing.drawIcon(command.kind, x: node.minX + Size.paddingX, midY: node.midY, theme: theme, selected: !theme.isRounded && column.isFocused)
-            drawText(command.title, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX + CommandDrawing.width, in: node)
+            CommandDrawing.drawIcon(command.kind, x: node.minX + Part.rowPaddingX, midY: node.midY, theme: theme, selected: !theme.isRounded && column.isFocused)
+            drawText(command.title, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Part.rowPaddingX + CommandDrawing.width, in: node)
         } else {
-            drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Size.paddingX, in: node)
+            drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Part.rowPaddingX, in: node)
         }
         // 下線: 選び直した文節は実線，確信の低い文節は点線．線の種類でも区別し，色だけに頼らない
         let offset = theme.isRounded ? Glass.underlineOffset : Branch.underlineOffset
         let y = node.maxY - offset
-        let from = node.minX + Size.paddingX
-        let to = node.maxX - Size.paddingX - (column.isCorrected ? correctedLabelWidth : 0)
+        let from = node.minX + Part.rowPaddingX
+        let to = node.maxX - Part.rowPaddingX - (column.isCorrected ? correctedLabelWidth : 0)
         if column.isCorrected {
             // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
             NoteDrawing.drawTag(UIStrings.Branch.corrected, maxX: node.maxX - Part.rowPaddingX, midY: node.midY, theme: theme,
@@ -484,7 +485,7 @@ final class BranchView: NSView {
     /// 区切っている文節の幹．切れ目(「問題｜が｜ある」)に，候補の番号と同じ形の小さな丸で番号を描く
     private func drawSplit(_ split: LatticePanel.Column.Split, in node: NSRect, color: NSColor) {
         let pieces = splitPieces(split)
-        let left = node.minX + Size.paddingX
+        let left = node.minX + Part.rowPaddingX
         for run in pieces.runs {
             drawText(run.text, attributes: [.font: trunkFont, .foregroundColor: color], x: left + run.x, in: node)
         }

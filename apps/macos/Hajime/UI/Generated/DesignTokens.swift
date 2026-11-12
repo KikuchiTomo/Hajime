@@ -259,7 +259,7 @@ enum DesignTokens {
             static let compactPaddingY: CGFloat = 4
             static let separatorGap: CGFloat = 12
             static let rowPaddingX: CGFloat = 4
-            static let headerHeight: CGFloat = 20
+            static let headerHeight: CGFloat = 16
             static let rowHeight: CGFloat = 28
             static let labelFontSize: CGFloat = 11.5
             static let keyFontSize: CGFloat = 10.5
