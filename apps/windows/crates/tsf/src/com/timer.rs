@@ -1,5 +1,5 @@
 //! エンジンに来てもらう(wake)・遅れた返事を反映するための時計．入力先のアプリのスレッドごとに，見えないメッセージ専用の窓を 1 つ持ち，
-//! その窓に時計を付ける．
+//! その窓に時計を付ける．同じ窓で，キーの処理を終えてから行うこと(入力メニューを出す)も受け持つ．
 //!
 //! 窓の無い時計(SetTimer(None, …))の知らせは宛先の窓を持たないので，アプリのメッセージの処理によっては配られない
 //! (WinUI などのアプリ)．配られないと，Space の変換の遅れた返事・打鍵が止まったときの変換・打ち間違いの見直しが画面に出ない
@@ -9,8 +9,8 @@ use std::cell::Cell;
 use windows::Win32::Foundation::{HMODULE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleExW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, KillTimer, RegisterClassExW, SetTimer,
-    HWND_MESSAGE, WINDOW_EX_STYLE, WINDOW_STYLE, WM_TIMER, WNDCLASSEXW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, KillTimer, PostMessageW, RegisterClassExW,
+    SetTimer, HWND_MESSAGE, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_TIMER, WNDCLASSEXW,
 };
 use windows_core::{w, PCWSTR};
 
@@ -19,11 +19,15 @@ const CLASS: PCWSTR = w!("hajime.tsf.timer");
 const TIMER_ID: usize = 1;
 /// GetModuleHandleExW の FROM_ADDRESS | UNCHANGED_REFCOUNT
 const FROM_ADDRESS: u32 = 0x4 | 0x2;
+/// 今の知らせ(キーの処理)を終えてから行うことの知らせ(この窓だけが受ける)
+const WM_DEFERRED: u32 = WM_APP + 1;
 
 thread_local! {
     static WINDOW: Cell<Option<HWND>> = const { Cell::new(None) };
     /// 時計が鳴ったときに呼ぶもの(このスレッドの文字入力のサービス)
     static HANDLER: Cell<Option<fn()>> = const { Cell::new(None) };
+    /// 今の知らせを終えてから呼ぶもの
+    static DEFERRED: Cell<Option<fn()>> = const { Cell::new(None) };
 }
 
 /// milliseconds 後に handler を一度呼ぶ(前に頼んだものは取り消す)
@@ -32,6 +36,15 @@ pub fn schedule(milliseconds: u32, handler: fn()) {
     HANDLER.with(|cell| cell.set(Some(handler)));
     // SAFETY: このスレッドで作った窓に付ける．同じ番号で頼み直すと前の時計を置き換える
     unsafe { SetTimer(Some(window), TIMER_ID, milliseconds.max(1), None) };
+}
+
+/// 今受けている知らせ(キーの処理)を終えてから handler を一度呼ぶ(前に頼んでまだ呼んでいないものは置き換える)．
+/// 閉じるまで戻らないもの(入力メニュー)をキーの処理の中で出すと，TSF がキーを渡している途中のまま次のキーが届くので，後に回す
+pub fn defer(handler: fn()) {
+    let Some(window) = window() else { return };
+    DEFERRED.with(|cell| cell.set(Some(handler)));
+    // SAFETY: このスレッドで作った窓に，この窓だけが使う知らせを置く(引数は使わない)
+    let _ = unsafe { PostMessageW(Some(window), WM_DEFERRED, WPARAM(0), LPARAM(0)) };
 }
 
 pub fn cancel() {
@@ -48,6 +61,7 @@ pub fn close() {
         let _ = unsafe { DestroyWindow(window) };
     }
     HANDLER.with(|cell| cell.set(None));
+    DEFERRED.with(|cell| cell.set(None));
 }
 
 /// このスレッドの窓．無ければ作る
@@ -101,6 +115,14 @@ unsafe extern "system" fn procedure(
             // SAFETY: このスレッドの窓の時計．一度だけ鳴らす
             let _ = unsafe { KillTimer(Some(window), TIMER_ID) };
             if let Some(handler) = HANDLER.with(Cell::get) {
+                handler();
+            }
+        });
+        return LRESULT(0);
+    }
+    if message == WM_DEFERRED {
+        let _ = std::panic::catch_unwind(|| {
+            if let Some(handler) = DEFERRED.with(Cell::take) {
                 handler();
             }
         });

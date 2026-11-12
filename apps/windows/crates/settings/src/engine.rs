@@ -23,6 +23,22 @@ pub trait Engine {
     }
 }
 
+/// 単語の登録で受け取った語と読み(入力先で選んでいた文字か入力中の語なので，Debug では中身を出さない)．分からなければ空
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct WordRegistration {
+    pub word: String,
+    pub reading: String,
+}
+
+impl std::fmt::Debug for WordRegistration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WordRegistration")
+            .field("wordLength", &self.word.chars().count())
+            .field("readingLength", &self.reading.chars().count())
+            .finish()
+    }
+}
+
 /// ファイルの読み書きの結果
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileOutcome {
@@ -152,6 +168,21 @@ impl<E: Engine> EngineStore<E> {
 
     pub fn remove_user_dictionary_entry(&self, entry: DictionaryEntry) -> Result<(), StoreError> {
         self.done(RequestBody::RemoveUserDictionaryEntry { entry })
+    }
+
+    /// 単語の登録(入力メニューかキー)でエンジンが持っている語と読みを受け取る．エンジンは一度渡すと消す．
+    /// 持っていない・語も読みも空なら None
+    pub fn take_word_registration(&self) -> Result<Option<WordRegistration>, StoreError> {
+        match self.send(RequestBody::TakeWordRegistration)? {
+            ResponseBody::WordRegistration { word, reading } => {
+                let registration = WordRegistration {
+                    word: word.unwrap_or_default(),
+                    reading: reading.unwrap_or_default(),
+                };
+                Ok((registration != WordRegistration::default()).then_some(registration))
+            }
+            _ => Err(StoreError::Malformed),
+        }
     }
 
     /// 辞書のファイルを取り込む(replacing を渡すとその辞書を取り込み直す)．取り込んだ件数か失敗の理由を返す
@@ -621,6 +652,62 @@ mod tests {
             .read_user_dictionary()
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn 単語の登録の語と読みを受け取る() {
+        let engine = scripted(Some(ResponseBody::WordRegistration {
+            word: Some("山田".into()),
+            reading: Some("やまだ".into()),
+        }));
+        let store = EngineStore::new(&engine);
+        assert_eq!(
+            store.take_word_registration(),
+            Ok(Some(WordRegistration {
+                word: "山田".into(),
+                reading: "やまだ".into()
+            }))
+        );
+        assert_eq!(
+            engine.requests.borrow()[0],
+            RequestBody::TakeWordRegistration
+        );
+        // 読みが分からなければ語だけを入れる
+        let engine = scripted(Some(ResponseBody::WordRegistration {
+            word: Some("Hajime".into()),
+            reading: None,
+        }));
+        assert_eq!(
+            EngineStore::new(&engine).take_word_registration(),
+            Ok(Some(WordRegistration {
+                word: "Hajime".into(),
+                reading: String::new()
+            }))
+        );
+        // 持っていない・空なら入れない
+        for (word, reading) in [(None, None), (Some(String::new()), Some(String::new()))] {
+            let engine = scripted(Some(ResponseBody::WordRegistration { word, reading }));
+            assert_eq!(EngineStore::new(&engine).take_word_registration(), Ok(None));
+        }
+        // 設定の画面のほかからの要求として断られたとき・古いエンジン
+        let engine = scripted(Some(ResponseBody::Error {
+            code: ErrorCode::Malformed,
+        }));
+        assert_eq!(
+            EngineStore::new(&engine).take_word_registration(),
+            Err(StoreError::Rejected)
+        );
+    }
+
+    #[test]
+    fn 単語の登録の語と読みは_debug_に出さない() {
+        let registration = WordRegistration {
+            word: "山田".into(),
+            reading: "やまだ".into(),
+        };
+        let shown = format!("{registration:?}");
+        assert!(!shown.contains("山田"));
+        assert!(!shown.contains("やまだ"));
     }
 
     #[test]

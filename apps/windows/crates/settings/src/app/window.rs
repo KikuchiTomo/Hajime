@@ -181,6 +181,8 @@ pub struct App {
     pub(super) update: super::update::Updater,
     /// 見本のエンジンで開いた(--offline)
     pub(super) offline: bool,
+    /// 単語の登録で開いた(--register-word)．つながったら，エンジンが持っている語と読みを登録の欄に入れる
+    register_word: bool,
 }
 
 /// タイトルバーのアイコンを描く画像の置き場所(0 は外観・情報のページの見本)
@@ -280,6 +282,7 @@ pub fn open(
         measure: options.measure.map(Measurement::new),
         update: super::update::Updater::default(),
         offline: options.offline,
+        register_word: options.register_word,
     };
     APP.with(|cell| *cell.borrow_mut() = Some(app));
     uia::install(uia::Hooks {
@@ -335,6 +338,8 @@ pub struct Options {
     pub page: Option<Page>,
     /// 見本のエンジンで開いた(--offline)．設定のファイルを開かず，ウィザードも見本の値で開く
     pub offline: bool,
+    /// 単語の登録で開いた(--register-word)．ユーザー辞書のページの登録の欄に，エンジンが持っている語と読みを入れる
+    pub register_word: bool,
 }
 
 /// 状態を借りて f を呼ぶ．借りられない(手続きの中から呼ばれた)ときは None
@@ -456,6 +461,7 @@ impl App {
                 ffi::kill_timer(self.window, RECONNECT_TIMER);
                 let page = self.view.page;
                 self.open_page(page);
+                self.take_registration();
                 ffi::post(self.window, WM_WARM, 0, 0);
                 if let Some(measurement) = &mut self.measure {
                     measurement.content = Some(self.started.elapsed().as_secs_f64() * 1000.0);
@@ -464,6 +470,39 @@ impl App {
             }
             None => self.disconnect(),
         }
+    }
+
+    /// 単語の登録で開いたとき，エンジンが持っている語と読みを受け取り，登録した単語の一覧の入力欄に入れて，読みの欄に入力位置を置く．
+    /// つながってから一度だけ行う(エンジンは一度渡すと消す)．語と読みは入力内容なので，引数では受け取らない
+    fn take_registration(&mut self) {
+        if !self.register_word {
+            return;
+        }
+        let Some(model) = &self.model else { return };
+        self.register_word = false;
+        let registration = model
+            .store()
+            .take_word_registration()
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        // 登録した単語の一覧を出す(取り込んだ辞書の一覧を出していたら切り替える)
+        self.view_values.insert(
+            pages::DICTIONARY_TAB.to_string(),
+            serde_json::Value::String(pages::DICTIONARY_TAB_WORDS.to_string()),
+        );
+        if self.view.page == Page::Dictionary {
+            self.refresh();
+        } else {
+            self.open_page(Page::Dictionary);
+        }
+        let Some(element) = self
+            .view
+            .fill_registration(&registration.reading, &registration.word)
+        else {
+            return;
+        };
+        self.set_focus(Focus::Page(element));
     }
 
     pub(super) fn availability(&self) -> Availability {

@@ -1,5 +1,6 @@
 //! タスクバーの入力モードの表示(「あ」「A」)と入力メニュー．TSF の言語バーの項目(GUID_LBI_INPUTMODE)として出す．
-//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・手書き入力・絵文字と記号・設定を開くなどを選ぶ(macOS の入力メニューと同じ項目．crate::menu)．
+//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・手書き入力・絵文字と記号・単語の登録・ユーザー辞書・設定を開くなどを選ぶ
+//! (macOS の入力メニューと同じ項目．crate::menu)．同じメニューを，キー(入力メニューを開く)で入力位置にも出す(show_menu)．
 //! Windows 8 からのタスクバーの入力インジケーターは，右クリックで InitMenu を呼ばず OnClick(TF_LBI_CLK_RIGHT) を呼ぶだけなので，
 //! メニューは自分で出す(InitMenu は古い言語バーのために残す)
 
@@ -27,9 +28,9 @@ use windows::Win32::UI::TextServices::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DestroyMenu, DestroyWindow,
     GetSystemMetrics, PostMessageW, SetForegroundWindow, TrackPopupMenuEx, HICON, ICONINFO,
-    MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SM_CXSMICON, SM_CYSMICON, TPM_BOTTOMALIGN,
-    TPM_LEFTALIGN, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_NULL,
-    WS_POPUP,
+    MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SM_CXSMICON, SM_CYSMICON, TPMPARAMS,
+    TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TPM_TOPALIGN,
+    TPM_VERTICAL, WINDOW_EX_STYLE, WM_NULL, WS_POPUP,
 };
 use windows_core::{
     implement, w, IUnknown, Interface, Ref, Result, BOOL, BSTR, GUID, HSTRING, PCWSTR,
@@ -47,6 +48,8 @@ pub trait Actions {
     fn open_handwriting(&self);
     /// 絵文字と記号のパレットを前に見ていた種類で開く(組み立て中の文字を確定してから)
     fn open_palette(&self);
+    /// 単語の登録．入力先で選んでいる文字を読み，設定の画面のユーザー辞書の登録で開いてもらう
+    fn register_word(&self);
     fn toggle_mode(&self);
     /// エンジンとつながっているか
     fn connected(&self) -> bool;
@@ -65,22 +68,6 @@ impl InputModeItem {
             sink: RefCell::new(None),
             mode: Cell::new(None),
             actions,
-        }
-    }
-
-    /// メニューで選んだ項目を行う
-    fn select(&self, id: u32) {
-        match menu::selection(id) {
-            Some(menu::Selection::Command(command)) => self.actions.run(command),
-            Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
-            Some(menu::Selection::Palette) => self.actions.open_palette(),
-            Some(menu::Selection::CheckForUpdates) => {
-                let _ = super::launch::start_with(
-                    super::launch::SETTINGS_FILE,
-                    menu::CHECK_FOR_UPDATES_ARGUMENT,
-                );
-            }
-            None => {}
         }
     }
 
@@ -141,10 +128,7 @@ impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
             if click == TF_LBI_CLK_LEFT {
                 self.actions.toggle_mode();
             } else if click == TF_LBI_CLK_RIGHT {
-                let items = menu::items(self.actions.menu_settings().as_ref());
-                if let Some(id) = popup(&items, *pt)? {
-                    self.select(id);
-                }
+                show_menu(self.actions.as_ref(), Anchor::Taskbar(*pt))?;
             }
             Ok(())
         })
@@ -180,7 +164,7 @@ impl ITfLangBarItemButton_Impl for InputModeItem_Impl {
 
     fn OnMenuSelect(&self, wid: u32) -> Result<()> {
         guard(|| {
-            self.select(wid);
+            select(self.actions.as_ref(), wid);
             Ok(())
         })
     }
@@ -220,9 +204,59 @@ impl ITfSource_Impl for InputModeItem_Impl {
     }
 }
 
-/// 右クリックのメニューを at(画面の座標)に出し，選んだ項目の番号を返す．選ばずに閉じたら None
-fn popup(items: &[Item], at: POINT) -> Result<Option<u32>> {
-    // SAFETY: メニューと持ち主の窓はこの関数の中で作って消す．文字列は AppendMenuW の呼び出しのあいだ生きている
+/// 入力メニューを出す場所(画面の座標)
+#[derive(Debug, Clone, Copy)]
+pub enum Anchor {
+    /// タスクバーの「あ」「A」を右クリックした点．その上に出す
+    Taskbar(POINT),
+    /// 入力位置．その下に出し，下に入らなければ上に出す(入力位置の行は覆わない)
+    Caret(RECT),
+}
+
+/// 入力メニューを at に出し，選んだ項目を行う(タスクバーの右クリックと，キーで入力位置に出すときで同じ項目・同じ扱いにする)
+pub fn show_menu(actions: &dyn Actions, at: Anchor) -> Result<()> {
+    let items = menu::items(actions.menu_settings().as_ref());
+    if let Some(id) = popup(&items, at)? {
+        select(actions, id);
+    }
+    Ok(())
+}
+
+/// メニューで選んだ項目を行う
+fn select(actions: &dyn Actions, id: u32) {
+    match menu::selection(id) {
+        Some(menu::Selection::Command(command)) => actions.run(command),
+        Some(menu::Selection::Handwriting) => actions.open_handwriting(),
+        Some(menu::Selection::Palette) => actions.open_palette(),
+        Some(menu::Selection::RegisterWord) => actions.register_word(),
+        Some(menu::Selection::CheckForUpdates) => {
+            let _ = super::launch::start_with(
+                super::launch::SETTINGS_FILE,
+                menu::CHECK_FOR_UPDATES_ARGUMENT,
+            );
+        }
+        None => {}
+    }
+}
+
+/// メニューを at に出し，選んだ項目の番号を返す．選ばずに閉じたら None
+fn popup(items: &[Item], at: Anchor) -> Result<Option<u32>> {
+    let common = TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_LEFTALIGN;
+    let (flags, x, y, exclude) = match at {
+        Anchor::Taskbar(point) => (common | TPM_BOTTOMALIGN, point.x, point.y, None),
+        // 入力位置の行(rcExclude)を避けて，上か下に出す
+        Anchor::Caret(rect) => (
+            common | TPM_TOPALIGN | TPM_VERTICAL,
+            rect.left,
+            rect.bottom,
+            Some(TPMPARAMS {
+                cbSize: std::mem::size_of::<TPMPARAMS>() as u32,
+                rcExclude: rect,
+            }),
+        ),
+    };
+    // SAFETY: メニューと持ち主の窓はこの関数の中で作って消す．文字列は AppendMenuW の呼び出しのあいだ生きている．
+    // exclude は TrackPopupMenuEx の呼び出しのあいだ生きている
     unsafe {
         let menu = CreatePopupMenu()?;
         let mut appended = Ok(());
@@ -266,11 +300,11 @@ fn popup(items: &[Item], at: POINT) -> Result<Option<u32>> {
         let _ = SetForegroundWindow(owner);
         let chosen = TrackPopupMenuEx(
             menu,
-            (TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_BOTTOMALIGN).0,
-            at.x,
-            at.y,
+            flags.0,
+            x,
+            y,
             owner,
-            None,
+            exclude.as_ref().map(|params| params as *const TPMPARAMS),
         );
         // 次にメニューを出したときにすぐ閉じないよう，持ち主の窓にメッセージを送ってから消す
         let _ = PostMessageW(Some(owner), WM_NULL, Default::default(), Default::default());
