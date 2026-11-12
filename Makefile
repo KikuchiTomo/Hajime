@@ -21,6 +21,7 @@ fetch-models:
 check:
 	$(PYTHON) tools/check/check_skills.py
 	$(PYTHON) tools/check/check_strings.py
+	$(PYTHON) tools/check/check_settings_fields.py
 	$(PYTHON) .claude/skills/hajime-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/protocol/generate.py --check

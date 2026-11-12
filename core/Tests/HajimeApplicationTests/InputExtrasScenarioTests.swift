@@ -202,6 +202,22 @@ struct InputExtrasScenarioTests {
         #expect(harness.committed == "「東京」")
     }
 
+    @Test("R-22: 利用者が足した変換マクロを一覧に並べ，オフにしたマクロは並べない")
+    func customMacros() throws {
+        let added = ConversionMacro(pattern: "【{text}】")
+        let harness = harness(table: ["とうきょう": [("東京", nil)]]) {
+            $0.association = false
+            $0.conversionMacros = true
+            $0.macros = [added, ConversionMacro(pattern: "〈{text}〉", isEnabled: false)]
+        }
+        harness.type("toukyou")
+        harness.press(.space, .shift)
+        let alternatives = try #require(harness.lattice?.columns.first(where: \.isFocused)?.alternatives)
+        #expect(alternatives.first == "【東京】")
+        #expect(!alternatives.contains("〈東京〉"))
+        #expect(!alternatives.contains("「東京」"))
+    }
+
     @Test("R-22: 変換マクロも連想変換も使わない設定なら，連想変換のキーはふつうの変換になる")
     func macrosOff() {
         let harness = harness(table: ["とうきょう": [("東京", nil)]]) { $0.association = false }

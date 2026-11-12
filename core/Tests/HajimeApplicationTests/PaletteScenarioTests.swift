@@ -377,6 +377,10 @@ struct PaletteScenarioTests {
         let off = self.harness(settings: { $0.paletteRecordsHistory = false }, usage: usage)
         openEmoji(off)
         #expect(off.palette?.tabs.first?.title == "顔と感情")
+        // よく使う文字の行の数を 0 にしても出さない
+        let none = self.harness(settings: { $0.paletteFrequentRows = 0 }, usage: usage)
+        openEmoji(none)
+        #expect(none.palette?.tabs.first?.title == "顔と感情")
     }
 
     @Test("R-26: ⌃D でピン留めし，ピン留めの行を先頭に出す．もう一度押すと外す")

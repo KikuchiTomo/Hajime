@@ -220,6 +220,11 @@ struct FeatureScenarioTests {
         circledOnly.numberFormKanji = false
         circledOnly.numberFormRoman = false
         #expect(SupplementedConverter(base, settings: FakeSettings(circledOnly), calendar: FakeCalendar()).candidates(for: "5").map(\.text) == ["5", "⑤", "❺"])
+        var withoutCircled = DefaultSettings.settings
+        withoutCircled.numberFormCircled = false
+        let candidates = SupplementedConverter(base, settings: FakeSettings(withoutCircled), calendar: FakeCalendar()).candidates(for: "5").map(\.text)
+        #expect(!candidates.contains("⑤") && !candidates.contains("❺"))
+        #expect(candidates.contains("五"))
     }
 
     @Test("R-27: 0 で始まる数・小数・符号の付いた数は書き換えない", arguments: ["01", "1.5", "-3", "５０１ー"])

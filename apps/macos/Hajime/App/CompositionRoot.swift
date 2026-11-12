@@ -81,7 +81,7 @@ final class CompositionRoot {
         settings.observe { [weak engine] in engine?.apply($0) }
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
-        let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
+        let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), settings: settings)
         // 同期(R-15)．この Mac の同期の設定は settings.json と別のファイルに置く
         let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
         let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))

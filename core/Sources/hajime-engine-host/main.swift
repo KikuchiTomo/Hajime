@@ -146,7 +146,7 @@ func run() -> Int32 {
         return 1
     }
     engine.apply(settings.current)
-    let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
+    let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), settings: settings)
     let calendar = SystemCalendar(clock: { Date() })
     let dictionaries = ImportedDictionaryStore(directory: HostPaths.local.appendingPathComponent("dictionaries", isDirectory: true))
     let associations = AssociationDictionaryStore(
