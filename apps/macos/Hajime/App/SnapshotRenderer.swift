@@ -394,6 +394,34 @@ enum SnapshotRenderer {
     }
 
     /// glass の地のぼかしは画像に写らないので，書き出すときだけ面を塗り，影の代わりに余白を付けて地の上に置く
+    /// 候補の窓と，その横に出す語の意味の吹き出しを並べる(吹き出しは MeaningBubbleController と同じ置き方．画面は十分に広いとみなす)．
+    /// row は選んでいる候補の行(候補の窓の座標．上が y の小さい側)
+    private static func withBubble(_ view: NSView, note: HomophoneNote, others: [String], row: NSRect?, theme: ResolvedTheme) -> NSView {
+        guard let row else { return backdropped(view) }
+        let metrics = MeaningBubbleLayout.Metrics.tokens(rounded: theme.isRounded)
+        let header = MeaningCardDrawing.headerHeight(theme: theme)
+        let content = MeaningCardDrawing.layout(note, others: others, width: metrics.width - metrics.padding * 2,
+                                                placement: .init(left: 0, headerMidY: header / 2), theme: theme)
+        let placement = MeaningBubbleLayout(
+            anchor: .init(x: 0, y: 0, width: view.frame.width, height: view.frame.height), targetY: row.midY,
+            size: (metrics.width, content.size.height + metrics.padding * 2), preferredPointer: metrics.padding + header / 2,
+            screen: .init(x: -1000, y: -1000, width: 4000, height: 4000), metrics: metrics)
+        let bubble = MeaningBubbleView()
+        bubble.fillsSurface = true
+        bubble.configure(content: content, placement: placement, metrics: metrics, theme: theme)
+        let margin: CGFloat = 16
+        let top = min(0, placement.window.y)
+        let bottom = max(view.frame.height, placement.window.maxY)
+        let container = SnapshotDesk(frame: NSRect(x: 0, y: 0, width: placement.window.maxX + margin * 2, height: bottom - top + margin * 2))
+        // 地は左下が原点なので，上の端から測った位置を直す
+        view.frame.origin = NSPoint(x: margin, y: margin + bottom - view.frame.height)
+        bubble.frame = NSRect(x: margin + placement.window.x, y: margin + bottom - placement.window.maxY,
+                              width: placement.window.width, height: placement.window.height)
+        container.addSubview(view)
+        container.addSubview(bubble)
+        return container
+    }
+
     private static func backdropped(_ view: NSView) -> NSView {
         let margin: CGFloat = 16
         let container = SnapshotDesk(frame: NSRect(x: 0, y: 0, width: view.frame.width + margin * 2, height: view.frame.height + margin * 2))
@@ -741,7 +769,7 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 同音異義語の使い分け(R-08)を一覧で出したところ．既定では候補の右のカードにし，選んでいる候補を三角で指す
+    /// 同音異義語の使い分け(R-08)を一覧で出したところ．既定では候補の窓の横の吹き出しにし，先で選んでいる候補を指す
     private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -752,7 +780,9 @@ enum SnapshotRenderer {
         panel.meaningPlacement = placement
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return backdropped(view)
+        guard placement == .side else { return backdropped(view) }
+        return withBubble(view, note: SamplePanels.homophone, others: SamplePanels.homophone.others,
+                          row: view.selectedRowRect(size: view.frame.size), theme: view.theme)
     }
 
     /// 同音異義語の無い語の意味を一覧で出したところ．同音語の行を出さず，長い意味は折り返す
@@ -766,10 +796,11 @@ enum SnapshotRenderer {
         panel.homophone = SamplePanels.meaning
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return backdropped(view)
+        return withBubble(view, note: SamplePanels.meaning, others: SamplePanels.meaning.others,
+                          row: view.selectedRowRect(size: view.frame.size), theme: view.theme)
     }
 
-    /// 意味のある候補から意味の無い候補(ひらがな)に移ったところ．カードの場所は空けたままにし，窓の大きさを変えない
+    /// 意味のある候補から意味の無い候補(ひらがな)に移ったところ．吹き出しを出さず，候補の窓の大きさは変えない
     private static func meaningEmptyListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -787,8 +818,8 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 同音異義語の使い分けを分岐図で出したところ．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
-    /// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補にすると，カードの場所を空けたままにする
+    /// 同音異義語の使い分けを分岐図で出したところ．既定では候補の窓の横の吹き出しにし，先で選んでいる枝の行を指す．
+    /// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補にすると，吹き出しを出さない
     private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -805,7 +836,9 @@ enum SnapshotRenderer {
             view.panel = panel
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        return backdropped(view)
+        guard placement == .side, let note = panel.columns[1].homophone else { return backdropped(view) }
+        return withBubble(view, note: note, others: BranchView.others(of: note, in: panel.columns[1]), row: view.selectedRowRect(),
+                          theme: view.theme)
     }
 
     /// コマンドの候補(R-22)を一覧で出したところ．selected は選んでいる行

@@ -585,7 +585,7 @@ enum UIStrings {
 
         static func label(for placement: MeaningPlacement) -> String {
             switch placement {
-            case .side: "候補の右"
+            case .side: "吹き出し"
             case .below: "候補の下"
             }
         }
