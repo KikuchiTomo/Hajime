@@ -2547,21 +2547,42 @@ impl PageView {
                     TextLayout::LINE,
                 );
             }
+            // まとまりの行は 1 枚のカードにまとめ，行のあいだに区切り線を引く(macOS の Form の grouped)．
+            // 切り替えの帯(Segmented)はカードに入れない
             let rows = self.sections.get(index).map(|section| &section.rows);
-            for card in section.cards.iter().filter(|card| frame.shows(card.card)) {
-                let control = rows
-                    .and_then(|rows| rows.get(card.row))
-                    .map(|row| &row.control);
-                if matches!(control, Some(Control::Segmented(_))) {
-                    continue;
+            let grouped: Vec<Rect> = section
+                .cards
+                .iter()
+                .filter(|card| {
+                    let control = rows
+                        .and_then(|rows| rows.get(card.row))
+                        .map(|row| &row.control);
+                    !matches!(control, Some(Control::Segmented(_)))
+                })
+                .map(|card| card.card)
+                .collect();
+            if let (Some(first), Some(last)) = (grouped.first(), grouped.last()) {
+                let group = Rect::new(first.x, first.y, first.width, last.max_y() - first.y);
+                if frame.shows(group) {
+                    canvas.fill_round(group, size::CARD_RADIUS, Color::from(palette.card));
+                    canvas.stroke_round(
+                        group,
+                        size::CARD_RADIUS,
+                        1.0,
+                        Color::from(palette.card_stroke),
+                    );
+                    for card in grouped.iter().skip(1) {
+                        canvas.fill_rect(
+                            Rect::new(
+                                card.x + size::CARD_PADDING_X,
+                                card.y,
+                                (card.width - size::CARD_PADDING_X * 2.0).max(0.0),
+                                1.0,
+                            ),
+                            Color::from(palette.card_stroke),
+                        );
+                    }
                 }
-                canvas.fill_round(card.card, size::CARD_RADIUS, Color::from(palette.card));
-                canvas.stroke_round(
-                    card.card,
-                    size::CARD_RADIUS,
-                    1.0,
-                    Color::from(palette.card_stroke),
-                );
             }
             if let (Some(rect), Some(Some(footer))) = (
                 section.footer.filter(|rect| frame.shows(*rect)),

@@ -247,7 +247,7 @@ public enum LayoutTokens {
         public static let cardGap: Double = 4
         public static let cardRadius: Double = 4
         public static let cardPaddingX: Double = 16
-        public static let rowHeight: Double = 68
+        public static let rowHeight: Double = 48
         public static let controlHeight: Double = 32
         public static let dropdownHeight: Double = 384
         public static let controlWidth: Double = 240
@@ -315,7 +315,7 @@ public enum LayoutTokens {
         public static let sliderThumbSize: Double = 20
         public static let sliderThumbInner: Double = 12
         public static let sliderThumbInnerHover: Double = 14
-        public static let cardPaddingY: Double = 16
+        public static let cardPaddingY: Double = 12
         public static let footerGap: Double = 8
         public static let labelMinWidth: Double = 160
         public static let radioSize: Double = 20
