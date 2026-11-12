@@ -548,6 +548,8 @@ pub struct ListButtons {
     pub sheet: bool,
     /// 表の下の「優先度を上げる」「優先度を下げる」を山形の絵のボタンにする(除外設定．macOS の chevron.up・chevron.down)
     pub move_icons: bool,
+    /// 入力欄と表のあいだに，打った行の確かめの文(形の誤り・上書き)の行を置く(macOS の RuleListEditor の message)
+    pub message_line: bool,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -758,6 +760,11 @@ impl Control {
             bottom_fields: usize::from(exclusions),
             sheet: matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
             move_icons: exclusions,
+            // シートで書く一覧(コマンド)はシートの中で確かめる
+            message_line: matches!(
+                self,
+                Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
+            ) && !matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
         })
     }
 

@@ -633,6 +633,11 @@ pub mod rule_list {
     pub const ENABLED: &str = "有効";
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
+    pub const CHANGES_KIND: &str =
+        "すでに登録されています。追加すると品詞とコメントを書き換えます。";
+    pub fn overwrites(key: &str) -> String {
+        format!("「{key}」はすでにあります。追加すると上書きします。")
+    }
     pub const NO_MATCHES: &str = "一致する項目はありません";
     pub const EDIT: &str = "編集";
 }

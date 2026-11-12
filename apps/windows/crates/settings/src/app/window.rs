@@ -2488,6 +2488,8 @@ impl App {
         };
         let event = self.view.edited(element);
         self.dispatch(event);
+        // 打った行の確かめの文と追加のボタンを描き直す
+        ffi::invalidate(self.window);
     }
 
     fn field_enter(&mut self, window: Window) {

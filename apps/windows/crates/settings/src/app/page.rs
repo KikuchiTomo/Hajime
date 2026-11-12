@@ -446,6 +446,8 @@ struct RowState {
     row: Row,
     /// キー設定のコマンドを置ける状態(新しい行のコマンドの欄を，選んだ状態に置けるものだけにする)
     command_states: std::collections::BTreeMap<String, Vec<String>>,
+    /// 打った行の形が誤っているときの文(一覧の形の invalid．上限は catalog から)
+    invalid_text: String,
     section: usize,
     /// 部品を置いたカード(出さない行は None)
     card: Option<layout::CardLayout>,
@@ -631,9 +633,15 @@ impl RowState {
             }
             _ => Default::default(),
         };
+        let invalid_text = row
+            .control
+            .list_spec()
+            .map(|spec| spec.invalid.resolve(&catalog.limits).into_owned())
+            .unwrap_or_default();
         Self {
             row: row.clone(),
             command_states,
+            invalid_text,
             section,
             card: None,
             visible: true,
@@ -929,6 +937,62 @@ impl RowState {
     }
 
     /// 入力欄の値(選ぶ欄は設定のファイルに書く値)
+    /// 打った行の確かめの文と，足せない問題か(macOS の RuleListEditor の message)．
+    /// 形が誤っていれば理由，同じ見分ける欄の行があれば上書きすること，同じ行があれば登録済みであること
+    fn input_message(&self) -> Option<(String, bool)> {
+        let spec = self.row.control.list_spec()?;
+        if !self.has_add_remove() {
+            return None;
+        }
+        let values = self.input_values();
+        if !spec.is_filled(&values) || values.iter().all(|value| value.trim().is_empty()) {
+            return None;
+        }
+        let item = spec.make(&values);
+        if !spec.is_valid(&item) {
+            return Some((self.invalid_text.clone(), true));
+        }
+        let shown = spec.display(&item);
+        let fields = spec.fields.len();
+        let others: Vec<&Vec<String>> = self
+            .table
+            .rows()
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| Some(*index) != self.editing)
+            .map(|(_, row)| row)
+            .collect();
+        let same_row =
+            |row: &&Vec<String>, count: usize| row.iter().take(count).eq(shown.iter().take(count));
+        if matches!(self.row.control, Control::Dictionary(_)) {
+            // ユーザー辞書は読みと単語の両方が同じ行を重なりとみなす
+            let same = others.iter().find(|row| same_row(row, 2))?;
+            return Some(if same.iter().take(fields).eq(shown.iter().take(fields)) {
+                (rule_list::ALREADY_REGISTERED.to_string(), true)
+            } else {
+                (rule_list::CHANGES_KIND.to_string(), false)
+            });
+        }
+        let keys: Vec<usize> = spec
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, field)| field.key)
+            .map(|(index, _)| index)
+            .collect();
+        if keys.is_empty() {
+            return None;
+        }
+        let collides = others.iter().any(|row| {
+            keys.iter()
+                .all(|index| row.get(*index) == shown.get(*index))
+        });
+        collides.then(|| {
+            let key = item.first().cloned().unwrap_or_default();
+            (rule_list::overwrites(&key), false)
+        })
+    }
+
     fn input_values(&self) -> Vec<String> {
         let Some(spec) = self.row.control.list_spec() else {
             return Vec::new();
@@ -1226,11 +1290,13 @@ impl RowState {
             Part::Bottom(index) if self.file_task(index).is_some() => self
                 .file_task(index)
                 .is_some_and(|task| task.is_import() || self.table.total() > 0),
+            // 打った行に問題があれば足せない(macOS の RuleListEditor)
             Part::Top(0) if self.has_add_remove() => {
-                self.editing.is_some()
+                (self.editing.is_some()
                     || self
                         .list_spec()
-                        .is_some_and(|(spec, _)| spec.is_filled(&self.input_values()))
+                        .is_some_and(|(spec, _)| spec.is_filled(&self.input_values())))
+                    && !self.input_message().is_some_and(|(_, problem)| problem)
             }
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
@@ -3897,6 +3963,42 @@ impl PageView {
 
     fn paint_list(&self, canvas: &mut dyn Canvas, frame: &Frame, index: usize, row: &RowState) {
         let theme = frame.theme;
+        // 打った行の確かめの文(問題は注意の色と警告の印，上書きの知らせは薄い文字と情報の印)を表のすぐ上に出す
+        if let (Some((text, problem)), Some(table)) =
+            (row.input_message(), row.part_rect(Part::Table))
+        {
+            let line = Rect::new(
+                table.x,
+                table.y - size::NOTE_LINE_HEIGHT - size::CONTROL_GAP / 2.0,
+                table.width,
+                size::NOTE_LINE_HEIGHT,
+            );
+            let (glyph, color) = if problem {
+                (theme.glyphs.warning, theme.palette.caution)
+            } else {
+                (theme.glyphs.info, theme.palette.text_secondary)
+            };
+            canvas.text(
+                Rect::new(
+                    line.x,
+                    line.y,
+                    size::CHEVRON_SIZE + size::CONTROL_GAP,
+                    line.height,
+                ),
+                glyph,
+                TextStyle::IconSmall,
+                Color::from(color),
+                TextLayout::LINE,
+            );
+            let left = line.x + size::CHEVRON_SIZE + size::CONTROL_GAP;
+            canvas.text(
+                Rect::new(left, line.y, (line.max_x() - left).max(0.0), line.height),
+                &text,
+                TextStyle::Caption,
+                Color::from(color),
+                TextLayout::LINE,
+            );
+        }
         // 打つもの → 置き換えるものの矢印(macOS の RuleListEditor の arrow.right)
         let arrow = row
             .row
