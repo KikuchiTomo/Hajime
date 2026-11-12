@@ -268,9 +268,9 @@ pub mod size {
         pub const PADDING_Y: f32 = 3.0;
     }
     pub mod branch {
-        pub const TRUNK_GAP: f32 = 10.0;
-        pub const BRANCH_INDENT: f32 = 14.0;
-        pub const BRANCH_STEM_X: f32 = 5.0;
+        pub const TRUNK_GAP: f32 = 12.0;
+        pub const BRANCH_INDENT: f32 = 16.0;
+        pub const BRANCH_STEM_X: f32 = 4.0;
         pub const LINE_WIDTH: f32 = 1.0;
         pub const LINE_WIDTH_SELECTED: f32 = 2.0;
         pub const UNDERLINE_OFFSET: f32 = 2.0;
@@ -339,7 +339,7 @@ pub mod size {
         pub const KEYCAP_HEIGHT: f32 = 17.0;
         pub const HINT_GAP: f32 = 10.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
-        pub const TRUNK_GAP: f32 = 6.0;
+        pub const TRUNK_GAP: f32 = 8.0;
         pub const BRANCH_INDENT: f32 = 28.0;
         pub const BRANCH_STEM_X: f32 = 12.0;
         pub const LINE_WIDTH: f32 = 1.5;

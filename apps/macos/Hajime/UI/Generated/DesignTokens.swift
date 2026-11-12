@@ -153,9 +153,9 @@ enum DesignTokens {
             static let paddingY: CGFloat = 3
         }
         enum Branch {
-            static let trunkGap: CGFloat = 10
-            static let branchIndent: CGFloat = 14
-            static let branchStemX: CGFloat = 5
+            static let trunkGap: CGFloat = 12
+            static let branchIndent: CGFloat = 16
+            static let branchStemX: CGFloat = 4
             static let lineWidth: CGFloat = 1
             static let lineWidthSelected: CGFloat = 2
             static let underlineOffset: CGFloat = 2
@@ -224,7 +224,7 @@ enum DesignTokens {
             static let keycapHeight: CGFloat = 17
             static let hintGap: CGFloat = 10
             static let footerHeight: CGFloat = 28
-            static let trunkGap: CGFloat = 6
+            static let trunkGap: CGFloat = 8
             static let branchIndent: CGFloat = 28
             static let branchStemX: CGFloat = 12
             static let lineWidth: CGFloat = 1.5

@@ -34,9 +34,9 @@ public enum LayoutTokens {
         public static let paddingY: Double = 3
     }
     public enum Branch {
-        public static let trunkGap: Double = 10
-        public static let branchIndent: Double = 14
-        public static let branchStemX: Double = 5
+        public static let trunkGap: Double = 12
+        public static let branchIndent: Double = 16
+        public static let branchStemX: Double = 4
         public static let lineWidth: Double = 1
         public static let lineWidthSelected: Double = 2
         public static let underlineOffset: Double = 2
@@ -105,7 +105,7 @@ public enum LayoutTokens {
         public static let keycapHeight: Double = 17
         public static let hintGap: Double = 10
         public static let footerHeight: Double = 28
-        public static let trunkGap: Double = 6
+        public static let trunkGap: Double = 8
         public static let branchIndent: Double = 28
         public static let branchStemX: Double = 12
         public static let lineWidth: Double = 1.5

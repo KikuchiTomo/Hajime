@@ -38,6 +38,11 @@ struct Metrics {
 const GAP: f32 = glass::SEPARATOR_GAP;
 
 impl Metrics {
+    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の地の左から PADDING_X)にそろえる
+    fn text_inset(&self) -> f32 {
+        self.inset + candidate::PADDING_X
+    }
+
     fn new(look: &Look, measure: &dyn Measure) -> Self {
         let scale = look.font_size / candidate::FONT_SIZE;
         let shadow = if look.theme.has_drop_shadow() {
@@ -272,9 +277,11 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         .max(branch_right + metrics.inset)
         .max(footer + metrics.inset * 2.0)
         .max(note + metrics.inset * 2.0)
-        .max(heading + metrics.inset * 2.0);
-    let trunk_y =
-        metrics.inset + heading_height(map, metrics) + upper_rows as f32 * metrics.row_height;
+        .max(heading + (metrics.inset + candidate::PADDING_X) * 2.0);
+    // いちばん上の行の地(角丸のテーマは行の上下を縮めて描く)の上の端を，縁の内側の余白の端にそろえる
+    let trunk_y = metrics.inset - metrics.row_inset
+        + heading_height(map, metrics)
+        + upper_rows as f32 * metrics.row_height;
     let width = width.ceil();
     let content_right = width - metrics.inset;
     // 下の枝の見える下の端(候補の行の地の下の端)
@@ -378,9 +385,9 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     painter.panel(body);
     if let Some(heading) = &map.association {
         let row = Frame::new(
+            metrics.text_inset(),
             metrics.inset,
-            metrics.inset,
-            body.width - metrics.inset * 2.0,
+            body.width - metrics.text_inset() * 2.0,
             metrics.footer_height,
         );
         super::association::draw(&mut painter, heading, row.inset(-candidate::PADDING_X, 0.0));
@@ -525,7 +532,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         }
     }
     let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
-    let content_width = body.width - metrics.inset * 2.0;
+    let content_width = body.width - metrics.text_inset() * 2.0;
     if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
         if slot.placement == MeaningPlacement::Below {
             // 候補の下: 枝と足元のあいだに，窓の幅いっぱいのカードを出す
@@ -540,7 +547,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
         let row = Frame::new(
-            metrics.inset,
+            metrics.text_inset(),
             footer_y + GAP,
             content_width,
             metrics.footer_height,
@@ -551,7 +558,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     if let Some(note) = map.note.as_ref() {
         // 打ち間違いを直したことなど，IME が変えたことを知らせる
         let row = Frame::new(
-            metrics.inset,
+            metrics.text_inset(),
             footer_y + GAP,
             content_width,
             metrics.footer_height,
@@ -964,9 +971,9 @@ fn footer(painter: &mut Painter, map: &BranchMap, y: f32, width: f32, metrics: &
     let theme = painter.theme;
     painter.separator(y, metrics.inset, width - metrics.inset);
     let footer = Frame::new(
-        metrics.inset,
+        metrics.text_inset(),
         y + candidate::FRAME_WIDTH + GAP,
-        width - metrics.inset * 2.0,
+        width - metrics.text_inset() * 2.0,
         metrics.footer_height,
     );
     painter.hints(&map.hints, footer.x, footer.mid_y());
@@ -1271,7 +1278,8 @@ mod tests {
         assert_eq!(selected[0].3, glass::LINE_WIDTH_SELECTED);
         // 枝は幹の下の 1 点から出て，行の左の手前で終わる
         let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
-        let node_bottom = inset + glass::ROW_HEIGHT * 2.0;
+        // いちばん上の行の地の上の端が縁の内側の余白の端にそろうよう，行は地を縮めた分だけ上から始まる
+        let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
         assert_eq!(selected[0].0.y, node_bottom - glass::CURVE_START_OVERLAP);
         assert_eq!(
             selected[0].1.x,
