@@ -636,6 +636,23 @@ struct EngineServiceTests {
         #expect(custom.cornerRadius == 4)
         #expect(custom.straightBranches)
     }
+    @Test("Windows の設定の画面がカスタムテーマの色を書き換えた customThemes を書くと，そのテーマの色が変わり候補の窓に運ぶ")
+    func customThemeColorFromSettingsApp() throws {
+        let id = greeted()
+        // Windows の設定の画面(themes::edited)は，テーマの配列をまるごと書く
+        func themes(text: String) -> String {
+            ##"{"customThemes":[{"id":"sunset","name":"夕焼け","base":"automatic","surface":"#2B1B17","text":"\##(text)","textMuted":"#C9A68F","##
+                + ##""selection":"#FF7A3D","selectionText":"#1A0E0A","correction":"#FFD23F","line":"#6B4A3E","cornerRadius":4.0,"branchStyle":"curved"}]"##
+        }
+        _ = fields(.writeSettingsFields(values: themes(text: "#FFE8D6") + #","customThemeID":"sunset"}"#), from: id)
+        #expect(settings.current.activeCustomTheme?.text == HexColor("#FFE8D6"))
+        let written = fields(.writeSettingsFields(values: themes(text: "#336699") + "}"), from: id)
+        #expect(written?.keys.sorted() == ["customThemes"])
+        #expect(settings.current.customThemes.map(\.text) == [HexColor("#336699")!])
+        #expect(settings.current.customThemeID == "sunset")
+        #expect(try #require(service.presentation.customTheme).text == WireColor(red: 0x33, green: 0x66, blue: 0x99))
+    }
+
     // MARK: 手書き入力(R-14)
 
     private static let handwritingKey = WireKeyInput(key: .character(text: "h"), modifiers: WireModifiers(shift: false, control: true, alt: true), isKeypad: false)

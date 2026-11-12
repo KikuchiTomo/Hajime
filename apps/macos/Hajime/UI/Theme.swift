@@ -244,6 +244,12 @@ extension HexColor {
     var color: NSColor {
         NSColor(srgbRed: CGFloat(red) / 255, green: CGFloat(green) / 255, blue: CGFloat(blue) / 255, alpha: 1)
     }
+
+    /// 色を sRGB にして写す．sRGB にできない色(模様など)は nil
+    init?(_ color: NSColor) {
+        guard let rgb = color.usingColorSpace(.sRGB) else { return nil }
+        self.init(srgbRed: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent)
+    }
 }
 
 extension RGB {

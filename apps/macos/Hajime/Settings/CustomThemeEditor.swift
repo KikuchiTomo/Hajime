@@ -105,9 +105,8 @@ struct CustomThemeEditor: View {
             ColorPicker(title, selection: Binding(
                 get: { Color(nsColor: theme[keyPath: keyPath].color) },
                 set: { color in
-                    guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return }
-                    theme[keyPath: keyPath] = HexColor(red: UInt8((rgb.redComponent * 255).rounded()), green: UInt8((rgb.greenComponent * 255).rounded()),
-                                                       blue: UInt8((rgb.blueComponent * 255).rounded()))
+                    guard let chosen = HexColor(NSColor(color)) else { return }
+                    theme[keyPath: keyPath] = chosen
                 }
             ), supportsOpacity: false)
             if warns {

@@ -749,14 +749,6 @@ impl RowState {
         )
     }
 
-    /// 選んだ行を切り替えるボタン(項目ごとの同期の範囲)．記号・コマンド・変換マクロの有効と無効は表の「有効」の列で切り替える
-    fn toggle_part(&self) -> Option<Part> {
-        match self.row.control {
-            Control::SyncFields(_) => Some(Part::Top(0)),
-            _ => None,
-        }
-    }
-
     /// 選んだ行を消すボタン(足す一覧は表の下の左)
     pub fn remove_part(&self) -> Option<Part> {
         self.has_add_remove().then_some(Part::Bottom(0))
@@ -800,10 +792,21 @@ impl RowState {
     /// rows の index の行を入力欄に出す．選ぶ欄は表に出した名前から選ぶ
     /// 行の書き換えをやめ，入力欄を空に戻す
     fn cancel_edit(&mut self) {
-        for input in &mut self.inputs {
+        let defaults: Vec<usize> = self
+            .row
+            .control
+            .list_spec()
+            .map(|spec| {
+                spec.fields
+                    .iter()
+                    .map(|field| field.default_choice)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (index, input) in self.inputs.iter_mut().enumerate() {
             match input {
                 Input::Edit(window) => ffi::set_text(*window, ""),
-                Input::Choice(selected) => *selected = 0,
+                Input::Choice(selected) => *selected = defaults.get(index).copied().unwrap_or(0),
             }
         }
         self.editing = None;
@@ -1022,7 +1025,6 @@ impl RowState {
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
             Part::Bottom(0) if self.has_add_remove() => selected,
-            Part::Top(index) if self.toggle_part() == Some(Part::Top(index)) => selected,
             // 辞書・カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
             Part::Bottom(index) if self.is_dictionary_list() => {
@@ -1462,7 +1464,14 @@ impl PageView {
 
     /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)．
     /// ページの上の端より上へ送った欄も隠す
-    pub fn place_fields(&self, theme: &Theme, origin: (f32, f32), scroll: f32, hidden: bool) {
+    pub fn place_fields(
+        &self,
+        theme: &Theme,
+        origin: (f32, f32),
+        header: f32,
+        scroll: f32,
+        hidden: bool,
+    ) {
         for row in &self.rows {
             let shown = !hidden && row.visible && row.card.is_some();
             for part in row.parts() {
@@ -1476,8 +1485,8 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
-                // 欄は窓なので，描いた絵のようにページの枠で切れない．ページの上(タイトルバー)へ出たら隠す
-                if y < origin.1 {
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(header)へ出たら隠す
+                if y < origin.1 + header {
                     ffi::show(window, false);
                     continue;
                 }
@@ -1876,9 +1885,9 @@ impl PageView {
                 index: first,
             });
         }
+        // 項目ごとの同期は表の「同期する」の印で切り替える(table_check_click)
         if let Control::SyncFields(_) = row.row.control {
-            return (Some(part) == row.toggle_part() && !positions.is_empty())
-                .then_some(Event::SyncToggleFields(positions));
+            return None;
         }
         if let Control::List(spec, _) = &row.row.control {
             match (spec.path, part) {
@@ -2193,6 +2202,7 @@ impl PageView {
                 spec: *spec,
                 indices: vec![index],
             }),
+            Control::SyncFields(_) => Some(Event::SyncToggleFields(vec![index])),
             _ => None,
         }
     }
@@ -2686,11 +2696,16 @@ impl PageView {
             else {
                 continue;
             };
+            let color = if note.row.danger {
+                palette.danger
+            } else {
+                palette.text_secondary
+            };
             canvas.text(
                 *rect,
                 note.row.title,
                 TextStyle::Caption,
-                Color::from(palette.text_secondary),
+                Color::from(color),
                 TextLayout::WRAP,
             );
         }
@@ -2791,17 +2806,12 @@ impl PageView {
                     paint::focus_ring(canvas, theme, card.card, size::CARD_RADIUS);
                 }
             }
+            // 切り替えの帯(macOS の segmented の Picker)．溝は薄い灰色で，選んだところだけを浮かせて描く
             Control::Segmented(_) => {
                 canvas.fill_round(
                     card.control,
                     size::CONTROL_RADIUS,
-                    Color::from(palette.control),
-                );
-                canvas.stroke_round(
-                    card.control,
-                    size::CONTROL_RADIUS,
-                    1.0,
-                    Color::from(palette.control_stroke),
+                    Color::from(palette.nav_selected),
                 );
                 for part in row.parts() {
                     if let (Part::Segment(position), Some(rect)) = (part, row.part_rect(part)) {
@@ -3289,12 +3299,13 @@ impl PageView {
             .row
             .control
             .list_buttons()
-            .is_some_and(|buttons| buttons.arrow);
-        if let (true, Some(first), Some(second)) = (
-            arrow,
-            row.part_rect(Part::Field(0)),
-            row.part_rect(Part::Field(1)),
-        ) {
+            .and_then(|buttons| buttons.arrow);
+        if let Some((first, second)) = arrow.and_then(|index| {
+            Some((
+                row.part_rect(Part::Field(index))?,
+                row.part_rect(Part::Field(index + 1))?,
+            ))
+        }) {
             let color = if row.enabled {
                 theme.palette.text_secondary
             } else {
@@ -3667,12 +3678,23 @@ fn preview_chips(
             TextLayout::WRAP,
         );
     }
-    let height = size::BODY_LINE_HEIGHT + PREVIEW_CHIP_PADDING_Y * 2.0;
+    // 札は macOS の resultChip と同じく枠の無い薄い地にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
+    let two_lines = shown.labels.iter().any(Option::is_some);
+    let height = size::BODY_LINE_HEIGHT
+        + if two_lines {
+            size::NOTE_LINE_HEIGHT
+        } else {
+            0.0
+        }
+        + PREVIEW_CHIP_PADDING_Y * 2.0;
     let (mut x, mut y) = (rect.x, rect.y);
     canvas.push_clip(rect);
-    for chip in &shown.chips {
-        let width =
-            (canvas.width(chip, TextStyle::Body) + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
+    for (index, chip) in shown.chips.iter().enumerate() {
+        let label = shown.labels.get(index).and_then(Option::as_ref);
+        let text_width = canvas
+            .width(chip, TextStyle::Body)
+            .max(label.map_or(0.0, |(label, _)| canvas.width(label, TextStyle::Caption)));
+        let width = (text_width + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
         if x > rect.x && x + width > rect.x + rect.width {
             x = rect.x;
             y += height + PREVIEW_CHIP_GAP;
@@ -3681,26 +3703,43 @@ fn preview_chips(
             break;
         }
         let area = Rect::new(x, y, width, height);
-        // 札は入力欄と同じ地と枠にする(左の一覧の選んだ色は暗い外観でカードとほとんど同じになり見えない)
-        canvas.fill_round(area, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
-        canvas.stroke_round(
+        canvas.fill_round(
             area,
             PREVIEW_CHIP_RADIUS,
-            1.0,
-            Color::from(palette.control_stroke),
+            Color::from(palette.text).with_alpha(opacity::PREVIEW_CHIP),
         );
+        let inner = Rect::new(
+            x + PREVIEW_CHIP_PADDING_X,
+            y + PREVIEW_CHIP_PADDING_Y,
+            width - PREVIEW_CHIP_PADDING_X * 2.0,
+            size::BODY_LINE_HEIGHT,
+        );
+        let layout = if two_lines {
+            TextLayout::CENTER
+        } else {
+            TextLayout::LINE
+        };
         canvas.text(
-            Rect::new(
-                x + PREVIEW_CHIP_PADDING_X,
-                y,
-                width - PREVIEW_CHIP_PADDING_X * 2.0,
-                height,
-            ),
+            inner,
             chip,
             TextStyle::Body,
             Color::from(palette.text),
-            TextLayout::LINE,
+            layout,
         );
+        if let Some((label, japanese)) = label {
+            let color = if *japanese {
+                palette.accent
+            } else {
+                palette.text_secondary
+            };
+            canvas.text(
+                Rect::new(inner.x, inner.max_y(), inner.width, size::NOTE_LINE_HEIGHT),
+                label,
+                TextStyle::Caption,
+                Color::from(color),
+                TextLayout::CENTER,
+            );
+        }
         x += width + PREVIEW_CHIP_GAP;
     }
     canvas.pop_clip();
@@ -3785,8 +3824,8 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
             };
             for field in spec.fields {
                 let input = match field.choices {
-                    Some(_) => Input::Choice(0),
-                    None => match fields.take(field.label) {
+                    Some(_) => Input::Choice(field.default_choice),
+                    None => match fields.take(field.prompt.unwrap_or(field.label)) {
                         Some(window) => {
                             // キーの書き方の欄は押したらキーを記録する(macOS の KeyField)
                             edit::set_record_on_click(

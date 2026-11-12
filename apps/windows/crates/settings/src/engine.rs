@@ -349,27 +349,31 @@ impl<E: Engine> SettingsStore for EngineStore<E> {
 
 /// 試した結果を 1 行の文にする(「make → make(英語)」を全角の空白で区切る)
 pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
-    let chips = words
-        .iter()
-        .map(|word| {
-            let language = options::WORD_LANGUAGES
-                .iter()
-                .find(|(value, _)| *value == word.language)
-                .map_or(word.language.as_str(), |(_, label)| label);
-            format!("{} → {}({language})", word.typed, word.shown)
-        })
-        .collect();
-    PreviewShown {
-        chips,
-        line: String::new(),
+    // macOS の resultChip と同じく，札は入る文字と，その下に英語か日本語かを小さく出す
+    let mut shown = PreviewShown::default();
+    for word in words {
+        let language = options::WORD_LANGUAGES
+            .iter()
+            .find(|(value, _)| *value == word.language)
+            .map_or(word.language.as_str(), |(_, label)| label);
+        shown.chips.push(word.shown.clone());
+        shown
+            .labels
+            .push(Some((language.to_string(), word.language == JAPANESE)));
     }
+    shown
 }
 
-/// 試した結果の出し方．chips は札にして折り返して並べる語(macOS の WrappingStack)，line は札にしない 1 行
+/// 日本語の値(PreviewWord.language)．日本語の札はアクセントの色で出す(macOS の .tint)
+const JAPANESE: &str = "japanese";
+
+/// 試した結果の出し方．chips は札にして折り返して並べる語(macOS の WrappingStack)，line は札にしない 1 行．
+/// labels は札の 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行の札
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PreviewShown {
     pub chips: Vec<String>,
     pub line: String,
+    pub labels: Vec<Option<(String, bool)>>,
 }
 
 /// 変換マクロを試した結果．書いている途中の形の結果なら札にせず，頭に「入力中の形: 」を付けた 1 行にする
@@ -379,11 +383,13 @@ pub fn macro_preview_text(results: &[String], drafting: bool) -> PreviewShown {
         return PreviewShown {
             chips: Vec::new(),
             line: format!("{}{shown}", crate::strings::extras::MACRO_DRAFT_RESULT),
+            labels: Vec::new(),
         };
     }
     PreviewShown {
         chips: results.to_vec(),
         line: String::new(),
+        labels: Vec::new(),
     }
 }
 
@@ -552,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn 試した結果を文にする() {
+    fn 試した結果を札にする() {
         let words = vec![
             PreviewWord {
                 typed: "make".into(),
@@ -565,9 +571,15 @@ mod tests {
                 language: "japanese".into(),
             },
         ];
+        // 札は入る文字と，2 行目の英語か日本語か(日本語はアクセントの色)
+        let shown = preview_text(&words);
+        assert_eq!(shown.chips, vec!["make", "すし"]);
         assert_eq!(
-            preview_text(&words).chips,
-            vec!["make → make(英語)", "sushi → すし(日本語)"]
+            shown.labels,
+            vec![
+                Some(("英語".to_string(), false)),
+                Some(("日本語".to_string(), true))
+            ]
         );
     }
 

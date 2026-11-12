@@ -464,7 +464,7 @@ pub mod size {
         pub const FRAME_WIDTH: f32 = 1.0;
         pub const GUIDE_DASH: f32 = 4.0;
         pub const ANCHOR_GAP: f32 = 4.0;
-        pub const CANDIDATE_GAP: f32 = 6.0;
+        pub const CANDIDATE_GAP: f32 = 8.0;
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
         pub const TITLE_HEIGHT: f32 = 32.0;
         pub const CAPTION_BUTTON_WIDTH: f32 = 46.0;
@@ -641,6 +641,7 @@ pub mod size {
         pub const ABOUT_ICON: f32 = 64.0;
         pub const TEMPLATE_NOW_WIDTH: f32 = 160.0;
         pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
+        pub const SEGMENT_INSET: f32 = 2.0;
         pub const LIST_ARROW_WIDTH: f32 = 24.0;
         pub const TITLE_BAR_HEIGHT: f32 = 32.0;
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
@@ -800,6 +801,7 @@ pub mod opacity {
         pub const LINK: f32 = 0.4;
         pub const LINK_HOVER_MIX: f32 = 0.35;
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
+        pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
     }
 }
