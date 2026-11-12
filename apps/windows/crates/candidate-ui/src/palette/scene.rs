@@ -167,8 +167,9 @@ impl Drawing<'_> {
         }
     }
 
-    /// 文字を，実際の外形(ink)の中心が frame の中心に来るように描く．外形を測れなければ行の箱の中心に合わせる
-    fn centered_by_ink(&mut self, text: &str, font: Font, color: Color, frame: Frame) {
+    /// 文字を，実際の外形(ink)の中心が frame の中心に来るように描く．外形を測れなければ行の箱の中心に合わせる．
+    /// snap なら描く位置を整数に丸める(字の輪郭をぼかさない)．色の付いた絵文字は丸めず，余白をそろえる
+    fn centered_by_ink(&mut self, text: &str, font: Font, color: Color, frame: Frame, snap: bool) {
         let (height, _) = self.measure.line(text, font);
         let width = self.painter.width(text, font);
         let ink = self
@@ -176,6 +177,7 @@ impl Drawing<'_> {
             .ink(text, font)
             .unwrap_or(Frame::new(0.0, 0.0, width, height));
         let (x, y) = centered_origin(ink, frame);
+        let (x, y) = if snap { (x.round(), y.round()) } else { (x, y) };
         self.painter.draws.push(Draw::Text {
             frame: Frame::new(x, y, width, height),
             text: text.to_string(),
@@ -202,7 +204,7 @@ impl Drawing<'_> {
                 .find(fits)
                 .unwrap_or(sizes.fonts[EMOJI_FIT_STEPS - 1])
         };
-        self.centered_by_ink(text, font, self.theme.text, frame);
+        self.centered_by_ink(text, font, self.theme.text, frame, false);
     }
 
     // MARK: - 部品
@@ -478,7 +480,7 @@ impl Drawing<'_> {
                 // 絵文字は外形が四角の余白の内側に収まる大きさにし，外形の中心を四角の中心に合わせる
                 self.emoji(&shown.text, fonts.preview_emoji, tile);
             } else {
-                self.centered_by_ink(&shown.text, fonts.preview_symbol, theme.text, tile);
+                self.centered_by_ink(&shown.text, fonts.preview_symbol, theme.text, tile, true);
             }
         }
         let area = preview::Area {
@@ -610,12 +612,11 @@ impl Drawing<'_> {
     }
 }
 
-/// 文字の外形(描く枠の左上からの位置)の中心が frame の中心に来る，描く枠の左上(core の PaletteWindowLayout.centeredOrigin)．
-/// 字の輪郭をぼかさないよう整数に丸める(上下左右の余白の差は 1 以内)
+/// 文字の外形(描く枠の左上からの位置)の中心が frame の中心に来る，描く枠の左上(core の PaletteWindowLayout.centeredOrigin)
 fn centered_origin(ink: Frame, frame: Frame) -> (f32, f32) {
     (
-        (frame.mid_x() - (ink.x + ink.width / 2.0)).round(),
-        (frame.mid_y() - (ink.y + ink.height / 2.0)).round(),
+        frame.mid_x() - (ink.x + ink.width / 2.0),
+        frame.mid_y() - (ink.y + ink.height / 2.0),
     )
 }
 
