@@ -7,10 +7,10 @@ import Testing
 
 /// 同梱の辞書で，促音を含む読みを Zenzai を使わずに変換し，文節の区切り・文節の第 1 候補・2〜5 番目の候補が崩れないことを確かめる．
 /// Zenzai を使わない変換は，分岐図の文節の候補と，一覧の 2 番目から後ろに混ぜる候補に出る．辞書の語(促音で切った交ぜ書きの「はっ声」，
-/// 名詞の「ッ」)や，活用の切れ端と漢字をつないだ候補(はっ再・じゅっ分．SokuonFragments で除くか下げる)が上位に出ると，
+/// 名詞の「ッ」)や，活用の切れ端と漢字をつないだ候補(はっ再・じゅっ分・シュッ派つ．SokuonFragments で除く)が上位に出ると，
 /// 「はッ制したとかないのか」のような候補になる．
-/// 辞書が要るので，環境変数 HAJIME_BUNDLED_DICTIONARY があるときだけ動かす(make test-zenzai)
-@Suite("同梱の辞書の促音の語(Zenzai なし)", .serialized, .enabled(if: ProcessInfo.processInfo.environment["HAJIME_BUNDLED_DICTIONARY"] != nil))
+/// 辞書が要るので，環境変数 HAJIME_BUNDLED_DICTIONARY があるときだけ動かす(make test-zenzai)．Zenzai を使う確かめは，HAJIME_ZENZAI_MODEL もあるときだけ
+@Suite("同梱の辞書の促音の語", .serialized, .enabled(if: ProcessInfo.processInfo.environment["HAJIME_BUNDLED_DICTIONARY"] != nil))
 @MainActor
 struct BundledDictionaryQualityTests {
     /// 読みと，Zenzai を使わない分岐図の文節(「｜」で区切る)．同梱の辞書を v0.5.1 にしたときの結果で，v0.2.0 から変わっていない
@@ -61,22 +61,33 @@ struct BundledDictionaryQualityTests {
     /// 2〜5 番目の候補に出てはいけない書き方(SokuonFragments)．ひらがなのあとのカタカナの促音(はッ制・きッぷ)，カタカナの促音のあとの漢字
     /// (イッ所・ハッ中)，頭のかなを促音で切ってつないだ漢字(じゅっ分・はっ再)
     private static let brokenPatterns = ["[ぁ-ゖ]ッ", "ッ[一-鿿]", "^[ぁ-ゖァ-ヺ]{1,2}[っッ][一-鿿]"].map { try! Regex($0) }
+    /// どの位置にも出してはいけない書き方(SokuonFragments で除く)．ひらがなのあとのカタカナの「ッ」(はッ制)，カタカナか漢字の「ッ」の
+    /// 切れ端に漢字をつないだもの(シュッ派つ・ハッ中・良ッ書)，頭のかなを促音で切ってつないだ漢字(じゅっ分・はっ駐)
+    private static let removedPatterns = ["[ぁ-ゖ]ッ", "[ァ-ヺ一-鿿]ッ[一-鿿]", "^[ぁ-ゖァ-ヺ]{1,2}[っッ][一-鿿]"].map { try! Regex($0) }
 
-    private static let engine: AzooKeyConverterEngine? = {
-        guard let path = ProcessInfo.processInfo.environment["HAJIME_BUNDLED_DICTIONARY"] else { return nil }
+    private static let engine: AzooKeyConverterEngine? = makeEngine(zenzai: false)
+    /// Zenzai を使うエンジン(環境変数 HAJIME_ZENZAI_MODEL があるときだけ)
+    private static let zenzaiEngine: AzooKeyConverterEngine? = makeEngine(zenzai: true)
+
+    private static func makeEngine(zenzai: Bool) -> AzooKeyConverterEngine? {
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment["HAJIME_BUNDLED_DICTIONARY"] else { return nil }
+        let model = zenzai ? environment["HAJIME_ZENZAI_MODEL"].flatMap { try? ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) } : nil
+        if zenzai, model == nil { return nil }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-dictionary-quality-\(UUID().uuidString)")
-        return try? AzooKeyConverterEngine(memoryDirectory: directory, versionString: "dictionary-quality",
+        return try? AzooKeyConverterEngine(memoryDirectory: directory, versionString: "dictionary-quality", zenzai: model,
                                            dictionaryDirectory: URL(fileURLWithPath: path, isDirectory: true))
-    }()
+    }
 
     /// 読みを打って Space を押し，打鍵の合間に求める候補も求めたあとの，分岐図の文節の文字・文節ごとの候補・一覧の候補を返す．
     /// 文節ごとの候補は，→ で注目を移しながら集める
-    private func convert(_ reading: String, presentation: CandidatePresentation) throws -> (columns: [String], alternatives: [[String]], entries: [String]) {
-        let engine = try #require(Self.engine)
+    private func convert(_ reading: String, presentation: CandidatePresentation, zenzai: Bool = false) throws
+        -> (columns: [String], alternatives: [[String]], entries: [String]) {
+        let engine = try #require(zenzai ? Self.zenzaiEngine : Self.engine)
         var settings = DefaultSettings.settings
         settings.candidatePresentation = presentation
         settings.typoCorrection = .off
-        // アプリと同じく，エンジンの候補に足す候補と除く・下げる候補の決まり(SupplementedConverter)と，検証木の採点を通す
+        // アプリと同じく，エンジンの候補に足す候補と除く候補の決まり(SupplementedConverter)と，検証木の採点を通す
         let engineSession = engine.makeSession()
         let store = FakeSettings(settings)
         let session = InputSession(converter: SupplementedConverter(engineSession, settings: store, calendar: FakeCalendar()), lexicon: FakeLexicon(),
@@ -136,5 +147,17 @@ struct BundledDictionaryQualityTests {
         }
         let list = try convert(reading, presentation: .list)
         #expect(broken(in: list.entries).isEmpty, "一覧の候補: \(list.entries.prefix(5))")
+    }
+
+    @Test("Zenzai を使っても，促音の切れ端をつないだ候補(シュッ派つ・ハッ中・はっ駐)は文節と一覧の 2 番目から後ろに出ない",
+          .enabled(if: ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"] != nil), arguments: segmentCases.map(\.reading))
+    func noRemovedCandidatesWithZenzai(reading: String) throws {
+        try #require(Self.zenzaiEngine != nil, "HAJIME_ZENZAI_MODEL のモデルが無い")
+        let automatic = try convert(reading, presentation: .automatic, zenzai: true)
+        let list = try convert(reading, presentation: .list, zenzai: true)
+        for candidates in automatic.alternatives + [list.entries] {
+            let removed = candidates.dropFirst().filter { text in Self.removedPatterns.contains { text.contains($0) } }
+            #expect(removed.isEmpty, "候補: \(candidates)")
+        }
     }
 }
