@@ -261,6 +261,8 @@ pub enum Condition {
     IsNot(&'static str, &'static str),
     /// オン・オフの項目がオンのとき
     On(&'static str),
+    /// すべての条件を満たすとき
+    All(&'static [Condition]),
 }
 
 /// カスタムテーマの書体の欄(macOS の ThemeFontPicker)
@@ -1147,6 +1149,12 @@ const LANGUAGE_RULE_FIELDS: &[Field] = &[
     ),
 ];
 
+/// 日本語のタイプミスを直すとき．修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く
+const CORRECTS_JAPANESE: Condition = Condition::All(&[
+    Condition::Is("typoCorrection", "standard"),
+    Condition::On("correction.japanese"),
+]);
+
 /// 補正のページ(macOS の CorrectionPage)
 fn correction() -> Vec<Section> {
     use Condition::*;
@@ -1154,10 +1162,14 @@ fn correction() -> Vec<Section> {
         Section::new(
             features::CORRECTION_KINDS,
             vec![
-                Row::toggle(features::CORRECTS_ENGLISH, "correction.english"),
-                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese"),
+                Row::toggle(features::CORRECTS_ENGLISH, "correction.english")
+                    .enabled_when(IsNot("typoCorrection", "off")),
+                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese")
+                    .enabled_when(Is("typoCorrection", "standard")),
                 Row::toggle(features::CORRECTS_REPEATED_KEYS, "correction.repeatedKeys")
-                    .enabled_when(On("correction.japanese")),
+                    .enabled_when(CORRECTS_JAPANESE),
+                Row::note(features::CORRECTION_KINDS_NOTE)
+                    .visible_when(IsNot("typoCorrection", "standard")),
                 Row::toggle(features::MISREADINGS, "misreadings"),
                 Row::toggle(extras::LOOSE_READINGS, "looseReadings"),
                 Row::note(extras::LOOSE_READINGS_NOTE),
@@ -1168,7 +1180,7 @@ fn correction() -> Vec<Section> {
         Section {
             title: None,
             rows: vec![Row::toggle(extras::HAND_SHIFT, "handShiftCorrection")
-                .enabled_when(On("correction.japanese"))],
+                .enabled_when(CORRECTS_JAPANESE)],
             footer: Some(extras::HAND_SHIFT_NOTE),
             footer_variants: &[],
         },
@@ -1861,11 +1873,21 @@ pub fn holds(
     text: impl Fn(&str) -> String,
     on: impl Fn(&str) -> bool,
 ) -> bool {
-    match condition {
-        Condition::Is(path, value) => text(path) == value,
-        Condition::IsNot(path, value) => text(path) != value,
-        Condition::On(path) => on(path),
+    fn check(
+        condition: Condition,
+        text: &dyn Fn(&str) -> String,
+        on: &dyn Fn(&str) -> bool,
+    ) -> bool {
+        match condition {
+            Condition::Is(path, value) => text(path) == value,
+            Condition::IsNot(path, value) => text(path) != value,
+            Condition::On(path) => on(path),
+            Condition::All(conditions) => conditions
+                .iter()
+                .all(|condition| check(*condition, text, on)),
+        }
     }
+    check(condition, &text, &on)
 }
 
 #[cfg(test)]
@@ -1920,6 +1942,43 @@ mod tests {
         assert!(holds(Condition::Is("inputStyle", "english"), text, on));
         assert!(!holds(Condition::IsNot("inputStyle", "english"), text, on));
         assert!(!holds(Condition::On("showsModeIndicator"), text, on));
+        let both = Condition::All(&[
+            Condition::Is("inputStyle", "english"),
+            Condition::On("liveConversion"),
+        ]);
+        assert!(!holds(both, text, on));
+        assert!(holds(both, text, |_: &str| true));
+    }
+
+    #[test]
+    fn 修正の対象はタイプミスの修正で選んだ範囲でだけ使える() {
+        let rows: Vec<Row> = sections(Page::Correction)
+            .unwrap()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .collect();
+        let enabled = |path: &str, level: &str, japanese: bool| {
+            let row = rows.iter().find(|row| row.path == path).unwrap();
+            row.enabled.is_none_or(|condition| {
+                holds(
+                    condition,
+                    |path| {
+                        if path == "typoCorrection" {
+                            level.to_string()
+                        } else {
+                            String::new()
+                        }
+                    },
+                    |path| path != "correction.japanese" || japanese,
+                )
+            })
+        };
+        assert!(enabled("correction.english", "conservative", true));
+        assert!(!enabled("correction.english", "off", true));
+        assert!(!enabled("correction.japanese", "conservative", true));
+        assert!(enabled("correction.repeatedKeys", "standard", true));
+        assert!(!enabled("correction.repeatedKeys", "standard", false));
+        assert!(!enabled("handShiftCorrection", "conservative", true));
     }
 
     #[test]
