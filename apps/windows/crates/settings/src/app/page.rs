@@ -93,14 +93,14 @@ pub enum Event {
     },
     /// 選んだ項目の同期の範囲を切り替える(表の行の番号)
     SyncToggleFields(Vec<usize>),
-    /// カスタムテーマの一覧の操作(index は選んだ行，name はそのテーマの名前)
+    /// カスタムテーマの一覧の操作(index は押した行のテーマの番号，name はそのテーマの名前)
     ThemeList {
         action: ThemeAction,
         index: Option<usize>,
         name: String,
     },
-    /// カスタムテーマの一覧で行を選んだ(選んでいなければ None)
-    ThemeSelected(Option<usize>),
+    /// カスタムテーマの編集の画面の下のボタン(名前の欄で Enter を押すと保存)
+    ThemeEditor(EditorAction),
     /// アプリの実行ファイルを選ぶ窓を出し(いくつも選べる)，path の一覧に表の下で選んでいる動作で足す
     ChooseApp {
         path: &'static str,
@@ -148,29 +148,37 @@ pub enum Event {
     Relayout,
 }
 
-/// カスタムテーマの一覧のボタンの操作
+/// カスタムテーマの操作(macOS の AppearancePage と CustomThemeRow)
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThemeAction {
-    /// 入力欄の名前に変える
-    Rename(String),
     /// 今のテーマを写して新しく作る
     Create,
     /// 今使っているテーマを複製する
     DuplicateCurrent,
+    /// 行を押して使う
     Use,
+    /// 行の右のボタン(編集・複製・削除)
+    Edit,
     Duplicate,
     Delete,
 }
 
 impl ThemeAction {
-    /// 表の下のボタンの並び(pages::Control::list_buttons と同じ)
-    const BOTTOM: [ThemeAction; 5] = [
-        ThemeAction::Create,
-        ThemeAction::DuplicateCurrent,
-        ThemeAction::Use,
+    /// カスタムテーマの行の右のボタンの並び(Part::Button の番号)
+    const ROW: [ThemeAction; 3] = [
+        ThemeAction::Edit,
         ThemeAction::Duplicate,
         ThemeAction::Delete,
     ];
+}
+
+/// カスタムテーマの編集の画面の下のボタン(macOS の CustomThemeEditor)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorAction {
+    /// 別の新しいテーマとして保存する(保存したテーマを直しているときだけ)
+    Duplicate,
+    Cancel,
+    Save,
 }
 
 /// 辞書の一覧の操作(macOS の ImportedDictionariesView・AssociationSection の部品)
@@ -225,14 +233,6 @@ fn list_button(label: &str) -> ListButton {
         crate::strings::dictionaries::MOVE_DOWN => ListButton::MoveDown,
         keys::DUPLICATE => ListButton::Duplicate,
         _ => ListButton::Always,
-    }
-}
-
-/// 表の下のボタンのうち，行を選ばなくても使える先頭のボタンの数(作る・取り込む)
-fn always_enabled(control: &Control) -> usize {
-    match control {
-        Control::CustomThemes(_) => 2,
-        _ => 0,
     }
 }
 
@@ -317,8 +317,11 @@ pub struct Extras {
     pub readings: Vec<Vec<String>>,
     /// 同期の状態と編集しているカスタムテーマの値(is_extra_path の道筋)
     pub extra: crate::store::Fields,
-    /// カスタムテーマの読みにくい組み合わせの知らせ(無ければ空)
-    pub theme_report: String,
+    /// 編集しているカスタムテーマの読みにくい組み合わせ(知らせの文と組み合わせ)
+    pub theme_issues: Vec<String>,
+    pub theme_pairs: Vec<ipc::ContrastPair>,
+    /// カスタムテーマごとに，読みにくい組み合わせがあるか(設定のファイルの customThemes と同じ並び)
+    pub theme_warnings: Vec<bool>,
     /// 同期のフォルダの名前と最後に同期した時刻(出す形)
     pub sync_folder: String,
     pub last_synced: String,
@@ -471,6 +474,11 @@ struct RowState {
     text: String,
     /// 色のボタンに出す色(「#RRGGBB」)
     color: String,
+    /// カスタムテーマの行のテーマ(見本の色の札に描く)と，読みにくい組み合わせがあるか
+    custom: Option<ipc::CustomTheme>,
+    warns: bool,
+    /// まだカスタムテーマを作れる(複製のボタン)
+    room: bool,
     /// 一覧の表
     table: Table,
     table_scroll: Scroller,
@@ -480,8 +488,6 @@ struct RowState {
     search: Option<Window>,
     /// 一覧で選んで書き換えている行(rows の番号)．追加のボタンは「更新」になり，この行を置き換える
     editing: Option<usize>,
-    /// カスタムテーマの一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
-    dictionary_inputs: Vec<Vec<String>>,
     /// 試す欄(打つ文・前の文字列)と結果
     preview_fields: Vec<Window>,
     preview_result: crate::engine::PreviewShown,
@@ -645,12 +651,14 @@ impl RowState {
             text,
             lines: Vec::new(),
             color: String::new(),
+            custom: None,
+            warns: false,
+            room: false,
             table: Table::default(),
             table_scroll: Scroller::default(),
             inputs: Vec::new(),
             search: None,
             editing: None,
-            dictionary_inputs: Vec::new(),
             preview_fields: Vec::new(),
             preview_result: Default::default(),
             text_scroll: Scroller::default(),
@@ -701,6 +709,8 @@ impl RowState {
             (Control::Slider(RangeKind::PaletteCellSize), Some(value)) => {
                 crate::strings::palette::cell_size_value(value)
             }
+            // カスタムテーマの行は利用者の付けた名前
+            (Control::CustomTheme(_), _) => self.text.clone(),
             _ => self.row.title.to_string(),
         }
     }
@@ -804,18 +814,9 @@ impl RowState {
         }
     }
 
-    /// 入力欄・追加・削除のある一覧か(項目ごとの同期・カスタムテーマの一覧は違う)
+    /// 入力欄・追加・削除のある一覧か(項目ごとの同期は違う)
     fn has_add_remove(&self) -> bool {
-        self.list_spec().is_some()
-            && !matches!(
-                self.row.control,
-                Control::SyncFields(_) | Control::CustomThemes(_)
-            )
-    }
-
-    /// カスタムテーマの一覧か(入力欄・更新・表の下のボタン)
-    fn is_dictionary_list(&self) -> bool {
-        matches!(self.row.control, Control::CustomThemes(_))
+        self.list_spec().is_some() && !matches!(self.row.control, Control::SyncFields(_))
     }
 
     /// 選んだ行を消すボタン(足す一覧の表の下の「削除」)
@@ -976,25 +977,6 @@ impl RowState {
         }
     }
 
-    /// カスタムテーマの一覧で選んだ行の値を入力欄に出す
-    fn fill_dictionary_inputs(&mut self, position: usize) {
-        let Some(spec) = self.row.control.list_spec().copied() else {
-            return;
-        };
-        let Some(values) = self.dictionary_inputs.get(position).cloned() else {
-            return;
-        };
-        for ((input, field), value) in self.inputs.iter_mut().zip(spec.fields).zip(&values) {
-            match (input, field.choices) {
-                (Input::Choice(selected), Some(choices)) => {
-                    *selected = options::index_of(choices, value);
-                }
-                (Input::Edit(window), _) => ffi::set_text(*window, value),
-                _ => {}
-            }
-        }
-    }
-
     fn windows(&self) -> impl Iterator<Item = Window> + '_ {
         self.inputs
             .iter()
@@ -1035,7 +1017,22 @@ impl RowState {
             Part::Decrement => Some(stepper_button(0.0)),
             Part::Increment => Some(stepper_button(1.0)),
             Part::Slider => self.slider_rect(),
-            Part::Radio => Some(card.card),
+            // カスタムテーマの行は右のボタンを除いたところを押して選ぶ
+            Part::Radio => Some(match self.row.control {
+                Control::CustomTheme(_) => {
+                    let right = card
+                        .parts
+                        .first()
+                        .map_or(card.card.max_x(), |button| button.x);
+                    Rect::new(
+                        card.card.x,
+                        card.card.y,
+                        right - card.card.x,
+                        card.card.height,
+                    )
+                }
+                _ => card.card,
+            }),
             Part::Segment(index) | Part::Button(index) => card.parts.get(index).copied(),
             Part::Filter => filter
                 .then(|| card.parts.get(fields + top + usize::from(search)).copied())
@@ -1093,6 +1090,10 @@ impl RowState {
             Control::Stepper(_) => parts.extend([Part::Decrement, Part::Increment]),
             Control::Seconds(_) | Control::Slider(_) => parts.push(Part::Slider),
             Control::ThemeOption(_) => parts.push(Part::Radio),
+            Control::CustomTheme(_) => {
+                parts.push(Part::Radio);
+                parts.extend((0..ThemeAction::ROW.len()).map(Part::Button));
+            }
             Control::Segmented(choices) => parts.extend((0..choices.len()).map(Part::Segment)),
             Control::Buttons(buttons) => parts.extend((0..buttons.len()).map(Part::Button)),
             Control::Action(_)
@@ -1116,7 +1117,8 @@ impl RowState {
             Control::Color => parts.push(Part::Color),
             // ひな形は 1 つのメニューで，選ぶと読み込む(macOS の KeymapPage のひな形のメニュー)
             Control::Preset => parts.push(Part::Dropdown),
-            Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
+            Control::KeymapReport => parts.push(Part::Text),
+            Control::TextField => parts.push(Part::Field(0)),
             Control::Dictionaries(_) => {
                 if let Some(rows) = &self.dictionaries {
                     parts.extend(
@@ -1196,11 +1198,6 @@ impl RowState {
             }
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
-            // カスタムテーマの一覧の更新
-            Part::Top(0) if self.is_dictionary_list() => selected,
-            Part::Bottom(index) if self.is_dictionary_list() => {
-                index < always_enabled(&self.row.control) || selected
-            }
             Part::Bottom(index) => match self.list_button(index) {
                 Some(ListButton::Remove | ListButton::Duplicate) => selected,
                 Some(ListButton::Edit) => self.table.selected_positions().len() == 1,
@@ -1211,7 +1208,9 @@ impl RowState {
                 None => selected,
             },
             Part::TableChoice(position) => position < self.table.len(),
-            Part::Field(index) => index < fields,
+            Part::Field(index) => index < fields || self.row.control == Control::TextField,
+            // カスタムテーマの複製は上限まで作ったら使えない(macOS と同じ)
+            Part::Button(1) if matches!(self.row.control, Control::CustomTheme(_)) => self.room,
             _ => true,
         }
     }
@@ -1234,6 +1233,12 @@ impl RowState {
             },
             Part::Button(index) => match self.row.control {
                 Control::Buttons(buttons) => buttons.get(index).map_or("", |(label, _)| label),
+                Control::CustomTheme(_) => match ThemeAction::ROW.get(index) {
+                    Some(ThemeAction::Edit) => more::EDIT_THEME,
+                    Some(ThemeAction::Duplicate) => more::DUPLICATE_THEME,
+                    Some(_) => more::DELETE_THEME,
+                    None => "",
+                },
                 _ => "",
             },
             Part::Segment(index) => match self.row.control {
@@ -1504,6 +1509,10 @@ pub struct PageView {
     table_hover: Option<(usize, usize)>,
     /// 中身の幅(DIP)
     width: f32,
+    /// 見本(外観・パレット・絵文字)を描いた大きさ(DIP)．見本の行の高さを決める
+    preview_size: Option<(f32, f32)>,
+    /// ページの題を描く(カスタムテーマの編集の画面は題の代わりに見本を上に留めるので描かない)
+    titled: bool,
 }
 
 /// 描くときに窓から渡すもの
@@ -1542,9 +1551,25 @@ impl PageView {
         availability: Availability,
     ) -> Self {
         let sections = match availability {
-            Availability::Ready => pages::sections(page).unwrap_or_default(),
+            Availability::Ready => pages::with_custom_theme_rows(
+                pages::sections(page).unwrap_or_default(),
+                catalog.limits.custom_themes,
+            ),
             Availability::Loading | Availability::Unavailable => Vec::new(),
         };
+        Self::with_sections(parent, font, pool, page, sections, catalog, availability)
+    }
+
+    /// 項目の並びを決めて作る(カスタムテーマの編集の画面．page は左の一覧で選んでおくページ)
+    pub fn with_sections(
+        parent: Window,
+        font: &ffi::Font,
+        pool: &mut Vec<Window>,
+        page: Page,
+        sections: Vec<Section>,
+        catalog: &Catalog,
+        availability: Availability,
+    ) -> Self {
         let mut id = FIRST_ID;
         let mut next_id = || {
             id = id.wrapping_add(1);
@@ -1579,7 +1604,30 @@ impl PageView {
             hover: HashMap::new(),
             table_hover: None,
             width: 0.0,
+            preview_size: None,
+            titled: true,
         }
+    }
+
+    /// ページの題を描かない(カスタムテーマの編集の画面)
+    pub fn untitled(mut self) -> Self {
+        self.titled = false;
+        self
+    }
+
+    /// ページにある見本の種類(外観・パレット・絵文字)．見本が無ければ None
+    pub fn preview_kind(&self) -> Option<PreviewKind> {
+        self.rows.iter().find_map(|row| match row.row.control {
+            Control::ThemePreview => Some(PreviewKind::Theme),
+            Control::PalettePreview => Some(PreviewKind::Palette),
+            Control::EmojiPreview => Some(PreviewKind::Emoji),
+            _ => None,
+        })
+    }
+
+    /// 見本を描いた大きさを決める(次に置くときに見本の行の高さにする)
+    pub fn set_preview_size(&mut self, size: Option<(f32, f32)>) {
+        self.preview_size = size;
     }
 
     /// 標準の EDIT の窓を隠して pool に返す(次のページで使い回す)
@@ -1614,8 +1662,7 @@ impl PageView {
                 pages::holds(condition, |path| values.text(path), |path| values.on(path))
             };
             row.visible = row.row.visible.is_none_or(condition)
-                && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty())
-                && (row.row.control != Control::ThemeReport || !extras.theme_report.is_empty());
+                && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty());
             row.readable = row.row.path.is_empty() || values.is_readable(row.row.path);
             row.enabled = row.readable && row.row.enabled.is_none_or(condition);
             row.resettable =
@@ -1691,8 +1738,23 @@ impl PageView {
                 Control::Preview(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
                 }
-                Control::ThemeReport => row.text = extras.theme_report.clone(),
-                Control::Color => row.color = values.text(row.row.path),
+                Control::ThemeIssue(index) => {
+                    row.text = extras.theme_issues.get(*index).cloned().unwrap_or_default();
+                    row.visible &= *index < extras.theme_issues.len();
+                }
+                Control::Color => {
+                    row.color = values.text(row.row.path);
+                    row.warns = crate::themes::warns(row.row.path, &extras.theme_pairs);
+                }
+                // 打っている途中は書き直さない(同じ値なら触らない．書き直すと入力位置が先頭に戻る)
+                Control::TextField => {
+                    if let Some(Input::Edit(window)) = row.inputs.first() {
+                        let text = values.text(row.row.path);
+                        if ffi::window_text(*window) != text {
+                            ffi::set_text(*window, &text);
+                        }
+                    }
+                }
                 _ => {}
             }
             if let Some(rows) = list_rows(&row.row, values, extras) {
@@ -1715,12 +1777,17 @@ impl PageView {
                         rows.busy = extras.importing_dictionary;
                     }
                 }
-                Control::CustomThemes(_) => {
-                    row.dictionary_inputs =
-                        crate::themes::entries(values.value(crate::themes::THEMES))
-                            .into_iter()
-                            .map(|entry| vec![entry.name])
-                            .collect();
+                Control::CustomTheme(index) => {
+                    // 今あるテーマの数だけ出す．押すと使い，使っているテーマに選ぶ印を付ける
+                    let entries = crate::themes::entries(values.value(crate::themes::THEMES));
+                    let entry = entries.get(*index);
+                    row.visible = entry.is_some();
+                    row.text = entry.map(|entry| entry.name.clone()).unwrap_or_default();
+                    row.on =
+                        entry.is_some_and(|entry| values.text(crate::themes::ACTIVE) == entry.id);
+                    row.custom = entry.and_then(|entry| crate::themes::to_wire(&entry.value));
+                    row.warns = extras.theme_warnings.get(*index).copied().unwrap_or(false);
+                    row.room = values.on(crate::themes::ROOM);
                 }
                 _ => {}
             }
@@ -1746,11 +1813,14 @@ impl PageView {
             .iter()
             .map(|row| row.dictionaries.as_ref().map(dictionary_rows::Rows::height))
             .collect();
+        let texts: Vec<String> = self.rows.iter().map(|row| row.text.clone()).collect();
         let metrics = Measured {
             measure,
             all: &all,
             expanded: &expanded,
             heights: &heights,
+            preview: self.preview_size,
+            texts: &texts,
         };
         self.layout = layout::layout(
             &self.sections,
@@ -1781,6 +1851,8 @@ impl PageView {
                 all: &[],
                 expanded: &[],
                 heights: &[],
+                preview: None,
+                texts: &[],
             };
             layout::button_width(label, &metrics)
         };
@@ -1811,10 +1883,7 @@ impl PageView {
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 let viewport = table_viewport(row);
                 row.table_scroll.set_extent(content, viewport);
-                if matches!(
-                    row.row.control,
-                    Control::KeymapReport | Control::ThemeReport
-                ) {
+                if row.row.control == Control::KeymapReport {
                     if let Some(card) = &row.card {
                         let inner = card.control.width - size::FIELD_PADDING_X * 2.0;
                         let height = measure.wrapped_height(&row.text, TextStyle::Caption, inner)
@@ -1833,7 +1902,7 @@ impl PageView {
         &self,
         theme: &Theme,
         origin: (f32, f32),
-        header: f32,
+        band: (f32, f32),
         scroll: f32,
         hidden: bool,
     ) {
@@ -1859,8 +1928,9 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
-                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(header)へ出たら隠す
-                if y < origin.1 + header {
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(band の上端より上)や，
+                // 下に留めたボタンの帯(band の下端より下．カスタムテーマの編集の画面)へ出たら隠す
+                if y < origin.1 + band.0 || y + line > origin.1 + band.1 {
                     ffi::show(window, false);
                     continue;
                 }
@@ -1923,6 +1993,12 @@ impl PageView {
                 .dictionaries
                 .as_ref()?
                 .tooltip(index, part),
+            // 絵だけのボタン(カスタムテーマの編集・複製・削除)は名前を出す
+            Part::Button(_) => self
+                .rows
+                .get(element.row)
+                .filter(|row| matches!(row.row.control, Control::CustomTheme(_)))
+                .map(|row| row.button_label(element.part)),
             Part::Bottom(_) => {
                 let row = self.rows.get(element.row)?;
                 let label = row.button_label(element.part);
@@ -1959,7 +2035,10 @@ impl PageView {
                 .control
                 .list_spec()
                 .and_then(|spec| spec.fields.get(index))
-                .map_or_else(String::new, |field| field.label.to_string()),
+                .map_or_else(
+                    || row.row.title.to_string(),
+                    |field| field.label.to_string(),
+                ),
             Part::Search => features::SEARCH.to_string(),
             Part::Table => row.row.control.table_columns().join("・"),
             Part::Entry(index, part) => row
@@ -1970,6 +2049,9 @@ impl PageView {
                 Control::Dictionaries(list) => list.import_label().to_string(),
                 _ => String::new(),
             },
+            // 読みにくいカスタムテーマは名前のあとに知らせる(macOS は印に読みやすさの名前を付ける)
+            Part::Radio if row.warns => format!("{}、{}", row.title(), more::READABILITY),
+            Part::Radio => row.title(),
             _ => row.row.title.to_string(),
         }
     }
@@ -2205,6 +2287,17 @@ impl PageView {
             (Control::Buttons(buttons), Part::Button(index)) => {
                 return Some(Event::Action(buttons.get(index)?.1))
             }
+            (Control::CustomTheme(position), Part::Radio | Part::Button(_)) => {
+                let action = match part {
+                    Part::Button(index) => ThemeAction::ROW.get(index)?.clone(),
+                    _ => ThemeAction::Use,
+                };
+                return Some(Event::ThemeList {
+                    action,
+                    index: Some(*position),
+                    name: row.text.clone(),
+                });
+            }
             (Control::InfoAction(_, action, _), Part::Action) => {
                 return Some(Event::Action(*action))
             }
@@ -2283,29 +2376,6 @@ impl PageView {
                 })
             }
             _ => {}
-        }
-        let positions = row.table.selected_positions();
-        let first = positions.first().copied();
-        if let (Control::CustomThemes(_), Part::Top(0) | Part::Bottom(_)) = (&row.row.control, part)
-        {
-            let action = match part {
-                Part::Top(_) => ThemeAction::Rename(
-                    row.edit(Part::Field(0))
-                        .map(ffi::window_text)
-                        .unwrap_or_default(),
-                ),
-                Part::Bottom(index) => ThemeAction::BOTTOM.get(index)?.clone(),
-                _ => return None,
-            };
-            let name = first
-                .and_then(|index| row.dictionary_inputs.get(index))
-                .and_then(|inputs| inputs.first().cloned())
-                .unwrap_or_default();
-            return Some(Event::ThemeList {
-                action,
-                index: first,
-                name,
-            });
         }
         // 項目ごとの同期は表の「同期する」の印で切り替える(table_check_click)
         if let Control::SyncFields(_) = row.row.control {
@@ -2517,6 +2587,14 @@ impl PageView {
                 row.table_scroll.jump_to(0.0);
                 None
             }
+            Part::Field(0) if row.row.control == Control::TextField => {
+                let text = row.edit(Part::Field(0)).map(ffi::window_text)?;
+                Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::String(text),
+                    clears: None,
+                })
+            }
             Part::PreviewField(_) => {
                 let texts: Vec<String> = row
                     .preview_fields
@@ -2564,6 +2642,10 @@ impl PageView {
         let row = self.rows.get(element.row)?;
         if !matches!(element.part, Part::Field(_)) {
             return None;
+        }
+        // カスタムテーマの名前の欄で Enter を押したら保存する(macOS の保存のボタンは既定の操作)
+        if row.row.control == Control::TextField {
+            return Some(Event::ThemeEditor(EditorAction::Save));
         }
         let button = Element {
             row: element.row,
@@ -2723,13 +2805,6 @@ impl PageView {
     /// 表で選んだ行が変わったあとの入力欄・ボタンの状態(macOS の RuleListEditor と同じ)
     fn selection_changed(&mut self, row_index: usize) -> Option<Event> {
         let row = self.rows.get_mut(row_index)?;
-        let positions = row.table.selected_positions();
-        if row.is_dictionary_list() {
-            // 選んだテーマの名前を入力欄に出す(書き換えて「更新」を押す)
-            if let Some(first) = positions.first() {
-                row.fill_dictionary_inputs(*first);
-            }
-        }
         if row.has_add_remove() {
             // 書き換えている行から選びが外れたら，書き換えをやめる(入力欄はその行の値なので空にする)
             if let Some(editing) = row.editing {
@@ -2738,10 +2813,8 @@ impl PageView {
                 }
             }
         }
-        let event = matches!(row.row.control, Control::CustomThemes(_))
-            .then(|| Event::ThemeSelected(positions.first().copied()));
         self.show_footer_variants();
-        event
+        None
     }
 
     /// 表の (x, y)(ページの中の座標)にある行の位置
@@ -2974,6 +3047,15 @@ impl PageView {
         }
     }
 
+    /// path のスライダーを動かしているあいだの値(動かしていなければ None)．
+    /// 外観の見本は動かしているあいだも文字の大きさを映す(macOS の AppearancePage の fontSize)
+    pub fn dragging(&self, path: &str) -> Option<f64> {
+        self.rows
+            .iter()
+            .find(|row| row.row.path == path)
+            .and_then(|row| row.dragging)
+    }
+
     /// スライダーから手を離した．値が変わっていれば書く
     pub fn slider_release(&mut self) -> Option<Event> {
         let row = self.rows.iter_mut().find(|row| row.dragging.is_some())?;
@@ -3057,7 +3139,7 @@ impl PageView {
     pub fn paint(&self, canvas: &mut dyn Canvas, frame: &Frame) {
         let theme = frame.theme;
         let palette = &theme.palette;
-        if frame.shows(self.layout.title) {
+        if self.titled && frame.shows(self.layout.title) {
             canvas.text(
                 self.layout.title,
                 self.page.title(),
@@ -3158,7 +3240,7 @@ impl PageView {
         let palette = &theme.palette;
         let Some(card) = &row.card else { return };
         // テーマの行はカードのどこを押しても選ぶので，ポインターを載せたらカードの地を変える(名前より先に塗る)
-        if let Control::ThemeOption(_) = row.row.control {
+        if let Control::ThemeOption(_) | Control::CustomTheme(_) = row.row.control {
             let hover = self.hover_value(
                 Element {
                     row: index,
@@ -3173,12 +3255,14 @@ impl PageView {
             );
         }
         // 値の右のボタンだけを使えなくする行(今すぐ同期)は，名前と値をふつうの色で出す
-        let label_color =
-            if row.enabled || matches!(row.row.control, Control::Note | Control::InfoAction(..)) {
-                palette.text
-            } else {
-                palette.text_disabled
-            };
+        let label_color = if row.row.control == Control::Placeholder {
+            palette.text_secondary
+        } else if row.enabled || matches!(row.row.control, Control::Note | Control::InfoAction(..))
+        {
+            palette.text
+        } else {
+            palette.text_disabled
+        };
         let label_style = if row.row.control == Control::Version {
             TextStyle::Subtitle
         } else {
@@ -3320,11 +3404,12 @@ impl PageView {
                 if let Some(rect) = card.parts.first() {
                     paint::radio(canvas, theme, *rect, row.on, state);
                 }
-                paint_swatch(canvas, theme, card.icon, value);
+                paint_swatch(canvas, theme, card.icon, value, None);
                 if state.focus_visible {
                     paint::focus_ring(canvas, theme, card.card, size::CARD_RADIUS);
                 }
             }
+            Control::CustomTheme(_) => self.paint_custom_theme(canvas, frame, index, row),
             // 切り替えの帯(macOS の segmented の Picker)．溝は薄い灰色で，選んだところだけを浮かせて描く
             Control::Segmented(_) => {
                 canvas.fill_round(
@@ -3465,9 +3550,11 @@ impl PageView {
                     value_layout(card),
                 );
             }
-            Control::KeymapReport | Control::ThemeReport => {
+            Control::KeymapReport => {
                 self.paint_text_box(canvas, frame, index, row, card.control);
             }
+            Control::ThemeIssue(_) => paint_issue(canvas, theme, card.control, &row.text),
+            Control::TextField => self.paint_field(canvas, frame, index, row, Part::Field(0)),
             Control::ThemePreview => canvas.preview(card.control),
             // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
             Control::Preview(_) => {
@@ -3489,7 +3576,7 @@ impl PageView {
                 }
                 preview_chips(canvas, theme, card.control, &row.preview_result);
             }
-            Control::Note => {}
+            Control::Note | Control::Placeholder => {}
             Control::Dictionaries(_) => self.paint_dictionaries(canvas, frame, index, row),
             _ => self.paint_list(canvas, frame, index, row),
         }
@@ -3540,6 +3627,58 @@ impl PageView {
         }
     }
 
+    /// カスタムテーマの行(macOS の CustomThemeRow)．選ぶ印・見本の色・名前・読みにくい印と，右に編集・複製・削除の絵のボタン
+    fn paint_custom_theme(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+    ) {
+        let theme = frame.theme;
+        let Some(card) = &row.card else { return };
+        let element = |part| Element { row: index, part };
+        let state = self.state(frame, element(Part::Radio), row.enabled);
+        paint::radio(canvas, theme, card.control, row.on, state);
+        if let Some(custom) = &row.custom {
+            paint_swatch(canvas, theme, card.icon, &custom.base, Some(custom));
+        }
+        // 読みにくい組み合わせがあれば，名前の右に注意の印を出す(macOS の exclamationmark.triangle.fill)
+        if let (true, Some(mark)) = (row.warns, card.parts.get(ThemeAction::ROW.len())) {
+            canvas.text(
+                *mark,
+                theme.glyphs.warning,
+                TextStyle::IconSmall,
+                Color::from(theme.palette.caution),
+                TextLayout::CENTER,
+            );
+        }
+        for position in 0..ThemeAction::ROW.len() {
+            let part = Part::Button(position);
+            let Some(rect) = row.part_rect(part) else {
+                continue;
+            };
+            let glyph = match ThemeAction::ROW[position] {
+                ThemeAction::Edit => theme.glyphs.edit,
+                ThemeAction::Duplicate => theme.glyphs.copy,
+                _ => theme.glyphs.delete,
+            };
+            paint::button(
+                canvas,
+                theme,
+                rect,
+                glyph,
+                paint::ButtonKind::Quiet,
+                self.state(frame, element(part), row.part_enabled(part)),
+            );
+        }
+        if state.focus_visible {
+            if let Some(rect) = row.part_rect(Part::Radio) {
+                paint::focus_ring(canvas, theme, rect, size::CARD_RADIUS);
+            }
+        }
+    }
+
     fn paint_color(
         &self,
         canvas: &mut dyn Canvas,
@@ -3555,6 +3694,17 @@ impl PageView {
             part: Part::Color,
         };
         let state = self.state(frame, element, row.enabled);
+        // 読みにくい組み合わせに入る色は，色のボタンの左に注意の印を出す(macOS の CustomThemeEditor)
+        if row.warns {
+            let icon = size::ICON_FONT_SIZE;
+            canvas.text(
+                Rect::new(rect.x - size::CONTROL_GAP - icon, rect.y, icon, rect.height),
+                theme.glyphs.warning,
+                TextStyle::IconSmall,
+                Color::from(palette.caution),
+                TextLayout::CENTER,
+            );
+        }
         paint::button(canvas, theme, rect, "", paint::ButtonKind::Standard, state);
         let gap = size::CONTROL_GAP;
         let swatch_size = rect.height - gap * 2.0;
@@ -4404,6 +4554,13 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
                 }
             }
         }
+        Control::TextField => {
+            if let Some(window) = fields.take(row.row.title) {
+                // 使い回した欄がキーを記録する欄だったら戻す
+                edit::set_record_on_click(window, None);
+                row.inputs.push(Input::Edit(window));
+            }
+        }
         Control::Preview(kind) => {
             let labels = match kind {
                 TryKind::Language => [features::TRY_PLACEHOLDER, features::TRY_PRECEDING],
@@ -4720,11 +4877,6 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
             .into_iter()
             .map(|item| spec.display(&item))
             .collect(),
-        Control::CustomThemes(_) => {
-            let entries = crate::themes::entries(values.value(crate::themes::THEMES));
-            let active = values.value(crate::themes::ACTIVE).and_then(Value::as_str);
-            crate::themes::table(&entries, active)
-        }
         _ => return None,
     })
 }
@@ -4820,12 +4972,19 @@ fn button_kind(action: Action) -> paint::ButtonKind {
     }
 }
 
-/// テーマの見本の札(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする
-fn paint_swatch(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, value: &str) {
+/// テーマの見本の札(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
+/// value は既成のテーマの値(カスタムテーマは元のテーマ)，custom はカスタムテーマの色
+fn paint_swatch(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    value: &str,
+    custom: Option<&ipc::CustomTheme>,
+) {
     use candidate_ui::theme::{ResolvedTheme, SystemLook};
     let resolved = ResolvedTheme::resolve(
         value,
-        None,
+        custom,
         &SystemLook {
             dark: theme.dark,
             ..SystemLook::default()
@@ -4868,6 +5027,40 @@ fn paint_swatch(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, value: &str)
     );
 }
 
+/// 読みにくい組み合わせの知らせの行の高さ(注意の印と，折り返した文．width はカードの中の幅)
+fn issue_height(text: &str, width: f32, measure: &dyn paint::Measure) -> f32 {
+    let inner = (width - size::ICON_FONT_SIZE - size::CONTROL_GAP).max(1.0);
+    (measure.wrapped_height(text, TextStyle::Body, inner) + size::CARD_PADDING_Y * 2.0)
+        .max(size::ROW_HEIGHT)
+}
+
+/// 読みにくい組み合わせの知らせ(macOS の Label と exclamationmark.triangle.fill)．rect はカードの中
+fn paint_issue(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, text: &str) {
+    let icon = size::ICON_FONT_SIZE;
+    let line = size::BODY_LINE_HEIGHT;
+    let top = rect.y + size::CARD_PADDING_Y;
+    canvas.text(
+        Rect::new(rect.x, top, icon, line),
+        theme.glyphs.warning,
+        TextStyle::IconSmall,
+        Color::from(theme.palette.caution),
+        TextLayout::CENTER,
+    );
+    let left = rect.x + icon + size::CONTROL_GAP;
+    canvas.text(
+        Rect::new(
+            left,
+            top,
+            (rect.max_x() - left).max(0.0),
+            (rect.height - size::CARD_PADDING_Y * 2.0).max(line),
+        ),
+        text,
+        TextStyle::Body,
+        Color::from(theme.palette.text),
+        TextLayout::WRAP,
+    );
+}
+
 /// 見本の画像の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreviewKind {
@@ -4898,6 +5091,10 @@ struct Measured<'a> {
     expanded: &'a [bool],
     /// 辞書の一覧のカードの高さ(行と同じ並び．辞書の一覧でなければ None)
     heights: &'a [Option<f32>],
+    /// ページの見本(外観・パレット・絵文字)を描いた大きさ．測れていなければ None
+    preview: Option<(f32, f32)>,
+    /// 行ごとの文(行と同じ並び．読みにくい組み合わせの知らせの高さを測る)
+    texts: &'a [String],
 }
 
 impl Measured<'_> {
@@ -4933,7 +5130,21 @@ impl Metrics for Measured<'_> {
     }
 
     fn height(&self, row: &Row, width: f32) -> Option<f32> {
+        if matches!(
+            row.control,
+            Control::ThemePreview | Control::PalettePreview | Control::EmojiPreview
+        ) {
+            return self
+                .preview
+                .map(|natural| layout::preview_height(natural, width));
+        }
         let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+        if let Control::ThemeIssue(_) = row.control {
+            let text = self
+                .position(row)
+                .and_then(|position| self.texts.get(position))?;
+            return Some(issue_height(text, inner, self.measure));
+        }
         if row.control == Control::TemplateReference {
             return Some(TemplateLayout::new((0.0, 0.0, inner), self.measure).height);
         }

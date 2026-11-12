@@ -1,11 +1,12 @@
 #![forbid(unsafe_code)]
 
 //! カスタムテーマ(macOS の AppearancePage・CustomThemeEditor)．設定のファイルの customThemes と customThemeID をそのまま読み書きする．
-//! 選んだテーマの色・形・書体は「customTheme.」で始まる道筋の値にし，ほかのページと同じ部品で出して書き換える
+//! 編集の画面では，テーマの下書きの名前・色・形・書体を「customTheme.」で始まる道筋の値にし，ほかのページと同じ部品で出して
+//! 書き換える．「保存」を押すまで設定のファイルには書かない(saved)
 
-use crate::model::SettingsModel;
-use crate::store::{Fields, SettingsStore, StoreError};
-use crate::strings::{more, windows};
+use crate::store::Fields;
+use crate::strings::more;
+use ipc::{ContrastIssue, ContrastPair};
 use serde_json::{json, Map, Value};
 
 pub const THEMES: &str = "customThemes";
@@ -13,13 +14,14 @@ pub const ACTIVE: &str = "customThemeID";
 /// 既成のテーマを選ぶ設定(カスタムテーマを使っているときは，その名前を選んだ状態で見せる)
 pub const BASE_THEME: &str = "theme";
 
-/// 編集しているテーマの id(選んでいなければ空)
-pub const ID: &str = "customTheme.id";
-/// 読みにくい組み合わせの知らせ(無ければ空)
-pub const READABILITY: &str = "customTheme.readability";
+/// カスタムテーマが 1 つも無い(一覧の代わりに知らせを出す)
+pub const EMPTY: &str = "customTheme.empty";
+/// まだ作れる(上限まで作っていない)
+pub const ROOM: &str = "customTheme.room";
 const PREFIX: &str = "customTheme.";
 
 /// 編集できる値(道筋の後ろと設定のファイルの名前が同じ)
+pub const NAME: &str = "customTheme.name";
 pub const COLORS: &[(&str, &str)] = &[
     ("customTheme.surface", more::SURFACE),
     ("customTheme.text", more::TEXT),
@@ -32,6 +34,9 @@ pub const COLORS: &[(&str, &str)] = &[
 pub const CORNER_RADIUS: &str = "customTheme.cornerRadius";
 pub const BRANCH_STYLE: &str = "customTheme.branchStyle";
 pub const FONT_NAME: &str = "customTheme.fontName";
+
+/// 読みやすさを確かめる組み合わせの数(ipc::ContrastPair の数．編集の画面の知らせの行の数)
+pub const CONTRAST_PAIRS: usize = 4;
 
 pub fn is_theme_path(path: &str) -> bool {
     path.starts_with(PREFIX)
@@ -72,58 +77,26 @@ pub fn active_name(themes: Option<&Value>, active: &str) -> Option<String> {
         .map(|entry| entry.name)
 }
 
-/// ほかのテーマと重ならない名前(「新しいテーマ」「新しいテーマ 2」…)
-pub fn unique_name(base: &str, entries: &[Entry]) -> String {
-    let taken = |name: &str| entries.iter().any(|entry| entry.name == name);
-    if !taken(base) {
-        return base.to_string();
-    }
-    (2..)
-        .map(|number| format!("{base} {number}"))
-        .find(|name| !taken(name))
-        .unwrap_or_else(|| base.to_string())
-}
-
-/// 表の行(名前・状態)
-pub fn table(entries: &[Entry], active: Option<&str>) -> Vec<Vec<String>> {
-    entries
-        .iter()
-        .map(|entry| {
-            let state = if active == Some(entry.id.as_str()) {
-                windows::IN_USE
-            } else {
-                ""
-            };
-            vec![entry.name.clone(), state.to_string()]
-        })
-        .collect()
-}
-
-/// 編集しているテーマの値(「customTheme.」の道筋)．テーマを選んでいなければ id だけを空にする
-pub fn values(entry: Option<&Entry>, readability: &str) -> Fields {
+/// 一覧の値(「customTheme.」の道筋)．count は今あるテーマの数，limit は作れる数の上限
+pub fn list_values(count: usize, limit: usize) -> Fields {
     let mut values = Fields::new();
-    values.insert(
-        ID.into(),
-        Value::String(entry.map_or_else(String::new, |entry| entry.id.clone())),
-    );
-    values.insert(READABILITY.into(), Value::String(readability.to_string()));
-    let Some(entry) = entry else {
-        return values;
-    };
-    for name in COLORS
-        .iter()
-        .map(|(path, _)| *path)
+    values.insert(EMPTY.into(), Value::Bool(count == 0));
+    values.insert(ROOM.into(), Value::Bool(count < limit));
+    values
+}
+
+/// 編集しているテーマの下書きの値(「customTheme.」の道筋)
+pub fn draft_values(draft: &Value) -> Fields {
+    let mut values = Fields::new();
+    for name in std::iter::once(NAME)
+        .chain(COLORS.iter().map(|(path, _)| *path))
         .chain([CORNER_RADIUS, BRANCH_STYLE])
     {
-        if let Some(value) = entry.value.get(field(name)) {
+        if let Some(value) = draft.get(field(name)) {
             values.insert(name.into(), value.clone());
         }
     }
-    let font = entry
-        .value
-        .get("fontName")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let font = draft.get("fontName").and_then(Value::as_str).unwrap_or("");
     values.insert(FONT_NAME.into(), Value::String(font.to_string()));
     values
 }
@@ -141,15 +114,15 @@ pub fn is_hex_color(text: &str) -> bool {
             .all(|character| character.is_ascii_hexdigit())
 }
 
-/// 編集しているテーマ(id)の値を path・value で書き換えた配列．書き換えられなければ None
-pub fn edited(themes: Option<&Value>, id: &str, path: &str, value: &Value) -> Option<Value> {
-    let mut elements = themes?.as_array()?.clone();
-    let element = elements
-        .iter_mut()
-        .find(|element| element.get("id").and_then(Value::as_str) == Some(id))?
-        .as_object_mut()?;
+/// 下書き(テーマ)の path の値を value にする．書き換えられない値なら None．
+/// 名前は打ったまま持ち，空白を除くのは保存するとき(macOS の CustomThemeEditor の trimmedName)
+pub fn edit(draft: &mut Value, path: &str, value: &Value) -> Option<()> {
+    let element = draft.as_object_mut()?;
     let name = field(path);
     match path {
+        NAME => {
+            element.insert(name.into(), Value::String(value.as_str()?.to_string()));
+        }
         FONT_NAME => {
             let font = value.as_str()?;
             if font.is_empty() {
@@ -173,43 +146,84 @@ pub fn edited(themes: Option<&Value>, id: &str, path: &str, value: &Value) -> Op
         }
         _ => return None,
     }
-    Some(Value::Array(elements))
+    Some(())
 }
 
-/// 編集しているテーマ(id)の path の値を value にして，設定のファイルの customThemes に書く．書き換えられない値なら None
-pub fn write<S: SettingsStore>(
-    model: &mut SettingsModel<S>,
-    id: &str,
-    path: &str,
-    value: &Value,
-) -> Option<Result<(), StoreError>> {
-    let changed = edited(model.value(THEMES), id, path, value)?;
-    Some(model.set(THEMES, changed))
+/// 保存する名前(前後の空白を除き，上限の長さで切る)
+pub fn trimmed_name(draft: &Value, maximum: usize) -> String {
+    draft
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .chars()
+        .take(maximum)
+        .collect()
 }
 
-/// 名前を書き換えた配列．空の名前は None(macOS と同じく名前を入れないと保存しない)
-pub fn renamed(themes: Option<&Value>, id: &str, name: &str, maximum: usize) -> Option<Value> {
-    let name: String = name.trim().chars().take(maximum).collect();
+/// 保存できないわけ(macOS の SettingsModel.saveCustomTheme)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaveError {
+    /// 名前が空
+    Name,
+    /// 上限まで作っている(新しいテーマを足せない)
+    Full,
+}
+
+/// 下書きを保存した配列．同じ id のテーマがあれば置き換え，無ければ後ろに足す(macOS の saveCustomTheme)．
+/// 名前は前後の空白を除き，上限の長さで切る
+pub fn saved(
+    themes: Option<&Value>,
+    draft: &Value,
+    limit: usize,
+    name_limit: usize,
+) -> Result<Value, SaveError> {
+    let name = trimmed_name(draft, name_limit);
     if name.is_empty() {
-        return None;
+        return Err(SaveError::Name);
     }
-    let mut elements = themes?.as_array()?.clone();
-    let element = elements
-        .iter_mut()
-        .find(|element| element.get("id").and_then(Value::as_str) == Some(id))?
-        .as_object_mut()?;
-    element.insert("name".into(), Value::String(name));
-    Some(Value::Array(elements))
-}
-
-/// 新しいテーマを後ろに足した配列(使うテーマにもする)
-pub fn appended(themes: Option<&Value>, theme: Map<String, Value>) -> Value {
+    let mut theme = draft.clone();
+    if let Some(element) = theme.as_object_mut() {
+        element.insert("name".into(), Value::String(name));
+    }
+    let id = draft.get("id").and_then(Value::as_str);
     let mut elements = themes
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    elements.push(Value::Object(theme));
-    Value::Array(elements)
+    let count = elements.len();
+    match elements
+        .iter_mut()
+        .find(|element| element.get("id").and_then(Value::as_str) == id)
+    {
+        Some(element) => *element = theme,
+        None if count >= limit => return Err(SaveError::Full),
+        None => elements.push(theme),
+    }
+    Ok(Value::Array(elements))
+}
+
+/// 色(path)が読みにくい組み合わせに入るか(macOS の CustomThemeEditor の色の行の印)
+pub fn warns(path: &str, pairs: &[ContrastPair]) -> bool {
+    let pair = match field(path) {
+        "text" => ContrastPair::Text,
+        "textMuted" => ContrastPair::TextMuted,
+        "selection" | "selectionText" => ContrastPair::SelectionText,
+        "correction" => ContrastPair::Correction,
+        _ => return false,
+    };
+    pairs.contains(&pair)
+}
+
+/// 読みにくい組み合わせの知らせの文(UIStrings.More.lowContrast)
+pub fn issue_text(issue: &ContrastIssue) -> String {
+    let (name, ground) = match issue.pair {
+        ContrastPair::Text => (more::TEXT, more::SURFACE),
+        ContrastPair::TextMuted => (more::TEXT_MUTED, more::SURFACE),
+        ContrastPair::SelectionText => (more::SELECTION_TEXT, more::SELECTION),
+        ContrastPair::Correction => (more::CORRECTION, more::SURFACE),
+    };
+    more::low_contrast(name, ground, issue.ratio, issue.minimum)
 }
 
 /// テーマを消した配列
@@ -342,17 +356,6 @@ mod tests {
     }
 
     #[test]
-    fn 新しいテーマの名前は重ならない() {
-        let themes = serde_json::json!([
-            {"id": "a", "name": "新しいテーマ"},
-            {"id": "b", "name": "新しいテーマ 2"},
-        ]);
-        let list = entries(Some(&themes));
-        assert_eq!(unique_name("新しいテーマ", &list), "新しいテーマ 3");
-        assert_eq!(unique_name("夜", &list), "夜");
-    }
-
-    #[test]
     fn 使っているカスタムテーマの名前() {
         let themes = serde_json::json!([{"id": "a", "name": "夜"}]);
         assert_eq!(active_name(Some(&themes), "a").as_deref(), Some("夜"));
@@ -361,49 +364,57 @@ mod tests {
     }
 
     #[test]
-    fn 一覧と編集の値を読む() {
-        let entries = entries(Some(&themes()));
-        assert_eq!(
-            table(&entries, Some("b")),
-            vec![
-                vec!["夕焼け".to_string(), String::new()],
-                vec!["海".to_string(), "使用中".to_string()]
-            ]
-        );
-        let values = values(entries.get(1), "");
-        assert_eq!(values[ID], "b");
+    fn 一覧と下書きの値を読む() {
+        assert_eq!(list_values(0, 50)[EMPTY], true);
+        assert_eq!(list_values(2, 50)[EMPTY], false);
+        assert_eq!(list_values(2, 50)[ROOM], true);
+        assert_eq!(list_values(50, 50)[ROOM], false);
+        let values = draft_values(&themes()[1]);
+        assert_eq!(values[NAME], "海");
         assert_eq!(values["customTheme.surface"], "#FFFFFF");
         assert_eq!(values[FONT_NAME], "Meiryo UI");
         assert_eq!(values[BRANCH_STYLE], "straight");
-        assert_eq!(super::values(None, "")[ID], "");
+        assert_eq!(draft_values(&themes()[0])[FONT_NAME], "");
     }
 
     #[test]
-    fn 色と形と書体を書き換える() {
-        let changed = edited(Some(&themes()), "a", "customTheme.text", &json!("#abcdef")).unwrap();
-        assert_eq!(changed[0]["text"], "#ABCDEF");
-        assert_eq!(
-            edited(Some(&themes()), "a", "customTheme.text", &json!("red")),
-            None
-        );
-        let changed = edited(Some(&themes()), "b", FONT_NAME, &json!("")).unwrap();
-        assert!(changed[1].get("fontName").is_none());
-        let changed = edited(Some(&themes()), "a", CORNER_RADIUS, &json!(4)).unwrap();
-        assert_eq!(changed[0]["cornerRadius"], 4.0);
-        assert_eq!(edited(Some(&themes()), "x", CORNER_RADIUS, &json!(4)), None);
+    fn 下書きの名前と色と形と書体を書き換える() {
+        let mut draft = themes()[0].clone();
+        edit(&mut draft, "customTheme.text", &json!("#abcdef")).unwrap();
+        assert_eq!(draft["text"], "#ABCDEF");
+        assert_eq!(edit(&mut draft, "customTheme.text", &json!("red")), None);
+        assert_eq!(draft["text"], "#ABCDEF");
+        edit(&mut draft, CORNER_RADIUS, &json!(4)).unwrap();
+        assert_eq!(draft["cornerRadius"], 4.0);
+        edit(&mut draft, NAME, &json!(" 朝焼け ")).unwrap();
+        assert_eq!(draft["name"], " 朝焼け ");
+        assert_eq!(trimmed_name(&draft, 2), "朝焼");
+        let mut second = themes()[1].clone();
+        edit(&mut second, FONT_NAME, &json!("")).unwrap();
+        assert!(second.get("fontName").is_none());
+        assert_eq!(edit(&mut second, "customTheme.base", &json!("x")), None);
     }
 
     #[test]
-    fn 名前を変え_複製し_消す() {
-        assert_eq!(renamed(Some(&themes()), "a", "  ", 32), None);
-        assert_eq!(
-            renamed(Some(&themes()), "a", " 朝焼け ", 32).unwrap()[0]["name"],
-            "朝焼け"
-        );
+    fn 下書きを保存すると置き換えるか足す() {
+        let mut draft = themes()[0].clone();
+        edit(&mut draft, NAME, &json!("  朝焼け  ")).unwrap();
+        let changed = saved(Some(&themes()), &draft, 50, 40).unwrap();
+        assert_eq!(changed.as_array().unwrap().len(), 2);
+        assert_eq!(changed[0]["name"], "朝焼け");
+        assert_eq!(changed[1], themes()[1]);
         let copy = copy(&themes()[0], "c".into(), "夕焼け のコピー".into()).unwrap();
-        let added = appended(Some(&themes()), copy);
+        let added = saved(Some(&themes()), &Value::Object(copy.clone()), 50, 40).unwrap();
         assert_eq!(added[2]["id"], "c");
         assert_eq!(added[2]["surface"], "#2B1B17");
+        // 上限まで作っていれば足せない(置き換えはできる)．名前が空なら保存しない
+        assert_eq!(
+            saved(Some(&themes()), &Value::Object(copy), 2, 40),
+            Err(SaveError::Full)
+        );
+        assert!(saved(Some(&themes()), &draft, 2, 40).is_ok());
+        edit(&mut draft, NAME, &json!("   ")).unwrap();
+        assert_eq!(saved(Some(&themes()), &draft, 50, 40), Err(SaveError::Name));
         assert_eq!(
             removed(Some(&added), "a")
                 .unwrap()
@@ -411,6 +422,24 @@ mod tests {
                 .unwrap()
                 .len(),
             2
+        );
+    }
+
+    #[test]
+    fn 読みにくい組み合わせに入る色に印を付ける() {
+        let pairs = [ContrastPair::SelectionText];
+        assert!(warns("customTheme.selection", &pairs));
+        assert!(warns("customTheme.selectionText", &pairs));
+        assert!(!warns("customTheme.text", &pairs));
+        assert!(!warns("customTheme.line", &[ContrastPair::Text]));
+        let text = issue_text(&ContrastIssue {
+            pair: ContrastPair::TextMuted,
+            ratio: 2.2,
+            minimum: 4.5,
+        });
+        assert_eq!(
+            text,
+            "補助の文字と背景の色が近く、読みにくくなっています。コントラスト比は 2.2 で、4.5 以上が目安です。"
         );
     }
 
@@ -449,8 +478,9 @@ mod tests {
     }
 
     #[test]
-    fn 選んだ色を編集しているテーマに書いて保存する() {
+    fn 選んだ色を下書きに書き_保存すると設定のファイルに書く() {
         use crate::catalog::Catalog;
+        use crate::model::SettingsModel;
         use crate::store::fake::FakeStore;
         use std::cell::RefCell;
 
@@ -466,26 +496,26 @@ mod tests {
         catalog.fields = vec![THEMES.to_string(), ACTIVE.to_string()];
         let mut model = SettingsModel::load(store, &catalog).unwrap();
 
-        // 色を選ぶ窓で #336699 を選ぶ(actions.rs の After::ChooseColor と同じ値)
+        // 色を選ぶ窓で #336699 を選ぶ(actions.rs の After::ChooseColor と同じ値)．保存するまでは書かない
+        let mut draft = entries(model.value(THEMES))[0].value.clone();
         let chosen = Value::String(hex_of(from_colorref(colorref((0x33, 0x66, 0x99)))));
-        write(&mut model, "a", "customTheme.text", &chosen)
-            .unwrap()
+        edit(&mut draft, "customTheme.text", &chosen).unwrap();
+        assert_eq!(draft_values(&draft)["customTheme.text"], "#336699");
+        assert!(model.store().writes.borrow().is_empty());
+
+        // 保存すると customThemes と使うテーマを書く(macOS の saveCustomTheme)
+        let changed = saved(model.value(THEMES), &draft, 50, 40).unwrap();
+        model
+            .set_all(&[(THEMES, changed), (ACTIVE, Value::String("a".into()))])
             .unwrap();
         let written = model.store().writes.borrow().last().cloned().unwrap();
-        assert_eq!(written.keys().collect::<Vec<_>>(), vec![THEMES]);
         assert_eq!(written[THEMES][0]["text"], "#336699");
         assert_eq!(written[THEMES][0]["surface"], "#2B1B17");
         assert_eq!(written[THEMES][1], themes()[1]);
         assert_eq!(model.value(THEMES).unwrap()[0]["text"], "#336699");
-        assert_eq!(
-            values(entries(model.value(THEMES)).first(), "")["customTheme.text"],
-            "#336699"
-        );
 
-        // 色でない値や，無いテーマは書かない
-        let count = model.store().writes.borrow().len();
-        assert!(write(&mut model, "a", "customTheme.text", &json!("blue")).is_none());
-        assert!(write(&mut model, "z", "customTheme.text", &chosen).is_none());
-        assert_eq!(model.store().writes.borrow().len(), count);
+        // 色でない値は下書きにも書かない
+        assert!(edit(&mut draft, "customTheme.text", &json!("blue")).is_none());
+        assert_eq!(draft["text"], "#336699");
     }
 }

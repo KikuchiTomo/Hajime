@@ -366,6 +366,8 @@ pub mod more {
     pub const THEME_FONT: &str = "テーマに合わせる";
     pub const FONT_STYLE: &str = "スタイル";
     pub const DUPLICATE_THEME: &str = "複製";
+    pub const CREATE_THEME: &str = "カスタムテーマを作成…";
+    pub const EDIT_THEME: &str = "編集…";
     pub const NEW_THEME_NAME: &str = "新しいテーマ";
     pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
     pub const PREVIEW: &str = "見本";
@@ -959,11 +961,6 @@ pub mod windows {
     pub const TOGGLE_SYNC_SCOPE: &str = "範囲の切り替え";
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
-    /// カスタムテーマをすぐ作って下で編集する(macOS は編集の画面を開くので「…」が付く)
-    pub const CREATE_THEME: &str = "カスタムテーマを作成";
-    /// 選んだカスタムテーマを使う(macOS は行を押して使う)
-    pub const USE_THEME: &str = "使用";
-    pub const IN_USE: &str = "使用中";
     /// コマンドの行き先のファイルを選ぶ窓の種類の名前
     pub const ALL_FILES: &str = "すべてのファイル";
     /// 除外設定のアプリの打つ欄の案内(macOS はアプリを選んで足すだけ．Windows は実行ファイルの名前でも足せる)

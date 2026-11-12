@@ -40,6 +40,8 @@ pub enum Placement {
     Center { ground: tokens::Rgb },
     /// 左上に寄せる(初期設定ウィザードの実演．文字の下に出す)
     TopLeft { ground: tokens::Rgb },
+    /// 余白を足さずに真ん中に置く(設定の画面の見本．余白は rect の外に呼ぶ側がとる)．見本のまわりは ground の色で塗る
+    Fit { ground: tokens::Rgb },
 }
 
 pub struct Preview {
@@ -109,7 +111,7 @@ impl Preview {
         }
     }
 
-    /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft のとき)
+    /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft・Fit のとき)
     pub fn size(&self, theme: &ResolvedTheme, font_size: f32, shown: Shown) -> Result<(f32, f32)> {
         let measure = self.measure_for(shown, theme, font_size)?;
         let scene = Self::scene(shown, theme, font_size, &measure);
@@ -135,11 +137,11 @@ impl Preview {
         // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
             Placement::Center { .. } => Surround::Snapshot { dark },
-            Placement::TopLeft { .. } => Surround::Bare,
+            Placement::TopLeft { .. } | Placement::Fit { .. } => Surround::Bare,
         };
         let mut scene = scene::surround(scene, theme, surround);
         match placement {
-            Placement::TopLeft { ground } => {
+            Placement::TopLeft { ground } | Placement::Fit { ground } => {
                 // 角の丸みの外を地の色で塗る(画像は不透明)
                 scene.draws.insert(
                     0,
@@ -172,7 +174,7 @@ impl Preview {
         let width = (scene.width * shown).ceil() as i32;
         let height = (scene.height * shown).ceil() as i32;
         let (left, top) = match placement {
-            Placement::Center { .. } => (
+            Placement::Center { .. } | Placement::Fit { .. } => (
                 rect.left + (rect.right - rect.left - width) / 2,
                 rect.top + (rect.bottom - rect.top - height) / 2,
             ),

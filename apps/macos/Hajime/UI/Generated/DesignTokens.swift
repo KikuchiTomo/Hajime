@@ -410,7 +410,6 @@ enum DesignTokens {
             static let scrollLine: CGFloat = 40
             static let listHeight: CGFloat = 220
             static let buttonWidth: CGFloat = 96
-            static let previewHeight: CGFloat = 240
             static let buttonPaddingX: CGFloat = 12
             static let pagePaddingTop: CGFloat = 20
             static let titleFontSize: CGFloat = 28
@@ -514,8 +513,6 @@ enum DesignTokens {
             static let titleBarIconSize: CGFloat = 16
             static let titleBarPaddingX: CGFloat = 16
             static let aboutTitleFontSize: CGFloat = 20
-            static let emojiPreviewHeight: CGFloat = 260
-            static let palettePreviewHeight: CGFloat = 300
             static let switchKnobOff: CGFloat = 12
             static let switchKnobOn: CGFloat = 14
             static let switchKnobPressed: CGFloat = 2

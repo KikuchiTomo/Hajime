@@ -8,7 +8,9 @@ use super::actions::After;
 use super::ffi::d2d::{self, Graphics, PreviewPixels, Surface};
 use super::ffi::uia;
 use super::ffi::{self, edit, Window};
-use super::page::{self, Availability, Described, Element, Event, Extras, Frame, PageView, Part};
+use super::page::{
+    self, Availability, Described, EditorAction, Element, Event, Extras, Frame, PageView, Part,
+};
 use super::paint::{self, Canvas, Measure, TextLayout, TextStyle};
 use super::sheet::{self, CommandSheet, SheetLayout, SheetPart};
 use super::theme::{Color, Theme};
@@ -74,7 +76,7 @@ const WARM_FIELDS: usize = 8;
 const FIELD_FACE: &str = "Yu Gothic UI";
 
 /// 左の一覧の幅(窓が狭いときは窓の半分)
-fn nav_width(width: f32) -> f32 {
+pub(super) fn nav_width(width: f32) -> f32 {
     size::NAV_WIDTH.min(width / 2.0)
 }
 
@@ -84,6 +86,8 @@ pub enum Focus {
     Search,
     Nav,
     Page(Element),
+    /// カスタムテーマの編集の画面の下のボタン
+    ThemeSheet(EditorAction),
 }
 
 /// ポインターを載せている・押しているところ
@@ -95,6 +99,16 @@ enum Target {
     Page(Element),
     /// 部品の中のスクロールバー(表・長い文)
     InnerScrollbar(Element),
+    /// カスタムテーマの編集の画面の下のボタン
+    ThemeSheet(EditorAction),
+}
+
+/// ページを送る場所(窓の中のタイトルバーの下の上端・下端，DIP)と，ページの中の座標を窓の中の座標にずらす量
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PageFrame {
+    top: f32,
+    bottom: f32,
+    shift: f32,
 }
 
 /// 開いているドロップダウンの一覧
@@ -118,7 +132,7 @@ type Loaded = Arc<Mutex<Option<Option<SettingsModel<Store>>>>>;
 pub struct App {
     pub(super) window: Window,
     search: Window,
-    graphics: Graphics,
+    pub(super) graphics: Graphics,
     surface: Surface,
     pub(super) theme: Theme,
     /// 窓の地を Mica にしているか(Windows 11 22H2 から．高コントラストでは使わない)
@@ -142,11 +156,13 @@ pub struct App {
     pub(super) sync_values: crate::store::Fields,
     /// 画面の中だけの値(「page.」の道筋．ユーザー辞書のページで出している一覧など)
     pub(super) view_values: crate::store::Fields,
-    /// 外観のページで編集しているカスタムテーマの id
-    pub(super) editing_theme: Option<String>,
+    /// 開いているカスタムテーマの編集の画面(ページの場所に重ねる)
+    pub(super) editor: Option<super::editor::ThemeEditor>,
     /// 外観の見本を描くもの(初めて描くときに作る．作れなければ見本を描かない)
     preview: Option<candidate_ui::app::preview::Preview>,
     preview_pixels: Option<(String, PreviewPixels)>,
+    /// 見本を描いた大きさ(DIP)と，測った見本の中身(PreviewSource の key)
+    preview_natural: Option<(String, (f32, f32))>,
     /// 見本の画像の通し番号(作り直すたびに増やす)
     preview_generation: u64,
     /// タイトルバーのアイコンの画像(DPI ごとに作り直す)
@@ -156,10 +172,10 @@ pub struct App {
     /// 記号の決まり(表の行と同じ並び．外す・切り替えるときに引く)
     pub(super) sequences: Vec<SymbolItem>,
     pub(super) readings: Vec<SymbolItem>,
-    field_font: Option<ffi::Font>,
+    pub(super) field_font: Option<ffi::Font>,
     field_brush: edit::Brush,
     /// 隠して使い回す打つ欄
-    pool: Vec<Window>,
+    pub(super) pool: Vec<Window>,
     nav: NavLayout,
     nav_scroll: Scroller,
     nav_hover: Vec<Tween>,
@@ -261,9 +277,10 @@ pub fn open(
         sync_rows: Vec::new(),
         sync_values: crate::store::Fields::new(),
         view_values: crate::store::Fields::new(),
-        editing_theme: None,
+        editor: None,
         preview: None,
         preview_pixels: None,
+        preview_natural: None,
         preview_generation: 0,
         title_icon: None,
         active: false,
@@ -384,7 +401,7 @@ impl App {
     }
 
     /// タイトルバーの下の大きさ(DIP)．ページと左の一覧はタイトルバーの下を窓の中として扱う
-    fn size(&self) -> (f32, f32) {
+    pub(super) fn size(&self) -> (f32, f32) {
         let (width, height) = ffi::client_size(self.window);
         (
             self.theme.dip(width),
@@ -570,6 +587,10 @@ impl App {
         // シートは前のページのコマンドを書いているので，ページを替える前に閉じる
         self.close_sheet();
         let start = Instant::now();
+        // 編集の画面を開いたままページを作り直すとき(つなぎ直しなど)は，編集の画面を閉じる
+        if self.editor.take().is_some() {
+            ffi::enable(self.search, true);
+        }
         let availability = self.availability();
         let Some(font) = &self.field_font else { return };
         let mut pool = std::mem::take(&mut self.pool);
@@ -586,21 +607,8 @@ impl App {
         // 更新を確かめている途中に情報のページを開き直しても，進み具合を出し続ける
         self.view.set_version_status(self.update.status());
         let built = start.elapsed().as_secs_f64() * 1000.0;
-        if let Focus::Page(_) = self.focus {
-            self.focus = Focus::Nav;
-        }
-        self.focused_edit = None;
-        self.close_flyout();
-        self.hover = None;
-        self.scroll = Scroller::default();
         let now = self.now();
-        self.enter = Tween::new(
-            0.0,
-            1.0,
-            now,
-            self.duration(motion::PAGE_ENTER),
-            Easing::DECELERATE,
-        );
+        self.reset_page_state(now);
         if let Some(index) = self.nav.position(page) {
             let top = self.nav.items[index].top;
             let duration = self.duration(motion::NAV_INDICATOR);
@@ -614,6 +622,97 @@ impl App {
             let refreshed = start.elapsed().as_secs_f64() * 1000.0;
             self.breakdown = (built, read - built, refreshed - read);
         }
+    }
+
+    /// ページを作り直したときに，フォーカス・ポインター・送りを戻し，入りの動きを始める
+    pub(super) fn reset_page_state(&mut self, now: f64) {
+        if let Focus::Page(_) | Focus::ThemeSheet(_) = self.focus {
+            self.focus = Focus::Nav;
+        }
+        self.focused_edit = None;
+        self.close_flyout();
+        self.hover = None;
+        self.pressed = None;
+        self.scroll = Scroller::default();
+        self.enter = Tween::new(
+            0.0,
+            1.0,
+            now,
+            self.duration(motion::PAGE_ENTER),
+            Easing::DECELERATE,
+        );
+    }
+
+    pub(super) fn search_window(&self) -> Window {
+        self.search
+    }
+
+    pub(super) fn scroll_offset(&self, now: f64) -> f32 {
+        self.scroll.offset(now)
+    }
+
+    /// ページを offset まで送る(編集の画面を閉じて外観のページに戻ったとき)
+    pub(super) fn restore_scroll(&mut self, offset: f32) {
+        self.scroll.jump_to(offset);
+        self.place_fields();
+        ffi::invalidate(self.window);
+    }
+
+    /// ページの部品にフォーカスを置く
+    pub(super) fn focus_page(&mut self, element: Element) {
+        self.set_focus(Focus::Page(element));
+    }
+
+    pub(super) fn focus_visible(&self) -> bool {
+        self.focus_visible
+    }
+
+    pub(super) fn theme_sheet_hover(&self) -> Option<EditorAction> {
+        match self.hover {
+            Some(Target::ThemeSheet(action)) => Some(action),
+            _ => None,
+        }
+    }
+
+    pub(super) fn theme_sheet_pressed(&self) -> Option<EditorAction> {
+        match self.pressed {
+            Some(Target::ThemeSheet(action)) => Some(action),
+            _ => None,
+        }
+    }
+
+    pub(super) fn theme_sheet_focus(&self) -> Option<EditorAction> {
+        match self.focus {
+            Focus::ThemeSheet(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// ページを送る場所．ふだんは上に留めた題の下から窓の下まで．編集の画面では見本の帯の下からボタンの帯の上まで送り，
+    /// ページの題の場所(layout の title)を見本の帯の下に隠す
+    fn page_frame(&self) -> PageFrame {
+        let (_, height) = self.size();
+        match self.theme_sheet() {
+            Some(sheet) => PageFrame {
+                top: sheet.band.max_y(),
+                bottom: sheet.footer.y,
+                shift: sheet.band.max_y() + size::PAGE_PADDING_TOP - page_header(),
+            },
+            None => PageFrame {
+                top: if self.availability() == Availability::Ready {
+                    page_header()
+                } else {
+                    0.0
+                },
+                bottom: height,
+                shift: 0.0,
+            },
+        }
+    }
+
+    /// 窓の中の y(DIP)をページの中の y にする
+    fn page_y(&self, y: f32, now: f64) -> f32 {
+        y + self.scroll.offset(now) - self.page_frame().shift
     }
 
     /// 値を部品に映して置き直す
@@ -639,15 +738,17 @@ impl App {
             if self.view.page == Page::Appearance && self.extras.fonts.is_empty() {
                 self.extras.fonts = candidate_ui::app::fonts::installed();
             }
-            // 同期の状態と，編集しているカスタムテーマの値を重ねる
+            // 同期の状態と，カスタムテーマの一覧と編集しているテーマの下書きの値を重ねる
             let entries = crate::themes::entries(model.value(crate::themes::THEMES));
-            let editing = self
-                .editing_theme
-                .as_deref()
-                .and_then(|id| entries.iter().find(|entry| entry.id == id));
             let mut extra = self.sync_values.clone();
             extra.extend(self.view_values.clone());
-            extra.extend(crate::themes::values(editing, &self.extras.theme_report));
+            if let Some(editor) = &self.editor {
+                extra.extend(crate::themes::draft_values(&editor.draft));
+            }
+            extra.extend(crate::themes::list_values(
+                entries.len(),
+                self.catalog.limits.custom_themes,
+            ));
             self.extras.extra = extra;
             let values = page::WithExtras {
                 values: model,
@@ -663,8 +764,12 @@ impl App {
     pub(super) fn arrange(&mut self) {
         let (width, height) = self.size();
         let nav_width = nav_width(width);
+        self.measure_preview();
         let content = self.view.arrange(width - nav_width, &self.graphics);
-        self.scroll.set_extent(content, height);
+        // ページの中の座標で，見える範囲の下の端までを送りの幅にする(ずらした分を引く)
+        let frame = self.page_frame();
+        self.scroll.set_extent(content, frame.bottom - frame.shift);
+        let _ = height;
         let nav_top = self.nav_top();
         self.nav_scroll
             .set_extent(self.nav.height, height - nav_top);
@@ -709,10 +814,17 @@ impl App {
         let (width, _) = self.size();
         let now = self.now();
         let entering = self.enter.running(now);
+        let frame = self.page_frame();
+        // 下に留めた帯はカスタムテーマの編集の画面だけ(ほかのページは窓の下の端で欄が切れる)
+        let bottom = if self.editor.is_some() {
+            frame.bottom - frame.shift
+        } else {
+            f32::MAX
+        };
         self.view.place_fields(
             &self.theme,
-            (nav_width(width), self.title_bar()),
-            page_header(),
+            (nav_width(width), self.title_bar() + frame.shift),
+            (frame.top - frame.shift, bottom),
             self.scroll.offset(now),
             entering || self.sheet.is_some(),
         );
@@ -790,6 +902,10 @@ impl App {
             availability: self.availability(),
             search: self.search_rect(),
             nav_top: self.nav_top(),
+            frame: self.page_frame(),
+            theme_sheet: self
+                .theme_sheet()
+                .map(|layout| (layout, self.theme_sheet_state())),
         };
         let tooltip = self.tooltip.filter(|(.., since)| {
             now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
@@ -859,40 +975,29 @@ impl App {
         }
     }
 
-    /// 見本の画像(外観の見本・パレットの見本・情報のページのアイコン)を作り直す(中身か大きさが変わったときだけ)
-    fn update_preview(&mut self) {
-        let Some((kind, rect)) = self.view.preview_rect() else {
-            self.preview_pixels = None;
-            return;
-        };
-        if kind == page::PreviewKind::Icon {
-            self.update_icon(rect);
-            return;
-        }
-        let Some(model) = &self.model else { return };
+    /// kind の見本に今の設定で描くもの(テーマ・文字の大きさ・候補の窓)．つながっていなければ None
+    fn preview_source(&self, kind: page::PreviewKind) -> Option<PreviewSource> {
+        let model = self.model.as_ref()?;
         let entries = crate::themes::entries(model.value(crate::themes::THEMES));
-        let shown = self
-            .editing_theme
-            .clone()
-            .or_else(|| {
-                model
-                    .value(crate::themes::ACTIVE)
-                    .and_then(serde_json::Value::as_str)
-                    .map(str::to_string)
-            })
-            .and_then(|id| entries.iter().find(|entry| entry.id == id))
-            .and_then(|entry| crate::themes::to_wire(&entry.value));
+        // 編集の画面では下書きを，ほかでは使っているテーマを描く(macOS の ThemeChoice(model.settings))
+        let shown = match &self.editor {
+            Some(editor) => crate::themes::to_wire(&editor.draft),
+            None => model
+                .value(crate::themes::ACTIVE)
+                .and_then(serde_json::Value::as_str)
+                .and_then(|id| entries.iter().find(|entry| entry.id == id))
+                .and_then(|entry| crate::themes::to_wire(&entry.value)),
+        };
         let theme_name = model
             .value("theme")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("automatic")
             .to_string();
-        let font_size = model
-            .value("candidateFontSize")
-            .and_then(serde_json::Value::as_f64)
+        let font_size = self
+            .view
+            .dragging(FONT_SIZE)
+            .or_else(|| model.value(FONT_SIZE).and_then(serde_json::Value::as_f64))
             .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
-        let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
-        let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
         // パレットの見本は設定のとおりの列数・行数・マスの大きさで描く(macOS の PalettePreview)
         let number = |name: &str| {
             model
@@ -939,7 +1044,7 @@ impl App {
         // カスタムテーマはすべての項目(元のテーマ・色・書体・角の丸み)で見分ける．一部だけで見分けると，
         // ほかの項目を変えても見本を作り直さず，変えたことがすぐ映らない
         let key = format!(
-            "{kind:?}|{:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
+            "{kind:?}|{:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}",
             palette.as_ref().map(|panel| (
                 panel.columns,
                 panel.visible_rows,
@@ -965,6 +1070,79 @@ impl App {
             self.theme.dark,
             self.theme.dpi,
         );
+        let look = candidate_ui::theme::SystemLook {
+            dark: self.theme.dark,
+            accent: None,
+            increase_contrast: ffi::high_contrast(),
+            backdrop: false,
+        };
+        let resolved =
+            candidate_ui::theme::ResolvedTheme::resolve(&theme_name, shown.as_ref(), &look);
+        Some(PreviewSource {
+            key,
+            resolved,
+            font_size,
+            palette,
+            emoji,
+        })
+    }
+
+    /// ページの見本を描いた大きさを測り，見本の行の高さにする(macOS の ScaledPreview は描いた大きさで置く)
+    fn measure_preview(&mut self) {
+        // 編集の画面は上に留めた帯に下書きの見本を描く
+        let kind = if self.editor.is_some() {
+            Some(page::PreviewKind::Theme)
+        } else {
+            self.view.preview_kind()
+        };
+        let source = kind.and_then(|kind| self.preview_source(kind));
+        let Some(source) = source else {
+            self.view.set_preview_size(None);
+            return;
+        };
+        if let Some((key, size)) = &self.preview_natural {
+            if *key == source.key {
+                self.view.set_preview_size(Some(*size));
+                return;
+            }
+        }
+        if self.preview.is_none() {
+            self.preview = candidate_ui::app::preview::Preview::new().ok();
+        }
+        let size = self.preview.as_ref().and_then(|preview| {
+            preview
+                .size(&source.resolved, source.font_size, source.shown())
+                .ok()
+        });
+        self.preview_natural = size.map(|size| (source.key, size));
+        self.view.set_preview_size(size);
+    }
+
+    /// 測った見本の大きさ(DIP)
+    pub(super) fn preview_natural_size(&self) -> Option<(f32, f32)> {
+        self.preview_natural.as_ref().map(|(_, size)| *size)
+    }
+
+    /// 見本の画像(外観の見本・パレットの見本・情報のページのアイコン)を作り直す(中身か大きさが変わったときだけ)
+    fn update_preview(&mut self) {
+        let shown = match self.theme_sheet() {
+            Some(sheet) => Some((page::PreviewKind::Theme, sheet.preview)),
+            None => self.view.preview_rect(),
+        };
+        let Some((kind, rect)) = shown else {
+            self.preview_pixels = None;
+            return;
+        };
+        if kind == page::PreviewKind::Icon {
+            self.update_icon(rect);
+            return;
+        }
+        let Some(source) = self.preview_source(kind) else {
+            return;
+        };
+        let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
+        let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        let key = format!("{}|{width}x{height}", source.key);
         if self
             .preview_pixels
             .as_ref()
@@ -976,31 +1154,19 @@ impl App {
             self.preview = candidate_ui::app::preview::Preview::new().ok();
         }
         let Some(preview) = &self.preview else { return };
-        let look = candidate_ui::theme::SystemLook {
-            dark: self.theme.dark,
-            accent: None,
-            increase_contrast: ffi::high_contrast(),
-            backdrop: false,
-        };
-        let resolved =
-            candidate_ui::theme::ResolvedTheme::resolve(&theme_name, shown.as_ref(), &look);
         let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
         // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
         self.preview_generation += 1;
         let generation = self.preview_generation;
-        // 見本は少し内側に描く(カードの縁と重ねない)
+        // 見本のまわりの余白は置き場所(カードの中の見本の余白)でとるので，画像には余白を足さない
         let request = d2d::PreviewRequest {
-            theme: &resolved,
-            font_size,
+            theme: &source.resolved,
+            font_size: source.font_size,
             dark: self.theme.dark,
             scale,
             background: self.theme.palette.card,
-            shown: match (&palette, &emoji) {
-                (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
-                (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
-                (None, None) => candidate_ui::app::preview::Shown::Sample,
-            },
-            placement: candidate_ui::app::preview::Placement::Center {
+            shown: source.shown(),
+            placement: candidate_ui::app::preview::Placement::Fit {
                 ground: self.theme.palette.card,
             },
         };
@@ -1079,6 +1245,18 @@ impl App {
         let (width, height) = self.size();
         let nav_width = nav_width(width);
         let now = self.now();
+        // 編集の画面を開いているあいだは左の一覧を使えない．下のボタンだけを押せる
+        if let Some(sheet) = self.theme_sheet() {
+            if x < nav_width {
+                return None;
+            }
+            if y >= sheet.footer.y {
+                return sheet
+                    .hit(x, y)
+                    .filter(|action| self.theme_sheet_enabled(*action))
+                    .map(Target::ThemeSheet);
+            }
+        }
         if x < nav_width {
             let nav_top = self.nav_top();
             if y < nav_top {
@@ -1093,15 +1271,16 @@ impl App {
         if self.availability() != Availability::Ready {
             return None;
         }
-        // ページの題の帯は送らずに上に留めるので，その下に送ったページの部品は押せない
-        if y < page_header() {
+        // ページの題の帯(編集の画面では見本の帯)は送らずに上に留めるので，その下に送ったページの部品は押せない
+        let frame = self.page_frame();
+        if y < frame.top || y >= frame.bottom {
             return None;
         }
         if self.scroll.can_scroll() && x >= width - size::SCROLLBAR_HIT && y < height {
             return Some(Target::PageScrollbar);
         }
         let page_x = x - nav_width;
-        let page_y = y + self.scroll.offset(now);
+        let page_y = self.page_y(y, now);
         let element = self.view.hit(page_x, page_y)?;
         if matches!(element.part, Part::Table | Part::Text) {
             if let Some(rect) = self.view.rect(element) {
@@ -1133,9 +1312,10 @@ impl App {
         // つまみをつかんでいれば動かす
         match self.pressed {
             Some(Target::PageScrollbar) => {
+                let frame = self.page_frame();
                 self.scroll.drag(
-                    y - size::SCROLLBAR_MARGIN,
-                    height - size::SCROLLBAR_MARGIN * 2.0,
+                    y - frame.top - size::SCROLLBAR_MARGIN,
+                    frame.bottom - frame.top - size::SCROLLBAR_MARGIN * 2.0,
                     now,
                 );
                 self.place_fields();
@@ -1149,13 +1329,17 @@ impl App {
                 return;
             }
             Some(Target::InnerScrollbar(element)) => {
-                let page_y = y + self.scroll.offset(now);
+                let page_y = self.page_y(y, now);
                 self.view.drag_inner_scrollbar(element, page_y, now);
                 ffi::invalidate(self.window);
                 return;
             }
             Some(Target::Page(element)) if element.part == Part::Slider => {
                 self.view.slider_drag(element, x - nav_width(width));
+                // 見本のあるページは，動かしているあいだの値で見本を描き直して置き直す(文字の大きさで見本の高さが変わる)
+                if self.view.preview_kind().is_some() {
+                    self.arrange();
+                }
                 ffi::invalidate(self.window);
                 return;
             }
@@ -1201,7 +1385,7 @@ impl App {
         // 表の上なら行にも印を付ける
         let table_hover = match target {
             Some(Target::Page(element)) if element.part == Part::Table => {
-                let page_y = y + self.scroll.offset(now);
+                let page_y = self.page_y(y, now);
                 self.view
                     .table_position(element.row, page_y, now)
                     .map(|position| (element.row, position))
@@ -1256,9 +1440,10 @@ impl App {
         ffi::capture(self.window);
         match target {
             Some(Target::PageScrollbar) => {
+                let frame = self.page_frame();
                 self.scroll.press(
-                    y - size::SCROLLBAR_MARGIN,
-                    height - size::SCROLLBAR_MARGIN * 2.0,
+                    y - frame.top - size::SCROLLBAR_MARGIN,
+                    frame.bottom - frame.top - size::SCROLLBAR_MARGIN * 2.0,
                     now,
                 );
                 self.place_fields();
@@ -1269,10 +1454,11 @@ impl App {
             }
             Some(Target::InnerScrollbar(element)) => {
                 self.set_focus(Focus::Page(element));
-                let page_y = y + self.scroll.offset(now);
+                let page_y = self.page_y(y, now);
                 self.view.press_inner_scrollbar(element, page_y, now);
             }
             Some(Target::Nav(_)) => self.set_focus(Focus::Nav),
+            Some(Target::ThemeSheet(action)) => self.focus = Focus::ThemeSheet(action),
             Some(Target::Page(element)) if matches!(element.part, Part::TableChoice(_)) => {
                 // 表の行の中の選ぶ欄は，その行を選んでから(離したときに)一覧を開く
                 self.set_focus(Focus::Page(Element {
@@ -1295,7 +1481,7 @@ impl App {
                     self.view.slider_drag(element, x - nav_width(width));
                 }
                 if element.part == Part::Table {
-                    let page_y = y + self.scroll.offset(now);
+                    let page_y = self.page_y(y, now);
                     let (width, _) = self.size();
                     let page_x = x - nav_width(width);
                     // 見出しを押したらその列で並べ替える(macOS の表と同じ)
@@ -1354,6 +1540,11 @@ impl App {
             }
             (Some(Target::Page(element)), Some(Target::Page(over))) if element == over => {
                 self.press(element);
+            }
+            (Some(Target::ThemeSheet(action)), Some(Target::ThemeSheet(over)))
+                if action == over =>
+            {
+                self.dispatch(Some(Event::ThemeEditor(action)));
             }
             _ => {}
         }
@@ -1425,7 +1616,7 @@ impl App {
         let window = match focus {
             Focus::Search => Some(self.search),
             Focus::Page(element) => self.view.edit(element),
-            Focus::Nav => None,
+            Focus::Nav | Focus::ThemeSheet(_) => None,
         };
         match window {
             Some(window) => ffi::focus(window),
@@ -1449,9 +1640,24 @@ impl App {
 
     /// Tab で次(back なら前)へ動かす
     fn move_focus(&mut self, back: bool) {
-        let mut stops = vec![Focus::Search, Focus::Nav];
+        // 編集の画面では，ページの部品と下のボタンだけを巡る(左の一覧と検索には移らない)
+        let mut stops = if self.editor.is_some() {
+            Vec::new()
+        } else {
+            vec![Focus::Search, Focus::Nav]
+        };
         if self.availability() == Availability::Ready {
             stops.extend(self.view.focusable().into_iter().map(Focus::Page));
+        }
+        if let Some(sheet) = self.theme_sheet() {
+            stops.extend(
+                sheet
+                    .buttons
+                    .iter()
+                    .map(|(action, _)| *action)
+                    .filter(|action| self.theme_sheet_enabled(*action))
+                    .map(Focus::ThemeSheet),
+            );
         }
         let current = stops.iter().position(|stop| *stop == self.focus);
         if let Some(next) = crate::ui::cycle(current, stops.len(), back) {
@@ -1474,8 +1680,24 @@ impl App {
             self.move_focus(shift);
             return true;
         }
+        // 編集の画面は Esc で閉じる(macOS の cancelAction)
+        if key == VK_ESCAPE.0 && self.editor.is_some() {
+            self.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
+            return true;
+        }
         self.focus_visible = true;
+        // 編集の画面を開いているあいだは左の一覧でページを移らない
+        if self.editor.is_some() && matches!(self.focus, Focus::Nav | Focus::Search) {
+            return self.page_key(key, control);
+        }
         match self.focus {
+            Focus::ThemeSheet(action) => {
+                if key == VK_SPACE.0 || key == VK_RETURN.0 {
+                    self.dispatch(Some(Event::ThemeEditor(action)));
+                    return true;
+                }
+                self.page_key(key, control)
+            }
             Focus::Nav => {
                 let current = self.nav.position(self.view.page);
                 let next = match key {
@@ -1673,6 +1895,7 @@ impl App {
             Focus::Page(element) if self.view.edit(element).is_none() => {
                 Some(NODE_PAGE + PageView::element_id(element))
             }
+            Focus::ThemeSheet(action) => Some(NODE_THEME_SHEET + theme_sheet_index(action)),
             _ => None,
         }
     }
@@ -1694,6 +1917,28 @@ impl App {
         let nav_width = nav_width(width);
         let nav_top = self.nav_top();
         let nav_offset = self.nav_scroll.offset(now);
+        // 編集の画面を開いているあいだは，左の一覧と検索を読ませない(使えないので)
+        if let Some(sheet) = self.theme_sheet() {
+            let mut nodes: Vec<uia::Node> = sheet
+                .buttons
+                .iter()
+                .map(|(action, rect)| uia::Node {
+                    id: NODE_THEME_SHEET + theme_sheet_index(*action),
+                    role: uia::Role::Button,
+                    name: super::editor::label(*action).to_string(),
+                    rect: self.screen_rect(*rect),
+                    enabled: self.theme_sheet_enabled(*action),
+                    focused: self.focus == Focus::ThemeSheet(*action),
+                    toggled: None,
+                    expanded: None,
+                    value: None,
+                    selected: None,
+                    host: None,
+                })
+                .collect();
+            nodes.extend(self.page_nodes(now));
+            return nodes;
+        }
         let mut nodes = vec![uia::Node {
             id: NODE_SEARCH,
             role: uia::Role::Edit,
@@ -1725,10 +1970,19 @@ impl App {
                 host: None,
             });
         }
+        nodes.extend(self.page_nodes(now));
+        nodes
+    }
+
+    /// ページの部品の読み上げの節
+    fn page_nodes(&self, now: f64) -> Vec<uia::Node> {
+        let mut nodes = Vec::new();
         if self.availability() != Availability::Ready {
             return nodes;
         }
-        let offset = self.scroll.offset(now);
+        let (width, _) = self.size();
+        let nav_width = nav_width(width);
+        let offset = self.scroll.offset(now) - self.page_frame().shift;
         for element in self.view.elements() {
             let Some(described) = self.view.describe(element) else {
                 continue;
@@ -1790,6 +2044,23 @@ impl App {
         if self.sheet.is_some() {
             self.sheet_act(id, act);
             return;
+        }
+        if let Some(sheet) = self.theme_sheet() {
+            if let Some((action, _)) = sheet
+                .buttons
+                .iter()
+                .find(|(action, _)| NODE_THEME_SHEET + theme_sheet_index(*action) == id)
+            {
+                match act {
+                    uia::Act::Focus => self.set_focus(Focus::ThemeSheet(*action)),
+                    _ => self.dispatch(Some(Event::ThemeEditor(*action))),
+                }
+                return;
+            }
+            // 左の一覧と検索は使えない
+            if id < NODE_PAGE {
+                return;
+            }
         }
         if id == NODE_SEARCH {
             if act == uia::Act::Focus {
@@ -1853,7 +2124,7 @@ impl App {
                 items,
                 selected,
                 nav_width(width) + rect.x,
-                rect.y - self.scroll.offset(now),
+                rect.y - self.scroll.offset(now) + self.page_frame().shift,
                 rect,
             )
         };
@@ -2591,6 +2862,28 @@ fn sheet_node(part: SheetPart) -> i32 {
     NODE_SHEET + index
 }
 
+/// 候補の文字の大きさの設定(見本の文字の大きさ)
+const FONT_SIZE: &str = "candidateFontSize";
+
+/// 見本に描くもの(App::preview_source)．key は中身を見分ける文字(画像の大きさを除く)
+struct PreviewSource {
+    key: String,
+    resolved: candidate_ui::theme::ResolvedTheme,
+    font_size: f32,
+    palette: Option<ipc::PalettePanel>,
+    emoji: Option<ipc::CandidateList>,
+}
+
+impl PreviewSource {
+    fn shown(&self) -> candidate_ui::app::preview::Shown<'_> {
+        match (&self.palette, &self.emoji) {
+            (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
+            (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
+            (None, None) => candidate_ui::app::preview::Shown::Sample,
+        }
+    }
+}
+
 /// 描くときに使う状態(借りたまま描くために App から分ける)
 struct PaintState<'a> {
     theme: &'a Theme,
@@ -2608,6 +2901,10 @@ struct PaintState<'a> {
     availability: Availability,
     search: Rect,
     nav_top: f32,
+    /// ページを送る場所
+    frame: PageFrame,
+    /// 開いているカスタムテーマの編集の画面
+    theme_sheet: Option<(super::editor::SheetLayout, super::editor::SheetState)>,
 }
 
 /// 上に留めるページの題の帯の高さ(DIP)．ページはこの下で送る
@@ -2627,16 +2924,22 @@ fn paint_window(
     let nav_width = nav_width(state.width);
     let ready = state.availability == Availability::Ready;
     // ページの題は送らずに上に留める(macOS のツールバーの題・Windows 11 の設定アプリの見出しと同じ)．
-    // ページはその下で送る．読み込み中などの知らせは題も含めて知らせの側で描く
-    let header = if ready { page_header() } else { 0.0 };
+    // ページはその下で送る．読み込み中などの知らせは題も含めて知らせの側で描く．
+    // カスタムテーマの編集の画面では，題の代わりに見本の帯を上に留め，下にボタンの帯を留める
+    let frame = state.frame;
     let page_area = Rect::new(
         nav_width,
-        header,
+        frame.top,
         state.width - nav_width,
-        (state.height - header).max(0.0),
+        (frame.bottom - frame.top).max(0.0),
     );
+    // 編集の画面を開いているあいだは左の一覧を使えないので薄くする
+    if state.theme_sheet.is_some() {
+        canvas.set_opacity(tokens::opacity::settings_windows::DISABLED_OVERLAY);
+    }
     paint_nav(canvas, state, nav, nav_scroll, nav_width, view.page);
-    if ready {
+    canvas.set_opacity(1.0);
+    if ready && state.theme_sheet.is_none() {
         let (left, content) = crate::layout::content_frame(state.width - nav_width);
         canvas.text(
             Rect::new(
@@ -2655,7 +2958,7 @@ fn paint_window(
     let offset = (1.0 - state.enter) * size::PAGE_ENTER_OFFSET;
     let scroll_offset = scroll.offset(state.now);
     canvas.set_opacity(state.enter);
-    canvas.translate(nav_width, offset - scroll_offset);
+    canvas.translate(nav_width, offset - scroll_offset + frame.shift);
     match state.availability {
         Availability::Ready => {
             let frame = Frame {
@@ -2674,8 +2977,8 @@ fn paint_window(
                 focused_edit: state.focused_edit,
                 draw_fields: false,
                 visible: (
-                    scroll_offset - offset,
-                    scroll_offset - offset + state.height,
+                    frame.top - frame.shift + scroll_offset - offset,
+                    frame.bottom - frame.shift + scroll_offset - offset,
                 ),
             };
             view.paint(canvas, &frame);
@@ -2690,10 +2993,13 @@ fn paint_window(
             state.now,
         ),
     }
-    canvas.translate(-nav_width, scroll_offset - offset);
+    canvas.translate(-nav_width, scroll_offset - offset - frame.shift);
     canvas.set_opacity(1.0);
     canvas.pop_clip();
     page::scrollbar(canvas, theme, page_area, scroll, state.now);
+    if let Some((layout, sheet)) = &state.theme_sheet {
+        super::editor::paint_sheet(canvas, theme, layout, sheet);
+    }
 }
 
 fn paint_nav(
@@ -2964,6 +3270,16 @@ fn paint_tooltip(
 
 /// ページの部品の読み上げの番号の始まり(左の一覧の項目と分ける)
 const NODE_PAGE: i32 = 1000;
+/// 読み上げの番号: カスタムテーマの編集の画面の下のボタン(検索欄とページの部品の番号のあいだ)
+const NODE_THEME_SHEET: i32 = 950;
+
+fn theme_sheet_index(action: EditorAction) -> i32 {
+    match action {
+        EditorAction::Duplicate => 0,
+        EditorAction::Cancel => 1,
+        EditorAction::Save => 2,
+    }
+}
 /// 読み上げの番号: 検索欄(左の一覧の項目の番号とページの部品の番号のあいだ)
 const NODE_SEARCH: i32 = 900;
 /// シートの部品の読み上げの番号の始まり
@@ -3174,8 +3490,15 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             });
             Some(LRESULT(0))
         }
+        // 欄の中で Esc を押したら，シートかカスタムテーマの編集の画面を閉じる(macOS の cancelAction)
         edit::WM_FIELD_ESCAPE => {
-            with_app(App::close_sheet);
+            with_app(|app| {
+                if app.editor.is_some() {
+                    app.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
+                } else {
+                    app.close_sheet();
+                }
+            });
             Some(LRESULT(0))
         }
         edit::WM_FIELD_ENTER => {

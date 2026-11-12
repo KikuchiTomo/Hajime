@@ -725,6 +725,36 @@
   "changes": {
     "liveConversionDelay": 0.6,
     "candidateFontSize": 16,
+    "customThemes": [
+      {
+        "id": "5E8B1C3A-7D2F-4A61-9B0E-2C4D6F8A1B3C",
+        "name": "夕焼け",
+        "base": "automatic",
+        "surface": "#2B1B17",
+        "text": "#FFE8D6",
+        "textMuted": "#C9A68F",
+        "selection": "#FF7A3D",
+        "selectionText": "#1B0F0B",
+        "correction": "#FFB070",
+        "line": "#5A3A2E",
+        "cornerRadius": 10,
+        "branchStyle": "curved"
+      },
+      {
+        "id": "A1B2C3D4-E5F6-4789-8ABC-DEF012345678",
+        "name": "霧",
+        "base": "automatic",
+        "surface": "#FFFFFF",
+        "text": "#000000",
+        "textMuted": "#B0B0B0",
+        "selection": "#0A84FF",
+        "selectionText": "#FFFFFF",
+        "correction": "#FF2D55",
+        "line": "#CCCCCC",
+        "cornerRadius": 12,
+        "branchStyle": "straight"
+      }
+    ],
     "customRomaji": [
       {
         "keys": "xn",
