@@ -395,6 +395,7 @@ pub mod more {
 pub mod keys {
     /// 絞り込んで行が無くなったとき
     pub const NO_MATCHES: &str = "当てはまる行はありません";
+    pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const STATE: &str = "状態";
@@ -957,9 +958,9 @@ pub mod windows {
     pub fn version(version: &str) -> String {
         format!("v{version} (Windows)")
     }
-    /// キーの書き方(macOS は押して記録するので無い)
+    /// キーの欄の使い方(macOS は押して記録するだけなので無い．Windows は打って書くこともできる)
     pub const KEY_NOTE: &str =
-        "キーは「Ctrl Shift Space」のように、修飾キーとキーの名前を空白で区切って入力します。";
+        "キーの欄を押してから割り当てるキーを押すと記録します。「Ctrl+Shift+Space」のように入力することもできます。";
     /// 読めないキーの書き方
     pub const INVALID_KEY: &str = "キーの書き方が正しくありません";
     /// macOS の exclusionsNote の「アプリの固有ID」を，Windows で見分けに使う実行ファイルの名前にしたもの

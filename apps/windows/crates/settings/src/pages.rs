@@ -507,7 +507,7 @@ const ASSOCIATION_SPEC: ListSpec = ListSpec {
 };
 
 /// 一覧の入力欄の右のボタンと，表の下のボタン(並びは部品を作る順と同じ)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ListButtons {
     pub top: &'static [&'static str],
     pub bottom: &'static [&'static str],
@@ -519,6 +519,12 @@ pub struct ListButtons {
     pub files: Option<ListFiles>,
     /// 先頭の 2 つの打つ欄のあいだに矢印を置く(打つもの → 置き換えるもの．macOS の RuleListEditor)
     pub arrow: bool,
+    /// 先頭から決まった幅にする入力欄の幅(残りの欄で残りの幅を分ける．キー設定の状態とキー)
+    pub field_widths: &'static [f32],
+    /// 検索欄と絞り込みを入力欄の上の帯に置く(キー設定．macOS の KeymapPage の上の帯)
+    pub toolbar: bool,
+    /// 表の下のボタンのうち，右に寄せる末尾のボタンの数(キー設定の既定に戻す)
+    pub trailing_bottom: usize,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -603,9 +609,11 @@ impl Control {
         const ADD_CANCEL: &[&str] = &[settings::ADD, settings::CANCEL];
         let (top, bottom): (&'static [&'static str], &'static [&'static str]) = match self {
             // キー設定はキーを押して記録する・行を複製する，除外設定はアプリのファイルを選んで足す(macOS の KeymapPage・ExclusionsPage)
+            // キー設定のキーは欄を押して記録する(macOS の KeyField)．macOS と同じく新しい行の右は追加だけにし，
+            // 表の下に削除・複製・既定に戻すを置く
             Control::List(spec, _) if spec.path == "keymap" => (
-                ADD_CANCEL,
-                &[settings::REMOVE, keys::RECORD, keys::DUPLICATE],
+                &[settings::ADD],
+                &[settings::REMOVE, keys::DUPLICATE, keys::RESTORE],
             ),
             Control::List(spec, _) if spec.path == "profileRules" => {
                 (ADD_CANCEL, &[settings::REMOVE, more::ADD_APPS])
@@ -668,6 +676,16 @@ impl Control {
                         .iter()
                         .all(|field| field.choices.is_none() && !field.notation)
             });
+        // キー設定の新しい行は状態とキーを決まった幅にし，コマンドに残りを渡す(macOS の KeymapPage)
+        const KEYMAP_FIELD_WIDTHS: &[f32] = &[
+            tokens::size::settings::KEYMAP_STATE_WIDTH,
+            tokens::size::settings::KEYMAP_KEY_WIDTH,
+        ];
+        let field_widths: &'static [f32] = match self {
+            Control::List(spec, _) if spec.path == "keymap" => KEYMAP_FIELD_WIDTHS,
+            _ => &[],
+        };
+        let keymap = matches!(self, Control::List(spec, _) if spec.path == "keymap");
         Some(ListButtons {
             top,
             bottom,
@@ -675,6 +693,9 @@ impl Control {
             filter,
             files: list_files(self),
             arrow,
+            field_widths,
+            toolbar: keymap,
+            trailing_bottom: usize::from(keymap),
         })
     }
 
@@ -1747,10 +1768,8 @@ const KEYMAP_FIELDS: &[Field] = &[
 /// キー設定のページ(macOS の KeymapPage)．表の行は上から順に並び，同じキーの行は下の行を使う
 fn keymap() -> Vec<Section> {
     vec![
-        Section::untitled(vec![
-            Row::new(keys::PRESET_MENU, "", Control::Preset),
-            Row::action(keys::RESTORE, Action::RestoreKeymap),
-        ]),
+        // 既定に戻すボタンは表の下の帯に置く(macOS の KeymapPage の下の右)
+        Section::untitled(vec![Row::new(keys::PRESET_MENU, "", Control::Preset)]),
         Section::untitled(vec![Row::new("", "", Control::KeymapReport)]),
         Section {
             title: None,
