@@ -7,8 +7,9 @@
 use crate::engine::Engine;
 use crate::store::Fields;
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, KeymapReport, PreviewWord, RequestBody, ResponseBody,
-    SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult, SyncGroupState, SyncStatus, WordClass,
+    DictionaryAddResult, DictionaryEntry, FileFailure, KeymapReport, PreviewWord, RequestBody,
+    ResponseBody, SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult, SyncGroupState,
+    SyncStatus, WordClass,
 };
 use serde_json::Value;
 use std::sync::Mutex;
@@ -298,7 +299,19 @@ impl Engine for SampleEngine {
                 word: None,
                 reading: None,
             },
-            // ファイルの読み書きと辞書の取り込みは見本では行わない(何も変えずに済んだことにする)
+            // 辞書は見本の一覧から消すだけ(索引のファイルは無い)
+            RequestBody::RemoveDictionary { id } => {
+                remove_dictionary(state, "importedDictionaries", &id)
+            }
+            RequestBody::RemoveAssociationDictionary { id } => {
+                remove_dictionary(state, "associationDictionaries", &id)
+            }
+            // 辞書の取り込みは見本ではファイルを読まない(読めなかったことにする)
+            RequestBody::ImportDictionary { .. }
+            | RequestBody::ImportAssociationDictionary { .. } => ResponseBody::FileFailed {
+                reason: FileFailure::Unreadable,
+            },
+            // ファイルの読み書きは見本では行わない(何も変えずに済んだことにする)
             RequestBody::ImportRuleList { .. }
             | RequestBody::ImportProfileRules { .. }
             | RequestBody::ImportUserDictionary { .. }
@@ -309,6 +322,23 @@ impl Engine for SampleEngine {
             _ => ResponseBody::Done,
         })
     }
+}
+
+/// 見本の辞書の一覧(path)から id の辞書を外す
+fn remove_dictionary(state: &mut State, path: &str, id: &str) -> ResponseBody {
+    let Some(Value::Array(list)) = state.current.get_mut(path) else {
+        return ResponseBody::FileFailed {
+            reason: FileFailure::UnknownDictionary,
+        };
+    };
+    let before = list.len();
+    list.retain(|element| element.get("id").and_then(Value::as_str) != Some(id));
+    if list.len() == before {
+        return ResponseBody::FileFailed {
+            reason: FileFailure::UnknownDictionary,
+        };
+    }
+    ResponseBody::Done
 }
 
 fn symbols(state: &mut State, kind: SymbolKind) -> &mut Vec<SymbolItem> {
@@ -355,5 +385,33 @@ mod tests {
             .read_symbol_items(SymbolKind::Reading)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn 見本の辞書を一覧から消す() {
+        use crate::engine::FileOutcome;
+        use crate::pages::DictionaryList;
+        let store = EngineStore::new(SampleEngine::new());
+        let path = "importedDictionaries".to_string();
+        let count = |store: &EngineStore<SampleEngine>| {
+            let values = store.read(std::slice::from_ref(&path), false).unwrap();
+            crate::dictionaries::entries(DictionaryList::Imported, values.get(&path)).len()
+        };
+        let before = count(&store);
+        assert!(before >= 2);
+        let id = "D0000000-0000-0000-0000-000000000002".to_string();
+        assert_eq!(
+            store.remove_dictionary(DictionaryList::Imported, id.clone()),
+            Ok(FileOutcome::Done)
+        );
+        assert_eq!(count(&store), before - 1);
+        assert_eq!(
+            store.remove_dictionary(DictionaryList::Imported, id),
+            Ok(FileOutcome::Failed(FileFailure::UnknownDictionary))
+        );
+        assert_eq!(
+            store.import_dictionary(DictionaryList::Imported, "C:\\a.txt".into(), None),
+            Ok(FileOutcome::Failed(FileFailure::Unreadable))
+        );
     }
 }

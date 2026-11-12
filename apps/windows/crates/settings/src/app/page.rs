@@ -4,6 +4,10 @@
 //! 部品は子の窓にせず，状態だけを持って Direct2D で描く(ページを開くたびに窓を作り直さない)．
 //! 文字を打つ欄だけは標準の EDIT にする(IME・クリップボード・読み上げのため)
 
+mod dictionary_rows;
+
+pub use dictionary_rows::EntryPart;
+
 use super::ffi::{self, edit, Window};
 use super::paint::{self, Canvas, State, TextLayout, TextStyle};
 use super::theme::{Color, Theme};
@@ -14,7 +18,7 @@ use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{
     self, Action, Cell, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row,
-    Section, TryKind, MACROS_PATH,
+    Section, TryKind, DICTIONARY_CONDITIONS, MACROS_PATH,
 };
 use crate::store::SettingsStore;
 use crate::strings::{extras, features, keys, more, rule_list, settings, windows as text};
@@ -32,6 +36,11 @@ use tokens::size::settings_windows as size;
 
 /// 部品の番号の始まり(0 は使わない．窓の部品の番号と分ける)
 const FIRST_ID: u16 = 100;
+
+/// 辞書の行の部品の読み上げの番号(ほかの部品の番号 行 * 100 + 部品 と重ならないよう後ろに置く)
+const ENTRY_ID_BASE: usize = 10_000_000;
+const ENTRY_ID_ROW: usize = 1_000_000;
+const ENTRY_ID_ENTRY: usize = 1_000;
 
 /// 部品の操作から生まれる頼み
 #[derive(Debug, Clone, PartialEq)]
@@ -151,29 +160,28 @@ impl ThemeAction {
     ];
 }
 
-/// 辞書の一覧のボタンの操作
+/// 辞書の一覧の操作(macOS の ImportedDictionariesView・AssociationSection の部品)
 #[derive(Debug, Clone, PartialEq)]
 pub enum DictionaryAction {
-    /// 入力欄の値(名前・分野・使う場面・アプリ)で選んだ辞書を書き換える
-    Update(Vec<String>),
+    /// ファイルを選んで新しい辞書を取り込む
     Import,
+    /// ファイルを選んで辞書を取り込み直す
     Reimport,
     MoveUp,
     MoveDown,
     Toggle,
     Remove,
-}
-
-impl DictionaryAction {
-    /// 表の下のボタンの並び(pages::Control::list_buttons と同じ)
-    const BOTTOM: [DictionaryAction; 6] = [
-        DictionaryAction::Import,
-        DictionaryAction::Reimport,
-        DictionaryAction::MoveUp,
-        DictionaryAction::MoveDown,
-        DictionaryAction::Toggle,
-        DictionaryAction::Remove,
-    ];
+    /// 名前・分野を打った値に変える
+    Rename(String),
+    SetField(String),
+    /// 使う場面(always・apps・context)を変える
+    SetCondition(&'static str),
+    /// アプリの実行ファイルを選ぶ窓を出して，選んだアプリに足す
+    ChooseApps,
+    /// 選んだ実行ファイル(場所)を選んだアプリに足す
+    AddApps(Vec<String>),
+    /// 選んだアプリの index 番目を外す
+    RemoveApp(usize),
 }
 
 /// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
@@ -190,7 +198,6 @@ fn bottom_always_enabled(control: &Control, index: usize) -> bool {
 fn always_enabled(control: &Control) -> usize {
     match control {
         Control::CustomThemes(_) => 2,
-        Control::Dictionaries(..) => 1,
         _ => 0,
     }
 }
@@ -291,6 +298,8 @@ pub struct Extras {
     pub fonts: Vec<InstalledFace>,
     /// 単語に書ける書き方を今入れたときの値(extras::TEMPLATE_ROWS と同じ並び．読めなければ空)
     pub template_values: Vec<String>,
+    /// 辞書を取り込んでいる(macOS の isImportingDictionary．取り込むボタンを使えなくし，輪を回す)
+    pub importing_dictionary: bool,
 }
 
 impl Extras {
@@ -355,6 +364,10 @@ pub enum Part {
     Button(usize),
     /// 表の下の状態で絞り込む欄(キー設定)
     Filter,
+    /// 辞書の一覧の辞書の行の部品(辞書の番号と部品)
+    Entry(usize, EntryPart),
+    /// 辞書の一覧の下の取り込むボタン
+    Import,
 }
 
 /// ページの中の部品(行の番号と部品)
@@ -427,7 +440,7 @@ struct RowState {
     search: Option<Window>,
     /// 一覧で選んで書き換えている行(rows の番号)．追加のボタンは「更新」になり，この行を置き換える
     editing: Option<usize>,
-    /// 辞書・カスタムテーマの一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
+    /// カスタムテーマの一覧の行ごとの入力欄の値(行を選んだら入力欄に出す)
     dictionary_inputs: Vec<Vec<String>>,
     /// 試す欄(打つ文・前の文字列)と結果
     preview_fields: Vec<Window>,
@@ -442,6 +455,8 @@ struct RowState {
     dragging: Option<f64>,
     /// 表の下の状態で絞り込む欄で選んでいる番号(0 はすべての状態)
     filter: usize,
+    /// 辞書の一覧の状態(辞書の一覧の行だけ)．入力欄(inputs)は開いた辞書の名前と分野
+    dictionaries: Option<dictionary_rows::Rows>,
 }
 
 /// 謝辞のカードの中の置き場所
@@ -594,6 +609,10 @@ impl RowState {
             acknowledgement: None,
             dragging: None,
             filter: 0,
+            dictionaries: match row.control {
+                Control::Dictionaries(list) => Some(dictionary_rows::Rows::new(list)),
+                _ => None,
+            },
         }
     }
 
@@ -724,29 +743,26 @@ impl RowState {
         match &self.row.control {
             Control::List(spec, limit) => Some((spec, *limit)),
             Control::Dictionary(spec) => Some((spec, LimitKind::UserDictionaryEntries)),
-            // 記号・辞書の上限はエンジンが確かめ，項目ごとの同期は足さないので，上限は使わない
-            Control::Symbols(_, spec)
-            | Control::SyncFields(spec)
-            | Control::Dictionaries(_, spec) => Some((spec, LimitKind::ProfileRules)),
+            // 記号の上限はエンジンが確かめ，項目ごとの同期は足さないので，上限は使わない
+            Control::Symbols(_, spec) | Control::SyncFields(spec) => {
+                Some((spec, LimitKind::ProfileRules))
+            }
             _ => None,
         }
     }
 
-    /// 入力欄・追加・削除のある一覧か(項目ごとの同期・辞書の一覧・カスタムテーマの一覧は違う)
+    /// 入力欄・追加・削除のある一覧か(項目ごとの同期・カスタムテーマの一覧は違う)
     fn has_add_remove(&self) -> bool {
         self.list_spec().is_some()
             && !matches!(
                 self.row.control,
-                Control::SyncFields(_) | Control::Dictionaries(..) | Control::CustomThemes(_)
+                Control::SyncFields(_) | Control::CustomThemes(_)
             )
     }
 
-    /// 辞書・カスタムテーマの一覧か(入力欄・更新・表の下のボタン)
+    /// カスタムテーマの一覧か(入力欄・更新・表の下のボタン)
     fn is_dictionary_list(&self) -> bool {
-        matches!(
-            self.row.control,
-            Control::Dictionaries(..) | Control::CustomThemes(_)
-        )
+        matches!(self.row.control, Control::CustomThemes(_))
     }
 
     /// 選んだ行を消すボタン(足す一覧は表の下の左)
@@ -832,7 +848,7 @@ impl RowState {
         }
     }
 
-    /// 辞書・カスタムテーマの一覧で選んだ行の値を入力欄に出す
+    /// カスタムテーマの一覧で選んだ行の値を入力欄に出す
     fn fill_dictionary_inputs(&mut self, position: usize) {
         let Some(spec) = self.row.control.list_spec().copied() else {
             return;
@@ -911,6 +927,8 @@ impl RowState {
                 .and_then(|layout| layout.expand),
             // 試す欄(2 つ)の後ろに並べたボタン
             Part::PreviewAdd(index) => card.parts.get(2 + index).copied(),
+            Part::Entry(index, part) => self.dictionaries.as_ref()?.part_rect(index, part),
+            Part::Import => card.parts.first().copied(),
             Part::Toggle
             | Part::Dropdown
             | Part::Action
@@ -962,6 +980,17 @@ impl RowState {
             Control::Color => parts.push(Part::Color),
             Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
             Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
+            Control::Dictionaries(_) => {
+                if let Some(rows) = &self.dictionaries {
+                    parts.extend(
+                        rows.placement
+                            .parts
+                            .iter()
+                            .map(|(index, part, _)| Part::Entry(*index, *part)),
+                    );
+                }
+                parts.push(Part::Import);
+            }
             Control::Preview(kind) => {
                 parts.extend([Part::PreviewField(0), Part::PreviewField(1)]);
                 if *kind == TryKind::Language {
@@ -1008,6 +1037,11 @@ impl RowState {
             .list_spec()
             .map_or(0, |spec| spec.fields.len());
         match part {
+            Part::Entry(index, part) => self
+                .dictionaries
+                .as_ref()
+                .is_some_and(|rows| rows.part_enabled(index, part)),
+            Part::Import => self.dictionaries.as_ref().is_some_and(|rows| !rows.busy),
             Part::Decrement => self.choice.is_some_and(|index| index > 0),
             Part::Increment => self
                 .choice
@@ -1025,7 +1059,7 @@ impl RowState {
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
             Part::Bottom(0) if self.has_add_remove() => selected,
-            // 辞書・カスタムテーマの一覧の更新
+            // カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
             Part::Bottom(index) if self.is_dictionary_list() => {
                 index < always_enabled(&self.row.control) || selected
@@ -1094,6 +1128,12 @@ impl RowState {
                 .iter()
                 .map(|(_, name)| (*name).to_string())
                 .collect(),
+            (Control::Dictionaries(_), Part::Entry(_, EntryPart::Condition)) => {
+                DICTIONARY_CONDITIONS
+                    .iter()
+                    .map(|(_, name)| (*name).to_string())
+                    .collect()
+            }
             (control, Part::Field(index)) => control
                 .list_spec()
                 .and_then(|spec| spec.fields.get(index))
@@ -1118,6 +1158,9 @@ impl RowState {
                 Some(Input::Choice(selected)) => Some(*selected),
                 _ => None,
             },
+            Part::Entry(index, EntryPart::Condition) => {
+                self.dictionaries.as_ref()?.condition_index(index)
+            }
             _ => None,
         }
     }
@@ -1125,7 +1168,7 @@ impl RowState {
     /// 部品が選ぶ欄か
     fn is_dropdown(&self, part: Part) -> bool {
         match part {
-            Part::Dropdown | Part::Filter => true,
+            Part::Dropdown | Part::Filter | Part::Entry(_, EntryPart::Condition) => true,
             Part::Field(index) => matches!(self.inputs.get(index), Some(Input::Choice(_))),
             _ => false,
         }
@@ -1140,8 +1183,89 @@ impl RowState {
             },
             Part::PreviewField(index) => self.preview_fields.get(index).copied(),
             Part::Search => self.search,
+            // 開いた辞書の名前と分野の欄(開いた辞書は 1 つだけなので，欄も 1 組)
+            Part::Entry(index, part @ (EntryPart::Name | EntryPart::Field)) => {
+                if self.dictionaries.as_ref()?.expanded_index() != Some(index) {
+                    return None;
+                }
+                let position = usize::from(part == EntryPart::Field);
+                match self.inputs.get(position) {
+                    Some(Input::Edit(window)) => Some(*window),
+                    _ => None,
+                }
+            }
             _ => None,
         }
+    }
+
+    /// 辞書の一覧の部品を押した
+    fn activate_dictionary(&mut self, list: DictionaryList, part: Part, now: f64) -> Option<Event> {
+        let rows = self.dictionaries.as_mut()?;
+        let event = |action, index| {
+            Some(Event::DictionaryList {
+                list,
+                action,
+                index,
+            })
+        };
+        let (index, part) = match part {
+            Part::Import => return event(DictionaryAction::Import, None),
+            Part::Entry(index, part) => (index, part),
+            _ => return None,
+        };
+        let entry = rows.entries.get(index)?.clone();
+        let action = match part {
+            EntryPart::Expand => {
+                // 開くのは 1 つだけ．開いたら名前と分野を欄に入れる
+                let open = rows.expanded_index() == Some(index);
+                rows.expanded = (!open).then(|| entry.id.clone());
+                if !open {
+                    let texts = [&entry.name, &entry.field];
+                    for (input, text) in self.inputs.iter().zip(texts) {
+                        if let Input::Edit(window) = input {
+                            ffi::set_text(*window, text);
+                        }
+                    }
+                }
+                return Some(Event::Relayout);
+            }
+            EntryPart::Toggle => {
+                if let Some(knob) = rows.knobs.get_mut(index) {
+                    let target = if entry.is_enabled { 0.0 } else { 1.0 };
+                    knob.retarget(target, now, f64::from(motion::TOGGLE), Easing::STANDARD);
+                }
+                DictionaryAction::Toggle
+            }
+            EntryPart::MoveUp => DictionaryAction::MoveUp,
+            EntryPart::MoveDown => DictionaryAction::MoveDown,
+            EntryPart::AddApp => DictionaryAction::ChooseApps,
+            EntryPart::RemoveApp(app) => DictionaryAction::RemoveApp(app),
+            EntryPart::Reimport => DictionaryAction::Reimport,
+            EntryPart::Remove => DictionaryAction::Remove,
+            // 打つ欄は窓が受け取り，使う場面の欄はドロップダウンで選ぶ(choose)
+            EntryPart::Name | EntryPart::Field | EntryPart::Condition => return None,
+        };
+        event(action, Some(index))
+    }
+
+    /// 辞書の一覧の打つ欄が変わった(macOS と同じく打つたびに書く．今の値と同じなら書かない)
+    fn dictionary_edited(&self, list: DictionaryList, part: Part) -> Option<Event> {
+        let Part::Entry(index, entry_part) = part else {
+            return None;
+        };
+        let rows = self.dictionaries.as_ref()?;
+        let entry = rows.entries.get(index)?;
+        let typed = self.edit(part).map(ffi::window_text)?;
+        let action = match entry_part {
+            EntryPart::Name if typed.trim() != entry.name => DictionaryAction::Rename(typed),
+            EntryPart::Field if typed.trim() != entry.field => DictionaryAction::SetField(typed),
+            _ => return None,
+        };
+        Some(Event::DictionaryList {
+            list,
+            action,
+            index: Some(index),
+        })
     }
 }
 
@@ -1370,12 +1494,12 @@ impl PageView {
                 row.table_scroll.set_extent(content, table_viewport(row));
             }
             match &row.row.control {
-                Control::Dictionaries(list, _) => {
+                Control::Dictionaries(list) => {
                     let entries = crate::dictionaries::entries(*list, values.value(list.path()));
-                    row.dictionary_inputs = entries
-                        .iter()
-                        .map(|entry| crate::dictionaries::inputs(*list, entry))
-                        .collect();
+                    if let Some(rows) = &mut row.dictionaries {
+                        rows.set_entries(entries, now);
+                        rows.busy = extras.importing_dictionary;
+                    }
                 }
                 Control::CustomThemes(_) => {
                     row.dictionary_inputs =
@@ -1403,10 +1527,16 @@ impl PageView {
             .flat_map(|section| &section.rows)
             .collect();
         let expanded: Vec<bool> = self.rows.iter().map(|row| row.expanded).collect();
+        let heights: Vec<Option<f32>> = self
+            .rows
+            .iter()
+            .map(|row| row.dictionaries.as_ref().map(dictionary_rows::Rows::height))
+            .collect();
         let metrics = Measured {
             measure,
             all: &all,
             expanded: &expanded,
+            heights: &heights,
         };
         self.layout = layout::layout(
             &self.sections,
@@ -1429,6 +1559,27 @@ impl PageView {
                 if let Some(row) = self.rows.get_mut(flat) {
                     row.card = Some(card.clone());
                 }
+            }
+        }
+        let button = |label: &str| {
+            let metrics = Measured {
+                measure,
+                all: &[],
+                expanded: &[],
+                heights: &[],
+            };
+            layout::button_width(label, &metrics)
+        };
+        for row in &mut self.rows {
+            if let (Some(rows), Some(card)) = (&mut row.dictionaries, &row.card) {
+                let area = (card.card.x, card.card.y, card.card.width);
+                rows.placement = dictionary_rows::place(
+                    rows.list,
+                    &rows.entries,
+                    rows.expanded_index(),
+                    area,
+                    &button,
+                );
             }
         }
         for row in &mut self.rows {
@@ -1474,6 +1625,15 @@ impl PageView {
     ) {
         for row in &self.rows {
             let shown = !hidden && row.visible && row.card.is_some();
+            // 部品に無い欄(閉じた辞書の行の欄)は隠す
+            let placed: Vec<Window> = row
+                .parts()
+                .into_iter()
+                .filter_map(|part| row.edit(part))
+                .collect();
+            for window in row.windows().filter(|window| !placed.contains(window)) {
+                ffi::show(window, false);
+            }
             for part in row.parts() {
                 let Some(window) = row.edit(part) else {
                     continue;
@@ -1543,6 +1703,12 @@ impl PageView {
     pub fn tooltip(&self, element: Element) -> Option<&'static str> {
         match element.part {
             Part::Reset => Some(features::RESTORE_DEFAULT),
+            Part::Entry(index, part) => self
+                .rows
+                .get(element.row)?
+                .dictionaries
+                .as_ref()?
+                .tooltip(index, part),
             _ => None,
         }
     }
@@ -1574,6 +1740,14 @@ impl PageView {
                 .map_or_else(String::new, |field| field.label.to_string()),
             Part::Search => features::SEARCH.to_string(),
             Part::Table => row.row.control.table_columns().join("・"),
+            Part::Entry(index, part) => row
+                .dictionaries
+                .as_ref()
+                .map_or_else(String::new, |rows| rows.name(index, part)),
+            Part::Import => match row.row.control {
+                Control::Dictionaries(list) => list.import_label().to_string(),
+                _ => String::new(),
+            },
             _ => row.row.title.to_string(),
         }
     }
@@ -1588,6 +1762,13 @@ impl PageView {
         let row = self.rows.get(element.row)?;
         Some(match element.part {
             Part::Toggle => Described::Toggle(row.on),
+            Part::Entry(index, EntryPart::Toggle) => Described::Toggle(
+                row.dictionaries
+                    .as_ref()
+                    .and_then(|rows| rows.entries.get(index))
+                    .is_some_and(|entry| entry.is_enabled),
+            ),
+            Part::Entry(_, EntryPart::Name | EntryPart::Field) => Described::Edit,
             Part::Slider => Described::Slider(
                 row.number()
                     .map(|value| row.number_text(value))
@@ -1595,7 +1776,9 @@ impl PageView {
             ),
             Part::Radio => Described::Radio(row.on),
             Part::Segment(index) => Described::Radio(row.choice == Some(index)),
-            Part::Dropdown | Part::Field(_) | Part::Filter if row.is_dropdown(element.part) => {
+            Part::Dropdown | Part::Field(_) | Part::Filter | Part::Entry(..)
+                if row.is_dropdown(element.part) =>
+            {
                 let items = row.dropdown_items(element.part);
                 let label = row
                     .dropdown_selected(element.part)
@@ -1612,6 +1795,14 @@ impl PageView {
 
     /// 部品の番号(読み上げで見分ける．ページの中で変わらない)
     pub fn element_id(element: Element) -> i32 {
+        // 辞書の行の部品は辞書の数だけあるので，ほかの部品の番号より後ろに分けて数える
+        if let Part::Entry(index, part) = element.part {
+            let id = ENTRY_ID_BASE
+                + element.row * ENTRY_ID_ROW
+                + index * ENTRY_ID_ENTRY
+                + part.ordinal();
+            return i32::try_from(id).unwrap_or(i32::MAX);
+        }
         let part = match element.part {
             Part::Reset => 0,
             Part::Toggle => 1,
@@ -1636,6 +1827,8 @@ impl PageView {
             Part::Expand => 79,
             Part::PreviewAdd(index) => 65 + index,
             Part::Link(index) => 80 + index,
+            Part::Import => 32,
+            Part::Entry(..) => 0,
         };
         let id = element.row * 100 + part;
         i32::try_from(id).unwrap_or(i32::MAX)
@@ -1719,6 +1912,10 @@ impl PageView {
                 row.knob.running(now)
                     || row.table_scroll.animating(now)
                     || row.text_scroll.animating(now)
+                    || row
+                        .dictionaries
+                        .as_ref()
+                        .is_some_and(|rows| rows.animating(now))
             })
     }
 
@@ -1741,6 +1938,9 @@ impl PageView {
             return None;
         }
         let part = element.part;
+        if let Control::Dictionaries(list) = row.row.control {
+            return row.activate_dictionary(list, part, now);
+        }
         match (&row.row.control, part) {
             (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
             (Control::Stepper(_), Part::Decrement) => return row.step(-1),
@@ -1871,20 +2071,6 @@ impl PageView {
                 name,
             });
         }
-        if let (Control::Dictionaries(list, _), Part::Top(0) | Part::Bottom(_)) =
-            (&row.row.control, part)
-        {
-            let action = match part {
-                Part::Top(_) => DictionaryAction::Update(row.input_values()),
-                Part::Bottom(index) => DictionaryAction::BOTTOM.get(index)?.clone(),
-                _ => return None,
-            };
-            return Some(Event::DictionaryList {
-                list: *list,
-                action,
-                index: first,
-            });
-        }
         // 項目ごとの同期は表の「同期する」の印で切り替える(table_check_click)
         if let Control::SyncFields(_) = row.row.control {
             return None;
@@ -1997,6 +2183,14 @@ impl PageView {
                 }
                 None
             }
+            (Control::Dictionaries(list), Part::Entry(entry, EntryPart::Condition)) => {
+                let (value, _) = DICTIONARY_CONDITIONS.get(index)?;
+                Some(Event::DictionaryList {
+                    list: *list,
+                    action: DictionaryAction::SetCondition(value),
+                    index: Some(entry),
+                })
+            }
             _ => None,
         };
         self.show_footer_variants();
@@ -2011,6 +2205,9 @@ impl PageView {
             (Control::List(spec, _), Part::Field(0)) => spec.path == MACROS_PATH,
             _ => false,
         };
+        if let Control::Dictionaries(list) = changed.row.control {
+            return changed.dictionary_edited(list, element.part);
+        }
         if macro_preview {
             let (text, preceding, draft) = self.macro_preview_inputs()?;
             return Some(Event::Preview {
@@ -2221,7 +2418,7 @@ impl PageView {
         let row = self.rows.get_mut(row_index)?;
         let positions = row.table.selected_positions();
         if row.is_dictionary_list() {
-            // 選んだ辞書の名前などを入力欄に出す(書き換えて「更新」を押す)
+            // 選んだテーマの名前を入力欄に出す(書き換えて「更新」を押す)
             if let Some(first) = positions.first() {
                 row.fill_dictionary_inputs(*first);
             }
@@ -2614,7 +2811,10 @@ impl PageView {
             }
         }
         for (index, row) in self.rows.iter().enumerate() {
-            let shown = row.card.as_ref().is_some_and(|card| frame.shows(card.card));
+            // 辞書の一覧の取り込むボタンはカードの下にあるので，ボタンだけ見えていても描く
+            let shown = row.card.as_ref().is_some_and(|card| {
+                frame.shows(card.card) || card.parts.iter().any(|part| frame.shows(*part))
+            });
             if row.visible && shown {
                 self.paint_row(canvas, frame, index, row);
             }
@@ -2976,6 +3176,7 @@ impl PageView {
                 preview_chips(canvas, theme, card.control, &row.preview_result);
             }
             Control::Note => {}
+            Control::Dictionaries(_) => self.paint_dictionaries(canvas, frame, index, row),
             _ => self.paint_list(canvas, frame, index, row),
         }
     }
@@ -3807,6 +4008,21 @@ impl<F: FnMut() -> u16> FieldSource<'_, F> {
 /// 一覧の入力欄・検索欄・試す欄の標準の EDIT を用意する
 fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowState) {
     match &row.row.control {
+        // 辞書の一覧は開いた辞書の名前と分野の欄(連想の辞書は名前だけ)
+        Control::Dictionaries(list) => {
+            let prompts: &[&str] = match list {
+                DictionaryList::Imported => &[
+                    crate::strings::dictionaries::NAME,
+                    crate::strings::dictionaries::FIELD_PROMPT,
+                ],
+                DictionaryList::Association => &[crate::strings::dictionaries::NAME],
+            };
+            for prompt in prompts {
+                if let Some(window) = fields.take(prompt) {
+                    row.inputs.push(Input::Edit(window));
+                }
+            }
+        }
         Control::Preview(kind) => {
             let labels = match kind {
                 TryKind::Language => [features::TRY_PLACEHOLDER, features::TRY_PRECEDING],
@@ -3999,10 +4215,6 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
         Control::Dictionary(_) => extras.dictionary.clone(),
         Control::Symbols(kind, _) => extras.symbol_rows(*kind).to_vec(),
         Control::SyncFields(_) => extras.sync_fields.clone(),
-        Control::Dictionaries(list, _) => {
-            let entries = crate::dictionaries::entries(*list, values.value(list.path()));
-            crate::dictionaries::table(*list, &entries)
-        }
         Control::List(spec, _) if spec.has_enabled_flag() => {
             let list = values.value(spec.path);
             spec.items(list)
@@ -4201,6 +4413,8 @@ struct Measured<'a> {
     all: &'a [&'a Row],
     /// 謝辞のライセンスの全文を開いているか(行と同じ並び)
     expanded: &'a [bool],
+    /// 辞書の一覧のカードの高さ(行と同じ並び．辞書の一覧でなければ None)
+    heights: &'a [Option<f32>],
 }
 
 impl Measured<'_> {
@@ -4239,6 +4453,11 @@ impl Metrics for Measured<'_> {
         let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
         if row.control == Control::TemplateReference {
             return Some(TemplateLayout::new((0.0, 0.0, inner), self.measure).height);
+        }
+        if let Control::Dictionaries(_) = row.control {
+            return self
+                .position(row)
+                .and_then(|position| self.heights.get(position).copied().flatten());
         }
         let Control::Acknowledgement(index) = row.control else {
             return None;

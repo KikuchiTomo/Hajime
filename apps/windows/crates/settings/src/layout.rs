@@ -181,6 +181,10 @@ pub fn layout(
                 };
                 let card = place(index, row, &notes, frame, metrics);
                 y = card.card.max_y();
+                // 辞書の一覧は取り込むボタンをカードの下に置く(macOS の Section の footer)
+                if let Control::Dictionaries(_) = row.control {
+                    y = card.parts.iter().map(Rect::max_y).fold(y, f32::max);
+                }
                 cards.push(card);
             }
             index = next;
@@ -330,6 +334,7 @@ fn place(
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
             card
         }
+        Control::Dictionaries(list) => place_dictionaries(position, row, *list, frame, metrics),
         Control::Segmented(choices) => place_segments(position, choices, frame, metrics),
         Control::Action(_) => place_action(position, row.title, notes, frame, metrics),
         Control::Buttons(buttons) => {
@@ -340,6 +345,28 @@ fn place(
         Control::ThemeOption(_) => place_option(position, frame),
         _ => place_labeled(position, row, notes, frame, metrics),
     }
+}
+
+/// 辞書の一覧(macOS の ImportedDictionariesView・AssociationSection)．カードは辞書の行の高さ(画面の側で測る)にし，
+/// 取り込むボタンをカードの下に注記と同じ間を空けて置く(parts の 0 番目)．部品の欄はカードの中の全体
+fn place_dictionaries(
+    position: usize,
+    row: &Row,
+    list: crate::pages::DictionaryList,
+    frame: Frame,
+    metrics: &dyn Metrics,
+) -> CardLayout {
+    let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
+    let mut card = empty(frame.card(height), position);
+    card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
+    let button = button_width(list.import_label(), metrics).min(frame.width);
+    card.parts = vec![Rect::new(
+        frame.x,
+        frame.y + height + size::FOOTER_GAP,
+        button,
+        size::CONTROL_HEIGHT,
+    )];
+    card
 }
 
 /// 名前(と説明)を左，部品を右に置く行
@@ -1190,22 +1217,32 @@ mod tests {
     }
 
     #[test]
-    fn 辞書の一覧は表の下にボタンを折り返して並べる() {
-        let page = sections(Page::Dictionary).unwrap();
-        for width in [800.0, 400.0] {
-            let layout = layout(&page, width, |_| true, &Estimate);
-            let card = &layout.sections[3].cards[0];
-            // 入力欄 4 つ・更新・表の下の 6 つ
-            assert_eq!(card.parts.len(), 11);
-            for part in &card.parts {
-                assert!(part.max_x() <= card.card.max_x() - size::CARD_PADDING_X + 0.01);
-                assert!(part.max_y() <= card.card.max_y());
-            }
-            for part in &card.parts[5..] {
-                assert!(part.y >= card.control.max_y());
+    fn 辞書の一覧は取り込むボタンをカードの下に置き_注記はその下() {
+        for (page, index) in [(Page::Dictionary, 3), (Page::Conversion, 0)] {
+            let sections = sections(page).unwrap();
+            let index = sections
+                .iter()
+                .position(|section| {
+                    section
+                        .rows
+                        .iter()
+                        .any(|row| matches!(row.control, Control::Dictionaries(_)))
+                })
+                .unwrap_or(index);
+            for width in [800.0, 400.0] {
+                let layout = layout(&sections, width, |_| true, &Estimate);
+                let section = &layout.sections[index];
+                let card = &section.cards[0];
+                // 取り込むボタンだけ．カードの左の端にそろえ，カードの下に間を空けて置く
+                assert_eq!(card.parts.len(), 1);
+                let button = card.parts[0];
+                assert_eq!(button.x, card.card.x);
+                assert_eq!(button.y, card.card.max_y() + size::FOOTER_GAP);
+                assert!(button.width >= size::BUTTON_WIDTH);
+                let footer = section.footer.unwrap();
+                assert!(footer.y >= button.max_y());
             }
         }
-        assert!(button_width("有効・無効の切り替え", &Estimate) > size::BUTTON_WIDTH);
         assert_eq!(button_width("更新", &Estimate), size::BUTTON_WIDTH);
     }
 
@@ -1239,11 +1276,18 @@ mod tests {
             Page::Palette,
         ] {
             let layout = all(page, 800.0);
-            for card in layout.sections.iter().flat_map(|section| &section.cards) {
-                assert!(card.control.max_y() <= card.card.max_y(), "{card:?}");
-                assert!(card.control.y >= card.card.y);
-                for part in &card.parts {
-                    assert!(part.max_y() <= card.card.max_y(), "{card:?}");
+            let rows = sections(page).unwrap();
+            for (section, rows) in layout.sections.iter().zip(&rows) {
+                for card in &section.cards {
+                    assert!(card.control.max_y() <= card.card.max_y(), "{card:?}");
+                    assert!(card.control.y >= card.card.y);
+                    // 辞書の一覧の取り込むボタンはカードの下に置く
+                    if matches!(rows.rows[card.row].control, Control::Dictionaries(_)) {
+                        continue;
+                    }
+                    for part in &card.parts {
+                        assert!(part.max_y() <= card.card.max_y(), "{card:?}");
+                    }
                 }
             }
         }

@@ -183,6 +183,8 @@ pub struct App {
     measure: Option<Measurement>,
     /// 「更新を確認」の進み具合(R-19)
     pub(super) update: super::update::Updater,
+    /// 辞書を取り込んだ結果の受け箱(取り込みは別のスレッドで待ち，終えたら WM_DICTIONARY_IMPORTED を送る)
+    pub(super) dictionary_import: super::actions::ImportInbox,
     /// 見本のエンジンで開いた(--offline)
     pub(super) offline: bool,
     /// 単語の登録で開いた(--register-word)．つながったら，エンジンが持っている語と読みを登録の欄に入れる
@@ -285,6 +287,7 @@ pub fn open(
         breakdown: (0.0, 0.0, 0.0),
         measure: options.measure.map(Measurement::new),
         update: super::update::Updater::default(),
+        dictionary_import: super::actions::ImportInbox::default(),
         offline: options.offline,
         register_word: options.register_word,
     };
@@ -2532,6 +2535,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         super::update::WM_UPDATE => {
             super::update::receive(window);
+            Some(LRESULT(0))
+        }
+        super::actions::WM_DICTIONARY_IMPORTED => {
+            let after = with_app(App::finish_import).flatten();
+            super::actions::run_after(window, after);
             Some(LRESULT(0))
         }
         WM_WARM => {
