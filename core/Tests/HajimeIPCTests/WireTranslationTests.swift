@@ -125,6 +125,18 @@ struct WireTranslationTests {
         #expect(LauncherCommand.Kind.allCases.map { WireCommandKind($0).rawValue } == LauncherCommand.Kind.allCases.map(\.rawValue))
     }
 
+    @Test("絵文字の名前を，一覧の行と分岐図の枝ごとに運ぶ．添えるものが無い枝では並びを送らない")
+    func emojiNames() {
+        let entries = [CandidatePanel.Entry(text: "猫", annotation: nil), CandidatePanel.Entry(text: "🐈", annotation: nil, detail: "ネコ")]
+        let list = WireCandidateList(CandidatePanel(variants: [], selectedVariant: nil, entries: entries, selectedEntry: 0, focus: .candidate,
+                                                    position: 1, total: 2, note: nil))
+        #expect(list.entries.map(\.detail) == [nil, "ネコ"])
+        var column = LatticePanel.Column(text: "猫", alternatives: ["猫", "🐈"], selectedAlternative: 0, isFocused: true, isUncertain: false)
+        #expect(WireBranchMap(LatticePanel(columns: [column]), hints: []).columns.first?.alternativeDetails == nil)
+        column.alternativeDetails = [nil, "ネコ"]
+        #expect(WireBranchMap(LatticePanel(columns: [column]), hints: []).columns.first?.alternativeDetails == [nil, "ネコ"])
+    }
+
     @Test("候補の中の直した部分の位置は，Unicode のスカラー値の数で運ぶ(Rust の char と合わせる)")
     func correctedRangeInScalars() {
         // 「が」+ 結合の濁点(2 スカラーで 1 文字)のあとに直した「良い」がある

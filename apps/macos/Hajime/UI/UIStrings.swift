@@ -507,6 +507,7 @@ enum UIStrings {
         static let emojiConversion = "絵文字に変換"
         static let emojiCandidatePosition = "絵文字の位置"
         static let emojiCandidateCount = "絵文字の数"
+        static let showsEmojiNames = "絵文字の名前を表示"
         /// 絵文字の位置の値(「4 番目」)
         static func emojiCandidatePositionValue(_ position: Int) -> String { "\(position) 番目" }
         static let latexConversion = "LaTeX のコマンドに変換"
@@ -1092,7 +1093,7 @@ extension UIStrings {
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion, "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,
-            "emojiCandidateCount": UIStrings.Settings.emojiCandidateCount,
+            "emojiCandidateCount": UIStrings.Settings.emojiCandidateCount, "showsEmojiNames": UIStrings.Settings.showsEmojiNames,
             "latexConversion": UIStrings.Settings.latexConversion,
             "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
             "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,

@@ -190,6 +190,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
                 .map(|row| {
                     painter.width(&row.text, Font::Candidate)
                         + row.command.map_or(0.0, |_| Painter::command_width())
+                        + painter.detail_width(row.detail.as_deref())
                 })
                 .chain(
                     column
@@ -648,6 +649,8 @@ struct Row {
     note: Option<String>,
     /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
     command: Option<CommandKind>,
+    /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
+    detail: Option<String>,
 }
 
 /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
@@ -666,6 +669,10 @@ fn lower_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
                 .alternative_commands
                 .as_ref()
                 .and_then(|kinds| kinds.get(index).copied().flatten()),
+            detail: column
+                .alternative_details
+                .as_ref()
+                .and_then(|details| details.get(index).cloned().flatten()),
         })
         .collect()
 }
@@ -683,6 +690,7 @@ fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
             opacity: rest,
             note: None,
             command: None,
+            detail: None,
         })
         .collect()
 }
@@ -863,6 +871,17 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
         text_x += Painter::command_width();
     }
     painter.text(&row.text, Font::Candidate, text_color, text_x, frame);
+    // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
+    if let Some(detail) = row.detail.as_deref() {
+        painter.detail(
+            &row.text,
+            Font::Candidate,
+            detail,
+            muted_color,
+            text_x,
+            frame,
+        );
+    }
     if let Some(note) = row.note.as_deref() {
         painter.tag(
             note,
@@ -986,6 +1005,7 @@ mod tests {
             homophone: None,
             alternative_notes: vec![None, Some("修正".into())],
             alternative_commands: None,
+            alternative_details: None,
             source_name: None,
             split: None,
         }

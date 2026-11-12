@@ -255,6 +255,7 @@ pub mod size {
         pub const MAX_WIDTH: f32 = 720.0;
         pub const SCREEN_MARGIN: f32 = 16.0;
         pub const TRUNCATION_CONTEXT: f32 = 4.0;
+        pub const DETAIL_GAP: f32 = 8.0;
     }
     pub mod mode_indicator {
         pub const FONT_SIZE: f32 = 14.0;

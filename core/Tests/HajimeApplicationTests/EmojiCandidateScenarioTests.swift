@@ -119,23 +119,47 @@ struct EmojiCandidateScenarioTests {
         #expect(harness.focusedAlternatives?.firstIndex(of: "🐈") == 2)
     }
 
-    @Test("絵文字を選んでいるときは，語の意味のカードに絵文字の名前を出す")
-    func meaningCardShowsName() {
+    @Test("絵文字の候補の横に名前を添え，絵文字を選んでも語の意味のカードは開かない")
+    func namesBesideEmoji() {
         let harness = harness(settings())
         harness.type("neko")
         harness.press(.space)
-        harness.press(.down)
-        harness.press(.down)
         let column = harness.lattice?.columns.first(where: \.isFocused)
-        #expect(column?.text == "🐈")
-        #expect(column?.homophone == HomophoneNote(word: "🐈", meaning: "ネコ", others: []))
-        // 語の意味を出さない設定では出さない
-        let off = self.harness(settings { $0.homophoneNotes = false })
-        off.type("neko")
-        off.press(.space)
-        off.press(.down)
-        off.press(.down)
-        #expect(off.lattice?.columns.first(where: \.isFocused)?.homophone == nil)
+        #expect(column?.alternatives == ["猫", "根子", "🐈", "😺", "音子"])
+        // 名前を知らない絵文字(😺)には添えない
+        #expect(column?.alternativeDetails == [nil, nil, "ネコ", nil, nil])
+        harness.press(.down)
+        harness.press(.down)
+        let selected = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(selected?.text == "🐈")
+        #expect(selected?.homophone == nil)
+    }
+
+    @Test("一覧と入力中の候補の窓でも，絵文字の候補の横に名前を添える", arguments: [CandidatePresentation.segmentList, .list])
+    func namesInLists(presentation: CandidatePresentation) {
+        let harness = harness(settings { $0.candidatePresentation = presentation })
+        harness.type("neko")
+        harness.press(.space)
+        if presentation == .list { harness.press(.down) }
+        let entries = harness.panel?.entries ?? []
+        #expect(entries.first { $0.text == "🐈" }?.detail == "ネコ")
+        #expect(entries.filter { $0.text != "🐈" }.allSatisfy { $0.detail == nil })
+        #expect(harness.panel?.homophone == nil)
+        let typing = self.harness(settings { $0.liveConversion = false })
+        typing.type("neko")
+        #expect(typing.panel?.entries.first { $0.text == "🐈" }?.detail == "ネコ")
+    }
+
+    @Test("名前を表示しない設定では添えない")
+    func namesOff() {
+        let harness = harness(settings { $0.showsEmojiNames = false })
+        harness.type("neko")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.first(where: \.isFocused)?.alternativeDetails == [])
+        let list = self.harness(settings { $0.showsEmojiNames = false; $0.candidatePresentation = .segmentList })
+        list.type("neko")
+        list.press(.space)
+        #expect(list.panel?.entries.allSatisfy { $0.detail == nil } == true)
     }
 
     @Test("確定した絵文字は，その読みで選んだことを伝える")

@@ -258,6 +258,7 @@ private struct ConversionTab: View {
                             LabeledContent(UIStrings.Settings.emojiCandidateCount, value: "\(model.settings.emojiCandidateCount)")
                         }
                     }
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
                 }
                 .disabled(!model.settings.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)

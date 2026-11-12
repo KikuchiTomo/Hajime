@@ -242,6 +242,13 @@ pub trait Measure {
     fn has_glyph(&self, _font: Font, _glyph: char) -> bool {
         false
     }
+
+    /// text を 1 行に並べたときの行の高さと，行の上からベースラインまでの長さ(書体に無い字は代わりの書体で並べた値)．
+    /// 大きさの違う文字のベースラインをそろえるのに使う．並べて測れないときは行の下端をベースラインとみなす
+    fn line(&self, _text: &str, font: Font) -> (f32, f32) {
+        let height = self.height(font);
+        (height, height)
+    }
 }
 
 /// 描く層が使い回す書体の組(Rc で共有する)も，そのまま測るのに使う
@@ -256,6 +263,10 @@ impl<T: Measure + ?Sized> Measure for std::rc::Rc<T> {
 
     fn has_glyph(&self, font: Font, glyph: char) -> bool {
         (**self).has_glyph(font, glyph)
+    }
+
+    fn line(&self, text: &str, font: Font) -> (f32, f32) {
+        (**self).line(text, font)
     }
 }
 

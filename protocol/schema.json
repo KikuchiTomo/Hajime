@@ -1585,6 +1585,10 @@
         {
           "name": "command",
           "type": "CommandKind?"
+        },
+        {
+          "name": "detail",
+          "type": "string?"
         }
       ]
     },
@@ -1869,6 +1873,10 @@
         {
           "name": "alternativeCommands",
           "type": "[CommandKind?]?"
+        },
+        {
+          "name": "alternativeDetails",
+          "type": "[string?]?"
         },
         {
           "name": "sourceName",

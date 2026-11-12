@@ -90,7 +90,7 @@ extension SettingsView {
                                UIStrings.Choice.predictionDisplay, UIStrings.Choice.hiddenPredictions,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiCandidatePosition,
-                               UIStrings.Settings.emojiCandidateCount, UIStrings.Settings.latexConversion,
+                               UIStrings.Settings.emojiCandidateCount, UIStrings.Settings.showsEmojiNames, UIStrings.Settings.latexConversion,
                                UIStrings.Settings.numberFormConversion, UIStrings.Association.enabled,
                                UIStrings.Association.limit, UIStrings.Association.dictionaries]
             case .correction: [UIStrings.Features.exceptions, UIStrings.Features.rules, UIStrings.Features.correctsEnglish, UIStrings.Features.misreadings,

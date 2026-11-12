@@ -12,6 +12,9 @@ public final class PaletteEmojiLookup: EmojiLooking {
     private let usage: any PaletteUsageStoring
     private let settings: any SettingsReading
     private let now: () -> Date
+    /// 引いた名前(名前の無い絵文字は nil)．名前は候補の窓を描くたびに引くので，表を頭から探し直さないよう覚える．
+    /// 覚えるのは表の絵文字の数まで
+    private var names: [String: String?] = [:]
 
     public init(catalog: any PaletteCatalogProviding, usage: any PaletteUsageStoring, settings: any SettingsReading, now: @escaping () -> Date) {
         self.catalog = catalog
@@ -30,8 +33,12 @@ public final class PaletteEmojiLookup: EmojiLooking {
     }
 
     public func name(of emoji: String) -> String? {
-        guard let item = catalog.index?.catalog.item(for: emoji), item.kind == .emoji, !item.japaneseName.isEmpty else { return nil }
-        return item.japaneseName
+        if let cached = names[emoji] { return cached }
+        guard let index = catalog.index else { return nil }
+        let item = index.catalog.item(for: emoji)
+        let name = item.flatMap { $0.kind == .emoji && !$0.japaneseName.isEmpty ? $0.japaneseName : nil }
+        names[emoji] = name
+        return name
     }
 
     public func didCommit(_ emoji: String, reading: String) {

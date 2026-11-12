@@ -63,6 +63,7 @@ pub mod settings {
     pub const EMOJI_CONVERSION: &str = "絵文字に変換";
     pub const EMOJI_CANDIDATE_POSITION: &str = "絵文字の位置";
     pub const EMOJI_CANDIDATE_COUNT: &str = "絵文字の数";
+    pub const SHOWS_EMOJI_NAMES: &str = "絵文字の名前を表示";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
     pub const NUMBER_FORMS: &str = "数字の書き方";
     pub const NUMBER_FORM_CONVERSION: &str = "数字を丸数字などに変換";
@@ -747,6 +748,7 @@ pub mod sync {
         ("emojiConversion", "絵文字に変換"),
         ("emojiCandidatePosition", "絵文字の位置"),
         ("emojiCandidateCount", "絵文字の数"),
+        ("showsEmojiNames", "絵文字の名前を表示"),
         ("latexConversion", "LaTeX のコマンドに変換"),
         ("numberFormConversion", "数字を丸数字などに変換"),
         ("numberFormCircled", "丸数字"),

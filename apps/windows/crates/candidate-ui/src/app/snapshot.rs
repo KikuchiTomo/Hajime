@@ -340,6 +340,7 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
             corrected_start: None,
             corrected_length: None,
             command: None,
+            detail: None,
         })
         .collect()
 }
@@ -483,34 +484,38 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     }
 }
 
-/// 読みで引いた絵文字(設定の「絵文字に変換」．macOS の SamplePanels.emojiNote)．選んでいる絵文字の名前(CLDR)を意味のカードに出す
-fn emoji_note() -> HomophoneNote {
-    HomophoneNote {
-        word: "😄".into(),
-        part_of_speech: None,
-        senses: vec![HomophoneSense {
-            meaning: "笑顔".into(),
-            example: None,
-        }],
-        others: vec![],
-    }
-}
-
 /// 「えがお」の候補．4・5 番目に絵文字を出す(macOS の SamplePanels.emojiCandidates)
 const EMOJI_CANDIDATES: [&str; 9] = [
     "笑顔", "^_^", "(^-^)", "😄", "😀", "(^_^)", "(^o^)", "(*^^*)", "(^^)",
 ];
 
+/// 絵文字の候補の横に薄く添える名前(CLDR．macOS の SamplePanels.emojiNames)
+fn emoji_name(text: &str) -> Option<String> {
+    match text {
+        "😄" => Some("笑顔".into()),
+        "😀" => Some("にっこり笑う".into()),
+        _ => None,
+    }
+}
+
+fn emoji_entries(texts: &[&str]) -> Vec<CandidateEntry> {
+    entries(texts)
+        .into_iter()
+        .map(|entry| CandidateEntry {
+            detail: emoji_name(&entry.text),
+            ..entry
+        })
+        .collect()
+}
+
 /// 文節ごとの一覧で絵文字を選んだところ(macOS の emoji-list)
 fn emoji_list() -> CandidateList {
     CandidateList {
-        entries: entries(&EMOJI_CANDIDATES),
+        entries: emoji_entries(&EMOJI_CANDIDATES),
         hints: None,
         selected_entry: Some(3),
         position: 4,
         total: 30,
-        homophone: Some(emoji_note()),
-        meaning_placement: Some(MeaningPlacement::Side),
         ..list()
     }
 }
@@ -519,7 +524,7 @@ fn emoji_list() -> CandidateList {
 fn emoji_suggestion() -> CandidateList {
     CandidateList {
         variants: vec![],
-        entries: entries(&["笑顔", "(^^)", "(*^^*)", "😄", "😀"]),
+        entries: emoji_entries(&["笑顔", "(^^)", "(*^^*)", "😄", "😀"]),
         shows_numbers: Some(false),
         selected_entry: None,
         position: 0,
@@ -542,8 +547,10 @@ fn emoji_branch() -> BranchMap {
                 selected_alternative: Some(3),
                 variants: strings(&["えがお", "エガオ", "ｴｶﾞｵ"]),
                 is_focused: true,
-                homophone: Some(emoji_note()),
                 alternative_notes: vec![None; alternatives.len()],
+                alternative_details: Some(
+                    alternatives.iter().map(|text| emoji_name(text)).collect(),
+                ),
                 alternatives,
                 ..column("😄")
             },
@@ -552,7 +559,7 @@ fn emoji_branch() -> BranchMap {
         total: 30,
         note: None,
         hints: vec![],
-        meaning_placement: Some(MeaningPlacement::Side),
+        meaning_placement: None,
     }
 }
 
@@ -632,6 +639,7 @@ fn column(text: &str) -> BranchColumn {
         homophone: None,
         alternative_notes: vec![],
         alternative_commands: None,
+        alternative_details: None,
         source_name: None,
         split: None,
     }

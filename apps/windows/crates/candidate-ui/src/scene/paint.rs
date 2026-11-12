@@ -92,6 +92,43 @@ impl<'a> Painter<'a> {
         });
     }
 
+    /// 候補の文字(font で x から row に描いたもの)のすぐあとに添える控えめな説明(絵文字の名前)の幅．
+    /// 候補の文字とのあいだを含む．説明が無ければ 0
+    pub fn detail_width(&self, detail: Option<&str>) -> f32 {
+        detail
+            .filter(|detail| !detail.is_empty())
+            .map_or(0.0, |detail| {
+                candidate::DETAIL_GAP + self.width(detail, Font::Label)
+            })
+    }
+
+    /// 候補の文字(font で x から row に描いたもの)のすぐあとに，控えめな説明(絵文字の名前)を小さい文字で添える．
+    /// 候補の文字とベースラインをそろえる(どちらも行の高さの真ん中に描くと，大きさの違う文字はベースラインがずれる)
+    pub fn detail(
+        &mut self,
+        text: &str,
+        font: Font,
+        detail: &str,
+        color: Color,
+        x: f32,
+        row: Frame,
+    ) {
+        if detail.is_empty() {
+            return;
+        }
+        let (text_height, text_baseline) = self.measure.line(text, font);
+        let (height, baseline) = self.measure.line(detail, Font::Label);
+        let base_y = row.y + (row.height - text_height) / 2.0 + text_baseline;
+        let left = x + self.width(text, font) + candidate::DETAIL_GAP;
+        self.text(
+            detail,
+            Font::Label,
+            color,
+            left,
+            Frame::new(left, base_y - baseline, 0.0, height),
+        );
+    }
+
     /// 右端を right にそろえて描く
     pub fn text_right(&mut self, text: &str, font: Font, color: Color, right: f32, row: Frame) {
         let width = self.width(text, font);

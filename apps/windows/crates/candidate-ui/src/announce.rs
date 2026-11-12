@@ -152,6 +152,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    detail: None,
                 },
                 CandidateEntry {
                     text: "返還".into(),
@@ -159,6 +160,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    detail: None,
                 },
             ],
             selected_entry: Some(1),
@@ -244,6 +246,7 @@ mod tests {
             homophone: None,
             alternative_notes: vec![],
             alternative_commands: None,
+            alternative_details: None,
             source_name: None,
             split: None,
         };

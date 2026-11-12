@@ -170,6 +170,7 @@ impl Page {
                 settings::EMOJI_CONVERSION,
                 settings::EMOJI_CANDIDATE_POSITION,
                 settings::EMOJI_CANDIDATE_COUNT,
+                settings::SHOWS_EMOJI_NAMES,
                 settings::LATEX_CONVERSION,
                 settings::NUMBER_FORM_CONVERSION,
                 association::ENABLED,
@@ -1188,6 +1189,8 @@ fn conversion() -> Vec<Section> {
                     RangeKind::EmojiCandidateCount,
                 )
                 .enabled_when(On("emojiConversion")),
+                Row::toggle(settings::SHOWS_EMOJI_NAMES, "showsEmojiNames")
+                    .enabled_when(On("emojiConversion")),
                 Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
             ],
         ),

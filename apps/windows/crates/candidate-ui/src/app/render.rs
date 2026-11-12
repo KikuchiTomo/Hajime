@@ -25,7 +25,8 @@ use windows::Win32::Graphics::DirectWrite::{
     IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH, DWRITE_FONT_STRETCH_NORMAL,
     DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT,
     DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD,
-    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
+    DWRITE_LINE_METRICS, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS,
+    DWRITE_WORD_WRAPPING_NO_WRAP,
 };
 use windows_core::{Interface, Result, BOOL, HSTRING};
 use windows_numerics::{Matrix3x2, Vector2};
@@ -226,6 +227,22 @@ impl Measure for TextMeasure {
         let has = self.find_glyph(font, glyph);
         self.glyphs.borrow_mut().insert((font, glyph), has);
         has
+    }
+
+    fn line(&self, text: &str, font: Font) -> (f32, f32) {
+        let fallback = (self.height(font), self.height(font));
+        // 描くときと同じ並べ方(書体に無い字は代わりの書体)で 1 行目の高さとベースラインを測る．並べた配置は覚えておいたものを使う
+        let Some(layout) = self.layout(text, font, f32::MAX, f32::MAX) else {
+            return fallback;
+        };
+        let mut lines = [DWRITE_LINE_METRICS::default()];
+        let mut count = 0u32;
+        // SAFETY: layout は生きている COM の参照で，lines と count は書き込める領域
+        let measured = unsafe { layout.GetLineMetrics(Some(&mut lines), &mut count) };
+        if measured.is_err() || count == 0 {
+            return fallback;
+        }
+        (lines[0].height, lines[0].baseline)
     }
 }
 

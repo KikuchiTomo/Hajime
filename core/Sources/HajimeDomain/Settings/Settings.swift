@@ -163,6 +163,8 @@ public struct Settings: Sendable, Equatable {
     public var emojiCandidatePosition = DefaultSettings.emojiCandidatePosition
     /// 絵文字の候補を出す数の上限
     public var emojiCandidateCount = DefaultSettings.emojiCandidateCount
+    /// 絵文字の候補の横に，絵文字の名前(CLDR の日本語の名前．😄 なら「笑顔」)を控えめに添える
+    public var showsEmojiNames = true
     /// 読み(「らむだ」)から LaTeX のコマンド(「\lambda」)の候補を出す
     public var latexConversion = false
     /// 読みが数字だけのとき(「21」)，丸数字などに書き換えた候補(「㉑」)を出す(NumberForms)．出す書き方は下の 4 つで選ぶ
@@ -384,7 +386,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiCandidatePosition, emojiCandidateCount, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
@@ -490,6 +492,7 @@ extension Settings: Codable {
         read(.emojiConversion, into: \.emojiConversion)
         read(.emojiCandidatePosition, into: \.emojiCandidatePosition)
         read(.emojiCandidateCount, into: \.emojiCandidateCount)
+        read(.showsEmojiNames, into: \.showsEmojiNames)
         read(.latexConversion, into: \.latexConversion)
         read(.numberFormConversion, into: \.numberFormConversion)
         read(.numberFormCircled, into: \.numberFormCircled)
@@ -624,6 +627,7 @@ extension Settings: Codable {
         try container.encode(emojiConversion, forKey: .emojiConversion)
         try container.encode(emojiCandidatePosition, forKey: .emojiCandidatePosition)
         try container.encode(emojiCandidateCount, forKey: .emojiCandidateCount)
+        try container.encode(showsEmojiNames, forKey: .showsEmojiNames)
         try container.encode(latexConversion, forKey: .latexConversion)
         try container.encode(numberFormConversion, forKey: .numberFormConversion)
         try container.encode(numberFormCircled, forKey: .numberFormCircled)

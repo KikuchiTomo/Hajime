@@ -1356,6 +1356,8 @@ pub struct CandidateEntry {
     pub corrected_length: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<CommandKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -1366,6 +1368,7 @@ impl fmt::Debug for CandidateEntry {
             .field("correctedStart", &self.corrected_start)
             .field("correctedLength", &self.corrected_length)
             .field("command", &self.command)
+            .field("detail", &REDACTED)
             .finish()
     }
 }
@@ -1603,6 +1606,9 @@ pub struct BranchColumn {
     #[serde(rename = "alternativeCommands")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternative_commands: Option<Vec<Option<CommandKind>>>,
+    #[serde(rename = "alternativeDetails")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternative_details: Option<Vec<Option<String>>>,
     #[serde(rename = "sourceName")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>,
@@ -1629,6 +1635,7 @@ impl fmt::Debug for BranchColumn {
             .field("homophone", &self.homophone)
             .field("alternativeNotes", &REDACTED)
             .field("alternativeCommands", &self.alternative_commands)
+            .field("alternativeDetails", &REDACTED)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)
             .finish()

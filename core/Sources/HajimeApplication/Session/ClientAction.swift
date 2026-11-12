@@ -119,12 +119,15 @@ public struct CandidatePanel: Sendable, Equatable {
         public var corrected: Range<Int>?
         /// コマンドの候補なら，その種類．描く側は種類のアイコンを文字の前に添え，札(annotation)をアクセントの色にする
         public var command: LauncherCommand.Kind?
+        /// 候補の文字のすぐあとに控えめに添える説明(絵文字の名前)．描く側は薄い色の 1 段小さい文字にし，候補の文字とベースラインをそろえる
+        public var detail: String?
 
-        public init(text: String, annotation: String?, corrected: Range<Int>? = nil, command: LauncherCommand.Kind? = nil) {
+        public init(text: String, annotation: String?, corrected: Range<Int>? = nil, command: LauncherCommand.Kind? = nil, detail: String? = nil) {
             self.text = text
             self.annotation = annotation
             self.corrected = corrected
             self.command = command
+            self.detail = detail
         }
     }
 
@@ -206,6 +209,8 @@ public struct LatticePanel: Sendable, Equatable {
         public var alternativeNotes: [String?] = []
         /// 下の枝の候補ごとのコマンドの種類(alternatives と同じ数)．コマンドでない候補は nil
         public var alternativeCommands: [LauncherCommand.Kind?] = []
+        /// 下の枝の候補ごとに，文字のすぐあとに控えめに添える説明(alternatives と同じ数．絵文字の名前)．添えるものが無いページでは空
+        public var alternativeDetails: [String?] = []
         /// 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前(分野)．足元に小さく出す(R-16)
         public var sourceName: String?
         /// 文節を区切っているとき(⇧↓)の，区切れる位置で分けた文節．区切っていなければ nil

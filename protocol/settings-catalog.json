@@ -110,6 +110,7 @@
     "reviewCorrectionTimeout",
     "shiftStartsAlphabet",
     "showsAssociationHint",
+    "showsEmojiNames",
     "showsHomophones",
     "showsKeyHints",
     "showsModeIndicator",

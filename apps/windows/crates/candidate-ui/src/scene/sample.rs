@@ -23,6 +23,7 @@ pub fn column(text: &str) -> BranchColumn {
         homophone: None,
         alternative_notes: vec![],
         alternative_commands: None,
+        alternative_details: None,
         source_name: None,
         split: None,
     }
