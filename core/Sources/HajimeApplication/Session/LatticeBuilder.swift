@@ -10,6 +10,8 @@ struct LatticeBuilder {
     let converter: any KanaKanjiConverting
     /// 上の枝(字種)を作るときに，読みに残った英字(英語と判定した語)をかなにするローマ字の表
     var romajiTable: RomajiTable = .standard
+    /// 文節の候補を前後の語とのつながりで並べ替えるもの．nil なら文節の読みだけで求めた順のまま(設定の contextualSegmentCandidates)
+    var contextRanker: SegmentContextRanker?
 
     func build(reading: String, focus: InitialFocus = .automatic) -> SegmentLattice {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
@@ -33,10 +35,27 @@ struct LatticeBuilder {
     func filled(_ segment: SegmentLattice.Segment, reading: String) -> SegmentLattice.Segment {
         guard segment.isPending else { return segment }
         let preferred = segment.candidates.first.flatMap { $0.origin == .sentencePart ? $0.text : nil }
-        var result = makeSegment(start: segment.readingStart, length: segment.readingLength,
-                                 rest: String(reading.dropFirst(segment.readingStart)), preferred: preferred)
+        var result = makeSegment(start: segment.readingStart, length: segment.readingLength, reading: reading, preferred: preferred)
         if case .variant(let index) = segment.choice, result.variants.indices.contains(index) { result.choice = segment.choice }
         result.isDecided = segment.isDecided
+        return result
+    }
+
+    /// 文節の 2 番目から先の候補を，前後の語とのつながりで並べ替える(文節の読みだけの候補は前後を知らないため)．
+    /// 並べ替えは前後の語を含めた変換を求めるので，文節を作るたびには行わず，候補を見せる文節だけに行う
+    /// (打鍵が止まったあいだに分岐図を前もって作る 1 歩と，文節の長さの下見を遅くしないため)．
+    /// 枝を見せるか・自動で選ぶ文節かの計算(isConfident・confidenceGap)は変えない．選んでいる候補は並べ替えたあとも選んだまま
+    func rankedByContext(_ segment: SegmentLattice.Segment, reading: String) -> SegmentLattice.Segment {
+        guard let contextRanker, !segment.isPending, !segment.isContextRanked else { return segment }
+        var result = segment
+        let variantTexts = Set(segment.variants.map(\.text))
+        result.candidates = contextRanker.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: 1)
+            .enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
+        if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
+            let moved = result.candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
+            result.choice = .candidate(moved)
+        }
+        result.isContextRanked = true
         return result
     }
 
@@ -65,7 +84,7 @@ struct LatticeBuilder {
     /// 文節ごとに，その文節を作る手順．文節が 1 つにしかならなければ nil
     private func clauseSegmentMakers(of reading: String, sentence: Candidate?) -> [() -> SegmentLattice.Segment]? {
         clausePlan(of: reading, sentence: sentence)?.map { plan in
-            { [self] in makeSegment(start: plan.start, length: plan.length, rest: String(reading.dropFirst(plan.start)), preferred: plan.preferred) }
+            { [self] in makeSegment(start: plan.start, length: plan.length, reading: reading, preferred: plan.preferred) }
         }
     }
 
@@ -133,7 +152,7 @@ struct LatticeBuilder {
         let segment = lattice.focused
         let length = segment.readingLength + (longer ? 1 : -1)
         guard length >= 1, segment.readingStart + length <= reading.count else { return nil }
-        return makeSegment(start: segment.readingStart, length: length, rest: String(reading.dropFirst(segment.readingStart)), preferred: nil).selected.text
+        return makeSegment(start: segment.readingStart, length: length, reading: reading, preferred: nil).selected.text
     }
 
     /// 注目している文節の終わりを，前(grow が false)か次(true)の語の切れ目に動かす．
@@ -276,9 +295,8 @@ struct LatticeBuilder {
         let available = reading.count - segment.readingStart
         let length = min(max(length, 1), available)
         guard length != segment.readingLength else { return lattice }
-        let rest = String(reading.dropFirst(segment.readingStart))
         var segments = Array(lattice.segments.prefix(index))
-        segments.append(makeSegment(start: segment.readingStart, length: length, rest: rest, preferred: nil))
+        segments.append(makeSegment(start: segment.readingStart, length: length, reading: reading, preferred: nil))
         // 区切りを変えた後ろは，その読みだけで求め直す
         let decided = lattice.segments.dropFirst(index + 1).filter(\.isDecided)
         segments += following(reading, from: segment.readingStart + length).map { rebuilt in
@@ -321,15 +339,16 @@ struct LatticeBuilder {
                 .filter { ClauseSplitter.canStartClause(with: restCharacters[$0.readingCount]) }
                 .min { $0.readingCount < $1.readingCount }
             let length = clause?.readingCount ?? rest.count
-            result.append(makeSegment(start: position, length: length, rest: rest, preferred: clause?.text ?? expected))
+            result.append(makeSegment(start: position, length: length, reading: reading, preferred: clause?.text ?? expected))
             position += length
             sentence = clause.flatMap { clause in expected.map { String($0.dropFirst(clause.text.count)) } }
         }
         return result
     }
 
-    /// rest の先頭 length 文字を 1 つの文節とし，同じ長さの候補を集める．preferred があれば先頭に置く
-    private func makeSegment(start: Int, length: Int, rest: String, preferred: String?) -> SegmentLattice.Segment {
+    /// reading の start から length 文字を 1 つの文節とし，同じ長さの候補を集める．preferred があれば先頭に置く
+    private func makeSegment(start: Int, length: Int, reading: String, preferred: String?) -> SegmentLattice.Segment {
+        let rest = String(reading.dropFirst(start))
         let slice = String(rest.prefix(length))
         var candidates: [Candidate] = []
         func append(_ candidate: Candidate) {

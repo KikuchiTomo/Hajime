@@ -1,7 +1,7 @@
 #if canImport(CryptoKit)
 import CryptoKit
-import Foundation
 #endif
+import Foundation
 import HajimeDomain
 import Testing
 
@@ -15,6 +15,19 @@ struct SHA256DigestTests {
             == "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1")
         #expect(SHA256Digest.hex(of: [UInt8](repeating: 0x61, count: 1_000_000))
             == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0")
+    }
+
+    @Test("続いたメモリに無い列と Data でも，同じ値になる")
+    func nonContiguousAndData() {
+        let bytes = (0..<1000).map { UInt8(truncatingIfNeeded: $0 &* 17 &+ 3) }
+        let expected = SHA256Digest.hex(of: bytes)
+        #expect(SHA256Digest.hex(of: AnySequence(bytes)) == expected)
+        #expect(SHA256Digest.hex(of: Data(bytes)) == expected)
+        var digest = SHA256Digest()
+        digest.update(Data(bytes[0..<100]))
+        digest.update(AnySequence(bytes[100..<130]))
+        digest.update(Data(bytes[130...]))
+        #expect(digest.finalizeHex() == expected)
     }
 
     @Test("ハッシュの値を 16 進の小文字にする")

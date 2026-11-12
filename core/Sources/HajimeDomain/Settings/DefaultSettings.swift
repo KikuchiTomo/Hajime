@@ -51,6 +51,8 @@ public enum DefaultSettings {
     public static let engineCandidateCount = 20
     /// 打っているあいだに出す変換の候補の数．続く語句の予測を求める数も同じ
     public static let suggestionCount = 5
+    /// 文節の候補のうち，前後の語とのつながりで先頭へ集める数(SegmentContextRanker)
+    public static let contextualSegmentCandidateCount = 5
     /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
     public static let headWordAlternativeCount = 8
     /// 打ち間違いを直した文節に入れる，打ったままの読みの候補(LatticeBuilder.addingTyped)の数

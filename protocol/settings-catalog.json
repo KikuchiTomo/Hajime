@@ -23,6 +23,7 @@
     "candidateFontSize",
     "candidatePresentation",
     "commands",
+    "contextualSegmentCandidates",
     "conversionMacros",
     "correction",
     "correctionDelay",

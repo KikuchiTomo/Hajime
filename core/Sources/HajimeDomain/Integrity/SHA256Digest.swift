@@ -9,8 +9,6 @@ public struct SHA256Digest: Sendable {
     /// 64 バイトに満たず，まだ処理していない末尾
     private var pending: [UInt8] = []
     private var totalBytes: UInt64 = 0
-    /// 1 つの塊を処理するときの語の並び．塊ごとに作り直さない
-    private var schedule = [UInt32](repeating: 0, count: 64)
 
     public init() {
         pending.reserveCapacity(Self.blockSize)
@@ -24,20 +22,28 @@ public struct SHA256Digest: Sendable {
     }
 
     public mutating func update(_ bytes: some Sequence<UInt8>) {
-        let bytes = Array(bytes)
+        // 続いたメモリにあるもの(Data，Array)は写さずに読む．起動のたびに同梱の辞書と Zenzai のモデル(合わせて 280MB ほど)を確かめるので
+        let done: Void? = bytes.withContiguousStorageIfAvailable { absorb(UnsafeRawBufferPointer($0)) }
+        if done == nil {
+            Array(bytes).withUnsafeBytes { absorb($0) }
+        }
+    }
+
+    private mutating func absorb(_ bytes: UnsafeRawBufferPointer) {
         var offset = 0
         if !pending.isEmpty {
             let filling = min(Self.blockSize - pending.count, bytes.count)
             pending.append(contentsOf: bytes[0..<filling])
             offset = filling
             guard pending.count == Self.blockSize else { return }
-            compress(pending)
+            let block = pending
+            block.withUnsafeBytes { compress($0) }
             pending.removeAll(keepingCapacity: true)
         }
-        // まとまった 64 バイトは写さずに処理する(70MB ほどのモデルを読むので)
-        while bytes.count - offset >= Self.blockSize {
-            compress(bytes[offset..<offset + Self.blockSize])
-            offset += Self.blockSize
+        let whole = (bytes.count - offset) / Self.blockSize * Self.blockSize
+        if whole > 0 {
+            compress(UnsafeRawBufferPointer(rebasing: bytes[offset..<offset + whole]))
+            offset += whole
         }
         pending.append(contentsOf: bytes[offset...])
     }
@@ -50,11 +56,7 @@ public struct SHA256Digest: Sendable {
         while tail.count % Self.blockSize != Self.blockSize - 8 { tail.append(0) }
         for shift in stride(from: 56, through: 0, by: -8) { tail.append(UInt8(truncatingIfNeeded: bitLength >> UInt64(shift))) }
         pending.removeAll()
-        var offset = 0
-        while offset < tail.count {
-            compress(tail[offset..<offset + Self.blockSize])
-            offset += Self.blockSize
-        }
+        tail.withUnsafeBytes { compress($0) }
         return state.flatMap { word in [UInt8(word >> 24), UInt8(truncatingIfNeeded: word >> 16), UInt8(truncatingIfNeeded: word >> 8), UInt8(truncatingIfNeeded: word)] }
     }
 
@@ -90,54 +92,57 @@ public struct SHA256Digest: Sendable {
         0x748f_82ee, 0x78a5_636f, 0x84c8_7814, 0x8cc7_0208, 0x90be_fffa, 0xa450_6ceb, 0xbef9_a3f7, 0xc671_78f2,
     ]
 
-    private mutating func compress(_ block: some Collection<UInt8>) {
-        totalBytes &+= UInt64(Self.blockSize)
-        // 持ち主を 1 つにして，書き換えのたびに写さないようにする
-        var words = schedule
-        schedule = []
-        defer { schedule = words }
-        var index = block.startIndex
-        for word in 0..<16 {
-            var value: UInt32 = 0
-            for _ in 0..<4 {
-                value = value << 8 | UInt32(block[index])
-                index = block.index(after: index)
+    /// 64 バイトの倍数の長さの塊をまとめて処理する．語の並びは塊ごとに作り直さず，一時的な領域に置く
+    private mutating func compress(_ blocks: UnsafeRawBufferPointer) {
+        guard !blocks.isEmpty else { return }
+        totalBytes &+= UInt64(blocks.count)
+        var h0 = state[0], h1 = state[1], h2 = state[2], h3 = state[3], h4 = state[4], h5 = state[5], h6 = state[6], h7 = state[7]
+        Self.constants.withUnsafeBufferPointer { constants in
+            withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 64) { words in
+                var offset = 0
+                while offset < blocks.count {
+                    for word in 0..<16 {
+                        words[word] = UInt32(bigEndian: blocks.loadUnaligned(fromByteOffset: offset + word * 4, as: UInt32.self))
+                    }
+                    for word in 16..<64 {
+                        let s0 = Self.rotate(words[word - 15], 7) ^ Self.rotate(words[word - 15], 18) ^ (words[word - 15] >> 3)
+                        let s1 = Self.rotate(words[word - 2], 17) ^ Self.rotate(words[word - 2], 19) ^ (words[word - 2] >> 10)
+                        words[word] = words[word - 16] &+ s0 &+ words[word - 7] &+ s1
+                    }
+                    var a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7
+                    for round in 0..<64 {
+                        let s1 = Self.rotate(e, 6) ^ Self.rotate(e, 11) ^ Self.rotate(e, 25)
+                        let choice = (e & f) ^ (~e & g)
+                        let temporary1 = h &+ s1 &+ choice &+ constants[round] &+ words[round]
+                        let s0 = Self.rotate(a, 2) ^ Self.rotate(a, 13) ^ Self.rotate(a, 22)
+                        let majority = (a & b) ^ (a & c) ^ (b & c)
+                        let temporary2 = s0 &+ majority
+                        h = g
+                        g = f
+                        f = e
+                        e = d &+ temporary1
+                        d = c
+                        c = b
+                        b = a
+                        a = temporary1 &+ temporary2
+                    }
+                    h0 &+= a
+                    h1 &+= b
+                    h2 &+= c
+                    h3 &+= d
+                    h4 &+= e
+                    h5 &+= f
+                    h6 &+= g
+                    h7 &+= h
+                    offset += Self.blockSize
+                }
             }
-            words[word] = value
         }
-        for word in 16..<64 {
-            let s0 = rotate(words[word - 15], 7) ^ rotate(words[word - 15], 18) ^ (words[word - 15] >> 3)
-            let s1 = rotate(words[word - 2], 17) ^ rotate(words[word - 2], 19) ^ (words[word - 2] >> 10)
-            words[word] = words[word - 16] &+ s0 &+ words[word - 7] &+ s1
-        }
-        var a = state[0], b = state[1], c = state[2], d = state[3], e = state[4], f = state[5], g = state[6], h = state[7]
-        for round in 0..<64 {
-            let s1 = rotate(e, 6) ^ rotate(e, 11) ^ rotate(e, 25)
-            let choice = (e & f) ^ (~e & g)
-            let temporary1 = h &+ s1 &+ choice &+ Self.constants[round] &+ words[round]
-            let s0 = rotate(a, 2) ^ rotate(a, 13) ^ rotate(a, 22)
-            let majority = (a & b) ^ (a & c) ^ (b & c)
-            let temporary2 = s0 &+ majority
-            h = g
-            g = f
-            f = e
-            e = d &+ temporary1
-            d = c
-            c = b
-            b = a
-            a = temporary1 &+ temporary2
-        }
-        state[0] &+= a
-        state[1] &+= b
-        state[2] &+= c
-        state[3] &+= d
-        state[4] &+= e
-        state[5] &+= f
-        state[6] &+= g
-        state[7] &+= h
+        state = [h0, h1, h2, h3, h4, h5, h6, h7]
     }
 
-    private func rotate(_ value: UInt32, _ count: UInt32) -> UInt32 {
+    @inline(__always)
+    private static func rotate(_ value: UInt32, _ count: UInt32) -> UInt32 {
         value >> count | value << (32 - count)
     }
 }

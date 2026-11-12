@@ -46,27 +46,28 @@ final class UnavailableEnglishLexicon: EnglishLexicon {
     func suggestions(for text: String) -> [String] { [] }
 }
 
-/// インストール先の Dictionary\ に置いたかな漢字変換の辞書を確かめて読む．無いか，ハッシュが合わなければ azooKey に同梱の辞書で動く
+/// インストール先に置いた Zenzai のモデル(Zenzai\)とかな漢字変換の辞書(Dictionary\)を，同時に確かめて読む．
+/// 無いか，大きさとハッシュが合わないものは使わずに動く(モデルが無ければ Zenzai なし，辞書が無ければ azooKey に同梱の辞書)
 @MainActor
-func loadBundledDictionary() -> BundledDictionary? {
-    let url = HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true)
-    do {
-        return try BundledDictionary.verified(at: url)
-    } catch {
-        FileHandle.standardError.write(Data("同梱の辞書を使いません: \(error)\n".utf8))
-        return nil
-    }
+func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, dictionary: BundledDictionary?) {
+    let models = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true)
+    let resources = StartupResources.verified(
+        zenzai: models.appendingPathComponent(ZenzaiModel.Variant.small.fileName),
+        fastZenzai: models.appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
+        dictionary: HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
+    return (accepted(resources.zenzai, name: "Zenzai(small)"), accepted(resources.fastZenzai, name: "Zenzai(xsmall)"),
+            accepted(resources.dictionary, name: "同梱の辞書"))
 }
 
-/// インストール先の Zenzai\ に置いたモデルを確かめて読む．無いか，大きさとハッシュが合わなければ Zenzai なしで動く
-@MainActor
-func loadZenzaiModel(_ variant: ZenzaiModel.Variant = .small) -> ZenzaiModel? {
-    let url = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(variant.fileName)
-    do {
-        return try ZenzaiModel.verified(at: url, variant: variant)
-    } catch {
-        // 中身は書かない(ファイルの場所と理由だけ)
-        FileHandle.standardError.write(Data("Zenzai(\(variant.rawValue))を使いません: \(error)\n".utf8))
+/// 確かめた結果を使うものにする．合わなければ理由を書いて使わない(中身は書かない．ファイルの種類と理由だけ)
+private func accepted<Value, Failure: Error>(_ result: Result<Value, Failure>?, name: String) -> Value? {
+    switch result {
+    case .success(let value):
+        return value
+    case .failure(let error):
+        FileHandle.standardError.write(Data("\(name)を使いません: \(error)\n".utf8))
+        return nil
+    case nil:
         return nil
     }
 }
@@ -133,12 +134,13 @@ func run() -> Int32 {
 
     let settings = FileSettingsStore(fileURL: HostPaths.roaming.appendingPathComponent("settings.json"))
     let memory = HostPaths.local.appendingPathComponent("memory", isDirectory: true)
-    let zenzai = loadZenzaiModel()
+    let resources = loadStartupResources()
+    let zenzai = resources.zenzai
     let engine: AzooKeyConverterEngine
     do {
         engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: HostPaths.versionString, zenzai: zenzai,
-                                            fastZenzai: loadZenzaiModel(.xsmall),
-                                            dictionaryDirectory: loadBundledDictionary()?.url)
+                                            fastZenzai: resources.fastZenzai,
+                                            dictionaryDirectory: resources.dictionary?.url)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))
         return 1
