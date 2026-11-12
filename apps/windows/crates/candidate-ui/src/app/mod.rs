@@ -10,7 +10,7 @@ mod window;
 
 use crate::announce::{self, Announcer};
 use crate::motion;
-use crate::scene::{self, Look, Scene, Surround};
+use crate::scene::{self, CardReservation, Look, Scene, Surround};
 use crate::strings;
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
@@ -91,6 +91,8 @@ struct App {
     crossfade: Option<(Scene, Instant)>,
     /// 選んでいるものが同じまま中身が変わった(次の refresh で重ねて変える)
     arrived: bool,
+    /// 候補の右に出した語の意味のカードの場所(同じ候補の並びのあいだは空けたままにする)
+    meaning: CardReservation,
 }
 
 thread_local! {
@@ -166,6 +168,7 @@ pub fn run() {
             resize: None,
             crossfade: None,
             arrived: false,
+            meaning: CardReservation::default(),
         })
     });
     window::run_message_loop();
@@ -567,6 +570,11 @@ impl App {
         self.refresh_prediction(&theme, look.dark, &measure);
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
+        style.reserved_card = match &self.content {
+            Content::Candidates(list) => self.meaning.list(list, &style, &measure),
+            Content::BranchMap(map) => self.meaning.branch(map, &style, &measure),
+            Content::Hidden | Content::Note(_) | Content::Mode(_) => self.meaning.clear(),
+        };
         let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
             Content::Candidates(list) => Some(scene::candidate_list(list, style, &measure)),
