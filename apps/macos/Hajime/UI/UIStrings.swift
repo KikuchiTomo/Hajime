@@ -422,7 +422,7 @@ enum UIStrings {
         static let sortHint = "並べ替え"
         static func overwrites(_ key: String) -> String { "「\(key)」はすでにあります。追加すると上書きします。" }
         static let alreadyRegistered = "すでに登録されています。"
-        static let changesKind = "すでに登録されています。追加すると品詞を書き換えます。"
+        static let changesKind = "すでに登録されています。追加すると品詞とコメントを書き換えます。"
         static let full = "これ以上は追加できません。"
         static let noMatches = "一致する項目はありません"
     }
@@ -526,7 +526,9 @@ enum UIStrings {
         static let importDictionary = "インポート…"
         static let exportDictionary = "エクスポート…"
         static let exportFileName = "hajime-user-dictionary.txt"
-        static let dictionaryNote = "読み・単語・品詞をタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。"
+        static let dictionaryNote = "読み・単語・品詞・コメントをタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。コメントは候補の横に出て、押すとコメントを入力します。"
+        static let comment = "コメント"
+        static let commentPrompt = "コメント(省略可)"
         static let wordClass = "品詞"
         static let personNameGroup = "人名"
         static let otherWordClasses = "その他"

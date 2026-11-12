@@ -24,6 +24,8 @@ struct RuleItem: Identifiable, Hashable {
     /// 種類(RuleKinds)を選ぶ一覧での種類の ID と，表に出す名前
     var kind: String?
     var kindTitle = ""
+    /// 添え書きの欄(Labels.note)のある一覧での添え書き(ユーザー辞書のコメント)．空なら無し
+    var note = ""
 }
 
 /// 行ごとに選ぶ種類(ユーザー辞書の品詞)．入力欄の右のポップアップで選び，表の右の列に出す
@@ -61,6 +63,9 @@ struct RuleListEditor: View {
         var valuePrompt: String?
         /// 一覧が空のときに表の中に出す文
         var empty: String
+        /// 空でもよい添え書きの欄(ユーザー辞書のコメント)．nil なら出さない．入力欄の下の行に置き，表の右の列に出す
+        var note: String?
+        var notePrompt: String?
     }
 
     let labels: Labels
@@ -69,8 +74,9 @@ struct RuleListEditor: View {
     let kinds: RuleKinds?
     /// 足す前に確かめる．問題があれば利用者に見せる文を返す
     let problem: (_ key: String, _ value: String) -> String?
-    /// 保存する．kind は選んだ種類(kinds が無ければ nil)，editing は書き換える行(新しく足すときは nil)．保存できたら true(入力欄を空にする)
-    let save: (_ key: String, _ value: String, _ kind: String?, _ editing: RuleItem?) -> Bool
+    /// 保存する．kind は選んだ種類(kinds が無ければ nil)，note は添え書き(欄が無ければ nil)，editing は書き換える行(新しく足すときは nil)．
+    /// 保存できたら true(入力欄を空にする)
+    let save: (_ key: String, _ value: String, _ kind: String?, _ note: String?, _ editing: RuleItem?) -> Bool
     let remove: (_ items: [RuleItem]) -> Void
     /// 行ごとにオン・オフできる一覧なら渡す
     let setEnabled: ((RuleItem, Bool) -> Void)?
@@ -85,26 +91,27 @@ struct RuleListEditor: View {
     @State private var key = ""
     @State private var value = ""
     @State private var kind: String
+    @State private var note = ""
     @State private var editing: RuleItem?
     @State private var query = ""
     @State private var selection = Set<RuleItem.ID>()
     @State private var sortOrder: [KeyPathComparator<RuleItem>] = []
     @FocusState private var focusedField: Field?
 
-    private enum Field { case key, value }
+    private enum Field { case key, value, note }
 
     init(labels: Labels, items: [RuleItem], problem: @escaping (_ key: String, _ value: String) -> String?,
          save: @escaping (_ key: String, _ value: String, _ editing: RuleItem?) -> Bool, remove: @escaping (_ items: [RuleItem]) -> Void,
          setEnabled: ((RuleItem, Bool) -> Void)? = nil, importFile: (() -> Void)? = nil, exportFile: (() -> Void)? = nil,
          keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight,
          draftChanged: ((String) -> Void)? = nil) {
-        self.init(labels: labels, items: items, kinds: nil, problem: problem, save: { key, value, _, editing in save(key, value, editing) },
+        self.init(labels: labels, items: items, kinds: nil, problem: problem, save: { key, value, _, _, editing in save(key, value, editing) },
                   remove: remove, setEnabled: setEnabled, importFile: importFile, exportFile: exportFile, keysAreUnique: keysAreUnique,
                   tableHeight: tableHeight, draftChanged: draftChanged)
     }
 
     init(labels: Labels, items: [RuleItem], kinds: RuleKinds?, problem: @escaping (_ key: String, _ value: String) -> String?,
-         save: @escaping (_ key: String, _ value: String, _ kind: String?, _ editing: RuleItem?) -> Bool,
+         save: @escaping (_ key: String, _ value: String, _ kind: String?, _ note: String?, _ editing: RuleItem?) -> Bool,
          remove: @escaping (_ items: [RuleItem]) -> Void, setEnabled: ((RuleItem, Bool) -> Void)? = nil, importFile: (() -> Void)? = nil,
          exportFile: (() -> Void)? = nil, keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight,
          draftChanged: ((String) -> Void)? = nil) {
@@ -127,6 +134,8 @@ struct RuleListEditor: View {
 
     private var trimmedKey: String { key.trimmingCharacters(in: .whitespaces) }
     private var trimmedValue: String { value.trimmingCharacters(in: .whitespaces) }
+    private var trimmedNote: String { note.trimmingCharacters(in: .whitespaces) }
+    private var hasNote: Bool { labels.value != nil && labels.note != nil }
     private var isFilled: Bool { !trimmedKey.isEmpty && (!hasValue || !trimmedValue.isEmpty) }
 
     /// 入力欄の下に出す文．形が合わなければ理由，同じ入力の行があれば上書きすること
@@ -137,8 +146,8 @@ struct RuleListEditor: View {
         if keysAreUnique {
             if others.contains(where: { $0.key == trimmedKey }) { return (UIStrings.RuleList.overwrites(trimmedKey), false) }
         } else if let same = others.first(where: { $0.key == trimmedKey && $0.value == trimmedValue }) {
-            // 種類だけが違えば，その行の種類を書き換える
-            if kinds != nil, same.kind != kind { return (UIStrings.RuleList.changesKind, false) }
+            // 種類か添え書きだけが違えば，その行の種類と添え書きを書き換える
+            if (kinds != nil && same.kind != kind) || (hasNote && same.note != trimmedNote) { return (UIStrings.RuleList.changesKind, false) }
             return (UIStrings.RuleList.alreadyRegistered, true)
         }
         return nil
@@ -155,6 +164,7 @@ struct RuleListEditor: View {
         if !query.isEmpty {
             result = result.filter {
                 $0.key.localizedCaseInsensitiveContains(query) || $0.value.localizedCaseInsensitiveContains(query) || $0.kindTitle.localizedCaseInsensitiveContains(query)
+                    || $0.note.localizedCaseInsensitiveContains(query)
             }
         }
         if !sortOrder.isEmpty { result.sort(using: sortOrder) }
@@ -163,6 +173,13 @@ struct RuleListEditor: View {
 
     var body: some View {
         editor
+        if hasNote, let noteLabel = labels.note {
+            TextField(noteLabel, text: $note, prompt: Text(labels.notePrompt ?? noteLabel))
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+                .focused($focusedField, equals: .note)
+                .onSubmit(commit)
+        }
         if let message {
             Label(message.text, systemImage: message.isProblem ? "exclamationmark.triangle.fill" : "info.circle")
                 .font(.caption)
@@ -189,7 +206,11 @@ struct RuleListEditor: View {
                                  sort: { toggleSort(\.value) }, ascending: sortDirection(\.value)))
         }
         if let kinds {
-            columns.append(.init(title: kinds.label, sort: { toggleSort(\.kindTitle) }, ascending: sortDirection(\.kindTitle)))
+            columns.append(.init(title: kinds.label, width: hasNote ? DesignTokens.Size.Settings.ruleKindColumnWidth : nil,
+                                 sort: { toggleSort(\.kindTitle) }, ascending: sortDirection(\.kindTitle)))
+        }
+        if hasNote, let noteLabel = labels.note {
+            columns.append(.init(title: noteLabel, sort: { toggleSort(\.note) }, ascending: sortDirection(\.note)))
         }
         return FormTableHeader(columns: columns)
     }
@@ -256,6 +277,13 @@ struct RuleListEditor: View {
                 keyColumn
                 valueColumn
             })
+        } else if kinds != nil, hasNote {
+            decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
+                keyColumn
+                valueColumn
+                kindColumn
+                noteColumn
+            })
         } else if kinds != nil {
             decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
                 keyColumn
@@ -315,6 +343,16 @@ struct RuleListEditor: View {
     private var kindColumn: some TableColumnContent<RuleItem, KeyPathComparator<RuleItem>> {
         TableColumn(kinds?.label ?? "", value: \.kindTitle) { item in
             Text(item.kindTitle).lineLimit(1).foregroundStyle(.secondary)
+        }
+        // 右に添え書きの列があるときは，表の外の見出しとそろえるため幅を決める
+        .width(min: hasNote ? DesignTokens.Size.Settings.ruleKindColumnWidth : 80,
+               ideal: hasNote ? DesignTokens.Size.Settings.ruleKindColumnWidth : 120,
+               max: hasNote ? DesignTokens.Size.Settings.ruleKindColumnWidth : .infinity)
+    }
+
+    private var noteColumn: some TableColumnContent<RuleItem, KeyPathComparator<RuleItem>> {
+        TableColumn(labels.note ?? "", value: \.note) { item in
+            Text(item.note).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
         }
         .width(min: 80, ideal: 120)
     }
@@ -385,12 +423,13 @@ struct RuleListEditor: View {
         key = item.key
         value = item.value
         if let kinds { kind = item.kind ?? kinds.defaultID }
+        note = item.note
         focusedField = hasValue ? .value : .key
     }
 
     private func commit() {
         guard isFilled, message?.isProblem != true else { return }
-        if save(trimmedKey, trimmedValue, kinds == nil ? nil : kind, editing) { clear() }
+        if save(trimmedKey, trimmedValue, kinds == nil ? nil : kind, hasNote ? trimmedNote : nil, editing) { clear() }
     }
 
     private func clear() {
@@ -398,6 +437,7 @@ struct RuleListEditor: View {
         key = ""
         value = ""
         if let kinds { kind = kinds.defaultID }
+        note = ""
         focusedField = .key
     }
 }

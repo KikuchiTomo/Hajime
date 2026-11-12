@@ -132,7 +132,8 @@ enum SnapshotRenderer {
                                          CorrectionRule(typed: "adn", word: "and")]
             settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "wye", kana: "ゑ")]
             settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME", wordClass: .properNoun),
-                                       UserDictionaryEntry(reading: "かいしゃ", word: "会社"), UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
+                                       UserDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "東京都千代田区千代田1-1"),
+                                       UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
                                        UserDictionaryEntry(reading: "おつ", word: "お疲れさまでした", wordClass: .abbreviation)]
             settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
                                     SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]

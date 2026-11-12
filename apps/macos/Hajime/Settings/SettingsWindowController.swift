@@ -225,15 +225,15 @@ final class SettingsModel: ObservableObject {
     // MARK: ユーザー辞書
 
     /// 語を登録する．replacing を渡すとその語を書き換える(同じ位置に置く)．保存できなければ false を返し，打った語を入力欄に残す．
-    /// 同じ読みと語がもうあれば，その語の品詞を書き換える
-    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String, wordClass: WordClass) -> Bool {
+    /// 同じ読みと語がもうあれば，その語の品詞とコメントを書き換える
+    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String, wordClass: WordClass, comment: String) -> Bool {
         var entries = settings.userDictionary
         let index = old.flatMap { old in entries.firstIndex { $0.isSameWord(as: old) } }
         if let index { entries.remove(at: index) }
         let count = entries.count
-        switch UserDictionaryEditing.add(reading: reading, word: word, wordClass: wordClass, to: &entries) {
+        switch UserDictionaryEditing.add(reading: reading, word: word, wordClass: wordClass, comment: comment, to: &entries) {
         case .added:
-            // 足した語(末尾)を元の位置に戻す．ほかの語の品詞を書き換えただけなら動かさない
+            // 足した語(末尾)を元の位置に戻す．ほかの語の品詞やコメントを書き換えただけなら動かさない
             if let index, entries.count > count { entries.insert(entries.removeLast(), at: index) }
             return update { $0.userDictionary = entries }
         case .alreadyRegistered:

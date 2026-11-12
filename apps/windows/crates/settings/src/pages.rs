@@ -1527,6 +1527,7 @@ const DICTIONARY_FIELDS: &[Field] = &[
         options::WORD_CLASSES,
         false,
     ),
+    Field::named("comment", settings::COMMENT, false).optional(),
 ];
 
 /// ユーザー辞書の注記に入れ替えて出す文(品詞の欄で選んでいる値と文)
