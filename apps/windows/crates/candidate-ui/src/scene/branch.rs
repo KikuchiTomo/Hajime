@@ -18,7 +18,7 @@ use super::{Color, Draw, Figure, Frame, Look, Measure, Point, Scene, Segment};
 use crate::strings;
 use crate::theme::Font;
 use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
-use tokens::size::{branch, candidate, glass};
+use tokens::size::{branch, candidate, glass, space};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
 struct Metrics {
@@ -35,8 +35,6 @@ struct Metrics {
     line_width_selected: f32,
     /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
     root_inset: f32,
-    /// 枝の水平の線の終わりから候補の行までの空き
-    tip_gap: f32,
     /// 枝の曲がり角の半径．直線の枝は 0(直角)
     turn_radius: f32,
     /// 1 ドットあたりのデバイスのピクセル数
@@ -64,7 +62,6 @@ impl Metrics {
                 line_width: glass::LINE_WIDTH,
                 line_width_selected: glass::LINE_WIDTH_SELECTED,
                 root_inset: glass::SELECTION_INSET_Y,
-                tip_gap: glass::BRANCH_TIP_GAP,
                 turn_radius: if look.theme.curved_branches() {
                     glass::BRANCH_TURN_RADIUS
                 } else {
@@ -86,7 +83,6 @@ impl Metrics {
             line_width: branch::LINE_WIDTH,
             line_width_selected: branch::LINE_WIDTH_SELECTED,
             root_inset: 0.0,
-            tip_gap: candidate::FRAME_WIDTH,
             turn_radius: 0.0,
             pixel_scale: look.pixel_scale,
         }
@@ -776,7 +772,7 @@ fn branches(
         painter,
         Point::new(node.x + metrics.stem_x, root_y(node, downward, metrics)),
         &mids,
-        row_frame(0).x - metrics.tip_gap,
+        lead_min_x(row_frame(0)) - space::INLINE,
         rows.iter().position(|row| row.selected),
         color,
         metrics,
@@ -784,6 +780,11 @@ fn branches(
     for (index, row) in rows.iter().enumerate() {
         draw_row(painter, row, row_frame(index), metrics);
     }
+}
+
+/// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
+fn lead_min_x(row: Frame) -> f32 {
+    row.x + candidate::PADDING_X / 2.0
 }
 
 /// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
@@ -899,10 +900,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
         if row.selected {
             painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
         }
-        let center = Point::new(
-            frame.x + padding / 2.0 + glass::BADGE_SIZE / 2.0,
-            frame.mid_y(),
-        );
+        let center = Point::new(lead_min_x(frame) + glass::BADGE_SIZE / 2.0, frame.mid_y());
         painter.badge(
             &row.badge,
             center,
@@ -919,7 +917,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
             &row.badge,
             muted_color,
             Frame::new(
-                frame.x + padding / 2.0,
+                lead_min_x(frame),
                 frame.y,
                 metrics.lead - padding / 2.0,
                 frame.height,
@@ -980,7 +978,7 @@ fn draw_preview(
         theme.line.faded(rest),
         metrics,
     );
-    let text_x = tip_x + candidate::PADDING_X / 2.0;
+    let text_x = tip_x + space::INLINE;
     let shown = painter.truncated(text, Font::Candidate, max_x - text_x);
     painter.text(&shown, Font::Candidate, color, text_x, row);
 }
@@ -1334,8 +1332,11 @@ mod tests {
             paths[1].0[0].start.y,
             node_bottom - glass::SELECTION_INSET_Y
         );
-        let tip_x = (glass::PADDING + glass::BRANCH_STEM_X).round() + glass::BRANCH_INDENT
-            - glass::BRANCH_TIP_GAP;
+        // 番号の丸の左の端から inline だけ手前
+        let tip_x = (glass::PADDING + glass::BRANCH_STEM_X).round()
+            + glass::BRANCH_INDENT
+            + candidate::PADDING_X / 2.0
+            - space::INLINE;
         for (figures, _, _) in &paths {
             assert!(figures.iter().all(|figure| tip(figure).x == tip_x));
         }

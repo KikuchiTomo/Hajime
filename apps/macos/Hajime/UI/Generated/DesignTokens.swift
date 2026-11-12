@@ -127,6 +127,7 @@ enum DesignTokens {
             static let sm: CGFloat = 8
             static let md: CGFloat = 12
             static let lg: CGFloat = 16
+            static let inline: CGFloat = 4
         }
         enum Candidate {
             static let rowHeight: CGFloat = 22
@@ -235,7 +236,6 @@ enum DesignTokens {
             static let selectionInsetY: CGFloat = 2
             static let variantInsetY: CGFloat = 4
             static let branchTurnRadius: CGFloat = 8
-            static let branchTipGap: CGFloat = 3
             static let dotPitch: CGFloat = 5
             static let keycapPartGap: CGFloat = 1
             static let keycapGap: CGFloat = 3

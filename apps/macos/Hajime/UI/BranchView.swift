@@ -20,6 +20,7 @@ final class BranchView: NSView {
     private typealias Size = DesignTokens.Size.Candidate
     private typealias Branch = DesignTokens.Size.Branch
     private typealias Glass = DesignTokens.Size.Glass
+    private typealias Space = DesignTokens.Size.Space
 
     var panel: LatticePanel? {
         didSet {
@@ -74,8 +75,6 @@ final class BranchView: NSView {
         var lineWidthSelected: CGFloat
         /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
         var rootInset: CGFloat
-        /// 枝の水平の線の終わりから候補の行までの空き
-        var tipGap: CGFloat
     }
 
     private var metrics: Metrics {
@@ -84,13 +83,13 @@ final class BranchView: NSView {
             return Metrics(inset: Glass.padding, rowHeight: (Glass.rowHeight * scale).rounded(), trunkGap: Glass.trunkGap,
                            branchIndent: Glass.branchIndent, stemX: Glass.branchStemX, lead: Glass.badgeSize + Size.paddingX,
                            footerHeight: Glass.footerHeight, lineWidth: Glass.lineWidth, lineWidthSelected: Glass.lineWidthSelected,
-                           rootInset: Glass.selectionInsetY, tipGap: Glass.branchTipGap)
+                           rootInset: Glass.selectionInsetY)
         }
         let labelHeight = (labelFont.ascender - labelFont.descender).rounded(.up) + Size.sectionPaddingY * 2
         return Metrics(inset: Size.frameWidth + Size.bevelWidth + Size.paddingX, rowHeight: (Size.rowHeight * scale).rounded(),
                        trunkGap: Branch.trunkGap, branchIndent: Branch.branchIndent, stemX: Branch.branchStemX, lead: Size.indexWidth,
                        footerHeight: max(labelHeight, Glass.keycapHeight + Size.sectionPaddingY * 2),
-                       lineWidth: Branch.lineWidth, lineWidthSelected: Branch.lineWidthSelected, rootInset: 0, tipGap: Size.frameWidth)
+                       lineWidth: Branch.lineWidth, lineWidthSelected: Branch.lineWidthSelected, rootInset: 0)
     }
 
     private var candidateFont: NSFont { theme.candidateFont(size: fontSize) }
@@ -558,12 +557,15 @@ final class BranchView: NSView {
             self.branchRowRect(index, from: node, width: width, downward: downward, metrics: metrics)
         }
         BranchLineDrawing.draw(stemX: node.minX + metrics.stemX, rootY: rootY(of: node, downward: downward),
-                               rowMidYs: rows.indices.map { rowRect($0).midY }, tipX: rowRect(0).minX - metrics.tipGap,
+                               rowMidYs: rows.indices.map { rowRect($0).midY }, tipX: leadMinX(in: rowRect(0)) - Space.inline,
                                selected: rows.firstIndex(where: \.isSelected), style: lineStyle(color: theme.line))
         for (index, row) in rows.enumerated() {
             drawRow(row, in: rowRect(index))
         }
     }
+
+    /// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
+    private func leadMinX(in row: NSRect) -> CGFloat { row.minX + Size.paddingX / 2 }
 
     /// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
     private func rootY(of node: NSRect, downward: Bool) -> CGFloat {
@@ -582,7 +584,7 @@ final class BranchView: NSView {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
         if theme.isRounded {
             if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection) }
-            let badgeCenter = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
+            let badgeCenter = NSPoint(x: leadMinX(in: rect) + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(row.badge, center: badgeCenter, theme: theme, selected: row.isSelected, opacity: row.opacity)
         } else {
             if row.isSelected {
@@ -590,7 +592,7 @@ final class BranchView: NSView {
                 rect.fill()
             }
             let badgeColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: rect.minX + Size.paddingX / 2, y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
+            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: leadMinX(in: rect), y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
         }
         var textX = rect.minX + Size.paddingX / 2 + metrics.lead
         if let kind = row.command {
@@ -618,7 +620,7 @@ final class BranchView: NSView {
         let tipX = (stemX + metrics.branchIndent / 2).rounded()
         BranchLineDrawing.draw(stemX: stemX, rootY: rootY(of: node, downward: true), rowMidYs: [row.midY], tipX: tipX, selected: nil,
                                style: lineStyle(color: theme.line.withAlphaComponent(theme.line.alphaComponent * restOpacity)))
-        let textX = tipX + Size.paddingX / 2
+        let textX = tipX + Space.inline
         let attributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: color]
         drawText(TextFitting.truncated(text, attributes: attributes, width: maxX - textX), attributes: attributes, x: textX, in: row)
     }
