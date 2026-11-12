@@ -43,6 +43,20 @@ struct CandidateListLayoutTests {
         #expect(layout.width == layout.body.width + sample.metrics.shadow)
     }
 
+    @Test("足元を出さない窓(設定の画面の見本)は，最後の候補の行の下に縁の内側の余白だけを置く", arguments: [Layout.Style.rounded, .bevel])
+    func withoutFooter(style: Layout.Style) throws {
+        let metrics = style == .rounded ? Self.rounded : Self.bevel
+        let layout = Layout(style: style, listWidth: 180, footerWidth: 0, hasHeader: false, rowCount: 6, card: nil, maximumWidth: 720,
+                            metrics: metrics, hasFooter: false)
+        let last = try #require(layout.rows.last)
+        let outer = metrics.edge + metrics.padding
+        #expect(layout.footer.height == 0)
+        #expect(layout.footerSeparator.height == 0)
+        #expect(abs(layout.body.maxY - last.maxY - outer) <= 0.5)
+        #expect(layout.height < Layout(style: style, listWidth: 180, footerWidth: 0, hasHeader: false, rowCount: 6, card: nil,
+                                       maximumWidth: 720, metrics: metrics).height)
+    }
+
     @Test("区切りの線の上と下は同じ間隔(候補の下のカードの上と下も)", arguments: samples)
     func separatorGaps(sample: Sample) throws {
         let layout = sample.place()

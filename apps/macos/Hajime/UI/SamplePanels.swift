@@ -93,7 +93,8 @@ enum SamplePanels {
     static let emojiNames: [String: String] = ["🐈が": "ネコ", "😺が": "にっこり笑う猫"]
 
     /// 設定の画面の絵文字の見本．位置・数・名前の設定を変えると，その場で並びが変わる．
-    /// 「文節を絵文字に変換」がオンなら「ねこ」の文節全体の絵文字を，オフなら「ねこが」の語を絵文字にした候補を並べる．どちらもオフなら nil
+    /// 「文節を絵文字に変換」がオンなら「ねこ」の文節全体の絵文字を，オフなら「ねこが」の語を絵文字にした候補を並べる．どちらもオフなら nil．
+    /// 位置と数がわかる範囲(絵文字の後ろのふだんの候補 1 つまで．1 ページに収まる分)だけを出す
     static func emojiPlacement(_ settings: HajimeDomain.Settings) -> CandidatePanel? {
         guard let placement = settings.emojiPlacement else { return nil }
         let tail = settings.emojiConversion ? "" : emojiPlacementParticle
@@ -102,7 +103,7 @@ enum SamplePanels {
         let texts = placement.placed(emojiPlacementWords.map { $0 + tail } + emoji.map(\.text)) { names[$0] != nil }
         return CandidatePanel(
             variants: [], selectedVariant: nil,
-            entries: texts.prefix(settings.listCandidatesPerPage).map { .init(text: $0, annotation: nil, detail: settings.showsEmojiNames ? names[$0] : nil) },
+            entries: texts.prefix(min(settings.listCandidatesPerPage, placement.index + placement.count + 1)).map { .init(text: $0, annotation: nil, detail: settings.showsEmojiNames ? names[$0] : nil) },
             selectedEntry: 0, focus: .candidate, position: 1, total: texts.count, note: nil
         )
     }

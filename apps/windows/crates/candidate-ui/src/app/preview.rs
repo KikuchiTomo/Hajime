@@ -25,6 +25,8 @@ pub enum Shown<'a> {
     Sample,
     Branch(&'a ipc::BranchMap),
     List(&'a ipc::CandidateList),
+    /// 足元の行を出さない候補の一覧(設定の画面の絵文字の見本)
+    CompactList(&'a ipc::CandidateList),
     /// 入力位置の下の案内(初期設定の実演の「修正」「もしかして」)
     Note(&'a ipc::Note),
     /// モードの札(初期設定の実演の「あ」「A」)
@@ -79,6 +81,14 @@ impl Preview {
             Shown::Sample => scene::branch_map(&sample::branch(), &look, measure),
             Shown::Branch(map) => scene::branch_map(map, &look, measure),
             Shown::List(list) => scene::candidate_list(list, &look, measure),
+            Shown::CompactList(list) => scene::candidate_list(
+                list,
+                &Look {
+                    shows_footer: false,
+                    ..look
+                },
+                measure,
+            ),
             Shown::Note(note) => scene::note(note, &look, measure),
             Shown::Mode(label) => scene::mode(label, &look, measure),
             Shown::Palette(panel) => {
