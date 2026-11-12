@@ -73,10 +73,33 @@ enum SamplePanels {
                  .init(meaning: "気持ちが変わる。心が揺れる", example: "心が動く")],
         others: [])
 
-    /// 読みで引いた絵文字(設定の「文節の中の語を絵文字に変換」)．「ねこがかわいい」を変換し，「ねこが」の文節の 4・5 番目に語を絵文字にした候補を出す．
+    /// 読みで引いた絵文字(設定の「語を絵文字に変換」)．「ねこがかわいい」を変換し，「ねこが」の文節の 4・5 番目に語を絵文字にした候補を出す．
     /// 絵文字の名前(CLDR)を候補の横に薄く添える．候補は hajime-playground --panels で求めたもの
     static let emojiCandidates = ["猫が", "ネコが", "ネコ画", "🐈が", "😺が", "ねこ画", "猫画", "根子が", "音子が"]
     static let emojiNames: [String: String] = ["🐈が": "ネコ", "😺が": "にっこり笑う猫"]
+
+    /// 設定の画面の絵文字の見本．位置・数・名前の設定を変えると，その場で並びが変わる．
+    /// 「文節を絵文字に変換」がオンなら「ねこ」の文節全体の絵文字を，オフなら「ねこが」の語を絵文字にした候補を並べる．どちらもオフなら nil
+    static func emojiPlacement(_ settings: HajimeDomain.Settings) -> CandidatePanel? {
+        guard let placement = settings.emojiPlacement else { return nil }
+        let tail = settings.emojiConversion ? "" : emojiPlacementParticle
+        let emoji = emojiPlacementEmoji.prefix(placement.count).map { (text: $0.emoji + tail, name: $0.name) }
+        let names = Dictionary(uniqueKeysWithValues: emoji.map { ($0.text, $0.name) })
+        let texts = placement.placed(emojiPlacementWords.map { $0 + tail } + emoji.map(\.text)) { names[$0] != nil }
+        return CandidatePanel(
+            variants: [], selectedVariant: nil,
+            entries: texts.prefix(settings.listCandidatesPerPage).map { .init(text: $0, annotation: nil, detail: settings.showsEmojiNames ? names[$0] : nil) },
+            selectedEntry: 0, focus: .candidate, position: 1, total: texts.count, note: nil
+        )
+    }
+
+    /// 見本の「ねこ」のふだんの候補(位置の上限 9 番目より前を埋める数)と，「ねこが」にするときの助詞
+    private static let emojiPlacementWords = ["猫", "ネコ", "ねこ", "根子", "音子", "値子", "寝子", "子子", "弥固"]
+    private static let emojiPlacementParticle = "が"
+    /// 見本の「ねこ」の絵文字と名前(数の上限 5 つ．名前は CLDR)
+    private static let emojiPlacementEmoji: [(emoji: String, name: String)] = [
+        ("🐈", "ネコ"), ("😺", "にっこり笑う猫"), ("😸", "にやっと笑う猫"), ("😹", "嬉し泣きする猫"), ("😻", "目がハートの猫"),
+    ]
 
     /// 文節ごとの一覧で絵文字を選んだところ
     static let emojiList = CandidatePanel(

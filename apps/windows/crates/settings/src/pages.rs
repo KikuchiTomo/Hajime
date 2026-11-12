@@ -363,6 +363,8 @@ pub enum Control {
     ThemePreview,
     /// パレットの見本(パレットの窓と同じ描き方．列数・行数・マスの大きさは設定のとおり)
     PalettePreview,
+    /// 絵文字の候補の見本(候補の窓と同じ描き方の一覧．絵文字の位置・数・名前は設定のとおり)
+    EmojiPreview,
     /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
     ThemeReport,
 }
@@ -805,6 +807,8 @@ pub struct Row {
     pub visible: Option<Condition>,
     /// 値を変えたときに一緒に空(null)にする項目(テーマを選んだらカスタムテーマを外す)
     pub clears: Option<&'static str>,
+    /// 名前の横に札の形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
+    pub example: Option<(&'static str, &'static str)>,
 }
 
 impl Row {
@@ -865,7 +869,13 @@ impl Row {
             enabled: None,
             visible: None,
             clears: None,
+            example: None,
         }
+    }
+
+    pub fn with_example(mut self, example: (&'static str, &'static str)) -> Self {
+        self.example = Some(example);
+        self
     }
 
     pub fn clearing(mut self, path: &'static str) -> Self {
@@ -1194,9 +1204,10 @@ fn conversion() -> Vec<Section> {
         Section::new(
             settings::EMOJI_SECTION,
             vec![
-                Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
-                Row::toggle(settings::EMOJI_WORD_CONVERSION, "emojiWordConversion"),
-                Row::note(settings::EMOJI_NOTE),
+                Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion")
+                    .with_example(settings::EMOJI_CONVERSION_EXAMPLE),
+                Row::toggle(settings::EMOJI_WORD_CONVERSION, "emojiWordConversion")
+                    .with_example(settings::EMOJI_WORD_CONVERSION_EXAMPLE),
                 Row::stepper(
                     settings::EMOJI_CANDIDATE_POSITION,
                     "emojiCandidatePosition",
@@ -1210,6 +1221,7 @@ fn conversion() -> Vec<Section> {
                 )
                 .enabled_when(EMOJI_ON),
                 Row::toggle(settings::SHOWS_EMOJI_NAMES, "showsEmojiNames").enabled_when(EMOJI_ON),
+                Row::new(more::PREVIEW, "", Control::EmojiPreview).visible_when(EMOJI_ON),
             ],
         ),
         Section::new(

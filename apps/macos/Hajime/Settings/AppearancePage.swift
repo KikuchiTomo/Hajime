@@ -165,57 +165,60 @@ struct ThemePreview: NSViewRepresentable {
     let choice: ThemeChoice
     let fontSize: Double
 
-    func makeNSView(context: Context) -> ScaledPreview {
-        ScaledPreview()
+    func makeNSView(context: Context) -> ScaledPreview<BranchView> {
+        let view = BranchView()
+        view.fillsSurface = true
+        return ScaledPreview(content: view)
     }
 
-    func updateNSView(_ view: ScaledPreview, context: Context) {
-        view.branch.theme = ResolvedTheme.resolve(choice, appearance: view.effectiveAppearance)
-        view.branch.fontSize = CGFloat(fontSize)
-        view.branch.panel = SamplePanels.lattice
-        view.natural = view.branch.fittingSize(for: SamplePanels.lattice)
+    func updateNSView(_ view: ScaledPreview<BranchView>, context: Context) {
+        view.content.theme = ResolvedTheme.resolve(choice, appearance: view.effectiveAppearance)
+        view.content.fontSize = CGFloat(fontSize)
+        view.content.panel = SamplePanels.lattice
+        view.natural = view.content.fittingSize(for: SamplePanels.lattice)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: ScaledPreview, context: Context) -> CGSize? {
-        let natural = view.branch.fittingSize(for: SamplePanels.lattice)
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: ScaledPreview<BranchView>, context: Context) -> CGSize? {
+        ScaledPreview<BranchView>.size(natural: view.content.fittingSize(for: SamplePanels.lattice), proposal: proposal)
+    }
+}
+
+/// 候補の窓の見本を描いた大きさのまま持ち，枠が狭ければ座標の比(bounds)で縮めて描く
+@MainActor
+final class ScaledPreview<Content: NSView>: NSView {
+    let content: Content
+    var natural: NSSize = .zero {
+        didSet { if natural != oldValue { updateScale() } }
+    }
+
+    override var isFlipped: Bool { true }
+
+    init(content: Content) {
+        self.content = content
+        super.init(frame: .zero)
+        addSubview(content)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
+
+    /// 描いた大きさ natural の見本を，提案された幅に収まるよう同じ比で縮めた大きさ
+    static func size(natural: NSSize, proposal: ProposedViewSize) -> CGSize {
         guard natural.width > 0 else { return natural }
         let width = min(natural.width, proposal.width ?? natural.width)
         return CGSize(width: width, height: (natural.height * width / natural.width).rounded(.up))
     }
 
-    /// 分岐図を描いた大きさのまま持ち，枠が狭ければ座標の比(bounds)で縮めて描く
-    @MainActor
-    final class ScaledPreview: NSView {
-        let branch: BranchView = {
-            let view = BranchView()
-            view.fillsSurface = true
-            return view
-        }()
-        var natural: NSSize = .zero {
-            didSet { if natural != oldValue { updateScale() } }
-        }
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateScale()
+    }
 
-        override var isFlipped: Bool { true }
-
-        init() {
-            super.init(frame: .zero)
-            addSubview(branch)
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
-
-        override func setFrameSize(_ newSize: NSSize) {
-            super.setFrameSize(newSize)
-            updateScale()
-        }
-
-        private func updateScale() {
-            branch.frame = NSRect(origin: .zero, size: natural)
-            guard natural.width > 0, frame.width > 0 else { return }
-            let scale = min(1, frame.width / natural.width)
-            setBoundsSize(NSSize(width: frame.width / scale, height: frame.height / scale))
-            branch.needsDisplay = true
-        }
+    private func updateScale() {
+        content.frame = NSRect(origin: .zero, size: natural)
+        guard natural.width > 0, frame.width > 0 else { return }
+        let scale = min(1, frame.width / natural.width)
+        setBoundsSize(NSSize(width: frame.width / scale, height: frame.height / scale))
+        content.needsDisplay = true
     }
 }

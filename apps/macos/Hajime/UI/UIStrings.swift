@@ -524,8 +524,10 @@ enum UIStrings {
         static let symbolConversion = "記号に変換"
         static let emojiSection = "絵文字"
         static let emojiConversion = "文節を絵文字に変換"
-        static let emojiWordConversion = "文節の中の語を絵文字に変換"
-        static let emojiNote = "「びーる」→ 🍺 のように文節全体を、「ねこが」→ 🐈が のように文節の中の語を絵文字にします。Space で変換したときの候補にだけ表示し、入力中は表示しません。"
+        static let emojiWordConversion = "語を絵文字に変換"
+        /// 項目名の横に出す，その設定で出る候補の見本(読みと候補)
+        static let emojiConversionExample = (reading: "びーる", candidate: "🍺")
+        static let emojiWordConversionExample = (reading: "ねこが", candidate: "🐈が")
         static let emojiCandidatePosition = "絵文字の位置"
         static let emojiCandidateCount = "絵文字の数"
         static let showsEmojiNames = "絵文字の名前を表示"

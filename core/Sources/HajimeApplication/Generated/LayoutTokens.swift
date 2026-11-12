@@ -332,6 +332,7 @@ public enum LayoutTokens {
         public static let titleBarIconSize: Double = 16
         public static let titleBarPaddingX: Double = 16
         public static let aboutTitleFontSize: Double = 20
+        public static let emojiPreviewHeight: Double = 260
         public static let palettePreviewHeight: Double = 300
         public static let switchKnobOff: Double = 12
         public static let switchKnobOn: Double = 14

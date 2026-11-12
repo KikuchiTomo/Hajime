@@ -566,6 +566,7 @@ pub mod size {
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
         pub const TITLE_BAR_PADDING_X: f32 = 16.0;
         pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
+        pub const EMOJI_PREVIEW_HEIGHT: f32 = 260.0;
         pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
         pub const SWITCH_KNOB_OFF: f32 = 12.0;
         pub const SWITCH_KNOB_ON: f32 = 14.0;
