@@ -10,16 +10,17 @@ use std::collections::HashMap;
 use tokens::size::settings_windows as size;
 use windows::Win32::Foundation::{D2DERR_RECREATE_TARGET, HWND};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_IGNORE, D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_HOLLOW,
-    D2D1_FIGURE_END_OPEN, D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_F, D2D_SIZE_U,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_OPEN,
+    D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_F, D2D_SIZE_U,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Bitmap, ID2D1Factory, ID2D1HwndRenderTarget, ID2D1RenderTarget,
     ID2D1SolidColorBrush, ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_ARC_SEGMENT,
     D2D1_ARC_SIZE_LARGE, D2D1_ARC_SIZE_SMALL, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
     D2D1_BITMAP_PROPERTIES, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_SOLID,
-    D2D1_DRAW_TEXT_OPTIONS_CLIP, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
-    D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_LINE_JOIN_ROUND, D2D1_PRESENT_OPTIONS_NONE,
+    D2D1_DRAW_TEXT_OPTIONS_CLIP, D2D1_ELLIPSE, D2D1_EXTEND_MODE_CLAMP,
+    D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_GAMMA_2_2, D2D1_HWND_RENDER_TARGET_PROPERTIES,
+    D2D1_LINE_JOIN_ROUND, D2D1_PRESENT_OPTIONS_NONE, D2D1_RADIAL_GRADIENT_BRUSH_PROPERTIES,
     D2D1_RENDER_TARGET_PROPERTIES, D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
     D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE,
 };
@@ -184,12 +185,7 @@ impl Graphics {
             ),
             TextStyle::Demo => (
                 self.text_family,
-                size::WIZARD_DEMO_FONT_SIZE,
-                DWRITE_FONT_WEIGHT_NORMAL,
-            ),
-            TextStyle::Hero => (
-                self.icon_family,
-                size::WIZARD_HERO_SIZE / 2.0,
+                tokens::size::onboarding::FIELD_FONT_SIZE,
                 DWRITE_FONT_WEIGHT_NORMAL,
             ),
             TextStyle::Mono => (
@@ -352,10 +348,12 @@ fn contains(collection: Option<&IDWriteFontCollection>, family: &str) -> bool {
 pub struct Surface {
     window: HWND,
     target: Option<ID2D1HwndRenderTarget>,
-    preview: Option<(u64, ID2D1Bitmap)>,
+    /// 描き先に作った画像(見本の画像の generation と)．画像の置き場所(Canvas::preview_at の slot)ごと
+    preview: Vec<Option<(u64, ID2D1Bitmap)>>,
 }
 
-/// 外観の見本の画像(窓の DPI のピクセル．BGRA)．generation が変わったら描き先の画像を作り直す
+/// 外観の見本の画像(窓の DPI のピクセル．アルファを掛けた BGRA．不透明な画像はアルファを 255 にする)．
+/// generation が変わったら描き先の画像を作り直す
 pub struct PreviewPixels {
     pub generation: u64,
     pub width: u32,
@@ -368,7 +366,7 @@ impl Surface {
         Self {
             window,
             target: None,
-            preview: None,
+            preview: Vec::new(),
         }
     }
 
@@ -416,7 +414,7 @@ impl Surface {
         };
         // SAFETY: 作ったばかりの描き先
         unsafe { target.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE) };
-        self.preview = None;
+        self.preview.clear();
         self.target = Some(target.clone());
         Ok(target)
     }
@@ -431,10 +429,27 @@ impl Surface {
         preview: Option<&PreviewPixels>,
         draw: impl FnOnce(&mut dyn Canvas),
     ) -> Result<()> {
+        self.draw_layers(graphics, size, dpi, clear, &[preview], draw)
+    }
+
+    /// 描く．画像を置き場所(slot)ごとに渡す(初期設定の実演は，ページを替えるあいだ前のページの画像も重ねる)
+    pub fn draw_layers(
+        &mut self,
+        graphics: &Graphics,
+        size: (i32, i32),
+        dpi: u32,
+        clear: Color,
+        previews: &[Option<&PreviewPixels>],
+        draw: impl FnOnce(&mut dyn Canvas),
+    ) -> Result<()> {
         let width = u32::try_from(size.0).unwrap_or(0);
         let height = u32::try_from(size.1).unwrap_or(0);
         let target = self.ensure(graphics, width, height, dpi)?;
-        let bitmap = self.preview_bitmap(&target, preview, dpi);
+        let bitmaps: Vec<Option<ID2D1Bitmap>> = previews
+            .iter()
+            .enumerate()
+            .map(|(slot, pixels)| self.preview_bitmap(&target, slot, *pixels, dpi))
+            .collect();
         let render: ID2D1RenderTarget = target.cast()?;
         // SAFETY: target は生きている COM の参照．BeginDraw と EndDraw を対にする
         let brush = unsafe {
@@ -451,7 +466,7 @@ impl Surface {
                 dy: 0.0,
                 opacity: 1.0,
                 pixel: BASE_DPI / dpi as f32,
-                preview: bitmap,
+                previews: bitmaps,
             };
             draw(&mut canvas);
         }
@@ -461,7 +476,7 @@ impl Surface {
             if error.code() == D2DERR_RECREATE_TARGET {
                 // 次に描くときに作り直す
                 self.target = None;
-                self.preview = None;
+                self.preview.clear();
                 return Ok(());
             }
             return Err(error);
@@ -472,11 +487,15 @@ impl Surface {
     fn preview_bitmap(
         &mut self,
         target: &ID2D1HwndRenderTarget,
+        slot: usize,
         pixels: Option<&PreviewPixels>,
         dpi: u32,
     ) -> Option<ID2D1Bitmap> {
+        if self.preview.len() <= slot {
+            self.preview.resize(slot + 1, None);
+        }
         let pixels = pixels?;
-        if let Some((generation, bitmap)) = &self.preview {
+        if let Some((generation, bitmap)) = &self.preview[slot] {
             if *generation == pixels.generation {
                 return Some(bitmap.clone());
             }
@@ -484,7 +503,7 @@ impl Surface {
         let properties = D2D1_BITMAP_PROPERTIES {
             pixelFormat: D2D1_PIXEL_FORMAT {
                 format: DXGI_FORMAT_B8G8R8A8_UNORM,
-                alphaMode: D2D1_ALPHA_MODE_IGNORE,
+                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
             },
             dpiX: dpi as f32,
             dpiY: dpi as f32,
@@ -502,7 +521,7 @@ impl Surface {
             )
         }
         .ok()?;
-        self.preview = Some((pixels.generation, bitmap.clone()));
+        self.preview[slot] = Some((pixels.generation, bitmap.clone()));
         Some(bitmap)
     }
 }
@@ -524,7 +543,7 @@ struct D2dCanvas<'a> {
     dy: f32,
     opacity: f32,
     pixel: f32,
-    preview: Option<ID2D1Bitmap>,
+    previews: Vec<Option<ID2D1Bitmap>>,
 }
 
 impl D2dCanvas<'_> {
@@ -685,7 +704,7 @@ impl Canvas for D2dCanvas<'_> {
     }
 
     fn preview(&mut self, rect: Rect) {
-        let Some(bitmap) = &self.preview else {
+        let Some(Some(bitmap)) = self.previews.first() else {
             return;
         };
         // SAFETY: target と bitmap は生きている COM の参照
@@ -707,6 +726,68 @@ impl Canvas for D2dCanvas<'_> {
                 D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                 None,
             );
+        }
+    }
+
+    fn preview_at(&mut self, slot: usize, x: f32, y: f32) {
+        let Some(Some(bitmap)) = self.previews.get(slot) else {
+            return;
+        };
+        // SAFETY: target と bitmap は生きている COM の参照
+        unsafe {
+            let size = bitmap.GetSize();
+            let destination = self.rect(Rect::new(
+                (x / self.pixel).round() * self.pixel,
+                (y / self.pixel).round() * self.pixel,
+                size.width,
+                size.height,
+            ));
+            self.target.DrawBitmap(
+                bitmap,
+                Some(&destination),
+                self.opacity,
+                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                None,
+            );
+        }
+    }
+
+    fn radial_glow(&mut self, area: Rect, x: f32, y: f32, radius: f32, value: Color) {
+        if value.alpha <= 0.0 || radius <= 0.0 {
+            return;
+        }
+        let stops = [
+            D2D1_GRADIENT_STOP {
+                position: 0.0,
+                color: color(value, self.opacity),
+            },
+            D2D1_GRADIENT_STOP {
+                position: 1.0,
+                color: color(value.with_alpha(0.0), self.opacity),
+            },
+        ];
+        // SAFETY: target は生きている COM の参照．stops は呼び出しのあいだ有効
+        unsafe {
+            let Ok(collection) = self.target.CreateGradientStopCollection(
+                &stops,
+                D2D1_GAMMA_2_2,
+                D2D1_EXTEND_MODE_CLAMP,
+            ) else {
+                return;
+            };
+            let properties = D2D1_RADIAL_GRADIENT_BRUSH_PROPERTIES {
+                center: vector!(x + self.dx, y + self.dy),
+                gradientOriginOffset: vector!(0.0, 0.0),
+                radiusX: radius,
+                radiusY: radius,
+            };
+            let Ok(brush) = self
+                .target
+                .CreateRadialGradientBrush(&properties, None, &collection)
+            else {
+                return;
+            };
+            self.target.FillRectangle(&self.rect(area), &brush);
         }
     }
 
@@ -810,7 +891,136 @@ pub fn render_preview(
                 request.placement,
             )
             .is_ok();
+        // 描いた画像は不透明(描き先はアルファを書かないことがあるので，255 にそろえる)
+        for alpha in pixels.iter_mut().skip(3).step_by(4) {
+            *alpha = 0xFF;
+        }
         let result = painted.then(|| pixels.to_vec());
+        SelectObject(dc, old);
+        let _ = DeleteObject(HGDIOBJ(bitmap.0));
+        let _ = DeleteDC(dc);
+        result
+    }
+}
+
+/// 透明な地に重ねる候補の窓の部品(初期設定の実演)．rect はデバイスのピクセル(左・上・幅・高さ)
+pub struct Layer<'a> {
+    pub shown: candidate_ui::app::preview::Shown<'a>,
+    pub rect: (i32, i32, i32, i32),
+}
+
+/// 候補の窓の描き方と見た目(初期設定の実演)
+pub struct LayerLook<'a> {
+    pub theme: &'a candidate_ui::theme::ResolvedTheme,
+    pub font_size: f32,
+    pub dark: bool,
+    /// 画面の DPI の倍率
+    pub scale: f32,
+}
+
+/// layers を透明な地に描いた画像(アルファを掛けた BGRA)．黒い地と白い地に描いて比べ，地の透け具合を求める
+/// (候補の窓の描き方は不透明な描き先に描くので，角の丸みや縁のなめらかさを残したまま舞台の地に重ねるため)
+pub fn render_layers(
+    preview: &candidate_ui::app::preview::Preview,
+    width: u32,
+    height: u32,
+    look: &LayerLook,
+    layers: &[Layer],
+) -> Option<Vec<u8>> {
+    use candidate_ui::app::preview::Placement;
+    let on = |ground: tokens::Rgb| {
+        render_on(width, height, ground, |dc| {
+            layers.iter().all(|layer| {
+                let (left, top, layer_width, layer_height) = layer.rect;
+                preview
+                    .paint(
+                        dc,
+                        windows::Win32::Foundation::RECT {
+                            left,
+                            top,
+                            right: left + layer_width,
+                            bottom: top + layer_height,
+                        },
+                        look.theme,
+                        look.font_size,
+                        look.dark,
+                        look.scale,
+                        layer.shown,
+                        Placement::TopLeft { ground },
+                    )
+                    .is_ok()
+            })
+        })
+    };
+    let mut pixels = on(tokens::Rgb {
+        red: 0,
+        green: 0,
+        blue: 0,
+    })?;
+    let light = on(tokens::Rgb {
+        red: 0xFF,
+        green: 0xFF,
+        blue: 0xFF,
+    })?;
+    for (pixel, light) in pixels.chunks_exact_mut(4).zip(light.chunks_exact(4)) {
+        // 白い地と黒い地の差が透けている分．黒い地の色はアルファを掛けた色になる
+        let through = (0..3)
+            .map(|channel| u32::from(light[channel].saturating_sub(pixel[channel])))
+            .sum::<u32>()
+            / 3;
+        let alpha = 255 - through.min(255) as u8;
+        for channel in pixel.iter_mut().take(3) {
+            *channel = (*channel).min(alpha);
+        }
+        pixel[3] = alpha;
+    }
+    Some(pixels)
+}
+
+/// ground で塗った width × height の DIB に paint で描き，画素を返す(描けなければ None)
+fn render_on(
+    width: u32,
+    height: u32,
+    ground: tokens::Rgb,
+    paint: impl FnOnce(windows::Win32::Graphics::Gdi::HDC) -> bool,
+) -> Option<Vec<u8>> {
+    use windows::Win32::Graphics::Gdi::{
+        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
+    };
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: i32::try_from(width).ok()?,
+            // 上から下へ並べる
+            biHeight: -i32::try_from(height).ok()?,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    // SAFETY: DC と DIB はこの関数の中で作って消す．bits は DIB を消すまで width × height × 4 バイト
+    unsafe {
+        let dc = CreateCompatibleDC(None);
+        let mut bits = std::ptr::null_mut();
+        let Ok(bitmap) = CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)
+        else {
+            let _ = DeleteDC(dc);
+            return None;
+        };
+        let old = SelectObject(dc, HGDIOBJ(bitmap.0));
+        let length = (width * height * 4) as usize;
+        let pixels = std::slice::from_raw_parts_mut(bits.cast::<u8>(), length);
+        let fill = [ground.blue, ground.green, ground.red, 0xFF];
+        for (index, byte) in pixels.iter_mut().enumerate() {
+            *byte = fill[index % 4];
+        }
+        let result = paint(dc).then(|| pixels.to_vec());
         SelectObject(dc, old);
         let _ = DeleteObject(HGDIOBJ(bitmap.0));
         let _ = DeleteDC(dc);

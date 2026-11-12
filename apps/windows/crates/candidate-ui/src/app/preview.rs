@@ -25,6 +25,10 @@ pub enum Shown<'a> {
     Sample,
     Branch(&'a ipc::BranchMap),
     List(&'a ipc::CandidateList),
+    /// 入力位置の下の案内(初期設定の実演の「修正」「もしかして」)
+    Note(&'a ipc::Note),
+    /// モードの札(初期設定の実演の「あ」「A」)
+    Mode(&'a str),
 }
 
 /// rect の中のどこに置くか
@@ -61,6 +65,29 @@ impl Preview {
         Ok(Self { renderer, target })
     }
 
+    fn scene(
+        shown: Shown,
+        theme: &ResolvedTheme,
+        font_size: f32,
+        measure: &dyn scene::Measure,
+    ) -> scene::Scene {
+        let look = Look::new(theme, font_size);
+        match shown {
+            Shown::Sample => scene::branch_map(&sample::branch(), &look, measure),
+            Shown::Branch(map) => scene::branch_map(map, &look, measure),
+            Shown::List(list) => scene::candidate_list(list, &look, measure),
+            Shown::Note(note) => scene::note(note, &look, measure),
+            Shown::Mode(label) => scene::mode(label, &look, measure),
+        }
+    }
+
+    /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft のとき)
+    pub fn size(&self, theme: &ResolvedTheme, font_size: f32, shown: Shown) -> Result<(f32, f32)> {
+        let measure = self.renderer.measure(theme, font_size)?;
+        let scene = Self::scene(shown, theme, font_size, &measure);
+        Ok((scene.width, scene.height))
+    }
+
     /// hdc の rect(デバイスのピクセル)に，候補の窓 shown を描く．scale は画面の DPI の倍率．
     /// 見本が rect より大きければ見本ごと縮める(macOS の ScaledPreview と同じ)
     #[allow(clippy::too_many_arguments)]
@@ -76,12 +103,7 @@ impl Preview {
         placement: Placement,
     ) -> Result<()> {
         let measure = self.renderer.measure(theme, font_size)?;
-        let look = Look::new(theme, font_size);
-        let scene = match shown {
-            Shown::Sample => scene::branch_map(&sample::branch(), &look, &measure),
-            Shown::Branch(map) => scene::branch_map(map, &look, &measure),
-            Shown::List(list) => scene::candidate_list(list, &look, &measure),
-        };
+        let scene = Self::scene(shown, theme, font_size, &measure);
         // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
             Placement::Center => Surround::Snapshot { dark },
