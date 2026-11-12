@@ -1133,8 +1133,17 @@ impl ITfThreadMgrEventSink_Impl for TextService_Impl {
         _pdimprevfocus: Ref<ITfDocumentMgr>,
     ) -> Result<()> {
         guard(|| {
-            self.finish_composition(None);
             self.cancel_timer();
+            self.finish_composition(None);
+            // 手書きの窓を開いているあいだは，選んだ文字を取りに来続ける．エンジンは deactivate の答えで，そのときだけ
+            // 来るよう頼む(入力メニューを出し入れするなど，同じアプリの中で注目が動いても，選んだ文字を入れられるように)
+            let wake = self
+                .inner
+                .borrow()
+                .state
+                .as_ref()
+                .and_then(|state| state.wake_after_milliseconds);
+            self.schedule_timer(wake);
             Ok(())
         })
     }

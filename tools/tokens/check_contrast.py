@@ -48,9 +48,11 @@ def main(argv: list[str]) -> int:
     # Windows の glass の色(glass.light・glass-dark)も同じ基準で検査する
     themes = {**tokens["theme"], **{f"glass-{name}": body for name, body in tokens.get("glass", {}).items() if "color" in body}}
     # Windows の設定の画面の色は「settings-windows.light」のように名前を付けて同じ形で確かめる
-    for mode, body in tokens["settings-windows"].items():
-        if not mode.startswith("$"):
-            themes[f"settings-windows.{mode}"] = body
+    # Windows の手書きの窓だけの色(handwriting-windows.light など)も同じ形で確かめる
+    for group in ("settings-windows", "handwriting-windows"):
+        for mode, body in tokens.get(group, {}).items():
+            if not mode.startswith("$"):
+                themes[f"{group}.{mode}"] = body
     failures: list[str] = []
     for rule in tokens["$extensions"]["hajime"]["contrast"]:
         colors = themes[rule["theme"]]["color"]

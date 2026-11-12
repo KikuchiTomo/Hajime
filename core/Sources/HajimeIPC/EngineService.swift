@@ -29,10 +29,12 @@ public final class EngineService {
         var isSettingsApp = false
     }
 
-    /// 開いている手書きの窓(R-14)．選んだ文字は窓を開いたセッションに預け，DLL の wake で入れる
-    /// (DLL は要求にしか答えられないので，エンジンから入力欄に押し込めない)
+    /// 開いている手書きの窓(R-14)．選んだ文字は入れる先のセッションに預け，DLL の wake・activate・次のキーで入れる
+    /// (DLL は要求にしか答えられないので，エンジンから入力欄に押し込めない)．
+    /// 入れる先は窓を開いたセッションで，ほかのアプリ(セッション)に入力先が移ったらそちらに移す(Windows の手書きの
+    /// パネルと同じく，今の入力先に入れる)．DLL は入力欄の中で注目が動くたびに deactivate を送るので，deactivate では閉じない
     private struct Handwriting {
-        let session: UInt32
+        var session: UInt32
         var chosen: String?
     }
 
@@ -264,6 +266,8 @@ public final class EngineService {
             }
             // 移ったアプリのモードを先に覚える．前のアプリの deactivate より先に届いても，次のアプリがこのモードにそろう
             rememberMode(of: current)
+            // 手書きの窓を開いているあいだに入力先が移ったら，選んだ文字はこちらに入れる．もう選んでいれば今入れる
+            actions += retargetHandwriting(to: session, current: current)
             return edit(actions, handled: true, session: session, anchor: wire.caret ?? lastAnchor)
         case .deactivate(let session):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
@@ -271,11 +275,12 @@ public final class EngineService {
             rememberMode(of: current)
             let actions = current.input.deactivate()
             ui(.hide)
-            // 入力先から外れたら手書きの窓も閉じる．選んだ文字が別の入力欄に入らないように
-            closeHandwriting(ofSession: session)
+            // 手書きの窓は閉じない．DLL は入力欄の中で注目が動くたび(入力メニューを出す・閉じるときも)に deactivate を送るので，
+            // ここで閉じると開いた直後に消える．入れる先はそのままにし，ほかのアプリに移ったら activate で移す
             // 入力欄から外れたら，学んだことをファイルに書き出す(macOS の入力コントローラの deactivateServer と同じ)
             flushLearning()
-            return edit(actions, handled: true, session: session, anchor: lastAnchor)
+            // 来てもらうのは手書きの窓の文字を取りに来るときだけ(入力欄から外れたので，変換の続きのためには来なくてよい)
+            return edit(actions, handled: true, session: session, anchor: lastAnchor, wakeOnlyForHandwriting: true)
         case .wake(let session, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             return wake(session: session, current: current, context: context)
@@ -543,10 +548,7 @@ public final class EngineService {
         let context = InputContext(wire, settings: settings.current)
         if let caret = wire.caret { lastAnchor = caret }
         var actions: [ClientAction] = []
-        if handwriting?.session == session, let text = handwriting?.chosen {
-            handwriting = nil
-            actions += current.input.insert(text)
-        }
+        actions += takeHandwriting(for: session, current: current)
         let targets = paletteTargets.filter { $0.session == session }
         paletteTargets.removeAll { $0.session == session }
         for pending in targets {
@@ -655,7 +657,8 @@ public final class EngineService {
         }
     }
 
-    private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?) -> WireResponseBody {
+    /// wakeOnlyForHandwriting なら，手書きの窓の文字を取りに来るときだけ来てもらう(入力欄から外れた deactivate の答え)
+    private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?, wakeOnlyForHandwriting: Bool = false) -> WireResponseBody {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, composition: lastComposition, hints: { [hints] in hints($0, current) },
                                    listHints: { [listHints] in listHints($0, current) }, paletteCellSize: current.paletteCellSize)
@@ -684,7 +687,8 @@ public final class EngineService {
             return .edit(handled: handled, operations: routed.edits, state: WireSessionState(mode: .japanese, isComposing: false, keymap: current.keymap, wakeAfterMilliseconds: nil,
                                                                                                   keyboardLayout: WireSessionState.keyboardLayout(for: current)))
         }
-        return .edit(handled: handled, operations: routed.edits, state: state(of: input, wakeAfter: wakeAfter(session)))
+        let wake = wakeOnlyForHandwriting ? (handwriting?.session == session ? Self.handwritingPollMilliseconds : nil) : wakeAfter(session)
+        return .edit(handled: handled, operations: routed.edits, state: state(of: input, wakeAfter: wake))
     }
 
     private func wakeAfter(_ session: UInt32) -> UInt32? {
@@ -753,6 +757,21 @@ public final class EngineService {
         shownPalette = nil
         paletteTargets.removeAll { $0.session == session }
         ui(.hidePalette)
+    }
+
+    /// 手書きの窓で選んだ文字を，入れる先が session なら取り出して入れる
+    private func takeHandwriting(for session: UInt32, current: Session) -> [ClientAction] {
+        guard handwriting?.session == session, let text = handwriting?.chosen else { return [] }
+        handwriting = nil
+        return current.input.insert(text)
+    }
+
+    /// 手書きの窓を開いているあいだに入力先が session(ほかのアプリ)に移ったら，選んだ文字の入れる先をそちらに移す．
+    /// もう選んでいれば，移った先に今入れる
+    private func retargetHandwriting(to session: UInt32, current: Session) -> [ClientAction] {
+        guard handwriting != nil else { return [] }
+        handwriting?.session = session
+        return takeHandwriting(for: session, current: current)
     }
 
     private func closeHandwriting(ofSession session: UInt32) {
