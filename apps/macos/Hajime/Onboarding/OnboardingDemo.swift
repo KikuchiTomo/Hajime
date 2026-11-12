@@ -282,9 +282,11 @@ enum DemoScripts {
             let long = formatted(now, "y年M月d日"), short = formatted(now, "y/MM/dd")
             return typing("kyou") + choosing([long, short, "今日"], to: 1, commit: short)
         case .looseReadings:
-            return typing("shumire-shon") + choosing(["シュミレーション", "シミュレーション", "趣味レーション"], to: 1, commit: "シミュレーション")
+            let example = UIStrings.Extras.looseReadingsExample.candidate
+            return typing("shanbu-") + choosing(["シャンブー", example, "しゃんぶー"], to: 1, commit: example)
         case .phoneticSpelling:
-            return typing("foto") + choosing(["フォト", "photo", "ふぉと"], to: 1, commit: "photo")
+            let example = UIStrings.Extras.phoneticSpellingExample.candidate
+            return typing("kokoa") + choosing(["ココア", example, "ここあ"], to: 1, commit: example)
         case .handShift:
             // 右手も左手も 1 キー右にずれたまま「konnichiha」と打った(QWERTY)
             let keys = "lpmmovjojs"

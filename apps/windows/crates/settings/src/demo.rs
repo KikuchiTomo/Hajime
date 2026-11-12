@@ -938,17 +938,19 @@ pub fn spot_frames(path: &str, today: Today) -> Vec<Frame> {
             frames
         }
         "looseReadings" => {
-            let mut frames = typing("shumire-shon", "", None);
+            let example = crate::strings::extras::LOOSE_READINGS_EXAMPLE.1;
+            let mut frames = typing("shanbu-", "", None);
             frames.extend(pick(
-                &["シュミレーション", "シミュレーション", "趣味レーション"],
+                &["シャンブー", example, "しゃんぶー"],
                 1,
-                Some("シミュレーション"),
+                Some(example),
             ));
             frames
         }
         "phoneticSpelling" => {
-            let mut frames = typing("foto", "", None);
-            frames.extend(pick(&["フォト", "photo", "ふぉと"], 1, Some("photo")));
+            let example = crate::strings::extras::PHONETIC_SPELLING_EXAMPLE.1;
+            let mut frames = typing("kokoa", "", None);
+            frames.extend(pick(&["ココア", example, "ここあ"], 1, Some(example)));
             frames
         }
         "handShiftCorrection" => {
@@ -1095,9 +1097,9 @@ mod tests {
             readings("yorosikuonagaisimasu").last().unwrap(),
             "よろしくおながいします"
         );
-        assert_eq!(readings("shumire-shon").last().unwrap(), "しゅみれーしょn");
+        assert_eq!(readings("shanbu-").last().unwrap(), "しゃんぶー");
         assert_eq!(readings("lpmmovjojs").last().unwrap(), "lpっもvじょjs");
-        assert_eq!(readings("foto").last().unwrap(), "ふぉと");
+        assert_eq!(readings("kokoa").last().unwrap(), "ここあ");
     }
 
     #[test]
@@ -1298,7 +1300,7 @@ mod tests {
         assert_eq!(off.len(), 1);
         choices.set_toggle("phoneticSpelling", true);
         let on = script(Step::Extras, &choices, None, Mark::Direct, TODAY);
-        assert!(frames(&on).iter().any(|frame| text_of(frame) == "photo"));
+        assert!(frames(&on).iter().any(|frame| text_of(frame) == "cocoa"));
     }
 
     #[test]
