@@ -127,7 +127,45 @@ enum DesignTokens {
             static let sm: CGFloat = 8
             static let md: CGFloat = 12
             static let lg: CGFloat = 16
+            static let xl: CGFloat = 24
+            static let fine: CGFloat = 2
+            static let inset: CGFloat = 4
             static let inline: CGFloat = 4
+            static let stack: CGFloat = 4
+            static let group: CGFloat = 8
+            static let section: CGFloat = 12
+            static let window: CGFloat = 12
+            static let page: CGFloat = 24
+        }
+        enum Text {
+            static let candidate: CGFloat = 15
+            static let candidateLine: CGFloat = 20
+            static let body: CGFloat = 13
+            static let bodyLine: CGFloat = 20
+            static let small: CGFloat = 11
+            static let smallLine: CGFloat = 16
+            static let tag: CGFloat = 10
+            static let tagLine: CGFloat = 12
+        }
+        enum Part {
+            static let windowRadius: CGFloat = 12
+            static let cardRadius: CGFloat = 8
+            static let rowHeight: CGFloat = 28
+            static let rowPaddingX: CGFloat = 4
+            static let rowRadius: CGFloat = 8
+            static let fieldHeight: CGFloat = 28
+            static let fieldPaddingX: CGFloat = 8
+            static let fieldPaddingY: CGFloat = 4
+            static let fieldRadius: CGFloat = 8
+            static let tagHeight: CGFloat = 16
+            static let tagPaddingX: CGFloat = 4
+            static let tagPaddingY: CGFloat = 2
+            static let tagGlyphGap: CGFloat = 2
+            static let tagRadius: CGFloat = 4
+            static let badgeSize: CGFloat = 16
+            static let iconSize: CGFloat = 16
+            static let iconRadius: CGFloat = 4
+            static let stroke: CGFloat = 1
         }
         enum Candidate {
             static let rowHeight: CGFloat = 22

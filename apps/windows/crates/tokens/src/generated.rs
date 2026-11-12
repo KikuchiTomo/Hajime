@@ -245,7 +245,45 @@ pub mod size {
         pub const SM: f32 = 8.0;
         pub const MD: f32 = 12.0;
         pub const LG: f32 = 16.0;
+        pub const XL: f32 = 24.0;
+        pub const FINE: f32 = 2.0;
+        pub const INSET: f32 = 4.0;
         pub const INLINE: f32 = 4.0;
+        pub const STACK: f32 = 4.0;
+        pub const GROUP: f32 = 8.0;
+        pub const SECTION: f32 = 12.0;
+        pub const WINDOW: f32 = 12.0;
+        pub const PAGE: f32 = 24.0;
+    }
+    pub mod text {
+        pub const CANDIDATE: f32 = 15.0;
+        pub const CANDIDATE_LINE: f32 = 20.0;
+        pub const BODY: f32 = 13.0;
+        pub const BODY_LINE: f32 = 20.0;
+        pub const SMALL: f32 = 11.0;
+        pub const SMALL_LINE: f32 = 16.0;
+        pub const TAG: f32 = 10.0;
+        pub const TAG_LINE: f32 = 12.0;
+    }
+    pub mod part {
+        pub const WINDOW_RADIUS: f32 = 12.0;
+        pub const CARD_RADIUS: f32 = 8.0;
+        pub const ROW_HEIGHT: f32 = 28.0;
+        pub const ROW_PADDING_X: f32 = 4.0;
+        pub const ROW_RADIUS: f32 = 8.0;
+        pub const FIELD_HEIGHT: f32 = 28.0;
+        pub const FIELD_PADDING_X: f32 = 8.0;
+        pub const FIELD_PADDING_Y: f32 = 4.0;
+        pub const FIELD_RADIUS: f32 = 8.0;
+        pub const TAG_HEIGHT: f32 = 16.0;
+        pub const TAG_PADDING_X: f32 = 4.0;
+        pub const TAG_PADDING_Y: f32 = 2.0;
+        pub const TAG_GLYPH_GAP: f32 = 2.0;
+        pub const TAG_RADIUS: f32 = 4.0;
+        pub const BADGE_SIZE: f32 = 16.0;
+        pub const ICON_SIZE: f32 = 16.0;
+        pub const ICON_RADIUS: f32 = 4.0;
+        pub const STROKE: f32 = 1.0;
     }
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
