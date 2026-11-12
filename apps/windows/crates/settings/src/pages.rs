@@ -372,8 +372,11 @@ pub enum Control {
     PalettePreview,
     /// 絵文字の候補の見本(候補の窓と同じ描き方の一覧．絵文字の位置・数・名前は設定のとおり)
     EmojiPreview,
-    /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
-    ThemeReport,
+    /// カスタムテーマの読みにくい組み合わせの 1 つ(知らせの番号)．注意の印と文を並べる．無ければ出さない
+    /// (macOS の CustomThemeEditor の Label)
+    ThemeIssue(usize),
+    /// 1 行の文字を打つ欄(カスタムテーマの名前．macOS の TextField)
+    TextField,
 }
 
 /// 試す欄で試すもの
@@ -2244,20 +2247,11 @@ pub fn with_custom_theme_rows(mut sections: Vec<Section>, limit: usize) -> Vec<S
     sections
 }
 
-/// 外観のページ(macOS の AppearancePage と CustomThemeEditor)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
-/// カスタムテーマは一覧で選んだものを下の行で編集する(値は crate::themes の「customTheme.」の道筋)
+/// 外観のページ(macOS の AppearancePage)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
+/// カスタムテーマは行の右のボタンや一覧の下のボタンで編集の画面(theme_editor)を開いて作る・直す
 fn appearance() -> Vec<Section> {
     use crate::themes;
     use Condition::*;
-    let editing = || IsNot(themes::ID, "");
-    // 読みにくい組み合わせの知らせは色の上に出す(macOS の CustomThemeEditor と同じ)
-    let mut colors = vec![Row::new(more::READABILITY, "", Control::ThemeReport)
-        .visible_when(IsNot(themes::READABILITY, ""))];
-    colors.extend(
-        themes::COLORS
-            .iter()
-            .map(|(path, title)| Row::new(title, path, Control::Color).visible_when(editing())),
-    );
     let theme_rows = options::THEMES
         .iter()
         .map(|(value, name)| {
@@ -2277,6 +2271,37 @@ fn appearance() -> Vec<Section> {
                 Row::new("", "", Control::Buttons(THEME_BUTTONS)).enabled_when(On(themes::ROOM)),
             ],
         ),
+        Section::new(
+            more::FONT,
+            vec![Row::slider(
+                settings::FONT_SIZE_NAME,
+                "candidateFontSize",
+                RangeKind::CandidateFontSize,
+            )],
+        ),
+    ]
+}
+
+/// カスタムテーマを編集する画面(macOS の CustomThemeEditor)．名前・読みやすさ・色・形を並べる．
+/// 値は編集している下書きの「customTheme.」の道筋(crate::themes)で，「保存」を押すまで設定のファイルに書かない．
+/// 見本は画面の上に留め，ボタン(複製・キャンセル・保存)は下に留めて描く(app::window)
+pub fn theme_editor() -> Vec<Section> {
+    use crate::themes;
+    let issues = (0..themes::CONTRAST_PAIRS)
+        .map(|index| Row::new("", "", Control::ThemeIssue(index)))
+        .collect();
+    let colors = themes::COLORS
+        .iter()
+        .map(|(path, title)| Row::new(title, path, Control::Color))
+        .collect();
+    vec![
+        Section::untitled(vec![Row::new(
+            more::THEME_NAME,
+            themes::NAME,
+            Control::TextField,
+        )]),
+        // 読みにくい組み合わせが無ければ，見出しごと出さない(macOS と同じ)
+        Section::new(more::READABILITY, issues),
         Section::new(more::COLORS, colors),
         Section::new(
             more::SHAPE,
@@ -2285,35 +2310,23 @@ fn appearance() -> Vec<Section> {
                     more::CORNER_RADIUS,
                     themes::CORNER_RADIUS,
                     RangeKind::CustomThemeCornerRadius,
-                )
-                .visible_when(editing()),
+                ),
                 Row::choice(
                     more::BRANCH_STYLE,
                     themes::BRANCH_STYLE,
                     options::BRANCH_STYLES,
-                )
-                .visible_when(editing()),
+                ),
                 Row::new(
                     more::FONT,
                     themes::FONT_NAME,
                     Control::ThemeFont(FontPart::Family),
-                )
-                .visible_when(editing()),
+                ),
                 Row::new(
                     more::FONT_STYLE,
                     themes::FONT_NAME,
                     Control::ThemeFont(FontPart::Style),
-                )
-                .visible_when(editing()),
+                ),
             ],
-        ),
-        Section::new(
-            more::FONT,
-            vec![Row::slider(
-                settings::FONT_SIZE_NAME,
-                "candidateFontSize",
-                RangeKind::CandidateFontSize,
-            )],
         ),
     ]
 }

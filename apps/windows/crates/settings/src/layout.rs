@@ -286,7 +286,7 @@ fn place(
             size::BODY_LINE_HEIGHT * size::MACRO_PREVIEW_LINES,
             metrics,
         ),
-        Control::KeymapReport | Control::ThemeReport => place_inputs(
+        Control::KeymapReport => place_inputs(
             position,
             0,
             NO_BUTTONS,
@@ -297,8 +297,8 @@ fn place(
         Control::ThemePreview | Control::PalettePreview | Control::EmojiPreview => {
             place_preview(position, row, frame, metrics)
         }
-        // 謝辞と書き方の表は中身を画面の側で測って置く．部品の欄はカードの中の全体
-        Control::Acknowledgement(_) | Control::TemplateReference => {
+        // 謝辞・書き方の表・読みにくい組み合わせの知らせは中身を画面の側で測って置く．部品の欄はカードの中の全体
+        Control::Acknowledgement(_) | Control::TemplateReference | Control::ThemeIssue(_) => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
             let mut card = empty(frame.card(height), position);
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
@@ -313,6 +313,12 @@ fn place(
         Control::Version => place_about(position, row.title, frame, metrics),
         Control::ThemeOption(_) => place_option(position, frame),
         Control::CustomTheme(_) => place_custom_theme(position, frame),
+        // 打つ欄は部品の欄に置く(一覧の入力欄と同じく parts の先頭)
+        Control::TextField => {
+            let mut card = place_labeled(position, row, notes, frame, metrics);
+            card.parts.push(card.control);
+            card
+        }
         _ => place_labeled(position, row, notes, frame, metrics),
     }
 }
@@ -1201,9 +1207,14 @@ mod tests {
 
     #[test]
     fn 行がひとつも出ないまとまりは見出しも置かない() {
-        let page = sections(Page::Appearance).unwrap();
-        // カスタムテーマを選んでいない(色・形の行を出さない)
-        let hidden = layout(&page, 800.0, |row| row.visible.is_none(), &Estimate);
+        let page = crate::pages::theme_editor();
+        // 読みにくい組み合わせが無い(読みやすさの知らせを出さない)
+        let hidden = layout(
+            &page,
+            800.0,
+            |row| !matches!(row.control, Control::ThemeIssue(_)),
+            &Estimate,
+        );
         let shown = layout(&page, 800.0, |_| true, &Estimate);
         let titles = |layout: &PageLayout| {
             layout

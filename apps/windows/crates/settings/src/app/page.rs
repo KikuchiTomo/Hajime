@@ -90,6 +90,8 @@ pub enum Event {
         index: Option<usize>,
         name: String,
     },
+    /// カスタムテーマの編集の画面の下のボタン(名前の欄で Enter を押すと保存)
+    ThemeEditor(EditorAction),
     /// アプリの実行ファイルを選ぶ窓を出し，path の一覧の入力欄に名前を入れる
     ChooseApp {
         path: &'static str,
@@ -146,6 +148,15 @@ impl ThemeAction {
         ThemeAction::Duplicate,
         ThemeAction::Delete,
     ];
+}
+
+/// カスタムテーマの編集の画面の下のボタン(macOS の CustomThemeEditor)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorAction {
+    /// 別の新しいテーマとして保存する(保存したテーマを直しているときだけ)
+    Duplicate,
+    Cancel,
+    Save,
 }
 
 /// 辞書の一覧のボタンの操作
@@ -272,8 +283,9 @@ pub struct Extras {
     pub readings: Vec<Vec<String>>,
     /// 同期の状態と編集しているカスタムテーマの値(is_extra_path の道筋)
     pub extra: crate::store::Fields,
-    /// カスタムテーマの読みにくい組み合わせの知らせ(無ければ空)
-    pub theme_report: String,
+    /// 編集しているカスタムテーマの読みにくい組み合わせ(知らせの文と組み合わせ)
+    pub theme_issues: Vec<String>,
+    pub theme_pairs: Vec<ipc::ContrastPair>,
     /// カスタムテーマごとに，読みにくい組み合わせがあるか(設定のファイルの customThemes と同じ並び)
     pub theme_warnings: Vec<bool>,
     /// 同期のフォルダの名前と最後に同期した時刻(出す形)
@@ -974,7 +986,8 @@ impl RowState {
             }
             Control::Color => parts.push(Part::Color),
             Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
-            Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
+            Control::KeymapReport => parts.push(Part::Text),
+            Control::TextField => parts.push(Part::Field(0)),
             Control::Preview(kind) => {
                 parts.extend([Part::PreviewField(0), Part::PreviewField(1)]);
                 if *kind == TryKind::Language {
@@ -1044,7 +1057,7 @@ impl RowState {
                 index < always_enabled(&self.row.control) || selected
             }
             Part::Bottom(index) => bottom_always_enabled(&self.row.control, index) || selected,
-            Part::Field(index) => index < fields,
+            Part::Field(index) => index < fields || self.row.control == Control::TextField,
             // カスタムテーマの複製は上限まで作ったら使えない(macOS と同じ)
             Part::Button(1) if matches!(self.row.control, Control::CustomTheme(_)) => self.room,
             _ => true,
@@ -1190,6 +1203,8 @@ pub struct PageView {
     width: f32,
     /// 見本(外観・パレット・絵文字)を描いた大きさ(DIP)．見本の行の高さを決める
     preview_size: Option<(f32, f32)>,
+    /// ページの題を描く(カスタムテーマの編集の画面は題の代わりに見本を上に留めるので描かない)
+    titled: bool,
 }
 
 /// 描くときに窓から渡すもの
@@ -1234,6 +1249,19 @@ impl PageView {
             ),
             Availability::Loading | Availability::Unavailable => Vec::new(),
         };
+        Self::with_sections(parent, font, pool, page, sections, catalog, availability)
+    }
+
+    /// 項目の並びを決めて作る(カスタムテーマの編集の画面．page は左の一覧で選んでおくページ)
+    pub fn with_sections(
+        parent: Window,
+        font: &ffi::Font,
+        pool: &mut Vec<Window>,
+        page: Page,
+        sections: Vec<Section>,
+        catalog: &Catalog,
+        availability: Availability,
+    ) -> Self {
         let mut id = FIRST_ID;
         let mut next_id = || {
             id = id.wrapping_add(1);
@@ -1269,7 +1297,14 @@ impl PageView {
             table_hover: None,
             width: 0.0,
             preview_size: None,
+            titled: true,
         }
+    }
+
+    /// ページの題を描かない(カスタムテーマの編集の画面)
+    pub fn untitled(mut self) -> Self {
+        self.titled = false;
+        self
     }
 
     /// ページにある見本の種類(外観・パレット・絵文字)．見本が無ければ None
@@ -1319,8 +1354,7 @@ impl PageView {
                 pages::holds(condition, |path| values.text(path), |path| values.on(path))
             };
             row.visible = row.row.visible.is_none_or(condition)
-                && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty())
-                && (row.row.control != Control::ThemeReport || !extras.theme_report.is_empty());
+                && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty());
             row.readable = row.row.path.is_empty() || values.is_readable(row.row.path);
             row.enabled = row.readable && row.row.enabled.is_none_or(condition);
             row.resettable =
@@ -1395,8 +1429,23 @@ impl PageView {
                 Control::Preview(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
                 }
-                Control::ThemeReport => row.text = extras.theme_report.clone(),
-                Control::Color => row.color = values.text(row.row.path),
+                Control::ThemeIssue(index) => {
+                    row.text = extras.theme_issues.get(*index).cloned().unwrap_or_default();
+                    row.visible &= *index < extras.theme_issues.len();
+                }
+                Control::Color => {
+                    row.color = values.text(row.row.path);
+                    row.warns = crate::themes::warns(row.row.path, &extras.theme_pairs);
+                }
+                // 打っている途中は書き直さない(同じ値なら触らない．書き直すと入力位置が先頭に戻る)
+                Control::TextField => {
+                    if let Some(Input::Edit(window)) = row.inputs.first() {
+                        let text = values.text(row.row.path);
+                        if ffi::window_text(*window) != text {
+                            ffi::set_text(*window, &text);
+                        }
+                    }
+                }
                 _ => {}
             }
             if let Some(rows) = list_rows(&row.row, values, extras) {
@@ -1450,11 +1499,13 @@ impl PageView {
             .flat_map(|section| &section.rows)
             .collect();
         let expanded: Vec<bool> = self.rows.iter().map(|row| row.expanded).collect();
+        let texts: Vec<String> = self.rows.iter().map(|row| row.text.clone()).collect();
         let metrics = Measured {
             measure,
             all: &all,
             expanded: &expanded,
             preview: self.preview_size,
+            texts: &texts,
         };
         self.layout = layout::layout(
             &self.sections,
@@ -1494,10 +1545,7 @@ impl PageView {
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 let viewport = table_viewport(row);
                 row.table_scroll.set_extent(content, viewport);
-                if matches!(
-                    row.row.control,
-                    Control::KeymapReport | Control::ThemeReport
-                ) {
+                if row.row.control == Control::KeymapReport {
                     if let Some(card) = &row.card {
                         let inner = card.control.width - size::FIELD_PADDING_X * 2.0;
                         let height = measure.wrapped_height(&row.text, TextStyle::Caption, inner)
@@ -1516,7 +1564,7 @@ impl PageView {
         &self,
         theme: &Theme,
         origin: (f32, f32),
-        header: f32,
+        band: (f32, f32),
         scroll: f32,
         hidden: bool,
     ) {
@@ -1533,8 +1581,9 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
-                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(header)へ出たら隠す
-                if y < origin.1 + header {
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(band の上端より上)や，
+                // 下に留めたボタンの帯(band の下端より下．カスタムテーマの編集の画面)へ出たら隠す
+                if y < origin.1 + band.0 || y + line > origin.1 + band.1 {
                     ffi::show(window, false);
                     continue;
                 }
@@ -1625,7 +1674,10 @@ impl PageView {
                 .control
                 .list_spec()
                 .and_then(|spec| spec.fields.get(index))
-                .map_or_else(String::new, |field| field.label.to_string()),
+                .map_or_else(
+                    || row.row.title.to_string(),
+                    |field| field.label.to_string(),
+                ),
             Part::Search => features::SEARCH.to_string(),
             Part::Table => row.row.control.table_columns().join("・"),
             // 読みにくいカスタムテーマは名前のあとに知らせる(macOS は印に読みやすさの名前を付ける)
@@ -2079,6 +2131,14 @@ impl PageView {
                 row.table_scroll.jump_to(0.0);
                 None
             }
+            Part::Field(0) if row.row.control == Control::TextField => {
+                let text = row.edit(Part::Field(0)).map(ffi::window_text)?;
+                Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::String(text),
+                    clears: None,
+                })
+            }
             Part::PreviewField(_) => {
                 let texts: Vec<String> = row
                     .preview_fields
@@ -2126,6 +2186,10 @@ impl PageView {
         let row = self.rows.get(element.row)?;
         if !matches!(element.part, Part::Field(_)) {
             return None;
+        }
+        // カスタムテーマの名前の欄で Enter を押したら保存する(macOS の保存のボタンは既定の操作)
+        if row.row.control == Control::TextField {
+            return Some(Event::ThemeEditor(EditorAction::Save));
         }
         let button = Element {
             row: element.row,
@@ -2586,7 +2650,7 @@ impl PageView {
     pub fn paint(&self, canvas: &mut dyn Canvas, frame: &Frame) {
         let theme = frame.theme;
         let palette = &theme.palette;
-        if frame.shows(self.layout.title) {
+        if self.titled && frame.shows(self.layout.title) {
             canvas.text(
                 self.layout.title,
                 self.page.title(),
@@ -2999,9 +3063,11 @@ impl PageView {
                     value_layout(card),
                 );
             }
-            Control::KeymapReport | Control::ThemeReport => {
+            Control::KeymapReport => {
                 self.paint_text_box(canvas, frame, index, row, card.control);
             }
+            Control::ThemeIssue(_) => paint_issue(canvas, theme, card.control, &row.text),
+            Control::TextField => self.paint_field(canvas, frame, index, row, Part::Field(0)),
             Control::ThemePreview => canvas.preview(card.control),
             // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
             Control::Preview(_) => {
@@ -3140,6 +3206,17 @@ impl PageView {
             part: Part::Color,
         };
         let state = self.state(frame, element, row.enabled);
+        // 読みにくい組み合わせに入る色は，色のボタンの左に注意の印を出す(macOS の CustomThemeEditor)
+        if row.warns {
+            let icon = size::ICON_FONT_SIZE;
+            canvas.text(
+                Rect::new(rect.x - size::CONTROL_GAP - icon, rect.y, icon, rect.height),
+                theme.glyphs.warning,
+                TextStyle::IconSmall,
+                Color::from(palette.caution),
+                TextLayout::CENTER,
+            );
+        }
         paint::button(canvas, theme, rect, "", paint::ButtonKind::Standard, state);
         let gap = size::CONTROL_GAP;
         let swatch_size = rect.height - gap * 2.0;
@@ -3878,6 +3955,13 @@ impl<F: FnMut() -> u16> FieldSource<'_, F> {
 /// 一覧の入力欄・検索欄・試す欄の標準の EDIT を用意する
 fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowState) {
     match &row.row.control {
+        Control::TextField => {
+            if let Some(window) = fields.take(row.row.title) {
+                // 使い回した欄がキーを記録する欄だったら戻す
+                edit::set_record_on_click(window, None);
+                row.inputs.push(Input::Edit(window));
+            }
+        }
         Control::Preview(kind) => {
             let labels = match kind {
                 TryKind::Language => [features::TRY_PLACEHOLDER, features::TRY_PRECEDING],
@@ -4246,6 +4330,40 @@ fn paint_swatch(
     );
 }
 
+/// 読みにくい組み合わせの知らせの行の高さ(注意の印と，折り返した文．width はカードの中の幅)
+fn issue_height(text: &str, width: f32, measure: &dyn paint::Measure) -> f32 {
+    let inner = (width - size::ICON_FONT_SIZE - size::CONTROL_GAP).max(1.0);
+    (measure.wrapped_height(text, TextStyle::Body, inner) + size::CARD_PADDING_Y * 2.0)
+        .max(size::ROW_HEIGHT)
+}
+
+/// 読みにくい組み合わせの知らせ(macOS の Label と exclamationmark.triangle.fill)．rect はカードの中
+fn paint_issue(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, text: &str) {
+    let icon = size::ICON_FONT_SIZE;
+    let line = size::BODY_LINE_HEIGHT;
+    let top = rect.y + size::CARD_PADDING_Y;
+    canvas.text(
+        Rect::new(rect.x, top, icon, line),
+        theme.glyphs.warning,
+        TextStyle::IconSmall,
+        Color::from(theme.palette.caution),
+        TextLayout::CENTER,
+    );
+    let left = rect.x + icon + size::CONTROL_GAP;
+    canvas.text(
+        Rect::new(
+            left,
+            top,
+            (rect.max_x() - left).max(0.0),
+            (rect.height - size::CARD_PADDING_Y * 2.0).max(line),
+        ),
+        text,
+        TextStyle::Body,
+        Color::from(theme.palette.text),
+        TextLayout::WRAP,
+    );
+}
+
 /// 見本の画像の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreviewKind {
@@ -4276,6 +4394,8 @@ struct Measured<'a> {
     expanded: &'a [bool],
     /// ページの見本(外観・パレット・絵文字)を描いた大きさ．測れていなければ None
     preview: Option<(f32, f32)>,
+    /// 行ごとの文(行と同じ並び．読みにくい組み合わせの知らせの高さを測る)
+    texts: &'a [String],
 }
 
 impl Measured<'_> {
@@ -4320,6 +4440,12 @@ impl Metrics for Measured<'_> {
                 .map(|natural| layout::preview_height(natural, width));
         }
         let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+        if let Control::ThemeIssue(_) = row.control {
+            let text = self
+                .position(row)
+                .and_then(|position| self.texts.get(position))?;
+            return Some(issue_height(text, inner, self.measure));
+        }
         if row.control == Control::TemplateReference {
             return Some(TemplateLayout::new((0.0, 0.0, inner), self.measure).height);
         }
