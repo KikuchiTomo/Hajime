@@ -43,6 +43,14 @@ struct RuleListSpec<Rule> {
             invalidMessage: UIStrings.Extras.invalidEnglishTerm, file: .englishTerms)
     }
 
+    /// 予測に表示しない語句．書き方どおりに比べる
+    static var hiddenPredictions: RuleListSpec<String> {
+        RuleListSpec<String>(
+            list: \.hiddenPredictions, key: { $0 }, value: { _ in "" }, make: { key, _ in key.trimmingCharacters(in: .whitespaces) },
+            isValid: RuleListEditing.isValidHiddenPrediction, limit: DefaultSettings.maximumHiddenPredictions,
+            invalidMessage: UIStrings.Choice.invalidHiddenPrediction, file: .hiddenPredictions)
+    }
+
     static var romaji: RuleListSpec<RomajiRule> {
         RuleListSpec<RomajiRule>(
             list: \.customRomaji, key: \.keys, value: \.kana, make: RuleListEditing.romajiRule(keys:kana:), isValid: \.isValid,

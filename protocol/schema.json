@@ -430,7 +430,8 @@
         "romaji",
         "symbolSequences",
         "symbolReadings",
-        "englishTerms"
+        "englishTerms",
+        "hiddenPredictions"
       ]
     },
     {
@@ -1916,7 +1917,8 @@
       "kind": "enum",
       "cases": [
         "emoji",
-        "symbol"
+        "symbol",
+        "kaomoji"
       ]
     },
     {
@@ -2148,6 +2150,10 @@
         {
           "name": "cellSize",
           "type": "f64"
+        },
+        {
+          "name": "cellsPerRow",
+          "type": "u32?"
         }
       ]
     },

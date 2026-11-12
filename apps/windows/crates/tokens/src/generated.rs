@@ -410,12 +410,17 @@ pub mod size {
         pub const CELL_RADIUS: f32 = 6.0;
         pub const EMOJI_SCALE: f32 = 0.7;
         pub const SYMBOL_SCALE: f32 = 0.55;
+        pub const KAOMOJI_SCALE: f32 = 0.4;
+        pub const KAOMOJI_MIN_FONT_SIZE: f32 = 9.0;
+        pub const KAOMOJI_PADDING_X: f32 = 4.0;
         pub const SELECTION_STROKE: f32 = 2.0;
         pub const SCROLLBAR_WIDTH: f32 = 3.0;
         pub const SCROLLBAR_GUTTER: f32 = 9.0;
         pub const SCROLLBAR_MIN_LENGTH: f32 = 16.0;
         pub const PREVIEW_HEIGHT: f32 = 60.0;
         pub const PREVIEW_GLYPH_SIZE: f32 = 40.0;
+        pub const PREVIEW_KAOMOJI_FONT_SIZE: f32 = 18.0;
+        pub const PREVIEW_KAOMOJI_WIDTH: f32 = 0.45;
         pub const PREVIEW_GAP: f32 = 10.0;
         pub const NAME_FONT_SIZE: f32 = 13.0;
         pub const DETAIL_FONT_SIZE: f32 = 11.0;

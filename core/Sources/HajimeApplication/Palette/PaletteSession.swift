@@ -4,11 +4,12 @@ import HajimeDomain
 /// 開いているパレットの状態(R-26)．キーとマウスの操作を受け，窓に出す内容(PalettePanel)と入れる文字を決める．
 ///
 /// - 文字のキーは探す欄に入る．ローマ字はかなにして，打ったままの英数字とかなの両方で探す(漢字には変換しない)
-/// - 矢印でマス目を動き，Tab と ⇧Tab でまとまりを移り，⌃Tab で絵文字と記号を切り替える(PaletteKeymap)
+/// - 矢印でマス目を動き，Tab と ⇧Tab でまとまりを移り，⌃Tab で絵文字・記号・顔文字を順に切り替える(PaletteKeymap)
 /// - Enter で選んでいる文字を入れる．⇧Enter は閉じずに続けて入れる．⌥Enter で肌の色の帯を開く
 /// - Esc は肌の色の帯を閉じ，探す語を消し，最後にパレットを閉じる
 /// - マス目の並びは表の順で変えない．ピン留めとよく使う文字はその上に写しとして出し，よく使う文字は開いたときだけ作り直す
 ///   (開いているあいだに並びが変わると，覚えた位置で選べなくなるため)
+/// - 顔文字は広いマスに並べる．ピン留め・よく使う文字・探した結果には，今の種類とマスの形が同じ種類だけを出す
 @MainActor
 final class PaletteSession {
     /// 操作の結果
@@ -48,7 +49,8 @@ final class PaletteSession {
     private var query = PaletteSearch.Query(typed: "")
     private var display = ""
     private var pinnedItems: [PaletteItem] = []
-    private var frequentItems: [PaletteItem] = []
+    /// マスの形ごとのよく使う文字
+    private var frequentItems: [PaletteCellShape: [PaletteItem]] = [:]
     private var sections: [PaletteSection] = []
     private var rows: [Row] = []
     private var selection: PalettePanel.Position?
@@ -71,6 +73,16 @@ final class PaletteSession {
     private var index: PaletteIndex? { services.catalog.index }
     private var columns: Int { settings.current.paletteColumns }
     private var visibleRows: Int { settings.current.paletteRows }
+    private var shape: PaletteCellShape { kind.cellShape }
+    private var cellsPerRow: Int { cellsPerRow(for: shape) }
+
+    /// 1 行のマスの数．広いマスは列の数を DefaultSettings.paletteWideCellSpan で割った数
+    private func cellsPerRow(for shape: PaletteCellShape) -> Int {
+        switch shape {
+        case .square: columns
+        case .wide: max(columns / DefaultSettings.paletteWideCellSpan, 1)
+        }
+    }
 
     // MARK: - キー
 
@@ -107,7 +119,7 @@ final class PaletteSession {
         updateQuery()
         // 「:bow:」のように閉じたショートコードがそのまま当たれば，選ばずに入れる
         if character == ":", let pattern = query.shortcodePattern, !pattern.isEmpty, query.typed.count > 2,
-           let item = index?.catalog.items.first(where: { $0.shortcodes.contains(pattern.lowercased()) }) {
+           let item = index?.catalog.item(forShortcode: pattern) {
             return insert(item, keepsOpen: false)
         }
         rebuild()
@@ -149,7 +161,9 @@ final class PaletteSession {
         case .nextSection: return moveToSection(offset: 1)
         case .previousSection: return moveToSection(offset: -1)
         case .switchKind:
-            switchKind(to: kind == .emoji ? .symbol : .emoji)
+            let kinds = PaletteItem.Kind.allCases
+            let next = ((kinds.firstIndex(of: kind) ?? 0) + 1) % kinds.count
+            switchKind(to: kinds[next])
             return .render
         case .skinTone:
             guard let item = selectedItem, item.hasSkinTones else { return .none }
@@ -279,20 +293,25 @@ final class PaletteSession {
         rebuild()
     }
 
-    /// ピン留めとよく使う文字を作る．よく使う文字は開いたときだけ作り直す
+    /// ピン留めとよく使う文字を作る．よく使う文字は開いたときだけ，マスの形ごとに作り直す
     private func refreshShortcuts(refreshingFrequent: Bool = true) {
         guard let catalog = index?.catalog else { return }
         let usage = services.usage.usage
         pinnedItems = usage.pinned.compactMap(catalog.item(for:))
         guard refreshingFrequent else { return }
-        frequentItems = []
-        let count = settings.current.paletteFrequentRows * columns
-        guard settings.current.paletteRecordsHistory, count > 0 else { return }
+        frequentItems = [:]
+        guard settings.current.paletteRecordsHistory else { return }
         let now = services.now()
         let pinned = Set(usage.pinned)
-        var row: [String] = []
-        services.usage.update { row = $0.refreshFrequentRow(count: count, at: now, excluding: pinned) }
-        frequentItems = row.compactMap(catalog.item(for:))
+        for shape in PaletteCellShape.allCases {
+            let count = settings.current.paletteFrequentRows * cellsPerRow(for: shape)
+            guard count > 0 else { continue }
+            var row: [String] = []
+            services.usage.update {
+                row = $0.refreshFrequentRow(count: count, at: now, excluding: pinned, shape: shape) { catalog.item(for: $0)?.kind.cellShape == shape }
+            }
+            frequentItems[shape] = row.compactMap(catalog.item(for:))
+        }
     }
 
     private func updateQuery() {
@@ -323,7 +342,8 @@ final class PaletteSession {
         let previous = keepingSelection ? selection : nil
         if let index {
             if query.isEmpty {
-                sections = [PaletteSection(kind: .pinned, items: pinnedItems), PaletteSection(kind: .frequent, items: frequentItems)]
+                sections = [PaletteSection(kind: .pinned, items: pinnedItems.filter { $0.kind.cellShape == shape }),
+                            PaletteSection(kind: .frequent, items: frequentItems[shape] ?? [])]
                     + index.catalog.categories.filter { $0.kind == kind }.map { PaletteSection(kind: .category($0), items: index.catalog.items(in: $0)) }
             } else {
                 let usage = services.usage.usage
@@ -331,16 +351,17 @@ final class PaletteSession {
                     usage: settings.current.paletteRecordsHistory ? usage.scores(at: services.now()) : [:],
                     learned: settings.current.paletteRecordsHistory ? usage.learnedChoices(for: query) : [],
                     pinned: Set(usage.pinned), preferredKind: kind)
-                sections = [PaletteSection(kind: .results, items: index.search.search(query, ranking: ranking))]
+                sections = [PaletteSection(kind: .results, items: index.search.search(query, ranking: ranking, shape: shape))]
             }
             sections.removeAll { $0.items.isEmpty }
         } else {
             sections = []
         }
         rows = []
+        let perRow = cellsPerRow
         for (sectionIndex, section) in sections.enumerated() {
-            for start in stride(from: 0, to: section.items.count, by: columns) {
-                rows.append(Row(section: sectionIndex, start: start, count: min(columns, section.items.count - start)))
+            for start in stride(from: 0, to: section.items.count, by: perRow) {
+                rows.append(Row(section: sectionIndex, start: start, count: min(perRow, section.items.count - start)))
             }
         }
         if let previous, item(at: previous) != nil {
@@ -436,9 +457,9 @@ final class PaletteSession {
         return PalettePanel(
             modes: PaletteItem.Kind.allCases.map { PalettePanel.Mode(kind: $0, title: PaletteStrings.title(of: $0), isSelected: $0 == kind) },
             query: display,
-            placeholder: kind == .emoji ? PaletteStrings.emojiPlaceholder : PaletteStrings.symbolPlaceholder,
+            placeholder: PaletteStrings.placeholder(of: kind),
             tabs: tabs, heading: heading, rows: panelRows, rowCount: rows.count, firstRow: firstRow,
-            columns: columns, visibleRows: visibleRows, selection: selection,
+            columns: columns, visibleRows: visibleRows, cellsPerRow: cellsPerRow, selection: selection,
             preview: settings.current.paletteShowsPreview ? selected.map { preview(of: $0, text: cellText($0), pinned: pinned.contains($0.text)) } : nil,
             showsPreview: settings.current.paletteShowsPreview,
             skinTone: usage.defaultSkinTone,
@@ -453,14 +474,16 @@ final class PaletteSession {
     }
 
     private func preview(of item: PaletteItem, text: String, pinned: Bool) -> PalettePanel.Preview {
-        let readings = ([item.nameReading] + item.readings).filter { !$0.isEmpty }
+        // 名前と同じ読み(かなだけの名前・顔文字)は，名前と並べても同じ語が 2 度出るだけなので除く
+        let readings = ([item.nameReading] + item.readings).filter { !$0.isEmpty && $0 != item.japaneseName }
         var unique: [String] = []
         for reading in readings where !unique.contains(reading) { unique.append(reading) }
         return PalettePanel.Preview(
             text: text, japaneseName: item.japaneseName, englishName: item.englishName,
             shortcodes: item.shortcodes.map { ":\($0):" },
             readings: Array(unique.prefix(DefaultSettings.palettePreviewReadings)),
-            codePoints: text.unicodeScalars.map { "U+" + String($0.value, radix: 16, uppercase: true) }.joined(separator: " "),
+            // 顔文字は符号位置を並べても長いだけで役に立たないので出さない
+            codePoints: item.kind == .kaomoji ? "" : text.unicodeScalars.map { "U+" + String($0.value, radix: 16, uppercase: true) }.joined(separator: " "),
             isPinned: pinned)
     }
 

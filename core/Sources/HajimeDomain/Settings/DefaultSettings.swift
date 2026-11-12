@@ -334,6 +334,10 @@ public enum DefaultSettings {
     public static let maximumCorrectionRules = 2_000
     /// 直さない語の長さの上限
     public static let maximumExceptionLength = 64
+    /// 予測に表示しない語句の数の上限
+    public static let maximumHiddenPredictions = 2_000
+    /// 予測に表示しない語句の長さの上限
+    public static let maximumHiddenPredictionLength = 64
     /// 戻した補正から覚える語句の短さの下限(文字数)．これより短い文節は，読み全体を覚える
     public static let minimumRememberedPhraseLength = 2
     /// 置き換えの決まりの打った英字の長さと，置き換える語句の長さの上限
@@ -386,8 +390,9 @@ public enum DefaultSettings {
     public static let followUpPollInterval = 0.001
     /// 入力の異常(英字のキーが英字でない文字で届いたなど)を記録する間隔の下限(秒)．打つたびに記録しない
     public static let inputDiagnosticLogInterval = 60.0
-    /// 入れた入力メソッドが OS の入力ソースから外れていないかを確かめる間隔の下限(秒)．入力先が変わるたびには確かめない
-    public static let inputSourceCheckInterval = 10.0
+    /// 入れた入力メソッドが OS の入力ソースから外れていないかを確かめる間隔の下限(秒)．確かめるたびに補助のアプリを起動するので，
+    /// 入力先が変わるたびには確かめない
+    public static let inputSourceCheckInterval = 60.0
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
     /// 最新のリリースのページ．自動で更新できないとき(署名の無い開発版，確かめられない配布物，通信の失敗)にブラウザで開く．
@@ -431,6 +436,8 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// 顔文字の広いマス 1 つが占める四角いマスの数．1 行の広いマスの数は，列の数をこれで割ったもの(1 つ以上)
+    public static let paletteWideCellSpan = 3
     /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．
     /// Windows のエンジンのプロセスは書体を確かめられない(描くのは候補ウィンドウ)ので，この表でパレットに出す絵文字を絞る(R-26)．
     /// 古い順に並べる．どれにも当たらなければ先頭の版にする
@@ -449,10 +456,12 @@ public enum DefaultSettings {
     public static let palettePreviewReadings = 4
     /// 同梱のパレットの表のファイルの名前(アプリの中・Windows のインストール先に置く)
     public static let bundledPaletteFileName = "palette.tsv"
-    /// パレットの表のファイルの大きさの上限．同梱の表は 600KB ほど．壊れた大きなファイルを読み込まないため
+    /// パレットの表のファイルの大きさの上限．同梱の表は 700KB ほど．壊れた大きなファイルを読み込まないため
     public static let maximumPaletteFileBytes = 4 * 1024 * 1024
     /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える
     public static let maximumPaletteTextLength = 4
+    /// 顔文字の長さの上限(Character の数)．同梱の表の顔文字はいちばん長いもので 23 文字(tools/palette/build.py の KAOMOJI_MAX_LENGTH と同じ)
+    public static let maximumKaomojiTextLength = 32
     /// パレットで探したときに並べる項目の数の上限
     public static let maximumPaletteSearchResults = 400
     /// あいまいな照合(FuzzyMatch)の点．当たった 1 文字の点，飛ばし始めと飛ばし続けの減点，

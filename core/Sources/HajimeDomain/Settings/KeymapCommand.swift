@@ -122,6 +122,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case forgetCandidate
     /// 最後に確定した語の学習を取り消す
     case forgetLastCommit
+    /// 入力中の予測の窓に出している語句を「予測に表示しない語句」(設定)に入れ，次から予測に出さない
+    case hidePrediction
 
     // ツール
     /// 設定の画面を開く．入力メニューの操作を IME に取り次がないアプリ(cmux など)でも開けるようにする
@@ -133,6 +135,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case emojiPalette
     /// 記号のパレットを開く．開いているときは閉じる
     case symbolPalette
+    /// 顔文字のパレットを開く．開いているときは閉じる
+    case kaomojiPalette
 
     /// 設定の画面でコマンドを並べるまとまり
     public enum Group: String, Sendable, CaseIterable {
@@ -159,8 +163,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit: .commit
-        case .forgetCandidate, .forgetLastCommit: .learning
-        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette: .tools
+        case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
+        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette: .tools
         }
     }
 
@@ -170,10 +174,10 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
         // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
-             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette:
+             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
-        case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]
+        case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
         case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate,
@@ -197,6 +201,16 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .kanaStyle: .kana
         case .englishStyle: .english
         case .englishAutoStyle: .englishAuto
+        default: nil
+        }
+    }
+
+    /// パレットを開くコマンドなら，開くパレットの種類
+    public var paletteKind: PaletteItem.Kind? {
+        switch self {
+        case .emojiPalette: .emoji
+        case .symbolPalette: .symbol
+        case .kaomojiPalette: .kaomoji
         default: nil
         }
     }

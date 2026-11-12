@@ -128,6 +128,11 @@ pub mod choice {
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const SUGGESTION_DISPLAY: &str = "入力中の候補";
     pub const PREDICTION_DISPLAY: &str = "入力中の予測";
+    pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴にある予測を優先";
+    pub const PREDICTION_FROM_CORRECTION: &str = "打ち間違いを直した読みからも予測";
+    pub const HIDDEN_PREDICTIONS: &str = "予測に表示しない語句";
+    pub const HIDDEN_PREDICTION_PLACEHOLDER: &str = "語句";
+    pub const HIDDEN_PREDICTIONS_EMPTY: &str = "予測に表示しない語句はありません";
 }
 
 /// UIStrings.Features
@@ -176,6 +181,8 @@ pub mod features {
     pub const CORRECTION_KINDS: &str = "修正の対象";
     pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
     pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
+    pub const CORRECTION_KINDS_NOTE: &str =
+        "使用できない項目は、変換の「タイプミスの修正」で有効にできます。";
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
     pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";
@@ -200,8 +207,10 @@ pub mod extras {
     pub const ENGLISH_TERM_PLACEHOLDER: &str = "書き方どおりの語（例: OpenAI）";
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
-    pub const DYNAMIC_DICTIONARY: &str = "単語の {datetime:…} などを入力時の値にする";
-    pub const DYNAMIC_DICTIONARY_NOTE: &str = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。";
+    pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
+    pub const DYNAMIC_DICTIONARY_NOTE: &str = "登録する単語に次の書き方を入れておくと、変換したときにその時点の値に置き換えて入れます。単語のほかの文字はそのまま入ります。読みはローマ字（gh など）でも登録できます。";
+    pub const TEMPLATE_FILTERS: &str = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）。";
+    pub const DATE_FORMAT_SYMBOLS: &str = "日時の書式の記号: YYYY 年、MM 月、DD 日、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、GG 元号（令和）、E 元号の年。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。";
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
@@ -469,11 +478,13 @@ pub mod keys {
         ("undoConversionEdit", "直前の変更を取り消し"),
         ("forgetCandidate", "候補を学習から削除"),
         ("forgetLastCommit", "最後の学習を取り消し"),
+        ("hidePrediction", "予測に表示しない"),
         ("openSettings", "設定を開く"),
         ("toggleLiveConversion", "ライブ変換の切り替え"),
         ("handwriting", "手書き入力"),
         ("emojiPalette", "絵文字のパレット"),
         ("symbolPalette", "記号のパレット"),
+        ("kaomojiPalette", "顔文字のパレット"),
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
     ];
@@ -506,9 +517,11 @@ pub mod keys {
         ("segmentToHalfwidthKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("forgetCandidate", "選択中の候補を学習から削除します"),
         ("forgetLastCommit", "最後に確定した語句の学習を取り消します。入力した文字は削除しません"),
+        ("hidePrediction", "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"),
         ("handwriting", "「手書き入力」の設定がオンのときに使えます"),
         ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
+        ("kaomojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"),
         ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
     ];
@@ -583,6 +596,7 @@ pub mod palette {
     pub const CLEAR_HISTORY_QUESTION: &str = "使った文字の記録を消去しますか？";
     pub const EMOJI_KEY: &str = "絵文字のパレットを開くキー";
     pub const SYMBOL_KEY: &str = "記号のパレットを開くキー";
+    pub const KAOMOJI_KEY: &str = "顔文字のパレットを開くキー";
     pub const NO_KEY: &str = "なし";
     pub const CLEAR_HISTORY_NOTE: &str =
         "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。";
@@ -665,6 +679,12 @@ pub mod sync {
         ("initialFocus", "最初に選択する文節"),
         ("suggestionDisplay", "入力中の候補"),
         ("predictionDisplay", "入力中の予測"),
+        ("predictionPrefersHistory", "入力履歴にある予測を優先"),
+        ("hiddenPredictions", "予測に表示しない語句"),
+        (
+            "predictionFromCorrection",
+            "打ち間違いを直した読みからも予測",
+        ),
         ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
@@ -756,6 +776,19 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// 単語に書ける書き方(TextTemplate)と，入るもの・例．1 つずつ注記の行にする(macOS は表にして今の値を出す)
+    pub const TEMPLATE_ROWS: &[&str] = &[
+        "{date}　今日の日付（例: 2026/04/01）",
+        "{time}　今の時刻（例: 09:30）",
+        "{datetime:YYYY/MM/DD hh:mm:ss}　書式を決めた日時（例: 2026/04/01 09:30:15）",
+        "{datetime+1d:MM/DD}　日をずらした日付。-7d なら 7 日前（例: 04/02）",
+        "{uuid}　UUID。入れるたびに変わる",
+        "{random:1-6}　範囲の中の整数。入れるたびに変わる",
+        "{date|fullwidth}　| のあとの名前で変えた値（例: ２０２６／０４／０１）",
+        "{{ }}　「{」と「}」の文字そのもの",
+    ];
+    /// 単語に書ける書き方の登録の例(macOS は今の値を出す)
+    pub const TEMPLATE_EXAMPLE: &str = "例: 読み「dt」に単語「{datetime:YYYY-MM-DD hh:mm}」を登録すると、「dt」を変換したときに「2026-04-01 09:30」のような今の日時を入れます。";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)
@@ -1047,6 +1080,13 @@ pub mod limited {
         )
     }
 
+    pub fn invalid_hidden_prediction(limits: &Limits) -> String {
+        format!(
+            "予測に表示しない語句は {} 文字までにしてください",
+            limits.hidden_prediction_length
+        )
+    }
+
     pub fn invalid_english_term(limits: &Limits) -> String {
         format!(
             "語は {}〜{} 文字の英字にしてください",
@@ -1080,6 +1120,7 @@ pub enum LimitedText {
     Symbol,
     ReadingSymbol,
     EnglishTerm,
+    HiddenPrediction,
 }
 
 impl Text {
@@ -1094,6 +1135,7 @@ impl Text {
             Text::Limited(LimitedText::Symbol) => limited::invalid_symbol,
             Text::Limited(LimitedText::ReadingSymbol) => limited::invalid_reading_symbol,
             Text::Limited(LimitedText::EnglishTerm) => limited::invalid_english_term,
+            Text::Limited(LimitedText::HiddenPrediction) => limited::invalid_hidden_prediction,
         };
         make(limits).into()
     }

@@ -23,6 +23,7 @@ struct EnginePaletteTests {
         ["emoji", "people", "🙇", "0.6", "おじぎする人", "おじぎするひと", "person bowing", "おじぎ", "bow", "bow", ""],
         ["emoji", "people", "👍", "0.6", "サムズアップ", "さむずあっぷ", "thumbs up", "いいね", "good", "+1|thumbsup", ""],
         ["symbol", "arrows", "→", "", "右向矢印", "みぎむきやじるし", "rightwards arrow", "やじるし", "arrow", "", ""],
+        ["kaomoji", "greeting", "m(_ _)m", "", "ぺこり", "ぺこり", "", "ぺこり|おじぎ", "", "", ""],
     ].map { $0.joined(separator: "\t") }.joined(separator: "\n")
 
     init() {
@@ -183,6 +184,23 @@ struct EnginePaletteTests {
         let other = connect()
         #expect(service.handle(WireRequest(id: 43, body: .openPalette(session: session, context: Self.field)), from: other).body == .error(code: .unknownSession))
         #expect(shownPanel == nil)
+    }
+
+    @Test("R-26: 顔文字に切り替えると，1 行の広いマスの数を添えて送る．四角いマスなら省く")
+    func kaomoji() throws {
+        let id = connect()
+        let session = try open(id)
+        let window = connect(isCandidateWindow: true)
+        _ = openPalette(session: session, from: id)
+        #expect(shownPanel?.cellsPerRow == nil)
+        #expect(shownPanel?.modes.map(\.kind) == [.emoji, .symbol, .kaomoji])
+        #expect(service.handle(WireRequest(id: 10, body: .choosePalette(target: .mode(kind: .kaomoji))), from: window).body == .done)
+        _ = service.handle(WireRequest(id: 11, body: .wake(session: session, context: Self.field)), from: id)
+        let panel = try #require(shownPanel)
+        #expect(panel.modes.first { $0.isSelected }?.kind == .kaomoji)
+        #expect(panel.columns == UInt32(DefaultSettings.paletteColumns))
+        #expect(panel.cellsPerRow == UInt32(DefaultSettings.paletteColumns / DefaultSettings.paletteWideCellSpan))
+        #expect(panel.rows.first?.cells.map(\.text) == ["m(_ _)m"])
     }
 
     @Test("R-26: セッションを閉じたら，そのセッションが出していたパレットを閉じる")

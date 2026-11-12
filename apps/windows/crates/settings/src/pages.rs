@@ -159,6 +159,8 @@ impl Page {
                 menu::LIVE_CONVERSION,
                 choice::PRESENTATION,
                 choice::INITIAL_FOCUS,
+                choice::PREDICTION_DISPLAY,
+                choice::HIDDEN_PREDICTIONS,
                 features::OKURIGANA,
                 features::PREFERS_KATAKANA,
                 features::CALCULATION,
@@ -265,6 +267,8 @@ pub enum Condition {
     IsNot(&'static str, &'static str),
     /// オン・オフの項目がオンのとき
     On(&'static str),
+    /// すべての条件を満たすとき
+    All(&'static [Condition]),
 }
 
 /// カスタムテーマの書体の欄(macOS の ThemeFontPicker)
@@ -353,6 +357,7 @@ pub enum LimitKind {
     Commands,
     Macros,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 impl LimitKind {
@@ -367,6 +372,7 @@ impl LimitKind {
             LimitKind::Commands => catalog.limits.commands,
             LimitKind::Macros => catalog.limits.macros,
             LimitKind::EnglishTerms => catalog.limits.english_terms,
+            LimitKind::HiddenPredictions => catalog.limits.hidden_predictions,
         }
     }
 }
@@ -534,6 +540,7 @@ fn list_files(control: &Control) -> Option<ListFiles> {
             "wordLanguage.englishWords" => ListFiles::rule_list(RuleList::EnglishWords),
             "wordLanguage.japaneseWords" => ListFiles::rule_list(RuleList::JapaneseWords),
             "englishTerms" => ListFiles::rule_list(RuleList::EnglishTerms),
+            "hiddenPredictions" => ListFiles::rule_list(RuleList::HiddenPredictions),
             "profileRules" => ListFiles {
                 import: FileTask::ImportProfileRules,
                 export: FileTask::ExportProfileRules,
@@ -997,6 +1004,16 @@ fn conversion() -> Vec<Section> {
                     "predictionDisplay",
                     options::SUGGESTION_DISPLAY,
                 ),
+                Row::toggle(
+                    choice::PREDICTION_PREFERS_HISTORY,
+                    "predictionPrefersHistory",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
+                Row::toggle(
+                    choice::PREDICTION_FROM_CORRECTION,
+                    "predictionFromCorrection",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
                 Row::seconds(
@@ -1012,6 +1029,22 @@ fn conversion() -> Vec<Section> {
                 )
                 .enabled_when(On("liveConversion")),
             ],
+        ),
+        Section::new(
+            choice::HIDDEN_PREDICTIONS,
+            vec![Row::list(
+                ListSpec {
+                    path: "hiddenPredictions",
+                    fields: HIDDEN_PREDICTION_FIELDS,
+                    empty: choice::HIDDEN_PREDICTIONS_EMPTY,
+                    invalid: crate::strings::Text::Limited(
+                        crate::strings::LimitedText::HiddenPrediction,
+                    ),
+                    lowercase: false,
+                    exclusive_with: None,
+                },
+                LimitKind::HiddenPredictions,
+            )],
         ),
         Section::new(
             more::CANDIDATES,
@@ -1192,6 +1225,7 @@ const CORRECTION_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::REPLACEMENT, false),
 ];
 const EXCEPTION_FIELDS: &[Field] = &[Field::text(features::EXCEPTION_PLACEHOLDER)];
+const HIDDEN_PREDICTION_FIELDS: &[Field] = &[Field::text(choice::HIDDEN_PREDICTION_PLACEHOLDER)];
 const ROMAJI_FIELDS: &[Field] = &[
     Field::named("keys", settings::ROMAJI_KEYS, true),
     Field::named("kana", settings::ROMAJI_KANA, false),
@@ -1214,6 +1248,12 @@ const LANGUAGE_RULE_FIELDS: &[Field] = &[
     ),
 ];
 
+/// 日本語のタイプミスを直すとき．修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く
+const CORRECTS_JAPANESE: Condition = Condition::All(&[
+    Condition::Is("typoCorrection", "standard"),
+    Condition::On("correction.japanese"),
+]);
+
 /// 補正のページ(macOS の CorrectionPage)
 fn correction() -> Vec<Section> {
     use Condition::*;
@@ -1221,10 +1261,14 @@ fn correction() -> Vec<Section> {
         Section::new(
             features::CORRECTION_KINDS,
             vec![
-                Row::toggle(features::CORRECTS_ENGLISH, "correction.english"),
-                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese"),
+                Row::toggle(features::CORRECTS_ENGLISH, "correction.english")
+                    .enabled_when(IsNot("typoCorrection", "off")),
+                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese")
+                    .enabled_when(Is("typoCorrection", "standard")),
                 Row::toggle(features::CORRECTS_REPEATED_KEYS, "correction.repeatedKeys")
-                    .enabled_when(On("correction.japanese")),
+                    .enabled_when(CORRECTS_JAPANESE),
+                Row::note(features::CORRECTION_KINDS_NOTE)
+                    .visible_when(IsNot("typoCorrection", "standard")),
                 Row::toggle(features::MISREADINGS, "misreadings"),
                 Row::toggle(extras::LOOSE_READINGS, "looseReadings"),
                 Row::note(extras::LOOSE_READINGS_NOTE),
@@ -1235,7 +1279,7 @@ fn correction() -> Vec<Section> {
         Section {
             title: None,
             rows: vec![Row::toggle(extras::HAND_SHIFT, "handShiftCorrection")
-                .enabled_when(On("correction.japanese"))],
+                .enabled_when(CORRECTS_JAPANESE)],
             footer: Some(extras::HAND_SHIFT_NOTE),
             footer_variants: &[],
         },
@@ -1522,10 +1566,21 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            rows: vec![
-                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary").visible_when(words())
-            ],
-            footer: Some(extras::DYNAMIC_DICTIONARY_NOTE),
+            // 書き方を 1 つずつ注記の行にして並べ，最後に登録の例を置く(macOS の書き方の表と同じ中身)
+            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
+                .chain(std::iter::once(Row::note(extras::DYNAMIC_DICTIONARY_NOTE)))
+                .chain(
+                    crate::strings::windows::TEMPLATE_ROWS
+                        .iter()
+                        .map(|text| Row::note(text)),
+                )
+                .chain(std::iter::once(Row::note(extras::TEMPLATE_FILTERS)))
+                .chain(std::iter::once(Row::note(
+                    crate::strings::windows::TEMPLATE_EXAMPLE,
+                )))
+                .map(|row| row.visible_when(words()))
+                .collect(),
+            footer: Some(extras::DATE_FORMAT_SYMBOLS),
             footer_variants: &[],
         },
         Section {
@@ -1592,6 +1647,12 @@ fn palette_page() -> Vec<Section> {
                     palette::SYMBOL_KEY,
                     "",
                     Control::Info(Info::PaletteKeys("symbolPalette")),
+                )
+                .enabled_when(On("palette")),
+                Row::new(
+                    palette::KAOMOJI_KEY,
+                    "",
+                    Control::Info(Info::PaletteKeys("kaomojiPalette")),
                 )
                 .enabled_when(On("palette")),
                 Row::toggle(palette::CLOSES_AFTER_INSERT, "paletteClosesAfterInsert")
@@ -1946,11 +2007,21 @@ pub fn holds(
     text: impl Fn(&str) -> String,
     on: impl Fn(&str) -> bool,
 ) -> bool {
-    match condition {
-        Condition::Is(path, value) => text(path) == value,
-        Condition::IsNot(path, value) => text(path) != value,
-        Condition::On(path) => on(path),
+    fn check(
+        condition: Condition,
+        text: &dyn Fn(&str) -> String,
+        on: &dyn Fn(&str) -> bool,
+    ) -> bool {
+        match condition {
+            Condition::Is(path, value) => text(path) == value,
+            Condition::IsNot(path, value) => text(path) != value,
+            Condition::On(path) => on(path),
+            Condition::All(conditions) => conditions
+                .iter()
+                .all(|condition| check(*condition, text, on)),
+        }
     }
+    check(condition, &text, &on)
 }
 
 #[cfg(test)]
@@ -2005,6 +2076,43 @@ mod tests {
         assert!(holds(Condition::Is("inputStyle", "english"), text, on));
         assert!(!holds(Condition::IsNot("inputStyle", "english"), text, on));
         assert!(!holds(Condition::On("showsModeIndicator"), text, on));
+        let both = Condition::All(&[
+            Condition::Is("inputStyle", "english"),
+            Condition::On("liveConversion"),
+        ]);
+        assert!(!holds(both, text, on));
+        assert!(holds(both, text, |_: &str| true));
+    }
+
+    #[test]
+    fn 修正の対象はタイプミスの修正で選んだ範囲でだけ使える() {
+        let rows: Vec<Row> = sections(Page::Correction)
+            .unwrap()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .collect();
+        let enabled = |path: &str, level: &str, japanese: bool| {
+            let row = rows.iter().find(|row| row.path == path).unwrap();
+            row.enabled.is_none_or(|condition| {
+                holds(
+                    condition,
+                    |path| {
+                        if path == "typoCorrection" {
+                            level.to_string()
+                        } else {
+                            String::new()
+                        }
+                    },
+                    |path| path != "correction.japanese" || japanese,
+                )
+            })
+        };
+        assert!(enabled("correction.english", "conservative", true));
+        assert!(!enabled("correction.english", "off", true));
+        assert!(!enabled("correction.japanese", "conservative", true));
+        assert!(enabled("correction.repeatedKeys", "standard", true));
+        assert!(!enabled("correction.repeatedKeys", "standard", false));
+        assert!(!enabled("handShiftCorrection", "conservative", true));
     }
 
     #[test]

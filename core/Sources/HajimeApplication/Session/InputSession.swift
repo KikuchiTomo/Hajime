@@ -76,6 +76,9 @@ public final class InputSession {
     private var settledLive: (candidate: Candidate, reading: String)?
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
+    /// 読みの先頭の「:」から打ったキー(「:bow」)．「:」で閉じたショートコードを絵文字にするのに使う(R-26)．
+    /// 打ったキーと読みが対応しなくなったら(文字のキー以外を押したら)nil にする
+    private var typedShortcode: String?
     /// Space で変換したときに，まだ求め終わっていなかった訂正のキーの並びと左の文脈．
     /// 訂正が届いたら applyLateCorrections で変換を直す．次のキーが来たら捨てる
     private var lateCorrection: (keys: [String], leftContext: String?)?
@@ -139,6 +142,7 @@ public final class InputSession {
     private let usage: (any UsageRecording)?
     /// 戻した補正を覚えるところ．無ければ覚えない
     private let rejections: (any CorrectionRejectionRecording)?
+    private let predictionHiding: (any PredictionHiding)?
     /// 連想変換の語を引く(R-18)
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
@@ -156,9 +160,10 @@ public final class InputSession {
     ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
-                rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil,
-                palette: PaletteServices? = nil) {
+                rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
+                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil) {
         self.paletteServices = palette
+        self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
         self.rejections = rejections
@@ -350,9 +355,9 @@ public final class InputSession {
                 return rerender(context: context)
             }
             return fills + [preview]
-        case .composing where predictionsShown && suggestionPredictions?.reading != suggestionTarget().reading:
+        case .composing where predictionsShown && suggestionPredictions?.reading != predictionTarget().reading:
             let reading = composition.conversionReading
-            let target = suggestionTarget().reading
+            let target = predictionTarget().reading
             return [{ [self] in
                 guard phase == .composing, composition.conversionReading == reading else { return [] }
                 suggestionPredictions = (target, converter.predictions(for: target))
@@ -534,6 +539,9 @@ public final class InputSession {
     /// 6. 入力方式ごとの処理(EN 入力・かな入力)
     /// 7. ローマ字入力と共通の処理．文字は読みに足し，表に無いほかのキーは，組み立て中なら何もせず，組み立てていなければアプリに渡す
     private func routeJapanese(_ event: KeyEvent, command: KeymapCommand?, context: InputContext) -> KeyResult {
+        // 文字のキー以外(⌫ など)を押したら，打ったキーと読みが対応しなくなるので，ショートコードを追うのをやめる
+        let typesCharacter = if case .character = event.key { command == nil } else { false }
+        if !typesCharacter { typedShortcode = nil }
         if context.profile == .terminal, settings.current.terminalCommands, let result = applyTerminal(event) {
             return result
         }
@@ -586,7 +594,7 @@ public final class InputSession {
         // 手書き入力は設定でオンにしたときだけ
         if command == .handwriting, !settings.current.handwriting { return nil }
         // パレットは設定でオンにしていて，アプリがパレットを描けるときだけ(描けないのに開くと，キーを受けたまま何も見せなくなる)
-        if command == .emojiPalette || command == .symbolPalette, !settings.current.palette || paletteServices == nil { return nil }
+        if command.paletteKind != nil, !settings.current.palette || paletteServices == nil { return nil }
         return command
     }
 
@@ -633,10 +641,9 @@ public final class InputSession {
     private func handlePalette(_ event: KeyEvent, palette: PaletteSession, context: InputContext) -> KeyResult {
         if let command = lookUp(event) {
             switch command {
-            case .emojiPalette, .symbolPalette:
-                // 開いている種類のキーで閉じ，もう一方のキーで切り替える
-                let kind: PaletteItem.Kind = command == .emojiPalette ? .emoji : .symbol
-                guard palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
+            case .emojiPalette, .symbolPalette, .kaomojiPalette:
+                // 開いている種類のキーで閉じ，ほかの種類のキーで切り替える
+                guard let kind = command.paletteKind, palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
                 return KeyResult(handled: true, actions: paletteActions(palette.perform(.mode(kind)), palette: palette))
             case _ where command.changesMode:
                 // 日本語入力と英数入力の切り替えは効かせ，探す欄の見せ方を合わせる
@@ -682,6 +689,7 @@ public final class InputSession {
         case .handwriting: return KeyResult(handled: true, actions: commitAll() + [.showHandwriting])
         case .emojiPalette: return KeyResult(handled: true, actions: openPalette(.emoji))
         case .symbolPalette: return KeyResult(handled: true, actions: openPalette(.symbol))
+        case .kaomojiPalette: return KeyResult(handled: true, actions: openPalette(.kaomoji))
         // 入力モード
         case .japaneseMode: return switchMode(to: .japanese)
         case .directMode: return switchMode(to: .direct)
@@ -798,6 +806,11 @@ public final class InputSession {
                 break
             }
             return KeyResult(handled: true, actions: render(context: context))
+        case .hidePrediction:
+            // 予測の窓に出している語句を「予測に表示しない語句」に入れ，次の予測に替える
+            guard phase == .composing, let shown = shownPrediction, shown.reading == composition.conversionReading,
+                  predictionHiding?.hide(shown.prediction.text) == true else { return KeyResult(handled: true) }
+            return KeyResult(handled: true, actions: render(context: context) + [.showNote(PanelBuilder.predictionHiddenNote(shown.prediction.text))])
         case .forgetLastCommit:
             guard converter.forgetLastCommit() else { return KeyResult(handled: true) }
             showsTransientNote = true
@@ -959,7 +972,43 @@ public final class InputSession {
         return KeyResult(handled: true, actions: render(context: context))
     }
 
+    /// 文字を読みに足す．「:bow:」のように読みの先頭の「:」から打ったショートコードを「:」で閉じたら，読みに替えて絵文字を確定する(R-26)
     private func insertCharacter(_ character: Character, context: InputContext) -> KeyResult {
+        let tracked = phase == .composing ? typedShortcode : nil
+        typedShortcode = nil
+        if character == ":", let tracked, let emoji = shortcodeEmoji(String(tracked.dropFirst())) {
+            return KeyResult(handled: true, actions: reset() + [.commit(emoji)])
+        }
+        let startsShortcode = character == ":" && !isComposing && shortcodeInputAvailable
+        let result = insertComposedCharacter(character, context: context)
+        guard isComposing, phase == .composing else { return result }
+        if startsShortcode {
+            typedShortcode = ":"
+        } else if let tracked, PaletteSearch.Query.isShortcodeCharacter(character) {
+            typedShortcode = tracked + String(character)
+        }
+        return result
+    }
+
+    /// 打っているショートコードを絵文字にできるか．パレットを使う設定で，ローマ字入力のときだけ
+    /// (かな入力の「:」のキーは「け」，EN 入力は英字をそのまま入れる)
+    private var shortcodeInputAvailable: Bool {
+        settings.current.palette && settings.current.inputStyle == .romaji && paletteServices?.catalog.index != nil
+    }
+
+    /// ショートコード(「bow」)の絵文字を，既定の肌の色にして返す．使った記録も残す．無ければ nil
+    private func shortcodeEmoji(_ name: String) -> String? {
+        guard shortcodeInputAvailable, !name.isEmpty, let paletteServices, let index = paletteServices.catalog.index,
+              let item = index.catalog.item(forShortcode: name) else { return nil }
+        let usage = paletteServices.usage
+        if settings.current.paletteRecordsHistory {
+            let now = paletteServices.now()
+            usage.update { $0.record(item.text, at: now) }
+        }
+        return item.text(skinTone: usage.usage.effectiveSkinTone(for: item.text))
+    }
+
+    private func insertComposedCharacter(_ character: Character, context: InputContext) -> KeyResult {
         var actions: [ClientAction] = []
         if case .selecting = phase, let number = numberKey(character) {
             // 候補を選んでいるときの番号キーは，その候補を確定する．その番号の候補が無ければ何もしない(打ち損じで確定しない)
@@ -1437,6 +1486,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         conversionHistory.clear()
+        typedShortcode = nil
         heldReading = nil
         convertedFromEnglish = nil
         typedBeforeEnglishWord = nil
@@ -1605,8 +1655,19 @@ public final class InputSession {
     /// 今の読みで候補を求めるか
     private var suggestionsShown: Bool { suggestionsEnabled && readingIsSettled }
 
-    /// 今の読みで続く語句の予測を求めるか
-    private var predictionsShown: Bool { showsPredictions && readingIsLongEnough && readingIsSettled }
+    /// 今の読みで続く語句の予測を求めるか．打ち間違いを直して見せているときと「もしかして」と示しているときは，
+    /// 直した読みから予測する設定(predictionFromCorrection)のときだけ求める
+    private var predictionsShown: Bool {
+        showsPredictions && readingIsLongEnough && readingIsSettled
+            && (settings.current.predictionFromCorrection || (!readingCorrector.isApplied && readingCorrector.suggestion == nil))
+    }
+
+    /// 続く語句の予測を求める読みと，その前に置く文節．「もしかして」と示しているときは，示した読み全体から予測する．
+    /// ほかは入力中の候補と同じ(打ち間違いを直して見せているときは直した読み)
+    private func predictionTarget() -> (reading: String, prefix: SuggestionPrefix?) {
+        if let suggested = readingCorrector.suggestion { return (suggested.conversionReading, nil) }
+        return suggestionTarget()
+    }
 
     /// 打っているあいだの候補を求める読みと，その前に置く文節．ライブ変換で文が見えているときは，文全体の候補を並べても
     /// 頭が同じ文ばかりで見分けられないので，今打っている最後の文節の候補を出す(その前の文節は見えている変換のまま)．
@@ -1664,26 +1725,34 @@ public final class InputSession {
         var candidate: Candidate
     }
 
-    /// 予測の窓に出す予測．出さない設定，読みが短いとき，「もしかして」を示しているときと英単語を直しているとき(確定のキーをそちらに使う)，
+    /// 予測の窓に出す予測．出さない設定，読みが短いとき，英単語を直しているとき(確定のキーをそちらに使う)，
     /// 確定のキーが無いとき，予測をまだ求めていないときは nil．変換の候補と同じ語句は出さない(予測ではないため)．
     /// 予測した語句のうち，見えている字・ひらがなとカタカナの読み・変換の候補のどれかと頭が重なる部分を打った部分にし，残りを補う部分にする
-    /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)
+    /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)．
+    /// 確定した履歴(学習)にある語句を先に出す設定なら，それを先に選ぶ．
+    /// 「もしかして」と示しているときは示した読みから予測し，確定のキーは添えない(キーはまず読みを直す．直すと添える)．
+    /// 設定の「予測に表示しない語句」にある語句は出さない
     private func makePrediction(marked: MarkedText) -> ShownPrediction? {
-        guard predictionsShown, readingCorrector.suggestion == nil, corrector.active == nil,
+        guard predictionsShown, corrector.active == nil,
             let key = keyLabel(.acceptSuggestion, in: .composing) else { return nil }
-        let (reading, prefix) = suggestionTarget()
+        let (reading, prefix) = predictionTarget()
         guard let stored = suggestionPredictions, stored.reading == reading else { return nil }
+        let suggesting = readingCorrector.suggestion != nil
         let conversions = conversionCandidates(for: reading, prefix: prefix).map(\.text)
-        let shown = String(marked.text.dropFirst(prefix?.text.count ?? 0))
+        // 示しているだけの読みは組み立て中の文字に見えていないので，見えている字とは比べない
+        let shown = suggesting ? reading : String(marked.text.dropFirst(prefix?.text.count ?? 0))
         let typedForms = ([shown, reading, KanaWidth.katakana(from: reading)] + conversions).map(Array.init)
         let whole = composition.conversionReading
-        for candidate in stored.candidates where candidate.commandID == nil && !conversions.contains(candidate.text) {
+        let ordered = settings.current.predictionPrefersHistory
+            ? stored.candidates.filter(\.isLearned) + stored.candidates.filter { !$0.isLearned } : stored.candidates
+        for candidate in ordered where candidate.commandID == nil && !conversions.contains(candidate.text)
+            && !settings.current.hiddenPredictions.contains(candidate.text) {
             let characters = Array(candidate.text)
             let typedCount = typedForms.map { form in zip(characters, form).prefix { $0 == $1 }.count }.max() ?? 0
             // 見えている字と同じなら，補うものが無い
             guard typedCount < characters.count else { continue }
             let prediction = Prediction(typed: String(characters[..<typedCount]), completion: String(characters[typedCount...]),
-                                        key: settings.current.showsKeyHints ? key : nil)
+                                        key: settings.current.showsKeyHints && !suggesting ? key : nil)
             let committed = prefix.map { $0.joined(with: candidate, readingCount: whole.count) } ?? candidate
             return ShownPrediction(prediction: prediction, reading: whole, candidate: committed)
         }

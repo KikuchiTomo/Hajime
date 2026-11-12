@@ -29,6 +29,18 @@ struct RuleListTests {
         #expect(RuleList.englishWords.rows(in: settings).contains(RuleListRow(key: "swift", value: "")))
     }
 
+    @Test("予測に表示しない語句は 1 列で，書き方どおりに比べる．長すぎる語句と重なる語句は足さず，読むときも除く")
+    func hiddenPredictions() {
+        var settings = Settings()
+        let long = String(repeating: "あ", count: DefaultSettings.maximumHiddenPredictionLength + 1)
+        #expect(RuleList.hiddenPredictions.merge(rows([("エピソード", ""), (" GitHub ", ""), (long, ""), ("エピソード", "")]), into: &settings) == 3)
+        #expect(settings.hiddenPredictions == ["エピソード", "GitHub"])
+        #expect(RuleList.hiddenPredictions.rows(in: settings) == rows([("エピソード", ""), ("GitHub", "")]))
+        settings.hiddenPredictions += ["GitHub", long, "a\tb"]
+        settings.clampToValidRanges()
+        #expect(settings.hiddenPredictions == ["エピソード", "GitHub"])
+    }
+
     @Test("ローマ字の綴り")
     func romaji() {
         var settings = Settings()

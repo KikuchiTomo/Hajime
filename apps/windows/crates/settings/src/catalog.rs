@@ -84,6 +84,8 @@ pub struct Limits {
     pub english_terms: usize,
     pub english_term_minimum: usize,
     pub english_term_maximum: usize,
+    pub hidden_predictions: usize,
+    pub hidden_prediction_length: usize,
 }
 
 /// 設定の画面がエンジンを待つ時間(秒)

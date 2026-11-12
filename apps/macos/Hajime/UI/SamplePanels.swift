@@ -153,6 +153,22 @@ enum SamplePalettes {
             showsPreview: true, skinTone: .none, skinTonePicker: .init(options: options, selected: 2), message: nil, hints: hints)
     }()
 
+    /// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
+    static let kaomoji: PalettePanel = {
+        let texts = [["(^o^)", "m(_ _)m", "(´・ω・｀)"], ["＼(^o^)／", "(^o^)", "(^^)"], ["(*^^*)", "^_^", ":D"], ["・ω・", "(*´ω｀*)", "(^O^)"],
+                     ["(^_^)", "(・∀・)", "(*^_^*)"], ["ヾ(｡>﹏<｡)ﾉﾞ✧*。", "(((((((((((っ･ω･)っ ﾌﾞｰﾝ", "(*´∀｀*)"]]
+        let titles = [PaletteStrings.frequent] + Array(repeating: PaletteCategory.joy.title, count: 5)
+        let tabs: [PalettePanel.Tab] = [.init(section: .frequent, title: PaletteStrings.frequent, symbol: PaletteStrings.frequentSymbol, isSelected: false)]
+            + PaletteCategory.allCases.filter { $0.kind == .kaomoji }.map { .init(section: .category($0), title: $0.title, symbol: $0.symbol, isSelected: $0 == .joy) }
+        return PalettePanel(
+            modes: modes(.kaomoji), query: "", placeholder: PaletteStrings.kaomojiPlaceholder, tabs: tabs, heading: PaletteStrings.frequent,
+            rows: rows(texts, titles: titles, starts: [0, 1]), rowCount: 48, firstRow: 0, columns: 9, visibleRows: 6, cellsPerRow: 3,
+            selection: .init(row: 0, column: 2),
+            preview: .init(text: "(´・ω・｀)", japaneseName: "しょぼーん", englishName: "", shortcodes: [],
+                           readings: ["しょんぼり", "がっかり"], codePoints: "", isPinned: false),
+            showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
+    }()
+
     /// 記号のパレット．ピン留めの行の下に矢印のまとまり
     static let symbol: PalettePanel = {
         let titles = [PaletteStrings.pinned] + Array(repeating: PaletteCategory.arrows.title, count: 5)

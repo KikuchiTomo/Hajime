@@ -295,12 +295,17 @@ enum DesignTokens {
             static let cellRadius: CGFloat = 6
             static let emojiScale: CGFloat = 0.7
             static let symbolScale: CGFloat = 0.55
+            static let kaomojiScale: CGFloat = 0.4
+            static let kaomojiMinFontSize: CGFloat = 9
+            static let kaomojiPaddingX: CGFloat = 4
             static let selectionStroke: CGFloat = 2
             static let scrollbarWidth: CGFloat = 3
             static let scrollbarGutter: CGFloat = 9
             static let scrollbarMinLength: CGFloat = 16
             static let previewHeight: CGFloat = 60
             static let previewGlyphSize: CGFloat = 40
+            static let previewKaomojiFontSize: CGFloat = 18
+            static let previewKaomojiWidth: CGFloat = 0.45
             static let previewGap: CGFloat = 10
             static let nameFontSize: CGFloat = 13
             static let detailFontSize: CGFloat = 11

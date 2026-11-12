@@ -146,7 +146,7 @@ func run() -> Int32 {
         return 1
     }
     engine.apply(settings.current)
-    let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
+    let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), settings: settings)
     let calendar = SystemCalendar(clock: { Date() })
     let dictionaries = ImportedDictionaryStore(directory: HostPaths.local.appendingPathComponent("dictionaries", isDirectory: true))
     let associations = AssociationDictionaryStore(
@@ -199,6 +199,8 @@ func run() -> Int32 {
                                       lexicon: lexicon, settings: settings)
     // 戻した補正を設定の「直さない語句」に覚える(macOS の CompositionRoot と同じ)
     let rejections = SettingsCorrectionRejections(settings: settings)
+    // 予測に出した語句を設定の「予測に表示しない語句」に入れる(macOS の CompositionRoot と同じ)
+    let predictionHiding = SettingsPredictionHiding(settings: settings)
     // 絵文字と記号のパレット(R-26)．描くのは Windows の候補ウィンドウだけ(Linux のアドオンはパレットを描かないので渡さない)．
     // エンジンのプロセスは書体を確かめられないので，Windows のビルド番号から描ける絵文字のバージョンを決める
     #if os(Windows)
@@ -218,7 +220,8 @@ func run() -> Int32 {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                           lexicon: lexicon, englishTerms: englishTerms),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                         keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary, palette: palette)
+                         keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                         palette: palette)
         },
         settings: settings,
         ui: sendToWindow,
