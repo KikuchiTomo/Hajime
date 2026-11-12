@@ -273,6 +273,10 @@ enum UIStrings {
         /// 品詞の列が無い・知らない品詞の行に添えるツールチップ
         static let defaultedHelp = "品詞が無いため名詞として登録します"
         static let unreadableHelp = "読めないため取り込みません"
+        /// 表の行の読み上げ(行の番号・列の値・意味を「、」でつなぐ)
+        static func row(line: Int, values: [String]) -> String {
+            (["\(line.formatted()) 行目"] + values).joined(separator: "、")
+        }
         static func format(_ format: HajimeDomain.ImportPreview.Format) -> String {
             switch format {
             case .tabSeparated: "タブ区切り"
