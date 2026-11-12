@@ -172,6 +172,73 @@
   }
 }
 
+/* ヒーローの下の大きな画面の写真 */
+.hajime-showcase {
+  margin-top: 3rem;
+}
+
+.hajime-showcase img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+
+.hajime-features__title,
+.hajime-catalog__title {
+  margin-top: 4rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/*
+ * 画像を付けない機能の一覧．分類ごとに，名前と 1〜2 文の説明を格子に並べる
+ */
+.hajime-catalog {
+  width: 100%;
+  margin-top: 2rem;
+}
+
+.hajime-catalog__group {
+  margin-top: 2.5rem;
+}
+
+.hajime-catalog__group-title {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--hajime-rule);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.hajime-catalog__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1.5rem 2rem;
+  margin-top: 1.25rem;
+}
+
+.hajime-catalog__name {
+  font-weight: 600;
+}
+
+.hajime-catalog__name a {
+  text-decoration: underline;
+  text-decoration-color: var(--hajime-rule);
+  text-underline-offset: 3px;
+}
+
+.hajime-catalog__name a:hover {
+  text-decoration-color: currentColor;
+}
+
+.hajime-catalog__text {
+  margin-top: 0.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  opacity: 0.8;
+}
+
 .hajime-download__version {
   margin-left: 0.5em;
   font-size: 0.8125rem;
