@@ -46,8 +46,8 @@ struct DictionaryPage: View {
     }
 }
 
-/// 専門用語の辞書(R-29)．使うかと，分野ごとのオン・オフ．既定はすべて使う
-private struct TermDictionaryView: View {
+/// 専門用語の辞書(R-29)．使うかと，分野ごとのオン・オフ．既定はすべて使う(見本の画像にも写す．SnapshotRenderer)
+struct TermDictionaryView: View {
     @ObservedObject var model: SettingsModel
 
     /// 分野と設定の項目(並びは TermField.allCases と同じ)

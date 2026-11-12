@@ -1596,7 +1596,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## hajime-dictionary(Mozc の辞書 dictionary_oss の語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-かな漢字変換の辞書として，hajime-dictionary v0.4.0 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
+かな漢字変換の辞書として，hajime-dictionary v0.5.0 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
 Wikidata: https://www.wikidata.org/
 品詞の番号の対応には，mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使用しています．
 同音異義語の使い分けの辞書(data/usage/usage_dict_extra.tsv)と，語の意味の辞書(data/usage/usage_dict_words.tsv)の読みと表記も，同じ dictionary_oss から抜き出しています．この 2 つと data/usage/usage_dict.txt の品詞の列も，dictionary_oss の品詞から付けています．
@@ -1687,7 +1687,7 @@ Public Domain Dataです。使用・変更・配布に関しては一切の制�
 ## hajime-dictionary(Mozc UT 辞書の語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-hajime-dictionary v0.4.0 には，Mozc UT 辞書(作者: UTUMI Hirosi．https://github.com/utuhiro78)の次の 6 つから選んだ語の読みと表記を追加しています．品詞と出やすさは hajime-dictionary で決めています．
+hajime-dictionary v0.5.0 には，Mozc UT 辞書(作者: UTUMI Hirosi．https://github.com/utuhiro78)の次の 6 つから選んだ語の読みと表記を追加しています．品詞と出やすさは hajime-dictionary で決めています．
 mozcdic-ut-sudachidict(コミット 13129ddebe1cb8eabb63feccbe157adec4e1de01): SudachiDict の名詞から作られた辞書．Apache License 2.0(下の SudachiDict の節)
 mozcdic-ut-neologd(コミット d8307abf02b830b185c9320822cffa0d0787c54e): mecab-ipadic-NEologd の名詞から作られた辞書．Apache License 2.0(下の mecab-ipadic-NEologd の節)
 mozcdic-ut-personal-names(コミット 3da38e0187c5db754c420a5733ae95640652323c): 人名の辞書．Apache License 2.0
@@ -1699,7 +1699,7 @@ Apache License 2.0 の全文は LICENSES/Apache-2.0.txt にあります．
 ## hajime-dictionary(NEologd と SudachiDict の元のデータの語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-hajime-dictionary v0.4.0 には，mecab-ipadic-NEologd の元のデータ(seed．コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)の固有名詞・一般名詞・形容詞・副詞・表記の揺れと，SudachiDict の元のデータ(20261015 の small_lex・core_lex・notcore_lex)の名詞から選んだ語を追加しています．どちらも Apache License 2.0 で，それぞれ下の mecab-ipadic-NEologd と SudachiDict の節の条件に従います．
+hajime-dictionary v0.5.0 には，mecab-ipadic-NEologd の元のデータ(seed．コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)の固有名詞・一般名詞・形容詞・副詞・表記の揺れと，SudachiDict の元のデータ(20261015 の small_lex・core_lex・notcore_lex)の名詞から選んだ語を追加しています．どちらも Apache License 2.0 で，それぞれ下の mecab-ipadic-NEologd と SudachiDict の節の条件に従います．
 
 ## hajime-dictionary(専門用語の辞書)
 
@@ -1710,12 +1710,12 @@ Wikidata(https://www.wikidata.org/)の分野ごとのクラスの項目の日本
 
 ## hajime-dictionary の配布の条件(CC BY-SA 4.0)
 
-hajime-dictionary v0.4.0 は CC BY-SA 4.0 の語(ウィキペディアの見出しと EDICT2．v0.5.0 からは JMdict も)を含むので，辞書の全体を CC BY-SA 4.0(https://creativecommons.org/licenses/by-sa/4.0/legalcode)の条件で配布しています．辞書は Hajime IME のプログラムとは別のファイルとして同梱しています．辞書を作り変えて配布するときも，同じ条件で配布してください．全文は辞書の LICENSES/CC-BY-SA-4.0.txt にあります．
+hajime-dictionary v0.5.0 は CC BY-SA 4.0 の語(ウィキペディアの見出し・EDICT2・JMdict)を含むので，辞書の全体を CC BY-SA 4.0(https://creativecommons.org/licenses/by-sa/4.0/legalcode)の条件で配布しています．辞書は Hajime IME のプログラムとは別のファイルとして同梱しています．辞書を作り変えて配布するときも，同じ条件で配布してください．全文は辞書の LICENSES/CC-BY-SA-4.0.txt にあります．
 
 ## SudachiDict(hajime-dictionary の Mozc UT 辞書の語)
 
 https://github.com/WorksApplications/SudachiDict
-hajime-dictionary v0.4.0 に追加した mozcdic-ut-sudachidict の語と SudachiDict の元のデータの語は，SudachiDict の名詞から作られています．SudachiDict の LEGAL(コミット 830bf9e1313f6f75235ba87ee041e144dbcad8c1)を載せます．
+hajime-dictionary v0.5.0 に追加した mozcdic-ut-sudachidict の語と SudachiDict の元のデータの語は，SudachiDict の名詞から作られています．SudachiDict の LEGAL(コミット 830bf9e1313f6f75235ba87ee041e144dbcad8c1)を載せます．
 
 ```
 LEGAL NOTICE INFORMATION
@@ -1852,7 +1852,7 @@ limitations under the License.
 ## mecab-ipadic-NEologd(hajime-dictionary の Mozc UT 辞書の語)
 
 https://github.com/neologd/mecab-ipadic-neologd
-hajime-dictionary v0.4.0 に追加した mozcdic-ut-neologd の語と NEologd の元のデータ(seed)の語は，mecab-ipadic-NEologd から作られています．mecab-ipadic-NEologd の COPYING(コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)を載せます．
+hajime-dictionary v0.5.0 に追加した mozcdic-ut-neologd の語と NEologd の元のデータ(seed)の語は，mecab-ipadic-NEologd から作られています．mecab-ipadic-NEologd の COPYING(コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)を載せます．
 
 ```
 Copyright (C) 2015-2019 Toshinori Sato (@overlast)
