@@ -133,6 +133,7 @@ pub mod choice {
     pub const ENGLISH_INPUT_LIVE_CONVERSION: &str = "英字入力のライブ変換";
     /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)
     pub const ENGLISH_INPUT_LIVE_CONVERSION_EXAMPLE: (&str, &str) = ("kyouha", "今日は");
+    pub const ENGLISH_AUTO_EXAMPLE: (&str, &str) = ("zoom dekaigi", "zoom で会議");
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
@@ -1060,9 +1061,8 @@ pub mod association {
     pub const IMPORT_FAILED: &str =
         "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
     pub const NOTE: &str = "上の辞書ほど優先";
-    /// 読み込めるファイルの例の行(「,」で区切った行と，先頭に意味の説明を置いてタブで区切った行．タブは ⇥ で見せる)
+    /// 読み込めるファイルの例の行(同じ意味の単語を「,」で区切った 1 行)
     pub const FILE_EXAMPLE: &str = "美しい,綺麗,麗しい";
-    pub const TAB_FILE_EXAMPLE: &str = "見た目がよい ⇥ 美しい ⇥ 綺麗";
 
     pub fn too_many(limit: usize) -> String {
         format!("取り込める連想の辞書は {limit} 個までです")
@@ -1286,11 +1286,6 @@ pub mod windows {
     }
     /// キーの欄の例の値(macOS は押して記録するだけなので無い．Windows は打って書くこともできる)
     pub const KEY_EXAMPLE: &str = "Ctrl+Shift+Space";
-    /// 英字入力(自動)を選んだときの見本(macOS は候補の見本のタグ．Windows は入力方式の行の注記にする)
-    pub const ENGLISH_AUTO_EXAMPLE: &str = "zoom dekaigi → zoom で会議";
-    /// 連想の辞書の一覧の下に出す，読み込めるファイルの見本(macOS は等幅の字の見本の箱)
-    pub const ASSOCIATION_FILE_EXAMPLE: &str =
-        "美しい,綺麗,麗しい\n見た目がよい ⇥ 美しい ⇥ 綺麗\n上の辞書ほど優先";
     /// 読めないキーの書き方
     pub const INVALID_KEY: &str = "キーの書き方が正しくありません";
     /// 除外設定の一覧の並びの意味を示す 1 行(macOS の UIStrings.More.exclusionsOrder)
