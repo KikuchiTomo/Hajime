@@ -287,6 +287,8 @@ pub struct Extras {
     pub keymap_report: String,
     /// キー設定の行ごとの問題(行の印と，使われない行を薄く出すのに使う)
     pub keymap_issues: Vec<ipc::KeymapRowIssue>,
+    /// キー設定の表に合うひな形(keys::PRESETS の番号．合わなければ None)
+    pub keymap_preset: Option<usize>,
     /// 変換マクロを試した結果(コマンドのページを出すたびに読む)
     pub macro_preview: crate::engine::PreviewShown,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
@@ -323,8 +325,6 @@ pub enum Part {
     Action,
     /// 色のボタン
     Color,
-    /// ひな形を読み込むボタン
-    PresetLoad,
     /// 一覧の入力欄(打つ欄か選ぶ欄)
     Field(usize),
     /// 入力欄の右のボタン(追加・削除・切り替え・更新)
@@ -585,7 +585,7 @@ impl RowState {
             resettable: false,
             on: false,
             knob: Tween::fixed(0.0),
-            choice: matches!(row.control, Control::Preset).then_some(0),
+            choice: None,
             extra_choice: None,
             font_items: Vec::new(),
             numbers,
@@ -928,7 +928,6 @@ impl RowState {
             | Part::Color
             | Part::Table
             | Part::Text => Some(card.control),
-            Part::PresetLoad => card.parts.first().copied(),
             Part::Field(index) | Part::PreviewField(index) => card.parts.get(index).copied(),
             Part::Top(index) => card.parts.get(fields + index).copied(),
             Part::Search => search
@@ -971,7 +970,8 @@ impl RowState {
                 }
             }
             Control::Color => parts.push(Part::Color),
-            Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
+            // ひな形は 1 つのメニューで，選ぶと読み込む(macOS の KeymapPage のひな形のメニュー)
+            Control::Preset => parts.push(Part::Dropdown),
             Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
             Control::Preview(kind) => {
                 parts.extend([Part::PreviewField(0), Part::PreviewField(1)]);
@@ -1058,7 +1058,6 @@ impl RowState {
             Part::Bottom(index) => buttons
                 .and_then(|buttons| buttons.bottom_labels().get(index).copied())
                 .unwrap_or(""),
-            Part::PresetLoad => keys::LOAD,
             Part::Action => match self.row.control {
                 Control::Version => more::CHECK_FOR_UPDATES,
                 Control::LabeledAction(_, label) | Control::InfoAction(_, _, label) => label,
@@ -1406,6 +1405,7 @@ impl PageView {
                     row.text = crate::keys::assigned(values.value("keymap"), command)
                 }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
+                Control::Preset => row.choice = extras.keymap_preset,
                 Control::TemplateReference => row.lines.clone_from(&extras.template_values),
                 Control::Preview(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
@@ -1618,7 +1618,6 @@ impl PageView {
             Part::Segment(_) | Part::Button(_) => row.button_label(element.part).to_string(),
             Part::Top(_)
             | Part::Bottom(_)
-            | Part::PresetLoad
             | Part::Action
             | Part::Link(_)
             | Part::PreviewAdd(_)
@@ -1675,7 +1674,6 @@ impl PageView {
             Part::Dropdown => 2,
             Part::Action => 3,
             Part::Color => 4,
-            Part::PresetLoad => 5,
             Part::Decrement => 6,
             Part::Increment => 7,
             Part::Slider => 8,
@@ -1899,10 +1897,6 @@ impl PageView {
                     current: row.color.clone(),
                 })
             }
-            (Control::Preset, Part::PresetLoad) => {
-                let (preset, _) = keys::PRESETS.get(row.choice?)?;
-                return Some(Event::LoadPreset(preset));
-            }
             _ => {}
         }
         let positions = row.table.selected_positions();
@@ -2044,10 +2038,9 @@ impl PageView {
                 row.table_scroll.jump_to(0.0);
                 None
             }
-            (Control::Preset, Part::Dropdown) => {
-                row.choice = Some(index);
-                None
-            }
+            (Control::Preset, Part::Dropdown) => keys::PRESETS
+                .get(index)
+                .map(|(preset, _)| Event::LoadPreset(preset)),
             (_, Part::Field(field)) => {
                 // 出した選択肢の位置を選択肢の番号にする(キー設定のコマンドは置けるものだけを出す)
                 let positions = row.choice_positions(field);
@@ -2934,11 +2927,19 @@ impl PageView {
             Control::Choice(_) | Control::ThemeFont(_) | Control::Preset => {
                 let dropdown = element(Part::Dropdown);
                 let items = row.dropdown_items(Part::Dropdown);
-                let label = row
-                    .choice
-                    .and_then(|choice| items.get(choice))
-                    .cloned()
-                    .unwrap_or_default();
+                // ひな形は今の表に合うひな形の名前を出す．合わなければ「カスタム」(macOS の currentPreset)
+                let label = match row.row.control {
+                    Control::Preset => keys::current_preset(
+                        row.choice
+                            .and_then(|choice| items.get(choice))
+                            .map_or(keys::CUSTOM_PRESET, String::as_str),
+                    ),
+                    _ => row
+                        .choice
+                        .and_then(|choice| items.get(choice))
+                        .cloned()
+                        .unwrap_or_default(),
+                };
                 paint::dropdown(
                     canvas,
                     theme,
@@ -2947,19 +2948,6 @@ impl PageView {
                     frame.open == Some(dropdown),
                     self.state(frame, dropdown, row.enabled),
                 );
-                if let (Control::Preset, Some(rect)) =
-                    (&row.row.control, row.part_rect(Part::PresetLoad))
-                {
-                    let load = element(Part::PresetLoad);
-                    paint::button(
-                        canvas,
-                        theme,
-                        rect,
-                        keys::LOAD,
-                        paint::ButtonKind::Standard,
-                        self.state(frame, load, row.enabled),
-                    );
-                }
             }
             Control::Action(kind) => {
                 let action = element(Part::Action);
