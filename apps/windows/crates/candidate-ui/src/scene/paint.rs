@@ -12,7 +12,7 @@ use tokens::size::{branch, candidate, glass};
 /// 候補の横の札の色分け
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TagStyle {
-    /// 控えめな地(「入力のまま」，取り込んだ辞書の名前)
+    /// 控えめな地(「入力のまま」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)
     Plain,
     /// 補正の色の地(「修正」)
     Corrected,
@@ -375,17 +375,28 @@ impl<'a> Painter<'a> {
         (self.width(text, Font::Label) + glass::TAG_PADDING_X * 2.0).ceil()
     }
 
-    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前)．「修正」は補正の色の地，
-    /// コマンドはアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(選択の地)に描くとき
-    pub fn tag(&mut self, text: &str, max_x: f32, mid_y: f32, selected: bool, style: TagStyle) {
-        let theme = self.theme;
+    /// 札の枠．描くときと押した位置を調べるときで同じものを使う
+    pub fn tag_frame(&self, text: &str, max_x: f32, mid_y: f32) -> Frame {
         let width = self.tag_width(text);
-        let frame = Frame::new(
+        Frame::new(
             (max_x - width).round(),
             (mid_y - glass::TAG_HEIGHT / 2.0).round(),
             width,
             glass::TAG_HEIGHT,
-        );
+        )
+    }
+
+    /// 札を押せる範囲．札の左右の幅で，行(row)の高さいっぱいにする(背の低い札でも押しやすいように．macOS の NoteDrawing.tagHitRect)
+    pub fn tag_hit_frame(&self, text: &str, max_x: f32, row: Frame) -> Frame {
+        let tag = self.tag_frame(text, max_x, row.mid_y());
+        Frame::new(tag.x, row.y, tag.width, row.height)
+    }
+
+    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
+    /// コマンドはアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(選択の地)に描くとき
+    pub fn tag(&mut self, text: &str, max_x: f32, mid_y: f32, selected: bool, style: TagStyle) {
+        let theme = self.theme;
+        let frame = self.tag_frame(text, max_x, mid_y);
         let (fill, color) = if selected {
             (
                 theme.selection_text.with_alpha(opacity::badge::SELECTED),

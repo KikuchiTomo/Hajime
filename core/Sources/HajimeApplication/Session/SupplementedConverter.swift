@@ -45,7 +45,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     /// 読みごとに見つけたうろ覚えの語と英単語．入力を終えたときに捨てる
     private var listExtrasCache: [String: (loose: [String], phonetic: [String])] = [:]
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
-    private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [String]]) = ([], [:])
+    private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [(word: String, comment: String)]]) = ([], [:])
     /// 取り込んだ辞書を引くもの．無ければ取り込んだ辞書は使わない
     private let lookup: (any DictionaryLookup)?
     private var applicationID: String?
@@ -183,17 +183,19 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func forget(_ candidate: Candidate) { base.forget(candidate) }
     public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { base.forget(candidate, readingRange: range) }
     public func forgetLastCommit() -> Bool { base.forgetLastCommit() }
+    public func reopenLastCommit() { base.reopenLastCommit() }
     public func suspendLearningUntilEnd() { base.suspendLearningUntilEnd() }
 
     private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {
         let current = settings.current
         var result = Okurigana.reorder(candidates, style: current.okuriganaStyle)
         var userWords = userDictionaryWords(for: reading, in: current.userDictionary)
-        if current.dynamicDictionary, userWords.contains(where: TextTemplate.containsPlaceholder) {
+        if current.dynamicDictionary, userWords.contains(where: { TextTemplate.containsPlaceholder($0.word) }) {
             let values = templateValues()
-            userWords = userWords.map { TextTemplate.expand($0, values: values) }
+            userWords = userWords.map { (TextTemplate.expand($0.word, values: values), $0.comment) }
         }
-        insert(userWords, into: &result, at: 0, reading: reading, origin: .userDictionary)
+        insert(userWords.map(\.word), into: &result, at: 0, reading: reading, origin: .userDictionary)
+        attachComments(userWords, to: &result, reading: reading)
         // 読み全体と一致する取り込んだ辞書の語は，エンジンの候補の順に関わらず前の方に出るようにここで足す．
         // 既定の 1 番目は変えず，その次に優先度の順で並べる
         let importedWords = auxiliary.filter { $0.word.reading == reading }.sorted { $0.costOffset > $1.costOffset }.map(\.word.word)
@@ -406,14 +408,24 @@ public final class SupplementedConverter: KanaKanjiConverting {
         }
     }
 
-    private func userDictionaryWords(for reading: String, in entries: [UserDictionaryEntry]) -> [String] {
+    private func userDictionaryWords(for reading: String, in entries: [UserDictionaryEntry]) -> [(word: String, comment: String)] {
         // 設定を写しても配列の中身は共有されるので，変わっていなければ比べるのはすぐ済む
         if dictionaryIndex.source != entries {
             // ローマ字の読み(「gh」「toyota」)は，打ったときと同じ読みにそろえて引く(ReadingNormalization)
-            let valid = entries.compactMap { entry in entry.isValid ? entry.lookupReading.map { ($0, entry.word) } : nil }
-            dictionaryIndex = (entries, Dictionary(grouping: valid, by: \.0).mapValues { $0.map(\.1) })
+            let valid = entries.compactMap { entry in entry.isValid ? entry.lookupReading.map { ($0, entry) } : nil }
+            dictionaryIndex = (entries, Dictionary(grouping: valid, by: \.0).mapValues { $0.map { (word: $0.1.word, comment: $0.1.comment) } })
         }
         return dictionaryIndex.words[reading] ?? []
+    }
+
+    /// 読み全体と一致したユーザー辞書の語のコメントを，同じ語の候補に付ける．
+    /// 変換エンジンが同じ語を先に出していれば(文の中の語として渡しているため)，その候補に付ける
+    private func attachComments(_ words: [(word: String, comment: String)], to candidates: inout [Candidate], reading: String) {
+        for (word, comment) in words where !comment.isEmpty {
+            for index in candidates.indices where candidates[index].text == word && candidates[index].readingCount == reading.count && candidates[index].comment == nil {
+                candidates[index].comment = comment
+            }
+        }
     }
 
     private func insert(_ texts: [String], into candidates: inout [Candidate], at position: Int, reading: String, origin: CandidateOrigin) {

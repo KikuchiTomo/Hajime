@@ -235,6 +235,25 @@ impl Scene {
     }
 }
 
+/// 一覧の候補の札に出したユーザー辞書の語のコメント(長ければ先頭だけ)．札がコメントでなければ None
+pub fn entry_comment(entry: &ipc::CandidateEntry) -> Option<&str> {
+    if entry.has_comment == Some(true) {
+        entry.annotation.as_deref()
+    } else {
+        None
+    }
+}
+
+/// 分岐図の下の枝の index 番目の候補に添えたユーザー辞書の語のコメント(macOS の LatticePanel.Column.comment(at:))．コメントでなければ None
+pub fn alternative_comment(column: &ipc::BranchColumn, index: usize) -> Option<&str> {
+    let comments = column.alternative_comments.as_ref()?;
+    if comments.get(index).copied() == Some(true) {
+        column.alternative_notes.get(index)?.as_deref()
+    } else {
+        None
+    }
+}
+
 /// 文字の幅と高さを測る．描く層が OS の書体で測る
 pub trait Measure {
     fn width(&self, text: &str, font: Font) -> f32;

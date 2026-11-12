@@ -20,6 +20,8 @@ enum UIStrings {
         static func senseNumber(_ number: Int) -> String { "\(number)" }
         /// コマンドの候補を読み上げる文(「コマンド、Claude を開く」)
         static func commandAnnouncement(_ title: String) -> String { "\(CandidatePanel.commandAnnotation)、\(title)" }
+        /// ユーザー辞書の語のコメントを，候補に続けて読み上げる文(「ピヨ株式会社、コメント、東京都千代田区…」)
+        static func commentAnnouncement(_ text: String, comment: String) -> String { "\(text)、コメント、\(comment)" }
     }
 
     /// 連想変換(R-18)
@@ -290,6 +292,7 @@ enum UIStrings {
             case .resumeEditing: "読みに戻して末尾から編集"
             case .undoConversionEdit: "直前の変更を取り消し"
             case .undoPrediction: "予測の確定を取り消し"
+            case .undoCommit: "確定を取り消し"
             case .forgetCandidate: "候補を学習から削除"
             case .forgetLastCommit: "最後の学習を取り消し"
             case .hidePrediction: "予測に表示しない"
@@ -312,7 +315,7 @@ enum UIStrings {
             case .convertWithoutLearning: "学習した順位を使わずに変換し、確定しても学習しません"
             case .insertBoundary: "入力中に、現在の位置で文節を区切ります"
             case .acceptSuggestion: "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"
-            case .reconvert: "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"
+            case .reconvert: "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します。確定した直後に押すと、確定を取り消して確定する前の変換に戻します"
             case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
             case .nextCandidate: "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"
             case .previousCandidate: "入力中に押すと変換を始めます。入力中の候補を表示しているときは、文字種から選択します。分岐図では上の枝の文字種へ進みます"
@@ -326,6 +329,7 @@ enum UIStrings {
             case .resumeEditing: "変換をやめて読みに戻り、末尾から入力を続けます"
             case .undoConversionEdit: "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"
             case .undoPrediction: "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"
+            case .undoCommit: "確定した直後に押すと、確定した文字を削除して確定する前の変換に戻します。文節の区切りと選んだ候補も戻るので、そのまま選び直せます。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"
             case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
@@ -422,6 +426,7 @@ enum UIStrings {
         static let sortHint = "並べ替え"
         static func overwrites(_ key: String) -> String { "「\(key)」はすでにあります。追加すると上書きします。" }
         static let alreadyRegistered = "すでに登録されています。"
+        static let changesKind = "すでに登録されています。追加すると品詞とコメントを書き換えます。"
         static let full = "これ以上は追加できません。"
         static let noMatches = "一致する項目はありません"
     }
@@ -525,7 +530,31 @@ enum UIStrings {
         static let importDictionary = "インポート…"
         static let exportDictionary = "エクスポート…"
         static let exportFileName = "hajime-user-dictionary.txt"
-        static let dictionaryNote = "読みと単語をタブで区切ったテキストファイルを読み込めます。"
+        static let dictionaryNote = "読み・単語・品詞・コメントをタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。コメントは候補の横に出て、押すとコメントを入力します。"
+        static let comment = "コメント"
+        static let commentPrompt = "コメント(省略可)"
+        static let wordClass = "品詞"
+        static let personNameGroup = "人名"
+        static let otherWordClasses = "その他"
+        static let abbreviationNote = "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。"
+
+        static func label(for wordClass: WordClass) -> String {
+            switch wordClass {
+            case .noun: "名詞"
+            case .personName: "人名(姓と名)"
+            case .surname: "人名(姓のみ)"
+            case .givenName: "人名(名のみ)"
+            case .place: "地名"
+            case .symbol: "顔文字・記号"
+            case .abbreviation: "短縮よみ"
+            case .properNoun: "固有名詞"
+            case .organization: "組織名"
+            case .suruNoun: "サ変名詞(〜する)"
+            case .adjectivalNoun: "形容動詞(〜な)"
+            case .adverb: "副詞"
+            case .interjection: "感動詞"
+            }
+        }
         static let appearance = "外観"
         static let restoreDefaults = "すべての設定を既定に戻す"
         static let saveFailed = "設定を保存できませんでした"

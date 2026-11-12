@@ -280,6 +280,10 @@ public enum DefaultSettings {
     public static let meaningSenseLimitRange = 1...5
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
     public static let maximumUserDictionaryEntries = 10_000
+    /// 単語を登録するときに選んでおく品詞
+    public static let userWordClass = WordClass.noun
+    /// 品詞を書いていない語(品詞を選べるようになる前に登録した語)の品詞．それまでと同じに変換するため固有名詞にする
+    public static let legacyUserWordClass = WordClass.properNoun
     /// アプリの扱いの規則の上限(CSV で取り込むとき)
     public static let maximumProfileRules = 1_000
     /// 「IME のオンオフを記憶」で覚えておくアプリの数
@@ -315,6 +319,9 @@ public enum DefaultSettings {
     public static let correctionTimeoutStep = 1.0
     public static let maximumUserDictionaryReadingLength = 32
     public static let maximumUserDictionaryWordLength = 64
+    /// ユーザー辞書の語のコメントの長さの上限．候補の窓では先頭の userDictionaryCommentShownLength 文字だけを出す
+    public static let maximumUserDictionaryCommentLength = 128
+    public static let userDictionaryCommentShownLength = 24
     /// 取り込むユーザー辞書のファイルの大きさの上限
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限

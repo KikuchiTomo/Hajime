@@ -61,6 +61,9 @@ public enum LayoutTokens {
         public static let previewChipGap: Double = 6
         public static let ruleCheckColumnWidth: Double = 40
         public static let ruleKeyColumnWidth: Double = 160
+        public static let ruleValueColumnWidth: Double = 150
+        public static let ruleNoteFieldGap: Double = 8
+        public static let ruleKindColumnWidth: Double = 120
         public static let commandReadingColumnWidth: Double = 110
         public static let commandTitleColumnWidth: Double = 120
         public static let commandKindColumnWidth: Double = 130
@@ -70,7 +73,7 @@ public enum LayoutTokens {
         public static let tablePopupTextInset: Double = 21
         public static let themeEditorWidth: Double = 640
         public static let themeEditorHeight: Double = 720
-        public static let userDictionaryTableHeight: Double = 330
+        public static let userDictionaryTableHeight: Double = 280
         public static let previewPadding: Double = 24
         public static let keyFilterRadius: Double = 5
         public static let fontSliderWidth: Double = 220

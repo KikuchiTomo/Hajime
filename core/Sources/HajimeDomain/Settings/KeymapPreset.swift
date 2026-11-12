@@ -2,8 +2,9 @@
 ///
 /// 行は「状態<タブ>キー<タブ>コマンド」の形で書く(Keymap.rows(from:))．
 /// Windows 風・Mac 風・ATOK 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行を Hajime IME の状態とコマンドに置き換えて作った．
-/// Hajime IME に無いコマンドの行(読みの中のカーソル移動・予測・再変換・確定の取り消しなど)は除き，
-/// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Option+↑ を足してある(Ctrl+Tab はアプリのタブの切り替えとぶつかる)
+/// Hajime IME に無いコマンドの行(読みの中のカーソル移動・予測・再変換など)は除き，
+/// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Option+↑ と，確定の取り消しの Ctrl+Backspace を足してある
+/// (Ctrl+Tab はアプリのタブの切り替えとぶつかる)
 public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// Hajime IME の既定
     case standard
@@ -55,7 +56,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// 変換中の F6〜F8 は選んでいる文節だけの字種(F9・F10 は全文)，Esc は直前の変更の取り消し(続けて押すと全文を読みに戻す)，
     /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける．
     /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)．
-    /// 予測を確定した直後の Backspace で補う前の読みに戻す(Windows 風・ATOK 風は確定の取り消しと同じ Ctrl+Backspace)
+    /// 予測を確定した直後の Backspace で補う前の読みに戻す(Windows 風・ATOK 風は確定の取り消しの Ctrl+Backspace で戻す)．
+    /// 確定した直後の ⌃⌫ で確定する前の変換に戻す(ひな形すべて．確定した直後の変換のキーも同じ)
     static let standardRows = """
         anywhere\tEnter\tcommit
         anywhere\tEscape\tcancel
@@ -76,6 +78,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         idle\tSpace\tinsertSpace
         idle\tShift Space\tinsertAlternateSpace
         idle\tBackspace\tundoPrediction
+        idle\tCtrl Backspace\tundoCommit
         composing\tSpace\tconvert
         composing\tShift Space\tassociate
         composing\tHenkan\tconvert
@@ -237,7 +240,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate
         composing\tCtrl Delete\thidePrediction
-        idle\tCtrl Backspace\tundoPrediction
+        idle\tCtrl Backspace\tundoCommit
         composing\tOption Space\tinsertBoundary
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
@@ -339,6 +342,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tCtrl Delete\tforgetCandidate
         composing\tCtrl Delete\thidePrediction
         idle\tBackspace\tundoPrediction
+        idle\tCtrl Backspace\tundoCommit
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
@@ -413,7 +417,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tShift Henkan\tpreviousCandidatePage
         converting\tCtrl Delete\tforgetCandidate
         composing\tCtrl Delete\thidePrediction
-        idle\tCtrl Backspace\tundoPrediction
+        idle\tCtrl Backspace\tundoCommit
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate

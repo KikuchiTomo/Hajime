@@ -777,19 +777,24 @@
     "userDictionary": [
       {
         "reading": "はじめ",
-        "word": "Hajime IME"
+        "word": "Hajime IME",
+        "wordClass": "properNoun"
       },
       {
         "reading": "しぶや",
-        "word": "渋谷"
+        "word": "渋谷",
+        "wordClass": "place"
       },
       {
         "reading": "かぶしきがいしゃ",
-        "word": "株式会社"
+        "word": "株式会社",
+        "wordClass": "noun",
+        "comment": "東京都千代田区千代田1-1"
       },
       {
         "reading": "めーる",
-        "word": "hajime@example.com"
+        "word": "hajime@example.com",
+        "wordClass": "abbreviation"
       }
     ],
     "symbols": {

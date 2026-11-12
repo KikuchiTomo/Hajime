@@ -379,6 +379,7 @@ fn entry(text: &str) -> CandidateEntry {
         corrected_start: None,
         corrected_length: None,
         command: None,
+        has_comment: None,
     }
 }
 

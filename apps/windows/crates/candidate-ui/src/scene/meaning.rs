@@ -1126,6 +1126,7 @@ mod tests {
                     corrected_start: None,
                     corrected_length: None,
                     command: None,
+                    has_comment: None,
                 })
                 .collect(),
             selected_entry: Some(0),

@@ -424,6 +424,15 @@
               "type": "u32"
             }
           ]
+        },
+        {
+          "name": "comment",
+          "fields": [
+            {
+              "name": "index",
+              "type": "u32"
+            }
+          ]
         }
       ]
     },
@@ -704,6 +713,25 @@
       ]
     },
     {
+      "name": "WordClass",
+      "kind": "enum",
+      "cases": [
+        "noun",
+        "properNoun",
+        "personName",
+        "surname",
+        "givenName",
+        "organization",
+        "place",
+        "symbol",
+        "suruNoun",
+        "adjectivalNoun",
+        "adverb",
+        "interjection",
+        "abbreviation"
+      ]
+    },
+    {
       "name": "DictionaryEntry",
       "kind": "struct",
       "fields": [
@@ -714,6 +742,14 @@
         {
           "name": "word",
           "type": "string"
+        },
+        {
+          "name": "wordClass",
+          "type": "WordClass?"
+        },
+        {
+          "name": "comment",
+          "type": "string?"
         }
       ]
     },
@@ -1585,6 +1621,10 @@
         {
           "name": "command",
           "type": "CommandKind?"
+        },
+        {
+          "name": "hasComment",
+          "type": "bool?"
         }
       ]
     },
@@ -1869,6 +1909,10 @@
         {
           "name": "alternativeCommands",
           "type": "[CommandKind?]?"
+        },
+        {
+          "name": "alternativeComments",
+          "type": "[bool]?"
         },
         {
           "name": "sourceName",

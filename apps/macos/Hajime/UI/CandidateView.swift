@@ -159,11 +159,24 @@ final class CandidateView: NSView {
         }
     }
 
-    /// point(この view の座標)にある押せる対象．無ければ nil
+    /// 候補の行の札の右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - rowPaddingX }
+
+    /// ユーザー辞書の語のコメントの札を押せる範囲．コメントの札の無い行は nil
+    private func commentRect(_ entry: CandidatePanel.Entry, in row: NSRect) -> NSRect? {
+        entry.comment.map { NoteDrawing.tagHitRect($0, maxX: tagMaxX(in: row), row: row, theme: theme) }
+    }
+
+    /// point(この view の座標)にある押せる対象．無ければ nil．
+    /// コメントの札は行の中にあるので，行より先に調べる(札を押すと候補の代わりにコメントを入れる)
     func target(at point: NSPoint) -> PointerTarget? {
         guard let panel else { return nil }
         let layout = placement(for: panel, size: bounds.size).layout
-        if let row = layout.hitRows.firstIndex(where: { NSRect($0).contains(point) }) { return .entry(row) }
+        if let row = layout.hitRows.firstIndex(where: { NSRect($0).contains(point) }) {
+            // 札を押せる範囲は，候補の行と同じく行と行のあいだまで(札の右の端は行の地の内側)
+            if let comment = commentRect(panel.entries[row], in: NSRect(layout.hitRows[row])), comment.contains(point) { return .comment(row) }
+            return .entry(row)
+        }
         if panel.association == nil, let header = layout.header,
            let cell = variantCells(panel, in: NSRect(header)).firstIndex(where: { $0.contains(point) }), panel.variants[cell].isAvailable {
             return .listVariant(cell)
@@ -298,7 +311,7 @@ final class CandidateView: NSView {
             GlassDrawing.drawUnderline(from: from, to: to, y: rect.maxY - offset, color: color, dotted: true, theme: theme)
         }
         if let annotation = entry.annotation {
-            NoteDrawing.drawTag(annotation, maxX: rect.maxX - rowPaddingX, midY: rect.midY, theme: theme, selected: isSelected,
+            NoteDrawing.drawTag(annotation, maxX: tagMaxX(in: rect), midY: rect.midY, theme: theme, selected: isSelected,
                                 command: entry.command != nil)
         }
     }
@@ -380,6 +393,11 @@ final class CandidateView: NSView {
     private func drawText(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, in rect: NSRect) {
         TextFitting.draw(text, attributes: attributes, x: x, midY: rect.midY)
     }
+}
+
+extension CandidatePanel.Entry {
+    /// 札に出したユーザー辞書の語のコメント(長ければ先頭だけ)．札がコメントでなければ nil
+    var comment: String? { hasComment ? annotation : nil }
 }
 
 extension ResolvedTheme {

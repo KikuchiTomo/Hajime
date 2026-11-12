@@ -12,6 +12,8 @@ enum PanelBuilder {
     static let candidateForgottenNote = Note.info("学習から削除しました")
     /// 最後に確定した語の学習を取り消したときの案内
     static let lastCommitForgottenNote = Note.info("最後の学習を取り消しました")
+    /// 確定を取り消して，確定する前の変換に戻したときの案内
+    static let commitUndoneNote = Note.info("確定を取り消しました")
     /// 戻した補正を覚えたときの案内．phrase は覚えた語句(打ったままの読み)
     static func correctionRememberedNote(_ phrase: String) -> Note { .info("「\(phrase)」は次から直しません") }
     /// 予測に表示しない語句に入れたときの案内．text は入れた語句
@@ -103,7 +105,9 @@ enum PanelBuilder {
             // 前の文節(shownPrefix)は一覧に出さない
             let text = !selection.shownPrefix.isEmpty && candidate.text.hasPrefix(selection.shownPrefix)
                 ? String(candidate.text.dropFirst(selection.shownPrefix.count)) : candidate.text
-            return CandidatePanel.Entry(text: text, annotation: selection.annotations[index], corrected: selection.shownPrefix.isEmpty ? range : nil)
+            let annotation = selection.annotations[index]
+            return CandidatePanel.Entry(text: text, annotation: annotation ?? candidate.comment.map(commentTag),
+                                        corrected: selection.shownPrefix.isEmpty ? range : nil, hasComment: annotation == nil && candidate.comment != nil)
         }
         let isCorrected = selection.candidates.first?.origin == .correction
         return CandidatePanel(
@@ -116,6 +120,19 @@ enum PanelBuilder {
             total: selection.candidates.count,
             note: isCorrected ? correctionNote(key: nextKey) : nil
         )
+    }
+
+    /// 候補の窓の札に出すコメント．長いコメント(住所など)は先頭だけを出し，押したときはすべてを入れる
+    static func commentTag(_ comment: String) -> String {
+        comment.count <= DefaultSettings.userDictionaryCommentShownLength ? comment : String(comment.prefix(DefaultSettings.userDictionaryCommentShownLength)) + "…"
+    }
+
+    /// 札にコメントを出す候補か．打ったまま・直した候補・コマンドの札はコメントより先に出す
+    static func hasComment(_ candidate: Candidate) -> Bool {
+        switch candidate.origin {
+        case .asTyped, .correction, .command: false
+        default: candidate.comment != nil
+        }
     }
 
     /// コマンドの候補の行．印(▶)の代わりに種類と「コマンド」の札を付け，文字を入れる候補と見分けられるようにする．コマンドでなければ nil
@@ -216,9 +233,11 @@ enum PanelBuilder {
                 case .asTyped: asTypedNote
                 case .correction: correctedNote
                 case .command: CandidatePanel.commandAnnotation
-                default: nil
+                default: candidate.comment.map(commentTag)
                 }
             }
+            // コメントのある候補が無いページでは送らない
+            if page.contains(where: hasComment) { column.alternativeComments = page.map(hasComment) }
             // コマンドの候補が無いページでは送らない
             if page.contains(where: { $0.commandKind != nil }) { column.alternativeCommands = page.map(\.commandKind) }
             return column
@@ -250,9 +269,9 @@ enum PanelBuilder {
             let annotation: String? = switch candidate.origin {
             case .asTyped: asTypedNote
             case .correction: correctedNote
-            default: nil
+            default: candidate.comment.map(commentTag)
             }
-            return CandidatePanel.Entry(text: candidate.text, annotation: annotation, corrected: range)
+            return CandidatePanel.Entry(text: candidate.text, annotation: annotation, corrected: range, hasComment: hasComment(candidate))
         }
         let variantIndex = selectedVariant.flatMap { index -> Int? in
             guard showsVariants, case .variant(let variant) = segment.variants[index].origin else { return nil }

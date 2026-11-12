@@ -105,7 +105,21 @@ public struct SyncDocument: Sendable, Equatable, Codable {
     public struct DictionaryEntry: Sendable, Equatable, Codable {
         public var reading: String
         public var word: String
+        /// 品詞(WordClass の rawValue)．品詞を選べるようになる前のバージョンが書いた語には無い．
+        /// 知らない品詞も書き換えずに渡すため文字列のまま持つ
+        public var wordClass: String?
+        /// コメント．無ければ書かない
+        public var comment: String?
+        /// 登録した時刻．品詞やコメントを変えたときも変えた時刻にする
         public var addedAt: Date
+
+        public init(reading: String, word: String, wordClass: String? = nil, comment: String? = nil, addedAt: Date) {
+            self.reading = reading
+            self.word = word
+            self.wordClass = wordClass
+            self.comment = comment
+            self.addedAt = addedAt
+        }
     }
 
     public static let currentVersion = 1

@@ -69,7 +69,9 @@ let package = Package(
         .testTarget(name: "HajimePersistenceTests", dependencies: ["HajimeDomain", "HajimePersistence"], exclude: ["Fixtures"]),
         .testTarget(
             name: "HajimeEngineTests",
-            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimeTestSupport"],
+            // 品詞の ID を本体の辞書の語と比べるため，エンジンのモジュールも直接使う
+            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimeTestSupport",
+                           .product(name: "KanaKanjiConverterModuleWithDefaultDictionary", package: "AzooKeyKanaKanjiConverter")],
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
     ],
