@@ -2567,6 +2567,15 @@ impl PageView {
         }
     }
 
+    /// path のスライダーを動かしているあいだの値(動かしていなければ None)．
+    /// 外観の見本は動かしているあいだも文字の大きさを映す(macOS の AppearancePage の fontSize)
+    pub fn dragging(&self, path: &str) -> Option<f64> {
+        self.rows
+            .iter()
+            .find(|row| row.row.path == path)
+            .and_then(|row| row.dragging)
+    }
+
     /// スライダーから手を離した．値が変わっていれば書く
     pub fn slider_release(&mut self) -> Option<Event> {
         let row = self.rows.iter_mut().find(|row| row.dragging.is_some())?;

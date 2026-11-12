@@ -959,9 +959,10 @@ impl App {
             .and_then(serde_json::Value::as_str)
             .unwrap_or("automatic")
             .to_string();
-        let font_size = model
-            .value("candidateFontSize")
-            .and_then(serde_json::Value::as_f64)
+        let font_size = self
+            .view
+            .dragging(FONT_SIZE)
+            .or_else(|| model.value(FONT_SIZE).and_then(serde_json::Value::as_f64))
             .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
         // パレットの見本は設定のとおりの列数・行数・マスの大きさで描く(macOS の PalettePreview)
         let number = |name: &str| {
@@ -1297,6 +1298,10 @@ impl App {
             }
             Some(Target::Page(element)) if element.part == Part::Slider => {
                 self.view.slider_drag(element, x - nav_width(width));
+                // 見本のあるページは，動かしているあいだの値で見本を描き直して置き直す(文字の大きさで見本の高さが変わる)
+                if self.view.preview_kind().is_some() {
+                    self.arrange();
+                }
                 ffi::invalidate(self.window);
                 return;
             }
@@ -2332,6 +2337,9 @@ impl App {
         }
     }
 }
+
+/// 候補の文字の大きさの設定(見本の文字の大きさ)
+const FONT_SIZE: &str = "candidateFontSize";
 
 /// 見本に描くもの(App::preview_source)．key は中身を見分ける文字(画像の大きさを除く)
 struct PreviewSource {
