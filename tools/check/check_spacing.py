@@ -98,7 +98,6 @@ PENDING_FILES: dict[str, str] = {
     "apps/macos/Hajime/Settings/AppearancePage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/AssociationSection.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/DictionaryPage.swift": FOLLOW_UP_SETTINGS,
-    "apps/macos/Hajime/Settings/EmojiSection.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/KeymapPage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/SettingsRows.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/WordLanguagePage.swift": FOLLOW_UP_SETTINGS,

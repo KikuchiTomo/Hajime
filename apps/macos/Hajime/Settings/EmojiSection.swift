@@ -35,13 +35,23 @@ struct EmojiSection: View {
         }
     }
 
-    /// オン・オフの項目．名前の横に，その設定で出る候補の見本(「びーる → 🍺」)を札の形で添える
+    /// 2 つの切り替えの名前のうち長いほうの幅(Form の名前と同じ本文の書体で測る)．札の左の端をそろえる．
+    /// 名前の欄は最小の幅として使うので，測り方の差で名前が欠けることはない
+    private var titleWidth: CGFloat {
+        let font = NSFont.preferredFont(forTextStyle: .body)
+        return [UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiWordConversion]
+            .map { ($0 as NSString).size(withAttributes: [.font: font]).width.rounded(.up) }
+            .max() ?? 0
+    }
+
+    /// オン・オフの項目．名前の横に，その設定で出る候補の見本(「びーる → 🍺」)を札の形で添える．
+    /// 札は 2 つの名前の長いほうのあとから書き出し，行ごとの左の端をそろえる
     private func exampleToggle(_ title: String, keyPath: WritableKeyPath<HajimeDomain.Settings, Bool>,
                                example: (reading: String, candidate: String)) -> some View {
         ResettableRow(model: model, keyPath: keyPath) {
             Toggle(isOn: model.binding(keyPath)) {
-                HStack(spacing: DesignTokens.Size.Space.sm) {
-                    Text(title)
+                HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.group) {
+                    Text(title).frame(minWidth: titleWidth, alignment: .leading)
                     CandidateExample(reading: example.reading, candidate: example.candidate)
                 }
             }
@@ -55,7 +65,7 @@ struct CandidateExample: View {
     let candidate: String
 
     var body: some View {
-        HStack(spacing: DesignTokens.Size.Space.xs) {
+        HStack(spacing: DesignTokens.Size.Space.inline) {
             Text(reading).foregroundStyle(.secondary)
             Image(systemName: "arrow.right").foregroundStyle(.tertiary).imageScale(.small)
             Text(candidate)

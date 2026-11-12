@@ -9,7 +9,7 @@ use crate::pages::{Control, ListButtons, Row, Section, TryKind};
 use crate::strings::{keys, more};
 use tokens::size::settings as size_settings;
 use tokens::size::settings_windows as size;
-use tokens::size::space as size_space;
+use tokens::size::space;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Rect {
@@ -160,6 +160,12 @@ pub fn layout(
         });
         let mut cards: Vec<CardLayout> = Vec::new();
         let rows = &section.rows;
+        // 候補の見本の札は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
+        let example_title = rows
+            .iter()
+            .filter(|row| row.example.is_some())
+            .map(|row| metrics.width(row.title, TextKind::Body))
+            .fold(0.0, f32::max);
         let mut index = 0;
         while index < rows.len() {
             let row = &rows[index];
@@ -178,6 +184,7 @@ pub fn layout(
                     y,
                     width,
                     reserve,
+                    example_title,
                 };
                 let card = place(index, row, &notes, frame, metrics);
                 y = card.card.max_y();
@@ -217,6 +224,8 @@ struct Frame {
     y: f32,
     width: f32,
     reserve: bool,
+    /// まとまりの中で候補の見本の札を添える行の，いちばん長い名前の幅(札の左の端をそろえる)
+    example_title: f32,
 }
 
 impl Frame {
@@ -361,16 +370,16 @@ fn place_labeled(
     } else {
         metrics.lines(row.title, TextKind::Body, label_width)
     };
-    // 名前の横の候補の見本の札．名前の 1 行目の横に収まらなければ，名前の下の行に置く
+    // 名前の横の候補の見本の札．まとまりの中でいちばん長い名前のあとにそろえて置き，
+    // 名前の 1 行目の横に収まらなければ，名前の下の行に置く
     let example = row
         .example
         .map(|example| (example_width(example, metrics).min(label_width), example));
-    let example_beside = example.is_some_and(|(width, _)| {
-        label_lines == 1
-            && metrics.width(row.title, TextKind::Body) + size_space::SM + width <= label_width
-    });
+    let example_x = left + frame.example_title + space::GROUP;
+    let example_beside = example
+        .is_some_and(|(width, _)| label_lines == 1 && example_x + width <= left + label_width);
     let example_below = match example {
-        Some(_) if !example_beside => size_space::XS + example_height(),
+        Some(_) if !example_beside => space::STACK + example_height(),
         _ => 0.0,
     };
     let label_height = label_lines as f32 * size::BODY_LINE_HEIGHT;
@@ -412,17 +421,12 @@ fn place_labeled(
     // 札は名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
     let icon = match example {
         Some((width, _)) if example_beside => Rect::new(
-            left + metrics.width(row.title, TextKind::Body) + size_space::SM,
+            example_x,
             label.y + (size::BODY_LINE_HEIGHT - example_height()) / 2.0,
             width,
             example_height(),
         ),
-        Some((width, _)) => Rect::new(
-            left,
-            label.max_y() + size_space::XS,
-            width,
-            example_height(),
-        ),
+        Some((width, _)) => Rect::new(left, label.max_y() + space::STACK, width, example_height()),
         None => Rect::new(left, frame.y, 0.0, 0.0),
     };
     let mut y = label.max_y() + example_below;
@@ -497,7 +501,7 @@ pub fn example_parts(example: (&str, &str), width: impl Fn(&str) -> f32) -> [(f3
     for (index, text) in [reading, EXAMPLE_ARROW, candidate].into_iter().enumerate() {
         let part = width(text);
         parts[index] = (x, part);
-        x += part + size_space::XS;
+        x += part + space::INLINE;
     }
     parts
 }
@@ -949,6 +953,7 @@ impl Metrics for Estimate {
 mod tests {
     use super::*;
     use crate::pages::{sections, Page};
+    use crate::strings::settings as settings_strings;
 
     fn all(page: Page, width: f32) -> PageLayout {
         layout(&sections(page).unwrap(), width, |_| true, &Estimate)
@@ -1030,6 +1035,16 @@ mod tests {
     fn 候補の見本の札は名前の横に置き_名前と同じ行の真ん中にそろえる() {
         let cards = example_cards(900.0);
         assert_eq!(cards.len(), 2);
+        // 2 つの札の左の端は，長いほうの名前のあとにそろえる
+        assert_eq!(cards[0].icon.x, cards[1].icon.x);
+        let longest = [
+            settings_strings::EMOJI_CONVERSION,
+            settings_strings::EMOJI_WORD_CONVERSION,
+        ]
+        .iter()
+        .map(|title| Estimate.width(title, TextKind::Body))
+        .fold(0.0, f32::max);
+        assert_eq!(cards[0].icon.x, cards[0].label.x + longest + space::GROUP);
         for card in &cards {
             assert!(card.icon.width > 0.0);
             assert!(card.icon.x > card.label.x);
