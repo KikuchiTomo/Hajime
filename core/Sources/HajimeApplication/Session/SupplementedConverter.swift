@@ -29,7 +29,7 @@ import HajimeDomain
 /// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
 ///   どの辞書を効かせるかは DictionaryActivation が決める(アプリの条件，文脈の条件)
 /// - 専門用語の辞書の語(R-29): 取り込んだ辞書と同じく，読みの中の部分ごとに，設定で使う分野の語を引いてエンジンに渡す．
-///   点数は取り込んだ辞書の語より低く(DefaultSettings.termWordCost)，通常の辞書に同じ読みの語がある語はさらに低くする(termHomophoneWordCost)．
+///   点数は取り込んだ辞書の語より低く(DefaultSettings.termWordCost)，読みが通常の辞書の語と重なる語はさらに低くする(termOverlappingWordCost)．
 ///   同じ語が取り込んだ辞書にもあれば取り込んだ辞書の方を使う
 ///
 /// 記号・日付・数字の書き方は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
@@ -66,7 +66,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         /// 取り込んだ辞書の id．専門用語の辞書なら nil(文脈の条件に数えない)
         var id: String?
         var name: String
-        /// 読み全体と一致するときに，候補の前の方に差し込む位置．専門用語の辞書の同音の語は nil(差し込まない)
+        /// 読み全体と一致するときに，候補の前の方に差し込む位置．専門用語の辞書の，通常の辞書に同じ読みの語がある語は nil(差し込まない)
         var wholeReadingOffset: Int?
     }
 
@@ -161,10 +161,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
                     }
                 }
                 for term in terms?.words(reading: part) ?? [] where fields.contains(term.field) && best[term.word] == nil {
-                    let cost = term.hasHomophones ? DefaultSettings.termHomophoneWordCost : DefaultSettings.termWordCost
+                    let cost = term.overlap == .none ? DefaultSettings.termWordCost : DefaultSettings.termOverlappingWordCost
                     best[term.word] = cost - DefaultSettings.importedWordCost
                     sources[term.word] = Source(id: nil, name: term.field.name,
-                                                wholeReadingOffset: term.hasHomophones ? nil : DefaultSettings.termWordCandidateOffset)
+                                                wholeReadingOffset: term.overlap == .sameReading ? nil : DefaultSettings.termWordCandidateOffset)
                 }
             }
         }

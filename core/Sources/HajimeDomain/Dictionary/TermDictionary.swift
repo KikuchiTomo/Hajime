@@ -127,14 +127,23 @@ public struct TermFieldSettings: Sendable, Equatable, Codable {
 
 /// 専門用語の辞書の 1 語と，その分野
 public struct TermWord: Sendable, Equatable, Hashable {
+    /// 読みが通常の辞書の語とどう重なるか(辞書を作るときに決める)
+    public enum Overlap: Sendable, Equatable, Hashable {
+        /// 重ならない(新しい読み)
+        case none
+        /// 同じ読みの語がある(「しかん」の 士官)
+        case sameReading
+        /// 通常の辞書の 2 つの語の読みに分けられる(「てるす」は「て」と「るす」)
+        case splittable
+    }
+
     public var word: DictionaryWord
     public var field: TermField
-    /// 通常の辞書に同じ読みの語があるか(辞書を作るときに決める)．あれば点数を下げ，ふだんの語を押しのけないようにする
-    public var hasHomophones: Bool
+    public var overlap: Overlap
 
-    public init(word: DictionaryWord, field: TermField, hasHomophones: Bool = false) {
+    public init(word: DictionaryWord, field: TermField, overlap: Overlap = .none) {
         self.word = word
         self.field = field
-        self.hasHomophones = hasHomophones
+        self.overlap = overlap
     }
 }

@@ -361,10 +361,11 @@ public enum DefaultSettings {
     public static let termDictionaryFileName = "terms.tsv"
     /// 専門用語の辞書の語の点数．取り込んだ辞書の語(importedWordCost)より低くし，ふだんの語の変換に割り込まないようにする
     public static let termWordCost: Float = -10
-    /// 通常の辞書に同じ読みの語がある専門用語の語の点数．同じ読みのふだんの語(「しかん」の 士官)を押しのけないよう，さらに低くする
-    public static let termHomophoneWordCost: Float = -16
+    /// 読みが通常の辞書の語と重なる専門用語の語の点数(TermWord.Overlap)．同じ読みのふだんの語(「しかん」の 士官)を押しのけたり，
+    /// 語の切れ目をまたいで入り込んだり(「ぽんとたたいた」が「ぽんと多対多」)しないよう，さらに低くする
+    public static let termOverlappingWordCost: Float = -16
     /// 読み全体と一致する専門用語の辞書の語を差し込む位置(上から何番目か)．取り込んだ辞書の語(importedWordCandidateOffset)より下．
-    /// 同音の語は差し込まず，エンジンの候補の順に任せる
+    /// 通常の辞書に同じ読みの語がある語は差し込まず，エンジンの候補の順に任せる
     public static let termWordCandidateOffset = 2
     /// ユーザー辞書の語の点数(対数尤度)．辞書の一般的な語より少し上に出る値(azooKey-Desktop と同じ)
     public static let userDictionaryWordCost: Float = -5

@@ -52,11 +52,20 @@ struct TermDictionaryConverterTests {
     @Test("通常の辞書に同じ読みの語がある語は，さらに低い点数で渡し，読み全体と一致しても前に差し込まない")
     func homophones() {
         let (converter, base, terms, _) = make(Settings())
-        terms.words["しかん"] = [TermWord(word: DictionaryWord(reading: "しかん", word: "篩管"), field: .biology, hasHomophones: true)]
+        terms.words["しかん"] = [TermWord(word: DictionaryWord(reading: "しかん", word: "篩管"), field: .biology, overlap: .sameReading)]
         base.table["しかん"] = [("士官", nil), ("弛緩", nil)]
         #expect(converter.candidates(for: "しかん").map(\.text) == ["士官", "弛緩"])
-        #expect(base.auxiliaryWords.map(\.costOffset) == [DefaultSettings.termHomophoneWordCost - DefaultSettings.importedWordCost])
-        #expect(DefaultSettings.termHomophoneWordCost < DefaultSettings.termWordCost)
+        #expect(base.auxiliaryWords.map(\.costOffset) == [DefaultSettings.termOverlappingWordCost - DefaultSettings.importedWordCost])
+        #expect(DefaultSettings.termOverlappingWordCost < DefaultSettings.termWordCost)
+    }
+
+    @Test("通常の辞書の 2 つの語に分けられる読みの語は，さらに低い点数で渡し，読み全体と一致すれば差し込む")
+    func splittable() {
+        let (converter, base, terms, _) = make(Settings())
+        terms.words["たたいた"] = [TermWord(word: DictionaryWord(reading: "たたいた", word: "多対多"), field: .computing, overlap: .splittable)]
+        base.table["たたいた"] = [("叩いた", nil), ("たたいた", nil), ("タタイタ", nil)]
+        #expect(converter.candidates(for: "たたいた").map(\.text) == ["叩いた", "たたいた", "多対多", "タタイタ"])
+        #expect(base.auxiliaryWords.map(\.costOffset) == [DefaultSettings.termOverlappingWordCost - DefaultSettings.importedWordCost])
     }
 
     @Test("専門用語の辞書を切ると，どの分野の語も渡さない")

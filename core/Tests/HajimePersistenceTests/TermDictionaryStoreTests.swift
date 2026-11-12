@@ -22,6 +22,7 @@ struct TermDictionaryStoreTests {
             "ふーりえへんかん\tフーリエ変換\tnoun\tphysics\t0",
             "ぱいそん\tPython\tproperNoun\tcomputing\t0",
             "しかん\t篩管\tnoun\tbiology\t1",
+            "たたいた\t多対多\tnoun\tcomputing\t2",
             "かんくう\t管腔\tnoun\tmedicine",
         ])
         defer { try? FileManager.default.removeItem(at: url) }
@@ -29,10 +30,11 @@ struct TermDictionaryStoreTests {
         #expect(store.words(reading: "ふーりえへんかん").map(\.field) == [.mathematics, .physics])
         #expect(store.words(reading: "ぱいそん") == [TermWord(word: DictionaryWord(reading: "ぱいそん", word: "Python", wordClass: .properNoun), field: .computing)])
         #expect(store.words(reading: "かでん").isEmpty)
-        // 通常の辞書に同じ読みの語があるか．列が無ければあるとみなす(点数を下げる方)
-        #expect(store.words(reading: "しかん").map(\.hasHomophones) == [true])
-        #expect(store.words(reading: "かんくう").map(\.hasHomophones) == [true])
-        #expect(store.words(reading: "かでんあつ").map(\.hasHomophones) == [false])
+        // 読みが通常の辞書の語とどう重なるか．列が無ければ同じ読みの語があるとみなす(点数を下げる方)
+        #expect(store.words(reading: "しかん").map(\.overlap) == [.sameReading])
+        #expect(store.words(reading: "たたいた").map(\.overlap) == [.splittable])
+        #expect(store.words(reading: "かんくう").map(\.overlap) == [.sameReading])
+        #expect(store.words(reading: "かでんあつ").map(\.overlap) == [TermWord.Overlap.none])
     }
 
     @Test("知らない分野の行と，読みの形が正しくない行は使わない")
