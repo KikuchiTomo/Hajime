@@ -152,6 +152,38 @@ pub enum ButtonKind {
     Destructive,
     /// 地の無い小さい絵のボタン(数を 1 段ずつ変える)．絵は文字の色
     Quiet,
+    /// 地と枠のある絵だけのボタン(除外設定の優先度を上げる・下げる)．地はふつうのボタンと同じ
+    Icon,
+}
+
+/// 省いたところに入れる字
+const ELLIPSIS: char = '\u{2026}';
+
+/// width に収まらない文字を，真ん中を「…」にして縮める(macOS の truncationMode(.middle)．長いパスの両端を残す)
+pub fn truncate_middle(
+    measure: &(impl Measure + ?Sized),
+    text: &str,
+    style: TextStyle,
+    width: f32,
+) -> String {
+    if measure.width(text, style) <= width {
+        return text.to_string();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    // 残す字を 1 つずつ減らし，収まったところで止める(前を 1 字多く残す)
+    for kept in (0..chars.len()).rev() {
+        let head = kept.div_ceil(2);
+        let tail = kept - head;
+        let candidate: String = chars[..head]
+            .iter()
+            .chain(std::iter::once(&ELLIPSIS))
+            .chain(&chars[chars.len() - tail..])
+            .collect();
+        if measure.width(&candidate, style) <= width {
+            return candidate;
+        }
+    }
+    ELLIPSIS.to_string()
 }
 
 fn mix(a: Color, b: Color, t: f32) -> Color {
@@ -202,7 +234,7 @@ pub fn button(
             Color::from(palette.control_strong_stroke).with_alpha(opacity::ACCENT_DISABLED),
             Color::from(palette.text_disabled),
         ),
-        (ButtonKind::Standard | ButtonKind::Destructive, enabled) => {
+        (ButtonKind::Standard | ButtonKind::Destructive | ButtonKind::Icon, enabled) => {
             let base = Color::from(palette.control);
             let fill = if state.pressed && enabled {
                 Color::from(palette.control_pressed)
@@ -244,12 +276,15 @@ pub fn button(
         }
     };
     canvas.fill_round(rect, radius, fill);
-    if matches!(kind, ButtonKind::Standard | ButtonKind::Destructive) {
+    if matches!(
+        kind,
+        ButtonKind::Standard | ButtonKind::Destructive | ButtonKind::Icon
+    ) {
         canvas.stroke_round(rect, radius, 1.0, Color::from(palette.control_stroke));
     }
     let style = match kind {
         ButtonKind::Subtle => TextStyle::Icon,
-        ButtonKind::Quiet => TextStyle::IconSmall,
+        ButtonKind::Quiet | ButtonKind::Icon => TextStyle::IconSmall,
         _ => TextStyle::Body,
     };
     canvas.text(rect, label, style, text, TextLayout::CENTER);
@@ -700,6 +735,24 @@ mod tests {
 
     fn theme() -> Theme {
         Theme::fixed(false, 96)
+    }
+
+    #[test]
+    fn 収まらない文字は真ん中を省く() {
+        let canvas = Recorder::default();
+        // 1 字 10 の幅で数える
+        assert_eq!(
+            truncate_middle(&canvas, "abc", TextStyle::Body, 30.0),
+            "abc"
+        );
+        assert_eq!(
+            truncate_middle(&canvas, "C:/Windows/notepad.exe", TextStyle::Body, 70.0),
+            format!("C:/{ELLIPSIS}exe")
+        );
+        assert_eq!(
+            truncate_middle(&canvas, "abcdef", TextStyle::Body, 5.0),
+            ELLIPSIS.to_string()
+        );
     }
 
     #[test]
