@@ -12,8 +12,6 @@ struct BackupPage: View {
                     Button(UIStrings.More.exportSettings) { model.exportSettings() }
                     Button(UIStrings.More.importSettings) { model.importSettings() }
                 }
-            } footer: {
-                Text(UIStrings.More.backupNote).font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 Button(UIStrings.Settings.restoreDefaults, role: .destructive) { model.restoreDefaults() }
@@ -62,8 +60,6 @@ struct AboutPage: View {
                 }
             } header: {
                 Text(UIStrings.More.acknowledgements)
-            } footer: {
-                Text(UIStrings.More.acknowledgementsNote).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

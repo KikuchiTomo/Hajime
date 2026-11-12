@@ -172,8 +172,8 @@ pub mod features {
     pub const TRY_LANGUAGE: &str = "試す";
     pub const LANGUAGE_JUDGING: &str = "判別方法";
     pub const USES_CONTEXT: &str = "前の単語で判別";
-    pub const USES_CONTEXT_NOTE: &str =
-        "make・shine のように英語にも日本語にも読める単語を、前が英語なら英語、日本語なら日本語にします。";
+    /// 「前の単語で判別」の横に出す見本(前が日本語なら英字の語も日本語にする．macOS の UIStrings.Features.usesContextExample)
+    pub const USES_CONTEXT_EXAMPLE: (&str, &str) = ("試合に make", "試合に負け");
     pub const AVOIDS_OFFENSIVE: &str = "不適切な変換を避ける";
     pub const WORD_PLACEHOLDER: &str = "英字の単語";
     pub const LANGUAGE_RULE_WORD: &str = "単語";
@@ -201,8 +201,6 @@ pub mod features {
     pub const CORRECTION_KINDS: &str = "修正の対象";
     pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
     pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
-    pub const CORRECTION_KINDS_NOTE: &str =
-        "使用できない項目は、変換の「タイプミスの修正」で有効にできます。";
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
     pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";
@@ -218,21 +216,24 @@ pub mod extras {
     pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
     pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。";
     pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
+    /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補．macOS の UIStrings.Extras の …Example)
+    pub const LOOSE_READINGS_EXAMPLE: (&str, &str) = ("しゅみれーしょん", "シミュレーション");
+    pub const PHONETIC_SPELLING_EXAMPLE: (&str, &str) = ("ふぉと", "photo");
+    /// 両手が 1 キー右にずれたまま「arigatou」を打った並び
+    pub const HAND_SHIFT_EXAMPLE: (&str, &str) = ("stohsypi", "ありがとう");
+    pub const ENGLISH_TERM_CANDIDATES_EXAMPLE: (&str, &str) = ("api", "API");
     pub const PHONETIC_SPELLING_NOTE: &str =
         "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。";
     pub const ENGLISH_TERM_CANDIDATES: &str = "英語の語の辞書を使う";
     pub const ENGLISH_TERMS: &str = "英語の語の辞書に足した語";
     pub const ENGLISH_TERMS_SECTION: &str = "英語の語の辞書";
-    pub const ENGLISH_TERM_CANDIDATES_NOTE: &str = "ローマ字で打った「api」を「API」に、「openai」を「OpenAI」にするように、書き方の決まった英語の語を候補に出します。「sora」のように読みが日本語の語（空）になるときは、日本語を先に出します。";
-    pub const ENGLISH_TERM_PLACEHOLDER: &str = "書き方どおりの語（例: OpenAI）";
+    pub const ENGLISH_TERM_PLACEHOLDER: &str = "書き方どおりの語";
+    pub const ENGLISH_TERM_PROMPT: &str = "例: OpenAI";
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
-    pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
-    pub const COMMANDS_NOTE: &str =
-        "コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
     pub const COMMAND_READING: &str = "読み";
     pub const COMMAND_TITLE: &str = "名前";
     pub const COMMAND_KIND: &str = "動作";
@@ -619,7 +620,6 @@ pub mod more {
         format!("{count} 件を追加しました")
     }
     pub const CSV_FAILED: &str = "読み込めませんでした。CSV のファイルではないか、大きすぎます";
-    pub const BACKUP_NOTE: &str = "すべての設定を JSON としてインポート・エクスポート可能です。";
     pub const EXPORT_SETTINGS: &str = "設定をエクスポート…";
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
@@ -631,8 +631,6 @@ pub mod more {
     pub const VERSION: &str = "バージョン";
     pub const CHECK_FOR_UPDATES: &str = "更新を確認";
     pub const ACKNOWLEDGEMENTS: &str = "謝辞";
-    pub const ACKNOWLEDGEMENTS_NOTE: &str =
-        "Hajime IME は上記のソフトウェア・モデル・データを利用しています。";
     pub const NOTICES_MISSING: &str = "謝辞のファイルが見つかりません";
     /// 謝辞の項目のライセンスの全文を開く(macOS の UIStrings.More.licenseText)
     pub const LICENSE_TEXT: &str = "ライセンス全文";
@@ -1184,9 +1182,6 @@ pub mod windows {
     pub const ON: &str = "オン";
     pub const OFF: &str = "オフ";
     pub const OPEN_SETTINGS_FILE: &str = "設定ファイルを開く";
-    /// macOS の UIStrings.Sync.note の Mac を PC に，iCloud Drive を OneDrive にしたもの
-    pub const SYNC_NOTE: &str =
-        "Dropbox や OneDrive のフォルダを選択すると、ほかの PC と同期できます。";
     /// 項目ごとの同期の表の列(macOS は項目ごとのスイッチ)
     pub const SYNC_FIELD: &str = "項目";
     /// 項目ごとの同期の表のまとまりの列
@@ -1221,14 +1216,12 @@ pub mod windows {
         "キーの欄を押してから割り当てるキーを押すと記録します。「Ctrl+Shift+Space」のように入力することもできます。";
     /// 読めないキーの書き方
     pub const INVALID_KEY: &str = "キーの書き方が正しくありません";
-    /// macOS の exclusionsNote の「アプリの固有ID」を，Windows で見分けに使う実行ファイルの名前にしたもの
-    pub const EXCLUSIONS_NOTE: &str =
-        "実行ファイルの名前を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。";
+    /// 除外設定の一覧の並びの意味を示す 1 行(macOS の UIStrings.More.exclusionsOrder)
+    pub const EXCLUSIONS_ORDER: &str = "上の行ほど優先";
+    /// コマンドを同期しないことを示す 1 行(macOS の UIStrings.Extras.commandsStoredLocally の Mac を PC にしたもの)
+    pub const COMMANDS_STORED_LOCALLY: &str = "この PC だけに保存";
     /// 不正な実行ファイルの名前(macOS はアプリを選んで足すので無い)
     pub const INVALID_APP: &str = "実行ファイルの名前に使えない文字が含まれています";
-    /// macOS の languageNote の右クリックで足す説明を，試す欄の下のボタンで足す説明にしたもの(Windows の結果は文字で出す)
-    pub const LANGUAGE_NOTE: &str =
-        "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。試した単語は「試す」の下のボタンで一覧に追加できます。";
     /// 見分け方の決まりが無いとき(macOS は空の一覧を出すだけ)
     pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
     /// 変換エンジン(hajime-engine-host)に設定を頼めないとき
