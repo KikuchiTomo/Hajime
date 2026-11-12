@@ -22,10 +22,8 @@ pub enum TextStyle {
     Icon,
     /// 小さい絵(山形の印・チェック)
     IconSmall,
-    /// 初期設定ウィザードの実演の文書の文字
+    /// 初期設定の実演の入力欄の文字
     Demo,
-    /// 初期設定ウィザードの最初と最後のページの大きな絵
-    Hero,
     /// 等幅の小さい文字(ライセンスの全文)
     Mono,
 }
@@ -87,6 +85,14 @@ pub trait Canvas: Measure {
     fn arc(&mut self, arc: Arc, color: Color);
     /// 外観の見本の画像を rect に描く(作れなければ何もしない)
     fn preview(&mut self, rect: Rect);
+    /// slot 番目の画像を (x, y) を左上にして等倍で描く(初期設定の実演．作れなければ何もしない)
+    fn preview_at(&mut self, slot: usize, x: f32, y: f32) {
+        let _ = (slot, x, y);
+    }
+    /// area の中に，(x, y) を中心に半径 radius まで color から透明へにじませる(初期設定の実演の舞台)
+    fn radial_glow(&mut self, area: Rect, x: f32, y: f32, radius: f32, color: Color) {
+        let _ = (area, x, y, radius, color);
+    }
     /// rect の外に描かないようにする(pop_clip と対にする)
     fn push_clip(&mut self, rect: Rect);
     fn pop_clip(&mut self);

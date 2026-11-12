@@ -1,104 +1,102 @@
 #![forbid(unsafe_code)]
 
-//! 初期設定ウィザードの実演の台本．キーを打つ・変換する・候補を選ぶ様子を，時間で進む場面(Beat)の並びにする．
-//! 選んだ値(Choices)で台本を作り直すので，選ぶとすぐ実演に出る．OS に依らない(描くのは app::wizard)．
+//! 初期設定の実演の台本(macOS の DemoScripts と同じ)．入力欄の文字(確定した文字と組み立て中の文字)と，その下に出す
+//! 候補の窓(分岐図・一覧・案内)とモードの札を，時間で切り替わるコマの並びにする．選んでいる値で中身を変える．
+//! 打っている途中の読みは，打ちかけのローマ字を含めて 1 キーずつ見せる．OS に依らない(描くのは app::wizard)．
 //! 実演の文字は台本に書いた見本だけで，利用者の入力は使わない
 
-use crate::strings::wizard as text;
-use crate::wizard::{Choices, Field, Step, SWITCH_HENKAN};
+use crate::strings::{windows_wizard as notes, wizard as text};
+use crate::wizard::{Choices, Field, Step};
+use candidate_ui::scene::sample;
 use ipc::{
     AssociationHeading, BranchColumn, BranchMap, CandidateEntry, CandidateFocus, CandidateList,
-    KeyHint,
+    CommandKind, Note, NoteTone,
 };
-use tokens::motion::settings_windows as motion;
+use tokens::motion::onboarding as motion;
 
-/// 入力中の文字の見え方(下線の種類)
+/// 組み立て中の文字の見え方(下線の種類)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Style {
-    /// 確定した文字(下線なし)
-    Plain,
-    /// 入力中の文字(細い下線)
-    Typing,
+    /// 打っている読み(細い下線)
+    Reading,
     /// 変換した文節(細い下線)
     Converted,
     /// 選んでいる文節(太い下線)
     Focused,
-    /// 補正した文字(点線)
-    Corrected,
+    /// 補正した文字(補正の色の点線)
+    Correction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Run {
+pub struct Segment {
     pub text: String,
     pub style: Style,
+}
+
+/// 入力欄の下に出す窓
+#[derive(Debug, Clone, PartialEq)]
+pub enum Panel {
+    Lattice(BranchMap),
+    List(CandidateList),
+    Note(Note),
 }
 
 /// 入力モード(札に出す)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
+    Direct,
     Japanese,
-    English,
-}
-
-/// 候補ウィンドウ
-#[derive(Debug, Clone, PartialEq)]
-pub enum Popup {
-    Branch(BranchMap),
-    List(CandidateList),
 }
 
 /// 実演の 1 コマ
 #[derive(Debug, Clone, PartialEq)]
 pub struct Frame {
-    /// 文書の中の文字(確定したものと入力中のもの)
-    pub runs: Vec<Run>,
-    pub mode: Mode,
-    /// 押しているキー
-    pub key: Option<&'static str>,
-    pub popup: Option<Popup>,
-    /// 候補ウィンドウを見分ける番号(変わったら描き直す)
-    pub popup_id: u32,
-    /// ライブ変換が漢字にするのを待っている(コマの中の進み具合を帯で出す)
-    pub waiting: bool,
-    /// 何をしているかの説明
-    pub caption: Option<&'static str>,
+    pub committed: String,
+    pub marked: Vec<Segment>,
+    pub panel: Option<Panel>,
+    /// 文字の終わりの横に出すモードの札
+    pub mode: Option<Mode>,
+    /// 入力欄の上に出すアプリの名前(アプリを切り替える実演)
+    pub application: Option<&'static str>,
+    /// このコマを見せておく時間(ミリ秒)
+    pub duration: f64,
 }
 
-impl Default for Frame {
-    fn default() -> Self {
+impl Frame {
+    fn new(duration: f64) -> Self {
         Self {
-            runs: Vec::new(),
-            mode: Mode::Japanese,
-            key: None,
-            popup: None,
-            popup_id: 0,
-            waiting: false,
-            caption: None,
+            committed: String::new(),
+            marked: Vec::new(),
+            panel: None,
+            mode: None,
+            application: None,
+            duration,
         }
     }
-}
 
-#[derive(Debug, Clone, PartialEq)]
-struct Beat {
-    /// ミリ秒
-    duration: f64,
-    frame: Frame,
+    fn committed(text: &str, duration: f64) -> Self {
+        Self {
+            committed: text.into(),
+            ..Self::new(duration)
+        }
+    }
+
+    fn with_mode(mut self, mode: Mode) -> Self {
+        self.mode = Some(mode);
+        self
+    }
 }
 
 /// 実演の台本．初めから終わりまで進んだら繰り返す
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Script {
-    beats: Vec<Beat>,
-    /// 結果を見せるコマ(動きを減らす設定のときはこれだけを出す)
-    result: usize,
+    frames: Vec<Frame>,
 }
 
 /// 台本の今の位置
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Position {
-    pub beat: usize,
-    /// コマの中の進み具合(0〜1)
-    pub progress: f32,
+    pub index: usize,
     /// コマに入ってからのミリ秒
     pub elapsed: f64,
     /// 次のコマまでのミリ秒
@@ -107,11 +105,15 @@ pub struct Position {
 
 impl Script {
     pub fn is_empty(&self) -> bool {
-        self.beats.is_empty()
+        self.frames.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.frames.len()
     }
 
     pub fn total(&self) -> f64 {
-        self.beats.iter().map(|beat| beat.duration).sum()
+        self.frames.iter().map(|frame| frame.duration).sum()
     }
 
     /// 始めてから elapsed ミリ秒たったときの位置(繰り返す)
@@ -121,75 +123,51 @@ impl Script {
             return None;
         }
         let mut time = elapsed.max(0.0) % total;
-        for (index, beat) in self.beats.iter().enumerate() {
-            if time < beat.duration {
+        for (index, frame) in self.frames.iter().enumerate() {
+            if time < frame.duration {
                 return Some(Position {
-                    beat: index,
-                    progress: (time / beat.duration) as f32,
+                    index,
                     elapsed: time,
-                    remaining: beat.duration - time,
+                    remaining: frame.duration - time,
                 });
             }
-            time -= beat.duration;
+            time -= frame.duration;
         }
         None
     }
 
-    pub fn frame(&self, beat: usize) -> Option<&Frame> {
-        self.beats.get(beat).map(|beat| &beat.frame)
+    pub fn frame(&self, index: usize) -> Option<&Frame> {
+        self.frames.get(index)
     }
 
-    pub fn result(&self) -> Option<&Frame> {
-        self.frame(self.result)
-    }
-
-    pub fn result_index(&self) -> usize {
-        self.result
+    /// 最後のコマ(動きを減らす設定のときはこれだけを見せる．macOS と同じ)
+    pub fn last(&self) -> Option<&Frame> {
+        self.frames.last()
     }
 }
 
-/// 今日の日付(日付の実演に使う)．weekday は 0 が日曜
+/// 今の日時(日付の実演に使う)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Today {
     pub year: u16,
     pub month: u16,
     pub day: u16,
-    pub weekday: u16,
     pub hour: u16,
     pub minute: u16,
+    pub second: u16,
 }
 
-/// 令和 n 年は西暦 n + 2018 年(core の DateExpressions と同じ)
-const REIWA_OFFSET: u16 = 2018;
-const WEEKDAYS: [&str; 7] = ["日", "月", "火", "水", "木", "金", "土"];
-
 impl Today {
-    /// 年・月・日(とそれより後ろ)から．曜日は暦から求める
-    pub fn from_fields(fields: [u16; 6]) -> Self {
-        let [year, month, day, hour, minute, _] = fields;
-        let days = days_from_civil(i64::from(year), i64::from(month), i64::from(day));
-        // 1970/1/1 は木曜
-        let weekday = (days + 4).rem_euclid(7) as u16;
+    pub fn from_fields([year, month, day, hour, minute, second]: [u16; 6]) -> Self {
         Self {
             year,
             month,
             day,
-            weekday,
             hour,
             minute,
+            second,
         }
     }
-}
-
-/// 1970/1/1 からの日数(グレゴリオ暦)
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = year.div_euclid(400);
-    let of_era = year - era * 400;
-    let shifted = (month + 9) % 12;
-    let of_year = (153 * shifted + 2) / 5 + day - 1;
-    let of_era_day = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
-    era * 146_097 + of_era_day - 719_468
 }
 
 /// UNIX 時刻(秒)を UTC の年・月・日・時・分・秒にする
@@ -218,867 +196,764 @@ pub fn utc_fields(seconds: u64) -> [u16; 6] {
     ]
 }
 
-/// ローマ字の区切り(打つキーと，打ち終えたときのかな)
-type Unit = (&'static str, &'static str);
+// MARK: - ローマ字
 
-const YOUKOSO: &[Unit] = &[("yo", "よ"), ("u", "う"), ("ko", "こ"), ("so", "そ")];
-const WATASHINO: &[Unit] = &[("wa", "わ"), ("ta", "た"), ("shi", "し"), ("no", "の")];
-const NAMAEHA: &[Unit] = &[("na", "な"), ("ma", "ま"), ("e", "え"), ("ha", "は")];
-const NAKANODESU: &[Unit] = &[
-    ("na", "な"),
-    ("ka", "か"),
-    ("no", "の"),
-    ("de", "で"),
-    ("su", "す"),
+/// 子音(と拗音)の行．5 つは あ・い・う・え・お の段(空なら無い)
+const ROWS: &[(&str, [&str; 5])] = &[
+    ("", ["あ", "い", "う", "え", "お"]),
+    ("k", ["か", "き", "く", "け", "こ"]),
+    ("s", ["さ", "し", "す", "せ", "そ"]),
+    ("t", ["た", "ち", "つ", "て", "と"]),
+    ("n", ["な", "に", "ぬ", "ね", "の"]),
+    ("h", ["は", "ひ", "ふ", "へ", "ほ"]),
+    ("m", ["ま", "み", "む", "め", "も"]),
+    ("y", ["や", "", "ゆ", "いぇ", "よ"]),
+    ("r", ["ら", "り", "る", "れ", "ろ"]),
+    ("w", ["わ", "うぃ", "う", "うぇ", "を"]),
+    ("g", ["が", "ぎ", "ぐ", "げ", "ご"]),
+    ("z", ["ざ", "じ", "ず", "ぜ", "ぞ"]),
+    ("d", ["だ", "ぢ", "づ", "で", "ど"]),
+    ("b", ["ば", "び", "ぶ", "べ", "ぼ"]),
+    ("p", ["ぱ", "ぴ", "ぷ", "ぺ", "ぽ"]),
+    ("f", ["ふぁ", "ふぃ", "ふ", "ふぇ", "ふぉ"]),
+    ("v", ["ゔぁ", "ゔぃ", "ゔ", "ゔぇ", "ゔぉ"]),
+    ("j", ["じゃ", "じ", "じゅ", "じぇ", "じょ"]),
+    ("l", ["ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]),
+    ("x", ["ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]),
+    ("sh", ["しゃ", "し", "しゅ", "しぇ", "しょ"]),
+    ("ch", ["ちゃ", "ち", "ちゅ", "ちぇ", "ちょ"]),
+    ("ts", ["つぁ", "つぃ", "つ", "つぇ", "つぉ"]),
+    ("th", ["てゃ", "てぃ", "てゅ", "てぇ", "てょ"]),
+    ("dh", ["でゃ", "でぃ", "でゅ", "でぇ", "でょ"]),
+    ("ky", ["きゃ", "きぃ", "きゅ", "きぇ", "きょ"]),
+    ("sy", ["しゃ", "しぃ", "しゅ", "しぇ", "しょ"]),
+    ("ty", ["ちゃ", "ちぃ", "ちゅ", "ちぇ", "ちょ"]),
+    ("ny", ["にゃ", "にぃ", "にゅ", "にぇ", "にょ"]),
+    ("hy", ["ひゃ", "ひぃ", "ひゅ", "ひぇ", "ひょ"]),
+    ("my", ["みゃ", "みぃ", "みゅ", "みぇ", "みょ"]),
+    ("ry", ["りゃ", "りぃ", "りゅ", "りぇ", "りょ"]),
+    ("gy", ["ぎゃ", "ぎぃ", "ぎゅ", "ぎぇ", "ぎょ"]),
+    ("zy", ["じゃ", "じぃ", "じゅ", "じぇ", "じょ"]),
+    ("jy", ["じゃ", "じぃ", "じゅ", "じぇ", "じょ"]),
+    ("dy", ["ぢゃ", "ぢぃ", "ぢゅ", "ぢぇ", "ぢょ"]),
+    ("by", ["びゃ", "びぃ", "びゅ", "びぇ", "びょ"]),
+    ("py", ["ぴゃ", "ぴぃ", "ぴゅ", "ぴぇ", "ぴょ"]),
+    ("ly", ["ゃ", "ぃ", "ゅ", "ぇ", "ょ"]),
+    ("xy", ["ゃ", "ぃ", "ゅ", "ぇ", "ょ"]),
 ];
-const NIHONGO: &[Unit] = &[("ni", "に"), ("ho", "ほ"), ("nn", "ん"), ("go", "ご")];
-const KYOUHA: &[Unit] = &[("kyo", "きょ"), ("u", "う"), ("ha", "は")];
-const IITENKI: &[Unit] = &[
-    ("i", "い"),
-    ("i", "い"),
-    ("te", "て"),
+const VOWELS: [char; 5] = ['a', 'i', 'u', 'e', 'o'];
+/// 行に無いもの
+const SPECIAL: &[(&str, &str)] = &[
     ("nn", "ん"),
-    ("ki", "き"),
-];
-/// 「う」を 2 度打った(ダブルタイプ)
-const ARIGATOU_TYPO: &[Unit] = &[
-    ("a", "あ"),
-    ("ri", "り"),
-    ("ga", "が"),
-    ("to", "と"),
-    ("o", "お"),
-    ("u", "う"),
-];
-const TOUKYOU: &[Unit] = &[("to", "と"), ("u", "う"), ("kyo", "きょ"), ("u", "う")];
-const KYOU: &[Unit] = &[("kyo", "きょ"), ("u", "う")];
-const KAWAII: &[Unit] = &[("ka", "か"), ("wa", "わ"), ("i", "い"), ("i", "い")];
-const SHUMIRESHON: &[Unit] = &[
-    ("shu", "しゅ"),
-    ("mi", "み"),
-    ("re", "れ"),
+    ("n'", "ん"),
+    ("ltu", "っ"),
+    ("xtu", "っ"),
     ("-", "ー"),
-    ("sho", "しょ"),
-    ("nn", "ん"),
-];
-const FOTO: &[Unit] = &[("fo", "ふぉ"), ("to", "と")];
-const KURODO: &[Unit] = &[("ku", "く"), ("ro", "ろ"), ("-", "ー"), ("do", "ど")];
-/// 右手も左手も 1 キー右にずれたまま「konnichiha」と打った(QWERTY)
-const HAND_SHIFTED: &[Unit] = &[
-    ("l", "l"),
-    ("p", "p"),
-    ("m", "m"),
-    ("m", "m"),
-    ("o", "o"),
-    ("v", "v"),
-    ("j", "j"),
-    ("o", "o"),
-    ("j", "j"),
-    ("s", "s"),
-];
-/// 動的なユーザー辞書の実演で打つ読み(英字のまま)
-const TS: &[Unit] = &[("t", "t"), ("s", "s")];
-const CALCULATION: &[Unit] = &[
-    ("1", "1"),
-    ("+", "+"),
-    ("2", "2"),
-    ("*", "*"),
-    ("3", "3"),
-    ("=", "="),
-];
-const POSTAL: &[Unit] = &[
-    ("1", "1"),
-    ("0", "0"),
-    ("0", "0"),
-    ("-", "-"),
-    ("0", "0"),
-    ("0", "0"),
-    ("0", "0"),
-    ("1", "1"),
 ];
 
-/// ローマ字かかなか
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Keys {
-    Romaji,
-    Kana,
+fn kana_of(romaji: &str) -> Option<&'static str> {
+    if let Some((_, kana)) = SPECIAL.iter().find(|(keys, _)| *keys == romaji) {
+        return Some(kana);
+    }
+    let vowel = romaji.chars().last()?;
+    let column = VOWELS.iter().position(|candidate| *candidate == vowel)?;
+    let consonant = &romaji[..romaji.len() - vowel.len_utf8()];
+    ROWS.iter()
+        .find(|(row, _)| *row == consonant)
+        .map(|(_, kana)| kana[column])
+        .filter(|kana| !kana.is_empty())
 }
 
-/// 台本を書く道具．今のコマを変えながら場面を足す
-struct Builder {
-    beats: Vec<Beat>,
-    frame: Frame,
-    keys: Keys,
-    result: Option<usize>,
+/// romaji で始まる綴りがあるか(まだ打ち続けられるか)
+fn continues(romaji: &str) -> bool {
+    let longer = |keys: &str| keys.len() > romaji.len() && keys.starts_with(romaji);
+    SPECIAL.iter().any(|(keys, _)| longer(keys))
+        || ROWS.iter().any(|(row, kana)| {
+            VOWELS
+                .iter()
+                .zip(kana)
+                .any(|(vowel, kana)| !kana.is_empty() && longer(&format!("{row}{vowel}")))
+        })
 }
 
-impl Builder {
-    fn new(keys: Keys) -> Self {
-        Self {
-            beats: Vec::new(),
-            frame: Frame::default(),
-            keys,
-            result: None,
-        }
-    }
-
-    fn push(&mut self, duration: f32) {
-        self.beats.push(Beat {
-            duration: f64::from(duration),
-            frame: self.frame.clone(),
-        });
-        self.frame.key = None;
-        self.frame.waiting = false;
-    }
-
-    /// 入力中の文字(最後の Typing の続き)に足す
-    fn append_typing(&mut self, added: &str) {
-        match self.frame.runs.last_mut() {
-            Some(run) if run.style == Style::Typing => run.text.push_str(added),
-            _ => self.frame.runs.push(Run {
-                text: added.into(),
-                style: Style::Typing,
-            }),
-        }
-    }
-
-    fn pop_typing(&mut self, count: usize) {
-        if let Some(run) = self.frame.runs.last_mut() {
-            for _ in 0..count {
-                run.text.pop();
-            }
-        }
-    }
-
-    /// かなを打つ．ローマ字のときは 1 文字ずつ打ち，区切りを打ち終えたらかなにする
-    fn type_units(&mut self, units: &[Unit]) {
-        for (keys, kana) in units {
-            match self.keys {
-                Keys::Romaji if keys.chars().count() > 1 || keys != kana => {
-                    let count = keys.chars().count();
-                    for (index, key) in keys.chars().enumerate() {
-                        if index + 1 < count {
-                            self.append_typing(&key.to_string());
-                            self.push(motion::WIZARD_KEY);
-                        }
-                    }
-                    self.pop_typing(count - 1);
-                    self.append_typing(kana);
+/// keys を 1 つずつ打ったときの，組み立て中の読み(打ちかけのローマ字を含む．macOS の DemoScripts.readings)
+pub fn readings(keys: &str) -> Vec<String> {
+    let mut done = String::new();
+    let mut pending = String::new();
+    keys.chars()
+        .map(|key| {
+            pending.push(key);
+            loop {
+                if let Some(kana) = kana_of(&pending) {
+                    done.push_str(kana);
+                    pending.clear();
+                    break;
                 }
-                _ => self.append_typing(kana),
+                if continues(&pending) {
+                    break;
+                }
+                let mut chars = pending.chars();
+                let Some(first) = chars.next() else { break };
+                let rest: String = chars.collect();
+                match rest.chars().next() {
+                    // n のあとに母音・y・n 以外が来たら「ん」
+                    Some(second) if first == 'n' && !"aiueoyn'".contains(second) => {
+                        done.push('ん');
+                    }
+                    // 同じ子音が続いたら「っ」
+                    Some(second) if first == second && !VOWELS.contains(&first) => {
+                        done.push('っ');
+                    }
+                    // 綴りにならない字はそのまま
+                    _ => done.push(first),
+                }
+                pending = rest;
+                if pending.is_empty() {
+                    break;
+                }
             }
-            self.push(motion::WIZARD_KEY);
-        }
-    }
-
-    /// 英数モードで打つ(そのまま確定する)
-    fn type_direct(&mut self, letters: &str) {
-        for letter in letters.chars() {
-            match self.frame.runs.last_mut() {
-                Some(run) if run.style == Style::Plain => run.text.push(letter),
-                _ => self.frame.runs.push(Run {
-                    text: letter.into(),
-                    style: Style::Plain,
-                }),
-            }
-            self.push(motion::WIZARD_KEY);
-        }
-    }
-
-    /// キーを押して見せる
-    fn key(&mut self, label: &'static str) {
-        self.frame.key = Some(label);
-        self.push(motion::WIZARD_KEY_PRESS);
-    }
-
-    fn pause(&mut self, duration: f32) {
-        self.push(duration);
-    }
-
-    fn caption(&mut self, caption: &'static str) {
-        self.frame.caption = Some(caption);
-    }
-
-    fn popup(&mut self, popup: Option<Popup>) {
-        self.frame.popup = popup;
-        self.frame.popup_id += 1;
-    }
-
-    /// 入力中・変換中の文字を確定する
-    fn commit(&mut self) {
-        let text: String = self
-            .frame
-            .runs
-            .iter()
-            .map(|run| run.text.as_str())
-            .collect();
-        self.frame.runs = vec![Run {
-            text,
-            style: Style::Plain,
-        }];
-        self.popup(None);
-    }
-
-    /// 入力中・変換中の文字(確定した文字より後ろ)を置き換える
-    fn replace_composition(&mut self, runs: &[(&str, Style)]) {
-        self.frame.runs.retain(|run| run.style == Style::Plain);
-        self.frame.runs.extend(runs.iter().map(|(text, style)| Run {
-            text: (*text).into(),
-            style: *style,
-        }));
-    }
-
-    /// 結果を見せて止まる(ここを結果のコマにする)
-    fn hold(&mut self) {
-        self.result = Some(self.beats.len());
-        self.push(motion::WIZARD_HOLD);
-    }
-
-    fn finish(mut self) -> Script {
-        if self.beats.is_empty() {
-            return Script::default();
-        }
-        let result = self.result.unwrap_or(self.beats.len() - 1);
-        // 繰り返す前に文書を空にする間
-        self.frame = Frame {
-            mode: self.frame.mode,
-            ..Frame::default()
-        };
-        self.push(motion::WIZARD_PAUSE);
-        Script {
-            beats: self.beats,
-            result,
-        }
-    }
-}
-
-fn column(text: &str) -> BranchColumn {
-    BranchColumn {
-        text: text.into(),
-        alternatives: vec![],
-        selected_alternative: None,
-        variants: vec![],
-        selected_variant: None,
-        is_focused: false,
-        is_uncertain: false,
-        is_decided: false,
-        is_corrected: None,
-        preview: None,
-        shorter: None,
-        longer: None,
-        usage_note: None,
-        homophone: None,
-        alternative_notes: vec![],
-        alternative_commands: None,
-        source_name: None,
-        split: None,
-    }
-}
-
-fn hints() -> Vec<KeyHint> {
-    text::HINTS
-        .iter()
-        .map(|(keys, label)| KeyHint {
-            keys: (*keys).into(),
-            label: (*label).into(),
+            format!("{done}{pending}")
         })
         .collect()
 }
 
-/// 文節を並べた分岐図．focused の文節に候補の枝を出し，selected を選ぶ
-fn branch(columns: &[&str], focused: usize, alternatives: &[&str], selected: usize) -> Popup {
-    Popup::Branch(BranchMap {
-        columns: columns
-            .iter()
-            .enumerate()
-            .map(|(index, text)| {
-                if index == focused {
-                    BranchColumn {
-                        alternatives: alternatives.iter().map(|text| (*text).into()).collect(),
-                        selected_alternative: Some(selected as u32),
-                        is_focused: true,
-                        ..column(alternatives.get(selected).copied().unwrap_or(text))
-                    }
-                } else {
-                    column(text)
-                }
-            })
-            .collect(),
-        position: selected as u32 + 1,
-        total: alternatives.len() as u32,
-        note: None,
-        hints: hints(),
-        association: None,
-        association_hint: None,
-        association_key: None,
-        meaning_placement: None,
-    })
+// MARK: - 部品
+
+fn keystroke() -> f64 {
+    f64::from(motion::KEYSTROKE)
 }
 
-fn list(entries: &[&str], selected: usize, association: Option<&str>) -> Popup {
-    headed_list(entries, selected, association, text::ASSOCIATION_LABEL)
+fn hold() -> f64 {
+    f64::from(motion::HOLD)
 }
 
-/// 見出し(連想の語と，連想・整形などの種類)の付いた一覧
-fn headed_list(entries: &[&str], selected: usize, association: Option<&str>, label: &str) -> Popup {
-    Popup::List(CandidateList {
+fn segments(texts: &[(&str, Style)]) -> Vec<Segment> {
+    texts
+        .iter()
+        .map(|(text, style)| Segment {
+            text: (*text).into(),
+            style: *style,
+        })
+        .collect()
+}
+
+fn typing(keys: &str, committed: &str, mode: Option<Mode>) -> Vec<Frame> {
+    readings(keys)
+        .into_iter()
+        .map(|reading| Frame {
+            committed: committed.into(),
+            marked: vec![Segment {
+                text: reading,
+                style: Style::Reading,
+            }],
+            mode,
+            ..Frame::new(keystroke())
+        })
+        .collect()
+}
+
+fn converted(texts: &[(&str, Style)], committed: &str, panel: Option<Panel>) -> Frame {
+    Frame {
+        committed: committed.into(),
+        marked: segments(texts),
+        panel,
+        ..Frame::new(hold())
+    }
+}
+
+fn pause(frames: &[Frame], milliseconds: f64) -> Vec<Frame> {
+    frames
+        .last()
+        .map(|frame| Frame {
+            duration: milliseconds,
+            ..frame.clone()
+        })
+        .into_iter()
+        .collect()
+}
+
+fn entry(text: &str) -> CandidateEntry {
+    CandidateEntry {
+        text: text.into(),
+        annotation: None,
+        corrected_start: None,
+        corrected_length: None,
+        command: None,
+    }
+}
+
+fn list(entries: Vec<CandidateEntry>, selected: usize) -> CandidateList {
+    CandidateList {
         variants: vec![],
         selected_variant: None,
-        entries: entries
-            .iter()
-            .map(|text| CandidateEntry {
-                text: (*text).into(),
-                annotation: None,
-                corrected_start: None,
-                corrected_length: None,
-                command: None,
-            })
-            .collect(),
         selected_entry: Some(selected as u32),
         focus: CandidateFocus::Candidate,
         position: selected as u32 + 1,
         total: entries.len() as u32,
+        entries,
         note: None,
         hints: None,
-        association: association.map(|headword| AssociationHeading {
-            headword: headword.into(),
-            label: label.into(),
-            group: 0,
-            group_count: 1,
-        }),
+        association: None,
         association_hint: None,
         association_key: None,
         homophone: None,
         shows_numbers: None,
         meaning_placement: None,
-    })
-}
-
-/// 候補の窓(分岐図か一覧)
-fn candidates(
-    branch_map: bool,
-    columns: &[&str],
-    focused: usize,
-    alternatives: &[&str],
-    selected: usize,
-) -> Popup {
-    if branch_map {
-        branch(columns, focused, alternatives, selected)
-    } else {
-        list(alternatives, selected, None)
     }
 }
 
-/// 変換した文節を下線つきで並べる(focused を太く)
-fn segments<'a>(columns: &[&'a str], focused: usize) -> Vec<(&'a str, Style)> {
-    columns
+fn note(tone: NoteTone, title: &str, subject: Option<&str>, key: &str, action: &str) -> Note {
+    Note {
+        tone,
+        title: title.into(),
+        subject: subject.map(Into::into),
+        key: Some(key.into()),
+        key_action: Some(action.into()),
+        text: String::new(),
+    }
+}
+
+fn heading(headword: &str, label: &str) -> AssociationHeading {
+    AssociationHeading {
+        headword: headword.into(),
+        label: label.into(),
+        group: 1,
+        group_count: 1,
+    }
+}
+
+/// 分岐図．focus の文節に候補の枝(alternatives の先頭を選ぶ)を出す
+fn lattice(columns: &[(&str, &[&str])], focus: usize, uncertain: Option<usize>) -> BranchMap {
+    BranchMap {
+        columns: columns
+            .iter()
+            .enumerate()
+            .map(|(index, (text, alternatives))| {
+                let is_uncertain = uncertain == Some(index);
+                if index == focus {
+                    BranchColumn {
+                        alternatives: alternatives.iter().map(|text| (*text).into()).collect(),
+                        selected_alternative: Some(0),
+                        is_focused: true,
+                        is_uncertain,
+                        ..sample::column(text)
+                    }
+                } else {
+                    BranchColumn {
+                        is_uncertain,
+                        ..sample::column(text)
+                    }
+                }
+            })
+            .collect(),
+        position: 1,
+        total: columns.get(focus).map_or(0, |(_, list)| list.len() as u32),
+        note: None,
+        // 舞台の分岐図にはキーの案内を出さない(macOS の showsHints = false)
+        hints: vec![],
+        association: None,
+        association_hint: None,
+        association_key: None,
+        meaning_placement: None,
+    }
+}
+
+// MARK: - ページ
+
+/// step の実演．spotlight(機能の紹介のページで見せている機能)があれば，その機能だけを(オフでも)見せる
+pub fn script(step: Step, choices: &Choices, spotlight: Option<&str>, today: Today) -> Script {
+    if let Some(spot) =
+        spotlight.and_then(|path| step.spots().iter().find(|spot| spot.path == path))
+    {
+        return Script {
+            frames: spot_frames(spot.path, today),
+        };
+    }
+    let frames = match step {
+        Step::ModeSwitch => mode_switch(),
+        Step::AppModes => app_modes(),
+        Step::Correction => correction(choices),
+        Step::Theme => theme(),
+        Step::LiveConversion => live_conversion(choices),
+        Step::Presentation => presentation(choices),
+        Step::Characters => characters(choices),
+        // 機能の紹介のページは，オンにした機能を順に見せる
+        Step::Features | Step::Extras => {
+            let frames: Vec<Frame> = step
+                .spots()
+                .iter()
+                .filter(|spot| choices.is_on(spot.path))
+                .flat_map(|spot| spot_frames(spot.path, today))
+                .collect();
+            if frames.is_empty() {
+                vec![Frame::new(hold())]
+            } else {
+                frames
+            }
+        }
+    };
+    Script { frames }
+}
+
+/// 英数で打ち，日本語に切り替えて打って変換する
+fn mode_switch() -> Vec<Frame> {
+    let english = notes::DEMO_DIRECT_TEXT;
+    let mut frames = vec![Frame::new(hold() / 2.0).with_mode(Mode::Direct)];
+    frames.extend(english.char_indices().map(|(index, letter)| {
+        Frame::committed(&english[..index + letter.len_utf8()], keystroke()).with_mode(Mode::Direct)
+    }));
+    frames.push(Frame::committed(english, hold() / 2.0).with_mode(Mode::Japanese));
+    frames.extend(typing("nihongo", english, Some(Mode::Japanese)));
+    frames.push(converted(&[("日本語", Style::Converted)], english, None));
+    frames.push(Frame::committed(&format!("{english}日本語"), hold()));
+    frames
+}
+
+/// メモ帳(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英数になり，メモ帳に戻すと日本語に戻る
+fn app_modes() -> Vec<Frame> {
+    let notes_app = notes::DEMO_NOTES;
+    let terminal = text::DEMO_TERMINAL;
+    let command = "git status";
+    let in_app = |frames: Vec<Frame>, application: &'static str| -> Vec<Frame> {
+        frames
+            .into_iter()
+            .map(|frame| Frame {
+                application: Some(application),
+                ..frame
+            })
+            .collect()
+    };
+    let mut frames = vec![Frame::new(hold() / 2.0).with_mode(Mode::Japanese)];
+    frames.extend(typing("kyouha", "", Some(Mode::Japanese)));
+    let mut frames = in_app(frames, notes_app);
+    frames.extend(in_app(
+        vec![
+            converted(&[("今日は", Style::Converted)], "", None),
+            Frame::committed("今日は", hold()).with_mode(Mode::Japanese),
+        ],
+        notes_app,
+    ));
+    let mut typed = vec![Frame::new(hold() / 2.0).with_mode(Mode::Direct)];
+    typed.extend(command.char_indices().map(|(index, letter)| {
+        Frame::committed(&command[..index + letter.len_utf8()], keystroke()).with_mode(Mode::Direct)
+    }));
+    typed.push(Frame::committed(command, hold()).with_mode(Mode::Direct));
+    frames.extend(in_app(typed, terminal));
+    frames.extend(in_app(
+        vec![Frame::committed("今日は", hold()).with_mode(Mode::Japanese)],
+        notes_app,
+    ));
+    frames
+}
+
+fn correction(choices: &Choices) -> Vec<Frame> {
+    let keys = "yorosikuonagaisimasu";
+    let mut frames = typing(keys, "", None);
+    let delay = choices
+        .correction_delay()
+        .map_or(hold() / 2.0, |seconds| seconds * 1000.0);
+    frames.extend(pause(&frames, delay));
+    let typed = readings(keys).pop().unwrap_or_default();
+    match choices.value(Field::Correction) {
+        "off" => frames.push(converted(
+            &[("よろしくおながいします", Style::Converted)],
+            "",
+            None,
+        )),
+        "cautious" => {
+            let shown = note(
+                NoteTone::Suggestion,
+                notes::NOTE_SUGGESTION,
+                Some("よろしくお願いします"),
+                notes::KEY_TAB,
+                notes::NOTE_FIX,
+            );
+            frames.push(converted(
+                &[("よろしくおながいします", Style::Converted)],
+                "",
+                Some(Panel::Note(shown)),
+            ));
+            frames.push(converted(
+                &[("よろしくお願いします", Style::Converted)],
+                "",
+                None,
+            ));
+        }
+        _ => {
+            let shown = note(
+                NoteTone::Correction,
+                notes::NOTE_CORRECTION,
+                Some(&typed),
+                notes::KEY_ESCAPE,
+                notes::NOTE_REVERT,
+            );
+            frames.push(converted(
+                &[
+                    ("よろしく", Style::Converted),
+                    ("お願い", Style::Correction),
+                    ("します", Style::Converted),
+                ],
+                "",
+                Some(Panel::Note(shown)),
+            ));
+        }
+    }
+    frames
+}
+
+/// 選んだテーマの見本の分岐図(1 コマ)
+fn theme() -> Vec<Frame> {
+    let map = BranchMap {
+        hints: vec![],
+        ..sample::branch()
+    };
+    vec![converted(
+        &[
+            ("私の", Style::Converted),
+            ("名前は", Style::Converted),
+            ("中野です", Style::Focused),
+        ],
+        "",
+        Some(Panel::Lattice(map)),
+    )]
+}
+
+fn live_conversion(choices: &Choices) -> Vec<Frame> {
+    let mut frames = typing("kyouhaiitenkidesune", "", None);
+    if choices.live() {
+        frames.extend(pause(
+            &frames,
+            choices.seconds(crate::wizard::LIVE_DELAY) * 1000.0,
+        ));
+        frames.push(converted(
+            &[("今日はいい天気ですね", Style::Converted)],
+            "",
+            None,
+        ));
+    } else {
+        frames.extend(pause(&frames, hold() / 2.0));
+        let columns: [(&str, &[&str]); 3] = [
+            ("今日は", &["今日は", "京は", "教派"]),
+            ("いい", &["いい", "良い", "言い"]),
+            ("天気ですね", &["天気ですね", "転機ですね"]),
+        ];
+        frames.push(converted(
+            &[
+                ("今日は", Style::Focused),
+                ("いい", Style::Converted),
+                ("天気ですね", Style::Converted),
+            ],
+            "",
+            Some(Panel::Lattice(lattice(&columns, 0, None))),
+        ));
+    }
+    frames.push(Frame::committed("今日はいい天気ですね", hold() / 2.0));
+    frames
+}
+
+fn presentation(choices: &Choices) -> Vec<Frame> {
+    let mut frames = typing("watasinonamaehanakanodesu", "", None);
+    frames.extend(pause(&frames, hold() / 3.0));
+    let focus = match choices.value(Field::Path("initialFocus")) {
+        "start" => 0,
+        _ => 2,
+    };
+    let names = ["私の", "名前は", "中野です"];
+    let marked: Vec<(&str, Style)> = names
         .iter()
         .enumerate()
         .map(|(index, text)| {
-            let style = if index == focused {
+            let style = if index == focus {
                 Style::Focused
             } else {
                 Style::Converted
             };
             (*text, style)
         })
+        .collect();
+    match choices.value(Field::Path("candidatePresentation")) {
+        "segmentList" => {
+            let entries = if focus == 0 {
+                [names[0], "わたしの", "ワタシノ"]
+            } else {
+                [names[2], "中のです", "なかのです"]
+            };
+            let shown = list(entries.iter().map(|text| entry(text)).collect(), 0);
+            frames.push(converted(&marked, "", Some(Panel::List(shown))));
+        }
+        "list" => {
+            let entries = [
+                "私の名前は中野です",
+                "私の名前は中のです",
+                "わたしのなまえはなかのです",
+            ];
+            let shown = list(entries.iter().map(|text| entry(text)).collect(), 0);
+            frames.push(converted(
+                &[(entries[0], Style::Focused)],
+                "",
+                Some(Panel::List(shown)),
+            ));
+        }
+        _ => {
+            let columns: [(&str, &[&str]); 3] = [
+                ("私の", &["私の", "渡しの", "わたしの"]),
+                ("名前は", &["名前は", "なまえは"]),
+                (
+                    "中野です",
+                    &["中野です", "中のです", "仲のです", "那珂のです"],
+                ),
+            ];
+            frames.push(converted(
+                &marked,
+                "",
+                Some(Panel::Lattice(lattice(&columns, focus, Some(2)))),
+            ));
+        }
+    }
+    frames
+}
+
+/// 句読点・括弧・スラッシュ・数字の幅を選んだものにして，1 字ずつ入れる
+fn characters(choices: &Choices) -> Vec<Frame> {
+    let value = |path: &'static str| choices.value(Field::Path(path));
+    let (comma, period) = match value("punctuation") {
+        "commaPeriod" => ("，", "．"),
+        "toutenPeriod" => ("、", "．"),
+        "commaKuten" => ("，", "。"),
+        _ => ("、", "。"),
+    };
+    let (open, close) = match value("brackets") {
+        "square" => ("［", "］"),
+        _ => ("「", "」"),
+    };
+    let slash = match value("slash") {
+        "slash" => "／",
+        _ => "・",
+    };
+    let fullwidth = value("numberWidth") == "fullwidth";
+    let number = |digits: &str| -> String {
+        if fullwidth {
+            digits
+                .chars()
+                .map(|digit| char::from_u32(digit as u32 + 0xFEE0).unwrap_or(digit))
+                .collect()
+        } else {
+            digits.into()
+        }
+    };
+    let shown = format!(
+        "{open}はい{close}{comma}{}時{slash}{}時{period}",
+        number("10"),
+        number("11")
+    );
+    let mut frames: Vec<Frame> = shown
+        .char_indices()
+        .map(|(index, letter)| {
+            Frame::committed(&shown[..index + letter.len_utf8()], keystroke() * 2.0)
+        })
+        .collect();
+    frames.push(Frame::committed(&shown, hold()));
+    frames
+}
+
+// MARK: - 機能ごとの実演
+
+/// 一覧の候補を from から to まで 1 つずつ選び，最後に確定する(commit が None なら確定しない)．
+/// command はコマンドの候補の位置．一覧では種類のアイコンと札を付け，選んでいるあいだは確定のキーで動くことを出す
+struct Choosing<'a> {
+    entries: &'a [&'a str],
+    to: usize,
+    heading: Option<AssociationHeading>,
+    command: Option<usize>,
+    commit: Option<&'a str>,
+}
+
+fn choosing(choosing: Choosing) -> Vec<Frame> {
+    let rows: Vec<CandidateEntry> = choosing
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(index, text)| {
+            if Some(index) == choosing.command {
+                CandidateEntry {
+                    annotation: Some(candidate_ui::strings::COMMAND.into()),
+                    command: Some(CommandKind::OpenApplication),
+                    ..entry(text)
+                }
+            } else {
+                entry(text)
+            }
+        })
+        .collect();
+    let mut frames = Vec::new();
+    for selected in 0..=choosing.to {
+        let chooses_command = Some(selected) == choosing.command;
+        let mut shown = list(rows.clone(), selected);
+        shown.association = choosing.heading.clone();
+        if chooses_command {
+            shown.note = Some(Note {
+                key: Some(notes::KEY_ENTER.into()),
+                key_action: Some(notes::NOTE_RUN.into()),
+                ..note(NoteTone::Info, "", None, "", "")
+            });
+        }
+        let text = if chooses_command {
+            format!("{}{}", notes::COMMAND_MARK, choosing.entries[selected])
+        } else {
+            choosing.entries[selected].to_string()
+        };
+        let mut frame = converted(&[(&text, Style::Focused)], "", Some(Panel::List(shown)));
+        // 選んでいる候補を動かすあいだは短く，最後の候補は長く見せる
+        if selected != choosing.to {
+            frame.duration = hold() / 2.0;
+        }
+        frames.push(frame);
+    }
+    if let Some(commit) = choosing.commit {
+        frames.push(Frame::committed(commit, hold()));
+    }
+    frames
+}
+
+/// 打ちかけの字をそのまま 1 字ずつ見せる(数字や記号はローマ字の組み立てを通さない)
+fn typing_literally(shown: &str) -> Vec<Frame> {
+    shown
+        .char_indices()
+        .map(|(index, letter)| Frame {
+            marked: segments(&[(&shown[..index + letter.len_utf8()], Style::Reading)]),
+            ..Frame::new(keystroke() * 1.5)
+        })
         .collect()
 }
 
-const NAME_COLUMNS: [&str; 3] = ["私の", "名前は", "中野です"];
-const NAME_ALTERNATIVES: [&str; 4] = ["中野です", "中のです", "仲のです", "那珂のです"];
-
-/// step の実演．選んだ値で台本を変える
-pub fn script(step: Step, choices: &Choices, today: Today) -> Script {
-    let keys = if choices.value(Field::Path("inputStyle")) == "kana" {
-        Keys::Kana
-    } else {
-        Keys::Romaji
+/// 一つの機能の実演．オンかどうかによらず，その機能が何をするかを見せる(macOS の DemoScripts.frames(for:))
+pub fn spot_frames(path: &str, today: Today) -> Vec<Frame> {
+    let pick = |entries: &[&str], to: usize, commit: Option<&str>| {
+        choosing(Choosing {
+            entries,
+            to,
+            heading: None,
+            command: None,
+            commit,
+        })
     };
-    let branch_map = choices.value(Field::Path("candidatePresentation")) == "automatic";
-    let mut b = Builder::new(keys);
-    match step {
-        Step::Welcome => {
-            b.type_units(YOUKOSO);
-            b.key(text::KEY_ENTER);
-            b.commit();
-            b.hold();
-        }
-        Step::Switch => {
-            let henkan = choices.value(Field::Switch) == SWITCH_HENKAN;
-            let (to_english, to_japanese) = if henkan {
-                (text::KEY_MUHENKAN, text::KEY_HENKAN)
-            } else {
-                (text::KEY_HANKAKU, text::KEY_HANKAKU)
-            };
-            b.key(to_english);
-            b.frame.mode = Mode::English;
-            b.caption(text::CAPTION_ENGLISH);
-            b.pause(motion::WIZARD_KEY);
-            b.type_direct("Windows ");
-            b.key(to_japanese);
-            b.frame.mode = Mode::Japanese;
-            b.caption(text::CAPTION_JAPANESE);
-            b.pause(motion::WIZARD_KEY);
-            b.type_units(NIHONGO);
-            b.key(text::KEY_ENTER);
-            b.commit();
-            b.hold();
-        }
-        Step::AppModes => {
-            // メモ帳(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英語になり，
-            // メモ帳に戻すと日本語に戻る(macOS の初期設定と同じ)
-            b.caption(text::CAPTION_APP_NOTES);
-            b.type_units(KYOUHA);
-            b.key(text::KEY_SPACE);
-            b.replace_composition(&[("今日は", Style::Converted)]);
-            b.pause(motion::WIZARD_KEY);
-            b.key(text::KEY_ENTER);
-            b.commit();
-            b.pause(motion::WIZARD_KEY);
-            b.frame.runs.clear();
-            b.frame.mode = Mode::English;
-            b.caption(text::CAPTION_APP_TERMINAL);
-            b.pause(motion::WIZARD_KEY);
-            b.type_direct("git status");
-            b.pause(motion::WIZARD_PAUSE);
-            b.frame.runs = vec![Run {
-                text: "今日は".into(),
-                style: Style::Plain,
-            }];
-            b.frame.mode = Mode::Japanese;
-            b.caption(text::CAPTION_APP_BACK);
-            b.hold();
-        }
-        Step::Characters => {
-            let (comma, period) = match choices.value(Field::Path("punctuation")) {
-                "commaPeriod" => ("，", "．"),
-                "toutenPeriod" => ("、", "．"),
-                "commaKuten" => ("，", "。"),
-                _ => ("、", "。"),
-            };
-            b.caption(if keys == Keys::Kana {
-                text::CAPTION_KANA
-            } else {
-                text::CAPTION_ROMAJI
-            });
-            b.type_units(KYOUHA);
-            b.type_units(&[(",", comma)]);
-            b.type_units(IITENKI);
-            b.type_units(&[(".", period)]);
-            b.hold();
-        }
-        Step::LiveConversion => {
-            let live = choices.is_on("liveConversion");
-            let delay = choices
-                .value(Field::Path("liveConversionDelay"))
-                .parse::<f32>()
-                .unwrap_or(0.5)
-                * 1000.0;
-            b.type_units(WATASHINO);
-            if live {
-                b.frame.waiting = true;
-                b.push(delay);
-                b.replace_composition(&[("私の", Style::Typing)]);
-                b.caption(text::CAPTION_LIVE);
-                b.pause(motion::WIZARD_PAUSE);
-                b.type_units(NAMAEHA);
-                b.frame.waiting = true;
-                b.push(delay);
-                b.replace_composition(&[("私の名前は", Style::Typing)]);
-                b.hold();
-            } else {
-                b.type_units(NAMAEHA);
-                b.caption(text::CAPTION_SPACE);
-                b.pause(motion::WIZARD_PAUSE);
-                b.key(text::KEY_SPACE);
-                b.replace_composition(&segments(&["私の", "名前は"], 0));
-                b.hold();
-            }
-        }
-        Step::Window | Step::Appearance => {
-            b.frame.runs.push(Run {
-                text: "私の名前は".into(),
-                style: Style::Plain,
-            });
-            b.type_units(NAKANODESU);
-            b.key(text::KEY_SPACE);
-            b.replace_composition(&segments(&["中野です"], 0));
-            b.popup(Some(candidates(
-                branch_map,
-                &["私の", "名前は", "中野です"],
-                2,
-                &NAME_ALTERNATIVES,
-                0,
-            )));
-            b.pause(motion::WIZARD_PAUSE);
-            b.key(text::KEY_DOWN);
-            b.replace_composition(&segments(&["中のです"], 0));
-            b.popup(Some(candidates(
-                branch_map,
-                &["私の", "名前は", "中のです"],
-                2,
-                &NAME_ALTERNATIVES,
-                1,
-            )));
-            b.pause(motion::WIZARD_PAUSE);
-            b.key(text::KEY_UP);
-            b.replace_composition(&segments(&["中野です"], 0));
-            b.popup(Some(candidates(
-                branch_map,
-                &["私の", "名前は", "中野です"],
-                2,
-                &NAME_ALTERNATIVES,
-                0,
-            )));
-            b.hold();
-            b.key(text::KEY_ENTER);
-            b.commit();
-            b.pause(motion::WIZARD_PAUSE);
-        }
-        Step::Focus => {
-            b.type_units(WATASHINO);
-            b.type_units(NAMAEHA);
-            b.type_units(NAKANODESU);
-            b.key(text::KEY_SPACE);
-            let start = match choices.value(Field::Path("initialFocus")) {
-                "start" => 0,
-                _ => 2,
-            };
-            let alternatives: [&[&str]; 3] = [
-                &["私の", "渡しの", "わたしの"],
-                &["名前は", "名まえは", "なまえは"],
-                &NAME_ALTERNATIVES,
-            ];
-            let show = |b: &mut Builder, focused: usize| {
-                b.replace_composition(&segments(&NAME_COLUMNS, focused));
-                b.popup(Some(candidates(
-                    branch_map,
-                    &NAME_COLUMNS,
-                    focused,
-                    alternatives[focused],
-                    0,
-                )));
-            };
-            show(&mut b, start);
-            b.caption(text::CAPTION_FOCUS);
-            b.hold();
-            let (key, order) = if start == 0 {
-                (text::KEY_RIGHT, [1, 2])
-            } else {
-                (text::KEY_LEFT, [1, 0])
-            };
-            for focused in order {
-                b.key(key);
-                show(&mut b, focused);
-                b.pause(motion::WIZARD_PAUSE);
-            }
-        }
-        Step::Correction => {
-            let corrects = matches!(
-                choices.value(Field::Correction),
-                "cautious" | "standard" | "aggressive"
-            );
-            b.caption(text::CAPTION_TYPO);
-            b.type_units(ARIGATOU_TYPO);
-            b.pause(motion::WIZARD_PAUSE);
-            if corrects {
-                b.replace_composition(&[("ありがと", Style::Typing), ("う", Style::Corrected)]);
-                b.caption(text::CAPTION_CORRECTED);
-                b.pause(motion::WIZARD_PAUSE);
-                b.key(text::KEY_SPACE);
-                b.replace_composition(&segments(&["ありがとう"], 0));
-            } else {
-                b.key(text::KEY_SPACE);
-                b.replace_composition(&segments(&["有難おう"], 0));
-                b.caption(text::CAPTION_NOT_CORRECTED);
-            }
-            b.hold();
-        }
-        Step::Features | Step::Extras => features(&mut b, choices, today, branch_map, step),
-        Step::Done => {}
-    }
-    b.finish()
-}
-
-/// 便利な機能・試験的な機能を順に見せる(オフの機能は，変換しても出ないことを見せる)
-fn features(b: &mut Builder, choices: &Choices, today: Today, branch_map: bool, step: Step) {
-    let items = if step == Step::Features {
-        crate::wizard::FEATURES
-    } else {
-        crate::wizard::EXTRAS
-    };
-    for (index, (path, title)) in items.iter().enumerate() {
-        if index > 0 {
-            b.frame.runs.clear();
-            b.pause(motion::WIZARD_PAUSE);
-        }
-        b.caption(title);
-        feature(b, path, choices.is_on(path), today, branch_map);
-    }
-}
-
-/// 1 つの機能だけの実演(項目にポインターを置いたとき．macOS の OnboardingSpotlight)．オンかどうかによらず，
-/// その機能が何をするかを見せる
-pub fn spotlight(path: &str, choices: &Choices, today: Today) -> Script {
-    let keys = if choices.value(Field::Path("inputStyle")) == "kana" {
-        Keys::Kana
-    } else {
-        Keys::Romaji
-    };
-    let branch_map = choices.value(Field::Path("candidatePresentation")) == "automatic";
-    let mut b = Builder::new(keys);
-    feature(&mut b, path, true, today, branch_map);
-    b.finish()
-}
-
-/// 1 つの機能の実演．on でなければ，変換しても出ないことを見せる
-fn feature(b: &mut Builder, path: &str, on: bool, today: Today, branch_map: bool) {
     match path {
-        "association" => association(b, on, branch_map),
-        "calculation" => converted_to(b, CALCULATION, on, &["7", "1+2*3=7", "1+2*3="], "1+2*3="),
-        "postalCodeConversion" => converted_to(
-            b,
-            POSTAL,
-            on,
-            &["東京都千代田区千代田", "100-0001"],
-            "100-0001",
-        ),
-        "dateConversion" => date(b, on, today),
-        "looseReadings" => choose(
-            b,
-            SHUMIRESHON,
-            on,
-            &["シュミレーション", "シミュレーション", "趣味レーション"],
-        ),
-        "phoneticSpelling" => choose(b, FOTO, on, &["フォト", "photo", "ふぉと"]),
-        "handShiftCorrection" => hand_shift(b, on),
-        "conversionMacros" => macros(b, on),
-        "dynamicDictionary" => {
-            let stamp = format!(
-                "{:04}-{:02}-{:02} {:02}:{:02}",
-                today.year, today.month, today.day, today.hour, today.minute
+        "association" => {
+            let mut frames = typing("kawaii", "", None);
+            frames.extend(pick(&["可愛い", "かわいい", "カワイイ"], 0, None));
+            frames.extend(choosing(Choosing {
+                entries: &["愛らしい", "可憐", "愛くるしい", "キュート"],
+                to: 3,
+                heading: Some(heading("可愛い", text::ASSOCIATION)),
+                command: None,
+                commit: Some("キュート"),
+            }));
+            frames
+        }
+        "calculation" => {
+            let mut frames = typing_literally("1+2*3=");
+            frames.extend(pick(&["7", "1+2*3=7"], 1, Some("1+2*3=7")));
+            frames
+        }
+        "postalCodeConversion" => {
+            let mut frames = typing_literally("100-0001");
+            frames.extend(pick(
+                &["東京都千代田区千代田", "100-0001"],
+                0,
+                Some("東京都千代田区千代田"),
+            ));
+            frames
+        }
+        "dateConversion" => {
+            let long = format!("{}年{}月{}日", today.year, today.month, today.day);
+            let short = format!("{}/{:02}/{:02}", today.year, today.month, today.day);
+            let mut frames = typing("kyou", "", None);
+            frames.extend(pick(&[&long, &short, "今日"], 1, Some(&short)));
+            frames
+        }
+        "looseReadings" => {
+            let mut frames = typing("shumire-shon", "", None);
+            frames.extend(pick(
+                &["シュミレーション", "シミュレーション", "趣味レーション"],
+                1,
+                Some("シミュレーション"),
+            ));
+            frames
+        }
+        "phoneticSpelling" => {
+            let mut frames = typing("foto", "", None);
+            frames.extend(pick(&["フォト", "photo", "ふぉと"], 1, Some("photo")));
+            frames
+        }
+        "handShiftCorrection" => {
+            // 右手も左手も 1 キー右にずれたまま「konnichiha」と打った(QWERTY)
+            let keys = "lpmmovjojs";
+            let mut frames = typing(keys, "", None);
+            frames.extend(pause(&frames, hold() / 2.0));
+            let shown = note(
+                NoteTone::Correction,
+                notes::NOTE_CORRECTION,
+                Some(keys),
+                notes::KEY_ESCAPE,
+                notes::NOTE_REVERT,
             );
-            converted_to(b, TS, on, &[stamp.as_str(), "ts", "TS"], "ts");
+            frames.push(converted(
+                &[("こんにちは", Style::Correction)],
+                "",
+                Some(Panel::Note(shown)),
+            ));
+            frames.push(Frame::committed("こんにちは", hold()));
+            frames
         }
-        "launcherCommands" => commands(b, on),
-        _ => {}
-    }
-}
-
-/// 打って変換すると entries の最初の候補になる(オフなら off の文字のまま)．結果を見せて確定する
-fn converted_to(b: &mut Builder, units: &[Unit], on: bool, entries: &[&str], off: &str) {
-    b.type_units(units);
-    b.key(text::KEY_SPACE);
-    if on {
-        b.replace_composition(&segments(&[entries[0]], 0));
-        b.popup(Some(list(entries, 0, None)));
-        b.hold();
-    } else {
-        b.replace_composition(&segments(&[off], 0));
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
-    }
-    b.key(text::KEY_ENTER);
-    b.commit();
-}
-
-/// 打って変換し，2 番目の候補を選んで確定する(オフなら 2 番目の候補は出ない)
-fn choose(b: &mut Builder, units: &[Unit], on: bool, entries: &[&str]) {
-    b.type_units(units);
-    b.key(text::KEY_SPACE);
-    b.replace_composition(&segments(&[entries[0]], 0));
-    if !on {
-        let shown: Vec<&str> = entries
-            .iter()
-            .enumerate()
-            .filter(|(index, _)| *index != 1)
-            .map(|(_, entry)| *entry)
-            .collect();
-        b.popup(Some(list(&shown, 0, None)));
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
-        b.key(text::KEY_ENTER);
-        b.commit();
-        return;
-    }
-    b.popup(Some(list(entries, 0, None)));
-    b.pause(motion::WIZARD_PAUSE);
-    b.key(text::KEY_DOWN);
-    b.replace_composition(&segments(&[entries[1]], 0));
-    b.popup(Some(list(entries, 1, None)));
-    b.hold();
-    b.key(text::KEY_ENTER);
-    b.commit();
-}
-
-/// 連想: 変換した語から似た意味の語を出す(macOS と同じ例)
-fn association(b: &mut Builder, on: bool, branch_map: bool) {
-    let words = ["愛らしい", "可憐", "愛くるしい", "キュート"];
-    b.type_units(KAWAII);
-    b.key(text::KEY_SPACE);
-    b.replace_composition(&segments(&["可愛い"], 0));
-    b.popup(Some(candidates(
-        branch_map,
-        &["可愛い"],
-        0,
-        &["可愛い", "かわいい", "カワイイ"],
-        0,
-    )));
-    b.pause(motion::WIZARD_PAUSE);
-    if on {
-        b.key(text::KEY_ASSOCIATE);
-        b.replace_composition(&[(words[0], Style::Focused)]);
-        b.popup(Some(list(&words, 0, Some("可愛い"))));
-        b.pause(motion::WIZARD_PAUSE);
-        for selected in 1..words.len() {
-            b.key(text::KEY_DOWN);
-            b.replace_composition(&[(words[selected], Style::Focused)]);
-            b.popup(Some(list(&words, selected, Some("可愛い"))));
+        "conversionMacros" => {
+            let mut frames = typing("toukyou", "", None);
+            frames.extend(pick(&["東京", "とうきょう", "トウキョウ"], 0, None));
+            frames.extend(choosing(Choosing {
+                entries: &[
+                    "「東京」",
+                    "『東京』",
+                    "【東京】",
+                    "（東京）",
+                    "東京（とうきょう）",
+                ],
+                to: 4,
+                heading: Some(heading("東京", notes::MACRO_LABEL)),
+                command: None,
+                commit: Some("東京（とうきょう）"),
+            }));
+            frames
         }
-        b.hold();
-    } else {
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
-    }
-    b.key(text::KEY_ENTER);
-    b.commit();
-}
-
-/// 日付: 「きょう」を今日の日付に
-fn date(b: &mut Builder, on: bool, today: Today) {
-    b.type_units(KYOU);
-    b.key(text::KEY_SPACE);
-    b.replace_composition(&segments(&["今日"], 0));
-    let mut dates = vec!["今日".to_string(), "京".to_string()];
-    if on {
-        let Today {
-            year,
-            month,
-            day,
-            weekday,
-            ..
-        } = today;
-        dates.extend([
-            format!("{year}/{month}/{day}"),
-            format!("{year}年{month}月{day}日"),
-            format!(
-                "令和{}年{month}月{day}日",
-                year.saturating_sub(REIWA_OFFSET)
-            ),
-            format!(
-                "{month}/{day}({})",
-                WEEKDAYS[usize::from(weekday) % WEEKDAYS.len()]
-            ),
-        ]);
-    }
-    let entries: Vec<&str> = dates.iter().map(String::as_str).collect();
-    b.popup(Some(list(&entries, 0, None)));
-    b.pause(motion::WIZARD_PAUSE);
-    if on {
-        for selected in [1, 2, 3] {
-            b.key(text::KEY_DOWN);
-            let shown = entries[selected + 1];
-            b.replace_composition(&[(shown, Style::Focused)]);
-            b.popup(Some(list(&entries, selected + 1, None)));
+        "dynamicDictionary" => {
+            // 読み「ts」・単語「{datetime:YYYY-MM-DD hh:mm:ss}」を登録したとき
+            let stamp = format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                today.year, today.month, today.day, today.hour, today.minute, today.second
+            );
+            let mut frames = typing_literally("ts");
+            frames.extend(pick(&[&stamp, "ts", "TS"], 0, Some(&stamp)));
+            frames
         }
-        b.hold();
-    } else {
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
-    }
-    b.key(text::KEY_ENTER);
-    b.commit();
-}
-
-/// 手のずれ: 1 キー横にずれたまま打った文を直す
-fn hand_shift(b: &mut Builder, on: bool) {
-    b.type_units(HAND_SHIFTED);
-    b.pause(motion::WIZARD_PAUSE);
-    if on {
-        b.replace_composition(&[("こんにちは", Style::Corrected)]);
-        b.caption(text::CAPTION_HAND_SHIFT);
-        b.hold();
-    } else {
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
-    }
-    b.key(text::KEY_ENTER);
-    b.commit();
-}
-
-/// 変換マクロ: 変換した語を整えた形を連想変換と同じキーで出す
-fn macros(b: &mut Builder, on: bool) {
-    let shaped = [
-        "「東京」",
-        "『東京』",
-        "【東京】",
-        "（東京）",
-        "東京（とうきょう）",
-    ];
-    b.type_units(TOUKYOU);
-    b.key(text::KEY_SPACE);
-    b.replace_composition(&segments(&["東京"], 0));
-    b.popup(Some(list(&["東京", "とうきょう", "トウキョウ"], 0, None)));
-    b.pause(motion::WIZARD_PAUSE);
-    if on {
-        b.key(text::KEY_ASSOCIATE);
-        b.replace_composition(&[(shaped[0], Style::Focused)]);
-        b.popup(Some(headed_list(
-            &shaped,
-            0,
-            Some("東京"),
-            text::MACRO_LABEL,
-        )));
-        for selected in 1..shaped.len() {
-            b.key(text::KEY_DOWN);
-            b.replace_composition(&[(shaped[selected], Style::Focused)]);
-            b.popup(Some(headed_list(
-                &shaped,
-                selected,
-                Some("東京"),
-                text::MACRO_LABEL,
-            )));
+        "launcherCommands" => {
+            // 第 1 候補は語のまま．コマンドは 2 番目に並び，選んで確定したときだけ動く(文字は入らない)
+            let mut frames = typing("kuro-do", "", None);
+            frames.extend(choosing(Choosing {
+                entries: &["クロード", text::COMMANDS_EXAMPLE, "黒戸"],
+                to: 1,
+                heading: None,
+                command: Some(1),
+                commit: None,
+            }));
+            frames.push(Frame::new(hold()));
+            frames
         }
-        b.hold();
-    } else {
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
+        _ => vec![Frame::new(hold())],
     }
-    b.key(text::KEY_ENTER);
-    b.commit();
-}
-
-/// コマンド: 読みを変換すると 2 番目の候補にコマンドが並ぶ．選んで確定したときだけ動く(文字は入らない)
-fn commands(b: &mut Builder, on: bool) {
-    let command = format!("{}{}", text::COMMAND_MARK, text::COMMANDS_EXAMPLE);
-    let entries = if on {
-        vec!["クロード", command.as_str(), "黒戸"]
-    } else {
-        vec!["クロード", "黒戸"]
-    };
-    b.type_units(KURODO);
-    b.key(text::KEY_SPACE);
-    b.replace_composition(&segments(&["クロード"], 0));
-    b.popup(Some(list(&entries, 0, None)));
-    b.pause(motion::WIZARD_PAUSE);
-    if on {
-        b.key(text::KEY_DOWN);
-        b.popup(Some(list(&entries, 1, None)));
-        b.caption(text::CAPTION_COMMAND);
-        b.hold();
-    } else {
-        b.caption(text::CAPTION_OFF);
-        b.pause(motion::WIZARD_HOLD);
-    }
-    b.key(text::KEY_ESCAPE);
-    b.frame.runs.clear();
-    b.popup(None);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::wizard::{Read, SWITCH_TOGGLE};
+    use crate::wizard::{Read, LIVE, LIVE_DELAY};
     use serde_json::{json, Value};
     use std::collections::HashMap;
 
@@ -1088,230 +963,234 @@ mod tests {
         fn value(&self, path: &str) -> Option<&Value> {
             self.0.get(path)
         }
-        fn is_default(&self, _: &str) -> bool {
-            true
-        }
     }
 
     const TODAY: Today = Today {
         year: 2026,
         month: 10,
         day: 28,
-        weekday: 3,
-        hour: 0,
-        minute: 0,
+        hour: 9,
+        minute: 5,
+        second: 7,
     };
 
     fn choices() -> Choices {
         Choices::load(&Table(HashMap::from([
-            ("liveConversion", json!(true)),
-            ("inputStyle", json!("romaji")),
-            ("typoCorrection", json!("standard")),
+            ("correctionDelay", json!(0.8)),
             ("association", json!(true)),
             ("calculation", json!(true)),
-            ("postalCodeConversion", json!(true)),
-            ("dateConversion", json!(true)),
         ])))
     }
 
     fn text_of(frame: &Frame) -> String {
-        frame.runs.iter().map(|run| run.text.as_str()).collect()
+        frame.committed.clone()
+            + &frame
+                .marked
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<String>()
     }
 
     fn frames(script: &Script) -> Vec<&Frame> {
-        (0..script.beats.len())
-            .filter_map(|beat| script.frame(beat))
+        (0..script.len())
+            .filter_map(|index| script.frame(index))
             .collect()
     }
 
+    fn last(step: Step, choices: &Choices) -> Frame {
+        script(step, choices, None, TODAY).last().unwrap().clone()
+    }
+
+    /// 最後に窓を出したコマの窓
+    fn last_panel(step: Step, choices: &Choices) -> Panel {
+        frames(&script(step, choices, None, TODAY))
+            .into_iter()
+            .rev()
+            .find_map(|frame| frame.panel.clone())
+            .unwrap()
+    }
+
     #[test]
-    fn ローマ字を1文字ずつ打ってかなにする() {
-        let script = script(Step::Welcome, &choices(), TODAY);
-        let texts: Vec<String> = frames(&script).into_iter().map(text_of).collect();
-        assert_eq!(texts[0], "y");
-        assert_eq!(texts[1], "よ");
-        assert_eq!(texts[2], "よう");
-        assert_eq!(text_of(script.result().unwrap()), "ようこそ");
-        assert_eq!(script.result().unwrap().runs[0].style, Style::Plain);
+    fn ローマ字は打ちかけのまま見せる() {
+        assert_eq!(
+            readings("kyouha"),
+            ["k", "ky", "きょ", "きょう", "きょうh", "きょうは"]
+        );
+        assert_eq!(readings("nihongo").last().unwrap(), "にほんご");
+        assert_eq!(readings("nihongo")[5], "にほんg");
+        assert_eq!(
+            readings("kyouhaiitenkidesune").last().unwrap(),
+            "きょうはいいてんきですね"
+        );
+        assert_eq!(
+            readings("yorosikuonagaisimasu").last().unwrap(),
+            "よろしくおながいします"
+        );
+        assert_eq!(readings("shumire-shon").last().unwrap(), "しゅみれーしょn");
+        assert_eq!(readings("lpmmovjojs").last().unwrap(), "lpっもvじょjs");
+        assert_eq!(readings("foto").last().unwrap(), "ふぉと");
     }
 
     #[test]
     fn 台本を繰り返す() {
-        let script = script(Step::Welcome, &choices(), TODAY);
+        let script = script(Step::ModeSwitch, &choices(), None, TODAY);
         let total = script.total();
         let first = script.position(10.0).unwrap();
         let again = script.position(total + 10.0).unwrap();
-        assert_eq!(first.beat, again.beat);
+        assert_eq!(first.index, again.index);
         assert!(first.remaining > 0.0);
+    }
+
+    #[test]
+    fn 補正の強さで直し方が変わる() {
+        let mut choices = choices();
+        let shown = |choices: &Choices| last_panel(Step::Correction, choices);
+        let Panel::Note(standard) = shown(&choices) else {
+            panic!("案内ではない")
+        };
+        assert_eq!(standard.tone, NoteTone::Correction);
+        assert_eq!(standard.subject.as_deref(), Some("よろしくおながいします"));
+        assert!(last(Step::Correction, &choices)
+            .marked
+            .iter()
+            .any(|segment| segment.style == Style::Correction));
+        choices.select(Field::Correction, "cautious");
+        let Panel::Note(cautious) = shown(&choices) else {
+            panic!("案内ではない")
+        };
+        assert_eq!(cautious.tone, NoteTone::Suggestion);
+        assert_eq!(
+            text_of(&last(Step::Correction, &choices)),
+            "よろしくお願いします"
+        );
+        choices.select(Field::Correction, "off");
+        let off = script(Step::Correction, &choices, None, TODAY);
+        assert!(frames(&off).iter().all(|frame| frame.panel.is_none()));
+        assert_eq!(text_of(off.last().unwrap()), "よろしくおながいします");
+    }
+
+    #[test]
+    fn 補正は補正を探す時間だけ待つ() {
+        let script = script(Step::Correction, &choices(), None, TODAY);
+        assert!(frames(&script).iter().any(|frame| frame.duration == 800.0));
     }
 
     #[test]
     fn ライブ変換は選んだ時間だけ待ってから漢字にする() {
         let mut choices = choices();
-        choices.select(Field::Path("liveConversionDelay"), "0.8");
-        let script = script(Step::LiveConversion, &choices, TODAY);
-        let waiting = script.beats.iter().find(|beat| beat.frame.waiting).unwrap();
-        assert_eq!(waiting.duration, 800.0);
-        assert_eq!(text_of(script.result().unwrap()), "私の名前は");
-        choices.set_toggle("liveConversion", false);
-        let off = super::script(Step::LiveConversion, &choices, TODAY);
-        assert!(off.beats.iter().all(|beat| !beat.frame.waiting));
+        choices.set_seconds(LIVE_DELAY, 1.2);
+        let on = script(Step::LiveConversion, &choices, None, TODAY);
+        assert!(frames(&on).iter().any(|frame| frame.duration == 1200.0));
+        assert!(frames(&on).iter().all(|frame| frame.panel.is_none()));
+        choices.select(LIVE, "false");
+        let Panel::Lattice(map) = last_panel(Step::LiveConversion, &choices) else {
+            panic!("分岐図ではない")
+        };
+        assert_eq!(map.columns[0].alternatives, ["今日は", "京は", "教派"]);
     }
 
     #[test]
-    fn 候補の窓は選んだ形で出す() {
+    fn 候補の出し方ごとに違う窓を出す() {
         let mut choices = choices();
-        let shown = script(Step::Window, &choices, TODAY);
-        assert!(matches!(
-            shown.result().unwrap().popup,
-            Some(Popup::Branch(_))
-        ));
-        choices.select(Field::Path("candidatePresentation"), "list");
-        let shown = script(Step::Window, &choices, TODAY);
-        assert!(matches!(
-            shown.result().unwrap().popup,
-            Some(Popup::List(_))
-        ));
+        let mut shown = Vec::new();
+        for value in ["automatic", "segmentList", "list"] {
+            choices.select(Field::Path("candidatePresentation"), value);
+            shown.push(last_panel(Step::Presentation, &choices));
+        }
+        assert!(matches!(shown[0], Panel::Lattice(_)));
+        let (Panel::List(segment), Panel::List(whole)) = (&shown[1], &shown[2]) else {
+            panic!("一覧ではない")
+        };
+        assert_eq!(segment.entries[0].text, "私の");
+        assert_eq!(whole.entries[0].text, "私の名前は中野です");
     }
 
     #[test]
     fn 最初に選ぶ文節を選んだ値にする() {
         let mut choices = choices();
         let focused = |choices: &Choices| {
-            let script = script(Step::Focus, choices, TODAY);
-            let frame = script.result().unwrap().clone();
-            frame
-                .runs
+            last(Step::Presentation, choices)
+                .marked
                 .iter()
-                .position(|run| run.style == Style::Focused)
+                .position(|segment| segment.style == Style::Focused)
                 .unwrap()
         };
         assert_eq!(focused(&choices), 0);
         choices.select(Field::Path("initialFocus"), "end");
         assert_eq!(focused(&choices), 2);
-    }
-
-    #[test]
-    fn 補正をオフにすると直さない() {
-        let mut choices = choices();
-        let corrected = |choices: &Choices| {
-            script(Step::Correction, choices, TODAY)
-                .beats
-                .iter()
-                .any(|beat| {
-                    beat.frame
-                        .runs
-                        .iter()
-                        .any(|run| run.style == Style::Corrected)
-                })
+        choices.select(Field::Path("candidatePresentation"), "segmentList");
+        let Panel::List(segment) = last_panel(Step::Presentation, &choices) else {
+            panic!("一覧ではない")
         };
-        assert!(corrected(&choices));
-        choices.select(Field::Correction, "off");
-        assert!(!corrected(&choices));
+        assert_eq!(segment.entries[0].text, "中野です");
     }
 
     #[test]
-    fn 切り替えのキーを選んだ方式にする() {
+    fn 入力する文字は選んだ文字にする() {
         let mut choices = choices();
-        let keys = |choices: &Choices| -> Vec<&'static str> {
-            script(Step::Switch, choices, TODAY)
-                .beats
-                .iter()
-                .filter_map(|beat| beat.frame.key)
-                .collect()
-        };
-        choices.select(Field::Switch, SWITCH_TOGGLE);
-        assert_eq!(keys(&choices)[0], text::KEY_HANKAKU);
-        choices.select(Field::Switch, SWITCH_HENKAN);
-        assert_eq!(keys(&choices)[..2], [text::KEY_MUHENKAN, text::KEY_HENKAN]);
-    }
-
-    #[test]
-    fn 日付は今日の日付を出しオフなら出さない() {
-        let mut choices = choices();
-        let has_date = |choices: &Choices| {
-            script(Step::Features, choices, TODAY)
-                .beats
-                .iter()
-                .any(|beat| text_of(&beat.frame).contains("2026年10月28日"))
-        };
-        assert!(has_date(&choices));
-        assert!(script(Step::Features, &choices, TODAY)
-            .beats
-            .iter()
-            .any(|beat| text_of(&beat.frame) == "令和8年10月28日"));
-        choices.set_toggle("dateConversion", false);
-        assert!(!has_date(&choices));
-    }
-
-    #[test]
-    fn 句読点は選んだものにする() {
-        let mut choices = choices();
-        choices.select(Field::Path("punctuation"), "commaPeriod");
-        let script = script(Step::Characters, &choices, TODAY);
-        assert_eq!(text_of(script.result().unwrap()), "きょうは，いいてんき．");
-    }
-
-    #[test]
-    fn 暦と曜日を求める() {
-        // 2026-10-28T00:00:00Z
-        assert_eq!(utc_fields(1_793_145_600), [2026, 10, 28, 0, 0, 0]);
-        assert_eq!(utc_fields(951_782_400), [2000, 2, 29, 0, 0, 0]);
-        assert_eq!(Today::from_fields([2026, 10, 28, 0, 0, 0]), TODAY);
-        assert_eq!(Today::from_fields([1970, 1, 1, 0, 0, 0]).weekday, 4);
-    }
-
-    #[test]
-    fn アプリを切り替えるとモードが変わる() {
-        let script = script(Step::AppModes, &choices(), TODAY);
-        let modes: Vec<Mode> = frames(&script).iter().map(|frame| frame.mode).collect();
-        assert!(modes.contains(&Mode::English));
         assert_eq!(
-            script.result().map(|frame| frame.mode),
-            Some(Mode::Japanese)
+            text_of(&last(Step::Characters, &choices)),
+            "「はい」、10時・11時。"
+        );
+        choices.select(Field::Path("punctuation"), "commaPeriod");
+        choices.select(Field::Path("brackets"), "square");
+        choices.select(Field::Path("slash"), "slash");
+        choices.select(Field::Path("numberWidth"), "fullwidth");
+        assert_eq!(
+            text_of(&last(Step::Characters, &choices)),
+            "［はい］，１０時／１１時．"
         );
     }
 
     #[test]
-    fn 機能ごとの実演はオフでもその機能を見せる() {
-        let mut choices = choices();
-        for (path, _) in crate::wizard::FEATURES.iter().chain(crate::wizard::EXTRAS) {
-            choices.set_toggle(path, false);
-            let script = spotlight(path, &choices, TODAY);
-            assert!(!script.is_empty(), "{path}");
-            assert!(
-                !script
-                    .beats
-                    .iter()
-                    .any(|beat| beat.frame.caption == Some(text::CAPTION_OFF)),
-                "{path}"
-            );
-        }
-        let looks = spotlight("looseReadings", &choices, TODAY);
-        assert!(looks
-            .beats
+    fn アプリを切り替えるとモードと名前が変わる() {
+        let script = script(Step::AppModes, &choices(), None, TODAY);
+        let shown = frames(&script);
+        assert!(shown
             .iter()
-            .any(|beat| text_of(&beat.frame) == "シミュレーション"));
+            .any(|frame| frame.application == Some(text::DEMO_TERMINAL)
+                && frame.mode == Some(Mode::Direct)));
+        let last = script.last().unwrap();
+        assert_eq!(last.application, Some(notes::DEMO_NOTES));
+        assert_eq!(last.mode, Some(Mode::Japanese));
+    }
+
+    #[test]
+    fn 機能ごとの実演はオフでもその機能を見せる() {
+        let choices = choices();
+        for spot in crate::wizard::FEATURES.iter().chain(crate::wizard::EXTRAS) {
+            let step = if crate::wizard::FEATURES.contains(spot) {
+                Step::Features
+            } else {
+                Step::Extras
+            };
+            let shown = script(step, &choices, Some(spot.path), TODAY);
+            assert!(shown.len() > 1, "{}", spot.path);
+        }
+        let date = script(Step::Features, &choices, Some("dateConversion"), TODAY);
+        assert_eq!(date.last().unwrap().committed, "2026/10/28");
+        let stamp = script(Step::Extras, &choices, Some("dynamicDictionary"), TODAY);
+        assert_eq!(stamp.last().unwrap().committed, "2026-10-28 09:05:07");
+        let commands = script(Step::Extras, &choices, Some("launcherCommands"), TODAY);
+        assert!(frames(&commands)
+            .iter()
+            .any(|frame| text_of(frame) == "▶ Claude を開く"));
     }
 
     #[test]
     fn 試験的な機能はオンにしたものを見せる() {
         let mut choices = choices();
-        for (path, _) in crate::wizard::EXTRAS {
-            choices.set_toggle(path, false);
-        }
-        let off = script(Step::Extras, &choices, TODAY);
-        assert!(off
-            .beats
-            .iter()
-            .all(|beat| !text_of(&beat.frame).contains("photo")));
+        let off = script(Step::Extras, &choices, None, TODAY);
+        assert_eq!(off.len(), 1);
         choices.set_toggle("phoneticSpelling", true);
-        let on = script(Step::Extras, &choices, TODAY);
-        assert!(on.beats.iter().any(|beat| text_of(&beat.frame) == "photo"));
+        let on = script(Step::Extras, &choices, None, TODAY);
+        assert!(frames(&on).iter().any(|frame| text_of(frame) == "photo"));
     }
 
     #[test]
-    fn 最後のページには実演が無い() {
-        assert!(script(Step::Done, &choices(), TODAY).is_empty());
+    fn 暦を求める() {
+        // 2026-10-28T00:00:00Z
+        assert_eq!(utc_fields(1_793_145_600), [2026, 10, 28, 0, 0, 0]);
+        assert_eq!(utc_fields(951_782_400), [2000, 2, 29, 0, 0, 0]);
     }
 }
