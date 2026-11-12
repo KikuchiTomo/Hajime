@@ -119,7 +119,7 @@ final class PaletteSession {
         updateQuery()
         // 「:bow:」のように閉じたショートコードがそのまま当たれば，選ばずに入れる
         if character == ":", let pattern = query.shortcodePattern, !pattern.isEmpty, query.typed.count > 2,
-           let item = index?.catalog.items.first(where: { $0.shortcodes.contains(pattern.lowercased()) }) {
+           let item = index?.catalog.item(forShortcode: pattern) {
             return insert(item, keepsOpen: false)
         }
         rebuild()

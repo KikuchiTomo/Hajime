@@ -26,6 +26,11 @@ public struct PaletteSearch: Sendable {
 
         public var isEmpty: Bool { shortcodePattern?.isEmpty ?? (typed.isEmpty && kana.isEmpty) }
 
+        /// ショートコードに使う文字か(英小文字・数字・「_」「+」「-」)
+        public static func isShortcodeCharacter(_ character: Character) -> Bool {
+            character.isASCII && (character.isLowercase || character.isNumber || "_+-".contains(character))
+        }
+
         /// 「:」で始めたときの，コロンを除いたショートコード(「:bow:」→「bow」)．「:」で始めていなければ nil
         public var shortcodePattern: String? {
             guard typed.hasPrefix(":") else { return nil }
