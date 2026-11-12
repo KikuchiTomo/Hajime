@@ -1462,7 +1462,14 @@ impl PageView {
 
     /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)．
     /// ページの上の端より上へ送った欄も隠す
-    pub fn place_fields(&self, theme: &Theme, origin: (f32, f32), scroll: f32, hidden: bool) {
+    pub fn place_fields(
+        &self,
+        theme: &Theme,
+        origin: (f32, f32),
+        header: f32,
+        scroll: f32,
+        hidden: bool,
+    ) {
         for row in &self.rows {
             let shown = !hidden && row.visible && row.card.is_some();
             for part in row.parts() {
@@ -1476,8 +1483,8 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
-                // 欄は窓なので，描いた絵のようにページの枠で切れない．ページの上(タイトルバー)へ出たら隠す
-                if y < origin.1 {
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(header)へ出たら隠す
+                if y < origin.1 + header {
                     ffi::show(window, false);
                     continue;
                 }
