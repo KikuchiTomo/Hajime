@@ -289,9 +289,8 @@ pub struct Extras {
     pub macro_preview: crate::engine::PreviewShown,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
     pub fonts: Vec<InstalledFace>,
-    /// 単語に書ける書き方を今入れたときの値(extras::TEMPLATE_ROWS と同じ並び．読めなければ空)と，登録の例の値
+    /// 単語に書ける書き方を今入れたときの値(extras::TEMPLATE_ROWS と同じ並び．読めなければ空)
     pub template_values: Vec<String>,
-    pub template_example: String,
 }
 
 impl Extras {
@@ -1348,10 +1347,7 @@ impl PageView {
                     row.text = crate::keys::assigned(values.value("keymap"), command)
                 }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
-                Control::TemplateReference => {
-                    row.lines.clone_from(&extras.template_values);
-                    row.text.clone_from(&extras.template_example);
-                }
+                Control::TemplateReference => row.lines.clone_from(&extras.template_values),
                 Control::Preview(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
                 }
@@ -3816,20 +3812,14 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
     }
 }
 
-/// 単語に書ける書き方の表(macOS の TemplateReference)の置き場所．見出し・区切り線・書き方の行・区切り線・
-/// 登録の例・付けられる名前・日時の書式の記号を上から並べる．書き方は等幅の文字で 1 行，入るものは折り返し，
-/// 今入れたときの値は 1 行にする
+/// 単語に書ける書き方の表(macOS の TemplateReference)の置き場所．見出し・区切り線・書き方の行を上から並べる．
+/// 書き方は等幅の文字で 1 行，入るものは折り返し，今入れたときの値は 1 行にする
 struct TemplateLayout {
     /// 列の左端と幅(書き方・入るもの・今入れると)
     columns: [(f32, f32); 3],
     header: Rect,
     /// 書き方の行ごとの上端と高さ
     rows: Vec<(f32, f32)>,
-    /// 表の下の区切り線の高さの位置
-    divider: f32,
-    example: Rect,
-    filters: Rect,
-    symbols: Rect,
     height: f32,
 }
 
@@ -3866,35 +3856,16 @@ impl TemplateLayout {
                 row
             })
             .collect();
-        let divider = top;
-        top += size::CONTROL_GAP;
-        let caption = |text: &str, top: f32| {
-            let height = measure
-                .wrapped_height(text, TextStyle::Caption, width)
-                .max(size::NOTE_LINE_HEIGHT);
-            Rect::new(x, top, width, height)
-        };
-        // 登録の例の値は今の日時なので，同じ長さの見本で測る
-        let example = caption(&extras::template_example("2026-04-01 09:30"), top);
-        let filters = caption(
-            extras::TEMPLATE_FILTERS,
-            example.max_y() + size::CONTROL_GAP,
-        );
-        let symbols = caption(extras::DATE_FORMAT_SYMBOLS, filters.max_y());
         Self {
             columns,
             header,
             rows,
-            divider,
-            example,
-            filters,
-            symbols,
-            height: symbols.max_y() + size::CARD_PADDING_Y - y,
+            height: top + size::CARD_PADDING_Y - y,
         }
     }
 }
 
-/// 単語に書ける書き方の表を描く(macOS の TemplateReference)．row.lines は今入れたときの値，row.text は登録の例の値
+/// 単語に書ける書き方の表を描く(macOS の TemplateReference)．row.lines は今入れたときの値
 fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
     let Some(card) = &row.card else {
         return;
@@ -3950,19 +3921,6 @@ fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
             Color::from(palette.text),
             TextLayout::LINE,
         );
-    }
-    divider(canvas, layout.divider);
-    let example = if row.text.is_empty() {
-        extras::template_example("…")
-    } else {
-        extras::template_example(&row.text)
-    };
-    for (rect, text) in [
-        (layout.example, example.as_str()),
-        (layout.filters, extras::TEMPLATE_FILTERS),
-        (layout.symbols, extras::DATE_FORMAT_SYMBOLS),
-    ] {
-        canvas.text(rect, text, TextStyle::Caption, secondary, TextLayout::WRAP);
     }
 }
 

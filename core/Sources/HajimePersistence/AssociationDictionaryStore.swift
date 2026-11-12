@@ -19,10 +19,14 @@ public final class AssociationDictionaryStore: AssociationLookup {
     private let bundledSource: URL?
     private var bundled: BundledIndex?
     private var bundledLoading: Task<Void, Never>?
+    /// 同梱の辞書を読み終えたら，その意味の数を書く設定．設定の画面は設定の groupCount を「〜件の意味」として出すので，
+    /// 書かないと同梱の辞書がいつも 0 件に見える(既定値の groupCount は 0)
+    private let settings: (any SettingsStoring)?
 
-    public init(directory: URL, bundledSource: URL? = nil) {
+    public init(directory: URL, bundledSource: URL? = nil, settings: (any SettingsStoring)? = nil) {
         self.directory = directory
         self.bundledSource = bundledSource
+        self.settings = settings
     }
 
     /// 同梱の辞書を裏で読み始める．起動時に呼んでおくと，初めて連想変換を使うときに待たない
@@ -42,6 +46,13 @@ public final class AssociationDictionaryStore: AssociationLookup {
 
     private func finishLoading(_ index: BundledIndex?) {
         bundled = index
+        guard let count = index?.groupCount, let settings,
+            settings.current.associationDictionaries.contains(where: { $0.isBundled && $0.groupCount != count }) else { return }
+        try? settings.update { current in
+            for position in current.associationDictionaries.indices where current.associationDictionaries[position].isBundled {
+                current.associationDictionaries[position].groupCount = count
+            }
+        }
     }
 
     public func url(for dictionary: AssociationDictionary) -> URL {
@@ -109,6 +120,9 @@ final class BundledIndex: Sendable {
         self.groups = groups
         self.positions = positions
     }
+
+    /// まとまり(意味)の数
+    var groupCount: Int { groups.count }
 
     /// 読めなければ nil．取り込むときと同じ大きさの上限と形の確かめをする(AssociationFileReader)
     static func load(_ url: URL) -> BundledIndex? {

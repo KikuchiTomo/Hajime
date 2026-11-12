@@ -38,7 +38,7 @@ layout: hextra-home
 </div>
 
 <figure class="hajime-showcase">
-  <img src="images/hero.webp" alt="テキストエディットで「写真を撮る」と入力し，分岐図の候補の「撮る」の横に，意味・使い方の例・同音語のカードが表示されている" width="1400" height="672" />
+  <img src="images/hero.webp" alt="テキストエディットで「写真を撮る」と入力し，分岐図の候補の「撮る」の横に，意味・使い方の例・同音語が表示されている" width="1400" height="672" />
 </figure>
 
 {{< hajime/features title="主な機能" >}}

@@ -127,7 +127,45 @@ enum DesignTokens {
             static let sm: CGFloat = 8
             static let md: CGFloat = 12
             static let lg: CGFloat = 16
+            static let xl: CGFloat = 24
+            static let fine: CGFloat = 2
+            static let inset: CGFloat = 4
             static let inline: CGFloat = 4
+            static let stack: CGFloat = 4
+            static let group: CGFloat = 8
+            static let section: CGFloat = 12
+            static let window: CGFloat = 12
+            static let page: CGFloat = 24
+        }
+        enum Text {
+            static let candidate: CGFloat = 15
+            static let candidateLine: CGFloat = 20
+            static let body: CGFloat = 13
+            static let bodyLine: CGFloat = 20
+            static let small: CGFloat = 11
+            static let smallLine: CGFloat = 16
+            static let tag: CGFloat = 10
+            static let tagLine: CGFloat = 12
+        }
+        enum Part {
+            static let windowRadius: CGFloat = 12
+            static let cardRadius: CGFloat = 8
+            static let rowHeight: CGFloat = 28
+            static let rowPaddingX: CGFloat = 4
+            static let rowRadius: CGFloat = 8
+            static let fieldHeight: CGFloat = 28
+            static let fieldPaddingX: CGFloat = 8
+            static let fieldPaddingY: CGFloat = 4
+            static let fieldRadius: CGFloat = 8
+            static let tagHeight: CGFloat = 16
+            static let tagPaddingX: CGFloat = 4
+            static let tagPaddingY: CGFloat = 2
+            static let tagGlyphGap: CGFloat = 2
+            static let tagRadius: CGFloat = 4
+            static let badgeSize: CGFloat = 16
+            static let iconSize: CGFloat = 16
+            static let iconRadius: CGFloat = 4
+            static let stroke: CGFloat = 1
         }
         enum Candidate {
             static let rowHeight: CGFloat = 22
@@ -141,10 +179,9 @@ enum DesignTokens {
             static let maxVisible: CGFloat = 9
             static let shadowOffset: CGFloat = 2
             static let labelFontSize: CGFloat = 11
-            static let variantPaddingX: CGFloat = 6
-            static let sectionPaddingY: CGFloat = 3
+            static let variantPaddingX: CGFloat = 4
+            static let sectionPaddingY: CGFloat = 4
             static let minWidth: CGFloat = 180
-            static let variantInsetY: CGFloat = 1
             static let maxWidth: CGFloat = 720
             static let gridMaxWidth: CGFloat = 960
             static let screenMargin: CGFloat = 16
@@ -153,13 +190,13 @@ enum DesignTokens {
         }
         enum ModeIndicator {
             static let fontSize: CGFloat = 14
-            static let paddingX: CGFloat = 10
-            static let paddingY: CGFloat = 3
+            static let paddingX: CGFloat = 8
+            static let paddingY: CGFloat = 4
         }
         enum Branch {
-            static let trunkGap: CGFloat = 10
-            static let branchIndent: CGFloat = 14
-            static let branchStemX: CGFloat = 5
+            static let trunkGap: CGFloat = 12
+            static let branchIndent: CGFloat = 16
+            static let branchStemX: CGFloat = 4
             static let lineWidth: CGFloat = 1
             static let lineWidthSelected: CGFloat = 2
             static let underlineOffset: CGFloat = 2
@@ -213,19 +250,24 @@ enum DesignTokens {
         }
         enum Glass {
             static let cornerRadius: CGFloat = 12
-            static let padding: CGFloat = 10
+            static let windowPadding: CGFloat = 8
+            static let compactPaddingX: CGFloat = 8
+            static let compactPaddingY: CGFloat = 4
+            static let separatorGap: CGFloat = 8
+            static let rowPaddingX: CGFloat = 4
+            static let headerHeight: CGFloat = 20
             static let rowHeight: CGFloat = 28
             static let labelFontSize: CGFloat = 11.5
             static let keyFontSize: CGFloat = 10.5
             static let badgeSize: CGFloat = 17
             static let selectionRadius: CGFloat = 7
             static let keycapRadius: CGFloat = 4
-            static let keycapPaddingX: CGFloat = 5
+            static let keycapPaddingX: CGFloat = 4
             static let keycapPaddingY: CGFloat = 3
             static let keycapHeight: CGFloat = 17
-            static let hintGap: CGFloat = 10
+            static let hintGap: CGFloat = 12
             static let footerHeight: CGFloat = 28
-            static let trunkGap: CGFloat = 6
+            static let trunkGap: CGFloat = 8
             static let branchIndent: CGFloat = 28
             static let branchStemX: CGFloat = 12
             static let lineWidth: CGFloat = 1.5
@@ -234,48 +276,48 @@ enum DesignTokens {
             static let modeIndicatorSize: CGFloat = 34
             static let modeIndicatorFontSize: CGFloat = 17
             static let selectionInsetY: CGFloat = 2
-            static let variantInsetY: CGFloat = 4
             static let branchTurnRadius: CGFloat = 8
             static let dotPitch: CGFloat = 5
-            static let keycapPartGap: CGFloat = 1
-            static let keycapGap: CGFloat = 3
+            static let keycapPartGap: CGFloat = 2
+            static let keycapGap: CGFloat = 4
             static let shadowRadius: CGFloat = 12
             static let shadowOffsetY: CGFloat = 3
             static let tagHeight: CGFloat = 16
-            static let tagPaddingX: CGFloat = 6
+            static let tagPaddingX: CGFloat = 8
             static let tagRadius: CGFloat = 8
-            static let noteIconSize: CGFloat = 18
+            static let noteIconSize: CGFloat = 17
             static let commandIconSize: CGFloat = 18
             static let commandIconRadius: CGFloat = 5
-            static let noteGap: CGFloat = 6
-            static let usageTagGap: CGFloat = 4
-            static let meaningCardWidth: CGFloat = 280
-            static let meaningBranchWidth: CGFloat = 300
-            static let meaningPadding: CGFloat = 10
-            static let meaningGap: CGFloat = 14
-            static let meaningNotch: CGFloat = 6
-            static let meaningRadius: CGFloat = 10
-            static let meaningHeadwordFontSize: CGFloat = 15
-            static let meaningBodyFontSize: CGFloat = 13
-            static let meaningExampleFontSize: CGFloat = 12
-            static let meaningPosFontSize: CGFloat = 10.5
-            static let meaningPosHeight: CGFloat = 17
-            static let meaningPosPaddingX: CGFloat = 7
-            static let meaningIconSize: CGFloat = 13
-            static let meaningEmptyIconSize: CGFloat = 24
-            static let meaningBadgeSize: CGFloat = 17
-            static let meaningBadgeRadius: CGFloat = 5
-            static let meaningBadgeFontSize: CGFloat = 10.5
-            static let meaningLineSpacing: CGFloat = 2
-            static let meaningHeaderGap: CGFloat = 8
-            static let meaningSenseGap: CGFloat = 9
-            static let meaningExampleGap: CGFloat = 3
-            static let meaningExampleBarWidth: CGFloat = 2
-            static let meaningExampleIndent: CGFloat = 8
-            static let meaningOthersGap: CGFloat = 8
-            static let meaningDotSize: CGFloat = 6
-            static let meaningMeaningLines: CGFloat = 3
-            static let meaningExampleLines: CGFloat = 2
+            static let noteGap: CGFloat = 8
+        }
+        enum Meaning {
+            static let cardGap: CGFloat = 16
+            static let markerWidth: CGFloat = 16
+            static let markerGap: CGFloat = 8
+            static let headerGap: CGFloat = 8
+            static let senseGap: CGFloat = 8
+            static let exampleGap: CGFloat = 4
+            static let exampleIndent: CGFloat = 12
+            static let exampleBarWidth: CGFloat = 2
+            static let meaningPitch: CGFloat = 20
+            static let examplePitch: CGFloat = 18
+            static let othersGap: CGFloat = 12
+            static let partOfSpeechGap: CGFloat = 8
+            static let partOfSpeechHeight: CGFloat = 16
+            static let partOfSpeechPaddingX: CGFloat = 8
+            static let tagGap: CGFloat = 4
+            static let headwordFontSize: CGFloat = 15
+            static let bodyFontSize: CGFloat = 13
+            static let exampleFontSize: CGFloat = 12
+            static let partOfSpeechFontSize: CGFloat = 10.5
+            static let numberFontSize: CGFloat = 10.5
+            static let numberRadius: CGFloat = 4
+            static let iconSize: CGFloat = 13
+            static let dotSize: CGFloat = 6
+            static let listWidth: CGFloat = 288
+            static let branchWidth: CGFloat = 300
+            static let meaningLines: CGFloat = 3
+            static let exampleLines: CGFloat = 2
         }
         enum Handwriting {
             static let width: CGFloat = 284
@@ -290,10 +332,10 @@ enum DesignTokens {
             static let candidateFontSize: CGFloat = 18
         }
         enum Prediction {
-            static let gap: CGFloat = 6
+            static let gap: CGFloat = 8
             static let paddingX: CGFloat = 8
-            static let paddingY: CGFloat = 3
-            static let keyGap: CGFloat = 6
+            static let paddingY: CGFloat = 4
+            static let keyGap: CGFloat = 8
         }
         enum Palette {
             static let padding: CGFloat = 12
@@ -555,11 +597,6 @@ enum DesignTokens {
             static let correctionTagContrast: CGFloat = 0.3
             static let commandTag: CGFloat = 0.16
             static let commandTagContrast: CGFloat = 0.3
-            static let meaningCard: CGFloat = 0.06
-            static let meaningCardContrast: CGFloat = 0.12
-            static let meaningBadge: CGFloat = 0.16
-            static let meaningBadgeContrast: CGFloat = 0.3
-            static let meaningExampleBar: CGFloat = 0.5
             static let meaningEmptyIcon: CGFloat = 0.25
         }
         enum Rounded {

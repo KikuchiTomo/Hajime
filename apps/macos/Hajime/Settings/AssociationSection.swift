@@ -52,7 +52,13 @@ private struct AssociationDictionaryRow: View {
     @State private var expanded = false
 
     var body: some View {
-        DisclosureGroup(isExpanded: $expanded) {
+        DictionaryRowHeader(isExpanded: $expanded,
+                            isEnabled: Binding(get: { dictionary.isEnabled },
+                                               set: { value in model.updateAssociationDictionary(dictionary.id) { $0.isEnabled = value } }),
+                            name: dictionary.name, summary: UIStrings.Association.summary(dictionary), isFirst: isFirst, isLast: isLast) {
+            model.moveAssociationDictionary(dictionary, by: $0)
+        }
+        if expanded {
             TextField(UIStrings.Dictionaries.name, text: Binding(get: { dictionary.name },
                                                                  set: { value in model.updateAssociationDictionary(dictionary.id) { $0.name = value } }))
             HStack {
@@ -60,22 +66,6 @@ private struct AssociationDictionaryRow: View {
                     .disabled(model.isImportingDictionary)
                 Spacer()
                 Button(UIStrings.Settings.remove, role: .destructive) { model.removeAssociationDictionary(dictionary) }
-            }
-        } label: {
-            HStack {
-                Toggle(isOn: Binding(get: { dictionary.isEnabled },
-                                     set: { value in model.updateAssociationDictionary(dictionary.id) { $0.isEnabled = value } })) {
-                    VStack(alignment: .leading) {
-                        Text(dictionary.name)
-                        Text(UIStrings.Association.summary(dictionary)).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
-                Spacer()
-                Button { model.moveAssociationDictionary(dictionary, by: -1) } label: { Image(systemName: "chevron.up") }
-                    .buttonStyle(.borderless).disabled(isFirst).help(UIStrings.Dictionaries.moveUp)
-                Button { model.moveAssociationDictionary(dictionary, by: 1) } label: { Image(systemName: "chevron.down") }
-                    .buttonStyle(.borderless).disabled(isLast).help(UIStrings.Dictionaries.moveDown)
             }
         }
     }

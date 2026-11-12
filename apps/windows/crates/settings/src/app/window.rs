@@ -614,7 +614,7 @@ impl App {
             }
             // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
             if self.view.page == Page::Dictionary {
-                (self.extras.template_values, self.extras.template_example) =
+                self.extras.template_values =
                     super::actions::template_values(model, &self.extras.template_values);
                 ffi::set_timer(self.window, TEMPLATE_TIMER, TEMPLATE_INTERVAL);
             }

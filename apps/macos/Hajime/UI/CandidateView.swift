@@ -7,6 +7,7 @@ import HajimeDomain
 final class CandidateView: NSView {
     private typealias Size = DesignTokens.Size.Candidate
     private typealias Glass = DesignTokens.Size.Glass
+    private typealias Meaning = DesignTokens.Size.Meaning
 
     var panel: CandidatePanel? {
         didSet {
@@ -32,30 +33,52 @@ final class CandidateView: NSView {
 
     private var candidateFont: NSFont { theme.candidateFont(size: fontSize) }
     private var labelFont: NSFont { theme.labelFont(size: theme.isRounded ? Glass.labelFontSize : Size.labelFontSize) }
-    private var rowHeight: CGFloat { ((theme.isRounded ? Glass.rowHeight : Size.rowHeight) * fontSize / Size.fontSize).rounded() }
-    private var sectionHeight: CGFloat {
-        theme.isRounded ? Glass.footerHeight
-            : max((labelFont.ascender - labelFont.descender).rounded(.up), Glass.keycapHeight) + Size.sectionPaddingY * 2
+
+    /// 区画の寸法．行の間隔は文字の大きさに合わせて変える
+    private var metrics: CandidateListLayout.Metrics {
+        let scale = fontSize / Size.fontSize
+        if theme.isRounded {
+            let footer = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
+            return .rounded(rowPitch: (Glass.rowHeight * scale).rounded(), headerHeight: Glass.headerHeight, footerHeight: footer)
+        }
+        let section = max((labelFont.ascender - labelFont.descender).rounded(.up), Glass.keycapHeight) + Size.sectionPaddingY * 2
+        return .bevel(rowPitch: (Size.rowHeight * scale).rounded(), sectionHeight: section, hasShadow: theme.hasDropShadow)
     }
-    /// 外枠と立体の縁の太さ．glass は余白
-    private var inset: CGFloat { theme.isRounded ? Glass.padding / 2 : Size.frameWidth + Size.bevelWidth }
-    /// 番号の幅
+
+    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈の札の右，足元の案内と位置の左右の端をここにそろえる
+    private var rowPaddingX: CGFloat { theme.isRounded ? Glass.rowPaddingX : Size.paddingX }
+    /// 番号の幅(番号から候補の文字まで)
     private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
-    private var dropShadowOffset: CGFloat { theme.hasDropShadow ? Size.shadowOffset : 0 }
 
-    // MARK: - 語の意味のカード
+    // MARK: - 語の意味
 
-    /// 語の意味のカード(R-08)の置き方と中身．layout が nil なら，意味の無い候補を選んでいるあいだ空けておくカード
+    /// 語の意味(R-08)の置き方と中身．layout が nil なら，意味の無い候補を選んでいるあいだ空けておく場所
     private struct MeaningSlot {
         var placement: MeaningPlacement
         var layout: MeaningCardDrawing.Layout?
-        /// カードの大きさ(内側の余白を含む)
+        /// 目印の列の左の端と見出しの行の縦の真ん中
+        var position: MeaningCardLayout.Placement
+        /// 場所の大きさ(platinum と desk は下の余白を含む)
         var size: NSSize
     }
 
-    /// 候補の右に出したカードの場所．同じ候補の並びのあいだは，意味の無い候補(ひらがなの候補など)を選んでも場所を空けたままにし，
+    /// 候補の右に出した語の意味の場所．同じ候補の並びのあいだは，意味の無い候補(ひらがなの候補など)を選んでも場所を空けたままにし，
     /// 窓の幅と高さを変えない(候補を移るたびに窓の縁が動かないように)
     private var reservedCard: (entries: [String], height: CGFloat)?
+
+    /// 候補の右: 目印の列は場所の左の端，見出しの行は候補の 1 行目の地の真ん中
+    private var sidePosition: MeaningCardLayout.Placement {
+        .init(left: 0, headerMidY: (metrics.rowPitch - metrics.rowInset * 2) / 2)
+    }
+
+    /// 候補の下: 目印の列を候補の番号に，文の列を候補の文字にそろえる．見出しの行は場所の上の端から
+    private var belowPosition: MeaningCardLayout.Placement {
+        .init(left: rowPaddingX + lead - Meaning.markerWidth - Meaning.markerGap,
+              headerMidY: sectionPadding + MeaningCardDrawing.headerHeight(theme: theme) / 2)
+    }
+
+    /// platinum と desk は区画どうしを線で区切って空きを取らないので，語の意味の上と下に文字の行と同じ余白を足す
+    private var sectionPadding: CGFloat { theme.isRounded ? 0 : Size.sectionPaddingY }
 
     private func updateReservedCard() {
         guard let panel, panel.meaningPlacement == .side else {
@@ -63,7 +86,9 @@ final class CandidateView: NSView {
             return
         }
         let entries = panel.entries.map(\.text)
-        let height = panel.homophone.map { MeaningCardDrawing.layout($0, width: Glass.meaningCardWidth, theme: theme).size.height }
+        let height = panel.homophone.map {
+            MeaningCardDrawing.layout($0, width: Meaning.listWidth, placement: sidePosition, theme: theme).size.height + sectionPadding
+        }
         if let reserved = reservedCard, reserved.entries == entries {
             reservedCard = (entries, max(reserved.height, height ?? 0))
         } else {
@@ -71,46 +96,41 @@ final class CandidateView: NSView {
         }
     }
 
-    /// listWidth は候補の列の幅(余白を含む)．下に出すカードはこの幅に合わせて折り返す
-    private func meaningSlot(for panel: CandidatePanel, listWidth: CGFloat) -> MeaningSlot? {
-        switch panel.meaningPlacement {
-        case .below:
-            guard let note = panel.homophone else { return nil }
-            let width = max(listWidth - Size.paddingX - Glass.meaningPadding * 2, Glass.meaningCardWidth)
-            let layout = MeaningCardDrawing.layout(note, width: width, theme: theme)
-            return MeaningSlot(placement: .below, layout: layout, size: layout.size)
-        case .side:
-            let layout = panel.homophone.map { MeaningCardDrawing.layout($0, width: Glass.meaningCardWidth, theme: theme) }
-            let reserved = reservedCard?.entries == panel.entries.map(\.text) ? reservedCard?.height : nil
-            guard layout != nil || reserved != nil else { return nil }
-            let height = max(layout?.size.height ?? 0, reserved ?? 0)
-            return MeaningSlot(placement: .side, layout: layout,
-                               size: NSSize(width: Glass.meaningCardWidth + Glass.meaningPadding * 2 + cardMargin, height: height + cardMargin * 2))
-        }
+    /// 候補の右の語の意味．下の語の意味は窓の中身の幅で折り返すので，幅が決まってから作る(belowSlot)
+    private func sideSlot(for panel: CandidatePanel) -> MeaningSlot? {
+        guard panel.meaningPlacement == .side else { return nil }
+        let position = sidePosition
+        let layout = panel.homophone.map { MeaningCardDrawing.layout($0, width: Meaning.listWidth, placement: position, theme: theme) }
+        let reserved = reservedCard?.entries == panel.entries.map(\.text) ? reservedCard?.height : nil
+        guard layout != nil || reserved != nil else { return nil }
+        let height = max((layout?.size.height).map { $0 + sectionPadding } ?? 0, reserved ?? 0)
+        return MeaningSlot(placement: .side, layout: layout, position: position, size: NSSize(width: Meaning.listWidth, height: height))
     }
 
-    /// platinum と desk は窓の縁に余白が無いので，候補の右のカードを縁から離す空き(上・下・右)．角丸のテーマは 0
-    private var cardMargin: CGFloat { theme.isRounded ? 0 : Size.paddingX / 2 }
+    private func belowSlot(for panel: CandidatePanel, width: CGFloat) -> MeaningSlot? {
+        guard panel.meaningPlacement == .below, let note = panel.homophone else { return nil }
+        let position = belowPosition
+        let layout = MeaningCardDrawing.layout(note, width: width, placement: position, theme: theme)
+        return MeaningSlot(placement: .below, layout: layout, position: position,
+                           size: NSSize(width: layout.size.width, height: layout.size.height + sectionPadding))
+    }
 
-    /// 下に出すカードの上下の空き
-    private var belowCardMargin: CGFloat { Size.paddingX / 2 }
+    // MARK: - 大きさと区画
 
-    // MARK: - 大きさ
-
-    /// 候補の列(字種の行・候補)の幅．余白を含み，足元とカードを除く．表に広げていれば，すべての列と列のあいだの線を合わせた幅
+    /// 候補の列(行の地)の幅．足元とカードを除く．表に広げていれば，すべての列と列のあいだの線を合わせた幅
     private func listWidth(for panel: CandidatePanel) -> CGFloat {
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
             width + variant.label.size(withAttributes: labelAttributes).width + Size.variantPaddingX * 2
-        }
-        let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + Size.paddingX * 2 } ?? 0
+        } + (rowPaddingX - Size.variantPaddingX) * 2
+        let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + rowPaddingX * 2 } ?? 0
         let columns = CGFloat(panel.columnCount)
         let entriesWidth = cellWidth(for: panel) * columns + Size.frameWidth * (columns - 1)
-        return max(Size.minWidth, entriesWidth, variantsWidth + Size.paddingX * 2, headingWidth)
+        return max(Size.minWidth, entriesWidth, variantsWidth, headingWidth).rounded(.up)
     }
 
-    /// 候補 1 つの枠の幅(番号・文字・添え書きと左右の余白)．表ではすべての列を同じ幅にそろえ，窓が表の幅の上限に収まらなければ
-    /// 列を狭めて，収まらない候補は末尾を省く
+    /// 候補 1 つの行の地の幅．左の余白・番号・文字・添え書き・右の余白(文字の右は番号の左より広く空ける)．
+    /// 表ではすべての列を同じ幅にそろえ，窓が幅の上限に収まらなければ列を狭めて，収まらない候補は末尾を省く
     private func cellWidth(for panel: CandidatePanel) -> CGFloat {
         let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont]
         let entryWidth = panel.entries.map { entry in
@@ -118,12 +138,13 @@ final class CandidateView: NSView {
             let icon = entry.command == nil ? 0 : CommandDrawing.width
             return icon + entry.text.size(withAttributes: textAttributes).width + CandidateDetailDrawing.width(entry.detail, font: labelFont) + annotation
         }.max() ?? 0
-        let natural = lead + entryWidth + Size.paddingX * 2
+        let natural = (rowPaddingX + lead + entryWidth + Size.paddingX).rounded(.up)
         guard panel.columnLength != nil else { return natural }
         // 列の位置を整数にそろえる．文字が収まる幅は切り上げ，上限から割った幅は切り捨てる(文字を 1 ドット足りずに省かないように)
         let columns = CGFloat(panel.columnCount)
-        let available = (max(maximumWidth, Size.minWidth) - inset * 2 - dropShadowOffset - Size.frameWidth * (columns - 1)) / columns
-        return min(natural.rounded(.up), available.rounded(.down))
+        let outer = (metrics.edge + metrics.padding) * 2 + metrics.shadow
+        let available = (max(maximumWidth, Size.minWidth) - outer - Size.frameWidth * (columns - 1)) / columns
+        return min(natural, available.rounded(.down))
     }
 
     /// 候補を縦に並べる行の数．表なら 1 列の候補の数(最後のページで候補が少なければその数)
@@ -134,41 +155,34 @@ final class CandidateView: NSView {
 
     private func footerWidth(for panel: CandidatePanel) -> CGFloat {
         let footer = footerContent(for: panel)
-        return hintsWidth(footer) + footer.position.size(withAttributes: [.font: labelFont]).width + Size.paddingX * 3
+        return (hintsWidth(footer) + footer.position.size(withAttributes: [.font: labelFont]).width + rowPaddingX * 2 + Glass.hintGap).rounded(.up)
     }
 
-    /// 字種の行(または連想の見出し)と候補を並べた高さ
-    private func listHeight(for panel: CandidatePanel) -> CGFloat {
-        CGFloat(rowCount(for: panel)) * rowHeight + (!panel.variants.isEmpty || panel.association != nil ? sectionHeight + Size.frameWidth : 0)
+    /// 区画の配置と，そこに出すカード．size は窓の大きさを外から決めるとき(描くときと押した位置を調べるときは今の大きさ)
+    private func placement(for panel: CandidatePanel, size: NSSize? = nil) -> (layout: CandidateListLayout, slot: MeaningSlot?) {
+        let list = listWidth(for: panel)
+        let footer = footerWidth(for: panel)
+        let metrics = metrics
+        let style: CandidateListLayout.Style = theme.isRounded ? .rounded : .bevel
+        let hasHeader = panel.association != nil || !panel.variants.isEmpty
+        let limit = max(maximumWidth, Size.minWidth)
+        var slot = sideSlot(for: panel)
+        var card = slot.map { CandidateListLayout.Card.side(width: $0.size.width, height: $0.size.height) }
+        if slot == nil, panel.meaningPlacement == .below, panel.homophone != nil {
+            // 下のカードは窓の中身の幅いっぱい．窓の幅の上限を超えるなら上限に収める
+            let outer = (metrics.edge + metrics.padding) * 2 + metrics.shadow
+            let width = min(CandidateListLayout.belowCardWidth(listWidth: list, footerWidth: footer, minimum: Meaning.listWidth), limit - outer).rounded(.down)
+            slot = belowSlot(for: panel, width: width)
+            card = slot.map { .below(width: $0.size.width, height: $0.size.height) }
+        }
+        let layout = CandidateListLayout(style: style, listWidth: list, footerWidth: footer, hasHeader: hasHeader, rowCount: rowCount(for: panel),
+                                         card: card, maximumWidth: limit, metrics: metrics, size: size.map { (Double($0.width), Double($0.height)) })
+        return (layout, slot)
     }
 
     func fittingSize(for panel: CandidatePanel) -> NSSize {
-        let list = listWidth(for: panel)
-        let slot = meaningSlot(for: panel, listWidth: list)
-        var contentWidth = max(list, footerWidth(for: panel))
-        var height = listHeight(for: panel) + sectionHeight + Size.frameWidth
-        switch slot?.placement {
-        case .side?:
-            contentWidth = max(list + Glass.meaningGap + (slot?.size.width ?? 0), footerWidth(for: panel))
-            height = max(listHeight(for: panel), slot?.size.height ?? 0) + sectionHeight + Size.frameWidth
-        case .below?:
-            contentWidth = max(contentWidth, (slot?.size.width ?? 0) + Size.paddingX)
-            height += (slot?.size.height ?? 0) + belowCardMargin * 2
-        case nil:
-            break
-        }
-        let width = min(contentWidth + inset * 2 + dropShadowOffset, max(maximumWidth, Size.minWidth))
-        // 表は列の幅をそろえて上限に収めてあるので，ここで切らない
-        return NSSize(width: width.rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
-    }
-
-    /// 窓の中身の枠(余白の内側)と，そのうち候補の列の幅．候補の右にカードを出すときは，カードの分を除いた幅
-    private func columns(for panel: CandidatePanel) -> (content: NSRect, listWidth: CGFloat, slot: MeaningSlot?) {
-        let body = NSRect(x: 0, y: 0, width: bounds.width - dropShadowOffset, height: bounds.height - dropShadowOffset)
-        let content = body.insetBy(dx: inset, dy: inset)
-        let slot = meaningSlot(for: panel, listWidth: listWidth(for: panel))
-        guard let slot, slot.placement == .side else { return (content, content.width, slot) }
-        return (content, max(content.width - Glass.meaningGap - slot.size.width, 0), slot)
+        let layout = placement(for: panel).layout
+        return NSSize(width: layout.width, height: layout.height)
     }
 
     // MARK: - 押した位置
@@ -176,52 +190,43 @@ final class CandidateView: NSView {
     /// 押した対象を知らせる先(候補の窓をマウスで押したとき)
     var onChoose: ((PointerTarget) -> Void)?
 
-    /// 字種の行と候補の行の位置．描くときと押した位置を調べるときで同じものを使う
-    private struct Geometry {
-        var variantsRow: NSRect?
-        /// 候補ごとの枠．表では上から下へ詰め，列を左から右へ並べる
-        var entryRows: [NSRect]
-        /// 表の列のあいだの線の x(列が 1 つなら空)と，線を引く縦の範囲
-        var columnSeparators: [CGFloat] = []
-        var entriesSpan: ClosedRange<CGFloat> = 0...0
+    /// 候補ごとの行の地と押せる範囲，表の列のあいだの縦の線
+    private struct Cells {
+        var rows: [NSRect]
+        var hitRows: [NSRect]
+        var separators: [NSRect]
     }
 
-    private func geometry(for panel: CandidatePanel) -> Geometry {
-        let (content, listWidth, _) = columns(for: panel)
-        var y = content.minY
-        var variantsRow: NSRect?
-        if panel.association != nil || !panel.variants.isEmpty {
-            if panel.association == nil { variantsRow = NSRect(x: content.minX, y: y, width: listWidth, height: sectionHeight) }
-            y += sectionHeight + Size.frameWidth
+    /// 候補ごとの枠．表では上から下へ詰め，列を左から右へ並べる．列のあいだは 1 ドットの縦の線で区切る．
+    /// 表でなければ，配置の候補の行をそのまま使う
+    private func cells(for panel: CandidatePanel, layout: CandidateListLayout) -> Cells {
+        let rows = layout.rows.map(NSRect.init), hits = layout.hitRows.map(NSRect.init)
+        guard let length = panel.columnLength, length > 0, let first = rows.first, let last = rows.last else {
+            return Cells(rows: rows, hitRows: hits, separators: [])
         }
-        guard let length = panel.columnLength, length > 0 else {
-            let entryRows = panel.entries.indices.map { index in
-                NSRect(x: content.minX, y: y + CGFloat(index) * rowHeight, width: listWidth, height: rowHeight)
-            }
-            return Geometry(variantsRow: variantsRow, entryRows: entryRows)
-        }
-        let cell = cellWidth(for: panel)
-        let entryRows = panel.entries.indices.map { index in
-            NSRect(x: content.minX + CGFloat(index / length) * (cell + Size.frameWidth), y: y + CGFloat(index % length) * rowHeight,
-                   width: cell, height: rowHeight)
-        }
-        let separators = (1..<max(panel.columnCount, 1)).map { content.minX + CGFloat($0) * (cell + Size.frameWidth) - Size.frameWidth }
-        return Geometry(variantsRow: variantsRow, entryRows: entryRows, columnSeparators: separators,
-                        entriesSpan: y...(y + CGFloat(rowCount(for: panel)) * rowHeight))
+        let columns = panel.columnCount
+        let gaps = Size.frameWidth * CGFloat(columns - 1)
+        let cell = min(cellWidth(for: panel), ((first.width - gaps) / CGFloat(columns)).rounded(.down))
+        let x = { (column: Int) in first.minX + CGFloat(column) * (cell + Size.frameWidth) }
+        let place = { (row: NSRect, index: Int) in NSRect(x: x(index / length), y: row.minY, width: cell, height: row.height) }
+        // 縦の線は行の地の上の端から下の端まで(glass は行と行のあいだの空きの分だけ短くなる)
+        let separators = (1..<max(columns, 1)).map { NSRect(x: x($0) - Size.frameWidth, y: first.minY, width: Size.frameWidth, height: last.maxY - first.minY) }
+        return Cells(rows: panel.entries.indices.map { place(rows[$0 % length], $0) },
+                     hitRows: panel.entries.indices.map { place(hits[$0 % length], $0) }, separators: separators)
     }
 
-    /// 字種の行の 1 つずつの枠
+    /// 字種の行の 1 つずつの枠(行の高さいっぱい)．最初の字種の文字を候補の番号の左にそろえる
     private func variantCells(_ panel: CandidatePanel, in rect: NSRect) -> [NSRect] {
-        var x = rect.minX + Size.paddingX / 2
+        var x = rect.minX + rowPaddingX - Size.variantPaddingX
         return panel.variants.map { variant in
             let width = variant.label.size(withAttributes: [.font: labelFont]).width + Size.variantPaddingX * 2
             defer { x += width }
-            return NSRect(x: x, y: rect.minY + (theme.isRounded ? 4 : 1), width: width, height: rect.height - (theme.isRounded ? 8 : 2))
+            return NSRect(x: x, y: rect.minY, width: width, height: rect.height)
         }
     }
 
-    /// 候補の行の札の右端
-    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Size.paddingX / 2 }
+    /// 候補の行の札の右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - rowPaddingX }
 
     /// ユーザー辞書の語のコメントの札を押せる範囲．コメントの札の無い行は nil
     private func commentRect(_ entry: CandidatePanel.Entry, in row: NSRect) -> NSRect? {
@@ -232,13 +237,15 @@ final class CandidateView: NSView {
     /// コメントの札は行の中にあるので，行より先に調べる(札を押すと候補の代わりにコメントを入れる)
     func target(at point: NSPoint) -> PointerTarget? {
         guard let panel else { return nil }
-        let geometry = geometry(for: panel)
-        if let row = geometry.entryRows.firstIndex(where: { $0.contains(point) }) {
-            if let comment = commentRect(panel.entries[row], in: geometry.entryRows[row]), comment.contains(point) { return .comment(row) }
+        let layout = placement(for: panel, size: bounds.size).layout
+        let hitRows = cells(for: panel, layout: layout).hitRows
+        if let row = hitRows.firstIndex(where: { $0.contains(point) }) {
+            // 札を押せる範囲は，候補の行と同じく行と行のあいだまで(札の右の端は行の地の内側)
+            if let comment = commentRect(panel.entries[row], in: hitRows[row]), comment.contains(point) { return .comment(row) }
             return .entry(row)
         }
-        if let row = geometry.variantsRow, let cell = variantCells(panel, in: row).firstIndex(where: { $0.contains(point) }),
-           panel.variants[cell].isAvailable {
+        if panel.association == nil, let header = layout.header,
+           let cell = variantCells(panel, in: NSRect(header)).firstIndex(where: { $0.contains(point) }), panel.variants[cell].isAvailable {
             return .listVariant(cell)
         }
         return nil
@@ -256,82 +263,54 @@ final class CandidateView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let panel else { return }
-        let body = NSRect(x: 0, y: 0, width: bounds.width - dropShadowOffset, height: bounds.height - dropShadowOffset)
+        let (layout, slot) = placement(for: panel, size: bounds.size)
+        let body = NSRect(layout.body)
         if theme.isRounded {
             GlassDrawing.drawFrame(in: body, theme: theme, fillsSurface: fillsSurface)
         } else {
             BevelDrawing.drawDropShadow(for: body, theme: theme)
             BevelDrawing.drawPanel(in: body, theme: theme)
         }
-        let (content, listWidth, slot) = columns(for: panel)
-        let listMaxX = content.minX + listWidth
-        var y = content.minY
-        if let heading = panel.association {
-            let row = NSRect(x: content.minX + Size.paddingX, y: y, width: listWidth - Size.paddingX * 2, height: sectionHeight)
-            AssociationHeadingDrawing.draw(heading, in: row, theme: theme, font: labelFont, emphasis: labelFont)
-            y += sectionHeight
-            drawSeparator(y: y, from: content.minX, to: listMaxX)
-            y += Size.frameWidth
-        } else if !panel.variants.isEmpty {
-            drawVariants(panel, in: NSRect(x: content.minX, y: y, width: listWidth, height: sectionHeight))
-            y += sectionHeight
-            drawSeparator(y: y, from: content.minX, to: listMaxX)
-            y += Size.frameWidth
-        }
-        var selectedMidY: CGFloat?
-        let geometry = geometry(for: panel)
-        for x in geometry.columnSeparators { drawColumnSeparator(x: x, span: geometry.entriesSpan) }
-        for (index, (entry, row)) in zip(panel.entries, geometry.entryRows).enumerated() {
-            drawEntry(entry, index: index, panel: panel, in: row)
-            if panel.focus == .candidate, panel.selectedEntry == index { selectedMidY = row.midY }
-        }
-        y += CGFloat(rowCount(for: panel)) * rowHeight
-        if let slot {
-            switch slot.placement {
-            case .side:
-                // 候補の右: 候補の列と同じ高さのカードにし，選んでいる候補を左の辺の三角で指す
-                y = content.minY + max(listHeight(for: panel), slot.size.height)
-                // platinum と desk はカードの枠を窓の縁から離し，二重の線に見せない
-                let card = NSRect(x: listMaxX + Glass.meaningGap, y: content.minY + cardMargin,
-                                  width: slot.size.width - cardMargin, height: y - content.minY - cardMargin * 2)
-                drawCard(slot.layout, in: card, pointerY: selectedMidY)
-            case .below:
-                // 候補の下: 候補と足元のあいだに，窓の幅いっぱいのカードを出す．足元のキーの案内は消さない
-                y += belowCardMargin
-                let card = NSRect(x: content.minX + Size.paddingX / 2, y: y, width: content.width - Size.paddingX, height: slot.size.height)
-                drawCard(slot.layout, in: card, pointerY: nil)
-                y += slot.size.height + belowCardMargin
+        if let header = layout.header.map(NSRect.init) {
+            if let heading = panel.association {
+                let row = header.insetBy(dx: rowPaddingX, dy: 0)
+                AssociationHeadingDrawing.draw(heading, in: row, theme: theme, font: labelFont, emphasis: labelFont)
+            } else {
+                drawVariants(panel, in: header)
             }
         }
-        drawSeparator(y: y, from: content.minX, to: content.maxX)
-        y += Size.frameWidth
-        drawFooter(panel, in: NSRect(x: content.minX, y: y, width: content.width, height: sectionHeight))
-    }
-
-    /// 語の意味のカード．layout が nil なら空けておくカード(意味の無い候補を選んでいるとき)
-    private func drawCard(_ layout: MeaningCardDrawing.Layout?, in rect: NSRect, pointerY: CGFloat?) {
-        guard let layout else {
-            MeaningCardDrawing.drawEmpty(in: rect, theme: theme, pointerY: pointerY)
-            return
+        if let line = layout.headerSeparator { drawLine(NSRect(line)) }
+        let cells = cells(for: panel, layout: layout)
+        cells.separators.forEach(drawLine)
+        for (index, (entry, row)) in zip(panel.entries, cells.rows).enumerated() {
+            drawEntry(entry, index: index, panel: panel, in: row)
         }
-        MeaningCardDrawing.drawBackground(in: rect, theme: theme, pointerY: pointerY)
-        MeaningCardDrawing.drawContent(layout, in: rect, theme: theme)
-    }
-
-    private func drawSeparator(y: CGFloat, from minX: CGFloat, to maxX: CGFloat) {
-        if theme.isRounded {
-            theme.line.setFill()
-            NSRect(x: minX + Size.paddingX / 2, y: y, width: maxX - minX - Size.paddingX, height: Size.frameWidth).fill()
-        } else {
-            BevelDrawing.drawSeparator(y: y, from: minX, to: maxX, theme: theme)
+        if let slot, let card = layout.card.map(NSRect.init) {
+            if let line = layout.cardSeparator { drawLine(NSRect(line)) }
+            if let meaning = slot.layout {
+                MeaningCardDrawing.drawContent(meaning, in: card, theme: theme)
+                // 候補の右に出すときは，選んでいる候補の行の右の端から語の意味の見出しへ線でつなぐ
+                // 表では，選んでいる候補の行の高さで候補の列の右の端から引く(ほかの列の候補にかからないように)
+                if slot.placement == .side, let selected = panel.selectedEntry, panel.focus == .candidate, cells.rows.indices.contains(selected),
+                   let listMaxX = layout.rows.first.map({ NSRect($0).maxX }) {
+                    let row = cells.rows[selected]
+                    MeaningCardDrawing.drawConnector(from: NSPoint(x: listMaxX, y: row.midY.rounded()),
+                                                     to: NSPoint(x: MeaningCardDrawing.connectorEndX(in: card, placement: slot.position),
+                                                                 y: (card.minY + slot.position.headerMidY).rounded()),
+                                                     theme: theme)
+                }
+            } else {
+                MeaningCardDrawing.drawEmpty(in: card, placement: slot.position, theme: theme)
+            }
         }
+        drawLine(NSRect(layout.footerSeparator))
+        drawFooter(panel, in: NSRect(layout.footer))
     }
 
-    /// 表の列のあいだの縦の線．glass は上下を少し空けた細い線，platinum と desk は候補の行の高さいっぱいの 1 ドットの線
-    private func drawColumnSeparator(x: CGFloat, span: ClosedRange<CGFloat>) {
+    /// 区切りの線(1 ドット)
+    private func drawLine(_ rect: NSRect) {
         theme.line.setFill()
-        let margin: CGFloat = theme.isRounded ? Glass.padding / 2 : 0
-        NSRect(x: x.rounded(), y: span.lowerBound + margin, width: Size.frameWidth, height: span.upperBound - span.lowerBound - margin * 2).fill()
+        rect.fill()
     }
 
     private func drawVariants(_ panel: CandidatePanel, in rect: NSRect) {
@@ -356,7 +335,7 @@ final class CandidateView: NSView {
         let isSelected = panel.focus == .candidate && panel.selectedEntry == index
         if isSelected {
             if theme.isRounded {
-                GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection)
+                GlassDrawing.fillCapsule(rect, color: theme.selection)
             } else {
                 theme.selection.setFill()
                 rect.fill()
@@ -365,20 +344,19 @@ final class CandidateView: NSView {
         let opacity: CGFloat = (isSelected || index == 0) ? 1 : restOpacity
         let textColor = (isSelected ? theme.selectionText : theme.text).withAlphaComponent(opacity)
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
-        // 表では選んでいる列にだけ番号を振る(番号キーはその列の中で選ぶ)．ほかの列は番号の場所を空けたままにし，列を移っても文字を動かさない
-        let number = panel.number(ofEntry: index).map(String.init)
-        var textX: CGFloat
+        // 表では選んでいる列にだけ番号を振る(番号キーはその列の中で選ぶ)．ほかの列は番号の場所を空けたままにし，列を移っても文字を動かさない．
         // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
         // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
-        if theme.isRounded {
-            let center = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
-            if let number { GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity) }
-            textX = rect.minX + Size.paddingX / 2 + lead
-        } else {
-            if let number {
-                drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
+        let number = panel.number(ofEntry: index).map(String.init)
+        let numberX = rect.minX + rowPaddingX
+        var textX = numberX + lead
+        if let number {
+            if theme.isRounded {
+                let center = NSPoint(x: numberX + Glass.badgeSize / 2, y: rect.midY)
+                GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity)
+            } else {
+                drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: numberX, in: rect)
             }
-            textX = rect.minX + Size.paddingX + lead
         }
         if let kind = entry.command {
             // コマンドの候補は，文字の前に種類のアイコンを置く
@@ -388,7 +366,7 @@ final class CandidateView: NSView {
         let annotationWidth = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
         let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: textColor]
         let detailWidth = CandidateDetailDrawing.width(entry.detail, font: labelFont)
-        let available = rect.maxX - Size.paddingX - annotationWidth - detailWidth - textX
+        let available = rect.maxX - rowPaddingX - annotationWidth - detailWidth - textX
         // 長い文の候補は，ほかの候補と違うところの少し手前から見せる(頭が同じ文が並ぶので，末尾を省くと見分けられない)
         let shared = entry.text.count > Int(available / max(candidateFont.pointSize, 1))
             ? max(TextFitting.sharedPrefixLength(of: entry.text, among: panel.entries.map(\.text)) - Int(DesignTokens.Size.Candidate.truncationContext), 0) : 0
@@ -405,7 +383,7 @@ final class CandidateView: NSView {
             let width = { (text: ArraySlice<Character>) in String(text).size(withAttributes: [.font: self.candidateFont]).width }
             let from = (textX + width(characters[..<start])).rounded()
             let to = (from + width(characters[start..<end])).rounded()
-            let offset = theme.isRounded ? Glass.underlineOffset : DesignTokens.Size.Branch.underlineOffset
+            let offset = theme.isRounded ? Glass.underlineOffset - Glass.selectionInsetY : DesignTokens.Size.Branch.underlineOffset
             let color = (isSelected ? theme.selectionText : theme.correction).withAlphaComponent(opacity)
             GlassDrawing.drawUnderline(from: from, to: to, y: rect.maxY - offset, color: color, dotted: true, theme: theme)
         }
@@ -450,17 +428,19 @@ final class CandidateView: NSView {
     private func hintsWidth(_ footer: Footer) -> CGFloat {
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         if let note = footer.note { return NoteDrawing.width(note, theme: theme) }
-        let extra = footer.associationHint.map { $0.size(withAttributes: attributes).width + Size.paddingX } ?? 0
+        let extra = footer.associationHint.map { $0.size(withAttributes: attributes).width + Glass.hintGap } ?? 0
         return GlassDrawing.hintsWidth(footer.hints, theme: theme) + extra
     }
 
-    /// glass は案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)
+    /// glass は案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
+    /// 左右の端は候補の行の番号の左と注釈の札の右にそろえる
     private func drawFooter(_ panel: CandidatePanel, in rect: NSRect) {
         let footer = footerContent(for: panel)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
-        let left = rect.minX + Size.paddingX
+        let left = rect.minX + rowPaddingX
+        let rightEdge = rect.maxX - rowPaddingX
         let right = { (text: String, attributes: [NSAttributedString.Key: Any]) in
-            self.drawText(text, attributes: attributes, x: rect.maxX - Size.paddingX - text.size(withAttributes: attributes).width, in: rect)
+            self.drawText(text, attributes: attributes, x: rightEdge - text.size(withAttributes: attributes).width, in: rect)
         }
         let hintsWidth = GlassDrawing.hintsWidth(footer.hints, theme: theme)
         if theme.isRounded {
@@ -468,28 +448,27 @@ final class CandidateView: NSView {
                 NoteDrawing.draw(note, x: left, midY: rect.midY, theme: theme)
             } else {
                 GlassDrawing.drawHints(footer.hints, x: left, midY: rect.midY, theme: theme)
-                if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Size.paddingX, in: rect) }
+                if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Glass.hintGap, in: rect) }
             }
             right(footer.position, muted)
             return
         }
         drawText(footer.position, attributes: muted, x: left, in: rect)
         if let note = footer.note {
-            NoteDrawing.draw(note, x: rect.maxX - Size.paddingX - NoteDrawing.width(note, theme: theme), midY: rect.midY, theme: theme)
+            NoteDrawing.draw(note, x: rightEdge - NoteDrawing.width(note, theme: theme), midY: rect.midY, theme: theme)
         } else {
-            GlassDrawing.drawHints(footer.hints, x: rect.maxX - Size.paddingX - hintsWidth, midY: rect.midY, theme: theme)
+            GlassDrawing.drawHints(footer.hints, x: rightEdge - hintsWidth, midY: rect.midY, theme: theme)
             if let hint = footer.associationHint {
                 let width = hint.size(withAttributes: muted).width
-                drawText(hint, attributes: muted, x: rect.maxX - Size.paddingX - hintsWidth - Size.paddingX - width, in: rect)
+                drawText(hint, attributes: muted, x: rightEdge - hintsWidth - Glass.hintGap - width, in: rect)
             }
         }
     }
 
-    /// 行の高さの中で縦に中央にそろえて描く．座標は整数に丸め，文字の輪郭をぼかさない
+    /// 行の縦の真ん中に，文字の行の箱(書体の ascender から descender まで)の真ん中を合わせて描く．
+    /// ベースラインと x は整数に丸め，文字の輪郭をぼかさない
     private func drawText(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, in rect: NSRect) {
-        let size = text.size(withAttributes: attributes)
-        let y = rect.minY + ((rect.height - size.height) / 2).rounded()
-        text.draw(at: NSPoint(x: x.rounded(), y: y), withAttributes: attributes)
+        TextFitting.draw(text, attributes: attributes, x: x, midY: rect.midY)
     }
 }
 

@@ -1904,7 +1904,7 @@ fn commands() -> Vec<Section> {
         Section {
             title: Some(extras::TRY_MACROS),
             rows: vec![Row::new("", "", Control::Preview(TryKind::Macros))],
-            footer: Some(extras::MACRO_REFERENCE),
+            footer: None,
             footer_variants: &[],
         },
     ]
@@ -1929,12 +1929,9 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // macOS の UserWordsView と同じく，切り替え・説明・書き方の表(書き方・入るもの・今入れると)・
-            // 付けられる名前と日時の書式の記号を 1 枚のカードに並べる
+            // macOS の UserWordsView と同じく，切り替えと書き方の表(書き方・入るもの・今入れると)を 1 枚のカードに並べる
             rows: vec![
                 Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"),
-                Row::note(extras::DYNAMIC_DICTIONARY_NOTE),
-                // 表の下に登録の例・付けられる名前・日時の書式の記号を小さく添える
                 Row::new("", "", Control::TemplateReference),
             ]
             .into_iter()
@@ -1958,7 +1955,8 @@ fn dictionary() -> Vec<Section> {
                 }),
             )
             .visible_when(words())],
-            footer: Some(settings::DICTIONARY_NOTE),
+            // 注記は短縮よみを選んだときだけ出す(ふだんは空)
+            footer: Some(""),
             footer_variants: DICTIONARY_NOTES,
         },
         Section {
