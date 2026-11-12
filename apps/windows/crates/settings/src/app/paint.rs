@@ -27,6 +27,8 @@ pub enum TextStyle {
     Demo,
     /// 等幅の小さい文字(ライセンスの全文)
     Mono,
+    /// 本文の大きさの等幅の文字(一覧の表の打つもの．macOS の表の monospaced)
+    Code,
     /// 情報のページの製品名(WinUI の Subtitle)
     Subtitle,
     /// テーマの見本の札の文字

@@ -175,6 +175,7 @@ pub struct SettingsPalette {
     pub switch_off: Rgb,
     pub text: Rgb,
     pub text_disabled: Rgb,
+    pub text_placeholder: Rgb,
     pub text_secondary: Rgb,
 }
 
@@ -205,6 +206,7 @@ pub mod settings_windows {
         switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
         text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
         text_disabled: Rgb { red: 0xA0, green: 0xA0, blue: 0xA0 },
+        text_placeholder: Rgb { red: 0x5F, green: 0x5F, blue: 0x5F },
         text_secondary: Rgb { red: 0x5F, green: 0x5F, blue: 0x5F },
     };
     pub const DARK: SettingsPalette = SettingsPalette {
@@ -231,6 +233,7 @@ pub mod settings_windows {
         switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         text_disabled: Rgb { red: 0x78, green: 0x78, blue: 0x78 },
+        text_placeholder: Rgb { red: 0x9D, green: 0x9D, blue: 0x9D },
         text_secondary: Rgb { red: 0xCF, green: 0xCF, blue: 0xCF },
     };
 }
@@ -242,6 +245,7 @@ pub mod size {
         pub const SM: f32 = 8.0;
         pub const MD: f32 = 12.0;
         pub const LG: f32 = 16.0;
+        pub const INLINE: f32 = 4.0;
     }
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
@@ -352,9 +356,7 @@ pub mod size {
         pub const MODE_INDICATOR_SIZE: f32 = 34.0;
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
         pub const SELECTION_INSET_Y: f32 = 2.0;
-        pub const CURVE_START_OVERLAP: f32 = 2.0;
-        pub const CURVE_END_GAP: f32 = 4.0;
-        pub const CURVE_BEND: f32 = 0.35;
+        pub const BRANCH_TURN_RADIUS: f32 = 8.0;
         pub const DOT_PITCH: f32 = 5.0;
         pub const KEYCAP_PART_GAP: f32 = 2.0;
         pub const KEYCAP_GAP: f32 = 4.0;
@@ -486,7 +488,7 @@ pub mod size {
         pub const CARD_GAP: f32 = 4.0;
         pub const CARD_RADIUS: f32 = 4.0;
         pub const CARD_PADDING_X: f32 = 16.0;
-        pub const ROW_HEIGHT: f32 = 68.0;
+        pub const ROW_HEIGHT: f32 = 48.0;
         pub const CONTROL_HEIGHT: f32 = 32.0;
         pub const DROPDOWN_HEIGHT: f32 = 384.0;
         pub const CONTROL_WIDTH: f32 = 240.0;
@@ -554,7 +556,7 @@ pub mod size {
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
         pub const SLIDER_THUMB_INNER_HOVER: f32 = 14.0;
-        pub const CARD_PADDING_Y: f32 = 16.0;
+        pub const CARD_PADDING_Y: f32 = 12.0;
         pub const FOOTER_GAP: f32 = 8.0;
         pub const LABEL_MIN_WIDTH: f32 = 160.0;
         pub const RADIO_SIZE: f32 = 20.0;
@@ -567,6 +569,8 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
+        pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
+        pub const LIST_ARROW_WIDTH: f32 = 24.0;
         pub const TITLE_BAR_HEIGHT: f32 = 32.0;
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
         pub const TITLE_BAR_PADDING_X: f32 = 16.0;
@@ -723,5 +727,6 @@ pub mod opacity {
         pub const LINK: f32 = 0.4;
         pub const LINK_HOVER_MIX: f32 = 0.35;
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
+        pub const TABLE_STRIPE: f32 = 0.035;
     }
 }

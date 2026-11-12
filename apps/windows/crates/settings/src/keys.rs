@@ -30,20 +30,67 @@ const NAMES: &[&str] = &[
     "Muhenkan",
 ];
 
-/// 読むときだけ受け付ける別名(KeyStroke.aliases)
+/// 読むときだけ受け付ける別名(KeyStroke.aliases と，画面に出す Windows の名前)
 const ALIASES: &[(&str, &str)] = &[
     ("esc", "Escape"),
     ("return", "Enter"),
     ("kanji", "Hankaku/Zenkaku"),
     ("del", "Delete"),
+    ("bs", "Backspace"),
+    ("pgup", "PageUp"),
+    ("pgdn", "PageDown"),
+    ("↑", "Up"),
+    ("↓", "Down"),
+    ("←", "Left"),
+    ("→", "Right"),
+    ("英数", "Eisu"),
+    ("かな", "Kana"),
+    ("半角/全角", "Hankaku/Zenkaku"),
+    ("変換", "Henkan"),
+    ("無変換", "Muhenkan"),
+];
+
+/// 画面に出すキーの名前(core の KeyStroke.label(style: .windows) と同じ)
+const LABELS: &[(&str, &str)] = &[
+    ("Backspace", "BS"),
+    ("Delete", "Del"),
+    ("Escape", "Esc"),
+    ("Up", "↑"),
+    ("Down", "↓"),
+    ("Left", "←"),
+    ("Right", "→"),
+    ("PageUp", "PgUp"),
+    ("PageDown", "PgDn"),
+    ("Eisu", "英数"),
+    ("Kana", "かな"),
+    ("Hankaku/Zenkaku", "半角/全角"),
+    ("Henkan", "変換"),
+    ("Muhenkan", "無変換"),
 ];
 
 /// ファンクションキーの番号の範囲(KeyStroke.functionKeys)
 const FUNCTION_KEYS: std::ops::RangeInclusive<u32> = 1..=20;
 
-/// 「ctrl alt space」のような書き方を「Ctrl Option Space」に整える．読めなければ None
+/// 「ctrl alt space」「Ctrl+Alt+Space」のような書き方を「Ctrl Option Space」に整える．読めなければ None
 pub fn canonical(text: &str) -> Option<String> {
-    let parts: Vec<&str> = text.split(' ').filter(|part| !part.is_empty()).collect();
+    let text = text.trim();
+    // 画面の書き方(「+」でつなぐ)も読む．「Ctrl++」は「+」のキー
+    let parts: Vec<&str> = if text.contains('+') && text != "+" {
+        let (body, plus) = match text.strip_suffix("++") {
+            Some(body) => (body, true),
+            None => (text, false),
+        };
+        let mut parts: Vec<&str> = body
+            .split(['+', ' '])
+            .filter(|part| !part.is_empty())
+            .collect();
+        if plus {
+            parts.push("+");
+        }
+        parts
+    } else {
+        text.split(' ').filter(|part| !part.is_empty()).collect()
+    };
     let (last, modifiers) = parts.split_last()?;
     let (mut control, mut option, mut shift, mut command) = (false, false, false, false);
     for modifier in modifiers {
@@ -51,7 +98,7 @@ pub fn canonical(text: &str) -> Option<String> {
             "ctrl" | "control" => control = true,
             "option" | "alt" => option = true,
             "shift" => shift = true,
-            "cmd" | "command" => command = true,
+            "cmd" | "command" | "win" => command = true,
             _ => return None,
         }
     }
@@ -177,15 +224,20 @@ fn function_number(lowered: &str) -> Option<u32> {
 
 /// 画面に出す書き方．Option を Alt にし，英字を大文字にする
 pub fn display(notation: &str) -> String {
+    // core の KeyStroke.label(style: .windows) と同じく「Ctrl+Alt+K」の形にし，日本語のキーは日本語の名前で出す
     notation
         .split(' ')
         .map(|part| match part {
             "Option" => "Alt".to_string(),
+            "Cmd" => "Win".to_string(),
             part if part.chars().count() == 1 => part.to_uppercase(),
-            part => part.to_string(),
+            part => LABELS
+                .iter()
+                .find(|(name, _)| *name == part)
+                .map_or_else(|| part.to_string(), |(_, label)| (*label).to_string()),
         })
         .collect::<Vec<_>>()
-        .join(" ")
+        .join("+")
 }
 
 /// command に割り当てたキー(入力していないときに効く行．状態が「どこでも」か「入力していないとき」)を「、」で並べる．
@@ -286,7 +338,7 @@ mod tests {
         ]);
         assert_eq!(
             super::assigned(Some(&keymap), "emojiPalette"),
-            "Ctrl Alt E、F12"
+            "Ctrl+Alt+E、F12"
         );
         assert_eq!(super::assigned(Some(&keymap), "symbolPalette"), "なし");
     }
@@ -358,9 +410,37 @@ mod tests {
     }
 
     #[test]
-    fn 画面では_alt_と大文字で出す() {
-        assert_eq!(display("Ctrl Option k"), "Ctrl Alt K");
-        assert_eq!(display("Shift Space"), "Shift Space");
+    fn 画面では_windows_の書き方で出す() {
+        assert_eq!(display("Ctrl Option k"), "Ctrl+Alt+K");
+        assert_eq!(display("Shift Space"), "Shift+Space");
+        assert_eq!(display("Eisu"), "英数");
+        assert_eq!(display("Ctrl Henkan"), "Ctrl+変換");
+        assert_eq!(display("Shift Backspace"), "Shift+BS");
+        assert_eq!(display("Cmd Up"), "Win+↑");
+        // 画面の書き方から元の書き方に戻せる(表の行を入力欄に写して書き換える)
+        for notation in [
+            "Ctrl Option k",
+            "Shift Space",
+            "Eisu",
+            "Kana",
+            "Hankaku/Zenkaku",
+            "Ctrl Henkan",
+            "Muhenkan",
+            "Shift Backspace",
+            "Delete",
+            "Escape",
+            "Shift Up",
+            "Ctrl PageDown",
+            "F12",
+            "Ctrl ,",
+            "Ctrl +",
+        ] {
+            assert_eq!(
+                canonical(&display(notation)).as_deref(),
+                Some(notation),
+                "{notation}"
+            );
+        }
     }
 
     #[test]

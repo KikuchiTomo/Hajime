@@ -13,7 +13,8 @@ pub const REGISTER_WORD: &str = "単語の登録…";
 pub const USER_DICTIONARY: &str = "ユーザー辞書…";
 pub const OPEN_SETTINGS: &str = "設定を開く…";
 pub const CHECK_FOR_UPDATES: &str = "更新を確認";
-/// 「更新を確認」で設定の画面の実行ファイルに渡す引数(最新のリリースのページを開いて終える)
+/// 「更新を確認」で設定の画面の実行ファイルに渡す引数．設定の画面を情報のページで開き，そこの「更新を確認」を
+/// 押したときと同じ確認を始める(確認・変更点・ダウンロード・インストールを同じ流れにする)
 pub const CHECK_FOR_UPDATES_ARGUMENT: &str = "--check-for-updates";
 /// エンジンが受けなかったときに，設定の画面をユーザー辞書の登録した単語のページで直接開く引数(EngineService.settingsDictionaryArguments と同じ)
 pub const USER_DICTIONARY_ARGUMENTS: &str = "--page dictionary";
@@ -48,7 +49,7 @@ pub enum Selection {
     Palette,
     /// 単語の登録．入力先で選んでいる文字を読み，エンジンに設定の画面のユーザー辞書の登録で開いてもらう(キーの「単語の登録」と同じ)
     RegisterWord,
-    /// 最新のリリースのページを開く(入力先のアプリから起動するので，ブラウザーが前に出る)
+    /// 設定の画面を情報のページで開き，「更新を確認」を押したときと同じ確認を始める(入力先のアプリから起動するので，設定の画面が前に出る)
     CheckForUpdates,
 }
 
@@ -328,6 +329,16 @@ mod tests {
         // 単語の登録はユーザー辞書のページを開き，登録の欄に入力位置を置く
         assert!(REGISTER_WORD_ARGUMENTS.starts_with(USER_DICTIONARY_ARGUMENTS));
         assert!(REGISTER_WORD_ARGUMENTS.ends_with(" --register-word"));
+    }
+
+    #[test]
+    fn 更新を確認は設定の画面の情報のページと同じ確認を始める引数で開く() {
+        // 設定の画面(settings::app::CHECK_FOR_UPDATES)と同じ引数．ほかの引数を付けず，ページは設定の画面が決める
+        assert_eq!(CHECK_FOR_UPDATES_ARGUMENT, "--check-for-updates");
+        assert_eq!(
+            selection(ID_CHECK_FOR_UPDATES),
+            Some(Selection::CheckForUpdates)
+        );
     }
 
     #[test]

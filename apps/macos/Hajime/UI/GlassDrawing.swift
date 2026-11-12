@@ -76,15 +76,6 @@ enum GlassDrawing {
         drawLineCentered(label, attributes: [.font: theme.keyFont(size: fontSize), .foregroundColor: color], in: rect)
     }
 
-    /// 枝の曲線．幹の下(上)の start から，候補の行の左の end へ，角を丸めて曲がる
-    static func branchCurve(from start: NSPoint, to end: NSPoint) -> NSBezierPath {
-        let path = NSBezierPath()
-        path.move(to: start)
-        path.curve(to: end, controlPoint1: NSPoint(x: start.x, y: end.y), controlPoint2: NSPoint(x: start.x + (end.x - start.x) * 0.35, y: end.y))
-        path.lineCapStyle = .round
-        return path
-    }
-
     // MARK: - 足元の案内
 
     /// 案内の幅．描くときと大きさを求めるときで同じものを使う

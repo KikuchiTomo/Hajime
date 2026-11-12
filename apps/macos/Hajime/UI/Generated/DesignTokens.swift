@@ -127,6 +127,7 @@ enum DesignTokens {
             static let sm: CGFloat = 8
             static let md: CGFloat = 12
             static let lg: CGFloat = 16
+            static let inline: CGFloat = 4
         }
         enum Candidate {
             static let rowHeight: CGFloat = 22
@@ -237,9 +238,7 @@ enum DesignTokens {
             static let modeIndicatorSize: CGFloat = 34
             static let modeIndicatorFontSize: CGFloat = 17
             static let selectionInsetY: CGFloat = 2
-            static let curveStartOverlap: CGFloat = 2
-            static let curveEndGap: CGFloat = 4
-            static let curveBend: CGFloat = 0.35
+            static let branchTurnRadius: CGFloat = 8
             static let dotPitch: CGFloat = 5
             static let keycapPartGap: CGFloat = 2
             static let keycapGap: CGFloat = 4
@@ -371,7 +370,7 @@ enum DesignTokens {
             static let cardGap: CGFloat = 4
             static let cardRadius: CGFloat = 4
             static let cardPaddingX: CGFloat = 16
-            static let rowHeight: CGFloat = 68
+            static let rowHeight: CGFloat = 48
             static let controlHeight: CGFloat = 32
             static let dropdownHeight: CGFloat = 384
             static let controlWidth: CGFloat = 240
@@ -439,7 +438,7 @@ enum DesignTokens {
             static let sliderThumbSize: CGFloat = 20
             static let sliderThumbInner: CGFloat = 12
             static let sliderThumbInnerHover: CGFloat = 14
-            static let cardPaddingY: CGFloat = 16
+            static let cardPaddingY: CGFloat = 12
             static let footerGap: CGFloat = 8
             static let labelMinWidth: CGFloat = 160
             static let radioSize: CGFloat = 20
@@ -452,6 +451,8 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
+            static let keymapListHeight: CGFloat = 400
+            static let listArrowWidth: CGFloat = 24
             static let titleBarHeight: CGFloat = 32
             static let titleBarIconSize: CGFloat = 16
             static let titleBarPaddingX: CGFloat = 16
@@ -606,6 +607,7 @@ enum DesignTokens {
             static let link: CGFloat = 0.4
             static let linkHoverMix: CGFloat = 0.35
             static let sliderTrackDisabled: CGFloat = 0.5
+            static let tableStripe: CGFloat = 0.035
         }
     }
 }

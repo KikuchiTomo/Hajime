@@ -3,7 +3,7 @@
 //! 描く順の部品(Draw)を SVG にする(テストだけ)．Windows でなくても窓の見た目を画像にして見比べるのに使う．
 //! 文字の幅は書体の大きさから見積もる(日本語の字は 1 字が書体の大きさ，英数字は 0.6 倍)．本物の描画は app::render
 
-use super::{Draw, Frame, Measure, Scene};
+use super::{Draw, Frame, Measure, Scene, Segment};
 use crate::icon;
 use crate::theme::{Color, Face, Font, ResolvedTheme, Weight};
 use std::fmt::Write;
@@ -163,6 +163,43 @@ fn write_draw(out: &mut String, draw: &Draw, theme: &ResolvedTheme, font_size: f
                 out,
                 "<path d=\"M{} {} C{} {} {} {} {} {}\" fill=\"none\" stroke=\"{}\" stroke-width=\"{width}\" stroke-linecap=\"round\"/>",
                 from.x, from.y, control1.x, control1.y, control2.x, control2.y, to.x, to.y,
+                stroke(*color)
+            );
+        }
+        Draw::Path {
+            figures,
+            color,
+            width,
+        } => {
+            // 端は平らにし，直角の角は尖らせる(描く層と同じ)．円弧は y が下へ増える画面で見た向き(SVG の sweep と同じ)
+            let mut d = String::new();
+            for figure in figures {
+                let _ = write!(d, "M{} {} ", figure.start.x, figure.start.y);
+                for segment in &figure.segments {
+                    match segment {
+                        Segment::Line(to) => {
+                            let _ = write!(d, "L{} {} ", to.x, to.y);
+                        }
+                        Segment::Arc {
+                            to,
+                            radius,
+                            clockwise,
+                        } => {
+                            let _ = write!(
+                                d,
+                                "A{radius} {radius} 0 0 {} {} {} ",
+                                u8::from(*clockwise),
+                                to.x,
+                                to.y
+                            );
+                        }
+                    }
+                }
+            }
+            let _ = write!(
+                out,
+                "<path d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"{width}\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\"/>",
+                d.trim_end(),
                 stroke(*color)
             );
         }

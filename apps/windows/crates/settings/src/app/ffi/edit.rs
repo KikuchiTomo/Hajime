@@ -18,9 +18,9 @@ use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindow
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetParent, GetWindowTextLengthW, PostMessageW, SendMessageW,
     SetLayeredWindowAttributes, ES_AUTOHSCROLL, LWA_ALPHA, PRF_CLIENT, PRF_ERASEBKGND,
-    WINDOW_STYLE, WM_APP, WM_CHAR, WM_GETFONT, WM_KEYDOWN, WM_KILLFOCUS, WM_MOUSEWHEEL,
-    WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_SETFOCUS, WM_SYSCHAR, WM_SYSKEYDOWN, WS_CHILD,
-    WS_EX_LAYERED, WS_TABSTOP,
+    WINDOW_STYLE, WM_APP, WM_CHAR, WM_GETFONT, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDOWN,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_SETFOCUS, WM_SYSCHAR, WM_SYSKEYDOWN,
+    WS_CHILD, WS_EX_LAYERED, WS_TABSTOP,
 };
 use windows_core::w;
 
@@ -49,6 +49,8 @@ struct FieldData {
     placeholder: Vec<u16>,
     /// キーを記録しているときの案内．記録していなければ None
     recording: Option<Vec<u16>>,
+    /// 押したらキーを記録し始める欄の案内(キー設定のキーの欄．macOS の KeyField は押して記録する)
+    record_on_click: Option<Vec<u16>>,
 }
 
 /// 枠の無い欄を作る(見えない状態で作る．置くときに見せる)
@@ -70,6 +72,7 @@ pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<H
     let data = Box::new(FieldData {
         placeholder: placeholder.encode_utf16().collect(),
         recording: None,
+        record_on_click: None,
     });
     // SAFETY: window はこのスレッドの窓．data は WM_NCDESTROY で Box に戻して放す
     unsafe {
@@ -91,17 +94,13 @@ pub fn set_placeholder(window: HWND, placeholder: &str) {
     super::win32::invalidate(window);
 }
 
-/// 次に押したキーをキー設定の書き方(crate::keys::from_key)にして入れる(キー設定の「キーを記録」)．
-/// 押すまでは prompt を案内に出す．修飾キーだけを押しているあいだは待つ
-pub fn record_key(window: HWND, prompt: &str) {
+/// 押したらキーを記録し始める欄にする(prompt は記録しているあいだの案内)．None なら普通の欄に戻す
+/// (欄は前のページの欄を使い回すので，取り出すたびに決め直す)
+pub fn set_record_on_click(window: HWND, prompt: Option<&str>) {
     with_data(window, |data| {
-        data.recording = Some(prompt.encode_utf16().collect());
+        data.record_on_click = prompt.map(|prompt| prompt.encode_utf16().collect());
+        data.recording = None;
     });
-    // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
-    set_ime(window, false);
-    super::win32::set_text(window, "");
-    super::win32::focus(window);
-    super::win32::invalidate(window);
 }
 
 /// 欄で IME を使うか(記録しているあいだだけ使わない)
@@ -226,6 +225,18 @@ fn handle(
         }
         // 記録しているあいだは文字を入れない
         WM_CHAR | WM_SYSCHAR if field.recording.is_some() => Some(LRESULT(0)),
+        // キーの欄は押したら記録し始める(打って書くこともできる)．次に押したキーをキー設定の書き方
+        // (crate::keys::from_key)にして入れ，押すまでは案内を出す．修飾キーだけを押しているあいだは待つ．
+        // フォーカスが外れたらやめる(WM_KILLFOCUS)
+        WM_LBUTTONDOWN if field.recording.is_none() && field.record_on_click.is_some() => {
+            field.recording = field.record_on_click.clone();
+            // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
+            set_ime(window, false);
+            super::win32::set_text(window, "");
+            super::win32::invalidate(window);
+            // SAFETY: 窓の手続きが受けたものをそのまま渡す(フォーカスを入れる)
+            Some(unsafe { DefSubclassProc(window, message, wparam, lparam) })
+        }
         WM_KEYDOWN if wparam.0 == usize::from(VK_TAB.0) => {
             notify_parent(window, WM_FIELD_TAB, usize::from(pressed(VK_SHIFT.0)));
             Some(LRESULT(0))

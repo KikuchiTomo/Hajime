@@ -13,7 +13,7 @@
 
 use super::card_layout::{self, CardLayout, Content, Placement, SenseLines};
 use super::paint::Painter;
-use super::{Draw, Frame, Look, Measure, Point};
+use super::{Draw, Figure, Frame, Look, Measure, Point, Segment};
 use crate::keys::Icon;
 use crate::strings;
 use crate::theme::{Color, Font};
@@ -326,37 +326,52 @@ pub(super) fn draw(painter: &mut Painter, card: Option<&Card>, rect: Frame, posi
 }
 
 /// 選んでいる候補の行の右の端(start)から語の意味の見出し(end)へ引く線．端に丸を付ける．
-/// 曲線の枝のテーマはなめらかな S 字，直線の枝のテーマは折れ線にする
+/// 枝(branch_lines)と同じ形: 水平に出て，真ん中で枝と同じ半径の 4 分の 1 の円で曲がり，縦に進んでまた曲がり，水平に見出しへ入る．
+/// 直線の枝のテーマは直角に曲がる．高さの差が小さければ半径を縮める(macOS の MeaningCardDrawing.drawConnector)
 pub(super) fn connector(painter: &mut Painter, start: Point, end: Point) {
     let theme = painter.theme;
     let middle = ((start.x + end.x) / 2.0).round();
-    if theme.curved_branches() {
-        painter.draws.push(Draw::Curve {
-            from: start,
-            control1: Point::new(middle, start.y),
-            control2: Point::new(middle, end.y),
-            to: end,
-            color: theme.selection,
-            width: glass::LINE_WIDTH_SELECTED,
-        });
+    let rise = end.y - start.y;
+    let turn = if theme.curved_branches() {
+        glass::BRANCH_TURN_RADIUS
     } else {
-        // 枝と同じく，デバイスのピクセルにそろう長方形で描く
-        let width = branch::LINE_WIDTH_SELECTED;
-        let half = width / 2.0;
-        let (top, bottom) = (start.y.min(end.y), start.y.max(end.y));
-        for frame in [
-            Frame::new(start.x, (start.y - half).round(), middle - start.x, width),
-            Frame::new(
-                (middle - half).round(),
-                (top - half).round(),
-                width,
-                bottom - top + width,
-            ),
-            Frame::new(middle, (end.y - half).round(), end.x - middle, width),
-        ] {
-            painter.rect(frame, theme.selection);
-        }
-    }
+        0.0
+    };
+    let radius = turn
+        .min(rise.abs() / 2.0)
+        .min(middle - start.x)
+        .min(end.x - middle)
+        .max(0.0);
+    let direction = if rise < 0.0 { -1.0 } else { 1.0 };
+    let segments = if rise == 0.0 {
+        vec![Segment::Line(end)]
+    } else {
+        vec![
+            Segment::Line(Point::new(middle - radius, start.y)),
+            // 下へ曲がるときは時計回り，上へ曲がるときは反時計回り(y が下へ増える画面で見た向き)
+            Segment::Arc {
+                to: Point::new(middle, start.y + direction * radius),
+                radius,
+                clockwise: direction > 0.0,
+            },
+            Segment::Line(Point::new(middle, end.y - direction * radius)),
+            Segment::Arc {
+                to: Point::new(middle + radius, end.y),
+                radius,
+                clockwise: direction < 0.0,
+            },
+            Segment::Line(end),
+        ]
+    };
+    painter.draws.push(Draw::Path {
+        figures: vec![Figure { start, segments }],
+        color: theme.selection,
+        width: if theme.is_rounded() {
+            glass::LINE_WIDTH_SELECTED
+        } else {
+            branch::LINE_WIDTH_SELECTED
+        },
+    });
     painter.draws.push(Draw::Ellipse {
         frame: Frame::square(end, meaning::DOT_SIZE),
         color: theme.selection,
@@ -1016,43 +1031,81 @@ mod tests {
         }
     }
 
-    #[test]
-    fn つなぐ線は曲線の枝のテーマでs字_直線の枝のテーマで折れ線() {
-        let start = Point::new(100.0, 50.0);
-        let end = Point::new(140.0, 90.0);
-        let curved = theme("washi");
-        let mut drawn = painter(&Look::new(&curved, 15.0));
+    /// つないだ線の図形と，その中の円弧の半径と向き
+    fn connector_path(
+        name: &str,
+        start: Point,
+        end: Point,
+    ) -> (Figure, Vec<(f32, bool)>, Vec<Draw>) {
+        let theme = theme(name);
+        let mut drawn = painter(&Look::new(&theme, 15.0));
         connector(&mut drawn, start, end);
-        assert!(
-            matches!(drawn.draws[0], Draw::Curve { from, to, color, .. } if from == start && to == end && color == curved.selection)
-        );
-        assert!(
-            matches!(drawn.draws.last(), Some(Draw::Ellipse { frame, .. }) if frame.mid_x() == end.x && frame.mid_y() == end.y)
-        );
+        let figure = drawn
+            .draws
+            .iter()
+            .find_map(|draw| match draw {
+                Draw::Path { figures, color, .. } if *color == theme.selection => {
+                    Some(figures[0].clone())
+                }
+                _ => None,
+            })
+            .expect("線");
+        let arcs = figure
+            .segments
+            .iter()
+            .filter_map(|segment| match segment {
+                Segment::Arc {
+                    radius, clockwise, ..
+                } => Some((*radius, *clockwise)),
+                Segment::Line(_) => None,
+            })
+            .collect();
+        (figure, arcs, drawn.draws)
+    }
 
+    #[test]
+    fn つなぐ線は枝と同じ半径の曲がり角で曲がり_直線の枝のテーマは直角() {
+        let start = Point::new(100.0, 50.0);
+        let down = Point::new(140.0, 90.0);
+        let up = Point::new(140.0, 20.0);
+        // 下へ: 時計回りに曲がって下り，反時計回りに曲がって見出しへ入る
+        let (figure, arcs, draws) = connector_path("washi", start, down);
+        assert_eq!(figure.start, start);
+        assert_eq!(figure.segments.last(), Some(&Segment::Line(down)));
+        assert_eq!(
+            arcs,
+            vec![
+                (glass::BRANCH_TURN_RADIUS, true),
+                (glass::BRANCH_TURN_RADIUS, false)
+            ]
+        );
+        assert!(
+            matches!(draws.last(), Some(Draw::Ellipse { frame, .. }) if frame.mid_x() == down.x && frame.mid_y() == down.y)
+        );
+        // 上へ: 向きが逆
+        let (_, arcs, _) = connector_path("washi", start, up);
+        assert_eq!(
+            arcs,
+            vec![
+                (glass::BRANCH_TURN_RADIUS, false),
+                (glass::BRANCH_TURN_RADIUS, true)
+            ]
+        );
+        // 高さの差が半径の 2 倍より小さければ半径を縮める
+        let (_, arcs, _) = connector_path("washi", start, Point::new(140.0, 56.0));
+        assert!(arcs.iter().all(|(radius, _)| *radius == 3.0));
+        // 同じ高さなら 1 本の水平の線
+        let (figure, arcs, _) = connector_path("washi", start, Point::new(140.0, 50.0));
+        assert!(arcs.is_empty());
+        assert_eq!(figure.segments.len(), 1);
+        // 直線の枝のテーマは直角(半径 0)
         for name in ["platinum", "automatic"] {
-            let straight = theme(name);
-            let mut drawn = painter(&Look::new(&straight, 15.0));
-            connector(&mut drawn, start, end);
+            let (_, arcs, draws) = connector_path(name, start, down);
+            assert!(arcs.iter().all(|(radius, _)| *radius == 0.0), "{name}");
             assert!(
-                !drawn
-                    .draws
-                    .iter()
-                    .any(|draw| matches!(draw, Draw::Curve { .. })),
+                !draws.iter().any(|draw| matches!(draw, Draw::Curve { .. })),
                 "{name}"
             );
-            let rects: Vec<Frame> = drawn
-                .draws
-                .iter()
-                .filter_map(|draw| match draw {
-                    Draw::Rect { frame, .. } => Some(*frame),
-                    _ => None,
-                })
-                .collect();
-            assert_eq!(rects.len(), 3, "{name}");
-            // 候補の行の端から出て，カードの辺で終わる
-            assert_eq!(rects[0].x, start.x);
-            assert_eq!(rects[2].max_x(), end.x);
         }
     }
 

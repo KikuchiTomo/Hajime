@@ -507,7 +507,7 @@ const ASSOCIATION_SPEC: ListSpec = ListSpec {
 };
 
 /// 一覧の入力欄の右のボタンと，表の下のボタン(並びは部品を作る順と同じ)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ListButtons {
     pub top: &'static [&'static str],
     pub bottom: &'static [&'static str],
@@ -517,6 +517,14 @@ pub struct ListButtons {
     pub filter: bool,
     /// 表の下の右に置く，一覧のファイルを読み込む・書き出すボタン(macOS の RuleListEditor の下の帯)
     pub files: Option<ListFiles>,
+    /// 先頭の 2 つの打つ欄のあいだに矢印を置く(打つもの → 置き換えるもの．macOS の RuleListEditor)
+    pub arrow: bool,
+    /// 先頭から決まった幅にする入力欄の幅(残りの欄で残りの幅を分ける．キー設定の状態とキー)
+    pub field_widths: &'static [f32],
+    /// 検索欄と絞り込みを入力欄の上の帯に置く(キー設定．macOS の KeymapPage の上の帯)
+    pub toolbar: bool,
+    /// 表の下のボタンのうち，右に寄せる末尾のボタンの数(キー設定の既定に戻す)
+    pub trailing_bottom: usize,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -596,26 +604,27 @@ impl Control {
     /// 一覧の部品のボタン．一覧でなければ None
     pub fn list_buttons(&self) -> Option<ListButtons> {
         use crate::strings::{rule_list, windows};
-        const ADD_REMOVE: &[&str] = &[settings::ADD, settings::REMOVE];
+        // 足す一覧は macOS の RuleListEditor と同じく，入力欄の右に追加(書き換えているあいだは更新とキャンセル)，
+        // 表の下の左に削除を置く．有効・無効は表の「有効」の列で切り替える
+        const ADD_CANCEL: &[&str] = &[settings::ADD, settings::CANCEL];
         let (top, bottom): (&'static [&'static str], &'static [&'static str]) = match self {
             // キー設定はキーを押して記録する・行を複製する，除外設定はアプリのファイルを選んで足す(macOS の KeymapPage・ExclusionsPage)
-            Control::List(spec, _) if spec.path == "keymap" => {
-                (ADD_REMOVE, &[keys::RECORD, keys::DUPLICATE])
-            }
+            // キー設定のキーは欄を押して記録する(macOS の KeyField)．macOS と同じく新しい行の右は追加だけにし，
+            // 表の下に削除・複製・既定に戻すを置く
+            Control::List(spec, _) if spec.path == "keymap" => (
+                &[settings::ADD],
+                &[settings::REMOVE, keys::DUPLICATE, keys::RESTORE],
+            ),
             Control::List(spec, _) if spec.path == "profileRules" => {
-                (ADD_REMOVE, &[more::ADD_APPS])
+                (ADD_CANCEL, &[settings::REMOVE, more::ADD_APPS])
             }
             // コマンドは行き先のファイルやアプリを選べる(macOS の CommandsPage の選ぶボタン)
-            Control::List(spec, _) if spec.path == "commands" => (
-                ADD_REMOVE,
-                &[windows::CHOOSE_TARGET, windows::TOGGLE_ENABLED],
-            ),
-            Control::List(spec, _) if spec.has_enabled_flag() => {
-                (ADD_REMOVE, &[windows::TOGGLE_ENABLED])
+            Control::List(spec, _) if spec.path == "commands" => {
+                (ADD_CANCEL, &[settings::REMOVE, windows::CHOOSE_TARGET])
             }
-            Control::List(..) | Control::Dictionary(_) => (ADD_REMOVE, &[]),
-            // 有効・無効の切り替えは，ほかの一覧と同じく表の下に置く(上に並べると入力欄が狭くなり，案内の文字が欠ける)
-            Control::Symbols(..) => (ADD_REMOVE, &[windows::TOGGLE_ENABLED]),
+            Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
+                (ADD_CANCEL, &[settings::REMOVE])
+            }
             Control::SyncFields(_) => (&[windows::TOGGLE_SYNC_SCOPE], &[]),
             Control::Dictionaries(DictionaryList::Imported, _) => (
                 &[rule_list::UPDATE],
@@ -656,12 +665,37 @@ impl Control {
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
         );
         let filter = matches!(self, Control::List(spec, _) if spec.path == "keymap");
+        // 打つもの → 置き換えるものの一覧(先頭の 2 つの欄がどちらも打つ欄)．コマンドの読みと名前は置き換えではない
+        let arrow = matches!(
+            self,
+            Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
+        ) && !matches!(self, Control::List(spec, _) if spec.path == "commands")
+            && self.list_spec().is_some_and(|spec| {
+                spec.fields.len() >= 2
+                    && spec.fields[..2]
+                        .iter()
+                        .all(|field| field.choices.is_none() && !field.notation)
+            });
+        // キー設定の新しい行は状態とキーを決まった幅にし，コマンドに残りを渡す(macOS の KeymapPage)
+        const KEYMAP_FIELD_WIDTHS: &[f32] = &[
+            tokens::size::settings::KEYMAP_STATE_WIDTH,
+            tokens::size::settings::KEYMAP_KEY_WIDTH,
+        ];
+        let field_widths: &'static [f32] = match self {
+            Control::List(spec, _) if spec.path == "keymap" => KEYMAP_FIELD_WIDTHS,
+            _ => &[],
+        };
+        let keymap = matches!(self, Control::List(spec, _) if spec.path == "keymap");
         Some(ListButtons {
             top,
             bottom,
             search,
             filter,
             files: list_files(self),
+            arrow,
+            field_widths,
+            toolbar: keymap,
+            trailing_bottom: usize::from(keymap),
         })
     }
 
@@ -676,6 +710,127 @@ impl Control {
             | Control::CustomThemes(spec) => Some(spec),
             _ => None,
         }
+    }
+
+    /// 表の列(見出し・行のどの値を出すか・幅・描き方)．macOS の RuleListEditor・KeymapPage・ExclusionsPage・CommandsPage と
+    /// 同じ幅にし，打つもの(先頭の列)は等幅の文字で出す．行の値は入力欄と同じ並びで，有効の印・札はその後ろに持つ
+    pub fn table_layout(&self) -> TableLayout {
+        use crate::strings::{rule_list, windows};
+        use tokens::size::settings as mac;
+        use ColumnWidth::{Fill, Fixed};
+        let field_count = self.list_spec().map_or(0, |spec| spec.fields.len());
+        let labels: Vec<&'static str> = self
+            .list_spec()
+            .map(|spec| spec.fields.iter().map(|field| field.label).collect())
+            .unwrap_or_default();
+        let label = |index: usize| labels.get(index).copied().unwrap_or("");
+        let check = |source: usize| Column {
+            title: rule_list::ENABLED,
+            source,
+            width: Fixed(mac::RULE_CHECK_COLUMN_WIDTH),
+            cell: Cell::Check,
+            badge: None,
+        };
+        let column = |source: usize, width: ColumnWidth, cell: Cell| Column {
+            title: label(source),
+            source,
+            width,
+            cell,
+            badge: None,
+        };
+        // 決まりの一覧: 打つもの(等幅)と，あれば置き換えるもの．最後の列が残りの幅に広がる
+        let rules = |count: usize| -> Vec<Column> {
+            (0..count)
+                .map(|index| {
+                    let width = if index + 1 == count {
+                        Fill
+                    } else {
+                        Fixed(mac::RULE_KEY_COLUMN_WIDTH)
+                    };
+                    let cell = if index == 0 { Cell::Mono } else { Cell::Text };
+                    column(index, width, cell)
+                })
+                .collect()
+        };
+        let layout = match self {
+            // 記号: 有効の印・入力(等幅)・記号と札(変更あり・追加)．行は入力・記号・有効の印・札
+            Control::Symbols(..) => TableLayout {
+                columns: vec![
+                    check(2),
+                    column(0, Fixed(mac::RULE_KEY_COLUMN_WIDTH), Cell::Mono),
+                    Column {
+                        badge: Some(3),
+                        ..column(1, Fill, Cell::Text)
+                    },
+                ],
+                enabled: Some(2),
+            },
+            // コマンド: 有効の印・読み・名前・動作・行き先(macOS の CommandsPage の列の幅)
+            Control::List(spec, _) if spec.path == "commands" => TableLayout {
+                columns: vec![
+                    check(field_count),
+                    column(0, Fixed(mac::COMMAND_READING_COLUMN_WIDTH), Cell::Text),
+                    column(1, Fixed(mac::COMMAND_TITLE_COLUMN_WIDTH), Cell::Text),
+                    column(2, Fixed(mac::COMMAND_KIND_COLUMN_WIDTH), Cell::Secondary),
+                    column(3, Fill, Cell::Text),
+                ],
+                enabled: Some(field_count),
+            },
+            // 変換マクロ: 有効の印・形(等幅)
+            Control::List(spec, _) if spec.has_enabled_flag() => TableLayout {
+                columns: std::iter::once(check(field_count))
+                    .chain(rules(field_count))
+                    .collect(),
+                enabled: Some(field_count),
+            },
+            // キー設定: 状態・キー・コマンド(macOS の KeymapPage)
+            Control::List(spec, _) if spec.path == "keymap" => TableLayout {
+                columns: vec![
+                    column(0, Fixed(mac::KEYMAP_STATE_WIDTH), Cell::Text),
+                    column(1, Fixed(mac::KEYMAP_KEY_WIDTH), Cell::Text),
+                    column(2, Fill, Cell::Text),
+                ],
+                enabled: None,
+            },
+            // 除外設定: アプリ・動作(macOS の ExclusionsPage は動作の列を決まった幅にする)
+            Control::List(spec, _) if spec.path == "profileRules" => TableLayout {
+                columns: vec![
+                    column(0, Fill, Cell::Text),
+                    column(1, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Text),
+                ],
+                enabled: None,
+            },
+            // ユーザー辞書: 読み(等幅)・単語・品詞・コメント(macOS の RuleListEditor の種類と添え書きの列)
+            Control::Dictionary(_) => TableLayout {
+                columns: vec![
+                    column(0, Fixed(mac::RULE_KEY_COLUMN_WIDTH), Cell::Mono),
+                    column(1, Fixed(mac::RULE_VALUE_COLUMN_WIDTH), Cell::Text),
+                    column(2, Fixed(mac::RULE_KIND_COLUMN_WIDTH), Cell::Secondary),
+                    column(3, Fill, Cell::Secondary),
+                ],
+                enabled: None,
+            },
+            Control::List(..) => TableLayout {
+                columns: rules(field_count),
+                enabled: None,
+            },
+            _ => TableLayout {
+                columns: self
+                    .table_columns()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(source, title)| Column {
+                        title,
+                        source,
+                        width: Fill,
+                        cell: Cell::Text,
+                        badge: None,
+                    })
+                    .collect(),
+                enabled: None,
+            },
+        };
+        layout.with_titles(windows::SYMBOL_STATE)
     }
 
     /// 表の列の名前．ふつうは入力欄と同じ列で，記号は状態の列を足す．項目ごとの同期と辞書の一覧は入力欄と別の列
@@ -700,6 +855,98 @@ impl Control {
             Control::CustomThemes(_) => vec![more::THEME_NAME, windows::SYMBOL_STATE],
             _ => fields().collect(),
         }
+    }
+}
+
+/// 表の行の値で「有効」を表す印(空なら無効)．表の検索に掛からない文字にする
+pub const ENABLED_CELL: &str = "\u{2713}";
+
+/// 表の列の幅
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ColumnWidth {
+    Fixed(f32),
+    /// 残りの幅(Fill の列が複数あれば等しく分ける)
+    Fill,
+}
+
+/// 表の列の値の描き方
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cell {
+    Text,
+    /// 等幅の文字(打つもの．macOS の表の monospaced)
+    Mono,
+    /// 薄い文字(種類・添え書き)
+    Secondary,
+    /// 有効の印(値が空でなければ印を付ける．押すと有効・無効を切り替える)
+    Check,
+}
+
+/// 表の 1 列
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Column {
+    pub title: &'static str,
+    /// 行の値の何番目を出すか
+    pub source: usize,
+    pub width: ColumnWidth,
+    pub cell: Cell,
+    /// 右に寄せて小さく出す札(行の値の何番目か．記号の「変更あり」「追加」)
+    pub badge: Option<usize>,
+}
+
+/// 表の列と，行が有効かを持つ値の番号(無効の行は薄く出す)
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableLayout {
+    pub columns: Vec<Column>,
+    pub enabled: Option<usize>,
+}
+
+impl TableLayout {
+    /// 名前の無い列(行の値にあって入力欄に無い列)に名前を付ける
+    fn with_titles(mut self, fallback: &'static str) -> Self {
+        for column in &mut self.columns {
+            if column.title.is_empty() && column.cell != Cell::Check {
+                column.title = fallback;
+            }
+        }
+        self
+    }
+
+    /// 幅 width の表の各列の左端と幅(左の余白 padding から並べる)
+    pub fn spans(&self, width: f32, padding: f32) -> Vec<(f32, f32)> {
+        let fixed: f32 = self
+            .columns
+            .iter()
+            .map(|column| match column.width {
+                ColumnWidth::Fixed(width) => width,
+                ColumnWidth::Fill => 0.0,
+            })
+            .sum();
+        let fills = self
+            .columns
+            .iter()
+            .filter(|column| column.width == ColumnWidth::Fill)
+            .count()
+            .max(1) as f32;
+        let rest = ((width - padding - fixed) / fills).max(0.0);
+        let mut left = padding;
+        self.columns
+            .iter()
+            .map(|column| {
+                let span = match column.width {
+                    ColumnWidth::Fixed(width) => width,
+                    ColumnWidth::Fill => rest,
+                };
+                let placed = (left, span);
+                left += span;
+                placed
+            })
+            .collect()
+    }
+
+    /// 行が有効か(有効かを持たない表はいつも有効)
+    pub fn row_enabled(&self, cells: &[String]) -> bool {
+        self.enabled
+            .is_none_or(|index| cells.get(index).is_some_and(|cell| !cell.is_empty()))
     }
 }
 
@@ -1521,10 +1768,8 @@ const KEYMAP_FIELDS: &[Field] = &[
 /// キー設定のページ(macOS の KeymapPage)．表の行は上から順に並び，同じキーの行は下の行を使う
 fn keymap() -> Vec<Section> {
     vec![
-        Section::untitled(vec![
-            Row::new(keys::PRESET_MENU, "", Control::Preset),
-            Row::action(keys::RESTORE, Action::RestoreKeymap),
-        ]),
+        // 既定に戻すボタンは表の下の帯に置く(macOS の KeymapPage の下の右)
+        Section::untitled(vec![Row::new(keys::PRESET_MENU, "", Control::Preset)]),
         Section::untitled(vec![Row::new("", "", Control::KeymapReport)]),
         Section {
             title: None,
@@ -2430,7 +2675,11 @@ mod tests {
         let buttons = romaji[0].control.list_buttons().unwrap();
         assert_eq!(
             buttons.bottom_labels(),
-            vec![settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY]
+            vec![
+                settings::REMOVE,
+                settings::IMPORT_DICTIONARY,
+                settings::EXPORT_DICTIONARY
+            ]
         );
         let apps = &sections(Page::Apps).unwrap()[0].rows;
         let labels = apps[0].control.list_buttons().unwrap().bottom_labels();

@@ -96,21 +96,34 @@ enum MeaningCardDrawing {
     }
 
     /// 選んでいる候補の行の右の端(from)から語の意味の見出し(to)へ引く線．端に丸を付ける．
-    /// 曲線の枝のテーマはなめらかな S 字，直線の枝のテーマは折れ線にする
+    /// 枝(BranchLineDrawing)と同じ半径の曲がり角でつなぐ．直線の枝のテーマは直角に曲がる
     static func drawConnector(from start: NSPoint, to end: NSPoint, theme: ResolvedTheme) {
+        // 枝と同じ形: 水平に出て，真ん中で枝と同じ半径の 4 分の 1 の円で曲がり，縦に進んでまた曲がり，水平に見出しへ入る．
+        // 直線の枝のテーマは直角に曲がる．高さの差が小さければ半径を縮める
+        let middle = ((start.x + end.x) / 2).rounded()
+        let curved = theme.isRounded && !theme.straightBranches
+        let rise = end.y - start.y
+        let radius = min(curved ? DesignTokens.Size.Glass.branchTurnRadius : 0, abs(rise) / 2, middle - start.x, end.x - middle)
+        let direction: CGFloat = rise < 0 ? -1 : 1
         let path = NSBezierPath()
         path.move(to: start)
-        let middle = ((start.x + end.x) / 2).rounded()
-        if theme.isRounded, !theme.straightBranches {
-            path.curve(to: end, controlPoint1: NSPoint(x: middle, y: start.y), controlPoint2: NSPoint(x: middle, y: end.y))
+        if rise == 0 {
+            path.line(to: end)
+        } else if radius > 0 {
+            path.line(to: NSPoint(x: middle - radius, y: start.y))
+            path.appendArc(from: NSPoint(x: middle, y: start.y), to: NSPoint(x: middle, y: end.y), radius: radius)
+            path.line(to: NSPoint(x: middle, y: end.y - direction * radius))
+            path.appendArc(from: NSPoint(x: middle, y: end.y), to: end, radius: radius)
+            path.line(to: end)
         } else {
             path.line(to: NSPoint(x: middle, y: start.y))
             path.line(to: NSPoint(x: middle, y: end.y))
             path.line(to: end)
         }
         path.lineWidth = theme.isRounded ? DesignTokens.Size.Glass.lineWidthSelected : DesignTokens.Size.Branch.lineWidthSelected
-        path.lineCapStyle = .round
-        path.lineJoinStyle = .round
+        // 枝の線(BranchLineDrawing)と同じく，端は平らにし直角の角は尖らせる
+        path.lineCapStyle = .butt
+        path.lineJoinStyle = .miter
         theme.selection.setStroke()
         path.stroke()
         let dot = Meaning.dotSize

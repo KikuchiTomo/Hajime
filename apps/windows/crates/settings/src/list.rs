@@ -280,6 +280,39 @@ impl ListSpec {
         result
     }
 
+    /// index 番目の行(items の並び)を，同じ位置のまま item に書き換えた配列．欄に無い値は元の要素から引き継ぐ．
+    /// ほかの行と見分ける欄が同じになるなら None(そのときは upsert でその行に重ねる)．
+    /// キー設定の表のように並びに意味がある一覧で，書き換えた行が末尾へ動いて効き方が変わらないようにする
+    pub fn replace_at(&self, list: Option<&Value>, index: usize, item: &Item) -> Option<Value> {
+        let collides = self
+            .items(list)
+            .iter()
+            .enumerate()
+            .any(|(position, existing)| position != index && self.same_key(existing, item));
+        if collides {
+            return None;
+        }
+        let mut position = 0;
+        let mut replaced = false;
+        let elements = self
+            .entries(list)
+            .into_iter()
+            .map(|(element, row)| {
+                if row.is_none() {
+                    return element;
+                }
+                position += 1;
+                if position - 1 == index {
+                    replaced = true;
+                    self.merged(&element, item)
+                } else {
+                    element
+                }
+            })
+            .collect();
+        replaced.then_some(Value::Array(elements))
+    }
+
     /// 文字列の配列から text を除いた配列(exclusive_with の一覧に使う)
     pub fn without(list: Option<&Value>, text: &str) -> Value {
         let elements = match list {
@@ -526,7 +559,7 @@ mod tests {
         assert!(!KEYMAP.is_valid(&KEYMAP.make(&texts(&["afterEnglish", "Hyper k", "english"]))));
         assert_eq!(
             KEYMAP.display(&KEYMAP.make(&texts(&["afterEnglish", "alt k", "english"])))[1],
-            "Alt K"
+            "Alt+K"
         );
     }
 
@@ -628,5 +661,46 @@ mod tests {
         // ほかの一覧は点を含む語も出す
         let words = json!(["node.js"]);
         assert_eq!(WORDS.items(Some(&words)), vec![texts(&["node.js"])]);
+    }
+
+    #[test]
+    fn 書き換えた行は同じ位置に残す() {
+        const KEY_FIELDS: &[Field] = &[
+            Field::named("state", "状態", false),
+            Field::named("key", "キー", false),
+        ];
+        const KEYMAP: ListSpec = ListSpec {
+            path: "keymap",
+            fields: KEY_FIELDS,
+            empty: "",
+            invalid: crate::strings::Text::Fixed(""),
+            lowercase: false,
+            exclusive_with: None,
+        };
+        let list = json!([
+            {"state": "a", "key": "x", "command": "c1"},
+            {"state": "b", "key": "y", "command": "c2"},
+            {"state": "c", "key": "z", "command": "c3"},
+        ]);
+        let edited = KEYMAP
+            .replace_at(Some(&list), 0, &texts(&["a", "q"]))
+            .expect("書き換えられる");
+        assert_eq!(
+            edited,
+            json!([
+                {"state": "a", "key": "q", "command": "c1"},
+                list[1].clone(),
+                list[2].clone(),
+            ])
+        );
+        // ほかの行と見分ける欄が同じになるなら書き換えない(その行に重ねる)
+        assert_eq!(
+            RULES.replace_at(
+                Some(&json!([{"typed": "teh", "word": "the"}, {"typed": "adn", "word": "and"}])),
+                1,
+                &texts(&["teh", "THE"])
+            ),
+            None
+        );
     }
 }

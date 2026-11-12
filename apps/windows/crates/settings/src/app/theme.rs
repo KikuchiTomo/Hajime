@@ -55,7 +55,10 @@ impl From<Rgb> for Color {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Glyphs {
     pub chevron_down: &'static str,
+    pub chevron_up: &'static str,
     pub chevron_right: &'static str,
+    /// 一覧の入力欄の間の矢印(打つもの → 置き換えるもの)
+    pub arrow_right: &'static str,
     pub check: &'static str,
     pub undo: &'static str,
     pub search: &'static str,
@@ -67,7 +70,9 @@ pub struct Glyphs {
 
 pub const GLYPHS: Glyphs = Glyphs {
     chevron_down: "\u{E70D}",
+    chevron_up: "\u{E70E}",
     chevron_right: "\u{E76C}",
+    arrow_right: "\u{E72A}",
     check: "\u{E73E}",
     undo: "\u{E7A7}",
     search: "\u{E721}",
@@ -187,6 +192,8 @@ fn system_palette() -> SettingsPalette {
         switch_off: gray,
         text,
         text_disabled: gray,
+        // 高コントラストは OS の灰色(使えない文字と同じ)で案内を出す
+        text_placeholder: gray,
         text_secondary: text,
     }
 }

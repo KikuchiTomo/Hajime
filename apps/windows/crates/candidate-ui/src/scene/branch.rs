@@ -8,17 +8,19 @@
 //! - 文節を区切っているときは，注目している文節の幹を切れ目で分け，切れ目に小さな番号の丸を挟む．枝は出さない
 //! - 語の意味のカードは，候補の枝の先に置いて選んでいる候補から線でつなぐか，枝と足元のあいだに窓の幅いっぱいに出す
 //!
-//! 角丸のテーマは曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
+//! 枝は幹の文節から 1 本の幹を伸ばし，候補ごとに同じ形の曲がり角と水平の線を出す(branch_lines)．
+//! 曲線の枝のテーマは 4 分の 1 の円で，直線の枝のテーマは直角に曲がる．platinum と desk は 1 ドットの線で描く
 
+use super::branch_lines::{BranchLines, Turn};
 use super::card_layout::{self, Placement};
 use super::meaning::{self, Slot};
 use super::paint::{Painter, TagStyle};
-use super::{Draw, Frame, Look, Measure, Point, Scene};
+use super::{Color, Draw, Figure, Frame, Look, Measure, Point, Scene, Segment};
 use crate::strings;
 use crate::theme::Font;
 use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
 use tokens::size::meaning as card_size;
-use tokens::size::{branch, candidate, glass};
+use tokens::size::{branch, candidate, glass, space};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
 struct Metrics {
@@ -33,6 +35,14 @@ struct Metrics {
     /// 候補の行の地の上下を縮める量(角丸のテーマ)．行の地の見える上の端は行の上の端からこの分だけ下
     row_inset: f32,
     shadow: f32,
+    line_width: f32,
+    line_width_selected: f32,
+    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
+    root_inset: f32,
+    /// 枝の曲がり角の半径．直線の枝は 0(直角)
+    turn_radius: f32,
+    /// 1 ドットあたりのデバイスのピクセル数
+    pixel_scale: f32,
 }
 
 /// 区切りの線の上と下，カードと枝・区切りの線のあいだの空き
@@ -66,6 +76,15 @@ impl Metrics {
                 footer_height,
                 row_inset: glass::SELECTION_INSET_Y,
                 shadow,
+                line_width: glass::LINE_WIDTH,
+                line_width_selected: glass::LINE_WIDTH_SELECTED,
+                root_inset: glass::SELECTION_INSET_Y,
+                turn_radius: if look.theme.curved_branches() {
+                    glass::BRANCH_TURN_RADIUS
+                } else {
+                    0.0
+                },
+                pixel_scale: look.pixel_scale,
             };
         }
         Self {
@@ -78,6 +97,11 @@ impl Metrics {
             footer_height,
             row_inset: 0.0,
             shadow,
+            line_width: branch::LINE_WIDTH,
+            line_width_selected: branch::LINE_WIDTH_SELECTED,
+            root_inset: 0.0,
+            turn_radius: 0.0,
+            pixel_scale: look.pixel_scale,
         }
     }
 }
@@ -796,102 +820,121 @@ fn branches(
     if rows.is_empty() {
         return;
     }
-    let stem_x = (node.x + metrics.stem_x).round();
     let row_frame = |index: usize| branch_row(node, width, index, downward, metrics);
-    if painter.theme.curved_branches() {
-        let stem_y = if downward {
-            node.max_y() - glass::CURVE_START_OVERLAP
-        } else {
-            node.y + glass::CURVE_START_OVERLAP
-        };
-        curves(painter, rows, Point::new(stem_x, stem_y), &row_frame);
-    } else {
-        straight_lines(painter, rows, stem_x, node, downward, &row_frame);
-    }
+    let mids: Vec<f32> = (0..rows.len())
+        .map(|index| row_frame(index).mid_y())
+        .collect();
+    let color = painter.theme.line;
+    lines(
+        painter,
+        Point::new(node.x + metrics.stem_x, root_y(node, downward, metrics)),
+        &mids,
+        lead_min_x(row_frame(0)) - space::INLINE,
+        rows.iter().position(|row| row.selected),
+        color,
+        metrics,
+    );
     for (index, row) in rows.iter().enumerate() {
         draw_row(painter, row, row_frame(index), metrics);
     }
 }
 
-/// 枝の曲線．幹の下(上)の start から，候補の行の左の end へ，角を丸めて曲がる
-fn curve(start: Point, end: Point, color: crate::theme::Color, width: f32) -> Draw {
-    Draw::Curve {
-        from: start,
-        control1: Point::new(start.x, end.y),
-        control2: Point::new(start.x + (end.x - start.x) * glass::CURVE_BEND, end.y),
-        to: end,
-        color,
-        width,
-    }
+/// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
+fn lead_min_x(row: Frame) -> f32 {
+    row.x + candidate::PADDING_X / 2.0
 }
 
-/// 幹の下(上)の 1 点から，候補ごとに曲線を出す．選んでいる枝は最後に選択の色で重ねる
-fn curves(painter: &mut Painter, rows: &[Row], start: Point, row_frame: &dyn Fn(usize) -> Frame) {
-    let end = |index: usize| {
-        let frame = row_frame(index);
-        Point::new(frame.x - glass::CURVE_END_GAP, frame.mid_y())
-    };
-    let line = painter.theme.line;
-    let selection = painter.theme.selection;
-    for (index, row) in rows.iter().enumerate().filter(|(_, row)| !row.selected) {
-        painter.draws.push(curve(
-            start,
-            end(index),
-            line.faded(row.opacity),
-            glass::LINE_WIDTH,
-        ));
-    }
-    for (index, _) in rows.iter().enumerate().filter(|(_, row)| row.selected) {
-        painter.draws.push(curve(
-            start,
-            end(index),
-            selection,
-            glass::LINE_WIDTH_SELECTED,
-        ));
-    }
-}
-
-/// platinum と desk: 縦の線を下ろし，候補ごとに横の線を出す
-fn straight_lines(
-    painter: &mut Painter,
-    rows: &[Row],
-    stem_x: f32,
-    node: Frame,
-    downward: bool,
-    row_frame: &dyn Fn(usize) -> Frame,
-) {
-    let last = row_frame(rows.len() - 1);
-    let (top, bottom) = if downward {
-        (node.max_y(), last.mid_y())
+/// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
+fn root_y(node: Frame, downward: bool, metrics: &Metrics) -> f32 {
+    if downward {
+        node.max_y() - metrics.root_inset
     } else {
-        (last.mid_y(), node.y)
-    };
-    let theme = painter.theme;
-    painter.rect(
-        Frame::new(stem_x, top, branch::LINE_WIDTH, bottom - top),
-        theme.line,
-    );
-    for (index, row) in rows.iter().enumerate() {
-        let frame = row_frame(index);
-        let tick = if row.selected {
-            branch::LINE_WIDTH_SELECTED
-        } else {
-            branch::LINE_WIDTH
-        };
-        painter.rect(
-            Frame::new(
-                stem_x,
-                (frame.mid_y() - tick / 2.0).round(),
-                frame.x - stem_x - candidate::FRAME_WIDTH,
-                tick,
-            ),
-            if row.selected {
-                theme.selection
-            } else {
-                theme.line
-            },
-        );
+        node.y + metrics.root_inset
     }
+}
+
+/// 幹と枝の線(macOS の BranchLineDrawing)．root は幹の x と根元の y，mids は候補の行の縦の中心(幹に近い順)．
+/// 選んでいない線(幹と，候補ごとの曲がり角と水平の線)は 1 つの部品にまとめて 1 回でなぞり，重なったところを濃くしない．
+/// 選んでいる候補への道(幹の根元からその候補の曲がり角まで，曲がり角，水平の線)は，最後に選択の色と太さで上に重ねる
+fn lines(
+    painter: &mut Painter,
+    root: Point,
+    mids: &[f32],
+    tip_x: f32,
+    selected: Option<usize>,
+    color: Color,
+    metrics: &Metrics,
+) {
+    let layout = |width: f32| {
+        BranchLines::new(
+            root.x,
+            root.y,
+            mids,
+            tip_x,
+            metrics.turn_radius,
+            width,
+            metrics.pixel_scale,
+        )
+    };
+    let base = layout(metrics.line_width);
+    let last = base.turns.len().saturating_sub(1);
+    let mut figures = Vec::new();
+    for (index, turn) in base.turns.iter().enumerate() {
+        if Some(index) == selected {
+            continue;
+        }
+        // 幹はいちばん遠い候補の曲がり角とひと続きにし，角に切れ目を作らない(選んでいる候補より先の部分だけを描く)
+        let mut figure = match base.stem_after(selected).filter(|_| index == last) {
+            Some((from, to)) => Figure {
+                start: from,
+                segments: vec![Segment::Line(to)],
+            },
+            None => Figure {
+                start: turn.start,
+                segments: Vec::new(),
+            },
+        };
+        figure.segments.extend(turn_segments(turn));
+        figures.push(figure);
+    }
+    if !figures.is_empty() {
+        painter.draws.push(Draw::Path {
+            figures,
+            color,
+            width: metrics.line_width,
+        });
+    }
+    let Some(selected) = selected.filter(|&index| index < base.turns.len()) else {
+        return;
+    };
+    let route = layout(metrics.line_width_selected);
+    let turn = &route.turns[selected];
+    let mut segments = vec![Segment::Line(turn.start)];
+    segments.extend(turn_segments(turn));
+    painter.draws.push(Draw::Path {
+        figures: vec![Figure {
+            start: route.root,
+            segments,
+        }],
+        color: painter.theme.selection,
+        width: metrics.line_width_selected,
+    });
+}
+
+/// 曲がり角(半径が 0 なら直角)と水平の線．曲がり角の始まりから描き始めること．
+/// 下へ進んで右へ曲がる角は，y が下へ増える画面では反時計回り，上へ進んで右へ曲がる角は時計回り
+fn turn_segments(turn: &Turn) -> Vec<Segment> {
+    let radius = turn.end.x - turn.start.x;
+    let corner = if radius > 0.0 {
+        Segment::Arc {
+            to: turn.end,
+            radius,
+            clockwise: turn.end.y < turn.start.y,
+        }
+    } else {
+        Segment::Line(turn.end)
+    };
+    vec![corner, Segment::Line(turn.tip)]
 }
 
 fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
@@ -914,10 +957,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
         if row.selected {
             painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
         }
-        let center = Point::new(
-            frame.x + padding / 2.0 + glass::BADGE_SIZE / 2.0,
-            frame.mid_y(),
-        );
+        let center = Point::new(lead_min_x(frame) + glass::BADGE_SIZE / 2.0, frame.mid_y());
         painter.badge(
             &row.badge,
             center,
@@ -934,7 +974,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
             &row.badge,
             muted_color,
             Frame::new(
-                frame.x + padding / 2.0,
+                lead_min_x(frame),
                 frame.y,
                 metrics.lead - padding / 2.0,
                 frame.height,
@@ -981,32 +1021,21 @@ fn draw_preview(
     metrics: &Metrics,
 ) {
     let theme = painter.theme;
-    let stem_x = (node.x + metrics.stem_x).round();
+    let stem_x = node.x + metrics.stem_x;
     let row = Frame::new(stem_x, node.max_y(), node.width, metrics.row_height);
     let color = theme.text_muted.faded(rest);
-    let text_x = if theme.is_rounded() {
-        let end = Point::new(stem_x + metrics.branch_indent / 2.0, row.mid_y());
-        let start = Point::new(stem_x, node.max_y() - glass::CURVE_START_OVERLAP);
-        painter
-            .draws
-            .push(curve(start, end, theme.line.faded(rest), glass::LINE_WIDTH));
-        end.x + candidate::PADDING_X / 2.0
-    } else {
-        painter.rect(
-            Frame::new(stem_x, node.max_y(), branch::LINE_WIDTH, row.height / 2.0),
-            color,
-        );
-        painter.rect(
-            Frame::new(
-                stem_x,
-                row.mid_y().round(),
-                metrics.branch_indent / 2.0,
-                branch::LINE_WIDTH,
-            ),
-            color,
-        );
-        stem_x + metrics.branch_indent / 2.0 + candidate::PADDING_X / 2.0
-    };
+    // 枝と同じ形で，幹から短く曲がる
+    let tip_x = (stem_x + metrics.branch_indent / 2.0).round();
+    lines(
+        painter,
+        Point::new(stem_x, root_y(node, true, metrics)),
+        &[row.mid_y()],
+        tip_x,
+        None,
+        theme.line.faded(rest),
+        metrics,
+    );
+    let text_x = tip_x + space::INLINE;
     let shown = painter.truncated(text, Font::Candidate, max_x - text_x);
     painter.text(&shown, Font::Candidate, color, text_x, row);
 }
@@ -1297,44 +1326,109 @@ mod tests {
         }
     }
 
-    #[test]
-    fn 角丸のテーマは曲線の枝で_選んだ枝を最後に選択の色で描く() {
-        let theme = theme("nordic");
-        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
-        let curves: Vec<_> = scene
+    /// 枝の線の部品(図形・色・太さ)を描く順に
+    fn paths(scene: &Scene) -> Vec<(Vec<Figure>, Color, f32)> {
+        scene
             .draws
             .iter()
             .filter_map(|draw| match draw {
-                Draw::Curve {
-                    from,
-                    to,
+                Draw::Path {
+                    figures,
                     color,
                     width,
-                    ..
-                } => Some((*from, *to, *color, *width)),
+                } => Some((figures.clone(), *color, *width)),
                 _ => None,
             })
-            .collect();
-        // 下の枝 2 本・上の枝 1 本
-        assert_eq!(curves.len(), 3);
-        let selected: Vec<_> = curves
+            .collect()
+    }
+
+    fn arcs(figures: &[Figure]) -> Vec<(f32, bool)> {
+        figures
             .iter()
-            .filter(|curve| curve.2 == theme.selection)
-            .collect();
-        assert_eq!(selected.len(), 1);
-        assert_eq!(selected[0].3, glass::LINE_WIDTH_SELECTED);
-        // 枝は幹の下の 1 点から出て，行の左の手前で終わる
-        let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
-        // いちばん上の行の地の上の端が縁の内側の余白の端にそろうよう，行は地を縮めた分だけ上から始まる
-        let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
-        assert_eq!(selected[0].0.y, node_bottom - glass::CURVE_START_OVERLAP);
+            .flat_map(|figure| figure.segments.iter())
+            .filter_map(|segment| match segment {
+                Segment::Arc {
+                    radius, clockwise, ..
+                } => Some((*radius, *clockwise)),
+                Segment::Line(_) => None,
+            })
+            .collect()
+    }
+
+    /// 図形の終わり(水平の線の終わり)
+    fn tip(figure: &Figure) -> Point {
+        match figure.segments.last() {
+            Some(Segment::Line(to)) | Some(Segment::Arc { to, .. }) => *to,
+            None => figure.start,
+        }
+    }
+
+    #[test]
+    fn 曲線の枝は1本の幹と同じ半径の曲がり角で描き_選んだ道を最後に選択の色で重ねる() {
+        let theme = theme("nordic");
+        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+        let paths = paths(&scene);
+        // 下の枝の選んでいない線・下の枝の選んだ道・上の枝の選んでいない線．線は向きごとに 1 つの部品にまとめる
+        assert_eq!(paths.len(), 3);
         assert_eq!(
-            selected[0].1.x,
-            (inset + glass::BRANCH_STEM_X).round() + glass::BRANCH_INDENT - glass::CURVE_END_GAP
+            paths.iter().map(|path| path.1).collect::<Vec<_>>(),
+            vec![theme.line, theme.selection, theme.line]
         );
+        assert_eq!(paths[0].2, glass::LINE_WIDTH);
+        assert_eq!(paths[1].2, glass::LINE_WIDTH_SELECTED);
+        // 曲がり角はどれも同じ半径．下へ曲がる角は反時計回り，上へ曲がる角は時計回り
+        assert_eq!(arcs(&paths[0].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
+        assert_eq!(arcs(&paths[1].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
+        assert_eq!(arcs(&paths[2].0), vec![(glass::BRANCH_TURN_RADIUS, true)]);
+        // 選んだ道は文節の地の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
+        // いちばん上の行の地の上の端が縁の内側の余白の端にそろうよう，行は地を縮めた分だけ上から始まる
+        let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
+        let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
+        assert_eq!(
+            paths[1].0[0].start.y,
+            node_bottom - glass::SELECTION_INSET_Y
+        );
+        // 番号の丸の左の端から inline だけ手前
+        let tip_x = (inset + glass::BRANCH_STEM_X).round()
+            + glass::BRANCH_INDENT
+            + candidate::PADDING_X / 2.0
+            - space::INLINE;
+        for (figures, _, _) in &paths {
+            assert!(figures.iter().all(|figure| tip(figure).x == tip_x));
+        }
+        // 選んだのは下の枝のいちばん遠い候補なので，選んでいない線に幹は無く，手前の候補の曲がり角だけ
+        assert_eq!(paths[0].0.len(), 1);
+        assert_eq!(paths[0].0[0].segments.len(), 2);
+        // 上の枝は幹といちばん遠い候補の曲がり角をひと続きに描く
+        assert_eq!(paths[2].0.len(), 1);
+        assert_eq!(paths[2].0[0].segments.len(), 3);
+        assert_eq!(paths[2].0[0].start.y, inset + glass::ROW_HEIGHT);
+        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
         // 確信の低い文節の点線は丸い点
         assert!(scene.draws.iter().any(|draw| matches!(draw,
             Draw::Line { dot_pitch: Some(pitch), color, .. } if *pitch == glass::DOT_PITCH && *color == theme.correction)));
+    }
+
+    #[test]
+    fn 線はデバイスのピクセルにそろえる() {
+        let theme = theme("washi");
+        let look = Look {
+            pixel_scale: 2.0,
+            ..Look::new(&theme, 15.0)
+        };
+        let scene = branch_map(&map(), &look, &Fixed);
+        for (figures, _, width) in paths(&scene) {
+            for figure in &figures {
+                // 幹の線の縁と水平の線の縁が，デバイスのピクセルの境に来る
+                let edge = figure.start.x * 2.0 - width;
+                let end = tip(figure);
+                assert_eq!(end.x * 2.0, (end.x * 2.0).round());
+                assert_eq!((end.y * 2.0 - width), (end.y * 2.0 - width).round());
+                if figure.segments.len() == 3 {
+                    assert_eq!(edge, edge.round());
+                }
+            }
+        }
     }
 
     #[test]
@@ -1342,9 +1436,15 @@ mod tests {
         let theme = theme("platinum");
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
-        // 選んだ枝の横の線は 2 ドットで選択の色
-        assert!(scene.draws.iter().any(|draw| matches!(draw,
-            Draw::Rect { frame, color } if frame.height == branch::LINE_WIDTH_SELECTED && *color == theme.selection)));
+        let paths = paths(&scene);
+        // 直角に曲がる．選んだ道は 2 ドットで選択の色
+        assert!(paths.iter().all(|path| arcs(&path.0).is_empty()));
+        assert!(paths
+            .iter()
+            .any(|path| path.1 == theme.selection && path.2 == branch::LINE_WIDTH_SELECTED));
+        assert!(paths
+            .iter()
+            .any(|path| path.1 == theme.line && path.2 == branch::LINE_WIDTH));
     }
 
     #[test]
@@ -1353,6 +1453,9 @@ mod tests {
         theme.straight_branches = true;
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
+        let paths = paths(&scene);
+        assert_eq!(paths.len(), 3);
+        assert!(paths.iter().all(|path| arcs(&path.0).is_empty()));
     }
 
     #[test]
@@ -1474,10 +1577,11 @@ mod tests {
                 branch.max_x() + card_size::CARD_GAP - tokens::size::space::XS,
                 "{name}"
             );
-            if theme.curved_branches() {
-                assert!(scene.draws.iter().any(|draw| matches!(draw,
-                    Draw::Curve { from, to, .. } if from.x == branch.max_x().round() && to.x == dot.mid_x())), "{name}");
-            }
+            // 選んでいる枝の行の右の端から，丸の中心まで 1 本の線(曲がり角は枝と同じ半径)
+            assert!(scene.draws.iter().any(|draw| matches!(draw,
+                Draw::Path { figures, color, .. } if *color == theme.selection
+                    && figures[0].start.x == branch.max_x().round()
+                    && matches!(figures[0].segments.last(), Some(Segment::Line(to)) if to.x == dot.mid_x()))), "{name}");
             // 三角で指さない
             assert!(
                 !scene
@@ -1613,7 +1717,8 @@ mod tests {
             .into_iter()
             .find(|(text, _)| text.ends_with('…'));
         assert_eq!(shown.map(|(_, color)| color), Some(theme.text_muted));
-        // 添える候補の枝は曲線(注目している文節が無いので，この 1 本だけ)
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 1);
+        // 添える候補の枝は 1 本だけ(注目している文節が無いので)
+        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Path { .. })), 1);
+        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
     }
 }
