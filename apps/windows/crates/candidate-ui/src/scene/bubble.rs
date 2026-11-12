@@ -2,11 +2,11 @@
 
 //! 語の意味の吹き出し(R-08．macOS の MeaningBubble と同じ決め方)．
 //!
-//! 候補の窓の外に出す小さな窓で，先(三角)で選んでいる候補の行の縦の真ん中を指す．
+//! 候補の窓の外に出す小さな窓で，三角で選んでいる候補の行の縦の真ん中を指す．
 //! - 候補の窓の右に出す．画面の右の端に入らなければ左に出す
-//! - 縦は，先が選んでいる行を指す位置(先は見出しの行の高さ)にし，画面の上下の端からはみ出さないように寄せる．
-//!   寄せた分だけ先の位置をずらし，行を指し続ける
-//! - 地・縁・角の丸みは候補の窓と同じ決まりにし，縁の線は先まで途切れずにつなぐ
+//! - 縦は，三角が選んでいる行を指す位置(三角は見出しの行の高さ)にし，画面の上下の端からはみ出さないように寄せる．
+//!   寄せた分だけ三角の位置をずらし，行を指し続ける
+//! - 背景・枠線・角の丸みは候補の窓と同じ決まりにし，枠線は三角まで途切れずにつなぐ
 //! - 中身は語の意味の配置(card_layout)をそのまま使う．アクセントの色は使わない
 //!
 //! 座標は下が y の正
@@ -28,15 +28,15 @@ pub enum Side {
 /// 吹き出しの寸法
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Metrics {
-    /// 本体の幅(縁を含み，先を除く)
+    /// 本体の幅(枠線を含み，三角を除く)
     pub width: f32,
     pub padding: f32,
     pub radius: f32,
     pub pointer_length: f32,
     pub pointer_width: f32,
-    /// 候補の窓の縁と先の頂点のあいだ
+    /// 候補の窓の枠線と三角の頂点のあいだ
     pub gap: f32,
-    /// 画面の端に寄せたときの，吹き出しの縁と画面の端のあいだ
+    /// 画面の端に寄せたときの，吹き出しの端と画面の端のあいだ
     pub screen_margin: f32,
 }
 
@@ -59,19 +59,19 @@ impl Metrics {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Placement {
     pub side: Side,
-    /// 窓(本体と先)の枠．画面の座標
+    /// 窓(本体と三角)の枠．画面の座標
     pub window: Frame,
     /// 本体の枠．窓の中の座標
     pub body: Frame,
-    /// 先の頂点の y．窓の中の座標
+    /// 三角の頂点の y．窓の中の座標
     pub pointer_y: f32,
 }
 
 /// 吹き出しの窓の置き方を決める(core の MeaningBubbleLayout と同じ決め方)．
-/// 先の頂点は選んでいる行 row の右の端から gap(inline)の所に置き，行の縦の真ん中を指す．
+/// 三角の頂点は選んでいる行 row の右の端から gap(inline)の所に置き，行の縦の真ん中を指す．
 /// 候補の窓 window の空いている所に重ねてよいが，obstacles(ほかの候補・幹の文節・足元の案内・入力中の文字)は覆わない．
 /// 覆ってしまう物があれば上か下へ寄せ，行の横に置けなければ候補の窓の右の外，それも無理なら窓の左の外に置く．
-/// size は本体の大きさ，preferred は本体の上の端から先までの長さ(見出しの行の真ん中)，screen は画面の使える範囲(どれも画面の座標)
+/// size は本体の大きさ，preferred は本体の上の端から三角までの長さ(見出しの行の真ん中)，screen は画面の使える範囲(どれも画面の座標)
 pub fn place(
     row: Frame,
     window: Frame,
@@ -88,7 +88,7 @@ pub fn place(
     let target = row.mid_y();
     let half = metrics.pointer_width / 2.0;
     let (lowest, highest) = (metrics.radius + half, height - metrics.radius - half);
-    // 窓の左の端を x に置いたときの縦の位置と先の位置．覆う物があれば上か下へ寄せる．置けなければ None
+    // 窓の左の端を x に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ None
     let vertical = |x: f32| -> Option<(f32, f32)> {
         if x < screen.x || x + window_width > screen.max_x() {
             return None;
@@ -121,7 +121,7 @@ pub fn place(
     let found = [beside_row, outside_right, outside_left]
         .into_iter()
         .find_map(|(side, x)| vertical(x).map(|(y, pointer)| (side, x, y, pointer)));
-    // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(先は角の丸みにかけない範囲で行を指す)
+    // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
     let (side, x, y, pointer) = found.unwrap_or_else(|| {
         let x = outside_right
             .1
@@ -144,7 +144,7 @@ pub fn place(
     }
 }
 
-/// 本体と先を 1 本の線でなぞる閉じた図形．縁の線の太さ stroke の半分だけ内側を通し，線をピクセルにそろえる
+/// 本体と三角を 1 本の線でなぞる閉じた図形．枠線の太さ stroke の半分だけ内側を通し，線をピクセルにそろえる
 pub fn outline(placement: &Placement, metrics: &Metrics, stroke: f32) -> Figure {
     let half_stroke = stroke / 2.0;
     let body = placement.body.inset(half_stroke, half_stroke);
@@ -163,7 +163,7 @@ pub fn outline(placement: &Placement, metrics: &Metrics, stroke: f32) -> Figure 
         segments.push(arc(Point::new(right, top + radius)));
     }
     if placement.side == Side::Left {
-        // 先は本体の右の辺
+        // 三角は本体の右の辺
         segments.push(Segment::Line(Point::new(right, y - half)));
         segments.push(Segment::Line(Point::new(right + metrics.pointer_length, y)));
         segments.push(Segment::Line(Point::new(right, y + half)));
@@ -177,7 +177,7 @@ pub fn outline(placement: &Placement, metrics: &Metrics, stroke: f32) -> Figure 
         segments.push(arc(Point::new(left, bottom - radius)));
     }
     if placement.side == Side::Right {
-        // 先は本体の左の辺
+        // 三角は本体の左の辺
         segments.push(Segment::Line(Point::new(left, y + half)));
         segments.push(Segment::Line(Point::new(left - metrics.pointer_length, y)));
         segments.push(Segment::Line(Point::new(left, y - half)));
@@ -197,11 +197,11 @@ pub struct Bubble {
     card: Card,
     pub width: f32,
     pub height: f32,
-    /// 本体の上の端から先までの長さ(見出しの行の縦の真ん中)
+    /// 本体の上の端から三角までの長さ(見出しの行の縦の真ん中)
     pub preferred_pointer: f32,
 }
 
-/// 語の意味の吹き出しの中身．others は同音語の札に出す語
+/// 語の意味の吹き出しの中身．others は同音語のタグに出す語
 pub fn bubble(
     note: &HomophoneNote,
     others: Vec<String>,
@@ -230,7 +230,7 @@ pub fn bubble(
     }
 }
 
-/// 一覧で吹き出しに出す語の意味と同音語の札の語，先で指す行(候補の窓の場面の座標)．
+/// 一覧で吹き出しに出す語の意味と同音語のタグの語，三角で指す行(候補の窓の場面の座標)．
 /// 候補の右(吹き出し)に出す設定で，候補を選んでいて意味があるときだけ
 pub fn for_list<'a>(
     list: &'a ipc::CandidateList,
@@ -247,7 +247,7 @@ pub fn for_list<'a>(
     Some((note, note.others.clone(), row))
 }
 
-/// 分岐図で吹き出しに出す語の意味と同音語の札の語(枝に出ていない語だけ)，先で指す枝の行．
+/// 分岐図で吹き出しに出す語の意味と同音語のタグの語(枝に出ていない語だけ)，三角で指す枝の行．
 /// 候補の右(吹き出し)に出す設定で，注目している文節で候補を選んでいて意味があり，区切っていないときだけ
 pub fn for_branch<'a>(
     map: &'a ipc::BranchMap,
@@ -275,9 +275,9 @@ fn target_row(scene: &Scene, target: &ipc::PointerTarget) -> Option<Frame> {
         .map(|hit| hit.frame)
 }
 
-/// 置き方の決まった吹き出しの窓を描く．地と縁は候補の窓と同じ色で，先まで 1 本の線で縁取る．
+/// 置き方の決まった吹き出しの窓を描く．背景と枠線は候補の窓と同じ色で，三角まで 1 本の線で枠線を引く．
 /// 角丸のテーマは，候補の窓(scene::surround)と同じぼかした影を本体の下に付け，そのぶん窓のまわりを空ける．
-/// 返す場面の body が吹き出し(本体と先)の枠なので，窓は placement.window の左上から body の分だけずらして置く
+/// 返す場面の body が吹き出し(本体と三角)の枠なので，窓は placement.window の左上から body の分だけずらして置く
 pub fn bubble_scene(
     bubble: &Bubble,
     placement: &Placement,
@@ -401,7 +401,7 @@ mod tests {
     /// 窓・選んでいる行・覆わない物
     type Setup = (Frame, Frame, Vec<Frame>);
 
-    /// 一覧の窓(幅 300)．行の地は窓の左右の余白 12 の内側
+    /// 一覧の窓(幅 300)．行の背景は窓の左右の余白 12 の内側
     fn list(x: f32, y: f32, selected: usize) -> Setup {
         let window = Frame::new(x, y, 300.0, 200.0);
         let rows: Vec<Frame> = (0..4)
@@ -448,7 +448,7 @@ mod tests {
         )
     }
 
-    /// 先の頂点(画面の座標)
+    /// 三角の頂点(画面の座標)
     fn tip(placement: &Placement) -> Point {
         let x = match placement.side {
             Side::Right => placement.window.x,
@@ -462,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn 先の頂点は選んでいる行の右の端から_inline_の所で行の縦の真ん中を指す() {
+    fn 三角の頂点は選んでいる行の右の端から_inline_の所で行の縦の真ん中を指す() {
         let setup = list(100.0, 100.0, 1);
         let placement = placed(&setup, (288.0, 160.0), SCREEN);
         assert_eq!(placement.side, Side::Right);
@@ -472,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    fn 広い窓でも先は選んでいる行のすぐ横で_ほかの候補と幹と足元を覆わない() {
+    fn 広い窓でも三角は選んでいる行のすぐ横で_ほかの候補と幹と足元を覆わない() {
         for selected in 0..4 {
             let setup = wide_branch(selected);
             let placement = placed(&setup, (288.0, 110.0), SCREEN);
@@ -492,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn 足元を覆う高さなら上へ寄せ_先は行を指したまま() {
+    fn 足元を覆う高さなら上へ寄せ_三角は行を指したまま() {
         let setup = wide_branch(3);
         let placement = placed(&setup, (288.0, 110.0), SCREEN);
         let footer = *setup.2.last().expect("足元");
@@ -524,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn 縁の線は先まで途切れずにつながる() {
+    fn 枠線は三角まで途切れずにつながる() {
         for x in [100.0, 880.0] {
             let placement = placed(&list(x, 100.0, 1), (288.0, 160.0), SCREEN);
             let figure = outline(&placement, &METRICS, 1.0);

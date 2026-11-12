@@ -1,7 +1,7 @@
 import HajimeApplication
 import Testing
 
-/// 語の意味の吹き出しの置き方: 選んでいる行のすぐ横，覆わない物を避けた上下の寄せ，左右の切り替え，先の位置，縁の線のつながり
+/// 語の意味の吹き出しの置き方: 選んでいる行のすぐ横，覆わない物を避けた上下の寄せ，左右の切り替え，三角の位置，枠線のつながり
 @Suite("語の意味の吹き出しの置き方")
 struct MeaningBubbleLayoutTests {
     typealias Layout = MeaningBubbleLayout
@@ -11,7 +11,7 @@ struct MeaningBubbleLayoutTests {
     static let screen = Box(x: 0, y: 0, width: 1200, height: 800)
     static let size = (width: 288.0, height: 160.0)
 
-    /// 一覧の窓(幅 300)．行の地は窓の左右の余白 12 の内側で，行の右の端は窓の右の端の 12 手前
+    /// 一覧の窓(幅 300)．行の背景は窓の左右の余白 12 の内側で，行の右の端は窓の右の端の 12 手前
     static func list(x: Double, y: Double, selected: Int) -> (window: Box, row: Box, obstacles: [Box]) {
         let window = Box(x: x, y: y, width: 300, height: 200)
         let rows = (0..<4).map { Box(x: x + 12, y: y + 12 + 28 * Double($0), width: 276, height: 24) }
@@ -41,12 +41,12 @@ struct MeaningBubbleLayoutTests {
         Box(x: layout.window.x + layout.body.x, y: layout.window.y, width: layout.body.width, height: layout.body.height)
     }
 
-    /// 先の頂点(画面の座標)
+    /// 三角の頂点(画面の座標)
     static func tip(_ layout: Layout) -> (x: Double, y: Double) {
         (layout.side == .right ? layout.window.x : layout.window.maxX, layout.window.y + layout.pointerY)
     }
 
-    @Test("先の頂点は選んでいる行の右の端から inline の所で，行の縦の真ん中を指す")
+    @Test("三角の頂点は選んでいる行の右の端から inline の所で，行の縦の真ん中を指す")
     func besideRow() {
         let setup = Self.list(x: 100, y: 100, selected: 1)
         let layout = Self.place(setup)
@@ -56,7 +56,7 @@ struct MeaningBubbleLayoutTests {
         #expect(layout.pointerY == 20)
     }
 
-    @Test("広い窓でも先は選んでいる行のすぐ横で，ほかの候補・幹の文節・足元を覆わない", arguments: [0, 1, 2, 3])
+    @Test("広い窓でも三角は選んでいる行のすぐ横で，ほかの候補・幹の文節・足元を覆わない", arguments: [0, 1, 2, 3])
     func wideWindow(selected: Int) {
         let setup = Self.wideBranch(selected: selected)
         let layout = Self.place(setup, size: (288, 110))
@@ -68,7 +68,7 @@ struct MeaningBubbleLayoutTests {
         }
     }
 
-    @Test("足元を覆う高さなら上へ寄せ，先は行を指したまま")
+    @Test("足元を覆う高さなら上へ寄せ，三角は行を指したまま")
     func avoidsFooter() {
         let setup = Self.wideBranch(selected: 3)
         let layout = Self.place(setup, size: (288, 110))
@@ -90,7 +90,7 @@ struct MeaningBubbleLayoutTests {
         #expect(Self.tip(nearEdge).y == 100 + 12 + 12)
     }
 
-    @Test("画面の下に入らなければ上へ寄せ，画面の端とのあいだを空け，先は行を指し続ける")
+    @Test("画面の下に入らなければ上へ寄せ，画面の端とのあいだを空け，三角は行を指し続ける")
     func bottom() {
         let setup = Self.list(x: 100, y: 590, selected: 3)
         let layout = Self.place(setup)
@@ -99,7 +99,7 @@ struct MeaningBubbleLayoutTests {
         #expect(layout.pointerY <= 160 - Self.metrics.radius - Self.metrics.pointerWidth / 2)
     }
 
-    @Test("縁の線は本体と先を 1 本でなぞり，始まりに戻る", arguments: [100.0, 880.0])
+    @Test("枠線は本体と三角を 1 本でなぞり，始まりに戻る", arguments: [100.0, 880.0])
     func outline(x: Double) throws {
         let layout = Self.place(Self.list(x: x, y: 100, selected: 1))
         let outline = layout.outline(metrics: Self.metrics, stroke: 1)
@@ -111,7 +111,7 @@ struct MeaningBubbleLayoutTests {
         }
         let last = try #require(points.last)
         #expect(last == (outline.startX, outline.startY))
-        // 先の頂点は窓の端(線の太さの半分だけ内側)
+        // 三角の頂点は窓の端(線の太さの半分だけ内側)
         let tipX = layout.side == .right ? 0.5 : layout.window.width - 0.5
         #expect(points.contains { $0 == (tipX, layout.pointerY) })
     }

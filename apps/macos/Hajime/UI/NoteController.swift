@@ -47,7 +47,7 @@ final class NoteView: NSView {
     /// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．余白はこの内側から測る
     private var inset: CGFloat { theme.isRounded ? Size.frameWidth : Size.frameWidth + Size.bevelWidth }
 
-    /// 1 行だけの小さな窓の余白(予測の窓・モードの札と同じ)．中身の高さは足元の行と同じ決め方
+    /// 1 行だけの小さな窓の余白(予測の窓・モード表示と同じ)．中身の高さは足元の行と同じ決め方
     override var fittingSize: NSSize {
         let font = theme.labelFont(size: Glass.labelFontSize)
         let height = max(Glass.noteIconSize, Glass.keycapHeight, (font.ascender - font.descender).rounded(.up))

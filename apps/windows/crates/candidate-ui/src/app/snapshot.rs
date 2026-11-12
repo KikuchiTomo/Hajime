@@ -590,7 +590,7 @@ fn meaning_empty_list() -> CandidateList {
 }
 
 /// 同音異義語の使い分けを分岐図で出したところ(macOS の homophoneBranchView)．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
-/// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
+/// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
 fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     let alternatives = strings(&["取る", "撮る", "とる", "採る"]);
     let has_meaning = selected == 1;

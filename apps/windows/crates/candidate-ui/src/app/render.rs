@@ -730,7 +730,7 @@ impl Renderer {
     }
 
     /// target に scene を描く．BeginDraw と EndDraw は呼ぶ側が受け持つ．
-    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モードの札のフェード)
+    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モード表示のフェード)
     pub fn paint(
         &self,
         target: &ID2D1RenderTarget,
@@ -969,7 +969,7 @@ impl Painter<'_> {
                 fill,
                 stroke,
             } => {
-                // 閉じた図形を塗ってから縁をなぞる(吹き出しの形)
+                // 閉じた図形を塗ってから枠線を引く(吹き出しの形)
                 // SAFETY: factory は生きている COM の参照．sink は閉じるまでこの関数の中だけで使う
                 let geometry = unsafe {
                     let path = self.renderer.d2d.CreatePathGeometry()?;

@@ -1,11 +1,11 @@
-/// 語の意味の吹き出し(R-08)の置き方と形．候補の窓とは別の小さな窓で，先(三角)で選んでいる候補の行の縦の真ん中を指す．
+/// 語の意味の吹き出し(R-08)の置き方と形．候補の窓とは別の小さな窓で，三角で選んでいる候補の行の縦の真ん中を指す．
 ///
-/// - 先の頂点は，選んでいる行の右の端から gap(inline)の所に置く．吹き出しは候補の窓の空いている所に重ねてよいが，
+/// - 三角の頂点は，選んでいる行の右の端から gap(inline)の所に置く．吹き出しは候補の窓の空いている所に重ねてよいが，
 ///   ほかの候補・幹の文節・足元の案内・入力中の文字(obstacles)は覆わない
-/// - 縦は，先が行を指す位置(先は見出しの行の高さ)にし，覆ってしまう物があれば上か下へ寄せる．画面の上下の端からは screenMargin の内側．
-///   寄せた分だけ先の位置をずらし，行を指し続ける．先は角の丸みにはかけない
-/// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・先が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
-/// - 縁の線は本体と先を 1 本でなぞる(outline)
+/// - 縦は，三角が行を指す位置(三角は見出しの行の高さ)にし，覆ってしまう物があれば上か下へ寄せる．画面の上下の端からは screenMargin の内側．
+///   寄せた分だけ三角の位置をずらし，行を指し続ける．三角は角の丸みにはかけない
+/// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・三角が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
+/// - 枠線は本体と三角を 1 本でなぞる(outline)
 ///
 /// 座標は上が y の小さい側(画面の上の端が 0 に近い)．macOS は画面の座標(下が y の小さい側)から直して使う．
 /// Windows の候補ウィンドウ(scene::bubble)は同じ決め方を Rust で持つ
@@ -13,22 +13,22 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     public typealias Box = MeaningCardLayout.Box
 
     public enum Side: Sendable, Equatable {
-        /// 候補の窓の右(先は本体の左の辺)
+        /// 候補の窓の右(三角は本体の左の辺)
         case right
-        /// 候補の窓の左(先は本体の右の辺)
+        /// 候補の窓の左(三角は本体の右の辺)
         case left
     }
 
     public struct Metrics: Sendable, Equatable {
-        /// 本体の幅(縁を含み，先を除く)
+        /// 本体の幅(枠線を含み，三角を除く)
         public var width: Double
         public var padding: Double
         public var radius: Double
         public var pointerLength: Double
         public var pointerWidth: Double
-        /// 候補の窓の縁と先の頂点のあいだ
+        /// 候補の窓の枠線と三角の頂点のあいだ
         public var gap: Double
-        /// 画面の端に寄せたときの，吹き出しの縁と画面の端のあいだ
+        /// 画面の端に寄せたときの，吹き出しの端と画面の端のあいだ
         public var screenMargin: Double
 
         public init(width: Double, padding: Double, radius: Double, pointerLength: Double, pointerWidth: Double, gap: Double, screenMargin: Double) {
@@ -50,18 +50,18 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     }
 
     public var side: Side
-    /// 窓(本体と先)の枠．画面の座標
+    /// 窓(本体と三角)の枠．画面の座標
     public var window: Box
     /// 本体の枠．窓の中の座標
     public var body: Box
-    /// 先の頂点の y．窓の中の座標
+    /// 三角の頂点の y．窓の中の座標
     public var pointerY: Double
 
     /// - Parameters:
-    ///   - row: 選んでいる候補の行の地(画面の座標)．先はこの行の縦の真ん中を指す
+    ///   - row: 選んでいる候補の行の背景(画面の座標)．三角はこの行の縦の真ん中を指す
     ///   - window: 候補の窓の本体の枠(画面の座標)
     ///   - size: 本体の大きさ
-    ///   - preferredPointer: 本体の上の端から先までの長さ(見出しの行の真ん中)
+    ///   - preferredPointer: 本体の上の端から三角までの長さ(見出しの行の真ん中)
     ///   - screen: 画面の使える範囲
     ///   - obstacles: 覆わない物(ほかの候補・幹の文節・足元の案内・入力中の文字．画面の座標)
     public init(row: Box, window candidate: Box, size: (width: Double, height: Double), preferredPointer: Double, screen: Box, obstacles: [Box],
@@ -72,7 +72,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let targetY = row.midY
         let half = metrics.pointerWidth / 2
         let pointerRange = (metrics.radius + half)...(size.height - metrics.radius - half)
-        // x(窓の左の端)に置いたときの縦の位置と先の位置．覆う物があれば上か下へ寄せる．置けなければ nil
+        // x(窓の左の端)に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ nil
         func vertical(at x: Double) -> (y: Double, pointer: Double)? {
             guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
             var top = screen.y, bottom = screen.maxY
@@ -94,7 +94,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let outsideRight = (Side.right, candidate.maxX + metrics.gap)
         let outsideLeft = (Side.left, candidate.x - metrics.gap - windowWidth)
         let found = [besideRow, outsideRight, outsideLeft].lazy.compactMap { side, x in vertical(at: x).map { (side, x, $0.y, $0.pointer) } }.first
-        // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(先は角の丸みにかけない範囲で行を指す)
+        // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
         let (side, x, y, pointer) = found ?? {
             let x = max(min(outsideRight.1, screen.maxX - windowWidth), screen.x)
             let y = max(min(targetY - preferredPointer, screen.maxY - size.height), screen.y)
@@ -106,7 +106,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         pointerY = pointer.rounded()
     }
 
-    /// 縁の線がなぞる点．本体の角は丸め(corner)，先は 3 つの点でとがらせる．
+    /// 枠線がなぞる点．本体の角は丸め(corner)，三角は 3 つの点でとがらせる．
     /// 線の太さ stroke の半分だけ内側を通し，線をピクセルにそろえる．左上の角の終わりから時計回り
     public enum Segment: Sendable, Equatable {
         case line(x: Double, y: Double)

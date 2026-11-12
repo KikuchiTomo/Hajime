@@ -97,9 +97,9 @@ enum GlassDrawing {
         return result
     }
 
-    /// キーキャップの札とその説明を左から並べる．キーは文字ではなく SF Symbols のアイコンで描く(KeyHint.Part)．
-    /// 1 つの案内に複数のキーがあれば(「↓ Tab」)，キーごとに札を並べてから説明を書く．
-    /// 札の形はテーマに合わせる: 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
+    /// キーキャップとその説明を左から並べる．キーは文字ではなく SF Symbols のアイコンで描く(KeyHint.Part)．
+    /// 1 つの案内に複数のキーがあれば(「↓ Tab」)，キーごとにキーキャップを並べてから説明を書く．
+    /// タグの形はテーマに合わせる: 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
     static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
         var x = x
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: theme.textMuted]
@@ -121,26 +121,26 @@ enum GlassDrawing {
         }
     }
 
-    /// キーキャップの札だけ(説明なし)の幅．予測の窓の確定のキーに使う
+    /// キーキャップだけ(説明なし)の幅．予測の窓の確定のキーに使う
     static func keysWidth(_ key: String, theme: ResolvedTheme) -> CGFloat {
         keycapsWidth(KeyHint(key: key, label: ""), theme: theme)
     }
 
-    /// キーキャップの札だけ(説明なし)を x から描く
+    /// キーキャップだけ(説明なし)を x から描く
     static func drawKeys(_ key: String, x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
         drawHints([KeyHint(key: key, label: "")], x: x, midY: midY, theme: theme)
     }
 
-    /// キーキャップの札の縁の太さ．platinum は外枠と立体の縁，ほかは縁の線
+    /// キーキャップの縁の太さ．platinum は外枠と立体の縁，ほかは縁の線
     static func keycapBorder(theme: ResolvedTheme) -> CGFloat {
         theme.kind == .platinum ? DesignTokens.Size.Candidate.frameWidth + DesignTokens.Size.Candidate.bevelWidth : DesignTokens.Size.Candidate.frameWidth
     }
 
-    /// キーキャップの札の地と縁(パレットの肌の色のボタンも同じ形にする)
+    /// キーキャップの地と縁(パレットの肌の色のボタンも同じ形にする)
     static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
         switch theme.kind {
         case .platinum:
-            // 角の立った立体の札．外枠の内側に光の縁(左と上)と影の縁(右と下)
+            // 角の立った立体のキーキャップ．外枠の内側に光の縁(左と上)と影の縁(右と下)
             theme.frame.setFill()
             cap.fill()
             let inner = cap.insetBy(dx: 1, dy: 1)
@@ -153,7 +153,7 @@ enum GlassDrawing {
             NSRect(x: inner.minX, y: inner.maxY - 1, width: inner.width, height: 1).fill()
             NSRect(x: inner.maxX - 1, y: inner.minY, width: 1, height: inner.height).fill()
         case .desk:
-            // 蛍光表示管の琥珀色で縁取った札
+            // 蛍光表示管の琥珀色で縁取ったキーキャップ
             theme.text.withAlphaComponent(DesignTokens.Opacity.Keycap.deskFill).setFill()
             cap.fill()
             theme.text.withAlphaComponent(DesignTokens.Opacity.Keycap.deskStroke).setStroke()
@@ -197,7 +197,7 @@ enum GlassDrawing {
         return max(Glass.keycapHeight, (content + Glass.keycapPaddingX * 2).rounded(.up))
     }
 
-    /// 案内の札を並べた幅(説明を除く)
+    /// 案内のキーキャップを並べた幅(説明を除く)
     private static func keycapsWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
         let caps = hint.keycaps
         return caps.map { keycapWidth($0, theme: theme) }.reduce(0, +) + Glass.keycapGap * CGFloat(max(caps.count - 1, 0))
@@ -216,7 +216,7 @@ enum GlassDrawing {
     }
 
     /// 文字の行の箱(書体の ascender から descender まで)を rect の真ん中に置いて描く．
-    /// 札や番号の丸の中の字を，横に並ぶ文字と同じ決め方で縦の真ん中にそろえる(TextFitting.draw)
+    /// タグや番号の丸の中の字を，横に並ぶ文字と同じ決め方で縦の真ん中にそろえる(TextFitting.draw)
     static func drawLineCentered(_ text: String, attributes: [NSAttributedString.Key: Any], in rect: NSRect) {
         let width = text.size(withAttributes: attributes).width
         TextFitting.draw(text, attributes: attributes, x: rect.midX - width / 2, midY: rect.midY)

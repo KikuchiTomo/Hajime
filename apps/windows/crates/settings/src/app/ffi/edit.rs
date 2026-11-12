@@ -96,6 +96,18 @@ pub fn set_placeholder(window: HWND, placeholder: &str) {
     super::win32::invalidate(window);
 }
 
+/// 欄にフォーカスを入れて，次に押したキーを記録する(キー設定の「キーで検索」)．prompt は記録しているあいだの案内
+pub fn start_recording(window: HWND, prompt: &str) {
+    with_data(window, |data| {
+        data.recording = Some(prompt.encode_utf16().collect());
+    });
+    // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
+    set_ime(window, false);
+    super::win32::set_text(window, "");
+    super::win32::focus(window);
+    super::win32::invalidate(window);
+}
+
 /// 押したらキーを記録し始める欄にする(prompt は記録しているあいだの案内)．None なら普通の欄に戻す
 /// (欄は前のページの欄を使い回すので，取り出すたびに決め直す)
 pub fn set_record_on_click(window: HWND, prompt: Option<&str>) {

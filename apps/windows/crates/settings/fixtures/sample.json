@@ -831,8 +831,50 @@
         "name": "郵便の用語",
         "field": "物流",
         "isEnabled": true,
-        "condition": "always",
+        "condition": {
+          "always": {}
+        },
         "wordCount": 1280
+      },
+      {
+        "id": "D0000000-0000-0000-0000-000000000002",
+        "name": "電気の用語",
+        "field": "電気",
+        "isEnabled": true,
+        "condition": {
+          "apps": {
+            "_0": [
+              "code.exe",
+              "excel.exe"
+            ]
+          }
+        },
+        "wordCount": 342
+      },
+      {
+        "id": "D0000000-0000-0000-0000-000000000003",
+        "name": "法律の用語",
+        "field": "",
+        "isEnabled": false,
+        "condition": {
+          "context": {}
+        },
+        "wordCount": 87
+      }
+    ],
+    "associationDictionaries": [
+      {
+        "id": "8C1F0E2A-5B7D-4E39-9A61-3D2C4B5E6F70",
+        "name": "日本語 WordNet",
+        "isEnabled": true,
+        "groupCount": 0,
+        "isBundled": true
+      },
+      {
+        "id": "A0000000-0000-0000-0000-000000000001",
+        "name": "社内の類語",
+        "isEnabled": true,
+        "groupCount": 56
       }
     ]
   },

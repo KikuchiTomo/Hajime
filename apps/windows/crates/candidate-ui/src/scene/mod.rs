@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! 候補ウィンドウ・分岐図・案内・モードの札の中身を，描く順の部品(Draw)の並びにする．
+//! 候補ウィンドウ・分岐図・案内・モード表示の中身を，描く順の部品(Draw)の並びにする．
 //! 配置と色はここで決め(macOS の CandidateView・BranchView・GlassDrawing と同じ決め方)，描く層(app::render)は部品をなぞるだけにする．
 //! そのため，配置と線の座標を Windows でなくても確かめられる
 
@@ -35,7 +35,7 @@ pub enum Draw {
         frame: Frame,
         color: Color,
     },
-    /// 角丸の長方形を塗る・縁取る．縁は stroke の太さの線で，frame の上をなぞる
+    /// 角丸の長方形を塗り，枠線を引く．枠線は stroke の太さの線で，frame の上をなぞる
     RoundRect {
         frame: Frame,
         radius: f32,
@@ -67,7 +67,7 @@ pub enum Draw {
         color: Color,
         width: f32,
     },
-    /// 閉じた図形(吹き出しの形)を塗る・縁取る．figure の終わりから始まりへ閉じる．縁は stroke の太さの線で図形の上をなぞる
+    /// 閉じた図形(吹き出しの形)を塗る・枠線を引く．figure の終わりから始まりへ閉じる．枠線は stroke の太さの線で図形の上をなぞる
     Shape {
         figure: Figure,
         fill: Option<Color>,
@@ -317,7 +317,7 @@ impl Scene {
     }
 }
 
-/// 一覧の候補の札に出したユーザー辞書の語のコメント(長ければ先頭だけ)．札がコメントでなければ None
+/// 一覧の候補のタグに出したユーザー辞書の語のコメント(長ければ先頭だけ)．タグがコメントでなければ None
 pub fn entry_comment(entry: &ipc::CandidateEntry) -> Option<&str> {
     if entry.has_comment == Some(true) {
         entry.annotation.as_deref()

@@ -10,7 +10,7 @@ import HajimeDomain
 /// 文字は配置のベースラインに書く(行の箱の中で上下にずれないように)．
 /// - 意味が 2 つ以上なら，目印の列に枠線だけの丸の番号を付ける(候補の番号の塗った丸と形を変え，番号キーで選ぶものと見分ける)
 /// - 使い方の例は左に縦の線を引いて控えめな色で出し，例の中の見出しの語だけを強める
-/// - 同音語は区切りの線の下に，耳のアイコンと札だけで並べる
+/// - 同音語は区切りの線の下に，耳のアイコンとタグだけで並べる
 /// - アクセントの色は使わない．アイコン・番号・品詞は控えめな色
 ///
 /// 折り返しは重いので，同じ注釈と幅の配置は覚えておいて使い回す(ふわっと出すあいだ 1 秒に 60 回描き直すため)
@@ -45,7 +45,7 @@ enum MeaningCardDrawing {
         "\(theme.kind)|\(theme.typeface)|\(theme.customFontName ?? "")|\(theme.text)|\(theme.textMuted)|\(increasesContrast)"
     }
 
-    /// 幅 width の語の意味の配置．others は同音語の札に出す語(分岐図では枝に出ている語を除いたもの)．
+    /// 幅 width の語の意味の配置．others は同音語のタグに出す語(分岐図では枝に出ている語を除いたもの)．
     /// placement は目印の列の左の端と見出しの行の縦の真ん中(まわりの候補の行に合わせて描く側が決める)
     static func layout(_ note: HomophoneNote, others: [String]? = nil, width: CGFloat, placement: MeaningCardLayout.Placement,
                        theme: ResolvedTheme) -> Layout {
@@ -102,8 +102,8 @@ enum MeaningCardDrawing {
         let headword = placed.headword
         draw(NSAttributedString(string: headword.text, attributes: [.font: font(.headword, theme), .foregroundColor: theme.text]),
              x: headword.line.x, baseline: headword.line.baseline)
-        // アクセントの色は使わない．番号は枠線だけの丸，品詞は枠線だけの札にし，字は控えめな色(地を塗らないので地との差が保てる)．
-        // 同音語の札は，パレットの説明の札と同じく文字の色を薄く敷いた地に文字の色の字．札の形は 1 種類(角の丸み part.tagRadius)
+        // アクセントの色は使わない．番号は枠線だけの丸，品詞は枠線だけのタグにし，字は控えめな色(背景を塗らないので背景との差が保てる)．
+        // 同音語のタグは，パレットの説明のタグと同じく文字の色を薄く敷いた背景に文字の色の字．タグの形は 1 種類(角の丸み part.tagRadius)
         let tagRadius = theme.isRounded ? DesignTokens.Size.Part.tagRadius : 0
         let stroke = DesignTokens.Size.Part.stroke
         if let chip = placed.partOfSpeech {
@@ -156,7 +156,7 @@ enum MeaningCardDrawing {
         }
     }
 
-    /// 縁取るだけの形
+    /// 枠線だけの形
     private static func outline(_ path: NSBezierPath, color: NSColor, width: CGFloat) {
         color.setStroke()
         path.lineWidth = width

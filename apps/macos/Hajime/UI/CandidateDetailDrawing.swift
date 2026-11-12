@@ -2,7 +2,7 @@ import AppKit
 
 /// 候補の文字のすぐあとに添える控えめな説明(絵文字の名前．CandidatePanel.Entry.detail，LatticePanel.Column.alternativeDetails)．
 /// 一覧(CandidateView)と分岐図(BranchView)で同じに描く．
-/// 説明は札と同じ小さい文字で薄い色にする．候補の文字と 1 行の文字列にして描くので，文字の大きさが違ってもベースラインがそろう
+/// 説明はタグと同じ小さい文字で薄い色にする．候補の文字と 1 行の文字列にして描くので，文字の大きさが違ってもベースラインがそろう
 @MainActor
 enum CandidateDetailDrawing {
     private typealias Size = DesignTokens.Size.Candidate

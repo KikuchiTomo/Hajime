@@ -23,6 +23,14 @@ use ipc::{
     SymbolOrigin, SymbolSaveResult, SyncStatus, WordClass,
 };
 use std::borrow::Cow;
+use std::sync::{Arc, Mutex};
+use windows::Win32::UI::WindowsAndMessaging::WM_APP;
+
+/// 辞書を取り込み終えた知らせ(別のスレッドから窓に送る)
+pub(super) const WM_DICTIONARY_IMPORTED: u32 = WM_APP + 40;
+
+/// 辞書を取り込んだ結果の受け箱(一覧と結果)
+pub(super) type ImportInbox = Arc<Mutex<Option<(DictionaryList, Result<FileOutcome, StoreError>)>>>;
 
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
 pub enum After {
@@ -58,6 +66,11 @@ pub enum After {
     ImportDictionary {
         list: DictionaryList,
         replacing: Option<String>,
+    },
+    /// アプリの実行ファイルを選ぶ窓(いくつでも選べる)を出してから，辞書(id)の選んだアプリに足す
+    ChooseDictionaryApps {
+        list: DictionaryList,
+        id: String,
     },
 }
 
@@ -124,6 +137,27 @@ pub fn run_after(window: Window, after: Option<After>) {
                 return;
             };
             let after = with_app(|app| app.import_dictionary(list, path, replacing)).flatten();
+            run_after(window, after);
+        }
+        Some(After::ChooseDictionaryApps { list, id }) => {
+            let filter = crate::files::APP_FILTER;
+            let files = ffi::choose_files(window, filter.name, filter.pattern);
+            if files.is_empty() {
+                return;
+            }
+            let after = with_app(|app| {
+                let index = app.model.as_ref().and_then(|model| {
+                    crate::dictionaries::entries(list, model.value(list.path()))
+                        .iter()
+                        .position(|entry| entry.id == id)
+                })?;
+                app.handle(Event::DictionaryList {
+                    list,
+                    action: DictionaryAction::AddApps(files),
+                    index: Some(index),
+                })
+            })
+            .flatten();
             run_after(window, after);
         }
         Some(After::ChooseColor { path, current }) => {
@@ -545,12 +579,15 @@ impl App {
         action: DictionaryAction,
         index: Option<usize>,
     ) -> Option<After> {
+        let importing = self.extras.importing_dictionary;
         let model = self.model.as_mut()?;
         let path = list.path();
         let current = model.value(path).cloned();
         let entries = crate::dictionaries::entries(list, current.as_ref());
         let chosen = index.and_then(|index| entries.get(index));
         let changed = match (&action, index) {
+            // 取り込んでいるあいだは次の取り込みを始めない(macOS はボタンを使えなくする)
+            (DictionaryAction::Import | DictionaryAction::Reimport, _) if importing => return None,
             (DictionaryAction::Import, _) => {
                 let limit = match list {
                     DictionaryList::Imported => self.catalog.limits.imported_dictionaries,
@@ -580,16 +617,41 @@ impl App {
                 let outcome = model.store().remove_dictionary(list, entry.id.clone());
                 return self.finish_dictionary(list, outcome, false);
             }
-            (DictionaryAction::Update(inputs), Some(index)) => {
-                match crate::dictionaries::update(list, current.as_ref(), index, inputs) {
-                    Some(value) => value,
-                    None => {
-                        return Some(After::Message {
-                            text: text::INVALID_APP.into(),
-                            warning: true,
-                        })
-                    }
-                }
+            (DictionaryAction::Rename(name), Some(index)) => {
+                crate::dictionaries::renamed(current.as_ref(), index, name)?
+            }
+            (DictionaryAction::SetField(field), Some(index)) => {
+                crate::dictionaries::with_field(current.as_ref(), index, field)?
+            }
+            (DictionaryAction::SetCondition(condition), Some(index)) => {
+                crate::dictionaries::with_condition(current.as_ref(), index, condition)?
+            }
+            (DictionaryAction::ChooseApps, _) => {
+                return Some(After::ChooseDictionaryApps {
+                    list,
+                    id: chosen?.id.clone(),
+                })
+            }
+            (DictionaryAction::AddApps(files), Some(index)) => {
+                // エンジンは入力先のアプリを実行ファイルの名前で見分ける．名前にできないファイルがあれば知らせる
+                let names: Vec<String> = files
+                    .iter()
+                    .filter_map(|file| crate::dictionaries::app_name(file))
+                    .collect();
+                let invalid = names.len() < files.len();
+                let value = crate::dictionaries::with_apps(current.as_ref(), index, &names)?;
+                let result = model.set(path, value);
+                let after = result.err().and_then(|error| self.failure(error));
+                self.refresh();
+                return after.or_else(|| {
+                    invalid.then(|| After::Message {
+                        text: text::INVALID_APP.into(),
+                        warning: true,
+                    })
+                });
+            }
+            (DictionaryAction::RemoveApp(app), Some(index)) => {
+                crate::dictionaries::without_app(current.as_ref(), index, *app)?
             }
             (DictionaryAction::Toggle, Some(index)) => {
                 crate::dictionaries::toggle(current.as_ref(), index)?
@@ -608,19 +670,42 @@ impl App {
         after
     }
 
-    /// 選んだファイルを辞書として取り込む
+    /// 選んだファイルを辞書として取り込み始める．エンジンが読み終えるのは別のスレッドで待ち(大きな辞書は数秒かかる)，
+    /// 待つあいだは取り込むボタンの横に輪を回す(macOS の isImportingDictionary)
     fn import_dictionary(
         &mut self,
         list: DictionaryList,
         path: String,
         replacing: Option<String>,
     ) -> Option<After> {
-        let outcome = self
-            .model
-            .as_ref()?
-            .store()
-            .import_dictionary(list, path, replacing);
-        self.finish_dictionary(list, outcome, true)
+        if self.extras.importing_dictionary {
+            return None;
+        }
+        let inbox = Arc::clone(&self.dictionary_import);
+        let window = self.window.0 as isize;
+        self.extras.importing_dictionary = true;
+        self.refresh();
+        self.model.as_ref()?.store().import_dictionary_later(
+            list,
+            path,
+            replacing,
+            Box::new(move |outcome| {
+                if let Ok(mut slot) = inbox.lock() {
+                    *slot = Some((list, outcome));
+                }
+                ffi::post(Window(window as *mut _), WM_DICTIONARY_IMPORTED, 0, 0);
+            }),
+        );
+        None
+    }
+
+    /// 辞書を取り込み終えた(WM_DICTIONARY_IMPORTED)．輪を止め，結果を知らせる
+    pub(super) fn finish_import(&mut self) -> Option<After> {
+        let (list, outcome) = self.dictionary_import.lock().ok()?.take()?;
+        self.extras.importing_dictionary = false;
+        let after = self.finish_dictionary(list, outcome, true);
+        self.refresh();
+        after
     }
 
     /// 取り込み・削除の結果を知らせ，設定を読み直す
@@ -1320,7 +1405,7 @@ fn symbol_row(item: &SymbolItem) -> Vec<String> {
         SymbolOrigin::Changed => Some(features::CHANGED),
         SymbolOrigin::Added => Some(features::ADDED),
     };
-    // 入力・記号・有効の印・札(変更あり・追加)．有効は表の「有効」の列，札は記号の右に小さく出す(macOS と同じ)
+    // 入力・記号・有効の印・タグ(変更あり・追加)．有効は表の「有効」の列，タグは記号の右に小さく出す(macOS と同じ)
     let enabled = if item.is_enabled {
         crate::pages::ENABLED_CELL
     } else {
