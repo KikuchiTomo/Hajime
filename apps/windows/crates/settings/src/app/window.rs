@@ -1163,8 +1163,15 @@ impl App {
             scale,
             background: self.theme.palette.card,
             shown: source.shown(),
-            placement: candidate_ui::app::preview::Placement::Fit {
-                ground: self.theme.palette.card,
+            // 絵文字の見本は設定の項目の名前と同じ左の端から置く(layout::place_preview)．ほかの見本は欄の真ん中
+            placement: if source.emoji.is_some() {
+                candidate_ui::app::preview::Placement::TopLeft {
+                    ground: self.theme.palette.card,
+                }
+            } else {
+                candidate_ui::app::preview::Placement::Fit {
+                    ground: self.theme.palette.card,
+                }
             },
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
@@ -2875,7 +2882,8 @@ impl PreviewSource {
     fn shown(&self) -> candidate_ui::app::preview::Shown<'_> {
         match (&self.palette, &self.emoji) {
             (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
-            (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
+            // 絵文字の見本は足元の行を出さない小さな窓にする
+            (None, Some(list)) => candidate_ui::app::preview::Shown::CompactList(list),
             (None, None) => candidate_ui::app::preview::Shown::Sample,
         }
     }
