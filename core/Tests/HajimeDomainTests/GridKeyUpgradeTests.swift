@@ -2,13 +2,13 @@ import Foundation
 @testable import HajimeDomain
 import Testing
 
-@Suite("候補を表に広げるキーを足す設定の引き上げ(バージョン 16 → 17)")
+@Suite("候補を表に広げるキーを足す設定の引き上げ(バージョン 17 → 18)")
 struct GridKeyUpgradeTests {
-    /// バージョン 16 で保存した表を読み込んだときの表
+    /// バージョン 17 で保存した表を読み込んだときの表
     private func upgraded(_ keymap: Keymap) throws -> Keymap {
         var object = try SettingsCoding.object(of: Settings())
         object["keymap"] = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(keymap))
-        object[SettingsSchema.versionKey] = .number(16)
+        object[SettingsSchema.versionKey] = .number(17)
         return try SettingsCoding.decode(JSONEncoder().encode(JSONValue.object(object))).keymap
     }
 

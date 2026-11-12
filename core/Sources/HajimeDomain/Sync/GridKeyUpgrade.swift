@@ -1,4 +1,4 @@
-/// 候補を表に広げるキーを，バージョン 16 までに保存したキー設定の表に足す(SettingsSchema のバージョン 16 → 17)．
+/// 候補を表に広げるキーを，バージョン 17 までに保存したキー設定の表に足す(SettingsSchema のバージョン 17 → 18)．
 ///
 /// - ひな形のまま保存した表は，今のそのひな形の表にする(標準は変換中の ⌥↓，Windows 風・Mac 風・ATOK 風は変換中の Tab)
 /// - 利用者が変えた表は，表に広げるキーが無く，変換中に標準のキーが空いていれば足す．利用者の決めたキーは変えない
@@ -24,12 +24,12 @@ enum GridKeyUpgrade {
         return result
     }
 
-    /// バージョン 17 でひな形に足した行
+    /// バージョン 18 でひな形に足した行
     static func added(to preset: KeymapPreset) -> [KeymapEntry] {
         preset.keymap.entries.filter { $0.command == .expandCandidates }
     }
 
-    /// バージョン 16 のひな形の表．今のひな形の表から足した行を除いたもの
+    /// バージョン 17 のひな形の表．今のひな形の表から足した行を除いたもの
     static func previous(_ preset: KeymapPreset) -> Keymap {
         Keymap(preset.keymap.entries.filter { $0.command != .expandCandidates })
     }
