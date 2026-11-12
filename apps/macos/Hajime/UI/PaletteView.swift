@@ -6,12 +6,21 @@ import HajimeDomain
 ///
 /// 何を出すかは core(PaletteSession)が決めた PalettePanel のとおりにし，ここでは描くことと，押した位置を PaletteTarget にすることだけをする．
 /// 窓の大きさは列数・行数・マスの大きさだけで決め，中身(探した結果の数や種類)では変えない．
-/// 顔文字はマス目の幅を 1 行のマスの数(cellsPerRow)で割った広いマスに，テーマの文字の書体で描く
+/// 顔文字はマス目の幅を 1 行のマスの数(cellsPerRow)で割った広いマスに，テーマの文字の書体で描く．
+///
+/// core が添えた動き(PalettePanel.Motion)があれば，選択の枠・種類の切り替えとタブの印を滑らせ，マス目の中身を送り，
+/// 肌の色の帯とピンを弾ませる(PaletteMotionState)．動いているあいだは画面のリフレッシュ(CADisplayLink)ごとに，
+/// 動いている部品の範囲だけを描き直す．「視差効果を減らす」が有効なら動かさない
 final class PaletteView: NSView {
     private typealias Size = DesignTokens.Size.Palette
     private typealias Glass = DesignTokens.Size.Glass
 
-    var panel: PalettePanel? { didSet { needsDisplay = true } }
+    var panel: PalettePanel? {
+        didSet {
+            startMotion(from: oldValue)
+            needsDisplay = true
+        }
+    }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     /// マスの一辺(設定のパレットのマスの大きさ)
     var cellSize = CGFloat(DefaultSettings.paletteCellSize) { didSet { needsDisplay = true } }
@@ -19,6 +28,17 @@ final class PaletteView: NSView {
     var fillsSurface = false { didSet { needsDisplay = true } }
     /// 押した対象を知らせる先
     var onTarget: ((PaletteTarget) -> Void)?
+    /// 動きの時刻(秒)．画像への書き出しで動きの途中のコマを描くときに差し替える
+    var clock: () -> CFTimeInterval = CACurrentMediaTime
+    /// 窓に出ていなくても動きを付けるか(画像への書き出しで動きの途中のコマを描くとき)
+    var forcesMotion = false
+
+    private var motion = PaletteMotionState()
+    private var displayLink: CADisplayLink?
+    /// 中身を送るあいだの，前と今のマス目の画像．送り始めに一度だけ描き，コマごとにはこの画像をずらして重ねる(文字を描き直さない)
+    private var swapImages: (previous: NSImage, current: NSImage)?
+    /// マス目を画像に描いているところか．画像には描き直す範囲に関わらずすべてのマスを描く
+    private var rendersOffscreen = false
 
     override var isFlipped: Bool { true }
 
@@ -175,18 +195,120 @@ final class PaletteView: NSView {
             BevelDrawing.drawDropShadow(for: layout.body, theme: theme)
             BevelDrawing.drawPanel(in: layout.body, theme: theme)
         }
-        drawSearch(panel, in: layout.search)
-        drawModes(panel, in: layout.modes)
-        drawTabs(panel, in: layout.tabs)
-        drawHeading(panel.heading, in: layout.heading)
-        drawGrid(panel, layout: layout)
-        if let preview = layout.preview {
+        // 動いているあいだは動いている部品の範囲だけを描き直すので，その範囲に掛からない部品は描かない
+        if needsToDraw(layout.search) { drawSearch(panel, in: layout.search) }
+        if needsToDraw(Self.union(layout.modes)) { drawModes(panel, in: layout.modes) }
+        if needsToDraw(Self.union(layout.tabs)) { drawTabs(panel, in: layout.tabs) }
+        if needsToDraw(layout.heading) { drawHeading(panel.heading, in: layout.heading) }
+        if needsToDraw(layout.grid.union(layout.scrollbar).insetBy(dx: -Size.selectionStroke, dy: -Size.selectionStroke)) { drawGrid(panel, layout: layout) }
+        if let preview = layout.preview, needsToDraw(preview.insetBy(dx: 0, dy: -Size.gap)) {
             separator(y: preview.minY - Size.gap / 2, from: layout.grid.minX, to: layout.footer.maxX)
             if let shown = panel.preview { drawPreview(shown, in: preview, isWide: Self.isWide(panel)) }
         }
-        separator(y: layout.footer.minY, from: layout.footer.minX, to: layout.footer.maxX)
-        drawFooter(panel, layout: layout)
+        if needsToDraw(layout.footer) {
+            separator(y: layout.footer.minY, from: layout.footer.minX, to: layout.footer.maxX)
+            drawFooter(panel, layout: layout)
+        }
         if let picker = panel.skinTonePicker { drawPicker(picker, layout: layout) }
+    }
+
+    private static func union(_ rects: [NSRect]) -> NSRect {
+        rects.dropFirst().reduce(rects.first ?? .zero) { $0.union($1) }
+    }
+
+    // MARK: - 動き
+
+    /// core が添えた動き(PalettePanel.Motion)から，滑る印・送る中身・弾む部品の動きを始める．
+    /// 窓に出ていないとき・前の内容が無いとき・「視差効果を減らす」が有効なときは動かさない
+    private func startMotion(from old: PalettePanel?) {
+        // 大きさが決まる前(窓に入れる前)は，部品の位置が求められないので動かさない
+        guard let panel, let old, !bounds.isEmpty, forcesMotion || (window != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) else {
+            stopMotion()
+            return
+        }
+        typealias Duration = DesignTokens.Motion.Palette
+        let layout = layout(for: panel)
+        let oldLayout = self.layout(for: old)
+        let time = clock()
+        let changes = panel.motion
+        // 選択の枠．滑っている途中で次へ動いたら，今の位置から滑らせ直す
+        if let from = changes.selectionFrom, panel.selection != nil {
+            let previous = old.selection.map { cellRect(row: $0.row, column: $0.column, in: oldLayout, panel: old) }
+            let current = motion.selection.flatMap { slide in previous.map { PaletteMotionState.rect(slide, to: $0, at: time, easing: PaletteEasing.easeOut) } }
+            motion.selection = .init(from: current ?? cellRect(row: from.row, column: from.column, in: layout, panel: panel), start: time,
+                                     duration: Duration.selection / 1000)
+        } else if old.selection != panel.selection || changes.content != nil {
+            motion.selection = nil
+        }
+        // 種類の切り替えの印
+        if let from = changes.modeFrom, let index = panel.modes.firstIndex(where: { $0.kind == from }), layout.modes.indices.contains(index) {
+            let previous = old.modes.firstIndex(where: \.isSelected).flatMap { oldLayout.modes.indices.contains($0) ? oldLayout.modes[$0] : nil }
+            let current = motion.mode.flatMap { slide in previous.map { PaletteMotionState.rect(slide, to: $0, at: time, easing: PaletteEasing.easeInOut) } }
+            motion.mode = .init(from: current ?? layout.modes[index], start: time, duration: Duration.indicator / 1000)
+        }
+        // まとまりのタブの印
+        if let from = changes.tabFrom, let index = panel.tabs.firstIndex(where: { $0.section == from }), layout.tabs.indices.contains(index) {
+            let previous = old.tabs.firstIndex(where: \.isSelected).flatMap { oldLayout.tabs.indices.contains($0) ? oldLayout.tabs[$0] : nil }
+            let current = motion.tab.flatMap { slide in previous.map { PaletteMotionState.rect(slide, to: $0, at: time, easing: PaletteEasing.easeInOut) } }
+            motion.tab = .init(from: current ?? layout.tabs[index], start: time, duration: Duration.indicator / 1000)
+        } else if old.tabs.map(\.section) != panel.tabs.map(\.section) {
+            motion.tab = nil
+        }
+        if let direction = changes.content {
+            motion.content = .init(previous: old, direction: direction, start: time, duration: Duration.content / 1000)
+            swapImages = nil
+        }
+        if changes.opensPicker {
+            motion.picker = .init(start: time, duration: Duration.pop / 1000)
+        } else if panel.skinTonePicker == nil {
+            motion.picker = nil
+        }
+        if changes.togglesPin {
+            motion.pin = .init(start: time, duration: Duration.pop / 1000)
+        }
+        if motion.isActive, displayLink == nil, window != nil {
+            let link = displayLink(target: self, selector: #selector(stepMotion(_:)))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
+    }
+
+    private func stopMotion() {
+        motion = PaletteMotionState()
+        swapImages = nil
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+
+    /// 画面のリフレッシュごとに，動いている部品の範囲だけを描き直す．動きが終わったら止める
+    @objc private func stepMotion(_ link: CADisplayLink) {
+        guard let panel else {
+            stopMotion()
+            return
+        }
+        let layout = layout(for: panel)
+        let margin = Size.selectionStroke + 2
+        if let slide = motion.selection, let to = panel.selection {
+            setNeedsDisplay(slide.from.union(cellRect(row: to.row, column: to.column, in: layout, panel: panel)).insetBy(dx: -margin, dy: -margin))
+        }
+        if motion.mode != nil { setNeedsDisplay(Self.union(layout.modes)) }
+        if motion.tab != nil { setNeedsDisplay(Self.union(layout.tabs)) }
+        if motion.content != nil { setNeedsDisplay(layout.grid.insetBy(dx: -margin, dy: -margin)) }
+        if motion.picker != nil, let picker = panel.skinTonePicker {
+            setNeedsDisplay((layout.preview ?? .zero).union(Self.union(pickerCells(picker, in: layout))).insetBy(dx: -margin * 2, dy: -margin * 2))
+        }
+        if motion.pin != nil, let preview = layout.preview { setNeedsDisplay(pinRect(in: preview).insetBy(dx: -margin * 2, dy: -margin * 2)) }
+        motion.prune(at: clock())
+        if motion.content == nil { swapImages = nil }
+        if !motion.isActive {
+            link.invalidate()
+            displayLink = nil
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stopMotion() }
     }
 
     private func separator(y: CGFloat, from minX: CGFloat, to maxX: CGFloat) {
@@ -245,26 +367,40 @@ final class PaletteView: NSView {
         fill(whole, color: theme.badge, radius: Size.searchRadius)
         let font = theme.labelFont(size: Size.modeFontSize)
         for (mode, rect) in zip(panel.modes, rects) {
-            if mode.isSelected { fill(rect.insetBy(dx: 2, dy: 2), color: theme.selection, radius: Size.searchRadius - 2) }
-            GlassDrawing.drawCentered(mode.title, attributes: [.font: font, .foregroundColor: mode.isSelected ? theme.selectionText : theme.textMuted], in: rect)
+            GlassDrawing.drawCentered(mode.title, attributes: [.font: font, .foregroundColor: theme.textMuted], in: rect)
         }
+        guard let selected = panel.modes.firstIndex(where: \.isSelected), rects.indices.contains(selected) else { return }
+        // 選んでいる種類の印．切り替えたら前の種類から滑らせ，印に重なった文字だけを選択の文字の色で描き直す
+        // (印が滑るあいだ，文字の色も印の端で切り替わる)
+        let pill = PaletteMotionState.rect(motion.mode, to: rects[selected], at: clock(), easing: PaletteEasing.easeInOut).insetBy(dx: 2, dy: 2)
+        fill(pill, color: theme.selection, radius: Size.searchRadius - 2)
+        NSGraphicsContext.saveGraphicsState()
+        (theme.isRounded ? NSBezierPath(roundedRect: pill, xRadius: Size.searchRadius - 2, yRadius: Size.searchRadius - 2) : NSBezierPath(rect: pill)).addClip()
+        for (mode, rect) in zip(panel.modes, rects) where rect.intersects(pill) {
+            GlassDrawing.drawCentered(mode.title, attributes: [.font: font, .foregroundColor: theme.selectionText], in: rect)
+        }
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     private func drawTabs(_ panel: PalettePanel, in rects: [NSRect]) {
-        for (tab, rect) in zip(panel.tabs, rects) {
-            let color = tab.isSelected ? theme.text : theme.textMuted
-            if tab.isSelected, theme.isRounded {
+        // 選んでいるまとまりの印．まとまりが変わったら前のタブから滑らせる
+        if let selected = panel.tabs.firstIndex(where: \.isSelected), rects.indices.contains(selected) {
+            let rect = PaletteMotionState.rect(motion.tab, to: rects[selected], at: clock(), easing: PaletteEasing.easeInOut)
+            if theme.isRounded {
                 // 角丸のテーマは薄い地と下の線で示す
                 fill(rect.insetBy(dx: 2, dy: 2), color: theme.focusTint, radius: Glass.selectionRadius)
                 theme.selection.setFill()
                 NSRect(x: rect.minX + 4, y: rect.maxY - Size.selectionStroke, width: rect.width - 8, height: Size.selectionStroke).fill()
-            } else if tab.isSelected {
+            } else {
                 // platinum と desk は選択の色の枠と下の線で示す．塗ってアイコンを選択の文字の色にすると，
                 // 選択の文字の色が暗いテーマ(desk)では SF Symbols の顔の中まで塗られて見分けられない
                 stroke(rect.insetBy(dx: 2, dy: 2), color: theme.selection, radius: 0, width: 1)
                 theme.selection.setFill()
                 NSRect(x: rect.minX + 4, y: rect.maxY - Size.selectionStroke - 2, width: rect.width - 8, height: Size.selectionStroke).fill()
             }
+        }
+        for (tab, rect) in zip(panel.tabs, rects) {
+            let color = tab.isSelected ? theme.text : theme.textMuted
             if let name = PaletteIcons.symbolName(for: tab.section),
                let image = SymbolImageCache.image(name, pointSize: Size.tabIconSize, weight: tab.isSelected ? .semibold : .regular, color: color) {
                 image.draw(in: NSRect(x: (rect.midX - image.size.width / 2).rounded(), y: (rect.midY - image.size.height / 2).rounded(),
@@ -283,25 +419,108 @@ final class PaletteView: NSView {
     }
 
     private func drawGrid(_ panel: PalettePanel, layout: Layout) {
+        let time = clock()
+        if let swap = motion.content {
+            // 中身を送る．前の中身を送る向きへ出ていかせながら薄くし，今の中身を手前から入れながら濃くする
+            let t = PaletteEasing.easeOut(PaletteMotionState.progress(swap.start, swap.duration, at: time))
+            let (dx, dy): (CGFloat, CGFloat) = switch swap.direction {
+            case .next: (1, 0)
+            case .previous: (-1, 0)
+            case .down: (0, 1)
+            case .up: (0, -1)
+            }
+            let shift = Size.contentShift
+            let area = layout.grid.insetBy(dx: -Size.selectionStroke, dy: -Size.selectionStroke)
+            if swapImages == nil, let previous = cellsImage(swap.previous, layout: layout, area: area), let current = cellsImage(panel, layout: layout, area: area) {
+                swapImages = (previous, current)
+            }
+            NSGraphicsContext.saveGraphicsState()
+            area.clip()
+            if let images = swapImages {
+                images.previous.draw(in: area.offsetBy(dx: -dx * shift * t, dy: -dy * shift * t), from: .zero, operation: .sourceOver, fraction: 1 - t,
+                                     respectFlipped: true, hints: nil)
+                images.current.draw(in: area.offsetBy(dx: dx * shift * (1 - t), dy: dy * shift * (1 - t)), from: .zero, operation: .sourceOver, fraction: t,
+                                    respectFlipped: true, hints: nil)
+            } else {
+                drawCells(swap.previous, layout: layout, offset: CGPoint(x: -dx * shift * t, y: -dy * shift * t), alpha: 1 - t, time: time)
+                drawCells(panel, layout: layout, offset: CGPoint(x: dx * shift * (1 - t), y: dy * shift * (1 - t)), alpha: t, time: time)
+            }
+            NSGraphicsContext.restoreGraphicsState()
+        } else {
+            drawCells(panel, layout: layout, offset: .zero, alpha: 1, time: time)
+        }
+        if let message = panel.message {
+            let attributes: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Size.detailFontSize), .foregroundColor: theme.textMuted]
+            GlassDrawing.drawCentered(message, attributes: attributes, in: layout.grid)
+        }
+        drawScrollbar(panel, in: layout.scrollbar)
+    }
+
+    /// panel のマス目(線・選択の枠・文字)を，area の大きさの透明な画像に描く．画面と同じ細かさ(Retina なら 2 倍)で描く
+    private func cellsImage(_ panel: PalettePanel, layout: Layout, area: NSRect) -> NSImage? {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        guard area.width > 0, area.height > 0,
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int((area.width * scale).rounded(.up)), pixelsHigh: Int((area.height * scale).rounded(.up)),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0),
+              let bitmap = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        rep.size = area.size
+        let context = bitmap.cgContext
+        // view と同じ，上が 0 の座標で描く
+        context.translateBy(x: 0, y: area.height * scale)
+        context.scaleBy(x: scale, y: -scale)
+        context.translateBy(x: -area.minX, y: -area.minY)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+        rendersOffscreen = true
+        drawCells(panel, layout: layout, offset: .zero, alpha: 1, time: clock(), slidesSelection: false)
+        rendersOffscreen = false
+        NSGraphicsContext.restoreGraphicsState()
+        let image = NSImage(size: area.size)
+        image.addRepresentation(rep)
+        return image
+    }
+
+    /// 描き直す範囲に掛かるか．マス目を画像に描いているときは，すべてを描く
+    private func shouldDraw(_ rect: NSRect) -> Bool {
+        rendersOffscreen || needsToDraw(rect)
+    }
+
+    /// マス目の線・選択の枠・文字を描く．offset だけずらし，alpha の濃さで描く(中身を送るとき)．
+    /// 一部だけを描き直すときは，描き直す範囲に掛からないマスを描かない
+    private func drawCells(_ panel: PalettePanel, layout: Layout, offset: CGPoint, alpha: CGFloat, time: CFTimeInterval, slidesSelection: Bool = true) {
+        guard alpha > 0 else { return }
         let emojiFont = NSFont(name: PaletteIcons.emojiFontName, size: (cellSize * Size.emojiScale).rounded()) ?? .systemFont(ofSize: cellSize * Size.emojiScale)
         let symbolFont = theme.candidateFont(size: (cellSize * Size.symbolScale).rounded())
         let isWide = Self.isWide(panel)
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        context?.setAlpha(alpha)
+        context?.translateBy(x: offset.x, y: offset.y)
+        defer { context?.restoreGState() }
+        if let selection = panel.selection {
+            // 色だけに頼らないよう，地を塗ったうえで枠も描く．選択が動いたら前のマスから滑らせる
+            let target = cellRect(row: selection.row, column: selection.column, in: layout, panel: panel)
+            let rect = slidesSelection && offset == .zero ? PaletteMotionState.rect(motion.selection, to: target, at: time, easing: PaletteEasing.easeOut) : target
+            let inner = rect.insetBy(dx: 1, dy: 1)
+            if shouldDraw(inner.offsetBy(dx: offset.x, dy: offset.y).insetBy(dx: -Size.selectionStroke, dy: -Size.selectionStroke)) {
+                fill(inner, color: theme.focusTint, radius: Size.cellRadius)
+                stroke(inner, color: theme.selection, radius: Size.cellRadius, width: Size.selectionStroke)
+            }
+        }
         for row in panel.rows {
             if row.startsSection, row.index != panel.firstRow {
                 // まとまりの境目に細い線を引く
                 let y = layout.grid.minY + CGFloat(row.index - panel.firstRow) * cellSize
-                theme.line.setFill()
-                NSRect(x: layout.grid.minX + Size.cellRadius, y: y.rounded(), width: layout.grid.width - Size.cellRadius * 2, height: DesignTokens.Size.Candidate.frameWidth).fill()
+                let line = NSRect(x: layout.grid.minX + Size.cellRadius, y: y.rounded(), width: layout.grid.width - Size.cellRadius * 2, height: DesignTokens.Size.Candidate.frameWidth)
+                if shouldDraw(line.offsetBy(dx: offset.x, dy: offset.y)) {
+                    theme.line.setFill()
+                    line.fill()
+                }
             }
             for (column, cell) in row.cells.enumerated() {
                 let rect = cellRect(row: row.index, column: column, in: layout, panel: panel)
-                let isSelected = panel.selection == PalettePanel.Position(row: row.index, column: column)
-                if isSelected {
-                    // 色だけに頼らないよう，地を塗ったうえで枠も描く
-                    let inner = rect.insetBy(dx: 1, dy: 1)
-                    fill(inner, color: theme.focusTint, radius: Size.cellRadius)
-                    stroke(inner, color: theme.selection, radius: Size.cellRadius, width: Size.selectionStroke)
-                }
+                guard shouldDraw(rect.offsetBy(dx: offset.x, dy: offset.y)) else { continue }
                 if isWide {
                     // 顔文字は絵文字を含んでいても文字の書体で描く(顔の形を崩さない)
                     drawFitted(cell.text, size: (cellSize * Size.kaomojiScale).rounded(), color: theme.text, in: rect.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
@@ -311,11 +530,6 @@ final class PaletteView: NSView {
                 GlassDrawing.drawCentered(cell.text, attributes: [.font: font, .foregroundColor: theme.text], in: rect)
             }
         }
-        if let message = panel.message {
-            let attributes: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Size.detailFontSize), .foregroundColor: theme.textMuted]
-            GlassDrawing.drawCentered(message, attributes: attributes, in: layout.grid)
-        }
-        drawScrollbar(panel, in: layout.scrollbar)
     }
 
     private func drawScrollbar(_ panel: PalettePanel, in rect: NSRect) {
@@ -353,7 +567,11 @@ final class PaletteView: NSView {
         PalettePreviewDrawing.draw(preview, in: .init(area: area, tile: tile, pin: pin), theme: theme)
         if let image = SymbolImageCache.image(preview.isPinned ? "pin.fill" : "pin", pointSize: Size.tabIconSize, weight: .regular,
                                               color: preview.isPinned ? theme.selection : theme.textMuted) {
-            image.draw(in: NSRect(x: (pin.midX - image.size.width / 2).rounded(), y: (pin.midY - image.size.height / 2).rounded(), width: image.size.width, height: image.size.height))
+            // ピン留めを切り替えたら，ピンを一度大きくして弾ませる
+            let scale = motion.pin.map { 1 + (Size.pinBounce - 1) * PaletteEasing.bounce(PaletteMotionState.progress($0.start, $0.duration, at: clock())) } ?? 1
+            let width = image.size.width * scale
+            let height = image.size.height * scale
+            image.draw(in: NSRect(x: pin.midX - width / 2, y: pin.midY - height / 2, width: width, height: height))
         }
     }
 
@@ -375,11 +593,23 @@ final class PaletteView: NSView {
         guard let first = cells.first, let last = cells.last else { return }
         let margin = Size.selectionStroke * 2
         let strip = NSRect(x: first.minX, y: first.minY, width: last.maxX - first.minX, height: first.height).insetBy(dx: -margin, dy: -margin)
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        defer { context?.restoreGState() }
+        // 開いたら，覆いと帯を薄い形から濃くし，帯は少し小さい形から少し行き過ぎて元の大きさへ浮かび上がらせる
+        let pop = motion.picker.map { PaletteMotionState.progress($0.start, $0.duration, at: clock()) }
+        if let t = pop { context?.setAlpha(PaletteEasing.easeOut(min(t * 2, 1))) }
         // 下の説明の文字が帯のまわりに見えないよう，説明の欄ごと(上の区切りの線の下から)面の色で覆う
         if let preview = layout.preview {
             theme.surface.withAlphaComponent(1).setFill()
             let top = (preview.minY - Size.gap / 2).rounded() + DesignTokens.Size.Candidate.frameWidth
             NSRect(x: preview.minX, y: top, width: preview.width, height: preview.maxY - top).fill()
+        }
+        if let t = pop {
+            let scale = Size.popScale + (1 - Size.popScale) * PaletteEasing.overshoot(t)
+            context?.translateBy(x: strip.midX, y: strip.midY)
+            context?.scaleBy(x: scale, y: scale)
+            context?.translateBy(x: -strip.midX, y: -strip.midY)
         }
         fill(strip, color: theme.surface.withAlphaComponent(1), radius: Size.searchRadius)
         stroke(strip, color: theme.frame, radius: Size.searchRadius, width: 1)

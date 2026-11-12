@@ -448,6 +448,10 @@ pub mod size {
         pub const FOOTER_HEIGHT: f32 = 28.0;
         pub const PICKER_CELL_SIZE: f32 = 36.0;
         pub const PROBE_FONT_SIZE: f32 = 20.0;
+        pub const OPEN_RISE: f32 = 6.0;
+        pub const CONTENT_SHIFT: f32 = 18.0;
+        pub const POP_SCALE: f32 = 0.9;
+        pub const PIN_BOUNCE: f32 = 1.35;
     }
     pub mod snapshot {
         pub const MARGIN: f32 = 16.0;
@@ -633,6 +637,13 @@ pub mod motion {
         pub const KEYSTROKE: f32 = 85.0;
         pub const HOLD: f32 = 1400.0;
         pub const PAGE: f32 = 220.0;
+    }
+    pub mod palette {
+        pub const OPEN: f32 = 140.0;
+        pub const SELECTION: f32 = 110.0;
+        pub const INDICATOR: f32 = 200.0;
+        pub const CONTENT: f32 = 170.0;
+        pub const POP: f32 = 220.0;
     }
 }
 

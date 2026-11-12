@@ -269,7 +269,11 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
 
 変換の質は，次の指標で測る．変換・補正・区切りに触れる変更では，変更の前と後でこれらを測って PR に書き，どれも下げない．
 
-- 文の変換(`make evaluate`．`hajime-playground --evaluate`)．評価用の文は `core/Evaluation/conversion-basic.tsv` と AJIMEE-Bench(`make fetch-evaluation`)
+- 文の変換(`make evaluate`．`hajime-playground --evaluate`)．評価用の文は次の 4 つ(AJIMEE-Bench と Tatoeba は `make fetch-evaluation` で取得する)
+  - `core/Evaluation/conversion-basic.tsv`: 利用者から報告された例と，同音異義語を文脈で選ぶ例
+  - `core/Evaluation/conversion-everyday.tsv`: ふだん打つ文(同音の動詞・熟語を文脈で選ぶ文，仕事と IT の文，日常の文)
+  - AJIMEE-Bench: Wikipedia の文 200 文(文脈付きを含む)
+  - Tatoeba: 人が付けたふりがなのある日本語の文から，文の番号で選んだ約 2,000 文(会話や日常の文が多い)
   - 第 1 候補の正解率(Accuracy@1)．文全体の第 1 候補が期待する文のどれかと同じ割合
   - 上位 10 候補の正解率．文全体の候補の上位 10 個に期待する文が入っている割合
   - MinCER．第 1 候補と期待する文との文字誤り率のうち最も小さいものの平均
@@ -280,6 +284,7 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
   - 操作の平均．着かなかった文は 60 回と数える
 - 打っている途中の表示(`hajime-playground --evaluate-live`)．確定する文と食い違う漢字やカタカナを見せた途中の表示の数(R-01)
 - 打ち間違いの補正(`hajime-playground --evaluate-typo`)．直した・示した・誤って直した数(R-02)
+- 本物の Zenzai のテスト(`make test-zenzai`)は，conversion-basic と conversion-everyday の第 1 候補の正解の数が下限を下回らないことを確かめる(ConversionAccuracyTests)．正解率を上げたら下限も上げる
 - 1 キーの処理の時間(`core/Tests/HajimeEngineTests/LatencyProbeTests.swift`)(R-01)
 - 受け入れ条件: 上の指標をすべて測れて，変更の前と後の数を PR に書ける
 
