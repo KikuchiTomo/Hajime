@@ -662,6 +662,7 @@ enum DesignTokens {
             static let link: CGFloat = 0.4
             static let linkHoverMix: CGFloat = 0.35
             static let sliderTrackDisabled: CGFloat = 0.5
+            static let previewChip: CGFloat = 0.06
             static let tableStripe: CGFloat = 0.035
         }
     }

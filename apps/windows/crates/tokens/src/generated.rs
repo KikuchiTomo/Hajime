@@ -799,6 +799,7 @@ pub mod opacity {
         pub const LINK: f32 = 0.4;
         pub const LINK_HOVER_MIX: f32 = 0.35;
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
+        pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
     }
 }
