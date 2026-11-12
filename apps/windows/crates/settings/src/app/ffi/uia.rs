@@ -10,15 +10,16 @@ use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Foundation::{VARIANT_FALSE, VARIANT_TRUE};
 use windows::Win32::System::Com::SAFEARRAY;
 use windows::Win32::System::Ole::{SafeArrayCreateVector, SafeArrayPutElement};
-use windows::Win32::System::Variant::{VARIANT, VT_BOOL, VT_BSTR, VT_I4};
+use windows::Win32::System::Variant::{VARIANT, VT_BOOL, VT_BSTR, VT_I4, VT_UNKNOWN};
 use windows::Win32::UI::Accessibility::{
     ExpandCollapseState, ExpandCollapseState_Collapsed, ExpandCollapseState_Expanded,
     ExpandCollapseState_LeafNode, IExpandCollapseProvider, IExpandCollapseProvider_Impl,
     IInvokeProvider, IInvokeProvider_Impl, IRawElementProviderFragment,
     IRawElementProviderFragmentRoot, IRawElementProviderFragmentRoot_Impl,
     IRawElementProviderFragment_Impl, IRawElementProviderSimple, IRawElementProviderSimple_Impl,
-    ISelectionItemProvider, ISelectionItemProvider_Impl, IToggleProvider, IToggleProvider_Impl,
-    IValueProvider, IValueProvider_Impl, NavigateDirection, NavigateDirection_FirstChild,
+    ISelectionItemProvider, ISelectionItemProvider_Impl, ISelectionProvider,
+    ISelectionProvider_Impl, IToggleProvider, IToggleProvider_Impl, IValueProvider,
+    IValueProvider_Impl, NavigateDirection, NavigateDirection_FirstChild,
     NavigateDirection_LastChild, NavigateDirection_NextSibling, NavigateDirection_Parent,
     NavigateDirection_PreviousSibling, ProviderOptions, ProviderOptions_ServerSideProvider,
     ProviderOptions_UseComThreading, ToggleState, ToggleState_Off, ToggleState_On,
@@ -27,14 +28,16 @@ use windows::Win32::UI::Accessibility::{
     UIA_DocumentControlTypeId, UIA_EditControlTypeId, UIA_ExpandCollapsePatternId,
     UIA_HasKeyboardFocusPropertyId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
     UIA_IsKeyboardFocusablePropertyId, UIA_ListControlTypeId, UIA_ListItemControlTypeId,
-    UIA_NamePropertyId, UIA_RadioButtonControlTypeId, UIA_SelectionItemPatternId,
+    UIA_NamePropertyId, UIA_PositionInSetPropertyId, UIA_RadioButtonControlTypeId,
+    UIA_SelectionItemPatternId, UIA_SelectionPatternId, UIA_SizeOfSetPropertyId,
     UIA_SliderControlTypeId, UIA_TogglePatternId, UIA_ValuePatternId, UiaAppendRuntimeId,
     UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent, UiaRect,
     UiaReturnRawElementProvider, UiaRootObjectId, UIA_E_ELEMENTNOTAVAILABLE, UIA_PATTERN_ID,
     UIA_PROPERTY_ID,
 };
 use windows_core::{
-    implement, ComObject, Error, IUnknown, IUnknownImpl, Result, BOOL, BSTR, HRESULT, PCWSTR,
+    implement, ComObject, Error, IUnknown, IUnknownImpl, Interface, Result, BOOL, BSTR, HRESULT,
+    PCWSTR,
 };
 
 /// 要素の役割
@@ -71,6 +74,8 @@ pub struct Node {
     pub selected: Option<bool>,
     /// 要素の元になる標準の窓(打つ欄の EDIT)．値の読み書きなどはその窓が答える
     pub host: Option<HWND>,
+    /// 親の要素の番号(表の List の行など)．None なら窓の直下
+    pub parent: Option<i32>,
 }
 
 /// 読み上げの側から頼まれる操作
@@ -199,6 +204,25 @@ fn provider(window: HWND, id: i32) -> IRawElementProviderFragment {
     ComObject::new(NodeProvider { window, id }).to_interface()
 }
 
+/// 同じ親を持つ要素(親が None なら窓の直下)．並びは窓が作った順
+fn children(nodes: &[Node], parent: Option<i32>) -> Vec<&Node> {
+    nodes.iter().filter(|node| node.parent == parent).collect()
+}
+
+/// 親の中で同じ役割の要素の何番目か(1 から)と数(PositionInSet・SizeOfSet)．親が無ければ None
+fn position_in_set(nodes: &[Node], node: &Node) -> Option<(i32, i32)> {
+    node.parent?;
+    let set: Vec<&Node> = children(nodes, node.parent)
+        .into_iter()
+        .filter(|sibling| sibling.role == node.role)
+        .collect();
+    let index = set.iter().position(|sibling| sibling.id == node.id)?;
+    Some((
+        i32::try_from(index + 1).unwrap_or(i32::MAX),
+        i32::try_from(set.len()).unwrap_or(i32::MAX),
+    ))
+}
+
 /// 窓そのもの(要素の根)．名前などは窓から読む(UiaHostProviderFromHwnd)
 #[implement(
     IRawElementProviderSimple,
@@ -231,9 +255,10 @@ impl IRawElementProviderSimple_Impl for Root_Impl {
 impl IRawElementProviderFragment_Impl for Root_Impl {
     fn Navigate(&self, direction: NavigateDirection) -> Result<IRawElementProviderFragment> {
         let nodes = nodes();
+        let top = children(&nodes, None);
         let node = match direction {
-            NavigateDirection_FirstChild => nodes.first(),
-            NavigateDirection_LastChild => nodes.last(),
+            NavigateDirection_FirstChild => top.first(),
+            NavigateDirection_LastChild => top.last(),
             _ => None,
         };
         match node {
@@ -265,12 +290,27 @@ impl IRawElementProviderFragment_Impl for Root_Impl {
 
 impl IRawElementProviderFragmentRoot_Impl for Root_Impl {
     fn ElementProviderFromPoint(&self, x: f64, y: f64) -> Result<IRawElementProviderFragment> {
-        let found = nodes().into_iter().find(|node| {
+        let inside = |node: &&Node| {
             let (left, top, width, height) = node.rect;
             x >= f64::from(left)
                 && x < f64::from(left + width)
                 && y >= f64::from(top)
                 && y < f64::from(top + height)
+        };
+        // 子(表の行)があればそちらを先に答える(親の List の四角は子を含むので)．
+        // 送って隠れた行は親の外に出るので，親の四角の中にある点のときだけ子を答える
+        let nodes = nodes();
+        let in_parent = |node: &&Node| {
+            node.parent.is_some_and(|parent| {
+                nodes
+                    .iter()
+                    .any(|candidate| candidate.id == parent && inside(&candidate))
+            })
+        };
+        let found = nodes.iter().filter(inside).find(in_parent).or_else(|| {
+            nodes
+                .iter()
+                .find(|node| node.parent.is_none() && inside(node))
         });
         match found {
             Some(node) => Ok(provider(self.window, node.id)),
@@ -294,7 +334,8 @@ impl IRawElementProviderFragmentRoot_Impl for Root_Impl {
     IToggleProvider,
     IExpandCollapseProvider,
     IValueProvider,
-    ISelectionItemProvider
+    ISelectionItemProvider,
+    ISelectionProvider
 )]
 struct NodeProvider {
     window: HWND,
@@ -338,8 +379,10 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
                 patternid == UIA_SelectionItemPatternId || patternid == UIA_InvokePatternId
             }
             Role::Slider => patternid == UIA_ValuePatternId,
+            // 一覧は選んでいる子(行)を答える
+            Role::List => patternid == UIA_SelectionPatternId,
             // 打つ欄の値の読み書きは標準の EDIT(host)が答える
-            Role::List | Role::Document | Role::Edit => false,
+            Role::Document | Role::Edit => false,
         };
         if supported {
             Ok(self.to_interface())
@@ -349,7 +392,12 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
     }
 
     fn GetPropertyValue(&self, propertyid: UIA_PROPERTY_ID) -> Result<VARIANT> {
-        let node = self.node()?;
+        let nodes = nodes();
+        let node = nodes
+            .iter()
+            .find(|node| node.id == self.id)
+            .cloned()
+            .ok_or_else(not_available)?;
         let control_type = match node.role {
             Role::Button => UIA_ButtonControlTypeId,
             Role::CheckBox => UIA_CheckBoxControlTypeId,
@@ -368,6 +416,11 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             UIA_HasKeyboardFocusPropertyId => variant_bool(node.focused),
             UIA_IsKeyboardFocusablePropertyId => variant_bool(node.enabled),
             UIA_AutomationIdPropertyId => variant_text(&format!("hajime.settings.{}", node.id)),
+            // 一覧の中の何番目か・何件か(「3/34」のように読む)
+            UIA_PositionInSetPropertyId => position_in_set(&nodes, &node)
+                .map_or_else(VARIANT::default, |(position, _)| variant_i32(position)),
+            UIA_SizeOfSetPropertyId => position_in_set(&nodes, &node)
+                .map_or_else(VARIANT::default, |(_, size)| variant_i32(size)),
             _ => VARIANT::default(),
         })
     }
@@ -383,22 +436,33 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
 
 impl IRawElementProviderFragment_Impl for NodeProvider_Impl {
     fn Navigate(&self, direction: NavigateDirection) -> Result<IRawElementProviderFragment> {
-        if direction == NavigateDirection_Parent {
-            let root: IRawElementProviderFragment = ComObject::new(Root {
-                window: self.window,
-            })
-            .to_interface();
-            return Ok(root);
-        }
         let nodes = nodes();
-        let Some(index) = nodes.iter().position(|node| node.id == self.id) else {
+        let Some(node) = nodes.iter().find(|node| node.id == self.id) else {
             return Err(not_available());
         };
+        if direction == NavigateDirection_Parent {
+            return Ok(match node.parent {
+                Some(parent) => provider(self.window, parent),
+                None => ComObject::new(Root {
+                    window: self.window,
+                })
+                .to_interface(),
+            });
+        }
+        // 兄弟は同じ親を持つ要素の中で，子は自分を親に持つ要素の中で辿る
+        let siblings = children(&nodes, node.parent);
+        let own = children(&nodes, Some(self.id));
+        let index = siblings
+            .iter()
+            .position(|sibling| sibling.id == self.id)
+            .unwrap_or(0);
         let next = match direction {
-            NavigateDirection_NextSibling => nodes.get(index + 1),
+            NavigateDirection_NextSibling => siblings.get(index + 1),
             NavigateDirection_PreviousSibling => {
-                index.checked_sub(1).and_then(|index| nodes.get(index))
+                index.checked_sub(1).and_then(|index| siblings.get(index))
             }
+            NavigateDirection_FirstChild => own.first(),
+            NavigateDirection_LastChild => own.last(),
             _ => None,
         };
         match next {
@@ -520,6 +584,85 @@ impl ISelectionItemProvider_Impl for NodeProvider_Impl {
     }
 
     fn SelectionContainer(&self) -> Result<IRawElementProviderSimple> {
-        null()
+        match self.node()?.parent {
+            Some(parent) => provider(self.window, parent).cast(),
+            None => null(),
+        }
+    }
+}
+
+/// 一覧(List)が選んでいる子．1 つだけ選べ，選ばなくてもよい
+impl ISelectionProvider_Impl for NodeProvider_Impl {
+    fn GetSelection(&self) -> Result<*mut SAFEARRAY> {
+        let nodes = nodes();
+        let selected: Vec<IRawElementProviderSimple> = children(&nodes, Some(self.id))
+            .into_iter()
+            .filter(|child| child.selected == Some(true))
+            .map(|child| provider(self.window, child.id).cast())
+            .collect::<Result<_>>()?;
+        // SAFETY: 要素の数の配列を作り，各要素を入れる(配列が参照を持つ)．受け取った側が放す
+        unsafe {
+            let array = SafeArrayCreateVector(VT_UNKNOWN, 0, selected.len() as u32);
+            if array.is_null() {
+                return Err(Error::from(windows::Win32::Foundation::E_OUTOFMEMORY));
+            }
+            for (index, element) in selected.iter().enumerate() {
+                let index = index as i32;
+                SafeArrayPutElement(array, &index, element.as_raw())?;
+            }
+            Ok(array)
+        }
+    }
+
+    fn CanSelectMultiple(&self) -> Result<BOOL> {
+        Ok(false.into())
+    }
+
+    fn IsSelectionRequired(&self) -> Result<BOOL> {
+        Ok(false.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(id: i32, role: Role, parent: Option<i32>) -> Node {
+        Node {
+            id,
+            role,
+            name: String::new(),
+            rect: (0, 0, 0, 0),
+            enabled: true,
+            focused: false,
+            toggled: None,
+            expanded: None,
+            value: None,
+            selected: None,
+            host: None,
+            parent,
+        }
+    }
+
+    #[test]
+    fn 表の行は_list_の子として並び_何件目かと件数を答える() {
+        let nodes = vec![
+            node(860, Role::RadioButton, None),
+            node(850, Role::List, None),
+            node(851, Role::Button, None),
+            node(100_000, Role::ListItem, Some(850)),
+            node(100_001, Role::ListItem, Some(850)),
+            node(100_002, Role::ListItem, Some(850)),
+        ];
+        let top: Vec<i32> = children(&nodes, None).iter().map(|node| node.id).collect();
+        assert_eq!(top, vec![860, 850, 851]);
+        let rows: Vec<i32> = children(&nodes, Some(850))
+            .iter()
+            .map(|node| node.id)
+            .collect();
+        assert_eq!(rows, vec![100_000, 100_001, 100_002]);
+        assert_eq!(position_in_set(&nodes, &nodes[4]), Some((2, 3)));
+        // 窓の直下の要素は位置を答えない(UI Automation の既定に任せる)
+        assert_eq!(position_in_set(&nodes, &nodes[1]), None);
     }
 }
