@@ -211,7 +211,15 @@ public struct Settings: Sendable, Equatable {
     /// パレットのマスの一辺(pt)．文字の大きさはこれに合わせる
     public var paletteCellSize = DefaultSettings.paletteCellSize
     /// パレットの下に，選んでいる文字の名前・読み・ショートコードを出す
-    public var paletteShowsPreview = true
+    public var paletteShowsPreview = DefaultSettings.paletteShowsPreview
+    /// パレットの説明に，Unicode の名前(並びの絵文字は CLDR の英語の名前)を出す
+    public var paletteShowsUnicodeName = DefaultSettings.paletteShowsUnicodeName
+    /// パレットの説明に，探すときに使える読みを出す
+    public var paletteShowsReadings = DefaultSettings.paletteShowsReadings
+    /// パレットの説明に，「:smile:」のショートコードを出す
+    public var paletteShowsShortcodes = DefaultSettings.paletteShowsShortcodes
+    /// パレットの説明に，「U+1F604」のコードポイントを出す(顔文字には出さない)
+    public var paletteShowsCodePoints = DefaultSettings.paletteShowsCodePoints
     /// パレットのよく使う文字の行の数．0 なら出さない
     public var paletteFrequentRows = DefaultSettings.paletteFrequentRows
     /// 保存したカスタムテーマ
@@ -372,6 +380,7 @@ extension Settings: Codable {
         case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, macroSkipsSameReading, launcherCommands, commands
         case englishTermCandidates, englishTerms
         case palette, paletteClosesAfterInsert, paletteRecordsHistory, paletteColumns, paletteRows, paletteCellSize, paletteShowsPreview, paletteFrequentRows
+        case paletteShowsUnicodeName, paletteShowsReadings, paletteShowsShortcodes, paletteShowsCodePoints
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -510,6 +519,10 @@ extension Settings: Codable {
         read(.paletteCellSize, into: \.paletteCellSize)
         read(.paletteShowsPreview, into: \.paletteShowsPreview)
         read(.paletteFrequentRows, into: \.paletteFrequentRows)
+        read(.paletteShowsUnicodeName, into: \.paletteShowsUnicodeName)
+        read(.paletteShowsReadings, into: \.paletteShowsReadings)
+        read(.paletteShowsShortcodes, into: \.paletteShowsShortcodes)
+        read(.paletteShowsCodePoints, into: \.paletteShowsCodePoints)
         // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
@@ -635,6 +648,10 @@ extension Settings: Codable {
         try container.encode(paletteCellSize, forKey: .paletteCellSize)
         try container.encode(paletteShowsPreview, forKey: .paletteShowsPreview)
         try container.encode(paletteFrequentRows, forKey: .paletteFrequentRows)
+        try container.encode(paletteShowsUnicodeName, forKey: .paletteShowsUnicodeName)
+        try container.encode(paletteShowsReadings, forKey: .paletteShowsReadings)
+        try container.encode(paletteShowsShortcodes, forKey: .paletteShowsShortcodes)
+        try container.encode(paletteShowsCodePoints, forKey: .paletteShowsCodePoints)
         var others = encoder.container(keyedBy: AnyKey.self)
         try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))
         for (key, value) in unknownFields where !Self.fieldNames.contains(key) && key != SettingsSchema.versionKey {

@@ -204,10 +204,11 @@ fn render_all(output: &Path) -> Result<()> {
             let path = output.join(format!("{kind}-{name}.png"));
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
         }
-        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-symbol と同じ見本
+        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-flag・palette-symbol・palette-kaomoji と同じ見本
         for (kind, panel) in [
             ("palette-emoji", palette::sample::emoji()),
             ("palette-search", palette::sample::search()),
+            ("palette-flag", palette::sample::flag()),
             ("palette-symbol", palette::sample::symbol()),
             ("palette-kaomoji", palette::sample::kaomoji()),
         ] {

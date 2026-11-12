@@ -5,6 +5,7 @@
 //! 顔文字は，マス目の幅を 1 行のマスの数(cells_per_row)で割った広いマスに並べる
 
 use super::emoji::SKIN_TONES;
+use super::preview;
 use crate::geometry::Frame;
 use crate::scene::Measure;
 use crate::theme::{Font, ResolvedTheme, Role};
@@ -27,19 +28,20 @@ pub struct Fonts {
     pub cell_kaomoji: Font,
     /// 顔文字とタブの短い顔を縮めるときの文字(下限の大きさ)．これでも収まらなければ末尾を省く
     pub kaomoji_small: Font,
-    /// マス目の中の知らせと，説明の読み
+    /// マス目の中の知らせと，説明の Unicode の名前と読み
     pub detail: Font,
     pub name: Font,
+    /// 説明のショートコードとコードポイントの札(等幅)．行に入らない札は code_small に縮める
     pub code: Font,
+    pub code_small: Font,
+    /// 説明の名前を定めたところと「読み」の枠の札
+    pub tag: Font,
     pub preview_emoji: Font,
     pub preview_symbol: Font,
     pub preview_kaomoji: Font,
     pub button_emoji: Font,
     pub picker_emoji: Font,
 }
-
-/// 説明の記号を，マスの記号より大きく見せる倍率(macOS と同じ)
-const PREVIEW_SYMBOL_BOOST: f32 = 1.2;
 
 impl Fonts {
     pub fn new(cell_size: f32) -> Self {
@@ -60,13 +62,15 @@ impl Fonts {
             detail: Font::sized(Role::Label, palette::DETAIL_FONT_SIZE),
             name: Font::sized(Role::Emphasis, palette::NAME_FONT_SIZE),
             code: Font::sized(Role::Code, palette::CODE_FONT_SIZE),
+            code_small: Font::sized(Role::Code, palette::PREVIEW_CHIP_SMALL_FONT_SIZE),
+            tag: Font::sized(Role::Label, palette::PREVIEW_TAG_FONT_SIZE),
             preview_emoji: Font::sized(
                 Role::Emoji,
                 palette::PREVIEW_GLYPH_SIZE * palette::EMOJI_SCALE,
             ),
             preview_symbol: Font::sized(
                 Role::Candidate,
-                palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * PREVIEW_SYMBOL_BOOST,
+                palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * palette::PREVIEW_SYMBOL_BOOST,
             ),
             preview_kaomoji: Font::sized(Role::Candidate, palette::PREVIEW_KAOMOJI_FONT_SIZE),
             button_emoji: Font::sized(Role::Emoji, skin_tone_button_side() * palette::EMOJI_SCALE),
@@ -94,6 +98,8 @@ impl Fonts {
             self.detail,
             self.name,
             self.code,
+            self.code_small,
+            self.tag,
             self.preview_emoji,
             self.preview_symbol,
             self.preview_kaomoji,
@@ -156,7 +162,7 @@ pub struct Layout {
 }
 
 impl Layout {
-    /// 窓の大きさは列数・行数・マスの大きさ・説明を出すかだけで決まり，中身(探した結果の数など)では変えない
+    /// 窓の大きさは列数・行数・マスの大きさ・説明を出すかと説明に出す項目だけで決まり，中身(探した結果の数など)では変えない
     pub fn new(panel: &PalettePanel, theme: &ResolvedTheme, measure: &dyn Measure) -> Self {
         let cell = cell_size(panel);
         let fonts = Fonts::new(cell);
@@ -180,8 +186,13 @@ impl Layout {
             + palette::HEADING_HEIGHT
             + rows * cell
             + palette::GAP;
+        let preview_height = preview::height(
+            &preview::fields(panel.preview_fields.as_ref()),
+            &fonts,
+            measure,
+        );
         if panel.shows_preview {
-            height += palette::PREVIEW_HEIGHT;
+            height += preview_height;
         }
         let height = (height + palette::FOOTER_HEIGHT + shadow).ceil();
         let body = Frame::new(0.0, 0.0, width - shadow, height - shadow);
@@ -251,8 +262,8 @@ impl Layout {
         );
         y = grid.max_y() + palette::GAP;
         let preview = panel.shows_preview.then(|| {
-            let frame = Frame::new(content.x, y, content.width, palette::PREVIEW_HEIGHT);
-            y += palette::PREVIEW_HEIGHT;
+            let frame = Frame::new(content.x, y, content.width, preview_height);
+            y += preview_height;
             frame
         });
         let footer = Frame::new(content.x, y, content.width, palette::FOOTER_HEIGHT);
@@ -478,7 +489,30 @@ mod tests {
             "washi",
         );
         assert_eq!(hidden.preview, None);
-        assert_eq!(washi.height - hidden.height, palette::PREVIEW_HEIGHT);
+        let fields = preview::fields(None);
+        assert_eq!(
+            washi.height - hidden.height,
+            preview::height(&fields, &washi.fonts, &Fixed)
+        );
+        // 説明に出す項目を減らせば説明の欄は低くなり，選んでいる文字によらず同じ高さ
+        let fewer = layout(
+            &PalettePanel {
+                preview_fields: Some(ipc::PalettePreviewFields {
+                    readings: false,
+                    shortcodes: false,
+                    code_points: false,
+                    ..fields
+                }),
+                ..emoji.clone()
+            },
+            "washi",
+        );
+        assert!(fewer.height < washi.height);
+        let symbol = layout(&sample::symbol(), "washi");
+        assert_eq!(
+            symbol.preview.map(|frame| frame.height),
+            washi.preview.map(|frame| frame.height)
+        );
         // desk は影の分だけ大きく，本体は影を除く
         let desk = layout(&emoji, "desk");
         assert_eq!(desk.body.width, desk.width - candidate::SHADOW_OFFSET);

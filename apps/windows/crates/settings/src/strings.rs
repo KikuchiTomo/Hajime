@@ -599,6 +599,10 @@ pub mod palette {
     pub const ROWS: &str = "パレットの行数";
     pub const CELL_SIZE: &str = "パレットのマスの大きさ";
     pub const SHOWS_PREVIEW: &str = "パレットに文字の説明を表示";
+    pub const SHOWS_UNICODE_NAME: &str = "説明に Unicode の名前を表示";
+    pub const SHOWS_READINGS: &str = "説明に読みを表示";
+    pub const SHOWS_SHORTCODES: &str = "説明にショートコードを表示";
+    pub const SHOWS_CODE_POINTS: &str = "説明にコードポイントを表示";
     pub const FREQUENT_ROWS: &str = "よく使う文字の行数";
     pub const CLEAR_HISTORY: &str = "使った文字の記録を消去";
     pub const CLEAR_HISTORY_QUESTION: &str = "使った文字の記録を消去しますか？";
@@ -775,6 +779,10 @@ pub mod sync {
         ("paletteRows", "パレットの行数"),
         ("paletteCellSize", "パレットのマスの大きさ"),
         ("paletteShowsPreview", "パレットに文字の説明を表示"),
+        ("paletteShowsUnicodeName", "説明に Unicode の名前を表示"),
+        ("paletteShowsReadings", "説明に読みを表示"),
+        ("paletteShowsShortcodes", "説明にショートコードを表示"),
+        ("paletteShowsCodePoints", "説明にコードポイントを表示"),
         ("paletteFrequentRows", "よく使う文字の行数"),
     ];
 
