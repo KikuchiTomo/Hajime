@@ -41,6 +41,8 @@ final class CompositionRoot {
     var modeMemory = AppModeMemory()
     /// 日本語のモードで英字のキーをアプリに渡した理由の記録．入力欄ごとのコントローラーで共有し，同じ理由を続けて記録しない
     let passThroughDiagnostics = PassThroughDiagnostics()
+    /// 入力ソースから外れたときに登録し直す．入力欄ごとのコントローラーで共有し，確かめる間隔を空ける
+    let inputSourceRegistration = InputSourceRegistration()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
                  dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {
@@ -240,6 +242,8 @@ enum AppIdentity {
     static let directModeKey = "com.apple.inputmethod.Roman"
     /// Contents/Helpers に入れた更新用のアプリの名前(apps/macos/project.yml の HajimeUpdater の PRODUCT_NAME)
     static let updaterName = "Hajime IME Updater"
+    /// Contents/Helpers に入れた，入力ソースの登録を直す補助のアプリの名前(apps/macos/project.yml の HajimeInputSourceHelper の PRODUCT_NAME)
+    static let inputSourceHelperName = "Hajime IME Input Source Helper"
 
     static var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"

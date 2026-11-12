@@ -344,9 +344,6 @@ pub mod size {
         pub const COMMAND_ICON_SIZE: f32 = 18.0;
         pub const COMMAND_ICON_RADIUS: f32 = 5.0;
         pub const NOTE_GAP: f32 = 6.0;
-        pub const USAGE_MAX_WIDTH: f32 = 360.0;
-        pub const USAGE_ROW_HEIGHT: f32 = 22.0;
-        pub const USAGE_PADDING_Y: f32 = 4.0;
         pub const USAGE_TAG_GAP: f32 = 4.0;
         pub const MEANING_CARD_WIDTH: f32 = 280.0;
         pub const MEANING_BRANCH_WIDTH: f32 = 300.0;

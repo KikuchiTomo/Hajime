@@ -55,8 +55,10 @@ site:
 site-serve:
 	cd apps/docs-site && hugo server
 
+# ビルドしたアプリは LaunchServices の登録から外す．入れた Hajime IME が入力ソースから外れないようにする(tools/macos/unregister_builds.sh)
 build-macos:
 	cd apps/macos && xcodegen generate --quiet && xcodebuild -project Hajime.xcodeproj -scheme Hajime -configuration Release -destination "generic/platform=macOS" -derivedDataPath build build -quiet
+	tools/macos/unregister_builds.sh
 
 # 配布物(.pkg)を作る．署名と公証は使える証明書と設定があるときだけ(tools/macos/package.sh)
 package-macos:

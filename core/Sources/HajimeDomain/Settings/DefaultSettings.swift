@@ -386,6 +386,9 @@ public enum DefaultSettings {
     public static let followUpPollInterval = 0.001
     /// 入力の異常(英字のキーが英字でない文字で届いたなど)を記録する間隔の下限(秒)．打つたびに記録しない
     public static let inputDiagnosticLogInterval = 60.0
+    /// 入れた入力メソッドが OS の入力ソースから外れていないかを確かめる間隔の下限(秒)．確かめるたびに補助のアプリを起動するので，
+    /// 入力先が変わるたびには確かめない
+    public static let inputSourceCheckInterval = 60.0
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
     /// 最新のリリースのページ．自動で更新できないとき(署名の無い開発版，確かめられない配布物，通信の失敗)にブラウザで開く．

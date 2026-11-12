@@ -168,6 +168,10 @@ private struct ConversionTab: View {
                 }
                 .disabled(model.settings.suggestionDisplay == .off)
                 ResettablePicker(model: model, title: UIStrings.Choice.predictionDisplay, keyPath: \.predictionDisplay, label: UIStrings.Choice.label(for:))
+                ResettableToggle(model: model, title: UIStrings.Choice.predictionPrefersHistory, keyPath: \.predictionPrefersHistory)
+                    .disabled(model.settings.predictionDisplay == .off)
+                ResettableToggle(model: model, title: UIStrings.Choice.predictionFromCorrection, keyPath: \.predictionFromCorrection)
+                    .disabled(model.settings.predictionDisplay == .off)
                 ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
                 ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
                 ResettableRow(model: model, keyPath: \.liveConversionDelay) {

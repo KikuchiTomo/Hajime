@@ -4,7 +4,8 @@
 
 use ipc::{BranchColumn, BranchMap, KeyHint};
 
-fn column(text: &str) -> BranchColumn {
+/// 枝を出していない文節
+pub fn column(text: &str) -> BranchColumn {
     BranchColumn {
         text: text.into(),
         alternatives: vec![],

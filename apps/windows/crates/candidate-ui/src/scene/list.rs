@@ -1,12 +1,14 @@
 #![forbid(unsafe_code)]
 
-//! 候補の一覧(macOS の CandidateView)．上から，文字種の行・候補・足元の 3 つの区画
+//! 候補の一覧(macOS の CandidateView)．上から，文字種の行・候補・足元の 3 つの区画．
+//! 語の意味のカードは，候補の右(候補の列と同じ高さ)か，候補と足元のあいだに出す
 
+use super::meaning;
 use super::paint::{Painter, TagStyle};
 use super::{Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
-use ipc::{CandidateFocus, CandidateList, KeyHint};
+use ipc::{CandidateFocus, CandidateList, KeyHint, MeaningPlacement};
 use tokens::opacity;
 use tokens::size::{branch, candidate, glass};
 
@@ -106,10 +108,34 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let padding = candidate::PADDING_X;
     let footer = footer(list);
 
+    // 候補の右に出す語の意味のカード．幅は決まっているので，候補の列より先に決める
+    let card_margin = card_margin(look);
+    let side = (meaning::placement(list.meaning_placement) == MeaningPlacement::Side)
+        .then(|| {
+            let card = list
+                .homophone
+                .as_ref()
+                .map(|note| meaning::list_card(&painter, note));
+            meaning::side_slot(card, glass::MEANING_CARD_WIDTH, look.reserved_card)
+        })
+        .flatten()
+        .map(|slot| meaning::Slot {
+            width: slot.width + card_margin,
+            height: slot.height + card_margin * 2.0,
+            ..slot
+        });
+    let side_extent = side
+        .as_ref()
+        .map_or(0.0, |slot| glass::MEANING_GAP + slot.width);
+
     // 長い文の候補は，窓の幅の上限に収まるよう省く．ほかの候補と違うところの少し手前から見せる
     // (頭が同じ文が並ぶので，末尾を省くと見分けられない．macOS の CandidateView と同じ)
-    let text_limit =
-        candidate::MAX_WIDTH - metrics.lead - padding * 2.0 - metrics.inset * 2.0 - metrics.shadow;
+    let text_limit = candidate::MAX_WIDTH
+        - metrics.lead
+        - padding * 2.0
+        - metrics.inset * 2.0
+        - metrics.shadow
+        - side_extent;
     let shown: Vec<String> = list
         .entries
         .iter()
@@ -170,25 +196,52 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .association
         .as_ref()
         .map_or(0.0, |heading| super::association::width(&painter, heading));
-    let homophone_width = list.homophone.as_ref().map_or(0.0, |note| {
-        super::homophone::width(&painter, note) + padding * 2.0
-    });
-    let content_width = candidate::MIN_WIDTH
+    // 候補の列(文字種の行・候補)の幅と高さ．足元とカードを除く
+    let list_width = candidate::MIN_WIDTH
         .max(metrics.lead + entry_width + padding * 2.0)
         .max(variants_width + padding * 2.0)
-        .max(heading_width)
-        .max(homophone_width)
-        .max(footer_width);
-    let mut content_height = list.entries.len() as f32 * metrics.row_height
-        + metrics.section_height
-        + candidate::FRAME_WIDTH;
+        .max(heading_width);
     // 連想の一覧では，文字種の行の代わりに見出しの行を出す
-    if !list.variants.is_empty() || list.association.is_some() {
-        content_height += metrics.section_height + candidate::FRAME_WIDTH;
-    }
-    if let Some(note) = &list.homophone {
-        content_height += super::homophone::height(note) + candidate::FRAME_WIDTH;
-    }
+    let list_height = list.entries.len() as f32 * metrics.row_height
+        + if !list.variants.is_empty() || list.association.is_some() {
+            metrics.section_height + candidate::FRAME_WIDTH
+        } else {
+            0.0
+        };
+    let footer_height = metrics.section_height + candidate::FRAME_WIDTH;
+    let (content_width, content_height, slot) = match side {
+        Some(slot) => (
+            (list_width + side_extent).max(footer_width),
+            list_height.max(slot.height) + footer_height,
+            Some(slot),
+        ),
+        None => {
+            // 候補の下のカードは窓の幅いっぱいにし，その幅で折り返す
+            let below = (list.meaning_placement == Some(MeaningPlacement::Below))
+                .then_some(list.homophone.as_ref())
+                .flatten();
+            let content_width = list_width.max(footer_width).max(below.map_or(0.0, |_| {
+                glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0 + padding
+            }));
+            let slot = below.map(|note| {
+                let width = content_width - padding - glass::MEANING_PADDING * 2.0;
+                meaning::below_slot(meaning::Card::new(
+                    &painter,
+                    note,
+                    note.others.clone(),
+                    width,
+                ))
+            });
+            let below_height = slot
+                .as_ref()
+                .map_or(0.0, |slot| slot.height + below_margin() * 2.0);
+            (
+                content_width,
+                list_height + below_height + footer_height,
+                slot,
+            )
+        }
+    };
     let width = (content_width + metrics.inset * 2.0 + metrics.shadow).ceil();
     let height = (content_height + metrics.inset * 2.0 + metrics.shadow).ceil();
     let (width, height) = look.sized(width, height);
@@ -197,28 +250,37 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
     painter.panel(body);
     let content = body.inset(metrics.inset, metrics.inset);
+    // 候補の右にカードを出すときは，候補の列をカードの分だけ狭める
+    let list_width = match &slot {
+        Some(slot) if slot.placement == MeaningPlacement::Side => {
+            (content.width - glass::MEANING_GAP - slot.width).max(0.0)
+        }
+        _ => content.width,
+    };
+    let list_max_x = content.x + list_width;
     let mut y = content.y;
     if let Some(heading) = &list.association {
         super::association::draw(
             &mut painter,
             heading,
-            Frame::new(content.x, y, content.width, metrics.section_height),
+            Frame::new(content.x, y, list_width, metrics.section_height),
         );
         y += metrics.section_height;
-        separator(&mut painter, y, content.x, content.max_x());
+        separator(&mut painter, y, content.x, list_max_x);
         y += candidate::FRAME_WIDTH;
     } else if !list.variants.is_empty() {
         variants(
             &mut painter,
             list,
-            Frame::new(content.x, y, content.width, metrics.section_height),
+            Frame::new(content.x, y, list_width, metrics.section_height),
         );
         y += metrics.section_height;
-        separator(&mut painter, y, content.x, content.max_x());
+        separator(&mut painter, y, content.x, list_max_x);
         y += candidate::FRAME_WIDTH;
     }
+    let mut selected_mid_y = None;
     for (index, entry) in list.entries.iter().enumerate() {
-        let row = Frame::new(content.x, y, content.width, metrics.row_height);
+        let row = Frame::new(content.x, y, list_width, metrics.row_height);
         painter.hit(
             row,
             ipc::PointerTarget::Entry {
@@ -228,6 +290,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         let selected =
             list.focus == CandidateFocus::Candidate && list.selected_entry == Some(index as u32);
         if selected {
+            selected_mid_y = Some(row.mid_y());
             if theme.is_rounded() {
                 painter.capsule(row.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
             } else {
@@ -325,21 +388,33 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         }
         y += metrics.row_height;
     }
-    if let Some(note) = &list.homophone {
-        // 意味と使い分けは候補と足元のあいだに出す．足元のキーの案内は消さない
-        separator(&mut painter, y, content.x, content.max_x());
-        y += candidate::FRAME_WIDTH;
-        super::homophone::draw(
-            &mut painter,
-            note,
-            Frame::new(
-                content.x + padding,
-                y,
-                content.width - padding * 2.0,
-                super::homophone::height(note),
-            ),
-        );
-        y += super::homophone::height(note);
+    if let Some(slot) = &slot {
+        match slot.placement {
+            MeaningPlacement::Side => {
+                // 候補の右: 候補の列と同じ高さのカードにし，選んでいる候補を左の辺の三角で指す．
+                // platinum と desk はカードの枠を窓の縁から離し，二重の線に見せない
+                y = content.y + list_height.max(slot.height);
+                let card = Frame::new(
+                    list_max_x + glass::MEANING_GAP,
+                    content.y + card_margin,
+                    slot.width - card_margin,
+                    y - content.y - card_margin * 2.0,
+                );
+                meaning::draw(&mut painter, slot.card.as_ref(), card, selected_mid_y);
+            }
+            MeaningPlacement::Below => {
+                // 候補の下: 候補と足元のあいだに，窓の幅いっぱいのカードを出す．足元のキーの案内は消さない
+                y += below_margin();
+                let card = Frame::new(
+                    content.x + padding / 2.0,
+                    y,
+                    content.width - padding,
+                    slot.height,
+                );
+                meaning::draw(&mut painter, slot.card.as_ref(), card, None);
+                y += slot.height + below_margin();
+            }
+        }
     }
     separator(&mut painter, y, content.x, content.max_x());
     y += candidate::FRAME_WIDTH;
@@ -349,6 +424,20 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         Frame::new(content.x, y, content.width, metrics.section_height),
     );
     painter.finish(width, height)
+}
+
+/// platinum と desk は窓の縁に余白が無いので，候補の右のカードを縁から離す空き(上・下・右)．角丸のテーマは 0
+fn card_margin(look: &Look) -> f32 {
+    if look.theme.is_rounded() {
+        0.0
+    } else {
+        candidate::PADDING_X / 2.0
+    }
+}
+
+/// 候補の下に出すカードの上下の空き
+fn below_margin() -> f32 {
+    candidate::PADDING_X / 2.0
 }
 
 fn separator(painter: &mut Painter, y: f32, from: f32, to: f32) {
@@ -583,99 +672,226 @@ mod tests {
         }
     }
 
+    fn homophone() -> ipc::HomophoneNote {
+        ipc::HomophoneNote {
+            word: "変換".into(),
+            senses: vec![ipc::HomophoneSense {
+                meaning: "別の形に変える".into(),
+                example: Some("かなを漢字に変換する".into()),
+            }],
+            others: vec!["返還".into(), "偏官".into()],
+            part_of_speech: Some(ipc::PartOfSpeech::Noun),
+        }
+    }
+
+    fn with_meaning(placement: MeaningPlacement) -> CandidateList {
+        CandidateList {
+            homophone: Some(homophone()),
+            meaning_placement: Some(placement),
+            ..list(Some(0))
+        }
+    }
+
+    /// 描いた多角形(一覧のカードが選んでいる候補を指す三角)
+    fn polygons(scene: &Scene) -> Vec<Vec<Point>> {
+        scene
+            .draws
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Polygon { points, .. } => Some(points.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
     #[test]
-    fn 使い分けは候補と足元のあいだに出し_長い意味と多いほかの語は欄の幅に収める() {
-        for name in ["platinum", "automatic"] {
+    fn 語の意味は候補の右のカードにし_選んでいる候補を三角で指す() {
+        for name in ["platinum", "automatic", "desk"] {
             let theme = theme(name);
-            let mut short = list(Some(0));
-            short.homophone = Some(ipc::HomophoneNote {
-                word: "撮る".into(),
-                senses: vec![ipc::HomophoneSense {
-                    meaning: "撮影する".into(),
-                    example: Some("写真を撮る".into()),
-                }],
-                others: vec!["取る".into(), "採る".into()],
-                part_of_speech: None,
-            });
-            let scene = candidate_list(&short, &Look::new(&theme, 15.0), &Fixed);
+            let look = Look::new(&theme, 15.0);
+            let scene = candidate_list(&with_meaning(MeaningPlacement::Side), &look, &Fixed);
             let texts = texts_of(&scene);
-            for text in [
-                "撮る",
-                "撮影する",
-                "「写真を撮る」",
-                "ほかに",
-                "取る",
-                "採る",
-            ] {
-                assert!(texts.contains(&text.to_string()), "{text}");
+            for text in ["変換", "名詞", "別の形に変える", "同音語", "返還", "偏官"]
+            {
+                assert!(texts.contains(&text.to_string()), "{name}: {text}");
             }
             // 足元のキーの案内は消さない
-            assert!(texts.contains(&"2 / 30".to_string()));
+            assert!(texts.contains(&"2 / 30".to_string()), "{name}");
+            // カードは候補の列の右に置き，候補の行はカードにかからない
+            let meaning = text_frame(&scene, "別の形に変える").expect("意味を描く");
+            let candidate = text_frame(&scene, "へんかん").expect("候補を描く");
+            assert!(meaning.x > candidate.max_x(), "{name}");
+            let row = scene
+                .hits
+                .iter()
+                .find(|hit| hit.target == ipc::PointerTarget::Entry { index: 0 })
+                .map(|hit| hit.frame)
+                .expect("候補の行");
+            assert!(row.max_x() + glass::MEANING_GAP <= meaning.x, "{name}");
+            // 三角は選んでいる候補の行の高さを指す(カードの角にかからない範囲で)
+            let pointers = polygons(&scene);
+            assert_eq!(pointers.len(), 1, "{name}");
+            assert!(
+                (pointers[0][1].y - row.mid_y()).abs()
+                    <= glass::MEANING_RADIUS + glass::MEANING_NOTCH,
+                "{name}"
+            );
+            assert!(pointers[0][1].x < meaning.x, "{name}");
+            // 意味の無い一覧より広い
+            let plain = candidate_list(&list(Some(0)), &look, &Fixed);
+            assert!(
+                scene.width >= plain.width + glass::MEANING_CARD_WIDTH,
+                "{name}"
+            );
+        }
+    }
 
-            let mut long = short.clone();
+    #[test]
+    fn 文字種の行を選んでいるあいだは三角で指さない() {
+        let theme = theme("automatic");
+        let mut variants = with_meaning(MeaningPlacement::Side);
+        variants.focus = CandidateFocus::Variants;
+        variants.selected_variant = Some(0);
+        let scene = candidate_list(&variants, &Look::new(&theme, 15.0), &Fixed);
+        assert!(polygons(&scene).is_empty());
+        assert!(texts_of(&scene).contains(&"別の形に変える".to_string()));
+    }
+
+    #[test]
+    fn 長い意味はカードの幅で折り返し_候補を窓の幅の上限に収める() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let mut long = with_meaning(MeaningPlacement::Side);
             if let Some(note) = long.homophone.as_mut() {
-                note.senses[0].meaning = "意".repeat(80);
+                note.senses[0].meaning = "意".repeat(200);
                 note.others = (0..30).map(|index| format!("語{index}")).collect();
             }
-            let scene = candidate_list(&long, &Look::new(&theme, 15.0), &Fixed);
-            let without = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
-            assert!(
-                scene.width
-                    <= without
-                        .width
-                        .max(glass::USAGE_MAX_WIDTH + candidate::PADDING_X * 2.0 + 40.0)
-            );
+            long.entries[1].text = "長".repeat(80);
+            let scene = candidate_list(&long, &look, &Fixed);
             let texts = texts_of(&scene);
-            assert!(!texts.contains(&"「写真を撮る」".to_string()));
+            let lines = texts.iter().filter(|text| text.starts_with('意')).count();
+            assert_eq!(lines, glass::MEANING_MEANING_LINES as usize, "{name}");
             assert!(texts
                 .iter()
                 .any(|text| text.starts_with('意') && text.ends_with('…')));
             assert!(texts.iter().any(|text| text.starts_with('+')));
+            // 長い候補は省き，カードを含めて窓の幅の上限に収める
+            assert!(texts
+                .iter()
+                .any(|text| text.starts_with('長') && text.ends_with('…')));
+            assert!(
+                scene.width <= candidate::MAX_WIDTH + 1.0,
+                "{name}: {}",
+                scene.width
+            );
             for draw in &scene.draws {
                 if let Draw::Text { frame, .. } = draw {
-                    assert!(frame.x >= 0.0 && frame.x < scene.body.max_x(), "{draw:?}");
+                    assert!(
+                        frame.x >= 0.0 && frame.max_x() <= scene.body.max_x(),
+                        "{name}: {draw:?}"
+                    );
                 }
             }
         }
     }
 
     #[test]
-    fn 意味が2つ以上なら番号を付けて1行ずつ並べ_ほかの語が無ければほかにの行を出さない() {
-        let theme = theme("platinum");
-        let look = Look::new(&theme, 15.0);
-        let mut one = list(Some(0));
-        one.homophone = Some(ipc::HomophoneNote {
-            word: "動く".into(),
-            senses: vec![ipc::HomophoneSense {
-                meaning: "位置が変わる".into(),
-                example: Some("車が動く".into()),
-            }],
-            others: vec![],
-            part_of_speech: None,
-        });
-        let single = candidate_list(&one, &look, &Fixed);
-        let texts = texts_of(&single);
-        assert!(texts.contains(&"位置が変わる".to_string()));
-        assert!(!texts.contains(&"ほかに".to_string()));
-        assert!(!texts.contains(&"1.".to_string()));
+    fn 候補の下に出す設定では候補と足元のあいだに窓の幅いっぱいのカードを出す() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let scene = candidate_list(&with_meaning(MeaningPlacement::Below), &look, &Fixed);
+            let meaning = text_frame(&scene, "別の形に変える").expect("意味を描く");
+            let last = text_frame(&scene, "へんかん").expect("候補を描く");
+            let footer = text_frame(&scene, "2 / 30").expect("足元を描く");
+            assert!(
+                meaning.y > last.max_y() && meaning.max_y() < footer.y,
+                "{name}"
+            );
+            // 三角で指さない
+            assert!(polygons(&scene).is_empty(), "{name}");
+            // 窓の幅はカードの幅に合わせて広げる
+            assert!(scene.width >= glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0);
+            let plain = candidate_list(&list(Some(0)), &look, &Fixed);
+            assert!(scene.height > plain.height, "{name}");
+        }
+    }
 
-        let mut two = one.clone();
+    #[test]
+    fn 意味の無い候補に移っても空けておいたカードで窓の大きさを変えない() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let mut reservation = crate::scene::CardReservation::default();
+            let shown = with_meaning(MeaningPlacement::Side);
+            let first = candidate_list(
+                &shown,
+                &Look {
+                    reserved_card: reservation.list(&shown, &look, &Fixed),
+                    ..look
+                },
+                &Fixed,
+            );
+            let moved = CandidateList {
+                homophone: None,
+                meaning_placement: None,
+                selected_entry: Some(1),
+                ..list(Some(1))
+            };
+            let reserved = reservation.list(&moved, &look, &Fixed);
+            assert!(reserved.is_some(), "{name}");
+            let empty = candidate_list(
+                &moved,
+                &Look {
+                    reserved_card: reserved,
+                    ..look
+                },
+                &Fixed,
+            );
+            assert_eq!(
+                (empty.width, empty.height),
+                (first.width, first.height),
+                "{name}"
+            );
+            assert!(!texts_of(&empty).contains(&"別の形に変える".to_string()));
+            assert!(empty.draws.iter().any(|draw| matches!(
+                draw,
+                Draw::Icon {
+                    icon: crate::keys::Icon::Book,
+                    ..
+                }
+            )));
+            // 空けておかなければカードを出さない
+            let bare = candidate_list(&moved, &look, &Fixed);
+            assert!(bare.width < empty.width, "{name}");
+        }
+    }
+
+    #[test]
+    fn 意味が2つ以上なら角丸の四角に番号を入れる() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let mut two = with_meaning(MeaningPlacement::Side);
         if let Some(note) = two.homophone.as_mut() {
             note.senses.push(ipc::HomophoneSense {
-                meaning: "働く".into(),
+                meaning: "向きを変える".into(),
                 example: None,
             });
         }
+        let single = candidate_list(&with_meaning(MeaningPlacement::Side), &look, &Fixed);
         let double = candidate_list(&two, &look, &Fixed);
         let texts = texts_of(&double);
-        for text in ["1.", "位置が変わる", "2.", "働く"] {
-            assert!(texts.contains(&text.to_string()), "{text}");
-        }
-        // 意味の行が 1 つ増えた分だけ高くなる
-        assert_eq!(
-            double.height - single.height,
-            glass::USAGE_ROW_HEIGHT.ceil()
-        );
+        assert!(texts.contains(&"向きを変える".to_string()));
+        let badges = double
+            .draws
+            .iter()
+            .filter(|draw| matches!(draw, Draw::RoundRect { radius, .. } if *radius == glass::MEANING_BADGE_RADIUS))
+            .count();
+        assert_eq!(badges, 2);
+        assert!(double.height >= single.height);
+        // 意味が 1 つなら番号の四角を描かない
+        assert!(!single.draws.iter().any(|draw| matches!(draw, Draw::RoundRect { radius, .. } if *radius == glass::MEANING_BADGE_RADIUS)));
     }
 
     fn texts_of(scene: &Scene) -> Vec<String> {

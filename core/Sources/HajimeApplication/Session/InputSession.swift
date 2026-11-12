@@ -350,9 +350,9 @@ public final class InputSession {
                 return rerender(context: context)
             }
             return fills + [preview]
-        case .composing where predictionsShown && suggestionPredictions?.reading != suggestionTarget().reading:
+        case .composing where predictionsShown && suggestionPredictions?.reading != predictionTarget().reading:
             let reading = composition.conversionReading
-            let target = suggestionTarget().reading
+            let target = predictionTarget().reading
             return [{ [self] in
                 guard phase == .composing, composition.conversionReading == reading else { return [] }
                 suggestionPredictions = (target, converter.predictions(for: target))
@@ -1605,8 +1605,19 @@ public final class InputSession {
     /// 今の読みで候補を求めるか
     private var suggestionsShown: Bool { suggestionsEnabled && readingIsSettled }
 
-    /// 今の読みで続く語句の予測を求めるか
-    private var predictionsShown: Bool { showsPredictions && readingIsLongEnough && readingIsSettled }
+    /// 今の読みで続く語句の予測を求めるか．打ち間違いを直して見せているときと「もしかして」と示しているときは，
+    /// 直した読みから予測する設定(predictionFromCorrection)のときだけ求める
+    private var predictionsShown: Bool {
+        showsPredictions && readingIsLongEnough && readingIsSettled
+            && (settings.current.predictionFromCorrection || (!readingCorrector.isApplied && readingCorrector.suggestion == nil))
+    }
+
+    /// 続く語句の予測を求める読みと，その前に置く文節．「もしかして」と示しているときは，示した読み全体から予測する．
+    /// ほかは入力中の候補と同じ(打ち間違いを直して見せているときは直した読み)
+    private func predictionTarget() -> (reading: String, prefix: SuggestionPrefix?) {
+        if let suggested = readingCorrector.suggestion { return (suggested.conversionReading, nil) }
+        return suggestionTarget()
+    }
 
     /// 打っているあいだの候補を求める読みと，その前に置く文節．ライブ変換で文が見えているときは，文全体の候補を並べても
     /// 頭が同じ文ばかりで見分けられないので，今打っている最後の文節の候補を出す(その前の文節は見えている変換のまま)．
@@ -1664,26 +1675,32 @@ public final class InputSession {
         var candidate: Candidate
     }
 
-    /// 予測の窓に出す予測．出さない設定，読みが短いとき，「もしかして」を示しているときと英単語を直しているとき(確定のキーをそちらに使う)，
+    /// 予測の窓に出す予測．出さない設定，読みが短いとき，英単語を直しているとき(確定のキーをそちらに使う)，
     /// 確定のキーが無いとき，予測をまだ求めていないときは nil．変換の候補と同じ語句は出さない(予測ではないため)．
     /// 予測した語句のうち，見えている字・ひらがなとカタカナの読み・変換の候補のどれかと頭が重なる部分を打った部分にし，残りを補う部分にする
-    /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)
+    /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)．
+    /// 確定した履歴(学習)にある語句を先に出す設定なら，それを先に選ぶ．
+    /// 「もしかして」と示しているときは示した読みから予測し，確定のキーは添えない(キーはまず読みを直す．直すと添える)
     private func makePrediction(marked: MarkedText) -> ShownPrediction? {
-        guard predictionsShown, readingCorrector.suggestion == nil, corrector.active == nil,
+        guard predictionsShown, corrector.active == nil,
             let key = keyLabel(.acceptSuggestion, in: .composing) else { return nil }
-        let (reading, prefix) = suggestionTarget()
+        let (reading, prefix) = predictionTarget()
         guard let stored = suggestionPredictions, stored.reading == reading else { return nil }
+        let suggesting = readingCorrector.suggestion != nil
         let conversions = conversionCandidates(for: reading, prefix: prefix).map(\.text)
-        let shown = String(marked.text.dropFirst(prefix?.text.count ?? 0))
+        // 示しているだけの読みは組み立て中の文字に見えていないので，見えている字とは比べない
+        let shown = suggesting ? reading : String(marked.text.dropFirst(prefix?.text.count ?? 0))
         let typedForms = ([shown, reading, KanaWidth.katakana(from: reading)] + conversions).map(Array.init)
         let whole = composition.conversionReading
-        for candidate in stored.candidates where candidate.commandID == nil && !conversions.contains(candidate.text) {
+        let ordered = settings.current.predictionPrefersHistory
+            ? stored.candidates.filter(\.isLearned) + stored.candidates.filter { !$0.isLearned } : stored.candidates
+        for candidate in ordered where candidate.commandID == nil && !conversions.contains(candidate.text) {
             let characters = Array(candidate.text)
             let typedCount = typedForms.map { form in zip(characters, form).prefix { $0 == $1 }.count }.max() ?? 0
             // 見えている字と同じなら，補うものが無い
             guard typedCount < characters.count else { continue }
             let prediction = Prediction(typed: String(characters[..<typedCount]), completion: String(characters[typedCount...]),
-                                        key: settings.current.showsKeyHints ? key : nil)
+                                        key: settings.current.showsKeyHints && !suggesting ? key : nil)
             let committed = prefix.map { $0.joined(with: candidate, readingCount: whole.count) } ?? candidate
             return ShownPrediction(prediction: prediction, reading: whole, candidate: committed)
         }

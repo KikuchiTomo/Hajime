@@ -86,6 +86,8 @@
     "phoneticSpelling",
     "postalCodeConversion",
     "predictionDisplay",
+    "predictionFromCorrection",
+    "predictionPrefersHistory",
     "prefersKatakana",
     "profileRules",
     "proofreading",

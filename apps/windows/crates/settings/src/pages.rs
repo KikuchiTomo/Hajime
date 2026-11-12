@@ -895,6 +895,16 @@ fn conversion() -> Vec<Section> {
                     "predictionDisplay",
                     options::SUGGESTION_DISPLAY,
                 ),
+                Row::toggle(
+                    choice::PREDICTION_PREFERS_HISTORY,
+                    "predictionPrefersHistory",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
+                Row::toggle(
+                    choice::PREDICTION_FROM_CORRECTION,
+                    "predictionFromCorrection",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
                 Row::seconds(

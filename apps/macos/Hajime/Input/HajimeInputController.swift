@@ -215,6 +215,7 @@ final class HajimeInputController: IMKInputController {
     @MainActor
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
+        root.inputSourceRegistration.repairIfNeeded()
         if let client = sender as? any IMKTextInput {
             KeyboardLayoutOverride.apply(root.settings.current.keyboardLayout, to: client)
             // 除外設定でアプリに入力先を移したときのモードを決めていれば，そのモードにする

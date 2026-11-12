@@ -62,6 +62,7 @@ final class Harness {
             switch action {
             case .setMarkedText(let text): marked = text
             case .showNote(let shown): note = shown.text
+            case .showPrediction(let shown): prediction = shown
             case .hideCandidates: note = nil
             default: break
             }

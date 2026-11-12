@@ -61,6 +61,10 @@ public struct Settings: Sendable, Equatable {
     public var predictionDisplay = SuggestionDisplay.whenLiveConversionOff
     /// 入力中の候補がこの件数以下なら窓を出さない．0 なら候補があれば出す
     public var suggestionSkipCount = 0
+    /// 入力中の予測で，確定した履歴(学習)にある語句を先に出すか
+    public var predictionPrefersHistory = true
+    /// 打ち間違いを直した読み(直して見せている読みと「もしかして」と示した読み)からも予測するか．オフなら直しているあいだは予測を出さない
+    public var predictionFromCorrection = true
     /// 一覧の 1 ページの候補の数
     public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
     /// 分岐図の下の枝に出す候補の数
@@ -352,7 +356,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
@@ -438,6 +442,8 @@ extension Settings: Codable {
         settings.predictionDisplay = settings.suggestionDisplay
         read(.predictionDisplay, into: \.predictionDisplay)
         read(.suggestionSkipCount, into: \.suggestionSkipCount)
+        read(.predictionPrefersHistory, into: \.predictionPrefersHistory)
+        read(.predictionFromCorrection, into: \.predictionFromCorrection)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
         read(.numberKeySelection, into: \.numberKeySelection)
@@ -561,6 +567,8 @@ extension Settings: Codable {
         try container.encode(suggestionDisplay, forKey: .suggestionDisplay)
         try container.encode(predictionDisplay, forKey: .predictionDisplay)
         try container.encode(suggestionSkipCount, forKey: .suggestionSkipCount)
+        try container.encode(predictionPrefersHistory, forKey: .predictionPrefersHistory)
+        try container.encode(predictionFromCorrection, forKey: .predictionFromCorrection)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
