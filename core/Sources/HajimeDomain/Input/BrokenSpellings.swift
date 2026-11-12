@@ -1,16 +1,19 @@
-/// 字の並びが崩れた候補(「はッ制」「シュッ派つ」「じゅっ分」「出発スる」「自ャ」)を見分け，2 番目から後ろで除く規則．
+/// 字の並びが崩れた候補(「はッ制」「シュッ派つ」「じゅっ分」「出発スる」「自ャ」「8精子」)を見分け，2 番目から後ろで除く規則．
 ///
 /// エンジンは辞書の語を自由につなぐので，活用の切れ端(這っ の「はっ」，「ざっ」「シュッ」)や 1 文字のカタカナの語(ス・ノ・コ・ヲ)，
-/// 小さいかな(ャ・ァ)が，漢字やひらがなの語とつながった候補を作る．Zenzai を使わない変換の候補を 2 番目から後ろに混ぜると(ADR 0016)，
-/// これが上位に出る．正しい書き方に無い形なので除く．
+/// 小さいかな(ャ・ァ)，促音で終わる読みの数(はっ → 8)が，漢字やひらがなの語とつながった候補を作る．
+/// Zenzai を使わない変換の候補を 2 番目から後ろに混ぜると(ADR 0016)，これが上位に出る．正しい書き方に無い形なので除く．
 /// - 促音の切れ端: かなと促音で終わる語のすぐ後に漢字で始まる語が続く(じゅっ分・はっ再・シュッ派つ・ハッ中)，漢字のあとのカタカナの「ッ」
 ///   (良ッ書・良ッた)
-/// - 拍の途中の字種の切り替え: ひらがなのすぐ後の小さいカタカナ(はッ制・ねェ)，カタカナのすぐ後の小さいひらがな(シゃ)，
-///   カタカナの「ッ」のすぐ後の「と」以外のひらがな(ザッしを・アッさり．サッと・ハッとする は残す)
+/// - 拍の途中の字種の切り替え: ひらがなのすぐ後の小さいカタカナ(はッ制・とゥ)，カタカナのすぐ後の小さいひらがな(シゃ)，
+///   カタカナの「ッ」のすぐ後の「と」以外のひらがな(ザッしを・アッさり．サッと・ハッとする は残す)．
+///   語末で前のかなの母音を伸ばす小さいカタカナ(だよォ・かなァ・ねェ)は，伸ばす書き方なので残す
 /// - 小さいかなの位置: 漢字・数字・英字のすぐ後の小さいかな(自ャ・打ァ・非ゃっぽ)
 /// - 1 文字のカタカナ: 前後にカタカナの無い 1 文字のカタカナが，ひらがなか漢字と並ぶ(出発スる・コの・雑誌ヲ・コども)．
 ///   ひらがなか漢字のすぐ後のカタカナの「ン」(えンピつ)も同じ．
 ///   ヵ・ヶ，数のあとの カ・ケ(3カ月)，漢字に挟まれた ノ・ケ・ツ(湯ノ沢・霞ケ関・一ツ橋)，音の名前(ハ長調)は残す
+/// - 数のあとの助数詞でない語: 読みが促音で終わる数(いっ・はっ・ろっ・じゅっ)のすぐ後の，助数詞でない漢字の語(8精子)．
+///   助数詞(8本・1分・6匹・10回・1体)は残す．読みが促音で終わらない数(中2・第2子)は当たらない
 /// - 当たらない: 1 つの語(辞書の「うっ血」「フッ素」「三ッ星」「トッ捕まる」)，強めの接頭の語(ぶっ飛ぶ・ブッ飛ばす・カッ飛ぶ・真ッ赤)，
 ///   数のあとの「ッ」(三ッ＋星)，動詞の活用の促音(引っ＋越し)，送りがなの促音(開けっ＋放し)，ユーザー辞書の語や記号
 /// - 第 1 候補は変えない．ライブ変換で見えている文字と同じにするため
@@ -28,11 +31,29 @@ public enum BrokenSpellings {
     /// 音の名前(ハ長調・イ短調)の頭の字
     static let noteNames: Set<Character> = ["イ", "ロ", "ハ", "ニ", "ホ", "ヘ", "ト"]
     static let smallKana: Set<Character> = Set("ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ")
+    /// ひらがなと，その母音を伸ばす小さいカタカナ(か → ァ・よ → ォ・ね → ェ)
+    static let elongationMarks: [Character: Character] = {
+        let rows: [(Character, String)] = [
+            ("ァ", "あかさたなはまやらわがざだばぱぁゃゎ"), ("ィ", "いきしちにひみりぎじぢびぴぃ"), ("ゥ", "うくすつぬふむゆるぐずづぶぷぅゅゔ"),
+            ("ェ", "えけせてねへめれげぜでべぺぇ"), ("ォ", "おこそとのほもよろをごぞどぼぽぉょ"),
+        ]
+        return Dictionary(uniqueKeysWithValues: rows.flatMap { mark, row in row.map { ($0, mark) } })
+    }()
+    /// 読みが促音で終わる数(いっ・はっ・ろっ・じゅっ・ひゃっ)のすぐ後に来てよい漢字．助数詞と位の漢字(8本・1分・10回・8千)．
+    /// 促音のあとは か・さ・た・ぱ 行の音なので，その音で読む助数詞を並べる．読みがぱ行で始まる語をまとめて残すと，
+    /// 「6日機」(日 を ぴ と読む)のような崩れも残るので，ぱ行で読む助数詞(本・分・杯・匹)も字で並べる
+    static let counters: Set<Character> = Set(
+        "回階個箇課科家戸件軒県巻貫缶館画角格期基機騎球級曲局斤区句系景稿校項港刻国羽"
+            + "冊刷歳才札作策佐式室社車尺首種周週宿升勝章食色職審針進寸世隻席石節説戦銭線選双層曹艘足束族試失指"
+            + "体対隊卓択反丁町兆張着通滴点店転頭等棟刀統斗灯党艇干傑"
+            + "本分杯匹泊発歩編遍片票品服幅方報包鉢派敗班版筆拍俵篇波頁"
+            + "千百十万億"
+    )
 
     /// 候補の窓に出さない候補か．エンジンの候補だけを見る
     public static func isBroken(_ candidate: Candidate) -> Bool {
         guard isEngineText(candidate) else { return false }
-        return hasScriptBreak(Array(candidate.text)) || hasFragment(candidate)
+        return hasScriptBreak(Array(candidate.text)) || hasFragment(candidate) || hasNumberBeforeNonCounter(candidate)
     }
 
     /// 拍の途中の字種の切り替え・小さいかなの位置・1 文字のカタカナ
@@ -43,8 +64,9 @@ public enum BrokenSpellings {
             if smallKana.contains(character) || character == "ッ" {
                 // 頭の小さいかなは，読みが小さいかなで始まる(かな入力で「ぁ」を打った)ときもあるので見ない
                 guard let before else { continue }
-                // ひらがなのすぐ後の小さいカタカナ(はッ・ねェ)，カタカナのすぐ後の小さいひらがな(シゃ)
-                if isHiragana(before) && isKatakana(character) { return true }
+                // ひらがなのすぐ後の小さいカタカナ(はッ・とゥ)，カタカナのすぐ後の小さいひらがな(シゃ)．
+                // 語末で前のかなの母音を伸ばすもの(だよォ・かなァ・ねェ)は残す
+                if isHiragana(before) && isKatakana(character) && !isElongation(character, before: before, after: after) { return true }
                 if isKatakana(before) && isHiragana(character) { return true }
                 // 漢字・数字・英字のすぐ後の小さいかな(自ャ・打ァ)．漢字のあとの「ッ」は，漢字が続くとき(三ッ星・良ッ書)を促音の切れ端で見る
                 if isKanji(before) || before.isASCII || before.isNumber {
@@ -98,6 +120,35 @@ public enum BrokenSpellings {
     }
 
 
+    /// 語末で，前のかなの母音を伸ばす小さいカタカナか(だよォ・かなァ)．とゥ・しェ は母音が違うので，拍の途中の切り替え
+    private static func isElongation(_ character: Character, before: Character, after: Character?) -> Bool {
+        guard elongationMarks[before] == character else { return false }
+        return after.map { !isHiragana($0) } ?? true
+    }
+
+    /// 読みが促音で終わる数の語(はっ → 8)のすぐ後に，助数詞でない漢字の語が続くか(8精子)
+    private static func hasNumberBeforeNonCounter(_ candidate: Candidate) -> Bool {
+        guard let words = knownWords(of: candidate) else { return false }
+        return zip(words, words.dropFirst()).contains { number, next in
+            guard number.endsWithSokuon, !number.text.isEmpty, number.text.allSatisfy(isDigit), let head = next.text.first else { return false }
+            return isKanji(head) && !counters.contains(head)
+        }
+    }
+
+    /// 候補を作る語の並び．語をつないだ候補は元の語の並び(learnedParts)から作る．先頭の語を選び直した候補は，
+    /// 残り(語の区切りが分からない)を 1 つの語として後ろに足す．分からなければ nil
+    private static func knownWords(of candidate: Candidate) -> [Candidate.Word]? {
+        if wordBoundaries(of: candidate) != nil { return candidate.words }
+        guard candidate.origin == .combined, let head = candidate.learnedParts.first, wordBoundaries(of: head) != nil,
+              candidate.text.hasPrefix(head.text) else { return nil }
+        let parts = candidate.learnedParts
+        if parts.allSatisfy({ wordBoundaries(of: $0) != nil }), parts.map(\.text).joined() == candidate.text {
+            return parts.flatMap(\.words)
+        }
+        let rest = String(candidate.text.dropFirst(head.text.count))
+        return head.words + (rest.isEmpty ? [] : [Candidate.Word(text: rest, readingCount: candidate.readingCount - head.readingCount)])
+    }
+
     /// 語の切れ目の位置(字の数)．1 つの語なら空，語の区切りが分からなければ nil
     private static func wordBoundaries(of candidate: Candidate) -> [Int]? {
         guard !candidate.words.isEmpty, candidate.words.map(\.text).joined() == candidate.text else { return nil }
@@ -132,6 +183,8 @@ public enum BrokenSpellings {
     }
 
     private static func isSmallTsu(_ character: Character) -> Bool { character == "っ" || character == "ッ" }
+
+    private static func isDigit(_ character: Character) -> Bool { ("0"..."9").contains(character) || ("０"..."９").contains(character) }
 
     /// カタカナをひらがなにした文字列(強めの接頭の語をカタカナで書いたもの「ブッ」を「ぶっ」として引くため)
     private static func hiragana(_ text: String) -> String {

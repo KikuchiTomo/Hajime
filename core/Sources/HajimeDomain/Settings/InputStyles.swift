@@ -148,6 +148,18 @@ public enum ZenzaiModelChoice: String, Sendable, Equatable, Codable, CaseIterabl
     case combined
 }
 
+/// 合議(ADR 0016 の案 2)に使う jinen のモデル．jinen でも変換し，読みにそろえてから Zenzai の結果と合わせる
+public enum JinenModelChoice: String, Sendable, Equatable, Codable, CaseIterable {
+    /// 起動のあとに 1 回だけ測った 1 文の時間で決める．速ければ small，遅ければ xsmall
+    case automatic
+    /// small のモデルを使う．精度を優先する
+    case small
+    /// xsmall のモデルを使う．速さを優先する(GPU の無い環境)
+    case xsmall
+    /// jinen を使わない(Zenzai だけで変換する)
+    case off
+}
+
 /// 利用者が登録した語．読みと語の組で 1 語とみなし，同じ組を品詞を変えて重ねて登録しない
 public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
     /// 読み．ひらがなか，ローマ字・英字(「gh」「toyota」)．引くときは lookupReading にそろえる

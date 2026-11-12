@@ -36,10 +36,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW, KillTimer,
     LoadCursorW, PostMessageW, RegisterClassExW, SetTimer, SetWindowLongPtrW, SetWindowPos,
     ShowWindow, TranslateMessage, CS_DROPSHADOW, GWLP_USERDATA, HTTRANSPARENT, HWND_TOPMOST,
-    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP,
-    WM_DWMCOLORIZATIONCOLORCHANGED, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT,
-    WM_SETTINGCHANGE, WM_SYSCOLORCHANGE, WM_THEMECHANGED, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOREDRAW, SWP_NOSIZE,
+    SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_DWMCOLORIZATIONCOLORCHANGED, WM_LBUTTONDOWN,
+    WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT, WM_SETTINGCHANGE, WM_SYSCOLORCHANGE, WM_THEMECHANGED,
+    WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_POPUP,
 };
 use windows_core::{w, Result, BOOL, BSTR, PCWSTR};
 
@@ -67,16 +68,25 @@ struct Callbacks {
     paint: fn(),
     /// 窓の中を押した(窓の中のピクセルの座標)
     click: fn(i32, i32),
+    /// OS の外観やアニメーション効果の設定が変わった
+    settings: fn(),
 }
 
 static CALLBACKS: OnceLock<Callbacks> = OnceLock::new();
 
-pub fn set_callbacks(inbox: fn(), timer: fn(Timer), paint: fn(), click: fn(i32, i32)) {
+pub fn set_callbacks(
+    inbox: fn(),
+    timer: fn(Timer),
+    paint: fn(),
+    click: fn(i32, i32),
+    settings: fn(),
+) {
     let _ = CALLBACKS.set(Callbacks {
         click,
         inbox,
         timer,
         paint,
+        settings,
     });
 }
 
@@ -93,6 +103,9 @@ pub struct Window {
     chrome: std::cell::Cell<Option<(bool, bool, COLORREF, u64)>>,
     /// 最後に置いた本体の枠(画面のピクセル)．隠したら None．語の意味の吹き出しを候補の窓の横に置くのに使う
     body: std::cell::Cell<Option<RECT>>,
+    /// 最後に SetWindowPos で出した窓の位置と大きさ(画面のピクセル)．隠したら None．
+    /// 同じ位置と大きさで出しているあいだは置き直さない(置き直すたびに DWM が窓を合成し直し，ちらつくため)
+    shown: std::cell::Cell<Option<RECT>>,
 }
 
 /// 入力位置に対して窓を置いた側
@@ -238,6 +251,7 @@ impl Window {
             held: std::cell::Cell::new(None),
             chrome: std::cell::Cell::new(None),
             body: std::cell::Cell::new(None),
+            shown: std::cell::Cell::new(None),
         })
     }
 
@@ -341,18 +355,12 @@ impl Window {
             pixels(scene.body.height),
             pixels(gap),
         );
-        // SAFETY: hwnd はこの窓
-        let _ = unsafe {
-            SetWindowPos(
-                self.hwnd,
-                Some(HWND_TOPMOST),
-                x - pixels(scene.body.x),
-                y - pixels(scene.body.y),
-                (scene.width * scale).ceil() as i32,
-                (scene.height * scale).ceil() as i32,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            )
-        };
+        self.show_at(
+            x - pixels(scene.body.x),
+            y - pixels(scene.body.y),
+            (scene.width * scale).ceil() as i32,
+            (scene.height * scale).ceil() as i32,
+        );
     }
 
     /// 本体(scene.body)を入力位置の下(入らなければ上)に置く．影や余白はそのまわりにはみ出す．
@@ -390,18 +398,12 @@ impl Window {
             right: x + pixels(scene.body.width),
             bottom: y + pixels(scene.body.height),
         }));
-        // SAFETY: hwnd はこの窓
-        let _ = unsafe {
-            SetWindowPos(
-                self.hwnd,
-                Some(HWND_TOPMOST),
-                x - pixels(scene.body.x),
-                y - pixels(scene.body.y),
-                (scene.width * scale).ceil() as i32,
-                (scene.height * scale).ceil() as i32,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            )
-        };
+        self.show_at(
+            x - pixels(scene.body.x),
+            y - pixels(scene.body.y),
+            (scene.width * scale).ceil() as i32,
+            (scene.height * scale).ceil() as i32,
+        );
     }
 
     /// ナレーターに text を読み上げてもらう．前の読み上げを打ち切り，今の選択を読む
@@ -432,15 +434,54 @@ impl Window {
     /// scale は (x, y) を決めた拡大率(候補の窓の拡大率)．この窓の拡大率は，隠れているあいだ前にいた画面のままのことがあるので使わない
     pub fn place_at(&self, x: i32, y: i32, scene: &Scene, scale: f32) {
         let pixels = |value: f32| (value * scale).round() as i32;
+        self.show_at(
+            x - pixels(scene.body.x),
+            y - pixels(scene.body.y),
+            (scene.width * scale).ceil() as i32,
+            (scene.height * scale).ceil() as i32,
+        );
+    }
+
+    /// 出している窓を最前面に付け直す．位置・大きさ・中身は変えず，描き直さない(隠している窓は出さない)
+    pub fn raise(&self) {
+        if self.shown.get().is_none() {
+            return;
+        }
         // SAFETY: hwnd はこの窓
         let _ = unsafe {
             SetWindowPos(
                 self.hwnd,
                 Some(HWND_TOPMOST),
-                x - pixels(scene.body.x),
-                y - pixels(scene.body.y),
-                (scene.width * scale).ceil() as i32,
-                (scene.height * scale).ceil() as i32,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW,
+            )
+        };
+    }
+
+    /// 窓を (x, y) に width × height で出す(画面のピクセル)．前と同じ位置と大きさで出していれば何もしない
+    fn show_at(&self, x: i32, y: i32, width: i32, height: i32) {
+        let rect = RECT {
+            left: x,
+            top: y,
+            right: x + width,
+            bottom: y + height,
+        };
+        if self.shown.get() == Some(rect) {
+            return;
+        }
+        self.shown.set(Some(rect));
+        // SAFETY: hwnd はこの窓
+        let _ = unsafe {
+            SetWindowPos(
+                self.hwnd,
+                Some(HWND_TOPMOST),
+                x,
+                y,
+                width,
+                height,
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
             )
         };
@@ -450,6 +491,7 @@ impl Window {
         self.side.set(None);
         self.held.set(None);
         self.body.set(None);
+        self.shown.set(None);
         // SAFETY: hwnd はこの窓
         let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
     }
@@ -652,6 +694,10 @@ unsafe extern "system" fn procedure(
         // 覚えた設定を読み直させ，処理は DefWindowProcW にも任せる
         WM_SETTINGCHANGE | WM_THEMECHANGED | WM_SYSCOLORCHANGE | WM_DWMCOLORIZATIONCOLORCHANGED => {
             super::system::settings_changed();
+            // 次のキーを待たずに，今の外観で描き直させる
+            if let Some(callbacks) = CALLBACKS.get() {
+                (callbacks.settings)();
+            }
             None
         }
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),

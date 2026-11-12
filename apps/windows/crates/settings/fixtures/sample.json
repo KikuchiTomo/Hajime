@@ -19,6 +19,7 @@
     "candidateFontSize": 15,
     "candidatePresentation": "automatic",
     "candidateReranking": true,
+    "jinenModel": "automatic",
     "commands": [],
     "contextualSegmentCandidates": true,
     "conversionMacros": false,

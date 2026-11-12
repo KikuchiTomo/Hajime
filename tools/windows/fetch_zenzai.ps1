@@ -1,5 +1,5 @@
-# Zenzai のモデル(small と xsmall)を取得し，SHA-256 を確かめる(tools/models/fetch_zenzai.sh の Windows 版)．
-# 取得元とハッシュは fetch_zenzai.sh・core/Sources/HajimeEngine/ZenzaiModel.swift と同じ値にする．
+﻿# Zenzai と jinen のモデル(それぞれ small と xsmall)を取得し，SHA-256 を確かめる(tools/models/fetch_zenzai.sh の Windows 版)．
+# 取得元とハッシュは fetch_zenzai.sh・core/Sources/HajimeEngine/ZenzaiModel.swift・JinenModel.swift と同じ値にする．
 #
 # 使い方: tools/windows/fetch_zenzai.ps1 -Output <置く場所>
 param(
@@ -25,7 +25,7 @@ function Get-Model([string]$File, [string]$Url, [string]$Mirror, [string]$Expect
     $actual = (Get-FileHash -Algorithm SHA256 -Path $destination).Hash.ToLowerInvariant()
     if ($actual -ne $Expected) {
         Remove-Item -Force $destination
-        throw "Zenzai のモデルの SHA-256 が一致しません: $File $actual"
+        throw "モデルの SHA-256 が一致しません: $File $actual"
     }
     Write-Host "確かめました: $destination"
 }
@@ -40,3 +40,13 @@ Get-Model 'zenz-v3.2-xsmall-Q5_K_M.gguf' `
     'https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf/resolve/4f5423f0fad41a73b1242eb96fe5c12ae4fdca83/ggml-model-Q5_K_M.gguf' `
     'https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fzenz-v3.2-xsmall-4f5423f/zenz-v3.2-xsmall-Q5_K_M.gguf' `
     '00c64b3d318045a708d0cad5434faccab10f5481a49e6362864551fd0995fa58'
+# togatogah/jinen-v2-small.gguf(CC BY-SA 4.0．国立国会図書館の書誌データを加工して作られている．THIRD_PARTY_NOTICES.md)．合議に使う
+Get-Model 'jinen-v2-small-Q5_K_M.gguf' `
+    'https://huggingface.co/togatogah/jinen-v2-small.gguf/resolve/3461d0573ab447985badde3174165b967d06076c/jinen-v2-small-Q5_K_M.gguf' `
+    'https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fjinen-v2-small-3461d05/jinen-v2-small-Q5_K_M.gguf' `
+    '80482707513d6b67dafc31774371cf95d765542abf8d74eebf5f32f92d788bd3'
+# togatogah/jinen-v2-xsmall.gguf(CC BY-SA 4.0)．合議で，遅い環境(GPU の無い PC)に使う
+Get-Model 'jinen-v2-xsmall-Q5_K_M.gguf' `
+    'https://huggingface.co/togatogah/jinen-v2-xsmall.gguf/resolve/3910fd01bf4ba86eca89617f18db9b0c1c5b2283/jinen-v2-xsmall-Q5_K_M.gguf' `
+    'https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fjinen-v2-xsmall-3910fd0/jinen-v2-xsmall-Q5_K_M.gguf' `
+    '24ff3af5db712fbbb4aa9254ee28ec4d731207134471ab68b06c1828726284c2'

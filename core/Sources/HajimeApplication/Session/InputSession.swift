@@ -25,6 +25,8 @@ public final class InputSession {
     private let converter: any KanaKanjiConverting
     /// 候補を文脈で並べ替えるもの(検証木)．使うかは設定の candidateReranking で決める(rerankingScorer)
     private let scorer: (any CandidateScoring)?
+    /// 別のモデルとの合議(ADR 0016 の案 2)．使うかは設定の jinenModel で決める(activeFusing)
+    private let fusing: (any CandidateFusing)?
     private let lexicon: any EnglishLexicon
     private let usageDictionary: (any UsageDictionaryProviding)?
     private let settings: any SettingsReading
@@ -177,12 +179,14 @@ public final class InputSession {
     ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
     ///   - calendar: 変換マクロの日時(`{date}` など．R-22)．nil なら日時の名前は置き換えない
     ///   - scorer: 候補の 2 番目から後ろを文脈で並べ替えるもの(検証木．ADR 0016)．nil か設定の candidateReranking がオフなら並べ替えない
+    ///   - fusing: 別のモデルでも変換して合わせるもの(合議．ADR 0016 の案 2)．nil か設定の jinenModel が「使わない」なら合わせない
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
                 rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
                 usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil,
-                scorer: (any CandidateScoring)? = nil) {
+                scorer: (any CandidateScoring)? = nil, fusing: (any CandidateFusing)? = nil) {
         self.scorer = scorer
+        self.fusing = fusing
         self.paletteServices = palette
         self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
@@ -525,6 +529,19 @@ public final class InputSession {
     /// 一覧では，文節を入れ替えた文に使う文節の候補を求める手順．入力中でなければ空
     public var latticeWarmingSteps: [@MainActor () -> Void] {
         guard phase == .composing, !composition.isEmpty else { return [] }
+        return fusionWarmingSteps + latticePreviewSteps
+    }
+
+    /// 別のモデルとの合議を，打鍵の合間に 1 歩(推論 1 回など)ずつ進める手順．Space で第 1 候補を決めるのに使うので，分岐図の下見より先に行う
+    private var fusionWarmingSteps: [@MainActor () -> Void] {
+        guard let fusing = activeFusing else { return [] }
+        let reading = composition.conversionReading
+        let unchanged = { [self] in phase == .composing && composition.conversionReading == reading }
+        let count = reading.count * 2 + DefaultSettings.fusionExtraSteps
+        return Array(repeating: { if unchanged() { _ = fusing.advanceFusion(for: reading) } }, count: count)
+    }
+
+    private var latticePreviewSteps: [@MainActor () -> Void] {
         guard settings.current.candidatePresentation.segmentsReading else {
             // 一覧では，文全体の候補を文脈で並べ替える点数を前もって求める(採点が遅い環境では Space で待たないので，ここで求めないと並べ替えない)
             let reading = composition.conversionReading
@@ -1366,10 +1383,12 @@ public final class InputSession {
         freezeWordsReadAsRomaji()
         reviewReading(final: true)
         guard settings.current.candidatePresentation.segmentsReading else {
+            prepareFusionForConversion()
             phase = .selecting(makeSelection(focus: .candidate(0)))
             return
         }
         corrector.commit(into: &composition)
+        prepareFusionForConversion()
         // 区切りと幹だけの分岐図をすぐ出し，注目している文節の候補だけをここで求める．ほかの文節は followUps で足す
         phase = .lattice(initialLattice(latticeBuilder, quick: true))
         latticeUntouched = true
@@ -1638,6 +1657,19 @@ public final class InputSession {
     }
 
     /// 候補を文脈で並べ替えるもの．設定でオフなら nil
+    private var activeFusing: (any CandidateFusing)? {
+        settings.current.jinenModel == .off ? nil : fusing
+    }
+
+    /// Space で変換するとき，別のモデルとの合議を求めておく(ADR 0016 の案 2)．
+    /// 合議が遅い環境では待たず，打鍵の合間に求め終えた結果だけを使う(求め終えていなければ Zenzai の結果だけで出す)
+    private func prepareFusionForConversion() {
+        guard let fusing = activeFusing else { return }
+        let reading = composition.conversionReading
+        guard !reading.isEmpty, !fusing.hasFusion(for: reading), !fusing.prefersPrecomputedFusion else { return }
+        fusing.prepareFusion(for: reading)
+    }
+
     private var rerankingScorer: (any CandidateScoring)? {
         settings.current.candidateReranking ? scorer : nil
     }

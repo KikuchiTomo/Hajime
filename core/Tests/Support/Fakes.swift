@@ -280,3 +280,51 @@ public final class FakeCandidateScorer: CandidateScoring {
         answered.contains([reading, before, after] + texts) ? texts.map { table[$0] } : nil
     }
 }
+
+/// 決まった表記を合議の結果として重ねるもの(ADR 0016 の案 2)．求め終えると，FakeConverter の読みの候補の先頭(first)か 2 番目に表記を入れる
+@MainActor
+public final class FakeCandidateFuser: CandidateFusing {
+    private let converter: FakeConverter
+    /// 読み → (重ねる表記, 第 1 候補にするか)
+    public var results: [String: (text: String, first: Bool)]
+    /// 求め終えるまでの歩の数
+    public var stepsToFinish: Int
+    /// 合議が遅い環境として振る舞うか
+    public var prefersPrecomputedFusion = false
+    /// 読みごとに進めた歩の数
+    public private(set) var steps: [String: Int] = [:]
+    /// prepareFusion で一度に求めた読み
+    public private(set) var prepared: [String] = []
+    private var finished: Set<String> = []
+
+    public init(converter: FakeConverter, results: [String: (text: String, first: Bool)], stepsToFinish: Int = 3) {
+        self.converter = converter
+        self.results = results
+        self.stepsToFinish = stepsToFinish
+    }
+
+    public func prepareFusion(for reading: String) {
+        guard !finished.contains(reading) else { return }
+        prepared.append(reading)
+        finish(reading)
+    }
+
+    public func advanceFusion(for reading: String) -> Bool {
+        guard !finished.contains(reading) else { return true }
+        steps[reading, default: 0] += 1
+        if steps[reading, default: 0] >= stepsToFinish { finish(reading) }
+        return finished.contains(reading)
+    }
+
+    public func hasFusion(for reading: String) -> Bool {
+        finished.contains(reading)
+    }
+
+    private func finish(_ reading: String) {
+        finished.insert(reading)
+        guard let result = results[reading] else { return }
+        var entries = (converter.table[reading] ?? []).filter { $0.text != result.text }
+        entries.insert((result.text, nil), at: result.first ? 0 : min(1, entries.count))
+        converter.table[reading] = entries
+    }
+}

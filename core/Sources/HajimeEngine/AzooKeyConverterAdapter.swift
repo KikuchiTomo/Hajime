@@ -31,6 +31,24 @@ public final class AzooKeyConverterEngine {
     private var auxiliaryWords: [AuxiliaryWord] = []
     /// Zenzai を使った変換にかかった時間の移動平均(秒)．まだ測っていなければ nil
     private var zenzaiCost: Double?
+    /// 合議に使う別のモデル(jinen)の small と xsmall．確かめ済み．どちらも無ければ合議しない
+    private let jinenModels: [JinenModel.Variant: JinenModel]
+    /// 設定で選んだ jinen のモデル(apply(_:) で入れ替える)
+    private var jinenChoice = JinenModelChoice.automatic
+    /// 「自動」で決めた結果(small・xsmall・使わない)．起動のあと，打鍵の合間に 1 歩ずつ測って決める(advanceAutomaticJinenDecision)．まだ決めていなければ nil
+    private var automaticJinenChoice: JinenModelChoice?
+    /// 「自動」を決める測定の途中の状態．測っていなければ nil
+    private var automaticJinenProbe: AutomaticJinenProbe?
+    /// 「自動」を決めたときに測った 1 歩の p95(秒)．Zenzai だけと，試した jinen の大きさごと．テストで値を出すために持つ
+    private(set) var automaticJinenStepTimes: (zenzai: Double, fusion: [JinenModel.Variant: Double])?
+    /// 今読んでいる jinen の推論の文脈と，その大きさ．大きさを変えたら読み直す(メモリを抑えるため 1 つだけ持つ)
+    private var jinenRunner: (variant: JinenModel.Variant, runner: ExperimentalJinen)?
+    /// 読めなかった大きさ．読み直さない
+    private var failedJinenVariants: Set<JinenModel.Variant> = []
+    /// 合議 1 回(jinen の変換・読みにそろえる・採点)にかかった時間の移動平均(秒)
+    private var fusionCost: Double?
+    private var fusionCount = 0
+    private var lastFusionTime: ContinuousClock.Instant?
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
@@ -38,8 +56,10 @@ public final class AzooKeyConverterEngine {
     ///   - zenzai: 確かめ済みの Zenzai のモデル(small)．nil なら Zenzai を使わない
     ///   - fastZenzai: 確かめ済みの速さを優先する Zenzai のモデル(xsmall)．nil なら設定にかかわらず zenzai だけを使う
     ///   - dictionaryDirectory: かな漢字変換の辞書(louds/・cb/・p/・mm.binary を持つディレクトリ)．nil なら azooKey に同梱の辞書を使う
+    ///   - jinen: 確かめ済みの jinen のモデル(small)．jinen と fastJinen の両方が nil なら合議しない(ADR 0016 の案 2)
+    ///   - fastJinen: 確かめ済みの jinen のモデル(xsmall)
     public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil, fastZenzai: ZenzaiModel? = nil,
-                dictionaryDirectory: URL? = nil) throws {
+                jinen: JinenModel? = nil, fastJinen: JinenModel? = nil, dictionaryDirectory: URL? = nil) throws {
         // 辞書の場所を誤ると，エンジンは何も言わずに語の無い状態で動き，変換がほぼすべて読みのままになる．作る前に止める
         if let dictionaryDirectory {
             let charID = dictionaryDirectory.appendingPathComponent("louds/charID.chid", isDirectory: false)
@@ -54,6 +74,7 @@ public final class AzooKeyConverterEngine {
         self.versionString = versionString
         self.accurateZenzai = zenzai
         self.fastZenzai = fastZenzai
+        self.jinenModels = [jinen, fastJinen].compactMap { $0 }.reduce(into: [:]) { $0[$1.variant] = $1 }
         self.converter = dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary()
     }
 
@@ -86,8 +107,8 @@ public final class AzooKeyConverterEngine {
         return String(scalars)
     }
 
-    /// 入力欄ひとつぶんの変換．検証木の採点(CandidateScoring)も同じものが受け持つ
-    public func makeSession() -> any KanaKanjiConverting & CandidateScoring {
+    /// 入力欄ひとつぶんの変換．検証木の採点(CandidateScoring)と合議(CandidateFusing)も同じものが受け持つ
+    public func makeSession() -> any KanaKanjiConverting & CandidateScoring & CandidateFusing {
         // 読みのもっともらしさを測る変換は，表示する変換と状態を混ぜないよう別のセッションで行う
         AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
                                 typingSessionID: converter.createSession(), restSessionID: converter.createSession())
@@ -96,8 +117,12 @@ public final class AzooKeyConverterEngine {
     /// 最初の変換で Zenzai のモデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
     /// 入力中の表示で Zenzai を使わないか．Zenzai の変換が 1 キーの時間に収まらない環境(GPU の無い Windows など)だけ true
     var skipsZenzaiWhileTyping: Bool {
-        Self.exceedsTypingBudget(zenzaiCost)
+        !waitsForModels && Self.exceedsTypingBudget(zenzaiCost)
     }
+
+    /// 評価の道具で，時間による切り替え(入力中の表示で Zenzai を使わない・採点と合議を Space で待たない)をすべてやめ，
+    /// 言語モデルの結果を必ず待つ(マシンの負荷で評価の結果が変わらないように)．アプリでは使わない
+    public var waitsForModels = false
 
     /// Zenzai を使った変換の時間を覚える(打鍵が止まったときや Space の変換も測り，速い環境に戻ったら入力中にも使う)
     func recordZenzaiCost(_ duration: Duration) {
@@ -141,7 +166,7 @@ public final class AzooKeyConverterEngine {
     /// 最後の採点から DefaultSettings.candidateScoringProbeInterval たったら，次の 1 回は採点して速さを測り直す(混んでいたあと速さが戻るように)．
     /// 評価の道具でトークンの数を決めているときは，結果を負荷で変えないよう遅いとみなさない
     var prefersPrecomputedScores: Bool {
-        guard fixedCandidateTreeTokenLimit == nil, (scoringCallCost ?? 0) > DefaultSettings.candidateScoringSlowThreshold else { return false }
+        guard !waitsForModels, fixedCandidateTreeTokenLimit == nil, (scoringCallCost ?? 0) > DefaultSettings.candidateScoringSlowThreshold else { return false }
         guard let lastScoringTime else { return true }
         return ContinuousClock.now - lastScoringTime < .seconds(DefaultSettings.candidateScoringProbeInterval)
     }
@@ -169,7 +194,182 @@ public final class AzooKeyConverterEngine {
         return current
     }
 
+    /// jinen のモデルを「自動」にしたときに決めた結果(small・xsmall・使わない)．まだ決めていなければ nil．設定の画面に出す
+    public var automaticJinenModel: JinenModelChoice? {
+        automaticJinenChoice
+    }
+
+    /// 合議に使う jinen の大きさ．設定で選んだもの(「自動」なら測って決めたもの)．そのモデルが無ければもう一方．
+    /// 使わない設定のとき，どちらのモデルも無いとき，「自動」でまだ決めていないか使わないと決めたときは nil
+    public var resolvedJinenVariant: JinenModel.Variant? {
+        let preferred: JinenModel.Variant
+        switch jinenChoice {
+        case .off: return nil
+        case .small: preferred = .small
+        case .xsmall: preferred = .xsmall
+        case .automatic:
+            switch automaticJinenChoice {
+            case .small: preferred = .small
+            case .xsmall: preferred = .xsmall
+            case .automatic, .off, nil: return nil
+            }
+        }
+        let other: JinenModel.Variant = preferred == .small ? .xsmall : .small
+        return [preferred, other].first { jinenModels[$0] != nil && !failedJinenVariants.contains($0) }
+    }
+
+    /// 合議に使う jinen．使わないとき，モデルが無いとき，Zenzai を使わないとき，読めなかったとき，「自動」でまだ決めていないときは nil
+    var jinen: ExperimentalJinen? {
+        guard usesZenzai, jinenChoice != .off, !jinenModels.isEmpty else { return nil }
+        guard let variant = resolvedJinenVariant else { return nil }
+        return jinenRunner(variant)
+    }
+
+    /// その大きさの jinen を読む(前に読んだものと大きさが違えば，前のものを捨ててから読む)．読めなければ nil
+    private func jinenRunner(_ variant: JinenModel.Variant) -> ExperimentalJinen? {
+        if let jinenRunner, jinenRunner.variant == variant { return jinenRunner.runner }
+        jinenRunner = nil
+        guard let model = jinenModels[variant], !failedJinenVariants.contains(variant) else { return nil }
+        do {
+            let runner = try ExperimentalJinen(modelURL: model.url)
+            jinenRunner = (variant, runner)
+            return runner
+        } catch {
+            failedJinenVariants.insert(variant)
+            return nil
+        }
+    }
+
+    /// 「自動」の jinen を決める測定を 1 歩進める．打鍵の合間の手順(AzooKeyConverterSession.advanceFusion)から呼び，起動や Space では進めない．
+    /// 打鍵の合間の 1 歩の時間で決める(次のキーはそのとき動いている 1 歩を待つため)．決まった読み(入力内容は使わない)で，
+    /// Zenzai だけの 1 歩(分岐図の文節ごとの変換)と，合議の 1 歩(jinen の 1 トークン・読みにそろえる・Zenzai の採点・jinen の採点)を測り，
+    /// 合議の 1 歩の p95 が Zenzai だけの 1 歩の p95 ＋ DefaultSettings.jinenAutomaticStepMargin 以下なら，その大きさにする．
+    /// small から試し，超えれば xsmall，それも超えれば使わない．GPU の無い PC でも速ければ small になる．
+    /// 測ることが無ければ(決め終えた，「自動」でない，モデルが無い)何もせず true，1 歩進めたら false
+    func advanceAutomaticJinenDecision() -> Bool {
+        guard jinenChoice == .automatic, automaticJinenChoice == nil, !jinenModels.isEmpty else { return true }
+        guard usesZenzai else {
+            automaticJinenChoice = .off
+            return true
+        }
+        let probe = automaticJinenProbe ?? AutomaticJinenProbe(session: makeProbeSession(), readings: Self.automaticJinenReadings, warmUpReading: Self.warmUpReading,
+                                                                variants: [.small, .xsmall].filter { jinenModels[$0] != nil })
+        automaticJinenProbe = probe
+        guard let unit = probe.units.first else { return finishAutomaticJinenDecision(.off) }
+        let clock = ContinuousClock()
+        switch unit {
+        case .sentence(let reading):
+            probe.units.removeFirst()
+            let clauses = probe.session.clausesForMeasurement(reading).map(AutomaticJinenProbe.Unit.clause)
+            probe.units.insert(contentsOf: clauses, at: 0)
+        case .clause(let reading):
+            probe.units.removeFirst()
+            probe.zenzaiTimes.append(clock.measure { probe.session.convertForMeasurement(reading) })
+        case .begin(let variant):
+            probe.units.removeFirst()
+            probe.begin(variant)
+        case .fusion(let reading, let counted):
+            guard let variant = probe.variant, let runner = jinenRunner(variant) else {
+                // 読めなければ，この大きさは使えないものとして次を試す
+                probe.units.removeAll {
+                    if case .fusion = $0 { return true }
+                    return false
+                }
+                return false
+            }
+            var finished = false
+            let time = clock.measure { finished = probe.session.advanceFusion(for: reading, using: runner) }
+            if counted { probe.fusionTimes.append(time) }
+            if finished { probe.units.removeFirst() }
+        case .judge(let variant):
+            probe.units.removeFirst()
+            let zenzaiStep = Self.p95Seconds(probe.zenzaiTimes)
+            let step = probe.fusionTimes.isEmpty ? .infinity : Self.p95Seconds(probe.fusionTimes)
+            automaticJinenStepTimes = (zenzaiStep, (automaticJinenStepTimes?.fusion ?? [:]).merging([variant: step]) { $1 })
+            if Self.acceptsJinenStep(step, zenzaiStep: zenzaiStep) {
+                _ = finishAutomaticJinenDecision(variant == .small ? .small : .xsmall)
+            } else if probe.variants.isEmpty {
+                jinenRunner = nil
+                _ = finishAutomaticJinenDecision(.off)
+            } else {
+                probe.planNextVariant()
+            }
+        }
+        return false
+    }
+
+    private func finishAutomaticJinenDecision(_ choice: JinenModelChoice) -> Bool {
+        automaticJinenChoice = choice
+        automaticJinenProbe?.session.endComposition()
+        automaticJinenProbe = nil
+        return true
+    }
+
+    /// 「自動」を測るための変換のセッション(入力に使うセッションと状態を混ぜない)
+    private func makeProbeSession() -> AzooKeyConverterSession {
+        AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
+                                typingSessionID: converter.createSession(), restSessionID: converter.createSession())
+    }
+
+    /// 合議の 1 歩の p95 が，Zenzai だけの 1 歩の p95 ＋ DefaultSettings.jinenAutomaticStepMargin 以下か(「自動」でその大きさを使うか)
+    nonisolated static func acceptsJinenStep(_ step: Double, zenzaiStep: Double) -> Bool {
+        step <= zenzaiStep + DefaultSettings.jinenAutomaticStepMargin
+    }
+
+    /// 「自動」を決めるときに変換する読み(入力内容は使わない)
+    private static let automaticJinenReadings = ["あしたのかいぎにしゅっせきします", "みんなのいけんをはんえいする", "でんしゃがおくれている"]
+
+    nonisolated static func p95Seconds(_ durations: [Duration]) -> Double {
+        guard !durations.isEmpty else { return 0 }
+        let sorted = durations.sorted()
+        let value = sorted[min(sorted.count - 1, Int(Double(sorted.count) * 0.95))]
+        return Double(value.components.seconds) + Double(value.components.attoseconds) / 1e18
+    }
+
+    /// 言語モデルを CPU で推論する環境か(Windows の llama.cpp は CPU の DLL だけを入れている)
+    static var infersOnCPU: Bool {
+        #if os(Windows)
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// 合議の 1 歩(推論 1 回など)にかかった時間を覚える
+    func recordFusionStepCost(_ duration: Duration) {
+        fusionCount += 1
+        lastFusionTime = .now
+        // 最初の数歩はモデルの準備を含むので数えない
+        guard fusionCount > 3 else { return }
+        fusionCost = Self.smoothedCost(fusionCost, adding: duration)
+    }
+
+    /// 合議が遅い環境か．1 歩の時間の移動平均が DefaultSettings.fusionSlowStepThreshold を超えたら，打鍵の合間に前もって求めた結果だけを使い，
+    /// Space では求めない．最後の合議から DefaultSettings.candidateScoringProbeInterval たったら，次は Space でも求めて速さを測り直す
+    var prefersPrecomputedFusion: Bool {
+        // 評価の道具でトークンの数を決めているときは，結果を負荷で変えないよう遅いとみなさない(prefersPrecomputedScores と同じ)
+        guard !waitsForModels, fixedCandidateTreeTokenLimit == nil else { return false }
+        // CPU で推論する環境(Windows)では，Space で合議を待たない
+        if Self.infersOnCPU { return true }
+        guard (fusionCost ?? 0) > DefaultSettings.fusionSlowStepThreshold else { return false }
+        guard let lastFusionTime else { return true }
+        return ContinuousClock.now - lastFusionTime < .seconds(DefaultSettings.candidateScoringProbeInterval)
+    }
+
+    /// jinen だけで読みを変換する(評価の道具が 1 文の時間を測るのに使う)．使う大きさは設定の jinenModel で決まる．使えなければ nil
+    public func jinenConversion(reading: String, leftContext: String?) -> String? {
+        jinen?.convert(reading: reading, leftContext: leftContext ?? "", maximumLeftContextLength: DefaultSettings.maximumLeftContextLength)?.text
+    }
+
+    /// 表記を読みにそろえられるか(評価の道具用)．そろえた表記を返す．そろえられなければ nil
+    public func alignedText(_ text: String, reading: String) -> String? {
+        let session = makeSession()
+        defer { session.endComposition() }
+        return (session as? AzooKeyConverterSession)?.alignedText(text, reading: reading)
+    }
+
     public func warmUp() {
+        // 「自動」の jinen は起動では決めない．起動の直後のキーを待たせないよう，打鍵の合間に 1 歩ずつ測る(advanceAutomaticJinenDecision)
         let session = makeSession()
         _ = session.candidates(for: Self.warmUpReading)
         session.endComposition()
@@ -215,6 +415,12 @@ public final class AzooKeyConverterEngine {
         case .disabled: .nothing
         }
         usesEmoji = settings.emojiConversion
+        jinenChoice = settings.jinenModel
+        if jinenChoice != .automatic, let probe = automaticJinenProbe {
+            // 「自動」でなくなったら測るのをやめる(「自動」に戻したら初めから測る)
+            probe.session.endComposition()
+            automaticJinenProbe = nil
+        }
         if settings.zenzaiModel != zenzaiChoice {
             zenzaiChoice = settings.zenzaiModel
             // 測った時間は前のモデルのものなので，選び直したモデルで測り直す
@@ -344,7 +550,7 @@ extension AzooKeyConverterEngine: EmojiLooking {}
 
 /// 入力欄ひとつぶんの変換の状態．
 @MainActor
-final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
+final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, CandidateFusing {
     private struct Result {
         var all: [HajimeDomain.Candidate]
         var clauses: [HajimeDomain.Candidate]
@@ -366,6 +572,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
     private var segmentationCache: [String: [HajimeDomain.Candidate.Word]] = [:]
     /// 検証木の点数(scores)．読み・前後の文字・表記をつないだものがキー．左の文脈が変わったときと入力を終えたときに捨てる
     private var scoreCache: [String: [Double?]] = [:]
+    /// 合議の結果(prepareFusion)．読みがキー．重ねる候補と，それを第 1 候補にするか．左の文脈が変わったときと入力を終えたときに捨てる
+    private var fusionCache: [String: Fusion] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
@@ -411,7 +619,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
     }
 
     func candidates(for reading: String) -> [HajimeDomain.Candidate] {
-        request(reading)?.all ?? []
+        let all = request(reading)?.all ?? []
+        // 合議の結果は，打鍵が止まったあとの変換(Space など)にだけ重ねる
+        guard !typing, let fusion = fusionCache[reading], let candidate = fusion.candidate else { return all }
+        var result = all.filter { $0.text != candidate.text }
+        result.insert(candidate, at: fusion.first ? 0 : min(1, result.count))
+        return result
     }
 
     func setTyping(_ typing: Bool) {
@@ -546,7 +759,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
         return words
     }
 
-    /// 語の品詞の ID から，文節に分けるための印を付ける．名詞の ID は azooKey の CIDData(一般名詞 1285〜数 1295)の並びの範囲
+    /// 語の品詞の ID と読みから，文節に分けるための印と，崩れた候補を見分けるための印を付ける．名詞の ID は azooKey の CIDData(一般名詞 1285〜数 1295)の並びの範囲
     private static func words(of data: [DicdataElement]) -> [HajimeDomain.Candidate.Word] {
         data.map { element in
             .init(text: element.word, readingCount: element.ruby.count, startsWithParticle: CIDData.isJoshi(cid: element.lcid),
@@ -555,7 +768,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
                   startsWithConjunctiveParticle: conjunctiveParticleIDs.contains(element.lcid),
                   endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid),
                   isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid),
-                  isCommonNoun: element.lcid == CIDData.一般名詞.cid)
+                  isCommonNoun: element.lcid == CIDData.一般名詞.cid,
+                  endsWithSokuon: element.ruby.last.map("ッっ".contains) ?? false)
         }
     }
 
@@ -660,6 +874,198 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
 
     var prefersPrecomputedScores: Bool { engine.prefersPrecomputedScores }
 
+    /// 合議の結果．candidate は重ねる候補(読みにそろえた別のモデルの候補．重ねるものが無ければ nil)
+    private struct Fusion {
+        var candidate: HajimeDomain.Candidate?
+        var first: Bool
+    }
+
+    /// 途中まで進めた合議．読みが変わったら捨てて始め直す
+    private struct FusionJob {
+        enum Stage {
+            /// jinen で 1 トークンずつ変換している
+            case generating(ExperimentalJinen.ConversionProgress)
+            /// jinen の表記を読みにそろえる
+            case aligning(String)
+            /// 今の第 1 候補と，読みにそろえた jinen の候補を Zenzai で採点する
+            case scoringMain(HajimeDomain.Candidate)
+            /// 同じ 2 つを jinen で採点し，2 つのモデルの点数で比べる(1 歩を短くするため，Zenzai の採点と分ける)
+            case scoringOther(HajimeDomain.Candidate, main: [Double?])
+        }
+
+        var reading: String
+        var current: HajimeDomain.Candidate
+        var stage: Stage
+    }
+
+    private var fusionJob: FusionJob?
+
+    /// 読み全体を jinen でも変換し，読みにそろえてから，今の第 1 候補(Zenzai)と比べる．
+    /// 2 つのモデルの点数(FirstCandidateArbitration)で上回れば第 1 候補に，そうでなければ 2 番目に重ねる
+    /// Space で求めるときは，「自動」の測定を進めない(Space を待たせない)
+    func prepareFusion(for reading: String) {
+        guard let jinen = engine.jinen else { return }
+        while !advanceRecordingCost(reading, jinen: jinen) {}
+    }
+
+    /// 打鍵の合間の 1 歩．「自動」をまだ決めていなければ，その測定を 1 歩進める．決めたあとは合議を 1 歩(推論 1 回か，読みにそろえる 1 回か，
+    /// 採点 1 回)進める．結果を覚え終えたら(重ねるものが無いときも) true
+    func advanceFusion(for reading: String) -> Bool {
+        guard engine.advanceAutomaticJinenDecision() else { return false }
+        guard let jinen = engine.jinen else { return true }
+        return advanceRecordingCost(reading, jinen: jinen)
+    }
+
+    private func advanceRecordingCost(_ reading: String, jinen: ExperimentalJinen) -> Bool {
+        guard !reading.isEmpty, fusionCache[reading] == nil else { return true }
+        let started = ContinuousClock.now
+        defer { engine.recordFusionStepCost(ContinuousClock.now - started) }
+        return advanceFusion(for: reading, using: jinen)
+    }
+
+    /// 合議を 1 歩進める(かかった時間は覚えない．「自動」の測定でも使う)．結果を覚え終えたら true
+    func advanceFusion(for reading: String, using jinen: ExperimentalJinen) -> Bool {
+        guard !reading.isEmpty, fusionCache[reading] == nil else { return true }
+        guard var job = fusionJob, job.reading == reading else {
+            fusionJob = startFusion(reading, jinen: jinen)
+            return fusionJob == nil
+        }
+        let left = leftContext ?? ""
+        switch job.stage {
+        case .generating(var progress):
+            jinen.advance(&progress)
+            switch progress.state {
+            case .running:
+                job.stage = .generating(progress)
+            case .finished(let conversion?):
+                job.stage = .aligning(conversion.text)
+            case .finished(nil), .failed:
+                return finishFusion(reading, Fusion(candidate: nil, first: false))
+            }
+        case .aligning(let text):
+            guard let challenger = align(text, reading: reading), challenger.text != job.current.text else {
+                return finishFusion(reading, Fusion(candidate: nil, first: false))
+            }
+            job.stage = .scoringMain(challenger)
+        case .scoringMain(let challenger):
+            let texts = [job.current.text, challenger.text]
+            // 比べる 2 つの表記は必ず採点する．打鍵の合間の採点の上限(時間で増減する)ではなく，合議の上限を使う
+            let options = engine.options(leftContext: left.isEmpty ? nil : left)
+            let main = engine.withSession(scoringSessionID) { converter in
+                converter.experimentalScoreCandidates(texts, convertTarget: reading, options: options,
+                                                      maximumTreeTokens: DefaultSettings.fusionScoringTokenLimit, maximumCandidates: texts.count)
+            }?.scores.map { $0.map(Double.init) } ?? [nil, nil]
+            job.stage = .scoringOther(challenger, main: main)
+        case .scoringOther(let challenger, let main):
+            let texts = [job.current.text, challenger.text]
+            let other = jinen.score(texts, reading: reading, leftContext: left, maximumLeftContextLength: DefaultSettings.maximumLeftContextLength)
+            var first = false
+            if let currentByMain = main[0], let challengerByMain = main[1], let currentByOther = other[0], let challengerByOther = other[1] {
+                let scores = FirstCandidateArbitration.Scores(currentByMain: currentByMain, challengerByMain: challengerByMain,
+                                                              currentByOther: Double(currentByOther), challengerByOther: Double(challengerByOther))
+                first = FirstCandidateArbitration.prefersChallenger(scores, weight: DefaultSettings.fusionOtherModelWeight, margin: DefaultSettings.fusionMargin)
+            }
+            return finishFusion(reading, Fusion(candidate: challenger, first: first))
+        }
+        fusionJob = job
+        return false
+    }
+
+    /// 合議を始める．今の第 1 候補(Space と同じ問い)を求め，jinen のプロンプトを作る．始められなければ結果なしで終える
+    private func startFusion(_ reading: String, jinen: ExperimentalJinen) -> FusionJob? {
+        let wasTyping = typing
+        typing = false
+        defer { typing = wasTyping }
+        guard let current = request(reading)?.all.first(where: { $0.readingCount == reading.count }),
+              let progress = jinen.beginConversion(reading: reading, leftContext: leftContext ?? "",
+                                                   maximumLeftContextLength: DefaultSettings.maximumLeftContextLength) else {
+            _ = finishFusion(reading, Fusion(candidate: nil, first: false))
+            return nil
+        }
+        return FusionJob(reading: reading, current: current, stage: .generating(progress))
+    }
+
+    private func finishFusion(_ reading: String, _ fusion: Fusion) -> Bool {
+        fusionCache[reading] = fusion
+        fusionJob = nil
+        return true
+    }
+
+    /// 文を変換し(打っているあいだに求め終えるので，「自動」の測定では数えない)，第 1 候補の語を文節(自立語＋付属語)にまとめた読みを返す．
+    /// Zenzai だけのときの打鍵の合間の 1 歩の多くは，分岐図の文節ごとの候補を求めること(LatticeBuilder.warmingSteps)なので，その読みで測る
+    func clausesForMeasurement(_ reading: String) -> [String] {
+        let wasTyping = typing
+        typing = false
+        defer { typing = wasTyping }
+        guard let sentence = request(reading)?.all.first(where: { $0.readingCount == reading.count }) else { return [] }
+        var lengths: [Int] = []
+        for word in sentence.words {
+            if word.isFunctionWord, !lengths.isEmpty { lengths[lengths.count - 1] += word.readingCount } else { lengths.append(word.readingCount) }
+        }
+        var start = 0
+        return lengths.compactMap { length in
+            defer { start += length }
+            let slice = String(reading.dropFirst(start).prefix(length))
+            return slice.isEmpty ? nil : slice
+        }
+    }
+
+    /// 読みを打鍵が止まったときと同じ問いで変換する(「自動」の測定で，Zenzai だけの 1 歩を測る)
+    func convertForMeasurement(_ reading: String) {
+        let wasTyping = typing
+        typing = false
+        defer { typing = wasTyping }
+        _ = request(reading)
+    }
+
+    /// 合議の途中の結果を捨てる(「自動」の測定で，別の大きさの jinen を試す前に呼ぶ)
+    func resetFusion() {
+        fusionCache = [:]
+        fusionJob = nil
+    }
+
+    /// 表記を読みにそろえられるか(評価の道具が，合議で別のモデルの候補が落ちた理由を調べるのに使う)．そろえた表記を返す
+    func alignedText(_ text: String, reading: String) -> String? {
+        align(text, reading: reading)?.text
+    }
+
+    func hasFusion(for reading: String) -> Bool {
+        fusionCache[reading] != nil
+    }
+
+    var prefersPrecomputedFusion: Bool { engine.prefersPrecomputedFusion }
+
+    /// 別のモデルの表記を，辞書の語の読みで読み全体を作れるかで確かめ(読みにそろえる)，作れればエンジンの候補にする．
+    /// 別のモデルは NFKC の表記を出すので，そのままで作れないときは，読みにある全角の記号を全角に戻して試す
+    private func align(_ text: String, reading: String) -> HajimeDomain.Candidate? {
+        var options = engine.options(leftContext: nil, usesZenzai: false)
+        options.typoCorrectionMode = .disabled
+        if learningSuspended { options.learningType = .nothing }
+        for attempt in Self.alignmentAttempts(text, reading: reading) {
+            let aligned = engine.withSession(scoringSessionID) { converter in
+                converter.experimentalAlignText(attempt, reading: reading, options: options)
+            } ?? nil
+            if let aligned { return register(aligned, readingLength: reading.count) }
+        }
+        return nil
+    }
+
+    /// 読みにそろえるときに試す表記．そのままの表記と，読みにある全角の記号(「（」「？」など)に当たる半角の記号を全角に戻した表記
+    static func alignmentAttempts(_ text: String, reading: String) -> [String] {
+        let fullWidth = Set(reading.unicodeScalars.filter { (0xFF01 ... 0xFF5E).contains($0.value) })
+        guard !fullWidth.isEmpty else { return [text] }
+        var scalars = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            if (0x21 ... 0x7E).contains(scalar.value), let wide = Unicode.Scalar(scalar.value + 0xFEE0), fullWidth.contains(wide) {
+                scalars.append(wide)
+            } else {
+                scalars.append(scalar)
+            }
+        }
+        let restored = String(scalars)
+        return restored == text ? [text] : [text, restored]
+    }
+
     /// 点数を覚えるキー．読み・前後の文字・表記を，読みや表記に出ない文字でつなぐ
     private static func scoreKey(_ texts: [String], reading: String, before: String, after: String) -> String {
         ([reading, before, after] + texts).joined(separator: "\u{0}")
@@ -670,6 +1076,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
         leftContext = text
         cache = [:]
         scoreCache = [:]
+        fusionCache = [:]
     }
 
     func didCommit(_ candidate: HajimeDomain.Candidate) {
@@ -787,6 +1194,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
         segmentationCache = [:]
         segmentCandidateCache = [:]
         scoreCache = [:]
+        fusionCache = [:]
         engineCandidates = [:]
         cache = [:]
     }

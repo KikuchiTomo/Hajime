@@ -15,10 +15,14 @@ public struct SettingsServices {
     public var previewLanguage: (_ text: String, _ precedingText: String?) -> [WordLanguagePreview.Word]
     /// 見本の語に変換マクロを当てた結果(設定の画面の「試す」．macOS と同じ ConversionMacroPreview)．pattern は書いている途中の形
     public var previewMacros: (_ text: String, _ reading: String, _ pattern: String?) -> [String]
+    /// jinen のモデルを「自動」にしたときにエンジンが決めた結果(JinenModelChoice の値 small・xsmall・off)．まだ決めていなければ nil．設定の画面の選択肢に添える
+    public var automaticJinenModel: () -> String?
 
     public init(resetLearning: @escaping () -> Void = {}, usage: (any UsageReading)? = nil, resetPaletteHistory: @escaping () -> Void = {},
                 previewLanguage: @escaping (_ text: String, _ precedingText: String?) -> [WordLanguagePreview.Word] = { _, _ in [] },
-                previewMacros: @escaping (_ text: String, _ reading: String, _ pattern: String?) -> [String] = { _, _, _ in [] }) {
+                previewMacros: @escaping (_ text: String, _ reading: String, _ pattern: String?) -> [String] = { _, _, _ in [] },
+                automaticJinenModel: @escaping () -> String? = { nil }) {
+        self.automaticJinenModel = automaticJinenModel
         self.resetLearning = resetLearning
         self.usage = usage
         self.resetPaletteHistory = resetPaletteHistory

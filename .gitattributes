@@ -1,2 +1,4 @@
 # 生成したファイルは改行を LF に固定する．Windows で取り出すと CRLF になり，作り直した内容と比べるテストが合わなくなる
 protocol/*.json text eol=lf
+# 評価用の文は，Windows で取り出しても行の区切りを LF のままにする(読む側は CRLF も行の区切りとして読む)
+core/Evaluation/*.tsv text eol=lf

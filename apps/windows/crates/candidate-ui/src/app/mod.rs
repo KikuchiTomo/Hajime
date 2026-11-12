@@ -88,6 +88,13 @@ struct App {
     announcer: Announcer,
     /// 出している窓の大きさ(影の分を含む)と，大きさが変わる途中の動き
     shown_size: Option<(f32, f32)>,
+    /// 候補の窓に最後に描いた場面と濃さと拡大率．同じものを描き直さない(描くたびに画面が差し替わり，ちらつくため)．
+    /// 拡大率の違う画面へ移ったときは同じ場面でも描き直す
+    drawn: Option<(Scene, f32, f32)>,
+    /// 語の意味の吹き出しに最後に描いた場面と濃さと拡大率
+    bubble_drawn: Option<(Scene, f32, f32)>,
+    /// 最後に描き直した OS の設定の世代(ライト・ダークなどの変化を受けて描き直したか)
+    settings_generation: u64,
     resize: Option<motion::Resize>,
     /// あとから届いた中身を重ねて変えている途中の，前の中身と始めた時刻
     crossfade: Option<(Scene, Instant)>,
@@ -118,7 +125,7 @@ pub fn run() {
         return;
     };
     window::make_dpi_aware();
-    window::set_callbacks(on_inbox, on_timer, on_paint, on_click);
+    window::set_callbacks(on_inbox, on_timer, on_paint, on_click, on_settings_changed);
     let (Ok(plain), Ok(glass), Ok(prediction_plain), Ok(prediction_glass), Ok(bubble)) = (
         Window::create(w!("hajime.candidate"), false),
         Window::create(w!("hajime.candidate.glass"), true),
@@ -177,6 +184,9 @@ pub fn run() {
             fade: Fade::None,
             announcer: Announcer::default(),
             shown_size: None,
+            drawn: None,
+            bubble_drawn: None,
+            settings_generation: system::settings_generation(),
             resize: None,
             crossfade: None,
             arrived: false,
@@ -237,6 +247,10 @@ fn on_inbox() {
     with_app(App::drain);
 }
 
+fn on_settings_changed() {
+    with_app(App::settings_changed);
+}
+
 fn on_paint() {
     with_app(App::repaint);
 }
@@ -276,10 +290,56 @@ impl App {
             Ok(mut queue) => queue.drain(..).collect(),
             Err(_) => return,
         };
+        // 入力位置が変わらない Move(入力欄に書くたびに届く)だけなら描き直さない
+        let mut changed = false;
         for command in commands {
+            if self.repeats(&command) {
+                continue;
+            }
+            changed = true;
             self.apply(command);
         }
-        self.refresh();
+        if changed {
+            self.refresh();
+        }
+        // 起こしのたびに，出している窓を最前面に付け直す(あとから出た別のアプリの最前面の窓の下にもぐらないように)．
+        // 位置・大きさ・中身は変えず，描き直さない
+        self.raise_windows();
+    }
+
+    /// 出している窓を最前面に付け直す．候補の窓・予測の窓・吹き出しの順(吹き出しを候補の窓の上に)
+    fn raise_windows(&self) {
+        self.window().raise();
+        self.prediction_window().raise();
+        self.bubble.raise();
+    }
+
+    /// OS の外観(ライト・ダーク・アクセントカラー・ハイコントラスト)が変わった．次のキーを待たずに今の外観で描き直す．
+    /// 窓ごとに同じ知らせが届くので，同じ世代では 1 回だけ描き直す(同じ場面は描かないので，重ねて呼んでもちらつかない)
+    fn settings_changed(&mut self) {
+        let generation = system::settings_generation();
+        if generation == self.settings_generation {
+            return;
+        }
+        self.settings_generation = generation;
+        if self.scene.is_some() || self.prediction_scene.is_some() {
+            self.refresh();
+        }
+    }
+
+    /// 今の状態を変えない指示か(入力位置も組み立て中の文字の位置も前と同じ Move)
+    fn repeats(&self, command: &UiCommand) -> bool {
+        match command {
+            UiCommand::Move {
+                anchor,
+                composition,
+            } => {
+                self.anchor.as_ref() == Some(anchor)
+                    && self.prediction_anchor.as_ref()
+                        == Some(composition.as_ref().unwrap_or(anchor))
+            }
+            _ => false,
+        }
     }
 
     fn apply(&mut self, command: UiCommand) {
@@ -496,7 +556,10 @@ impl App {
             } else {
                 &mut self.plain
             };
-            let _ = window.draw(&self.renderer, &scene, &measure, opacity);
+            let scale = window.scale();
+            let painted = window.draw(&self.renderer, &scene, &measure, opacity);
+            // 薄くしているあいだなどに描いたものも覚え，次に同じものだけを描き直さないようにする
+            self.drawn = painted.is_ok().then_some((scene, opacity, scale));
         }
         if let Some(scene) = self.prediction_scene.clone() {
             let window = if self.prediction_on_glass {
@@ -508,7 +571,9 @@ impl App {
         }
         if let Some(scene) = self.bubble_scene.clone() {
             let opacity = self.opacity;
-            let _ = self.bubble.draw(&self.renderer, &scene, &measure, opacity);
+            let scale = self.bubble.scale();
+            let painted = self.bubble.draw(&self.renderer, &scene, &measure, opacity);
+            self.bubble_drawn = painted.is_ok().then_some((scene, opacity, scale));
         }
     }
 
@@ -686,13 +751,21 @@ impl App {
             scale,
         );
         let opacity = self.opacity;
-        let _ = self.bubble.draw(&self.renderer, &drawn, &measure, opacity);
+        // 吹き出しの窓は置いたあとの画面の拡大率で描く
+        let bubble_scale = self.bubble.scale();
+        if self.bubble_drawn.as_ref() != Some(&(drawn.clone(), opacity, bubble_scale)) {
+            let painted = self.bubble.draw(&self.renderer, &drawn, &measure, opacity);
+            self.bubble_drawn = painted
+                .is_ok()
+                .then(|| (drawn.clone(), opacity, bubble_scale));
+        }
         self.bubble_scene = Some(drawn);
     }
 
     fn hide_bubble(&mut self) {
         self.bubble.hide();
         self.bubble_scene = None;
+        self.bubble_drawn = None;
         self.bubble_at = None;
         self.bubble_anchor = None;
         self.bubble_glide = None;
@@ -769,6 +842,7 @@ impl App {
         if on_glass != self.on_glass {
             // 窓を替える．動いている時計も移す
             self.window().hide();
+            self.drawn = None;
             self.window().stop_timer(Timer::Fade);
             self.window().stop_timer(Timer::Mode);
             self.on_glass = on_glass;
@@ -798,12 +872,21 @@ impl App {
                 } else {
                     &mut self.plain
                 };
-                let _ = window.draw_over(&self.renderer, below, scene, &measure, opacity);
+                let scale = window.scale();
+                let same = below.is_none()
+                    && self.drawn.as_ref() == Some(&(scene.clone(), opacity, scale));
+                if !same {
+                    let painted = window.draw_over(&self.renderer, below, scene, &measure, opacity);
+                    // 重ね変わりの途中に描いたものは次のコマで描き直すので覚えない
+                    self.drawn = (painted.is_ok() && below.is_none())
+                        .then(|| (scene.clone(), opacity, scale));
+                }
                 self.refresh_bubble(bare.as_ref(), font_size, now);
             }
             _ => {
                 self.hide_bubble();
                 self.window().hide();
+                self.drawn = None;
                 self.window().stop_timer(Timer::Motion);
                 self.shown_size = None;
                 self.resize = None;

@@ -8,7 +8,7 @@ use super::phonetic;
 use super::timer;
 use crate::filter;
 use crate::key::{self, RawKey};
-use crate::plan::CompositionPlan;
+use crate::plan::{CompositionPlan, PanelAnchor};
 use ipc::windows::{pipe_name, EngineClient, Outcome, Pending};
 use ipc::{
     EditOperation, ErrorCode, FieldContext, InputMode, Key, Rect, RequestBody, ResponseBody,
@@ -90,6 +90,8 @@ struct Inner {
     late_since: Option<Instant>,
     atoms: Vec<(TextStyle, u32)>,
     caret: Option<Rect>,
+    /// 候補の窓をそろえる字．そろえる字を添えない返事でも，組み立て中の文字が同じあいだは前の字にそろえる
+    panel_anchor: PanelAnchor,
     timer: usize,
     application_id: Option<String>,
     mode_item: Option<ComObject<InputModeItem>>,
@@ -620,13 +622,17 @@ impl TextService_Impl {
                 let mut result = Ok(());
                 // 候補の窓をそろえる字(組み立て中の文字の頭からの UTF-16 の位置)．無ければ頭にそろえる
                 let mut panel_anchor = None;
+                // この返事で書き換えた組み立て中の文字(そろえる字を前の返事から引き継ぐかを決める)
+                let mut written = None;
                 for edit in edits {
                     if let EditOperation::SetComposition {
                         panel_anchor: anchor,
+                        segments,
                         ..
                     } = &edit
                     {
                         panel_anchor = *anchor;
+                        written = Some(CompositionPlan::new(segments).text);
                     }
                     result = match edit {
                         EditOperation::Commit { text } => {
@@ -655,6 +661,16 @@ impl TextService_Impl {
                         break;
                     }
                 }
+                // 添えない返事でも，組み立て中の文字が同じあいだは前の字にそろえる(基準が行き来して窓が動き続けないように)
+                let panel_anchor = {
+                    let mut inner = service.inner.borrow_mut();
+                    if composition.is_none() {
+                        inner.panel_anchor.reset();
+                        None
+                    } else {
+                        inner.panel_anchor.resolve(written.as_deref(), panel_anchor)
+                    }
+                };
                 // 候補の窓を置く基準(そろえる字があればその字)と，組み立て中の文字全体の位置(予測の窓を右に置く基準)
                 let rects = composition.as_ref().and_then(|current| {
                     let whole = text_rect(ec, &target, current).ok()?;

@@ -1,4 +1,4 @@
-param([Parameter(Mandatory = $true)][string]$Dll)
+﻿param([Parameter(Mandatory = $true)][string]$Dll)
 
 $expected = @('DllCanUnloadNow', 'DllGetClassObject', 'DllRegisterServer', 'DllUnregisterServer')
 $output = & llvm-readobj --coff-exports $Dll

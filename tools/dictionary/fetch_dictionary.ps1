@@ -1,4 +1,4 @@
-# かな漢字変換の辞書(hajime-dictionary)を取得し，SHA-256 を確かめて展開する(tools/dictionary/fetch_dictionary.sh の Windows 版)．
+﻿# かな漢字変換の辞書(hajime-dictionary)を取得し，SHA-256 を確かめて展開する(tools/dictionary/fetch_dictionary.sh の Windows 版)．
 # 版とハッシュは fetch_dictionary.sh・core/Sources/HajimeEngine/BundledDictionary.swift と同じ値にする．
 #
 # 使い方: tools/dictionary/fetch_dictionary.ps1 -Output <置く場所>

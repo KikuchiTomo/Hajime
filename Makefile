@@ -3,6 +3,7 @@ PYTHON ?= python3 -I
 # Zenzai のモデルの置き場所．既定は tools/models/fetch_zenzai.sh と同じリポジトリの 1 つ上の models/
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
+JINEN_MODEL ?= $(MODELS_DIR)/jinen-v2-small-Q5_K_M.gguf
 # かな漢字変換の辞書(hajime-dictionary)．tools/dictionary/fetch_dictionary.sh が MODELS_DIR に展開する
 BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.5.2/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
@@ -49,7 +50,8 @@ test-debug:
 test-zenzai:
 	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
 	@dictionary=; if [ -d "$(BUNDLED_DICTIONARY)" ]; then dictionary="HAJIME_BUNDLED_DICTIONARY=$(abspath $(BUNDLED_DICTIONARY))"; fi; \
-	env HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" $$dictionary swift test --package-path core -c release --filter HajimeEngineTests
+	jinen=; if [ -f "$(JINEN_MODEL)" ]; then jinen="HAJIME_JINEN_MODEL=$(abspath $(JINEN_MODEL))"; fi; \
+	env HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" $$dictionary $$jinen swift test --package-path core -c release --filter HajimeEngineTests
 
 # 公式サイト(apps/docs-site)．出力先は make site SITE_OUT=<ディレクトリ> で変えられる
 SITE_OUT ?= $(CURDIR)/apps/docs-site/public
