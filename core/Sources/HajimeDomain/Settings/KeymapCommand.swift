@@ -54,7 +54,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case insertBoundary
     /// 「もしかして」と示した読みに直す
     case acceptSuggestion
-    /// 再変換．入力先で選んでいる確定済みの文字を読みに戻し，変換し直す．Esc で元の文字に戻す
+    /// 再変換．入力先で選んでいる確定済みの文字を読みに戻し，変換し直す．Esc で元の文字に戻す．
+    /// 確定した直後(文字を選んでいない)は，確定を取り消して確定する前の変換に戻す(undoCommit と同じ．読みのまま確定したものは変換する)
     case reconvert
 
     // 字種
@@ -119,6 +120,9 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 予測の窓の予測を確定した直後に，確定した語句を消して補う前の読み(組み立て中の文字)に戻す．確定した語句の学習も取り消す．
     /// 直後でなければ(取り消すものが無い・入力位置の前が確定した語句でない)キーをアプリに渡す
     case undoPrediction
+    /// 確定した直後に，確定した文字を消して確定する前に戻す．変換は文節の区切りと選んだ候補まで戻し，読みは読みに，予測は補う前の読みに戻す．
+    /// 確定した語の学習も取り消す．直後でなければ(取り消すものが無い・入力位置の前が確定した文字でない)キーをアプリに渡す
+    case undoCommit
 
     // 学習
     /// 選んでいる候補を学習から消す
@@ -165,7 +169,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
-        case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction: .commit
+        case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction, .undoCommit: .commit
         case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
         case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette: .tools
         }
@@ -188,7 +192,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .resumeEditing, .undoConversionEdit, .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana,
              .forgetCandidate: [.converting]
-        case .forgetLastCommit, .reconvert, .undoPrediction: [.idle]
+        case .forgetLastCommit, .reconvert, .undoPrediction, .undoCommit: [.idle]
         }
     }
 

@@ -69,10 +69,10 @@ public final class InputSession {
     private var suggestionPredictions: (reading: String, candidates: [Candidate])?
     /// 予測の窓に出している予測．出していなければ nil
     private var shownPrediction: ShownPrediction?
-    /// 予測を確定した直後に，補う前の読みに戻せる確定．次のキーまで持つ(キー設定の表の「予測の確定を取り消し」)
-    private var undoablePrediction: UndoablePrediction?
-    /// 今受けているキーで取り消せる予測の確定(キーを受けたときに undoablePrediction から移す)
-    private var undoingPrediction: UndoablePrediction?
+    /// 確定した直後に，確定する前に戻せる確定．次のキーまで持つ(キー設定の表の「確定の取り消し」「予測の確定を取り消し」)
+    private var undoableCommit: UndoableCommit?
+    /// 今受けているキーで取り消せる確定(キーを受けたときに undoableCommit から移す)
+    private var undoingCommit: UndoableCommit?
     /// 確定を取り消した予測の読みと語句．同じ読みのあいだは出し直さない
     private var declinedPrediction: (reading: String, text: String)?
     /// 最後に出した入力中の候補の窓．ローマ字を打ちかけているあいだはこれを出しておく
@@ -206,10 +206,10 @@ public final class InputSession {
     // MARK: - 外からの操作
 
     public func handle(_ event: KeyEvent, context: InputContext) -> KeyResult {
-        // 予測の確定は，すぐ次のキーでだけ取り消せる
-        undoingPrediction = undoablePrediction
-        undoablePrediction = nil
-        defer { undoingPrediction = nil }
+        // 確定は，すぐ次のキーでだけ取り消せる
+        undoingCommit = undoableCommit
+        undoableCommit = nil
+        defer { undoingCommit = nil }
         if context.isSecure {
             // パスワード欄では何もしない(docs/dev/SECURITY-MODEL.md)
             return .passThrough
@@ -295,6 +295,7 @@ public final class InputSession {
     public func setMode(_ newMode: InputMode) -> [ClientAction] {
         guard newMode != mode else { return [] }
         let actions = commitAll()
+        undoableCommit = nil
         mode = newMode
         // 英数にしたあとは行の頭の判断と関係なくなるので行を終える(キーで英数にしたときは TerminalLine.didHandle が終える)
         if newMode == .direct { terminal.endLine() }
@@ -304,16 +305,18 @@ public final class InputSession {
     /// 入力欄からフォーカスが外れた．組み立て中の文字は確定する
     /// OS が commitComposition と deactivateServer の両方で呼ぶことがあるので，何度呼んでも同じ結果になるようにする
     public func deactivate() -> [ClientAction] {
-        undoablePrediction = nil
         let actions = closePalette() + commitAll()
+        // 入力欄を離れて確定したものは取り消さない(戻ったときに入力位置の前が同じとは限らない)
+        undoableCommit = nil
         terminal.didLeave(committing: actions)
         return actions
     }
 
     /// キーの外で選んだ文字(手書きの窓の候補)を入れる．組み立て中の文字があれば先に確定し，選んだ文字で置き換えない
     public func insert(_ text: String) -> [ClientAction] {
-        undoablePrediction = nil
-        return commitAll() + [.commit(text)]
+        let actions = commitAll()
+        undoableCommit = nil
+        return actions + [.commit(text)]
     }
 
     /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ．
@@ -746,7 +749,7 @@ public final class InputSession {
 
     /// パレットの窓をマウスで操作した
     public func palette(_ target: PaletteTarget, context: InputContext) -> [ClientAction] {
-        undoablePrediction = nil
+        undoableCommit = nil
         guard let palette else { return [] }
         return paletteActions(palette.perform(target), palette: palette)
     }
@@ -836,7 +839,9 @@ public final class InputSession {
         case .reconvert:
             // 組み立て中は効かない(表は入力文字なしの状態に置く)．入力先の選んでいる文字はアプリ側が読む
             guard !isComposing else { return .passThrough }
-            return KeyResult(handled: true, actions: [.requestReconversion])
+            // 確定した直後は文字を選んでいないので，確定を取り消して確定する前の変換に戻す(文節の区切りと選んだ候補も戻る)
+            let undone = undoCommit(.conversion, context: context)
+            return undone.handled ? undone : KeyResult(handled: true, actions: [.requestReconversion])
         case .convertWithoutLearning: return convert(withoutLearning: true, context: context)
         case .deleteBackward: return handleBackspace(context: context)
         case .insertBoundary:
@@ -904,7 +909,8 @@ public final class InputSession {
             heldReading = nil
             return KeyResult(handled: true, actions: render(context: context))
         case .undoConversionEdit: return undoConversionEdit(context: context)
-        case .undoPrediction: return undoPrediction(context: context)
+        case .undoPrediction: return undoCommit(.prediction, context: context)
+        case .undoCommit: return undoCommit(.any, context: context)
         // 学習
         case .forgetCandidate:
             switch phase {
@@ -1517,6 +1523,19 @@ public final class InputSession {
 
     /// 組み立て中の読みを，今の表示のとおりに確定する
     private func commitComposition() -> [ClientAction] {
+        // すぐ次のキーで取り消せるよう，確定する前の状態を覚える(コマンドを動かしたときは取り消せない)
+        var snapshot = commitSnapshot()
+        undoableCommit = nil
+        let actions = commitCompositionText(learned: &snapshot.learned)
+        let committed = actions.compactMap { action -> String? in
+            if case .commit(let text) = action { text } else { nil }
+        }.joined()
+        if !committed.isEmpty { undoableCommit = UndoableCommit(committed: committed, restore: .composition(snapshot)) }
+        return actions
+    }
+
+    /// 組み立て中の読みを，今の表示のとおりに確定する．確定した語を学んだら learned を true にする
+    private func commitCompositionText(learned: inout Bool) -> [ClientAction] {
         // 連想の一覧で選んでいる語は，元の変換の文節に入れてから確定する
         resolveAssociation()
         // 候補を求めていない文節は，学習に使うエンジンの候補にするため求めてから確定する
@@ -1528,6 +1547,7 @@ public final class InputSession {
             }
             for segment in lattice.segments where segment.selected.isLearnable {
                 converter.didCommit(segment.selected)
+                learned = true
             }
             // 選び直した文節は，確定したときに第 1 候補でないもので数える(触って元に戻したものは数えない)
             let changed = lattice.segments.filter { $0.choice != .candidate(0) }.count
@@ -1550,6 +1570,7 @@ public final class InputSession {
             let candidate = currentCandidate()
             if candidate.isLearnable {
                 converter.didCommit(candidate)
+                learned = true
             }
             actions.append(.commit(candidate.text))
             if candidate.readingCount >= composition.conversionReading.count {
@@ -1922,38 +1943,114 @@ public final class InputSession {
         let typed = composition
         phase = .selecting(CandidateSelection(candidates: [shown.candidate], annotations: [nil], focus: .candidate(0)))
         let actions = commitAll()
-        let committed = actions.compactMap { action -> String? in
-            if case .commit(let text) = action { text } else { nil }
-        }.joined()
-        if !committed.isEmpty { undoablePrediction = UndoablePrediction(committed: committed, text: shown.prediction.text, typed: typed) }
+        if let committed = undoableCommit?.committed {
+            undoableCommit = UndoableCommit(committed: committed, restore: .prediction(text: shown.prediction.text, typed: typed))
+        }
         return actions
     }
 
-    /// 予測を確定した直後に取り消すための記録
-    private struct UndoablePrediction: Equatable {
+    /// 確定した直後に取り消すための記録
+    private struct UndoableCommit {
         /// 入力先に入れた文字
         var committed: String
-        /// 予測した語句
-        var text: String
-        /// 確定する前の組み立て中の文字(補う前の読み)
-        var typed: Composition
+        var restore: Restore
+
+        /// 取り消したときに戻す先
+        enum Restore {
+            /// 予測を確定した．予測した語句と，補う前の読み(組み立て中の文字)
+            case prediction(text: String, typed: Composition)
+            /// 読みか変換を確定した．確定する前の入力の状態
+            case composition(CommitSnapshot)
+        }
     }
 
-    /// 予測を確定した直後なら，入れた語句を消して補う前の読みに戻し，その確定の学習を取り消す．
-    /// 入力位置の前が入れた語句でなければ(カーソルを動かした・アプリが文字を変えた・前の文字列を読めない)，何もせずキーをアプリに渡す
-    private func undoPrediction(context: InputContext) -> KeyResult {
-        guard !isComposing, let undo = undoingPrediction, context.canReplacePrecedingText,
-              let preceding = context.precedingText, preceding.hasSuffix(undo.committed) else { return .passThrough }
-        _ = converter.forgetLastCommit()
-        setLeftContext(String(preceding.dropLast(undo.committed.count)))
-        composition = undo.typed
-        phase = .composing
-        declinedPrediction = (undo.typed.conversionReading, undo.text)
-        return KeyResult(handled: true, actions: [.replacePrecedingText(undo.committed.utf16.count)] + render(context: context))
+    /// 確定する前の入力の状態．確定を取り消すと，この状態に戻す(文節の区切り・選んだ候補・直前の変更の取り消しの段も戻る)
+    private struct CommitSnapshot {
+        var phase: Phase
+        var composition: Composition
+        var forcedBoundaries: [Int]
+        var conversionHistory: ConversionHistory<ConversionSnapshot>
+        var heldReading: Composition?
+        var reconverting: String?
+        var convertedFromEnglish: String?
+        /// 確定したときに学んだ語があるか．あれば取り消すときに学習も取り消す
+        var learned = false
     }
 
-    /// 予測の確定を取り消せる(すぐ次のキーが取り消しのキーなら取り消す)か．Windows の DLL に取り消しのキーを送ってもらうかに使う
-    public var hasUndoablePrediction: Bool { undoablePrediction != nil }
+    /// 取り消す確定の種類(キー設定の表のコマンドごと)
+    private enum UndoTarget {
+        /// 予測の確定だけ(予測の確定を取り消し)
+        case prediction
+        /// 読みと変換の確定だけ(再変換のキーを確定の直後に押したとき)
+        case conversion
+        /// どちらも(確定の取り消し)
+        case any
+    }
+
+    /// 確定した直後なら，入れた文字を消して確定する前に戻し，確定で学んだ語の学習も取り消す．
+    /// 予測は補う前の読みに，読みと変換は確定する前の組み立て中の文字・分岐図・一覧に戻す．
+    /// 直後でない・入力位置の前が入れた文字でない(カーソルを動かした・アプリが文字を変えた・前の文字列を読めない)・
+    /// 取り消す種類でなければ，何もせずキーをアプリに渡す
+    private func undoCommit(_ target: UndoTarget, context: InputContext) -> KeyResult {
+        guard !isComposing, let undo = undoingCommit, context.canReplacePrecedingText,
+              let preceding = context.precedingText, Self.endsWith(preceding, committed: undo.committed) else { return .passThrough }
+        let replacement = ClientAction.replacePrecedingText(undo.committed.utf16.count)
+        switch (undo.restore, target) {
+        case (.prediction(let text, let typed), .prediction), (.prediction(let text, let typed), .any):
+            _ = converter.forgetLastCommit()
+            setLeftContext(String(preceding.dropLast(undo.committed.count)))
+            composition = typed
+            phase = .composing
+            declinedPrediction = (typed.conversionReading, text)
+            return KeyResult(handled: true, actions: [replacement] + render(context: context))
+        case (.composition(let snapshot), .conversion), (.composition(let snapshot), .any):
+            if snapshot.learned { _ = converter.forgetLastCommit() }
+            converter.reopenLastCommit()
+            setLeftContext(String(preceding.dropLast(undo.committed.count)))
+            restore(snapshot)
+            if phase == .composing, target == .conversion {
+                // 再変換のキーは変換のキーでもあるので，読みのまま確定したものは変換して出す
+                return KeyResult(handled: true, actions: [replacement] + convert(withoutLearning: false, context: context).actions)
+            }
+            if phase != .composing { pendingNote = PanelBuilder.commitUndoneNote }
+            return KeyResult(handled: true, actions: [replacement] + render(context: context))
+        default:
+            return .passThrough
+        }
+    }
+
+    /// 入力位置の前の文字列が，確定した文字で終わるか．アプリから読む前の文字列は長さに上限があるので
+    /// (DefaultSettings.maximumLeftContextLength)，確定した文字のほうが長いときは，上限まで読めた分が確定した文字の終わりと同じかで決める
+    private static func endsWith(_ preceding: String, committed: String) -> Bool {
+        preceding.hasSuffix(committed)
+            || (preceding.utf16.count >= DefaultSettings.maximumLeftContextLength && committed.hasSuffix(preceding))
+    }
+
+    /// 確定する前の入力の状態を覚える．確定で学んだ語があるかは確定してから足す
+    private func commitSnapshot() -> CommitSnapshot {
+        CommitSnapshot(phase: phase, composition: composition, forcedBoundaries: forcedBoundaries, conversionHistory: conversionHistory,
+                       heldReading: heldReading, reconverting: reconverting, convertedFromEnglish: convertedFromEnglish)
+    }
+
+    /// 確定を取り消して，確定する前の入力の状態に戻す．打鍵が止まったときの表示(ライブ変換した文)で見せる
+    private func restore(_ snapshot: CommitSnapshot) {
+        composition = snapshot.composition
+        phase = snapshot.phase
+        forcedBoundaries = snapshot.forcedBoundaries
+        conversionHistory = snapshot.conversionHistory
+        heldReading = snapshot.heldReading
+        reconverting = snapshot.reconverting
+        convertedFromEnglish = snapshot.convertedFromEnglish
+        isSettled = true
+    }
+
+    /// 確定を取り消せる(すぐ次のキーが取り消しのキーなら取り消す)か．Windows の DLL に取り消しのキーを送ってもらうかに使う
+    public var hasUndoableCommit: Bool { undoableCommit != nil }
+
+    /// 予測の確定を取り消せるか．予測の確定だけを取り消すキーを送ってもらうかに使う
+    public var hasUndoablePrediction: Bool {
+        if case .prediction? = undoableCommit?.restore { true } else { false }
+    }
 
     /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ で選び始める(予測の窓を出していなければ Tab でも．↑ は字種の行から)．
     /// 番号キーは読みに数字を打つキーなので，選び始めるまでは番号を振らない(選び始めると一覧と同じに番号で選べる)
@@ -2695,7 +2792,7 @@ public final class InputSession {
     /// 読みが求められない・長すぎる・組み立て中なら何もしない．Esc で元の文字に戻す(reconverting)
     public func reconvert(_ text: String, reading given: String? = nil, transcriber: (any ReadingTranscribing)? = nil,
                           context: InputContext) -> [ClientAction] {
-        undoablePrediction = nil
+        undoableCommit = nil
         guard !isComposing, !text.isEmpty, text.count <= DefaultSettings.maximumReconversionLength else { return [] }
         let reading = KanaWidth.hiragana(from: given ?? transcriber?.reading(of: text) ?? "")
         guard !reading.isEmpty, reading.count <= DefaultSettings.maximumReconversionLength,
@@ -2712,7 +2809,7 @@ public final class InputSession {
     /// 分岐図の幹は文節を選び(←→)，枝は番号キーで選んだのと同じ(迷う文節へ進むか確定)，一覧の行は選んで確定する(番号 → Enter)．
     /// 押した対象が今の状態に無ければ何もしない
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
-        undoablePrediction = nil
+        undoableCommit = nil
         let baseline = editBaseline(command: nil)
         defer { trackConversionEdit(from: baseline) }
         return pick(target, context: context)

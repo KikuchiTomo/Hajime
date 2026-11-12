@@ -183,6 +183,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func forget(_ candidate: Candidate) { base.forget(candidate) }
     public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { base.forget(candidate, readingRange: range) }
     public func forgetLastCommit() -> Bool { base.forgetLastCommit() }
+    public func reopenLastCommit() { base.reopenLastCommit() }
     public func suspendLearningUntilEnd() { base.suspendLearningUntilEnd() }
 
     private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {

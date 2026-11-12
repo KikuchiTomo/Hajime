@@ -364,6 +364,10 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
     private var committedInComposition: [KanaKanjiConverterModule.Candidate] = []
     /// 最後に終えた入力で確定して学んだ候補(最後の学習を取り消すときに使う)
     private var lastCommitted: [KanaKanjiConverterModule.Candidate] = []
+    /// 今の入力で確定を伝えられたか(学ばなかったときも)．入力を終えたら，この入力を最後の確定にする
+    private var committedAnyInComposition = false
+    /// 最後に終えた入力で返した候補(engineCandidates)．確定を取り消したときに戻し，同じ候補のまま確定し直せるようにする
+    private var lastEngineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
 
     init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID, scoringSessionID: KanaKanjiConverter.ConversionSessionID,
          typingSessionID: KanaKanjiConverter.ConversionSessionID, restSessionID: KanaKanjiConverter.ConversionSessionID) {
@@ -643,6 +647,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
     }
 
     func didCommit(_ candidate: HajimeDomain.Candidate) {
+        committedAnyInComposition = true
         guard case .engine(let id) = candidate.origin, let engineCandidate = engineCandidates[id] else {
             // つないだ候補は，元の語(エンジンの候補)を学ぶ
             learn(candidate.learnedParts.compactMap { part in
@@ -708,6 +713,10 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
         return true
     }
 
+    func reopenLastCommit() {
+        engineCandidates.merge(lastEngineCandidates) { current, _ in current }
+    }
+
     func suspendLearningUntilEnd() {
         guard !learningSuspended else { return }
         learningSuspended = true
@@ -736,8 +745,12 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
         lastRestRequested = nil
         deferredReading = nil
         learningSuspended = false
-        if !committedInComposition.isEmpty { lastCommitted = committedInComposition }
+        // 学ばなかった入力(学習を使わない変換)も最後の確定にし，その前の入力の学習を取り消さないようにする
+        if committedAnyInComposition { lastCommitted = committedInComposition }
+        committedAnyInComposition = false
         committedInComposition = []
+        // 候補の id は使い回さないので，前の入力の候補を残しても別の候補と取り違えない
+        if !engineCandidates.isEmpty { lastEngineCandidates = engineCandidates }
         _ = engine.withSession(sessionID) { $0.stopComposition() }
         _ = engine.withSession(scoringSessionID) { $0.stopComposition() }
         _ = engine.withSession(typingSessionID) { $0.stopComposition() }

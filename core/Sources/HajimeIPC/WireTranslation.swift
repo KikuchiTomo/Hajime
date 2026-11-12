@@ -128,15 +128,15 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    /// undoablePrediction は予測の確定を取り消せるか．取り消すキー(入力文字なしの Backspace など)は，取り消せるときだけ送ってもらう
-    /// (いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
+    /// undoablePrediction は予測の確定を，undoableCommit は確定(予測も含む)を取り消せるか．取り消すキー(入力文字なしの Backspace・
+    /// Ctrl+Backspace など)は，取り消せるときだけ送ってもらう(いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
     public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil,
-                undoablePrediction: Bool = false) {
+                undoablePrediction: Bool = false, undoableCommit: Bool = false) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
         if !isComposing {
             for entry in keymap.entries where (entry.state == state || entry.state == .anywhere) && entry.command.isAvailable(in: state)
-                && (undoablePrediction || entry.command != .undoPrediction) {
+                && (undoablePrediction || entry.command != .undoPrediction) && (undoableCommit || entry.command != .undoCommit) {
                 guard let chord = WireKeyChord(entry.stroke), !chords.contains(chord) else { continue }
                 chords.append(chord)
             }
