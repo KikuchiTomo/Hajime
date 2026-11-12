@@ -67,6 +67,8 @@ pub enum After {
     File(FileTask),
     /// フォルダを選ぶ窓を出してから，同期のフォルダにする
     ChooseSyncFolder,
+    /// 試した語をどちらの一覧に足すかを選ぶメニューを出してから，その一覧に足す
+    ChooseWordList(String),
     /// 色を選ぶ窓を出してから，path の色を変える
     ChooseColor {
         path: &'static str,
@@ -171,6 +173,19 @@ pub fn run_after(window: Window, after: Option<After>) {
                     action: DictionaryAction::AddApps(files),
                     index: Some(index),
                 })
+            })
+            .flatten();
+            run_after(window, after);
+        }
+        Some(After::ChooseWordList(word)) => {
+            // ポインターの位置にメニューを出す(macOS は結果のタグの下に出す)
+            let items = [features::ENGLISH_WORDS, features::JAPANESE_WORDS];
+            let Some(chosen) = ffi::choose_menu(window, &items) else {
+                return;
+            };
+            let after = with_app(|app| {
+                let event = app.view.word_list_add(word, chosen == 0)?;
+                app.handle(event)
             })
             .flatten();
             run_after(window, after);
@@ -340,12 +355,6 @@ impl App {
         {
             return self.set_in_list(&spec, index, field, &value);
         }
-        if let Event::Notice(text) = event {
-            return Some(After::Message {
-                text: text.into(),
-                warning: true,
-            });
-        }
         if let Event::TemplatePanel { target, open } = event {
             // 開いているかをページごとに覚える(見本のエンジンで開いたときは覚えない)
             if open {
@@ -401,6 +410,7 @@ impl App {
                 self.theme_list(ThemeAction::DuplicateCurrent, None)
             }
             Event::ChooseColor { path, current } => Some(After::ChooseColor { path, current }),
+            Event::ChooseWordList(word) => Some(After::ChooseWordList(word)),
             other => self.handle_other(other),
         }
     }
@@ -471,9 +481,9 @@ impl App {
             | Event::ThemeList { .. }
             | Event::ThemeEditor(_)
             | Event::ChooseColor { .. }
+            | Event::ChooseWordList(_)
             | Event::ChooseApp { .. }
             | Event::OpenUrl(_)
-            | Event::Notice(_)
             | Event::EditCommand(_)
             | Event::ListMove { .. }
             | Event::ListSet { .. }
@@ -611,6 +621,8 @@ impl App {
                         .unwrap_or_default()
                 };
                 self.view.show_preview(TryKind::Language, &shown);
+                // 結果のタグを押せるよう，置き場所を測り直す
+                self.arrange();
                 return None;
             }
             Event::Action(Action::RestoreDefaults) => model.restore_defaults(),

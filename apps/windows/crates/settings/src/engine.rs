@@ -395,6 +395,7 @@ pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
             .find(|(value, _)| *value == word.language)
             .map_or(word.language.as_str(), |(_, label)| label);
         shown.chips.push(word.shown.clone());
+        shown.typed.push(word.typed.clone());
         shown
             .labels
             .push(Some((language.to_string(), word.language == JAPANESE)));
@@ -406,12 +407,14 @@ pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
 const JAPANESE: &str = "japanese";
 
 /// 試した結果の出し方．chips はタグにして折り返して並べる語(macOS の WrappingStack)，line はタグにしない 1 行．
-/// labels はタグの 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行のタグ
+/// labels はタグの 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行のタグ．
+/// typed はタグごとの打った語(英語と日本語の試す欄．タグを押して一覧に足す)．押せないタグでは空
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PreviewShown {
     pub chips: Vec<String>,
     pub line: String,
     pub labels: Vec<Option<(String, bool)>>,
+    pub typed: Vec<String>,
 }
 
 /// 辞書を取り込む要求

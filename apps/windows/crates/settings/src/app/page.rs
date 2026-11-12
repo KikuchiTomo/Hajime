@@ -107,6 +107,8 @@ pub enum Event {
     ChooseApp {
         path: &'static str,
     },
+    /// 英語と日本語の試した語(word)を，いつも英語・いつも日本語にする単語のどちらに足すかを選ぶメニューを出す(macOS の resultChip)
+    ChooseWordList(String),
     /// 色を選ぶ窓を出す(path の値を変える．current は今の色)
     ChooseColor {
         path: &'static str,
@@ -134,8 +136,6 @@ pub enum Event {
     },
     /// 既定のブラウザーで開く(謝辞の出どころ)
     OpenUrl(String),
-    /// 知らせを出すだけ(操作できない理由)
-    Notice(&'static str),
     /// コマンドを足す・書き換えるシートを出す(書き換えるコマンドの表の行の番号．足すなら None)
     EditCommand(Option<usize>),
     /// 表の中の選ぶ欄で選び直した(index は表の行の番号，field は欄，value は設定のファイルに書く値)．すぐ書く
@@ -401,8 +401,8 @@ pub enum Part {
     Text,
     /// 謝辞の出どころの行の中の URL(行の番号)
     Link(usize),
-    /// 試した語をいつも英語(0)・いつも日本語(1)にする単語に足すボタン
-    PreviewAdd(usize),
+    /// 英語と日本語の試す欄の結果のタグ(番号)．押すと，その語をいつも英語・いつも日本語にする単語に足すメニューを出す
+    PreviewChip(usize),
     /// 謝辞のライセンスの全文を開く・閉じる
     Expand,
     /// 数を 1 段減らす・増やすボタン
@@ -519,6 +519,8 @@ struct RowState {
     /// 試す欄(打つ文・前の文字列)と結果
     preview_fields: Vec<Window>,
     preview_result: crate::engine::PreviewShown,
+    /// 試した結果のタグの置き場所(ページの中の座標．preview_result と同じ並び)．置くときに測る
+    chip_areas: Vec<Rect>,
     /// 長い文の送り
     text_scroll: Scroller,
     /// 謝辞のライセンスの全文を開いている
@@ -725,6 +727,7 @@ impl RowState {
             editing: None,
             preview_fields: Vec::new(),
             preview_result: Default::default(),
+            chip_areas: Vec::new(),
             text_scroll: Scroller::default(),
             expanded: false,
             acknowledgement: None,
@@ -1243,8 +1246,7 @@ impl RowState {
                 .acknowledgement
                 .as_ref()
                 .and_then(|layout| layout.expand),
-            // 試す欄(2 つ)の後ろに並べたボタン
-            Part::PreviewAdd(index) => card.parts.get(2 + index).copied(),
+            Part::PreviewChip(index) => self.chip_areas.get(index).copied(),
             Part::Entry(index, part) => self.dictionaries.as_ref()?.part_rect(index, part),
             Part::Import => card.parts.first().copied(),
             Part::Toggle
@@ -1330,7 +1332,7 @@ impl RowState {
             Control::Preview(kind) => {
                 parts.extend([Part::PreviewField(0), Part::PreviewField(1)]);
                 if *kind == TryKind::Language {
-                    parts.extend([Part::PreviewAdd(0), Part::PreviewAdd(1)]);
+                    parts.extend((0..self.chip_areas.len()).map(Part::PreviewChip));
                 }
             }
             control => {
@@ -1488,8 +1490,6 @@ impl RowState {
                 .and_then(|line| crate::notices::split_url(line))
                 .map_or("", |(_, url, _)| url),
             Part::Expand => more::LICENSE_TEXT,
-            Part::PreviewAdd(0) => text::ADD_TO_ENGLISH,
-            Part::PreviewAdd(_) => text::ADD_TO_JAPANESE,
             _ => "",
         }
     }
@@ -1862,6 +1862,25 @@ impl PageView {
         self
     }
 
+    /// 試した語(word)を，いつも英語(english)・いつも日本語にする単語の一覧に足す．もう一方の一覧にあれば移す(ListSpec.exclusive_with)
+    pub fn word_list_add(&self, word: String, english: bool) -> Option<Event> {
+        let path = if english {
+            "wordLanguage.englishWords"
+        } else {
+            "wordLanguage.japaneseWords"
+        };
+        let (spec, limit) = self.rows.iter().find_map(|row| match &row.row.control {
+            Control::List(spec, limit) if spec.path == path => Some((*spec, *limit)),
+            _ => None,
+        })?;
+        Some(Event::ListAdd {
+            spec,
+            limit,
+            item: vec![word],
+            replacing: None,
+        })
+    }
+
     /// ページにある見本の種類(外観・パレット・絵文字)．見本が無ければ None
     pub fn preview_kind(&self) -> Option<PreviewKind> {
         self.rows.iter().find_map(|row| match row.row.control {
@@ -2145,6 +2164,18 @@ impl PageView {
             };
             layout::button_width(label, &metrics)
         };
+        // 英語と日本語の試した結果のタグの置き場所(押した位置を調べるため)．描くときと同じ並べ方
+        for row in &mut self.rows {
+            row.chip_areas = match (&row.row.control, &row.card) {
+                (Control::Preview(TryKind::Language), Some(card)) => chip_areas(
+                    measure,
+                    card.control,
+                    &row.preview_result,
+                    tokens::size::settings::PREVIEW_BUTTON_GAP,
+                ),
+                _ => Vec::new(),
+            };
+        }
         for row in &mut self.rows {
             if let (Some(rows), Some(card)) = (&mut row.dictionaries, &row.card) {
                 let area = (card.card.x, card.card.y, card.card.width);
@@ -2391,12 +2422,26 @@ impl PageView {
                     );
                     format!("{} {value} {}", item.code, item.meaning)
                 }),
-            Part::Top(_)
-            | Part::Bottom(_)
-            | Part::Action
-            | Part::Link(_)
-            | Part::PreviewAdd(_)
-            | Part::Expand => row.button_label(element.part).to_string(),
+            Part::Top(_) | Part::Bottom(_) | Part::Action | Part::Link(_) | Part::Expand => {
+                row.button_label(element.part).to_string()
+            }
+            // 読み上げは入る文字と，英語か日本語か(macOS の resultChip と同じく 1 つにまとめる)
+            Part::PreviewChip(index) => {
+                let chip = row
+                    .preview_result
+                    .chips
+                    .get(index)
+                    .map_or("", String::as_str);
+                match row
+                    .preview_result
+                    .labels
+                    .get(index)
+                    .and_then(Option::as_ref)
+                {
+                    Some((label, _)) => format!("{chip} {label}"),
+                    None => chip.to_string(),
+                }
+            }
             Part::Field(index) => row
                 .row
                 .control
@@ -2511,7 +2556,7 @@ impl PageView {
             Part::PreviewField(index) => 60 + index,
             Part::Text => 70,
             Part::Expand => 79,
-            Part::PreviewAdd(index) => 65 + index,
+            Part::PreviewChip(index) => 90 + index.min(9),
             Part::Link(index) => 80 + index,
             Part::Import => 33,
             Part::Entry(..) => 0,
@@ -2724,35 +2769,9 @@ impl PageView {
                     .map(|(_, url, _)| url.to_string())?;
                 return Some(Event::OpenUrl(url));
             }
-            (Control::Preview(TryKind::Language), Part::PreviewAdd(index)) => {
-                let typed = row
-                    .edit(Part::PreviewField(0))
-                    .map(ffi::window_text)
-                    .unwrap_or_default();
-                let word = typed.trim().to_lowercase();
-                if word.is_empty() || word.contains(char::is_whitespace) {
-                    return Some(Event::Notice(text::ADD_ONE_WORD));
-                }
-                let path = if index == 0 {
-                    "wordLanguage.englishWords"
-                } else {
-                    "wordLanguage.japaneseWords"
-                };
-                let (spec, limit) =
-                    self.rows
-                        .iter()
-                        .find_map(|other| match &other.row.control {
-                            Control::List(spec, limit) if spec.path == path => {
-                                Some((*spec, *limit))
-                            }
-                            _ => None,
-                        })?;
-                return Some(Event::ListAdd {
-                    spec,
-                    limit,
-                    item: vec![word],
-                    replacing: None,
-                });
+            (Control::Preview(TryKind::Language), Part::PreviewChip(index)) => {
+                let word = row.preview_result.typed.get(index)?.trim().to_lowercase();
+                return (!word.is_empty()).then_some(Event::ChooseWordList(word));
             }
             (_, Part::TemplateSegment(index)) => {
                 row.template_group = index;
@@ -4173,24 +4192,18 @@ impl PageView {
             // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
             Control::PreviewChips(_) => {
                 let gap = tokens::size::settings::PREVIEW_CHIP_GAP;
-                preview_chips(canvas, theme, card.control, &row.preview_result, gap);
+                preview_chips(
+                    canvas,
+                    theme,
+                    card.control,
+                    &row.preview_result,
+                    gap,
+                    &|_| None,
+                );
             }
             Control::Preview(kind) => {
                 for field in 0..2 {
                     self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
-                }
-                for button in 0..2 {
-                    let part = Part::PreviewAdd(button);
-                    if let Some(rect) = row.part_rect(part) {
-                        paint::button(
-                            canvas,
-                            theme,
-                            rect,
-                            row.button_label(part),
-                            paint::ButtonKind::Standard,
-                            self.state(frame, element(part), row.enabled),
-                        );
-                    }
                 }
                 // 英語と日本語の結果は押せるチップなので group で離す(押せる部品どうし)
                 let gap = if *kind == TryKind::Language {
@@ -4198,7 +4211,19 @@ impl PageView {
                 } else {
                     tokens::size::settings::PREVIEW_CHIP_GAP
                 };
-                preview_chips(canvas, theme, card.control, &row.preview_result, gap);
+                // 英語と日本語の結果のタグは押せる(押すと，その語をいつも英語・いつも日本語にする単語に足すメニューを出す)
+                let chip_state = |chip: usize| {
+                    (*kind == TryKind::Language && chip_opens_menu(&row.preview_result, chip))
+                        .then(|| self.state(frame, element(Part::PreviewChip(chip)), row.enabled))
+                };
+                preview_chips(
+                    canvas,
+                    theme,
+                    card.control,
+                    &row.preview_result,
+                    gap,
+                    &chip_state,
+                );
             }
             Control::Note | Control::Placeholder => {}
             Control::Dictionaries(_) => self.paint_dictionaries(canvas, frame, index, row),
@@ -5215,14 +5240,71 @@ fn example_chip(
 }
 
 /// 表の行を見せる高さ
+/// 試した結果のタグの高さ(2 行目に英語か日本語かを出すときは 2 行)
+fn chip_height(shown: &crate::engine::PreviewShown) -> f32 {
+    let two_lines = shown.labels.iter().any(Option::is_some);
+    size::BODY_LINE_HEIGHT
+        + if two_lines {
+            size::NOTE_LINE_HEIGHT
+        } else {
+            0.0
+        }
+        + tokens::size::settings::PREVIEW_CHIP_PADDING_Y * 2.0
+}
+
+/// 押せるタグ(打った語があるタグ)か．押すとメニューを出すので，文字の後ろに下向きの山形を添える
+fn chip_opens_menu(shown: &crate::engine::PreviewShown, index: usize) -> bool {
+    shown
+        .typed
+        .get(index)
+        .is_some_and(|typed| !typed.is_empty())
+}
+
+/// 試した結果のタグの置き場所．rect の中に左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
+/// rect からはみ出すタグは置かない．描くとき(preview_chips)と押した位置を調べるとき(Part::PreviewChip)の両方で使う
+fn chip_areas(
+    measure: &dyn paint::Measure,
+    rect: Rect,
+    shown: &crate::engine::PreviewShown,
+    gap: f32,
+) -> Vec<Rect> {
+    use tokens::size::settings::PREVIEW_CHIP_PADDING_X;
+    let height = chip_height(shown);
+    let (mut x, mut y) = (rect.x, rect.y);
+    let mut areas = Vec::new();
+    for (index, chip) in shown.chips.iter().enumerate() {
+        let label = shown.labels.get(index).and_then(Option::as_ref);
+        let mut text_width = measure
+            .width(chip, TextStyle::Body)
+            .max(label.map_or(0.0, |(label, _)| measure.width(label, TextStyle::Caption)));
+        if chip_opens_menu(shown, index) {
+            text_width += tokens::size::space::INLINE
+                + measure.width(super::theme::GLYPHS.chevron_down, TextStyle::IconSmall);
+        }
+        let width = (text_width + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
+        if x > rect.x && x + width > rect.x + rect.width {
+            x = rect.x;
+            y += height + gap;
+        }
+        if y + height > rect.y + rect.height {
+            break;
+        }
+        areas.push(Rect::new(x, y, width, height));
+        x += width + gap;
+    }
+    areas
+}
+
 /// 試した結果を rect の中に描く．語はタグにして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
-/// タグにしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出すタグは描かない
+/// タグにしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出すタグは描かない．
+/// state はタグごとの押せる部品の状態(押せるタグはポインターを載せると背景を変え，フォーカスの印を出す)．押せないタグは None
 fn preview_chips(
     canvas: &mut dyn Canvas,
     theme: &Theme,
     rect: Rect,
     shown: &crate::engine::PreviewShown,
     gap: f32,
+    state: &dyn Fn(usize) -> Option<State>,
 ) {
     use tokens::size::settings::{
         PREVIEW_CHIP_PADDING_X, PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS,
@@ -5239,39 +5321,49 @@ fn preview_chips(
     }
     // タグは macOS の resultChip と同じく枠の無い薄い背景にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
     let two_lines = shown.labels.iter().any(Option::is_some);
-    let height = size::BODY_LINE_HEIGHT
-        + if two_lines {
-            size::NOTE_LINE_HEIGHT
-        } else {
-            0.0
-        }
-        + PREVIEW_CHIP_PADDING_Y * 2.0;
-    let (mut x, mut y) = (rect.x, rect.y);
+    let areas = chip_areas(&*canvas, rect, shown, gap);
     canvas.push_clip(rect);
-    for (index, chip) in shown.chips.iter().enumerate() {
-        let label = shown.labels.get(index).and_then(Option::as_ref);
-        let text_width = canvas
-            .width(chip, TextStyle::Body)
-            .max(label.map_or(0.0, |(label, _)| canvas.width(label, TextStyle::Caption)));
-        let width = (text_width + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
-        if x > rect.x && x + width > rect.x + rect.width {
-            x = rect.x;
-            y += height + gap;
-        }
-        if y + height > rect.y + rect.height {
+    for (index, area) in areas.into_iter().enumerate() {
+        let Some(chip) = shown.chips.get(index) else {
             break;
-        }
-        let area = Rect::new(x, y, width, height);
+        };
+        let label = shown.labels.get(index).and_then(Option::as_ref);
         canvas.fill_round(
             area,
             PREVIEW_CHIP_RADIUS,
             Color::from(palette.text).with_alpha(opacity::PREVIEW_CHIP),
         );
+        let chip_state = state(index);
+        if let Some(chip_state) = chip_state {
+            // 押せるタグは，ポインターを載せたら背景を変える(テーマの行と同じ色)
+            canvas.fill_round(
+                area,
+                PREVIEW_CHIP_RADIUS,
+                Color::from(palette.nav_hover).with_alpha(
+                    chip_state
+                        .hover
+                        .max(if chip_state.pressed { 1.0 } else { 0.0 }),
+                ),
+            );
+        }
+        let menu = chip_opens_menu(shown, index);
+        let chevron = if menu {
+            tokens::size::space::INLINE
+                + canvas.width(theme.glyphs.chevron_down, TextStyle::IconSmall)
+        } else {
+            0.0
+        };
         let inner = Rect::new(
-            x + PREVIEW_CHIP_PADDING_X,
-            y + PREVIEW_CHIP_PADDING_Y,
-            width - PREVIEW_CHIP_PADDING_X * 2.0,
+            area.x + PREVIEW_CHIP_PADDING_X,
+            area.y + PREVIEW_CHIP_PADDING_Y,
+            area.width - PREVIEW_CHIP_PADDING_X * 2.0,
             size::BODY_LINE_HEIGHT,
+        );
+        let text_area = Rect::new(
+            inner.x,
+            inner.y,
+            (inner.width - chevron).max(0.0),
+            inner.height,
         );
         let layout = if two_lines {
             TextLayout::CENTER
@@ -5279,12 +5371,26 @@ fn preview_chips(
             TextLayout::LINE
         };
         canvas.text(
-            inner,
+            text_area,
             chip,
             TextStyle::Body,
             Color::from(palette.text),
             layout,
         );
+        if menu {
+            canvas.text(
+                Rect::new(
+                    text_area.max_x() + tokens::size::space::INLINE,
+                    inner.y,
+                    chevron - tokens::size::space::INLINE,
+                    inner.height,
+                ),
+                theme.glyphs.chevron_down,
+                TextStyle::IconSmall,
+                Color::from(palette.text_secondary),
+                TextLayout::CENTER,
+            );
+        }
         if let Some((label, japanese)) = label {
             let color = if *japanese {
                 palette.accent
@@ -5299,7 +5405,9 @@ fn preview_chips(
                 TextLayout::CENTER,
             );
         }
-        x += width + gap;
+        if chip_state.is_some_and(|state| state.focus_visible) {
+            paint::focus_ring(canvas, theme, area, PREVIEW_CHIP_RADIUS);
+        }
     }
     canvas.pop_clip();
 }
@@ -6041,5 +6149,68 @@ fn font_items(
                 .collect();
             (items, choice)
         }
+    }
+}
+
+#[cfg(test)]
+mod chip_tests {
+    use super::*;
+
+    /// 1 字を 10 の幅で数える(絵の書体の字も 10)
+    struct Fixed;
+
+    impl paint::Measure for Fixed {
+        fn width(&self, text: &str, _: TextStyle) -> f32 {
+            text.chars().count() as f32 * 10.0
+        }
+        fn wrapped_height(&self, _: &str, _: TextStyle, _: f32) -> f32 {
+            size::BODY_LINE_HEIGHT
+        }
+        fn baseline(&self, _: &str, _: TextStyle) -> f32 {
+            size::BODY_LINE_HEIGHT * 0.75
+        }
+    }
+
+    fn shown(chips: &[&str], typed: &[&str]) -> crate::engine::PreviewShown {
+        crate::engine::PreviewShown {
+            chips: chips.iter().map(|chip| (*chip).to_string()).collect(),
+            line: String::new(),
+            labels: chips
+                .iter()
+                .map(|_| Some(("英語".to_string(), false)))
+                .collect(),
+            typed: typed.iter().map(|typed| (*typed).to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn 押せるタグは山形の分だけ広く_幅に収まらなければ次の行に送る() {
+        let gap = tokens::size::settings::PREVIEW_BUTTON_GAP;
+        let rect = Rect::new(0.0, 0.0, 300.0, 200.0);
+        let plain = chip_areas(&Fixed, rect, &shown(&["zoom", "会議"], &[]), gap);
+        let menu = chip_areas(
+            &Fixed,
+            rect,
+            &shown(&["zoom", "会議"], &["zoom", "kaigi"]),
+            gap,
+        );
+        assert_eq!(plain.len(), 2);
+        assert_eq!(menu.len(), 2);
+        assert!(menu[0].width > plain[0].width);
+        assert_eq!(menu[1].x, menu[0].max_x() + gap);
+        let narrow = chip_areas(
+            &Fixed,
+            Rect::new(0.0, 0.0, 120.0, 200.0),
+            &shown(&["zoom", "会議"], &["zoom", "kaigi"]),
+            gap,
+        );
+        assert_eq!(narrow[1].x, 0.0);
+        assert!(narrow[1].y > narrow[0].y);
+    }
+
+    #[test]
+    fn 試す欄にはタグの数だけ押せる部品を並べる_ボタンは置かない() {
+        assert!(!chip_opens_menu(&shown(&["zoom"], &[]), 0));
+        assert!(chip_opens_menu(&shown(&["zoom"], &["zoom"]), 0));
     }
 }
