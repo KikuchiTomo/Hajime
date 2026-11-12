@@ -49,7 +49,7 @@ struct WireTranslationTests {
         ], anchor: anchor)
         #expect(routed.edits == [
             .commit(text: "確定"),
-            .setComposition(segments: [WireTextSegment(text: "にほん", style: .reading), WireTextSegment(text: "語", style: .focused)], caret: nil, panelAnchor: nil),
+            .setComposition(segments: [WireTextSegment(text: "にほん", style: .reading), WireTextSegment(text: "語", style: .focused)], caret: nil, panelAnchor: nil, replacedLength: nil),
             .selectMode(mode: .direct),
         ])
         #expect(routed.ui == [
@@ -84,7 +84,7 @@ struct WireTranslationTests {
         ], anchor: nil)
         #expect(routed.edits == [
             .setComposition(segments: [WireTextSegment(text: "今日は", style: .converted), WireTextSegment(text: "かな", style: .reading)],
-                            caret: nil, panelAnchor: 3),
+                            caret: nil, panelAnchor: 3, replacedLength: nil),
         ])
     }
 
@@ -147,6 +147,23 @@ struct WireTranslationTests {
         let composing = WireSessionState(mode: .japanese, isComposing: true, keymap: keymap, wakeAfterMilliseconds: 300)
         #expect(composing.consumedKeys.isEmpty)
         #expect(composing.wakeAfterMilliseconds == 300)
+    }
+
+    @Test("予測の確定を取り消すキー(入力文字なしの Backspace)は，取り消せるときだけ受け取る")
+    func undoKeyOnlyWhenUndoable() {
+        let keymap = KeymapPreset.standard.keymap
+        let backspace = WireKeyChord(key: .backspace, modifiers: noModifiers)
+        #expect(!WireSessionState(mode: .japanese, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil).consumedKeys.contains(backspace))
+        #expect(WireSessionState(mode: .japanese, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil, undoablePrediction: true)
+            .consumedKeys.contains(backspace))
+    }
+
+    @Test("入力位置の前を置き換えるときは，次の組み立て中の文字に置き換える長さを添える．置き換えられるかは DLL が知らせたときだけ")
+    func replacePrecedingText() {
+        let routed = RoutedActions([.replacePrecedingText(5), .setMarkedText(MarkedText([.init("えぴ", style: .reading)])), .hideCandidates], anchor: nil)
+        #expect(routed.edits == [.setComposition(segments: [WireTextSegment(text: "えぴ", style: .reading)], caret: nil, panelAnchor: nil, replacedLength: 5)])
+        #expect(!InputContext(WireFieldContext(isSecure: false), settings: Settings()).canReplacePrecedingText)
+        #expect(InputContext(WireFieldContext(isSecure: false, canReplacePrecedingText: true), settings: Settings()).canReplacePrecedingText)
     }
 
     @Test("入力位置の前の文字列は打ち始めのときだけ頼む")

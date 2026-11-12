@@ -44,7 +44,9 @@ extension InputContext {
             profile: settings.profile(forApplication: wire.applicationId),
             isSecure: wire.isSecure,
             precedingText: wire.isSecure ? nil : wire.precedingText,
-            applicationID: wire.applicationId
+            applicationID: wire.applicationId,
+            // 入力位置の前の文字を置き換えられる DLL だけが知らせる(古い DLL は setComposition の replacedLength を読まない)
+            canReplacePrecedingText: wire.canReplacePrecedingText ?? false
         )
     }
 }
@@ -126,11 +128,15 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil) {
+    /// undoablePrediction は予測の確定を取り消せるか．取り消すキー(入力文字なしの Backspace など)は，取り消せるときだけ送ってもらう
+    /// (いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
+    public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil,
+                undoablePrediction: Bool = false) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
         if !isComposing {
-            for entry in keymap.entries where (entry.state == state || entry.state == .anywhere) && entry.command.isAvailable(in: state) {
+            for entry in keymap.entries where (entry.state == state || entry.state == .anywhere) && entry.command.isAvailable(in: state)
+                && (undoablePrediction || entry.command != .undoPrediction) {
                 guard let chord = WireKeyChord(entry.stroke), !chords.contains(chord) else { continue }
                 chords.append(chord)
             }
@@ -319,6 +325,8 @@ public struct RoutedActions: Sendable, Equatable {
     /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
     public init(_ actions: [ClientAction], anchor: WireRect?, composition: WireRect? = nil, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
                 listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, paletteCellSize: Double = DefaultSettings.paletteCellSize) {
+        // 次の組み立て中の文字で置き換える，入力位置の前の文字の長さ(予測の確定の取り消し)
+        var replacedLength: UInt32?
         for action in actions {
             switch action {
             case .commit(let text):
@@ -326,7 +334,10 @@ public struct RoutedActions: Sendable, Equatable {
             case .setMarkedText(let marked):
                 edits.append(.setComposition(segments: marked.segments.map { WireTextSegment(text: $0.text, style: WireTextStyle($0.style)) },
                                              caret: marked.caret.map { _ in UInt32(marked.textBeforeCaret.utf16.count) },
-                                             panelAnchor: nil))
+                                             panelAnchor: nil, replacedLength: replacedLength))
+                replacedLength = nil
+            case .replacePrecedingText(let length):
+                replacedLength = UInt32(clamping: length)
             case .selectMode(let mode):
                 edits.append(.selectMode(mode: WireInputMode(mode)))
             case .showCandidates(let panel):
@@ -371,8 +382,8 @@ public struct RoutedActions: Sendable, Equatable {
             return nil
         }.first
         if let panelAnchor, let index = edits.lastIndex(where: { if case .setComposition = $0 { true } else { false } }),
-           case .setComposition(let segments, let caret, _) = edits[index] {
-            edits[index] = .setComposition(segments: segments, caret: caret, panelAnchor: UInt32(clamping: panelAnchor))
+           case .setComposition(let segments, let caret, _, let replaced) = edits[index] {
+            edits[index] = .setComposition(segments: segments, caret: caret, panelAnchor: UInt32(clamping: panelAnchor), replacedLength: replaced)
         }
     }
 }

@@ -14,11 +14,13 @@
 /// - バージョン 10: 絵文字と記号のパレットを開くキー(⌃⌥E・⌃⌥K)を足した(PaletteKeyUpgrade)
 /// - バージョン 11: 顔文字のパレットを開くキー(⌃⌥F)を足した(KaomojiKeyUpgrade)
 /// - バージョン 12: キー設定の表のコマンド `hidePrediction`(予測に表示しない)を足し，表に入力中の ⌃⌫ か Ctrl+Delete を足した(HidePredictionKeyUpgrade)
+/// - バージョン 13: キー設定の表のコマンド `undoPrediction`(予測の確定を取り消し)を足し，表に入力文字なしの Backspace か Ctrl+Backspace を足した
+///   (PredictionUndoKeyUpgrade)
 ///
 /// 項目の名前や形を変えるときは，バージョンを 1 つ上げ，`migrations` に移し替えを足す．移し替えは JSON のまま行い，
 /// 読み込む前に古いバージョンから順に当てる．新しいバージョンのファイルを古いバージョンで開いたときは移し替えず，知らない項目を残す(Settings.unknownFields)
 public enum SettingsSchema {
-    public static let currentVersion = 12
+    public static let currentVersion = 13
     public static let versionKey = "schemaVersion"
 
     /// バージョン n から n+1 への移し替え．添字 0 がバージョン 1 → 2
@@ -34,6 +36,7 @@ public enum SettingsSchema {
         { PaletteKeyUpgrade.upgrade(&$0) },
         { KaomojiKeyUpgrade.upgrade(&$0) },
         { HidePredictionKeyUpgrade.upgrade(&$0) },
+        { PredictionUndoKeyUpgrade.upgrade(&$0) },
     ]
 
     /// ファイルのバージョンを読み，今のバージョンまで移し替える．今より新しいバージョンはそのまま

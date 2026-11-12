@@ -173,6 +173,9 @@ pub struct FieldContext {
     pub preceding_text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caret: Option<Rect>,
+    #[serde(rename = "canReplacePrecedingText")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_replace_preceding_text: Option<bool>,
 }
 
 impl fmt::Debug for FieldContext {
@@ -182,6 +185,7 @@ impl fmt::Debug for FieldContext {
             .field("isSecure", &self.is_secure)
             .field("precedingText", &REDACTED)
             .field("caret", &self.caret)
+            .field("canReplacePrecedingText", &self.can_replace_preceding_text)
             .finish()
     }
 }
@@ -254,6 +258,9 @@ pub enum EditOperation {
         #[serde(rename = "panelAnchor")]
         #[serde(default, skip_serializing_if = "Option::is_none")]
         panel_anchor: Option<u32>,
+        #[serde(rename = "replacedLength")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        replaced_length: Option<u32>,
     },
     SelectMode {
         mode: InputMode,
@@ -271,11 +278,12 @@ impl fmt::Debug for EditOperation {
                 .debug_struct("Commit")
                 .field("text", &REDACTED)
                 .finish(),
-            Self::SetComposition { segments, caret, panel_anchor, .. } => f
+            Self::SetComposition { segments, caret, panel_anchor, replaced_length, .. } => f
                 .debug_struct("SetComposition")
                 .field("segments", segments)
                 .field("caret", caret)
                 .field("panelAnchor", panel_anchor)
+                .field("replacedLength", replaced_length)
                 .finish(),
             Self::SelectMode { mode, .. } => f
                 .debug_struct("SelectMode")

@@ -54,7 +54,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// 入力中の Shift+Space と，変換中の Shift+↑ で連想変換(R-18)．
     /// 変換中の F6〜F8 は選んでいる文節だけの字種(F9・F10 は全文)，Esc は直前の変更の取り消し(続けて押すと全文を読みに戻す)，
     /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける．
-    /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)
+    /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)．
+    /// 予測を確定した直後の Backspace で補う前の読みに戻す(Windows 風・ATOK 風は確定の取り消しと同じ Ctrl+Backspace)
     static let standardRows = """
         anywhere\tEnter\tcommit
         anywhere\tEscape\tcancel
@@ -74,6 +75,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         anywhere\tUp\tpreviousCandidate
         idle\tSpace\tinsertSpace
         idle\tShift Space\tinsertAlternateSpace
+        idle\tBackspace\tundoPrediction
         composing\tSpace\tconvert
         composing\tShift Space\tassociate
         composing\tHenkan\tconvert
@@ -235,6 +237,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate
         composing\tCtrl Delete\thidePrediction
+        idle\tCtrl Backspace\tundoPrediction
         composing\tOption Space\tinsertBoundary
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
@@ -335,6 +338,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate
         composing\tCtrl Delete\thidePrediction
+        idle\tBackspace\tundoPrediction
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
@@ -409,6 +413,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tShift Henkan\tpreviousCandidatePage
         converting\tCtrl Delete\tforgetCandidate
         composing\tCtrl Delete\thidePrediction
+        idle\tCtrl Backspace\tundoPrediction
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
