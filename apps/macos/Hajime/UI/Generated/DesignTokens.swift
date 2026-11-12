@@ -236,6 +236,7 @@ enum DesignTokens {
             static let commandTitleColumnWidth: CGFloat = 120
             static let commandKindColumnWidth: CGFloat = 130
             static let ruleProfileColumnWidth: CGFloat = 210
+            static let formMargin: CGFloat = 20
             static let tableHeaderInset: CGFloat = 10
             static let tableColumnSpacing: CGFloat = 17
             static let tablePopupTextInset: CGFloat = 21

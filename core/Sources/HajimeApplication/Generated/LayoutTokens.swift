@@ -117,6 +117,7 @@ public enum LayoutTokens {
         public static let commandTitleColumnWidth: Double = 120
         public static let commandKindColumnWidth: Double = 130
         public static let ruleProfileColumnWidth: Double = 210
+        public static let formMargin: Double = 20
         public static let tableHeaderInset: Double = 10
         public static let tableColumnSpacing: Double = 17
         public static let tablePopupTextInset: Double = 21

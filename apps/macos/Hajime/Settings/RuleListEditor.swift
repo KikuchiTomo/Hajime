@@ -493,9 +493,12 @@ struct RuleListEditor: View {
 
     private var noteColumn: some TableColumnContent<RuleItem, KeyPathComparator<RuleItem>> {
         TableColumn(labels.note ?? "", value: \.note) { item in
+            // 長い添え書きは「…」で切り，ポインターを載せると全文を出す
             Text(item.note).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
+                .help(item.note)
         }
-        .width(min: 80, ideal: 120)
+        // 最後の列は残りの幅に広がる．左の列の幅を決めているので，最小の幅が残りより広いと表の右にはみ出して「…」が出ない
+        .width(min: 40, ideal: 80)
     }
 
     /// 表に共通の操作(ダブルクリックで編集，右クリック，Delete キーで削除，空のときの案内)．

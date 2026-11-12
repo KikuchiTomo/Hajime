@@ -374,6 +374,7 @@ pub mod size {
         pub const COMMAND_TITLE_COLUMN_WIDTH: f32 = 120.0;
         pub const COMMAND_KIND_COLUMN_WIDTH: f32 = 130.0;
         pub const RULE_PROFILE_COLUMN_WIDTH: f32 = 210.0;
+        pub const FORM_MARGIN: f32 = 20.0;
         pub const TABLE_HEADER_INSET: f32 = 10.0;
         pub const TABLE_COLUMN_SPACING: f32 = 17.0;
         pub const TABLE_POPUP_TEXT_INSET: f32 = 21.0;
