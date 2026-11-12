@@ -245,17 +245,16 @@ struct PaletteScenarioTests {
         #expect(harness.palette?.cellsPerRow == 6)
     }
 
-    @Test("R-26: 顔文字のパレットのキーは既定では割り当てず，割り当てれば顔文字で開き，もう一度押すと閉じる")
+    @Test("R-26: ⌃⌥F で顔文字のパレットを開き，もう一度押すと閉じる")
     func kaomojiKey() {
-        #expect(KeymapPreset.allCases.allSatisfy { $0.keymap.strokes(for: .kaomojiPalette, in: .idle).isEmpty })
-        let harness = harness { $0.keymap.entries.append(KeymapEntry(.anywhere, KeyStroke(.character("j"), control: true, option: true), .kaomojiPalette)) }
-        harness.press(.character("j"), [.control, .option])
+        let harness = harness()
+        harness.press(.character("f"), [.control, .option])
         #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .kaomoji)
         // ほかの種類のキーで切り替え，開いている種類のキーで閉じる
         harness.press(.character("e"), [.control, .option])
         #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .emoji)
-        harness.press(.character("j"), [.control, .option])
-        harness.press(.character("j"), [.control, .option])
+        harness.press(.character("f"), [.control, .option])
+        harness.press(.character("f"), [.control, .option])
         #expect(harness.palette == nil)
     }
 

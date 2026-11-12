@@ -146,7 +146,7 @@ description: 設定画面の項目と既定値
 
 | 項目 | 既定 | 選択肢・説明 |
 |---|---|---|
-| 絵文字と記号のパレット | オン | Control+Option+E・Control+Option+K(Windows は Ctrl+Alt+E・Ctrl+Alt+K)でパレットを開く．顔文字のパレットには既定のキーが無い．キーはキー設定で変更できる |
+| 絵文字と記号のパレット | オン | Control+Option+E・Control+Option+K・Control+Option+F(Windows は Ctrl+Alt+E・Ctrl+Alt+K・Ctrl+Alt+F)で絵文字・記号・顔文字のパレットを開く．キーはキー設定で変更できる |
 | 入力したらパレットを閉じる | オン | オフにすると，Enter で入力しても閉じない |
 | パレットで使った文字を記録 | オン | よく使う文字の行と，検索結果の並びに使う．端末の中にだけ保存する．macOS は「使った文字の記録を消去」で消せる(ピン留めと肌の色は残る) |
 | パレットの列数 | 9 | 6〜14 |

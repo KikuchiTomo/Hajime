@@ -133,7 +133,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case emojiPalette
     /// 記号のパレットを開く．開いているときは閉じる
     case symbolPalette
-    /// 顔文字のパレットを開く．開いているときは閉じる．既定ではキーを割り当てない(⌃Tab でパレットの種類を切り替えても開ける)
+    /// 顔文字のパレットを開く．開いているときは閉じる
     case kaomojiPalette
 
     /// 設定の画面でコマンドを並べるまとまり

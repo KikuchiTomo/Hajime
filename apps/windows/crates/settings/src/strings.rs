@@ -742,9 +742,9 @@ pub mod sync {
 pub mod windows {
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
-    /// 絵文字と記号のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
+    /// 絵文字・記号・顔文字のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
     pub const PALETTE_KEYS_NOTE: &str =
-        "既定では Ctrl+Alt+E で絵文字、Ctrl+Alt+K で記号のパレットを開きます。";
+        "既定では Ctrl+Alt+E で絵文字、Ctrl+Alt+K で記号、Ctrl+Alt+F で顔文字のパレットを開きます。";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
     pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
     pub const ON: &str = "オン";
