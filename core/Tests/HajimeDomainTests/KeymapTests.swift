@@ -171,7 +171,7 @@ struct KeymapPresetTests {
         #expect(windows.command(for: KeyEvent(.down, modifiers: .control), in: .converting) == .commitFirstSegment)
         #expect(windows.command(for: KeyEvent(.function(2)), in: .composing) == .convertWithoutLearning)
         #expect(windows.command(for: KeyEvent(.muhenkan), in: .composing) == .switchKanaType)
-        // 変換中の Tab は候補を表に広げる(Microsoft IME と同じ)
+        // 変換中の Tab は候補を表に広げる
         #expect(windows.command(for: KeyEvent(.tab), in: .converting) == .expandCandidates)
         // 連想は macOS の標準と同じ ⇧↑(Alt+↑ も使える)
         #expect(windows.command(for: KeyEvent(.up, modifiers: .shift), in: .converting) == .associate)

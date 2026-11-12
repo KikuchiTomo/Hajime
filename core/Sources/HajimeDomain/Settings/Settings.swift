@@ -73,7 +73,7 @@ public struct Settings: Sendable, Equatable {
     public var branchCandidatesPerPage = DefaultSettings.latticeCandidatesPerSegment
     /// 候補を表に広げたとき(キー設定の表の「候補を表に広げる」)の列の数．1 列の行の数は一覧の候補の数
     public var candidateGridColumns = DefaultSettings.candidateGridColumns
-    /// 候補を送り続けて最初のページを越えたら，候補を表に広げる(Microsoft IME のテーブルビューと同じ)
+    /// 候補を送り続けて最初のページを越えたら，候補を表に広げる(目当ての候補が最初のページに無かったので，まとめて見せる)
     public var expandsGridOnPaging = false
     /// ライブ変換で，打鍵が止まってから漢字にするまでの時間(秒)
     public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
