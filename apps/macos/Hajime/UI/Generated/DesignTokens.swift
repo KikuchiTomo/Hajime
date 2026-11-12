@@ -506,6 +506,7 @@ enum DesignTokens {
             static let aboutIcon: CGFloat = 64
             static let templateNowWidth: CGFloat = 160
             static let keymapListHeight: CGFloat = 400
+            static let segmentInset: CGFloat = 2
             static let listArrowWidth: CGFloat = 24
             static let titleBarHeight: CGFloat = 32
             static let titleBarIconSize: CGFloat = 16

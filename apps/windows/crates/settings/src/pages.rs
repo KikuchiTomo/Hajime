@@ -528,6 +528,8 @@ pub struct ListButtons {
     pub toolbar: bool,
     /// 表の下のボタンのうち，右に寄せる末尾のボタンの数(キー設定の既定に戻す)
     pub trailing_bottom: usize,
+    /// 最後の入力欄を次の行に幅いっぱいで置く(ユーザー辞書のコメント．macOS の RuleListEditor の添え書きの欄)
+    pub note_line: bool,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -699,6 +701,7 @@ impl Control {
             field_widths,
             toolbar: keymap,
             trailing_bottom: usize::from(keymap),
+            note_line: matches!(self, Control::Dictionary(_)),
         })
     }
 
@@ -1841,7 +1844,9 @@ const DICTIONARY_FIELDS: &[Field] = &[
         options::WORD_CLASSES,
         false,
     ),
-    Field::named("comment", settings::COMMENT, false).optional(),
+    Field::named("comment", settings::COMMENT, false)
+        .optional()
+        .prompt(settings::COMMENT_PROMPT),
 ];
 
 /// ユーザー辞書の注記に入れ替えて出す文(品詞の欄で選んでいる値と文)
