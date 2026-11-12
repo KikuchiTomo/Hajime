@@ -1,7 +1,7 @@
 import AppKit
 import HajimeDomain
 
-/// 入力モードを切り替えたとき，入力位置の近くに小さな札を出す(docs/dev/DESIGN-SYSTEM.md の「モードの表示」)．
+/// 入力モードを切り替えたとき，入力位置の近くに小さな表示を出す(docs/dev/DESIGN-SYSTEM.md の「モードの表示」)．
 @MainActor
 final class ModeIndicatorController {
     private let view = ModeIndicatorView()
@@ -61,7 +61,7 @@ final class ModeIndicatorView: NSView {
 
     var label = "" { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
-    /// glass の面を自分で塗るか．ぼかしの地の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
 
     private var attributes: [NSAttributedString.Key: Any] {
@@ -69,7 +69,7 @@ final class ModeIndicatorView: NSView {
         return [.font: font, .foregroundColor: theme.text]
     }
 
-    /// glass は角丸の正方形(文字が長いときは横に伸ばす)，platinum と desk は文字に合わせた札
+    /// glass は角丸の正方形(文字が長いときは横に伸ばす)，platinum と desk は文字に合わせた四角
     override var fittingSize: NSSize {
         let text = label.size(withAttributes: attributes)
         if theme.isRounded {
@@ -88,7 +88,7 @@ final class ModeIndicatorView: NSView {
         } else {
             BevelDrawing.drawPanel(in: bounds, theme: theme)
         }
-        // 文字の行の箱を札の真ん中に置く
+        // 文字の行の箱をタグの真ん中に置く
         let width = label.size(withAttributes: attributes).width
         TextFitting.draw(label, attributes: attributes, x: (bounds.width - width) / 2, midY: bounds.midY)
     }

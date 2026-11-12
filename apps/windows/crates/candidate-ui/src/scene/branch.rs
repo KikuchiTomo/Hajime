@@ -20,7 +20,7 @@ use crate::strings;
 use crate::theme::Font;
 use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
 use tokens::size::meaning as card_size;
-use tokens::size::{branch, candidate, glass, space};
+use tokens::size::{branch, candidate, glass, part, space};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
 struct Metrics {
@@ -32,12 +32,12 @@ struct Metrics {
     /// 候補の文字の前に置く番号の幅
     lead: f32,
     footer_height: f32,
-    /// 候補の行の地の上下を縮める量(角丸のテーマ)．行の地の見える上の端は行の上の端からこの分だけ下
+    /// 候補の行の背景の上下を縮める量(角丸のテーマ)．行の背景の見える上の端は行の上の端からこの分だけ下
     row_inset: f32,
     shadow: f32,
     line_width: f32,
     line_width_selected: f32,
-    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
+    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の背景が上下に細いので，その端から伸ばす)
     root_inset: f32,
     /// 枝の曲がり角の半径．直線の枝は 0(直角)
     turn_radius: f32,
@@ -49,7 +49,7 @@ struct Metrics {
 const GAP: f32 = glass::SEPARATOR_GAP;
 
 impl Metrics {
-    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の地の左から PADDING_X)にそろえる
+    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から PADDING_X)にそろえる
     fn text_inset(&self) -> f32 {
         self.inset + candidate::PADDING_X
     }
@@ -61,7 +61,7 @@ impl Metrics {
         } else {
             0.0
         };
-        // 足元の行(と注釈・知らせの行)は，キーの札・案内のアイコン・文字の行の箱のいちばん高いもの
+        // 足元の行(と注釈・知らせの行)は，キーキャップ・案内のアイコン・文字の行の箱のいちばん高いもの
         let footer_height = glass::KEYCAP_HEIGHT
             .max(glass::NOTE_ICON_SIZE)
             .max(measure.height(Font::Label).ceil());
@@ -72,7 +72,7 @@ impl Metrics {
                 trunk_gap: glass::TRUNK_GAP,
                 branch_indent: glass::BRANCH_INDENT,
                 stem_x: glass::BRANCH_STEM_X,
-                lead: glass::BADGE_SIZE + candidate::PADDING_X,
+                lead: glass::BADGE_SIZE + glass::BADGE_GAP,
                 footer_height,
                 row_inset: glass::SELECTION_INSET_Y,
                 shadow,
@@ -167,24 +167,6 @@ fn position(map: &BranchMap) -> String {
     }
 }
 
-/// 候補の右にカードを出すか(意味があるか，空けておく場所があるか)
-fn has_side_card(map: &BranchMap, reserved: Option<f32>) -> bool {
-    focused(map).is_some_and(|(_, column)| {
-        column.split.is_none()
-            && meaning::placement(map.meaning_placement) == MeaningPlacement::Side
-            && (column.homophone.is_some() || reserved.is_some())
-    })
-}
-
-/// 候補の右の語の意味の置き方．枝の 3 段目として，目印の列は場所の左の端，見出しの行は最初の候補の行の地の真ん中
-pub(super) fn side_position(look: &Look, measure: &dyn Measure) -> Placement {
-    let metrics = Metrics::new(look, measure);
-    Placement {
-        left: 0.0,
-        header_mid_y: (metrics.row_height - metrics.row_inset * 2.0) / 2.0,
-    }
-}
-
 /// 候補の下の語の意味の置き方．目印の列を幹の文字と足元の左の端にそろえる
 fn below_position(painter: &Painter) -> Placement {
     Placement {
@@ -193,44 +175,28 @@ fn below_position(painter: &Painter) -> Placement {
     }
 }
 
-/// 注目している文節で出す，幅 width の語の意味．区切っているあいだは出さない．
-/// 候補の右は窓の中身の右の端まで，候補の下は窓の中身の幅
-fn meaning_slot(
-    map: &BranchMap,
-    painter: &Painter,
-    metrics: &Metrics,
-    reserved: Option<f32>,
-    width: f32,
-) -> Option<Slot> {
+/// 注目している文節で，候補の下に出す幅 width(窓の中身の幅)の語の意味．区切っているあいだと，
+/// 候補の右(吹き出し)に出す設定では None
+fn meaning_slot(map: &BranchMap, painter: &Painter, width: f32) -> Option<Slot> {
     let (_, column) = focused(map)?;
-    if column.split.is_some() {
+    if column.split.is_some() || map.meaning_placement != Some(MeaningPlacement::Below) {
         return None;
     }
-    match meaning::placement(map.meaning_placement) {
-        MeaningPlacement::Side => {
-            let position = Placement {
-                left: 0.0,
-                header_mid_y: (metrics.row_height - metrics.row_inset * 2.0) / 2.0,
-            };
-            let card = column
-                .homophone
-                .as_ref()
-                .map(|note| meaning::branch_card(painter, note, column, width, position));
-            meaning::side_slot(card, width, reserved, position, 0.0)
-        }
-        MeaningPlacement::Below => {
-            let note = column.homophone.as_ref()?;
-            let position = below_position(painter);
-            Some(meaning::below_slot(
-                meaning::branch_card(painter, note, column, width, position),
-                position,
-                0.0,
-            ))
-        }
-    }
+    let note = column.homophone.as_ref()?;
+    let position = below_position(painter);
+    Some(meaning::below_slot(
+        meaning::Card::new(
+            painter,
+            note,
+            meaning::branch_others(note, column),
+            width,
+            position,
+        ),
+        0.0,
+    ))
 }
 
-fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Option<f32>) -> Layout {
+fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     let padding = candidate::PADDING_X;
     let mut x = metrics.inset;
     let mut trunk_x = Vec::new();
@@ -289,15 +255,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         + label_width
         + note_width
         + padding * 2.0;
-    // 候補の右に出すカードは，候補の枝の先に続けて置く(枝の一部として幅に数える)
-    let side = has_side_card(map, reserved);
-    let card_extent = if side {
-        card_size::CARD_GAP + card_size::BRANCH_WIDTH
-    } else {
-        0.0
-    };
-    let branch_right =
-        focused.map_or(metrics.inset, |(index, _)| trunk_x[index]) + branch_width + card_extent;
+    let branch_right = focused.map_or(metrics.inset, |(index, _)| trunk_x[index]) + branch_width;
     let preview_rows = usize::from(map.columns.iter().any(|column| column.preview.is_some()));
     let upper_rows = column.map_or(0, |column| column.variants.len());
     let lower_rows = column
@@ -331,13 +289,13 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         .max(footer + metrics.inset * 2.0)
         .max(note + metrics.inset * 2.0)
         .max(heading + (metrics.inset + candidate::PADDING_X) * 2.0);
-    // いちばん上の行の地(角丸のテーマは行の上下を縮めて描く)の上の端を，縁の内側の余白の端にそろえる
+    // いちばん上の行の背景(角丸のテーマは行の上下を縮めて描く)の上の端を，枠線の内側の余白の端にそろえる
     let trunk_y = metrics.inset - metrics.row_inset
         + heading_height(map, metrics)
         + upper_rows as f32 * metrics.row_height;
     let width = width.ceil();
     let content_right = width - metrics.inset;
-    // 下の枝の見える下の端(候補の行の地の下の端)
+    // 下の枝の見える下の端(候補の行の背景の下の端)
     let lower_top = trunk_y + metrics.row_height;
     let mut bottom = lower_top + metrics.row_height * lower_rows as f32
         - if lower_rows > 0 {
@@ -345,38 +303,13 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         } else {
             0.0
         };
-    let mut slot = None;
-    let mut card = None;
-    if let Some((index, _)) = focused {
-        if side {
-            // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端
-            // 枝の行の右の端(branches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
-            let x = (trunk_x[index] + metrics.stem_x).round() - metrics.stem_x
-                + branch_width
-                + card_size::CARD_GAP;
-            let card_width = (content_right - x).max(card_size::BRANCH_WIDTH).floor();
-            slot = meaning_slot(map, painter, metrics, reserved, card_width);
-            if let Some(slot) = &slot {
-                let frame = Frame::new(x, lower_top + metrics.row_inset, slot.width, slot.height);
-                bottom = bottom.max(frame.max_y());
-                card = Some(frame);
-            }
-        } else if map.meaning_placement == Some(MeaningPlacement::Below) {
-            // 候補の下: 窓の中身の幅いっぱい．枝とのあいだも区切りの線と同じ空き
-            slot = meaning_slot(
-                map,
-                painter,
-                metrics,
-                reserved,
-                content_right - metrics.inset,
-            );
-            if let Some(slot) = &slot {
-                let frame = Frame::new(metrics.inset, bottom + GAP, slot.width, slot.height);
-                bottom = frame.max_y();
-                card = Some(frame);
-            }
-        }
-    }
+    // 候補の下: 窓の中身の幅いっぱい．枝とのあいだも区切りの線と同じ空き
+    let slot = meaning_slot(map, painter, content_right - metrics.inset);
+    let card = slot.as_ref().map(|slot| {
+        let frame = Frame::new(metrics.inset, bottom + GAP, slot.width, slot.height);
+        bottom = frame.max_y();
+        frame
+    });
     let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
         + usize::from(map.note.is_some());
     let height = bottom
@@ -415,7 +348,7 @@ fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
     painter.hints_width(&map.hints) + source + association
 }
 
-/// 連想の知らせ(R-18)のキーキャップの札．キーが割り当てられていなければ None(語だけを文字で出す)
+/// 連想の知らせ(R-18)のキーキャップ．キーが割り当てられていなければ None(語だけを文字で出す)
 fn association_key_hint(map: &BranchMap) -> Option<KeyHint> {
     let label = map.association_hint.as_ref()?;
     map.association_key.as_ref().map(|key| KeyHint {
@@ -437,7 +370,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
-    let layout = layout(map, &metrics, &painter, look.reserved_card);
+    let layout = layout(map, &metrics, &painter);
     let (width, height) = look.sized(
         layout.width + metrics.shadow,
         layout.height + metrics.shadow,
@@ -451,22 +384,15 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             body.width - metrics.text_inset() * 2.0,
             metrics.footer_height,
         );
-        super::association::draw(&mut painter, heading, row.inset(-candidate::PADDING_X, 0.0));
+        super::association::draw(&mut painter, heading, row);
         painter.separator(row.max_y() + GAP, metrics.inset, body.width - metrics.inset);
     }
     let focused_index = focused(map).map(|(index, _)| index);
-    // 注目している文節の枝(候補の右のカードを含む)が重なる範囲には，ほかの文節の添え書きを描かない
-    let side_card = layout
-        .slot
-        .as_ref()
-        .zip(layout.card)
-        .filter(|(slot, _)| slot.placement == MeaningPlacement::Side);
+    // 注目している文節の枝が重なる範囲には，ほかの文節の添え書きを描かない
     let branch_range = focused_index.map(|index| {
         (
             layout.trunk_x[index],
-            side_card.map_or(layout.trunk_x[index] + layout.branch_width, |(_, card)| {
-                card.max_x()
-            }),
+            layout.trunk_x[index] + layout.branch_width,
         )
     });
     for (index, column) in map.columns.iter().enumerate() {
@@ -477,6 +403,8 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             metrics.row_height,
         );
         trunk_node(&mut painter, column, node);
+        // 語の意味の吹き出しは幹の文節を覆わない
+        painter.keep_clear.push(node);
         painter.hit(
             node,
             ipc::PointerTarget::Segment {
@@ -498,6 +426,29 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             }
         }
         if column.is_focused {
+            // 吹き出しは選んでいない枝の行を覆わない
+            let lower = lower_rows(column, look.rest_opacity).len();
+            let upper = upper_rows(column, look.rest_opacity).len();
+            for index in
+                (0..lower).filter(|index| column.selected_alternative != Some(*index as u32))
+            {
+                painter.keep_clear.push(branch_row(
+                    node,
+                    layout.branch_width,
+                    index,
+                    true,
+                    &metrics,
+                ));
+            }
+            for index in 0..upper {
+                painter.keep_clear.push(branch_row(
+                    node,
+                    layout.branch_width,
+                    index,
+                    false,
+                    &metrics,
+                ));
+            }
             // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
             let pressable = column.split.is_none();
             branches(
@@ -518,8 +469,8 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             );
             if pressable {
                 for index in 0..column.alternatives.len() {
-                    // コメントの札は枝の行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
-                    // 札を押すと候補の代わりにコメントを入れる
+                    // コメントのタグは枝の行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
+                    // タグを押すと候補の代わりにコメントを入れる
                     if let Some(comment) = super::alternative_comment(column, index) {
                         let row = branch_row(node, layout.branch_width, index, true, &metrics);
                         let frame = painter.tag_hit_frame(comment, tag_max_x(row), row);
@@ -548,26 +499,6 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                     );
                 }
             }
-            if let Some((slot, card)) = side_card {
-                // 選んでいる候補の枝の先から，語の意味の見出しへ線でつなぐ
-                let selected = column
-                    .selected_alternative
-                    .filter(|index| (*index as usize) < column.alternatives.len());
-                if let (Some(selected), Some(content)) = (selected, &slot.card) {
-                    let row_y = node.max_y() + selected as f32 * metrics.row_height;
-                    // 枝の行の右の端(枝の根もとの x を整数に丸めた分だけずれる)から出す
-                    let start = Point::new(
-                        (node.x + metrics.stem_x).round() - metrics.stem_x + layout.branch_width,
-                        (row_y + metrics.row_height / 2.0).round(),
-                    );
-                    let end = Point::new(
-                        meaning::connector_end_x(card, slot.position),
-                        content.header_mid_y(card),
-                    );
-                    meaning::connector(&mut painter, start, end);
-                }
-                meaning::draw(&mut painter, slot.card.as_ref(), card, slot.position);
-            }
         } else if let Some(preview) = column.preview.as_deref() {
             let overlaps =
                 branch_range.is_some_and(|(from, to)| node.x <= to && node.max_x() >= from);
@@ -590,12 +521,17 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         }
     }
     let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
+    // 吹き出しは枝の下の注釈・候補の下の語の意味・足元を覆わない
+    painter.keep_clear.push(Frame::new(
+        body.x,
+        footer_y,
+        body.width,
+        body.max_y() - footer_y,
+    ));
     let content_width = body.width - metrics.text_inset() * 2.0;
     if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
-        if slot.placement == MeaningPlacement::Below {
-            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す
-            meaning::draw(&mut painter, slot.card.as_ref(), card, slot.position);
-        }
+        // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す
+        meaning::draw(&mut painter, &slot.card, card);
     }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
         let row = Frame::new(
@@ -622,10 +558,10 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     painter.finish(width, height)
 }
 
-/// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)．直していなければ 0
+/// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」のタグの幅(前の空きを含む)．直していなければ 0
 fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
     if column.is_corrected == Some(true) {
-        painter.tag_width(strings::CORRECTED) + candidate::PADDING_X / 2.0
+        painter.tag_width(strings::CORRECTED) + space::INLINE
     } else {
         0.0
     }
@@ -688,7 +624,7 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
         // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
         painter.tag(
             strings::CORRECTED,
-            node.max_x() - candidate::PADDING_X / 2.0,
+            node.max_x() - part::ROW_PADDING_X,
             node.mid_y(),
             !rounded && column.is_focused,
             TagStyle::Corrected,
@@ -740,7 +676,7 @@ struct Row {
     opacity: f32,
     /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
     note: Option<String>,
-    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
+    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色のタグにする)
     command: Option<CommandKind>,
     /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
     detail: Option<String>,
@@ -788,7 +724,7 @@ fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
         .collect()
 }
 
-/// 枝の index 番目の行(番号・文字・札を描く枠)．描くときと押した位置を調べるときで同じものを使う
+/// 枝の index 番目の行(番号・文字・タグを描く枠)．描くときと押した位置を調べるときで同じものを使う
 fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &Metrics) -> Frame {
     let stem_x = (node.x + metrics.stem_x).round();
     let y = if downward {
@@ -804,9 +740,9 @@ fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &M
     )
 }
 
-/// 枝の行の札の右端
+/// 枝の行のタグの右端
 fn tag_max_x(row: Frame) -> f32 {
-    row.max_x() - candidate::PADDING_X / 2.0
+    row.max_x() - part::ROW_PADDING_X
 }
 
 fn branches(
@@ -841,10 +777,10 @@ fn branches(
 
 /// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
 fn lead_min_x(row: Frame) -> f32 {
-    row.x + candidate::PADDING_X / 2.0
+    row.x + part::ROW_PADDING_X
 }
 
-/// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
+/// 幹の根元: 下の枝は文節のタグの下の端，上の枝は上の端
 fn root_y(node: Frame, downward: bool, metrics: &Metrics) -> f32 {
     if downward {
         node.max_y() - metrics.root_inset
@@ -939,7 +875,6 @@ fn turn_segments(turn: &Turn) -> Vec<Segment> {
 
 fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
     let theme = painter.theme;
-    let padding = candidate::PADDING_X;
     let opacity = if row.selected { 1.0 } else { row.opacity };
     let text_color = if row.selected {
         theme.selection_text
@@ -976,13 +911,13 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
             Frame::new(
                 lead_min_x(frame),
                 frame.y,
-                metrics.lead - padding / 2.0,
+                metrics.lead - part::ROW_PADDING_X,
                 frame.height,
             ),
             Font::Key,
         );
     }
-    let mut text_x = frame.x + padding / 2.0 + metrics.lead;
+    let mut text_x = frame.x + part::ROW_PADDING_X + metrics.lead;
     if let Some(kind) = row.command {
         // コマンドの候補は，文字の前に種類のアイコンを置く
         painter.command(kind, text_x, frame.mid_y(), row.selected, opacity);
@@ -1024,8 +959,9 @@ fn draw_preview(
     let stem_x = node.x + metrics.stem_x;
     let row = Frame::new(stem_x, node.max_y(), node.width, metrics.row_height);
     let color = theme.text_muted.faded(rest);
-    // 枝と同じ形で，幹から短く曲がる
-    let tip_x = (stem_x + metrics.branch_indent / 2.0).round();
+    // 枝と同じ形で，幹から短く曲がる．枝の行の左の端までの真ん中で止める
+    let branch_min_x = stem_x + metrics.branch_indent;
+    let tip_x = ((stem_x + branch_min_x) / 2.0).round();
     lines(
         painter,
         Point::new(stem_x, root_y(node, true, metrics)),
@@ -1157,7 +1093,19 @@ mod tests {
     }
 
     #[test]
-    fn コマンドの枝は種類のアイコンと札を付け_選ぶと幹も印の代わりにアイコンで見せる() {
+    fn 連想の見出しが窓の幅を決めるときは説明と位置のあいだを_group_だけ空ける() {
+        use super::super::association::testing::{gap, long};
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut associated = map();
+            associated.association = Some(long());
+            let scene = branch_map(&associated, &Look::new(&theme, 15.0), &Fixed);
+            assert_eq!(gap(&scene), space::GROUP, "{name}");
+        }
+    }
+
+    #[test]
+    fn コマンドの枝は種類のアイコンとタグを付け_選ぶと幹も印の代わりにアイコンで見せる() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
@@ -1237,7 +1185,7 @@ mod tests {
     }
 
     #[test]
-    fn コメントの札を押すとコメント_札の外の枝と_コメントでない札は候補() {
+    fn コメントのタグを押すとコメント_タグの外の枝と_コメントでないタグは候補() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let mut commented = map();
@@ -1253,23 +1201,23 @@ mod tests {
                     .map(|hit| hit.frame)
             };
             let comment = ipc::PointerTarget::Comment { index: 0 };
-            let tag = text_frame(&scene, "千代田区千代田1-1").expect("札を描く");
+            let tag = text_frame(&scene, "千代田区千代田1-1").expect("タグを描く");
             assert_eq!(
                 scene.target_at(tag.mid_x(), tag.mid_y()),
                 Some(comment.clone())
             );
-            // 札の上下の空きも，枝の行の高さいっぱいまで札として押せる
+            // タグの上下の空きも，枝の行の高さいっぱいまでタグとして押せる
             let row = hit(ipc::PointerTarget::Alternative { index: 0 }).expect("枝の行");
-            let area = hit(comment.clone()).expect("札を押せる範囲");
+            let area = hit(comment.clone()).expect("タグを押せる範囲");
             assert_eq!((area.y, area.height), (row.y, row.height), "{name}");
             assert!(area.max_x() <= row.max_x(), "{name}");
             assert_eq!(scene.target_at(tag.mid_x(), row.y + 1.0), Some(comment));
-            // 札の左(候補の文字の側)は候補
+            // タグの左(候補の文字の側)は候補
             assert_eq!(
                 scene.target_at(area.x - 1.0, row.mid_y()),
                 Some(ipc::PointerTarget::Alternative { index: 0 })
             );
-            // コメントでない札(修正)は押しても候補
+            // コメントでないタグ(修正)は押しても候補
             let corrected = scene
                 .draws
                 .iter()
@@ -1278,13 +1226,13 @@ mod tests {
                     _ => None,
                 })
                 .find(|frame| frame.y > row.y)
-                .expect("枝の札を描く");
+                .expect("枝のタグを描く");
             assert_eq!(
                 scene.target_at(corrected.mid_x(), corrected.mid_y()),
                 Some(ipc::PointerTarget::Alternative { index: 1 })
             );
         }
-        // コメントの無い分岐図には札の押せる範囲を足さない
+        // コメントの無い分岐図にはタグの押せる範囲を足さない
         let theme = theme("automatic");
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         assert!(!scene
@@ -1380,8 +1328,8 @@ mod tests {
         assert_eq!(arcs(&paths[0].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
         assert_eq!(arcs(&paths[1].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
         assert_eq!(arcs(&paths[2].0), vec![(glass::BRANCH_TURN_RADIUS, true)]);
-        // 選んだ道は文節の地の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
-        // いちばん上の行の地の上の端が縁の内側の余白の端にそろうよう，行は地を縮めた分だけ上から始まる
+        // 選んだ道は文節の背景の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
+        // いちばん上の行の背景の上の端が枠線の内側の余白の端にそろうよう，行は背景を縮めた分だけ上から始まる
         let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
         let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
         assert_eq!(
@@ -1389,10 +1337,9 @@ mod tests {
             node_bottom - glass::SELECTION_INSET_Y
         );
         // 番号の丸の左の端から inline だけ手前
-        let tip_x = (inset + glass::BRANCH_STEM_X).round()
-            + glass::BRANCH_INDENT
-            + candidate::PADDING_X / 2.0
-            - space::INLINE;
+        let tip_x =
+            (inset + glass::BRANCH_STEM_X).round() + glass::BRANCH_INDENT + part::ROW_PADDING_X
+                - space::INLINE;
         for (figures, _, _) in &paths {
             assert!(figures.iter().all(|figure| tip(figure).x == tip_x));
         }
@@ -1419,7 +1366,7 @@ mod tests {
         let scene = branch_map(&map(), &look, &Fixed);
         for (figures, _, width) in paths(&scene) {
             for figure in &figures {
-                // 幹の線の縁と水平の線の縁が，デバイスのピクセルの境に来る
+                // 幹の線の端と水平の線の端が，デバイスのピクセルの境に来る
                 let edge = figure.start.x * 2.0 - width;
                 let end = tip(figure);
                 assert_eq!(end.x * 2.0, (end.x * 2.0).round());
@@ -1533,80 +1480,36 @@ mod tests {
     }
 
     #[test]
-    fn 語の意味は選んでいる候補の枝の先に箱を描かずに置き_線でつなぐ() {
+    fn 吹き出しに出す設定では枝の窓に語の意味を入れず_選んでいる枝の行を指す() {
         for name in ["washi", "platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
-            let scene = branch_map(&meaning_map(ipc::MeaningPlacement::Side), &look, &Fixed);
-            let texts = texts(&scene);
-            for text in ["写真や動画を写す", "動詞", "採る"] {
-                assert!(
-                    texts.iter().any(|(shown, _)| shown == text),
-                    "{name}: {text}"
-                );
-            }
-            // 同音語は耳のアイコンと札だけ．見出しの言葉は置かない
-            assert!(!texts.iter().any(|(shown, _)| shown == "同音語"), "{name}");
-            // 同音語の札には，枝に出ている語(取る)を出さない
-            let tags = texts.iter().filter(|(shown, _)| shown == "取る").count();
-            assert_eq!(tags, 1, "{name}");
-            // 語の意味は候補の枝の右に，つなぐ線を引く幅を空けて置く
-            let meaning = text_frame(&scene, "写真や動画を写す").expect("意味を描く");
-            let branch = scene
+            let shown = meaning_map(ipc::MeaningPlacement::Side);
+            let scene = branch_map(&shown, &look, &Fixed);
+            assert!(text_frame(&scene, "写真や動画を写す").is_none(), "{name}");
+            // 意味の無い枝の窓と同じ大きさ
+            let mut plain = shown.clone();
+            plain.columns[1].homophone = None;
+            let bare = branch_map(&plain, &look, &Fixed);
+            assert_eq!(
+                (scene.width, scene.height),
+                (bare.width, bare.height),
+                "{name}"
+            );
+            // 吹き出しは選んでいる枝の行を指し，同音語のタグには枝に出ていない語だけを出す
+            let (note, others, row) =
+                super::super::bubble::for_branch(&shown, &scene).expect("吹き出し");
+            assert_eq!(note.word, "撮る");
+            assert_eq!(others, vec!["採る".to_string()]);
+            let selected = scene
                 .hits
                 .iter()
                 .find(|hit| hit.target == ipc::PointerTarget::Alternative { index: 1 })
                 .map(|hit| hit.frame)
                 .expect("選んでいる枝");
-            assert!(meaning.x >= branch.max_x() + card_size::CARD_GAP, "{name}");
-            // 端の丸は見出しのアイコンの手前(目印の列の左の端から XS)
-            let dot = scene
-                .draws
-                .iter()
-                .find_map(|draw| match draw {
-                    Draw::Ellipse { frame, color }
-                        if frame.width == card_size::DOT_SIZE && *color == theme.selection =>
-                    {
-                        Some(*frame)
-                    }
-                    _ => None,
-                })
-                .expect("端の丸");
-            assert_eq!(
-                dot.mid_x(),
-                branch.max_x() + card_size::CARD_GAP - tokens::size::space::XS,
-                "{name}"
-            );
-            // 選んでいる枝の行の右の端から，丸の中心まで 1 本の線(曲がり角は枝と同じ半径)
-            assert!(scene.draws.iter().any(|draw| matches!(draw,
-                Draw::Path { figures, color, .. } if *color == theme.selection
-                    && figures[0].start.x == branch.max_x().round()
-                    && matches!(figures[0].segments.last(), Some(Segment::Line(to)) if to.x == dot.mid_x()))), "{name}");
-            // 三角で指さない
-            assert!(
-                !scene
-                    .draws
-                    .iter()
-                    .any(|draw| matches!(draw, Draw::Polygon { .. })),
-                "{name}"
-            );
-            let plain = branch_map(
-                &BranchMap {
-                    meaning_placement: None,
-                    columns: meaning_map(ipc::MeaningPlacement::Side)
-                        .columns
-                        .into_iter()
-                        .map(|column| BranchColumn {
-                            homophone: None,
-                            ..column
-                        })
-                        .collect(),
-                    ..meaning_map(ipc::MeaningPlacement::Side)
-                },
-                &look,
-                &Fixed,
-            );
-            assert!(scene.width > plain.width, "{name}");
+            assert_eq!(row, selected, "{name}");
+            // 意味の無い枝を選んだら出さない
+            assert!(super::super::bubble::for_branch(&plain, &bare).is_none());
         }
     }
 
@@ -1623,58 +1526,17 @@ mod tests {
                 meaning.y > last.max_y() && meaning.max_y() < footer.y,
                 "{name}"
             );
-            // 線でつながない
+            // 吹き出しには出さない
+            let map = meaning_map(ipc::MeaningPlacement::Below);
             assert!(
-                !scene.draws.iter().any(|draw| matches!(draw,
-                Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE)),
+                super::super::bubble::for_branch(&map, &scene).is_none(),
                 "{name}"
             );
         }
     }
 
     #[test]
-    fn 分岐図で意味の無い候補に移っても空けておいたカードで窓の大きさを変えない() {
-        let theme = theme("washi");
-        let look = Look::new(&theme, 15.0);
-        let mut reservation = crate::scene::CardReservation::default();
-        let shown = meaning_map(ipc::MeaningPlacement::Side);
-        let first = branch_map(
-            &shown,
-            &Look {
-                reserved_card: reservation.branch(&shown, &look, &Fixed),
-                ..look
-            },
-            &Fixed,
-        );
-        let mut moved = shown.clone();
-        moved.columns[1].selected_alternative = Some(2);
-        moved.columns[1].text = "とる".into();
-        moved.columns[1].homophone = None;
-        moved.meaning_placement = None;
-        let empty = branch_map(
-            &moved,
-            &Look {
-                reserved_card: reservation.branch(&moved, &look, &Fixed),
-                ..look
-            },
-            &Fixed,
-        );
-        assert_eq!((empty.width, empty.height), (first.width, first.height));
-        assert!(text_frame(&empty, "写真や動画を写す").is_none());
-        assert!(empty.draws.iter().any(|draw| matches!(
-            draw,
-            Draw::Icon {
-                icon: crate::keys::Icon::Book,
-                ..
-            }
-        )));
-        // 空いたカードへは線を引かない
-        assert!(!empty.draws.iter().any(|draw| matches!(draw,
-            Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE)));
-    }
-
-    #[test]
-    fn 区切っているあいだは語の意味のカードを出さない() {
+    fn 区切っているあいだは語の意味を出さない() {
         let theme = theme("washi");
         let mut splitting = meaning_map(ipc::MeaningPlacement::Side);
         splitting.columns[1].split = Some(BranchSplit {
@@ -1682,6 +1544,7 @@ mod tests {
         });
         let scene = branch_map(&splitting, &Look::new(&theme, 15.0), &Fixed);
         assert!(text_frame(&scene, "写真や動画を写す").is_none());
+        assert!(super::super::bubble::for_branch(&splitting, &scene).is_none());
     }
 
     #[test]

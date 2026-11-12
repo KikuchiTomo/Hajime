@@ -1,13 +1,13 @@
 #![forbid(unsafe_code)]
 
-//! 入力位置の下の案内(macOS の NoteView)，モードの札(ModeIndicatorView)，続く語句の予測の窓(PredictionView)
+//! 入力位置の下の案内(macOS の NoteView)，モード表示(ModeIndicatorView)，続く語句の予測の窓(PredictionView)
 
 use super::paint::Painter;
 use super::{Frame, Look, Measure, Scene};
 use crate::theme::Font;
 use tokens::size::{candidate, glass, mode_indicator, prediction as spacing};
 
-/// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．小さな窓の余白はこの内側から測る
+/// 枠線(角丸)，外枠とベベル(platinum と desk)の太さ．小さな窓の余白はこの内側から測る
 fn edge(look: &Look) -> f32 {
     if look.theme.is_rounded() {
         candidate::FRAME_WIDTH
@@ -20,7 +20,7 @@ fn edge(look: &Look) -> f32 {
 pub fn note(note: &ipc::Note, look: &Look, measure: &dyn Measure) -> Scene {
     let mut painter = Painter::new(look, measure);
     let inset = edge(look);
-    // 1 行だけの小さな窓の余白(予測の窓・モードの札と同じ)．中身の高さは足元の行と同じ決め方
+    // 1 行だけの小さな窓の余白(予測の窓・モード表示と同じ)．中身の高さは足元の行と同じ決め方
     let width = (painter.note_width(note) + (glass::COMPACT_PADDING_X + inset) * 2.0).ceil();
     let content = glass::NOTE_ICON_SIZE
         .max(glass::KEYCAP_HEIGHT)
@@ -71,7 +71,7 @@ pub fn prediction(prediction: &ipc::Prediction, look: &Look, measure: &dyn Measu
     painter.finish(width, height)
 }
 
-/// モードの札(入力モードの「あ」「A」や，切り替えた入力方式)．角丸のテーマは角丸の正方形(文字が長いときは横に伸ばす)，platinum と desk は文字に合わせた札
+/// モード表示(入力モードの「あ」「A」や，切り替えた入力方式)．角丸のテーマは角丸の正方形(文字が長いときは横に伸ばす)，platinum と desk は文字に合わせた四角
 pub fn mode(label: &str, look: &Look, measure: &dyn Measure) -> Scene {
     let mut painter = Painter::new(look, measure);
     let text_width = measure.width(label, Font::Mode);
@@ -116,7 +116,7 @@ mod tests {
             assert!(drawn.contains(&("エピ".into(), theme.text)));
             assert!(drawn.contains(&("ソード".into(), theme.text_muted)));
             assert!(!drawn.iter().any(|(text, _)| text.contains("Tab")));
-            // キーの案内を出さない設定では札を付けず，そのぶん狭い
+            // キーの案内を出さない設定ではタグを付けず，そのぶん狭い
             let plain = prediction(
                 &ipc::Prediction { key: None, ..shown },
                 &Look::new(&theme, 15.0),
@@ -127,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn 角丸のテーマのモードの札は正方形() {
+    fn 角丸のテーマのモード表示は正方形() {
         let theme = theme("automatic");
         let scene = mode("あ", &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(scene.width, glass::MODE_INDICATOR_SIZE);
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn 長い札は横に伸ばす() {
+    fn 長いタグは横に伸ばす() {
         let theme = theme("automatic");
         let scene = mode("ローマ字", &Look::new(&theme, 15.0), &Fixed);
         assert!(scene.width > glass::MODE_INDICATOR_SIZE);
@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn platinum_のモードの札は立体の縁() {
+    fn platinum_のモード表示は立体の縁() {
         let theme = theme("platinum");
         let scene = mode("A", &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(

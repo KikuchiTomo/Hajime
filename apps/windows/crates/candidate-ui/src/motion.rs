@@ -2,7 +2,7 @@
 
 //! 候補の窓の動き(macOS の CandidatePanelController と同じ決まり)．OS に依らない部分
 //!
-//! - 出ている窓の大きさが変わるときは，縁を motion.candidate-window.resize の時間で滑らかに動かす(ease-out)
+//! - 出ている窓の大きさが変わるときは，枠線を motion.candidate-window.resize の時間で滑らかに動かす(ease-out)
 //! - 選んでいるものが同じまま中身が変わったとき(あとから届いた候補)は，motion.candidate-window.update の時間で重ねて変える
 //! - アニメーション効果がオフなら，大きさはすぐ変え，重ね変わりだけにする
 

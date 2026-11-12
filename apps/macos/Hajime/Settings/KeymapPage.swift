@@ -47,7 +47,7 @@ struct KeymapPage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DesignTokens.Size.Space.section) {
             toolbar
             missingWarning
             composer
@@ -77,7 +77,7 @@ struct KeymapPage: View {
     // MARK: 検索とひな形
 
     private var toolbar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.Size.Space.group) {
             TextField(Keys.searchPrompt, text: $query)
                 .textFieldStyle(.roundedBorder)
             if recording == .search {
@@ -130,7 +130,7 @@ struct KeymapPage: View {
         let missing = keymap.missingEssentials
         if !missing.isEmpty {
             GroupBox {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
                     ForEach(Array(missing.enumerated()), id: \.offset) { _, item in
                         Label(Keys.missing(state: Keys.label(for: item.state), command: Keys.label(for: item.command)),
                               systemImage: "exclamationmark.triangle.fill")
@@ -147,8 +147,8 @@ struct KeymapPage: View {
 
     private var composer: some View {
         GroupBox(Keys.newRow) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
+                HStack(spacing: DesignTokens.Size.Space.group) {
                     statePicker(selection: Binding(get: { draft.state }, set: setDraftState), command: nil)
                         .frame(width: DesignTokens.Size.Settings.keymapStateWidth)
                     KeyField(stroke: draft.stroke, isRecording: recording == .draft,
@@ -326,7 +326,7 @@ struct KeymapPage: View {
     // MARK: 下の操作
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
             HStack {
                 Button(Keys.remove) { remove(selection) }
                     .disabled(selection.isEmpty)
@@ -403,7 +403,7 @@ struct KeyField: View {
     private typealias Keys = UIStrings.Keys
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: DesignTokens.Size.Space.inline) {
             if isRecording {
                 KeyCapture(onCapture: { stroke in
                     onRecord(false)

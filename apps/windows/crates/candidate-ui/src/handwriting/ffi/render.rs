@@ -1,5 +1,5 @@
-//! 手書きの窓を Direct2D で描く．枠(見出しの帯・ボタン・地)は Windows 11 の色(settings-windows)で，
-//! 書く欄は macOS と同じく候補ウィンドウのテーマの色で描く．1 ドットの線と部品の縁はデバイスのピクセルにそろえる
+//! 手書きの窓を Direct2D で描く．枠(見出しの帯・ボタン・背景)は Windows 11 の色(settings-windows)で，
+//! 書く欄は macOS と同じく候補ウィンドウのテーマの色で描く．1 ドットの線と部品の枠線はデバイスのピクセルにそろえる
 
 use crate::handwriting::ink::Ink;
 use crate::handwriting::layout::{Control, Layout, TextWidth};
@@ -41,7 +41,7 @@ const ICON_FAMILIES: [&str; 2] = ["Segoe Fluent Icons", "Segoe MDL2 Assets"];
 const CLOSE_GLYPH: &str = "\u{E8BB}";
 const UNDO_GLYPH: &str = "\u{E7A7}";
 const LOCALE: &str = "ja-JP";
-/// 書く欄の地がこれより透けていれば，欄の地を Windows の入力欄の色にする(macOS の textBackgroundColor と同じ扱い)
+/// 書く欄の背景がこれより透けていれば，欄の背景を Windows の入力欄の色にする(macOS の textBackgroundColor と同じ扱い)
 const OPAQUE_ENOUGH: f32 = 0.5;
 /// 字の幅を測るときの枠の大きさ．f32::MAX にすると，中央にそろえる書式では幅を求められない
 const MEASURE_EXTENT: f32 = 4096.0;
@@ -448,7 +448,7 @@ impl Painter<'_> {
         self.outline_rounded(&canvas, radius, self.theme.line);
     }
 
-    /// 書く欄の地．macOS と同じくテーマの地を使い，透ける地(すりガラス)なら Windows の入力欄の色にする
+    /// 書く欄の背景．macOS と同じくテーマの背景を使い，透ける背景(すりガラス)なら Windows の入力欄の色にする
     fn canvas_ground(&self) -> Color {
         if self.theme.surface.alpha < OPAQUE_ENOUGH {
             Chrome::color(self.chrome.palette.control)
@@ -457,7 +457,7 @@ impl Painter<'_> {
         }
     }
 
-    /// 書いていないときの案内．十字の線の上に地を敷いて読めるようにする(macOS と同じ)
+    /// 書いていないときの案内．十字の線の上に背景を敷いて読めるようにする(macOS と同じ)
     fn prompt(&self, canvas: &Frame, ground: Color) {
         let width = self
             .fonts
@@ -557,7 +557,7 @@ impl Painter<'_> {
                 self.button_text(chip_look),
             );
         }
-        // まだ送れる側の端を地の色へ薄れさせ，続きがあることを示す
+        // まだ送れる側の端を背景の色へ薄れさせ，続きがあることを示す
         let (left, right) = layout.overflows();
         let fade = size::SCROLL_FADE;
         if left {
@@ -573,7 +573,7 @@ impl Painter<'_> {
         unsafe { self.target.PopAxisAlignedClip() };
     }
 
-    /// Windows 11 の標準のボタン(地・1 ドットの縁・角丸)
+    /// Windows 11 の標準のボタン(背景・1 ドットの枠線・角丸)
     fn button(&self, frame: &Frame, look: Look) {
         let palette = &self.chrome.palette;
         let ground = match look {
@@ -599,7 +599,7 @@ impl Painter<'_> {
         })
     }
 
-    /// 閉じるボタン．ポインタを置くと赤い地に白いアイコン(Windows 11 のキャプションボタンと同じ)
+    /// 閉じるボタン．ポインタを置くと赤い背景に白いアイコン(Windows 11 のキャプションボタンと同じ)
     fn close_button(&self, frame: &Frame, look: Look) {
         let frame = self.snap(frame);
         let glyph = match look {
@@ -616,7 +616,7 @@ impl Painter<'_> {
         self.text(CLOSE_GLYPH, &frame, &self.fonts.caption_icon, glyph);
     }
 
-    /// frame の中を地の色へ薄れさせる．leading なら左端が濃い
+    /// frame の中を背景の色へ薄れさせる．leading なら左端が濃い
     fn fade(&self, frame: &Frame, leading: bool) {
         let ground = Chrome::color(self.chrome.palette.background);
         let stops = [
@@ -663,7 +663,7 @@ impl Painter<'_> {
         self.scale.round().max(1.0) / self.scale
     }
 
-    /// 縁をデバイスのピクセルにそろえた四角
+    /// 枠線をデバイスのピクセルにそろえた四角
     fn snap(&self, frame: &Frame) -> Frame {
         let snap = |value: f32| (value * self.scale).round() / self.scale;
         let x = snap(frame.x);
@@ -699,7 +699,7 @@ impl Painter<'_> {
         }
     }
 
-    /// 内側に 1 ドットの縁を描く(線の真ん中を半ドット内側に置き，ピクセルにそろえる)
+    /// 内側に 1 ドットの枠線を描く(線の真ん中を半ドット内側に置き，ピクセルにそろえる)
     fn outline_rounded(&self, frame: &Frame, radius: f32, color: Color) {
         let line = self.hairline();
         let inset = frame.inset(line / 2.0, line / 2.0);

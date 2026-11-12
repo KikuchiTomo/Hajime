@@ -47,7 +47,7 @@ layout: hextra-home
     subtitle="Space を押さなくても，打つそばから漢字に変換され，Enter で確定できます．"
     link="docs/usage/#変換と確定"
     image="images/features/live-conversion.webp"
-    alt="テキストエディットで kyouhaiitenkidesune と打ち，「今日はいい天気ですね」と表示されている"
+    alt="テキストエディットのメモで，打っている途中の文が「帰りに駅前のカフェに寄って、買ったばかりの本を少しだけ読んだ」と漢字に変換されている"
   >}}
   {{< hajime/feature
     title="変換候補をツリー表示"
@@ -131,7 +131,7 @@ layout: hextra-home
     subtitle="アプリを切り替えたときに日本語入力にするか英数にするかを，アプリごとに決められます．"
     link="docs/settings/#除外設定"
     image="images/features/app-modes.webp"
-    alt="初期設定のアプリごとの入力モードの画面．IME をオフ，IME をオン，IME のオンオフを記憶を説明している"
+    alt="初期設定のアプリごとの入力モードの画面．IME をオフを選び，ターミナルに切り替えると英数(A)になる実演を出している"
   >}}
   {{< hajime/feature
     title="外部通信不要"

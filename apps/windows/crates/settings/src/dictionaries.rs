@@ -2,11 +2,16 @@
 
 //! 取り込んだ辞書・連想の辞書の一覧(macOS の ImportedDictionariesView・AssociationSection)．
 //! 一覧は設定のファイルの配列(importedDictionaries・associationDictionaries)をそのまま読み書きする．
-//! 名前・分野・使う場面・オン・オフ・並びはここで変え，取り込みと削除(索引のファイルがある)はエンジンに頼む
+//! 名前・分野・使う場面・アプリ・オン・オフ・並びはここで変え，取り込みと削除(索引のファイルがある)はエンジンに頼む
 
 use crate::pages::DictionaryList;
 use crate::strings::{association, dictionaries, windows};
 use serde_json::{json, Map, Value};
+
+/// 使う場面(DictionaryCondition)の名前．設定のファイルの書き方と同じ
+pub const ALWAYS: &str = "always";
+pub const APPS: &str = "apps";
+pub const CONTEXT: &str = "context";
 
 /// 一覧の 1 行
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,7 +27,7 @@ pub struct Entry {
     pub apps: Vec<String>,
     /// 語の数(取り込んだ辞書)か意味の数(連想の辞書)
     pub count: u64,
-    /// アプリに同梱した辞書(消せない)
+    /// アプリに同梱した辞書(消せない・取り込み直せない)
     pub is_bundled: bool,
 }
 
@@ -60,7 +65,7 @@ fn entry(list: DictionaryList, element: &Value) -> Option<Entry> {
                 })
                 .unwrap_or_default(),
         ),
-        None => ("always".to_string(), Vec::new()),
+        None => (ALWAYS.to_string(), Vec::new()),
     };
     let count_key = match list {
         DictionaryList::Imported => "wordCount",
@@ -84,103 +89,129 @@ fn entry(list: DictionaryList, element: &Value) -> Option<Entry> {
     })
 }
 
-/// 表の行(名前・内容・状態)
-pub fn table(list: DictionaryList, entries: &[Entry]) -> Vec<Vec<String>> {
-    entries
-        .iter()
-        .map(|entry| {
-            let summary = match list {
-                DictionaryList::Imported => {
-                    let condition = match entry.condition.as_str() {
-                        "apps" => dictionaries::apps_condition(entry.apps.len()),
-                        "context" => dictionaries::CONTEXT.to_string(),
-                        _ => dictionaries::ALWAYS.to_string(),
-                    };
-                    dictionaries::summary(&entry.field, entry.count, &condition)
-                }
-                // 同梱の辞書は件数を数えていない(設定には 0 と書いてある)ので，件数のかわりに同梱と出す
-                DictionaryList::Association if entry.is_bundled => {
-                    crate::strings::windows::ASSOCIATION_BUNDLED.to_string()
-                }
-                DictionaryList::Association => association::summary(entry.count),
-            };
-            let state = if entry.is_enabled {
-                ""
-            } else {
-                windows::DISABLED
-            };
-            vec![entry.name.clone(), summary, state.to_string()]
-        })
-        .collect()
-}
-
-/// 入力欄に出す値(名前・分野・使う場面・アプリ)．連想の辞書は名前だけ
-pub fn inputs(list: DictionaryList, entry: &Entry) -> Vec<String> {
+/// 行の名前の下に出す要約(macOS の UIStrings.Dictionaries.summary・UIStrings.Association.summary)
+pub fn summary(list: DictionaryList, entry: &Entry) -> String {
     match list {
-        DictionaryList::Imported => vec![
-            entry.name.clone(),
-            entry.field.clone(),
-            entry.condition.clone(),
-            entry.apps.join(", "),
-        ],
-        DictionaryList::Association => vec![entry.name.clone()],
+        DictionaryList::Imported => {
+            let condition = match entry.condition.as_str() {
+                APPS => dictionaries::apps_condition(entry.apps.len()),
+                CONTEXT => dictionaries::CONTEXT.to_string(),
+                _ => dictionaries::ALWAYS.to_string(),
+            };
+            dictionaries::summary(&entry.field, entry.count, &condition)
+        }
+        // 同梱の辞書は件数を数えていない(設定には 0 と書いてある)ので，件数のかわりに同梱と出す
+        DictionaryList::Association if entry.is_bundled => windows::ASSOCIATION_BUNDLED.to_string(),
+        DictionaryList::Association => association::summary(entry.count),
     }
 }
 
-/// 入力欄の値で index の辞書を書き換えた配列．アプリの名前が正しくなければ None
-pub fn update(
-    list: DictionaryList,
+/// index の辞書を change で書き換えた配列．index の辞書が無ければ None
+fn changed(
     value: Option<&Value>,
     index: usize,
-    inputs: &[String],
+    change: impl FnOnce(&mut Map<String, Value>),
 ) -> Option<Value> {
     let mut elements = value?.as_array()?.clone();
-    let element = elements.get_mut(index)?.as_object_mut()?;
-    let name = inputs.first()?.trim();
-    if !name.is_empty() {
-        element.insert("name".into(), Value::String(name.to_string()));
-    }
-    if list == DictionaryList::Imported {
-        element.insert(
-            "field".into(),
-            Value::String(inputs.get(1)?.trim().to_string()),
-        );
-        let condition = match inputs.get(2)?.as_str() {
-            "apps" => {
-                let apps = parse_apps(inputs.get(3)?)?;
-                json!({ "apps": { "_0": apps } })
-            }
-            "context" => json!({ "context": {} }),
-            _ => json!({ "always": {} }),
-        };
-        element.insert("condition".into(), condition);
-    }
+    change(elements.get_mut(index)?.as_object_mut()?);
     Some(Value::Array(elements))
 }
 
-/// 「code.exe, notepad.exe」を実行ファイルの名前の並びにする(小文字)．英数字・「.」・「-」・「_」でない名前があれば None
-pub fn parse_apps(text: &str) -> Option<Vec<String>> {
-    text.split([',', '、'])
-        .map(|name| name.trim().to_lowercase())
-        .filter(|name| !name.is_empty())
-        .map(|name| {
-            name.chars()
-                .all(|character| character.is_ascii_alphanumeric() || ".-_".contains(character))
-                .then_some(name)
-        })
-        .collect()
+/// index の辞書の名前を変えた配列．空の名前(前後の空白だけを含む)にはしない(None)
+pub fn renamed(value: Option<&Value>, index: usize, name: &str) -> Option<Value> {
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    changed(value, index, |element| {
+        element.insert("name".into(), Value::String(name.to_string()));
+    })
+}
+
+/// index の辞書の分野を変えた配列(空なら分野を付けない)
+pub fn with_field(value: Option<&Value>, index: usize, field: &str) -> Option<Value> {
+    changed(value, index, |element| {
+        element.insert("field".into(), Value::String(field.trim().to_string()));
+    })
+}
+
+/// index の辞書の使う場面を condition(always・apps・context)にした配列．
+/// 選んだアプリに変えるとき，もともと選んだアプリならアプリをそのまま残す(macOS の ImportedDictionariesView と同じ)
+pub fn with_condition(value: Option<&Value>, index: usize, condition: &str) -> Option<Value> {
+    changed(value, index, |element| {
+        let apps = current_apps(element);
+        let condition = match (condition, apps) {
+            (APPS, Some(apps)) => json!({ APPS: { "_0": apps } }),
+            (APPS, None) => json!({ APPS: { "_0": [] } }),
+            (CONTEXT, _) => json!({ CONTEXT: {} }),
+            _ => json!({ ALWAYS: {} }),
+        };
+        element.insert("condition".into(), condition);
+    })
+}
+
+/// 使う場面が選んだアプリならそのアプリ
+fn current_apps(element: &Map<String, Value>) -> Option<Vec<Value>> {
+    element
+        .get("condition")?
+        .get(APPS)?
+        .get("_0")?
+        .as_array()
+        .cloned()
+}
+
+/// index の辞書の選んだアプリに names を足した配列．すでにあるアプリは足さない(macOS と同じ)．
+/// 使う場面が選んだアプリでなければ None
+pub fn with_apps(value: Option<&Value>, index: usize, names: &[String]) -> Option<Value> {
+    let element = value?.as_array()?.get(index)?.as_object()?;
+    let mut apps = current_apps(element)?;
+    for name in names {
+        let name = Value::String(name.clone());
+        if !apps.contains(&name) {
+            apps.push(name);
+        }
+    }
+    changed(value, index, |element| {
+        element.insert("condition".into(), json!({ APPS: { "_0": apps } }));
+    })
+}
+
+/// index の辞書の選んだアプリから position 番目のアプリを外した配列
+pub fn without_app(value: Option<&Value>, index: usize, position: usize) -> Option<Value> {
+    let element = value?.as_array()?.get(index)?.as_object()?;
+    let mut apps = current_apps(element)?;
+    if position >= apps.len() {
+        return None;
+    }
+    apps.remove(position);
+    changed(value, index, |element| {
+        element.insert("condition".into(), json!({ APPS: { "_0": apps } }));
+    })
+}
+
+/// 選んだ実行ファイルの場所をアプリの名前(実行ファイルの名前の小文字)にする．
+/// 英数字・「.」・「-」・「_」でない名前なら None(エンジンは入力先のアプリをこの名前で見分ける)
+pub fn app_name(path: &str) -> Option<String> {
+    let name = std::path::Path::new(path)
+        .file_name()?
+        .to_string_lossy()
+        .to_lowercase();
+    (!name.is_empty()
+        && name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || ".-_".contains(character)))
+    .then_some(name)
 }
 
 /// index の辞書のオン・オフを切り替えた配列
 pub fn toggle(value: Option<&Value>, index: usize) -> Option<Value> {
-    let mut elements = value?.as_array()?.clone();
-    let element: &mut Map<String, Value> = elements.get_mut(index)?.as_object_mut()?;
-    let enabled = element
-        .get("isEnabled")
-        .and_then(Value::as_bool)
-        .unwrap_or(true);
-    element.insert("isEnabled".into(), Value::Bool(!enabled));
-    Some(Value::Array(elements))
+    changed(value, index, |element| {
+        let enabled = element
+            .get("isEnabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        element.insert("isEnabled".into(), Value::Bool(!enabled));
+    })
 }
 
 /// index の辞書を offset だけ動かした配列(上ほど優先する)．動かせなければ None
@@ -200,72 +231,136 @@ mod tests {
     fn imported() -> Value {
         json!([
             {"id": "a", "name": "電気", "field": "電気", "isEnabled": true, "condition": {"always": {}}, "wordCount": 3},
-            {"id": "b", "name": "法律", "field": "", "isEnabled": false, "condition": {"apps": {"_0": ["code.exe"]}}, "wordCount": 12}
+            {"id": "b", "name": "法律", "field": "", "isEnabled": false, "condition": {"apps": {"_0": ["code.exe"]}}, "wordCount": 12},
+            {"id": "c", "name": "医療", "field": "医療", "isEnabled": true, "condition": {"context": {}}, "wordCount": 5}
         ])
     }
 
     #[test]
-    fn 設定の配列を行と表にする() {
+    fn 設定の配列を行と要約にする() {
         let entries = entries(DictionaryList::Imported, Some(&imported()));
-        assert_eq!(entries.len(), 2);
+        assert_eq!(entries.len(), 3);
         assert_eq!(entries[1].apps, vec!["code.exe".to_string()]);
+        assert!(!entries[1].is_enabled);
+        let summaries: Vec<String> = entries
+            .iter()
+            .map(|entry| summary(DictionaryList::Imported, entry))
+            .collect();
         assert_eq!(
-            table(DictionaryList::Imported, &entries),
+            summaries,
             vec![
-                vec![
-                    "電気".to_string(),
-                    "電気・3 件・常に".to_string(),
-                    String::new()
-                ],
-                vec![
-                    "法律".to_string(),
-                    "12 件・選んだアプリ 1 個".to_string(),
-                    "無効".to_string()
-                ],
+                "電気・3 件・常に",
+                "12 件・選んだアプリ 1 個",
+                "医療・5 件・文脈に合わせる"
             ]
         );
-        assert_eq!(
-            inputs(DictionaryList::Imported, &entries[1]),
-            vec!["法律", "", "apps", "code.exe"]
-        );
-        let association = json!([{"id": "w", "name": "日本語 WordNet", "isEnabled": true, "groupCount": 0, "isBundled": true}]);
+        let association = json!([
+            {"id": "w", "name": "日本語 WordNet", "isEnabled": true, "groupCount": 0, "isBundled": true},
+            {"id": "x", "name": "類語", "isEnabled": true, "groupCount": 42}
+        ]);
         let entries = super::entries(DictionaryList::Association, Some(&association));
         assert!(entries[0].is_bundled);
         assert_eq!(
-            table(DictionaryList::Association, &entries)[0][1],
-            crate::strings::windows::ASSOCIATION_BUNDLED
+            summary(DictionaryList::Association, &entries[0]),
+            windows::ASSOCIATION_BUNDLED
         );
+        assert_eq!(
+            summary(DictionaryList::Association, &entries[1]),
+            "42 件の意味"
+        );
+        // 形の合わない要素(id の無いもの)は飛ばし，配列でなければ空
+        let broken = json!([{"name": "id なし"}, {"id": "y", "name": "ok"}]);
+        assert_eq!(entries_len(&broken), 1);
+        assert!(super::entries(DictionaryList::Imported, Some(&json!({}))).is_empty());
+    }
+
+    fn entries_len(value: &Value) -> usize {
+        entries(DictionaryList::Imported, Some(value)).len()
     }
 
     #[test]
-    fn 名前と分野と使う場面を書き換える() {
-        let inputs = ["電気の語", "電気", "apps", "Code.exe, notepad.exe"].map(String::from);
-        let updated = update(DictionaryList::Imported, Some(&imported()), 0, &inputs).unwrap();
-        assert_eq!(updated[0]["name"], "電気の語");
+    fn 名前と分野を書き換える() {
+        let renamed = renamed(Some(&imported()), 0, "  電気の語 ").unwrap();
+        assert_eq!(renamed[0]["name"], "電気の語");
+        assert_eq!(renamed[1], imported()[1]);
+        // 名前を空にしても名前は消さない
+        assert_eq!(super::renamed(Some(&imported()), 0, "   "), None);
+        assert_eq!(super::renamed(Some(&imported()), 9, "x"), None);
+        let field = with_field(Some(&imported()), 1, " 法律 ").unwrap();
+        assert_eq!(field[1]["field"], "法律");
+        let cleared = with_field(Some(&imported()), 0, "").unwrap();
+        assert_eq!(cleared[0]["field"], "");
+    }
+
+    #[test]
+    fn 使う場面を切り替える() {
+        // 常に → 選んだアプリ: アプリは空で始める
+        let apps = with_condition(Some(&imported()), 0, APPS).unwrap();
+        assert_eq!(apps[0]["condition"], json!({"apps": {"_0": []}}));
+        // 選んだアプリ → 選んだアプリ: アプリを残す
+        let same = with_condition(Some(&imported()), 1, APPS).unwrap();
+        assert_eq!(same[1]["condition"], imported()[1]["condition"]);
+        let context = with_condition(Some(&imported()), 1, CONTEXT).unwrap();
+        assert_eq!(context[1]["condition"], json!({"context": {}}));
+        let always = with_condition(Some(&imported()), 2, ALWAYS).unwrap();
+        assert_eq!(always[2]["condition"], json!({"always": {}}));
+        let entries = entries(DictionaryList::Imported, Some(&context));
+        assert_eq!(entries[1].condition, CONTEXT);
+        assert!(entries[1].apps.is_empty());
+    }
+
+    #[test]
+    fn 選んだアプリを足して外す() {
+        let names = ["notepad.exe".to_string(), "code.exe".to_string()];
+        let added = with_apps(Some(&imported()), 1, &names).unwrap();
+        // すでにあるアプリは足さない
         assert_eq!(
-            updated[0]["condition"],
+            added[1]["condition"],
             json!({"apps": {"_0": ["code.exe", "notepad.exe"]}})
         );
-        assert_eq!(updated[1], imported()[1]);
-        let bad = ["電気", "", "apps", "../x"].map(String::from);
+        // 使う場面が選んだアプリでなければ足さない
+        assert_eq!(with_apps(Some(&imported()), 0, &names), None);
+        let removed = without_app(Some(&added), 1, 0).unwrap();
         assert_eq!(
-            update(DictionaryList::Imported, Some(&imported()), 0, &bad),
-            None
+            removed[1]["condition"],
+            json!({"apps": {"_0": ["notepad.exe"]}})
         );
-        // 名前を空にしても名前は消さない
-        let empty = ["", "", "context", ""].map(String::from);
-        let updated = update(DictionaryList::Imported, Some(&imported()), 0, &empty).unwrap();
-        assert_eq!(updated[0]["name"], "電気");
-        assert_eq!(updated[0]["condition"], json!({"context": {}}));
+        assert_eq!(without_app(Some(&added), 1, 5), None);
+        assert_eq!(without_app(Some(&imported()), 0, 0), None);
+    }
+
+    #[test]
+    fn 実行ファイルの場所をアプリの名前にする() {
+        assert_eq!(
+            app_name("C:\\Program Files\\Code\\Code.exe"),
+            Some("code.exe".to_string())
+        );
+        assert_eq!(
+            app_name("C:\\x\\my-app_1.EXE"),
+            Some("my-app_1.exe".to_string())
+        );
+        assert_eq!(app_name("C:\\x\\メモ帳.exe"), None);
+        assert_eq!(app_name("C:\\x\\a b.exe"), None);
+        assert_eq!(app_name(""), None);
     }
 
     #[test]
     fn 切り替えと並べ替え() {
         let toggled = toggle(Some(&imported()), 1).unwrap();
         assert_eq!(toggled[1]["isEnabled"], true);
+        let toggled = toggle(Some(&imported()), 0).unwrap();
+        assert_eq!(toggled[0]["isEnabled"], false);
+        // isEnabled の無い辞書はオンとして扱う
+        let missing = json!([{"id": "a", "name": "x"}]);
+        assert_eq!(toggle(Some(&missing), 0).unwrap()[0]["isEnabled"], false);
+        assert_eq!(toggle(Some(&imported()), 3), None);
         let moved_up = moved(Some(&imported()), 1, -1).unwrap();
         assert_eq!(moved_up[0]["id"], "b");
+        assert_eq!(moved_up[1]["id"], "a");
+        let moved_down = moved(Some(&imported()), 1, 1).unwrap();
+        assert_eq!(moved_down[2]["id"], "b");
         assert_eq!(moved(Some(&imported()), 0, -1), None);
-        assert_eq!(moved(Some(&imported()), 1, 1), None);
+        assert_eq!(moved(Some(&imported()), 2, 1), None);
+        assert_eq!(moved(None, 0, 1), None);
     }
 }

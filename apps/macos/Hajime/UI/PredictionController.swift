@@ -69,11 +69,11 @@ final class PredictionView: NSView {
     var prediction = Prediction(typed: "", completion: "", key: nil) { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
-    /// glass の面を自分で塗るか．ぼかしの地(GlassBackdrop)の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
 
     private var font: NSFont { theme.candidateFont(size: fontSize) }
-    /// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．余白はこの内側から測る
+    /// 枠線(角丸)，外枠とベベル(platinum と desk)の太さ．余白はこの内側から測る
     private var inset: CGFloat { theme.isRounded ? Size.frameWidth : Size.frameWidth + Size.bevelWidth }
 
     private func attributes(_ color: NSColor) -> [NSAttributedString.Key: Any] { [.font: font, .foregroundColor: color] }
@@ -98,7 +98,7 @@ final class PredictionView: NSView {
         }
         var x = Spacing.paddingX + inset
         for (text, color) in [(prediction.typed, theme.text), (prediction.completion, theme.textMuted)] where !text.isEmpty {
-            // 文字の行の箱を窓の縦の真ん中に置く(キーの札と同じ真ん中)
+            // 文字の行の箱を窓の縦の真ん中に置く(キーキャップと同じ真ん中)
             TextFitting.draw(text, attributes: attributes(color), x: x, midY: bounds.midY)
             x += text.size(withAttributes: attributes(color)).width
         }

@@ -72,6 +72,12 @@ struct CandidateGridScenarioTests {
         #expect(panel.number(ofEntry: 17) == 9)
         #expect(panel.number(ofEntry: 0) == nil)
         #expect(panel.number(ofEntry: 18) == nil)
+        // 番号の列はどの列でも取り，選べない列の番号も(薄く)出す
+        #expect(panel.displayedNumber(ofEntry: 9)?.number == 1)
+        #expect(panel.displayedNumber(ofEntry: 9)?.selectable == true)
+        #expect(panel.displayedNumber(ofEntry: 0)?.number == 1)
+        #expect(panel.displayedNumber(ofEntry: 0)?.selectable == false)
+        #expect(panel.displayedNumber(ofEntry: 19)?.number == 2)
         harness.press(.character("3"))
         #expect(harness.committed == "缶12")
     }

@@ -162,7 +162,7 @@ fn bench_refresh() {
 #[test]
 #[ignore = "時間を測るだけ(--ignored で動かす)"]
 fn bench_chrome() {
-    // 出さない窓に，refresh のたびと同じ地と角と縁を書く
+    // 出さない窓に，refresh のたびと同じ背景と角と枠線を書く
     let window = super::window::Window::create(windows_core::w!("hajime.bench"), false).unwrap();
     let border = crate::theme::Color {
         red: 0.5,

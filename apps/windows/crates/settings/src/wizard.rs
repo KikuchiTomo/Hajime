@@ -167,7 +167,7 @@ pub struct Card {
     pub recommended: bool,
 }
 
-/// 入力モードの札(macOS の InfoCard の枠に入れる文字)
+/// 入力モード表示(macOS の InfoCard の枠に入れる文字)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mark {
     /// 英数(A)
@@ -193,7 +193,7 @@ pub struct Picker {
     pub choices: &'static [Choice],
     /// 推奨の値(メニューの名前に「(推奨)」を添える)
     pub recommended: Option<&'static str>,
-    /// カードの地に載せる(入力する文字の行)
+    /// カードの背景に載せる(入力する文字の行)
     pub framed: bool,
 }
 
@@ -203,7 +203,7 @@ pub struct Spot {
     /// オンとオフを切り替える設定の項目
     pub path: &'static str,
     pub title: &'static str,
-    /// 舞台の下の札に出す説明
+    /// 舞台の下のタグに出す説明
     pub detail: &'static str,
 }
 

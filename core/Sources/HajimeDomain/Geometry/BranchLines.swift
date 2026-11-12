@@ -1,12 +1,12 @@
 /// 分岐図の枝の線の配置(ADR 0007)．
 ///
-/// 幹の文節の札の端から 1 本の縦の線(幹)を伸ばし，候補ごとに同じ半径の 4 分の 1 の円で曲がって，
+/// 幹の文節のタグの端から 1 本の縦の線(幹)を伸ばし，候補ごとに同じ半径の 4 分の 1 の円で曲がって，
 /// 水平の線で候補の行の手前まで伸ばす．直線の枝は半径を 0 にした同じ形(直角に曲がる)にする．
 /// - 曲がり角の形と水平の線の終わりの x は，どの候補でも同じ
 /// - 幹はいちばん遠い候補の曲がり角の始まりで終わる(先を飛び出させない)
 /// - 曲がり角と水平の線は，隣の候補のものと重ならない．幹は 1 本だけで，候補ごとに描くのは曲がり角と水平の線だけ
 ///
-/// 線の縁をデバイスのピクセルの境にそろえる．太さが奇数のピクセルの線は，中心を半ピクセルずらす．
+/// 線の端をデバイスのピクセルの境にそろえる．太さが奇数のピクセルの線は，中心を半ピクセルずらす．
 /// 座標は上が y の小さい側．macOS の BranchView がこの配置を描き，Windows の候補ウィンドウ(scene::branch_lines)は同じ決め方を Rust で持つ
 public struct BranchLines: Sendable, Equatable {
     /// 1 つの候補への曲がり角と水平の線
@@ -21,7 +21,7 @@ public struct BranchLines: Sendable, Equatable {
         public var tip: Point
     }
 
-    /// 幹の根元(文節の札の端)
+    /// 幹の根元(文節のタグの端)
     public var root: Point
     /// 幹の先(いちばん遠い候補の曲がり角の始まり)．候補が無ければ根元と同じ
     public var stemEnd: Point
@@ -32,7 +32,7 @@ public struct BranchLines: Sendable, Equatable {
 
     /// - Parameters:
     ///   - stemX: 幹の x
-    ///   - rootY: 幹の根元の y．下へ伸ばすなら文節の札の下の端，上へ伸ばすなら上の端
+    ///   - rootY: 幹の根元の y．下へ伸ばすなら文節のタグの下の端，上へ伸ばすなら上の端
     ///   - rowMidYs: 候補の行の縦の中心．幹に近い順に並べる．根元より大きければ下へ，小さければ上へ伸ばす
     ///   - tipX: 水平の線の終わりの x
     ///   - radius: 曲がり角の半径．0 なら直角．根元から最初の行まで，または行と行のあいだ(線の太さの分を除く)に入らなければ縮める
@@ -66,7 +66,7 @@ public struct BranchLines: Sendable, Equatable {
         return from == stemEnd ? nil : (from, stemEnd)
     }
 
-    /// 線の縁がデバイスのピクセルの境に来る，線の中心の座標
+    /// 線の端がデバイスのピクセルの境に来る，線の中心の座標
     public static func alignCenter(_ value: Double, lineWidth: Double, scale: Double) -> Double {
         let pixels = lineWidth * scale
         return ((value * scale - pixels / 2).rounded() + pixels / 2) / scale

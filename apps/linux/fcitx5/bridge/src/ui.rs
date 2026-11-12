@@ -25,7 +25,7 @@ pub struct Panel {
 }
 
 impl Panel {
-    /// 指示を当てる．候補に関係しない指示(書体・モードの札・手書き)は持たない
+    /// 指示を当てる．候補に関係しない指示(書体・モード表示・手書き)は持たない
     pub fn apply(&mut self, command: UiCommand) {
         match command {
             UiCommand::ShowCandidates { list, .. } => *self = Self::from_list(list),

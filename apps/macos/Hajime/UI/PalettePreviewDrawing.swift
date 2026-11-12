@@ -2,7 +2,7 @@ import AppKit
 import HajimeApplication
 import HajimeDomain
 
-/// パレットの説明の欄(R-26)の名前・項目名・値・札を描く．配置は core の PalettePreviewLayout が決め，ここでは書体と色を決めて
+/// パレットの説明の欄(R-26)の名前・項目名・値・タグを描く．配置は core の PalettePreviewLayout が決め，ここでは書体と色を決めて
 /// 決まったベースラインに文字を置くだけにする(文字はベースラインの位置で描くので，書体が違っても縦がそろう)
 @MainActor
 enum PalettePreviewDrawing {
@@ -26,7 +26,7 @@ enum PalettePreviewDrawing {
         return NSRect(x: rect.maxX - side, y: (midY - side / 2).rounded(), width: side, height: side)
     }
 
-    /// 名前・項目名・値・札を描く．kind は今の種類(顔文字は項目名の列を読みだけで決める)
+    /// 名前・項目名・値・タグを描く．kind は今の種類(顔文字は項目名の列を読みだけで決める)
     static func draw(_ preview: PalettePanel.Preview, fields: PalettePanel.PreviewFields, kind: PaletteItem.Kind, area: NSRect, tile: NSRect,
                      theme: ResolvedTheme) {
         let measuring = Measuring(theme)
@@ -51,7 +51,7 @@ enum PalettePreviewDrawing {
         (text as NSString).draw(with: NSRect(x: x, y: baseline, width: drawingWidth, height: 0), options: [], attributes: attributes)
     }
 
-    /// 等幅の文字の札．角丸のテーマは控えめな地，platinum と desk は光の縁の色の地に 1 ドットの枠(入力欄の形)
+    /// 等幅の文字のタグ．角丸のテーマは控えめな背景，platinum と desk は明るい線の色の背景に 1 ドットの枠(入力欄の形)
     private static func drawChip(_ chip: PalettePreviewLayout.Chip, measuring: Measuring, theme: ResolvedTheme) {
         let rect = NSRect(x: chip.frame.x, y: chip.frame.y, width: chip.frame.width, height: chip.frame.height)
         if theme.isRounded {

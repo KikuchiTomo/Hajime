@@ -48,7 +48,7 @@ type LineCache = HashMap<Font, HashMap<String, (f32, f32)>>;
 type InkCache = HashMap<Font, HashMap<String, Option<Frame>>>;
 /// 字の外形を測るために描く細かさ(1 DIP を何ピクセルにするか．2 倍の画面で 1 ピクセルまで測る)
 const INK_SCALE: f32 = 2.0;
-/// 字の外形に数える画素の濃さ(0〜255)．縁のぼかしの薄い画素は数えず，目に見える形で真ん中に置く(macOS の GlyphFitting と同じ)
+/// 字の外形に数える画素の濃さ(0〜255)．枠線のぼかしの薄い画素は数えず，目に見える形で真ん中に置く(macOS の GlyphFitting と同じ)
 const INK_ALPHA: u8 = 96;
 /// DIP の基準の DPI
 const INK_BASE_DPI: f32 = 96.0;
@@ -730,7 +730,7 @@ impl Renderer {
     }
 
     /// target に scene を描く．BeginDraw と EndDraw は呼ぶ側が受け持つ．
-    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モードの札のフェード)
+    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モード表示のフェード)
     pub fn paint(
         &self,
         target: &ID2D1RenderTarget,
@@ -963,6 +963,62 @@ impl Painter<'_> {
                     self.target
                         .DrawGeometry(&geometry, self.brush, *width, &self.renderer.flat)
                 };
+            }
+            Draw::Shape {
+                figure,
+                fill,
+                stroke,
+            } => {
+                // 閉じた図形を塗ってから枠線を引く(吹き出しの形)
+                // SAFETY: factory は生きている COM の参照．sink は閉じるまでこの関数の中だけで使う
+                let geometry = unsafe {
+                    let path = self.renderer.d2d.CreatePathGeometry()?;
+                    let sink = path.Open()?;
+                    sink.BeginFigure(
+                        vector!(figure.start.x, figure.start.y),
+                        D2D1_FIGURE_BEGIN_FILLED,
+                    );
+                    for segment in &figure.segments {
+                        match *segment {
+                            Segment::Line(to) => sink.AddLine(vector!(to.x, to.y)),
+                            Segment::Arc {
+                                to,
+                                radius,
+                                clockwise,
+                            } => sink.AddArc(&D2D1_ARC_SEGMENT {
+                                point: vector!(to.x, to.y),
+                                size: D2D_SIZE_F {
+                                    width: radius,
+                                    height: radius,
+                                },
+                                rotationAngle: 0.0,
+                                sweepDirection: if clockwise {
+                                    D2D1_SWEEP_DIRECTION_CLOCKWISE
+                                } else {
+                                    D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE
+                                },
+                                arcSize: D2D1_ARC_SIZE_SMALL,
+                            }),
+                        }
+                    }
+                    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
+                    sink.Close()?;
+                    path
+                };
+                let geometry: ID2D1Geometry = geometry.into();
+                if let Some(color) = fill {
+                    self.color(*color);
+                    // SAFETY: target・brush・geometry は生きている COM の参照
+                    unsafe { self.target.FillGeometry(&geometry, self.brush, None) };
+                }
+                if let Some((color, width)) = stroke {
+                    self.color(*color);
+                    // SAFETY: target・brush・geometry・stroke style は生きている COM の参照
+                    unsafe {
+                        self.target
+                            .DrawGeometry(&geometry, self.brush, *width, &self.renderer.flat)
+                    };
+                }
             }
             Draw::Line {
                 from,

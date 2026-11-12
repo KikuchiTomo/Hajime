@@ -21,7 +21,16 @@ pub trait Engine {
     fn request_file(&self, body: RequestBody) -> Option<ResponseBody> {
         self.request(body)
     }
+
+    /// ファイルの読み書きを頼み，応答を done に渡す．応答は別のスレッドで待ってよい(待つあいだ画面を止めない．
+    /// macOS の辞書の取り込みと同じ)．既定はその場で待つ
+    fn request_file_later(&self, body: RequestBody, done: Done) {
+        done(self.request_file(body));
+    }
 }
+
+/// 別のスレッドで待った応答を受け取るもの
+pub type Done = Box<dyn FnOnce(Option<ResponseBody>) + Send>;
 
 /// 単語の登録で受け取った語と読み(入力先で選んでいた文字か入力中の語なので，Debug では中身を出さない)．分からなければ空
 #[derive(Clone, Default, PartialEq, Eq)]
@@ -192,24 +201,24 @@ impl<E: Engine> EngineStore<E> {
         path: String,
         replacing: Option<String>,
     ) -> Result<FileOutcome, StoreError> {
-        let body = match list {
-            DictionaryList::Imported => RequestBody::ImportDictionary { path, replacing },
-            DictionaryList::Association => {
-                RequestBody::ImportAssociationDictionary { path, replacing }
-            }
-        };
-        match self.engine.request_file(body) {
-            None => Err(StoreError::Unavailable),
-            Some(ResponseBody::DictionaryImported { dictionary }) => {
-                Ok(FileOutcome::Imported(dictionary.word_count))
-            }
-            Some(ResponseBody::AssociationImported { dictionary }) => {
-                Ok(FileOutcome::Imported(dictionary.group_count))
-            }
-            Some(ResponseBody::FileFailed { reason }) => Ok(FileOutcome::Failed(reason)),
-            Some(ResponseBody::Error { .. }) => Err(StoreError::Rejected),
-            Some(_) => Err(StoreError::Malformed),
-        }
+        let response = self
+            .engine
+            .request_file(import_request(list, path, replacing));
+        import_outcome(response)
+    }
+
+    /// 辞書のファイルを取り込み，結果を done に渡す．大きな辞書は読むのに時間がかかるので，応答は別のスレッドで待つ
+    pub fn import_dictionary_later(
+        &self,
+        list: DictionaryList,
+        path: String,
+        replacing: Option<String>,
+        done: Box<dyn FnOnce(Result<FileOutcome, StoreError>) + Send>,
+    ) {
+        self.engine.request_file_later(
+            import_request(list, path, replacing),
+            Box::new(move |response| done(import_outcome(response))),
+        );
     }
 
     /// 辞書を一覧と索引から消す
@@ -349,7 +358,7 @@ impl<E: Engine> SettingsStore for EngineStore<E> {
 
 /// 試した結果を 1 行の文にする(「make → make(英語)」を全角の空白で区切る)
 pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
-    // macOS の resultChip と同じく，札は入る文字と，その下に英語か日本語かを小さく出す
+    // macOS の resultChip と同じく，タグは入る文字と，その下に英語か日本語かを小さく出す
     let mut shown = PreviewShown::default();
     for word in words {
         let language = options::WORD_LANGUAGES
@@ -364,11 +373,11 @@ pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
     shown
 }
 
-/// 日本語の値(PreviewWord.language)．日本語の札はアクセントの色で出す(macOS の .tint)
+/// 日本語の値(PreviewWord.language)．日本語のタグはアクセントの色で出す(macOS の .tint)
 const JAPANESE: &str = "japanese";
 
-/// 試した結果の出し方．chips は札にして折り返して並べる語(macOS の WrappingStack)，line は札にしない 1 行．
-/// labels は札の 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行の札
+/// 試した結果の出し方．chips はタグにして折り返して並べる語(macOS の WrappingStack)，line はタグにしない 1 行．
+/// labels はタグの 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行のタグ
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PreviewShown {
     pub chips: Vec<String>,
@@ -376,7 +385,7 @@ pub struct PreviewShown {
     pub labels: Vec<Option<(String, bool)>>,
 }
 
-/// 変換マクロを試した結果．書いている途中の形の結果なら札にせず，頭に「入力中の形: 」を付けた 1 行にする
+/// 変換マクロを試した結果．書いている途中の形の結果ならタグにせず，頭に「入力中の形: 」を付けた 1 行にする
 pub fn macro_preview_text(results: &[String], drafting: bool) -> PreviewShown {
     if drafting {
         let shown = results.first().map_or("", String::as_str);
@@ -390,6 +399,30 @@ pub fn macro_preview_text(results: &[String], drafting: bool) -> PreviewShown {
         chips: results.to_vec(),
         line: String::new(),
         labels: Vec::new(),
+    }
+}
+
+/// 辞書を取り込む要求
+fn import_request(list: DictionaryList, path: String, replacing: Option<String>) -> RequestBody {
+    match list {
+        DictionaryList::Imported => RequestBody::ImportDictionary { path, replacing },
+        DictionaryList::Association => RequestBody::ImportAssociationDictionary { path, replacing },
+    }
+}
+
+/// 辞書を取り込んだ応答を，取り込んだ件数か失敗の理由にする
+fn import_outcome(response: Option<ResponseBody>) -> Result<FileOutcome, StoreError> {
+    match response {
+        None => Err(StoreError::Unavailable),
+        Some(ResponseBody::DictionaryImported { dictionary }) => {
+            Ok(FileOutcome::Imported(dictionary.word_count))
+        }
+        Some(ResponseBody::AssociationImported { dictionary }) => {
+            Ok(FileOutcome::Imported(dictionary.group_count))
+        }
+        Some(ResponseBody::FileFailed { reason }) => Ok(FileOutcome::Failed(reason)),
+        Some(ResponseBody::Error { .. }) => Err(StoreError::Rejected),
+        Some(_) => Err(StoreError::Malformed),
     }
 }
 
@@ -535,6 +568,32 @@ mod tests {
                 replacing: None
             }
         );
+        // 別のスレッドで待つ取り込みも，同じ要求と結果にする
+        let later = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let slot = std::sync::Arc::clone(&later);
+        store.import_dictionary_later(
+            DictionaryList::Imported,
+            "C:\\b.txt".into(),
+            Some("b".into()),
+            Box::new(move |outcome| *slot.lock().unwrap() = Some(outcome)),
+        );
+        assert_eq!(
+            engine.requests.borrow()[1],
+            RequestBody::ImportDictionary {
+                path: "C:\\b.txt".into(),
+                replacing: Some("b".into())
+            }
+        );
+        assert_eq!(*later.lock().unwrap(), Some(Ok(FileOutcome::Imported(7))));
+        let engine = scripted(None);
+        assert_eq!(
+            EngineStore::new(&engine).import_dictionary(
+                DictionaryList::Imported,
+                "C:\\c.txt".into(),
+                None
+            ),
+            Err(StoreError::Unavailable)
+        );
         let engine = scripted(Some(ResponseBody::Done));
         assert_eq!(
             EngineStore::new(&engine).remove_dictionary(DictionaryList::Imported, "x".into()),
@@ -558,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    fn 試した結果を札にする() {
+    fn 試した結果をタグにする() {
         let words = vec![
             PreviewWord {
                 typed: "make".into(),
@@ -571,7 +630,7 @@ mod tests {
                 language: "japanese".into(),
             },
         ];
-        // 札は入る文字と，2 行目の英語か日本語か(日本語はアクセントの色)
+        // タグは入る文字と，2 行目の英語か日本語か(日本語はアクセントの色)
         let shown = preview_text(&words);
         assert_eq!(shown.chips, vec!["make", "すし"]);
         assert_eq!(

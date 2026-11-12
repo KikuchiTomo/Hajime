@@ -32,7 +32,7 @@ pub const WM_FIELD_ENTER: u32 = WM_APP + 2;
 pub const WM_FIELD_FOCUS: u32 = WM_APP + 3;
 /// 親に届く知らせ: キーを記録した(lparam は欄)
 pub const WM_FIELD_RECORDED: u32 = WM_APP + 4;
-/// 親に届く知らせ: Esc を押した(lparam は欄．シートを閉じる)
+/// 親に届く知らせ: Esc を押した(lparam は欄．シート・カスタムテーマの編集の画面を閉じる)
 pub const WM_FIELD_ESCAPE: u32 = WM_APP + 5;
 
 const SUBCLASS: usize = 0x5391;
@@ -57,7 +57,7 @@ struct FieldData {
 
 /// 枠の無い欄を作る(見えない状態で作る．置くときに見せる)
 pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<HWND> {
-    // 親の窓の地が Mica(透明)でも GDI で描いた欄が透けないよう，自分の面を持つ窓(子の WS_EX_LAYERED．
+    // 親の窓の背景が Mica(透明)でも GDI で描いた欄が透けないよう，自分の面を持つ窓(子の WS_EX_LAYERED．
     // Windows 8 からで，マニフェストの宣言が要る．build.rs)にして，不透明に重ねる
     let window = super::win32::create(
         WS_EX_LAYERED,
@@ -96,6 +96,18 @@ pub fn set_placeholder(window: HWND, placeholder: &str) {
     super::win32::invalidate(window);
 }
 
+/// 欄にフォーカスを入れて，次に押したキーを記録する(キー設定の「キーで検索」)．prompt は記録しているあいだの案内
+pub fn start_recording(window: HWND, prompt: &str) {
+    with_data(window, |data| {
+        data.recording = Some(prompt.encode_utf16().collect());
+    });
+    // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
+    set_ime(window, false);
+    super::win32::set_text(window, "");
+    super::win32::focus(window);
+    super::win32::invalidate(window);
+}
+
 /// 押したらキーを記録し始める欄にする(prompt は記録しているあいだの案内)．None なら普通の欄に戻す
 /// (欄は前のページの欄を使い回すので，取り出すたびに決め直す)
 pub fn set_record_on_click(window: HWND, prompt: Option<&str>) {
@@ -125,7 +137,7 @@ fn with_data(window: HWND, f: impl FnOnce(&mut FieldData)) {
     f(data);
 }
 
-/// 入力欄の地の塗り(WM_CTLCOLOREDIT で返す)．色を変えたら作り直す
+/// 入力欄の背景の塗り(WM_CTLCOLOREDIT で返す)．色を変えたら作り直す
 pub struct Brush(HBRUSH);
 
 impl Brush {
@@ -146,7 +158,7 @@ impl Drop for Brush {
     }
 }
 
-/// WM_CTLCOLOREDIT の DC に文字と地の色を付ける
+/// WM_CTLCOLOREDIT の DC に文字と背景の色を付ける
 pub fn color_field(hdc: usize, text: tokens::Rgb, background: tokens::Rgb) {
     use windows::Win32::Graphics::Gdi::{SetBkColor, HDC};
     let hdc = HDC(hdc as *mut _);

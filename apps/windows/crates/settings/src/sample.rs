@@ -7,8 +7,9 @@
 use crate::engine::Engine;
 use crate::store::Fields;
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, KeymapReport, PreviewWord, RequestBody, ResponseBody,
-    SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult, SyncGroupState, SyncStatus, WordClass,
+    ContrastIssue, ContrastPair, DictionaryAddResult, DictionaryEntry, FileFailure, KeymapReport,
+    PreviewWord, RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult,
+    SyncGroupState, SyncStatus, WordClass,
 };
 use serde_json::Value;
 use std::sync::Mutex;
@@ -137,9 +138,11 @@ impl Engine for SampleEngine {
                     missing: Vec::new(),
                 },
             },
-            RequestBody::CheckCustomTheme { .. } => {
-                ResponseBody::ThemeReport { issues: Vec::new() }
-            }
+            RequestBody::CheckCustomTheme { theme } => ResponseBody::ThemeReport {
+                issues: serde_json::from_str(&theme)
+                    .map(|theme| contrast_issues(&theme))
+                    .unwrap_or_default(),
+            },
             RequestBody::ReadUsage => ResponseBody::Usage {
                 values: serde_json::to_string(&state.usage).unwrap_or_default(),
                 first_candidate_rate: state.first_candidate_rate,
@@ -299,7 +302,19 @@ impl Engine for SampleEngine {
                 word: None,
                 reading: None,
             },
-            // ファイルの読み書きと辞書の取り込みは見本では行わない(何も変えずに済んだことにする)
+            // 辞書は見本の一覧から消すだけ(索引のファイルは無い)
+            RequestBody::RemoveDictionary { id } => {
+                remove_dictionary(state, "importedDictionaries", &id)
+            }
+            RequestBody::RemoveAssociationDictionary { id } => {
+                remove_dictionary(state, "associationDictionaries", &id)
+            }
+            // 辞書の取り込みは見本ではファイルを読まない(読めなかったことにする)
+            RequestBody::ImportDictionary { .. }
+            | RequestBody::ImportAssociationDictionary { .. } => ResponseBody::FileFailed {
+                reason: FileFailure::Unreadable,
+            },
+            // ファイルの読み書きは見本では行わない(何も変えずに済んだことにする)
             RequestBody::ImportRuleList { .. }
             | RequestBody::ImportProfileRules { .. }
             | RequestBody::ImportUserDictionary { .. }
@@ -310,6 +325,67 @@ impl Engine for SampleEngine {
             _ => ResponseBody::Done,
         })
     }
+}
+
+/// 見本の辞書の一覧(path)から id の辞書を外す
+fn remove_dictionary(state: &mut State, path: &str, id: &str) -> ResponseBody {
+    let Some(Value::Array(list)) = state.current.get_mut(path) else {
+        return ResponseBody::FileFailed {
+            reason: FileFailure::UnknownDictionary,
+        };
+    };
+    let before = list.len();
+    list.retain(|element| element.get("id").and_then(Value::as_str) != Some(id));
+    if list.len() == before {
+        return ResponseBody::FileFailed {
+            reason: FileFailure::UnknownDictionary,
+        };
+    }
+    ResponseBody::Done
+}
+
+/// カスタムテーマの読みにくい組み合わせ(core の CustomTheme.lowContrastPairs を写したもの．見本の画面で印を確かめる)
+fn contrast_issues(theme: &Value) -> Vec<ContrastIssue> {
+    /// DefaultSettings.minimumTextContrast と minimumMarkContrast
+    const TEXT: f64 = 4.5;
+    const MARK: f64 = 3.0;
+    let luminance = |name: &str| {
+        let (red, green, blue) = crate::themes::rgb(theme.get(name)?.as_str()?)?;
+        let linear = |channel: u8| {
+            let value = f64::from(channel) / 255.0;
+            if value <= 0.04045 {
+                value / 12.92
+            } else {
+                ((value + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        Some(0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue))
+    };
+    let ratio = |front: &str, back: &str| {
+        let (a, b) = (luminance(front)?, luminance(back)?);
+        Some((a.max(b) + 0.05) / (a.min(b) + 0.05))
+    };
+    [
+        (ContrastPair::Text, "text", "surface", TEXT),
+        (ContrastPair::TextMuted, "textMuted", "surface", TEXT),
+        (
+            ContrastPair::SelectionText,
+            "selectionText",
+            "selection",
+            TEXT,
+        ),
+        (ContrastPair::Correction, "correction", "surface", MARK),
+    ]
+    .into_iter()
+    .filter_map(|(pair, front, back, minimum)| {
+        let ratio = ratio(front, back)?;
+        (ratio < minimum).then_some(ContrastIssue {
+            pair,
+            ratio,
+            minimum,
+        })
+    })
+    .collect()
 }
 
 fn symbols(state: &mut State, kind: SymbolKind) -> &mut Vec<SymbolItem> {
@@ -394,6 +470,50 @@ mod tests {
             .read_symbol_items(SymbolKind::Reading)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn 見本の辞書を一覧から消す() {
+        use crate::engine::FileOutcome;
+        use crate::pages::DictionaryList;
+        let store = EngineStore::new(SampleEngine::new());
+        let path = "importedDictionaries".to_string();
+        let count = |store: &EngineStore<SampleEngine>| {
+            let values = store.read(std::slice::from_ref(&path), false).unwrap();
+            crate::dictionaries::entries(DictionaryList::Imported, values.get(&path)).len()
+        };
+        let before = count(&store);
+        assert!(before >= 2);
+        let id = "D0000000-0000-0000-0000-000000000002".to_string();
+        assert_eq!(
+            store.remove_dictionary(DictionaryList::Imported, id.clone()),
+            Ok(FileOutcome::Done)
+        );
+        assert_eq!(count(&store), before - 1);
+        assert_eq!(
+            store.remove_dictionary(DictionaryList::Imported, id),
+            Ok(FileOutcome::Failed(FileFailure::UnknownDictionary))
+        );
+        assert_eq!(
+            store.import_dictionary(DictionaryList::Imported, "C:\\a.txt".into(), None),
+            Ok(FileOutcome::Failed(FileFailure::Unreadable))
+        );
+    }
+
+    #[test]
+    fn 見本のエンジンも読みにくいカスタムテーマを知らせる() {
+        let store = EngineStore::new(SampleEngine::new());
+        let theme = serde_json::json!({
+            "surface": "#FFFFFF", "text": "#000000", "textMuted": "#B0B0B0",
+            "selection": "#0A84FF", "selectionText": "#FFFFFF", "correction": "#FF2D55", "line": "#CCCCCC"
+        });
+        let issues = store.check_custom_theme(&theme).unwrap();
+        let pairs: Vec<ContrastPair> = issues.iter().map(|issue| issue.pair).collect();
+        assert_eq!(
+            pairs,
+            vec![ContrastPair::TextMuted, ContrastPair::SelectionText]
+        );
+        assert!(issues[0].ratio < issues[0].minimum);
     }
 
     #[test]

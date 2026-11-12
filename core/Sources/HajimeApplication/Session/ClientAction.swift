@@ -10,7 +10,7 @@ public enum ClientAction: Sendable, Equatable {
     /// 文節格子を出す．hideCandidates で一覧と一緒に消える
     case showLattice(LatticePanel)
     case hideCandidates
-    /// 入力モードを切り替えたことを知らせる札を出す
+    /// 入力モードを切り替えたことを知らせるタグを出す
     case showModeIndicator(InputMode)
     /// OS の入力メニューの表示を，このモードに合わせる
     case selectMode(InputMode)
@@ -124,9 +124,9 @@ public struct CandidatePanel: Sendable, Equatable {
         public var annotation: String?
         /// 打ち間違いを直した部分(text の中の文字の位置)．補正の点線の下線を引く．直していなければ nil
         public var corrected: Range<Int>?
-        /// コマンドの候補なら，その種類．描く側は種類のアイコンを文字の前に添え，札(annotation)をアクセントの色にする
+        /// コマンドの候補なら，その種類．描く側は種類のアイコンを文字の前に添え，タグ(annotation)をアクセントの色にする
         public var command: LauncherCommand.Kind?
-        /// 札(annotation)がユーザー辞書の語のコメントか．描く側は札を押せるようにし，押したら PointerTarget.comment を渡す
+        /// タグ(annotation)がユーザー辞書の語のコメントか．描く側はタグを押せるようにし，押したら PointerTarget.comment を渡す
         public var hasComment: Bool
         /// 候補の文字のすぐあとに控えめに添える説明(絵文字の名前)．描く側は薄い色の 1 段小さい文字にし，候補の文字とベースラインをそろえる
         public var detail: String?
@@ -188,6 +188,16 @@ public struct CandidatePanel: Sendable, Equatable {
     public var numberedColumn: Int {
         guard let columnLength, columnLength > 0, focus == .candidate, let selectedEntry else { return 0 }
         return selectedEntry / columnLength
+    }
+
+    /// entries の index 番目の候補の番号の列に出す番号(1 から)と，番号キーで選べるか．
+    /// 番号の列はどの候補でも取るので，選べない番号(表のほかの列，選び始める前の入力中の候補の窓)も出して列を空に見せない．
+    /// 選べないことは描く側が薄さで示す
+    public func displayedNumber(ofEntry index: Int) -> (number: Int, selectable: Bool)? {
+        guard entries.indices.contains(index) else { return nil }
+        if let number = number(ofEntry: index) { return (number, true) }
+        guard let columnLength, columnLength > 0 else { return (index + 1, false) }
+        return (index % columnLength + 1, false)
     }
 
     /// entries の index 番目の候補に振る番号(1 から)．番号を振らない候補なら nil
@@ -357,7 +367,7 @@ extension AssociationHeading: CustomStringConvertible, CustomDebugStringConverti
 }
 
 /// 候補の窓の足元や入力位置の下に出す案内．見た目を作り込めるよう，部品に分けて渡す
-/// (「修正」と打ったままの字と戻すキーを，色・取り消し線・キーの札で描き分ける)
+/// (「修正」と打ったままの字と戻すキーを，色・取り消し線・キーキャップで描き分ける)
 public struct Note: Sendable, Equatable {
     public enum Tone: String, Sendable, Equatable {
         /// 打ち間違いを直した
@@ -399,8 +409,8 @@ public struct Note: Sendable, Equatable {
 }
 
 extension CandidatePanel {
-    /// 打ち間違いを直した候補の添え書き．描く側で補正の色の札にする
+    /// 打ち間違いを直した候補の添え書き．描く側で補正の色のタグにする
     public static let correctedAnnotation = "修正"
-    /// コマンドの候補の添え書き．描く側でアクセントの色の札にする
+    /// コマンドの候補の添え書き．描く側でアクセントの色のタグにする
     public static let commandAnnotation = "コマンド"
 }

@@ -2,7 +2,7 @@ import HajimeDomain
 
 /// パレットの窓の部品の位置(R-26)．余白は間隔の段階(design/tokens の size.space)だけで決める．
 ///
-/// - 窓の内側の余白は上下左右とも metrics.padding(窓の縁の内側から．角丸のテーマは縁の線，platinum と desk は立体の縁)
+/// - 窓の内側の余白は上下左右とも metrics.padding(窓の枠線の内側から．角丸のテーマは枠線，platinum と desk はベベル)
 /// - 区画(探す欄 → タブ → マス目 → 区切り → 説明 → 区切り → 足元)のあいだは metrics.sectionGap．区切りの線の上と下も同じ
 /// - まとまりのあいだ(探す欄と種類の切り替え，タブとマスの見出し，マス目とスクロールの位置の線)は metrics.groupGap，
 ///   まとまりの中(マスの見出しとマス目)は metrics.itemGap
@@ -27,9 +27,9 @@ public struct PaletteWindowLayout: Sendable, Equatable {
         public var scrollbarWidth: Double
         /// 区切りの線の太さ
         public var lineWidth: Double
-        /// 足元の行の高さ(キーの札の高さ)．肌の色のボタンもこの高さの正方形
+        /// 足元の行の高さ(キーキャップの高さ)．肌の色のボタンもこの高さの正方形
         public var footerHeight: Double
-        /// 窓の縁の太さ(角丸のテーマは縁の線，platinum と desk は外枠と立体の縁)
+        /// 窓の枠線の太さ(角丸のテーマは枠線，platinum と desk は外枠とベベル)
         public var border: Double
         /// 窓の右と下に付ける影(desk)
         public var shadow: Double

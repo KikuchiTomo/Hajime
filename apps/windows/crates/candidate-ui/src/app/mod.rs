@@ -12,7 +12,7 @@ mod window;
 
 use crate::announce::{self, Announcer};
 use crate::motion;
-use crate::scene::{self, CardReservation, Look, Scene, Surround};
+use crate::scene::{self, Look, Scene, Surround};
 use crate::strings;
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
@@ -41,7 +41,7 @@ enum Content {
     Candidates(ipc::CandidateList),
     BranchMap(ipc::BranchMap),
     Note(ipc::Note),
-    /// モードの札の文字
+    /// モード表示の文字
     Mode(String),
 }
 
@@ -51,13 +51,13 @@ enum Fade {
     None,
     /// 出し始めに，第 1 候補と選んでいる候補のほかを濃くしていく
     Rest(Instant),
-    /// モードの札を消していく
+    /// モード表示を消していく
     ModeOut(Instant),
 }
 
 struct App {
     renderer: Renderer,
-    /// 地を色で塗る窓と，すりガラスの地の窓(OS が影を付ける)
+    /// 背景を色で塗る窓と，すりガラスの背景の窓(OS が影を付ける)
     plain: Window,
     glass: Window,
     /// 続く語句の予測の窓(色で塗る窓とすりガラスの窓)．候補の窓とは別に，組み立て中の文字の右に出す．押しても受けない
@@ -93,8 +93,12 @@ struct App {
     crossfade: Option<(Scene, Instant)>,
     /// 選んでいるものが同じまま中身が変わった(次の refresh で重ねて変える)
     arrived: bool,
-    /// 候補の右に出した語の意味のカードの場所(同じ候補の並びのあいだは空けたままにする)
-    meaning: CardReservation,
+    /// 語の意味の吹き出しの窓(候補の窓の横に出す．背景は自分で塗り，押しても受けない)
+    bubble: Window,
+    bubble_scene: Option<Scene>,
+    /// 吹き出しの本体を置いた位置(論理ピクセル)と，選んでいる候補が変わって付いて動いている途中の動き
+    bubble_at: Option<(f32, f32)>,
+    bubble_glide: Option<motion::Resize>,
     /// 読んだ OS の外観とアニメーション効果の設定
     system: system::SystemCache,
 }
@@ -113,17 +117,19 @@ pub fn run() {
     };
     window::make_dpi_aware();
     window::set_callbacks(on_inbox, on_timer, on_paint, on_click);
-    let (Ok(plain), Ok(glass), Ok(prediction_plain), Ok(prediction_glass)) = (
+    let (Ok(plain), Ok(glass), Ok(prediction_plain), Ok(prediction_glass), Ok(bubble)) = (
         Window::create(w!("hajime.candidate"), false),
         Window::create(w!("hajime.candidate.glass"), true),
         Window::create(w!("hajime.prediction"), false),
         Window::create(w!("hajime.prediction.glass"), true),
+        Window::create(w!("hajime.meaning"), false),
     ) else {
         return;
     };
-    // 予測の窓を押した位置を，候補の窓を押したものと取り違えないよう，押しても受けない
+    // 予測の窓と吹き出しを押した位置を，候補の窓を押したものと取り違えないよう，押しても受けない
     prediction_plain.pass_clicks_through();
     prediction_glass.pass_clicks_through();
+    bubble.pass_clicks_through();
     let Ok(renderer) = Renderer::new() else {
         return;
     };
@@ -172,7 +178,10 @@ pub fn run() {
             resize: None,
             crossfade: None,
             arrived: false,
-            meaning: CardReservation::default(),
+            bubble,
+            bubble_scene: None,
+            bubble_at: None,
+            bubble_glide: None,
             system: system::SystemCache::default(),
         })
     });
@@ -317,7 +326,7 @@ impl App {
                 recognition_delay_milliseconds,
                 recognition_timeout_milliseconds,
             } => {
-                // 手書きの窓はすりガラスにしない(書く欄の地が透けないように)．枠は OS のライトとダークに合わせる
+                // 手書きの窓はすりガラスにしない(書く欄の背景が透けないように)．枠は OS のライトとダークに合わせる
                 let look = self.system.look(false);
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
@@ -334,7 +343,7 @@ impl App {
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
             UiCommand::ShowPalette { panel, anchor } => {
-                // パレット(R-26)は別の窓に出す(候補・案内・モードの札に置き換わらないように)．すりガラスにはしない
+                // パレット(R-26)は別の窓に出す(候補・案内・モード表示に置き換わらないように)．すりガラスにはしない
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
                     self.presentation.custom_theme.as_ref(),
@@ -351,8 +360,8 @@ impl App {
                 self.prediction_anchor = Some(composition.unwrap_or_else(|| anchor.clone()));
                 self.anchor = Some(anchor);
             }
-            // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
-            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)
+            // 候補と知らせを消す．モード表示は残し，出しておく時間が過ぎたら消す(macOS と同じくタグは別に扱う．
+            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate でタグが消えないように)
             UiCommand::Hide => {
                 if !matches!(self.content, Content::Mode(_)) {
                     self.content = Content::Hidden;
@@ -386,7 +395,7 @@ impl App {
         self.window().start_timer(Timer::Fade, FRAME_MILLISECONDS);
     }
 
-    /// モードの札を出しておく時間が過ぎた．フェードして消す
+    /// モード表示を出しておく時間が過ぎた．フェードして消す
     fn mode_elapsed(&mut self) {
         self.window().stop_timer(Timer::Mode);
         if !matches!(self.content, Content::Mode(_)) {
@@ -434,7 +443,7 @@ impl App {
 
     /// 窓の大きさの動きと重ね変わりの 1 コマ．どちらも終わったら時計を止める
     fn step_motion(&mut self) {
-        if self.resize.is_none() && self.crossfade.is_none() {
+        if self.resize.is_none() && self.crossfade.is_none() && self.bubble_glide.is_none() {
             self.window().stop_timer(Timer::Motion);
             return;
         }
@@ -493,6 +502,10 @@ impl App {
                 &mut self.prediction_plain
             };
             let _ = window.draw(&self.renderer, &scene, &measure, 1.0);
+        }
+        if let Some(scene) = self.bubble_scene.clone() {
+            let opacity = self.opacity;
+            let _ = self.bubble.draw(&self.renderer, &scene, &measure, opacity);
         }
     }
 
@@ -562,6 +575,107 @@ impl App {
         }
     }
 
+    /// 語の意味の吹き出しを，候補の窓の横に出す・動かす・隠す．window は候補の窓の場面(影を足す前)．
+    /// 吹き出しは自分で背景を塗る窓なので，すりガラスの背景を使わない見た目(backdrop なし)で描く
+    fn refresh_bubble(&mut self, window: Option<&Scene>, font_size: f32, now: Instant) {
+        let shown = match (&self.content, window) {
+            (Content::Candidates(list), Some(window)) => scene::bubble::for_list(list, window),
+            (Content::BranchMap(map), Some(window)) => scene::bubble::for_branch(map, window),
+            _ => None,
+        }
+        .map(|(note, others, row)| (note.clone(), others, row));
+        let (Some((note, others, row)), Some((body, work))) =
+            (shown, self.window().body_and_work_area())
+        else {
+            self.hide_bubble();
+            return;
+        };
+        let look = self.system.look(false);
+        let theme = ResolvedTheme::resolve(
+            &self.presentation.theme,
+            self.presentation.custom_theme.as_ref(),
+            &look,
+        );
+        let Ok(measure) = self.renderer.measure(&theme, font_size) else {
+            return;
+        };
+        let style = Look::new(&theme, font_size);
+        let scale = self.window().scale();
+        let dips = |rect: &windows::Win32::Foundation::RECT| {
+            scene::Frame::new(
+                rect.left as f32 / scale,
+                rect.top as f32 / scale,
+                (rect.right - rect.left) as f32 / scale,
+                (rect.bottom - rect.top) as f32 / scale,
+            )
+        };
+        let anchor = dips(&body);
+        let screen = dips(&work);
+        // 候補の窓の場面の座標(本体が原点)を，画面の論理ピクセルに直す
+        let on_screen = |frame: &scene::Frame| frame.offset(anchor.x, anchor.y);
+        let mut keep_clear: Vec<scene::Frame> = window
+            .map(|window| window.keep_clear.iter().map(on_screen).collect())
+            .unwrap_or_default();
+        // 入力中の文字の行も覆わない
+        if let Some(caret) = &self.anchor {
+            keep_clear.push(scene::Frame::new(
+                screen.x,
+                caret.y as f32 / scale,
+                screen.width,
+                (caret.height.max(1) as f32) / scale,
+            ));
+        }
+        let bubble = scene::bubble::bubble(&note, others, &style, &measure);
+        let placement = scene::bubble::place(
+            on_screen(&row),
+            anchor,
+            (bubble.width, bubble.height),
+            bubble.preferred_pointer,
+            screen,
+            &keep_clear,
+            &scene::bubble::Metrics::tokens(theme.is_rounded()),
+        );
+        let drawn = scene::bubble::bubble_scene(&bubble, &placement, &style, &measure);
+        // 選んでいる候補が変わったら付いて動く(視覚効果を減らす設定ならすぐ移す)
+        let target = (placement.window.x, placement.window.y);
+        if let Some(shown) = self.bubble_at {
+            let moving = self.bubble_glide.map(|glide| glide.to);
+            if shown != target && moving != Some(target) && !self.system.reduce_motion() {
+                let from = self.bubble_glide.map_or(shown, |glide| glide.size_at(now));
+                self.bubble_glide = Some(motion::Resize {
+                    from,
+                    to: target,
+                    start: now,
+                });
+                self.window().start_timer(Timer::Motion, FRAME_MILLISECONDS);
+            }
+        }
+        let (x, y) = match self.bubble_glide {
+            Some(glide) if !glide.is_done(now) => glide.size_at(now),
+            _ => {
+                self.bubble_glide = None;
+                target
+            }
+        };
+        self.bubble_at = Some(target);
+        self.bubble.set_chrome(false, look.dark, theme.frame);
+        self.bubble.place_at(
+            (x * scale).round() as i32,
+            (y * scale).round() as i32,
+            &drawn,
+        );
+        let opacity = self.opacity;
+        let _ = self.bubble.draw(&self.renderer, &drawn, &measure, opacity);
+        self.bubble_scene = Some(drawn);
+    }
+
+    fn hide_bubble(&mut self) {
+        self.bubble.hide();
+        self.bubble_scene = None;
+        self.bubble_at = None;
+        self.bubble_glide = None;
+    }
+
     fn refresh(&mut self) {
         let look = self.system.look(self.backdrop);
         let theme = ResolvedTheme::resolve(
@@ -577,11 +691,6 @@ impl App {
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
         style.pixel_scale = self.window().scale();
-        style.reserved_card = match &self.content {
-            Content::Candidates(list) => self.meaning.list(list, &style, &measure),
-            Content::BranchMap(map) => self.meaning.branch(map, &style, &measure),
-            Content::Hidden | Content::Note(_) | Content::Mode(_) => self.meaning.clear(),
-        };
         let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
             Content::Candidates(list) => Some(scene::candidate_list(list, style, &measure)),
@@ -590,10 +699,10 @@ impl App {
             Content::Mode(label) => Some(scene::mode(label, style, &measure)),
         };
         let mut scene = build(&self.content, &style);
-        // 候補の窓は，大きさが変わるときに縁を滑らかに動かす(地と縁は途中の大きさで描き，中身は新しい配置のまま)
+        // 候補の窓は，大きさが変わるときに枠線を滑らかに動かす(背景と枠線は途中の大きさで描き，中身は新しい配置のまま)
         let now = Instant::now();
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
-        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える(macOS と同じ)
+        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，枠線を動かさずにすぐ変える(macOS と同じ)
         let typing =
             matches!(&self.content, Content::Candidates(list) if list.selected_entry.is_none());
         let natural = scene.as_ref().map(|scene| (scene.width, scene.height));
@@ -617,6 +726,8 @@ impl App {
             self.shown_size = None;
             self.resize = None;
         }
+        // 吹き出しの三角で指す行は，影を足す前の場面(本体が原点)の座標で探す
+        let bare = scene.clone();
         let scene = scene.map(|scene| scene::surround(scene, &theme, Surround::Shadow));
         // あとから届いた中身は，前の中身の上に重ねて濃くしていく
         if std::mem::take(&mut self.arrived) && is_list {
@@ -629,7 +740,7 @@ impl App {
         {
             self.crossfade = None;
         }
-        if self.resize.is_some() || self.crossfade.is_some() {
+        if self.resize.is_some() || self.crossfade.is_some() || self.bubble_glide.is_some() {
             self.window().start_timer(Timer::Motion, FRAME_MILLISECONDS);
         }
         let on_glass = theme.backdrop;
@@ -666,8 +777,10 @@ impl App {
                     &mut self.plain
                 };
                 let _ = window.draw_over(&self.renderer, below, scene, &measure, opacity);
+                self.refresh_bubble(bare.as_ref(), font_size, now);
             }
             _ => {
+                self.hide_bubble();
                 self.window().hide();
                 self.window().stop_timer(Timer::Motion);
                 self.shown_size = None;

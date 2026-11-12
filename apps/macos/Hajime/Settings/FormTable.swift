@@ -86,8 +86,8 @@ struct FormTableHost<Content: View>: NSViewRepresentable {
 
 /// 表の列の見出し．FormTableHost の表の上(スクロールの外)に置き，表の見出しは .tableColumnHeaders(.hidden) で隠す．
 ///
-/// 表の見出し(NSTableHeaderView)は，Form の中では地が描かれず，位置も SwiftUI に動かされる．スクロールすると行が見出しの下を通って
-/// 重なり，外から位置や地を直しても描き直しで戻された．見出しを表の外に描けば，行は見出しの下を通らない．
+/// 表の見出し(NSTableHeaderView)は，Form の中では背景が描かれず，位置も SwiftUI に動かされる．スクロールすると行が見出しの下を通って
+/// 重なり，外から位置や背景を直しても描き直しで戻された．見出しを表の外に描けば，行は見出しの下を通らない．
 /// 列の幅は表の列と同じ値(DesignTokens)を使い，最後の列だけを残りの幅にする
 struct FormTableHeader: View {
     struct Column {

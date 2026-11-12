@@ -5,7 +5,7 @@ use ipc::{InputMode, PartOfSpeech};
 /// 上の枝(文字種)の丸に入れる印
 pub const VARIANT_BADGE: &str = "↑";
 
-/// 打ち間違いを直した文節の幹に添える札
+/// 打ち間違いを直した文節の幹に添えるタグ
 pub const CORRECTED: &str = "修正";
 
 /// コマンドの候補を読み上げるときの前置き(core の CandidatePanel.commandAnnotation)
@@ -56,7 +56,7 @@ pub const PALETTE_READING_SEPARATOR: &str = "、";
 /// エンジンが Unicode の名前(UCD の名前)を送るときの出どころ(core の PaletteStrings.unicodeSource)．ほかは CLDR の英語の名前
 pub const PALETTE_UNICODE_SOURCE: &str = "Unicode";
 
-/// 語の意味のカードに入らなかった同音語の数(パレットの説明の欄に入らなかった読みと札の数にも使う)
+/// 語の意味のカードに入らなかった同音語の数(パレットの説明の欄に入らなかった読みとタグの数にも使う)
 pub fn more(count: usize) -> String {
     format!("+{count}")
 }
@@ -66,7 +66,7 @@ pub fn sense_number(number: usize) -> String {
     format!("{number}")
 }
 
-/// 品詞の名前(core の PartOfSpeech.name と同じ)．語の意味のカードの見出しの札と読み上げに使う
+/// 品詞の名前(core の PartOfSpeech.name と同じ)．語の意味のカードの見出しのタグと読み上げに使う
 pub fn part_of_speech(part: PartOfSpeech) -> &'static str {
     match part {
         PartOfSpeech::Noun => "名詞",

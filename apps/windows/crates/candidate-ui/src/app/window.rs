@@ -53,9 +53,9 @@ const CLICK_THROUGH: isize = 1;
 /// 時計の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Timer {
-    /// モードの札を出しておく時間
+    /// モード表示を出しておく時間
     Mode = 1,
-    /// フェード(出し始めの濃さ・モードの札を消す)の 1 コマ
+    /// フェード(出し始めの濃さ・モード表示を消す)の 1 コマ
     Fade = 2,
     /// 窓の大きさの動きと，あとから届いた中身の重ね変わりの 1 コマ
     Motion = 3,
@@ -88,9 +88,11 @@ pub struct Window {
     side: std::cell::Cell<Option<Side>>,
     /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
     held: std::cell::Cell<Option<Placed>>,
-    /// 最後に DWM に書いた地と角と縁(backdrop・dark・縁の色)と，書いたときの OS の設定の世代．
+    /// 最後に DWM に書いた背景と角と枠線(backdrop・dark・枠線の色)と，書いたときの OS の設定の世代．
     /// どれも同じなら書き直さない(OS の設定が変わったら書き直す)
     chrome: std::cell::Cell<Option<(bool, bool, COLORREF, u64)>>,
+    /// 最後に置いた本体の枠(画面のピクセル)．隠したら None．語の意味の吹き出しを候補の窓の横に置くのに使う
+    body: std::cell::Cell<Option<RECT>>,
 }
 
 /// 入力位置に対して窓を置いた側
@@ -182,7 +184,7 @@ fn colorref(color: Color) -> COLORREF {
 }
 
 impl Window {
-    /// class は窓の種類の名前．shadow なら OS が窓の影を付ける(すりガラスの地の窓)
+    /// class は窓の種類の名前．shadow なら OS が窓の影を付ける(すりガラスの背景の窓)
     pub fn create(class: PCWSTR, shadow: bool) -> Result<Self> {
         // SAFETY: 自分のプロセスのモジュール
         let instance = unsafe { GetModuleHandleW(None)? };
@@ -235,6 +237,7 @@ impl Window {
             side: std::cell::Cell::new(None),
             held: std::cell::Cell::new(None),
             chrome: std::cell::Cell::new(None),
+            body: std::cell::Cell::new(None),
         })
     }
 
@@ -254,7 +257,7 @@ impl Window {
         }
     }
 
-    /// 地をすりガラス(Windows 11 の DWM の背景)にできるか確かめる
+    /// 背景をすりガラス(Windows 11 の DWM の背景)にできるか確かめる
     pub fn supports_backdrop(&self) -> bool {
         let supported = set_attribute(
             self.hwnd,
@@ -265,7 +268,7 @@ impl Window {
         supported
     }
 
-    /// 窓の地と角と縁．backdrop なら地をすりガラスにして角を OS の丸みで丸め，縁を border の色で OS に描かせる．
+    /// 窓の背景と角と枠線．backdrop なら背景をすりガラスにして角を OS の丸みで丸め，枠線を border の色で OS に描かせる．
     /// そうでなければ OS は何も描かず，角丸の形も影も中身の側(scene)が描く
     pub fn set_chrome(&self, backdrop: bool, dark: bool, border: Color) {
         // 打つたびやアニメーションのコマごとに同じ値を DWM に書き直さない
@@ -381,6 +384,12 @@ impl Window {
             side,
             anchor: anchor_rect,
         }));
+        self.body.set(Some(RECT {
+            left: x,
+            top: y,
+            right: x + pixels(scene.body.width),
+            bottom: y + pixels(scene.body.height),
+        }));
         // SAFETY: hwnd はこの窓
         let _ = unsafe {
             SetWindowPos(
@@ -413,9 +422,34 @@ impl Window {
         };
     }
 
+    /// 最後に置いた本体の枠と，それがある画面の使える範囲(どちらも画面のピクセル)．出していなければ None
+    pub fn body_and_work_area(&self) -> Option<(RECT, RECT)> {
+        let body = self.body.get()?;
+        Some((body, work_area(&body)))
+    }
+
+    /// 本体(scene.body)の左上を画面の (x, y)(ピクセル)に置いて出す．語の意味の吹き出しに使う
+    pub fn place_at(&self, x: i32, y: i32, scene: &Scene) {
+        let scale = self.scale();
+        let pixels = |value: f32| (value * scale).round() as i32;
+        // SAFETY: hwnd はこの窓
+        let _ = unsafe {
+            SetWindowPos(
+                self.hwnd,
+                Some(HWND_TOPMOST),
+                x - pixels(scene.body.x),
+                y - pixels(scene.body.y),
+                (scene.width * scale).ceil() as i32,
+                (scene.height * scale).ceil() as i32,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            )
+        };
+    }
+
     pub fn hide(&self) {
         self.side.set(None);
         self.held.set(None);
+        self.body.set(None);
         // SAFETY: hwnd はこの窓
         let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
     }

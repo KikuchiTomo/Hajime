@@ -115,7 +115,7 @@ private struct CustomThemeRow: View {
     }
 }
 
-/// テーマの一行．名前の前に，地・文字・選択の色を小さく並べる
+/// テーマの一行．名前の前に，背景・文字・選択の色を小さく並べる
 private struct ThemeRow: View {
     let choice: ThemeChoice
     let title: String
@@ -124,7 +124,8 @@ private struct ThemeRow: View {
 
     var body: some View {
         Button(action: select) {
-            HStack(spacing: 10) {
+            // 選ぶ印・色の見本・名前は，見本と情報の列(パレットの説明の欄)と同じくまとまりの間だけ離す
+            HStack(spacing: DesignTokens.Size.Space.group) {
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 ThemeSwatch(theme: ResolvedTheme.resolve(choice))

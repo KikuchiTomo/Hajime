@@ -380,7 +380,7 @@ fn text_icon(text: &str) -> Result<HICON> {
         );
         let old_bitmap = SelectObject(dc, HGDIOBJ(color.0));
         let old_font = SelectObject(dc, HGDIOBJ(font.0));
-        // 黒の地に白で描いて字の覆う割合を取り，角丸の面から抜いて，字の色で塗る(crate::icon)
+        // 黒の背景に白で描いて字の覆う割合を取り，角丸の面から抜いて，字の色で塗る(crate::icon)
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, COLORREF(0x00FF_FFFF));
         let mut rect = RECT {

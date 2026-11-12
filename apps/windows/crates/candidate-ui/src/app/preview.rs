@@ -25,9 +25,11 @@ pub enum Shown<'a> {
     Sample,
     Branch(&'a ipc::BranchMap),
     List(&'a ipc::CandidateList),
+    /// 足元の行を出さない候補の一覧(設定の画面の絵文字の見本)
+    CompactList(&'a ipc::CandidateList),
     /// 入力位置の下の案内(初期設定の実演の「修正」「もしかして」)
     Note(&'a ipc::Note),
-    /// モードの札(初期設定の実演の「あ」「A」)
+    /// モード表示(初期設定の実演の「あ」「A」)
     Mode(&'a str),
     /// 絵文字と記号のパレット(設定の画面のパレットの見本)
     Palette(&'a ipc::PalettePanel),
@@ -40,6 +42,8 @@ pub enum Placement {
     Center { ground: tokens::Rgb },
     /// 左上に寄せる(初期設定ウィザードの実演．文字の下に出す)
     TopLeft { ground: tokens::Rgb },
+    /// 余白を足さずに真ん中に置く(設定の画面の見本．余白は rect の外に呼ぶ側がとる)．見本のまわりは ground の色で塗る
+    Fit { ground: tokens::Rgb },
 }
 
 pub struct Preview {
@@ -77,6 +81,14 @@ impl Preview {
             Shown::Sample => scene::branch_map(&sample::branch(), &look, measure),
             Shown::Branch(map) => scene::branch_map(map, &look, measure),
             Shown::List(list) => scene::candidate_list(list, &look, measure),
+            Shown::CompactList(list) => scene::candidate_list(
+                list,
+                &Look {
+                    shows_footer: false,
+                    ..look
+                },
+                measure,
+            ),
             Shown::Note(note) => scene::note(note, &look, measure),
             Shown::Mode(label) => scene::mode(label, &look, measure),
             Shown::Palette(panel) => {
@@ -109,7 +121,7 @@ impl Preview {
         }
     }
 
-    /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft のとき)
+    /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft・Fit のとき)
     pub fn size(&self, theme: &ResolvedTheme, font_size: f32, shown: Shown) -> Result<(f32, f32)> {
         let measure = self.measure_for(shown, theme, font_size)?;
         let scene = Self::scene(shown, theme, font_size, &measure);
@@ -132,15 +144,15 @@ impl Preview {
     ) -> Result<()> {
         let measure = self.measure_for(shown, theme, font_size)?;
         let scene = Self::scene(shown, theme, font_size, &measure);
-        // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
+        // 外観の見本は下地の上に置き，実演はウィザードの背景にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
             Placement::Center { .. } => Surround::Snapshot { dark },
-            Placement::TopLeft { .. } => Surround::Bare,
+            Placement::TopLeft { .. } | Placement::Fit { .. } => Surround::Bare,
         };
         let mut scene = scene::surround(scene, theme, surround);
         match placement {
-            Placement::TopLeft { ground } => {
-                // 角の丸みの外を地の色で塗る(画像は不透明)
+            Placement::TopLeft { ground } | Placement::Fit { ground } => {
+                // 角の丸みの外を背景の色で塗る(画像は不透明)
                 scene.draws.insert(
                     0,
                     Draw::Rect {
@@ -172,7 +184,7 @@ impl Preview {
         let width = (scene.width * shown).ceil() as i32;
         let height = (scene.height * shown).ceil() as i32;
         let (left, top) = match placement {
-            Placement::Center { .. } => (
+            Placement::Center { .. } | Placement::Fit { .. } => (
                 rect.left + (rect.right - rect.left - width) / 2,
                 rect.top + (rect.bottom - rect.top - height) / 2,
             ),

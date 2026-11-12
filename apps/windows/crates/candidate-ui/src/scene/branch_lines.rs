@@ -1,12 +1,12 @@
 //! 分岐図の枝の線の配置(ADR 0007．macOS は core の BranchLines と同じ決め方)．
 //!
-//! 幹の文節の札の端から 1 本の縦の線(幹)を伸ばし，候補ごとに同じ半径の 4 分の 1 の円で曲がって，
+//! 幹の文節のタグの端から 1 本の縦の線(幹)を伸ばし，候補ごとに同じ半径の 4 分の 1 の円で曲がって，
 //! 水平の線で候補の行の手前まで伸ばす．直線の枝は半径を 0 にした同じ形(直角に曲がる)にする．
 //! - 曲がり角の形と水平の線の終わりの x は，どの候補でも同じ
 //! - 幹はいちばん遠い候補の曲がり角の始まりで終わる(先を飛び出させない)
 //! - 曲がり角と水平の線は，隣の候補のものと重ならない．幹は 1 本だけで，候補ごとに描くのは曲がり角と水平の線だけ
 //!
-//! 線の縁をデバイスのピクセルの境にそろえる．太さが奇数のピクセルの線は，中心を半ピクセルずらす．y は下へ増える
+//! 線の端をデバイスのピクセルの境にそろえる．太さが奇数のピクセルの線は，中心を半ピクセルずらす．y は下へ増える
 
 use super::Point;
 
@@ -25,7 +25,7 @@ pub(crate) struct Turn {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct BranchLines {
-    /// 幹の根元(文節の札の端)
+    /// 幹の根元(文節のタグの端)
     pub root: Point,
     /// 幹の先(いちばん遠い候補の曲がり角の始まり)．候補が無ければ根元と同じ
     pub stem_end: Point,
@@ -37,7 +37,7 @@ pub(crate) struct BranchLines {
 
 impl BranchLines {
     /// - stem_x: 幹の x
-    /// - root_y: 幹の根元の y．下へ伸ばすなら文節の札の下の端，上へ伸ばすなら上の端
+    /// - root_y: 幹の根元の y．下へ伸ばすなら文節のタグの下の端，上へ伸ばすなら上の端
     /// - row_mid_ys: 候補の行の縦の中心．幹に近い順に並べる．根元より大きければ下へ，小さければ上へ伸ばす
     /// - tip_x: 水平の線の終わりの x
     /// - radius: 曲がり角の半径．0 なら直角．根元から最初の行まで，または行と行のあいだ(線の太さの分を除く)に入らなければ縮める
@@ -103,7 +103,7 @@ impl BranchLines {
     }
 }
 
-/// 線の縁がデバイスのピクセルの境に来る，線の中心の座標
+/// 線の端がデバイスのピクセルの境に来る，線の中心の座標
 pub(crate) fn align_center(value: f32, line_width: f32, scale: f32) -> f32 {
     let pixels = line_width * scale;
     ((value * scale - pixels / 2.0).round() + pixels / 2.0) / scale
@@ -118,13 +118,13 @@ pub(crate) fn align_edge(value: f32, scale: f32) -> f32 {
 mod tests {
     use super::*;
 
-    /// 下の枝: 文節の札の下の端(y = 40)から，28 ずつ離れた 5 つの行へ
+    /// 下の枝: 文節のタグの下の端(y = 40)から，28 ずつ離れた 5 つの行へ
     fn downward(radius: f32, line_width: f32, scale: f32) -> BranchLines {
         let mids: Vec<f32> = (0..5).map(|index| 56.0 + index as f32 * 28.0).collect();
         BranchLines::new(22.0, 40.0, &mids, 47.0, radius, line_width, scale)
     }
 
-    /// 上の枝: 文節の札の上の端(y = 100)から，上へ 3 つの行へ
+    /// 上の枝: 文節のタグの上の端(y = 100)から，上へ 3 つの行へ
     fn upward() -> BranchLines {
         BranchLines::new(22.0, 100.0, &[84.0, 56.0, 28.0], 47.0, 8.0, 1.5, 2.0)
     }

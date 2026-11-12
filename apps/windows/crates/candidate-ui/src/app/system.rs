@@ -71,7 +71,7 @@ impl SystemCache {
     }
 }
 
-/// 今の OS の外観．backdrop は，すりガラスの地を使えるかをウィンドウで確かめた結果
+/// 今の OS の外観．backdrop は，すりガラスの背景を使えるかをウィンドウで確かめた結果
 pub fn look(backdrop: bool) -> SystemLook {
     let dark = dword(PERSONALIZE, w!("AppsUseLightTheme")) == Some(0);
     SystemLook {

@@ -2,7 +2,7 @@
 
 //! 初期設定の窓(macOS の OnboardingView)．設定の画面と同じ描き方(Direct2D・トークンの色・Mica・DPI・高コントラスト・読み上げ)で，
 //! 左に実演の舞台，右にページ(見出し・選ぶもの・足元)を置く．大きさ・余白・動きは onboarding のトークン(macOS と同じ値)．
-//! 実演は台本(demo)を時間で進め，候補の窓とモードの札は candidate-ui の描き方で描いて舞台に重ねる．
+//! 実演は台本(demo)を時間で進め，候補の窓とモード表示は candidate-ui の描き方で描いて舞台に重ねる．
 //! 止まっているコマのあいだは時計で次のコマを待ち，CPU を使わない．動きを減らす設定のときは最後のコマだけを出す．
 //! 値は「はじめる」でまとめてエンジンに書く．済んだことは HKCU に書く(ffi::set_setup_completed)
 
@@ -66,11 +66,11 @@ const NODE_INFO: i32 = 8000;
 
 /// ページを替える動き(macOS の easeInOut)
 const EASE_IN_OUT: Easing = Easing::new(0.42, 0.0, 0.58, 1.0);
-/// 説明の札を浮かべる動き(macOS のばねの動きに近い，弾まずに柔らかく止まる曲線)
+/// 説明のカードを浮かべる動き(macOS のばねの動きに近い，弾まずに柔らかく止まる曲線)
 const SOFT: Easing = Easing::new(0.22, 1.0, 0.36, 1.0);
-/// 説明の札を浮かべる長さ(ページを替える動きの何倍か．macOS の spring の response と同じ比)
+/// 説明のカードを浮かべる長さ(ページを替える動きの何倍か．macOS の spring の response と同じ比)
 const CAPTION_MOTION: f32 = 1.6 * 1.3;
-/// 前の説明の札を消す長さ(ページを替える動きの何倍か)
+/// 前の説明のカードを消す長さ(ページを替える動きの何倍か)
 const CAPTION_LEAVE: f32 = 0.6;
 
 /// 見出しの「n / 9」の行の高さ
@@ -79,7 +79,7 @@ const COUNTER_HEIGHT: f32 = board::COUNTER_HEIGHT;
 const LINE: f32 = size::BODY_LINE_HEIGHT;
 /// 選択肢のカードの丸の大きさ(macOS の title3 の記号)
 const CHECK: f32 = board::CHECK_SIZE;
-/// 推奨の札の高さ
+/// 推奨のタグの高さ
 const BADGE_HEIGHT: f32 = board::BADGE_HEIGHT;
 /// テーマのカードの見本の高さ(macOS の fieldHeight × 1.3)
 const SWATCH_HEIGHT: f32 = board::FIELD_HEIGHT * 1.3;
@@ -194,7 +194,7 @@ struct Menu {
     opened: Tween,
 }
 
-/// 舞台に重ねる候補の窓とモードの札の画像
+/// 舞台に重ねる候補の窓とモード表示の画像
 struct Overlay {
     pixels: PreviewPixels,
     /// 舞台の座標(DIP)の左上
@@ -245,7 +245,7 @@ struct Wizard {
     /// ページを替える動き(0 から 1)と，薄くしていく前のページ
     fade: Tween,
     leaving: Option<Leaving>,
-    /// 機能の紹介のページで見せている機能と，その説明の札を浮かべる動き．前の札は薄くして消す
+    /// 機能の紹介のページで見せている機能と，その説明のカードを浮かべる動き．前のタグは薄くして消す
     spotlight: Option<&'static str>,
     /// アプリごとの入力モードのページで，実演に動きを見せているモード(macOS の OnboardingModel.appMode)
     app_mode: Mark,
@@ -692,7 +692,7 @@ impl Wizard {
         uia::focus_changed(self.window, self.focus_node());
     }
 
-    /// 見せる機能を変え，説明の札を浮かべ直す
+    /// 見せる機能を変え，説明のカードを浮かべ直す
     fn set_spotlight(&mut self, path: Option<&'static str>, from: Step, now: f64) {
         if self.spotlight == path {
             return;
@@ -701,7 +701,7 @@ impl Wizard {
             self.caption_leaving = Some((
                 old,
                 from,
-                // 消える札は短く薄くし，浮かんでくる札と重なって見える間を短くする
+                // 消えるタグは短く薄くし，浮かんでくるタグと重なって見える間を短くする
                 Tween::new(
                     1.0,
                     0.0,
@@ -998,7 +998,7 @@ impl Wizard {
         let gap = board::CARD_GAP;
         let padding = board::CARD_PADDING;
         let mut parts = Vec::new();
-        // カードの縁の線がスクロールの端で切れないように空ける(macOS と同じ)
+        // カードの枠線がスクロールの端で切れないように空ける(macOS と同じ)
         let mut y = space::INSET;
         let detail_height = |detail: &str, inner: f32| {
             space::STACK + measure.wrapped_height(detail, TextStyle::Caption, inner)
@@ -1302,7 +1302,7 @@ impl Wizard {
             .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32)
     }
 
-    /// 今のコマに合わせて，舞台に重ねる候補の窓とモードの札の画像を作る
+    /// 今のコマに合わせて，舞台に重ねる候補の窓とモード表示の画像を作る
     fn update_overlay(&mut self, now: f64) {
         let index = self
             .demo_position(now)
@@ -2318,7 +2318,7 @@ fn paint_stage(canvas: &mut dyn Canvas, state: &PaintState, fade: f32, height: f
     canvas.set_opacity(1.0);
 }
 
-/// 入力欄の模型と文字，その下に重ねる候補の窓とモードの札
+/// 入力欄の模型と文字，その下に重ねる候補の窓とモード表示
 fn paint_stage_frame(
     canvas: &mut dyn Canvas,
     state: &PaintState,
@@ -2334,7 +2334,7 @@ fn paint_stage_frame(
     if let Some(application) = frame.and_then(|frame| frame.application) {
         // 入力欄の上に，入力先のアプリの名前を窓の見出しのように出す
         let label = canvas.width(application, TextStyle::NavHeader);
-        // 札の形(1 行の欄の左右の余白，札の上下の余白)にし，入力欄の上に stack だけ離して置く(macOS と同じ)
+        // タグの形(1 行の欄の左右の余白，タグの上下の余白)にし，入力欄の上に stack だけ離して置く(macOS と同じ)
         let tab_height = size::NOTE_LINE_HEIGHT + part::TAG_PADDING_Y * 2.0;
         let tab = Rect::new(
             field.x,
@@ -2356,7 +2356,7 @@ fn paint_stage_frame(
         );
     }
     if let Some(key) = frame.and_then(|frame| frame.key) {
-        // 押したキーを，入力欄の右上にキーの札で出す．アプリの名前の札と同じ高さにそろえる(macOS と同じ)
+        // 押したキーを，入力欄の右上にキーキャップで出す．アプリの名前のタグと同じ高さにそろえる(macOS と同じ)
         let label = canvas.width(key, TextStyle::NavHeader);
         let cap_height = size::NOTE_LINE_HEIGHT + part::TAG_PADDING_Y * 2.0;
         let cap_width = label + part::FIELD_PADDING_X * 2.0;
@@ -2461,7 +2461,7 @@ fn paint_stage_frame(
     }
 }
 
-/// 見せている機能の説明の札(舞台の下)．項目を移るたびに下から浮かび上がる
+/// 見せている機能の説明のカード(舞台の下)．項目を移るたびに下から浮かび上がる
 fn paint_captions(canvas: &mut dyn Canvas, state: &PaintState, height: f32) {
     let wizard = state.wizard;
     let page = wizard.fade.value(state.now);
@@ -2715,7 +2715,7 @@ struct Look {
     now: f64,
 }
 
-/// カードの地と縁(macOS の OptionCard．選んだものはアクセントの色の地と縁)
+/// カードの背景と枠線(macOS の OptionCard．選んだものはアクセントの色の背景と枠線)
 fn card_ground(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -2752,7 +2752,7 @@ fn card_ground(
     }
 }
 
-/// 推奨の札．x は左端，line は名前の行
+/// 推奨のタグ．x は左端，line は名前の行
 fn badge(canvas: &mut dyn Canvas, theme: &Theme, x: f32, line: Rect) {
     let width = canvas.width(text::RECOMMENDED, TextStyle::NavHeader) + board::CARD_PADDING;
     let rect = Rect::new(
@@ -2771,7 +2771,7 @@ fn badge(canvas: &mut dyn Canvas, theme: &Theme, x: f32, line: Rect) {
     );
 }
 
-/// 名前(と推奨の札)と説明
+/// 名前(と推奨のタグ)と説明
 fn card_text(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -2867,8 +2867,8 @@ fn paint_card(
     }
 }
 
-/// 説明だけのカード．入力モードの札を枠に入れて並べる(macOS の InfoCard)
-/// アプリごとの入力モードのカード．実演に動きを見せているモードのカードは選んだカードと同じ地にする
+/// 説明だけのカード．入力モード表示を枠に入れて並べる(macOS の InfoCard)
+/// アプリごとの入力モードのカード．実演に動きを見せているモードのカードは選んだカードと同じ背景にする
 fn paint_info(
     canvas: &mut dyn Canvas,
     wizard: &Wizard,
@@ -2915,7 +2915,7 @@ fn paint_info(
         Color::from(palette.accent),
         TextLayout::CENTER,
     );
-    // 名前は札と同じく縦の真ん中に置く(macOS の InfoCard)
+    // 名前はタグと同じく縦の真ん中に置く(macOS の InfoCard)
     let x = mark.max_x() + board::CARD_GAP;
     canvas.text(
         Rect::new(
@@ -2931,7 +2931,7 @@ fn paint_info(
     );
 }
 
-/// テーマのカード．そのテーマの地・選択・文字・補正の色を小さく並べた見本と名前(macOS の ThemeTile)
+/// テーマのカード．そのテーマの背景・選択・文字・補正の色を小さく並べた見本と名前(macOS の ThemeTile)
 fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look, index: usize) {
     let theme = &wizard.theme;
     let palette = &theme.palette;
@@ -3020,7 +3020,7 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
     }
 }
 
-/// 名前とメニューのボタンの行(入力する文字の行はカードの地に載せる)
+/// 名前とメニューのボタンの行(入力する文字の行はカードの背景に載せる)
 fn paint_picker(
     canvas: &mut dyn Canvas,
     wizard: &Wizard,
@@ -3171,7 +3171,7 @@ fn paint_slider(
     }
 }
 
-/// 機能の行．アイコン・名前・スイッチ．見せている機能の行はアクセントの色の地と縁(macOS の SpotlightRow)
+/// 機能の行．アイコン・名前・スイッチ．見せている機能の行はアクセントの色の背景と枠線(macOS の SpotlightRow)
 #[allow(clippy::too_many_arguments)]
 fn paint_spot(
     canvas: &mut dyn Canvas,
@@ -3360,7 +3360,7 @@ fn paint_footer(canvas: &mut dyn Canvas, state: &PaintState, fade: f32) {
     canvas.set_opacity(1.0);
 }
 
-/// 地の無い文字だけのボタン(macOS の plain．ポインターを載せると文字を濃くし，押すと薄くする)
+/// 背景の無い文字だけのボタン(macOS の plain．ポインターを載せると文字を濃くし，押すと薄くする)
 fn paint_plain_button(
     canvas: &mut dyn Canvas,
     theme: &Theme,

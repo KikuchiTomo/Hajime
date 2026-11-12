@@ -8,7 +8,8 @@ struct ResettableRow<Value: Equatable, Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        HStack(spacing: 6) {
+        // 部品と「既定に戻す」は押し間違えないようにまとまりの間だけ離す
+        HStack(spacing: DesignTokens.Size.Space.group) {
             content()
             if model.settings[keyPath: keyPath] != DefaultSettings.settings[keyPath: keyPath] {
                 Button {
@@ -20,6 +21,28 @@ struct ResettableRow<Value: Equatable, Content: View>: View {
                 .buttonStyle(.borderless)
                 .help(UIStrings.Features.restoreDefault)
                 .accessibilityLabel(UIStrings.Features.restoreDefault)
+            }
+        }
+    }
+}
+
+/// 既定から戻せる，整数を範囲の中で 1 段ずつ選ぶ項目．値はステッパーのすぐ左に置き，選ぶ項目やスライダーの値と同じく右に寄せる
+struct ResettableStepper: View {
+    @ObservedObject var model: SettingsModel
+    let title: String
+    let keyPath: WritableKeyPath<HajimeDomain.Settings, Int>
+    let range: ClosedRange<Int>
+    var step = 1
+    /// 今の値を書いた文字(「4 番目」「2 文字以下」)
+    let value: String
+
+    var body: some View {
+        ResettableRow(model: model, keyPath: keyPath) {
+            LabeledContent(title) {
+                HStack {
+                    Text(value).monospacedDigit()
+                    Stepper(title, value: model.binding(keyPath), in: range, step: step).labelsHidden()
+                }
             }
         }
     }

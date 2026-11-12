@@ -8,7 +8,7 @@ use crate::palette::{
     self,
     layout::{cell_size, Fonts, Layout},
 };
-use crate::scene::{self, CardReservation, Look, Scene, Surround};
+use crate::scene::{self, Look, Scene, Surround};
 use crate::theme::{ResolvedTheme, SystemLook};
 use ipc::{
     BranchColumn, BranchMap, BranchSplit, CandidateEntry, CandidateFocus, CandidateList,
@@ -38,7 +38,7 @@ const BASE_DPI: f32 = 96.0;
 const SHOW_HANDWRITING: &str = "--show-handwriting";
 
 /// 引数が --show-handwriting <x> <y> <秒> <light|dark> なら，エンジンにつながずに手書きの窓を (x, y)(画面のピクセル)の
-/// 下に出し，秒だけ動かして終わる(本物の窓の縁・影・DPI・フォーカスを奪わないことを確かめる．書いた線は認識するが，選んだ文字はどこにも入らない)
+/// 下に出し，秒だけ動かして終わる(本物の窓の枠線・影・DPI・フォーカスを奪わないことを確かめる．書いた線は認識するが，選んだ文字はどこにも入らない)
 fn show_handwriting(arguments: &[String]) -> bool {
     let Some(index) = arguments
         .iter()
@@ -147,7 +147,7 @@ fn render_all(output: &Path) -> Result<()> {
     let renderer = Renderer::new()?;
     let custom = sample_theme();
     for (name, theme_name, dark) in LOOKS {
-        // 見本はすりガラスの地を写せないので，地を塗る(macOS の fillsSurface と同じ)
+        // 見本はすりガラスの背景を写せないので，背景を塗る(macOS の fillsSurface と同じ)
         let system = SystemLook {
             dark,
             ..SystemLook::default()
@@ -160,25 +160,28 @@ fn render_all(output: &Path) -> Result<()> {
             pixel_scale: tokens::size::snapshot::SCALE,
             ..Look::new(&theme, font_size)
         };
-        // 意味のある候補から意味の無い候補に移ったところは，前の窓で空けたカードの場所を引き継ぐ(描く層と同じ手順)
-        let mut reservation = CardReservation::default();
-        reservation.list(&meaning_list(), &look, &measure);
-        let empty_list = Look {
-            reserved_card: reservation.list(&meaning_empty_list(), &look, &measure),
-            ..look
+        // 候補の右(吹き出し)に出す設定の語の意味は，候補の窓の横の吹き出しに並べて写す(描く層は別の窓に出す)
+        let with_list_bubble = |list: &ipc::CandidateList| {
+            let window = scene::candidate_list(list, &look, &measure);
+            match scene::bubble::for_list(list, &window)
+                .map(|(note, others, row)| (note.clone(), others, row))
+            {
+                Some((note, others, row)) => {
+                    scene::bubble::beside(window, &note, others, row, &look, &measure)
+                }
+                None => window,
+            }
         };
-        reservation.branch(
-            &homophone_branch(MeaningPlacement::Side, 1),
-            &look,
-            &measure,
-        );
-        let empty_branch = Look {
-            reserved_card: reservation.branch(
-                &homophone_branch(MeaningPlacement::Side, 2),
-                &look,
-                &measure,
-            ),
-            ..look
+        let with_branch_bubble = |map: &ipc::BranchMap| {
+            let window = scene::branch_map(map, &look, &measure);
+            match scene::bubble::for_branch(map, &window)
+                .map(|(note, others, row)| (note.clone(), others, row))
+            {
+                Some((note, others, row)) => {
+                    scene::bubble::beside(window, &note, others, row, &look, &measure)
+                }
+                None => window,
+            }
         };
         let scenes: [(&str, Scene); 19] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
@@ -188,27 +191,20 @@ fn render_all(output: &Path) -> Result<()> {
             ),
             (
                 "homophone-list",
-                scene::candidate_list(&homophone_list(MeaningPlacement::Side), &look, &measure),
+                with_list_bubble(&homophone_list(MeaningPlacement::Side)),
             ),
             (
                 "homophone-list-below",
                 scene::candidate_list(&homophone_list(MeaningPlacement::Below), &look, &measure),
             ),
-            (
-                "meaning-list",
-                scene::candidate_list(&meaning_list(), &look, &measure),
-            ),
+            ("meaning-list", with_list_bubble(&meaning_list())),
             (
                 "meaning-list-empty",
-                scene::candidate_list(&meaning_empty_list(), &empty_list, &measure),
+                scene::candidate_list(&meaning_empty_list(), &look, &measure),
             ),
             (
                 "homophone-branch",
-                scene::branch_map(
-                    &homophone_branch(MeaningPlacement::Side, 1),
-                    &look,
-                    &measure,
-                ),
+                with_branch_bubble(&homophone_branch(MeaningPlacement::Side, 1)),
             ),
             (
                 "homophone-branch-below",
@@ -222,7 +218,7 @@ fn render_all(output: &Path) -> Result<()> {
                 "homophone-branch-empty",
                 scene::branch_map(
                     &homophone_branch(MeaningPlacement::Side, 2),
-                    &empty_branch,
+                    &look,
                     &measure,
                 ),
             ),
@@ -594,7 +590,7 @@ fn meaning_empty_list() -> CandidateList {
 }
 
 /// 同音異義語の使い分けを分岐図で出したところ(macOS の homophoneBranchView)．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
-/// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
+/// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
 fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     let alternatives = strings(&["取る", "撮る", "とる", "採る"]);
     let has_meaning = selected == 1;
