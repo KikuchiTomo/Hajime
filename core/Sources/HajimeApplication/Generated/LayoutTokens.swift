@@ -8,7 +8,45 @@ public enum LayoutTokens {
         public static let sm: Double = 8
         public static let md: Double = 12
         public static let lg: Double = 16
+        public static let xl: Double = 24
+        public static let fine: Double = 2
+        public static let inset: Double = 4
         public static let inline: Double = 4
+        public static let stack: Double = 4
+        public static let group: Double = 8
+        public static let section: Double = 12
+        public static let window: Double = 12
+        public static let page: Double = 24
+    }
+    public enum Text {
+        public static let candidate: Double = 15
+        public static let candidateLine: Double = 20
+        public static let body: Double = 13
+        public static let bodyLine: Double = 20
+        public static let small: Double = 11
+        public static let smallLine: Double = 16
+        public static let tag: Double = 10
+        public static let tagLine: Double = 12
+    }
+    public enum Part {
+        public static let windowRadius: Double = 12
+        public static let cardRadius: Double = 8
+        public static let rowHeight: Double = 28
+        public static let rowPaddingX: Double = 4
+        public static let rowRadius: Double = 8
+        public static let fieldHeight: Double = 28
+        public static let fieldPaddingX: Double = 8
+        public static let fieldPaddingY: Double = 4
+        public static let fieldRadius: Double = 8
+        public static let tagHeight: Double = 16
+        public static let tagPaddingX: Double = 4
+        public static let tagPaddingY: Double = 2
+        public static let tagGlyphGap: Double = 2
+        public static let tagRadius: Double = 4
+        public static let badgeSize: Double = 16
+        public static let iconSize: Double = 16
+        public static let iconRadius: Double = 4
+        public static let stroke: Double = 1
     }
     public enum Candidate {
         public static let rowHeight: Double = 22
