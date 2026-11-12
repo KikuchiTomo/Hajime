@@ -48,7 +48,7 @@ struct OnboardingView: View {
                            startRadius: 0, endRadius: Size.height * 0.8)
             RadialGradient(colors: [Color(nsColor: .systemPink).opacity(Opacity.stageGlowSecondary), .clear], center: .bottomTrailing,
                            startRadius: 0, endRadius: Size.height * 0.7)
-            OnboardingStage(page: model.page, settings: model.draft, spotlight: model.spotlight)
+            OnboardingStage(page: model.page, settings: model.draft, spotlight: model.spotlight, appMode: model.appMode)
                 .id(model.page)
                 .transition(.opacity)
             if let spotlight = model.spotlight {
@@ -115,7 +115,9 @@ struct OnboardingView: View {
     private var appModes: some View {
         VStack(spacing: Size.cardGap) {
             ForEach([AppProfile.imeOff, .imeOn, .remembersMode], id: \.self) { profile in
-                InfoCard(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile))
+                InfoCard(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile), highlighted: model.appMode == profile) {
+                    model.appMode = profile
+                }
             }
         }
     }
@@ -373,13 +375,15 @@ private struct CharacterRow<Value: Hashable & CaseIterable>: View where Value.Al
     }
 }
 
-/// 紹介だけのカード．入力モードの札と名前を並べる(どう動くかは左の舞台の実演で見せる)
+/// 紹介だけのカード．入力モードの札と名前を並べる．ポインタを置くか押すと，左の舞台にそのモードの動きを見せる
 private struct InfoCard: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding
 
     let mark: String
     let title: String
+    let highlighted: Bool
+    let focus: () -> Void
 
     var body: some View {
         HStack(spacing: Size.cardGap) {
@@ -396,8 +400,16 @@ private struct InfoCard: View {
             Spacer(minLength: 0)
         }
         .padding(Size.cardPadding)
-        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).fill(Color.primary.opacity(Opacity.cardIdle)))
+        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
+            .fill(highlighted ? Color.accentColor.opacity(Opacity.cardSelected) : Color.primary.opacity(Opacity.cardIdle)))
+        .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
+            .strokeBorder(highlighted ? Color.accentColor : Color.clear, lineWidth: 1.5))
+        .contentShape(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous))
+        .onHover { inside in if inside { focus() } }
+        .onTapGesture(perform: focus)
+        .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: highlighted)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(highlighted ? .isSelected : [])
     }
 }
 

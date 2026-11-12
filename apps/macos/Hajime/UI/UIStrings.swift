@@ -645,6 +645,9 @@ enum UIStrings {
         /// 実演でアプリを切り替えるときに出す名前
         static let demoNotes = "メモ"
         static let demoTerminal = "ターミナル"
+        /// 実演で押すキーの名前(キーの札に出す)
+        static let demoKeyKana = "かな"
+        static let demoKeyEisu = "英数"
 
         // b. 自動補正
         static let correctionTitle = "自動補正"

@@ -1082,6 +1082,10 @@ pub mod windows_wizard {
     pub const DEMO_NOTES: &str = "メモ帳";
     /// 英数で打つ実演の文字(macOS は「Mac で」)
     pub const DEMO_DIRECT_TEXT: &str = "PC で";
+    /// 実演で押すキーの名前(キーの札に出す．macOS は「かな」「英数」)
+    pub const DEMO_KEY_HENKAN: &str = "変換";
+    pub const DEMO_KEY_MUHENKAN: &str = "無変換";
+    pub const DEMO_KEY_HANKAKU: &str = "半角/全角";
     /// 補正とコマンドの実演の案内(core の Note と同じ文言)
     pub const NOTE_SUGGESTION: &str = "もしかして";
     pub const NOTE_CORRECTION: &str = "修正";

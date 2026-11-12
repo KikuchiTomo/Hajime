@@ -119,6 +119,8 @@ enum Target {
     Spot(usize),
     /// 機能の行のスイッチ
     Switch(usize),
+    /// アプリごとの入力モードのカード(ポインターを置くとそのモードの動きを見せる)
+    Info(usize),
     MenuItem(usize),
     Button(Button),
 }
@@ -245,6 +247,8 @@ struct Wizard {
     leaving: Option<Leaving>,
     /// 機能の紹介のページで見せている機能と，その説明の札を浮かべる動き．前の札は薄くして消す
     spotlight: Option<&'static str>,
+    /// アプリごとの入力モードのページで，実演に動きを見せているモード(macOS の OnboardingModel.appMode)
+    app_mode: Mark,
     caption: Tween,
     caption_leaving: Option<(&'static str, Step, Tween)>,
     /// 見せている機能の行を強調する動き
@@ -332,6 +336,7 @@ pub fn open(
         fade: Tween::fixed(1.0),
         leaving: None,
         spotlight: step.spots().first().map(|spot| spot.path),
+        app_mode: Mark::Direct,
         caption: Tween::fixed(1.0),
         caption_leaving: None,
         spot_glows: Vec::new(),
@@ -621,7 +626,13 @@ impl Wizard {
 
     /// 台本を作り直して初めから見せる(ページ・見せている機能・選んだ値が変わったとき．macOS と同じ)
     fn restart_demo(&mut self) {
-        self.script = demo::script(self.step, &self.choices, self.spotlight, self.today);
+        self.script = demo::script(
+            self.step,
+            &self.choices,
+            self.spotlight,
+            self.app_mode,
+            self.today,
+        );
         self.script_id += 1;
         self.demo_started = self.now();
         ffi::kill_timer(self.window, DEMO_TIMER);
@@ -722,6 +733,21 @@ impl Wizard {
                 )),
             }
         }
+    }
+
+    /// アプリごとの入力モードのカードを選び，そのモードの実演を始め直す
+    fn app_mode_index(&mut self, index: usize) {
+        let Some(mark) = self.step.items().into_iter().find_map(|item| match item {
+            Item::Info(infos) => infos.get(index).map(|info| info.mark),
+            _ => None,
+        }) else {
+            return;
+        };
+        if self.app_mode == mark {
+            return;
+        }
+        self.app_mode = mark;
+        self.restart_demo();
     }
 
     fn spotlight_index(&mut self, index: usize) {
@@ -922,6 +948,7 @@ impl Wizard {
                 self.focus = Focus::Spot(index);
                 self.toggle(index);
             }
+            Target::Info(index) => self.app_mode_index(index),
             Target::MenuItem(index) => self.choose_menu(index),
             Target::Button(button) => {
                 if self.button_visible(button) && self.button_enabled(button) {
@@ -1234,7 +1261,8 @@ impl Wizard {
                         Target::Spot(index)
                     })
                 }
-                PartKind::Info(..) | PartKind::TaskbarNote => None,
+                PartKind::Info(index, _) => Some(Target::Info(index)),
+                PartKind::TaskbarNote => None,
             };
         }
         None
@@ -1826,6 +1854,7 @@ impl Wizard {
         let hover = self.target_at(x, y);
         match hover {
             Some(Target::Spot(index) | Target::Switch(index)) => self.spotlight_index(index),
+            Some(Target::Info(index)) => self.app_mode_index(index),
             Some(Target::MenuItem(index)) => {
                 if let Some(menu) = &mut self.menu {
                     menu.highlighted = index;
@@ -2153,7 +2182,7 @@ impl Wizard {
                 Target::Slider(item) => Focus::Slider(item),
                 Target::Spot(index) | Target::Switch(index) => Focus::Spot(index),
                 Target::Button(button) => Focus::Button(button),
-                Target::MenuItem(_) => self.focus,
+                Target::Info(_) | Target::MenuItem(_) => self.focus,
             };
             ffi::invalidate(self.window);
             return;
@@ -2323,6 +2352,32 @@ fn paint_stage_frame(
             application,
             TextStyle::NavHeader,
             Color::from(palette.text_secondary),
+            TextLayout::CENTER,
+        );
+    }
+    if let Some(key) = frame.and_then(|frame| frame.key) {
+        // 押したキーを，入力欄の右上にキーの札で出す．アプリの名前の札と同じ高さにそろえる(macOS と同じ)
+        let label = canvas.width(key, TextStyle::NavHeader);
+        let cap_height = size::NOTE_LINE_HEIGHT + part::TAG_PADDING_Y * 2.0;
+        let cap_width = label + part::FIELD_PADDING_X * 2.0;
+        let cap = Rect::new(
+            field.max_x() - cap_width,
+            field.y - space::STACK - cap_height,
+            cap_width,
+            cap_height,
+        );
+        canvas.fill_round(cap, part::TAG_RADIUS, Color::from(palette.control));
+        canvas.stroke_round(
+            cap,
+            part::TAG_RADIUS,
+            part::STROKE,
+            Color::from(palette.control_stroke),
+        );
+        canvas.text(
+            cap,
+            key,
+            TextStyle::NavHeader,
+            Color::from(palette.text),
             TextLayout::CENTER,
         );
     }
@@ -2603,7 +2658,7 @@ fn paint_page(
                 field,
                 card,
             } => paint_card(canvas, wizard, rect, &look, (item, index), field, card),
-            PartKind::Info(_, info) => paint_info(canvas, wizard, rect, info),
+            PartKind::Info(index, info) => paint_info(canvas, wizard, rect, &look, index, info),
             PartKind::Theme(index) => paint_theme(canvas, wizard, rect, &look, index),
             PartKind::Picker {
                 item,
@@ -2813,10 +2868,34 @@ fn paint_card(
 }
 
 /// 説明だけのカード．入力モードの札を枠に入れて並べる(macOS の InfoCard)
-fn paint_info(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, info: Info) {
+/// アプリごとの入力モードのカード．実演に動きを見せているモードのカードは選んだカードと同じ地にする
+fn paint_info(
+    canvas: &mut dyn Canvas,
+    wizard: &Wizard,
+    rect: Rect,
+    look: &Look,
+    index: usize,
+    info: Info,
+) {
     let theme = &wizard.theme;
     let palette = &theme.palette;
-    card_ground(canvas, theme, rect, false, 0.0, false);
+    let target = Target::Info(index);
+    let (hover, pressed) = if look.current {
+        (
+            wizard.hover_value(target, look.now),
+            wizard.pressed == Some(target),
+        )
+    } else {
+        (0.0, false)
+    };
+    card_ground(
+        canvas,
+        theme,
+        rect,
+        wizard.app_mode == info.mark,
+        hover,
+        pressed,
+    );
     let mark = Rect::new(
         rect.x + board::CARD_PADDING,
         rect.y + (rect.height - board::INFO_SYMBOL_WIDTH) / 2.0,
