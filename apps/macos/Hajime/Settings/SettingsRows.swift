@@ -8,7 +8,8 @@ struct ResettableRow<Value: Equatable, Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        HStack(spacing: 6) {
+        // 部品と「既定に戻す」は押し間違えないようにまとまりの間だけ離す
+        HStack(spacing: DesignTokens.Size.Space.group) {
             content()
             if model.settings[keyPath: keyPath] != DefaultSettings.settings[keyPath: keyPath] {
                 Button {

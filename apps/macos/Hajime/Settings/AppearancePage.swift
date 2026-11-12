@@ -124,7 +124,7 @@ private struct ThemeRow: View {
 
     var body: some View {
         Button(action: select) {
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.Size.Space.inline) {
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 ThemeSwatch(theme: ResolvedTheme.resolve(choice))
