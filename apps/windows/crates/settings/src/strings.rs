@@ -228,6 +228,63 @@ pub mod extras {
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
+    pub const TEMPLATE_SYNTAX: &str = "書き方";
+    pub const TEMPLATE_MEANING: &str = "入るもの";
+    pub const TEMPLATE_NOW: &str = "今入れると";
+    /// 単語に書ける書き方(TextTemplate)と，入るもの．「今入れると」の列は書き方を今の値に置き換えて出す
+    pub const TEMPLATE_ROWS: &[(&str, &str)] = &[
+        ("{date}", "今日の日付"),
+        ("{time}", "今の時刻"),
+        ("{datetime:YYYY/MM/DD hh:mm:ss}", "書式を決めた日時"),
+        ("{datetime+1d:MM/DD}", "日をずらした日付（-7d なら 7 日前）"),
+        (
+            "{time+30m}",
+            "ずらした時刻（m 分・h 時間・d 日・w 週・M 月・y 年）",
+        ),
+        (
+            "{date+1w@mon:M/D(ddd)}",
+            "来週の月曜（@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末）",
+        ),
+        (
+            "{date+3b:M/D(ddd)}",
+            "3 営業日後（b は土日と祝日を除いて数える）",
+        ),
+        (
+            "{date:GGEE年M月D日|kansuji}",
+            "漢数字の和暦（1 年は「元年」）",
+        ),
+        ("{date:FFFF年度 NN JJ}", "年度・和風月名・干支"),
+        ("{utc}", "協定世界時の日時"),
+        ("{unixtime}", "UNIX 時間（秒）"),
+        (
+            "{holiday:平日}",
+            "祝日の名前（祝日でなければ : のあとの文字）",
+        ),
+        ("{season}", "その月の時候の挨拶"),
+        ("{greeting}", "時刻に合った挨拶"),
+        (
+            "{days:12/25}",
+            "その日までの日数（2027-03-31 のように年も書ける）",
+        ),
+        ("{age:1990-04-01}", "その日に生まれた人の満年齢"),
+        ("{uuid}", "UUID（入れるたびに変わる）"),
+        ("{random:1-6}", "範囲の中の整数（入れるたびに変わる）"),
+        (
+            "{alnum:8}",
+            "英数字 8 文字（{hex:8} なら 16 進数。入れるたびに変わる）",
+        ),
+        (
+            "{pick:はい,いいえ}",
+            "並べたうちのどれか 1 つ（入れるたびに変わる）",
+        ),
+        ("{date|fullwidth}", "| のあとの名前で変えた値"),
+        ("{{ }}", "「{」と「}」の文字そのもの"),
+    ];
+    /// 登録の例に使う単語
+    pub const TEMPLATE_EXAMPLE_WORD: &str = "{datetime:YYYY-MM-DD hh:mm}";
+    pub fn template_example(value: &str) -> String {
+        format!("例: 読み「dt」に単語「{TEMPLATE_EXAMPLE_WORD}」を登録すると、「dt」を変換したときに「{value}」を入れます。")
+    }
     pub const DYNAMIC_DICTIONARY_NOTE: &str = "登録する単語に次の書き方を入れておくと、変換したときにその時点の値に置き換えて入れます。単語のほかの文字はそのまま入ります。読みはローマ字（gh など）でも登録できます。";
     pub const TEMPLATE_FILTERS: &str = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）、ascii（半角英数）、romaji（ローマ字）、snake・camel・pascal・kebab（英語の語の書き方）、url（URL に入れる形）、length（文字数）、kansuji（漢数字）、kanjidigits（1 字ずつの漢数字）、daiji（大字）、comma（3 桁区切り）、circled（丸数字）、html（HTML に入れる形）、base64（Base64）。続けて書くと左から順にかけます。";
     pub const DATE_FORMAT_SYMBOLS: &str = "日時の書式の記号: YYYY 年、MM 月、MMM・MMMM 英語の月（Nov、November）、DD 日、DDD 年の何日目、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、AA AM・PM、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、EEE・EEEE 英語の曜日（Mon、Monday）、GG 元号（令和）、E 元号の年、EE 元号の年（1 年は「元」）、WW 週番号、Q 四半期、FFFF 年度（4 月始まり）、NN 和風月名（霜月）、JJ 干支（丙午）。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。";
@@ -878,33 +935,6 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
-    /// 単語に書ける書き方(TextTemplate)と，入るもの・例．1 つずつ注記の行にする(macOS は表にして今の値を出す)
-    pub const TEMPLATE_ROWS: &[&str] = &[
-        "{date}　今日の日付（例: 2026/04/01）",
-        "{time}　今の時刻（例: 09:30）",
-        "{datetime:YYYY/MM/DD hh:mm:ss}　書式を決めた日時（例: 2026/04/01 09:30:15）",
-        "{datetime+1d:MM/DD}　日をずらした日付。-7d なら 7 日前（例: 04/02）",
-        "{time+30m}　ずらした時刻。m 分・h 時間・d 日・w 週・M 月・y 年でずらす（例: 10:00）",
-        "{date+1w@mon:M/D(ddd)}　来週の月曜。@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末（例: 4/6(月)）",
-        "{date+3b:M/D(ddd)}　3 営業日後。b は土日と祝日を除いて数える（例: 4/6(月)）",
-        "{date:GGEE年M月D日|kansuji}　漢数字の和暦。1 年は「元年」（例: 令和八年四月一日）",
-        "{date:FFFF年度 NN JJ}　年度・和風月名・干支（例: 2026年度 卯月 丙午）",
-        "{utc}　協定世界時の日時（例: 2026-04-01T00:30:15Z）",
-        "{unixtime}　UNIX 時間（秒）",
-        "{holiday:平日}　祝日の名前。祝日でなければ : のあとの文字（例: 平日）",
-        "{season}　その月の時候の挨拶（例: 陽春の候）",
-        "{greeting}　時刻に合った挨拶（例: おはようございます）",
-        "{days:12/25}　その日までの日数。2027-03-31 のように年も書ける",
-        "{age:1990-04-01}　その日に生まれた人の満年齢",
-        "{uuid}　UUID。入れるたびに変わる",
-        "{random:1-6}　範囲の中の整数。入れるたびに変わる",
-        "{alnum:8}　英数字 8 文字。{hex:8} なら 16 進数。入れるたびに変わる",
-        "{pick:はい,いいえ}　並べたうちのどれか 1 つ。入れるたびに変わる",
-        "{date|fullwidth}　| のあとの名前で変えた値（例: ２０２６／０４／０１）",
-        "{{ }}　「{」と「}」の文字そのもの",
-    ];
-    /// 単語に書ける書き方の登録の例(macOS は今の値を出す)
-    pub const TEMPLATE_EXAMPLE: &str = "例: 読み「dt」に単語「{datetime:YYYY-MM-DD hh:mm}」を登録すると、「dt」を変換したときに「2026-04-01 09:30」のような今の日時を入れます。";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)

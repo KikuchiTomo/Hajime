@@ -53,6 +53,10 @@ const WARM_ID: u16 = 50;
 const RECONNECT_TIMER: usize = 1;
 /// 説明の吹き出しを出すまでの時計の番号
 const TOOLTIP_TIMER: usize = 2;
+/// ユーザー辞書の書き方の表の今の値を読み直す間隔のタイマー
+const TEMPLATE_TIMER: usize = 3;
+/// 書き方の表の今の値を読み直す間隔(ミリ秒．秒の値が変わるので 1 秒)
+const TEMPLATE_INTERVAL: u32 = 1000;
 /// ポインターを載せてから説明の吹き出しを出すまで(ミリ秒．OS のツールチップと同じくらい)
 const TOOLTIP_DELAY: u32 = 500;
 /// 読み込みのスレッドが終わった知らせ
@@ -607,6 +611,12 @@ impl App {
         if let Some(model) = &self.model {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = super::actions::keymap_report(model);
+            }
+            // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
+            if self.view.page == Page::Dictionary {
+                (self.extras.template_values, self.extras.template_example) =
+                    super::actions::template_values(model, &self.extras.template_values);
+                ffi::set_timer(self.window, TEMPLATE_TIMER, TEMPLATE_INTERVAL);
             }
             // 変換マクロの一覧やオン・オフが変わったら，試した結果も読み直す
             if let Some((text, reading, draft)) = self.view.macro_preview_inputs() {
@@ -2492,6 +2502,25 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         WM_WARM => {
             with_app(App::warm_fields);
+            Some(LRESULT(0))
+        }
+        WM_TIMER if wparam.0 == TEMPLATE_TIMER => {
+            with_app(|app| {
+                let Some(model) = &app.model else {
+                    ffi::kill_timer(app.window, TEMPLATE_TIMER);
+                    return;
+                };
+                if app.view.page != Page::Dictionary {
+                    // ほかのページに移ったら読み直さない(開いたときの例も捨てる)
+                    ffi::kill_timer(app.window, TEMPLATE_TIMER);
+                    app.extras.template_values.clear();
+                    return;
+                }
+                // 値を部品に映す(読み直しは refresh の中で行う)
+                let _ = model;
+                app.refresh();
+                ffi::invalidate(app.window);
+            });
             Some(LRESULT(0))
         }
         WM_TIMER if wparam.0 == TOOLTIP_TIMER => {

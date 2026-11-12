@@ -317,8 +317,8 @@ fn place(
             size::EMOJI_PREVIEW_HEIGHT,
             metrics,
         ),
-        // 謝辞は中身(名前・出どころ・ライセンスの全文)を画面の側で測って置く．部品の欄はカードの中の全体
-        Control::Acknowledgement(_) => {
+        // 謝辞と書き方の表は中身を画面の側で測って置く．部品の欄はカードの中の全体
+        Control::Acknowledgement(_) | Control::TemplateReference => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
             let mut card = empty(frame.card(height), position);
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
@@ -1054,14 +1054,17 @@ mod tests {
     }
 
     #[test]
-    fn 説明の長い行は部品を名前の高さに置く() {
+    fn 書き方の表は切り替えと同じカードに置く() {
         let page = sections(Page::Dictionary).unwrap();
         let layout = layout(&page, 800.0, |_| true, &Estimate);
-        // 単語に書ける書き方の表を説明に持つ行(ユーザー辞書の 2 つ目の区切り)
-        let card = &layout.sections[1].cards[0];
-        assert!(card.descriptions.len() > 5);
-        assert!(card.card.height > size::ROW_HEIGHT * 2.0);
-        assert!(card.control.max_y() <= card.card.y + size::ROW_HEIGHT);
+        // ユーザー辞書の 2 つ目の区切り: 切り替え(説明を 1 つ持つ)と，その下の書き方の表(macOS の UserWordsView)
+        let section = &layout.sections[1];
+        assert_eq!(section.cards.len(), 2);
+        let (toggle, table) = (&section.cards[0], &section.cards[1]);
+        assert_eq!(toggle.descriptions.len(), 1);
+        assert_eq!(page[1].rows[table.row].control, Control::TemplateReference);
+        // 間を空けずに続ける(1 枚のカードに区切り線で並べる)
+        assert_eq!(table.card.y, toggle.card.max_y());
     }
 
     #[test]

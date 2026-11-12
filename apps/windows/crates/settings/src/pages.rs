@@ -343,6 +343,9 @@ pub enum Control {
     Acknowledgement(usize),
     /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
     KeymapReport,
+    /// 単語に書ける書き方の表(書き方・入るもの・今入れると)と，登録の例・付けられる名前・日時の書式の記号
+    /// (macOS の UserWordsView の TemplateReference)．高さは画面の側で測る
+    TemplateReference,
     /// キー設定のひな形を選んで読み込む
     Preset,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
@@ -1926,21 +1929,18 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // 書き方を 1 つずつ注記の行にして並べ，最後に登録の例を置く(macOS の書き方の表と同じ中身)
-            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
-                .chain(std::iter::once(Row::note(extras::DYNAMIC_DICTIONARY_NOTE)))
-                .chain(
-                    crate::strings::windows::TEMPLATE_ROWS
-                        .iter()
-                        .map(|text| Row::note(text)),
-                )
-                .chain(std::iter::once(Row::note(extras::TEMPLATE_FILTERS)))
-                .chain(std::iter::once(Row::note(
-                    crate::strings::windows::TEMPLATE_EXAMPLE,
-                )))
-                .map(|row| row.visible_when(words()))
-                .collect(),
-            footer: Some(extras::DATE_FORMAT_SYMBOLS),
+            // macOS の UserWordsView と同じく，切り替え・説明・書き方の表(書き方・入るもの・今入れると)・
+            // 付けられる名前と日時の書式の記号を 1 枚のカードに並べる
+            rows: vec![
+                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"),
+                Row::note(extras::DYNAMIC_DICTIONARY_NOTE),
+                // 表の下に登録の例・付けられる名前・日時の書式の記号を小さく添える
+                Row::new("", "", Control::TemplateReference),
+            ]
+            .into_iter()
+            .map(|row| row.visible_when(words()))
+            .collect(),
+            footer: None,
             footer_variants: &[],
         },
         Section {
