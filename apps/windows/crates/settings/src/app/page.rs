@@ -1165,6 +1165,8 @@ pub struct PageView {
     table_hover: Option<(usize, usize)>,
     /// 中身の幅(DIP)
     width: f32,
+    /// 見本(外観・パレット・絵文字)を描いた大きさ(DIP)．見本の行の高さを決める
+    preview_size: Option<(f32, f32)>,
 }
 
 /// 描くときに窓から渡すもの
@@ -1240,7 +1242,23 @@ impl PageView {
             hover: HashMap::new(),
             table_hover: None,
             width: 0.0,
+            preview_size: None,
         }
+    }
+
+    /// ページにある見本の種類(外観・パレット・絵文字)．見本が無ければ None
+    pub fn preview_kind(&self) -> Option<PreviewKind> {
+        self.rows.iter().find_map(|row| match row.row.control {
+            Control::ThemePreview => Some(PreviewKind::Theme),
+            Control::PalettePreview => Some(PreviewKind::Palette),
+            Control::EmojiPreview => Some(PreviewKind::Emoji),
+            _ => None,
+        })
+    }
+
+    /// 見本を描いた大きさを決める(次に置くときに見本の行の高さにする)
+    pub fn set_preview_size(&mut self, size: Option<(f32, f32)>) {
+        self.preview_size = size;
     }
 
     /// 標準の EDIT の窓を隠して pool に返す(次のページで使い回す)
@@ -1405,6 +1423,7 @@ impl PageView {
             measure,
             all: &all,
             expanded: &expanded,
+            preview: self.preview_size,
         };
         self.layout = layout::layout(
             &self.sections,
@@ -4162,6 +4181,8 @@ struct Measured<'a> {
     all: &'a [&'a Row],
     /// 謝辞のライセンスの全文を開いているか(行と同じ並び)
     expanded: &'a [bool],
+    /// ページの見本(外観・パレット・絵文字)を描いた大きさ．測れていなければ None
+    preview: Option<(f32, f32)>,
 }
 
 impl Measured<'_> {
@@ -4197,6 +4218,14 @@ impl Metrics for Measured<'_> {
     }
 
     fn height(&self, row: &Row, width: f32) -> Option<f32> {
+        if matches!(
+            row.control,
+            Control::ThemePreview | Control::PalettePreview | Control::EmojiPreview
+        ) {
+            return self
+                .preview
+                .map(|natural| layout::preview_height(natural, width));
+        }
         let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
         if row.control == Control::TemplateReference {
             return Some(TemplateLayout::new((0.0, 0.0, inner), self.measure).height);

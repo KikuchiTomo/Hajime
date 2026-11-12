@@ -51,7 +51,8 @@ pub trait Metrics {
     fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize;
     /// 1 行にしたときの幅
     fn width(&self, text: &str, kind: TextKind) -> f32;
-    /// 中身で高さの変わるカード(謝辞)の高さ．width はカードの幅．None なら決まった高さ
+    /// 中身で高さの変わるカード(謝辞)の高さ．width はカードの幅．None なら決まった高さ．
+    /// 見本の行(ThemePreview など)は見本を描く高さで，width は見本を置ける幅(余白を除く)
     fn height(&self, _row: &Row, _width: f32) -> Option<f32> {
         None
     }
@@ -293,30 +294,9 @@ fn place(
             size::BODY_LINE_HEIGHT * size::REPORT_LINES,
             metrics,
         ),
-        Control::ThemePreview => place_inputs(
-            position,
-            0,
-            NO_BUTTONS,
-            frame,
-            size::PREVIEW_HEIGHT,
-            metrics,
-        ),
-        Control::PalettePreview => place_inputs(
-            position,
-            0,
-            NO_BUTTONS,
-            frame,
-            size::PALETTE_PREVIEW_HEIGHT,
-            metrics,
-        ),
-        Control::EmojiPreview => place_inputs(
-            position,
-            0,
-            NO_BUTTONS,
-            frame,
-            size::EMOJI_PREVIEW_HEIGHT,
-            metrics,
-        ),
+        Control::ThemePreview | Control::PalettePreview | Control::EmojiPreview => {
+            place_preview(position, row, frame, metrics)
+        }
         // 謝辞と書き方の表は中身を画面の側で測って置く．部品の欄はカードの中の全体
         Control::Acknowledgement(_) | Control::TemplateReference => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
@@ -334,6 +314,31 @@ fn place(
         Control::ThemeOption(_) => place_option(position, frame),
         _ => place_labeled(position, row, notes, frame, metrics),
     }
+}
+
+/// 見本の行(macOS の AppearancePage の ThemePreview)．見本は描いた大きさのまま置き，まわりに見本の余白をとる．
+/// 欄の幅が描いた幅より狭ければ見本ごと同じ比で縮める(高さも縮む)．描いた高さは画面の側で測る(Metrics::height)
+fn place_preview(position: usize, row: &Row, frame: Frame, metrics: &dyn Metrics) -> CardLayout {
+    let padding = size_settings::PREVIEW_PADDING;
+    let width = (frame.width - padding * 2.0).max(0.0);
+    let height = metrics
+        .height(row, width)
+        .unwrap_or(size::ROW_HEIGHT - padding * 2.0)
+        .max(0.0);
+    let mut card = empty(frame.card(height + padding * 2.0), position);
+    card.control = Rect::new(frame.x + padding, frame.y + padding, width, height);
+    card
+}
+
+/// 見本を幅 width に収めたときの高さ．natural は描いた大きさ(幅・高さ)．広ければ描いた高さのまま，
+/// 狭ければ幅に合わせて同じ比で縮める(macOS の ScaledPreview.size)
+pub fn preview_height(natural: (f32, f32), width: f32) -> f32 {
+    let (natural_width, natural_height) = natural;
+    if natural_width <= 0.0 {
+        return natural_height.max(0.0);
+    }
+    let shown = natural_width.min(width.max(0.0));
+    (natural_height * shown / natural_width).ceil()
 }
 
 /// 名前(と説明)を左，部品を右に置く行
@@ -1169,8 +1174,45 @@ mod tests {
         assert!(titles(&hidden) < titles(&shown));
         assert_eq!(hidden.sections.len(), page.len());
         assert!(hidden.height < shown.height);
-        // 見本の欄は見本の高さを取る
-        assert!(shown.sections[0].cards[0].control.height >= size::PREVIEW_HEIGHT);
+    }
+
+    /// 見本の高さを決める(謝辞と同じく画面の側で測る)
+    struct Previewed(f32, f32);
+
+    impl Metrics for Previewed {
+        fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
+            Estimate.lines(text, kind, width)
+        }
+
+        fn width(&self, text: &str, kind: TextKind) -> f32 {
+            Estimate.width(text, kind)
+        }
+
+        fn height(&self, row: &Row, width: f32) -> Option<f32> {
+            (row.control == Control::ThemePreview).then(|| preview_height((self.0, self.1), width))
+        }
+    }
+
+    #[test]
+    fn 見本は描いた大きさで置き_狭ければ縮める() {
+        assert_eq!(preview_height((400.0, 200.0), 600.0), 200.0);
+        assert_eq!(preview_height((400.0, 200.0), 200.0), 100.0);
+        let page = sections(Page::Appearance).unwrap();
+        let padding = size_settings::PREVIEW_PADDING;
+        // 広い窓: 見本は描いた高さのまま，まわりに見本の余白をとる
+        let wide = layout(&page, 1000.0, |_| true, &Previewed(400.0, 200.0));
+        let card = &wide.sections[0].cards[0];
+        assert_eq!(card.control.height, 200.0);
+        assert_eq!(card.card.height, 200.0 + padding * 2.0);
+        assert_eq!(card.control.x - card.card.x, padding);
+        // 狭い窓: 幅に合わせて同じ比で縮める
+        let narrow = layout(&page, 300.0, |_| true, &Previewed(400.0, 200.0));
+        let card = &narrow.sections[0].cards[0];
+        assert!(card.control.height < 200.0);
+        assert_eq!(
+            card.control.height,
+            preview_height((400.0, 200.0), card.control.width)
+        );
     }
 
     #[test]

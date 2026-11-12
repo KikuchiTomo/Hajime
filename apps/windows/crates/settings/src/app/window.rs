@@ -144,6 +144,8 @@ pub struct App {
     /// 外観の見本を描くもの(初めて描くときに作る．作れなければ見本を描かない)
     preview: Option<candidate_ui::app::preview::Preview>,
     preview_pixels: Option<(String, PreviewPixels)>,
+    /// 見本を描いた大きさ(DIP)と，測った見本の中身(PreviewSource の key)
+    preview_natural: Option<(String, (f32, f32))>,
     /// 見本の画像の通し番号(作り直すたびに増やす)
     preview_generation: u64,
     /// タイトルバーのアイコンの画像(DPI ごとに作り直す)
@@ -257,6 +259,7 @@ pub fn open(
         editing_theme: None,
         preview: None,
         preview_pixels: None,
+        preview_natural: None,
         preview_generation: 0,
         title_icon: None,
         active: false,
@@ -650,6 +653,7 @@ impl App {
     pub(super) fn arrange(&mut self) {
         let (width, height) = self.size();
         let nav_width = nav_width(width);
+        self.measure_preview();
         let content = self.view.arrange(width - nav_width, &self.graphics);
         self.scroll.set_extent(content, height);
         let nav_top = self.nav_top();
@@ -832,17 +836,9 @@ impl App {
         }
     }
 
-    /// 見本の画像(外観の見本・パレットの見本・情報のページのアイコン)を作り直す(中身か大きさが変わったときだけ)
-    fn update_preview(&mut self) {
-        let Some((kind, rect)) = self.view.preview_rect() else {
-            self.preview_pixels = None;
-            return;
-        };
-        if kind == page::PreviewKind::Icon {
-            self.update_icon(rect);
-            return;
-        }
-        let Some(model) = &self.model else { return };
+    /// kind の見本に今の設定で描くもの(テーマ・文字の大きさ・候補の窓)．つながっていなければ None
+    fn preview_source(&self, kind: page::PreviewKind) -> Option<PreviewSource> {
+        let model = self.model.as_ref()?;
         let entries = crate::themes::entries(model.value(crate::themes::THEMES));
         let shown = self
             .editing_theme
@@ -864,8 +860,6 @@ impl App {
             .value("candidateFontSize")
             .and_then(serde_json::Value::as_f64)
             .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
-        let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
-        let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
         // パレットの見本は設定のとおりの列数・行数・マスの大きさで描く(macOS の PalettePreview)
         let number = |name: &str| {
             model
@@ -912,7 +906,7 @@ impl App {
         // カスタムテーマはすべての項目(元のテーマ・色・書体・角の丸み)で見分ける．一部だけで見分けると，
         // ほかの項目を変えても見本を作り直さず，変えたことがすぐ映らない
         let key = format!(
-            "{kind:?}|{:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
+            "{kind:?}|{:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}",
             palette.as_ref().map(|panel| (
                 panel.columns,
                 panel.visible_rows,
@@ -938,6 +932,67 @@ impl App {
             self.theme.dark,
             self.theme.dpi,
         );
+        let look = candidate_ui::theme::SystemLook {
+            dark: self.theme.dark,
+            accent: None,
+            increase_contrast: ffi::high_contrast(),
+            backdrop: false,
+        };
+        let resolved =
+            candidate_ui::theme::ResolvedTheme::resolve(&theme_name, shown.as_ref(), &look);
+        Some(PreviewSource {
+            key,
+            resolved,
+            font_size,
+            palette,
+            emoji,
+        })
+    }
+
+    /// ページの見本を描いた大きさを測り，見本の行の高さにする(macOS の ScaledPreview は描いた大きさで置く)
+    fn measure_preview(&mut self) {
+        let source = self
+            .view
+            .preview_kind()
+            .and_then(|kind| self.preview_source(kind));
+        let Some(source) = source else {
+            self.view.set_preview_size(None);
+            return;
+        };
+        if let Some((key, size)) = &self.preview_natural {
+            if *key == source.key {
+                self.view.set_preview_size(Some(*size));
+                return;
+            }
+        }
+        if self.preview.is_none() {
+            self.preview = candidate_ui::app::preview::Preview::new().ok();
+        }
+        let size = self.preview.as_ref().and_then(|preview| {
+            preview
+                .size(&source.resolved, source.font_size, source.shown())
+                .ok()
+        });
+        self.preview_natural = size.map(|size| (source.key, size));
+        self.view.set_preview_size(size);
+    }
+
+    /// 見本の画像(外観の見本・パレットの見本・情報のページのアイコン)を作り直す(中身か大きさが変わったときだけ)
+    fn update_preview(&mut self) {
+        let Some((kind, rect)) = self.view.preview_rect() else {
+            self.preview_pixels = None;
+            return;
+        };
+        if kind == page::PreviewKind::Icon {
+            self.update_icon(rect);
+            return;
+        }
+        let Some(source) = self.preview_source(kind) else {
+            return;
+        };
+        let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
+        let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        let key = format!("{}|{width}x{height}", source.key);
         if self
             .preview_pixels
             .as_ref()
@@ -949,31 +1004,19 @@ impl App {
             self.preview = candidate_ui::app::preview::Preview::new().ok();
         }
         let Some(preview) = &self.preview else { return };
-        let look = candidate_ui::theme::SystemLook {
-            dark: self.theme.dark,
-            accent: None,
-            increase_contrast: ffi::high_contrast(),
-            backdrop: false,
-        };
-        let resolved =
-            candidate_ui::theme::ResolvedTheme::resolve(&theme_name, shown.as_ref(), &look);
         let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
         // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
         self.preview_generation += 1;
         let generation = self.preview_generation;
-        // 見本は少し内側に描く(カードの縁と重ねない)
+        // 見本のまわりの余白は置き場所(カードの中の見本の余白)でとるので，画像には余白を足さない
         let request = d2d::PreviewRequest {
-            theme: &resolved,
-            font_size,
+            theme: &source.resolved,
+            font_size: source.font_size,
             dark: self.theme.dark,
             scale,
             background: self.theme.palette.card,
-            shown: match (&palette, &emoji) {
-                (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
-                (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
-                (None, None) => candidate_ui::app::preview::Shown::Sample,
-            },
-            placement: candidate_ui::app::preview::Placement::Center {
+            shown: source.shown(),
+            placement: candidate_ui::app::preview::Placement::Fit {
                 ground: self.theme.palette.card,
             },
         };
@@ -2072,6 +2115,25 @@ impl App {
             ffi::destroy(self.window);
         } else {
             ffi::post(self.window, WM_MEASURE, 0, 0);
+        }
+    }
+}
+
+/// 見本に描くもの(App::preview_source)．key は中身を見分ける文字(画像の大きさを除く)
+struct PreviewSource {
+    key: String,
+    resolved: candidate_ui::theme::ResolvedTheme,
+    font_size: f32,
+    palette: Option<ipc::PalettePanel>,
+    emoji: Option<ipc::CandidateList>,
+}
+
+impl PreviewSource {
+    fn shown(&self) -> candidate_ui::app::preview::Shown<'_> {
+        match (&self.palette, &self.emoji) {
+            (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
+            (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
+            (None, None) => candidate_ui::app::preview::Shown::Sample,
         }
     }
 }

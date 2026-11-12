@@ -291,7 +291,6 @@ public enum LayoutTokens {
         public static let scrollLine: Double = 40
         public static let listHeight: Double = 220
         public static let buttonWidth: Double = 96
-        public static let previewHeight: Double = 240
         public static let buttonPaddingX: Double = 12
         public static let pagePaddingTop: Double = 20
         public static let titleFontSize: Double = 28
@@ -392,8 +391,6 @@ public enum LayoutTokens {
         public static let titleBarIconSize: Double = 16
         public static let titleBarPaddingX: Double = 16
         public static let aboutTitleFontSize: Double = 20
-        public static let emojiPreviewHeight: Double = 260
-        public static let palettePreviewHeight: Double = 300
         public static let switchKnobOff: Double = 12
         public static let switchKnobOn: Double = 14
         public static let switchKnobPressed: Double = 2
