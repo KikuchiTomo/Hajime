@@ -177,3 +177,29 @@ fn bench_chrome() {
         per_call(start.elapsed(), rounds)
     );
 }
+
+#[test]
+#[ignore = "時間を測るだけ(--ignored で動かす)"]
+fn bench_startup() {
+    // 起動したての候補ウィンドウが描けるようになるまで(描く部品と 4 つの窓を作る)．窓は出さない
+    let start = Instant::now();
+    let renderer = Renderer::new().unwrap();
+    let windows: Vec<_> = [
+        windows_core::w!("hajime.bench.1"),
+        windows_core::w!("hajime.bench.2"),
+        windows_core::w!("hajime.bench.3"),
+        windows_core::w!("hajime.bench.4"),
+    ]
+    .into_iter()
+    .map(|class| super::window::Window::create(class, false).unwrap())
+    .collect();
+    let theme = ResolvedTheme::resolve("automatic", None, &system::look(false));
+    let _ = renderer
+        .measure(&theme, tokens::size::candidate::FONT_SIZE)
+        .unwrap();
+    println!(
+        "起動から描けるまで (ms): {:.1}({} 窓)",
+        start.elapsed().as_secs_f64() * 1000.0,
+        windows.len()
+    );
+}
