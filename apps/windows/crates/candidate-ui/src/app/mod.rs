@@ -102,6 +102,8 @@ struct App {
     bubble_scene: Option<Scene>,
     /// 吹き出しの本体を置いた位置(論理ピクセル)と，選んでいる候補が変わって付いて動いている途中の動き
     bubble_at: Option<(f32, f32)>,
+    /// 吹き出しを置いたときの候補の窓の本体の左上(画面のピクセル)と拡大率．窓を置き直したかを見分ける
+    bubble_anchor: Option<(i32, i32, f32)>,
     bubble_glide: Option<motion::Resize>,
     /// 読んだ OS の外観とアニメーション効果の設定
     system: system::SystemCache,
@@ -187,6 +189,7 @@ pub fn run() {
             bubble,
             bubble_scene: None,
             bubble_at: None,
+            bubble_anchor: None,
             bubble_glide: None,
             system: system::SystemCache::default(),
         })
@@ -631,8 +634,11 @@ impl App {
         let Ok(measure) = self.renderer.measure(&theme, font_size) else {
             return;
         };
-        let style = Look::new(&theme, font_size);
         let scale = self.window().scale();
+        let style = Look {
+            pixel_scale: scale,
+            ..Look::new(&theme, font_size)
+        };
         let dips = |rect: &windows::Win32::Foundation::RECT| {
             scene::Frame::new(
                 rect.left as f32 / scale,
@@ -667,19 +673,33 @@ impl App {
             &scene::bubble::Metrics::tokens(theme.is_rounded()),
         );
         let drawn = scene::bubble::bubble_scene(&bubble, &placement, &style, &measure);
-        // 選んでいる候補が変わったら付いて動く(視覚効果を減らす設定ならすぐ移す)
+        // 選んでいる候補が変わったら付いて動く(視覚効果を減らす設定ならすぐ移す)．
+        // 候補の窓を置き直したときは，前の場所から滑らせずに窓に付けてすぐ移す
         let target = (placement.window.x, placement.window.y);
-        if let Some(shown) = self.bubble_at {
-            let moving = self.bubble_glide.map(|glide| glide.to);
-            if shown != target && moving != Some(target) && !self.system.reduce_motion() {
-                let from = self.bubble_glide.map_or(shown, |glide| glide.size_at(now));
-                self.bubble_glide = Some(motion::Resize {
-                    from,
-                    to: target,
-                    start: now,
-                });
-                self.window().start_timer(Timer::Motion, FRAME_MILLISECONDS);
-            }
+        let anchor_now = (body.left, body.top, scale);
+        let window_moved = self.bubble_anchor.is_some_and(|shown| shown != anchor_now);
+        self.bubble_anchor = Some(anchor_now);
+        if window_moved {
+            self.bubble_glide = None;
+        }
+        let moving = self.bubble_glide.map(|glide| glide.to);
+        if moving != Some(target)
+            && motion::glides_bubble(
+                self.bubble_at,
+                target,
+                window_moved,
+                self.system.reduce_motion(),
+            )
+        {
+            let from = self
+                .bubble_glide
+                .map_or(self.bubble_at.unwrap_or(target), |glide| glide.size_at(now));
+            self.bubble_glide = Some(motion::Resize {
+                from,
+                to: target,
+                start: now,
+            });
+            self.window().start_timer(Timer::Motion, FRAME_MILLISECONDS);
         }
         let (x, y) = match self.bubble_glide {
             Some(glide) if !glide.is_done(now) => glide.size_at(now),
@@ -690,10 +710,12 @@ impl App {
         };
         self.bubble_at = Some(target);
         self.bubble.set_chrome(false, look.dark, theme.frame);
+        // 位置と大きさは候補の窓の拡大率で決める(吹き出しの窓は隠れているあいだ前の画面の拡大率のままのことがある)
         self.bubble.place_at(
             (x * scale).round() as i32,
             (y * scale).round() as i32,
             &drawn,
+            scale,
         );
         let opacity = self.opacity;
         if self.bubble_drawn.as_ref() != Some(&(drawn.clone(), opacity)) {
@@ -708,6 +730,7 @@ impl App {
         self.bubble_scene = None;
         self.bubble_drawn = None;
         self.bubble_at = None;
+        self.bubble_anchor = None;
         self.bubble_glide = None;
     }
 

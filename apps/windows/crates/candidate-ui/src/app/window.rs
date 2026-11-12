@@ -420,9 +420,9 @@ impl Window {
         Some((body, work_area(&body)))
     }
 
-    /// 本体(scene.body)の左上を画面の (x, y)(ピクセル)に置いて出す．語の意味の吹き出しに使う
-    pub fn place_at(&self, x: i32, y: i32, scene: &Scene) {
-        let scale = self.scale();
+    /// 本体(scene.body)の左上を画面の (x, y)(ピクセル)に置いて出す．語の意味の吹き出しに使う．
+    /// scale は (x, y) を決めた拡大率(候補の窓の拡大率)．この窓の拡大率は，隠れているあいだ前にいた画面のままのことがあるので使わない
+    pub fn place_at(&self, x: i32, y: i32, scene: &Scene, scale: f32) {
         let pixels = |value: f32| (value * scale).round() as i32;
         self.show_at(
             x - pixels(scene.body.x),

@@ -47,8 +47,10 @@ struct WordLanguagePage: View {
                      empty: UIStrings.Features.japaneseWordsEmpty)
             Section {
                 HStack {
-                    TextField(UIStrings.Features.languageRuleWord, text: $ruleWord)
+                    TextField(UIStrings.Features.languageRuleWord, text: $ruleWord, prompt: Text(UIStrings.Features.languageRuleWord))
+                        .textFieldStyle(.roundedBorder)
                         .onSubmit(addRule)
+                    Text(UIStrings.Features.languageRuleContext).foregroundStyle(.secondary)
                     Picker(UIStrings.Features.languageRuleContext, selection: $ruleContext) {
                         ForEach(WordLanguageContext.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag($0) }
                     }
@@ -62,6 +64,8 @@ struct WordLanguagePage: View {
                     Button(UIStrings.Settings.add, action: addRule)
                         .disabled(ruleWord.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                // ほかの一覧の足す行と同じく，部品の名前は Form の名前の列に出さない(出すと欄が潰れる)．「前」は欄の後ろの文字で示す
+                .labelsHidden()
                 ForEach(settings.rules, id: \.self) { rule in
                     HStack {
                         Text(rule.word).monospaced()

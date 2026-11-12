@@ -170,11 +170,6 @@ private struct InputTab: View {
 private struct ConversionTab: View {
     @ObservedObject var model: SettingsModel
 
-    /// 見本のタグの左の端．ページの中でいちばん長い見本付きの名前のあとにそろえる(Windows の layout と同じく，まとまりをまたいでも)
-    private var exampleTitleWidth: CGFloat {
-        ExampleToggle.titleWidth([UIStrings.More.listSegmentAlternatives, UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiWordConversion])
-    }
-
     var body: some View {
         Form {
             Section(UIStrings.Settings.conversion) {
@@ -216,8 +211,9 @@ private struct ConversionTab: View {
                                   value: UIStrings.More.gridSize(rows: model.settings.listCandidatesPerPage, columns: model.settings.candidateGridColumns))
                 ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
                 ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
+                // 見本はこのまとまりに 1 つだけなので名前のすぐ後ろに置く(見出しで区切った「絵文字」の見本とはそろえない)
                 ExampleToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives,
-                              example: UIStrings.More.listSegmentAlternativesExample, titleWidth: exampleTitleWidth)
+                              example: UIStrings.More.listSegmentAlternativesExample)
             }
             Section(UIStrings.More.typo) {
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
@@ -256,7 +252,7 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
             }
-            EmojiSection(model: model, titleWidth: exampleTitleWidth)
+            EmojiSection(model: model)
             Section(UIStrings.Settings.numberForms) {
                 ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
                 Group {

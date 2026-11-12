@@ -546,7 +546,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
         return words
     }
 
-    /// 語の品詞の ID から，文節に分けるための印を付ける．名詞の ID は azooKey の CIDData(一般名詞 1285〜数 1295)の並びの範囲
+    /// 語の品詞の ID と読みから，文節に分けるための印と，崩れた候補を見分けるための印を付ける．名詞の ID は azooKey の CIDData(一般名詞 1285〜数 1295)の並びの範囲
     private static func words(of data: [DicdataElement]) -> [HajimeDomain.Candidate.Word] {
         data.map { element in
             .init(text: element.word, readingCount: element.ruby.count, startsWithParticle: CIDData.isJoshi(cid: element.lcid),
@@ -554,7 +554,9 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
                   startsWithPredicate: predicateIDs.contains { $0.contains(element.lcid) },
                   startsWithConjunctiveParticle: conjunctiveParticleIDs.contains(element.lcid),
                   endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid),
-                  isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid))
+                  isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid),
+                  isCommonNoun: element.lcid == CIDData.一般名詞.cid,
+                  endsWithSokuon: element.ruby.last.map("ッっ".contains) ?? false)
         }
     }
 

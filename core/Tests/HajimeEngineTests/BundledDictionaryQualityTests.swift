@@ -79,6 +79,23 @@ struct BundledDictionaryQualityTests {
         "とっきょをとる", "ねぇたのむからしんじてくれよ",
     ]
 
+    /// 読みが促音で終わる数(はっ → 8・ろっ → 6)に，助数詞でない漢字の語をつないだ書き方．直す前は，はっせいし のほかは
+    /// 分岐図の文節か一覧の 2〜5 番目に出ていた．はっせいし は，利用者が「8｜精子」と分かれた候補を見た読み
+    private nonisolated static let numberCases: [(reading: String, spellings: [String])] = [
+        ("はっせいし", ["8精子"]), ("はっせいしたとかないのか", ["8精子"]), ("ろっけん", ["6権", "6券", "6圏", "6犬", "6研", "6拳"]),
+        ("はっちゅう", ["8中"]), ("はっこつ", ["8骨"]), ("ろっきん", ["6筋", "6金"]),
+    ]
+
+    /// 数と助数詞の書き方．数のあとの語の決まりで除かず，一覧の上位 5 に出る
+    private nonisolated static let counterCases: [(reading: String, text: String)] = [
+        ("はっぽん", "8本"), ("いっぷん", "1分"), ("じゅっかい", "10回"), ("ろっぽん", "6本"), ("ろっけん", "6件"), ("はっさい", "8歳"),
+    ]
+
+    /// 語末で前のかなの母音を伸ばす書き方．拍の途中の字種の切り替えとして除かず，一覧の上位 5 に出る
+    private nonisolated static let elongationCases: [(reading: String, text: String)] = [
+        ("だいじょうぶだよぉ", "大丈夫だよォ"), ("どうしてるかなぁ", "どうしてるかなァ"), ("そうだねぇ", "そうだねェ"),
+    ]
+
     /// 2〜5 番目の候補に出てはいけない書き方のうち，決まり(BrokenSpellings)と別に書いた形．頭のかなを促音で切ってつないだ漢字(じゅっ分・はっ再)，
     /// ひらがなやカタカナのあとのカタカナの「ッ」に漢字が続くもの(はッ制・シュッ派つ・ハッ中)
     private static let brokenPatterns = ["[ぁ-ゖ]ッ", "[ァ-ヺ]ッ[一-鿿]", "^[ぁ-ゖァ-ヺ]{1,2}[っッ][一-鿿]"].map { try! Regex($0) }
@@ -177,6 +194,39 @@ struct BundledDictionaryQualityTests {
         }
         let list = try convert(reading, presentation: .list)
         #expect(broken(in: list.entries).isEmpty, "一覧の候補: \(list.entries.prefix(5))")
+    }
+
+    @Test("読みが促音で終わる数に助数詞でない語をつないだ書き方(8精子・6権・8中)は，文節と一覧の 2〜5 番目に出ない", arguments: numberCases)
+    func noNumberBeforeNonCounter(reading: String, spellings: [String]) throws {
+        try expectNoNumberBeforeNonCounter(reading: reading, spellings: spellings, zenzai: false)
+    }
+
+    @Test("Zenzai を使っても，読みが促音で終わる数に助数詞でない語をつないだ書き方は，文節と一覧の 2〜5 番目に出ない",
+          .enabled(if: ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"] != nil), arguments: numberCases)
+    func noNumberBeforeNonCounterWithZenzai(reading: String, spellings: [String]) throws {
+        try #require(Self.zenzaiEngine != nil, "HAJIME_ZENZAI_MODEL のモデルが無い")
+        try expectNoNumberBeforeNonCounter(reading: reading, spellings: spellings, zenzai: true)
+    }
+
+    private func expectNoNumberBeforeNonCounter(reading: String, spellings: [String], zenzai: Bool) throws {
+        let automatic = try convert(reading, presentation: .automatic, zenzai: zenzai)
+        let list = try convert(reading, presentation: .list, zenzai: zenzai)
+        for candidates in automatic.alternatives + [list.entries] {
+            let found = candidates.dropFirst().prefix(4).filter { text in spellings.contains { text.hasPrefix($0) } }
+            #expect(found.isEmpty, "候補: \(candidates.prefix(5))")
+        }
+    }
+
+    @Test("数と助数詞(8本・1分・10回・6本・6件・8歳)は除かず，一覧の上位 5 に出る", arguments: counterCases)
+    func keepsCounters(reading: String, text: String) throws {
+        let list = try convert(reading, presentation: .list)
+        #expect(list.entries.prefix(5).contains(text), "一覧の候補: \(list.entries.prefix(5))")
+    }
+
+    @Test("語末で母音を伸ばす書き方(大丈夫だよォ・どうしてるかなァ・そうだねェ)は除かず，一覧の上位 5 に出る", arguments: elongationCases)
+    func keepsElongation(reading: String, text: String) throws {
+        let list = try convert(reading, presentation: .list)
+        #expect(list.entries.prefix(5).contains(text), "一覧の候補: \(list.entries.prefix(5))")
     }
 
     @Test("Zenzai を使っても，崩れた書き方(シュッ派つ・ハッ中・はっ駐・出発スる)は文節と一覧の 2〜5 番目に出ない",

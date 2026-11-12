@@ -5,6 +5,8 @@
 /// - 縦は，吹き出しの上の端を候補の窓の上の端にそろえ，三角だけを動かして行を指す(候補を移っても吹き出しは動かない)．
 ///   三角が行に届かないとき(下のほうの行を選んでいて吹き出しが短いとき)だけ，届くところまで下げる．三角は角の丸みにはかけない
 /// - 覆ってしまう物があれば上か下へ寄せる．ただし候補の窓の上の端より上には出さない．画面の上下の端からは screenMargin の内側
+/// - 窓の上の端より上に出さない置き方が無いとき(窓が入力位置の上にあって吹き出しが窓より高いときなど)だけ，
+///   入力中の文字やほかの候補を覆わないように窓の上の端より上へ寄せる
 /// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・三角が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
 /// - 枠線は本体と三角を 1 本でなぞる(outline)
 ///
@@ -74,13 +76,14 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let pointerRange = (metrics.radius + half)...(size.height - metrics.radius - half)
         // 上の端は候補の窓の上の端．三角が行に届かなければ，届くところまで下げる
         let preferredY = max(candidate.y, targetY - pointerRange.upperBound)
-        // x(窓の左の端)に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ nil
-        func vertical(at x: Double) -> (y: Double, pointer: Double)? {
+        // x(窓の左の端)に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ nil．
+        // 吹き出しの上の端は floor より上に出さない
+        func vertical(at x: Double, floor: Double) -> (y: Double, pointer: Double)? {
             guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
-            var top = max(screen.y, candidate.y), bottom = screen.maxY
-            // 候補の窓の上の端より上にある物(入力中の文字の行など)は，上の端にそろえるだけで覆わないので見ない．
+            var top = max(screen.y, floor), bottom = screen.maxY
+            // floor より上にある物(入力中の文字の行など)は，floor で止めるだけで覆わないので見ない．
             // 見ると，窓と入力中の文字のあいだが gap より狭いときに，吹き出しだけが窓の上の端より下がる
-            for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX && obstacle.maxY > candidate.y {
+            for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX && obstacle.maxY > floor {
                 if obstacle.y >= targetY {
                     bottom = min(bottom, obstacle.y - metrics.gap)
                 } else if obstacle.maxY <= targetY {
@@ -97,7 +100,10 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let besideRow = (Side.right, row.maxX + metrics.gap)
         let outsideRight = (Side.right, candidate.maxX + metrics.gap)
         let outsideLeft = (Side.left, candidate.x - metrics.gap - windowWidth)
-        let found = [besideRow, outsideRight, outsideLeft].lazy.compactMap { side, x in vertical(at: x).map { (side, x, $0.y, $0.pointer) } }.first
+        // まず窓の上の端より上に出さない置き方を探し，無ければ上に出してよい置き方を探す
+        let found = [candidate.y, screen.y].lazy.flatMap { floor in
+            [besideRow, outsideRight, outsideLeft].lazy.compactMap { side, x in vertical(at: x, floor: floor).map { (side, x, $0.y, $0.pointer) } }
+        }.first
         // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
         let (side, x, y, pointer) = found ?? {
             let x = max(min(outsideRight.1, screen.maxX - windowWidth), screen.x)
