@@ -5,7 +5,7 @@
         --small-model <small の gguf> --xsmall-model <xsmall の gguf>
         --evaluation <評価用の文の置き場所> --sets <リポジトリの core/Evaluation> --output <出力.json> [--label <版の名前>]
 
-- 文: conversion-basic・conversion-everyday(リポジトリの core/Evaluation)，AJIMEE-Bench・Tatoeba(make fetch-evaluation で取得)．
+- 文: conversion-basic・conversion-everyday・conversion-terms(リポジトリの core/Evaluation)，AJIMEE-Bench・Tatoeba(make fetch-evaluation で取得)．
   語彙: vocabulary-person・place・other．それぞれを Zenzai small と xsmall で変換する(hajime-playground --evaluate)
 - 測るもの: 第 1 候補の正解の数と割合，上位 10 候補の正解率，MinCER，1 回の変換の時間の中央値
 - 起動の時間(hajime-playground --startup)も測る．古い版には無いので，無ければ空にする
@@ -23,6 +23,7 @@ import sys
 SETS = [
     ("conversion-basic", "sets", "conversion-basic.tsv"),
     ("conversion-everyday", "sets", "conversion-everyday.tsv"),
+    ("conversion-terms", "sets", "conversion-terms.tsv"),
     ("ajimee", "evaluation", "ajimee.tsv"),
     ("tatoeba", "evaluation", "tatoeba.tsv"),
     ("vocabulary-person", "sets", "vocabulary-person.tsv"),

@@ -162,6 +162,8 @@ func run() -> Int32 {
     let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), settings: settings)
     let calendar = SystemCalendar(clock: { Date() })
     let dictionaries = ImportedDictionaryStore(directory: HostPaths.local.appendingPathComponent("dictionaries", isDirectory: true))
+    // 同梱の辞書の中の専門用語の辞書(R-29)．同梱の辞書が無いか古ければ使わない
+    let terms = resources.dictionary?.termDictionaryURL.map { TermDictionaryStore(url: $0) }
     let associations = AssociationDictionaryStore(
         directory: HostPaths.local.appendingPathComponent("associations", isDirectory: true),
         bundledSource: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
@@ -235,7 +237,7 @@ func run() -> Int32 {
             // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ．合議はこのプロセスの中で行う(ADR 0016)
             let engineSession = engine.makeSession()
             return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
-                                                                 emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
+                                                                 terms: terms, emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                                 keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
                                 palette: palette, calendar: calendar, scorer: engineSession)

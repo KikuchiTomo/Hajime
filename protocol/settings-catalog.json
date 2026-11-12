@@ -121,6 +121,8 @@
     "suggestionSkipCount",
     "symbolConversion",
     "symbolRules",
+    "termDictionary",
+    "termFields",
     "terminalCommands",
     "theme",
     "typoCorrection",

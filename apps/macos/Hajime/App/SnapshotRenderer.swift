@@ -245,6 +245,22 @@ enum SnapshotRenderer {
         SettingsFixture.settle(sidebarWindow)
         render(sidebar, name: "settings-sidebar", to: output, appearance: NSAppearance(named: .aqua))
         sidebarWindow.close()
+        // 辞書のページの「専門用語」の中身(R-29．タブは窓の外から切り替えられないので中身だけを描く)．1 つの分野を切り，既定に戻すボタンも写す
+        fixture.model.update { $0.termFields.religion = false }
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            let terms = NSHostingView(rootView: TermDictionaryView(model: fixture.model))
+            let termsWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: SettingsView.size.width - DesignTokens.Size.Settings.sidebarWidth,
+                                                           height: SettingsView.size.height),
+                                       styleMask: [.borderless], backing: .buffered, defer: false)
+            termsWindow.contentView = terms
+            termsWindow.orderFrontRegardless()
+            SettingsFixture.settle(termsWindow)
+            render(terms, name: "settings-dictionary-terms\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+            termsWindow.close()
+        }
+        fixture.model.update { $0.termFields = TermFieldSettings() }
+        NSApp.appearance = NSAppearance(named: .aqua)
         // 読みにくい色を選んだカスタムテーマの編集の画面(知らせが出るか)
         var theme = fixture.model.draftCustomTheme()
         theme.textMuted = HexColor("#B0B0B0")!

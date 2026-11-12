@@ -326,9 +326,9 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限
     public static let maximumRuleListFileBytes = 1024 * 1024
-    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.4.0 は 8068 行で約 700KB
+    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.5.0 は 8069 行で約 700KB
     public static let maximumBundledDictionaryManifestBytes = 4 * 1024 * 1024
-    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.4.0 でいちばん大きいファイルは約 1MB
+    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.5.0 でいちばん大きいファイルは約 1MB
     public static let maximumBundledDictionaryFileBytes = 64 * 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
@@ -355,6 +355,18 @@ public enum DefaultSettings {
     public static let importedWordCandidateOffset = 1
     /// 「最近」とみなす確定の回数
     public static let importedDictionaryContextWindow = 30
+    /// 同梱の専門用語の辞書(R-29)を使うか．分野ごとのオン・オフは TermFieldSettings(既定はすべてオン)
+    public static let termDictionary = true
+    /// 同梱の辞書(BundledDictionary)の中の，専門用語の辞書のファイルの名前
+    public static let termDictionaryFileName = "terms.tsv"
+    /// 専門用語の辞書の語の点数．取り込んだ辞書の語(importedWordCost)より低くし，ふだんの語の変換に割り込まないようにする
+    public static let termWordCost: Float = -10
+    /// 読みが通常の辞書の語と重なる専門用語の語の点数(TermWord.Overlap)．同じ読みのふだんの語(「しかん」の 士官)を押しのけたり，
+    /// 語の切れ目をまたいで入り込んだり(「ぽんとたたいた」が「ぽんと多対多」)しないよう，さらに低くする
+    public static let termOverlappingWordCost: Float = -16
+    /// 読み全体と一致する専門用語の辞書の語を差し込む位置(上から何番目か)．取り込んだ辞書の語(importedWordCandidateOffset)より下．
+    /// 通常の辞書に同じ読みの語がある語は差し込まず，エンジンの候補の順に任せる
+    public static let termWordCandidateOffset = 2
     /// ユーザー辞書の語の点数(対数尤度)．辞書の一般的な語より少し上に出る値(azooKey-Desktop と同じ)
     public static let userDictionaryWordCost: Float = -5
 

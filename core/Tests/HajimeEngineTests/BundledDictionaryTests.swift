@@ -25,6 +25,19 @@ struct BundledDictionaryTests {
         #expect(try BundledDictionary.verified(at: directory, expectedManifestSHA256: manifestSHA256).url == directory)
     }
 
+    @Test("専門用語の辞書(R-29)は，一覧にあって確かめたときだけ使う")
+    func termDictionary() throws {
+        let (plain, plainSHA256) = try makeDictionary()
+        #expect(try BundledDictionary.verified(at: plain, expectedManifestSHA256: plainSHA256).termDictionaryURL == nil)
+        let (directory, manifestSHA256) = try makeDictionary(manifest: "\(abcSHA256)  louds/charID.chid\n\(abcSHA256)  terms.tsv\n")
+        try Data("abc".utf8).write(to: directory.appendingPathComponent("terms.tsv"))
+        let url = try BundledDictionary.verified(at: directory, expectedManifestSHA256: manifestSHA256).termDictionaryURL
+        #expect(url == directory.appendingPathComponent("terms.tsv"))
+        // 一覧に無いファイルは，置いてあっても使わない
+        try Data("abc".utf8).write(to: plain.appendingPathComponent("terms.tsv"))
+        #expect(try BundledDictionary.verified(at: plain, expectedManifestSHA256: plainSHA256).termDictionaryURL == nil)
+    }
+
     @Test("一覧が無ければ使わない")
     func missingManifest() throws {
         let (directory, manifestSHA256) = try makeDictionary()

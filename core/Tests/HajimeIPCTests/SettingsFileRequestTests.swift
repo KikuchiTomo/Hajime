@@ -103,7 +103,7 @@ struct SettingsFileRequestTests {
         #expect(!status.isEnabled)
         #expect(status.groups.count == SyncGroup.syncableCases.count)
         #expect(status.groups.first { $0.group == "appearance" }?.scope == "local")
-        #expect(status.groups.first { $0.group == "dictionary" }?.fields == ["userDictionary", "englishTerms"])
+        #expect(status.groups.first { $0.group == "dictionary" }?.fields == ["userDictionary", "englishTerms", "termDictionary", "termFields"])
     }
 
     @Test("フォルダ・範囲・項目ごとの指定を変え，変えたあとの様子を返す")

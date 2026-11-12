@@ -54,7 +54,7 @@ jobs:
         working-directory: apps/windows
       - run: cargo build --locked --release -p tsf --target i686-pc-windows-msvc
         working-directory: apps/windows
-      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai" -Dictionary "$env:RUNNER_TEMP\dictionary\hajime-dictionary-0.4.0"
+      - run: tools/windows/stage.ps1 -Output apps/windows/target/stage -Llama "$env:RUNNER_TEMP\llama" -Zenzai "$env:RUNNER_TEMP\zenzai" -Dictionary "$env:RUNNER_TEMP\dictionary\hajime-dictionary-0.5.0"
         shell: pwsh
       # 集めた DLL だけでエンジンが起動できることを確かめる(足りないと 0xC0000135 で終わり，入力できない)
       - run: tools/windows/check_stage.ps1 -Stage apps/windows/target/stage
