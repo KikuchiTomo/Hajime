@@ -68,7 +68,7 @@ struct CandidateRerankingTests {
     }
 
     @Test("促音の切れ端を漢字とつないだ候補は，点数が高くても採点せず，並べ替えたあとに除く")
-    func keepsSokuonFragmentsDown() {
+    func keepsBrokenSpellingsDown() {
         let fragment = Candidate(text: "じゅっ分", readingCount: 4, origin: .engine(id: 1),
                                  words: [Candidate.Word(text: "じゅっ", readingCount: 3), Candidate.Word(text: "分", readingCount: 1)])
         let candidates = [Self.engine("10分"), Self.engine("十分"), fragment, Self.engine("ジュップン")]
