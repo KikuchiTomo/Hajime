@@ -397,11 +397,13 @@ fn place_labeled(
         } else {
             frame.y + (height - size::CONTROL_HEIGHT) / 2.0
         };
+        // 部品はカードの右の端にそろえる．既定に戻すボタンは部品の左に置く(macOS の SettingsRows は
+        // 変えた行だけ部品の左にボタンを出す．空けておく場所は名前の欄から取る)
         (
             height,
             frame.y + (height - text_height) / 2.0,
             control_top,
-            right - reset_space - trailing,
+            right - trailing,
         )
     };
     // 狭い窓で部品の幅が足りなければ縮める
@@ -433,8 +435,14 @@ fn place_labeled(
             (*index, rect)
         })
         .collect();
+    let reset_x = if stacked {
+        // 名前の下に部品を置く狭い窓では，部品の右に置く
+        trailing_x + trailing + size::CONTROL_GAP
+    } else {
+        trailing_x - size::CONTROL_GAP - size::RESET_SIZE
+    };
     let reset = Rect::new(
-        trailing_x + trailing + size::CONTROL_GAP,
+        reset_x,
         control_top + (size::CONTROL_HEIGHT - size::RESET_SIZE) / 2.0,
         size::RESET_SIZE,
         size::RESET_SIZE,
@@ -959,7 +967,9 @@ mod tests {
                 assert!(card.card.y >= last);
                 assert!(card.control.x > card.label.x);
                 assert!(card.label.max_x() <= card.control.x);
-                assert!(card.reset.x >= card.control.max_x());
+                // 既定に戻すボタンは部品の左で，名前に重ならない
+                assert!(card.reset.max_x() <= card.control.x);
+                assert!(card.label.max_x() <= card.reset.x);
                 last = card.card.max_y();
             }
         }
@@ -967,7 +977,7 @@ mod tests {
     }
 
     #[test]
-    fn 部品と既定に戻すボタンは右の端にそろえる() {
+    fn 部品は右の端にそろえ_既定に戻すボタンは部品の左に置く() {
         for page in [Page::Input, Page::Conversion, Page::Palette] {
             let layout = all(page, 900.0);
             let cards: Vec<&CardLayout> = layout
@@ -976,13 +986,14 @@ mod tests {
                 .flat_map(|section| &section.cards)
                 .filter(|card| card.reset.width > 0.0 && card.label.width > 0.0)
                 .collect();
-            let right = cards[0].reset.max_x();
             for card in &cards {
+                // 部品はカードの右の余白の内側にそろえる(macOS と同じく右の端を空けない)
                 assert!(
-                    (card.reset.max_x() - right).abs() < 0.01,
+                    (card.control.max_x() - (card.card.max_x() - size::CARD_PADDING_X)).abs()
+                        < 0.01,
                     "{page:?} {card:?}"
                 );
-                assert!((card.control.max_x() + size::CONTROL_GAP - card.reset.x).abs() < 0.01);
+                assert!((card.reset.max_x() + size::CONTROL_GAP - card.control.x).abs() < 0.01);
             }
         }
     }

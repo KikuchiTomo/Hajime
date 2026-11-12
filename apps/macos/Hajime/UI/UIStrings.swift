@@ -65,7 +65,6 @@ enum UIStrings {
         static let englishTermsNote = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。"
         static let invalidEnglishTerm = "語は \(DefaultSettings.englishTermLengthRange.lowerBound)〜\(DefaultSettings.englishTermLengthRange.upperBound) 文字の英字にしてください"
         static let dynamicDictionary = "単語に書いた日付や時刻などを入力時の値にする"
-        static let dynamicDictionaryNote = "登録する単語に次の書き方を入れておくと、変換したときにその時点の値に置き換えて入れます。単語のほかの文字はそのまま入ります。読みはローマ字（gh など）でも登録できます。"
         static let templateSyntax = "書き方"
         static let templateMeaning = "入るもの"
         static let templateNow = "今入れると"
@@ -94,13 +93,6 @@ enum UIStrings {
             ("{date|fullwidth}", "| のあとの名前で変えた値"),
             ("{{ }}", "「{」と「}」の文字そのもの"),
         ]
-        static let templateFilters = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）、ascii（半角英数）、romaji（ローマ字）、snake・camel・pascal・kebab（英語の語の書き方）、url（URL に入れる形）、length（文字数）、kansuji（漢数字）、kanjidigits（1 字ずつの漢数字）、daiji（大字）、comma（3 桁区切り）、circled（丸数字）、html（HTML に入れる形）、base64（Base64）。続けて書くと左から順にかけます。"
-        static let dateFormatSymbols = "日時の書式の記号: YYYY 年、MM 月、MMM・MMMM 英語の月（Nov、November）、DD 日、DDD 年の何日目、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、AA AM・PM、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、EEE・EEEE 英語の曜日（Mon、Monday）、GG 元号（令和）、E 元号の年、EE 元号の年（1 年は「元」）、WW 週番号、Q 四半期、FFFF 年度（4 月始まり）、NN 和風月名（霜月）、JJ 干支（丙午）。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。"
-        /// 登録の例に使う単語
-        static let templateExampleWord = "{datetime:YYYY-MM-DD hh:mm}"
-        static func templateExample(_ value: String) -> String {
-            "例: 読み「dt」に単語「\(templateExampleWord)」を登録すると、「dt」を変換したときに「\(value)」を入れます。"
-        }
         static let commandsPage = "コマンド"
         static let commandsSection = "コマンド"
         static let launcherCommands = "読みでコマンドを呼び出す"
@@ -132,7 +124,6 @@ enum UIStrings {
         static let tryMacroWord = "試す語"
         static let tryMacroReading = "読み"
         static let macroDraftResult = "入力中の形: "
-        static let macroReference = "{text} 語、{reading} 読み\n{date} 日付、{time} 時刻、{datetime:YYYY年M月D日(ddd) hh:mm} 書式を指定、{utc} 協定世界時、{unixtime} UNIX 時間\n書式: YYYY 年、MM 月、DD 日、hh 時、mm 分、ss 秒、ddd 曜日（水）、EEE 曜日（Wed）、MMM 月（Nov）、GGE 和暦（令和8）、GGEE 元年を「元」にした和暦、A 午前・午後、WW 週番号、Q 四半期、DDD 年の何日目、FFFF 年度、NN 和風月名、JJ 干支\nずらす: {date+1d} 明日、{time+30m} 30 分後、{date+3b} 3 営業日後（m 分、h 時間、d 日、w 週、M 月、y 年、b 土日と祝日を除く日）\n合わせる: {date@fri} 今週の金曜、{date+1w@mon} 来週の月曜、{date@end} 月末、{date+1M@1} 来月 1 日\n暦: {holiday} 祝日の名前、{season} 時候の挨拶（晩秋の候）、{greeting} 時刻の挨拶、{days:12/25} その日までの日数、{age:1990-04-01} 満年齢\n乱数: {uuid}、{random:1-6}、{alnum:8} 英数字、{hex:8} 16 進数、{pick:A,B,C} どれか 1 つ\n変換: {reading|romaji} のように | で続けます（upper、lower、capitalize、katakana、hiragana、halfwidth、fullwidth、ascii、romaji、snake、camel、pascal、kebab、url、length、kansuji、kanjidigits、daiji、comma、circled、html、base64）\n{{ と }} で { と } そのものを入れます。"
 
         static func label(for kind: LauncherCommand.Kind) -> String {
             switch kind {
@@ -557,7 +548,6 @@ enum UIStrings {
         static let importDictionary = "インポート…"
         static let exportDictionary = "エクスポート…"
         static let exportFileName = "hajime-user-dictionary.txt"
-        static let dictionaryNote = "読み・単語・品詞・コメントをタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。コメントは候補の横に出て、押すとコメントを入力します。"
         static let comment = "コメント"
         static let commentPrompt = "コメント(省略可)"
         static let wordClass = "品詞"

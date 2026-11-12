@@ -104,14 +104,7 @@ private struct UserWordsView: View {
         Form {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.dynamicDictionary, keyPath: \.dynamicDictionary)
-                Text(UIStrings.Extras.dynamicDictionaryNote)
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 TemplateReference()
-                VStack(alignment: .leading) {
-                    Text(UIStrings.Extras.templateFilters)
-                    Text(UIStrings.Extras.dateFormatSymbols)
-                }
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Section {
                 RuleListEditor(
@@ -138,8 +131,6 @@ private struct UserWordsView: View {
                     tableHeight: DesignTokens.Size.Settings.userDictionaryTableHeight
                 )
                 .prefilled($model.userWordDraft)
-            } footer: {
-                Text(UIStrings.Settings.dictionaryNote).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -164,7 +155,7 @@ private struct UserWordsView: View {
     }
 }
 
-/// 単語に書ける書き方(TextTemplate)の表．書き方・入るもの・今入れたときの値を並べ，下に登録の例を添える．
+/// 単語に書ける書き方(TextTemplate)の表．書き方・入るもの・今入れたときの値を並べる．
 /// 「今入れると」は 1 秒ごとに求め直す．UUID と整数は入れるたびに変わるので，ページを開いたときの例を 1 つ出す
 private struct TemplateReference: View {
     @State private var uuid = UUID().uuidString
@@ -173,29 +164,24 @@ private struct TemplateReference: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let values = values(at: timeline.date)
-            VStack(alignment: .leading) {
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: DesignTokens.Size.Settings.tableColumnSpacing) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: DesignTokens.Size.Settings.tableColumnSpacing) {
+                GridRow {
+                    Text(UIStrings.Extras.templateSyntax)
+                    Text(UIStrings.Extras.templateMeaning)
+                    Text(UIStrings.Extras.templateNow)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Divider()
+                ForEach(UIStrings.Extras.templateRows, id: \.syntax) { row in
                     GridRow {
-                        Text(UIStrings.Extras.templateSyntax)
-                        Text(UIStrings.Extras.templateMeaning)
-                        Text(UIStrings.Extras.templateNow)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    Divider()
-                    ForEach(UIStrings.Extras.templateRows, id: \.syntax) { row in
-                        GridRow {
-                            Text(row.syntax).font(.body.monospaced()).textSelection(.enabled).fixedSize()
-                            Text(row.meaning).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                            // UUID のような長い値は 1 行にし，間を省く(表が行の幅を超えないように)
-                            Text(TextTemplate.expand(row.syntax, values: values)).font(.body.monospacedDigit()).textSelection(.enabled)
-                                .lineLimit(1).truncationMode(.middle)
-                        }
+                        Text(row.syntax).font(.body.monospaced()).textSelection(.enabled).fixedSize()
+                        Text(row.meaning).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        // UUID のような長い値は 1 行にし，間を省く(表が行の幅を超えないように)
+                        Text(TextTemplate.expand(row.syntax, values: values)).font(.body.monospacedDigit()).textSelection(.enabled)
+                            .lineLimit(1).truncationMode(.middle)
                     }
                 }
-                Divider()
-                Text(UIStrings.Extras.templateExample(TextTemplate.expand(UIStrings.Extras.templateExampleWord, values: values)))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

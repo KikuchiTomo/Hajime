@@ -3096,7 +3096,9 @@ public final class InputSession {
         } else if let candidate = best {
             best = rule.stabilized(candidate, reading: reading, settled: settledLive)
         }
-        let shown = best.map { rule.display(of: $0, reading: reading, settled: isSettled) } ?? reading
+        // 前に止まったときに変換して見せた読み(今の読みの先頭)は，打ち続けてもかなに戻さない
+        let converted = settledLive.flatMap { reading.hasPrefix($0.reading) ? $0.reading.count : nil } ?? 0
+        let shown = best.map { rule.display(of: $0, reading: reading, settled: isSettled, convertedLength: converted) } ?? reading
         // 打ち間違いを直した読みは，直した語句だけを点線の下線にする．どこを直したかが分かるように
         if readingCorrector.isApplied {
             let candidate = best ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
