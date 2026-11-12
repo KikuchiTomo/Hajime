@@ -1,12 +1,14 @@
 #![forbid(unsafe_code)]
 
 //! 入力メニュー(タスクバーの「あ」「A」を右クリックしたときのメニュー)の項目．macOS の入力メニューと同じ項目にする．
-//! 項目は「ライブ変換」「手書き入力」(使う設定のときだけ)「設定を開く…」「更新を確認」にし，入力方式などほかの設定は設定の画面とキーで変える
+//! 項目は「ライブ変換」「手書き入力」「絵文字と記号」(この 2 つは使う設定のときだけ)「設定を開く…」「更新を確認」にし，
+//! 入力方式などほかの設定は設定の画面とキーで変える
 
 use ipc::{InputMode, MenuCommand, SettingsSnapshot};
 
 pub const LIVE_CONVERSION: &str = "ライブ変換";
 pub const HANDWRITING: &str = "手書き入力";
+pub const PALETTE: &str = "絵文字と記号";
 pub const OPEN_SETTINGS: &str = "設定を開く…";
 pub const CHECK_FOR_UPDATES: &str = "更新を確認";
 /// 「更新を確認」で設定の画面の実行ファイルに渡す引数(最新のリリースのページを開いて終える)
@@ -24,6 +26,7 @@ const ID_LIVE_CONVERSION: u32 = 1;
 const ID_OPEN_SETTINGS: u32 = 2;
 const ID_HANDWRITING: u32 = 3;
 const ID_CHECK_FOR_UPDATES: u32 = 4;
+const ID_PALETTE: u32 = 5;
 
 /// 選んだ項目の扱い
 #[derive(Debug, Clone, PartialEq)]
@@ -32,6 +35,8 @@ pub enum Selection {
     Command(MenuCommand),
     /// 手書きの窓を開く(組み立て中の文字を確定するので，文書を書き換えられる要求で頼む)
     Handwriting,
+    /// 絵文字と記号のパレットを前に見ていた種類で開く(R-26．組み立て中の文字を確定するので，手書きと同じく文書を書き換えられる要求で頼む)
+    Palette,
     /// 最新のリリースのページを開く(入力先のアプリから起動するので，ブラウザーが前に出る)
     CheckForUpdates,
 }
@@ -61,6 +66,14 @@ pub fn items(settings: Option<&SettingsSnapshot>) -> Vec<Item> {
             checked: false,
         });
     }
+    // 絵文字と記号も設定で使うときだけ，手書き入力の次に出す(macOS の入力メニューと同じ)
+    if settings.is_some_and(|current| current.palette == Some(true)) {
+        items.push(Item::Command {
+            id: ID_PALETTE,
+            label: PALETTE,
+            checked: false,
+        });
+    }
     items.extend([
         Item::Separator,
         Item::Command {
@@ -83,6 +96,7 @@ pub fn selection(id: u32) -> Option<Selection> {
         ID_LIVE_CONVERSION => Some(Selection::Command(MenuCommand::ToggleLiveConversion)),
         ID_OPEN_SETTINGS => Some(Selection::Command(MenuCommand::OpenSettings)),
         ID_HANDWRITING => Some(Selection::Handwriting),
+        ID_PALETTE => Some(Selection::Palette),
         ID_CHECK_FOR_UPDATES => Some(Selection::CheckForUpdates),
         _ => None,
     }
@@ -112,6 +126,7 @@ mod tests {
     fn snapshot(live: bool) -> SettingsSnapshot {
         SettingsSnapshot {
             handwriting: None,
+            palette: None,
             theme: "automatic".into(),
             input_style: "romaji".into(),
             live_conversion: live,
@@ -176,6 +191,57 @@ mod tests {
     }
 
     #[test]
+    fn 絵文字と記号は使う設定のときだけ手書き入力の次に出す() {
+        let mut on = snapshot(false);
+        on.palette = Some(true);
+        assert_eq!(
+            labels(&items(Some(&on))),
+            vec![
+                (LIVE_CONVERSION, false),
+                (PALETTE, false),
+                (OPEN_SETTINGS, false),
+                (CHECK_FOR_UPDATES, false)
+            ]
+        );
+        on.handwriting = Some(true);
+        assert_eq!(
+            labels(&items(Some(&on))),
+            vec![
+                (LIVE_CONVERSION, false),
+                (HANDWRITING, false),
+                (PALETTE, false),
+                (OPEN_SETTINGS, false),
+                (CHECK_FOR_UPDATES, false)
+            ]
+        );
+        on.palette = Some(false);
+        assert!(!labels(&items(Some(&on))).contains(&(PALETTE, false)));
+        // パレットを知らない古いエンジン(palette が無い)では出さない
+        on.palette = None;
+        assert!(!labels(&items(Some(&on))).contains(&(PALETTE, false)));
+        assert!(!labels(&items(None)).contains(&(PALETTE, false)));
+    }
+
+    #[test]
+    fn 項目の番号は重ならない() {
+        let mut all = snapshot(true);
+        all.handwriting = Some(true);
+        all.palette = Some(true);
+        let mut ids: Vec<u32> = items(Some(&all))
+            .iter()
+            .filter_map(|item| match item {
+                Item::Command { id, .. } => Some(*id),
+                Item::Separator => None,
+            })
+            .collect();
+        let count = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), count);
+        assert!(ids.iter().all(|id| selection(*id).is_some()));
+    }
+
+    #[test]
     fn 項目の番号から操作を引く() {
         assert_eq!(
             selection(ID_LIVE_CONVERSION),
@@ -186,6 +252,7 @@ mod tests {
             Some(Selection::Command(MenuCommand::OpenSettings))
         );
         assert_eq!(selection(ID_HANDWRITING), Some(Selection::Handwriting));
+        assert_eq!(selection(ID_PALETTE), Some(Selection::Palette));
         assert_eq!(
             selection(ID_CHECK_FOR_UPDATES),
             Some(Selection::CheckForUpdates)

@@ -804,15 +804,24 @@ impl TextService_Impl {
 
     /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く(エンジンが edit で返す)
     fn open_handwriting(&self) {
+        self.send_menu_edit(|session, context| RequestBody::OpenHandwriting { session, context });
+    }
+
+    /// 入力メニューの「絵文字と記号」(R-26)．組み立て中の文字を確定してから，前に見ていた種類でパレットを開く(エンジンが edit で返す．
+    /// 開いているあいだは状態の isComposing が真になり，キーをすべてエンジンに送る)
+    fn open_palette(&self) {
+        self.send_menu_edit(|session, context| RequestBody::OpenPalette { session, context });
+    }
+
+    /// 入力メニューから，文書を書き換えられる要求をエンジンに送る．セッションが無ければ先に作る
+    fn send_menu_edit(&self, make: impl FnOnce(u32, FieldContext) -> RequestBody) {
         if self.inner.borrow().session.is_none() {
             self.ensure_session();
         }
         let Some((context, engine, session)) = self.focused_context() else {
             return;
         };
-        self.send_edit(&context, engine, session, |session, context| {
-            RequestBody::OpenHandwriting { session, context }
-        });
+        self.send_edit(&context, engine, session, make);
     }
 
     /// 再変換．入力先で選んでいる文字(maximum_length 文字まで)を読み，Windows の日本語の解析で読みを求めて，エンジンに変換し直してもらう．
@@ -928,6 +937,12 @@ impl langbar::Actions for MenuActions {
     fn open_handwriting(&self) {
         if let Some(service) = Self::active() {
             service.open_handwriting();
+        }
+    }
+
+    fn open_palette(&self) {
+        if let Some(service) = Self::active() {
+            service.open_palette();
         }
     }
 

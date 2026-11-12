@@ -12,6 +12,7 @@ struct EnginePaletteTests {
     private let settings: FakeSettings
     private let service: EngineService
     private let sent: Box<[WireUiCommand]>
+    private let usage: FakePaletteUsageStore
 
     final class Box<Value> {
         var value: Value
@@ -35,6 +36,7 @@ struct EnginePaletteTests {
         let palette = PaletteServices(catalog: catalog, usage: usage, now: { Date(timeIntervalSince1970: 1_800_000_000) })
         self.settings = settings
         self.sent = sent
+        self.usage = usage
         self.service = EngineService(
             makeSession: { InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: settings, keyNames: .windows, palette: palette) },
             settings: settings,
@@ -134,6 +136,53 @@ struct EnginePaletteTests {
         }
         #expect(operations.contains(.commit(text: "👍")))
         #expect(sent.value.last == .hidePalette)
+    }
+
+    @Test("R-26: 入力メニューの「絵文字と記号」は，組み立て中の文字を確定し，前に見ていた種類でパレットを開く")
+    func opensFromMenu() throws {
+        usage.update { $0.lastKind = .symbol }
+        let id = connect()
+        let session = try open(id)
+        type("kana", session: session, from: id)
+        sent.value.removeAll()
+        let opened = service.handle(WireRequest(id: 40, body: .openPalette(session: session, context: Self.field)), from: id).body
+        guard case .edit(true, let operations, let state) = opened else {
+            Issue.record("パレットを開く要求に edit で答えない")
+            return
+        }
+        #expect(operations.contains { if case .commit = $0 { true } else { false } })
+        #expect(state.isComposing)
+        #expect(shownPanel?.rows.first?.cells.map(\.text) == ["→"])
+        #expect(sent.value.contains { if case .showPalette(_, let anchor) = $0 { anchor == Self.field.caret } else { false } })
+        #expect(service.snapshot.palette == true)
+    }
+
+    @Test("R-26: 入力メニューの「絵文字と記号」は，前に見ていた種類が無ければ絵文字で開く．使わない設定なら開かない")
+    func opensFromMenuWithDefaults() throws {
+        let id = connect()
+        let session = try open(id)
+        _ = service.handle(WireRequest(id: 41, body: .openPalette(session: session, context: Self.field)), from: id)
+        #expect(shownPanel?.rows.first?.cells.map(\.text) == ["🙇", "👍"])
+        _ = press(.escape, session: session, from: id)
+        #expect(shownPanel == nil)
+        try settings.update { $0.palette = false }
+        sent.value.removeAll()
+        guard case .edit(true, _, let state) = service.handle(WireRequest(id: 42, body: .openPalette(session: session, context: Self.field)), from: id).body else {
+            Issue.record("パレットを開く要求に edit で答えない")
+            return
+        }
+        #expect(!state.isComposing)
+        #expect(!sent.value.contains { if case .showPalette = $0 { true } else { false } })
+        #expect(service.snapshot.palette == false)
+    }
+
+    @Test("R-26: ほかの接続のセッションには，入力メニューからパレットを開けない")
+    func opensFromMenuOnlyOwnSession() throws {
+        let owner = connect()
+        let session = try open(owner)
+        let other = connect()
+        #expect(service.handle(WireRequest(id: 43, body: .openPalette(session: session, context: Self.field)), from: other).body == .error(code: .unknownSession))
+        #expect(shownPanel == nil)
     }
 
     @Test("R-26: セッションを閉じたら，そのセッションが出していたパレットを閉じる")
