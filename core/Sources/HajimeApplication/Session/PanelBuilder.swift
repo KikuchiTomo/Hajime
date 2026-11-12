@@ -12,6 +12,8 @@ enum PanelBuilder {
     static let candidateForgottenNote = Note.info("学習から削除しました")
     /// 最後に確定した語の学習を取り消したときの案内
     static let lastCommitForgottenNote = Note.info("最後の学習を取り消しました")
+    /// 確定を取り消して，確定する前の変換に戻したときの案内
+    static let commitUndoneNote = Note.info("確定を取り消しました")
     /// 戻した補正を覚えたときの案内．phrase は覚えた語句(打ったままの読み)
     static func correctionRememberedNote(_ phrase: String) -> Note { .info("「\(phrase)」は次から直しません") }
     /// 予測に表示しない語句に入れたときの案内．text は入れた語句
