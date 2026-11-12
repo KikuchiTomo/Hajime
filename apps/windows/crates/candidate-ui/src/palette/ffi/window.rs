@@ -30,10 +30,11 @@ use windows::Win32::UI::Controls::{MARGINS, WM_MOUSELEAVE};
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, GetCursorPos, LoadCursorW, RegisterClassExW, SetWindowPos,
-    ShowWindow, HWND_TOPMOST, IDC_ARROW, MA_NOACTIVATE, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE,
-    WHEEL_DELTA, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_PAINT,
-    WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, GetCursorPos, KillTimer, LoadCursorW, RegisterClassExW,
+    SetTimer, SetWindowPos, ShowWindow, HWND_TOPMOST, IDC_ARROW, MA_NOACTIVATE, SWP_NOACTIVATE,
+    SWP_SHOWWINDOW, SW_HIDE, WHEEL_DELTA, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEMOVE,
+    WM_MOUSEWHEEL, WM_PAINT, WM_TIMER, WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_POPUP,
 };
 use windows_core::{w, Result, BSTR, PCWSTR};
 
@@ -41,6 +42,8 @@ const CLASS: PCWSTR = w!("hajime.palette");
 const BASE_DPI: f32 = 96.0;
 /// 読み上げの種類の名前．同じ名前の読み上げは新しいものが前のものを置き換える
 const ANNOUNCEMENT_ID: &str = "hajime.palette";
+/// 動きの 1 コマを描く時計の番号
+const MOTION_TIMER: usize = 1;
 
 /// 窓に届いたことのうち，パレットが扱うもの．座標は窓の中の DIP
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -52,6 +55,8 @@ pub enum Event {
     /// ホイールを回した目盛りの数(奥へ回すと正．細かく回せるホイールは端数になる)
     Wheel(f32),
     Paint,
+    /// 動きの次のコマを描く時刻になった(start_motion_timer)
+    Tick,
 }
 
 pub type Handler = fn(Event);
@@ -203,8 +208,20 @@ impl Window {
     }
 
     pub fn hide(&self) {
+        self.stop_motion_timer();
         // SAFETY: 自分の窓を隠すだけ
         let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
+    }
+
+    /// milliseconds ごとに Event::Tick を送る時計を動かす(動いているあいだだけ)
+    pub fn start_motion_timer(&self, milliseconds: u32) {
+        // SAFETY: 自分の窓の時計を動かすだけ
+        unsafe { SetTimer(Some(self.hwnd), MOTION_TIMER, milliseconds.max(1), None) };
+    }
+
+    pub fn stop_motion_timer(&self) {
+        // SAFETY: 自分の窓の時計を止めるだけ(動いていなくてもよい)
+        let _ = unsafe { KillTimer(Some(self.hwnd), MOTION_TIMER) };
     }
 
     fn target(
@@ -354,6 +371,10 @@ unsafe extern "system" fn procedure(
         }
         WM_MOUSEWHEEL => {
             handle(Event::Wheel(notches(wparam)));
+            Some(LRESULT(0))
+        }
+        WM_TIMER if wparam.0 == MOTION_TIMER => {
+            handle(Event::Tick);
             Some(LRESULT(0))
         }
         WM_PAINT => {

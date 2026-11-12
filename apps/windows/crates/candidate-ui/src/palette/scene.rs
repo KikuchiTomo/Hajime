@@ -5,12 +5,13 @@
 
 use super::emoji::{is_emoji, skin_tone_sample};
 use super::layout::{skin_tone_button_inset, Layout};
+use super::motion::{bounce, overshoot, Tween};
 use super::preview::{self, Part};
 use crate::geometry::Frame;
 use crate::scene::paint::Painter;
 use crate::scene::{Draw, Look, Measure, Scene};
 use crate::theme::{Color, Font, ResolvedTheme};
-use ipc::{PalettePanel, PalettePosition, PalettePreview, PaletteSkinTonePicker};
+use ipc::{PaletteContentMotion, PalettePanel, PalettePreview, PaletteSkinTonePicker};
 use tokens::opacity;
 use tokens::size::{candidate, glass, palette};
 
@@ -55,14 +56,21 @@ fn tab_glyph(section: &str) -> Option<char> {
     })
 }
 
-/// パレットの窓の中身．窓の大きさは layout と同じ
-pub fn palette(panel: &PalettePanel, layout: &Layout, look: &Look, measure: &dyn Measure) -> Scene {
+/// パレットの窓の中身．窓の大きさは layout と同じ．tween は動きの途中の形(止まっていれば Tween::default())
+pub fn palette<'a>(
+    panel: &'a PalettePanel,
+    layout: &'a Layout,
+    look: &'a Look,
+    measure: &'a dyn Measure,
+    tween: Tween<'a>,
+) -> Scene {
     let mut drawing = Drawing {
         painter: Painter::new(look, measure),
         theme: look.theme,
         measure,
         layout,
         panel,
+        tween,
     };
     drawing.paint();
     drawing.painter.finish(layout.width, layout.height)
@@ -74,6 +82,7 @@ struct Drawing<'a> {
     measure: &'a dyn Measure,
     layout: &'a Layout,
     panel: &'a PalettePanel,
+    tween: Tween<'a>,
 }
 
 impl Drawing<'_> {
@@ -107,6 +116,19 @@ impl Drawing<'_> {
     }
 
     // MARK: - 形
+
+    /// paint で描いた部品を，clip の中だけに opacity の濃さで描くまとまりにする．scale が 1 でなければ clip の真ん中を中心に大きさを変える
+    fn grouped(&mut self, clip: Frame, opacity: f32, scale: f32, paint: impl FnOnce(&mut Self)) {
+        let outer = std::mem::take(&mut self.painter.draws);
+        paint(self);
+        let draws = std::mem::replace(&mut self.painter.draws, outer);
+        self.painter.draws.push(Draw::Group {
+            clip,
+            opacity,
+            scale,
+            draws,
+        });
+    }
 
     /// 角丸のテーマは角丸で，platinum と desk は角の立った形で塗る
     fn fill(&mut self, frame: Frame, color: Color, radius: f32) {
@@ -246,35 +268,52 @@ impl Drawing<'_> {
         };
         let whole = Frame::new(first.x, first.y, last.max_x() - first.x, first.height);
         self.fill(whole, theme.badge, palette::SEARCH_RADIUS);
-        let inner = palette::SELECTION_STROKE;
+        let font = self.layout.fonts.mode;
         for (mode, frame) in self.panel.modes.iter().zip(frames) {
-            let color = if mode.is_selected {
-                self.fill(
-                    frame.inset(inner, inner),
-                    theme.selection,
-                    palette::SEARCH_RADIUS - inner,
-                );
-                theme.selection_text
-            } else {
-                theme.text_muted
-            };
             self.painter
-                .centered(&mode.title, self.layout.fonts.mode, color, *frame);
+                .centered(&mode.title, font, theme.text_muted, *frame);
         }
+        let Some(selected) = self
+            .panel
+            .modes
+            .iter()
+            .position(|mode| mode.is_selected)
+            .and_then(|index| frames.get(index))
+        else {
+            return;
+        };
+        // 選んでいる種類の印．切り替えたら前の種類から滑らせ，印に重なった文字だけを選択の文字の色で描き直す
+        // (印が滑るあいだ，文字の色も印の端で切り替わる)
+        let inner = palette::SELECTION_STROKE;
+        let pill = self.tween.mode.unwrap_or(*selected).inset(inner, inner);
+        self.fill(pill, theme.selection, palette::SEARCH_RADIUS - inner);
+        let modes = &self.panel.modes;
+        self.grouped(pill, 1.0, 1.0, |drawing| {
+            for (mode, frame) in modes.iter().zip(frames) {
+                if frame.x < pill.max_x() && pill.x < frame.max_x() {
+                    drawing
+                        .painter
+                        .centered(&mode.title, font, theme.selection_text, *frame);
+                }
+            }
+        });
     }
 
     /// まとまりのタブ．角丸のテーマは薄い地と下の線，platinum と desk は選択の色で塗って示す
     fn tabs(&mut self) {
         let theme = self.theme;
-        let fonts = self.layout.fonts;
         let inner = palette::SELECTION_STROKE;
-        for (tab, frame) in self.panel.tabs.iter().zip(&self.layout.tabs) {
-            let mut color = if tab.is_selected {
-                theme.text
-            } else {
-                theme.text_muted
-            };
-            if tab.is_selected && theme.is_rounded() {
+        let frames = &self.layout.tabs;
+        let selected = self
+            .panel
+            .tabs
+            .iter()
+            .position(|tab| tab.is_selected)
+            .and_then(|index| frames.get(index))
+            .map(|frame| self.tween.tab.unwrap_or(*frame));
+        // 選んでいるまとまりの印．まとまりが変わったら前のタブから滑らせる
+        if let Some(frame) = selected {
+            if theme.is_rounded() {
                 self.fill(
                     frame.inset(inner, inner),
                     theme.focus_tint,
@@ -289,27 +328,50 @@ impl Drawing<'_> {
                     ),
                     theme.selection,
                 );
-            } else if tab.is_selected {
+            } else {
                 self.painter
                     .rect(frame.inset(inner, inner), theme.selection);
-                color = theme.selection_text;
             }
-            match tab_glyph(&tab.section) {
-                Some(glyph) => self.glyph(
-                    glyph,
-                    fonts.tab_icon,
-                    (&tab.symbol, fonts.tab_symbol),
-                    color,
-                    *frame,
-                ),
-                // 顔文字のまとまりの短い顔はタブの幅に収まるよう縮める
-                None => self.fitted(
-                    &tab.symbol,
-                    fonts.tab_symbol,
-                    color,
-                    frame.inset(palette::SELECTION_STROKE, 0.0),
-                ),
-            }
+        }
+        let tabs = &self.panel.tabs;
+        for (tab, frame) in tabs.iter().zip(frames) {
+            let color = if tab.is_selected && theme.is_rounded() {
+                theme.text
+            } else {
+                theme.text_muted
+            };
+            self.tab_icon(tab, *frame, color);
+        }
+        // platinum と desk は印を選択の色で塗るので，印に重なったアイコンだけを選択の文字の色で描き直す
+        if let (Some(frame), false) = (selected, theme.is_rounded()) {
+            let clip = frame.inset(inner, inner);
+            self.grouped(clip, 1.0, 1.0, |drawing| {
+                for (tab, tab_frame) in tabs.iter().zip(frames) {
+                    if tab_frame.x < clip.max_x() && clip.x < tab_frame.max_x() {
+                        drawing.tab_icon(tab, *tab_frame, theme.selection_text);
+                    }
+                }
+            });
+        }
+    }
+
+    fn tab_icon(&mut self, tab: &ipc::PaletteTab, frame: Frame, color: Color) {
+        let fonts = self.layout.fonts;
+        match tab_glyph(&tab.section) {
+            Some(glyph) => self.glyph(
+                glyph,
+                fonts.tab_icon,
+                (&tab.symbol, fonts.tab_symbol),
+                color,
+                frame,
+            ),
+            // 顔文字のまとまりの短い顔はタブの幅に収まるよう縮める
+            None => self.fitted(
+                &tab.symbol,
+                fonts.tab_symbol,
+                color,
+                frame.inset(palette::SELECTION_STROKE, 0.0),
+            ),
         }
     }
 
@@ -330,7 +392,55 @@ impl Drawing<'_> {
         let layout = self.layout;
         let panel = self.panel;
         let fonts = layout.fonts;
+        if let Some((previous, previous_layout, direction, t)) = self.tween.content {
+            // 中身を送る．前の中身を送る向きへ出ていかせながら薄くし，今の中身を手前から入れながら濃くする
+            let (dx, dy) = match direction {
+                PaletteContentMotion::Next => (1.0, 0.0),
+                PaletteContentMotion::Previous => (-1.0, 0.0),
+                PaletteContentMotion::Down => (0.0, 1.0),
+                PaletteContentMotion::Up => (0.0, -1.0),
+            };
+            let shift = palette::CONTENT_SHIFT;
+            let stroke = palette::SELECTION_STROKE;
+            let clip = layout.grid.inset(-stroke, -stroke);
+            self.grouped(clip, 1.0 - t, 1.0, |drawing| {
+                drawing.cells(previous, previous_layout, None);
+                drawing.shift_all(-dx * shift * t, -dy * shift * t);
+            });
+            self.grouped(clip, t, 1.0, |drawing| {
+                drawing.cells(panel, layout, None);
+                drawing.shift_all(dx * shift * (1.0 - t), dy * shift * (1.0 - t));
+            });
+        } else {
+            self.cells(panel, layout, self.tween.selection);
+        }
+        if let Some(message) = &panel.message {
+            let shown = self
+                .painter
+                .truncated(message, fonts.detail, layout.footer.width);
+            self.painter
+                .centered(&shown, fonts.detail, theme.text_muted, layout.grid);
+        }
+        self.scrollbar();
+    }
+
+    /// 描いた部品をすべて dx, dy だけずらす(まとまりの中で使う)
+    fn shift_all(&mut self, dx: f32, dy: f32) {
+        let draws = std::mem::take(&mut self.painter.draws);
+        self.painter.draws = draws.into_iter().map(|draw| draw.offset(dx, dy)).collect();
+    }
+
+    /// panel のマス目の線・選択の枠・文字．sliding は滑っている途中の選択の枠の位置
+    fn cells(&mut self, panel: &PalettePanel, layout: &Layout, sliding: Option<Frame>) {
+        let theme = self.theme;
         let last_row = panel.first_row.saturating_add(panel.visible_rows);
+        let selected = panel.selection.as_ref().map(|position| {
+            sliding.unwrap_or_else(|| layout.cell_frame(position.row, position.column))
+        });
+        if let Some(frame) = selected {
+            self.selection(frame);
+        }
+        let mut cells = Vec::new();
         for row in &panel.rows {
             // 見えている行だけを描く(マス目の外にはみ出さない)
             if row.index < panel.first_row || row.index >= last_row {
@@ -350,46 +460,47 @@ impl Drawing<'_> {
             }
             for (column, cell) in (0..panel.columns).zip(&row.cells) {
                 let frame = layout.cell_frame(row.index, column);
-                let selected = panel.selection
-                    == Some(PalettePosition {
-                        row: row.index,
-                        column,
-                    });
-                if selected {
-                    self.selection(frame);
-                }
-                // platinum と desk の選んでいるマスは選択の色で塗るので，記号は選択の文字の色にする
-                let color = if selected && !theme.is_rounded() {
-                    theme.selection_text
-                } else {
-                    theme.text
-                };
-                if layout.wide {
-                    // 顔文字は絵文字を含んでいても候補の書体で描く(顔の形を崩さない)
-                    self.fitted(
-                        &cell.text,
-                        fonts.cell_kaomoji,
-                        color,
-                        frame.inset(palette::KAOMOJI_PADDING_X, 0.0),
-                    );
-                    continue;
-                }
-                let font = if is_emoji(&cell.text) {
-                    fonts.cell_emoji
-                } else {
-                    fonts.cell_symbol
-                };
-                self.painter.centered(&cell.text, font, color, frame);
+                self.cell(&cell.text, frame, layout, theme.text);
+                cells.push((cell.text.as_str(), frame));
             }
         }
-        if let Some(message) = &panel.message {
-            let shown = self
-                .painter
-                .truncated(message, fonts.detail, layout.footer.width);
-            self.painter
-                .centered(&shown, fonts.detail, theme.text_muted, layout.grid);
+        // platinum と desk の選んでいるマスは選択の色で塗るので，枠に重なった文字だけを選択の文字の色で描き直す
+        // (枠が滑るあいだ，文字の色も枠の端で切り替わる)
+        if let (Some(frame), false) = (selected, theme.is_rounded()) {
+            let clip = frame.inset(candidate::FRAME_WIDTH, candidate::FRAME_WIDTH);
+            self.grouped(clip, 1.0, 1.0, |drawing| {
+                for (text, cell) in &cells {
+                    let overlaps = cell.x < clip.max_x()
+                        && clip.x < cell.max_x()
+                        && cell.y < clip.max_y()
+                        && clip.y < cell.max_y();
+                    if overlaps {
+                        drawing.cell(text, *cell, layout, theme.selection_text);
+                    }
+                }
+            });
         }
-        self.scrollbar();
+    }
+
+    /// 1 つのマスの文字
+    fn cell(&mut self, text: &str, frame: Frame, layout: &Layout, color: Color) {
+        let fonts = layout.fonts;
+        if layout.wide {
+            // 顔文字は絵文字を含んでいても候補の書体で描く(顔の形を崩さない)
+            self.fitted(
+                text,
+                fonts.cell_kaomoji,
+                color,
+                frame.inset(palette::KAOMOJI_PADDING_X, 0.0),
+            );
+            return;
+        }
+        let font = if is_emoji(text) {
+            fonts.cell_emoji
+        } else {
+            fonts.cell_symbol
+        };
+        self.painter.centered(text, font, color, frame);
     }
 
     /// 全体の行がマス目に収まらないときだけ，右に見えている位置を示すつまみを描く
@@ -460,13 +571,21 @@ impl Drawing<'_> {
         } else {
             (glyph::PIN, theme.text_muted)
         };
-        self.glyph(
-            glyph,
-            fonts.tab_icon,
-            (PIN_FALLBACK, fonts.tab_symbol),
-            color,
-            pin,
-        );
+        // ピン留めを切り替えたら，ピンを一度大きくして弾ませる
+        let scale = self
+            .tween
+            .pin
+            .map_or(1.0, |t| 1.0 + (palette::PIN_BOUNCE - 1.0) * bounce(t));
+        let room = pin.width * (palette::PIN_BOUNCE - 1.0);
+        self.grouped(pin.inset(-room, -room), 1.0, scale, |drawing| {
+            drawing.glyph(
+                glyph,
+                fonts.tab_icon,
+                (PIN_FALLBACK, fonts.tab_symbol),
+                color,
+                pin,
+            );
+        });
     }
 
     /// 説明の名前・読み・札の 1 つ
@@ -564,23 +683,40 @@ impl Drawing<'_> {
         let strip = Frame::new(first.x, first.y, last.max_x() - first.x, first.height)
             .inset(-margin, -margin);
         let surface = theme.surface.with_alpha(1.0);
-        if let Some(preview) = self.layout.preview {
-            self.painter.rect(cover(preview), surface);
-        }
-        self.fill(strip, surface, palette::SEARCH_RADIUS);
-        self.outline(
-            strip,
-            theme.frame,
-            palette::SEARCH_RADIUS,
-            candidate::FRAME_WIDTH,
-        );
-        for (index, (option, frame)) in picker.options.iter().zip(&cells).enumerate() {
-            if index == picker.selected as usize {
-                self.selection(*frame);
+        // 開いたら，覆いと帯を薄い形から濃くし，帯は少し小さい形から少し行き過ぎて元の大きさへ浮かび上がらせる
+        let (opacity, scale) = self.tween.picker.map_or((1.0, 1.0), |t| {
+            (
+                (t * 2.0).min(1.0).powf(0.5),
+                palette::POP_SCALE + (1.0 - palette::POP_SCALE) * overshoot(t),
+            )
+        });
+        let body = self.layout.body;
+        self.grouped(body, opacity, 1.0, |drawing| {
+            if let Some(preview) = drawing.layout.preview {
+                drawing.painter.rect(cover(preview), surface);
             }
-            self.painter
-                .centered(option, self.layout.fonts.picker_emoji, theme.text, *frame);
-        }
+            let room = strip.height;
+            drawing.grouped(strip.inset(-room, -room), 1.0, scale, |drawing| {
+                drawing.fill(strip, surface, palette::SEARCH_RADIUS);
+                drawing.outline(
+                    strip,
+                    theme.frame,
+                    palette::SEARCH_RADIUS,
+                    candidate::FRAME_WIDTH,
+                );
+                for (index, (option, frame)) in picker.options.iter().zip(&cells).enumerate() {
+                    if index == picker.selected as usize {
+                        drawing.selection(*frame);
+                    }
+                    drawing.painter.centered(
+                        option,
+                        drawing.layout.fonts.picker_emoji,
+                        theme.text,
+                        *frame,
+                    );
+                }
+            });
+        });
     }
 }
 
@@ -594,7 +730,7 @@ fn cover(preview: Frame) -> Frame {
 mod tests {
     use super::super::sample;
     use super::*;
-    use crate::scene::testing::{count, text_frame, texts, theme, Fixed};
+    use crate::scene::testing::{count, flattened, text_frame, texts, theme, Fixed};
     use crate::theme::Role;
 
     /// アイコンの書体が入っているとして測る
@@ -617,14 +753,19 @@ mod tests {
     fn draw(panel: &PalettePanel, name: &str, measure: &dyn Measure) -> (Layout, Scene) {
         let theme = theme(name);
         let layout = Layout::new(panel, &theme, measure);
-        let scene = palette(panel, &layout, &Look::new(&theme, 15.0), measure);
+        let scene = palette(
+            panel,
+            &layout,
+            &Look::new(&theme, 15.0),
+            measure,
+            Tween::default(),
+        );
         (layout, scene)
     }
 
     fn fonts_of(scene: &Scene) -> Vec<(String, Font)> {
-        scene
-            .draws
-            .iter()
+        flattened(&scene.draws)
+            .into_iter()
             .filter_map(|draw| match draw {
                 Draw::Text { text, font, .. } => Some((text.clone(), *font)),
                 _ => None,
@@ -681,6 +822,94 @@ mod tests {
         // 説明の大きな顔文字と，タブの短い顔
         assert!(fonts.contains(&("(´・ω・｀)".into(), layout.fonts.preview_kaomoji)));
         assert!(fonts.contains(&("T_T".into(), layout.fonts.tab_symbol)));
+    }
+
+    /// from から to へ動き始めて milliseconds たったところ
+    fn draw_moving(
+        from: &PalettePanel,
+        to: &PalettePanel,
+        milliseconds: f32,
+        name: &str,
+    ) -> (Layout, Scene) {
+        let theme = theme(name);
+        let from_layout = Layout::new(from, &theme, &Fixed);
+        let layout = Layout::new(to, &theme, &Fixed);
+        let start = std::time::Instant::now();
+        let mut motion = super::super::motion::Motion::default();
+        motion.start(from, &from_layout, to, &layout, start);
+        let at = start + std::time::Duration::from_secs_f32(milliseconds / 1000.0);
+        let tween = motion.tween(to, &layout, at);
+        let scene = palette(to, &layout, &Look::new(&theme, 15.0), &Fixed, tween);
+        (layout, scene)
+    }
+
+    #[test]
+    fn 動きの途中は印と枠を滑らせ_中身を送るときは前と今の中身を薄くして重ねる() {
+        let steps = sample::motion_steps();
+        // 選択の枠とタブの印が滑っている途中
+        let (from, to, milliseconds) = &steps[0];
+        let (layout, scene) = draw_moving(from, to, *milliseconds, "automatic");
+        let target = layout
+            .cell_frame(3, 6)
+            .inset(candidate::FRAME_WIDTH, candidate::FRAME_WIDTH);
+        let focus = theme("automatic").focus_tint;
+        let tints: Vec<Frame> = flattened(&scene.draws)
+            .into_iter()
+            .filter_map(|draw| match draw {
+                Draw::RoundRect {
+                    frame,
+                    fill: Some(color),
+                    ..
+                } if *color == focus && frame.width == target.width => Some(*frame),
+                _ => None,
+            })
+            .collect();
+        assert!(!tints.contains(&target), "滑り終えていない");
+        // 種類を切り替えて中身を送っている途中．前と今の中身を，濃さの和が 1 のまとまりで重ねる
+        let (from, to, milliseconds) = &steps[1];
+        let (layout, scene) = draw_moving(from, to, *milliseconds, "platinum");
+        let groups: Vec<f32> = scene
+            .draws
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Group {
+                    clip,
+                    opacity,
+                    draws,
+                    ..
+                } if clip.width > layout.grid.width && !draws.is_empty() => Some(*opacity),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(groups.len(), 2);
+        assert!((groups[0] + groups[1] - 1.0).abs() < 1e-4);
+        assert!(groups
+            .iter()
+            .all(|opacity| *opacity > 0.0 && *opacity < 1.0));
+        // 止まっていればまとまりで重ねない
+        let (_, still) = draw(to, "platinum", &Fixed);
+        assert!(!still.draws.iter().any(
+            |draw| matches!(draw, Draw::Group { clip, .. } if clip.width > layout.grid.width)
+        ));
+    }
+
+    #[test]
+    fn 肌の色の帯は浮かび上がる途中は薄く小さい() {
+        let steps = sample::motion_steps();
+        let (from, to, milliseconds) = &steps[2];
+        let (_, scene) = draw_moving(from, to, *milliseconds, "automatic");
+        let popping = scene.draws.iter().find_map(|draw| match draw {
+            Draw::Group { opacity, draws, .. } if *opacity < 1.0 => {
+                draws.iter().find_map(|inner| match inner {
+                    Draw::Group { scale, .. } => Some((*opacity, *scale)),
+                    _ => None,
+                })
+            }
+            _ => None,
+        });
+        let (opacity, scale) = popping.expect("帯が浮かび上がっている");
+        assert!(opacity > 0.0 && opacity < 1.0);
+        assert!(scale > palette::POP_SCALE && scale < 1.1);
     }
 
     #[test]
@@ -907,8 +1136,10 @@ mod tests {
         let (layout, scene) = draw(&panel, "automatic", &Fixed);
         let theme = theme("automatic");
         let preview = layout.preview.unwrap();
-        let cover = scene.draws.iter().position(|draw| {
-            *draw
+        // 帯は開く動きのためにまとまり(Draw::Group)に入れるので，まとまりの中も含めた描く順で比べる
+        let draws = flattened(&scene.draws);
+        let cover = draws.iter().position(|draw| {
+            **draw
                 == Draw::Rect {
                     frame: super::cover(preview),
                     color: theme.surface.with_alpha(1.0),
@@ -916,8 +1147,7 @@ mod tests {
         });
         let cover = cover.unwrap();
         // 説明の文字は覆う前に描く
-        let name = scene
-            .draws
+        let name = draws
             .iter()
             .position(|draw| matches!(draw, Draw::Text { text, .. } if text == "おじぎする人"));
         assert!(name.unwrap() < cover);
@@ -926,7 +1156,7 @@ mod tests {
             assert!(text_frame(&scene, option).is_some(), "{option}");
         }
         let inner = cells[2].inset(candidate::FRAME_WIDTH, candidate::FRAME_WIDTH);
-        assert!(scene.draws.contains(&Draw::RoundRect {
+        assert!(draws.contains(&&Draw::RoundRect {
             frame: inner,
             radius: palette::CELL_RADIUS,
             fill: Some(theme.focus_tint),

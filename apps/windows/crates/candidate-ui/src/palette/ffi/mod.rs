@@ -6,16 +6,19 @@
 mod window;
 
 use super::layout::{cell_size, Fonts, Layout, Wheel};
+use super::motion::{ease_out, progress, Motion};
 use super::scene;
 use crate::announce::{self, Announcer};
 use crate::app::render::{Renderer, TextMeasure};
-use crate::app::system;
+use crate::app::{system, FRAME_MILLISECONDS};
 use crate::geometry::{origin, Bounds};
-use crate::scene::{surround, Look, Scene, Surround};
+use crate::scene::{surround, Draw, Look, Scene, Surround};
 use crate::theme::ResolvedTheme;
 use ipc::windows::{pipe_name, EngineClient};
 use ipc::{PalettePanel, PaletteTarget, Rect, RequestBody};
 use std::cell::RefCell;
+use std::time::Instant;
+use tokens::motion::palette as duration;
 use window::{Event, Window};
 
 /// 出しているパレット
@@ -25,6 +28,10 @@ struct Shown {
     /// 窓の全体(角丸のテーマは影の余白を含む)
     scene: Scene,
     measure: std::rc::Rc<TextMeasure>,
+    /// 動きの 1 コマごとに中身を作り直すために覚えておく
+    theme: ResolvedTheme,
+    /// 窓の左上と大きさ(画面のピクセル)
+    placement: (i32, i32, i32, i32),
 }
 
 /// パレットの窓の状態．候補ウィンドウのプロセスの窓のスレッドだけで触る
@@ -42,6 +49,12 @@ struct Controller {
     pointer: Option<(f32, f32)>,
     wheel: Wheel,
     announcer: Announcer,
+    /// 動いている部品(選択の枠・印・中身・帯・ピン)
+    motion: Motion,
+    /// 開く動きを始めた時刻．開き終えたら None
+    opening: Option<Instant>,
+    /// 動きの 1 コマを描く時計が動いているか
+    ticking: bool,
 }
 
 thread_local! {
@@ -96,6 +109,9 @@ impl Controller {
             pointer: None,
             wheel: Wheel::default(),
             announcer: Announcer::default(),
+            motion: Motion::default(),
+            opening: None,
+            ticking: false,
         })
     }
 
@@ -107,8 +123,15 @@ impl Controller {
         };
         let layout = Layout::new(&panel, theme, &measure);
         let look = Look::new(theme, font_size);
+        // 窓の大きさと位置を決めるための，止まっている中身(描くのは frame で動きの途中の形にしてから)
         let scene = surround(
-            scene::palette(&panel, &layout, &look, &measure),
+            scene::palette(
+                &panel,
+                &layout,
+                &look,
+                measure.as_ref(),
+                super::motion::Tween::default(),
+            ),
             theme,
             Surround::Shadow,
         );
@@ -134,12 +157,27 @@ impl Controller {
         };
         let opening = self.origin.is_none();
         self.origin = Some((left, top));
-        self.window.show_at(
+        let placement = (
             left - pixels(scene.body.x),
             top - pixels(scene.body.y),
             (scene.width * scale).ceil() as i32,
             (scene.height * scale).ceil() as i32,
         );
+        // 動きを始める．「アニメーション効果」がオフなら動かさない
+        let now = Instant::now();
+        let animates = !system::reduce_motion();
+        match &self.shown {
+            Some(old) if animates => {
+                self.motion
+                    .start(&old.panel, &old.layout, &panel, &layout, now)
+            }
+            _ => self.motion.reset(),
+        }
+        if opening {
+            self.opening = animates.then_some(now);
+        }
+        self.window
+            .show_at(placement.0, placement.1, placement.2, placement.3);
         if opening {
             self.pointer = Some(self.window.pointer());
         }
@@ -149,8 +187,10 @@ impl Controller {
             layout,
             scene,
             measure,
+            theme: theme.clone(),
+            placement,
         });
-        self.repaint();
+        self.frame(now);
         // ナレーターが動いているときだけ，選んでいる文字の名前と知らせを読み上げる
         if system::screen_reader() {
             if let Some(text) = self.announcer.next(text) {
@@ -161,12 +201,62 @@ impl Controller {
 
     fn hide(&mut self) {
         self.window.hide();
+        self.motion.reset();
+        self.opening = None;
+        self.ticking = false;
         self.shown = None;
         self.origin = None;
         self.hovered = None;
         self.pointer = None;
         self.wheel.reset();
         self.announcer.reset();
+    }
+
+    /// now の時点の動きの途中の形で中身を作り直して描く．開くあいだは窓を少し下から上げながら濃くする．
+    /// 動いているあいだは次のコマを描く時計を動かし，止まったら時計を止める
+    fn frame(&mut self, now: Instant) {
+        let Some(shown) = self.shown.as_mut() else {
+            return;
+        };
+        let tween = self.motion.tween(&shown.panel, &shown.layout, now);
+        let look = Look::new(&shown.theme, tokens::size::candidate::FONT_SIZE);
+        let content = scene::palette(
+            &shown.panel,
+            &shown.layout,
+            &look,
+            shown.measure.as_ref(),
+            tween,
+        );
+        let mut scene = surround(content, &shown.theme, Surround::Shadow);
+        let (x, y, width, height) = shown.placement;
+        let opening = self
+            .opening
+            .map(|start| progress(start, duration::OPEN, now))
+            .filter(|t| *t < 1.0);
+        match opening {
+            Some(t) => {
+                let shown_amount = ease_out(t);
+                let rise =
+                    tokens::size::palette::OPEN_RISE * self.window.scale() * (1.0 - shown_amount);
+                self.window
+                    .show_at(x, y + rise.round() as i32, width, height);
+                scene = faded(scene, shown_amount);
+            }
+            None => {
+                if self.opening.take().is_some() {
+                    self.window.show_at(x, y, width, height);
+                }
+            }
+        }
+        shown.scene = scene;
+        self.repaint();
+        let moving = opening.is_some() || self.motion.is_active(now);
+        if moving && !self.ticking {
+            self.window.start_motion_timer(FRAME_MILLISECONDS);
+        } else if !moving && self.ticking {
+            self.window.stop_motion_timer();
+        }
+        self.ticking = moving;
     }
 
     fn repaint(&mut self) {
@@ -212,6 +302,7 @@ impl Controller {
                 }
             }
             Event::Paint => self.repaint(),
+            Event::Tick => self.frame(Instant::now()),
         }
     }
 
@@ -234,5 +325,19 @@ impl Controller {
         if let Some(engine) = &self.engine {
             let _ = engine.send(RequestBody::ChoosePalette { target });
         }
+    }
+}
+
+/// 窓の全体を opacity の濃さにした中身(開く動き)．色の絵文字も同じ濃さにするため，全体をまとまり(Draw::Group)にする
+fn faded(scene: Scene, opacity: f32) -> Scene {
+    let whole = crate::geometry::Frame::new(0.0, 0.0, scene.width, scene.height);
+    Scene {
+        draws: vec![Draw::Group {
+            clip: whole,
+            opacity,
+            scale: 1.0,
+            draws: scene.draws,
+        }],
+        ..scene
     }
 }

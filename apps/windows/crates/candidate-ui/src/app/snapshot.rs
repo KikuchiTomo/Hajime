@@ -215,9 +215,33 @@ fn render_all(output: &Path) -> Result<()> {
             let fonts = Fonts::new(cell_size(&panel));
             let measure = renderer.measure_with(&theme, font_size, &fonts.all())?;
             let layout = Layout::new(&panel, &theme, &measure);
-            let scene = palette::scene::palette(&panel, &layout, &look, &measure);
+            let scene = palette::scene::palette(
+                &panel,
+                &layout,
+                &look,
+                &measure,
+                palette::motion::Tween::default(),
+            );
             let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });
             let path = output.join(format!("{kind}-{name}.png"));
+            write_png(&imaging, &renderer, &scene, &measure, &path)?;
+        }
+        // 動きの途中のコマ(macOS の palette-motion-*)．選択の枠とタブの印が滑る・種類を切り替えて中身を送る・肌の色の帯が浮かび上がる
+        for (step, (from, to, milliseconds)) in
+            palette::sample::motion_steps().into_iter().enumerate()
+        {
+            let fonts = Fonts::new(cell_size(&to));
+            let measure = renderer.measure_with(&theme, font_size, &fonts.all())?;
+            let from_layout = Layout::new(&from, &theme, &measure);
+            let layout = Layout::new(&to, &theme, &measure);
+            let start = std::time::Instant::now();
+            let mut motion = palette::motion::Motion::default();
+            motion.start(&from, &from_layout, &to, &layout, start);
+            let at = start + std::time::Duration::from_secs_f32(milliseconds / 1000.0);
+            let tween = motion.tween(&to, &layout, at);
+            let scene = palette::scene::palette(&to, &layout, &look, &measure, tween);
+            let scene = scene::surround(scene, &theme, Surround::Snapshot { dark });
+            let path = output.join(format!("palette-motion-{}-{name}.png", step + 1));
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
         }
     }

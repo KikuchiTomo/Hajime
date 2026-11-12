@@ -15,9 +15,10 @@ use windows::Win32::Graphics::Direct2D::Common::{
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Factory, ID2D1Geometry, ID2D1RenderTarget, ID2D1SolidColorBrush,
-    ID2D1StrokeStyle, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_CUSTOM, D2D1_DASH_STYLE_SOLID,
-    D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
-    D2D1_LINE_JOIN_ROUND, D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
+    ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND,
+    D2D1_DASH_STYLE_CUSTOM, D2D1_DASH_STYLE_SOLID, D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT,
+    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_LAYER_PARAMETERS, D2D1_LINE_JOIN_ROUND,
+    D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFontCollection, IDWriteTextFormat,
@@ -27,6 +28,7 @@ use windows::Win32::Graphics::DirectWrite::{
     DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
 };
 use windows_core::{Interface, Result, BOOL, HSTRING};
+use windows_numerics::{Matrix3x2, Vector2};
 
 const LOCALE: &str = "ja-JP";
 /// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
@@ -742,6 +744,12 @@ impl Painter<'_> {
                     )
                 };
             }
+            Draw::Group {
+                clip,
+                opacity,
+                scale,
+                draws,
+            } => self.group(clip, *opacity, *scale, draws)?,
             Draw::Shadow {
                 frame,
                 radius,
@@ -766,6 +774,55 @@ impl Painter<'_> {
             }
         }
         Ok(())
+    }
+
+    /// draws を clip の中だけに描く．薄く描くときは濃さを決めた層に描いてから重ねる(色の絵文字も同じ濃さにするため)．
+    /// 大きさを変えるときは clip の真ん中を中心に変える
+    fn group(&self, clip: &Frame, opacity: f32, scale: f32, draws: &[Draw]) -> Result<()> {
+        if opacity <= 0.0 {
+            return Ok(());
+        }
+        let bounds = rect(clip);
+        // SAFETY: target は描いている途中の COM の参照．Push と Pop を対にする
+        unsafe {
+            self.target
+                .PushAxisAlignedClip(&bounds, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
+        };
+        let layered = opacity < 1.0;
+        if layered {
+            // SAFETY: 同上．layer は Pop するまで生きている
+            let layer = unsafe { self.target.CreateLayer(None)? };
+            let parameters = D2D1_LAYER_PARAMETERS {
+                contentBounds: bounds,
+                maskTransform: Matrix3x2::identity(),
+                opacity,
+                ..Default::default()
+            };
+            // SAFETY: 同上
+            unsafe { self.target.PushLayer(&parameters, &layer) };
+        }
+        let mut previous = Matrix3x2::identity();
+        if scale != 1.0 {
+            // SAFETY: 同上．変えた形は描き終えたら戻す
+            unsafe {
+                self.target.GetTransform(&mut previous);
+                let center = Vector2::new(clip.mid_x(), clip.mid_y());
+                self.target
+                    .SetTransform(&(Matrix3x2::scale_around(scale, scale, center) * previous));
+            }
+        }
+        let painted = draws.iter().try_for_each(|draw| self.draw(draw));
+        // SAFETY: 上の Push と SetTransform と対にする
+        unsafe {
+            if scale != 1.0 {
+                self.target.SetTransform(&previous);
+            }
+            if layered {
+                self.target.PopLayer();
+            }
+            self.target.PopAxisAlignedClip();
+        }
+        painted
     }
 
     fn stroke(
