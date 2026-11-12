@@ -258,7 +258,7 @@ public enum LayoutTokens {
         public static let detailFontSize: Double = 11
         public static let codeFontSize: Double = 10
         public static let previewChipSmallFontSize: Double = 8
-        public static let skinButtonPadding: Double = 3
+        public static let skinButtonPadding: Double = 2
         public static let pickerCellSize: Double = 36
         public static let cellPadding: Double = 4
         public static let probeFontSize: Double = 20

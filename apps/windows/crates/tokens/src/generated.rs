@@ -495,7 +495,7 @@ pub mod size {
         pub const DETAIL_FONT_SIZE: f32 = 11.0;
         pub const CODE_FONT_SIZE: f32 = 10.0;
         pub const PREVIEW_CHIP_SMALL_FONT_SIZE: f32 = 8.0;
-        pub const SKIN_BUTTON_PADDING: f32 = 3.0;
+        pub const SKIN_BUTTON_PADDING: f32 = 2.0;
         pub const PICKER_CELL_SIZE: f32 = 36.0;
         pub const CELL_PADDING: f32 = 4.0;
         pub const PROBE_FONT_SIZE: f32 = 20.0;
