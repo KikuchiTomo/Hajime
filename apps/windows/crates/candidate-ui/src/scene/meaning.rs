@@ -12,7 +12,7 @@
 
 use super::card_layout::{self, CardLayout, Content, SenseLines};
 use super::paint::Painter;
-use super::{Draw, Frame, Look, Measure, Point};
+use super::{CardStyle, Draw, Frame, Look, Measure, Point};
 use crate::keys::Icon;
 use crate::strings;
 use crate::theme::{Color, Font};
@@ -59,7 +59,8 @@ impl Card {
     pub fn new(painter: &Painter, note: &HomophoneNote, others: Vec<String>, width: f32) -> Self {
         let theme = painter.theme;
         let measure = painter.measure;
-        let columns = card_layout::Columns::new(width);
+        let padding = padding(painter.card_style);
+        let columns = card_layout::Columns::new(width, padding);
         let numbered = note.senses.len() > 1;
         let body = Style {
             font: Font::MeaningBody,
@@ -106,7 +107,14 @@ impl Card {
             others_label: strings::HOMOPHONE_OTHERS,
             more: &strings::more,
         };
-        let layout = card_layout::place(&content, width, measure, theme);
+        let layout = card_layout::place(
+            &content,
+            width,
+            padding,
+            padding_y(painter.card_style),
+            measure,
+            theme,
+        );
         Self {
             width: layout.width,
             height: layout.height,
@@ -119,6 +127,38 @@ impl Card {
     /// 見出しの行の縦の中心(rect はカードの枠)．分岐図のつなぐ線はここへ引く
     pub fn header_mid_y(&self, rect: Frame) -> f32 {
         (rect.y + self.layout.header_mid_y()).round()
+    }
+}
+
+/// 一覧・枝とカードのあいだ．つなぐ線で示す案(Open・Outline)は線を引く幅を空ける
+pub(super) fn card_gap(style: CardStyle) -> f32 {
+    match style {
+        CardStyle::Filled => glass::SEPARATOR_GAP,
+        CardStyle::Open | CardStyle::Outline => meaning::CARD_GAP,
+    }
+}
+
+/// つなぐ線の終わりの x．箱を描かない案は，見出しのアイコンの手前で止める
+pub(super) fn connector_end_x(style: CardStyle, card_x: f32) -> f32 {
+    match style {
+        CardStyle::Open => card_x - tokens::size::space::XS,
+        CardStyle::Filled | CardStyle::Outline => card_x,
+    }
+}
+
+/// カードの内側の余白．箱を描かないときは 0(文字は分岐図の続きとして，カードの場所の左上から置く)
+fn padding(style: CardStyle) -> f32 {
+    match style {
+        CardStyle::Open => 0.0,
+        CardStyle::Filled | CardStyle::Outline => meaning::PADDING,
+    }
+}
+
+/// カードの上下の余白．箱を描かないときは，見出しの行の縦の真ん中を候補の 1 行目の地の真ん中にそろえる(地 24 と見出しの行 16 の差の半分)
+fn padding_y(style: CardStyle) -> f32 {
+    match style {
+        CardStyle::Open => tokens::size::space::XS,
+        CardStyle::Filled | CardStyle::Outline => meaning::PADDING,
     }
 }
 
@@ -313,6 +353,21 @@ pub(super) fn draw(
 /// カードの地．角丸のテーマは文字の色を薄く敷き，platinum と desk は 1 ドットの枠にする(区画にするときは枠を描かない)．三角は地と同じ色
 fn background(painter: &mut Painter, rect: Frame, pointer_y: Option<f32>, card_frame: CardFrame) {
     let theme = painter.theme;
+    // 箱を描かない案と枠の線だけの案は，選んでいる候補を三角で指さず，つなぐ線で示す(描く側が引く)
+    let pointer_y = pointer_y.filter(|_| painter.card_style == CardStyle::Filled);
+    match painter.card_style {
+        CardStyle::Open => return,
+        CardStyle::Outline if theme.is_rounded() => {
+            painter.draws.push(Draw::RoundRect {
+                frame: rect.inset(0.5, 0.5),
+                radius: meaning::RADIUS.min(theme.corner_radius),
+                fill: None,
+                stroke: Some((theme.line, candidate::FRAME_WIDTH)),
+            });
+            return;
+        }
+        _ => {}
+    }
     let notch = meaning::NOTCH;
     let pointer = |x: f32, y: f32| {
         vec![
@@ -419,13 +474,21 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     let theme = painter.theme;
     let layout = &card.layout;
     let at = |frame: Frame| frame.offset(rect.x, rect.y);
+    // 箱を描かない案と枠の線だけの案は，アクセントの色(青)をつなぐ線だけに使い，目印と札は控えめな色にする
+    let (mark, tint, bar_color) = if painter.card_style == CardStyle::Filled {
+        (
+            theme.selection,
+            theme.meaning_tint(),
+            theme
+                .selection
+                .with_alpha(opacity::glass::MEANING_EXAMPLE_BAR),
+        )
+    } else {
+        (theme.text_muted, theme.badge, theme.line)
+    };
 
     // 見出し
-    painter.icon(
-        Icon::Book,
-        icon_frame(at(layout.book_icon)),
-        theme.selection,
-    );
+    painter.icon(Icon::Book, icon_frame(at(layout.book_icon)), mark);
     let headword = &layout.headword;
     painter.text(
         &headword.text,
@@ -444,13 +507,13 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             } else {
                 0.0
             },
-            fill: Some(theme.meaning_tint()),
+            fill: Some(tint),
             stroke: None,
         });
         painter.text(
             &chip.text,
             Font::MeaningTag,
-            theme.selection,
+            mark,
             rect.x + chip.text_place.line.x,
             at(chip.text_place.line),
         );
@@ -466,13 +529,13 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
                 } else {
                     0.0
                 },
-                fill: Some(theme.meaning_tint()),
+                fill: Some(tint),
                 stroke: None,
             });
             painter.text(
                 &number.text,
                 number.font,
-                theme.selection,
+                mark,
                 rect.x + number.place.line.x,
                 at(number.place.line),
             );
@@ -485,11 +548,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             painter.draws.push(Draw::RoundRect {
                 frame: bar,
                 radius: bar.width / 2.0,
-                fill: Some(
-                    theme
-                        .selection
-                        .with_alpha(opacity::glass::MEANING_EXAMPLE_BAR),
-                ),
+                fill: Some(bar_color),
                 stroke: None,
             });
         }

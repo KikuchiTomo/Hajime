@@ -221,7 +221,8 @@ final class BranchView: NSView {
         let previewRows = panel.columns.contains { $0.preview != nil } ? 1 : 0
         let upperRows = column?.variants.count ?? 0
         let lowerRows = max(column?.alternatives.count ?? 0, previewRows)
-        let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Size.paddingX * 3
+        // 足元: 左右の余白と，案内と位置のあいだ(案内と案内のあいだと同じ)
+        let footer = footerWidth(panel) + (showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) : 0) + Size.paddingX * 2 + Glass.hintGap
         // 使い分けや誤用の注釈と，IME からの知らせ(直したことなど)は，枝と足元のあいだに 1 行ずつ出す．キーの案内は消さない
         let note = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) },
                     panel.meaningPlacement == .below && column?.homophone != nil ? Meaning.listWidth : nil]
@@ -433,7 +434,7 @@ final class BranchView: NSView {
     private func drawTrunkNode(_ column: LatticePanel.Column, in node: NSRect) {
         let color: NSColor
         if theme.isRounded {
-            if column.isFocused { GlassDrawing.fillCapsule(node.insetBy(dx: 0, dy: 2), color: theme.focusTint) }
+            if column.isFocused { GlassDrawing.fillCapsule(node.insetBy(dx: 0, dy: Glass.selectionInsetY), color: theme.focusTint) }
             color = theme.text
         } else {
             if column.isFocused {
@@ -562,7 +563,7 @@ final class BranchView: NSView {
             self.branchRowRect(index, from: node, width: width, downward: downward, metrics: metrics)
         }
         if theme.isRounded, !theme.straightBranches {
-            drawCurves(rows, stemX: stemX, stemY: downward ? node.maxY - 2 : node.minY + 2, rowRect: rowRect)
+            drawCurves(rows, stemX: stemX, stemY: downward ? node.maxY - Glass.curveStartOverlap : node.minY + Glass.curveStartOverlap, rowRect: rowRect)
         } else {
             drawStraightLines(rows, stemX: stemX, node: node, downward: downward, rowRect: rowRect)
         }
@@ -576,7 +577,7 @@ final class BranchView: NSView {
         let start = NSPoint(x: stemX, y: stemY)
         let curves = rows.indices.map { index in
             let rect = rowRect(index)
-            return GlassDrawing.branchCurve(from: start, to: NSPoint(x: rect.minX - 3, y: rect.midY))
+            return GlassDrawing.branchCurve(from: start, to: NSPoint(x: rect.minX - Glass.curveEndGap, y: rect.midY))
         }
         for (index, curve) in curves.enumerated() where !rows[index].isSelected {
             theme.line.withAlphaComponent(theme.line.alphaComponent * rows[index].opacity).setStroke()
@@ -608,7 +609,7 @@ final class BranchView: NSView {
     private func drawRow(_ row: Row, in rect: NSRect) {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
         if theme.isRounded {
-            if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection) }
+            if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: Glass.selectionInsetY), color: theme.selection) }
             let badgeCenter = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(row.badge, center: badgeCenter, theme: theme, selected: row.isSelected, opacity: row.opacity)
         } else {
@@ -640,7 +641,7 @@ final class BranchView: NSView {
         let textX: CGFloat
         if theme.isRounded {
             let end = NSPoint(x: stemX + metrics.branchIndent / 2, y: row.midY)
-            let curve = GlassDrawing.branchCurve(from: NSPoint(x: stemX, y: node.maxY - 2), to: end)
+            let curve = GlassDrawing.branchCurve(from: NSPoint(x: stemX, y: node.maxY - Glass.curveStartOverlap), to: end)
             theme.line.withAlphaComponent(theme.line.alphaComponent * restOpacity).setStroke()
             curve.lineWidth = Glass.lineWidth
             curve.stroke()
@@ -681,7 +682,7 @@ final class BranchView: NSView {
     private func associationWidth(_ panel: LatticePanel) -> CGFloat {
         guard let hint = panel.associationHint else { return 0 }
         let width = associationKeyHint(panel).map { GlassDrawing.hintsWidth([$0], theme: theme) } ?? textWidth(hint.label, font: labelFont)
-        return width + Size.paddingX
+        return width + Glass.hintGap
     }
 
     /// 区切りの線．窓の中身の左右の端から端まで(語の意味のカードの端と同じ)
@@ -699,12 +700,12 @@ final class BranchView: NSView {
         let position = showsPosition(panel) ? position(of: panel) : ""
         // 右の位置と辞書の名前，連想の知らせを先に取り，残りの幅に入るキーの案内だけを出す
         let reserved = footerWidth(panel) - (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0)
-            + (position.isEmpty ? 0 : textWidth(position, font: labelFont) + Size.paddingX)
+            + (position.isEmpty ? 0 : textWidth(position, font: labelFont) + Glass.hintGap)
         var hintsEnd = footer.minX
         if showsHints {
             let shown = GlassDrawing.hints(hints, fitting: footer.width - reserved, theme: theme)
             GlassDrawing.drawHints(shown, x: footer.minX, midY: footer.midY, theme: theme)
-            if !shown.isEmpty { hintsEnd += GlassDrawing.hintsWidth(shown, theme: theme) + Size.paddingX }
+            if !shown.isEmpty { hintsEnd += GlassDrawing.hintsWidth(shown, theme: theme) + Glass.hintGap }
         }
         if let hint = panel.associationHint {
             // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く

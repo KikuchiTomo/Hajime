@@ -2,7 +2,8 @@
 ///
 /// 角丸のテーマ(rounded)
 /// - 縁の線の内側に，上下左右とも metrics.padding の余白を空ける．候補の行の地・区切りの線・カードの左右の端は余白の内側の端にそろう
-/// - 区切りの線の上と下は metrics.separatorGap．候補の右のカードと一覧のあいだ，候補の下のカードと候補のあいだも同じ
+/// - 区切りの線の上と下は metrics.separatorGap．候補の下のカードと候補のあいだも同じ
+/// - 候補の右のカードと一覧のあいだは metrics.cardGap(選んでいる候補とカードをつなぐ線をここに引く)
 /// - 候補の右のカードは，上の端を候補の 1 行目の地の上の端に，右の端を足元の区切りの線の右の端にそろえる
 ///
 /// platinum と desk(bevel)
@@ -37,6 +38,8 @@ public struct CandidateListLayout: Sendable, Equatable {
         public var padding: Double
         /// 区切りの線の上と下の空き
         public var separatorGap: Double
+        /// 候補の右のカードと一覧のあいだ(角丸のテーマ)
+        public var cardGap: Double
         public var separatorWidth: Double
         /// 候補の行の間隔(行の地の高さと，行と行のあいだの和)
         public var rowPitch: Double
@@ -49,11 +52,12 @@ public struct CandidateListLayout: Sendable, Equatable {
         /// desk の影の幅(右と下)
         public var shadow: Double
 
-        public init(edge: Double, padding: Double, separatorGap: Double, separatorWidth: Double, rowPitch: Double, rowInset: Double, headerHeight: Double,
-                    footerHeight: Double, shadow: Double) {
+        public init(edge: Double, padding: Double, separatorGap: Double, cardGap: Double, separatorWidth: Double, rowPitch: Double, rowInset: Double,
+                    headerHeight: Double, footerHeight: Double, shadow: Double) {
             self.edge = edge
             self.padding = padding
             self.separatorGap = separatorGap
+            self.cardGap = cardGap
             self.separatorWidth = separatorWidth
             self.rowPitch = rowPitch
             self.rowInset = rowInset
@@ -65,13 +69,13 @@ public struct CandidateListLayout: Sendable, Equatable {
         /// 角丸のテーマ．行の間隔と行の高さは文字の大きさで変わるので描く側が渡す
         public static func rounded(rowPitch: Double, headerHeight: Double, footerHeight: Double) -> Metrics {
             Metrics(edge: LayoutTokens.Candidate.frameWidth, padding: LayoutTokens.Glass.windowPadding, separatorGap: LayoutTokens.Glass.separatorGap,
-                    separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: LayoutTokens.Glass.selectionInsetY,
+                    cardGap: LayoutTokens.Meaning.cardGap, separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: LayoutTokens.Glass.selectionInsetY,
                     headerHeight: headerHeight, footerHeight: footerHeight, shadow: 0)
         }
 
         /// platinum と desk．文字種の行と足元の行は同じ高さ(sectionHeight)
         public static func bevel(rowPitch: Double, sectionHeight: Double, hasShadow: Bool) -> Metrics {
-            Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: 0, separatorGap: 0,
+            Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: 0, separatorGap: 0, cardGap: 0,
                     separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: 0, headerHeight: sectionHeight,
                     footerHeight: sectionHeight, shadow: hasShadow ? LayoutTokens.Candidate.shadowOffset : 0)
         }
@@ -113,7 +117,7 @@ public struct CandidateListLayout: Sendable, Equatable {
         let gap = metrics.separatorGap
         let line = metrics.separatorWidth
         // 候補の右のカードと一覧のあいだ: 角丸は空き，platinum と desk は縦の線
-        let sideGap = style == .rounded ? gap : line
+        let sideGap = style == .rounded ? metrics.cardGap : line
 
         var contentWidth = max(listWidth, footerWidth)
         switch card {

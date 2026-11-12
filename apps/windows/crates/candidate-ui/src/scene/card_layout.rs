@@ -34,10 +34,11 @@ pub(super) struct Columns {
 }
 
 impl Columns {
-    pub fn new(width: f32) -> Self {
-        let marker_x = meaning::PADDING;
+    /// padding はカードの内側の余白(箱を描かないときは 0)
+    pub fn new(width: f32, padding: f32) -> Self {
+        let marker_x = padding;
         let text_x = marker_x + meaning::MARKER_WIDTH + meaning::MARKER_GAP;
-        let text_width = (width - meaning::PADDING - text_x).max(0.0);
+        let text_width = (width - padding - text_x).max(0.0);
         Self {
             marker_x,
             marker_width: meaning::MARKER_WIDTH,
@@ -235,19 +236,21 @@ fn truncated(measure: &dyn Measure, text: &str, font: Font, width: f32) -> Strin
     "…".to_string()
 }
 
-/// 幅 width(内側の余白を含む)のカードの配置
+/// 幅 width(内側の余白を含む)のカードの配置．padding は左右，padding_y は上下の余白
 pub(super) fn place(
     content: &Content,
     width: f32,
+    padding: f32,
+    padding_y: f32,
     measure: &dyn Measure,
     theme: &ResolvedTheme,
 ) -> CardLayout {
     let rows = Rows { measure, theme };
-    let columns = Columns::new(width);
-    let right = width - meaning::PADDING;
+    let columns = Columns::new(width, padding);
+    let right = width - padding;
 
     // 見出し: 辞書のアイコン・語・品詞の札を，語の文字の箱の縦の真ん中にそろえる
-    let mut y = meaning::PADDING;
+    let mut y = padding_y;
     let header_height = rows
         .em(Font::MeaningHeadword)
         .max(meaning::PART_OF_SPEECH_HEIGHT)
@@ -370,9 +373,9 @@ pub(super) fn place(
     if !content.others.is_empty() {
         y += meaning::OTHERS_GAP;
         let separator = Frame::new(
-            meaning::PADDING,
+            padding,
             y.round(),
-            width - meaning::PADDING * 2.0,
+            width - padding * 2.0,
             candidate::FRAME_WIDTH,
         );
         y = separator.max_y() + meaning::OTHERS_GAP;
@@ -427,7 +430,7 @@ pub(super) fn place(
         }
         y += row_height;
     }
-    layout.height = (y + meaning::PADDING).ceil();
+    layout.height = (y + padding_y).ceil();
     layout
 }
 
@@ -544,7 +547,14 @@ mod tests {
                 };
                 (
                     name,
-                    place(&content, meaning::LIST_WIDTH, &Varied, &theme()),
+                    place(
+                        &content,
+                        meaning::LIST_WIDTH,
+                        meaning::PADDING,
+                        meaning::PADDING,
+                        &Varied,
+                        &theme(),
+                    ),
                 )
             })
             .collect()
@@ -761,7 +771,14 @@ mod tests {
             others_label: "同音語",
             more: &more,
         };
-        let layout = place(&content, meaning::LIST_WIDTH, &Varied, &theme());
+        let layout = place(
+            &content,
+            meaning::LIST_WIDTH,
+            meaning::PADDING,
+            meaning::PADDING,
+            &Varied,
+            &theme(),
+        );
         assert!(layout.headword.text.ends_with('…'));
         let chip = layout.part_of_speech.expect("品詞");
         assert!(chip.frame.max_x() <= layout.width - meaning::PADDING);

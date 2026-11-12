@@ -114,7 +114,7 @@ final class CandidateView: NSView {
 
     private func footerWidth(for panel: CandidatePanel) -> CGFloat {
         let footer = footerContent(for: panel)
-        return (hintsWidth(footer) + footer.position.size(withAttributes: [.font: labelFont]).width + rowPaddingX * 2 + Size.paddingX).rounded(.up)
+        return (hintsWidth(footer) + footer.position.size(withAttributes: [.font: labelFont]).width + rowPaddingX * 2 + Glass.hintGap).rounded(.up)
     }
 
     /// 区画の配置と，そこに出すカード．size は窓の大きさを外から決めるとき(描くときと押した位置を調べるときは今の大きさ)
@@ -351,7 +351,7 @@ final class CandidateView: NSView {
     private func hintsWidth(_ footer: Footer) -> CGFloat {
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         if let note = footer.note { return NoteDrawing.width(note, theme: theme) }
-        let extra = footer.associationHint.map { $0.size(withAttributes: attributes).width + Size.paddingX } ?? 0
+        let extra = footer.associationHint.map { $0.size(withAttributes: attributes).width + Glass.hintGap } ?? 0
         return GlassDrawing.hintsWidth(footer.hints, theme: theme) + extra
     }
 
@@ -371,7 +371,7 @@ final class CandidateView: NSView {
                 NoteDrawing.draw(note, x: left, midY: rect.midY, theme: theme)
             } else {
                 GlassDrawing.drawHints(footer.hints, x: left, midY: rect.midY, theme: theme)
-                if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Size.paddingX, in: rect) }
+                if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Glass.hintGap, in: rect) }
             }
             right(footer.position, muted)
             return
@@ -383,7 +383,7 @@ final class CandidateView: NSView {
             GlassDrawing.drawHints(footer.hints, x: rightEdge - hintsWidth, midY: rect.midY, theme: theme)
             if let hint = footer.associationHint {
                 let width = hint.size(withAttributes: muted).width
-                drawText(hint, attributes: muted, x: rightEdge - hintsWidth - Size.paddingX - width, in: rect)
+                drawText(hint, attributes: muted, x: rightEdge - hintsWidth - Glass.hintGap - width, in: rect)
             }
         }
     }

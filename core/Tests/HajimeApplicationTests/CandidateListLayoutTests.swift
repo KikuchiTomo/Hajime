@@ -72,9 +72,9 @@ struct CandidateListLayoutTests {
         let first = try #require(layout.rows.first)
         #expect(card.y == first.y)
         #expect(card.maxX == layout.footerSeparator.maxX)
-        // 一覧とのあいだは，角丸のテーマでは縁の内側の余白と同じ．platinum と desk は線 1 本
+        // 一覧とのあいだは，角丸のテーマではつなぐ線を引く幅．platinum と desk は線 1 本
         let between = card.x - first.maxX
-        #expect(between == (sample.style == .rounded ? sample.metrics.padding : sample.metrics.separatorWidth))
+        #expect(between == (sample.style == .rounded ? sample.metrics.cardGap : sample.metrics.separatorWidth))
         #expect(layout.content.maxX - card.maxX == 0)
         if sample.style == .bevel {
             let line = try #require(layout.cardSeparator)
@@ -126,6 +126,6 @@ struct CandidateListLayoutTests {
         #expect(wide.width <= 720)
         let card = try #require(wide.card)
         #expect(card.maxX == wide.footerSeparator.maxX)
-        #expect(card.x - (wide.rows.first?.maxX ?? 0) == Self.rounded.padding)
+        #expect(card.x - (wide.rows.first?.maxX ?? 0) == Self.rounded.cardGap)
     }
 }

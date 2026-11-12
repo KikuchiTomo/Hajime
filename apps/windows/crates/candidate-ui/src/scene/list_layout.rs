@@ -43,6 +43,8 @@ pub(super) struct Metrics {
     pub padding: f32,
     /// 区切りの線の上と下の空き
     pub separator_gap: f32,
+    /// 候補の右のカードと一覧のあいだ(角丸のテーマ)
+    pub card_gap: f32,
     pub separator_width: f32,
     /// 候補の行の間隔(行の地の高さと，行と行のあいだの和)
     pub row_pitch: f32,
@@ -63,6 +65,7 @@ impl Metrics {
             edge: candidate::FRAME_WIDTH,
             padding: glass::WINDOW_PADDING,
             separator_gap: glass::SEPARATOR_GAP,
+            card_gap: tokens::size::meaning::CARD_GAP,
             separator_width: candidate::FRAME_WIDTH,
             row_pitch,
             row_inset: glass::SELECTION_INSET_Y,
@@ -78,6 +81,7 @@ impl Metrics {
             edge: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH,
             padding: 0.0,
             separator_gap: 0.0,
+            card_gap: 0.0,
             separator_width: candidate::FRAME_WIDTH,
             row_pitch,
             row_inset: 0.0,
@@ -141,7 +145,7 @@ pub(super) fn place(
     let line = metrics.separator_width;
     // 候補の右のカードと一覧のあいだ: 角丸は空き，platinum と desk は縦の線
     let side_gap = match style {
-        Style::Rounded => gap,
+        Style::Rounded => metrics.card_gap,
         Style::Bevel => line,
     };
     let content_width = match card {
@@ -422,7 +426,7 @@ mod tests {
             assert_eq!(card.y, first.y, "{name}");
             assert_eq!(card.max_x(), layout.footer_separator.max_x(), "{name}");
             let expected = match style {
-                Style::Rounded => metrics.padding,
+                Style::Rounded => metrics.card_gap,
                 Style::Bevel => metrics.separator_width,
             };
             assert_eq!(card.x - first.max_x(), expected, "{name}");
@@ -499,6 +503,6 @@ mod tests {
         assert!(layout.width <= 720.0);
         let card = layout.card.expect("カード");
         assert_eq!(card.max_x(), layout.footer_separator.max_x());
-        assert_eq!(card.x - layout.rows[0].max_x(), metrics.padding);
+        assert_eq!(card.x - layout.rows[0].max_x(), metrics.card_gap);
     }
 }

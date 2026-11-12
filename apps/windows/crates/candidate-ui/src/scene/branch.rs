@@ -241,7 +241,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
     // 候補の右に出すカードは，候補の枝の先に続けて置く(枝の一部として幅に数える)
     let side = has_side_card(map, reserved);
     let card_extent = if side {
-        GAP + card_size::BRANCH_WIDTH
+        meaning::card_gap(painter.card_style) + card_size::BRANCH_WIDTH
     } else {
         0.0
     };
@@ -252,8 +252,10 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
     let lower_rows = column
         .map_or(0, |column| column.alternatives.len())
         .max(preview_rows);
-    let footer =
-        footer_width(map, painter) + painter.width(&position(map), Font::Label) + padding * 3.0;
+    let footer = footer_width(map, painter)
+        + painter.width(&position(map), Font::Label)
+        + padding * 2.0
+        + glass::HINT_GAP;
     // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す．候補の下のカードは窓の幅をカードの幅まで広げる
     let below = map.meaning_placement == Some(MeaningPlacement::Below)
         && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
@@ -298,7 +300,9 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         if side {
             // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端
             // 枝の行の右の端(branches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
-            let x = (trunk_x[index] + metrics.stem_x).round() - metrics.stem_x + branch_width + GAP;
+            let x = (trunk_x[index] + metrics.stem_x).round() - metrics.stem_x
+                + branch_width
+                + meaning::card_gap(painter.card_style);
             let card_width = (content_right - x).max(card_size::BRANCH_WIDTH).floor();
             slot = meaning_slot(map, painter, reserved, card_width);
             if let Some(slot) = &slot {
@@ -349,7 +353,7 @@ fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
             || painter.width(hint, Font::Label),
             |key_hint| painter.hints_width(&[key_hint]),
         );
-        width + candidate::PADDING_X
+        width + glass::HINT_GAP
     });
     painter.hints_width(&map.hints) + source + association
 }
@@ -499,7 +503,10 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                         (node.x + metrics.stem_x).round() - metrics.stem_x + layout.branch_width,
                         (row_y + metrics.row_height / 2.0).round(),
                     );
-                    let end = Point::new(card.x, content.header_mid_y(card));
+                    let end = Point::new(
+                        meaning::connector_end_x(painter.card_style, card.x),
+                        content.header_mid_y(card),
+                    );
                     meaning::connector(&mut painter, start, end);
                 }
                 meaning::draw(
@@ -979,7 +986,7 @@ fn footer(painter: &mut Painter, map: &BranchMap, y: f32, width: f32, metrics: &
     painter.hints(&map.hints, footer.x, footer.mid_y());
     if let Some(hint) = map.association_hint.as_deref() {
         // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く
-        let x = footer.x + painter.hints_width(&map.hints) + candidate::PADDING_X;
+        let x = footer.x + painter.hints_width(&map.hints) + glass::HINT_GAP;
         match association_key_hint(map) {
             Some(key_hint) => painter.hints(&[key_hint], x, footer.mid_y()),
             None => painter.text(hint, Font::Label, theme.text_muted, x, footer),

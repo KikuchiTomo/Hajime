@@ -6,7 +6,7 @@
 use super::list_layout::{self, ListLayout, Style};
 use super::meaning::{self, CardFrame};
 use super::paint::{Painter, TagStyle};
-use super::{Frame, Look, Measure, Point, Scene};
+use super::{CardStyle, Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
 use ipc::{CandidateFocus, CandidateList, KeyHint, MeaningPlacement};
@@ -103,7 +103,10 @@ fn footer(list: &CandidateList) -> Footer {
 }
 
 pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) -> Scene {
-    let metrics = Metrics::new(look, measure);
+    let mut metrics = Metrics::new(look, measure);
+    if metrics.style == Style::Rounded {
+        metrics.layout.card_gap = meaning::card_gap(look.card_style);
+    }
     let mut painter = Painter::new(look, measure);
     let padding = candidate::PADDING_X;
     let footer = footer(list);
@@ -119,11 +122,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         })
         .flatten();
     let side_extent = side.as_ref().map_or(0.0, |slot| {
-        metrics
-            .layout
-            .separator_gap
-            .max(metrics.layout.separator_width)
-            + slot.width
+        metrics.layout.card_gap.max(metrics.layout.separator_width) + slot.width
     });
     let outer = (metrics.layout.edge + metrics.layout.padding) * 2.0 + metrics.layout.shadow;
 
@@ -183,15 +182,14 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         Some(note) => painter.note_width(note),
         None => painter.hints_width(&footer.hints),
     };
-    let association_hint = footer
-        .association_hint
-        .as_deref()
-        .map_or(0.0, |hint| painter.width(hint, Font::Label) + padding);
+    let association_hint = footer.association_hint.as_deref().map_or(0.0, |hint| {
+        painter.width(hint, Font::Label) + glass::HINT_GAP
+    });
     let footer_width = (hints_width
         + association_hint
         + painter.width(&footer.position, Font::Label)
         + metrics.row_padding_x * 2.0
-        + padding)
+        + glass::HINT_GAP)
         .ceil();
     let heading_width = list.association.as_ref().map_or(0.0, |heading| {
         super::association::width(&painter, heading) - padding * 2.0 + metrics.row_padding_x * 2.0
@@ -417,6 +415,20 @@ fn draw_list(
             CardFrame::Pane
         };
         meaning::draw(painter, slot.card.as_ref(), card, pointer_y, frame);
+        // つなぐ線で示す案は，選んでいる候補の行の右の端から，カードの見出しへ線を引く
+        if let (MeaningPlacement::Side, Some(row_y), Some(content)) =
+            (slot.placement, selected_mid_y, slot.card.as_ref())
+        {
+            if painter.card_style != CardStyle::Filled {
+                let row_right = layout.rows[0].max_x();
+                let start = Point::new(row_right, row_y.round());
+                let end = Point::new(
+                    meaning::connector_end_x(painter.card_style, card.x),
+                    content.header_mid_y(card),
+                );
+                meaning::connector(painter, start, end);
+            }
+        }
     }
     painter.rect(layout.footer_separator, theme.line);
     footer_section(painter, footer, layout.footer, metrics.row_padding_x);
@@ -481,7 +493,7 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame, inset:
                 painter.hints(&footer.hints, left, section.mid_y());
                 if let Some(hint) = &footer.association_hint {
                     // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)
-                    let x = left + painter.hints_width(&footer.hints) + candidate::PADDING_X;
+                    let x = left + painter.hints_width(&footer.hints) + glass::HINT_GAP;
                     painter.text(hint, Font::Label, theme.text_muted, x, section);
                 }
             }
@@ -511,7 +523,7 @@ fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame, inset:
             let width = painter.hints_width(&footer.hints);
             painter.hints(&footer.hints, right - width, section.mid_y());
             if let Some(hint) = &footer.association_hint {
-                let end = right - width - candidate::PADDING_X;
+                let end = right - width - glass::HINT_GAP;
                 painter.text_right(hint, Font::Label, theme.text_muted, end, section);
             }
         }

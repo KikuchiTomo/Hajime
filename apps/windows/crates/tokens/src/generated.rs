@@ -350,7 +350,7 @@ pub mod size {
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
         pub const SELECTION_INSET_Y: f32 = 2.0;
         pub const CURVE_START_OVERLAP: f32 = 2.0;
-        pub const CURVE_END_GAP: f32 = 3.0;
+        pub const CURVE_END_GAP: f32 = 4.0;
         pub const CURVE_BEND: f32 = 0.35;
         pub const DOT_PITCH: f32 = 5.0;
         pub const KEYCAP_PART_GAP: f32 = 2.0;
@@ -367,6 +367,7 @@ pub mod size {
     }
     pub mod meaning {
         pub const PADDING: f32 = 12.0;
+        pub const CARD_GAP: f32 = 16.0;
         pub const MARKER_WIDTH: f32 = 16.0;
         pub const MARKER_GAP: f32 = 8.0;
         pub const HEADER_GAP: f32 = 8.0;

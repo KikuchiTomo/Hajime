@@ -116,7 +116,7 @@ public enum LayoutTokens {
         public static let modeIndicatorFontSize: Double = 17
         public static let selectionInsetY: Double = 2
         public static let curveStartOverlap: Double = 2
-        public static let curveEndGap: Double = 3
+        public static let curveEndGap: Double = 4
         public static let curveBend: Double = 0.35
         public static let dotPitch: Double = 5
         public static let keycapPartGap: Double = 2
@@ -133,6 +133,7 @@ public enum LayoutTokens {
     }
     public enum Meaning {
         public static let padding: Double = 12
+        public static let cardGap: Double = 16
         public static let markerWidth: Double = 16
         public static let markerGap: Double = 8
         public static let headerGap: Double = 8
