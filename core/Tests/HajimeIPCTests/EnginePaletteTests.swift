@@ -42,7 +42,7 @@ struct EnginePaletteTests {
             makeSession: { InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: settings, keyNames: .windows, palette: palette) },
             settings: settings,
             ui: { sent.value.append($0) },
-            openSettings: {}
+            openSettings: { _ in }
         )
     }
 
@@ -237,7 +237,7 @@ struct EnginePaletteTests {
     func unavailable() throws {
         let plainService = EngineService(
             makeSession: { [settings] in InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: settings) },
-            settings: settings, ui: { _ in }, openSettings: {})
+            settings: settings, ui: { _ in }, openSettings: { _ in })
         let id = plainService.connect()
         _ = plainService.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)
         guard case .sessionOpened(let session, _) = plainService.handle(WireRequest(id: 2, body: .openSession), from: id).body else {
@@ -263,7 +263,7 @@ struct EnginePaletteHistoryTests {
         let settings = FakeSettings(DefaultSettings.settings)
         let service = EngineService(
             makeSession: { InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: settings) },
-            settings: settings, ui: { _ in }, openSettings: {},
+            settings: settings, ui: { _ in }, openSettings: { _ in },
             services: SettingsServices(resetPaletteHistory: { cleared += 1 }))
         let id = service.connect(isSettingsApp: true)
         _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)

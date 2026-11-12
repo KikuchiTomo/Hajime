@@ -18,6 +18,13 @@ public enum ClientAction: Sendable, Equatable {
     case selectInputStyle(InputStyle)
     /// 設定の画面を開く(キーで開くとき)
     case openSettings
+    /// 単語の登録を始める(設定のユーザー辞書の画面を開き，語と読みを入力欄に入れる)．
+    /// word が nil なら，アプリ側が入力先で選んでいる文字を語にする(入力先を読めるのはアプリ側)．読みが分からなければ reading は nil
+    case openWordRegistration(word: String?, reading: String?)
+    /// 設定のユーザー辞書の画面を開く
+    case openUserDictionary
+    /// 入力メニューを入力位置に出す
+    case openMenu
     /// ライブ変換を切り替える(設定に保存する)
     case toggleLiveConversion
     /// 手書きで文字を探す窓を出す(R-14)．選んだ文字は commit と同じく入力先に入れる

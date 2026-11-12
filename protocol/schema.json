@@ -201,6 +201,14 @@
         {
           "name": "canReplacePrecedingText",
           "type": "bool?"
+        },
+        {
+          "name": "canShowMenu",
+          "type": "bool?"
+        },
+        {
+          "name": "canRequestWordRegistration",
+          "type": "bool?"
         }
       ]
     },
@@ -310,6 +318,18 @@
               "type": "u32"
             }
           ]
+        },
+        {
+          "name": "requestWordRegistration",
+          "fields": [
+            {
+              "name": "maximumLength",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "showMenu"
         }
       ]
     },
@@ -372,6 +392,9 @@
         },
         {
           "name": "openSettings"
+        },
+        {
+          "name": "openUserDictionary"
         }
       ]
     },
@@ -1320,6 +1343,22 @@
               "type": "[DictionaryEntry]"
             }
           ]
+        },
+        {
+          "name": "openWordRegistration",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "reading",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "takeWordRegistration"
         }
       ]
     },
@@ -1555,6 +1594,19 @@
             {
               "name": "code",
               "type": "ErrorCode"
+            }
+          ]
+        },
+        {
+          "name": "wordRegistration",
+          "fields": [
+            {
+              "name": "word",
+              "type": "string?"
+            },
+            {
+              "name": "reading",
+              "type": "string?"
             }
           ]
         }

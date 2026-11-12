@@ -76,7 +76,7 @@ struct SettingsFileRequestTests {
         let converter = FakeConverter([:])
         service = EngineService(
             makeSession: { InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings) },
-            settings: settings, ui: { _ in }, openSettings: {}, sync: sync, files: files
+            settings: settings, ui: { _ in }, openSettings: { _ in }, sync: sync, files: files
         )
     }
 

@@ -302,6 +302,9 @@ enum UIStrings {
             case .emojiPalette: "絵文字のパレット"
             case .symbolPalette: "記号のパレット"
             case .kaomojiPalette: "顔文字のパレット"
+            case .registerWord: "単語の登録"
+            case .openUserDictionary: "ユーザー辞書を開く"
+            case .openMenu: "入力メニューを開く"
             }
         }
 
@@ -337,12 +340,14 @@ enum UIStrings {
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
             case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
+            case .registerWord: "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"
+            case .openMenu: "入力メニューの項目を入力位置に表示します"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
                  .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
                  .previousCandidatePage, .firstCandidate, .lastCandidate, .nextSegment, .previousSegment, .firstSegment, .lastSegment,
-                 .extendSegment, .shrinkSegment, .commit, .openSettings, .toggleLiveConversion: nil
+                 .extendSegment, .shrinkSegment, .commit, .openSettings, .toggleLiveConversion, .openUserDictionary: nil
             }
         }
 

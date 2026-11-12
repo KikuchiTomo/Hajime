@@ -144,6 +144,12 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case symbolPalette
     /// 顔文字のパレットを開く．開いているときは閉じる
     case kaomojiPalette
+    /// 単語を登録する(設定のユーザー辞書の画面を開き，入力中の語か入力先で選んでいる語を単語の欄に入れる)
+    case registerWord
+    /// 設定のユーザー辞書の画面を開く
+    case openUserDictionary
+    /// 入力メニュー(macOS のメニューバー・Windows のタスクバーの入力メニューと同じ項目)を入力位置に出す
+    case openMenu
 
     /// 設定の画面でコマンドを並べるまとまり
     public enum Group: String, Sendable, CaseIterable {
@@ -171,7 +177,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction, .undoCommit: .commit
         case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
-        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette: .tools
+        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette, .registerWord, .openUserDictionary,
+             .openMenu: .tools
         }
     }
 
@@ -181,7 +188,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
         // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
-             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette:
+             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette, .registerWord, .openUserDictionary,
+             .openMenu:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]

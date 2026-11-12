@@ -21,7 +21,7 @@ struct NamedPipeTests {
         let converter = FakeConverter(["かな": [("仮名", nil)]])
         return EngineService(
             makeSession: { InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings) },
-            settings: settings, ui: { _ in }, openSettings: {}
+            settings: settings, ui: { _ in }, openSettings: { _ in }
         )
     }
 
