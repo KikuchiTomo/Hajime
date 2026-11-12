@@ -141,6 +141,48 @@ public struct PalettePanel: Sendable, Equatable {
         }
     }
 
+    /// 前に出した内容からの動き．描く側はこれを見て，選択やタブの印を滑らせ，マス目の中身を入れ替える動きを付ける．
+    /// 何が動いたかは core が決め，動きを付けるかどうか(OS の「視差効果を減らす」「アニメーション効果」)と動きの速さは描く側が決める
+    public struct Motion: Sendable, Equatable {
+        /// マス目の中身の入れ替わり方
+        public enum Content: String, Sendable, Equatable, CaseIterable {
+            /// 種類を後ろ(右の切り替え)へ移した．中身を左へ送る
+            case next
+            /// 種類を前(左の切り替え)へ移した．中身を右へ送る
+            case previous
+            /// 下のまとまりへ飛んだ．中身を上へ送る
+            case down
+            /// 上のまとまりへ飛んだ．中身を下へ送る
+            case up
+        }
+
+        /// 選択が動いてきた元のマス．マス目の中身とスクロールの位置が前と同じときだけ(選択の枠を滑らせる)
+        public var selectionFrom: Position?
+        /// 前に選んでいた種類(種類の切り替えの印を滑らせる)
+        public var modeFrom: PaletteItem.Kind?
+        /// 前に選んでいたまとまり．タブの並びが前と同じときだけ(タブの印を滑らせる)
+        public var tabFrom: PaletteSection.Kind?
+        /// マス目の中身が入れ替わった
+        public var content: Content?
+        /// 肌の色の帯を開いた
+        public var opensPicker: Bool
+        /// 選んでいる文字のピン留めを切り替えた
+        public var togglesPin: Bool
+
+        public init(selectionFrom: Position? = nil, modeFrom: PaletteItem.Kind? = nil, tabFrom: PaletteSection.Kind? = nil, content: Content? = nil,
+                    opensPicker: Bool = false, togglesPin: Bool = false) {
+            self.selectionFrom = selectionFrom
+            self.modeFrom = modeFrom
+            self.tabFrom = tabFrom
+            self.content = content
+            self.opensPicker = opensPicker
+            self.togglesPin = togglesPin
+        }
+
+        /// 動くものが無い
+        public var isEmpty: Bool { self == Motion() }
+    }
+
     /// 足元に出すキーの案内
     public struct Hint: Sendable, Equatable {
         public var key: String
@@ -182,10 +224,13 @@ public struct PalettePanel: Sendable, Equatable {
     /// 文字が無いときの知らせ(「見つかりません」「読み込んでいます」)
     public var message: String?
     public var hints: [Hint]
+    /// 前に出した内容からの動き
+    public var motion: Motion
 
     public init(modes: [Mode], query: String, placeholder: String, tabs: [Tab], heading: String, rows: [Row], rowCount: Int, firstRow: Int,
                 columns: Int, visibleRows: Int, cellsPerRow: Int? = nil, selection: Position?, preview: Preview?, showsPreview: Bool,
-                previewFields: PreviewFields = PreviewFields(), skinTone: SkinTone, skinTonePicker: SkinTonePicker?, message: String?, hints: [Hint]) {
+                previewFields: PreviewFields = PreviewFields(), skinTone: SkinTone, skinTonePicker: SkinTonePicker?, message: String?, hints: [Hint],
+                motion: Motion = Motion()) {
         self.modes = modes
         self.query = query
         self.placeholder = placeholder
@@ -205,6 +250,7 @@ public struct PalettePanel: Sendable, Equatable {
         self.skinTonePicker = skinTonePicker
         self.message = message
         self.hints = hints
+        self.motion = motion
     }
 }
 

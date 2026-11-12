@@ -373,6 +373,49 @@ struct PaletteScenarioTests {
         #expect(harness.palette?.tabs.map(\.title).contains("ピン留め") == false)
     }
 
+    @Test("R-26: 選択を動かすと元のマスを添え，種類を切り替えると印と中身を送る動きを添える")
+    func motion() throws {
+        let harness = harness()
+        openEmoji(harness)
+        #expect(harness.palette?.motion.isEmpty == true)
+        harness.press(.right)
+        #expect(harness.palette?.motion == PalettePanel.Motion(selectionFrom: PalettePanel.Position(row: 0, column: 0)))
+        harness.click(.hover(PalettePanel.Position(row: 2, column: 0)))
+        let hovered = try #require(harness.palette?.motion)
+        #expect(hovered.selectionFrom == PalettePanel.Position(row: 0, column: 1))
+        // 選んでいるまとまりが変わったので，タブの印も滑らせる
+        #expect(hovered.tabFrom == .category(.smileys))
+        // 種類を後ろへ切り替えたら中身を左へ送り，前へ戻したら右へ送る．選択の枠は滑らせない
+        harness.press(.tab, .control)
+        #expect(harness.palette?.motion == PalettePanel.Motion(modeFrom: .emoji, content: .next))
+        harness.click(.mode(.emoji))
+        #expect(harness.palette?.motion == PalettePanel.Motion(modeFrom: .symbol, content: .previous))
+        // 探す語を打ったときは中身を送らない(打つたびに動かさない)
+        harness.type("e")
+        #expect(harness.palette?.motion.content == nil)
+        #expect(harness.palette?.motion.selectionFrom == nil)
+    }
+
+    @Test("R-26: まとまりへ飛んだら中身を送り，1 行のスクロールでは送らない．肌の色の帯とピン留めにも動きを添える")
+    func motionJumpPickerAndPin() {
+        let harness = harness { $0.paletteRows = 1 }
+        openEmoji(harness)
+        harness.press(.down)
+        // 1 行のスクロールでは送らず，選択の枠も滑らせない(スクロールの位置が変わったため)
+        #expect(harness.palette?.motion.content == nil)
+        #expect(harness.palette?.motion.selectionFrom == nil)
+        harness.press(.up)
+        harness.press(.tab)
+        #expect(harness.palette?.firstRow == 2)
+        #expect(harness.palette?.motion.content == .down)
+        #expect(harness.palette?.motion.tabFrom == .category(.smileys))
+        harness.press(.enter, .option)
+        #expect(harness.palette?.motion.opensPicker == true)
+        harness.press(.escape)
+        harness.press(.character("d"), .control)
+        #expect(harness.palette?.motion.togglesPin == true)
+    }
+
     @Test("R-26: 探しているときは，今見ている種類の文字を先に出す")
     func searchPrefersKind() {
         let harness = harness()
@@ -468,8 +511,13 @@ struct PaletteScenarioTests {
         harness.press(.character("d"), .control)
         #expect(usage.usage.pinned == ["😃"])
         #expect(harness.palette?.tabs.first?.title == "ピン留め")
-        #expect(texts(harness.palette).first == ["😃"])
+        // 選んでいる文字はそのまま，マス目も画面の同じ位置に残す(ピン留めの行は上に足し，スクロールの位置をずらす)
+        #expect(harness.palette?.preview?.text == "😃")
         #expect(harness.palette?.preview?.isPinned == true)
+        #expect(harness.palette?.firstRow == 1)
+        #expect(texts(harness.palette).first == ["😀", "😃", "😄", "😁", "😆", "😅"])
+        harness.press(.home)
+        #expect(texts(harness.palette).first == ["😃"])
         harness.press(.character("d"), .control)
         #expect(usage.usage.pinned.isEmpty)
     }
