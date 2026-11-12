@@ -630,6 +630,7 @@ pub mod rule_list {
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
     pub const NO_MATCHES: &str = "一致する項目はありません";
+    pub const EDIT: &str = "編集";
 }
 
 /// UIStrings.Terms

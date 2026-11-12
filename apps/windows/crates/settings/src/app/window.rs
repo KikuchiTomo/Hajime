@@ -38,9 +38,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_ACTIVATE, WM_ACTIVATEAPP, WM_APP, WM_CANCELMODE, WM_CAPTURECHANGED, WM_COMMAND,
     WM_CTLCOLOREDIT, WM_CTLCOLORSTATIC, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND, WM_GETMINMAXINFO,
     WM_GETOBJECT, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
-    WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCHITTEST, WM_PAINT, WM_SETTINGCHANGE,
-    WM_SIZE, WM_SYSCOLORCHANGE, WM_SYSKEYDOWN, WM_THEMECHANGED, WM_TIMER, WS_CLIPCHILDREN,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP,
+    WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCHITTEST, WM_PAINT, WM_RBUTTONUP,
+    WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOLORCHANGE, WM_SYSKEYDOWN, WM_THEMECHANGED, WM_TIMER,
+    WS_CLIPCHILDREN, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW,
+    WS_POPUP,
 };
 use windows_core::{w, PCWSTR};
 
@@ -1202,6 +1203,27 @@ impl App {
         ffi::invalidate(self.window);
     }
 
+    /// 右クリック．表の行ならその行を選んでメニューを出す
+    fn right_click(&mut self, lparam: LPARAM) {
+        let (x, y) = self.point(lparam);
+        let now = self.now();
+        self.close_flyout();
+        let Some(Target::Page(element)) = self.target_at(x, y) else {
+            return;
+        };
+        if element.part != Part::Table {
+            return;
+        }
+        let page_y = y + self.scroll.offset(now);
+        let Some(position) = self.view.table_position(element.row, page_y, now) else {
+            return;
+        };
+        if self.view.table_menu(element.row, position) {
+            self.open_row_menu(element.row, x, y);
+        }
+        ffi::invalidate(self.window);
+    }
+
     /// ポインターを押した．double は 2 回続けて押したとき(表の行を書き換える)
     fn mouse_down(&mut self, lparam: LPARAM, double: bool) {
         let (x, y) = self.point(lparam);
@@ -1756,18 +1778,41 @@ impl App {
     // MARK: - ドロップダウン
 
     fn open_flyout(&mut self, element: Element) {
-        let (items, selected) = self.view.dropdown_items(element);
-        if items.is_empty() {
-            return;
-        }
         let Some(rect) = self.view.rect(element) else {
             return;
         };
         let now = self.now();
         let (width, _) = self.size();
         // ページの中の位置を窓の中の位置にする
-        let left = nav_width(width) + rect.x;
-        let top = rect.y - self.scroll.offset(now);
+        let anchor = Rect::new(
+            nav_width(width) + rect.x,
+            rect.y - self.scroll.offset(now),
+            rect.width,
+            rect.height,
+        );
+        self.open_flyout_at(element, anchor);
+    }
+
+    /// 表の行のメニューを (x, y)(窓の中の DIP)に出す(macOS の表の contextMenu)
+    fn open_row_menu(&mut self, row: usize, x: f32, y: f32) {
+        let element = Element {
+            row,
+            part: Part::RowMenu,
+        };
+        // メニューの幅は WinUI の MenuFlyout と同じく，項目が短くても最小の幅を取る
+        self.open_flyout_at(element, Rect::new(x, y, size::SEGMENT_MIN_WIDTH, 0.0));
+    }
+
+    /// anchor(窓の中の DIP)の下に一覧を出す．下に収まらなければ上に出す
+    fn open_flyout_at(&mut self, element: Element, anchor: Rect) {
+        let (items, selected) = self.view.dropdown_items(element);
+        if items.is_empty() {
+            return;
+        }
+        let now = self.now();
+        let rect = anchor;
+        let left = anchor.x;
+        let top = anchor.y;
         let padding = size::FLYOUT_PADDING;
         let item = size::FLYOUT_ITEM_HEIGHT;
         let widest = items
@@ -1844,8 +1889,14 @@ impl App {
         };
         let element = flyout.element;
         self.close_flyout();
-        let event = self.view.choose(element, index);
+        let event = if element.part == Part::RowMenu {
+            let now = self.now();
+            self.view.choose_row_menu(element.row, index, now)
+        } else {
+            self.view.choose(element, index)
+        };
         self.dispatch(event);
+        ffi::invalidate(self.window);
     }
 
     fn flyout_key(&mut self, key: u16) -> bool {
@@ -2589,6 +2640,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         WM_LBUTTONUP => {
             with_app(|app| app.mouse_up(lparam));
+            Some(LRESULT(0))
+        }
+        // 表の行を右クリックしたらメニューを出す(macOS の表の contextMenu)
+        WM_RBUTTONUP => {
+            with_app(|app| app.right_click(lparam));
             Some(LRESULT(0))
         }
         WM_CAPTURECHANGED | WM_CANCELMODE => {
