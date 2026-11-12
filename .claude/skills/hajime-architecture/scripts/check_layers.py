@@ -23,16 +23,18 @@ ALLOWED: dict[str, set[str]] = {
         "KanaKanjiConverterModule",
         "KanaKanjiConverterModuleWithDefaultDictionary",
         "SwiftUtils",
-        # Zenzai のモデルのハッシュを確かめるため(OS の標準のライブラリ)
+        # Zenzai のモデルと同梱の辞書のハッシュを確かめるため(OS の標準のライブラリ)．Windows は CNG を呼ぶ C の口
         "CryptoKit",
+        "CWindowsHash",
     },
     # Vision と CoreGraphics は手書きの認識(端末の中だけ．VisionHandwritingRecognizer)に使う
     # CryptoKit は同期のフォルダと運ぶ辞書の索引の SHA-256 を求めるのに使う(DictionaryFileSync)
     # CWindowsSpellCheck は Windows のスペルチェッカーを呼ぶ C の口(英単語の辞書．WindowsSpellCheckerLexicon)
     "HajimePersistence": {"Foundation", "HajimeDomain", "HajimeApplication", "CoreGraphics", "Vision", "CryptoKit", "WinSDK", "CWindowsSpellCheck"},
     "HajimeIPC": {"Foundation", "HajimeDomain", "HajimeApplication", "WinSDK", "Glibc", "Darwin"},
-    # C の口(Swift を持たない)．Windows のスペルチェッカーを呼ぶだけで，このリポジトリのモジュールを使わない
+    # C の口(Swift を持たない)．Windows のスペルチェッカーと CNG を呼ぶだけで，このリポジトリのモジュールを使わない
     "CWindowsSpellCheck": set(),
+    "CWindowsHash": set(),
     "hajime-playground": {"Foundation", "HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimePersistence"},
     "hajime-engine-host": {
         "Foundation",

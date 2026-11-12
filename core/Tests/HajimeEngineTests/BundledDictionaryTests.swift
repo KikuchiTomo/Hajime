@@ -59,6 +59,21 @@ struct BundledDictionaryTests {
         }
     }
 
+    @Test("合わないファイルがいくつもあれば，一覧の順で最初のファイルの理由で使わない(並べて確かめても理由が変わらない)")
+    func firstFailureInManifestOrder() throws {
+        let bad = String(repeating: "0", count: 64)
+        let lines = (0..<200).map { "\(bad)  louds/f\($0).louds" }.joined(separator: "\n")
+        let (directory, manifestSHA256) = try makeDictionary(manifest: "\(abcSHA256)  louds/charID.chid\n\(abcSHA256)  louds/none.louds\n\(lines)\n")
+        for index in 0..<200 {
+            try Data("x".utf8).write(to: directory.appendingPathComponent("louds/f\(index).louds"))
+        }
+        for _ in 0..<5 {
+            #expect(throws: BundledDictionary.VerificationError.fileNotFound) {
+                try BundledDictionary.verified(at: directory, expectedManifestSHA256: manifestSHA256)
+            }
+        }
+    }
+
     @Test("エンジンが読むのに要るファイルが一覧に無ければ使わない")
     func requiredFileMissing() throws {
         let (directory, manifestSHA256) = try makeDictionary(manifest: "")
