@@ -175,6 +175,7 @@ pub struct SettingsPalette {
     pub switch_off: Rgb,
     pub text: Rgb,
     pub text_disabled: Rgb,
+    pub text_placeholder: Rgb,
     pub text_secondary: Rgb,
 }
 
@@ -205,6 +206,7 @@ pub mod settings_windows {
         switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
         text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
         text_disabled: Rgb { red: 0xA0, green: 0xA0, blue: 0xA0 },
+        text_placeholder: Rgb { red: 0x5F, green: 0x5F, blue: 0x5F },
         text_secondary: Rgb { red: 0x5F, green: 0x5F, blue: 0x5F },
     };
     pub const DARK: SettingsPalette = SettingsPalette {
@@ -231,6 +233,7 @@ pub mod settings_windows {
         switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         text_disabled: Rgb { red: 0x78, green: 0x78, blue: 0x78 },
+        text_placeholder: Rgb { red: 0x9D, green: 0x9D, blue: 0x9D },
         text_secondary: Rgb { red: 0xCF, green: 0xCF, blue: 0xCF },
     };
 }
