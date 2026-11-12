@@ -347,7 +347,7 @@ fn write_draw(out: &mut String, draw: &Draw, theme: &ResolvedTheme, font_size: f
 #[cfg(test)]
 mod tests {
     use super::super::testing::theme;
-    use super::super::{branch_map, candidate_list, mode, note, prediction, CardReservation, Look};
+    use super::super::{branch_map, candidate_list, mode, note, prediction, Look};
     use super::*;
     use ipc::{
         BranchColumn, BranchMap, CandidateEntry, CandidateFocus, CandidateList, HomophoneNote,
@@ -489,30 +489,17 @@ mod tests {
                 meaning_placement: Some(MeaningPlacement::Below),
                 ..branch()
             };
-            // 意味のある候補から意味の無い候補に移ったところ(場所を空けたまま)
-            let mut reservation = CardReservation::default();
-            reservation.list(&list(), &look, &measure);
+            // 意味の無い候補を選んだところ(吹き出しを出さず，窓の大きさは変えない)
             let empty = CandidateList {
                 homophone: None,
                 meaning_placement: None,
                 selected_entry: Some(1),
                 ..list()
             };
-            let empty_look = Look {
-                reserved_card: reservation.list(&empty, &look, &measure),
-                ..look
-            };
-            // 分岐図でも，意味のある枝から意味の無い枝に移ったところ
-            let mut branch_reservation = CardReservation::default();
-            branch_reservation.branch(&branch(), &look, &measure);
             let mut empty_branch = branch();
             empty_branch.columns[1].homophone = None;
             empty_branch.columns[1].selected_alternative = Some(2);
             empty_branch.meaning_placement = None;
-            let empty_branch_look = Look {
-                reserved_card: branch_reservation.branch(&empty_branch, &look, &measure),
-                ..look
-            };
             // 候補を表に広げた一覧(1 列 9 個．2 列目を選んでいる)
             let grid = CandidateList {
                 entries: (1..=20)
@@ -534,20 +521,71 @@ mod tests {
                 total: 20,
                 ..list()
             };
+            let list_scene = candidate_list(&list(), &look, &measure);
+            let branch_scene = branch_map(&branch(), &look, &measure);
+            let shown_list = super::super::bubble::for_list(&list(), &list_scene)
+                .map(|(note, others, row)| (note.clone(), others, row));
+            let shown_branch = super::super::bubble::for_branch(&branch(), &branch_scene)
+                .map(|(note, others, row)| (note.clone(), others, row));
             let scenes = [
-                ("list", candidate_list(&list(), &look, &measure)),
-                ("list-below", candidate_list(&below_list, &look, &measure)),
-                ("list-empty", candidate_list(&empty, &empty_look, &measure)),
-                ("list-grid", candidate_list(&grid, &look, &measure)),
-                ("branch", branch_map(&branch(), &look, &measure)),
-                ("branch-below", branch_map(&below_branch, &look, &measure)),
+                ("list", list_scene.clone(), shown_list),
+                (
+                    "list-below",
+                    candidate_list(&below_list, &look, &measure),
+                    None,
+                ),
+                ("list-empty", candidate_list(&empty, &look, &measure), None),
+                ("list-grid", candidate_list(&grid, &look, &measure), None),
+                ("branch", branch_scene.clone(), shown_branch),
+                (
+                    "branch-below",
+                    branch_map(&below_branch, &look, &measure),
+                    None,
+                ),
                 (
                     "branch-empty",
-                    branch_map(&empty_branch, &empty_branch_look, &measure),
+                    branch_map(&empty_branch, &look, &measure),
+                    None,
                 ),
             ];
-            for (kind, drawn) in scenes {
-                let svg = scene(&drawn, &theme, font_size, background, 16.0);
+            for (kind, drawn, shown) in scenes {
+                let svg = match shown {
+                    // 吹き出しは画面が十分に広いとみなして候補の窓の右に置く
+                    Some((note, others, row)) => {
+                        let margin = 16.0;
+                        let shown = super::super::bubble::bubble(&note, others, &look, &measure);
+                        let placement = super::super::bubble::place(
+                            drawn.body.offset(margin, margin),
+                            margin + row.mid_y(),
+                            (shown.width, shown.height),
+                            shown.preferred_pointer,
+                            Frame::new(-1000.0, -1000.0, 4000.0, 4000.0),
+                            &super::super::bubble::Metrics::tokens(theme.is_rounded()),
+                        );
+                        let bubble =
+                            super::super::bubble::bubble_scene(&shown, &placement, &look, &measure);
+                        let width = placement.window.max_x() + margin;
+                        let height =
+                            (drawn.height.max(placement.window.max_y() - margin)) + margin * 2.0;
+                        composite(
+                            width,
+                            height,
+                            background,
+                            &[
+                                (&drawn, margin, margin, true),
+                                (
+                                    &bubble,
+                                    placement.window.x - bubble.body.x,
+                                    placement.window.y - bubble.body.y,
+                                    false,
+                                ),
+                            ],
+                            &theme,
+                            font_size,
+                        )
+                    }
+                    None => scene(&drawn, &theme, font_size, background, 16.0),
+                };
                 let path =
                     std::path::Path::new(&directory).join(format!("meaning-{kind}-{name}.svg"));
                 std::fs::write(path, svg).expect("書き出せる");

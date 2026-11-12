@@ -169,7 +169,6 @@ pub fn outline(placement: &Placement, metrics: &Metrics, stroke: f32) -> Figure 
 /// 中身を決めた吹き出し．width・height は本体の大きさ
 pub struct Bubble {
     card: Card,
-    position: CardPlacement,
     pub width: f32,
     pub height: f32,
     /// 本体の上の端から先までの長さ(見出しの行の縦の真ん中)
@@ -202,8 +201,52 @@ pub fn bubble(
         width: metrics.width,
         preferred_pointer: metrics.padding + header / 2.0,
         card,
-        position,
     }
+}
+
+/// 一覧で吹き出しに出す語の意味と同音語の札の語，先で指す行(候補の窓の場面の座標)．
+/// 候補の右(吹き出し)に出す設定で，候補を選んでいて意味があるときだけ
+pub fn for_list<'a>(
+    list: &'a ipc::CandidateList,
+    scene: &Scene,
+) -> Option<(&'a HomophoneNote, Vec<String>, Frame)> {
+    if meaning::placement(list.meaning_placement) != ipc::MeaningPlacement::Side
+        || list.focus != ipc::CandidateFocus::Candidate
+    {
+        return None;
+    }
+    let note = list.homophone.as_ref()?;
+    let index = list.selected_entry?;
+    let row = target_row(scene, &ipc::PointerTarget::Entry { index })?;
+    Some((note, note.others.clone(), row))
+}
+
+/// 分岐図で吹き出しに出す語の意味と同音語の札の語(枝に出ていない語だけ)，先で指す枝の行．
+/// 候補の右(吹き出し)に出す設定で，注目している文節で候補を選んでいて意味があり，区切っていないときだけ
+pub fn for_branch<'a>(
+    map: &'a ipc::BranchMap,
+    scene: &Scene,
+) -> Option<(&'a HomophoneNote, Vec<String>, Frame)> {
+    if meaning::placement(map.meaning_placement) != ipc::MeaningPlacement::Side {
+        return None;
+    }
+    let column = map.columns.iter().find(|column| column.is_focused)?;
+    if column.split.is_some() {
+        return None;
+    }
+    let note = column.homophone.as_ref()?;
+    let index = column.selected_alternative?;
+    let row = target_row(scene, &ipc::PointerTarget::Alternative { index })?;
+    Some((note, meaning::branch_others(note, column), row))
+}
+
+/// 押せる範囲から，選んでいる行の枠を探す(押せる範囲は行と同じ高さ)
+fn target_row(scene: &Scene, target: &ipc::PointerTarget) -> Option<Frame> {
+    scene
+        .hits
+        .iter()
+        .find(|hit| &hit.target == target)
+        .map(|hit| hit.frame)
 }
 
 /// 置き方の決まった吹き出しの窓を描く．地と縁は候補の窓と同じ色で，先まで 1 本の線で縁取る．
@@ -247,7 +290,7 @@ pub fn bubble_scene(
         bubble.card.width,
         bubble.card.height,
     ));
-    meaning::draw(&mut painter, Some(&bubble.card), content, bubble.position);
+    meaning::draw(&mut painter, &bubble.card, content);
     let mut scene = painter.finish(
         placement.window.width + margin * 2.0,
         placement.window.height + margin * 2.0 + offset,
@@ -259,6 +302,52 @@ pub fn bubble_scene(
         placement.window.height,
     );
     scene
+}
+
+/// 候補の窓の場面 window の横に，row(window の座標)を指す吹き出しを並べた 1 つの場面(画像への書き出しに使う．
+/// 画面は十分に広いとみなして右に出す)
+pub fn beside(
+    window: Scene,
+    note: &HomophoneNote,
+    others: Vec<String>,
+    row: Frame,
+    look: &Look,
+    measure: &dyn Measure,
+) -> Scene {
+    let shown = bubble(note, others, look, measure);
+    let placement = place(
+        window.body,
+        row.mid_y(),
+        (shown.width, shown.height),
+        shown.preferred_pointer,
+        Frame::new(-10000.0, -10000.0, 20000.0, 20000.0),
+        &Metrics::tokens(look.theme.is_rounded()),
+    );
+    let drawn = bubble_scene(&shown, &placement, look, measure);
+    let x = placement.window.x - drawn.body.x;
+    let y = placement.window.y - drawn.body.y;
+    // 吹き出しが窓の上にはみ出すときは，全体を下へずらす
+    let shift = (-y).max(0.0);
+    let mut draws: Vec<Draw> = window
+        .draws
+        .into_iter()
+        .map(|draw| draw.offset(0.0, shift))
+        .collect();
+    draws.extend(
+        drawn
+            .draws
+            .into_iter()
+            .map(|draw| draw.offset(x, y + shift)),
+    );
+    let width = window.width.max(x + drawn.width);
+    let height = (window.height + shift).max(y + shift + drawn.height);
+    Scene {
+        width,
+        height,
+        body: Frame::new(0.0, 0.0, width, height),
+        draws,
+        hits: Vec::new(),
+    }
 }
 
 #[cfg(test)]

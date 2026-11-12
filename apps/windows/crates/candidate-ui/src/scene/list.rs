@@ -111,19 +111,6 @@ fn section_padding(metrics: &Metrics) -> f32 {
     }
 }
 
-/// 候補の右の語の意味の置き方(目印の列は場所の左の端，見出しの行は候補の 1 行目の地の真ん中)と，下に足す余白
-pub(super) fn side_position(look: &Look, measure: &dyn Measure) -> (Placement, f32) {
-    let metrics = Metrics::new(look, measure);
-    let row = metrics.layout.row_pitch - metrics.layout.row_inset * 2.0;
-    (
-        Placement {
-            left: 0.0,
-            header_mid_y: row / 2.0,
-        },
-        section_padding(&metrics),
-    )
-}
-
 /// 候補の下の語の意味の置き方．目印の列を候補の番号に，文の列を候補の文字にそろえる
 fn below_position(metrics: &Metrics, theme: &crate::theme::ResolvedTheme) -> Placement {
     Placement {
@@ -185,26 +172,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let padding = candidate::PADDING_X;
     let footer = footer(list);
 
-    // 候補の右に出す語の意味．幅は決まっているので，候補の列より先に決める
-    let side = (meaning::placement(list.meaning_placement) == MeaningPlacement::Side)
-        .then(|| {
-            let (position, bottom) = side_position(look, measure);
-            let card = list
-                .homophone
-                .as_ref()
-                .map(|note| meaning::list_card(&painter, note, position));
-            meaning::side_slot(
-                card,
-                card_size::LIST_WIDTH,
-                look.reserved_card,
-                position,
-                bottom,
-            )
-        })
-        .flatten();
-    let side_extent = side.as_ref().map_or(0.0, |slot| {
-        metrics.layout.card_gap.max(metrics.layout.separator_width) + slot.width
-    });
+    // 候補の右に出す設定の語の意味は，窓の外の吹き出し(bubble)に出す．窓の中に出すのは候補の下に出す設定だけ
     let outer = (metrics.layout.edge + metrics.layout.padding) * 2.0 + metrics.layout.shadow;
 
     // 表に広げたときは列の幅をそろえ，窓が表の幅の上限に収まるよう列を狭める(収まらない候補は末尾を省く)
@@ -215,7 +183,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     });
     // 長い文の候補は，窓の幅の上限に収まるよう省く．ほかの候補と違うところの少し手前から見せる
     // (頭が同じ文が並ぶので，末尾を省くと見分けられない．macOS の CandidateView と同じ)
-    let text_limit = cell_limit.unwrap_or(candidate::MAX_WIDTH - outer - side_extent)
+    let text_limit = cell_limit.unwrap_or(candidate::MAX_WIDTH - outer)
         - metrics.lead
         - metrics.row_padding_x
         - candidate::PADDING_X;
@@ -294,38 +262,24 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     // 候補を縦に並べる行の数．表なら 1 列の候補の数(最後のページで候補が少なければその数)
     let rows = grid.map_or(list.entries.len(), |length| list.entries.len().min(length));
     let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
-    let (slot, card) = match side {
-        Some(slot) => {
-            let card = list_layout::Card::Side {
-                width: slot.width,
-                height: slot.height,
-            };
-            (Some(slot), Some(card))
-        }
-        None => {
-            // 候補の下のカードは窓の中身の幅いっぱいにし，その幅で折り返す
-            let below = (list.meaning_placement == Some(MeaningPlacement::Below))
-                .then_some(list.homophone.as_ref())
-                .flatten();
-            let slot = below.map(|note| {
-                let width =
-                    list_layout::below_card_width(list_width, footer_width, card_size::LIST_WIDTH)
-                        .min(limit - outer)
-                        .floor();
-                let position = below_position(&metrics, look.theme);
-                meaning::below_slot(
-                    meaning::Card::new(&painter, note, note.others.clone(), width, position),
-                    position,
-                    section_padding(&metrics),
-                )
-            });
-            let card = slot.as_ref().map(|slot| list_layout::Card::Below {
-                width: slot.width,
-                height: slot.height,
-            });
-            (slot, card)
-        }
-    };
+    // 候補の下の語の意味は窓の中身の幅いっぱいにし，その幅で折り返す
+    let below = (list.meaning_placement == Some(MeaningPlacement::Below))
+        .then_some(list.homophone.as_ref())
+        .flatten();
+    let slot = below.map(|note| {
+        let width = list_layout::below_card_width(list_width, footer_width, card_size::LIST_WIDTH)
+            .min(limit - outer)
+            .floor();
+        let position = below_position(&metrics, look.theme);
+        meaning::below_slot(
+            meaning::Card::new(&painter, note, note.others.clone(), width, position),
+            section_padding(&metrics),
+        )
+    });
+    let card = slot.as_ref().map(|slot| list_layout::Card::Below {
+        width: slot.width,
+        height: slot.height,
+    });
     let has_header = !list.variants.is_empty() || list.association.is_some();
     let layout = list_layout::place(
         metrics.style,
@@ -428,7 +382,6 @@ fn draw_list(
     if let Some(line) = layout.header_separator {
         painter.rect(line, theme.line);
     }
-    let mut selected_mid_y = None;
     for separator in &cells.separators {
         painter.rect(*separator, theme.line);
     }
@@ -456,7 +409,6 @@ fn draw_list(
         let selected =
             list.focus == CandidateFocus::Candidate && list.selected_entry == Some(index as u32);
         if selected {
-            selected_mid_y = Some(row.mid_y());
             if theme.is_rounded() {
                 painter.capsule(row, theme.selection);
             } else {
@@ -570,19 +522,7 @@ fn draw_list(
         if let Some(line) = layout.card_separator {
             painter.rect(line, theme.line);
         }
-        meaning::draw(painter, slot.card.as_ref(), card, slot.position);
-        // 候補の右に出すときは，選んでいる候補の行の右の端から語の意味の見出しへ線でつなぐ
-        if let (MeaningPlacement::Side, Some(row_y), Some(content)) =
-            (slot.placement, selected_mid_y, slot.card.as_ref())
-        {
-            // 表では候補の列の右の端から引く(ほかの列の候補にかからないように)
-            let start = Point::new(layout.rows[0].max_x(), row_y.round());
-            let end = Point::new(
-                meaning::connector_end_x(card, slot.position),
-                content.header_mid_y(card),
-            );
-            meaning::connector(painter, start, end);
-        }
+        meaning::draw(painter, &slot.card, card);
     }
     painter.rect(layout.footer_separator, theme.line);
     footer_section(painter, footer, layout.footer, metrics.row_padding_x);
@@ -967,88 +907,68 @@ mod tests {
         }
     }
 
-    /// 描いた多角形(語の意味は三角で指さないので，無いことを確かめる)
-    fn polygons(scene: &Scene) -> Vec<Vec<Point>> {
-        scene
-            .draws
-            .iter()
-            .filter_map(|draw| match draw {
-                Draw::Polygon { points, .. } => Some(points.clone()),
-                _ => None,
-            })
-            .collect()
-    }
-
-    /// 語の意味とつなぐ線の端の丸
-    fn dots(scene: &Scene) -> Vec<Frame> {
-        scene
-            .draws
-            .iter()
-            .filter_map(|draw| match draw {
-                Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE => Some(*frame),
-                _ => None,
-            })
-            .collect()
-    }
-
     #[test]
-    fn 語の意味は候補の右に箱を描かずに置き_選んでいる候補から線でつなぐ() {
+    fn 吹き出しに出す設定では候補の窓に語の意味を入れず_窓の大きさを変えない() {
         for name in ["platinum", "automatic", "desk"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
-            let scene = candidate_list(&with_meaning(MeaningPlacement::Side), &look, &Fixed);
+            let shown = with_meaning(MeaningPlacement::Side);
+            let scene = candidate_list(&shown, &look, &Fixed);
             let texts = texts_of(&scene);
-            for text in ["変換", "名詞", "別の形に変える", "返還", "偏官"] {
-                assert!(texts.contains(&text.to_string()), "{name}: {text}");
-            }
-            // 同音語は耳のアイコンと札だけ．見出しの言葉は置かない
-            assert!(!texts.contains(&"同音語".to_string()), "{name}");
+            assert!(!texts.contains(&"別の形に変える".to_string()), "{name}");
             // 足元のキーの案内は消さない
             assert!(texts.contains(&"2 / 30".to_string()), "{name}");
-            // 語の意味は候補の列の右に，つなぐ線を引く幅を空けて置く
-            let meaning = text_frame(&scene, "別の形に変える").expect("意味を描く");
-            let candidate = text_frame(&scene, "へんかん").expect("候補を描く");
-            assert!(meaning.x > candidate.max_x(), "{name}");
-            let row = scene
+            // 意味の無い一覧と同じ大きさ
+            let plain = candidate_list(
+                &CandidateList {
+                    homophone: None,
+                    ..shown.clone()
+                },
+                &look,
+                &Fixed,
+            );
+            assert_eq!(
+                (scene.width, scene.height),
+                (plain.width, plain.height),
+                "{name}"
+            );
+            // 吹き出しは選んでいる候補の行を指す
+            let (note, others, row) =
+                super::super::bubble::for_list(&shown, &scene).expect("吹き出し");
+            assert_eq!(note.word, "変換");
+            assert_eq!(others, note.others);
+            let selected = scene
                 .hits
                 .iter()
                 .find(|hit| hit.target == ipc::PointerTarget::Entry { index: 0 })
                 .map(|hit| hit.frame)
-                .expect("候補の行");
-            assert!(row.max_x() + card_size::CARD_GAP <= meaning.x, "{name}");
-            // 三角で指さず，選んでいる候補の行の高さから線を引き，見出しのアイコンの手前の丸で止める
-            assert!(polygons(&scene).is_empty(), "{name}");
-            let dots = dots(&scene);
-            assert_eq!(dots.len(), 1, "{name}");
-            assert!(
-                dots[0].mid_x() > row.max_x() && dots[0].mid_x() < meaning.x,
-                "{name}"
-            );
-            // 意味の無い一覧より広い
-            let plain = candidate_list(&list(Some(0)), &look, &Fixed);
-            assert!(scene.width >= plain.width + card_size::LIST_WIDTH, "{name}");
+                .expect("選んでいる行");
+            assert_eq!(row, selected, "{name}");
         }
     }
 
     #[test]
-    fn 文字種の行を選んでいるあいだはつなぐ線を引かない() {
+    fn 文字種の行を選んでいるあいだは吹き出しを出さない() {
         let theme = theme("automatic");
         let mut variants = with_meaning(MeaningPlacement::Side);
         variants.focus = CandidateFocus::Variants;
         variants.selected_variant = Some(0);
         let scene = candidate_list(&variants, &Look::new(&theme, 15.0), &Fixed);
-        assert!(dots(&scene).is_empty());
-        assert!(texts_of(&scene).contains(&"別の形に変える".to_string()));
+        assert!(super::super::bubble::for_list(&variants, &scene).is_none());
+        // 候補の下に出す設定では吹き出しを出さない
+        let below = with_meaning(MeaningPlacement::Below);
+        let scene = candidate_list(&below, &Look::new(&theme, 15.0), &Fixed);
+        assert!(super::super::bubble::for_list(&below, &scene).is_none());
     }
 
     #[test]
-    fn 長い意味はカードの幅で折り返し_候補を窓の幅の上限に収める() {
+    fn 長い意味は窓の幅で折り返し_候補を窓の幅の上限に収める() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
-            let mut long = with_meaning(MeaningPlacement::Side);
+            let mut long = with_meaning(MeaningPlacement::Below);
             if let Some(note) = long.homophone.as_mut() {
-                note.senses[0].meaning = "意".repeat(200);
+                note.senses[0].meaning = "意".repeat(600);
                 note.others = (0..30).map(|index| format!("語{index}")).collect();
             }
             long.entries[1].text = "長".repeat(80);
@@ -1056,9 +976,13 @@ mod tests {
             let texts = texts_of(&scene);
             let lines = texts.iter().filter(|text| text.starts_with('意')).count();
             assert_eq!(lines, card_size::MEANING_LINES as usize, "{name}");
-            assert!(texts
+            // 入らない分は省く(3 行に入る字だけを出す)
+            let shown: usize = texts
                 .iter()
-                .any(|text| text.starts_with('意') && text.ends_with('…')));
+                .filter(|text| text.starts_with('意'))
+                .map(|text| text.chars().filter(|c| *c == '意').count())
+                .sum();
+            assert!(shown < 600, "{name}: {shown}");
             assert!(texts.iter().any(|text| text.starts_with('+')));
             // 長い候補は省き，カードを含めて窓の幅の上限に収める
             assert!(texts
@@ -1093,62 +1017,10 @@ mod tests {
                 meaning.y > last.max_y() && meaning.max_y() < footer.y,
                 "{name}"
             );
-            // 三角で指さない
-            assert!(polygons(&scene).is_empty(), "{name}");
             // 窓の幅はカードの幅に合わせて広げる
             assert!(scene.width >= card_size::LIST_WIDTH);
             let plain = candidate_list(&list(Some(0)), &look, &Fixed);
             assert!(scene.height > plain.height, "{name}");
-        }
-    }
-
-    #[test]
-    fn 意味の無い候補に移っても空けておいたカードで窓の大きさを変えない() {
-        for name in ["platinum", "automatic"] {
-            let theme = theme(name);
-            let look = Look::new(&theme, 15.0);
-            let mut reservation = crate::scene::CardReservation::default();
-            let shown = with_meaning(MeaningPlacement::Side);
-            let first = candidate_list(
-                &shown,
-                &Look {
-                    reserved_card: reservation.list(&shown, &look, &Fixed),
-                    ..look
-                },
-                &Fixed,
-            );
-            let moved = CandidateList {
-                homophone: None,
-                meaning_placement: None,
-                selected_entry: Some(1),
-                ..list(Some(1))
-            };
-            let reserved = reservation.list(&moved, &look, &Fixed);
-            assert!(reserved.is_some(), "{name}");
-            let empty = candidate_list(
-                &moved,
-                &Look {
-                    reserved_card: reserved,
-                    ..look
-                },
-                &Fixed,
-            );
-            assert_eq!(
-                (empty.width, empty.height),
-                (first.width, first.height),
-                "{name}"
-            );
-            assert!(!texts_of(&empty).contains(&"別の形に変える".to_string()));
-            assert!(empty.draws.iter().any(|draw| matches!(
-                draw,
-                Draw::Icon {
-                    icon: crate::keys::Icon::Book,
-                    ..
-                }
-            )));
-            // 空けておかなければカードを出さない
-            let bare = candidate_list(&moved, &look, &Fixed);
-            assert!(bare.width < empty.width, "{name}");
         }
     }
 
@@ -1169,14 +1041,14 @@ mod tests {
     fn 意味が2つ以上なら枠線だけの丸に番号を入れる() {
         let theme = theme("automatic");
         let look = Look::new(&theme, 15.0);
-        let mut two = with_meaning(MeaningPlacement::Side);
+        let mut two = with_meaning(MeaningPlacement::Below);
         if let Some(note) = two.homophone.as_mut() {
             note.senses.push(ipc::HomophoneSense {
                 meaning: "向きを変える".into(),
                 example: None,
             });
         }
-        let single = candidate_list(&with_meaning(MeaningPlacement::Side), &look, &Fixed);
+        let single = candidate_list(&with_meaning(MeaningPlacement::Below), &look, &Fixed);
         let double = candidate_list(&two, &look, &Fixed);
         let texts = texts_of(&double);
         assert!(texts.contains(&"向きを変える".to_string()));

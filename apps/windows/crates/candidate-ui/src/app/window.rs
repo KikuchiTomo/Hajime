@@ -91,6 +91,8 @@ pub struct Window {
     /// 最後に DWM に書いた地と角と縁(backdrop・dark・縁の色)と，書いたときの OS の設定の世代．
     /// どれも同じなら書き直さない(OS の設定が変わったら書き直す)
     chrome: std::cell::Cell<Option<(bool, bool, COLORREF, u64)>>,
+    /// 最後に置いた本体の枠(画面のピクセル)．隠したら None．語の意味の吹き出しを候補の窓の横に置くのに使う
+    body: std::cell::Cell<Option<RECT>>,
 }
 
 /// 入力位置に対して窓を置いた側
@@ -235,6 +237,7 @@ impl Window {
             side: std::cell::Cell::new(None),
             held: std::cell::Cell::new(None),
             chrome: std::cell::Cell::new(None),
+            body: std::cell::Cell::new(None),
         })
     }
 
@@ -381,6 +384,12 @@ impl Window {
             side,
             anchor: anchor_rect,
         }));
+        self.body.set(Some(RECT {
+            left: x,
+            top: y,
+            right: x + pixels(scene.body.width),
+            bottom: y + pixels(scene.body.height),
+        }));
         // SAFETY: hwnd はこの窓
         let _ = unsafe {
             SetWindowPos(
@@ -413,9 +422,34 @@ impl Window {
         };
     }
 
+    /// 最後に置いた本体の枠と，それがある画面の使える範囲(どちらも画面のピクセル)．出していなければ None
+    pub fn body_and_work_area(&self) -> Option<(RECT, RECT)> {
+        let body = self.body.get()?;
+        Some((body, work_area(&body)))
+    }
+
+    /// 本体(scene.body)の左上を画面の (x, y)(ピクセル)に置いて出す．語の意味の吹き出しに使う
+    pub fn place_at(&self, x: i32, y: i32, scene: &Scene) {
+        let scale = self.scale();
+        let pixels = |value: f32| (value * scale).round() as i32;
+        // SAFETY: hwnd はこの窓
+        let _ = unsafe {
+            SetWindowPos(
+                self.hwnd,
+                Some(HWND_TOPMOST),
+                x - pixels(scene.body.x),
+                y - pixels(scene.body.y),
+                (scene.width * scale).ceil() as i32,
+                (scene.height * scale).ceil() as i32,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            )
+        };
+    }
+
     pub fn hide(&self) {
         self.side.set(None);
         self.held.set(None);
+        self.body.set(None);
         // SAFETY: hwnd はこの窓
         let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
     }

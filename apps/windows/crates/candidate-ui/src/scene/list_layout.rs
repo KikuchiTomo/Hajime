@@ -25,12 +25,10 @@ pub(super) enum Style {
     Bevel,
 }
 
-/// 語の意味のカード
+/// 候補の下に出す語の意味(候補の右に出す設定では窓の外の吹き出しに出すので，窓の区画には入らない)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) enum Card {
-    /// 候補の右．語の意味の場所の大きさ
-    Side { width: f32, height: f32 },
-    /// 候補の下．幅は窓の中身の幅の下限(below_card_width)で，カードは窓の中身の幅いっぱいに置く
+    /// 幅は窓の中身の幅の下限(below_card_width)で，語の意味は窓の中身の幅いっぱいに置く
     Below { width: f32, height: f32 },
 }
 
@@ -43,8 +41,6 @@ pub(super) struct Metrics {
     pub padding: f32,
     /// 区切りの線の上と下の空き
     pub separator_gap: f32,
-    /// 候補の右のカードと一覧のあいだ(角丸のテーマ)
-    pub card_gap: f32,
     pub separator_width: f32,
     /// 候補の行の間隔(行の地の高さと，行と行のあいだの和)
     pub row_pitch: f32,
@@ -65,7 +61,6 @@ impl Metrics {
             edge: candidate::FRAME_WIDTH,
             padding: glass::WINDOW_PADDING,
             separator_gap: glass::SEPARATOR_GAP,
-            card_gap: tokens::size::meaning::CARD_GAP,
             separator_width: candidate::FRAME_WIDTH,
             row_pitch,
             row_inset: glass::SELECTION_INSET_Y,
@@ -81,7 +76,6 @@ impl Metrics {
             edge: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH,
             padding: 0.0,
             separator_gap: 0.0,
-            card_gap: tokens::size::meaning::CARD_GAP,
             separator_width: candidate::FRAME_WIDTH,
             row_pitch,
             row_inset: 0.0,
@@ -143,10 +137,7 @@ pub(super) fn place(
     let outer = metrics.edge + metrics.padding;
     let gap = metrics.separator_gap;
     let line = metrics.separator_width;
-    // 候補の右の語の意味と一覧のあいだ(つなぐ線を引く幅)
-    let side_gap = metrics.card_gap;
     let content_width = match card {
-        Some(Card::Side { width, .. }) => (list_width + side_gap + width).max(footer_width),
         Some(Card::Below { width, .. }) => list_width.max(footer_width).max(width),
         None => list_width.max(footer_width),
     };
@@ -177,21 +168,10 @@ pub(super) fn place(
         0.0
     };
     let mut list_bottom = rows_top + rows_height;
-    let mut list_column = content_width;
+    let list_column = content_width;
     let mut card_frame = None;
     let mut card_separator = None;
     match card {
-        Some(Card::Side { width, height }) => {
-            list_column = (content_width - side_gap - width).max(0.0);
-            let region = rows_height.max(height);
-            card_frame = Some(Frame::new(
-                outer + list_column + side_gap,
-                rows_top,
-                width,
-                region,
-            ));
-            list_bottom = rows_top + region;
-        }
         Some(Card::Below { height, .. }) => {
             let top = list_bottom
                 + match style {
@@ -273,24 +253,6 @@ mod tests {
             .flat_map(|style| {
                 vec![
                     (format!("{style:?} カードなし"), style, false, None),
-                    (
-                        format!("{style:?} 右に低いカード"),
-                        style,
-                        false,
-                        Some(Card::Side {
-                            width: 312.0,
-                            height: 80.0,
-                        }),
-                    ),
-                    (
-                        format!("{style:?} 右に高いカード"),
-                        style,
-                        true,
-                        Some(Card::Side {
-                            width: 312.0,
-                            height: 200.0,
-                        }),
-                    ),
                     (
                         format!("{style:?} 下のカード"),
                         style,
@@ -409,23 +371,6 @@ mod tests {
     }
 
     #[test]
-    fn 候補の右のカードは1行目の地の上の端と区切りの線の右の端にそろう() {
-        for (name, style, card, layout) in placed() {
-            let Some(Card::Side { .. }) = card else {
-                continue;
-            };
-            let metrics = metrics(style);
-            let card = layout.card.expect("カード");
-            let first = layout.rows[0];
-            assert_eq!(card.y, first.y, "{name}");
-            assert_eq!(card.max_x(), layout.footer_separator.max_x(), "{name}");
-            // 一覧とのあいだはつなぐ線を引く幅．箱を描かないので区切りの線も引かない
-            assert_eq!(card.x - first.max_x(), metrics.card_gap, "{name}");
-            assert!(layout.card_separator.is_none(), "{name}");
-        }
-    }
-
-    #[test]
     fn 候補の下のカードの左右の端は区切りの線の端() {
         for (name, _, card, layout) in placed() {
             let Some(Card::Below { .. }) = card else {
@@ -475,21 +420,17 @@ mod tests {
         let metrics = metrics(Style::Rounded);
         let layout = place(
             Style::Rounded,
-            600.0,
+            800.0,
             160.0,
             false,
             3,
-            Some(Card::Side {
-                width: 312.0,
-                height: 80.0,
-            }),
+            None,
             720.0,
             &metrics,
             None,
         );
         assert!(layout.width <= 720.0);
-        let card = layout.card.expect("カード");
-        assert_eq!(card.max_x(), layout.footer_separator.max_x());
-        assert_eq!(card.x - layout.rows[0].max_x(), metrics.card_gap);
+        // 候補の行の右の端と足元の区切りの線の右の端はそろったまま
+        assert_eq!(layout.rows[0].max_x(), layout.footer_separator.max_x());
     }
 }
