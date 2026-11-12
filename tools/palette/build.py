@@ -13,13 +13,17 @@
 - emoji_all_E17.0.txt: azooKey の絵文字の読み(Mozc の絵文字データと CLDR から作ったもの)
 - emoji.json: 「:bow:」のようなショートコード(iamcal/emoji-data)
 - UnicodeData.txt: 記号の英語の名前
+- emoticon.tsv，categorized.tsv: Mozc の顔文字と読み，まとまり
 
 出力は 1 行に 1 項目で，列はタブで区切る(HajimeDomain の PaletteCatalog が読む)．
     種類  まとまり  文字  絵文字のバージョン  日本語の名前  名前の読み  英語の名前  読み  キーワード  ショートコード  肌の色の形
-- 種類は emoji か symbol．まとまりは PaletteCategory の id
+- 種類は emoji か symbol か kaomoji．まとまりは PaletteCategory の id
 - 読み・キーワード・ショートコード・肌の色の形は | で区切る．読みはひらがな．肌の色の形は明るい順に 5 つ
 - 名前の読みは日本語の名前の読み(ひらがな)．探したときに，名前で当たった項目を読みやキーワードで当たった項目より先にするのに使う
-- 絵文字は emoji-test.txt の並び，記号は symbols.txt の並び．肌の色を変えた形と部品(Component)は項目にしない
+- 絵文字は emoji-test.txt の並び，記号は symbols.txt の並び，顔文字は emoticon.tsv の並びのあとに categorized.tsv にだけある顔文字．
+  肌の色を変えた形と部品(Component)は項目にしない
+- 顔文字の日本語の名前と名前の読みは，最初の読み(Mozc でいちばん顔文字を表す読み)．英語の名前とキーワードは無い．
+  まとまりは Mozc のまとまりと読みから決める(kaomoji_category)
 外から来る XML なので，外部の実体を読まない ElementTree で読む
 """
 import json
@@ -40,6 +44,31 @@ GROUPS = {
 }
 SKIN_TONES = [0x1F3FB, 0x1F3FC, 0x1F3FD, 0x1F3FE, 0x1F3FF]
 SYMBOL_CATEGORIES = ["punctuation", "brackets", "arrows", "math", "letters", "units", "enclosed", "shapes", "lines", "misc"]
+KAOMOJI_CATEGORIES = ["joy", "sorrow", "sweat", "anger", "surprise", "greeting", "animals", "otherFaces"]
+# 顔文字の長さの上限(DefaultSettings.maximumKaomojiTextLength と同じ)．超えるものは表に入れない
+KAOMOJI_MAX_LENGTH = 32
+# 顔文字の形を説明する読み．名前には使わない
+KAOMOJI_DESCRIPTIVE_READINGS = {"よこおき"}
+# Mozc の顔文字のまとまり → パレットのまとまり．OTHER とまとまりの無い顔文字は，読みから振り分ける(KAOMOJI_HINTS)
+MOZC_KAOMOJI_CATEGORIES = {"SMILE": "joy", "SADNESS": "sorrow", "SWEAT": "sweat", "DISPLEASURE": "anger", "SURPRISE": "surprise"}
+# 読みのどれかがこれなら動物にする(Mozc のまとまりより先)
+KAOMOJI_ANIMALS = {"どうぶつ", "ねこ", "いぬ", "くま", "くまー", "にゃー", "ごりら", "たこ"}
+# 最初の読みがこれならあいさつと動作にする(Mozc のまとまりより先)．最初の読みだけで決めるのは，
+# 「＼(^o^)／」のように後ろの読みに「おーい」を持つ笑顔まで移さないため
+KAOMOJI_GREETINGS = {
+    "おじぎ", "ぺこり", "ごめん", "ごめんなさい", "ありがとう", "ばいばい", "さようなら", "さよなら", "またね", "こんにちは", "ではでは",
+    "よろしく", "けいれい", "おやすみ", "やぁ", "たのむ", "おーい", "ねる", "いっぷく", "おちゃ", "めも", "めもめも", "ちゃぶだい",
+}
+# Mozc のまとまりが無いか OTHER の顔文字を，読みのどれかで振り分ける．上にあるものを先に当てる．どれにも当たらなければ otherFaces
+KAOMOJI_HINTS = [
+    ("sorrow", {"なく", "なみだ", "しくしく", "えーん", "うるうる", "しょぼーん", "しょんぼり", "がっくり", "がーん", "ちーん", "ぐすん", "かなしい",
+                "ぶわっ", "うわーん", "ぴー"}),
+    ("anger", {"いかり", "おこる", "むか", "むかっ", "むかー", "むきー", "ぷんぷん", "ちっ", "こら", "ぶー", "やだやだ", "じと", "じとっ", "じとー"}),
+    ("sweat", {"あせ", "ぎくっ", "とほほ", "やれやれ", "がくぶる", "ごくり", "うーん", "はぁ", "はぁはぁ", "ためいき", "えっと", "えーと"}),
+    ("surprise", {"びっくり", "びくっ", "めがてん", "はっ", "わお", "ぽかーん", "くわっ", "ええ", "えぇ", "うおお", "きゃー", "どきっ"}),
+    ("joy", {"にこ", "にこにこ", "にこっ", "わーい", "うれしい", "てれ", "ぽっ", "ばんざい", "いい", "いいね", "えへへ", "うふふ", "もえ", "わくわく",
+             "きゃっ", "ぐっ", "ぶい", "ぴーす", "はーと", "うっとり", "にやにや", "いえい", "きらり", "きらっ", "ぺろ", "ぺろぺろ", "すまいる"}),
+]
 
 DIGITS = ["ぜろ", "いち", "に", "さん", "よん", "ご", "ろく", "なな", "はち", "きゅう"]
 LETTERS = {
@@ -190,6 +219,58 @@ def read_unicode_names(path):
         if not columns[1].startswith("<"):
             names[chr(int(columns[0], 16))] = columns[1]
     return names
+
+
+def read_kaomoji(source):
+    """Mozc の顔文字を (文字, 読み, Mozc のまとまり) の並びにする．emoticon.tsv の並びのあとに categorized.tsv にだけある顔文字を置き，
+    同じ顔文字の読みとまとまりはまとめる(まとまりは categorized.tsv を先にする)"""
+    entries = {}
+    order = []
+
+    def add(text, readings, categories, first):
+        if not text or len(text) > KAOMOJI_MAX_LENGTH or "\t" in text:
+            return
+        if text not in entries:
+            entries[text] = ([], [])
+            order.append(text)
+        known_readings, known_categories = entries[text]
+        # 読みはひらがなと長音にそろえる(「やだね～」→「やだねー」，「どうしましょう・・」→「どうしましょう」)
+        readings = [reading.replace("～", "ー").replace("・", "") for reading in readings]
+        known_readings.extend(reading for reading in readings if reading and reading not in known_readings)
+        new = [category for category in categories if category not in known_categories]
+        if first:
+            known_categories[:0] = new
+        else:
+            known_categories.extend(new)
+
+    # emoticon.tsv は「顔文字<タブ>読み(空白区切り)<タブ>まとまり(空白区切り)」．まとまりの無い行もある
+    for line in open(f"{source}/emoticon.tsv", encoding="utf-8").read().splitlines()[1:]:
+        columns = line.split("\t")
+        if len(columns) >= 2:
+            add(columns[0], columns[1].split(), columns[2].split() if len(columns) > 2 else [], first=False)
+    # categorized.tsv は「顔文字<タブ>まとまり<タブ>読み」
+    for line in open(f"{source}/categorized.tsv", encoding="utf-8").read().splitlines():
+        if line.startswith("#"):
+            continue
+        columns = line.split("\t")
+        if len(columns) >= 3:
+            add(columns[0], columns[2].split(), columns[1].split(), first=True)
+    return [(text, *entries[text]) for text in order if entries[text][0]]
+
+
+def kaomoji_category(readings, mozc_categories):
+    """顔文字のまとまり．動物・あいさつ(最初の読み)・Mozc のまとまり・読みの順に決める"""
+    if any(reading in KAOMOJI_ANIMALS for reading in readings):
+        return "animals"
+    if readings and readings[0] in KAOMOJI_GREETINGS:
+        return "greeting"
+    for category in mozc_categories:
+        if category in MOZC_KAOMOJI_CATEGORIES:
+            return MOZC_KAOMOJI_CATEGORIES[category]
+    for category, hints in KAOMOJI_HINTS:
+        if any(reading in hints for reading in readings):
+            return category
+    return "otherFaces"
 
 
 def read_symbols(path):
@@ -442,12 +523,24 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
         english_words = en_keywords.get(k, []) + ([unicode_name.lower()] if unicode_name else [])
         lines.append(["symbol", category, character, "", name_ja, reading, name_en, clean(readings), clean(keywords + english_words), "", ""])
 
+    kaomoji = read_kaomoji(source)
+    categorized = {category: [] for category in KAOMOJI_CATEGORIES}
+    for text, readings, mozc_categories in kaomoji:
+        # 名前は最初の読み．「よこおき」(横向きの顔文字)は形の説明なので，ほかの読みがあればそちらにする
+        name = next((reading for reading in readings if reading not in KAOMOJI_DESCRIPTIVE_READINGS), readings[0])
+        categorized[kaomoji_category(readings, mozc_categories)].append(
+            ["kaomoji", None, text, "", name, name, "", clean(readings), "", "", ""])
+    for category in KAOMOJI_CATEGORIES:
+        for columns in categorized[category]:
+            columns[1] = category
+            lines.append(columns)
+
     with open(destination, "w", encoding="utf-8", newline="\n") as output:
         output.write("# 絵文字と記号のパレットの表．tools/palette/update.sh が作る．手で書き換えない\n")
         output.write("# 種類\tまとまり\t文字\t絵文字のバージョン\t日本語の名前\t名前の読み\t英語の名前\t読み\tキーワード\tショートコード\t肌の色の形\n")
         for columns in lines:
             output.write("\t".join(columns) + "\n")
-    print(f"絵文字 {len(entries)} 個，記号 {len(lines) - len(entries)} 個", file=sys.stderr)
+    print(f"絵文字 {len(entries)} 個，記号 {len(lines) - len(entries) - len(kaomoji)} 個，顔文字 {len(kaomoji)} 個", file=sys.stderr)
 
 
 if __name__ == "__main__":

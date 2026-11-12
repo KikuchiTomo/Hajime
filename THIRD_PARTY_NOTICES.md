@@ -1560,6 +1560,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 https://github.com/google/mozc
 キー設定のひな形「Windows 風」「Mac 風」は，Mozc の src/data/keymap/ のキー設定の表(コミット c4b2aef7c65e61be394bacadaec200eb5b97f91c)をもとに作っています．
+パレットの顔文字と読みは，Mozc の src/data/emoticon/ の顔文字の表(コミット 85590f17409ebff387285f9665f362ede83ebd8e)から作っています．
 
 ```
 Copyright 2010-2018, Google Inc.

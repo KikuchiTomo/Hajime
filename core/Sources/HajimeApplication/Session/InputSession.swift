@@ -1641,10 +1641,18 @@ public final class InputSession {
     }
 
     /// 読み(最後の文節なら文節の読み)を変換した候補．文節の候補は，ライブ変換と別の変換の状態で Zenzai を使わずに求める
-    /// (打つたびに求めるため．分岐図の文節と同じ)
+    /// (打つたびに求めるため．分岐図の文節と同じ)．
+    /// 文節の候補は前を知らないので，ライブ変換で求めた文全体の候補でその文節になった字の順に並べ替える(設定の contextualSegmentCandidates．
+    /// 「プログラムを」のあとの「かこう」で「書こう」を上に)．打つたびに求めるので，分岐図と違って前後の語を含めた変換は求めない
     private func conversionCandidates(for reading: String, prefix: SuggestionPrefix?) -> [Candidate] {
-        (prefix == nil ? converter.candidates(for: reading) : converter.segmentCandidates(for: reading))
-            .filter { $0.readingCount == reading.count && $0.commandID == nil }
+        guard let prefix else {
+            return converter.candidates(for: reading).filter { $0.readingCount == reading.count && $0.commandID == nil }
+        }
+        let candidates = converter.segmentCandidates(for: reading).filter { $0.readingCount == reading.count && $0.commandID == nil }
+        guard settings.current.contextualSegmentCandidates else { return candidates }
+        var ranker = SegmentContextRanker(converter: converter)
+        ranker.usesNeighborConversion = false
+        return ranker.ranked(candidates, start: prefix.readingCount, length: reading.count, reading: composition.conversionReading)
     }
 
     /// 予測の窓に出している予測と，確定したときの候補

@@ -172,7 +172,7 @@ public struct Settings: Sendable, Equatable {
 
     /// かな漢字変換に使う Zenzai のモデル
     public var zenzaiModel = ZenzaiModelChoice.accurate
-    /// 分岐図・文節ごとの一覧で，文節の候補を前後の語とのつながりで並べ替える(「を」のあとの「かこう」なら「書こう」を先に)
+    /// 分岐図・文節ごとの一覧・入力中の候補の窓で，文節の候補を前後の語とのつながりで並べ替える(「を」のあとの「かこう」なら「書こう」を先に)
     public var contextualSegmentCandidates = true
     /// 文全体の候補の一覧に，分岐図の文節を 1 か所だけほかの候補に替えた文を入れる
     public var listSegmentAlternatives = true
