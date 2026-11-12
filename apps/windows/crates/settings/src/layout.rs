@@ -803,6 +803,7 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     bottom_fields: 0,
     sheet: false,
     move_icons: false,
+    message_line: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -819,6 +820,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     bottom_fields: 0,
     sheet: false,
     move_icons: false,
+    message_line: false,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -857,7 +859,8 @@ fn place_list(
     let x = frame.inner_left();
     let card_top = frame.y + size::CARD_PADDING_Y;
     let inner = frame.inner_width();
-    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に絞り込みを置く
+    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に「キーで検索」のボタンと絞り込みを置く(macOS の KeymapPage)
+    let mut key_search = None;
     let (toolbar_search, toolbar_filter, top) = if buttons.toolbar {
         let filter = buttons.filter.then(|| {
             Rect::new(
@@ -867,7 +870,16 @@ fn place_list(
                 size::CONTROL_HEIGHT,
             )
         });
-        let search_right = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let filter_left = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let key_width = button_width(crate::strings::keys::SEARCH_BY_KEY, metrics);
+        let key = Rect::new(
+            filter_left - key_width,
+            card_top,
+            key_width,
+            size::CONTROL_HEIGHT,
+        );
+        key_search = Some(key);
+        let search_right = key.x - size::CONTROL_GAP;
         let search = buttons.search.then(|| {
             Rect::new(
                 x,
@@ -932,6 +944,10 @@ fn place_list(
         let note = Rect::new(x, list_top, inner, size::CONTROL_HEIGHT);
         parts.insert(fields, note);
         list_top += size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    }
+    // 打った行の確かめの文の行(空のときも場所を取り，文が出ても表が動かないようにする)
+    if buttons.message_line {
+        list_top += size::NOTE_LINE_HEIGHT;
     }
     // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
     let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
@@ -1032,6 +1048,8 @@ fn place_list(
     parts.extend(leading_rects);
     parts.extend(right_buttons);
     parts.extend(trailing_iter);
+    // 「キーで検索」のボタンは最後に入れる(part_rect は最後の部品を引く)
+    parts.extend(key_search);
     let lines = leading_lines
         .len()
         .max(trailing_line.map_or(0, |line| line + 1));

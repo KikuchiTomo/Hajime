@@ -548,6 +548,8 @@ pub struct ListButtons {
     pub sheet: bool,
     /// 表の下の「優先度を上げる」「優先度を下げる」を山形の絵のボタンにする(除外設定．macOS の chevron.up・chevron.down)
     pub move_icons: bool,
+    /// 入力欄と表のあいだに，打った行の確かめの文(形の誤り・上書き)の行を置く(macOS の RuleListEditor の message)
+    pub message_line: bool,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -758,6 +760,11 @@ impl Control {
             bottom_fields: usize::from(exclusions),
             sheet: matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
             move_icons: exclusions,
+            // シートで書く一覧(コマンド)はシートの中で確かめる
+            message_line: matches!(
+                self,
+                Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
+            ) && !matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
         })
     }
 
@@ -887,6 +894,15 @@ impl Control {
                     column(1, Fixed(mac::RULE_VALUE_COLUMN_WIDTH), Cell::Text),
                     column(2, Fixed(mac::RULE_KIND_COLUMN_WIDTH), Cell::Secondary),
                     column(3, Fill, Cell::Secondary),
+                ],
+                enabled: None,
+            },
+            // 英語と日本語の判別ルール: 語(等幅)・前・結果．結果は行の中で選び直す(macOS の WordLanguagePage)
+            Control::List(spec, _) if spec.path == "wordLanguage.rules" => TableLayout {
+                columns: vec![
+                    column(0, Fill, Cell::Mono),
+                    column(1, Fixed(mac::RULE_KIND_COLUMN_WIDTH), Cell::Secondary),
+                    column(2, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Choice),
                 ],
                 enabled: None,
             },

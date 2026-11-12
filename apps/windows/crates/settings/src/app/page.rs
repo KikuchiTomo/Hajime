@@ -405,6 +405,8 @@ pub enum Part {
     RowMenu,
     /// 表の行の中の選ぶ欄(表の中の位置．列は表の選ぶ欄の列．除外設定の動作)
     TableChoice(usize),
+    /// 押したキーで表を絞り込むボタン(キー設定．macOS の「キーで検索」)
+    KeySearch,
 }
 
 /// ページの中の部品(行の番号と部品)
@@ -444,6 +446,8 @@ struct RowState {
     row: Row,
     /// キー設定のコマンドを置ける状態(新しい行のコマンドの欄を，選んだ状態に置けるものだけにする)
     command_states: std::collections::BTreeMap<String, Vec<String>>,
+    /// 打った行の形が誤っているときの文(一覧の形の invalid．上限は catalog から)
+    invalid_text: String,
     section: usize,
     /// 部品を置いたカード(出さない行は None)
     card: Option<layout::CardLayout>,
@@ -629,9 +633,15 @@ impl RowState {
             }
             _ => Default::default(),
         };
+        let invalid_text = row
+            .control
+            .list_spec()
+            .map(|spec| spec.invalid.resolve(&catalog.limits).into_owned())
+            .unwrap_or_default();
         Self {
             row: row.clone(),
             command_states,
+            invalid_text,
             section,
             card: None,
             visible: true,
@@ -927,6 +937,62 @@ impl RowState {
     }
 
     /// 入力欄の値(選ぶ欄は設定のファイルに書く値)
+    /// 打った行の確かめの文と，足せない問題か(macOS の RuleListEditor の message)．
+    /// 形が誤っていれば理由，同じ見分ける欄の行があれば上書きすること，同じ行があれば登録済みであること
+    fn input_message(&self) -> Option<(String, bool)> {
+        let spec = self.row.control.list_spec()?;
+        if !self.has_add_remove() {
+            return None;
+        }
+        let values = self.input_values();
+        if !spec.is_filled(&values) || values.iter().all(|value| value.trim().is_empty()) {
+            return None;
+        }
+        let item = spec.make(&values);
+        if !spec.is_valid(&item) {
+            return Some((self.invalid_text.clone(), true));
+        }
+        let shown = spec.display(&item);
+        let fields = spec.fields.len();
+        let others: Vec<&Vec<String>> = self
+            .table
+            .rows()
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| Some(*index) != self.editing)
+            .map(|(_, row)| row)
+            .collect();
+        let same_row =
+            |row: &&Vec<String>, count: usize| row.iter().take(count).eq(shown.iter().take(count));
+        if matches!(self.row.control, Control::Dictionary(_)) {
+            // ユーザー辞書は読みと単語の両方が同じ行を重なりとみなす
+            let same = others.iter().find(|row| same_row(row, 2))?;
+            return Some(if same.iter().take(fields).eq(shown.iter().take(fields)) {
+                (rule_list::ALREADY_REGISTERED.to_string(), true)
+            } else {
+                (rule_list::CHANGES_KIND.to_string(), false)
+            });
+        }
+        let keys: Vec<usize> = spec
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, field)| field.key)
+            .map(|(index, _)| index)
+            .collect();
+        if keys.is_empty() {
+            return None;
+        }
+        let collides = others.iter().any(|row| {
+            keys.iter()
+                .all(|index| row.get(*index) == shown.get(*index))
+        });
+        collides.then(|| {
+            let key = item.first().cloned().unwrap_or_default();
+            (rule_list::overwrites(&key), false)
+        })
+    }
+
     fn input_values(&self) -> Vec<String> {
         let Some(spec) = self.row.control.list_spec() else {
             return Vec::new();
@@ -1056,6 +1122,7 @@ impl RowState {
             Part::Reset => Some(card.reset),
             // 行のメニューは押した位置に出すので，部品の欄は持たない
             Part::RowMenu => None,
+            Part::KeySearch => card.parts.last().copied(),
             // 更新を確かめるボタン・値の右のボタンは部品の欄の外
             Part::Action
                 if matches!(self.row.control, Control::Version | Control::InfoAction(..)) =>
@@ -1189,6 +1256,9 @@ impl RowState {
                     if buttons.filter {
                         parts.push(Part::Filter);
                     }
+                    if buttons.toolbar {
+                        parts.push(Part::KeySearch);
+                    }
                     parts.extend((fields..fields + bottom_fields).map(Part::Field));
                     parts.extend((0..buttons.bottom_labels().len()).map(Part::Bottom));
                 }
@@ -1220,11 +1290,13 @@ impl RowState {
             Part::Bottom(index) if self.file_task(index).is_some() => self
                 .file_task(index)
                 .is_some_and(|task| task.is_import() || self.table.total() > 0),
+            // 打った行に問題があれば足せない(macOS の RuleListEditor)
             Part::Top(0) if self.has_add_remove() => {
-                self.editing.is_some()
+                (self.editing.is_some()
                     || self
                         .list_spec()
-                        .is_some_and(|(spec, _)| spec.is_filled(&self.input_values()))
+                        .is_some_and(|(spec, _)| spec.is_filled(&self.input_values())))
+                    && !self.input_message().is_some_and(|(_, problem)| problem)
             }
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
@@ -1254,6 +1326,7 @@ impl RowState {
     fn button_label(&self, part: Part) -> &'static str {
         let buttons = self.row.control.list_buttons();
         match part {
+            Part::KeySearch => keys::SEARCH_BY_KEY,
             Part::Top(0) if self.has_add_remove() && self.editing.is_some() => rule_list::UPDATE,
             Part::Top(index) => buttons
                 .and_then(|buttons| buttons.top.get(index).copied())
@@ -1895,6 +1968,35 @@ impl PageView {
     }
 
     /// ポインターを載せたときに出す説明(絵だけのボタン．macOS の .help)
+    /// 表の (x, y)(ページの中の座標)の欄の文字と，欄の幅と書体．文字の欄でなければ None
+    /// (切れた文字の全文を説明の吹き出しに出すため．macOS の表は切れた文字に全文の説明を出す)
+    pub fn table_cell(
+        &self,
+        row_index: usize,
+        x: f32,
+        y: f32,
+        now: f64,
+    ) -> Option<(String, f32, TextStyle)> {
+        let row = self.rows.get(row_index)?;
+        let rect = row.part_rect(Part::Table)?;
+        let position = self.table_position(row_index, y, now)?;
+        let layout = row.row.control.table_layout();
+        let padding = size::FIELD_PADDING_X;
+        let spans = layout.spans(rect.width, padding);
+        let (column, (_, width)) = layout
+            .columns
+            .iter()
+            .zip(&spans)
+            .find(|(_, (left, width))| x >= rect.x + left && x < rect.x + left + width)?;
+        let style = match column.cell {
+            Cell::Mono => TextStyle::Code,
+            Cell::Text | Cell::Secondary => TextStyle::Body,
+            _ => return None,
+        };
+        let text = row.table.shown_row(position)?.get(column.source)?.clone();
+        Some((text, (width - padding).max(0.0), style))
+    }
+
     pub fn tooltip(&self, element: Element) -> Option<&'static str> {
         match element.part {
             Part::Reset => Some(features::RESTORE_DEFAULT),
@@ -1998,7 +2100,8 @@ impl PageView {
             Part::Slider => 8,
             Part::Radio => 9,
             Part::Filter => 31,
-            Part::RowMenu => 51,
+            Part::RowMenu => 52,
+            Part::KeySearch => 32,
             Part::Segment(index) => 90 + index,
             Part::Button(index) => 95 + index,
             Part::Field(index) => 10 + index,
@@ -2137,6 +2240,13 @@ impl PageView {
         let part = element.part;
         match (&row.row.control, part) {
             (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
+            // 次に押したキーを検索欄に書き，その行だけを出す(検索欄はキーの名前で絞る)
+            (_, Part::KeySearch) => {
+                if let Some(search) = row.search {
+                    edit::start_recording(search, keys::PRESS);
+                }
+                return None;
+            }
             (Control::Stepper(_), Part::Decrement) => return row.step(-1),
             (Control::Stepper(_), Part::Increment) => return row.step(1),
             (Control::ThemeOption(value), Part::Radio) => {
@@ -3882,6 +3992,42 @@ impl PageView {
 
     fn paint_list(&self, canvas: &mut dyn Canvas, frame: &Frame, index: usize, row: &RowState) {
         let theme = frame.theme;
+        // 打った行の確かめの文(問題は注意の色と警告の印，上書きの知らせは薄い文字と情報の印)を表のすぐ上に出す
+        if let (Some((text, problem)), Some(table)) =
+            (row.input_message(), row.part_rect(Part::Table))
+        {
+            let line = Rect::new(
+                table.x,
+                table.y - size::NOTE_LINE_HEIGHT - size::CONTROL_GAP / 2.0,
+                table.width,
+                size::NOTE_LINE_HEIGHT,
+            );
+            let (glyph, color) = if problem {
+                (theme.glyphs.warning, theme.palette.caution)
+            } else {
+                (theme.glyphs.info, theme.palette.text_secondary)
+            };
+            canvas.text(
+                Rect::new(
+                    line.x,
+                    line.y,
+                    size::CHEVRON_SIZE + size::CONTROL_GAP,
+                    line.height,
+                ),
+                glyph,
+                TextStyle::IconSmall,
+                Color::from(color),
+                TextLayout::LINE,
+            );
+            let left = line.x + size::CHEVRON_SIZE + size::CONTROL_GAP;
+            canvas.text(
+                Rect::new(left, line.y, (line.max_x() - left).max(0.0), line.height),
+                &text,
+                TextStyle::Caption,
+                Color::from(color),
+                TextLayout::LINE,
+            );
+        }
         // 打つもの → 置き換えるものの矢印(macOS の RuleListEditor の arrow.right)
         let arrow = row
             .row
@@ -3935,6 +4081,14 @@ impl PageView {
                     );
                 }
                 Part::Field(_) | Part::Search => self.paint_field(canvas, frame, index, row, part),
+                Part::KeySearch => paint::button(
+                    canvas,
+                    theme,
+                    rect,
+                    keys::SEARCH_BY_KEY,
+                    paint::ButtonKind::Standard,
+                    self.state(frame, element, row.part_enabled(part)),
+                ),
                 Part::Top(_) | Part::Bottom(_) => {
                     let label = row.button_label(part);
                     let icon = row
