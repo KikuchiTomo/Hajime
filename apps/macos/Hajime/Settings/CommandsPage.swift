@@ -105,8 +105,6 @@ struct CommandsPage: View {
             }
         } header: {
             Text(UIStrings.Extras.tryMacros)
-        } footer: {
-            Text(UIStrings.Extras.macroReference).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
         }
     }
 

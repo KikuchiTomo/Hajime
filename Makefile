@@ -24,6 +24,7 @@ check:
 	$(PYTHON) tools/check/check_settings_fields.py
 	$(PYTHON) .claude/skills/hajime-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
+	$(PYTHON) tools/check/check_spacing.py
 	$(PYTHON) tools/protocol/generate.py --check
 	$(PYTHON) tools/tokens/generate_swift.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check

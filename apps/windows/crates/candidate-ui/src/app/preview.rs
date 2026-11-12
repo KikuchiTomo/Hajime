@@ -36,11 +36,10 @@ pub enum Shown<'a> {
 /// rect の中のどこに置くか
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Placement {
-    Center,
+    /// 真ん中に置く(設定の画面の外観・パレットの見本)．見本のまわりは ground の色で塗る
+    Center { ground: tokens::Rgb },
     /// 左上に寄せる(初期設定ウィザードの実演．文字の下に出す)
-    TopLeft {
-        ground: tokens::Rgb,
-    },
+    TopLeft { ground: tokens::Rgb },
 }
 
 pub struct Preview {
@@ -135,7 +134,7 @@ impl Preview {
         let scene = Self::scene(shown, theme, font_size, &measure);
         // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
-            Placement::Center => Surround::Snapshot { dark },
+            Placement::Center { .. } => Surround::Snapshot { dark },
             Placement::TopLeft { .. } => Surround::Bare,
         };
         let mut scene = scene::surround(scene, theme, surround);
@@ -150,10 +149,14 @@ impl Preview {
                     },
                 );
             }
-            Placement::Center => {
-                // 下地は描かず，設定の画面がカードの色で塗った地のまま見せる(見本のまわりに別の色の四角を出さない)
-                if let Some(Draw::Rect { .. }) = scene.draws.first() {
-                    scene.draws.remove(0);
+            Placement::Center { ground } => {
+                // 下地は設定の画面のカードの色で塗る(見本のまわりに別の色の四角を出さない)．
+                // 描き先(DC に結んだ描き先)は前の中身を読まないので，塗らないと黒く残る
+                // 描き先の幅と高さはピクセルに切り上げるので，端の 1 列も塗れるよう少し広く塗る
+                let (width, height) = (scene.width, scene.height);
+                if let Some(Draw::Rect { frame, color }) = scene.draws.first_mut() {
+                    *frame = Frame::new(-1.0, -1.0, width + 2.0, height + 2.0);
+                    *color = Color::rgb(ground);
                 }
             }
         }
@@ -169,7 +172,7 @@ impl Preview {
         let width = (scene.width * shown).ceil() as i32;
         let height = (scene.height * shown).ceil() as i32;
         let (left, top) = match placement {
-            Placement::Center => (
+            Placement::Center { .. } => (
                 rect.left + (rect.right - rect.left - width) / 2,
                 rect.top + (rect.bottom - rect.top - height) / 2,
             ),

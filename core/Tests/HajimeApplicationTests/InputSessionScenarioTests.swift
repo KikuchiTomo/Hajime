@@ -1781,9 +1781,17 @@ struct LiveConversionTimingTests {
             "らい": [("雷", nil)],
             "らいぶ": [("ライブ", nil)],
             "きょうはらい": [("今日は雷", nil)],
+            "きょうはらいぶ": [("今日はライブ", nil)],
+            "きょうはらいぶかい": [("今日はライブ会", nil)],
+            "きょうはら": [("今日は羅", nil)],
+            "きょうはらく": [("今日は楽", nil)],
         ])
         converter.trailingWords["雷"] = .init(readingCount: 2, textCount: 1)
         converter.trailingWords["今日は雷"] = .init(readingCount: 2, textCount: 1)
+        converter.trailingWords["今日はライブ"] = .init(readingCount: 3, textCount: 3)
+        converter.trailingWords["今日はライブ会"] = .init(readingCount: 2, textCount: 1)
+        converter.trailingWords["今日は羅"] = .init(readingCount: 1, textCount: 1)
+        converter.trailingWords["今日は楽"] = .init(readingCount: 2, textCount: 1)
         return (InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings()), converter)
     }
 
@@ -1815,6 +1823,60 @@ struct LiveConversionTimingTests {
         #expect(session.awaitsSettle)
         #expect(marked(session.settle(context: InputContext())) == "今日は雷")
         #expect(!session.awaitsSettle)
+    }
+
+    @Test("止まって変換して見せた文は，続けて打ってもかなに戻さない(打つたびにかなと漢字が入れ替わってちらつかない)")
+    func keepsSettledConversionWhileTyping() {
+        let (session, _) = session()
+        for key in "kyouharai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        #expect(marked(session.settle(context: InputContext())) == "今日は雷")
+        // ローマ字を打ちかけても「今日はらいb」に戻さない
+        let consonant = session.handle(KeyEvent(.character("b")), context: InputContext())
+        #expect(consonant.actions.compactMap { if case .setMarkedText(let text) = $0 { text.text } else { nil } } == ["今日は雷b"])
+        #expect(marked(session.handle(KeyEvent(.character("u")), context: InputContext()).actions) == "今日はライブ")
+        // 確定はしない(組み立て中のまま)
+        #expect(session.isComposing)
+    }
+
+    /// 「kyouharai」と打って止まり(今日は雷)，続けて keys を打ったあとの組み立て中の文字
+    private func typedAfterSettle(_ session: InputSession, _ keys: [KeyEvent]) -> String? {
+        for key in "kyouharai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+        _ = session.settle(context: InputContext())
+        var shown: String?
+        for key in keys { shown = marked(session.handle(key, context: InputContext()).actions) ?? shown }
+        return shown
+    }
+
+    @Test("止まって変換した語を Backspace で消したときや，打ち直して読みが変わったときは，前の決まりどおり末尾の短い語をかなのまま見せる")
+    func fallsBackWhenReadingChanges() {
+        // Backspace で止まったときの読み(きょうはらい)の中に戻った
+        let (deleted, _) = session()
+        #expect(typedAfterSettle(deleted, [KeyEvent(.backspace)]) == "今日はら")
+        // 打ち直して先頭の読みが止まったときと合わなくなった(きょうはらい → きょうはらく)
+        let (retyped, _) = session()
+        #expect(typedAfterSettle(retyped, [KeyEvent(.backspace), KeyEvent(.character("k")), KeyEvent(.character("u"))]) == "今日はらく")
+    }
+
+    @Test("止まったあとに打った語は止まるまでかなのまま見せ，次に止まったら変換して見せる")
+    func settlesNewTail() {
+        let (session, _) = session()
+        let keys = "buka".map { KeyEvent(.character($0)) } + [KeyEvent(.character("i"))]
+        #expect(typedAfterSettle(session, keys) == "今日はライブかい")
+        #expect(session.awaitsSettle)
+        #expect(marked(session.settle(context: InputContext())) == "今日はライブ会")
+    }
+
+    @Test("止まったあとに続けて打っても，Space の変換と Enter の確定は変わらない")
+    func conversionUnchanged() {
+        let (spaced, _) = session()
+        _ = typedAfterSettle(spaced, [KeyEvent(.character("b")), KeyEvent(.character("u"))])
+        #expect(marked(spaced.handle(KeyEvent(.space), context: InputContext()).actions) == "今日はライブ")
+        let chosen = spaced.handle(KeyEvent(.enter), context: InputContext()).actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }
+        #expect(chosen == ["今日はライブ"])
+        let (entered, _) = session()
+        _ = typedAfterSettle(entered, [KeyEvent(.character("b")), KeyEvent(.character("u"))])
+        let committed = entered.handle(KeyEvent(.enter), context: InputContext()).actions.compactMap { if case .commit(let text) = $0 { text } else { nil } }
+        #expect(committed == ["今日はライブ"])
     }
 
     @Test("読みが短いあいだは，打鍵が止まるまでかなのまま")

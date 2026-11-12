@@ -30,6 +30,8 @@ pub struct Table {
     query: String,
     /// 列の値で絞り込む(列の番号と値．キー設定の状態)
     restriction: Option<(usize, String)>,
+    /// 並べ替える列と向き(真なら昇順)．None なら rows の並びのまま(macOS の表の見出しを押す並べ替え)
+    sort: Option<(usize, bool)>,
 }
 
 impl Table {
@@ -72,6 +74,26 @@ impl Table {
         self.refilter();
     }
 
+    /// column 列で並べ替える．同じ列なら向きを入れ替え，別の列ならその列の昇順にする．選んでいた行は外す
+    pub fn toggle_sort(&mut self, column: usize) {
+        self.sort = match self.sort {
+            Some((current, ascending)) if current == column => Some((column, !ascending)),
+            _ => Some((column, true)),
+        };
+        self.clear_selection();
+        self.refilter();
+    }
+
+    /// 並べ替えている列と向き
+    pub fn sort(&self) -> Option<(usize, bool)> {
+        self.sort
+    }
+
+    /// 出している行の position 番目の rows の番号
+    pub fn row_index(&self, position: usize) -> Option<usize> {
+        self.shown.get(position).copied()
+    }
+
     /// すべての行の数(絞り込む前)
     pub fn total(&self) -> usize {
         self.rows.len()
@@ -92,6 +114,19 @@ impl Table {
                             .any(|cell| cell.to_lowercase().contains(query.as_str())))
             })
             .collect();
+        if let Some((column, ascending)) = self.sort {
+            let rows = &self.rows;
+            let cell = |index: &usize| rows[*index].get(column).map_or("", String::as_str);
+            // 同じ値の行は元の並びのまま(安定な並べ替え)
+            self.shown.sort_by(|a, b| {
+                let order = cell(a).cmp(cell(b));
+                if ascending {
+                    order
+                } else {
+                    order.reverse()
+                }
+            });
+        }
     }
 
     /// 出している行の数
@@ -282,5 +317,28 @@ mod tests {
         table.set_rows(vec![vec!["a".into()]]);
         assert!(table.selected_positions().is_empty());
         assert_eq!(table.cursor(), None);
+    }
+
+    #[test]
+    fn 見出しを押すと並べ替え_もう一度押すと逆にする() {
+        let mut table = Table::default();
+        table.set_rows(vec![
+            vec!["b".to_string()],
+            vec!["a".to_string()],
+            vec!["c".to_string()],
+        ]);
+        table.toggle_sort(0);
+        let shown: Vec<_> = (0..3)
+            .filter_map(|position| table.row_index(position))
+            .collect();
+        assert_eq!(shown, vec![1, 0, 2]);
+        table.toggle_sort(0);
+        let shown: Vec<_> = (0..3)
+            .filter_map(|position| table.row_index(position))
+            .collect();
+        assert_eq!(shown, vec![2, 0, 1]);
+        // 選んだ行は rows の番号で返す
+        table.click(0, false, false);
+        assert_eq!(table.selected_rows(), vec![2]);
     }
 }

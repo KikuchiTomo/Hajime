@@ -53,6 +53,10 @@ const WARM_ID: u16 = 50;
 const RECONNECT_TIMER: usize = 1;
 /// 説明の吹き出しを出すまでの時計の番号
 const TOOLTIP_TIMER: usize = 2;
+/// ユーザー辞書の書き方の表の今の値を読み直す間隔のタイマー
+const TEMPLATE_TIMER: usize = 3;
+/// 書き方の表の今の値を読み直す間隔(ミリ秒．秒の値が変わるので 1 秒)
+const TEMPLATE_INTERVAL: u32 = 1000;
 /// ポインターを載せてから説明の吹き出しを出すまで(ミリ秒．OS のツールチップと同じくらい)
 const TOOLTIP_DELAY: u32 = 500;
 /// 読み込みのスレッドが終わった知らせ
@@ -305,6 +309,10 @@ pub fn open(
     });
     // 起動した側が決めた見せ方(前に出さないなど)に従う
     ffi::show_default(window);
+    if options.check_for_updates {
+        // 確かめる窓はこの窓を持ち主にして出すので，窓を出してから始める
+        with_app(super::update::start_check);
+    }
     Some(window)
 }
 
@@ -340,6 +348,9 @@ pub struct Options {
     pub offline: bool,
     /// 単語の登録で開いた(--register-word)．ユーザー辞書のページの登録の欄に，エンジンが持っている語と読みを入れる
     pub register_word: bool,
+    /// 入力メニューの「更新を確認」で開いた(--check-for-updates)．窓を出したら，情報のページの「更新を確認」を
+    /// 押したときと同じ確認を始める
+    pub check_for_updates: bool,
 }
 
 /// 状態を借りて f を呼ぶ．借りられない(手続きの中から呼ばれた)ときは None
@@ -395,7 +406,7 @@ impl App {
         ffi::frame::set_title_bar(self.window, title_bar);
         // 先に作った検索欄は，地を変えたあとに描き直す(自分の面を持つ窓なので，前の絵が残る)
         self.search_painted = false;
-        edit::set_placeholder_color(self.theme.palette.text_secondary);
+        edit::set_placeholder_color(self.theme.palette.text_placeholder);
         self.field_brush = edit::Brush::new(self.theme.palette.control);
         if let Some(font) = &self.field_font {
             ffi::set_font(self.search, font);
@@ -600,6 +611,12 @@ impl App {
         if let Some(model) = &self.model {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = super::actions::keymap_report(model);
+            }
+            // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
+            if self.view.page == Page::Dictionary {
+                self.extras.template_values =
+                    super::actions::template_values(model, &self.extras.template_values);
+                ffi::set_timer(self.window, TEMPLATE_TIMER, TEMPLATE_INTERVAL);
             }
             // 変換マクロの一覧やオン・オフが変わったら，試した結果も読み直す
             if let Some((text, reading, draft)) = self.view.macro_preview_inputs() {
@@ -956,7 +973,9 @@ impl App {
                 (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
                 (None, None) => candidate_ui::app::preview::Shown::Sample,
             },
-            placement: candidate_ui::app::preview::Placement::Center,
+            placement: candidate_ui::app::preview::Placement::Center {
+                ground: self.theme.palette.card,
+            },
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
             return;
@@ -1176,7 +1195,8 @@ impl App {
         ffi::invalidate(self.window);
     }
 
-    fn mouse_down(&mut self, lparam: LPARAM) {
+    /// ポインターを押した．double は 2 回続けて押したとき(表の行を書き換える)
+    fn mouse_down(&mut self, lparam: LPARAM, double: bool) {
         let (x, y) = self.point(lparam);
         let now = self.now();
         let (_, height) = self.size();
@@ -1224,9 +1244,25 @@ impl App {
                 }
                 if element.part == Part::Table {
                     let page_y = y + self.scroll.offset(now);
+                    let (width, _) = self.size();
+                    let page_x = x - nav_width(width);
+                    // 見出しを押したらその列で並べ替える(macOS の表と同じ)
+                    if self.view.table_header_click(element.row, page_x, page_y) {
+                        ffi::invalidate(self.window);
+                        return;
+                    }
                     if let Some(position) = self.view.table_position(element.row, page_y, now) {
+                        // 「有効」の列の印を押したら，その行の有効・無効を切り替える
+                        if let Some(event) =
+                            self.view.table_check_click(element.row, page_x, position)
+                        {
+                            self.dispatch(Some(event));
+                            return;
+                        }
                         let (control, shift) = ffi::modifiers();
-                        let event = self.view.table_click(element.row, position, control, shift);
+                        let event =
+                            self.view
+                                .table_click(element.row, position, control, shift, double);
                         self.dispatch(event);
                     }
                 }
@@ -1426,9 +1462,12 @@ impl App {
                     k if k == VK_END.0 => Move::End,
                     k if k == VK_DELETE.0 => {
                         // 選んだ行を消すボタンを押す
+                        let Some(part) = self.view.remove_part(element.row) else {
+                            return true;
+                        };
                         let remove = Element {
                             row: element.row,
-                            part: Part::Top(1),
+                            part,
                         };
                         if self.view.enabled(remove) {
                             let event = self.view.activate(remove, now);
@@ -2465,6 +2504,25 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             with_app(App::warm_fields);
             Some(LRESULT(0))
         }
+        WM_TIMER if wparam.0 == TEMPLATE_TIMER => {
+            with_app(|app| {
+                let Some(model) = &app.model else {
+                    ffi::kill_timer(app.window, TEMPLATE_TIMER);
+                    return;
+                };
+                if app.view.page != Page::Dictionary {
+                    // ほかのページに移ったら読み直さない(開いたときの例も捨てる)
+                    ffi::kill_timer(app.window, TEMPLATE_TIMER);
+                    app.extras.template_values.clear();
+                    return;
+                }
+                // 値を部品に映す(読み直しは refresh の中で行う)
+                let _ = model;
+                app.refresh();
+                ffi::invalidate(app.window);
+            });
+            Some(LRESULT(0))
+        }
         WM_TIMER if wparam.0 == TOOLTIP_TIMER => {
             ffi::kill_timer(window, TOOLTIP_TIMER);
             ffi::invalidate(window);
@@ -2489,7 +2547,8 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             Some(LRESULT(0))
         }
         WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => {
-            with_app(|app| app.mouse_down(lparam));
+            let double = message == WM_LBUTTONDBLCLK;
+            with_app(|app| app.mouse_down(lparam, double));
             Some(LRESULT(0))
         }
         WM_LBUTTONUP => {

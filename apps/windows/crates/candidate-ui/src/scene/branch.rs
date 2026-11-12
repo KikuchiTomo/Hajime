@@ -8,15 +8,19 @@
 //! - 文節を区切っているときは，注目している文節の幹を切れ目で分け，切れ目に小さな番号の丸を挟む．枝は出さない
 //! - 語の意味のカードは，候補の枝の先に置いて選んでいる候補から線でつなぐか，枝と足元のあいだに窓の幅いっぱいに出す
 //!
-//! 角丸のテーマは曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
+//! 枝は幹の文節から 1 本の幹を伸ばし，候補ごとに同じ形の曲がり角と水平の線を出す(branch_lines)．
+//! 曲線の枝のテーマは 4 分の 1 の円で，直線の枝のテーマは直角に曲がる．platinum と desk は 1 ドットの線で描く
 
+use super::branch_lines::{BranchLines, Turn};
+use super::card_layout::{self, Placement};
 use super::meaning::{self, Slot};
 use super::paint::{Painter, TagStyle};
-use super::{Draw, Frame, Look, Measure, Point, Scene};
+use super::{Color, Draw, Figure, Frame, Look, Measure, Point, Scene, Segment};
 use crate::strings;
 use crate::theme::Font;
 use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
-use tokens::size::{branch, candidate, glass};
+use tokens::size::meaning as card_size;
+use tokens::size::{branch, candidate, glass, space};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
 struct Metrics {
@@ -28,10 +32,28 @@ struct Metrics {
     /// 候補の文字の前に置く番号の幅
     lead: f32,
     footer_height: f32,
+    /// 候補の行の地の上下を縮める量(角丸のテーマ)．行の地の見える上の端は行の上の端からこの分だけ下
+    row_inset: f32,
     shadow: f32,
+    line_width: f32,
+    line_width_selected: f32,
+    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
+    root_inset: f32,
+    /// 枝の曲がり角の半径．直線の枝は 0(直角)
+    turn_radius: f32,
+    /// 1 ドットあたりのデバイスのピクセル数
+    pixel_scale: f32,
 }
 
+/// 区切りの線の上と下，カードと枝・区切りの線のあいだの空き
+const GAP: f32 = glass::SEPARATOR_GAP;
+
 impl Metrics {
+    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の地の左から PADDING_X)にそろえる
+    fn text_inset(&self) -> f32 {
+        self.inset + candidate::PADDING_X
+    }
+
     fn new(look: &Look, measure: &dyn Measure) -> Self {
         let scale = look.font_size / candidate::FONT_SIZE;
         let shadow = if look.theme.has_drop_shadow() {
@@ -39,28 +61,47 @@ impl Metrics {
         } else {
             0.0
         };
+        // 足元の行(と注釈・知らせの行)は，キーの札・案内のアイコン・文字の行の箱のいちばん高いもの
+        let footer_height = glass::KEYCAP_HEIGHT
+            .max(glass::NOTE_ICON_SIZE)
+            .max(measure.height(Font::Label).ceil());
         if look.theme.is_rounded() {
             return Self {
-                inset: glass::PADDING,
+                inset: candidate::FRAME_WIDTH + glass::WINDOW_PADDING,
                 row_height: (glass::ROW_HEIGHT * scale).round(),
                 trunk_gap: glass::TRUNK_GAP,
                 branch_indent: glass::BRANCH_INDENT,
                 stem_x: glass::BRANCH_STEM_X,
                 lead: glass::BADGE_SIZE + candidate::PADDING_X,
-                footer_height: glass::FOOTER_HEIGHT,
+                footer_height,
+                row_inset: glass::SELECTION_INSET_Y,
                 shadow,
+                line_width: glass::LINE_WIDTH,
+                line_width_selected: glass::LINE_WIDTH_SELECTED,
+                root_inset: glass::SELECTION_INSET_Y,
+                turn_radius: if look.theme.curved_branches() {
+                    glass::BRANCH_TURN_RADIUS
+                } else {
+                    0.0
+                },
+                pixel_scale: look.pixel_scale,
             };
         }
-        let label = measure.height(Font::Label).ceil() + candidate::SECTION_PADDING_Y * 2.0;
         Self {
-            inset: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH + candidate::PADDING_X,
+            inset: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH + glass::WINDOW_PADDING,
             row_height: (candidate::ROW_HEIGHT * scale).round(),
             trunk_gap: branch::TRUNK_GAP,
             branch_indent: branch::BRANCH_INDENT,
             stem_x: branch::BRANCH_STEM_X,
             lead: candidate::INDEX_WIDTH,
-            footer_height: label.max(glass::KEYCAP_HEIGHT + candidate::SECTION_PADDING_Y * 2.0),
+            footer_height,
+            row_inset: 0.0,
             shadow,
+            line_width: branch::LINE_WIDTH,
+            line_width_selected: branch::LINE_WIDTH_SELECTED,
+            root_inset: 0.0,
+            turn_radius: 0.0,
+            pixel_scale: look.pixel_scale,
         }
     }
 }
@@ -126,18 +167,40 @@ fn position(map: &BranchMap) -> String {
     }
 }
 
-/// 候補の下に出すカードの上下の空き
-fn below_margin() -> f32 {
-    candidate::PADDING_X / 2.0
+/// 候補の右にカードを出すか(意味があるか，空けておく場所があるか)
+fn has_side_card(map: &BranchMap, reserved: Option<f32>) -> bool {
+    focused(map).is_some_and(|(_, column)| {
+        column.split.is_none()
+            && meaning::placement(map.meaning_placement) == MeaningPlacement::Side
+            && (column.homophone.is_some() || reserved.is_some())
+    })
 }
 
-/// 注目している文節で出す語の意味のカード．区切っているあいだは出さない．
-/// 候補の右は幅が決まっているので content_width を使わず，候補の下は content_width(窓の中身の幅)で折り返す
+/// 候補の右の語の意味の置き方．枝の 3 段目として，目印の列は場所の左の端，見出しの行は最初の候補の行の地の真ん中
+pub(super) fn side_position(look: &Look, measure: &dyn Measure) -> Placement {
+    let metrics = Metrics::new(look, measure);
+    Placement {
+        left: 0.0,
+        header_mid_y: (metrics.row_height - metrics.row_inset * 2.0) / 2.0,
+    }
+}
+
+/// 候補の下の語の意味の置き方．目印の列を幹の文字と足元の左の端にそろえる
+fn below_position(painter: &Painter) -> Placement {
+    Placement {
+        left: candidate::PADDING_X,
+        header_mid_y: card_layout::header_height(painter.theme) / 2.0,
+    }
+}
+
+/// 注目している文節で出す，幅 width の語の意味．区切っているあいだは出さない．
+/// 候補の右は窓の中身の右の端まで，候補の下は窓の中身の幅
 fn meaning_slot(
     map: &BranchMap,
     painter: &Painter,
+    metrics: &Metrics,
     reserved: Option<f32>,
-    content_width: Option<f32>,
+    width: f32,
 ) -> Option<Slot> {
     let (_, column) = focused(map)?;
     if column.split.is_some() {
@@ -145,18 +208,24 @@ fn meaning_slot(
     }
     match meaning::placement(map.meaning_placement) {
         MeaningPlacement::Side => {
-            let card = column.homophone.as_ref().map(|note| {
-                meaning::branch_card(painter, note, column, glass::MEANING_BRANCH_WIDTH)
-            });
-            meaning::side_slot(card, glass::MEANING_BRANCH_WIDTH, reserved)
+            let position = Placement {
+                left: 0.0,
+                header_mid_y: (metrics.row_height - metrics.row_inset * 2.0) / 2.0,
+            };
+            let card = column
+                .homophone
+                .as_ref()
+                .map(|note| meaning::branch_card(painter, note, column, width, position));
+            meaning::side_slot(card, width, reserved, position, 0.0)
         }
         MeaningPlacement::Below => {
             let note = column.homophone.as_ref()?;
-            let width =
-                (content_width? - glass::MEANING_PADDING * 2.0).max(glass::MEANING_CARD_WIDTH);
-            Some(meaning::below_slot(meaning::branch_card(
-                painter, note, column, width,
-            )))
+            let position = below_position(painter);
+            Some(meaning::below_slot(
+                meaning::branch_card(painter, note, column, width, position),
+                position,
+                0.0,
+            ))
         }
     }
 }
@@ -221,11 +290,12 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         + note_width
         + padding * 2.0;
     // 候補の右に出すカードは，候補の枝の先に続けて置く(枝の一部として幅に数える)
-    let side = meaning_slot(map, painter, reserved, None)
-        .filter(|slot| slot.placement == MeaningPlacement::Side);
-    let card_extent = side
-        .as_ref()
-        .map_or(0.0, |slot| glass::MEANING_GAP + slot.width);
+    let side = has_side_card(map, reserved);
+    let card_extent = if side {
+        card_size::CARD_GAP + card_size::BRANCH_WIDTH
+    } else {
+        0.0
+    };
     let branch_right =
         focused.map_or(metrics.inset, |(index, _)| trunk_x[index]) + branch_width + card_extent;
     let preview_rows = usize::from(map.columns.iter().any(|column| column.preview.is_some()));
@@ -233,12 +303,10 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
     let lower_rows = column
         .map_or(0, |column| column.alternatives.len())
         .max(preview_rows);
-    let lower_height = (metrics.row_height * lower_rows as f32).max(
-        side.as_ref()
-            .map_or(0.0, |slot| slot.height + padding / 2.0),
-    );
-    let footer =
-        footer_width(map, painter) + painter.width(&position(map), Font::Label) + padding * 3.0;
+    let footer = footer_width(map, painter)
+        + painter.width(&position(map), Font::Label)
+        + padding * 2.0
+        + glass::HINT_GAP;
     // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す．候補の下のカードは窓の幅をカードの幅まで広げる
     let below = map.meaning_placement == Some(MeaningPlacement::Below)
         && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
@@ -247,7 +315,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
             .and_then(|column| column.usage_note.as_deref())
             .map(|text| painter.width(text, Font::Label)),
         map.note.as_ref().map(|note| painter.note_width(note)),
-        below.then_some(glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0),
+        below.then_some(card_size::LIST_WIDTH),
     ]
     .into_iter()
     .flatten()
@@ -262,53 +330,68 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
         .max(branch_right + metrics.inset)
         .max(footer + metrics.inset * 2.0)
         .max(note + metrics.inset * 2.0)
-        .max(heading + metrics.inset * 2.0);
-    let trunk_y =
-        metrics.inset + heading_height(map, metrics) + upper_rows as f32 * metrics.row_height;
+        .max(heading + (metrics.inset + candidate::PADDING_X) * 2.0);
+    // いちばん上の行の地(角丸のテーマは行の上下を縮めて描く)の上の端を，縁の内側の余白の端にそろえる
+    let trunk_y = metrics.inset - metrics.row_inset
+        + heading_height(map, metrics)
+        + upper_rows as f32 * metrics.row_height;
     let width = width.ceil();
+    let content_right = width - metrics.inset;
+    // 下の枝の見える下の端(候補の行の地の下の端)
+    let lower_top = trunk_y + metrics.row_height;
+    let mut bottom = lower_top + metrics.row_height * lower_rows as f32
+        - if lower_rows > 0 {
+            metrics.row_inset
+        } else {
+            0.0
+        };
+    let mut slot = None;
+    let mut card = None;
+    if let Some((index, _)) = focused {
+        if side {
+            // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端
+            // 枝の行の右の端(branches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
+            let x = (trunk_x[index] + metrics.stem_x).round() - metrics.stem_x
+                + branch_width
+                + card_size::CARD_GAP;
+            let card_width = (content_right - x).max(card_size::BRANCH_WIDTH).floor();
+            slot = meaning_slot(map, painter, metrics, reserved, card_width);
+            if let Some(slot) = &slot {
+                let frame = Frame::new(x, lower_top + metrics.row_inset, slot.width, slot.height);
+                bottom = bottom.max(frame.max_y());
+                card = Some(frame);
+            }
+        } else if map.meaning_placement == Some(MeaningPlacement::Below) {
+            // 候補の下: 窓の中身の幅いっぱい．枝とのあいだも区切りの線と同じ空き
+            slot = meaning_slot(
+                map,
+                painter,
+                metrics,
+                reserved,
+                content_right - metrics.inset,
+            );
+            if let Some(slot) = &slot {
+                let frame = Frame::new(metrics.inset, bottom + GAP, slot.width, slot.height);
+                bottom = frame.max_y();
+                card = Some(frame);
+            }
+        }
+    }
     let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
         + usize::from(map.note.is_some());
-    // 候補の下のカードは，窓の中身の幅で折り返す
-    let slot =
-        side.or_else(|| meaning_slot(map, painter, reserved, Some(width - metrics.inset * 2.0)));
-    let below_height = slot
-        .as_ref()
-        .filter(|slot| slot.placement == MeaningPlacement::Below)
-        .map_or(0.0, |slot| slot.height + below_margin() * 2.0);
-    let height = trunk_y
-        + metrics.row_height
-        + lower_height
+    let height = bottom
+        + (GAP + metrics.footer_height) * extra_rows as f32
+        + GAP
         + candidate::FRAME_WIDTH
-        + below_height
-        + metrics.footer_height * (1 + extra_rows) as f32
-        + if painter.theme.is_rounded() {
-            0.0
-        } else {
-            metrics.inset
-        };
-    let card = slot
-        .as_ref()
-        .zip(focused)
-        .map(|(slot, (index, _))| match slot.placement {
-            MeaningPlacement::Side => Frame::new(
-                trunk_x[index] + branch_width + glass::MEANING_GAP,
-                trunk_y + metrics.row_height + padding / 4.0,
-                slot.width,
-                slot.height,
-            ),
-            MeaningPlacement::Below => Frame::new(
-                metrics.inset,
-                trunk_y + metrics.row_height + lower_height + below_margin(),
-                width - metrics.inset * 2.0,
-                slot.height,
-            ),
-        });
+        + GAP
+        + metrics.footer_height
+        + metrics.inset;
     Layout {
         trunk_x,
         trunk_width,
         trunk_y,
         branch_width,
-        lower_height,
+        lower_height: bottom - lower_top,
         slot,
         card,
         width,
@@ -327,7 +410,7 @@ fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
             || painter.width(hint, Font::Label),
             |key_hint| painter.hints_width(&[key_hint]),
         );
-        width + candidate::PADDING_X
+        width + glass::HINT_GAP
     });
     painter.hints_width(&map.hints) + source + association
 }
@@ -341,10 +424,10 @@ fn association_key_hint(map: &BranchMap) -> Option<KeyHint> {
     })
 }
 
-/// 連想の一覧の見出しの行の高さ(区切りの線を含む)．連想でなければ 0
+/// 連想の一覧の見出しの行の高さ(区切りの線とその上下の空きを含む)．連想でなければ 0
 fn heading_height(map: &BranchMap, metrics: &Metrics) -> f32 {
     if map.association.is_some() {
-        metrics.footer_height + candidate::FRAME_WIDTH
+        metrics.footer_height + GAP * 2.0 + candidate::FRAME_WIDTH
     } else {
         0.0
     }
@@ -363,18 +446,13 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     painter.panel(body);
     if let Some(heading) = &map.association {
         let row = Frame::new(
+            metrics.text_inset(),
             metrics.inset,
-            metrics.inset,
-            body.width - metrics.inset * 2.0,
+            body.width - metrics.text_inset() * 2.0,
             metrics.footer_height,
         );
-        super::association::draw(&mut painter, heading, row);
-        let line_inset = if theme.is_rounded() {
-            metrics.inset
-        } else {
-            metrics.inset - candidate::PADDING_X
-        };
-        painter.separator(row.max_y(), line_inset, body.width - line_inset);
+        super::association::draw(&mut painter, heading, row.inset(-candidate::PADDING_X, 0.0));
+        painter.separator(row.max_y() + GAP, metrics.inset, body.width - metrics.inset);
     }
     let focused_index = focused(map).map(|(index, _)| index);
     // 注目している文節の枝(候補の右のカードを含む)が重なる範囲には，ほかの文節の添え書きを描かない
@@ -471,20 +549,24 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                 }
             }
             if let Some((slot, card)) = side_card {
-                // 選んでいる候補の枝の先から，カードの見出しへ線でつなぐ
+                // 選んでいる候補の枝の先から，語の意味の見出しへ線でつなぐ
                 let selected = column
                     .selected_alternative
                     .filter(|index| (*index as usize) < column.alternatives.len());
                 if let (Some(selected), Some(content)) = (selected, &slot.card) {
                     let row_y = node.max_y() + selected as f32 * metrics.row_height;
+                    // 枝の行の右の端(枝の根もとの x を整数に丸めた分だけずれる)から出す
                     let start = Point::new(
-                        (node.x + layout.branch_width).round(),
+                        (node.x + metrics.stem_x).round() - metrics.stem_x + layout.branch_width,
                         (row_y + metrics.row_height / 2.0).round(),
                     );
-                    let end = Point::new(card.x, content.header_mid_y(card));
+                    let end = Point::new(
+                        meaning::connector_end_x(card, slot.position),
+                        content.header_mid_y(card),
+                    );
                     meaning::connector(&mut painter, start, end);
                 }
-                meaning::draw(&mut painter, slot.card.as_ref(), card, None);
+                meaning::draw(&mut painter, slot.card.as_ref(), card, slot.position);
             }
         } else if let Some(preview) = column.preview.as_deref() {
             let overlaps =
@@ -508,36 +590,35 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         }
     }
     let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
-    let content_width = body.width - metrics.inset * 2.0;
+    let content_width = body.width - metrics.text_inset() * 2.0;
     if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
         if slot.placement == MeaningPlacement::Below {
-            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいのカードを出す
-            meaning::draw(&mut painter, slot.card.as_ref(), card, None);
-            footer_y = card.max_y() + below_margin();
+            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す
+            meaning::draw(&mut painter, slot.card.as_ref(), card, slot.position);
         }
     }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
         let row = Frame::new(
-            metrics.inset,
-            footer_y,
+            metrics.text_inset(),
+            footer_y + GAP,
             content_width,
             metrics.footer_height,
         );
         painter.text(note, Font::Label, theme.text_muted, row.x, row);
-        footer_y += metrics.footer_height;
+        footer_y = row.max_y();
     }
     if let Some(note) = map.note.as_ref() {
         // 打ち間違いを直したことなど，IME が変えたことを知らせる
         let row = Frame::new(
-            metrics.inset,
-            footer_y,
+            metrics.text_inset(),
+            footer_y + GAP,
             content_width,
             metrics.footer_height,
         );
         painter.note(note, row.x, row.mid_y());
-        footer_y += metrics.footer_height;
+        footer_y = row.max_y();
     }
-    footer(&mut painter, map, footer_y, body.width, &metrics);
+    footer(&mut painter, map, footer_y + GAP, body.width, &metrics);
     painter.finish(width, height)
 }
 
@@ -739,102 +820,121 @@ fn branches(
     if rows.is_empty() {
         return;
     }
-    let stem_x = (node.x + metrics.stem_x).round();
     let row_frame = |index: usize| branch_row(node, width, index, downward, metrics);
-    if painter.theme.curved_branches() {
-        let stem_y = if downward {
-            node.max_y() - glass::CURVE_START_OVERLAP
-        } else {
-            node.y + glass::CURVE_START_OVERLAP
-        };
-        curves(painter, rows, Point::new(stem_x, stem_y), &row_frame);
-    } else {
-        straight_lines(painter, rows, stem_x, node, downward, &row_frame);
-    }
+    let mids: Vec<f32> = (0..rows.len())
+        .map(|index| row_frame(index).mid_y())
+        .collect();
+    let color = painter.theme.line;
+    lines(
+        painter,
+        Point::new(node.x + metrics.stem_x, root_y(node, downward, metrics)),
+        &mids,
+        lead_min_x(row_frame(0)) - space::INLINE,
+        rows.iter().position(|row| row.selected),
+        color,
+        metrics,
+    );
     for (index, row) in rows.iter().enumerate() {
         draw_row(painter, row, row_frame(index), metrics);
     }
 }
 
-/// 枝の曲線．幹の下(上)の start から，候補の行の左の end へ，角を丸めて曲がる
-fn curve(start: Point, end: Point, color: crate::theme::Color, width: f32) -> Draw {
-    Draw::Curve {
-        from: start,
-        control1: Point::new(start.x, end.y),
-        control2: Point::new(start.x + (end.x - start.x) * glass::CURVE_BEND, end.y),
-        to: end,
-        color,
-        width,
-    }
+/// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
+fn lead_min_x(row: Frame) -> f32 {
+    row.x + candidate::PADDING_X / 2.0
 }
 
-/// 幹の下(上)の 1 点から，候補ごとに曲線を出す．選んでいる枝は最後に選択の色で重ねる
-fn curves(painter: &mut Painter, rows: &[Row], start: Point, row_frame: &dyn Fn(usize) -> Frame) {
-    let end = |index: usize| {
-        let frame = row_frame(index);
-        Point::new(frame.x - glass::CURVE_END_GAP, frame.mid_y())
-    };
-    let line = painter.theme.line;
-    let selection = painter.theme.selection;
-    for (index, row) in rows.iter().enumerate().filter(|(_, row)| !row.selected) {
-        painter.draws.push(curve(
-            start,
-            end(index),
-            line.faded(row.opacity),
-            glass::LINE_WIDTH,
-        ));
-    }
-    for (index, _) in rows.iter().enumerate().filter(|(_, row)| row.selected) {
-        painter.draws.push(curve(
-            start,
-            end(index),
-            selection,
-            glass::LINE_WIDTH_SELECTED,
-        ));
-    }
-}
-
-/// platinum と desk: 縦の線を下ろし，候補ごとに横の線を出す
-fn straight_lines(
-    painter: &mut Painter,
-    rows: &[Row],
-    stem_x: f32,
-    node: Frame,
-    downward: bool,
-    row_frame: &dyn Fn(usize) -> Frame,
-) {
-    let last = row_frame(rows.len() - 1);
-    let (top, bottom) = if downward {
-        (node.max_y(), last.mid_y())
+/// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
+fn root_y(node: Frame, downward: bool, metrics: &Metrics) -> f32 {
+    if downward {
+        node.max_y() - metrics.root_inset
     } else {
-        (last.mid_y(), node.y)
-    };
-    let theme = painter.theme;
-    painter.rect(
-        Frame::new(stem_x, top, branch::LINE_WIDTH, bottom - top),
-        theme.line,
-    );
-    for (index, row) in rows.iter().enumerate() {
-        let frame = row_frame(index);
-        let tick = if row.selected {
-            branch::LINE_WIDTH_SELECTED
-        } else {
-            branch::LINE_WIDTH
-        };
-        painter.rect(
-            Frame::new(
-                stem_x,
-                (frame.mid_y() - tick / 2.0).round(),
-                frame.x - stem_x - candidate::FRAME_WIDTH,
-                tick,
-            ),
-            if row.selected {
-                theme.selection
-            } else {
-                theme.line
-            },
-        );
+        node.y + metrics.root_inset
     }
+}
+
+/// 幹と枝の線(macOS の BranchLineDrawing)．root は幹の x と根元の y，mids は候補の行の縦の中心(幹に近い順)．
+/// 選んでいない線(幹と，候補ごとの曲がり角と水平の線)は 1 つの部品にまとめて 1 回でなぞり，重なったところを濃くしない．
+/// 選んでいる候補への道(幹の根元からその候補の曲がり角まで，曲がり角，水平の線)は，最後に選択の色と太さで上に重ねる
+fn lines(
+    painter: &mut Painter,
+    root: Point,
+    mids: &[f32],
+    tip_x: f32,
+    selected: Option<usize>,
+    color: Color,
+    metrics: &Metrics,
+) {
+    let layout = |width: f32| {
+        BranchLines::new(
+            root.x,
+            root.y,
+            mids,
+            tip_x,
+            metrics.turn_radius,
+            width,
+            metrics.pixel_scale,
+        )
+    };
+    let base = layout(metrics.line_width);
+    let last = base.turns.len().saturating_sub(1);
+    let mut figures = Vec::new();
+    for (index, turn) in base.turns.iter().enumerate() {
+        if Some(index) == selected {
+            continue;
+        }
+        // 幹はいちばん遠い候補の曲がり角とひと続きにし，角に切れ目を作らない(選んでいる候補より先の部分だけを描く)
+        let mut figure = match base.stem_after(selected).filter(|_| index == last) {
+            Some((from, to)) => Figure {
+                start: from,
+                segments: vec![Segment::Line(to)],
+            },
+            None => Figure {
+                start: turn.start,
+                segments: Vec::new(),
+            },
+        };
+        figure.segments.extend(turn_segments(turn));
+        figures.push(figure);
+    }
+    if !figures.is_empty() {
+        painter.draws.push(Draw::Path {
+            figures,
+            color,
+            width: metrics.line_width,
+        });
+    }
+    let Some(selected) = selected.filter(|&index| index < base.turns.len()) else {
+        return;
+    };
+    let route = layout(metrics.line_width_selected);
+    let turn = &route.turns[selected];
+    let mut segments = vec![Segment::Line(turn.start)];
+    segments.extend(turn_segments(turn));
+    painter.draws.push(Draw::Path {
+        figures: vec![Figure {
+            start: route.root,
+            segments,
+        }],
+        color: painter.theme.selection,
+        width: metrics.line_width_selected,
+    });
+}
+
+/// 曲がり角(半径が 0 なら直角)と水平の線．曲がり角の始まりから描き始めること．
+/// 下へ進んで右へ曲がる角は，y が下へ増える画面では反時計回り，上へ進んで右へ曲がる角は時計回り
+fn turn_segments(turn: &Turn) -> Vec<Segment> {
+    let radius = turn.end.x - turn.start.x;
+    let corner = if radius > 0.0 {
+        Segment::Arc {
+            to: turn.end,
+            radius,
+            clockwise: turn.end.y < turn.start.y,
+        }
+    } else {
+        Segment::Line(turn.end)
+    };
+    vec![corner, Segment::Line(turn.tip)]
 }
 
 fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
@@ -857,10 +957,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
         if row.selected {
             painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
         }
-        let center = Point::new(
-            frame.x + padding / 2.0 + glass::BADGE_SIZE / 2.0,
-            frame.mid_y(),
-        );
+        let center = Point::new(lead_min_x(frame) + glass::BADGE_SIZE / 2.0, frame.mid_y());
         painter.badge(
             &row.badge,
             center,
@@ -877,7 +974,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
             &row.badge,
             muted_color,
             Frame::new(
-                frame.x + padding / 2.0,
+                lead_min_x(frame),
                 frame.y,
                 metrics.lead - padding / 2.0,
                 frame.height,
@@ -924,54 +1021,40 @@ fn draw_preview(
     metrics: &Metrics,
 ) {
     let theme = painter.theme;
-    let stem_x = (node.x + metrics.stem_x).round();
+    let stem_x = node.x + metrics.stem_x;
     let row = Frame::new(stem_x, node.max_y(), node.width, metrics.row_height);
     let color = theme.text_muted.faded(rest);
-    let text_x = if theme.is_rounded() {
-        let end = Point::new(stem_x + metrics.branch_indent / 2.0, row.mid_y());
-        let start = Point::new(stem_x, node.max_y() - glass::CURVE_START_OVERLAP);
-        painter
-            .draws
-            .push(curve(start, end, theme.line.faded(rest), glass::LINE_WIDTH));
-        end.x + candidate::PADDING_X / 2.0
-    } else {
-        painter.rect(
-            Frame::new(stem_x, node.max_y(), branch::LINE_WIDTH, row.height / 2.0),
-            color,
-        );
-        painter.rect(
-            Frame::new(
-                stem_x,
-                row.mid_y().round(),
-                metrics.branch_indent / 2.0,
-                branch::LINE_WIDTH,
-            ),
-            color,
-        );
-        stem_x + metrics.branch_indent / 2.0 + candidate::PADDING_X / 2.0
-    };
+    // 枝と同じ形で，幹から短く曲がる
+    let tip_x = (stem_x + metrics.branch_indent / 2.0).round();
+    lines(
+        painter,
+        Point::new(stem_x, root_y(node, true, metrics)),
+        &[row.mid_y()],
+        tip_x,
+        None,
+        theme.line.faded(rest),
+        metrics,
+    );
+    let text_x = tip_x + space::INLINE;
     let shown = painter.truncated(text, Font::Candidate, max_x - text_x);
     painter.text(&shown, Font::Candidate, color, text_x, row);
 }
 
+/// 足元．y は区切りの線の上の端．線は窓の中身の左右の端から端まで(語の意味のカードの端と同じ)．
+/// 線の下に区切りの線の上と同じ空きを空けて案内を出す
 fn footer(painter: &mut Painter, map: &BranchMap, y: f32, width: f32, metrics: &Metrics) {
     let theme = painter.theme;
-    let line_inset = if theme.is_rounded() {
-        metrics.inset
-    } else {
-        metrics.inset - candidate::PADDING_X
-    };
-    painter.separator(y, line_inset, width - line_inset);
+    painter.separator(y, metrics.inset, width - metrics.inset);
     let footer = Frame::new(
-        metrics.inset,
-        y + candidate::FRAME_WIDTH,
-        width - metrics.inset * 2.0,
+        metrics.text_inset(),
+        y + candidate::FRAME_WIDTH + GAP,
+        width - metrics.text_inset() * 2.0,
         metrics.footer_height,
     );
     painter.hints(&map.hints, footer.x, footer.mid_y());
     if let Some(hint) = map.association_hint.as_deref() {
         // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く
-        let x = footer.x + painter.hints_width(&map.hints) + candidate::PADDING_X;
+        let x = footer.x + painter.hints_width(&map.hints) + glass::HINT_GAP;
         match association_key_hint(map) {
             Some(key_hint) => painter.hints(&[key_hint], x, footer.mid_y()),
             None => painter.text(hint, Font::Label, theme.text_muted, x, footer),
@@ -1243,43 +1326,109 @@ mod tests {
         }
     }
 
-    #[test]
-    fn 角丸のテーマは曲線の枝で_選んだ枝を最後に選択の色で描く() {
-        let theme = theme("nordic");
-        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
-        let curves: Vec<_> = scene
+    /// 枝の線の部品(図形・色・太さ)を描く順に
+    fn paths(scene: &Scene) -> Vec<(Vec<Figure>, Color, f32)> {
+        scene
             .draws
             .iter()
             .filter_map(|draw| match draw {
-                Draw::Curve {
-                    from,
-                    to,
+                Draw::Path {
+                    figures,
                     color,
                     width,
-                    ..
-                } => Some((*from, *to, *color, *width)),
+                } => Some((figures.clone(), *color, *width)),
                 _ => None,
             })
-            .collect();
-        // 下の枝 2 本・上の枝 1 本
-        assert_eq!(curves.len(), 3);
-        let selected: Vec<_> = curves
+            .collect()
+    }
+
+    fn arcs(figures: &[Figure]) -> Vec<(f32, bool)> {
+        figures
             .iter()
-            .filter(|curve| curve.2 == theme.selection)
-            .collect();
-        assert_eq!(selected.len(), 1);
-        assert_eq!(selected[0].3, glass::LINE_WIDTH_SELECTED);
-        // 枝は幹の下の 1 点から出て，行の左の手前で終わる
-        let node_bottom = glass::PADDING + glass::ROW_HEIGHT * 2.0;
-        assert_eq!(selected[0].0.y, node_bottom - glass::CURVE_START_OVERLAP);
+            .flat_map(|figure| figure.segments.iter())
+            .filter_map(|segment| match segment {
+                Segment::Arc {
+                    radius, clockwise, ..
+                } => Some((*radius, *clockwise)),
+                Segment::Line(_) => None,
+            })
+            .collect()
+    }
+
+    /// 図形の終わり(水平の線の終わり)
+    fn tip(figure: &Figure) -> Point {
+        match figure.segments.last() {
+            Some(Segment::Line(to)) | Some(Segment::Arc { to, .. }) => *to,
+            None => figure.start,
+        }
+    }
+
+    #[test]
+    fn 曲線の枝は1本の幹と同じ半径の曲がり角で描き_選んだ道を最後に選択の色で重ねる() {
+        let theme = theme("nordic");
+        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+        let paths = paths(&scene);
+        // 下の枝の選んでいない線・下の枝の選んだ道・上の枝の選んでいない線．線は向きごとに 1 つの部品にまとめる
+        assert_eq!(paths.len(), 3);
         assert_eq!(
-            selected[0].1.x,
-            (glass::PADDING + glass::BRANCH_STEM_X).round() + glass::BRANCH_INDENT
-                - glass::CURVE_END_GAP
+            paths.iter().map(|path| path.1).collect::<Vec<_>>(),
+            vec![theme.line, theme.selection, theme.line]
         );
+        assert_eq!(paths[0].2, glass::LINE_WIDTH);
+        assert_eq!(paths[1].2, glass::LINE_WIDTH_SELECTED);
+        // 曲がり角はどれも同じ半径．下へ曲がる角は反時計回り，上へ曲がる角は時計回り
+        assert_eq!(arcs(&paths[0].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
+        assert_eq!(arcs(&paths[1].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
+        assert_eq!(arcs(&paths[2].0), vec![(glass::BRANCH_TURN_RADIUS, true)]);
+        // 選んだ道は文節の地の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
+        // いちばん上の行の地の上の端が縁の内側の余白の端にそろうよう，行は地を縮めた分だけ上から始まる
+        let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
+        let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
+        assert_eq!(
+            paths[1].0[0].start.y,
+            node_bottom - glass::SELECTION_INSET_Y
+        );
+        // 番号の丸の左の端から inline だけ手前
+        let tip_x = (inset + glass::BRANCH_STEM_X).round()
+            + glass::BRANCH_INDENT
+            + candidate::PADDING_X / 2.0
+            - space::INLINE;
+        for (figures, _, _) in &paths {
+            assert!(figures.iter().all(|figure| tip(figure).x == tip_x));
+        }
+        // 選んだのは下の枝のいちばん遠い候補なので，選んでいない線に幹は無く，手前の候補の曲がり角だけ
+        assert_eq!(paths[0].0.len(), 1);
+        assert_eq!(paths[0].0[0].segments.len(), 2);
+        // 上の枝は幹といちばん遠い候補の曲がり角をひと続きに描く
+        assert_eq!(paths[2].0.len(), 1);
+        assert_eq!(paths[2].0[0].segments.len(), 3);
+        assert_eq!(paths[2].0[0].start.y, inset + glass::ROW_HEIGHT);
+        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
         // 確信の低い文節の点線は丸い点
         assert!(scene.draws.iter().any(|draw| matches!(draw,
             Draw::Line { dot_pitch: Some(pitch), color, .. } if *pitch == glass::DOT_PITCH && *color == theme.correction)));
+    }
+
+    #[test]
+    fn 線はデバイスのピクセルにそろえる() {
+        let theme = theme("washi");
+        let look = Look {
+            pixel_scale: 2.0,
+            ..Look::new(&theme, 15.0)
+        };
+        let scene = branch_map(&map(), &look, &Fixed);
+        for (figures, _, width) in paths(&scene) {
+            for figure in &figures {
+                // 幹の線の縁と水平の線の縁が，デバイスのピクセルの境に来る
+                let edge = figure.start.x * 2.0 - width;
+                let end = tip(figure);
+                assert_eq!(end.x * 2.0, (end.x * 2.0).round());
+                assert_eq!((end.y * 2.0 - width), (end.y * 2.0 - width).round());
+                if figure.segments.len() == 3 {
+                    assert_eq!(edge, edge.round());
+                }
+            }
+        }
     }
 
     #[test]
@@ -1287,9 +1436,15 @@ mod tests {
         let theme = theme("platinum");
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
-        // 選んだ枝の横の線は 2 ドットで選択の色
-        assert!(scene.draws.iter().any(|draw| matches!(draw,
-            Draw::Rect { frame, color } if frame.height == branch::LINE_WIDTH_SELECTED && *color == theme.selection)));
+        let paths = paths(&scene);
+        // 直角に曲がる．選んだ道は 2 ドットで選択の色
+        assert!(paths.iter().all(|path| arcs(&path.0).is_empty()));
+        assert!(paths
+            .iter()
+            .any(|path| path.1 == theme.selection && path.2 == branch::LINE_WIDTH_SELECTED));
+        assert!(paths
+            .iter()
+            .any(|path| path.1 == theme.line && path.2 == branch::LINE_WIDTH));
     }
 
     #[test]
@@ -1298,6 +1453,9 @@ mod tests {
         theme.straight_branches = true;
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
+        let paths = paths(&scene);
+        assert_eq!(paths.len(), 3);
+        assert!(paths.iter().all(|path| arcs(&path.0).is_empty()));
     }
 
     #[test]
@@ -1375,22 +1533,24 @@ mod tests {
     }
 
     #[test]
-    fn 語の意味は選んでいる候補の枝の先にカードを置き_線でつなぐ() {
+    fn 語の意味は選んでいる候補の枝の先に箱を描かずに置き_線でつなぐ() {
         for name in ["washi", "platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
             let scene = branch_map(&meaning_map(ipc::MeaningPlacement::Side), &look, &Fixed);
             let texts = texts(&scene);
-            for text in ["写真や動画を写す", "動詞", "同音語", "採る"] {
+            for text in ["写真や動画を写す", "動詞", "採る"] {
                 assert!(
                     texts.iter().any(|(shown, _)| shown == text),
                     "{name}: {text}"
                 );
             }
+            // 同音語は耳のアイコンと札だけ．見出しの言葉は置かない
+            assert!(!texts.iter().any(|(shown, _)| shown == "同音語"), "{name}");
             // 同音語の札には，枝に出ている語(取る)を出さない
             let tags = texts.iter().filter(|(shown, _)| shown == "取る").count();
             assert_eq!(tags, 1, "{name}");
-            // カードは候補の枝の右に置く
+            // 語の意味は候補の枝の右に，つなぐ線を引く幅を空けて置く
             let meaning = text_frame(&scene, "写真や動画を写す").expect("意味を描く");
             let branch = scene
                 .hits
@@ -1398,26 +1558,31 @@ mod tests {
                 .find(|hit| hit.target == ipc::PointerTarget::Alternative { index: 1 })
                 .map(|hit| hit.frame)
                 .expect("選んでいる枝");
-            assert!(meaning.x >= branch.max_x() + glass::MEANING_GAP, "{name}");
-            // 端の丸は選んでいる枝の高さより下(カードの見出し)にあり，カードの左の辺に付く
+            assert!(meaning.x >= branch.max_x() + card_size::CARD_GAP, "{name}");
+            // 端の丸は見出しのアイコンの手前(目印の列の左の端から XS)
             let dot = scene
                 .draws
                 .iter()
                 .find_map(|draw| match draw {
                     Draw::Ellipse { frame, color }
-                        if frame.width == glass::MEANING_DOT_SIZE && *color == theme.selection =>
+                        if frame.width == card_size::DOT_SIZE && *color == theme.selection =>
                     {
                         Some(*frame)
                     }
                     _ => None,
                 })
                 .expect("端の丸");
-            assert_eq!(dot.mid_x(), branch.max_x() + glass::MEANING_GAP, "{name}");
-            if theme.curved_branches() {
-                assert!(scene.draws.iter().any(|draw| matches!(draw,
-                    Draw::Curve { from, to, .. } if from.x == branch.max_x().round() && to.x == dot.mid_x())), "{name}");
-            }
-            // 一覧と違って三角で指さない
+            assert_eq!(
+                dot.mid_x(),
+                branch.max_x() + card_size::CARD_GAP - tokens::size::space::XS,
+                "{name}"
+            );
+            // 選んでいる枝の行の右の端から，丸の中心まで 1 本の線(曲がり角は枝と同じ半径)
+            assert!(scene.draws.iter().any(|draw| matches!(draw,
+                Draw::Path { figures, color, .. } if *color == theme.selection
+                    && figures[0].start.x == branch.max_x().round()
+                    && matches!(figures[0].segments.last(), Some(Segment::Line(to)) if to.x == dot.mid_x()))), "{name}");
+            // 三角で指さない
             assert!(
                 !scene
                     .draws
@@ -1441,10 +1606,7 @@ mod tests {
                 &look,
                 &Fixed,
             );
-            assert!(
-                scene.width >= plain.width + glass::MEANING_BRANCH_WIDTH,
-                "{name}"
-            );
+            assert!(scene.width > plain.width, "{name}");
         }
     }
 
@@ -1464,7 +1626,7 @@ mod tests {
             // 線でつながない
             assert!(
                 !scene.draws.iter().any(|draw| matches!(draw,
-                Draw::Ellipse { frame, .. } if frame.width == glass::MEANING_DOT_SIZE)),
+                Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE)),
                 "{name}"
             );
         }
@@ -1508,7 +1670,7 @@ mod tests {
         )));
         // 空いたカードへは線を引かない
         assert!(!empty.draws.iter().any(|draw| matches!(draw,
-            Draw::Ellipse { frame, .. } if frame.width == glass::MEANING_DOT_SIZE)));
+            Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE)));
     }
 
     #[test]
@@ -1555,7 +1717,8 @@ mod tests {
             .into_iter()
             .find(|(text, _)| text.ends_with('…'));
         assert_eq!(shown.map(|(_, color)| color), Some(theme.text_muted));
-        // 添える候補の枝は曲線(注目している文節が無いので，この 1 本だけ)
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 1);
+        // 添える候補の枝は 1 本だけ(注目している文節が無いので)
+        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Path { .. })), 1);
+        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
     }
 }

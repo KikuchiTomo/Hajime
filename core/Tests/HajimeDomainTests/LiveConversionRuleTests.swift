@@ -28,4 +28,23 @@ struct LiveConversionRuleTests {
         let noWords = Candidate(text: "売っている", readingCount: 5, origin: .engine(id: 0))
         #expect(rule.stabilized(noWords, reading: "うっている", settled: (candidate([("打って", 3)]), "うって")).text == "売っている")
     }
+
+    @Test("止まって変換して見せた語は，続けて打ってもかなに戻さない．止まったあとに打った語だけをかなのまま見せる")
+    func keepsConvertedWords() {
+        let rule = LiveConversionRule()
+        let sentence = Candidate(text: "今日は雷", readingCount: 6, origin: .engine(id: 0), trailingWord: .init(readingCount: 2, textCount: 1))
+        // 止まる前に見せていない(convertedLength が 0)なら，末尾の短い語はかなのまま
+        #expect(rule.display(of: sentence, reading: "きょうはらい", settled: false) == "今日はらい")
+        // 「きょうはらい」で止まって「今日は雷」を見せたあとは，ローマ字を打ちかけても「雷」をかなに戻さない
+        #expect(rule.display(of: sentence, reading: "きょうはらい", settled: false, convertedLength: 6) == "今日は雷")
+        // 「きょうは」で止まったあとに打った「らい」は，止まるまでかなのまま
+        #expect(rule.display(of: sentence, reading: "きょうはらい", settled: false, convertedLength: 4) == "今日はらい")
+        // 止まって見せた語に続けて打った語(雷 → ライブ)も，かなに戻さない
+        let live = Candidate(text: "今日はライブ", readingCount: 7, origin: .engine(id: 0), trailingWord: .init(readingCount: 3, textCount: 3))
+        #expect(rule.display(of: live, reading: "きょうはらいぶ", settled: false, convertedLength: 6) == "今日はライブ")
+        // 短い読みでも，止まって変換して見せたものはかなに戻さない
+        let thunder = Candidate(text: "雷", readingCount: 2, origin: .engine(id: 0), trailingWord: .init(readingCount: 2, textCount: 1))
+        #expect(rule.display(of: thunder, reading: "らい", settled: false) == "らい")
+        #expect(rule.display(of: thunder, reading: "らい", settled: false, convertedLength: 2) == "雷")
+    }
 }

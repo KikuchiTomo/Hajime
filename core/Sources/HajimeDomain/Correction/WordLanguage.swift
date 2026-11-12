@@ -68,6 +68,16 @@ public struct WordLanguageSettings: Sendable, Equatable, Codable {
         !word.isEmpty && word.count <= DefaultSettings.maximumWordLanguageWordLength && word.allSatisfy { $0.isASCII && $0.isLetter }
     }
 
+    /// 語を language の一覧に足したあと，もう一方の一覧から除く．
+    /// 同じ語が両方にあると英語の一覧が先に効き(WordLanguageClassifier)，日本語の一覧に足した語が効かないため
+    public mutating func removeFromOtherList(_ words: [String], addedTo language: WordLanguage) {
+        let added = Set(words.map { $0.lowercased() })
+        switch language {
+        case .english: japaneseWords.removeAll { added.contains($0) }
+        case .japanese: englishWords.removeAll { added.contains($0) }
+        }
+    }
+
     /// 形の誤った語と決まりを捨て，数を上限に収める
     public mutating func clampToValidRanges() {
         func clean(_ words: [String]) -> [String] {

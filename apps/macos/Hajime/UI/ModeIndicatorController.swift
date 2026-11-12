@@ -77,7 +77,9 @@ final class ModeIndicatorView: NSView {
             return NSSize(width: width.rounded(.up), height: Glass.modeIndicatorSize)
         }
         let inset = DesignTokens.Size.Candidate.frameWidth + DesignTokens.Size.Candidate.bevelWidth
-        return NSSize(width: (text.width + Size.paddingX * 2 + inset * 2).rounded(.up), height: (text.height + Size.paddingY * 2 + inset * 2).rounded(.up))
+        let font = attributes[.font] as? NSFont
+        let line = font.map { ($0.ascender - $0.descender).rounded(.up) } ?? text.height
+        return NSSize(width: (text.width + Size.paddingX * 2 + inset * 2).rounded(.up), height: (line + Size.paddingY * 2 + inset * 2).rounded(.up))
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -86,7 +88,8 @@ final class ModeIndicatorView: NSView {
         } else {
             BevelDrawing.drawPanel(in: bounds, theme: theme)
         }
-        let size = label.size(withAttributes: attributes)
-        label.draw(at: NSPoint(x: ((bounds.width - size.width) / 2).rounded(), y: ((bounds.height - size.height) / 2).rounded()), withAttributes: attributes)
+        // 文字の行の箱を札の真ん中に置く
+        let width = label.size(withAttributes: attributes).width
+        TextFitting.draw(label, attributes: attributes, x: (bounds.width - width) / 2, midY: bounds.midY)
     }
 }
