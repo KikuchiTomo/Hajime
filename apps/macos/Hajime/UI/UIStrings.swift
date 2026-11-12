@@ -505,6 +505,10 @@ enum UIStrings {
         static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
+        static let emojiCandidatePosition = "絵文字の位置"
+        static let emojiCandidateCount = "絵文字の数"
+        /// 絵文字の位置の値(「4 番目」)
+        static func emojiCandidatePositionValue(_ position: Int) -> String { "\(position) 番目" }
         static let latexConversion = "LaTeX のコマンドに変換"
         static let numberForms = "数字の書き方"
         static let numberFormConversion = "数字を丸数字などに変換"
@@ -1087,7 +1091,8 @@ extension UIStrings {
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
-            "emojiConversion": UIStrings.Settings.emojiConversion,
+            "emojiConversion": UIStrings.Settings.emojiConversion, "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,
+            "emojiCandidateCount": UIStrings.Settings.emojiCandidateCount,
             "latexConversion": UIStrings.Settings.latexConversion,
             "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
             "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,

@@ -608,6 +608,9 @@ impl RowState {
                 RangeKind::LiveConversionSkipLength | RangeKind::EnglishSkipLength,
             ) => more::skip_length(value),
             Control::Stepper(RangeKind::SuggestionSkipCount) => more::skip_count(value),
+            Control::Stepper(RangeKind::EmojiCandidatePosition) => {
+                settings::emoji_candidate_position(value)
+            }
             Control::Seconds(_) => more::seconds(value),
             _ => format!("{value}"),
         }

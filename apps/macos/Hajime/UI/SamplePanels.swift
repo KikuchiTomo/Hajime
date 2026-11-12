@@ -51,6 +51,41 @@ enum SamplePanels {
                  .init(meaning: "気持ちが変わる。心が揺れる", example: "心が動く")],
         others: [])
 
+    /// 読みで引いた絵文字(設定の「絵文字に変換」)．「えがお」の 4・5 番目に絵文字を出し，選んでいる絵文字の名前(CLDR)を意味のカードに出す
+    static let emojiNote = HomophoneNote(word: "😄", meaning: "笑顔", others: [])
+    static let emojiCandidates = ["笑顔", "^_^", "(^-^)", "😄", "😀", "(^_^)", "(^o^)", "(*^^*)", "(^^)"]
+
+    /// 文節ごとの一覧で絵文字を選んだところ
+    static let emojiList: CandidatePanel = {
+        var panel = CandidatePanel(
+            variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) }, selectedVariant: nil,
+            entries: emojiCandidates.map { .init(text: $0, annotation: nil) },
+            selectedEntry: 3, focus: .candidate, position: 4, total: 30, note: nil
+        )
+        panel.homophone = emojiNote
+        return panel
+    }()
+
+    /// 打っているあいだの候補の窓に出した絵文字
+    static let emojiSuggestion: CandidatePanel = {
+        var panel = CandidatePanel(
+            variants: [], selectedVariant: nil,
+            entries: ["笑顔", "(^^)", "(*^^*)", "😄", "😀"].map { .init(text: $0, annotation: nil) },
+            selectedEntry: nil, focus: .candidate, position: 0, total: 5,
+            note: Note(tone: .info, title: "", key: ["↓", "Tab"].joined(separator: IndicatorLabels.keySeparator), keyAction: "選択")
+        )
+        panel.showsNumbers = false
+        return panel
+    }()
+
+    /// 分岐図で絵文字を選んだところ
+    static let emojiLattice: LatticePanel = {
+        var column = LatticePanel.Column(text: "😄", alternatives: Array(emojiCandidates.prefix(5)), selectedAlternative: 3,
+                                         variants: ["えがお", "エガオ", "ｴｶﾞｵ"], isFocused: true, isUncertain: false)
+        column.homophone = emojiNote
+        return LatticePanel(columns: [.init(text: "今日も", isFocused: false, isUncertain: false), column], position: 1, total: 30)
+    }()
+
     static let lattice = LatticePanel(columns: [
         .init(text: "私の", isFocused: false, isUncertain: false),
         .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),

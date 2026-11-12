@@ -126,7 +126,7 @@ fn render_all(output: &Path) -> Result<()> {
             ),
             ..look
         };
-        let scenes: [(&str, Scene); 15] = [
+        let scenes: [(&str, Scene); 18] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "homophone-list",
@@ -177,6 +177,18 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::candidate_list(&correction(), &look, &measure),
             ),
             ("branch", scene::branch_map(&lattice(), &look, &measure)),
+            (
+                "emoji-list",
+                scene::candidate_list(&emoji_list(), &look, &measure),
+            ),
+            (
+                "emoji-suggestion",
+                scene::candidate_list(&emoji_suggestion(), &look, &measure),
+            ),
+            (
+                "emoji-branch",
+                scene::branch_map(&emoji_branch(), &look, &measure),
+            ),
             (
                 "branch-preview",
                 scene::branch_map(&preview(), &look, &measure),
@@ -468,6 +480,79 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         note: None,
         hints: vec![],
         meaning_placement: has_meaning.then_some(placement),
+    }
+}
+
+/// 読みで引いた絵文字(設定の「絵文字に変換」．macOS の SamplePanels.emojiNote)．選んでいる絵文字の名前(CLDR)を意味のカードに出す
+fn emoji_note() -> HomophoneNote {
+    HomophoneNote {
+        word: "😄".into(),
+        part_of_speech: None,
+        senses: vec![HomophoneSense {
+            meaning: "笑顔".into(),
+            example: None,
+        }],
+        others: vec![],
+    }
+}
+
+/// 「えがお」の候補．4・5 番目に絵文字を出す(macOS の SamplePanels.emojiCandidates)
+const EMOJI_CANDIDATES: [&str; 9] = [
+    "笑顔", "^_^", "(^-^)", "😄", "😀", "(^_^)", "(^o^)", "(*^^*)", "(^^)",
+];
+
+/// 文節ごとの一覧で絵文字を選んだところ(macOS の emoji-list)
+fn emoji_list() -> CandidateList {
+    CandidateList {
+        entries: entries(&EMOJI_CANDIDATES),
+        hints: None,
+        selected_entry: Some(3),
+        position: 4,
+        total: 30,
+        homophone: Some(emoji_note()),
+        meaning_placement: Some(MeaningPlacement::Side),
+        ..list()
+    }
+}
+
+/// 打っているあいだの候補の窓に出した絵文字(macOS の emoji-suggestion)．選び始めるまで番号を振らない
+fn emoji_suggestion() -> CandidateList {
+    CandidateList {
+        variants: vec![],
+        entries: entries(&["笑顔", "(^^)", "(*^^*)", "😄", "😀"]),
+        shows_numbers: Some(false),
+        selected_entry: None,
+        position: 0,
+        total: 5,
+        hints: Some(vec![hint("↓ Tab", "選択")]),
+        ..list()
+    }
+}
+
+/// 分岐図で絵文字を選んだところ(macOS の emoji-branch)
+fn emoji_branch() -> BranchMap {
+    let alternatives = strings(&EMOJI_CANDIDATES[..5]);
+    BranchMap {
+        association: None,
+        association_hint: None,
+        association_key: None,
+        columns: vec![
+            column("今日も"),
+            BranchColumn {
+                selected_alternative: Some(3),
+                variants: strings(&["えがお", "エガオ", "ｴｶﾞｵ"]),
+                is_focused: true,
+                homophone: Some(emoji_note()),
+                alternative_notes: vec![None; alternatives.len()],
+                alternatives,
+                ..column("😄")
+            },
+        ],
+        position: 1,
+        total: 30,
+        note: None,
+        hints: vec![],
+        meaning_placement: Some(MeaningPlacement::Side),
     }
 }
 

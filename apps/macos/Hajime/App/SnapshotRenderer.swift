@@ -72,6 +72,11 @@ enum SnapshotRenderer {
                 }
                 render(associationHintListView(theme: look.theme, appearance: appearance), name: "association-hint-list-\(look.name)", to: output, appearance: appearance)
                 render(predictionView(theme: look.theme, appearance: appearance), name: "prediction-\(look.name)", to: output, appearance: appearance)
+                render(panelView(SamplePanels.emojiList, theme: look.theme, appearance: appearance), name: "emoji-list-\(look.name)", to: output, appearance: appearance)
+                render(panelView(SamplePanels.emojiSuggestion, theme: look.theme, appearance: appearance), name: "emoji-suggestion-\(look.name)", to: output,
+                       appearance: appearance)
+                render(latticeView(SamplePanels.emojiLattice, theme: look.theme, appearance: appearance), name: "emoji-branch-\(look.name)", to: output,
+                       appearance: appearance)
                 render(associationHintBranchView(theme: look.theme, appearance: appearance), name: "association-hint-branch-\(look.name)", to: output, appearance: appearance)
             }
         }
@@ -516,11 +521,20 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    private static func latticeView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
-        let panel = SamplePanels.lattice
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 決まった中身の一覧(絵文字の候補など)
+    private static func panelView(_ panel: CandidatePanel, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

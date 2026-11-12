@@ -38,6 +38,8 @@
     "dateConversion": true,
     "dynamicDictionary": false,
     "emojiConversion": true,
+    "emojiCandidatePosition": 4,
+    "emojiCandidateCount": 2,
     "englishInputLiveConversion": false,
     "englishSkipLength": 2,
     "englishTermCandidates": true,

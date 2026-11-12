@@ -61,6 +61,8 @@ pub mod settings {
     pub const PROOFREADING: &str = "校正支援";
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
     pub const EMOJI_CONVERSION: &str = "絵文字に変換";
+    pub const EMOJI_CANDIDATE_POSITION: &str = "絵文字の位置";
+    pub const EMOJI_CANDIDATE_COUNT: &str = "絵文字の数";
     pub const LATEX_CONVERSION: &str = "LaTeX のコマンドに変換";
     pub const NUMBER_FORMS: &str = "数字の書き方";
     pub const NUMBER_FORM_CONVERSION: &str = "数字を丸数字などに変換";
@@ -91,6 +93,11 @@ pub mod settings {
     /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const DICTIONARY_NOTE: &str = "読みと単語をタブで区切ったテキストファイルを読み込めます。";
+
+    /// 絵文字の位置の値(macOS の UIStrings.Settings.emojiCandidatePositionValue)
+    pub fn emoji_candidate_position(value: f64) -> String {
+        format!("{value} 番目")
+    }
 
     /// UIStrings.Settings.fontSize(スライダーの名前に今の値を付ける)
     pub fn font_size(size: f64) -> String {
@@ -738,6 +745,8 @@ pub mod sync {
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
         ("emojiConversion", "絵文字に変換"),
+        ("emojiCandidatePosition", "絵文字の位置"),
+        ("emojiCandidateCount", "絵文字の数"),
         ("latexConversion", "LaTeX のコマンドに変換"),
         ("numberFormConversion", "数字を丸数字などに変換"),
         ("numberFormCircled", "丸数字"),

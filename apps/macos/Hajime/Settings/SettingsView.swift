@@ -246,6 +246,20 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.proofreading, keyPath: \.proofreading)
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
+                Group {
+                    ResettableRow(model: model, keyPath: \.emojiCandidatePosition) {
+                        Stepper(value: model.binding(\.emojiCandidatePosition), in: DefaultSettings.emojiCandidatePositionRange) {
+                            LabeledContent(UIStrings.Settings.emojiCandidatePosition,
+                                           value: UIStrings.Settings.emojiCandidatePositionValue(model.settings.emojiCandidatePosition))
+                        }
+                    }
+                    ResettableRow(model: model, keyPath: \.emojiCandidateCount) {
+                        Stepper(value: model.binding(\.emojiCandidateCount), in: DefaultSettings.emojiCandidateCountRange) {
+                            LabeledContent(UIStrings.Settings.emojiCandidateCount, value: "\(model.settings.emojiCandidateCount)")
+                        }
+                    }
+                }
+                .disabled(!model.settings.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
             }
             Section(UIStrings.Settings.numberForms) {
