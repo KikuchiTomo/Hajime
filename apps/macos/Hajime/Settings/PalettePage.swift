@@ -24,6 +24,7 @@ struct PalettePage: View {
                 Group {
                     LabeledContent(UIStrings.Palette.emojiKey, value: keys(for: .emojiPalette))
                     LabeledContent(UIStrings.Palette.symbolKey, value: keys(for: .symbolPalette))
+                    LabeledContent(UIStrings.Palette.kaomojiKey, value: keys(for: .kaomojiPalette))
                     ResettableToggle(model: model, title: UIStrings.Palette.closesAfterInsert, keyPath: \.paletteClosesAfterInsert)
                     ResettableToggle(model: model, title: UIStrings.Palette.recordsHistory, keyPath: \.paletteRecordsHistory)
                     if let clear = model.clearPaletteHistory {

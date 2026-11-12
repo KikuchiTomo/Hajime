@@ -586,7 +586,7 @@ public final class InputSession {
         // 手書き入力は設定でオンにしたときだけ
         if command == .handwriting, !settings.current.handwriting { return nil }
         // パレットは設定でオンにしていて，アプリがパレットを描けるときだけ(描けないのに開くと，キーを受けたまま何も見せなくなる)
-        if command == .emojiPalette || command == .symbolPalette, !settings.current.palette || paletteServices == nil { return nil }
+        if command.paletteKind != nil, !settings.current.palette || paletteServices == nil { return nil }
         return command
     }
 
@@ -633,10 +633,9 @@ public final class InputSession {
     private func handlePalette(_ event: KeyEvent, palette: PaletteSession, context: InputContext) -> KeyResult {
         if let command = lookUp(event) {
             switch command {
-            case .emojiPalette, .symbolPalette:
-                // 開いている種類のキーで閉じ，もう一方のキーで切り替える
-                let kind: PaletteItem.Kind = command == .emojiPalette ? .emoji : .symbol
-                guard palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
+            case .emojiPalette, .symbolPalette, .kaomojiPalette:
+                // 開いている種類のキーで閉じ，ほかの種類のキーで切り替える
+                guard let kind = command.paletteKind, palette.kind != kind else { return KeyResult(handled: true, actions: closePalette()) }
                 return KeyResult(handled: true, actions: paletteActions(palette.perform(.mode(kind)), palette: palette))
             case _ where command.changesMode:
                 // 日本語入力と英数入力の切り替えは効かせ，探す欄の見せ方を合わせる
@@ -682,6 +681,7 @@ public final class InputSession {
         case .handwriting: return KeyResult(handled: true, actions: commitAll() + [.showHandwriting])
         case .emojiPalette: return KeyResult(handled: true, actions: openPalette(.emoji))
         case .symbolPalette: return KeyResult(handled: true, actions: openPalette(.symbol))
+        case .kaomojiPalette: return KeyResult(handled: true, actions: openPalette(.kaomoji))
         // 入力モード
         case .japaneseMode: return switchMode(to: .japanese)
         case .directMode: return switchMode(to: .direct)
