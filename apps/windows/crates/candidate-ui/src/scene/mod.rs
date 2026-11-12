@@ -84,10 +84,19 @@ pub enum Draw {
         blur: f32,
         color: Color,
     },
+    /// 中の部品を clip の中だけに，opacity の濃さで描く．scale が 1 でなければ clip の真ん中を中心に大きさを変える
+    /// (パレットの印を滑らせる・中身を送る・部品を弾ませる動き)
+    Group {
+        clip: Frame,
+        opacity: f32,
+        scale: f32,
+        draws: Vec<Draw>,
+    },
 }
 
 impl Draw {
-    fn offset(self, dx: f32, dy: f32) -> Self {
+    /// 部品を dx, dy だけずらす
+    pub fn offset(self, dx: f32, dy: f32) -> Self {
         match self {
             Self::Rect { frame, color } => Self::Rect {
                 frame: frame.offset(dx, dy),
@@ -175,6 +184,17 @@ impl Draw {
                 radius,
                 blur,
                 color,
+            },
+            Self::Group {
+                clip,
+                opacity,
+                scale,
+                draws,
+            } => Self::Group {
+                clip: clip.offset(dx, dy),
+                opacity,
+                scale,
+                draws: draws.into_iter().map(|draw| draw.offset(dx, dy)).collect(),
             },
         }
     }
@@ -363,10 +383,21 @@ pub(crate) mod testing {
         ResolvedTheme::resolve(name, None, &SystemLook::default())
     }
 
+    /// 部品を，まとめた部品(Draw::Group)の中も含めて描く順に並べる
+    pub fn flattened(draws: &[Draw]) -> Vec<&Draw> {
+        let mut all = Vec::new();
+        for draw in draws {
+            all.push(draw);
+            if let Draw::Group { draws, .. } = draw {
+                all.extend(flattened(draws));
+            }
+        }
+        all
+    }
+
     pub fn texts(scene: &Scene) -> Vec<(String, Color)> {
-        scene
-            .draws
-            .iter()
+        flattened(&scene.draws)
+            .into_iter()
             .filter_map(|draw| match draw {
                 Draw::Text { text, color, .. } => Some((text.clone(), *color)),
                 _ => None,
@@ -375,14 +406,19 @@ pub(crate) mod testing {
     }
 
     pub fn text_frame(scene: &Scene, wanted: &str) -> Option<Frame> {
-        scene.draws.iter().find_map(|draw| match draw {
-            Draw::Text { text, frame, .. } if text == wanted => Some(*frame),
-            _ => None,
-        })
+        flattened(&scene.draws)
+            .into_iter()
+            .find_map(|draw| match draw {
+                Draw::Text { text, frame, .. } if text == wanted => Some(*frame),
+                _ => None,
+            })
     }
 
     pub fn count(scene: &Scene, matches: impl Fn(&Draw) -> bool) -> usize {
-        scene.draws.iter().filter(|draw| matches(draw)).count()
+        flattened(&scene.draws)
+            .into_iter()
+            .filter(|draw| matches(draw))
+            .count()
     }
 }
 
