@@ -143,6 +143,14 @@ impl Scroller {
         size::SCROLLBAR_THIN + (size::SCROLLBAR_WIDE - size::SCROLLBAR_THIN) * wide
     }
 
+    /// 送れる場所の上でポインターが動いた．細いスクロールバーを出して，送れることを知らせる
+    /// (WinUI の ScrollViewer はポインターが中で動くと細い印を出し，止まると消す)
+    pub fn reveal_bar(&mut self, now: f64) {
+        if self.can_scroll() {
+            self.active_at = now;
+        }
+    }
+
     /// ポインターがスクロールバーの上に来た・離れた
     pub fn set_hover(&mut self, hover: bool, now: f64) {
         if self.hover == hover {

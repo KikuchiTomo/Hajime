@@ -561,10 +561,18 @@ impl AcknowledgementLayout {
                 measure.width(prefix, TextStyle::Caption) + measure.width(url, TextStyle::Caption)
                     <= width
             });
+            // URL のあとの文は，URL と同じ行に収まる分を続けて書き，残りを下に折り返す(macOS の文の中の Link と同じ流れ)
             let height = match parts {
-                Some((_, _, suffix)) if fits && !suffix.trim().is_empty() => {
+                Some((prefix, url, suffix)) if fits && !suffix.trim().is_empty() => {
+                    let used = measure.width(prefix, TextStyle::Caption)
+                        + measure.width(url, TextStyle::Caption);
+                    let (_, rest) = split_to_width(measure, suffix, width - used);
                     size::NOTE_LINE_HEIGHT
-                        + measure.wrapped_height(suffix.trim(), TextStyle::Caption, width)
+                        + if rest.trim().is_empty() {
+                            0.0
+                        } else {
+                            measure.wrapped_height(rest.trim(), TextStyle::Caption, width)
+                        }
                 }
                 _ => measure
                     .wrapped_height(line, TextStyle::Caption, width)
@@ -4040,20 +4048,36 @@ impl PageView {
                         Rect::new(link.x, link.max_y() - 2.0, link.width, 1.0),
                         color.with_alpha(opacity::LINK + (1.0 - opacity::LINK) * state.hover),
                     );
-                    // URL のあとの文(「(v0.2.0)」など)は，リンクにせず下に折り返して出す
+                    // URL のあとの文(「(v0.2.0)」など)はリンクにせず，URL と同じ行に収まる分を続けて書き，残りを下に折り返す
                     if !suffix.trim().is_empty() {
+                        let (head, rest) =
+                            split_to_width(canvas, suffix, rect.max_x() - link.max_x());
                         canvas.text(
                             Rect::new(
-                                rect.x,
-                                rect.y + size::NOTE_LINE_HEIGHT,
-                                rect.width,
-                                rect.height - size::NOTE_LINE_HEIGHT,
+                                link.max_x(),
+                                rect.y,
+                                (rect.max_x() - link.max_x()).max(0.0),
+                                size::NOTE_LINE_HEIGHT,
                             ),
-                            suffix.trim(),
+                            head,
                             TextStyle::Caption,
                             secondary,
-                            TextLayout::WRAP,
+                            TextLayout::LINE,
                         );
+                        if !rest.trim().is_empty() {
+                            canvas.text(
+                                Rect::new(
+                                    rect.x,
+                                    rect.y + size::NOTE_LINE_HEIGHT,
+                                    rect.width,
+                                    rect.height - size::NOTE_LINE_HEIGHT,
+                                ),
+                                rest.trim(),
+                                TextStyle::Caption,
+                                secondary,
+                                TextLayout::WRAP,
+                            );
+                        }
                     }
                     if state.focus_visible {
                         paint::focus_ring(canvas, theme, *link, size::CONTROL_RADIUS);
@@ -5040,6 +5064,23 @@ fn paint_table_choice(
         Color::from(secondary),
         TextLayout::CENTER,
     );
+}
+
+/// text の先頭から，幅 width に収まる分と残りに分ける(謝辞の URL のあとの文を URL と同じ行に続けるため)
+fn split_to_width<'a>(
+    measure: &dyn paint::Measure,
+    text: &'a str,
+    width: f32,
+) -> (&'a str, &'a str) {
+    let mut end = 0;
+    for (index, character) in text.char_indices() {
+        let next = index + character.len_utf8();
+        if measure.width(&text[..next], TextStyle::Caption) > width {
+            break;
+        }
+        end = next;
+    }
+    text.split_at(end)
 }
 
 /// 表の有効の印(WinUI 3 の CheckBox．入れたら色を塗ってチェックを描く)．cell の左に置き，上下は真ん中にする
