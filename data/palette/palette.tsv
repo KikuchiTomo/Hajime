@@ -3347,3 +3347,445 @@ symbol	misc	⚂		さいころ	さいころ	die face-3	さいころ	die face-3
 symbol	misc	⚃		さいころ	さいころ	die face-4	さいころ	die face-4		
 symbol	misc	⚄		さいころ	さいころ	die face-5	さいころ	die face-5		
 symbol	misc	⚅		さいころ	さいころ	die face-6	さいころ	die face-6		
+kaomoji	joy	＼(^o^)／		にこにこ	にこにこ		にこにこ|にこっ|にこ|ばんざい|おわた|おーい|はーい			
+kaomoji	joy	(^o^)		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	(^^)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(*^^*)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	^_^		にこっ	にこっ		にこっ|にこ			
+kaomoji	joy	:D		にこにこ	にこにこ		よこおき|にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	・ω・		にこ	にこ		にこ			
+kaomoji	joy	(*´ω｀*)		てれ	てれ		てれ			
+kaomoji	joy	(^O^)		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	(^_^)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(・∀・)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(*^_^*)		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	:)		すまいる	すまいる		よこおき|すまいる|またね			
+kaomoji	joy	(*´∀｀*)		てれ	てれ		てれ|またーり|うっとり			
+kaomoji	joy	(*´∀｀)		てれ	てれ		てれ			
+kaomoji	joy	(^O^)／		にこにこ	にこにこ		にこにこ|おーい|はーい			
+kaomoji	joy	(^○^)		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	(^^)/		にこにこ	にこにこ		にこにこ|おーい|はーい|ではでは			
+kaomoji	joy	(^q^)		にこにこ	にこにこ		にこにこ|にこっ|にこ|よだれ			
+kaomoji	joy	(^.^)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	;)		うぃんく	うぃんく		よこおき|うぃんく|ういんく|にこにこ|にこっ|にこ			
+kaomoji	joy	（＾ν＾）		にゅっ	にゅっ		にゅっ|にこにこ|にこっ|にこ			
+kaomoji	joy	(#^.^#)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(#^^#)		にこっ	にこっ		にこっ|にこ|にこにこ			
+kaomoji	joy	(^_-)		にこにこ	にこにこ		にこにこ|ういんく|うぃんく			
+kaomoji	joy	(*´Д｀)		てれ	てれ		てれ|あーん			
+kaomoji	joy	(*´艸｀*)		てれ	てれ		てれ|ぽっ|きゃっ			
+kaomoji	joy	(*´ｪ`*)		てれ	てれ		てれ|ぽっ			
+kaomoji	joy	(*´ω`*)		てれ	てれ		てれ			
+kaomoji	joy	(●´ω｀●)		てれ	てれ		てれ|にこ|にこにこ|ぽっ			
+kaomoji	joy	(●´ϖ`●)		にこ	にこ		にこ|にこにこ|にこっ			
+kaomoji	joy	(*´ڡ`●)		ぺろ	ぺろ		ぺろ			
+kaomoji	joy	(๑´ڡ`๑)		ぺろ	ぺろ		ぺろ|ぺろっ|おいしい			
+kaomoji	joy	٩(๑´3｀๑)۶		ばんざい	ばんざい		ばんざい			
+kaomoji	joy	(๑˙❥˙๑)		くちびる	くちびる		くちびる			
+kaomoji	joy	(^^♪		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(^。^)		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	(^Q^)		じゅるっ	じゅるっ		じゅるっ|にこっ			
+kaomoji	joy	(^・^)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(^o^)v		にこにこ	にこにこ		にこにこ|にこっ|にこ|ぶい|ぴーす			
+kaomoji	joy	(^_^)v		にこにこ	にこにこ		にこにこ|にこっ|にこ|ぶい|ぴーす			
+kaomoji	joy	(^O^)v		ぶい	ぶい		ぶい|ぴーす			
+kaomoji	joy	(^^)v		にこにこ	にこにこ		にこにこ|にこっ|にこ|ぶい|ぴーす			
+kaomoji	joy	(*^^)v		にこにこ	にこにこ		にこにこ|にこっ|にこ|ぶい|ぴーす			
+kaomoji	joy	(*^。^*)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(*^▽^*)		てれ	てれ		てれ			
+kaomoji	joy	（*^_^*）		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	（＾ｖ＾）		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	（＾◇＾）		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	（＾ｕ＾）		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	（ ＾ν＾）		にゅっ	にゅっ		にゅっ|にこにこ|にこっ|にこ			
+kaomoji	joy	（●＾o＾●）		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	joy	(｡･･｡)		てれ	てれ		てれ			
+kaomoji	joy	(｡>﹏<｡)		てれ	てれ		てれ|はずかしい			
+kaomoji	joy	(>ω<)		うれしい	うれしい		うれしい			
+kaomoji	joy	(〃ω〃)		てれ	てれ		てれ			
+kaomoji	joy	(〃∇〃)		てれ	てれ		てれ			
+kaomoji	joy	(*ﾟ∀ﾟ)		にこ	にこ		にこ|にこにこ|にこっ|つー			
+kaomoji	joy	(-ω☆)ｷﾗﾘ		きらり	きらり		きらり			
+kaomoji	joy	(-д☆)ｷﾗｯ		きらっ	きらっ		きらっ			
+kaomoji	joy	(^_-)-☆		にこにこ	にこにこ		にこにこ|ういんく|うぃんく			
+kaomoji	joy	(^_^)/		にこにこ	にこにこ		にこにこ|にこっ|にこ|おーい|はーい			
+kaomoji	joy	(^o^)／		にこにこ	にこにこ		にこにこ|おーい|はーい			
+kaomoji	joy	(^o^)丿		にこにこ	にこにこ		にこにこ|にこっ|にこ|はーい|てをあげて			
+kaomoji	joy	ヽ(^o^)丿		にこにこ	にこにこ		にこにこ|ばんざい			
+kaomoji	joy	!(^o^)!		にこにこ	にこにこ		にこにこ|にこっ|にこ|ぴんぽーん			
+kaomoji	joy	ヽ(^。^)ノ		にこにこ	にこにこ		にこにこ|にこっ|にこ|ばんざい			
+kaomoji	joy	ヽ(´ｴ`)ﾉ		ばんざい	ばんざい		ばんざい			
+kaomoji	joy	ヽ(=´▽`=)ﾉ		わーい	わーい		わーい|ばんざい			
+kaomoji	joy	(=^･^=)		にこ	にこ		にこ|にこにこ|にこっ			
+kaomoji	joy	(^_^.)		にこにこ	にこにこ		にこにこ|にこっ|にこ			
+kaomoji	joy	(*μ_μ)		てれ	てれ		てれ			
+kaomoji	joy	( ´∀｀)		もなー	もなー		もなー|にこ|にこにこ|にこっ			
+kaomoji	joy	(ﾉ´∀｀*)		てれ	てれ		てれ			
+kaomoji	joy	(о´∀`о)		にこ	にこ		にこ			
+kaomoji	joy	（ ・∀・）		もららー	もららー		もららー			
+kaomoji	joy	（ ﾟ∀ﾟ ）		にこにこ	にこにこ		にこにこ|にこ|にこっ			
+kaomoji	joy	(≧▽≦)		うれしい	うれしい		うれしい			
+kaomoji	joy	(≧∀≦)		にこ	にこ		にこ			
+kaomoji	joy	(≧∇≦)/		いえい	いえい		いえい			
+kaomoji	joy	(≧∇≦)b		うれしい	うれしい		うれしい|いい|いいね			
+kaomoji	joy	（≧∇≦）		にこ	にこ		にこ			
+kaomoji	joy	ლ(´ڡ`ლ)		ぺろ	ぺろ		ぺろ|おいしい			
+kaomoji	joy	٩(♡ε♡ )۶		はーと	はーと		はーと			
+kaomoji	joy	ヽ(｀▽´)/		わーい	わーい		わーい|ばんざい			
+kaomoji	joy	(ㆁωㆁ*)		てれ	てれ		てれ			
+kaomoji	joy	(ｕ_ｕ*)		てれ	てれ		てれ|ぽっ			
+kaomoji	joy	(^0_0^)		にこにこ	にこにこ		にこにこ|めがね|にこ|にこっ			
+kaomoji	joy	^m^		にこにこ	にこにこ		にこにこ|にこ|にこっ			
+kaomoji	joy	:-)		すまいる	すまいる		よこおき|すまいる|こんにちは|なんちゃって			
+kaomoji	joy	・ｖ・		にこ	にこ		にこ			
+kaomoji	joy	<3		はーと	はーと		よこおき|はーと			
+kaomoji	joy	(•ө•)♡		はーと	はーと		はーと			
+kaomoji	joy	＼(-o-)／		わーい	わーい		わーい|にこにこ|ばんざい			
+kaomoji	joy	＼(~o~)／		にこにこ	にこにこ		にこにこ|ばんざい			
+kaomoji	joy	(/･ω･)/		ばんざい	ばんざい		ばんざい			
+kaomoji	joy	(　･ิω･ิ)		まゆ	まゆ		まゆ|きり|きりっ			
+kaomoji	joy	(･ิω･ิ)		まゆ	まゆ		まゆ			
+kaomoji	joy	( ･ิω･ิ)		まゆ	まゆ		まゆ|きり|きりっ			
+kaomoji	joy	( ･ิϖ･ิ)		まゆ	まゆ		まゆ			
+kaomoji	joy	(*´σｰ｀)ｴﾍﾍ		えへへ	えへへ		えへへ			
+kaomoji	joy	(*ﾉω・*)ﾃﾍ		てれ	てれ		てれ|ぽっ|てへ			
+kaomoji	joy	(*'ω'*)		てれ	てれ		てれ			
+kaomoji	joy	(*‘ω‘ *)		にこ	にこ		にこ|にこにこ			
+kaomoji	joy	(´vωv`*)		てれ	てれ		てれ			
+kaomoji	joy	（*´▽｀*）		もえ	もえ		もえ			
+kaomoji	joy	(*´ｪ｀*)ﾎﾟｯ		てれ	てれ		てれ|ぽっ			
+kaomoji	joy	(´∀｀*)ｳﾌﾌ		うふふ	うふふ		うふふ			
+kaomoji	joy	(⌒,_ゝ⌒)		にこっ	にこっ		にこっ|ぷっ			
+kaomoji	joy	(*>_<*)ﾉ		てれ	てれ		てれ			
+kaomoji	joy	(￣ー￣)ﾆﾔﾘ		にやり	にやり		にやり			
+kaomoji	joy	(￣ー￣)ｂｸﾞｯ!		ぐっ	ぐっ		ぐっ			
+kaomoji	joy	( ´∀｀)bｸﾞｯ!		ぐっ	ぐっ		ぐっ			
+kaomoji	joy	( ・∀・)ｲｲ!!		いい	いい		いい			
+kaomoji	joy	(・∀・)ｲｲ!!		いい	いい		いい			
+kaomoji	joy	(・∀・)ｲｲﾈ!!		いいね	いいね		いいね			
+kaomoji	joy	（・∀・）ﾆﾔﾆﾔ		にやにや	にやにや		にやにや			
+kaomoji	joy	(o・ω・o)		にこ	にこ		にこ|にこにこ			
+kaomoji	joy	(//∇//)		てれ	てれ		てれ			
+kaomoji	joy	❤(ӦｖӦ｡)		てれ	てれ		てれ|はーと			
+kaomoji	joy	•̀.̫•́✧		きりっ	きりっ		きりっ			
+kaomoji	joy	(๑•̀ㅁ•́๑)✧		きりっ	きりっ		きりっ			
+kaomoji	joy	(๑•̀ㅂ•́)و✧		よし	よし		よし|ぐっ			
+kaomoji	joy	(*°∀°)=3		もえ	もえ		もえ			
+kaomoji	joy	( ^ω^ )ﾆｺﾆｺ		にこにこ	にこにこ		にこにこ			
+kaomoji	joy	( ^)o(^ )		にこにこ	にこにこ		にこにこ|わーい			
+kaomoji	joy	(∩´∀｀)∩ﾜｰｲ		わーい	わーい		わーい			
+kaomoji	joy	（＾ω＾）ﾍﾟﾛﾍﾟﾛ		ぺろぺろ	ぺろぺろ		ぺろぺろ			
+kaomoji	joy	v(´∀｀*v)ﾋﾟｰｽ		ぴーす	ぴーす		ぴーす|ぶい			
+kaomoji	joy	( ´ ▽ ` )ﾉ		はーい	はーい		はーい			
+kaomoji	joy	ヾ(*´∀｀*)ﾉｷｬｯｷｬ		きゃっ	きゃっ		きゃっ|きゃっきゃ			
+kaomoji	joy	ヾ(｡>﹏<｡)ﾉﾞ✧*。		うれしい	うれしい		うれしい			
+kaomoji	joy	(*˘︶˘*).｡.:*♡		はーと	はーと		はーと			
+kaomoji	joy	(人´∀｀)．☆．。．:*･ﾟ		うっとり	うっとり		うっとり			
+kaomoji	joy	((o(´∀｀)o))ﾜｸﾜｸ		わくわく	わくわく		わくわく			
+kaomoji	joy	( T_T)＼(^-^ )		よしよし	よしよし		よしよし			
+kaomoji	joy	(^ム^)		にこにこ	にこにこ		にこにこ|にこっ|にこ|わーい			
+kaomoji	sorrow	(T_T)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(´・ω・｀)		しょぼーん	しょぼーん		しょぼーん|しょんぼり|がっかり			
+kaomoji	sorrow	(;_;)		しくしく	しくしく		しくしく|なみだ|なく|えーん|うるうる			
+kaomoji	sorrow	(´・ω・`)		しょぼーん	しょぼーん		しょぼーん|がっくり|がくーり|しょんぼり			
+kaomoji	sorrow	(´；ω；｀)		なみだ	なみだ		なみだ|なく			
+kaomoji	sorrow	＿|￣|○		がっくり	がっくり		がっくり|がくーり			
+kaomoji	sorrow	(ToT)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(TT)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(TдT)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(TOT)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(;O;)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(*´﹃｀*)		だらー	だらー		だらー			
+kaomoji	sorrow	(ヽ´ω`)		ぐったり	ぐったり		ぐったり|げっそり			
+kaomoji	sorrow	٩(๑´0`๑)۶		うわーん	うわーん		うわーん			
+kaomoji	sorrow	(;_;		しくしく	しくしく		しくしく|なみだ|うるうる			
+kaomoji	sorrow	(/_;)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(:_;)		しくしく	しくしく		しくしく|なみだ|なく|えーん|うるうる			
+kaomoji	sorrow	(｡ŏ﹏ŏ)		うーん	うーん		うーん			
+kaomoji	sorrow	(¯―¯٥)		なみだ	なみだ		なみだ|なく			
+kaomoji	sorrow	(ﾉД`)ｼｸｼｸ		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(;_:)		しくしく	しくしく		しくしく|なみだ|なく|えーん			
+kaomoji	sorrow	(　；∀；)		しくしく	しくしく		しくしく|なく|なみだ|えーん			
+kaomoji	sorrow	( ；∀；)		なみだ	なみだ		なみだ|しくしく|なく|えーん			
+kaomoji	sorrow	(´Д⊂ヽ		しくしく	しくしく		しくしく|なみだ|えーん			
+kaomoji	sorrow	٩(′д‵)۶		はぁ	はぁ		はぁ|うわーん			
+kaomoji	sorrow	ヽ(｀Д´#)ﾉ		むか	むか		むか|むかっ|うわーん			
+kaomoji	sorrow	(｀；ω；´)		ぶわっ	ぶわっ		ぶわっ|なく|なみだ			
+kaomoji	sorrow	;-(		なく	なく		よこおき|なく|なみだ|しくしく			
+kaomoji	sorrow	•́ε•̀٥		ぶー	ぶー		ぶー			
+kaomoji	sorrow	( ´Д｀)=3		ためいき	ためいき		ためいき|はぁ			
+kaomoji	sorrow	( TДT)		なみだ	なみだ		なみだ|なく|えーん			
+kaomoji	sorrow	( ･ั﹏･ั)		うーん	うーん		うーん			
+kaomoji	sorrow	(･ัω･ั)		うーん	うーん		うーん			
+kaomoji	sorrow	(´；ω；｀)ｳｯ…		うっ	うっ		うっ|なみだ|なく|しくしく			
+kaomoji	sorrow	(´；ω；｀)ﾌﾞﾜｯ		ぶわっ	ぶわっ		ぶわっ|なみだ|なく|しくしく			
+kaomoji	sorrow	(つд⊂)ｴｰﾝ		えーん	えーん		えーん			
+kaomoji	sorrow	(´д⊂)‥ﾊｩ		はぅ	はぅ		はぅ			
+kaomoji	sorrow	(´Д⊂ｸﾞｽﾝ		ぐすん	ぐすん		ぐすん|なく			
+kaomoji	sorrow	(´・ω・｀)ｼｮﾎﾞｰﾝ		しょぼーん	しょぼーん		しょぼーん			
+kaomoji	sorrow	(´・ω:;.:...		しょぼーん	しょぼーん		しょぼーん			
+kaomoji	sorrow	｡ﾟ(ﾟ´Д｀ﾟ)ﾟ｡		しくしく	しくしく		しくしく|なく|えーん|なみだ			
+kaomoji	sorrow	ﾟ(ﾟ´ω`ﾟ)ﾟ｡ﾋﾟｰ		ぴー	ぴー		ぴー			
+kaomoji	sorrow	Ω＼ζ°)ﾁｰﾝ		ちーん	ちーん		ちーん			
+kaomoji	sorrow	(´ . .̫ . `)		しょぼーん	しょぼーん		しょぼーん			
+kaomoji	sorrow	(๑´•.̫ • `๑)		しょぼーん	しょぼーん		しょぼーん			
+kaomoji	sorrow	｡･ﾟ･(ﾉД`)･ﾟ･｡		なみだ	なみだ		なみだ|しくしく|えーん			
+kaomoji	sorrow	｡･ﾟ･(ﾉ∀`)･ﾟ･｡		なみだ	なみだ		なみだ|なく|えーん			
+kaomoji	sorrow	＿|￣|○ il||li		がーん	がーん		がーん			
+kaomoji	sorrow	(´°̥̥̥̥̥̥̥̥ω°̥̥̥̥̥̥̥̥｀)		なみだ	なみだ		なみだ|なく			
+kaomoji	sweat	^^;		にこにこ	にこにこ		にこにこ|あせ|ぎくっ|ぽりぽり			
+kaomoji	sweat	(^_^;)		にこにこ	にこにこ		にこにこ|あせ|ぎくっ|ぽりぽり			
+kaomoji	sweat	(-_-;)		ぎくっ	ぎくっ		ぎくっ|あせ|じろ|じとっ|じと|じとー			
+kaomoji	sweat	(-.-;)		じとっ	じとっ		じとっ|じと|じとー|ぎくっ			
+kaomoji	sweat	(・・;)		びくっ	びくっ		びくっ|びっくり|めがてん|あせ			
+kaomoji	sweat	(・_・;)		ぎくっ	ぎくっ		ぎくっ|あせ|めがてん|えー			
+kaomoji	sweat	(・・;		めがてん	めがてん		めがてん|なぜ|なぞ|はてな|あせ|ぎくっ			
+kaomoji	sweat	(・。・;		あせ	あせ		あせ|めがてん|びくっ			
+kaomoji	sweat	(；・∀・)		ぎくっ	ぎくっ		ぎくっ|あせ			
+kaomoji	sweat	(；´∀｀)		あせ	あせ		あせ			
+kaomoji	sweat	(；´Д｀)		あせ	あせ		あせ|はぁはぁ			
+kaomoji	sweat	(^o^;)		わーい	わーい		わーい|にこ|にこにこ|にこっ|あせ|ぎくっ			
+kaomoji	sweat	(^o^;		ぎくっ	ぎくっ		ぎくっ|あせ			
+kaomoji	sweat	(^.^;		にこにこ	にこにこ		にこにこ|あせ|ぎくっ|ぽりぽり			
+kaomoji	sweat	(^^ゞ		にこにこ	にこにこ		にこにこ|あせ|ぎくっ|ぽりぽり			
+kaomoji	sweat	（；^ω^）		あせ	あせ		あせ			
+kaomoji	sweat	（；＾ω＾）		あせ	あせ		あせ			
+kaomoji	sweat	(゜_゜)		うーん	うーん		うーん|えっと|えーと			
+kaomoji	sweat	(゜.゜)		うーん	うーん		うーん|えっと|えーと			
+kaomoji	sweat	(゜レ゜)		うーん	うーん		うーん			
+kaomoji	sweat	(゜o゜;		ぎくっ	ぎくっ		ぎくっ|びっくり|めがてん|あせ|えっと|えーと			
+kaomoji	sweat	(~_~;)		あせ	あせ		あせ|ほへー			
+kaomoji	sweat	(~O~;)		ほへー	ほへー		ほへー|あせ			
+kaomoji	sweat	(＠_＠;)		びくっ	びくっ		びくっ|びっくり|めがてん|あせ			
+kaomoji	sweat	(*_*;		びくっ	びくっ		びくっ|びっくり|めがてん|あせ			
+kaomoji	sweat	(ーー;)		ぎくっ	ぎくっ		ぎくっ|あせ|じろ|じとっ|じと|じとー			
+kaomoji	sweat	(+o+)		うーん	うーん		うーん			
+kaomoji	sweat	(｡･_･｡)		うーん	うーん		うーん			
+kaomoji	sweat	(´Д｀)ﾊｧ…		はぁ	はぁ		はぁ			
+kaomoji	sweat	(;´Д｀)ﾊｧﾊｧ		はぁはぁ	はぁはぁ		はぁはぁ|あせ			
+kaomoji	sweat	(*´Д`)ﾊｧﾊｧ		はぁはぁ	はぁはぁ		はぁはぁ			
+kaomoji	sweat	(ﾟДﾟ)ﾊｧ?		はぁ	はぁ		はぁ			
+kaomoji	sweat	(^O^;)		わーい	わーい		わーい|にこっ|にこ|にこにこ|あせ			
+kaomoji	sweat	(；一_一)		じろ	じろ		じろ|じとっ|じと|じとー|あせ			
+kaomoji	sweat	Σ(´∀｀；)		どきっ	どきっ		どきっ|あせ			
+kaomoji	sweat	Σ(・∀・；)		どきっ	どきっ		どきっ|あせ			
+kaomoji	sweat	(・.・;)		めがてん	めがてん		めがてん|あせ|びっくり|びくっ			
+kaomoji	sweat	(=o=;)		てつやあけ	てつやあけ		てつやあけ|あせ|ねむい			
+kaomoji	sweat	^_^;		にこにこ	にこにこ		にこにこ|あせ|ぎくっ|ぽりぽり			
+kaomoji	sweat	(； ･`ω･´)		あせ	あせ		あせ			
+kaomoji	sweat	(； ･`д･´)		あせ	あせ		あせ|まゆ			
+kaomoji	sweat	(´-﹏-`；)		あせ	あせ		あせ			
+kaomoji	sweat	(´ε｀；)ｳｰﾝ…		うーん	うーん		うーん|あせ			
+kaomoji	sweat	(ㆀ˘･з･˘)		あせ	あせ		あせ			
+kaomoji	sweat	( •̀ㅁ•́;)		あせ	あせ		あせ			
+kaomoji	sweat	(ﾟＡﾟ;)ｺﾞｸﾘ		ごくり	ごくり		ごくり|あせ			
+kaomoji	sweat	(;ﾟ∀ﾟ)=3ﾊｧﾊｧ		はぁはぁ	はぁはぁ		はぁはぁ|あせ			
+kaomoji	sweat	┐(´д｀)┌ﾔﾚﾔﾚ		やれやれ	やれやれ		やれやれ			
+kaomoji	sweat	(;´д｀)ﾄﾎﾎ…		とほほ	とほほ		とほほ|あせ			
+kaomoji	sweat	((((；ﾟДﾟ))))ｶﾞｸｶﾞｸﾌﾞﾙﾌﾞﾙ		がくぶる	がくぶる		がくぶる			
+kaomoji	sweat	(@@;)		びくっ	びくっ		びくっ|びっくり|めがてん|あせ			
+kaomoji	anger	(-_-)		じとっ	じとっ		じとっ|じと|じとー|むっ			
+kaomoji	anger	(-.-)		じとっ	じとっ		じとっ|じと|じとー|むっ			
+kaomoji	anger	(--)		むか	むか		むか			
+kaomoji	anger	(・へ・)		むか	むか		むか			
+kaomoji	anger	٩(๑òωó๑)۶		むか	むか		むか|むかっ|むきー|ぷんぷん			
+kaomoji	anger	٩(๑`^´๑)۶		むか	むか		むか|むかっ|むきー|ぷんぷん			
+kaomoji	anger	（●｀ε´●）		ぷんぷん	ぷんぷん		ぷんぷん|いかり|むか			
+kaomoji	anger	(｀´）		むか	むか		むか|むかー			
+kaomoji	anger	(~o~)		ほへー	ほへー		ほへー			
+kaomoji	anger	(~_~)		ほへー	ほへー		ほへー			
+kaomoji	anger	(~O~)		ほへー	ほへー		ほへー			
+kaomoji	anger	(~_~メ)		むか	むか		むか|むかー			
+kaomoji	anger	(-_-メ)		むか	むか		むか			
+kaomoji	anger	(ー_ー;)		じろ	じろ		じろ|じとっ|じと|じとー|あせ			
+kaomoji	anger	(ー_ー)		じとっ	じとっ		じとっ|じとー			
+kaomoji	anger	((+_+))		うーん	うーん		うーん			
+kaomoji	anger	(・д・)ﾁｯ		ちっ	ちっ		ちっ			
+kaomoji	anger	(=_=;)		てつやあけ	てつやあけ		てつやあけ|ねむい			
+kaomoji	anger	(=_=)		てつやあけ	てつやあけ		てつやあけ|てつや|ねむい			
+kaomoji	anger	( 一一)		じろ	じろ		じろ|じとー|じと|じとっ			
+kaomoji	anger	(# ﾟДﾟ)		いかり	いかり		いかり|むか			
+kaomoji	anger	(ーー゛)		むか	むか		むか			
+kaomoji	anger	(－－〆)		むか	むか		むか|むかー			
+kaomoji	anger	（#^ω^）		いかり	いかり		いかり|むか|ぴきぴき			
+kaomoji	anger	:|		しんけん	しんけん		よこおき|しんけん			
+kaomoji	anger	:(		おこる	おこる		よこおき|おこる|かなしい|やだねー			
+kaomoji	anger	:-(		おこる	おこる		よこおき|おこる|かなしい|やだねー			
+kaomoji	anger	:-P		したぺろり	したぺろり		よこおき|したぺろり			
+kaomoji	anger	・３・		ぶー	ぶー		ぶー			
+kaomoji	anger	−３−		ぶー	ぶー		ぶー			
+kaomoji	anger	(#･∀･)		いかり	いかり		いかり|きー			
+kaomoji	anger	(ー_ー)!!		じとっ	じとっ		じとっ|じと|びっくり			
+kaomoji	anger	ヽ(`Д´)ﾉﾌﾟﾝﾌﾟﾝ		ぷんぷん	ぷんぷん		ぷんぷん|こら|いかり			
+kaomoji	anger	ヽ(｀Д´#)ﾉ ﾑｷｰ!!		むきー	むきー		むきー			
+kaomoji	anger	（´-`）.｡oO		うーん	うーん		うーん			
+kaomoji	anger	c(`Д´と⌒ｃ)つ彡 ﾔﾀﾞﾔﾀﾞ		やだやだ	やだやだ		やだやだ			
+kaomoji	anger	(^_^メ)		にこにこ	にこにこ		にこにこ|むか|ぴくぴく|やくざ			
+kaomoji	surprise	(*_*)		びくっ	びくっ		びくっ|びっくり|めがてん			
+kaomoji	surprise	(ﾟ∀ﾟ)		あひゃ	あひゃ		あひゃ|びっくり|めがてん			
+kaomoji	surprise	(・_・)		びくっ	びくっ		びくっ|びっくり|めがてん|えー			
+kaomoji	surprise	(・o・)		びくっ	びくっ		びくっ|びっくり|めがてん|ぽかーん			
+kaomoji	surprise	(・・)		めがてん	めがてん		めがてん|びっくり|びくっ|しーん			
+kaomoji	surprise	(・・?		めがてん	めがてん		めがてん|なぜ|なぞ|はてな			
+kaomoji	surprise	(・。・)		めがてん	めがてん		めがてん|びっくり|びくっ			
+kaomoji	surprise	(゜゜)		うーん	うーん		うーん|えっと|えーと			
+kaomoji	surprise	(゜-゜)		うーん	うーん		うーん|えっと|えーと			
+kaomoji	surprise	(@_@)		びくっ	びくっ		びくっ|びっくり|めがてん			
+kaomoji	surprise	(@@)		めがてん	めがてん		めがてん|びっくり|びくっ			
+kaomoji	surprise	(@_@。		びくっ	びくっ		びくっ|びっくり|めがてん			
+kaomoji	surprise	(+_+)		びくっ	びくっ		びくっ|びっくり|まぶしい|うーん			
+kaomoji	surprise	( ﾟдﾟ)		ぽかーん	ぽかーん		ぽかーん			
+kaomoji	surprise	(´ﾟдﾟ｀)		びっくり	びっくり		びっくり			
+kaomoji	surprise	(ﾟдﾟ)！		びっくり	びっくり		びっくり			
+kaomoji	surprise	ヮ(ﾟдﾟ)ォ!		わお	わお		わお			
+kaomoji	surprise	( ﾟдﾟ)ﾊｯ!		はっ	はっ		はっ|びっくり			
+kaomoji	surprise	Σ(ﾟ∀ﾟﾉ)ﾉｷｬｰ		きゃー	きゃー		きゃー|びっくり			
+kaomoji	surprise	(*ﾉｪﾉ)ｷｬｰ		てれ	てれ		てれ|きゃー			
+kaomoji	surprise	(?_?)		なぜ	なぜ		なぜ|なぞ|はてな			
+kaomoji	surprise	Σ(ﾟДﾟ)		うおっ	うおっ		うおっ|びっくり|ぎくっ			
+kaomoji	surprise	(✽ ﾟдﾟ ✽)		ぽかーん	ぽかーん		ぽかーん|びっくり			
+kaomoji	surprise	:-O		さけび	さけび		よこおき|さけび|ぼうぜん			
+kaomoji	surprise	:-|		どうしましょう	どうしましょう		よこおき|どうしましょう			
+kaomoji	surprise	＼(◎o◎)／！		びっくり	びっくり		びっくり			
+kaomoji	surprise	( ﾟдﾟ)ﾎﾟｶｰﾝ		ぽかーん	ぽかーん		ぽかーん			
+kaomoji	surprise	( ﾟдﾟ )ｸﾜｯ!!		くわっ	くわっ		くわっ			
+kaomoji	surprise	Σヽ(｀д´；)ﾉ うおおおお！		うおお	うおお		うおお|うおおおお			
+kaomoji	surprise	ε≡≡ﾍ( ´Д`)ﾉ		だっしゅ	だっしゅ		だっしゅ			
+kaomoji	surprise	工ｴｴｪｪ(´д｀)ｪｪｴｴ工		ええ	ええ		ええ|えぇ			
+kaomoji	surprise	＼(◎o◎)／		びっくり	びっくり		びっくり			
+kaomoji	greeting	m(_ _)m		ぺこり	ぺこり		ぺこり|ごめん|ごめんなさい|おじぎ|ありがとう			
+kaomoji	greeting	m(__)m		ぺこり	ぺこり		ぺこり|ごめん|ごめんなさい|おじぎ			
+kaomoji	greeting	(._.)		ぺこり	ぺこり		ぺこり|どれどれ|ごめんなさい|ごめん			
+kaomoji	greeting	φ(..)		めもめも	めもめも		めもめも			
+kaomoji	greeting	(゜o゜)		おーい	おーい		おーい			
+kaomoji	greeting	(_ _)		ぺこり	ぺこり		ぺこり|ごめん|ごめんなさい|おじぎ			
+kaomoji	greeting	(_ _;)		ぺこり	ぺこり		ぺこり|おじぎ|あせ|ごめん|ごめんなさい			
+kaomoji	greeting	m(_ _;)m		ぺこり	ぺこり		ぺこり|おじぎ|あせ|ごめん|ごめんなさい			
+kaomoji	greeting	_(_^_)_		ぺこり	ぺこり		ぺこり|ごめん|ごめんなさい|おじぎ			
+kaomoji	greeting	_(._.)_		ぺこり	ぺこり		ぺこり|ごめん|ごめんなさい|おじぎ			
+kaomoji	greeting	(^_^)/~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(｀･ω･´)ゞ		けいれい	けいれい		けいれい|しゃきーん|びしっ			
+kaomoji	greeting	<(｀･ω･´)		けいれい	けいれい		けいれい			
+kaomoji	greeting	く(｀･ω･´)		けいれい	けいれい		けいれい			
+kaomoji	greeting	∠(｀・ω・´)		けいれい	けいれい		けいれい			
+kaomoji	greeting	(^^)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(^.^)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(@^^)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(ToT)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(T_T)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(;_;)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら|なみだ|なく|えーん			
+kaomoji	greeting	($・・)/~~~		ばいばい	ばいばい		ばいばい|さようなら|さよなら			
+kaomoji	greeting	(人∀・)ﾀﾉﾑ		たのむ	たのむ		たのむ			
+kaomoji	greeting	_φ(･_･		めも	めも		めも			
+kaomoji	greeting	( ^^) _U~~		おちゃ	おちゃ		おちゃ			
+kaomoji	greeting	( ^^) _旦~~		おちゃ	おちゃ		おちゃ			
+kaomoji	greeting	|ω・｀)ﾉ ﾔｧ		やぁ	やぁ		やぁ			
+kaomoji	greeting	(つ∀-)ｵﾔｽﾐｰ		おやすみ	おやすみ		おやすみ|ねる			
+kaomoji	greeting	(-。-)y-゜゜゜		いっぷく	いっぷく		いっぷく|たばこ			
+kaomoji	greeting	(^。^)y-.。o○		いっぷく	いっぷく		いっぷく|たばこ			
+kaomoji	greeting	φ(..)メモメモ		めも	めも		めも|めもめも			
+kaomoji	greeting	(╯°□°）╯︵ ┻━┻		ちゃぶだい	ちゃぶだい		ちゃぶだい			
+kaomoji	greeting	(ノ｀Д´)ノ彡┻━┻		ちゃぶだい	ちゃぶだい		ちゃぶだい|ちゃぶだいがえし			
+kaomoji	greeting	( ｀・∀・´)ﾉﾖﾛｼｸ		よろしく	よろしく		よろしく			
+kaomoji	greeting	(。-ω-)zzz. . . (。ﾟωﾟ) ﾊｯ!		ねる	ねる		ねる|ぐーぐー			
+kaomoji	greeting	(:3[▓▓]		ねる	ねる		ねる|ふとん			
+kaomoji	greeting	(¦3[▓▓]		ねる	ねる		ねる|ふとん			
+kaomoji	greeting	=͟͟͞͞ (¦3[▓▓]		ねる	ねる		ねる|ふとん			
+kaomoji	greeting	(__)		ぺこり	ぺこり		ぺこり|ごめん|ごめんなさい|おじぎ			
+kaomoji	animals	(⌒▽⌒)		にこにこ	にこにこ		にこにこ|にこっ|にこ|にゃー			
+kaomoji	animals	(ΦωΦ)		ねこ	ねこ		ねこ|どうぶつ			
+kaomoji	animals	(=^・^=)		どうぶつ	どうぶつ		どうぶつ|ねこ			
+kaomoji	animals	(=^・・^=)		どうぶつ	どうぶつ		どうぶつ|ねこ			
+kaomoji	animals	((≡ﾟ♀ﾟ≡))		ねこ	ねこ		ねこ			
+kaomoji	animals	Ｃ:。ミ		どうぶつ	どうぶつ		どうぶつ|たこ			
+kaomoji	animals	くコ:彡		どうぶつ	どうぶつ		どうぶつ|いか			
+kaomoji	animals	：8]		ごりら	ごりら		よこおき|ごりら|どうぶつ			
+kaomoji	animals	ʕ•ٹ•ʔ		どうぶつ	どうぶつ		どうぶつ			
+kaomoji	animals	ʕ•ӫ̫͡•ʔ		どうぶつ	どうぶつ		どうぶつ			
+kaomoji	animals	ʕº̫͡ºʔ		どうぶつ	どうぶつ		どうぶつ			
+kaomoji	animals	Uo･ｪ･oU		どうぶつ	どうぶつ		どうぶつ|いぬ			
+kaomoji	animals	U^ｪ^U		どうぶつ	どうぶつ		どうぶつ|いぬ			
+kaomoji	animals	（´(ｪ)｀）		くまー	くまー		くまー|くま|どうぶつ			
+kaomoji	animals	（・(ｪ)・）		くまー	くまー		くまー|くま|どうぶつ			
+kaomoji	animals	(*￣(ｴ)￣*)		どうぶつ	どうぶつ		どうぶつ|くま			
+kaomoji	animals	ʕ•̀ω•́ʔ✧		どうぶつ	どうぶつ		どうぶつ			
+kaomoji	animals	⊂ﾟＵ┬───┬~		いぬ	いぬ		いぬ|どうぶつ|みにちゅあだっくす			
+kaomoji	otherFaces	☆彡		きらきら	きらきら		きらきら|ほし|ながれぼし			
+kaomoji	otherFaces	(´ε｀ )		ちゅっ	ちゅっ		ちゅっ			
+kaomoji	otherFaces	☆ミ		きらきら	きらきら		きらきら|ほし|ながれぼし			
+kaomoji	otherFaces	(p_-)		むしめがね	むしめがね		むしめがね			
+kaomoji	otherFaces	(..)		どれどれ	どれどれ		どれどれ			
+kaomoji	otherFaces	(^m^)		とんとん	とんとん		とんとん			
+kaomoji	otherFaces	(^ρ^)		あひゃ	あひゃ		あひゃ			
+kaomoji	otherFaces	_(┐「ε:)_		ばた	ばた		ばた|たかざわじゅんすけ			
+kaomoji	otherFaces	_(:3」∠)_		たかざわじゅんすけ	たかざわじゅんすけ		たかざわじゅんすけ			
+kaomoji	otherFaces	( ﾟдﾟ )		みんな	みんな		みんな|みるな			
+kaomoji	otherFaces	( ﾟдﾟ )彡		ふりむき	ふりむき		ふりむき			
+kaomoji	otherFaces	( ﾟ∀ﾟ)o彡°		じょるじゅ	じょるじゅ		じょるじゅ			
+kaomoji	otherFaces	(ﾟ∀ﾟ)ｱﾋｬ		あひゃ	あひゃ		あひゃ			
+kaomoji	otherFaces	ﾍ(ﾟ∀ﾟﾍ)ｱﾋｬ		あひゃ	あひゃ		あひゃ			
+kaomoji	otherFaces	(ﾉ∀`)ｱﾁｬｰ		あちゃー	あちゃー		あちゃー			
+kaomoji	otherFaces	(ﾟдﾟ)ｳﾏｰ		うまー	うまー		うまー			
+kaomoji	otherFaces	|дﾟ)ﾁﾗｯ		ちらっ	ちらっ		ちらっ			
+kaomoji	otherFaces	(/ω・＼)ﾁﾗｯ		ちらっ	ちらっ		ちらっ			
+kaomoji	otherFaces	(-_-)zzz		ねてる	ねてる		ねてる|いねむり|ふてね|ねる			
+kaomoji	otherFaces	／(^o^)＼		おわた	おわた		おわた			
+kaomoji	otherFaces	ヽ(´ー｀)ノ		またーり	またーり		またーり|ばんざーい			
+kaomoji	otherFaces	(,,ﾟДﾟ)		ぎこ	ぎこ		ぎこ			
+kaomoji	otherFaces	((´^ω^))		ぷぎー	ぷぎー		ぷぎー			
+kaomoji	otherFaces	♪～(´ε｀ )		くちぶえ	くちぶえ		くちぶえ			
+kaomoji	otherFaces	∠( ﾟдﾟ)／		びしっ	びしっ		びしっ			
+kaomoji	otherFaces	σ(ﾟ∀ﾟ )ｵﾚ		おれ	おれ		おれ			
+kaomoji	otherFaces	ヽ(ﾟ∀｡)ﾉｳｪ		うぇ	うぇ		うぇ			
+kaomoji	otherFaces	ψ(｀∇´)ψ		かもーん	かもーん		かもーん			
+kaomoji	otherFaces	○o。		ごぼごぼ	ごぼごぼ		ごぼごぼ			
+kaomoji	otherFaces	○o。.		ごぼごぼ	ごぼごぼ		ごぼごぼ|ぶくぶく|あわ			
+kaomoji	otherFaces	|:3ミ		ばかぼんのぱぱ	ばかぼんのぱぱ		よこおき|ばかぼんのぱぱ			
+kaomoji	otherFaces	|彡ｻｯ		さっ	さっ		さっ			
+kaomoji	otherFaces	●～*		ばくだん	ばくだん		ばくだん			
+kaomoji	otherFaces	.。o○		ごぼごぼ	ごぼごぼ		ごぼごぼ|ぶくぶく|あわ			
+kaomoji	otherFaces	＼(^o^)／ｵﾜﾀ		おわた	おわた		おわた			
+kaomoji	otherFaces	( ´ー｀)y-~~		たばこ	たばこ		たばこ|いっぷく			
+kaomoji	otherFaces	( ･`ω･´)		まゆ	まゆ		まゆ|しゃきーん			
+kaomoji	otherFaces	( ･`д･´)		まゆ	まゆ		まゆ|しゃきーん			
+kaomoji	otherFaces	( ･´ｰ･｀)どや		どや	どや		どや|どやがお			
+kaomoji	otherFaces	(*´ω｀*)ﾓｷｭ		もきゅ	もきゅ		もきゅ			
+kaomoji	otherFaces	( ´,_ゝ｀)ﾌﾟｯ		ぷっ	ぷっ		ぷっ			
+kaomoji	otherFaces	ｶﾜ(・∀・)ｲｲ!!		かわいい	かわいい		かわいい			
+kaomoji	otherFaces	ﾈﾑｲ(´･ωゞ)		ねむい	ねむい		ねむい			
+kaomoji	otherFaces	（ ＾ω＾）おっ		おっ	おっ		おっ			
+kaomoji	otherFaces	( ˘ω˘)ｽﾔｧ		すやあ	すやあ		すやあ|すやぁ			
+kaomoji	otherFaces	( ˘ω˘)ｸｿﾈﾐ		くそねみ	くそねみ		くそねみ			
+kaomoji	otherFaces	( ﾟДﾟ)y─┛~~		たばこ	たばこ		たばこ|いっぷく			
+kaomoji	otherFaces	( ﾟдﾟ )彡そう！		そう	そう		そう|ふりむき			
+kaomoji	otherFaces	щ(ﾟдﾟщ)ｶﾓｰﾝ		かもーん	かもーん		かもーん			
+kaomoji	otherFaces	(ﾟ∀ﾟ)ｷﾀｺﾚ!!		きたこれ	きたこれ		きたこれ			
+kaomoji	otherFaces	(;ﾟ∀ﾟ)=3ﾑｯﾊｰ		むっはー	むっはー		むっはー|むはー			
+kaomoji	otherFaces	ヽ(ﾟ∀ﾟ)ﾉ ﾊﾟｯ☆		ぱっ	ぱっ		ぱっ			
+kaomoji	otherFaces	( ´ー｀)ﾌｩｰ．．．		ふぅ	ふぅ		ふぅ			
+kaomoji	otherFaces	(´～｀)ﾓｸﾞﾓｸﾞ		もぐもぐ	もぐもぐ		もぐもぐ			
+kaomoji	otherFaces	(つд⊂)ｺﾞｼｺﾞｼ		ごしごし	ごしごし		ごしごし			
+kaomoji	otherFaces	（｀ェ´）ﾋﾟｬｰ		ぴゃー	ぴゃー		ぴゃー			
+kaomoji	otherFaces	☆（ゝω・）vｷｬﾋﾟ		きゃぴ	きゃぴ		きゃぴ			
+kaomoji	otherFaces	(ΦωΦ)ﾌﾌﾌ…		ふふふ	ふふふ		ふふふ			
+kaomoji	otherFaces	ヽ(･ω･)/ｽﾞｺｰ		ずこー	ずこー		ずこー			
+kaomoji	otherFaces	(｢・ω・)｢ｶﾞｵｰ		がおー	がおー		がおー			
+kaomoji	otherFaces	(｀・ω・´)ｼｬｷｰﾝ		しゃきーん	しゃきーん		しゃきーん			
+kaomoji	otherFaces	(´∀｀∩)↑age↑		あげ	あげ		あげ			
+kaomoji	otherFaces	ε-(´∀｀*)ﾎｯ		ほっ	ほっ		ほっ			
+kaomoji	otherFaces	ι(´Д｀υ)ｱﾂｨｰ		あついー	あついー		あついー			
+kaomoji	otherFaces	¯\_(ツ)_/¯		すくめる	すくめる		すくめる			
+kaomoji	otherFaces	┌(_Д_┌ )┐		ぶりっじ	ぶりっじ		ぶりっじ			
+kaomoji	otherFaces	(  Д ) ﾟ ﾟ		ぽーん	ぽーん		ぽーん			
+kaomoji	otherFaces	(ヾﾉ･∀･`)ﾑﾘﾑﾘ		むりむり	むりむり		むりむり			
+kaomoji	otherFaces	(ヾﾉ･∀･`)ﾅｲﾅｲ		ないない	ないない		ないない			
+kaomoji	otherFaces	( ｰ`дｰ´)ｷﾘｯ		きりっ	きりっ		きりっ|まゆ			
+kaomoji	otherFaces	(σ・∀・)σｹﾞｯﾂ!!		げっつ	げっつ		げっつ			
+kaomoji	otherFaces	( ﾟ∀ﾟ)･∵. ｸﾞﾊｯ!!		ぐはっ	ぐはっ		ぐはっ			
+kaomoji	otherFaces	m9(^Д^)ﾌﾟｷﾞｬｰ		ぷぎゃー	ぷぎゃー		ぷぎゃー			
+kaomoji	otherFaces	(*´･ω･)(･ω･｀*)ﾈｰ		ねー	ねー		ねー			
+kaomoji	otherFaces	(-_-)/~~~ピシー!ピシー!		ぴしー	ぴしー		ぴしー			
+kaomoji	otherFaces	(゜∀。)ﾜﾋｬﾋｬﾋｬﾋｬﾋｬﾋｬ		あひゃ	あひゃ		あひゃ|わひゃ			
+kaomoji	otherFaces	( ‘д‘⊂彡☆))Д´) ﾊﾟｰﾝ		ぱーん	ぱーん		ぱーん			
+kaomoji	otherFaces	ｷﾀ━━━━(ﾟ∀ﾟ)━━━━!!		きたー	きたー		きたー			
+kaomoji	otherFaces	(((((((((((っ･ω･)っ ﾌﾞｰﾝ		ぶーん	ぶーん		ぶーん			
