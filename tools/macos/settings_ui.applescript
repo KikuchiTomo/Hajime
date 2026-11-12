@@ -7,6 +7,7 @@
 -- osascript settings_ui.applescript controls                      開いているページの部品(1 行に 1 つ，タブ区切り)
 -- osascript settings_ui.applescript states                        部品の使えるかだけ(値と「既定に戻す」を読まないので速い)
 -- osascript settings_ui.applescript press <名前>                   開いているページの名前のボタンを押す
+-- osascript settings_ui.applescript press-last                    開いているページのいちばん下のボタンを押す(名前の読めないボタン)
 -- osascript settings_ui.applescript act <まとまり> <役割> <名前> <番目> <操作> [回数]
 --     操作: click・increment・decrement・restore(すぐ後ろの「既定に戻す」を押す)・menu(選択肢の名前)・choose(選択肢を選ぶ．回数の代わりに選択肢の名前)
 
@@ -23,6 +24,7 @@ on run argv
 	if command is "controls" then return my listControls(true)
 	if command is "states" then return my listControls(false)
 	if command is "press" then return my press(item 2 of argv)
+	if command is "press-last" then return my pressLast()
 	if command is "act" then
 		set extra to ""
 		if (count of argv) ≥ 7 then set extra to item 7 of argv
@@ -34,7 +36,7 @@ end run
 -- 設定の画面の窓(初期設定の窓などを除く)
 on settingsWindow()
 	tell application "System Events"
-		tell process processName
+		tell my targetProcess()
 			repeat with w in windows
 				if exists splitter group 1 of group 1 of w then return contents of w
 			end repeat
@@ -42,6 +44,15 @@ on settingsWindow()
 	end tell
 	error "設定の画面が見つかりません"
 end settingsWindow
+
+-- 操作するプロセス．HAJIME_UI_PID があればその番号のプロセス(ほかの人が同時に開発版を動かしていても取り違えない)
+on targetProcess()
+	set pidText to system attribute "HAJIME_UI_PID"
+	tell application "System Events"
+		if pidText is "" then return process processName
+		return first process whose unix id is (pidText as integer)
+	end tell
+end targetProcess
 
 on sidebar()
 	tell application "System Events" to return outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of (my settingsWindow())
@@ -100,8 +111,8 @@ on listControls(withDetails)
 				end try
 				if r is in controlRoles then
 					set n to my nameOf(e)
-					set k to my occurrence(seen, r & ":" & n)
-					set end of seen to r & ":" & n
+					set k to my occurrence(seen, r & ":" & my withoutDigits(n))
+					set end of seen to r & ":" & my withoutDigits(n)
 					set v to ""
 					set restorable to "0"
 					if withDetails then
@@ -152,6 +163,14 @@ on nameOf(e)
 	return ""
 end nameOf
 
+on withoutDigits(textValue)
+	set result_ to ""
+	repeat with c in (characters of textValue)
+		if c is not in {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "."} then set result_ to result_ & c
+	end repeat
+	return result_
+end withoutDigits
+
 on occurrence(seen, key)
 	set k to 1
 	repeat with s in seen
@@ -182,21 +201,63 @@ end restoreButtonAfter
 
 on press(buttonName)
 	tell application "System Events"
-		repeat with g in (groups of (my detail()))
-			repeat with e in (entire contents of g)
-				try
-					if role of e is "AXButton" and name of e is buttonName then
-						click e
-						return buttonName
-					end if
-				end try
-			end repeat
+		-- まとまりに入らないボタン(1 つだけの Section の中のボタン)もあるので，ページ全体から探す
+		set elements to entire contents of (my detail())
+		repeat with e in elements
+			try
+				if role of e is "AXButton" and (my nameOf(e)) is buttonName then
+					click e
+					return buttonName
+				end if
+			end try
 		end repeat
 	end tell
 	error "ボタンが見つかりません: " & buttonName
 end press
 
+on findControl(groupIndex, wantedRole, wantedName, wantedOccurrence)
+	tell application "System Events"
+		set elements to my flatContents(group groupIndex of (my detail()))
+		set k to 0
+		repeat with e in elements
+			set r to ""
+			try
+				set r to role of e
+			end try
+			if r is wantedRole and my withoutDigits(my nameOf(e)) is my withoutDigits(wantedName) then
+				set k to k + 1
+				if k is wantedOccurrence then return contents of e
+			end if
+		end repeat
+	end tell
+	error "部品が見つかりません: " & wantedName
+end findControl
+
+-- 開いているページのいちばん下のまとまりの，最後のボタンを押す．SwiftUI のボタンの名前は System Events から読めない(AXAttributedDescription にだけある)ので，位置で指す
+on pressLast()
+	tell application "System Events"
+		set g to last group of (my detail())
+		click last button of g
+	end tell
+	return "ok"
+end pressLast
+
 on act(groupIndex, wantedRole, wantedName, wantedOccurrence, operation, extra)
+	if (operation is "increment" or operation is "decrement") and extra is not "" then
+		-- 何段も動かす．名前に値が入る部品は 1 段動かすと前の参照が使えなくなるので，使えなくなったら探し直す
+		set actionName to "AXIncrement"
+		if operation is "decrement" then set actionName to "AXDecrement"
+		set e to my findControl(groupIndex, wantedRole, wantedName, wantedOccurrence)
+		repeat (extra as integer) times
+			try
+				tell application "System Events" to perform action actionName of e
+			on error
+				set e to my findControl(groupIndex, wantedRole, wantedName, wantedOccurrence)
+				tell application "System Events" to perform action actionName of e
+			end try
+		end repeat
+		return ""
+	end if
 	tell application "System Events"
 		set g to group groupIndex of (my detail())
 		set elements to my flatContents(g)
@@ -207,7 +268,8 @@ on act(groupIndex, wantedRole, wantedName, wantedOccurrence, operation, extra)
 			try
 				set r to role of e
 			end try
-			if r is wantedRole and (my nameOf(e)) is wantedName then
+			-- 名前に今の値を含む部品(「候補の文字サイズ: 15」)は，値を変えると名前が変わるので，数字を除いて比べる
+			if r is wantedRole and my withoutDigits(my nameOf(e)) is my withoutDigits(wantedName) then
 				set k to k + 1
 				if k is wantedOccurrence then return my operate(e, elements, i, operation, extra)
 			end if
@@ -236,8 +298,8 @@ on operate(e, elements, i, operation, extra)
 			click e
 			delay 0.3
 			set names to name of every menu item of menu 1 of e
-			-- 開いた選択肢の一覧は，選んでいる値をもう一度選んで閉じる(値は変えない)
-			click (first menu item of menu 1 of e whose selected is true)
+			-- 開いた選択肢の一覧は取り消して閉じる．選んでいる値を選び直すと，同じ値でも書き直す画面がある(同期の範囲)
+			perform action "AXCancel" of menu 1 of e
 			set AppleScript's text item delimiters to linefeed
 			return names as text
 		else if operation is "choose" then

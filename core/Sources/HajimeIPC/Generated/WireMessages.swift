@@ -258,13 +258,17 @@ public struct WireFieldContext: Sendable, Equatable, Codable {
     public var precedingText: String?
     public var caret: WireRect?
     public var canReplacePrecedingText: Bool?
+    public var canShowMenu: Bool?
+    public var canRequestWordRegistration: Bool?
 
-    public init(applicationId: String? = nil, isSecure: Bool, precedingText: String? = nil, caret: WireRect? = nil, canReplacePrecedingText: Bool? = nil) {
+    public init(applicationId: String? = nil, isSecure: Bool, precedingText: String? = nil, caret: WireRect? = nil, canReplacePrecedingText: Bool? = nil, canShowMenu: Bool? = nil, canRequestWordRegistration: Bool? = nil) {
         self.applicationId = applicationId
         self.isSecure = isSecure
         self.precedingText = precedingText
         self.caret = caret
         self.canReplacePrecedingText = canReplacePrecedingText
+        self.canShowMenu = canShowMenu
+        self.canRequestWordRegistration = canRequestWordRegistration
     }
 }
 
@@ -328,6 +332,8 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
     case setComposition(segments: [WireTextSegment], caret: UInt32?, panelAnchor: UInt32?, replacedLength: UInt32?)
     case selectMode(mode: WireInputMode)
     case requestReconversion(maximumLength: UInt32)
+    case requestWordRegistration(maximumLength: UInt32)
+    case showMenu
 
     private enum CodingKeys: String, CodingKey {
         case type, text, segments, caret, panelAnchor, replacedLength, mode, maximumLength
@@ -345,6 +351,10 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
             self = try .selectMode(mode: container.decode(WireInputMode.self, forKey: .mode))
         case "requestReconversion":
             self = try .requestReconversion(maximumLength: container.decode(UInt32.self, forKey: .maximumLength))
+        case "requestWordRegistration":
+            self = try .requestWordRegistration(maximumLength: container.decode(UInt32.self, forKey: .maximumLength))
+        case "showMenu":
+            self = .showMenu
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -368,6 +378,11 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
         case .requestReconversion(let maximumLength):
             try container.encode("requestReconversion", forKey: .type)
             try container.encode(maximumLength, forKey: .maximumLength)
+        case .requestWordRegistration(let maximumLength):
+            try container.encode("requestWordRegistration", forKey: .type)
+            try container.encode(maximumLength, forKey: .maximumLength)
+        case .showMenu:
+            try container.encode("showMenu", forKey: .type)
         }
     }
 }
@@ -379,6 +394,8 @@ extension WireEditOperation: CustomStringConvertible, CustomDebugStringConvertib
         case .setComposition: "WireEditOperation.setComposition"
         case .selectMode: "WireEditOperation.selectMode"
         case .requestReconversion: "WireEditOperation.requestReconversion"
+        case .requestWordRegistration: "WireEditOperation.requestWordRegistration"
+        case .showMenu: "WireEditOperation.showMenu"
         }
     }
     public var debugDescription: String { description }
@@ -427,6 +444,7 @@ extension WireSettingsSnapshot: CustomStringConvertible, CustomDebugStringConver
 public enum WireMenuCommand: Sendable, Equatable, Codable {
     case toggleLiveConversion
     case openSettings
+    case openUserDictionary
 
     private enum CodingKeys: String, CodingKey {
         case type
@@ -440,6 +458,8 @@ public enum WireMenuCommand: Sendable, Equatable, Codable {
             self = .toggleLiveConversion
         case "openSettings":
             self = .openSettings
+        case "openUserDictionary":
+            self = .openUserDictionary
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -452,6 +472,8 @@ public enum WireMenuCommand: Sendable, Equatable, Codable {
             try container.encode("toggleLiveConversion", forKey: .type)
         case .openSettings:
             try container.encode("openSettings", forKey: .type)
+        case .openUserDictionary:
+            try container.encode("openUserDictionary", forKey: .type)
         }
     }
 }
@@ -461,6 +483,7 @@ extension WireMenuCommand: CustomStringConvertible, CustomDebugStringConvertible
         switch self {
         case .toggleLiveConversion: "WireMenuCommand.toggleLiveConversion"
         case .openSettings: "WireMenuCommand.openSettings"
+        case .openUserDictionary: "WireMenuCommand.openUserDictionary"
         }
     }
     public var debugDescription: String { description }
@@ -916,6 +939,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case addUserDictionaryEntry(entry: WireDictionaryEntry)
     case removeUserDictionaryEntry(entry: WireDictionaryEntry)
     case mergeUserDictionary(entries: [WireDictionaryEntry])
+    case openWordRegistration(text: String, reading: String?)
+    case takeWordRegistration
 
     private enum CodingKeys: String, CodingKey {
         case type, protocolVersion, session, input, context, mode, text, reading, rect, composition, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, pattern, offset, limit, entry, entries
@@ -1035,6 +1060,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .removeUserDictionaryEntry(entry: container.decode(WireDictionaryEntry.self, forKey: .entry))
         case "mergeUserDictionary":
             self = try .mergeUserDictionary(entries: container.decode([WireDictionaryEntry].self, forKey: .entries))
+        case "openWordRegistration":
+            self = try .openWordRegistration(text: container.decode(String.self, forKey: .text), reading: container.decodeIfPresent(String.self, forKey: .reading))
+        case "takeWordRegistration":
+            self = .takeWordRegistration
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -1227,6 +1256,12 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
         case .mergeUserDictionary(let entries):
             try container.encode("mergeUserDictionary", forKey: .type)
             try container.encode(entries, forKey: .entries)
+        case .openWordRegistration(let text, let reading):
+            try container.encode("openWordRegistration", forKey: .type)
+            try container.encode(text, forKey: .text)
+            try container.encodeIfPresent(reading, forKey: .reading)
+        case .takeWordRegistration:
+            try container.encode("takeWordRegistration", forKey: .type)
         }
     }
 }
@@ -1289,6 +1324,8 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .addUserDictionaryEntry: "WireRequestBody.addUserDictionaryEntry"
         case .removeUserDictionaryEntry: "WireRequestBody.removeUserDictionaryEntry"
         case .mergeUserDictionary: "WireRequestBody.mergeUserDictionary"
+        case .openWordRegistration: "WireRequestBody.openWordRegistration"
+        case .takeWordRegistration: "WireRequestBody.takeWordRegistration"
         }
     }
     public var debugDescription: String { description }
@@ -1332,9 +1369,10 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case dictionaryAdded(result: WireDictionaryAddResult)
     case dictionaryMerged(added: UInt32)
     case error(code: WireErrorCode)
+    case wordRegistration(word: String?, reading: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, items, result, values, report, issues, firstCandidateRate, words, results, entries, total, code
+        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, items, result, values, report, issues, firstCandidateRate, words, results, entries, total, code, word, reading
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1385,6 +1423,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .dictionaryMerged(added: container.decode(UInt32.self, forKey: .added))
         case "error":
             self = try .error(code: container.decode(WireErrorCode.self, forKey: .code))
+        case "wordRegistration":
+            self = try .wordRegistration(word: container.decodeIfPresent(String.self, forKey: .word), reading: container.decodeIfPresent(String.self, forKey: .reading))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -1464,6 +1504,10 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .error(let code):
             try container.encode("error", forKey: .type)
             try container.encode(code, forKey: .code)
+        case .wordRegistration(let word, let reading):
+            try container.encode("wordRegistration", forKey: .type)
+            try container.encodeIfPresent(word, forKey: .word)
+            try container.encodeIfPresent(reading, forKey: .reading)
         }
     }
 }
@@ -1493,6 +1537,7 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .dictionaryAdded: "WireResponseBody.dictionaryAdded"
         case .dictionaryMerged: "WireResponseBody.dictionaryMerged"
         case .error: "WireResponseBody.error"
+        case .wordRegistration: "WireResponseBody.wordRegistration"
         }
     }
     public var debugDescription: String { description }

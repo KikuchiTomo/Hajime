@@ -63,14 +63,21 @@ public struct InputContext: Sendable, Equatable {
     /// 入力位置の前の確定済みの文字を，組み立て中の文字で置き換えられるか(ClientAction.replacePrecedingText)．
     /// Windows の古い DLL は置き換えられないので，DLL が知らせたときだけ true にする
     public var canReplacePrecedingText: Bool
+    /// 入力メニューを入力位置に出せるか(ClientAction.openMenu)．Windows の古い DLL は出せないので，DLL が知らせたときだけ true にする
+    public var canOpenMenu: Bool
+    /// 入力先で選んでいる文字を読んで単語の登録に渡せるか(ClientAction.openWordRegistration の word が nil)．
+    /// Windows の古い DLL は読めないので，DLL が知らせたときだけ true にする
+    public var canReadSelectionForRegistration: Bool
 
     public init(profile: AppProfile = .standard, isSecure: Bool = false, precedingText: String? = nil, applicationID: String? = nil,
-                canReplacePrecedingText: Bool = true) {
+                canReplacePrecedingText: Bool = true, canOpenMenu: Bool = true, canReadSelectionForRegistration: Bool = true) {
         self.profile = profile
         self.isSecure = isSecure
         self.precedingText = precedingText
         self.applicationID = applicationID
         self.canReplacePrecedingText = canReplacePrecedingText
+        self.canOpenMenu = canOpenMenu
+        self.canReadSelectionForRegistration = canReadSelectionForRegistration
     }
 }
 

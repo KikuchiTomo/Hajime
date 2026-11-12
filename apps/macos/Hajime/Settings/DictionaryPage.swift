@@ -23,6 +23,15 @@ struct DictionaryPage: View {
                 UserWordsView(model: model)
             }
         }
+        // 単語の登録とユーザー辞書を開く操作では，登録した単語を出す
+        .onAppear(perform: showUserWordsIfAsked)
+        .onChange(of: model.showsUserWords) { _, _ in showUserWordsIfAsked() }
+    }
+
+    private func showUserWordsIfAsked() {
+        guard model.showsUserWords else { return }
+        showsImported = false
+        model.showsUserWords = false
     }
 }
 
@@ -67,6 +76,7 @@ private struct UserWordsView: View {
                     keysAreUnique: false,
                     tableHeight: DesignTokens.Size.Settings.userDictionaryTableHeight
                 )
+                .prefilled($model.userWordDraft)
             } footer: {
                 Text(UIStrings.Settings.dictionaryNote).font(.caption).foregroundStyle(.secondary)
             }

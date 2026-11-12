@@ -1,18 +1,25 @@
 #![forbid(unsafe_code)]
 
-//! 入力メニュー(タスクバーの「あ」「A」を右クリックしたときのメニュー)の項目．macOS の入力メニューと同じ項目にする．
-//! 項目は「ライブ変換」「手書き入力」「絵文字と記号」(この 2 つは使う設定のときだけ)「設定を開く…」「更新を確認」にし，
-//! 入力方式などほかの設定は設定の画面とキーで変える
+//! 入力メニュー(タスクバーの「あ」「A」を右クリックしたときと，キーで入力位置に出すときのメニュー)の項目．macOS の入力メニューと同じ項目にする．
+//! 項目は「ライブ変換」「手書き入力」「絵文字と記号」(この 2 つは使う設定のときだけ)，区切りの線，「単語の登録…」「ユーザー辞書…」
+//! 「設定を開く…」「更新を確認」にし，入力方式などほかの設定は設定の画面とキーで変える
 
 use ipc::{InputMode, MenuCommand, SettingsSnapshot};
 
 pub const LIVE_CONVERSION: &str = "ライブ変換";
 pub const HANDWRITING: &str = "手書き入力";
 pub const PALETTE: &str = "絵文字と記号";
+pub const REGISTER_WORD: &str = "単語の登録…";
+pub const USER_DICTIONARY: &str = "ユーザー辞書…";
 pub const OPEN_SETTINGS: &str = "設定を開く…";
 pub const CHECK_FOR_UPDATES: &str = "更新を確認";
 /// 「更新を確認」で設定の画面の実行ファイルに渡す引数(最新のリリースのページを開いて終える)
 pub const CHECK_FOR_UPDATES_ARGUMENT: &str = "--check-for-updates";
+/// エンジンが受けなかったときに，設定の画面をユーザー辞書の登録した単語のページで直接開く引数(EngineService.settingsDictionaryArguments と同じ)
+pub const USER_DICTIONARY_ARGUMENTS: &str = "--page dictionary";
+/// 単語の登録で，設定の画面を直接開く引数．設定の画面は読みの欄に入力位置を置く(語はエンジンが持っているときだけ入る．
+/// 入力内容なので引数には入れない)
+pub const REGISTER_WORD_ARGUMENTS: &str = "--page dictionary --register-word";
 
 /// 日本語・英数のときにタスクバーに出す字と，説明
 pub const JAPANESE_ICON: &str = "あ";
@@ -27,6 +34,8 @@ const ID_OPEN_SETTINGS: u32 = 2;
 const ID_HANDWRITING: u32 = 3;
 const ID_CHECK_FOR_UPDATES: u32 = 4;
 const ID_PALETTE: u32 = 5;
+const ID_REGISTER_WORD: u32 = 6;
+const ID_USER_DICTIONARY: u32 = 7;
 
 /// 選んだ項目の扱い
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +46,8 @@ pub enum Selection {
     Handwriting,
     /// 絵文字と記号のパレットを前に見ていた種類で開く(R-26．組み立て中の文字を確定するので，手書きと同じく文書を書き換えられる要求で頼む)
     Palette,
+    /// 単語の登録．入力先で選んでいる文字を読み，エンジンに設定の画面のユーザー辞書の登録で開いてもらう(キーの「単語の登録」と同じ)
+    RegisterWord,
     /// 最新のリリースのページを開く(入力先のアプリから起動するので，ブラウザーが前に出る)
     CheckForUpdates,
 }
@@ -77,6 +88,16 @@ pub fn items(settings: Option<&SettingsSnapshot>) -> Vec<Item> {
     items.extend([
         Item::Separator,
         Item::Command {
+            id: ID_REGISTER_WORD,
+            label: REGISTER_WORD,
+            checked: false,
+        },
+        Item::Command {
+            id: ID_USER_DICTIONARY,
+            label: USER_DICTIONARY,
+            checked: false,
+        },
+        Item::Command {
             id: ID_OPEN_SETTINGS,
             label: OPEN_SETTINGS,
             checked: false,
@@ -97,8 +118,20 @@ pub fn selection(id: u32) -> Option<Selection> {
         ID_OPEN_SETTINGS => Some(Selection::Command(MenuCommand::OpenSettings)),
         ID_HANDWRITING => Some(Selection::Handwriting),
         ID_PALETTE => Some(Selection::Palette),
+        ID_REGISTER_WORD => Some(Selection::RegisterWord),
+        ID_USER_DICTIONARY => Some(Selection::Command(MenuCommand::OpenUserDictionary)),
         ID_CHECK_FOR_UPDATES => Some(Selection::CheckForUpdates),
         _ => None,
+    }
+}
+
+/// エンジンが受けなかったときに設定の画面を直接開く引数(エンジンが動いていなくても開けるようにする．設定の画面がエンジンを起動し直す)．
+/// 設定の画面を開かないコマンドは None
+pub fn settings_arguments(command: &MenuCommand) -> Option<&'static str> {
+    match command {
+        MenuCommand::OpenSettings => Some(""),
+        MenuCommand::OpenUserDictionary => Some(USER_DICTIONARY_ARGUMENTS),
+        MenuCommand::ToggleLiveConversion => None,
     }
 }
 
@@ -146,24 +179,58 @@ mod tests {
             .collect()
     }
 
+    /// 区切りの線の下の，いつも出す項目
+    const FIXED: [(&str, bool); 4] = [
+        (REGISTER_WORD, false),
+        (USER_DICTIONARY, false),
+        (OPEN_SETTINGS, false),
+        (CHECK_FOR_UPDATES, false),
+    ];
+
+    /// head のあとにいつも出す項目を続けた並び
+    fn then_fixed(head: &[(&'static str, bool)]) -> Vec<(&'static str, bool)> {
+        head.iter().copied().chain(FIXED).collect()
+    }
+
     #[test]
-    fn 項目はライブ変換と設定を開くと更新を確認() {
+    fn 項目はライブ変換と単語の登録とユーザー辞書と設定を開くと更新を確認() {
         assert_eq!(
             labels(&items(Some(&snapshot(true)))),
-            vec![
-                (LIVE_CONVERSION, true),
-                (OPEN_SETTINGS, false),
-                (CHECK_FOR_UPDATES, false)
-            ]
+            then_fixed(&[(LIVE_CONVERSION, true)])
         );
         assert_eq!(
             labels(&items(None)),
-            vec![
-                (LIVE_CONVERSION, false),
-                (OPEN_SETTINGS, false),
-                (CHECK_FOR_UPDATES, false)
-            ]
+            then_fixed(&[(LIVE_CONVERSION, false)])
         );
+    }
+
+    #[test]
+    fn 区切りの線は単語の登録の上に引く() {
+        let mut all = snapshot(false);
+        all.handwriting = Some(true);
+        all.palette = Some(true);
+        for settings in [None, Some(&all)] {
+            let items = items(settings);
+            let separator = items
+                .iter()
+                .position(|item| *item == Item::Separator)
+                .unwrap();
+            assert_eq!(
+                items.get(separator + 1),
+                Some(&Item::Command {
+                    id: ID_REGISTER_WORD,
+                    label: REGISTER_WORD,
+                    checked: false
+                })
+            );
+            assert_eq!(
+                items
+                    .iter()
+                    .filter(|item| **item == Item::Separator)
+                    .count(),
+                1
+            );
+        }
     }
 
     #[test]
@@ -172,21 +239,12 @@ mod tests {
         on.handwriting = Some(true);
         assert_eq!(
             labels(&items(Some(&on))),
-            vec![
-                (LIVE_CONVERSION, false),
-                (HANDWRITING, false),
-                (OPEN_SETTINGS, false),
-                (CHECK_FOR_UPDATES, false)
-            ]
+            then_fixed(&[(LIVE_CONVERSION, false), (HANDWRITING, false)])
         );
         on.handwriting = Some(false);
         assert_eq!(
             labels(&items(Some(&on))),
-            vec![
-                (LIVE_CONVERSION, false),
-                (OPEN_SETTINGS, false),
-                (CHECK_FOR_UPDATES, false)
-            ]
+            then_fixed(&[(LIVE_CONVERSION, false)])
         );
     }
 
@@ -196,23 +254,16 @@ mod tests {
         on.palette = Some(true);
         assert_eq!(
             labels(&items(Some(&on))),
-            vec![
-                (LIVE_CONVERSION, false),
-                (PALETTE, false),
-                (OPEN_SETTINGS, false),
-                (CHECK_FOR_UPDATES, false)
-            ]
+            then_fixed(&[(LIVE_CONVERSION, false), (PALETTE, false)])
         );
         on.handwriting = Some(true);
         assert_eq!(
             labels(&items(Some(&on))),
-            vec![
+            then_fixed(&[
                 (LIVE_CONVERSION, false),
                 (HANDWRITING, false),
-                (PALETTE, false),
-                (OPEN_SETTINGS, false),
-                (CHECK_FOR_UPDATES, false)
-            ]
+                (PALETTE, false)
+            ])
         );
         on.palette = Some(false);
         assert!(!labels(&items(Some(&on))).contains(&(PALETTE, false)));
@@ -253,12 +304,30 @@ mod tests {
         );
         assert_eq!(selection(ID_HANDWRITING), Some(Selection::Handwriting));
         assert_eq!(selection(ID_PALETTE), Some(Selection::Palette));
+        assert_eq!(selection(ID_REGISTER_WORD), Some(Selection::RegisterWord));
+        assert_eq!(
+            selection(ID_USER_DICTIONARY),
+            Some(Selection::Command(MenuCommand::OpenUserDictionary))
+        );
         assert_eq!(
             selection(ID_CHECK_FOR_UPDATES),
             Some(Selection::CheckForUpdates)
         );
         assert_eq!(selection(0), None);
         assert_eq!(selection(10), None);
+    }
+
+    #[test]
+    fn 設定の画面を開くコマンドはエンジンが受けなければ直接開く() {
+        assert_eq!(settings_arguments(&MenuCommand::OpenSettings), Some(""));
+        assert_eq!(
+            settings_arguments(&MenuCommand::OpenUserDictionary),
+            Some("--page dictionary")
+        );
+        assert_eq!(settings_arguments(&MenuCommand::ToggleLiveConversion), None);
+        // 単語の登録はユーザー辞書のページを開き，登録の欄に入力位置を置く
+        assert!(REGISTER_WORD_ARGUMENTS.starts_with(USER_DICTIONARY_ARGUMENTS));
+        assert!(REGISTER_WORD_ARGUMENTS.ends_with(" --register-word"));
     }
 
     #[test]

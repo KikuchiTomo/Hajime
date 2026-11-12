@@ -58,7 +58,18 @@ final class SettingsWindowController {
     }
 
     private func makeWindow() -> NSWindow {
-        Self.makeWindow(model: model, sync: sync, navigation: SettingsNavigation())
+        Self.makeWindow(model: model, sync: sync, navigation: navigation)
+    }
+
+    /// 開いているページ．ユーザー辞書を開くときに切り替える
+    private let navigation = SettingsNavigation()
+
+    /// ユーザー辞書の登録した単語のページを開く．word か reading があれば登録の欄に入れる(単語の登録)
+    func showUserDictionary(word: String, reading: String) {
+        navigation.page = .dictionary
+        if !word.isEmpty || !reading.isEmpty { model.userWordDraft = RuleDraft(key: reading, value: word) }
+        model.showsUserWords = true
+        show()
     }
 
     /// 設定の画面の窓を作る．計測と書き出し(デバッグビルド)でも同じ窓を使う
@@ -91,6 +102,10 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var settings: HajimeDomain.Settings
     @Published var message: String?
     @Published private(set) var usageCounts: UsageCounts
+    /// 単語の登録で，ユーザー辞書の登録の欄に入れる読みと語．入れたら消す
+    @Published var userWordDraft: RuleDraft?
+    /// ユーザー辞書のページで登録した単語を出すよう求められたら true にする(取り込んだ辞書を出していても切り替える)．切り替えたら false に戻す
+    @Published var showsUserWords = false
     private let store: any SettingsStoring & SettingsObserving
     private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void

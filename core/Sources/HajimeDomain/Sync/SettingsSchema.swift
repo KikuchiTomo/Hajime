@@ -20,11 +20,13 @@
 /// - バージョン 15: 変換マクロの形(語の中の数字の漢数字・大字・3 桁区切り)を足した．保存した一覧に無効のまま足す(MacroPresetUpgrade)
 /// - バージョン 16: キー設定の表のコマンド `undoCommit`(確定の取り消し)を足し，表に入力文字なしの Ctrl+Backspace を足した．
 ///   Windows 風・ATOK 風の同じキーの予測の確定の取り消しは，確定の取り消しに替えた(UndoCommitKeyUpgrade)
+/// - バージョン 17: キー設定の表のコマンド `registerWord`(単語の登録)・`openUserDictionary`(ユーザー辞書を開く)・`openMenu`(入力メニュー)を足し，
+///   表に Ctrl+F7(単語の登録)と Ctrl+F10・Ctrl+変換(入力メニュー)を足した(WordToolKeyUpgrade)
 ///
 /// 項目の名前や形を変えるときは，バージョンを 1 つ上げ，`migrations` に移し替えを足す．移し替えは JSON のまま行い，
 /// 読み込む前に古いバージョンから順に当てる．新しいバージョンのファイルを古いバージョンで開いたときは移し替えず，知らない項目を残す(Settings.unknownFields)
 public enum SettingsSchema {
-    public static let currentVersion = 16
+    public static let currentVersion = 17
     public static let versionKey = "schemaVersion"
 
     /// バージョン n から n+1 への移し替え．添字 0 がバージョン 1 → 2
@@ -44,6 +46,7 @@ public enum SettingsSchema {
         { MacroPresetUpgrade.upgrade(&$0) },
         { MacroPresetUpgrade.upgrade(&$0) },
         { UndoCommitKeyUpgrade.upgrade(&$0) },
+        { WordToolKeyUpgrade.upgrade(&$0) },
     ]
 
     /// ファイルのバージョンを読み，今のバージョンまで移し替える．今より新しいバージョンはそのまま
