@@ -1,0 +1,131 @@
+import HajimeApplication
+import Testing
+
+/// 候補の一覧の窓の区画の配置．縁の内側の余白，区切りの線の上と下の間隔，語の意味のカードの揃いを確かめる
+@Suite("候補の一覧の窓の配置")
+struct CandidateListLayoutTests {
+    typealias Layout = CandidateListLayout
+
+    static let rounded = Layout.Metrics.rounded(rowPitch: LayoutTokens.Glass.rowHeight, headerHeight: 20, footerHeight: 18)
+    static let bevel = Layout.Metrics.bevel(rowPitch: LayoutTokens.Candidate.rowHeight, sectionHeight: 22, hasShadow: true)
+
+    struct Sample: CustomTestStringConvertible, Sendable {
+        var name: String
+        var style: Layout.Style
+        var hasHeader: Bool
+        var card: Layout.Card?
+        var testDescription: String { name }
+
+        var metrics: Layout.Metrics { style == .rounded ? CandidateListLayoutTests.rounded : CandidateListLayoutTests.bevel }
+
+        func place(rows: Int = 4, maximumWidth: Double = 720) -> Layout {
+            Layout(style: style, listWidth: 180, footerWidth: 160, hasHeader: hasHeader, rowCount: rows, card: card, maximumWidth: maximumWidth, metrics: metrics)
+        }
+    }
+
+    static let samples: [Sample] = [Layout.Style.rounded, .bevel].flatMap { style in
+        [Sample(name: "\(style) カードなし", style: style, hasHeader: false, card: nil),
+         Sample(name: "\(style) 右に低いカード", style: style, hasHeader: false, card: .side(width: 312, height: 80)),
+         Sample(name: "\(style) 右に高いカード", style: style, hasHeader: true, card: .side(width: 312, height: 200)),
+         Sample(name: "\(style) 下のカード", style: style, hasHeader: false, card: .below(width: 312, height: 120)),
+         Sample(name: "\(style) 文字種の行と下のカード", style: style, hasHeader: true, card: .below(width: 312, height: 120))]
+    }
+
+    @Test("縁の内側の余白は上下左右で同じ", arguments: samples)
+    func windowPadding(sample: Sample) {
+        let layout = sample.place()
+        let parts = layout.parts
+        let outer = sample.metrics.edge + sample.metrics.padding
+        #expect(parts.map(\.x).min() == outer)
+        #expect(parts.map(\.y).min() == outer)
+        #expect(abs(layout.body.maxX - (parts.map(\.maxX).max() ?? 0) - outer) <= 0.5)
+        #expect(abs(layout.body.maxY - (parts.map(\.maxY).max() ?? 0) - outer) <= 0.5)
+        #expect(layout.width == layout.body.width + sample.metrics.shadow)
+    }
+
+    @Test("区切りの線の上と下は同じ間隔(候補の下のカードの上と下も)", arguments: samples)
+    func separatorGaps(sample: Sample) throws {
+        let layout = sample.place()
+        let gap = sample.metrics.separatorGap
+        let last = try #require(layout.rows.last)
+        let above = layout.footerSeparator.y - max(last.maxY, layout.card?.maxY ?? 0)
+        let below = layout.footer.y - layout.footerSeparator.maxY
+        #expect(above == gap)
+        #expect(below == gap)
+        if let header = layout.header, let line = layout.headerSeparator, let first = layout.rows.first {
+            #expect(line.y - header.maxY == gap)
+            #expect(first.y - line.maxY == gap)
+        }
+        if case .below = sample.card, let card = layout.card {
+            let between = card.y - last.maxY
+            #expect(between == (sample.style == .rounded ? gap : sample.metrics.separatorWidth))
+        }
+    }
+
+    @Test("候補の右のカード: 上の端は候補の 1 行目の地の上の端，右の端は足元の区切りの線の右の端", arguments: samples.filter {
+        if case .side = $0.card { return true }
+        return false
+    })
+    func sideCard(sample: Sample) throws {
+        let layout = sample.place()
+        let card = try #require(layout.card)
+        let first = try #require(layout.rows.first)
+        #expect(card.y == first.y)
+        #expect(card.maxX == layout.footerSeparator.maxX)
+        // 一覧とのあいだは，角丸のテーマでは縁の内側の余白と同じ．platinum と desk は線 1 本
+        let between = card.x - first.maxX
+        #expect(between == (sample.style == .rounded ? sample.metrics.padding : sample.metrics.separatorWidth))
+        #expect(layout.content.maxX - card.maxX == 0)
+        if sample.style == .bevel {
+            let line = try #require(layout.cardSeparator)
+            #expect(line.x == first.maxX)
+            #expect(line.y == card.y && line.height == card.height)
+        }
+    }
+
+    @Test("候補の下のカード: 左右の端は足元の区切りの線の端", arguments: samples.filter {
+        if case .below = $0.card { return true }
+        return false
+    })
+    func belowCard(sample: Sample) throws {
+        let layout = sample.place()
+        let card = try #require(layout.card)
+        #expect(card.x == layout.footerSeparator.x)
+        #expect(card.maxX == layout.footerSeparator.maxX)
+    }
+
+    @Test("候補の行の地は同じ x と幅で，行と行のあいだは rowInset の 2 倍．押せる範囲は隙間なく並ぶ", arguments: samples)
+    func rows(sample: Sample) {
+        let layout = sample.place()
+        #expect(Set(layout.rows.map(\.x)).count == 1)
+        #expect(Set(layout.rows.map(\.width)).count == 1)
+        for (row, next) in zip(layout.rows, layout.rows.dropFirst()) {
+            #expect(next.y - row.maxY == sample.metrics.rowInset * 2)
+        }
+        for (row, next) in zip(layout.hitRows, layout.hitRows.dropFirst()) {
+            #expect(next.y == row.maxY)
+        }
+    }
+
+    @Test("区画が重ならない", arguments: samples)
+    func noOverlap(sample: Sample) {
+        let layout = sample.place()
+        let parts = layout.parts
+        for (index, part) in parts.enumerated() {
+            for other in parts[(index + 1)...] {
+                #expect(!part.intersects(other), "\(part) と \(other)")
+            }
+        }
+    }
+
+    @Test("窓の幅の上限を超えるときは候補の列を狭め，カードと区切りの線の右の端はそろえたまま")
+    func maximumWidth() throws {
+        let sample = Sample(name: "狭い", style: .rounded, hasHeader: false, card: .side(width: 312, height: 80))
+        let wide = Layout(style: .rounded, listWidth: 600, footerWidth: 160, hasHeader: false, rowCount: 3, card: sample.card, maximumWidth: 720,
+                          metrics: Self.rounded)
+        #expect(wide.width <= 720)
+        let card = try #require(wide.card)
+        #expect(card.maxX == wide.footerSeparator.maxX)
+        #expect(card.x - (wide.rows.first?.maxX ?? 0) == Self.rounded.padding)
+    }
+}

@@ -44,7 +44,7 @@ enum AssociationHeadingDrawing {
     /// 縦に中央にそろえて描き，描いた幅を返す．座標は整数に丸め，文字の輪郭をぼかさない
     private static func drawText(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, in rect: NSRect) -> CGFloat {
         let size = text.size(withAttributes: attributes)
-        text.draw(at: NSPoint(x: x.rounded(), y: rect.minY + ((rect.height - size.height) / 2).rounded()), withAttributes: attributes)
+        TextFitting.draw(text, attributes: attributes, x: x, midY: rect.midY)
         return size.width
     }
 

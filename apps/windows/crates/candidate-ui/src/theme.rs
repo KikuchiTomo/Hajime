@@ -419,24 +419,24 @@ impl ResolvedTheme {
             Font::MeaningHeadword => (
                 self.face(),
                 Weight::Semibold,
-                size::glass::MEANING_HEADWORD_FONT_SIZE,
+                size::meaning::HEADWORD_FONT_SIZE,
             ),
-            Font::MeaningBody => (self.face(), body, size::glass::MEANING_BODY_FONT_SIZE),
-            Font::MeaningExample => (self.face(), body, size::glass::MEANING_EXAMPLE_FONT_SIZE),
+            Font::MeaningBody => (self.face(), body, size::meaning::BODY_FONT_SIZE),
+            Font::MeaningExample => (self.face(), body, size::meaning::EXAMPLE_FONT_SIZE),
             Font::MeaningExampleStrong => (
                 self.face(),
                 Weight::Semibold,
-                size::glass::MEANING_EXAMPLE_FONT_SIZE,
+                size::meaning::EXAMPLE_FONT_SIZE,
             ),
             Font::MeaningTag => (
                 self.label_face(),
                 Weight::Medium,
-                size::glass::MEANING_POS_FONT_SIZE,
+                size::meaning::PART_OF_SPEECH_FONT_SIZE,
             ),
             Font::MeaningNumber => (
                 self.key_face(),
                 Weight::Semibold,
-                size::glass::MEANING_BADGE_FONT_SIZE,
+                size::meaning::NUMBER_FONT_SIZE,
             ),
         };
         FontSpec { face, weight, size }

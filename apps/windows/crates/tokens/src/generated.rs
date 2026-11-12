@@ -236,6 +236,13 @@ pub mod settings_windows {
 }
 
 pub mod size {
+    pub mod space {
+        pub const XXS: f32 = 2.0;
+        pub const XS: f32 = 4.0;
+        pub const SM: f32 = 8.0;
+        pub const MD: f32 = 12.0;
+        pub const LG: f32 = 16.0;
+    }
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
         pub const FONT_SIZE: f32 = 15.0;
@@ -249,9 +256,8 @@ pub mod size {
         pub const SHADOW_OFFSET: f32 = 2.0;
         pub const LABEL_FONT_SIZE: f32 = 11.0;
         pub const VARIANT_PADDING_X: f32 = 6.0;
-        pub const SECTION_PADDING_Y: f32 = 3.0;
+        pub const SECTION_PADDING_Y: f32 = 4.0;
         pub const MIN_WIDTH: f32 = 180.0;
-        pub const VARIANT_INSET_Y: f32 = 1.0;
         pub const MAX_WIDTH: f32 = 720.0;
         pub const SCREEN_MARGIN: f32 = 16.0;
         pub const TRUNCATION_CONTEXT: f32 = 4.0;
@@ -316,6 +322,10 @@ pub mod size {
     pub mod glass {
         pub const CORNER_RADIUS: f32 = 12.0;
         pub const PADDING: f32 = 10.0;
+        pub const WINDOW_PADDING: f32 = 8.0;
+        pub const SEPARATOR_GAP: f32 = 8.0;
+        pub const ROW_PADDING_X: f32 = 4.0;
+        pub const HEADER_HEIGHT: f32 = 20.0;
         pub const ROW_HEIGHT: f32 = 28.0;
         pub const LABEL_FONT_SIZE: f32 = 11.5;
         pub const KEY_FONT_SIZE: f32 = 10.5;
@@ -335,7 +345,6 @@ pub mod size {
         pub const MODE_INDICATOR_SIZE: f32 = 34.0;
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
         pub const SELECTION_INSET_Y: f32 = 2.0;
-        pub const VARIANT_INSET_Y: f32 = 4.0;
         pub const CURVE_START_OVERLAP: f32 = 2.0;
         pub const CURVE_END_GAP: f32 = 3.0;
         pub const CURVE_BEND: f32 = 0.35;
@@ -351,34 +360,38 @@ pub mod size {
         pub const COMMAND_ICON_SIZE: f32 = 18.0;
         pub const COMMAND_ICON_RADIUS: f32 = 5.0;
         pub const NOTE_GAP: f32 = 6.0;
-        pub const USAGE_TAG_GAP: f32 = 4.0;
-        pub const MEANING_CARD_WIDTH: f32 = 280.0;
-        pub const MEANING_BRANCH_WIDTH: f32 = 300.0;
-        pub const MEANING_PADDING: f32 = 10.0;
-        pub const MEANING_GAP: f32 = 14.0;
-        pub const MEANING_NOTCH: f32 = 6.0;
-        pub const MEANING_RADIUS: f32 = 10.0;
-        pub const MEANING_HEADWORD_FONT_SIZE: f32 = 15.0;
-        pub const MEANING_BODY_FONT_SIZE: f32 = 13.0;
-        pub const MEANING_EXAMPLE_FONT_SIZE: f32 = 12.0;
-        pub const MEANING_POS_FONT_SIZE: f32 = 10.5;
-        pub const MEANING_POS_HEIGHT: f32 = 17.0;
-        pub const MEANING_POS_PADDING_X: f32 = 7.0;
-        pub const MEANING_ICON_SIZE: f32 = 13.0;
-        pub const MEANING_EMPTY_ICON_SIZE: f32 = 24.0;
-        pub const MEANING_BADGE_SIZE: f32 = 17.0;
-        pub const MEANING_BADGE_RADIUS: f32 = 5.0;
-        pub const MEANING_BADGE_FONT_SIZE: f32 = 10.5;
-        pub const MEANING_LINE_SPACING: f32 = 2.0;
-        pub const MEANING_HEADER_GAP: f32 = 8.0;
-        pub const MEANING_SENSE_GAP: f32 = 9.0;
-        pub const MEANING_EXAMPLE_GAP: f32 = 3.0;
-        pub const MEANING_EXAMPLE_BAR_WIDTH: f32 = 2.0;
-        pub const MEANING_EXAMPLE_INDENT: f32 = 8.0;
-        pub const MEANING_OTHERS_GAP: f32 = 8.0;
-        pub const MEANING_DOT_SIZE: f32 = 6.0;
-        pub const MEANING_MEANING_LINES: f32 = 3.0;
-        pub const MEANING_EXAMPLE_LINES: f32 = 2.0;
+    }
+    pub mod meaning {
+        pub const PADDING: f32 = 12.0;
+        pub const MARKER_WIDTH: f32 = 16.0;
+        pub const MARKER_GAP: f32 = 8.0;
+        pub const HEADER_GAP: f32 = 8.0;
+        pub const SENSE_GAP: f32 = 8.0;
+        pub const EXAMPLE_GAP: f32 = 4.0;
+        pub const EXAMPLE_INDENT: f32 = 12.0;
+        pub const EXAMPLE_BAR_WIDTH: f32 = 2.0;
+        pub const MEANING_PITCH: f32 = 20.0;
+        pub const EXAMPLE_PITCH: f32 = 18.0;
+        pub const OTHERS_GAP: f32 = 12.0;
+        pub const PART_OF_SPEECH_GAP: f32 = 8.0;
+        pub const PART_OF_SPEECH_HEIGHT: f32 = 16.0;
+        pub const PART_OF_SPEECH_PADDING_X: f32 = 8.0;
+        pub const TAG_GAP: f32 = 4.0;
+        pub const HEADWORD_FONT_SIZE: f32 = 15.0;
+        pub const BODY_FONT_SIZE: f32 = 13.0;
+        pub const EXAMPLE_FONT_SIZE: f32 = 12.0;
+        pub const PART_OF_SPEECH_FONT_SIZE: f32 = 10.5;
+        pub const NUMBER_FONT_SIZE: f32 = 10.5;
+        pub const NUMBER_RADIUS: f32 = 4.0;
+        pub const ICON_SIZE: f32 = 13.0;
+        pub const EMPTY_ICON_SIZE: f32 = 24.0;
+        pub const RADIUS: f32 = 8.0;
+        pub const NOTCH: f32 = 6.0;
+        pub const DOT_SIZE: f32 = 6.0;
+        pub const LIST_WIDTH: f32 = 312.0;
+        pub const BRANCH_WIDTH: f32 = 324.0;
+        pub const MEANING_LINES: f32 = 3.0;
+        pub const EXAMPLE_LINES: f32 = 2.0;
     }
     pub mod handwriting {
         pub const WIDTH: f32 = 284.0;

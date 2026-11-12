@@ -2,6 +2,16 @@ import AppKit
 
 /// 文字を決まった幅に収める．候補ウィンドウの幅には上限があるので(size.candidate.max-width)，長い文の候補は末尾を「…」で省く
 enum TextFitting {
+    /// 文字の行の箱(書体の ascender から descender まで)の縦の真ん中を midY に合わせて描く(上下が反転した isFlipped のビュー)．
+    /// 日本語の字を代わりの書体で描くと NSString の行の高さが変わり，行の高さで真ん中に置くと字が上下にずれるので，書体の値でベースラインを決める．
+    /// ベースラインと x は整数に丸め，文字の輪郭をぼかさない
+    static func draw(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, midY: CGFloat) {
+        guard let font = attributes[.font] as? NSFont else { return }
+        let baseline = (midY + (font.ascender + font.descender) / 2).rounded()
+        NSAttributedString(string: text, attributes: attributes)
+            .draw(with: NSRect(x: x.rounded(), y: baseline, width: CGFloat.greatestFiniteMagnitude, height: 0), options: [], context: nil)
+    }
+
     /// 幅に収まるよう末尾を「…」で省く．省く位置は二分探索で決め，測る回数を文字数の対数に抑える(長い文でも打鍵を遅らせない)
     static func truncated(_ text: String, attributes: [NSAttributedString.Key: Any], width: CGFloat) -> String {
         guard text.size(withAttributes: attributes).width > width else { return text }

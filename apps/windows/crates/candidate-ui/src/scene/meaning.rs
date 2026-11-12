@@ -10,7 +10,8 @@
 //!
 //! 候補の右に出すときは，一覧では選んでいる候補を指す三角を左の辺に付け，分岐図では選んでいる候補からカードへ線を引く
 
-use super::paint::{Painter, TagStyle};
+use super::card_layout::{self, CardLayout, Content, SenseLines};
+use super::paint::Painter;
 use super::{Draw, Frame, Look, Measure, Point};
 use crate::keys::Icon;
 use crate::strings;
@@ -18,7 +19,7 @@ use crate::theme::{Color, Font};
 use ipc::{BranchColumn, BranchMap, CandidateList, HomophoneNote, MeaningPlacement};
 use std::ops::Range;
 use tokens::opacity;
-use tokens::size::{branch, candidate, glass};
+use tokens::size::{branch, candidate, glass, meaning};
 
 /// 行の頭に置かない字(句読点・閉じ括弧・中点・長音・繰り返しの記号・小さいかな)．折り返すときは前の行に付ける
 const LINE_START_FORBIDDEN: &str = "、。，．,.:;!?)]}）］｝」』】〕〉》・：；？！ー…‥々ゝゞヽヾぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ";
@@ -41,121 +42,89 @@ struct Run {
 /// 折り返した 1 行
 struct Line {
     runs: Vec<Run>,
-    height: f32,
 }
 
-/// 1 つの意味の行
-struct Sense {
-    number: Option<String>,
-    meaning: Vec<Line>,
-    example: Vec<Line>,
-    height: f32,
-}
-
-/// 描く位置を決めたカード．width・height は内側の余白を含む
+/// 配置を決めたカード(配置は card_layout)．width・height は内側の余白を含む
 pub(super) struct Card {
-    word: String,
-    part_of_speech: Option<&'static str>,
-    /// 同音語の札に出す語(分岐図では枝に出ている語を除いたもの)
-    others: Vec<String>,
-    header_height: f32,
-    senses: Vec<Sense>,
+    /// 意味ごとの，折り返した意味の行と例の行
+    meaning: Vec<Vec<Line>>,
+    example: Vec<Vec<Line>>,
+    layout: CardLayout,
     pub width: f32,
     pub height: f32,
 }
 
 impl Card {
-    /// 文字を並べる幅(余白を除く)が width のカード
+    /// 幅 width(内側の余白を含む)のカード
     pub fn new(painter: &Painter, note: &HomophoneNote, others: Vec<String>, width: f32) -> Self {
         let theme = painter.theme;
         let measure = painter.measure;
+        let columns = card_layout::Columns::new(width);
         let numbered = note.senses.len() > 1;
-        let text_width = width
-            - if numbered {
-                glass::MEANING_BADGE_SIZE + glass::NOTE_GAP
-            } else {
-                0.0
-            };
-        let example_width =
-            text_width - glass::MEANING_EXAMPLE_BAR_WIDTH - glass::MEANING_EXAMPLE_INDENT;
         let body = Style {
             font: Font::MeaningBody,
             color: theme.text,
         };
-        let senses: Vec<Sense> = note
+        let meaning_lines: Vec<Vec<Line>> = note
             .senses
             .iter()
-            .enumerate()
-            .map(|(index, sense)| {
-                let meaning = lines(
+            .map(|sense| {
+                lines(
                     measure,
                     &styled(&sense.meaning, body),
-                    text_width,
-                    glass::MEANING_MEANING_LINES as usize,
-                );
-                let example = sense.example.as_deref().map_or_else(Vec::new, |example| {
+                    columns.text_width,
+                    meaning::MEANING_LINES as usize,
+                )
+            })
+            .collect();
+        let example_lines: Vec<Vec<Line>> = note
+            .senses
+            .iter()
+            .map(|sense| {
+                sense.example.as_deref().map_or_else(Vec::new, |example| {
                     lines(
                         measure,
                         &example_text(example, &note.word, painter),
-                        example_width,
-                        glass::MEANING_EXAMPLE_LINES as usize,
+                        columns.example_width,
+                        meaning::EXAMPLE_LINES as usize,
                     )
-                });
-                let height = lines_height(&meaning)
-                    + if example.is_empty() {
-                        0.0
-                    } else {
-                        glass::MEANING_EXAMPLE_GAP + lines_height(&example)
-                    };
-                Sense {
-                    number: numbered.then(|| strings::sense_number(index + 1)),
-                    meaning,
-                    example,
-                    height,
-                }
+                })
             })
             .collect();
-        let header_height = measure
-            .height(Font::MeaningHeadword)
-            .ceil()
-            .max(glass::MEANING_POS_HEIGHT);
-        let others_height = if others.is_empty() {
-            0.0
-        } else {
-            glass::MEANING_OTHERS_GAP * 2.0 + candidate::FRAME_WIDTH + glass::TAG_HEIGHT
-        };
-        let senses_height = senses.iter().map(|sense| sense.height).sum::<f32>()
-            + glass::MEANING_SENSE_GAP * senses.len().saturating_sub(1) as f32;
-        let height = glass::MEANING_PADDING * 2.0
-            + header_height
-            + glass::MEANING_HEADER_GAP
-            + senses_height
-            + others_height;
-        Self {
-            word: note.word.clone(),
+        let senses = (0..note.senses.len())
+            .map(|index| SenseLines {
+                number: numbered.then(|| strings::sense_number(index + 1)),
+                meaning_lines: meaning_lines[index].len(),
+                example_lines: example_lines[index].len(),
+            })
+            .collect();
+        let content = Content {
+            word: &note.word,
             part_of_speech: note.part_of_speech.map(strings::part_of_speech),
-            others,
-            header_height,
             senses,
-            width: width + glass::MEANING_PADDING * 2.0,
-            height: height.ceil(),
+            others: &others,
+            others_label: strings::HOMOPHONE_OTHERS,
+            more: &strings::more,
+        };
+        let layout = card_layout::place(&content, width, measure);
+        Self {
+            width: layout.width,
+            height: layout.height,
+            meaning: meaning_lines,
+            example: example_lines,
+            layout,
         }
     }
 
     /// 見出しの行の縦の中心(rect はカードの枠)．分岐図のつなぐ線はここへ引く
     pub fn header_mid_y(&self, rect: Frame) -> f32 {
-        (rect.y + glass::MEANING_PADDING + self.header_height / 2.0).round()
+        (rect.y + self.layout.header_mid_y()).round()
     }
 }
 
 /// 一覧で出すカード(候補の右に出すときの幅)
 pub(super) fn list_card(painter: &Painter, note: &HomophoneNote) -> Card {
-    Card::new(
-        painter,
-        note,
-        note.others.clone(),
-        glass::MEANING_CARD_WIDTH,
-    )
+    Card::new(painter, note, note.others.clone(), meaning::LIST_WIDTH)
 }
 
 /// 分岐図で出すカード．同音語の札には，下の枝に出ていない語だけを出す(枝に出ている語は見れば分かる)
@@ -178,12 +147,12 @@ pub(super) fn branch_card(
 pub(super) struct Slot {
     pub placement: MeaningPlacement,
     pub card: Option<Card>,
-    /// カードの大きさ(内側の余白を含む．一覧の候補の右では窓の縁から離す空きも含む)
+    /// カードの大きさ(内側の余白を含む)
     pub width: f32,
     pub height: f32,
 }
 
-/// 候補の右に出すカード．意味が無くても，空けておく高さ(reserved)があれば空いたカードにする．
+/// 候補の右に出すカード(幅 width は内側の余白を含む)．意味が無くても，空けておく高さ(reserved)があれば空いたカードにする．
 /// 出さなければ None
 pub(super) fn side_slot(card: Option<Card>, width: f32, reserved: Option<f32>) -> Option<Slot> {
     if card.is_none() && reserved.is_none() {
@@ -196,7 +165,7 @@ pub(super) fn side_slot(card: Option<Card>, width: f32, reserved: Option<f32>) -
     Some(Slot {
         placement: MeaningPlacement::Side,
         card,
-        width: width + glass::MEANING_PADDING * 2.0,
+        width,
         height,
     })
 }
@@ -273,7 +242,7 @@ impl CardReservation {
         let height = column
             .homophone
             .as_ref()
-            .map(|note| branch_card(&painter, note, column, glass::MEANING_BRANCH_WIDTH).height);
+            .map(|note| branch_card(&painter, note, column, meaning::BRANCH_WIDTH).height);
         self.hold(
             ReservationKey::Branch(index, column.alternatives.clone()),
             height,
@@ -300,20 +269,30 @@ impl CardReservation {
 
 // MARK: - 地
 
+/// カードの地の描き方
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CardFrame {
+    /// 角丸のテーマは文字の色を薄く敷いた地，platinum と desk は 1 ドットの枠
+    Boxed,
+    /// platinum と desk の一覧で，枠の無い区画にするとき(一覧とのあいだの線は一覧の側が描く)
+    Pane,
+}
+
 /// カードを描く．card が None なら空けておくカード．pointer_y があれば，左の辺からその高さを指す三角を出す(一覧で選んでいる候補を指す)
 pub(super) fn draw(
     painter: &mut Painter,
     card: Option<&Card>,
     rect: Frame,
     pointer_y: Option<f32>,
+    frame: CardFrame,
 ) {
-    background(painter, rect, pointer_y);
+    background(painter, rect, pointer_y, frame);
     match card {
         Some(card) => content(painter, card, rect),
         None => {
             // 意味の無い候補を選んでいるときは，地の真ん中に辞書のアイコンを薄く出す(カードの場所は動かさない)
             let theme = painter.theme;
-            let side = glass::MEANING_EMPTY_ICON_SIZE;
+            let side = meaning::EMPTY_ICON_SIZE;
             let frame = Frame::new(
                 (rect.mid_x() - side / 2.0).round(),
                 (rect.mid_y() - side / 2.0).round(),
@@ -331,41 +310,48 @@ pub(super) fn draw(
     }
 }
 
-/// カードの地．角丸のテーマは文字の色を薄く敷き，platinum と desk は 1 ドットの枠にする．三角は地と同じ色
-fn background(painter: &mut Painter, rect: Frame, pointer_y: Option<f32>) {
+/// カードの地．角丸のテーマは文字の色を薄く敷き，platinum と desk は 1 ドットの枠にする(区画にするときは枠を描かない)．三角は地と同じ色
+fn background(painter: &mut Painter, rect: Frame, pointer_y: Option<f32>, card_frame: CardFrame) {
     let theme = painter.theme;
-    let notch = glass::MEANING_NOTCH;
-    let pointer = |y: f32| {
+    let notch = meaning::NOTCH;
+    let pointer = |x: f32, y: f32| {
         vec![
-            Point::new(rect.x, y - notch),
-            Point::new(rect.x - notch, y),
-            Point::new(rect.x, y + notch),
+            Point::new(x, y - notch),
+            Point::new(x - notch, y),
+            Point::new(x, y + notch),
         ]
     };
     if !theme.is_rounded() {
         let line = candidate::FRAME_WIDTH;
-        for frame in [
-            Frame::new(rect.x, rect.y, rect.width, line),
-            Frame::new(rect.x, rect.max_y() - line, rect.width, line),
-            Frame::new(rect.x, rect.y, line, rect.height),
-            Frame::new(rect.max_x() - line, rect.y, line, rect.height),
-        ] {
-            painter.rect(frame, theme.line);
+        if card_frame == CardFrame::Boxed {
+            for frame in [
+                Frame::new(rect.x, rect.y, rect.width, line),
+                Frame::new(rect.x, rect.max_y() - line, rect.width, line),
+                Frame::new(rect.x, rect.y, line, rect.height),
+                Frame::new(rect.max_x() - line, rect.y, line, rect.height),
+            ] {
+                painter.rect(frame, theme.line);
+            }
         }
         if let Some(y) = pointer_y {
             let y = y
                 .min(rect.max_y() - notch * 2.0)
                 .max(rect.y + notch * 2.0)
                 .round();
+            // 区画にするときは，一覧とのあいだの線(rect の左の 1 ドット外)から出す
+            let base = match card_frame {
+                CardFrame::Boxed => rect.x,
+                CardFrame::Pane => rect.x - line,
+            };
             painter.draws.push(Draw::Polygon {
-                points: pointer(y),
+                points: pointer(base, y),
                 color: theme.line,
             });
         }
         return;
     }
     let fill = theme.meaning_card_fill();
-    let radius = glass::MEANING_RADIUS
+    let radius = meaning::RADIUS
         .min(theme.corner_radius)
         .min(rect.height / 2.0)
         .min(rect.width / 2.0);
@@ -382,7 +368,7 @@ fn background(painter: &mut Painter, rect: Frame, pointer_y: Option<f32>) {
             .max(rect.y + radius + notch)
             .round();
         painter.draws.push(Draw::Polygon {
-            points: pointer(y),
+            points: pointer(rect.x, y),
             color: fill,
         });
     }
@@ -421,52 +407,81 @@ pub(super) fn connector(painter: &mut Painter, start: Point, end: Point) {
         }
     }
     painter.draws.push(Draw::Ellipse {
-        frame: Frame::square(end, glass::MEANING_DOT_SIZE),
+        frame: Frame::square(end, meaning::DOT_SIZE),
         color: theme.selection,
     });
 }
 
 // MARK: - 中身
 
-/// rect(カードの枠．地は描かない)の中に，見出し・意味・例・同音語を描く
+/// rect(カードの枠．地は描かない)の中に，配置のとおりに見出し・意味・例・同音語を描く
 fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     let theme = painter.theme;
-    let left = rect.x + glass::MEANING_PADDING;
-    let right = rect.max_x() - glass::MEANING_PADDING;
-    let mut y = rect.y + glass::MEANING_PADDING;
-    header(painter, card, left, right, y);
-    y += card.header_height + glass::MEANING_HEADER_GAP;
-    for sense in &card.senses {
-        let mut text_x = left;
-        if let (Some(number), Some(first)) = (&sense.number, sense.meaning.first()) {
-            let size = glass::MEANING_BADGE_SIZE;
-            let badge = Frame::new(left, (y + (first.height - size) / 2.0).round(), size, size);
+    let layout = &card.layout;
+    let at = |frame: Frame| frame.offset(rect.x, rect.y);
+
+    // 見出し
+    painter.icon(
+        Icon::Book,
+        icon_frame(at(layout.book_icon)),
+        theme.selection,
+    );
+    let headword = &layout.headword;
+    painter.text(
+        &headword.text,
+        headword.font,
+        theme.text,
+        rect.x + headword.frame.x,
+        at(headword.frame),
+    );
+    if let Some(chip) = &layout.part_of_speech {
+        // 品詞の札: アクセントの色を薄く敷いた地にアクセントの色の字
+        let frame = at(chip.frame);
+        painter.draws.push(Draw::RoundRect {
+            frame,
+            radius: if theme.is_rounded() {
+                frame.height / 2.0
+            } else {
+                0.0
+            },
+            fill: Some(theme.meaning_tint()),
+            stroke: None,
+        });
+        painter.text(
+            &chip.text,
+            Font::MeaningTag,
+            theme.selection,
+            rect.x + chip.text_frame.x,
+            at(chip.text_frame),
+        );
+    }
+
+    // 意味と例
+    for (index, sense) in layout.senses.iter().enumerate() {
+        if let (Some(badge), Some(number)) = (sense.badge, &sense.number) {
             painter.draws.push(Draw::RoundRect {
-                frame: badge,
+                frame: at(badge),
                 radius: if theme.is_rounded() {
-                    glass::MEANING_BADGE_RADIUS
+                    meaning::NUMBER_RADIUS
                 } else {
                     0.0
                 },
                 fill: Some(theme.meaning_tint()),
                 stroke: None,
             });
-            painter.centered(number, Font::MeaningNumber, theme.selection, badge);
-            text_x = badge.max_x() + glass::NOTE_GAP;
-        }
-        let mut line_y = y;
-        for line in &sense.meaning {
-            draw_line(painter, line, text_x, line_y);
-            line_y += line.height + glass::MEANING_LINE_SPACING;
-        }
-        if !sense.example.is_empty() {
-            line_y += glass::MEANING_EXAMPLE_GAP - glass::MEANING_LINE_SPACING;
-            let bar = Frame::new(
-                text_x,
-                line_y,
-                glass::MEANING_EXAMPLE_BAR_WIDTH,
-                lines_height(&sense.example),
+            painter.text(
+                &number.text,
+                number.font,
+                theme.selection,
+                rect.x + number.frame.x,
+                at(number.frame),
             );
+        }
+        for (frame, line) in sense.meaning.iter().zip(&card.meaning[index]) {
+            draw_line(painter, line, at(*frame));
+        }
+        if let Some(bar) = sense.example_bar {
+            let bar = at(bar);
             painter.draws.push(Draw::RoundRect {
                 frame: bar,
                 radius: bar.width / 2.0,
@@ -477,137 +492,74 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
                 ),
                 stroke: None,
             });
-            for line in &sense.example {
-                draw_line(
-                    painter,
-                    line,
-                    bar.max_x() + glass::MEANING_EXAMPLE_INDENT,
-                    line_y,
-                );
-                line_y += line.height + glass::MEANING_LINE_SPACING;
-            }
         }
-        y += sense.height + glass::MEANING_SENSE_GAP;
+        for (frame, line) in sense.example.iter().zip(&card.example[index]) {
+            draw_line(painter, line, at(*frame));
+        }
     }
-    if card.others.is_empty() {
+
+    // 同音語
+    let Some(separator) = layout.separator else {
         return;
+    };
+    painter.rect(at(separator), theme.line);
+    if let Some(ear) = layout.ear_icon {
+        painter.icon(Icon::Ear, icon_frame(at(ear)), theme.text_muted);
     }
-    y += glass::MEANING_OTHERS_GAP - glass::MEANING_SENSE_GAP;
-    painter.rect(
-        Frame::new(left, y.round(), right - left, candidate::FRAME_WIDTH),
-        theme.line,
-    );
-    y += candidate::FRAME_WIDTH + glass::MEANING_OTHERS_GAP;
-    others(
-        painter,
-        &card.others,
-        left,
-        right,
-        y + glass::TAG_HEIGHT / 2.0,
-    );
-}
-
-/// 1 行を x から左寄せで描く．書体の変わり目で字の間が空かないよう，次の字の位置は切り上げない幅で進める
-fn draw_line(painter: &mut Painter, line: &Line, x: f32, y: f32) {
-    let row = Frame::new(x, y, 0.0, line.height);
-    let mut x = x;
-    for run in &line.runs {
-        painter.text(&run.text, run.style.font, run.style.color, x, row);
-        x += painter.measure.width(&run.text, run.style.font);
+    if let Some(label) = &layout.others_label {
+        painter.text(
+            &label.text,
+            label.font,
+            theme.text_muted,
+            rect.x + label.frame.x,
+            at(label.frame),
+        );
     }
-}
-
-/// 見出し: 辞書のアイコン・語・品詞の札．語が長ければ品詞の札の手前で省く
-fn header(painter: &mut Painter, card: &Card, left: f32, right: f32, y: f32) {
-    let theme = painter.theme;
-    let mid_y = y + card.header_height / 2.0;
-    let icon = glass::MEANING_ICON_SIZE;
-    painter.icon(
-        Icon::Book,
-        Frame::new(left, (mid_y - icon / 2.0).round(), icon, icon),
-        theme.selection,
-    );
-    let mut x = left + icon + glass::NOTE_GAP;
-    let tag_width = card
-        .part_of_speech
-        .map_or(0.0, |name| tag_width(painter, name));
-    let available = right
-        - x
-        - if tag_width > 0.0 {
-            tag_width + glass::NOTE_GAP
-        } else {
-            0.0
-        };
-    let shown = painter.truncated(&card.word, Font::MeaningHeadword, available);
-    let row = Frame::new(x, y, 0.0, card.header_height);
-    painter.text(&shown, Font::MeaningHeadword, theme.text, x, row);
-    x += painter.width(&shown, Font::MeaningHeadword) + glass::NOTE_GAP;
-    if let Some(name) = card.part_of_speech {
-        // 品詞の札: アクセントの色を薄く敷いた地にアクセントの色の字
-        let height = glass::MEANING_POS_HEIGHT;
-        let frame = Frame::new(x.round(), (mid_y - height / 2.0).round(), tag_width, height);
+    for tag in &layout.tags {
+        let frame = at(tag.frame);
         painter.draws.push(Draw::RoundRect {
             frame,
             radius: if theme.is_rounded() {
-                height / 2.0
+                glass::TAG_RADIUS
             } else {
                 0.0
             },
-            fill: Some(theme.meaning_tint()),
+            fill: Some(theme.badge),
             stroke: None,
         });
-        painter.centered(name, Font::MeaningTag, theme.selection, frame);
+        painter.text(
+            &tag.text,
+            Font::Label,
+            theme.text_muted,
+            rect.x + tag.text_frame.x,
+            at(tag.text_frame),
+        );
+    }
+    if let Some(more) = &layout.more {
+        painter.text(
+            &more.text,
+            more.font,
+            theme.text_muted,
+            rect.x + more.frame.x,
+            at(more.frame),
+        );
     }
 }
 
-fn tag_width(painter: &Painter, name: &str) -> f32 {
-    (painter.width(name, Font::MeaningTag) + glass::MEANING_POS_PADDING_X * 2.0).ceil()
+/// 目印の枠(目印の列の一辺の正方形)の真ん中に置くアイコンの枠
+fn icon_frame(marker: Frame) -> Frame {
+    Frame::square(
+        Point::new(marker.mid_x(), marker.mid_y()),
+        meaning::ICON_SIZE,
+    )
 }
 
-/// 同音語の行: 耳のアイコン・「同音語」・札．入らない札は「+n」にまとめる
-fn others(painter: &mut Painter, others: &[String], left: f32, right: f32, mid_y: f32) {
-    let theme = painter.theme;
-    let icon = glass::MEANING_ICON_SIZE;
-    painter.icon(
-        Icon::Ear,
-        Frame::new(left, (mid_y - icon / 2.0).round(), icon, icon),
-        theme.text_muted,
-    );
-    let row = Frame::new(
-        left,
-        (mid_y - glass::TAG_HEIGHT / 2.0).round(),
-        0.0,
-        glass::TAG_HEIGHT,
-    );
-    let mut x = left + icon + glass::NOTE_GAP / 2.0;
-    painter.text(
-        strings::HOMOPHONE_OTHERS,
-        Font::Label,
-        theme.text_muted,
-        x,
-        row,
-    );
-    x += painter.width(strings::HOMOPHONE_OTHERS, Font::Label);
-    for (index, word) in others.iter().enumerate() {
-        let tag = painter.tag_width(word);
-        let rest = others.len() - index - 1;
-        let reserve = if rest > 0 {
-            glass::USAGE_TAG_GAP + painter.width(&strings::more(rest), Font::Label)
-        } else {
-            0.0
-        };
-        if x + glass::USAGE_TAG_GAP + tag + reserve > right {
-            painter.text(
-                &strings::more(others.len() - index),
-                Font::Label,
-                theme.text_muted,
-                x + glass::USAGE_TAG_GAP,
-                row,
-            );
-            return;
-        }
-        x += glass::USAGE_TAG_GAP + tag;
-        painter.tag(word, x, mid_y, false, TagStyle::Plain);
+/// 1 行を行の箱 frame の左から描く．書体の変わり目で字の間が空かないよう，次の字の位置は切り上げない幅で進める
+fn draw_line(painter: &mut Painter, line: &Line, frame: Frame) {
+    let mut x = frame.x;
+    for run in &line.runs {
+        painter.text(&run.text, run.style.font, run.style.color, x, frame);
+        x += painter.measure.width(&run.text, run.style.font);
     }
 }
 
@@ -708,7 +660,7 @@ fn width(measure: &dyn Measure, characters: &[(char, Style)]) -> f32 {
         .sum()
 }
 
-/// 幅 width で折り返した行．行の高さは行の中のいちばん大きい書体の高さ
+/// 幅 width で折り返した行
 fn lines(
     measure: &dyn Measure,
     characters: &[(char, Style)],
@@ -717,19 +669,8 @@ fn lines(
 ) -> Vec<Line> {
     wrap(measure, characters, width, max_lines)
         .into_iter()
-        .map(|runs| {
-            let height = runs
-                .iter()
-                .map(|run| measure.height(run.style.font).ceil())
-                .fold(0.0, f32::max);
-            Line { runs, height }
-        })
+        .map(|runs| Line { runs })
         .collect()
-}
-
-fn lines_height(lines: &[Line]) -> f32 {
-    lines.iter().map(|line| line.height).sum::<f32>()
-        + glass::MEANING_LINE_SPACING * lines.len().saturating_sub(1) as f32
 }
 
 /// 幅で貪欲に折り返す．行の頭に置かない字は前の行に付け，英数字の語は途中で切らない．
@@ -946,39 +887,47 @@ mod tests {
             &painter(&look),
             &note(&[(long.as_str(), Some(long.as_str()))], &[]),
         );
-        let sense = &card.senses[0];
-        assert_eq!(sense.meaning.len(), glass::MEANING_MEANING_LINES as usize);
-        assert_eq!(sense.example.len(), glass::MEANING_EXAMPLE_LINES as usize);
+        assert_eq!(card.meaning[0].len(), meaning::MEANING_LINES as usize);
+        assert_eq!(card.example[0].len(), meaning::EXAMPLE_LINES as usize);
         let last = |lines: &[Line]| -> String {
             lines
                 .last()
                 .map(|line| line.runs.iter().map(|run| run.text.as_str()).collect())
                 .unwrap_or_default()
         };
-        assert!(last(&sense.meaning).ends_with(ELLIPSIS));
-        assert!(last(&sense.example).ends_with(ELLIPSIS));
+        assert!(last(&card.meaning[0]).ends_with(ELLIPSIS));
+        assert!(last(&card.example[0]).ends_with(ELLIPSIS));
         // 意味が 1 つなら番号を付けない
-        assert_eq!(sense.number, None);
+        assert_eq!(card.layout.senses[0].number, None);
     }
 
     #[test]
-    fn 意味が2つ以上なら番号を付け_文字の幅を番号の分だけ狭める() {
+    fn 意味が2つ以上なら目印の列に番号を付け_文字の幅は変えない() {
         let theme = theme("washi");
         let look = Look::new(&theme, 15.0);
-        let text = "意".repeat(28);
+        let text = "意".repeat(26);
         let one = list_card(&painter(&look), &note(&[(text.as_str(), None)], &[]));
         let two = list_card(
             &painter(&look),
             &note(&[(text.as_str(), None), ("働く", None)], &[]),
         );
-        assert_eq!(one.senses[0].meaning.len(), 1);
-        assert_eq!(two.senses[0].meaning.len(), 2);
-        assert_eq!(two.senses[0].number.as_deref(), Some("1"));
-        assert_eq!(two.senses[1].number.as_deref(), Some("2"));
+        // 番号は目印の列に置くので，意味の文の幅は番号があっても同じ
+        assert_eq!(one.meaning[0].len(), two.meaning[0].len());
         assert_eq!(
-            one.width,
-            glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0
+            two.layout.senses[0]
+                .number
+                .as_ref()
+                .map(|number| number.text.as_str()),
+            Some("1")
         );
+        assert_eq!(
+            two.layout.senses[1]
+                .number
+                .as_ref()
+                .map(|number| number.text.as_str()),
+            Some("2")
+        );
+        assert_eq!(one.width, meaning::LIST_WIDTH);
     }
 
     #[test]
@@ -992,7 +941,9 @@ mod tests {
         let none = list_card(&painter(&look), &note(&[("撮影する", None)], &[]));
         assert_eq!(
             few.height - none.height,
-            glass::MEANING_OTHERS_GAP * 2.0 + candidate::FRAME_WIDTH + glass::TAG_HEIGHT
+            meaning::OTHERS_GAP * 2.0
+                + candidate::FRAME_WIDTH
+                + glass::TAG_HEIGHT.max(meaning::MARKER_WIDTH)
         );
         let mut drawn = painter(&look);
         draw(
@@ -1000,6 +951,7 @@ mod tests {
             Some(&few),
             Frame::new(0.0, 0.0, few.width, few.height),
             None,
+            CardFrame::Boxed,
         );
         let shown: Vec<String> = drawn
             .draws
@@ -1025,7 +977,7 @@ mod tests {
         let crowded = list_card(&painter(&look), &note(&[("撮影する", None)], &many));
         let mut drawn = painter(&look);
         let rect = Frame::new(0.0, 0.0, crowded.width, crowded.height);
-        draw(&mut drawn, Some(&crowded), rect, None);
+        draw(&mut drawn, Some(&crowded), rect, None, CardFrame::Boxed);
         assert!(drawn
             .draws
             .iter()
@@ -1049,9 +1001,15 @@ mod tests {
             &painter(&look),
             &note(&[("撮影する", None)], &["取る", "採る", "執る"]),
             &column,
-            glass::MEANING_BRANCH_WIDTH,
+            meaning::BRANCH_WIDTH,
         );
-        assert_eq!(card.others, ["採る", "執る"]);
+        let tags: Vec<&str> = card
+            .layout
+            .tags
+            .iter()
+            .map(|tag| tag.text.as_str())
+            .collect();
+        assert_eq!(tags, ["採る", "執る"]);
     }
 
     #[test]
@@ -1065,6 +1023,7 @@ mod tests {
                 None,
                 Frame::new(0.0, 0.0, 300.0, 120.0),
                 Some(40.0),
+                CardFrame::Boxed,
             );
             assert!(!drawn
                 .draws
@@ -1092,19 +1051,16 @@ mod tests {
             let rect = Frame::new(20.0, 10.0, 300.0, 120.0);
             for wanted in [0.0, 70.0, 500.0] {
                 let mut drawn = painter(&look);
-                background(&mut drawn, rect, Some(wanted));
+                background(&mut drawn, rect, Some(wanted), CardFrame::Boxed);
                 let tip = drawn.draws.iter().find_map(|draw| match draw {
                     Draw::Polygon { points, .. } => Some(points[1]),
                     _ => None,
                 });
                 let tip = tip.expect("三角を描く");
-                assert_eq!(tip.x, rect.x - glass::MEANING_NOTCH);
+                assert_eq!(tip.x, rect.x - meaning::NOTCH);
+                assert!(tip.y - meaning::NOTCH >= rect.y + 1.0, "{name} {wanted}");
                 assert!(
-                    tip.y - glass::MEANING_NOTCH >= rect.y + 1.0,
-                    "{name} {wanted}"
-                );
-                assert!(
-                    tip.y + glass::MEANING_NOTCH <= rect.max_y() - 1.0,
+                    tip.y + meaning::NOTCH <= rect.max_y() - 1.0,
                     "{name} {wanted}"
                 );
             }
