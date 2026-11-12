@@ -633,6 +633,94 @@ extension WireSyncStatus: CustomStringConvertible, CustomDebugStringConvertible 
     public var debugDescription: String { description }
 }
 
+public enum WireImportKind: String, Sendable, Equatable, Codable, CaseIterable {
+    case userDictionary
+    case dictionary
+    case association
+}
+
+extension WireImportKind: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportKind.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireImportFormat: String, Sendable, Equatable, Codable, CaseIterable {
+    case tabSeparated
+    case commaSeparated
+    case skk
+    case propertyList
+}
+
+extension WireImportFormat: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportFormat.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireImportColumn: String, Sendable, Equatable, Codable, CaseIterable {
+    case reading
+    case word
+    case wordClass
+    case comment
+    case meaning
+    case words
+}
+
+extension WireImportColumn: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportColumn.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public enum WireImportRowStatus: String, Sendable, Equatable, Codable, CaseIterable {
+    case ok
+    case defaultedWordClass
+    case unreadable
+}
+
+extension WireImportRowStatus: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportRowStatus.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WireImportPreviewRow: Sendable, Equatable, Codable {
+    public var line: UInt32
+    public var cells: [String]
+    public var status: WireImportRowStatus
+
+    public init(line: UInt32, cells: [String], status: WireImportRowStatus) {
+        self.line = line
+        self.cells = cells
+        self.status = status
+    }
+}
+
+extension WireImportPreviewRow: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportPreviewRow" }
+    public var debugDescription: String { description }
+}
+
+public struct WireImportPreview: Sendable, Equatable, Codable {
+    public var format: WireImportFormat
+    public var columns: [WireImportColumn]
+    public var rows: [WireImportPreviewRow]
+    public var importable: UInt32
+    public var defaulted: UInt32
+    public var unreadable: UInt32
+
+    public init(format: WireImportFormat, columns: [WireImportColumn], rows: [WireImportPreviewRow], importable: UInt32, defaulted: UInt32, unreadable: UInt32) {
+        self.format = format
+        self.columns = columns
+        self.rows = rows
+        self.importable = importable
+        self.defaulted = defaulted
+        self.unreadable = unreadable
+    }
+}
+
+extension WireImportPreview: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireImportPreview" }
+    public var debugDescription: String { description }
+}
+
 public struct WireImportedDictionaryInfo: Sendable, Equatable, Codable {
     public var id: String
     public var name: String
@@ -918,6 +1006,7 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case readSymbolItems(kind: WireSymbolKind)
     case saveSymbolRule(kind: WireSymbolKind, input: String, output: String, isEnabled: Bool, replacing: String?)
     case removeSymbolRules(kind: WireSymbolKind, inputs: [String])
+    case previewImport(kind: WireImportKind, path: String)
     case importUserDictionary(path: String)
     case exportUserDictionary(path: String)
     case handwritingChosen(text: String)
@@ -1018,6 +1107,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .saveSymbolRule(kind: container.decode(WireSymbolKind.self, forKey: .kind), input: container.decode(String.self, forKey: .input), output: container.decode(String.self, forKey: .output), isEnabled: container.decode(Bool.self, forKey: .isEnabled), replacing: container.decodeIfPresent(String.self, forKey: .replacing))
         case "removeSymbolRules":
             self = try .removeSymbolRules(kind: container.decode(WireSymbolKind.self, forKey: .kind), inputs: container.decode([String].self, forKey: .inputs))
+        case "previewImport":
+            self = try .previewImport(kind: container.decode(WireImportKind.self, forKey: .kind), path: container.decode(String.self, forKey: .path))
         case "importUserDictionary":
             self = try .importUserDictionary(path: container.decode(String.self, forKey: .path))
         case "exportUserDictionary":
@@ -1193,6 +1284,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("removeSymbolRules", forKey: .type)
             try container.encode(kind, forKey: .kind)
             try container.encode(inputs, forKey: .inputs)
+        case .previewImport(let kind, let path):
+            try container.encode("previewImport", forKey: .type)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(path, forKey: .path)
         case .importUserDictionary(let path):
             try container.encode("importUserDictionary", forKey: .type)
             try container.encode(path, forKey: .path)
@@ -1303,6 +1398,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .readSymbolItems: "WireRequestBody.readSymbolItems"
         case .saveSymbolRule: "WireRequestBody.saveSymbolRule"
         case .removeSymbolRules: "WireRequestBody.removeSymbolRules"
+        case .previewImport: "WireRequestBody.previewImport"
         case .importUserDictionary: "WireRequestBody.importUserDictionary"
         case .exportUserDictionary: "WireRequestBody.exportUserDictionary"
         case .handwritingChosen: "WireRequestBody.handwritingChosen"
@@ -1355,6 +1451,7 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case syncStatus(status: WireSyncStatus)
     case dictionaryImported(dictionary: WireImportedDictionaryInfo)
     case associationImported(dictionary: WireAssociationDictionaryInfo)
+    case importPreview(preview: WireImportPreview)
     case imported(added: UInt32, skipped: UInt32)
     case fileFailed(reason: WireFileFailure)
     case symbolItems(items: [WireSymbolItem])
@@ -1372,7 +1469,7 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case wordRegistration(word: String?, reading: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, items, result, values, report, issues, firstCandidateRate, words, results, entries, total, code, word, reading
+        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, preview, added, skipped, reason, items, result, values, report, issues, firstCandidateRate, words, results, entries, total, code, word, reading
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1395,6 +1492,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .dictionaryImported(dictionary: container.decode(WireImportedDictionaryInfo.self, forKey: .dictionary))
         case "associationImported":
             self = try .associationImported(dictionary: container.decode(WireAssociationDictionaryInfo.self, forKey: .dictionary))
+        case "importPreview":
+            self = try .importPreview(preview: container.decode(WireImportPreview.self, forKey: .preview))
         case "imported":
             self = try .imported(added: container.decode(UInt32.self, forKey: .added), skipped: container.decode(UInt32.self, forKey: .skipped))
         case "fileFailed":
@@ -1459,6 +1558,9 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .associationImported(let dictionary):
             try container.encode("associationImported", forKey: .type)
             try container.encode(dictionary, forKey: .dictionary)
+        case .importPreview(let preview):
+            try container.encode("importPreview", forKey: .type)
+            try container.encode(preview, forKey: .preview)
         case .imported(let added, let skipped):
             try container.encode("imported", forKey: .type)
             try container.encode(added, forKey: .added)
@@ -1523,6 +1625,7 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .syncStatus: "WireResponseBody.syncStatus"
         case .dictionaryImported: "WireResponseBody.dictionaryImported"
         case .associationImported: "WireResponseBody.associationImported"
+        case .importPreview: "WireResponseBody.importPreview"
         case .imported: "WireResponseBody.imported"
         case .fileFailed: "WireResponseBody.fileFailed"
         case .symbolItems: "WireResponseBody.symbolItems"

@@ -383,6 +383,8 @@ public protocol SettingsFileHandling: AnyObject {
     func importAssociationDictionary(from path: String, replacing id: String?) async throws(SettingsFileFailure) -> AssociationDictionary
     /// 連想の辞書を一覧と索引から消す．同梱の辞書は消せない
     func removeAssociationDictionary(id: String) throws(SettingsFileFailure)
+    /// 取り込む前に，ファイルの中身の読み方(列が何として読まれたか，行ごとに取り込めるか)を返す．何も登録しない
+    func previewImport(_ kind: ImportPreview.Kind, from path: String) async throws(SettingsFileFailure) -> ImportPreview
     /// ユーザー辞書を「読み<タブ>語」の行のファイルから取り込む．新しく足した語と，読めなかった行の数を返す
     func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int)
     func exportUserDictionary(to path: String) async throws(SettingsFileFailure)

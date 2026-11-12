@@ -9,8 +9,9 @@ use crate::pages::DictionaryList;
 use crate::store::{Fields, SettingsStore, StoreError};
 use crate::usage::Usage;
 use ipc::{
-    ContrastIssue, DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, KeymapReport,
-    PreviewWord, RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolSaveResult, SyncStatus,
+    ContrastIssue, DictionaryAddResult, DictionaryEntry, ErrorCode, FileFailure, ImportKind,
+    ImportPreview, KeymapReport, PreviewWord, RequestBody, ResponseBody, SymbolItem, SymbolKind,
+    SymbolSaveResult, SyncStatus,
 };
 
 /// 要求を 1 つ送って応答を待つ口．応答が無い(つながらない・時間切れ)ときは None
@@ -55,6 +56,13 @@ pub enum FileOutcome {
     /// 読み込んで足した件数
     Imported(u32),
     Failed(FileFailure),
+}
+
+/// 取り込む前に読めなかった理由(ファイルの理由か，エンジンとのやり取り)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImportFailure {
+    File(FileFailure),
+    Store(StoreError),
 }
 
 pub struct EngineStore<E: Engine> {
@@ -218,6 +226,27 @@ impl<E: Engine> EngineStore<E> {
         self.engine.request_file_later(
             import_request(list, path, replacing),
             Box::new(move |response| done(import_outcome(response))),
+        );
+    }
+
+    /// 取り込む前に，ファイルの中身の読み方(列と行ごとに取り込めるか)を求め，done に渡す(何も登録しない)．
+    /// 大きな辞書は読むのに時間がかかるので，応答は別のスレッドで待つ
+    pub fn preview_import_later(
+        &self,
+        kind: ImportKind,
+        path: String,
+        done: Box<dyn FnOnce(Result<ImportPreview, ImportFailure>) + Send>,
+    ) {
+        self.engine.request_file_later(
+            RequestBody::PreviewImport { kind, path },
+            Box::new(move |response| {
+                done(match response {
+                    Some(ResponseBody::ImportPreview { preview }) => Ok(preview),
+                    Some(ResponseBody::FileFailed { reason }) => Err(ImportFailure::File(reason)),
+                    None => Err(ImportFailure::Store(StoreError::Unavailable)),
+                    Some(_) => Err(ImportFailure::Store(StoreError::Malformed)),
+                })
+            }),
         );
     }
 

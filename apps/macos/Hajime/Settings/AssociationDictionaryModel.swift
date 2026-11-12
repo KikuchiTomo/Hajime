@@ -7,28 +7,29 @@ extension SettingsModel {
     /// 連想の辞書のファイルを選んで取り込む．existing を渡すと，その辞書を取り込み直す(名前はそのまま)．
     /// 読み書きは core(SettingsFiles)が行う(Windows のエンジンと同じ)
     func importAssociationFile(replacing existing: AssociationDictionary? = nil) {
-        guard let files, associations != nil else { return }
+        guard associations != nil else { return }
         guard existing != nil || settings.associationDictionaries.count < DefaultSettings.maximumAssociationDictionaries else {
             message = UIStrings.Association.tooMany
             return
         }
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        FilePanel.chooseOne(panel) { [self] source in
-            isImportingDictionary = true
-            Task {
-                defer { isImportingDictionary = false }
-                do throws(SettingsFileFailure) {
-                    let imported = try await files.importAssociationDictionary(from: source.path, replacing: existing?.id)
-                    message = UIStrings.Association.imported(imported.groupCount)
-                } catch {
-                    logger.error("連想の辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
-                    switch error {
-                    case .tooMany: message = UIStrings.Association.tooMany
-                    case .writeFailed: message = UIStrings.Settings.saveFailed
-                    default: message = UIStrings.Association.importFailed
-                    }
+        chooseImport(.association, replacing: existing?.id)
+    }
+
+    /// 中身を見せた連想の辞書のファイルを取り込む．replacing を渡すと，その辞書を取り込み直す
+    func importAssociation(path: String, replacing id: String?) {
+        guard let files, associations != nil else { return }
+        isImportingDictionary = true
+        Task {
+            defer { isImportingDictionary = false }
+            do throws(SettingsFileFailure) {
+                let imported = try await files.importAssociationDictionary(from: path, replacing: id)
+                message = UIStrings.Association.imported(imported.groupCount)
+            } catch {
+                logger.error("連想の辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
+                switch error {
+                case .tooMany: message = UIStrings.Association.tooMany
+                case .writeFailed: message = UIStrings.Settings.saveFailed
+                default: message = UIStrings.Association.importFailed
                 }
             }
         }
