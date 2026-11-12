@@ -31,6 +31,34 @@ struct FileSettingsStoreTests {
         #endif
     }
 
+    @Test("カスタムテーマの色を変えて保存すると，settings.json の customThemes に #RRGGBB で書き，読み直せる")
+    func customThemeColor() throws {
+        let url = temporaryFile()
+        let store = FileSettingsStore(fileURL: url)
+        let white = HexColor("#FFFFFF")!
+        let theme = CustomTheme(id: "sunset", name: "夕焼け", base: .automatic, surface: white, text: HexColor("#000000")!,
+                                textMuted: HexColor("#767676")!, selection: HexColor("#0057D9")!, selectionText: white,
+                                correction: HexColor("#808080")!, line: HexColor("#CCCCCC")!)
+        var next = store.current
+        try next.saveCustomTheme(theme)
+        try store.update { $0 = next }
+
+        // 編集の画面で文字の色を選び直して保存する(CustomThemeEditor と同じ手順)
+        var edited = try #require(store.current.activeCustomTheme)
+        edited.text = HexColor(srgbRed: 0.2, green: 0.4, blue: 0.6)
+        next = store.current
+        try next.saveCustomTheme(edited)
+        try store.update { $0 = next }
+
+        let json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let themes = try #require(json["customThemes"] as? [[String: Any]])
+        #expect(themes.count == 1)
+        #expect(themes.first?["text"] as? String == "#336699")
+        #expect(themes.first?["surface"] as? String == "#FFFFFF")
+        #expect(json["customThemeID"] as? String == "sunset")
+        #expect(FileSettingsStore(fileURL: url).current.activeCustomTheme?.text == HexColor("#336699"))
+    }
+
     @Test("壊れたファイルなら既定値で始める")
     func broken() throws {
         let url = temporaryFile()

@@ -554,6 +554,53 @@ struct CustomThemeTests {
         #expect(theme.lowContrastPairs == [.textMuted, .selectionText, .correction])
     }
 
+    @Test("色を選ぶ部品の sRGB の成分を #RRGGBB にする．範囲の外の成分は端に寄せる")
+    func hexColorFromComponents() {
+        #expect(HexColor(srgbRed: 0.2, green: 0.4, blue: 0.6).hex == "#336699")
+        #expect(HexColor(srgbRed: 0.999, green: 0.501, blue: 0.001).hex == "#FF8000")
+        // 拡張 sRGB の色(Display P3 の鮮やかな色など)は成分が 0〜1 の外になる
+        #expect(HexColor(srgbRed: 1.2, green: -0.1, blue: 0.5).hex == "#FF0080")
+        #expect(HexColor(srgbRed: .nan, green: .infinity, blue: -.infinity).hex == "#00FF00")
+    }
+
+    @Test("カスタムテーマを保存すると，同じ id のテーマを置き換えて使う．無ければ後ろに足す")
+    func saveCustomTheme() throws {
+        let white = HexColor("#FFFFFF")!
+        let theme = CustomTheme(id: "t", name: "夕焼け", base: .automatic, surface: white, text: HexColor("#000000")!, textMuted: HexColor("#767676")!,
+                                selection: HexColor("#0057D9")!, selectionText: white, correction: HexColor("#808080")!, line: HexColor("#CCCCCC")!)
+        var settings = Settings()
+        try settings.saveCustomTheme(theme)
+        #expect(settings.customThemes == [theme])
+        #expect(settings.activeCustomTheme == theme)
+
+        var edited = theme
+        edited.text = HexColor(srgbRed: 0.2, green: 0.4, blue: 0.6)
+        try settings.saveCustomTheme(edited)
+        #expect(settings.customThemes.map(\.text.hex) == ["#336699"])
+        #expect(settings.activeCustomTheme?.text.hex == "#336699")
+
+        var other = theme
+        other.id = "u"
+        try settings.saveCustomTheme(other)
+        #expect(settings.customThemes.map(\.id) == ["t", "u"])
+        #expect(settings.customThemeID == "u")
+
+        var unnamed = theme
+        unnamed.name = ""
+        #expect(throws: Settings.CustomThemeRejection.invalid) { try settings.saveCustomTheme(unnamed) }
+        settings.customThemes = (0..<DefaultSettings.maximumCustomThemes).map { number in
+            var copy = theme
+            copy.id = "full\(number)"
+            return copy
+        }
+        #expect(throws: Settings.CustomThemeRejection.full) { try settings.saveCustomTheme(other) }
+        // 上限まであっても，今あるテーマは書き換えられる
+        var full = settings.customThemes[0]
+        full.line = white
+        try settings.saveCustomTheme(full)
+        #expect(settings.customThemes[0].line == white)
+    }
+
     @Test("使っているテーマが無くなったら既成のテーマに戻す")
     func missingActiveTheme() {
         var settings = Settings()
