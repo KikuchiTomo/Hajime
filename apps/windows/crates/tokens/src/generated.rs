@@ -548,7 +548,6 @@ pub mod size {
         pub const SCROLL_LINE: f32 = 40.0;
         pub const LIST_HEIGHT: f32 = 220.0;
         pub const BUTTON_WIDTH: f32 = 96.0;
-        pub const PREVIEW_HEIGHT: f32 = 240.0;
         pub const BUTTON_PADDING_X: f32 = 12.0;
         pub const PAGE_PADDING_TOP: f32 = 20.0;
         pub const TITLE_FONT_SIZE: f32 = 28.0;
@@ -652,8 +651,6 @@ pub mod size {
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
         pub const TITLE_BAR_PADDING_X: f32 = 16.0;
         pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
-        pub const EMOJI_PREVIEW_HEIGHT: f32 = 260.0;
-        pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
         pub const SWITCH_KNOB_OFF: f32 = 12.0;
         pub const SWITCH_KNOB_ON: f32 = 14.0;
         pub const SWITCH_KNOB_PRESSED: f32 = 2.0;

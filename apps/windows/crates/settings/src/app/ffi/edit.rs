@@ -32,7 +32,7 @@ pub const WM_FIELD_ENTER: u32 = WM_APP + 2;
 pub const WM_FIELD_FOCUS: u32 = WM_APP + 3;
 /// 親に届く知らせ: キーを記録した(lparam は欄)
 pub const WM_FIELD_RECORDED: u32 = WM_APP + 4;
-/// 親に届く知らせ: Esc を押した(lparam は欄．シートを閉じる)
+/// 親に届く知らせ: Esc を押した(lparam は欄．シート・カスタムテーマの編集の画面を閉じる)
 pub const WM_FIELD_ESCAPE: u32 = WM_APP + 5;
 
 const SUBCLASS: usize = 0x5391;
