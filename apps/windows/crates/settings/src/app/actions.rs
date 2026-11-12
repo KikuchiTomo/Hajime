@@ -1333,24 +1333,28 @@ const CHANGING_NAMES: &[&str] = &["uuid", "random", "alnum", "hex", "pick"];
 
 /// 書き方のチップに添える今の値(macOS の TemplatePalette)．エンジンが変換マクロを試すときと同じ値(日時・乱数)で置き換える．
 /// 変換マクロのチップは試す語と読み(text・reading)を {text} と {reading} に入れる．
-/// 入れるたびに変わる書き方は，前に求めた値があればそのまま使う．読めなければ空(チップは決めておいた例を出す)
+/// 入れるたびに変わる書き方は，前に求めた値があればそのまま使う．読めなければ空(チップは決めておいた例を出す)．
+/// 値はチップの値を求める書き方(Item::sample)と組にして返す
 pub fn template_values(
     model: &SettingsModel<Store>,
     items: &[crate::template_reference::Item],
     (text, reading): (&str, &str),
-    previous: &[String],
-) -> Vec<String> {
+    previous: &[(&'static str, String)],
+) -> Vec<(&'static str, String)> {
     items
         .iter()
-        .enumerate()
-        .map(|(index, item)| {
+        .map(|item| {
             let changing = CHANGING_NAMES
                 .iter()
                 .any(|name| item.sample.contains(&format!("{{{name}")));
-            match previous.get(index).filter(|value| !value.is_empty()) {
-                Some(value) if changing => value.clone(),
+            let before = previous
+                .iter()
+                .find(|(sample, value)| *sample == item.sample && !value.is_empty());
+            let value = match before {
+                Some((_, value)) if changing => value.clone(),
                 _ => draft_result(model, text, reading, item.sample),
-            }
+            };
+            (item.sample, value)
         })
         .collect()
 }

@@ -350,8 +350,9 @@ pub struct Extras {
     pub macro_results: Vec<String>,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
     pub fonts: Vec<InstalledFace>,
-    /// 書き方のチップ(選んでいるまとまり)に添える今の値(チップと同じ並び．読めなければ空)
-    pub template_values: Vec<String>,
+    /// 書き方のチップに添える今の値．チップの値を求める書き方(Item::sample)と値の組(読めなければ空)．
+    /// ページやまとまりを切り替えたあと読み直すまでのあいだ，ほかのチップの値を出さないよう書き方で引く
+    pub template_values: Vec<(&'static str, String)>,
     /// 辞書を取り込んでいる(macOS の isImportingDictionary．取り込むボタンを使えなくし，輪を回す)
     pub importing_dictionary: bool,
 }
@@ -1997,8 +1998,17 @@ impl PageView {
             if let Some(target) = row.row.control.template_target() {
                 row.template_enabled = target == TemplateTarget::Macro
                     || values.value("dynamicDictionary").and_then(Value::as_bool) == Some(true);
-                if row.template_panel_open() {
-                    row.lines.clone_from(&extras.template_values);
+                if let Some(items) = row.template_items() {
+                    row.lines = items
+                        .iter()
+                        .map(|(item, _)| {
+                            extras
+                                .template_values
+                                .iter()
+                                .find(|(sample, _)| *sample == item.sample)
+                                .map_or_else(String::new, |(_, value)| value.clone())
+                        })
+                        .collect();
                 }
             }
             if let Some(rows) = list_rows(&row.row, values, extras) {

@@ -835,6 +835,36 @@ impl App {
                 extra: &self.extras.extra,
             };
             self.view.sync(&values, &self.extras, now);
+            // ページを開いた・スイッチを入れたなどで書き方のチップの欄を出したばかりなら，今の値をすぐ読んで映す
+            // (読み直すまで決めておいた例の値を出さない)
+            if let Some(items) = self.view.template_items() {
+                let missing = items.iter().any(|item| {
+                    !self
+                        .extras
+                        .template_values
+                        .iter()
+                        .any(|(sample, _)| *sample == item.sample)
+                });
+                if missing {
+                    let (text, reading) = self
+                        .view
+                        .macro_preview_inputs()
+                        .map(|(text, reading, _)| (text, reading))
+                        .unwrap_or_default();
+                    self.extras.template_values = super::actions::template_values(
+                        model,
+                        &items,
+                        (&text, &reading),
+                        &self.extras.template_values,
+                    );
+                    let values = page::WithExtras {
+                        values: model,
+                        extra: &self.extras.extra,
+                    };
+                    self.view.sync(&values, &self.extras, now);
+                }
+                ffi::set_timer(self.window, TEMPLATE_TIMER, TEMPLATE_INTERVAL);
+            }
         }
         self.preview_pixels = None;
         self.arrange();
