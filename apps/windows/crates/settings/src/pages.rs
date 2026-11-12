@@ -1437,8 +1437,20 @@ fn dictionary() -> Vec<Section> {
     vec![
         Section {
             title: None,
-            rows: vec![Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary")],
-            footer: Some(extras::DYNAMIC_DICTIONARY_NOTE),
+            // 書き方を 1 つずつ注記の行にして並べ，最後に登録の例を置く(macOS の書き方の表と同じ中身)
+            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
+                .chain(std::iter::once(Row::note(extras::DYNAMIC_DICTIONARY_NOTE)))
+                .chain(
+                    crate::strings::windows::TEMPLATE_ROWS
+                        .iter()
+                        .map(|text| Row::note(text)),
+                )
+                .chain(std::iter::once(Row::note(extras::TEMPLATE_FILTERS)))
+                .chain(std::iter::once(Row::note(
+                    crate::strings::windows::TEMPLATE_EXAMPLE,
+                )))
+                .collect(),
+            footer: Some(extras::DATE_FORMAT_SYMBOLS),
             footer_variants: &[],
         },
         Section::new(
