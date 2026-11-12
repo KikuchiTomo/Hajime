@@ -3,7 +3,8 @@
 //! カスタムテーマ(macOS の AppearancePage・CustomThemeEditor)．設定のファイルの customThemes と customThemeID をそのまま読み書きする．
 //! 選んだテーマの色・形・書体は「customTheme.」で始まる道筋の値にし，ほかのページと同じ部品で出して書き換える
 
-use crate::store::Fields;
+use crate::model::SettingsModel;
+use crate::store::{Fields, SettingsStore, StoreError};
 use crate::strings::{more, windows};
 use serde_json::{json, Map, Value};
 
@@ -175,6 +176,17 @@ pub fn edited(themes: Option<&Value>, id: &str, path: &str, value: &Value) -> Op
     Some(Value::Array(elements))
 }
 
+/// 編集しているテーマ(id)の path の値を value にして，設定のファイルの customThemes に書く．書き換えられない値なら None
+pub fn write<S: SettingsStore>(
+    model: &mut SettingsModel<S>,
+    id: &str,
+    path: &str,
+    value: &Value,
+) -> Option<Result<(), StoreError>> {
+    let changed = edited(model.value(THEMES), id, path, value)?;
+    Some(model.set(THEMES, changed))
+}
+
 /// 名前を書き換えた配列．空の名前は None(macOS と同じく名前を入れないと保存しない)
 pub fn renamed(themes: Option<&Value>, id: &str, name: &str, maximum: usize) -> Option<Value> {
     let name: String = name.trim().chars().take(maximum).collect();
@@ -283,6 +295,25 @@ pub fn hex(red: f32, green: f32, blue: f32) -> String {
         channel(red),
         channel(green),
         channel(blue)
+    )
+}
+
+/// 赤・緑・青を「#RRGGBB」にする(色を選ぶ窓で選んだ色を書く値)
+pub fn hex_of((red, green, blue): (u8, u8, u8)) -> String {
+    format!("#{red:02X}{green:02X}{blue:02X}")
+}
+
+/// 赤・緑・青を Win32 の COLORREF(0x00BBGGRR)にする
+pub fn colorref((red, green, blue): (u8, u8, u8)) -> u32 {
+    u32::from(red) | (u32::from(green) << 8) | (u32::from(blue) << 16)
+}
+
+/// Win32 の COLORREF(0x00BBGGRR)を赤・緑・青にする
+pub fn from_colorref(value: u32) -> (u8, u8, u8) {
+    (
+        (value & 0xFF) as u8,
+        ((value >> 8) & 0xFF) as u8,
+        ((value >> 16) & 0xFF) as u8,
     )
 }
 
@@ -405,5 +436,56 @@ mod tests {
         assert_eq!(hex(1.0, 0.5, 0.0), "#FF8000");
         assert_eq!(rgb("#FF8000"), Some((255, 128, 0)));
         assert_eq!(rgb("FF8000"), None);
+        assert_eq!(hex_of((0x33, 0x66, 0x99)), "#336699");
+        assert_eq!(hex_of((0, 0x0A, 0xFF)), "#000AFF");
+    }
+
+    #[test]
+    fn 色を選ぶ窓の色を赤_緑_青と行き来する() {
+        assert_eq!(colorref((0x12, 0x34, 0x56)), 0x0056_3412);
+        assert_eq!(from_colorref(0x0056_3412), (0x12, 0x34, 0x56));
+        let current = rgb("#2B1B17").unwrap();
+        assert_eq!(hex_of(from_colorref(colorref(current))), "#2B1B17");
+    }
+
+    #[test]
+    fn 選んだ色を編集しているテーマに書いて保存する() {
+        use crate::catalog::Catalog;
+        use crate::store::fake::FakeStore;
+        use std::cell::RefCell;
+
+        let fields = |value: Value| value.as_object().cloned().unwrap();
+        let store = FakeStore {
+            current: RefCell::new(fields(
+                json!({"customThemes": themes(), "customThemeID": "a"}),
+            )),
+            defaults: fields(json!({"customThemes": [], "customThemeID": null})),
+            ..Default::default()
+        };
+        let mut catalog = Catalog::load().unwrap();
+        catalog.fields = vec![THEMES.to_string(), ACTIVE.to_string()];
+        let mut model = SettingsModel::load(store, &catalog).unwrap();
+
+        // 色を選ぶ窓で #336699 を選ぶ(actions.rs の After::ChooseColor と同じ値)
+        let chosen = Value::String(hex_of(from_colorref(colorref((0x33, 0x66, 0x99)))));
+        write(&mut model, "a", "customTheme.text", &chosen)
+            .unwrap()
+            .unwrap();
+        let written = model.store().writes.borrow().last().cloned().unwrap();
+        assert_eq!(written.keys().collect::<Vec<_>>(), vec![THEMES]);
+        assert_eq!(written[THEMES][0]["text"], "#336699");
+        assert_eq!(written[THEMES][0]["surface"], "#2B1B17");
+        assert_eq!(written[THEMES][1], themes()[1]);
+        assert_eq!(model.value(THEMES).unwrap()[0]["text"], "#336699");
+        assert_eq!(
+            values(entries(model.value(THEMES)).first(), "")["customTheme.text"],
+            "#336699"
+        );
+
+        // 色でない値や，無いテーマは書かない
+        let count = model.store().writes.borrow().len();
+        assert!(write(&mut model, "a", "customTheme.text", &json!("blue")).is_none());
+        assert!(write(&mut model, "z", "customTheme.text", &chosen).is_none());
+        assert_eq!(model.store().writes.borrow().len(), count);
     }
 }

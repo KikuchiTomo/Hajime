@@ -382,22 +382,14 @@ final class SettingsModel: ObservableObject {
 
     /// カスタムテーマを保存して使う．同じ id のテーマがあれば置き換え，無ければ足す．保存できたら true
     func saveCustomTheme(_ theme: CustomTheme) -> Bool {
-        guard theme.isValid else {
-            message = UIStrings.More.invalidTheme
+        var checked = settings
+        do throws(HajimeDomain.Settings.CustomThemeRejection) {
+            try checked.saveCustomTheme(theme)
+        } catch {
+            message = error == .invalid ? UIStrings.More.invalidTheme : UIStrings.More.themesFull
             return false
         }
-        guard settings.customThemes.contains(where: { $0.id == theme.id }) || settings.customThemes.count < DefaultSettings.maximumCustomThemes else {
-            message = UIStrings.More.themesFull
-            return false
-        }
-        return update { current in
-            if let index = current.customThemes.firstIndex(where: { $0.id == theme.id }) {
-                current.customThemes[index] = theme
-            } else {
-                current.customThemes.append(theme)
-            }
-            current.customThemeID = theme.id
-        }
+        return update { current in _ = try? current.saveCustomTheme(theme) }
     }
 
     func deleteCustomTheme(id: String) {
@@ -428,9 +420,7 @@ final class SettingsModel: ObservableObject {
         func hex(_ color: NSColor) -> HexColor {
             var value = HexColor(red: 0, green: 0, blue: 0)
             NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
-                let rgb = color.usingColorSpace(.sRGB) ?? .black
-                value = HexColor(red: UInt8((rgb.redComponent * 255).rounded()), green: UInt8((rgb.greenComponent * 255).rounded()),
-                                 blue: UInt8((rgb.blueComponent * 255).rounded()))
+                value = HexColor(color) ?? value
             }
             return value
         }

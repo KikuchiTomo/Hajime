@@ -149,7 +149,7 @@ enum DesignTokens {
         }
         enum Part {
             static let windowRadius: CGFloat = 12
-            static let cardRadius: CGFloat = 8
+            static let cardRadius: CGFloat = 12
             static let rowHeight: CGFloat = 28
             static let rowPaddingX: CGFloat = 4
             static let rowRadius: CGFloat = 8
@@ -164,6 +164,7 @@ enum DesignTokens {
             static let tagRadius: CGFloat = 4
             static let badgeSize: CGFloat = 16
             static let iconSize: CGFloat = 16
+            static let iconPadding: CGFloat = 3
             static let iconRadius: CGFloat = 4
             static let stroke: CGFloat = 1
         }

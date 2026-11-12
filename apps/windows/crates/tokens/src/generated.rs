@@ -284,7 +284,7 @@ pub mod size {
     }
     pub mod part {
         pub const WINDOW_RADIUS: f32 = 12.0;
-        pub const CARD_RADIUS: f32 = 8.0;
+        pub const CARD_RADIUS: f32 = 12.0;
         pub const ROW_HEIGHT: f32 = 28.0;
         pub const ROW_PADDING_X: f32 = 4.0;
         pub const ROW_RADIUS: f32 = 8.0;
@@ -299,6 +299,7 @@ pub mod size {
         pub const TAG_RADIUS: f32 = 4.0;
         pub const BADGE_SIZE: f32 = 16.0;
         pub const ICON_SIZE: f32 = 16.0;
+        pub const ICON_PADDING: f32 = 3.0;
         pub const ICON_RADIUS: f32 = 4.0;
         pub const STROKE: f32 = 1.0;
     }
