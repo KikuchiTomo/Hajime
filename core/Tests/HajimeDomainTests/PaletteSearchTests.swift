@@ -158,10 +158,27 @@ struct BundledPaletteTests {
         return PaletteCatalog(text: (try? String(contentsOf: url, encoding: .utf8)) ?? "")
     }()
 
-    @Test("絵文字と記号のすべてのまとまりを読む")
+    @Test("絵文字・記号・顔文字のすべてのまとまりを読む")
     func everyCategory() {
         #expect(Self.catalog.items.count > 3000)
         #expect(Self.catalog.categories == PaletteCategory.allCases)
+        // 顔文字は 4 文字を超えるものも読む．どれにも名前と読みがある
+        let kaomoji = Self.catalog.items.filter { $0.kind == .kaomoji }
+        #expect(kaomoji.count > 400)
+        #expect(kaomoji.contains { $0.text.count > DefaultSettings.maximumPaletteTextLength })
+        #expect(kaomoji.allSatisfy { !$0.japaneseName.isEmpty && !$0.readings.isEmpty })
+    }
+
+    @Test("マスの形を渡すと，その形の種類だけを探す")
+    func searchByShape() {
+        let search = PaletteSearch(catalog: Self.catalog)
+        let query = PaletteSearch.Query(typed: "", kana: "おじぎ")
+        let wide = search.search(query, shape: .wide)
+        #expect(!wide.isEmpty)
+        #expect(wide.allSatisfy { $0.kind == .kaomoji })
+        let square = search.search(query, shape: .square)
+        #expect(square.first?.text == "🙇")
+        #expect(!square.contains { $0.kind == .kaomoji })
     }
 
     @Test("よく探す語で，目当ての文字が先頭に来る", arguments: [

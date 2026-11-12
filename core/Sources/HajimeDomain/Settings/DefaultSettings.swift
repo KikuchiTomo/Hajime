@@ -432,6 +432,8 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// 顔文字の広いマス 1 つが占める四角いマスの数．1 行の広いマスの数は，列の数をこれで割ったもの(1 つ以上)
+    public static let paletteWideCellSpan = 3
     /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．
     /// Windows のエンジンのプロセスは書体を確かめられない(描くのは候補ウィンドウ)ので，この表でパレットに出す絵文字を絞る(R-26)．
     /// 古い順に並べる．どれにも当たらなければ先頭の版にする
@@ -450,10 +452,12 @@ public enum DefaultSettings {
     public static let palettePreviewReadings = 4
     /// 同梱のパレットの表のファイルの名前(アプリの中・Windows のインストール先に置く)
     public static let bundledPaletteFileName = "palette.tsv"
-    /// パレットの表のファイルの大きさの上限．同梱の表は 600KB ほど．壊れた大きなファイルを読み込まないため
+    /// パレットの表のファイルの大きさの上限．同梱の表は 700KB ほど．壊れた大きなファイルを読み込まないため
     public static let maximumPaletteFileBytes = 4 * 1024 * 1024
     /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える
     public static let maximumPaletteTextLength = 4
+    /// 顔文字の長さの上限(Character の数)．同梱の表の顔文字はいちばん長いもので 23 文字(tools/palette/build.py の KAOMOJI_MAX_LENGTH と同じ)
+    public static let maximumKaomojiTextLength = 32
     /// パレットで探したときに並べる項目の数の上限
     public static let maximumPaletteSearchResults = 400
     /// あいまいな照合(FuzzyMatch)の点．当たった 1 文字の点，飛ばし始めと飛ばし続けの減点，
