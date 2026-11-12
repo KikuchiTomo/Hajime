@@ -79,17 +79,15 @@ FOLLOW_UP_CANDIDATE = "#430 の次の PR で直す(候補の窓・分岐図・�
 FOLLOW_UP_PALETTE = "パレットの PR で直す"
 FOLLOW_UP_SETTINGS = "設定の画面と初期設定の PR で直す"
 PENDING_SECTIONS: dict[str, str] = {
-    "candidate": FOLLOW_UP_CANDIDATE, "glass": FOLLOW_UP_CANDIDATE, "branch": FOLLOW_UP_CANDIDATE,
+    "candidate": FOLLOW_UP_CANDIDATE, "glass": FOLLOW_UP_CANDIDATE, "branch": FOLLOW_UP_CANDIDATE, "meaning": FOLLOW_UP_CANDIDATE,
     "mode-indicator": FOLLOW_UP_CANDIDATE, "prediction": FOLLOW_UP_CANDIDATE, "handwriting": FOLLOW_UP_CANDIDATE,
     "palette": FOLLOW_UP_PALETTE,
     "settings": FOLLOW_UP_SETTINGS, "settings-windows": FOLLOW_UP_SETTINGS, "onboarding": FOLLOW_UP_SETTINGS,
 }
 PENDING_FILES: dict[str, str] = {
-    "apps/macos/Hajime/UI/CandidateView.swift": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/UI/BranchView.swift": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/UI/MeaningCardDrawing.swift": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/UI/AssociationHeadingDrawing.swift": FOLLOW_UP_CANDIDATE,
-    "apps/windows/crates/candidate-ui/src/scene/list.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/branch.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/meaning.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/association.rs": FOLLOW_UP_CANDIDATE,
