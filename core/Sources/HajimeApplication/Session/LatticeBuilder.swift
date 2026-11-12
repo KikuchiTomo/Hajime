@@ -95,8 +95,12 @@ struct LatticeBuilder {
             }
         }
         result.candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
-        // 並べ替えで押し下げた絵文字を置き場所に置き直す(上の枝と重なる候補を除いたあとの位置で数える)
-        if let emojiPlacement { result.candidates = emojiPlacement.placed(result.candidates) }
+        // 並べ替えで第 1 候補が変わったら，その語と合わなくなった絵文字を除き(家に帰る → 🐸 を出さない)，
+        // 押し下げた絵文字を置き場所に置き直す(上の枝と重なる候補を除いたあとの位置で数える)
+        if let emojiPlacement {
+            let slice = String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+            result.candidates = emojiPlacement.placed(converter.keepingRelevantEmoji(result.candidates, reading: slice))
+        }
         if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
             let moved = result.candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
             result.choice = .candidate(moved)
@@ -475,8 +479,9 @@ struct LatticeBuilder {
         let best = engineCandidates.first, second = engineCandidates.dropFirst().first
         let confident = SegmentLattice.isConfident(best: best, second: second)
         let gap = best.flatMap { best in second.map { best.score - $0.score } } ?? .infinity
-        // 文節の先頭の語を選び直した候補を前に並べたので，絵文字を置き場所に置き直す
-        if let emojiPlacement { candidates = emojiPlacement.placed(candidates) }
+        // 文節の先頭の語を選び直した候補を前に並べたので，第 1 候補(文の中の文節の字)と合わない絵文字を除き(家に帰る → 🐸 を出さない)，
+        // 絵文字を置き場所に置き直す
+        if let emojiPlacement { candidates = emojiPlacement.placed(converter.keepingRelevantEmoji(candidates, reading: slice)) }
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
                                       variants: variants(of: slice), isConfident: confident, confidenceGap: gap)
     }

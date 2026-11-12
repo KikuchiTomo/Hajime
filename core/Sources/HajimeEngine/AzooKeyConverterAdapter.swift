@@ -60,8 +60,8 @@ public final class AzooKeyConverterEngine {
     /// 読みに合う絵文字(EmojiLooking)．肌の色などを変えた形は除く．パレットの表を持たない作り(Linux)で使う．
     /// azooKey の絵文字の辞書は，どの絵文字にも絵文字の形を選ぶ印(U+FE0F)を後ろに付けている(「😀」の後ろにも付き，
     /// 「🖐」には 2 つ付く)．同じ絵文字のエンジンの辞書の語と重なって見えたり，確定した文字に余計な印が入ったりしないよう，
-    /// 要らない印を除く
-    public func emoji(for reading: String, limit: Int) -> [String] {
+    /// 要らない印を除く．azooKey の絵文字の辞書は名前を持たないので，文節の語(word)とは照らし合わせない
+    public func emoji(for reading: String, word: EmojiWord, limit: Int) -> [String] {
         var seen = Set<String>()
         return emojiReplacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true)
             .map { Self.withoutExtraEmojiStyle($0.text) }

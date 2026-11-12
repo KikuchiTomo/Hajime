@@ -52,6 +52,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private var listExtrasCache: [String: (loose: [String], phonetic: [String])] = [:]
     /// 候補に足した絵文字の候補の文字ごとに，絵文字と引いた読み．確定したときにどの読みで選んだかを知るため．入力を終えたときに捨てる
     private var emojiSources: [String: [EmojiSource]] = [:]
+    /// 読みの絵文字を引いたときの第 1 候補(読みごと)．文の中で第 1 候補が変わったときだけ照らし合わせ直す(keepingRelevantEmoji)
+    private var emojiFirstCandidates: [String: String] = [:]
     /// 今の入力を終えるまで学ばない(suspendLearningUntilEnd)．選んだ絵文字も覚えない
     private var learningSuspended = false
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
@@ -226,6 +228,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
         auxiliaryCache.lookups = [:]
         listExtrasCache = [:]
         emojiSources = [:]
+        emojiFirstCandidates = [:]
         learningSuspended = false
         base.endComposition()
     }
@@ -296,10 +299,13 @@ public final class SupplementedConverter: KanaKanjiConverting {
         guard let emoji else { return }
         var found: [(text: String, source: EmojiSource)] = []
         if current.emojiConversion, reading.count >= DefaultSettings.minimumEmojiReadingLength {
-            found += emoji.emoji(for: reading, limit: placement.count).map { ($0, EmojiSource(emoji: $0, reading: reading, readingCount: reading.count)) }
+            // 第 1 候補の語と名前が合う絵文字だけを出す(「かえる」の第 1 候補が「帰る」なら 🐸 を出さない)
+            emojiFirstCandidates[reading] = result.first { $0.origin != .emoji }?.text
+            found += emoji.emoji(for: reading, word: emojiWord(for: result, reading: reading), limit: placement.count)
+                .map { ($0, EmojiSource(emoji: $0, reading: reading, readingCount: reading.count)) }
         }
         if current.emojiWordConversion, let split = wordEmojiSplit(reading, emoji: emoji) {
-            found += emoji.emoji(for: split.head, limit: placement.count)
+            found += emoji.emoji(for: split.head, word: split.word, limit: placement.count)
                 .map { ($0 + split.tail, EmojiSource(emoji: $0, reading: split.head, readingCount: reading.count)) }
         }
         var seen = Set(result.map(\.text))
@@ -310,22 +316,50 @@ public final class SupplementedConverter: KanaKanjiConverting {
         result = placement.placed(result + added.map { Candidate(text: $0.text, readingCount: reading.count, origin: .emoji) })
     }
 
+    /// 絵文字を照らし合わせる文節の語．第 1 候補がかなのままなら(「もも」「ぶどう」)，語の意味を決める最初の漢字かカタカナの候補(桃・ブドウ)を使い，
+    /// ひらがなの第 1 候補は名前がそのひらがなの絵文字(🍊 みかん)にだけ合わせる
+    private func emojiWord(for candidates: [Candidate], reading: String) -> EmojiWord {
+        let words = base.segmentationWords(for: reading)
+        let others = candidates.filter { $0.origin != .emoji }
+        let first = others.first { !EmojiRelevance.isHiragana($0.text) } ?? others.first
+        let kana = others.first.flatMap { EmojiRelevance.isHiragana($0.text) ? $0.text : nil }
+        return EmojiWord(text: first?.text ?? reading, isNoun: words.count == 1 && words[0].startsWithNoun, hiraganaText: kana)
+    }
+
+    public func keepingRelevantEmoji(_ candidates: [Candidate], reading: String) -> [Candidate] {
+        guard let emoji, candidates.contains(where: { $0.origin == .emoji }) else { return candidates }
+        // 第 1 候補が引いたときと同じなら，引いたときに照らし合わせてある(カタカナの字を上の枝に移した文節でも，引いたときの語で決める)
+        // 新しい第 1 候補が漢字を含まない(とり・ゆき・ウマ)なら，字で語の意味は決まらないので，引いたときの照らし合わせのままにする．
+        // 漢字で別の語に決まったとき(カエル → 帰る)だけ照らし合わせ直す
+        let first = candidates.first { $0.origin != .emoji }?.text
+        guard let first, first != emojiFirstCandidates[reading], EmojiRelevance.containsKanji(first) else { return candidates }
+        // 文節全体の読みで引いた絵文字だけを確かめる．語を絵文字にした候補(🐈が)は，語(猫)を文脈に左右されない語の並びから決めている
+        let allowed = Set(emoji.emoji(for: reading, word: emojiWord(for: candidates, reading: reading), limit: .max))
+        return candidates.filter { candidate in
+            guard candidate.origin == .emoji,
+                  let source = emojiSources[candidate.text]?.first(where: { $0.reading == reading && $0.readingCount == reading.count }) else { return true }
+            return allowed.contains(source.emoji)
+        }
+    }
+
     /// 文節の先頭の名詞を絵文字にできるときの，名詞の読み(ねこ)と後ろの付属語の字(が)．文節が名詞で始まり，絵文字の読みと同じ名詞 1 語の後ろに
     /// 付属語だけが続くときに限る．辞書には「猫が」のように名詞と助詞をつないだ語もあるので，語の並びの切れ目に頼らず，
     /// 長い方から読みを切って，前が絵文字の読みの名詞，後ろが付属語だけになる切れ目を探す
-    private func wordEmojiSplit(_ reading: String, emoji: any EmojiLooking) -> (head: String, tail: String)? {
+    private func wordEmojiSplit(_ reading: String, emoji: any EmojiLooking) -> (head: String, word: EmojiWord, tail: String)? {
         let words = base.segmentationWords(for: reading)
         guard let first = words.first, first.startsWithNoun, words.reduce(0, { $0 + $1.readingCount }) == reading.count else { return nil }
         let characters = Array(reading)
         for length in stride(from: characters.count - 1, through: DefaultSettings.minimumEmojiReadingLength, by: -1) {
             let head = String(characters[..<length])
-            guard !emoji.emoji(for: head, limit: 1).isEmpty else { continue }
             let tailReading = String(characters[length...])
             let tail = base.segmentationWords(for: tailReading)
             guard EmojiPlacement.isFunctionWords(tail, readingCount: tailReading.count) else { continue }
             let headWords = base.segmentationWords(for: head)
             guard headWords.count == 1, headWords[0].startsWithNoun, headWords[0].readingCount == length else { continue }
-            return (head, tail.map(\.text).joined())
+            // 名詞の表記(猫)と名前が合う絵文字があるときだけ
+            let word = EmojiWord(text: headWords[0].text, isNoun: true)
+            guard !emoji.emoji(for: head, word: word, limit: 1).isEmpty else { continue }
+            return (head, word, tail.map(\.text).joined())
         }
         return nil
     }

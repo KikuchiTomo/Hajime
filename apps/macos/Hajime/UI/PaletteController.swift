@@ -2,6 +2,7 @@ import AppKit
 import CoreText
 import HajimeApplication
 import HajimeDomain
+import HajimePersistence
 
 /// 絵文字と記号のパレットの窓を出し入れする(R-26)．窓はアプリ全体で 1 つだけ使い回す．
 ///
@@ -94,22 +95,9 @@ final class PaletteController {
     }
 }
 
-/// OS の絵文字の書体がその絵文字を 1 つの字として描けるか(R-26)．新しいバージョンの絵文字は，OS が古いと
-/// 部品に分かれて描かれるので，パレットに出さない．CoreText はどのスレッドからでも使える
+/// OS の絵文字の書体がその絵文字を 1 つの字として描けるか(R-26)．確かめ方は hajime-playground と同じ(EmojiGlyphProbe)
 enum EmojiRendering {
     static func canRender(_ text: String) -> Bool {
-        let font = CTFontCreateWithName(PaletteIcons.emojiFontName as CFString, DesignTokens.Size.Palette.probeFontSize, nil)
-        let string = NSAttributedString(string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font])
-        let line = CTLineCreateWithAttributedString(string)
-        guard let runs = CTLineGetGlyphRuns(line) as? [CTRun], runs.count == 1, CTRunGetGlyphCount(runs[0]) == 1 else { return false }
-        var glyph = CGGlyph()
-        CTRunGetGlyphs(runs[0], CFRange(location: 0, length: 1), &glyph)
-        guard glyph != 0 else { return false }
-        // 絵文字の書体に無い字は，OS が別の書体で代わりに描く．代わりの書体で描いた字は描けないものとする
-        let attributes = CTRunGetAttributes(runs[0]) as NSDictionary
-        guard let value = attributes[kCTFontAttributeName as String], CFGetTypeID(value as CFTypeRef) == CTFontGetTypeID() else { return false }
-        // 型を CTFontGetTypeID で確かめたので，必ず CTFont になる
-        let used = CTFontCopyPostScriptName(value as! CTFont) as String
-        return used == PaletteIcons.emojiFontName
+        EmojiGlyphProbe.canRender(text, size: DesignTokens.Size.Palette.probeFontSize)
     }
 }

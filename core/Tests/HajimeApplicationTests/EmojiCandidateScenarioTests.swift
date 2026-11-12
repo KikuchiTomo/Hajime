@@ -260,6 +260,34 @@ struct EmojiCandidateScenarioTests {
         #expect(!candidates.contains { EmojiPlacement.containsEmoji($0) })
     }
 
+    @Test("絵文字は文節の第 1 候補の語と名詞かを添えて引く(帰る → 🐸 を出さないため．照らし合わせは EmojiRelevance)")
+    func passesFirstCandidate() {
+        let emoji = FakeEmoji(["かえる": ["🐸"], "ねこ": ["🐈"]])
+        let converter = FakeConverter(["かえる": [("帰る", nil), ("変える", nil)], "ねこ": [("猫", nil), ("ねこ", nil)]])
+        converter.words["かえる"] = [Candidate.Word(text: "帰る", readingCount: 3, startsWithPredicate: true)]
+        converter.words["ねこ"] = [Candidate.Word(text: "猫", readingCount: 2, startsWithNoun: true)]
+        let supplemented = SupplementedConverter(converter, settings: FakeSettings(settings()), calendar: FakeCalendar(), emoji: emoji)
+        _ = supplemented.listCandidates(for: "かえる")
+        _ = supplemented.listCandidates(for: "ねこ")
+        #expect(emoji.words["かえる"] == EmojiWord(text: "帰る", isNoun: false))
+        #expect(emoji.words["ねこ"] == EmojiWord(text: "猫", isNoun: true))
+    }
+
+    @Test("文の中で文節の第 1 候補が変わったら，その語と名前が合わなくなった絵文字を除く(かえる だけなら 🐸，家に帰る の文節では出さない)")
+    func keepsOnlyRelevantEmoji() {
+        let row = ["emoji", "nature", "🐸", "0.6", "カエルの顔", "かえるのかお", "frog", "かえる|かえるのかお", "カエルの顔|動物|顔", "", ""]
+        let lookup = PaletteEmojiLookup(catalog: FakePaletteCatalog(row.joined(separator: "\t")), usage: FakePaletteUsageStore(),
+                                        settings: FakeSettings(settings()), now: Date.init)
+        let converter = FakeConverter(["かえる": [("カエル", nil), ("帰る", nil), ("変える", nil)]])
+        let supplemented = SupplementedConverter(converter, settings: FakeSettings(settings()), calendar: FakeCalendar(), emoji: lookup)
+        let alone = supplemented.listCandidates(for: "かえる")
+        #expect(alone.contains { $0.text == "🐸" })
+        #expect(supplemented.keepingRelevantEmoji(alone, reading: "かえる").contains { $0.text == "🐸" })
+        // 文の中の文節(家に｜帰る)では「帰る」を先頭にした候補になる
+        let inSentence = [Candidate(text: "帰る", readingCount: 3, origin: .sentencePart)] + alone.filter { $0.text != "帰る" }
+        #expect(!supplemented.keepingRelevantEmoji(inSentence, reading: "かえる").contains { $0.text == "🐸" })
+    }
+
     @Test("文節全体と文節の中の語の絵文字は別々の設定で，片方だけでも動く", arguments: [(true, false), (false, true), (true, true)])
     func independentSettings(whole: Bool, word: Bool) {
         let converter = supplemented(settings { $0.emojiConversion = whole; $0.emojiWordConversion = word }, converter: sentenceConverter())
@@ -290,34 +318,38 @@ struct PaletteEmojiLookupTests {
         PaletteEmojiLookup(catalog: catalog, usage: usage, settings: FakeSettings(settings), now: { self.start })
     }
 
-    @Test("読みと同じ読みの絵文字だけを，表の順に出す．記号は出さない")
+    /// 文節の第 1 候補の「手」
+    private static let hand = EmojiWord(text: "手", isNoun: true)
+
+    @Test("読みと同じ読みで，名前の語が文節の語と合う絵文字だけを，表の順に出す．記号は出さない")
     func exactReading() {
-        #expect(lookup().emoji(for: "て", limit: 5) == ["👋", "🙌", "🫶"])
-        #expect(lookup().emoji(for: "て", limit: 2) == ["👋", "🙌"])
-        #expect(lookup().emoji(for: "てを", limit: 5).isEmpty)
+        // 🙌(万歳)は読みに「て」があるが，名前に「手」が無いので出さない
+        #expect(lookup().emoji(for: "て", word: Self.hand, limit: 5) == ["👋", "🫶"])
+        #expect(lookup().emoji(for: "て", word: Self.hand, limit: 1) == ["👋"])
+        #expect(lookup().emoji(for: "てを", word: Self.hand, limit: 5).isEmpty)
     }
 
     @Test("OS が描けない新しい絵文字を除いた表なら，その絵文字は出さない(Windows のビルド番号で除いた表)")
     func limitedCatalog() {
         let catalog = FakePaletteCatalog(Self.table)
         catalog.index = catalog.index.map { PaletteIndex(catalog: $0.catalog.limited(to: .supportedOnWindows(build: 19045))) }
-        #expect(lookup(catalog: catalog).emoji(for: "て", limit: 5) == ["👋", "🙌"])
+        #expect(lookup(catalog: catalog).emoji(for: "て", word: Self.hand, limit: 5) == ["👋"])
     }
 
     @Test("表を読み終えるまでは出さない")
     func notLoaded() {
         let catalog = FakePaletteCatalog(Self.table)
         catalog.index = nil
-        #expect(lookup(catalog: catalog).emoji(for: "て", limit: 5).isEmpty)
+        #expect(lookup(catalog: catalog).emoji(for: "て", word: Self.hand, limit: 5).isEmpty)
     }
 
     @Test("肌の色を変えられる絵文字は，パレットで選んだ肌の色で出す")
     func skinTone() {
         var usage = PaletteUsage()
         usage.defaultSkinTone = .medium
-        #expect(lookup(usage: FakePaletteUsageStore(usage)).emoji(for: "ばいばい", limit: 5) == ["👋🏽", "🙌"])
+        #expect(lookup(usage: FakePaletteUsageStore(usage)).emoji(for: "て", word: Self.hand, limit: 5) == ["👋🏽", "🫶"])
         usage.setSkinTone(.dark, for: "👋")
-        #expect(lookup(usage: FakePaletteUsageStore(usage)).emoji(for: "ばいばい", limit: 5) == ["👋🏿", "🙌"])
+        #expect(lookup(usage: FakePaletteUsageStore(usage)).emoji(for: "て", word: Self.hand, limit: 5) == ["👋🏿", "🫶"])
     }
 
     @Test("名前は肌の色を変えた形からも引く")
@@ -332,7 +364,7 @@ struct PaletteEmojiLookupTests {
         let usage = FakePaletteUsageStore()
         let lookup = lookup(usage: usage)
         lookup.didCommit("🫶", reading: "て")
-        #expect(lookup.emoji(for: "て", limit: 1) == ["🫶"])
+        #expect(lookup.emoji(for: "て", word: Self.hand, limit: 1) == ["🫶"])
         lookup.didCommit("👋🏽", reading: "ばいばい")
         lookup.didCommit("👋🏽", reading: "ばいばい")
         #expect(usage.usage.learnedChoices(for: PaletteSearch.Query(typed: "", kana: "ばいばい")) == ["👋"])

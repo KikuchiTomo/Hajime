@@ -216,7 +216,12 @@ public final class FakeEmoji: EmojiLooking {
         self.names = names
     }
 
-    public func emoji(for reading: String, limit: Int) -> [String] { Array((table[reading] ?? []).prefix(limit)) }
+    /// 文節の語(word)は覚えておく(テストで確かめる)．照らし合わせはパレットの表(EmojiRelevance)でするので，ここでは読みだけで引く
+    public private(set) var words: [String: EmojiWord] = [:]
+    public func emoji(for reading: String, word: EmojiWord, limit: Int) -> [String] {
+        words[reading] = word
+        return Array((table[reading] ?? []).prefix(limit))
+    }
     public func name(of emoji: String) -> String? { names[emoji] }
     public func didCommit(_ emoji: String, reading: String) { committed.append((emoji, reading)) }
 }

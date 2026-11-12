@@ -30,7 +30,7 @@ ALLOWED: dict[str, set[str]] = {
     # Vision と CoreGraphics は手書きの認識(端末の中だけ．VisionHandwritingRecognizer)に使う
     # CryptoKit は同期のフォルダと運ぶ辞書の索引の SHA-256 を求めるのに使う(DictionaryFileSync)
     # CWindowsSpellCheck は Windows のスペルチェッカーを呼ぶ C の口(英単語の辞書．WindowsSpellCheckerLexicon)
-    "HajimePersistence": {"Foundation", "HajimeDomain", "HajimeApplication", "CoreGraphics", "Vision", "CryptoKit", "WinSDK", "CWindowsSpellCheck"},
+    "HajimePersistence": {"Foundation", "HajimeDomain", "HajimeApplication", "CoreGraphics", "CoreText", "Vision", "CryptoKit", "WinSDK", "CWindowsSpellCheck"},
     "HajimeIPC": {"Foundation", "HajimeDomain", "HajimeApplication", "WinSDK", "Glibc", "Darwin"},
     # C の口(Swift を持たない)．Windows のスペルチェッカーと CNG を呼ぶだけで，このリポジトリのモジュールを使わない
     "CWindowsSpellCheck": set(),
