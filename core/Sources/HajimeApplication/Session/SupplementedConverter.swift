@@ -252,7 +252,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     /// 読みと同じ読みの絵文字を足し，置き場所(placement)にまとめる．ほかに候補が無ければ，読みのかなを第 1 候補にする
     private func addEmoji(to result: inout [Candidate], reading: String, placement: EmojiPlacement) {
-        guard let emoji else { return }
+        guard let emoji, reading.count >= DefaultSettings.minimumEmojiReadingLength else { return }
         let found = emoji.emoji(for: reading, limit: placement.count).filter { text in !result.contains { $0.text == text } }
         guard !found.isEmpty else { return }
         if result.isEmpty { result.append(Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))) }

@@ -14,7 +14,7 @@ struct EmojiCandidateScenarioTests {
         FakeConverter(["ねこ": [("猫", nil), ("ねこ", nil), ("ネコ", nil), ("🐱", nil), ("根子", nil), ("音子", nil), ("値子", nil), ("子子", nil)]])
     }
 
-    private let emoji = FakeEmoji(["ねこ": ["🐈", "😺", "😸"], "なく": ["😢", "😭", "🐦"]], names: ["🐈": "ネコ"])
+    private let emoji = FakeEmoji(["ねこ": ["🐈", "😺", "😸"], "なく": ["😢", "😭", "🐦"], "は": ["🦷", "🌿"]], names: ["🐈": "ネコ"])
 
     /// 位置を 3 番目，数を 2 にした設定(既定の値に左右されずに位置を確かめるため)
     private func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
@@ -55,6 +55,12 @@ struct EmojiCandidateScenarioTests {
         let candidates = supplemented(settings { $0.userDictionary = [UserDictionaryEntry(reading: "ねこ", word: "🐱")] }).candidates(for: "ねこ")
         #expect(candidates.first?.text == "🐱")
         #expect(candidates.first?.origin == .userDictionary)
+    }
+
+    @Test("1 文字の読み(助詞や語の切れ端)には絵文字を出さない")
+    func skipsSingleCharacterReading() {
+        let converter = FakeConverter(["は": [("は", nil), ("歯", nil), ("葉", nil), ("派", nil)]])
+        #expect(!supplemented(settings(), converter: converter).candidates(for: "は").contains { $0.origin == .emoji })
     }
 
     @Test("エンジンが候補を出さない読みでも，絵文字を第 1 候補にしない")
