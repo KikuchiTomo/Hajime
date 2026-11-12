@@ -862,13 +862,20 @@ mod tests {
         problems.set_filter(2);
         assert_eq!(problems.tab_order(&layout)[0], ImportPart::Filter(2));
         let rows = problems.pending.preview.rows.clone();
+        // 読み上げの文は表の文言(strings.rs)から組み立てる(文言を直したときにテストが古い言い方を期待しないように)
         assert_eq!(
             problems.row_name(&rows[1]),
-            "2 行目、かいしゃ、会社、名詞、品詞が無いため名詞として登録します"
+            text::row(
+                2,
+                &[
+                    "かいしゃ",
+                    "会社",
+                    crate::options::label_of(crate::options::WORD_CLASSES, "noun"),
+                    text::DEFAULTED_HELP
+                ]
+            )
         );
-        assert!(problems
-            .row_name(&rows[2])
-            .ends_with("読めないため取り込みません"));
+        assert!(problems.row_name(&rows[2]).ends_with(text::UNREADABLE_HELP));
     }
 
     #[test]
