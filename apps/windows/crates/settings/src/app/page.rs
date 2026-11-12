@@ -394,6 +394,8 @@ enum Input {
 
 struct RowState {
     row: Row,
+    /// キー設定のコマンドを置ける状態(新しい行のコマンドの欄を，選んだ状態に置けるものだけにする)
+    command_states: std::collections::BTreeMap<String, Vec<String>>,
     section: usize,
     /// 部品を置いたカード(出さない行は None)
     card: Option<layout::CardLayout>,
@@ -566,8 +568,15 @@ impl RowState {
             Control::Version => text::version(env!("CARGO_PKG_VERSION")),
             _ => String::new(),
         };
+        let command_states = match &row.control {
+            Control::List(spec, _) if spec.path == "keymap" => {
+                catalog.keymap_command_states.clone()
+            }
+            _ => Default::default(),
+        };
         Self {
             row: row.clone(),
+            command_states,
             section,
             card: None,
             visible: true,
@@ -1101,8 +1110,9 @@ impl RowState {
                 .and_then(|spec| spec.fields.get(index))
                 .and_then(|field| field.choices)
                 .map(|choices| {
-                    choices
+                    self.choice_positions(index)
                         .iter()
+                        .filter_map(|position| choices.get(*position))
                         .map(|(_, name)| (*name).to_string())
                         .collect()
                 })
@@ -1117,11 +1127,56 @@ impl RowState {
             Part::Dropdown => self.choice,
             Part::Filter => Some(self.filter),
             Part::Field(index) => match self.inputs.get(index) {
-                Some(Input::Choice(selected)) => Some(*selected),
+                Some(Input::Choice(selected)) => self
+                    .choice_positions(index)
+                    .iter()
+                    .position(|position| position == selected),
                 _ => None,
             },
             _ => None,
         }
+    }
+
+    /// 選ぶ欄に出す選択肢(選択肢の番号の並び)．キー設定のコマンドの欄は，選んだ状態に置けるものだけにする
+    /// (macOS の KeymapPage の commandPicker)．ほかの欄はすべて
+    fn choice_positions(&self, index: usize) -> Vec<usize> {
+        let Some(spec) = self.row.control.list_spec() else {
+            return Vec::new();
+        };
+        let Some(choices) = spec.fields.get(index).and_then(|field| field.choices) else {
+            return Vec::new();
+        };
+        if spec.path != "keymap" || index != KEYMAP_COMMAND || self.command_states.is_empty() {
+            return (0..choices.len()).collect();
+        }
+        let state = self.keymap_state();
+        (0..choices.len())
+            .filter(|position| self.command_available(choices[*position].0, state))
+            .collect()
+    }
+
+    /// 新しい行の状態の値(キー設定)
+    fn keymap_state(&self) -> &'static str {
+        let states = self
+            .row
+            .control
+            .list_spec()
+            .and_then(|spec| spec.fields.first())
+            .and_then(|field| field.choices)
+            .unwrap_or(&[]);
+        match self.inputs.first() {
+            Some(Input::Choice(selected)) => states.get(*selected).map_or("", |(value, _)| value),
+            _ => "",
+        }
+    }
+
+    /// command を state の行に置けるか(KeymapCommand.isAvailable(in:))
+    fn command_available(&self, command: &str, state: &str) -> bool {
+        state == KEYMAP_ANYWHERE
+            || self
+                .command_states
+                .get(command)
+                .is_none_or(|states| states.iter().any(|value| value == state))
     }
 
     /// 部品が選ぶ欄か
@@ -1994,8 +2049,21 @@ impl PageView {
                 None
             }
             (_, Part::Field(field)) => {
-                if let Some(Input::Choice(selected)) = row.inputs.get_mut(field) {
-                    *selected = index;
+                // 出した選択肢の位置を選択肢の番号にする(キー設定のコマンドは置けるものだけを出す)
+                let positions = row.choice_positions(field);
+                if let (Some(Input::Choice(selected)), Some(position)) =
+                    (row.inputs.get_mut(field), positions.get(index))
+                {
+                    *selected = *position;
+                }
+                // キー設定の状態を変えたら，置けないコマンドを置けるものの先頭にする(macOS の setDraftState)
+                if field == 0 {
+                    let allowed = row.choice_positions(KEYMAP_COMMAND);
+                    if let Some(Input::Choice(command)) = row.inputs.get_mut(KEYMAP_COMMAND) {
+                        if !allowed.is_empty() && !allowed.contains(command) {
+                            *command = allowed[0];
+                        }
+                    }
                 }
                 None
             }
@@ -3985,6 +4053,11 @@ fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
         );
     }
 }
+
+/// キー設定の入力欄のうちコマンドの欄の番号(状態・キー・コマンド)
+const KEYMAP_COMMAND: usize = 2;
+/// キー設定の「いつでも」の状態(KeymapState.anywhere)．どのコマンドも置ける
+const KEYMAP_ANYWHERE: &str = "anywhere";
 
 /// 表の有効の印(WinUI 3 の CheckBox．入れたら色を塗ってチェックを描く)．cell の左に置き，上下は真ん中にする
 fn paint_check(canvas: &mut dyn Canvas, theme: &Theme, cell: Rect, checked: bool, enabled: bool) {
