@@ -42,7 +42,13 @@ public final class AzooKeyConverterEngine {
     /// 「自動」を決めたときに測った 1 歩の p95(秒)．Zenzai だけと，試した jinen の大きさごと．テストで値を出すために持つ
     private(set) var automaticJinenStepTimes: (zenzai: Double, fusion: [JinenModel.Variant: Double])?
     /// 今読んでいる jinen の推論の文脈と，その大きさ．大きさを変えたら読み直す(メモリを抑えるため 1 つだけ持つ)
-    private var jinenRunner: (variant: JinenModel.Variant, runner: ExperimentalJinen)?
+    private var jinenRunner: (variant: JinenModel.Variant, runner: ExperimentalJinen)? {
+        didSet { jinenGeneration += 1 }
+    }
+    /// 読み込んだ jinen を替えた(解放した)回数．合議の途中の手順が，前に読んだモデルのものかを見分ける
+    private(set) var jinenGeneration = 0
+    /// 読み込んでいる jinen の大きさ(テストで，使わなくなったモデルを解放したかを確かめる)
+    var loadedJinenVariant: JinenModel.Variant? { jinenRunner?.variant }
     /// 読めなかった大きさ．読み直さない
     private var failedJinenVariants: Set<JinenModel.Variant> = []
     /// 合議 1 回(jinen の変換・読みにそろえる・採点)にかかった時間の移動平均(秒)
@@ -415,11 +421,15 @@ public final class AzooKeyConverterEngine {
         case .disabled: .nothing
         }
         usesEmoji = settings.emojiConversion
-        jinenChoice = settings.jinenModel
-        if jinenChoice != .automatic, let probe = automaticJinenProbe {
-            // 「自動」でなくなったら測るのをやめる(「自動」に戻したら初めから測る)
-            probe.session.endComposition()
-            automaticJinenProbe = nil
+        if settings.jinenModel != jinenChoice {
+            jinenChoice = settings.jinenModel
+            if jinenChoice != .automatic, let probe = automaticJinenProbe {
+                // 「自動」でなくなったら測るのをやめる(「自動」に戻したら初めから測る)
+                probe.session.endComposition()
+                automaticJinenProbe = nil
+            }
+            // 使わなくなったモデルとコンテキストを解放する(使わない設定にしたときと，大きさを替えたとき)．替えた大きさは次の合議で読む
+            if jinenRunner?.variant != resolvedJinenVariant { jinenRunner = nil }
         }
         if settings.zenzaiModel != zenzaiChoice {
             zenzaiChoice = settings.zenzaiModel
@@ -896,6 +906,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         var reading: String
         var current: HajimeDomain.Candidate
         var stage: Stage
+        /// 始めたときに読み込んでいた jinen(AzooKeyConverterEngine.jinenGeneration)．替わったら始め直す
+        var generation: Int
     }
 
     private var fusionJob: FusionJob?
@@ -926,7 +938,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     /// 合議を 1 歩進める(かかった時間は覚えない．「自動」の測定でも使う)．結果を覚え終えたら true
     func advanceFusion(for reading: String, using jinen: ExperimentalJinen) -> Bool {
         guard !reading.isEmpty, fusionCache[reading] == nil else { return true }
-        guard var job = fusionJob, job.reading == reading else {
+        guard var job = fusionJob, job.reading == reading, job.generation == engine.jinenGeneration else {
             fusionJob = startFusion(reading, jinen: jinen)
             return fusionJob == nil
         }
@@ -982,7 +994,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
             _ = finishFusion(reading, Fusion(candidate: nil, first: false))
             return nil
         }
-        return FusionJob(reading: reading, current: current, stage: .generating(progress))
+        return FusionJob(reading: reading, current: current, stage: .generating(progress), generation: engine.jinenGeneration)
     }
 
     private func finishFusion(_ reading: String, _ fusion: Fusion) -> Bool {

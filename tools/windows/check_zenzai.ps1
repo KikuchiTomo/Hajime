@@ -23,8 +23,13 @@ if (-not (Test-Path $playground)) { throw "$playground がありません" }
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $file = Join-Path $root 'core\Evaluation\conversion-basic.tsv'
+# llama.cpp は読み込みの記録(load_backend など)を標準エラーに書く．PowerShell 5.1 は Stop のもとで，それを 2>$null でも NativeCommandError にして止める．
+# playground を呼ぶあいだだけ Continue にし，終了コードで判定する
+$ErrorActionPreference = 'Continue'
 $output = & $playground --evaluate $file --zenzai (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') --dictionary (Join-Path $Dictionary 'Dictionary') 2>$null
-if ($LASTEXITCODE -ne 0) { throw "hajime-playground が終了コード $LASTEXITCODE で終わりました" }
+$exitCode = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($exitCode -ne 0) { throw "hajime-playground が終了コード $exitCode で終わりました" }
 $summary = $output | Select-Object -Last 1
 Write-Host $summary
 if ($summary -notmatch '(\d+) / (\d+) \(') { throw '評価の結果を読めませんでした' }
