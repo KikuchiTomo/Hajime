@@ -96,11 +96,33 @@ magick "$textedit" -font "$font" -pointsize 27 -fill 'rgb(235,235,235)' -annotat
   -fill 'rgb(62,113,214)' -draw "rectangle 85,127 $from,128" -draw "rectangle $from,126 $to,129" \
   "$work/tree.png" -geometry +28+95 -composite -quality 85 "$work/candidate-tree.webp"
 
-# ライブ変換と補正: 写真の入力中の文と案内(題の下の帯)を，塗った窓の同じ位置に戻す．高さを 672 にそろえる
-for name in live-conversion typo-correction; do
-  magick "$textedit" \( "$images/features/$name.webp" -crop 1250x268+74+96 +repage \) -geometry +74+96 -composite \
-    -quality 82 "$images/features/$name.webp"
-done
+# ライブ変換と補正: メモを書いている途中の窓にする．確定した文の行の下に入力中の文(細い下線と入力位置)を書き，
+# 補正は入力中の文の下に案内を置く(案内は元の写真から切り抜いた tools/site/typo-note.png)．
+# 窓の左上(題と文の行)を切り抜いて 1.4 倍にし，中身が写真の幅の大部分を占め，文字がほかの写真の候補の文字と近い大きさになるようにする
+line() { echo $((124 + $1 * 44)); }
+# $1 出力，$2 入力中の文，残りは確定した文(上の行から)．入力中の文はそのすぐ下の行
+memo() {
+  local output=$1 text=$2 y w args=() index=0
+  shift 2
+  for committed in "$@"; do
+    args+=(-annotate "+85+$(line $index)" "$committed")
+    index=$((index + 1))
+  done
+  y=$(line "$index")
+  w=$(width "$text")
+  magick "$textedit" -font "$font" -pointsize 27 -fill 'rgb(235,235,235)' "${args[@]}" -annotate "+85+$y" "$text" \
+    -fill 'rgb(62,113,214)' -draw "rectangle 85,$((y + 3)) $((85 + w)),$((y + 4))" \
+    -draw "rectangle $((86 + w)),$((y - 24)) $((87 + w)),$((y + 7))" "$output"
+}
+zoom() { magick "$1" -crop 1000x480+40+40 +repage -filter Lanczos -resize 1400x672 -quality 82 "$2"; }
+memo "$work/live.png" "帰りに駅前のカフェに寄って、新しい本を少しだけ読みました" \
+  "11月13日" "朝から雨だったが、昼には晴れてきた。" "午前は資料をまとめて、午後は打ち合わせ。" \
+  "打ち合わせは思ったより早く終わった。"
+zoom "$work/live.png" "$images/features/live-conversion.webp"
+memo "$work/typo.png" "ありがとうございます" \
+  "山田様" "いつもお世話になっております。" "先日はお忙しいところ、打ち合わせのお時間をいただき"
+magick "$work/typo.png" "$root/tools/site/typo-note.png" -geometry "+83+$(($(line 3) + 12))" -composite "$work/typo-note.png"
+zoom "$work/typo-note.png" "$images/features/typo-correction.webp"
 
 # トップの画像: 窓の中身(題の下)を窓の色で塗り，入力中の文と下線を書いて，分岐図と語の意味を置く
 window homophone-branch-glass-dark hero-branch 74
