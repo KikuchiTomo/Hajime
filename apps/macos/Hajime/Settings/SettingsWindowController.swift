@@ -120,6 +120,8 @@ final class SettingsModel: ObservableObject {
     let files: (any SettingsFileHandling)?
     /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
     @Published var isImportingDictionary = false
+    /// 取り込む前に中身を見せているファイル．「取り込む」を押すまで何も登録しない(SettingsView のシート)
+    @Published var pendingImport: PendingImport?
     /// 連想の辞書の索引(R-18)．無ければ連想の辞書を取り込めない
     let associations: AssociationDictionaryStore?
     /// 「ファイルを開く」コマンドのファイルのブックマーク(R-22)．無ければファイルのコマンドを足せない
@@ -206,19 +208,21 @@ final class SettingsModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText, .tabSeparatedText]
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
-            UIStrings.More.importedRules(try await files.importRuleList(list, from: url.path).added)
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+                UIStrings.More.importedRules(try await files.importRuleList(list, from: url.path).added)
+            }
         }
     }
 
     func exportRuleList(_ list: RuleList) {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = list.exportFileName
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
-            try await files.exportRuleList(list, to: url.path)
-            return nil
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+                try await files.exportRuleList(list, to: url.path)
+                return nil
+            }
         }
     }
 
@@ -266,24 +270,26 @@ final class SettingsModel: ObservableObject {
         update { UserDictionaryEditing.remove(entries, from: &$0.userDictionary) }
     }
 
-    /// 「読み<タブ>語<タブ>品詞」の行が並んだテキストのファイルから取り込む
+    /// 「読み<タブ>語<タブ>品詞」の行が並んだテキストのファイルを選び，取り込む前に中身を見せる
     func importDictionary() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        chooseImport(.userDictionary)
+    }
+
+    /// 中身を見せたファイルを登録した単語に取り込む
+    func importUserDictionary(path: String) {
         runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
-            UIStrings.Settings.imported(try await files.importUserDictionary(from: url.path).added)
+            UIStrings.Settings.imported(try await files.importUserDictionary(from: path).added)
         }
     }
 
     func exportDictionary() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = UIStrings.Settings.exportFileName
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
-            try await files.exportUserDictionary(to: url.path)
-            return nil
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+                try await files.exportUserDictionary(to: url.path)
+                return nil
+            }
         }
     }
 
@@ -295,35 +301,38 @@ final class SettingsModel: ObservableObject {
         panel.allowedContentTypes = [.application]
         panel.allowsMultipleSelection = true
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        guard panel.runModal() == .OK else { return }
-        let identifiers = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }.filter(ProfileRuleCSV.isValidIdentifier)
-        guard !identifiers.isEmpty else {
-            message = UIStrings.More.noBundleID
-            return
-        }
-        // 同じアプリの同じ種類の扱い(入力の扱いとモードの扱い)は置き換える．種類が違えば両方を残す
-        let added = identifiers.map { ProfileRule(applicationPrefix: $0, profile: profile) }
-        update { current in
-            ProfileRuleCSV.merge(added, into: &current)
+        FilePanel.chooseMany(panel) { [self] urls in
+            let identifiers = urls.compactMap { Bundle(url: $0)?.bundleIdentifier }.filter(ProfileRuleCSV.isValidIdentifier)
+            guard !identifiers.isEmpty else {
+                message = UIStrings.More.noBundleID
+                return
+            }
+            // 同じアプリの同じ種類の扱い(入力の扱いとモードの扱い)は置き換える．種類が違えば両方を残す
+            let added = identifiers.map { ProfileRule(applicationPrefix: $0, profile: profile) }
+            update { current in
+                ProfileRuleCSV.merge(added, into: &current)
+            }
         }
     }
 
     func importProfileRules() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .plainText]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.More.csvFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
-            UIStrings.More.importedRules(try await files.importProfileRules(from: url.path).added)
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.More.csvFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+                UIStrings.More.importedRules(try await files.importProfileRules(from: url.path).added)
+            }
         }
     }
 
     func exportProfileRules() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = UIStrings.More.exportCSVFileName
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
-            try await files.exportProfileRules(to: url.path)
-            return nil
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.Settings.exportFailed) { files throws(SettingsFileFailure) in
+                try await files.exportProfileRules(to: url.path)
+                return nil
+            }
         }
     }
 
@@ -333,10 +342,11 @@ final class SettingsModel: ObservableObject {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = UIStrings.More.exportSettingsFileName
         panel.allowedContentTypes = [.json]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.More.settingsExportFailed) { files throws(SettingsFileFailure) in
-            try await files.exportSettings(to: url.path)
-            return nil
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.More.settingsExportFailed) { files throws(SettingsFileFailure) in
+                try await files.exportSettings(to: url.path)
+                return UIStrings.More.settingsExported
+            }
         }
     }
 
@@ -344,10 +354,11 @@ final class SettingsModel: ObservableObject {
     func importSettings() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        runFileTask(failure: UIStrings.More.settingsImportFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
-            try await files.importSettings(from: url.path)
-            return UIStrings.More.settingsImported
+        FilePanel.chooseOne(panel) { [self] url in
+            runFileTask(failure: UIStrings.More.settingsImportFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+                try await files.importSettings(from: url.path)
+                return UIStrings.More.settingsImported
+            }
         }
     }
 

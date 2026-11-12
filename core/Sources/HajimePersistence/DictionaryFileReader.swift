@@ -148,7 +148,7 @@ public enum DictionaryFileReader {
 
     /// 読みをひらがなにそろえる(カタカナの読みの辞書もあるため)．Google 日本語入力や Microsoft IME の書き出しにある
     /// ローマ字・英字の読み(「gh」)は，打ったときの読みにそろえる(ReadingNormalization)．使えない読みは空にして捨てる
-    private static func normalizedReading(_ reading: Substring) -> String {
+    static func normalizedReading(_ reading: Substring) -> String {
         ReadingNormalization.normalized(reading.trimmingCharacters(in: .whitespaces)) ?? ""
     }
 }

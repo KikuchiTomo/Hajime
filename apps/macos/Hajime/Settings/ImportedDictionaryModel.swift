@@ -4,23 +4,24 @@ import HajimeDomain
 
 /// 取り込んだ辞書の取り込み・取り込み直し・削除・並べ替え(R-16)
 extension SettingsModel {
-    /// 辞書のファイルを選んで取り込む．existing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
+    /// 辞書のファイルを選び，取り込む前に中身を見せる．existing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
     func importDictionaryFile(replacing existing: ImportedDictionary? = nil) {
-        guard let files else { return }
         guard existing != nil || settings.importedDictionaries.count < DefaultSettings.maximumImportedDictionaries else {
             message = UIStrings.Dictionaries.tooMany
             return
         }
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let source = panel.url else { return }
+        chooseImport(.dictionary, replacing: existing?.id)
+    }
+
+    /// 中身を見せた辞書のファイルを取り込む．replacing を渡すと，その辞書を取り込み直す
+    func importDictionary(path: String, replacing id: String?) {
+        guard let files else { return }
         isImportingDictionary = true
         // 大きな辞書は読むのに数秒かかる．読むのはメインスレッドの外(SettingsFiles)なので，画面は止まらない
         Task {
             defer { isImportingDictionary = false }
             do throws(SettingsFileFailure) {
-                let imported = try await files.importDictionary(from: source.path, replacing: existing?.id)
+                let imported = try await files.importDictionary(from: path, replacing: id)
                 message = UIStrings.Dictionaries.imported(imported.wordCount)
             } catch {
                 logger.error("辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
@@ -59,12 +60,13 @@ extension SettingsModel {
         }
     }
 
-    /// アプリの条件に足すアプリを選ぶ(/Applications から)
-    func chooseApplicationID() -> String? {
+    /// アプリの条件に足すアプリを選ぶ(/Applications から)．選んだアプリのバンドル ID で chosen を呼ぶ
+    func chooseApplicationID(then chosen: @escaping @MainActor (String) -> Void) {
         let panel = NSOpenPanel()
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         panel.allowedContentTypes = [.application]
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        return Bundle(url: url)?.bundleIdentifier
+        FilePanel.chooseOne(panel) { url in
+            if let identifier = Bundle(url: url)?.bundleIdentifier { chosen(identifier) }
+        }
     }
 }

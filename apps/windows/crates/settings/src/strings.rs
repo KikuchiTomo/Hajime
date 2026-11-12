@@ -101,8 +101,7 @@ pub mod settings {
     pub const WORD_CLASS: &str = "品詞";
     pub const COMMENT: &str = "コメント";
     pub const COMMENT_PROMPT: &str = "コメント(省略可)";
-    pub const ABBREVIATION_NOTE: &str =
-        "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
+    pub const ABBREVIATION_NOTE: &str = "読みだけを変換したときに出ます";
 
     /// 絵文字の位置の値(macOS の UIStrings.Settings.emojiCandidatePositionValue)
     pub fn emoji_candidate_position(value: f64) -> String {
@@ -259,6 +258,56 @@ pub mod extras {
     pub const TRY_MACROS: &str = "変換マクロを試す";
     pub const TRY_MACRO_WORD: &str = "試す語";
     pub const TRY_MACRO_READING: &str = "読み";
+}
+
+/// 数を 3 桁ずつ「,」で区切る(macOS の formatted() と同じ見た目．1,234)
+pub fn thousands(count: u32) -> String {
+    let digits = count.to_string();
+    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    grouped
+}
+
+/// UIStrings.ImportPreview(辞書のファイルを取り込む前に中身を見せるシート)
+pub mod import_preview {
+    use ipc::{ImportFormat, ImportKind};
+
+    pub const LINE: &str = "行";
+    pub const ALL: &str = "すべて";
+    pub const DEFAULTED: &str = "名詞にする";
+    pub const UNREADABLE: &str = "読めない";
+    pub const MEANING: &str = "意味";
+    pub const WORDS: &str = "語";
+    /// 品詞の列が無い・知らない品詞の行に添えるツールチップ
+    pub const DEFAULTED_HELP: &str = "品詞が無いため名詞として登録します";
+    pub const UNREADABLE_HELP: &str = "読めないため取り込みません";
+
+    pub fn filter(name: &str, count: u32) -> String {
+        format!("{name} {}", super::thousands(count))
+    }
+
+    pub fn format(format: ImportFormat) -> &'static str {
+        match format {
+            ImportFormat::TabSeparated => "タブ区切り",
+            ImportFormat::CommaSeparated => "「,」区切り",
+            ImportFormat::Skk => "SKK",
+            ImportFormat::PropertyList => "macOS のユーザ辞書",
+        }
+    }
+
+    pub fn import_button(count: u32, kind: ImportKind) -> String {
+        let count = super::thousands(count);
+        if kind == ImportKind::Association {
+            format!("{count} 件を取り込む")
+        } else {
+            format!("{count} 語を取り込む")
+        }
+    }
 }
 
 /// UIStrings.Templates(単語と変換マクロに書ける書き方のチップ．まとまりとチップは macOS と同じで，tools/check/check_strings.py が確かめる．
@@ -624,6 +673,7 @@ pub mod more {
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
+    pub const SETTINGS_EXPORTED: &str = "設定を書き出しました";
     pub const SETTINGS_IMPORT_FAILED: &str =
         "読み込めませんでした。Hajime IME の設定ファイルではないか、大きすぎます";
     pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
@@ -864,7 +914,7 @@ pub mod rule_list {
 pub mod terms {
     pub const ENABLED: &str = "専門用語の辞書を使う";
     pub const FIELDS: &str = "使う分野";
-    pub const NOTE: &str = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。";
+    pub const NOTE: &str = "通常の辞書にもある語は、分野をオフにしても出ます";
 
     /// 分野の id と名前(core の TermField と同じ並びと名前．tools/check/check_strings.py が確かめる)
     pub const FIELD_NAMES: &[(&str, &str)] = &[
@@ -917,8 +967,7 @@ pub mod dictionaries {
     pub const HIDE_DETAILS: &str = "詳細を隠す";
     pub const IMPORT_FAILED: &str =
         "辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
-    pub const NOTE: &str =
-        "タブ区切り・SKK・macOS のユーザー辞書の形式を読み込めます。上にある辞書ほど優先されます。";
+    pub const NOTE: &str = "上の辞書ほど優先";
 
     pub fn too_many(limit: usize) -> String {
         format!("取り込める辞書は {limit} 個までです")
@@ -989,7 +1038,7 @@ pub mod association {
     pub const IMPORT_FILE: &str = "連想の辞書をインポート…";
     pub const IMPORT_FAILED: &str =
         "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
-    pub const NOTE: &str = "1 行に同じ意味の単語をタブか「,」で区切って並べたファイルを読み込めます。タブで区切るときは、先頭の列に意味の説明を書きます。上にある辞書ほど先に出ます。";
+    pub const NOTE: &str = "上の辞書ほど優先";
 
     pub fn too_many(limit: usize) -> String {
         format!("取り込める連想の辞書は {limit} 個までです")
@@ -1515,5 +1564,18 @@ mod limits {
             "{} 文字まで、単語は {} 文字まで",
             limits.user_dictionary_reading_length, limits.user_dictionary_word_length
         )));
+    }
+}
+
+#[cfg(test)]
+mod numbers {
+    use super::thousands;
+
+    #[test]
+    fn 数を_3_桁ずつ区切る() {
+        assert_eq!(thousands(0), "0");
+        assert_eq!(thousands(999), "999");
+        assert_eq!(thousands(1_000), "1,000");
+        assert_eq!(thousands(1_234_567), "1,234,567");
     }
 }

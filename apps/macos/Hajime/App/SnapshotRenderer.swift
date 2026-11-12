@@ -346,6 +346,42 @@ enum SnapshotRenderer {
             termsWindow.close()
         }
         fixture.model.update { $0.termFields = TermFieldSettings() }
+        // 辞書のファイルを取り込む前に中身を見せるシート(R-16・R-18・R-21)．名詞にする行と読めない行を含む見本のファイルを読む
+        let importSamples: [(name: String, kind: ImportPreview.Kind, file: String, text: String)] = [
+            ("settings-import-preview-words", .userDictionary, "ユーザー辞書.txt", """
+            !Microsoft IME Dictionary Tool
+            はじめ\tHajime IME\t固有名詞\t
+            しぶや\t渋谷\t地名
+            かぶしきがいしゃ\t株式会社
+            めーる\thajime@example.com\t短縮よみ
+            はしる\t走る\t動詞
+            ひとつだけ
+            とうきょう\t東京\t地名\t首都
+            漢字\t読みがひらがなでない
+            """),
+            ("settings-import-preview-association", .association, "連想.txt", """
+            明るい\t明るい\t朗らか\t陽気
+            嬉しい,楽しい,喜ばしい
+            ひとつ
+            """),
+        ]
+        for (name, kind, file, text) in importSamples {
+            guard let preview = try? ImportPreviewReader.preview(kind, data: Data(text.utf8)) else { continue }
+            let pending = PendingImport(kind: kind, path: "/tmp/\(file)", preview: preview, replacing: nil)
+            for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+                NSApp.appearance = NSAppearance(named: appearance)
+                // 写す窓は前に出ていないので，既定のボタンが灰色になる．前に出ている窓と同じに描く
+                let sheet = NSHostingView(rootView: ImportPreviewSheet(pending: pending, commit: {}, cancel: {}).background(.background)
+                    .environment(\.controlActiveState, .key))
+                let sheetWindow = NSWindow(contentRect: NSRect(origin: .zero, size: sheet.fittingSize), styleMask: [.borderless], backing: .buffered, defer: false)
+                sheetWindow.contentView = sheet
+                sheetWindow.orderFrontRegardless()
+                SettingsFixture.settle(sheetWindow)
+                render(sheet, name: "\(name)\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+                sheetWindow.close()
+            }
+        }
+        NSApp.appearance = NSAppearance(named: .aqua)
         // 変換のページの「絵文字」(ページの下のほうにあるので，まとまりだけを描く)．既定(ライトとダーク)と，
         // 位置と数と名前を変えたとき，文節を絵文字にしない(語だけを絵文字にする)ときに，下の見本の並びが変わるか
         let emojiCases: [(String, NSAppearance.Name, (inout HajimeDomain.Settings) -> Void)] = [

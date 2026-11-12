@@ -270,9 +270,10 @@ private struct CommandEditor: View {
             panel.allowedContentTypes = [.application]
             panel.directoryURL = URL(fileURLWithPath: "/Applications")
         }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        draft.target = url.path
-        if draft.kind == .openFile { chosenFile = url }
-        if draft.title.isEmpty { draft.title = url.deletingPathExtension().lastPathComponent }
+        FilePanel.chooseOne(panel) { url in
+            draft.target = url.path
+            if draft.kind == .openFile { chosenFile = url }
+            if draft.title.isEmpty { draft.title = url.deletingPathExtension().lastPathComponent }
+        }
     }
 }

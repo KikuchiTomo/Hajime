@@ -33,7 +33,7 @@ enum UIStrings {
         static let importFile = "連想の辞書をインポート…"
         static let tooMany = "取り込める連想の辞書は \(DefaultSettings.maximumAssociationDictionaries) 個までです"
         static let importFailed = "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
-        static let note = "1 行に同じ意味の単語をタブか「,」で区切って並べたファイルを読み込めます。タブで区切るときは、先頭の列に意味の説明を書きます。上にある辞書ほど先に出ます。"
+        static let note = "上の辞書ほど優先"
         static func imported(_ count: Int) -> String { "\(count) 件の意味を取り込みました" }
         static func summary(_ dictionary: AssociationDictionary) -> String { "\(dictionary.groupCount) 件の意味" }
         /// 連想の一覧の見出しの前に置く言葉
@@ -256,7 +256,32 @@ enum UIStrings {
     enum Terms {
         static let enabled = "専門用語の辞書を使う"
         static let fields = "使う分野"
-        static let note = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。"
+        static let note = "通常の辞書にもある語は、分野をオフにしても出ます"
+    }
+
+    /// 辞書のファイルを取り込む前に中身を見せるシート(ImportPreview)
+    enum ImportPreview {
+        static let line = "行"
+        static let all = "すべて"
+        static let defaulted = "名詞にする"
+        static let unreadable = "読めない"
+        static let meaning = "意味"
+        static let words = "語"
+        static func filter(_ name: String, _ count: Int) -> String { "\(name) \(count.formatted())" }
+        /// 品詞の列が無い・知らない品詞の行に添えるツールチップ
+        static let defaultedHelp = "品詞が無いため名詞として登録します"
+        static let unreadableHelp = "読めないため取り込みません"
+        static func format(_ format: HajimeDomain.ImportPreview.Format) -> String {
+            switch format {
+            case .tabSeparated: "タブ区切り"
+            case .commaSeparated: "「,」区切り"
+            case .skk: "SKK"
+            case .propertyList: "macOS のユーザ辞書"
+            }
+        }
+        static func importButton(_ count: Int, _ kind: HajimeDomain.ImportPreview.Kind) -> String {
+            kind == .association ? "\(count.formatted()) 件を取り込む" : "\(count.formatted()) 語を取り込む"
+        }
     }
 
     enum Dictionaries {
@@ -280,7 +305,7 @@ enum UIStrings {
         static let hideDetails = "詳細を隠す"
         static let tooMany = "取り込める辞書は \(DefaultSettings.maximumImportedDictionaries) 個までです"
         static let importFailed = "辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
-        static let note = "タブ区切り・SKK・macOS のユーザー辞書の形式を読み込めます。上にある辞書ほど優先されます。"
+        static let note = "上の辞書ほど優先"
         static func imported(_ count: Int) -> String { "\(count) 件を取り込みました" }
 
         static func summary(_ dictionary: ImportedDictionary) -> String {
@@ -672,7 +697,7 @@ enum UIStrings {
         static let wordClass = "品詞"
         static let personNameGroup = "人名"
         static let otherWordClasses = "その他"
-        static let abbreviationNote = "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。"
+        static let abbreviationNote = "読みだけを変換したときに出ます"
 
         static func label(for wordClass: WordClass) -> String {
             switch wordClass {
@@ -1179,6 +1204,7 @@ enum UIStrings {
         static let importSettings = "設定をインポート…"
         static let exportSettingsFileName = "hajime-settings.json"
         static let settingsImported = "設定を読み込みました"
+        static let settingsExported = "設定を書き出しました"
         static let settingsImportFailed = "読み込めませんでした。Hajime IME の設定ファイルではないか、大きすぎます"
         static let settingsExportFailed = "書き出せませんでした"
 

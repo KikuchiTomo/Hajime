@@ -540,6 +540,94 @@
       ]
     },
     {
+      "name": "ImportKind",
+      "kind": "enum",
+      "cases": [
+        "userDictionary",
+        "dictionary",
+        "association"
+      ]
+    },
+    {
+      "name": "ImportFormat",
+      "kind": "enum",
+      "cases": [
+        "tabSeparated",
+        "commaSeparated",
+        "skk",
+        "propertyList"
+      ]
+    },
+    {
+      "name": "ImportColumn",
+      "kind": "enum",
+      "cases": [
+        "reading",
+        "word",
+        "wordClass",
+        "comment",
+        "meaning",
+        "words"
+      ]
+    },
+    {
+      "name": "ImportRowStatus",
+      "kind": "enum",
+      "cases": [
+        "ok",
+        "defaultedWordClass",
+        "unreadable"
+      ]
+    },
+    {
+      "name": "ImportPreviewRow",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "line",
+          "type": "u32"
+        },
+        {
+          "name": "cells",
+          "type": "[string]"
+        },
+        {
+          "name": "status",
+          "type": "ImportRowStatus"
+        }
+      ]
+    },
+    {
+      "name": "ImportPreview",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "format",
+          "type": "ImportFormat"
+        },
+        {
+          "name": "columns",
+          "type": "[ImportColumn]"
+        },
+        {
+          "name": "rows",
+          "type": "[ImportPreviewRow]"
+        },
+        {
+          "name": "importable",
+          "type": "u32"
+        },
+        {
+          "name": "defaulted",
+          "type": "u32"
+        },
+        {
+          "name": "unreadable",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "ImportedDictionaryInfo",
       "kind": "struct",
       "fields": [
@@ -1166,6 +1254,19 @@
           ]
         },
         {
+          "name": "previewImport",
+          "fields": [
+            {
+              "name": "kind",
+              "type": "ImportKind"
+            },
+            {
+              "name": "path",
+              "type": "string"
+            }
+          ]
+        },
+        {
           "name": "importUserDictionary",
           "fields": [
             {
@@ -1456,6 +1557,15 @@
             {
               "name": "dictionary",
               "type": "AssociationDictionaryInfo"
+            }
+          ]
+        },
+        {
+          "name": "importPreview",
+          "fields": [
+            {
+              "name": "preview",
+              "type": "ImportPreview"
             }
           ]
         },

@@ -98,6 +98,10 @@ public enum LayoutTokens {
         public static let keymapCaptureHeight: Double = 22
         public static let ruleTableHeight: Double = 220
         public static let commandEditorWidth: Double = 460
+        public static let importPreviewWidth: Double = 640
+        public static let importPreviewTableHeight: Double = 360
+        public static let importPreviewLineColumnWidth: Double = 56
+        public static let importPreviewKindColumnWidth: Double = 112
         public static let ruleSearchWidth: Double = 160
         public static let previewChipPaddingX: Double = 8
         public static let previewChipPaddingY: Double = 4
@@ -146,7 +150,7 @@ public enum LayoutTokens {
         public static let keyFontSize: Double = 10.5
         public static let badgeSize: Double = 16
         public static let badgeGap: Double = 8
-        public static let selectionRadius: Double = 7
+        public static let selectionRadius: Double = 8
         public static let keycapRadius: Double = 4
         public static let keycapPaddingX: Double = 4
         public static let keycapPaddingY: Double = 3

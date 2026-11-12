@@ -64,6 +64,10 @@ extension EngineService {
                 try files.removeAssociationDictionary(id: id)
                 return .done
             }
+        case .previewImport(let kind, let path):
+            return { files throws(SettingsFileFailure) in
+                .importPreview(preview: WireImportPreview(try await files.previewImport(ImportPreview.Kind(kind), from: path)))
+            }
         case .importUserDictionary(let path):
             return { files throws(SettingsFileFailure) in Self.imported(try await files.importUserDictionary(from: path)) }
         case .exportUserDictionary(let path):
@@ -144,6 +148,31 @@ extension WireFileFailure {
         case .unknownDictionary: self = .unknownDictionary
         case .writeFailed: self = .writeFailed
         }
+    }
+}
+
+extension ImportPreview.Kind {
+    init(_ kind: WireImportKind) {
+        switch kind {
+        case .userDictionary: self = .userDictionary
+        case .dictionary: self = .dictionary
+        case .association: self = .association
+        }
+    }
+}
+
+extension WireImportPreview {
+    init(_ preview: ImportPreview) {
+        self.init(
+            format: WireImportFormat(rawValue: preview.format.rawValue) ?? .tabSeparated,
+            columns: preview.columns.compactMap { WireImportColumn(rawValue: $0.rawValue) },
+            rows: preview.rows.map { row in
+                WireImportPreviewRow(line: UInt32(clamping: row.line), cells: row.cells,
+                                     status: WireImportRowStatus(rawValue: row.status.rawValue) ?? .unreadable)
+            },
+            importable: UInt32(clamping: preview.importable),
+            defaulted: UInt32(clamping: preview.defaulted),
+            unreadable: UInt32(clamping: preview.unreadable))
     }
 }
 

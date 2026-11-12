@@ -355,6 +355,10 @@ pub mod size {
         pub const KEYMAP_CAPTURE_HEIGHT: f32 = 22.0;
         pub const RULE_TABLE_HEIGHT: f32 = 220.0;
         pub const COMMAND_EDITOR_WIDTH: f32 = 460.0;
+        pub const IMPORT_PREVIEW_WIDTH: f32 = 640.0;
+        pub const IMPORT_PREVIEW_TABLE_HEIGHT: f32 = 360.0;
+        pub const IMPORT_PREVIEW_LINE_COLUMN_WIDTH: f32 = 56.0;
+        pub const IMPORT_PREVIEW_KIND_COLUMN_WIDTH: f32 = 112.0;
         pub const RULE_SEARCH_WIDTH: f32 = 160.0;
         pub const PREVIEW_CHIP_PADDING_X: f32 = 8.0;
         pub const PREVIEW_CHIP_PADDING_Y: f32 = 4.0;
@@ -403,7 +407,7 @@ pub mod size {
         pub const KEY_FONT_SIZE: f32 = 10.5;
         pub const BADGE_SIZE: f32 = 16.0;
         pub const BADGE_GAP: f32 = 8.0;
-        pub const SELECTION_RADIUS: f32 = 7.0;
+        pub const SELECTION_RADIUS: f32 = 8.0;
         pub const KEYCAP_RADIUS: f32 = 4.0;
         pub const KEYCAP_PADDING_X: f32 = 4.0;
         pub const KEYCAP_PADDING_Y: f32 = 3.0;

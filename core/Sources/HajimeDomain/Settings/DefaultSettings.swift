@@ -349,6 +349,8 @@ public enum DefaultSettings {
     public static let syncCopyChunkBytes = 1024 * 1024
     /// 取り込む辞書 1 つの語の数の上限
     public static let maximumImportedWords = 3_000_000
+    /// 取り込む前に見せる行の数の上限(読めない行と品詞を名詞にする行は先に残す．ImportPreview)
+    public static let maximumImportPreviewRows = 1_000
     /// 取り込める辞書の数の上限
     public static let maximumImportedDictionaries = 32
     /// 取り込む語の読みと語の長さの上限

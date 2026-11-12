@@ -217,6 +217,10 @@ enum DesignTokens {
             static let keymapCaptureHeight: CGFloat = 22
             static let ruleTableHeight: CGFloat = 220
             static let commandEditorWidth: CGFloat = 460
+            static let importPreviewWidth: CGFloat = 640
+            static let importPreviewTableHeight: CGFloat = 360
+            static let importPreviewLineColumnWidth: CGFloat = 56
+            static let importPreviewKindColumnWidth: CGFloat = 112
             static let ruleSearchWidth: CGFloat = 160
             static let previewChipPaddingX: CGFloat = 8
             static let previewChipPaddingY: CGFloat = 4
@@ -265,7 +269,7 @@ enum DesignTokens {
             static let keyFontSize: CGFloat = 10.5
             static let badgeSize: CGFloat = 16
             static let badgeGap: CGFloat = 8
-            static let selectionRadius: CGFloat = 7
+            static let selectionRadius: CGFloat = 8
             static let keycapRadius: CGFloat = 4
             static let keycapPaddingX: CGFloat = 4
             static let keycapPaddingY: CGFloat = 3

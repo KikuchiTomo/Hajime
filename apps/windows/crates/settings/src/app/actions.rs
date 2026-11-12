@@ -32,6 +32,20 @@ pub(super) const WM_DICTIONARY_IMPORTED: u32 = WM_APP + 40;
 /// 辞書を取り込んだ結果の受け箱(一覧と結果)
 pub(super) type ImportInbox = Arc<Mutex<Option<(DictionaryList, Result<FileOutcome, StoreError>)>>>;
 
+/// 取り込む前に中身を読み終えた知らせ(別のスレッドから窓に送る)
+pub(super) const WM_IMPORT_PREVIEWED: u32 = WM_APP + 41;
+
+/// 取り込む前に読んだ結果の受け箱(取り込み・ファイル・結果)
+pub(super) type PreviewInbox = Arc<
+    Mutex<
+        Option<(
+            super::import_sheet::ImportAction,
+            String,
+            Result<ipc::ImportPreview, crate::engine::ImportFailure>,
+        )>,
+    >,
+>;
+
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
 pub enum After {
     Message {
@@ -136,7 +150,8 @@ pub fn run_after(window: Window, after: Option<After>) {
             let Some(path) = ffi::choose_file(window, true, "", filter.name, filter.pattern) else {
                 return;
             };
-            let after = with_app(|app| app.import_dictionary(list, path, replacing)).flatten();
+            let action = super::import_sheet::ImportAction::Dictionary { list, replacing };
+            let after = with_app(|app| app.preview_import(action, path)).flatten();
             run_after(window, after);
         }
         Some(After::ChooseDictionaryApps { list, id }) => {
@@ -197,7 +212,15 @@ pub fn run_after(window: Window, after: Option<After>) {
             else {
                 return;
             };
-            let after = with_app(|app| app.run_file(task, path)).flatten();
+            // 辞書のファイルは取り込む前に中身を見せる(シートで「取り込む」を押したら取り込む)
+            let after = if task == FileTask::ImportUserDictionary {
+                with_app(|app| {
+                    app.preview_import(super::import_sheet::ImportAction::UserDictionary, path)
+                })
+                .flatten()
+            } else {
+                with_app(|app| app.run_file(task, path)).flatten()
+            };
             run_after(window, after);
         }
         None => {}
@@ -752,6 +775,81 @@ impl App {
             }),
         );
         None
+    }
+
+    /// 取り込む前に中身を読む．読み終えたら WM_IMPORT_PREVIEWED でシートを出す(何も登録しない)
+    pub(super) fn preview_import(
+        &mut self,
+        action: super::import_sheet::ImportAction,
+        path: String,
+    ) -> Option<After> {
+        if self.extras.importing_dictionary {
+            return None;
+        }
+        let inbox = Arc::clone(&self.import_preview);
+        let window = self.window.0 as isize;
+        let kind = action.kind();
+        self.extras.importing_dictionary = true;
+        self.refresh();
+        let reply_path = path.clone();
+        self.model.as_ref()?.store().preview_import_later(
+            kind,
+            path,
+            Box::new(move |outcome| {
+                if let Ok(mut slot) = inbox.lock() {
+                    *slot = Some((action, reply_path, outcome));
+                }
+                ffi::post(Window(window as *mut _), WM_IMPORT_PREVIEWED, 0, 0);
+            }),
+        );
+        None
+    }
+
+    /// 取り込む前に読み終えた(WM_IMPORT_PREVIEWED)．読めたらシートを出し，読めなければ知らせる
+    pub(super) fn finish_preview(&mut self) -> Option<After> {
+        let (action, path, outcome) = self.import_preview.lock().ok()?.take()?;
+        self.extras.importing_dictionary = false;
+        self.refresh();
+        match outcome {
+            Ok(preview) => {
+                self.open_import_sheet(super::import_sheet::PendingImport {
+                    path,
+                    preview,
+                    action,
+                });
+                None
+            }
+            Err(crate::engine::ImportFailure::Store(error)) => self.failure(error),
+            Err(crate::engine::ImportFailure::File(_)) => Some(After::Message {
+                text: match action {
+                    super::import_sheet::ImportAction::UserDictionary => settings::IMPORT_FAILED,
+                    super::import_sheet::ImportAction::Dictionary {
+                        list: DictionaryList::Imported,
+                        ..
+                    } => dictionaries::IMPORT_FAILED,
+                    super::import_sheet::ImportAction::Dictionary {
+                        list: DictionaryList::Association,
+                        ..
+                    } => association::IMPORT_FAILED,
+                }
+                .into(),
+                warning: true,
+            }),
+        }
+    }
+
+    /// シートで「取り込む」を押した．見せたファイルを取り込む
+    pub(super) fn commit_import(&mut self) -> Option<After> {
+        let sheet = self.close_import_sheet()?;
+        let path = sheet.pending.path;
+        match sheet.pending.action {
+            super::import_sheet::ImportAction::UserDictionary => {
+                self.run_file(FileTask::ImportUserDictionary, path)
+            }
+            super::import_sheet::ImportAction::Dictionary { list, replacing } => {
+                self.import_dictionary(list, path, replacing)
+            }
+        }
     }
 
     /// 辞書を取り込み終えた(WM_DICTIONARY_IMPORTED)．輪を止め，結果を知らせる
