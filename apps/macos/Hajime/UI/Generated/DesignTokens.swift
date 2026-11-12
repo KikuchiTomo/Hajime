@@ -221,7 +221,8 @@ enum DesignTokens {
             static let previewChipPaddingX: CGFloat = 8
             static let previewChipPaddingY: CGFloat = 4
             static let previewChipRadius: CGFloat = 6
-            static let previewChipGap: CGFloat = 6
+            static let previewChipGap: CGFloat = 4
+            static let previewButtonGap: CGFloat = 8
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
             static let ruleValueColumnWidth: CGFloat = 150
@@ -245,7 +246,7 @@ enum DesignTokens {
             static let themeSwatchWidth: CGFloat = 40
             static let aboutIcon: CGFloat = 64
             static let themeSwatchHeight: CGFloat = 20
-            static let themeSwatchGap: CGFloat = 3
+            static let themeSwatchGap: CGFloat = 4
             static let themeSwatchFontSize: CGFloat = 11
             static let themeSwatchSelectionWidth: CGFloat = 12
             static let themeSwatchSelectionHeight: CGFloat = 10
@@ -452,6 +453,7 @@ enum DesignTokens {
             static let navHeaderFontSize: CGFloat = 12
             static let controlRadius: CGFloat = 4
             static let fieldPaddingX: CGFloat = 11
+            static let fieldPaddingY: CGFloat = 5
             static let focusStroke: CGFloat = 2
             static let chevronSize: CGFloat = 12
             static let flyoutPadding: CGFloat = 4
@@ -461,7 +463,7 @@ enum DesignTokens {
             static let tableHeaderHeight: CGFloat = 32
             static let scrollbarThin: CGFloat = 2
             static let scrollbarWide: CGFloat = 6
-            static let scrollbarMargin: CGFloat = 3
+            static let scrollbarMargin: CGFloat = 2
             static let scrollbarHit: CGFloat = 14
             static let scrollbarMinThumb: CGFloat = 24
             static let progressRingSize: CGFloat = 32
@@ -471,12 +473,10 @@ enum DesignTokens {
             static let wizardWidth: CGFloat = 920
             static let wizardHeight: CGFloat = 640
             static let wizardTextWidth: CGFloat = 380
-            static let wizardPadding: CGFloat = 32
             static let wizardFooterHeight: CGFloat = 72
             static let wizardStepBar: CGFloat = 4
             static let wizardOptionHeight: CGFloat = 44
             static let wizardOptionNoteHeight: CGFloat = 64
-            static let wizardOptionGap: CGFloat = 6
             static let wizardRadioSize: CGFloat = 20
             static let wizardDemoFontSize: CGFloat = 20
             static let wizardDemoLineHeight: CGFloat = 34
@@ -498,7 +498,7 @@ enum DesignTokens {
             static let radioDot: CGFloat = 10
             static let themeSwatchWidth: CGFloat = 40
             static let themeSwatchHeight: CGFloat = 20
-            static let themeSwatchGap: CGFloat = 3
+            static let themeSwatchGap: CGFloat = 4
             static let themeSwatchSelectionWidth: CGFloat = 12
             static let themeSwatchSelectionHeight: CGFloat = 10
             static let themeSwatchRadius: CGFloat = 6

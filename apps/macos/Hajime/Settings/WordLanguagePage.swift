@@ -33,7 +33,7 @@ struct WordLanguagePage: View {
                         .textFieldStyle(.roundedBorder)
                     let words = sample.isEmpty ? [] : preview(sample, preceding.isEmpty ? nil : preceding)
                     if !words.isEmpty {
-                        WrappingStack(spacing: DesignTokens.Size.Settings.previewChipGap) {
+                        WrappingStack(spacing: DesignTokens.Size.Settings.previewButtonGap) {
                             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
                                 resultChip(word)
                             }

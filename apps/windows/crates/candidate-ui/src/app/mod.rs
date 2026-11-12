@@ -630,7 +630,6 @@ impl App {
             on_screen(&row),
             anchor,
             (bubble.width, bubble.height),
-            bubble.preferred_pointer,
             screen,
             &keep_clear,
             &scene::bubble::Metrics::tokens(theme.is_rounded()),

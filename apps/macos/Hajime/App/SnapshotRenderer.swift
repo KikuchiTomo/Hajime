@@ -55,6 +55,13 @@ enum SnapshotRenderer {
                 render(homophoneListView(theme: look.theme, appearance: appearance, nearRightEdge: true), name: "homophone-list-left-\(look.name)",
                        to: output, appearance: appearance)
                 render(homophoneBranchView(theme: look.theme, appearance: appearance), name: "homophone-branch-\(look.name)", to: output, appearance: appearance)
+                // 1 番目といちばん下を選んだところ(吹き出しの上の端は窓の上の端にそろえ，三角だけが動く)
+                render(homophoneListView(theme: look.theme, appearance: appearance, selected: 3), name: "homophone-list-lower-\(look.name)",
+                       to: output, appearance: appearance)
+                render(homophoneBranchView(theme: look.theme, appearance: appearance, selected: 0, note: took),
+                       name: "homophone-branch-first-\(look.name)", to: output, appearance: appearance)
+                render(homophoneBranchView(theme: look.theme, appearance: appearance, selected: 3, note: adopted),
+                       name: "homophone-branch-lower-\(look.name)", to: output, appearance: appearance)
                 render(meaningListView(theme: look.theme, appearance: appearance), name: "meaning-list-\(look.name)", to: output, appearance: appearance)
                 render(homophoneListView(theme: look.theme, appearance: appearance, placement: .below), name: "homophone-list-below-\(look.name)", to: output, appearance: appearance)
                 render(homophoneBranchView(theme: look.theme, appearance: appearance, placement: .below), name: "homophone-branch-below-\(look.name)", to: output, appearance: appearance)
@@ -478,7 +485,7 @@ enum SnapshotRenderer {
         let box = { (rect: NSRect) in MeaningBubbleLayout.Box(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height) }
         let placement = MeaningBubbleLayout(
             row: box(row), window: .init(x: 0, y: 0, width: view.frame.width, height: view.frame.height),
-            size: (metrics.width, content.size.height + metrics.padding * 2), preferredPointer: metrics.padding + header / 2,
+            size: (metrics.width, content.size.height + metrics.padding * 2),
             screen: .init(x: -1000, y: -1000, width: nearRightEdge ? 1000 + Double(view.frame.width) + metrics.screenMargin : 4000, height: 4000),
             obstacles: obstacles.map(box), metrics: metrics)
         let bubble = MeaningBubbleView()
@@ -846,20 +853,29 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
+    /// 撮る以外の候補を選んだときの見本の語の意味(意味が 1 つで，吹き出しが短いもの)
+    private static let held = HomophoneNote(word: "執る", partOfSpeech: .verb, senses: [.init(meaning: "仕事や事務を取り扱う", example: "指揮を執る")],
+                                            others: ["取る", "撮る", "採る", "捕る"])
+    private static let took = HomophoneNote(word: "取る", partOfSpeech: .verb, senses: [.init(meaning: "手に持つ", example: "本を手に取る")],
+                                            others: ["執る", "捕る"])
+    private static let adopted = HomophoneNote(word: "採る", partOfSpeech: .verb, senses: [.init(meaning: "選んで用いる", example: "新人を採る")],
+                                               others: ["執る", "捕る"])
+
     /// 同音異義語の使い分け(R-08)を一覧で出したところ．既定では候補の窓の横の吹き出しにし，三角で選んでいる候補を指す
     private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side,
-                                          nearRightEdge: Bool = false) -> NSView {
+                                          nearRightEdge: Bool = false, selected: Int = 0) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
         var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: ["撮る", "取る", "採る", "執る"].map { .init(text: $0, annotation: nil) },
-                                   selectedEntry: 0, focus: .candidate, position: 1, total: 6, note: nil)
-        panel.homophone = SamplePanels.homophone
+                                   selectedEntry: selected, focus: .candidate, position: selected + 1, total: 6, note: nil)
+        let note = selected == 3 ? held : SamplePanels.homophone
+        panel.homophone = note
         panel.meaningPlacement = placement
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         guard placement == .side else { return backdropped(view) }
-        return withBubble(view, note: SamplePanels.homophone, others: SamplePanels.homophone.others,
+        return withBubble(view, note: note, others: note.others,
                           row: view.selectedRowRect(size: view.frame.size), obstacles: view.bubbleObstacles(size: view.frame.size), theme: view.theme,
                           nearRightEdge: nearRightEdge)
     }
@@ -899,7 +915,8 @@ enum SnapshotRenderer {
 
     /// 同音異義語の使い分けを分岐図で出したところ．既定では候補の窓の横の吹き出しにし，三角で選んでいる枝の行を指す．
     /// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補にすると，吹き出しを出さない
-    private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1) -> NSView {
+    private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1,
+                                            note: HomophoneNote? = nil) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
@@ -911,7 +928,7 @@ enum SnapshotRenderer {
         if selected != 1 {
             panel.columns[1].selectedAlternative = selected
             panel.columns[1].text = panel.columns[1].alternatives[selected]
-            panel.columns[1].homophone = nil
+            panel.columns[1].homophone = note
             view.panel = panel
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
