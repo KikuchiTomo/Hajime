@@ -192,6 +192,8 @@ struct PaletteScenarioTests {
         #expect(panel.tabs.map(\.title) == ["笑顔", "悲しみ", "挨拶と動作"])
         #expect(panel.placeholder == "顔文字を検索")
         #expect(panel.preview?.japaneseName == "にこにこ")
+        // 名前と同じ読みは説明の読みに重ねて出さない
+        #expect(panel.preview?.readings == ["えがお"])
         // 符号位置は長いだけなので出さない
         #expect(panel.preview?.codePoints == "")
         harness.press(.right)
