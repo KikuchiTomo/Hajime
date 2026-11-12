@@ -49,6 +49,12 @@ enum UIStrings {
     /// 手のずれ・うろ覚えの語・動的なユーザー辞書・コマンド・変換マクロ(R-02・R-16・R-18・R-22)
     enum Extras {
         static let handShift = "手の位置のずれを修正（試験的）"
+        /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)
+        static let looseReadingsExample = (reading: "しゅみれーしょん", candidate: "シミュレーション")
+        static let phoneticSpellingExample = (reading: "ふぉと", candidate: "photo")
+        /// 両手が 1 キー右にずれたまま「arigatou」を打った並び
+        static let handShiftExample = (reading: "stohsypi", candidate: "ありがとう")
+        static let englishTermCandidatesExample = (reading: "api", candidate: "API")
         static let handShiftNote = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。"
         static let looseReadings = "うろ覚えのカタカナ語の候補"
         static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。"
@@ -57,16 +63,17 @@ enum UIStrings {
         static let englishTermCandidates = "英語の語の辞書を使う"
         static let englishTerms = "英語の語の辞書に足した語"
         static let englishTermsSection = "英語の語の辞書"
-        static let englishTermCandidatesNote = "ローマ字で打った「api」を「API」に、「openai」を「OpenAI」にするように、書き方の決まった英語の語を候補に出します。「sora」のように読みが日本語の語（空）になるときは、日本語を先に出します。"
-        static let englishTermPlaceholder = "書き方どおりの語（例: OpenAI）"
+        static let englishTermPlaceholder = "書き方どおりの語"
+        /// 英語の語の欄の入力の例
+        static let englishTermPrompt = "例: OpenAI"
         static let englishTermsEmpty = "足した語はありません"
-        static let englishTermsNote = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。"
         static let invalidEnglishTerm = "語は \(DefaultSettings.englishTermLengthRange.lowerBound)〜\(DefaultSettings.englishTermLengthRange.upperBound) 文字の英字にしてください"
         static let dynamicDictionary = "単語に書いた日付や時刻などを入力時の値にする"
         static let commandsPage = "コマンド"
         static let commandsSection = "コマンド"
         static let launcherCommands = "読みでコマンドを呼び出す"
-        static let commandsNote = "コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
+        /// コマンドを同期しないことを示す 1 行
+        static let commandsStoredLocally = "この Mac だけに保存"
         static let commandReading = "読み"
         static let commandTitle = "名前"
         static let commandKind = "動作"
@@ -995,7 +1002,8 @@ enum UIStrings {
         static let languagePage = "英語と日本語"
         static let languageJudging = "判別方法"
         static let usesContext = "前の単語で判別"
-        static let usesContextNote = "make・shine のように英語にも日本語にも読める単語を、前が英語なら英語、日本語なら日本語にします。"
+        /// 「前の単語で判別」の横に出す見本(前が日本語なら英字の語も日本語にする)
+        static let usesContextExample = (reading: "試合に make", candidate: "試合に負け")
         static let avoidsOffensive = "不適切な変換を避ける"
         static let englishWords = "常に英語にする単語"
         static let japaneseWords = "常に日本語にする単語"
@@ -1011,7 +1019,6 @@ enum UIStrings {
         static let alreadyListed = "すでに一覧にあります"
         static let englishWordsEmpty = "常に英語にする単語はありません"
         static let japaneseWordsEmpty = "常に日本語にする単語はありません"
-        static let languageNote = "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。試した結果を右クリックすると一覧に追加できます。"
 
         static func label(for language: WordLanguage) -> String {
             switch language {
@@ -1034,7 +1041,6 @@ enum UIStrings {
         static let correctsEnglish = "英単語"
         static let correctsJapanese = "日本語のタイプミス"
         static let correctsRepeatedKeys = "同じキーの重なり"
-        static let correctionKindsNote = "使用できない項目は、変換の「タイプミスの修正」で有効にできます。"
         static let exceptions = "修正しない語句"
         static let exceptionPlaceholder = "英字か読み"
         static let rules = "置き換え"
@@ -1103,7 +1109,8 @@ enum UIStrings {
         }
 
         // 除外設定
-        static let exclusionsNote = "アプリの固有 ID を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。"
+        /// 一覧の並びの意味を示す 1 行
+        static let exclusionsOrder = "上の行ほど優先"
         static let addApps = "アプリを追加…"
         static let exclusionsEmpty = "アプリはありません"
         static let importCSV = "CSV をインポート…"
@@ -1170,7 +1177,6 @@ enum UIStrings {
 
         // バックアップ
         static let backup = "バックアップ"
-        static let backupNote = "すべての設定を JSON としてインポート・エクスポート可能です。"
         static let exportSettings = "設定をエクスポート…"
         static let importSettings = "設定をインポート…"
         static let exportSettingsFileName = "hajime-settings.json"
@@ -1185,7 +1191,6 @@ enum UIStrings {
         static func versionValue(_ version: String) -> String { "v\(version) (macOS)" }
         static let checkForUpdates = "更新を確認"
         static let acknowledgements = "謝辞"
-        static let acknowledgementsNote = "Hajime IME は上記のソフトウェア・モデル・データを利用しています。"
         static let noticesMissing = "謝辞のファイルが見つかりません"
         static let licenseText = "ライセンス全文"
     }
@@ -1202,7 +1207,6 @@ extension UIStrings {
         static let lastSynced = "最後に同期した時刻"
         static let syncNow = "今すぐ同期"
         static let scopes = "同期する項目"
-        static let note = "Dropbox や iCloud Drive のフォルダを選択すると、ほかの Mac と同期できます。"
         static let failed = "同期できませんでした"
         static let unreadable = "同期ファイルを読み込めないため、同期を停止しています"
         static let items = "項目ごとに選択"

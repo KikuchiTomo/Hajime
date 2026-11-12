@@ -28,8 +28,6 @@ struct SyncPage: View {
                 if let error = sync.lastError {
                     Text(error).foregroundStyle(.red)
                 }
-            } footer: {
-                Text(UIStrings.Sync.note).font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 ForEach(SyncGroup.syncableCases, id: \.self) { group in

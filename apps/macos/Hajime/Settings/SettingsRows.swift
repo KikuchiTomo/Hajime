@@ -1,3 +1,4 @@
+import AppKit
 import HajimeDomain
 import SwiftUI
 
@@ -68,17 +69,57 @@ struct ResettableToggle: View {
     @ObservedObject var model: SettingsModel
     let title: String
     let keyPath: WritableKeyPath<HajimeDomain.Settings, Bool>
-    /// スイッチに付ける説明．行全体に .help を付けると「既定に戻す」のボタンの説明まで置き換わるので，スイッチにだけ付ける
-    var help: String?
 
     var body: some View {
         ResettableRow(model: model, keyPath: keyPath) {
-            if let help {
-                Toggle(title, isOn: model.binding(keyPath)).help(help)
-            } else {
-                Toggle(title, isOn: model.binding(keyPath))
+            Toggle(title, isOn: model.binding(keyPath))
+        }
+    }
+}
+
+/// 既定から戻せるオン・オフの項目で，名前の横にその設定で出る候補の見本(「びーる → 🍺」)をタグの形で添えるもの．
+/// 説明の文の代わりに見本で違いを見せる．隣り合う行のタグの左の端をそろえるときは，titleWidth に長いほうの名前の幅を渡す
+struct ExampleToggle: View {
+    @ObservedObject var model: SettingsModel
+    let title: String
+    let keyPath: WritableKeyPath<HajimeDomain.Settings, Bool>
+    let example: (reading: String, candidate: String)
+    var titleWidth: CGFloat?
+
+    var body: some View {
+        ResettableRow(model: model, keyPath: keyPath) {
+            Toggle(isOn: model.binding(keyPath)) {
+                HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.group) {
+                    Text(title).frame(minWidth: titleWidth, alignment: .leading)
+                    CandidateExample(reading: example.reading, candidate: example.candidate)
+                }
             }
         }
+    }
+
+    /// 名前のうち長いほうの幅(Form の名前と同じ本文の書体で測る)．名前の欄の最小の幅に使うので，測り方の差で名前が欠けることはない
+    static func titleWidth(_ titles: [String]) -> CGFloat {
+        let font = NSFont.preferredFont(forTextStyle: .body)
+        return titles.map { ($0 as NSString).size(withAttributes: [.font: font]).width.rounded(.up) }.max() ?? 0
+    }
+}
+
+/// 読みと，その読みで出る候補を並べたタグ(「ねこが → 🐈が」)
+struct CandidateExample: View {
+    let reading: String
+    let candidate: String
+
+    var body: some View {
+        HStack(spacing: DesignTokens.Size.Space.inline) {
+            Text(reading).foregroundStyle(.secondary)
+            Image(systemName: "arrow.right").foregroundStyle(.tertiary).imageScale(.small)
+            Text(candidate)
+        }
+        .font(.callout)
+        .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+        .accessibilityElement(children: .combine)
     }
 }
 

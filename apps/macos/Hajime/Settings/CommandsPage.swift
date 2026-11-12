@@ -41,7 +41,7 @@ struct CommandsPage: View {
             } header: {
                 Text(UIStrings.Extras.commandsSection)
             } footer: {
-                Text(UIStrings.Extras.commandsNote).font(.caption).foregroundStyle(.secondary)
+                Text(UIStrings.Extras.commandsStoredLocally).font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.conversionMacros, keyPath: \.conversionMacros)
