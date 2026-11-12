@@ -595,14 +595,26 @@ pub fn segment(
 ) {
     let palette = &theme.palette;
     let radius = size::CONTROL_RADIUS;
-    let fill = if selected {
-        Color::from(palette.nav_selected)
+    // 選んだところは溝の中で浮かせた札にする(macOS の segmented の Picker)．ほかはポインターを載せたときだけ薄く塗る
+    let inset = size::SEGMENT_INSET;
+    let face = Rect::new(
+        rect.x + inset,
+        rect.y + inset,
+        (rect.width - inset * 2.0).max(0.0),
+        (rect.height - inset * 2.0).max(0.0),
+    );
+    if selected {
+        canvas.fill_round(face, radius, Color::from(palette.control));
+        canvas.stroke_round(face, radius, 1.0, Color::from(palette.control_stroke));
     } else if state.pressed {
-        Color::from(palette.nav_pressed)
+        canvas.fill_round(face, radius, Color::from(palette.nav_pressed));
     } else {
-        Color::from(palette.nav_hover).with_alpha(state.hover)
-    };
-    canvas.fill_round(rect, radius, fill);
+        canvas.fill_round(
+            face,
+            radius,
+            Color::from(palette.nav_hover).with_alpha(state.hover),
+        );
+    }
     let text = if selected {
         palette.text
     } else {
@@ -615,20 +627,6 @@ pub fn segment(
         Color::from(text),
         TextLayout::CENTER,
     );
-    if selected {
-        let width = size::NAV_INDICATOR_HEIGHT;
-        let height = size::NAV_INDICATOR_WIDTH;
-        canvas.fill_round(
-            Rect::new(
-                rect.x + (rect.width - width) / 2.0,
-                rect.max_y() - height,
-                width,
-                height,
-            ),
-            height / 2.0,
-            Color::from(palette.accent),
-        );
-    }
     if state.focus_visible {
         focus_ring(canvas, theme, rect, radius);
     }

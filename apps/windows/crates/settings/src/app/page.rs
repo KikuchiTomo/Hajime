@@ -754,14 +754,6 @@ impl RowState {
         matches!(self.row.control, Control::Dictionaries(..))
     }
 
-    /// 選んだ行を切り替えるボタン(項目ごとの同期の範囲)．記号・コマンド・変換マクロの有効と無効は表の「有効」の列で切り替える
-    fn toggle_part(&self) -> Option<Part> {
-        match self.row.control {
-            Control::SyncFields(_) => Some(Part::Top(0)),
-            _ => None,
-        }
-    }
-
     /// 選んだ行を消すボタン(足す一覧は表の下の左)
     pub fn remove_part(&self) -> Option<Part> {
         self.has_add_remove().then_some(Part::Bottom(0))
@@ -1046,7 +1038,6 @@ impl RowState {
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
             Part::Bottom(0) if self.has_add_remove() => selected,
-            Part::Top(index) if self.toggle_part() == Some(Part::Top(index)) => selected,
             // 辞書・カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
             Part::Bottom(index) if self.is_dictionary_list() => {
@@ -1521,7 +1512,14 @@ impl PageView {
 
     /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)．
     /// ページの上の端より上へ送った欄も隠す
-    pub fn place_fields(&self, theme: &Theme, origin: (f32, f32), scroll: f32, hidden: bool) {
+    pub fn place_fields(
+        &self,
+        theme: &Theme,
+        origin: (f32, f32),
+        header: f32,
+        scroll: f32,
+        hidden: bool,
+    ) {
         for row in &self.rows {
             let shown = !hidden && row.visible && row.card.is_some();
             for part in row.parts() {
@@ -1535,8 +1533,8 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
-                // 欄は窓なので，描いた絵のようにページの枠で切れない．ページの上(タイトルバー)へ出たら隠す
-                if y < origin.1 {
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(header)へ出たら隠す
+                if y < origin.1 + header {
                     ffi::show(window, false);
                     continue;
                 }
@@ -1934,9 +1932,9 @@ impl PageView {
                 index: first,
             });
         }
+        // 項目ごとの同期は表の「同期する」の印で切り替える(table_check_click)
         if let Control::SyncFields(_) = row.row.control {
-            return (Some(part) == row.toggle_part() && !positions.is_empty())
-                .then_some(Event::SyncToggleFields(positions));
+            return None;
         }
         if let Control::List(spec, _) = &row.row.control {
             match (spec.path, part) {
@@ -2251,6 +2249,7 @@ impl PageView {
                 spec: *spec,
                 indices: vec![index],
             }),
+            Control::SyncFields(_) => Some(Event::SyncToggleFields(vec![index])),
             _ => None,
         }
     }
@@ -2744,11 +2743,16 @@ impl PageView {
             else {
                 continue;
             };
+            let color = if note.row.danger {
+                palette.danger
+            } else {
+                palette.text_secondary
+            };
             canvas.text(
                 *rect,
                 note.row.title,
                 TextStyle::Caption,
-                Color::from(palette.text_secondary),
+                Color::from(color),
                 TextLayout::WRAP,
             );
         }
@@ -2850,17 +2854,12 @@ impl PageView {
                 }
             }
             Control::CustomTheme(_) => self.paint_custom_theme(canvas, frame, index, row),
+            // 切り替えの帯(macOS の segmented の Picker)．溝は薄い灰色で，選んだところだけを浮かせて描く
             Control::Segmented(_) => {
                 canvas.fill_round(
                     card.control,
                     size::CONTROL_RADIUS,
-                    Color::from(palette.control),
-                );
-                canvas.stroke_round(
-                    card.control,
-                    size::CONTROL_RADIUS,
-                    1.0,
-                    Color::from(palette.control_stroke),
+                    Color::from(palette.nav_selected),
                 );
                 for part in row.parts() {
                     if let (Part::Segment(position), Some(rect)) = (part, row.part_rect(part)) {
@@ -3897,7 +3896,7 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
             for field in spec.fields {
                 let input = match field.choices {
                     Some(_) => Input::Choice(0),
-                    None => match fields.take(field.label) {
+                    None => match fields.take(field.prompt.unwrap_or(field.label)) {
                         Some(window) => {
                             // キーの書き方の欄は押したらキーを記録する(macOS の KeyField)
                             edit::set_record_on_click(

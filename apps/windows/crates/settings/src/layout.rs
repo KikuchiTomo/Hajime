@@ -750,6 +750,7 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
+    note_line: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -762,6 +763,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
+    note_line: false,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -812,6 +814,10 @@ fn place_inputs(
         .map(|label| button_width(label, metrics))
         .collect();
     let buttons_width: f32 = widths.iter().map(|width| width + size::CONTROL_GAP).sum();
+    // 添え書きの欄(最後の欄)を次の行に置くときは，1 行目に並べる欄から外す
+    let note_line = buttons.note_line && fields >= 2;
+    let all_fields = fields;
+    let fields = if note_line { fields - 1 } else { fields };
     // 決まった幅の欄(キー設定の状態とキー)を除いた欄で残りを分ける
     let fixed: Vec<f32> = buttons.field_widths.iter().copied().take(fields).collect();
     let fixed_total: f32 = fixed.iter().sum();
@@ -835,11 +841,18 @@ fn place_inputs(
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
     }
-    let list_top = if fields + buttons.top.len() == 0 {
+    // 入力欄の並びの上の帯は 1 行目の欄・ボタンのあとに置く(parts の順: 入力欄・上のボタン)．
+    // 添え書きの欄は 2 行目に幅いっぱいで置き，1 行目の欄のすぐあとの parts に入れる(入力欄の番号の順)
+    let mut list_top = if all_fields + buttons.top.len() == 0 {
         top
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
+    if note_line {
+        let note = Rect::new(x, list_top, inner, size::CONTROL_HEIGHT);
+        parts.insert(fields, note);
+        list_top += size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    }
     // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
     let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
     let leading: Vec<f32> = buttons.bottom[..split]
