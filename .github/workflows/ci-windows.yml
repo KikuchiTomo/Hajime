@@ -123,7 +123,10 @@ jobs:
         shell: pwsh
       # Windows では使わない依存(SwiftyMarisa)の項目を Package.resolved から消さないよう，固定した版だけで解決する
       - run: swift build --package-path core --only-use-versions-from-resolved-file -Xswiftc "-L$env:LLAMA_DIR"
-      - run: swift test --package-path core --only-use-versions-from-resolved-file -Xswiftc "-L$env:LLAMA_DIR"
+      # 時間を測るテスト(名前付きパイプの 1 キーの往復，1 キーあたりの処理時間)は，ほかのテストと並行させると CPU とメインスレッドを
+      # 取り合って時間が揺れるので，ほかのテストを流したあとに並行させずに流す
+      - run: swift test --package-path core --only-use-versions-from-resolved-file -Xswiftc "-L$env:LLAMA_DIR" --skip NamedPipeTests --skip LatencyProbeTests
+      - run: swift test --package-path core --only-use-versions-from-resolved-file -Xswiftc "-L$env:LLAMA_DIR" --skip-build --no-parallel --filter NamedPipeTests --filter LatencyProbeTests
       # テストはモデルを使わないので，Zenzai を CPU で動かして変換できることを別に確かめる
       - run: tools/windows/fetch_zenzai.ps1 -Output "$env:RUNNER_TEMP\zenzai"
         shell: pwsh
