@@ -464,7 +464,7 @@ pub mod size {
         pub const FRAME_WIDTH: f32 = 1.0;
         pub const GUIDE_DASH: f32 = 4.0;
         pub const ANCHOR_GAP: f32 = 4.0;
-        pub const CANDIDATE_GAP: f32 = 6.0;
+        pub const CANDIDATE_GAP: f32 = 8.0;
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
         pub const TITLE_HEIGHT: f32 = 32.0;
         pub const CAPTION_BUTTON_WIDTH: f32 = 46.0;
