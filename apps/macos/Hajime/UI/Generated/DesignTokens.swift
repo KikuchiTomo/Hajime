@@ -234,9 +234,8 @@ enum DesignTokens {
             static let modeIndicatorFontSize: CGFloat = 17
             static let selectionInsetY: CGFloat = 2
             static let variantInsetY: CGFloat = 4
-            static let curveStartOverlap: CGFloat = 2
-            static let curveEndGap: CGFloat = 3
-            static let curveBend: CGFloat = 0.35
+            static let branchTurnRadius: CGFloat = 8
+            static let branchTipGap: CGFloat = 3
             static let dotPitch: CGFloat = 5
             static let keycapPartGap: CGFloat = 1
             static let keycapGap: CGFloat = 3

@@ -352,9 +352,8 @@ pub mod size {
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
         pub const SELECTION_INSET_Y: f32 = 2.0;
         pub const VARIANT_INSET_Y: f32 = 4.0;
-        pub const CURVE_START_OVERLAP: f32 = 2.0;
-        pub const CURVE_END_GAP: f32 = 3.0;
-        pub const CURVE_BEND: f32 = 0.35;
+        pub const BRANCH_TURN_RADIUS: f32 = 8.0;
+        pub const BRANCH_TIP_GAP: f32 = 3.0;
         pub const DOT_PITCH: f32 = 5.0;
         pub const KEYCAP_PART_GAP: f32 = 1.0;
         pub const KEYCAP_GAP: f32 = 3.0;
