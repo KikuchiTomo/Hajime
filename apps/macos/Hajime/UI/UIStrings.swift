@@ -34,6 +34,9 @@ enum UIStrings {
         static let tooMany = "取り込める連想の辞書は \(DefaultSettings.maximumAssociationDictionaries) 個までです"
         static let importFailed = "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
         static let note = "上の辞書ほど優先"
+        /// 読み込めるファイルの例の行(「,」で区切った行と，先頭に意味の説明を置いてタブで区切った行．タブは ⇥ で見せる)
+        static let fileExample = "美しい,綺麗,麗しい"
+        static let tabFileExample = "見た目がよい ⇥ 美しい ⇥ 綺麗"
         static func imported(_ count: Int) -> String { "\(count) 件の意味を取り込みました" }
         static func summary(_ dictionary: AssociationDictionary) -> String { "\(dictionary.groupCount) 件の意味" }
         /// 連想の一覧の見出しの前に置く言葉
@@ -455,39 +458,39 @@ enum UIStrings {
         /// コマンドの説明(選ぶときの補足)．名前で分かるものは nil
         static func help(for command: KeymapCommand) -> String? {
             switch command {
-            case .nextInputStyle: "ローマ字入力・かな入力・英字入力・英字入力(自動)を順に切り替えます"
-            case .insertSpace: "幅は「スペース幅」の設定に従います。入力中の文字は確定してから入力します"
-            case .insertAlternateSpace: "「スペース幅」の設定と逆の幅の空白を入力します"
+            case .nextInputStyle: "ローマ字 → かな → 英字 → 英字(自動)"
+            case .insertSpace: "「スペース幅」の幅の空白を入力します"
+            case .insertAlternateSpace: "「スペース幅」と逆の幅の空白を入力します"
             case .convert: "英単語を修正した直後は、修正前に戻します"
-            case .convertWithoutLearning: "学習した順位を使わずに変換し、確定しても学習しません"
-            case .insertBoundary: "入力中に、現在の位置で文節を区切ります"
-            case .acceptSuggestion: "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"
-            case .reconvert: "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します。確定した直後に押すと、確定を取り消して確定する前の変換に戻します"
-            case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
-            case .nextCandidate: "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"
-            case .previousCandidate: "入力中に押すと変換を始めます。入力中の候補を表示しているときは、文字種から選択します。分岐図では上の枝の文字種へ進みます"
-            case .nextUncertainSegment, .previousUncertainSegment: "誤変換の可能性が高い文節に移動します"
-            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを次・前の単語の切れ目まで動かします"
-            case .splitSegment: "単語の切れ目に番号を表示し、数字キーで区切ります"
-            case .editSegment: "選んでいる文節を消して読みを打ち直します。文節を移ると変換します"
-            case .commitFirstSegment: "先頭の文節を確定し、残りの変換を続けます"
-            case .cancel: "変換中は読みに戻し、修正した読みは入力したままに戻します。入力中は読みを削除します"
-            case .backToReading: "変換をやめて全文を読みに戻します。ライブ変換がオンでも、読みを変更するまで読みのまま表示します"
-            case .resumeEditing: "変換をやめて読みに戻り、末尾から入力を続けます"
-            case .undoConversionEdit: "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"
-            case .undoPrediction: "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"
-            case .undoCommit: "確定した直後に押すと、確定した文字を削除して確定する前の変換に戻します。文節の区切りと選んだ候補も戻るので、そのまま選び直せます。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"
-            case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"
+            case .convertWithoutLearning: "学習を使わずに変換し、学習もしません"
+            case .insertBoundary: "今の位置で文節を区切ります"
+            case .acceptSuggestion: "「もしかして」の読みに修正します"
+            case .reconvert: "確定した文字を変換し直します"
+            case .switchKanaType: "ひらがな → 全角カタカナ → 半角カタカナ"
+            case .nextCandidate: "入力中は変換を始めます"
+            case .previousCandidate: "入力中は変換を始め、文字種を選択します"
+            case .nextUncertainSegment, .previousUncertainSegment: "誤変換の多い文節に移動します"
+            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを単語の切れ目まで動かします"
+            case .splitSegment: "切れ目の番号を数字キーで選んで区切ります"
+            case .editSegment: "選択中の文節の読みを打ち直します"
+            case .commitFirstSegment: "先頭の文節だけを確定します"
+            case .cancel: "変換中は読みに戻し、入力中は読みを削除します"
+            case .backToReading: "全文を読みに戻します"
+            case .resumeEditing: "読みに戻り、末尾から入力を続けます"
+            case .undoConversionEdit: "直前の候補と区切りの変更を戻します"
+            case .undoPrediction: "確定した予測を取り消し、補う前の読みに戻します"
+            case .undoCommit: "確定を取り消し、確定前の変換に戻します"
+            case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "選択中の文節だけを変換します"
             case .forgetCandidate: "選択中の候補を学習から削除します"
-            case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
-            case .hidePrediction: "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"
-            case .handwriting: "「手書き入力」の設定がオンのときに使えます"
-            case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
-            case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
-            case .registerWord: "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"
-            case .openMenu: "入力メニューの項目を入力位置に表示します"
-            case .expandCandidates: "候補を何列かの表に広げ、一度に多くの候補を表示します。表では文節の移動のキーで列を移り、数字キーは選択中の列から選びます。もう一度押すか Esc で元に戻します"
-            case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
+            case .forgetLastCommit: "最後に確定した語句の学習を取り消します"
+            case .hidePrediction: "表示中の予測を「予測に表示しない語句」に追加します"
+            case .handwriting: "「手書き入力」がオンのときに使えます"
+            case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」がオンのときに使えます"
+            case .associate: "選択中の文節を似た意味の単語の一覧にします"
+            case .registerWord: "選択中の文字でユーザー辞書の登録を開きます"
+            case .openMenu: "入力メニューを入力位置に表示します"
+            case .expandCandidates: "候補を表に広げます"
+            case .englishAutoStyle: "kyou no meeting → 今日の meeting"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
                  .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
@@ -546,10 +549,10 @@ enum UIStrings {
         static func rowCount(_ shown: Int, _ total: Int) -> String { shown == total ? "\(total) 行" : "\(shown) / \(total) 行" }
         static func hidden(by winners: String) -> String { "同じキーの行があるため使われません: \(winners)" }
         static func partlyHidden(states: String, by winners: String) -> String { "\(states)では次の行を使います: \(winners)" }
-        static let plainCharacter = "修飾キーの無い文字のキーです。この状態ではその文字を入力できなくなります"
-        static func duplicateWarning(_ row: String) -> String { "同じキーの行があります: \(row)。追加した行を使います" }
+        static let plainCharacter = "この状態ではこの文字を入力できなくなります"
+        static func duplicateWarning(_ row: String) -> String { "同じキーの行より優先します: \(row)" }
         static func missing(state: String, command: String) -> String { "\(state)に「\(command)」のキーがありません" }
-        static let missingNote = "キーが無いと、入力を確定したり取り消したりできなくなります。"
+        static let addStandardKeys = "既定のキーを追加"
 
         /// 行を 1 行の文にする(警告の中で行を示す)
         static func describe(_ entry: KeymapEntry) -> String {
@@ -681,9 +684,9 @@ enum UIStrings {
         static let numberFormRoman = "ローマ数字"
         static let learning = "学習"
         static let zenzaiModel = "Zenzai のモデル"
-        static let zenzaiModelNote = "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。"
-        static let candidateReranking = "Zenzai による候補の並べ替え"
-        static let candidateRerankingNote = "変換の候補の 2 番目以降を、Zenzai で前後の文に合う順に並べ替えます。第 1 候補は変わりません。"
+        /// 併用を選んだときに出す，入力中と変換で使うモデル
+        static let zenzaiCombinedNote = "入力中: 速さを優先 / 変換: 精度を優先"
+        static let candidateReranking = "2 番目以降の候補を Zenzai で並べ替え"
         static let resetLearning = "学習結果を消去"
         static let reading = "読み"
         static let word = "単語"
@@ -865,10 +868,10 @@ enum UIStrings {
     enum Choice {
         static let inputStyle = "入力方式"
         static let keyboardLayout = "キー配列"
-        static let keyboardLayoutNote = "ローマ字入力と英字入力で使用します。"
         static let englishInputLiveConversion = "英字入力のライブ変換"
-        static let englishInputLiveConversionNote = "英語の辞書にない単語をローマ字として読み、日本語に変換して表示します。Esc で英字に戻せます。"
-        static let englishAutoNote = "英語で入力しながら、日本語にできる語句を自動で日本語に変換します。判別方法は「英語と日本語」で変更できます。"
+        /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)
+        static let englishInputLiveConversionExample = DefaultSettings.englishInputLiveConversionExample
+        static let englishAutoExample = DefaultSettings.englishAutoExample
 
         static func label(for style: InputStyle) -> String {
             switch style {
@@ -994,8 +997,8 @@ enum UIStrings {
         static let noKey = "なし"
         static let clearHistory = "使った文字の記録を消去"
         static let clearHistoryQuestion = "使った文字の記録を消去しますか？"
-        static let clearHistoryNote = "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。"
-        static let themeNote = "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。"
+        static let clearHistoryNote = "ピン留めと肌の色は残ります"
+        static let openKeys = "キー設定を開く"
         static func cellSizeValue(_ size: Int) -> String { "\(cellSize)：\(size) pt" }
     }
 
@@ -1104,11 +1107,11 @@ enum UIStrings {
         static let listCandidates = "一覧の候補数"
         static let gridColumns = "表の列数"
         static let expandsGridOnPaging = "候補を送り続けたら表に広げる"
-        static let gridColumnsNote = "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。"
+        /// 表に広げたときの大きさ(一覧の候補数の行 × 列数)
+        static func gridSize(rows: Int, columns: Int) -> String { "\(rows) 行 × \(columns) 列" }
         static let contextualSegmentCandidates = "前後の文脈で候補を並べ替え"
-        static let contextualSegmentCandidatesNote = "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。"
         static let listSegmentAlternatives = "一覧に文節を入れ替えた候補を表示"
-        static let listSegmentAlternativesNote = "一覧で、文節を 1 か所だけほかの候補に替えた文を、迷う文節から順に表示します。"
+        static let listSegmentAlternativesExample = DefaultSettings.listSegmentAlternativesExample
         static let liveConversionDelay = "漢字にするまでの待ち時間"
         static let liveConversionSkipLength = "ライブ変換しない文字数"
         static let englishSkipLength = "英単語にしない文字数"
@@ -1188,7 +1191,7 @@ enum UIStrings {
             case .correction: correction
             }
             let ground = pair == .selectionText ? selection : surface
-            return String(format: "%@と%@の色が近く、読みにくくなっています。コントラスト比は %.1f で、%.1f 以上が目安です。", name, ground, ratio, pair.minimum)
+            return String(format: "%@と%@ %.1f : 1(目安 %.1f : 1 以上)", name, ground, ratio, pair.minimum)
         }
 
         static func label(for style: CustomTheme.BranchStyle) -> String {

@@ -140,7 +140,8 @@ def rust_table(text: str, name: str) -> dict[str, str]:
     if start < 0:
         return {}
     end = text.find("];", start)
-    return dict(re.findall(rf'\("(\w+)", {STRING}\)', text[start:end]))
+    # rustfmt は短い組を 1 行に，長い組を 1 項目 1 行に書く．どちらも読む
+    return dict(re.findall(rf'\(\s*"(\w+)",\s*{STRING},?\s*\)', text[start:end]))
 
 
 TEMPLATE_KINDS = {"syntax": "Syntax", "filter": "Filter", "formatSymbol": "FormatSymbol"}

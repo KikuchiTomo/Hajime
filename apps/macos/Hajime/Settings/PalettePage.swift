@@ -7,6 +7,8 @@ import SwiftUI
 /// 説明と説明に出す項目・よく使う文字の行数)を決める．見た目はテーマに合わせた見本をその場で描く
 struct PalettePage: View {
     @ObservedObject var model: SettingsModel
+    /// 開くキーを変えるときにキー設定のページへ移る(設定の画面の外で描くときは無い)
+    @Environment(SettingsNavigation.self) private var navigation: SettingsNavigation?
     /// 動かしているあいだのマスの大きさ．手を離したときに保存し，1 段ごとに設定のファイルを書き直さない
     @State private var cellSize: Double?
     /// 使った文字の記録を消してよいかを尋ねているか
@@ -25,6 +27,9 @@ struct PalettePage: View {
                     LabeledContent(UIStrings.Palette.emojiKey, value: keys(for: .emojiPalette))
                     LabeledContent(UIStrings.Palette.symbolKey, value: keys(for: .symbolPalette))
                     LabeledContent(UIStrings.Palette.kaomojiKey, value: keys(for: .kaomojiPalette))
+                    if let navigation {
+                        Button(UIStrings.Palette.openKeys) { navigation.page = .keys }
+                    }
                     ResettableToggle(model: model, title: UIStrings.Palette.closesAfterInsert, keyPath: \.paletteClosesAfterInsert)
                     ResettableToggle(model: model, title: UIStrings.Palette.recordsHistory, keyPath: \.paletteRecordsHistory)
                     if let clear = model.clearPaletteHistory {
@@ -64,7 +69,6 @@ struct PalettePage: View {
                     ResettableToggle(model: model, title: UIStrings.Palette.showsCodePoints, keyPath: \.paletteShowsCodePoints)
                 }
                 .disabled(!model.settings.paletteShowsPreview)
-                Text(UIStrings.Palette.themeNote).font(.callout).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

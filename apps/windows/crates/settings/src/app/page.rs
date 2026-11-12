@@ -790,6 +790,10 @@ impl RowState {
             Control::Stepper(RangeKind::EmojiCandidatePosition) => {
                 settings::emoji_candidate_position(value)
             }
+            // 表に広げたときの大きさ(一覧の候補数の行 × 列数．行の数は値を映すときに text に入れておく)
+            Control::Stepper(RangeKind::CandidateGridColumns) => {
+                more::grid_size(self.text.parse().unwrap_or(0.0), value)
+            }
             Control::Seconds(_) => more::seconds(value),
             _ => format!("{value}"),
         }
@@ -1947,6 +1951,13 @@ impl PageView {
                         .and_then(Value::as_f64)
                         .unwrap_or(0.0);
                     row.choice = Some(options::nearest(&row.numbers, value));
+                    if row.row.control == Control::Stepper(RangeKind::CandidateGridColumns) {
+                        let rows = values
+                            .value("listCandidatesPerPage")
+                            .and_then(Value::as_f64)
+                            .unwrap_or(0.0);
+                        row.text = format!("{rows}");
+                    }
                 }
                 Control::ThemeOption(value) => {
                     // カスタムテーマを使っているときは，既成のテーマのどれも選ばない(macOS と同じ)

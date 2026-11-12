@@ -863,8 +863,17 @@ impl App {
         let now = self.now();
         if let Some(model) = &self.model {
             if self.view.page == Page::Keys {
-                (self.extras.keymap_report, self.extras.keymap_issues) =
-                    super::actions::keymap_report(model);
+                let missing;
+                (
+                    self.extras.keymap_report,
+                    self.extras.keymap_issues,
+                    missing,
+                ) = super::actions::keymap_report(model);
+                // キーの無い確定・取り消しがあれば，標準の表のキーを足すボタンを出す
+                self.view_values.insert(
+                    pages::KEYMAP_MISSING.to_string(),
+                    serde_json::Value::Bool(missing),
+                );
                 self.extras.keymap_preset = super::actions::matching_preset(model);
             }
             // 書き方のチップは今の値を添える．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)

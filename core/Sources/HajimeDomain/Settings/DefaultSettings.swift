@@ -600,6 +600,12 @@ public enum DefaultSettings {
     /// 前が日本語なら英字の語も日本語にする
     public static let usesContextExample = (reading: "試合に make", candidate: "試合に負け")
     public static let englishTermCandidatesExample = (reading: "api", candidate: "API")
+    /// 英字入力で，英語の辞書に無くローマ字として読める語を日本語にして見せる
+    public static let englishInputLiveConversionExample = (reading: "kyouha", candidate: "今日は")
+    /// 英字入力(自動)で，日本語として読める語だけを日本語にし，英単語はそのまま残す(打った文と確定した文)
+    public static let englishAutoExample = (reading: "zoom dekaigi", candidate: "zoom で会議")
+    /// 一覧に，第 1 候補の文(reading)の文節を 1 か所だけ替えた文(candidate)を出す
+    public static let listSegmentAlternativesExample = (reading: "資料を送る", candidate: "資料を贈る")
     /// 英語の語を，読み全体がふつうの日本語の語になるとき(「そら」→ 空)に出す位置．第 1 候補は日本語のままにする
     public static let englishTermCandidateOffset = 1
     /// 動的なユーザー辞書の語(TextTemplate)を置き換えた文字列の長さの上限
