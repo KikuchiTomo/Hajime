@@ -62,12 +62,14 @@ public struct Candidate: Sendable, Equatable {
         public var isFunctionWord: Bool
         /// 一般名詞の語か(「家」「花」．代名詞・副詞にもなる名詞・固有名詞は含まない)．左の文脈の無い 1 語の第 1 候補を決めるのに使う(ContextlessNoun)
         public var isCommonNoun: Bool
+        /// 読みが促音で終わる語か(数の「いっ」「はっ」「じゅっ」)．数のあとに助数詞でない語が続く崩れた候補(8精子)を見分けるのに使う
+        public var endsWithSokuon: Bool
 
         public init(
             text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false,
             startsWithNoun: Bool = false, startsWithPredicate: Bool = false,
             startsWithConjunctiveParticle: Bool = false, endsWithSentenceFinalParticle: Bool = false, isFunctionWord: Bool = false,
-            isCommonNoun: Bool = false
+            isCommonNoun: Bool = false, endsWithSokuon: Bool = false
         ) {
             self.text = text
             self.readingCount = readingCount
@@ -79,6 +81,7 @@ public struct Candidate: Sendable, Equatable {
             self.endsWithSentenceFinalParticle = endsWithSentenceFinalParticle
             self.isFunctionWord = isFunctionWord
             self.isCommonNoun = isCommonNoun
+            self.endsWithSokuon = endsWithSokuon
         }
     }
 

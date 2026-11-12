@@ -9,6 +9,17 @@ struct BrokenSpellingsTests {
                   words: words.map { Candidate.Word(text: $0, readingCount: 1) })
     }
 
+    /// 読みの分かる語．reading の終わりの促音を印にする
+    private static func word(_ text: String, reading: String) -> Candidate.Word {
+        Candidate.Word(text: text, readingCount: reading.count, endsWithSokuon: reading.hasSuffix("っ"))
+    }
+
+    /// 読みの分かる語をつないだエンジンの候補
+    private static func engine(_ words: [(text: String, reading: String)]) -> Candidate {
+        Candidate(text: words.map(\.text).joined(), readingCount: words.reduce(0) { $0 + $1.reading.count }, origin: .engine(id: 0),
+                  words: words.map { word($0.text, reading: $0.reading) })
+    }
+
     /// 語の区切りの分からない，語をつないだ候補
     private static func combined(_ text: String, readingCount: Int = 5) -> Candidate {
         Candidate(text: text, readingCount: readingCount, origin: .combined)
@@ -84,7 +95,7 @@ struct BrokenSpellingsTests {
     }
 
     @Test("拍の途中の字種の切り替え・小さいかなの位置・1 文字のカタカナを除く対象にする", arguments: [
-        "ねェ", "シゃ", "ザッしを", "アッさり", "さボッた", "自ャ", "打ァ", "非ゃっぽ", "良ッた",
+        "とゥ", "しェ", "ねェさん", "シゃ", "ザッしを", "アッさり", "さボッた", "自ャ", "打ァ", "非ゃっぽ", "良ッた",
         "出発スる", "コの", "雑誌ヲ", "コども", "呼ぶヨ", "ホんがある", "8歳ノ", "えンピつを",
     ])
     func scriptBreaks(text: String) {
@@ -97,5 +108,48 @@ struct BrokenSpellingsTests {
     ])
     func keepsOrdinaryText(text: String) {
         #expect(!BrokenSpellings.isBroken(Self.combined(text)))
+    }
+
+    @Test("語末で前のかなの母音を伸ばす小さいカタカナは，伸ばす書き方として除かない", arguments: [
+        "だよォ", "大丈夫だよォ", "どうしてるかなァ", "ねェ", "じゃァ", "さァ", "だァ", "そうだねェ！", "すごいィ",
+    ])
+    func keepsElongation(text: String) {
+        #expect(!BrokenSpellings.isBroken(Self.combined(text)))
+    }
+
+    @Test("読みが促音で終わる数のすぐ後に，助数詞でない漢字の語が続く候補を除く対象にする", arguments: [
+        [("8", "はっ"), ("精子", "せいし")], [("8", "はっ"), ("生", "せい")], [("1", "いっ"), ("緒", "しょ"), ("に", "に")],
+        [("10", "じゅっ"), ("先", "せん")], [("６", "ろっ"), ("子", "こ")], [("6", "ろっ"), ("日", "ぴ"), ("機", "き")],
+    ])
+    func brokenNumbers(words: [(String, String)]) {
+        #expect(BrokenSpellings.isBroken(Self.engine(words.map { (text: $0.0, reading: $0.1) })))
+    }
+
+    @Test("助数詞・読みが促音で終わらない数・漢字でない語は除かない", arguments: [
+        [("8", "はっ"), ("本", "ほん")], [("1", "いっ"), ("分", "ぷん")], [("6", "ろっ"), ("匹", "ぴき")], [("10", "じゅっ"), ("回", "かい")],
+        [("8", "はっ"), ("千", "せん")], [("1", "いっ"), ("体", "たい")], [("1", "いっ"), ("頁", "ぺーじ")], [("8", "はっ"), ("世", "せい")],
+        [("第", "だい"), ("2", "に"), ("子", "し")], [("中", "ちゅう"), ("2", "に")], [("8", "はち"), ("精子", "せいし")],
+        [("8", "はっ"), ("せいし", "せいし")], [("一", "いっ"), ("緒", "しょ")],
+    ])
+    func keepsNumbers(words: [(String, String)]) {
+        #expect(!BrokenSpellings.isBroken(Self.engine(words.map { (text: $0.0, reading: $0.1) })))
+    }
+
+    @Test("語をつないだ候補も，元の語の並びで数のあとの語を見る")
+    func numbersInCombinedCandidates() {
+        let number = Self.engine([(text: "8", reading: "はっ")])
+        // 文節を替えた文(8｜精子た)．どの文節も語の並びが分かる
+        var substituted = Self.combined("8精子た", readingCount: 6)
+        substituted.learnedParts = [number, Self.engine([(text: "精子", reading: "せいし"), (text: "た", reading: "た")])]
+        #expect(BrokenSpellings.isBroken(substituted))
+        // 先頭の語を選び直した候補(8 に 精子 をつないだもの)．残りの語の読みは分からないので，字だけで助数詞かを見る
+        var headWord = Self.combined("8精子", readingCount: 5)
+        headWord.learnedParts = [number]
+        #expect(BrokenSpellings.isBroken(headWord))
+        var counter = Self.combined("8本の", readingCount: 4)
+        counter.learnedParts = [number]
+        #expect(!BrokenSpellings.isBroken(counter))
+        // 語の並びが分からない候補は見ない
+        #expect(!BrokenSpellings.isBroken(Self.combined("8精子")))
     }
 }
