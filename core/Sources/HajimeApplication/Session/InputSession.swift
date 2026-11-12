@@ -2968,7 +2968,7 @@ public final class InputSession {
             return commitAll()
         case (.selecting, .comment(let index)):
             // 一覧の行を選び，その候補をコメントに置き換えて確定する
-            guard selectByNumber(index + 1), case .selecting(var selection) = phase, case .candidate(let focused) = selection.focus,
+            guard selectByNumber(index + 1, perPage: listPerPage), case .selecting(var selection) = phase, case .candidate(let focused) = selection.focus,
                   let replaced = Self.commentCandidate(for: selection.candidates[focused], prefix: selection.shownPrefix) else { return [] }
             selection.candidates[focused] = replaced
             phase = .selecting(selection)
@@ -2978,6 +2978,7 @@ public final class InputSession {
             guard lattice.select(number: index + 1, perPage: latticePerPage), case .candidate(let chosen) = lattice.focused.choice,
                   let replaced = Self.commentCandidate(for: lattice.focused.selected, prefix: "") else { return [] }
             lattice.segments[lattice.focusedIndex].candidates[chosen] = replaced
+            expandedCandidates = false
             return advance(after: lattice, context: context)
         default:
             return []

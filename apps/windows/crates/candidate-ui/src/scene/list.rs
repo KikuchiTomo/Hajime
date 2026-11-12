@@ -346,8 +346,16 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         }
     }
     for (index, entry) in list.entries.iter().enumerate() {
-<<<<<<< HEAD
-        let row = Frame::new(content.x, y, list_width, metrics.row_height);
+        // 表では上から下へ詰め，列を左から右へ並べる
+        let row = match grid {
+            Some(length) => Frame::new(
+                content.x + (index / length) as f32 * (cell_width + candidate::FRAME_WIDTH),
+                entries_top + (index % length) as f32 * metrics.row_height,
+                cell_width,
+                metrics.row_height,
+            ),
+            None => Frame::new(content.x, y, list_width, metrics.row_height),
+        };
         // コメントの札は行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
         // 札を押すと候補の代わりにコメントを入れる
         if let Some(comment) = super::entry_comment(entry) {
@@ -359,18 +367,6 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 },
             );
         }
-=======
-        // 表では上から下へ詰め，列を左から右へ並べる
-        let row = match grid {
-            Some(length) => Frame::new(
-                content.x + (index / length) as f32 * (cell_width + candidate::FRAME_WIDTH),
-                entries_top + (index % length) as f32 * metrics.row_height,
-                cell_width,
-                metrics.row_height,
-            ),
-            None => Frame::new(content.x, y, list_width, metrics.row_height),
-        };
->>>>>>> 42fc064d (feat(core): 変換中の候補を表に広げて一度に多く見せる「候補を表に広げる」を足す)
         painter.hit(
             row,
             ipc::PointerTarget::Entry {
@@ -719,6 +715,7 @@ mod tests {
                 corrected_start: None,
                 corrected_length: None,
                 command: None,
+                has_comment: None,
             })
             .collect();
         list.column_length = Some(9);
