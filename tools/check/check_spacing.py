@@ -5,7 +5,8 @@
 - size.space の段階は 2・4・8・12・16・24 だけ．役割(fine〜page)は段階を参照し，近さの順を守る
 - size.text と size.part の値が $extensions.hajime.formula の式と一致する(部品の高さは式で決める)
 - 画面のトークンの余白(名前に padding・gap・inset・margin・indent・spacing を含むもの)は，
-  役割(size.space.<役割>)か部品(size.part)を参照する．段階の名前や数値を直接書かない．値は段階に載る
+  役割(size.space.<役割>)か部品(size.part)を参照する．段階の名前や数値を直接書かない．
+  部品の値(アイコンの箱の余白 3 など)は部品の決まりで決めるので，段階に載らなくてよい
 
 描画のコード(CODE_DIRS)
 - 余白に数値を書かない(.padding(8)，spacing: 6，insetBy(dx: 0, dy: 2)，rect.minX + 4，x + 8.0 など)
@@ -224,7 +225,7 @@ def check_tokens(raw: dict) -> list[str]:
                 section_errors.append(f"size.{key}: 段階の名前({target})を参照している．役割を参照する")
             elif parts[:2] not in (["size", "space"], ["size", "part"]):
                 section_errors.append(f"size.{key}: {target} を参照している．size.space の役割か size.part を参照する")
-            elif flat[f"size.{key}"] not in SCALE.values():
+            elif parts[:2] == ["size", "space"] and flat[f"size.{key}"] not in SCALE.values():
                 section_errors.append(f"size.{key}: 値 {flat[f'size.{key}']:g} が段階にありません")
         if section in PENDING_SECTIONS:
             if section_errors:

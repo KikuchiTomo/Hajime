@@ -30,7 +30,7 @@ public enum LayoutTokens {
     }
     public enum Part {
         public static let windowRadius: Double = 12
-        public static let cardRadius: Double = 8
+        public static let cardRadius: Double = 12
         public static let rowHeight: Double = 28
         public static let rowPaddingX: Double = 4
         public static let rowRadius: Double = 8
@@ -45,6 +45,7 @@ public enum LayoutTokens {
         public static let tagRadius: Double = 4
         public static let badgeSize: Double = 16
         public static let iconSize: Double = 16
+        public static let iconPadding: Double = 3
         public static let iconRadius: Double = 4
         public static let stroke: Double = 1
     }
@@ -258,7 +259,7 @@ public enum LayoutTokens {
         public static let detailFontSize: Double = 11
         public static let codeFontSize: Double = 10
         public static let previewChipSmallFontSize: Double = 8
-        public static let skinButtonPadding: Double = 2
+        public static let skinButtonPadding: Double = 3
         public static let pickerCellSize: Double = 36
         public static let cellPadding: Double = 4
         public static let probeFontSize: Double = 20
