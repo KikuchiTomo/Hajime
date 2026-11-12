@@ -242,6 +242,8 @@ enum AppIdentity {
     static let directModeKey = "com.apple.inputmethod.Roman"
     /// Contents/Helpers に入れた更新用のアプリの名前(apps/macos/project.yml の HajimeUpdater の PRODUCT_NAME)
     static let updaterName = "Hajime IME Updater"
+    /// Contents/Helpers に入れた，入力ソースの登録を直す補助のアプリの名前(apps/macos/project.yml の HajimeInputSourceHelper の PRODUCT_NAME)
+    static let inputSourceHelperName = "Hajime IME Input Source Helper"
 
     static var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
