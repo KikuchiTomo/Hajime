@@ -87,16 +87,19 @@ enum Shot {
     DynamicOff,
     /// 辞書のファイルを取り込む前に中身を見せるシート(名詞にする行と読めない行を含む見本のファイル)
     ImportPreview,
+    /// キー設定の表から確定の行を消した(キーの無い知らせと「既定のキーを追加」)
+    MissingKeys,
 }
 
 impl Shot {
     /// ふつうの 1 枚のほかに写すページと状態
-    const TEMPLATES: [(Page, Shot); 5] = [
+    const TEMPLATES: [(Page, Shot); 6] = [
         (Page::Dictionary, Shot::Open),
         (Page::Dictionary, Shot::Typing),
         (Page::Dictionary, Shot::DynamicOff),
         (Page::Commands, Shot::Open),
         (Page::Dictionary, Shot::ImportPreview),
+        (Page::Keys, Shot::MissingKeys),
     ];
 
     fn suffix(self) -> &'static str {
@@ -106,6 +109,7 @@ impl Shot {
             Shot::Typing => "-templates-typing",
             Shot::DynamicOff => "-templates-off",
             Shot::ImportPreview => "-import-preview",
+            Shot::MissingKeys => "-missing-keys",
         }
     }
 }
@@ -2381,6 +2385,17 @@ impl App {
 
     fn accessibility_act(&mut self, id: i32, act: uia::Act) {
         if self.import_sheet.is_some() {
+            // 表の行: フォーカス・選ぶは，その行を選んで表にフォーカスを置く
+            if let Some(sheet) = self.import_sheet.as_mut() {
+                let count = sheet.rows().len();
+                if let Some(row) = (0..count).find(|row| import_row_node(*row) == id) {
+                    sheet.focus = ImportPart::Table;
+                    sheet.cursor = row;
+                    self.import_focus_changed();
+                    ffi::invalidate(self.window);
+                    return;
+                }
+            }
             if let Some(part) = self.import_sheet_layout().and_then(|layout| {
                 layout
                     .order()
@@ -2891,18 +2906,37 @@ impl App {
             return;
         };
         // 書き方のチップ: 開いているか(閉じた状態はふつうの 1 枚)と，「入力時の値にする」のオン・オフ
-        self.templates_open =
-            if matches!(shot, Shot::Plain | Shot::DynamicOff | Shot::ImportPreview) {
-                std::collections::HashSet::new()
-            } else {
-                [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
-            };
+        self.templates_open = if matches!(
+            shot,
+            Shot::Plain | Shot::DynamicOff | Shot::ImportPreview | Shot::MissingKeys
+        ) {
+            std::collections::HashSet::new()
+        } else {
+            [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
+        };
         if page == Page::Dictionary {
             if let Some(model) = &mut self.model {
                 let _ = model.set(
                     "dynamicDictionary",
                     serde_json::Value::Bool(shot != Shot::DynamicOff),
                 );
+            }
+        }
+        // キーの無い知らせ: キー設定の表から確定の行を消して写し，写したら元の表に戻す
+        let mut restored_keymap = None;
+        if shot == Shot::MissingKeys {
+            if let Some(model) = &mut self.model {
+                if let Some(keymap) = model.value("keymap").cloned() {
+                    let without_commit: Vec<serde_json::Value> = keymap
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|row| row["command"] != "commit")
+                        .cloned()
+                        .collect();
+                    let _ = model.set("keymap", serde_json::Value::Array(without_commit));
+                    restored_keymap = Some(keymap);
+                }
             }
         }
         self.forced_theme = Some(if dark {
@@ -2998,6 +3032,9 @@ impl App {
         self.import_sheet = None;
         if let Err(error) = written {
             eprintln!("{name} を書き出せませんでした: {error}");
+        }
+        if let (Some(keymap), Some(model)) = (restored_keymap, &mut self.model) {
+            let _ = model.set("keymap", keymap);
         }
         self.snapshots = Some((directory, jobs));
         ffi::post(self.window, WM_SNAPSHOT, 0, 0);
@@ -3175,39 +3212,50 @@ impl App {
         };
         sheet.focus_visible = true;
         let focus = sheet.focus;
-        let order = layout.order();
-        let row = size::TABLE_ROW_HEIGHT;
+        // 切り替えはまとまりで 1 回だけ止まる(選んでいるところ)
+        let order = sheet.tab_order(&layout);
+        let viewport = layout.body.height;
+        let page = ((viewport / size::TABLE_ROW_HEIGHT) as isize - 1).max(1);
         match key {
             k if k == VK_TAB.0 => {
-                let index = order.iter().position(|part| *part == focus).unwrap_or(0);
+                let index = order
+                    .iter()
+                    .position(|part| {
+                        *part == focus
+                            || matches!(
+                                (part, focus),
+                                (ImportPart::Filter(_), ImportPart::Filter(_))
+                            )
+                    })
+                    .unwrap_or(0);
                 let next = if shift {
                     (index + order.len() - 1) % order.len()
                 } else {
                     (index + 1) % order.len()
                 };
                 sheet.focus = order[next];
+                self.import_focus_changed();
             }
             k if k == VK_ESCAPE.0 => {
                 self.close_import_sheet();
             }
-            k if focus == ImportPart::Table && (k == VK_UP.0 || k == VK_DOWN.0) => {
-                sheet
-                    .scroll
-                    .scroll_by(if k == VK_UP.0 { -row } else { row }, now);
-            }
-            k if focus == ImportPart::Table && (k == VK_PRIOR.0 || k == VK_NEXT.0) => {
-                let page = layout.body.height - row;
-                sheet
-                    .scroll
-                    .scroll_by(if k == VK_PRIOR.0 { -page } else { page }, now);
-            }
-            k if focus == ImportPart::Table && (k == VK_HOME.0 || k == VK_END.0) => {
-                let target = if k == VK_HOME.0 {
-                    0.0
-                } else {
-                    sheet.scroll.max()
+            // 表は行を選んで移る(はみ出すときは送る)
+            k if focus == ImportPart::Table
+                && [
+                    VK_UP.0, VK_DOWN.0, VK_PRIOR.0, VK_NEXT.0, VK_HOME.0, VK_END.0,
+                ]
+                .contains(&k) =>
+            {
+                let delta = match k {
+                    k if k == VK_UP.0 => -1,
+                    k if k == VK_DOWN.0 => 1,
+                    k if k == VK_PRIOR.0 => -page,
+                    k if k == VK_NEXT.0 => page,
+                    k if k == VK_HOME.0 => isize::MIN / 2,
+                    _ => isize::MAX / 2,
                 };
-                sheet.scroll.scroll_to(target, now);
+                sheet.move_cursor(delta, viewport, now);
+                self.import_focus_changed();
             }
             k if matches!(focus, ImportPart::Filter(_)) && (k == VK_LEFT.0 || k == VK_RIGHT.0) => {
                 let ImportPart::Filter(index) = focus else {
@@ -3221,6 +3269,7 @@ impl App {
                 };
                 sheet.focus = ImportPart::Filter(next);
                 self.import_press(ImportPart::Filter(next));
+                self.import_focus_changed();
             }
             // Enter はキャンセルにフォーカスがあればキャンセル，ほかは取り込む(ContentDialog の既定のボタン)
             k if k == VK_RETURN.0 => {
@@ -3252,19 +3301,40 @@ impl App {
     }
 
     fn import_mouse_down(&mut self, x: f32, y: f32) {
-        let hit = self
-            .import_sheet_layout()
-            .and_then(|layout| layout.hit(x, y));
-        let Some(part) = hit else {
+        let now = self.now();
+        let Some(layout) = self.import_sheet_layout() else {
+            return;
+        };
+        let Some(part) = layout.hit(x, y) else {
             return;
         };
         if let Some(sheet) = self.import_sheet.as_mut() {
             sheet.focus_visible = false;
             sheet.pressed = Some(part);
             sheet.focus = part;
+            // 表の行を押したら，その行を選ぶ
+            if part == ImportPart::Table {
+                if let Some(row) = sheet.row_at(&layout, y, now) {
+                    sheet.cursor = row;
+                }
+            }
         }
+        self.import_focus_changed();
         ffi::capture(self.window);
         ffi::invalidate(self.window);
+    }
+
+    /// シートのフォーカスが移ったことを読み上げに知らせる(表なら選んでいる行)
+    fn import_focus_changed(&self) {
+        let Some(sheet) = self.import_sheet.as_ref() else {
+            return;
+        };
+        let id = if sheet.focus == ImportPart::Table && !sheet.rows().is_empty() {
+            import_row_node(sheet.cursor)
+        } else {
+            import_node(sheet.focus)
+        };
+        uia::focus_changed(self.window, id);
     }
 
     fn import_mouse_up(&mut self, x: f32, y: f32) {
@@ -3537,38 +3607,63 @@ impl App {
         let sheet = self.import_sheet.as_ref()?;
         let layout = self.import_sheet_layout()?;
         let filters = sheet.filters();
-        Some(
-            layout
-                .parts
-                .iter()
-                .map(|(part, rect)| {
-                    let part = *part;
-                    let (role, selected) = match part {
-                        ImportPart::Filter(index) => (
-                            uia::Role::RadioButton,
-                            filters
-                                .get(index)
-                                .map(|(filter, _)| *filter == sheet.filter),
-                        ),
-                        ImportPart::Table => (uia::Role::List, None),
-                        ImportPart::Cancel | ImportPart::Import => (uia::Role::Button, None),
-                    };
-                    uia::Node {
-                        id: import_node(part),
-                        role,
-                        name: sheet.name(part),
-                        rect: self.screen_rect(*rect),
-                        enabled: sheet.enabled(part),
-                        focused: sheet.focus == part,
-                        toggled: None,
-                        expanded: None,
-                        value: None,
-                        selected,
-                        host: None,
-                    }
-                })
-                .collect(),
-        )
+        let rows = sheet.rows();
+        // 表にフォーカスがあるときは，選んでいる行がフォーカスを持つ
+        let on_row = sheet.focus == ImportPart::Table && !rows.is_empty();
+        let mut nodes: Vec<uia::Node> = layout
+            .parts
+            .iter()
+            .map(|(part, rect)| {
+                let part = *part;
+                let (role, selected) = match part {
+                    ImportPart::Filter(index) => (
+                        uia::Role::RadioButton,
+                        filters
+                            .get(index)
+                            .map(|(filter, _)| *filter == sheet.filter),
+                    ),
+                    ImportPart::Table => (uia::Role::List, None),
+                    ImportPart::Cancel | ImportPart::Import => (uia::Role::Button, None),
+                };
+                uia::Node {
+                    id: import_node(part),
+                    role,
+                    name: sheet.name(part),
+                    rect: self.screen_rect(*rect),
+                    enabled: sheet.enabled(part),
+                    focused: sheet.focus == part && !on_row,
+                    toggled: None,
+                    expanded: None,
+                    value: None,
+                    selected,
+                    host: None,
+                }
+            })
+            .collect();
+        // 表の行(列の値と，名詞にする・取り込まない意味を名前に含める)．送って見えていない行も入れる
+        let offset = sheet.scroll.offset(self.now());
+        nodes.extend(rows.iter().enumerate().map(|(index, row)| {
+            let top = layout.body.y + index as f32 * size::TABLE_ROW_HEIGHT - offset;
+            uia::Node {
+                id: import_row_node(index),
+                role: uia::Role::ListItem,
+                name: sheet.row_name(row),
+                rect: self.screen_rect(Rect::new(
+                    layout.body.x,
+                    top,
+                    layout.body.width,
+                    size::TABLE_ROW_HEIGHT,
+                )),
+                enabled: true,
+                focused: on_row && index == sheet.cursor,
+                toggled: None,
+                expanded: None,
+                value: None,
+                selected: Some(index == sheet.cursor),
+                host: None,
+            }
+        }));
+        Some(nodes)
     }
 
     fn sheet_nodes(&self) -> Option<Vec<uia::Node>> {
@@ -3638,6 +3733,11 @@ fn import_node(part: ImportPart) -> i32 {
         ImportPart::Cancel => NODE_IMPORT + 1,
         ImportPart::Import => NODE_IMPORT + 2,
     }
+}
+
+/// 取り込む前のシートの表の行の読み上げの番号
+fn import_row_node(row: usize) -> i32 {
+    NODE_IMPORT_ROW + i32::try_from(row).unwrap_or(0)
 }
 
 /// シートの部品の読み上げの番号
@@ -4085,9 +4185,10 @@ fn theme_sheet_index(action: EditorAction) -> i32 {
 const NODE_SEARCH: i32 = 900;
 /// シートの部品の読み上げの番号の始まり
 const NODE_SHEET: i32 = 800;
-/// 取り込む前に中身を見せるシートの部品の読み上げの番号(切り替えは NODE_IMPORT_FILTER から)
+/// 取り込む前に中身を見せるシートの部品の読み上げの番号(切り替えは NODE_IMPORT_FILTER から，表の行は NODE_IMPORT_ROW から)
 const NODE_IMPORT: i32 = 850;
 const NODE_IMPORT_FILTER: i32 = 860;
+const NODE_IMPORT_ROW: i32 = 100_000;
 /// シートの動作の一覧を開いているときのドロップダウンの持ち主(ページの部品と重ならない番号)
 const SHEET_KIND: Element = Element {
     row: usize::MAX,

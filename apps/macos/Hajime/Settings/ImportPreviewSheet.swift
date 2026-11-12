@@ -68,6 +68,11 @@ struct ImportPreviewSheet: View {
 
     private enum Filter: Hashable { case all, defaulted, unreadable }
     @State private var filter = Filter.all
+    /// 表で選んでいる行(shownRows の番号)．開いたときは選ばず，表で ↑↓ を押すか行を押すと選ぶ．表にフォーカスがあるとき色を付ける
+    @State private var selection: Int?
+    @FocusState private var tableFocused: Bool
+    /// VoiceOver の読む行を選んだ行に合わせる
+    @AccessibilityFocusState private var spokenRow: Int?
 
     private typealias Space = DesignTokens.Size.Space
     private typealias Part = DesignTokens.Size.Part
@@ -136,29 +141,102 @@ struct ImportPreviewSheet: View {
         .frame(width: Size.importPreviewWidth)
     }
 
-    /// 見出しと行．行は表の中で送る(多いファイルでも見せる行は上限まで)
+    /// 見出しと行．行は表の中で送る(多いファイルでも見せる行は上限まで)．
+    /// 表は Tab で止まり，↑↓・Page Up/Down・Home/End で行を選ぶ．見出しは送る部分の外に置き，選んだ行を隠さない
     private var table: some View {
         let widths = columnWidths
-        return ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-                Section {
-                    ForEach(Array(shownRows.enumerated()), id: \.offset) { index, row in
-                        rowView(row, widths)
-                            .background(index % 2 == 1 ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear))
+        let rows = shownRows
+        // キーはフォーカスのある表の外枠が受ける(中の ScrollView ではなく)
+        return ScrollViewReader { proxy in
+            VStack(spacing: 0) {
+                header(widths)
+                Divider()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                            let selected = tableFocused && index == selection
+                            rowView(row, widths, selected: selected)
+                                .background(rowBackground(index, selected: selected))
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selection = index
+                                    tableFocused = true
+                                }
+                                .id(index)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(rowLabel(row))
+                                .accessibilityAddTraits(index == selection ? [.isStaticText, .isSelected] : .isStaticText)
+                                .accessibilityFocused($spokenRow, equals: index)
+                        }
                     }
-                } header: {
-                    VStack(spacing: 0) {
-                        header(widths)
-                        Divider()
-                    }
-                    .background(.background)
                 }
             }
+            .frame(height: Size.importPreviewTableHeight)
+            .background(.background, in: RoundedRectangle(cornerRadius: Part.fieldRadius))
+            .overlay(RoundedRectangle(cornerRadius: Part.fieldRadius).strokeBorder(.separator))
+            .clipShape(RoundedRectangle(cornerRadius: Part.fieldRadius))
+            // フォーカスの輪は表の角の丸みに沿わせる
+            .contentShape(.focusEffect, RoundedRectangle(cornerRadius: Part.fieldRadius))
+            .focusable()
+            .focused($tableFocused)
+            .onMoveCommand { direction in
+                // まだ選んでいなければ，先頭の行から選ぶ
+                switch direction {
+                case .up: select(selection.map { $0 - 1 } ?? 0, in: rows.count, proxy)
+                case .down: select(selection.map { $0 + 1 } ?? 0, in: rows.count, proxy)
+                default: break
+                }
+            }
+            .onKeyPress(keys: [.pageUp, .pageDown, .home, .end]) { press in
+                let page = max(Int(Size.importPreviewTableHeight / Part.rowHeight) - 2, 1)
+                switch press.key {
+                case .pageUp: select(selection.map { $0 - page } ?? 0, in: rows.count, proxy)
+                case .pageDown: select(selection.map { $0 + page } ?? 0, in: rows.count, proxy)
+                case .home: select(0, in: rows.count, proxy)
+                default: select(rows.count - 1, in: rows.count, proxy)
+                }
+                return .handled
+            }
+            .onChange(of: filter) {
+                selection = nil
+                proxy.scrollTo(0, anchor: .top)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(pending.fileName)
         }
-        .frame(height: Size.importPreviewTableHeight)
-        .background(.background, in: RoundedRectangle(cornerRadius: Part.fieldRadius))
-        .overlay(RoundedRectangle(cornerRadius: Part.fieldRadius).strokeBorder(.separator))
-        .clipShape(RoundedRectangle(cornerRadius: Part.fieldRadius))
+    }
+
+    /// 表の行を選び(端で止める)，見えるところまで送る．VoiceOver もその行を読む
+    private func select(_ index: Int, in count: Int, _ proxy: ScrollViewProxy) {
+        guard count > 0 else { return }
+        let row = min(max(index, 0), count - 1)
+        selection = row
+        proxy.scrollTo(row)
+        spokenRow = row
+    }
+
+    /// 選んだ行はシステムの選択の色，ほかは 1 行おきに薄く敷く(表の縞)
+    private func rowBackground(_ index: Int, selected: Bool) -> AnyShapeStyle {
+        if selected { return AnyShapeStyle(Color(nsColor: .selectedContentBackgroundColor)) }
+        return index % 2 == 1 ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear)
+    }
+
+    /// 行の読み上げ(行の番号・列の値・名詞にする・取り込まない意味)
+    private func rowLabel(_ row: ImportPreview.Row) -> String {
+        var values = preview.columns.enumerated().compactMap { index, column -> String? in
+            let value = row.cells.indices.contains(index) ? row.cells[index] : ""
+            guard !value.isEmpty else { return nil }
+            if column == .wordClass, row.status != .unreadable, let wordClass = WordClass(rawValue: value) {
+                return UIStrings.Settings.label(for: wordClass)
+            }
+            return value
+        }
+        switch row.status {
+        case .defaultedWordClass: values.append(Strings.defaultedHelp)
+        case .unreadable: values.append(Strings.unreadableHelp)
+        case .ok: break
+        }
+        return Strings.row(line: row.line, values: values)
     }
 
     private func header(_ widths: [CGFloat]) -> some View {
@@ -174,33 +252,36 @@ struct ImportPreviewSheet: View {
         .frame(height: Part.rowHeight)
     }
 
-    private func rowView(_ row: ImportPreview.Row, _ widths: [CGFloat]) -> some View {
+    /// 行．選んだ行は文字をすべて選択の上の色にする(表の作法．注意の色も選択の色に揃える)
+    private func rowView(_ row: ImportPreview.Row, _ widths: [CGFloat], selected: Bool) -> some View {
         let unreadable = row.status == .unreadable
+        let onSelection = AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
+        let caution = selected ? onSelection : AnyShapeStyle(.orange)
         return HStack(alignment: .firstTextBaseline, spacing: Space.group) {
             HStack(spacing: Space.inline) {
                 if unreadable {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel(Strings.unreadable)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(caution)
                 }
-                Text(row.line.formatted()).monospacedDigit().foregroundStyle(.secondary)
+                Text(row.line.formatted()).monospacedDigit().foregroundStyle(selected ? onSelection : AnyShapeStyle(.secondary))
             }
             .frame(width: Size.importPreviewLineColumnWidth, alignment: .trailing)
             .help(unreadable ? Strings.unreadableHelp : "")
             ForEach(Array(preview.columns.enumerated()), id: \.offset) { index, column in
-                cellFrame(cell(row, column: column, value: row.cells.indices.contains(index) ? row.cells[index] : ""), width: widths[index])
+                cellFrame(cell(row, column: column, value: row.cells.indices.contains(index) ? row.cells[index] : "", caution: caution), width: widths[index])
             }
         }
-        .foregroundStyle(unreadable ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        .foregroundStyle(selected ? onSelection : unreadable ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
         .padding(.horizontal, Part.fieldPaddingX)
         .frame(height: Part.rowHeight)
     }
 
     /// 列の中身．品詞は名前にし，名詞にした行はその印を付ける
     @ViewBuilder
-    private func cell(_ row: ImportPreview.Row, column: ImportPreview.Column, value: String) -> some View {
+    private func cell(_ row: ImportPreview.Row, column: ImportPreview.Column, value: String, caution: AnyShapeStyle) -> some View {
         if column == .wordClass, row.status != .unreadable, let wordClass = WordClass(rawValue: value) {
             let label = Text(UIStrings.Settings.label(for: wordClass))
             if row.status == .defaultedWordClass {
-                label.foregroundStyle(.orange).help(Strings.defaultedHelp)
+                label.foregroundStyle(caution).help(Strings.defaultedHelp)
             } else {
                 label
             }

@@ -131,11 +131,12 @@ impl Engine for SampleEngine {
             RequestBody::ReadKeymapPreset { .. } => {
                 fields(&pick(&state.defaults, &["keymap".to_string()]))
             }
-            // 見本でも，同じ状態・同じキーの行は下の行が使われ，上の行は使われない(画面で行の印を確かめるため)
+            // 見本でも，同じ状態・同じキーの行は下の行が使われ，上の行は使われない(画面で行の印を確かめるため)．
+            // 確定・取り消しのキーが無ければ知らせる(「既定のキーを追加」を確かめるため)
             RequestBody::CheckKeymap { values } => ResponseBody::KeymapReport {
                 report: KeymapReport {
                     rows: hidden_rows(&values),
-                    missing: Vec::new(),
+                    missing: missing_essentials(&values),
                 },
             },
             RequestBody::CheckCustomTheme { theme } => ResponseBody::ThemeReport {
@@ -396,6 +397,39 @@ fn symbols(state: &mut State, kind: SymbolKind) -> &mut Vec<SymbolItem> {
 }
 
 /// 同じ状態・同じキーの行のうち，下に同じ行がある行(使われない行)
+/// 確定・取り消しのキーが無い状態とコマンド(core の Keymap.missingEssentials)．
+/// 見本なので，同じキーのほかの行に負けるかは見ず，その状態か いつでも の行があればキーがあるとみなす．
+/// 変換中の取り消しは，直前の変更の取り消しのキーがあれば足りる
+fn missing_essentials(values: &str) -> Vec<ipc::KeymapMissing> {
+    let rows = serde_json::from_str::<Fields>(values)
+        .ok()
+        .and_then(|fields| fields.get("keymap").and_then(Value::as_array).cloned())
+        .unwrap_or_default();
+    let has = |state: &str, command: &str| {
+        rows.iter().any(|row| {
+            let text = |name: &str| row.get(name).and_then(Value::as_str).unwrap_or("");
+            (text("state") == state || text("state") == "anywhere") && text("command") == command
+        })
+    };
+    let mut missing = Vec::new();
+    for state in ["composing", "converting"] {
+        for command in ["commit", "cancel"] {
+            let substitutes: &[&str] = if state == "converting" && command == "cancel" {
+                &["cancel", "undoConversionEdit"]
+            } else {
+                &[command]
+            };
+            if !substitutes.iter().any(|substitute| has(state, substitute)) {
+                missing.push(ipc::KeymapMissing {
+                    state: state.to_string(),
+                    command: command.to_string(),
+                });
+            }
+        }
+    }
+    missing
+}
+
 fn hidden_rows(values: &str) -> Vec<ipc::KeymapRowIssue> {
     let keymap: Vec<(String, String)> = serde_json::from_str::<Fields>(values)
         .ok()
@@ -514,6 +548,35 @@ mod tests {
             vec![ContrastPair::TextMuted, ContrastPair::SelectionText]
         );
         assert!(issues[0].ratio < issues[0].minimum);
+    }
+
+    #[test]
+    fn 確定と取り消しのキーが無ければ知らせる() {
+        let store = EngineStore::new(SampleEngine::new());
+        let keymap = store.read(&["keymap".to_string()], true).unwrap()["keymap"].clone();
+        let mut values = Fields::new();
+        values.insert("keymap".into(), keymap.clone());
+        assert!(store.check_keymap(&values).unwrap().missing.is_empty());
+        let without_commit: Vec<Value> = keymap
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["command"] != "commit")
+            .cloned()
+            .collect();
+        values.insert("keymap".into(), Value::Array(without_commit.clone()));
+        let missing = store.check_keymap(&values).unwrap().missing;
+        let pairs: Vec<(&str, &str)> = missing
+            .iter()
+            .map(|item| (item.state.as_str(), item.command.as_str()))
+            .collect();
+        assert_eq!(pairs, [("composing", "commit"), ("converting", "commit")]);
+        // 標準の表のキーを足すと知らせは消える(設定の画面の「既定のキーを追加」)
+        let standard = store.read_keymap_preset("standard").unwrap()["keymap"].clone();
+        let added =
+            crate::keys::with_missing(&Value::Array(without_commit), &missing, &standard).unwrap();
+        values.insert("keymap".into(), added);
+        assert!(store.check_keymap(&values).unwrap().missing.is_empty());
     }
 
     #[test]

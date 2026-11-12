@@ -28,16 +28,16 @@ struct AssociationSection: View {
         } header: {
             Text(UIStrings.Association.dictionaries)
         } footer: {
+            // 一覧についての 1 行は一覧のすぐ下に，読み込めるファイルの見本は取り込むボタンの下に置く
             VStack(alignment: .leading, spacing: DesignTokens.Size.Space.group) {
+                Text(UIStrings.Association.note).font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button(UIStrings.Association.importFile) { model.importAssociationFile() }
                         .disabled(model.isImportingDictionary || model.associations == nil)
                     if model.isImportingDictionary { ProgressView().controlSize(.small) }
                     Spacer()
                 }
-                // 読み込めるファイルの書き方は，ファイルの中身の見本で見せる
-                FileExample(lines: [UIStrings.Association.fileExample, UIStrings.Association.tabFileExample])
-                Text(UIStrings.Association.note).font(.caption).foregroundStyle(.secondary)
+                FileExample(text: UIStrings.Association.fileExample)
             }
         }
     }
@@ -70,19 +70,16 @@ private struct AssociationDictionaryRow: View {
     }
 }
 
-/// 読み込めるファイルの中身の見本．ファイルの行のまま等幅の字で並べる
+/// 読み込めるファイルの中身の見本(1 行)．ファイルの行のまま等幅の字で書く．押せない飾りなので，ホバーで色を変えない
 private struct FileExample: View {
-    let lines: [String]
+    let text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Size.Space.fine) {
-            ForEach(lines, id: \.self) { Text($0) }
-        }
-        .font(.caption.monospaced())
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
-        .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
-        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+        Text(text)
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+            .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
     }
 }

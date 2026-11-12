@@ -1222,6 +1222,8 @@ pub struct Row {
     pub clears: Option<&'static str>,
     /// 名前の横にタグの形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
     pub example: Option<(&'static str, &'static str)>,
+    /// 満たすときだけ見本を出す(入力方式の見本は英字入力(自動)を選んだときだけ)．None ならいつも出す
+    pub example_visible: Option<Condition>,
 }
 
 impl Row {
@@ -1283,6 +1285,7 @@ impl Row {
             visible: None,
             clears: None,
             example: None,
+            example_visible: None,
             danger: false,
         }
     }
@@ -1295,6 +1298,12 @@ impl Row {
 
     pub fn with_example(mut self, example: (&'static str, &'static str)) -> Self {
         self.example = Some(example);
+        self
+    }
+
+    /// condition を満たすときだけ見本を出す
+    pub fn example_when(mut self, condition: Condition) -> Self {
+        self.example_visible = Some(condition);
         self
     }
 
@@ -1377,10 +1386,10 @@ fn input() -> Vec<Section> {
         Section::new(
             settings::INPUT_STYLE_SECTION,
             vec![
-                Row::choice(choice::INPUT_STYLE, "inputStyle", options::INPUT_STYLES),
-                // 英字入力(自動)では，打った英文が日本語になる見本を出す
-                Row::note(crate::strings::windows::ENGLISH_AUTO_EXAMPLE)
-                    .visible_when(Is("inputStyle", "englishAuto")),
+                // 英字入力(自動)を選んだときだけ，名前のすぐ後ろに打った英文が日本語になる見本を出す
+                Row::choice(choice::INPUT_STYLE, "inputStyle", options::INPUT_STYLES)
+                    .with_example(choice::ENGLISH_AUTO_EXAMPLE)
+                    .example_when(Is("inputStyle", "englishAuto")),
                 Row::toggle(
                     choice::ENGLISH_INPUT_LIVE_CONVERSION,
                     "englishInputLiveConversion",
@@ -1605,13 +1614,12 @@ fn conversion() -> Vec<Section> {
         ),
         Section {
             title: Some(association::DICTIONARIES),
-            rows: vec![Row::new(
-                "",
-                "",
-                Control::Dictionaries(DictionaryList::Association),
-            )],
-            // 読み込めるファイルの書き方は，ファイルの中身の見本で見せる
-            footer: Some(crate::strings::windows::ASSOCIATION_FILE_EXAMPLE),
+            // 一覧についての 1 行は一覧のすぐ下に，読み込めるファイルの見本は取り込むボタンの下に置く
+            rows: vec![
+                Row::new("", "", Control::Dictionaries(DictionaryList::Association)),
+                Row::note(association::NOTE),
+            ],
+            footer: Some(association::FILE_EXAMPLE),
             footer_variants: &[],
         },
         Section::new(

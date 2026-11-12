@@ -55,11 +55,14 @@ struct ResettablePicker<Value: Hashable & CaseIterable>: View where Value.AllCas
     let title: String
     let keyPath: WritableKeyPath<HajimeDomain.Settings, Value>
     var values: [Value] = Array(Value.allCases)
+    /// 名前のすぐ後ろに添える見本(ChoicePicker)
+    var example: (reading: String, candidate: String)?
+    var titleWidth: CGFloat?
     let label: (Value) -> String
 
     var body: some View {
         ResettableRow(model: model, keyPath: keyPath) {
-            ChoicePicker(title: title, selection: model.binding(keyPath), values: values, label: label)
+            ChoicePicker(title: title, selection: model.binding(keyPath), values: values, example: example, titleWidth: titleWidth, label: label)
         }
     }
 }
