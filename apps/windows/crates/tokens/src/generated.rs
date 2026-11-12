@@ -264,8 +264,8 @@ pub mod size {
     }
     pub mod mode_indicator {
         pub const FONT_SIZE: f32 = 14.0;
-        pub const PADDING_X: f32 = 10.0;
-        pub const PADDING_Y: f32 = 3.0;
+        pub const PADDING_X: f32 = 8.0;
+        pub const PADDING_Y: f32 = 4.0;
     }
     pub mod branch {
         pub const TRUNK_GAP: f32 = 12.0;
@@ -324,8 +324,9 @@ pub mod size {
     }
     pub mod glass {
         pub const CORNER_RADIUS: f32 = 12.0;
-        pub const PADDING: f32 = 10.0;
         pub const WINDOW_PADDING: f32 = 8.0;
+        pub const COMPACT_PADDING_X: f32 = 8.0;
+        pub const COMPACT_PADDING_Y: f32 = 4.0;
         pub const SEPARATOR_GAP: f32 = 8.0;
         pub const ROW_PADDING_X: f32 = 4.0;
         pub const HEADER_HEIGHT: f32 = 20.0;
@@ -335,9 +336,9 @@ pub mod size {
         pub const BADGE_SIZE: f32 = 17.0;
         pub const SELECTION_RADIUS: f32 = 7.0;
         pub const KEYCAP_RADIUS: f32 = 4.0;
-        pub const KEYCAP_PADDING_X: f32 = 5.0;
+        pub const KEYCAP_PADDING_X: f32 = 4.0;
         pub const KEYCAP_HEIGHT: f32 = 17.0;
-        pub const HINT_GAP: f32 = 10.0;
+        pub const HINT_GAP: f32 = 12.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
         pub const TRUNK_GAP: f32 = 8.0;
         pub const BRANCH_INDENT: f32 = 28.0;
@@ -352,17 +353,17 @@ pub mod size {
         pub const CURVE_END_GAP: f32 = 3.0;
         pub const CURVE_BEND: f32 = 0.35;
         pub const DOT_PITCH: f32 = 5.0;
-        pub const KEYCAP_PART_GAP: f32 = 1.0;
-        pub const KEYCAP_GAP: f32 = 3.0;
+        pub const KEYCAP_PART_GAP: f32 = 2.0;
+        pub const KEYCAP_GAP: f32 = 4.0;
         pub const SHADOW_RADIUS: f32 = 12.0;
         pub const SHADOW_OFFSET_Y: f32 = 3.0;
         pub const TAG_HEIGHT: f32 = 16.0;
-        pub const TAG_PADDING_X: f32 = 6.0;
+        pub const TAG_PADDING_X: f32 = 8.0;
         pub const TAG_RADIUS: f32 = 8.0;
         pub const NOTE_ICON_SIZE: f32 = 17.0;
         pub const COMMAND_ICON_SIZE: f32 = 18.0;
         pub const COMMAND_ICON_RADIUS: f32 = 5.0;
-        pub const NOTE_GAP: f32 = 6.0;
+        pub const NOTE_GAP: f32 = 8.0;
     }
     pub mod meaning {
         pub const PADDING: f32 = 12.0;
@@ -409,10 +410,10 @@ pub mod size {
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
     }
     pub mod prediction {
-        pub const GAP: f32 = 6.0;
+        pub const GAP: f32 = 8.0;
         pub const PADDING_X: f32 = 8.0;
-        pub const PADDING_Y: f32 = 3.0;
-        pub const KEY_GAP: f32 = 6.0;
+        pub const PADDING_Y: f32 = 4.0;
+        pub const KEY_GAP: f32 = 8.0;
     }
     pub mod palette {
         pub const PADDING: f32 = 8.0;
