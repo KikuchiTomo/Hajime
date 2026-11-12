@@ -23,6 +23,8 @@ public final class InputSession {
 
 
     private let converter: any KanaKanjiConverting
+    /// 候補を文脈で並べ替えるもの(検証木)．使うかは設定の candidateReranking で決める(rerankingScorer)
+    private let scorer: (any CandidateScoring)?
     private let lexicon: any EnglishLexicon
     private let usageDictionary: (any UsageDictionaryProviding)?
     private let settings: any SettingsReading
@@ -172,10 +174,13 @@ public final class InputSession {
     ///   - usageDictionary: 同音異義語の使い分けの辞書(R-08)．nil ならこのリポジトリで書いた組だけを使う
     ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
     ///   - calendar: 変換マクロの日時(`{date}` など．R-22)．nil なら日時の名前は置き換えない
+    ///   - scorer: 候補の 2 番目から後ろを文脈で並べ替えるもの(検証木．ADR 0016)．nil か設定の candidateReranking がオフなら並べ替えない
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
                 rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
-                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil) {
+                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil,
+                scorer: (any CandidateScoring)? = nil) {
+        self.scorer = scorer
         self.paletteServices = palette
         self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
@@ -516,14 +521,20 @@ public final class InputSession {
     public var latticeWarmingSteps: [@MainActor () -> Void] {
         guard phase == .composing, !composition.isEmpty else { return [] }
         guard settings.current.candidatePresentation.segmentsReading else {
-            // 一覧では，文節を入れ替えた文(makeSelection)を作るのに使う文節の候補だけを，1 文節ずつ前もって求める
-            guard settings.current.listSegmentAlternatives else { return [] }
-            return latticeBuilder.segmentWarmingSteps(reading: composition.conversionReading).map { item in
+            // 一覧では，文全体の候補を文脈で並べ替える点数を前もって求める(採点が遅い環境では Space で待たないので，ここで求めないと並べ替えない)
+            let reading = composition.conversionReading
+            let reranking: [@MainActor () -> Void] = rerankingScorer == nil ? [] : [{ [self] in
+                if phase == .composing && composition.conversionReading == reading { _ = listCandidates(for: reading, precomputing: true) }
+            }]
+            // 文節を入れ替えた文(makeSelection)を作るのに使う文節の候補も，1 文節ずつ前もって求める
+            guard settings.current.listSegmentAlternatives else { return reranking }
+            let segmentSteps: [@MainActor () -> Void] = latticeBuilder.segmentWarmingSteps(reading: reading).map { item in
                 { [self] in
                     item.make()
                     listWarmedSegments.insert(item.slice)
                 }
             }
+            return reranking + segmentSteps
         }
         let builder = latticeBuilder
         let reading = composition.conversionReading
@@ -1575,7 +1586,30 @@ public final class InputSession {
         _ = newComposition()
         var builder = LatticeBuilder(converter: converter, romajiTable: romajiTable.table)
         if settings.current.contextualSegmentCandidates { builder.contextRanker = SegmentContextRanker(converter: converter) }
+        builder.scorer = rerankingScorer
+        builder.usesPrecomputedScoresOnly = rerankingScorer?.prefersPrecomputedScores ?? false
         return builder
+    }
+
+    /// 候補を文脈で並べ替えるもの．設定でオフなら nil
+    private var rerankingScorer: (any CandidateScoring)? {
+        settings.current.candidateReranking ? scorer : nil
+    }
+
+    /// 一覧に出す，エンジンの文全体の候補．2 番目から後ろを文脈で並べ替え，Zenzai を使わない変換の候補(分岐図の文節の候補と同じ)も混ぜる．
+    /// 並べ替えるのはエンジンの候補だけで，記号やユーザー辞書の語などの位置は変えない(CandidateReranking)．
+    /// 採点が遅い環境では，打鍵の合間に前もって求めた(precomputing)点数があるときだけ並べ替える
+    private func listCandidates(for reading: String, precomputing: Bool = false) -> [Candidate] {
+        let candidates = converter.listCandidates(for: reading)
+        guard let scorer = rerankingScorer, !candidates.isEmpty else { return candidates }
+        let additions = converter.segmentCandidates(for: reading)
+        let texts = CandidateReranking.textsToScore(candidates, adding: additions, readingCount: reading.count)
+        guard !texts.isEmpty else { return candidates }
+        let waits = precomputing || !scorer.prefersPrecomputedScores
+        guard let values = waits ? scorer.scores(of: texts, reading: reading, before: "", after: "")
+            : scorer.cachedScores(of: texts, reading: reading, before: "", after: "") else { return candidates }
+        let table = Dictionary(zip(texts, values), uniquingKeysWith: { first, _ in first })
+        return CandidateReranking.reranked(candidates, adding: additions, readingCount: reading.count) { table[$0] ?? nil }
     }
 
     /// 空の読み．利用者が足したローマ字の綴りを使う
@@ -1686,10 +1720,12 @@ public final class InputSession {
             ]
             annotations += [nil, PanelBuilder.asTypedNote]
         }
-        var listed = converter.listCandidates(for: composition.conversionReading)
+        var listed = listCandidates(for: composition.conversionReading)
         // 文節を 1 か所だけ替えた文を，エンジンの文全体の候補と交互に並べる(一覧では文節を選び直せないため)
         if settings.current.listSegmentAlternatives, corrector.active == nil, !readingCorrector.isApplied {
             var builder = latticeBuilder
+            // 替えた文に使う文節は採点しない(文節ごとに推論すると Space が遅くなる．文全体の候補は上で採点した)
+            builder.scorer = nil
             let reading = composition.conversionReading
             // 前後の語を含めた変換は，一覧を出したあと打鍵の合間に求め(followUps)，求め終えていれば並べ替えに使う．
             // 求めていなければ，求めてある文全体の候補だけで並べ替える．打鍵が止まったあいだには求めない(1 歩が長くなる．CI のマシンで 0.056 秒)
@@ -1702,7 +1738,8 @@ public final class InputSession {
             // 替えた文に使う文節の候補を，迷う文節から順に前後の文脈で並べ替える(一覧の 1 ページに出る分だけ)
             let order = lattice.segments.indices.sorted { (lattice.segments[$0].confidenceGap, $0) < (lattice.segments[$1].confidenceGap, $1) }
             for index in order.prefix(DefaultSettings.listContextRankedSegments) {
-                lattice.segments[index] = builder.rankedByContext(lattice.segments[index], reading: composition.conversionReading)
+                lattice.segments[index] = builder.rankedByContext(lattice.segments[index], reading: composition.conversionReading,
+                                                                  context: LatticeBuilder.context(in: lattice, at: index))
             }
             listed = SegmentSubstitution.interleave(listed, with: SegmentSubstitution.sentences(from: lattice, perSegment: DefaultSettings.listSubstitutionsPerSegment))
         }
@@ -2031,7 +2068,8 @@ public final class InputSession {
             }
             // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)
             if !lattice.focused.isContextRanked {
-                let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading)
+                let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading,
+                                                            context: LatticeBuilder.context(in: lattice, at: lattice.focusedIndex))
                 if ranked.isContextRanked {
                     lattice.segments[lattice.focusedIndex] = ranked
                     phase = .lattice(lattice)

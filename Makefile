@@ -4,11 +4,11 @@ PYTHON ?= python3 -I
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
 # かな漢字変換の辞書(hajime-dictionary)．tools/dictionary/fetch_dictionary.sh が MODELS_DIR に展開する
-BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.3.0/Dictionary
+BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.4.0/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
-.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
+.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations release-metrics evaluate-engines setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
 
 setup:
 	mise install
@@ -28,6 +28,7 @@ check:
 	$(PYTHON) tools/tokens/generate_swift.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check
 	$(PYTHON) tools/release/changelog.py check
+	$(PYTHON) -m unittest discover -s tools/evaluation -p 'test_*.py'
 
 # モデルがあれば本物の Zenzai のテストも動かす．無ければ飛ばしたことを最後に出す
 test: test-debug
@@ -92,18 +93,25 @@ english-terms:
 # AJIMEE-Bench を取得してハッシュを確かめ，評価用の TSV にする
 fetch-evaluation:
 	tools/evaluation/fetch_ajimee.sh "$(EVALUATION_DIR)"
+	tools/evaluation/fetch_tatoeba.sh "$(EVALUATION_DIR)"
 
-# かな漢字変換の正解率・上位の候補に正解が入った割合・MinCER を，文(conversion-basic と AJIMEE-Bench)と語彙(vocabulary-*)で測る．Zenzai のモデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
+# かな漢字変換の正解率・上位の候補に正解が入った割合・MinCER を，文(conversion-basic・conversion-everyday・AJIMEE-Bench・Tatoeba)と語彙(vocabulary-*)で測る．Zenzai のモデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
 evaluate:
 	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
 	swift build --package-path core -c release --product hajime-playground
 	@options=; if [ -f "$(ZENZAI_MODEL)" ]; then options="--zenzai $(abspath $(ZENZAI_MODEL))"; fi; \
 	if [ -n "$(DICTIONARY)" ]; then options="$$options --dictionary $(abspath $(DICTIONARY))"; fi; \
 	bin=$$(swift build --package-path core -c release --show-bin-path); \
-	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv" core/Evaluation/vocabulary-*.tsv; do \
+	for file in core/Evaluation/conversion-basic.tsv core/Evaluation/conversion-everyday.tsv "$(EVALUATION_DIR)/ajimee.tsv" "$(EVALUATION_DIR)/tatoeba.tsv" core/Evaluation/vocabulary-*.tsv; do \
+		[ -f "$$file" ] || { echo "== $$file がありません(make fetch-evaluation で取得)"; continue; }; \
 		echo "== $$file"; \
 		"$$bin/hajime-playground" --evaluate "$$file" $$options 2>/dev/null | tail -1; \
 	done
+
+# 前のリリース(BASE=タグ．既定はいちばん新しい v*)と今の作業ツリーの版で，かな漢字変換の指標を測って比べ，build/release-metrics/report.md に書く．
+# リリースの PR に CI(.github/workflows/metrics.yml)がコメントするものと同じ．前の版をはじめから作るので時間がかかる
+release-metrics:
+	EVALUATION_DIR="$(EVALUATION_DIR)" MODELS_DIR="$(MODELS_DIR)" tools/evaluation/release_metrics.sh "$(BASE)" build/release-metrics
 
 # 期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合を，文(conversion-basic と AJIMEE-Bench)で測る(R-25)．
 # 候補の出し方ごとに，同梱の辞書と Zenzai のモデルで測る．PRESENTATION=automatic,segmentList,list で出し方を選べる．
@@ -119,6 +127,29 @@ evaluate-operations:
 	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv"; do \
 		echo "== $$file"; \
 		"$$bin/hajime-playground" --evaluate-operations "$$file" $$options 2>/dev/null | grep -E '^(==|第 1 候補)'; \
+	done
+
+# 変換エンジンどうしの相補性(単独の正解率・どれかが正解した割合・食い違う割合)と，検証木で候補を並べ替えた効果を，
+# AJIMEE-Bench と語彙で測る(docs/dev/adr/0016-reading-aligned-fusion.md)．Hajime IME の 3 つの構成(ラティスだけ・Zenzai small・xsmall)の候補を
+# $(EVALUATION_DIR)/engines/ に書き出す．ほかのエンジンの結果を同じ形(<セット>.<名前>.jsonl)でそこに置くと，相補性の表に加わる
+ZENZAI_FAST_MODEL ?= $(MODELS_DIR)/zenz-v3.2-xsmall-Q5_K_M.gguf
+evaluate-engines:
+	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
+	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
+	swift build --package-path core -c release --product hajime-playground
+	@out="$(EVALUATION_DIR)/engines"; mkdir -p "$$out"; \
+	dictionary=$${DICTIONARY:-$(BUNDLED_DICTIONARY)}; options=; if [ -d "$$dictionary" ]; then options="--dictionary $$(cd "$$dictionary" && pwd)"; fi; \
+	bin=$$(swift build --package-path core -c release --show-bin-path); \
+	for set in ajimee:$(EVALUATION_DIR)/ajimee.tsv vocab-person:core/Evaluation/vocabulary-person.tsv vocab-place:core/Evaluation/vocabulary-place.tsv vocab-other:core/Evaluation/vocabulary-other.tsv; do \
+		name=$${set%%:*}; file=$${set#*:}; \
+		"$$bin/hajime-playground" --dump-candidates "$$file" $$options 2>/dev/null | grep '^{' >| "$$out/$$name.lattice.jsonl"; \
+		"$$bin/hajime-playground" --dump-candidates "$$file" --score $$options --zenzai "$(abspath $(ZENZAI_MODEL))" 2>/dev/null | grep '^{' >| "$$out/$$name.small.jsonl"; \
+		if [ -f "$(ZENZAI_FAST_MODEL)" ]; then "$$bin/hajime-playground" --dump-candidates "$$file" $$options --zenzai "$(abspath $(ZENZAI_FAST_MODEL))" --zenzai-variant xsmall 2>/dev/null | grep '^{' >| "$$out/$$name.xsmall.jsonl"; fi; \
+		echo "== $$name: 検証木で並べ替えた効果"; \
+		$(PYTHON) tools/evaluation/reranking.py "$$file" "$$out/$$name.small.jsonl"; \
+		echo "== $$name: エンジンどうしの相補性"; \
+		engines=$$(for result in "$$out/$$name".*.jsonl; do engine=$${result##*/$$name.}; echo "$${engine%.jsonl}=$$result"; done); \
+		$(PYTHON) tools/evaluation/complementarity.py "$$file" $$engines --baseline small --nfkc; \
 	done
 
 tokens:

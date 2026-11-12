@@ -107,11 +107,33 @@ extension WirePalettePanel {
             cellSize: cellSize,
             // 四角いマスだけなら省く(顔文字を知らない候補ウィンドウにも同じ形で送る)
             cellsPerRow: panel.cellsPerRow == panel.columns ? nil : UInt32(clamping: panel.cellsPerRow),
+            // 動くものが無ければ送らない
+            motion: panel.motion.isEmpty ? nil : WirePaletteMotion(panel.motion),
             previewFields: WirePalettePreviewFields(unicodeName: panel.previewFields.unicodeName, readings: panel.previewFields.readings,
                                                     shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints),
             // 種類で行を足していなければ省く(候補ウィンドウは visibleRows を窓の行の数にする)
             windowRows: panel.windowRows == panel.visibleRows ? nil : UInt32(clamping: panel.windowRows)
         )
+    }
+}
+
+extension WirePaletteMotion {
+    public init(_ motion: PalettePanel.Motion) {
+        self.init(selectionFrom: motion.selectionFrom.map { WirePalettePosition(row: UInt32(clamping: $0.row), column: UInt32(clamping: $0.column)) },
+                  modeFrom: motion.modeFrom.map(WirePaletteKind.init), tabFrom: motion.tabFrom?.wireName,
+                  content: motion.content.map(WirePaletteContentMotion.init),
+                  opensPicker: motion.opensPicker, togglesPin: motion.togglesPin)
+    }
+}
+
+extension WirePaletteContentMotion {
+    public init(_ content: PalettePanel.Motion.Content) {
+        switch content {
+        case .next: self = .next
+        case .previous: self = .previous
+        case .down: self = .down
+        case .up: self = .up
+        }
     }
 }
 

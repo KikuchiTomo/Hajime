@@ -238,6 +238,27 @@ public enum DefaultSettings {
     public static let zenzaiCostSmoothing = 0.3
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)
     public static let maximumLeftContextLength = 40
+    /// 検証木で文節を採点するときに，右の文脈として渡す後ろの文節の文字数の上限
+    public static let maximumRightContextLength = 40
+    /// 候補を Zenzai でまとめて採点する(検証木)ときの，1 回の推論で評価するトークンの数の上限(根を含む)．
+    /// 時間はおおむねこれに比例する
+    public static let candidateTreeTokenLimit = 192
+    /// 速さを測って評価するトークンの数を減らすときの下限．文節の候補(数トークン)なら数個を採点できる
+    public static let minimumCandidateTreeTokens = 24
+    /// 検証木で 1 回採点する時間の目安(秒)．かかった時間から，これに収まるようにトークンの数を増減する．
+    /// Space で分岐図を出すときに同期で求めることがあるので，1 キー 50ms(R-01)のうち Zenzai の変換の残りに収める
+    public static let candidateScoringBudget = 0.015
+    /// 採点 1 回(プロンプトを評価し直す時間を含む)の時間の移動平均がこれを超える環境では，打鍵の合間に前もって求めた点数だけを使い，
+    /// Space では採点を待たない(秒)．GPU の無い Windows を見込む
+    public static let candidateScoringSlowThreshold = 0.03
+    /// 採点が遅い環境とみなしたあと，速さを測り直すために 1 回採点するまでの間(秒)
+    public static let candidateScoringProbeInterval = 30.0
+    /// 採点が目安のこの割合より速く済んだら，評価するトークンの数を増やす
+    public static let candidateTreeGrowthMargin = 0.7
+    /// 評価するトークンの数を増やすときの倍率
+    public static let candidateTreeGrowth = 1.25
+    /// 検証木に入れる候補の数の上限
+    public static let candidateTreeCandidateLimit = 16
     /// 設定のファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)．ユーザー辞書を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても，
     /// ふつうの文字なら 1 語 450 バイトほどで約 4.5MB に収まるので，余裕を見て倍にした．
     /// 結合文字を重ねた語のように 1 字が何バイトにもなる場合は超えうるが，書く前に大きさを確かめて断るので，ファイルは壊れない
@@ -298,9 +319,9 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限
     public static let maximumRuleListFileBytes = 1024 * 1024
-    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.3.0 は 6526 行で約 560KB
+    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.4.0 は 8068 行で約 700KB
     public static let maximumBundledDictionaryManifestBytes = 4 * 1024 * 1024
-    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.3.0 でいちばん大きいファイルは約 1MB
+    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.4.0 でいちばん大きいファイルは約 1MB
     public static let maximumBundledDictionaryFileBytes = 64 * 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
@@ -438,6 +459,8 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// パレットのマス目の先頭の行がこの数以上飛んだら(まとまりへ飛んだときなど)，中身を送る動きを付ける．1 行ずつのスクロールには付けない
+    public static let paletteJumpRows = 2
     /// 顔文字の広いマス 1 つが占める四角いマスの数．1 行の広いマスの数は，列の数をこれで割ったもの(1 つ以上)
     public static let paletteWideCellSpan = 3
     /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．
@@ -540,6 +563,8 @@ public enum DefaultSettings {
     public static let maximumTemplateRandomRange = 1_000_000_000
     /// `{date+1d}` などでずらす数の上限(単位によらない)
     public static let maximumTemplateShift = 36_500
+    /// `{days:2027-03-31}` `{age:1990-04-01}` に書ける年
+    public static let templateYearRange = 1...9_999
     /// `{alnum}` `{hex}` の文字数の既定と上限
     public static let templateRandomTextLength = 8
     public static let maximumTemplateRandomTextLength = 64
@@ -571,7 +596,8 @@ public enum DefaultSettings {
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000009", pattern: "`{text}`"),
     ] + addedMacros
     /// あとから足した変換マクロ(MacroPresetUpgrade が保存済みの一覧にも足す)．
-    /// 括弧・フリガナ・ローマ字・pixiv と LaTeX のルビ・傍点・ハッシュタグ・打ち消し線・Wikipedia へのリンク
+    /// 括弧・フリガナ・ローマ字・pixiv と LaTeX のルビ・傍点・ハッシュタグ・打ち消し線・Wikipedia へのリンク(バージョン 14)，
+    /// 語の中の数字の漢数字・大字・3 桁区切り(バージョン 15．数字の無い語では元の語と同じになるので出ない)
     public static let addedMacros: [ConversionMacro] = [
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000A", pattern: "〈{text}〉", isEnabled: false),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000B", pattern: "“{text}”", isEnabled: false),
@@ -584,6 +610,9 @@ public enum DefaultSettings {
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000012", pattern: "#{text}", isEnabled: false),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000013", pattern: "~~{text}~~", isEnabled: false),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000014", pattern: "[{text}](https://ja.wikipedia.org/wiki/{text|url})", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000015", pattern: "{text|kansuji}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000016", pattern: "{text|daiji}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000017", pattern: "{text|comma}", isEnabled: false),
     ]
     /// 設定の画面で変換マクロを試す見本の語と読み(語を打たなかったとき)
     public static let macroSampleText = "東京"

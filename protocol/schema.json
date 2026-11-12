@@ -2140,6 +2140,46 @@
       ]
     },
     {
+      "name": "PaletteContentMotion",
+      "kind": "enum",
+      "cases": [
+        "next",
+        "previous",
+        "down",
+        "up"
+      ]
+    },
+    {
+      "name": "PaletteMotion",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "selectionFrom",
+          "type": "PalettePosition?"
+        },
+        {
+          "name": "modeFrom",
+          "type": "PaletteKind?"
+        },
+        {
+          "name": "tabFrom",
+          "type": "string?"
+        },
+        {
+          "name": "content",
+          "type": "PaletteContentMotion?"
+        },
+        {
+          "name": "opensPicker",
+          "type": "bool"
+        },
+        {
+          "name": "togglesPin",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "PalettePanel",
       "kind": "struct",
       "fields": [
@@ -2218,6 +2258,10 @@
         {
           "name": "cellsPerRow",
           "type": "u32?"
+        },
+        {
+          "name": "motion",
+          "type": "PaletteMotion?"
         },
         {
           "name": "previewFields",

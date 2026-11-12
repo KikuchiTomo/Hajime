@@ -334,6 +334,10 @@ enum DesignTokens {
             static let pickerCellSize: CGFloat = 36
             static let pickerCellPadding: CGFloat = 4
             static let probeFontSize: CGFloat = 20
+            static let openRise: CGFloat = 6
+            static let contentShift: CGFloat = 18
+            static let popScale: CGFloat = 0.9
+            static let pinBounce: CGFloat = 1.35
         }
         enum Snapshot {
             static let margin: CGFloat = 16
@@ -518,6 +522,13 @@ enum DesignTokens {
             static let keystroke: Double = 85
             static let hold: Double = 1400
             static let page: Double = 220
+        }
+        enum Palette {
+            static let open: Double = 140
+            static let selection: Double = 110
+            static let indicator: Double = 200
+            static let content: Double = 170
+            static let pop: Double = 220
         }
     }
     enum Opacity {

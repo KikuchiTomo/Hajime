@@ -215,6 +215,10 @@ public enum LayoutTokens {
         public static let pickerCellSize: Double = 36
         public static let pickerCellPadding: Double = 4
         public static let probeFontSize: Double = 20
+        public static let openRise: Double = 6
+        public static let contentShift: Double = 18
+        public static let popScale: Double = 0.9
+        public static let pinBounce: Double = 1.35
     }
     public enum Snapshot {
         public static let margin: Double = 16

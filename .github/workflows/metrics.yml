@@ -1,0 +1,86 @@
+name: Metrics
+
+# リリースの PR(タイトルが chore(release))で，前のリリースと比べたかな漢字変換の指標(R-25)を PR にコメントする．
+# 前のリリースのタグと PR の版を同じ実行の中で両方作って測る(tools/evaluation/release_metrics.sh)．コメントは PR ごとに 1 つで，動かし直すと書き換える．
+# ほかの PR で測るときは手で動かす: gh workflow run metrics.yml -f pr=<PR の番号>
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 指標をコメントする PR の番号
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: metrics-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  release-metrics-macos:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.pull_request.title, 'chore(release)')
+    runs-on: macos-15
+    # 前の版と PR の版の 2 つを作り，Zenzai small と xsmall で評価用の文(約 2,900 問)を変換する
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      # 指標を PR にコメントするため(ほかのリポジトリからの PR ではトークンが読み取りだけになり，コメントは書けない)
+      pull-requests: write
+    env:
+      MODELS_DIR: ${{ github.workspace }}/../models
+      EVALUATION_DIR: ${{ github.workspace }}/../evaluation
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # 前のリリースのタグを読むので，履歴とタグをすべて取る
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/head', inputs.pr) || '' }}
+      # ci.yml の core-macos と同じ Xcode を使う
+      - run: |
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
+          echo "使う Xcode: $xcode"
+          sudo xcode-select -s "$xcode"
+      # PR の版の作ったものは ci.yml の core-macos のキャッシュから戻す(保存はしない)
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            core/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: core-${{ runner.os }}-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
+          restore-keys: |
+            core-${{ runner.os }}-${{ hashFiles('core/Package.resolved') }}-
+      # モデルと辞書は版ごとに取得スクリプトの版で置き場所が分かれるので，まとめてキャッシュする
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/../models
+          key: metrics-models-${{ hashFiles('tools/models/fetch_zenzai.sh', 'tools/dictionary/fetch_dictionary.sh') }}
+          restore-keys: |
+            metrics-models-
+      # AJIMEE-Bench と Tatoeba(前の版と PR の版の両方に同じ文を使う)
+      - run: make fetch-evaluation
+      - run: |
+          version=$(tools/release/version.sh macos)
+          HEAD_LABEL="v$version(この PR)" tools/evaluation/release_metrics.sh "" build/release-metrics
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-metrics
+          path: build/release-metrics/
+          if-no-files-found: ignore
+      # 前に書いたコメント(印で探す)があれば書き換え，無ければ足す
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body=build/release-metrics/report.md
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.body | startswith("<!-- hajime-release-metrics -->")) | .id' | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F "body=@$body" >/dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$body" >/dev/null
+          fi

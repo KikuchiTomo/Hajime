@@ -184,6 +184,8 @@ public struct Settings: Sendable, Equatable {
     public var contextualSegmentCandidates = true
     /// 文全体の候補の一覧に，分岐図の文節を 1 か所だけほかの候補に替えた文を入れる
     public var listSegmentAlternatives = true
+    /// 変換の候補の 2 番目から後ろを，Zenzai の点数(検証木．ADR 0016)で前後の文脈に合う順に並べ替える．第 1 候補は変えない
+    public var candidateReranking = true
 
     // MARK: 辞書と学習
     /// 確定した候補から学ぶか
@@ -373,7 +375,7 @@ extension Settings: Codable {
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
-        case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives
+        case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
@@ -487,6 +489,7 @@ extension Settings: Codable {
         read(.zenzaiModel, into: \.zenzaiModel)
         read(.contextualSegmentCandidates, into: \.contextualSegmentCandidates)
         read(.listSegmentAlternatives, into: \.listSegmentAlternatives)
+        read(.candidateReranking, into: \.candidateReranking)
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
         readList(.importedDictionaries, into: \.importedDictionaries)
@@ -618,6 +621,7 @@ extension Settings: Codable {
         try container.encode(zenzaiModel, forKey: .zenzaiModel)
         try container.encode(contextualSegmentCandidates, forKey: .contextualSegmentCandidates)
         try container.encode(listSegmentAlternatives, forKey: .listSegmentAlternatives)
+        try container.encode(candidateReranking, forKey: .candidateReranking)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)

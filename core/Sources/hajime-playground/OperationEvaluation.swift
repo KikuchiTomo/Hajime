@@ -22,8 +22,11 @@ enum OperationEvaluation {
     /// 1 文で押す数の上限．これを超えたら着かないとする
     static let maximumOperations = 60
 
-    /// - Parameter warmsBeforeSpace: Space の前に，打鍵が止まったあいだに求めるもの(InputSession.latticeWarmingSteps)を求めるか
-    static func run(cases: [EvaluationCase], engine: AzooKeyConverterEngine, presentations: [CandidatePresentation], warmsBeforeSpace: Bool = false) {
+    /// - Parameters:
+    ///   - warmsBeforeSpace: Space の前に，打鍵が止まったあいだに求めるもの(InputSession.latticeWarmingSteps)を求めるか
+    ///   - reranking: 候補を検証木の点数で並べ替える(設定の candidateReranking)．前後で比べるときに切る
+    static func run(cases: [EvaluationCase], engine: AzooKeyConverterEngine, presentations: [CandidatePresentation], warmsBeforeSpace: Bool = false,
+                    reranking: Bool = true) {
         // 単語の一覧の読み込みは重いので，文ごとに作らず使い回す
         let lexicon = WordListLexicon()
         for presentation in presentations {
@@ -34,7 +37,7 @@ enum OperationEvaluation {
                     print("-  \(item.reading)  打てない文字を含むので飛ばす")
                     continue
                 }
-                let driver = Driver(engine: engine, lexicon: lexicon, presentation: presentation, leftContext: item.leftContext)
+                let driver = Driver(engine: engine, lexicon: lexicon, presentation: presentation, leftContext: item.leftContext, reranking: reranking)
                 for key in keys { driver.press(key) }
                 // ライブ変換を切って打つので，組み立て中の文字がそのまま読み
                 guard driver.text == item.reading else {
@@ -178,9 +181,10 @@ enum OperationEvaluation {
         private var context: InputContext
         private(set) var marked = MarkedText.empty
 
-        init(engine: AzooKeyConverterEngine, lexicon: WordListLexicon, presentation: CandidatePresentation, leftContext: String?) {
+        init(engine: AzooKeyConverterEngine, lexicon: WordListLexicon, presentation: CandidatePresentation, leftContext: String?, reranking: Bool) {
             var settings = DefaultSettings.settings
             settings.candidatePresentation = presentation
+            settings.candidateReranking = reranking
             // 打つたびに変換すると遅いので，ライブ変換を切って打つ．Space の変換は読み全体から求めるので結果は変わらない
             settings.liveConversion = false
             // 打っている間の変換(入力中の候補の窓)も出さない．打っている間に Zenzai を使うかはそのときの処理の速さで決まり，
@@ -189,9 +193,10 @@ enum OperationEvaluation {
             let store = StaticSettings(settings)
             // 英語の語の辞書(R-24)は，リポジトリの頭で動かしたときに data/ から読む(make try と同じ)
             let terms = EnglishTerms(bundled: EnglishTermFile(url: EnglishTermCheck.bundledURL), settings: store)
-            let converter = SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: engine,
+            let engineSession = engine.makeSession()
+            let converter = SupplementedConverter(engineSession, settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: engine,
                                                   englishTerms: terms)
-            session = InputSession(converter: converter, lexicon: lexicon, settings: store)
+            session = InputSession(converter: converter, lexicon: lexicon, settings: store, scorer: engineSession)
             context = InputContext(precedingText: leftContext)
         }
 

@@ -58,6 +58,93 @@ enum Evaluation {
               + "  変換の時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
     }
 
+    /// 1 問ぶんの候補と時間．tools/evaluation/complementarity.py が読む(ほかのエンジンの結果も同じ形で書く)．
+    /// pool・scores・scoreMilliseconds は --score を付けたときだけ出す(検証木で採点した候補と点数)
+    private struct CandidateRecord: Encodable {
+        var id: Int
+        var candidates: [String]
+        var milliseconds: Double
+        var pool: [String]?
+        var scores: [Double?]?
+        var scoreMilliseconds: Double?
+    }
+
+    /// 評価用の文ごとに，読み全体の候補(上位 dumpCount 個)と 1 回の変換の時間を JSON Lines で出す．
+    /// エンジンどうしの相補性(どれかが正解した割合・割れる率)を tools/evaluation/complementarity.py で測るため．
+    /// scores なら，Zenzai の候補と Zenzai を使わない変換の候補(分岐図の文節の候補と同じ求め方)を合わせ，検証木で採点した点数も出す
+    static func dump(cases: [EvaluationCase], engine: AzooKeyConverterEngine, scores: Bool) {
+        let clock = ContinuousClock()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        for (index, item) in cases.enumerated() {
+            let base = engine.makeSession()
+            let session = newSession(base, context: item.leftContext)
+            var candidates: [String] = []
+            let duration = clock.measure { candidates = wholeCandidates(session, item.reading) }
+            var record = CandidateRecord(id: index, candidates: Array(candidates.prefix(dumpCount)), milliseconds: milliseconds(duration))
+            if scores {
+                let reading = item.reading
+                let lattice = base.segmentCandidates(for: reading).filter { $0.readingCount == reading.count }.map(\.text)
+                var pool: [String] = []
+                for text in candidates.prefix(dumpCount) + lattice where !pool.contains(text) { pool.append(text) }
+                var values: [Double?] = []
+                let scoring = clock.measure { values = base.scores(of: pool, reading: reading, before: "", after: "") }
+                record.pool = pool
+                record.scores = values
+                record.scoreMilliseconds = milliseconds(scoring)
+            }
+            guard let line = try? encoder.encode(record) else { continue }
+            print(String(decoding: line, as: UTF8.self))
+        }
+    }
+
+    /// 検証木の採点 1 回の時間を測る．文ごとに変換してプロンプトを KV に置いたあと(Space を押したときと同じ)，
+    /// 新しいセッション(点数を覚えていない)で同じ候補を repeats 回採点し，文ごとの最小と中央値をまとめる．
+    /// ほかのプロセスが GPU を使っていると延びるので，文ごとの最小を「混んでいないときの時間」の目安にする
+    static func benchScoring(cases: [EvaluationCase], engine: AzooKeyConverterEngine, repeats: Int) {
+        let clock = ContinuousClock()
+        var minimums: [Double] = []
+        var medians: [Double] = []
+        var limits: [Int] = []
+        var scored: [Int] = []
+        for item in cases {
+            let base = engine.makeSession()
+            let session = newSession(base, context: item.leftContext)
+            let candidates = wholeCandidates(session, item.reading)
+            let lattice = base.segmentCandidates(for: item.reading).filter { $0.readingCount == item.reading.count }.map(\.text)
+            var pool: [String] = []
+            for text in candidates.dropFirst() + lattice where !pool.contains(text) { pool.append(text) }
+            guard !pool.isEmpty else { continue }
+            var times: [Double] = []
+            for _ in 0..<repeats {
+                let fresh = engine.makeSession()
+                fresh.setLeftContext(item.leftContext)
+                limits.append(engine.candidateTreeTokenLimit)
+                var values: [Double?] = []
+                times.append(milliseconds(clock.measure { values = fresh.scores(of: pool, reading: item.reading, before: "", after: "") }))
+                scored.append(values.compactMap { $0 }.count)
+            }
+            times.sort()
+            minimums.append(times[0])
+            medians.append(times[times.count / 2])
+        }
+        func summary(_ values: [Double]) -> String {
+            let sorted = values.sorted()
+            return String(format: "中央値 %.1fms  90%% %.1fms  最大 %.1fms", sorted[sorted.count / 2], sorted[sorted.count * 9 / 10], sorted.last ?? 0)
+        }
+        let sortedLimits = limits.sorted()
+        print("採点した文: \(minimums.count)  1 回の採点の時間(文ごとの最小): \(summary(minimums))")
+        print("1 回の採点の時間(文ごとの中央値): \(summary(medians))")
+        print("評価するトークンの数の上限: 中央値 \(sortedLimits[sortedLimits.count / 2])  最小 \(sortedLimits.first ?? 0)  採点できた表記の数: 中央値 \(scored.sorted()[scored.count / 2])")
+    }
+
+    private static func milliseconds(_ duration: Duration) -> Double {
+        (Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18) * 1000
+    }
+
+    /// dump で出す候補の数．上位 10 の再現率と並べ替えの余地を測るので，それより多めに出す
+    static let dumpCount = 20
+
     /// 期待する変換のうち最も近いものとの文字誤り率(編集距離 ÷ 期待する文の文字数)．AJIMEE-Bench の MinCER と同じ測り方
     static func minimumCharacterErrorRate(expected: [String], output: String) -> Double {
         expected.filter { !$0.isEmpty }
@@ -261,7 +348,11 @@ enum Evaluation {
 
     /// アプリと同じく，エンジンの候補に記号・日付・並べ替え(SupplementedConverter)を既定の設定で足したもの
     private static func newSession(_ engine: AzooKeyConverterEngine, context: String?) -> any KanaKanjiConverting {
-        let session = SupplementedConverter(engine.makeSession(), settings: StaticSettings(DefaultSettings.settings), calendar: SystemCalendar(clock: { Date() }))
+        newSession(engine.makeSession(), context: context)
+    }
+
+    private static func newSession(_ base: any KanaKanjiConverting, context: String?) -> any KanaKanjiConverting {
+        let session = SupplementedConverter(base, settings: StaticSettings(DefaultSettings.settings), calendar: SystemCalendar(clock: { Date() }))
         session.setLeftContext(context)
         return session
     }

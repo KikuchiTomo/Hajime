@@ -232,11 +232,13 @@ func run() -> Int32 {
     #endif
     let service = EngineService(
         makeSession: {
-            InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
-                                                          lexicon: lexicon, englishTerms: englishTerms),
-                         lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                         keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
-                         palette: palette, calendar: calendar)
+            // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ．合議はこのプロセスの中で行う(ADR 0016)
+            let engineSession = engine.makeSession()
+            return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
+                                                                 emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
+                                lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
+                                keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                                palette: palette, calendar: calendar, scorer: engineSession)
         },
         settings: settings,
         ui: sendToWindow,

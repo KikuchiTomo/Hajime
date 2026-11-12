@@ -1884,6 +1884,47 @@ impl fmt::Debug for PaletteSkinTonePicker {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PaletteContentMotion {
+    Next,
+    Previous,
+    Down,
+    Up,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaletteMotion {
+    #[serde(rename = "selectionFrom")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_from: Option<PalettePosition>,
+    #[serde(rename = "modeFrom")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode_from: Option<PaletteKind>,
+    #[serde(rename = "tabFrom")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_from: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<PaletteContentMotion>,
+    #[serde(rename = "opensPicker")]
+    pub opens_picker: bool,
+    #[serde(rename = "togglesPin")]
+    pub toggles_pin: bool,
+}
+
+impl fmt::Debug for PaletteMotion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PaletteMotion")
+            .field("selectionFrom", &self.selection_from)
+            .field("modeFrom", &self.mode_from)
+            .field("tabFrom", &REDACTED)
+            .field("content", &self.content)
+            .field("opensPicker", &self.opens_picker)
+            .field("togglesPin", &self.toggles_pin)
+            .finish()
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PalettePanel {
     pub modes: Vec<PaletteMode>,
@@ -1918,6 +1959,8 @@ pub struct PalettePanel {
     #[serde(rename = "cellsPerRow")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cells_per_row: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub motion: Option<PaletteMotion>,
     #[serde(rename = "previewFields")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_fields: Option<PalettePreviewFields>,
@@ -1948,6 +1991,7 @@ impl fmt::Debug for PalettePanel {
             .field("hints", &self.hints)
             .field("cellSize", &self.cell_size)
             .field("cellsPerRow", &self.cells_per_row)
+            .field("motion", &self.motion)
             .field("previewFields", &self.preview_fields)
             .field("windowRows", &self.window_rows)
             .finish()

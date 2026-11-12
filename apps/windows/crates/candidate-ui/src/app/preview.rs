@@ -82,7 +82,13 @@ impl Preview {
             Shown::Mode(label) => scene::mode(label, &look, measure),
             Shown::Palette(panel) => {
                 let layout = crate::palette::layout::Layout::new(panel, theme, measure);
-                crate::palette::scene::palette(panel, &layout, &look, measure)
+                crate::palette::scene::palette(
+                    panel,
+                    &layout,
+                    &look,
+                    measure,
+                    crate::palette::motion::Tween::default(),
+                )
             }
         }
     }

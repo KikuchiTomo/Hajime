@@ -5,8 +5,9 @@
 
 use super::emoji::{with_skin_tone, SKIN_TONES};
 use ipc::{
-    KeyHint, PaletteCell, PaletteKind, PaletteMode, PalettePanel, PalettePosition, PalettePreview,
-    PalettePreviewFields, PaletteRow, PaletteSkinTonePicker, PaletteTab, SkinTone,
+    KeyHint, PaletteCell, PaletteContentMotion, PaletteKind, PaletteMode, PaletteMotion,
+    PalettePanel, PalettePosition, PalettePreview, PalettePreviewFields, PaletteRow,
+    PaletteSkinTonePicker, PaletteTab, SkinTone,
 };
 
 /// 設定のマスの大きさの既定(core の DefaultSettings.paletteCellSize)
@@ -230,6 +231,7 @@ pub fn emoji() -> PalettePanel {
         cell_size: CELL_SIZE,
         cells_per_row: None,
         window_rows: None,
+        motion: None,
         preview_fields: None,
     }
 }
@@ -374,6 +376,7 @@ pub fn search() -> PalettePanel {
         cell_size: CELL_SIZE,
         cells_per_row: None,
         window_rows: None,
+        motion: None,
         preview_fields: None,
     }
 }
@@ -409,6 +412,7 @@ pub fn flag() -> PalettePanel {
         cell_size: CELL_SIZE,
         cells_per_row: None,
         window_rows: None,
+        motion: None,
         preview_fields: None,
     }
 }
@@ -496,6 +500,7 @@ pub fn symbol() -> PalettePanel {
         cell_size: CELL_SIZE,
         cells_per_row: None,
         window_rows: None,
+        motion: None,
         preview_fields: None,
     }
 }
@@ -553,6 +558,57 @@ pub fn kaomoji() -> PalettePanel {
         cell_size: CELL_SIZE,
         cells_per_row: Some(KAOMOJI_CELLS_PER_ROW),
         window_rows: Some(VISIBLE_ROWS),
+        motion: None,
         preview_fields: None,
     }
+}
+
+/// 動きの途中のコマの見本(macOS の SamplePalettes.motionSteps)．前の内容・動きを添えた次の内容・描く時刻(ミリ秒)
+pub fn motion_steps() -> Vec<(PalettePanel, PalettePanel, f32)> {
+    use tokens::motion::palette as duration;
+    let still = PaletteMotion {
+        selection_from: None,
+        mode_from: None,
+        tab_from: None,
+        content: None,
+        opens_picker: false,
+        toggles_pin: false,
+    };
+    // 選択の枠が右下へ滑り，タブの印も次のまとまりへ滑る
+    let mut moved = emoji();
+    moved.selection = Some(PalettePosition { row: 3, column: 6 });
+    for (index, tab) in moved.tabs.iter_mut().enumerate() {
+        tab.is_selected = index == 2;
+    }
+    moved.motion = Some(PaletteMotion {
+        selection_from: emoji().selection,
+        tab_from: Some("smileys".into()),
+        ..still.clone()
+    });
+    // 絵文字から記号へ切り替えて，種類の印を滑らせ，中身を左へ送る
+    let switched = PalettePanel {
+        motion: Some(PaletteMotion {
+            mode_from: Some(PaletteKind::Emoji),
+            content: Some(PaletteContentMotion::Next),
+            ..still.clone()
+        }),
+        ..symbol()
+    };
+    // 肌の色の帯が浮かび上がる
+    let before = PalettePanel {
+        skin_tone_picker: None,
+        ..search()
+    };
+    let picking = PalettePanel {
+        motion: Some(PaletteMotion {
+            opens_picker: true,
+            ..still
+        }),
+        ..search()
+    };
+    vec![
+        (emoji(), moved, duration::INDICATOR / 2.0),
+        (emoji(), switched, duration::CONTENT / 2.0),
+        (before, picking, duration::POP / 3.0),
+    ]
 }

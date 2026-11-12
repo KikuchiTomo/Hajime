@@ -18,6 +18,7 @@
     "calculation": true,
     "candidateFontSize": 15,
     "candidatePresentation": "automatic",
+    "candidateReranking": true,
     "commands": [],
     "contextualSegmentCandidates": true,
     "conversionMacros": false,

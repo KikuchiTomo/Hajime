@@ -1992,6 +1992,41 @@ extension WirePaletteSkinTonePicker: CustomStringConvertible, CustomDebugStringC
     public var debugDescription: String { description }
 }
 
+public enum WirePaletteContentMotion: String, Sendable, Equatable, Codable, CaseIterable {
+    case next
+    case previous
+    case down
+    case up
+}
+
+extension WirePaletteContentMotion: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteContentMotion.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePaletteMotion: Sendable, Equatable, Codable {
+    public var selectionFrom: WirePalettePosition?
+    public var modeFrom: WirePaletteKind?
+    public var tabFrom: String?
+    public var content: WirePaletteContentMotion?
+    public var opensPicker: Bool
+    public var togglesPin: Bool
+
+    public init(selectionFrom: WirePalettePosition? = nil, modeFrom: WirePaletteKind? = nil, tabFrom: String? = nil, content: WirePaletteContentMotion? = nil, opensPicker: Bool, togglesPin: Bool) {
+        self.selectionFrom = selectionFrom
+        self.modeFrom = modeFrom
+        self.tabFrom = tabFrom
+        self.content = content
+        self.opensPicker = opensPicker
+        self.togglesPin = togglesPin
+    }
+}
+
+extension WirePaletteMotion: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePaletteMotion" }
+    public var debugDescription: String { description }
+}
+
 public struct WirePalettePanel: Sendable, Equatable, Codable {
     public var modes: [WirePaletteMode]
     public var query: String
@@ -2012,10 +2047,11 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
     public var hints: [WireKeyHint]
     public var cellSize: Double
     public var cellsPerRow: UInt32?
+    public var motion: WirePaletteMotion?
     public var previewFields: WirePalettePreviewFields?
     public var windowRows: UInt32?
 
-    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil, previewFields: WirePalettePreviewFields? = nil, windowRows: UInt32? = nil) {
+    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil, motion: WirePaletteMotion? = nil, previewFields: WirePalettePreviewFields? = nil, windowRows: UInt32? = nil) {
         self.modes = modes
         self.query = query
         self.placeholder = placeholder
@@ -2035,6 +2071,7 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
         self.hints = hints
         self.cellSize = cellSize
         self.cellsPerRow = cellsPerRow
+        self.motion = motion
         self.previewFields = previewFields
         self.windowRows = windowRows
     }

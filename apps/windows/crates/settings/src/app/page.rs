@@ -286,8 +286,8 @@ pub struct Extras {
     pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
-    /// 変換マクロを試した結果の文(コマンドのページを出すたびに読む)
-    pub macro_preview: String,
+    /// 変換マクロを試した結果(コマンドのページを出すたびに読む)
+    pub macro_preview: crate::engine::PreviewShown,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
     pub fonts: Vec<InstalledFace>,
 }
@@ -428,7 +428,7 @@ struct RowState {
     dictionary_inputs: Vec<Vec<String>>,
     /// 試す欄(打つ文・前の文字列)と結果
     preview_fields: Vec<Window>,
-    preview_result: String,
+    preview_result: crate::engine::PreviewShown,
     /// 長い文の送り
     text_scroll: Scroller,
     /// 謝辞のライセンスの全文を開いている
@@ -584,7 +584,7 @@ impl RowState {
             editing: None,
             dictionary_inputs: Vec::new(),
             preview_fields: Vec::new(),
-            preview_result: String::new(),
+            preview_result: Default::default(),
             text_scroll: Scroller::default(),
             expanded: false,
             acknowledgement: None,
@@ -745,7 +745,7 @@ impl RowState {
     /// 選んだ行を切り替えるボタン(記号の有効と無効，項目ごとの同期の範囲)
     fn toggle_part(&self) -> Option<Part> {
         match self.row.control {
-            Control::Symbols(..) => Some(Part::Top(2)),
+            Control::Symbols(..) => Some(Part::Bottom(0)),
             Control::List(spec, _) if spec.path == "commands" => Some(Part::Bottom(1)),
             Control::List(spec, _) if spec.has_enabled_flag() => Some(Part::Bottom(0)),
             Control::SyncFields(_) => Some(Part::Top(0)),
@@ -1884,7 +1884,7 @@ impl PageView {
                     kind,
                     indices: selected,
                 }),
-                Part::Top(2) => (!selected.is_empty()).then_some(Event::SymbolToggle {
+                Part::Bottom(0) => (!selected.is_empty()).then_some(Event::SymbolToggle {
                     kind,
                     indices: selected,
                 }),
@@ -2347,10 +2347,10 @@ impl PageView {
     }
 
     /// 試した結果を出す
-    pub fn show_preview(&mut self, kind: TryKind, text: &str) {
+    pub fn show_preview(&mut self, kind: TryKind, shown: &crate::engine::PreviewShown) {
         for row in &mut self.rows {
             if row.row.control == Control::Preview(kind) {
-                row.preview_result = text.to_string();
+                row.preview_result.clone_from(shown);
             }
         }
     }
@@ -2805,13 +2805,7 @@ impl PageView {
                         );
                     }
                 }
-                canvas.text(
-                    card.control,
-                    &row.preview_result,
-                    TextStyle::Body,
-                    Color::from(palette.text),
-                    TextLayout::WRAP,
-                );
+                preview_chips(canvas, theme, card.control, &row.preview_result);
             }
             Control::Note => {}
             _ => self.paint_list(canvas, frame, index, row),
@@ -3338,6 +3332,66 @@ impl PageView {
 }
 
 /// 表の行を見せる高さ
+/// 試した結果を rect の中に描く．語は札にして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
+/// 札にしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出す札は描かない
+fn preview_chips(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    shown: &crate::engine::PreviewShown,
+) {
+    use tokens::size::settings::{
+        PREVIEW_CHIP_GAP, PREVIEW_CHIP_PADDING_X, PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS,
+    };
+    let palette = &theme.palette;
+    if !shown.line.is_empty() {
+        canvas.text(
+            rect,
+            &shown.line,
+            TextStyle::Body,
+            Color::from(palette.text),
+            TextLayout::WRAP,
+        );
+    }
+    let height = size::BODY_LINE_HEIGHT + PREVIEW_CHIP_PADDING_Y * 2.0;
+    let (mut x, mut y) = (rect.x, rect.y);
+    canvas.push_clip(rect);
+    for chip in &shown.chips {
+        let width =
+            (canvas.width(chip, TextStyle::Body) + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
+        if x > rect.x && x + width > rect.x + rect.width {
+            x = rect.x;
+            y += height + PREVIEW_CHIP_GAP;
+        }
+        if y + height > rect.y + rect.height {
+            break;
+        }
+        let area = Rect::new(x, y, width, height);
+        // 札は入力欄と同じ地と枠にする(左の一覧の選んだ色は暗い外観でカードとほとんど同じになり見えない)
+        canvas.fill_round(area, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
+        canvas.stroke_round(
+            area,
+            PREVIEW_CHIP_RADIUS,
+            1.0,
+            Color::from(palette.control_stroke),
+        );
+        canvas.text(
+            Rect::new(
+                x + PREVIEW_CHIP_PADDING_X,
+                y,
+                width - PREVIEW_CHIP_PADDING_X * 2.0,
+                height,
+            ),
+            chip,
+            TextStyle::Body,
+            Color::from(palette.text),
+            TextLayout::LINE,
+        );
+        x += width + PREVIEW_CHIP_GAP;
+    }
+    canvas.pop_clip();
+}
+
 fn table_viewport(row: &RowState) -> f32 {
     row.card.as_ref().map_or(0.0, |card| {
         (card.control.height - size::TABLE_HEADER_HEIGHT).max(0.0)
@@ -3647,10 +3701,16 @@ impl Measured<'_> {
 
 impl Metrics for Measured<'_> {
     fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
-        let (style, line) = match kind {
-            TextKind::Body => (TextStyle::Body, size::BODY_LINE_HEIGHT),
-            TextKind::Caption => (TextStyle::Caption, size::NOTE_LINE_HEIGHT),
+        let style = match kind {
+            TextKind::Body => TextStyle::Body,
+            TextKind::Caption => TextStyle::Caption,
         };
+        // 行の数は書体の 1 行の高さで割って数える．置く場所の行の高さ(BODY_LINE_HEIGHT・NOTE_LINE_HEIGHT)は
+        // 書体の行より高いので，それで割ると長い文の行が足りなくなり，最後の行が欠ける
+        let line = self.measure.wrapped_height("あ", style, f32::MAX);
+        if line <= 0.0 {
+            return 1;
+        }
         let height = self.measure.wrapped_height(text, style, width.max(1.0));
         ((height / line).round() as usize).max(1)
     }

@@ -7,6 +7,10 @@
 /// | `{utc:…}` | 協定世界時の日時(既定の書式は `YYYY-MM-DD'T'hh:mm:ss'Z'`) |
 /// | `{unixtime}` | UNIX 時間(秒) |
 /// | `{date+1d}` `{time-30m}` `{date+1M@end}` | 日時の名前のあとに，ずらす量と合わせる先を左から順に当てる(DateStep) |
+/// | `{holiday}` `{holiday:平日}` | 祝日の名前(JapaneseCalendar)．祝日でなければ空か引数の文字 |
+/// | `{season}` `{greeting}` | 月の時候の挨拶(「晩秋の候」)と，時刻の挨拶(「こんにちは」) |
+/// | `{days:12/25}` `{days:2027-03-31}` | その日までの日数(過ぎていれば負)．年を書かなければ次に来るその日 |
+/// | `{age:1990-04-01}` | その日に生まれた人の満年齢 |
 /// | `{uuid}` | UUID(大文字．小文字は `{uuid|lower}`) |
 /// | `{random:1-6}` | その範囲の整数 |
 /// | `{alnum:8}` `{hex:8}` | その長さの英数字・16 進数(小文字) |
@@ -39,7 +43,7 @@ public enum TextTemplate {
 
     /// 日時の名前のあとに書く，ずらす量(`+1d`)と合わせる先(`@mon`)
     ///
-    /// - ずらす量: `+` か `-` と数と単位．単位は m 分・h 時間・d 日・w 週・M 月・y 年
+    /// - ずらす量: `+` か `-` と数と単位．単位は m 分・h 時間・d 日・w 週・M 月・y 年・b 平日(土日と祝日を飛ばす)
     /// - 合わせる先: `@mon`〜`@sun` その週(月曜から日曜)の曜日，`@1`〜`@31` その月の日(月の日数より大きければ月末)，`@end` 月末
     public enum DateStep: Sendable, Equatable {
         case shift(Int, CalendarDate.Unit)
@@ -77,7 +81,9 @@ public enum TextTemplate {
             }
         }
 
-        private static let units: [Character: CalendarDate.Unit] = ["m": .minute, "h": .hour, "d": .day, "w": .week, "M": .month, "y": .year]
+        private static let units: [Character: CalendarDate.Unit] = [
+            "m": .minute, "h": .hour, "d": .day, "w": .week, "M": .month, "y": .year, "b": .businessDay,
+        ]
         private static let weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
         private static func anchor(named word: Substring) -> CalendarDate.Anchor? {
@@ -175,7 +181,7 @@ public enum TextTemplate {
         return raw.map { filters.reduce($0) { value, filter in filter.apply(to: value) } }
     }
 
-    private static let dateNames: Set<String> = ["datetime", "date", "time", "utc", "unixtime"]
+    private static let dateNames: Set<String> = ["datetime", "date", "time", "utc", "unixtime", "holiday", "season", "greeting", "days", "age"]
 
     private static func dateValue(name: Substring, steps: Substring, argument: Substring?, values: Values) -> String? {
         guard let now = values.now, let steps = DateStep.parse(steps) else { return nil }
@@ -186,8 +192,36 @@ public enum TextTemplate {
         case "time": return DateTimeFormat.format(format ?? "hh:mm", date: date)
         case "utc": return DateTimeFormat.format(format ?? "YYYY-MM-DD'T'hh:mm:ss'Z'", date: date.inUTC)
         case "unixtime": return String(date.unixTime)
+        case "holiday": return JapaneseCalendar.holiday(on: date) ?? format ?? ""
+        case "season": return JapaneseCalendar.seasonalGreeting(month: date.month)
+        case "greeting": return JapaneseCalendar.greeting(hour: date.hour)
+        case "days":
+            guard let format, let target = day(format, from: date) else { return nil }
+            return String(date.days(until: target))
+        case "age":
+            guard let format, let birth = day(format, from: date, requiresYear: true), birth.days(until: date) >= 0 else { return nil }
+            let hadBirthday = (date.month, date.day) >= (birth.month, birth.day)
+            return String(date.year - birth.year - (hadBirthday ? 0 : 1))
         default: return DateTimeFormat.format(format ?? "YYYY/MM/DD hh:mm:ss", date: date)
         }
+    }
+
+    /// `2027-03-31`・`2027/3/31`・`12/25` の日．年を書かなければ，today から数えて次に来るその日(今日なら今日)．
+    /// 無い日(2 月 30 日など)と読めない書き方は nil
+    private static func day(_ text: String, from today: CalendarDate, requiresYear: Bool = false) -> CalendarDate? {
+        let numbers = text.split(whereSeparator: { $0 == "-" || $0 == "/" }).map { Int($0) }
+        guard numbers.count == 3 || (numbers.count == 2 && !requiresYear), numbers.allSatisfy({ $0 != nil }) else { return nil }
+        let values = numbers.compactMap { $0 }
+        let (month, day) = (values[values.count - 2], values[values.count - 1])
+        guard (1...12).contains(month), day >= 1 else { return nil }
+        func date(year: Int) -> CalendarDate? {
+            guard DefaultSettings.templateYearRange.contains(year), day <= CalendarDate.daysInMonth(year: year, month: month) else { return nil }
+            return today.anchored(to: .dayOfMonth(1)).shifted(by: (year - today.year) * 12 + month - today.month, .month)
+                .anchored(to: .dayOfMonth(day))
+        }
+        if values.count == 3 { return date(year: values[0]) }
+        // うるう日は 4 年(100 年おきの例外を含め 8 年)のうちに来る
+        return (today.year...today.year + 8).lazy.compactMap { date(year: $0) }.first { today.days(until: $0) >= 0 }
     }
 
     private static func baseValue(name: Substring, argument: String?, values: Values) -> String? {

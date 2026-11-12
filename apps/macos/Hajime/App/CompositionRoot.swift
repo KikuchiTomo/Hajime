@@ -132,11 +132,13 @@ final class CompositionRoot {
     }
 
     func makeSession() -> InputSession {
-        InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
-                                                         lexicon: lexicon, englishTerms: englishTerms),
-                     lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                     rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
-                     calendar: calendar)
+        // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ
+        let engineSession = engine.makeSession()
+        return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
+                                                             emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
+                            lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
+                            rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
+                            calendar: calendar, scorer: engineSession)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)

@@ -488,7 +488,7 @@ impl App {
                 ..
             } => {
                 let shown = if text.trim().is_empty() {
-                    String::new()
+                    crate::engine::PreviewShown::default()
                 } else {
                     model
                         .store()
@@ -1016,13 +1016,13 @@ impl App {
     }
 }
 
-/// 試す語と読みに変換マクロを当てた結果の文．つながらなければ空
+/// 試す語と読みに変換マクロを当てた結果．つながらなければ空
 pub fn macro_preview(
     model: &SettingsModel<Store>,
     text: &str,
     reading: &str,
     draft: &str,
-) -> String {
+) -> crate::engine::PreviewShown {
     model
         .store()
         .preview_macros(text, reading, draft)

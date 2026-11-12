@@ -57,6 +57,20 @@ final class PaletteSession {
     private var firstRow = 0
     /// 肌の色の帯．forDefault なら既定の肌の色を選ぶ帯，そうでなければ選んでいる絵文字の帯
     private var picker: (forDefault: Bool, selected: Int)?
+    /// 前に出した内容のうち，動き(PalettePanel.Motion)を決めるのに使うもの
+    private var shown: Shown?
+
+    private struct Shown {
+        var kind: PaletteItem.Kind
+        var query: String
+        var rowCount: Int
+        var firstRow: Int
+        var selection: PalettePanel.Position?
+        var tabs: [PaletteSection.Kind]
+        var selectedTab: PaletteSection.Kind?
+        var hasPicker: Bool
+        var preview: (text: String, isPinned: Bool)?
+    }
 
     init(kind: PaletteItem.Kind, inputMode: InputMode, services: PaletteServices, settings: any SettingsReading, keyNames: KeyNameStyle,
          makeComposition: @escaping () -> Composition) {
@@ -347,9 +361,12 @@ final class PaletteSession {
         display = showsTyped && !typed.isEmpty ? typed : composition.displayReading
     }
 
-    /// まとまりとマス目の行を作り直す
+    /// まとまりとマス目の行を作り直す．keepingSelection なら，選んでいた文字を(ピン留めの行が増減しても)同じまとまりで選んだままにし，
+    /// 画面の同じ行に残るようスクロールの位置も合わせる
     private func rebuild(keepingSelection: Bool = false) {
-        let previous = keepingSelection ? selection : nil
+        let previous: (section: PaletteSection.Kind, text: String, row: Int)? = keepingSelection ? selection.flatMap { position in
+            selectedItem.map { (sections[rows[position.row].section].kind, $0.text, position.row) }
+        } : nil
         if let index {
             if query.isEmpty {
                 sections = [PaletteSection(kind: .pinned, items: pinnedItems.filter { $0.kind.cellShape == shape }),
@@ -374,14 +391,27 @@ final class PaletteSession {
                 rows.append(Row(section: sectionIndex, start: start, count: min(perRow, section.items.count - start)))
             }
         }
-        if let previous, item(at: previous) != nil {
-            selection = previous
+        if let previous, let position = position(of: previous.text, preferring: previous.section) {
+            selection = position
+            firstRow += position.row - previous.row
         } else {
             selection = rows.isEmpty ? nil : PalettePanel.Position(row: 0, column: 0)
             firstRow = 0
         }
         firstRow = min(firstRow, maximumFirstRow)
         ensureVisible()
+    }
+
+    /// 文字のマスの位置．prefer のまとまりにあればそこを，無ければ最初に出てくるところを返す
+    private func position(of text: String, preferring preferred: PaletteSection.Kind) -> PalettePanel.Position? {
+        var fallback: PalettePanel.Position?
+        for (rowIndex, row) in rows.enumerated() {
+            guard let column = sections[row.section].items[row.start..<(row.start + row.count)].firstIndex(where: { $0.text == text }) else { continue }
+            let position = PalettePanel.Position(row: rowIndex, column: column - row.start)
+            if sections[row.section].kind == preferred { return position }
+            if fallback == nil { fallback = position }
+        }
+        return fallback
     }
 
     // MARK: - 動く
@@ -464,7 +494,7 @@ final class PaletteSession {
         }
         let message: String? = index == nil ? PaletteStrings.loading : (rows.isEmpty && !query.isEmpty ? PaletteStrings.notFound : nil)
         let selected = selectedItem
-        return PalettePanel(
+        var panel = PalettePanel(
             modes: PaletteItem.Kind.allCases.map { PalettePanel.Mode(kind: $0, title: PaletteStrings.title(of: $0), isSelected: $0 == kind) },
             query: display,
             placeholder: PaletteStrings.placeholder(of: kind),
@@ -482,6 +512,37 @@ final class PaletteSession {
             },
             message: message,
             hints: hints(for: selected))
+        let next = Shown(kind: kind, query: display, rowCount: rows.count, firstRow: firstRow, selection: selection, tabs: tabs.map(\.section),
+                         selectedTab: tabs.first { $0.isSelected }?.section, hasPicker: picker != nil,
+                         preview: selected.map { ($0.text, pinned.contains($0.text)) })
+        panel.motion = shown.map { Self.motion(from: $0, to: next) } ?? PalettePanel.Motion()
+        shown = next
+        return panel
+    }
+
+    /// 前に出した内容から今の内容への動き．同じ内容を出し直したときは動かない
+    private static func motion(from old: Shown, to new: Shown) -> PalettePanel.Motion {
+        var motion = PalettePanel.Motion()
+        let sameContent = old.kind == new.kind && old.query == new.query && old.rowCount == new.rowCount
+        if sameContent, old.firstRow == new.firstRow, let from = old.selection, from != new.selection {
+            motion.selectionFrom = from
+        }
+        if old.kind != new.kind {
+            motion.modeFrom = old.kind
+            let kinds = PaletteItem.Kind.allCases
+            motion.content = (kinds.firstIndex(of: new.kind) ?? 0) > (kinds.firstIndex(of: old.kind) ?? 0) ? .next : .previous
+        } else if sameContent, abs(new.firstRow - old.firstRow) >= DefaultSettings.paletteJumpRows {
+            // 何行も飛んだ(まとまりのタブ・Tab・Home・End)ときだけ中身を送る．1 行ずつのスクロールでは送らない
+            motion.content = new.firstRow > old.firstRow ? .down : .up
+        }
+        if old.tabs == new.tabs, !new.tabs.isEmpty, let from = old.selectedTab, from != new.selectedTab {
+            motion.tabFrom = from
+        }
+        motion.opensPicker = !old.hasPicker && new.hasPicker
+        if let before = old.preview, let after = new.preview, before.text == after.text, before.isPinned != after.isPinned {
+            motion.togglesPin = true
+        }
+        return motion
     }
 
     private var previewFields: PalettePanel.PreviewFields {

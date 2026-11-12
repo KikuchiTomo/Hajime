@@ -142,6 +142,67 @@ struct InputExtrasTests {
         #expect(TextFilter.url.apply(to: "東京 タワー/a~b") == "%E6%9D%B1%E4%BA%AC%20%E3%82%BF%E3%83%AF%E3%83%BC%2Fa~b")
     }
 
+    @Test("R-21: 祝日の名前と，土日と祝日を飛ばす平日のずらし")
+    func holidaysAndBusinessDays() {
+        // 2026/11/01 は日曜日．11/3 は文化の日
+        let values = TextTemplate.Values(now: now)
+        #expect(TextTemplate.expand("[{holiday}]・{holiday:平日}・{holiday+2d}", values: values) == "[]・平日・文化の日")
+        #expect(TextTemplate.expand("{date+1b:M/D}・{date+2b:M/D(ddd)}・{date-1b:M/D(ddd)}・{date+0b:M/D}", values: values)
+            == "11/2・11/4(水)・10/30(金)・11/1")
+        // 年をまたぐと，元日と土日を飛ばす
+        let yearEnd = TextTemplate.Values(now: CalendarDate(year: 2026, month: 12, day: 31, weekday: 5))
+        #expect(TextTemplate.expand("{date+1b}・{date+1d:GGEE年 FFFF年度}", values: yearEnd) == "2027/01/04・令和9年 2026年度")
+
+        func holiday(_ year: Int, _ month: Int, _ day: Int) -> String? {
+            JapaneseCalendar.holiday(on: CalendarDate(year: year, month: month, day: day, weekday: 1))
+        }
+        // 敬老の日(9/21)と秋分の日(9/23)に挟まれた日は国民の休日，日曜日の祝日のあとは振替休日
+        #expect(holiday(2026, 9, 21) == "敬老の日" && holiday(2026, 9, 22) == "国民の休日" && holiday(2026, 9, 23) == "秋分の日")
+        #expect(holiday(2026, 5, 3) == "憲法記念日" && holiday(2026, 5, 6) == "振替休日" && holiday(2026, 5, 7) == nil)
+        #expect(holiday(2027, 3, 21) == "春分の日" && holiday(2027, 3, 22) == "振替休日")
+        #expect(holiday(2026, 3, 20) == "春分の日" && holiday(2026, 1, 12) == "成人の日" && holiday(2026, 10, 12) == "スポーツの日")
+        // 2021 年は山の日を 8/8 に移し，日曜日なので 8/9 が振替休日．祝日を求めない年は nil
+        #expect(holiday(2021, 8, 8) == "山の日" && holiday(2021, 8, 9) == "振替休日" && holiday(2021, 8, 11) == nil)
+        #expect(holiday(2019, 1, 1) == nil && holiday(2100, 1, 1) == nil)
+    }
+
+    @Test("R-21: 時候の挨拶・時刻の挨拶・ある日までの日数・満年齢")
+    func seasonGreetingDaysAndAge() {
+        let values = TextTemplate.Values(now: now)
+        #expect(TextTemplate.expand("{season}・{season+2M}", values: values) == "晩秋の候・厳寒の候")
+        #expect(TextTemplate.expand("{greeting}・{greeting+3h}・{greeting+10h}・{greeting-6h}", values: values)
+            == "おはようございます・こんにちは・こんばんは・こんばんは")
+        // 年を書かなければ次に来るその日．2/29 は次のうるう年
+        #expect(TextTemplate.expand("{days:12/25}・{days:11/1}・{days:10/31}・{days:2026-10-01}・{days:2/29}", values: values)
+            == "54・0・364・-31・485")
+        #expect(TextTemplate.expand("{age:1990-04-01}・{age:1990/11/2}", values: values) == "36・35")
+        #expect(TextTemplate.expand("{days:2/30}・{days}・{days:x}・{age:12/25}・{age:2030-01-01}・{days:99999-1-1}", values: values)
+            == "{days:2/30}・{days}・{days:x}・{age:12/25}・{age:2030-01-01}・{days:99999-1-1}")
+    }
+
+    @Test("R-21: 年度・元年・和風月名・干支の書式")
+    func japaneseDateSymbols() {
+        let values = TextTemplate.Values(now: now)
+        #expect(TextTemplate.expand("{date:FFFF年度 'FY'FF NN JJ}", values: values) == "2026年度 FY26 霜月 丙午")
+        #expect(TextTemplate.expand("{date+4M:FFFF}・{date+5M:FFFF}", values: values) == "2026・2027")
+        let heisei = TextTemplate.Values(now: CalendarDate(year: 2019, month: 4, day: 30, weekday: 3))
+        #expect(TextTemplate.expand("{date:GGEE年}・{date+1d:GGEE年}・{date+1d:GGE年}", values: heisei) == "平成31年・令和元年・令和1年")
+        #expect(TextTemplate.expand("{date:GGEE年M月D日|kansuji}", values: heisei) == "平成三十一年四月三十日")
+    }
+
+    @Test("R-21: 数字の漢数字・大字・3 桁区切り・丸数字と，HTML・Base64 の形")
+    func numberAndEncodingFilters() {
+        let values = TextTemplate.Values(text: "2026年 第3回 1234567.89 007 ７５", reading: "")
+        #expect(TextTemplate.expand("{text|kansuji}", values: values) == "二千二十六年 第三回 百二十三万四千五百六十七.89 七 七十五")
+        #expect(TextTemplate.expand("{text|kanjidigits}", values: values) == "二〇二六年 第三回 一二三四五六七.89 〇〇七 七五")
+        #expect(TextTemplate.expand("{text|comma}", values: values) == "2,026年 第3回 1,234,567.89 007 ７５")
+        #expect(TextTemplate.expand("{text|circled}", values: values) == "2026年 第③回 1234567.89 ⑦ ７５")
+        #expect(TextFilter.daiji.apply(to: "金12000円・10・0") == "金壱万弐千円・壱拾・0")
+        #expect(TextFilter.kansuji.apply(to: "0・00・12345678901234567") == "〇・〇・12345678901234567")
+        #expect(TextFilter.html.apply(to: "<a href=\"x\">&'") == "&lt;a href=&quot;x&quot;&gt;&amp;&#39;")
+        #expect(TextFilter.base64.apply(to: "東京") == "5p2x5Lqs")
+    }
+
     @Test("R-22: かなをヘボン式のローマ字にする(ん は n，っ は子音を重ね，ー は母音を重ねる)")
     func romaji() {
         #expect(HepburnRomanizer.romaji(from: "とうきょう") == "toukyou")
@@ -315,6 +376,22 @@ struct InputExtrasTests {
         var empty: [String: JSONValue] = [SettingsSchema.versionKey: .number(10)]
         SettingsSchema.migrate(&empty)
         #expect(empty["macros"] == nil)
+        // バージョン 14 で保存した一覧には，バージョン 15 で足した形だけを足す
+        let version14 = Array(DefaultSettings.conversionMacros.prefix(DefaultSettings.conversionMacros.count - 3))
+        var saved: [String: JSONValue] = [
+            SettingsSchema.versionKey: .number(14), "macros": try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(version14)),
+        ]
+        SettingsSchema.migrate(&saved)
+        let upgraded15 = try JSONDecoder().decode([ConversionMacro].self, from: JSONEncoder().encode(try #require(saved["macros"])))
+        #expect(upgraded15 == DefaultSettings.conversionMacros)
+    }
+
+    @Test("R-22: 数字の形の変換マクロは，語に数字があるときだけ出る")
+    func numberMacroPresets() {
+        let macros = DefaultSettings.addedMacros.suffix(3).map { ConversionMacro(id: $0.id, pattern: $0.pattern) }
+        #expect(ConversionMacros.results(text: "第3回", reading: "だいさんかい", macros: macros) == ["第三回", "第参回"])
+        #expect(ConversionMacros.results(text: "12000円", reading: "12000えん", macros: macros) == ["一万二千円", "壱万弐千円", "12,000円"])
+        #expect(ConversionMacros.results(text: "東京", reading: "とうきょう", macros: macros).isEmpty)
     }
 
     @Test("設定の新しい項目は既定でオフで，ファイルに書いて読み戻せる")

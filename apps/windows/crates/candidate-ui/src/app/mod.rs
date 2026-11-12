@@ -32,7 +32,7 @@ const SECURITY_IDENTIFICATION: u32 = 0x0001_0000;
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const ANCHOR_GAP: i32 = 2;
 /// フェードの 1 コマの長さ(60 コマ毎秒)
-const FRAME_MILLISECONDS: u32 = 16;
+pub(crate) const FRAME_MILLISECONDS: u32 = 16;
 
 type Inbox = Arc<Mutex<VecDeque<UiCommand>>>;
 

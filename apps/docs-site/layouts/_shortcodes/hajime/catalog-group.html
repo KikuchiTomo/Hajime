@@ -1,0 +1,9 @@
+{{- /*
+機能の一覧の 1 つの分類．title が分類の名前
+*/ -}}
+<div class="hajime-catalog__group">
+  <h3 class="hajime-catalog__group-title">{{ .Get "title" }}</h3>
+  <ul class="hajime-catalog__items">
+    {{- .Inner -}}
+  </ul>
+</div>

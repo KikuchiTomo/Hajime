@@ -280,6 +280,11 @@ private struct ConversionTab: View {
             } footer: {
                 Text(UIStrings.Settings.zenzaiModelNote)
             }
+            Section {
+                ResettableToggle(model: model, title: UIStrings.Settings.candidateReranking, keyPath: \.candidateReranking)
+            } footer: {
+                Text(UIStrings.Settings.candidateRerankingNote)
+            }
             Section(UIStrings.Settings.learning) {
                 ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))
                 Button(UIStrings.Settings.resetLearning, role: .destructive) { model.resetLearning() }
