@@ -5,7 +5,7 @@
 //! 部品は右の端にそろえ，既定に戻すボタンは部品の右の決まった場所に置く(macOS の ResettableRow と同じ並び)．
 //! 注記は前の行のカードの中に，名前の下の説明として入れる．窓が狭く名前の欄が足りないときは，部品を名前の下に置く
 
-use crate::pages::{Control, ListButtons, Row, Section};
+use crate::pages::{Control, ListButtons, Row, Section, TryKind};
 use crate::strings::{keys, more};
 use tokens::size::settings_windows as size;
 
@@ -260,12 +260,21 @@ fn place(
         return place_inputs(position, fields, buttons, frame, size::LIST_HEIGHT, metrics);
     }
     match control {
-        Control::Preview => place_inputs(
+        // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
+        Control::Preview(TryKind::Language) => place_inputs(
             position,
             2,
             PREVIEW_BUTTONS,
             frame,
             size::BODY_LINE_HEIGHT * size::PREVIEW_LINES,
+            metrics,
+        ),
+        Control::Preview(TryKind::Macros) => place_inputs(
+            position,
+            2,
+            NO_BUTTONS,
+            frame,
+            size::BODY_LINE_HEIGHT * size::MACRO_PREVIEW_LINES,
             metrics,
         ),
         Control::KeymapReport | Control::ThemeReport => place_inputs(

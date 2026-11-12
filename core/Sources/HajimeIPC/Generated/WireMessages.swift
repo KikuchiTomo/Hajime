@@ -879,13 +879,14 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case resetUsage
     case resetPaletteHistory
     case previewLanguage(text: String, precedingText: String?)
+    case previewMacros(text: String, reading: String, pattern: String?)
     case readUserDictionary(offset: UInt32, limit: UInt32)
     case addUserDictionaryEntry(entry: WireDictionaryEntry)
     case removeUserDictionaryEntry(entry: WireDictionaryEntry)
     case mergeUserDictionary(entries: [WireDictionaryEntry])
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, text, reading, rect, composition, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, offset, limit, entry, entries
+        case type, protocolVersion, session, input, context, mode, text, reading, rect, composition, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, pattern, offset, limit, entry, entries
     }
 
     public init(from decoder: any Decoder) throws {
@@ -992,6 +993,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = .resetPaletteHistory
         case "previewLanguage":
             self = try .previewLanguage(text: container.decode(String.self, forKey: .text), precedingText: container.decodeIfPresent(String.self, forKey: .precedingText))
+        case "previewMacros":
+            self = try .previewMacros(text: container.decode(String.self, forKey: .text), reading: container.decode(String.self, forKey: .reading), pattern: container.decodeIfPresent(String.self, forKey: .pattern))
         case "readUserDictionary":
             self = try .readUserDictionary(offset: container.decode(UInt32.self, forKey: .offset), limit: container.decode(UInt32.self, forKey: .limit))
         case "addUserDictionaryEntry":
@@ -1174,6 +1177,11 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encode("previewLanguage", forKey: .type)
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(precedingText, forKey: .precedingText)
+        case .previewMacros(let text, let reading, let pattern):
+            try container.encode("previewMacros", forKey: .type)
+            try container.encode(text, forKey: .text)
+            try container.encode(reading, forKey: .reading)
+            try container.encodeIfPresent(pattern, forKey: .pattern)
         case .readUserDictionary(let offset, let limit):
             try container.encode("readUserDictionary", forKey: .type)
             try container.encode(offset, forKey: .offset)
@@ -1244,6 +1252,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .resetUsage: "WireRequestBody.resetUsage"
         case .resetPaletteHistory: "WireRequestBody.resetPaletteHistory"
         case .previewLanguage: "WireRequestBody.previewLanguage"
+        case .previewMacros: "WireRequestBody.previewMacros"
         case .readUserDictionary: "WireRequestBody.readUserDictionary"
         case .addUserDictionaryEntry: "WireRequestBody.addUserDictionaryEntry"
         case .removeUserDictionaryEntry: "WireRequestBody.removeUserDictionaryEntry"
@@ -1286,13 +1295,14 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
     case themeReport(issues: [WireContrastIssue])
     case usage(values: String, firstCandidateRate: Double?)
     case languagePreview(words: [WirePreviewWord])
+    case macroPreview(results: [String])
     case userDictionary(entries: [WireDictionaryEntry], total: UInt32)
     case dictionaryAdded(result: WireDictionaryAddResult)
     case dictionaryMerged(added: UInt32)
     case error(code: WireErrorCode)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, items, result, values, report, issues, firstCandidateRate, words, entries, total, code
+        case type, protocolVersion, session, state, handled, operations, settings, status, dictionary, added, skipped, reason, items, result, values, report, issues, firstCandidateRate, words, results, entries, total, code
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1333,6 +1343,8 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
             self = try .usage(values: container.decode(String.self, forKey: .values), firstCandidateRate: container.decodeIfPresent(Double.self, forKey: .firstCandidateRate))
         case "languagePreview":
             self = try .languagePreview(words: container.decode([WirePreviewWord].self, forKey: .words))
+        case "macroPreview":
+            self = try .macroPreview(results: container.decode([String].self, forKey: .results))
         case "userDictionary":
             self = try .userDictionary(entries: container.decode([WireDictionaryEntry].self, forKey: .entries), total: container.decode(UInt32.self, forKey: .total))
         case "dictionaryAdded":
@@ -1404,6 +1416,9 @@ public enum WireResponseBody: Sendable, Equatable, Codable {
         case .languagePreview(let words):
             try container.encode("languagePreview", forKey: .type)
             try container.encode(words, forKey: .words)
+        case .macroPreview(let results):
+            try container.encode("macroPreview", forKey: .type)
+            try container.encode(results, forKey: .results)
         case .userDictionary(let entries, let total):
             try container.encode("userDictionary", forKey: .type)
             try container.encode(entries, forKey: .entries)
@@ -1441,6 +1456,7 @@ extension WireResponseBody: CustomStringConvertible, CustomDebugStringConvertibl
         case .themeReport: "WireResponseBody.themeReport"
         case .usage: "WireResponseBody.usage"
         case .languagePreview: "WireResponseBody.languagePreview"
+        case .macroPreview: "WireResponseBody.macroPreview"
         case .userDictionary: "WireResponseBody.userDictionary"
         case .dictionaryAdded: "WireResponseBody.dictionaryAdded"
         case .dictionaryMerged: "WireResponseBody.dictionaryMerged"

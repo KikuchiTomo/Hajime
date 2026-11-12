@@ -168,6 +168,10 @@ enum DesignTokens {
             static let ruleTableHeight: CGFloat = 220
             static let commandEditorWidth: CGFloat = 460
             static let ruleSearchWidth: CGFloat = 160
+            static let previewChipPaddingX: CGFloat = 8
+            static let previewChipPaddingY: CGFloat = 4
+            static let previewChipRadius: CGFloat = 6
+            static let previewChipGap: CGFloat = 6
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
             static let commandReadingColumnWidth: CGFloat = 110
@@ -443,6 +447,7 @@ enum DesignTokens {
             static let tableIndicatorInset: CGFloat = 8
             static let tooltipOffset: CGFloat = 24
             static let previewLines: CGFloat = 2
+            static let macroPreviewLines: CGFloat = 5
             static let reportLines: CGFloat = 4
             static let statusLines: CGFloat = 3
             static let pageScroll: CGFloat = 0.8

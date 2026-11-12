@@ -135,7 +135,8 @@ final class CompositionRoot {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                          lexicon: lexicon, englishTerms: englishTerms),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                     rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices)
+                     rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
+                     calendar: calendar)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)
@@ -148,10 +149,13 @@ final class CompositionRoot {
         // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける
         let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, englishTerms: englishTerms),
                                           lexicon: lexicon, settings: settings)
+        // 変換マクロの「試す」は，入力と同じ日時と乱数で見本の語に当てる
+        let macroPreview = ConversionMacroPreview(settings: settings, calendar: calendar)
         let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, files: SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations), associations: associations,
                                                   commandBookmarks: commandBookmarks,
                                                   resetLearning: { [engine] in engine.resetLearning() },
-                                                  previewLanguage: { preview.preview($0, precedingText: $1) })
+                                                  previewLanguage: { preview.preview($0, precedingText: $1) },
+                                                  previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) })
         controller.noteSetAsideFile(settings.setAsideFile)
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
         controller.setCheckForUpdates(Self.checkForUpdates)

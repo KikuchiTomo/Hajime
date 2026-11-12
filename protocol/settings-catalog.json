@@ -62,6 +62,7 @@
     "liveConversionDelay",
     "liveConversionSkipLength",
     "looseReadings",
+    "macroSkipsSameReading",
     "macros",
     "meaningPlacement",
     "meaningSenseLimit",

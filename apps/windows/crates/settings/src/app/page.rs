@@ -13,10 +13,11 @@ use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{
-    self, Action, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row, Section,
+    self, Action, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row,
+    Section, TryKind, MACROS_PATH,
 };
 use crate::store::SettingsStore;
-use crate::strings::{features, keys, more, rule_list, settings, windows as text};
+use crate::strings::{extras, features, keys, more, rule_list, settings, windows as text};
 use crate::ui::anim::{Easing, Tween};
 use crate::ui::scroll::Scroller;
 use crate::ui::table::{Move, Table};
@@ -108,10 +109,12 @@ pub enum Event {
     },
     /// キー設定のひな形を読み込む(ひな形の値)
     LoadPreset(&'static str),
-    /// 英語と日本語の見分けを試す
+    /// 試す．英語と日本語の見分けなら打った文と前の文字列，変換マクロなら試す語と読みと，変換マクロの欄に書いている途中の形(draft)
     Preview {
+        kind: TryKind,
         text: String,
         preceding: String,
+        draft: String,
     },
     /// 既定のブラウザーで開く(謝辞の出どころ)
     OpenUrl(String),
@@ -283,6 +286,8 @@ pub struct Extras {
     pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
+    /// 変換マクロを試した結果の文(コマンドのページを出すたびに読む)
+    pub macro_preview: String,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
     pub fonts: Vec<InstalledFace>,
 }
@@ -934,12 +939,12 @@ impl RowState {
             Control::Color => parts.push(Part::Color),
             Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
             Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
-            Control::Preview => parts.extend([
-                Part::PreviewField(0),
-                Part::PreviewField(1),
-                Part::PreviewAdd(0),
-                Part::PreviewAdd(1),
-            ]),
+            Control::Preview(kind) => {
+                parts.extend([Part::PreviewField(0), Part::PreviewField(1)]);
+                if *kind == TryKind::Language {
+                    parts.extend([Part::PreviewAdd(0), Part::PreviewAdd(1)]);
+                }
+            }
             control => {
                 if let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
                     parts.extend((0..spec.fields.len()).map(Part::Field));
@@ -1312,6 +1317,9 @@ impl PageView {
                     row.text = crate::keys::assigned(values.value("keymap"), command)
                 }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
+                Control::Preview(TryKind::Macros) => {
+                    row.preview_result = extras.macro_preview.clone();
+                }
                 Control::ThemeReport => row.text = extras.theme_report.clone(),
                 Control::Color => row.color = values.text(row.row.path),
                 _ => {}
@@ -1748,7 +1756,7 @@ impl PageView {
                     .map(|(_, url, _)| url.to_string())?;
                 return Some(Event::OpenUrl(url));
             }
-            (Control::Preview, Part::PreviewAdd(index)) => {
+            (Control::Preview(TryKind::Language), Part::PreviewAdd(index)) => {
                 let typed = row
                     .edit(Part::PreviewField(0))
                     .map(ffi::window_text)
@@ -1961,8 +1969,23 @@ impl PageView {
         event
     }
 
-    /// 打つ欄の文字が変わった．頼みがあれば返す(試す欄)
+    /// 打つ欄の文字が変わった．頼みがあれば返す(試す欄．変換マクロの欄に書いている形も試す)
     pub fn edited(&mut self, element: Element) -> Option<Event> {
+        let changed = self.rows.get(element.row)?;
+        let macro_preview = match (&changed.row.control, element.part) {
+            (Control::Preview(TryKind::Macros), Part::PreviewField(_)) => true,
+            (Control::List(spec, _), Part::Field(0)) => spec.path == MACROS_PATH,
+            _ => false,
+        };
+        if macro_preview {
+            let (text, preceding, draft) = self.macro_preview_inputs()?;
+            return Some(Event::Preview {
+                kind: TryKind::Macros,
+                text,
+                preceding,
+                draft,
+            });
+        }
         let row = self.rows.get_mut(element.row)?;
         match element.part {
             Part::Search => {
@@ -1982,12 +2005,39 @@ impl PageView {
                     .map(|window| ffi::window_text(*window))
                     .collect();
                 Some(Event::Preview {
+                    kind: TryKind::Language,
                     text: texts.first().cloned().unwrap_or_default(),
                     preceding: texts.get(1).cloned().unwrap_or_default(),
+                    draft: String::new(),
                 })
             }
             _ => None,
         }
+    }
+
+    /// 変換マクロの試す欄の語と読みと，変換マクロの欄に書いている途中の形．試す欄が無いページでは None
+    pub fn macro_preview_inputs(&self) -> Option<(String, String, String)> {
+        let preview = self
+            .rows
+            .iter()
+            .find(|row| row.row.control == Control::Preview(TryKind::Macros))?;
+        let texts: Vec<String> = preview
+            .preview_fields
+            .iter()
+            .map(|window| ffi::window_text(*window))
+            .collect();
+        let draft = self
+            .rows
+            .iter()
+            .find(|row| matches!(&row.row.control, Control::List(spec, _) if spec.path == MACROS_PATH))
+            .and_then(|row| row.edit(Part::Field(0)))
+            .map(ffi::window_text)
+            .unwrap_or_default();
+        Some((
+            texts.first().cloned().unwrap_or_default(),
+            texts.get(1).cloned().unwrap_or_default(),
+            draft,
+        ))
     }
 
     /// 打つ欄で Enter を押した(一覧なら追加・更新のボタンを押す)
@@ -2297,9 +2347,9 @@ impl PageView {
     }
 
     /// 試した結果を出す
-    pub fn show_preview(&mut self, text: &str) {
+    pub fn show_preview(&mut self, kind: TryKind, text: &str) {
         for row in &mut self.rows {
-            if row.row.control == Control::Preview {
+            if row.row.control == Control::Preview(kind) {
                 row.preview_result = text.to_string();
             }
         }
@@ -2737,7 +2787,8 @@ impl PageView {
                 self.paint_text_box(canvas, frame, index, row, card.control);
             }
             Control::ThemePreview => canvas.preview(card.control),
-            Control::Preview => {
+            // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
+            Control::Preview(_) => {
                 for field in 0..2 {
                     self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
                 }
@@ -3347,8 +3398,12 @@ impl<F: FnMut() -> u16> FieldSource<'_, F> {
 /// 一覧の入力欄・検索欄・試す欄の標準の EDIT を用意する
 fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowState) {
     match &row.row.control {
-        Control::Preview => {
-            for label in [features::TRY_PLACEHOLDER, features::TRY_PRECEDING] {
+        Control::Preview(kind) => {
+            let labels = match kind {
+                TryKind::Language => [features::TRY_PLACEHOLDER, features::TRY_PRECEDING],
+                TryKind::Macros => [extras::TRY_MACRO_WORD, extras::TRY_MACRO_READING],
+            };
+            for label in labels {
                 if let Some(window) = fields.take(label) {
                     row.preview_fields.push(window);
                 }

@@ -41,7 +41,7 @@ final class Harness {
          associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false, hidesPredictions: Bool = true,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
          wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
-         palette: ((FakeSettings) -> PaletteServices)? = nil) {
+         palette: ((FakeSettings) -> PaletteServices)? = nil, calendar: (any CalendarReading)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
@@ -50,7 +50,8 @@ final class Harness {
                                     associations: associations, keyNames: keyNames,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
                                     predictionHiding: hidesPredictions ? SettingsPredictionHiding(settings: store) : nil,
-                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store))
+                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store),
+                                    calendar: calendar)
     }
 
     func type(_ text: String) {

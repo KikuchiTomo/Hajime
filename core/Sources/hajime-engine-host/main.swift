@@ -210,6 +210,8 @@ func run() -> Int32 {
     // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
     let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, englishTerms: englishTerms),
                                       lexicon: lexicon, settings: settings)
+    // 変換マクロの「試す」は，入力と同じ日時と乱数で見本の語に当てる(macOS と同じ)
+    let macroPreview = ConversionMacroPreview(settings: settings, calendar: calendar)
     // 戻した補正を設定の「直さない語句」に覚える(macOS の CompositionRoot と同じ)
     let rejections = SettingsCorrectionRejections(settings: settings)
     // 予測に出した語句を設定の「予測に表示しない語句」に入れる(macOS の CompositionRoot と同じ)
@@ -234,7 +236,7 @@ func run() -> Int32 {
                                                           lexicon: lexicon, englishTerms: englishTerms),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                          keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
-                         palette: palette)
+                         palette: palette, calendar: calendar)
         },
         settings: settings,
         ui: sendToWindow,
@@ -253,7 +255,8 @@ func run() -> Int32 {
             resetLearning: { [engine] in engine.resetLearning() },
             usage: usage,
             resetPaletteHistory: resetPaletteHistory,
-            previewLanguage: { preview.preview($0, precedingText: $1) }
+            previewLanguage: { preview.preview($0, precedingText: $1) },
+            previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) }
         ),
         runCommand: { command in
             // 読みで呼び出すコマンド(R-22)．Windows だけで動かす(Linux はまだ設定の画面が無く，コマンドを登録できない)

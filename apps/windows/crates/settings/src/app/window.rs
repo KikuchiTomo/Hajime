@@ -532,6 +532,11 @@ impl App {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = super::actions::keymap_report(model);
             }
+            // 変換マクロの一覧やオン・オフが変わったら，試した結果も読み直す
+            if let Some((text, reading, draft)) = self.view.macro_preview_inputs() {
+                self.extras.macro_preview =
+                    super::actions::macro_preview(model, &text, &reading, &draft);
+            }
             if self.view.page == Page::Appearance && self.extras.fonts.is_empty() {
                 self.extras.fonts = candidate_ui::app::fonts::installed();
             }

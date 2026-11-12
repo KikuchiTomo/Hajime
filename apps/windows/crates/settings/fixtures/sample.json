@@ -418,8 +418,64 @@
         "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000009",
         "pattern": "`{text}`",
         "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-00000000000A",
+        "pattern": "〈{text}〉",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-00000000000B",
+        "pattern": "“{text}”",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-00000000000C",
+        "pattern": "\"{text}\"",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-00000000000D",
+        "pattern": "{text}（{reading|katakana}）",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-00000000000E",
+        "pattern": "{reading|romaji}",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-00000000000F",
+        "pattern": "[[rb:{text} > {reading}]]",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000010",
+        "pattern": "\\ruby{{{text}}}{{{reading}}}",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000011",
+        "pattern": "《《{text}》》",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000012",
+        "pattern": "#{text}",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000013",
+        "pattern": "~~{text}~~",
+        "isEnabled": false
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000014",
+        "pattern": "[{text}](https://ja.wikipedia.org/wiki/{text|url})",
+        "isEnabled": false
       }
     ],
+    "macroSkipsSameReading": true,
     "meaningPlacement": "side",
     "meaningSenseLimit": 3,
     "misreadings": true,

@@ -536,8 +536,11 @@ public enum DefaultSettings {
     public static let maximumTemplateOutputLength = 256
     /// `{random:a-b}` の範囲の幅の上限
     public static let maximumTemplateRandomRange = 1_000_000_000
-    /// `{datetime+nd}` でずらせる日数の上限
-    public static let maximumTemplateDayOffset = 36_500
+    /// `{date+1d}` などでずらす数の上限(単位によらない)
+    public static let maximumTemplateShift = 36_500
+    /// `{alnum}` `{hex}` の文字数の既定と上限
+    public static let templateRandomTextLength = 8
+    public static let maximumTemplateRandomTextLength = 64
     /// コマンドの数・名前と行き先の長さの上限
     public static let maximumCommands = 200
     public static let maximumCommandTitleLength = 40
@@ -553,7 +556,7 @@ public enum DefaultSettings {
     public static let maximumMacroPatternLength = 120
     /// 連想の一覧で変換マクロのまとまりに付ける説明
     public static let macroGroupLabel = "整形"
-    /// 初めから入っている変換マクロ
+    /// 初めから入っている変換マクロ．addedMacros は無効にして入れておき，使う形だけを利用者がオンにする
     public static let conversionMacros: [ConversionMacro] = [
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000001", pattern: "「{text}」"),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000002", pattern: "『{text}』"),
@@ -564,5 +567,23 @@ public enum DefaultSettings {
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000007", pattern: "<ruby>{text}<rt>{reading}</rt></ruby>"),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000008", pattern: "**{text}**"),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000009", pattern: "`{text}`"),
+    ] + addedMacros
+    /// あとから足した変換マクロ(MacroPresetUpgrade が保存済みの一覧にも足す)．
+    /// 括弧・フリガナ・ローマ字・pixiv と LaTeX のルビ・傍点・ハッシュタグ・打ち消し線・Wikipedia へのリンク
+    public static let addedMacros: [ConversionMacro] = [
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000A", pattern: "〈{text}〉", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000B", pattern: "“{text}”", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000C", pattern: "\"{text}\"", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000D", pattern: "{text}（{reading|katakana}）", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000E", pattern: "{reading|romaji}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000F", pattern: "[[rb:{text} > {reading}]]", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000010", pattern: "\\ruby{{{text}}}{{{reading}}}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000011", pattern: "《《{text}》》", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000012", pattern: "#{text}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000013", pattern: "~~{text}~~", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000014", pattern: "[{text}](https://ja.wikipedia.org/wiki/{text|url})", isEnabled: false),
     ]
+    /// 設定の画面で変換マクロを試す見本の語と読み(語を打たなかったとき)
+    public static let macroSampleText = "東京"
+    public static let macroSampleReading = "とうきょう"
 }
