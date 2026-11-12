@@ -1901,7 +1901,7 @@ fn commands() -> Vec<Section> {
         Section {
             title: Some(extras::TRY_MACROS),
             rows: vec![Row::new("", "", Control::Preview(TryKind::Macros))],
-            footer: Some(extras::MACRO_REFERENCE),
+            footer: None,
             footer_variants: &[],
         },
     ]
@@ -1926,21 +1926,16 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // 書き方を 1 つずつ注記の行にして並べ，最後に登録の例を置く(macOS の書き方の表と同じ中身)
+            // 書き方を 1 つずつ注記の行にして並べる(macOS の書き方の表と同じ中身)
             rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
-                .chain(std::iter::once(Row::note(extras::DYNAMIC_DICTIONARY_NOTE)))
                 .chain(
                     crate::strings::windows::TEMPLATE_ROWS
                         .iter()
                         .map(|text| Row::note(text)),
                 )
-                .chain(std::iter::once(Row::note(extras::TEMPLATE_FILTERS)))
-                .chain(std::iter::once(Row::note(
-                    crate::strings::windows::TEMPLATE_EXAMPLE,
-                )))
                 .map(|row| row.visible_when(words()))
                 .collect(),
-            footer: Some(extras::DATE_FORMAT_SYMBOLS),
+            footer: None,
             footer_variants: &[],
         },
         Section {
@@ -1958,7 +1953,8 @@ fn dictionary() -> Vec<Section> {
                 }),
             )
             .visible_when(words())],
-            footer: Some(settings::DICTIONARY_NOTE),
+            // 注記は短縮よみを選んだときだけ出す(ふだんは空)
+            footer: Some(""),
             footer_variants: DICTIONARY_NOTES,
         },
         Section {
