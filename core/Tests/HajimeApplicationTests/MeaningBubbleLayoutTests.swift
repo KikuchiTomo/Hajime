@@ -108,6 +108,16 @@ struct MeaningBubbleLayoutTests {
         #expect(Self.tip(layout).y == setup.row.midY)
     }
 
+    @Test("入力中の文字の行が窓のすぐ上(gap より近く)にあっても，吹き出しの上の端は窓の上の端にそろう")
+    func caretJustAbove() {
+        var setup = Self.list(x: 100, y: 100, selected: 1)
+        // Windows は入力位置と候補の窓のあいだが 2(gap の 4 より狭い)
+        setup.obstacles.append(Box(x: 0, y: 80, width: 1200, height: 18))
+        let layout = Self.place(setup)
+        #expect(layout.window.y == setup.window.y)
+        #expect(Self.tip(layout).y == setup.row.midY)
+    }
+
     @Test("三角が行に届かないときだけ，届くところまで下げる")
     func lowersToReach() {
         let setup = Self.list(x: 100, y: 100, selected: 3)

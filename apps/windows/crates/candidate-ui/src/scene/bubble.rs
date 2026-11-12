@@ -96,10 +96,11 @@ pub fn place(
             return None;
         }
         let (mut top, mut bottom) = (screen.y.max(window.y), screen.max_y());
-        for obstacle in obstacles
-            .iter()
-            .filter(|obstacle| obstacle.x < x + window_width && x < obstacle.max_x())
-        {
+        // 候補の窓の上の端より上にある物(入力中の文字の行など)は，上の端にそろえるだけで覆わないので見ない．
+        // 見ると，窓と入力中の文字のあいだが gap より狭いときに，吹き出しだけが窓の上の端より下がる
+        for obstacle in obstacles.iter().filter(|obstacle| {
+            obstacle.x < x + window_width && x < obstacle.max_x() && obstacle.max_y() > window.y
+        }) {
             if obstacle.y >= target {
                 bottom = bottom.min(obstacle.y - metrics.gap);
             } else if obstacle.max_y() <= target {
@@ -528,6 +529,16 @@ mod tests {
             assert_eq!(placement.window.y, setup.0.y, "{selected}");
             assert_eq!(tip(&placement).y, setup.1.mid_y(), "{selected}");
         }
+    }
+
+    #[test]
+    fn 入力中の文字の行が窓のすぐ上にあっても吹き出しの上の端は窓の上の端にそろう() {
+        // 入力位置と候補の窓のあいだは ANCHOR_GAP の 2(gap の 4 より狭い)
+        let mut setup = list(100.0, 100.0, 1);
+        setup.2.push(Frame::new(0.0, 80.0, 1200.0, 18.0));
+        let placement = placed(&setup, (288.0, 160.0), SCREEN);
+        assert_eq!(placement.window.y, setup.0.y);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
     }
 
     #[test]
