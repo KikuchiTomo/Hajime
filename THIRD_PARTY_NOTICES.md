@@ -1,7 +1,5 @@
 # 謝辞
 
-Hajime IME は次のソフトウェア・モデル・データを利用しています．
-
 ## AzooKeyKanaKanjiConverter
 
 https://github.com/azooKey/AzooKeyKanaKanjiConverter
@@ -243,7 +241,6 @@ https://github.com/azooKey/azooKey_dictionary_storage
 
 https://github.com/azooKey/azooKey_emoji_dictionary_storage
 https://github.com/google/mozc
-絵文字の読みは，絵文字と記号のパレットの表(data/palette/palette.tsv)にも使っています．
 
 ```
 Copyright 2010-2018, Google Inc.
@@ -280,7 +277,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 https://github.com/azooKey/azooKey_emoji_dictionary_storage
 https://www.unicode.org/
-絵文字と記号のパレットの表(data/palette/palette.tsv)には，Unicode 17.0 の emoji-test.txt と UnicodeData.txt，CLDR 49 の絵文字と記号の名前(annotations と annotationsDerived)も使っています．同じライセンスです．
 
 ```
 UNICODE LICENSE V3
@@ -326,9 +322,7 @@ authorization of the copyright holder.
 
 ## emoji-data
 
-iamcal/emoji-data(e77759c296ed37beb0dbd63908b43d8619509c6d)
 https://github.com/iamcal/emoji-data
-絵文字と記号のパレットの表(data/palette/palette.tsv)の，絵文字のショートコード(「:bow:」)に使っています．
 
 ```
 The MIT License (MIT)
@@ -356,7 +350,7 @@ SOFTWARE.
 
 ## Zenzai(zenz-v3.2-small)
 
-https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
+https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf(リビジョン c67e03e)
 
 ```
                                  Apache License
@@ -539,14 +533,14 @@ https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
 
 ## Zenzai(zenz-v3.2-xsmall)
 
-https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf(コミット 4f5423f0fad41a73b1242eb96fe5c12ae4fdca83 の ggml-model-Q5_K_M.gguf)．設定の「Zenzai のモデル」で速さを優先するときと併用するときに使う．ライセンスは上の zenz-v3.2-small と同じ Apache License 2.0(全文は上の節)．
+https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf(リビジョン 4f5423f)
+Apache License 2.0(全文は zenz-v3.2-small の節)
 
 ## jinen(jinen-v2-small・jinen-v2-xsmall)
 
-https://huggingface.co/togatogah/jinen-v2-small.gguf(コミット 3461d0573ab447985badde3174165b967d06076c の jinen-v2-small-Q5_K_M.gguf)
-https://huggingface.co/togatogah/jinen-v2-xsmall.gguf(コミット 3910fd01bf4ba86eca89617f18db9b0c1c5b2283 の jinen-v2-xsmall-Q5_K_M.gguf)
-作成: Hitoshi Togasaki．設定の「jinen のモデル」で，Zenzai の変換と合わせるのに使う．Hajime IME は作成者が配布する GGUF を改変せずにそのまま同梱している．
-モデルは CC BY-SA 4.0 で配布されている．同梱したモデルを再配布するときも，同じ条件に従うこと．
+https://huggingface.co/togatogah/jinen-v2-small.gguf
+https://huggingface.co/togatogah/jinen-v2-xsmall.gguf
+作成: Hitoshi Togasaki．CC BY-SA 4.0
 
 ```
 jinen-v2-small (GGUF) / jinen-v2-xsmall (GGUF) by Hitoshi Togasaki (togatogah)
@@ -567,8 +561,7 @@ https://creativecommons.org/licenses/by-sa/4.0/legalcode
 ## llama.cpp
 
 https://github.com/ggml-org/llama.cpp
-改変したもの: https://github.com/azooKey/llama.cpp(b9637-azookey.1．コミット 66afb885a8ddcc0511798aec9fb5a01017941018)
-macOS 版はこの版の xcframework を，Windows 版は同じコミットから tools/windows/build_llama.ps1 でビルドした DLL を同梱する．
+改変したもの: https://github.com/azooKey/llama.cpp
 
 ```
 MIT License
@@ -1582,8 +1575,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ## Mozc
 
 https://github.com/google/mozc
-キー設定のひな形「Windows 風」「Mac 風」は，Mozc の src/data/keymap/ のキー設定の表(コミット c4b2aef7c65e61be394bacadaec200eb5b97f91c)をもとに作っています．
-パレットの顔文字と読みは，Mozc の src/data/emoticon/ の顔文字の表(コミット 85590f17409ebff387285f9665f362ede83ebd8e)から作っています．
 
 ```
 Copyright 2010-2018, Google Inc.
@@ -1619,11 +1610,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## hajime-dictionary(Mozc の辞書 dictionary_oss の語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-かな漢字変換の辞書として，hajime-dictionary v0.5.2 を同梱しています．azooKey_dictionary_storage の辞書(Apache License 2.0)に，Mozc の辞書 src/data/dictionary_oss(コミット e5f1494923a0a624d01f19c50d57bbdfa03ea5ba)にしかない語と，Wikidata(CC0 1.0)の項目の日本語名と英語名から作った外来語の英字表記を追加したものです．
-Wikidata: https://www.wikidata.org/
-品詞の番号の対応には，mecab-ipadic の left-id.def(MeCab のコミット 61b90ba6e669dc2d7d533d4a80d206f3b31d52b1)を使用しています．
-同音異義語の使い分けの辞書(data/usage/usage_dict_extra.tsv)と，語の意味の辞書(data/usage/usage_dict_words.tsv)の読みと表記も，同じ dictionary_oss から抜き出しています．この 2 つと data/usage/usage_dict.txt の品詞の列も，dictionary_oss の品詞から付けています．
-Mozc の著作権表示とライセンスは，上の Mozc の節と同じです．辞書の語の多くは IPAdic に由来するため，dictionary_oss の README.txt に従って次の表示を載せています．
+Mozc の辞書(dictionary_oss)．著作権表示とライセンスは Mozc の節と同じ
 
 ```
 IPAdic is licensed as follows:
@@ -1710,35 +1697,28 @@ Public Domain Dataです。使用・変更・配布に関しては一切の制�
 ## hajime-dictionary(Mozc UT 辞書の語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-hajime-dictionary v0.5.2 には，Mozc UT 辞書(作者: UTUMI Hirosi．https://github.com/utuhiro78)の次の 6 つから選んだ語の読みと表記を追加しています．品詞と出やすさは hajime-dictionary で決めています．
-mozcdic-ut-sudachidict(コミット 13129ddebe1cb8eabb63feccbe157adec4e1de01): SudachiDict の名詞から作られた辞書．Apache License 2.0(下の SudachiDict の節)
-mozcdic-ut-neologd(コミット d8307abf02b830b185c9320822cffa0d0787c54e): mecab-ipadic-NEologd の名詞から作られた辞書．Apache License 2.0(下の mecab-ipadic-NEologd の節)
-mozcdic-ut-personal-names(コミット 3da38e0187c5db754c420a5733ae95640652323c): 人名の辞書．Apache License 2.0
-mozcdic-ut-place-names(コミット 7e2b4422837846ea2e78d1a34856d95001d5941a): 日本郵便株式会社の郵便番号データから作られた地名の辞書．郵便番号データに限っては日本郵便株式会社は著作権を主張しません
-mozcdic-ut-jawiki(コミット cd3c637e2e41042da3d66e6268891d619eb8951f): 日本語版ウィキペディアの記事の見出しから作られた辞書．CC BY-SA 4.0(著作者はウィキペディアの寄稿者．https://ja.wikipedia.org/wiki/Wikipedia:ウィキペディアを二次利用する)
-mozcdic-ut-edict2(コミット 8fe8f7918baf513c3d7e243807dfcda2d5c30139): Electronic Dictionary Research and Development Group の EDICT2 から作られた辞書(名詞だけを使う)．CC BY-SA 4.0(https://www.edrdg.org/edrdg/licence.html)
-Apache License 2.0 の全文は LICENSES/Apache-2.0.txt にあります．
+Mozc UT 辞書(UTUMI Hirosi．https://github.com/utuhiro78)．Apache License 2.0
+mozcdic-ut-jawiki: ウィキペディアの寄稿者．CC BY-SA 4.0(https://ja.wikipedia.org/)
+mozcdic-ut-edict2: Electronic Dictionary Research and Development Group．CC BY-SA 4.0(https://www.edrdg.org/edrdg/licence.html)
 
 ## hajime-dictionary(NEologd と SudachiDict の元のデータの語)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-hajime-dictionary v0.5.2 には，mecab-ipadic-NEologd の元のデータ(seed．コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)の固有名詞・一般名詞・形容詞・副詞と，SudachiDict の元のデータ(20261015 の small_lex・core_lex・notcore_lex)の名詞から選んだ語を追加しています．どちらも Apache License 2.0 で，それぞれ下の mecab-ipadic-NEologd と SudachiDict の節の条件に従います．
+mecab-ipadic-NEologd・SudachiDict．Apache License 2.0(下の節)
 
 ## hajime-dictionary(専門用語の辞書)
 
 https://github.com/KikuchiTomo/hajime-dictionary
-hajime-dictionary v0.5.0 から，専門用語の辞書(Dictionary/terms.tsv)を含めています．次の 2 つから，分野の付いた語のうち通常の辞書に無い語の読みと表記を選んでいます．
-JMdict(Electronic Dictionary Research and Development Group．https://www.edrdg.org/jmdict/j_jmdict.html)の分野の印の付いた語義の語．jmdict-simplified(https://github.com/scriptin/jmdict-simplified)の 3.6.2+20261109214828 の JSON を使っています．CC BY-SA 4.0(https://www.edrdg.org/edrdg/licence.html)
-Wikidata(https://www.wikidata.org/)の分野ごとのクラスの項目の日本語名と名前の読み．CC0 1.0
+JMdict: Electronic Dictionary Research and Development Group．CC BY-SA 4.0(https://www.edrdg.org/edrdg/licence.html)
+jmdict-simplified: https://github.com/scriptin/jmdict-simplified
 
 ## hajime-dictionary の配布の条件(CC BY-SA 4.0)
 
-hajime-dictionary v0.5.2 は CC BY-SA 4.0 の語(ウィキペディアの見出し・EDICT2・JMdict)を含むので，辞書の全体を CC BY-SA 4.0(https://creativecommons.org/licenses/by-sa/4.0/legalcode)の条件で配布しています．辞書は Hajime IME のプログラムとは別のファイルとして同梱しています．辞書を作り変えて配布するときも，同じ条件で配布してください．全文は辞書の LICENSES/CC-BY-SA-4.0.txt にあります．
+hajime-dictionary は CC BY-SA 4.0(https://creativecommons.org/licenses/by-sa/4.0/legalcode)で配布しています
 
 ## SudachiDict(hajime-dictionary の Mozc UT 辞書の語)
 
 https://github.com/WorksApplications/SudachiDict
-hajime-dictionary v0.5.2 に追加した mozcdic-ut-sudachidict の語と SudachiDict の元のデータの語は，SudachiDict の名詞から作られています．SudachiDict の LEGAL(コミット 830bf9e1313f6f75235ba87ee041e144dbcad8c1)を載せます．
 
 ```
 LEGAL NOTICE INFORMATION
@@ -1875,7 +1855,6 @@ limitations under the License.
 ## mecab-ipadic-NEologd(hajime-dictionary の Mozc UT 辞書の語)
 
 https://github.com/neologd/mecab-ipadic-neologd
-hajime-dictionary v0.5.2 に追加した mozcdic-ut-neologd の語と NEologd の元のデータ(seed)の語は，mecab-ipadic-NEologd から作られています．mecab-ipadic-NEologd の COPYING(コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)を載せます．
 
 ```
 Copyright (C) 2015-2019 Toshinori Sato (@overlast)
@@ -1967,14 +1946,10 @@ limitations under the License.
 
 日本郵便株式会社
 https://www.post.japanpost.jp/service/search/zipcode/download/
-郵便番号変換の表(data/postal/postal-codes.tsv)に使っています．郵便番号データ(UTF-8 形式)と大口事業所個別番号データを整えたものです．
-日本郵便株式会社は，どちらのデータの著作権も主張していません．
 
 ## 日本語 WordNet
 
-Japanese WordNet wnja 2.1
 https://bond-lab.github.io/wnja/
-連想変換の辞書(data/thesaurus/wordnet-ja.tsv)に使っています．同じ意味の単語の組と意味の説明を取り出して並べ替えたものです．
 
 ```
 Copyright: 2021-2026 Francis Bond, Takayuki Kuribayashi
@@ -2019,9 +1994,7 @@ Technology and LICENSEE agrees to preserve same.
 
 ## japanese-usage-dictionary
 
-japanese-usage-dictionary(hiroyuki-komatsu/japanese-usage-dictionary の 38d34621238afe66e8e669ff0a37bc84039b6b93)
 https://github.com/hiroyuki-komatsu/japanese-usage-dictionary
-同音異義語の使い分けの注釈(data/usage/usage_dict.txt)に使っています．各行の末尾に，Mozc の dictionary_oss から求めた品詞の列を足して同梱しています．
 
 ```
 Copyright (c) 2011, Hiroyuki Komatsu, Shoji Ogura, Tsuyoshi Horo
@@ -2051,9 +2024,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Kiwi Maru
 
-Kiwi Maru(Google Fonts の google/fonts の 130fcfb0ff422fec96b335616b2ca99f91914792)
 https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru
-Windows の候補ウィンドウの既定の書体に使っています(配布物の fonts\\ に入れ，Hajime IME の中だけで使います)．
 
 ```
 Copyright 2020 The Kiwi Maru Project Authors (https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru)
@@ -2371,6 +2342,88 @@ https://github.com/swiftlang/swift-foundation-icu
     portions of this Software are embedded into the binary product as a result,
     you may redistribute such product without providing attribution as would
     otherwise be required by Sections 4(a), 4(b) and 4(d) of the License.
+
+-------------------------------------------------------------------------------
+swift-foundation NOTICE.txt
+
+                            The Foundation Project
+                            ======================
+
+This product contains a derivation of Fabian Fett's 'Base64.swift'.
+
+  * LICENSE (Apache License 2.0): the same as the Apache License 2.0 above.
+
+  * HOMEPAGE:
+    * https://github.com/swift-extras/swift-extras-base64
+
+---
+
+This product contains a derivation of Daniel Lemire's 'chromiumbase64'
+implementation in 'fastbase64'.
+
+  * LICENSE:
+
+    Copyright (c) 2015-2016, Wojciech Muła, Alfred Klomp,  Daniel Lemire
+    (Unless otherwise stated in the source code)
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    1. Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+    TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+  * HOMEPAGE:
+    * https://github.com/lemire/fastbase64
+
+---
+
+This product contains a derivation of Nick Galbreath's 'base64'
+implementation in 'stringencoders'.
+
+  * LICENSE (The MIT License):
+
+    The MIT License (MIT)
+
+    Copyright (c) 2016 Nick Galbreath
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+  * HOMEPAGE:
+    * https://github.com/client9/stringencoders
 ```
 
 ## ICU(swift-foundation-icu に含まれる．Windows 版に同梱)
