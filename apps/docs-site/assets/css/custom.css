@@ -286,13 +286,15 @@
 
 /*
  * 文書の表．見出しを中身と同じく左にそろえ，ページの中の表で列の幅をそろえる(項目の列と既定の列)．
- * 狭い画面では列を 1 字の幅まで細くせず，表を横に送る(Hextra の表は横に送れる)
+ * 狭い画面では表を行ごとのカードに組み替える．1 行目に項目名を太字で出し，ほかのセルには列の見出しを
+ * 小さな項目名として添える(列の見出しは layouts/_markup/render-table.html がセルの data-label に入れる)．
+ * 2 組を横に並べた 4 列の表(記号と意味)は，カードの中で組ごとに 2 行に並べる
  */
 .content table:not(.hextra-code-block table) th {
   text-align: left;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 600px) {
   .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) {
     display: table;
     table-layout: fixed;
@@ -307,16 +309,72 @@
   }
 }
 
-@media (max-width: 767px) {
-  .content table:not(.hextra-code-block table) :is(th, td):first-child {
-    min-width: 7rem;
+@media (max-width: 599px) {
+  .content table:not(.hextra-code-block table) {
+    display: block;
+    overflow: visible;
   }
 
-  .content table:not(.hextra-code-block table) :is(th, td):nth-child(2):not(:last-child) {
-    min-width: 5rem;
+  .content table:not(.hextra-code-block table) thead {
+    display: none;
   }
 
-  .content table:not(.hextra-code-block table) :is(th, td):last-child {
-    min-width: 12rem;
+  .content table:not(.hextra-code-block table) tbody {
+    display: block;
+  }
+
+  .content table:not(.hextra-code-block table) tr {
+    display: block;
+    padding: 12px;
+    border: 1px solid var(--hajime-rule);
+    border-radius: 8px;
+  }
+
+  .content table:not(.hextra-code-block table) tr + tr {
+    margin-top: 8px;
+  }
+
+  .content table:not(.hextra-code-block table) td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .content table:not(.hextra-code-block table) td + td {
+    margin-top: 4px;
+  }
+
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) td:first-child {
+    font-weight: 600;
+  }
+
+  /* 項目名の列を同じ幅にして，値をどの行でも同じ x から書き出す(折り返しはぶら下げ) */
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) td:not(:first-child) {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: baseline;
+  }
+
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) td:not(:first-child)::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    opacity: 0.6;
+  }
+
+  /* 空のセル(説明の無い項目)は項目名ごと出さない */
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) td:empty {
+    display: none;
+  }
+
+  .content table:not(.hextra-code-block table):has(th:nth-child(4)) tr {
+    display: grid;
+    /* 記号の列を同じ幅にして，意味をどのカードでも同じ x から書き出す */
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 4px 8px;
+  }
+
+  .content table:not(.hextra-code-block table):has(th:nth-child(4)) td + td {
+    margin-top: 0;
   }
 }
