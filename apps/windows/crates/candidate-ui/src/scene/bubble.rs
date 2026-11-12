@@ -6,6 +6,7 @@
 //! - 候補の窓の右に出す．画面の右の端に入らなければ左に出す
 //! - 縦は，三角が選んでいる行を指す位置(三角は見出しの行の高さ)にし，画面の上下の端からはみ出さないように寄せる．
 //!   寄せた分だけ三角の位置をずらし，行を指し続ける
+//! - 吹き出しは候補の窓の上の端より上に出さず，窓の高さに入るなら窓の下の端より下にも出さない．窓より高いときは窓の上の端にそろえる
 //! - 背景・枠線・角の丸みは候補の窓と同じ決まりにし，枠線は三角まで途切れずにつなぐ
 //! - 中身は語の意味の配置(card_layout)をそのまま使う．アクセントの色は使わない
 //!
@@ -88,12 +89,20 @@ pub fn place(
     let target = row.mid_y();
     let half = metrics.pointer_width / 2.0;
     let (lowest, highest) = (metrics.radius + half, height - metrics.radius - half);
+    // 三角が見出しの行を指す位置を，候補の窓の上下の端の内側に寄せる．窓より高ければ窓の上の端
+    let preferred_y = if height > window.height {
+        window.y
+    } else {
+        (target - preferred)
+            .max(window.y)
+            .min(window.max_y() - height)
+    };
     // 窓の左の端を x に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ None
     let vertical = |x: f32| -> Option<(f32, f32)> {
         if x < screen.x || x + window_width > screen.max_x() {
             return None;
         }
-        let (mut top, mut bottom) = (screen.y, screen.max_y());
+        let (mut top, mut bottom) = (screen.y.max(window.y), screen.max_y());
         for obstacle in obstacles
             .iter()
             .filter(|obstacle| obstacle.x < x + window_width && x < obstacle.max_x())
@@ -109,7 +118,7 @@ pub fn place(
         if bottom - top < height {
             return None;
         }
-        let y = (target - preferred).max(top).min(bottom - height);
+        let y = preferred_y.max(top).min(bottom - height);
         let pointer = target - y;
         (lowest..=highest)
             .contains(&pointer)
@@ -127,9 +136,7 @@ pub fn place(
             .1
             .min(screen.max_x() - window_width)
             .max(screen.x);
-        let y = (target - preferred)
-            .min(screen.max_y() - height)
-            .max(screen.y);
+        let y = preferred_y.min(screen.max_y() - height).max(screen.y);
         (Side::Right, x, y, (target - y).max(lowest).min(highest))
     });
     let body_x = match side {
@@ -520,6 +527,28 @@ mod tests {
         let setup = list(100.0, 590.0, 3);
         let placement = placed(&setup, (288.0, 160.0), SCREEN);
         assert!(placement.window.max_y() <= SCREEN.max_y() - METRICS.screen_margin);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
+    }
+
+    #[test]
+    fn 候補の窓の上の端より上に出さず_窓の高さに入るなら下の端より下にも出さない() {
+        // いちばん上の行で，三角を本体の上の端から遠くに置きたいとき
+        let top = list(100.0, 100.0, 0);
+        let raised = place(top.1, top.0, (288.0, 160.0), 40.0, SCREEN, &top.2, &METRICS);
+        assert_eq!(raised.window.y, top.0.y);
+        assert_eq!(tip(&raised).y, top.1.mid_y());
+        // いちばん下の行
+        let bottom = list(100.0, 100.0, 3);
+        let lowered = placed(&bottom, (288.0, 160.0), SCREEN);
+        assert_eq!(lowered.window.max_y(), bottom.0.max_y());
+        assert_eq!(tip(&lowered).y, bottom.1.mid_y());
+    }
+
+    #[test]
+    fn 候補の窓より高い吹き出しは窓の上の端にそろえる() {
+        let setup = list(100.0, 100.0, 1);
+        let placement = placed(&setup, (288.0, 260.0), SCREEN);
+        assert_eq!(placement.window.y, setup.0.y);
         assert_eq!(tip(&placement).y, setup.1.mid_y());
     }
 

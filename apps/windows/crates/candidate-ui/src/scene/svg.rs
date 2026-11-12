@@ -757,7 +757,7 @@ mod tests {
         }
     }
 
-    /// 候補の窓の見本(分岐図・入力中の候補・予測・モード表示・案内)を，標準のテーマと platinum で SVG に書き出す．
+    /// 候補の窓の見本(分岐図・文字種の行のある一覧・入力中の候補・予測・モード表示・案内)を，標準のテーマと platinum で SVG に書き出す．
     /// HAJIME_SCENE_SVG=<ディレクトリ> cargo test -p candidate-ui --lib scene::svg -- --ignored
     #[test]
     #[ignore = "見本を書き出すときだけ動かす"]
@@ -813,11 +813,25 @@ mod tests {
                 key_action: Some("戻す".into()),
                 text: "修正「オン外します」　Esc 戻す".into(),
             };
+            // 文字種の行が先頭の一覧(候補の窓の上の余白と足元の並びを見る)
+            let variants = CandidateList {
+                homophone: None,
+                meaning_placement: None,
+                variants: ["カタカナ", "全角英数", "半角英数"]
+                    .iter()
+                    .map(|label| ipc::CandidateVariant {
+                        label: (*label).into(),
+                        is_available: true,
+                    })
+                    .collect(),
+                ..list()
+            };
             let scenes = [
                 (
                     "branch",
                     branch_map(&super::super::sample::branch(), &look, &measure),
                 ),
+                ("list", candidate_list(&variants, &look, &measure)),
                 ("suggestion", candidate_list(&suggestion, &look, &measure)),
                 ("prediction", prediction(&shown, &look, &measure)),
                 ("mode", mode("あ", &look, &measure)),

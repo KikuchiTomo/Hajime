@@ -4,6 +4,7 @@
 ///   ほかの候補・幹の文節・足元の案内・入力中の文字(obstacles)は覆わない
 /// - 縦は，三角が行を指す位置(三角は見出しの行の高さ)にし，覆ってしまう物があれば上か下へ寄せる．画面の上下の端からは screenMargin の内側．
 ///   寄せた分だけ三角の位置をずらし，行を指し続ける．三角は角の丸みにはかけない
+/// - 吹き出しは候補の窓の上の端より上に出さず，窓の高さに入るなら窓の下の端より下にも出さない．窓より高いときは窓の上の端にそろえる
 /// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・三角が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
 /// - 枠線は本体と三角を 1 本でなぞる(outline)
 ///
@@ -72,10 +73,14 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let targetY = row.midY
         let half = metrics.pointerWidth / 2
         let pointerRange = (metrics.radius + half)...(size.height - metrics.radius - half)
+        // 三角が見出しの行を指す位置を，候補の窓の上下の端の内側に寄せる．窓より高ければ窓の上の端
+        let preferredY = size.height > candidate.height
+            ? candidate.y
+            : min(max(targetY - preferredPointer, candidate.y), candidate.maxY - size.height)
         // x(窓の左の端)に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ nil
         func vertical(at x: Double) -> (y: Double, pointer: Double)? {
             guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
-            var top = screen.y, bottom = screen.maxY
+            var top = max(screen.y, candidate.y), bottom = screen.maxY
             for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX {
                 if obstacle.y >= targetY {
                     bottom = min(bottom, obstacle.y - metrics.gap)
@@ -86,7 +91,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
                 }
             }
             guard bottom - top >= size.height else { return nil }
-            let y = min(max(targetY - preferredPointer, top), bottom - size.height)
+            let y = min(max(preferredY, top), bottom - size.height)
             guard pointerRange.contains(targetY - y) else { return nil }
             return (y, targetY - y)
         }
@@ -97,7 +102,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
         let (side, x, y, pointer) = found ?? {
             let x = max(min(outsideRight.1, screen.maxX - windowWidth), screen.x)
-            let y = max(min(targetY - preferredPointer, screen.maxY - size.height), screen.y)
+            let y = max(min(preferredY, screen.maxY - size.height), screen.y)
             return (Side.right, x, y, min(max(targetY - y, pointerRange.lowerBound), pointerRange.upperBound))
         }()
         self.side = side
