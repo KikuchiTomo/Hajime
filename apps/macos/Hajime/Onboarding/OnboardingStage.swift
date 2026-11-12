@@ -217,19 +217,25 @@ final class DemoStageView: NSView {
             drawApplicationTab(application, above: field)
         }
         if let key = current?.key {
-            drawKey(key, above: field, theme: theme)
+            drawKey(key, above: field)
         }
     }
 
-    /// 押したキーを，入力欄の右上にキーの札(候補の窓の足元の案内と同じ形)で出す．アプリの名前の札と同じ高さにそろえる
-    private func drawKey(_ name: String, above field: NSRect, theme: ResolvedTheme) {
+    /// 押したキーを，入力欄の右上にキーの札で出す．アプリの名前の札と同じ高さにそろえ，入力欄と同じ地と縁にする
+    private func drawKey(_ name: String, above field: NSRect) {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
-                                                         .foregroundColor: theme.text]
+                                                         .foregroundColor: NSColor.labelColor]
         let text = name.size(withAttributes: attributes)
         let height = text.height + DesignTokens.Size.Part.tagPaddingY * 2
         let width = text.width + DesignTokens.Size.Part.fieldPaddingX * 2
         let cap = NSRect(x: field.maxX - width, y: field.minY - DesignTokens.Size.Space.stack - height, width: width, height: height)
-        GlassDrawing.drawKeycap(cap, theme: theme)
+        let radius = DesignTokens.Size.Part.tagRadius
+        let path = NSBezierPath(roundedRect: cap.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
+        NSColor.textBackgroundColor.withAlphaComponent(DesignTokens.Opacity.Onboarding.field).setFill()
+        path.fill()
+        NSColor.separatorColor.setStroke()
+        path.lineWidth = DesignTokens.Size.Part.stroke
+        path.stroke()
         name.draw(at: NSPoint(x: cap.minX + DesignTokens.Size.Part.fieldPaddingX, y: cap.minY + DesignTokens.Size.Part.tagPaddingY), withAttributes: attributes)
     }
 
