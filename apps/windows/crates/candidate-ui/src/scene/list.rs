@@ -101,6 +101,34 @@ fn footer(list: &CandidateList) -> Footer {
     }
 }
 
+/// 候補を表に広げたとき(キー設定の表の「候補を表に広げる」)の 1 列の候補の数．広げていなければ None
+fn column_length(list: &CandidateList) -> Option<usize> {
+    list.column_length
+        .map(|length| length as usize)
+        .filter(|&length| length > 0)
+}
+
+/// 列の数．広げていなければ 1
+fn column_count(list: &CandidateList) -> usize {
+    column_length(list).map_or(1, |length| list.entries.len().div_ceil(length).max(1))
+}
+
+/// index 番目の候補に振る番号(1 から)．表では選んでいる候補の列(字種の行にいるときは先頭の列)にだけ振る．
+/// 番号を振らない窓(選び始める前の入力中の候補の窓)なら None．core の CandidatePanel.number(ofEntry:) と同じ決まり
+fn entry_number(list: &CandidateList, index: usize) -> Option<usize> {
+    if !list.shows_numbers.unwrap_or(true) {
+        return None;
+    }
+    let Some(length) = column_length(list) else {
+        return Some(index + 1);
+    };
+    let numbered = match (list.focus, list.selected_entry) {
+        (CandidateFocus::Candidate, Some(selected)) => selected as usize / length,
+        _ => 0,
+    };
+    (index / length == numbered).then_some(index % length + 1)
+}
+
 pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) -> Scene {
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
@@ -128,14 +156,23 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .as_ref()
         .map_or(0.0, |slot| glass::MEANING_GAP + slot.width);
 
+    // 表に広げたときは列の幅をそろえ，窓が表の幅の上限に収まるよう列を狭める(収まらない候補は末尾を省く)
+    let grid = column_length(list);
+    let columns = column_count(list) as f32;
+    let cell_limit = grid.map(|_| {
+        ((candidate::GRID_MAX_WIDTH
+            - metrics.inset * 2.0
+            - metrics.shadow
+            - candidate::FRAME_WIDTH * (columns - 1.0))
+            / columns)
+            .floor()
+    });
     // 長い文の候補は，窓の幅の上限に収まるよう省く．ほかの候補と違うところの少し手前から見せる
     // (頭が同じ文が並ぶので，末尾を省くと見分けられない．macOS の CandidateView と同じ)
-    let text_limit = candidate::MAX_WIDTH
+    let text_limit = cell_limit
+        .unwrap_or(candidate::MAX_WIDTH - metrics.inset * 2.0 - metrics.shadow - side_extent)
         - metrics.lead
-        - padding * 2.0
-        - metrics.inset * 2.0
-        - metrics.shadow
-        - side_extent;
+        - padding * 2.0;
     let shown: Vec<String> = list
         .entries
         .iter()
@@ -196,13 +233,18 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         .association
         .as_ref()
         .map_or(0.0, |heading| super::association::width(&painter, heading));
-    // 候補の列(文字種の行・候補)の幅と高さ．足元とカードを除く
+    // 候補 1 つの枠の幅．表では文字が収まる幅を切り上げ，上限から割った幅を超えない(列の位置を整数にそろえる)
+    let natural_cell = metrics.lead + entry_width + padding * 2.0;
+    let cell_width = cell_limit.map_or(natural_cell, |limit| natural_cell.ceil().min(limit));
+    // 候補の列(文字種の行・候補)の幅と高さ．足元とカードを除く．表なら，すべての列と列のあいだの線を合わせた幅
     let list_width = candidate::MIN_WIDTH
-        .max(metrics.lead + entry_width + padding * 2.0)
+        .max(cell_width * columns + candidate::FRAME_WIDTH * (columns - 1.0))
         .max(variants_width + padding * 2.0)
         .max(heading_width);
+    // 候補を縦に並べる行の数．表なら 1 列の候補の数(最後のページで候補が少なければその数)
+    let rows = grid.map_or(list.entries.len(), |length| list.entries.len().min(length));
     // 連想の一覧では，文字種の行の代わりに見出しの行を出す
-    let list_height = list.entries.len() as f32 * metrics.row_height
+    let list_height = rows as f32 * metrics.row_height
         + if !list.variants.is_empty() || list.association.is_some() {
             metrics.section_height + candidate::FRAME_WIDTH
         } else {
@@ -279,8 +321,46 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         y += candidate::FRAME_WIDTH;
     }
     let mut selected_mid_y = None;
+    let entries_top = y;
+    if let Some(length) = grid {
+        // 表の列のあいだの縦の線．glass は上下を少し空けた細い線，platinum と desk は候補の行の高さいっぱいの線
+        let margin = if theme.is_rounded() {
+            glass::PADDING / 2.0
+        } else {
+            0.0
+        };
+        let height = list.entries.len().min(length) as f32 * metrics.row_height;
+        for column in 1..column_count(list) {
+            let x = (content.x + column as f32 * (cell_width + candidate::FRAME_WIDTH)
+                - candidate::FRAME_WIDTH)
+                .round();
+            painter.rect(
+                Frame::new(
+                    x,
+                    entries_top + margin,
+                    candidate::FRAME_WIDTH,
+                    height - margin * 2.0,
+                ),
+                theme.line,
+            );
+        }
+    }
     for (index, entry) in list.entries.iter().enumerate() {
-        let row = Frame::new(content.x, y, list_width, metrics.row_height);
+        // 表では上から下へ詰め，列を左から右へ並べる
+        let row = match grid {
+            Some(length) => Frame::new(
+                content.x + (index / length) as f32 * (cell_width + candidate::FRAME_WIDTH),
+                entries_top + (index % length) as f32 * metrics.row_height,
+                cell_width,
+                metrics.row_height,
+            ),
+            None => Frame::new(
+                content.x,
+                entries_top + index as f32 * metrics.row_height,
+                list_width,
+                metrics.row_height,
+            ),
+        };
         // コメントの札は行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
         // 札を押すと候補の代わりにコメントを入れる
         if let Some(comment) = super::entry_comment(entry) {
@@ -326,7 +406,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
             theme.text_muted
         }
         .faded(opacity);
-        let number = (index + 1).to_string();
+        // 表では選んでいる列にだけ番号を振る(番号キーはその列の中で選ぶ)．ほかの列は番号の場所を空けたままにし，列を移っても文字を動かさない
+        let number = entry_number(list, index).map(|number| number.to_string());
         let mut text_x = if theme.is_rounded() {
             row.x + padding / 2.0 + metrics.lead
         } else {
@@ -339,13 +420,12 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         }
         // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
         // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
-        let numbered = list.shows_numbers.unwrap_or(true);
         if theme.is_rounded() {
-            if numbered {
+            if let Some(number) = &number {
                 let center =
                     Point::new(row.x + padding / 2.0 + glass::BADGE_SIZE / 2.0, row.mid_y());
                 painter.badge(
-                    &number,
+                    number,
                     center,
                     selected,
                     opacity,
@@ -355,8 +435,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
             }
             painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         } else {
-            if numbered {
-                painter.text(&number, Font::Label, muted_color, row.x + padding, row);
+            if let Some(number) = &number {
+                painter.text(number, Font::Label, muted_color, row.x + padding, row);
             }
             painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         }
@@ -397,8 +477,8 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 TagStyle::of(annotation, entry.command.is_some()),
             );
         }
-        y += metrics.row_height;
     }
+    y = entries_top + rows as f32 * metrics.row_height;
     if let Some(slot) = &slot {
         match slot.placement {
             MeaningPlacement::Side => {
@@ -625,8 +705,75 @@ mod tests {
             total: 30,
             note: None,
             meaning_placement: None,
+            column_length: None,
             hints: Some(vec![hint("↑", "文字種")]),
         }
+    }
+
+    /// 「缶1」〜「缶20」を 1 列 9 個の表に広げ，2 列目の 2 番目(缶11)を選んだ一覧
+    fn grid() -> CandidateList {
+        let mut list = list(Some(10));
+        list.entries = (1..=20)
+            .map(|number| CandidateEntry {
+                text: format!("缶{number}"),
+                annotation: None,
+                corrected_start: None,
+                corrected_length: None,
+                command: None,
+                has_comment: None,
+            })
+            .collect();
+        list.column_length = Some(9);
+        list.position = 11;
+        list.total = 20;
+        list.hints = Some(vec![hint("←→", "列"), hint("Alt+↓", "戻す")]);
+        list
+    }
+
+    #[test]
+    fn 表に広げた一覧は上から下へ詰めて列を左から右へ並べ_押した位置の候補を選ぶ() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let scene = candidate_list(&grid(), &Look::new(&theme, 15.0), &Fixed);
+            let frame = |text: &str| text_frame(&scene, text).expect("描いた文字がある");
+            // 同じ行の列は同じ高さ，同じ列の候補は同じ x
+            assert_eq!(frame("缶1").y, frame("缶10").y);
+            assert_eq!(frame("缶10").y, frame("缶19").y);
+            assert!(frame("缶1").x < frame("缶10").x && frame("缶10").x < frame("缶19").x);
+            assert_eq!(frame("缶10").x, frame("缶18").x);
+            assert!(frame("缶9").y > frame("缶1").y);
+            let at = |text: &str| {
+                let found = frame(text);
+                scene.target_at(found.x + 1.0, found.mid_y())
+            };
+            assert_eq!(at("缶12"), Some(ipc::PointerTarget::Entry { index: 11 }));
+            assert_eq!(at("缶20"), Some(ipc::PointerTarget::Entry { index: 19 }));
+        }
+    }
+
+    #[test]
+    fn 表では選んでいる列にだけ番号を振る() {
+        let shown = grid();
+        assert_eq!(entry_number(&shown, 9), Some(1));
+        assert_eq!(entry_number(&shown, 17), Some(9));
+        assert_eq!(entry_number(&shown, 0), None);
+        assert_eq!(entry_number(&shown, 18), None);
+        // 字種の行にいるときは先頭の列
+        let mut variants = grid();
+        variants.focus = CandidateFocus::Variants;
+        variants.selected_entry = None;
+        assert_eq!(entry_number(&variants, 0), Some(1));
+        assert_eq!(entry_number(&variants, 9), None);
+        // 広げていない一覧はすべてに振る
+        assert_eq!(entry_number(&list(Some(0)), 1), Some(2));
+        // platinum の番号の文字は 2 列目の 9 個だけ
+        let scene = candidate_list(&grid(), &Look::new(&theme("platinum"), 15.0), &Fixed);
+        let numbers: Vec<String> = texts(&scene)
+            .into_iter()
+            .map(|(text, _)| text)
+            .filter(|text| text.parse::<u32>().is_ok())
+            .collect();
+        assert_eq!(numbers, (1..=9).map(|n| n.to_string()).collect::<Vec<_>>());
     }
 
     fn hint(keys: &str, label: &str) -> KeyHint {

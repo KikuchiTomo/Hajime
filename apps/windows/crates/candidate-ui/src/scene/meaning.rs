@@ -1158,6 +1158,7 @@ mod tests {
             association_key: None,
             hints: None,
             meaning_placement: homophone.as_ref().map(|_| MeaningPlacement::Side),
+            column_length: None,
             homophone,
             shows_numbers: None,
             variants: vec![],

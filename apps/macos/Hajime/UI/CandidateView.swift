@@ -97,20 +97,39 @@ final class CandidateView: NSView {
 
     // MARK: - 大きさ
 
-    /// 候補の列(字種の行・候補)の幅．余白を含み，足元とカードを除く
+    /// 候補の列(字種の行・候補)の幅．余白を含み，足元とカードを除く．表に広げていれば，すべての列と列のあいだの線を合わせた幅
     private func listWidth(for panel: CandidatePanel) -> CGFloat {
-        let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont]
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: labelFont]
+        let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
+            width + variant.label.size(withAttributes: labelAttributes).width + Size.variantPaddingX * 2
+        }
+        let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + Size.paddingX * 2 } ?? 0
+        let columns = CGFloat(panel.columnCount)
+        let entriesWidth = cellWidth(for: panel) * columns + Size.frameWidth * (columns - 1)
+        return max(Size.minWidth, entriesWidth, variantsWidth + Size.paddingX * 2, headingWidth)
+    }
+
+    /// 候補 1 つの枠の幅(番号・文字・添え書きと左右の余白)．表ではすべての列を同じ幅にそろえ，窓が表の幅の上限に収まらなければ
+    /// 列を狭めて，収まらない候補は末尾を省く
+    private func cellWidth(for panel: CandidatePanel) -> CGFloat {
+        let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont]
         let entryWidth = panel.entries.map { entry in
             let annotation = entry.annotation.map { NoteDrawing.tagWidth($0, theme: theme) + Size.paddingX } ?? 0
             let icon = entry.command == nil ? 0 : CommandDrawing.width
             return icon + entry.text.size(withAttributes: textAttributes).width + annotation
         }.max() ?? 0
-        let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
-            width + variant.label.size(withAttributes: labelAttributes).width + Size.variantPaddingX * 2
-        }
-        let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + Size.paddingX * 2 } ?? 0
-        return max(Size.minWidth, lead + entryWidth + Size.paddingX * 2, variantsWidth + Size.paddingX * 2, headingWidth)
+        let natural = lead + entryWidth + Size.paddingX * 2
+        guard panel.columnLength != nil else { return natural }
+        // 列の位置を整数にそろえる．文字が収まる幅は切り上げ，上限から割った幅は切り捨てる(文字を 1 ドット足りずに省かないように)
+        let columns = CGFloat(panel.columnCount)
+        let available = (max(maximumWidth, Size.minWidth) - inset * 2 - dropShadowOffset - Size.frameWidth * (columns - 1)) / columns
+        return min(natural.rounded(.up), available.rounded(.down))
+    }
+
+    /// 候補を縦に並べる行の数．表なら 1 列の候補の数(最後のページで候補が少なければその数)
+    private func rowCount(for panel: CandidatePanel) -> Int {
+        guard let length = panel.columnLength, length > 0 else { return panel.entries.count }
+        return min(panel.entries.count, length)
     }
 
     private func footerWidth(for panel: CandidatePanel) -> CGFloat {
@@ -120,7 +139,7 @@ final class CandidateView: NSView {
 
     /// 字種の行(または連想の見出し)と候補を並べた高さ
     private func listHeight(for panel: CandidatePanel) -> CGFloat {
-        CGFloat(panel.entries.count) * rowHeight + (!panel.variants.isEmpty || panel.association != nil ? sectionHeight + Size.frameWidth : 0)
+        CGFloat(rowCount(for: panel)) * rowHeight + (!panel.variants.isEmpty || panel.association != nil ? sectionHeight + Size.frameWidth : 0)
     }
 
     func fittingSize(for panel: CandidatePanel) -> NSSize {
@@ -139,6 +158,7 @@ final class CandidateView: NSView {
             break
         }
         let width = min(contentWidth + inset * 2 + dropShadowOffset, max(maximumWidth, Size.minWidth))
+        // 表は列の幅をそろえて上限に収めてあるので，ここで切らない
         return NSSize(width: width.rounded(.up), height: (height + inset * 2 + dropShadowOffset).rounded(.up))
     }
 
@@ -159,7 +179,11 @@ final class CandidateView: NSView {
     /// 字種の行と候補の行の位置．描くときと押した位置を調べるときで同じものを使う
     private struct Geometry {
         var variantsRow: NSRect?
+        /// 候補ごとの枠．表では上から下へ詰め，列を左から右へ並べる
         var entryRows: [NSRect]
+        /// 表の列のあいだの線の x(列が 1 つなら空)と，線を引く縦の範囲
+        var columnSeparators: [CGFloat] = []
+        var entriesSpan: ClosedRange<CGFloat> = 0...0
     }
 
     private func geometry(for panel: CandidatePanel) -> Geometry {
@@ -170,10 +194,20 @@ final class CandidateView: NSView {
             if panel.association == nil { variantsRow = NSRect(x: content.minX, y: y, width: listWidth, height: sectionHeight) }
             y += sectionHeight + Size.frameWidth
         }
-        let entryRows = panel.entries.indices.map { index in
-            NSRect(x: content.minX, y: y + CGFloat(index) * rowHeight, width: listWidth, height: rowHeight)
+        guard let length = panel.columnLength, length > 0 else {
+            let entryRows = panel.entries.indices.map { index in
+                NSRect(x: content.minX, y: y + CGFloat(index) * rowHeight, width: listWidth, height: rowHeight)
+            }
+            return Geometry(variantsRow: variantsRow, entryRows: entryRows)
         }
-        return Geometry(variantsRow: variantsRow, entryRows: entryRows)
+        let cell = cellWidth(for: panel)
+        let entryRows = panel.entries.indices.map { index in
+            NSRect(x: content.minX + CGFloat(index / length) * (cell + Size.frameWidth), y: y + CGFloat(index % length) * rowHeight,
+                   width: cell, height: rowHeight)
+        }
+        let separators = (1..<max(panel.columnCount, 1)).map { content.minX + CGFloat($0) * (cell + Size.frameWidth) - Size.frameWidth }
+        return Geometry(variantsRow: variantsRow, entryRows: entryRows, columnSeparators: separators,
+                        entriesSpan: y...(y + CGFloat(rowCount(for: panel)) * rowHeight))
     }
 
     /// 字種の行の 1 つずつの枠
@@ -245,12 +279,13 @@ final class CandidateView: NSView {
             y += Size.frameWidth
         }
         var selectedMidY: CGFloat?
-        for (index, entry) in panel.entries.enumerated() {
-            let row = NSRect(x: content.minX, y: y, width: listWidth, height: rowHeight)
+        let geometry = geometry(for: panel)
+        for x in geometry.columnSeparators { drawColumnSeparator(x: x, span: geometry.entriesSpan) }
+        for (index, (entry, row)) in zip(panel.entries, geometry.entryRows).enumerated() {
             drawEntry(entry, index: index, panel: panel, in: row)
             if panel.focus == .candidate, panel.selectedEntry == index { selectedMidY = row.midY }
-            y += rowHeight
         }
+        y += CGFloat(rowCount(for: panel)) * rowHeight
         if let slot {
             switch slot.placement {
             case .side:
@@ -292,6 +327,13 @@ final class CandidateView: NSView {
         }
     }
 
+    /// 表の列のあいだの縦の線．glass は上下を少し空けた細い線，platinum と desk は候補の行の高さいっぱいの 1 ドットの線
+    private func drawColumnSeparator(x: CGFloat, span: ClosedRange<CGFloat>) {
+        theme.line.setFill()
+        let margin: CGFloat = theme.isRounded ? Glass.padding / 2 : 0
+        NSRect(x: x.rounded(), y: span.lowerBound + margin, width: Size.frameWidth, height: span.upperBound - span.lowerBound - margin * 2).fill()
+    }
+
     private func drawVariants(_ panel: CandidatePanel, in rect: NSRect) {
         for (index, (variant, cell)) in zip(panel.variants, variantCells(panel, in: rect)).enumerated() {
             let isSelected = panel.focus == .variants && panel.selectedVariant == index
@@ -323,16 +365,17 @@ final class CandidateView: NSView {
         let opacity: CGFloat = (isSelected || index == 0) ? 1 : restOpacity
         let textColor = (isSelected ? theme.selectionText : theme.text).withAlphaComponent(opacity)
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
-        let number = "\(index + 1)"
+        // 表では選んでいる列にだけ番号を振る(番号キーはその列の中で選ぶ)．ほかの列は番号の場所を空けたままにし，列を移っても文字を動かさない
+        let number = panel.number(ofEntry: index).map(String.init)
         var textX: CGFloat
         // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
         // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
         if theme.isRounded {
             let center = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
-            if panel.showsNumbers { GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity) }
+            if let number { GlassDrawing.drawBadge(number, center: center, theme: theme, selected: isSelected, opacity: opacity) }
             textX = rect.minX + Size.paddingX / 2 + lead
         } else {
-            if panel.showsNumbers {
+            if let number {
                 drawText(number, attributes: [.font: labelFont, .foregroundColor: mutedColor], x: rect.minX + Size.paddingX, in: rect)
             }
             textX = rect.minX + Size.paddingX + lead

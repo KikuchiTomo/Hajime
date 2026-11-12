@@ -30,11 +30,13 @@ enum SnapshotRenderer {
             (ThemeChoice(.contrast), .darkAqua, "contrast"),
         ]
         checkPointerTargets()
+        checkGridPointerTargets()
         for look in looks {
             let appearance = NSAppearance(named: look.appearance)
             // 色を今の外観で決める部品があるので，その外観を描くときの外観にして組み立てる
             (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
+                render(gridView(SamplePanels.grid, theme: look.theme, appearance: appearance), name: "list-grid-\(look.name)", to: output, appearance: appearance)
                 render(suggestionView(theme: look.theme, appearance: appearance), name: "suggestion-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
@@ -87,6 +89,7 @@ enum SnapshotRenderer {
                     render(longLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-long-\(focus)-\(look.name)", to: output, appearance: appearance)
                 }
                 render(longListView(theme: look.theme, appearance: appearance), name: "list-long-\(look.name)", to: output, appearance: appearance)
+                render(gridView(longGrid, theme: look.theme, appearance: appearance), name: "list-grid-long-\(look.name)", to: output, appearance: appearance)
             }
         }
         for (appearance, name) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
@@ -553,6 +556,26 @@ enum SnapshotRenderer {
             + panel.entries.indices.filter { panel.entries[$0].comment != nil }.map(PointerTarget.comment))
     }
 
+    /// 表に広げた一覧でも，見えている候補がどれも押せ，押した候補が描いた位置の候補であることを確かめる
+    private static func checkGridPointerTargets() {
+        for (name, theme) in [("glass", ThemeChoice(.automatic)), ("platinum", ThemeChoice(.platinum))] {
+            let view = CandidateView()
+            view.theme = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
+            view.maximumWidth = DesignTokens.Size.Candidate.gridMaxWidth
+            let panel = SamplePanels.grid
+            view.panel = panel
+            view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+            var found = Set<PointerTarget>()
+            for y in stride(from: 0, to: view.bounds.height, by: 2) {
+                for x in stride(from: 0, to: view.bounds.width, by: 4) {
+                    if let target = view.target(at: NSPoint(x: x, y: y)) { found.insert(target) }
+                }
+            }
+            let expected = expectedTargets(panel)
+            print("押した位置の確かめ(\(name)・表): \(found == expected ? "ok" : "合わない \(found.subtracting(expected)) \(expected.subtracting(found))")")
+        }
+    }
+
     private static let longSentence = ["今日は", "朝から", "とても", "良い", "天気だったので", "近所の", "公園まで", "散歩に", "出かけて", "久しぶりに",
                                        "友達と", "ゆっくり", "話を", "しました"]
 
@@ -571,6 +594,27 @@ enum SnapshotRenderer {
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: view.panel!))
         return backdropped(view)
+    }
+
+    /// 候補を表に広げた一覧．窓の幅は表の上限まで広げる
+    private static func gridView(_ panel: CandidatePanel, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        view.maximumWidth = DesignTokens.Size.Candidate.gridMaxWidth
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// 長い文の候補を表に広げた一覧．列の幅をそろえて表の幅の上限に収め，収まらない候補は末尾を省く．最後のページで 3 列目の途中まで
+    private static var longGrid: CandidatePanel {
+        let sentence = longSentence.prefix(6).joined()
+        let entries = (0..<22).map { index in index.isMultiple(of: 3) ? sentence : String(longSentence[index % longSentence.count]) }
+        var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: entries.map { .init(text: $0, annotation: nil) },
+                                   selectedEntry: 20, focus: .candidate, position: 57, total: 58, note: nil)
+        panel.columnLength = DefaultSettings.candidatesPerPage
+        return panel
     }
 
     /// 幅の上限を超える長い文の一覧

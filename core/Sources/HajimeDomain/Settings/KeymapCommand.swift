@@ -83,6 +83,9 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 連想変換．選んでいる文節の語と似た意味・関わりのある語の一覧に切り替える(R-18)．
     /// 入力中なら変換してから切り替える．一覧を出しているときは元の変換に戻す
     case associate
+    /// 候補を表に広げる(一覧の候補の数 × 設定の列の数を 1 ページにし，列を横に並べる)．広げているときは元に戻す．
+    /// 表では文節を移るキーで列を移り，番号キーは選んでいる列の中で選ぶ．Esc でも元に戻す
+    case expandCandidates
 
     // 文節
     case nextSegment
@@ -172,7 +175,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .reconvert: .composing
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: .scripts
-        case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
+        case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate,
+             .expandCandidates: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction, .undoCommit: .commit
@@ -195,7 +199,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
-        case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate,
+        case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .expandCandidates,
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .resumeEditing, .undoConversionEdit, .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana,

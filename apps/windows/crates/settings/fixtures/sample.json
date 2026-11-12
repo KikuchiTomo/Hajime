@@ -369,6 +369,8 @@
     "launcherCommands": false,
     "learning": "enabled",
     "listCandidatesPerPage": 9,
+    "candidateGridColumns": 4,
+    "expandsGridOnPaging": false,
     "listSegmentAlternatives": true,
     "liveConversion": true,
     "liveConversionDelay": 0.4,

@@ -205,7 +205,9 @@ extension WireCandidateList {
             // 振るとき(ふつうの一覧)は送らない
             showsNumbers: panel.showsNumbers ? nil : false,
             // 意味が無ければ送らない
-            meaningPlacement: panel.homophone == nil ? nil : WireMeaningPlacement(panel.meaningPlacement)
+            meaningPlacement: panel.homophone == nil ? nil : WireMeaningPlacement(panel.meaningPlacement),
+            // 表に広げていなければ送らない(知らない候補ウィンドウは 1 列の一覧として出す)
+            columnLength: panel.columnLength.map(UInt32.init(clamping:))
         )
     }
 }

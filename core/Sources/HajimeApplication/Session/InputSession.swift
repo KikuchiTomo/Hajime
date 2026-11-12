@@ -118,6 +118,8 @@ public final class InputSession {
     private var showsCorrectionNote = false
     /// 分岐図か一覧の足元に 1 回だけ出す案内(学習から消したとき)
     private var pendingNote: Note?
+    /// 候補を表に広げているか(KeymapCommand.expandCandidates)．変換を終えるか読みに戻ると閉じる
+    private var expandedCandidates = false
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
     /// 変換中の候補の選択(表記)と文節の区切りの変更．直前の変更の取り消し(KeymapCommand.undoConversionEdit)で戻す
@@ -894,7 +896,11 @@ public final class InputSession {
         case .previousCandidatePage: return moveCandidate(.previousPage, context: context)
         case .firstCandidate: return moveCandidate(.first, context: context)
         case .lastCandidate: return moveCandidate(.last, context: context)
-        case .associate: return associate(context: context)
+        case .associate:
+            // 連想の一覧は表に広げない(元の出し方の候補の数で出す)
+            expandedCandidates = false
+            return associate(context: context)
+        case .expandCandidates: return toggleGrid(context: context)
         // 文節
         case .nextSegment: return moveSegment(.next, event: event, context: context)
         case .previousSegment: return moveSegment(.previous, event: event, context: context)
@@ -911,7 +917,9 @@ public final class InputSession {
         // 確定と取り消し
         case .commit: return KeyResult(handled: true, actions: commitAll())
         case .commitFirstSegment: return commitFirstSegment(context: context)
-        case .cancel: return handleEscape(context: context)
+        case .cancel:
+            if let collapsed = collapseGrid(context: context) { return collapsed }
+            return handleEscape(context: context)
         case .backToReading:
             // 全文を読みに戻す．読みを変えるまでは読みのまま見せる(ライブ変換で文に戻さない)
             phase = .composing
@@ -922,7 +930,9 @@ public final class InputSession {
             phase = .composing
             heldReading = nil
             return KeyResult(handled: true, actions: render(context: context))
-        case .undoConversionEdit: return undoConversionEdit(context: context)
+        case .undoConversionEdit:
+            if let collapsed = collapseGrid(context: context) { return collapsed }
+            return undoConversionEdit(context: context)
         case .undoPrediction: return undoCommit(.prediction, context: context)
         case .undoCommit: return undoCommit(.any, context: context)
         // 学習
@@ -1005,10 +1015,10 @@ public final class InputSession {
         case .composing:
             return 0
         case .lattice(let lattice):
-            return min(lattice.focused.candidates.count, latticePerPage)
+            return min(lattice.focused.candidates.count, latticeNumberPerPage)
         case .selecting(let selection):
             guard case .candidate(let index) = selection.focus else { return 0 }
-            let perPage = settings.current.listCandidatesPerPage
+            let perPage = listNumberPerPage
             return min(selection.candidates.count - index / perPage * perPage, perPage)
         case .association(let list, _):
             return list.page(perPage: associationPerPage).words.count
@@ -1146,7 +1156,7 @@ public final class InputSession {
         var actions: [ClientAction] = []
         if case .selecting = phase, let number = numberKey(character) {
             // 候補を選んでいるときの番号キーは，その候補を確定する．その番号の候補が無ければ何もしない(打ち損じで確定しない)
-            guard selectByNumber(number) else { return KeyResult(handled: true) }
+            guard selectByNumber(number, perPage: listNumberPerPage) else { return KeyResult(handled: true) }
             return KeyResult(handled: true, actions: commitAll())
         }
         if case .association(var list, let origin) = phase, let number = numberKey(character) {
@@ -1513,9 +1523,9 @@ public final class InputSession {
     }
 
     /// 番号キーで候補を選ぶ．候補を選んでいるときだけ使う
-    private func selectByNumber(_ number: Int) -> Bool {
+    /// 一覧の候補を番号で選ぶ．番号は perPage 件ずつに分けた，選んでいる候補のまとまり(ページか，表なら列)の中の順番
+    private func selectByNumber(_ number: Int, perPage: Int) -> Bool {
         guard case .selecting(var selection) = phase, case .candidate(let index) = selection.focus else { return false }
-        let perPage = settings.current.listCandidatesPerPage
         let target = index / perPage * perPage + number - 1
         guard target < selection.candidates.count else { return false }
         selection.focus = .candidate(target)
@@ -1658,6 +1668,7 @@ public final class InputSession {
 
     private func reset() -> [ClientAction] {
         conversionHistory.clear()
+        expandedCandidates = false
         typedShortcode = nil
         heldReading = nil
         convertedFromEnglish = nil
@@ -2130,6 +2141,8 @@ public final class InputSession {
         defer { pendingNote = nil }
         switch phase {
         case .composing:
+            // 読みに戻ったら表を閉じる(次に変換したときはふつうの出し方で出す)
+            expandedCandidates = false
             // 打鍵が止まる前の表示だけを入力中として求める(Space の分岐図や，止まったときの表示は Zenzai を使う)
             converter.setTyping(!isSettled)
             defer { converter.setTyping(false) }
@@ -2157,8 +2170,9 @@ public final class InputSession {
             let marked = MarkedText([.init(shownPrefix, style: .converted), .init(String(candidate.text.dropFirst(shownPrefix.count)), style: .focused),
                                      .init(remainder, style: .reading)].filter { !$0.text.isEmpty })
             var panel = PanelBuilder.listPanel(for: selection, composition: composition, showsVariants: settings.current.showsVariantRow,
-                                               perPage: settings.current.listCandidatesPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
+                                               perPage: listPerPage, nextKey: keyLabel(.nextCandidate, in: .converting),
                                                corrected: correctedRange(of: \.conversionReading))
+            if expandedCandidates { panel.columnLength = gridRows }
             if case .candidate = selection.focus, candidate.commandID != nil, let note = commandNote { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
             if let pendingNote { panel.note = pendingNote }
@@ -2193,6 +2207,7 @@ public final class InputSession {
                     : PanelBuilder.isCorrected(segment, changed: corrected) ? .correction : .converted
                 return .init(segment.selected.text, style: style)
             })
+            if expandedCandidates, !splitMode { return [.setMarkedText(marked), .showCandidates(gridPanel(lattice, corrected: corrected))] }
             if isSegmentList { return [.setMarkedText(marked), .showCandidates(segmentListPanel(lattice, corrected: corrected))] }
             var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                                   showsVariants: settings.current.showsVariantRow, corrected: corrected)
@@ -2222,9 +2237,31 @@ public final class InputSession {
     /// 文節ごとの一覧で見せるか(分岐図と同じ文節格子を，注目している文節の一覧として見せる)
     private var isSegmentList: Bool { settings.current.candidatePresentation == .segmentList }
 
-    /// 文節格子の 1 ページの候補の数．文節ごとの一覧なら一覧の候補数
+    /// 文節格子の 1 ページの候補の数．文節ごとの一覧なら一覧の候補数，表に広げていれば表の候補の数
     private var latticePerPage: Int {
-        isSegmentList ? settings.current.listCandidatesPerPage : settings.current.branchCandidatesPerPage
+        if expandedCandidates { return gridSize }
+        return isSegmentList ? settings.current.listCandidatesPerPage : settings.current.branchCandidatesPerPage
+    }
+
+    /// 一覧の 1 ページの候補の数．表に広げていれば表の候補の数
+    private var listPerPage: Int { expandedCandidates ? gridSize : settings.current.listCandidatesPerPage }
+
+    /// 番号キーで選ぶまとまりの候補の数．表では選んでいる列の中で選ぶので列の長さ
+    private var latticeNumberPerPage: Int { expandedCandidates ? gridRows : latticePerPage }
+    private var listNumberPerPage: Int { expandedCandidates ? gridRows : listPerPage }
+
+    /// 表の 1 列の候補の数(一覧の候補の数．番号キーの 1〜9 に合わせる)と，表の候補の数
+    private var gridRows: Int { settings.current.listCandidatesPerPage }
+    private var gridSize: Int { gridRows * settings.current.candidateGridColumns }
+
+    /// 分岐図の文節の候補を広げた表．文節ごとの一覧と同じ中身を，表の候補の数で列に分けて並べ，注目している文節の頭にそろえる．
+    /// 語の意味は表の下に出す(右に出すと窓が横に長くなりすぎる)
+    private func gridPanel(_ lattice: SegmentLattice, corrected: Range<Int>?) -> CandidatePanel {
+        var panel = segmentListPanel(lattice, corrected: corrected)
+        panel.columnLength = gridRows
+        panel.meaningPlacement = .below
+        panel.anchor = lattice.segments.prefix(lattice.focusedIndex).map { $0.selected.text.utf16.count }.reduce(0, +)
+        return panel
     }
 
     /// 文節ごとの一覧の窓．分岐図の足元の案内(打ち間違い・使い分け・連想・区切る状態)も同じに出す
@@ -2356,6 +2393,7 @@ public final class InputSession {
             }
         case .lattice(var lattice):
             let perPage = latticePerPage
+            let before = lattice.focused.choice
             switch move {
             case .next: lattice.moveSelection(by: 1)
             case .previous: lattice.moveSelection(by: -1, entersVariants: settings.current.showsVariantRow)
@@ -2365,8 +2403,12 @@ public final class InputSession {
             case .last: lattice.selectCandidate(at: lattice.focused.candidates.count - 1)
             }
             phase = .lattice(lattice)
+            if case .candidate(let from) = before, case .candidate(let to) = lattice.focused.choice {
+                expandGridIfPaged(from: from, to: to, perPage: perPage, move: move)
+            }
         case .selecting(var selection):
-            let perPage = settings.current.listCandidatesPerPage
+            let perPage = listPerPage
+            let before = selection.focus
             switch move {
             case .next:
                 // 種類の行からは候補の先頭に戻る
@@ -2389,9 +2431,68 @@ public final class InputSession {
             case .last: selection.focus = .candidate(max(selection.candidates.count - 1, 0))
             }
             phase = .selecting(selection)
+            if case .candidate(let from) = before, case .candidate(let to) = selection.focus {
+                expandGridIfPaged(from: from, to: to, perPage: perPage, move: move)
+            }
         case .association:
             // 連想の一覧の中の動きは performInAssociation が受け持つ
             break
+        }
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    // MARK: - 候補の表
+
+    /// 候補を送るキーで最初のページの最後の候補から次のページへ進んだら，候補を表に広げる(設定 expandsGridOnPaging．
+    /// 目当ての候補が最初のページに無かったので，まとめて見せる)．ページ送りのキーや，表に広げているときは何もしない
+    private func expandGridIfPaged(from: Int, to: Int, perPage: Int, move: CandidateMove) {
+        guard settings.current.expandsGridOnPaging, !expandedCandidates, move == .next, from == perPage - 1, to == perPage else { return }
+        expandedCandidates = true
+    }
+
+    /// 候補を表に広げる．広げていれば元に戻す．分岐図・文節ごとの一覧・一覧のどれでも，選んでいる候補はそのまま
+    private func toggleGrid(context: InputContext) -> KeyResult {
+        switch phase {
+        case .lattice, .selecting:
+            guard inlineEdit == nil, !splitMode else { return KeyResult(handled: true) }
+            expandedCandidates.toggle()
+            return KeyResult(handled: true, actions: render(context: context))
+        case .composing, .association:
+            return KeyResult(handled: true)
+        }
+    }
+
+    /// 表に広げていれば閉じて元の出し方に戻す(取り消しのキー)．選んでいる候補はそのまま．広げていなければ nil
+    private func collapseGrid(context: InputContext) -> KeyResult? {
+        guard expandedCandidates, inlineEdit == nil else { return nil }
+        switch phase {
+        case .lattice, .selecting:
+            expandedCandidates = false
+            return KeyResult(handled: true, actions: render(context: context))
+        case .composing, .association:
+            return nil
+        }
+    }
+
+    /// 表で隣の列の同じ行へ移る(文節を移るキー)．右の端の列で同じ行が無ければ最後の候補へ，左の端からは動かない．
+    /// 列を越えると次・前のページを見せる．字種の行にいるときは nil(字種を左右に選ぶ)
+    private func moveGridColumn(forward: Bool, context: InputContext) -> KeyResult? {
+        let step = forward ? gridRows : -gridRows
+        switch phase {
+        case .lattice(var lattice):
+            guard case .candidate(let index) = lattice.focused.choice else { return nil }
+            let target = index + step
+            guard target >= 0 else { return KeyResult(handled: true) }
+            lattice.selectCandidate(at: min(target, lattice.focused.candidates.count - 1))
+            phase = .lattice(lattice)
+        case .selecting(var selection):
+            guard case .candidate(let index) = selection.focus else { return nil }
+            let target = index + step
+            guard target >= 0 else { return KeyResult(handled: true) }
+            selection.focus = .candidate(min(target, selection.candidates.count - 1))
+            phase = .selecting(selection)
+        case .composing, .association:
+            return nil
         }
         return KeyResult(handled: true, actions: render(context: context))
     }
@@ -2403,6 +2504,9 @@ public final class InputSession {
 
     /// 文節を移る・長さを変える・区切る．一覧は文節が 1 つなので，種類の行にいるときの左右だけ字種を移る
     private func moveSegment(_ move: SegmentMove, event: KeyEvent? = nil, context: InputContext) -> KeyResult {
+        if expandedCandidates, move == .next || move == .previous, let moved = moveGridColumn(forward: move == .next, context: context) {
+            return moved
+        }
         switch phase {
         case .composing, .association:
             // 連想の一覧の中の動きは performInAssociation が受け持つ
@@ -2785,7 +2889,9 @@ public final class InputSession {
     /// 分岐図の番号キー．番号で選んだら，まだ選んでいない迷う文節へ進む．残っていなければ確定する(1 回の判断で済ませる)．
     /// 番号キーでなければ nil
     private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
-        guard let number = numberKey(character), lattice.select(number: number, perPage: latticePerPage) else { return nil }
+        guard let number = numberKey(character), lattice.select(number: number, perPage: latticeNumberPerPage) else { return nil }
+        // 表から選んだら表を閉じ，分岐図に戻って次の文節へ進む
+        expandedCandidates = false
         return KeyResult(handled: true, actions: advance(after: lattice, context: context))
     }
 
@@ -2844,15 +2950,16 @@ public final class InputSession {
             guard lattice.selectVariant(at: index) else { return [] }
             return advance(after: lattice, context: context)
         case (.lattice(var lattice), .entry(let index)):
-            // 文節ごとの一覧の候補．分岐図の下の枝と同じに選ぶ
+            // 文節ごとの一覧と表の候補．分岐図の下の枝と同じに選ぶ(表は閉じる)
             guard lattice.select(number: index + 1, perPage: latticePerPage) else { return [] }
+            expandedCandidates = false
             return advance(after: lattice, context: context)
         case (.lattice(var lattice), .listVariant(let index)):
             guard let variant = segmentVariantIndex(ScriptVariant.allCases.indices.contains(index) ? ScriptVariant.allCases[index] : nil, in: lattice.focused),
                   lattice.selectVariant(at: variant) else { return [] }
             return advance(after: lattice, context: context)
         case (.selecting, .entry(let index)):
-            guard selectByNumber(index + 1) else { return [] }
+            guard selectByNumber(index + 1, perPage: listPerPage) else { return [] }
             return commitAll()
         case (.selecting(var selection), .listVariant(let index)):
             guard ScriptVariant.allCases.indices.contains(index), ScriptVariant.allCases[index].apply(to: composition) != nil else { return [] }
@@ -2861,7 +2968,7 @@ public final class InputSession {
             return commitAll()
         case (.selecting, .comment(let index)):
             // 一覧の行を選び，その候補をコメントに置き換えて確定する
-            guard selectByNumber(index + 1), case .selecting(var selection) = phase, case .candidate(let focused) = selection.focus,
+            guard selectByNumber(index + 1, perPage: listPerPage), case .selecting(var selection) = phase, case .candidate(let focused) = selection.focus,
                   let replaced = Self.commentCandidate(for: selection.candidates[focused], prefix: selection.shownPrefix) else { return [] }
             selection.candidates[focused] = replaced
             phase = .selecting(selection)
@@ -2871,6 +2978,7 @@ public final class InputSession {
             guard lattice.select(number: index + 1, perPage: latticePerPage), case .candidate(let chosen) = lattice.focused.choice,
                   let replaced = Self.commentCandidate(for: lattice.focused.selected, prefix: "") else { return [] }
             lattice.segments[lattice.focusedIndex].candidates[chosen] = replaced
+            expandedCandidates = false
             return advance(after: lattice, context: context)
         default:
             return []

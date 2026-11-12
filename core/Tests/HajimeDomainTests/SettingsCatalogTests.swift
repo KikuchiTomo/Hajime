@@ -30,6 +30,7 @@ struct SettingsCatalogTests {
             "fields": .array(Settings.fieldNames.sorted().map(JSONValue.string)),
             "ranges": .object([
                 "candidatesPerPage": range(DefaultSettings.candidatesPerPageRange),
+                "candidateGridColumns": range(DefaultSettings.candidateGridColumnsRange),
                 "liveConversionDelay": range(DefaultSettings.liveConversionDelayRange),
                 "liveConversionSkipLength": range(DefaultSettings.liveConversionSkipLengthRange),
                 "suggestionSkipCount": range(DefaultSettings.suggestionSkipCountRange),
