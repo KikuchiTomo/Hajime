@@ -115,7 +115,7 @@ memo() {
     -draw "rectangle $((86 + w)),$((y - 24)) $((87 + w)),$((y + 7))" "$output"
 }
 zoom() { magick "$1" -crop 1000x480+40+40 +repage -filter Lanczos -resize 1400x672 -quality 82 "$2"; }
-memo "$work/live.png" "帰りに駅前のカフェに寄って、新しい本を少しだけ読みました" \
+memo "$work/live.png" "帰りに駅前のカフェに寄って、買ったばかりの本を少しだけ読んだ" \
   "11月13日" "朝から雨だったが、昼には晴れてきた。" "午前は資料をまとめて、午後は打ち合わせ。" \
   "打ち合わせは思ったより早く終わった。"
 zoom "$work/live.png" "$images/features/live-conversion.webp"
