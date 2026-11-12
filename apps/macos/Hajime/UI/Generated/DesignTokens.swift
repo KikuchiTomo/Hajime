@@ -330,6 +330,20 @@ enum DesignTokens {
             static let anchorGap: CGFloat = 4
             static let candidateGap: CGFloat = 6
             static let candidateFontSize: CGFloat = 18
+            static let titleHeight: CGFloat = 32
+            static let captionButtonWidth: CGFloat = 46
+            static let captionFontSize: CGFloat = 12
+            static let captionIconSize: CGFloat = 10
+            static let controlHeight: CGFloat = 32
+            static let controlRadius: CGFloat = 4
+            static let controlPaddingX: CGFloat = 12
+            static let labelFontSize: CGFloat = 14
+            static let iconButtonWidth: CGFloat = 32
+            static let iconSize: CGFloat = 16
+            static let resizeBorder: CGFloat = 6
+            static let scrollFade: CGFloat = 20
+            static let wheelStep: CGFloat = 48
+            static let promptPaddingY: CGFloat = 4
         }
         enum Prediction {
             static let gap: CGFloat = 8
