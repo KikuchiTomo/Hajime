@@ -25,6 +25,8 @@ pub enum Shown<'a> {
     Sample,
     Branch(&'a ipc::BranchMap),
     List(&'a ipc::CandidateList),
+    /// 絵文字と記号のパレット(設定の画面のパレットの見本)
+    Palette(&'a ipc::PalettePanel),
 }
 
 /// rect の中のどこに置くか
@@ -75,12 +77,28 @@ impl Preview {
         shown: Shown,
         placement: Placement,
     ) -> Result<()> {
-        let measure = self.renderer.measure(theme, font_size)?;
         let look = Look::new(theme, font_size);
-        let scene = match shown {
-            Shown::Sample => scene::branch_map(&sample::branch(), &look, &measure),
-            Shown::Branch(map) => scene::branch_map(map, &look, &measure),
-            Shown::List(list) => scene::candidate_list(list, &look, &measure),
+        let (scene, measure) = match shown {
+            Shown::Palette(panel) => {
+                // パレットはマスの大きさに合わせた書体で測る(パレットの窓と同じ)
+                let fonts =
+                    crate::palette::layout::Fonts::new(crate::palette::layout::cell_size(panel));
+                let measure = self.renderer.measure_with(theme, font_size, &fonts.all())?;
+                let layout = crate::palette::layout::Layout::new(panel, theme, &measure);
+                (
+                    crate::palette::scene::palette(panel, &layout, &look, &measure),
+                    measure,
+                )
+            }
+            _ => {
+                let measure = self.renderer.measure(theme, font_size)?;
+                let scene = match shown {
+                    Shown::Branch(map) => scene::branch_map(map, &look, &measure),
+                    Shown::List(list) => scene::candidate_list(list, &look, &measure),
+                    _ => scene::branch_map(&sample::branch(), &look, &measure),
+                };
+                (scene, measure)
+            }
         };
         // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
@@ -100,14 +118,9 @@ impl Preview {
                 );
             }
             Placement::Center => {
-                // 下地は設定の画面のカードと同じく角を丸める．丸みの外は設定の画面が塗った地の色のまま残る
-                if let Some(Draw::Rect { frame, color }) = scene.draws.first().cloned() {
-                    scene.draws[0] = Draw::RoundRect {
-                        frame,
-                        radius: tokens::size::settings_windows::CARD_RADIUS,
-                        fill: Some(color),
-                        stroke: None,
-                    };
+                // 下地は描かず，設定の画面がカードの色で塗った地のまま見せる(見本のまわりに別の色の四角を出さない)
+                if let Some(Draw::Rect { .. }) = scene.draws.first() {
+                    scene.draws.remove(0);
                 }
             }
         }

@@ -16,6 +16,8 @@ pub const ENABLED: &str = "sync.enabled";
 pub const FOLDER: &str = "sync.folder";
 /// 同期できなかった理由(failed・unreadable．無ければ空)
 pub const PROBLEM: &str = "sync.problem";
+/// 項目ごとに範囲を選べるまとまりがあるか(項目ごとの表を出すか)
+pub const HAS_FIELDS: &str = "sync.hasFields";
 /// まとまりの範囲の道筋の頭(「sync.scope.input」)
 const SCOPE: &str = "sync.scope.";
 
@@ -47,6 +49,10 @@ pub fn values(status: &SyncStatus) -> Fields {
     for group in &status.groups {
         values.insert(scope_path(&group.group), Value::String(group.scope.clone()));
     }
+    values.insert(
+        HAS_FIELDS.into(),
+        Value::Bool(!field_rows(status).is_empty()),
+    );
     values
 }
 

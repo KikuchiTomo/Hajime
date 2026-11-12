@@ -5,6 +5,7 @@
 
 use super::theme::{Color, Theme};
 use crate::layout::Rect;
+use tokens::opacity::settings_windows as opacity;
 use tokens::size::settings_windows as size;
 
 /// 文字の種類(書体と大きさと太さ)
@@ -28,6 +29,10 @@ pub enum TextStyle {
     Hero,
     /// 等幅の小さい文字(ライセンスの全文)
     Mono,
+    /// 情報のページの製品名(WinUI の Subtitle)
+    Subtitle,
+    /// テーマの見本の札の文字
+    Swatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -135,6 +140,10 @@ pub enum ButtonKind {
     Accent,
     /// 地の無い小さいボタン(既定に戻す)
     Subtle,
+    /// 消す・戻す操作のボタン(地はふつうのボタンと同じで，文字を危険の色にする)
+    Destructive,
+    /// 地の無い小さい絵のボタン(数を 1 段ずつ変える)．絵は文字の色
+    Quiet,
 }
 
 fn mix(a: Color, b: Color, t: f32) -> Color {
@@ -182,15 +191,28 @@ pub fn button(
             (fill, Color::from(palette.accent_text))
         }
         (ButtonKind::Accent, false) => (
-            Color::from(palette.control_strong_stroke).with_alpha(0.35),
+            Color::from(palette.control_strong_stroke).with_alpha(opacity::ACCENT_DISABLED),
             Color::from(palette.text_disabled),
         ),
-        (ButtonKind::Standard, enabled) => {
+        (ButtonKind::Standard | ButtonKind::Destructive, enabled) => {
             let base = Color::from(palette.control);
             let fill = if state.pressed && enabled {
                 Color::from(palette.control_pressed)
             } else {
                 mix(base, Color::from(palette.control_hover), state.hover)
+            };
+            let text = match (kind, enabled) {
+                (_, false) => palette.text_disabled,
+                (ButtonKind::Destructive, true) => palette.danger,
+                _ => palette.text,
+            };
+            (fill, Color::from(text))
+        }
+        (ButtonKind::Quiet, enabled) => {
+            let fill = if state.pressed && enabled {
+                Color::from(palette.nav_pressed)
+            } else {
+                Color::from(palette.nav_hover).with_alpha(state.hover)
             };
             let text = if enabled {
                 palette.text
@@ -214,13 +236,13 @@ pub fn button(
         }
     };
     canvas.fill_round(rect, radius, fill);
-    if kind == ButtonKind::Standard {
+    if matches!(kind, ButtonKind::Standard | ButtonKind::Destructive) {
         canvas.stroke_round(rect, radius, 1.0, Color::from(palette.control_stroke));
     }
-    let style = if kind == ButtonKind::Subtle {
-        TextStyle::Icon
-    } else {
-        TextStyle::Body
+    let style = match kind {
+        ButtonKind::Subtle => TextStyle::Icon,
+        ButtonKind::Quiet => TextStyle::IconSmall,
+        _ => TextStyle::Body,
     };
     canvas.text(rect, label, style, text, TextLayout::CENTER);
     if state.focus_visible {
@@ -262,7 +284,7 @@ pub fn field_frame(
         canvas.fill_round(
             rect,
             radius,
-            Color::from(palette.background).with_alpha(0.4),
+            Color::from(palette.background).with_alpha(opacity::DISABLED_OVERLAY),
         );
     }
 }
@@ -383,11 +405,11 @@ pub fn toggle(
         );
     }
     // つまみはオフで小さく，オンで少し大きい(WinUI と同じ)
-    let knob_off = height * 0.6;
-    let knob_on = height * 0.7;
+    let knob_off = size::SWITCH_KNOB_OFF;
+    let knob_on = size::SWITCH_KNOB_ON;
     let knob = knob_off + (knob_on - knob_off) * progress;
     let knob = if state.pressed && state.enabled {
-        knob + 2.0
+        knob + size::SWITCH_KNOB_PRESSED
     } else {
         knob
     };
@@ -429,6 +451,178 @@ pub fn toggle(
     );
     if state.focus_visible {
         focus_ring(canvas, theme, switch, height / 2.0);
+    }
+}
+
+/// スライダー(WinUI の Slider)．progress は値の位置(0〜1)．溝の左を値までアクセントの色で塗り，丸いつまみを置く
+pub fn slider(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, progress: f32, state: State) {
+    let palette = &theme.palette;
+    let thumb = size::SLIDER_THUMB_SIZE;
+    let track = size::SLIDER_TRACK_HEIGHT;
+    let middle = rect.y + rect.height / 2.0;
+    let left = rect.x + thumb / 2.0;
+    let width = (rect.width - thumb).max(0.0);
+    let x = left + width * progress.clamp(0.0, 1.0);
+    let rest = if state.enabled {
+        Color::from(palette.control_strong_stroke)
+    } else {
+        Color::from(palette.text_disabled).with_alpha(opacity::SLIDER_TRACK_DISABLED)
+    };
+    canvas.fill_round(
+        Rect::new(left, middle - track / 2.0, width, track),
+        track / 2.0,
+        rest,
+    );
+    let fill = if state.enabled {
+        Color::from(palette.accent)
+    } else {
+        Color::from(palette.text_disabled)
+    };
+    canvas.fill_round(
+        Rect::new(left, middle - track / 2.0, x - left, track),
+        track / 2.0,
+        fill,
+    );
+    let outer = Rect::new(x - thumb / 2.0, middle - thumb / 2.0, thumb, thumb);
+    canvas.fill_round(outer, thumb / 2.0, Color::from(palette.control));
+    canvas.stroke_round(outer, thumb / 2.0, 1.0, Color::from(palette.control_stroke));
+    let inner = if state.pressed && state.enabled {
+        size::SLIDER_THUMB_INNER
+    } else {
+        size::SLIDER_THUMB_INNER
+            + (size::SLIDER_THUMB_INNER_HOVER - size::SLIDER_THUMB_INNER) * state.hover
+    };
+    canvas.fill_round(
+        Rect::new(x - inner / 2.0, middle - inner / 2.0, inner, inner),
+        inner / 2.0,
+        fill,
+    );
+    if state.focus_visible {
+        focus_ring(canvas, theme, outer, thumb / 2.0);
+    }
+}
+
+/// 数を 1 段ずつ変える部品の枠と値(ボタンは呼ぶ側が button の Quiet で描く)．値は左に寄せる
+pub fn stepper_frame(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    value: &str,
+    enabled: bool,
+) {
+    let palette = &theme.palette;
+    let radius = size::CONTROL_RADIUS;
+    canvas.fill_round(rect, radius, Color::from(palette.control));
+    canvas.stroke_round(rect, radius, 1.0, Color::from(palette.control_stroke));
+    let text = if enabled {
+        palette.text
+    } else {
+        palette.text_disabled
+    };
+    let buttons = size::STEPPER_BUTTON_WIDTH * 2.0;
+    canvas.text(
+        Rect::new(
+            rect.x + size::FIELD_PADDING_X,
+            rect.y,
+            (rect.width - size::FIELD_PADDING_X - buttons).max(0.0),
+            rect.height,
+        ),
+        value,
+        TextStyle::Body,
+        Color::from(text),
+        TextLayout::LINE,
+    );
+}
+
+/// 選ぶ印(ラジオボタン．WinUI の RadioButton)．選んでいれば地をアクセントの色にし，真ん中に点を置く
+pub fn radio(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, selected: bool, state: State) {
+    let palette = &theme.palette;
+    let radius = rect.width / 2.0;
+    if selected {
+        let fill = if state.enabled {
+            mix(
+                Color::from(palette.accent),
+                Color::from(palette.accent_hover),
+                state.hover,
+            )
+        } else {
+            Color::from(palette.text_disabled)
+        };
+        canvas.fill_round(rect, radius, fill);
+        let dot = size::RADIO_DOT;
+        canvas.fill_round(
+            Rect::new(
+                rect.x + (rect.width - dot) / 2.0,
+                rect.y + (rect.height - dot) / 2.0,
+                dot,
+                dot,
+            ),
+            dot / 2.0,
+            Color::from(palette.accent_text),
+        );
+    } else {
+        let fill = mix(
+            Color::from(palette.control),
+            Color::from(palette.control_hover),
+            state.hover,
+        );
+        canvas.fill_round(rect, radius, fill);
+        let stroke = if state.enabled {
+            palette.switch_off
+        } else {
+            palette.text_disabled
+        };
+        canvas.stroke_round(rect, radius, 1.0, Color::from(stroke));
+    }
+}
+
+/// 一覧を切り替える部品の 1 つの欄．選んだ欄は地を付け，下にアクセントの色の短い線を引く(WinUI の SelectorBar)
+pub fn segment(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    label: &str,
+    selected: bool,
+    state: State,
+) {
+    let palette = &theme.palette;
+    let radius = size::CONTROL_RADIUS;
+    let fill = if selected {
+        Color::from(palette.nav_selected)
+    } else if state.pressed {
+        Color::from(palette.nav_pressed)
+    } else {
+        Color::from(palette.nav_hover).with_alpha(state.hover)
+    };
+    canvas.fill_round(rect, radius, fill);
+    let text = if selected {
+        palette.text
+    } else {
+        palette.text_secondary
+    };
+    canvas.text(
+        rect,
+        label,
+        TextStyle::Body,
+        Color::from(text),
+        TextLayout::CENTER,
+    );
+    if selected {
+        let width = size::NAV_INDICATOR_HEIGHT;
+        let height = size::NAV_INDICATOR_WIDTH;
+        canvas.fill_round(
+            Rect::new(
+                rect.x + (rect.width - width) / 2.0,
+                rect.max_y() - height,
+                width,
+                height,
+            ),
+            height / 2.0,
+            Color::from(palette.accent),
+        );
+    }
+    if state.focus_visible {
+        focus_ring(canvas, theme, rect, radius);
     }
 }
 

@@ -197,6 +197,16 @@ impl Graphics {
                 size::CAPTION_FONT_SIZE,
                 DWRITE_FONT_WEIGHT_NORMAL,
             ),
+            TextStyle::Subtitle => (
+                self.display_family,
+                size::ABOUT_TITLE_FONT_SIZE,
+                DWRITE_FONT_WEIGHT_SEMI_BOLD,
+            ),
+            TextStyle::Swatch => (
+                self.text_family,
+                size::THEME_SWATCH_FONT_SIZE,
+                DWRITE_FONT_WEIGHT_SEMI_BOLD,
+            ),
         };
         // SAFETY: 文字列は呼び出しのあいだ有効
         let format = unsafe {
@@ -814,6 +824,86 @@ pub fn render_preview(
         SelectObject(dc, old);
         let _ = DeleteObject(HGDIOBJ(bitmap.0));
         let _ = DeleteDC(dc);
+        result
+    }
+}
+
+/// 実行ファイルのアイコン(リソースの 1 番)を，窓の DPI のピクセルで width × height の画像にする(情報のページ)．
+/// 透けるところは background の色にする
+pub fn render_icon(width: u32, height: u32, background: tokens::Rgb) -> Option<Vec<u8>> {
+    use windows::Win32::Graphics::Gdi::{
+        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
+    };
+    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        DestroyIcon, DrawIconEx, LoadImageW, DI_NORMAL, HICON, IMAGE_ICON, LR_DEFAULTCOLOR,
+    };
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: i32::try_from(width).ok()?,
+            biHeight: -i32::try_from(height).ok()?,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    // SAFETY: アイコン・DC・DIB はこの関数の中で作って消す．bits は DIB を消すまで width × height × 4 バイト
+    unsafe {
+        let instance = GetModuleHandleW(None).ok()?;
+        // 1 番のアイコン(MAKEINTRESOURCE(1))を描く大きさで読む(縮めてぼかさない)
+        let handle = LoadImageW(
+            Some(instance.into()),
+            PCWSTR(std::ptr::without_provenance(1)),
+            IMAGE_ICON,
+            i32::try_from(width).ok()?,
+            i32::try_from(height).ok()?,
+            LR_DEFAULTCOLOR,
+        )
+        .ok()?;
+        let icon = HICON(handle.0);
+        let dc = CreateCompatibleDC(None);
+        let mut bits = std::ptr::null_mut();
+        let Ok(bitmap) = CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)
+        else {
+            let _ = DeleteDC(dc);
+            let _ = DestroyIcon(icon);
+            return None;
+        };
+        let old = SelectObject(dc, HGDIOBJ(bitmap.0));
+        let length = (width * height * 4) as usize;
+        let pixels = std::slice::from_raw_parts_mut(bits.cast::<u8>(), length);
+        let fill = [background.blue, background.green, background.red, 0xFF];
+        for (index, byte) in pixels.iter_mut().enumerate() {
+            *byte = fill[index % 4];
+        }
+        let drawn = DrawIconEx(
+            dc,
+            0,
+            0,
+            icon,
+            i32::try_from(width).ok()?,
+            i32::try_from(height).ok()?,
+            0,
+            None,
+            DI_NORMAL,
+        )
+        .is_ok();
+        // DrawIconEx はアルファを書き換えるので，不透明にそろえる(描き先はアルファを使わない)
+        for pixel in pixels.chunks_exact_mut(4) {
+            pixel[3] = 0xFF;
+        }
+        let result = drawn.then(|| pixels.to_vec());
+        SelectObject(dc, old);
+        let _ = DeleteObject(HGDIOBJ(bitmap.0));
+        let _ = DeleteDC(dc);
+        let _ = DestroyIcon(icon);
         result
     }
 }

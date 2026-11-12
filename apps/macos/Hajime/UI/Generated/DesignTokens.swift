@@ -351,7 +351,7 @@ enum DesignTokens {
             static let contentMaxWidth: CGFloat = 1000
             static let controlGap: CGFloat = 8
             static let toggleWidth: CGFloat = 96
-            static let stepperWidth: CGFloat = 96
+            static let stepperWidth: CGFloat = 160
             static let secondsLabelWidth: CGFloat = 56
             static let navWidth: CGFloat = 280
             static let windowWidth: CGFloat = 1000
@@ -394,6 +394,38 @@ enum DesignTokens {
             static let wizardKeycapMinWidth: CGFloat = 48
             static let wizardModeSize: CGFloat = 28
             static let wizardHeroSize: CGFloat = 72
+            static let stepperButtonWidth: CGFloat = 32
+            static let sliderTrackHeight: CGFloat = 4
+            static let sliderThumbSize: CGFloat = 20
+            static let sliderThumbInner: CGFloat = 12
+            static let sliderThumbInnerHover: CGFloat = 14
+            static let cardPaddingY: CGFloat = 12
+            static let footerGap: CGFloat = 8
+            static let labelMinWidth: CGFloat = 160
+            static let radioSize: CGFloat = 20
+            static let radioDot: CGFloat = 10
+            static let themeSwatchWidth: CGFloat = 40
+            static let themeSwatchHeight: CGFloat = 20
+            static let themeSwatchGap: CGFloat = 3
+            static let themeSwatchSelectionWidth: CGFloat = 12
+            static let themeSwatchSelectionHeight: CGFloat = 10
+            static let themeSwatchRadius: CGFloat = 6
+            static let themeSwatchFontSize: CGFloat = 11
+            static let aboutIcon: CGFloat = 64
+            static let aboutTitleFontSize: CGFloat = 20
+            static let palettePreviewHeight: CGFloat = 300
+            static let switchKnobOff: CGFloat = 12
+            static let switchKnobOn: CGFloat = 14
+            static let switchKnobPressed: CGFloat = 2
+            static let segmentMinWidth: CGFloat = 120
+            static let tableRowInset: CGFloat = 2
+            static let tableIndicatorInset: CGFloat = 8
+            static let tooltipOffset: CGFloat = 24
+            static let previewLines: CGFloat = 2
+            static let reportLines: CGFloat = 4
+            static let statusLines: CGFloat = 3
+            static let pageScroll: CGFloat = 0.8
+            static let tablePageRows: CGFloat = 4
         }
         enum StandardTheme {
             static let cornerRadius: CGFloat = 12
@@ -507,6 +539,13 @@ enum DesignTokens {
         }
         enum Palette {
             static let scrollbar: CGFloat = 0.45
+        }
+        enum SettingsWindows {
+            static let disabledOverlay: CGFloat = 0.4
+            static let accentDisabled: CGFloat = 0.35
+            static let link: CGFloat = 0.4
+            static let linkHoverMix: CGFloat = 0.35
+            static let sliderTrackDisabled: CGFloat = 0.5
         }
     }
 }

@@ -200,6 +200,77 @@ pub fn emoji() -> PalettePanel {
     }
 }
 
+/// 設定の画面の見本(macOS の SamplePalettes.preview)．列数・行数・よく使う文字の行数・説明の有無・マスの大きさは設定のとおりにし，
+/// 絵文字は見本の並びを繰り返して埋める
+pub fn settings(
+    columns: u32,
+    rows: u32,
+    frequent_rows: u32,
+    shows_preview: bool,
+    cell_size: f64,
+) -> PalettePanel {
+    let columns = columns.max(1);
+    let rows = rows.max(1);
+    let frequent_rows = frequent_rows.min(rows);
+    let frequent: Vec<&str> = EMOJI_ROWS[0].to_vec();
+    let smileys: Vec<&str> = EMOJI_ROWS[1..]
+        .iter()
+        .flat_map(|row| row.iter().copied())
+        .collect();
+    let cell = |text: &str| PaletteCell {
+        text: text.into(),
+        name: text.into(),
+        is_pinned: false,
+    };
+    let mut panel_rows = Vec::new();
+    for index in 0..rows {
+        let (source, offset, title) = if index < frequent_rows {
+            (&frequent, index * columns, "よく使う")
+        } else {
+            (&smileys, (index - frequent_rows) * columns, "顔と感情")
+        };
+        panel_rows.push(PaletteRow {
+            index,
+            cells: (0..columns)
+                .map(|column| cell(source[((offset + column) as usize) % source.len()]))
+                .collect(),
+            starts_section: index == 0 || index == frequent_rows,
+            section_title: title.into(),
+        });
+    }
+    let mut panel = emoji();
+    let first = if frequent_rows > 0 {
+        tab("frequent", "よく使う", "🕘", false)
+    } else {
+        tab("smileys", "顔と感情", "😀", true)
+    };
+    let sections: &[(&str, &str, &str)] = if frequent_rows > 0 {
+        &EMOJI_SECTIONS
+    } else {
+        &EMOJI_SECTIONS[1..]
+    };
+    panel.tabs = tabs(first, sections, "smileys");
+    panel.heading = if frequent_rows > 0 {
+        "よく使う"
+    } else {
+        "顔と感情"
+    }
+    .into();
+    panel.rows = panel_rows;
+    panel.columns = columns;
+    panel.visible_rows = rows;
+    panel.selection = Some(PalettePosition {
+        row: 1.min(rows - 1),
+        column: 2.min(columns - 1),
+    });
+    panel.shows_preview = shows_preview;
+    if !shows_preview {
+        panel.preview = None;
+    }
+    panel.cell_size = cell_size;
+    panel
+}
+
 /// 「ojigi」と打って探したところ．肌の色の帯を開いている
 pub fn search() -> PalettePanel {
     let options = SKIN_TONES

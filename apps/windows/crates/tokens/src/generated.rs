@@ -165,6 +165,7 @@ pub struct SettingsPalette {
     pub control_pressed: Rgb,
     pub control_stroke: Rgb,
     pub control_strong_stroke: Rgb,
+    pub danger: Rgb,
     pub flyout: Rgb,
     pub flyout_stroke: Rgb,
     pub nav_hover: Rgb,
@@ -194,6 +195,7 @@ pub mod settings_windows {
         control_pressed: Rgb { red: 0xF5, green: 0xF5, blue: 0xF5 },
         control_stroke: Rgb { red: 0xC4, green: 0xC4, blue: 0xC4 },
         control_strong_stroke: Rgb { red: 0x8A, green: 0x8A, blue: 0x8A },
+        danger: Rgb { red: 0xC4, green: 0x2B, blue: 0x1C },
         flyout: Rgb { red: 0xF9, green: 0xF9, blue: 0xF9 },
         flyout_stroke: Rgb { red: 0xD9, green: 0xD9, blue: 0xD9 },
         nav_hover: Rgb { red: 0xED, green: 0xED, blue: 0xED },
@@ -219,6 +221,7 @@ pub mod settings_windows {
         control_pressed: Rgb { red: 0x32, green: 0x32, blue: 0x32 },
         control_stroke: Rgb { red: 0x4A, green: 0x4A, blue: 0x4A },
         control_strong_stroke: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
+        danger: Rgb { red: 0xFF, green: 0x99, blue: 0xA4 },
         flyout: Rgb { red: 0x2C, green: 0x2C, blue: 0x2C },
         flyout_stroke: Rgb { red: 0x3D, green: 0x3D, blue: 0x3D },
         nav_hover: Rgb { red: 0x29, green: 0x29, blue: 0x29 },
@@ -463,7 +466,7 @@ pub mod size {
         pub const CONTENT_MAX_WIDTH: f32 = 1000.0;
         pub const CONTROL_GAP: f32 = 8.0;
         pub const TOGGLE_WIDTH: f32 = 96.0;
-        pub const STEPPER_WIDTH: f32 = 96.0;
+        pub const STEPPER_WIDTH: f32 = 160.0;
         pub const SECONDS_LABEL_WIDTH: f32 = 56.0;
         pub const NAV_WIDTH: f32 = 280.0;
         pub const WINDOW_WIDTH: f32 = 1000.0;
@@ -506,6 +509,38 @@ pub mod size {
         pub const WIZARD_KEYCAP_MIN_WIDTH: f32 = 48.0;
         pub const WIZARD_MODE_SIZE: f32 = 28.0;
         pub const WIZARD_HERO_SIZE: f32 = 72.0;
+        pub const STEPPER_BUTTON_WIDTH: f32 = 32.0;
+        pub const SLIDER_TRACK_HEIGHT: f32 = 4.0;
+        pub const SLIDER_THUMB_SIZE: f32 = 20.0;
+        pub const SLIDER_THUMB_INNER: f32 = 12.0;
+        pub const SLIDER_THUMB_INNER_HOVER: f32 = 14.0;
+        pub const CARD_PADDING_Y: f32 = 12.0;
+        pub const FOOTER_GAP: f32 = 8.0;
+        pub const LABEL_MIN_WIDTH: f32 = 160.0;
+        pub const RADIO_SIZE: f32 = 20.0;
+        pub const RADIO_DOT: f32 = 10.0;
+        pub const THEME_SWATCH_WIDTH: f32 = 40.0;
+        pub const THEME_SWATCH_HEIGHT: f32 = 20.0;
+        pub const THEME_SWATCH_GAP: f32 = 3.0;
+        pub const THEME_SWATCH_SELECTION_WIDTH: f32 = 12.0;
+        pub const THEME_SWATCH_SELECTION_HEIGHT: f32 = 10.0;
+        pub const THEME_SWATCH_RADIUS: f32 = 6.0;
+        pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
+        pub const ABOUT_ICON: f32 = 64.0;
+        pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
+        pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
+        pub const SWITCH_KNOB_OFF: f32 = 12.0;
+        pub const SWITCH_KNOB_ON: f32 = 14.0;
+        pub const SWITCH_KNOB_PRESSED: f32 = 2.0;
+        pub const SEGMENT_MIN_WIDTH: f32 = 120.0;
+        pub const TABLE_ROW_INSET: f32 = 2.0;
+        pub const TABLE_INDICATOR_INSET: f32 = 8.0;
+        pub const TOOLTIP_OFFSET: f32 = 24.0;
+        pub const PREVIEW_LINES: f32 = 2.0;
+        pub const REPORT_LINES: f32 = 4.0;
+        pub const STATUS_LINES: f32 = 3.0;
+        pub const PAGE_SCROLL: f32 = 0.8;
+        pub const TABLE_PAGE_ROWS: f32 = 4.0;
     }
     pub mod standard_theme {
         pub const CORNER_RADIUS: f32 = 12.0;
@@ -621,5 +656,12 @@ pub mod opacity {
     }
     pub mod palette {
         pub const SCROLLBAR: f32 = 0.45;
+    }
+    pub mod settings_windows {
+        pub const DISABLED_OVERLAY: f32 = 0.4;
+        pub const ACCENT_DISABLED: f32 = 0.35;
+        pub const LINK: f32 = 0.4;
+        pub const LINK_HOVER_MIX: f32 = 0.35;
+        pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
     }
 }

@@ -12,6 +12,7 @@ pub mod model;
 pub mod notices;
 pub mod options;
 pub mod pages;
+pub mod sample;
 pub mod store;
 pub mod strings;
 pub mod sync;
