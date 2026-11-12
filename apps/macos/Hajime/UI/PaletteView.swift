@@ -548,7 +548,7 @@ final class PaletteView: NSView {
         let kind = Self.kind(of: panel)
         if kind.cellShape == .wide {
             // 顔文字は横に長いので，文字の幅に合わせて四角を広げる(説明の欄の幅の一定の割合まで)
-            let width = preview.text.size(withAttributes: [.font: theme.candidateFont(size: Size.previewKaomojiFontSize)]).width + Size.kaomojiPaddingX * 4
+            let width = preview.text.size(withAttributes: [.font: theme.candidateFont(size: Size.previewKaomojiFontSize)]).width + Size.tilePadding * 2
             tile.size.width = min(max(tile.width, width.rounded(.up)), (rect.width * Size.previewKaomojiWidth).rounded())
             fill(tile, color: theme.badge, radius: Size.cellRadius)
             drawFitted(preview.text, size: Size.previewKaomojiFontSize, color: theme.text, in: tile.insetBy(dx: Size.kaomojiPaddingX, dy: 0))

@@ -5,7 +5,8 @@
 - size.space の段階は 2・4・8・12・16・24 だけ．役割(fine〜page)は段階を参照し，近さの順を守る
 - size.text と size.part の値が $extensions.hajime.formula の式と一致する(部品の高さは式で決める)
 - 画面のトークンの余白(名前に padding・gap・inset・margin・indent・spacing を含むもの)は，
-  役割(size.space.<役割>)か部品(size.part)を参照する．段階の名前や数値を直接書かない．値は段階に載る
+  役割(size.space.<役割>)か部品(size.part)を参照する．段階の名前や数値を直接書かない．
+  部品の値(アイコンの箱の余白 3 など)は部品の決まりで決めるので，段階に載らなくてよい
 
 描画のコード(CODE_DIRS)
 - 余白に数値を書かない(.padding(8)，spacing: 6，insetBy(dx: 0, dy: 2)，rect.minX + 4，x + 8.0 など)
@@ -76,12 +77,10 @@ MOTION_FILES = {"motion.rs", "anim.rs", "PaletteMotion.swift"}
 
 # 決まりを入れる前からの画面で，あとの PR で直すもの(トークンの節とファイル)．直したら外す
 FOLLOW_UP_CANDIDATE = "#430 の次の PR で直す(候補の窓・分岐図・語の意味・案内と，予測・モードの札・手書きの窓)"
-FOLLOW_UP_PALETTE = "パレットの PR で直す"
 FOLLOW_UP_SETTINGS = "設定の画面と初期設定の PR で直す"
 PENDING_SECTIONS: dict[str, str] = {
     "candidate": FOLLOW_UP_CANDIDATE, "glass": FOLLOW_UP_CANDIDATE, "branch": FOLLOW_UP_CANDIDATE, "meaning": FOLLOW_UP_CANDIDATE,
     "mode-indicator": FOLLOW_UP_CANDIDATE, "prediction": FOLLOW_UP_CANDIDATE, "handwriting": FOLLOW_UP_CANDIDATE,
-    "palette": FOLLOW_UP_PALETTE,
     "settings": FOLLOW_UP_SETTINGS, "settings-windows": FOLLOW_UP_SETTINGS, "onboarding": FOLLOW_UP_SETTINGS,
 }
 PENDING_FILES: dict[str, str] = {
@@ -91,8 +90,6 @@ PENDING_FILES: dict[str, str] = {
     "apps/windows/crates/candidate-ui/src/scene/branch.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/meaning.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/association.rs": FOLLOW_UP_CANDIDATE,
-    "apps/macos/Hajime/UI/PaletteView.swift": FOLLOW_UP_PALETTE,
-    "apps/windows/crates/candidate-ui/src/palette/scene.rs": FOLLOW_UP_PALETTE,
     "apps/macos/Hajime/Settings/AboutPage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/AppearancePage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/AssociationSection.swift": FOLLOW_UP_SETTINGS,
@@ -227,7 +224,7 @@ def check_tokens(raw: dict) -> list[str]:
                 section_errors.append(f"size.{key}: 段階の名前({target})を参照している．役割を参照する")
             elif parts[:2] not in (["size", "space"], ["size", "part"]):
                 section_errors.append(f"size.{key}: {target} を参照している．size.space の役割か size.part を参照する")
-            elif flat[f"size.{key}"] not in SCALE.values():
+            elif parts[:2] == ["size", "space"] and flat[f"size.{key}"] not in SCALE.values():
                 section_errors.append(f"size.{key}: 値 {flat[f'size.{key}']:g} が段階にありません")
         if section in PENDING_SECTIONS:
             if section_errors:
