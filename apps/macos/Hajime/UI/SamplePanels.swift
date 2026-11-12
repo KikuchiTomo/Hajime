@@ -51,22 +51,23 @@ enum SamplePanels {
                  .init(meaning: "気持ちが変わる。心が揺れる", example: "心が動く")],
         others: [])
 
-    /// 読みで引いた絵文字(設定の「絵文字に変換」)．「えがお」の 4・5 番目に絵文字を出し，絵文字の名前(CLDR)を候補の横に薄く添える
-    static let emojiCandidates = ["笑顔", "^_^", "(^-^)", "😄", "😀", "(^_^)", "(^o^)", "(*^^*)", "(^^)"]
-    static let emojiNames: [String: String] = ["😄": "笑顔", "😀": "にっこり笑う"]
+    /// 読みで引いた絵文字(設定の「文節の中の語を絵文字に変換」)．「ねこがかわいい」を変換し，「ねこが」の文節の 4・5 番目に語を絵文字にした候補を出す．
+    /// 絵文字の名前(CLDR)を候補の横に薄く添える．候補は hajime-playground --panels で求めたもの
+    static let emojiCandidates = ["猫が", "ネコが", "ネコ画", "🐈が", "😺が", "ねこ画", "猫画", "根子が", "音子が"]
+    static let emojiNames: [String: String] = ["🐈が": "ネコ", "😺が": "にっこり笑う猫"]
 
     /// 文節ごとの一覧で絵文字を選んだところ
     static let emojiList = CandidatePanel(
         variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) }, selectedVariant: nil,
         entries: emojiCandidates.map { .init(text: $0, annotation: nil, detail: emojiNames[$0]) },
-        selectedEntry: 3, focus: .candidate, position: 4, total: 30, note: nil
+        selectedEntry: 3, focus: .candidate, position: 4, total: 11, note: nil
     )
 
-    /// 打っているあいだの候補の窓に出した絵文字
+    /// 打っているあいだの候補の窓．絵文字は変換したときの候補にだけ出すので，ここには出さない(候補は --panels で求めたもの)
     static let emojiSuggestion: CandidatePanel = {
         var panel = CandidatePanel(
             variants: [], selectedVariant: nil,
-            entries: ["笑顔", "(^^)", "(*^^*)", "😄", "😀"].map { .init(text: $0, annotation: nil, detail: emojiNames[$0]) },
+            entries: ["猫が可愛い", "猫がかわいい", "ねこが可愛い", "ネコが可愛い", "ねこがかわいい"].map { .init(text: $0, annotation: nil) },
             selectedEntry: nil, focus: .candidate, position: 0, total: 5,
             note: Note(tone: .info, title: "", key: ["↓", "Tab"].joined(separator: IndicatorLabels.keySeparator), keyAction: "選択")
         )
@@ -74,13 +75,13 @@ enum SamplePanels {
         return panel
     }()
 
-    /// 分岐図で絵文字を選んだところ
+    /// 分岐図で語を絵文字にした候補を選んだところ
     static let emojiLattice: LatticePanel = {
         let alternatives = Array(emojiCandidates.prefix(5))
-        var column = LatticePanel.Column(text: "😄", alternatives: alternatives, selectedAlternative: 3,
-                                         variants: ["えがお", "エガオ", "ｴｶﾞｵ"], isFocused: true, isUncertain: false)
+        var column = LatticePanel.Column(text: "🐈が", alternatives: alternatives, selectedAlternative: 3,
+                                         variants: ["ねこが", "ネコガ", "ﾈｺｶﾞ"], isFocused: true, isUncertain: false)
         column.alternativeDetails = alternatives.map { emojiNames[$0] }
-        return LatticePanel(columns: [.init(text: "今日も", isFocused: false, isUncertain: false), column], position: 1, total: 30)
+        return LatticePanel(columns: [column, .init(text: "かわいい", isFocused: false, isUncertain: false)], position: 1, total: 11)
     }()
 
     static let lattice = LatticePanel(columns: [

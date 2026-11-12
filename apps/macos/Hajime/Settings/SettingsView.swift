@@ -245,7 +245,12 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.misuseNotes, keyPath: \.misuseNotes)
                 ResettableToggle(model: model, title: UIStrings.Settings.proofreading, keyPath: \.proofreading)
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
+                ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
+            }
+            Section(UIStrings.Settings.emojiSection) {
                 ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
+                ResettableToggle(model: model, title: UIStrings.Settings.emojiWordConversion, keyPath: \.emojiWordConversion)
+                Text(UIStrings.Settings.emojiNote).font(.caption).foregroundStyle(.secondary)
                 Group {
                     ResettableRow(model: model, keyPath: \.emojiCandidatePosition) {
                         Stepper(value: model.binding(\.emojiCandidatePosition), in: DefaultSettings.emojiCandidatePositionRange) {
@@ -260,8 +265,7 @@ private struct ConversionTab: View {
                     }
                     ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
                 }
-                .disabled(!model.settings.emojiConversion)
-                ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
+                .disabled(!model.settings.emojiConversion && !model.settings.emojiWordConversion)
             }
             Section(UIStrings.Settings.numberForms) {
                 ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)

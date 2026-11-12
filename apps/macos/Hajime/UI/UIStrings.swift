@@ -504,7 +504,10 @@ enum UIStrings {
         static let misuseNotes = "誤用の注釈を表示"
         static let proofreading = "校正支援"
         static let symbolConversion = "記号に変換"
-        static let emojiConversion = "絵文字に変換"
+        static let emojiSection = "絵文字"
+        static let emojiConversion = "文節を絵文字に変換"
+        static let emojiWordConversion = "文節の中の語を絵文字に変換"
+        static let emojiNote = "「びーる」→ 🍺 のように文節全体を、「ねこが」→ 🐈が のように文節の中の語を絵文字にします。Space で変換したときの候補にだけ表示し、入力中は表示しません。"
         static let emojiCandidatePosition = "絵文字の位置"
         static let emojiCandidateCount = "絵文字の数"
         static let showsEmojiNames = "絵文字の名前を表示"
@@ -1092,7 +1095,8 @@ extension UIStrings {
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
-            "emojiConversion": UIStrings.Settings.emojiConversion, "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,
+            "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
+            "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,
             "emojiCandidateCount": UIStrings.Settings.emojiCandidateCount, "showsEmojiNames": UIStrings.Settings.showsEmojiNames,
             "latexConversion": UIStrings.Settings.latexConversion,
             "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,

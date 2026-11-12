@@ -543,7 +543,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
                   endsWithParticle: CIDData.isJoshi(cid: element.rcid), startsWithNoun: nounIDs.contains(element.lcid),
                   startsWithPredicate: predicateIDs.contains { $0.contains(element.lcid) },
                   startsWithConjunctiveParticle: conjunctiveParticleIDs.contains(element.lcid),
-                  endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid))
+                  endsWithSentenceFinalParticle: sentenceFinalParticleIDs.contains(element.rcid),
+                  isFunctionWord: functionWordIDs.contains(element.lcid) && functionWordIDs.contains(element.rcid))
         }
     }
 

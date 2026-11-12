@@ -168,6 +168,7 @@ impl Page {
                 features::HANDWRITING,
                 settings::DATE_CONVERSION,
                 settings::EMOJI_CONVERSION,
+                settings::EMOJI_WORD_CONVERSION,
                 settings::EMOJI_CANDIDATE_POSITION,
                 settings::EMOJI_CANDIDATE_COUNT,
                 settings::SHOWS_EMOJI_NAMES,
@@ -279,6 +280,8 @@ pub enum Condition {
     On(&'static str),
     /// すべての条件を満たすとき
     All(&'static [Condition]),
+    /// どれかの条件を満たすとき
+    Any(&'static [Condition]),
 }
 
 /// カスタムテーマの書体の欄(macOS の ThemeFontPicker)
@@ -1176,22 +1179,28 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(settings::MISUSE_NOTES, "misuseNotes"),
                 Row::toggle(settings::PROOFREADING, "proofreading"),
                 Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
+                Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
+            ],
+        ),
+        Section::new(
+            settings::EMOJI_SECTION,
+            vec![
                 Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
+                Row::toggle(settings::EMOJI_WORD_CONVERSION, "emojiWordConversion"),
+                Row::note(settings::EMOJI_NOTE),
                 Row::stepper(
                     settings::EMOJI_CANDIDATE_POSITION,
                     "emojiCandidatePosition",
                     RangeKind::EmojiCandidatePosition,
                 )
-                .enabled_when(On("emojiConversion")),
+                .enabled_when(EMOJI_ON),
                 Row::stepper(
                     settings::EMOJI_CANDIDATE_COUNT,
                     "emojiCandidateCount",
                     RangeKind::EmojiCandidateCount,
                 )
-                .enabled_when(On("emojiConversion")),
-                Row::toggle(settings::SHOWS_EMOJI_NAMES, "showsEmojiNames")
-                    .enabled_when(On("emojiConversion")),
-                Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
+                .enabled_when(EMOJI_ON),
+                Row::toggle(settings::SHOWS_EMOJI_NAMES, "showsEmojiNames").enabled_when(EMOJI_ON),
             ],
         ),
         Section::new(
@@ -1293,6 +1302,12 @@ const LANGUAGE_RULE_FIELDS: &[Field] = &[
 ];
 
 /// 日本語のタイプミスを直すとき．修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く
+/// 文節全体か文節の中の語のどちらかを絵文字にする設定のとき(位置・数・名前の表示は両方に共通)
+const EMOJI_ON: Condition = Condition::Any(&[
+    Condition::On("emojiConversion"),
+    Condition::On("emojiWordConversion"),
+]);
+
 const CORRECTS_JAPANESE: Condition = Condition::All(&[
     Condition::Is("typoCorrection", "standard"),
     Condition::On("correction.japanese"),
@@ -2081,6 +2096,9 @@ pub fn holds(
             Condition::All(conditions) => conditions
                 .iter()
                 .all(|condition| check(*condition, text, on)),
+            Condition::Any(conditions) => conditions
+                .iter()
+                .any(|condition| check(*condition, text, on)),
         }
     }
     check(condition, &text, &on)

@@ -484,16 +484,24 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     }
 }
 
-/// 「えがお」の候補．4・5 番目に絵文字を出す(macOS の SamplePanels.emojiCandidates)
+/// 「ねこがかわいい」の「ねこが」の文節の候補．4・5 番目に語を絵文字にした候補を出す(macOS の SamplePanels.emojiCandidates)
 const EMOJI_CANDIDATES: [&str; 9] = [
-    "笑顔", "^_^", "(^-^)", "😄", "😀", "(^_^)", "(^o^)", "(*^^*)", "(^^)",
+    "猫が",
+    "ネコが",
+    "ネコ画",
+    "🐈が",
+    "😺が",
+    "ねこ画",
+    "猫画",
+    "根子が",
+    "音子が",
 ];
 
 /// 絵文字の候補の横に薄く添える名前(CLDR．macOS の SamplePanels.emojiNames)
 fn emoji_name(text: &str) -> Option<String> {
     match text {
-        "😄" => Some("笑顔".into()),
-        "😀" => Some("にっこり笑う".into()),
+        "🐈が" => Some("ネコ".into()),
+        "😺が" => Some("にっこり笑う猫".into()),
         _ => None,
     }
 }
@@ -515,16 +523,22 @@ fn emoji_list() -> CandidateList {
         hints: None,
         selected_entry: Some(3),
         position: 4,
-        total: 30,
+        total: 11,
         ..list()
     }
 }
 
-/// 打っているあいだの候補の窓に出した絵文字(macOS の emoji-suggestion)．選び始めるまで番号を振らない
+/// 打っているあいだの候補の窓(macOS の emoji-suggestion)．絵文字は変換したときの候補にだけ出すので，ここには出さない
 fn emoji_suggestion() -> CandidateList {
     CandidateList {
         variants: vec![],
-        entries: emoji_entries(&["笑顔", "(^^)", "(*^^*)", "😄", "😀"]),
+        entries: entries(&[
+            "猫が可愛い",
+            "猫がかわいい",
+            "ねこが可愛い",
+            "ネコが可愛い",
+            "ねこがかわいい",
+        ]),
         shows_numbers: Some(false),
         selected_entry: None,
         position: 0,
@@ -534,7 +548,7 @@ fn emoji_suggestion() -> CandidateList {
     }
 }
 
-/// 分岐図で絵文字を選んだところ(macOS の emoji-branch)
+/// 分岐図で語を絵文字にした候補を選んだところ(macOS の emoji-branch)
 fn emoji_branch() -> BranchMap {
     let alternatives = strings(&EMOJI_CANDIDATES[..5]);
     BranchMap {
@@ -542,21 +556,21 @@ fn emoji_branch() -> BranchMap {
         association_hint: None,
         association_key: None,
         columns: vec![
-            column("今日も"),
             BranchColumn {
                 selected_alternative: Some(3),
-                variants: strings(&["えがお", "エガオ", "ｴｶﾞｵ"]),
+                variants: strings(&["ねこが", "ネコガ", "ﾈｺｶﾞ"]),
                 is_focused: true,
                 alternative_notes: vec![None; alternatives.len()],
                 alternative_details: Some(
                     alternatives.iter().map(|text| emoji_name(text)).collect(),
                 ),
                 alternatives,
-                ..column("😄")
+                ..column("🐈が")
             },
+            column("かわいい"),
         ],
         position: 1,
-        total: 30,
+        total: 11,
         note: None,
         hints: vec![],
         meaning_placement: None,

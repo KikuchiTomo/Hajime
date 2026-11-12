@@ -38,6 +38,7 @@
     "dateConversion": true,
     "dynamicDictionary": false,
     "emojiConversion": true,
+    "emojiWordConversion": true,
     "emojiCandidatePosition": 4,
     "emojiCandidateCount": 2,
     "showsEmojiNames": true,

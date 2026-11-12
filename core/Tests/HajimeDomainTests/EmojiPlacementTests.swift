@@ -39,14 +39,31 @@ struct EmojiPlacementTests {
         #expect(EmojiPlacement(index: 1, count: 1).placed(list).map(\.text) == ["😺", "🐈", "猫", "ねこ"])
     }
 
-    @Test("設定の位置は 1 から数え，絵文字に変換しない設定では置き場所が無い")
+    @Test("設定の位置は 1 から数え，どちらの絵文字にも変換しない設定では置き場所が無い")
     func settings() {
         var settings = DefaultSettings.settings
         settings.emojiCandidatePosition = 4
         settings.emojiCandidateCount = 3
         #expect(settings.emojiPlacement == EmojiPlacement(index: 3, count: 3))
+        // 文節全体と文節の中の語のどちらかを絵文字にする設定なら，置き場所は共通
         settings.emojiConversion = false
+        #expect(settings.emojiPlacement == EmojiPlacement(index: 3, count: 3))
+        settings.emojiWordConversion = false
         #expect(settings.emojiPlacement == nil)
+    }
+
+    @Test("付属語だけでできた語の並びを見分ける(文節の中の名詞を絵文字にするのは，後ろが付属語だけのとき)")
+    func functionWords() {
+        let particle = Candidate.Word(text: "が", readingCount: 1, startsWithParticle: true, endsWithParticle: true, isFunctionWord: true)
+        let auxiliary = Candidate.Word(text: "です", readingCount: 2, isFunctionWord: true)
+        // 「が可愛い」のように助詞で始まっても自立語を含む語は付属語ではない
+        let particleAndAdjective = Candidate.Word(text: "が可愛い", readingCount: 5, startsWithParticle: true)
+        #expect(EmojiPlacement.isFunctionWords([particle], readingCount: 1))
+        #expect(EmojiPlacement.isFunctionWords([particle, auxiliary], readingCount: 3))
+        #expect(!EmojiPlacement.isFunctionWords([particleAndAdjective], readingCount: 5))
+        #expect(!EmojiPlacement.isFunctionWords([], readingCount: 0))
+        // 語の並びが読み全体を覆わなければ付属語だけとはみなさない
+        #expect(!EmojiPlacement.isFunctionWords([particle], readingCount: 2))
     }
 
     @Test("範囲の外の位置と数は範囲に収める(第 1 候補にはしない)")

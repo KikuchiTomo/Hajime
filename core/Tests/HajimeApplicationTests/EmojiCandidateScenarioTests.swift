@@ -4,8 +4,8 @@ import HajimeDomain
 import HajimeTestSupport
 import Testing
 
-/// 読みで引いた絵文字を変換の候補に足す(設定の「絵文字に変換」)．第 1 候補にはせず，分岐図の見えている枝・一覧の 1 ページ目・
-/// 入力中の候補の窓に入る位置にまとめて置く(EmojiPlacement)
+/// 読みで引いた絵文字を変換したときの候補に足す(設定の「文節を絵文字に変換」「文節の中の語を絵文字に変換」)．第 1 候補にはせず，
+/// 分岐図の見えている枝と一覧の 1 ページ目に入る位置にまとめて置く(EmojiPlacement)．打っているあいだの表示と入力中の候補の窓には出さない
 @MainActor
 @Suite("絵文字の候補")
 struct EmojiCandidateScenarioTests {
@@ -37,17 +37,29 @@ struct EmojiCandidateScenarioTests {
 
     @Test("読みで引いた絵文字を設定の位置にまとめ，数を設定で抑える．エンジンの辞書の絵文字は除く")
     func placesLookedUpEmoji() {
-        let candidates = supplemented(settings()).candidates(for: "ねこ")
+        let candidates = supplemented(settings()).listCandidates(for: "ねこ")
         #expect(candidates.map(\.text) == ["猫", "ねこ", "🐈", "😺", "ネコ", "根子", "音子", "値子", "子子"])
         #expect(candidates.filter { $0.origin == .emoji }.map(\.text) == ["🐈", "😺"])
-        let moved = supplemented(settings { $0.emojiCandidatePosition = 5; $0.emojiCandidateCount = 3 }).candidates(for: "ねこ")
+        let moved = supplemented(settings { $0.emojiCandidatePosition = 5; $0.emojiCandidateCount = 3 }).listCandidates(for: "ねこ")
         #expect(moved.map(\.text).prefix(7) == ["猫", "ねこ", "ネコ", "根子", "🐈", "😺", "😸"])
     }
 
     @Test("設定を切ると絵文字を出さない．エンジンの辞書の絵文字も出さない")
     func settingOff() {
-        let candidates = supplemented(settings { $0.emojiConversion = false }).candidates(for: "ねこ").map(\.text)
-        #expect(!candidates.contains { EmojiPlacement.isEmoji($0) })
+        let candidates = supplemented(settings { $0.emojiConversion = false; $0.emojiWordConversion = false }).listCandidates(for: "ねこ").map(\.text)
+        #expect(!candidates.contains { EmojiPlacement.containsEmoji($0) })
+    }
+
+    @Test("打っているあいだに求める候補(ライブ変換の文字)には絵文字を出さない．エンジンの辞書の絵文字が学習で先頭に来ても出さない")
+    func noEmojiWhileTyping() {
+        let converter = FakeConverter(["ねこ": [("🐱", nil), ("猫", nil), ("ねこ", nil)]])
+        #expect(supplemented(settings(), converter: converter).candidates(for: "ねこ").map(\.text) == ["猫", "ねこ"])
+        converter.predictionTexts["ねこ"] = ["🐱", "猫カフェ"]
+        #expect(supplemented(settings(), converter: converter).predictions(for: "ねこ").map(\.text) == ["猫カフェ"])
+        let harness = harness(settings { $0.liveConversionSkipLength = 0 }, converter: converter)
+        harness.type("neko")
+        harness.settle()
+        #expect(harness.marked.text == "猫")
     }
 
     @Test("ユーザー辞書に登録した絵文字は先頭に残す")
@@ -65,7 +77,7 @@ struct EmojiCandidateScenarioTests {
 
     @Test("エンジンが候補を出さない読みでも，絵文字を第 1 候補にしない")
     func neverFirstWithoutOtherCandidates() {
-        let candidates = supplemented(settings(), converter: FakeConverter()).candidates(for: "なく").map(\.text)
+        let candidates = supplemented(settings(), converter: FakeConverter()).listCandidates(for: "なく").map(\.text)
         #expect(candidates == ["なく", "😢", "😭"])
     }
 
@@ -90,11 +102,21 @@ struct EmojiCandidateScenarioTests {
         #expect(!entries.contains("😸"))
     }
 
-    @Test("入力中の候補の窓にも出す")
-    func suggestionShowsEmoji() {
-        let harness = harness(settings { $0.liveConversion = false })
+    @Test("入力中の候補の窓には出さず，Space で変換したあとの候補には 4 番目から出す")
+    func suggestionWindowHasNoEmoji() {
+        let harness = harness(settings { $0.liveConversion = false; $0.emojiCandidatePosition = DefaultSettings.emojiCandidatePosition })
         harness.type("neko")
-        #expect(harness.panel?.entries.map(\.text).prefix(4) == ["猫", "ねこ", "🐈", "😺"])
+        #expect(harness.panel?.entries.isEmpty == false)
+        #expect(harness.panel?.entries.contains { EmojiPlacement.containsEmoji($0.text) } == false)
+        harness.press(.space)
+        #expect(harness.focusedAlternatives?.firstIndex(of: "🐈") == DefaultSettings.emojiCandidatePosition - 1)
+    }
+
+    @Test("最後の文節の入力中の候補の窓にも，語を絵文字にした候補を出さない")
+    func suggestionWindowForLastClause() {
+        let harness = harness(settings { $0.liveConversion = false }, converter: sentenceConverter())
+        harness.type("shiroinekoga")
+        #expect(harness.panel?.entries.contains { EmojiPlacement.containsEmoji($0.text) } == false)
     }
 
     @Test("文の途中の文節でも，文節の読みが絵文字の読みと同じなら出す．文全体の候補から文節の字を前に集めても押し下げない")
@@ -145,9 +167,6 @@ struct EmojiCandidateScenarioTests {
         #expect(entries.first { $0.text == "🐈" }?.detail == "ネコ")
         #expect(entries.filter { $0.text != "🐈" }.allSatisfy { $0.detail == nil })
         #expect(harness.panel?.homophone == nil)
-        let typing = self.harness(settings { $0.liveConversion = false })
-        typing.type("neko")
-        #expect(typing.panel?.entries.first { $0.text == "🐈" }?.detail == "ネコ")
     }
 
     @Test("名前を表示しない設定では添えない")
@@ -178,14 +197,74 @@ struct EmojiCandidateScenarioTests {
     @Test("学習を使わずに変換しているあいだは，選んだ絵文字を伝えない")
     func suspendedLearning() {
         let converter = supplemented(settings())
-        let candidate = converter.candidates(for: "ねこ").first { $0.origin == .emoji }!
+        let candidate = converter.listCandidates(for: "ねこ").first { $0.origin == .emoji }!
         converter.suspendLearningUntilEnd()
         converter.didCommit(candidate)
         #expect(emoji.committed.isEmpty)
         converter.endComposition()
-        let again = converter.candidates(for: "ねこ").first { $0.origin == .emoji }!
+        let again = converter.listCandidates(for: "ねこ").first { $0.origin == .emoji }!
         converter.didCommit(again)
         #expect(emoji.committed.map(\.reading) == ["ねこ"])
+    }
+
+    // MARK: 文節の中の語を絵文字にする(「ねこが」→「🐈が」)
+
+    private static let noun = { (text: String, count: Int) in Candidate.Word(text: text, readingCount: count, startsWithNoun: true) }
+    private static let particle = { (text: String) in
+        Candidate.Word(text: text, readingCount: text.count, startsWithParticle: true, endsWithParticle: true, isFunctionWord: true)
+    }
+
+    /// 「白い｜猫が」に分かれる変換器．「ねこが」は辞書の 1 語(名詞と助詞をつないだ語)，「ねこがかわいい」は後ろに自立語がある
+    private func sentenceConverter() -> FakeConverter {
+        let converter = FakeConverter([
+            "しろいねこが": [("白い猫が", nil)],
+            "しろい": [("白い", nil)],
+            "ねこが": [("猫が", nil), ("根子が", nil), ("音子が", nil), ("値子が", nil)],
+            "ねこ": [("猫", nil), ("🐱", nil), ("根子", nil)],
+            "ねこがかわいい": [("猫が可愛い", nil), ("猫がかわいい", nil)],
+        ])
+        converter.words["しろいねこが"] = [Candidate.Word(text: "白い", readingCount: 3, startsWithPredicate: true), Self.noun("猫", 2), Self.particle("が")]
+        converter.candidateWords["白い猫が"] = converter.words["しろいねこが"]
+        // 辞書には名詞と助詞をつないだ語(猫が)もあるので，語の並びの切れ目ではなく読みを切って確かめる
+        converter.words["ねこが"] = [Candidate.Word(text: "猫が", readingCount: 3, endsWithParticle: true, startsWithNoun: true)]
+        converter.words["ねこ"] = [Self.noun("猫", 2)]
+        converter.words["が"] = [Self.particle("が")]
+        converter.words["ねこがかわいい"] = [Self.noun("猫", 2), Candidate.Word(text: "が可愛い", readingCount: 5, startsWithParticle: true)]
+        converter.words["がかわいい"] = [Candidate.Word(text: "が可愛い", readingCount: 5, startsWithParticle: true)]
+        return converter
+    }
+
+    @Test("文節が絵文字にできる語と助詞でできていれば，語を絵文字にして助詞を付けた候補を出す．名前は元の絵文字のもの")
+    func wordEmoji() {
+        let harness = harness(settings { $0.initialFocus = .start }, converter: sentenceConverter())
+        harness.type("shiroinekoga")
+        harness.press(.space)
+        harness.press(.right)
+        let column = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(column?.alternatives.firstIndex(of: "🐈が") == 2)
+        #expect(column?.alternatives.firstIndex(of: "😺が") == 3)
+        #expect(column?.alternativeDetails.first { $0 != nil } == "ネコ")
+        // 辞書の絵文字の語(🐱)を先頭の語にした候補は出さない
+        #expect(column?.alternatives.contains("🐱が") == false)
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.enter)
+        #expect(harness.committed == "白い🐈が")
+        #expect(emoji.committed.map(\.emoji) == ["🐈"])
+        #expect(emoji.committed.map(\.reading) == ["ねこ"])
+    }
+
+    @Test("文節の後ろに自立語があるときは，語を絵文字にした候補を出さない")
+    func wordEmojiNeedsOnlyFunctionWords() {
+        let candidates = supplemented(settings(), converter: sentenceConverter()).listCandidates(for: "ねこがかわいい").map(\.text)
+        #expect(!candidates.contains { EmojiPlacement.containsEmoji($0) })
+    }
+
+    @Test("文節全体と文節の中の語の絵文字は別々の設定で，片方だけでも動く", arguments: [(true, false), (false, true), (true, true)])
+    func independentSettings(whole: Bool, word: Bool) {
+        let converter = supplemented(settings { $0.emojiConversion = whole; $0.emojiWordConversion = word }, converter: sentenceConverter())
+        #expect(converter.listCandidates(for: "ねこ").contains { $0.text == "🐈" } == whole)
+        #expect(converter.listCandidates(for: "ねこが").contains { $0.text == "🐈が" } == word)
     }
 }
 

@@ -30,15 +30,29 @@ public struct EmojiPlacement: Sendable, Equatable {
     }
 
     /// 文字がすべて絵文字として描かれる字か(「🐈」「❤️」「👋🏻」「🇯🇵」「1️⃣」)．
-    /// 字ごとに，絵文字の形で描く字(Emoji_Presentation)か，絵文字の形を選ぶ印(U+FE0F)かキーキャップの印(U+20E3)を付けた字なら絵文字とみなす．
     /// 印の無い「☺」「❤」「#」や，語と混ざった「🐈が」は絵文字ではない
     public static func isEmoji(_ text: String) -> Bool {
-        !text.isEmpty && text.allSatisfy { character in
-            let scalars = character.unicodeScalars
-            guard let first = scalars.first else { return false }
-            return first.properties.isEmojiPresentation
-                || (first.properties.isEmoji && scalars.contains { $0 == emojiStyle || $0 == keycap })
-        }
+        !text.isEmpty && text.allSatisfy(isEmojiCharacter)
+    }
+
+    /// 絵文字として描かれる字を含むか(「🐈が」)
+    public static func containsEmoji(_ text: String) -> Bool {
+        text.contains(where: isEmojiCharacter)
+    }
+
+    /// 絵文字の形で描く字(Emoji_Presentation)か，絵文字の形を選ぶ印(U+FE0F)かキーキャップの印(U+20E3)を付けた字
+    private static func isEmojiCharacter(_ character: Character) -> Bool {
+        let scalars = character.unicodeScalars
+        guard let first = scalars.first else { return false }
+        return first.properties.isEmojiPresentation
+            || (first.properties.isEmoji && scalars.contains { $0 == emojiStyle || $0 == keycap })
+    }
+
+    /// 語の並びが付属語(助詞・助動詞)だけでできていて，読みの readingCount 文字を覆うか．
+    /// 文節の中の名詞を絵文字にする(「ねこが」→「🐈が」)のは，名詞の後ろが付属語だけのときに限る．
+    /// 「ねこがかわいい」の「がかわいい」のように自立語を含むと，語を絵文字にした文が読みにくくなるので使わない
+    public static func isFunctionWords(_ words: [Candidate.Word], readingCount: Int) -> Bool {
+        !words.isEmpty && words.allSatisfy(\.isFunctionWord) && words.reduce(0, { $0 + $1.readingCount }) == readingCount
     }
 
     private static let emojiStyle: Unicode.Scalar = "\u{FE0F}"

@@ -487,8 +487,9 @@ struct LatticeBuilder {
         let tail = words.dropFirst().map(\.text).joined()
         let headReading = String(slice.prefix(head.readingCount))
         // 先頭の語だけを文脈なしで Zenzai にかけると，ふだんの語が下がる(ごく → 語句 が見えなくなる)ので，辞書の変換の順を使う
+        // 辞書の絵文字の語は使わない(語を絵文字にした候補は，読みで引いた絵文字から作る．SupplementedConverter)
         return converter.dictionaryCandidates(for: headReading)
-            .filter { $0.readingCount == head.readingCount }
+            .filter { $0.readingCount == head.readingCount && !EmojiPlacement.containsEmoji($0.text) }
             .prefix(DefaultSettings.headWordAlternativeCount)
             .map { word in
                 var candidate = Candidate(text: word.text + tail, readingCount: slice.count, origin: .combined)

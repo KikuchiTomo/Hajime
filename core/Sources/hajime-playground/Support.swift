@@ -103,9 +103,12 @@ enum PlaygroundEmoji {
                                   settings: StaticSettings(DefaultSettings.settings), now: { Date() })
     }
 
-    /// 引数で変える絵文字の設定(--no-emoji・--emoji-position <何番目>・--emoji-count <数>)
+    /// 引数で変える絵文字の設定(--no-emoji で文節全体と文節の中の語の両方を切る・--emoji-position <何番目>・--emoji-count <数>)
     static func adjust(_ settings: inout Settings, arguments: Arguments) {
-        if CommandLine.arguments.contains("--no-emoji") { settings.emojiConversion = false }
+        if CommandLine.arguments.contains("--no-emoji") {
+            settings.emojiConversion = false
+            settings.emojiWordConversion = false
+        }
         if let position = arguments.value(of: "--emoji-position").flatMap(Int.init) { settings.emojiCandidatePosition = position }
         if let count = arguments.value(of: "--emoji-count").flatMap(Int.init) { settings.emojiCandidateCount = count }
     }

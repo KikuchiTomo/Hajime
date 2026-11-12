@@ -58,11 +58,13 @@ public struct Candidate: Sendable, Equatable {
         public var startsWithConjunctiveParticle: Bool
         /// 文の終わりに付く助詞(終助詞「ね」「よ」「わ」)で終わる語か
         public var endsWithSentenceFinalParticle: Bool
+        /// 助詞と助動詞(付属語)だけでできた語か(「が」「です」「にも」)．文節の中の名詞を絵文字にするとき，後ろが付属語だけかを見る
+        public var isFunctionWord: Bool
 
         public init(
             text: String, readingCount: Int, startsWithParticle: Bool = false, endsWithParticle: Bool = false,
             startsWithNoun: Bool = false, startsWithPredicate: Bool = false,
-            startsWithConjunctiveParticle: Bool = false, endsWithSentenceFinalParticle: Bool = false
+            startsWithConjunctiveParticle: Bool = false, endsWithSentenceFinalParticle: Bool = false, isFunctionWord: Bool = false
         ) {
             self.text = text
             self.readingCount = readingCount
@@ -72,6 +74,7 @@ public struct Candidate: Sendable, Equatable {
             self.startsWithPredicate = startsWithPredicate
             self.startsWithConjunctiveParticle = startsWithConjunctiveParticle
             self.endsWithSentenceFinalParticle = endsWithSentenceFinalParticle
+            self.isFunctionWord = isFunctionWord
         }
     }
 

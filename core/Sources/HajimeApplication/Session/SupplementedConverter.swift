@@ -13,13 +13,14 @@ import HajimeDomain
 /// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
 /// - LaTeX のコマンド(LatexCommands): 「らむだ」→「\lambda」．設定でオンにしたときだけ．記号と同じ位置に差し込む
-/// - 絵文字(EmojiLooking): 「なく」→ 😢．読みと同じ読みの絵文字を引き，設定の位置(EmojiPlacement)にまとめて置く．第 1 候補にはしない．
-///   エンジンの辞書にある絵文字の語は除く(位置が定まらず，学習で第 1 候補になり，OS が描けない絵文字も混じるため)．
-///   確定した絵文字は，その読みで選んだことを覚える(EmojiLooking.didCommit)
 /// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
 /// - ユーザー辞書のローマ字の読み(「gh」→ GitHub)と，入れるときに中身を決める語(TextTemplate．「にちじ」→ `{datetime:...}`)
 ///
 /// 変換の一覧と分岐図の文節(listCandidates・segmentCandidates)にだけ足すもの．打っているあいだ(ライブ変換)には出さず，第 1 候補にもしない
+/// - 絵文字(EmojiLooking．設定の「文節を絵文字に変換」「文節の中の語を絵文字に変換」): 文節の読みと同じ読みの絵文字(「びーる」→ 🍺)と，
+///   文節の先頭の語を絵文字にして付属語を付けたもの(「ねこが」→ 🐈が)．設定の位置(EmojiPlacement)にまとめて置く．
+///   エンジンの辞書から来る絵文字を含む候補は，どこでも除く(位置が定まらず，学習で第 1 候補になり，OS が描けない絵文字も混じるため)．
+///   確定した絵文字は，その読みで選んだことを覚える(EmojiLooking.didCommit)
 /// - コマンド(LauncherCommand): 読みが一致すれば 2 番目に「▶ 名前」を置く．候補の窓では印の代わりにアイコンと札で見せる．選んで確定したときだけ動く(R-22)
 /// - うろ覚えの語(LooseReadings): 「しゅみれーしょん」→「シミュレーション」
 /// - 発音どおりに綴った英単語(PhoneticSpelling): 「ふぉと」→「photo」
@@ -46,8 +47,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let englishTerms: EnglishTerms?
     /// 読みごとに見つけたうろ覚えの語と英単語．入力を終えたときに捨てる
     private var listExtrasCache: [String: (loose: [String], phonetic: [String])] = [:]
-    /// 候補に足した絵文字と，その絵文字を引いた読み．確定したときにどの読みで選んだかを知るため．入力を終えたときに捨てる
-    private var emojiReadings: [String: Set<String>] = [:]
+    /// 候補に足した絵文字の候補の文字ごとに，絵文字と引いた読み．確定したときにどの読みで選んだかを知るため．入力を終えたときに捨てる
+    private var emojiSources: [String: [EmojiSource]] = [:]
     /// 今の入力を終えるまで学ばない(suspendLearningUntilEnd)．選んだ絵文字も覚えない
     private var learningSuspended = false
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
@@ -66,6 +67,14 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private struct Source {
         var id: String
         var name: String
+    }
+
+    /// 絵文字の候補(「🐈が」)の元の絵文字(🐈)と，その絵文字を引いた読み(ねこ)
+    private struct EmojiSource: Equatable {
+        var emoji: String
+        var reading: String
+        /// 候補の読みの長さ(「ねこが」なら 3)
+        var readingCount: Int
     }
 
     private struct Lookup {
@@ -113,7 +122,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
         base.setApplication(identifier)
     }
 
-    public func emojiName(of text: String) -> String? { emoji?.name(of: text) }
+    /// 「🐈が」のように語を絵文字にした候補は，元の絵文字(🐈)の名前
+    public func emojiName(of text: String) -> String? { emoji?.name(of: emojiSources[text]?.first?.emoji ?? text) }
 
     public func sourceName(of text: String, reading: String) -> String? {
         auxiliary.first { text.contains($0.word.word) && reading.contains($0.word.reading) }
@@ -170,7 +180,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     public func plausibility(of reading: String) -> Double { base.plausibility(of: reading) }
     public func languageModelScores(forKeys keys: [String]) -> [Double?] { base.languageModelScores(forKeys: keys) }
-    public func predictions(for reading: String) -> [Candidate] { base.predictions(for: reading) }
+    /// 打っているあいだの予測にも，エンジンの辞書から来る絵文字は出さない
+    public func predictions(for reading: String) -> [Candidate] { base.predictions(for: reading).filter { !EmojiPlacement.containsEmoji($0.text) } }
     public func dictionaryCandidates(for reading: String) -> [Candidate] { base.dictionaryCandidates(for: reading) }
     public func segmentationWords(for reading: String) -> [Candidate.Word] { base.segmentationWords(for: reading) }
     public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { base.typoCorrections(forKeys: keys) }
@@ -181,8 +192,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func didCommit(_ candidate: Candidate) {
         if candidate.origin == .emoji {
             // 読みは候補を足したときに覚えたもの．同じ絵文字を長さの違う読みで足したときは，候補の読みの長さで選ぶ
-            if !learningSuspended, let reading = emojiReadings[candidate.text]?.first(where: { $0.count == candidate.readingCount }) {
-                emoji?.didCommit(candidate.text, reading: reading)
+            if !learningSuspended, let source = emojiSources[candidate.text]?.first(where: { $0.readingCount == candidate.readingCount }) {
+                emoji?.didCommit(source.emoji, reading: source.reading)
             }
             return
         }
@@ -193,7 +204,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func endComposition() {
         auxiliaryCache.lookups = [:]
         listExtrasCache = [:]
-        emojiReadings = [:]
+        emojiSources = [:]
         learningSuspended = false
         base.endComposition()
     }
@@ -207,7 +218,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {
         let current = settings.current
-        // エンジンの辞書の絵文字の語を除く．ユーザー辞書の語より先に除き，登録した絵文字は消さない
+        // エンジンの辞書から来る絵文字を含む候補を除く．ユーザー辞書の語より先に除き，登録した絵文字は消さない
         var result = Okurigana.reorder(candidates.filter { !Self.isEngineEmoji($0) }, style: current.okuriganaStyle)
         var userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         if current.dynamicDictionary, userWords.contains(where: TextTemplate.containsPlaceholder) {
@@ -246,24 +257,55 @@ public final class SupplementedConverter: KanaKanjiConverting {
         // カタカナを先に出す並べ替え(かなで打った外来語のため)のあとに足す．ローマ字で打った「api」の「アピ」を「API」より先にしない
         if let dictionary = englishTerms?.dictionary { addEnglishTerms(from: dictionary, to: &result, reading: reading, settings: current) }
         if forList { addListExtras(to: &result, reading: reading, settings: current) }
-        if let placement = current.emojiPlacement { addEmoji(to: &result, reading: reading, placement: placement) }
+        // 絵文字は変換したときの候補(一覧と分岐図の文節)にだけ出す．打っているあいだの表示と入力中の候補の窓には出さない
+        if forList, let placement = current.emojiPlacement { addEmoji(to: &result, reading: reading, placement: placement, settings: current) }
         return result
     }
 
-    /// 読みと同じ読みの絵文字を足し，置き場所(placement)にまとめる．ほかに候補が無ければ，読みのかなを第 1 候補にする
-    private func addEmoji(to result: inout [Candidate], reading: String, placement: EmojiPlacement) {
-        guard let emoji, reading.count >= DefaultSettings.minimumEmojiReadingLength else { return }
-        let found = emoji.emoji(for: reading, limit: placement.count).filter { text in !result.contains { $0.text == text } }
-        guard !found.isEmpty else { return }
+    /// 文節の読みと同じ読みの絵文字(「びーる」→ 🍺)と，文節の先頭の語を絵文字にして付属語を付けたもの(「ねこが」→ 🐈が)を足し，
+    /// 置き場所(placement)にまとめる．2 つは別々の設定で切れ，数の上限は合わせて数える．ほかに候補が無ければ，読みのかなを第 1 候補にする
+    private func addEmoji(to result: inout [Candidate], reading: String, placement: EmojiPlacement, settings current: Settings) {
+        guard let emoji else { return }
+        var found: [(text: String, source: EmojiSource)] = []
+        if current.emojiConversion, reading.count >= DefaultSettings.minimumEmojiReadingLength {
+            found += emoji.emoji(for: reading, limit: placement.count).map { ($0, EmojiSource(emoji: $0, reading: reading, readingCount: reading.count)) }
+        }
+        if current.emojiWordConversion, let split = wordEmojiSplit(reading, emoji: emoji) {
+            found += emoji.emoji(for: split.head, limit: placement.count)
+                .map { ($0 + split.tail, EmojiSource(emoji: $0, reading: split.head, readingCount: reading.count)) }
+        }
+        var seen = Set(result.map(\.text))
+        let added = found.filter { seen.insert($0.text).inserted }.prefix(placement.count)
+        guard !added.isEmpty else { return }
         if result.isEmpty { result.append(Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))) }
-        for text in found { emojiReadings[text, default: []].insert(reading) }
-        result = placement.placed(result + found.map { Candidate(text: $0, readingCount: reading.count, origin: .emoji) })
+        for item in added where !(emojiSources[item.text] ?? []).contains(item.source) { emojiSources[item.text, default: []].append(item.source) }
+        result = placement.placed(result + added.map { Candidate(text: $0.text, readingCount: reading.count, origin: .emoji) })
     }
 
-    /// エンジンの辞書の語のうち，絵文字だけでできているもの(エンジンの語と，それをつないだ・切り出したもの)
+    /// 文節の先頭の名詞を絵文字にできるときの，名詞の読み(ねこ)と後ろの付属語の字(が)．文節が名詞で始まり，絵文字の読みと同じ名詞 1 語の後ろに
+    /// 付属語だけが続くときに限る．辞書には「猫が」のように名詞と助詞をつないだ語もあるので，語の並びの切れ目に頼らず，
+    /// 長い方から読みを切って，前が絵文字の読みの名詞，後ろが付属語だけになる切れ目を探す
+    private func wordEmojiSplit(_ reading: String, emoji: any EmojiLooking) -> (head: String, tail: String)? {
+        let words = base.segmentationWords(for: reading)
+        guard let first = words.first, first.startsWithNoun, words.reduce(0, { $0 + $1.readingCount }) == reading.count else { return nil }
+        let characters = Array(reading)
+        for length in stride(from: characters.count - 1, through: DefaultSettings.minimumEmojiReadingLength, by: -1) {
+            let head = String(characters[..<length])
+            guard !emoji.emoji(for: head, limit: 1).isEmpty else { continue }
+            let tailReading = String(characters[length...])
+            let tail = base.segmentationWords(for: tailReading)
+            guard EmojiPlacement.isFunctionWords(tail, readingCount: tailReading.count) else { continue }
+            let headWords = base.segmentationWords(for: head)
+            guard headWords.count == 1, headWords[0].startsWithNoun, headWords[0].readingCount == length else { continue }
+            return (head, tail.map(\.text).joined())
+        }
+        return nil
+    }
+
+    /// エンジンの辞書から来る絵文字を含む候補(エンジンの語と，それをつないだ・切り出したもの．「🐱」「🐱が」)
     private static func isEngineEmoji(_ candidate: Candidate) -> Bool {
         switch candidate.origin {
-        case .engine, .combined, .sentencePart: EmojiPlacement.isEmoji(candidate.text)
+        case .engine, .combined, .sentencePart: EmojiPlacement.containsEmoji(candidate.text)
         default: false
         }
     }

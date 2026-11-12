@@ -1795,8 +1795,9 @@ public final class InputSession {
         guard readingCorrector.isApplied, let typed = readingCorrector.typedComposition(from: composition) else { return [] }
         let reading = typed.conversionReading
         guard reading != composition.conversionReading else { return [] }
+        // 打ったままの読みの絵文字は入れない(絵文字は今の読みのものを置き場所に置く)
         return (listing ? converter.listCandidates(for: reading) : converter.candidates(for: reading))
-            .filter { $0.readingCount == reading.count && $0.commandID == nil }
+            .filter { $0.readingCount == reading.count && $0.commandID == nil && $0.origin != .emoji }
             .map { Candidate(text: $0.text, readingCount: readingCount, origin: .asTyped) }
     }
 
@@ -1847,9 +1848,8 @@ public final class InputSession {
         guard suggestionsShown else { return ([], nil) }
         let (reading, prefix) = suggestionTarget()
         var seen = Set<String>()
-        var whole = conversionCandidates(for: reading, prefix: prefix)
-        // 最後の文節の候補は前後の文脈で並べ替えたので，絵文字を置き場所に置き直す(窓に出す数の中に入るように)
-        if let placement = settings.current.emojiPlacement { whole = placement.placed(whole) }
+        // 絵文字は変換したときの候補にだけ出す(打っているあいだの窓には出さない．最後の文節の候補は文節の候補から求めるので，そこに入る絵文字を除く)
+        let whole = conversionCandidates(for: reading, prefix: prefix).filter { $0.origin != .emoji }
         // 打ち間違いを直しているときは，直した第 1 候補のすぐ後ろに打ったままの読みの候補を出す(一覧と同じ)
         let typed = prefix == nil ? Array(typedReadingAlternatives(readingCount: reading.count, listing: false).prefix(DefaultSettings.typedAlternativeCount)) : []
         let candidates = (Array(whole.prefix(1)) + typed + Array(whole.dropFirst(1)))

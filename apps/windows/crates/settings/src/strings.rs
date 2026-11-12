@@ -60,7 +60,11 @@ pub mod settings {
     pub const MISUSE_NOTES: &str = "誤用の注釈を表示";
     pub const PROOFREADING: &str = "校正支援";
     pub const SYMBOL_CONVERSION: &str = "記号に変換";
-    pub const EMOJI_CONVERSION: &str = "絵文字に変換";
+    pub const EMOJI_SECTION: &str = "絵文字";
+    pub const EMOJI_CONVERSION: &str = "文節を絵文字に変換";
+    pub const EMOJI_WORD_CONVERSION: &str = "文節の中の語を絵文字に変換";
+    pub const EMOJI_NOTE: &str =
+        "「びーる」→ 🍺 のように文節全体を、「ねこが」→ 🐈が のように文節の中の語を絵文字にします。Space で変換したときの候補にだけ表示し、入力中は表示しません。";
     pub const EMOJI_CANDIDATE_POSITION: &str = "絵文字の位置";
     pub const EMOJI_CANDIDATE_COUNT: &str = "絵文字の数";
     pub const SHOWS_EMOJI_NAMES: &str = "絵文字の名前を表示";
@@ -745,7 +749,8 @@ pub mod sync {
         ("numberKeySelection", "番号キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
-        ("emojiConversion", "絵文字に変換"),
+        ("emojiConversion", "文節を絵文字に変換"),
+        ("emojiWordConversion", "文節の中の語を絵文字に変換"),
         ("emojiCandidatePosition", "絵文字の位置"),
         ("emojiCandidateCount", "絵文字の数"),
         ("showsEmojiNames", "絵文字の名前を表示"),

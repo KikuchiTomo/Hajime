@@ -39,6 +39,7 @@
     "emojiCandidateCount",
     "emojiCandidatePosition",
     "emojiConversion",
+    "emojiWordConversion",
     "englishInputLiveConversion",
     "englishSkipLength",
     "englishTermCandidates",
