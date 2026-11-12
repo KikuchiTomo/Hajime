@@ -3437,7 +3437,7 @@ impl PageView {
         let theme = frame.theme;
         let palette = &theme.palette;
         let Some(card) = &row.card else { return };
-        // テーマの行はカードのどこを押しても選ぶので，ポインターを載せたらカードの地を変える(名前より先に塗る)
+        // テーマの行はカードのどこを押しても選ぶので，ポインターを載せたらカードの背景を変える(名前より先に塗る)
         if let Control::ThemeOption(_) | Control::CustomTheme(_) = row.row.control {
             let hover = self.hover_value(
                 Element {
@@ -4445,7 +4445,7 @@ impl PageView {
             } else if self.table_hover == Some((index, position)) {
                 canvas.fill_round(line, size::CONTROL_RADIUS, Color::from(palette.nav_hover));
             }
-            // 1 行おきに薄く敷く(macOS の表の縞)．選んだ行とポインターを載せた行は上の地のまま
+            // 1 行おきに薄く敷く(macOS の表の縞)．選んだ行とポインターを載せた行は上の背景のまま
             if position % 2 == 1 && !selected && self.table_hover != Some((index, position)) {
                 canvas.fill_rect(
                     Rect::new(rect.x + 1.0, top, rect.width - 2.0, row_height),
@@ -4614,7 +4614,7 @@ fn example_chip(
     } else {
         (palette.text_disabled, palette.text_disabled)
     };
-    // タグは試す欄の結果のタグと同じ地と枠にする
+    // タグは試す欄の結果のタグと同じ背景と枠にする
     canvas.fill_round(rect, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
     canvas.stroke_round(
         rect,
@@ -4668,7 +4668,7 @@ fn preview_chips(
             TextLayout::WRAP,
         );
     }
-    // タグは macOS の resultChip と同じく枠の無い薄い地にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
+    // タグは macOS の resultChip と同じく枠の無い薄い背景にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
     let two_lines = shown.labels.iter().any(Option::is_some);
     let height = size::BODY_LINE_HEIGHT
         + if two_lines {
@@ -5002,8 +5002,8 @@ const KEYMAP_COMMAND: usize = 2;
 /// キー設定の「いつでも」の状態(KeymapState.anywhere)．どのコマンドも置ける
 const KEYMAP_ANYWHERE: &str = "anywhere";
 
-/// 表の行の中の選ぶ欄(macOS の表の中の Picker)．ふだんは地を描かずに名前と山形の印だけを出し，
-/// ポインターを載せた・開いているときだけドロップダウンの地を出す(行の縞と選んだ行の地を消さない)
+/// 表の行の中の選ぶ欄(macOS の表の中の Picker)．ふだんは背景を描かずに名前と山形の印だけを出し，
+/// ポインターを載せた・開いているときだけドロップダウンの背景を出す(行の縞と選んだ行の背景を消さない)
 fn paint_table_choice(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -5265,7 +5265,7 @@ fn button_kind(action: Action) -> paint::ButtonKind {
     }
 }
 
-/// テーマの見本(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
+/// テーマの見本(背景・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
 /// value は既成のテーマの値(カスタムテーマは元のテーマ)，custom はカスタムテーマの色
 fn paint_swatch(
     canvas: &mut dyn Canvas,

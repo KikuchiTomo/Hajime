@@ -136,7 +136,7 @@ pub struct App {
     pub(super) graphics: Graphics,
     surface: Surface,
     pub(super) theme: Theme,
-    /// 窓の地を Mica にしているか(Windows 11 22H2 から．高コントラストでは使わない)
+    /// 窓の背景を Mica にしているか(Windows 11 22H2 から．高コントラストでは使わない)
     mica: bool,
     /// 窓を描いたあとに検索欄を描き直したか．検索欄は自分の面を持つ窓で，窓が出る前に描いた絵は画面に出ない
     search_painted: bool,
@@ -424,14 +424,14 @@ impl App {
         ffi::set_dark_title_bar(self.window, self.theme.dark);
         // 高コントラストのときは OS の色で塗るので Mica にしない
         self.mica = ffi::set_mica(self.window, !self.theme.high_contrast);
-        // Mica のときはタイトルバーを窓の中に入れ，本文と同じ地に描く(設定アプリと同じ)．Mica でなければ OS の枠のまま
+        // Mica のときはタイトルバーを窓の中に入れ，本文と同じ背景に描く(設定アプリと同じ)．Mica でなければ OS の枠のまま
         let title_bar = if self.mica {
             self.theme.px(size::TITLE_BAR_HEIGHT)
         } else {
             0
         };
         ffi::frame::set_title_bar(self.window, title_bar);
-        // 先に作った検索欄は，地を変えたあとに描き直す(自分の面を持つ窓なので，前の絵が残る)
+        // 先に作った検索欄は，背景を変えたあとに描き直す(自分の面を持つ窓なので，前の絵が残る)
         self.search_painted = false;
         edit::set_placeholder_color(self.theme.palette.text_placeholder);
         self.field_brush = edit::Brush::new(self.theme.palette.control);
@@ -806,7 +806,7 @@ impl App {
         let (left, top) = self.client_px(x, y);
         let (right, bottom) = self.client_px(x + width, y + line);
         ffi::place(self.search, left, top, right - left, bottom - top);
-        // シートを出しているあいだは窓の中身の打つ欄を隠す(欄は窓なので暗くした地の上に出てしまう)
+        // シートを出しているあいだは窓の中身の打つ欄を隠す(欄は窓なので暗くした背景の上に出てしまう)
         ffi::show(self.search, self.sheet.is_none());
     }
 
@@ -874,7 +874,7 @@ impl App {
         }
         let (width, height) = self.size();
         let theme = self.theme;
-        // Mica のときは地を透明にし，Mica を見せる(カードと部品は不透明のまま描く)
+        // Mica のときは背景を透明にし，Mica を見せる(カードと部品は不透明のまま描く)
         let clear = if self.mica {
             Color::from(theme.palette.background).with_alpha(0.0)
         } else {
@@ -1192,7 +1192,7 @@ impl App {
         ));
     }
 
-    /// 情報のページのアイコン(実行ファイルのリソースの 1 番)の画像を作る．カードの地の上に描く
+    /// 情報のページのアイコン(実行ファイルのリソースの 1 番)の画像を作る．カードの背景の上に描く
     /// タイトルバーのアイコンの画像を窓の DPI で作っておく
     fn update_title_icon(&mut self) {
         let dpi = self.theme.dpi;
@@ -3246,7 +3246,7 @@ fn paint_flyout_items(
             continue;
         }
         let rect = Rect::new(padding, top + 1.0, width - padding * 2.0, item - 2.0);
-        // 地は文字の色を薄く重ねる(一覧の地の明るさによらず見分けられる)
+        // 背景は文字の色を薄く重ねる(一覧の背景の明るさによらず見分けられる)
         let subtle = |opacity: f32| Color::from(palette.text).with_alpha(opacity);
         if Some(index) == selected {
             let opacity = if Some(index) == hover {
@@ -3292,7 +3292,7 @@ fn paint_flyout_items(
 }
 
 /// 説明の吹き出し．ポインターの右下に出し，窓からはみ出さないよう詰める
-/// タイトルバー(WinUI 3 の TitleBar)．地は描かず Mica を見せる．閉じるボタンなどは DWM が描く．
+/// タイトルバー(WinUI 3 の TitleBar)．背景は描かず Mica を見せる．閉じるボタンなどは DWM が描く．
 /// 窓が後ろにあるときは題を薄くする
 fn paint_title_bar(canvas: &mut dyn Canvas, theme: &Theme, width: f32, height: f32, active: bool) {
     let icon = size::TITLE_BAR_ICON_SIZE;

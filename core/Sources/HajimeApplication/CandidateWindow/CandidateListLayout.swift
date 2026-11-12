@@ -6,7 +6,7 @@
 /// - 区切りの線の上と下は metrics.separatorGap．候補の下の語の意味と候補のあいだも同じ
 ///
 /// platinum と desk(bevel)
-/// - 候補の行は立体の縁の内側いっぱいに置く(余白を空けない)．区画と区画は 1 ドットの線で区切る
+/// - 候補の行はベベルの内側いっぱいに置く(余白を空けない)．区画と区画は 1 ドットの線で区切る
 /// - 候補の下の語の意味は区画にし，一覧とのあいだに横の線を引く
 ///
 /// 座標は窓の左上が原点で，下が y の正．macOS の CandidateView がこの配置を描き，
@@ -29,16 +29,16 @@ public struct CandidateListLayout: Sendable, Equatable {
 
     /// 寸法．テーマの種類ごとの値は rounded・bevel
     public struct Metrics: Sendable, Equatable {
-        /// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ
+        /// 枠線(角丸)，外枠とベベル(platinum と desk)の太さ
         public var edge: Double
-        /// 縁の内側の余白
+        /// 枠線の内側の余白
         public var padding: Double
         /// 区切りの線の上と下の空き
         public var separatorGap: Double
         public var separatorWidth: Double
-        /// 候補の行の間隔(行の地の高さと，行と行のあいだの和)
+        /// 候補の行の間隔(行の背景の高さと，行と行のあいだの和)
         public var rowPitch: Double
-        /// 候補の行の地の上下を縮める量．行と行のあいだはこの 2 倍
+        /// 候補の行の背景の上下を縮める量．行と行のあいだはこの 2 倍
         public var rowInset: Double
         /// 文字種の行・連想の見出しの行の高さ
         public var headerHeight: Double
@@ -80,12 +80,12 @@ public struct CandidateListLayout: Sendable, Equatable {
     public var height: Double
     /// 窓の枠(影を除く)
     public var body: Box
-    /// 縁と余白の内側
+    /// 枠線と余白の内側
     public var content: Box
     /// 文字種の行(連想の一覧では見出しの行)と，その下の区切りの線
     public var header: Box?
     public var headerSeparator: Box?
-    /// 候補の行の地(角丸のテーマは選んだ行の地そのもの)
+    /// 候補の行の背景(角丸のテーマは選んだ行の背景そのもの)
     public var rows: [Box]
     /// 候補の行を押せる範囲(行と行のあいだを含む)
     public var hitRows: [Box]
@@ -102,7 +102,7 @@ public struct CandidateListLayout: Sendable, Equatable {
     }
 
     /// - Parameters:
-    ///   - listWidth: 候補の列(行の地)の幅
+    ///   - listWidth: 候補の列(行の背景)の幅
     ///   - footerWidth: 足元の中身の幅
     ///   - maximumWidth: 窓の幅の上限．超えるときは候補の列を狭める(長い候補は描く側が末尾を省く)
     ///   - size: 窓の大きさ(影を含む)を外から決めるとき(窓の大きさを変える動きの途中)．幅は候補の列で吸収し，区画は上から積む
@@ -169,7 +169,7 @@ public struct CandidateListLayout: Sendable, Equatable {
         height = body.height + metrics.shadow
     }
 
-    /// 区切りの線と区画(行の地・カード・足元)．重なりを確かめるのに使う
+    /// 区切りの線と区画(行の背景・カード・足元)．重なりを確かめるのに使う
     public var parts: [Box] {
         [header, headerSeparator, card, cardSeparator, footerSeparator, footer].compactMap { $0 } + rows
     }

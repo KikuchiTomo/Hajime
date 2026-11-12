@@ -21,7 +21,7 @@ struct MeaningCardLayoutTests {
     }
 
     static let metrics = Layout.Metrics.tokens
-    /// 候補の右に置くとき(目印の列はカードの左の端，見出しの行は候補の 1 行目の地 24 の真ん中)
+    /// 候補の右に置くとき(目印の列はカードの左の端，見出しの行は候補の 1 行目の背景 24 の真ん中)
     static let placement = Layout.Placement(left: 0, headerMidY: 12)
 
     static func content(senses: [Layout.Content.Sense] = [.init(number: "1", meaningLines: 1, exampleLines: 1),

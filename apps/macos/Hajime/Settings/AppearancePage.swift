@@ -115,7 +115,7 @@ private struct CustomThemeRow: View {
     }
 }
 
-/// テーマの一行．名前の前に，地・文字・選択の色を小さく並べる
+/// テーマの一行．名前の前に，背景・文字・選択の色を小さく並べる
 private struct ThemeRow: View {
     let choice: ThemeChoice
     let title: String

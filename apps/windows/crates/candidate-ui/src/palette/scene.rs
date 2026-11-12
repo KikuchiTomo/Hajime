@@ -160,7 +160,7 @@ impl Drawing<'_> {
         }
     }
 
-    /// 選んでいるマス．色だけに頼らないよう，地を塗ったうえで枠も描く
+    /// 選んでいるマス．色だけに頼らないよう，背景を塗ったうえで枠も描く
     fn selection(&mut self, frame: Frame) {
         let inner = frame.inset(candidate::FRAME_WIDTH, candidate::FRAME_WIDTH);
         self.fill(inner, self.theme.focus_tint, palette::CELL_RADIUS);
@@ -343,7 +343,7 @@ impl Drawing<'_> {
         });
     }
 
-    /// まとまりのタブ．角丸のテーマは薄い地と下の線，platinum と desk は選択の色で塗って示す
+    /// まとまりのタブ．角丸のテーマは薄い背景と下の線，platinum と desk は選択の色で塗って示す
     fn tabs(&mut self) {
         let theme = self.theme;
         let inner = palette::INSET;
@@ -683,7 +683,7 @@ impl Drawing<'_> {
                 text_x,
                 baselines,
             } => {
-                // 角丸のテーマは控えめな地．platinum と desk は光の縁の色の地に 1 ドットの枠(入力欄の形)
+                // 角丸のテーマは控えめな背景．platinum と desk は明るい線の色の背景に 1 ドットの枠(入力欄の形)
                 if self.theme.is_rounded() {
                     self.fill(frame, theme.badge, palette::CHIP_RADIUS);
                 } else {
@@ -710,7 +710,7 @@ impl Drawing<'_> {
         );
         self.painter.hints(&hints, footer.x, footer.mid_y());
         self.painter.keycap(button);
-        // 余白はタグの縁(platinum は外枠と立体の縁)の内側から測る．キーキャップの中の記号と同じ余白
+        // 余白はタグの枠線(platinum は外枠とベベル)の内側から測る．キーキャップの中の記号と同じ余白
         let border = keycap_border(self.theme);
         self.emoji(
             &skin_tone_sample(self.panel.skin_tone),
@@ -770,7 +770,7 @@ impl Drawing<'_> {
     }
 }
 
-/// キーキャップの縁の太さ．platinum は外枠と立体の縁，ほかは縁の線(scene::paint の keycap と同じ形)
+/// キーキャップの枠線の太さ．platinum は外枠とベベル，ほかは枠線(scene::paint の keycap と同じ形)
 fn keycap_border(theme: &ResolvedTheme) -> f32 {
     if theme.kind == Kind::Platinum {
         candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
@@ -1417,7 +1417,7 @@ mod tests {
             .collect();
         let preview = layout.preview.unwrap();
         let tile = Frame::new(preview.x, preview.y, palette::TILE_SIZE, palette::TILE_SIZE);
-        // 肌の色のボタンはタグの縁(角丸のテーマは線 1)の内側から余白を空ける
+        // 肌の色のボタンはタグの枠線(角丸のテーマは線 1)の内側から余白を空ける
         let line = candidate::FRAME_WIDTH;
         let mut boxes = vec![
             (

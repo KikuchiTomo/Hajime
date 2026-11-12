@@ -62,7 +62,7 @@ pub struct Handlers {
 static HANDLERS: std::sync::OnceLock<Handlers> = std::sync::OnceLock::new();
 
 /// フォーカスを奪わない手書きの窓．書いても押しても動かしても大きさを変えても，入力先のアプリからフォーカスを移さない．
-/// 枠(WS_THICKFRAME)は持つが中身で覆い，Windows 11 の縁・影・角丸は DWM に描かせる
+/// 枠(WS_THICKFRAME)は持つが中身で覆い，Windows 11 の枠線・影・角丸は DWM に描かせる
 pub struct Window {
     hwnd: HWND,
 }
@@ -136,7 +136,7 @@ impl Window {
         }
     }
 
-    /// DWM の縁と影をダークかライトに合わせる
+    /// DWM の枠線と影をダークかライトに合わせる
     pub fn set_dark(&self, dark: bool) {
         self.set_attribute(DWMWA_USE_IMMERSIVE_DARK_MODE, &BOOL::from(dark));
     }
@@ -342,7 +342,7 @@ unsafe extern "system" fn procedure(
     let handled = std::panic::catch_unwind(|| match message {
         // 押しても前に出ない(入力先のアプリからフォーカスを移さない)
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),
-        // 枠の分を取らず，窓の全体を中身にする(縁と影は DWM が描く)
+        // 枠の分を取らず，窓の全体を中身にする(枠線と影は DWM が描く)
         WM_NCCALCSIZE if wparam.0 != 0 => Some(LRESULT(0)),
         WM_NCHITTEST => {
             let (x, y) = screen_dip(hwnd, lparam);

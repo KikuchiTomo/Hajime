@@ -57,7 +57,7 @@ struct FieldData {
 
 /// 枠の無い欄を作る(見えない状態で作る．置くときに見せる)
 pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<HWND> {
-    // 親の窓の地が Mica(透明)でも GDI で描いた欄が透けないよう，自分の面を持つ窓(子の WS_EX_LAYERED．
+    // 親の窓の背景が Mica(透明)でも GDI で描いた欄が透けないよう，自分の面を持つ窓(子の WS_EX_LAYERED．
     // Windows 8 からで，マニフェストの宣言が要る．build.rs)にして，不透明に重ねる
     let window = super::win32::create(
         WS_EX_LAYERED,
@@ -137,7 +137,7 @@ fn with_data(window: HWND, f: impl FnOnce(&mut FieldData)) {
     f(data);
 }
 
-/// 入力欄の地の塗り(WM_CTLCOLOREDIT で返す)．色を変えたら作り直す
+/// 入力欄の背景の塗り(WM_CTLCOLOREDIT で返す)．色を変えたら作り直す
 pub struct Brush(HBRUSH);
 
 impl Brush {
@@ -158,7 +158,7 @@ impl Drop for Brush {
     }
 }
 
-/// WM_CTLCOLOREDIT の DC に文字と地の色を付ける
+/// WM_CTLCOLOREDIT の DC に文字と背景の色を付ける
 pub fn color_field(hdc: usize, text: tokens::Rgb, background: tokens::Rgb) {
     use windows::Win32::Graphics::Gdi::{SetBkColor, HDC};
     let hdc = HDC(hdc as *mut _);

@@ -19,7 +19,7 @@ use tokens::size::{branch, candidate, glass};
 struct Metrics {
     layout: list_layout::Metrics,
     style: Style,
-    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
+    /// 行の背景の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
     row_padding_x: f32,
     /// 番号の幅(番号から候補の文字まで)
     lead: f32,
@@ -252,11 +252,11 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let heading_width = list.association.as_ref().map_or(0.0, |heading| {
         super::association::width(&painter, heading) + metrics.row_padding_x * 2.0
     });
-    // 候補 1 つの行の地の幅: 左の余白・番号・文字・右の余白(文字の右は番号の左より広く空ける)．
+    // 候補 1 つの行の背景の幅: 左の余白・番号・文字・右の余白(文字の右は番号の左より広く空ける)．
     // 表では文字が収まる幅を切り上げ，上限から割った幅を超えない(列の位置を整数にそろえる)
     let natural_cell = (metrics.row_padding_x + metrics.lead + entry_width + padding).ceil();
     let cell_width = cell_limit.map_or(natural_cell, |limit| natural_cell.min(limit));
-    // 候補の列(行の地)の幅．表なら，すべての列と列のあいだの線を合わせた幅
+    // 候補の列(行の背景)の幅．表なら，すべての列と列のあいだの線を合わせた幅
     let list_width = candidate::MIN_WIDTH
         .max(cell_width * columns + column_gutter() * (columns - 1.0))
         .max(variants_width + (metrics.row_padding_x - candidate::VARIANT_PADDING_X) * 2.0)
@@ -311,7 +311,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     painter.finish(layout.width, layout.height)
 }
 
-/// 候補ごとの行の地と押せる範囲，表の列のあいだの縦の線
+/// 候補ごとの行の背景と押せる範囲，表の列のあいだの縦の線
 struct Cells {
     rows: Vec<Frame>,
     hit_rows: Vec<Frame>,
@@ -496,7 +496,7 @@ fn draw_list(
                 .collect();
             let from = (text_x + painter.width(&before, Font::Candidate)).round();
             let to = (from + painter.width(&corrected, Font::Candidate)).round();
-            // 角丸のテーマの行の地は行の間隔より上下に縮めてあるので，その分を引く
+            // 角丸のテーマの行の背景は行の間隔より上下に縮めてあるので，その分を引く
             let offset = if theme.is_rounded() {
                 glass::UNDERLINE_OFFSET - glass::SELECTION_INSET_Y
             } else {
@@ -550,13 +550,13 @@ fn draw_list(
     }
 }
 
-/// 候補の行のタグの右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+/// 候補の行のタグの右端(行の背景の内側の余白の内側．足元の位置の右の端と同じ x)
 fn tag_max_x(row: Frame, metrics: &Metrics) -> f32 {
     row.max_x() - metrics.row_padding_x
 }
 
 /// 文字種の行．ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)．
-/// 最初の文字種の文字を候補の番号の左(行の地の内側の余白 inset)にそろえる
+/// 最初の文字種の文字を候補の番号の左(行の背景の内側の余白 inset)にそろえる
 fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: f32) {
     let theme = painter.theme;
     let mut x = section.x + inset - candidate::VARIANT_PADDING_X;
@@ -597,7 +597,7 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: 
 }
 
 /// 角丸のテーマは案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
-/// 左右の端は候補の行の番号の左と注釈のタグの右(行の地の内側の余白 inset)にそろえる
+/// 左右の端は候補の行の番号の左と注釈のタグの右(行の背景の内側の余白 inset)にそろえる
 fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame, inset: f32) {
     let theme = painter.theme;
     let left = section.x + inset;

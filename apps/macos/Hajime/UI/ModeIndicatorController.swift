@@ -61,7 +61,7 @@ final class ModeIndicatorView: NSView {
 
     var label = "" { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
-    /// glass の面を自分で塗るか．ぼかしの地の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
 
     private var attributes: [NSAttributedString.Key: Any] {

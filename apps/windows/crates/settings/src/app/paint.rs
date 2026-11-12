@@ -146,13 +146,13 @@ pub enum ButtonKind {
     Standard,
     /// 主な操作(アクセントの色)
     Accent,
-    /// 地の無い小さいボタン(既定に戻す)
+    /// 背景の無い小さいボタン(既定に戻す)
     Subtle,
-    /// 消す・戻す操作のボタン(地はふつうのボタンと同じで，文字を危険の色にする)
+    /// 消す・戻す操作のボタン(背景はふつうのボタンと同じで，文字を危険の色にする)
     Destructive,
-    /// 地の無い小さい絵のボタン(数を 1 段ずつ変える)．絵は文字の色
+    /// 背景の無い小さい絵のボタン(数を 1 段ずつ変える)．絵は文字の色
     Quiet,
-    /// 地と枠のある絵だけのボタン(除外設定の優先度を上げる・下げる)．地はふつうのボタンと同じ
+    /// 背景と枠のある絵だけのボタン(除外設定の優先度を上げる・下げる)．背景はふつうのボタンと同じ
     Icon,
 }
 
@@ -577,7 +577,7 @@ pub fn stepper_frame(
     );
 }
 
-/// 選ぶ印(ラジオボタン．WinUI の RadioButton)．選んでいれば地をアクセントの色にし，真ん中に点を置く
+/// 選ぶ印(ラジオボタン．WinUI の RadioButton)．選んでいれば背景をアクセントの色にし，真ん中に点を置く
 pub fn radio(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, selected: bool, state: State) {
     let palette = &theme.palette;
     let radius = rect.width / 2.0;
@@ -619,7 +619,7 @@ pub fn radio(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, selected: bool,
     }
 }
 
-/// 一覧を切り替える部品の 1 つの欄．選んだ欄は地を付け，下にアクセントの色の短い線を引く(WinUI の SelectorBar)
+/// 一覧を切り替える部品の 1 つの欄．選んだ欄は背景を付け，下にアクセントの色の短い線を引く(WinUI の SelectorBar)
 pub fn segment(
     canvas: &mut dyn Canvas,
     theme: &Theme,

@@ -253,7 +253,7 @@ pub fn destroy(window: HWND) {
 }
 
 pub fn invalidate(window: HWND) {
-    // SAFETY: このスレッドの窓．地は自分で塗るので消さない
+    // SAFETY: このスレッドの窓．背景は自分で塗るので消さない
     let _ = unsafe { InvalidateRect(Some(window), None, false) };
 }
 
@@ -314,7 +314,7 @@ pub fn set_dark_title_bar(window: HWND, dark: bool) {
     };
 }
 
-/// 窓の地を Windows 11 の Mica にする(on が偽なら戻す)．枠を窓の中まで広げ，地を透明で描いたところに Mica が見える．
+/// 窓の背景を Windows 11 の Mica にする(on が偽なら戻す)．枠を窓の中まで広げ，背景を透明で描いたところに Mica が見える．
 /// Mica を使えない Windows(22H2 より前)では偽を返し，枠も広げない
 pub fn set_mica(window: HWND, on: bool) -> bool {
     let backdrop = if on { DWMSBT_MAINWINDOW } else { DWMSBT_NONE };

@@ -25,7 +25,7 @@ final class PaletteView: NSView {
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     /// マスの一辺(設定のパレットのマスの大きさ)
     var cellSize = CGFloat(DefaultSettings.paletteCellSize) { didSet { needsDisplay = true } }
-    /// glass の面を自分で塗るか．ぼかしの地(GlassBackdrop)の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
     /// 押した対象を知らせる先
     var onTarget: ((PaletteTarget) -> Void)?
@@ -44,7 +44,7 @@ final class PaletteView: NSView {
     override var isFlipped: Bool { true }
 
     private var dropShadowOffset: CGFloat { theme.hasDropShadow ? DesignTokens.Size.Candidate.shadowOffset : 0 }
-    /// 窓の縁の太さ(角丸のテーマは縁の線，platinum と desk は外枠と立体の縁)．内側の余白はこの内側から測る
+    /// 窓の枠線の太さ(角丸のテーマは枠線，platinum と desk は外枠とベベル)．内側の余白はこの内側から測る
     private var border: CGFloat {
         DesignTokens.Size.Candidate.frameWidth + (theme.isRounded ? 0 : DesignTokens.Size.Candidate.bevelWidth)
     }
@@ -381,7 +381,7 @@ final class PaletteView: NSView {
         if let selected = panel.tabs.firstIndex(where: \.isSelected), rects.indices.contains(selected) {
             let rect = PaletteMotionState.rect(motion.tab, to: rects[selected], at: clock(), easing: PaletteEasing.easeInOut)
             if theme.isRounded {
-                // 角丸のテーマは薄い地と下の線で示す
+                // 角丸のテーマは薄い背景と下の線で示す
                 fill(rect.insetBy(dx: Size.inset, dy: Size.inset), color: theme.focusTint, radius: Glass.selectionRadius)
                 theme.selection.setFill()
                 NSRect(x: rect.minX + Size.itemGap, y: rect.maxY - Size.selectionStroke, width: rect.width - Size.itemGap * 2, height: Size.selectionStroke).fill()
@@ -493,7 +493,7 @@ final class PaletteView: NSView {
         context?.translateBy(x: offset.x, y: offset.y)
         defer { context?.restoreGState() }
         if let selection = panel.selection {
-            // 色だけに頼らないよう，地を塗ったうえで枠も描く．選択が動いたら前のマスから滑らせる
+            // 色だけに頼らないよう，背景を塗ったうえで枠も描く．選択が動いたら前のマスから滑らせる
             let target = cellRect(row: selection.row, column: selection.column, in: layout, panel: panel)
             let rect = slidesSelection && offset == .zero ? PaletteMotionState.rect(motion.selection, to: target, at: time, easing: PaletteEasing.easeOut) : target
             let inner = rect.insetBy(dx: 1, dy: 1)
@@ -588,7 +588,7 @@ final class PaletteView: NSView {
         GlassDrawing.drawHints(fitting, x: footer.minX, midY: footer.midY, theme: theme)
         let button = layout.skinToneButton
         GlassDrawing.drawKeycap(button, theme: theme)
-        // 余白はタグの縁(platinum と desk は立体の縁)の内側から測る．キーキャップの中の記号と同じ余白
+        // 余白はタグの枠線(platinum と desk はベベル)の内側から測る．キーキャップの中の記号と同じ余白
         let border = GlassDrawing.keycapBorder(theme: theme)
         drawEmoji(PaletteStrings.skinToneSample.text(skinTone: panel.skinTone), in: button.insetBy(dx: border, dy: border), padding: Size.skinButtonPadding)
     }

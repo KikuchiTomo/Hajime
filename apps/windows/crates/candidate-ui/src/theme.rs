@@ -3,8 +3,8 @@
 //! 設定と OS の外観から決めた，描画に使う色と書体(macOS の ResolvedTheme と同じ決め方)．
 //!
 //! 描き方は 2 通り．
-//! - 角丸と曲線の枝(is_rounded): glass と，和紙・ネオン・端末・北欧・高コントラスト．glass だけ地をすりガラスにし，ほかは地を色で塗る
-//! - 四角い枠と立体の縁: platinum と desk
+//! - 角丸と曲線の枝(is_rounded): glass と，和紙・ネオン・端末・北欧・高コントラスト．glass だけ背景をすりガラスにし，ほかは背景を色で塗る
+//! - 四角い枠とベベル: platinum と desk
 
 use ipc::CustomTheme;
 use tokens::{opacity, size, Palette, Rgb};
@@ -61,7 +61,7 @@ impl From<&ipc::Color> for Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
-    /// すりガラスの地に角丸と曲線の枝．既定
+    /// すりガラスの背景に角丸と曲線の枝．既定
     Glass,
     Platinum,
     Desk,
@@ -120,7 +120,7 @@ pub struct SystemLook {
     pub accent: Option<Rgb>,
     /// 「コントラストを上げる」に当たる設定(Windows はハイコントラスト)
     pub increase_contrast: bool,
-    /// 地をすりガラスにできるか(Windows 11 の DWM の背景)
+    /// 背景をすりガラスにできるか(Windows 11 の DWM の背景)
     pub backdrop: bool,
 }
 
@@ -138,9 +138,9 @@ pub struct ResolvedTheme {
     pub correction: Color,
     /// 枝と区切りの線
     pub line: Color,
-    /// 注目している文節の地(角丸のテーマ．選択より弱い色)
+    /// 注目している文節の背景(角丸のテーマ．選択より弱い色)
     pub focus_tint: Color,
-    /// 番号の丸とキーキャップの地
+    /// 番号の丸とキーキャップの背景
     pub badge: Color,
     pub typeface: Typeface,
     /// 角の丸さ(角丸のテーマ)．カスタムテーマで変わる
@@ -149,12 +149,12 @@ pub struct ResolvedTheme {
     pub straight_branches: bool,
     /// 候補の書体の名前(カスタムテーマ)．None ならテーマの書体
     pub font_name: Option<String>,
-    /// 地をすりガラスにする(glass で，OS が背景をぼかせるとき)
+    /// 背景をすりガラスにする(glass で，OS が背景をぼかせるとき)
     pub backdrop: bool,
 }
 
 impl ResolvedTheme {
-    /// 補正の色を薄く敷いた地(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
+    /// 補正の色を薄く敷いた背景(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
     pub fn correction_tint(&self) -> Color {
         self.correction.with_alpha(if self.kind == Kind::Contrast {
             opacity::glass::CORRECTION_TAG_CONTRAST
@@ -163,7 +163,7 @@ impl ResolvedTheme {
         })
     }
 
-    /// アクセントの色を薄く敷いた地(コマンドの候補のタグと，種類のアイコンの四角)
+    /// アクセントの色を薄く敷いた背景(コマンドの候補のタグと，種類のアイコンの四角)
     pub fn command_tint(&self) -> Color {
         self.selection.with_alpha(if self.kind == Kind::Contrast {
             opacity::glass::COMMAND_TAG_CONTRAST
@@ -218,7 +218,7 @@ impl ResolvedTheme {
         }
     }
 
-    /// 標準のテーマ．暗い地に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
+    /// 標準のテーマ．暗い背景に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
     /// macOS と同じく，角丸の描き方に色・書体・形を重ねる．書体は丸ゴシックの系統(同梱の Kiwi Maru)
     fn standard(contrast: bool) -> Self {
         Self {
@@ -279,7 +279,7 @@ impl ResolvedTheme {
         }
     }
 
-    /// platinum と desk．「コントラストを上げる」が有効なときは，立体の縁を外枠と同じ色にする
+    /// platinum と desk．「コントラストを上げる」が有効なときは，ベベルを外枠と同じ色にする
     fn bevelled(kind: Kind, contrast: bool) -> Self {
         let palette = palette(kind);
         let frame = Color::rgb(palette.frame);
@@ -304,7 +304,7 @@ impl ResolvedTheme {
             selection: Color::rgb(palette.selection),
             selection_text: Color::rgb(palette.selection_text),
             correction: Color::rgb(palette.correction),
-            // 区画を分ける線は，platinum は影の縁，desk は暗い面なので光の縁の色
+            // 区画を分ける線は，platinum は暗い線，desk は暗い面なので明るい線の色
             line: if kind == Kind::Desk {
                 bevel_light
             } else {
@@ -717,7 +717,7 @@ mod tests {
     #[test]
     fn カスタムテーマは元のテーマの描き方に色と形を重ねる() {
         let theme = ResolvedTheme::resolve("platinum", Some(&custom("automatic")), &look());
-        // glass を元にしたら，地を色で塗る角丸のテーマにする
+        // glass を元にしたら，背景を色で塗る角丸のテーマにする
         assert_eq!(theme.kind, Kind::Nordic);
         assert_eq!(
             theme.surface,

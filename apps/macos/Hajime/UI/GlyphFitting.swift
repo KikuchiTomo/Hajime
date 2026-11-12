@@ -15,7 +15,7 @@ final class GlyphFitting {
     private var inks: [Key: NSRect] = [:]
     /// 覚えておく数の上限(超えたら捨てて測り直す)．マス目の絵文字を描き直すたびに測り直さない数にする
     private let limit = 2048
-    /// 外形に数える画素の濃さ(0〜255)．縁のぼかしの薄い画素は数えず，目に見える形で真ん中に置く
+    /// 外形に数える画素の濃さ(0〜255)．枠線のぼかしの薄い画素は数えず，目に見える形で真ん中に置く
     private static let inkAlpha: UInt8 = 96
 
     /// text を font で draw(at:) で描いたときの外形．描く原点(行の左上)からの位置

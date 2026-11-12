@@ -400,7 +400,7 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
                 x = left
             }
             let baselines = lines.indices.map { top + rows.chip.ascent + rows.chip.pitch * Double(line + $0) }
-            // タグは文字の上下に chipPaddingY を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
+            // タグは文字の上下に chipPaddingY を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，枠線はドットにそろえる)
             let pitch = rows.chip.pitch
             let height = min((measuring.ascent(role) + measuring.descent(role) + metrics.chipPaddingY * 2).rounded(), pitch)
             let rowTop = top + pitch * Double(line)

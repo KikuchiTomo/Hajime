@@ -998,7 +998,7 @@ impl Wizard {
         let gap = board::CARD_GAP;
         let padding = board::CARD_PADDING;
         let mut parts = Vec::new();
-        // カードの縁の線がスクロールの端で切れないように空ける(macOS と同じ)
+        // カードの枠線がスクロールの端で切れないように空ける(macOS と同じ)
         let mut y = space::INSET;
         let detail_height = |detail: &str, inner: f32| {
             space::STACK + measure.wrapped_height(detail, TextStyle::Caption, inner)
@@ -2715,7 +2715,7 @@ struct Look {
     now: f64,
 }
 
-/// カードの地と縁(macOS の OptionCard．選んだものはアクセントの色の地と縁)
+/// カードの背景と枠線(macOS の OptionCard．選んだものはアクセントの色の背景と枠線)
 fn card_ground(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -2868,7 +2868,7 @@ fn paint_card(
 }
 
 /// 説明だけのカード．入力モード表示を枠に入れて並べる(macOS の InfoCard)
-/// アプリごとの入力モードのカード．実演に動きを見せているモードのカードは選んだカードと同じ地にする
+/// アプリごとの入力モードのカード．実演に動きを見せているモードのカードは選んだカードと同じ背景にする
 fn paint_info(
     canvas: &mut dyn Canvas,
     wizard: &Wizard,
@@ -2931,7 +2931,7 @@ fn paint_info(
     );
 }
 
-/// テーマのカード．そのテーマの地・選択・文字・補正の色を小さく並べた見本と名前(macOS の ThemeTile)
+/// テーマのカード．そのテーマの背景・選択・文字・補正の色を小さく並べた見本と名前(macOS の ThemeTile)
 fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look, index: usize) {
     let theme = &wizard.theme;
     let palette = &theme.palette;
@@ -3020,7 +3020,7 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
     }
 }
 
-/// 名前とメニューのボタンの行(入力する文字の行はカードの地に載せる)
+/// 名前とメニューのボタンの行(入力する文字の行はカードの背景に載せる)
 fn paint_picker(
     canvas: &mut dyn Canvas,
     wizard: &Wizard,
@@ -3171,7 +3171,7 @@ fn paint_slider(
     }
 }
 
-/// 機能の行．アイコン・名前・スイッチ．見せている機能の行はアクセントの色の地と縁(macOS の SpotlightRow)
+/// 機能の行．アイコン・名前・スイッチ．見せている機能の行はアクセントの色の背景と枠線(macOS の SpotlightRow)
 #[allow(clippy::too_many_arguments)]
 fn paint_spot(
     canvas: &mut dyn Canvas,
@@ -3360,7 +3360,7 @@ fn paint_footer(canvas: &mut dyn Canvas, state: &PaintState, fade: f32) {
     canvas.set_opacity(1.0);
 }
 
-/// 地の無い文字だけのボタン(macOS の plain．ポインターを載せると文字を濃くし，押すと薄くする)
+/// 背景の無い文字だけのボタン(macOS の plain．ポインターを載せると文字を濃くし，押すと薄くする)
 fn paint_plain_button(
     canvas: &mut dyn Canvas,
     theme: &Theme,

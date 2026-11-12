@@ -57,7 +57,7 @@ enum Fade {
 
 struct App {
     renderer: Renderer,
-    /// 地を色で塗る窓と，すりガラスの地の窓(OS が影を付ける)
+    /// 背景を色で塗る窓と，すりガラスの背景の窓(OS が影を付ける)
     plain: Window,
     glass: Window,
     /// 続く語句の予測の窓(色で塗る窓とすりガラスの窓)．候補の窓とは別に，組み立て中の文字の右に出す．押しても受けない
@@ -326,7 +326,7 @@ impl App {
                 recognition_delay_milliseconds,
                 recognition_timeout_milliseconds,
             } => {
-                // 手書きの窓はすりガラスにしない(書く欄の地が透けないように)．枠は OS のライトとダークに合わせる
+                // 手書きの窓はすりガラスにしない(書く欄の背景が透けないように)．枠は OS のライトとダークに合わせる
                 let look = self.system.look(false);
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
@@ -699,10 +699,10 @@ impl App {
             Content::Mode(label) => Some(scene::mode(label, style, &measure)),
         };
         let mut scene = build(&self.content, &style);
-        // 候補の窓は，大きさが変わるときに縁を滑らかに動かす(地と縁は途中の大きさで描き，中身は新しい配置のまま)
+        // 候補の窓は，大きさが変わるときに枠線を滑らかに動かす(背景と枠線は途中の大きさで描き，中身は新しい配置のまま)
         let now = Instant::now();
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
-        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える(macOS と同じ)
+        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，枠線を動かさずにすぐ変える(macOS と同じ)
         let typing =
             matches!(&self.content, Content::Candidates(list) if list.selected_entry.is_none());
         let natural = scene.as_ref().map(|scene| (scene.width, scene.height));

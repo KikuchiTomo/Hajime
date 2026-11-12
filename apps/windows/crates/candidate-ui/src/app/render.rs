@@ -48,7 +48,7 @@ type LineCache = HashMap<Font, HashMap<String, (f32, f32)>>;
 type InkCache = HashMap<Font, HashMap<String, Option<Frame>>>;
 /// 字の外形を測るために描く細かさ(1 DIP を何ピクセルにするか．2 倍の画面で 1 ピクセルまで測る)
 const INK_SCALE: f32 = 2.0;
-/// 字の外形に数える画素の濃さ(0〜255)．縁のぼかしの薄い画素は数えず，目に見える形で真ん中に置く(macOS の GlyphFitting と同じ)
+/// 字の外形に数える画素の濃さ(0〜255)．枠線のぼかしの薄い画素は数えず，目に見える形で真ん中に置く(macOS の GlyphFitting と同じ)
 const INK_ALPHA: u8 = 96;
 /// DIP の基準の DPI
 const INK_BASE_DPI: f32 = 96.0;

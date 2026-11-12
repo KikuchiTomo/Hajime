@@ -221,7 +221,7 @@ final class DemoStageView: NSView {
         }
     }
 
-    /// 押したキーを，入力欄の右上にキーキャップで出す．アプリの名前のタグと同じ高さにそろえ，入力欄と同じ地と縁にする
+    /// 押したキーを，入力欄の右上にキーキャップで出す．アプリの名前のタグと同じ高さにそろえ，入力欄と同じ背景と枠線にする
     private func drawKey(_ name: String, above field: NSRect) {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
                                                          .foregroundColor: NSColor.labelColor]

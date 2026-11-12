@@ -55,7 +55,7 @@ final class BranchView: NSView {
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
     var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
-    /// glass の面を自分で塗るか．ぼかしの地(GlassBackdrop)の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
 
     override var isFlipped: Bool { true }
@@ -72,18 +72,18 @@ final class BranchView: NSView {
         /// 候補の文字の前に置く番号の幅
         var lead: CGFloat
         var footerHeight: CGFloat
-        /// 候補の行の地の上下を縮める量(角丸のテーマ)．行の地の見える上の端は行の上の端からこの分だけ下
+        /// 候補の行の背景の上下を縮める量(角丸のテーマ)．行の背景の見える上の端は行の上の端からこの分だけ下
         var rowInset: CGFloat
         var lineWidth: CGFloat
         var lineWidthSelected: CGFloat
-        /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
+        /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の背景が上下に細いので，その端から伸ばす)
         var rootInset: CGFloat
     }
 
     /// 区切りの線の上と下，カードと枝・区切りの線のあいだの空き
     private var gap: CGFloat { Glass.separatorGap }
 
-    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の地の左から paddingX)にそろえる
+    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から paddingX)にそろえる
     private var textInset: CGFloat { metrics.inset + Size.paddingX }
 
     private var metrics: Metrics {
@@ -223,9 +223,9 @@ final class BranchView: NSView {
         }
         width = width.rounded(.up)
         let contentRight = width - metrics.inset
-        // いちばん上の行の地(角丸のテーマは行の上下を縮めて描く)の上の端を，縁の内側の余白の端にそろえる
+        // いちばん上の行の背景(角丸のテーマは行の上下を縮めて描く)の上の端を，枠線の内側の余白の端にそろえる
         let trunkY = metrics.inset - metrics.rowInset + headingHeight(panel) + CGFloat(upperRows) * metrics.rowHeight
-        // 下の枝の見える下の端(候補の行の地の下の端)
+        // 下の枝の見える下の端(候補の行の背景の下の端)
         let lowerTop = trunkY + metrics.rowHeight
         var bottom = lowerTop + metrics.rowHeight * CGFloat(lowerRows) - (lowerRows > 0 ? metrics.rowInset : 0)
         var slot: MeaningSlot?
@@ -367,7 +367,7 @@ final class BranchView: NSView {
         let focusedIndex = panel.columns.firstIndex(where: \.isFocused)
         // 注目している文節の枝が重なる範囲には，ほかの文節の添え書きを描かない
         let branchRange = focusedIndex.map { layout.trunkX[$0]...(layout.trunkX[$0] + layout.branchWidth) }
-        // 幹をずらしたときは，窓の内側の外に出た文節を描かない(窓の縁に重ねない)
+        // 幹をずらしたときは，窓の内側の外に出た文節を描かない(窓の枠線に重ねない)
         NSGraphicsContext.saveGraphicsState()
         if let clip = layout.clip { NSRect(x: clip.lowerBound, y: 0, width: clip.upperBound - clip.lowerBound, height: body.height).clip() }
         for (index, column) in panel.columns.enumerated() {

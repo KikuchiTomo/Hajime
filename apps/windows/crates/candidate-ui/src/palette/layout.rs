@@ -5,7 +5,7 @@
 //! 顔文字は，マス目の幅を 1 行のマスの数(cells_per_row)で割った広いマスに並べる．
 //!
 //! 余白は間隔の段階(design/tokens の size.space)だけで決める．
-//! - 窓の内側の余白は上下左右とも padding(窓の縁の内側から．角丸のテーマは縁の線，platinum と desk は立体の縁)
+//! - 窓の内側の余白は上下左右とも padding(窓の枠線の内側から．角丸のテーマは枠線，platinum と desk はベベル)
 //! - 区画(探す欄 → タブ → マス目 → 区切り → 説明 → 区切り → 足元)のあいだは section-gap．区切りの線の上と下も同じ
 //! - まとまりのあいだ(探す欄と種類の切り替え，タブとマスの見出し，マス目とスクロールの位置の線)は group-gap，
 //!   まとまりの中(マスの見出しとマス目)は item-gap
@@ -119,7 +119,7 @@ impl Fonts {
                 palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * palette::PREVIEW_SYMBOL_BOOST,
             ),
             preview_kaomoji: Font::sized(Role::Candidate, palette::PREVIEW_KAOMOJI_FONT_SIZE),
-            // タグの縁(角丸のテーマと desk は線 1，platinum は外枠と立体の縁 2)の内側から余白を空ける．縁の細いほうで候補を作る
+            // タグの枠線(角丸のテーマと desk は線 1，platinum は外枠とベベル 2)の内側から余白を空ける．枠線の細いほうで候補を作る
             button_emoji: EmojiSizes::new(
                 glass::KEYCAP_HEIGHT
                     - candidate::FRAME_WIDTH * 2.0
@@ -244,7 +244,7 @@ impl Layout {
         } else {
             0.0
         };
-        // 窓の縁の太さ(角丸のテーマは縁の線，platinum と desk は外枠と立体の縁)．内側の余白はこの内側から測る
+        // 窓の枠線の太さ(角丸のテーマは枠線，platinum と desk は外枠とベベル)．内側の余白はこの内側から測る
         let border = if theme.is_rounded() {
             candidate::FRAME_WIDTH
         } else {
@@ -702,7 +702,7 @@ mod tests {
             assert_eq!(button.height, glass::KEYCAP_HEIGHT);
             assert_eq!(button.width, button.height);
             assert_eq!(button.mid_y(), layout.footer.mid_y());
-            // 下の余白は窓の縁(platinum と desk は立体の縁の内側)から測る
+            // 下の余白は窓の枠線(platinum と desk はベベルの内側)から測る
             let border = layout.content.x - layout.body.x - palette::PADDING;
             let above = layout.footer.y - (layout.separators[1] + candidate::FRAME_WIDTH);
             let below = layout.body.max_y() - border - layout.footer.max_y();

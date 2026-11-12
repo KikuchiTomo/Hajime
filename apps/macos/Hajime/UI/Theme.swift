@@ -5,11 +5,11 @@ import HajimeDomain
 /// glass の色は OS の意味の色(labelColor・controlAccentColor など)を使う．ライト・ダークとアクセントカラーに OS が合わせるため．
 ///
 /// 描き方は 2 通り．
-/// - 角丸と曲線の枝(isRounded): glass と，和紙・ネオン・端末・北欧・高コントラスト．glass だけ地をぼかし，ほかは地を色で塗る
-/// - 四角い枠と立体の縁: platinum と desk
+/// - 角丸と曲線の枝(isRounded): glass と，和紙・ネオン・端末・北欧・高コントラスト．glass だけ背景をぼかし，ほかは背景を色で塗る
+/// - 四角い枠とベベル: platinum と desk
 struct ResolvedTheme {
     enum Kind {
-        /// すりガラスの地に角丸と曲線の枝．既定
+        /// すりガラスの背景に角丸と曲線の枝．既定
         case glass
         case platinum
         case desk
@@ -43,9 +43,9 @@ struct ResolvedTheme {
     let correction: NSColor
     /// 枝と区切りの線
     let line: NSColor
-    /// 注目している文節の地(glass だけ．選択より弱い色)
+    /// 注目している文節の背景(glass だけ．選択より弱い色)
     let focusTint: NSColor
-    /// 番号の丸とキーキャップの地
+    /// 番号の丸とキーキャップの背景
     let badge: NSColor
     var typeface: Typeface = .system
     /// 角の丸さ(角丸のテーマ)．カスタムテーマで変えられる
@@ -101,7 +101,7 @@ struct ResolvedTheme {
     /// 標準のテーマの書体(ヒラギノ丸ゴ)．標準のテーマは枝を直線で描く
     static let standardFontName = "HiraMaruProN-W4"
 
-    /// 標準のテーマ．暗い地に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
+    /// 標準のテーマ．暗い背景に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
     /// カスタムテーマと同じく，角丸の描き方に色・書体・形を重ねる．ライトとダークで色を変えない
     private static func standard(increaseContrast: Bool) -> ResolvedTheme {
         var theme = rounded(DesignTokens.Palette.standard, kind: .nordic, typeface: .rounded, increaseContrast: increaseContrast)
@@ -134,7 +134,7 @@ struct ResolvedTheme {
 
     private static func palette(_ palette: ThemePalette, kind: Kind, increaseContrast: Bool) -> ResolvedTheme {
         let frame = palette.frame.color
-        // 「コントラストを上げる」が有効なときは，立体の縁を外枠と同じ色にする(docs/dev/DESIGN-SYSTEM.md)
+        // 「コントラストを上げる」が有効なときは，ベベルを外枠と同じ色にする(docs/dev/DESIGN-SYSTEM.md)
         let bevelLight = increaseContrast ? frame : palette.bevelLight.color
         let bevelShadow = increaseContrast ? frame : palette.bevelShadow.color
         return ResolvedTheme(
@@ -148,7 +148,7 @@ struct ResolvedTheme {
             selection: palette.selection.color,
             selectionText: palette.selectionText.color,
             correction: palette.correction.color,
-            // 区画を分ける線は，platinum は影の縁，desk は暗い面なので光の縁の色
+            // 区画を分ける線は，platinum は暗い線，desk は暗い面なので明るい線の色
             line: kind == .desk ? bevelLight : bevelShadow,
             focusTint: palette.selection.color,
             badge: palette.surface.color
@@ -157,7 +157,7 @@ struct ResolvedTheme {
 
     /// 角丸と曲線の枝で描くか(platinum と desk のほか)
     var isRounded: Bool { kind != .platinum && kind != .desk }
-    /// 地をぼかすか(glass だけ)．ほかの角丸のテーマは地を色で塗る
+    /// 背景をぼかすか(glass だけ)．ほかの角丸のテーマは背景を色で塗る
     var usesBackdrop: Bool { kind == .glass }
     var hasBevel: Bool { !isRounded }
     var hasDropShadow: Bool { kind == .desk }
@@ -197,13 +197,13 @@ struct ResolvedTheme {
         font(size: size, weight: .semibold)
     }
 
-    /// 補正の色を薄く敷いた地(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
+    /// 補正の色を薄く敷いた背景(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
     var correctionTint: NSColor {
         let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast || kind == .contrast
         return correction.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.correctionTagContrast : DesignTokens.Opacity.Glass.correctionTag)
     }
 
-    /// アクセントの色を薄く敷いた地(コマンドの候補のタグと，種類のアイコンの四角)
+    /// アクセントの色を薄く敷いた背景(コマンドの候補のタグと，種類のアイコンの四角)
     var commandTint: NSColor {
         let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast || kind == .contrast
         return selection.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.commandTagContrast : DesignTokens.Opacity.Glass.commandTag)
