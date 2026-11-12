@@ -7,6 +7,7 @@
 mod association;
 mod branch;
 mod branch_lines;
+pub mod bubble;
 mod card_layout;
 pub(crate) mod fitting;
 mod list;
@@ -66,6 +67,12 @@ pub enum Draw {
         figures: Vec<Figure>,
         color: Color,
         width: f32,
+    },
+    /// 閉じた図形(吹き出しの形)を塗る・縁取る．figure の終わりから始まりへ閉じる．縁は stroke の太さの線で図形の上をなぞる
+    Shape {
+        figure: Figure,
+        fill: Option<Color>,
+        stroke: Option<(Color, f32)>,
     },
     /// 直線(端は丸い)．dot_pitch があれば，その間隔の丸い点にする
     Line {
@@ -205,6 +212,15 @@ impl Draw {
                     .collect(),
                 color,
                 width,
+            },
+            Self::Shape {
+                figure,
+                fill,
+                stroke,
+            } => Self::Shape {
+                figure: figure.offset(dx, dy),
+                fill,
+                stroke,
             },
             Self::Line {
                 from,

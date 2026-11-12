@@ -411,25 +411,24 @@ pub mod size {
     pub mod meaning {
         pub const CARD_GAP: f32 = 16.0;
         pub const MARKER_WIDTH: f32 = 16.0;
-        pub const MARKER_GAP: f32 = 8.0;
+        pub const MARKER_GAP: f32 = 4.0;
         pub const HEADER_GAP: f32 = 8.0;
         pub const SENSE_GAP: f32 = 8.0;
         pub const EXAMPLE_GAP: f32 = 4.0;
         pub const EXAMPLE_INDENT: f32 = 12.0;
         pub const EXAMPLE_BAR_WIDTH: f32 = 2.0;
         pub const MEANING_PITCH: f32 = 20.0;
-        pub const EXAMPLE_PITCH: f32 = 18.0;
+        pub const EXAMPLE_PITCH: f32 = 16.0;
         pub const OTHERS_GAP: f32 = 12.0;
-        pub const PART_OF_SPEECH_GAP: f32 = 8.0;
+        pub const PART_OF_SPEECH_GAP: f32 = 4.0;
         pub const PART_OF_SPEECH_HEIGHT: f32 = 16.0;
-        pub const PART_OF_SPEECH_PADDING_X: f32 = 8.0;
+        pub const PART_OF_SPEECH_PADDING_X: f32 = 4.0;
         pub const TAG_GAP: f32 = 4.0;
         pub const HEADWORD_FONT_SIZE: f32 = 15.0;
         pub const BODY_FONT_SIZE: f32 = 13.0;
-        pub const EXAMPLE_FONT_SIZE: f32 = 12.0;
-        pub const PART_OF_SPEECH_FONT_SIZE: f32 = 10.5;
-        pub const NUMBER_FONT_SIZE: f32 = 10.5;
-        pub const NUMBER_RADIUS: f32 = 4.0;
+        pub const EXAMPLE_FONT_SIZE: f32 = 11.0;
+        pub const PART_OF_SPEECH_FONT_SIZE: f32 = 10.0;
+        pub const NUMBER_FONT_SIZE: f32 = 10.0;
         pub const ICON_SIZE: f32 = 13.0;
         pub const DOT_SIZE: f32 = 6.0;
         pub const LIST_WIDTH: f32 = 288.0;
@@ -656,6 +655,14 @@ pub mod size {
         pub const SLIDER_THUMB: f32 = 20.0;
         pub const SLIDER_RAIL: f32 = 4.0;
         pub const BUTTON_MIN_WIDTH: f32 = 64.0;
+    }
+    pub mod bubble {
+        pub const WIDTH: f32 = 288.0;
+        pub const PADDING: f32 = 12.0;
+        pub const RADIUS: f32 = 8.0;
+        pub const POINTER_LENGTH: f32 = 8.0;
+        pub const POINTER_WIDTH: f32 = 16.0;
+        pub const GAP: f32 = 4.0;
     }
 }
 

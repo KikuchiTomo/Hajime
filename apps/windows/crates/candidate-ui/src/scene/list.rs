@@ -1111,8 +1111,21 @@ mod tests {
         }
     }
 
+    /// 枠線だけの丸(語の意味の番号)の数
+    fn number_circles(scene: &Scene) -> usize {
+        let size = card_size::MARKER_WIDTH - 1.0;
+        scene
+            .draws
+            .iter()
+            .filter(|draw| {
+                matches!(draw, Draw::RoundRect { radius, frame, fill: None, stroke: Some(_) }
+                if frame.width == size && frame.height == size && *radius == size / 2.0)
+            })
+            .count()
+    }
+
     #[test]
-    fn 意味が2つ以上なら角丸の四角に番号を入れる() {
+    fn 意味が2つ以上なら枠線だけの丸に番号を入れる() {
         let theme = theme("automatic");
         let look = Look::new(&theme, 15.0);
         let mut two = with_meaning(MeaningPlacement::Side);
@@ -1126,20 +1139,10 @@ mod tests {
         let double = candidate_list(&two, &look, &Fixed);
         let texts = texts_of(&double);
         assert!(texts.contains(&"向きを変える".to_string()));
-        let badges = double
-            .draws
-            .iter()
-            .filter(|draw| matches!(draw, Draw::RoundRect { radius, frame, .. }
-                if *radius == card_size::NUMBER_RADIUS && frame.width == card_size::MARKER_WIDTH && frame.height == card_size::MARKER_WIDTH))
-            .count();
-        assert_eq!(badges, 2);
+        assert_eq!(number_circles(&double), 2);
         assert!(double.height >= single.height);
-        // 意味が 1 つなら番号の四角を描かない
-        assert!(!single
-            .draws
-            .iter()
-            .any(|draw| matches!(draw, Draw::RoundRect { radius, frame, .. }
-            if *radius == card_size::NUMBER_RADIUS && frame.width == card_size::MARKER_WIDTH)));
+        // 意味が 1 つなら番号の丸を描かない
+        assert_eq!(number_circles(&single), 0);
     }
 
     fn texts_of(scene: &Scene) -> Vec<String> {

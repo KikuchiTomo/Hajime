@@ -293,25 +293,24 @@ enum DesignTokens {
         enum Meaning {
             static let cardGap: CGFloat = 16
             static let markerWidth: CGFloat = 16
-            static let markerGap: CGFloat = 8
+            static let markerGap: CGFloat = 4
             static let headerGap: CGFloat = 8
             static let senseGap: CGFloat = 8
             static let exampleGap: CGFloat = 4
             static let exampleIndent: CGFloat = 12
             static let exampleBarWidth: CGFloat = 2
             static let meaningPitch: CGFloat = 20
-            static let examplePitch: CGFloat = 18
+            static let examplePitch: CGFloat = 16
             static let othersGap: CGFloat = 12
-            static let partOfSpeechGap: CGFloat = 8
+            static let partOfSpeechGap: CGFloat = 4
             static let partOfSpeechHeight: CGFloat = 16
-            static let partOfSpeechPaddingX: CGFloat = 8
+            static let partOfSpeechPaddingX: CGFloat = 4
             static let tagGap: CGFloat = 4
             static let headwordFontSize: CGFloat = 15
             static let bodyFontSize: CGFloat = 13
-            static let exampleFontSize: CGFloat = 12
-            static let partOfSpeechFontSize: CGFloat = 10.5
-            static let numberFontSize: CGFloat = 10.5
-            static let numberRadius: CGFloat = 4
+            static let exampleFontSize: CGFloat = 11
+            static let partOfSpeechFontSize: CGFloat = 10
+            static let numberFontSize: CGFloat = 10
             static let iconSize: CGFloat = 13
             static let dotSize: CGFloat = 6
             static let listWidth: CGFloat = 288
@@ -538,6 +537,14 @@ enum DesignTokens {
             static let sliderThumb: CGFloat = 20
             static let sliderRail: CGFloat = 4
             static let buttonMinWidth: CGFloat = 64
+        }
+        enum Bubble {
+            static let width: CGFloat = 288
+            static let padding: CGFloat = 12
+            static let radius: CGFloat = 8
+            static let pointerLength: CGFloat = 8
+            static let pointerWidth: CGFloat = 16
+            static let gap: CGFloat = 4
         }
     }
     enum Motion {

@@ -964,6 +964,62 @@ impl Painter<'_> {
                         .DrawGeometry(&geometry, self.brush, *width, &self.renderer.flat)
                 };
             }
+            Draw::Shape {
+                figure,
+                fill,
+                stroke,
+            } => {
+                // 閉じた図形を塗ってから縁をなぞる(吹き出しの形)
+                // SAFETY: factory は生きている COM の参照．sink は閉じるまでこの関数の中だけで使う
+                let geometry = unsafe {
+                    let path = self.renderer.d2d.CreatePathGeometry()?;
+                    let sink = path.Open()?;
+                    sink.BeginFigure(
+                        vector!(figure.start.x, figure.start.y),
+                        D2D1_FIGURE_BEGIN_FILLED,
+                    );
+                    for segment in &figure.segments {
+                        match *segment {
+                            Segment::Line(to) => sink.AddLine(vector!(to.x, to.y)),
+                            Segment::Arc {
+                                to,
+                                radius,
+                                clockwise,
+                            } => sink.AddArc(&D2D1_ARC_SEGMENT {
+                                point: vector!(to.x, to.y),
+                                size: D2D_SIZE_F {
+                                    width: radius,
+                                    height: radius,
+                                },
+                                rotationAngle: 0.0,
+                                sweepDirection: if clockwise {
+                                    D2D1_SWEEP_DIRECTION_CLOCKWISE
+                                } else {
+                                    D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE
+                                },
+                                arcSize: D2D1_ARC_SIZE_SMALL,
+                            }),
+                        }
+                    }
+                    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
+                    sink.Close()?;
+                    path
+                };
+                let geometry: ID2D1Geometry = geometry.into();
+                if let Some(color) = fill {
+                    self.color(*color);
+                    // SAFETY: target・brush・geometry は生きている COM の参照
+                    unsafe { self.target.FillGeometry(&geometry, self.brush, None) };
+                }
+                if let Some((color, width)) = stroke {
+                    self.color(*color);
+                    // SAFETY: target・brush・geometry・stroke style は生きている COM の参照
+                    unsafe {
+                        self.target
+                            .DrawGeometry(&geometry, self.brush, *width, &self.renderer.flat)
+                    };
+                }
+            }
             Draw::Line {
                 from,
                 to,

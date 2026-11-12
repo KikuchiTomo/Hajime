@@ -385,9 +385,15 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     let theme = painter.theme;
     let layout = &card.layout;
     let at = |frame: Frame| frame.offset(rect.x, rect.y);
-    // アクセントの色(青)は選んでいる候補とつなぐ線だけに使う．アイコンは控えめな色，札(品詞・番号・同音語)は
-    // パレットの説明の札と同じく文字の色を薄く敷いた地に文字の色の字(控えめな色の字では地との差が足りないテーマがある)
-    let (mark, tint, bar_color) = (theme.text_muted, theme.badge, theme.line);
+    // アクセントの色(青)は使わない．アイコン・番号・品詞は控えめな色で，番号は枠線だけの丸，品詞は枠線だけの札にする
+    // (地を塗らないので，控えめな色の字でも地との差が保てる)．同音語の札は，パレットの説明の札と同じく
+    // 文字の色を薄く敷いた地に文字の色の字．札の形は 1 種類(角の丸み part.tag-radius)
+    let (mark, bar_color) = (theme.text_muted, theme.line);
+    let tag_radius = if theme.is_rounded() {
+        tokens::size::part::TAG_RADIUS
+    } else {
+        0.0
+    };
 
     // 見出し
     painter.icon(Icon::Book, icon_frame(at(layout.book_icon)), mark);
@@ -403,19 +409,15 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         // 品詞の札
         let frame = at(chip.frame);
         painter.draws.push(Draw::RoundRect {
-            frame,
-            radius: if theme.is_rounded() {
-                frame.height / 2.0
-            } else {
-                0.0
-            },
-            fill: Some(tint),
-            stroke: None,
+            frame: frame.inset(0.5, 0.5),
+            radius: tag_radius,
+            fill: None,
+            stroke: Some((theme.line, tokens::size::part::STROKE)),
         });
         painter.text(
             &chip.text,
             Font::MeaningTag,
-            theme.text,
+            mark,
             rect.x + chip.text_place.line.x,
             at(chip.text_place.line),
         );
@@ -424,20 +426,22 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     // 意味と例
     for (index, sense) in layout.senses.iter().enumerate() {
         if let (Some(badge), Some(number)) = (sense.badge, &sense.number) {
+            // 番号は枠線だけの丸(候補の番号の塗った丸と形を変え，番号キーで選ぶものと見分ける)
+            let badge = at(badge);
             painter.draws.push(Draw::RoundRect {
-                frame: at(badge),
+                frame: badge.inset(0.5, 0.5),
                 radius: if theme.is_rounded() {
-                    meaning::NUMBER_RADIUS
+                    badge.width / 2.0 - 0.5
                 } else {
                     0.0
                 },
-                fill: Some(tint),
-                stroke: None,
+                fill: None,
+                stroke: Some((theme.line, tokens::size::part::STROKE)),
             });
             painter.text(
                 &number.text,
                 number.font,
-                theme.text,
+                mark,
                 rect.x + number.place.line.x,
                 at(number.place.line),
             );
@@ -471,11 +475,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         let frame = at(tag.frame);
         painter.draws.push(Draw::RoundRect {
             frame,
-            radius: if theme.is_rounded() {
-                glass::TAG_RADIUS
-            } else {
-                0.0
-            },
+            radius: tag_radius,
             fill: Some(theme.badge),
             stroke: None,
         });

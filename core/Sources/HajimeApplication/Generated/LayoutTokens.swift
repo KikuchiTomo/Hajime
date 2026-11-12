@@ -174,25 +174,24 @@ public enum LayoutTokens {
     public enum Meaning {
         public static let cardGap: Double = 16
         public static let markerWidth: Double = 16
-        public static let markerGap: Double = 8
+        public static let markerGap: Double = 4
         public static let headerGap: Double = 8
         public static let senseGap: Double = 8
         public static let exampleGap: Double = 4
         public static let exampleIndent: Double = 12
         public static let exampleBarWidth: Double = 2
         public static let meaningPitch: Double = 20
-        public static let examplePitch: Double = 18
+        public static let examplePitch: Double = 16
         public static let othersGap: Double = 12
-        public static let partOfSpeechGap: Double = 8
+        public static let partOfSpeechGap: Double = 4
         public static let partOfSpeechHeight: Double = 16
-        public static let partOfSpeechPaddingX: Double = 8
+        public static let partOfSpeechPaddingX: Double = 4
         public static let tagGap: Double = 4
         public static let headwordFontSize: Double = 15
         public static let bodyFontSize: Double = 13
-        public static let exampleFontSize: Double = 12
-        public static let partOfSpeechFontSize: Double = 10.5
-        public static let numberFontSize: Double = 10.5
-        public static let numberRadius: Double = 4
+        public static let exampleFontSize: Double = 11
+        public static let partOfSpeechFontSize: Double = 10
+        public static let numberFontSize: Double = 10
         public static let iconSize: Double = 13
         public static let dotSize: Double = 6
         public static let listWidth: Double = 288
@@ -419,5 +418,13 @@ public enum LayoutTokens {
         public static let sliderThumb: Double = 20
         public static let sliderRail: Double = 4
         public static let buttonMinWidth: Double = 64
+    }
+    public enum Bubble {
+        public static let width: Double = 288
+        public static let padding: Double = 12
+        public static let radius: Double = 8
+        public static let pointerLength: Double = 8
+        public static let pointerWidth: Double = 16
+        public static let gap: Double = 4
     }
 }
