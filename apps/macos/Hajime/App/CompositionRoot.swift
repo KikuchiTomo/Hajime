@@ -67,11 +67,12 @@ final class CompositionRoot {
         let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent(AppIdentity.supportDirectoryName, isDirectory: true)
         let settings = FileSettingsStore(fileURL: support.appendingPathComponent("settings.json"))
-        let zenzai = loadZenzaiModel()
+        let resources = loadStartupResources()
+        let zenzai = resources.zenzai
         let memory = support.appendingPathComponent("memory", isDirectory: true)
         let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai,
-                                                fastZenzai: loadZenzaiModel(.xsmall),
-                                                dictionaryDirectory: loadBundledDictionary()?.url)
+                                                fastZenzai: resources.fastZenzai,
+                                                dictionaryDirectory: resources.dictionary?.url)
         // 打ち間違いの訂正は時間がかかるので，別の変換器でメインスレッドの外で求める(Zenzai があるときだけ)
         let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: AppIdentity.versionString) }
         engine.apply(settings.current)
@@ -99,28 +100,31 @@ final class CompositionRoot {
         installed = root
     }
 
-    /// アプリに入れたかな漢字変換の辞書を確かめて読む．無いか，ハッシュが合わなければ azooKey に同梱の辞書で動く
-    private static func loadBundledDictionary() -> BundledDictionary? {
-        guard let url = Bundle.main.resourceURL?.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true) else { return nil }
-        do {
-            return try BundledDictionary.verified(at: url)
-        } catch {
-            Logger(subsystem: AppIdentity.bundleIdentifier, category: "dictionary")
-                .notice("同梱の辞書を使いません: \(String(describing: error), privacy: .public)")
-            return nil
+    /// アプリに入れた Zenzai のモデルとかな漢字変換の辞書を，同時に確かめて読む．
+    /// 無いか，ハッシュが合わないものは使わずに動く(small が無ければ Zenzai なし，辞書が無ければ azooKey に同梱の辞書)
+    private static func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, dictionary: BundledDictionary?) {
+        let resources = Bundle.main.resourceURL.map { url in
+            StartupResources.verified(
+                zenzai: url.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.Variant.small.fileName),
+                fastZenzai: url.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
+                dictionary: url.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
         }
+        let zenzaiLog = Logger(subsystem: AppIdentity.bundleIdentifier, category: "zenzai")
+        let dictionaryLog = Logger(subsystem: AppIdentity.bundleIdentifier, category: "dictionary")
+        return (accepted(resources?.zenzai, log: zenzaiLog, name: "Zenzai(small)"),
+                accepted(resources?.fastZenzai, log: zenzaiLog, name: "Zenzai(xsmall)"),
+                accepted(resources?.dictionary, log: dictionaryLog, name: "同梱の辞書"))
     }
 
-    /// アプリに入れた Zenzai のモデルを確かめて読む．無いか，ハッシュが合わなければそのモデルなしで動く(small が無ければ Zenzai なし)
-    private static func loadZenzaiModel(_ variant: ZenzaiModel.Variant = .small) -> ZenzaiModel? {
-        guard let url = Bundle.main.resourceURL?
-            .appendingPathComponent("Zenzai", isDirectory: true)
-            .appendingPathComponent(variant.fileName) else { return nil }
-        do {
-            return try ZenzaiModel.verified(at: url, variant: variant)
-        } catch {
-            Logger(subsystem: AppIdentity.bundleIdentifier, category: "zenzai")
-                .notice("Zenzai(\(variant.rawValue, privacy: .public))を使いません: \(String(describing: error), privacy: .public)")
+    /// 確かめた結果を使うものにする．合わなければ理由を記録して使わない
+    private static func accepted<Value, Failure: Error>(_ result: Result<Value, Failure>?, log: Logger, name: String) -> Value? {
+        switch result {
+        case .success(let value):
+            return value
+        case .failure(let error):
+            log.notice("\(name, privacy: .public)を使いません: \(String(describing: error), privacy: .public)")
+            return nil
+        case nil:
             return nil
         }
     }

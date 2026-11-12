@@ -20,6 +20,8 @@ import HajimeEngine
 //   hajime-playground --plausibility <読み,読み,…>               読みの変換のもっともらしさと時間
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 //   hajime-playground --english-terms <ファイル>                  英語の語の辞書(R-24)の語ごとの読み・語の並び・もっともらしさ・候補の先頭
+//   hajime-playground --startup <同梱の辞書> [--zenzai <モデル>] [--zenzai-fast <xsmall のモデル>]
+//                                                                起動(モデルと辞書の確認・エンジン・warmUp)から最初の変換までの時間
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
@@ -27,6 +29,15 @@ import HajimeEngine
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
+    if let dictionary = arguments.value(of: "--startup") {
+        do {
+            try StartupProbe.run(zenzaiPath: arguments.value(of: "--zenzai"), fastZenzaiPath: arguments.value(of: "--zenzai-fast"), dictionaryPath: dictionary)
+        } catch {
+            print("起動できませんでした: \(error)")
+            exit(1)
+        }
+        return
+    }
     do {
         let playground = try PlaygroundEngine(zenzaiPath: arguments.value(of: "--zenzai"),
                                               zenzaiVariant: arguments.value(of: "--zenzai-variant").flatMap(ZenzaiModel.Variant.init(rawValue:)) ?? .small,

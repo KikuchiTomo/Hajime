@@ -49,18 +49,35 @@ public struct BundledDictionary: Sendable, Equatable {
         guard let text = String(data: data, encoding: .utf8) else { throw .malformedManifest }
         let entries = try parse(text)
         guard entries.contains(where: { $0.path == requiredFile }) else { throw .malformedManifest }
-        for entry in entries {
-            let url = entry.path.split(separator: "/").reduce(directory) { $0.appendingPathComponent(String($1)) }
-            guard let (file, _) = FileDigest.openRegularFile(at: url) else { throw .fileNotFound }
-            let digest: String
-            do {
-                digest = try FileDigest.sha256(of: file, maximumBytes: DefaultSettings.maximumBundledDictionaryFileBytes)
-            } catch {
-                throw .fileTooLarge
-            }
-            guard digest == entry.sha256 else { throw .hashMismatch }
-        }
+        // ファイルは数千あり，起動のたびにすべて確かめるので，コアの数だけ並べて確かめる．
+        // どれか 1 つでも合わなければ使わない．理由は一覧の順で最初に見つかったものにする(並べ方で変わらないように)
+        let failures = ConcurrentWork.map(entries.map(Entry.init)) { entry in check(entry, in: directory) }
+        if let failure = failures.lazy.compactMap({ $0 }).first { throw failure }
         return BundledDictionary(url: directory)
+    }
+
+    /// 一覧の 1 行(並べた仕事に渡すため Sendable にする)
+    private struct Entry: Sendable {
+        let sha256: String
+        let path: String
+
+        init(_ entry: (sha256: String, path: String)) {
+            sha256 = entry.sha256
+            path = entry.path
+        }
+    }
+
+    /// 一覧の 1 つのファイルを，ふつうのファイルとして 1 度だけ開いて読み，大きさの上限を守ってハッシュを比べる．合わなければ理由を返す
+    private static func check(_ entry: Entry, in directory: URL) -> VerificationError? {
+        let url = entry.path.split(separator: "/").reduce(directory) { $0.appendingPathComponent(String($1)) }
+        guard let (file, _) = FileDigest.openRegularFile(at: url) else { return .fileNotFound }
+        let digest: String
+        do {
+            digest = try FileDigest.sha256(of: file, maximumBytes: DefaultSettings.maximumBundledDictionaryFileBytes)
+        } catch {
+            return .fileTooLarge
+        }
+        return digest == entry.sha256 ? nil : .hashMismatch
     }
 
     /// 一覧の 1 行は「SHA-256(小文字の 16 進 64 桁)<空白 2 つ>ディレクトリからの相対パス(区切りは /)」
