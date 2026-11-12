@@ -98,6 +98,23 @@ public final class SettingsFiles: SettingsFileHandling {
         associations?.remove(dictionary)
     }
 
+    // MARK: 取り込む前に見せる
+
+    /// 取り込む前に，ファイルの中身の読み方を返す(何も登録しない)．大きさの上限は取り込むときと同じ
+    public func previewImport(_ kind: ImportPreview.Kind, from path: String) async throws(SettingsFileFailure) -> ImportPreview {
+        let source = try Self.url(path)
+        let limit = switch kind {
+        case .userDictionary: DefaultSettings.maximumUserDictionaryFileBytes
+        case .dictionary: DefaultSettings.maximumImportedDictionaryBytes
+        case .association: DefaultSettings.maximumAssociationFileBytes
+        }
+        let preview = try await Self.read {
+            try ImportPreviewReader.preview(kind, data: try ProtectedFile.read(from: source, maximumBytes: limit))
+        }
+        guard preview.importable + preview.unreadable > 0 else { throw .empty }
+        return preview
+    }
+
     // MARK: ユーザー辞書
 
     public func importUserDictionary(from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int) {

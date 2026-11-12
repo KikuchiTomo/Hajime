@@ -3,6 +3,7 @@
 mod actions;
 mod editor;
 mod ffi;
+mod import_sheet;
 mod page;
 mod paint;
 mod sheet;

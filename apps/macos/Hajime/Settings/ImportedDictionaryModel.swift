@@ -4,31 +4,31 @@ import HajimeDomain
 
 /// 取り込んだ辞書の取り込み・取り込み直し・削除・並べ替え(R-16)
 extension SettingsModel {
-    /// 辞書のファイルを選んで取り込む．existing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
+    /// 辞書のファイルを選び，取り込む前に中身を見せる．existing を渡すと，その辞書を取り込み直す(名前と条件はそのまま)
     func importDictionaryFile(replacing existing: ImportedDictionary? = nil) {
-        guard let files else { return }
         guard existing != nil || settings.importedDictionaries.count < DefaultSettings.maximumImportedDictionaries else {
             message = UIStrings.Dictionaries.tooMany
             return
         }
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        FilePanel.chooseOne(panel) { [self] source in
-            isImportingDictionary = true
-            // 大きな辞書は読むのに数秒かかる．読むのはメインスレッドの外(SettingsFiles)なので，画面は止まらない
-            Task {
-                defer { isImportingDictionary = false }
-                do throws(SettingsFileFailure) {
-                    let imported = try await files.importDictionary(from: source.path, replacing: existing?.id)
-                    message = UIStrings.Dictionaries.imported(imported.wordCount)
-                } catch {
-                    logger.error("辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
-                    switch error {
-                    case .tooMany: message = UIStrings.Dictionaries.tooMany
-                    case .writeFailed: message = UIStrings.Settings.saveFailed
-                    default: message = UIStrings.Dictionaries.importFailed
-                    }
+        chooseImport(.dictionary, replacing: existing?.id)
+    }
+
+    /// 中身を見せた辞書のファイルを取り込む．replacing を渡すと，その辞書を取り込み直す
+    func importDictionary(path: String, replacing id: String?) {
+        guard let files else { return }
+        isImportingDictionary = true
+        // 大きな辞書は読むのに数秒かかる．読むのはメインスレッドの外(SettingsFiles)なので，画面は止まらない
+        Task {
+            defer { isImportingDictionary = false }
+            do throws(SettingsFileFailure) {
+                let imported = try await files.importDictionary(from: path, replacing: id)
+                message = UIStrings.Dictionaries.imported(imported.wordCount)
+            } catch {
+                logger.error("辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
+                switch error {
+                case .tooMany: message = UIStrings.Dictionaries.tooMany
+                case .writeFailed: message = UIStrings.Settings.saveFailed
+                default: message = UIStrings.Dictionaries.importFailed
                 }
             }
         }

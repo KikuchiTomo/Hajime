@@ -120,6 +120,8 @@ final class SettingsModel: ObservableObject {
     let files: (any SettingsFileHandling)?
     /// 辞書を取り込んでいるあいだ true(取り込みは数秒かかることがある)
     @Published var isImportingDictionary = false
+    /// 取り込む前に中身を見せているファイル．「取り込む」を押すまで何も登録しない(SettingsView のシート)
+    @Published var pendingImport: PendingImport?
     /// 連想の辞書の索引(R-18)．無ければ連想の辞書を取り込めない
     let associations: AssociationDictionaryStore?
     /// 「ファイルを開く」コマンドのファイルのブックマーク(R-22)．無ければファイルのコマンドを足せない
@@ -268,15 +270,15 @@ final class SettingsModel: ObservableObject {
         update { UserDictionaryEditing.remove(entries, from: &$0.userDictionary) }
     }
 
-    /// 「読み<タブ>語<タブ>品詞」の行が並んだテキストのファイルから取り込む
+    /// 「読み<タブ>語<タブ>品詞」の行が並んだテキストのファイルを選び，取り込む前に中身を見せる
     func importDictionary() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]
-        panel.allowsMultipleSelection = false
-        FilePanel.chooseOne(panel) { [self] url in
-            runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
-                UIStrings.Settings.imported(try await files.importUserDictionary(from: url.path).added)
-            }
+        chooseImport(.userDictionary)
+    }
+
+    /// 中身を見せたファイルを登録した単語に取り込む
+    func importUserDictionary(path: String) {
+        runFileTask(failure: UIStrings.Settings.importFailed, importsIntoSettings: true) { files throws(SettingsFileFailure) in
+            UIStrings.Settings.imported(try await files.importUserDictionary(from: path).added)
         }
     }
 

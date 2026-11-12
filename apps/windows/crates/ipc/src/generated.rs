@@ -507,6 +507,82 @@ impl fmt::Debug for SyncStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportKind {
+    UserDictionary,
+    Dictionary,
+    Association,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportFormat {
+    TabSeparated,
+    CommaSeparated,
+    Skk,
+    PropertyList,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportColumn {
+    Reading,
+    Word,
+    WordClass,
+    Comment,
+    Meaning,
+    Words,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportRowStatus {
+    Ok,
+    DefaultedWordClass,
+    Unreadable,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImportPreviewRow {
+    pub line: u32,
+    pub cells: Vec<String>,
+    pub status: ImportRowStatus,
+}
+
+impl fmt::Debug for ImportPreviewRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ImportPreviewRow")
+            .field("line", &self.line)
+            .field("cells", &REDACTED)
+            .field("status", &self.status)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImportPreview {
+    pub format: ImportFormat,
+    pub columns: Vec<ImportColumn>,
+    pub rows: Vec<ImportPreviewRow>,
+    pub importable: u32,
+    pub defaulted: u32,
+    pub unreadable: u32,
+}
+
+impl fmt::Debug for ImportPreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ImportPreview")
+            .field("format", &self.format)
+            .field("columns", &self.columns)
+            .field("rows", &self.rows)
+            .field("importable", &self.importable)
+            .field("defaulted", &self.defaulted)
+            .field("unreadable", &self.unreadable)
+            .finish()
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImportedDictionaryInfo {
     pub id: String,
@@ -873,6 +949,10 @@ pub enum RequestBody {
         kind: SymbolKind,
         inputs: Vec<String>,
     },
+    PreviewImport {
+        kind: ImportKind,
+        path: String,
+    },
     ImportUserDictionary {
         path: String,
     },
@@ -1092,6 +1172,11 @@ impl fmt::Debug for RequestBody {
                 .field("kind", kind)
                 .field("inputs", &REDACTED)
                 .finish(),
+            Self::PreviewImport { kind, .. } => f
+                .debug_struct("PreviewImport")
+                .field("kind", kind)
+                .field("path", &REDACTED)
+                .finish(),
             Self::ImportUserDictionary { .. } => f
                 .debug_struct("ImportUserDictionary")
                 .field("path", &REDACTED)
@@ -1220,6 +1305,9 @@ pub enum ResponseBody {
     AssociationImported {
         dictionary: AssociationDictionaryInfo,
     },
+    ImportPreview {
+        preview: ImportPreview,
+    },
     Imported {
         added: u32,
         skipped: u32,
@@ -1309,6 +1397,10 @@ impl fmt::Debug for ResponseBody {
             Self::AssociationImported { dictionary, .. } => f
                 .debug_struct("AssociationImported")
                 .field("dictionary", dictionary)
+                .finish(),
+            Self::ImportPreview { preview, .. } => f
+                .debug_struct("ImportPreview")
+                .field("preview", preview)
                 .finish(),
             Self::Imported { added, skipped, .. } => f
                 .debug_struct("Imported")

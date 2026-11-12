@@ -8,6 +8,7 @@ use super::actions::After;
 use super::ffi::d2d::{self, Graphics, PreviewPixels, Surface};
 use super::ffi::uia;
 use super::ffi::{self, edit, Window};
+use super::import_sheet::{self, ImportLayout, ImportPart, ImportSheet, PendingImport};
 use super::page::{
     self, Availability, Described, EditorAction, Element, Event, Extras, Frame, PageView, Part,
 };
@@ -84,15 +85,18 @@ enum Shot {
     Typing,
     /// 「入力時の値にする」がオフ(ボタンもチップも出さない)
     DynamicOff,
+    /// 辞書のファイルを取り込む前に中身を見せるシート(名詞にする行と読めない行を含む見本のファイル)
+    ImportPreview,
 }
 
 impl Shot {
     /// ふつうの 1 枚のほかに写すページと状態
-    const TEMPLATES: [(Page, Shot); 4] = [
+    const TEMPLATES: [(Page, Shot); 5] = [
         (Page::Dictionary, Shot::Open),
         (Page::Dictionary, Shot::Typing),
         (Page::Dictionary, Shot::DynamicOff),
         (Page::Commands, Shot::Open),
+        (Page::Dictionary, Shot::ImportPreview),
     ];
 
     fn suffix(self) -> &'static str {
@@ -101,7 +105,68 @@ impl Shot {
             Shot::Open => "-templates-open",
             Shot::Typing => "-templates-typing",
             Shot::DynamicOff => "-templates-off",
+            Shot::ImportPreview => "-import-preview",
         }
+    }
+}
+
+/// 取り込む前のシートの見本(macOS の SnapshotRenderer の settings-import-preview-words と同じ中身)
+fn import_sample() -> PendingImport {
+    use ipc::{ImportColumn, ImportFormat, ImportPreview, ImportPreviewRow, ImportRowStatus};
+    let row = |line: u32, cells: &[&str], status: ImportRowStatus| ImportPreviewRow {
+        line,
+        cells: cells.iter().map(|cell| (*cell).to_string()).collect(),
+        status,
+    };
+    PendingImport {
+        path: "C:\\ユーザー辞書.txt".into(),
+        preview: ImportPreview {
+            format: ImportFormat::TabSeparated,
+            columns: vec![
+                ImportColumn::Reading,
+                ImportColumn::Word,
+                ImportColumn::WordClass,
+                ImportColumn::Comment,
+            ],
+            rows: vec![
+                row(
+                    2,
+                    &["はじめ", "Hajime IME", "properNoun", ""],
+                    ImportRowStatus::Ok,
+                ),
+                row(3, &["しぶや", "渋谷", "place", ""], ImportRowStatus::Ok),
+                row(
+                    4,
+                    &["かぶしきがいしゃ", "株式会社", "noun", ""],
+                    ImportRowStatus::DefaultedWordClass,
+                ),
+                row(
+                    5,
+                    &["めーる", "hajime@example.com", "abbreviation", ""],
+                    ImportRowStatus::Ok,
+                ),
+                row(
+                    6,
+                    &["はしる", "走る", "noun", ""],
+                    ImportRowStatus::DefaultedWordClass,
+                ),
+                row(7, &["ひとつだけ"], ImportRowStatus::Unreadable),
+                row(
+                    8,
+                    &["とうきょう", "東京", "place", "首都"],
+                    ImportRowStatus::Ok,
+                ),
+                row(
+                    9,
+                    &["漢字", "読みがひらがなでない"],
+                    ImportRowStatus::Unreadable,
+                ),
+            ],
+            importable: 6,
+            defaulted: 2,
+            unreadable: 2,
+        },
+        action: import_sheet::ImportAction::UserDictionary,
     }
 }
 
@@ -250,6 +315,10 @@ pub struct App {
     pub(super) update: super::update::Updater,
     /// 辞書を取り込んだ結果の受け箱(取り込みは別のスレッドで待ち，終えたら WM_DICTIONARY_IMPORTED を送る)
     pub(super) dictionary_import: super::actions::ImportInbox,
+    /// 取り込む前に読んだ結果の受け箱(読み終えたら WM_IMPORT_PREVIEWED を送る)
+    pub(super) import_preview: super::actions::PreviewInbox,
+    /// 取り込む前に中身を見せているシート
+    pub(super) import_sheet: Option<ImportSheet>,
     /// 見本のエンジンで開いた(--offline)
     pub(super) offline: bool,
     /// 書き方のチップを開いている一覧(ページごとに覚える．見本のエンジンで開いたときは覚えない)
@@ -367,6 +436,8 @@ pub fn open(
         }),
         update: super::update::Updater::default(),
         dictionary_import: super::actions::ImportInbox::default(),
+        import_preview: super::actions::PreviewInbox::default(),
+        import_sheet: None,
         offline: options.offline,
         templates_open: if options.offline {
             std::collections::HashSet::new()
@@ -918,7 +989,7 @@ impl App {
         let (right, bottom) = self.client_px(x + width, y + line);
         ffi::place(self.search, left, top, right - left, bottom - top);
         // シートを出しているあいだは窓の中身の打つ欄を隠す(欄は窓なので暗くした背景の上に出てしまう)
-        ffi::show(self.search, self.sheet.is_none());
+        ffi::show(self.search, !self.modal_open());
     }
 
     /// ページの打つ欄を今の送りの位置に置く
@@ -938,7 +1009,7 @@ impl App {
             (nav_width(width), self.title_bar() + frame.shift),
             (frame.top - frame.shift, bottom),
             self.scroll.offset(now),
-            entering || self.sheet.is_some(),
+            entering || self.modal_open(),
         );
         self.place_sheet_fields();
     }
@@ -1025,6 +1096,8 @@ impl App {
         });
         let sheet = self.sheet.as_ref();
         let sheet_layout = self.sheet_layout();
+        let import = self.import_sheet.as_ref();
+        let import_layout = self.import_sheet_layout();
         let sheet_frame = sheet::SheetFrame {
             theme: &theme,
             size: (width, height),
@@ -1055,6 +1128,9 @@ impl App {
                 paint_window(canvas, &state, nav, nav_scroll, view, scroll);
                 if let (Some(sheet), Some(layout)) = (sheet, &sheet_layout) {
                     sheet::paint(canvas, sheet, layout, &sheet_frame);
+                }
+                if let (Some(sheet), Some(layout)) = (import, &import_layout) {
+                    import_sheet::paint(canvas, sheet, layout, &sheet_frame, now);
                 }
                 if let Some((text, x, y, _)) = tooltip {
                     paint_tooltip(canvas, &theme, text, (*x, *y), (width, height));
@@ -1423,6 +1499,10 @@ impl App {
 
     fn mouse_move(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
+        if self.import_sheet.is_some() {
+            self.import_mouse_move(x, y);
+            return;
+        }
         if self.sheet.is_some() {
             self.sheet_mouse_move(x, y);
             return;
@@ -1597,6 +1677,10 @@ impl App {
     /// ポインターを押した．double は 2 回続けて押したとき(表の行を書き換える)
     fn mouse_down(&mut self, lparam: LPARAM, double: bool) {
         let (x, y) = self.point(lparam);
+        if self.import_sheet.is_some() {
+            self.import_mouse_down(x, y);
+            return;
+        }
         if self.sheet.is_some() {
             self.sheet_mouse_down(x, y);
             return;
@@ -1705,6 +1789,10 @@ impl App {
 
     fn mouse_up(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
+        if self.import_sheet.is_some() {
+            self.import_mouse_up(x, y);
+            return;
+        }
         if self.sheet.is_some() {
             self.sheet_mouse_up(x, y);
             return;
@@ -1773,6 +1861,12 @@ impl App {
         if let Some(flyout) = &mut self.flyout {
             flyout.scroll.scroll_by(amount, now);
             ffi::invalidate(flyout.window);
+            return;
+        }
+        if let Some(sheet) = self.import_sheet.as_mut() {
+            // シートの表を送る(表の外でも送る．シートの後ろのページは送らない)
+            sheet.scroll.scroll_by(amount, now);
+            ffi::invalidate(self.window);
             return;
         }
         if self.sheet.is_some() {
@@ -1869,6 +1963,9 @@ impl App {
         let (control, shift) = ffi::modifiers();
         if self.flyout.is_some() {
             return self.flyout_key(key);
+        }
+        if self.import_sheet.is_some() {
+            return self.import_key(key, shift);
         }
         if self.sheet.is_some() {
             return self.sheet_key(key, shift);
@@ -2139,6 +2236,9 @@ impl App {
     }
 
     fn nodes(&self) -> Vec<uia::Node> {
+        if let Some(nodes) = self.import_nodes() {
+            return nodes;
+        }
         if let Some(nodes) = self.sheet_nodes() {
             return nodes;
         }
@@ -2271,6 +2371,25 @@ impl App {
     }
 
     fn accessibility_act(&mut self, id: i32, act: uia::Act) {
+        if self.import_sheet.is_some() {
+            if let Some(part) = self.import_sheet_layout().and_then(|layout| {
+                layout
+                    .order()
+                    .into_iter()
+                    .find(|part| import_node(*part) == id)
+            }) {
+                match act {
+                    uia::Act::Focus => {
+                        if let Some(sheet) = self.import_sheet.as_mut() {
+                            sheet.focus = part;
+                        }
+                    }
+                    _ => self.import_press(part),
+                }
+                ffi::invalidate(self.window);
+            }
+            return;
+        }
         if self.sheet.is_some() {
             self.sheet_act(id, act);
             return;
@@ -2763,11 +2882,12 @@ impl App {
             return;
         };
         // 書き方のチップ: 開いているか(閉じた状態はふつうの 1 枚)と，「入力時の値にする」のオン・オフ
-        self.templates_open = if matches!(shot, Shot::Plain | Shot::DynamicOff) {
-            std::collections::HashSet::new()
-        } else {
-            [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
-        };
+        self.templates_open =
+            if matches!(shot, Shot::Plain | Shot::DynamicOff | Shot::ImportPreview) {
+                std::collections::HashSet::new()
+            } else {
+                [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
+            };
         if page == Page::Dictionary {
             if let Some(model) = &mut self.model {
                 let _ = model.set(
@@ -2791,10 +2911,20 @@ impl App {
                 self.field_changed(field);
             }
         }
+        // 取り込む前のシート: 見本のエンジンはファイルを読めないので，macOS の見本と同じ中身を渡す
+        self.import_sheet = None;
+        if shot == Shot::ImportPreview {
+            self.open_import_sheet(import_sample());
+        }
         self.scroll.jump_to(0.0);
         let (width, height) = self.size();
         let content = self.view.arrange(width - nav_width(width), &self.graphics);
-        let total = content.max(height);
+        // シートは窓の真ん中に出すので，窓の大きさで写す
+        let total = if self.import_sheet.is_some() {
+            height
+        } else {
+            content.max(height)
+        };
         let now = self.now() + SNAPSHOT_SETTLE;
         let name = format!(
             "settings-{}{}-{}.png",
@@ -2842,9 +2972,21 @@ impl App {
                     &self.nav_scroll,
                     &self.view,
                     &self.scroll,
-                )
+                );
+                if let (Some(sheet), Some(layout)) =
+                    (self.import_sheet.as_ref(), self.import_sheet_layout())
+                {
+                    let frame = sheet::SheetFrame {
+                        theme: &self.theme,
+                        size: (width, total),
+                        focused_edit: None,
+                        hover: 0.0,
+                    };
+                    import_sheet::paint(canvas, sheet, &layout, &frame, now);
+                }
             },
         );
+        self.import_sheet = None;
         if let Err(error) = written {
             eprintln!("{name} を書き出せませんでした: {error}");
         }
@@ -2930,6 +3072,206 @@ impl App {
         self.place_search();
         self.place_fields();
         self.sheet_focus(SheetPart::Reading);
+        ffi::invalidate(self.window);
+    }
+
+    /// シート(コマンドか，取り込む前の中身)を出しているか．出しているあいだは窓の中身の打つ欄を隠す
+    fn modal_open(&self) -> bool {
+        self.sheet.is_some() || self.import_sheet.is_some()
+    }
+
+    // MARK: - 取り込む前に中身を見せるシート
+
+    /// 取り込む前に中身を見せるシートを出す
+    pub(super) fn open_import_sheet(&mut self, pending: PendingImport) {
+        self.close_flyout();
+        self.hover = None;
+        self.tooltip = None;
+        self.view.set_hover(None, self.now());
+        self.view.set_table_hover(None);
+        let mut sheet = ImportSheet::new(pending);
+        let viewport = self
+            .import_layout_for(&sheet)
+            .map_or(0.0, |layout| layout.body.height);
+        sheet
+            .scroll
+            .set_extent(ImportLayout::content_height(&sheet), viewport);
+        self.import_sheet = Some(sheet);
+        self.place_search();
+        self.place_fields();
+        ffi::focus(self.window);
+        ffi::invalidate(self.window);
+    }
+
+    /// 取り込む前の中身のシートを閉じる(何も登録しない)．閉じたシートを返す
+    pub(super) fn close_import_sheet(&mut self) -> Option<ImportSheet> {
+        let sheet = self.import_sheet.take()?;
+        self.place_search();
+        self.place_fields();
+        ffi::invalidate(self.window);
+        Some(sheet)
+    }
+
+    fn import_layout_for(&self, sheet: &ImportSheet) -> Option<ImportLayout> {
+        Some(ImportLayout::new(self.size(), sheet, &self.graphics))
+    }
+
+    fn import_sheet_layout(&self) -> Option<ImportLayout> {
+        self.import_layout_for(self.import_sheet.as_ref()?)
+    }
+
+    /// シートの部品を押した(クリック・Space・Enter)
+    fn import_press(&mut self, part: ImportPart) {
+        let Some(sheet) = self.import_sheet.as_mut() else {
+            return;
+        };
+        if !sheet.enabled(part) {
+            return;
+        }
+        match part {
+            ImportPart::Filter(index) => {
+                sheet.set_filter(index);
+                let viewport = self
+                    .import_sheet_layout()
+                    .map_or(0.0, |layout| layout.body.height);
+                if let Some(sheet) = self.import_sheet.as_mut() {
+                    sheet
+                        .scroll
+                        .set_extent(ImportLayout::content_height(sheet), viewport);
+                }
+            }
+            ImportPart::Table => {}
+            ImportPart::Cancel => {
+                self.close_import_sheet();
+            }
+            ImportPart::Import => {
+                let after = self.commit_import();
+                if after.is_some() {
+                    AFTER.with(|slot| *slot.borrow_mut() = after);
+                    ffi::post(self.window, WM_AFTER, 0, 0);
+                }
+            }
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// シートでキーを押した．Tab で部品を巡り，Esc で閉じ，Enter で取り込む．表は矢印で送る
+    fn import_key(&mut self, key: u16, shift: bool) -> bool {
+        let now = self.now();
+        let Some(layout) = self.import_sheet_layout() else {
+            return false;
+        };
+        let Some(sheet) = self.import_sheet.as_mut() else {
+            return false;
+        };
+        sheet.focus_visible = true;
+        let focus = sheet.focus;
+        let order = layout.order();
+        let row = size::TABLE_ROW_HEIGHT;
+        match key {
+            k if k == VK_TAB.0 => {
+                let index = order.iter().position(|part| *part == focus).unwrap_or(0);
+                let next = if shift {
+                    (index + order.len() - 1) % order.len()
+                } else {
+                    (index + 1) % order.len()
+                };
+                sheet.focus = order[next];
+            }
+            k if k == VK_ESCAPE.0 => {
+                self.close_import_sheet();
+            }
+            k if focus == ImportPart::Table && (k == VK_UP.0 || k == VK_DOWN.0) => {
+                sheet
+                    .scroll
+                    .scroll_by(if k == VK_UP.0 { -row } else { row }, now);
+            }
+            k if focus == ImportPart::Table && (k == VK_PRIOR.0 || k == VK_NEXT.0) => {
+                let page = layout.body.height - row;
+                sheet
+                    .scroll
+                    .scroll_by(if k == VK_PRIOR.0 { -page } else { page }, now);
+            }
+            k if focus == ImportPart::Table && (k == VK_HOME.0 || k == VK_END.0) => {
+                let target = if k == VK_HOME.0 {
+                    0.0
+                } else {
+                    sheet.scroll.max()
+                };
+                sheet.scroll.scroll_to(target, now);
+            }
+            k if matches!(focus, ImportPart::Filter(_)) && (k == VK_LEFT.0 || k == VK_RIGHT.0) => {
+                let ImportPart::Filter(index) = focus else {
+                    return true;
+                };
+                let count = sheet.filters().len();
+                let next = if k == VK_LEFT.0 {
+                    index.saturating_sub(1)
+                } else {
+                    (index + 1).min(count.saturating_sub(1))
+                };
+                sheet.focus = ImportPart::Filter(next);
+                self.import_press(ImportPart::Filter(next));
+            }
+            // Enter はキャンセルにフォーカスがあればキャンセル，ほかは取り込む(ContentDialog の既定のボタン)
+            k if k == VK_RETURN.0 => {
+                let part = if focus == ImportPart::Cancel {
+                    ImportPart::Cancel
+                } else {
+                    ImportPart::Import
+                };
+                self.import_press(part);
+            }
+            k if k == VK_SPACE.0 => self.import_press(focus),
+            _ => return false,
+        }
+        ffi::invalidate(self.window);
+        true
+    }
+
+    fn import_mouse_move(&mut self, x: f32, y: f32) {
+        let hover = self
+            .import_sheet_layout()
+            .and_then(|layout| layout.hit(x, y));
+        if let Some(sheet) = self.import_sheet.as_mut() {
+            if sheet.hover != hover {
+                sheet.hover = hover;
+                ffi::track_leave(self.window);
+                ffi::invalidate(self.window);
+            }
+        }
+    }
+
+    fn import_mouse_down(&mut self, x: f32, y: f32) {
+        let hit = self
+            .import_sheet_layout()
+            .and_then(|layout| layout.hit(x, y));
+        let Some(part) = hit else {
+            return;
+        };
+        if let Some(sheet) = self.import_sheet.as_mut() {
+            sheet.focus_visible = false;
+            sheet.pressed = Some(part);
+            sheet.focus = part;
+        }
+        ffi::capture(self.window);
+        ffi::invalidate(self.window);
+    }
+
+    fn import_mouse_up(&mut self, x: f32, y: f32) {
+        ffi::release_capture();
+        let hit = self
+            .import_sheet_layout()
+            .and_then(|layout| layout.hit(x, y));
+        let pressed = self
+            .import_sheet
+            .as_mut()
+            .and_then(|sheet| sheet.pressed.take());
+        if let (Some(pressed), Some(hit)) = (pressed, hit) {
+            if pressed == hit {
+                self.import_press(pressed);
+            }
+        }
         ffi::invalidate(self.window);
     }
 
@@ -3181,6 +3523,45 @@ impl App {
     }
 
     /// シートを出しているときの読み上げの要素(シートの部品だけ)
+    /// 取り込む前のシートの部品(出しているあいだは，後ろのページの部品を読ませない)
+    fn import_nodes(&self) -> Option<Vec<uia::Node>> {
+        let sheet = self.import_sheet.as_ref()?;
+        let layout = self.import_sheet_layout()?;
+        let filters = sheet.filters();
+        Some(
+            layout
+                .parts
+                .iter()
+                .map(|(part, rect)| {
+                    let part = *part;
+                    let (role, selected) = match part {
+                        ImportPart::Filter(index) => (
+                            uia::Role::RadioButton,
+                            filters
+                                .get(index)
+                                .map(|(filter, _)| *filter == sheet.filter),
+                        ),
+                        ImportPart::Table => (uia::Role::List, None),
+                        ImportPart::Cancel | ImportPart::Import => (uia::Role::Button, None),
+                    };
+                    uia::Node {
+                        id: import_node(part),
+                        role,
+                        name: sheet.name(part),
+                        rect: self.screen_rect(*rect),
+                        enabled: sheet.enabled(part),
+                        focused: sheet.focus == part,
+                        toggled: None,
+                        expanded: None,
+                        value: None,
+                        selected,
+                        host: None,
+                    }
+                })
+                .collect(),
+        )
+    }
+
     fn sheet_nodes(&self) -> Option<Vec<uia::Node>> {
         let sheet = self.sheet.as_ref()?;
         let layout = self.sheet_layout()?;
@@ -3237,6 +3618,16 @@ impl App {
             uia::Act::Invoke | uia::Act::Toggle | uia::Act::Select => self.sheet_press(part),
         }
         ffi::invalidate(self.window);
+    }
+}
+
+/// 取り込む前のシートの部品の読み上げの番号
+fn import_node(part: ImportPart) -> i32 {
+    match part {
+        ImportPart::Filter(index) => NODE_IMPORT_FILTER + index as i32,
+        ImportPart::Table => NODE_IMPORT,
+        ImportPart::Cancel => NODE_IMPORT + 1,
+        ImportPart::Import => NODE_IMPORT + 2,
     }
 }
 
@@ -3685,6 +4076,9 @@ fn theme_sheet_index(action: EditorAction) -> i32 {
 const NODE_SEARCH: i32 = 900;
 /// シートの部品の読み上げの番号の始まり
 const NODE_SHEET: i32 = 800;
+/// 取り込む前に中身を見せるシートの部品の読み上げの番号(切り替えは NODE_IMPORT_FILTER から)
+const NODE_IMPORT: i32 = 850;
+const NODE_IMPORT_FILTER: i32 = 860;
 /// シートの動作の一覧を開いているときのドロップダウンの持ち主(ページの部品と重ならない番号)
 const SHEET_KIND: Element = Element {
     row: usize::MAX,
@@ -3770,6 +4164,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         super::update::WM_UPDATE => {
             super::update::receive(window);
+            Some(LRESULT(0))
+        }
+        super::actions::WM_IMPORT_PREVIEWED => {
+            let after = with_app(App::finish_preview).flatten();
+            super::actions::run_after(window, after);
             Some(LRESULT(0))
         }
         super::actions::WM_DICTIONARY_IMPORTED => {

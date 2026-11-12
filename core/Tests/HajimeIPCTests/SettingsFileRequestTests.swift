@@ -50,6 +50,10 @@ struct SettingsFileRequestTests {
             calls.append("importUserDictionary \(path)")
             return (4, 2)
         }
+        func previewImport(_ kind: ImportPreview.Kind, from path: String) async throws(SettingsFileFailure) -> ImportPreview {
+            calls.append("previewImport \(kind.rawValue) \(path)")
+            return ImportPreview(kind: kind, format: .tabSeparated, columns: [.reading, .word], rows: [], importable: 3, defaulted: 1, unreadable: 2)
+        }
         func exportUserDictionary(to path: String) async throws(SettingsFileFailure) { calls.append("exportUserDictionary \(path)") }
         func exportSettings(to path: String) async throws(SettingsFileFailure) { calls.append("exportSettings \(path)") }
         func importSettings(from path: String) async throws(SettingsFileFailure) { calls.append("importSettings \(path)") }

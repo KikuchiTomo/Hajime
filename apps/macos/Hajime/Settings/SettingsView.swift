@@ -27,6 +27,10 @@ struct SettingsView: View {
         .alert(model.message ?? "", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button(UIStrings.Settings.ok) { model.message = nil }
         }
+        // 辞書のファイルを取り込む前に中身を見せる(どのページから取り込んでも同じシート)
+        .sheet(item: $model.pendingImport) { pending in
+            ImportPreviewSheet(pending: pending, commit: { model.commitImport(pending) }, cancel: { model.pendingImport = nil })
+        }
     }
 
     @ViewBuilder
