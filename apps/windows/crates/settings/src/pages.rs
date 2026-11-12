@@ -897,6 +897,15 @@ impl Control {
                 ],
                 enabled: None,
             },
+            // 英語と日本語の判別ルール: 語(等幅)・前・結果．結果は行の中で選び直す(macOS の WordLanguagePage)
+            Control::List(spec, _) if spec.path == "wordLanguage.rules" => TableLayout {
+                columns: vec![
+                    column(0, Fill, Cell::Mono),
+                    column(1, Fixed(mac::RULE_KIND_COLUMN_WIDTH), Cell::Secondary),
+                    column(2, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Choice),
+                ],
+                enabled: None,
+            },
             Control::List(..) => TableLayout {
                 columns: rules(field_count),
                 enabled: None,

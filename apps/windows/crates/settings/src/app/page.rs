@@ -2071,7 +2071,7 @@ impl PageView {
             Part::Slider => 8,
             Part::Radio => 9,
             Part::Filter => 31,
-            Part::RowMenu => 51,
+            Part::RowMenu => 52,
             Part::KeySearch => 32,
             Part::Segment(index) => 90 + index,
             Part::Button(index) => 95 + index,
