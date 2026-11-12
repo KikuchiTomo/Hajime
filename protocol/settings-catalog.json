@@ -43,6 +43,7 @@
     "englishTermCandidates",
     "englishTerms",
     "escapeSwitchesToDirect",
+    "expandsGridOnPaging",
     "handShiftCorrection",
     "handwriting",
     "hiddenPredictions",

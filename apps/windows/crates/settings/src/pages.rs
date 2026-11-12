@@ -1090,6 +1090,7 @@ fn conversion() -> Vec<Section> {
                     RangeKind::CandidateGridColumns,
                 ),
                 Row::note(more::GRID_COLUMNS_NOTE),
+                Row::toggle(more::EXPANDS_GRID_ON_PAGING, "expandsGridOnPaging"),
                 Row::toggle(
                     more::CONTEXTUAL_SEGMENT_CANDIDATES,
                     "contextualSegmentCandidates",

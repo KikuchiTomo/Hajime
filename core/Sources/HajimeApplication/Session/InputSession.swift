@@ -2393,6 +2393,7 @@ public final class InputSession {
             }
         case .lattice(var lattice):
             let perPage = latticePerPage
+            let before = lattice.focused.choice
             switch move {
             case .next: lattice.moveSelection(by: 1)
             case .previous: lattice.moveSelection(by: -1, entersVariants: settings.current.showsVariantRow)
@@ -2402,8 +2403,12 @@ public final class InputSession {
             case .last: lattice.selectCandidate(at: lattice.focused.candidates.count - 1)
             }
             phase = .lattice(lattice)
+            if case .candidate(let from) = before, case .candidate(let to) = lattice.focused.choice {
+                expandGridIfPaged(from: from, to: to, perPage: perPage, move: move)
+            }
         case .selecting(var selection):
             let perPage = listPerPage
+            let before = selection.focus
             switch move {
             case .next:
                 // 種類の行からは候補の先頭に戻る
@@ -2426,6 +2431,9 @@ public final class InputSession {
             case .last: selection.focus = .candidate(max(selection.candidates.count - 1, 0))
             }
             phase = .selecting(selection)
+            if case .candidate(let from) = before, case .candidate(let to) = selection.focus {
+                expandGridIfPaged(from: from, to: to, perPage: perPage, move: move)
+            }
         case .association:
             // 連想の一覧の中の動きは performInAssociation が受け持つ
             break
@@ -2434,6 +2442,13 @@ public final class InputSession {
     }
 
     // MARK: - 候補の表
+
+    /// 候補を送るキーで最初のページの最後の候補から次のページへ進んだら，候補を表に広げる(設定 expandsGridOnPaging．
+    /// 目当ての候補が最初のページに無かったので，まとめて見せる)．ページ送りのキーや，表に広げているときは何もしない
+    private func expandGridIfPaged(from: Int, to: Int, perPage: Int, move: CandidateMove) {
+        guard settings.current.expandsGridOnPaging, !expandedCandidates, move == .next, from == perPage - 1, to == perPage else { return }
+        expandedCandidates = true
+    }
 
     /// 候補を表に広げる．広げていれば元に戻す．分岐図・文節ごとの一覧・一覧のどれでも，選んでいる候補はそのまま
     private func toggleGrid(context: InputContext) -> KeyResult {

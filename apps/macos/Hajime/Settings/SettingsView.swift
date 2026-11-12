@@ -208,6 +208,7 @@ private struct ConversionTab: View {
                     }
                 }
                 Text(UIStrings.More.gridColumnsNote).font(.caption).foregroundStyle(.secondary)
+                ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
                 ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
                 Text(UIStrings.More.contextualSegmentCandidatesNote).font(.caption).foregroundStyle(.secondary)
                 ResettableToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives)

@@ -140,6 +140,40 @@ struct CandidateGridScenarioTests {
         #expect(IndicatorLabels.listHints(for: listPanel).contains { $0.first == .expandCandidates })
     }
 
+    @Test("設定「候補を送り続けたら表に広げる」がオンなら，候補を送るキーで最初のページを越えたときに表に広げる．オフなら次のページを見せる")
+    func expandsOnPaging() {
+        var settings = DefaultSettings.settings
+        settings.expandsGridOnPaging = true
+        let harness = Harness(converter: Self.converter(), settings: settings)
+        harness.type("kan")
+        harness.press(.space)
+        for _ in 1..<settings.branchCandidatesPerPage { harness.press(.space) }
+        #expect(harness.panel == nil)
+        harness.press(.space)
+        #expect(harness.panel?.columnLength == DefaultSettings.candidatesPerPage)
+        #expect(harness.marked.text == "缶\(settings.branchCandidatesPerPage + 1)")
+        // ページ送りのキーでは広げない
+        let paged = Harness(converter: Self.converter(), settings: settings)
+        paged.type("kan")
+        paged.press(.space)
+        paged.press(.pageDown)
+        #expect(paged.panel == nil)
+        // 一覧でも同じ
+        var list = Settings.listPresentation
+        list.expandsGridOnPaging = true
+        let listed = Harness(converter: Self.converter(), settings: list)
+        listed.type("kan")
+        listed.press(.space)
+        for _ in 0..<list.listCandidatesPerPage { listed.press(.down) }
+        #expect(listed.panel?.columnLength == DefaultSettings.candidatesPerPage)
+        // オフ(既定)なら広げない
+        let off = Harness(converter: Self.converter())
+        off.type("kan")
+        off.press(.space)
+        for _ in 0..<DefaultSettings.settings.branchCandidatesPerPage { off.press(.space) }
+        #expect(off.panel == nil)
+    }
+
     @Test("読みに戻すと表を閉じ，次の変換はふつうの出し方で出す")
     func closesWhenLeavingConversion() {
         let harness = Self.expanded()

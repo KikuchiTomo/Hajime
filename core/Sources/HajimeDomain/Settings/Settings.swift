@@ -73,6 +73,8 @@ public struct Settings: Sendable, Equatable {
     public var branchCandidatesPerPage = DefaultSettings.latticeCandidatesPerSegment
     /// 候補を表に広げたとき(キー設定の表の「候補を表に広げる」)の列の数．1 列の行の数は一覧の候補の数
     public var candidateGridColumns = DefaultSettings.candidateGridColumns
+    /// 候補を送り続けて最初のページを越えたら，候補を表に広げる(Microsoft IME のテーブルビューと同じ)
+    public var expandsGridOnPaging = false
     /// ライブ変換で，打鍵が止まってから漢字にするまでの時間(秒)
     public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
     /// 読みがこの文字数以下のときはライブ変換しない(Space で変換する)．0 なら長さによらずライブ変換する
@@ -377,7 +379,7 @@ extension Settings: Codable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, questionExclamationCommits, keypadCalculation, cyclesLetterCase, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
-        case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
+        case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
@@ -447,6 +449,7 @@ extension Settings: Codable {
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
         read(.branchCandidatesPerPage, into: \.branchCandidatesPerPage)
         read(.candidateGridColumns, into: \.candidateGridColumns)
+        read(.expandsGridOnPaging, into: \.expandsGridOnPaging)
         read(.liveConversionDelay, into: \.liveConversionDelay)
         read(.liveConversionSkipLength, into: \.liveConversionSkipLength)
         read(.englishSkipLength, into: \.englishSkipLength)
@@ -584,6 +587,7 @@ extension Settings: Codable {
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
         try container.encode(branchCandidatesPerPage, forKey: .branchCandidatesPerPage)
         try container.encode(candidateGridColumns, forKey: .candidateGridColumns)
+        try container.encode(expandsGridOnPaging, forKey: .expandsGridOnPaging)
         try container.encode(liveConversionDelay, forKey: .liveConversionDelay)
         try container.encode(liveConversionSkipLength, forKey: .liveConversionSkipLength)
         try container.encode(englishSkipLength, forKey: .englishSkipLength)

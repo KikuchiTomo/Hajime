@@ -977,6 +977,7 @@ enum UIStrings {
         static let branchCandidates = "分岐図の候補数"
         static let listCandidates = "一覧の候補数"
         static let gridColumns = "表の列数"
+        static let expandsGridOnPaging = "候補を送り続けたら表に広げる"
         static let gridColumnsNote = "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。"
         static let contextualSegmentCandidates = "前後の文脈で候補を並べ替え"
         static let contextualSegmentCandidatesNote = "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。"
@@ -1128,7 +1129,7 @@ extension UIStrings {
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
             "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
-            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates, "candidateGridColumns": More.gridColumns,
+            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates, "candidateGridColumns": More.gridColumns, "expandsGridOnPaging": More.expandsGridOnPaging,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,

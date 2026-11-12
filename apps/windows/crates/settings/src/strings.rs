@@ -266,6 +266,7 @@ pub mod more {
     pub const BRANCH_CANDIDATES: &str = "分岐図の候補数";
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
     pub const GRID_COLUMNS: &str = "表の列数";
+    pub const EXPANDS_GRID_ON_PAGING: &str = "候補を送り続けたら表に広げる";
     pub const GRID_COLUMNS_NOTE: &str =
         "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
@@ -756,6 +757,7 @@ pub mod sync {
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
         ("candidateGridColumns", "表の列数"),
+        ("expandsGridOnPaging", "候補を送り続けたら表に広げる"),
         ("contextualSegmentCandidates", "前後の文脈で候補を並べ替え"),
         (
             "listSegmentAlternatives",
