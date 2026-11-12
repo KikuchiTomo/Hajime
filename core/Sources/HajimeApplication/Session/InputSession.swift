@@ -1656,7 +1656,7 @@ public final class InputSession {
         return builder
     }
 
-    /// 候補を文脈で並べ替えるもの．設定でオフなら nil
+    /// 別のモデルとの合議に使うもの．設定で「使わない」なら nil
     private var activeFusing: (any CandidateFusing)? {
         settings.current.jinenModel == .off ? nil : fusing
     }
@@ -1670,6 +1670,7 @@ public final class InputSession {
         fusing.prepareFusion(for: reading)
     }
 
+    /// 候補を文脈で並べ替えるもの．設定でオフなら nil
     private var rerankingScorer: (any CandidateScoring)? {
         settings.current.candidateReranking ? scorer : nil
     }

@@ -137,6 +137,31 @@ struct CandidateFusionTests {
         session.endComposition()
     }
 
+    @Test("使わない設定にしたら，読み込んだ jinen のモデルとコンテキストを解放する．戻せば読み直し，合議を始め直す", .enabled(if: hasModels))
+    func releasesJinenWhenTurnedOff() throws {
+        let engine = try makeEngine()
+        let session = engine.makeSession()
+        let reading = "しらぬい"
+        // 合議の途中(jinen で 1 トークン出したところ)で設定を替える
+        _ = session.advanceFusion(for: reading)
+        _ = session.advanceFusion(for: reading)
+        weak var loaded = engine.jinen
+        #expect(engine.loadedJinenVariant == .small)
+        var settings = DefaultSettings.settings
+        settings.jinenModel = .off
+        engine.apply(settings)
+        #expect(engine.loadedJinenVariant == nil)
+        #expect(loaded == nil)
+        #expect(session.advanceFusion(for: reading))
+        #expect(!session.hasFusion(for: reading))
+        settings.jinenModel = .small
+        engine.apply(settings)
+        session.prepareFusion(for: reading)
+        #expect(engine.loadedJinenVariant == .small)
+        #expect(session.hasFusion(for: reading))
+        session.endComposition()
+    }
+
     @Test("打鍵の合間に 1 歩ずつ進めても，一度に求めたのと同じ結果になる", .enabled(if: hasModels))
     func stepwiseMatchesAtOnce() throws {
         let engine = try makeEngine()
