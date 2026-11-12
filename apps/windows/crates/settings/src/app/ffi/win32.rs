@@ -5,9 +5,9 @@ use windows::Win32::Foundation::{
     COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SYSTEMTIME, WPARAM,
 };
 use windows::Win32::Graphics::Dwm::{
-    DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW, DWMSBT_NONE,
-    DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
-    DWMWCP_ROUND,
+    DwmExtendFrameIntoClientArea, DwmGetWindowAttribute, DwmSetWindowAttribute, DWMSBT_MAINWINDOW,
+    DWMSBT_NONE, DWMWA_EXTENDED_FRAME_BOUNDS, DWMWA_SYSTEMBACKDROP_TYPE,
+    DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
 };
 use windows::Win32::Graphics::Gdi::{
     ClientToScreen, CreateFontIndirectW, DeleteObject, GetMonitorInfoW, GetSysColor,
@@ -21,6 +21,7 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
     RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_DWORD, RRF_RT_REG_DWORD,
 };
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::System::Time::SystemTimeToTzSpecificLocalTime;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::Controls::MARGINS;
@@ -38,15 +39,16 @@ use windows::Win32::UI::Shell::{
     FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW, GetClientRect,
-    GetMessageW, GetWindowTextLengthW, GetWindowTextW, KillTimer, LoadCursorW, LoadIconW,
-    MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW, SetTimer,
-    SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, CS_DBLCLKS,
-    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDOK, IDYES, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MB_YESNO, MINMAXINFO, MSG,
-    SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
-    SW_HIDE, SW_SHOW, SW_SHOWNA, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW, WNDPROC,
+    CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW,
+    GetClientRect, GetMessageW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, KillTimer,
+    LoadCursorW, LoadIconW, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW,
+    SendMessageW, SetTimer, SetWindowPos, SetWindowTextW, SetWindowsHookExW, ShowWindow,
+    SystemParametersInfoW, TranslateMessage, UnhookWindowsHookEx, CS_DBLCLKS, CS_DROPSHADOW,
+    CS_HREDRAW, CS_VREDRAW, HCBT_ACTIVATE, HHOOK, HMENU, IDC_ARROW, IDOK, IDYES,
+    MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MB_YESNO, MINMAXINFO,
+    MSG, SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNA, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    WH_CBT, WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW, WNDPROC,
 };
 use windows_core::{w, BOOL, HSTRING, PCWSTR};
 
@@ -789,31 +791,111 @@ pub fn run_installer(path: &std::path::Path) -> bool {
     result.0 as isize > 32
 }
 
+thread_local! {
+    /// 次に出す知らせの窓を真ん中に置く持ち主の窓(centered の中だけ)
+    static CENTER_ON: std::cell::Cell<Option<HWND>> = const { std::cell::Cell::new(None) };
+}
+
+/// 知らせの窓(MessageBox)を出すとき，持ち主の窓の見えている枠の真ん中に置く．
+/// MessageBox は画面の作業領域の真ん中に出るので，出る直前(HCBT_ACTIVATE)に動かす．画面からはみ出す分は戻す
+fn centered<T>(owner: HWND, show: impl FnOnce() -> T) -> T {
+    CENTER_ON.with(|cell| cell.set(Some(owner)));
+    // SAFETY: このスレッドだけのフックで，show が終わったら外す
+    let hook =
+        unsafe { SetWindowsHookExW(WH_CBT, Some(center_dialog), None, GetCurrentThreadId()) };
+    let result = show();
+    if let Ok(hook) = hook {
+        // SAFETY: 上で付けたフック
+        let _ = unsafe { UnhookWindowsHookEx(hook) };
+    }
+    CENTER_ON.with(|cell| cell.set(None));
+    result
+}
+
+extern "system" fn center_dialog(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code == HCBT_ACTIVATE as i32 {
+        if let Some(owner) = CENTER_ON.with(std::cell::Cell::take) {
+            let dialog = HWND(wparam.0 as *mut _);
+            let mut frame = RECT::default();
+            let mut bounds = RECT::default();
+            // SAFETY: どちらもこのスレッドの窓．矩形はこの関数の中の値で，大きさを正しく渡す
+            let read = unsafe {
+                DwmGetWindowAttribute(
+                    owner,
+                    DWMWA_EXTENDED_FRAME_BOUNDS,
+                    (&raw mut bounds).cast(),
+                    std::mem::size_of::<RECT>() as u32,
+                )
+                .is_ok()
+                    || GetWindowRect(owner, &mut bounds).is_ok()
+            };
+            // SAFETY: 上と同じ
+            if read && unsafe { GetWindowRect(dialog, &mut frame) }.is_ok() {
+                let width = frame.right - frame.left;
+                let height = frame.bottom - frame.top;
+                let mut x = bounds.left + (bounds.right - bounds.left - width) / 2;
+                let mut y = bounds.top + (bounds.bottom - bounds.top - height) / 2;
+                let mut monitor = MONITORINFO {
+                    cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+                    ..Default::default()
+                };
+                // SAFETY: monitor はこの関数の中の値で，cbSize を正しく入れている
+                if unsafe {
+                    GetMonitorInfoW(
+                        MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST),
+                        &mut monitor,
+                    )
+                }
+                .as_bool()
+                {
+                    let work = monitor.rcWork;
+                    x = x.clamp(work.left, (work.right - width).max(work.left));
+                    y = y.clamp(work.top, (work.bottom - height).max(work.top));
+                }
+                // SAFETY: 出ようとしている知らせの窓(このスレッド)
+                let _ = unsafe {
+                    SetWindowPos(
+                        dialog,
+                        None,
+                        x,
+                        y,
+                        0,
+                        0,
+                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                    )
+                };
+            }
+        }
+    }
+    // SAFETY: フックの手続きが受けたものをそのまま次に渡す
+    unsafe { CallNextHookEx(None::<HHOOK>, code, wparam, lparam) }
+}
+
 /// はい・いいえで尋ねる窓．はいなら true
 pub fn ask(owner: HWND, title: &str, text: &str) -> bool {
     // SAFETY: owner はこのスレッドの窓．文字列は呼び出しの間生きている
-    let result = unsafe {
+    let result = centered(owner, || unsafe {
         MessageBoxW(
             Some(owner),
             &HSTRING::from(text),
             &HSTRING::from(title),
             MB_YESNO | MB_ICONQUESTION,
         )
-    };
+    });
     result == IDYES
 }
 
 /// 確かめる窓(OK とキャンセル)．OK なら true
 pub fn confirm(owner: HWND, title: &str, text: &str) -> bool {
     // SAFETY: owner はこのスレッドの窓．文字列は呼び出しの間生きている
-    let result = unsafe {
+    let result = centered(owner, || unsafe {
         MessageBoxW(
             Some(owner),
             &HSTRING::from(text),
             &HSTRING::from(title),
             MB_OKCANCEL | MB_ICONQUESTION,
         )
-    };
+    });
     result == IDOK
 }
 
@@ -824,14 +906,14 @@ pub fn message(owner: HWND, title: &str, text: &str, warning: bool) {
         MB_ICONINFORMATION
     };
     // SAFETY: owner はこのスレッドの窓．文字列は呼び出しの間生きている
-    unsafe {
+    centered(owner, || unsafe {
         MessageBoxW(
             Some(owner),
             &HSTRING::from(text),
             &HSTRING::from(title),
             MB_OK | icon,
         )
-    };
+    });
 }
 
 /// 最小の大きさを WM_GETMINMAXINFO に書く

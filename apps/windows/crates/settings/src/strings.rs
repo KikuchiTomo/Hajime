@@ -287,6 +287,13 @@ pub mod import_preview {
         format!("{name} {}", super::thousands(count))
     }
 
+    /// 表の行の読み上げ(行の番号・列の値・意味を「、」でつなぐ)
+    pub fn row(line: u32, values: &[&str]) -> String {
+        let mut parts = vec![format!("{} 行目", super::thousands(line))];
+        parts.extend(values.iter().map(|value| (*value).to_string()));
+        parts.join("、")
+    }
+
     pub fn format(format: ImportFormat) -> &'static str {
         match format {
             ImportFormat::TabSeparated => "タブ区切り",
@@ -1600,5 +1607,14 @@ mod numbers {
         assert_eq!(thousands(999), "999");
         assert_eq!(thousands(1_000), "1,000");
         assert_eq!(thousands(1_234_567), "1,234,567");
+    }
+
+    #[test]
+    fn 取り込む前の表の行は_行の番号と値を読点でつなぐ() {
+        assert_eq!(
+            super::import_preview::row(4, &["かぶしきがいしゃ", "株式会社", "名詞"]),
+            "4 行目、かぶしきがいしゃ、株式会社、名詞"
+        );
+        assert_eq!(super::import_preview::row(1_200, &[]), "1,200 行目");
     }
 }
