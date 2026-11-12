@@ -80,7 +80,7 @@ scene themes 720 theme-washi:50:40 theme-neon:715:40 theme-nordic:50:375 theme-t
 
 # トップの画像: 窓の中身(題の下)を窓の色で塗り，入力中の文と下線を書いて，分岐図と語の意味を置く
 font="/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc"
-window homophone-branch-glass-dark hero-branch 74
+window homophone-branch-glass-dark hero-branch 64
 magick "$images/features/candidate-tree.webp" -fill 'rgb(30,30,30)' -draw "rectangle 74,96 1324,600" \
   -font "$font" -pointsize 27 -fill 'rgb(235,235,235)' -annotate +85+124 "写真を撮る" \
   -fill 'rgb(62,113,214)' -draw "rectangle 85,127 166,128" -draw "rectangle 166,126 220,129" \
