@@ -721,6 +721,7 @@ pub enum Stat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RangeKind {
     CandidatesPerPage,
+    CandidateGridColumns,
     LiveConversionDelay,
     LiveConversionSkipLength,
     SuggestionSkipCount,
@@ -744,6 +745,7 @@ impl RangeKind {
         let ranges = &catalog.ranges;
         match self {
             RangeKind::CandidatesPerPage => ranges.candidates_per_page,
+            RangeKind::CandidateGridColumns => ranges.candidate_grid_columns,
             RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
             RangeKind::LiveConversionSkipLength => ranges.live_conversion_skip_length,
             RangeKind::SuggestionSkipCount => ranges.suggestion_skip_count,
@@ -1082,6 +1084,12 @@ fn conversion() -> Vec<Section> {
                     "listCandidatesPerPage",
                     RangeKind::CandidatesPerPage,
                 ),
+                Row::stepper(
+                    more::GRID_COLUMNS,
+                    "candidateGridColumns",
+                    RangeKind::CandidateGridColumns,
+                ),
+                Row::note(more::GRID_COLUMNS_NOTE),
                 Row::toggle(
                     more::CONTEXTUAL_SEGMENT_CANDIDATES,
                     "contextualSegmentCandidates",

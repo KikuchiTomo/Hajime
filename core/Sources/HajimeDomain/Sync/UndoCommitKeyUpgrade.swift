@@ -1,7 +1,8 @@
 /// 確定を取り消すキーを，バージョン 15 までに保存したキー設定の表に足す(SettingsSchema のバージョン 15 → 16)．
 ///
-/// - ひな形のまま保存した表は，今のそのひな形の表にする(どのひな形も入力文字なしの Ctrl+Backspace．
-///   Windows 風・ATOK 風は，同じキーで予測の確定だけを取り消していた行を，予測も変換も取り消す行に替える)
+/// - ひな形のまま保存した表は，バージョン 16 のそのひな形の表にする(どのひな形も入力文字なしの Ctrl+Backspace．
+///   Windows 風・ATOK 風は，同じキーで予測の確定だけを取り消していた行を，予測も変換も取り消す行に替える．
+///   その先はあとの移し替えが今のひな形の表にする)
 /// - 利用者が変えた表は，確定を取り消すキーが無く，入力文字なしで標準のキーが空いていれば足す．利用者の決めたキーは変えない
 enum UndoCommitKeyUpgrade {
     static func upgrade(_ object: inout [String: JSONValue]) {
@@ -28,7 +29,7 @@ enum UndoCommitKeyUpgrade {
 
     /// バージョン 16 でひな形に足した行
     static func added(to preset: KeymapPreset) -> [KeymapEntry] {
-        preset.keymap.entries.filter { $0.command == .undoCommit }
+        WordToolKeyUpgrade.previous(preset).entries.filter { $0.command == .undoCommit }
     }
 
     /// バージョン 15 のひな形の表．バージョン 16 のひな形の表から足した行を除いたもの．

@@ -40,7 +40,7 @@ final class CandidatePanelController {
         view.showsHints = showsHints
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
-        view.maximumWidth = Self.maximumWidth(caret: caret)
+        view.maximumWidth = Self.maximumWidth(caret: caret, grid: panel.columnLength != nil)
         // 選んでいる候補が同じまま中身が変わったときは，あとから届いた候補なので重ねて変える(選び直しはすぐ見せる)
         let arrived = shownList.map { $0 != panel && $0.selectedEntry == panel.selectedEntry && $0.focus == panel.focus } ?? false
         shownList = panel
@@ -81,10 +81,10 @@ final class CandidatePanelController {
         }
     }
 
-    /// 窓の幅の上限．トークンの上限と，入力位置がある画面の幅(左右に余白を空ける)の狭い方
-    private static func maximumWidth(caret: NSRect) -> CGFloat {
+    /// 窓の幅の上限．トークンの上限(候補を表に広げていれば表の上限)と，入力位置がある画面の幅(左右に余白を空ける)の狭い方
+    private static func maximumWidth(caret: NSRect, grid: Bool = false) -> CGFloat {
         let screen = FloatingPanel.visibleFrame(for: caret).width - DesignTokens.Size.Candidate.screenMargin * 2
-        return min(DesignTokens.Size.Candidate.maxWidth, screen)
+        return min(grid ? DesignTokens.Size.Candidate.gridMaxWidth : DesignTokens.Size.Candidate.maxWidth, screen)
     }
 
     /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．

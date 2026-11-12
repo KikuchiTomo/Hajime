@@ -202,6 +202,12 @@ private struct ConversionTab: View {
                         LabeledContent(UIStrings.More.listCandidates, value: "\(model.settings.listCandidatesPerPage)")
                     }
                 }
+                ResettableRow(model: model, keyPath: \.candidateGridColumns) {
+                    Stepper(value: model.binding(\.candidateGridColumns), in: DefaultSettings.candidateGridColumnsRange) {
+                        LabeledContent(UIStrings.More.gridColumns, value: "\(model.settings.candidateGridColumns)")
+                    }
+                }
+                Text(UIStrings.More.gridColumnsNote).font(.caption).foregroundStyle(.secondary)
                 ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
                 Text(UIStrings.More.contextualSegmentCandidatesNote).font(.caption).foregroundStyle(.secondary)
                 ResettableToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives)

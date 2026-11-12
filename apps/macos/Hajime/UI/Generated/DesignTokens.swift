@@ -145,6 +145,7 @@ enum DesignTokens {
             static let minWidth: CGFloat = 180
             static let variantInsetY: CGFloat = 1
             static let maxWidth: CGFloat = 720
+            static let gridMaxWidth: CGFloat = 960
             static let screenMargin: CGFloat = 16
             static let truncationContext: CGFloat = 4
         }

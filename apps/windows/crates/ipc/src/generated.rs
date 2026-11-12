@@ -1622,6 +1622,9 @@ pub struct CandidateList {
     #[serde(rename = "meaningPlacement")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meaning_placement: Option<MeaningPlacement>,
+    #[serde(rename = "columnLength")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub column_length: Option<u32>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1642,6 +1645,7 @@ impl fmt::Debug for CandidateList {
             .field("homophone", &self.homophone)
             .field("showsNumbers", &self.shows_numbers)
             .field("meaningPlacement", &self.meaning_placement)
+            .field("columnLength", &self.column_length)
             .finish()
     }
 }
