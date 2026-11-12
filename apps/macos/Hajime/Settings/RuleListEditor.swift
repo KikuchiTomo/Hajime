@@ -172,13 +172,16 @@ struct RuleListEditor: View {
     }
 
     var body: some View {
-        editor
-        if hasNote, let noteLabel = labels.note {
-            TextField(noteLabel, text: $note, prompt: Text(labels.notePrompt ?? noteLabel))
-                .textFieldStyle(.roundedBorder)
-                .labelsHidden()
-                .focused($focusedField, equals: .note)
-                .onSubmit(commit)
+        // 添え書きの欄は，入力の行と同じまとまり(Form の 1 行)に置き，あいだに区切りの線を入れない
+        VStack(alignment: .leading, spacing: DesignTokens.Size.Settings.ruleNoteFieldGap) {
+            editor
+            if hasNote, let noteLabel = labels.note {
+                TextField(noteLabel, text: $note, prompt: Text(labels.notePrompt ?? noteLabel))
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .focused($focusedField, equals: .note)
+                    .onSubmit(commit)
+            }
         }
         if let message {
             Label(message.text, systemImage: message.isProblem ? "exclamationmark.triangle.fill" : "info.circle")

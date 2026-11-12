@@ -175,6 +175,7 @@ enum DesignTokens {
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
             static let ruleValueColumnWidth: CGFloat = 150
+            static let ruleNoteFieldGap: CGFloat = 8
             static let ruleKindColumnWidth: CGFloat = 120
             static let commandReadingColumnWidth: CGFloat = 110
             static let commandTitleColumnWidth: CGFloat = 120
@@ -185,7 +186,7 @@ enum DesignTokens {
             static let tablePopupTextInset: CGFloat = 21
             static let themeEditorWidth: CGFloat = 640
             static let themeEditorHeight: CGFloat = 720
-            static let userDictionaryTableHeight: CGFloat = 330
+            static let userDictionaryTableHeight: CGFloat = 280
             static let previewPadding: CGFloat = 24
             static let keyFilterRadius: CGFloat = 5
             static let fontSliderWidth: CGFloat = 220

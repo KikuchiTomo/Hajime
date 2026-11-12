@@ -290,6 +290,7 @@ pub mod size {
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;
         pub const RULE_VALUE_COLUMN_WIDTH: f32 = 150.0;
+        pub const RULE_NOTE_FIELD_GAP: f32 = 8.0;
         pub const RULE_KIND_COLUMN_WIDTH: f32 = 120.0;
         pub const COMMAND_READING_COLUMN_WIDTH: f32 = 110.0;
         pub const COMMAND_TITLE_COLUMN_WIDTH: f32 = 120.0;
@@ -300,7 +301,7 @@ pub mod size {
         pub const TABLE_POPUP_TEXT_INSET: f32 = 21.0;
         pub const THEME_EDITOR_WIDTH: f32 = 640.0;
         pub const THEME_EDITOR_HEIGHT: f32 = 720.0;
-        pub const USER_DICTIONARY_TABLE_HEIGHT: f32 = 330.0;
+        pub const USER_DICTIONARY_TABLE_HEIGHT: f32 = 280.0;
         pub const PREVIEW_PADDING: f32 = 24.0;
         pub const KEY_FILTER_RADIUS: f32 = 5.0;
         pub const FONT_SLIDER_WIDTH: f32 = 220.0;
