@@ -98,7 +98,7 @@ final class PredictionView: NSView {
         }
         var x = Spacing.paddingX + inset
         for (text, color) in [(prediction.typed, theme.text), (prediction.completion, theme.textMuted)] where !text.isEmpty {
-            // 文字の行の箱を窓の縦の真ん中に置く(キーの札と同じ真ん中)
+            // 文字の行の箱を窓の縦の真ん中に置く(キーキャップと同じ真ん中)
             TextFitting.draw(text, attributes: attributes(color), x: x, midY: bounds.midY)
             x += text.size(withAttributes: attributes(color)).width
         }

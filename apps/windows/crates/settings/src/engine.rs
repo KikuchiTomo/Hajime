@@ -349,7 +349,7 @@ impl<E: Engine> SettingsStore for EngineStore<E> {
 
 /// 試した結果を 1 行の文にする(「make → make(英語)」を全角の空白で区切る)
 pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
-    // macOS の resultChip と同じく，札は入る文字と，その下に英語か日本語かを小さく出す
+    // macOS の resultChip と同じく，タグは入る文字と，その下に英語か日本語かを小さく出す
     let mut shown = PreviewShown::default();
     for word in words {
         let language = options::WORD_LANGUAGES
@@ -364,11 +364,11 @@ pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
     shown
 }
 
-/// 日本語の値(PreviewWord.language)．日本語の札はアクセントの色で出す(macOS の .tint)
+/// 日本語の値(PreviewWord.language)．日本語のタグはアクセントの色で出す(macOS の .tint)
 const JAPANESE: &str = "japanese";
 
-/// 試した結果の出し方．chips は札にして折り返して並べる語(macOS の WrappingStack)，line は札にしない 1 行．
-/// labels は札の 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行の札
+/// 試した結果の出し方．chips はタグにして折り返して並べる語(macOS の WrappingStack)，line はタグにしない 1 行．
+/// labels はタグの 2 行目(英語か日本語かと，日本語か)．chips と同じ並びで，無ければ 1 行のタグ
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PreviewShown {
     pub chips: Vec<String>,
@@ -376,7 +376,7 @@ pub struct PreviewShown {
     pub labels: Vec<Option<(String, bool)>>,
 }
 
-/// 変換マクロを試した結果．書いている途中の形の結果なら札にせず，頭に「入力中の形: 」を付けた 1 行にする
+/// 変換マクロを試した結果．書いている途中の形の結果ならタグにせず，頭に「入力中の形: 」を付けた 1 行にする
 pub fn macro_preview_text(results: &[String], drafting: bool) -> PreviewShown {
     if drafting {
         let shown = results.first().map_or("", String::as_str);
@@ -558,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn 試した結果を札にする() {
+    fn 試した結果をタグにする() {
         let words = vec![
             PreviewWord {
                 typed: "make".into(),
@@ -571,7 +571,7 @@ mod tests {
                 language: "japanese".into(),
             },
         ];
-        // 札は入る文字と，2 行目の英語か日本語か(日本語はアクセントの色)
+        // タグは入る文字と，2 行目の英語か日本語か(日本語はアクセントの色)
         let shown = preview_text(&words);
         assert_eq!(shown.chips, vec!["make", "すし"]);
         assert_eq!(

@@ -23,7 +23,7 @@ def relative_luminance(hex_color: str) -> float:
 
 
 def blend(color: str, opacity: float, under: str) -> str:
-    """color を opacity の濃さで under の上に重ねた色(パレットの説明の札のように，文字の色を薄く敷いた地)．"""
+    """color を opacity の濃さで under の上に重ねた色(パレットの説明のカードのように，文字の色を薄く敷いた地)．"""
     top = [int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
     bottom = [int(under.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
     mixed = [round(t * opacity + b * (1 - opacity)) for t, b in zip(top, bottom)]
@@ -58,7 +58,7 @@ def main(argv: list[str]) -> int:
         colors = themes[rule["theme"]]["color"]
         bg = colors[rule["bg"]]["$value"]
         name = rule["bg"]
-        # tint があれば，その色をその濃さで bg の上に重ねた地と比べる(例: 文字の色を薄く敷いた札)
+        # tint があれば，その色をその濃さで bg の上に重ねた地と比べる(例: 文字の色を薄く敷いたタグ)
         if tint := rule.get("tint"):
             opacity = lookup(tokens, tint["opacity"])
             bg = blend(colors[tint["color"]]["$value"], opacity, bg)

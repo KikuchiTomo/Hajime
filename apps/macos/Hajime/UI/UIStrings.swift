@@ -94,7 +94,7 @@ enum UIStrings {
         static let commandsPage = "コマンド"
         static let commandsSection = "コマンド"
         static let launcherCommands = "読みでコマンドを呼び出す"
-        static let commandsNote = "読みを変換すると、候補の一覧に「コマンド」の札を付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
+        static let commandsNote = "読みを変換すると、候補の一覧に「コマンド」のタグを付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
         static let commandReading = "読み"
         static let commandTitle = "名前"
         static let commandKind = "動作"
@@ -176,7 +176,7 @@ enum UIStrings {
     }
 
     enum Branch {
-        /// 打ち間違いを直した文節に添える札
+        /// 打ち間違いを直した文節に添えるタグ
         static let corrected = "修正"
         /// 選んでいる候補の取り込んだ辞書
         static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
@@ -645,7 +645,7 @@ enum UIStrings {
         /// 実演でアプリを切り替えるときに出す名前
         static let demoNotes = "メモ"
         static let demoTerminal = "ターミナル"
-        /// 実演で押すキーの名前(キーの札に出す)
+        /// 実演で押すキーの名前(キーキャップに出す)
         static let demoKeyKana = "かな"
         static let demoKeyEisu = "英数"
 

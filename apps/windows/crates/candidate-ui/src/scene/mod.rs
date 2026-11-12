@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! 候補ウィンドウ・分岐図・案内・モードの札の中身を，描く順の部品(Draw)の並びにする．
+//! 候補ウィンドウ・分岐図・案内・モード表示の中身を，描く順の部品(Draw)の並びにする．
 //! 配置と色はここで決め(macOS の CandidateView・BranchView・GlassDrawing と同じ決め方)，描く層(app::render)は部品をなぞるだけにする．
 //! そのため，配置と線の座標を Windows でなくても確かめられる
 
@@ -300,7 +300,7 @@ impl Scene {
     }
 }
 
-/// 一覧の候補の札に出したユーザー辞書の語のコメント(長ければ先頭だけ)．札がコメントでなければ None
+/// 一覧の候補のタグに出したユーザー辞書の語のコメント(長ければ先頭だけ)．タグがコメントでなければ None
 pub fn entry_comment(entry: &ipc::CandidateEntry) -> Option<&str> {
     if entry.has_comment == Some(true) {
         entry.annotation.as_deref()

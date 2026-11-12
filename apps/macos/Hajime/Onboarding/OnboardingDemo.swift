@@ -13,11 +13,11 @@ struct DemoFrame: Equatable {
     var committed = ""
     var marked = MarkedText.empty
     var panel: Panel?
-    /// 入力欄の横に出すモードの札(「あ」「A」)
+    /// 入力欄の横に出すモード表示(「あ」「A」)
     var mode: String?
     /// 入力欄の上に出すアプリの名前．アプリを切り替える実演で使う
     var application: String?
-    /// このコマで押したキー(「かな」「英数」)．入力欄の右上にキーの札で出す
+    /// このコマで押したキー(「かな」「英数」)．入力欄の右上にキーキャップで出す
     var key: String?
     /// このコマを見せておく時間(秒)
     var duration: TimeInterval
@@ -75,7 +75,7 @@ enum DemoScripts {
     // MARK: - ページ
 
     /// メモ(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英数になり，メモに戻すと日本語に戻る
-    /// アプリを切り替えたときに，モードの札が選んだカードのとおりに変わるのを見せる
+    /// アプリを切り替えたときに，モード表示が選んだカードのとおりに変わるのを見せる
     /// - IME をオフ: メモで日本語を打ち，ターミナルに切り替えると英数になる
     /// - IME をオン: ターミナルで英数を打ち，メモに切り替えると日本語になる
     /// - オンオフを記憶: メモで英数に切り替えてからターミナルに移り，メモに戻ると英数のまま
@@ -238,7 +238,7 @@ enum DemoScripts {
     // MARK: - 機能ごとの実演
 
     /// 候補の一覧のコマ．選んでいる候補を from から to まで 1 つずつ動かし，最後に確定する(commit が nil なら確定しない)．
-    /// command はコマンドの候補の位置と種類．一覧では種類のアイコンと札を付け，選んでいるあいだは確定のキーで動くことを出す
+    /// command はコマンドの候補の位置と種類．一覧では種類のアイコンとタグを付け，選んでいるあいだは確定のキーで動くことを出す
     private static func choosing(_ entries: [String], from: Int = 0, to: Int, heading: AssociationHeading? = nil, marked: [(String, MarkedText.Style)]? = nil,
                                  command: (index: Int, kind: LauncherCommand.Kind)? = nil, commit: String? = nil) -> [DemoFrame] {
         var frames: [DemoFrame] = []

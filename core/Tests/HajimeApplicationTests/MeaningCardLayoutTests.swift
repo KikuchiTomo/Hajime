@@ -44,7 +44,7 @@ struct MeaningCardLayoutTests {
         ("同音語が入りきらない", content(others: (1...12).map { "語\($0)" })),
     ]
 
-    @Test("文の列の x は 1 か所: 見出しの語・意味・例の縦の線・同音語の札が同じ x から書き出す", arguments: samples.map(\.0))
+    @Test("文の列の x は 1 か所: 見出しの語・意味・例の縦の線・同音語のタグが同じ x から書き出す", arguments: samples.map(\.0))
     func textColumn(name: String) throws {
         let layout = Self.place(try #require(Self.samples.first { $0.0 == name }?.1))
         let x = layout.columns.textX
@@ -69,7 +69,7 @@ struct MeaningCardLayoutTests {
         #expect(layout.separator?.maxX == layout.width)
     }
 
-    @Test("目印の列: アイコンと番号の札は同じ x・同じ幅で，その行の 1 行目の文字の箱の縦の真ん中にある", arguments: samples.map(\.0))
+    @Test("目印の列: アイコンと番号のバッジは同じ x・同じ幅で，その行の 1 行目の文字の箱の縦の真ん中にある", arguments: samples.map(\.0))
     func markers(name: String) throws {
         let layout = Self.place(try #require(Self.samples.first { $0.0 == name }?.1))
         let markers = [layout.bookIcon] + layout.senses.compactMap(\.badge) + [layout.earIcon].compactMap { $0 }
@@ -79,7 +79,7 @@ struct MeaningCardLayoutTests {
         for sense in layout.senses {
             guard let badge = sense.badge, let first = sense.meaning.first else { continue }
             #expect(abs(badge.midY - first.box.midY) <= 0.5)
-            // 番号の文字も札の真ん中
+            // 番号の文字もタグの真ん中
             let number = try #require(sense.number)
             #expect(abs(number.line.box.midY - badge.midY) <= 0.5)
             #expect(abs(number.line.box.midX - badge.midX) <= 0.5)
@@ -91,12 +91,12 @@ struct MeaningCardLayoutTests {
         let layout = Self.place(try #require(Self.samples.first { $0.0 == name }?.1))
         #expect(abs(layout.headerMidY - Self.placement.headerMidY) <= 0.5)
         #expect(abs(layout.headword.line.box.midY - Self.placement.headerMidY) <= 0.5)
-        // 見出しの行の上の端(目印・札)がカードの上の端
+        // 見出しの行の上の端(目印・タグ)がカードの上の端
         let height = Layout.headerHeight(measuring: Measuring(), metrics: Self.metrics)
         #expect(abs((layout.parts.map(\.y).min() ?? 0) - (Self.placement.headerMidY - height / 2)) <= 0.5)
     }
 
-    @Test("札は行の文字の箱(または耳のアイコン)の縦の真ん中: 品詞の札と同音語の札", arguments: samples.map(\.0))
+    @Test("タグは行の文字の箱(または耳のアイコン)の縦の真ん中: 品詞のタグと同音語のタグ", arguments: samples.map(\.0))
     func chips(name: String) throws {
         let layout = Self.place(try #require(Self.samples.first { $0.0 == name }?.1))
         if let chip = layout.partOfSpeech {
@@ -160,7 +160,7 @@ struct MeaningCardLayoutTests {
         }
     }
 
-    @Test("入らない同音語の札は「+n」にまとめ，カードの幅に収める")
+    @Test("入らない同音語のタグは「+n」にまとめ，カードの幅に収める")
     func moreTags() throws {
         let layout = Self.place(Self.content(others: (1...12).map { "語\($0)" }))
         let more = try #require(layout.more)
@@ -169,7 +169,7 @@ struct MeaningCardLayoutTests {
         #expect(!layout.tags.isEmpty)
     }
 
-    @Test("長い見出しの語は品詞の札の手前で省く")
+    @Test("長い見出しの語は品詞のタグの手前で省く")
     func longHeadword() {
         var content = Self.content()
         content.word = String(repeating: "長", count: 40)

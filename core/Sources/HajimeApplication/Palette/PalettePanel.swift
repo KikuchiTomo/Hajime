@@ -126,7 +126,7 @@ public struct PalettePanel: Sendable, Equatable {
             self.codePoints = codePoints
         }
 
-        /// 札(ショートコードかコードポイント)の行を出すか
+        /// タグ(ショートコードかコードポイント)の行を出すか
         public var chips: Bool { shortcodes || codePoints }
     }
 

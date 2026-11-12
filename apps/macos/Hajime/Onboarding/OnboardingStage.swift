@@ -3,7 +3,7 @@ import HajimeApplication
 import HajimeDomain
 import SwiftUI
 
-/// 初期設定の左の実演．入力欄の模型と，その下に候補ウィンドウと同じ部品(分岐図・一覧・案内・モードの札)を置き，台本のコマを時間で切り替える
+/// 初期設定の左の実演．入力欄の模型と，その下に候補ウィンドウと同じ部品(分岐図・一覧・案内・モード表示)を置き，台本のコマを時間で切り替える
 struct OnboardingStage: NSViewRepresentable {
     let page: OnboardingPage
     let settings: HajimeDomain.Settings
@@ -221,7 +221,7 @@ final class DemoStageView: NSView {
         }
     }
 
-    /// 押したキーを，入力欄の右上にキーの札で出す．アプリの名前の札と同じ高さにそろえ，入力欄と同じ地と縁にする
+    /// 押したキーを，入力欄の右上にキーキャップで出す．アプリの名前のタグと同じ高さにそろえ，入力欄と同じ地と縁にする
     private func drawKey(_ name: String, above field: NSRect) {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
                                                          .foregroundColor: NSColor.labelColor]
@@ -244,7 +244,7 @@ final class DemoStageView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
                                                          .foregroundColor: NSColor.secondaryLabelColor]
         let text = name.size(withAttributes: attributes)
-        // 札の形(1 行の欄の左右の余白，札の上下の余白)にし，入力欄の上に stack だけ離して置く
+        // タグの形(1 行の欄の左右の余白，タグの上下の余白)にし，入力欄の上に stack だけ離して置く
         let height = text.height + DesignTokens.Size.Part.tagPaddingY * 2
         let tab = NSRect(x: field.minX, y: field.minY - DesignTokens.Size.Space.stack - height,
                          width: text.width + DesignTokens.Size.Part.fieldPaddingX * 2, height: height)

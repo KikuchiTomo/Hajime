@@ -49,7 +49,7 @@ public struct LauncherCommand: Sendable, Equatable, Codable, Hashable, Identifia
     /// 候補の文字列．文字を入れる候補と見分けられるよう，印を付ける(入力中の文字に出る)
     public var candidateText: String { DefaultSettings.commandCandidateMark + title }
 
-    /// 候補の文字列(candidateText)から印を除いた名前．候補の窓では印の代わりにアイコンと札で見せる
+    /// 候補の文字列(candidateText)から印を除いた名前．候補の窓では印の代わりにアイコンとタグで見せる
     public static func title(ofCandidateText text: String) -> String {
         text.hasPrefix(DefaultSettings.commandCandidateMark) ? String(text.dropFirst(DefaultSettings.commandCandidateMark.count)) : text
     }

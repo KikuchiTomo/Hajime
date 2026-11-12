@@ -10,8 +10,8 @@ import HajimeDomain
 /// 文字は配置のベースラインに書く(行の箱の中で上下にずれないように)．
 /// - 意味が 2 つ以上なら，目印の列に角丸の四角の番号を付ける(候補の番号の丸と形を変え，番号キーで選ぶものと見分ける)
 /// - 使い方の例は左に縦の線を引いて控えめな色で出し，例の中の見出しの語だけを強める
-/// - 同音語は区切りの線の下に，耳のアイコンと札だけで並べる
-/// - アクセントの色は，選んでいる候補とつなぐ線(drawConnector)だけに使う．アイコンは控えめな色，札は文字の色を薄く敷いた地に文字の色の字
+/// - 同音語は区切りの線の下に，耳のアイコンとタグだけで並べる
+/// - アクセントの色は，選んでいる候補とつなぐ線(drawConnector)だけに使う．アイコンは控えめな色，タグは文字の色を薄く敷いた地に文字の色の字
 ///
 /// 折り返しは重いので，同じ注釈と幅の配置は覚えておいて使い回す(ふわっと出すあいだ 1 秒に 60 回描き直すため)
 @MainActor
@@ -45,7 +45,7 @@ enum MeaningCardDrawing {
         "\(theme.kind)|\(theme.typeface)|\(theme.customFontName ?? "")|\(theme.text)|\(theme.textMuted)|\(increasesContrast)"
     }
 
-    /// 幅 width の語の意味の配置．others は同音語の札に出す語(分岐図では枝に出ている語を除いたもの)．
+    /// 幅 width の語の意味の配置．others は同音語のタグに出す語(分岐図では枝に出ている語を除いたもの)．
     /// placement は目印の列の左の端と見出しの行の縦の真ん中(まわりの候補の行に合わせて描く側が決める)
     static func layout(_ note: HomophoneNote, others: [String]? = nil, width: CGFloat, placement: MeaningCardLayout.Placement,
                        theme: ResolvedTheme) -> Layout {
@@ -152,7 +152,7 @@ enum MeaningCardDrawing {
         let headword = placed.headword
         draw(NSAttributedString(string: headword.text, attributes: [.font: font(.headword, theme), .foregroundColor: theme.text]),
              x: headword.line.x, baseline: headword.line.baseline)
-        // 札(品詞・番号・同音語)は，パレットの説明の札と同じく文字の色を薄く敷いた地に文字の色の字
+        // タグ(品詞・番号・同音語)は，パレットの説明のカードと同じく文字の色を薄く敷いた地に文字の色の字
         // (控えめな色の字では地との差が足りないテーマがある)．アクセントの色は選んでいる候補とつなぐ線だけに使う
         if let chip = placed.partOfSpeech {
             let frame = box(chip.frame)

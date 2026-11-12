@@ -4,15 +4,15 @@
 //!
 //! 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．選んでいる候補とは，描く側がつなぐ線で結ぶ．
 //! 中は「目印の列」と「文の列」の 2 列にする．
-//! - 目印の列は幅が決まっていて，見出しの辞書のアイコン・意味の番号の札・同音語の耳のアイコンを，列の中で横の真ん中に置く
-//! - 文の列は，見出しの語・意味・使い方の例の縦の線・同音語の札を，どれも同じ x(text_x)から書き出す．
+//! - 目印の列は幅が決まっていて，見出しの辞書のアイコン・意味の番号のバッジ・同音語の耳のアイコンを，列の中で横の真ん中に置く
+//! - 文の列は，見出しの語・意味・使い方の例の縦の線・同音語のタグを，どれも同じ x(text_x)から書き出す．
 //!   使い方の例の文は，そこから EXAMPLE_INDENT だけ下げる．折り返した行も，それぞれの書き出しの x にそろえる
-//! - 同音語は，区切りの線の下に耳のアイコンと札だけで並べる(見出しの言葉は置かない)
+//! - 同音語は，区切りの線の下に耳のアイコンとタグだけで並べる(見出しの言葉は置かない)
 //!
 //! 縦は，文字の箱で積む．文字の箱は，書体の大きさの高さで，行の箱(書体の行の高さ．DirectWrite は文字をこの箱の縦の真ん中に描く)と
 //! 縦の真ん中が同じもの．日本語の字の外形はほぼこの箱に収まるので，箱と箱のあいだが見た目の間隔になる
-//! - 目印と札は，その行の 1 行目の文字の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
-//! - 文字の箱・札・目印のあいだを，トークンの間隔にする．見出しの行の縦の真ん中は Placement::header_mid_y(候補の 1 行目の真ん中)
+//! - 目印とタグは，その行の 1 行目の文字の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
+//! - 文字の箱・タグ・目印のあいだを，トークンの間隔にする．見出しの行の縦の真ん中は Placement::header_mid_y(候補の 1 行目の真ん中)
 //! - 折り返した行は MEANING_PITCH(例は EXAMPLE_PITCH)ずつ下げる
 //! - 例の縦の線は，例の 1 行目の文字の箱の上の端から，最後の行の文字の箱の下の端まで
 //!
@@ -76,7 +76,7 @@ pub(super) struct Text {
     pub place: Line,
 }
 
-/// 札．frame の中に，文字(text)を text に書く
+/// タグ．frame の中に，文字(text)を text に書く
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Chip {
     pub text: String,
@@ -95,7 +95,7 @@ pub(super) struct Sense {
     pub example: Vec<Line>,
 }
 
-/// 配置に渡す 1 つの意味．number は番号の札の文字(意味が 1 つなら None)，行の数は描く側が columns の幅で折り返したもの
+/// 配置に渡す 1 つの意味．number は番号のバッジの文字(意味が 1 つなら None)，行の数は描く側が columns の幅で折り返したもの
 pub(super) struct SenseLines {
     pub number: Option<String>,
     pub meaning_lines: usize,
@@ -126,7 +126,7 @@ pub(super) struct CardLayout {
     pub separator: Option<Frame>,
     pub ear_icon: Option<Frame>,
     pub tags: Vec<Chip>,
-    /// 入らなかった札の数(「+n」)
+    /// 入らなかったタグの数(「+n」)
     pub more: Option<Text>,
 }
 
@@ -207,7 +207,7 @@ impl Rows<'_> {
             .collect()
     }
 
-    /// frame の中の札の文字．文字の箱を札の縦の真ん中に置く
+    /// frame の中のタグの文字．文字の箱をタグの縦の真ん中に置く
     fn chip(&self, text: &str, font: Font, frame: Frame, padding_x: f32) -> Chip {
         Chip {
             text: text.to_string(),
@@ -244,7 +244,7 @@ fn truncated(measure: &dyn Measure, text: &str, font: Font, width: f32) -> Strin
     "…".to_string()
 }
 
-/// 見出しの行の高さ(語の文字の箱・品詞の札・目印のいちばん高いもの)．描く側が見出しの行を候補の行の真ん中にそろえるのに使う
+/// 見出しの行の高さ(語の文字の箱・品詞のタグ・目印のいちばん高いもの)．描く側が見出しの行を候補の行の真ん中にそろえるのに使う
 pub(super) fn header_height(theme: &ResolvedTheme) -> f32 {
     theme
         .font(Font::MeaningHeadword, candidate::FONT_SIZE)
@@ -265,7 +265,7 @@ pub(super) fn place(
     let columns = Columns::new(width, placement.left);
     let right = width;
 
-    // 見出し: 辞書のアイコン・語・品詞の札を，語の文字の箱の縦の真ん中にそろえる
+    // 見出し: 辞書のアイコン・語・品詞のタグを，語の文字の箱の縦の真ん中にそろえる
     let header_height = header_height(theme);
     let pos_width = content.part_of_speech.map(|name| {
         (measure.width(name, Font::MeaningTag) + meaning::PART_OF_SPEECH_PADDING_X * 2.0).ceil()
@@ -297,7 +297,7 @@ pub(super) fn place(
     });
     let mut y = placement.header_mid_y + header_height / 2.0 + meaning::HEADER_GAP;
 
-    // 意味: 番号の札は 1 行目の文字の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
+    // 意味: 番号のバッジは 1 行目の文字の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
     let mut senses = Vec::new();
     for (index, sense) in content.senses.iter().enumerate() {
         if index > 0 {
@@ -363,7 +363,7 @@ pub(super) fn place(
         });
     }
 
-    // 同音語: 区切りの線の下に，耳のアイコンと札．入らない札は「+n」にまとめる
+    // 同音語: 区切りの線の下に，耳のアイコンとタグ．入らないタグは「+n」にまとめる
     let mut layout = CardLayout {
         width,
         height: 0.0,
@@ -659,7 +659,7 @@ mod tests {
     }
 
     #[test]
-    fn 札は行の縦の真ん中() {
+    fn タグは行の縦の真ん中() {
         for (name, layout) in layouts() {
             if let Some(chip) = &layout.part_of_speech {
                 assert!(
@@ -757,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn 入らない同音語の札は数にまとめて幅に収める() {
+    fn 入らない同音語のタグは数にまとめて幅に収める() {
         let (_, layout) = layouts()
             .into_iter()
             .find(|(name, _)| *name == "同音語が入りきらない")
@@ -768,7 +768,7 @@ mod tests {
     }
 
     #[test]
-    fn 長い見出しの語は品詞の札の手前で省く() {
+    fn 長い見出しの語は品詞のタグの手前で省く() {
         let long = "長".repeat(40);
         let senses = vec![sense(None, 1, 0)];
         let content = Content {

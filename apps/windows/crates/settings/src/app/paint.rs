@@ -31,7 +31,7 @@ pub enum TextStyle {
     Code,
     /// 情報のページの製品名(WinUI の Subtitle)
     Subtitle,
-    /// テーマの見本の札の文字
+    /// テーマの見本の文字
     Swatch,
 }
 
@@ -630,7 +630,7 @@ pub fn segment(
 ) {
     let palette = &theme.palette;
     let radius = size::CONTROL_RADIUS;
-    // 選んだところは溝の中で浮かせた札にする(macOS の segmented の Picker)．ほかはポインターを載せたときだけ薄く塗る
+    // 選んだところは溝の中で浮かせたタグにする(macOS の segmented の Picker)．ほかはポインターを載せたときだけ薄く塗る
     let inset = size::SEGMENT_INSET;
     let face = Rect::new(
         rect.x + inset,
