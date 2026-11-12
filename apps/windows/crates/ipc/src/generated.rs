@@ -1824,6 +1824,12 @@ pub struct PalettePreview {
     pub code_points: String,
     #[serde(rename = "isPinned")]
     pub is_pinned: bool,
+    #[serde(rename = "nameSource")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_source: Option<String>,
+    #[serde(rename = "englishNameSource")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub english_name_source: Option<String>,
 }
 
 impl fmt::Debug for PalettePreview {
@@ -1836,6 +1842,29 @@ impl fmt::Debug for PalettePreview {
             .field("readings", &REDACTED)
             .field("codePoints", &REDACTED)
             .field("isPinned", &self.is_pinned)
+            .field("nameSource", &REDACTED)
+            .field("englishNameSource", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PalettePreviewFields {
+    #[serde(rename = "unicodeName")]
+    pub unicode_name: bool,
+    pub readings: bool,
+    pub shortcodes: bool,
+    #[serde(rename = "codePoints")]
+    pub code_points: bool,
+}
+
+impl fmt::Debug for PalettePreviewFields {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PalettePreviewFields")
+            .field("unicodeName", &self.unicode_name)
+            .field("readings", &self.readings)
+            .field("shortcodes", &self.shortcodes)
+            .field("codePoints", &self.code_points)
             .finish()
     }
 }
@@ -1889,6 +1918,9 @@ pub struct PalettePanel {
     #[serde(rename = "cellsPerRow")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cells_per_row: Option<u32>,
+    #[serde(rename = "previewFields")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_fields: Option<PalettePreviewFields>,
 }
 
 impl fmt::Debug for PalettePanel {
@@ -1913,6 +1945,7 @@ impl fmt::Debug for PalettePanel {
             .field("hints", &self.hints)
             .field("cellSize", &self.cell_size)
             .field("cellsPerRow", &self.cells_per_row)
+            .field("previewFields", &self.preview_fields)
             .finish()
     }
 }

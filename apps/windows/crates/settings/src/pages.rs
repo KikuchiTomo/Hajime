@@ -207,6 +207,10 @@ impl Page {
                 palette::CELL_SIZE,
                 palette::FREQUENT_ROWS,
                 palette::SHOWS_PREVIEW,
+                palette::SHOWS_UNICODE_NAME,
+                palette::SHOWS_READINGS,
+                palette::SHOWS_SHORTCODES,
+                palette::SHOWS_CODE_POINTS,
             ],
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             Page::Keys => std::iter::once(keys::PRESET_MENU)
@@ -1703,6 +1707,14 @@ fn palette_page() -> Vec<Section> {
                 )
                 .enabled_when(On("paletteRecordsHistory")),
                 Row::toggle(palette::SHOWS_PREVIEW, "paletteShowsPreview"),
+                Row::toggle(palette::SHOWS_UNICODE_NAME, "paletteShowsUnicodeName")
+                    .enabled_when(On("paletteShowsPreview")),
+                Row::toggle(palette::SHOWS_READINGS, "paletteShowsReadings")
+                    .enabled_when(On("paletteShowsPreview")),
+                Row::toggle(palette::SHOWS_SHORTCODES, "paletteShowsShortcodes")
+                    .enabled_when(On("paletteShowsPreview")),
+                Row::toggle(palette::SHOWS_CODE_POINTS, "paletteShowsCodePoints")
+                    .enabled_when(On("paletteShowsPreview")),
             ],
             footer: Some(palette::THEME_NOTE),
             footer_variants: &[],

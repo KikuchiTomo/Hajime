@@ -786,6 +786,12 @@ impl App {
                     0
                 },
                 on("paletteShowsPreview"),
+                ipc::PalettePreviewFields {
+                    unicode_name: on("paletteShowsUnicodeName"),
+                    readings: on("paletteShowsReadings"),
+                    shortcodes: on("paletteShowsShortcodes"),
+                    code_points: on("paletteShowsCodePoints"),
+                },
                 number("paletteCellSize"),
             )
         });
@@ -798,6 +804,12 @@ impl App {
                 panel.visible_rows,
                 panel.cell_size,
                 panel.shows_preview,
+                panel.preview_fields.as_ref().map(|fields| (
+                    fields.unicode_name,
+                    fields.readings,
+                    fields.shortcodes,
+                    fields.code_points
+                )),
                 panel.rows.len()
             )),
             shown

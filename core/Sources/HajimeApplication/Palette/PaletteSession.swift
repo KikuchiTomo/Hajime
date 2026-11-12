@@ -462,6 +462,7 @@ final class PaletteSession {
             columns: columns, visibleRows: visibleRows, cellsPerRow: cellsPerRow, selection: selection,
             preview: settings.current.paletteShowsPreview ? selected.map { preview(of: $0, text: cellText($0), pinned: pinned.contains($0.text)) } : nil,
             showsPreview: settings.current.paletteShowsPreview,
+            previewFields: previewFields,
             skinTone: usage.defaultSkinTone,
             skinTonePicker: picker.map { current in
                 let sample = current.forDefault ? nil : selected
@@ -473,18 +474,14 @@ final class PaletteSession {
             hints: hints(for: selected))
     }
 
+    private var previewFields: PalettePanel.PreviewFields {
+        let current = settings.current
+        return PalettePanel.PreviewFields(unicodeName: current.paletteShowsUnicodeName, readings: current.paletteShowsReadings,
+                                          shortcodes: current.paletteShowsShortcodes, codePoints: current.paletteShowsCodePoints)
+    }
+
     private func preview(of item: PaletteItem, text: String, pinned: Bool) -> PalettePanel.Preview {
-        // 名前と同じ読み(かなだけの名前・顔文字)は，名前と並べても同じ語が 2 度出るだけなので除く
-        let readings = ([item.nameReading] + item.readings).filter { !$0.isEmpty && $0 != item.japaneseName }
-        var unique: [String] = []
-        for reading in readings where !unique.contains(reading) { unique.append(reading) }
-        return PalettePanel.Preview(
-            text: text, japaneseName: item.japaneseName, englishName: item.englishName,
-            shortcodes: item.shortcodes.map { ":\($0):" },
-            readings: Array(unique.prefix(DefaultSettings.palettePreviewReadings)),
-            // 顔文字は符号位置を並べても長いだけで役に立たないので出さない
-            codePoints: item.kind == .kaomoji ? "" : text.unicodeScalars.map { "U+" + String($0.value, radix: 16, uppercase: true) }.joined(separator: " "),
-            isPinned: pinned)
+        PalettePanel.Preview(item: item, text: text, fields: previewFields, isPinned: pinned)
     }
 
     private func hints(for selected: PaletteItem?) -> [PalettePanel.Hint] {

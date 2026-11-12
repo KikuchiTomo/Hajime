@@ -77,29 +77,57 @@ public struct PalettePanel: Sendable, Equatable {
         }
     }
 
-    /// 選んでいる文字の説明
+    /// 選んでいる文字の説明．出さない設定の項目は空にしてある
     public struct Preview: Sendable, Equatable {
         /// 入れる文字(肌の色を当てたもの)
         public var text: String
-        public var japaneseName: String
-        public var englishName: String
+        /// 見出しの名前．日本語の名前(CLDR の日本語の短い名前など)．無ければ英語の名前
+        public var name: String
+        /// 見出しの名前を定めたところ(「CLDR」)．わからなければ nil
+        public var nameSource: String?
+        /// Unicode の名前．1 つの符号位置の文字は UCD の名前，並び(国旗・ZWJ・キーキャップ)は CLDR の英語の短い名前．
+        /// 出さない設定のときと，名前の無いもの(顔文字)は空
+        public var unicodeName: String
+        /// unicodeName を定めたところ(「Unicode」「CLDR」)
+        public var unicodeNameSource: String?
+        /// 名前の読みと，ほかの読みのうち先頭のいくつか．見出しの名前と同じ読みは除く
+        public var readings: [String]
         /// 「:bow:」の形
         public var shortcodes: [String]
-        /// 名前の読みと，ほかの読みのうち先頭のいくつか
-        public var readings: [String]
-        /// 「U+1F647」の形．顔文字は長いので空
-        public var codePoints: String
+        /// 「U+1F647」の形を 1 つの符号位置ごとに．顔文字は並べても長いだけなので空
+        public var codePoints: [String]
         public var isPinned: Bool
 
-        public init(text: String, japaneseName: String, englishName: String, shortcodes: [String], readings: [String], codePoints: String, isPinned: Bool) {
+        public init(text: String, name: String, nameSource: String? = nil, unicodeName: String = "", unicodeNameSource: String? = nil,
+                    readings: [String] = [], shortcodes: [String] = [], codePoints: [String] = [], isPinned: Bool = false) {
             self.text = text
-            self.japaneseName = japaneseName
-            self.englishName = englishName
-            self.shortcodes = shortcodes
+            self.name = name
+            self.nameSource = nameSource
+            self.unicodeName = unicodeName
+            self.unicodeNameSource = unicodeNameSource
             self.readings = readings
+            self.shortcodes = shortcodes
             self.codePoints = codePoints
             self.isPinned = isPinned
         }
+    }
+
+    /// 説明の欄に出す項目(設定)．描く側は，選んでいる文字によらずこれで欄の高さを決める(窓の大きさを中身で変えない)
+    public struct PreviewFields: Sendable, Equatable {
+        public var unicodeName: Bool
+        public var readings: Bool
+        public var shortcodes: Bool
+        public var codePoints: Bool
+
+        public init(unicodeName: Bool = true, readings: Bool = true, shortcodes: Bool = true, codePoints: Bool = true) {
+            self.unicodeName = unicodeName
+            self.readings = readings
+            self.shortcodes = shortcodes
+            self.codePoints = codePoints
+        }
+
+        /// 札(ショートコードかコードポイント)の行を出すか
+        public var chips: Bool { shortcodes || codePoints }
     }
 
     /// 肌の色を選ぶ帯．肌の色を変えない形から暗い形まで(SkinTone.allCases の順)
@@ -146,6 +174,8 @@ public struct PalettePanel: Sendable, Equatable {
     public var preview: Preview?
     /// 説明の欄を出すか(設定)．出すなら，選んでいる文字が無いときも欄の場所を空けておく(窓の大きさを中身で変えない)
     public var showsPreview: Bool
+    /// 説明の欄に出す項目(設定)
+    public var previewFields: PreviewFields
     /// 既定の肌の色(足元の肌の色のボタンに出す)
     public var skinTone: SkinTone
     public var skinTonePicker: SkinTonePicker?
@@ -154,8 +184,8 @@ public struct PalettePanel: Sendable, Equatable {
     public var hints: [Hint]
 
     public init(modes: [Mode], query: String, placeholder: String, tabs: [Tab], heading: String, rows: [Row], rowCount: Int, firstRow: Int,
-                columns: Int, visibleRows: Int, cellsPerRow: Int? = nil, selection: Position?, preview: Preview?, showsPreview: Bool, skinTone: SkinTone,
-                skinTonePicker: SkinTonePicker?, message: String?, hints: [Hint]) {
+                columns: Int, visibleRows: Int, cellsPerRow: Int? = nil, selection: Position?, preview: Preview?, showsPreview: Bool,
+                previewFields: PreviewFields = PreviewFields(), skinTone: SkinTone, skinTonePicker: SkinTonePicker?, message: String?, hints: [Hint]) {
         self.modes = modes
         self.query = query
         self.placeholder = placeholder
@@ -170,6 +200,7 @@ public struct PalettePanel: Sendable, Equatable {
         self.selection = selection
         self.preview = preview
         self.showsPreview = showsPreview
+        self.previewFields = previewFields
         self.skinTone = skinTone
         self.skinTonePicker = skinTonePicker
         self.message = message
@@ -250,6 +281,12 @@ public enum PaletteStrings {
     public static let skinTone = "肌の色"
     public static let pin = "ピン留め"
     public static let close = "閉じる"
+    /// 説明の欄で，名前を定めたところを示す札と，読みの頭の札
+    public static let unicodeSource = "Unicode"
+    public static let cldrSource = "CLDR"
+    public static let readings = "読み"
+    /// 説明の欄で読みを並べるときの区切り
+    public static let readingSeparator = "、"
     /// タブにアイコンを描けないときに代わりに見せる文字
     public static let pinnedSymbol = "📌"
     public static let frequentSymbol = "🕘"

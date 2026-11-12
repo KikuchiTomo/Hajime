@@ -250,12 +250,13 @@
         "columns": 9,
         "visibleRows": 6,
         "selection": { "row": 0, "column": 0 },
-        "preview": { "text": "🙇", "japaneseName": "おじぎする人", "englishName": "person bowing", "shortcodes": [":bow:"], "readings": ["おじぎ"], "codePoints": "U+1F647", "isPinned": true },
+        "preview": { "text": "🙇", "japaneseName": "おじぎする人", "englishName": "PERSON BOWING DEEPLY", "shortcodes": [":bow:"], "readings": ["おじぎ"], "codePoints": "U+1F647", "isPinned": true, "nameSource": "CLDR", "englishNameSource": "Unicode" },
         "showsPreview": true,
         "skinTone": "none",
         "skinTonePicker": { "options": ["🙇", "🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"], "selected": 2 },
         "hints": [{ "keys": "Enter", "label": "入力" }],
-        "cellSize": 36.5
+        "cellSize": 36.5,
+        "previewFields": { "unicodeName": true, "readings": true, "shortcodes": false, "codePoints": true }
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },
