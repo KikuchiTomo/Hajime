@@ -52,6 +52,8 @@ enum SnapshotRenderer {
                 render(associationListView(theme: look.theme, appearance: appearance), name: "association-list-\(look.name)", to: output, appearance: appearance)
                 render(associationBranchView(theme: look.theme, appearance: appearance), name: "association-branch-\(look.name)", to: output, appearance: appearance)
                 render(homophoneListView(theme: look.theme, appearance: appearance), name: "homophone-list-\(look.name)", to: output, appearance: appearance)
+                render(homophoneListView(theme: look.theme, appearance: appearance, nearRightEdge: true), name: "homophone-list-left-\(look.name)",
+                       to: output, appearance: appearance)
                 render(homophoneBranchView(theme: look.theme, appearance: appearance), name: "homophone-branch-\(look.name)", to: output, appearance: appearance)
                 render(meaningListView(theme: look.theme, appearance: appearance), name: "meaning-list-\(look.name)", to: output, appearance: appearance)
                 render(homophoneListView(theme: look.theme, appearance: appearance, placement: .below), name: "homophone-list-below-\(look.name)", to: output, appearance: appearance)
@@ -396,7 +398,9 @@ enum SnapshotRenderer {
     /// glass の地のぼかしは画像に写らないので，書き出すときだけ面を塗り，影の代わりに余白を付けて地の上に置く
     /// 候補の窓と，その横に出す語の意味の吹き出しを並べる(吹き出しは MeaningBubbleController と同じ置き方．画面は十分に広いとみなす)．
     /// row は選んでいる候補の行(候補の窓の座標．上が y の小さい側)
-    private static func withBubble(_ view: NSView, note: HomophoneNote, others: [String], row: NSRect?, theme: ResolvedTheme) -> NSView {
+    /// nearRightEdge なら，候補の窓が画面の右の端にあるとみなす(吹き出しは左に出る)
+    private static func withBubble(_ view: NSView, note: HomophoneNote, others: [String], row: NSRect?, theme: ResolvedTheme,
+                                   nearRightEdge: Bool = false) -> NSView {
         guard let row else { return backdropped(view) }
         let metrics = MeaningBubbleLayout.Metrics.tokens(rounded: theme.isRounded)
         let header = MeaningCardDrawing.headerHeight(theme: theme)
@@ -405,17 +409,20 @@ enum SnapshotRenderer {
         let placement = MeaningBubbleLayout(
             anchor: .init(x: 0, y: 0, width: view.frame.width, height: view.frame.height), targetY: row.midY,
             size: (metrics.width, content.size.height + metrics.padding * 2), preferredPointer: metrics.padding + header / 2,
-            screen: .init(x: -1000, y: -1000, width: 4000, height: 4000), metrics: metrics)
+            screen: .init(x: -1000, y: -1000, width: nearRightEdge ? 1000 + Double(view.frame.width) + metrics.screenMargin : 4000, height: 4000),
+            metrics: metrics)
         let bubble = MeaningBubbleView()
         bubble.fillsSurface = true
         bubble.configure(content: content, placement: placement, metrics: metrics, theme: theme)
         let margin: CGFloat = 16
         let top = min(0, placement.window.y)
         let bottom = max(view.frame.height, placement.window.maxY)
-        let container = SnapshotDesk(frame: NSRect(x: 0, y: 0, width: placement.window.maxX + margin * 2, height: bottom - top + margin * 2))
+        let left = min(0, placement.window.x)
+        let right = max(view.frame.width, placement.window.maxX)
+        let container = SnapshotDesk(frame: NSRect(x: 0, y: 0, width: right - left + margin * 2, height: bottom - top + margin * 2))
         // 地は左下が原点なので，上の端から測った位置を直す
-        view.frame.origin = NSPoint(x: margin, y: margin + bottom - view.frame.height)
-        bubble.frame = NSRect(x: margin + placement.window.x, y: margin + bottom - placement.window.maxY,
+        view.frame.origin = NSPoint(x: margin - left, y: margin + bottom - view.frame.height)
+        bubble.frame = NSRect(x: margin - left + placement.window.x, y: margin + bottom - placement.window.maxY,
                               width: placement.window.width, height: placement.window.height)
         container.addSubview(view)
         container.addSubview(bubble)
@@ -770,7 +777,8 @@ enum SnapshotRenderer {
     }
 
     /// 同音異義語の使い分け(R-08)を一覧で出したところ．既定では候補の窓の横の吹き出しにし，先で選んでいる候補を指す
-    private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side) -> NSView {
+    private static func homophoneListView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side,
+                                          nearRightEdge: Bool = false) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
@@ -782,7 +790,7 @@ enum SnapshotRenderer {
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         guard placement == .side else { return backdropped(view) }
         return withBubble(view, note: SamplePanels.homophone, others: SamplePanels.homophone.others,
-                          row: view.selectedRowRect(size: view.frame.size), theme: view.theme)
+                          row: view.selectedRowRect(size: view.frame.size), theme: view.theme, nearRightEdge: nearRightEdge)
     }
 
     /// 同音異義語の無い語の意味を一覧で出したところ．同音語の行を出さず，長い意味は折り返す
