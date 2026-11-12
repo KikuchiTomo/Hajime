@@ -207,9 +207,9 @@ pub mod features {
 /// UIStrings.Extras
 pub mod extras {
     pub const HAND_SHIFT: &str = "手の位置のずれを修正(試験的)";
-    pub const HAND_SHIFT_NOTE: &str = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。";
+    pub const HAND_SHIFT_NOTE: &str = "片手か両手が 1 キー横にずれたまま打った文を修正します。";
     pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
-    pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。";
+    pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている単語を候補に表示します。";
     pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
     /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)．core の DefaultSettings の同じ名前の見本と同じ値(make check で比べる)
     pub const LOOSE_READINGS_EXAMPLE: (&str, &str) = ("しゃんぶー", "シャンプー");
@@ -218,7 +218,7 @@ pub mod extras {
     pub const HAND_SHIFT_EXAMPLE: (&str, &str) = ("stohsypi", "ありがとう");
     pub const ENGLISH_TERM_CANDIDATES_EXAMPLE: (&str, &str) = ("api", "API");
     pub const PHONETIC_SPELLING_NOTE: &str =
-        "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に出します。";
+        "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。";
     pub const ENGLISH_TERM_CANDIDATES: &str = "英単語辞書を使用";
     pub const ENGLISH_TERMS: &str = "追加した単語";
     pub const ENGLISH_TERMS_SECTION: &str = "英単語辞書";
@@ -1330,36 +1330,36 @@ pub mod wizard {
     pub const APP_MODES_DETAIL: &str = "除外設定でアプリを追加して選びます。";
     pub const DEMO_TERMINAL: &str = "ターミナル";
     pub const CORRECTION_TITLE: &str = "自動補正";
-    pub const CORRECTION_OFF: &str = "直さない";
+    pub const CORRECTION_OFF: &str = "修正しない";
     pub const THEME_TITLE: &str = "外観";
-    pub const THEME_DETAIL: &str = "色や書体は、あとから設定の画面で変えられます。";
+    pub const THEME_DETAIL: &str = "色やフォントは、あとから設定で変更できます。";
     pub const LIVE_TITLE: &str = "ライブ変換";
     pub const LIVE_ON: &str = "ライブ変換を使う";
     pub const LIVE_OFF: &str = "使わない";
-    pub const LIVE_DELAY: &str = "漢字にするまでの時間";
-    pub const PRESENTATION_TITLE: &str = "候補の出し方";
-    pub const INITIAL_FOCUS: &str = "最初に選ぶ文節";
+    pub const LIVE_DELAY: &str = "変換までの待ち時間";
+    pub const PRESENTATION_TITLE: &str = "候補の表示";
+    pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
     pub const FEATURES_TITLE: &str = "便利な機能";
     pub const EXTRAS_TITLE: &str = "試験的な機能";
     pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。";
     pub const MACROS: &str = "変換マクロ";
     pub const MACROS_DETAIL: &str =
-        "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
-    pub const DYNAMIC_DICTIONARY: &str = "動的なユーザー辞書";
+        "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。";
+    pub const DYNAMIC_DICTIONARY: &str = "書式の展開";
     pub const DYNAMIC_DICTIONARY_DETAIL: &str =
-        "単語に {datetime:YYYY/MM/DD} などを書くと、入力したときの値にします。";
+        "単語に {datetime:YYYY/MM/DD} などを書くと、入力時の値に置換します。";
     pub const COMMANDS: &str = "コマンド";
-    pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。";
+    pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ実行します。設定の「コマンド」で登録します。";
     pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
     pub const ASSOCIATION: &str = "連想変換";
-    pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、似た意味の語を出します。";
+    pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、似た意味の単語を表示します。";
     pub const CALCULATION: &str = "計算";
-    pub const CALCULATION_DETAIL: &str = "「1+2*3=」と打つと、答えを候補に出します。";
+    pub const CALCULATION_DETAIL: &str = "「1+2*3=」と打つと、計算結果を候補に表示します。";
     pub const POSTAL_CODE: &str = "郵便番号";
-    pub const POSTAL_CODE_DETAIL: &str = "郵便番号から住所を出します。";
+    pub const POSTAL_CODE_DETAIL: &str = "郵便番号を住所に変換します。";
     pub const DATE: &str = "日付と時刻";
-    pub const DATE_DETAIL: &str = "「きょう」「いま」「なう」から日付と時刻を出します。";
+    pub const DATE_DETAIL: &str = "「きょう」「いま」「なう」を日付と時刻に変換します。";
 }
 
 /// 初期設定の，macOS では関数(UIStrings.Onboarding の detail(for:) など)が返す文言と，Windows だけの文言
@@ -1371,13 +1371,13 @@ pub mod windows_wizard {
 
     /// 補正の強さの説明(macOS の UIStrings.Onboarding.detail(for: CorrectionSensitivity))
     pub const CORRECTION_CAUTIOUS_DETAIL: &str =
-        "確かなときだけ直し、迷うときは「もしかして」で知らせます。";
-    pub const CORRECTION_STANDARD_DETAIL: &str = "よくある打ち間違いを直します。";
-    pub const CORRECTION_AGGRESSIVE_DETAIL: &str = "少しでも打ち間違いらしければ直します。";
+        "確実なときだけ修正し、迷うときは「もしかして」を表示します。";
+    pub const CORRECTION_STANDARD_DETAIL: &str = "よくあるタイプミスを修正します。";
+    pub const CORRECTION_AGGRESSIVE_DETAIL: &str = "タイプミスの可能性があれば修正します。";
 
     /// 候補の出し方の説明(macOS の UIStrings.Onboarding.detail(for: CandidatePresentation))
     pub const PRESENTATION_AUTOMATIC_DETAIL: &str = "文節ごとに候補を枝分かれさせます。";
-    pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選んでいる文節の候補を縦に並べます。";
+    pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選択中の文節の候補を縦に並べます。";
     pub const PRESENTATION_LIST_DETAIL: &str = "文全体の候補を縦に並べます。";
 
     /// 実演でアプリを切り替えるときに出す名前(macOS は「メモ」)
@@ -1404,12 +1404,12 @@ pub mod windows_wizard {
 
     /// 最後のページの案内(macOS はメニューバーから設定を開く．Windows はタスクバーのアイコンから)
     pub const TASKBAR_NOTE: &str =
-        "設定の画面は、タスクバーの入力モードのアイコンを右クリックしても開けます。";
+        "設定は、タスクバーの入力モードのアイコンを右クリックしても開けます。";
     /// 実演の舞台の読み上げの名前
     pub const DEMO: &str = "実演";
     pub const LOADING: &str = "設定を読み込んでいます…";
     pub const SAVE_FAILED: &str =
-        "設定を保存できませんでした。変換エンジンが動いているか確かめてください。";
+        "設定を保存できませんでした。変換エンジンが起動しているか確認してください。";
 }
 
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．
