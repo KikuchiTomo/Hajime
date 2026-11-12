@@ -846,13 +846,15 @@ impl Canvas for D2dCanvas<'_> {
 }
 
 /// draw で描いたものを PNG に書き出す(見本の書き出し．--render-snapshots)．size は DIP で，scale 倍のピクセルで描く．
-/// candidate-ui の見本の書き出しと同じく，WIC のビットマップに Direct2D で描いて PNG にする
+/// candidate-ui の見本の書き出しと同じく，WIC のビットマップに Direct2D で描いて PNG にする．
+/// preview はページの見本の画像(scale 倍のピクセルで作ったもの)．画面と同じく Canvas::preview で描く
 pub fn write_png(
     graphics: &Graphics,
     size: (f32, f32),
     scale: f32,
     clear: Color,
     path: &std::path::Path,
+    preview: Option<&PreviewPixels>,
     draw: impl FnOnce(&mut dyn Canvas),
 ) -> Result<()> {
     use windows::Win32::Foundation::GENERIC_WRITE;
@@ -900,6 +902,28 @@ pub fn write_png(
     }
     // SAFETY: 同上
     let brush = unsafe { target.CreateSolidColorBrush(&color(clear, 1.0), None)? };
+    let bitmap_properties = D2D1_BITMAP_PROPERTIES {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        dpiX: BASE_DPI * scale,
+        dpiY: BASE_DPI * scale,
+    };
+    // SAFETY: pixels は width × height × 4 バイトで，呼び出しのあいだ有効
+    let preview = preview.and_then(|pixels| unsafe {
+        target
+            .CreateBitmap(
+                D2D_SIZE_U {
+                    width: pixels.width,
+                    height: pixels.height,
+                },
+                Some(pixels.pixels.as_ptr().cast()),
+                pixels.width * 4,
+                &bitmap_properties,
+            )
+            .ok()
+    });
     let mut canvas = D2dCanvas {
         graphics,
         target: &target,
@@ -908,7 +932,7 @@ pub fn write_png(
         dy: 0.0,
         opacity: 1.0,
         pixel: 1.0 / scale,
-        previews: Vec::new(),
+        previews: vec![preview],
     };
     draw(&mut canvas);
     // SAFETY: 同上
