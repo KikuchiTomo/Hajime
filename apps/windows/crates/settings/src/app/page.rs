@@ -749,14 +749,6 @@ impl RowState {
         )
     }
 
-    /// 選んだ行を切り替えるボタン(項目ごとの同期の範囲)．記号・コマンド・変換マクロの有効と無効は表の「有効」の列で切り替える
-    fn toggle_part(&self) -> Option<Part> {
-        match self.row.control {
-            Control::SyncFields(_) => Some(Part::Top(0)),
-            _ => None,
-        }
-    }
-
     /// 選んだ行を消すボタン(足す一覧は表の下の左)
     pub fn remove_part(&self) -> Option<Part> {
         self.has_add_remove().then_some(Part::Bottom(0))
@@ -1022,7 +1014,6 @@ impl RowState {
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
             Part::Bottom(0) if self.has_add_remove() => selected,
-            Part::Top(index) if self.toggle_part() == Some(Part::Top(index)) => selected,
             // 辞書・カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
             Part::Bottom(index) if self.is_dictionary_list() => {
@@ -1883,9 +1874,9 @@ impl PageView {
                 index: first,
             });
         }
+        // 項目ごとの同期は表の「同期する」の印で切り替える(table_check_click)
         if let Control::SyncFields(_) = row.row.control {
-            return (Some(part) == row.toggle_part() && !positions.is_empty())
-                .then_some(Event::SyncToggleFields(positions));
+            return None;
         }
         if let Control::List(spec, _) = &row.row.control {
             match (spec.path, part) {
@@ -2200,6 +2191,7 @@ impl PageView {
                 spec: *spec,
                 indices: vec![index],
             }),
+            Control::SyncFields(_) => Some(Event::SyncToggleFields(vec![index])),
             _ => None,
         }
     }
@@ -2693,11 +2685,16 @@ impl PageView {
             else {
                 continue;
             };
+            let color = if note.row.danger {
+                palette.danger
+            } else {
+                palette.text_secondary
+            };
             canvas.text(
                 *rect,
                 note.row.title,
                 TextStyle::Caption,
-                Color::from(palette.text_secondary),
+                Color::from(color),
                 TextLayout::WRAP,
             );
         }
