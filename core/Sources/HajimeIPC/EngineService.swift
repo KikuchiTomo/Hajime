@@ -165,7 +165,7 @@ public final class EngineService {
         let response = WireResponse(id: request.id, body: body(for: request.body, from: id))
         // 設定の項目は大きくなりうる(ユーザー辞書など)．送れない大きさなら，項目を分けて頼んでもらう
         switch response.body {
-        case .settingsFields, .userDictionary, .languagePreview:
+        case .settingsFields, .userDictionary, .languagePreview, .macroPreview:
             if Self.fits(response) { return response }
         default:
             return response
@@ -360,6 +360,8 @@ public final class EngineService {
         case .previewLanguage(let text, let precedingText):
             let words = services.previewLanguage(text, precedingText)
             return .languagePreview(words: words.map { WirePreviewWord(typed: $0.typed, shown: $0.shown, language: $0.language.rawValue) })
+        case .previewMacros(let text, let reading, let pattern):
+            return .macroPreview(results: services.previewMacros(text, reading, pattern))
         case .readUserDictionary(let offset, let limit):
             let entries = settings.current.userDictionary
             let start = min(Int(offset), entries.count)

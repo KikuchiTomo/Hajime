@@ -1229,6 +1229,23 @@
           ]
         },
         {
+          "name": "previewMacros",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "reading",
+              "type": "string"
+            },
+            {
+              "name": "pattern",
+              "type": "string?"
+            }
+          ]
+        },
+        {
           "name": "readUserDictionary",
           "fields": [
             {
@@ -1453,6 +1470,15 @@
             {
               "name": "words",
               "type": "[PreviewWord]"
+            }
+          ]
+        },
+        {
+          "name": "macroPreview",
+          "fields": [
+            {
+              "name": "results",
+              "type": "[string]"
             }
           ]
         },

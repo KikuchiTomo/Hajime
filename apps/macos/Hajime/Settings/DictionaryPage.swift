@@ -108,7 +108,11 @@ private struct TemplateReference: View {
 
     private func values(at date: Date) -> TextTemplate.Values {
         let calendar = SystemCalendar(clock: { date })
-        return TextTemplate.Values(now: calendar.now(), day: { calendar.day(offsetFromToday: $0) }, uuid: { uuid },
-                                   random: { range in range.lowerBound + randomSeed % range.count })
+        // 呼ぶたびに次の数にする(英数字の乱数が同じ字の繰り返しにならないように)．求め直すたびに同じ並びから始めるので，例は変わらない
+        var state = UInt64(randomSeed)
+        return TextTemplate.Values(now: calendar.now(), uuid: { uuid }, random: { range in
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return range.lowerBound + Int((state >> 33) % UInt64(range.count))
+        })
     }
 }

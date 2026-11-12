@@ -311,8 +311,8 @@ pub enum Control {
     Stat(Stat),
     /// 決まりの一覧(入力欄・追加・削除・表)
     List(ListSpec, LimitKind),
-    /// 英語と日本語の見分けを試す欄(打つ文・前の文字列・結果)
-    Preview,
+    /// 試す欄(2 つの入力欄と結果)．何を試すかは TryKind
+    Preview(TryKind),
     /// アプリのバージョン(変えられない)と，更新を確かめるボタン
     Version,
     /// 名前の右に置く操作のボタン(ボタンの名前)．macOS の LabeledContent の中のボタン
@@ -343,6 +343,15 @@ pub enum Control {
     PalettePreview,
     /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
     ThemeReport,
+}
+
+/// 試す欄で試すもの
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TryKind {
+    /// 英語と日本語の見分け(打つ文・前の文字列)．結果の語をいつも英語・いつも日本語にする単語に足すボタンを置く
+    Language,
+    /// 変換マクロ(試す語・読み)．変換マクロの欄に形を書いている途中なら，その形だけを当てる(macOS の CommandsPage)
+    Macros,
 }
 
 /// 一覧の上限の種類(catalog の Limits のどれか)
@@ -1349,7 +1358,7 @@ fn language() -> Vec<Section> {
         },
         Section::new(
             features::TRY_LANGUAGE,
-            vec![Row::new("", "", Control::Preview)],
+            vec![Row::new("", "", Control::Preview(TryKind::Language))],
         ),
         Section::new(
             features::ENGLISH_WORDS,
@@ -1509,6 +1518,9 @@ const COMMAND_FIELDS: &[Field] = &[
 
 const MACRO_FIELDS: &[Field] = &[Field::named("pattern", extras::MACRO_PATTERN, true)];
 
+/// 変換マクロの一覧の項目(書いている途中の形を試す欄に渡すため，画面からも探す)
+pub const MACROS_PATH: &str = "macros";
+
 /// コマンドと変換マクロのページ(macOS の CommandsPage)．コマンドの行き先は実行ファイル・ファイルのパスか URL を打つ
 fn commands() -> Vec<Section> {
     vec![
@@ -1535,9 +1547,10 @@ fn commands() -> Vec<Section> {
             title: Some(extras::MACROS_SECTION),
             rows: vec![
                 Row::toggle(extras::CONVERSION_MACROS, "conversionMacros"),
+                Row::toggle(extras::MACRO_SKIPS_SAME_READING, "macroSkipsSameReading"),
                 Row::list(
                     ListSpec {
-                        path: "macros",
+                        path: MACROS_PATH,
                         fields: MACRO_FIELDS,
                         empty: extras::MACROS_EMPTY,
                         invalid: crate::strings::Text::Fixed(extras::INVALID_MACRO),
@@ -1548,6 +1561,12 @@ fn commands() -> Vec<Section> {
                 ),
             ],
             footer: Some(extras::MACROS_NOTE),
+            footer_variants: &[],
+        },
+        Section {
+            title: Some(extras::TRY_MACROS),
+            rows: vec![Row::new("", "", Control::Preview(TryKind::Macros))],
+            footer: Some(extras::MACRO_REFERENCE),
             footer_variants: &[],
         },
     ]

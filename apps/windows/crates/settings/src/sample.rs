@@ -159,6 +159,32 @@ impl Engine for SampleEngine {
                     })
                     .collect(),
             },
+            // 見本では {text} と {reading} だけを差し込む(ほかの書き方はエンジンが置き換える)
+            RequestBody::PreviewMacros {
+                text,
+                reading,
+                pattern,
+            } => {
+                let (word, reading) = if text.trim().is_empty() {
+                    ("東京", "とうきょう")
+                } else {
+                    (text.trim(), reading.trim())
+                };
+                let apply = |form: &str| form.replace("{text}", word).replace("{reading}", reading);
+                let results = match pattern {
+                    Some(pattern) => vec![apply(&pattern)],
+                    None => state
+                        .current
+                        .get("macros")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .filter(|macro_| macro_["isEnabled"].as_bool().unwrap_or(true))
+                        .filter_map(|macro_| macro_["pattern"].as_str().map(apply))
+                        .collect(),
+                };
+                ResponseBody::MacroPreview { results }
+            }
             RequestBody::ReadUserDictionary { offset, limit } => {
                 let start = (offset as usize).min(state.dictionary.len());
                 let end = start

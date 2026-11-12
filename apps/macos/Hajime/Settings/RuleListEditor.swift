@@ -52,6 +52,8 @@ struct RuleListEditor: View {
     /// 左が重ならない一覧か．重なってよい一覧(ユーザー辞書の読み)では，左と右の両方が同じ行だけを重なりとみなす
     let keysAreUnique: Bool
     let tableHeight: CGFloat
+    /// 上の欄の左に打っている文字が変わるたびに知らせる(変換マクロの書いている途中の形を試すため)
+    let draftChanged: ((String) -> Void)?
 
     @State private var key = ""
     @State private var value = ""
@@ -66,7 +68,8 @@ struct RuleListEditor: View {
     init(labels: Labels, items: [RuleItem], problem: @escaping (_ key: String, _ value: String) -> String?,
          save: @escaping (_ key: String, _ value: String, _ editing: RuleItem?) -> Bool, remove: @escaping (_ items: [RuleItem]) -> Void,
          setEnabled: ((RuleItem, Bool) -> Void)? = nil, importFile: (() -> Void)? = nil, exportFile: (() -> Void)? = nil,
-         keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight) {
+         keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight,
+         draftChanged: ((String) -> Void)? = nil) {
         self.labels = labels
         self.items = items
         self.problem = problem
@@ -77,6 +80,7 @@ struct RuleListEditor: View {
         self.exportFile = exportFile
         self.keysAreUnique = keysAreUnique
         self.tableHeight = tableHeight
+        self.draftChanged = draftChanged
     }
 
     private var hasValue: Bool { labels.value != nil }
@@ -170,6 +174,7 @@ struct RuleListEditor: View {
                 .disabled(!isFilled || message?.isProblem == true)
         }
         .labelsHidden()
+        .onChange(of: key) { _, typed in draftChanged?(typed) }
     }
 
     /// 列を隠すと最後の列が表の幅に広がらないので，列の組み合わせごとに表を分ける(macOS 14.0 では列の if が使えない)

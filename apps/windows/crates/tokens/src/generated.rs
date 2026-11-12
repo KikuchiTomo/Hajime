@@ -283,6 +283,10 @@ pub mod size {
         pub const RULE_TABLE_HEIGHT: f32 = 220.0;
         pub const COMMAND_EDITOR_WIDTH: f32 = 460.0;
         pub const RULE_SEARCH_WIDTH: f32 = 160.0;
+        pub const PREVIEW_CHIP_PADDING_X: f32 = 8.0;
+        pub const PREVIEW_CHIP_PADDING_Y: f32 = 4.0;
+        pub const PREVIEW_CHIP_RADIUS: f32 = 6.0;
+        pub const PREVIEW_CHIP_GAP: f32 = 6.0;
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;
         pub const COMMAND_READING_COLUMN_WIDTH: f32 = 110.0;
@@ -542,6 +546,7 @@ pub mod size {
         pub const TABLE_INDICATOR_INSET: f32 = 8.0;
         pub const TOOLTIP_OFFSET: f32 = 24.0;
         pub const PREVIEW_LINES: f32 = 2.0;
+        pub const MACRO_PREVIEW_LINES: f32 = 5.0;
         pub const REPORT_LINES: f32 = 4.0;
         pub const STATUS_LINES: f32 = 3.0;
         pub const PAGE_SCROLL: f32 = 0.8;

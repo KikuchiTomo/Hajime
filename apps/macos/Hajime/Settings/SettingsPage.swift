@@ -105,7 +105,8 @@ extension SettingsView {
             case .keys: [UIStrings.Keys.presetMenu] + KeymapCommand.allCases.map(UIStrings.Keys.label(for:))
                 + KeymapState.allCases.map(UIStrings.Keys.label(for:)) + KeymapPreset.allCases.map(UIStrings.Keys.label(for:))
             case .dictionary: [UIStrings.Settings.reading, UIStrings.Settings.word, UIStrings.Dictionaries.imported, UIStrings.Extras.dynamicDictionary]
-            case .commands: [UIStrings.Extras.launcherCommands, UIStrings.Extras.macrosSection, UIStrings.Extras.conversionMacros]
+            case .commands: [UIStrings.Extras.launcherCommands, UIStrings.Extras.macrosSection, UIStrings.Extras.conversionMacros,
+                              UIStrings.Extras.macroSkipsSameReading, UIStrings.Extras.tryMacros]
             case .appearance: [UIStrings.More.theme, UIStrings.More.customThemes, UIStrings.More.font]
             case .sync: [UIStrings.Sync.folder, UIStrings.Sync.scopes, UIStrings.Sync.label(for: .dictionary)]
             default: []
