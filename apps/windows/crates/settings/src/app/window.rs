@@ -2131,10 +2131,7 @@ impl App {
             part: Part::RowMenu,
         };
         // メニューの幅は WinUI の MenuFlyout と同じく，項目が短くても最小の幅を取る
-        self.open_flyout_at(
-            element,
-            Some(Rect::new(x, y, size::SEGMENT_MIN_WIDTH, 0.0)),
-        );
+        self.open_flyout_at(element, Some(Rect::new(x, y, size::SEGMENT_MIN_WIDTH, 0.0)));
     }
 
     /// 一覧を出す．anchor(窓の中の DIP)があればその下に，無ければ部品の下に出す．下に収まらなければ上に出す
