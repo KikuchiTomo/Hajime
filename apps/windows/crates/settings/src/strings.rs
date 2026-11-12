@@ -215,9 +215,9 @@ pub mod extras {
     pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
     pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。";
     pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
-    /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補．macOS の UIStrings.Extras の …Example)
-    pub const LOOSE_READINGS_EXAMPLE: (&str, &str) = ("しゅみれーしょん", "シミュレーション");
-    pub const PHONETIC_SPELLING_EXAMPLE: (&str, &str) = ("ふぉと", "photo");
+    /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)．core の DefaultSettings の同じ名前の見本と同じ値(make check で比べる)
+    pub const LOOSE_READINGS_EXAMPLE: (&str, &str) = ("しゃんぶー", "シャンプー");
+    pub const PHONETIC_SPELLING_EXAMPLE: (&str, &str) = ("ここあ", "cocoa");
     /// 両手が 1 キー右にずれたまま「arigatou」を打った並び
     pub const HAND_SHIFT_EXAMPLE: (&str, &str) = ("stohsypi", "ありがとう");
     pub const ENGLISH_TERM_CANDIDATES_EXAMPLE: (&str, &str) = ("api", "API");
