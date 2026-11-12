@@ -36,6 +36,10 @@ use tokens::opacity::settings_windows as opacity;
 use tokens::size::settings_windows as size;
 use tokens::size::{part, space};
 
+/// jinen のモデルの項目と，エンジンが「自動」で決めた結果を添える名前(core の SettingsFields.automaticJinenModelName)
+const JINEN_MODEL_PATH: &str = "jinenModel";
+const AUTOMATIC_JINEN_MODEL: &str = "automaticJinenModel";
+
 /// 部品の番号の始まり(0 は使わない．窓の部品の番号と分ける)
 const FIRST_ID: u16 = 100;
 
@@ -493,6 +497,8 @@ struct RowState {
     /// 選択肢の後ろに足して選んだ状態にする名前(カスタムテーマを使っているときのテーマの欄．macOS と同じく，
     /// 既成のテーマのどれも選んでいないことを見せる)．選んでも何もしない
     extra_choice: Option<String>,
+    /// 選択肢「自動」の名前を置き換えるもの．jinen のモデルを「自動」にしたときにエンジンが決めた大きさを添える(「自動(small)」)
+    automatic_label: Option<String>,
     /// カスタムテーマの書体の欄の選択肢(選んだときに入れる値と画面に出す名前)
     font_items: Vec<(String, String)>,
     /// 数を選ぶ部品の選択肢
@@ -712,6 +718,7 @@ impl RowState {
             knob: Tween::fixed(0.0),
             choice: None,
             extra_choice: None,
+            automatic_label: None,
             font_items: Vec::new(),
             numbers,
             text,
@@ -1511,7 +1518,10 @@ impl RowState {
                 .collect(),
             (Control::Choice(choices), Part::Dropdown) => choices
                 .iter()
-                .map(|(_, name)| (*name).to_string())
+                .map(|(value, name)| match (&self.automatic_label, *value) {
+                    (Some(label), "automatic") => label.clone(),
+                    _ => (*name).to_string(),
+                })
                 .chain(self.extra_choice.clone())
                 .collect(),
             (_, Part::Filter) => std::iter::once(keys::ALL_STATES)
@@ -1955,6 +1965,17 @@ impl PageView {
                     row.choice = choice;
                 }
                 Control::Choice(choices) => {
+                    row.automatic_label = (row.row.path == JINEN_MODEL_PATH)
+                        .then(|| values.text(AUTOMATIC_JINEN_MODEL))
+                        .filter(|variant| !variant.is_empty())
+                        .map(|value| {
+                            // 決めた結果の値(small・xsmall・off)を，選択肢の名前(「使わない」など)にする
+                            let name = options::JINEN_MODELS
+                                .iter()
+                                .find(|(choice, _)| *choice == value)
+                                .map_or(value.as_str(), |(_, name)| name);
+                            format!("{}({name})", text::JINEN_AUTOMATIC_WITH)
+                        });
                     row.extra_choice = (row.row.path == crate::themes::BASE_THEME)
                         .then(|| {
                             crate::themes::active_name(

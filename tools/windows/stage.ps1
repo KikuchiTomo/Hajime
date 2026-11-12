@@ -1,8 +1,8 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$Output,
-    # tools/windows/fetch_llama.ps1 で展開した llama.cpp の場所
+    # tools/windows/build_llama.ps1 でビルドした llama.cpp の場所
     [Parameter(Mandatory = $true)][string]$Llama,
-    # tools/windows/fetch_zenzai.ps1 でモデルを置いた場所
+    # tools/windows/fetch_zenzai.ps1 でモデル(Zenzai と jinen)を置いた場所
     [Parameter(Mandatory = $true)][string]$Zenzai,
     # tools/dictionary/fetch_dictionary.ps1 で展開した hajime-dictionary-<版> の場所
     [Parameter(Mandatory = $true)][string]$Dictionary
@@ -30,13 +30,18 @@ if (-not $runtime) { throw 'Swift のランタイムが見つかりません' }
 Get-ChildItem -Path (Join-Path $runtime.FullName 'usr\bin') -Filter '*.dll' | Copy-Item -Destination $Output
 
 # Zenzai が使う llama.cpp の DLL と，確かめ済みのモデル(エンジンは Zenzai\ から読み，ハッシュを確かめ直す)．
-# ggml.dll は ggml-rpc.dll を読み込むので，これが無いとエンジンが起動しない(0xC0000135)
-foreach ($file in @('llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll')) {
+# CPU の命令ごとの ggml-cpu-*.dll は，エンジンが llama.dll と同じ場所から合うものを選んで読む
+foreach ($file in @('llama.dll', 'ggml.dll', 'ggml-base.dll')) {
     Copy-Item (Join-Path $Llama $file) $Output
 }
+Get-ChildItem -Path $Llama -File -Filter 'ggml-cpu-*.dll' | Copy-Item -Destination $Output
 New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Zenzai') | Out-Null
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-xsmall-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
+# 合議(ADR 0016 の案 2)に使う jinen のモデル(エンジンは Jinen\ から読み，ハッシュを確かめ直す)．CC BY-SA 4.0(THIRD_PARTY_NOTICES.md)
+New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Jinen') | Out-Null
+Copy-Item (Join-Path $Zenzai 'jinen-v2-small-Q5_K_M.gguf') (Join-Path $Output 'Jinen')
+Copy-Item (Join-Path $Zenzai 'jinen-v2-xsmall-Q5_K_M.gguf') (Join-Path $Output 'Jinen')
 
 # かな漢字変換の辞書(エンジンは Dictionary\ から読み，ファイルごとのハッシュを確かめ直す)と，辞書のライセンスの表示
 # 辞書には [0022].louds のように角かっこを含む名前のファイルがあるので，ワイルドカードとして読まない -LiteralPath で写す
@@ -60,7 +65,8 @@ Copy-Item (Join-Path $Dictionary 'NOTICE.md') (Join-Path $Output 'LICENSES\hajim
 Copy-Item (Join-Path $Dictionary 'LICENSES\*') (Join-Path $Output 'LICENSES\hajime-dictionary')
 
 $required = @('hajime_tsf.dll', 'x86\hajime_tsf.dll', 'hajime-engine-host.exe', 'hajime-candidate-ui.exe', 'hajime-settings.exe', 'postal-codes.tsv', 'wordnet-ja.tsv', 'usage_dict.txt', 'usage_dict_extra.tsv', 'usage_dict_words.tsv', 'english-terms.txt', 'palette.tsv', 'emoji-synonyms.tsv',
-    'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-rpc.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'Zenzai\zenz-v3.2-xsmall-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
+    'llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu-x64.dll', 'ggml-cpu-sandybridge.dll', 'ggml-cpu-haswell.dll', 'Zenzai\zenz-v3.2-small-Q5_K_M.gguf', 'Zenzai\zenz-v3.2-xsmall-Q5_K_M.gguf',
+    'Jinen\jinen-v2-small-Q5_K_M.gguf', 'Jinen\jinen-v2-xsmall-Q5_K_M.gguf', 'LICENSES\Apache-2.0.txt',
     'Dictionary\SHA256SUMS', 'Dictionary\louds\charID.chid', 'LICENSES\hajime-dictionary\NOTICE.md', 'LICENSES\hajime-dictionary\Mozc-LICENSE.txt', 'LICENSES\hajime-dictionary\mozcdic-ut-LICENSE.txt',
     'fonts\KiwiMaru-Regular.ttf', 'fonts\KiwiMaru-Medium.ttf', 'LICENSES\OFL-1.1-KiwiMaru.txt')
 foreach ($file in $required) {

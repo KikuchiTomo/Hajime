@@ -34,7 +34,8 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
              "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "emojiWordConversion", "emojiCandidatePosition", "emojiCandidateCount", "showsEmojiNames", "latexConversion",
              "numberFormConversion", "numberFormCircled", "numberFormParenthesized", "numberFormKanji", "numberFormRoman", "learning",
              "association", "associationLimit", "showsAssociationHint", "handShiftCorrection", "looseReadings", "phoneticSpelling", "dynamicDictionary",
-             "conversionMacros", "macroSkipsSameReading", "zenzaiModel", "englishTermCandidates", "contextualSegmentCandidates", "listSegmentAlternatives", "candidateReranking"]
+             "conversionMacros", "macroSkipsSameReading", "zenzaiModel", "englishTermCandidates", "contextualSegmentCandidates", "listSegmentAlternatives", "candidateReranking",
+             "jinenModel"]
         case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules", "macros", "palette", "paletteClosesAfterInsert", "paletteRecordsHistory"]
         case .dictionary: ["userDictionary", "englishTerms", "termDictionary", "termFields"]

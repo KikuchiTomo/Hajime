@@ -10,17 +10,26 @@ struct EvaluationCase {
     var expected: [String]
     var leftContext: String?
 
-    /// 読み<TAB>期待する変換(| で区切って複数)<TAB>左の文脈(任意)．# で始まる行と空の行は読み飛ばす
+    /// 評価用の文のファイルに，読める行が 1 つも無い
+    struct EmptyFile: Error, CustomStringConvertible {
+        var file: String
+        var description: String { "評価用の文が 1 つもありません: \(file)" }
+    }
+
+    /// 読み<TAB>期待する変換(| で区切って複数)<TAB>左の文脈(任意)．# で始まる行と空の行は読み飛ばす．
+    /// 行の区切りは LF と CRLF のどちらでも読む(Windows で取り出したファイル)．読める行が無ければ投げる
     static func load(from file: String) throws -> [EvaluationCase] {
-        try String(contentsOfFile: file, encoding: .utf8)
-            .split(separator: "\n")
+        let cases = try String(contentsOfFile: file, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
             .filter { !$0.hasPrefix("#") && !$0.isEmpty }
-            .compactMap { line in
+            .compactMap { line -> EvaluationCase? in
                 let columns = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
                 guard columns.count >= 2 else { return nil }
                 let context = columns.count >= 3 && !columns[2].isEmpty ? columns[2] : nil
                 return EvaluationCase(reading: columns[0], expected: columns[1].split(separator: "|").map(String.init), leftContext: context)
             }
+        guard !cases.isEmpty else { throw EmptyFile(file: file) }
+        return cases
     }
 }
 
@@ -30,7 +39,8 @@ enum Evaluation {
     static let candidateWindow = 10
 
     /// 評価用の文を変換して，期待どおりになった割合・上位の候補に正解が入った割合・1 回の変換の時間を出す
-    static func conversion(cases: [EvaluationCase], engine: AzooKeyConverterEngine, terms: (any TermDictionaryLookup)? = nil) {
+    /// fusion なら，Space と同じく変換の前に合議を求める(ADR 0016 の案 2)．時間には合議の分も含める
+    static func conversion(cases: [EvaluationCase], engine: AzooKeyConverterEngine, terms: (any TermDictionaryLookup)? = nil, fusion: Bool = false) {
         let clock = ContinuousClock()
         var passed = 0
         var listed = 0
@@ -38,9 +48,13 @@ enum Evaluation {
         var durations: [Duration] = []
         for item in cases {
             // 文ごとに新しいセッションにして，前の文の変換や学習の影響を受けないようにする
-            let session = newSession(engine, context: item.leftContext, terms: terms)
+            let base = engine.makeSession()
+            let session = newSession(base, context: item.leftContext, terms: terms)
             var candidates: [String] = []
-            durations.append(clock.measure { candidates = wholeCandidates(session, item.reading) })
+            durations.append(clock.measure {
+                if fusion { base.prepareFusion(for: item.reading) }
+                candidates = wholeCandidates(session, item.reading)
+            })
             let output = candidates.first ?? item.reading
             let ok = item.expected.contains(output)
             if ok { passed += 1 }
@@ -55,7 +69,7 @@ enum Evaluation {
         let listedRate = Double(listed) / Double(cases.count) * 100
         let meanErrorRate = errorRates.reduce(0, +) / Double(errorRates.count) * 100
         print(String(format: "正解: %d / %d (%.1f%%)  上位 %d 候補: %.1f%%  MinCER: %.2f%%", passed, cases.count, accuracy, candidateWindow, listedRate, meanErrorRate)
-              + "  変換の時間 中央値: \(sorted[sorted.count / 2])  最大: \(sorted.last!)")
+              + "  変換の時間 中央値: \(sorted[sorted.count / 2])  90%: \(sorted[min(sorted.count - 1, sorted.count * 9 / 10)])  最大: \(sorted.last!)")
     }
 
     /// 1 問ぶんの候補と時間．tools/evaluation/complementarity.py が読む(ほかのエンジンの結果も同じ形で書く)．
@@ -96,6 +110,28 @@ enum Evaluation {
             guard let line = try? encoder.encode(record) else { continue }
             print(String(decoding: line, as: UTF8.self))
         }
+    }
+
+    /// jinen だけで 1 文を変換した時間と，NFKC にして比べた正解の数を出す(合議に使う jinen の大きさを選ぶため)．
+    /// 最初の 1 文はモデルの準備を含むので，測る前に 1 回変換しておく
+    static func benchJinen(cases: [EvaluationCase], engine: AzooKeyConverterEngine) {
+        let clock = ContinuousClock()
+        guard let first = cases.first, engine.jinenConversion(reading: first.reading, leftContext: first.leftContext) != nil else {
+            print("jinen を使えません(--zenzai と --jinen を渡してください)")
+            return
+        }
+        var times: [Double] = []
+        var passed = 0
+        for item in cases {
+            var output: String?
+            times.append(milliseconds(clock.measure { output = engine.jinenConversion(reading: item.reading, leftContext: item.leftContext) }))
+            let normalized = output?.precomposedStringWithCompatibilityMapping
+            if item.expected.contains(where: { $0.precomposedStringWithCompatibilityMapping == normalized }) { passed += 1 }
+        }
+        times.sort()
+        print(String(format: "jinen: %@  正解(NFKC): %d / %d  1 文の時間: 中央値 %.1fms  90%% %.1fms  最大 %.1fms",
+                     engine.resolvedJinenVariant?.rawValue ?? "?", passed, cases.count,
+                     times[times.count / 2], times[min(times.count - 1, times.count * 9 / 10)], times[times.count - 1]))
     }
 
     /// 検証木の採点 1 回の時間を測る．文ごとに変換してプロンプトを KV に置いたあと(Space を押したときと同じ)，
@@ -205,7 +241,7 @@ enum Evaluation {
     /// typingInterval を与えると，その間隔でキーを打ったときと同じに，打鍵の合間(correctionPrefetchDelay 止まったあと)に訂正を前もって求め，
     /// 次のキーで取り消す．打ち終えたあとも，見直すまで(correctionDelay)のあいだ前もって求める．見直しの時間は止まってから correctionDelay たったあとから測る
     static func typo(file: String, engine: AzooKeyConverterEngine, service: ZenzaiTypoService?, typingInterval: Double? = nil) throws {
-        let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
         let clock = ContinuousClock()
         var counts: [String: Int] = [:]
         var durations: [Duration] = []
@@ -285,7 +321,7 @@ enum Evaluation {
     /// 列: 文の番号, 期待(= なら直さないのが正しい), 候補のキー, 言語モデルの差(Zenzai の点数 + 手間 - 打ったままの点数), 手間,
     /// 変換のもっともらしさの差, 候補の変換, 正解か．打ったままの並びを言語モデルが読めないときは，ReadingCorrectionRule と同じく最も低い候補と比べる
     static func correctionFeatures(file: String, engine: AzooKeyConverterEngine, service: ZenzaiTypoService?) throws {
-        let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
         for (number, line) in lines.enumerated() {
             let columns = line.split(separator: "\t").map(String.init)
             guard columns.count == 2 else { continue }
@@ -313,7 +349,7 @@ enum Evaluation {
     /// 英字入力(自動)で語ごとに英語と日本語を見分けた結果を評価する．1 行は「打ったキー<TAB>入る文<TAB>前の文字列(任意)」．
     /// 打ったキーの空白は Space を押したもの．最後に Enter を押し，入力欄に入った文字(確定した文字とアプリに渡した空白)を比べる
     static func language(file: String, engine: AzooKeyConverterEngine) throws {
-        let lines = try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
         var settings = DefaultSettings.settings
         settings.inputStyle = .englishAuto
         let lexicon = WordListLexicon()

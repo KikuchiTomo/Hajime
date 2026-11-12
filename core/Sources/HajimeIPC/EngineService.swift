@@ -353,7 +353,8 @@ public final class EngineService {
             return .wordRegistration(word: pending?.word, reading: pending?.reading)
         case .readSettingsFields(let names, let defaults):
             return fields { () throws(SettingsFields.Failure) in
-                try SettingsFields.read(defaults ? DefaultSettings.settings : settings.current, names: names)
+                let read = try SettingsFields.read(defaults ? DefaultSettings.settings : settings.current, names: names)
+                return try SettingsFields.addingAutomaticJinenModel(services.automaticJinenModel(), to: read, names: names)
             }
         case .writeSettingsFields(let values):
             return fields { () throws(SettingsFields.Failure) in

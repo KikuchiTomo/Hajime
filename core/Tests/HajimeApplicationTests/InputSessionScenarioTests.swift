@@ -45,7 +45,7 @@ final class Harness {
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
          wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
          palette: ((FakeSettings) -> PaletteServices)? = nil, calendar: (any CalendarReading)? = nil,
-         scorer: (any CandidateScoring)? = nil) {
+         scorer: (any CandidateScoring)? = nil, fusing: (any CandidateFusing)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
@@ -55,7 +55,7 @@ final class Harness {
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
                                     predictionHiding: hidesPredictions ? SettingsPredictionHiding(settings: store) : nil,
                                     usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store),
-                                    calendar: calendar, scorer: scorer)
+                                    calendar: calendar, scorer: scorer, fusing: fusing)
     }
 
     func type(_ text: String) {

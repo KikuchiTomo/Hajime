@@ -690,6 +690,7 @@ enum UIStrings {
         /// 併用を選んだときに出す，入力中と変換で使うモデル
         static let zenzaiCombinedNote = "入力中: 速さを優先 / 変換: 精度を優先"
         static let candidateReranking = "2 番目以降の候補を Zenzai で並べ替え"
+        static let jinenModel = "jinen のモデル"
         static let resetLearning = "学習結果を消去"
         static let reading = "読み"
         static let word = "単語"
@@ -750,6 +751,16 @@ enum UIStrings {
             switch width {
             case .halfwidth: "半角"
             case .fullwidth: "全角"
+            }
+        }
+
+        /// 「自動」には，起動のあとに決めた結果(automaticResult．small・xsmall・使わない)があれば括弧で添える
+        static func label(for choice: JinenModelChoice, automaticResult: String?) -> String {
+            switch choice {
+            case .automatic: automaticResult.map { "自動(\($0))" } ?? "自動"
+            case .small: "small"
+            case .xsmall: "xsmall"
+            case .off: "使わない"
             }
         }
 
@@ -1280,7 +1291,7 @@ extension UIStrings {
             "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
             "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,
             "numberFormRoman": UIStrings.Settings.numberFormRoman, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
-            "candidateReranking": UIStrings.Settings.candidateReranking,
+            "candidateReranking": UIStrings.Settings.candidateReranking, "jinenModel": UIStrings.Settings.jinenModel,
             "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,

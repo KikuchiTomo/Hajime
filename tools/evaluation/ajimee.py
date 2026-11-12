@@ -39,6 +39,7 @@ for item in items:
         continue
     lines.append("\t".join([reading, "|".join(expected), context]))
 
-with open(destination, "w", encoding="utf-8") as file:
+# Windows でも行の区切りを LF にする(hajime-playground は CRLF も読めるが，ほかの道具と合わせる)
+with open(destination, "w", encoding="utf-8", newline="\n") as file:
     file.write("\n".join(lines) + "\n")
 print(f"{len(lines) - 1} 件を書きました(飛ばした項目: {skipped})", file=sys.stderr)

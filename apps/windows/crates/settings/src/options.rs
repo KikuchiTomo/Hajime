@@ -107,6 +107,14 @@ pub const ZENZAI_MODELS: &[Choice] = &[
     ("combined", "併用"),
 ];
 
+/// 合議に使う jinen のモデル(JinenModelChoice)．UIStrings.Settings.label(for: JinenModelChoice, automaticResult:)
+pub const JINEN_MODELS: &[Choice] = &[
+    ("automatic", "自動"),
+    ("small", "small"),
+    ("xsmall", "xsmall"),
+    ("off", "使わない"),
+];
+
 pub const LEARNING: &[Choice] = &[
     ("enabled", "学習する"),
     ("readOnly", "学習結果のみ使用"),
@@ -269,6 +277,7 @@ mod tests {
             OKURIGANA,
             LEARNING,
             ZENZAI_MODELS,
+            JINEN_MODELS,
             THEMES,
             WORD_LANGUAGES,
             WORD_CONTEXTS,
