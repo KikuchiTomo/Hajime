@@ -181,6 +181,16 @@ struct BundledPaletteTests {
         #expect(!square.contains { $0.kind == .kaomoji })
     }
 
+    @Test("顔文字の読みで，目当ての顔文字が先頭に来る", arguments: [
+        ("しょぼーん", "(´・ω・｀)"),
+        ("ぺこり", "m(_ _)m"),
+        ("しくしく", "(T_T)"),
+    ])
+    func findsKaomoji(kana: String, expected: String) {
+        let results = PaletteSearch(catalog: Self.catalog).search(PaletteSearch.Query(typed: "", kana: kana), shape: .wide)
+        #expect(results.first?.text == expected)
+    }
+
     @Test("よく探す語で，目当ての文字が先頭に来る", arguments: [
         (":bow:", "", "🙇"),
         (":joy:", "", "😂"),

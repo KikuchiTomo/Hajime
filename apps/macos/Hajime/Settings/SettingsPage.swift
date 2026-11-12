@@ -97,7 +97,7 @@ extension SettingsView {
                              UIStrings.Features.tryLanguage, UIStrings.Choice.label(for: .englishAuto), UIStrings.Extras.englishTermsSection,
                              UIStrings.Extras.englishTerms]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
-            case .palette: [UIStrings.Palette.enabled, UIStrings.Palette.emojiKey, UIStrings.Palette.symbolKey, UIStrings.Palette.closesAfterInsert,
+            case .palette: [UIStrings.Palette.enabled, UIStrings.Palette.emojiKey, UIStrings.Palette.symbolKey, UIStrings.Palette.kaomojiKey, UIStrings.Palette.closesAfterInsert,
                             UIStrings.Palette.recordsHistory, UIStrings.Palette.clearHistory, UIStrings.Palette.columns, UIStrings.Palette.rows,
                             UIStrings.Palette.cellSize, UIStrings.Palette.frequentRows, UIStrings.Palette.showsPreview]
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)

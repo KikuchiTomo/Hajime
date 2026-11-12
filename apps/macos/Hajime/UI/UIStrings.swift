@@ -255,6 +255,7 @@ enum UIStrings {
             case .handwriting: "手書き入力"
             case .emojiPalette: "絵文字のパレット"
             case .symbolPalette: "記号のパレット"
+            case .kaomojiPalette: "顔文字のパレット"
             }
         }
 
@@ -285,7 +286,7 @@ enum UIStrings {
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
-            case .emojiPalette, .symbolPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
+            case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
@@ -754,6 +755,7 @@ enum UIStrings {
         static let look = "パレットの見た目"
         static let emojiKey = "絵文字のパレットを開くキー"
         static let symbolKey = "記号のパレットを開くキー"
+        static let kaomojiKey = "顔文字のパレットを開くキー"
         static let noKey = "なし"
         static let clearHistory = "使った文字の記録を消去"
         static let clearHistoryQuestion = "使った文字の記録を消去しますか？"
