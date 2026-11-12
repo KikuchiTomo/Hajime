@@ -405,6 +405,8 @@ pub enum Part {
     RowMenu,
     /// 表の行の中の選ぶ欄(表の中の位置．列は表の選ぶ欄の列．除外設定の動作)
     TableChoice(usize),
+    /// 押したキーで表を絞り込むボタン(キー設定．macOS の「キーで検索」)
+    KeySearch,
 }
 
 /// ページの中の部品(行の番号と部品)
@@ -1056,6 +1058,7 @@ impl RowState {
             Part::Reset => Some(card.reset),
             // 行のメニューは押した位置に出すので，部品の欄は持たない
             Part::RowMenu => None,
+            Part::KeySearch => card.parts.last().copied(),
             // 更新を確かめるボタン・値の右のボタンは部品の欄の外
             Part::Action
                 if matches!(self.row.control, Control::Version | Control::InfoAction(..)) =>
@@ -1189,6 +1192,9 @@ impl RowState {
                     if buttons.filter {
                         parts.push(Part::Filter);
                     }
+                    if buttons.toolbar {
+                        parts.push(Part::KeySearch);
+                    }
                     parts.extend((fields..fields + bottom_fields).map(Part::Field));
                     parts.extend((0..buttons.bottom_labels().len()).map(Part::Bottom));
                 }
@@ -1254,6 +1260,7 @@ impl RowState {
     fn button_label(&self, part: Part) -> &'static str {
         let buttons = self.row.control.list_buttons();
         match part {
+            Part::KeySearch => keys::SEARCH_BY_KEY,
             Part::Top(0) if self.has_add_remove() && self.editing.is_some() => rule_list::UPDATE,
             Part::Top(index) => buttons
                 .and_then(|buttons| buttons.top.get(index).copied())
@@ -1999,6 +2006,7 @@ impl PageView {
             Part::Radio => 9,
             Part::Filter => 31,
             Part::RowMenu => 51,
+            Part::KeySearch => 32,
             Part::Segment(index) => 90 + index,
             Part::Button(index) => 95 + index,
             Part::Field(index) => 10 + index,
@@ -2137,6 +2145,13 @@ impl PageView {
         let part = element.part;
         match (&row.row.control, part) {
             (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
+            // 次に押したキーを検索欄に書き，その行だけを出す(検索欄はキーの名前で絞る)
+            (_, Part::KeySearch) => {
+                if let Some(search) = row.search {
+                    edit::start_recording(search, keys::PRESS);
+                }
+                return None;
+            }
             (Control::Stepper(_), Part::Decrement) => return row.step(-1),
             (Control::Stepper(_), Part::Increment) => return row.step(1),
             (Control::ThemeOption(value), Part::Radio) => {
@@ -3935,6 +3950,14 @@ impl PageView {
                     );
                 }
                 Part::Field(_) | Part::Search => self.paint_field(canvas, frame, index, row, part),
+                Part::KeySearch => paint::button(
+                    canvas,
+                    theme,
+                    rect,
+                    keys::SEARCH_BY_KEY,
+                    paint::ButtonKind::Standard,
+                    self.state(frame, element, row.part_enabled(part)),
+                ),
                 Part::Top(_) | Part::Bottom(_) => {
                     let label = row.button_label(part);
                     let icon = row
