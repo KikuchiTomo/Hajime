@@ -12,6 +12,7 @@ use super::page::{
     self, Availability, Described, EditorAction, Element, Event, Extras, Frame, PageView, Part,
 };
 use super::paint::{self, Canvas, Measure, TextLayout, TextStyle};
+use super::sheet::{self, CommandSheet, SheetLayout, SheetPart};
 use super::theme::{Color, Theme};
 use super::Store;
 use crate::catalog::{Catalog, Timing};
@@ -51,6 +52,8 @@ const FLYOUT_CLASS: PCWSTR = w!("hajime.settings.flyout");
 const ID_SEARCH: u16 = 1;
 /// 前もって作る打つ欄の番号の始まり
 const WARM_ID: u16 = 50;
+/// 使い回しの欄が足りないときにシートの打つ欄を作る番号の始まり
+const SHEET_FIELD_ID: u16 = 60;
 /// つなぎ直しの時計の番号
 const RECONNECT_TIMER: usize = 1;
 /// 説明の吹き出しを出すまでの時計の番号
@@ -84,7 +87,7 @@ pub enum Focus {
     Nav,
     Page(Element),
     /// カスタムテーマの編集の画面の下のボタン
-    Sheet(EditorAction),
+    ThemeSheet(EditorAction),
 }
 
 /// ポインターを載せている・押しているところ
@@ -97,7 +100,7 @@ enum Target {
     /// 部品の中のスクロールバー(表・長い文)
     InnerScrollbar(Element),
     /// カスタムテーマの編集の画面の下のボタン
-    Sheet(EditorAction),
+    ThemeSheet(EditorAction),
 }
 
 /// ページを送る場所(窓の中のタイトルバーの下の上端・下端，DIP)と，ページの中の座標を窓の中の座標にずらす量
@@ -190,6 +193,8 @@ pub struct App {
     tooltip: Option<(&'static str, f32, f32, f64)>,
     pressed: Option<Target>,
     flyout: Option<Flyout>,
+    /// 出しているコマンドのシート(macOS の CommandsPage の CommandEditor)
+    pub(super) sheet: Option<CommandSheet>,
     started: Instant,
     /// 描いた時刻と描くのにかかった時間(測るとき)
     frames: Vec<(f64, f64)>,
@@ -296,6 +301,7 @@ pub fn open(
         tooltip: None,
         pressed: None,
         flyout: None,
+        sheet: None,
         started,
         frames: Vec::new(),
         measuring: options.measure.is_some(),
@@ -575,6 +581,8 @@ impl App {
     // MARK: - ページ
 
     pub(super) fn open_page(&mut self, page: Page) {
+        // シートは前のページのコマンドを書いているので，ページを替える前に閉じる
+        self.close_sheet();
         let start = Instant::now();
         // 編集の画面を開いたままページを作り直すとき(つなぎ直しなど)は，編集の画面を閉じる
         if self.editor.take().is_some() {
@@ -615,7 +623,7 @@ impl App {
 
     /// ページを作り直したときに，フォーカス・ポインター・送りを戻し，入りの動きを始める
     pub(super) fn reset_page_state(&mut self, now: f64) {
-        if let Focus::Page(_) | Focus::Sheet(_) = self.focus {
+        if let Focus::Page(_) | Focus::ThemeSheet(_) = self.focus {
             self.focus = Focus::Nav;
         }
         self.focused_edit = None;
@@ -656,23 +664,23 @@ impl App {
         self.focus_visible
     }
 
-    pub(super) fn sheet_hover(&self) -> Option<EditorAction> {
+    pub(super) fn theme_sheet_hover(&self) -> Option<EditorAction> {
         match self.hover {
-            Some(Target::Sheet(action)) => Some(action),
+            Some(Target::ThemeSheet(action)) => Some(action),
             _ => None,
         }
     }
 
-    pub(super) fn sheet_pressed(&self) -> Option<EditorAction> {
+    pub(super) fn theme_sheet_pressed(&self) -> Option<EditorAction> {
         match self.pressed {
-            Some(Target::Sheet(action)) => Some(action),
+            Some(Target::ThemeSheet(action)) => Some(action),
             _ => None,
         }
     }
 
-    pub(super) fn sheet_focus(&self) -> Option<EditorAction> {
+    pub(super) fn theme_sheet_focus(&self) -> Option<EditorAction> {
         match self.focus {
-            Focus::Sheet(action) => Some(action),
+            Focus::ThemeSheet(action) => Some(action),
             _ => None,
         }
     }
@@ -681,7 +689,7 @@ impl App {
     /// ページの題の場所(layout の title)を見本の帯の下に隠す
     fn page_frame(&self) -> PageFrame {
         let (_, height) = self.size();
-        match self.sheet() {
+        match self.theme_sheet() {
             Some(sheet) => PageFrame {
                 top: sheet.band.max_y(),
                 bottom: sheet.footer.y,
@@ -794,7 +802,8 @@ impl App {
         let (left, top) = self.client_px(x, y);
         let (right, bottom) = self.client_px(x + width, y + line);
         ffi::place(self.search, left, top, right - left, bottom - top);
-        ffi::show(self.search, true);
+        // シートを出しているあいだは窓の中身の打つ欄を隠す(欄は窓なので暗くした地の上に出てしまう)
+        ffi::show(self.search, self.sheet.is_none());
     }
 
     /// ページの打つ欄を今の送りの位置に置く
@@ -814,8 +823,9 @@ impl App {
             (nav_width(width), self.title_bar() + frame.shift),
             (frame.top - frame.shift, bottom),
             self.scroll.offset(now),
-            entering,
+            entering || self.sheet.is_some(),
         );
+        self.place_sheet_fields();
     }
 
     /// 検索の言葉に合うページを左の一覧に並べる．開いているページが一覧から消えたら先頭のページを開く
@@ -890,11 +900,21 @@ impl App {
             search: self.search_rect(),
             nav_top: self.nav_top(),
             frame: self.page_frame(),
-            sheet: self.sheet().map(|layout| (layout, self.sheet_state())),
+            theme_sheet: self
+                .theme_sheet()
+                .map(|layout| (layout, self.theme_sheet_state())),
         };
         let tooltip = self.tooltip.filter(|(.., since)| {
             now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
         });
+        let sheet = self.sheet.as_ref();
+        let sheet_layout = self.sheet_layout();
+        let sheet_frame = sheet::SheetFrame {
+            theme: &theme,
+            size: (width, height),
+            focused_edit: self.focused_edit,
+            hover: 1.0,
+        };
         let mut cpu = 0.0;
         let active = self.active;
         let icon = self
@@ -917,6 +937,9 @@ impl App {
                 canvas.translate(0.0, title_bar);
                 canvas.push_clip(Rect::new(0.0, 0.0, width, height));
                 paint_window(canvas, &state, nav, nav_scroll, view, scroll);
+                if let (Some(sheet), Some(layout)) = (sheet, &sheet_layout) {
+                    sheet::paint(canvas, sheet, layout, &sheet_frame);
+                }
                 if let Some((text, x, y, _)) = tooltip {
                     paint_tooltip(canvas, &theme, text, (x, y), (width, height));
                 }
@@ -1099,7 +1122,7 @@ impl App {
 
     /// 見本の画像(外観の見本・パレットの見本・情報のページのアイコン)を作り直す(中身か大きさが変わったときだけ)
     fn update_preview(&mut self) {
-        let shown = match self.sheet() {
+        let shown = match self.theme_sheet() {
             Some(sheet) => Some((page::PreviewKind::Theme, sheet.preview)),
             None => self.view.preview_rect(),
         };
@@ -1220,15 +1243,15 @@ impl App {
         let nav_width = nav_width(width);
         let now = self.now();
         // 編集の画面を開いているあいだは左の一覧を使えない．下のボタンだけを押せる
-        if let Some(sheet) = self.sheet() {
+        if let Some(sheet) = self.theme_sheet() {
             if x < nav_width {
                 return None;
             }
             if y >= sheet.footer.y {
                 return sheet
                     .hit(x, y)
-                    .filter(|action| self.sheet_enabled(*action))
-                    .map(Target::Sheet);
+                    .filter(|action| self.theme_sheet_enabled(*action))
+                    .map(Target::ThemeSheet);
             }
         }
         if x < nav_width {
@@ -1277,6 +1300,10 @@ impl App {
 
     fn mouse_move(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
+        if self.sheet.is_some() {
+            self.sheet_mouse_move(x, y);
+            return;
+        }
         let now = self.now();
         let (width, height) = self.size();
         // つまみをつかんでいれば動かす
@@ -1387,6 +1414,10 @@ impl App {
     /// ポインターを押した．double は 2 回続けて押したとき(表の行を書き換える)
     fn mouse_down(&mut self, lparam: LPARAM, double: bool) {
         let (x, y) = self.point(lparam);
+        if self.sheet.is_some() {
+            self.sheet_mouse_down(x, y);
+            return;
+        }
         let now = self.now();
         let (_, height) = self.size();
         let target = self.target_at(x, y);
@@ -1424,7 +1455,20 @@ impl App {
                 self.view.press_inner_scrollbar(element, page_y, now);
             }
             Some(Target::Nav(_)) => self.set_focus(Focus::Nav),
-            Some(Target::Sheet(action)) => self.focus = Focus::Sheet(action),
+            Some(Target::ThemeSheet(action)) => self.focus = Focus::ThemeSheet(action),
+            Some(Target::Page(element)) if matches!(element.part, Part::TableChoice(_)) => {
+                // 表の行の中の選ぶ欄は，その行を選んでから(離したときに)一覧を開く
+                self.set_focus(Focus::Page(Element {
+                    row: element.row,
+                    part: Part::Table,
+                }));
+                if let Part::TableChoice(position) = element.part {
+                    let event = self
+                        .view
+                        .table_click(element.row, position, false, false, false);
+                    self.dispatch(event);
+                }
+            }
             Some(Target::Page(element)) => {
                 if self.view.edit(element).is_none() {
                     self.set_focus(Focus::Page(element));
@@ -1465,6 +1509,10 @@ impl App {
 
     fn mouse_up(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
+        if self.sheet.is_some() {
+            self.sheet_mouse_up(x, y);
+            return;
+        }
         let now = self.now();
         let pressed = self.pressed.take();
         ffi::release_capture();
@@ -1490,7 +1538,9 @@ impl App {
             (Some(Target::Page(element)), Some(Target::Page(over))) if element == over => {
                 self.press(element);
             }
-            (Some(Target::Sheet(action)), Some(Target::Sheet(over))) if action == over => {
+            (Some(Target::ThemeSheet(action)), Some(Target::ThemeSheet(over)))
+                if action == over =>
+            {
                 self.dispatch(Some(Event::ThemeEditor(action)));
             }
             _ => {}
@@ -1523,6 +1573,9 @@ impl App {
         if let Some(flyout) = &mut self.flyout {
             flyout.scroll.scroll_by(amount, now);
             ffi::invalidate(flyout.window);
+            return;
+        }
+        if self.sheet.is_some() {
             return;
         }
         // ホイールの位置は画面の座標
@@ -1560,7 +1613,7 @@ impl App {
         let window = match focus {
             Focus::Search => Some(self.search),
             Focus::Page(element) => self.view.edit(element),
-            Focus::Nav | Focus::Sheet(_) => None,
+            Focus::Nav | Focus::ThemeSheet(_) => None,
         };
         match window {
             Some(window) => ffi::focus(window),
@@ -1593,14 +1646,14 @@ impl App {
         if self.availability() == Availability::Ready {
             stops.extend(self.view.focusable().into_iter().map(Focus::Page));
         }
-        if let Some(sheet) = self.sheet() {
+        if let Some(sheet) = self.theme_sheet() {
             stops.extend(
                 sheet
                     .buttons
                     .iter()
                     .map(|(action, _)| *action)
-                    .filter(|action| self.sheet_enabled(*action))
-                    .map(Focus::Sheet),
+                    .filter(|action| self.theme_sheet_enabled(*action))
+                    .map(Focus::ThemeSheet),
             );
         }
         let current = stops.iter().position(|stop| *stop == self.focus);
@@ -1617,6 +1670,9 @@ impl App {
         if self.flyout.is_some() {
             return self.flyout_key(key);
         }
+        if self.sheet.is_some() {
+            return self.sheet_key(key, shift);
+        }
         if key == VK_TAB.0 {
             self.move_focus(shift);
             return true;
@@ -1632,7 +1688,7 @@ impl App {
             return self.page_key(key, control);
         }
         match self.focus {
-            Focus::Sheet(action) => {
+            Focus::ThemeSheet(action) => {
                 if key == VK_SPACE.0 || key == VK_RETURN.0 {
                     self.dispatch(Some(Event::ThemeEditor(action)));
                     return true;
@@ -1685,6 +1741,19 @@ impl App {
                     k if k == VK_NEXT.0 => Move::PageDown(page),
                     k if k == VK_HOME.0 => Move::Home,
                     k if k == VK_END.0 => Move::End,
+                    // 選んだコマンドをシートで書き換える(macOS の表の primaryAction)
+                    k if k == VK_RETURN.0 => {
+                        let event = self.view.table_enter(element.row);
+                        self.dispatch(event);
+                        return true;
+                    }
+                    // 選んだ行の中の選ぶ欄を開く(除外設定の動作)
+                    k if k == VK_SPACE.0 || k == VK_F4.0 => {
+                        if let Some(choice) = self.view.table_choice(element.row) {
+                            self.open_flyout(choice);
+                        }
+                        return true;
+                    }
                     k if k == VK_DELETE.0 => {
                         // 選んだ行を消すボタンを押す
                         let Some(part) = self.view.remove_part(element.row) else {
@@ -1823,7 +1892,7 @@ impl App {
             Focus::Page(element) if self.view.edit(element).is_none() => {
                 Some(NODE_PAGE + PageView::element_id(element))
             }
-            Focus::Sheet(action) => Some(NODE_SHEET + sheet_index(action)),
+            Focus::ThemeSheet(action) => Some(NODE_THEME_SHEET + theme_sheet_index(action)),
             _ => None,
         }
     }
@@ -1837,23 +1906,26 @@ impl App {
     }
 
     fn nodes(&self) -> Vec<uia::Node> {
+        if let Some(nodes) = self.sheet_nodes() {
+            return nodes;
+        }
         let now = self.now();
         let (width, _) = self.size();
         let nav_width = nav_width(width);
         let nav_top = self.nav_top();
         let nav_offset = self.nav_scroll.offset(now);
         // 編集の画面を開いているあいだは，左の一覧と検索を読ませない(使えないので)
-        if let Some(sheet) = self.sheet() {
+        if let Some(sheet) = self.theme_sheet() {
             let mut nodes: Vec<uia::Node> = sheet
                 .buttons
                 .iter()
                 .map(|(action, rect)| uia::Node {
-                    id: NODE_SHEET + sheet_index(*action),
+                    id: NODE_THEME_SHEET + theme_sheet_index(*action),
                     role: uia::Role::Button,
                     name: super::editor::label(*action).to_string(),
                     rect: self.screen_rect(*rect),
-                    enabled: self.sheet_enabled(*action),
-                    focused: self.focus == Focus::Sheet(*action),
+                    enabled: self.theme_sheet_enabled(*action),
+                    focused: self.focus == Focus::ThemeSheet(*action),
                     toggled: None,
                     expanded: None,
                     value: None,
@@ -1966,14 +2038,18 @@ impl App {
     }
 
     fn accessibility_act(&mut self, id: i32, act: uia::Act) {
-        if let Some(sheet) = self.sheet() {
+        if self.sheet.is_some() {
+            self.sheet_act(id, act);
+            return;
+        }
+        if let Some(sheet) = self.theme_sheet() {
             if let Some((action, _)) = sheet
                 .buttons
                 .iter()
-                .find(|(action, _)| NODE_SHEET + sheet_index(*action) == id)
+                .find(|(action, _)| NODE_THEME_SHEET + theme_sheet_index(*action) == id)
             {
                 match act {
-                    uia::Act::Focus => self.set_focus(Focus::Sheet(*action)),
+                    uia::Act::Focus => self.set_focus(Focus::ThemeSheet(*action)),
                     _ => self.dispatch(Some(Event::ThemeEditor(*action))),
                 }
                 return;
@@ -2023,18 +2099,35 @@ impl App {
     // MARK: - ドロップダウン
 
     fn open_flyout(&mut self, element: Element) {
-        let (items, selected) = self.view.dropdown_items(element);
+        let now = self.now();
+        let (items, selected, left, top, rect) = if element == SHEET_KIND {
+            // シートの動作(窓の中の位置)
+            let Some((sheet, layout)) = self.sheet.as_ref().zip(self.sheet_layout()) else {
+                return;
+            };
+            let (items, selected) = sheet.kinds();
+            let Some(rect) = layout.rect(SheetPart::Kind) else {
+                return;
+            };
+            (items, Some(selected), rect.x, rect.y, rect)
+        } else {
+            let (items, selected) = self.view.dropdown_items(element);
+            let Some(rect) = self.view.rect(element) else {
+                return;
+            };
+            let (width, _) = self.size();
+            // ページの中の位置を窓の中の位置にする
+            (
+                items,
+                selected,
+                nav_width(width) + rect.x,
+                rect.y - self.scroll.offset(now) + self.page_frame().shift,
+                rect,
+            )
+        };
         if items.is_empty() {
             return;
         }
-        let Some(rect) = self.view.rect(element) else {
-            return;
-        };
-        let now = self.now();
-        let (width, _) = self.size();
-        // ページの中の位置を窓の中の位置にする
-        let left = nav_width(width) + rect.x;
-        let top = rect.y - self.scroll.offset(now) + self.page_frame().shift;
         let padding = size::FLYOUT_PADDING;
         let item = size::FLYOUT_ITEM_HEIGHT;
         let widest = items
@@ -2095,6 +2188,9 @@ impl App {
         });
         ffi::show_inactive(window);
         ffi::invalidate(window);
+        if let Some(sheet) = self.sheet.as_mut().filter(|_| element == SHEET_KIND) {
+            sheet.open = true;
+        }
         ffi::invalidate(self.window);
     }
 
@@ -2102,6 +2198,9 @@ impl App {
         if let Some(flyout) = self.flyout.take() {
             ffi::destroy(flyout.window);
             ffi::invalidate(self.window);
+        }
+        if let Some(sheet) = self.sheet.as_mut() {
+            sheet.open = false;
         }
     }
 
@@ -2111,6 +2210,10 @@ impl App {
         };
         let element = flyout.element;
         self.close_flyout();
+        if element == SHEET_KIND {
+            self.sheet_choose_kind(index);
+            return;
+        }
         let event = self.view.choose(element, index);
         self.dispatch(event);
     }
@@ -2159,10 +2262,18 @@ impl App {
         true
     }
 
+    /// ドロップダウンの一覧の窓の中のポインターの位置(DIP)．一覧の窓にはタイトルバーが無いので，
+    /// 設定の窓の point と違ってタイトルバーの高さを引かない(引くと 1 項目上を選んでしまう)
+    fn flyout_local(&self, lparam: LPARAM) -> (f32, f32) {
+        let x = (lparam.0 & 0xffff) as i16 as i32;
+        let y = ((lparam.0 >> 16) & 0xffff) as i16 as i32;
+        (self.theme.dip(x), self.theme.dip(y))
+    }
+
     /// ドロップダウンの一覧の点がスクロールバーの上なら，トラックの中の y(上からの距離)とトラックの高さ
     fn flyout_scrollbar_point(&self, lparam: LPARAM) -> Option<(f32, f32)> {
         let flyout = self.flyout.as_ref()?;
-        let (x, y) = self.point(lparam);
+        let (x, y) = self.flyout_local(lparam);
         let grabbing = flyout.scroll.grabbing();
         if !flyout.scroll.can_scroll() || (!grabbing && x < flyout.width - size::SCROLLBAR_HIT) {
             return None;
@@ -2236,7 +2347,7 @@ impl App {
 
     fn flyout_point(&self, lparam: LPARAM) -> Option<usize> {
         let flyout = self.flyout.as_ref()?;
-        let (_, y) = self.point(lparam);
+        let (_, y) = self.flyout_local(lparam);
         let now = self.now();
         let local = y - size::FLYOUT_PADDING + flyout.scroll.offset(now);
         if local < 0.0 {
@@ -2291,7 +2402,11 @@ impl App {
     fn field_focus(&mut self, window: Window, focused: bool) {
         if focused {
             self.focused_edit = Some(window);
-            if window == self.search {
+            if let Some(sheet) = self.sheet.as_mut() {
+                if let Some(part) = sheet.part_of(window) {
+                    sheet.focus = part;
+                }
+            } else if window == self.search {
                 self.focus = Focus::Search;
             } else if let Some(element) = self.view.element_of(window) {
                 self.focus = Focus::Page(element);
@@ -2311,6 +2426,13 @@ impl App {
     }
 
     fn field_changed(&mut self, window: Window) {
+        if let Some(sheet) = self.sheet.as_mut() {
+            if let Some(part) = sheet.part_of(window) {
+                sheet.set_text(part, ffi::window_text(window));
+                ffi::invalidate(self.window);
+            }
+            return;
+        }
         if window == self.search {
             self.fill_nav();
             return;
@@ -2323,6 +2445,10 @@ impl App {
     }
 
     fn field_enter(&mut self, window: Window) {
+        if self.sheet.is_some() {
+            self.save_sheet();
+            return;
+        }
         let Some(element) = self.view.element_of(window) else {
             return;
         };
@@ -2348,6 +2474,389 @@ impl App {
             ffi::post(self.window, WM_MEASURE, 0, 0);
         }
     }
+}
+
+// MARK: - コマンドのシート
+
+impl App {
+    /// シートを出す．index は書き換えるコマンドの表の行(足すなら None)
+    pub(super) fn open_command_sheet(&mut self, index: Option<usize>) {
+        if self.sheet.is_some() {
+            return;
+        }
+        let Some((spec, _)) = self.view.list_spec(pages::COMMANDS) else {
+            return;
+        };
+        let Some(model) = self.model.as_ref() else {
+            return;
+        };
+        let list = model.value(spec.path);
+        let draft = match index {
+            Some(index) => {
+                let Some(item) = spec.items(list).get(index).cloned() else {
+                    return;
+                };
+                crate::commands::CommandDraft::from_item(spec.id_at(list, index), &item)
+            }
+            None => crate::commands::CommandDraft::default(),
+        };
+        let Some(font) = &self.field_font else {
+            return;
+        };
+        // 打つ欄は使い回しの欄から取る(無ければ作る)
+        let mut fields = Vec::new();
+        for (offset, prompt) in ["", "", draft.target_prompt()].into_iter().enumerate() {
+            let window = self.pool.pop().or_else(|| {
+                let id = u16::try_from(offset)
+                    .unwrap_or(0)
+                    .wrapping_add(SHEET_FIELD_ID);
+                edit::create(self.window, id, "", font)
+            });
+            let Some(window) = window else {
+                fields.into_iter().for_each(|window| self.pool.push(window));
+                return;
+            };
+            edit::set_record_on_click(window, None);
+            edit::set_placeholder(window, prompt);
+            fields.push(window);
+        }
+        let Ok(fields) = <[Window; 3]>::try_from(fields) else {
+            return;
+        };
+        ffi::set_text(fields[0], &draft.reading);
+        ffi::set_text(fields[1], &draft.title);
+        ffi::set_text(fields[2], &draft.target);
+        self.close_flyout();
+        self.hover = None;
+        self.tooltip = None;
+        self.view.set_hover(None, self.now());
+        self.view.set_table_hover(None);
+        self.sheet = Some(CommandSheet::new(draft, index, fields));
+        self.place_search();
+        self.place_fields();
+        self.sheet_focus(SheetPart::Reading);
+        ffi::invalidate(self.window);
+    }
+
+    /// シートを閉じる(保存しない)．打つ欄は隠して使い回しに戻し，フォーカスをコマンドの表へ戻す
+    pub(super) fn close_sheet(&mut self) {
+        let Some(sheet) = self.sheet.take() else {
+            return;
+        };
+        self.close_flyout();
+        for window in sheet.fields {
+            ffi::show(window, false);
+            ffi::set_text(window, "");
+            if self.focused_edit == Some(window) {
+                self.focused_edit = None;
+            }
+            self.pool.push(window);
+        }
+        self.place_search();
+        self.place_fields();
+        match self.view.list_table(pages::COMMANDS) {
+            Some(element) => self.set_focus(Focus::Page(element)),
+            None => ffi::focus(self.window),
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// 保存する．保存できたら閉じる
+    fn save_sheet(&mut self) {
+        if !self
+            .sheet
+            .as_ref()
+            .is_some_and(|sheet| sheet.enabled(SheetPart::Save))
+        {
+            return;
+        }
+        let (saved, after) = self.save_command();
+        if saved {
+            self.close_sheet();
+        }
+        if after.is_some() {
+            AFTER.with(|slot| *slot.borrow_mut() = after);
+            ffi::post(self.window, WM_AFTER, 0, 0);
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// シートの置き場所(出していなければ None)
+    fn sheet_layout(&self) -> Option<SheetLayout> {
+        let sheet = self.sheet.as_ref()?;
+        Some(SheetLayout::new(self.size(), &sheet.draft, &self.graphics))
+    }
+
+    /// シートの打つ欄を置く
+    fn place_sheet_fields(&self) {
+        let (Some(sheet), Some(layout)) = (self.sheet.as_ref(), self.sheet_layout()) else {
+            return;
+        };
+        let line = size::BODY_LINE_HEIGHT;
+        for part in [SheetPart::Reading, SheetPart::Title, SheetPart::Target] {
+            let (Some(window), Some(rect)) = (sheet.window(part), layout.rect(part)) else {
+                continue;
+            };
+            let x = rect.x + size::FIELD_PADDING_X;
+            let y = rect.y + (rect.height - line) / 2.0;
+            let width = (rect.width - size::FIELD_PADDING_X * 2.0).max(0.0);
+            let (left, top) = self.client_px(x, y);
+            let (right, bottom) = self.client_px(x + width, y + line);
+            ffi::place(window, left, top, right - left, bottom - top);
+            ffi::show(window, true);
+        }
+    }
+
+    /// シートの部品にフォーカスを移す(打つ欄なら欄に，ほかは窓に)
+    fn sheet_focus(&mut self, part: SheetPart) {
+        let Some(sheet) = self.sheet.as_mut() else {
+            return;
+        };
+        sheet.focus = part;
+        match sheet.window(part) {
+            Some(window) => ffi::focus(window),
+            None => {
+                if ffi::focused() != Some(self.window) {
+                    ffi::focus(self.window);
+                }
+            }
+        }
+        uia::focus_changed(self.window, sheet_node(part));
+        ffi::invalidate(self.window);
+    }
+
+    /// Tab でシートの中だけを巡る(シートの外へは出ない．WinUI の ContentDialog と同じ)
+    fn sheet_move_focus(&mut self, back: bool) {
+        let Some(layout) = self.sheet_layout() else {
+            return;
+        };
+        let Some(sheet) = self.sheet.as_ref() else {
+            return;
+        };
+        let order: Vec<SheetPart> = layout
+            .order()
+            .into_iter()
+            .filter(|part| sheet.enabled(*part))
+            .collect();
+        let current = order.iter().position(|part| *part == sheet.focus);
+        if let Some(next) = crate::ui::cycle(current, order.len(), back) {
+            if let Some(sheet) = self.sheet.as_mut() {
+                sheet.focus_visible = true;
+            }
+            self.sheet_focus(order[next]);
+        }
+    }
+
+    /// シートでキーを押した(窓にフォーカスがあるとき．打つ欄の Tab・Enter・Esc は欄から届く)
+    fn sheet_key(&mut self, key: u16, shift: bool) -> bool {
+        let Some(focus) = self.sheet.as_ref().map(|sheet| sheet.focus) else {
+            return false;
+        };
+        if let Some(sheet) = self.sheet.as_mut() {
+            sheet.focus_visible = true;
+        }
+        match key {
+            k if k == VK_TAB.0 => self.sheet_move_focus(shift),
+            k if k == VK_ESCAPE.0 => self.close_sheet(),
+            k if (k == VK_SPACE.0 || k == VK_RETURN.0 || k == VK_F4.0)
+                && focus == SheetPart::Kind =>
+            {
+                self.open_flyout(SHEET_KIND)
+            }
+            k if (k == VK_UP.0 || k == VK_DOWN.0) && focus == SheetPart::Kind => {
+                let Some((_, selected)) = self.sheet.as_ref().map(CommandSheet::kinds) else {
+                    return true;
+                };
+                let next = if k == VK_UP.0 {
+                    selected.saturating_sub(1)
+                } else {
+                    (selected + 1).min(crate::options::COMMAND_KINDS.len() - 1)
+                };
+                self.sheet_choose_kind(next);
+            }
+            k if k == VK_SPACE.0 || k == VK_RETURN.0 => self.sheet_press(focus),
+            _ => return false,
+        }
+        ffi::invalidate(self.window);
+        true
+    }
+
+    fn sheet_mouse_move(&mut self, x: f32, y: f32) {
+        let hover = self.sheet_layout().and_then(|layout| layout.hit(x, y));
+        if let Some(sheet) = self.sheet.as_mut() {
+            if sheet.hover != hover {
+                sheet.hover = hover;
+                ffi::track_leave(self.window);
+                ffi::invalidate(self.window);
+            }
+        }
+    }
+
+    fn sheet_mouse_down(&mut self, x: f32, y: f32) {
+        let hit = self.sheet_layout().and_then(|layout| layout.hit(x, y));
+        // 開いている動作の一覧の上を押したら閉じるだけ
+        if self.flyout.is_some() {
+            self.close_flyout();
+            if hit == Some(SheetPart::Kind) {
+                return;
+            }
+        }
+        let Some(part) = hit else {
+            return;
+        };
+        if let Some(sheet) = self.sheet.as_mut() {
+            sheet.focus_visible = false;
+            sheet.pressed = Some(part);
+        }
+        ffi::capture(self.window);
+        self.sheet_focus(part);
+    }
+
+    fn sheet_mouse_up(&mut self, x: f32, y: f32) {
+        ffi::release_capture();
+        let hit = self.sheet_layout().and_then(|layout| layout.hit(x, y));
+        let pressed = self.sheet.as_mut().and_then(|sheet| sheet.pressed.take());
+        if let (Some(pressed), Some(hit)) = (pressed, hit) {
+            if pressed == hit {
+                self.sheet_press(pressed);
+            }
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// シートの部品を押した(クリック・Space・Enter)
+    fn sheet_press(&mut self, part: SheetPart) {
+        let Some(sheet) = self.sheet.as_ref() else {
+            return;
+        };
+        if !sheet.enabled(part) {
+            return;
+        }
+        match part {
+            SheetPart::Kind => self.open_flyout(SHEET_KIND),
+            SheetPart::Choose => {
+                let application = sheet.draft.chooses_application();
+                AFTER.with(|slot| {
+                    *slot.borrow_mut() = Some(After::ChooseCommandTarget { application })
+                });
+                ffi::post(self.window, WM_AFTER, 0, 0);
+            }
+            SheetPart::Cancel => self.close_sheet(),
+            SheetPart::Save => self.save_sheet(),
+            SheetPart::Reading | SheetPart::Title | SheetPart::Target => {
+                if let Some(window) = sheet.window(part) {
+                    ffi::focus(window);
+                }
+            }
+        }
+    }
+
+    /// シートの動作を選び直した．行き先の案内と選ぶボタンが変わる
+    fn sheet_choose_kind(&mut self, index: usize) {
+        let Some(sheet) = self.sheet.as_mut() else {
+            return;
+        };
+        if index >= crate::options::COMMAND_KINDS.len() {
+            return;
+        }
+        sheet.draft.kind = index;
+        sheet.rejected = false;
+        if let Some(window) = sheet.window(SheetPart::Target) {
+            edit::set_placeholder(window, sheet.draft.target_prompt());
+        }
+        self.place_sheet_fields();
+        ffi::invalidate(self.window);
+    }
+
+    /// 選ぶ窓で選んだアプリかファイルを行き先にする(名前が空ならファイルの名前を入れる)
+    pub(super) fn sheet_choose(&mut self, path: &str) {
+        let Some(sheet) = self.sheet.as_mut() else {
+            return;
+        };
+        sheet.draft.choose(path);
+        sheet.rejected = false;
+        let draft = sheet.draft.clone();
+        if let Some(window) = sheet.window(SheetPart::Target) {
+            ffi::set_text(window, &draft.target);
+        }
+        if let Some(window) = sheet.window(SheetPart::Title) {
+            ffi::set_text(window, &draft.title);
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// シートを出しているときの読み上げの要素(シートの部品だけ)
+    fn sheet_nodes(&self) -> Option<Vec<uia::Node>> {
+        let sheet = self.sheet.as_ref()?;
+        let layout = self.sheet_layout()?;
+        let (items, selected) = sheet.kinds();
+        Some(
+            layout
+                .parts
+                .iter()
+                .map(|(part, rect)| {
+                    let part = *part;
+                    let host = sheet.window(part);
+                    let (role, value, expanded) = match part {
+                        SheetPart::Kind => (
+                            uia::Role::ComboBox,
+                            items.get(selected).cloned(),
+                            Some(sheet.open),
+                        ),
+                        _ if host.is_some() => (uia::Role::Edit, None, None),
+                        _ => (uia::Role::Button, None, None),
+                    };
+                    uia::Node {
+                        id: sheet_node(part),
+                        role,
+                        name: sheet.name(part).to_string(),
+                        rect: self.screen_rect(*rect),
+                        enabled: sheet.enabled(part),
+                        focused: sheet.focus == part,
+                        toggled: None,
+                        expanded,
+                        value,
+                        selected: None,
+                        host,
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    fn sheet_act(&mut self, id: i32, act: uia::Act) {
+        let Some(layout) = self.sheet_layout() else {
+            return;
+        };
+        let Some(part) = layout
+            .order()
+            .into_iter()
+            .find(|part| sheet_node(*part) == id)
+        else {
+            return;
+        };
+        match act {
+            uia::Act::Focus => self.sheet_focus(part),
+            uia::Act::Collapse => self.close_flyout(),
+            uia::Act::Expand => self.open_flyout(SHEET_KIND),
+            uia::Act::Invoke | uia::Act::Toggle | uia::Act::Select => self.sheet_press(part),
+        }
+        ffi::invalidate(self.window);
+    }
+}
+
+/// シートの部品の読み上げの番号
+fn sheet_node(part: SheetPart) -> i32 {
+    let index = match part {
+        SheetPart::Reading => 0,
+        SheetPart::Title => 1,
+        SheetPart::Kind => 2,
+        SheetPart::Target => 3,
+        SheetPart::Choose => 4,
+        SheetPart::Cancel => 5,
+        SheetPart::Save => 6,
+    };
+    NODE_SHEET + index
 }
 
 /// 候補の文字の大きさの設定(見本の文字の大きさ)
@@ -2392,7 +2901,7 @@ struct PaintState<'a> {
     /// ページを送る場所
     frame: PageFrame,
     /// 開いているカスタムテーマの編集の画面
-    sheet: Option<(super::editor::SheetLayout, super::editor::SheetState)>,
+    theme_sheet: Option<(super::editor::SheetLayout, super::editor::SheetState)>,
 }
 
 /// 上に留めるページの題の帯の高さ(DIP)．ページはこの下で送る
@@ -2422,12 +2931,12 @@ fn paint_window(
         (frame.bottom - frame.top).max(0.0),
     );
     // 編集の画面を開いているあいだは左の一覧を使えないので薄くする
-    if state.sheet.is_some() {
+    if state.theme_sheet.is_some() {
         canvas.set_opacity(tokens::opacity::settings_windows::DISABLED_OVERLAY);
     }
     paint_nav(canvas, state, nav, nav_scroll, nav_width, view.page);
     canvas.set_opacity(1.0);
-    if ready && state.sheet.is_none() {
+    if ready && state.theme_sheet.is_none() {
         let (left, content) = crate::layout::content_frame(state.width - nav_width);
         canvas.text(
             Rect::new(
@@ -2485,7 +2994,7 @@ fn paint_window(
     canvas.set_opacity(1.0);
     canvas.pop_clip();
     page::scrollbar(canvas, theme, page_area, scroll, state.now);
-    if let Some((layout, sheet)) = &state.sheet {
+    if let Some((layout, sheet)) = &state.theme_sheet {
         super::editor::paint_sheet(canvas, theme, layout, sheet);
     }
 }
@@ -2759,9 +3268,9 @@ fn paint_tooltip(
 /// ページの部品の読み上げの番号の始まり(左の一覧の項目と分ける)
 const NODE_PAGE: i32 = 1000;
 /// 読み上げの番号: カスタムテーマの編集の画面の下のボタン(検索欄とページの部品の番号のあいだ)
-const NODE_SHEET: i32 = 950;
+const NODE_THEME_SHEET: i32 = 950;
 
-fn sheet_index(action: EditorAction) -> i32 {
+fn theme_sheet_index(action: EditorAction) -> i32 {
     match action {
         EditorAction::Duplicate => 0,
         EditorAction::Cancel => 1,
@@ -2770,6 +3279,13 @@ fn sheet_index(action: EditorAction) -> i32 {
 }
 /// 読み上げの番号: 検索欄(左の一覧の項目の番号とページの部品の番号のあいだ)
 const NODE_SEARCH: i32 = 900;
+/// シートの部品の読み上げの番号の始まり
+const NODE_SHEET: i32 = 800;
+/// シートの動作の一覧を開いているときのドロップダウンの持ち主(ページの部品と重ならない番号)
+const SHEET_KIND: Element = Element {
+    row: usize::MAX,
+    part: Part::Dropdown,
+};
 
 fn accessibility_nodes() -> Vec<uia::Node> {
     with_app(|app| app.nodes()).unwrap_or_default()
@@ -2957,7 +3473,24 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             LRESULT(app.field_brush.handle())
         }),
         edit::WM_FIELD_TAB => {
-            with_app(|app| app.move_focus(wparam.0 == 1));
+            with_app(|app| {
+                if app.sheet.is_some() {
+                    app.sheet_move_focus(wparam.0 == 1);
+                } else {
+                    app.move_focus(wparam.0 == 1);
+                }
+            });
+            Some(LRESULT(0))
+        }
+        // 欄の中で Esc を押したら，シートかカスタムテーマの編集の画面を閉じる(macOS の cancelAction)
+        edit::WM_FIELD_ESCAPE => {
+            with_app(|app| {
+                if app.editor.is_some() {
+                    app.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
+                } else {
+                    app.close_sheet();
+                }
+            });
             Some(LRESULT(0))
         }
         edit::WM_FIELD_ENTER => {
@@ -2968,15 +3501,6 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         edit::WM_FIELD_FOCUS => {
             let field = HWND(lparam.0 as *mut _);
             with_app(|app| app.field_focus(field, wparam.0 == 1));
-            Some(LRESULT(0))
-        }
-        // 欄の中で Esc を押したら，カスタムテーマの編集の画面を閉じる(macOS の cancelAction)
-        edit::WM_FIELD_ESCAPE => {
-            with_app(|app| {
-                if app.editor.is_some() {
-                    app.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
-                }
-            });
             Some(LRESULT(0))
         }
         edit::WM_FIELD_RECORDED => {

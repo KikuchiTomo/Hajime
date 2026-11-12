@@ -183,7 +183,7 @@ pub fn paint_sheet(
 
 impl App {
     /// 編集の画面の置き場所(開いていなければ None)
-    pub(super) fn sheet(&self) -> Option<SheetLayout> {
+    pub(super) fn theme_sheet(&self) -> Option<SheetLayout> {
         let editor = self.editor.as_ref()?;
         let (width, height) = self.size();
         let left = super::window::nav_width(width);
@@ -196,7 +196,7 @@ impl App {
     }
 
     /// 下のボタンを使えるか(保存は名前があるとき，複製は上限まで作っていないとき)
-    pub(super) fn sheet_enabled(&self, action: EditorAction) -> bool {
+    pub(super) fn theme_sheet_enabled(&self, action: EditorAction) -> bool {
         let Some(editor) = &self.editor else {
             return false;
         };
@@ -213,18 +213,18 @@ impl App {
         }
     }
 
-    pub(super) fn sheet_state(&self) -> SheetState {
+    pub(super) fn theme_sheet_state(&self) -> SheetState {
         let enabled = [
             EditorAction::Duplicate,
             EditorAction::Cancel,
             EditorAction::Save,
         ]
-        .map(|action| self.sheet_enabled(action));
+        .map(|action| self.theme_sheet_enabled(action));
         SheetState {
             enabled,
-            hover: self.sheet_hover(),
-            pressed: self.sheet_pressed(),
-            focus: self.sheet_focus(),
+            hover: self.theme_sheet_hover(),
+            pressed: self.theme_sheet_pressed(),
+            focus: self.theme_sheet_focus(),
             focus_visible: self.focus_visible(),
         }
     }
@@ -304,7 +304,7 @@ impl App {
 
     /// 下のボタン(と名前の欄の Enter)
     pub(super) fn editor_action(&mut self, action: EditorAction) -> Option<After> {
-        if !self.sheet_enabled(action) {
+        if !self.theme_sheet_enabled(action) {
             return None;
         }
         let limit = self.catalog.limits.custom_themes;

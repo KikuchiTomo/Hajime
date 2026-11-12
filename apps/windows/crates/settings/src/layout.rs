@@ -92,6 +92,15 @@ pub struct PageLayout {
     pub height: f32,
 }
 
+/// 選択肢のいちばん長い名前が収まるドロップダウンの幅(名前・山形の印と，その左右の余白．paint::dropdown と同じ並び)
+fn dropdown_width(choices: &[crate::options::Choice], metrics: &dyn Metrics) -> f32 {
+    let widest = choices
+        .iter()
+        .map(|(_, label)| metrics.width(label, TextKind::Body))
+        .fold(0.0, f32::max);
+    (widest + size::FIELD_PADDING_X * 2.0 + size::FIELD_PADDING_X + size::CHEVRON_SIZE).ceil()
+}
+
 /// ボタンの幅．名前を測った幅に左右の余白を足し，下限より狭くしない
 pub fn button_width(label: &str, metrics: &dyn Metrics) -> f32 {
     (metrics.width(label, TextKind::Body) + size::BUTTON_PADDING_X * 2.0)
@@ -258,13 +267,26 @@ fn place(
 ) -> CardLayout {
     let control = &row.control;
     if let Some(buttons) = control.list_buttons() {
-        let fields = control.list_spec().map_or(0, |spec| spec.fields.len());
+        let spec_fields = control.list_spec().map_or(&[][..], |spec| spec.fields);
+        let fields = buttons.top_fields(spec_fields.len());
+        // 表の下の帯に置く欄(選ぶ欄)は，いちばん長い選択肢が収まる幅にする
+        let bottom_fields: Vec<f32> = spec_fields[fields..buttons.input_fields(spec_fields.len())]
+            .iter()
+            .map(|field| dropdown_width(field.choices.unwrap_or(&[]), metrics))
+            .collect();
         // キー設定は行が多いので表を高くする
         let height = match control {
             Control::List(spec, _) if spec.path == "keymap" => size::KEYMAP_LIST_HEIGHT,
             _ => size::LIST_HEIGHT,
         };
-        return place_inputs(position, fields, buttons, frame, height, metrics);
+        return place_list(
+            position,
+            (fields, &bottom_fields),
+            buttons,
+            frame,
+            height,
+            metrics,
+        );
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
@@ -760,6 +782,9 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     toolbar: false,
     trailing_bottom: 0,
     note_line: false,
+    bottom_fields: 0,
+    sheet: false,
+    move_icons: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -773,6 +798,9 @@ const NO_BUTTONS: ListButtons = ListButtons {
     toolbar: false,
     trailing_bottom: 0,
     note_line: false,
+    bottom_fields: 0,
+    sheet: false,
+    move_icons: false,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -787,6 +815,27 @@ fn place_inputs(
     below: f32,
     metrics: &dyn Metrics,
 ) -> CardLayout {
+    place_list(position, (fields, &[]), buttons, frame, below, metrics)
+}
+
+/// place_inputs と同じ．fields の 2 つ目は表の下の帯の左に置く欄の幅(下のボタンの前に並べる．
+/// parts では下のボタンの前に入る)
+fn place_list(
+    position: usize,
+    (fields, bottom_fields): (usize, &[f32]),
+    buttons: ListButtons,
+    frame: Frame,
+    below: f32,
+    metrics: &dyn Metrics,
+) -> CardLayout {
+    // 山形の絵のボタン(優先度を上げる・下げる)は決まった幅にする
+    let button = |label: &str| {
+        if buttons.is_icon(label) {
+            size::ICON_BUTTON_WIDTH
+        } else {
+            button_width(label, metrics)
+        }
+    };
     let x = frame.inner_left();
     let card_top = frame.y + size::CARD_PADDING_Y;
     let inner = frame.inner_width();
@@ -868,13 +917,14 @@ fn place_inputs(
     }
     // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
     let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
-    let leading: Vec<f32> = buttons.bottom[..split]
+    let leading: Vec<f32> = bottom_fields
         .iter()
-        .map(|label| button_width(label, metrics))
+        .copied()
+        .chain(buttons.bottom[..split].iter().map(|label| button(label)))
         .collect();
     let trailing_buttons: Vec<f32> = buttons.bottom[split..]
         .iter()
-        .map(|label| button_width(label, metrics))
+        .map(|label| button(label))
         .collect();
     let bar_search = buttons.search && !buttons.toolbar;
     let bar_filter = buttons.filter && !buttons.toolbar;
@@ -943,7 +993,7 @@ fn place_inputs(
             })
         })
         .collect();
-    // parts の順に入れる: 検索欄・絞り込み・下のボタン(左の組・右の組)・ファイルのボタン
+    // parts の順に入れる: 検索欄・絞り込み・下の帯の欄・下のボタン(左の組・右の組)・ファイルのボタン
     let mut trailing_iter = trailing_rects.into_iter();
     let right_buttons: Vec<Rect> = trailing_iter
         .by_ref()
@@ -1223,6 +1273,45 @@ mod tests {
         assert!(remove.max_x() < search.x);
         assert!((export.max_x() - (card.card.max_x() - size::CARD_PADDING_X)).abs() < 0.01);
         assert!(export.max_y() <= card.card.max_y());
+    }
+
+    #[test]
+    fn 除外設定は表の下の左に動作とアプリの追加_右に並べ替えと削除を置く() {
+        let layout = all(Page::Apps, 800.0);
+        let card = &layout.sections[0].cards[0];
+        // 名前の欄・追加・動作・アプリを追加…・∧・∨・削除
+        assert_eq!(card.parts.len(), 7);
+        let (name, add) = (card.parts[0], card.parts[1]);
+        assert_eq!(name.y, add.y);
+        assert!(name.max_y() <= card.control.y);
+        let bottom = &card.parts[2..];
+        let left = card.card.x + size::CARD_PADDING_X;
+        let right = card.card.max_x() - size::CARD_PADDING_X;
+        assert!((bottom[0].x - left).abs() < 0.01);
+        assert!(bottom[0].max_x() < bottom[1].x);
+        for rect in bottom {
+            assert_eq!(rect.y, bottom[0].y);
+            assert!(rect.y >= card.control.max_y());
+        }
+        // 絵のボタンは決まった幅で，削除は右の端
+        assert_eq!(bottom[2].width, size::ICON_BUTTON_WIDTH);
+        assert_eq!(bottom[3].width, size::ICON_BUTTON_WIDTH);
+        assert!((bottom[4].max_x() - right).abs() < 0.01);
+        assert!(bottom[1].max_x() < bottom[2].x);
+    }
+
+    #[test]
+    fn コマンドの一覧は入力欄を置かず_表の下にボタンを並べる() {
+        let layout = all(Page::Commands, 800.0);
+        let card = &layout.sections[0].cards[1];
+        // コマンドを追加…・編集…・削除
+        assert_eq!(card.parts.len(), 3);
+        assert!((card.control.y - (card.card.y + size::CARD_PADDING_Y)).abs() < 0.01);
+        for pair in card.parts.windows(2) {
+            assert!(pair[0].max_x() < pair[1].x);
+            assert_eq!(pair[0].y, pair[1].y);
+        }
+        assert!(card.parts[0].y >= card.control.max_y());
     }
 
     #[test]

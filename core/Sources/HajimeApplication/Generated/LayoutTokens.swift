@@ -367,6 +367,8 @@ public enum LayoutTokens {
         public static let wizardModeSize: Double = 28
         public static let wizardHeroSize: Double = 72
         public static let stepperButtonWidth: Double = 32
+        public static let iconButtonWidth: Double = 40
+        public static let dialogRadius: Double = 8
         public static let sliderTrackHeight: Double = 4
         public static let sliderThumbSize: Double = 20
         public static let sliderThumbInner: Double = 12

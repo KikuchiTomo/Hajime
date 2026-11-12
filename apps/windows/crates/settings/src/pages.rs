@@ -541,6 +541,13 @@ pub struct ListButtons {
     pub trailing_bottom: usize,
     /// 最後の入力欄を次の行に幅いっぱいで置く(ユーザー辞書のコメント．macOS の RuleListEditor の添え書きの欄)
     pub note_line: bool,
+    /// 末尾から何個の欄を，入力欄の並びでなく表の下の帯の左(下のボタンの前)に置くか
+    /// (除外設定の動作．macOS の ExclusionsPage は足すアプリの動作を表の下で選ぶ)
+    pub bottom_fields: usize,
+    /// 欄を一覧の上に並べず，シートで書く(コマンド．macOS の CommandsPage の CommandEditor)
+    pub sheet: bool,
+    /// 表の下の「優先度を上げる」「優先度を下げる」を山形の絵のボタンにする(除外設定．macOS の chevron.up・chevron.down)
+    pub move_icons: bool,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -558,12 +565,9 @@ impl ListFiles {
         }
     }
 
-    /// ボタンの名前(除外設定は CSV と書く．macOS と同じ)
+    /// ボタンの名前
     pub fn labels(self) -> [&'static str; 2] {
-        match self.import {
-            FileTask::ImportProfileRules => [more::IMPORT_CSV, more::EXPORT_CSV],
-            _ => [settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY],
-        }
+        [settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY]
     }
 
     /// index 番目(0 は読み込む，1 は書き出す)のボタンの操作
@@ -577,6 +581,29 @@ impl ListFiles {
 }
 
 impl ListButtons {
+    /// 一覧の上に並べる欄の数(fields は一覧の欄の数)
+    pub fn top_fields(&self, fields: usize) -> usize {
+        if self.sheet {
+            0
+        } else {
+            fields.saturating_sub(self.bottom_fields)
+        }
+    }
+
+    /// 入力欄を作る欄の数(上に並べる欄と表の下に置く欄)
+    pub fn input_fields(&self, fields: usize) -> usize {
+        if self.sheet {
+            0
+        } else {
+            fields
+        }
+    }
+
+    /// 下のボタンを山形の絵にするか(名前は読み上げと説明の吹き出しに使う)
+    pub fn is_icon(&self, label: &str) -> bool {
+        self.move_icons && (label == dictionaries::MOVE_UP || label == dictionaries::MOVE_DOWN)
+    }
+
     /// 表の下のボタンの名前(ファイルのボタンを含む．部品を作る順)
     pub fn bottom_labels(&self) -> Vec<&'static str> {
         self.bottom
@@ -598,10 +625,6 @@ fn list_files(control: &Control) -> Option<ListFiles> {
             "wordLanguage.japaneseWords" => ListFiles::rule_list(RuleList::JapaneseWords),
             "englishTerms" => ListFiles::rule_list(RuleList::EnglishTerms),
             "hiddenPredictions" => ListFiles::rule_list(RuleList::HiddenPredictions),
-            "profileRules" => ListFiles {
-                import: FileTask::ImportProfileRules,
-                export: FileTask::ExportProfileRules,
-            },
             _ => return None,
         },
         Control::Dictionary(_) => ListFiles {
@@ -631,13 +654,26 @@ impl Control {
                 &[settings::ADD],
                 &[settings::REMOVE, keys::DUPLICATE, keys::RESTORE],
             ),
-            Control::List(spec, _) if spec.path == "profileRules" => {
-                (ADD_CANCEL, &[settings::REMOVE, more::ADD_APPS])
-            }
-            // コマンドは行き先のファイルやアプリを選べる(macOS の CommandsPage の選ぶボタン)
-            Control::List(spec, _) if spec.path == "commands" => {
-                (ADD_CANCEL, &[settings::REMOVE, windows::CHOOSE_TARGET])
-            }
+            // 除外設定は macOS の ExclusionsPage と同じく，表の下に [動作][アプリを追加…] … [∧][∨][削除] を置く．
+            // Windows は選ぶ窓に出ないアプリ(実行ファイルの名前の先頭)も書けるよう，上に名前の欄と追加を残す
+            Control::List(spec, _) if spec.path == PROFILE_RULES => (
+                &[settings::ADD],
+                &[
+                    more::ADD_APPS,
+                    dictionaries::MOVE_UP,
+                    dictionaries::MOVE_DOWN,
+                    settings::REMOVE,
+                ],
+            ),
+            // コマンドの表は読むだけで，足す・書き換えるはシートで行う(macOS の CommandsPage)
+            Control::List(spec, _) if spec.path == COMMANDS => (
+                &[],
+                &[
+                    extras::ADD_COMMAND,
+                    extras::EDIT_COMMAND,
+                    extras::REMOVE_COMMAND,
+                ],
+            ),
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
                 (ADD_CANCEL, &[settings::REMOVE])
             }
@@ -667,18 +703,24 @@ impl Control {
             ),
             _ => return None,
         };
-        // 判別ルールは macOS と同じく検索しない(行が少ない)
+        // 除外設定・コマンド・判別ルールは行が少なく，macOS と同じく検索欄を置かない
         let search = matches!(
             self,
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
-        ) && !matches!(self, Control::List(spec, _) if spec.path == "wordLanguage.rules");
+        ) && !matches!(
+            self,
+            Control::List(spec, _)
+                if spec.path == PROFILE_RULES
+                    || spec.path == COMMANDS
+                    || spec.path == "wordLanguage.rules"
+        );
         let filter = matches!(self, Control::List(spec, _) if spec.path == "keymap");
         // 打つもの → 置き換えるものの一覧(先頭の 2 つの欄がどちらも打つ欄)．コマンドの読みと名前は置き換えではない．
         // 判別ルールは「前」と「結果」のあいだに置く
         let replaces = matches!(
             self,
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
-        ) && !matches!(self, Control::List(spec, _) if spec.path == "commands")
+        ) && !matches!(self, Control::List(spec, _) if spec.path == COMMANDS)
             && self.list_spec().is_some_and(|spec| {
                 spec.fields.len() >= 2
                     && spec.fields[..2]
@@ -699,6 +741,9 @@ impl Control {
             _ => &[],
         };
         let keymap = matches!(self, Control::List(spec, _) if spec.path == "keymap");
+        let exclusions = matches!(self, Control::List(spec, _) if spec.path == PROFILE_RULES);
+        // 除外設定の下の帯は [動作][アプリを追加…] を左に，[∧][∨][削除] を右に寄せる
+        let trailing_bottom = if exclusions { 3 } else { usize::from(keymap) };
         Some(ListButtons {
             top,
             bottom,
@@ -708,9 +753,22 @@ impl Control {
             arrow,
             field_widths,
             toolbar: keymap,
-            trailing_bottom: usize::from(keymap),
+            trailing_bottom,
             note_line: matches!(self, Control::Dictionary(_)),
+            bottom_fields: usize::from(exclusions),
+            sheet: matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
+            move_icons: exclusions,
         })
+    }
+
+    /// 表の見出しを押して並べ替えられるか．除外設定は上の決まりから先に効くので，並びを変えて見せない
+    pub fn sortable(&self) -> bool {
+        !self.reorderable()
+    }
+
+    /// 表の下のボタンで選んだ行を上下に動かせる一覧か(除外設定)
+    pub fn reorderable(&self) -> bool {
+        matches!(self, Control::List(spec, _) if spec.path == PROFILE_RULES)
     }
 
     /// 一覧の入力欄の決まり．一覧でなければ None
@@ -779,13 +837,14 @@ impl Control {
                 enabled: Some(2),
             },
             // コマンド: 有効の印・読み・名前・動作・行き先(macOS の CommandsPage の列の幅)
-            Control::List(spec, _) if spec.path == "commands" => TableLayout {
+            Control::List(spec, _) if spec.path == COMMANDS => TableLayout {
                 columns: vec![
                     check(field_count),
                     column(0, Fixed(mac::COMMAND_READING_COLUMN_WIDTH), Cell::Text),
                     column(1, Fixed(mac::COMMAND_TITLE_COLUMN_WIDTH), Cell::Text),
                     column(2, Fixed(mac::COMMAND_KIND_COLUMN_WIDTH), Cell::Secondary),
-                    column(3, Fill, Cell::Text),
+                    // 行き先は長いパスや URL なので真ん中を省く(macOS の truncationMode(.middle))
+                    column(3, Fill, Cell::Path),
                 ],
                 enabled: Some(field_count),
             },
@@ -813,11 +872,11 @@ impl Control {
                 ],
                 enabled: Some(4),
             },
-            // 除外設定: アプリ・動作(macOS の ExclusionsPage は動作の列を決まった幅にする)
-            Control::List(spec, _) if spec.path == "profileRules" => TableLayout {
+            // 除外設定: アプリ(真ん中を省く)・動作(行の中で選び直してすぐ書く．macOS の ExclusionsPage の Picker)
+            Control::List(spec, _) if spec.path == PROFILE_RULES => TableLayout {
                 columns: vec![
-                    column(0, Fill, Cell::Text),
-                    column(1, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Text),
+                    column(0, Fill, Cell::Path),
+                    column(1, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Choice),
                 ],
                 enabled: None,
             },
@@ -924,6 +983,10 @@ pub enum Cell {
     Secondary,
     /// 有効の印(値が空でなければ印を付ける．押すと有効・無効を切り替える)
     Check,
+    /// 長いパスや URL．収まらなければ真ん中を「…」にする(macOS の truncationMode(.middle))
+    Path,
+    /// 行の中で選び直せる選択肢(値は選択肢の名前．押すと一覧を開き，選んだらすぐ書く)
+    Choice,
     /// 行の問題の印(キー設定の重なり．値は KeymapMark の文字)
     Mark,
 }
@@ -1860,9 +1923,22 @@ fn keymap() -> Vec<Section> {
 }
 
 const APP_FIELDS: &[Field] = &[
-    Field::named("applicationPrefix", more::APPS, true),
+    // 表の見出しは macOS と同じ「アプリ」．Windows は実行ファイルの名前で見分けるので，打つ欄はそれを案内する
+    Field::named("applicationPrefix", more::APPS, true)
+        .prompt(crate::strings::windows::APP_EXECUTABLE_PROMPT),
     // 同じアプリに入力の扱いとモードの扱い(IME をオフなど)を 1 つずつ付けられるよう，動作も行を見分ける欄にする
     Field::choice("profile", more::BEHAVIOR, options::APP_PROFILES, true),
+];
+
+/// 除外設定の一覧の項目
+pub const PROFILE_RULES: &str = "profileRules";
+/// コマンドの一覧の項目
+pub const COMMANDS: &str = "commands";
+
+/// 除外設定の CSV を読み込む・書き出すボタン
+const EXCLUSION_FILES: &[(&str, Action)] = &[
+    (more::IMPORT_CSV, Action::File(FileTask::ImportProfileRules)),
+    (more::EXPORT_CSV, Action::File(FileTask::ExportProfileRules)),
 ];
 
 /// 除外設定のページ(macOS の ExclusionsPage)．アプリは実行ファイルの名前(小文字)で見分ける
@@ -1872,7 +1948,7 @@ fn apps() -> Vec<Section> {
             title: None,
             rows: vec![Row::list(
                 ListSpec {
-                    path: "profileRules",
+                    path: PROFILE_RULES,
                     fields: APP_FIELDS,
                     empty: more::EXCLUSIONS_EMPTY,
                     invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
@@ -1884,6 +1960,8 @@ fn apps() -> Vec<Section> {
             footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
             footer_variants: &[],
         },
+        // CSV の読み込みと書き出しは一覧の下の別のカードに置く(macOS の ExclusionsPage)
+        Section::untitled(vec![Row::new("", "", Control::Buttons(EXCLUSION_FILES))]),
         Section::untitled(vec![
             Row::toggle(more::TERMINAL_COMMANDS, "terminalCommands"),
             Row::toggle(
@@ -1916,7 +1994,8 @@ const DICTIONARY_FIELDS: &[Field] = &[
 const DICTIONARY_NOTES: &[(&str, &str)] = &[("abbreviation", settings::ABBREVIATION_NOTE)];
 
 const COMMAND_FIELDS: &[Field] = &[
-    Field::named("reading", extras::COMMAND_READING, true),
+    // 同じ読みのコマンドをいくつも足せる(macOS と同じ)．書き換えるコマンドは id で見分ける
+    Field::named("reading", extras::COMMAND_READING, false),
     Field::named("title", extras::COMMAND_TITLE, false),
     Field::choice("kind", extras::COMMAND_KIND, options::COMMAND_KINDS, false),
     Field::named("target", extras::COMMAND_TARGET, false),
@@ -1936,7 +2015,7 @@ fn commands() -> Vec<Section> {
                 Row::toggle(extras::LAUNCHER_COMMANDS, "launcherCommands"),
                 Row::list(
                     ListSpec {
-                        path: "commands",
+                        path: COMMANDS,
                         fields: COMMAND_FIELDS,
                         empty: extras::COMMANDS_EMPTY,
                         invalid: crate::strings::Text::Fixed(extras::INVALID_COMMAND),
@@ -2779,9 +2858,63 @@ mod tests {
                 settings::EXPORT_DICTIONARY
             ]
         );
-        let apps = &sections(Page::Apps).unwrap()[0].rows;
-        let labels = apps[0].control.list_buttons().unwrap().bottom_labels();
-        assert!(labels.contains(&more::IMPORT_CSV));
+    }
+
+    #[test]
+    fn 除外設定は_macos_と同じく表の下に動作と並べ替えを置き_csv_は別のカードにする() {
+        let page = sections(Page::Apps).unwrap();
+        let list = &page[0].rows[0].control;
+        let buttons = list.list_buttons().unwrap();
+        // [動作][アプリを追加…] … [∧][∨][削除]
+        assert_eq!(
+            buttons.bottom,
+            &[
+                more::ADD_APPS,
+                dictionaries::MOVE_UP,
+                dictionaries::MOVE_DOWN,
+                settings::REMOVE
+            ]
+        );
+        assert_eq!(buttons.trailing_bottom, 3);
+        assert_eq!(buttons.bottom_fields, 1);
+        assert_eq!(buttons.top_fields(2), 1);
+        assert!(buttons.is_icon(dictionaries::MOVE_UP));
+        assert!(!buttons.is_icon(more::ADD_APPS));
+        assert!(buttons.files.is_none() && !buttons.search);
+        // 上の決まりから先に効くので，見出しで並べ替えず，行を動かす
+        assert!(list.reorderable() && !list.sortable());
+        let layout = list.table_layout();
+        assert_eq!(layout.columns[0].cell, Cell::Path);
+        assert_eq!(layout.columns[1].cell, Cell::Choice);
+        // CSV は一覧の下の別のカード
+        assert_eq!(page[1].rows[0].control, Control::Buttons(EXCLUSION_FILES));
+    }
+
+    #[test]
+    fn コマンドは表を読むだけにし_足す_書き換える_消すを表の下に置く() {
+        let page = sections(Page::Commands).unwrap();
+        let list = &page[0].rows[1].control;
+        let buttons = list.list_buttons().unwrap();
+        assert!(buttons.sheet);
+        assert_eq!(buttons.top, &[] as &[&str]);
+        assert_eq!(buttons.top_fields(4), 0);
+        assert_eq!(buttons.input_fields(4), 0);
+        assert_eq!(
+            buttons.bottom,
+            &[
+                extras::ADD_COMMAND,
+                extras::EDIT_COMMAND,
+                extras::REMOVE_COMMAND
+            ]
+        );
+        // 同じ読みのコマンドをいくつも足せる(見分ける欄が無い)
+        assert!(list
+            .list_spec()
+            .unwrap()
+            .fields
+            .iter()
+            .all(|field| !field.key));
+        assert!(list.sortable());
     }
 
     #[test]
