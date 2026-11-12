@@ -116,6 +116,12 @@ pub type Item = Vec<String>;
 /// 行ごとの有効・無効の値の名前(コマンドと変換マクロ)
 const ENABLED: &str = "isEnabled";
 
+/// 除外設定の一覧の道筋と，アプリの欄の名前
+const PROFILE_RULES: &str = "profileRules";
+const APPLICATION: &str = "applicationPrefix";
+/// Windows のアプリ(実行ファイル)の名前の終わり
+const EXECUTABLE_SUFFIX: &str = ".exe";
+
 impl ListSpec {
     fn is_strings(&self) -> bool {
         self.fields
@@ -135,6 +141,9 @@ impl ListSpec {
     }
 
     fn item(&self, element: &Value) -> Option<Item> {
+        if self.is_mac_application(element) {
+            return None;
+        }
         if self.is_strings() {
             return element.as_str().map(|text| vec![text.to_string()]);
         }
@@ -148,6 +157,19 @@ impl ListSpec {
                     .map(str::to_string)
             })
             .collect()
+    }
+
+    /// 除外設定の macOS のアプリ(「com.apple.Terminal」のような固有ID)の行か．設定の既定値は macOS と同じなので
+    /// Windows でも入っているが，Windows は実行ファイルの名前で見分けるので使わない．表には出さず，要素は消さずに残す
+    /// (行の番号は表に出す行で数えるので，足す・消す・書き換えるときも元の要素のまま残る)
+    fn is_mac_application(&self, element: &Value) -> bool {
+        self.path == PROFILE_RULES
+            && element
+                .get(APPLICATION)
+                .and_then(Value::as_str)
+                .is_some_and(|name| {
+                    name.contains('.') && !name.to_lowercase().ends_with(EXECUTABLE_SUFFIX)
+                })
     }
 
     /// 入力欄の値から行を作る．打つ欄は前後の空白を除く
@@ -272,14 +294,17 @@ impl ListSpec {
         )
     }
 
-    /// indices の行(items の並び)を除いた配列．残す要素は元のまま(欄に無い値も落とさない)
+    /// indices の行(items の並び)を除いた配列．残す要素は元のまま(欄に無い値も落とさない)．
+    /// 表に出さない要素(除外設定の macOS のアプリ)も残す
     pub fn remove(&self, list: Option<&Value>, indices: &[usize]) -> Value {
         let mut position = 0;
         let elements = self
             .entries(list)
             .into_iter()
             .filter_map(|(element, item)| {
-                item?;
+                if item.is_none() {
+                    return self.is_mac_application(&element).then_some(element);
+                }
                 position += 1;
                 (!indices.contains(&(position - 1))).then_some(element)
             })
@@ -396,6 +421,19 @@ mod tests {
     const LANGUAGE_RULES: ListSpec = ListSpec {
         path: "wordLanguage.rules",
         fields: LANGUAGE_FIELDS,
+        empty: "",
+        invalid: crate::strings::Text::Fixed(""),
+        lowercase: true,
+        exclusive_with: None,
+    };
+
+    const APP_FIELDS: &[Field] = &[
+        Field::named("applicationPrefix", "アプリ", true),
+        Field::named("profile", "動作", true),
+    ];
+    const APPS: ListSpec = ListSpec {
+        path: "profileRules",
+        fields: APP_FIELDS,
         empty: "",
         invalid: crate::strings::Text::Fixed(""),
         lowercase: true,
@@ -549,5 +587,46 @@ mod tests {
             edited[1],
             json!({"id": "a", "isEnabled": false, "typed": "hte", "word": "the"})
         );
+    }
+
+    #[test]
+    fn 除外設定の_macos_のアプリは出さずに残す() {
+        let list = json!([
+            {"applicationPrefix": "com.apple.Terminal", "profile": "terminal"},
+            {"applicationPrefix": "cmd.exe", "profile": "terminal"},
+            {"applicationPrefix": "com.jetbrains.", "profile": "programming"},
+            {"applicationPrefix": "Code.EXE", "profile": "programming"},
+            {"applicationPrefix": "notepad", "profile": "off"},
+        ]);
+        assert_eq!(
+            APPS.items(Some(&list)),
+            vec![
+                texts(&["cmd.exe", "terminal"]),
+                texts(&["Code.EXE", "programming"]),
+                texts(&["notepad", "off"]),
+            ]
+        );
+        // 表の 1 行目(cmd.exe)を消しても，macOS のアプリの行は残る
+        assert_eq!(
+            APPS.remove(Some(&list), &[0]),
+            json!([
+                list[0].clone(),
+                list[2].clone(),
+                list[3].clone(),
+                list[4].clone()
+            ])
+        );
+        // 表の行の番号は表に出す行で数える
+        assert_eq!(APPS.element_at(Some(&list), 1), Some(list[3].clone()));
+        // 足しても macOS のアプリの行は元のまま残る
+        let added = APPS.upsert(Some(&list), &texts(&["wt.exe", "terminal"]));
+        assert_eq!(added[0], list[0]);
+        assert_eq!(
+            added[5],
+            json!({"applicationPrefix": "wt.exe", "profile": "terminal"})
+        );
+        // ほかの一覧は点を含む語も出す
+        let words = json!(["node.js"]);
+        assert_eq!(WORDS.items(Some(&words)), vec![texts(&["node.js"])]);
     }
 }
