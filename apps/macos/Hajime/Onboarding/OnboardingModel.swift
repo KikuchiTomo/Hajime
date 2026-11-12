@@ -12,6 +12,8 @@ final class OnboardingModel: ObservableObject {
     }
     /// 機能のページで，左の実演と説明に見せている機能(項目の上にポインタを置いたもの)．ほかのページでは nil
     @Published var spotlight: OnboardingSpotlight?
+    /// アプリごとの入力モードのページで，左の実演に動きを見せているモード(カードの上にポインタを置いたもの)
+    @Published var appMode = AppProfile.imeOff
 
     private let store: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "onboarding")

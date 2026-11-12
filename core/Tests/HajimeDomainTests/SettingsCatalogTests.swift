@@ -111,6 +111,11 @@ struct SettingsCatalogTests {
             ]),
             // 書き出すファイルの既定の名前(一覧の値は protocol の RuleList と同じ名前)
             "exportFileNames": .object(Dictionary(uniqueKeysWithValues: RuleList.allCases.map { ($0.rawValue, JSONValue.string($0.exportFileName)) })),
+            // キー設定のコマンドを置ける状態(KeymapCommand.states．「いつでも」はどのコマンドも置ける)．
+            // Windows のキー設定は，新しい行の状態に合うコマンドだけを選べるようにする(macOS の KeymapPage)
+            "keymapCommandStates": .object(Dictionary(uniqueKeysWithValues: KeymapCommand.allCases.map { command in
+                (command.rawValue, JSONValue.array(KeymapState.allCases.filter { command.states.contains($0) }.map { .string($0.rawValue) }))
+            })),
         ])
     }
 

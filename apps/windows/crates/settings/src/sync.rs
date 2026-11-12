@@ -4,7 +4,7 @@
 //! 「sync.」で始まる道筋の値にして，ほかのページと同じ部品(オン・オフ，選ぶ欄)で出す．
 //! 変えたときは道筋から同期の要求を作ってエンジンに頼む
 
-use crate::options::SYNC_SCOPES;
+use crate::options::{SYNC_GROUPS, SYNC_SCOPES};
 use crate::store::Fields;
 use crate::strings::sync;
 use ipc::{RequestBody, SyncProblem, SyncStatus};
@@ -25,7 +25,6 @@ pub const PROBLEM_FAILED: &str = "failed";
 pub const PROBLEM_UNREADABLE: &str = "unreadable";
 
 const SYNCED: &str = "synced";
-const LOCAL: &str = "local";
 
 /// まとまりの範囲の道筋
 pub fn scope_path(group: &str) -> String {
@@ -82,6 +81,8 @@ pub fn is_sync_path(path: &str) -> bool {
 /// 項目ごとの同期の表の 1 行
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldRow {
+    /// 項目のまとまり(SyncGroup の値)
+    pub group: String,
     pub field: String,
     /// この PC だけで持つ
     pub local: bool,
@@ -93,28 +94,36 @@ pub fn field_rows(status: &SyncStatus) -> Vec<FieldRow> {
         .groups
         .iter()
         .filter(|group| group.scope == SYNCED && group.fields.len() > 1)
-        .flat_map(|group| group.fields.iter())
-        .map(|field| FieldRow {
-            field: field.clone(),
-            local: status.local_fields.contains(field),
+        .flat_map(|group| {
+            group.fields.iter().map(|field| FieldRow {
+                group: group.group.clone(),
+                field: field.clone(),
+                local: status.local_fields.contains(field),
+            })
         })
         .collect()
 }
 
-/// 表の行(項目の名前・範囲の名前)
+/// 表の行(まとまりの名前・項目の名前・同期するかの印)．macOS の「項目ごとに選択」のスイッチ(オンで同期)と同じく，
+/// 同期する項目に印を付ける(pages::ENABLED_CELL．この PC だけで持つ項目は空)
 pub fn field_table(rows: &[FieldRow]) -> Vec<Vec<String>> {
-    let scope_name = |value: &str| {
-        SYNC_SCOPES
+    let group_name = |value: &str| {
+        SYNC_GROUPS
             .iter()
-            .find(|(scope, _)| *scope == value)
+            .find(|(group, _)| *group == value)
             .map_or(value, |(_, name)| name)
             .to_string()
     };
     rows.iter()
         .map(|row| {
             vec![
+                group_name(&row.group),
                 sync::field_label(&row.field).to_string(),
-                scope_name(if row.local { LOCAL } else { SYNCED }),
+                if row.local {
+                    String::new()
+                } else {
+                    crate::pages::ENABLED_CELL.to_string()
+                },
             ]
         })
         .collect()
@@ -213,10 +222,12 @@ mod tests {
             rows,
             vec![
                 FieldRow {
+                    group: "input".into(),
                     field: "inputStyle".into(),
                     local: false
                 },
                 FieldRow {
+                    group: "input".into(),
                     field: "liveConversion".into(),
                     local: true
                 },
@@ -225,8 +236,12 @@ mod tests {
         assert_eq!(
             field_table(&rows),
             vec![
-                vec!["入力方式".to_string(), "同期する".to_string()],
-                vec!["ライブ変換".to_string(), "この PC だけ".to_string()],
+                vec![
+                    "入力".to_string(),
+                    "入力方式".to_string(),
+                    crate::pages::ENABLED_CELL.to_string()
+                ],
+                vec!["入力".to_string(), "ライブ変換".to_string(), String::new()],
             ]
         );
     }

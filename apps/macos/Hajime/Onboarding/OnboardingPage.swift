@@ -30,17 +30,13 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         }
     }
 
-    var detail: String {
+    /// 見出しの下に添える 1 行．選択肢と左の実演で分かるページには添えない
+    var detail: String? {
         switch self {
-        case .modeSwitch: UIStrings.Onboarding.modeDetail
         case .appModes: UIStrings.Onboarding.appModesDetail
-        case .correction: UIStrings.Onboarding.correctionDetail
         case .theme: UIStrings.Onboarding.themeDetail
-        case .liveConversion: UIStrings.Onboarding.liveDetail
-        case .presentation: UIStrings.Onboarding.presentationDetail
-        case .characters: UIStrings.Onboarding.charactersDetail
-        case .features: UIStrings.Onboarding.featuresDetail
         case .extras: UIStrings.Onboarding.extrasDetail
+        case .modeSwitch, .correction, .liveConversion, .presentation, .characters, .features: nil
         }
     }
 
