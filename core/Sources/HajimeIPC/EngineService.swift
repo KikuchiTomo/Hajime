@@ -750,7 +750,7 @@ public final class EngineService {
     private func state(of input: InputSession, wakeAfter: UInt32?) -> WireSessionState {
         // パレットを開いているあいだは，DLL にすべてのキーを送ってもらう(探す欄に打つ文字・矢印・Esc をアプリに渡さない)
         WireSessionState(mode: input.mode, isComposing: input.isComposing || input.isPaletteOpen, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter,
-                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current))
+                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current), undoablePrediction: input.hasUndoablePrediction)
     }
 
     private func perform(_ action: HostAction) {

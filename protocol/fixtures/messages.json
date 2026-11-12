@@ -9,7 +9,7 @@
         "type": "key",
         "session": 4,
         "input": { "key": { "kind": "character", "text": "A" }, "modifiers": { "shift": true, "control": false, "alt": false }, "keyLabel": "a", "isKeypad": false },
-        "context": { "applicationId": "notepad.exe", "isSecure": false, "precedingText": "今日は", "caret": { "x": 100, "y": 200, "width": 2, "height": 20 } }
+        "context": { "applicationId": "notepad.exe", "isSecure": false, "precedingText": "今日は", "caret": { "x": 100, "y": 200, "width": 2, "height": 20 }, "canReplacePrecedingText": true }
       }
     },
     {
@@ -111,6 +111,7 @@
           { "type": "setComposition", "segments": [] },
           { "type": "setComposition", "segments": [{ "text": "今日はかな", "style": "converted" }], "caret": 3 },
           { "type": "setComposition", "segments": [{ "text": "今日は", "style": "converted" }, { "text": "かな", "style": "reading" }], "panelAnchor": 3 },
+          { "type": "setComposition", "segments": [{ "text": "えぴ", "style": "reading" }], "replacedLength": 5 },
           { "type": "selectMode", "mode": "japanese" },
           { "type": "requestReconversion", "maximumLength": 64 }
         ],

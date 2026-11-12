@@ -71,6 +71,7 @@ unsafe fn context(application_id: *const c_char, secure: c_int) -> FieldContext 
         is_secure: secure != 0,
         preceding_text: None,
         caret: None,
+        can_replace_preceding_text: None,
     }
 }
 

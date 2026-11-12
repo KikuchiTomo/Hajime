@@ -197,6 +197,10 @@
         {
           "name": "caret",
           "type": "Rect?"
+        },
+        {
+          "name": "canReplacePrecedingText",
+          "type": "bool?"
         }
       ]
     },
@@ -281,6 +285,10 @@
             },
             {
               "name": "panelAnchor",
+              "type": "u32?"
+            },
+            {
+              "name": "replacedLength",
               "type": "u32?"
             }
           ]

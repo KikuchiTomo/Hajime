@@ -182,6 +182,7 @@ mod tests {
             is_secure: false,
             preceding_text: None,
             caret: None,
+            can_replace_preceding_text: None,
         };
         let key = |key: Key| RequestBody::Key {
             session,

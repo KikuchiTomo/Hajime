@@ -114,6 +114,9 @@ final class Harness {
             case .runCommand(let command): ranCommands.append(command)
             case .showPalette(let value): palette = value
             case .hidePalette: palette = nil
+            case .replacePrecedingText(let length):
+                // アプリと同じく，入力位置の前の確定した文字を消す(このあとの組み立て中の文字で置き換える)
+                committed = String(decoding: Array(committed.utf16.dropLast(length)), as: UTF16.self)
             case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting, .awaitCorrections, .requestReconversion: break
             }
         }

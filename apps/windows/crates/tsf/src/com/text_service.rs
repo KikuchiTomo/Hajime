@@ -463,6 +463,7 @@ impl TextService_Impl {
                 is_secure: false,
                 preceding_text: None,
                 caret: inner.caret.clone(),
+                can_replace_preceding_text: Some(true),
             }
         };
         let pending = engine.send(RequestBody::Activate { session, context });
@@ -516,6 +517,8 @@ impl TextService_Impl {
             is_secure: field.is_secure,
             preceding_text: field.preceding_text,
             caret,
+            // 組み立てを始めるときに，入力位置の前の文字を置き換えられる(show の replaced_length)
+            can_replace_preceding_text: Some(true),
         }
     }
 
@@ -614,12 +617,16 @@ impl TextService_Impl {
                             commit(ec, &target, &mut composition, &text)
                         }
                         EditOperation::SetComposition {
-                            segments, caret, ..
+                            segments,
+                            caret,
+                            replaced_length,
+                            ..
                         } => show(
                             ec,
                             &target,
                             &mut composition,
                             &CompositionPlan::new(&segments).with_caret(caret),
+                            replaced_length,
                             &atoms,
                             &sink,
                         ),
@@ -1172,11 +1179,14 @@ fn commit(
     Ok(())
 }
 
+/// 組み立て中の文字を出す．組み立てを始めるときに replaced_length(UTF-16 の数)があれば，入力位置の前のその長さの文字を
+/// 組み立て中の文字で置き換える(予測の確定を取り消して読みに戻す．エンジンが入力位置の前の文字列で確かめてから送る)
 fn show(
     ec: u32,
     context: &ITfContext,
     composition: &mut Option<ITfComposition>,
     plan: &CompositionPlan,
+    replaced_length: Option<u32>,
     atoms: &[(TextStyle, u32)],
     sink: &ITfCompositionSink,
 ) -> Result<()> {
@@ -1195,6 +1205,15 @@ fn show(
                 let range = context
                     .cast::<ITfInsertAtSelection>()?
                     .InsertTextAtSelection(ec, TF_IAS_QUERYONLY, &[])?;
+                if let Some(length) = replaced_length.filter(|length| *length > 0) {
+                    let mut moved = 0;
+                    range.ShiftStart(
+                        ec,
+                        -(length.min(i32::MAX as u32) as i32),
+                        &mut moved,
+                        std::ptr::null(),
+                    )?;
+                }
                 let started = context
                     .cast::<ITfContextComposition>()?
                     .StartComposition(ec, &range, sink)?;

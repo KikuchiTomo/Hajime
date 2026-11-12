@@ -257,12 +257,14 @@ public struct WireFieldContext: Sendable, Equatable, Codable {
     public var isSecure: Bool
     public var precedingText: String?
     public var caret: WireRect?
+    public var canReplacePrecedingText: Bool?
 
-    public init(applicationId: String? = nil, isSecure: Bool, precedingText: String? = nil, caret: WireRect? = nil) {
+    public init(applicationId: String? = nil, isSecure: Bool, precedingText: String? = nil, caret: WireRect? = nil, canReplacePrecedingText: Bool? = nil) {
         self.applicationId = applicationId
         self.isSecure = isSecure
         self.precedingText = precedingText
         self.caret = caret
+        self.canReplacePrecedingText = canReplacePrecedingText
     }
 }
 
@@ -323,12 +325,12 @@ extension WireTextSegment: CustomStringConvertible, CustomDebugStringConvertible
 
 public enum WireEditOperation: Sendable, Equatable, Codable {
     case commit(text: String)
-    case setComposition(segments: [WireTextSegment], caret: UInt32?, panelAnchor: UInt32?)
+    case setComposition(segments: [WireTextSegment], caret: UInt32?, panelAnchor: UInt32?, replacedLength: UInt32?)
     case selectMode(mode: WireInputMode)
     case requestReconversion(maximumLength: UInt32)
 
     private enum CodingKeys: String, CodingKey {
-        case type, text, segments, caret, panelAnchor, mode, maximumLength
+        case type, text, segments, caret, panelAnchor, replacedLength, mode, maximumLength
     }
 
     public init(from decoder: any Decoder) throws {
@@ -338,7 +340,7 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
         case "commit":
             self = try .commit(text: container.decode(String.self, forKey: .text))
         case "setComposition":
-            self = try .setComposition(segments: container.decode([WireTextSegment].self, forKey: .segments), caret: container.decodeIfPresent(UInt32.self, forKey: .caret), panelAnchor: container.decodeIfPresent(UInt32.self, forKey: .panelAnchor))
+            self = try .setComposition(segments: container.decode([WireTextSegment].self, forKey: .segments), caret: container.decodeIfPresent(UInt32.self, forKey: .caret), panelAnchor: container.decodeIfPresent(UInt32.self, forKey: .panelAnchor), replacedLength: container.decodeIfPresent(UInt32.self, forKey: .replacedLength))
         case "selectMode":
             self = try .selectMode(mode: container.decode(WireInputMode.self, forKey: .mode))
         case "requestReconversion":
@@ -354,11 +356,12 @@ public enum WireEditOperation: Sendable, Equatable, Codable {
         case .commit(let text):
             try container.encode("commit", forKey: .type)
             try container.encode(text, forKey: .text)
-        case .setComposition(let segments, let caret, let panelAnchor):
+        case .setComposition(let segments, let caret, let panelAnchor, let replacedLength):
             try container.encode("setComposition", forKey: .type)
             try container.encode(segments, forKey: .segments)
             try container.encodeIfPresent(caret, forKey: .caret)
             try container.encodeIfPresent(panelAnchor, forKey: .panelAnchor)
+            try container.encodeIfPresent(replacedLength, forKey: .replacedLength)
         case .selectMode(let mode):
             try container.encode("selectMode", forKey: .type)
             try container.encode(mode, forKey: .mode)
