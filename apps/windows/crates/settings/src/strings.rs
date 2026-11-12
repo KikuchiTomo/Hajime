@@ -643,7 +643,10 @@ pub mod sync {
         ("suggestionDisplay", "入力中の候補"),
         ("predictionDisplay", "入力中の予測"),
         ("predictionPrefersHistory", "入力履歴にある予測を優先"),
-        ("predictionFromCorrection", "打ち間違いを直した読みからも予測"),
+        (
+            "predictionFromCorrection",
+            "打ち間違いを直した読みからも予測",
+        ),
         ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
