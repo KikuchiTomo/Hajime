@@ -1223,6 +1223,15 @@ fn conversion() -> Vec<Section> {
             footer: Some(settings::ZENZAI_MODEL_NOTE),
             footer_variants: &[],
         },
+        Section {
+            title: None,
+            rows: vec![Row::toggle(
+                settings::CANDIDATE_RERANKING,
+                "candidateReranking",
+            )],
+            footer: Some(settings::CANDIDATE_RERANKING_NOTE),
+            footer_variants: &[],
+        },
         Section::new(
             settings::LEARNING,
             vec![

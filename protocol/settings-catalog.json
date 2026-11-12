@@ -23,6 +23,7 @@
     "calculation",
     "candidateFontSize",
     "candidatePresentation",
+    "candidateReranking",
     "commands",
     "contextualSegmentCandidates",
     "conversionMacros",

@@ -62,7 +62,8 @@ public final class AzooKeyConverterEngine {
         emojiReplacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true).map(\.text)
     }
 
-    public func makeSession() -> any KanaKanjiConverting {
+    /// 入力欄ひとつぶんの変換．検証木の採点(CandidateScoring)も同じものが受け持つ
+    public func makeSession() -> any KanaKanjiConverting & CandidateScoring {
         // 読みのもっともらしさを測る変換は，表示する変換と状態を混ぜないよう別のセッションで行う
         AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
                                 typingSessionID: converter.createSession(), restSessionID: converter.createSession())
@@ -87,6 +88,61 @@ public final class AzooKeyConverterEngine {
 
     nonisolated static func exceedsTypingBudget(_ cost: Double?) -> Bool {
         (cost ?? 0) > DefaultSettings.zenzaiTypingBudget
+    }
+
+    /// 1 回の採点(検証木)で評価するトークンの数の上限．採点にかかった時間で増減し，1 回が DefaultSettings.candidateScoringBudget に
+    /// 収まるようにする(GPU の無い Windows やほかの処理で混んでいるときは少なくなり，採点する候補が減る)
+    public private(set) var candidateTreeTokenLimit = DefaultSettings.candidateTreeTokenLimit
+    /// 評価の道具で，採点の時間によらず決まった数にするとき(負荷で結果が変わらないように)．アプリでは使わない
+    public var fixedCandidateTreeTokenLimit: Int? {
+        didSet { if let fixedCandidateTreeTokenLimit { candidateTreeTokenLimit = fixedCandidateTreeTokenLimit } }
+    }
+
+    /// 検証木の採点 1 回(プロンプトを評価し直す時間を含む)の時間の移動平均(秒)．まだ測っていなければ nil
+    private var scoringCallCost: Double?
+    /// 採点した回数．最初の 1 回は GPU の準備の時間を含むので，時間の平均に入れない
+    private var scoringCallCount = 0
+    /// 最後に採点した時刻．遅い環境とみなしたあとも，ときどき採点して速さを測り直すのに使う
+    private var lastScoringTime: ContinuousClock.Instant?
+
+    func recordScoringCallCost(_ duration: Duration) {
+        scoringCallCount += 1
+        lastScoringTime = .now
+        guard scoringCallCount > 1 else { return }
+        scoringCallCost = Self.smoothedCost(scoringCallCost, adding: duration)
+    }
+
+    /// 採点が遅い環境か．採点 1 回の時間の移動平均が DefaultSettings.candidateScoringSlowThreshold を超えたら，
+    /// 打鍵の合間に前もって求めた点数だけを使う(Space で待たせない)．
+    /// 最後の採点から DefaultSettings.candidateScoringProbeInterval たったら，次の 1 回は採点して速さを測り直す(混んでいたあと速さが戻るように)．
+    /// 評価の道具でトークンの数を決めているときは，結果を負荷で変えないよう遅いとみなさない
+    var prefersPrecomputedScores: Bool {
+        guard fixedCandidateTreeTokenLimit == nil, (scoringCallCost ?? 0) > DefaultSettings.candidateScoringSlowThreshold else { return false }
+        guard let lastScoringTime else { return true }
+        return ContinuousClock.now - lastScoringTime < .seconds(DefaultSettings.candidateScoringProbeInterval)
+    }
+
+    /// 検証木で採点した時間を覚え，次の採点で評価するトークンの数の上限を決め直す．
+    /// プロンプトを評価し直した回は，時間をトークンの数で按分し，木のぶんの時間だけで決める(プロンプトは同じ読みなら次は評価し直さない)
+    func recordScoringCost(_ duration: Duration, treeTokens: Int, promptTokens: Int) {
+        let seconds = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+        let treeSeconds = seconds * Double(treeTokens) / Double(max(treeTokens + promptTokens, 1))
+        guard fixedCandidateTreeTokenLimit == nil else { return }
+        candidateTreeTokenLimit = Self.nextCandidateTreeTokenLimit(current: candidateTreeTokenLimit, tokens: treeTokens, seconds: treeSeconds)
+    }
+
+    /// 目安を超えたら，時間がトークンの数に比例するとみて目安に収まる数まで減らす．上限近くまで使って目安より十分速く済んだら少し増やす．
+    /// 1 トークンあたりの平均の時間で決めると，推論 1 回の決まった時間のぶん小さな木ほど割高に見え，上限が下がり続けるので使わない
+    nonisolated static func nextCandidateTreeTokenLimit(current: Int, tokens: Int, seconds: Double) -> Int {
+        let budget = DefaultSettings.candidateScoringBudget
+        if seconds > budget {
+            let affordable = Int(Double(max(tokens, 1)) * budget / seconds)
+            return max(DefaultSettings.minimumCandidateTreeTokens, min(current, affordable))
+        }
+        if tokens * 10 >= current * 9, seconds < budget * DefaultSettings.candidateTreeGrowthMargin {
+            return min(DefaultSettings.candidateTreeTokenLimit, Int(Double(current) * DefaultSettings.candidateTreeGrowth))
+        }
+        return current
     }
 
     public func warmUp() {
@@ -139,6 +195,10 @@ public final class AzooKeyConverterEngine {
             zenzaiChoice = settings.zenzaiModel
             // 測った時間は前のモデルのものなので，選び直したモデルで測り直す
             zenzaiCost = nil
+            candidateTreeTokenLimit = DefaultSettings.candidateTreeTokenLimit
+            scoringCallCost = nil
+            scoringCallCount = 0
+            lastScoringTime = nil
         }
         // かなにならない読み(「gh」)と，入れる時に中身を決める語(TextTemplate)は，文の中の語として渡さない．
         // SupplementedConverter が読み全体の一致で候補に出す
@@ -210,7 +270,7 @@ public final class AzooKeyConverterEngine {
         return fastZenzai
     }
 
-    private func zenzaiMode(leftContext: String?, model: ZenzaiModel?) -> ConvertRequestOptions.ZenzaiMode {
+    private func zenzaiMode(leftContext: String?, rightContext: String?, model: ZenzaiModel?) -> ConvertRequestOptions.ZenzaiMode {
         guard let zenzai = model else { return .off }
         return .on(
             weight: zenzai.url,
@@ -218,13 +278,16 @@ public final class AzooKeyConverterEngine {
             personalizationMode: nil,
             versionDependentMode: .v3(.init(
                 leftSideContext: leftContext,
-                maxLeftSideContextLength: DefaultSettings.maximumLeftContextLength
+                rightSideContext: rightContext,
+                maxLeftSideContextLength: DefaultSettings.maximumLeftContextLength,
+                maxRightSideContextLength: DefaultSettings.maximumRightContextLength
             ))
         )
     }
 
     /// - Parameter usesTypingModel: 打っている間の表示を求めるとき true．併用なら xsmall で求める
-    fileprivate func options(leftContext: String?, usesZenzai: Bool = true, usesTypingModel: Bool = false,
+    /// - Parameter rightContext: 読みの後ろにある文字．検証木で文節を採点するときだけ渡す(変換には使わない)
+    fileprivate func options(leftContext: String?, rightContext: String? = nil, usesZenzai: Bool = true, usesTypingModel: Bool = false,
                              candidateCount: Int = DefaultSettings.engineCandidateCount) -> ConvertRequestOptions {
         ConvertRequestOptions(
             N_best: candidateCount,
@@ -241,7 +304,7 @@ public final class AzooKeyConverterEngine {
             // 和暦と西暦の読み替え(「れいわ8ねん」→「2026年」)や数の桁区切りは azooKey が出す．
             // 「きょう」→ 日付の候補は SupplementedConverter が出す(設定の dateConversion)
             specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
-            zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext, model: usesTypingModel ? typingZenzai ?? zenzai : zenzai) : .off,
+            zenzaiMode: usesZenzai ? zenzaiMode(leftContext: leftContext, rightContext: rightContext, model: usesTypingModel ? typingZenzai ?? zenzai : zenzai) : .off,
             metadata: .init(versionString: versionString)
         )
     }
@@ -251,7 +314,7 @@ extension AzooKeyConverterEngine: EmojiLooking {}
 
 /// 入力欄ひとつぶんの変換の状態．
 @MainActor
-final class AzooKeyConverterSession: KanaKanjiConverting {
+final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring {
     private struct Result {
         var all: [HajimeDomain.Candidate]
         var clauses: [HajimeDomain.Candidate]
@@ -271,6 +334,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
     private var dictionaryCache: [String: [HajimeDomain.Candidate]] = [:]
     private var segmentCandidateCache: [String: [HajimeDomain.Candidate]] = [:]
     private var segmentationCache: [String: [HajimeDomain.Candidate.Word]] = [:]
+    /// 検証木の点数(scores)．読み・前後の文字・表記をつないだものがキー．左の文脈が変わったときと入力を終えたときに捨てる
+    private var scoreCache: [String: [Double?]] = [:]
     /// 返した候補をエンジンの候補に戻すための表．Candidate の id はこの表のキーで，入力を確定するまで使い回さない
     private var engineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
     private var nextID = 0
@@ -526,10 +591,49 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         return scores.map { $0.map(Double.init) }
     }
 
+    /// 表記を Zenzai の検証木で採点する．前の文節の文字は左の文脈に続け，後ろの文節の文字は右の文脈にする．
+    /// 採点は変換の状態を変えないので，採点用のセッションで行う．同じ問いは入力を終えるまで覚えておく
+    /// (打鍵の合間に前もって求め，Space で使うため)
+    func scores(of texts: [String], reading: String, before: String, after: String) -> [Double?] {
+        guard engine.usesZenzai, !texts.isEmpty, !reading.isEmpty else { return texts.map { _ in nil } }
+        let key = Self.scoreKey(texts, reading: reading, before: before, after: after)
+        if let cached = scoreCache[key] { return cached }
+        let left = (leftContext ?? "") + before
+        let options = engine.options(leftContext: left.isEmpty ? nil : left, rightContext: after.isEmpty ? nil : after)
+        let started = ContinuousClock.now
+        let result = engine.withSession(scoringSessionID) { converter in
+            converter.experimentalScoreCandidates(texts, convertTarget: reading, options: options,
+                                                  maximumTreeTokens: engine.candidateTreeTokenLimit,
+                                                  maximumCandidates: DefaultSettings.candidateTreeCandidateLimit)
+        }
+        if let result {
+            engine.recordScoringCallCost(ContinuousClock.now - started)
+            // 1 つも木に入らなかったときは，上限を使い切ったとみなす(速ければ上限を増やし，長い表記も入るようにする)
+            engine.recordScoringCost(ContinuousClock.now - started,
+                                     treeTokens: result.evaluatedTokens > 0 ? result.evaluatedTokens : engine.candidateTreeTokenLimit,
+                                     promptTokens: result.decodedPromptTokens)
+        }
+        let scores = result.map { $0.scores.map { $0.map(Double.init) } } ?? texts.map { _ in nil }
+        scoreCache[key] = scores
+        return scores
+    }
+
+    func cachedScores(of texts: [String], reading: String, before: String, after: String) -> [Double?]? {
+        scoreCache[Self.scoreKey(texts, reading: reading, before: before, after: after)]
+    }
+
+    var prefersPrecomputedScores: Bool { engine.prefersPrecomputedScores }
+
+    /// 点数を覚えるキー．読み・前後の文字・表記を，読みや表記に出ない文字でつなぐ
+    private static func scoreKey(_ texts: [String], reading: String, before: String, after: String) -> String {
+        ([reading, before, after] + texts).joined(separator: "\u{0}")
+    }
+
     func setLeftContext(_ text: String?) {
         guard text != leftContext else { return }
         leftContext = text
         cache = [:]
+        scoreCache = [:]
     }
 
     func didCommit(_ candidate: HajimeDomain.Candidate) {
@@ -637,6 +741,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
         dictionaryCache = [:]
         segmentationCache = [:]
         segmentCandidateCache = [:]
+        scoreCache = [:]
         engineCandidates = [:]
         cache = [:]
     }

@@ -223,3 +223,30 @@ public final class FakePaletteUsageStore: PaletteUsageStoring {
         if usage != before { saveCount += 1 }
     }
 }
+
+/// 表記ごとの点数を表から返す採点(検証木の代わり)．問い合わせを覚える
+@MainActor
+public final class FakeCandidateScorer: CandidateScoring {
+    /// 表記 → 点数．無い表記は nil(採点できなかった)
+    public var table: [String: Double]
+    public private(set) var requests: [(texts: [String], reading: String, before: String, after: String)] = []
+
+    public init(_ table: [String: Double] = [:]) {
+        self.table = table
+    }
+
+    /// 採点が遅い環境として振る舞うか
+    public var prefersPrecomputedScores = false
+    /// scores で答えた問い(cachedScores が答える)
+    private var answered: Set<[String]> = []
+
+    public func scores(of texts: [String], reading: String, before: String, after: String) -> [Double?] {
+        requests.append((texts, reading, before, after))
+        answered.insert([reading, before, after] + texts)
+        return texts.map { table[$0] }
+    }
+
+    public func cachedScores(of texts: [String], reading: String, before: String, after: String) -> [Double?]? {
+        answered.contains([reading, before, after] + texts) ? texts.map { table[$0] } : nil
+    }
+}

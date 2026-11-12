@@ -72,6 +72,9 @@ pub mod settings {
     pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
     pub const ZENZAI_MODEL_NOTE: &str =
         "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。";
+    pub const CANDIDATE_RERANKING: &str = "Zenzai による候補の並べ替え";
+    pub const CANDIDATE_RERANKING_NOTE: &str =
+        "変換の候補の 2 番目以降を、Zenzai で前後の文に合う順に並べ替えます。第 1 候補は変わりません。";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
     pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
@@ -743,6 +746,7 @@ pub mod sync {
         ("numberFormRoman", "ローマ数字"),
         ("learning", "学習"),
         ("zenzaiModel", "Zenzai のモデル"),
+        ("candidateReranking", "Zenzai による候補の並べ替え"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),
         ("showsModeIndicator", "入力モードの切り替えを表示"),

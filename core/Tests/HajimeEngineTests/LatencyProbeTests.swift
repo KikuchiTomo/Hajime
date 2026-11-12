@@ -25,7 +25,9 @@ struct LatencyProbeTests {
         let zenzai = try ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai)
         engine.warmUp()
-        let session = InputSession(converter: engine.makeSession(), lexicon: FakeLexicon(), settings: FakeSettings())
+        // アプリと同じく，エンジンのセッションに候補を文脈で並べ替える採点(検証木)も受け持たせる
+        let engineSession = engine.makeSession()
+        let session = InputSession(converter: engineSession, lexicon: FakeLexicon(), settings: FakeSettings(), scorer: engineSession)
         // 辞書を読み込ませるための 1 回目は数えない
         _ = session.handle(KeyEvent(.character("a")), context: InputContext())
         _ = session.handle(KeyEvent(.escape), context: InputContext())
@@ -67,8 +69,10 @@ struct LatencyProbeTests {
         engine.warmUp()
         // アプリと同じく，記号・日付・送り仮名などの候補を足す変換器(SupplementedConverter)を通して測る
         let settings = FakeSettings()
-        let converter = SupplementedConverter(engine.makeSession(), settings: settings, calendar: FakeCalendar())
-        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings)
+        // 候補を文脈で並べ替える採点(検証木)も，アプリと同じくエンジンのセッションが受け持つ
+        let engineSession = engine.makeSession()
+        let converter = SupplementedConverter(engineSession, settings: settings, calendar: FakeCalendar())
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings, scorer: engineSession)
         _ = session.handle(KeyEvent(.character("a")), context: InputContext())
         _ = session.handle(KeyEvent(.escape), context: InputContext())
         let keys = Array("kinouhatomodatitoeigawominiittekaerinikissatendekohiwonondekaraiedeyuuhanwotabemasita")
@@ -164,8 +168,9 @@ struct LatencyProbeTests {
         initial.typoCorrection = .off
         initial.misreadings = false
         let settings = FakeSettings(initial)
-        let session = InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: FakeCalendar()),
-                                   lexicon: FakeLexicon(), settings: settings)
+        let engineSession = engine.makeSession()
+        let session = InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: FakeCalendar()),
+                                   lexicon: FakeLexicon(), settings: settings, scorer: engineSession)
         let clock = ContinuousClock()
         var cold = Duration.seconds(Int64.max), warmed = Duration.seconds(Int64.max)
         for _ in 0..<Self.passes {

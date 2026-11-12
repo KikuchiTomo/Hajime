@@ -8,7 +8,7 @@ BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.3.0/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
-.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
+.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations evaluate-engines setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
 
 setup:
 	mise install
@@ -118,6 +118,29 @@ evaluate-operations:
 	for file in core/Evaluation/conversion-basic.tsv "$(EVALUATION_DIR)/ajimee.tsv"; do \
 		echo "== $$file"; \
 		"$$bin/hajime-playground" --evaluate-operations "$$file" $$options 2>/dev/null | grep -E '^(==|第 1 候補)'; \
+	done
+
+# 変換エンジンどうしの相補性(単独の正解率・どれかが正解した割合・食い違う割合)と，検証木で候補を並べ替えた効果を，
+# AJIMEE-Bench と語彙で測る(docs/dev/adr/0016-reading-aligned-fusion.md)．Hajime IME の 3 つの構成(ラティスだけ・Zenzai small・xsmall)の候補を
+# $(EVALUATION_DIR)/engines/ に書き出す．ほかのエンジンの結果を同じ形(<セット>.<名前>.jsonl)でそこに置くと，相補性の表に加わる
+ZENZAI_FAST_MODEL ?= $(MODELS_DIR)/zenz-v3.2-xsmall-Q5_K_M.gguf
+evaluate-engines:
+	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
+	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
+	swift build --package-path core -c release --product hajime-playground
+	@out="$(EVALUATION_DIR)/engines"; mkdir -p "$$out"; \
+	dictionary=$${DICTIONARY:-$(BUNDLED_DICTIONARY)}; options=; if [ -d "$$dictionary" ]; then options="--dictionary $$(cd "$$dictionary" && pwd)"; fi; \
+	bin=$$(swift build --package-path core -c release --show-bin-path); \
+	for set in ajimee:$(EVALUATION_DIR)/ajimee.tsv vocab-person:core/Evaluation/vocabulary-person.tsv vocab-place:core/Evaluation/vocabulary-place.tsv vocab-other:core/Evaluation/vocabulary-other.tsv; do \
+		name=$${set%%:*}; file=$${set#*:}; \
+		"$$bin/hajime-playground" --dump-candidates "$$file" $$options 2>/dev/null | grep '^{' >| "$$out/$$name.lattice.jsonl"; \
+		"$$bin/hajime-playground" --dump-candidates "$$file" --score $$options --zenzai "$(abspath $(ZENZAI_MODEL))" 2>/dev/null | grep '^{' >| "$$out/$$name.small.jsonl"; \
+		if [ -f "$(ZENZAI_FAST_MODEL)" ]; then "$$bin/hajime-playground" --dump-candidates "$$file" $$options --zenzai "$(abspath $(ZENZAI_FAST_MODEL))" --zenzai-variant xsmall 2>/dev/null | grep '^{' >| "$$out/$$name.xsmall.jsonl"; fi; \
+		echo "== $$name: 検証木で並べ替えた効果"; \
+		$(PYTHON) tools/evaluation/reranking.py "$$file" "$$out/$$name.small.jsonl"; \
+		echo "== $$name: エンジンどうしの相補性"; \
+		engines=$$(for result in "$$out/$$name".*.jsonl; do engine=$${result##*/$$name.}; echo "$${engine%.jsonl}=$$result"; done); \
+		$(PYTHON) tools/evaluation/complementarity.py "$$file" $$engines --baseline small --nfkc; \
 	done
 
 tokens:

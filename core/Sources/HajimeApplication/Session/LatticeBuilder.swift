@@ -12,6 +12,22 @@ struct LatticeBuilder {
     var romajiTable: RomajiTable = .standard
     /// 文節の候補を前後の語とのつながりで並べ替えるもの．nil なら文節の読みだけで求めた順のまま(設定の contextualSegmentCandidates)
     var contextRanker: SegmentContextRanker?
+    /// 文節の候補の 2 番目から後ろを，文の中での点数(検証木．ADR 0016)で並べ替えるもの．nil なら並べ替えない(設定の candidateReranking)
+    var scorer: (any CandidateScoring)?
+    /// 前もって求めた点数だけで並べ替える(採点が遅い環境)．求めていなければ並べ替えない
+    var usesPrecomputedScoresOnly = false
+
+    /// 文節の前後にある文字(幹で見えている文字)．文節の候補を文の中で採点するのに使う
+    struct SegmentContext: Equatable {
+        var before: String
+        var after: String
+    }
+
+    /// lattice の index の文節の前後にある，今見えている文字
+    static func context(in lattice: SegmentLattice, at index: Int) -> SegmentContext {
+        SegmentContext(before: lattice.segments.prefix(index).map(\.selected.text).joined(),
+                       after: lattice.segments.dropFirst(index + 1).map(\.selected.text).joined())
+    }
 
     func build(reading: String, focus: InitialFocus = .automatic) -> SegmentLattice {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
@@ -56,13 +72,26 @@ struct LatticeBuilder {
     /// 文節の 2 番目から先の候補を，前後の語とのつながりで並べ替える(文節の読みだけの候補は前後を知らないため)．
     /// 並べ替えは前後の語を含めた変換を求めるので，文節を作るたびには行わず，候補を見せる文節だけに行う
     /// (打鍵が止まったあいだに分岐図を前もって作る 1 歩と，文節の長さの下見を遅くしないため)．
-    /// 枝を見せるか・自動で選ぶ文節かの計算(isConfident・confidenceGap)は変えない．選んでいる候補は並べ替えたあとも選んだまま
-    func rankedByContext(_ segment: SegmentLattice.Segment, reading: String) -> SegmentLattice.Segment {
-        guard let contextRanker, !segment.isPending, !segment.isContextRanked else { return segment }
+    /// 枝を見せるか・自動で選ぶ文節かの計算(isConfident・confidenceGap)は変えない．選んでいる候補は並べ替えたあとも選んだまま．
+    /// 採点するもの(scorer)があれば，そのあとで 2 番目から後ろを，前後の文節の幹の文字(context)を左右の文脈にした検証木の点数の順にする
+    func rankedByContext(_ segment: SegmentLattice.Segment, reading: String, context: SegmentContext) -> SegmentLattice.Segment {
+        guard contextRanker != nil || scorer != nil, !segment.isPending, !segment.isContextRanked else { return segment }
         var result = segment
         let variantTexts = Set(segment.variants.map(\.text))
-        result.candidates = contextRanker.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: 1)
-            .enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
+        var candidates = contextRanker?.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: 1)
+            ?? segment.candidates
+        if let scorer {
+            let slice = String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+            let texts = CandidateReranking.textsToScore(candidates, adding: [], readingCount: segment.readingLength)
+            let values = texts.isEmpty ? nil : usesPrecomputedScoresOnly
+                ? scorer.cachedScores(of: texts, reading: slice, before: context.before, after: context.after)
+                : scorer.scores(of: texts, reading: slice, before: context.before, after: context.after)
+            if let values {
+                let table = Dictionary(zip(texts, values), uniquingKeysWith: { first, _ in first })
+                candidates = CandidateReranking.reranked(candidates, adding: [], readingCount: segment.readingLength) { table[$0] ?? nil }
+            }
+        }
+        result.candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
         if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
             let moved = result.candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
             result.choice = .candidate(moved)

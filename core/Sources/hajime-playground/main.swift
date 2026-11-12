@@ -7,9 +7,14 @@ import HajimeEngine
 // 使い方:
 //   hajime-playground [--zenzai <モデル>]                         ローマ字を打って結果を見る
 //   hajime-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
+//   hajime-playground --dump-candidates <TSV> [--zenzai <モデル>] [--score]
+//                                                                文ごとの候補(上位 20)と時間を JSON Lines で出す(tools/evaluation/complementarity.py が読む)．
+//                                                                --score を付けると，Zenzai を使わない変換の候補も合わせて検証木で採点した点数も出す
+//   hajime-playground --bench-scoring <TSV> --zenzai <モデル> [--repeat 5] 検証木の採点 1 回の時間(文ごとに繰り返した最小と中央値)
 //   hajime-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
 //   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--warm-before-space] [--zenzai <モデル>]
-//                                                                期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合
+//                                                                期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合．
+//                                                                --no-reranking を付けると候補を検証木の点数で並べ替えない(設定の candidateReranking を切る)
 //   hajime-playground --evaluate-typo <TSV> [--zenzai <モデル>] [--typing-interval <秒>]
 //                                                                打ち間違いの補正(直した・示した・直さなかった)．
 //                                                                --typing-interval を付けると，その間隔で打ったときのように打鍵の合間に訂正を前もって求める
@@ -24,6 +29,7 @@ import HajimeEngine
 //                                                                起動(モデルと辞書の確認・エンジン・warmUp)から最初の変換までの時間
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
+// --tree-tokens <数> を付けると，検証木の採点で評価するトークンの数をその数に決める(アプリは採点の時間で増減させる．評価の結果を負荷で変えないため)
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
 // --zenzai-fast <xsmall のモデル> と --zenzai-model accurate|fast|combined で，設定の「Zenzai のモデル」を試す
 
@@ -45,6 +51,8 @@ MainActor.assumeIsolated {
                                               zenzaiChoice: arguments.value(of: "--zenzai-model").flatMap(ZenzaiModelChoice.init(rawValue:)),
                                               dictionaryPath: arguments.value(of: "--dictionary"))
         defer { playground.removeMemory() }
+        // 検証木の採点で評価するトークンの数を決まった数にする(ほかの処理の負荷で並べ替えの結果が変わらないように)
+        if let tokens = arguments.value(of: "--tree-tokens").flatMap(Int.init) { playground.engine.fixedCandidateTreeTokenLimit = tokens }
         print("Zenzai: \(playground.engine.usesZenzai ? "あり" : "なし")")
         if let file = arguments.value(of: "--evaluate") {
             Evaluation.conversion(cases: try EvaluationCase.load(from: file), engine: playground.engine)
@@ -57,7 +65,13 @@ MainActor.assumeIsolated {
                 cases = cases.enumerated().filter { $0.offset % shard[1] == shard[0] }.map(\.element)
             }
             OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations,
-                                    warmsBeforeSpace: CommandLine.arguments.contains("--warm-before-space"))
+                                    warmsBeforeSpace: CommandLine.arguments.contains("--warm-before-space"),
+                                    reranking: !CommandLine.arguments.contains("--no-reranking"))
+        } else if let file = arguments.value(of: "--bench-scoring") {
+            Evaluation.benchScoring(cases: try EvaluationCase.load(from: file), engine: playground.engine,
+                                    repeats: arguments.value(of: "--repeat").flatMap(Int.init) ?? 5)
+        } else if let file = arguments.value(of: "--dump-candidates") {
+            Evaluation.dump(cases: try EvaluationCase.load(from: file), engine: playground.engine, scores: CommandLine.arguments.contains("--score"))
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {
