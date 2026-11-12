@@ -238,6 +238,23 @@ pub mod settings_windows {
     };
 }
 
+pub mod handwriting_windows {
+    pub mod light {
+        use crate::Rgb;
+
+        pub const CLOSE_HOVER: Rgb = Rgb { red: 0xC4, green: 0x2B, blue: 0x1C };
+        pub const CLOSE_PRESSED: Rgb = Rgb { red: 0xB3, green: 0x27, blue: 0x1A };
+        pub const CLOSE_TEXT: Rgb = Rgb { red: 0xFF, green: 0xFF, blue: 0xFF };
+    }
+    pub mod dark {
+        use crate::Rgb;
+
+        pub const CLOSE_HOVER: Rgb = Rgb { red: 0xC4, green: 0x2B, blue: 0x1C };
+        pub const CLOSE_PRESSED: Rgb = Rgb { red: 0xB3, green: 0x27, blue: 0x1A };
+        pub const CLOSE_TEXT: Rgb = Rgb { red: 0xFF, green: 0xFF, blue: 0xFF };
+    }
+}
+
 pub mod size {
     pub mod space {
         pub const XXS: f32 = 2.0;
@@ -407,6 +424,20 @@ pub mod size {
         pub const ANCHOR_GAP: f32 = 4.0;
         pub const CANDIDATE_GAP: f32 = 6.0;
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
+        pub const TITLE_HEIGHT: f32 = 32.0;
+        pub const CAPTION_BUTTON_WIDTH: f32 = 46.0;
+        pub const CAPTION_FONT_SIZE: f32 = 12.0;
+        pub const CAPTION_ICON_SIZE: f32 = 10.0;
+        pub const CONTROL_HEIGHT: f32 = 32.0;
+        pub const CONTROL_RADIUS: f32 = 4.0;
+        pub const CONTROL_PADDING_X: f32 = 12.0;
+        pub const LABEL_FONT_SIZE: f32 = 14.0;
+        pub const ICON_BUTTON_WIDTH: f32 = 32.0;
+        pub const ICON_SIZE: f32 = 16.0;
+        pub const RESIZE_BORDER: f32 = 6.0;
+        pub const SCROLL_FADE: f32 = 20.0;
+        pub const WHEEL_STEP: f32 = 48.0;
+        pub const PROMPT_PADDING_Y: f32 = 4.0;
     }
     pub mod prediction {
         pub const GAP: f32 = 6.0;

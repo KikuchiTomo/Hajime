@@ -35,9 +35,60 @@ use windows_core::{Result, HSTRING};
 const ARGUMENT: &str = "--render-snapshots";
 const BASE_DPI: f32 = 96.0;
 
-/// 引数に --render-snapshots があれば書き出して true を返す
+const SHOW_HANDWRITING: &str = "--show-handwriting";
+
+/// 引数が --show-handwriting <x> <y> <秒> <light|dark> なら，エンジンにつながずに手書きの窓を (x, y)(画面のピクセル)の
+/// 下に出し，秒だけ動かして終わる(本物の窓の縁・影・DPI・フォーカスを奪わないことを確かめる．書いた線は認識するが，選んだ文字はどこにも入らない)
+fn show_handwriting(arguments: &[String]) -> bool {
+    let Some(index) = arguments
+        .iter()
+        .position(|argument| argument == SHOW_HANDWRITING)
+    else {
+        return false;
+    };
+    let number = |offset: usize| {
+        arguments
+            .get(index + offset)
+            .and_then(|value| value.parse::<i32>().ok())
+    };
+    let (Some(x), Some(y), Some(seconds)) = (number(1), number(2), number(3)) else {
+        return true;
+    };
+    let dark = arguments
+        .get(index + 4)
+        .is_some_and(|value| value == "dark");
+    super::window::make_dpi_aware();
+    let theme = ResolvedTheme::resolve(
+        "automatic",
+        None,
+        &SystemLook {
+            dark,
+            ..SystemLook::default()
+        },
+    );
+    let anchor = ipc::Rect {
+        x,
+        y,
+        width: 1,
+        height: 20,
+    };
+    crate::handwriting::ffi::show(Some(anchor), 600, 3000, theme, dark);
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_secs(seconds.max(1) as u64);
+    std::thread::spawn(move || {
+        std::thread::sleep(deadline - std::time::Instant::now());
+        std::process::exit(0);
+    });
+    super::window::run_message_loop();
+    true
+}
+
+/// 引数に --render-snapshots があれば書き出して true を返す(--show-handwriting なら手書きの窓を出す)
 pub fn run_if_requested() -> bool {
     let arguments: Vec<String> = std::env::args().collect();
+    if show_handwriting(&arguments) {
+        return true;
+    }
     let Some(index) = arguments.iter().position(|argument| argument == ARGUMENT) else {
         return false;
     };
@@ -263,20 +314,55 @@ fn render_all(output: &Path) -> Result<()> {
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
         }
     }
+    render_handwriting(&imaging, output)?;
     Ok(())
 }
 
-fn write_png(
-    imaging: &IWICImagingFactory,
-    renderer: &Renderer,
-    scene: &Scene,
-    measure: &super::render::TextMeasure,
-    path: &Path,
-) -> Result<()> {
-    // 2 倍で描き，1 ドットの線がデバイスのピクセルにそろうかを確かめられるようにする
+/// 手書きの窓(macOS の handwriting-*)．ライトとダーク，既定のテーマとカスタムテーマ
+fn render_handwriting(imaging: &IWICImagingFactory, output: &Path) -> Result<()> {
+    use crate::handwriting::ffi::snapshot::{Snapshot, SAMPLES};
+    let snapshot = Snapshot::new()?;
+    let custom = sample_theme();
     let scale = tokens::size::snapshot::SCALE;
-    let width = (scene.width * scale).ceil() as u32;
-    let height = (scene.height * scale).ceil() as u32;
+    let (width, height) = Snapshot::size();
+    let pixels = (
+        (width * scale).ceil() as u32,
+        (height * scale).ceil() as u32,
+    );
+    for (look_name, theme_name, dark, custom) in [
+        ("light", "automatic", false, None),
+        ("dark", "automatic", true, None),
+        ("custom", "automatic", true, Some(&custom)),
+        ("platinum", "platinum", false, None),
+    ] {
+        let system = SystemLook {
+            dark,
+            ..SystemLook::default()
+        };
+        let theme = ResolvedTheme::resolve(theme_name, custom, &system);
+        for (sample_name, sample) in SAMPLES {
+            let path = output.join(format!("handwriting-{sample_name}-{look_name}.png"));
+            let target_factory = snapshot.factory();
+            write_bitmap(imaging, pixels, &path, |bitmap, properties| {
+                // SAFETY: bitmap は作ったばかりの WIC のビットマップ
+                let target =
+                    unsafe { target_factory.CreateWicBitmapRenderTarget(bitmap, properties)? };
+                snapshot.paint(&target, scale, sample, &theme, dark)
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// pixels の大きさの WIC のビットマップに draw で描き，PNG に書き出す
+fn write_bitmap(
+    imaging: &IWICImagingFactory,
+    pixels: (u32, u32),
+    path: &Path,
+    draw: impl FnOnce(&IWICBitmap, &D2D1_RENDER_TARGET_PROPERTIES) -> Result<()>,
+) -> Result<()> {
+    let scale = tokens::size::snapshot::SCALE;
+    let (width, height) = pixels;
     // SAFETY: 大きさと形式は定まった値
     let bitmap: IWICBitmap = unsafe {
         imaging.CreateBitmap(
@@ -295,18 +381,43 @@ fn write_png(
         dpiY: BASE_DPI * scale,
         ..Default::default()
     };
-    // SAFETY: bitmap は作ったばかりの WIC のビットマップ
-    let target = unsafe {
-        renderer
-            .factory()
-            .CreateWicBitmapRenderTarget(&bitmap, &properties)?
-    };
-    // SAFETY: BeginDraw と EndDraw を対にする
-    unsafe { target.BeginDraw() };
-    let painted = renderer.paint(&target, scene, measure, scale, 1.0);
-    // SAFETY: 同上
-    unsafe { target.EndDraw(None, None)? };
-    painted?;
+    draw(&bitmap, &properties)?;
+    encode_png(imaging, &bitmap, pixels, path)
+}
+
+fn write_png(
+    imaging: &IWICImagingFactory,
+    renderer: &Renderer,
+    scene: &Scene,
+    measure: &super::render::TextMeasure,
+    path: &Path,
+) -> Result<()> {
+    // 2 倍で描き，1 ドットの線がデバイスのピクセルにそろうかを確かめられるようにする
+    let scale = tokens::size::snapshot::SCALE;
+    let width = (scene.width * scale).ceil() as u32;
+    let height = (scene.height * scale).ceil() as u32;
+    write_bitmap(imaging, (width, height), path, |bitmap, properties| {
+        // SAFETY: bitmap は作ったばかりの WIC のビットマップ
+        let target = unsafe {
+            renderer
+                .factory()
+                .CreateWicBitmapRenderTarget(bitmap, properties)?
+        };
+        // SAFETY: BeginDraw と EndDraw を対にする
+        unsafe { target.BeginDraw() };
+        let painted = renderer.paint(&target, scene, measure, scale, 1.0);
+        // SAFETY: 同上
+        unsafe { target.EndDraw(None, None)? };
+        painted
+    })
+}
+
+fn encode_png(
+    imaging: &IWICImagingFactory,
+    bitmap: &IWICBitmap,
+    (width, height): (u32, u32),
+    path: &Path,
+) -> Result<()> {
     // SAFETY: WIC の部品を順に作って書く．どれも呼び出しのあいだ有効
     unsafe {
         let stream = imaging.CreateStream()?;
@@ -321,7 +432,7 @@ fn write_png(
         frame.SetSize(width, height)?;
         let mut format = GUID_WICPixelFormat32bppPBGRA;
         frame.SetPixelFormat(&mut format)?;
-        frame.WriteSource(&bitmap, std::ptr::null())?;
+        frame.WriteSource(bitmap, std::ptr::null())?;
         frame.Commit()?;
         encoder.Commit()?;
     }

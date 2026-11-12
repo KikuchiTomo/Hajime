@@ -76,6 +76,7 @@ def render(tokens: dict) -> str:
         lines += [f"    {snake(n)}: {rgb(colors[n]['$value'])}," for n in color_names]
         lines.append("};")
     lines += render_settings_palettes(tokens["settings-windows"])
+    lines += render_mode_colors("handwriting_windows", tokens["handwriting-windows"])
     for group, sections in (("size", tokens["size"]), ("motion", tokens["motion"]), ("opacity", tokens["opacity"])):
         lines.append("")
         lines.append(f"pub mod {group} {{")
@@ -109,6 +110,19 @@ def render_settings_palettes(palettes: dict) -> list[str]:
         lines.append(f"    pub const {upper(mode)}: SettingsPalette = SettingsPalette {{")
         lines += [f"        {snake(n)}: {rgb(colors[n]['$value'])}," for n in names]
         lines.append("    };")
+    lines.append("}")
+    return lines
+
+
+def render_mode_colors(module: str, modes: dict) -> list[str]:
+    """ライトとダークで分けた色を，モードごとの入れ子のモジュールの定数にする(例: handwriting_windows::dark::CLOSE_HOVER)"""
+    lines = ["", f"pub mod {module} {{"]
+    for mode, body in modes.items():
+        if mode.startswith("$"):
+            continue
+        lines += [f"    pub mod {snake(mode)} {{", "        use crate::Rgb;", ""]
+        lines += [f"        pub const {upper(name)}: Rgb = {rgb(token['$value'])};" for name, token in body["color"].items()]
+        lines.append("    }")
     lines.append("}")
     return lines
 

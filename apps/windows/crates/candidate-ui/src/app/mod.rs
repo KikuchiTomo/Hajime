@@ -317,18 +317,19 @@ impl App {
                 recognition_delay_milliseconds,
                 recognition_timeout_milliseconds,
             } => {
-                // 手書きの窓はすりガラスにしない(書く欄の地が透けないように)
+                // 手書きの窓はすりガラスにしない(書く欄の地が透けないように)．枠は OS のライトとダークに合わせる
+                let look = self.system.look(false);
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
                     self.presentation.custom_theme.as_ref(),
-                    &self.system.look(false),
+                    &look,
                 );
                 crate::handwriting::ffi::show(
                     anchor.or(self.anchor.clone()),
                     recognition_delay_milliseconds,
                     recognition_timeout_milliseconds,
                     theme,
-                    self.presentation.font_size as f32,
+                    look.dark,
                 );
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
