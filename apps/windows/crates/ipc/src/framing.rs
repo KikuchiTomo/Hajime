@@ -96,6 +96,8 @@ mod tests {
                         height: 18,
                     }),
                     can_replace_preceding_text: None,
+                    can_show_menu: None,
+                    can_request_word_registration: None,
                 },
             },
         }

@@ -18,6 +18,13 @@ public enum ClientAction: Sendable, Equatable {
     case selectInputStyle(InputStyle)
     /// 設定の画面を開く(キーで開くとき)
     case openSettings
+    /// 単語の登録を始める(設定のユーザー辞書の画面を開き，語と読みを入力欄に入れる)．
+    /// word が nil なら，アプリ側が入力先で選んでいる文字を語にする(入力先を読めるのはアプリ側)．読みが分からなければ reading は nil
+    case openWordRegistration(word: String?, reading: String?)
+    /// 設定のユーザー辞書の画面を開く
+    case openUserDictionary
+    /// 入力メニューを入力位置に出す
+    case openMenu
     /// ライブ変換を切り替える(設定に保存する)
     case toggleLiveConversion
     /// 手書きで文字を探す窓を出す(R-14)．選んだ文字は commit と同じく入力先に入れる
@@ -163,6 +170,28 @@ public struct CandidatePanel: Sendable, Equatable {
     /// 候補に番号を振るか．番号キーで選べない窓(選び始める前の入力中の候補の窓など)では振らない．
     /// 番号キーはそのまま文字になるので，振ると選べるように見えてしまう
     public var showsNumbers = true
+    /// 候補を表に広げたとき(KeymapCommand.expandCandidates)の 1 列の候補の数．entries を上から下へ詰め，列を左から右へ並べる．
+    /// 広げていなければ nil(1 列)
+    public var columnLength: Int?
+
+    /// 列の数．広げていなければ 1
+    public var columnCount: Int {
+        guard let columnLength, columnLength > 0 else { return 1 }
+        return max((entries.count + columnLength - 1) / columnLength, 1)
+    }
+
+    /// 番号キーで選べる列．表では選んでいる候補の列(字種の行にいるときは先頭の列)だけに番号を振る
+    public var numberedColumn: Int {
+        guard let columnLength, columnLength > 0, focus == .candidate, let selectedEntry else { return 0 }
+        return selectedEntry / columnLength
+    }
+
+    /// entries の index 番目の候補に振る番号(1 から)．番号を振らない候補なら nil
+    public func number(ofEntry index: Int) -> Int? {
+        guard showsNumbers, entries.indices.contains(index) else { return nil }
+        guard let columnLength, columnLength > 0 else { return index + 1 }
+        return index / columnLength == numberedColumn ? index % columnLength + 1 : nil
+    }
 
     public init(variants: [Variant], selectedVariant: Int?, entries: [Entry], selectedEntry: Int?, focus: Focus, position: Int, total: Int, note: Note?) {
         self.variants = variants

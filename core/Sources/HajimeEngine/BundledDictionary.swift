@@ -23,9 +23,9 @@ public struct BundledDictionary: Sendable, Equatable {
         case hashMismatch
     }
 
-    /// https://github.com/KikuchiTomo/hajime-dictionary の v0.4.0
-    public static let version = "0.4.0"
-    public static let expectedManifestSHA256 = "945b7d5efbd0e874d1b1a72aa5cfd1ee3d87c7a529a3e0ccaae793b3652003a5"
+    /// https://github.com/KikuchiTomo/hajime-dictionary の v0.5.0
+    public static let version = "0.5.0"
+    public static let expectedManifestSHA256 = "36dd11e55a4ed21f4f82ca09389d8b36f3d6555c97bd47ef27bad31e202fe0e4"
     /// アプリの中で辞書を置くディレクトリの名前
     public static let directoryName = "Dictionary"
     static let manifestName = "SHA256SUMS"
@@ -33,6 +33,8 @@ public struct BundledDictionary: Sendable, Equatable {
     static let requiredFile = "louds/charID.chid"
 
     public let url: URL
+    /// 専門用語の辞書(R-29)のファイル．一覧にあって確かめたときだけ持つ(v0.5.0 より前の辞書には無い)
+    public let termDictionaryURL: URL?
 
     /// ディレクトリを確かめてから作る．一覧かファイルのどれかが合わなければ使わない
     public static func verified(at directory: URL) throws(VerificationError) -> BundledDictionary {
@@ -53,7 +55,9 @@ public struct BundledDictionary: Sendable, Equatable {
         // どれか 1 つでも合わなければ使わない．理由は一覧の順で最初に見つかったものにする(並べ方で変わらないように)
         let failures = ConcurrentWork.map(entries.map(Entry.init)) { entry in check(entry, in: directory) }
         if let failure = failures.lazy.compactMap({ $0 }).first { throw failure }
-        return BundledDictionary(url: directory)
+        let terms = entries.contains { $0.path == DefaultSettings.termDictionaryFileName }
+            ? directory.appendingPathComponent(DefaultSettings.termDictionaryFileName, isDirectory: false) : nil
+        return BundledDictionary(url: directory, termDictionaryURL: terms)
     }
 
     /// 一覧の 1 行(並べた仕事に渡すため Sendable にする)

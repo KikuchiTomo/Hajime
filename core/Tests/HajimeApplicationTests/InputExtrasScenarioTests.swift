@@ -219,6 +219,44 @@ struct InputExtrasScenarioTests {
         #expect(harness.committed == "ぴよ")
     }
 
+    // MARK: 単語の登録と入力メニュー(R-21)
+
+    @Test("R-21: 入力中の単語の登録のキーは，見えている語と読みを登録に渡し，組み立て中の文字は入れずに消す")
+    func registerWordWhileComposing() throws {
+        let harness = harness(table: ["かいしゃ": [("会社", nil)]])
+        harness.type("kaisya")
+        harness.press(.space)
+        harness.press(.function(7), .control)
+        #expect(harness.registrations.count == 1)
+        #expect(harness.registrations.first?.word == "会社")
+        #expect(harness.registrations.first?.reading == "かいしゃ")
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text.isEmpty)
+    }
+
+    @Test("R-21: 入力していないときの単語の登録は，選んでいる文字を読めるアプリなら読んでもらい，読めなければ空の欄で開く")
+    func registerWordWhileIdle() {
+        let harness = harness()
+        harness.press(.function(7), .control)
+        #expect(harness.registrations.count == 1)
+        #expect(harness.registrations.first?.word == nil)
+        harness.context.canReadSelectionForRegistration = false
+        harness.press(.function(7), .control)
+        #expect(harness.registrations.last?.word == "")
+    }
+
+    @Test("R-21: 入力メニューのキー(Ctrl+F10・Ctrl+変換)は入力メニューを出す．出せないアプリではキーをそのまま渡す")
+    func openMenu() {
+        let harness = harness()
+        harness.press(.function(10), .control)
+        harness.press(.henkan, .control)
+        #expect(harness.openedMenus == 2)
+        harness.context.canOpenMenu = false
+        harness.press(.function(10), .control)
+        #expect(harness.openedMenus == 2)
+        #expect(!harness.lastResult.handled)
+    }
+
     // MARK: 変換マクロ(R-22)
 
     @Test("R-22: 変換マクロをオンにすると，連想変換のキーで選んでいる語を整えた形の一覧を出す(連想の辞書が無くても)")

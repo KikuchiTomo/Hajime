@@ -47,6 +47,8 @@ public enum DefaultSettings {
 
     /// 候補一覧に一度に出す数．番号キーの 1〜9 に対応させる
     public static let candidatesPerPage = 9
+    /// 候補を表に広げたとき(KeymapCommand.expandCandidates)の列の数．1 列の行の数は一覧の候補の数(9 なら 9 行 × 4 列で 36 件)
+    public static let candidateGridColumns = 4
     /// エンジンに求める候補の数
     public static let engineCandidateCount = 20
     /// 打っているあいだに出す変換の候補の数．続く語句の予測を求める数も同じ
@@ -301,6 +303,8 @@ public enum DefaultSettings {
     public static let minimumMarkContrast = 3.0
     /// 1 ページに出す候補の数を選べる範囲(番号キー 1〜9 で選べる数まで)
     public static let candidatesPerPageRange = 3...9
+    /// 候補を表に広げたときの列の数を選べる範囲
+    public static let candidateGridColumnsRange = 2...6
     /// ライブ変換で漢字にするまでの待ち時間・打ち間違いを見直すまでの待ち時間・モードの表示の時間を選べる範囲(秒)
     public static let liveConversionDelayRange = 0.1...1.5
     /// ライブ変換しない読みの長さを選べる範囲(文字)．0 はすべてライブ変換する
@@ -326,9 +330,9 @@ public enum DefaultSettings {
     public static let maximumUserDictionaryFileBytes = 4 * 1024 * 1024
     /// 読み込む決まりの一覧(置き換え・ローマ字など)のファイルの大きさの上限
     public static let maximumRuleListFileBytes = 1024 * 1024
-    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.4.0 は 8068 行で約 700KB
+    /// 同梱の辞書(BundledDictionary)のファイルごとの SHA-256 の一覧の大きさの上限．v0.5.0 は 8069 行で約 700KB
     public static let maximumBundledDictionaryManifestBytes = 4 * 1024 * 1024
-    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.4.0 でいちばん大きいファイルは約 1MB
+    /// 同梱の辞書のファイル 1 つの大きさの上限．v0.5.0 でいちばん大きいファイルは約 1MB
     public static let maximumBundledDictionaryFileBytes = 64 * 1024 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
@@ -355,6 +359,18 @@ public enum DefaultSettings {
     public static let importedWordCandidateOffset = 1
     /// 「最近」とみなす確定の回数
     public static let importedDictionaryContextWindow = 30
+    /// 同梱の専門用語の辞書(R-29)を使うか．分野ごとのオン・オフは TermFieldSettings(既定はすべてオン)
+    public static let termDictionary = true
+    /// 同梱の辞書(BundledDictionary)の中の，専門用語の辞書のファイルの名前
+    public static let termDictionaryFileName = "terms.tsv"
+    /// 専門用語の辞書の語の点数．取り込んだ辞書の語(importedWordCost)より低くし，ふだんの語の変換に割り込まないようにする
+    public static let termWordCost: Float = -10
+    /// 読みが通常の辞書の語と重なる専門用語の語の点数(TermWord.Overlap)．同じ読みのふだんの語(「しかん」の 士官)を押しのけたり，
+    /// 語の切れ目をまたいで入り込んだり(「ぽんとたたいた」が「ぽんと多対多」)しないよう，さらに低くする
+    public static let termOverlappingWordCost: Float = -16
+    /// 読み全体と一致する専門用語の辞書の語を差し込む位置(上から何番目か)．取り込んだ辞書の語(importedWordCandidateOffset)より下．
+    /// 通常の辞書に同じ読みの語がある語は差し込まず，エンジンの候補の順に任せる
+    public static let termWordCandidateOffset = 2
     /// ユーザー辞書の語の点数(対数尤度)．辞書の一般的な語より少し上に出る値(azooKey-Desktop と同じ)
     public static let userDictionaryWordCost: Float = -5
 

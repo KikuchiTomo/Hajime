@@ -17,17 +17,23 @@ final class InputMenuBuilder {
         var palette: Selector
         var openSettings: Selector
         var checkForUpdates: Selector
+        var registerWord: Selector
+        var openUserDictionary: Selector
     }
 
     private let settings: any SettingsStoring
     private let openSettings: () -> Void
     private let checkForUpdates: () -> Void
+    /// 設定のユーザー辞書の画面を開き，語と読みを登録の欄に入れる(空なら入れない)
+    private let openWordRegistration: (_ word: String, _ reading: String) -> Void
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
 
-    init(settings: any SettingsStoring, openSettings: @escaping () -> Void, checkForUpdates: @escaping () -> Void) {
+    init(settings: any SettingsStoring, openSettings: @escaping () -> Void, checkForUpdates: @escaping () -> Void,
+         openWordRegistration: @escaping (_ word: String, _ reading: String) -> Void) {
         self.settings = settings
         self.openSettings = openSettings
         self.checkForUpdates = checkForUpdates
+        self.openWordRegistration = openWordRegistration
     }
 
     /// 入力メニュー．プロセスで一度だけ作って使い回し，チェックの印だけ合わせる．項目に受け手(target)は付けない．
@@ -54,8 +60,7 @@ final class InputMenuBuilder {
         live.state = settings.current.liveConversion ? .on : .off
         menu.addItem(live)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: UIStrings.Menu.checkForUpdates, action: actions.checkForUpdates, keyEquivalent: ""))
+        for item in toolItems(actions: actions) { menu.addItem(item) }
         cachedMenu = menu
         liveConversionItem = live
         handwritingItem = NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")
@@ -87,6 +92,42 @@ final class InputMenuBuilder {
         } else if !settings.current.palette, present {
             menu.removeItem(paletteItem)
         }
+    }
+
+    /// 区切りの線より下の項目(単語の登録・ユーザー辞書・設定・更新)．Windows の入力メニューと同じ順に並べる
+    private func toolItems(actions: Actions) -> [NSMenuItem] {
+        [
+            NSMenuItem(title: UIStrings.Menu.registerWord, action: actions.registerWord, keyEquivalent: ""),
+            NSMenuItem(title: UIStrings.Menu.userDictionary, action: actions.openUserDictionary, keyEquivalent: ""),
+            NSMenuItem(title: UIStrings.Menu.openSettings, action: actions.openSettings, keyEquivalent: ""),
+            NSMenuItem(title: UIStrings.Menu.checkForUpdates, action: actions.checkForUpdates, keyEquivalent: ""),
+        ]
+    }
+
+    /// キー(入力メニューを開く)で入力位置に出す入力メニュー．入力メニューと同じ項目を，開くたびに今の設定で作る．
+    /// InputMethodKit を通さず自分で出すので，項目の受け手(target)をコントローラにする
+    func popUp(actions: Actions, target: AnyObject, at point: NSPoint) {
+        let menu = NSMenu()
+        let live = NSMenuItem(title: UIStrings.Menu.liveConversion, action: actions.toggleLiveConversion, keyEquivalent: "")
+        live.state = settings.current.liveConversion ? .on : .off
+        menu.addItem(live)
+        if settings.current.handwriting { menu.addItem(NSMenuItem(title: UIStrings.Menu.handwriting, action: actions.handwriting, keyEquivalent: "")) }
+        if settings.current.palette { menu.addItem(NSMenuItem(title: UIStrings.Menu.palette, action: actions.palette, keyEquivalent: "")) }
+        menu.addItem(.separator())
+        for item in toolItems(actions: actions) { menu.addItem(item) }
+        for item in menu.items { item.target = target }
+        menu.popUp(positioning: nil, at: point, in: nil)
+    }
+
+    /// 単語の登録．word は入力先で選んでいた文字(無ければ空)，reading はその読み(分からなければ空)
+    func handleRegisterWord(word: String, reading: String) {
+        logger.notice("入力メニュー: 単語の登録を開きます")
+        openWordRegistration(word, reading)
+    }
+
+    func handleOpenUserDictionary() {
+        logger.notice("入力メニュー: ユーザー辞書を開きます")
+        openWordRegistration("", "")
     }
 
     func handleToggleLiveConversion() {

@@ -12,6 +12,8 @@ struct EngineServiceTests {
     private let service: EngineService
     private let sent: Box<[WireUiCommand]>
     private let opened: Box<Int>
+    /// 設定の画面を開いたときの引数
+    private let launched: Box<[[String]]>
 
     final class Box<Value> {
         var value: Value
@@ -24,15 +26,20 @@ struct EngineServiceTests {
         let settings = FakeSettings(initial)
         let sent = Box<[WireUiCommand]>([])
         let opened = Box(0)
+        let launched = Box<[[String]]>([])
         let converter = FakeConverter(["かな": [("仮名", nil)]])
         self.settings = settings
         self.sent = sent
         self.opened = opened
+        self.launched = launched
         self.service = EngineService(
             makeSession: { InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings) },
             settings: settings,
             ui: { sent.value.append($0) },
-            openSettings: { opened.value += 1 }
+            openSettings: { arguments in
+                opened.value += 1
+                launched.value.append(arguments)
+            }
         )
     }
 
@@ -415,7 +422,7 @@ struct EngineServiceTests {
     }
 
     private func serviceWith(_ services: SettingsServices) -> (EngineService, EngineService.ConnectionID) {
-        let service = EngineService(makeSession: { fatalError("セッションは作らない") }, settings: settings, ui: { _ in }, openSettings: {}, services: services)
+        let service = EngineService(makeSession: { fatalError("セッションは作らない") }, settings: settings, ui: { _ in }, openSettings: { _ in }, services: services)
         let id = service.connect()
         _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)
         return (service, id)
@@ -533,6 +540,42 @@ struct EngineServiceTests {
             return
         }
         #expect(page.map(\.comment) == ["本社", nil])
+    }
+
+    @Test("単語の登録: DLL が送った語と読みを持っておき，設定の画面をユーザー辞書の登録で開き，設定の画面にだけ一度渡す")
+    func wordRegistration() {
+        let dll = greeted()
+        let opened = service.handle(WireRequest(id: 50, body: .openWordRegistration(text: "山田", reading: "やまだ")), from: dll).body
+        #expect(opened == .done)
+        #expect(launched.value.last == EngineService.settingsDictionaryArguments + [EngineService.settingsRegistrationArgument])
+        #expect(service.handle(WireRequest(id: 51, body: .takeWordRegistration), from: dll).body == .error(code: .malformed))
+        let app = service.connect(isSettingsApp: true)
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: app)
+        #expect(service.handle(WireRequest(id: 52, body: .takeWordRegistration), from: app).body == .wordRegistration(word: "山田", reading: "やまだ"))
+        #expect(service.handle(WireRequest(id: 53, body: .takeWordRegistration), from: app).body == .wordRegistration(word: nil, reading: nil))
+        #expect(service.handle(WireRequest(id: 54, body: .openWordRegistration(text: "x", reading: nil)), from: app).body == .error(code: .malformed))
+    }
+
+    @Test("入力メニューの「ユーザー辞書…」は，設定の画面をユーザー辞書のページで開く")
+    func openUserDictionary() {
+        let dll = greeted()
+        #expect(service.handle(WireRequest(id: 55, body: .menu(command: .openUserDictionary)), from: dll).body == .done)
+        #expect(launched.value.last == EngineService.settingsDictionaryArguments)
+    }
+
+    @Test("入力メニューと選んでいる文字の読み取りは，扱えると知らせた DLL にだけ頼む")
+    func menuAndRegistrationRouting() {
+        let routed = RoutedActions([.openMenu, .openWordRegistration(word: nil, reading: nil), .openWordRegistration(word: "会社", reading: "かいしゃ"), .openUserDictionary],
+                                   anchor: nil)
+        #expect(routed.edits == [.showMenu, .requestWordRegistration(maximumLength: UInt32(DefaultSettings.maximumUserDictionaryWordLength))])
+        #expect(routed.host == [.openWordRegistration(word: "会社", reading: "かいしゃ"), .openUserDictionary])
+        let old = InputContext(WireFieldContext(applicationId: "notepad.exe", isSecure: false), settings: DefaultSettings.settings)
+        #expect(!old.canOpenMenu)
+        #expect(!old.canReadSelectionForRegistration)
+        let new = InputContext(WireFieldContext(applicationId: "notepad.exe", isSecure: false, canShowMenu: true, canRequestWordRegistration: true),
+                               settings: DefaultSettings.settings)
+        #expect(new.canOpenMenu)
+        #expect(new.canReadSelectionForRegistration)
     }
 
     @Test("通信の品詞は core の品詞と同じ名前を同じ順に持つ")

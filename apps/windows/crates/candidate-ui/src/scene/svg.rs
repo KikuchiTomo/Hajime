@@ -282,6 +282,7 @@ mod tests {
             association_key: None,
             homophone: Some(homophone()),
             shows_numbers: None,
+            column_length: None,
             variants: vec![],
             selected_variant: None,
             entries: ["撮る", "取る", "採る", "執る"]

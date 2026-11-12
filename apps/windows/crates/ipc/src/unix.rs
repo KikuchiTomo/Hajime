@@ -183,6 +183,8 @@ mod tests {
             preceding_text: None,
             caret: None,
             can_replace_preceding_text: None,
+            can_show_menu: None,
+            can_request_word_registration: None,
         };
         let key = |key: Key| RequestBody::Key {
             session,

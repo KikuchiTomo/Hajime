@@ -29,7 +29,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .keyboard: ["keyboardLayout"]
         case .keys: ["keymap"]
         case .conversion:
-            ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "predictionDisplay", "suggestionSkipCount", "predictionPrefersHistory", "predictionFromCorrection", "hiddenPredictions", "listCandidatesPerPage", "branchCandidatesPerPage",
+            ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "predictionDisplay", "suggestionSkipCount", "predictionPrefersHistory", "predictionFromCorrection", "hiddenPredictions", "listCandidatesPerPage", "branchCandidatesPerPage", "candidateGridColumns", "expandsGridOnPaging",
              "liveConversionDelay", "liveConversionSkipLength", "englishSkipLength", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "remembersRejectedCorrections", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "meaningPlacement", "meaningSenseLimit", "showsPartOfSpeech", "showsUsageExamples", "showsHomophones", "misuseNotes", "proofreading",
              "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "latexConversion",
              "numberFormConversion", "numberFormCircled", "numberFormParenthesized", "numberFormKanji", "numberFormRoman", "learning",
@@ -37,7 +37,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
              "conversionMacros", "macroSkipsSameReading", "zenzaiModel", "englishTermCandidates", "contextualSegmentCandidates", "listSegmentAlternatives", "candidateReranking"]
         case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules", "macros", "palette", "paletteClosesAfterInsert", "paletteRecordsHistory"]
-        case .dictionary: ["userDictionary", "englishTerms"]
+        case .dictionary: ["userDictionary", "englishTerms", "termDictionary", "termFields"]
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID",

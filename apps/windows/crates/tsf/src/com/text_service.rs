@@ -2,7 +2,7 @@ use super::display_attribute;
 use super::edit_session;
 use super::guard::guard;
 use super::keyboard;
-use super::langbar::{self, InputModeItem};
+use super::langbar::{self, Anchor, InputModeItem};
 use super::launch;
 use super::phonetic;
 use super::timer;
@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use windows::Win32::Foundation::{LPARAM, RECT, WPARAM};
+use windows::Win32::Foundation::{LPARAM, POINT, RECT, WPARAM};
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_I4, VT_UNKNOWN};
 use windows::Win32::UI::TextServices::{
@@ -48,6 +48,10 @@ const CONVERSION_TIMEOUT: Duration =
 const RECONNECT_INTERVAL: Duration = Duration::from_millis(ipc::timing::RECONNECT_MILLISECONDS);
 /// 返事の遅れがこれより長く続いたら，エンジンが固まったとみなす
 const STALL_LIMIT: Duration = Duration::from_millis(ipc::timing::ENGINE_STALL_MILLISECONDS);
+/// 入力メニューの「単語の登録…」で読む，選んでいる文字の長さの上限．キーで頼まれたときはエンジンが上限を渡すが，
+/// メニューからは渡されないので，登録できる単語の長さの上限(core の DefaultSettings.maximumUserDictionaryWordLength)と同じにする．
+/// 登録できない長さの文字を読んで送らないため
+const MENU_REGISTRATION_LENGTH: u32 = 64;
 
 thread_local! {
     static ACTIVE: RefCell<Option<ComObject<TextService>>> = const { RefCell::new(None) };
@@ -275,13 +279,7 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             // コマンドの候補を確定すると，エンジンがアプリやページを開く．エンジンは裏のプロセスで窓を前に出せないので，
             // 前にいる入力先のアプリから，つないでいるエンジンにだけ前に出ることを許す(許さないと開いたアプリが後ろに出る)
             if input.key == Key::Enter {
-                let engine = self.inner.borrow().engine.clone();
-                if let Some(id) = engine.and_then(|engine| engine.server_process_id()) {
-                    // SAFETY: 引数はプロセスの番号だけ
-                    let _ = unsafe {
-                        windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(id)
-                    };
-                }
+                self.allow_engine_foreground();
             }
             // 前のキーの返事が遅れていたら，少し待って送った順に反映してから，このキーを送る
             self.apply_late(context, RESPONSE_TIMEOUT);
@@ -464,6 +462,8 @@ impl TextService_Impl {
                 preceding_text: None,
                 caret: inner.caret.clone(),
                 can_replace_preceding_text: Some(true),
+                can_show_menu: Some(true),
+                can_request_word_registration: Some(true),
             }
         };
         let pending = engine.send(RequestBody::Activate { session, context });
@@ -519,6 +519,9 @@ impl TextService_Impl {
             caret,
             // 組み立てを始めるときに，入力位置の前の文字を置き換えられる(show の replaced_length)
             can_replace_preceding_text: Some(true),
+            // 入力メニューを入力位置に出せる(ShowMenu)．選んでいる文字を読んで単語の登録に渡せる(RequestWordRegistration)
+            can_show_menu: Some(true),
+            can_request_word_registration: Some(true),
         }
     }
 
@@ -574,17 +577,30 @@ impl TextService_Impl {
     fn apply_operations(&self, context: &ITfContext, operations: Vec<EditOperation>) -> bool {
         let mut edits = Vec::new();
         let mut reconversion = None;
+        let mut registration = None;
+        let mut shows_menu = false;
         for operation in operations {
             match operation {
                 EditOperation::SelectMode { mode } => self.select_mode(mode),
                 EditOperation::RequestReconversion { maximum_length } => {
                     reconversion = Some(maximum_length)
                 }
+                EditOperation::RequestWordRegistration { maximum_length } => {
+                    registration = Some(maximum_length)
+                }
+                EditOperation::ShowMenu => shows_menu = true,
                 other => edits.push(other),
             }
         }
         let reconverted =
             reconversion.is_none_or(|maximum_length| self.reconvert(context, maximum_length));
+        if let Some(maximum_length) = registration {
+            self.register_word(context, maximum_length);
+        }
+        // メニューは閉じるまで戻らないので，キーの処理と組み立て中の文字の確定(下の edit)を終えてから出す
+        if shows_menu {
+            timer::defer(on_menu);
+        }
         if edits.is_empty() {
             return reconverted;
         }
@@ -631,7 +647,9 @@ impl TextService_Impl {
                             &sink,
                         ),
                         EditOperation::SelectMode { .. }
-                        | EditOperation::RequestReconversion { .. } => Ok(()),
+                        | EditOperation::RequestReconversion { .. }
+                        | EditOperation::RequestWordRegistration { .. }
+                        | EditOperation::ShowMenu => Ok(()),
                     };
                     if result.is_err() {
                         break;
@@ -839,7 +857,8 @@ impl TextService_Impl {
     /// 選んでいない・秘密の欄・長すぎる・読みを求められないときは何もせず false
     fn reconvert(&self, context: &ITfContext, maximum_length: u32) -> bool {
         let client_id = self.inner.borrow().client_id;
-        let Some(text) = read_selection(context, client_id, maximum_length) else {
+        let Some(text) = read_selection(context, client_id, maximum_length, Overflow::Reject)
+        else {
             return false;
         };
         let Some(reading) = phonetic::reading(&text) else {
@@ -859,6 +878,97 @@ impl TextService_Impl {
             }
         });
         true
+    }
+
+    /// 単語の登録(入力していないときのキーの「単語の登録」と，入力メニューの「単語の登録…」)．入力先で選んでいる文字
+    /// (maximum_length 文字までで切る)と，Windows の日本語の解析で求めた読みをエンジンに送る．エンジンは設定の画面を
+    /// ユーザー辞書の登録で開き，語と読みを渡す．選んでいない・秘密の欄では空の語で開く
+    /// (語と読みは入力内容なので，ログにも設定の画面の引数にも出さない)
+    fn register_word(&self, context: &ITfContext, maximum_length: u32) {
+        let client_id = self.inner.borrow().client_id;
+        let text = read_selection(context, client_id, maximum_length, Overflow::Truncate)
+            .unwrap_or_default();
+        let reading = phonetic::reading(&text);
+        self.open_settings(
+            RequestBody::OpenWordRegistration { text, reading },
+            crate::menu::REGISTER_WORD_ARGUMENTS,
+        );
+    }
+
+    /// 入力メニューの「単語の登録…」．注目している文書で選んでいる文字を語にする(キーと同じ)
+    fn register_selection(&self) {
+        match self.focused_context() {
+            Some((context, ..)) => self.register_word(&context, MENU_REGISTRATION_LENGTH),
+            None => self.open_settings(
+                RequestBody::OpenWordRegistration {
+                    text: String::new(),
+                    reading: None,
+                },
+                crate::menu::REGISTER_WORD_ARGUMENTS,
+            ),
+        }
+    }
+
+    /// 設定の画面を開く要求をエンジンに送る．エンジンが動いていない・受けなかった(古いエンジン)ときは，設定の画面を arguments で
+    /// 直接開く(設定の画面がエンジンを起動し直す)．返事が間に合わないだけなら，エンジンが開いている途中とみなして直接は開かない
+    /// (開くと窓が 2 つ出る)．開いた窓が入力先のアプリの後ろに出ないよう，エンジンに前に出ることを許す
+    fn open_settings(&self, body: RequestBody, arguments: &str) {
+        self.allow_engine_foreground();
+        let engine = self.inner.borrow().engine.clone();
+        let opened =
+            engine.is_some_and(|engine| match engine.send(body).outcome(RESPONSE_TIMEOUT) {
+                Outcome::Reply(reply) => matches!(reply, ResponseBody::Done),
+                Outcome::TimedOut => true,
+                Outcome::Unavailable => false,
+            });
+        if !opened {
+            let _ = launch::start_with(launch::SETTINGS_FILE, arguments);
+        }
+    }
+
+    /// つないでいるエンジンにだけ，窓を前に出すことを許す．エンジンは裏のプロセスで窓を前に出せないので，
+    /// エンジンが開くアプリ(コマンド・設定の画面)が後ろに出る．前にいる入力先のアプリから許す
+    fn allow_engine_foreground(&self) {
+        let engine = self.inner.borrow().engine.clone();
+        if let Some(id) = engine.and_then(|engine| engine.server_process_id()) {
+            // SAFETY: 引数はプロセスの番号だけ
+            let _ =
+                unsafe { windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(id) };
+        }
+    }
+
+    /// 入力メニューを入力位置に出す(キーの「入力メニューを開く」)．タスクバーの右クリックと同じ項目を出し，選んだ項目も同じく行う．
+    /// 入力位置を読めなければポインターの位置に出す
+    fn show_input_menu(&self) {
+        let client_id = self.inner.borrow().client_id;
+        let caret = self
+            .focused_context()
+            .and_then(|(context, ..)| read_field(&context, client_id, 0, true).caret)
+            .or_else(|| self.inner.borrow().caret.clone());
+        let rect = match caret {
+            Some(caret) => RECT {
+                left: caret.x,
+                top: caret.y,
+                right: caret.x.saturating_add(caret.width),
+                bottom: caret.y.saturating_add(caret.height),
+            },
+            None => {
+                let mut point = POINT::default();
+                // SAFETY: point はこの関数の中の値
+                if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point) }
+                    .is_err()
+                {
+                    return;
+                }
+                RECT {
+                    left: point.x,
+                    top: point.y,
+                    right: point.x,
+                    bottom: point.y,
+                }
+            }
+        };
+        let _ = langbar::show_menu(&MenuActions, Anchor::Caret(rect));
     }
 
     /// 入力中の文字の文脈(組み立て中ならそこ，無ければ注目している文書)と，エンジン・セッション
@@ -931,13 +1041,19 @@ impl langbar::Actions for MenuActions {
     }
 
     fn run(&self, command: ipc::MenuCommand) {
-        let opens_settings = command == ipc::MenuCommand::OpenSettings;
-        let answered = Self::active()
-            .and_then(|service| service.engine_request(RequestBody::Menu { command }))
-            .is_some();
-        // エンジンが動いていなくても設定の画面は開けるようにする(設定の画面がエンジンを起動し直す)
-        if !answered && opens_settings {
-            let _ = launch::start(launch::SETTINGS_FILE);
+        let service = Self::active();
+        // 設定の画面を開くコマンドは，エンジンが動いていなくても開けるようにする(設定の画面がエンジンを起動し直す)
+        match (crate::menu::settings_arguments(&command), service) {
+            (Some(arguments), Some(service)) => {
+                service.open_settings(RequestBody::Menu { command }, arguments)
+            }
+            (Some(arguments), None) => {
+                let _ = launch::start_with(launch::SETTINGS_FILE, arguments);
+            }
+            (None, Some(service)) => {
+                let _ = service.engine_request(RequestBody::Menu { command });
+            }
+            (None, None) => {}
         }
     }
 
@@ -957,6 +1073,16 @@ impl langbar::Actions for MenuActions {
         }
     }
 
+    fn register_word(&self) {
+        match Self::active() {
+            Some(service) => service.register_selection(),
+            None => {
+                let _ =
+                    launch::start_with(launch::SETTINGS_FILE, crate::menu::REGISTER_WORD_ARGUMENTS);
+            }
+        }
+    }
+
     fn toggle_mode(&self) {
         let Some(service) = Self::active() else {
             return;
@@ -972,6 +1098,14 @@ impl langbar::Actions for MenuActions {
             _ => InputMode::Japanese,
         };
         service.select_mode(next);
+    }
+}
+
+/// キーで頼まれた入力メニューを，キーの処理を終えてから出す(timer の窓の手続きが panic を受け止める)
+fn on_menu() {
+    let service = ACTIVE.with(|active| active.borrow().clone());
+    if let Some(service) = service {
+        service.show_input_menu();
     }
 }
 
@@ -1378,8 +1512,22 @@ fn read_field(
     reading.take()
 }
 
-/// 入力先で選んでいる文字．選んでいない・秘密の欄・maximum_length(UTF-16 で数える)より長いときは None
-fn read_selection(context: &ITfContext, client_id: u32, maximum_length: u32) -> Option<String> {
+/// 選んでいる文字が上限より長いときの扱い
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Overflow {
+    /// 読まない(再変換．途中までを変換し直すと，残りが元のまま残る)
+    Reject,
+    /// 頭から上限までにする(単語の登録．エンジンも単語の長さの上限で切る)
+    Truncate,
+}
+
+/// 入力先で選んでいる文字．選んでいない・秘密の欄では None．maximum_length(UTF-16 で数える)より長いときは overflow に従う
+fn read_selection(
+    context: &ITfContext,
+    client_id: u32,
+    maximum_length: u32,
+    overflow: Overflow,
+) -> Option<String> {
     let selected = Rc::new(RefCell::new(None));
     let output = selected.clone();
     let target = context.clone();
@@ -1397,10 +1545,21 @@ fn read_selection(context: &ITfContext, client_id: u32, maximum_length: u32) -> 
         let mut buffer = vec![0u16; maximum_length as usize + 1];
         let mut fetched = 0u32;
         unsafe { range.GetText(ec, 0, &mut buffer, &mut fetched)? };
-        if fetched == 0 || fetched > maximum_length {
+        if fetched == 0 || (fetched > maximum_length && overflow == Overflow::Reject) {
             return Ok(());
         }
-        buffer.truncate(fetched as usize);
+        buffer.truncate(fetched.min(maximum_length) as usize);
+        // 切った端が上位サロゲートなら，対になる字ごと落とす(壊れた字を送らない)
+        if fetched > maximum_length
+            && buffer
+                .last()
+                .is_some_and(|unit| (0xD800..=0xDBFF).contains(unit))
+        {
+            buffer.pop();
+        }
+        if buffer.is_empty() {
+            return Ok(());
+        }
         *output.borrow_mut() = Some(String::from_utf16_lossy(&buffer));
         Ok(())
     });

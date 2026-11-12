@@ -29,6 +29,7 @@ impl Range {
 #[serde(rename_all = "camelCase")]
 pub struct Ranges {
     pub candidates_per_page: Range,
+    pub candidate_grid_columns: Range,
     pub live_conversion_delay: Range,
     pub live_conversion_skip_length: Range,
     pub suggestion_skip_count: Range,

@@ -71,6 +71,10 @@ public struct Settings: Sendable, Equatable {
     public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
     /// 分岐図の下の枝に出す候補の数
     public var branchCandidatesPerPage = DefaultSettings.latticeCandidatesPerSegment
+    /// 候補を表に広げたとき(キー設定の表の「候補を表に広げる」)の列の数．1 列の行の数は一覧の候補の数
+    public var candidateGridColumns = DefaultSettings.candidateGridColumns
+    /// 候補を送り続けて最初のページを越えたら，候補を表に広げる(目当ての候補が最初のページに無かったので，まとめて見せる)
+    public var expandsGridOnPaging = false
     /// ライブ変換で，打鍵が止まってから漢字にするまでの時間(秒)
     public var liveConversionDelay = DefaultSettings.liveConversionSettleDelay
     /// 読みがこの文字数以下のときはライブ変換しない(Space で変換する)．0 なら長さによらずライブ変換する
@@ -196,6 +200,10 @@ public struct Settings: Sendable, Equatable {
     public var importedDictionaries: [ImportedDictionary] = []
     /// 取り込んだ連想の辞書(R-18)．並び順が優先度．語は Application Support の associations/ にある索引のファイルに置く
     public var associationDictionaries: [AssociationDictionary] = [DefaultSettings.bundledAssociationDictionary]
+    /// 同梱の専門用語の辞書(R-29)を使うか．通常の辞書にある語は，切っても出る
+    public var termDictionary = DefaultSettings.termDictionary
+    /// 専門用語の辞書の分野ごとのオン・オフ(termDictionary がオンのときだけ効く)
+    public var termFields = TermFieldSettings()
     /// 使い方を記録する(回数だけを端末の中に)
     public var recordsUsage = true
 
@@ -258,6 +266,7 @@ public struct Settings: Sendable, Equatable {
         func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T { min(max(value, range.lowerBound), range.upperBound) }
         listCandidatesPerPage = clamp(listCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
         branchCandidatesPerPage = clamp(branchCandidatesPerPage, DefaultSettings.candidatesPerPageRange)
+        candidateGridColumns = clamp(candidateGridColumns, DefaultSettings.candidateGridColumnsRange)
         associationLimit = clamp(associationLimit, DefaultSettings.associationLimitRange)
         meaningSenseLimit = clamp(meaningSenseLimit, DefaultSettings.meaningSenseLimitRange)
         var associationIDs = Set<String>()
@@ -370,13 +379,13 @@ extension Settings: Codable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case inputStyle, keyboardLayout, customRomaji, liveConversion, englishInputLiveConversion, wordLanguage, yenKey, punctuation, brackets, slash, spaceWidth, numberWidth, punctuationCommits, keymap
         case keypadDirect, questionExclamationCommits, keypadCalculation, cyclesLetterCase, symbolRules, correction, okuriganaStyle, calculation, postalCodeConversion, handwriting, misreadings, prefersKatakana
-        case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
+        case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking
-        case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
+        case learning, userDictionary, importedDictionaries, associationDictionaries, termDictionary, termFields, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
         case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, macroSkipsSameReading, launcherCommands, commands
@@ -439,6 +448,8 @@ extension Settings: Codable {
         read(.alphanumericHyphen, into: \.alphanumericHyphen)
         read(.listCandidatesPerPage, into: \.listCandidatesPerPage)
         read(.branchCandidatesPerPage, into: \.branchCandidatesPerPage)
+        read(.candidateGridColumns, into: \.candidateGridColumns)
+        read(.expandsGridOnPaging, into: \.expandsGridOnPaging)
         read(.liveConversionDelay, into: \.liveConversionDelay)
         read(.liveConversionSkipLength, into: \.liveConversionSkipLength)
         read(.englishSkipLength, into: \.englishSkipLength)
@@ -496,6 +507,8 @@ extension Settings: Codable {
         // 同期のファイルから来た設定でもファイルの名前に使うので，形の違う id は捨てる
         settings.importedDictionaries.removeAll { !$0.hasValidIdentity }
         readList(.associationDictionaries, into: \.associationDictionaries)
+        read(.termDictionary, into: \.termDictionary)
+        read(.termFields, into: \.termFields)
         read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
@@ -573,6 +586,8 @@ extension Settings: Codable {
         try container.encode(alphanumericHyphen, forKey: .alphanumericHyphen)
         try container.encode(listCandidatesPerPage, forKey: .listCandidatesPerPage)
         try container.encode(branchCandidatesPerPage, forKey: .branchCandidatesPerPage)
+        try container.encode(candidateGridColumns, forKey: .candidateGridColumns)
+        try container.encode(expandsGridOnPaging, forKey: .expandsGridOnPaging)
         try container.encode(liveConversionDelay, forKey: .liveConversionDelay)
         try container.encode(liveConversionSkipLength, forKey: .liveConversionSkipLength)
         try container.encode(englishSkipLength, forKey: .englishSkipLength)
@@ -626,6 +641,8 @@ extension Settings: Codable {
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)
         try container.encode(associationDictionaries, forKey: .associationDictionaries)
+        try container.encode(termDictionary, forKey: .termDictionary)
+        try container.encode(termFields, forKey: .termFields)
         try container.encode(recordsUsage, forKey: .recordsUsage)
         try container.encode(theme, forKey: .theme)
         try container.encode(candidateFontSize, forKey: .candidateFontSize)

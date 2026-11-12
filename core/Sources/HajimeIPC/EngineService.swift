@@ -80,7 +80,11 @@ public final class EngineService {
     private let ui: (WireUiCommand) -> Void
     /// 打ち間違いの見直しの結果の記録(CorrectionReport の文．入力の中身は含めない)．Windows はデバッグ出力に流す
     private let log: (String) -> Void
-    private let openSettings: () -> Void
+    /// 設定の画面を開く．引数は開くページなどの指示(settingsDictionaryArguments など)．空なら最初のページ
+    private let openSettings: (_ arguments: [String]) -> Void
+    /// 単語の登録で設定の画面に渡す語と読み．設定の画面が takeWordRegistration で受け取ると消す．
+    /// 入力内容なので，引数には入れずエンジンのプロセスの中に持つ
+    private var pendingRegistration: (word: String, reading: String)?
     /// コマンドを動かす(R-22)．エンジンのプロセスで動かし，DLL(入力先のアプリの中)には任せない
     private let runCommand: (LauncherCommand) -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
@@ -118,7 +122,7 @@ public final class EngineService {
     private let flushLearning: () -> Void
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
-                openSettings: @escaping () -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
+                openSettings: @escaping (_ arguments: [String]) -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 listHints: @escaping (CandidatePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
@@ -326,8 +330,22 @@ public final class EngineService {
                 perform(.toggleLiveConversion)
             case .openSettings:
                 perform(.openSettings)
+            case .openUserDictionary:
+                perform(.openUserDictionary)
             }
             return .done
+        case .openWordRegistration(let text, let reading):
+            // 入力メニューの「単語の登録…」かキーで，DLL が入力先の選んでいる文字(と OS の機能で求めた読み)を送ってくる
+            guard !connection.isCandidateWindow, !connection.isSettingsApp else { return .error(code: .malformed) }
+            perform(.openWordRegistration(word: String(text.prefix(DefaultSettings.maximumUserDictionaryWordLength)),
+                                          reading: String((reading ?? "").prefix(DefaultSettings.maximumUserDictionaryReadingLength))))
+            return .done
+        case .takeWordRegistration:
+            // 設定の画面だけが受け取れる．一度渡したら消す
+            guard connection.isSettingsApp else { return .error(code: .malformed) }
+            let pending = pendingRegistration
+            pendingRegistration = nil
+            return .wordRegistration(word: pending?.word, reading: pending?.reading)
         case .readSettingsFields(let names, let defaults):
             return fields { () throws(SettingsFields.Failure) in
                 try SettingsFields.read(defaults ? DefaultSettings.settings : settings.current, names: names)
@@ -458,6 +476,10 @@ public final class EngineService {
     }
 
     /// ユーザー辞書を 1 回で読む語の数の上限．1 語の大きさの上限から，応答がメッセージの上限に収まる数にする
+    /// 設定の画面(hajime-settings.exe)をユーザー辞書の登録した単語のページで開く引数
+    public static let settingsDictionaryArguments = ["--page", "dictionary"]
+    /// あわせて渡すと，設定の画面が takeWordRegistration で受け取った語と読みを登録の欄に入れる
+    public static let settingsRegistrationArgument = "--register-word"
     public static let maximumDictionaryPage = 500
 
     private var usage: WireResponseBody {
@@ -771,7 +793,12 @@ public final class EngineService {
         case .toggleLiveConversion:
             try? settings.update { $0.liveConversion.toggle() }
         case .openSettings:
-            openSettings()
+            openSettings([])
+        case .openUserDictionary:
+            openSettings(Self.settingsDictionaryArguments)
+        case .openWordRegistration(let word, let reading):
+            pendingRegistration = (word, reading)
+            openSettings(Self.settingsDictionaryArguments + [Self.settingsRegistrationArgument])
         case .showHandwriting:
             // セッションが要るので edit で扱う
             break

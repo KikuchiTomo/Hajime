@@ -15,6 +15,7 @@ MARKER = "<!-- hajime-release-metrics -->"
 SET_NAMES = {
     "conversion-basic": "報告された例(conversion-basic)",
     "conversion-everyday": "ふだんの文(conversion-everyday)",
+    "conversion-terms": "専門用語の文(conversion-terms)",
     "ajimee": "AJIMEE-Bench",
     "tatoeba": "Tatoeba",
     "vocabulary-person": "人名(語彙)",

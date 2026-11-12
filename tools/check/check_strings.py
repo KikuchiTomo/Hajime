@@ -43,6 +43,8 @@ OPTION_TABLES = {
 # Windows で名前を変える選択肢(macOS の Command のキーを，Windows では Ctrl のキーにする)
 WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOPES", "local")}
 SYNC_MODEL = ROOT / "core/Sources/HajimeDomain/Sync/SyncModel.swift"
+# 専門用語の辞書の分野の名前(core の TermField.name)．Windows の設定の画面は strings.rs の terms::FIELD_NAMES
+TERM_FIELDS = ROOT / "core/Sources/HajimeDomain/Dictionary/TermDictionary.swift"
 
 STRING = r'"((?:[^"\\]|\\.)*)"'
 
@@ -173,6 +175,15 @@ def check() -> list[str]:
         for value, name in rust_table(options, table).items():
             if (table, value) not in WINDOWS_ONLY_OPTIONS and labels.get(value) != name:
                 problems.append(f"{table} の {value}: Windows「{name}」と macOS「{labels.get(value)}」が違います")
+    # 専門用語の辞書の分野の名前と並び: core の TermField.name と Windows の terms::FIELD_NAMES が同じか
+    core = TERM_FIELDS.read_text(encoding="utf-8")
+    block = core[core.index("public var name: String {"):]
+    block = block[:block.index("\n    }\n")]
+    core_names = re.findall(rf"case \.(\w+): {STRING}", block)
+    start = rust.index("pub const FIELD_NAMES: &[(&str, &str)] = &[")
+    windows_names = re.findall(rf'\("(\w+)", {STRING}\)', rust[start:rust.index("];", start)])
+    if core_names != windows_names:
+        problems.append(f"terms::FIELD_NAMES が core の TermField.name と違います: Windows {windows_names} と core {core_names}")
     # 同期の項目の名前: macOS の fieldLabels が同期のまとまりのすべての項目を持ち，Windows の FIELD_LABELS が同じ名前か
     labels = swift_field_labels(swift, mac)
     model = SYNC_MODEL.read_text(encoding="utf-8")

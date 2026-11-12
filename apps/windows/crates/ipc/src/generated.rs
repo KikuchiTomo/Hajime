@@ -176,6 +176,12 @@ pub struct FieldContext {
     #[serde(rename = "canReplacePrecedingText")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub can_replace_preceding_text: Option<bool>,
+    #[serde(rename = "canShowMenu")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_show_menu: Option<bool>,
+    #[serde(rename = "canRequestWordRegistration")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_request_word_registration: Option<bool>,
 }
 
 impl fmt::Debug for FieldContext {
@@ -186,6 +192,8 @@ impl fmt::Debug for FieldContext {
             .field("precedingText", &REDACTED)
             .field("caret", &self.caret)
             .field("canReplacePrecedingText", &self.can_replace_preceding_text)
+            .field("canShowMenu", &self.can_show_menu)
+            .field("canRequestWordRegistration", &self.can_request_word_registration)
             .finish()
     }
 }
@@ -269,6 +277,11 @@ pub enum EditOperation {
         #[serde(rename = "maximumLength")]
         maximum_length: u32,
     },
+    RequestWordRegistration {
+        #[serde(rename = "maximumLength")]
+        maximum_length: u32,
+    },
+    ShowMenu,
 }
 
 impl fmt::Debug for EditOperation {
@@ -293,6 +306,11 @@ impl fmt::Debug for EditOperation {
                 .debug_struct("RequestReconversion")
                 .field("maximumLength", maximum_length)
                 .finish(),
+            Self::RequestWordRegistration { maximum_length, .. } => f
+                .debug_struct("RequestWordRegistration")
+                .field("maximumLength", maximum_length)
+                .finish(),
+            Self::ShowMenu => f.write_str("ShowMenu"),
         }
     }
 }
@@ -346,6 +364,7 @@ impl fmt::Debug for SettingsSnapshot {
 pub enum MenuCommand {
     ToggleLiveConversion,
     OpenSettings,
+    OpenUserDictionary,
 }
 
 impl fmt::Debug for MenuCommand {
@@ -353,6 +372,7 @@ impl fmt::Debug for MenuCommand {
         match self {
             Self::ToggleLiveConversion => f.write_str("ToggleLiveConversion"),
             Self::OpenSettings => f.write_str("OpenSettings"),
+            Self::OpenUserDictionary => f.write_str("OpenUserDictionary"),
         }
     }
 }
@@ -914,6 +934,12 @@ pub enum RequestBody {
     MergeUserDictionary {
         entries: Vec<DictionaryEntry>,
     },
+    OpenWordRegistration {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reading: Option<String>,
+    },
+    TakeWordRegistration,
 }
 
 impl fmt::Debug for RequestBody {
@@ -1140,6 +1166,12 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("MergeUserDictionary")
                 .field("entries", entries)
                 .finish(),
+            Self::OpenWordRegistration { .. } => f
+                .debug_struct("OpenWordRegistration")
+                .field("text", &REDACTED)
+                .field("reading", &REDACTED)
+                .finish(),
+            Self::TakeWordRegistration => f.write_str("TakeWordRegistration"),
         }
     }
 }
@@ -1234,6 +1266,12 @@ pub enum ResponseBody {
     },
     Error {
         code: ErrorCode,
+    },
+    WordRegistration {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        word: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reading: Option<String>,
     },
 }
 
@@ -1330,6 +1368,11 @@ impl fmt::Debug for ResponseBody {
             Self::Error { code, .. } => f
                 .debug_struct("Error")
                 .field("code", code)
+                .finish(),
+            Self::WordRegistration { .. } => f
+                .debug_struct("WordRegistration")
+                .field("word", &REDACTED)
+                .field("reading", &REDACTED)
                 .finish(),
         }
     }
@@ -1579,6 +1622,9 @@ pub struct CandidateList {
     #[serde(rename = "meaningPlacement")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meaning_placement: Option<MeaningPlacement>,
+    #[serde(rename = "columnLength")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub column_length: Option<u32>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1599,6 +1645,7 @@ impl fmt::Debug for CandidateList {
             .field("homophone", &self.homophone)
             .field("showsNumbers", &self.shows_numbers)
             .field("meaningPlacement", &self.meaning_placement)
+            .field("columnLength", &self.column_length)
             .finish()
     }
 }

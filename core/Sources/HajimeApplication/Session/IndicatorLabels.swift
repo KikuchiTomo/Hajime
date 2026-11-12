@@ -62,6 +62,7 @@ public enum IndicatorLabels {
         Hint(.shrinkSegmentToWord, .extendSegmentToWord, "単語ごと"),
         Hint(.splitSegment, "区切り"),
         Hint(.editSegment, "打ち直し"),
+        Hint(.expandCandidates, "候補を表に"),
     ]
 
     /// 連想の一覧の足元の案内
@@ -75,6 +76,13 @@ public enum IndicatorLabels {
     /// 一覧で候補を選んでいるときの足元の案内．先頭から前の候補へ進むと文字種の行に移る(R-03)
     public static let candidateHints: [Hint] = [
         Hint(.previousCandidate, "文字種"),
+        Hint(.expandCandidates, "表に広げる"),
+    ]
+
+    /// 候補を表に広げているときの足元の案内．文節を移るキーで列を移り，広げるキー(か取り消しのキー)で元に戻す
+    public static let gridHints: [Hint] = [
+        Hint(.previousSegment, .nextSegment, "列"),
+        Hint(.expandCandidates, "戻す", fallback: .cancel),
     ]
 
     /// 一覧で文字種の行を選んでいるときの足元の案内．左右で字種を選び，次の候補で候補に戻る
@@ -83,11 +91,13 @@ public enum IndicatorLabels {
         Hint(.nextCandidate, "候補"),
     ]
 
-    /// 一覧の足元の案内．連想の一覧は連想の案内，文字種の行にいれば字種を選ぶ案内，候補にいれば文字種の行へ移る案内．
+    /// 一覧の足元の案内．連想の一覧は連想の案内，文字種の行にいれば字種を選ぶ案内，表に広げていれば列を移る案内と戻す案内，
+    /// 候補にいれば文字種の行へ移る案内と表に広げる案内．
     /// 文字種の行が無い一覧(文字種の行を出さない設定，入力中の候補の窓)では，文字種の案内を出さない
     public static func listHints(for panel: CandidatePanel) -> [Hint] {
         if panel.association != nil { return associationHints }
         if panel.focus == .variants { return variantHints }
+        if panel.columnLength != nil { return gridHints }
         return panel.variants.isEmpty ? [] : candidateHints
     }
 

@@ -32,6 +32,7 @@ import HajimeEngine
 // --tree-tokens <数> を付けると，検証木の採点で評価するトークンの数をその数に決める(アプリは採点の時間で増減させる．評価の結果を負荷で変えないため)
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
 // --zenzai-fast <xsmall のモデル> と --zenzai-model accurate|fast|combined で，設定の「Zenzai のモデル」を試す
+// --dictionary の辞書に専門用語の辞書(terms.tsv．R-29)があれば，アプリと同じく既定の設定(すべての分野)で使う．--no-terms を付けると使わない
 
 MainActor.assumeIsolated {
     let arguments = Arguments()
@@ -49,13 +50,15 @@ MainActor.assumeIsolated {
                                               zenzaiVariant: arguments.value(of: "--zenzai-variant").flatMap(ZenzaiModel.Variant.init(rawValue:)) ?? .small,
                                               fastZenzaiPath: arguments.value(of: "--zenzai-fast"),
                                               zenzaiChoice: arguments.value(of: "--zenzai-model").flatMap(ZenzaiModelChoice.init(rawValue:)),
-                                              dictionaryPath: arguments.value(of: "--dictionary"))
+                                              dictionaryPath: arguments.value(of: "--dictionary"),
+                                              usesTerms: !CommandLine.arguments.contains("--no-terms"))
         defer { playground.removeMemory() }
         // 検証木の採点で評価するトークンの数を決まった数にする(ほかの処理の負荷で並べ替えの結果が変わらないように)
         if let tokens = arguments.value(of: "--tree-tokens").flatMap(Int.init) { playground.engine.fixedCandidateTreeTokenLimit = tokens }
         print("Zenzai: \(playground.engine.usesZenzai ? "あり" : "なし")")
+        print("専門用語の辞書: \(playground.terms == nil ? "なし" : "あり")")
         if let file = arguments.value(of: "--evaluate") {
-            Evaluation.conversion(cases: try EvaluationCase.load(from: file), engine: playground.engine)
+            Evaluation.conversion(cases: try EvaluationCase.load(from: file), engine: playground.engine, terms: playground.terms)
         } else if let file = arguments.value(of: "--evaluate-operations") {
             let presentations = (arguments.value(of: "--presentation") ?? CandidatePresentation.allCases.map(\.rawValue).joined(separator: ","))
                 .split(separator: ",").compactMap { CandidatePresentation(rawValue: String($0)) }

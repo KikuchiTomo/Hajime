@@ -265,6 +265,10 @@ pub mod more {
     pub const APPS: &str = "アプリ";
     pub const BRANCH_CANDIDATES: &str = "分岐図の候補数";
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
+    pub const GRID_COLUMNS: &str = "表の列数";
+    pub const EXPANDS_GRID_ON_PAGING: &str = "候補を送り続けたら表に広げる";
+    pub const GRID_COLUMNS_NOTE: &str =
+        "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES_NOTE: &str =
         "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。";
@@ -500,8 +504,12 @@ pub mod keys {
         ("emojiPalette", "絵文字のパレット"),
         ("symbolPalette", "記号のパレット"),
         ("kaomojiPalette", "顔文字のパレット"),
+        ("registerWord", "単語の登録"),
+        ("openUserDictionary", "ユーザー辞書を開く"),
+        ("openMenu", "入力メニューを開く"),
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
+        ("expandCandidates", "候補を表に広げる"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
@@ -541,6 +549,9 @@ pub mod keys {
         ("kaomojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します。確定した直後に押すと、確定を取り消して確定する前の変換に戻します"),
         ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
+        ("registerWord", "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"),
+        ("openMenu", "入力メニューの項目を入力位置に表示します"),
+        ("expandCandidates", "候補を何列かの表に広げ、一度に多くの候補を表示します。表では文節の移動のキーで列を移り、数字キーは選択中の列から選びます。もう一度押すか Esc で元に戻します"),
     ];
 }
 
@@ -552,10 +563,46 @@ pub mod rule_list {
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
 }
 
+/// UIStrings.Terms
+pub mod terms {
+    pub const ENABLED: &str = "専門用語の辞書を使う";
+    pub const FIELDS: &str = "使う分野";
+    pub const NOTE: &str = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。";
+
+    /// 分野の id と名前(core の TermField と同じ並びと名前．tools/check/check_strings.py が確かめる)
+    pub const FIELD_NAMES: &[(&str, &str)] = &[
+        ("computing", "情報技術"),
+        ("medicine", "医学"),
+        ("biology", "生物学"),
+        ("chemistry", "化学"),
+        ("physics", "物理学"),
+        ("mathematics", "数学"),
+        ("earth", "地学・天文学"),
+        ("engineering", "工学"),
+        ("architecture", "建築"),
+        ("law", "法律・政治"),
+        ("economics", "経済・金融"),
+        ("business", "ビジネス"),
+        ("linguistics", "言語学"),
+        ("philosophy", "哲学・思想"),
+        ("religion", "宗教・神話"),
+        ("music", "音楽"),
+        ("design", "美術・デザイン"),
+        ("food", "料理・食品"),
+        ("sports", "スポーツ"),
+        ("games", "囲碁・将棋・ゲーム"),
+        ("military", "軍事"),
+        ("agriculture", "農林水産"),
+        ("performingArts", "芸能・映像"),
+        ("history", "歴史・考古学"),
+    ];
+}
+
 /// UIStrings.Dictionaries
 pub mod dictionaries {
     pub const USER_WORDS: &str = "登録した単語";
     pub const IMPORTED: &str = "取り込んだ辞書";
+    pub const TERMS: &str = "専門用語";
     pub const EMPTY: &str = "取り込んだ辞書はありません";
     pub const IMPORT_FILE: &str = "辞書をインポート…";
     pub const REIMPORT: &str = "再読み込み…";
@@ -709,6 +756,8 @@ pub mod sync {
         ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
+        ("candidateGridColumns", "表の列数"),
+        ("expandsGridOnPaging", "候補を送り続けたら表に広げる"),
         ("contextualSegmentCandidates", "前後の文脈で候補を並べ替え"),
         (
             "listSegmentAlternatives",
@@ -776,6 +825,8 @@ pub mod sync {
         ("userDictionary", "ユーザー辞書"),
         ("importedDictionaries", "取り込んだ辞書"),
         ("associationDictionaries", "連想の辞書"),
+        ("termDictionary", "専門用語の辞書を使う"),
+        ("termFields", "専門用語の辞書の分野"),
         (
             "macroSkipsSameReading",
             "かなの語には読みを添える形を出さない",

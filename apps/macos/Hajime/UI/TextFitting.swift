@@ -48,50 +48,6 @@ enum TextFitting {
         return "…" + String(characters[low...])
     }
 
-    /// text の頭から width に入る 1 行の字数(少なくとも 1 字)．英数字の語は空白・「-」・「_」のあとで分け，語が 1 行に入らなければ途中で分ける．
-    /// 日本語はどの字のあいだでも分けるが，句読点などを行の頭に置かない．
-    /// Unicode の名前(SMILING FACE WITH ...)・ショートコード(:face_with_hand_over_mouth:)・見出しの名前を折り返すのに使う．
-    /// Windows の候補ウィンドウ(scene::fitting::line_break)と同じ決め方にする
-    static func lineBreak(_ text: Substring, attributes: [NSAttributedString.Key: Any], width: CGFloat) -> Int {
-        let characters = Array(text)
-        guard String(characters).size(withAttributes: attributes).width > width else { return characters.count }
-        // characters[..<low] は入る(1 字目は入らなくても置く)．characters[..<high] は入らない
-        var low = 1, high = characters.count
-        while high - low > 1 {
-            let middle = (low + high) / 2
-            if String(characters[..<middle]).size(withAttributes: attributes).width <= width { low = middle } else { high = middle }
-        }
-        return stride(from: low, through: 1, by: -1).first { canBreak(characters, at: $0) } ?? low
-    }
-
-    /// 幅 width で折り返した行．行の頭と末尾の空白は除く．maxLines を超える分は，最後の行の末尾を「…」にして省く
-    static func wrapped(_ text: String, attributes: [NSAttributedString.Key: Any], width: CGFloat, maxLines: Int = .max) -> [String] {
-        var lines: [String] = []
-        var rest = Substring(text)
-        while !rest.isEmpty, lines.count < maxLines {
-            let count = lineBreak(rest, attributes: attributes, width: width)
-            if lines.count == maxLines - 1, count < rest.count {
-                lines.append(truncated(String(rest), attributes: attributes, width: width))
-                break
-            }
-            lines.append(String(rest.prefix(count)).trimmingCharacters(in: .whitespaces))
-            rest = rest.dropFirst(count).drop { $0 == " " }
-        }
-        return lines
-    }
-
-    /// characters[end - 1] と characters[end] のあいだで行を分けてよいか．英数字の語の途中と，行の頭に置かない字の前では分けない
-    private static func canBreak(_ characters: [Character], at end: Int) -> Bool {
-        guard end < characters.count else { return true }
-        let before = characters[end - 1], after = characters[end]
-        if lineStartForbidden.contains(after) { return false }
-        if before == " " || before == "-" || before == "_" || after == " " { return true }
-        return !(before.isASCII && after.isASCII)
-    }
-
-    /// 行の頭に置かない字
-    private static let lineStartForbidden: Set<Character> = Set("、。，．・：；？！ー…‥）」』】〕〉》,.:;!?)]}")
-
     /// ほかの候補と頭から同じ字数(いちばん長く一致する候補との)．一覧で，候補ごとに違うところを見せるのに使う
     static func sharedPrefixLength(of text: String, among others: [String]) -> Int {
         let characters = Array(text)

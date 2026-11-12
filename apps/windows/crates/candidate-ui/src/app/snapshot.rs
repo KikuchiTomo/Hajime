@@ -126,8 +126,12 @@ fn render_all(output: &Path) -> Result<()> {
             ),
             ..look
         };
-        let scenes: [(&str, Scene); 15] = [
+        let scenes: [(&str, Scene); 16] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
+            (
+                "list-grid",
+                scene::candidate_list(&grid_list(), &look, &measure),
+            ),
             (
                 "homophone-list",
                 scene::candidate_list(&homophone_list(MeaningPlacement::Side), &look, &measure),
@@ -204,11 +208,13 @@ fn render_all(output: &Path) -> Result<()> {
             let path = output.join(format!("{kind}-{name}.png"));
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
         }
-        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-flag・palette-symbol・palette-kaomoji と同じ見本
+        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-flag・palette-long・palette-reduced・palette-symbol・palette-kaomoji と同じ見本
         for (kind, panel) in [
             ("palette-emoji", palette::sample::emoji()),
             ("palette-search", palette::sample::search()),
             ("palette-flag", palette::sample::flag()),
+            ("palette-long", palette::sample::long_name()),
+            ("palette-reduced", palette::sample::reduced()),
             ("palette-symbol", palette::sample::symbol()),
             ("palette-kaomoji", palette::sample::kaomoji()),
         ] {
@@ -359,8 +365,26 @@ fn list() -> CandidateList {
         total: 12,
         note: None,
         meaning_placement: None,
+        column_length: None,
         // 既定のキー設定で，一覧の先頭から文字種の行へ移るキー(エンジンの FooterHints が送るもの)
         hints: Some(vec![hint("Shift+Space", "文字種")]),
+    }
+}
+
+/// 候補を表に広げた一覧(R-30．macOS の SamplePanels.grid)．9 行 × 4 列で，2 列目の候補を選んでいる
+fn grid_list() -> CandidateList {
+    CandidateList {
+        entries: entries(&[
+            "高", "校", "考", "効", "行", "公", "工", "功", "好", "光", "口", "向", "項", "幸",
+            "構", "港", "稿", "鋼", "講", "購", "候", "交", "甲", "江", "孝", "抗", "拘", "肯",
+            "荒", "香", "航", "康", "黄", "侯", "坑", "后",
+        ]),
+        selected_entry: Some(11),
+        position: 12,
+        total: 58,
+        column_length: Some(9),
+        hints: Some(vec![hint("←→", "列"), hint("Alt+↓", "戻す")]),
+        ..list()
     }
 }
 
@@ -526,6 +550,7 @@ fn correction() -> CandidateList {
             text: "修正　Space 入力のままに戻す".into(),
         }),
         meaning_placement: None,
+        column_length: None,
         hints: Some(vec![hint("Shift+Space", "文字種")]),
     }
 }

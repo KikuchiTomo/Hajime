@@ -101,7 +101,8 @@ pub fn branch_map(map: &BranchMap) -> Option<String> {
         })
 }
 
-/// パレットで選んでいる文字の名前と，文字が無いときの知らせ(macOS の PaletteController.announce と同じ)
+/// パレットで選んでいる文字の名前と，文字が無いときの知らせ(macOS の PaletteController.announce と同じ)．
+/// 説明の欄に Unicode の名前を出していれば，欄では省いた部分も含めて全体を読む
 pub fn palette(panel: &PalettePanel) -> Option<String> {
     let selected = panel.selection.as_ref().and_then(|position| {
         panel
@@ -112,8 +113,14 @@ pub fn palette(panel: &PalettePanel) -> Option<String> {
             .get(position.column as usize)
             .map(|cell| cell.name.as_str())
     });
+    let unicode_name = panel
+        .preview
+        .as_ref()
+        .map(|preview| preview.english_name.as_str())
+        .filter(|name| !name.is_empty());
     let parts: Vec<&str> = selected
         .into_iter()
+        .chain(unicode_name)
         .chain(panel.message.as_deref())
         .collect();
     (!parts.is_empty()).then(|| parts.join("、"))
@@ -182,6 +189,7 @@ mod tests {
             total: 2,
             note: None,
             meaning_placement: None,
+            column_length: None,
             hints: None,
         }
     }
@@ -372,6 +380,12 @@ mod tests {
     fn パレットは選んでいる文字の名前と知らせを読む() {
         let mut panel = crate::palette::sample::search();
         panel.rows[0].cells[0].name = "おじぎする人".into();
+        // 説明の Unicode の名前も，欄で省いた部分を含めて読む
+        assert_eq!(
+            palette(&panel).as_deref(),
+            Some("おじぎする人、PERSON BOWING DEEPLY")
+        );
+        panel.preview = None;
         assert_eq!(palette(&panel).as_deref(), Some("おじぎする人"));
         panel.message = Some("読み込んでいます".into());
         assert_eq!(

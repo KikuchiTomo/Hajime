@@ -35,13 +35,15 @@ const SYMBOL_ROWS: [&[&str]; 6] = [
     &["⇄", "⇅", "⇆", "⇇", "⇈", "⇉", "⇊", "⇋", "⇌"],
 ];
 
-const KAOMOJI_ROWS: [&[&str]; 6] = [
+const KAOMOJI_ROWS: [&[&str]; 8] = [
     &["(^o^)", "m(_ _)m", "(´・ω・｀)"],
     &["＼(^o^)／", "(^o^)", "(^^)"],
     &["(*^^*)", "^_^", ":D"],
     &["・ω・", "(*´ω｀*)", "(^O^)"],
     &["(^_^)", "(・∀・)", "(*^_^*)"],
     &["ヾ(｡>﹏<｡)ﾉﾞ✧*。", "(((((((((((っ･ω･)っ ﾌﾞｰﾝ", "(*´∀｀*)"],
+    &["(*´ω`*)", "(o^―^o)", "ヽ(*´∀｀)ノ"],
+    &["(・ω・)", "(｀・ω・´)", "(*ﾟ▽ﾟ*)"],
 ];
 
 /// 絵文字のまとまり: 送るときの名前・見出し・アイコンを描けないときの文字
@@ -412,6 +414,53 @@ pub fn flag() -> PalettePanel {
     }
 }
 
+/// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ(macOS の SamplePalettes.longName)．
+/// 名前は 2 行で「…」にし，長い札は字を縮めて折り返す
+pub fn long_name() -> PalettePanel {
+    PalettePanel {
+        query: "つぎ".into(),
+        heading: "検索結果　3 件".into(),
+        rows: rows(&[&["⏭\u{FE0F}", "⏩", "▶\u{FE0F}"]], &["検索結果"], &[0]),
+        selection: Some(PalettePosition { row: 0, column: 0 }),
+        preview: Some(preview(
+            "⏭\u{FE0F}",
+            ("次の曲ボタン", CLDR),
+            (
+                "BLACK RIGHT-POINTING DOUBLE TRIANGLE WITH VERTICAL BAR",
+                UNICODE,
+            ),
+            &[":black_right_pointing_double_triangle_with_vertical_bar:"],
+            &[
+                "つぎのきょくぼたん",
+                "ぼたん",
+                "つぎのしーん",
+                "つぎのとらっく",
+            ],
+            "U+23ED U+FE0F",
+            false,
+        )),
+        ..flag()
+    }
+}
+
+/// 説明に出す項目を設定で減らしたところ(Unicode の名前とショートコードだけ．macOS の SamplePalettes.reduced)
+pub fn reduced() -> PalettePanel {
+    let fields = PalettePreviewFields {
+        unicode_name: true,
+        readings: false,
+        shortcodes: true,
+        code_points: false,
+    };
+    let mut panel = emoji();
+    panel.preview = panel.preview.map(|preview| PalettePreview {
+        readings: Vec::new(),
+        code_points: String::new(),
+        ..preview
+    });
+    panel.preview_fields = Some(fields);
+    panel
+}
+
 /// 記号のパレット．ピン留めの行の下に矢印のまとまり
 pub fn symbol() -> PalettePanel {
     let titles = ["ピン留め", "矢印", "矢印", "矢印", "矢印", "矢印"];
@@ -433,7 +482,7 @@ pub fn symbol() -> PalettePanel {
         selection: Some(PalettePosition { row: 2, column: 1 }),
         preview: Some(preview(
             "⇒",
-            ("右向き二重矢印", None),
+            ("右向き二重矢印", CLDR),
             ("RIGHTWARDS DOUBLE ARROW", UNICODE),
             &[],
             &["みぎむきにじゅうやじるし", "やじるし"],
@@ -454,7 +503,24 @@ pub fn symbol() -> PalettePanel {
 
 /// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
 pub fn kaomoji() -> PalettePanel {
-    let titles = ["よく使う", "笑顔", "笑顔", "笑顔", "笑顔", "笑顔"];
+    let titles = [
+        "よく使う",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+    ];
+    // 説明の欄が低い分(見出しと読みだけ)をマス目の行に回す(core の PaletteSession と同じ決め方)
+    let fields = super::preview::fields(None);
+    let extra = super::layout::extra_rows(
+        super::preview::height(&fields, PaletteKind::Kaomoji),
+        super::preview::height(&fields, PaletteKind::Emoji),
+        CELL_SIZE as f32,
+    );
+    let visible_rows = VISIBLE_ROWS + extra;
     PalettePanel {
         modes: modes(PaletteKind::Kaomoji),
         query: String::new(),
@@ -465,11 +531,11 @@ pub fn kaomoji() -> PalettePanel {
             "joy",
         ),
         heading: "よく使う".into(),
-        rows: rows(&KAOMOJI_ROWS, &titles, &[0, 1]),
+        rows: rows(&KAOMOJI_ROWS[..visible_rows as usize], &titles, &[0, 1]),
         row_count: 48,
         first_row: 0,
         columns: COLUMNS,
-        visible_rows: VISIBLE_ROWS,
+        visible_rows,
         selection: Some(PalettePosition { row: 0, column: 2 }),
         preview: Some(preview(
             "(´・ω・｀)",

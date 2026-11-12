@@ -69,6 +69,7 @@ fn list(step: usize) -> CandidateList {
         total: 30,
         note: None,
         meaning_placement: None,
+        column_length: None,
         hints: Some(vec![KeyHint {
             keys: "Shift+Space".into(),
             label: "文字種".into(),

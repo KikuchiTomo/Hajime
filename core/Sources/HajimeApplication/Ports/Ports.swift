@@ -128,6 +128,13 @@ public protocol DictionaryLookup: AnyObject {
     func words(reading: String, in dictionary: ImportedDictionary) -> [DictionaryWord]
 }
 
+/// 同梱の専門用語の辞書を読みで引く(R-29)
+@MainActor
+public protocol TermDictionaryLookup: AnyObject {
+    /// 読みがちょうど reading の語(分野では絞らない)
+    func words(reading: String) -> [TermWord]
+}
+
 /// 確定済みの文字の読み(再変換で使う)．OS の機能で求める(macOS は CFStringTokenizer，Windows は IFELanguage)
 @MainActor
 public protocol ReadingTranscribing: AnyObject {

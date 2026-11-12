@@ -4,6 +4,7 @@
 
 pub mod d2d;
 pub mod edit;
+pub mod frame;
 pub mod hash;
 pub mod net;
 pub mod uia;

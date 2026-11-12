@@ -101,8 +101,9 @@ fn start_engine() {
 }
 
 /// 起動の引数．--measure <ファイル> で窓を出すまで・中身を出すまで・ページを開く・送る時間を測って書き，終える．
-/// --theme light|dark で OS の設定によらず明暗を決め，--page <名前> で初めに開くページを決める(見本の撮影)．
-/// --offline ならエンジンにつながず，見本の値で開く
+/// --theme light|dark で OS の設定によらず明暗を決め，--page <名前> で初めに開くページを決める(見本の撮影．
+/// エンジンが入力メニューの「ユーザー辞書…」で --page dictionary を渡す)．
+/// --offline ならエンジンにつながず，見本の値で開く．--register-word なら単語の登録の語と読みをエンジンから受け取る
 fn options(started: std::time::Instant) -> window::Options {
     let arguments: Vec<String> = std::env::args().collect();
     let value = |name: &str| {
@@ -121,6 +122,7 @@ fn options(started: std::time::Instant) -> window::Options {
         }),
         measure: value("--measure").map(std::path::PathBuf::from),
         offline: arguments.iter().any(|argument| argument == OFFLINE),
+        register_word: arguments.iter().any(|argument| argument == REGISTER_WORD),
         page: value("--page").and_then(|name| {
             crate::pages::Page::ALL
                 .into_iter()
@@ -136,6 +138,9 @@ const SETUP_IF_NEEDED: &str = "--setup-if-needed";
 pub(crate) const OFFLINE: &str = "--offline";
 /// 最新のリリースのページをブラウザーで開いて終える(入力メニューの「更新を確認」．macOS と同じく通信しない)
 pub const CHECK_FOR_UPDATES: &str = "--check-for-updates";
+/// 単語の登録で開く(EngineService.settingsRegistrationArgument)．つながったら，エンジンが持っている語と読みを
+/// ユーザー辞書の登録の欄に入れる．語と読みは入力内容なので引数では受け取らない
+const REGISTER_WORD: &str = "--register-word";
 
 /// 同じ実行ファイルを arguments で起動する(ウィザードから設定の画面，設定の画面からウィザードを開く)
 pub(crate) fn launch_settings(arguments: &[&str]) {

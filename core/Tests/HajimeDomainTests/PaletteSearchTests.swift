@@ -169,6 +169,17 @@ struct BundledPaletteTests {
         #expect(kaomoji.allSatisfy { !$0.japaneseName.isEmpty && !$0.readings.isEmpty })
     }
 
+    @Test("R-26: 名前を定めたところを読む．絵文字は CLDR，記号は CLDR か Hajime IME，顔文字は無し")
+    func nameSources() throws {
+        let items = Self.catalog.items
+        #expect(items.filter { $0.kind == .emoji }.allSatisfy { $0.nameSource == .cldr })
+        #expect(items.filter { $0.kind == .kaomoji }.allSatisfy { $0.nameSource == nil })
+        #expect(try #require(Self.catalog.item(for: "，")).nameSource == .cldr)
+        #expect(try #require(Self.catalog.item(for: "①")).nameSource == .hajime)
+        // 名前のある記号には，どれにも出どころがある
+        #expect(items.filter { $0.kind == .symbol && !$0.japaneseName.isEmpty }.allSatisfy { $0.nameSource != nil })
+    }
+
     @Test("マスの形を渡すと，その形の種類だけを探す")
     func searchByShape() {
         let search = PaletteSearch(catalog: Self.catalog)

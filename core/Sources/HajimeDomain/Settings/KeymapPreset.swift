@@ -3,8 +3,8 @@
 /// 行は「状態<タブ>キー<タブ>コマンド」の形で書く(Keymap.rows(from:))．
 /// Windows 風・Mac 風・ATOK 風は，Mozc のキー設定の表(BSD 3-Clause．THIRD_PARTY_NOTICES.md)の行を Hajime IME の状態とコマンドに置き換えて作った．
 /// Hajime IME に無いコマンドの行(読みの中のカーソル移動・予測・再変換など)は除き，
-/// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Option+↑ と，確定の取り消しの Ctrl+Backspace を足してある
-/// (Ctrl+Tab はアプリのタブの切り替えとぶつかる)
+/// 切り替えのキーと設定を開くなどのキー(common)と，連想変換の Option+↑ と，確定の取り消しの Ctrl+Backspace と，
+/// 候補を表に広げる変換中の Tab を足してある(Ctrl+Tab はアプリのタブの切り替えとぶつかる)
 public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// Hajime IME の既定
     case standard
@@ -43,6 +43,9 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         anywhere\tCtrl Option e\temojiPalette
         anywhere\tCtrl Option k\tsymbolPalette
         anywhere\tCtrl Option f\tkaomojiPalette
+        anywhere\tCtrl F7\tregisterWord
+        anywhere\tCtrl F10\topenMenu
+        anywhere\tCtrl Henkan\topenMenu
         anywhere\tEisu\tdirectMode
         anywhere\tKana\tjapaneseMode
         anywhere\tHankaku/Zenkaku\ttoggleMode
@@ -57,7 +60,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける．
     /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)．
     /// 予測を確定した直後の Backspace で補う前の読みに戻す(Windows 風・ATOK 風は確定の取り消しの Ctrl+Backspace で戻す)．
-    /// 確定した直後の ⌃⌫ で確定する前の変換に戻す(ひな形すべて．確定した直後の変換のキーも同じ)
+    /// 確定した直後の ⌃⌫ で確定する前の変換に戻す(ひな形すべて．確定した直後の変換のキーも同じ)．
+    /// 変換中の ⌥↓ で候補を表に広げる(Windows 風・Mac 風・ATOK 風は Tab．標準の Tab は文節の移動)
     static let standardRows = """
         anywhere\tEnter\tcommit
         anywhere\tEscape\tcancel
@@ -100,6 +104,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tCtrl Shift Right\textendSegmentToWord
         converting\tCtrl Shift Left\tshrinkSegmentToWord
         converting\tShift Down\tsplitSegment
+        converting\tOption Down\texpandCandidates
         converting\tShift Backspace\teditSegment
         converting\tBackspace\tbackToReading
         converting\tCtrl Backspace\tforgetCandidate
@@ -245,6 +250,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
+        converting\tTab\texpandCandidates
         """
 
     /// Mac 風
@@ -346,6 +352,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
+        converting\tTab\texpandCandidates
         """
 
     /// ATOK 風．入力中の Ctrl+U・I・O・P・@ で字種，変換中の ←→ で文節の長さ，Shift+←→ で文節を移り，Ctrl+←→ で先頭・末尾の文節へ，
@@ -421,6 +428,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
+        converting\tTab\texpandCandidates
         """
 }
 

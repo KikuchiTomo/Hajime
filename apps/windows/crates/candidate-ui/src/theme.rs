@@ -392,7 +392,8 @@ impl ResolvedTheme {
                     Role::Candidate => (self.face(), body),
                     Role::Label => (self.label_face(), Weight::Medium),
                     Role::Emphasis => (self.label_face(), Weight::Semibold),
-                    Role::Code => (Face::Monospaced, Weight::Regular),
+                    Role::Code => (Face::Code, Weight::Regular),
+                    Role::Annotation => (self.annotation_face(), Weight::Medium),
                     Role::Emoji => (Face::Emoji, Weight::Regular),
                     Role::Icon => (Face::Icon, Weight::Regular),
                 };
@@ -433,6 +434,16 @@ impl ResolvedTheme {
             Typeface::Mincho => Face::Mincho,
             Typeface::Monospaced => Face::Monospaced,
             Typeface::Rounded => Face::Rounded,
+        }
+    }
+
+    /// 小さな注記の書体．カスタムテーマの書体・明朝・等幅はそのまま使い，それ以外はかなを詰めない書体にする
+    /// (欧文の UI の書体やかなを詰める UI の書体では，カタカナの項目名が英字の項目名より小さく見える)
+    fn annotation_face(&self) -> Face {
+        match self.face() {
+            Face::System | Face::Rounded if self.kind == Kind::Glass => Face::Readable,
+            Face::System | Face::Rounded => Face::SystemReadable,
+            face => face,
         }
     }
 
@@ -554,8 +565,10 @@ pub enum Role {
     Label,
     /// 強める語(文字の名前)
     Emphasis,
-    /// 等幅(英語の名前と符号位置)
+    /// 等幅(英語の名前と符号位置)．英数字だけを描くので，欧文の等幅の書体にする
     Code,
+    /// 小さな文字の注記(パレットの説明の項目名と値)．かなを詰めない書体にし，英字と日本語の字の大きさをそろえる
+    Annotation,
     /// 色の付いた絵文字の書体
     Emoji,
     /// アイコンの書体
@@ -578,6 +591,12 @@ pub enum Face {
     Emoji,
     /// アイコンの書体(macOS の SF Symbols に当たる)
     Icon,
+    /// 欧文の等幅の書体(ショートコードとコードポイント)
+    Code,
+    /// かなを詰めない，小さな字で読みやすい書体(glass の注記)
+    Readable,
+    /// 日本語の UI の書体で，代わりの書体にもかなを詰めない書体を使う(glass 以外の注記)
+    SystemReadable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -142,9 +142,17 @@ enum UIStrings {
         }
     }
 
+    /// 専門用語の辞書(R-29)．分野の名前は core の TermField.name(分岐図と同じ名前)
+    enum Terms {
+        static let enabled = "専門用語の辞書を使う"
+        static let fields = "使う分野"
+        static let note = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。"
+    }
+
     enum Dictionaries {
         static let userWords = "登録した単語"
         static let imported = "取り込んだ辞書"
+        static let terms = "専門用語"
         static let empty = "取り込んだ辞書はありません"
         static let importFile = "辞書をインポート…"
         static let reimport = "再読み込み…"
@@ -271,6 +279,7 @@ enum UIStrings {
             case .firstCandidate: "先頭の候補"
             case .lastCandidate: "末尾の候補"
             case .associate: "連想変換"
+            case .expandCandidates: "候補を表に広げる"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
@@ -300,6 +309,9 @@ enum UIStrings {
             case .emojiPalette: "絵文字のパレット"
             case .symbolPalette: "記号のパレット"
             case .kaomojiPalette: "顔文字のパレット"
+            case .registerWord: "単語の登録"
+            case .openUserDictionary: "ユーザー辞書を開く"
+            case .openMenu: "入力メニューを開く"
             }
         }
 
@@ -335,12 +347,15 @@ enum UIStrings {
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
             case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
+            case .registerWord: "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"
+            case .openMenu: "入力メニューの項目を入力位置に表示します"
+            case .expandCandidates: "候補を何列かの表に広げ、一度に多くの候補を表示します。表では文節の移動のキーで列を移り、数字キーは選択中の列から選びます。もう一度押すか Esc で元に戻します"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
                  .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .nextCandidatePage,
                  .previousCandidatePage, .firstCandidate, .lastCandidate, .nextSegment, .previousSegment, .firstSegment, .lastSegment,
-                 .extendSegment, .shrinkSegment, .commit, .openSettings, .toggleLiveConversion: nil
+                 .extendSegment, .shrinkSegment, .commit, .openSettings, .toggleLiveConversion, .openUserDictionary: nil
             }
         }
 
@@ -712,6 +727,8 @@ enum UIStrings {
         static let handwriting = "手書き入力"
         static let palette = "絵文字と記号"
         static let checkForUpdates = "更新を確認"
+        static let registerWord = "単語の登録…"
+        static let userDictionary = "ユーザー辞書…"
     }
 
     /// 設定の画面の選択肢の名前
@@ -831,6 +848,12 @@ enum UIStrings {
         static let showsReadings = "説明に読みを表示"
         static let showsShortcodes = "説明にショートコードを表示"
         static let showsCodePoints = "説明にコードポイントを表示"
+        /// 説明の欄の項目名．englishNameLabel は UCD の名前の無い並び(国旗など)で代わりに出す英語の名前
+        static let unicodeNameLabel = "Unicode"
+        static let englishNameLabel = "英語"
+        static let readingsLabel = "読み"
+        static let shortcodesLabel = "ショートコード"
+        static let codePointsLabel = "コードポイント"
         static let frequentRows = "よく使う文字の行数"
         static let page = "絵文字と記号"
         static let behavior = "パレット"
@@ -951,6 +974,9 @@ enum UIStrings {
         static let candidates = "候補"
         static let branchCandidates = "分岐図の候補数"
         static let listCandidates = "一覧の候補数"
+        static let gridColumns = "表の列数"
+        static let expandsGridOnPaging = "候補を送り続けたら表に広げる"
+        static let gridColumnsNote = "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。"
         static let contextualSegmentCandidates = "前後の文脈で候補を並べ替え"
         static let contextualSegmentCandidatesNote = "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。"
         static let listSegmentAlternatives = "一覧に文節を入れ替えた候補を表示"
@@ -1101,7 +1127,7 @@ extension UIStrings {
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
             "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
-            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
+            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates, "candidateGridColumns": More.gridColumns, "expandsGridOnPaging": More.expandsGridOnPaging,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,
@@ -1128,6 +1154,7 @@ extension UIStrings {
             "recordsUsage": UIStrings.Settings.recordsUsage, "keyboardLayout": Choice.keyboardLayout, "keymap": Keys.tab,
             "symbolRules": Features.symbolsPage, "userDictionary": UIStrings.Settings.dictionaryTab,
             "importedDictionaries": Dictionaries.imported, "associationDictionaries": Association.dictionaries,
+            "termDictionary": Terms.enabled, "termFields": "専門用語の辞書の分野",
             "handShiftCorrection": Extras.handShift, "looseReadings": Extras.looseReadings, "phoneticSpelling": Extras.phoneticSpelling,
             "dynamicDictionary": Extras.dynamicDictionary, "conversionMacros": Extras.conversionMacros, "macros": Extras.macrosSection,
             "macroSkipsSameReading": Extras.macroSkipsSameReading,
