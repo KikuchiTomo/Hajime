@@ -478,7 +478,7 @@ pub mod size {
         pub const CARD_GAP: f32 = 4.0;
         pub const CARD_RADIUS: f32 = 4.0;
         pub const CARD_PADDING_X: f32 = 16.0;
-        pub const ROW_HEIGHT: f32 = 52.0;
+        pub const ROW_HEIGHT: f32 = 68.0;
         pub const CONTROL_HEIGHT: f32 = 32.0;
         pub const DROPDOWN_HEIGHT: f32 = 384.0;
         pub const CONTROL_WIDTH: f32 = 240.0;
@@ -546,7 +546,7 @@ pub mod size {
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
         pub const SLIDER_THUMB_INNER_HOVER: f32 = 14.0;
-        pub const CARD_PADDING_Y: f32 = 12.0;
+        pub const CARD_PADDING_Y: f32 = 16.0;
         pub const FOOTER_GAP: f32 = 8.0;
         pub const LABEL_MIN_WIDTH: f32 = 160.0;
         pub const RADIO_SIZE: f32 = 20.0;
@@ -559,6 +559,9 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
+        pub const TITLE_BAR_HEIGHT: f32 = 32.0;
+        pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
+        pub const TITLE_BAR_PADDING_X: f32 = 16.0;
         pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
         pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
         pub const SWITCH_KNOB_OFF: f32 = 12.0;
