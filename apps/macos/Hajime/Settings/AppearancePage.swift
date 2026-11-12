@@ -124,7 +124,8 @@ private struct ThemeRow: View {
 
     var body: some View {
         Button(action: select) {
-            HStack(spacing: DesignTokens.Size.Space.inline) {
+            // 選ぶ印・色の見本・名前は，見本と情報の列(パレットの説明の欄)と同じくまとまりの間だけ離す
+            HStack(spacing: DesignTokens.Size.Space.group) {
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 ThemeSwatch(theme: ResolvedTheme.resolve(choice))
