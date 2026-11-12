@@ -7,12 +7,14 @@ import HajimeEngine
 /// アプリを入れずに，確かめる処理を変えたときの前後を比べるため(CPU 時間は /usr/bin/time などで外から測る)
 @MainActor
 enum StartupProbe {
-    static func run(zenzaiPath: String?, fastZenzaiPath: String?, dictionaryPath: String) throws {
+    static func run(zenzaiPath: String?, fastZenzaiPath: String?, jinenPath: String? = nil, fastJinenPath: String? = nil, dictionaryPath: String) throws {
         let clock = ContinuousClock()
         let start = clock.now
         let resources = StartupResources.verified(
             zenzai: zenzaiPath.map { URL(fileURLWithPath: $0) },
             fastZenzai: fastZenzaiPath.map { URL(fileURLWithPath: $0) },
+            jinen: jinenPath.map { URL(fileURLWithPath: $0) },
+            fastJinen: fastJinenPath.map { URL(fileURLWithPath: $0) },
             dictionary: URL(fileURLWithPath: dictionaryPath, isDirectory: true))
         let verified = clock.now
         guard let dictionary = try? resources.dictionary?.get() else {
