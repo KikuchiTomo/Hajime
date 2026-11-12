@@ -32,7 +32,7 @@ enum UIStrings {
         static let empty = "連想辞書はありません"
         static let importFile = "連想辞書をインポート…"
         static let tooMany = "インポートできる連想辞書は \(DefaultSettings.maximumAssociationDictionaries) 個までです"
-        static let importFailed = "連想辞書をインポートできませんでした。サイズか形式のエラーです"
+        static let importFailed = "連想辞書をインポートできませんでした。ファイルのサイズか形式が正しくありません"
         static let note = "上の辞書ほど優先"
         /// 読み込めるファイルの例の行(同じ意味の単語を「,」で区切った 1 行)
         static let fileExample = "美しい,綺麗,麗しい"
@@ -58,9 +58,9 @@ enum UIStrings {
         static let englishTermCandidatesExample = DefaultSettings.englishTermCandidatesExample
         static let handShiftNote = "片手か両手が 1 キー横にずれたまま打った文を修正します。"
         static let looseReadings = "うろ覚えのカタカナ語の候補"
-        static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている単語を候補に表示します。"
+        static let looseReadingsNote = "「\(looseReadingsExample.reading)」から「\(looseReadingsExample.candidate)」のように、読みを少し違えて覚えている単語を候補に表示します。"
         static let phoneticSpelling = "発音どおりに綴った英単語の候補"
-        static let phoneticSpellingNote = "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。"
+        static let phoneticSpellingNote = "「\(phoneticSpellingExample.reading)」から「\(phoneticSpellingExample.candidate)」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。"
         static let englishTermCandidates = "英単語辞書を使用"
         static let englishTerms = "追加した単語"
         static let englishTermsSection = "英単語辞書"
@@ -309,7 +309,7 @@ enum UIStrings {
         static let showDetails = "詳細を表示"
         static let hideDetails = "詳細を隠す"
         static let tooMany = "インポートできる辞書は \(DefaultSettings.maximumImportedDictionaries) 個までです"
-        static let importFailed = "辞書をインポートできませんでした。サイズか形式のエラーです"
+        static let importFailed = "辞書をインポートできませんでした。ファイルのサイズか形式が正しくありません"
         static let note = "上の辞書ほど優先"
         static func imported(_ count: Int) -> String { "\(count.formatted()) 単語をインポートしました" }
 
@@ -729,7 +729,7 @@ enum UIStrings {
         static let learningReset = "学習結果を消去しました"
         static let dictionaryFull = "ユーザー辞書に登録できるのは \(DefaultSettings.maximumUserDictionaryEntries.formatted()) 件までです"
         static let invalidEntry = "読みはひらがなで \(DefaultSettings.maximumUserDictionaryReadingLength) 文字まで、単語は \(DefaultSettings.maximumUserDictionaryWordLength) 文字までにしてください"
-        static let importFailed = "インポートできませんでした。サイズか形式のエラーです"
+        static let importFailed = "インポートできませんでした。ファイルのサイズか形式が正しくありません"
         static let exportFailed = "エクスポートできませんでした"
         static func imported(_ count: Int) -> String { "\(count.formatted()) 単語を追加しました" }
         static let fontSizeName = "候補の文字サイズ"
@@ -1160,7 +1160,7 @@ enum UIStrings {
         static let behavior = "動作"
         static let apps = "アプリ"
         static func importedRules(_ count: Int) -> String { "\(count) 件を追加しました" }
-        static let csvFailed = "インポートできませんでした。CSV の形式かサイズのエラーです"
+        static let csvFailed = "インポートできませんでした。CSV ファイルのサイズか形式が正しくありません"
         static let noBundleID = "バンドル ID がないアプリは追加できません"
 
         // 外観
@@ -1221,7 +1221,7 @@ enum UIStrings {
         static let exportSettingsFileName = "hajime-settings.json"
         static let settingsImported = "設定をインポートしました"
         static let settingsExported = "設定をエクスポートしました"
-        static let settingsImportFailed = "インポートできませんでした。Hajime IME の設定ファイルではないか、サイズのエラーです"
+        static let settingsImportFailed = "インポートできませんでした。ファイルのサイズか形式が正しくありません"
         static let settingsExportFailed = "エクスポートできませんでした"
 
         // 情報

@@ -9,7 +9,8 @@ pub mod settings {
     pub const IMPORT_DICTIONARY: &str = "インポート…";
     pub const EXPORT_DICTIONARY: &str = "エクスポート…";
     pub const EXPORT_FILE_NAME: &str = "hajime-user-dictionary.txt";
-    pub const IMPORT_FAILED: &str = "インポートできませんでした。サイズか形式のエラーです";
+    pub const IMPORT_FAILED: &str =
+        "インポートできませんでした。ファイルのサイズか形式が正しくありません";
     pub const EXPORT_FAILED: &str = "エクスポートできませんでした";
     pub fn imported(count: u32) -> String {
         format!("{} 単語を追加しました", super::thousands(count))
@@ -209,7 +210,7 @@ pub mod extras {
     pub const HAND_SHIFT: &str = "手の位置のずれを修正(試験的)";
     pub const HAND_SHIFT_NOTE: &str = "片手か両手が 1 キー横にずれたまま打った文を修正します。";
     pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
-    pub const LOOSE_READINGS_NOTE: &str = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている単語を候補に表示します。";
+    pub const LOOSE_READINGS_NOTE: &str = "「しゃんぶー」から「シャンプー」のように、読みを少し違えて覚えている単語を候補に表示します。";
     pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
     /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)．core の DefaultSettings の同じ名前の見本と同じ値(make check で比べる)
     pub const LOOSE_READINGS_EXAMPLE: (&str, &str) = ("しゃんぶー", "シャンプー");
@@ -218,7 +219,7 @@ pub mod extras {
     pub const HAND_SHIFT_EXAMPLE: (&str, &str) = ("stohsypi", "ありがとう");
     pub const ENGLISH_TERM_CANDIDATES_EXAMPLE: (&str, &str) = ("api", "API");
     pub const PHONETIC_SPELLING_NOTE: &str =
-        "「ふぉと」から「photo」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。";
+        "「ここあ」から「cocoa」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。";
     pub const ENGLISH_TERM_CANDIDATES: &str = "英単語辞書を使用";
     pub const ENGLISH_TERMS: &str = "追加した単語";
     pub const ENGLISH_TERMS_SECTION: &str = "英単語辞書";
@@ -670,14 +671,15 @@ pub mod more {
     pub fn imported_rules(count: u32) -> String {
         format!("{count} 件を追加しました")
     }
-    pub const CSV_FAILED: &str = "インポートできませんでした。CSV の形式かサイズのエラーです";
+    pub const CSV_FAILED: &str =
+        "インポートできませんでした。CSV ファイルのサイズか形式が正しくありません";
     pub const EXPORT_SETTINGS: &str = "設定をエクスポート…";
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定をインポートしました";
     pub const SETTINGS_EXPORTED: &str = "設定をエクスポートしました";
     pub const SETTINGS_IMPORT_FAILED: &str =
-        "インポートできませんでした。Hajime IME の設定ファイルではないか、サイズのエラーです";
+        "インポートできませんでした。ファイルのサイズか形式が正しくありません";
     pub const SETTINGS_EXPORT_FAILED: &str = "エクスポートできませんでした";
     pub const ABOUT: &str = "情報";
     pub const VERSION: &str = "バージョン";
@@ -994,7 +996,8 @@ pub mod dictionaries {
     pub const MOVE_DOWN: &str = "優先度を下げる";
     pub const SHOW_DETAILS: &str = "詳細を表示";
     pub const HIDE_DETAILS: &str = "詳細を隠す";
-    pub const IMPORT_FAILED: &str = "辞書をインポートできませんでした。サイズか形式のエラーです";
+    pub const IMPORT_FAILED: &str =
+        "辞書をインポートできませんでした。ファイルのサイズか形式が正しくありません";
     pub const NOTE: &str = "上の辞書ほど優先";
 
     pub fn too_many(limit: usize) -> String {
@@ -1066,7 +1069,7 @@ pub mod association {
     pub const EMPTY: &str = "連想辞書はありません";
     pub const IMPORT_FILE: &str = "連想辞書をインポート…";
     pub const IMPORT_FAILED: &str =
-        "連想辞書をインポートできませんでした。サイズか形式のエラーです";
+        "連想辞書をインポートできませんでした。ファイルのサイズか形式が正しくありません";
     pub const NOTE: &str = "上の辞書ほど優先";
     /// 読み込めるファイルの例の行(同じ意味の単語を「,」で区切った 1 行)
     pub const FILE_EXAMPLE: &str = "美しい,綺麗,麗しい";
@@ -1586,6 +1589,27 @@ mod limits {
             "{} 文字まで、単語は {} 文字まで",
             limits.user_dictionary_reading_length, limits.user_dictionary_word_length
         )));
+    }
+}
+
+#[cfg(test)]
+mod examples {
+    use super::extras;
+
+    /// 初期設定の説明に書く見本は，項目名の横の見本(core の DefaultSettings と同じ値．make check で比べる)と同じ
+    /// (macOS の UIStrings.Extras は見本の値を差し込む)
+    #[test]
+    fn 試験的な機能の説明の見本は項目名の横の見本と同じ() {
+        let (reading, candidate) = extras::LOOSE_READINGS_EXAMPLE;
+        assert_eq!(
+            extras::LOOSE_READINGS_NOTE,
+            format!("「{reading}」から「{candidate}」のように、読みを少し違えて覚えている単語を候補に表示します。")
+        );
+        let (reading, candidate) = extras::PHONETIC_SPELLING_EXAMPLE;
+        assert_eq!(
+            extras::PHONETIC_SPELLING_NOTE,
+            format!("「{reading}」から「{candidate}」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。")
+        );
     }
 }
 
