@@ -7,10 +7,13 @@ import HajimeDomain
 struct AssociationFinder {
     private let lookup: (any AssociationLookup)?
     private let settings: any SettingsReading
+    /// 変換マクロの日時と乱数(`{date}`・`{uuid}` など)
+    private let templateValues: TemplateValueSource
 
-    init(lookup: (any AssociationLookup)?, settings: any SettingsReading) {
+    init(lookup: (any AssociationLookup)?, settings: any SettingsReading, calendar: (any CalendarReading)?) {
         self.lookup = lookup
         self.settings = settings
+        self.templateValues = TemplateValueSource(calendar: calendar)
     }
 
     /// 連想変換か変換マクロを使う設定か(どちらも連想変換のキーで一覧を出す)
@@ -29,7 +32,8 @@ struct AssociationFinder {
             : []
         // マクロのまとまりは連想の数の上限に数えない(連想の語でまとまりが切られて，マクロが出なくなるのを避ける)
         if includesMacros, current.conversionMacros {
-            let results = ConversionMacros.results(text: text, reading: KanaWidth.hiragana(from: reading), macros: current.macros)
+            let results = ConversionMacros.results(text: text, reading: KanaWidth.hiragana(from: reading), macros: current.macros,
+                                                   values: templateValues.values(), skipsSameReading: current.macroSkipsSameReading)
             if !results.isEmpty { groups.append(AssociationGroup(label: DefaultSettings.macroGroupLabel, words: results)) }
         }
         return groups.isEmpty ? nil : Associations(headword: text, groups: groups)

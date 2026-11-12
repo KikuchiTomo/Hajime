@@ -12,7 +12,7 @@ use crate::files::FileTask;
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
-use crate::pages::{Action, DictionaryList, Page};
+use crate::pages::{Action, DictionaryList, Page, TryKind};
 use crate::store::StoreError;
 use crate::strings::{
     association, dictionaries, features, keys, more, rule_list, settings, sync as sync_text,
@@ -470,7 +470,23 @@ impl App {
                 self.refresh();
                 return None;
             }
-            Event::Preview { text, preceding } => {
+            Event::Preview {
+                kind: TryKind::Macros,
+                text,
+                preceding,
+                draft,
+            } => {
+                let shown = macro_preview(model, &text, &preceding, &draft);
+                self.extras.macro_preview.clone_from(&shown);
+                self.view.show_preview(TryKind::Macros, &shown);
+                return None;
+            }
+            Event::Preview {
+                kind: TryKind::Language,
+                text,
+                preceding,
+                ..
+            } => {
                 let shown = if text.trim().is_empty() {
                     String::new()
                 } else {
@@ -480,7 +496,7 @@ impl App {
                         .map(|words| crate::engine::preview_text(&words))
                         .unwrap_or_default()
                 };
-                self.view.show_preview(&shown);
+                self.view.show_preview(TryKind::Language, &shown);
                 return None;
             }
             Event::Action(Action::RestoreDefaults) => model.restore_defaults(),
@@ -998,6 +1014,20 @@ impl App {
         self.refresh();
         after
     }
+}
+
+/// 試す語と読みに変換マクロを当てた結果の文．つながらなければ空
+pub fn macro_preview(
+    model: &SettingsModel<Store>,
+    text: &str,
+    reading: &str,
+    draft: &str,
+) -> String {
+    model
+        .store()
+        .preview_macros(text, reading, draft)
+        .map(|results| crate::engine::macro_preview_text(&results, !draft.trim().is_empty()))
+        .unwrap_or_default()
 }
 
 /// 標準のひな形の値(KeymapPreset.standard)

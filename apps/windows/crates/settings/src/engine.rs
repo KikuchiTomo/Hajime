@@ -99,6 +99,23 @@ impl<E: Engine> EngineStore<E> {
         }
     }
 
+    /// 試す語と読みに変換マクロを当てた結果．draft があれば(変換マクロの欄に書いている途中の形)その形だけを当てる
+    pub fn preview_macros(
+        &self,
+        text: &str,
+        reading: &str,
+        draft: &str,
+    ) -> Result<Vec<String>, StoreError> {
+        match self.send(RequestBody::PreviewMacros {
+            text: text.to_string(),
+            reading: reading.to_string(),
+            pattern: (!draft.trim().is_empty()).then(|| draft.to_string()),
+        })? {
+            ResponseBody::MacroPreview { results } => Ok(results),
+            _ => Err(StoreError::Malformed),
+        }
+    }
+
     /// 登録した単語をすべて読む．1 回に返す数はエンジンが決めるので，返らなかった分を続けて頼む
     pub fn read_user_dictionary(&self) -> Result<Vec<DictionaryEntry>, StoreError> {
         let mut entries = Vec::new();
@@ -314,6 +331,15 @@ pub fn preview_text(words: &[PreviewWord]) -> String {
         .join("\u{3000}")
 }
 
+/// 変換マクロを試した結果を 1 つの文にする(全角の空白で区切る)．書いている途中の形の結果なら頭に「入力中の形: 」を付ける
+pub fn macro_preview_text(results: &[String], drafting: bool) -> String {
+    if drafting {
+        let shown = results.first().map_or("", String::as_str);
+        return format!("{}{shown}", crate::strings::extras::MACRO_DRAFT_RESULT);
+    }
+    results.join("\u{3000}")
+}
+
 fn parse(values: &str) -> Result<Fields, StoreError> {
     serde_json::from_str(values).map_err(|_| StoreError::Malformed)
 }
@@ -511,6 +537,40 @@ mod tests {
                 preceding_text: None
             }
         );
+    }
+
+    #[test]
+    fn 変換マクロを試す_書いている途中の形だけを送る() {
+        let engine = scripted(Some(ResponseBody::MacroPreview {
+            results: vec!["【東京】".into()],
+        }));
+        let store = EngineStore::new(&engine);
+        assert_eq!(
+            store.preview_macros("東京", "とうきょう", " ").unwrap(),
+            vec!["【東京】".to_string()]
+        );
+        assert_eq!(
+            engine.requests.borrow()[0],
+            RequestBody::PreviewMacros {
+                text: "東京".into(),
+                reading: "とうきょう".into(),
+                pattern: None
+            }
+        );
+    }
+
+    #[test]
+    fn 変換マクロを試した結果を文にする() {
+        let results = vec!["「東京」".to_string(), "【東京】".to_string()];
+        assert_eq!(
+            macro_preview_text(&results, false),
+            "「東京」\u{3000}【東京】"
+        );
+        assert_eq!(
+            macro_preview_text(&results[..1], true),
+            "入力中の形: 「東京」"
+        );
+        assert_eq!(macro_preview_text(&[], true), "入力中の形: ");
     }
 
     /// 登録した単語を total 個持ち，頼まれた範囲を返す

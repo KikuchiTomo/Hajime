@@ -124,6 +124,8 @@ public struct Settings: Sendable, Equatable {
     /// 連想変換のキーで出す一覧に，選んでいる語を整えた形(変換マクロ)を並べる
     public var conversionMacros = false
     public var macros: [ConversionMacro] = DefaultSettings.conversionMacros
+    /// かなの語(語が読みと同じ)には，語と読みを並べる変換マクロ(ルビ・読みを添える形)を出さない
+    public var macroSkipsSameReading = true
     /// 読みで呼び出すコマンド(ランチャー)を使う．同期しない(SyncGroup.commands)
     public var launcherCommands = false
     public var commands: [LauncherCommand] = []
@@ -367,7 +369,7 @@ extension Settings: Codable {
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
-        case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, launcherCommands, commands
+        case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, macroSkipsSameReading, launcherCommands, commands
         case englishTermCandidates, englishTerms
         case palette, paletteClosesAfterInsert, paletteRecordsHistory, paletteColumns, paletteRows, paletteCellSize, paletteShowsPreview, paletteFrequentRows
     }
@@ -495,6 +497,7 @@ extension Settings: Codable {
         read(.dynamicDictionary, into: \.dynamicDictionary)
         read(.conversionMacros, into: \.conversionMacros)
         readList(.macros, into: \.macros)
+        read(.macroSkipsSameReading, into: \.macroSkipsSameReading)
         read(.launcherCommands, into: \.launcherCommands)
         readList(.commands, into: \.commands)
         read(.englishTermCandidates, into: \.englishTermCandidates)
@@ -619,6 +622,7 @@ extension Settings: Codable {
         try container.encode(dynamicDictionary, forKey: .dynamicDictionary)
         try container.encode(conversionMacros, forKey: .conversionMacros)
         try container.encode(macros, forKey: .macros)
+        try container.encode(macroSkipsSameReading, forKey: .macroSkipsSameReading)
         try container.encode(launcherCommands, forKey: .launcherCommands)
         try container.encode(commands, forKey: .commands)
         try container.encode(englishTermCandidates, forKey: .englishTermCandidates)

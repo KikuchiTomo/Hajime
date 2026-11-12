@@ -69,12 +69,11 @@ struct InputExtrasTests {
         #expect(TextTemplate.expand("{datetime:EEE dddd}", values: values) == "Sun 日曜日")
     }
 
-    @Test("R-21: {datetime+nd:...} は日をずらし，{uuid}・{random} は渡した作り方で作る．知らない名前と {{ }} はそのまま")
+    @Test("R-21: {uuid}・{random} は渡した作り方で作る．知らない名前と {{ }} はそのまま")
     func otherTemplates() {
-        let values = TextTemplate.Values(
-            now: now, day: { CalendarDate(year: 2026, month: 11, day: 1 + $0, weekday: 1) }, uuid: { "UUID" }, random: { $0.upperBound })
+        let values = TextTemplate.Values(now: now, uuid: { "UUID" }, random: { $0.upperBound })
         #expect(TextTemplate.expand("{datetime+1d:MM/DD}", values: values) == "11/02")
-        #expect(TextTemplate.expand("{datetime-7d:D}", values: values) == "-6")
+        #expect(TextTemplate.expand("{datetime-7d:M/D}", values: values) == "10/25")
         #expect(TextTemplate.expand("id={uuid} n={random:1-6}", values: values) == "id=UUID n=6")
         #expect(TextTemplate.expand("{clipboard} {{x}} {text}", values: values) == "{clipboard} {x} {text}")
         #expect(TextTemplate.expand("{random:9-1}", values: values) == "{random:9-1}")
@@ -83,10 +82,76 @@ struct InputExtrasTests {
         #expect(!TextTemplate.containsPlaceholder("ふつうの語"))
     }
 
+    @Test("R-21: 日時は分・時間・日・週・月・年でずらし，その週の曜日・その月の日・月末に合わせる．左から順に当てる")
+    func dateSteps() {
+        // 2026/11/01 は日曜日．週は月曜から数える
+        let values = TextTemplate.Values(now: now)
+        #expect(TextTemplate.expand("{time+2h}・{time-30m}・{time+15h:M/D hh:mm}", values: values) == "11:05・08:35・11/2 00:05")
+        #expect(TextTemplate.expand("{date+1w:M/D(ddd)}・{date+1M}・{date-1y}", values: values) == "11/8(日)・2026/12/01・2025/11/01")
+        #expect(TextTemplate.expand("{date@mon:M/D(ddd)}・{date+1w@mon:M/D(ddd)}・{date@fri:M/D}", values: values) == "10/26(月)・11/2(月)・10/30")
+        #expect(TextTemplate.expand("{date@end:M/D}・{date+1M@1:M/D}・{date+1M@end:M/D}・{date@31:M/D}", values: values)
+            == "11/30・12/1・12/31・11/30")
+        // 1 月 31 日の 1 か月後は月末(うるう年は 29 日)
+        let january = TextTemplate.Values(now: CalendarDate(year: 2028, month: 1, day: 31, weekday: 2))
+        #expect(TextTemplate.expand("{date+1M}・{date+1y+1M}", values: january) == "2028/02/29・2029/02/28")
+        #expect(TextTemplate.expand("{datetime+1q}・{date@xyz}・{text+1d}・{date+99999d}", values: values)
+            == "{datetime+1q}・{date@xyz}・{text+1d}・{date+99999d}")
+    }
+
+    @Test("R-21: 英語の月と曜日・年の何日目・週番号・四半期・AM と PM・協定世界時・UNIX 時間")
+    func dateFormatSymbols() {
+        let values = TextTemplate.Values(now: now)
+        #expect(TextTemplate.expand("{date:MMMM MMM EEEE EEE}", values: values) == "November Nov Sunday Sun")
+        #expect(TextTemplate.expand("{date:DDDD DDD 'W'WW Q AA}", values: values) == "305 305 W44 4 AM")
+        #expect(TextTemplate.expand("{utc}", values: values) == "2026-11-01T00:05:07Z")
+        #expect(TextTemplate.expand("{unixtime}・{unixtime+1d}", values: values) == "1793491507・1793577907")
+        // 年の初めの週番号は前の年の週のことがある(2027/1/1 は金曜で，2026 年の第 53 週)
+        let newYear = TextTemplate.Values(now: CalendarDate(year: 2027, month: 1, day: 1, weekday: 6))
+        #expect(TextTemplate.expand("{date:W}・{date+3d:W}", values: newYear) == "53・1")
+        // 元号は始まりの日で切り替える
+        let heisei = TextTemplate.Values(now: CalendarDate(year: 2019, month: 4, day: 30, weekday: 3))
+        #expect(TextTemplate.expand("{date:GGE年}・{date+1d:GGE年}・{date-31y:GGE年}", values: heisei) == "平成31年・令和1年・昭和63年")
+    }
+
+    @Test("R-21: 英数字・16 進数の乱数と，並べた中から 1 つを選ぶ")
+    func randomTexts() {
+        let last = TextTemplate.Values(random: { $0.upperBound })
+        let first = TextTemplate.Values(random: { $0.lowerBound })
+        #expect(TextTemplate.expand("{alnum:4}・{hex}・{hex:3|upper}", values: last) == "9999・ffffffff・FFF")
+        #expect(TextTemplate.expand("{alnum:2}・{pick:犬,猫,鳥}・{pick:犬,猫,鳥}", values: first) == "AA・犬・犬")
+        #expect(TextTemplate.expand("{pick:犬,猫,鳥}", values: last) == "鳥")
+        #expect(TextTemplate.expand("{alnum:0}・{alnum:65}・{pick}", values: last) == "{alnum:0}・{alnum:65}・{pick}")
+    }
+
     @Test("R-21: {text|upper} など，値に変換をかける")
     func templateFilters() {
         let values = TextTemplate.Values(text: "hello", reading: "はろー")
         #expect(TextTemplate.expand("{text|upper}/{text|capitalize}/{reading|katakana}/{text|fullwidth}", values: values) == "HELLO/Hello/ハロー/ｈｅｌｌｏ")
+        #expect(TextTemplate.expand("{text|fullwidth|ascii}・{reading|halfwidth}・{text|length}・{text|nothing}", values: values)
+            == "hello・ﾊﾛｰ・5・{text|nothing}")
+    }
+
+    @Test("R-21: 英語の語の書き方(snake・camel・pascal・kebab)と URL の形")
+    func wordCaseFilters() {
+        let values = TextTemplate.Values(text: "Hello world HTTPServer v2", reading: "")
+        #expect(TextTemplate.expand("{text|snake}", values: values) == "hello_world_http_server_v2")
+        #expect(TextTemplate.expand("{text|kebab}", values: values) == "hello-world-http-server-v2")
+        #expect(TextTemplate.expand("{text|camel}", values: values) == "helloWorldHttpServerV2")
+        #expect(TextTemplate.expand("{text|pascal}", values: values) == "HelloWorldHttpServerV2")
+        #expect(TextFilter.snake.apply(to: "parseJSONValue") == "parse_json_value")
+        #expect(TextFilter.url.apply(to: "東京 タワー/a~b") == "%E6%9D%B1%E4%BA%AC%20%E3%82%BF%E3%83%AF%E3%83%BC%2Fa~b")
+    }
+
+    @Test("R-22: かなをヘボン式のローマ字にする(ん は n，っ は子音を重ね，ー は母音を重ねる)")
+    func romaji() {
+        #expect(HepburnRomanizer.romaji(from: "とうきょう") == "toukyou")
+        #expect(HepburnRomanizer.romaji(from: "しんぶん") == "shinbun")
+        #expect(HepburnRomanizer.romaji(from: "ちゃっと・まっちゃ") == "chatto・matcha")
+        #expect(HepburnRomanizer.romaji(from: "ふじさん") == "fujisan")
+        #expect(HepburnRomanizer.romaji(from: "コーヒー") == "koohii")
+        #expect(HepburnRomanizer.romaji(from: "ティーシャツ") == "tiishatsu")
+        #expect(HepburnRomanizer.romaji(from: "ヴァイオリン") == "vaiorin")
+        #expect(HepburnRomanizer.romaji(from: "東京タワー") == "東京tawaa")
     }
 
     @Test("R-21: 「にちじ」で日付と時刻を合わせた形を出す．「いま」には秒までの形も出す")
@@ -199,6 +264,57 @@ struct InputExtrasTests {
         #expect(!results.contains("東京"))
         #expect(DefaultSettings.conversionMacros.allSatisfy { $0.isValid })
         #expect(!ConversionMacro(pattern: "固定の文字").isValid)
+    }
+
+    @Test("R-22: 足した既定の形は無効で入り，オンにすれば使える．id は重ならない")
+    func addedMacroPresets() {
+        let added = DefaultSettings.addedMacros
+        #expect(added.allSatisfy { $0.isValid && !$0.isEnabled })
+        #expect(Set(DefaultSettings.conversionMacros.map(\.id)).count == DefaultSettings.conversionMacros.count)
+        let enabled = added.map { ConversionMacro(id: $0.id, pattern: $0.pattern) }
+        let results = ConversionMacros.results(text: "東京", reading: "とうきょう", macros: enabled)
+        #expect(results.contains("東京（トウキョウ）"))
+        #expect(results.contains("toukyou"))
+        #expect(results.contains("[[rb:東京 > とうきょう]]"))
+        #expect(results.contains("\\ruby{東京}{とうきょう}"))
+        #expect(results.contains("《《東京》》"))
+        #expect(results.contains("[東京](https://ja.wikipedia.org/wiki/%E6%9D%B1%E4%BA%AC)"))
+        #expect(!ConversionMacros.results(text: "東京", reading: "とうきょう", macros: added).contains("toukyou"))
+    }
+
+    @Test("R-22: 変換マクロでも日時と乱数を使える．かなの語には，語と読みを並べる形を出さない(設定で切れる)")
+    func macrosWithValuesAndKanaWords() {
+        let macros = [ConversionMacro(pattern: "{text}（{date:M/D}）"), ConversionMacro(pattern: "{text}（{reading}）"),
+                      ConversionMacro(pattern: "{reading|romaji}")]
+        let values = TextTemplate.Values(now: now)
+        #expect(ConversionMacros.results(text: "東京", reading: "とうきょう", macros: macros, values: values, skipsSameReading: true)
+            == ["東京（11/1）", "東京（とうきょう）", "toukyou"])
+        #expect(ConversionMacros.results(text: "すし", reading: "すし", macros: macros, values: values, skipsSameReading: true)
+            == ["すし（11/1）", "sushi"])
+        #expect(ConversionMacros.results(text: "スシ", reading: "すし", macros: macros, values: values, skipsSameReading: true)
+            == ["スシ（11/1）", "sushi"])
+        #expect(ConversionMacros.results(text: "すし", reading: "すし", macros: macros, values: values, skipsSameReading: false)
+            == ["すし（11/1）", "すし（すし）", "sushi"])
+    }
+
+    @Test("R-22: 前のバージョンで保存した一覧には，足した形を無効のまま末尾に足す．消した既定の形は戻さない")
+    func macroPresetUpgrade() throws {
+        let kept = DefaultSettings.conversionMacros[2]
+        let custom = ConversionMacro(pattern: "<<{text}>>")
+        let oldList = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode([kept, custom]))
+        var object: [String: JSONValue] = [SettingsSchema.versionKey: .number(10), "macros": oldList]
+        SettingsSchema.migrate(&object)
+        let upgraded = try #require(object["macros"])
+        let macros = try JSONDecoder().decode([ConversionMacro].self, from: JSONEncoder().encode(upgraded))
+        #expect(macros == [kept, custom] + DefaultSettings.addedMacros)
+        // もう一度移し替えても重ねて足さない
+        var again: [String: JSONValue] = [SettingsSchema.versionKey: .number(10), "macros": upgraded]
+        SettingsSchema.migrate(&again)
+        #expect(again["macros"] == upgraded)
+        // 一覧を書いていない設定は触らない(読むときに既定の一覧になる)
+        var empty: [String: JSONValue] = [SettingsSchema.versionKey: .number(10)]
+        SettingsSchema.migrate(&empty)
+        #expect(empty["macros"] == nil)
     }
 
     @Test("設定の新しい項目は既定でオフで，ファイルに書いて読み戻せる")

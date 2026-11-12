@@ -164,10 +164,11 @@ public final class InputSession {
     ///   - keyNames: 候補ウィンドウの案内と注記に出すキーの名前の書き方(入力メソッドを動かす OS に合わせる)
     ///   - usageDictionary: 同音異義語の使い分けの辞書(R-08)．nil ならこのリポジトリで書いた組だけを使う
     ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
+    ///   - calendar: 変換マクロの日時(`{date}` など．R-22)．nil なら日時の名前は置き換えない
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
                 rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
-                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil) {
+                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil) {
         self.paletteServices = palette
         self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
@@ -177,7 +178,7 @@ public final class InputSession {
         self.lexicon = lexicon
         self.settings = settings
         self.usage = usage
-        self.associationFinder = AssociationFinder(lookup: associations, settings: settings)
+        self.associationFinder = AssociationFinder(lookup: associations, settings: settings, calendar: calendar)
         let classifier = WordLanguageClassifier(lexicon: lexicon, converter: converter, settings: settings)
         self.corrector = EnglishWordCorrector(lexicon: lexicon, settings: settings, converter: converter, classifier: classifier)
         self.readingCorrector = ReadingCorrector(converter: converter, settings: settings, usesProvidedCorrections: typoService != nil)

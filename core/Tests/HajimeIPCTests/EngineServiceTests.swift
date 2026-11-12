@@ -458,6 +458,20 @@ struct EngineServiceTests {
         #expect(received.value?.1 == "I")
     }
 
+    @Test("R-22: 変換マクロの「試す」は見本の語・読み・書いている途中の形を渡し，結果を返す")
+    func previewMacros() {
+        let received = Box<(String, String, String?)?>(nil)
+        let (service, id) = serviceWith(SettingsServices(previewMacros: { text, reading, pattern in
+            received.value = (text, reading, pattern)
+            return ["【東京】"]
+        }))
+        let body = service.handle(WireRequest(id: 44, body: .previewMacros(text: "東京", reading: "とうきょう", pattern: "【{text}】")), from: id).body
+        #expect(body == .macroPreview(results: ["【東京】"]))
+        #expect(received.value?.0 == "東京")
+        #expect(received.value?.1 == "とうきょう")
+        #expect(received.value?.2 == "【{text}】")
+    }
+
     @Test("ユーザー辞書の語を足す・消す・取り込む・ページごとに読む")
     func userDictionary() {
         let id = greeted()

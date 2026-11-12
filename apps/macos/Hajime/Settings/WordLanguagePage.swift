@@ -32,7 +32,7 @@ struct WordLanguagePage: View {
                         .textFieldStyle(.roundedBorder)
                     let words = sample.isEmpty ? [] : preview(sample, preceding.isEmpty ? nil : preceding)
                     if !words.isEmpty {
-                        WrappingStack(spacing: 6) {
+                        WrappingStack(spacing: DesignTokens.Size.Settings.previewChipGap) {
                             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
                                 resultChip(word)
                             }
@@ -108,9 +108,9 @@ struct WordLanguagePage: View {
                 .font(.caption2)
                 .foregroundStyle(word.language == .japanese ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
         .contextMenu {
             // 試した語をそのまま一覧に足せるようにする
             Button(UIStrings.Features.englishWords) { add(word.typed, to: .english) }
@@ -184,53 +184,5 @@ struct WordLanguagePage: View {
         .buttonStyle(.borderless)
         .help(UIStrings.Settings.remove)
         .accessibilityLabel(UIStrings.Settings.remove)
-    }
-}
-
-/// 子を横に並べ，幅に収まらなければ次の行に送る
-private struct WrappingStack: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
-        let width = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width ?? width, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in arrange(width: bounds.width, subviews: subviews) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = []
-        var row = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            if !row.indices.isEmpty, row.width + spacing + size.width > width {
-                rows.append(row)
-                row = Row()
-            }
-            row.width += (row.indices.isEmpty ? 0 : spacing) + size.width
-            row.height = max(row.height, size.height)
-            row.indices.append(index)
-        }
-        if !row.indices.isEmpty { rows.append(row) }
-        return rows
     }
 }

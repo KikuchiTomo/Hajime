@@ -209,8 +209,8 @@ pub mod extras {
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
     pub const DYNAMIC_DICTIONARY_NOTE: &str = "登録する単語に次の書き方を入れておくと、変換したときにその時点の値に置き換えて入れます。単語のほかの文字はそのまま入ります。読みはローマ字（gh など）でも登録できます。";
-    pub const TEMPLATE_FILTERS: &str = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）。";
-    pub const DATE_FORMAT_SYMBOLS: &str = "日時の書式の記号: YYYY 年、MM 月、DD 日、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、GG 元号（令和）、E 元号の年。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。";
+    pub const TEMPLATE_FILTERS: &str = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）、ascii（半角英数）、romaji（ローマ字）、snake・camel・pascal・kebab（英語の語の書き方）、url（URL に入れる形）、length（文字数）。続けて書くと左から順にかけます。";
+    pub const DATE_FORMAT_SYMBOLS: &str = "日時の書式の記号: YYYY 年、MM 月、MMM・MMMM 英語の月（Nov、November）、DD 日、DDD 年の何日目、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、AA AM・PM、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、EEE・EEEE 英語の曜日（Mon、Monday）、GG 元号（令和）、E 元号の年、WW 週番号、Q 四半期。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。";
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
@@ -233,10 +233,16 @@ pub mod extras {
     pub const TARGET_PLACEHOLDER_SHORTCUT: &str = "ショートカットの名前";
     pub const MACROS_SECTION: &str = "変換マクロ";
     pub const CONVERSION_MACROS: &str = "連想変換のキーで変換マクロを表示";
-    pub const MACROS_NOTE: &str = "変換中に連想変換のキーを押すと、選んでいる語を整えた形が「整形」に並びます。{text} が語、{reading} が読みです。{text|upper} のように変換もかけられます。";
+    pub const MACROS_NOTE: &str = "変換中に連想変換のキーを押すと、選んでいる語を整えた形が「整形」に並びます。チェックを入れた形だけを出します。{text} が語、{reading} が読みです。日時・乱数・{reading|romaji} のような変換も使えます。";
     pub const MACRO_PATTERN: &str = "形";
     pub const MACROS_EMPTY: &str = "マクロはありません";
     pub const INVALID_MACRO: &str = "{text} か {reading} を含めてください";
+    pub const MACRO_SKIPS_SAME_READING: &str = "かなの語には読みを添える形を出さない";
+    pub const TRY_MACROS: &str = "変換マクロを試す";
+    pub const TRY_MACRO_WORD: &str = "試す語";
+    pub const TRY_MACRO_READING: &str = "読み";
+    pub const MACRO_DRAFT_RESULT: &str = "入力中の形: ";
+    pub const MACRO_REFERENCE: &str = "{text} 語、{reading} 読み\n{date} 日付、{time} 時刻、{datetime:YYYY年M月D日(ddd) hh:mm} 書式を指定、{utc} 協定世界時、{unixtime} UNIX 時間\n書式: YYYY 年、MM 月、DD 日、hh 時、mm 分、ss 秒、ddd 曜日（水）、EEE 曜日（Wed）、MMM 月（Nov）、GGE 和暦（令和8）、A 午前・午後、WW 週番号、Q 四半期、DDD 年の何日目\nずらす: {date+1d} 明日、{time+30m} 30 分後（m 分、h 時間、d 日、w 週、M 月、y 年）\n合わせる: {date@fri} 今週の金曜、{date+1w@mon} 来週の月曜、{date@end} 月末、{date+1M@1} 来月 1 日\n乱数: {uuid}、{random:1-6}、{alnum:8} 英数字、{hex:8} 16 進数、{pick:A,B,C} どれか 1 つ\n変換: {reading|romaji} のように | で続けます（upper、lower、capitalize、katakana、hiragana、halfwidth、fullwidth、ascii、romaji、snake、camel、pascal、kebab、url、length）\n{{ と }} で { と } そのものを入れます。";
 }
 
 /// UIStrings.More
@@ -756,6 +762,10 @@ pub mod sync {
         ("userDictionary", "ユーザー辞書"),
         ("importedDictionaries", "取り込んだ辞書"),
         ("associationDictionaries", "連想の辞書"),
+        (
+            "macroSkipsSameReading",
+            "かなの語には読みを添える形を出さない",
+        ),
         ("englishTermCandidates", "英語の語の辞書を使う"),
         ("englishTerms", "英語の語の辞書に足した語"),
         ("palette", "絵文字と記号のパレット"),
@@ -784,8 +794,14 @@ pub mod windows {
         "{time}　今の時刻（例: 09:30）",
         "{datetime:YYYY/MM/DD hh:mm:ss}　書式を決めた日時（例: 2026/04/01 09:30:15）",
         "{datetime+1d:MM/DD}　日をずらした日付。-7d なら 7 日前（例: 04/02）",
+        "{time+30m}　ずらした時刻。m 分・h 時間・d 日・w 週・M 月・y 年でずらす（例: 10:00）",
+        "{date+1w@mon:M/D(ddd)}　来週の月曜。@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末（例: 4/6(月)）",
+        "{utc}　協定世界時の日時（例: 2026-04-01T00:30:15Z）",
+        "{unixtime}　UNIX 時間（秒）",
         "{uuid}　UUID。入れるたびに変わる",
         "{random:1-6}　範囲の中の整数。入れるたびに変わる",
+        "{alnum:8}　英数字 8 文字。{hex:8} なら 16 進数。入れるたびに変わる",
+        "{pick:はい,いいえ}　並べたうちのどれか 1 つ。入れるたびに変わる",
         "{date|fullwidth}　| のあとの名前で変えた値（例: ２０２６／０４／０１）",
         "{{ }}　「{」と「}」の文字そのもの",
     ];

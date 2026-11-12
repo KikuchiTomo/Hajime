@@ -863,6 +863,12 @@ pub enum RequestBody {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         preceding_text: Option<String>,
     },
+    PreviewMacros {
+        text: String,
+        reading: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pattern: Option<String>,
+    },
     ReadUserDictionary {
         offset: u32,
         limit: u32,
@@ -1079,6 +1085,12 @@ impl fmt::Debug for RequestBody {
                 .field("text", &REDACTED)
                 .field("precedingText", &REDACTED)
                 .finish(),
+            Self::PreviewMacros { .. } => f
+                .debug_struct("PreviewMacros")
+                .field("text", &REDACTED)
+                .field("reading", &REDACTED)
+                .field("pattern", &REDACTED)
+                .finish(),
             Self::ReadUserDictionary { offset, limit, .. } => f
                 .debug_struct("ReadUserDictionary")
                 .field("offset", offset)
@@ -1175,6 +1187,9 @@ pub enum ResponseBody {
     LanguagePreview {
         words: Vec<PreviewWord>,
     },
+    MacroPreview {
+        results: Vec<String>,
+    },
     UserDictionary {
         entries: Vec<DictionaryEntry>,
         total: u32,
@@ -1262,6 +1277,10 @@ impl fmt::Debug for ResponseBody {
             Self::LanguagePreview { words, .. } => f
                 .debug_struct("LanguagePreview")
                 .field("words", words)
+                .finish(),
+            Self::MacroPreview { .. } => f
+                .debug_struct("MacroPreview")
+                .field("results", &REDACTED)
                 .finish(),
             Self::UserDictionary { entries, total, .. } => f
                 .debug_struct("UserDictionary")
