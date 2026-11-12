@@ -6,6 +6,7 @@
 
 mod association;
 mod branch;
+mod branch_lines;
 pub(crate) mod fitting;
 mod list;
 mod meaning;
@@ -55,6 +56,13 @@ pub enum Draw {
         color: Color,
         width: f32,
     },
+    /// 線をつないだ図形(分岐図の幹と枝)．すべての図形をまとめて 1 回でなぞり，重なったところを濃くしない．
+    /// 端は平らにし，直角の角は尖らせる
+    Path {
+        figures: Vec<Figure>,
+        color: Color,
+        width: f32,
+    },
     /// 直線(端は丸い)．dot_pitch があれば，その間隔の丸い点にする
     Line {
         from: Point,
@@ -92,6 +100,49 @@ pub enum Draw {
         scale: f32,
         draws: Vec<Draw>,
     },
+}
+
+/// start から segments を順につないだ 1 本の線
+#[derive(Debug, Clone, PartialEq)]
+pub struct Figure {
+    pub start: Point,
+    pub segments: Vec<Segment>,
+}
+
+/// 線の 1 区間．前の区間の終わり(最初は Figure の start)から to まで
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Segment {
+    Line(Point),
+    /// 半径 radius の円弧(半円より小さい方)．clockwise は y が下へ増える画面で見た向き
+    Arc {
+        to: Point,
+        radius: f32,
+        clockwise: bool,
+    },
+}
+
+impl Figure {
+    fn offset(self, dx: f32, dy: f32) -> Self {
+        Self {
+            start: self.start.offset(dx, dy),
+            segments: self
+                .segments
+                .into_iter()
+                .map(|segment| match segment {
+                    Segment::Line(to) => Segment::Line(to.offset(dx, dy)),
+                    Segment::Arc {
+                        to,
+                        radius,
+                        clockwise,
+                    } => Segment::Arc {
+                        to: to.offset(dx, dy),
+                        radius,
+                        clockwise,
+                    },
+                })
+                .collect(),
+        }
+    }
 }
 
 impl Draw {
@@ -136,6 +187,18 @@ impl Draw {
                 control1: control1.offset(dx, dy),
                 control2: control2.offset(dx, dy),
                 to: to.offset(dx, dy),
+                color,
+                width,
+            },
+            Self::Path {
+                figures,
+                color,
+                width,
+            } => Self::Path {
+                figures: figures
+                    .into_iter()
+                    .map(|figure| figure.offset(dx, dy))
+                    .collect(),
                 color,
                 width,
             },
@@ -314,6 +377,8 @@ pub struct Look<'a> {
     /// 候補の右に空けておく語の意味のカードの高さ(CardReservation が前の窓から決める)．
     /// 意味の無い候補を選んでいても，この高さの空いたカードを出して窓の大きさを変えない．None なら空けない
     pub reserved_card: Option<f32>,
+    /// 1 ドットあたりのデバイスのピクセル数(画面の DPI の倍率)．枝の線の縁をデバイスのピクセルの境にそろえるのに使う
+    pub pixel_scale: f32,
 }
 
 impl<'a> Look<'a> {
@@ -327,6 +392,7 @@ impl<'a> Look<'a> {
             rest_opacity: 1.0,
             size: None,
             reserved_card: None,
+            pixel_scale: 1.0,
         }
     }
 

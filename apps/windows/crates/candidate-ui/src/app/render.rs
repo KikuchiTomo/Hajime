@@ -3,7 +3,7 @@
 use crate::fonts::{InstalledFace, Selection};
 use crate::geometry::Frame;
 use crate::icon;
-use crate::scene::{Draw, Measure, Scene};
+use crate::scene::{Draw, Measure, Scene, Segment};
 use crate::theme::{Color, Face, Font, FontSpec, ResolvedTheme, Weight};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -12,14 +12,16 @@ use std::sync::OnceLock;
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED,
     D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED, D2D1_FIGURE_END_OPEN, D2D1_PIXEL_FORMAT,
-    D2D_RECT_F,
+    D2D_RECT_F, D2D_SIZE_F,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Factory, ID2D1Geometry, ID2D1RenderTarget, ID2D1SolidColorBrush,
-    ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND,
-    D2D1_DASH_STYLE_CUSTOM, D2D1_DASH_STYLE_SOLID, D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT,
-    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_LAYER_PARAMETERS, D2D1_LINE_JOIN_ROUND,
+    ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_ARC_SEGMENT, D2D1_ARC_SIZE_SMALL,
+    D2D1_CAP_STYLE_FLAT, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_CUSTOM, D2D1_DASH_STYLE_SOLID,
+    D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    D2D1_LAYER_PARAMETERS, D2D1_LINE_JOIN_MITER, D2D1_LINE_JOIN_ROUND,
     D2D1_RENDER_TARGET_PROPERTIES, D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
+    D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE,
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFontCollection, IDWriteTextFormat,
@@ -109,6 +111,8 @@ pub struct Renderer {
     /// 配布物に入れた書体の集まり．読めなければ None(OS の書体だけで描く)
     bundled: Option<IDWriteFontCollection>,
     round: ID2D1StrokeStyle,
+    /// 端が平らで角が尖った線(分岐図の幹と枝)
+    flat: ID2D1StrokeStyle,
     /// OS に入っている書体の一覧．カスタムテーマの書体の PostScript 名を初めて引くときに読む
     faces: OnceLock<Vec<InstalledFace>>,
     /// 前に作った書体の組と，その元の書体の指定(新しいものが後ろ)．
@@ -568,6 +572,18 @@ impl Renderer {
         };
         // SAFETY: properties は呼び出しのあいだ有効
         let round = unsafe { d2d.CreateStrokeStyle(&properties, None)? };
+        let properties = D2D1_STROKE_STYLE_PROPERTIES {
+            startCap: D2D1_CAP_STYLE_FLAT,
+            endCap: D2D1_CAP_STYLE_FLAT,
+            dashCap: D2D1_CAP_STYLE_FLAT,
+            lineJoin: D2D1_LINE_JOIN_MITER,
+            // 直角の角を尖らせる(角の長さは太さの √2 倍)
+            miterLimit: 2.0,
+            dashStyle: D2D1_DASH_STYLE_SOLID,
+            dashOffset: 0.0,
+        };
+        // SAFETY: properties は呼び出しのあいだ有効
+        let flat = unsafe { d2d.CreateStrokeStyle(&properties, None)? };
         let bundled = bundled_fonts(&dwrite);
         Ok(Self {
             d2d,
@@ -575,6 +591,7 @@ impl Renderer {
             fonts,
             bundled,
             round,
+            flat,
             faces: OnceLock::new(),
             measures: RefCell::default(),
         })
@@ -895,6 +912,57 @@ impl Painter<'_> {
                     path
                 };
                 self.stroke(&geometry.into(), *color, *width, None)?;
+            }
+            Draw::Path {
+                figures,
+                color,
+                width,
+            } => {
+                // すべての図形を 1 つの形にまとめて 1 回でなぞり，重なったところを濃くしない
+                // SAFETY: factory は生きている COM の参照．sink は閉じるまでこの関数の中だけで使う
+                let geometry = unsafe {
+                    let path = self.renderer.d2d.CreatePathGeometry()?;
+                    let sink = path.Open()?;
+                    for figure in figures {
+                        sink.BeginFigure(
+                            vector!(figure.start.x, figure.start.y),
+                            D2D1_FIGURE_BEGIN_HOLLOW,
+                        );
+                        for segment in &figure.segments {
+                            match *segment {
+                                Segment::Line(to) => sink.AddLine(vector!(to.x, to.y)),
+                                Segment::Arc {
+                                    to,
+                                    radius,
+                                    clockwise,
+                                } => sink.AddArc(&D2D1_ARC_SEGMENT {
+                                    point: vector!(to.x, to.y),
+                                    size: D2D_SIZE_F {
+                                        width: radius,
+                                        height: radius,
+                                    },
+                                    rotationAngle: 0.0,
+                                    sweepDirection: if clockwise {
+                                        D2D1_SWEEP_DIRECTION_CLOCKWISE
+                                    } else {
+                                        D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE
+                                    },
+                                    arcSize: D2D1_ARC_SIZE_SMALL,
+                                }),
+                            }
+                        }
+                        sink.EndFigure(D2D1_FIGURE_END_OPEN);
+                    }
+                    sink.Close()?;
+                    path
+                };
+                let geometry: ID2D1Geometry = geometry.into();
+                self.color(*color);
+                // SAFETY: target・brush・geometry・stroke style は生きている COM の参照
+                unsafe {
+                    self.target
+                        .DrawGeometry(&geometry, self.brush, *width, &self.renderer.flat)
+                };
             }
             Draw::Line {
                 from,

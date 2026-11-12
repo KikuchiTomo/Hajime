@@ -8,6 +8,7 @@ public enum LayoutTokens {
         public static let sm: Double = 8
         public static let md: Double = 12
         public static let lg: Double = 16
+        public static let inline: Double = 4
     }
     public enum Candidate {
         public static let rowHeight: Double = 22
@@ -115,9 +116,7 @@ public enum LayoutTokens {
         public static let modeIndicatorFontSize: Double = 17
         public static let selectionInsetY: Double = 2
         public static let variantInsetY: Double = 4
-        public static let curveStartOverlap: Double = 2
-        public static let curveEndGap: Double = 3
-        public static let curveBend: Double = 0.35
+        public static let branchTurnRadius: Double = 8
         public static let dotPitch: Double = 5
         public static let keycapPartGap: Double = 1
         public static let keycapGap: Double = 3

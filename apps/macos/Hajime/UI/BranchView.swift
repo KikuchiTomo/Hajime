@@ -14,11 +14,13 @@ import HajimeDomain
 /// - 連想の一覧(R-18)では，いちばん上に見出し(元の語と意味の説明)の行を出し，下の枝に連想の単語を並べる
 ///
 /// 幹の文節の位置は幹の文字の幅だけで決め，注目を移しても動かさない(空間の安定性)．
-/// glass は曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
+/// 枝は幹の文節から 1 本の幹を伸ばし，候補ごとに同じ形の曲がり角と水平の線を出す(BranchLines)．
+/// 曲線の枝のテーマは 4 分の 1 の円で，直線の枝のテーマは直角に曲がる．platinum と desk は 1 ドットの線で描く
 final class BranchView: NSView {
     private typealias Size = DesignTokens.Size.Candidate
     private typealias Branch = DesignTokens.Size.Branch
     private typealias Glass = DesignTokens.Size.Glass
+    private typealias Space = DesignTokens.Size.Space
 
     var panel: LatticePanel? {
         didSet {
@@ -69,6 +71,10 @@ final class BranchView: NSView {
         /// 候補の文字の前に置く番号の幅
         var lead: CGFloat
         var footerHeight: CGFloat
+        var lineWidth: CGFloat
+        var lineWidthSelected: CGFloat
+        /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
+        var rootInset: CGFloat
     }
 
     private var metrics: Metrics {
@@ -76,12 +82,14 @@ final class BranchView: NSView {
         if theme.isRounded {
             return Metrics(inset: Glass.padding, rowHeight: (Glass.rowHeight * scale).rounded(), trunkGap: Glass.trunkGap,
                            branchIndent: Glass.branchIndent, stemX: Glass.branchStemX, lead: Glass.badgeSize + Size.paddingX,
-                           footerHeight: Glass.footerHeight)
+                           footerHeight: Glass.footerHeight, lineWidth: Glass.lineWidth, lineWidthSelected: Glass.lineWidthSelected,
+                           rootInset: Glass.selectionInsetY)
         }
         let labelHeight = (labelFont.ascender - labelFont.descender).rounded(.up) + Size.sectionPaddingY * 2
         return Metrics(inset: Size.frameWidth + Size.bevelWidth + Size.paddingX, rowHeight: (Size.rowHeight * scale).rounded(),
                        trunkGap: Branch.trunkGap, branchIndent: Branch.branchIndent, stemX: Branch.branchStemX, lead: Size.indexWidth,
-                       footerHeight: max(labelHeight, Glass.keycapHeight + Size.sectionPaddingY * 2))
+                       footerHeight: max(labelHeight, Glass.keycapHeight + Size.sectionPaddingY * 2),
+                       lineWidth: Branch.lineWidth, lineWidthSelected: Branch.lineWidthSelected, rootInset: 0)
     }
 
     private var candidateFont: NSFont { theme.candidateFont(size: fontSize) }
@@ -545,59 +553,38 @@ final class BranchView: NSView {
     private func drawBranches(_ rows: [Row], from node: NSRect, width: CGFloat, downward: Bool) {
         guard !rows.isEmpty else { return }
         let metrics = metrics
-        let stemX = (node.minX + metrics.stemX).rounded()
         let rowRect = { (index: Int) -> NSRect in
             self.branchRowRect(index, from: node, width: width, downward: downward, metrics: metrics)
         }
-        if theme.isRounded, !theme.straightBranches {
-            drawCurves(rows, stemX: stemX, stemY: downward ? node.maxY - 2 : node.minY + 2, rowRect: rowRect)
-        } else {
-            drawStraightLines(rows, stemX: stemX, node: node, downward: downward, rowRect: rowRect)
-        }
+        BranchLineDrawing.draw(stemX: node.minX + metrics.stemX, rootY: rootY(of: node, downward: downward),
+                               rowMidYs: rows.indices.map { rowRect($0).midY }, tipX: leadMinX(in: rowRect(0)) - Space.inline,
+                               selected: rows.firstIndex(where: \.isSelected), style: lineStyle(color: theme.line))
         for (index, row) in rows.enumerated() {
             drawRow(row, in: rowRect(index))
         }
     }
 
-    /// glass: 幹の下(上)の 1 点から，候補ごとに曲線を出す．選んでいる枝は最後にアクセント色で重ねる
-    private func drawCurves(_ rows: [Row], stemX: CGFloat, stemY: CGFloat, rowRect: (Int) -> NSRect) {
-        let start = NSPoint(x: stemX, y: stemY)
-        let curves = rows.indices.map { index in
-            let rect = rowRect(index)
-            return GlassDrawing.branchCurve(from: start, to: NSPoint(x: rect.minX - 3, y: rect.midY))
-        }
-        for (index, curve) in curves.enumerated() where !rows[index].isSelected {
-            theme.line.withAlphaComponent(theme.line.alphaComponent * rows[index].opacity).setStroke()
-            curve.lineWidth = Glass.lineWidth
-            curve.stroke()
-        }
-        for (index, curve) in curves.enumerated() where rows[index].isSelected {
-            theme.selection.setStroke()
-            curve.lineWidth = Glass.lineWidthSelected
-            curve.stroke()
-        }
+    /// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
+    private func leadMinX(in row: NSRect) -> CGFloat { row.minX + Size.paddingX / 2 }
+
+    /// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
+    private func rootY(of node: NSRect, downward: Bool) -> CGFloat {
+        downward ? node.maxY - metrics.rootInset : node.minY + metrics.rootInset
     }
 
-    /// platinum と desk: 縦の線を下ろし，候補ごとに横の線を出す
-    private func drawStraightLines(_ rows: [Row], stemX: CGFloat, node: NSRect, downward: Bool, rowRect: (Int) -> NSRect) {
-        let last = rowRect(rows.count - 1)
-        let stemTop = downward ? node.maxY : last.midY
-        let stemBottom = downward ? last.midY : node.minY
-        theme.line.setFill()
-        NSRect(x: stemX, y: stemTop, width: Branch.lineWidth, height: stemBottom - stemTop).fill()
-        for (index, row) in rows.enumerated() {
-            let rect = rowRect(index)
-            let tickWidth = row.isSelected ? Branch.lineWidthSelected : Branch.lineWidth
-            (row.isSelected ? theme.selection : theme.line).setFill()
-            NSRect(x: stemX, y: (rect.midY - tickWidth / 2).rounded(), width: rect.minX - stemX - Size.frameWidth, height: tickWidth).fill()
-        }
+    /// 枝の線の太さと曲がり角．曲線の枝のテーマだけ角を丸める
+    private func lineStyle(color: NSColor) -> BranchLineDrawing.Style {
+        let metrics = metrics
+        let curved = theme.isRounded && !theme.straightBranches
+        return BranchLineDrawing.Style(lineWidth: metrics.lineWidth, selectedWidth: metrics.lineWidthSelected,
+                                       radius: curved ? Glass.branchTurnRadius : 0, color: color, selection: theme.selection)
     }
 
     private func drawRow(_ row: Row, in rect: NSRect) {
         let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
         if theme.isRounded {
             if row.isSelected { GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: 2), color: theme.selection) }
-            let badgeCenter = NSPoint(x: rect.minX + Size.paddingX / 2 + Glass.badgeSize / 2, y: rect.midY)
+            let badgeCenter = NSPoint(x: leadMinX(in: rect) + Glass.badgeSize / 2, y: rect.midY)
             GlassDrawing.drawBadge(row.badge, center: badgeCenter, theme: theme, selected: row.isSelected, opacity: row.opacity)
         } else {
             if row.isSelected {
@@ -605,7 +592,7 @@ final class BranchView: NSView {
                 rect.fill()
             }
             let badgeColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: rect.minX + Size.paddingX / 2, y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
+            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: leadMinX(in: rect), y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
         }
         var textX = rect.minX + Size.paddingX / 2 + metrics.lead
         if let kind = row.command {
@@ -626,23 +613,14 @@ final class BranchView: NSView {
     /// 注目していない確信の低い文節の下に，次の候補を 1 つだけ薄く添える
     private func drawPreview(_ text: String, under node: NSRect, maxX: CGFloat) {
         let metrics = metrics
-        let stemX = (node.minX + metrics.stemX).rounded()
+        let stemX = node.minX + metrics.stemX
         let row = NSRect(x: stemX, y: node.maxY, width: node.width, height: metrics.rowHeight)
         let color = theme.textMuted.withAlphaComponent(restOpacity)
-        let textX: CGFloat
-        if theme.isRounded {
-            let end = NSPoint(x: stemX + metrics.branchIndent / 2, y: row.midY)
-            let curve = GlassDrawing.branchCurve(from: NSPoint(x: stemX, y: node.maxY - 2), to: end)
-            theme.line.withAlphaComponent(theme.line.alphaComponent * restOpacity).setStroke()
-            curve.lineWidth = Glass.lineWidth
-            curve.stroke()
-            textX = end.x + Size.paddingX / 2
-        } else {
-            color.setFill()
-            NSRect(x: stemX, y: node.maxY, width: Branch.lineWidth, height: row.height / 2).fill()
-            NSRect(x: stemX, y: row.midY.rounded(), width: metrics.branchIndent / 2, height: Branch.lineWidth).fill()
-            textX = stemX + metrics.branchIndent / 2 + Size.paddingX / 2
-        }
+        // 枝と同じ形で，幹から短く曲がる
+        let tipX = (stemX + metrics.branchIndent / 2).rounded()
+        BranchLineDrawing.draw(stemX: stemX, rootY: rootY(of: node, downward: true), rowMidYs: [row.midY], tipX: tipX, selected: nil,
+                               style: lineStyle(color: theme.line.withAlphaComponent(theme.line.alphaComponent * restOpacity)))
+        let textX = tipX + Space.inline
         let attributes: [NSAttributedString.Key: Any] = [.font: candidateFont, .foregroundColor: color]
         drawText(TextFitting.truncated(text, attributes: attributes, width: maxX - textX), attributes: attributes, x: textX, in: row)
     }
