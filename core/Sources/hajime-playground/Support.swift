@@ -20,7 +20,7 @@ final class WordListLexicon: EnglishLexicon {
 
     init(path: String = "/usr/share/dict/words") {
         let text = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
-        words = Set(text.split(separator: "\n").map { $0.lowercased() })
+        words = Set(text.split(whereSeparator: \.isNewline).map { $0.lowercased() })
     }
 
     func isWord(_ text: String) -> Bool { words.contains(text.lowercased()) }
@@ -53,22 +53,30 @@ struct PlaygroundEngine {
     let typoService: ZenzaiTypoService?
     /// --dictionary の辞書の中の専門用語の辞書(R-29)．辞書を渡さないか，--no-terms を付けたときは nil
     let terms: TermDictionaryStore?
+    /// 合議するか(--jinen を渡したか)
+    let usesFusion: Bool
     private let memory: URL
 
     /// - Parameters:
     ///   - fastZenzaiPath: 速さを優先するモデル(xsmall)の場所．併用(zenzaiChoice)を試すときに渡す
     ///   - zenzaiChoice: 設定の「Zenzai のモデル」．渡したときだけ既定の設定にこれを入れてエンジンに渡す(渡さなければ今までどおり設定を渡さない)
     @MainActor
+    ///   - jinenPath: 合議(ADR 0016 の案 2)に使う jinen のモデルの場所．渡したときだけ合議する
     init(zenzaiPath: String?, zenzaiVariant: ZenzaiModel.Variant = .small, fastZenzaiPath: String? = nil, zenzaiChoice: ZenzaiModelChoice? = nil,
-         dictionaryPath: String?, usesTerms: Bool = true) throws {
+         jinenPath: String? = nil, jinenVariant: JinenModel.Variant = .small, dictionaryPath: String?, usesTerms: Bool = true) throws {
         memory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-playground-\(UUID().uuidString)")
         let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0), variant: zenzaiVariant) }
         let fastZenzai = try fastZenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0), variant: .xsmall) }
+        let jinen = try jinenPath.map { try JinenModel.verified(at: URL(fileURLWithPath: $0), variant: jinenVariant) }
+        usesFusion = jinen != nil
         engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "hajime-playground", zenzai: zenzai, fastZenzai: fastZenzai,
+                                            jinen: jinen?.variant == .small ? jinen : nil, fastJinen: jinen?.variant == .xsmall ? jinen : nil,
                                             dictionaryDirectory: dictionaryPath.map { URL(fileURLWithPath: $0, isDirectory: true) })
-        if let zenzaiChoice {
+        // 渡したものだけを既定の設定に入れてエンジンに渡す(jinen は渡した大きさを使い，「自動」の測定をしない)
+        if zenzaiChoice != nil || jinen != nil {
             var settings = DefaultSettings.settings
-            settings.zenzaiModel = zenzaiChoice
+            if let zenzaiChoice { settings.zenzaiModel = zenzaiChoice }
+            if let jinen { settings.jinenModel = jinen.variant == .small ? .small : .xsmall }
             engine.apply(settings)
         }
         terms = dictionaryPath.flatMap { path in

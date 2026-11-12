@@ -268,6 +268,21 @@ public enum DefaultSettings {
     public static let candidateTreeGrowth = 1.25
     /// 検証木に入れる候補の数の上限
     public static let candidateTreeCandidateLimit = 16
+    /// 合議(ADR 0016 の案 2)で，別のモデル(jinen)の候補を第 1 候補にするかを決めるとき，別のモデルの対数確率にかける重み
+    /// (FirstCandidateArbitration)．評価用の文で第 1 候補の正解がどのセットでも減らない値を選んだ
+    public static let fusionOtherModelWeight = 0.5
+    /// 合議で，別のモデルの候補が今の第 1 候補を上回らなければならない差(対数確率)
+    public static let fusionMargin = 2.0
+    /// 合議で 2 つの表記を主のモデル(Zenzai)で比べるときの，検証木のトークンの数の上限．長い文の 2 つの表記が入る数にする
+    public static let fusionScoringTokenLimit = 256
+    /// jinen のモデルを「自動」にしたとき，起動のあとに測った合議の 1 歩の p95 が，Zenzai だけの 1 歩の p95 にこれ(秒)を足した値以下なら，その大きさを使う．
+    /// 打鍵が止まったあとに次のキーが待つのは 1 歩ぶんなので，1 歩で決める．small から試し，超えれば xsmall，それも超えれば使わない．
+    /// 測ると，1 歩の最大は Mac(Metal)で Zenzai だけ 27ms・small 46ms，Windows(i7-12700F の CPU)で 29ms・34ms だった
+    public static let jinenAutomaticStepMargin = 0.015
+    /// 打鍵の合間に合議を進める手順の数のうち，jinen のトークンの数(読みの長さの 2 倍)のほかに要る分(プロンプト・読みにそろえる・採点と余り)
+    public static let fusionExtraSteps = 12
+    /// 合議の 1 歩(推論 1 回など)の時間の移動平均がこれを超えたら(秒)，打鍵の合間に前もって求めた結果だけを使い，Space では求めない
+    public static let fusionSlowStepThreshold = 0.008
     /// 設定のファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)．ユーザー辞書を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても，
     /// ふつうの文字なら 1 語 450 バイトほどで約 4.5MB に収まるので，余裕を見て倍にした．
     /// 結合文字を重ねた語のように 1 字が何バイトにもなる場合は超えうるが，書く前に大きさを確かめて断るので，ファイルは壊れない

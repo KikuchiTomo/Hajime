@@ -284,6 +284,11 @@ private struct ConversionTab: View {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Settings.candidateReranking, keyPath: \.candidateReranking)
             }
+            Section {
+                ResettablePicker(model: model, title: UIStrings.Settings.jinenModel, keyPath: \.jinenModel) { choice in
+                    UIStrings.Settings.label(for: choice, automaticResult: model.automaticJinenModel?())
+                }
+            }
             Section(UIStrings.Settings.learning) {
                 ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))
                 Button(UIStrings.Settings.resetLearning, role: .destructive) { model.resetLearning() }

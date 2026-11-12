@@ -541,16 +541,39 @@ https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
 
 https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf(コミット 4f5423f0fad41a73b1242eb96fe5c12ae4fdca83 の ggml-model-Q5_K_M.gguf)．設定の「Zenzai のモデル」で速さを優先するときと併用するときに使う．ライセンスは上の zenz-v3.2-small と同じ Apache License 2.0(全文は上の節)．
 
+## jinen(jinen-v2-small・jinen-v2-xsmall)
+
+https://huggingface.co/togatogah/jinen-v2-small.gguf(コミット 3461d0573ab447985badde3174165b967d06076c の jinen-v2-small-Q5_K_M.gguf)
+https://huggingface.co/togatogah/jinen-v2-xsmall.gguf(コミット 3910fd01bf4ba86eca89617f18db9b0c1c5b2283 の jinen-v2-xsmall-Q5_K_M.gguf)
+作成: Hitoshi Togasaki．設定の「jinen のモデル」で，Zenzai の変換と合わせるのに使う．Hajime IME は作成者が配布する GGUF を改変せずにそのまま同梱している．
+モデルは CC BY-SA 4.0 で配布されている．同梱したモデルを再配布するときも，同じ条件に従うこと．
+
+```
+jinen-v2-small (GGUF) / jinen-v2-xsmall (GGUF) by Hitoshi Togasaki (togatogah)
+Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+出典(モデルのカードの表示)
+
+学習コーパスの一部として、国立国会図書館の書誌データを加工しました。
+
+出典：国立国会図書館「全国書誌データ」（2026年7月9日に取得）および
+国立国会図書館サーチの書誌データを加工して作成
+
+加工および本モデルの作成は Hitoshi Togasaki によるものであり、
+国立国会図書館が作成・提供・保証するものではありません。
+```
+
 ## llama.cpp
 
 https://github.com/ggml-org/llama.cpp
-改変したもの: https://github.com/azooKey/llama.cpp
-Windows 版に同梱するビルド(b4846): https://github.com/fkunn1326/llama.cpp/releases/tag/b4846
+改変したもの: https://github.com/azooKey/llama.cpp(b9637-azookey.1．コミット 66afb885a8ddcc0511798aec9fb5a01017941018)
+macOS 版はこの版の xcframework を，Windows 版は同じコミットから tools/windows/build_llama.ps1 でビルドした DLL を同梱する．
 
 ```
 MIT License
 
-Copyright (c) 2023-2024 The ggml authors
+Copyright (c) 2023-2026 The ggml authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

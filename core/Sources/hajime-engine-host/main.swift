@@ -46,16 +46,20 @@ final class UnavailableEnglishLexicon: EnglishLexicon {
     func suggestions(for text: String) -> [String] { [] }
 }
 
-/// インストール先に置いた Zenzai のモデル(Zenzai\)とかな漢字変換の辞書(Dictionary\)を，同時に確かめて読む．
-/// 無いか，大きさとハッシュが合わないものは使わずに動く(モデルが無ければ Zenzai なし，辞書が無ければ azooKey に同梱の辞書)
+/// インストール先に置いた Zenzai と jinen のモデル(Zenzai\・Jinen\)とかな漢字変換の辞書(Dictionary\)を，同時に確かめて読む．
+/// 無いか，大きさとハッシュが合わないものは使わずに動く(モデルが無ければ Zenzai なし・合議なし，辞書が無ければ azooKey に同梱の辞書)
 @MainActor
-func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, dictionary: BundledDictionary?) {
+func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {
     let models = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true)
+    let jinen = HostPaths.installation.appendingPathComponent("Jinen", isDirectory: true)
     let resources = StartupResources.verified(
         zenzai: models.appendingPathComponent(ZenzaiModel.Variant.small.fileName),
         fastZenzai: models.appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
+        jinen: jinen.appendingPathComponent(JinenModel.Variant.small.fileName),
+        fastJinen: jinen.appendingPathComponent(JinenModel.Variant.xsmall.fileName),
         dictionary: HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
     return (accepted(resources.zenzai, name: "Zenzai(small)"), accepted(resources.fastZenzai, name: "Zenzai(xsmall)"),
+            accepted(resources.jinen, name: "jinen(small)"), accepted(resources.fastJinen, name: "jinen(xsmall)"),
             accepted(resources.dictionary, name: "同梱の辞書"))
 }
 
@@ -148,7 +152,7 @@ func run() -> Int32 {
     let engine: AzooKeyConverterEngine
     do {
         engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: HostPaths.versionString, zenzai: zenzai,
-                                            fastZenzai: resources.fastZenzai,
+                                            fastZenzai: resources.fastZenzai, jinen: resources.jinen, fastJinen: resources.fastJinen,
                                             dictionaryDirectory: resources.dictionary?.url)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))
@@ -244,7 +248,7 @@ func run() -> Int32 {
                                                                  terms: terms, emoji: emoji, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                                 keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
-                                palette: palette, calendar: calendar, scorer: engineSession)
+                                palette: palette, calendar: calendar, scorer: engineSession, fusing: engineSession)
         },
         settings: settings,
         ui: sendToWindow,
@@ -266,7 +270,8 @@ func run() -> Int32 {
             usage: usage,
             resetPaletteHistory: resetPaletteHistory,
             previewLanguage: { preview.preview($0, precedingText: $1) },
-            previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) }
+            previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) },
+            automaticJinenModel: { [engine] in engine.automaticJinenModel?.rawValue }
         ),
         runCommand: { command in
             // 読みで呼び出すコマンド(R-22)．Windows だけで動かす(Linux はまだ設定の画面が無く，コマンドを登録できない)

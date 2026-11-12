@@ -201,7 +201,7 @@ enum OperationEvaluation {
             let engineSession = engine.makeSession()
             let converter = SupplementedConverter(engineSession, settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: emoji,
                                                   englishTerms: terms)
-            session = InputSession(converter: converter, lexicon: lexicon, settings: store, scorer: engineSession)
+            session = InputSession(converter: converter, lexicon: lexicon, settings: store, scorer: engineSession, fusing: engineSession)
             context = InputContext(precedingText: leftContext)
         }
 

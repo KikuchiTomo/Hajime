@@ -101,13 +101,36 @@ jobs:
           key: swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-${{ github.run_id }}
           restore-keys: |
             swift-zenzai-${{ runner.os }}-6.3.3-${{ hashFiles('core/Package.resolved') }}-
+      # llama.cpp はソースからビルドする(約 15 分)．ビルドの手順が変わらなければ前のビルドを使う
+      - id: llama
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}\llama
+          key: llama-${{ runner.os }}-${{ hashFiles('tools/windows/build_llama.ps1') }}
+      - if: steps.llama.outputs.cache-hit != 'true'
+        run: tools/windows/build_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
+        shell: pwsh
+        # 手元の PC では 3 分で終わる．止まったときにジョブの時間を使い切らないよう上限を付ける
+        timeout-minutes: 40
+      - if: steps.llama.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}\llama
+          key: llama-${{ runner.os }}-${{ hashFiles('tools/windows/build_llama.ps1') }}
       - run: |
-          tools/windows/fetch_llama.ps1 -Output "$env:RUNNER_TEMP\llama"
           "LLAMA_DIR=$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "$env:RUNNER_TEMP\llama" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
         shell: pwsh
-      - run: swift build --package-path core -Xswiftc "-L$env:LLAMA_DIR"
-      - run: swift test --package-path core -Xswiftc "-L$env:LLAMA_DIR"
+      # Windows では使わない依存(SwiftyMarisa)の項目を Package.resolved から消さないよう，固定した版だけで解決する
+      - run: swift build --package-path core --only-use-versions-from-resolved-file -Xswiftc "-L$env:LLAMA_DIR"
+      - run: swift test --package-path core --only-use-versions-from-resolved-file -Xswiftc "-L$env:LLAMA_DIR"
+      # テストはモデルを使わないので，Zenzai を CPU で動かして変換できることを別に確かめる
+      - run: tools/windows/fetch_zenzai.ps1 -Output "$env:RUNNER_TEMP\zenzai"
+        shell: pwsh
+      - run: tools/dictionary/fetch_dictionary.ps1 -Output "$env:RUNNER_TEMP\dictionary"
+        shell: pwsh
+      - run: tools/windows/check_zenzai.ps1 -Zenzai "$env:RUNNER_TEMP\zenzai" -Dictionary "$env:RUNNER_TEMP\dictionary\hajime-dictionary-0.5.2"
+        shell: pwsh
       - if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

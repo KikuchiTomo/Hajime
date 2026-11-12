@@ -81,6 +81,7 @@ pub mod settings {
     /// 併用を選んだときに出す，入力中と変換で使うモデル
     pub const ZENZAI_COMBINED_NOTE: &str = "入力中: 速さを優先 / 変換: 精度を優先";
     pub const CANDIDATE_RERANKING: &str = "2 番目以降の候補を Zenzai で並べ替え";
+    pub const JINEN_MODEL: &str = "jinen のモデル";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
     pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
@@ -1187,6 +1188,7 @@ pub mod sync {
         ("learning", "学習"),
         ("zenzaiModel", "Zenzai のモデル"),
         ("candidateReranking", "2 番目以降の候補を Zenzai で並べ替え"),
+        ("jinenModel", "jinen のモデル"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),
         ("showsModeIndicator", "入力モードの切り替えを表示"),
@@ -1248,6 +1250,8 @@ pub mod windows {
     pub const TEMPLATE_BUTTON_LABEL: &str = "{ }";
     /// 置き換えられない部分(書き方の誤り)の頭に置く印(macOS は exclamationmark.triangle.fill の絵)
     pub const PROBLEM_MARK: &str = "⚠ ";
+    /// jinen のモデルを「自動」にしたときに，エンジンが決めた結果を添える名前の頭(「自動(small)」．macOS の UIStrings.Settings.label(for:automaticResult:))
+    pub const JINEN_AUTOMATIC_WITH: &str = "自動";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)

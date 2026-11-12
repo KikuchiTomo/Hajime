@@ -76,7 +76,7 @@ final class CompositionRoot {
         let zenzai = resources.zenzai
         let memory = support.appendingPathComponent("memory", isDirectory: true)
         let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai,
-                                                fastZenzai: resources.fastZenzai,
+                                                fastZenzai: resources.fastZenzai, jinen: resources.jinen, fastJinen: resources.fastJinen,
                                                 dictionaryDirectory: resources.dictionary?.url)
         // 打ち間違いの訂正は時間がかかるので，別の変換器でメインスレッドの外で求める(Zenzai があるときだけ)
         let typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: memory, versionString: AppIdentity.versionString) }
@@ -106,19 +106,24 @@ final class CompositionRoot {
         installed = root
     }
 
-    /// アプリに入れた Zenzai のモデルとかな漢字変換の辞書を，同時に確かめて読む．
-    /// 無いか，ハッシュが合わないものは使わずに動く(small が無ければ Zenzai なし，辞書が無ければ azooKey に同梱の辞書)
-    private static func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, dictionary: BundledDictionary?) {
+    /// アプリに入れた Zenzai と jinen のモデルとかな漢字変換の辞書を，同時に確かめて読む．
+    /// 無いか，ハッシュが合わないものは使わずに動く(small が無ければ Zenzai なし，jinen が無ければ合議なし，辞書が無ければ azooKey に同梱の辞書)
+    private static func loadStartupResources()
+        -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {
         let resources = Bundle.main.resourceURL.map { url in
             StartupResources.verified(
                 zenzai: url.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.Variant.small.fileName),
                 fastZenzai: url.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
+                jinen: url.appendingPathComponent("Jinen", isDirectory: true).appendingPathComponent(JinenModel.Variant.small.fileName),
+                fastJinen: url.appendingPathComponent("Jinen", isDirectory: true).appendingPathComponent(JinenModel.Variant.xsmall.fileName),
                 dictionary: url.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
         }
         let zenzaiLog = Logger(subsystem: AppIdentity.bundleIdentifier, category: "zenzai")
         let dictionaryLog = Logger(subsystem: AppIdentity.bundleIdentifier, category: "dictionary")
         return (accepted(resources?.zenzai, log: zenzaiLog, name: "Zenzai(small)"),
                 accepted(resources?.fastZenzai, log: zenzaiLog, name: "Zenzai(xsmall)"),
+                accepted(resources?.jinen, log: zenzaiLog, name: "jinen(small)"),
+                accepted(resources?.fastJinen, log: zenzaiLog, name: "jinen(xsmall)"),
                 accepted(resources?.dictionary, log: dictionaryLog, name: "同梱の辞書"))
     }
 
@@ -142,7 +147,7 @@ final class CompositionRoot {
                                                              terms: terms, emoji: emojiLookup, lexicon: lexicon, englishTerms: englishTerms),
                             lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                             rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
-                            calendar: calendar, scorer: engineSession)
+                            calendar: calendar, scorer: engineSession, fusing: engineSession)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)
@@ -166,6 +171,7 @@ final class CompositionRoot {
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
         controller.setCheckForUpdates(Self.checkForUpdates)
         controller.setClearPaletteHistory { [weak self] in self?.paletteUsage?.update { $0.clearHistory() } }
+        controller.setAutomaticJinenModel { [engine] in engine.automaticJinenModel.map { UIStrings.Settings.label(for: $0, automaticResult: nil) } }
         return controller
     }()
 

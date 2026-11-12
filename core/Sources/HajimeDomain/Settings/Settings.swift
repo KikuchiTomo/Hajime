@@ -198,6 +198,9 @@ public struct Settings: Sendable, Equatable {
     public var listSegmentAlternatives = true
     /// 変換の候補の 2 番目から後ろを，Zenzai の点数(検証木．ADR 0016)で前後の文脈に合う順に並べ替える．第 1 候補は変えない
     public var candidateReranking = true
+    /// 別のモデル(jinen)でも変換し，読みにそろえてから Zenzai の結果と合わせる(ADR 0016 の案 2)．使うモデルの大きさか，使わないか．
+    /// 2 つのモデルの点数で上回れば第 1 候補に，そうでなければ 2 番目に置く．モデルが無ければ何もしない
+    public var jinenModel = JinenModelChoice.automatic
 
     // MARK: 辞書と学習
     /// 確定した候補から学ぶか
@@ -419,7 +422,8 @@ extension Settings: Codable {
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
-        case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking
+        case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking,
+             jinenModel
         case learning, userDictionary, importedDictionaries, associationDictionaries, termDictionary, termFields, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
@@ -540,6 +544,7 @@ extension Settings: Codable {
         read(.contextualSegmentCandidates, into: \.contextualSegmentCandidates)
         read(.listSegmentAlternatives, into: \.listSegmentAlternatives)
         read(.candidateReranking, into: \.candidateReranking)
+        read(.jinenModel, into: \.jinenModel)
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
         readList(.importedDictionaries, into: \.importedDictionaries)
@@ -680,6 +685,7 @@ extension Settings: Codable {
         try container.encode(contextualSegmentCandidates, forKey: .contextualSegmentCandidates)
         try container.encode(listSegmentAlternatives, forKey: .listSegmentAlternatives)
         try container.encode(candidateReranking, forKey: .candidateReranking)
+        try container.encode(jinenModel, forKey: .jinenModel)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)

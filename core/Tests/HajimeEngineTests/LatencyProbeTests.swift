@@ -61,6 +61,67 @@ struct LatencyProbeTests {
         #expect(best < .milliseconds(50), "どの回も p95 が 50ms を超えた: \(passP95s)")
     }
 
+    /// 打鍵が止まったあいだの手順(InputSession.latticeWarmingSteps)を 1 歩ずつ動かし，1 歩の時間と，手順をすべて終えるまでの時間を測る．
+    /// 打鍵が止まったあとに次のキーが来ると，そのとき動いている 1 歩を待つので，1 歩の長さがそのキーの遅れになる．
+    /// 環境変数 HAJIME_JINEN_MODEL に jinen のモデルの場所があれば合議(ADR 0016 の案 2)の手順も含めて測る．大きさは HAJIME_JINEN_VARIANT(small・xsmall)．
+    /// 合議あり・なしを同じ文で比べるために使う(結果は HAJIME_FUSION_STEPS の行)．時間の上限は確かめない
+    @Test("打鍵が止まったあいだの手順の 1 歩の時間を，合議を含めて測る", .enabled(if: isReleaseBuild))
+    func warmingSteps() throws {
+        let environment = ProcessInfo.processInfo.environment
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-latency-\(UUID().uuidString)")
+        let zenzai = try environment["HAJIME_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
+        let variant = environment["HAJIME_JINEN_VARIANT"].flatMap(JinenModel.Variant.init(rawValue:)) ?? .small
+        let jinen = try environment["HAJIME_JINEN_MODEL"].map { try JinenModel.verified(at: URL(fileURLWithPath: $0), variant: variant) }
+        let dictionary = environment["HAJIME_BUNDLED_DICTIONARY"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai,
+                                                jinen: variant == .small ? jinen : nil, fastJinen: variant == .xsmall ? jinen : nil,
+                                                dictionaryDirectory: dictionary)
+        var settings = DefaultSettings.settings
+        settings.jinenModel = jinen == nil ? .off : (variant == .small ? .small : .xsmall)
+        engine.apply(settings)
+        engine.warmUp()
+        let engineSession = engine.makeSession()
+        let session = InputSession(converter: engineSession, lexicon: FakeLexicon(), settings: FakeSettings(settings), scorer: engineSession,
+                                   fusing: engineSession)
+        let clock = ContinuousClock()
+        let sentences = ["watashihaashitatoukyoudekaigininisshusekishimasu", "kyouhaiitenkidesune", "minnnanoikenwohanneisuru",
+                         "daiyonnshounoshuppannhayoteidoorideshita"]
+        var keys: [Duration] = []
+        var steps: [Duration] = []
+        var totals: [Duration] = []
+        // 1 回目は辞書とモデルの準備を含むので数えない
+        for pass in 0...Self.passes {
+            for sentence in sentences {
+                for (index, key) in sentence.enumerated() {
+                    let keyTime = clock.measure { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+                    // 5 キーごとと打ち終えたところで止まったとみなし，止まったあいだの手順をすべて動かす
+                    guard (index + 1) % 5 == 0 || index == sentence.count - 1 else {
+                        if pass > 0 { keys.append(keyTime) }
+                        continue
+                    }
+                    if pass > 0 { keys.append(keyTime) }
+                    _ = session.settle(context: InputContext())
+                    var total = Duration.zero
+                    for step in session.latticeWarmingSteps {
+                        let time = clock.measure { step() }
+                        total += time
+                        if pass > 0 { steps.append(time) }
+                    }
+                    if pass > 0 { totals.append(total) }
+                }
+                _ = session.handle(KeyEvent(.escape), context: InputContext())
+            }
+        }
+        let sortedKeys = keys.sorted()
+        let sortedSteps = steps.sorted()
+        let sortedTotals = totals.sorted()
+        func at(_ values: [Duration], _ ratio: Double) -> Duration { values[min(values.count - 1, Int(Double(values.count) * ratio))] }
+        print("HAJIME_FUSION_STEPS zenzai=\(engine.usesZenzai) jinen=\(jinen == nil ? "none" : variant.rawValue) "
+              + "key_p50=\(at(sortedKeys, 0.5)) key_p95=\(at(sortedKeys, 0.95)) "
+              + "step_p50=\(at(sortedSteps, 0.5)) step_p95=\(at(sortedSteps, 0.95)) step_max=\(sortedSteps.last!) "
+              + "pause_total_p50=\(at(sortedTotals, 0.5)) pause_total_p95=\(at(sortedTotals, 0.95)) steps=\(steps.count) pauses=\(totals.count)\(Self.loadAverage)")
+    }
+
     @Test("長い文で，打つ位置ごとの 1 キーの時間と Space で変換するまでの時間を測る", .enabled(if: isReleaseBuild))
     func longSentence() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-latency-\(UUID().uuidString)")

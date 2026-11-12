@@ -117,6 +117,22 @@ public protocol CandidateScoring: AnyObject {
     var prefersPrecomputedScores: Bool { get }
 }
 
+/// 別のモデルの変換を合わせる(合議．ADR 0016 の案 2)．読み全体の変換を別のモデルでも求め，読みにそろえてから，
+/// KanaKanjiConverting.candidates(for:) の結果に重ねる(第 1 候補にするか，2 番目に置くか)．
+/// 別のモデルの推論は打鍵の合間か Space で行い，打鍵のあいだは行わない
+@MainActor
+public protocol CandidateFusing: AnyObject {
+    /// 読みを別のモデルでも変換し，合わせる結果を求めておく．すでに求めていれば何もしない．
+    /// これを呼んだあとの candidates(for:) に結果が重なる
+    func prepareFusion(for reading: String)
+    /// prepareFusion を 1 歩(推論 1 回など)だけ進める．打鍵の合間に少しずつ求めるため．結果を求め終えたら true
+    func advanceFusion(for reading: String) -> Bool
+    /// prepareFusion で求めた結果があるか(求めても重ねる候補が無かったときも true)．推論はしない
+    func hasFusion(for reading: String) -> Bool
+    /// 別のモデルの推論が遅い環境か．遅ければ，打鍵の合間に前もって求めた結果だけを使い，Space では待たない
+    var prefersPrecomputedFusion: Bool { get }
+}
+
 /// エンジンに渡す，取り込んだ辞書の語．costOffset は語の点数に足す値(優先度)
 public struct AuxiliaryWord: Sendable, Equatable, Hashable {
     public var word: DictionaryWord

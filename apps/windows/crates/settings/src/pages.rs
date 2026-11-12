@@ -180,6 +180,7 @@ impl Page {
                 settings::MEANING,
                 settings::SHOWS_PART_OF_SPEECH,
                 settings::CANDIDATE_RERANKING,
+                settings::JINEN_MODEL,
             ],
             Page::Correction => vec![
                 features::EXCEPTIONS,
@@ -1714,6 +1715,11 @@ fn conversion() -> Vec<Section> {
         Section::untitled(vec![Row::toggle(
             settings::CANDIDATE_RERANKING,
             "candidateReranking",
+        )]),
+        Section::untitled(vec![Row::choice(
+            settings::JINEN_MODEL,
+            "jinenModel",
+            options::JINEN_MODELS,
         )]),
         Section::new(
             settings::LEARNING,

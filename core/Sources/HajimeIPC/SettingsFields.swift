@@ -22,6 +22,20 @@ public enum SettingsFields {
         return try text(of: Dictionary(uniqueKeysWithValues: wanted.map { ($0, all[$0] ?? .null) }))
     }
 
+    /// 設定の画面が読む，設定のファイルに無い項目の名前．jinen のモデルを「自動」にしたときにエンジンが決めた大きさ．
+    /// jinenModel を名前で頼んだときにだけ添える(すべての項目を読むときと，書き込みでは扱わない)
+    public static let automaticJinenModelName = "automaticJinenModel"
+
+    /// read の結果(JSON のオブジェクト)に，names に jinenModel を含むときだけ automaticJinenModel を添える．値が無ければ null
+    public static func addingAutomaticJinenModel(_ value: String?, to fields: String, names: [String]) throws(Failure) -> String {
+        guard names.contains("jinenModel") else { return fields }
+        guard let data = fields.data(using: .utf8), var object = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+            throw .malformed
+        }
+        object[automaticJinenModelName] = value.map(JSONValue.string) ?? .null
+        return try text(of: object)
+    }
+
     /// values(項目の名前から値への JSON のオブジェクト)を settings に重ねる．
     /// 値は設定のファイルを読むときと同じに読み，範囲の外の値は範囲に収める(Settings.clampToValidRanges)．
     /// 読めない値は今の値のまま．返すのは重ねた設定と，書いた項目の名前

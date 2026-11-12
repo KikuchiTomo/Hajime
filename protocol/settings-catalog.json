@@ -54,6 +54,7 @@
     "importedDictionaries",
     "initialFocus",
     "inputStyle",
+    "jinenModel",
     "keyboardLayout",
     "keymap",
     "keypadCalculation",
