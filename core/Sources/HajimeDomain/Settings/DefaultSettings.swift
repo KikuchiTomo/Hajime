@@ -459,6 +459,8 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// パレットのマス目の先頭の行がこの数以上飛んだら(まとまりへ飛んだときなど)，中身を送る動きを付ける．1 行ずつのスクロールには付けない
+    public static let paletteJumpRows = 2
     /// 顔文字の広いマス 1 つが占める四角いマスの数．1 行の広いマスの数は，列の数をこれで割ったもの(1 つ以上)
     public static let paletteWideCellSpan = 3
     /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．

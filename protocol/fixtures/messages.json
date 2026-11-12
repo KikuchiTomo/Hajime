@@ -278,7 +278,8 @@
         "skinTone": "none",
         "hints": [],
         "cellSize": 36.5,
-        "cellsPerRow": 3
+        "cellsPerRow": 3,
+        "motion": { "selectionFrom": { "row": 0, "column": 0 }, "modeFrom": "symbol", "tabFrom": "joy", "content": "next", "opensPicker": false, "togglesPin": true }
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },
