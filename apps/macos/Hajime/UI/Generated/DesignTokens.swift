@@ -503,6 +503,7 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
+            static let templateNowWidth: CGFloat = 160
             static let keymapListHeight: CGFloat = 400
             static let listArrowWidth: CGFloat = 24
             static let titleBarHeight: CGFloat = 32

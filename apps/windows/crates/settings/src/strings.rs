@@ -227,6 +227,58 @@ pub mod extras {
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
+    pub const TEMPLATE_SYNTAX: &str = "書き方";
+    pub const TEMPLATE_MEANING: &str = "入るもの";
+    pub const TEMPLATE_NOW: &str = "今入れると";
+    /// 単語に書ける書き方(TextTemplate)と，入るもの．「今入れると」の列は書き方を今の値に置き換えて出す
+    pub const TEMPLATE_ROWS: &[(&str, &str)] = &[
+        ("{date}", "今日の日付"),
+        ("{time}", "今の時刻"),
+        ("{datetime:YYYY/MM/DD hh:mm:ss}", "書式を決めた日時"),
+        ("{datetime+1d:MM/DD}", "日をずらした日付（-7d なら 7 日前）"),
+        (
+            "{time+30m}",
+            "ずらした時刻（m 分・h 時間・d 日・w 週・M 月・y 年）",
+        ),
+        (
+            "{date+1w@mon:M/D(ddd)}",
+            "来週の月曜（@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末）",
+        ),
+        (
+            "{date+3b:M/D(ddd)}",
+            "3 営業日後（b は土日と祝日を除いて数える）",
+        ),
+        (
+            "{date:GGEE年M月D日|kansuji}",
+            "漢数字の和暦（1 年は「元年」）",
+        ),
+        ("{date:FFFF年度 NN JJ}", "年度・和風月名・干支"),
+        ("{utc}", "協定世界時の日時"),
+        ("{unixtime}", "UNIX 時間（秒）"),
+        (
+            "{holiday:平日}",
+            "祝日の名前（祝日でなければ : のあとの文字）",
+        ),
+        ("{season}", "その月の時候の挨拶"),
+        ("{greeting}", "時刻に合った挨拶"),
+        (
+            "{days:12/25}",
+            "その日までの日数（2027-03-31 のように年も書ける）",
+        ),
+        ("{age:1990-04-01}", "その日に生まれた人の満年齢"),
+        ("{uuid}", "UUID（入れるたびに変わる）"),
+        ("{random:1-6}", "範囲の中の整数（入れるたびに変わる）"),
+        (
+            "{alnum:8}",
+            "英数字 8 文字（{hex:8} なら 16 進数。入れるたびに変わる）",
+        ),
+        (
+            "{pick:はい,いいえ}",
+            "並べたうちのどれか 1 つ（入れるたびに変わる）",
+        ),
+        ("{date|fullwidth}", "| のあとの名前で変えた値"),
+        ("{{ }}", "「{」と「}」の文字そのもの"),
+    ];
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
@@ -873,31 +925,6 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
-    /// 単語に書ける書き方(TextTemplate)と，入るもの・例．1 つずつ注記の行にする(macOS は表にして今の値を出す)
-    pub const TEMPLATE_ROWS: &[&str] = &[
-        "{date}　今日の日付（例: 2026/04/01）",
-        "{time}　今の時刻（例: 09:30）",
-        "{datetime:YYYY/MM/DD hh:mm:ss}　書式を決めた日時（例: 2026/04/01 09:30:15）",
-        "{datetime+1d:MM/DD}　日をずらした日付。-7d なら 7 日前（例: 04/02）",
-        "{time+30m}　ずらした時刻。m 分・h 時間・d 日・w 週・M 月・y 年でずらす（例: 10:00）",
-        "{date+1w@mon:M/D(ddd)}　来週の月曜。@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末（例: 4/6(月)）",
-        "{date+3b:M/D(ddd)}　3 営業日後。b は土日と祝日を除いて数える（例: 4/6(月)）",
-        "{date:GGEE年M月D日|kansuji}　漢数字の和暦。1 年は「元年」（例: 令和八年四月一日）",
-        "{date:FFFF年度 NN JJ}　年度・和風月名・干支（例: 2026年度 卯月 丙午）",
-        "{utc}　協定世界時の日時（例: 2026-04-01T00:30:15Z）",
-        "{unixtime}　UNIX 時間（秒）",
-        "{holiday:平日}　祝日の名前。祝日でなければ : のあとの文字（例: 平日）",
-        "{season}　その月の時候の挨拶（例: 陽春の候）",
-        "{greeting}　時刻に合った挨拶（例: おはようございます）",
-        "{days:12/25}　その日までの日数。2027-03-31 のように年も書ける",
-        "{age:1990-04-01}　その日に生まれた人の満年齢",
-        "{uuid}　UUID。入れるたびに変わる",
-        "{random:1-6}　範囲の中の整数。入れるたびに変わる",
-        "{alnum:8}　英数字 8 文字。{hex:8} なら 16 進数。入れるたびに変わる",
-        "{pick:はい,いいえ}　並べたうちのどれか 1 つ。入れるたびに変わる",
-        "{date|fullwidth}　| のあとの名前で変えた値（例: ２０２６／０４／０１）",
-        "{{ }}　「{」と「}」の文字そのもの",
-    ];
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)
