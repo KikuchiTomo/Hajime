@@ -792,6 +792,17 @@ impl RowState {
     }
 
     /// rows の index の行を入力欄に出す．選ぶ欄は表に出した名前から選ぶ
+    /// 行の書き換えをやめ，入力欄を空に戻す
+    fn cancel_edit(&mut self) {
+        for input in &mut self.inputs {
+            match input {
+                Input::Edit(window) => ffi::set_text(*window, ""),
+                Input::Choice(selected) => *selected = 0,
+            }
+        }
+        self.editing = None;
+    }
+
     fn fill_inputs(&mut self, index: usize) {
         let Some(spec) = self.row.control.list_spec().copied() else {
             return;
@@ -986,15 +997,18 @@ impl RowState {
             Part::Increment => self
                 .choice
                 .is_some_and(|index| index + 1 < self.numbers.len()),
-            // ファイルを読み込む・書き出すボタンはいつでも使える
-            Part::Bottom(index) if self.file_task(index).is_some() => true,
+            // 読み込むボタンはいつでも使える．書き出すボタンは書き出す行があるときだけ(macOS と同じ)
+            Part::Bottom(index) if self.file_task(index).is_some() => self
+                .file_task(index)
+                .is_some_and(|task| task.is_import() || self.table.total() > 0),
             Part::Top(0) if self.has_add_remove() => {
                 self.editing.is_some()
                     || self
                         .list_spec()
                         .is_some_and(|(spec, _)| spec.is_filled(&self.input_values()))
             }
-            Part::Top(1) if self.has_add_remove() => selected,
+            // 書き換えているあいだは「キャンセル」
+            Part::Top(1) if self.has_add_remove() => selected || self.editing.is_some(),
             Part::Top(index) if self.toggle_part() == Some(Part::Top(index)) => selected,
             // 辞書・カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
@@ -1012,6 +1026,9 @@ impl RowState {
         let buttons = self.row.control.list_buttons();
         match part {
             Part::Top(0) if self.has_add_remove() && self.editing.is_some() => rule_list::UPDATE,
+            Part::Top(1) if self.has_add_remove() && self.editing.is_some() => {
+                crate::strings::settings::CANCEL
+            }
             Part::Top(index) => buttons
                 .and_then(|buttons| buttons.top.get(index).copied())
                 .unwrap_or(""),
@@ -1432,7 +1449,8 @@ impl PageView {
         self.layout.height
     }
 
-    /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)
+    /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)．
+    /// ページの上の端より上へ送った欄も隠す
     pub fn place_fields(&self, theme: &Theme, origin: (f32, f32), scroll: f32, hidden: bool) {
         for row in &self.rows {
             let shown = !hidden && row.visible && row.card.is_some();
@@ -1447,6 +1465,11 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．ページの上(タイトルバー)へ出たら隠す
+                if y < origin.1 {
+                    ffi::show(window, false);
+                    continue;
+                }
                 let width = rect.width - size::FIELD_PADDING_X * 2.0;
                 let left = theme.px(x);
                 let top = theme.px(y);
@@ -1872,6 +1895,10 @@ impl PageView {
         if !row.has_add_remove() {
             return None;
         }
+        if part == Part::Top(1) && row.editing.is_some() {
+            row.cancel_edit();
+            return None;
+        }
         let (spec, limit) = row.list_spec().map(|(spec, limit)| (*spec, limit))?;
         let values = row.input_values();
         let selected = row.table.selected_rows();
@@ -2059,16 +2086,28 @@ impl PageView {
         None
     }
 
-    /// 表の行を押した．頼みがあれば返す
+    /// 表の行を押した．頼みがあれば返す．1 回押すと選ぶだけで，2 回押すと(double)その行を入力欄に出して書き換える
+    /// (macOS の RuleListEditor と同じ．選んだだけで書き換えにすると，打ちかけた行で選んだ行を上書きしてしまう)
     pub fn table_click(
         &mut self,
         row_index: usize,
         position: usize,
         control: bool,
         shift: bool,
+        double: bool,
     ) -> Option<Event> {
         let row = self.rows.get_mut(row_index)?;
-        if !row.table.click(position, control, shift) {
+        let changed = row.table.click(position, control, shift);
+        if double && !control && !shift && row.has_add_remove() {
+            if let [index] = row.table.selected_rows().as_slice() {
+                let index = *index;
+                row.fill_inputs(index);
+                row.editing = Some(index);
+                self.show_footer_variants();
+                return None;
+            }
+        }
+        if !changed {
             return None;
         }
         self.selection_changed(row_index)
@@ -2115,14 +2154,11 @@ impl PageView {
             }
         }
         if row.has_add_remove() {
-            // 1 行だけ選んだら入力欄に出し，追加のボタンを「更新」にする
-            match row.table.selected_rows().as_slice() {
-                [index] => {
-                    let index = *index;
-                    row.fill_inputs(index);
-                    row.editing = Some(index);
+            // 書き換えている行から選びが外れたら，書き換えをやめる(入力欄はその行の値なので空にする)
+            if let Some(editing) = row.editing {
+                if row.table.selected_rows().as_slice() != [editing] {
+                    row.cancel_edit();
                 }
-                _ => row.editing = None,
             }
         }
         let event = matches!(row.row.control, Control::CustomThemes(_))
@@ -3029,8 +3065,9 @@ impl PageView {
                     if link.height <= size::NOTE_LINE_HEIGHT =>
                 {
                     if !prefix.is_empty() {
+                        // 前置きは URL と同じ 1 行目に置く(行全体の高さで真ん中に置くと，下に折り返した文と重なる)
                         canvas.text(
-                            *rect,
+                            Rect::new(rect.x, rect.y, rect.width, size::NOTE_LINE_HEIGHT),
                             prefix,
                             TextStyle::Caption,
                             secondary,
@@ -3265,7 +3302,17 @@ impl PageView {
         );
         canvas.push_clip(body);
         if row.table.is_empty() {
-            let empty = row.list_spec().map_or("", |(spec, _)| spec.empty);
+            // 行はあるのに検索・絞り込みで無くなったときは「一致する項目はありません」(macOS と同じ)．
+            // 一覧の形はカスタムテーマの一覧も含めて部品から引く
+            let spec = row.row.control.list_spec();
+            let empty = if row.table.total() > 0 {
+                match spec.map(|spec| spec.path) {
+                    Some("keymap") => crate::strings::keys::NO_MATCHES,
+                    _ => crate::strings::rule_list::NO_MATCHES,
+                }
+            } else {
+                spec.map_or("", |spec| spec.empty)
+            };
             canvas.text(
                 body,
                 empty,

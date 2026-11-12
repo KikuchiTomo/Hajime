@@ -393,6 +393,8 @@ pub mod more {
 
 /// UIStrings.Keys(キー設定のページの名前と，検索に使うコマンド・状態・ひな形の名前)
 pub mod keys {
+    /// 絞り込んで行が無くなったとき
+    pub const NO_MATCHES: &str = "当てはまる行はありません";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const STATE: &str = "状態";
@@ -574,6 +576,7 @@ pub mod rule_list {
     pub const ENABLED: &str = "有効";
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
+    pub const NO_MATCHES: &str = "一致する項目はありません";
 }
 
 /// UIStrings.Terms

@@ -988,7 +988,7 @@ impl App {
             });
         }
         let model = self.model.as_mut()?;
-        // 選んで書き換えている行は，消してから足す(同じ位置ではなく，ほかの行と同じく決まりの並びで足す)
+        // 選んで書き換えている行は，ほかの行と重なるときだけ消してから足す(重なる行に重ねる)
         let current = match replacing {
             Some(index) => Some(spec.remove(model.value(spec.path), &[index])),
             None => model.value(spec.path).cloned(),
@@ -1004,9 +1004,13 @@ impl App {
             });
         }
         // いつも英語にする語といつも日本語にする語は，足した語をもう一方から除く(macOS と同じ)
+        // 選んだ行の書き換えは，ほかの行と重ならなければ同じ位置のまま書き換える(macOS と同じ．キー設定の表は
+        // 下の行が勝つので，末尾へ動かすと効き方が変わる)
+        let edited =
+            replacing.and_then(|index| spec.replace_at(model.value(spec.path), index, item));
         let mut changes = vec![(
             spec.path,
-            spec.upsert_with(current.as_ref(), item, base.as_ref()),
+            edited.unwrap_or_else(|| spec.upsert_with(current.as_ref(), item, base.as_ref())),
         )];
         if let (Some(other), Some(word)) = (spec.exclusive_with, item.first()) {
             changes.push((other, ListSpec::without(model.value(other), word)));

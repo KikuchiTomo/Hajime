@@ -187,6 +187,8 @@ fn system_palette() -> SettingsPalette {
         switch_off: gray,
         text,
         text_disabled: gray,
+        // 高コントラストは OS の灰色(使えない文字と同じ)で案内を出す
+        text_placeholder: gray,
         text_secondary: text,
     }
 }

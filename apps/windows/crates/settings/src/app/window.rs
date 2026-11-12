@@ -395,7 +395,7 @@ impl App {
         ffi::frame::set_title_bar(self.window, title_bar);
         // 先に作った検索欄は，地を変えたあとに描き直す(自分の面を持つ窓なので，前の絵が残る)
         self.search_painted = false;
-        edit::set_placeholder_color(self.theme.palette.text_secondary);
+        edit::set_placeholder_color(self.theme.palette.text_placeholder);
         self.field_brush = edit::Brush::new(self.theme.palette.control);
         if let Some(font) = &self.field_font {
             ffi::set_font(self.search, font);
@@ -956,7 +956,9 @@ impl App {
                 (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
                 (None, None) => candidate_ui::app::preview::Shown::Sample,
             },
-            placement: candidate_ui::app::preview::Placement::Center,
+            placement: candidate_ui::app::preview::Placement::Center {
+                ground: self.theme.palette.card,
+            },
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
             return;
@@ -1176,7 +1178,8 @@ impl App {
         ffi::invalidate(self.window);
     }
 
-    fn mouse_down(&mut self, lparam: LPARAM) {
+    /// ポインターを押した．double は 2 回続けて押したとき(表の行を書き換える)
+    fn mouse_down(&mut self, lparam: LPARAM, double: bool) {
         let (x, y) = self.point(lparam);
         let now = self.now();
         let (_, height) = self.size();
@@ -1226,7 +1229,9 @@ impl App {
                     let page_y = y + self.scroll.offset(now);
                     if let Some(position) = self.view.table_position(element.row, page_y, now) {
                         let (control, shift) = ffi::modifiers();
-                        let event = self.view.table_click(element.row, position, control, shift);
+                        let event =
+                            self.view
+                                .table_click(element.row, position, control, shift, double);
                         self.dispatch(event);
                     }
                 }
@@ -2489,7 +2494,8 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             Some(LRESULT(0))
         }
         WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => {
-            with_app(|app| app.mouse_down(lparam));
+            let double = message == WM_LBUTTONDBLCLK;
+            with_app(|app| app.mouse_down(lparam, double));
             Some(LRESULT(0))
         }
         WM_LBUTTONUP => {
