@@ -46,7 +46,10 @@ extension InputContext {
             precedingText: wire.isSecure ? nil : wire.precedingText,
             applicationID: wire.applicationId,
             // 入力位置の前の文字を置き換えられる DLL だけが知らせる(古い DLL は setComposition の replacedLength を読まない)
-            canReplacePrecedingText: wire.canReplacePrecedingText ?? false
+            canReplacePrecedingText: wire.canReplacePrecedingText ?? false,
+            // 入力メニューを出せる DLL と，選んでいる文字を読んで単語の登録に渡せる DLL だけが知らせる(古い DLL は新しい操作を読めない)
+            canOpenMenu: wire.canShowMenu ?? false,
+            canReadSelectionForRegistration: wire.canRequestWordRegistration ?? false
         )
     }
 }
@@ -320,6 +323,9 @@ extension WireBranchMap {
 public enum HostAction: Sendable, Equatable {
     case selectInputStyle(InputStyle)
     case openSettings
+    /// 設定のユーザー辞書の画面を開き，語と読みを登録の欄に入れる(空なら入れない)
+    case openWordRegistration(word: String, reading: String)
+    case openUserDictionary
     case toggleLiveConversion
     case showHandwriting
     /// コマンドを動かす(エンジンのプロセスで．DLL には送らない)
@@ -379,6 +385,17 @@ public struct RoutedActions: Sendable, Equatable {
                 edits.append(.requestReconversion(maximumLength: UInt32(DefaultSettings.maximumReconversionLength)))
             case .openSettings:
                 host.append(.openSettings)
+            case .openWordRegistration(let word, let reading):
+                // 入力先の選んでいる文字は DLL が読むので，読んで openWordRegistration で送ってもらう(InputSession は読める DLL のときだけ nil にする)
+                if let word {
+                    host.append(.openWordRegistration(word: word, reading: reading ?? ""))
+                } else {
+                    edits.append(.requestWordRegistration(maximumLength: UInt32(DefaultSettings.maximumUserDictionaryWordLength)))
+                }
+            case .openUserDictionary:
+                host.append(.openUserDictionary)
+            case .openMenu:
+                edits.append(.showMenu)
             case .toggleLiveConversion:
                 host.append(.toggleLiveConversion)
             case .showHandwriting:

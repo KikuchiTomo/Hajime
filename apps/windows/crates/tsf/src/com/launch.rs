@@ -16,11 +16,6 @@ fn installation() -> Option<PathBuf> {
     crate::install::installation_folder(&PathBuf::from(module_path().ok()?))
 }
 
-/// インストール先の file を起動する
-pub fn start(file: &str) -> Result<()> {
-    start_with(file, "")
-}
-
 /// インストール先の file を引数 arguments で起動する
 pub fn start_with(file: &str, arguments: &str) -> Result<()> {
     let folder = installation()

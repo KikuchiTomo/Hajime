@@ -242,10 +242,12 @@ func run() -> Int32 {
         },
         settings: settings,
         ui: sendToWindow,
-        openSettings: {
+        openSettings: { arguments in
             guard FileManager.default.fileExists(atPath: settingsApp.path) else { return }
             let process = Process()
             process.executableURL = settingsApp
+            // 開くページなどの指示だけを渡す．登録する語は引数に入れず，設定の画面が takeWordRegistration で受け取る
+            process.arguments = arguments
             try? process.run()
         },
         hints: { FooterHints.make(for: $0, settings: $1) },

@@ -142,6 +142,10 @@ pub struct App {
     preview_pixels: Option<(String, PreviewPixels)>,
     /// 見本の画像の通し番号(作り直すたびに増やす)
     preview_generation: u64,
+    /// タイトルバーのアイコンの画像(DPI ごとに作り直す)
+    title_icon: Option<(u32, PreviewPixels)>,
+    /// 窓が前にあるか(タイトルバーの題の色を変える．WinUI の TitleBar と同じ)
+    active: bool,
     /// 記号の決まり(表の行と同じ並び．外す・切り替えるときに引く)
     pub(super) sequences: Vec<SymbolItem>,
     pub(super) readings: Vec<SymbolItem>,
@@ -177,7 +181,12 @@ pub struct App {
     pub(super) update: super::update::Updater,
     /// 見本のエンジンで開いた(--offline)
     pub(super) offline: bool,
+    /// 単語の登録で開いた(--register-word)．つながったら，エンジンが持っている語と読みを登録の欄に入れる
+    register_word: bool,
 }
+
+/// タイトルバーのアイコンを描く画像の置き場所(0 は外観・情報のページの見本)
+const TITLE_ICON_SLOT: usize = 1;
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
@@ -245,6 +254,8 @@ pub fn open(
         preview: None,
         preview_pixels: None,
         preview_generation: 0,
+        title_icon: None,
+        active: false,
         sequences: Vec::new(),
         readings: Vec::new(),
         field_font,
@@ -271,6 +282,7 @@ pub fn open(
         measure: options.measure.map(Measurement::new),
         update: super::update::Updater::default(),
         offline: options.offline,
+        register_word: options.register_word,
     };
     APP.with(|cell| *cell.borrow_mut() = Some(app));
     uia::install(uia::Hooks {
@@ -326,6 +338,8 @@ pub struct Options {
     pub page: Option<Page>,
     /// 見本のエンジンで開いた(--offline)．設定のファイルを開かず，ウィザードも見本の値で開く
     pub offline: bool,
+    /// 単語の登録で開いた(--register-word)．ユーザー辞書のページの登録の欄に，エンジンが持っている語と読みを入れる
+    pub register_word: bool,
 }
 
 /// 状態を借りて f を呼ぶ．借りられない(手続きの中から呼ばれた)ときは None
@@ -349,15 +363,36 @@ impl App {
         }
     }
 
+    /// タイトルバーの下の大きさ(DIP)．ページと左の一覧はタイトルバーの下を窓の中として扱う
     fn size(&self) -> (f32, f32) {
         let (width, height) = ffi::client_size(self.window);
-        (self.theme.dip(width), self.theme.dip(height))
+        (
+            self.theme.dip(width),
+            (self.theme.dip(height) - self.title_bar()).max(0.0),
+        )
+    }
+
+    /// 窓の中に入れたタイトルバーの高さ(DIP)．OS の枠のままなら 0
+    fn title_bar(&self) -> f32 {
+        self.theme.dip(ffi::frame::title_bar(self.window))
+    }
+
+    /// タイトルバーの下の位置(DIP)を窓の中のピクセルにする
+    fn client_px(&self, x: f32, y: f32) -> (i32, i32) {
+        (self.theme.px(x), self.theme.px(y + self.title_bar()))
     }
 
     fn apply_theme(&mut self) {
         ffi::set_dark_title_bar(self.window, self.theme.dark);
         // 高コントラストのときは OS の色で塗るので Mica にしない
         self.mica = ffi::set_mica(self.window, !self.theme.high_contrast);
+        // Mica のときはタイトルバーを窓の中に入れ，本文と同じ地に描く(設定アプリと同じ)．Mica でなければ OS の枠のまま
+        let title_bar = if self.mica {
+            self.theme.px(size::TITLE_BAR_HEIGHT)
+        } else {
+            0
+        };
+        ffi::frame::set_title_bar(self.window, title_bar);
         // 先に作った検索欄は，地を変えたあとに描き直す(自分の面を持つ窓なので，前の絵が残る)
         self.search_painted = false;
         edit::set_placeholder_color(self.theme.palette.text_secondary);
@@ -426,6 +461,7 @@ impl App {
                 ffi::kill_timer(self.window, RECONNECT_TIMER);
                 let page = self.view.page;
                 self.open_page(page);
+                self.take_registration();
                 ffi::post(self.window, WM_WARM, 0, 0);
                 if let Some(measurement) = &mut self.measure {
                     measurement.content = Some(self.started.elapsed().as_secs_f64() * 1000.0);
@@ -434,6 +470,39 @@ impl App {
             }
             None => self.disconnect(),
         }
+    }
+
+    /// 単語の登録で開いたとき，エンジンが持っている語と読みを受け取り，登録した単語の一覧の入力欄に入れて，読みの欄に入力位置を置く．
+    /// つながってから一度だけ行う(エンジンは一度渡すと消す)．語と読みは入力内容なので，引数では受け取らない
+    fn take_registration(&mut self) {
+        if !self.register_word {
+            return;
+        }
+        let Some(model) = &self.model else { return };
+        self.register_word = false;
+        let registration = model
+            .store()
+            .take_word_registration()
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        // 登録した単語の一覧を出す(取り込んだ辞書の一覧を出していたら切り替える)
+        self.view_values.insert(
+            pages::DICTIONARY_TAB.to_string(),
+            serde_json::Value::String(pages::DICTIONARY_TAB_WORDS.to_string()),
+        );
+        if self.view.page == Page::Dictionary {
+            self.refresh();
+        } else {
+            self.open_page(Page::Dictionary);
+        }
+        let Some(element) = self
+            .view
+            .fill_registration(&registration.reading, &registration.word)
+        else {
+            return;
+        };
+        self.set_focus(Focus::Page(element));
     }
 
     pub(super) fn availability(&self) -> Availability {
@@ -598,15 +667,9 @@ impl App {
         let y = rect.y + (rect.height - line) / 2.0;
         // 右に虫めがねの絵を置く分を空ける
         let width = rect.width - size::FIELD_PADDING_X * 3.0 - size::CHEVRON_SIZE;
-        let left = self.theme.px(x);
-        let top = self.theme.px(y);
-        ffi::place(
-            self.search,
-            left,
-            top,
-            self.theme.px(x + width) - left,
-            self.theme.px(y + line) - top,
-        );
+        let (left, top) = self.client_px(x, y);
+        let (right, bottom) = self.client_px(x + width, y + line);
+        ffi::place(self.search, left, top, right - left, bottom - top);
         ffi::show(self.search, true);
     }
 
@@ -617,7 +680,7 @@ impl App {
         let entering = self.enter.running(now);
         self.view.place_fields(
             &self.theme,
-            (nav_width(width), 0.0),
+            (nav_width(width), self.title_bar()),
             self.scroll.offset(now),
             entering,
         );
@@ -659,6 +722,10 @@ impl App {
     fn paint(&mut self) {
         let now = self.now();
         self.update_preview();
+        let title_bar = self.title_bar();
+        if title_bar > 0.0 {
+            self.update_title_icon();
+        }
         let (width, height) = self.size();
         let theme = self.theme;
         // Mica のときは地を透明にし，Mica を見せる(カードと部品は不透明のまま描く)
@@ -695,16 +762,35 @@ impl App {
             now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
         });
         let mut cpu = 0.0;
-        let drawn = self
-            .surface
-            .draw(graphics, size, theme.dpi, clear, preview, |canvas| {
+        let active = self.active;
+        let icon = self
+            .title_icon
+            .as_ref()
+            .filter(|_| title_bar > 0.0)
+            .map(|(_, pixels)| pixels);
+        let drawn = self.surface.draw_layers(
+            graphics,
+            size,
+            theme.dpi,
+            clear,
+            &[preview, icon],
+            |canvas| {
                 let start = Instant::now();
+                if title_bar > 0.0 {
+                    paint_title_bar(canvas, &theme, width, title_bar, active);
+                }
+                // ページと左の一覧はタイトルバーの下に描く
+                canvas.translate(0.0, title_bar);
+                canvas.push_clip(Rect::new(0.0, 0.0, width, height));
                 paint_window(canvas, &state, nav, nav_scroll, view, scroll);
                 if let Some((text, x, y, _)) = tooltip {
                     paint_tooltip(canvas, &theme, text, (x, y), (width, height));
                 }
+                canvas.pop_clip();
+                canvas.translate(0.0, -title_bar);
                 cpu = start.elapsed().as_secs_f64() * 1000.0;
-            });
+            },
+        );
         if drawn.is_err() {
             return;
         }
@@ -870,6 +956,31 @@ impl App {
     }
 
     /// 情報のページのアイコン(実行ファイルのリソースの 1 番)の画像を作る．カードの地の上に描く
+    /// タイトルバーのアイコンの画像を窓の DPI で作っておく
+    fn update_title_icon(&mut self) {
+        let dpi = self.theme.dpi;
+        if self
+            .title_icon
+            .as_ref()
+            .is_none_or(|(made, _)| *made != dpi)
+        {
+            let side = u32::try_from(self.theme.px(size::TITLE_BAR_ICON_SIZE)).unwrap_or(0);
+            self.preview_generation += 1;
+            let generation = self.preview_generation;
+            self.title_icon = d2d::render_icon(side, side, None).map(|pixels| {
+                (
+                    dpi,
+                    PreviewPixels {
+                        generation,
+                        width: side,
+                        height: side,
+                        pixels,
+                    },
+                )
+            });
+        }
+    }
+
     fn update_icon(&mut self, rect: Rect) {
         let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
         let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
@@ -884,7 +995,7 @@ impl App {
         // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
         self.preview_generation += 1;
         let generation = self.preview_generation;
-        let Some(pixels) = d2d::render_icon(width, height, self.theme.palette.card) else {
+        let Some(pixels) = d2d::render_icon(width, height, Some(self.theme.palette.card)) else {
             return;
         };
         self.preview_pixels = Some((
@@ -937,10 +1048,11 @@ impl App {
         Some(Target::Page(element))
     }
 
+    /// ポインターの位置(タイトルバーの下の DIP)
     fn point(&self, lparam: LPARAM) -> (f32, f32) {
         let x = (lparam.0 & 0xffff) as i16 as i32;
         let y = ((lparam.0 >> 16) & 0xffff) as i16 as i32;
-        (self.theme.dip(x), self.theme.dip(y))
+        (self.theme.dip(x), self.theme.dip(y) - self.title_bar())
     }
 
     fn mouse_move(&mut self, lparam: LPARAM) {
@@ -1170,7 +1282,10 @@ impl App {
         let screen_x = (lparam.0 & 0xffff) as i16 as i32;
         let screen_y = ((lparam.0 >> 16) & 0xffff) as i16 as i32;
         let (client_x, client_y) = ffi::to_client(self.window, screen_x, screen_y);
-        let (x, y) = (self.theme.dip(client_x), self.theme.dip(client_y));
+        let (x, y) = (
+            self.theme.dip(client_x),
+            self.theme.dip(client_y) - self.title_bar(),
+        );
         let (width, _) = self.size();
         if x < nav_width(width) {
             self.nav_scroll.scroll_by(amount, now);
@@ -1433,15 +1548,10 @@ impl App {
 
     /// 窓の中の DIP の四角を画面のピクセルの四角(左・上・幅・高さ)にする
     fn screen_rect(&self, rect: Rect) -> (i32, i32, i32, i32) {
-        let left = self.theme.px(rect.x);
-        let top = self.theme.px(rect.y);
+        let (left, top) = self.client_px(rect.x, rect.y);
+        let (right, bottom) = self.client_px(rect.max_x(), rect.max_y());
         let (x, y) = ffi::to_screen(self.window, left, top);
-        (
-            x,
-            y,
-            self.theme.px(rect.max_x()) - left,
-            self.theme.px(rect.max_y()) - top,
-        )
+        (x, y, right - left, bottom - top)
     }
 
     fn nodes(&self) -> Vec<uia::Node> {
@@ -1605,13 +1715,10 @@ impl App {
             .width
             .max(widest + size::FIELD_PADDING_X * 2.0 + size::NAV_INDICATOR_WIDTH * 2.0);
         let flyout_height = (items.len() as f32 * item + padding * 2.0).min(size::DROPDOWN_HEIGHT);
-        let (screen_left, screen_top) = ffi::to_screen(
-            self.window,
-            self.theme.px(left),
-            self.theme.px(top + rect.height + padding),
-        );
-        let (_, above_top) =
-            ffi::to_screen(self.window, 0, self.theme.px(top - padding - flyout_height));
+        let (client_left, client_top) = self.client_px(left, top + rect.height + padding);
+        let (screen_left, screen_top) = ffi::to_screen(self.window, client_left, client_top);
+        let (_, client_above) = self.client_px(0.0, top - padding - flyout_height);
+        let (_, above_top) = ffi::to_screen(self.window, 0, client_above);
         let (_, work_top, _, work_bottom) = ffi::work_area(self.window);
         let pixel_height = self.theme.px(flyout_height);
         let y = if screen_top + pixel_height > work_bottom && above_top >= work_top {
@@ -2195,6 +2302,27 @@ fn paint_flyout_items(
 }
 
 /// 説明の吹き出し．ポインターの右下に出し，窓からはみ出さないよう詰める
+/// タイトルバー(WinUI 3 の TitleBar)．地は描かず Mica を見せる．閉じるボタンなどは DWM が描く．
+/// 窓が後ろにあるときは題を薄くする
+fn paint_title_bar(canvas: &mut dyn Canvas, theme: &Theme, width: f32, height: f32, active: bool) {
+    let icon = size::TITLE_BAR_ICON_SIZE;
+    let padding = size::TITLE_BAR_PADDING_X;
+    canvas.preview_at(TITLE_ICON_SLOT, padding, (height - icon) / 2.0);
+    let left = padding + icon + padding;
+    let color = if active {
+        theme.palette.text
+    } else {
+        theme.palette.text_disabled
+    };
+    canvas.text(
+        Rect::new(left, 0.0, (width - left).max(0.0), height),
+        settings::WINDOW_TITLE,
+        TextStyle::Caption,
+        Color::from(color),
+        TextLayout::LINE,
+    );
+}
+
 fn paint_tooltip(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -2279,6 +2407,10 @@ extern "system" fn main_procedure(
 }
 
 fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> Option<LRESULT> {
+    // タイトルバーを窓の中に入れているときの枠(閉じるボタン・動かす・大きさを変える)
+    if let Some(result) = ffi::frame::message(window, message, wparam, lparam) {
+        return Some(result);
+    }
     match message {
         WM_ERASEBKGND => Some(LRESULT(1)),
         WM_PAINT => {
@@ -2449,6 +2581,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             Some(LRESULT(0))
         }
         WM_ACTIVATE => {
+            let active = low_word(wparam.0) != WA_INACTIVE;
+            with_app(|app| {
+                app.active = active;
+                ffi::invalidate(app.window);
+            });
             if low_word(wparam.0) == WA_INACTIVE {
                 with_app(App::close_flyout);
             } else {
@@ -2475,6 +2612,7 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         WM_GETOBJECT => uia::get_object(window, wparam, lparam),
         WM_DESTROY => {
             uia::disconnect(window);
+            ffi::frame::remove_title_bar(window);
             APP.with(|cell| {
                 if let Ok(mut app) = cell.try_borrow_mut() {
                     if let Some(app) = app.as_mut() {

@@ -28,6 +28,12 @@ struct RuleItem: Identifiable, Hashable {
     var note = ""
 }
 
+/// 外から入力欄に入れる左と右の値(単語の登録で，選んでいた語と読みを入れる)
+struct RuleDraft: Equatable {
+    var key: String
+    var value: String
+}
+
 /// 行ごとに選ぶ種類(ユーザー辞書の品詞)．入力欄の右のポップアップで選び，表の右の列に出す
 struct RuleKinds {
     struct Option: Hashable {
@@ -87,6 +93,8 @@ struct RuleListEditor: View {
     let tableHeight: CGFloat
     /// 上の欄の左に打っている文字が変わるたびに知らせる(変換マクロの書いている途中の形を試すため)
     let draftChanged: ((String) -> Void)?
+    /// 外から入力欄に入れる値．入れたら nil に戻す
+    var prefill: Binding<RuleDraft?>?
 
     @State private var key = ""
     @State private var value = ""
@@ -128,6 +136,13 @@ struct RuleListEditor: View {
         self.keysAreUnique = keysAreUnique
         self.tableHeight = tableHeight
         self.draftChanged = draftChanged
+    }
+
+    /// 外から入力欄に値を入れられるようにした部品(単語の登録)
+    func prefilled(_ draft: Binding<RuleDraft?>) -> Self {
+        var copy = self
+        copy.prefill = draft
+        return copy
     }
 
     private var hasValue: Bool { labels.value != nil }
@@ -269,6 +284,18 @@ struct RuleListEditor: View {
         }
         .labelsHidden()
         .onChange(of: key) { _, typed in draftChanged?(typed) }
+        .onAppear(perform: applyPrefill)
+        .onChange(of: prefill?.wrappedValue) { _, _ in applyPrefill() }
+    }
+
+    /// 外から渡された値を入力欄に入れる．読み(左)が空なら左の欄に，あれば右の欄に入力位置を置く
+    private func applyPrefill() {
+        guard let draft = prefill?.wrappedValue else { return }
+        clear()
+        key = draft.key
+        value = draft.value
+        focusedField = draft.key.isEmpty ? .key : .value
+        prefill?.wrappedValue = nil
     }
 
     /// 列を隠すと最後の列が表の幅に広がらないので，列の組み合わせごとに表を分ける(macOS 14.0 では列の if が使えない)

@@ -806,6 +806,20 @@ public final class InputSession {
         case .emojiPalette: return KeyResult(handled: true, actions: openPalette(.emoji))
         case .symbolPalette: return KeyResult(handled: true, actions: openPalette(.symbol))
         case .kaomojiPalette: return KeyResult(handled: true, actions: openPalette(.kaomoji))
+        case .registerWord:
+            // 入力中なら見えている語と読みを登録の欄に移す(組み立て中の文字は入れずに消す)．入力していなければ入力先で選んでいる文字を使う
+            guard !composition.isEmpty else {
+                // 選んでいる文字を読めないアプリ(Windows の古い DLL)では，空の欄で開く
+                return KeyResult(handled: true, actions: [.openWordRegistration(word: context.canReadSelectionForRegistration ? nil : "", reading: nil)])
+            }
+            let word = shownText
+            let reading = composition.conversionReading
+            return KeyResult(handled: true, actions: reset() + [.openWordRegistration(word: word, reading: reading)])
+        case .openUserDictionary: return KeyResult(handled: true, actions: commitAll() + [.openUserDictionary])
+        case .openMenu:
+            // 入力メニューを出せないアプリ(Windows の古い DLL)では，キーをアプリに渡す
+            guard context.canOpenMenu else { return KeyResult(handled: false, actions: []) }
+            return KeyResult(handled: true, actions: commitAll() + [.openMenu])
         // 入力モード
         case .japaneseMode: return switchMode(to: .japanese)
         case .directMode: return switchMode(to: .direct)
@@ -2860,6 +2874,17 @@ public final class InputSession {
             return advance(after: lattice, context: context)
         default:
             return []
+        }
+    }
+
+    /// 組み立て中の文字として今見えている語(変換していれば選んでいる候補，していなければ読み)
+    private var shownText: String {
+        switch phase {
+        case .lattice(let lattice): return lattice.text
+        case .selecting(let selection):
+            if case .candidate(let index) = selection.focus, selection.candidates.indices.contains(index) { return selection.candidates[index].text }
+            return composition.displayReading
+        default: return composition.displayReading
         }
     }
 
