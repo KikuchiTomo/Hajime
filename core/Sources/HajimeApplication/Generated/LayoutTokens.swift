@@ -26,6 +26,7 @@ public enum LayoutTokens {
         public static let minWidth: Double = 180
         public static let variantInsetY: Double = 1
         public static let maxWidth: Double = 720
+        public static let gridMaxWidth: Double = 960
         public static let screenMargin: Double = 16
         public static let truncationContext: Double = 4
     }
