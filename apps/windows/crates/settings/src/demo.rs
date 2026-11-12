@@ -6,7 +6,7 @@
 //! 実演の文字は台本に書いた見本だけで，利用者の入力は使わない
 
 use crate::strings::{windows_wizard as notes, wizard as text};
-use crate::wizard::{Choices, Field, Step};
+use crate::wizard::{Choices, Field, Mark, Step, SWITCH_SINGLE};
 use candidate_ui::scene::sample;
 use ipc::{
     AssociationHeading, BranchColumn, BranchMap, CandidateEntry, CandidateFocus, CandidateList,
@@ -58,6 +58,8 @@ pub struct Frame {
     pub mode: Option<Mode>,
     /// 入力欄の上に出すアプリの名前(アプリを切り替える実演)
     pub application: Option<&'static str>,
+    /// このコマで押したキー(入力欄の右上にキーの札で出す)
+    pub key: Option<&'static str>,
     /// このコマを見せておく時間(ミリ秒)
     pub duration: f64,
 }
@@ -70,6 +72,7 @@ impl Frame {
             panel: None,
             mode: None,
             application: None,
+            key: None,
             duration,
         }
     }
@@ -83,6 +86,11 @@ impl Frame {
 
     fn with_mode(mut self, mode: Mode) -> Self {
         self.mode = Some(mode);
+        self
+    }
+
+    fn with_key(mut self, key: &'static str) -> Self {
+        self.key = Some(key);
         self
     }
 }
@@ -464,7 +472,14 @@ fn lattice(columns: &[(&str, &[&str])], focus: usize, uncertain: Option<usize>) 
 // MARK: - ページ
 
 /// step の実演．spotlight(機能の紹介のページで見せている機能)があれば，その機能だけを(オフでも)見せる
-pub fn script(step: Step, choices: &Choices, spotlight: Option<&str>, today: Today) -> Script {
+/// app_mode は，アプリごとの入力モードのページでポインタを置いたカード(そのモードの動きを見せる)
+pub fn script(
+    step: Step,
+    choices: &Choices,
+    spotlight: Option<&str>,
+    app_mode: Mark,
+    today: Today,
+) -> Script {
     if let Some(spot) =
         spotlight.and_then(|path| step.spots().iter().find(|spot| spot.path == path))
     {
@@ -473,8 +488,8 @@ pub fn script(step: Step, choices: &Choices, spotlight: Option<&str>, today: Tod
         };
     }
     let frames = match step {
-        Step::ModeSwitch => mode_switch(),
-        Step::AppModes => app_modes(),
+        Step::ModeSwitch => mode_switch(choices),
+        Step::AppModes => app_modes(choices, app_mode),
         Step::Correction => correction(choices),
         Step::Theme => theme(),
         Step::LiveConversion => live_conversion(choices),
@@ -498,25 +513,47 @@ pub fn script(step: Step, choices: &Choices, spotlight: Option<&str>, today: Tod
     Script { frames }
 }
 
-/// 英数で打ち，日本語に切り替えて打って変換する
-fn mode_switch() -> Vec<Frame> {
+/// 日本語にするキーと英数に戻すキー(選んだ切り替え方で変わる．1 つのキーなら同じキーを押す)
+fn switch_keys(choices: &Choices) -> (&'static str, &'static str) {
+    if choices.value(Field::Switch) == SWITCH_SINGLE {
+        (notes::DEMO_KEY_HANKAKU, notes::DEMO_KEY_HANKAKU)
+    } else {
+        (notes::DEMO_KEY_HENKAN, notes::DEMO_KEY_MUHENKAN)
+    }
+}
+
+/// 英数で打ち，日本語にするキーで切り替えて打って変換し，英数に戻すキーで戻す(macOS の modeSwitch)
+fn mode_switch(choices: &Choices) -> Vec<Frame> {
+    let (to_japanese, to_direct) = switch_keys(choices);
     let english = notes::DEMO_DIRECT_TEXT;
     let mut frames = vec![Frame::new(hold() / 2.0).with_mode(Mode::Direct)];
     frames.extend(english.char_indices().map(|(index, letter)| {
         Frame::committed(&english[..index + letter.len_utf8()], keystroke()).with_mode(Mode::Direct)
     }));
-    frames.push(Frame::committed(english, hold() / 2.0).with_mode(Mode::Japanese));
+    frames.push(
+        Frame::committed(english, hold() / 2.0)
+            .with_mode(Mode::Japanese)
+            .with_key(to_japanese),
+    );
     frames.extend(typing("nihongo", english, Some(Mode::Japanese)));
     frames.push(converted(&[("日本語", Style::Converted)], english, None));
-    frames.push(Frame::committed(&format!("{english}日本語"), hold()));
+    let done = format!("{english}日本語");
+    frames.push(Frame::committed(&done, hold() / 2.0).with_mode(Mode::Japanese));
+    frames.push(
+        Frame::committed(&done, hold())
+            .with_mode(Mode::Direct)
+            .with_key(to_direct),
+    );
     frames
 }
 
-/// メモ帳(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英数になり，メモ帳に戻すと日本語に戻る
-fn app_modes() -> Vec<Frame> {
+/// アプリを切り替えたときに，モードの札が選んだカードのとおりに変わるのを見せる(macOS の appModes)
+/// - IME をオフ: メモ帳で日本語を打ち，ターミナルに切り替えると英数になる
+/// - IME をオン: ターミナルで英数を打ち，メモ帳に切り替えると日本語になる
+/// - オンオフを記憶: メモ帳で英数に切り替えてからターミナルに移り，メモ帳に戻ると英数のまま
+fn app_modes(choices: &Choices, app_mode: Mark) -> Vec<Frame> {
     let notes_app = notes::DEMO_NOTES;
     let terminal = text::DEMO_TERMINAL;
-    let command = "git status";
     let in_app = |frames: Vec<Frame>, application: &'static str| -> Vec<Frame> {
         frames
             .into_iter()
@@ -526,27 +563,53 @@ fn app_modes() -> Vec<Frame> {
             })
             .collect()
     };
-    let mut frames = vec![Frame::new(hold() / 2.0).with_mode(Mode::Japanese)];
-    frames.extend(typing("kyouha", "", Some(Mode::Japanese)));
-    let mut frames = in_app(frames, notes_app);
-    frames.extend(in_app(
-        vec![
-            converted(&[("今日は", Style::Converted)], "", None),
-            Frame::committed("今日は", hold()).with_mode(Mode::Japanese),
-        ],
-        notes_app,
-    ));
-    let mut typed = vec![Frame::new(hold() / 2.0).with_mode(Mode::Direct)];
-    typed.extend(command.char_indices().map(|(index, letter)| {
-        Frame::committed(&command[..index + letter.len_utf8()], keystroke()).with_mode(Mode::Direct)
-    }));
-    typed.push(Frame::committed(command, hold()).with_mode(Mode::Direct));
-    frames.extend(in_app(typed, terminal));
-    frames.extend(in_app(
-        vec![Frame::committed("今日は", hold()).with_mode(Mode::Japanese)],
-        notes_app,
-    ));
-    frames
+    // committed のあとに text を 1 字ずつ英数で打つ
+    let typed = |text: &str, committed: &str| -> Vec<Frame> {
+        text.char_indices()
+            .map(|(index, letter)| {
+                let shown = format!("{committed}{}", &text[..index + letter.len_utf8()]);
+                Frame::committed(&shown, keystroke()).with_mode(Mode::Direct)
+            })
+            .collect()
+    };
+    let mut japanese = vec![Frame::new(hold() / 2.0).with_mode(Mode::Japanese)];
+    japanese.extend(typing("kyouha", "", Some(Mode::Japanese)));
+    japanese.push(converted(&[("今日は", Style::Converted)], "", None));
+    japanese.push(Frame::committed("今日は", hold()).with_mode(Mode::Japanese));
+    let mut direct = vec![Frame::new(hold() / 2.0).with_mode(Mode::Direct)];
+    match app_mode {
+        Mark::Japanese => {
+            direct.extend(typed("ls", ""));
+            direct.push(Frame::committed("ls", hold()).with_mode(Mode::Direct));
+            let mut frames = in_app(direct, terminal);
+            frames.extend(in_app(japanese, notes_app));
+            frames
+        }
+        Mark::Both => {
+            let (_, to_direct) = switch_keys(choices);
+            japanese.push(
+                Frame::committed("今日は", hold() / 2.0)
+                    .with_mode(Mode::Direct)
+                    .with_key(to_direct),
+            );
+            japanese.extend(typed("OK", "今日は"));
+            let mut frames = in_app(japanese, notes_app);
+            direct.extend(typed("ls", ""));
+            frames.extend(in_app(direct, terminal));
+            frames.extend(in_app(
+                vec![Frame::committed("今日はOK", hold()).with_mode(Mode::Direct)],
+                notes_app,
+            ));
+            frames
+        }
+        Mark::Direct => {
+            let mut frames = in_app(japanese, notes_app);
+            direct.extend(typed("git status", ""));
+            direct.push(Frame::committed("git status", hold()).with_mode(Mode::Direct));
+            frames.extend(in_app(direct, terminal));
+            frames
+        }
+    }
 }
 
 fn correction(choices: &Choices) -> Vec<Frame> {
@@ -1001,12 +1064,15 @@ mod tests {
     }
 
     fn last(step: Step, choices: &Choices) -> Frame {
-        script(step, choices, None, TODAY).last().unwrap().clone()
+        script(step, choices, None, Mark::Direct, TODAY)
+            .last()
+            .unwrap()
+            .clone()
     }
 
     /// 最後に窓を出したコマの窓
     fn last_panel(step: Step, choices: &Choices) -> Panel {
-        frames(&script(step, choices, None, TODAY))
+        frames(&script(step, choices, None, Mark::Direct, TODAY))
             .into_iter()
             .rev()
             .find_map(|frame| frame.panel.clone())
@@ -1036,7 +1102,7 @@ mod tests {
 
     #[test]
     fn 台本を繰り返す() {
-        let script = script(Step::ModeSwitch, &choices(), None, TODAY);
+        let script = script(Step::ModeSwitch, &choices(), None, Mark::Direct, TODAY);
         let total = script.total();
         let first = script.position(10.0).unwrap();
         let again = script.position(total + 10.0).unwrap();
@@ -1067,14 +1133,14 @@ mod tests {
             "よろしくお願いします"
         );
         choices.select(Field::Correction, "off");
-        let off = script(Step::Correction, &choices, None, TODAY);
+        let off = script(Step::Correction, &choices, None, Mark::Direct, TODAY);
         assert!(frames(&off).iter().all(|frame| frame.panel.is_none()));
         assert_eq!(text_of(off.last().unwrap()), "よろしくおながいします");
     }
 
     #[test]
     fn 補正は補正を探す時間だけ待つ() {
-        let script = script(Step::Correction, &choices(), None, TODAY);
+        let script = script(Step::Correction, &choices(), None, Mark::Direct, TODAY);
         assert!(frames(&script).iter().any(|frame| frame.duration == 800.0));
     }
 
@@ -1082,7 +1148,7 @@ mod tests {
     fn ライブ変換は選んだ時間だけ待ってから漢字にする() {
         let mut choices = choices();
         choices.set_seconds(LIVE_DELAY, 1.2);
-        let on = script(Step::LiveConversion, &choices, None, TODAY);
+        let on = script(Step::LiveConversion, &choices, None, Mark::Direct, TODAY);
         assert!(frames(&on).iter().any(|frame| frame.duration == 1200.0));
         assert!(frames(&on).iter().all(|frame| frame.panel.is_none()));
         choices.select(LIVE, "false");
@@ -1146,16 +1212,43 @@ mod tests {
     }
 
     #[test]
-    fn アプリを切り替えるとモードと名前が変わる() {
-        let script = script(Step::AppModes, &choices(), None, TODAY);
-        let shown = frames(&script);
-        assert!(shown
+    fn アプリを切り替えるとモードが選んだカードのとおりに変わる() {
+        let last = |mark: Mark| {
+            script(Step::AppModes, &choices(), None, mark, TODAY)
+                .last()
+                .unwrap()
+                .clone()
+        };
+        // IME をオフ: ターミナルに切り替えると英数
+        let off = last(Mark::Direct);
+        assert_eq!(off.application, Some(text::DEMO_TERMINAL));
+        assert_eq!(off.mode, Some(Mode::Direct));
+        // IME をオン: メモ帳に切り替えると日本語
+        let on = last(Mark::Japanese);
+        assert_eq!(on.application, Some(notes::DEMO_NOTES));
+        assert_eq!(on.mode, Some(Mode::Japanese));
+        // 記憶: メモ帳で英数にしてから戻ると英数のまま
+        let remembers = script(Step::AppModes, &choices(), None, Mark::Both, TODAY);
+        assert!(frames(&remembers)
             .iter()
-            .any(|frame| frame.application == Some(text::DEMO_TERMINAL)
-                && frame.mode == Some(Mode::Direct)));
-        let last = script.last().unwrap();
-        assert_eq!(last.application, Some(notes::DEMO_NOTES));
-        assert_eq!(last.mode, Some(Mode::Japanese));
+            .any(|frame| frame.key.is_some() && frame.application == Some(notes::DEMO_NOTES)));
+        let back = remembers.last().unwrap();
+        assert_eq!(back.application, Some(notes::DEMO_NOTES));
+        assert_eq!(back.mode, Some(Mode::Direct));
+    }
+
+    #[test]
+    fn 英数に戻すキーは切り替え方で変わる() {
+        let mut choices = choices();
+        let back = |choices: &Choices| {
+            script(Step::ModeSwitch, choices, None, Mark::Direct, TODAY)
+                .last()
+                .unwrap()
+                .key
+        };
+        assert_eq!(back(&choices), Some(notes::DEMO_KEY_MUHENKAN));
+        choices.select(Field::Switch, SWITCH_SINGLE);
+        assert_eq!(back(&choices), Some(notes::DEMO_KEY_HANKAKU));
     }
 
     #[test]
@@ -1167,14 +1260,32 @@ mod tests {
             } else {
                 Step::Extras
             };
-            let shown = script(step, &choices, Some(spot.path), TODAY);
+            let shown = script(step, &choices, Some(spot.path), Mark::Direct, TODAY);
             assert!(shown.len() > 1, "{}", spot.path);
         }
-        let date = script(Step::Features, &choices, Some("dateConversion"), TODAY);
+        let date = script(
+            Step::Features,
+            &choices,
+            Some("dateConversion"),
+            Mark::Direct,
+            TODAY,
+        );
         assert_eq!(date.last().unwrap().committed, "2026/10/28");
-        let stamp = script(Step::Extras, &choices, Some("dynamicDictionary"), TODAY);
+        let stamp = script(
+            Step::Extras,
+            &choices,
+            Some("dynamicDictionary"),
+            Mark::Direct,
+            TODAY,
+        );
         assert_eq!(stamp.last().unwrap().committed, "2026-10-28 09:05:07");
-        let commands = script(Step::Extras, &choices, Some("launcherCommands"), TODAY);
+        let commands = script(
+            Step::Extras,
+            &choices,
+            Some("launcherCommands"),
+            Mark::Direct,
+            TODAY,
+        );
         assert!(frames(&commands)
             .iter()
             .any(|frame| text_of(frame) == "▶ Claude を開く"));
@@ -1183,10 +1294,10 @@ mod tests {
     #[test]
     fn 試験的な機能はオンにしたものを見せる() {
         let mut choices = choices();
-        let off = script(Step::Extras, &choices, None, TODAY);
+        let off = script(Step::Extras, &choices, None, Mark::Direct, TODAY);
         assert_eq!(off.len(), 1);
         choices.set_toggle("phoneticSpelling", true);
-        let on = script(Step::Extras, &choices, None, TODAY);
+        let on = script(Step::Extras, &choices, None, Mark::Direct, TODAY);
         assert!(frames(&on).iter().any(|frame| text_of(frame) == "photo"));
     }
 

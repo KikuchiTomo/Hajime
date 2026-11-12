@@ -667,19 +667,21 @@ pub mod size {
         pub const WIDTH: f32 = 900.0;
         pub const HEIGHT: f32 = 600.0;
         pub const STAGE_WIDTH: f32 = 440.0;
-        pub const PADDING: f32 = 36.0;
-        pub const STAGE_PADDING: f32 = 28.0;
+        pub const PADDING: f32 = 24.0;
+        pub const STAGE_PADDING: f32 = 24.0;
+        pub const FIELD_TOP: f32 = 96.0;
         pub const CARD_RADIUS: f32 = 12.0;
-        pub const CARD_PADDING: f32 = 14.0;
-        pub const CARD_GAP: f32 = 10.0;
+        pub const CARD_PADDING: f32 = 12.0;
+        pub const CARD_GAP: f32 = 8.0;
+        pub const THEME_SAMPLE_WIDTH: f32 = 48.0;
         pub const DOT_SIZE: f32 = 7.0;
-        pub const DOT_GAP: f32 = 6.0;
+        pub const DOT_GAP: f32 = 4.0;
         pub const FIELD_HEIGHT: f32 = 46.0;
         pub const FIELD_RADIUS: f32 = 10.0;
         pub const FIELD_FONT_SIZE: f32 = 19.0;
         pub const APPLICATION_TAB_FONT_SIZE: f32 = 12.0;
         pub const INFO_SYMBOL_WIDTH: f32 = 28.0;
-        pub const DEMO_GAP: f32 = 14.0;
+        pub const DEMO_GAP: f32 = 8.0;
         pub const BADGE_RADIUS: f32 = 6.0;
         pub const COUNTER_HEIGHT: f32 = 16.0;
         pub const CHECK_SIZE: f32 = 20.0;
@@ -796,6 +798,7 @@ pub mod opacity {
         pub const LINK: f32 = 0.4;
         pub const LINK_HOVER_MIX: f32 = 0.35;
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
+        pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
     }
 }
