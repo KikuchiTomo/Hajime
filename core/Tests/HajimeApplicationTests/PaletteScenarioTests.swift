@@ -115,6 +115,41 @@ struct PaletteScenarioTests {
         #expect(harness.palette == nil)
     }
 
+    @Test("R-26: パレットを開かずに「:bow:」と打っても，読みに替えて絵文字を確定し，使った記録に残す")
+    func inlineShortcode() {
+        let usage = FakePaletteUsageStore()
+        let harness = harness(usage: usage)
+        harness.type(":bow:")
+        #expect(harness.committed == "🙇")
+        #expect(harness.palette == nil)
+        #expect(harness.marked == .empty)
+        #expect(usage.usage.score(of: "🙇", at: start) > 0)
+        // 既定の肌の色にする
+        usage.update { $0.defaultSkinTone = .medium }
+        harness.type(":wave:")
+        #expect(harness.committed == "🙇👋🏽")
+    }
+
+    @Test("R-26: 絵文字にするのは，読みの先頭の「:」から打ったショートコードを「:」で閉じたときだけ")
+    func inlineShortcodeOnlyWhenClosed() {
+        // 知らないショートコード・途中から始めた「:」・⌫ で打ち直したものは，読みのまま
+        for keys in [":bowx:", "kana:bow:", ":Bow:"] {
+            let harness = harness()
+            harness.type(keys)
+            #expect(harness.committed == "", "\(keys)")
+            #expect(harness.marked != .empty, "\(keys)")
+        }
+        let edited = harness()
+        edited.type(":bowx")
+        edited.press(.backspace)
+        edited.type(":")
+        #expect(edited.committed == "")
+        // パレットを使わない設定なら絵文字にしない
+        let off = harness { $0.palette = false }
+        off.type(":bow:")
+        #expect(off.committed == "")
+    }
+
     @Test("R-26: Esc は探す語を消し，次の Esc で閉じる．⌫ は 1 文字ずつ消す")
     func escapeAndBackspace() {
         let harness = harness()

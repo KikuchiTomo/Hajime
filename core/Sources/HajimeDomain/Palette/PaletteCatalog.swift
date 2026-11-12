@@ -53,6 +53,12 @@ public struct PaletteCatalog: Sendable, Equatable {
         items.first { $0.text == text || $0.skinTones.contains(text) }
     }
 
+    /// このショートコード(「:bow:」のコロンを除いた「bow」)の項目．大文字と小文字は区別しない
+    public func item(forShortcode name: String) -> PaletteItem? {
+        let name = name.lowercased()
+        return items.first { $0.shortcodes.contains(name) }
+    }
+
     /// 記号に，読みから引く記号の辞書(SymbolDictionary)の読みを足したもの．変換で出る記号はパレットでも同じ読みで探せるようにする
     public func addingReadings(_ entries: [(reading: String, symbols: [String])]) -> PaletteCatalog {
         var readings: [String: [String]] = [:]
