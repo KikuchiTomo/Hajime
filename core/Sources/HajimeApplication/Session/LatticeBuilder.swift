@@ -118,6 +118,15 @@ struct LatticeBuilder {
         return (clauseSegmentMakers(of: reading, sentence: sentence) ?? []).map { make in { _ = make() } }
     }
 
+    /// 文節ごとに，前後の文脈での並べ替え(rankedByContext)に使う変換を前もって求める手順．1 文節で 1 歩
+    func contextWarmingSteps(reading: String) -> [@MainActor () -> Void] {
+        guard let contextRanker else { return [] }
+        let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
+        return (clausePlan(of: reading, sentence: sentence) ?? []).map { plan in
+            { _ = contextRanker.contextualTexts(start: plan.start, length: plan.length, reading: reading) }
+        }
+    }
+
     /// 読みの長さの並びに，文(sentence)の文字を先頭から割り当てる．
     /// 各文節の候補のうち文の続きと一致するもの，または文の続きがその読みのかなそのものなら，それを見せる文字にする．
     /// 合うものが無くなったら，そこから後ろは文節ごとの第 1 候補にする(text を空にする)

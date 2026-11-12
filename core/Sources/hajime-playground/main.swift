@@ -8,7 +8,7 @@ import HajimeEngine
 //   hajime-playground [--zenzai <モデル>]                         ローマ字を打って結果を見る
 //   hajime-playground --evaluate <TSV> [--zenzai <モデル>]        評価用の文の正解の割合と変換の時間
 //   hajime-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
-//   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--zenzai <モデル>]
+//   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--warm-before-space] [--zenzai <モデル>]
 //                                                                期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合
 //   hajime-playground --evaluate-typo <TSV> [--zenzai <モデル>] [--typing-interval <秒>]
 //                                                                打ち間違いの補正(直した・示した・直さなかった)．
@@ -56,7 +56,8 @@ MainActor.assumeIsolated {
             if let shard = arguments.value(of: "--shard")?.split(separator: "/").compactMap({ Int($0) }), shard.count == 2, shard[1] > 0 {
                 cases = cases.enumerated().filter { $0.offset % shard[1] == shard[0] }.map(\.element)
             }
-            OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations)
+            OperationEvaluation.run(cases: cases, engine: playground.engine, presentations: presentations,
+                                    warmsBeforeSpace: CommandLine.arguments.contains("--warm-before-space"))
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {

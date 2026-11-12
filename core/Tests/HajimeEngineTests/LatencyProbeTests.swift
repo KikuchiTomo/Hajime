@@ -118,6 +118,41 @@ struct LatencyProbeTests {
         #expect(right < .milliseconds(150) && resize < .milliseconds(150), "長い文で変換中の操作が 0.15 秒を超えた: → \(right)，⇧→ \(resize)")
     }
 
+    @Test("一覧の表示でも，長い文で Space から一覧を出すまでが 0.15 秒以内(文節を入れ替えた文を作る分を含む)", .enabled(if: isReleaseBuild))
+    func listSpace() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-latency-\(UUID().uuidString)")
+        let zenzai = try ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "latency", zenzai: zenzai)
+        engine.warmUp()
+        var initial = Settings()
+        initial.candidatePresentation = .list
+        let settings = FakeSettings(initial)
+        let converter = SupplementedConverter(engine.makeSession(), settings: settings, calendar: FakeCalendar())
+        let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings)
+        _ = session.handle(KeyEvent(.character("a")), context: InputContext())
+        _ = session.handle(KeyEvent(.escape), context: InputContext())
+        let keys = Array("kinouhatomodatitoeigawominiittekaerinikissatendekohiwonondekaraiedeyuuhanwotabemasita")
+        let clock = ContinuousClock()
+        var space = Duration.seconds(Int64.max), warmedSpace = Duration.seconds(Int64.max), warmingStep = Duration.seconds(Int64.max)
+        for _ in 0..<Self.passes {
+            // 打鍵が止まったあいだに文節の候補を前もって求めたとき(アプリでふつうに起きる順)
+            for key in keys { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+            _ = session.settle(context: InputContext())
+            warmingStep = min(warmingStep, session.latticeWarmingSteps.map { step in clock.measure { step() } }.max() ?? .zero)
+            warmedSpace = min(warmedSpace, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
+            _ = session.handle(KeyEvent(.enter), context: InputContext())
+            // 止まらずに押した Space
+            for key in keys { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
+            space = min(space, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
+            _ = session.handle(KeyEvent(.enter), context: InputContext())
+        }
+        print("HAJIME_LIST zenzai=\(engine.usesZenzai) keys=\(keys.count) passes=\(Self.passes) space=\(space) warmed_space=\(warmedSpace) warming_step=\(warmingStep)\(Self.loadAverage)")
+        #expect(space < .milliseconds(150), "一覧の表示で，長い文の Space から一覧までが 0.15 秒を超えた: \(space)")
+        // 前もって求めていれば，Space は 1 キーと同じく 50ms 以内．前もって求める 1 歩も 1 キーと同じく 50ms 以内
+        #expect(warmedSpace < .milliseconds(50), "一覧の表示で，前もって求めても Space が 50ms を超えた: \(warmedSpace)")
+        #expect(warmingStep < .milliseconds(50), "一覧の表示で，前もって求める 1 歩が 50ms を超えた: \(warmingStep)")
+    }
+
     @Test("短い文(文節が 1 つ)でも，打鍵が止まったあいだに前もって求めると Space が速くなる", .enabled(if: isReleaseBuild))
     func shortSentenceWarmedSpace() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-latency-\(UUID().uuidString)")

@@ -22,7 +22,8 @@ enum OperationEvaluation {
     /// 1 文で押す数の上限．これを超えたら着かないとする
     static let maximumOperations = 60
 
-    static func run(cases: [EvaluationCase], engine: AzooKeyConverterEngine, presentations: [CandidatePresentation]) {
+    /// - Parameter warmsBeforeSpace: Space の前に，打鍵が止まったあいだに求めるもの(InputSession.latticeWarmingSteps)を求めるか
+    static func run(cases: [EvaluationCase], engine: AzooKeyConverterEngine, presentations: [CandidatePresentation], warmsBeforeSpace: Bool = false) {
         // 単語の一覧の読み込みは重いので，文ごとに作らず使い回す
         let lexicon = WordListLexicon()
         for presentation in presentations {
@@ -40,6 +41,9 @@ enum OperationEvaluation {
                     print("-  \(item.reading)  打った読みが違う(\(driver.text))ので飛ばす")
                     continue
                 }
+                // warmsBeforeSpace なら，アプリで打鍵が止まったときと同じく，分岐図(一覧なら文節を入れ替えた文)に使う候補を前もって求めてから押す．
+                // 求めると Zenzai の状態が変わり結果も少し変わるので，比べるときは前後とも同じにする
+                if warmsBeforeSpace { for step in driver.session.latticeWarmingSteps { step() } }
                 driver.press(KeyEvent(.space))
                 let first = driver.segments.map(\.text).joined(separator: "｜")
                 let operations = reach(driver, expected: item.expected)
