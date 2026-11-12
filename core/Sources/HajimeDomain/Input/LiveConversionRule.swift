@@ -5,6 +5,7 @@
 /// 打鍵が止まったとき，Space・Enter・句読点のときは，変換した文をそのまま見せる(settled)．
 /// 区切りや休止で見せ方を変えるのは，作業の切れ目で変化を出すほうが妨げにならないため
 /// (Iqbal & Bailey 2005．docs/dev/research/list-free-input.md)
+/// ただし，一度止まって変換して見せた読みは，続けて打ってもかなに戻さない(「今日は雷」から「b」で「今日はらいb」に戻すとちらつく)
 public struct LiveConversionRule: Sendable {
     public init() {}
 
@@ -12,14 +13,17 @@ public struct LiveConversionRule: Sendable {
     ///   - candidate: 読み全体の第 1 候補
     ///   - reading: 読み(かな)
     ///   - settled: 打鍵が止まったか．止まっていれば変換した文をそのまま見せる
-    public func display(of candidate: Candidate, reading: String, settled: Bool) -> String {
+    ///   - convertedLength: 前に打鍵が止まったときに変換して見せた読みの長さ(読みの先頭から)．
+    ///     この範囲にかかる語は，打っている途中でもかなに戻さない
+    public func display(of candidate: Candidate, reading: String, settled: Bool, convertedLength: Int = 0) -> String {
         guard !settled else { return candidate.text }
-        if reading.count < DefaultSettings.liveConversionMinimumLength {
+        if reading.count < DefaultSettings.liveConversionMinimumLength, convertedLength == 0 {
             return reading
         }
         guard let word = candidate.trailingWord,
             word.readingCount <= DefaultSettings.liveConversionHeldWordLength,
-            word.readingCount <= reading.count, word.textCount <= candidate.text.count else { return candidate.text }
+            word.readingCount <= reading.count, word.textCount <= candidate.text.count,
+            reading.count - word.readingCount >= convertedLength else { return candidate.text }
         let tail = String(reading.suffix(word.readingCount))
         let shown = String(candidate.text.suffix(word.textCount))
         // かなのままの語(助詞など)はそのまま
