@@ -2040,6 +2040,36 @@
         {
           "name": "isPinned",
           "type": "bool"
+        },
+        {
+          "name": "nameSource",
+          "type": "string?"
+        },
+        {
+          "name": "englishNameSource",
+          "type": "string?"
+        }
+      ]
+    },
+    {
+      "name": "PalettePreviewFields",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "unicodeName",
+          "type": "bool"
+        },
+        {
+          "name": "readings",
+          "type": "bool"
+        },
+        {
+          "name": "shortcodes",
+          "type": "bool"
+        },
+        {
+          "name": "codePoints",
+          "type": "bool"
         }
       ]
     },
@@ -2136,6 +2166,10 @@
         {
           "name": "cellsPerRow",
           "type": "u32?"
+        },
+        {
+          "name": "previewFields",
+          "type": "PalettePreviewFields?"
         }
       ]
     },

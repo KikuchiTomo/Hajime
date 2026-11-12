@@ -448,6 +448,13 @@ public enum DefaultSettings {
     public static let maximumPendingPaletteTargets = 32
     /// パレットの探す欄に打てる長さの上限(文字数)
     public static let maximumPaletteQueryLength = 32
+    /// パレットの下に選んでいる文字の説明を出すか
+    public static let paletteShowsPreview = true
+    /// パレットの説明に出す項目(Unicode の名前・読み・ショートコード・コードポイント)．どれも出す
+    public static let paletteShowsUnicodeName = true
+    public static let paletteShowsReadings = true
+    public static let paletteShowsShortcodes = true
+    public static let paletteShowsCodePoints = true
     /// パレットの説明に出す読みの数
     public static let palettePreviewReadings = 4
     /// 同梱のパレットの表のファイルの名前(アプリの中・Windows のインストール先に置く)

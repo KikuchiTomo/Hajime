@@ -770,6 +770,10 @@ enum UIStrings {
         static let rows = "パレットの行数"
         static let cellSize = "パレットのマスの大きさ"
         static let showsPreview = "パレットに文字の説明を表示"
+        static let showsUnicodeName = "説明に Unicode の名前を表示"
+        static let showsReadings = "説明に読みを表示"
+        static let showsShortcodes = "説明にショートコードを表示"
+        static let showsCodePoints = "説明にコードポイントを表示"
         static let frequentRows = "よく使う文字の行数"
         static let page = "絵文字と記号"
         static let behavior = "パレット"
@@ -1072,6 +1076,8 @@ extension UIStrings {
             "palette": Palette.enabled, "paletteClosesAfterInsert": Palette.closesAfterInsert, "paletteRecordsHistory": Palette.recordsHistory,
             "paletteColumns": Palette.columns, "paletteRows": Palette.rows, "paletteCellSize": Palette.cellSize,
             "paletteShowsPreview": Palette.showsPreview, "paletteFrequentRows": Palette.frequentRows,
+            "paletteShowsUnicodeName": Palette.showsUnicodeName, "paletteShowsReadings": Palette.showsReadings,
+            "paletteShowsShortcodes": Palette.showsShortcodes, "paletteShowsCodePoints": Palette.showsCodePoints,
         ]
 
         static func label(for scope: SyncScope) -> String {

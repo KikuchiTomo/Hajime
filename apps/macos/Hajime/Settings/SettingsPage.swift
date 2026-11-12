@@ -99,7 +99,8 @@ extension SettingsView {
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
             case .palette: [UIStrings.Palette.enabled, UIStrings.Palette.emojiKey, UIStrings.Palette.symbolKey, UIStrings.Palette.kaomojiKey, UIStrings.Palette.closesAfterInsert,
                             UIStrings.Palette.recordsHistory, UIStrings.Palette.clearHistory, UIStrings.Palette.columns, UIStrings.Palette.rows,
-                            UIStrings.Palette.cellSize, UIStrings.Palette.frequentRows, UIStrings.Palette.showsPreview]
+                            UIStrings.Palette.cellSize, UIStrings.Palette.frequentRows, UIStrings.Palette.showsPreview, UIStrings.Palette.showsUnicodeName,
+                            UIStrings.Palette.showsReadings, UIStrings.Palette.showsShortcodes, UIStrings.Palette.showsCodePoints]
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             case .keys: [UIStrings.Keys.presetMenu] + KeymapCommand.allCases.map(UIStrings.Keys.label(for:))
                 + KeymapState.allCases.map(UIStrings.Keys.label(for:)) + KeymapPreset.allCases.map(UIStrings.Keys.label(for:))

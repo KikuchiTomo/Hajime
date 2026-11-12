@@ -71,15 +71,89 @@ struct PaletteScenarioTests {
         #expect(panel.selection == PalettePanel.Position(row: 0, column: 0))
         #expect(panel.heading == "顔と感情")
         #expect(panel.tabs.map(\.title) == ["顔と感情", "人と体"])
-        #expect(panel.preview?.japaneseName == "にっこり笑う")
+        #expect(panel.preview?.name == "にっこり笑う")
         #expect(panel.preview?.shortcodes == [":grinning:"])
-        #expect(panel.preview?.codePoints == "U+1F600")
+        #expect(panel.preview?.codePoints == ["U+1F600"])
         #expect(panel.showsPreview)
         // 説明を出さない設定なら説明も欄も無い
         let hidden = self.harness { $0.paletteShowsPreview = false }
         openEmoji(hidden)
         #expect(hidden.palette?.preview == nil)
         #expect(hidden.palette?.showsPreview == false)
+    }
+
+    /// 説明の名前を確かめる表．1 つの符号位置の絵文字・異体字セレクタの付いた絵文字・国旗の並び・記号
+    private static let namedTable = [
+        line("emoji", "smileys", "😄", "笑顔", "えがお", "grinning face with smiling eyes", readings: "すまいる|えがお|かお", shortcodes: "smile"),
+        line("emoji", "smileys", "☺️", "微笑む顔", "ほほえむかお", "smiling face", readings: "ほほえみ"),
+        line("emoji", "flags", "🇯🇵", "旗: 日本", "はた: にほん", "flag: Japan", readings: "にほん|こっき", shortcodes: "jp|flag-jp"),
+        line("symbol", "punctuation", "，", "カンマ", "かんま", "comma", readings: "かんま|こんま"),
+        line("symbol", "arrows", "⇒", "右向き二重矢印", "みぎむきにじゅうやじるし", "rightwards double arrow", readings: "みぎむきにじゅうやじるし|やじるし"),
+    ].joined(separator: "\n")
+
+    @Test("R-26: 説明は 1 つの符号位置の文字に Unicode の名前を，並びに CLDR の英語の名前を出し，どこで定めた名前かを添える")
+    func previewNames() throws {
+        let harness = harness(catalog: FakePaletteCatalog(Self.namedTable))
+        openEmoji(harness)
+        let smile = try #require(harness.palette?.preview)
+        #expect(smile.name == "笑顔")
+        #expect(smile.nameSource == PaletteStrings.cldrSource)
+        #expect(smile.unicodeName == "SMILING FACE WITH OPEN MOUTH AND SMILING EYES")
+        #expect(smile.unicodeNameSource == PaletteStrings.unicodeSource)
+        // 名前の読みを先にし，同じ読みを重ねない
+        #expect(smile.readings == ["えがお", "すまいる", "かお"])
+        #expect(smile.shortcodes == [":smile:"])
+        #expect(smile.codePoints == ["U+1F604"])
+        // 異体字セレクタは数えずに 1 つの符号位置の文字とする．符号位置には異体字セレクタも出す
+        harness.press(.right)
+        let relaxed = try #require(harness.palette?.preview)
+        #expect(relaxed.unicodeName == "WHITE SMILING FACE")
+        #expect(relaxed.codePoints == ["U+263A", "U+FE0F"])
+        // 国旗の並びには UCD の名前が無いので，CLDR の英語の名前を出す
+        harness.press(.right)
+        let flag = try #require(harness.palette?.preview)
+        #expect(flag.name == "旗: 日本")
+        #expect(flag.unicodeName == "flag: Japan")
+        #expect(flag.unicodeNameSource == PaletteStrings.cldrSource)
+        #expect(flag.codePoints == ["U+1F1EF", "U+1F1F5"])
+        // 記号の日本語の名前はどこで定めたかを見分けられないので示さない．カタカナの名前のひらがなは読みに重ねない
+        harness.press(.tab, .control)
+        let comma = try #require(harness.palette?.preview)
+        #expect(comma.name == "カンマ")
+        #expect(comma.nameSource == nil)
+        #expect(comma.unicodeName == "FULLWIDTH COMMA")
+        #expect(comma.readings == ["こんま"])
+        harness.press(.right)
+        let arrow = try #require(harness.palette?.preview)
+        #expect(arrow.unicodeName == "RIGHTWARDS DOUBLE ARROW")
+        #expect(arrow.readings == ["みぎむきにじゅうやじるし", "やじるし"])
+        #expect(arrow.shortcodes == [])
+    }
+
+    @Test("R-26: 説明に出す項目を設定で選べ，選んだ項目を描く側に添える")
+    func previewFields() throws {
+        let shown = harness(catalog: FakePaletteCatalog(Self.namedTable))
+        openEmoji(shown)
+        #expect(shown.palette?.previewFields == PalettePanel.PreviewFields())
+        let hidden = harness(settings: {
+            $0.paletteShowsUnicodeName = false
+            $0.paletteShowsReadings = false
+            $0.paletteShowsShortcodes = false
+            $0.paletteShowsCodePoints = false
+        }, catalog: FakePaletteCatalog(Self.namedTable))
+        openEmoji(hidden)
+        let panel = try #require(hidden.palette)
+        #expect(panel.previewFields == PalettePanel.PreviewFields(unicodeName: false, readings: false, shortcodes: false, codePoints: false))
+        #expect(!panel.previewFields.chips)
+        let preview = try #require(panel.preview)
+        // 見出しの名前と名前を定めたところは，いつも出す
+        #expect(preview.name == "笑顔")
+        #expect(preview.nameSource == PaletteStrings.cldrSource)
+        #expect(preview.unicodeName == "")
+        #expect(preview.unicodeNameSource == nil)
+        #expect(preview.readings == [])
+        #expect(preview.shortcodes == [])
+        #expect(preview.codePoints == [])
     }
 
     @Test("R-26: ローマ字で打つとかなにして探し，Enter で先頭の文字を入れて閉じる")
@@ -226,11 +300,13 @@ struct PaletteScenarioTests {
         #expect(texts(panel) == [["(^o^)", "(*^^*)"], ["＼(^o^)／"], ["(T_T)"], ["m(_ _)m"]])
         #expect(panel.tabs.map(\.title) == ["笑顔", "悲しみ", "挨拶と動作"])
         #expect(panel.placeholder == "顔文字を検索")
-        #expect(panel.preview?.japaneseName == "にこにこ")
+        #expect(panel.preview?.name == "にこにこ")
         // 名前と同じ読みは説明の読みに重ねて出さない
         #expect(panel.preview?.readings == ["えがお"])
-        // 符号位置は長いだけなので出さない
-        #expect(panel.preview?.codePoints == "")
+        // 符号位置は長いだけなので出さず，Unicode の名前も無い
+        #expect(panel.preview?.codePoints == [])
+        #expect(panel.preview?.unicodeName == "")
+        #expect(panel.preview?.nameSource == nil)
         harness.press(.right)
         harness.press(.down)
         #expect(harness.palette?.selection == PalettePanel.Position(row: 1, column: 0))

@@ -42,7 +42,11 @@ pub const ASSOCIATION_PREFIX: &str = "連想";
 /// 語の意味のカードで，同音語の札の前に置く名前(macOS の UIStrings.Candidate.homophoneOthers)
 pub const HOMOPHONE_OTHERS: &str = "同音語";
 
-/// 語の意味のカードに入らなかった同音語の数
+/// パレットの説明の欄で，読みの頭に置く札と読みの区切り(core の PaletteStrings.readings・readingSeparator)
+pub const PALETTE_READINGS: &str = "読み";
+pub const PALETTE_READING_SEPARATOR: &str = "、";
+
+/// 語の意味のカードに入らなかった同音語の数(パレットの説明の欄に入らなかった読みと札の数にも使う)
 pub fn more(count: usize) -> String {
     format!("+{count}")
 }

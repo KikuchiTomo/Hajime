@@ -103,8 +103,29 @@ enum SamplePalettes {
                                        "🫤", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "🥹", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖",
                                        "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡", "😠", "🤬", "😈", "👿", "💀", "☠️", "💩", "🤡", "👹", "👺"]
 
-    /// 設定の画面の見本．設定の列数・行数・よく使う文字の行数・説明のとおりに並べる
-    static func preview(columns: Int, rows visibleRows: Int, frequentRows: Int, showsPreview: Bool) -> PalettePanel {
+    /// 説明の欄の見本にする文字．値は同梱の表(data/palette/palette.tsv)の行のとおり
+    private static let smile = PaletteItem(kind: .emoji, category: .smileys, text: "😄", japaneseName: "笑顔", nameReading: "えがお",
+                                           englishName: "grinning face with smiling eyes", readings: ["すまいる", "はっぴー", "わーい", "えがお", "かお"],
+                                           shortcodes: ["smile"])
+    private static let bowing = PaletteItem(kind: .emoji, category: .people, text: "🙇", japaneseName: "おじぎする人", nameReading: "おじぎするひと",
+                                            englishName: "person bowing",
+                                            readings: ["おじぎ", "ごめんなさい", "じぇすちゃー", "おじぎするひと", "おねがい", "しゃざい", "どげざ", "ゆるして"],
+                                            shortcodes: ["bow"], skinTones: ["🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"])
+    private static let japanFlag = PaletteItem(kind: .emoji, category: .flags, text: "🇯🇵", japaneseName: "旗: 日本", nameReading: "にっぽん",
+                                               englishName: "flag: Japan",
+                                               readings: ["こっき", "しゅくじつ", "にっぽん", "にほん", "はた", "ひのまる", "ふらぐ", "ふらっぐ"],
+                                               shortcodes: ["jp", "flag-jp"])
+    private static let shobon = PaletteItem(kind: .kaomoji, category: .sorrow, text: "(´・ω・｀)", japaneseName: "しょぼーん", nameReading: "しょぼーん",
+                                            readings: ["しょぼーん", "しょんぼり", "がっかり"])
+    private static let doubleArrow = PaletteItem(kind: .symbol, category: .arrows, text: "⇒", japaneseName: "右向き二重矢印", nameReading: "みぎむきにじゅうやじるし",
+                                                 englishName: "rightwards double arrow", readings: ["みぎむきにじゅうやじるし", "やじるし"])
+
+    private static func preview(_ item: PaletteItem, fields: PalettePanel.PreviewFields = .init(), isPinned: Bool = false) -> PalettePanel.Preview {
+        PalettePanel.Preview(item: item, text: item.text, fields: fields, isPinned: isPinned)
+    }
+
+    /// 設定の画面の見本．設定の列数・行数・よく使う文字の行数・説明と説明に出す項目のとおりに並べる
+    static func preview(columns: Int, rows visibleRows: Int, frequentRows: Int, showsPreview: Bool, previewFields: PalettePanel.PreviewFields) -> PalettePanel {
         let columns = max(columns, 1)
         let frequent = Array(frequentSample.prefix(frequentRows * columns))
         var rows: [PalettePanel.Row] = []
@@ -123,7 +144,8 @@ enum SamplePalettes {
         return PalettePanel(
             modes: modes(.emoji), query: "", placeholder: PaletteStrings.emojiPlaceholder, tabs: tabs, heading: rows.first?.sectionTitle ?? "",
             rows: Array(rows.prefix(visibleRows)), rowCount: rows.count, firstRow: 0, columns: columns, visibleRows: visibleRows, selection: selected,
-            preview: showsPreview ? emoji.preview : nil, showsPreview: showsPreview, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
+            preview: showsPreview ? preview(smile, fields: previewFields) : nil, showsPreview: showsPreview, previewFields: previewFields,
+            skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }
 
     /// 絵文字のパレットを開いたところ．よく使う文字の行の下に表のまとまりが続く
@@ -135,22 +157,29 @@ enum SamplePalettes {
             modes: modes(.emoji), query: "", placeholder: PaletteStrings.emojiPlaceholder, tabs: tabs, heading: PaletteStrings.frequent,
             rows: rows(emojiRows, titles: titles, starts: [0, 1]), rowCount: 210, firstRow: 0, columns: 9, visibleRows: 6,
             selection: .init(row: 1, column: 2),
-            preview: .init(text: "😄", japaneseName: "目も笑っている笑顔", englishName: "grinning face with smiling eyes", shortcodes: [":smile:"],
-                           readings: ["めもわらっているえがお", "えがお", "すまいる"], codePoints: "U+1F604", isPinned: false),
+            preview: preview(smile),
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 
     /// 「ojigi」と打って探したところ．肌の色の帯を開いている
     static let search: PalettePanel = {
-        let options = SkinTone.allCases.map { PaletteItem(kind: .emoji, category: .people, text: "🙇", skinTones: ["🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"]).text(skinTone: $0) }
+        let options = SkinTone.allCases.map { bowing.text(skinTone: $0) }
         return PalettePanel(
             modes: modes(.emoji), query: "おじぎ", placeholder: PaletteStrings.emojiPlaceholder, tabs: [],
             heading: PaletteStrings.results + "　" + PaletteStrings.resultCount(3),
             rows: rows([["🙇", "🙇‍♂️", "🙇‍♀️"]], titles: [PaletteStrings.results], starts: [0]), rowCount: 1, firstRow: 0, columns: 9, visibleRows: 6,
             selection: .init(row: 0, column: 0),
-            preview: .init(text: "🙇", japaneseName: "おじぎする人", englishName: "person bowing", shortcodes: [":bow:"],
-                           readings: ["おじぎするひと", "おじぎ", "ごめんなさい", "どげざ"], codePoints: "U+1F647", isPinned: true),
+            preview: preview(bowing, isPinned: true),
             showsPreview: true, skinTone: .none, skinTonePicker: .init(options: options, selected: 2), message: nil, hints: hints)
+    }()
+
+    /// 「nihon」と打って探し，国旗を選んだところ．並び(国旗)には UCD の名前が無いので，CLDR の英語の名前を出す
+    static let flag: PalettePanel = {
+        PalettePanel(
+            modes: modes(.emoji), query: "にほん", placeholder: PaletteStrings.emojiPlaceholder, tabs: [],
+            heading: PaletteStrings.results + "　" + PaletteStrings.resultCount(4),
+            rows: rows([["🗾", "🏯", "🎌", "🇯🇵"]], titles: [PaletteStrings.results], starts: [0]), rowCount: 1, firstRow: 0, columns: 9, visibleRows: 6,
+            selection: .init(row: 0, column: 3), preview: preview(japanFlag), showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 
     /// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
@@ -164,8 +193,7 @@ enum SamplePalettes {
             modes: modes(.kaomoji), query: "", placeholder: PaletteStrings.kaomojiPlaceholder, tabs: tabs, heading: PaletteStrings.frequent,
             rows: rows(texts, titles: titles, starts: [0, 1]), rowCount: 48, firstRow: 0, columns: 9, visibleRows: 6, cellsPerRow: 3,
             selection: .init(row: 0, column: 2),
-            preview: .init(text: "(´・ω・｀)", japaneseName: "しょぼーん", englishName: "", shortcodes: [],
-                           readings: ["しょんぼり", "がっかり"], codePoints: "", isPinned: false),
+            preview: preview(shobon),
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 
@@ -178,8 +206,7 @@ enum SamplePalettes {
             modes: modes(.symbol), query: "", placeholder: PaletteStrings.symbolPlaceholder, tabs: tabs, heading: PaletteCategory.arrows.title,
             rows: rows(symbolRows, titles: titles, starts: [0, 1]), rowCount: 160, firstRow: 0, columns: 9, visibleRows: 6,
             selection: .init(row: 2, column: 1),
-            preview: .init(text: "⇒", japaneseName: "右向き二重矢印", englishName: "rightwards double arrow", shortcodes: [],
-                           readings: ["みぎむきにじゅうやじるし", "ならば", "やじるし"], codePoints: "U+21D2", isPinned: false),
+            preview: preview(doubleArrow),
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 }

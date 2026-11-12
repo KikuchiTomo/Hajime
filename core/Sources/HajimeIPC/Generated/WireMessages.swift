@@ -1907,8 +1907,10 @@ public struct WirePalettePreview: Sendable, Equatable, Codable {
     public var readings: [String]
     public var codePoints: String
     public var isPinned: Bool
+    public var nameSource: String?
+    public var englishNameSource: String?
 
-    public init(text: String, japaneseName: String, englishName: String, shortcodes: [String], readings: [String], codePoints: String, isPinned: Bool) {
+    public init(text: String, japaneseName: String, englishName: String, shortcodes: [String], readings: [String], codePoints: String, isPinned: Bool, nameSource: String? = nil, englishNameSource: String? = nil) {
         self.text = text
         self.japaneseName = japaneseName
         self.englishName = englishName
@@ -1916,11 +1918,32 @@ public struct WirePalettePreview: Sendable, Equatable, Codable {
         self.readings = readings
         self.codePoints = codePoints
         self.isPinned = isPinned
+        self.nameSource = nameSource
+        self.englishNameSource = englishNameSource
     }
 }
 
 extension WirePalettePreview: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "WirePalettePreview" }
+    public var debugDescription: String { description }
+}
+
+public struct WirePalettePreviewFields: Sendable, Equatable, Codable {
+    public var unicodeName: Bool
+    public var readings: Bool
+    public var shortcodes: Bool
+    public var codePoints: Bool
+
+    public init(unicodeName: Bool, readings: Bool, shortcodes: Bool, codePoints: Bool) {
+        self.unicodeName = unicodeName
+        self.readings = readings
+        self.shortcodes = shortcodes
+        self.codePoints = codePoints
+    }
+}
+
+extension WirePalettePreviewFields: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WirePalettePreviewFields" }
     public var debugDescription: String { description }
 }
 
@@ -1959,8 +1982,9 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
     public var hints: [WireKeyHint]
     public var cellSize: Double
     public var cellsPerRow: UInt32?
+    public var previewFields: WirePalettePreviewFields?
 
-    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil) {
+    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil, previewFields: WirePalettePreviewFields? = nil) {
         self.modes = modes
         self.query = query
         self.placeholder = placeholder
@@ -1980,6 +2004,7 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
         self.hints = hints
         self.cellSize = cellSize
         self.cellsPerRow = cellsPerRow
+        self.previewFields = previewFields
     }
 }
 

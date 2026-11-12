@@ -32,7 +32,7 @@ final class PaletteView: NSView {
     func fittingSize(for panel: PalettePanel) -> NSSize {
         let width = inset * 2 + CGFloat(panel.columns) * cellSize + Size.scrollbarGutter + dropShadowOffset
         var height = inset * 2 + Size.searchHeight + Size.gap + Size.tabHeight + Size.headingHeight + CGFloat(panel.visibleRows) * cellSize + Size.gap
-        if panel.showsPreview { height += Size.previewHeight }
+        if panel.showsPreview { height += PalettePreviewDrawing.height(for: panel.previewFields, theme: theme) }
         height += Size.footerHeight + dropShadowOffset
         return NSSize(width: width.rounded(.up), height: height.rounded(.up))
     }
@@ -75,8 +75,9 @@ final class PaletteView: NSView {
         y = grid.maxY + Size.gap
         var preview: NSRect?
         if panel.showsPreview {
-            preview = NSRect(x: content.minX, y: y, width: content.width, height: Size.previewHeight)
-            y += Size.previewHeight
+            let height = PalettePreviewDrawing.height(for: panel.previewFields, theme: theme)
+            preview = NSRect(x: content.minX, y: y, width: content.width, height: height)
+            y += height
         }
         let footer = NSRect(x: content.minX, y: y, width: content.width, height: Size.footerHeight)
         let button = NSRect(x: footer.maxX - Size.footerHeight, y: footer.minY, width: Size.footerHeight, height: Size.footerHeight)
@@ -331,35 +332,25 @@ final class PaletteView: NSView {
         NSRect(x: preview.maxX - Size.footerHeight, y: preview.minY, width: Size.footerHeight, height: Size.footerHeight)
     }
 
+    /// 説明の欄．左上に選んでいる文字の大きな見本，右上にピン留めのボタン，見本の右と下に名前・読み・札(PalettePreviewDrawing)
     private func drawPreview(_ preview: PalettePanel.Preview, in rect: NSRect, isWide: Bool) {
-        var glyphRect = NSRect(x: rect.minX, y: (rect.midY - Size.previewGlyphSize / 2 - 4).rounded(), width: Size.previewGlyphSize + 8, height: Size.previewGlyphSize + 8)
+        let area = PalettePreviewDrawing.contentArea(of: rect)
+        let side = PalettePreviewDrawing.tileSide
+        var tile = NSRect(x: area.minX, y: area.minY, width: side, height: side)
         if isWide {
             // 顔文字は横に長いので，文字の幅に合わせて枠を広げる(説明の欄の幅の一定の割合まで)
             let width = preview.text.size(withAttributes: [.font: theme.candidateFont(size: Size.previewKaomojiFontSize)]).width + Size.kaomojiPaddingX * 4
-            glyphRect.size.width = min(max(glyphRect.width, width.rounded(.up)), (rect.width * Size.previewKaomojiWidth).rounded())
-            fill(glyphRect, color: theme.badge, radius: Size.cellRadius)
-            drawFitted(preview.text, size: Size.previewKaomojiFontSize, color: theme.text, in: glyphRect.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
+            tile.size.width = min(max(tile.width, width.rounded(.up)), (rect.width * Size.previewKaomojiWidth).rounded())
+            fill(tile, color: theme.badge, radius: Size.cellRadius)
+            drawFitted(preview.text, size: Size.previewKaomojiFontSize, color: theme.text, in: tile.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
         } else {
-            fill(glyphRect, color: theme.badge, radius: Size.cellRadius)
+            fill(tile, color: theme.badge, radius: Size.cellRadius)
             let glyphFont = Self.isEmoji(preview.text) ? (NSFont(name: PaletteIcons.emojiFontName, size: Size.previewGlyphSize * Size.emojiScale) ?? .systemFont(ofSize: Size.previewGlyphSize))
-                : theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * 1.2)
-            GlassDrawing.drawCentered(preview.text, attributes: [.font: glyphFont, .foregroundColor: theme.text], in: glyphRect)
-        }
-        let textX = glyphRect.maxX + Size.previewGap
-        let width = rect.maxX - textX - Size.footerHeight
-        var y = rect.minY + 2
-        let name = preview.japaneseName.isEmpty ? preview.englishName : preview.japaneseName
-        let nameAttributes: [NSAttributedString.Key: Any] = [.font: theme.emphasisFont(size: Size.nameFontSize), .foregroundColor: theme.text]
-        let detail: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Size.detailFontSize), .foregroundColor: theme.textMuted]
-        let code: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedSystemFont(ofSize: Size.codeFontSize, weight: .regular), .foregroundColor: theme.textMuted]
-        for (text, attributes) in [(name, nameAttributes), ((preview.shortcodes + preview.readings).joined(separator: "  "), detail),
-                                   ([preview.japaneseName.isEmpty ? "" : preview.englishName, preview.codePoints].filter { !$0.isEmpty }.joined(separator: "  "), code)]
-            where !text.isEmpty {
-            let shown = TextFitting.truncated(text, attributes: attributes, width: width)
-            shown.draw(at: NSPoint(x: textX, y: y.rounded()), withAttributes: attributes)
-            y += shown.size(withAttributes: attributes).height + 1
+                : theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * Size.previewSymbolBoost)
+            GlassDrawing.drawCentered(preview.text, attributes: [.font: glyphFont, .foregroundColor: theme.text], in: tile)
         }
         let pin = pinRect(in: rect)
+        PalettePreviewDrawing.draw(preview, in: .init(area: area, tile: tile, pin: pin), theme: theme)
         if let image = SymbolImageCache.image(preview.isPinned ? "pin.fill" : "pin", pointSize: Size.tabIconSize, weight: .regular,
                                               color: preview.isPinned ? theme.selection : theme.textMuted) {
             image.draw(in: NSRect(x: (pin.midX - image.size.width / 2).rounded(), y: (pin.midY - image.size.height / 2).rounded(), width: image.size.width, height: image.size.height))
@@ -382,11 +373,13 @@ final class PaletteView: NSView {
     private func drawPicker(_ picker: PalettePanel.SkinTonePicker, layout: Layout) {
         let cells = pickerCells(picker, in: layout)
         guard let first = cells.first, let last = cells.last else { return }
-        let strip = NSRect(x: first.minX, y: first.minY, width: last.maxX - first.minX, height: first.height).insetBy(dx: -4, dy: -4)
-        // 下の説明の文字が帯のまわりに見えないよう，説明の欄ごと面の色で覆う
+        let margin = Size.selectionStroke * 2
+        let strip = NSRect(x: first.minX, y: first.minY, width: last.maxX - first.minX, height: first.height).insetBy(dx: -margin, dy: -margin)
+        // 下の説明の文字が帯のまわりに見えないよう，説明の欄ごと(上の区切りの線の下から)面の色で覆う
         if let preview = layout.preview {
             theme.surface.withAlphaComponent(1).setFill()
-            preview.fill()
+            let top = (preview.minY - Size.gap / 2).rounded() + DesignTokens.Size.Candidate.frameWidth
+            NSRect(x: preview.minX, y: top, width: preview.width, height: preview.maxY - top).fill()
         }
         fill(strip, color: theme.surface.withAlphaComponent(1), radius: Size.searchRadius)
         stroke(strip, color: theme.frame, radius: Size.searchRadius, width: 1)

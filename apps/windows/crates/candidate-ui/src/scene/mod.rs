@@ -6,7 +6,7 @@
 
 mod association;
 mod branch;
-mod fitting;
+pub(crate) mod fitting;
 mod list;
 mod meaning;
 pub(crate) mod paint;

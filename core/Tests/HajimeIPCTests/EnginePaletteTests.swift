@@ -99,6 +99,23 @@ struct EnginePaletteTests {
         #expect(panel.hints.first?.keys == "Enter")
     }
 
+    @Test("R-26: 説明は見出しの名前・Unicode の名前・名前を定めたところを送り，出す項目の設定も添える")
+    func preview() throws {
+        try settings.update { $0.paletteShowsShortcodes = false }
+        let id = connect()
+        let session = try open(id)
+        _ = openPalette(session: session, from: id)
+        let panel = try #require(shownPanel)
+        let preview = try #require(panel.preview)
+        #expect(preview.japaneseName == "おじぎする人")
+        #expect(preview.nameSource == PaletteStrings.cldrSource)
+        #expect(preview.englishName == "PERSON BOWING DEEPLY")
+        #expect(preview.englishNameSource == PaletteStrings.unicodeSource)
+        #expect(preview.shortcodes.isEmpty)
+        #expect(preview.codePoints == "U+1F647")
+        #expect(panel.previewFields == WirePalettePreviewFields(unicodeName: true, readings: true, shortcodes: false, codePoints: true))
+    }
+
     @Test("R-26: 探して Enter で選んだ文字を確定し，パレットを閉じる")
     func searchAndInsert() throws {
         let id = connect()
