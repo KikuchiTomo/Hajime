@@ -1,4 +1,5 @@
 import HajimeDomain
+import HajimePersistence
 import SwiftUI
 
 /// 辞書のページ．登録した単語と，取り込んだ辞書(R-16)を切り替えて出す
@@ -33,8 +34,14 @@ private struct UserWordsView: View {
         Form {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.dynamicDictionary, keyPath: \.dynamicDictionary)
-            } footer: {
-                Text(UIStrings.Extras.dynamicDictionaryNote).font(.caption).foregroundStyle(.secondary)
+                Text(UIStrings.Extras.dynamicDictionaryNote)
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                TemplateReference()
+                VStack(alignment: .leading) {
+                    Text(UIStrings.Extras.templateFilters)
+                    Text(UIStrings.Extras.dateFormatSymbols)
+                }
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Section {
                 RuleListEditor(
@@ -60,5 +67,52 @@ private struct UserWordsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// 単語に書ける書き方(TextTemplate)の表．書き方・入るもの・今入れたときの値を並べ，下に登録の例を添える．
+/// 「今入れると」は 1 秒ごとに求め直す．UUID と整数は入れるたびに変わるので，ページを開いたときの例を 1 つ出す
+private struct TemplateReference: View {
+    @State private var uuid = UUID().uuidString
+    @State private var randomSeed = Int.random(in: 0..<Int(UInt16.max))
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let values = values(at: timeline.date)
+            VStack(alignment: .leading) {
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: DesignTokens.Size.Settings.tableColumnSpacing) {
+                    GridRow {
+                        Text(UIStrings.Extras.templateSyntax)
+                        Text(UIStrings.Extras.templateMeaning)
+                        Text(UIStrings.Extras.templateNow)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    Divider()
+                    ForEach(UIStrings.Extras.templateRows, id: \.syntax) { row in
+                        GridRow {
+                            Text(row.syntax).font(.body.monospaced()).textSelection(.enabled).fixedSize()
+                            Text(row.meaning).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            // UUID のような長い値は 1 行にし，間を省く(表が行の幅を超えないように)
+                            Text(TextTemplate.expand(row.syntax, values: values)).font(.body.monospacedDigit()).textSelection(.enabled)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                    }
+                }
+                Divider()
+                Text(UIStrings.Extras.templateExample(TextTemplate.expand(UIStrings.Extras.templateExampleWord, values: values)))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func values(at date: Date) -> TextTemplate.Values {
+        let calendar = SystemCalendar(clock: { date })
+        // 呼ぶたびに次の数にする(英数字の乱数が同じ字の繰り返しにならないように)．求め直すたびに同じ並びから始めるので，例は変わらない
+        var state = UInt64(randomSeed)
+        return TextTemplate.Values(now: calendar.now(), uuid: { uuid }, random: { range in
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return range.lowerBound + Int((state >> 33) % UInt64(range.count))
+        })
     }
 }

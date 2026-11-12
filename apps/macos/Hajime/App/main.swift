@@ -21,6 +21,11 @@ MainActor.assumeIsolated {
     }
 }
 
+// 入力ソースから外れていれば登録し直す(InputSourceRegistration)
+MainActor.assumeIsolated {
+    CompositionRoot.installed?.inputSourceRegistration.repairIfNeeded()
+}
+
 // 初期設定がまだ済んでいなければ，起動したときに 1 回だけ開く(開発版は --open-onboarding で済んでいても開く)
 MainActor.assumeIsolated {
     #if DEBUG

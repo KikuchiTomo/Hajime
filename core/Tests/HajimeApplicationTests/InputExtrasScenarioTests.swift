@@ -15,7 +15,7 @@ struct InputExtrasScenarioTests {
         settings.liveConversionSkipLength = 0
         change(&settings)
         return Harness(converter: FakeConverter(table), settings: settings,
-                       wrap: { SupplementedConverter($0, settings: $1, calendar: FakeCalendar()) })
+                       wrap: { SupplementedConverter($0, settings: $1, calendar: FakeCalendar()) }, calendar: FakeCalendar())
     }
 
     private func withCommands(_ settings: inout Settings) {
@@ -200,6 +200,59 @@ struct InputExtrasScenarioTests {
         #expect(lattice.columns.first(where: \.isFocused)?.alternatives.first == "「東京」")
         harness.press(.enter)
         #expect(harness.committed == "「東京」")
+    }
+
+    @Test("R-22: 利用者が足した変換マクロを一覧に並べ，オフにしたマクロは並べない")
+    func customMacros() throws {
+        let added = ConversionMacro(pattern: "【{text}】")
+        let harness = harness(table: ["とうきょう": [("東京", nil)]]) {
+            $0.association = false
+            $0.conversionMacros = true
+            $0.macros = [added, ConversionMacro(pattern: "〈{text}〉", isEnabled: false)]
+        }
+        harness.type("toukyou")
+        harness.press(.space, .shift)
+        let alternatives = try #require(harness.lattice?.columns.first(where: \.isFocused)?.alternatives)
+        #expect(alternatives.first == "【東京】")
+        #expect(!alternatives.contains("〈東京〉"))
+        #expect(!alternatives.contains("「東京」"))
+    }
+
+    @Test("R-22: 変換マクロの日時は暦から読む．かなの語には，語と読みを並べる形を出さない")
+    func macrosUseCalendarAndSkipKanaWords() throws {
+        let macros = [ConversionMacro(pattern: "{text}（{date:M/D}）"), ConversionMacro(pattern: "{text}（{reading}）")]
+        let harness = harness(table: ["とうきょう": [("東京", nil)], "すし": [("すし", nil)]]) {
+            $0.association = false
+            $0.conversionMacros = true
+            $0.macros = macros
+        }
+        harness.type("toukyou")
+        harness.press(.space, .shift)
+        let kanji = try #require(harness.lattice?.columns.first { $0.isFocused })
+        #expect(kanji.alternatives == ["東京（10/26）", "東京（とうきょう）"])
+        harness.press(.escape)
+        harness.press(.escape)
+        harness.press(.escape)
+        harness.type("susi")
+        harness.press(.space, .shift)
+        let kana = try #require(harness.lattice?.columns.first { $0.isFocused })
+        #expect(kana.alternatives == ["すし（10/26）"])
+    }
+
+    @Test("R-22: 設定の画面の「試す」は，見本の語に有効な変換マクロを当て，書いている途中の形はその形だけを当てる")
+    func macroPreview() {
+        var settings = DefaultSettings.settings
+        settings.macros = [ConversionMacro(pattern: "【{text}】"), ConversionMacro(pattern: "{text}（{reading}）"),
+                           ConversionMacro(pattern: "<{text}>", isEnabled: false)]
+        let store = FakeSettings(settings)
+        let preview = ConversionMacroPreview(settings: store, calendar: FakeCalendar())
+        #expect(preview.preview(text: "", reading: "") == ["【東京】", "東京（とうきょう）"])
+        #expect(preview.preview(text: " すし ", reading: "") == ["【すし】"])
+        #expect(preview.preview(text: "大阪", reading: "オオサカ") == ["【大阪】", "大阪（おおさか）"])
+        #expect(preview.preview(text: "大阪", reading: "おおさか", pattern: "{text}（{date:M/D}）") == ["大阪（10/26）"])
+        #expect(preview.preview(text: "", reading: "", pattern: String(repeating: "x", count: DefaultSettings.maximumMacroPatternLength + 1)).isEmpty)
+        store.current.macroSkipsSameReading = false
+        #expect(preview.preview(text: "すし", reading: "") == ["【すし】", "すし（すし）"])
     }
 
     @Test("R-22: 変換マクロも連想変換も使わない設定なら，連想変換のキーはふつうの変換になる")

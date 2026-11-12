@@ -61,6 +61,12 @@ public struct Settings: Sendable, Equatable {
     public var predictionDisplay = SuggestionDisplay.whenLiveConversionOff
     /// 入力中の候補がこの件数以下なら窓を出さない．0 なら候補があれば出す
     public var suggestionSkipCount = 0
+    /// 入力中の予測で，確定した履歴(学習)にある語句を先に出すか
+    public var predictionPrefersHistory = true
+    /// 打ち間違いを直した読み(直して見せている読みと「もしかして」と示した読み)からも予測するか．オフなら直しているあいだは予測を出さない
+    public var predictionFromCorrection = true
+    /// 予測に表示しない語句．入力中の予測の窓に出した語句をキー(キー設定の表の「予測に表示しない」)で足し，設定の画面で消せる
+    public var hiddenPredictions: [String] = []
     /// 一覧の 1 ページの候補の数
     public var listCandidatesPerPage = DefaultSettings.candidatesPerPage
     /// 分岐図の下の枝に出す候補の数
@@ -118,6 +124,8 @@ public struct Settings: Sendable, Equatable {
     /// 連想変換のキーで出す一覧に，選んでいる語を整えた形(変換マクロ)を並べる
     public var conversionMacros = false
     public var macros: [ConversionMacro] = DefaultSettings.conversionMacros
+    /// かなの語(語が読みと同じ)には，語と読みを並べる変換マクロ(ルビ・読みを添える形)を出さない
+    public var macroSkipsSameReading = true
     /// 読みで呼び出すコマンド(ランチャー)を使う．同期しない(SyncGroup.commands)
     public var launcherCommands = false
     public var commands: [LauncherCommand] = []
@@ -203,7 +211,15 @@ public struct Settings: Sendable, Equatable {
     /// パレットのマスの一辺(pt)．文字の大きさはこれに合わせる
     public var paletteCellSize = DefaultSettings.paletteCellSize
     /// パレットの下に，選んでいる文字の名前・読み・ショートコードを出す
-    public var paletteShowsPreview = true
+    public var paletteShowsPreview = DefaultSettings.paletteShowsPreview
+    /// パレットの説明に，Unicode の名前(並びの絵文字は CLDR の英語の名前)を出す
+    public var paletteShowsUnicodeName = DefaultSettings.paletteShowsUnicodeName
+    /// パレットの説明に，探すときに使える読みを出す
+    public var paletteShowsReadings = DefaultSettings.paletteShowsReadings
+    /// パレットの説明に，「:smile:」のショートコードを出す
+    public var paletteShowsShortcodes = DefaultSettings.paletteShowsShortcodes
+    /// パレットの説明に，「U+1F604」のコードポイントを出す(顔文字には出さない)
+    public var paletteShowsCodePoints = DefaultSettings.paletteShowsCodePoints
     /// パレットのよく使う文字の行の数．0 なら出さない
     public var paletteFrequentRows = DefaultSettings.paletteFrequentRows
     /// 保存したカスタムテーマ
@@ -273,6 +289,9 @@ public struct Settings: Sendable, Equatable {
             .prefix(DefaultSettings.maximumSymbolRules))
         correction.rules = Array(correction.rules.filter(\.isValid).prefix(DefaultSettings.maximumCorrectionRules))
         correction.exceptions = Array(correction.exceptions.filter(RuleListEditing.isValidException).prefix(DefaultSettings.maximumCorrectionRules))
+        var hidden = Set<String>()
+        hiddenPredictions = Array(hiddenPredictions.filter { RuleListEditing.isValidHiddenPrediction($0) && hidden.insert($0).inserted }
+            .prefix(DefaultSettings.maximumHiddenPredictions))
         profileRules = Array(profileRules.filter { ProfileRuleCSV.isValidIdentifier($0.applicationPrefix) }.prefix(DefaultSettings.maximumProfileRules))
         var macroIDs = Set<String>()
         macros = Array(macros.filter { $0.isValid && macroIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumMacros))
@@ -352,15 +371,16 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
-        case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, launcherCommands, commands
+        case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, macroSkipsSameReading, launcherCommands, commands
         case englishTermCandidates, englishTerms
         case palette, paletteClosesAfterInsert, paletteRecordsHistory, paletteColumns, paletteRows, paletteCellSize, paletteShowsPreview, paletteFrequentRows
+        case paletteShowsUnicodeName, paletteShowsReadings, paletteShowsShortcodes, paletteShowsCodePoints
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -438,6 +458,9 @@ extension Settings: Codable {
         settings.predictionDisplay = settings.suggestionDisplay
         read(.predictionDisplay, into: \.predictionDisplay)
         read(.suggestionSkipCount, into: \.suggestionSkipCount)
+        read(.predictionPrefersHistory, into: \.predictionPrefersHistory)
+        read(.predictionFromCorrection, into: \.predictionFromCorrection)
+        readList(.hiddenPredictions, into: \.hiddenPredictions)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
         read(.numberKeySelection, into: \.numberKeySelection)
@@ -483,6 +506,7 @@ extension Settings: Codable {
         read(.dynamicDictionary, into: \.dynamicDictionary)
         read(.conversionMacros, into: \.conversionMacros)
         readList(.macros, into: \.macros)
+        read(.macroSkipsSameReading, into: \.macroSkipsSameReading)
         read(.launcherCommands, into: \.launcherCommands)
         readList(.commands, into: \.commands)
         read(.englishTermCandidates, into: \.englishTermCandidates)
@@ -495,6 +519,10 @@ extension Settings: Codable {
         read(.paletteCellSize, into: \.paletteCellSize)
         read(.paletteShowsPreview, into: \.paletteShowsPreview)
         read(.paletteFrequentRows, into: \.paletteFrequentRows)
+        read(.paletteShowsUnicodeName, into: \.paletteShowsUnicodeName)
+        read(.paletteShowsReadings, into: \.paletteShowsReadings)
+        read(.paletteShowsShortcodes, into: \.paletteShowsShortcodes)
+        read(.paletteShowsCodePoints, into: \.paletteShowsCodePoints)
         // 形式のバージョンと，このバージョンが知らない項目
         let others = try decoder.container(keyedBy: AnyKey.self)
         if let version = try? others.decodeIfPresent(Int.self, forKey: AnyKey(stringValue: SettingsSchema.versionKey)) {
@@ -561,6 +589,9 @@ extension Settings: Codable {
         try container.encode(suggestionDisplay, forKey: .suggestionDisplay)
         try container.encode(predictionDisplay, forKey: .predictionDisplay)
         try container.encode(suggestionSkipCount, forKey: .suggestionSkipCount)
+        try container.encode(predictionPrefersHistory, forKey: .predictionPrefersHistory)
+        try container.encode(predictionFromCorrection, forKey: .predictionFromCorrection)
+        try container.encode(hiddenPredictions, forKey: .hiddenPredictions)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
@@ -604,6 +635,7 @@ extension Settings: Codable {
         try container.encode(dynamicDictionary, forKey: .dynamicDictionary)
         try container.encode(conversionMacros, forKey: .conversionMacros)
         try container.encode(macros, forKey: .macros)
+        try container.encode(macroSkipsSameReading, forKey: .macroSkipsSameReading)
         try container.encode(launcherCommands, forKey: .launcherCommands)
         try container.encode(commands, forKey: .commands)
         try container.encode(englishTermCandidates, forKey: .englishTermCandidates)
@@ -616,6 +648,10 @@ extension Settings: Codable {
         try container.encode(paletteCellSize, forKey: .paletteCellSize)
         try container.encode(paletteShowsPreview, forKey: .paletteShowsPreview)
         try container.encode(paletteFrequentRows, forKey: .paletteFrequentRows)
+        try container.encode(paletteShowsUnicodeName, forKey: .paletteShowsUnicodeName)
+        try container.encode(paletteShowsReadings, forKey: .paletteShowsReadings)
+        try container.encode(paletteShowsShortcodes, forKey: .paletteShowsShortcodes)
+        try container.encode(paletteShowsCodePoints, forKey: .paletteShowsCodePoints)
         var others = encoder.container(keyedBy: AnyKey.self)
         try others.encode(max(schemaVersion, SettingsSchema.currentVersion), forKey: AnyKey(stringValue: SettingsSchema.versionKey))
         for (key, value) in unknownFields where !Self.fieldNames.contains(key) && key != SettingsSchema.versionKey {

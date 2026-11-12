@@ -1,5 +1,7 @@
 #![allow(unsafe_code)]
 
+#[cfg(test)]
+mod bench;
 pub mod fonts;
 pub mod preview;
 pub(crate) mod render;
@@ -10,7 +12,7 @@ mod window;
 
 use crate::announce::{self, Announcer};
 use crate::motion;
-use crate::scene::{self, Look, Scene, Surround};
+use crate::scene::{self, CardReservation, Look, Scene, Surround};
 use crate::strings;
 use crate::theme::ResolvedTheme;
 use ipc::framing::read_message;
@@ -91,6 +93,10 @@ struct App {
     crossfade: Option<(Scene, Instant)>,
     /// 選んでいるものが同じまま中身が変わった(次の refresh で重ねて変える)
     arrived: bool,
+    /// 候補の右に出した語の意味のカードの場所(同じ候補の並びのあいだは空けたままにする)
+    meaning: CardReservation,
+    /// 読んだ OS の外観とアニメーション効果の設定
+    system: system::SystemCache,
 }
 
 thread_local! {
@@ -166,6 +172,8 @@ pub fn run() {
             resize: None,
             crossfade: None,
             arrived: false,
+            meaning: CardReservation::default(),
+            system: system::SystemCache::default(),
         })
     });
     window::run_message_loop();
@@ -313,7 +321,7 @@ impl App {
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
                     self.presentation.custom_theme.as_ref(),
-                    &system::look(false),
+                    &self.system.look(false),
                 );
                 crate::handwriting::ffi::show(
                     anchor.or(self.anchor.clone()),
@@ -329,7 +337,7 @@ impl App {
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
                     self.presentation.custom_theme.as_ref(),
-                    &system::look(false),
+                    &self.system.look(false),
                 );
                 crate::palette::ffi::show(panel, anchor.or(self.anchor.clone()), theme, ANCHOR_GAP);
             }
@@ -367,7 +375,7 @@ impl App {
     /// 候補を出した瞬間は，第 1 候補と選んでいる候補だけを濃く描き，残りを位置を変えずに濃くしていく．
     /// アニメーション効果がオフなら最初から濃く出す
     fn start_rest_fade(&mut self) {
-        if system::reduce_motion() {
+        if self.system.reduce_motion() {
             self.rest_opacity = 1.0;
             self.fade = Fade::None;
             return;
@@ -383,7 +391,7 @@ impl App {
         if !matches!(self.content, Content::Mode(_)) {
             return;
         }
-        if system::reduce_motion() {
+        if self.system.reduce_motion() {
             self.content = Content::Hidden;
             self.refresh();
             return;
@@ -435,7 +443,7 @@ impl App {
     /// 窓の大きさの動き．出ている窓の大きさが変わったら，前の大きさ(動いている途中ならその大きさ)から新しい大きさへ動かす．
     /// 返すのは今描く大きさ(動いていなければ None)
     fn moving_size(&mut self, natural: (f32, f32), now: Instant) -> Option<(f32, f32)> {
-        let animates = self.scene.is_some() && !system::reduce_motion();
+        let animates = self.scene.is_some() && !self.system.reduce_motion();
         if !animates {
             self.resize = None;
             return None;
@@ -554,7 +562,7 @@ impl App {
     }
 
     fn refresh(&mut self) {
-        let look = system::look(self.backdrop);
+        let look = self.system.look(self.backdrop);
         let theme = ResolvedTheme::resolve(
             &self.presentation.theme,
             self.presentation.custom_theme.as_ref(),
@@ -567,6 +575,11 @@ impl App {
         self.refresh_prediction(&theme, look.dark, &measure);
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
+        style.reserved_card = match &self.content {
+            Content::Candidates(list) => self.meaning.list(list, &style, &measure),
+            Content::BranchMap(map) => self.meaning.branch(map, &style, &measure),
+            Content::Hidden | Content::Note(_) | Content::Mode(_) => self.meaning.clear(),
+        };
         let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
             Content::Candidates(list) => Some(scene::candidate_list(list, style, &measure)),
@@ -660,6 +673,8 @@ impl App {
                 self.crossfade = None;
                 self.rest_opacity = 1.0;
                 self.announcer.reset();
+                // 次に出すときに OS の外観を読み直す(設定の変化の知らせが届かなかったときにも，出し直せば今の外観にする)
+                self.system.forget();
             }
         }
         self.announce();

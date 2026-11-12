@@ -168,6 +168,10 @@ enum DesignTokens {
             static let ruleTableHeight: CGFloat = 220
             static let commandEditorWidth: CGFloat = 460
             static let ruleSearchWidth: CGFloat = 160
+            static let previewChipPaddingX: CGFloat = 8
+            static let previewChipPaddingY: CGFloat = 4
+            static let previewChipRadius: CGFloat = 6
+            static let previewChipGap: CGFloat = 6
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
             static let commandReadingColumnWidth: CGFloat = 110
@@ -232,9 +236,6 @@ enum DesignTokens {
             static let commandIconSize: CGFloat = 18
             static let commandIconRadius: CGFloat = 5
             static let noteGap: CGFloat = 6
-            static let usageMaxWidth: CGFloat = 360
-            static let usageRowHeight: CGFloat = 22
-            static let usagePaddingY: CGFloat = 4
             static let usageTagGap: CGFloat = 4
             static let meaningCardWidth: CGFloat = 280
             static let meaningBranchWidth: CGFloat = 300
@@ -298,16 +299,37 @@ enum DesignTokens {
             static let cellRadius: CGFloat = 6
             static let emojiScale: CGFloat = 0.7
             static let symbolScale: CGFloat = 0.55
+            static let kaomojiScale: CGFloat = 0.4
+            static let kaomojiMinFontSize: CGFloat = 9
+            static let kaomojiPaddingX: CGFloat = 4
             static let selectionStroke: CGFloat = 2
             static let scrollbarWidth: CGFloat = 3
             static let scrollbarGutter: CGFloat = 9
             static let scrollbarMinLength: CGFloat = 16
-            static let previewHeight: CGFloat = 60
             static let previewGlyphSize: CGFloat = 40
+            static let previewTilePadding: CGFloat = 4
+            static let previewPaddingY: CGFloat = 4
+            static let previewSymbolBoost: CGFloat = 1.2
+            static let previewKaomojiFontSize: CGFloat = 18
+            static let previewKaomojiWidth: CGFloat = 0.45
             static let previewGap: CGFloat = 10
+            static let previewLineGap: CGFloat = 3
+            static let previewHeadingMaxLines: CGFloat = 2
+            static let previewNameLines: CGFloat = 2
+            static let previewNameMaxLines: CGFloat = 3
+            static let previewChipLines: CGFloat = 2
+            static let previewChipPaddingX: CGFloat = 4
+            static let previewChipPaddingY: CGFloat = 2
+            static let previewChipGap: CGFloat = 4
+            static let previewChipRadius: CGFloat = 4
+            static let previewTagFontSize: CGFloat = 9
+            static let previewTagPaddingX: CGFloat = 4
+            static let previewTagGap: CGFloat = 5
+            static let previewTagRadius: CGFloat = 3
             static let nameFontSize: CGFloat = 13
             static let detailFontSize: CGFloat = 11
             static let codeFontSize: CGFloat = 10
+            static let previewChipSmallFontSize: CGFloat = 8
             static let footerHeight: CGFloat = 28
             static let pickerCellSize: CGFloat = 36
             static let probeFontSize: CGFloat = 20
@@ -354,7 +376,7 @@ enum DesignTokens {
             static let contentMaxWidth: CGFloat = 1000
             static let controlGap: CGFloat = 8
             static let toggleWidth: CGFloat = 96
-            static let stepperWidth: CGFloat = 96
+            static let stepperWidth: CGFloat = 160
             static let secondsLabelWidth: CGFloat = 56
             static let navWidth: CGFloat = 280
             static let windowWidth: CGFloat = 1000
@@ -397,6 +419,39 @@ enum DesignTokens {
             static let wizardKeycapMinWidth: CGFloat = 48
             static let wizardModeSize: CGFloat = 28
             static let wizardHeroSize: CGFloat = 72
+            static let stepperButtonWidth: CGFloat = 32
+            static let sliderTrackHeight: CGFloat = 4
+            static let sliderThumbSize: CGFloat = 20
+            static let sliderThumbInner: CGFloat = 12
+            static let sliderThumbInnerHover: CGFloat = 14
+            static let cardPaddingY: CGFloat = 12
+            static let footerGap: CGFloat = 8
+            static let labelMinWidth: CGFloat = 160
+            static let radioSize: CGFloat = 20
+            static let radioDot: CGFloat = 10
+            static let themeSwatchWidth: CGFloat = 40
+            static let themeSwatchHeight: CGFloat = 20
+            static let themeSwatchGap: CGFloat = 3
+            static let themeSwatchSelectionWidth: CGFloat = 12
+            static let themeSwatchSelectionHeight: CGFloat = 10
+            static let themeSwatchRadius: CGFloat = 6
+            static let themeSwatchFontSize: CGFloat = 11
+            static let aboutIcon: CGFloat = 64
+            static let aboutTitleFontSize: CGFloat = 20
+            static let palettePreviewHeight: CGFloat = 300
+            static let switchKnobOff: CGFloat = 12
+            static let switchKnobOn: CGFloat = 14
+            static let switchKnobPressed: CGFloat = 2
+            static let segmentMinWidth: CGFloat = 120
+            static let tableRowInset: CGFloat = 2
+            static let tableIndicatorInset: CGFloat = 8
+            static let tooltipOffset: CGFloat = 24
+            static let previewLines: CGFloat = 2
+            static let macroPreviewLines: CGFloat = 5
+            static let reportLines: CGFloat = 4
+            static let statusLines: CGFloat = 3
+            static let pageScroll: CGFloat = 0.8
+            static let tablePageRows: CGFloat = 4
         }
         enum StandardTheme {
             static let cornerRadius: CGFloat = 12
@@ -419,6 +474,12 @@ enum DesignTokens {
             static let infoSymbolWidth: CGFloat = 28
             static let demoGap: CGFloat = 14
             static let badgeRadius: CGFloat = 6
+            static let counterHeight: CGFloat = 16
+            static let checkSize: CGFloat = 20
+            static let badgeHeight: CGFloat = 18
+            static let sliderThumb: CGFloat = 20
+            static let sliderRail: CGFloat = 4
+            static let buttonMinWidth: CGFloat = 64
         }
     }
     enum Motion {
@@ -507,9 +568,23 @@ enum DesignTokens {
             static let cardSelected: CGFloat = 0.12
             static let cardIdle: CGFloat = 0.05
             static let field: CGFloat = 0.82
+            static let fieldStroke: CGFloat = 0.14
+            static let caption: CGFloat = 0.92
+            static let captionStroke: CGFloat = 0.1
+            static let sliderRail: CGFloat = 0.6
+            static let sliderRailDisabled: CGFloat = 0.3
+            static let swatchText: CGFloat = 0.7
+            static let swatchFrame: CGFloat = 0.6
         }
         enum Palette {
             static let scrollbar: CGFloat = 0.45
+        }
+        enum SettingsWindows {
+            static let disabledOverlay: CGFloat = 0.4
+            static let accentDisabled: CGFloat = 0.35
+            static let link: CGFloat = 0.4
+            static let linkHoverMix: CGFloat = 0.35
+            static let sliderTrackDisabled: CGFloat = 0.5
         }
     }
 }

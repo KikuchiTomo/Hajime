@@ -12,6 +12,7 @@ struct EnginePaletteTests {
     private let settings: FakeSettings
     private let service: EngineService
     private let sent: Box<[WireUiCommand]>
+    private let usage: FakePaletteUsageStore
 
     final class Box<Value> {
         var value: Value
@@ -22,6 +23,7 @@ struct EnginePaletteTests {
         ["emoji", "people", "🙇", "0.6", "おじぎする人", "おじぎするひと", "person bowing", "おじぎ", "bow", "bow", ""],
         ["emoji", "people", "👍", "0.6", "サムズアップ", "さむずあっぷ", "thumbs up", "いいね", "good", "+1|thumbsup", ""],
         ["symbol", "arrows", "→", "", "右向矢印", "みぎむきやじるし", "rightwards arrow", "やじるし", "arrow", "", ""],
+        ["kaomoji", "greeting", "m(_ _)m", "", "ぺこり", "ぺこり", "", "ぺこり|おじぎ", "", "", ""],
     ].map { $0.joined(separator: "\t") }.joined(separator: "\n")
 
     init() {
@@ -35,6 +37,7 @@ struct EnginePaletteTests {
         let palette = PaletteServices(catalog: catalog, usage: usage, now: { Date(timeIntervalSince1970: 1_800_000_000) })
         self.settings = settings
         self.sent = sent
+        self.usage = usage
         self.service = EngineService(
             makeSession: { InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: settings, keyNames: .windows, palette: palette) },
             settings: settings,
@@ -98,6 +101,23 @@ struct EnginePaletteTests {
         #expect(panel.hints.first?.keys == "Enter")
     }
 
+    @Test("R-26: 説明は見出しの名前・Unicode の名前・名前を定めたところを送り，出す項目の設定も添える")
+    func preview() throws {
+        try settings.update { $0.paletteShowsShortcodes = false }
+        let id = connect()
+        let session = try open(id)
+        _ = openPalette(session: session, from: id)
+        let panel = try #require(shownPanel)
+        let preview = try #require(panel.preview)
+        #expect(preview.japaneseName == "おじぎする人")
+        #expect(preview.nameSource == PaletteStrings.cldrSource)
+        #expect(preview.englishName == "PERSON BOWING DEEPLY")
+        #expect(preview.englishNameSource == PaletteStrings.unicodeSource)
+        #expect(preview.shortcodes.isEmpty)
+        #expect(preview.codePoints == "U+1F647")
+        #expect(panel.previewFields == WirePalettePreviewFields(unicodeName: true, readings: true, shortcodes: false, codePoints: true))
+    }
+
     @Test("R-26: 探して Enter で選んだ文字を確定し，パレットを閉じる")
     func searchAndInsert() throws {
         let id = connect()
@@ -134,6 +154,70 @@ struct EnginePaletteTests {
         }
         #expect(operations.contains(.commit(text: "👍")))
         #expect(sent.value.last == .hidePalette)
+    }
+
+    @Test("R-26: 入力メニューの「絵文字と記号」は，組み立て中の文字を確定し，前に見ていた種類でパレットを開く")
+    func opensFromMenu() throws {
+        usage.update { $0.lastKind = .symbol }
+        let id = connect()
+        let session = try open(id)
+        type("kana", session: session, from: id)
+        sent.value.removeAll()
+        let opened = service.handle(WireRequest(id: 40, body: .openPalette(session: session, context: Self.field)), from: id).body
+        guard case .edit(true, let operations, let state) = opened else {
+            Issue.record("パレットを開く要求に edit で答えない")
+            return
+        }
+        #expect(operations.contains { if case .commit = $0 { true } else { false } })
+        #expect(state.isComposing)
+        #expect(shownPanel?.rows.first?.cells.map(\.text) == ["→"])
+        #expect(sent.value.contains { if case .showPalette(_, let anchor) = $0 { anchor == Self.field.caret } else { false } })
+        #expect(service.snapshot.palette == true)
+    }
+
+    @Test("R-26: 入力メニューの「絵文字と記号」は，前に見ていた種類が無ければ絵文字で開く．使わない設定なら開かない")
+    func opensFromMenuWithDefaults() throws {
+        let id = connect()
+        let session = try open(id)
+        _ = service.handle(WireRequest(id: 41, body: .openPalette(session: session, context: Self.field)), from: id)
+        #expect(shownPanel?.rows.first?.cells.map(\.text) == ["🙇", "👍"])
+        _ = press(.escape, session: session, from: id)
+        #expect(shownPanel == nil)
+        try settings.update { $0.palette = false }
+        sent.value.removeAll()
+        guard case .edit(true, _, let state) = service.handle(WireRequest(id: 42, body: .openPalette(session: session, context: Self.field)), from: id).body else {
+            Issue.record("パレットを開く要求に edit で答えない")
+            return
+        }
+        #expect(!state.isComposing)
+        #expect(!sent.value.contains { if case .showPalette = $0 { true } else { false } })
+        #expect(service.snapshot.palette == false)
+    }
+
+    @Test("R-26: ほかの接続のセッションには，入力メニューからパレットを開けない")
+    func opensFromMenuOnlyOwnSession() throws {
+        let owner = connect()
+        let session = try open(owner)
+        let other = connect()
+        #expect(service.handle(WireRequest(id: 43, body: .openPalette(session: session, context: Self.field)), from: other).body == .error(code: .unknownSession))
+        #expect(shownPanel == nil)
+    }
+
+    @Test("R-26: 顔文字に切り替えると，1 行の広いマスの数を添えて送る．四角いマスなら省く")
+    func kaomoji() throws {
+        let id = connect()
+        let session = try open(id)
+        let window = connect(isCandidateWindow: true)
+        _ = openPalette(session: session, from: id)
+        #expect(shownPanel?.cellsPerRow == nil)
+        #expect(shownPanel?.modes.map(\.kind) == [.emoji, .symbol, .kaomoji])
+        #expect(service.handle(WireRequest(id: 10, body: .choosePalette(target: .mode(kind: .kaomoji))), from: window).body == .done)
+        _ = service.handle(WireRequest(id: 11, body: .wake(session: session, context: Self.field)), from: id)
+        let panel = try #require(shownPanel)
+        #expect(panel.modes.first { $0.isSelected }?.kind == .kaomoji)
+        #expect(panel.columns == UInt32(DefaultSettings.paletteColumns))
+        #expect(panel.cellsPerRow == UInt32(DefaultSettings.paletteColumns / DefaultSettings.paletteWideCellSpan))
+        #expect(panel.rows.first?.cells.map(\.text) == ["m(_ _)m"])
     }
 
     @Test("R-26: セッションを閉じたら，そのセッションが出していたパレットを閉じる")

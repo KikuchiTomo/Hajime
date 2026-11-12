@@ -10,10 +10,15 @@ struct FileUsageStoreTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("hajime-usage-\(UUID().uuidString)/usage.json")
     }
 
+    /// 既定の設定(使い方を記録する)
+    private func defaultSettings() -> FileSettingsStore {
+        FileSettingsStore(fileURL: temporaryURL().deletingLastPathComponent().appendingPathComponent("settings.json"))
+    }
+
     @Test("決まった回数ごとに，本人だけが読み書きできるファイルに書く")
     func savesWithPermission() throws {
         let url = temporaryURL()
-        let store = FileUsageStore(fileURL: url, isEnabled: { true })
+        let store = FileUsageStore(fileURL: url, settings: defaultSettings())
         for _ in 0..<(DefaultSettings.usageSaveInterval - 1) { store.record(.conversionOpened) }
         #expect(!FileManager.default.fileExists(atPath: url.path))
         store.record(.conversionOpened)
@@ -21,14 +26,21 @@ struct FileUsageStoreTests {
         let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
         #expect(permissions?.intValue == 0o600)
         #endif
-        #expect(FileUsageStore(fileURL: url, isEnabled: { true }).counts.conversionsOpened == DefaultSettings.usageSaveInterval)
+        #expect(FileUsageStore(fileURL: url, settings: defaultSettings()).counts.conversionsOpened == DefaultSettings.usageSaveInterval)
     }
 
-    @Test("記録を止めているあいだは数えない")
-    func disabled() {
-        let store = FileUsageStore(fileURL: temporaryURL(), isEnabled: { false })
+    @Test("設定で記録を止めているあいだは数えない．止めたらすぐ止まり，戻したらまた数える")
+    func disabled() throws {
+        let settings = defaultSettings()
+        let store = FileUsageStore(fileURL: temporaryURL(), settings: settings)
         store.record(.conversionOpened)
-        #expect(store.counts.conversionsOpened == 0)
+        #expect(store.counts.conversionsOpened == 1)
+        try settings.update { $0.recordsUsage = false }
+        store.record(.conversionOpened)
+        #expect(store.counts.conversionsOpened == 1)
+        try settings.update { $0.recordsUsage = true }
+        store.record(.conversionOpened)
+        #expect(store.counts.conversionsOpened == 2)
     }
 
     @Test("壊れたファイルと大きすぎるファイルは読まずに 0 から数える")
@@ -36,9 +48,9 @@ struct FileUsageStoreTests {
         let url = temporaryURL()
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("{".utf8).write(to: url)
-        #expect(FileUsageStore(fileURL: url, isEnabled: { true }).counts == UsageCounts())
+        #expect(FileUsageStore(fileURL: url, settings: defaultSettings()).counts == UsageCounts())
         try Data(count: DefaultSettings.maximumUsageFileBytes + 1).write(to: url)
-        #expect(FileUsageStore(fileURL: url, isEnabled: { true }).counts == UsageCounts())
+        #expect(FileUsageStore(fileURL: url, settings: defaultSettings()).counts == UsageCounts())
     }
 }
 

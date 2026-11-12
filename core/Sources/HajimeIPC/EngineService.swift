@@ -165,7 +165,7 @@ public final class EngineService {
         let response = WireResponse(id: request.id, body: body(for: request.body, from: id))
         // 設定の項目は大きくなりうる(ユーザー辞書など)．送れない大きさなら，項目を分けて頼んでもらう
         switch response.body {
-        case .settingsFields, .userDictionary, .languagePreview:
+        case .settingsFields, .userDictionary, .languagePreview, .macroPreview:
             if Self.fits(response) { return response }
         default:
             return response
@@ -286,6 +286,11 @@ public final class EngineService {
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             if let caret = context.caret { lastAnchor = caret }
             return edit(current.input.openHandwriting(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
+        case .openPalette(let session, let context):
+            // 入力メニューの「絵文字と記号」(R-26)．macOS の入力メニューと同じく，組み立て中の文字を確定し，前に見ていた種類で開く
+            guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            if let caret = context.caret { lastAnchor = caret }
+            return edit(current.input.openPalette(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
         case .caret(let session, let rect, let composition):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
             lastAnchor = rect
@@ -355,6 +360,8 @@ public final class EngineService {
         case .previewLanguage(let text, let precedingText):
             let words = services.previewLanguage(text, precedingText)
             return .languagePreview(words: words.map { WirePreviewWord(typed: $0.typed, shown: $0.shown, language: $0.language.rawValue) })
+        case .previewMacros(let text, let reading, let pattern):
+            return .macroPreview(results: services.previewMacros(text, reading, pattern))
         case .readUserDictionary(let offset, let limit):
             let entries = settings.current.userDictionary
             let start = min(Int(offset), entries.count)
@@ -467,7 +474,7 @@ public final class EngineService {
         let current = settings.current
         return WireSettingsSnapshot(theme: current.theme.rawValue, inputStyle: current.inputStyle.rawValue, liveConversion: current.liveConversion,
                                     showsModeIndicator: current.showsModeIndicator, showsKeyHints: current.showsKeyHints,
-                                    candidateFontSize: current.candidateFontSize, handwriting: current.handwriting)
+                                    candidateFontSize: current.candidateFontSize, handwriting: current.handwriting, palette: current.palette)
     }
 
     /// セッションの今のモードを，入力先のアプリのモードとして覚える．キーで切り替えたモードも，ほかのアプリに移る前に覚えておく
@@ -745,7 +752,7 @@ public final class EngineService {
     private func state(of input: InputSession, wakeAfter: UInt32?) -> WireSessionState {
         // パレットを開いているあいだは，DLL にすべてのキーを送ってもらう(探す欄に打つ文字・矢印・Esc をアプリに渡さない)
         WireSessionState(mode: input.mode, isComposing: input.isComposing || input.isPaletteOpen, keymap: settings.current.keymap, wakeAfterMilliseconds: wakeAfter,
-                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current))
+                         keyboardLayout: WireSessionState.keyboardLayout(for: settings.current), undoablePrediction: input.hasUndoablePrediction)
     }
 
     private func perform(_ action: HostAction) {

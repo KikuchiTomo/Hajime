@@ -9,7 +9,7 @@
         "type": "key",
         "session": 4,
         "input": { "key": { "kind": "character", "text": "A" }, "modifiers": { "shift": true, "control": false, "alt": false }, "keyLabel": "a", "isKeypad": false },
-        "context": { "applicationId": "notepad.exe", "isSecure": false, "precedingText": "今日は", "caret": { "x": 100, "y": 200, "width": 2, "height": 20 } }
+        "context": { "applicationId": "notepad.exe", "isSecure": false, "precedingText": "今日は", "caret": { "x": 100, "y": 200, "width": 2, "height": 20 }, "canReplacePrecedingText": true }
       }
     },
     {
@@ -27,11 +27,12 @@
     { "id": 9, "body": { "type": "deactivate", "session": 4 } },
     { "id": 10, "body": { "type": "wake", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 10, "body": { "type": "openHandwriting", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
+    { "id": 10, "body": { "type": "openPalette", "session": 4, "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 10, "body": { "type": "reconvert", "session": 4, "text": "変換", "reading": "へんかん", "context": { "applicationId": "code.exe", "isSecure": false } } },
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": -5, "y": 0, "width": 0, "height": 16 } } },
     { "id": 11, "body": { "type": "caret", "session": 4, "rect": { "x": 20, "y": 0, "width": 14, "height": 16 }, "composition": { "x": -5, "y": 0, "width": 60, "height": 16 } } },
     { "id": 12, "body": { "type": "readSettings" } },
-    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5, "handwriting": true } } },
+    { "id": 13, "body": { "type": "writeSettings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5, "handwriting": true, "palette": true } } },
     { "id": 19, "body": { "type": "menu", "command": { "type": "toggleLiveConversion" } } },
     { "id": 20, "body": { "type": "menu", "command": { "type": "openSettings" } } },
     { "id": 14, "body": { "type": "readSettingsFields", "names": ["theme", "keymap"], "defaults": false } },
@@ -43,6 +44,8 @@
     { "id": 22, "body": { "type": "readUsage" } },
     { "id": 23, "body": { "type": "resetUsage" } },
     { "id": 24, "body": { "type": "previewLanguage", "text": "make sushi", "precedingText": "I" } },
+    { "id": 24, "body": { "type": "previewMacros", "text": "東京", "reading": "とうきょう" } },
+    { "id": 24, "body": { "type": "previewMacros", "text": "", "reading": "", "pattern": "【{text}】" } },
     { "id": 25, "body": { "type": "readUserDictionary", "offset": 0, "limit": 100 } },
     { "id": 26, "body": { "type": "addUserDictionaryEntry", "entry": { "reading": "えすきゅー", "word": "はじめ" } } },
     { "id": 27, "body": { "type": "removeUserDictionaryEntry", "entry": { "reading": "えすきゅー", "word": "はじめ" } } },
@@ -56,6 +59,7 @@
     { "id": 35, "body": { "type": "choosePalette", "target": { "type": "scroll", "rows": -2 } } },
     { "id": 36, "body": { "type": "choosePalette", "target": { "type": "skinTone", "tone": "mediumDark" } } },
     { "id": 37, "body": { "type": "choosePalette", "target": { "type": "mode", "kind": "symbol" } } },
+    { "id": 39, "body": { "type": "choosePalette", "target": { "type": "mode", "kind": "kaomoji" } } },
     { "id": 38, "body": { "type": "choosePalette", "target": { "type": "close" } } },
     { "id": 21, "body": { "type": "readSync" } },
     { "id": 22, "body": { "type": "setSyncFolder", "path": "C:\\Users\\a\\OneDrive\\hajime" } },
@@ -109,6 +113,7 @@
           { "type": "setComposition", "segments": [] },
           { "type": "setComposition", "segments": [{ "text": "今日はかな", "style": "converted" }], "caret": 3 },
           { "type": "setComposition", "segments": [{ "text": "今日は", "style": "converted" }, { "text": "かな", "style": "reading" }], "panelAnchor": 3 },
+          { "type": "setComposition", "segments": [{ "text": "えぴ", "style": "reading" }], "replacedLength": 5 },
           { "type": "selectMode", "mode": "japanese" },
           { "type": "requestReconversion", "maximumLength": 64 }
         ],
@@ -117,6 +122,7 @@
     },
     { "id": 3, "body": { "type": "done" } },
     { "id": 12, "body": { "type": "settings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5 } } },
+    { "id": 12, "body": { "type": "settings", "settings": { "theme": "washi", "inputStyle": "romaji", "liveConversion": true, "showsModeIndicator": false, "showsKeyHints": true, "candidateFontSize": 16.5, "handwriting": false, "palette": true } } },
     { "id": 9, "body": { "type": "error", "code": "unknownSession" } },
     { "id": 9, "body": { "type": "error", "code": "unsupportedVersion" } },
     { "id": 9, "body": { "type": "error", "code": "tooManySessions" } },
@@ -126,6 +132,7 @@
     { "id": 14, "body": { "type": "error", "code": "tooLarge" } },
     { "id": 22, "body": { "type": "usage", "values": "{\"commits\":4}", "firstCandidateRate": 0.75 } },
     { "id": 24, "body": { "type": "languagePreview", "words": [{ "typed": "make", "shown": "make", "language": "english" }] } },
+    { "id": 24, "body": { "type": "macroPreview", "results": ["【東京】", "東京（とうきょう）"] } },
     { "id": 25, "body": { "type": "userDictionary", "entries": [{ "reading": "えすきゅー", "word": "はじめ" }], "total": 1 } },
     { "id": 26, "body": { "type": "dictionaryAdded", "result": "alreadyRegistered" } },
     { "id": 28, "body": { "type": "dictionaryMerged", "added": 1 } },
@@ -243,12 +250,35 @@
         "columns": 9,
         "visibleRows": 6,
         "selection": { "row": 0, "column": 0 },
-        "preview": { "text": "🙇", "japaneseName": "おじぎする人", "englishName": "person bowing", "shortcodes": [":bow:"], "readings": ["おじぎ"], "codePoints": "U+1F647", "isPinned": true },
+        "preview": { "text": "🙇", "japaneseName": "おじぎする人", "englishName": "PERSON BOWING DEEPLY", "shortcodes": [":bow:"], "readings": ["おじぎ"], "codePoints": "U+1F647", "isPinned": true, "nameSource": "CLDR", "englishNameSource": "Unicode" },
         "showsPreview": true,
         "skinTone": "none",
         "skinTonePicker": { "options": ["🙇", "🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"], "selected": 2 },
         "hints": [{ "keys": "Enter", "label": "入力" }],
-        "cellSize": 36.5
+        "cellSize": 36.5,
+        "previewFields": { "unicodeName": true, "readings": true, "shortcodes": false, "codePoints": true }
+      },
+      "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
+    },
+    {
+      "type": "showPalette",
+      "panel": {
+        "modes": [{ "kind": "emoji", "title": "絵文字", "isSelected": false }, { "kind": "symbol", "title": "記号", "isSelected": false }, { "kind": "kaomoji", "title": "顔文字", "isSelected": true }],
+        "query": "",
+        "placeholder": "顔文字を検索",
+        "tabs": [{ "section": "joy", "title": "笑顔", "symbol": "^^", "isSelected": true }],
+        "heading": "笑顔",
+        "rows": [{ "index": 0, "cells": [{ "text": "(^o^)", "name": "にこにこ", "isPinned": false }, { "text": "¯\\_(ツ)_/¯", "name": "すくめる", "isPinned": false }], "startsSection": true, "sectionTitle": "笑顔" }],
+        "rowCount": 1,
+        "firstRow": 0,
+        "columns": 9,
+        "visibleRows": 6,
+        "selection": { "row": 0, "column": 1 },
+        "showsPreview": false,
+        "skinTone": "none",
+        "hints": [],
+        "cellSize": 36.5,
+        "cellsPerRow": 3
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },

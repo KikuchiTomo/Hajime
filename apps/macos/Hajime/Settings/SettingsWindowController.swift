@@ -16,9 +16,10 @@ final class SettingsWindowController {
 
     init(settings: any SettingsStoring & SettingsObserving, usage: any UsageReading, sync: SyncCoordinator, files: (any SettingsFileHandling)? = nil,
          associations: AssociationDictionaryStore? = nil, commandBookmarks: CommandBookmarks? = nil,
-         resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
+         resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil,
+         previewMacros: ((String, String, String?) -> [String])? = nil) {
         model = SettingsModel(store: settings, usage: usage, files: files, associations: associations, resetLearning: resetLearning,
-                              previewLanguage: previewLanguage)
+                              previewLanguage: previewLanguage, previewMacros: previewMacros)
         model.commandBookmarks = commandBookmarks
         self.sync = sync
     }
@@ -110,11 +111,15 @@ final class SettingsModel: ObservableObject {
     var commandBookmarks: CommandBookmarks?
     /// 英字入力(自動)で打った文を語ごとに見分けた結果(「試す」)．無ければ「試す」を出さない
     let previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])?
+    /// 見本の語(語・読み・書いている途中の形)に変換マクロを当てた結果(「変換マクロを試す」．ConversionMacroPreview)．無ければ出さない
+    let previewMacros: ((String, String, String?) -> [String])?
 
     init(store: any SettingsStoring & SettingsObserving, usage: (any UsageReading)?, files: (any SettingsFileHandling)? = nil,
          associations: AssociationDictionaryStore? = nil,
-         resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil) {
+         resetLearning: @escaping () -> Void, previewLanguage: ((String, String?) -> [WordLanguagePreview.Word])? = nil,
+         previewMacros: ((String, String, String?) -> [String])? = nil) {
         self.previewLanguage = previewLanguage
+        self.previewMacros = previewMacros
         self.store = store
         self.usage = usage
         self.files = files

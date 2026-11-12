@@ -8,6 +8,11 @@ struct CommandsPage: View {
     let bookmarks: CommandBookmarks?
     @State private var editing: CommandDraft?
     @State private var selection = Set<LauncherCommand.ID>()
+    /// 変換マクロを試す語と読み．空なら見本の語(DefaultSettings.macroSampleText)
+    @State private var sampleText = ""
+    @State private var sampleReading = ""
+    /// 変換マクロの欄に書いている途中の形
+    @State private var macroDraft = ""
 
     var body: some View {
         Form {
@@ -39,6 +44,7 @@ struct CommandsPage: View {
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.conversionMacros, keyPath: \.conversionMacros)
+                ResettableToggle(model: model, title: UIStrings.Extras.macroSkipsSameReading, keyPath: \.macroSkipsSameReading)
                 RuleListEditor(
                     labels: .init(key: UIStrings.Extras.macroPattern, value: nil, empty: UIStrings.Extras.macrosEmpty),
                     items: model.settings.macros.map { RuleItem(id: $0.id, key: $0.pattern, value: "", isEnabled: $0.isEnabled) },
@@ -52,12 +58,16 @@ struct CommandsPage: View {
                         model.update { settings in
                             if let index = settings.macros.firstIndex(where: { $0.id == item.id }) { settings.macros[index].isEnabled = enabled }
                         }
-                    }
+                    },
+                    draftChanged: { macroDraft = $0 }
                 )
             } header: {
                 Text(UIStrings.Extras.macrosSection)
             } footer: {
                 Text(UIStrings.Extras.macrosNote).font(.caption).foregroundStyle(.secondary)
+            }
+            if let preview = model.previewMacros {
+                macroPreview(preview)
             }
         }
         .formStyle(.grouped)
@@ -65,6 +75,38 @@ struct CommandsPage: View {
             CommandEditor(draft: draft, bookmarks: bookmarks) { command in
                 saveCommand(command)
             }
+        }
+    }
+
+    /// 試す語に変換マクロを当てた結果．欄に形を書いている途中なら，その形だけを当てる
+    private func macroPreview(_ preview: (String, String, String?) -> [String]) -> some View {
+        Section {
+            HStack {
+                TextField(UIStrings.Extras.tryMacroWord, text: $sampleText, prompt: Text(UIStrings.Extras.tryMacroWord))
+                    .textFieldStyle(.roundedBorder)
+                TextField(UIStrings.Extras.tryMacroReading, text: $sampleReading, prompt: Text(UIStrings.Extras.tryMacroReading))
+                    .textFieldStyle(.roundedBorder)
+            }
+            .labelsHidden()
+            let draft = macroDraft.trimmingCharacters(in: .whitespaces)
+            let results = preview(sampleText, sampleReading, draft.isEmpty ? nil : draft)
+            if draft.isEmpty {
+                WrappingStack(spacing: DesignTokens.Size.Settings.previewChipGap) {
+                    ForEach(Array(results.enumerated()), id: \.offset) { _, result in
+                        Text(result)
+                            .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+                            .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+                            .textSelection(.enabled)
+                    }
+                }
+            } else {
+                Text(UIStrings.Extras.macroDraftResult + (results.first ?? "")).textSelection(.enabled)
+            }
+        } header: {
+            Text(UIStrings.Extras.tryMacros)
+        } footer: {
+            Text(UIStrings.Extras.macroReference).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
         }
     }
 

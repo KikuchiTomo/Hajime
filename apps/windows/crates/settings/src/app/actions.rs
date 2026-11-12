@@ -12,7 +12,7 @@ use crate::files::FileTask;
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
-use crate::pages::{Action, DictionaryList, Page};
+use crate::pages::{Action, DictionaryList, Page, TryKind};
 use crate::store::StoreError;
 use crate::strings::{
     association, dictionaries, features, keys, more, rule_list, settings, sync as sync_text,
@@ -71,9 +71,20 @@ pub fn run_after(window: Window, after: Option<After>) {
             ffi::message(window, settings::WINDOW_TITLE, &text, warning)
         }
         Some(After::Notice(text)) => ffi::message(window, settings::WINDOW_TITLE, &text, false),
-        Some(After::OpenSetup) => super::launch_settings(&[super::SETUP]),
+        Some(After::OpenSetup) => {
+            // 見本の値で開いた画面からは，ウィザードも見本の値で開く(利用者の設定に触れない)
+            if with_app(|app| app.offline).unwrap_or(false) {
+                super::launch_settings(&[super::SETUP, super::OFFLINE]);
+            } else {
+                super::launch_settings(&[super::SETUP]);
+            }
+        }
         Some(After::OpenUrl(url)) => ffi::open_url(&url),
         Some(After::OpenSettingsFile) => {
+            // 見本の値で開いたときは，利用者の設定のファイルを開かない
+            if with_app(|app| app.offline).unwrap_or(false) {
+                return;
+            }
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
             }
@@ -292,6 +303,12 @@ impl App {
         }
         // 同期の値は設定のファイルの項目ではないので，同期の要求にして頼む
         if let Event::Set { path, value, .. } = &event {
+            // 画面の中だけの値(開いている一覧など)は書かずに覚える
+            if crate::pages::is_view_path(path) {
+                self.view_values.insert((*path).to_string(), value.clone());
+                self.refresh();
+                return None;
+            }
             if crate::sync::is_sync_path(path) {
                 let body = crate::sync::request(path, value)?;
                 return self.request_sync(body);
@@ -453,7 +470,23 @@ impl App {
                 self.refresh();
                 return None;
             }
-            Event::Preview { text, preceding } => {
+            Event::Preview {
+                kind: TryKind::Macros,
+                text,
+                preceding,
+                draft,
+            } => {
+                let shown = macro_preview(model, &text, &preceding, &draft);
+                self.extras.macro_preview.clone_from(&shown);
+                self.view.show_preview(TryKind::Macros, &shown);
+                return None;
+            }
+            Event::Preview {
+                kind: TryKind::Language,
+                text,
+                preceding,
+                ..
+            } => {
                 let shown = if text.trim().is_empty() {
                     String::new()
                 } else {
@@ -463,7 +496,7 @@ impl App {
                         .map(|words| crate::engine::preview_text(&words))
                         .unwrap_or_default()
                 };
-                self.view.show_preview(&shown);
+                self.view.show_preview(TryKind::Language, &shown);
                 return None;
             }
             Event::Action(Action::RestoreDefaults) => model.restore_defaults(),
@@ -983,6 +1016,20 @@ impl App {
     }
 }
 
+/// 試す語と読みに変換マクロを当てた結果の文．つながらなければ空
+pub fn macro_preview(
+    model: &SettingsModel<Store>,
+    text: &str,
+    reading: &str,
+    draft: &str,
+) -> String {
+    model
+        .store()
+        .preview_macros(text, reading, draft)
+        .map(|results| crate::engine::macro_preview_text(&results, !draft.trim().is_empty()))
+        .unwrap_or_default()
+}
+
 /// 標準のひな形の値(KeymapPreset.standard)
 const STANDARD_PRESET: &str = "standard";
 
@@ -1040,6 +1087,11 @@ pub fn confirmation(event: &Event) -> Option<(String, String)> {
         Event::Action(Action::RestoreKeymap) => Some((
             keys::RESTORE_TITLE.to_string(),
             keys::RESTORE_MESSAGE.to_string(),
+        )),
+        // macOS の PalettePage と同じく，消す前に尋ねる
+        Event::Action(Action::ResetPaletteHistory) => Some((
+            crate::strings::palette::CLEAR_HISTORY_QUESTION.to_string(),
+            crate::strings::palette::CLEAR_HISTORY_NOTE.to_string(),
         )),
         Event::ThemeList {
             action: ThemeAction::Delete,

@@ -60,6 +60,9 @@ pub struct Glyphs {
     pub undo: &'static str,
     pub search: &'static str,
     pub warning: &'static str,
+    /// 数を 1 段ずつ変えるボタン(減らす・増やす)
+    pub minus: &'static str,
+    pub plus: &'static str,
 }
 
 pub const GLYPHS: Glyphs = Glyphs {
@@ -69,6 +72,8 @@ pub const GLYPHS: Glyphs = Glyphs {
     undo: "\u{E7A7}",
     search: "\u{E721}",
     warning: "\u{E7BA}",
+    minus: "\u{E738}",
+    plus: "\u{E710}",
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -167,6 +172,7 @@ fn system_palette() -> SettingsPalette {
         card: window,
         card_stroke: text,
         caution: text,
+        danger: text,
         control: face,
         control_hover: face,
         control_pressed: face,

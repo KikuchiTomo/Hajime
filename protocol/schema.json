@@ -197,6 +197,10 @@
         {
           "name": "caret",
           "type": "Rect?"
+        },
+        {
+          "name": "canReplacePrecedingText",
+          "type": "bool?"
         }
       ]
     },
@@ -282,6 +286,10 @@
             {
               "name": "panelAnchor",
               "type": "u32?"
+            },
+            {
+              "name": "replacedLength",
+              "type": "u32?"
             }
           ]
         },
@@ -346,6 +354,10 @@
         },
         {
           "name": "handwriting",
+          "type": "bool?"
+        },
+        {
+          "name": "palette",
           "type": "bool?"
         }
       ]
@@ -426,7 +438,8 @@
         "romaji",
         "symbolSequences",
         "symbolReadings",
-        "englishTerms"
+        "englishTerms",
+        "hiddenPredictions"
       ]
     },
     {
@@ -807,6 +820,19 @@
         },
         {
           "name": "openHandwriting",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
+          "name": "openPalette",
           "fields": [
             {
               "name": "session",
@@ -1203,6 +1229,23 @@
           ]
         },
         {
+          "name": "previewMacros",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "reading",
+              "type": "string"
+            },
+            {
+              "name": "pattern",
+              "type": "string?"
+            }
+          ]
+        },
+        {
           "name": "readUserDictionary",
           "fields": [
             {
@@ -1427,6 +1470,15 @@
             {
               "name": "words",
               "type": "[PreviewWord]"
+            }
+          ]
+        },
+        {
+          "name": "macroPreview",
+          "fields": [
+            {
+              "name": "results",
+              "type": "[string]"
             }
           ]
         },
@@ -1899,7 +1951,8 @@
       "kind": "enum",
       "cases": [
         "emoji",
-        "symbol"
+        "symbol",
+        "kaomoji"
       ]
     },
     {
@@ -2039,6 +2092,36 @@
         {
           "name": "isPinned",
           "type": "bool"
+        },
+        {
+          "name": "nameSource",
+          "type": "string?"
+        },
+        {
+          "name": "englishNameSource",
+          "type": "string?"
+        }
+      ]
+    },
+    {
+      "name": "PalettePreviewFields",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "unicodeName",
+          "type": "bool"
+        },
+        {
+          "name": "readings",
+          "type": "bool"
+        },
+        {
+          "name": "shortcodes",
+          "type": "bool"
+        },
+        {
+          "name": "codePoints",
+          "type": "bool"
         }
       ]
     },
@@ -2131,6 +2214,14 @@
         {
           "name": "cellSize",
           "type": "f64"
+        },
+        {
+          "name": "cellsPerRow",
+          "type": "u32?"
+        },
+        {
+          "name": "previewFields",
+          "type": "PalettePreviewFields?"
         }
       ]
     },

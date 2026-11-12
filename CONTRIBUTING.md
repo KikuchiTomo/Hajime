@@ -12,7 +12,7 @@
 1. Issue で何をするかを相談する(小さな修正は不要)．Issue はテンプレートから作る
 2. ブランチを切る．名前は `<種類>/<内容>`(例: `feat/yen-key-policy`)
 3. `make fetch-models` で Zenzai のモデルを取得し，`make check` と `make test` を通す(モデルが無いと本物の Zenzai のテストを飛ばす)
-4. 利用者から見える変更なら，[CHANGELOG.md](CHANGELOG.md) の「未リリース」に 1 行で書く(リリースノートとアプリの「更新を確認」の変更点になる)．節の中は「追加」「変更」「修正」の見出しで分け，macOS と Windows の片方だけの変更は行の頭に「macOS:」「Windows:」を付ける．バージョンを上げると `tools/release/bump_version.sh` が「未リリース」を新しいバージョンの節に移す．書きぶりは `.claude/skills/hajime-docs` の「文体」に従う
+4. 利用者から見える変更なら，[CHANGELOG.md](CHANGELOG.md) の「未リリース」に 1 行で書く(リリースノートとアプリの「更新を確認」の変更点になる)．節の中は「追加」「変更」「修正」の見出しで分け，macOS と Windows の片方だけの変更は行の頭に「macOS:」「Windows:」を付ける．PR 番号は書かない(GitHub のリリースノートには，マージした PR の一覧が別に付く)．バージョンを上げると `tools/release/bump_version.sh` が「未リリース」を新しいバージョンの節に移す．書きぶりは `.claude/skills/hajime-docs` の「文体」に従う
 5. PR のテンプレートに沿って説明を書き，`type:` のラベルを付ける
 6. 検査が通ったらスカッシュマージする
 
@@ -48,6 +48,10 @@ main には直接 push できません．決まりの詳細は [docs/dev/REPOSIT
 止まったときに学習データと設定を消してよければ，先にアプリを消し(`make uninstall-macos` か `make uninstall-dev-macos`)，Finder で置き場所をゴミ箱に入れてから入れ直します．
 
 見た目だけを確かめるときは，Debug でビルドした「Hajime Debug」(`apps/macos/build/Build/Products/Debug/`)を `--render-snapshots` 付きで起動すると，候補ウィンドウと設定の画面の画像を書き出します(`design/mockups/` の画像はこれで作っています)．Debug は開発版と別のバンドル ID なので，入れた開発版のデータには触れません．
+
+設定の画面のすべての項目が使えるかは，Debug でビルドした「Hajime Debug」を `python3 -I tools/macos/check_settings_ui.py` で操作して確かめます(手で動かす道具で，CI では動かしません)．スイッチ・選択肢・ステッパー・スライダーを順に操作し，設定のファイルの項目が変わるか，範囲の端で止まるか，ほかの項目が使える・使えないに切り替わるか，「既定に戻す」で戻るかを表にします．Debug の設定の置き場所はほかの Debug と共有なので，始める前に丸ごと控えを取り，終わったら元に戻します．操作には，ターミナルに「アクセシビリティ」の許可が要ります．
+
+設定の項目を足したら，macOS と Windows の両方の設定の画面に部品を置き，core のテストで値を変えて動きを確かめます．`make check` の `tools/check/check_settings_fields.py` が，部品かテストの無い項目を知らせます．
 
 開発版のバンドル ID は 2026-10-26 に `men.haji.inputmethod.dev` から `.develop` に変えました．前の開発版を入れていた場合は，システム設定 > キーボード > 入力ソース で前の「Hajime Dev」を外し，新しく足し直してください．前の開発版の学習データと設定(`~/Library/Containers/men.haji.inputmethod.dev`)は使わないので，Finder で消してかまいません．
 

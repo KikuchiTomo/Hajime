@@ -38,10 +38,10 @@ final class Harness {
 
     /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)．wrapLexicon は英単語の辞書を包むもの(EnglishTermLexicon)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
-         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false,
+         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false, hidesPredictions: Bool = true,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
          wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
-         palette: ((FakeSettings) -> PaletteServices)? = nil) {
+         palette: ((FakeSettings) -> PaletteServices)? = nil, calendar: (any CalendarReading)? = nil) {
         self.converter = converter
         self.lexicon = lexicon
         let store = FakeSettings(settings)
@@ -49,7 +49,9 @@ final class Harness {
         self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
                                     associations: associations, keyNames: keyNames,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
-                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store))
+                                    predictionHiding: hidesPredictions ? SettingsPredictionHiding(settings: store) : nil,
+                                    usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store),
+                                    calendar: calendar)
     }
 
     func type(_ text: String) {
@@ -62,6 +64,7 @@ final class Harness {
             switch action {
             case .setMarkedText(let text): marked = text
             case .showNote(let shown): note = shown.text
+            case .showPrediction(let shown): prediction = shown
             case .hideCandidates: note = nil
             default: break
             }
@@ -112,6 +115,9 @@ final class Harness {
             case .runCommand(let command): ranCommands.append(command)
             case .showPalette(let value): palette = value
             case .hidePalette: palette = nil
+            case .replacePrecedingText(let length):
+                // アプリと同じく，入力位置の前の確定した文字を消す(このあとの組み立て中の文字で置き換える)
+                committed = String(decoding: Array(committed.utf16.dropLast(length)), as: UTF16.self)
             case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting, .awaitCorrections, .requestReconversion: break
             }
         }

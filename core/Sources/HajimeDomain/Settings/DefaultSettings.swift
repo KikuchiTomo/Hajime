@@ -219,6 +219,8 @@ public enum DefaultSettings {
     /// 読みで引いた絵文字を差し込む位置と，差し込む数．よく使う語のあとに並べ，候補の一覧の 1 ページに収める
     public static let emojiCandidateOffset = 5
     public static let emojiCandidateCount = 3
+    /// 文節の長さを変えたとき(⇧← ⇧→)に，すぐに分け直す後ろの文節の数．それより後ろは打鍵の合間に分け直す
+    public static let resizeResegmentedSegments = 2
     /// 文節格子の列ごとに見せる候補の数
     public static let latticeCandidatesPerSegment = 5
     /// 「nn」のあとの母音の読みを選び直す数．1 キーごとに変換にかけるので小さく保つ
@@ -334,6 +336,10 @@ public enum DefaultSettings {
     public static let maximumCorrectionRules = 2_000
     /// 直さない語の長さの上限
     public static let maximumExceptionLength = 64
+    /// 予測に表示しない語句の数の上限
+    public static let maximumHiddenPredictions = 2_000
+    /// 予測に表示しない語句の長さの上限
+    public static let maximumHiddenPredictionLength = 64
     /// 戻した補正から覚える語句の短さの下限(文字数)．これより短い文節は，読み全体を覚える
     public static let minimumRememberedPhraseLength = 2
     /// 置き換えの決まりの打った英字の長さと，置き換える語句の長さの上限
@@ -386,6 +392,9 @@ public enum DefaultSettings {
     public static let followUpPollInterval = 0.001
     /// 入力の異常(英字のキーが英字でない文字で届いたなど)を記録する間隔の下限(秒)．打つたびに記録しない
     public static let inputDiagnosticLogInterval = 60.0
+    /// 入れた入力メソッドが OS の入力ソースから外れていないかを確かめる間隔の下限(秒)．確かめるたびに補助のアプリを起動するので，
+    /// 入力先が変わるたびには確かめない
+    public static let inputSourceCheckInterval = 60.0
     /// 手書きの窓から受け取る文字の長さの上限
     public static let maximumHandwritingTextLength = 16
     /// 最新のリリースのページ．自動で更新できないとき(署名の無い開発版，確かめられない配布物，通信の失敗)にブラウザで開く．
@@ -429,6 +438,8 @@ public enum DefaultSettings {
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4
+    /// 顔文字の広いマス 1 つが占める四角いマスの数．1 行の広いマスの数は，列の数をこれで割ったもの(1 つ以上)
+    public static let paletteWideCellSpan = 3
     /// Windows の版(ビルド番号の下限)ごとに，OS の絵文字の書体(Segoe UI Emoji)が描ける絵文字のバージョン．
     /// Windows のエンジンのプロセスは書体を確かめられない(描くのは候補ウィンドウ)ので，この表でパレットに出す絵文字を絞る(R-26)．
     /// 古い順に並べる．どれにも当たらなければ先頭の版にする
@@ -443,14 +454,23 @@ public enum DefaultSettings {
     public static let maximumPendingPaletteTargets = 32
     /// パレットの探す欄に打てる長さの上限(文字数)
     public static let maximumPaletteQueryLength = 32
+    /// パレットの下に選んでいる文字の説明を出すか
+    public static let paletteShowsPreview = true
+    /// パレットの説明に出す項目(Unicode の名前・読み・ショートコード・コードポイント)．どれも出す
+    public static let paletteShowsUnicodeName = true
+    public static let paletteShowsReadings = true
+    public static let paletteShowsShortcodes = true
+    public static let paletteShowsCodePoints = true
     /// パレットの説明に出す読みの数
     public static let palettePreviewReadings = 4
     /// 同梱のパレットの表のファイルの名前(アプリの中・Windows のインストール先に置く)
     public static let bundledPaletteFileName = "palette.tsv"
-    /// パレットの表のファイルの大きさの上限．同梱の表は 600KB ほど．壊れた大きなファイルを読み込まないため
+    /// パレットの表のファイルの大きさの上限．同梱の表は 700KB ほど．壊れた大きなファイルを読み込まないため
     public static let maximumPaletteFileBytes = 4 * 1024 * 1024
     /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える
     public static let maximumPaletteTextLength = 4
+    /// 顔文字の長さの上限(Character の数)．同梱の表の顔文字はいちばん長いもので 23 文字(tools/palette/build.py の KAOMOJI_MAX_LENGTH と同じ)
+    public static let maximumKaomojiTextLength = 32
     /// パレットで探したときに並べる項目の数の上限
     public static let maximumPaletteSearchResults = 400
     /// あいまいな照合(FuzzyMatch)の点．当たった 1 文字の点，飛ばし始めと飛ばし続けの減点，
@@ -518,8 +538,11 @@ public enum DefaultSettings {
     public static let maximumTemplateOutputLength = 256
     /// `{random:a-b}` の範囲の幅の上限
     public static let maximumTemplateRandomRange = 1_000_000_000
-    /// `{datetime+nd}` でずらせる日数の上限
-    public static let maximumTemplateDayOffset = 36_500
+    /// `{date+1d}` などでずらす数の上限(単位によらない)
+    public static let maximumTemplateShift = 36_500
+    /// `{alnum}` `{hex}` の文字数の既定と上限
+    public static let templateRandomTextLength = 8
+    public static let maximumTemplateRandomTextLength = 64
     /// コマンドの数・名前と行き先の長さの上限
     public static let maximumCommands = 200
     public static let maximumCommandTitleLength = 40
@@ -535,7 +558,7 @@ public enum DefaultSettings {
     public static let maximumMacroPatternLength = 120
     /// 連想の一覧で変換マクロのまとまりに付ける説明
     public static let macroGroupLabel = "整形"
-    /// 初めから入っている変換マクロ
+    /// 初めから入っている変換マクロ．addedMacros は無効にして入れておき，使う形だけを利用者がオンにする
     public static let conversionMacros: [ConversionMacro] = [
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000001", pattern: "「{text}」"),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000002", pattern: "『{text}』"),
@@ -546,5 +569,23 @@ public enum DefaultSettings {
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000007", pattern: "<ruby>{text}<rt>{reading}</rt></ruby>"),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000008", pattern: "**{text}**"),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000009", pattern: "`{text}`"),
+    ] + addedMacros
+    /// あとから足した変換マクロ(MacroPresetUpgrade が保存済みの一覧にも足す)．
+    /// 括弧・フリガナ・ローマ字・pixiv と LaTeX のルビ・傍点・ハッシュタグ・打ち消し線・Wikipedia へのリンク
+    public static let addedMacros: [ConversionMacro] = [
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000A", pattern: "〈{text}〉", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000B", pattern: "“{text}”", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000C", pattern: "\"{text}\"", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000D", pattern: "{text}（{reading|katakana}）", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000E", pattern: "{reading|romaji}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000F", pattern: "[[rb:{text} > {reading}]]", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000010", pattern: "\\ruby{{{text}}}{{{reading}}}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000011", pattern: "《《{text}》》", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000012", pattern: "#{text}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000013", pattern: "~~{text}~~", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000014", pattern: "[{text}](https://ja.wikipedia.org/wiki/{text|url})", isEnabled: false),
     ]
+    /// 設定の画面で変換マクロを試す見本の語と読み(語を打たなかったとき)
+    public static let macroSampleText = "東京"
+    public static let macroSampleReading = "とうきょう"
 }

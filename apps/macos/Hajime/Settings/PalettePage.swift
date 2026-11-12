@@ -4,7 +4,7 @@ import HajimeDomain
 import SwiftUI
 
 /// 絵文字と記号のパレット(R-26)．使うか・開くキー・入れたあとの動き・使った文字の記録と，窓の見た目(列数・行数・マスの大きさ・
-/// 説明・よく使う文字の行数)を決める．見た目はテーマに合わせた見本をその場で描く
+/// 説明と説明に出す項目・よく使う文字の行数)を決める．見た目はテーマに合わせた見本をその場で描く
 struct PalettePage: View {
     @ObservedObject var model: SettingsModel
     /// 動かしているあいだのマスの大きさ．手を離したときに保存し，1 段ごとに設定のファイルを書き直さない
@@ -24,6 +24,7 @@ struct PalettePage: View {
                 Group {
                     LabeledContent(UIStrings.Palette.emojiKey, value: keys(for: .emojiPalette))
                     LabeledContent(UIStrings.Palette.symbolKey, value: keys(for: .symbolPalette))
+                    LabeledContent(UIStrings.Palette.kaomojiKey, value: keys(for: .kaomojiPalette))
                     ResettableToggle(model: model, title: UIStrings.Palette.closesAfterInsert, keyPath: \.paletteClosesAfterInsert)
                     ResettableToggle(model: model, title: UIStrings.Palette.recordsHistory, keyPath: \.paletteRecordsHistory)
                     if let clear = model.clearPaletteHistory {
@@ -65,6 +66,13 @@ struct PalettePage: View {
                 }
                 .disabled(!model.settings.paletteRecordsHistory)
                 ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
+                Group {
+                    ResettableToggle(model: model, title: UIStrings.Palette.showsUnicodeName, keyPath: \.paletteShowsUnicodeName)
+                    ResettableToggle(model: model, title: UIStrings.Palette.showsReadings, keyPath: \.paletteShowsReadings)
+                    ResettableToggle(model: model, title: UIStrings.Palette.showsShortcodes, keyPath: \.paletteShowsShortcodes)
+                    ResettableToggle(model: model, title: UIStrings.Palette.showsCodePoints, keyPath: \.paletteShowsCodePoints)
+                }
+                .disabled(!model.settings.paletteShowsPreview)
                 Text(UIStrings.Palette.themeNote).font(.callout).foregroundStyle(.secondary)
             }
         }
@@ -86,7 +94,9 @@ struct PalettePreview: NSViewRepresentable {
 
     private var panel: PalettePanel {
         SamplePalettes.preview(columns: settings.paletteColumns, rows: settings.paletteRows, frequentRows: settings.paletteRecordsHistory ? settings.paletteFrequentRows : 0,
-                               showsPreview: settings.paletteShowsPreview)
+                               showsPreview: settings.paletteShowsPreview,
+                               previewFields: PalettePanel.PreviewFields(unicodeName: settings.paletteShowsUnicodeName, readings: settings.paletteShowsReadings,
+                                                                         shortcodes: settings.paletteShowsShortcodes, codePoints: settings.paletteShowsCodePoints))
     }
 
     func makeNSView(context: Context) -> ScaledPalette {

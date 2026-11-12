@@ -86,6 +86,8 @@ struct SettingsCatalogTests {
                 "englishTerms": limit(DefaultSettings.maximumEnglishTerms),
                 "englishTermMinimum": limit(DefaultSettings.englishTermLengthRange.lowerBound),
                 "englishTermMaximum": limit(DefaultSettings.englishTermLengthRange.upperBound),
+                "hiddenPredictions": limit(DefaultSettings.maximumHiddenPredictions),
+                "hiddenPredictionLength": limit(DefaultSettings.maximumHiddenPredictionLength),
             ]),
             "timing": .object([
                 "responseTimeout": .number(DefaultSettings.settingsAppResponseTimeout),

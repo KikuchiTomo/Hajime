@@ -397,7 +397,9 @@ final class AzooKeyConverterSession: KanaKanjiConverting {
             let id = nextID
             nextID += 1
             engineCandidates[id] = candidate
-            return HajimeDomain.Candidate(text: candidate.text, readingCount: reading.count, origin: .engine(id: id))
+            var prediction = HajimeDomain.Candidate(text: candidate.text, readingCount: reading.count, origin: .engine(id: id))
+            prediction.isLearned = !candidate.data.isEmpty && candidate.data.allSatisfy { $0.metadata.contains(.isLearned) }
+            return prediction
         }
         predictionCache[reading] = Array(predictions)
         return Array(predictions)

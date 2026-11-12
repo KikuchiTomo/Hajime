@@ -6,7 +6,7 @@ import Foundation
 ///   よく使う文字と最近使った文字の両方が高くなる
 /// - 探した語ごとに選んだ文字を数え，同じ語で何度も選んだ文字は次から先頭に出す(learnedChoices)
 /// - よく使う行は，開いたときだけ作り直し，前に出していた文字は同じ位置に残す(refreshFrequentRow)．
-///   位置が変わると，覚えた場所で選べなくなるため
+///   位置が変わると，覚えた場所で選べなくなるため．行はマスの形(顔文字と，絵文字・記号)ごとに持つ
 /// - 肌の色は基本の形で数える．肌の色を変えても使った度合いは同じ文字に積む
 public struct PaletteUsage: Sendable, Equatable {
     struct Record: Sendable, Equatable, Codable {
@@ -23,9 +23,9 @@ public struct PaletteUsage: Sendable, Equatable {
     public private(set) var pinned: [String] = []
     /// 絵文字ごとに選んだ肌の色．選んでいない絵文字は既定の肌の色にする
     private(set) var skinTones: [String: SkinTone] = [:]
-    /// 前に開いたときのよく使う行
-    public private(set) var frequentRow: [String] = []
-    /// 前に見ていたパレットの種類(絵文字か記号か)．次に開くときはこの種類で開く
+    /// 前に開いたときの，マスの形ごとのよく使う行．空の行は持たない
+    public private(set) var frequentRows: [PaletteCellShape: [String]] = [:]
+    /// 前に見ていたパレットの種類．次に開くときはこの種類で開く
     public var lastKind: PaletteItem.Kind?
     /// 肌の色を変えられる絵文字の既定の肌の色．絵文字ごとに選んだ肌の色があればそちらを使う
     public var defaultSkinTone = SkinTone.none
@@ -63,15 +63,17 @@ public struct PaletteUsage: Sendable, Equatable {
 
     /// よく使う行を作り直す．使った度合いの高い順に count 個を選ぶが，前に出していた文字のうち残るものは同じ位置に置き，
     /// 外れた文字の位置に新しい文字を入れる．新しい文字は，外れる文字の度合いを DefaultSettings.paletteFrequentReplacementRatio 倍より
-    /// 上回るときだけ入れ替える(少しの差で並びが変わらないようにする)．excluding(ピン留めした文字など)は行に入れない
-    public mutating func refreshFrequentRow(count: Int, at date: Date, excluding: Set<String> = []) -> [String] {
+    /// 上回るときだけ入れ替える(少しの差で並びが変わらないようにする)．excluding(ピン留めした文字など)は行に入れない．
+    /// 行は shape ごとに持ち，accepting(その形の種類の文字か)に当たる文字だけを入れる
+    public mutating func refreshFrequentRow(count: Int, at date: Date, excluding: Set<String> = [], shape: PaletteCellShape = .square,
+                                            accepting: (String) -> Bool = { _ in true }) -> [String] {
         let now = date.timeIntervalSince1970
-        let scores = records.mapValues { Self.decayed($0, at: now) }
+        let scores = records.mapValues { Self.decayed($0, at: now) }.filter { accepting($0.key) }
         let ranked = scores.filter { !excluding.contains($0.key) && $0.value > 0 }
             .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
         let top = Array(ranked.prefix(max(count, 0)))
         let topSet = Set(top)
-        var row = Array(frequentRow.filter { !excluding.contains($0) && scores[$0] != nil }.prefix(max(count, 0)))
+        var row = Array((frequentRows[shape] ?? []).filter { !excluding.contains($0) && scores[$0] != nil }.prefix(max(count, 0)))
         var newcomers = top.filter { !row.contains($0) }
         // 外れた位置に，度合いの高い新しい文字から入れる
         for index in row.indices where !topSet.contains(row[index]) {
@@ -86,7 +88,7 @@ public struct PaletteUsage: Sendable, Equatable {
         for newcomer in newcomers where row.count < count {
             row.append(newcomer)
         }
-        frequentRow = row
+        frequentRows[shape] = row.isEmpty ? nil : row
         return row
     }
 
@@ -99,7 +101,7 @@ public struct PaletteUsage: Sendable, Equatable {
     public mutating func pin(_ text: String) -> Bool {
         guard !text.isEmpty, !pinned.contains(text), pinned.count < DefaultSettings.maximumPalettePins else { return pinned.contains(text) }
         pinned.append(text)
-        frequentRow.removeAll { $0 == text }
+        removeFromFrequentRows(text)
         return true
     }
 
@@ -124,7 +126,7 @@ public struct PaletteUsage: Sendable, Equatable {
     /// 1 つの文字の履歴を消す(よく使う行からも外す)．ピン留めはそのまま
     public mutating func forget(_ text: String) {
         records[text] = nil
-        frequentRow.removeAll { $0 == text }
+        removeFromFrequentRows(text)
         for key in choices.keys {
             choices[key]?[text] = nil
             if choices[key]?.isEmpty == true { choices[key] = nil }
@@ -135,7 +137,14 @@ public struct PaletteUsage: Sendable, Equatable {
     public mutating func clearHistory() {
         records = [:]
         choices = [:]
-        frequentRow = []
+        frequentRows = [:]
+    }
+
+    private mutating func removeFromFrequentRows(_ text: String) {
+        for shape in frequentRows.keys {
+            frequentRows[shape]?.removeAll { $0 == text }
+            if frequentRows[shape]?.isEmpty == true { frequentRows[shape] = nil }
+        }
     }
 
     // MARK: 計算
@@ -165,7 +174,8 @@ public struct PaletteUsage: Sendable, Equatable {
 
 extension PaletteUsage: Codable {
     private enum CodingKeys: String, CodingKey {
-        case records, choices, pinned, skinTones, frequentRow, lastKind, defaultSkinTone
+        // frequentRow は四角いマスの行(顔文字を足す前の名前のまま)，wideFrequentRow は顔文字の行
+        case records, choices, pinned, skinTones, frequentRow, wideFrequentRow, lastKind, defaultSkinTone
     }
 
     /// 項目が欠けていても，読めない項目があっても，読める項目だけで始める(壊れた履歴でパレットを開けなくしない)
@@ -176,7 +186,9 @@ extension PaletteUsage: Codable {
         choices = (try? container.decodeIfPresent([String: [String: Int]].self, forKey: .choices)) ?? [:]
         pinned = Array(((try? container.decodeIfPresent([String].self, forKey: .pinned)) ?? []).prefix(DefaultSettings.maximumPalettePins))
         skinTones = (try? container.decodeIfPresent([String: SkinTone].self, forKey: .skinTones)) ?? [:]
-        frequentRow = (try? container.decodeIfPresent([String].self, forKey: .frequentRow)) ?? []
+        for (shape, key) in [(PaletteCellShape.square, CodingKeys.frequentRow), (.wide, .wideFrequentRow)] {
+            if let row = try? container.decodeIfPresent([String].self, forKey: key), !row.isEmpty { frequentRows[shape] = row }
+        }
         lastKind = (try? container.decodeIfPresent(String.self, forKey: .lastKind)).flatMap { $0.flatMap(PaletteItem.Kind.init(rawValue:)) }
         defaultSkinTone = (try? container.decodeIfPresent(SkinTone.self, forKey: .defaultSkinTone)) ?? .none
     }
@@ -187,7 +199,8 @@ extension PaletteUsage: Codable {
         try container.encode(choices, forKey: .choices)
         try container.encode(pinned, forKey: .pinned)
         try container.encode(skinTones, forKey: .skinTones)
-        try container.encode(frequentRow, forKey: .frequentRow)
+        try container.encodeIfPresent(frequentRows[.square], forKey: .frequentRow)
+        try container.encodeIfPresent(frequentRows[.wide], forKey: .wideFrequentRow)
         try container.encodeIfPresent(lastKind?.rawValue, forKey: .lastKind)
         try container.encode(defaultSkinTone, forKey: .defaultSkinTone)
     }

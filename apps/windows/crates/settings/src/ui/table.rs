@@ -28,6 +28,8 @@ pub struct Table {
     /// キーボードで動かす行(shown の中の位置)
     cursor: Option<usize>,
     query: String,
+    /// 列の値で絞り込む(列の番号と値．キー設定の状態)
+    restriction: Option<(usize, String)>,
 }
 
 impl Table {
@@ -59,14 +61,35 @@ impl Table {
         self.refilter();
     }
 
+    /// column 列の値が value の行だけを出す(None なら絞り込まない)．変わったら選んでいた行は外す
+    pub fn restrict(&mut self, column: usize, value: Option<&str>) {
+        let restriction = value.map(|value| (column, value.to_string()));
+        if restriction == self.restriction {
+            return;
+        }
+        self.restriction = restriction;
+        self.clear_selection();
+        self.refilter();
+    }
+
+    /// すべての行の数(絞り込む前)
+    pub fn total(&self) -> usize {
+        self.rows.len()
+    }
+
     fn refilter(&mut self) {
         let query = &self.query;
+        let restriction = &self.restriction;
         self.shown = (0..self.rows.len())
             .filter(|index| {
-                query.is_empty()
-                    || self.rows[*index]
-                        .iter()
-                        .any(|cell| cell.to_lowercase().contains(query.as_str()))
+                let row = &self.rows[*index];
+                restriction
+                    .as_ref()
+                    .is_none_or(|(column, value)| row.get(*column) == Some(value))
+                    && (query.is_empty()
+                        || row
+                            .iter()
+                            .any(|cell| cell.to_lowercase().contains(query.as_str())))
             })
             .collect();
     }

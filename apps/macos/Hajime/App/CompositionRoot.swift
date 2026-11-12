@@ -41,6 +41,8 @@ final class CompositionRoot {
     var modeMemory = AppModeMemory()
     /// 日本語のモードで英字のキーをアプリに渡した理由の記録．入力欄ごとのコントローラーで共有し，同じ理由を続けて記録しない
     let passThroughDiagnostics = PassThroughDiagnostics()
+    /// 入力ソースから外れたときに登録し直す．入力欄ごとのコントローラーで共有し，確かめる間隔を空ける
+    let inputSourceRegistration = InputSourceRegistration()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
                  dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {
@@ -79,7 +81,7 @@ final class CompositionRoot {
         settings.observe { [weak engine] in engine?.apply($0) }
         // 最初の変換はモデルの準備で時間がかかるので，打ち始める前に一度変換しておく
         engine.warmUp()
-        let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
+        let usage = FileUsageStore(fileURL: support.appendingPathComponent("usage.json"), settings: settings)
         // 同期(R-15)．この Mac の同期の設定は settings.json と別のファイルに置く
         let synchronizer = SettingsSynchronizer(settings: settings, stateStore: FileSyncStateStore(fileURL: support.appendingPathComponent("sync-state.json")))
         let dictionaries = ImportedDictionaryStore(directory: support.appendingPathComponent("dictionaries", isDirectory: true))
@@ -133,21 +135,27 @@ final class CompositionRoot {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                          lexicon: lexicon, englishTerms: englishTerms),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                     rejections: correctionRejections, usageDictionary: usageDictionary, palette: paletteServices)
+                     rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
+                     calendar: calendar)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)
     private lazy var correctionRejections = SettingsCorrectionRejections(settings: settings)
+    /// 予測に出した語句を設定の「予測に表示しない語句」に入れる(入力欄ごとのセッションで共有する)
+    private lazy var predictionHiding = SettingsPredictionHiding(settings: settings)
 
     /// 設定の画面．開くたびに作らず使い回す
     private(set) lazy var settingsWindow: SettingsWindowController = {
         // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける
         let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, englishTerms: englishTerms),
                                           lexicon: lexicon, settings: settings)
+        // 変換マクロの「試す」は，入力と同じ日時と乱数で見本の語に当てる
+        let macroPreview = ConversionMacroPreview(settings: settings, calendar: calendar)
         let controller = SettingsWindowController(settings: settings, usage: usage, sync: sync, files: SettingsFiles(settings: settings, dictionaries: dictionaries, associations: associations), associations: associations,
                                                   commandBookmarks: commandBookmarks,
                                                   resetLearning: { [engine] in engine.resetLearning() },
-                                                  previewLanguage: { preview.preview($0, precedingText: $1) })
+                                                  previewLanguage: { preview.preview($0, precedingText: $1) },
+                                                  previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) })
         controller.noteSetAsideFile(settings.setAsideFile)
         controller.setOpenOnboarding { [unowned self] in self.onboarding.show() }
         controller.setCheckForUpdates(Self.checkForUpdates)
@@ -240,6 +248,8 @@ enum AppIdentity {
     static let directModeKey = "com.apple.inputmethod.Roman"
     /// Contents/Helpers に入れた更新用のアプリの名前(apps/macos/project.yml の HajimeUpdater の PRODUCT_NAME)
     static let updaterName = "Hajime IME Updater"
+    /// Contents/Helpers に入れた，入力ソースの登録を直す補助のアプリの名前(apps/macos/project.yml の HajimeInputSourceHelper の PRODUCT_NAME)
+    static let inputSourceHelperName = "Hajime IME Input Source Helper"
 
     static var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"

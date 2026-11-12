@@ -13,7 +13,7 @@ struct PaletteScenarioTests {
         [kind, category, text, kind == "emoji" ? "0.6" : "", name, nameReading, english, readings, keywords, shortcodes, tones].joined(separator: "\t")
     }
 
-    /// 顔が 7 個(2 行)，人が 3 個，記号が 2 個
+    /// 顔が 7 個(2 行)，人が 3 個，記号が 2 個，顔文字が 5 個
     static let table = [
         line("emoji", "smileys", "😀", "にっこり笑う", "にっこりわらう", "grinning face", readings: "えがお", shortcodes: "grinning"),
         line("emoji", "smileys", "😃", "大きな目で笑う", "おおきなめでわらう", "grinning face with big eyes", readings: "えがお", shortcodes: "smiley"),
@@ -29,6 +29,12 @@ struct PaletteScenarioTests {
         line("emoji", "people", "👋", "手を振る", "てをふる", "waving hand", readings: "ばいばい", shortcodes: "wave", tones: "👋🏻|👋🏼|👋🏽|👋🏾|👋🏿"),
         line("symbol", "arrows", "→", "右向矢印", "みぎむきやじるし", "rightwards arrow", readings: "やじるし|みぎ"),
         line("symbol", "punctuation", "※", "米印", "こめじるし", "reference mark", readings: "こめ"),
+        // 顔文字は笑顔が 3 個，悲しみと挨拶が 1 個ずつ．絵文字と同じ読み(えがお・おじぎ)を持たせ，探した結果に混ざらないことを確かめる
+        line("kaomoji", "joy", "(^o^)", "にこにこ", "にこにこ", "", readings: "にこにこ|えがお"),
+        line("kaomoji", "joy", "(*^^*)", "てれ", "てれ", "", readings: "てれ|にこにこ"),
+        line("kaomoji", "joy", "＼(^o^)／", "ばんざい", "ばんざい", "", readings: "ばんざい"),
+        line("kaomoji", "sorrow", "(T_T)", "しくしく", "しくしく", "", readings: "しくしく|なみだ"),
+        line("kaomoji", "greeting", "m(_ _)m", "ぺこり", "ぺこり", "", readings: "ぺこり|おじぎ"),
     ].joined(separator: "\n")
 
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
@@ -65,15 +71,89 @@ struct PaletteScenarioTests {
         #expect(panel.selection == PalettePanel.Position(row: 0, column: 0))
         #expect(panel.heading == "顔と感情")
         #expect(panel.tabs.map(\.title) == ["顔と感情", "人と体"])
-        #expect(panel.preview?.japaneseName == "にっこり笑う")
+        #expect(panel.preview?.name == "にっこり笑う")
         #expect(panel.preview?.shortcodes == [":grinning:"])
-        #expect(panel.preview?.codePoints == "U+1F600")
+        #expect(panel.preview?.codePoints == ["U+1F600"])
         #expect(panel.showsPreview)
         // 説明を出さない設定なら説明も欄も無い
         let hidden = self.harness { $0.paletteShowsPreview = false }
         openEmoji(hidden)
         #expect(hidden.palette?.preview == nil)
         #expect(hidden.palette?.showsPreview == false)
+    }
+
+    /// 説明の名前を確かめる表．1 つの符号位置の絵文字・異体字セレクタの付いた絵文字・国旗の並び・記号
+    private static let namedTable = [
+        line("emoji", "smileys", "😄", "笑顔", "えがお", "grinning face with smiling eyes", readings: "すまいる|えがお|かお", shortcodes: "smile"),
+        line("emoji", "smileys", "☺️", "微笑む顔", "ほほえむかお", "smiling face", readings: "ほほえみ"),
+        line("emoji", "flags", "🇯🇵", "旗: 日本", "はた: にほん", "flag: Japan", readings: "にほん|こっき", shortcodes: "jp|flag-jp"),
+        line("symbol", "punctuation", "，", "カンマ", "かんま", "comma", readings: "かんま|こんま"),
+        line("symbol", "arrows", "⇒", "右向き二重矢印", "みぎむきにじゅうやじるし", "rightwards double arrow", readings: "みぎむきにじゅうやじるし|やじるし"),
+    ].joined(separator: "\n")
+
+    @Test("R-26: 説明は 1 つの符号位置の文字に Unicode の名前を，並びに CLDR の英語の名前を出し，どこで定めた名前かを添える")
+    func previewNames() throws {
+        let harness = harness(catalog: FakePaletteCatalog(Self.namedTable))
+        openEmoji(harness)
+        let smile = try #require(harness.palette?.preview)
+        #expect(smile.name == "笑顔")
+        #expect(smile.nameSource == PaletteStrings.cldrSource)
+        #expect(smile.unicodeName == "SMILING FACE WITH OPEN MOUTH AND SMILING EYES")
+        #expect(smile.unicodeNameSource == PaletteStrings.unicodeSource)
+        // 名前の読みを先にし，同じ読みを重ねない
+        #expect(smile.readings == ["えがお", "すまいる", "かお"])
+        #expect(smile.shortcodes == [":smile:"])
+        #expect(smile.codePoints == ["U+1F604"])
+        // 異体字セレクタは数えずに 1 つの符号位置の文字とする．符号位置には異体字セレクタも出す
+        harness.press(.right)
+        let relaxed = try #require(harness.palette?.preview)
+        #expect(relaxed.unicodeName == "WHITE SMILING FACE")
+        #expect(relaxed.codePoints == ["U+263A", "U+FE0F"])
+        // 国旗の並びには UCD の名前が無いので，CLDR の英語の名前を出す
+        harness.press(.right)
+        let flag = try #require(harness.palette?.preview)
+        #expect(flag.name == "旗: 日本")
+        #expect(flag.unicodeName == "flag: Japan")
+        #expect(flag.unicodeNameSource == PaletteStrings.cldrSource)
+        #expect(flag.codePoints == ["U+1F1EF", "U+1F1F5"])
+        // 記号の日本語の名前はどこで定めたかを見分けられないので示さない．カタカナの名前のひらがなは読みに重ねない
+        harness.press(.tab, .control)
+        let comma = try #require(harness.palette?.preview)
+        #expect(comma.name == "カンマ")
+        #expect(comma.nameSource == nil)
+        #expect(comma.unicodeName == "FULLWIDTH COMMA")
+        #expect(comma.readings == ["こんま"])
+        harness.press(.right)
+        let arrow = try #require(harness.palette?.preview)
+        #expect(arrow.unicodeName == "RIGHTWARDS DOUBLE ARROW")
+        #expect(arrow.readings == ["みぎむきにじゅうやじるし", "やじるし"])
+        #expect(arrow.shortcodes == [])
+    }
+
+    @Test("R-26: 説明に出す項目を設定で選べ，選んだ項目を描く側に添える")
+    func previewFields() throws {
+        let shown = harness(catalog: FakePaletteCatalog(Self.namedTable))
+        openEmoji(shown)
+        #expect(shown.palette?.previewFields == PalettePanel.PreviewFields())
+        let hidden = harness(settings: {
+            $0.paletteShowsUnicodeName = false
+            $0.paletteShowsReadings = false
+            $0.paletteShowsShortcodes = false
+            $0.paletteShowsCodePoints = false
+        }, catalog: FakePaletteCatalog(Self.namedTable))
+        openEmoji(hidden)
+        let panel = try #require(hidden.palette)
+        #expect(panel.previewFields == PalettePanel.PreviewFields(unicodeName: false, readings: false, shortcodes: false, codePoints: false))
+        #expect(!panel.previewFields.chips)
+        let preview = try #require(panel.preview)
+        // 見出しの名前と名前を定めたところは，いつも出す
+        #expect(preview.name == "笑顔")
+        #expect(preview.nameSource == PaletteStrings.cldrSource)
+        #expect(preview.unicodeName == "")
+        #expect(preview.unicodeNameSource == nil)
+        #expect(preview.readings == [])
+        #expect(preview.shortcodes == [])
+        #expect(preview.codePoints == [])
     }
 
     @Test("R-26: ローマ字で打つとかなにして探し，Enter で先頭の文字を入れて閉じる")
@@ -107,6 +187,41 @@ struct PaletteScenarioTests {
         harness.type(":bow:")
         #expect(harness.committed == "🙇")
         #expect(harness.palette == nil)
+    }
+
+    @Test("R-26: パレットを開かずに「:bow:」と打っても，読みに替えて絵文字を確定し，使った記録に残す")
+    func inlineShortcode() {
+        let usage = FakePaletteUsageStore()
+        let harness = harness(usage: usage)
+        harness.type(":bow:")
+        #expect(harness.committed == "🙇")
+        #expect(harness.palette == nil)
+        #expect(harness.marked == .empty)
+        #expect(usage.usage.score(of: "🙇", at: start) > 0)
+        // 既定の肌の色にする
+        usage.update { $0.defaultSkinTone = .medium }
+        harness.type(":wave:")
+        #expect(harness.committed == "🙇👋🏽")
+    }
+
+    @Test("R-26: 絵文字にするのは，読みの先頭の「:」から打ったショートコードを「:」で閉じたときだけ")
+    func inlineShortcodeOnlyWhenClosed() {
+        // 知らないショートコード・途中から始めた「:」・⌫ で打ち直したものは，読みのまま
+        for keys in [":bowx:", "kana:bow:", ":Bow:"] {
+            let harness = harness()
+            harness.type(keys)
+            #expect(harness.committed == "", "\(keys)")
+            #expect(harness.marked != .empty, "\(keys)")
+        }
+        let edited = harness()
+        edited.type(":bowx")
+        edited.press(.backspace)
+        edited.type(":")
+        #expect(edited.committed == "")
+        // パレットを使わない設定なら絵文字にしない
+        let off = harness { $0.palette = false }
+        off.type(":bow:")
+        #expect(off.committed == "")
     }
 
     @Test("R-26: Esc は探す語を消し，次の Esc で閉じる．⌫ は 1 文字ずつ消す")
@@ -168,6 +283,94 @@ struct PaletteScenarioTests {
         harness.press(.character("k"), [.control, .option])
         harness.press(.enter)
         #expect(harness.committed == "※")
+    }
+
+    @Test("R-26: ⌃Tab で絵文字・記号・顔文字の順に切り替え，顔文字は広いマスに並べる")
+    func kaomoji() throws {
+        let harness = harness { $0.paletteRows = 4 }
+        openEmoji(harness)
+        harness.press(.tab, .control)
+        harness.press(.tab, .control)
+        let panel = try #require(harness.palette)
+        #expect(panel.modes.map(\.kind) == [.emoji, .symbol, .kaomoji])
+        #expect(panel.modes.first { $0.isSelected }?.kind == .kaomoji)
+        // 窓の幅(列の数)は変えず，1 行に 6 / 3 = 2 個の広いマスを並べる
+        #expect(panel.columns == 6)
+        #expect(panel.cellsPerRow == 2)
+        #expect(texts(panel) == [["(^o^)", "(*^^*)"], ["＼(^o^)／"], ["(T_T)"], ["m(_ _)m"]])
+        #expect(panel.tabs.map(\.title) == ["笑顔", "悲しみ", "挨拶と動作"])
+        #expect(panel.placeholder == "顔文字を検索")
+        #expect(panel.preview?.name == "にこにこ")
+        // 名前と同じ読みは説明の読みに重ねて出さない
+        #expect(panel.preview?.readings == ["えがお"])
+        // 符号位置は長いだけなので出さず，Unicode の名前も無い
+        #expect(panel.preview?.codePoints == [])
+        #expect(panel.preview?.unicodeName == "")
+        #expect(panel.preview?.nameSource == nil)
+        harness.press(.right)
+        harness.press(.down)
+        #expect(harness.palette?.selection == PalettePanel.Position(row: 1, column: 0))
+        harness.press(.enter)
+        #expect(harness.committed == "＼(^o^)／")
+        // 前に見ていた顔文字で開き，⌃Tab で絵文字に戻る
+        harness.press(.character("e"), [.control, .option])
+        harness.press(.tab, .control)
+        harness.press(.tab, .control)
+        harness.press(.tab, .control)
+        #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .emoji)
+        #expect(harness.palette?.cellsPerRow == 6)
+    }
+
+    @Test("R-26: ⌃⌥F で顔文字のパレットを開き，もう一度押すと閉じる")
+    func kaomojiKey() {
+        let harness = harness()
+        harness.press(.character("f"), [.control, .option])
+        #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .kaomoji)
+        // ほかの種類のキーで切り替え，開いている種類のキーで閉じる
+        harness.press(.character("e"), [.control, .option])
+        #expect(harness.palette?.modes.first { $0.isSelected }?.kind == .emoji)
+        harness.press(.character("f"), [.control, .option])
+        harness.press(.character("f"), [.control, .option])
+        #expect(harness.palette == nil)
+    }
+
+    @Test("R-26: 顔文字は顔文字のパレットでだけ探し，絵文字と記号の結果には混ぜない")
+    func kaomojiSearch() {
+        let harness = harness()
+        openEmoji(harness)
+        harness.type("ojigi")
+        #expect(texts(harness.palette) == [["🙇"]])
+        harness.click(.mode(.kaomoji))
+        #expect(texts(harness.palette) == [["m(_ _)m"]])
+        harness.press(.enter)
+        #expect(harness.committed == "m(_ _)m")
+    }
+
+    @Test("R-26: ピン留めとよく使う文字は，マスの形が同じ種類のパレットにだけ出す")
+    func kaomojiShortcuts() {
+        let usage = FakePaletteUsageStore()
+        let harness = harness(usage: usage)
+        openEmoji(harness)
+        harness.type("thumbsup")
+        harness.press(.enter)
+        openEmoji(harness)
+        harness.click(.mode(.kaomoji))
+        harness.type("shikushiku")
+        harness.press(.enter)
+        #expect(harness.committed == "👍(T_T)")
+
+        openEmoji(harness)
+        #expect(texts(harness.palette).first == ["👍"])
+        harness.click(.mode(.kaomoji))
+        #expect(harness.palette?.tabs.first?.title == "よく使う")
+        #expect(texts(harness.palette).first == ["(T_T)"])
+        // 顔文字をピン留めしても，絵文字のパレットには出さない
+        harness.press(.down)
+        harness.press(.character("d"), .control)
+        #expect(usage.usage.pinned == ["(^o^)"])
+        #expect(harness.palette?.tabs.first?.title == "ピン留め")
+        harness.click(.mode(.emoji))
+        #expect(harness.palette?.tabs.map(\.title).contains("ピン留め") == false)
     }
 
     @Test("R-26: 探しているときは，今見ている種類の文字を先に出す")
@@ -250,6 +453,10 @@ struct PaletteScenarioTests {
         let off = self.harness(settings: { $0.paletteRecordsHistory = false }, usage: usage)
         openEmoji(off)
         #expect(off.palette?.tabs.first?.title == "顔と感情")
+        // よく使う文字の行の数を 0 にしても出さない
+        let none = self.harness(settings: { $0.paletteFrequentRows = 0 }, usage: usage)
+        openEmoji(none)
+        #expect(none.palette?.tabs.first?.title == "顔と感情")
     }
 
     @Test("R-26: ⌃D でピン留めし，ピン留めの行を先頭に出す．もう一度押すと外す")

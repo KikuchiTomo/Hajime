@@ -1,13 +1,15 @@
 #![forbid(unsafe_code)]
 
 //! パレットの窓の部品の位置(DIP)と，押した位置の対象(macOS の PaletteView の layout(for:) と target(at:))．
-//! 描く側(palette::scene)と押した位置を調べる側が同じ計算を使う
+//! 描く側(palette::scene)と押した位置を調べる側が同じ計算を使う．
+//! 顔文字は，マス目の幅を 1 行のマスの数(cells_per_row)で割った広いマスに並べる
 
 use super::emoji::SKIN_TONES;
+use super::preview;
 use crate::geometry::Frame;
 use crate::scene::Measure;
 use crate::theme::{Font, ResolvedTheme, Role};
-use ipc::{PalettePanel, PaletteTarget};
+use ipc::{PaletteKind, PalettePanel, PaletteTarget};
 use tokens::size::{candidate, palette};
 
 /// パレットで描く文字の書体と大きさ．マスの文字はマスの大きさで変わる
@@ -22,18 +24,24 @@ pub struct Fonts {
     pub heading: Font,
     pub cell_emoji: Font,
     pub cell_symbol: Font,
-    /// マス目の中の知らせと，説明の読み
+    /// 顔文字の広いマスの文字．収まらなければ kaomoji_small に縮める
+    pub cell_kaomoji: Font,
+    /// 顔文字とタブの短い顔を縮めるときの文字(下限の大きさ)．これでも収まらなければ末尾を省く
+    pub kaomoji_small: Font,
+    /// マス目の中の知らせと，説明の Unicode の名前と読み
     pub detail: Font,
     pub name: Font,
+    /// 説明のショートコードとコードポイントの札(等幅)．行に入らない札は code_small に縮める
     pub code: Font,
+    pub code_small: Font,
+    /// 説明の名前を定めたところと「読み」の枠の札
+    pub tag: Font,
     pub preview_emoji: Font,
     pub preview_symbol: Font,
+    pub preview_kaomoji: Font,
     pub button_emoji: Font,
     pub picker_emoji: Font,
 }
-
-/// 説明の記号を，マスの記号より大きく見せる倍率(macOS と同じ)
-const PREVIEW_SYMBOL_BOOST: f32 = 1.2;
 
 impl Fonts {
     pub fn new(cell_size: f32) -> Self {
@@ -49,17 +57,22 @@ impl Fonts {
             heading: Font::sized(Role::Label, palette::HEADING_FONT_SIZE),
             cell_emoji: Font::sized(Role::Emoji, cell_size * palette::EMOJI_SCALE),
             cell_symbol: Font::sized(Role::Candidate, cell_size * palette::SYMBOL_SCALE),
+            cell_kaomoji: Font::sized(Role::Candidate, cell_size * palette::KAOMOJI_SCALE),
+            kaomoji_small: Font::sized(Role::Candidate, palette::KAOMOJI_MIN_FONT_SIZE),
             detail: Font::sized(Role::Label, palette::DETAIL_FONT_SIZE),
             name: Font::sized(Role::Emphasis, palette::NAME_FONT_SIZE),
             code: Font::sized(Role::Code, palette::CODE_FONT_SIZE),
+            code_small: Font::sized(Role::Code, palette::PREVIEW_CHIP_SMALL_FONT_SIZE),
+            tag: Font::sized(Role::Label, palette::PREVIEW_TAG_FONT_SIZE),
             preview_emoji: Font::sized(
                 Role::Emoji,
                 palette::PREVIEW_GLYPH_SIZE * palette::EMOJI_SCALE,
             ),
             preview_symbol: Font::sized(
                 Role::Candidate,
-                palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * PREVIEW_SYMBOL_BOOST,
+                palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * palette::PREVIEW_SYMBOL_BOOST,
             ),
+            preview_kaomoji: Font::sized(Role::Candidate, palette::PREVIEW_KAOMOJI_FONT_SIZE),
             button_emoji: Font::sized(Role::Emoji, skin_tone_button_side() * palette::EMOJI_SCALE),
             picker_emoji: Font::sized(
                 Role::Emoji,
@@ -80,11 +93,16 @@ impl Fonts {
             self.heading,
             self.cell_emoji,
             self.cell_symbol,
+            self.cell_kaomoji,
+            self.kaomoji_small,
             self.detail,
             self.name,
             self.code,
+            self.code_small,
+            self.tag,
             self.preview_emoji,
             self.preview_symbol,
+            self.preview_kaomoji,
             self.button_emoji,
             self.picker_emoji,
         ] {
@@ -133,13 +151,18 @@ pub struct Layout {
     pub preview: Option<Frame>,
     pub footer: Frame,
     pub skin_tone_button: Frame,
+    /// マスの高さ(四角いマスの一辺)
     pub cell: f32,
+    /// マスの幅．四角いマスは cell と同じ．顔文字の広いマスはマス目の幅を 1 行のマスの数で割ったもの
+    pub cell_width: f32,
+    /// 今の種類のマスが顔文字の広いマスか．広いマスの文字は，絵文字を含んでいても候補の書体で描く
+    pub wide: bool,
     pub fonts: Fonts,
     first_row: u32,
 }
 
 impl Layout {
-    /// 窓の大きさは列数・行数・マスの大きさ・説明を出すかだけで決まり，中身(探した結果の数など)では変えない
+    /// 窓の大きさは列数・行数・マスの大きさ・説明を出すかと説明に出す項目だけで決まり，中身(探した結果の数など)では変えない
     pub fn new(panel: &PalettePanel, theme: &ResolvedTheme, measure: &dyn Measure) -> Self {
         let cell = cell_size(panel);
         let fonts = Fonts::new(cell);
@@ -163,8 +186,13 @@ impl Layout {
             + palette::HEADING_HEIGHT
             + rows * cell
             + palette::GAP;
+        let preview_height = preview::height(
+            &preview::fields(panel.preview_fields.as_ref()),
+            &fonts,
+            measure,
+        );
         if panel.shows_preview {
-            height += palette::PREVIEW_HEIGHT;
+            height += preview_height;
         }
         let height = (height + palette::FOOTER_HEIGHT + shadow).ceil();
         let body = Frame::new(0.0, 0.0, width - shadow, height - shadow);
@@ -216,6 +244,16 @@ impl Layout {
         let heading = Frame::new(content.x, y, content.width, palette::HEADING_HEIGHT);
         y += palette::HEADING_HEIGHT;
         let grid = Frame::new(content.x, y, columns * cell, rows * cell);
+        // 1 行のマスの数．送られてこなければ四角いマス(列の数と同じ)
+        let cells_per_row = panel
+            .cells_per_row
+            .unwrap_or(panel.columns)
+            .clamp(1, panel.columns.max(1));
+        let cell_width = grid.width / cells_per_row as f32;
+        let wide = panel
+            .modes
+            .iter()
+            .any(|mode| mode.is_selected && mode.kind == PaletteKind::Kaomoji);
         let scrollbar = Frame::new(
             grid.max_x() + (palette::SCROLLBAR_GUTTER - palette::SCROLLBAR_WIDTH) / 2.0,
             grid.y,
@@ -224,8 +262,8 @@ impl Layout {
         );
         y = grid.max_y() + palette::GAP;
         let preview = panel.shows_preview.then(|| {
-            let frame = Frame::new(content.x, y, content.width, palette::PREVIEW_HEIGHT);
-            y += palette::PREVIEW_HEIGHT;
+            let frame = Frame::new(content.x, y, content.width, preview_height);
+            y += preview_height;
             frame
         });
         let footer = Frame::new(content.x, y, content.width, palette::FOOTER_HEIGHT);
@@ -249,6 +287,8 @@ impl Layout {
             footer,
             skin_tone_button,
             cell,
+            cell_width,
+            wide,
             fonts,
             first_row: panel.first_row,
         }
@@ -257,9 +297,9 @@ impl Layout {
     /// row 行(全体の中の位置)・column 列のマス
     pub fn cell_frame(&self, row: u32, column: u32) -> Frame {
         Frame::new(
-            self.grid.x + column as f32 * self.cell,
+            self.grid.x + column as f32 * self.cell_width,
             self.grid.y + row.saturating_sub(self.first_row) as f32 * self.cell,
-            self.cell,
+            self.cell_width,
             self.cell,
         )
     }
@@ -346,10 +386,10 @@ impl Layout {
 
     /// マス目の中の点にある文字の行と列．文字の無いマスなら None
     fn cell_at(&self, panel: &PalettePanel, x: f32, y: f32) -> Option<(u32, u32)> {
-        if self.cell <= 0.0 {
+        if self.cell <= 0.0 || self.cell_width <= 0.0 {
             return None;
         }
-        let column = ((x - self.grid.x) / self.cell).floor() as u32;
+        let column = ((x - self.grid.x) / self.cell_width).floor() as u32;
         let row = panel
             .first_row
             .checked_add(((y - self.grid.y) / self.cell).floor() as u32)?;
@@ -402,6 +442,31 @@ mod tests {
     }
 
     #[test]
+    fn 顔文字は窓の幅を変えずに広いマスに並べ押した位置を広いマスで数える() {
+        let kaomoji = sample::kaomoji();
+        let wide = layout(&kaomoji, "automatic");
+        let square = layout(&sample::emoji(), "automatic");
+        assert_eq!(wide.width, square.width);
+        assert!(wide.wide);
+        assert!(!square.wide);
+        assert_eq!(wide.cell_width, wide.cell * 3.0);
+        assert_eq!(square.cell_width, square.cell);
+        let second = wide.cell_frame(1, 1);
+        assert_eq!(second.x, wide.grid.x + wide.cell_width);
+        assert_eq!(second.width, wide.cell_width);
+        assert_eq!(
+            wide.target(&kaomoji, second.mid_x(), second.mid_y(), false),
+            Some(PaletteTarget::Cell { row: 1, column: 1 })
+        );
+        // 1 行のマスの数が列の数を超えていたら列の数にする
+        let broken = PalettePanel {
+            cells_per_row: Some(100),
+            ..sample::kaomoji()
+        };
+        assert_eq!(layout(&broken, "automatic").cell_width, wide.cell);
+    }
+
+    #[test]
     fn 窓の大きさは列数と行数とマスの大きさで決まり中身では変えない() {
         let emoji = sample::emoji();
         let washi = layout(&emoji, "washi");
@@ -424,7 +489,30 @@ mod tests {
             "washi",
         );
         assert_eq!(hidden.preview, None);
-        assert_eq!(washi.height - hidden.height, palette::PREVIEW_HEIGHT);
+        let fields = preview::fields(None);
+        assert_eq!(
+            washi.height - hidden.height,
+            preview::height(&fields, &washi.fonts, &Fixed)
+        );
+        // 説明に出す項目を減らせば説明の欄は低くなり，選んでいる文字によらず同じ高さ
+        let fewer = layout(
+            &PalettePanel {
+                preview_fields: Some(ipc::PalettePreviewFields {
+                    readings: false,
+                    shortcodes: false,
+                    code_points: false,
+                    ..fields
+                }),
+                ..emoji.clone()
+            },
+            "washi",
+        );
+        assert!(fewer.height < washi.height);
+        let symbol = layout(&sample::symbol(), "washi");
+        assert_eq!(
+            symbol.preview.map(|frame| frame.height),
+            washi.preview.map(|frame| frame.height)
+        );
         // desk は影の分だけ大きく，本体は影を除く
         let desk = layout(&emoji, "desk");
         assert_eq!(desk.body.width, desk.width - candidate::SHADOW_OFFSET);

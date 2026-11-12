@@ -128,7 +128,28 @@ struct PaletteUsageTests {
         usage.forget("👍")
         #expect(usage.score(of: "👍", at: start) == 0)
         #expect(usage.learnedChoices(for: query).isEmpty)
-        #expect(usage.frequentRow.isEmpty)
+        #expect(usage.frequentRows.values.joined().isEmpty)
+    }
+
+    @Test("よく使う行はマスの形ごとに持ち，その形の文字だけを入れる．前の形の行も読める")
+    func frequentRowsByShape() throws {
+        var usage = PaletteUsage()
+        usage.record("👍", at: start)
+        usage.record("(^o^)", at: start)
+        usage.record("(^o^)", at: start)
+        let isKaomoji: (String) -> Bool = { $0.hasPrefix("(") }
+        #expect(usage.refreshFrequentRow(count: 3, at: start, accepting: { !isKaomoji($0) }) == ["👍"])
+        #expect(usage.refreshFrequentRow(count: 3, at: start, shape: .wide, accepting: isKaomoji) == ["(^o^)"])
+        #expect(usage.frequentRows == [.square: ["👍"], .wide: ["(^o^)"]])
+        let data = try JSONEncoder().encode(usage)
+        #expect(try JSONDecoder().decode(PaletteUsage.self, from: data) == usage)
+        usage.forget("(^o^)")
+        #expect(usage.frequentRows == [.square: ["👍"]])
+
+        // 顔文字を足す前の履歴(四角いマスの行だけ)も読める
+        let old = try JSONDecoder().decode(PaletteUsage.self, from: Data(#"{"frequentRow": ["👍"], "lastKind": "kaomoji"}"#.utf8))
+        #expect(old.frequentRows == [.square: ["👍"]])
+        #expect(old.lastKind == .kaomoji)
     }
 
     @Test("覚える文字の数を上限に収め，度合いの低いものから捨てる")

@@ -32,6 +32,9 @@ public enum ClientAction: Sendable, Equatable {
     /// 候補の窓を出す・消す操作(showCandidates・showLattice・hideCandidates)では消えない．InputSession は予測が変わったときだけ送り，
     /// 打ち終わったときと分岐図・一覧で選び始めたときに nil を送る
     case showPrediction(Prediction?)
+    /// 次に出す組み立て中の文字で，入力位置の前の確定済みの文字(UTF-16 で数えた長さ)を置き換える．
+    /// 予測の確定を取り消すときに，確定した語句を補う前の読みに戻すのに使う．InputSession は入力位置の前の文字列で確かめてから送る
+    case replacePrecedingText(Int)
     /// 打ち間違いの訂正を求め終わるまで変換を待つ．入力コントローラは訂正を求めて渡し(provideCorrections)，
     /// resumeConversion で変換を続ける．訂正を求めない作りなら resumeConversion をすぐ呼ぶ
     case awaitCorrections

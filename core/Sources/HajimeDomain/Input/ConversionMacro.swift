@@ -1,7 +1,8 @@
 import Foundation
 
 /// 変換マクロ．変換中に選んでいる語を，決まった形に整える(「東京」→「【東京】」「東京(とうきょう)」)．
-/// 連想変換のキーで出す一覧の「整形」のまとまりに並ぶ(AssociationFinder)．形は TextTemplate の書き方で，`{text}` が選んでいる語，`{reading}` がその読み
+/// 連想変換のキーで出す一覧の「整形」のまとまりに並ぶ(AssociationFinder)．形は TextTemplate の書き方で，`{text}` が選んでいる語，`{reading}` がその読み．
+/// 日時・乱数・変換(`{reading|romaji}`)など，動的なユーザー辞書と同じ書き方をすべて使える
 public struct ConversionMacro: Sendable, Equatable, Codable, Hashable, Identifiable {
     public var id: String
     public var pattern: String
@@ -20,9 +21,18 @@ public struct ConversionMacro: Sendable, Equatable, Codable, Hashable, Identifia
             && !pattern.contains(where: { $0.isNewline || $0 == "\t" })
     }
 
-    /// 選んでいる語に当てはめた文字列
-    public func apply(text: String, reading: String) -> String {
-        TextTemplate.expand(pattern, values: .init(text: text, reading: reading))
+    /// 選んでいる語に当てはめた文字列．values は日時と乱数の作り方(語と読みは text と reading にする)
+    public func apply(text: String, reading: String, values: TextTemplate.Values = .init()) -> String {
+        var values = values
+        values.text = text
+        values.reading = reading
+        return TextTemplate.expand(pattern, values: values)
+    }
+
+    /// 語と読みを並べる形(ルビ・読みを添える形)か．かなの語では語と読みが同じになるので出さないことがある(ConversionMacros.results)
+    public var annotatesReading: Bool {
+        let names = TextTemplate.names(in: pattern)
+        return names.contains("text") && names.contains("reading")
     }
 }
 
@@ -46,11 +56,14 @@ extension ConversionMacro: CustomStringConvertible, CustomDebugStringConvertible
 }
 
 public enum ConversionMacros {
-    /// 選んでいる語に，使えるマクロをすべて当てはめた文字列(元の語と同じもの・重なるものは除く)
-    public static func results(text: String, reading: String, macros: [ConversionMacro]) -> [String] {
+    /// 選んでいる語に，使えるマクロをすべて当てはめた文字列(元の語と同じもの・重なるものは除く)．
+    /// skipsSameReading なら，語が読みと同じ(かなの語)ときに語と読みを並べる形を除く(「とうきょう(とうきょう)」を出さない)
+    public static func results(text: String, reading: String, macros: [ConversionMacro], values: TextTemplate.Values = .init(),
+                               skipsSameReading: Bool = false) -> [String] {
         var seen: Set<String> = [text]
-        return macros.filter { $0.isEnabled && $0.isValid }
-            .map { $0.apply(text: text, reading: reading) }
+        let sameReading = skipsSameReading && KanaWidth.hiragana(from: text) == KanaWidth.hiragana(from: reading)
+        return macros.filter { $0.isEnabled && $0.isValid && !(sameReading && $0.annotatesReading) }
+            .map { $0.apply(text: text, reading: reading, values: values) }
             .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 }

@@ -77,6 +77,16 @@ public enum KanaWidth {
         }))
     }
 
+    /// 全角の英数字・記号と全角の空白を半角にする(fullwidthASCII の逆)．ほかの文字はそのまま
+    public static func halfwidthASCII(from text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
+            if scalar == "\u{3000}" { return " " }
+            guard (asciiRange.lowerBound + fullwidthASCIIOffset...asciiRange.upperBound + fullwidthASCIIOffset).contains(scalar.value),
+                let converted = Unicode.Scalar(scalar.value - fullwidthASCIIOffset) else { return scalar }
+            return converted
+        }))
+    }
+
     public static func halfwidthKatakana(from katakana: String) -> String {
         var result = ""
         for character in katakana {

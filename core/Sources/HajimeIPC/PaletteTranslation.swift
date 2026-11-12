@@ -32,6 +32,7 @@ extension WirePaletteKind {
         switch kind {
         case .emoji: self = .emoji
         case .symbol: self = .symbol
+        case .kaomoji: self = .kaomoji
         }
     }
 }
@@ -41,6 +42,7 @@ extension PaletteItem.Kind {
         switch wire {
         case .emoji: self = .emoji
         case .symbol: self = .symbol
+        case .kaomoji: self = .kaomoji
         }
     }
 }
@@ -90,16 +92,23 @@ extension WirePalettePanel {
             columns: UInt32(clamping: panel.columns),
             visibleRows: UInt32(clamping: panel.visibleRows),
             selection: panel.selection.map { WirePalettePosition(row: UInt32(clamping: $0.row), column: UInt32(clamping: $0.column)) },
+            // 見出しの名前は japaneseName に，Unicode の名前(並びは CLDR の英語の名前)は englishName に入れる．
+            // 名前を定めたところは後から足した項目なので，知らない候補ウィンドウは読み飛ばす
             preview: panel.preview.map {
-                WirePalettePreview(text: $0.text, japaneseName: $0.japaneseName, englishName: $0.englishName, shortcodes: $0.shortcodes,
-                                   readings: $0.readings, codePoints: $0.codePoints, isPinned: $0.isPinned)
+                WirePalettePreview(text: $0.text, japaneseName: $0.name, englishName: $0.unicodeName, shortcodes: $0.shortcodes,
+                                   readings: $0.readings, codePoints: $0.codePoints.joined(separator: " "), isPinned: $0.isPinned,
+                                   nameSource: $0.nameSource, englishNameSource: $0.unicodeNameSource)
             },
             showsPreview: panel.showsPreview,
             skinTone: WireSkinTone(panel.skinTone),
             skinTonePicker: panel.skinTonePicker.map { WirePaletteSkinTonePicker(options: $0.options, selected: UInt32(clamping: $0.selected)) },
             message: panel.message,
             hints: panel.hints.map { WireKeyHint(keys: $0.key, label: $0.action) },
-            cellSize: cellSize
+            cellSize: cellSize,
+            // 四角いマスだけなら省く(顔文字を知らない候補ウィンドウにも同じ形で送る)
+            cellsPerRow: panel.cellsPerRow == panel.columns ? nil : UInt32(clamping: panel.cellsPerRow),
+            previewFields: WirePalettePreviewFields(unicodeName: panel.previewFields.unicodeName, readings: panel.previewFields.readings,
+                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints)
         )
     }
 }

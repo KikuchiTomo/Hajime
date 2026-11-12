@@ -14,7 +14,8 @@ struct KeymapTests {
         #expect(standard.command(for: KeyEvent(.space), in: .direct) == nil)
         #expect(standard.command(for: KeyEvent(.backspace), in: .composing) == .deleteBackward)
         #expect(standard.command(for: KeyEvent(.backspace), in: .converting) == .backToReading)
-        #expect(standard.command(for: KeyEvent(.backspace), in: .idle) == nil)
+        // 入力文字なしの Backspace は予測の確定の取り消し(取り消すものが無ければアプリに渡す)
+        #expect(standard.command(for: KeyEvent(.backspace), in: .idle) == .undoPrediction)
     }
 
     @Test("R-17: いつでも の行は，コマンドが効く状態でだけ効く")

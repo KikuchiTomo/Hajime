@@ -3,12 +3,16 @@
 /// | 書き方 | 入る文字 |
 /// |---|---|
 /// | `{datetime:YYYY/MM/DD hh:mm:ss}` | 今の日時を書式で(書式の記号は DateTimeFormat) |
-/// | `{datetime+1d:MM/DD}` | 今日から n 日ずらした日(`-7d` で 7 日前) |
-/// | `{date}` `{time}` | `{datetime:YYYY/MM/DD}` と `{datetime:hh:mm}` の略 |
-/// | `{uuid}` | UUID(大文字) |
+/// | `{date}` `{time}` | `{datetime:YYYY/MM/DD}` と `{datetime:hh:mm}` の略．`{date:M/D}` のように書式も書ける |
+/// | `{utc:…}` | 協定世界時の日時(既定の書式は `YYYY-MM-DD'T'hh:mm:ss'Z'`) |
+/// | `{unixtime}` | UNIX 時間(秒) |
+/// | `{date+1d}` `{time-30m}` `{date+1M@end}` | 日時の名前のあとに，ずらす量と合わせる先を左から順に当てる(DateStep) |
+/// | `{uuid}` | UUID(大文字．小文字は `{uuid|lower}`) |
 /// | `{random:1-6}` | その範囲の整数 |
+/// | `{alnum:8}` `{hex:8}` | その長さの英数字・16 進数(小文字) |
+/// | `{pick:A,B,C}` | `,` で区切ったうちのどれか 1 つ |
 /// | `{text}` `{reading}` | (変換マクロだけ)選んでいる語と，その読み |
-/// | `{text|upper}` | 値に変換をかける(upper・lower・capitalize・katakana・hiragana・halfwidth(半角カタカナ)・fullwidth(全角英数)) |
+/// | `{text|upper}` | 値に変換をかける(TextFilter) |
 /// | `{{` `}}` | `{` と `}` そのもの |
 ///
 /// 知らない名前は置き換えずにそのまま残す．コマンドを動かしたり，ファイルや画面の中身(クリップボードなど)を読んだりする名前は作らない
@@ -17,18 +21,15 @@ public enum TextTemplate {
     /// 置き換えに使う値．呼び出し側(SupplementedConverter と AssociationFinder)が渡す
     public struct Values {
         public var now: CalendarDate?
-        /// 今日から n 日ずらした日
-        public var day: ((Int) -> CalendarDate)?
         public var uuid: (() -> String)?
         /// 範囲の中の整数を 1 つ
         public var random: ((ClosedRange<Int>) -> Int)?
         public var text: String?
         public var reading: String?
 
-        public init(now: CalendarDate? = nil, day: ((Int) -> CalendarDate)? = nil, uuid: (() -> String)? = nil,
-                    random: ((ClosedRange<Int>) -> Int)? = nil, text: String? = nil, reading: String? = nil) {
+        public init(now: CalendarDate? = nil, uuid: (() -> String)? = nil, random: ((ClosedRange<Int>) -> Int)? = nil,
+                    text: String? = nil, reading: String? = nil) {
             self.now = now
-            self.day = day
             self.uuid = uuid
             self.random = random
             self.text = text
@@ -36,9 +37,65 @@ public enum TextTemplate {
         }
     }
 
+    /// 日時の名前のあとに書く，ずらす量(`+1d`)と合わせる先(`@mon`)
+    ///
+    /// - ずらす量: `+` か `-` と数と単位．単位は m 分・h 時間・d 日・w 週・M 月・y 年
+    /// - 合わせる先: `@mon`〜`@sun` その週(月曜から日曜)の曜日，`@1`〜`@31` その月の日(月の日数より大きければ月末)，`@end` 月末
+    public enum DateStep: Sendable, Equatable {
+        case shift(Int, CalendarDate.Unit)
+        case anchor(CalendarDate.Anchor)
+
+        /// `+1M@end` のような並び．読めなければ nil
+        static func parse(_ text: Substring) -> [DateStep]? {
+            var steps: [DateStep] = []
+            var rest = text
+            while let first = rest.first {
+                rest = rest.dropFirst()
+                if first == "@" {
+                    let word = rest.prefix { $0.isASCII && ($0.isLetter || $0.isNumber) }
+                    rest = rest.dropFirst(word.count)
+                    guard let anchor = anchor(named: word) else { return nil }
+                    steps.append(.anchor(anchor))
+                } else if first == "+" || first == "-" {
+                    let digits = rest.prefix { ("0"..."9").contains($0) }
+                    rest = rest.dropFirst(digits.count)
+                    guard let amount = Int(digits), amount <= DefaultSettings.maximumTemplateShift,
+                        let symbol = rest.first, let unit = units[symbol] else { return nil }
+                    rest = rest.dropFirst()
+                    steps.append(.shift(first == "-" ? -amount : amount, unit))
+                } else {
+                    return nil
+                }
+            }
+            return steps
+        }
+
+        func apply(to date: CalendarDate) -> CalendarDate {
+            switch self {
+            case .shift(let amount, let unit): date.shifted(by: amount, unit)
+            case .anchor(let anchor): date.anchored(to: anchor)
+            }
+        }
+
+        private static let units: [Character: CalendarDate.Unit] = ["m": .minute, "h": .hour, "d": .day, "w": .week, "M": .month, "y": .year]
+        private static let weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+        private static func anchor(named word: Substring) -> CalendarDate.Anchor? {
+            if word == "end" { return .endOfMonth }
+            if let index = weekdays.firstIndex(of: String(word)) { return .weekday(index + 1) }
+            if let day = Int(word), (1...31).contains(day) { return .dayOfMonth(day) }
+            return nil
+        }
+    }
+
     /// 語に置き換える部分(`{` で始まる名前)があるか
     public static func containsPlaceholder(_ text: String) -> Bool {
         tokens(of: text).contains { if case .placeholder = $0 { true } else { false } }
+    }
+
+    /// 語の中で使っている名前(`{text|upper}` なら text)
+    public static func names(in text: String) -> Set<String> {
+        Set(tokens(of: text).compactMap { if case .placeholder(let body) = $0 { String(parts(of: body).name) } else { nil } })
     }
 
     /// 置き換えた文字列．長さは DefaultSettings.maximumTemplateOutputLength まで
@@ -86,30 +143,55 @@ public enum TextTemplate {
         return tokens
     }
 
-    /// `名前[+nd][:引数][|変換]` の値．分からなければ nil
-    private static func value(of body: String, values: Values) -> String? {
-        var head = Substring(body)
-        var filters: [Substring] = []
-        if let bar = body.firstIndex(of: "|") {
-            head = body[..<bar]
-            filters = body[body.index(after: bar)...].split(separator: "|")
-        }
-        var name = head
+    /// `名前[ずらす量と合わせる先][:引数][|変換...]` を分けたもの
+    private static func parts(of body: String) -> (name: Substring, steps: Substring, argument: Substring?, filters: [Substring]) {
+        let segments = body.split(separator: "|", omittingEmptySubsequences: false)
+        let head = segments.first ?? Substring(body)
+        var nameAndSteps = head
         var argument: Substring?
         if let colon = head.firstIndex(of: ":") {
-            name = head[..<colon]
+            nameAndSteps = head[..<colon]
             argument = head[head.index(after: colon)...]
         }
-        guard let raw = baseValue(name: String(name), argument: argument.map(String.init), values: values) else { return nil }
-        return filters.reduce(Optional(raw)) { value, filter in value.flatMap { apply(String(filter), to: $0) } }
+        let stepsStart = nameAndSteps.firstIndex { $0 == "+" || $0 == "-" || $0 == "@" } ?? nameAndSteps.endIndex
+        return (nameAndSteps[..<stepsStart], nameAndSteps[stepsStart...], argument, segments.dropFirst().filter { !$0.isEmpty })
     }
 
-    private static func baseValue(name: String, argument: String?, values: Values) -> String? {
+    /// 置き換える値．分からなければ nil
+    private static func value(of body: String, values: Values) -> String? {
+        let parts = parts(of: body)
+        var filters: [TextFilter] = []
+        for name in parts.filters {
+            guard let filter = TextFilter(rawValue: String(name)) else { return nil }
+            filters.append(filter)
+        }
+        let raw: String?
+        if dateNames.contains(String(parts.name)) {
+            raw = dateValue(name: parts.name, steps: parts.steps, argument: parts.argument, values: values)
+        } else {
+            guard parts.steps.isEmpty else { return nil }
+            raw = baseValue(name: parts.name, argument: parts.argument.map(String.init), values: values)
+        }
+        return raw.map { filters.reduce($0) { value, filter in filter.apply(to: value) } }
+    }
+
+    private static let dateNames: Set<String> = ["datetime", "date", "time", "utc", "unixtime"]
+
+    private static func dateValue(name: Substring, steps: Substring, argument: Substring?, values: Values) -> String? {
+        guard let now = values.now, let steps = DateStep.parse(steps) else { return nil }
+        let date = steps.reduce(now) { $1.apply(to: $0) }
+        let format = argument.map(String.init)
         switch name {
-        case "date":
-            return values.now.map { DateTimeFormat.format(argument ?? "YYYY/MM/DD", date: $0) }
-        case "time":
-            return values.now.map { DateTimeFormat.format(argument ?? "hh:mm", date: $0) }
+        case "date": return DateTimeFormat.format(format ?? "YYYY/MM/DD", date: date)
+        case "time": return DateTimeFormat.format(format ?? "hh:mm", date: date)
+        case "utc": return DateTimeFormat.format(format ?? "YYYY-MM-DD'T'hh:mm:ss'Z'", date: date.inUTC)
+        case "unixtime": return String(date.unixTime)
+        default: return DateTimeFormat.format(format ?? "YYYY/MM/DD hh:mm:ss", date: date)
+        }
+    }
+
+    private static func baseValue(name: Substring, argument: String?, values: Values) -> String? {
+        switch name {
         case "uuid":
             return values.uuid?()
         case "random":
@@ -117,108 +199,25 @@ public enum TextTemplate {
             let bounds = (argument ?? "1-100").split(separator: "-", maxSplits: 1).compactMap { Int($0) }
             guard bounds.count == 2, bounds[0] <= bounds[1], bounds[1] - bounds[0] <= DefaultSettings.maximumTemplateRandomRange else { return nil }
             return String(random(bounds[0]...bounds[1]))
+        case "alnum", "hex":
+            guard let random = values.random else { return nil }
+            let length = argument.map { Int($0) } ?? DefaultSettings.templateRandomTextLength
+            guard let length, (1...DefaultSettings.maximumTemplateRandomTextLength).contains(length) else { return nil }
+            let alphabet = name == "hex" ? hexDigits : alphanumerics
+            return String((0..<length).map { _ in alphabet[min(max(random(0...alphabet.count - 1), 0), alphabet.count - 1)] })
+        case "pick":
+            guard let random = values.random, let argument else { return nil }
+            let choices = argument.split(separator: ",", omittingEmptySubsequences: false)
+            return String(choices[min(max(random(0...choices.count - 1), 0), choices.count - 1)])
         case "text":
             return values.text
         case "reading":
             return values.reading
         default:
-            guard name.hasPrefix("datetime") else { return nil }
-            let format = argument ?? "YYYY/MM/DD hh:mm:ss"
-            let offset = name.dropFirst("datetime".count)
-            if offset.isEmpty { return values.now.map { DateTimeFormat.format(format, date: $0) } }
-            // 「+1d」「-7d」．日の単位だけ
-            guard offset.hasSuffix("d"), let days = Int(offset.dropLast()), abs(days) <= DefaultSettings.maximumTemplateDayOffset,
-                offset.first == "+" || offset.first == "-", let day = values.day else { return nil }
-            return DateTimeFormat.format(format, date: day(days))
+            return nil
         }
     }
 
-    private static func apply(_ filter: String, to value: String) -> String? {
-        switch filter {
-        case "upper": value.uppercased()
-        case "lower": value.lowercased()
-        case "capitalize": value.prefix(1).uppercased() + value.dropFirst()
-        case "katakana": KanaWidth.katakana(from: value)
-        case "hiragana": KanaWidth.hiragana(from: value)
-        case "halfwidth": KanaWidth.halfwidthKatakana(from: KanaWidth.katakana(from: value))
-        case "fullwidth": KanaWidth.fullwidthASCII(from: value)
-        default: nil
-        }
-    }
-}
-
-/// 日時の書式．長い記号から順に当てはめ，記号でない文字はそのまま残す．`'...'` で囲んだところも記号として読まない
-///
-/// YYYY 年(4 桁)・YY 年(下 2 桁)・MM 月(2 桁)・M 月・DD 日(2 桁)・D 日・hh 時(24 時間制 2 桁)・h 時・mm 分(2 桁)・m 分・ss 秒(2 桁)・s 秒・
-/// A 午前/午後・KK 時(12 時間制 2 桁)・K 時(12 時間制)・dddd 曜日(「月曜日」)・ddd 曜日(「月」)・EEE 曜日(「Mon」)・GG 元号(「令和」)・
-/// E 元号の年(「8」)・ZZ 時間帯(「+09:00」)
-public enum DateTimeFormat {
-    private static let symbols = ["YYYY", "dddd", "ddd", "EEE", "YY", "MM", "DD", "hh", "mm", "ss", "KK", "GG", "ZZ", "M", "D", "h", "m", "s", "K", "A", "E"]
-    private static let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
-    private static let englishWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
-    public static func format(_ pattern: String, date: CalendarDate) -> String {
-        var result = ""
-        var rest = Substring(pattern)
-        while let first = rest.first {
-            if first == "'" {
-                let body = rest.dropFirst()
-                let end = body.firstIndex(of: "'") ?? body.endIndex
-                result += body[..<end]
-                rest = end < body.endIndex ? body[body.index(after: end)...] : ""
-                continue
-            }
-            if let symbol = symbols.first(where: { rest.hasPrefix($0) }) {
-                result += value(of: symbol, date: date)
-                rest = rest.dropFirst(symbol.count)
-            } else {
-                result.append(first)
-                rest = rest.dropFirst()
-            }
-        }
-        return result
-    }
-
-    private static func value(of symbol: String, date: CalendarDate) -> String {
-        let hour12 = date.hour % 12 == 0 ? 12 : date.hour % 12
-        let weekday = (date.weekday - 1 + 7) % 7
-        switch symbol {
-        case "YYYY": return String(date.year)
-        case "YY": return pad(date.year % 100)
-        case "MM": return pad(date.month)
-        case "M": return String(date.month)
-        case "DD": return pad(date.day)
-        case "D": return String(date.day)
-        case "hh": return pad(date.hour)
-        case "h": return String(date.hour)
-        case "mm": return pad(date.minute)
-        case "m": return String(date.minute)
-        case "ss": return pad(date.second)
-        case "s": return String(date.second)
-        case "KK": return pad(hour12)
-        case "K": return String(hour12)
-        case "A": return date.hour < 12 ? "午前" : "午後"
-        case "dddd": return weekdays[weekday] + "曜日"
-        case "ddd": return weekdays[weekday]
-        case "EEE": return englishWeekdays[weekday]
-        case "GG": return Era.name(forYear: date.year)
-        case "E": return String(Era.year(of: date.year))
-        case "ZZ":
-            let offset = date.utcOffsetSeconds
-            let sign = offset < 0 ? "-" : "+"
-            return "\(sign)\(pad(abs(offset) / 3600)):\(pad(abs(offset) % 3600 / 60))"
-        default: return symbol
-        }
-    }
-
-    static func pad(_ value: Int) -> String {
-        value < 10 && value >= 0 ? "0\(value)" : String(value)
-    }
-
-    /// 元号．令和(2019 年から)だけを扱う．それより前の年は西暦の数を返す
-    enum Era {
-        static let reiwaOffset = 2018
-        static func name(forYear year: Int) -> String { year > reiwaOffset ? "令和" : "" }
-        static func year(of year: Int) -> Int { year > reiwaOffset ? year - reiwaOffset : year }
-    }
+    private static let alphanumerics = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+    private static let hexDigits = Array("0123456789abcdef")
 }

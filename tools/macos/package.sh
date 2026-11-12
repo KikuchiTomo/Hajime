@@ -97,7 +97,7 @@ app="$work/root/$app_name.app"
 version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Contents/Info.plist")
 
 entitlements=$(find build/Build/Intermediates.noindex -path "*$configuration*" -name "$app_name.app.xcent" | head -1)
-# 中の部品(Frameworks の dylib とフレームワーク，Helpers の更新用のアプリ)から順に署名し，最後にアプリを権限つきで署名する
+# 中の部品(Frameworks の dylib とフレームワーク，Helpers の補助のアプリ)から順に署名し，最後にアプリを権限つきで署名する
 # (Apple の勧める順．--deep は部品を取りこぼすことがある)．更新用のアプリには IME の権限(サンドボックス)を付けない
 sign_app() {
   for nested in "$app/Contents/Frameworks/"* "$app/Contents/Helpers/"*.app; do
@@ -182,4 +182,6 @@ else
   productbuild --distribution "$work/distribution.xml" --package-path "$work" "$output"
   echo "Developer ID Installer の証明書が無いので，.pkg は署名していません(ほかの Mac では開くときに警告が出ます)"
 fi
+# ビルドしたアプリと配布物の中身を LaunchServices の登録から外す．入れた Hajime IME が入力ソースから外れないようにする
+"$root/tools/macos/unregister_builds.sh"
 echo "作りました: apps/macos/$output"

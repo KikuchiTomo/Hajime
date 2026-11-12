@@ -118,6 +118,15 @@ func run() -> Int32 {
         return 1
     }
     EngineProcess.requestFullExecutionSpeed()
+    // 候補ウィンドウは，辞書とモデルを読み込むあいだに起動しておく(起動してすぐの候補を早く出すため)．
+    // パイプはもうあるので候補ウィンドウはすぐにつなぎ，エンジンが受け付けて挨拶を送るまで待つ
+    let candidateWindow = HostPaths.installation.appendingPathComponent("hajime-candidate-ui.exe")
+    var candidateProcess: Process?
+    if FileManager.default.fileExists(atPath: candidateWindow.path) {
+        let process = Process()
+        process.executableURL = candidateWindow
+        if (try? process.run()) != nil { candidateProcess = process }
+    }
     #else
     let engineListener: UnixSocketListener
     let windowListener: UnixSocketListener
@@ -143,10 +152,14 @@ func run() -> Int32 {
                                             dictionaryDirectory: resources.dictionary?.url)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))
+        #if os(Windows)
+        // 先に起動した候補ウィンドウは，つなぐ相手が無いまま残らないよう終える
+        candidateProcess?.terminate()
+        #endif
         return 1
     }
     engine.apply(settings.current)
-    let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), isEnabled: { settings.current.recordsUsage })
+    let usage = FileUsageStore(fileURL: HostPaths.local.appendingPathComponent("usage.json"), settings: settings)
     let calendar = SystemCalendar(clock: { Date() })
     let dictionaries = ImportedDictionaryStore(directory: HostPaths.local.appendingPathComponent("dictionaries", isDirectory: true))
     let associations = AssociationDictionaryStore(
@@ -197,8 +210,12 @@ func run() -> Int32 {
     // 設定の画面の「試す」は，入力と同じ変換器と英単語の辞書で英語と日本語を見分ける(macOS と同じ)
     let preview = WordLanguagePreview(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, englishTerms: englishTerms),
                                       lexicon: lexicon, settings: settings)
+    // 変換マクロの「試す」は，入力と同じ日時と乱数で見本の語に当てる(macOS と同じ)
+    let macroPreview = ConversionMacroPreview(settings: settings, calendar: calendar)
     // 戻した補正を設定の「直さない語句」に覚える(macOS の CompositionRoot と同じ)
     let rejections = SettingsCorrectionRejections(settings: settings)
+    // 予測に出した語句を設定の「予測に表示しない語句」に入れる(macOS の CompositionRoot と同じ)
+    let predictionHiding = SettingsPredictionHiding(settings: settings)
     // 絵文字と記号のパレット(R-26)．描くのは Windows の候補ウィンドウだけ(Linux のアドオンはパレットを描かないので渡さない)．
     // エンジンのプロセスは書体を確かめられないので，Windows のビルド番号から描ける絵文字のバージョンを決める
     #if os(Windows)
@@ -218,7 +235,8 @@ func run() -> Int32 {
             InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                           lexicon: lexicon, englishTerms: englishTerms),
                          lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                         keyNames: .windows, rejections: rejections, usageDictionary: usageDictionary, palette: palette)
+                         keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                         palette: palette, calendar: calendar)
         },
         settings: settings,
         ui: sendToWindow,
@@ -237,7 +255,8 @@ func run() -> Int32 {
             resetLearning: { [engine] in engine.resetLearning() },
             usage: usage,
             resetPaletteHistory: resetPaletteHistory,
-            previewLanguage: { preview.preview($0, precedingText: $1) }
+            previewLanguage: { preview.preview($0, precedingText: $1) },
+            previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) }
         ),
         runCommand: { command in
             // 読みで呼び出すコマンド(R-22)．Windows だけで動かす(Linux はまだ設定の画面が無く，コマンドを登録できない)
@@ -264,16 +283,10 @@ func run() -> Int32 {
 
     #if os(Windows)
     let presentation = service.presentation
-    let candidateWindow = HostPaths.installation.appendingPathComponent("hajime-candidate-ui.exe")
     window.start(listener: windowListener, expectedImagePath: candidateWindow.path) {
         [.hello(protocolVersion: WireProtocol.version), .setPresentation(presentation: presentation)]
     }
     EnginePipeServer.start(listener: engineListener, service: service, candidateWindowPath: candidateWindow.path, settingsAppPath: settingsApp.path)
-    if FileManager.default.fileExists(atPath: candidateWindow.path) {
-        let process = Process()
-        process.executableURL = candidateWindow
-        try? process.run()
-    }
     #else
     let presentation = service.presentation
     window.start(listener: windowListener) {

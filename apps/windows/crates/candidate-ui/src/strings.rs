@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use ipc::InputMode;
+use ipc::{InputMode, PartOfSpeech};
 
 /// 上の枝(文字種)の丸に入れる印
 pub const VARIANT_BADGE: &str = "↑";
@@ -39,17 +39,38 @@ pub fn variants_position(index: u32, total: u32) -> String {
 /// 連想の一覧の見出しの前に置く言葉(macOS の UIStrings.Association.headingPrefix)
 pub const ASSOCIATION_PREFIX: &str = "連想";
 
-/// 使い分けの欄で，同じ読みのほかの語の前に置く(macOS の UIStrings.Candidate.homophoneOthers)
-pub const HOMOPHONE_OTHERS: &str = "ほかに";
+/// 語の意味のカードで，同音語の札の前に置く名前(macOS の UIStrings.Candidate.homophoneOthers)
+pub const HOMOPHONE_OTHERS: &str = "同音語";
 
-/// 使い分けの欄に入らなかったほかの語の数
+/// パレットの説明の欄で，読みの頭に置く札と読みの区切り(core の PaletteStrings.readings・readingSeparator)
+pub const PALETTE_READINGS: &str = "読み";
+pub const PALETTE_READING_SEPARATOR: &str = "、";
+
+/// 語の意味のカードに入らなかった同音語の数(パレットの説明の欄に入らなかった読みと札の数にも使う)
 pub fn more(count: usize) -> String {
     format!("+{count}")
 }
 
-/// 意味が 2 つ以上あるときの，意味の番号(macOS の UIStrings.Candidate.senseNumber)
+/// 意味が 2 つ以上あるときの，意味の番号(macOS の UIStrings.Candidate.senseNumber．語の意味のカードの角丸の四角に入れる)
 pub fn sense_number(number: usize) -> String {
-    format!("{number}.")
+    format!("{number}")
+}
+
+/// 品詞の名前(core の PartOfSpeech.name と同じ)．語の意味のカードの見出しの札と読み上げに使う
+pub fn part_of_speech(part: PartOfSpeech) -> &'static str {
+    match part {
+        PartOfSpeech::Noun => "名詞",
+        PartOfSpeech::Verb => "動詞",
+        PartOfSpeech::Adjective => "形容詞",
+        PartOfSpeech::AdjectivalNoun => "形容動詞",
+        PartOfSpeech::Adverb => "副詞",
+        PartOfSpeech::Prenominal => "連体詞",
+        PartOfSpeech::Conjunction => "接続詞",
+        PartOfSpeech::Interjection => "感動詞",
+        PartOfSpeech::Pronoun => "代名詞",
+        PartOfSpeech::Prefix => "接頭辞",
+        PartOfSpeech::Suffix => "接尾辞",
+    }
 }
 
 /// 連想の意味のまとまりの位置

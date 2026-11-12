@@ -173,6 +173,9 @@ pub struct FieldContext {
     pub preceding_text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caret: Option<Rect>,
+    #[serde(rename = "canReplacePrecedingText")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_replace_preceding_text: Option<bool>,
 }
 
 impl fmt::Debug for FieldContext {
@@ -182,6 +185,7 @@ impl fmt::Debug for FieldContext {
             .field("isSecure", &self.is_secure)
             .field("precedingText", &REDACTED)
             .field("caret", &self.caret)
+            .field("canReplacePrecedingText", &self.can_replace_preceding_text)
             .finish()
     }
 }
@@ -254,6 +258,9 @@ pub enum EditOperation {
         #[serde(rename = "panelAnchor")]
         #[serde(default, skip_serializing_if = "Option::is_none")]
         panel_anchor: Option<u32>,
+        #[serde(rename = "replacedLength")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        replaced_length: Option<u32>,
     },
     SelectMode {
         mode: InputMode,
@@ -271,11 +278,12 @@ impl fmt::Debug for EditOperation {
                 .debug_struct("Commit")
                 .field("text", &REDACTED)
                 .finish(),
-            Self::SetComposition { segments, caret, panel_anchor, .. } => f
+            Self::SetComposition { segments, caret, panel_anchor, replaced_length, .. } => f
                 .debug_struct("SetComposition")
                 .field("segments", segments)
                 .field("caret", caret)
                 .field("panelAnchor", panel_anchor)
+                .field("replacedLength", replaced_length)
                 .finish(),
             Self::SelectMode { mode, .. } => f
                 .debug_struct("SelectMode")
@@ -314,6 +322,8 @@ pub struct SettingsSnapshot {
     pub candidate_font_size: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handwriting: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<bool>,
 }
 
 impl fmt::Debug for SettingsSnapshot {
@@ -326,6 +336,7 @@ impl fmt::Debug for SettingsSnapshot {
             .field("showsKeyHints", &self.shows_key_hints)
             .field("candidateFontSize", &self.candidate_font_size)
             .field("handwriting", &self.handwriting)
+            .field("palette", &self.palette)
             .finish()
     }
 }
@@ -404,6 +415,7 @@ pub enum RuleList {
     SymbolSequences,
     SymbolReadings,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -716,6 +728,10 @@ pub enum RequestBody {
         session: u32,
         context: FieldContext,
     },
+    OpenPalette {
+        session: u32,
+        context: FieldContext,
+    },
     Reconvert {
         session: u32,
         text: String,
@@ -847,6 +863,12 @@ pub enum RequestBody {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         preceding_text: Option<String>,
     },
+    PreviewMacros {
+        text: String,
+        reading: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pattern: Option<String>,
+    },
     ReadUserDictionary {
         offset: u32,
         limit: u32,
@@ -901,6 +923,11 @@ impl fmt::Debug for RequestBody {
                 .finish(),
             Self::OpenHandwriting { session, context, .. } => f
                 .debug_struct("OpenHandwriting")
+                .field("session", session)
+                .field("context", context)
+                .finish(),
+            Self::OpenPalette { session, context, .. } => f
+                .debug_struct("OpenPalette")
                 .field("session", session)
                 .field("context", context)
                 .finish(),
@@ -1058,6 +1085,12 @@ impl fmt::Debug for RequestBody {
                 .field("text", &REDACTED)
                 .field("precedingText", &REDACTED)
                 .finish(),
+            Self::PreviewMacros { .. } => f
+                .debug_struct("PreviewMacros")
+                .field("text", &REDACTED)
+                .field("reading", &REDACTED)
+                .field("pattern", &REDACTED)
+                .finish(),
             Self::ReadUserDictionary { offset, limit, .. } => f
                 .debug_struct("ReadUserDictionary")
                 .field("offset", offset)
@@ -1154,6 +1187,9 @@ pub enum ResponseBody {
     LanguagePreview {
         words: Vec<PreviewWord>,
     },
+    MacroPreview {
+        results: Vec<String>,
+    },
     UserDictionary {
         entries: Vec<DictionaryEntry>,
         total: u32,
@@ -1241,6 +1277,10 @@ impl fmt::Debug for ResponseBody {
             Self::LanguagePreview { words, .. } => f
                 .debug_struct("LanguagePreview")
                 .field("words", words)
+                .finish(),
+            Self::MacroPreview { .. } => f
+                .debug_struct("MacroPreview")
+                .field("results", &REDACTED)
                 .finish(),
             Self::UserDictionary { entries, total, .. } => f
                 .debug_struct("UserDictionary")
@@ -1665,6 +1705,7 @@ impl fmt::Debug for BranchMap {
 pub enum PaletteKind {
     Emoji,
     Symbol,
+    Kaomoji,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1783,6 +1824,12 @@ pub struct PalettePreview {
     pub code_points: String,
     #[serde(rename = "isPinned")]
     pub is_pinned: bool,
+    #[serde(rename = "nameSource")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_source: Option<String>,
+    #[serde(rename = "englishNameSource")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub english_name_source: Option<String>,
 }
 
 impl fmt::Debug for PalettePreview {
@@ -1795,6 +1842,29 @@ impl fmt::Debug for PalettePreview {
             .field("readings", &REDACTED)
             .field("codePoints", &REDACTED)
             .field("isPinned", &self.is_pinned)
+            .field("nameSource", &REDACTED)
+            .field("englishNameSource", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PalettePreviewFields {
+    #[serde(rename = "unicodeName")]
+    pub unicode_name: bool,
+    pub readings: bool,
+    pub shortcodes: bool,
+    #[serde(rename = "codePoints")]
+    pub code_points: bool,
+}
+
+impl fmt::Debug for PalettePreviewFields {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PalettePreviewFields")
+            .field("unicodeName", &self.unicode_name)
+            .field("readings", &self.readings)
+            .field("shortcodes", &self.shortcodes)
+            .field("codePoints", &self.code_points)
             .finish()
     }
 }
@@ -1845,6 +1915,12 @@ pub struct PalettePanel {
     pub hints: Vec<KeyHint>,
     #[serde(rename = "cellSize")]
     pub cell_size: f64,
+    #[serde(rename = "cellsPerRow")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cells_per_row: Option<u32>,
+    #[serde(rename = "previewFields")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_fields: Option<PalettePreviewFields>,
 }
 
 impl fmt::Debug for PalettePanel {
@@ -1868,6 +1944,8 @@ impl fmt::Debug for PalettePanel {
             .field("message", &REDACTED)
             .field("hints", &self.hints)
             .field("cellSize", &self.cell_size)
+            .field("cellsPerRow", &self.cells_per_row)
+            .field("previewFields", &self.preview_fields)
             .finish()
     }
 }

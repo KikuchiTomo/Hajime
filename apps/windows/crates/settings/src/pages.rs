@@ -159,6 +159,8 @@ impl Page {
                 menu::LIVE_CONVERSION,
                 choice::PRESENTATION,
                 choice::INITIAL_FOCUS,
+                choice::PREDICTION_DISPLAY,
+                choice::HIDDEN_PREDICTIONS,
                 features::OKURIGANA,
                 features::PREFERS_KATAKANA,
                 features::CALCULATION,
@@ -168,6 +170,9 @@ impl Page {
                 settings::EMOJI_CONVERSION,
                 settings::LATEX_CONVERSION,
                 settings::NUMBER_FORM_CONVERSION,
+                association::ENABLED,
+                association::LIMIT,
+                association::DICTIONARIES,
                 settings::MEANING,
                 settings::SHOWS_PART_OF_SPEECH,
             ],
@@ -192,13 +197,20 @@ impl Page {
             Page::Symbols => vec![features::SEQUENCES, features::READINGS],
             Page::Palette => vec![
                 palette::ENABLED,
+                palette::EMOJI_KEY,
+                palette::SYMBOL_KEY,
                 palette::CLOSES_AFTER_INSERT,
                 palette::RECORDS_HISTORY,
+                palette::CLEAR_HISTORY,
                 palette::COLUMNS,
                 palette::ROWS,
                 palette::CELL_SIZE,
                 palette::FREQUENT_ROWS,
                 palette::SHOWS_PREVIEW,
+                palette::SHOWS_UNICODE_NAME,
+                palette::SHOWS_READINGS,
+                palette::SHOWS_SHORTCODES,
+                palette::SHOWS_CODE_POINTS,
             ],
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             Page::Keys => std::iter::once(keys::PRESET_MENU)
@@ -259,6 +271,8 @@ pub enum Condition {
     IsNot(&'static str, &'static str),
     /// オン・オフの項目がオンのとき
     On(&'static str),
+    /// すべての条件を満たすとき
+    All(&'static [Condition]),
 }
 
 /// カスタムテーマの書体の欄(macOS の ThemeFontPicker)
@@ -279,10 +293,20 @@ pub enum Control {
     Choice(&'static [Choice]),
     /// カスタムテーマの書体(入っている書体から選ぶ．選択肢は OS から読む)
     ThemeFont(FontPart),
-    /// 整数を範囲の中で選ぶ(候補の数)
+    /// 整数を範囲の中で 1 段ずつ選ぶ(候補の数．macOS の Stepper)．値を左に，減らす・増やすボタンを右に置く
     Stepper(RangeKind),
-    /// 秒を範囲の中で選ぶ(0.1 秒ごと)
+    /// 秒を範囲の中で選ぶスライダー(0.1 秒ごと．macOS の SecondsSlider)．今の値を右に出す
     Seconds(RangeKind),
+    /// 値を範囲の中で選ぶスライダー．今の値は名前の後ろに出す(macOS の「候補の文字サイズ: 15」)
+    Slider(RangeKind),
+    /// 既成のテーマの 1 つ(値)．選ぶ印と見本の色を並べる(macOS の AppearancePage の ThemeRow)
+    ThemeOption(&'static str),
+    /// 1 つのカードに並べる操作のボタン(名前と操作．macOS の HStack の Button)
+    Buttons(&'static [(&'static str, Action)]),
+    /// 一覧を切り替える部品(path の値．macOS の segmented の Picker)．カードに入れず真ん中に置く
+    Segmented(&'static [Choice]),
+    /// エンジンから読んだ値と，その右の操作のボタン(ボタンの名前)．macOS の LabeledContent の中の Text と Button
+    InfoAction(Info, Action, &'static str),
     /// 注記(前の行の説明として小さい文字で出す)
     Note,
     /// エンジンに頼む操作のボタン(項目の名前をボタンに出す)
@@ -291,8 +315,8 @@ pub enum Control {
     Stat(Stat),
     /// 決まりの一覧(入力欄・追加・削除・表)
     List(ListSpec, LimitKind),
-    /// 英語と日本語の見分けを試す欄(打つ文・前の文字列・結果)
-    Preview,
+    /// 試す欄(2 つの入力欄と結果)．何を試すかは TryKind
+    Preview(TryKind),
     /// アプリのバージョン(変えられない)と，更新を確かめるボタン
     Version,
     /// 名前の右に置く操作のボタン(ボタンの名前)．macOS の LabeledContent の中のボタン
@@ -319,8 +343,19 @@ pub enum Control {
     Color,
     /// 外観の見本(候補ウィンドウと同じ描き方の分岐図)
     ThemePreview,
+    /// パレットの見本(パレットの窓と同じ描き方．列数・行数・マスの大きさは設定のとおり)
+    PalettePreview,
     /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
     ThemeReport,
+}
+
+/// 試す欄で試すもの
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TryKind {
+    /// 英語と日本語の見分け(打つ文・前の文字列)．結果の語をいつも英語・いつも日本語にする単語に足すボタンを置く
+    Language,
+    /// 変換マクロ(試す語・読み)．変換マクロの欄に形を書いている途中なら，その形だけを当てる(macOS の CommandsPage)
+    Macros,
 }
 
 /// 一覧の上限の種類(catalog の Limits のどれか)
@@ -335,6 +370,7 @@ pub enum LimitKind {
     Commands,
     Macros,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 impl LimitKind {
@@ -349,6 +385,7 @@ impl LimitKind {
             LimitKind::Commands => catalog.limits.commands,
             LimitKind::Macros => catalog.limits.macros,
             LimitKind::EnglishTerms => catalog.limits.english_terms,
+            LimitKind::HiddenPredictions => catalog.limits.hidden_predictions,
         }
     }
 }
@@ -375,6 +412,20 @@ pub enum Action {
     SyncNow,
     /// 新しいバージョンがあるかを確かめ，あれば尋ねてから入れる(R-19．押したときだけ通信する)
     CheckForUpdates,
+}
+
+impl Action {
+    /// 消す・戻す操作か(ボタンを危険の色で描く．macOS の role: .destructive)
+    pub fn is_destructive(self) -> bool {
+        matches!(
+            self,
+            Action::ResetLearning
+                | Action::ResetUsage
+                | Action::ResetPaletteHistory
+                | Action::RestoreDefaults
+                | Action::RestoreKeymap
+        )
+    }
 }
 
 /// 取り込んで使う辞書の一覧の種類
@@ -442,6 +493,83 @@ pub struct ListButtons {
     pub bottom: &'static [&'static str],
     /// 表の下の左に検索欄を置く(行の多い一覧)
     pub search: bool,
+    /// 検索欄の右に状態で絞り込む欄を置く(キー設定．macOS の KeymapPage の状態の Picker)
+    pub filter: bool,
+    /// 表の下の右に置く，一覧のファイルを読み込む・書き出すボタン(macOS の RuleListEditor の下の帯)
+    pub files: Option<ListFiles>,
+}
+
+/// 一覧のファイルを読み込む・書き出す操作
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListFiles {
+    pub import: FileTask,
+    pub export: FileTask,
+}
+
+impl ListFiles {
+    fn rule_list(list: RuleList) -> Self {
+        Self {
+            import: FileTask::ImportRuleList(list),
+            export: FileTask::ExportRuleList(list),
+        }
+    }
+
+    /// ボタンの名前(除外設定は CSV と書く．macOS と同じ)
+    pub fn labels(self) -> [&'static str; 2] {
+        match self.import {
+            FileTask::ImportProfileRules => [more::IMPORT_CSV, more::EXPORT_CSV],
+            _ => [settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY],
+        }
+    }
+
+    /// index 番目(0 は読み込む，1 は書き出す)のボタンの操作
+    pub fn task(self, index: usize) -> FileTask {
+        if index == 0 {
+            self.import
+        } else {
+            self.export
+        }
+    }
+}
+
+impl ListButtons {
+    /// 表の下のボタンの名前(ファイルのボタンを含む．部品を作る順)
+    pub fn bottom_labels(&self) -> Vec<&'static str> {
+        self.bottom
+            .iter()
+            .copied()
+            .chain(self.files.into_iter().flat_map(ListFiles::labels))
+            .collect()
+    }
+}
+
+/// 一覧のファイル．読み込む・書き出すことのできる一覧だけ
+fn list_files(control: &Control) -> Option<ListFiles> {
+    Some(match control {
+        Control::List(spec, _) => match spec.path {
+            "customRomaji" => ListFiles::rule_list(RuleList::Romaji),
+            "correction.rules" => ListFiles::rule_list(RuleList::CorrectionRules),
+            "correction.exceptions" => ListFiles::rule_list(RuleList::Exceptions),
+            "wordLanguage.englishWords" => ListFiles::rule_list(RuleList::EnglishWords),
+            "wordLanguage.japaneseWords" => ListFiles::rule_list(RuleList::JapaneseWords),
+            "englishTerms" => ListFiles::rule_list(RuleList::EnglishTerms),
+            "hiddenPredictions" => ListFiles::rule_list(RuleList::HiddenPredictions),
+            "profileRules" => ListFiles {
+                import: FileTask::ImportProfileRules,
+                export: FileTask::ExportProfileRules,
+            },
+            _ => return None,
+        },
+        Control::Dictionary(_) => ListFiles {
+            import: FileTask::ImportUserDictionary,
+            export: FileTask::ExportUserDictionary,
+        },
+        Control::Symbols(SymbolKind::Sequence, _) => {
+            ListFiles::rule_list(RuleList::SymbolSequences)
+        }
+        Control::Symbols(SymbolKind::Reading, _) => ListFiles::rule_list(RuleList::SymbolReadings),
+        _ => return None,
+    })
 }
 
 impl Control {
@@ -509,10 +637,13 @@ impl Control {
             self,
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
         );
+        let filter = matches!(self, Control::List(spec, _) if spec.path == "keymap");
         Some(ListButtons {
             top,
             bottom,
             search,
+            filter,
+            files: list_files(self),
         })
     }
 
@@ -561,6 +692,8 @@ pub enum Info {
     SyncFolder,
     /// 最後に同期した時刻
     LastSynced,
+    /// パレットを開くキー(キー設定の表から引く．値はコマンドの名前)
+    PaletteKeys(&'static str),
 }
 
 /// 使い方の記録の値の種類
@@ -671,6 +804,10 @@ impl Row {
         Self::new(title, path, Control::Seconds(range))
     }
 
+    pub fn slider(title: &'static str, path: &'static str, range: RangeKind) -> Self {
+        Self::new(title, path, Control::Slider(range))
+    }
+
     pub fn note(text: &'static str) -> Self {
         Self::new(text, "", Control::Note)
     }
@@ -696,6 +833,7 @@ impl Row {
                 | Control::ThemeFont(_)
                 | Control::Stepper(_)
                 | Control::Seconds(_)
+                | Control::Slider(_)
         )
     }
 
@@ -757,24 +895,8 @@ impl Section {
     }
 }
 
-/// 作ったページ．左の一覧にはこのページだけを出す
-pub const BUILT: &[Page] = &[
-    Page::Input,
-    Page::Conversion,
-    Page::Correction,
-    Page::Language,
-    Page::Romaji,
-    Page::Keys,
-    Page::Apps,
-    Page::Dictionary,
-    Page::Symbols,
-    Page::Commands,
-    Page::Appearance,
-    Page::Usage,
-    Page::Sync,
-    Page::Backup,
-    Page::About,
-];
+/// 作ったページ．左の一覧にはこのページだけを出す(すべてのページを作った)
+pub const BUILT: &[Page] = &Page::ALL;
 
 /// ページの中身．項目の並びだけで書けるページは sections を返す．None のページは app が専用の部品で組み立てる
 pub fn sections(page: Page) -> Option<Vec<Section>> {
@@ -895,6 +1017,16 @@ fn conversion() -> Vec<Section> {
                     "predictionDisplay",
                     options::SUGGESTION_DISPLAY,
                 ),
+                Row::toggle(
+                    choice::PREDICTION_PREFERS_HISTORY,
+                    "predictionPrefersHistory",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
+                Row::toggle(
+                    choice::PREDICTION_FROM_CORRECTION,
+                    "predictionFromCorrection",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
                 Row::seconds(
@@ -910,6 +1042,22 @@ fn conversion() -> Vec<Section> {
                 )
                 .enabled_when(On("liveConversion")),
             ],
+        ),
+        Section::new(
+            choice::HIDDEN_PREDICTIONS,
+            vec![Row::list(
+                ListSpec {
+                    path: "hiddenPredictions",
+                    fields: HIDDEN_PREDICTION_FIELDS,
+                    empty: choice::HIDDEN_PREDICTIONS_EMPTY,
+                    invalid: crate::strings::Text::Limited(
+                        crate::strings::LimitedText::HiddenPrediction,
+                    ),
+                    lowercase: false,
+                    exclusive_with: None,
+                },
+                LimitKind::HiddenPredictions,
+            )],
         ),
         Section::new(
             more::CANDIDATES,
@@ -1065,17 +1213,16 @@ fn conversion() -> Vec<Section> {
                     .enabled_when(On("homophoneNotes")),
             ],
         ),
-        Section::new(
-            settings::ZENZAI_MODEL,
-            vec![
-                Row::choice(
-                    settings::ZENZAI_MODEL,
-                    "zenzaiModel",
-                    options::ZENZAI_MODELS,
-                ),
-                Row::note(settings::ZENZAI_MODEL_NOTE),
-            ],
-        ),
+        Section {
+            title: Some(settings::ZENZAI_MODEL),
+            rows: vec![Row::choice(
+                settings::ZENZAI_MODEL,
+                "zenzaiModel",
+                options::ZENZAI_MODELS,
+            )],
+            footer: Some(settings::ZENZAI_MODEL_NOTE),
+            footer_variants: &[],
+        },
         Section::new(
             settings::LEARNING,
             vec![
@@ -1091,6 +1238,7 @@ const CORRECTION_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::REPLACEMENT, false),
 ];
 const EXCEPTION_FIELDS: &[Field] = &[Field::text(features::EXCEPTION_PLACEHOLDER)];
+const HIDDEN_PREDICTION_FIELDS: &[Field] = &[Field::text(choice::HIDDEN_PREDICTION_PLACEHOLDER)];
 const ROMAJI_FIELDS: &[Field] = &[
     Field::named("keys", settings::ROMAJI_KEYS, true),
     Field::named("kana", settings::ROMAJI_KANA, false),
@@ -1113,6 +1261,12 @@ const LANGUAGE_RULE_FIELDS: &[Field] = &[
     ),
 ];
 
+/// 日本語のタイプミスを直すとき．修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く
+const CORRECTS_JAPANESE: Condition = Condition::All(&[
+    Condition::Is("typoCorrection", "standard"),
+    Condition::On("correction.japanese"),
+]);
+
 /// 補正のページ(macOS の CorrectionPage)
 fn correction() -> Vec<Section> {
     use Condition::*;
@@ -1120,10 +1274,14 @@ fn correction() -> Vec<Section> {
         Section::new(
             features::CORRECTION_KINDS,
             vec![
-                Row::toggle(features::CORRECTS_ENGLISH, "correction.english"),
-                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese"),
+                Row::toggle(features::CORRECTS_ENGLISH, "correction.english")
+                    .enabled_when(IsNot("typoCorrection", "off")),
+                Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese")
+                    .enabled_when(Is("typoCorrection", "standard")),
                 Row::toggle(features::CORRECTS_REPEATED_KEYS, "correction.repeatedKeys")
-                    .enabled_when(On("correction.japanese")),
+                    .enabled_when(CORRECTS_JAPANESE),
+                Row::note(features::CORRECTION_KINDS_NOTE)
+                    .visible_when(IsNot("typoCorrection", "standard")),
                 Row::toggle(features::MISREADINGS, "misreadings"),
                 Row::toggle(extras::LOOSE_READINGS, "looseReadings"),
                 Row::note(extras::LOOSE_READINGS_NOTE),
@@ -1134,13 +1292,13 @@ fn correction() -> Vec<Section> {
         Section {
             title: None,
             rows: vec![Row::toggle(extras::HAND_SHIFT, "handShiftCorrection")
-                .enabled_when(On("correction.japanese"))],
+                .enabled_when(CORRECTS_JAPANESE)],
             footer: Some(extras::HAND_SHIFT_NOTE),
             footer_variants: &[],
         },
         Section::new(
             features::RULES,
-            with_files(
+            files_inline(
                 Row::list(
                     ListSpec {
                         path: "correction.rules",
@@ -1157,7 +1315,7 @@ fn correction() -> Vec<Section> {
         ),
         Section::new(
             features::EXCEPTIONS,
-            with_files(
+            files_inline(
                 Row::list(
                     ListSpec {
                         path: "correction.exceptions",
@@ -1204,11 +1362,11 @@ fn language() -> Vec<Section> {
         },
         Section::new(
             features::TRY_LANGUAGE,
-            vec![Row::new("", "", Control::Preview)],
+            vec![Row::new("", "", Control::Preview(TryKind::Language))],
         ),
         Section::new(
             features::ENGLISH_WORDS,
-            with_files(
+            files_inline(
                 words(
                     "wordLanguage.englishWords",
                     "wordLanguage.japaneseWords",
@@ -1219,7 +1377,7 @@ fn language() -> Vec<Section> {
         ),
         Section::new(
             features::JAPANESE_WORDS,
-            with_files(
+            files_inline(
                 words(
                     "wordLanguage.japaneseWords",
                     "wordLanguage.englishWords",
@@ -1255,7 +1413,7 @@ fn language() -> Vec<Section> {
         },
         Section {
             title: Some(extras::ENGLISH_TERMS),
-            rows: with_files(
+            rows: files_inline(
                 Row::list(
                     ListSpec {
                         path: "englishTerms",
@@ -1287,6 +1445,10 @@ const KEYMAP_FIELDS: &[Field] = &[
 /// キー設定のページ(macOS の KeymapPage)．表の行は上から順に並び，同じキーの行は下の行を使う
 fn keymap() -> Vec<Section> {
     vec![
+        Section::untitled(vec![
+            Row::new(keys::PRESET_MENU, "", Control::Preset),
+            Row::action(keys::RESTORE, Action::RestoreKeymap),
+        ]),
         Section::untitled(vec![Row::new("", "", Control::KeymapReport)]),
         Section {
             title: None,
@@ -1304,10 +1466,6 @@ fn keymap() -> Vec<Section> {
             footer: Some(crate::strings::windows::KEY_NOTE),
             footer_variants: keys::COMMAND_HELP,
         },
-        Section::untitled(vec![
-            Row::new(keys::PRESET_MENU, "", Control::Preset),
-            Row::action(keys::RESTORE, Action::RestoreKeymap),
-        ]),
     ]
 }
 
@@ -1322,21 +1480,17 @@ fn apps() -> Vec<Section> {
     vec![
         Section {
             title: None,
-            rows: vec![
-                Row::list(
-                    ListSpec {
-                        path: "profileRules",
-                        fields: APP_FIELDS,
-                        empty: more::EXCLUSIONS_EMPTY,
-                        invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
-                        lowercase: true,
-                        exclusive_with: None,
-                    },
-                    LimitKind::ProfileRules,
-                ),
-                Row::action(more::IMPORT_CSV, Action::File(FileTask::ImportProfileRules)),
-                Row::action(more::EXPORT_CSV, Action::File(FileTask::ExportProfileRules)),
-            ],
+            rows: vec![Row::list(
+                ListSpec {
+                    path: "profileRules",
+                    fields: APP_FIELDS,
+                    empty: more::EXCLUSIONS_EMPTY,
+                    invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
+                    lowercase: true,
+                    exclusive_with: None,
+                },
+                LimitKind::ProfileRules,
+            )],
             footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
             footer_variants: &[],
         },
@@ -1359,7 +1513,6 @@ const DICTIONARY_FIELDS: &[Field] = &[
     Field::named("word", settings::WORD, false),
 ];
 
-/// ユーザー辞書のページ(macOS の DictionaryPage)．登録した単語(同じ読みに別の単語を登録できる)と取り込んだ辞書
 const COMMAND_FIELDS: &[Field] = &[
     Field::named("reading", extras::COMMAND_READING, true),
     Field::named("title", extras::COMMAND_TITLE, false),
@@ -1368,6 +1521,9 @@ const COMMAND_FIELDS: &[Field] = &[
 ];
 
 const MACRO_FIELDS: &[Field] = &[Field::named("pattern", extras::MACRO_PATTERN, true)];
+
+/// 変換マクロの一覧の項目(書いている途中の形を試す欄に渡すため，画面からも探す)
+pub const MACROS_PATH: &str = "macros";
 
 /// コマンドと変換マクロのページ(macOS の CommandsPage)．コマンドの行き先は実行ファイル・ファイルのパスか URL を打つ
 fn commands() -> Vec<Section> {
@@ -1395,9 +1551,10 @@ fn commands() -> Vec<Section> {
             title: Some(extras::MACROS_SECTION),
             rows: vec![
                 Row::toggle(extras::CONVERSION_MACROS, "conversionMacros"),
+                Row::toggle(extras::MACRO_SKIPS_SAME_READING, "macroSkipsSameReading"),
                 Row::list(
                     ListSpec {
-                        path: "macros",
+                        path: MACROS_PATH,
                         fields: MACRO_FIELDS,
                         empty: extras::MACROS_EMPTY,
                         invalid: crate::strings::Text::Fixed(extras::INVALID_MACRO),
@@ -1410,85 +1567,135 @@ fn commands() -> Vec<Section> {
             footer: Some(extras::MACROS_NOTE),
             footer_variants: &[],
         },
-    ]
-}
-
-fn dictionary() -> Vec<Section> {
-    let imported = Section {
-        title: Some(dictionaries::IMPORTED),
-        rows: vec![Row::new(
-            "",
-            "",
-            Control::Dictionaries(DictionaryList::Imported, IMPORTED_SPEC),
-        )],
-        footer: Some(dictionaries::NOTE),
-        footer_variants: &[],
-    };
-    vec![
         Section {
-            title: None,
-            rows: vec![Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary")],
-            footer: Some(extras::DYNAMIC_DICTIONARY_NOTE),
+            title: Some(extras::TRY_MACROS),
+            rows: vec![Row::new("", "", Control::Preview(TryKind::Macros))],
+            footer: Some(extras::MACRO_REFERENCE),
             footer_variants: &[],
         },
-        Section::new(
-            crate::strings::dictionaries::USER_WORDS,
-            vec![
-                Row::new(
-                    "",
-                    "",
-                    Control::Dictionary(ListSpec {
-                        path: "userDictionary",
-                        fields: DICTIONARY_FIELDS,
-                        empty: settings::DICTIONARY_EMPTY,
-                        invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Entry),
-                        lowercase: false,
-                        exclusive_with: None,
-                    }),
-                ),
-                Row::action(
-                    settings::IMPORT_DICTIONARY,
-                    Action::File(FileTask::ImportUserDictionary),
-                ),
-                Row::action(
-                    settings::EXPORT_DICTIONARY,
-                    Action::File(FileTask::ExportUserDictionary),
-                ),
-            ],
-        ),
-        imported,
     ]
 }
 
-/// 記号のページ(macOS の SymbolsPage)．既定の決まりは変えず，変えた分だけを設定に重ねる
-/// 絵文字と記号のパレットのページ(R-26．macOS の PalettePage)
+/// ユーザー辞書のページ(macOS の DictionaryPage)．登録した単語(同じ読みに別の単語を登録できる)と取り込んだ辞書を切り替えて出す
+fn dictionary() -> Vec<Section> {
+    use Condition::*;
+    let imported = || Is(DICTIONARY_TAB, DICTIONARY_TAB_IMPORTED);
+    let words = || IsNot(DICTIONARY_TAB, DICTIONARY_TAB_IMPORTED);
+    vec![
+        Section::untitled(vec![Row::new(
+            "",
+            DICTIONARY_TAB,
+            Control::Segmented(DICTIONARY_TABS),
+        )]),
+        Section {
+            title: None,
+            // 書き方を 1 つずつ注記の行にして並べ，最後に登録の例を置く(macOS の書き方の表と同じ中身)
+            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
+                .chain(std::iter::once(Row::note(extras::DYNAMIC_DICTIONARY_NOTE)))
+                .chain(
+                    crate::strings::windows::TEMPLATE_ROWS
+                        .iter()
+                        .map(|text| Row::note(text)),
+                )
+                .chain(std::iter::once(Row::note(extras::TEMPLATE_FILTERS)))
+                .chain(std::iter::once(Row::note(
+                    crate::strings::windows::TEMPLATE_EXAMPLE,
+                )))
+                .map(|row| row.visible_when(words()))
+                .collect(),
+            footer: Some(extras::DATE_FORMAT_SYMBOLS),
+            footer_variants: &[],
+        },
+        Section {
+            title: None,
+            rows: vec![Row::new(
+                "",
+                "",
+                Control::Dictionary(ListSpec {
+                    path: "userDictionary",
+                    fields: DICTIONARY_FIELDS,
+                    empty: settings::DICTIONARY_EMPTY,
+                    invalid: crate::strings::Text::Limited(crate::strings::LimitedText::Entry),
+                    lowercase: false,
+                    exclusive_with: None,
+                }),
+            )
+            .visible_when(words())],
+            footer: Some(settings::DICTIONARY_NOTE),
+            footer_variants: &[],
+        },
+        Section {
+            title: None,
+            rows: vec![Row::new(
+                "",
+                "",
+                Control::Dictionaries(DictionaryList::Imported, IMPORTED_SPEC),
+            )
+            .visible_when(imported())],
+            footer: Some(dictionaries::NOTE),
+            footer_variants: &[],
+        },
+    ]
+}
+
+/// ユーザー辞書のページで出している一覧(画面の中だけの値．設定のファイルには書かない)
+pub const DICTIONARY_TAB: &str = "page.dictionaryTab";
+pub const DICTIONARY_TAB_IMPORTED: &str = "imported";
+const DICTIONARY_TABS: &[Choice] = &[
+    ("words", dictionaries::USER_WORDS),
+    (DICTIONARY_TAB_IMPORTED, dictionaries::IMPORTED),
+];
+
+/// 画面の中だけの値(開いている一覧など)の道筋か
+pub fn is_view_path(path: &str) -> bool {
+    path.starts_with("page.")
+}
+
+/// 絵文字と記号のパレットのページ(R-26．macOS の PalettePage)．見本は設定のとおりの列数・行数・マスの大きさで描く
 fn palette_page() -> Vec<Section> {
     use Condition::*;
     vec![
+        Section::untitled(vec![Row::new(more::PREVIEW, "", Control::PalettePreview)]),
         Section::new(
             palette::BEHAVIOR,
             vec![
                 Row::toggle(palette::ENABLED, "palette"),
+                Row::new(
+                    palette::EMOJI_KEY,
+                    "",
+                    Control::Info(Info::PaletteKeys("emojiPalette")),
+                )
+                .enabled_when(On("palette")),
+                Row::new(
+                    palette::SYMBOL_KEY,
+                    "",
+                    Control::Info(Info::PaletteKeys("symbolPalette")),
+                )
+                .enabled_when(On("palette")),
+                Row::new(
+                    palette::KAOMOJI_KEY,
+                    "",
+                    Control::Info(Info::PaletteKeys("kaomojiPalette")),
+                )
+                .enabled_when(On("palette")),
                 Row::toggle(palette::CLOSES_AFTER_INSERT, "paletteClosesAfterInsert")
                     .enabled_when(On("palette")),
                 Row::toggle(palette::RECORDS_HISTORY, "paletteRecordsHistory")
                     .enabled_when(On("palette")),
                 Row::action(palette::CLEAR_HISTORY, Action::ResetPaletteHistory)
                     .enabled_when(On("palette")),
-                Row::note(palette::CLEAR_HISTORY_NOTE),
-                Row::note(crate::strings::windows::PALETTE_KEYS_NOTE),
             ],
         ),
-        Section::new(
-            palette::LOOK,
-            vec![
+        Section {
+            title: Some(palette::LOOK),
+            rows: vec![
                 Row::stepper(
                     palette::COLUMNS,
                     "paletteColumns",
                     RangeKind::PaletteColumns,
                 ),
                 Row::stepper(palette::ROWS, "paletteRows", RangeKind::PaletteRows),
-                Row::stepper(
+                Row::slider(
                     palette::CELL_SIZE,
                     "paletteCellSize",
                     RangeKind::PaletteCellSize,
@@ -1500,15 +1707,26 @@ fn palette_page() -> Vec<Section> {
                 )
                 .enabled_when(On("paletteRecordsHistory")),
                 Row::toggle(palette::SHOWS_PREVIEW, "paletteShowsPreview"),
-                Row::note(palette::THEME_NOTE),
+                Row::toggle(palette::SHOWS_UNICODE_NAME, "paletteShowsUnicodeName")
+                    .enabled_when(On("paletteShowsPreview")),
+                Row::toggle(palette::SHOWS_READINGS, "paletteShowsReadings")
+                    .enabled_when(On("paletteShowsPreview")),
+                Row::toggle(palette::SHOWS_SHORTCODES, "paletteShowsShortcodes")
+                    .enabled_when(On("paletteShowsPreview")),
+                Row::toggle(palette::SHOWS_CODE_POINTS, "paletteShowsCodePoints")
+                    .enabled_when(On("paletteShowsPreview")),
             ],
-        ),
+            footer: Some(palette::THEME_NOTE),
+            footer_variants: &[],
+        },
     ]
 }
 
+/// 記号のページ(macOS の SymbolsPage)．既定の決まりは変えず，変えた分だけを設定に重ねる．
+/// ファイルを読み込む・書き出すボタンは一覧の表の下の帯に置く(pages::list_files)
 fn symbols() -> Vec<Section> {
-    let section = |title, kind, fields, invalid, file| {
-        let mut rows = vec![Row::new(
+    let section = |title, kind, fields, invalid, _file: RuleList| {
+        let rows = vec![Row::new(
             "",
             "",
             Control::Symbols(
@@ -1523,7 +1741,6 @@ fn symbols() -> Vec<Section> {
                 },
             ),
         )];
-        rows.extend(file_rows(file));
         Section::new(title, rows)
     };
     vec![
@@ -1554,9 +1771,14 @@ const READING_FIELDS: &[Field] = &[
     Field::named("output", features::READING_OUTPUT, false),
 ];
 
+/// 一覧の行．ファイルを読み込む・書き出すボタンは一覧の表の下の帯に置く(pages::list_files．macOS の RuleListEditor)
+fn files_inline(list: Row, _file: RuleList) -> Vec<Row> {
+    vec![list]
+}
+
 /// ローマ字のページ(macOS の RomajiPage)．標準の表に重ねる綴り
 fn romaji() -> Vec<Section> {
-    vec![Section::untitled(with_files(
+    vec![Section::untitled(files_inline(
         Row::list(
             ListSpec {
                 path: "customRomaji",
@@ -1572,24 +1794,6 @@ fn romaji() -> Vec<Section> {
     ))]
 }
 
-/// 一覧と，その一覧のファイルを読み込む・書き出すボタン(macOS の RuleListEditor のインポート・エクスポート)
-fn with_files(list: Row, file: RuleList) -> Vec<Row> {
-    std::iter::once(list).chain(file_rows(file)).collect()
-}
-
-fn file_rows(file: RuleList) -> [Row; 2] {
-    [
-        Row::action(
-            settings::IMPORT_DICTIONARY,
-            Action::File(FileTask::ImportRuleList(file)),
-        ),
-        Row::action(
-            settings::EXPORT_DICTIONARY,
-            Action::File(FileTask::ExportRuleList(file)),
-        ),
-    ]
-}
-
 const THEME_FIELDS: &[Field] = &[Field::named("name", more::THEME_NAME, false)];
 
 /// 外観のページ(macOS の AppearancePage と CustomThemeEditor)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
@@ -1598,20 +1802,23 @@ fn appearance() -> Vec<Section> {
     use crate::themes;
     use Condition::*;
     let editing = || IsNot(themes::ID, "");
-    let mut colors: Vec<Row> = themes::COLORS
-        .iter()
-        .map(|(path, title)| Row::new(title, path, Control::Color).visible_when(editing()))
-        .collect();
-    colors.push(
-        Row::new(more::READABILITY, "", Control::ThemeReport)
-            .visible_when(IsNot(themes::READABILITY, "")),
+    // 読みにくい組み合わせの知らせは色の上に出す(macOS の CustomThemeEditor と同じ)
+    let mut colors = vec![Row::new(more::READABILITY, "", Control::ThemeReport)
+        .visible_when(IsNot(themes::READABILITY, ""))];
+    colors.extend(
+        themes::COLORS
+            .iter()
+            .map(|(path, title)| Row::new(title, path, Control::Color).visible_when(editing())),
     );
+    let theme_rows = options::THEMES
+        .iter()
+        .map(|(value, name)| {
+            Row::new(name, "theme", Control::ThemeOption(value)).clearing("customThemeID")
+        })
+        .collect();
     vec![
         Section::untitled(vec![Row::new(more::PREVIEW, "", Control::ThemePreview)]),
-        Section::new(
-            more::THEME,
-            vec![Row::choice(more::THEME, "theme", options::THEMES).clearing("customThemeID")],
-        ),
+        Section::new(more::THEME, theme_rows),
         Section::new(
             more::CUSTOM_THEMES,
             vec![Row::new(
@@ -1631,7 +1838,7 @@ fn appearance() -> Vec<Section> {
         Section::new(
             more::SHAPE,
             vec![
-                Row::stepper(
+                Row::slider(
                     more::CORNER_RADIUS,
                     themes::CORNER_RADIUS,
                     RangeKind::CustomThemeCornerRadius,
@@ -1659,7 +1866,7 @@ fn appearance() -> Vec<Section> {
         ),
         Section::new(
             more::FONT,
-            vec![Row::stepper(
+            vec![Row::slider(
                 settings::FONT_SIZE_NAME,
                 "candidateFontSize",
                 RangeKind::CandidateFontSize,
@@ -1697,32 +1904,46 @@ fn sync_page() -> Vec<Section> {
         .iter()
         .map(|(group, name)| Row::choice(name, scope_path(group), options::SYNC_SCOPES))
         .collect();
-    scopes.push(Row::new(
-        sync::ITEMS,
-        "",
-        Control::SyncFields(ListSpec {
-            path: "",
-            fields: &[],
-            empty: "",
-            invalid: crate::strings::Text::Fixed(""),
-            lowercase: false,
-            exclusive_with: None,
-        }),
-    ));
+    scopes.push(
+        Row::new(
+            sync::ITEMS,
+            crate::sync::HAS_FIELDS,
+            Control::SyncFields(ListSpec {
+                path: "",
+                fields: &[],
+                empty: "",
+                invalid: crate::strings::Text::Fixed(""),
+                lowercase: false,
+                exclusive_with: None,
+            }),
+        )
+        .visible_when(On(crate::sync::HAS_FIELDS)),
+    );
     vec![
         Section {
             title: None,
             rows: vec![
                 Row::toggle(sync::ENABLED, crate::sync::ENABLED)
                     .enabled_when(IsNot(crate::sync::FOLDER, "")),
-                Row::new(sync::FOLDER, "", Control::Info(Info::SyncFolder)),
-                Row::action(sync::CHOOSE_FOLDER, Action::ChooseSyncFolder),
-                Row::new(sync::LAST_SYNCED, "", Control::Info(Info::LastSynced)),
+                Row::new(
+                    sync::FOLDER,
+                    "",
+                    Control::InfoAction(
+                        Info::SyncFolder,
+                        Action::ChooseSyncFolder,
+                        sync::CHOOSE_FOLDER,
+                    ),
+                ),
+                Row::new(
+                    sync::LAST_SYNCED,
+                    "",
+                    Control::InfoAction(Info::LastSynced, Action::SyncNow, sync::SYNC_NOW),
+                )
+                .enabled_when(On(crate::sync::ENABLED)),
                 Row::note(sync::FAILED)
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_FAILED)),
                 Row::note(sync::UNREADABLE)
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_UNREADABLE)),
-                Row::action(sync::SYNC_NOW, Action::SyncNow).enabled_when(On(crate::sync::ENABLED)),
             ],
             footer: Some(crate::strings::windows::SYNC_NOTE),
             footer_variants: &[],
@@ -1745,21 +1966,23 @@ fn scope_path(group: &str) -> &'static str {
         .or_insert_with(|| Box::leak(crate::sync::scope_path(group).into_boxed_str()))
 }
 
+const BACKUP_BUTTONS: &[(&str, Action)] = &[
+    (
+        more::EXPORT_SETTINGS,
+        Action::File(FileTask::ExportSettings),
+    ),
+    (
+        more::IMPORT_SETTINGS,
+        Action::File(FileTask::ImportSettings),
+    ),
+];
+
 /// バックアップのページ(macOS の BackupPage)．設定のファイルを開くボタンも置く(画面に無い項目を直すため)
 fn backup() -> Vec<Section> {
     vec![
         Section {
             title: None,
-            rows: vec![
-                Row::action(
-                    more::EXPORT_SETTINGS,
-                    Action::File(FileTask::ExportSettings),
-                ),
-                Row::action(
-                    more::IMPORT_SETTINGS,
-                    Action::File(FileTask::ImportSettings),
-                ),
-            ],
+            rows: vec![Row::new("", "", Control::Buttons(BACKUP_BUTTONS))],
             footer: Some(more::BACKUP_NOTE),
             footer_variants: &[],
         },
@@ -1815,11 +2038,21 @@ pub fn holds(
     text: impl Fn(&str) -> String,
     on: impl Fn(&str) -> bool,
 ) -> bool {
-    match condition {
-        Condition::Is(path, value) => text(path) == value,
-        Condition::IsNot(path, value) => text(path) != value,
-        Condition::On(path) => on(path),
+    fn check(
+        condition: Condition,
+        text: &dyn Fn(&str) -> String,
+        on: &dyn Fn(&str) -> bool,
+    ) -> bool {
+        match condition {
+            Condition::Is(path, value) => text(path) == value,
+            Condition::IsNot(path, value) => text(path) != value,
+            Condition::On(path) => on(path),
+            Condition::All(conditions) => conditions
+                .iter()
+                .all(|condition| check(*condition, text, on)),
+        }
     }
+    check(condition, &text, &on)
 }
 
 #[cfg(test)]
@@ -1874,6 +2107,43 @@ mod tests {
         assert!(holds(Condition::Is("inputStyle", "english"), text, on));
         assert!(!holds(Condition::IsNot("inputStyle", "english"), text, on));
         assert!(!holds(Condition::On("showsModeIndicator"), text, on));
+        let both = Condition::All(&[
+            Condition::Is("inputStyle", "english"),
+            Condition::On("liveConversion"),
+        ]);
+        assert!(!holds(both, text, on));
+        assert!(holds(both, text, |_: &str| true));
+    }
+
+    #[test]
+    fn 修正の対象はタイプミスの修正で選んだ範囲でだけ使える() {
+        let rows: Vec<Row> = sections(Page::Correction)
+            .unwrap()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .collect();
+        let enabled = |path: &str, level: &str, japanese: bool| {
+            let row = rows.iter().find(|row| row.path == path).unwrap();
+            row.enabled.is_none_or(|condition| {
+                holds(
+                    condition,
+                    |path| {
+                        if path == "typoCorrection" {
+                            level.to_string()
+                        } else {
+                            String::new()
+                        }
+                    },
+                    |path| path != "correction.japanese" || japanese,
+                )
+            })
+        };
+        assert!(enabled("correction.english", "conservative", true));
+        assert!(!enabled("correction.english", "off", true));
+        assert!(!enabled("correction.japanese", "conservative", true));
+        assert!(enabled("correction.repeatedKeys", "standard", true));
+        assert!(!enabled("correction.repeatedKeys", "standard", false));
+        assert!(!enabled("handShiftCorrection", "conservative", true));
     }
 
     #[test]
@@ -1943,6 +2213,66 @@ mod tests {
         assert_eq!((range.lower(), range.upper()), (0.0, 4.0));
         assert_eq!(crate::strings::more::skip_count(0.0), "オフ");
         assert_eq!(crate::strings::more::skip_count(2.0), "2 件以下");
+    }
+
+    #[test]
+    fn 絵文字と記号のページを左の一覧に出す() {
+        let found = sidebar(BUILT, "");
+        assert_eq!(
+            found[1],
+            (
+                Group::Dictionary,
+                vec![
+                    Page::Dictionary,
+                    Page::Symbols,
+                    Page::Palette,
+                    Page::Commands
+                ]
+            )
+        );
+        assert_eq!(
+            sidebar(BUILT, "記号のパレットを開くキー")[0].1,
+            vec![Page::Palette]
+        );
+        assert!(Page::Conversion.matches("連想の辞書"));
+    }
+
+    #[test]
+    fn パレットのページは開くキーとマスの大きさのスライダーを出す() {
+        let rows: Vec<Row> = sections(Page::Palette)
+            .unwrap()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .collect();
+        assert!(rows
+            .iter()
+            .any(|row| row.control == Control::Info(Info::PaletteKeys("emojiPalette"))));
+        assert!(rows
+            .iter()
+            .any(|row| row.control == Control::Slider(RangeKind::PaletteCellSize)));
+        // 注記は名前の無い行の説明にしない(幅の無い説明にならない)
+        assert!(!rows.iter().any(|row| row.control == Control::Note));
+    }
+
+    #[test]
+    fn 消す操作は危険の色にする() {
+        assert!(Action::ResetLearning.is_destructive());
+        assert!(Action::RestoreDefaults.is_destructive());
+        assert!(!Action::OpenSettingsFile.is_destructive());
+    }
+
+    #[test]
+    fn 一覧のファイルのボタンは表の下の帯に置く() {
+        let romaji = &sections(Page::Romaji).unwrap()[0].rows;
+        assert_eq!(romaji.len(), 1);
+        let buttons = romaji[0].control.list_buttons().unwrap();
+        assert_eq!(
+            buttons.bottom_labels(),
+            vec![settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY]
+        );
+        let apps = &sections(Page::Apps).unwrap()[0].rows;
+        let labels = apps[0].control.list_buttons().unwrap().bottom_labels();
+        assert!(labels.contains(&more::IMPORT_CSV));
     }
 
     #[test]

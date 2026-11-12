@@ -29,19 +29,20 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .keyboard: ["keyboardLayout"]
         case .keys: ["keymap"]
         case .conversion:
-            ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "predictionDisplay", "suggestionSkipCount", "listCandidatesPerPage", "branchCandidatesPerPage",
+            ["typoCorrection", "candidatePresentation", "initialFocus", "suggestionDisplay", "predictionDisplay", "suggestionSkipCount", "predictionPrefersHistory", "predictionFromCorrection", "hiddenPredictions", "listCandidatesPerPage", "branchCandidatesPerPage",
              "liveConversionDelay", "liveConversionSkipLength", "englishSkipLength", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "remembersRejectedCorrections", "correctionSensitivity", "showsSuggestions", "okuriganaStyle", "calculation", "postalCodeConversion", "handwriting", "homophoneNotes", "meaningPlacement", "meaningSenseLimit", "showsPartOfSpeech", "showsUsageExamples", "showsHomophones", "misuseNotes", "proofreading",
              "misreadings", "prefersKatakana", "showsVariantRow", "showsKeyHints", "numberKeySelection", "dateConversion", "symbolConversion", "emojiConversion", "latexConversion",
              "numberFormConversion", "numberFormCircled", "numberFormParenthesized", "numberFormKanji", "numberFormRoman", "learning",
              "association", "associationLimit", "showsAssociationHint", "handShiftCorrection", "looseReadings", "phoneticSpelling", "dynamicDictionary",
-             "conversionMacros", "zenzaiModel", "englishTermCandidates", "contextualSegmentCandidates", "listSegmentAlternatives"]
+             "conversionMacros", "macroSkipsSameReading", "zenzaiModel", "englishTermCandidates", "contextualSegmentCandidates", "listSegmentAlternatives"]
         case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules", "macros", "palette", "paletteClosesAfterInsert", "paletteRecordsHistory"]
         case .dictionary: ["userDictionary", "englishTerms"]
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID",
-                           "paletteColumns", "paletteRows", "paletteCellSize", "paletteShowsPreview", "paletteFrequentRows"]
+                           "paletteColumns", "paletteRows", "paletteCellSize", "paletteShowsPreview", "paletteFrequentRows",
+                           "paletteShowsUnicodeName", "paletteShowsReadings", "paletteShowsShortcodes", "paletteShowsCodePoints"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "restrainsLiveConversionInCode", "profileRules"]
         case .usage: ["recordsUsage"]
         case .commands: ["launcherCommands", "commands"]

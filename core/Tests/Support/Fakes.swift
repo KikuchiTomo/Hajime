@@ -66,8 +66,16 @@ public final class FakeConverter: KanaKanjiConverting {
     public var predictionTexts: [String: [String]] = [:]
     public func segmentationWords(for reading: String) -> [Candidate.Word] { words[reading] ?? [] }
     public func languageModelScores(forKeys keys: [String]) -> [Double?] { keys.map { languageModelScores[$0] } }
+    /// 確定した履歴(学習)にある予測の語句
+    public var learnedPredictions: Set<String> = []
+    /// 予測をエンジンの候補(確定すると学ぶ)にするか．既定は学ばない候補
+    public var predictionsAreLearnable = false
     public func predictions(for reading: String) -> [Candidate] {
-        (predictionTexts[reading] ?? []).map { Candidate(text: $0, readingCount: reading.count, origin: .variant(.hiragana)) }
+        (predictionTexts[reading] ?? []).enumerated().map { index, text in
+            var candidate = Candidate(text: text, readingCount: reading.count, origin: predictionsAreLearnable ? .engine(id: 2000 + index) : .variant(.hiragana))
+            candidate.isLearned = learnedPredictions.contains(text)
+            return candidate
+        }
     }
     public func plausibility(of reading: String) -> Double { scores[reading] ?? (table[reading] == nil ? -.infinity : 0) }
     /// 打ったキーごとの，打ち間違いを直した読みの候補

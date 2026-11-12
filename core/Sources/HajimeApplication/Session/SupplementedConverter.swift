@@ -341,8 +341,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     /// 入れるときに中身を決める語(TextTemplate)に渡す値
     private func templateValues() -> TextTemplate.Values {
-        TextTemplate.Values(now: calendar.now(), day: { [calendar] in calendar.day(offsetFromToday: $0) },
-                            uuid: { UUID().uuidString }, random: { Int.random(in: $0) })
+        TemplateValueSource(calendar: calendar).values()
     }
 
     /// かなで打った読みの第 1 候補が英語のつづり(「Live変換」)を含み，その部分をカタカナにした候補(「ライブ変換」)があれば，
