@@ -172,24 +172,6 @@ impl ResolvedTheme {
         })
     }
 
-    /// 語の意味のカードの地(文字の色を薄く敷く)
-    pub fn meaning_card_fill(&self) -> Color {
-        self.text.with_alpha(if self.kind == Kind::Contrast {
-            opacity::glass::MEANING_CARD_CONTRAST
-        } else {
-            opacity::glass::MEANING_CARD
-        })
-    }
-
-    /// 意味の番号と品詞の札の地(アクセントの色を薄く敷く)
-    pub fn meaning_tint(&self) -> Color {
-        self.selection.with_alpha(if self.kind == Kind::Contrast {
-            opacity::glass::MEANING_BADGE_CONTRAST
-        } else {
-            opacity::glass::MEANING_BADGE
-        })
-    }
-
     /// 設定から描き方を決める．カスタムテーマを使っていれば，元のテーマの描き方に色・書体・形を重ねる
     pub fn resolve(theme: &str, custom: Option<&CustomTheme>, look: &SystemLook) -> Self {
         let Some(custom) = custom else {
@@ -420,24 +402,24 @@ impl ResolvedTheme {
             Font::MeaningHeadword => (
                 self.face(),
                 Weight::Semibold,
-                size::glass::MEANING_HEADWORD_FONT_SIZE,
+                size::meaning::HEADWORD_FONT_SIZE,
             ),
-            Font::MeaningBody => (self.face(), body, size::glass::MEANING_BODY_FONT_SIZE),
-            Font::MeaningExample => (self.face(), body, size::glass::MEANING_EXAMPLE_FONT_SIZE),
+            Font::MeaningBody => (self.face(), body, size::meaning::BODY_FONT_SIZE),
+            Font::MeaningExample => (self.face(), body, size::meaning::EXAMPLE_FONT_SIZE),
             Font::MeaningExampleStrong => (
                 self.face(),
                 Weight::Semibold,
-                size::glass::MEANING_EXAMPLE_FONT_SIZE,
+                size::meaning::EXAMPLE_FONT_SIZE,
             ),
             Font::MeaningTag => (
                 self.label_face(),
                 Weight::Medium,
-                size::glass::MEANING_POS_FONT_SIZE,
+                size::meaning::PART_OF_SPEECH_FONT_SIZE,
             ),
             Font::MeaningNumber => (
                 self.key_face(),
                 Weight::Semibold,
-                size::glass::MEANING_BADGE_FONT_SIZE,
+                size::meaning::NUMBER_FONT_SIZE,
             ),
         };
         FontSpec { face, weight, size }

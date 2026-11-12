@@ -44,9 +44,6 @@ pub fn variants_position(index: u32, total: u32) -> String {
 /// 連想の一覧の見出しの前に置く言葉(macOS の UIStrings.Association.headingPrefix)
 pub const ASSOCIATION_PREFIX: &str = "連想";
 
-/// 語の意味のカードで，同音語の札の前に置く名前(macOS の UIStrings.Candidate.homophoneOthers)
-pub const HOMOPHONE_OTHERS: &str = "同音語";
-
 /// パレットの説明の欄の項目名(macOS の UIStrings.Palette の unicodeNameLabel など)．
 /// PALETTE_ENGLISH_NAME は UCD の名前の無い並び(国旗など)で代わりに出す英語の名前
 pub const PALETTE_UNICODE_NAME: &str = "Unicode";

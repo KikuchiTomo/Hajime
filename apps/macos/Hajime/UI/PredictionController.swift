@@ -73,8 +73,8 @@ final class PredictionView: NSView {
     var fillsSurface = false { didSet { needsDisplay = true } }
 
     private var font: NSFont { theme.candidateFont(size: fontSize) }
-    /// platinum と desk は外枠と立体の縁の内側に描く
-    private var inset: CGFloat { theme.isRounded ? 0 : Size.frameWidth + Size.bevelWidth }
+    /// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．余白はこの内側から測る
+    private var inset: CGFloat { theme.isRounded ? Size.frameWidth : Size.frameWidth + Size.bevelWidth }
 
     private func attributes(_ color: NSColor) -> [NSAttributedString.Key: Any] { [.font: font, .foregroundColor: color] }
 
@@ -98,9 +98,9 @@ final class PredictionView: NSView {
         }
         var x = Spacing.paddingX + inset
         for (text, color) in [(prediction.typed, theme.text), (prediction.completion, theme.textMuted)] where !text.isEmpty {
-            let size = text.size(withAttributes: attributes(color))
-            text.draw(at: NSPoint(x: x, y: (bounds.midY - size.height / 2).rounded()), withAttributes: attributes(color))
-            x += size.width
+            // 文字の行の箱を窓の縦の真ん中に置く(キーの札と同じ真ん中)
+            TextFitting.draw(text, attributes: attributes(color), x: x, midY: bounds.midY)
+            x += text.size(withAttributes: attributes(color)).width
         }
         if let key = prediction.key {
             GlassDrawing.drawKeys(key, x: (x + Spacing.keyGap).rounded(), midY: bounds.midY, theme: theme)

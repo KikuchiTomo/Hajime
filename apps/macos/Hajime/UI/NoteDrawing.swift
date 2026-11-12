@@ -70,7 +70,7 @@ enum NoteDrawing {
     private static func drawText(_ text: String, attributes: [NSAttributedString.Key: Any], x: CGFloat, midY: CGFloat) -> CGFloat {
         guard !text.isEmpty else { return x }
         let size = text.size(withAttributes: attributes)
-        text.draw(at: NSPoint(x: x, y: (midY - size.height / 2).rounded()), withAttributes: attributes)
+        TextFitting.draw(text, attributes: attributes, x: x, midY: midY)
         return x + size.width.rounded(.up) + Glass.noteGap
     }
 
@@ -104,6 +104,6 @@ enum NoteDrawing {
         fill.setFill()
         let radius = theme.isRounded ? Glass.tagRadius : 0
         NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
-        GlassDrawing.drawCentered(text, attributes: [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: color], in: rect)
+        GlassDrawing.drawLineCentered(text, attributes: [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: color], in: rect)
     }
 }

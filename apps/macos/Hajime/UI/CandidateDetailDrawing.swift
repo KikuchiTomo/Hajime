@@ -24,9 +24,8 @@ enum CandidateDetailDrawing {
         return line
     }
 
-    /// 行の高さの真ん中に描く(候補の文字だけを描くときと同じ位置になる)
+    /// 行の高さの真ん中に描く(候補の文字だけを描くときと同じベースラインになる)
     static func draw(_ line: NSAttributedString, x: CGFloat, in rect: NSRect) {
-        let size = line.size()
-        line.draw(at: NSPoint(x: x.rounded(), y: rect.minY + ((rect.height - size.height) / 2).rounded()))
+        TextFitting.draw(line, x: x, midY: rect.midY)
     }
 }

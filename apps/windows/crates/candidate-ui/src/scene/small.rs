@@ -7,30 +7,28 @@ use super::{Frame, Look, Measure, Scene};
 use crate::theme::Font;
 use tokens::size::{candidate, glass, mode_indicator, prediction as spacing};
 
+/// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．小さな窓の余白はこの内側から測る
+fn edge(look: &Look) -> f32 {
+    if look.theme.is_rounded() {
+        candidate::FRAME_WIDTH
+    } else {
+        candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
+    }
+}
+
 /// 打ち間違いを直したこと・「もしかして」を知らせる 1 行
 pub fn note(note: &ipc::Note, look: &Look, measure: &dyn Measure) -> Scene {
     let mut painter = Painter::new(look, measure);
-    let rounded = look.theme.is_rounded();
-    let padding = if rounded {
-        glass::PADDING
-    } else {
-        candidate::PADDING_X
-    };
-    let inset = if rounded {
-        0.0
-    } else {
-        candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
-    };
-    let width = (painter.note_width(note) + (padding + inset) * 2.0).ceil();
+    let inset = edge(look);
+    // 1 行だけの小さな窓の余白(予測の窓・モードの札と同じ)．中身の高さは足元の行と同じ決め方
+    let width = (painter.note_width(note) + (glass::COMPACT_PADDING_X + inset) * 2.0).ceil();
     let content = glass::NOTE_ICON_SIZE
         .max(glass::KEYCAP_HEIGHT)
-        .max(measure.height(Font::Label));
-    let height = glass::FOOTER_HEIGHT
-        .max(content + (candidate::SECTION_PADDING_Y + inset) * 2.0)
-        .ceil();
+        .max(measure.height(Font::Label).ceil());
+    let height = (content + (glass::COMPACT_PADDING_Y + inset) * 2.0).ceil();
     let body = Frame::new(0.0, 0.0, width, height);
     painter.panel(body);
-    painter.note(note, padding + inset, body.mid_y());
+    painter.note(note, glass::COMPACT_PADDING_X + inset, body.mid_y());
     painter.finish(width, height)
 }
 
@@ -39,11 +37,7 @@ pub fn note(note: &ipc::Note, look: &Look, measure: &dyn Measure) -> Scene {
 pub fn prediction(prediction: &ipc::Prediction, look: &Look, measure: &dyn Measure) -> Scene {
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
-    let inset = if theme.is_rounded() {
-        0.0
-    } else {
-        candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
-    };
+    let inset = edge(look);
     let typed = painter.width(&prediction.typed, Font::Candidate);
     let completion = painter.width(&prediction.completion, Font::Candidate);
     let key = prediction
@@ -51,7 +45,10 @@ pub fn prediction(prediction: &ipc::Prediction, look: &Look, measure: &dyn Measu
         .as_deref()
         .map_or(0.0, |key| spacing::KEY_GAP + painter.keys_width(key));
     let width = (typed + completion + key + (spacing::PADDING_X + inset) * 2.0).ceil();
-    let content = measure.height(Font::Candidate).max(glass::KEYCAP_HEIGHT);
+    let content = measure
+        .height(Font::Candidate)
+        .ceil()
+        .max(glass::KEYCAP_HEIGHT);
     let height = (content + (spacing::PADDING_Y + inset) * 2.0).ceil();
     let body = Frame::new(0.0, 0.0, width, height);
     painter.panel(body);
@@ -89,7 +86,8 @@ pub fn mode(label: &str, look: &Look, measure: &dyn Measure) -> Scene {
         let inset = candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH;
         (
             (text_width + mode_indicator::PADDING_X * 2.0 + inset * 2.0).ceil(),
-            (measure.height(Font::Mode) + mode_indicator::PADDING_Y * 2.0 + inset * 2.0).ceil(),
+            (measure.height(Font::Mode).ceil() + mode_indicator::PADDING_Y * 2.0 + inset * 2.0)
+                .ceil(),
         )
     };
     let body = Frame::new(0.0, 0.0, width, height);
@@ -177,7 +175,10 @@ mod tests {
         let title = text_frame(&scene, "修正").expect("主な語");
         assert_eq!(
             title.x,
-            glass::PADDING + glass::NOTE_ICON_SIZE + glass::NOTE_GAP
+            candidate::FRAME_WIDTH
+                + glass::COMPACT_PADDING_X
+                + glass::NOTE_ICON_SIZE
+                + glass::NOTE_GAP
         );
         assert!(texts(&scene).contains(&("修正".into(), theme.correction)));
         assert!(texts(&scene).contains(&("ようですね".into(), theme.text_muted)));
@@ -202,7 +203,7 @@ mod tests {
         let scene = note(&info, &Look::new(&theme, 15.0), &Fixed);
         assert_eq!(
             text_frame(&scene, "学習から削除しました").map(|frame| frame.x),
-            Some(glass::PADDING)
+            Some(candidate::FRAME_WIDTH + glass::COMPACT_PADDING_X)
         );
         assert!(!scene
             .draws

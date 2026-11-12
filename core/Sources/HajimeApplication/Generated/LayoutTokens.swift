@@ -22,10 +22,9 @@ public enum LayoutTokens {
         public static let maxVisible: Double = 9
         public static let shadowOffset: Double = 2
         public static let labelFontSize: Double = 11
-        public static let variantPaddingX: Double = 6
-        public static let sectionPaddingY: Double = 3
+        public static let variantPaddingX: Double = 4
+        public static let sectionPaddingY: Double = 4
         public static let minWidth: Double = 180
-        public static let variantInsetY: Double = 1
         public static let maxWidth: Double = 720
         public static let gridMaxWidth: Double = 960
         public static let screenMargin: Double = 16
@@ -34,13 +33,13 @@ public enum LayoutTokens {
     }
     public enum ModeIndicator {
         public static let fontSize: Double = 14
-        public static let paddingX: Double = 10
-        public static let paddingY: Double = 3
+        public static let paddingX: Double = 8
+        public static let paddingY: Double = 4
     }
     public enum Branch {
-        public static let trunkGap: Double = 10
-        public static let branchIndent: Double = 14
-        public static let branchStemX: Double = 5
+        public static let trunkGap: Double = 12
+        public static let branchIndent: Double = 16
+        public static let branchStemX: Double = 4
         public static let lineWidth: Double = 1
         public static let lineWidthSelected: Double = 2
         public static let underlineOffset: Double = 2
@@ -94,19 +93,24 @@ public enum LayoutTokens {
     }
     public enum Glass {
         public static let cornerRadius: Double = 12
-        public static let padding: Double = 10
+        public static let windowPadding: Double = 8
+        public static let compactPaddingX: Double = 8
+        public static let compactPaddingY: Double = 4
+        public static let separatorGap: Double = 8
+        public static let rowPaddingX: Double = 4
+        public static let headerHeight: Double = 20
         public static let rowHeight: Double = 28
         public static let labelFontSize: Double = 11.5
         public static let keyFontSize: Double = 10.5
         public static let badgeSize: Double = 17
         public static let selectionRadius: Double = 7
         public static let keycapRadius: Double = 4
-        public static let keycapPaddingX: Double = 5
+        public static let keycapPaddingX: Double = 4
         public static let keycapPaddingY: Double = 3
         public static let keycapHeight: Double = 17
-        public static let hintGap: Double = 10
+        public static let hintGap: Double = 12
         public static let footerHeight: Double = 28
-        public static let trunkGap: Double = 6
+        public static let trunkGap: Double = 8
         public static let branchIndent: Double = 28
         public static let branchStemX: Double = 12
         public static let lineWidth: Double = 1.5
@@ -115,48 +119,48 @@ public enum LayoutTokens {
         public static let modeIndicatorSize: Double = 34
         public static let modeIndicatorFontSize: Double = 17
         public static let selectionInsetY: Double = 2
-        public static let variantInsetY: Double = 4
         public static let branchTurnRadius: Double = 8
         public static let dotPitch: Double = 5
-        public static let keycapPartGap: Double = 1
-        public static let keycapGap: Double = 3
+        public static let keycapPartGap: Double = 2
+        public static let keycapGap: Double = 4
         public static let shadowRadius: Double = 12
         public static let shadowOffsetY: Double = 3
         public static let tagHeight: Double = 16
-        public static let tagPaddingX: Double = 6
+        public static let tagPaddingX: Double = 8
         public static let tagRadius: Double = 8
-        public static let noteIconSize: Double = 18
+        public static let noteIconSize: Double = 17
         public static let commandIconSize: Double = 18
         public static let commandIconRadius: Double = 5
-        public static let noteGap: Double = 6
-        public static let usageTagGap: Double = 4
-        public static let meaningCardWidth: Double = 280
-        public static let meaningBranchWidth: Double = 300
-        public static let meaningPadding: Double = 10
-        public static let meaningGap: Double = 14
-        public static let meaningNotch: Double = 6
-        public static let meaningRadius: Double = 10
-        public static let meaningHeadwordFontSize: Double = 15
-        public static let meaningBodyFontSize: Double = 13
-        public static let meaningExampleFontSize: Double = 12
-        public static let meaningPosFontSize: Double = 10.5
-        public static let meaningPosHeight: Double = 17
-        public static let meaningPosPaddingX: Double = 7
-        public static let meaningIconSize: Double = 13
-        public static let meaningEmptyIconSize: Double = 24
-        public static let meaningBadgeSize: Double = 17
-        public static let meaningBadgeRadius: Double = 5
-        public static let meaningBadgeFontSize: Double = 10.5
-        public static let meaningLineSpacing: Double = 2
-        public static let meaningHeaderGap: Double = 8
-        public static let meaningSenseGap: Double = 9
-        public static let meaningExampleGap: Double = 3
-        public static let meaningExampleBarWidth: Double = 2
-        public static let meaningExampleIndent: Double = 8
-        public static let meaningOthersGap: Double = 8
-        public static let meaningDotSize: Double = 6
-        public static let meaningMeaningLines: Double = 3
-        public static let meaningExampleLines: Double = 2
+        public static let noteGap: Double = 8
+    }
+    public enum Meaning {
+        public static let cardGap: Double = 16
+        public static let markerWidth: Double = 16
+        public static let markerGap: Double = 8
+        public static let headerGap: Double = 8
+        public static let senseGap: Double = 8
+        public static let exampleGap: Double = 4
+        public static let exampleIndent: Double = 12
+        public static let exampleBarWidth: Double = 2
+        public static let meaningPitch: Double = 20
+        public static let examplePitch: Double = 18
+        public static let othersGap: Double = 12
+        public static let partOfSpeechGap: Double = 8
+        public static let partOfSpeechHeight: Double = 16
+        public static let partOfSpeechPaddingX: Double = 8
+        public static let tagGap: Double = 4
+        public static let headwordFontSize: Double = 15
+        public static let bodyFontSize: Double = 13
+        public static let exampleFontSize: Double = 12
+        public static let partOfSpeechFontSize: Double = 10.5
+        public static let numberFontSize: Double = 10.5
+        public static let numberRadius: Double = 4
+        public static let iconSize: Double = 13
+        public static let dotSize: Double = 6
+        public static let listWidth: Double = 288
+        public static let branchWidth: Double = 300
+        public static let meaningLines: Double = 3
+        public static let exampleLines: Double = 2
     }
     public enum Handwriting {
         public static let width: Double = 284
@@ -171,10 +175,10 @@ public enum LayoutTokens {
         public static let candidateFontSize: Double = 18
     }
     public enum Prediction {
-        public static let gap: Double = 6
+        public static let gap: Double = 8
         public static let paddingX: Double = 8
-        public static let paddingY: Double = 3
-        public static let keyGap: Double = 6
+        public static let paddingY: Double = 4
+        public static let keyGap: Double = 8
     }
     public enum Palette {
         public static let padding: Double = 12
