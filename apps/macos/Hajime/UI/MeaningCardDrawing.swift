@@ -255,7 +255,7 @@ enum MeaningCardDrawing {
         }
     }
 
-    /// 配置に渡す測り方．行の箱は書体の ascender と descender(代わりの書体で描く日本語の字もこの箱の中に収まる)
+    /// 配置に渡す測り方．行の箱は書体の ascender と descender，文字の箱は書体の大きさ(日本語の字の外形はほぼこの箱に収まる)
     private struct Measuring: MeaningCardMeasuring {
         var fonts: [MeaningCardLayout.Role: NSFont]
 
@@ -269,6 +269,7 @@ enum MeaningCardDrawing {
         func width(_ text: String, _ role: MeaningCardLayout.Role) -> Double { text.size(withAttributes: [.font: font(role)]).width }
         func ascent(_ role: MeaningCardLayout.Role) -> Double { font(role).ascender }
         func descent(_ role: MeaningCardLayout.Role) -> Double { -font(role).descender }
+        func size(_ role: MeaningCardLayout.Role) -> Double { font(role).pointSize }
     }
 
     /// 使い方の例．控えめな色で書き，例の中の見出しの語(活用した形は漢字の部分と送り仮名の長さまで)を文字の色の太字にする

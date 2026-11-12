@@ -17,6 +17,7 @@ struct MeaningCardLayoutTests {
 
         func ascent(_ role: Layout.Role) -> Double { (Self.sizes[role] ?? 10) * (role == .headword ? 0.95 : 0.88) }
         func descent(_ role: Layout.Role) -> Double { (Self.sizes[role] ?? 10) * (role == .number ? 0.12 : 0.24) }
+        func size(_ role: Layout.Role) -> Double { Self.sizes[role] ?? 10 }
     }
 
     static let metrics = Layout.Metrics.tokens

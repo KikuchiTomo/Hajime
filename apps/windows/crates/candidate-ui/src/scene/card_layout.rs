@@ -7,16 +7,17 @@
 //! - 文の列は，見出しの語・意味・使い方の例の縦の線・「同音語」を，どれも同じ x(text_x)から書き出す．
 //!   使い方の例の文は，そこから EXAMPLE_INDENT だけ下げる．折り返した行も，それぞれの書き出しの x にそろえる
 //!
-//! 縦は，文字の行の箱(書体の行の高さ．DirectWrite は文字をこの箱の縦の真ん中に描く)で積む．
-//! - 目印と札は，その行の 1 行目の行の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
-//! - 行の箱と行の箱のあいだ・カードの縁と行の箱のあいだを，トークンの間隔にする．内側の余白は上下左右とも PADDING
+//! 縦は，文字の箱で積む．文字の箱は，書体の大きさの高さで，行の箱(書体の行の高さ．DirectWrite は文字をこの箱の縦の真ん中に描く)と
+//! 縦の真ん中が同じもの．日本語の字の外形はほぼこの箱に収まるので，箱と箱のあいだが見た目の間隔になる
+//! - 目印と札は，その行の 1 行目の文字の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
+//! - 文字の箱・札・目印のあいだと，カードの縁とのあいだを，トークンの間隔にする．内側の余白は上下左右とも PADDING
 //! - 折り返した行は MEANING_PITCH(例は EXAMPLE_PITCH)ずつ下げる
-//! - 例の縦の線は，例の 1 行目の行の箱の上の端から，最後の行の行の箱の下の端まで
+//! - 例の縦の線は，例の 1 行目の文字の箱の上の端から，最後の行の文字の箱の下の端まで
 //!
 //! 座標はカードの左上が原点で，下が y の正
 
 use super::{Frame, Measure};
-use crate::theme::Font;
+use crate::theme::{Font, ResolvedTheme};
 use tokens::size::{candidate, glass, meaning};
 
 /// 横の列．x はカードの左の端から
@@ -48,31 +49,38 @@ impl Columns {
     }
 }
 
-/// 1 行の文字(中身を配置が持つもの)．frame は文字の行の箱
+/// 1 行の文字の置き場所．frame は文字の箱(書体の大きさの高さ)，line は描くときの行の箱(縦の真ん中は frame と同じ)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct Line {
+    pub frame: Frame,
+    pub line: Frame,
+}
+
+/// 1 行の文字(中身を配置が持つもの)
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Text {
     pub text: String,
     pub font: Font,
-    pub frame: Frame,
+    pub place: Line,
 }
 
-/// 札．frame の中に，文字(text)を行の箱 text_frame に書く
+/// 札．frame の中に，文字(text)を text に書く
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Chip {
     pub text: String,
     pub frame: Frame,
-    pub text_frame: Frame,
+    pub text_place: Line,
 }
 
-/// 1 つの意味．meaning と example は折り返した行の行の箱
+/// 1 つの意味．meaning と example は折り返した行
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Sense {
     pub badge: Option<Frame>,
     pub number: Option<Text>,
-    pub meaning: Vec<Frame>,
+    pub meaning: Vec<Line>,
     /// 使い方の例の左の縦の線．例が無ければ None
     pub example_bar: Option<Frame>,
-    pub example: Vec<Frame>,
+    pub example: Vec<Line>,
 }
 
 /// 配置に渡す 1 つの意味．number は番号の札の文字(意味が 1 つなら None)，行の数は描く側が columns の幅で折り返したもの
@@ -121,70 +129,94 @@ impl CardLayout {
     /// 置いた部品の枠(重なりを確かめるのに使う)
     #[cfg(test)]
     pub fn parts(&self) -> Vec<Frame> {
-        let mut parts = vec![self.book_icon, self.headword.frame];
+        let mut parts = vec![self.book_icon, self.headword.place.frame];
         parts.extend(self.part_of_speech.as_ref().map(|chip| chip.frame));
         for sense in &self.senses {
             parts.extend(sense.badge);
-            parts.extend(sense.meaning.iter().copied());
-            parts.extend(sense.example.iter().copied());
+            parts.extend(sense.meaning.iter().map(|line| line.frame));
+            parts.extend(sense.example.iter().map(|line| line.frame));
             parts.extend(sense.example_bar);
         }
         parts.extend(self.separator);
         parts.extend(self.ear_icon);
-        parts.extend(self.others_label.as_ref().map(|text| text.frame));
-        parts.extend(self.more.as_ref().map(|text| text.frame));
+        parts.extend(self.others_label.as_ref().map(|text| text.place.frame));
+        parts.extend(self.more.as_ref().map(|text| text.place.frame));
         parts.extend(self.tags.iter().map(|chip| chip.frame));
         parts
     }
 }
 
-/// 文字の行の箱の高さ(整数に切り上げる)
-fn line_height(measure: &dyn Measure, font: Font) -> f32 {
-    measure.height(font).ceil()
+/// 文字の箱を置く．書体の大きさは theme が，行の高さは measure が知る
+struct Rows<'a> {
+    measure: &'a dyn Measure,
+    theme: &'a ResolvedTheme,
 }
 
-/// 行の箱の縦の真ん中が mid_y の 1 行．上の端は整数の位置にする(字をぼかさない)
-fn centered(measure: &dyn Measure, font: Font, x: f32, width: f32, mid_y: f32) -> Frame {
-    let height = line_height(measure, font);
-    Frame::new(x, (mid_y - height / 2.0).round(), width, height)
-}
+impl Rows<'_> {
+    /// 文字の箱の高さ(書体の大きさ)
+    fn em(&self, font: Font) -> f32 {
+        self.theme.font(font, candidate::FONT_SIZE).size
+    }
 
-/// 1 行目の行の箱の上の端が top の段落．続く行は pitch ずつ下げる(行の箱より狭ければ行の箱の高さ)
-fn paragraph(
-    measure: &dyn Measure,
-    font: Font,
-    lines: usize,
-    x: f32,
-    width: f32,
-    top: f32,
-    pitch: f32,
-) -> Vec<Frame> {
-    let height = line_height(measure, font);
-    let step = pitch.max(height);
-    (0..lines)
-        .map(|index| Frame::new(x, top.round() + step * index as f32, width, height))
-        .collect()
+    /// 行の箱の高さ(整数に切り上げる．行の間隔の下限)
+    fn line_height(&self, font: Font) -> f32 {
+        self.measure.height(font).ceil()
+    }
+
+    /// 文字の箱の縦の真ん中が mid_y の 1 行．行の箱の上の端は整数の位置にし(字をぼかさない)，文字の箱はそこから求める
+    fn centered(&self, font: Font, x: f32, width: f32, mid_y: f32) -> Line {
+        let height = self.line_height(font);
+        let line = Frame::new(x, (mid_y - height / 2.0).round(), width, height);
+        let em = self.em(font);
+        Line {
+            frame: Frame::new(x, line.mid_y() - em / 2.0, width, em),
+            line,
+        }
+    }
+
+    /// 1 行目の文字の箱の上の端が top の段落．続く行は pitch ずつ下げる(行の箱より狭ければ行の箱の高さ)
+    #[allow(clippy::too_many_arguments)]
+    fn paragraph(
+        &self,
+        font: Font,
+        lines: usize,
+        x: f32,
+        width: f32,
+        top: f32,
+        pitch: f32,
+    ) -> Vec<Line> {
+        let first = self.centered(font, x, width, top + self.em(font) / 2.0);
+        let step = pitch.max(self.line_height(font));
+        (0..lines)
+            .map(|index| {
+                let dy = step * index as f32;
+                Line {
+                    frame: first.frame.offset(0.0, dy),
+                    line: first.line.offset(0.0, dy),
+                }
+            })
+            .collect()
+    }
+
+    /// frame の中の札の文字．文字の箱を札の縦の真ん中に置く
+    fn chip(&self, text: &str, font: Font, frame: Frame, padding_x: f32) -> Chip {
+        Chip {
+            text: text.to_string(),
+            text_place: self.centered(
+                font,
+                frame.x + padding_x,
+                self.measure.width(text, font),
+                frame.mid_y(),
+            ),
+            frame,
+        }
+    }
 }
 
 /// 目印の枠: 目印の列の中で，mid_y を縦の真ん中にした正方形
 fn marker(x: f32, mid_y: f32) -> Frame {
     let size = meaning::MARKER_WIDTH;
     Frame::new(x, (mid_y - size / 2.0).round(), size, size)
-}
-
-/// frame の中の札の文字．文字の行の箱を札の縦の真ん中に置く
-fn chip(measure: &dyn Measure, text: &str, font: Font, frame: Frame, padding_x: f32) -> Chip {
-    Chip {
-        text: text.to_string(),
-        text_frame: centered(
-            measure,
-            font,
-            frame.x + padding_x,
-            measure.width(text, font),
-            frame.mid_y(),
-        ),
-        frame,
-    }
 }
 
 /// 末尾を「…」にして width に収めたもの
@@ -204,13 +236,20 @@ fn truncated(measure: &dyn Measure, text: &str, font: Font, width: f32) -> Strin
 }
 
 /// 幅 width(内側の余白を含む)のカードの配置
-pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> CardLayout {
+pub(super) fn place(
+    content: &Content,
+    width: f32,
+    measure: &dyn Measure,
+    theme: &ResolvedTheme,
+) -> CardLayout {
+    let rows = Rows { measure, theme };
     let columns = Columns::new(width);
     let right = width - meaning::PADDING;
 
-    // 見出し: 辞書のアイコン・語・品詞の札を，語の行の箱の縦の真ん中にそろえる
+    // 見出し: 辞書のアイコン・語・品詞の札を，語の文字の箱の縦の真ん中にそろえる
     let mut y = meaning::PADDING;
-    let header_height = line_height(measure, Font::MeaningHeadword)
+    let header_height = rows
+        .em(Font::MeaningHeadword)
         .max(meaning::PART_OF_SPEECH_HEIGHT)
         .max(meaning::MARKER_WIDTH);
     let pos_width = content.part_of_speech.map(|name| {
@@ -220,23 +259,21 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
         (right - columns.text_x - pos_width.map_or(0.0, |pos| pos + meaning::PART_OF_SPEECH_GAP))
             .max(0.0);
     let word = truncated(measure, content.word, Font::MeaningHeadword, word_width);
-    let word_frame = centered(
-        measure,
+    let word_place = rows.centered(
         Font::MeaningHeadword,
         columns.text_x,
         measure.width(&word, Font::MeaningHeadword),
         y + header_height / 2.0,
     );
-    let book_icon = marker(columns.marker_x, word_frame.mid_y());
+    let book_icon = marker(columns.marker_x, word_place.frame.mid_y());
     let part_of_speech = content.part_of_speech.zip(pos_width).map(|(name, pos)| {
         let frame = Frame::new(
-            (word_frame.max_x() + meaning::PART_OF_SPEECH_GAP).round(),
-            (word_frame.mid_y() - meaning::PART_OF_SPEECH_HEIGHT / 2.0).round(),
+            (word_place.frame.max_x() + meaning::PART_OF_SPEECH_GAP).round(),
+            (word_place.frame.mid_y() - meaning::PART_OF_SPEECH_HEIGHT / 2.0).round(),
             pos,
             meaning::PART_OF_SPEECH_HEIGHT,
         );
-        chip(
-            measure,
+        rows.chip(
             name,
             Font::MeaningTag,
             frame,
@@ -245,14 +282,13 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
     });
     y += header_height + meaning::HEADER_GAP;
 
-    // 意味: 番号の札は 1 行目の行の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
+    // 意味: 番号の札は 1 行目の文字の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
     let mut senses = Vec::new();
     for (index, sense) in content.senses.iter().enumerate() {
         if index > 0 {
             y += meaning::SENSE_GAP;
         }
-        let lines = paragraph(
-            measure,
+        let lines = rows.paragraph(
             Font::MeaningBody,
             sense.meaning_lines,
             columns.text_x,
@@ -262,13 +298,12 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
         );
         let (badge, number) = match (&sense.number, lines.first()) {
             (Some(label), Some(first)) => {
-                let badge = marker(columns.marker_x, first.mid_y());
+                let badge = marker(columns.marker_x, first.frame.mid_y());
                 let label_width = measure.width(label, Font::MeaningNumber);
                 let number = Text {
                     text: label.clone(),
                     font: Font::MeaningNumber,
-                    frame: centered(
-                        measure,
+                    place: rows.centered(
                         Font::MeaningNumber,
                         badge.mid_x() - label_width / 2.0,
                         label_width,
@@ -280,14 +315,13 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
             _ => (None, None),
         };
         if let Some(last) = lines.last() {
-            y = last.max_y();
+            y = last.frame.max_y();
         }
         let mut example = Vec::new();
         let mut example_bar = None;
         if sense.example_lines > 0 {
             y += meaning::EXAMPLE_GAP;
-            example = paragraph(
-                measure,
+            example = rows.paragraph(
                 Font::MeaningExample,
                 sense.example_lines,
                 columns.example_x,
@@ -298,11 +332,11 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
             if let (Some(first), Some(last)) = (example.first(), example.last()) {
                 example_bar = Some(Frame::new(
                     columns.text_x,
-                    first.y,
+                    first.frame.y,
                     meaning::EXAMPLE_BAR_WIDTH,
-                    last.max_y() - first.y,
+                    last.frame.max_y() - first.frame.y,
                 ));
-                y = last.max_y();
+                y = last.frame.max_y();
             }
         }
         senses.push(Sense {
@@ -323,7 +357,7 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
         headword: Text {
             text: word,
             font: Font::MeaningHeadword,
-            frame: word_frame,
+            place: word_place,
         },
         part_of_speech,
         senses,
@@ -342,24 +376,25 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
             candidate::FRAME_WIDTH,
         );
         y = separator.max_y() + meaning::OTHERS_GAP;
-        let row_height = line_height(measure, Font::Label)
+        let row_height = rows
+            .em(Font::Label)
             .max(glass::TAG_HEIGHT)
             .max(meaning::MARKER_WIDTH);
-        let label = centered(
-            measure,
+        let label = rows.centered(
             Font::Label,
             columns.text_x,
             measure.width(content.others_label, Font::Label),
             y + row_height / 2.0,
         );
+        let label_mid = label.frame.mid_y();
         layout.separator = Some(separator);
-        layout.ear_icon = Some(marker(columns.marker_x, label.mid_y()));
+        layout.ear_icon = Some(marker(columns.marker_x, label_mid));
+        let mut x = label.frame.max_x() + meaning::TAG_GAP;
         layout.others_label = Some(Text {
             text: content.others_label.to_string(),
             font: Font::Label,
-            frame: label,
+            place: label,
         });
-        let mut x = label.max_x() + meaning::TAG_GAP;
         for (index, word) in content.others.iter().enumerate() {
             let tag_width = (measure.width(word, Font::Label) + glass::TAG_PADDING_X * 2.0).ceil();
             let rest = content.others.len() - index - 1;
@@ -370,33 +405,24 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
             };
             if x + tag_width + reserve > right {
                 let text = (content.more)(content.others.len() - index);
-                let frame = centered(
-                    measure,
-                    Font::Label,
-                    x,
-                    measure.width(&text, Font::Label),
-                    label.mid_y(),
-                );
+                let place =
+                    rows.centered(Font::Label, x, measure.width(&text, Font::Label), label_mid);
                 layout.more = Some(Text {
                     text,
                     font: Font::Label,
-                    frame,
+                    place,
                 });
                 break;
             }
             let frame = Frame::new(
                 x.round(),
-                (label.mid_y() - glass::TAG_HEIGHT / 2.0).round(),
+                (label_mid - glass::TAG_HEIGHT / 2.0).round(),
                 tag_width,
                 glass::TAG_HEIGHT,
             );
-            layout.tags.push(chip(
-                measure,
-                word,
-                Font::Label,
-                frame,
-                glass::TAG_PADDING_X,
-            ));
+            layout
+                .tags
+                .push(rows.chip(word, Font::Label, frame, glass::TAG_PADDING_X));
             x = frame.max_x() + meaning::TAG_GAP;
         }
         y += row_height;
@@ -407,7 +433,12 @@ pub(super) fn place(content: &Content, width: f32, measure: &dyn Measure) -> Car
 
 #[cfg(test)]
 mod tests {
+    use super::super::testing::theme as resolve;
     use super::*;
+
+    fn theme() -> ResolvedTheme {
+        resolve("automatic")
+    }
 
     /// 書体ごとに行の高さを変える(行の箱で揃えないと揃わない)．幅は字 1 つを書体の大きさとして測る
     struct Varied;
@@ -511,7 +542,10 @@ mod tests {
                     others_label: "同音語",
                     more: &more,
                 };
-                (name, place(&content, meaning::LIST_WIDTH, &Varied))
+                (
+                    name,
+                    place(&content, meaning::LIST_WIDTH, &Varied, &theme()),
+                )
             })
             .collect()
     }
@@ -524,9 +558,9 @@ mod tests {
     fn 文の列のxは1か所() {
         for (name, layout) in layouts() {
             let x = layout.columns.text_x;
-            assert_eq!(layout.headword.frame.x, x, "{name}");
+            assert_eq!(layout.headword.place.frame.x, x, "{name}");
             for sense in &layout.senses {
-                assert!(sense.meaning.iter().all(|line| line.x == x), "{name}");
+                assert!(sense.meaning.iter().all(|line| line.frame.x == x), "{name}");
                 if let Some(bar) = sense.example_bar {
                     assert_eq!(bar.x, x, "{name}");
                 }
@@ -534,12 +568,12 @@ mod tests {
                     sense
                         .example
                         .iter()
-                        .all(|line| line.x == x + meaning::EXAMPLE_INDENT),
+                        .all(|line| line.frame.x == x + meaning::EXAMPLE_INDENT),
                     "{name}"
                 );
             }
             if let Some(label) = &layout.others_label {
-                assert_eq!(label.frame.x, x, "{name}");
+                assert_eq!(label.place.frame.x, x, "{name}");
             }
             assert_eq!(
                 x,
@@ -562,26 +596,29 @@ mod tests {
                 "{name}"
             );
             assert!(
-                (layout.book_icon.mid_y() - layout.headword.frame.mid_y()).abs() <= 0.5,
+                (layout.book_icon.mid_y() - layout.headword.place.frame.mid_y()).abs() <= 0.5,
                 "{name}"
             );
             for sense in &layout.senses {
                 if let (Some(badge), Some(first), Some(number)) =
                     (sense.badge, sense.meaning.first(), &sense.number)
                 {
-                    assert!((badge.mid_y() - first.mid_y()).abs() <= 0.5, "{name}");
+                    assert!((badge.mid_y() - first.frame.mid_y()).abs() <= 0.5, "{name}");
                     assert!(
-                        (number.frame.mid_y() - badge.mid_y()).abs() <= 0.5,
+                        (number.place.frame.mid_y() - badge.mid_y()).abs() <= 0.5,
                         "{name}"
                     );
                     assert!(
-                        (number.frame.mid_x() - badge.mid_x()).abs() <= 0.5,
+                        (number.place.frame.mid_x() - badge.mid_x()).abs() <= 0.5,
                         "{name}"
                     );
                 }
             }
             if let (Some(ear), Some(label)) = (layout.ear_icon, &layout.others_label) {
-                assert!((ear.mid_y() - label.frame.mid_y()).abs() <= 0.5, "{name}");
+                assert!(
+                    (ear.mid_y() - label.place.frame.mid_y()).abs() <= 0.5,
+                    "{name}"
+                );
             }
         }
     }
@@ -591,15 +628,15 @@ mod tests {
         for (name, layout) in layouts() {
             if let Some(chip) = &layout.part_of_speech {
                 assert!(
-                    (chip.frame.mid_y() - layout.headword.frame.mid_y()).abs() <= 0.5,
+                    (chip.frame.mid_y() - layout.headword.place.frame.mid_y()).abs() <= 0.5,
                     "{name}"
                 );
-                assert!((chip.text_frame.mid_y() - chip.frame.mid_y()).abs() <= 0.5);
+                assert!((chip.text_place.frame.mid_y() - chip.frame.mid_y()).abs() <= 0.5);
             }
             if let Some(label) = &layout.others_label {
                 for tag in &layout.tags {
                     assert!(
-                        (tag.frame.mid_y() - label.frame.mid_y()).abs() <= 0.5,
+                        (tag.frame.mid_y() - label.place.frame.mid_y()).abs() <= 0.5,
                         "{name}"
                     );
                 }
@@ -616,8 +653,8 @@ mod tests {
                 .filter(|sense| !sense.example.is_empty())
             {
                 let bar = sense.example_bar.expect("縦の線");
-                let first = sense.example[0];
-                let last = sense.example[sense.example.len() - 1];
+                let first = sense.example[0].frame;
+                let last = sense.example[sense.example.len() - 1].frame;
                 assert_eq!(bar.y, first.y, "{name}");
                 assert_eq!(bar.max_y(), last.max_y(), "{name}");
                 assert!(bar.max_x() < first.x, "{name}");
@@ -663,13 +700,19 @@ mod tests {
                     .last()
                     .or(last.meaning.last())
                     .expect("行")
+                    .frame
                     .max_y();
             let row_top = layout
                 .tags
                 .iter()
                 .map(|tag| tag.frame.y)
                 .chain(layout.ear_icon.map(|ear| ear.y))
-                .chain(layout.others_label.as_ref().map(|label| label.frame.y))
+                .chain(
+                    layout
+                        .others_label
+                        .as_ref()
+                        .map(|label| label.place.frame.y),
+                )
                 .fold(f32::MAX, f32::min);
             let below = row_top - separator.max_y();
             assert!(
@@ -703,7 +746,7 @@ mod tests {
             .expect("見本");
         let more = layout.more.expect("+n");
         assert_eq!(more.text, format!("+{}", 12 - layout.tags.len()));
-        assert!(more.frame.max_x() <= layout.width - meaning::PADDING);
+        assert!(more.place.frame.max_x() <= layout.width - meaning::PADDING);
     }
 
     #[test]
@@ -718,7 +761,7 @@ mod tests {
             others_label: "同音語",
             more: &more,
         };
-        let layout = place(&content, meaning::LIST_WIDTH, &Varied);
+        let layout = place(&content, meaning::LIST_WIDTH, &Varied, &theme());
         assert!(layout.headword.text.ends_with('…'));
         let chip = layout.part_of_speech.expect("品詞");
         assert!(chip.frame.max_x() <= layout.width - meaning::PADDING);

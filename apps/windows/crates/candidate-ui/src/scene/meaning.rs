@@ -106,7 +106,7 @@ impl Card {
             others_label: strings::HOMOPHONE_OTHERS,
             more: &strings::more,
         };
-        let layout = card_layout::place(&content, width, measure);
+        let layout = card_layout::place(&content, width, measure, theme);
         Self {
             width: layout.width,
             height: layout.height,
@@ -431,8 +431,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         &headword.text,
         headword.font,
         theme.text,
-        rect.x + headword.frame.x,
-        at(headword.frame),
+        rect.x + headword.place.line.x,
+        at(headword.place.line),
     );
     if let Some(chip) = &layout.part_of_speech {
         // 品詞の札: アクセントの色を薄く敷いた地にアクセントの色の字
@@ -451,8 +451,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             &chip.text,
             Font::MeaningTag,
             theme.selection,
-            rect.x + chip.text_frame.x,
-            at(chip.text_frame),
+            rect.x + chip.text_place.line.x,
+            at(chip.text_place.line),
         );
     }
 
@@ -473,12 +473,12 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
                 &number.text,
                 number.font,
                 theme.selection,
-                rect.x + number.frame.x,
-                at(number.frame),
+                rect.x + number.place.line.x,
+                at(number.place.line),
             );
         }
-        for (frame, line) in sense.meaning.iter().zip(&card.meaning[index]) {
-            draw_line(painter, line, at(*frame));
+        for (place, line) in sense.meaning.iter().zip(&card.meaning[index]) {
+            draw_line(painter, line, at(place.line));
         }
         if let Some(bar) = sense.example_bar {
             let bar = at(bar);
@@ -493,8 +493,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
                 stroke: None,
             });
         }
-        for (frame, line) in sense.example.iter().zip(&card.example[index]) {
-            draw_line(painter, line, at(*frame));
+        for (place, line) in sense.example.iter().zip(&card.example[index]) {
+            draw_line(painter, line, at(place.line));
         }
     }
 
@@ -511,8 +511,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             &label.text,
             label.font,
             theme.text_muted,
-            rect.x + label.frame.x,
-            at(label.frame),
+            rect.x + label.place.line.x,
+            at(label.place.line),
         );
     }
     for tag in &layout.tags {
@@ -531,8 +531,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             &tag.text,
             Font::Label,
             theme.text_muted,
-            rect.x + tag.text_frame.x,
-            at(tag.text_frame),
+            rect.x + tag.text_place.line.x,
+            at(tag.text_place.line),
         );
     }
     if let Some(more) = &layout.more {
@@ -540,8 +540,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             &more.text,
             more.font,
             theme.text_muted,
-            rect.x + more.frame.x,
-            at(more.frame),
+            rect.x + more.place.line.x,
+            at(more.place.line),
         );
     }
 }

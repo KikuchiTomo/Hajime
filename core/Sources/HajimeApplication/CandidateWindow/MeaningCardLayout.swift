@@ -5,11 +5,12 @@
 /// - 文の列は，見出しの語・意味・使い方の例の縦の線・「同音語」を，どれも同じ x(columns.textX)から書き出す．
 ///   使い方の例の文は，そこから metrics.exampleIndent だけ下げる．折り返した行も，それぞれの書き出しの x にそろえる
 ///
-/// 縦は，文字の行の箱(ベースラインから上の ascent と下の descent の範囲)で積む．
-/// - 目印と札は，その行の 1 行目の行の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
-/// - 行の箱と行の箱のあいだ・カードの縁と行の箱のあいだを，トークンの間隔にする．内側の余白は上下左右とも metrics.padding
+/// 縦は，文字の箱で積む．文字の箱は，書体の大きさの高さで，行の箱(ベースラインから上の ascent と下の descent の範囲)と縦の真ん中が同じもの．
+/// 日本語の字の外形はほぼこの箱に収まるので，箱と箱のあいだが見た目の間隔になる(行の箱は書体の上下の余白を含むので使わない)．
+/// - 目印と札は，その行の 1 行目の文字の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
+/// - 文字の箱・札・目印のあいだと，カードの縁とのあいだを，トークンの間隔にする．内側の余白は上下左右とも metrics.padding
 /// - 折り返した行のベースラインは metrics.meaningPitch(例は examplePitch)ずつ下げる
-/// - 例の縦の線は，例の 1 行目の行の箱の上の端から，最後の行の行の箱の下の端まで
+/// - 例の縦の線は，例の 1 行目の文字の箱の上の端から，最後の行の文字の箱の下の端まで
 ///
 /// 意味と例を幅で折り返すのは描く側(行の頭に置かない字の決まりが OS の行分けにあるため)．
 /// 描く側は columns の幅で折り返し，行の数を Content に入れてこの配置を作る．座標はカードの左上が原点で，下が y の正．
@@ -61,7 +62,7 @@ public struct MeaningCardLayout: Sendable, Equatable {
         }
     }
 
-    /// 1 行の文字．x から書き，baseline に文字のベースラインを置く．box はその行の箱
+    /// 1 行の文字．x から書き，baseline に文字のベースラインを置く．box はその行の文字の箱(書体の大きさの高さ)
     public struct Line: Sendable, Equatable {
         public var x: Double
         public var baseline: Double
@@ -247,7 +248,7 @@ public struct MeaningCardLayout: Sendable, Equatable {
 
         // 見出し: 辞書のアイコン・語・品詞の札を，語の行の箱の縦の真ん中にそろえる
         var y = metrics.padding
-        let headerHeight = max(rows.lineHeight(.headword), metrics.partOfSpeechHeight, metrics.markerWidth)
+        let headerHeight = max(rows.em(.headword), metrics.partOfSpeechHeight, metrics.markerWidth)
         let headerMid = y + headerHeight / 2
         let posWidth = content.partOfSpeech.map { (measuring.width($0, .partOfSpeech) + metrics.partOfSpeechPaddingX * 2).rounded(.up) }
         let wordWidth = max(right - columns.textX - (posWidth.map { $0 + metrics.partOfSpeechGap } ?? 0), 0)
@@ -303,7 +304,7 @@ public struct MeaningCardLayout: Sendable, Equatable {
             let line = Box(x: metrics.padding, y: y.rounded(), width: width - metrics.padding * 2, height: metrics.separatorWidth)
             separator = line
             y = line.maxY + metrics.othersGap
-            let rowHeight = max(rows.lineHeight(.label), metrics.tagHeight, metrics.markerWidth)
+            let rowHeight = max(rows.em(.label), metrics.tagHeight, metrics.markerWidth)
             let labelLine = rows.centered(.label, x: columns.textX, width: measuring.width(content.othersLabel, .label), midY: y + rowHeight / 2)
             othersLabel = Text(text: content.othersLabel, role: .label, line: labelLine)
             earIcon = Self.marker(x: columns.markerX, size: metrics.markerWidth, midY: labelLine.box.midY)
@@ -364,33 +365,34 @@ public protocol MeaningCardMeasuring {
     func ascent(_ role: MeaningCardLayout.Role) -> Double
     /// ベースラインから下の高さ
     func descent(_ role: MeaningCardLayout.Role) -> Double
+    /// 書体の大きさ(文字の箱の高さ)
+    func size(_ role: MeaningCardLayout.Role) -> Double
 }
 
-/// 文字の行の箱を置く．ベースラインは整数の位置にする(字をぼかさない)
+/// 文字の箱を置く．ベースラインは整数の位置にし(字をぼかさない)，箱は丸めたベースラインから求める
 private struct RowPlacer<Measuring: MeaningCardMeasuring> {
     var measuring: Measuring
 
+    /// 文字の箱の高さ
+    func em(_ role: MeaningCardLayout.Role) -> Double { measuring.size(role) }
+
+    /// 行の箱の高さ(行の間隔の下限)
     func lineHeight(_ role: MeaningCardLayout.Role) -> Double {
         measuring.ascent(role) + measuring.descent(role)
     }
 
-    /// 行の箱の上の端が top の 1 行
-    func line(_ role: MeaningCardLayout.Role, x: Double, width: Double, top: Double) -> MeaningCardLayout.Line {
-        let ascent = measuring.ascent(role)
-        let baseline = (top + ascent).rounded()
-        return MeaningCardLayout.Line(x: x, baseline: baseline,
-                                      box: .init(x: x, y: baseline - ascent, width: width, height: lineHeight(role)))
-    }
-
-    /// 行の箱の縦の真ん中が midY の 1 行
+    /// 文字の箱の縦の真ん中が midY の 1 行．行の箱の真ん中を文字の箱の真ん中に合わせる
     func centered(_ role: MeaningCardLayout.Role, x: Double, width: Double, midY: Double) -> MeaningCardLayout.Line {
-        line(role, x: x, width: width, top: midY - lineHeight(role) / 2)
+        let ascent = measuring.ascent(role), descent = measuring.descent(role)
+        let baseline = (midY + (ascent - descent) / 2).rounded()
+        let center = baseline - (ascent - descent) / 2
+        return MeaningCardLayout.Line(x: x, baseline: baseline, box: .init(x: x, y: center - em(role) / 2, width: width, height: em(role)))
     }
 
-    /// 1 行目の行の箱の上の端が top の段落．続く行のベースラインは pitch ずつ下げる(行の箱より狭ければ行の箱の高さ)
+    /// 1 行目の文字の箱の上の端が top の段落．続く行のベースラインは pitch ずつ下げる(行の箱より狭ければ行の箱の高さ)
     func paragraph(_ role: MeaningCardLayout.Role, lines: Int, x: Double, width: Double, top: Double, pitch: Double) -> [MeaningCardLayout.Line] {
         guard lines > 0 else { return [] }
-        let first = line(role, x: x, width: width, top: top)
+        let first = centered(role, x: x, width: width, midY: top + em(role) / 2)
         let step = max(pitch, lineHeight(role).rounded(.up))
         return (0..<lines).map { index in
             var placed = first
@@ -400,7 +402,7 @@ private struct RowPlacer<Measuring: MeaningCardMeasuring> {
         }
     }
 
-    /// frame の中の札の文字．文字の行の箱を札の縦の真ん中に置く
+    /// frame の中の札の文字．文字の箱を札の縦の真ん中に置く
     func chip(_ text: String, role: MeaningCardLayout.Role, frame: MeaningCardLayout.Box, paddingX: Double) -> MeaningCardLayout.Chip {
         let placed = centered(role, x: frame.x + paddingX, width: measuring.width(text, role), midY: frame.midY)
         return MeaningCardLayout.Chip(text: text, role: role, frame: frame, textX: frame.x + paddingX, baseline: placed.baseline)
