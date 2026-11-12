@@ -170,6 +170,8 @@ pub mod features {
     pub const CORRECTION_KINDS: &str = "修正の対象";
     pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
     pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
+    pub const CORRECTION_KINDS_NOTE: &str =
+        "使用できない項目は、変換の「タイプミスの修正」で有効にできます。";
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
     pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";

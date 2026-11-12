@@ -7,11 +7,17 @@ struct CorrectionPage: View {
 
     var body: some View {
         Form {
+            // 修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く(オフなら何も直さず，英単語のみなら日本語は直さない)
             Section(UIStrings.Features.correctionKinds) {
                 ResettableToggle(model: model, title: UIStrings.Features.correctsEnglish, keyPath: \.correction.english)
+                    .disabled(model.settings.typoCorrection == .off)
                 ResettableToggle(model: model, title: UIStrings.Features.correctsJapanese, keyPath: \.correction.japanese)
+                    .disabled(model.settings.typoCorrection != .standard)
                 ResettableToggle(model: model, title: UIStrings.Features.correctsRepeatedKeys, keyPath: \.correction.repeatedKeys)
-                    .disabled(!model.settings.correction.japanese)
+                    .disabled(!correctsJapanese)
+                if model.settings.typoCorrection != .standard {
+                    Text(UIStrings.Features.correctionKindsNote).font(.caption).foregroundStyle(.secondary)
+                }
                 ResettableToggle(model: model, title: UIStrings.Features.misreadings, keyPath: \.misreadings)
                 ResettableToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings)
                     .help(UIStrings.Extras.looseReadingsNote)
@@ -20,7 +26,7 @@ struct CorrectionPage: View {
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.handShift, keyPath: \.handShiftCorrection)
-                    .disabled(!model.settings.correction.japanese)
+                    .disabled(!correctsJapanese)
             } footer: {
                 Text(UIStrings.Extras.handShiftNote).font(.caption).foregroundStyle(.secondary)
             }
@@ -36,5 +42,10 @@ struct CorrectionPage: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 日本語のタイプミスを直すか(同じキーの重なりと手のずれは，その中の種類)
+    private var correctsJapanese: Bool {
+        model.settings.typoCorrection == .standard && model.settings.correction.japanese
     }
 }
