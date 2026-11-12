@@ -1410,6 +1410,14 @@ impl App {
                 .set_hover(target == Some(Target::NavScrollbar), now);
             ffi::track_leave(self.window);
         }
+        // 左の一覧かページの上でポインターが動けば，そこの細いスクロールバーを出して送れることを知らせる
+        if x < nav_width(width) {
+            if y >= self.nav_top() {
+                self.nav_scroll.reveal_bar(now);
+            }
+        } else {
+            self.scroll.reveal_bar(now);
+        }
         // 表の上なら行にも印を付ける
         let table_hover = match target {
             Some(Target::Page(element)) if element.part == Part::Table => {
