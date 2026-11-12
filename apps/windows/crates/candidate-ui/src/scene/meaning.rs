@@ -686,6 +686,8 @@ fn wrap(
     }
     let mut lines = Vec::new();
     let mut start = 0;
+    // 前の行の頭(1 字だけの最後の行を作らないように，前の行を詰め直すのに使う)
+    let mut previous: Option<usize> = None;
     while start < characters.len() {
         let mut end = fitting_end(measure, characters, start, width);
         if end < characters.len()
@@ -708,7 +710,20 @@ fn wrap(
             lines.push(truncated(measure, &characters[start..], width));
             break;
         }
+        // 最後の行が 1 字だけになるときは，前の行の最後の字も送る(1 字だけの行を作らない)．
+        // 送る字を行の頭に置けないときと，前の行が短いときは送らない
+        if end == characters.len() && end - start == 1 && start >= 3 {
+            let moved = start - 1;
+            let previous_start = previous.unwrap_or(0);
+            if moved - previous_start >= 2 && !is_line_start_forbidden(characters[moved].0) {
+                if let Some(last) = lines.last_mut() {
+                    *last = runs(&characters[previous_start..moved]);
+                    start = moved;
+                }
+            }
+        }
         lines.push(runs(&characters[start..end]));
+        previous = Some(start);
         start = end;
     }
     lines
@@ -826,6 +841,14 @@ mod tests {
         assert_eq!(wrapped("あいうえーお", 40.0, 5), ["あいうえー", "お"]);
         // 行の途中の句読点はそのまま
         assert_eq!(wrapped("あい、うえおか", 40.0, 5), ["あい、う", "えおか"]);
+    }
+
+    #[test]
+    fn 最後の行を1字だけにしない() {
+        // 4 字の行のあとに 1 字だけ残るときは，前の行の最後の字も送る
+        assert_eq!(wrapped("あいうえお", 40.0, 5), ["あいう", "えお"]);
+        // 送る字を行の頭に置けないときは送らない
+        assert_eq!(wrapped("あいう。お", 40.0, 5), ["あいう。", "お"]);
     }
 
     #[test]

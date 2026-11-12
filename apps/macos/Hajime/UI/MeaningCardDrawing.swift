@@ -312,8 +312,24 @@ enum MeaningCardDrawing {
             lines.append(text.attributedSubstring(from: NSRange(location: start, length: count)))
             start += count
         }
-        return lines
+        return avoidingSingleCharacterLastLine(lines)
     }
+
+    /// 最後の行が 1 字だけになるときは，前の行の最後の字も送る(1 字だけの行を作らない)．
+    /// 送る字を行の頭に置けないときと，前の行が短いときは送らない(Windows の scene::meaning::wrap と同じ決め方)
+    private static func avoidingSingleCharacterLastLine(_ lines: [NSAttributedString]) -> [NSAttributedString] {
+        guard lines.count >= 2, let last = lines.last, last.string.count == 1 else { return lines }
+        let previous = lines[lines.count - 2]
+        guard previous.string.count >= 3, let moved = previous.string.last, !lineStartForbidden.contains(moved) else { return lines }
+        let split = previous.length - String(moved).utf16.count
+        let head = previous.attributedSubstring(from: NSRange(location: 0, length: split))
+        let tail = NSMutableAttributedString(attributedString: previous.attributedSubstring(from: NSRange(location: split, length: previous.length - split)))
+        tail.append(last)
+        return Array(lines.dropLast(2)) + [head, tail]
+    }
+
+    /// 行の頭に置かない字(Windows の scene::meaning の LINE_START_FORBIDDEN と同じ)
+    private static let lineStartForbidden = Set("、。，．,.:;!?)]}）］｝」』】〕〉》・：；？！ー…‥々ゝゞヽヾぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ")
 
     /// 末尾を「…」にして width に収めたもの
     private static func truncated(_ text: NSAttributedString, width: CGFloat) -> NSAttributedString {
