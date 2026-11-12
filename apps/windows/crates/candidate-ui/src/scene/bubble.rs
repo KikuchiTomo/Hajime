@@ -90,16 +90,18 @@ pub fn place(
     let (lowest, highest) = (metrics.radius + half, height - metrics.radius - half);
     // 上の端は候補の窓の上の端．三角が行に届かなければ，届くところまで下げる
     let preferred_y = window.y.max(target - highest);
-    // 窓の左の端を x に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ None
-    let vertical = |x: f32| -> Option<(f32, f32)> {
+    // 窓の左の端を x に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ None．
+    // 吹き出しの上の端は floor より上に出さない
+    let vertical = |x: f32, floor: f32| -> Option<(f32, f32)> {
         if x < screen.x || x + window_width > screen.max_x() {
             return None;
         }
-        let (mut top, mut bottom) = (screen.y.max(window.y), screen.max_y());
-        for obstacle in obstacles
-            .iter()
-            .filter(|obstacle| obstacle.x < x + window_width && x < obstacle.max_x())
-        {
+        let (mut top, mut bottom) = (screen.y.max(floor), screen.max_y());
+        // floor より上にある物(入力中の文字の行など)は，floor で止めるだけで覆わないので見ない．
+        // 見ると，窓と入力中の文字のあいだが gap より狭いときに，吹き出しだけが窓の上の端より下がる
+        for obstacle in obstacles.iter().filter(|obstacle| {
+            obstacle.x < x + window_width && x < obstacle.max_x() && obstacle.max_y() > floor
+        }) {
             if obstacle.y >= target {
                 bottom = bottom.min(obstacle.y - metrics.gap);
             } else if obstacle.max_y() <= target {
@@ -120,9 +122,13 @@ pub fn place(
     let beside_row = (Side::Right, row.max_x() + metrics.gap);
     let outside_right = (Side::Right, window.max_x() + metrics.gap);
     let outside_left = (Side::Left, window.x - metrics.gap - window_width);
-    let found = [beside_row, outside_right, outside_left]
-        .into_iter()
-        .find_map(|(side, x)| vertical(x).map(|(y, pointer)| (side, x, y, pointer)));
+    // まず窓の上の端より上に出さない置き方を探し，無ければ(窓が入力位置の上にあって吹き出しが窓より高いときなど)
+    // 入力中の文字やほかの候補を覆わないように，窓の上の端より上に出してよい置き方を探す
+    let found = [window.y, screen.y].into_iter().find_map(|floor| {
+        [beside_row, outside_right, outside_left]
+            .into_iter()
+            .find_map(|(side, x)| vertical(x, floor).map(|(y, pointer)| (side, x, y, pointer)))
+    });
     // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
     let (side, x, y, pointer) = found.unwrap_or_else(|| {
         let x = outside_right
@@ -528,6 +534,53 @@ mod tests {
             assert_eq!(placement.window.y, setup.0.y, "{selected}");
             assert_eq!(tip(&placement).y, setup.1.mid_y(), "{selected}");
         }
+    }
+
+    #[test]
+    fn 入力中の文字の行が窓のすぐ上にあっても吹き出しの上の端は窓の上の端にそろう() {
+        // 入力位置と候補の窓のあいだは ANCHOR_GAP の 2(gap の 4 より狭い)
+        let mut setup = list(100.0, 100.0, 1);
+        setup.2.push(Frame::new(0.0, 80.0, 1200.0, 18.0));
+        let placement = placed(&setup, (288.0, 160.0), SCREEN);
+        assert_eq!(placement.window.y, setup.0.y);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
+    }
+
+    #[test]
+    fn 負の座標の画面でも画面の中に置き_右の端では左に出す() {
+        // 主の画面の左上に置いた 2 枚目の画面(Windows の PC の配置)
+        let screen = Frame::new(-1920.0, -300.0, 1920.0, 1080.0);
+        let inside = |placement: &Placement| {
+            let margin = METRICS.screen_margin;
+            placement.window.x >= screen.x + margin
+                && placement.window.max_x() <= screen.max_x() - margin
+                && placement.window.y >= screen.y + margin
+                && placement.window.max_y() <= screen.max_y() - margin
+        };
+        let middle = list(-1200.0, -200.0, 1);
+        let right = placed(&middle, (288.0, 160.0), screen);
+        assert_eq!(right.side, Side::Right);
+        assert_eq!(right.window.y, middle.0.y);
+        assert_eq!(tip(&right).y, middle.1.mid_y());
+        assert!(inside(&right));
+        let edge = list(-320.0, -200.0, 1);
+        let left = placed(&edge, (288.0, 160.0), screen);
+        assert_eq!(left.side, Side::Left);
+        assert_eq!(left.window.max_x(), edge.0.x - METRICS.gap);
+        assert_eq!(tip(&left).y, edge.1.mid_y());
+        assert!(inside(&left));
+    }
+
+    #[test]
+    fn 窓が入力位置の上にあって吹き出しが窓より高いときは入力中の文字を覆わない() {
+        let mut setup = list(100.0, 500.0, 1);
+        // 入力中の文字の行は窓の下(あいだ 2)
+        let caret = Frame::new(0.0, 702.0, 1200.0, 18.0);
+        setup.2.push(caret);
+        let placement = placed(&setup, (288.0, 260.0), SCREEN);
+        assert!(placement.window.max_y() <= caret.y - METRICS.gap);
+        assert_eq!(tip(&placement).y, setup.1.mid_y());
+        assert!(!intersects(body(&placement), caret));
     }
 
     #[test]

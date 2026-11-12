@@ -349,10 +349,11 @@ fn place(
             let chip = size::BODY_LINE_HEIGHT
                 + size::NOTE_LINE_HEIGHT
                 + tokens::size::settings::PREVIEW_CHIP_PADDING_Y * 2.0;
+            // 結果のタグを押して一覧に足す(macOS の WordLanguagePage)ので，下にボタンは置かない
             place_stacked_inputs(
                 position,
                 2,
-                PREVIEW_BUTTONS,
+                NO_BUTTONS,
                 frame,
                 chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_BUTTON_GAP,
                 metrics,
@@ -887,29 +888,6 @@ fn place_custom_theme(position: usize, frame: Frame) -> CardLayout {
     card.parts.push(mark);
     card
 }
-
-/// 試す欄の下のボタン(試した語をいつも英語・いつも日本語にする単語に足す．macOS は結果の語のメニュー)
-pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
-    top: &[],
-    bottom: &[
-        crate::strings::windows::ADD_TO_ENGLISH,
-        crate::strings::windows::ADD_TO_JAPANESE,
-    ],
-    search: false,
-    filter: false,
-    files: None,
-    arrow: None,
-    field_widths: &[],
-    toolbar: false,
-    trailing_bottom: 0,
-    note_line: false,
-    bottom_fields: 0,
-    sheet: false,
-    move_icons: false,
-    message_line: false,
-    result: false,
-    template_field: None,
-};
 
 const NO_BUTTONS: ListButtons = ListButtons {
     top: &[],

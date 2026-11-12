@@ -39,6 +39,10 @@ use windows::Win32::UI::Shell::{
     FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
+    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, SetForegroundWindow, TrackPopupMenuEx,
+    MF_STRING, TPM_LEFTALIGN, TPM_NONOTIFY, TPM_RETURNCMD, TPM_TOPALIGN,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW,
     GetClientRect, GetMessageW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, KillTimer,
     LoadCursorW, LoadIconW, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW,
@@ -644,6 +648,36 @@ pub fn choose_files(owner: HWND, filter_name: &str, pattern: &str) -> Vec<String
                 text
             })
             .collect()
+    }
+}
+
+/// ポインターの位置に項目を選ぶメニューを出し，選んだ項目の番号を返す．選ばずに閉じたら None
+/// (英語と日本語の試した結果のタグを押したとき．macOS は SwiftUI のボタンのメニュー)
+pub fn choose_menu(owner: HWND, items: &[&str]) -> Option<usize> {
+    // SAFETY: メニューはこの関数の中で作って壊す．文字列は AppendMenuW の呼び出しのあいだ生きている．owner はこのスレッドの窓
+    unsafe {
+        let menu = CreatePopupMenu().ok()?;
+        for (index, item) in items.iter().enumerate() {
+            let text = HSTRING::from(*item);
+            let _ = AppendMenuW(menu, MF_STRING, index + 1, &text);
+        }
+        let mut point = POINT::default();
+        let _ = GetCursorPos(&mut point);
+        // 窓を前に出しておかないと，メニューの外を押しても閉じない
+        let _ = SetForegroundWindow(owner);
+        let chosen = TrackPopupMenuEx(
+            menu,
+            (TPM_RETURNCMD | TPM_NONOTIFY | TPM_LEFTALIGN | TPM_TOPALIGN).0,
+            point.x,
+            point.y,
+            owner,
+            None,
+        );
+        let _ = DestroyMenu(menu);
+        usize::try_from(chosen.0)
+            .ok()
+            .filter(|id| *id > 0)
+            .map(|id| id - 1)
     }
 }
 

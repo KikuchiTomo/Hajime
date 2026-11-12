@@ -1352,11 +1352,25 @@ impl App {
         {
             return;
         }
+        let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
+        let Some(pixels) = self.render_preview_pixels(&source, width, height, scale) else {
+            return;
+        };
+        self.preview_pixels = Some((key, pixels));
+    }
+
+    /// 見本の画像を width × height のピクセル(scale は 1 DIP あたりのピクセル)で作る．作れなければ None
+    fn render_preview_pixels(
+        &mut self,
+        source: &PreviewSource,
+        width: u32,
+        height: u32,
+        scale: f32,
+    ) -> Option<PreviewPixels> {
         if self.preview.is_none() {
             self.preview = candidate_ui::app::preview::Preview::new().ok();
         }
-        let Some(preview) = &self.preview else { return };
-        let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
+        let preview = self.preview.as_ref()?;
         // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
         self.preview_generation += 1;
         let generation = self.preview_generation;
@@ -1379,18 +1393,13 @@ impl App {
                 }
             },
         };
-        let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
-            return;
-        };
-        self.preview_pixels = Some((
-            key,
-            PreviewPixels {
-                generation,
-                width,
-                height,
-                pixels,
-            },
-        ));
+        let pixels = d2d::render_preview(preview, width, height, &request)?;
+        Some(PreviewPixels {
+            generation,
+            width,
+            height,
+            pixels,
+        })
     }
 
     /// 情報のページのアイコン(実行ファイルのリソースの 1 番)の画像を作る．カードの背景の上に描く
@@ -2277,6 +2286,7 @@ impl App {
                     value: None,
                     selected: None,
                     host: None,
+                    parent: None,
                 })
                 .collect();
             nodes.extend(self.page_nodes(now));
@@ -2294,6 +2304,7 @@ impl App {
             value: None,
             selected: None,
             host: Some(self.search),
+            parent: None,
         }];
         // 見えている範囲の外の項目も入れる(読み上げの側が送って読めるように)
         for (index, item) in self.nav.items.iter().enumerate() {
@@ -2311,6 +2322,7 @@ impl App {
                 value: None,
                 selected: Some(selected),
                 host: None,
+                parent: None,
             });
         }
         nodes.extend(self.page_nodes(now));
@@ -2378,6 +2390,7 @@ impl App {
                 value,
                 selected,
                 host,
+                parent: None,
             });
         }
         nodes
@@ -2961,7 +2974,18 @@ impl App {
         }
         self.scroll.jump_to(0.0);
         let (width, height) = self.size();
+        // 見本(外観・パレット・絵文字)の行の高さは見本を描いた大きさで決まるので，置く前に測る
+        self.measure_preview();
         let content = self.view.arrange(width - nav_width(width), &self.graphics);
+        // 見本の画像は書き出す倍率で作り，画面と同じ場所に描く(作らないと見本の行が空いて写る)
+        let snapshot_preview = self.view.preview_rect().and_then(|(kind, rect)| {
+            let source = (kind != page::PreviewKind::Icon)
+                .then(|| self.preview_source(kind))
+                .flatten()?;
+            let scale = tokens::size::snapshot::SCALE;
+            let pixel = |value: f32| (value * scale).round().max(0.0) as u32;
+            self.render_preview_pixels(&source, pixel(rect.width), pixel(rect.height), scale)
+        });
         // シートは窓の真ん中に出すので，窓の大きさで写す
         let total = if self.import_sheet.is_some() {
             height
@@ -3007,6 +3031,7 @@ impl App {
             tokens::size::snapshot::SCALE,
             Color::from(self.theme.palette.background),
             &directory.join(&name),
+            snapshot_preview.as_ref(),
             |canvas| {
                 paint_window(
                     canvas,
@@ -3637,6 +3662,7 @@ impl App {
                     value: None,
                     selected,
                     host: None,
+                    parent: None,
                 }
             })
             .collect();
@@ -3661,6 +3687,8 @@ impl App {
                 value: None,
                 selected: Some(index == sheet.cursor),
                 host: None,
+                // 行は表の List の子(ナレーターが List の中の何件目として読む)
+                parent: Some(import_node(ImportPart::Table)),
             }
         }));
         Some(nodes)
@@ -3698,6 +3726,7 @@ impl App {
                         value,
                         selected: None,
                         host,
+                        parent: None,
                     }
                 })
                 .collect(),

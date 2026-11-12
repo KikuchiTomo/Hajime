@@ -1274,11 +1274,6 @@ pub mod windows {
     pub const ALL_FILES: &str = "すべてのファイル";
     /// 除外設定のアプリの打つ欄の案内(macOS はアプリを選んで足すだけ．Windows は実行ファイルの名前でも足せる)
     pub const APP_EXECUTABLE_PROMPT: &str = "実行ファイル名";
-    /// 試した語を一覧に足すボタン(macOS は結果の語を右クリックして選ぶ)
-    pub const ADD_TO_ENGLISH: &str = "常に英語にする単語に追加";
-    pub const ADD_TO_JAPANESE: &str = "常に日本語にする単語に追加";
-    /// 試した語を足せないとき(1 語でない)
-    pub const ADD_ONE_WORD: &str = "1 語だけを入力すると、一覧に追加できます";
     /// 選んだ記号の決まりを有効・無効にするボタン(macOS は行ごとのオン・オフ)
     pub const TOGGLE_ENABLED: &str = "有効・無効の切り替え";
     /// ファイルを選ぶ窓の種類の名前(macOS は種類を名前で出さない)

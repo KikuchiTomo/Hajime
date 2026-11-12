@@ -22,7 +22,8 @@ public final class FakeConverter: KanaKanjiConverting {
     public func clauseCandidates(for reading: String) -> [Candidate] {
         guard !reading.isEmpty else { return [] }
         return (clauseTable[reading] ?? []).enumerated().map { index, entry in
-            Candidate(text: entry.text, readingCount: entry.readingCount, origin: .engine(id: 1000 + index), score: -Double(index) * (clauseScoreStep[reading] ?? 3))
+            Candidate(text: entry.text, readingCount: entry.readingCount, origin: .engine(id: 1000 + index), score: -Double(index) * (clauseScoreStep[reading] ?? 3),
+                      words: candidateWords[entry.text] ?? [])
         }
     }
 

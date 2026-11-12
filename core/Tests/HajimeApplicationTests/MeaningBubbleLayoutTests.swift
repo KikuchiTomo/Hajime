@@ -108,6 +108,49 @@ struct MeaningBubbleLayoutTests {
         #expect(Self.tip(layout).y == setup.row.midY)
     }
 
+    @Test("入力中の文字の行が窓のすぐ上(gap より近く)にあっても，吹き出しの上の端は窓の上の端にそろう")
+    func caretJustAbove() {
+        var setup = Self.list(x: 100, y: 100, selected: 1)
+        // Windows は入力位置と候補の窓のあいだが 2(gap の 4 より狭い)
+        setup.obstacles.append(Box(x: 0, y: 80, width: 1200, height: 18))
+        let layout = Self.place(setup)
+        #expect(layout.window.y == setup.window.y)
+        #expect(Self.tip(layout).y == setup.row.midY)
+    }
+
+    @Test("負の座標の画面(主の画面の左上に置いた 2 枚目)でも，画面の中に置き，右の端では左に出す")
+    func negativeScreen() {
+        let screen = Box(x: -1920, y: -300, width: 1920, height: 1080)
+        let inside = { (layout: Layout) in
+            layout.window.x >= screen.x + Self.metrics.screenMargin && layout.window.maxX <= screen.maxX - Self.metrics.screenMargin
+                && layout.window.y >= screen.y + Self.metrics.screenMargin && layout.window.maxY <= screen.maxY - Self.metrics.screenMargin
+        }
+        let middle = Self.list(x: -1200, y: -200, selected: 1)
+        let right = Self.place(middle, screen: screen)
+        #expect(right.side == .right)
+        #expect(right.window.y == middle.window.y)
+        #expect(Self.tip(right).y == middle.row.midY)
+        #expect(inside(right))
+        let edge = Self.list(x: -320, y: -200, selected: 1)
+        let left = Self.place(edge, screen: screen)
+        #expect(left.side == .left)
+        #expect(left.window.maxX == edge.window.x - Self.metrics.gap)
+        #expect(Self.tip(left).y == edge.row.midY)
+        #expect(inside(left))
+    }
+
+    @Test("窓が入力位置の上にあって吹き出しが窓より高いときは，入力中の文字を覆わないように窓の上の端より上へ寄せる")
+    func aboveCaret() {
+        var setup = Self.list(x: 100, y: 500, selected: 1)
+        // 入力中の文字の行は窓の下(あいだ 2)
+        let caret = Box(x: 0, y: 702, width: 1200, height: 18)
+        setup.obstacles.append(caret)
+        let layout = Self.place(setup, size: (288, 260))
+        #expect(layout.window.maxY <= caret.y - Self.metrics.gap)
+        #expect(Self.tip(layout).y == setup.row.midY)
+        #expect(!Self.bodyBox(layout).intersects(caret))
+    }
+
     @Test("三角が行に届かないときだけ，届くところまで下げる")
     func lowersToReach() {
         let setup = Self.list(x: 100, y: 100, selected: 3)
