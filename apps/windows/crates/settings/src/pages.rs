@@ -343,6 +343,9 @@ pub enum Control {
     Acknowledgement(usize),
     /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
     KeymapReport,
+    /// 単語に書ける書き方の表(書き方・入るもの・今入れると)と，登録の例・付けられる名前・日時の書式の記号
+    /// (macOS の UserWordsView の TemplateReference)．高さは画面の側で測る
+    TemplateReference,
     /// キー設定のひな形を選んで読み込む
     Preset,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
@@ -1926,15 +1929,14 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // 書き方を 1 つずつ注記の行にして並べる(macOS の書き方の表と同じ中身)
-            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
-                .chain(
-                    crate::strings::windows::TEMPLATE_ROWS
-                        .iter()
-                        .map(|text| Row::note(text)),
-                )
-                .map(|row| row.visible_when(words()))
-                .collect(),
+            // macOS の UserWordsView と同じく，切り替えと書き方の表(書き方・入るもの・今入れると)を 1 枚のカードに並べる
+            rows: vec![
+                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"),
+                Row::new("", "", Control::TemplateReference),
+            ]
+            .into_iter()
+            .map(|row| row.visible_when(words()))
+            .collect(),
             footer: None,
             footer_variants: &[],
         },

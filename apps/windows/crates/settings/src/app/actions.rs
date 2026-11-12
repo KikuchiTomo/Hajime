@@ -1047,6 +1047,32 @@ pub fn macro_preview(
         .unwrap_or_default()
 }
 
+/// 入れるたびに変わる書き方(UUID・乱数・選ぶ)．macOS と同じく，ページを開いたときの例を 1 つ出したままにする
+const CHANGING_TEMPLATES: &[&str] = &["{uuid}", "{random:1-6}", "{alnum:8}", "{pick:はい,いいえ}"];
+
+/// 単語に書ける書き方を今入れたときの値(macOS の TemplateReference)．エンジンが変換マクロを試すときと
+/// 同じ値(日時・乱数)で置き換える．入れるたびに変わる書き方は，前に求めた値があればそのまま使う．読めなければ空
+pub fn template_values(model: &SettingsModel<Store>, previous: &[String]) -> Vec<String> {
+    let expand = |template: &str| -> Option<String> {
+        model
+            .store()
+            .preview_macros("", "", template)
+            .ok()
+            .and_then(|results| results.into_iter().next())
+    };
+    crate::strings::extras::TEMPLATE_ROWS
+        .iter()
+        .enumerate()
+        .map(|(index, (syntax, _))| {
+            let kept = previous.get(index).filter(|value| !value.is_empty());
+            match kept {
+                Some(value) if CHANGING_TEMPLATES.contains(syntax) => value.clone(),
+                _ => expand(syntax).unwrap_or_default(),
+            }
+        })
+        .collect()
+}
+
 /// 標準のひな形の値(KeymapPreset.standard)
 const STANDARD_PRESET: &str = "standard";
 

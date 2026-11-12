@@ -385,6 +385,7 @@ public enum LayoutTokens {
         public static let themeSwatchRadius: Double = 6
         public static let themeSwatchFontSize: Double = 11
         public static let aboutIcon: Double = 64
+        public static let templateNowWidth: Double = 160
         public static let keymapListHeight: Double = 400
         public static let listArrowWidth: Double = 24
         public static let titleBarHeight: Double = 32
