@@ -291,14 +291,20 @@ fn place(
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
-        Control::Preview(TryKind::Language) => place_inputs(
-            position,
-            2,
-            PREVIEW_BUTTONS,
-            frame,
-            size::BODY_LINE_HEIGHT * size::PREVIEW_LINES,
-            metrics,
-        ),
+        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果の札(2 行の札)を置く
+        Control::Preview(TryKind::Language) => {
+            let chip = size::BODY_LINE_HEIGHT
+                + size::NOTE_LINE_HEIGHT
+                + tokens::size::settings::PREVIEW_CHIP_PADDING_Y * 2.0;
+            place_stacked_inputs(
+                position,
+                2,
+                PREVIEW_BUTTONS,
+                frame,
+                chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_CHIP_GAP,
+                metrics,
+            )
+        }
         Control::Preview(TryKind::Macros) => place_inputs(
             position,
             2,
@@ -735,7 +741,7 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     search: false,
     filter: false,
     files: None,
-    arrow: false,
+    arrow: None,
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
@@ -751,7 +757,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     search: false,
     filter: false,
     files: None,
-    arrow: false,
+    arrow: None,
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
@@ -839,8 +845,12 @@ fn place_list(
     let fixed_total: f32 = fixed.iter().sum();
     let count = (fields - fixed.len()).max(1) as f32;
     // 矢印を置くときは先頭の 2 つの欄のあいだを広げる
-    let arrow = buttons.arrow && fields >= 2;
-    let arrow_extra = if arrow { size::LIST_ARROW_WIDTH } else { 0.0 };
+    let arrow = buttons.arrow.filter(|index| index + 1 < fields);
+    let arrow_extra = if arrow.is_some() {
+        size::LIST_ARROW_WIDTH
+    } else {
+        0.0
+    };
     let gaps = size::CONTROL_GAP * (fields.max(1) - 1) as f32;
     let field_width = ((inner - buttons_width - gaps - arrow_extra - fixed_total) / count).max(0.0);
     let mut parts = Vec::new();
@@ -849,7 +859,7 @@ fn place_list(
         let width = fixed.get(index).copied().unwrap_or(field_width);
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
-        if arrow && index == 0 {
+        if arrow == Some(index) {
             cursor += arrow_extra;
         }
     }
@@ -979,6 +989,39 @@ fn place_list(
     let height = bottom + size::CARD_PADDING_Y - frame.y;
     let mut card = empty(frame.card(height), position);
     card.control = Rect::new(x, list_top, inner, below);
+    card.parts = parts;
+    card
+}
+
+/// 打つ欄を縦に並べる入力欄のカード(英語と日本語の試す欄)．入力欄は 1 つずつ幅いっぱいの行に置き，
+/// その下に結果と下のボタンを place_inputs と同じに置く
+fn place_stacked_inputs(
+    position: usize,
+    fields: usize,
+    buttons: ListButtons,
+    frame: Frame,
+    below: f32,
+    metrics: &dyn Metrics,
+) -> CardLayout {
+    let extra = (size::CONTROL_HEIGHT + size::CONTROL_GAP) * fields as f32;
+    // 欄を置かずに place_inputs で下のボタンを置き(欄の分を結果の上に足しておく)，あとで欄を縦に置く
+    let mut card = place_inputs(position, 0, buttons, frame, below + extra, metrics);
+    let x = frame.inner_left();
+    let top = frame.y + size::CARD_PADDING_Y;
+    let fields_rects: Vec<Rect> = (0..fields)
+        .map(|index| {
+            Rect::new(
+                x,
+                top + index as f32 * (size::CONTROL_HEIGHT + size::CONTROL_GAP),
+                frame.inner_width(),
+                size::CONTROL_HEIGHT,
+            )
+        })
+        .collect();
+    let list_top = top + fields as f32 * (size::CONTROL_HEIGHT + size::CONTROL_GAP);
+    card.control = Rect::new(x, list_top, frame.inner_width(), below);
+    let mut parts = fields_rects;
+    parts.extend(card.parts);
     card.parts = parts;
     card
 }

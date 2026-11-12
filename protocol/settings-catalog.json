@@ -137,6 +137,284 @@
     "yenKey",
     "zenzaiModel"
   ],
+  "keymapCommandStates" : {
+    "acceptSuggestion" : [
+      "composing"
+    ],
+    "associate" : [
+      "composing",
+      "converting"
+    ],
+    "backToReading" : [
+      "converting"
+    ],
+    "cancel" : [
+      "composing",
+      "converting"
+    ],
+    "cancelAndDirectMode" : [
+      "idle",
+      "composing",
+      "converting"
+    ],
+    "commit" : [
+      "composing",
+      "converting"
+    ],
+    "commitFirstSegment" : [
+      "converting"
+    ],
+    "convert" : [
+      "composing"
+    ],
+    "convertWithoutLearning" : [
+      "composing"
+    ],
+    "deleteBackward" : [
+      "composing"
+    ],
+    "directMode" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "editSegment" : [
+      "converting"
+    ],
+    "emojiPalette" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "englishAutoStyle" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "englishStyle" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "expandCandidates" : [
+      "converting"
+    ],
+    "extendSegment" : [
+      "converting"
+    ],
+    "extendSegmentToWord" : [
+      "converting"
+    ],
+    "firstCandidate" : [
+      "converting"
+    ],
+    "firstSegment" : [
+      "converting"
+    ],
+    "forgetCandidate" : [
+      "converting"
+    ],
+    "forgetLastCommit" : [
+      "idle"
+    ],
+    "handwriting" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "hidePrediction" : [
+      "composing"
+    ],
+    "insertAlternateSpace" : [
+      "idle",
+      "composing",
+      "converting"
+    ],
+    "insertBoundary" : [
+      "composing"
+    ],
+    "insertFullwidthSpace" : [
+      "idle",
+      "composing",
+      "converting"
+    ],
+    "insertHalfwidthSpace" : [
+      "idle",
+      "composing",
+      "converting"
+    ],
+    "insertSpace" : [
+      "idle",
+      "composing",
+      "converting"
+    ],
+    "japaneseMode" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "kanaStyle" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "kaomojiPalette" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "lastCandidate" : [
+      "converting"
+    ],
+    "lastSegment" : [
+      "converting"
+    ],
+    "nextCandidate" : [
+      "composing",
+      "converting"
+    ],
+    "nextCandidatePage" : [
+      "converting"
+    ],
+    "nextInputStyle" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "nextSegment" : [
+      "converting"
+    ],
+    "nextUncertainSegment" : [
+      "converting"
+    ],
+    "openMenu" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "openSettings" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "openUserDictionary" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "previousCandidate" : [
+      "composing",
+      "converting"
+    ],
+    "previousCandidatePage" : [
+      "converting"
+    ],
+    "previousSegment" : [
+      "converting"
+    ],
+    "previousUncertainSegment" : [
+      "converting"
+    ],
+    "reconvert" : [
+      "idle"
+    ],
+    "registerWord" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "resumeEditing" : [
+      "converting"
+    ],
+    "romajiStyle" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "segmentToHalfwidthKatakana" : [
+      "converting"
+    ],
+    "segmentToHiragana" : [
+      "converting"
+    ],
+    "segmentToKatakana" : [
+      "converting"
+    ],
+    "shrinkSegment" : [
+      "converting"
+    ],
+    "shrinkSegmentToWord" : [
+      "converting"
+    ],
+    "splitSegment" : [
+      "converting"
+    ],
+    "switchKanaType" : [
+      "composing",
+      "converting"
+    ],
+    "symbolPalette" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "toFullwidthAlphanumeric" : [
+      "composing",
+      "converting"
+    ],
+    "toHalfwidthAlphanumeric" : [
+      "composing",
+      "converting"
+    ],
+    "toHalfwidthKatakana" : [
+      "composing",
+      "converting"
+    ],
+    "toHiragana" : [
+      "composing",
+      "converting"
+    ],
+    "toKatakana" : [
+      "composing",
+      "converting"
+    ],
+    "toggleLiveConversion" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "toggleMode" : [
+      "idle",
+      "composing",
+      "converting",
+      "direct"
+    ],
+    "undoCommit" : [
+      "idle"
+    ],
+    "undoConversionEdit" : [
+      "converting"
+    ],
+    "undoPrediction" : [
+      "idle"
+    ]
+  },
   "latestReleaseURL" : "https://github.com/KikuchiTomo/Hajime/releases/latest",
   "limits" : {
     "applicationIdentifierLength" : 255,

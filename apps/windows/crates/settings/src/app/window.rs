@@ -618,7 +618,8 @@ impl App {
         let now = self.now();
         if let Some(model) = &self.model {
             if self.view.page == Page::Keys {
-                self.extras.keymap_report = super::actions::keymap_report(model);
+                (self.extras.keymap_report, self.extras.keymap_issues) =
+                    super::actions::keymap_report(model);
             }
             // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
             if self.view.page == Page::Dictionary {

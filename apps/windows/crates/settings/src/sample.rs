@@ -130,9 +130,10 @@ impl Engine for SampleEngine {
             RequestBody::ReadKeymapPreset { .. } => {
                 fields(&pick(&state.defaults, &["keymap".to_string()]))
             }
-            RequestBody::CheckKeymap { .. } => ResponseBody::KeymapReport {
+            // 見本でも，同じ状態・同じキーの行は下の行が使われ，上の行は使われない(画面で行の印を確かめるため)
+            RequestBody::CheckKeymap { values } => ResponseBody::KeymapReport {
                 report: KeymapReport {
-                    rows: Vec::new(),
+                    rows: hidden_rows(&values),
                     missing: Vec::new(),
                 },
             },
@@ -318,6 +319,44 @@ fn symbols(state: &mut State, kind: SymbolKind) -> &mut Vec<SymbolItem> {
     }
 }
 
+/// 同じ状態・同じキーの行のうち，下に同じ行がある行(使われない行)
+fn hidden_rows(values: &str) -> Vec<ipc::KeymapRowIssue> {
+    let keymap: Vec<(String, String)> = serde_json::from_str::<Fields>(values)
+        .ok()
+        .and_then(|fields| fields.get("keymap").and_then(Value::as_array).cloned())
+        .unwrap_or_default()
+        .iter()
+        .map(|row| {
+            let text = |name: &str| {
+                row.get(name)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string()
+            };
+            (text("state"), text("key"))
+        })
+        .collect();
+    keymap
+        .iter()
+        .enumerate()
+        .filter_map(|(index, row)| {
+            let winners: Vec<u32> = keymap
+                .iter()
+                .enumerate()
+                .skip(index + 1)
+                .filter(|(_, other)| *other == row)
+                .filter_map(|(winner, _)| u32::try_from(winner).ok())
+                .collect();
+            (!winners.is_empty()).then(|| ipc::KeymapRowIssue {
+                row: u32::try_from(index).unwrap_or(u32::MAX),
+                hidden_by: winners,
+                hidden_states: Vec::new(),
+                blocks_typing: false,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,5 +394,19 @@ mod tests {
             .read_symbol_items(SymbolKind::Reading)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn 同じ状態と同じキーの上の行は使われない() {
+        let values = serde_json::json!({"keymap": [
+            {"state": "idle", "key": "Ctrl k", "command": "a"},
+            {"state": "composing", "key": "Ctrl k", "command": "b"},
+            {"state": "idle", "key": "Ctrl k", "command": "c"},
+        ]})
+        .to_string();
+        let rows = super::hidden_rows(&values);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].row, 0);
+        assert_eq!(rows[0].hidden_by, vec![2]);
     }
 }

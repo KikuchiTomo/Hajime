@@ -23,6 +23,8 @@ pub struct Field {
     pub optional: bool,
     /// 入力欄の案内(None なら label)．表の見出しは label のまま
     pub prompt: Option<&'static str>,
+    /// 選ぶ欄の初めの選択肢の番号(判別ルールの「前: 日本語 → 日本語」．macOS の WordLanguagePage)
+    pub default_choice: usize,
 }
 
 impl Field {
@@ -36,6 +38,7 @@ impl Field {
             notation: false,
             optional: false,
             prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -48,6 +51,7 @@ impl Field {
             notation: false,
             optional: false,
             prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -65,6 +69,7 @@ impl Field {
             notation: false,
             optional: false,
             prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -78,6 +83,7 @@ impl Field {
             notation: true,
             optional: false,
             prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -85,6 +91,14 @@ impl Field {
     pub const fn optional(self) -> Self {
         Self {
             optional: true,
+            ..self
+        }
+    }
+
+    /// 選ぶ欄の初めの選択肢を決める
+    pub const fn default_choice(self, index: usize) -> Self {
+        Self {
+            default_choice: index,
             ..self
         }
     }
