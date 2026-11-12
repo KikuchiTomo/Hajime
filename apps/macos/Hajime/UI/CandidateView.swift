@@ -14,6 +14,8 @@ final class CandidateView: NSView {
     var keys = KeymapPreset.standard.keymap { didSet { needsDisplay = true } }
     /// 足元にキーの案内を出すか(設定の「キーの案内を表示」)
     var showsHints = true { didSet { needsDisplay = true } }
+    /// 足元の行(案内と位置)を出すか．設定の画面の見本では出さない
+    var showsFooter = true { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     var fontSize: CGFloat = Size.fontSize { didSet { needsDisplay = true } }
     /// 第 1 候補と選んでいる候補以外の濃さ．出した直後は薄くし，すぐに濃くする(ephemeral adaptation)．
@@ -134,8 +136,9 @@ final class CandidateView: NSView {
             slot = belowSlot(for: panel, width: width)
             card = slot.map { .below(width: $0.size.width, height: $0.size.height) }
         }
-        let layout = CandidateListLayout(style: style, listWidth: list, footerWidth: footer, hasHeader: hasHeader, rowCount: rowCount(for: panel),
-                                         card: card, maximumWidth: limit, metrics: metrics, size: size.map { (Double($0.width), Double($0.height)) })
+        let layout = CandidateListLayout(style: style, listWidth: list, footerWidth: showsFooter ? footer : 0, hasHeader: hasHeader,
+                                         rowCount: rowCount(for: panel), card: card, maximumWidth: limit, metrics: metrics,
+                                         size: size.map { (Double($0.width), Double($0.height)) }, hasFooter: showsFooter)
         return (layout, slot)
     }
 
@@ -273,6 +276,7 @@ final class CandidateView: NSView {
             if let line = layout.cardSeparator { drawLine(NSRect(line)) }
             MeaningCardDrawing.drawContent(slot.layout, in: card, theme: theme)
         }
+        guard showsFooter else { return }
         drawLine(NSRect(layout.footerSeparator))
         drawFooter(panel, in: NSRect(layout.footer))
     }

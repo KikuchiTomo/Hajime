@@ -397,6 +397,8 @@ pub struct Look<'a> {
     pub size: Option<(f32, f32)>,
     /// 1 ドットあたりのデバイスのピクセル数(画面の DPI の倍率)．枝の線の縁をデバイスのピクセルの境にそろえるのに使う
     pub pixel_scale: f32,
+    /// 候補の一覧の足元の行(案内と位置)を出すか．設定の画面の見本では出さない
+    pub shows_footer: bool,
 }
 
 impl<'a> Look<'a> {
@@ -410,6 +412,7 @@ impl<'a> Look<'a> {
             rest_opacity: 1.0,
             size: None,
             pixel_scale: 1.0,
+            shows_footer: true,
         }
     }
 

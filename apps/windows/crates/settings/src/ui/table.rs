@@ -222,6 +222,13 @@ impl Table {
         self.click(next, false, shift)
     }
 
+    /// rows の index 番目の行を 1 つだけ選ぶ(並べ替えたあとに動かした行を選び直す)．出していなければ選ばない
+    pub fn select_row(&mut self, index: usize) {
+        if let Some(position) = self.shown.iter().position(|shown| *shown == index) {
+            self.select_only(position);
+        }
+    }
+
     /// 選んでいる行を 1 つだけにして position にする(入力欄から書き換えるときなど)
     pub fn select_only(&mut self, position: usize) {
         self.click(position, false, false);

@@ -110,7 +110,8 @@ const EMOJI: [(&str, &str); 5] = [
 ];
 
 /// 設定の画面の絵文字の見本(macOS の SamplePanels.emojiPlacement)．位置・数・名前の設定を変えると，その場で並びが変わる．
-/// 1 ページ目だけを出し，先頭の候補を選んでいる(Space で変換した直後と同じ)
+/// 位置と数がわかる範囲(絵文字の後ろのふだんの候補 1 つまで．1 ページに収まる分)だけを出し，
+/// 先頭の候補を選んでいる(Space で変換した直後と同じ)
 pub fn emoji_placement(settings: EmojiSettings) -> CandidateList {
     let tail = if settings.whole { "" } else { EMOJI_PARTICLE };
     let emoji: Vec<(String, &str)> = EMOJI
@@ -137,7 +138,7 @@ pub fn emoji_placement(settings: EmojiSettings) -> CandidateList {
         selected_variant: None,
         entries: texts
             .iter()
-            .take(settings.per_page)
+            .take(settings.per_page.min(at + emoji.len() + 1))
             .map(|text| CandidateEntry {
                 text: text.clone(),
                 annotation: None,
@@ -187,7 +188,8 @@ mod tests {
     #[test]
     fn 絵文字の見本は設定の位置から設定の数だけ並べ名前を添える() {
         let entries = shown(DEFAULT);
-        assert_eq!(entries.len(), 9);
+        // 1〜6 番目(絵文字の後ろのふだんの候補 1 つまで)
+        assert_eq!(entries.len(), 6);
         assert_eq!(entries[2].0, "ねこ");
         assert_eq!(entries[3], ("🐈".to_string(), Some("ネコ".to_string())));
         assert_eq!(

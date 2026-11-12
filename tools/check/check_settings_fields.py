@@ -45,8 +45,8 @@ STORAGE_TESTS = {
 WINDOWS_CONTROLS = {
     # 記号の決まりは，エンジンが既定の決まりに重ねた一覧を読み，決まりを 1 つずつ重ねる・外す
     "Control::Symbols(": ("symbolRules",),
-    # カスタムテーマの一覧の「使う」で，使うテーマを選ぶ
-    "Control::CustomThemes(": ("customThemes", "customThemeID"),
+    # カスタムテーマの行を押して使うテーマを選び，行のボタンと編集の画面で作る・直す・消す
+    "Control::CustomTheme(": ("customThemes", "customThemeID"),
 }
 
 # 画面に部品を置かない項目と理由．OS ごとに書く

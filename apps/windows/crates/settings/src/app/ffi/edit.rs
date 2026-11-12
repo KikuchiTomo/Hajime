@@ -32,6 +32,8 @@ pub const WM_FIELD_ENTER: u32 = WM_APP + 2;
 pub const WM_FIELD_FOCUS: u32 = WM_APP + 3;
 /// 親に届く知らせ: キーを記録した(lparam は欄)
 pub const WM_FIELD_RECORDED: u32 = WM_APP + 4;
+/// 親に届く知らせ: Esc を押した(lparam は欄．シート・カスタムテーマの編集の画面を閉じる)
+pub const WM_FIELD_ESCAPE: u32 = WM_APP + 5;
 
 const SUBCLASS: usize = 0x5391;
 
@@ -247,7 +249,10 @@ fn handle(
         }
         // Tab・Enter・Esc の文字は入れない(EDIT が鳴らす音も止める)
         WM_CHAR if matches!(wparam.0, 0x09 | 0x0D | 0x1B) => Some(LRESULT(0)),
-        WM_KEYDOWN if wparam.0 == usize::from(VK_ESCAPE.0) => Some(LRESULT(0)),
+        WM_KEYDOWN if wparam.0 == usize::from(VK_ESCAPE.0) => {
+            notify_parent(window, WM_FIELD_ESCAPE, 0);
+            Some(LRESULT(0))
+        }
         WM_SETFOCUS | WM_KILLFOCUS => {
             if message == WM_KILLFOCUS && field.recording.take().is_some() {
                 set_ime(window, true);
