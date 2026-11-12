@@ -1,5 +1,5 @@
 //! タスクバーの入力モードの表示(「あ」「A」)と入力メニュー．TSF の言語バーの項目(GUID_LBI_INPUTMODE)として出す．
-//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・設定を開くを選ぶ(macOS の入力メニューと同じ項目．crate::menu)．
+//! 左クリックで日本語と英数を切り替え，右クリックのメニューでライブ変換・手書き入力・絵文字と記号・設定を開くなどを選ぶ(macOS の入力メニューと同じ項目．crate::menu)．
 //! Windows 8 からのタスクバーの入力インジケーターは，右クリックで InitMenu を呼ばず OnClick(TF_LBI_CLK_RIGHT) を呼ぶだけなので，
 //! メニューは自分で出す(InitMenu は古い言語バーのために残す)
 
@@ -45,6 +45,8 @@ pub trait Actions {
     fn run(&self, command: ipc::MenuCommand);
     /// 手書きの窓を開く(組み立て中の文字を確定してから)
     fn open_handwriting(&self);
+    /// 絵文字と記号のパレットを前に見ていた種類で開く(組み立て中の文字を確定してから)
+    fn open_palette(&self);
     fn toggle_mode(&self);
     /// エンジンとつながっているか
     fn connected(&self) -> bool;
@@ -71,6 +73,7 @@ impl InputModeItem {
         match menu::selection(id) {
             Some(menu::Selection::Command(command)) => self.actions.run(command),
             Some(menu::Selection::Handwriting) => self.actions.open_handwriting(),
+            Some(menu::Selection::Palette) => self.actions.open_palette(),
             Some(menu::Selection::CheckForUpdates) => {
                 let _ = super::launch::start_with(
                     super::launch::SETTINGS_FILE,

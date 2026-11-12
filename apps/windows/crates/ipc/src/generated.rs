@@ -314,6 +314,8 @@ pub struct SettingsSnapshot {
     pub candidate_font_size: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handwriting: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<bool>,
 }
 
 impl fmt::Debug for SettingsSnapshot {
@@ -326,6 +328,7 @@ impl fmt::Debug for SettingsSnapshot {
             .field("showsKeyHints", &self.shows_key_hints)
             .field("candidateFontSize", &self.candidate_font_size)
             .field("handwriting", &self.handwriting)
+            .field("palette", &self.palette)
             .finish()
     }
 }
@@ -716,6 +719,10 @@ pub enum RequestBody {
         session: u32,
         context: FieldContext,
     },
+    OpenPalette {
+        session: u32,
+        context: FieldContext,
+    },
     Reconvert {
         session: u32,
         text: String,
@@ -901,6 +908,11 @@ impl fmt::Debug for RequestBody {
                 .finish(),
             Self::OpenHandwriting { session, context, .. } => f
                 .debug_struct("OpenHandwriting")
+                .field("session", session)
+                .field("context", context)
+                .finish(),
+            Self::OpenPalette { session, context, .. } => f
+                .debug_struct("OpenPalette")
                 .field("session", session)
                 .field("context", context)
                 .finish(),

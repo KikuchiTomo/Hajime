@@ -347,6 +347,10 @@
         {
           "name": "handwriting",
           "type": "bool?"
+        },
+        {
+          "name": "palette",
+          "type": "bool?"
         }
       ]
     },
@@ -807,6 +811,19 @@
         },
         {
           "name": "openHandwriting",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
+          "name": "openPalette",
           "fields": [
             {
               "name": "session",
