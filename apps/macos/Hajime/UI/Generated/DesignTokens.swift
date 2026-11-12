@@ -453,6 +453,12 @@ enum DesignTokens {
             static let infoSymbolWidth: CGFloat = 28
             static let demoGap: CGFloat = 14
             static let badgeRadius: CGFloat = 6
+            static let counterHeight: CGFloat = 16
+            static let checkSize: CGFloat = 20
+            static let badgeHeight: CGFloat = 18
+            static let sliderThumb: CGFloat = 20
+            static let sliderRail: CGFloat = 4
+            static let buttonMinWidth: CGFloat = 64
         }
     }
     enum Motion {
@@ -541,6 +547,13 @@ enum DesignTokens {
             static let cardSelected: CGFloat = 0.12
             static let cardIdle: CGFloat = 0.05
             static let field: CGFloat = 0.82
+            static let fieldStroke: CGFloat = 0.14
+            static let caption: CGFloat = 0.92
+            static let captionStroke: CGFloat = 0.1
+            static let sliderRail: CGFloat = 0.6
+            static let sliderRailDisabled: CGFloat = 0.3
+            static let swatchText: CGFloat = 0.7
+            static let swatchFrame: CGFloat = 0.6
         }
         enum Palette {
             static let scrollbar: CGFloat = 0.45

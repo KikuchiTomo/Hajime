@@ -73,21 +73,21 @@ const CAPTION_MOTION: f32 = 1.6 * 1.3;
 const CAPTION_LEAVE: f32 = 0.6;
 
 /// 見出しの「n / 9」の行の高さ
-const COUNTER_HEIGHT: f32 = 16.0;
+const COUNTER_HEIGHT: f32 = board::COUNTER_HEIGHT;
 /// カードの名前の行の高さ
 const LINE: f32 = size::BODY_LINE_HEIGHT;
 /// 選択肢のカードの丸の大きさ(macOS の title3 の記号)
-const CHECK: f32 = 20.0;
+const CHECK: f32 = board::CHECK_SIZE;
 /// 推奨の札の高さ
-const BADGE_HEIGHT: f32 = 18.0;
+const BADGE_HEIGHT: f32 = board::BADGE_HEIGHT;
 /// テーマのカードの見本の高さ(macOS の fieldHeight × 1.3)
 const SWATCH_HEIGHT: f32 = board::FIELD_HEIGHT * 1.3;
 /// 機能の行の上下の余白(macOS の cardPadding × 0.7)
 const SPOT_PADDING_Y: f32 = board::CARD_PADDING * 0.7;
 /// スライダーのつまみの大きさ
-const THUMB: f32 = 20.0;
+const THUMB: f32 = board::SLIDER_THUMB;
 /// 足元のボタンの最小の幅
-const BUTTON_MIN_WIDTH: f32 = 64.0;
+const BUTTON_MIN_WIDTH: f32 = board::BUTTON_MIN_WIDTH;
 /// メニューの影のにじみの輪の数
 const MENU_SHADOW_RINGS: usize = 4;
 /// 覚えておく実演の画像の数(1 つの台本の窓が収まる数)
@@ -2341,7 +2341,7 @@ fn paint_stage_frame(
         if theme.high_contrast {
             Color::from(palette.control_stroke)
         } else {
-            Color::from(palette.text).with_alpha(0.14)
+            Color::from(palette.text).with_alpha(shade::FIELD_STROKE)
         },
     );
     let line = canvas.wrapped_height("あ", TextStyle::Demo, field.width);
@@ -2477,7 +2477,7 @@ fn paint_caption(
         if theme.high_contrast {
             Color::from(palette.background)
         } else {
-            Color::from(palette.flyout).with_alpha(0.92)
+            Color::from(palette.flyout).with_alpha(shade::CAPTION)
         },
     );
     canvas.stroke_round(
@@ -2487,7 +2487,7 @@ fn paint_caption(
         if theme.high_contrast {
             Color::from(palette.card_stroke)
         } else {
-            Color::from(palette.text).with_alpha(0.1)
+            Color::from(palette.text).with_alpha(shade::CAPTION_STROKE)
         },
     );
     let circle = Rect::new(card.x + padding, card.y + padding, icon, icon);
@@ -2887,7 +2887,7 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
         (
             board::CARD_PADDING * 3.0,
             dot / 1.5,
-            ui_color(colors.text).with_alpha(0.7),
+            ui_color(colors.text).with_alpha(shade::SWATCH_TEXT),
         ),
         (
             board::CARD_PADDING * 2.0,
@@ -2910,7 +2910,12 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
         );
         y += height + board::DOT_GAP;
     }
-    canvas.stroke_round(swatch, radius, 1.0, ui_color(colors.frame).with_alpha(0.6));
+    canvas.stroke_round(
+        swatch,
+        radius,
+        1.0,
+        ui_color(colors.frame).with_alpha(shade::SWATCH_FRAME),
+    );
     let line = Rect::new(
         swatch.x,
         swatch.max_y() + board::CARD_GAP / 2.0,
@@ -3038,7 +3043,7 @@ fn paint_slider(
     let travel = track.width - THUMB;
     let center_x = track.x + THUMB / 2.0 + travel * ratio;
     let center_y = track.y + track.height / 2.0;
-    let rail = 4.0;
+    let rail = board::SLIDER_RAIL;
     let accent = if enabled {
         Color::from(palette.accent)
     } else {
@@ -3047,7 +3052,11 @@ fn paint_slider(
     canvas.fill_round(
         Rect::new(track.x + THUMB / 2.0, center_y - rail / 2.0, travel, rail),
         rail / 2.0,
-        Color::from(palette.control_strong_stroke).with_alpha(if enabled { 0.6 } else { 0.3 }),
+        Color::from(palette.control_strong_stroke).with_alpha(if enabled {
+            shade::SLIDER_RAIL
+        } else {
+            shade::SLIDER_RAIL_DISABLED
+        }),
     );
     canvas.fill_round(
         Rect::new(

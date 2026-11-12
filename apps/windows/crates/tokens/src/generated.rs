@@ -568,6 +568,12 @@ pub mod size {
         pub const INFO_SYMBOL_WIDTH: f32 = 28.0;
         pub const DEMO_GAP: f32 = 14.0;
         pub const BADGE_RADIUS: f32 = 6.0;
+        pub const COUNTER_HEIGHT: f32 = 16.0;
+        pub const CHECK_SIZE: f32 = 20.0;
+        pub const BADGE_HEIGHT: f32 = 18.0;
+        pub const SLIDER_THUMB: f32 = 20.0;
+        pub const SLIDER_RAIL: f32 = 4.0;
+        pub const BUTTON_MIN_WIDTH: f32 = 64.0;
     }
 }
 
@@ -658,6 +664,13 @@ pub mod opacity {
         pub const CARD_SELECTED: f32 = 0.12;
         pub const CARD_IDLE: f32 = 0.05;
         pub const FIELD: f32 = 0.82;
+        pub const FIELD_STROKE: f32 = 0.14;
+        pub const CAPTION: f32 = 0.92;
+        pub const CAPTION_STROKE: f32 = 0.1;
+        pub const SLIDER_RAIL: f32 = 0.6;
+        pub const SLIDER_RAIL_DISABLED: f32 = 0.3;
+        pub const SWATCH_TEXT: f32 = 0.7;
+        pub const SWATCH_FRAME: f32 = 0.6;
     }
     pub mod palette {
         pub const SCROLLBAR: f32 = 0.45;

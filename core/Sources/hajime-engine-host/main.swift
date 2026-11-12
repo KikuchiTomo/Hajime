@@ -121,10 +121,11 @@ func run() -> Int32 {
     // 候補ウィンドウは，辞書とモデルを読み込むあいだに起動しておく(起動してすぐの候補を早く出すため)．
     // パイプはもうあるので候補ウィンドウはすぐにつなぎ，エンジンが受け付けて挨拶を送るまで待つ
     let candidateWindow = HostPaths.installation.appendingPathComponent("hajime-candidate-ui.exe")
+    var candidateProcess: Process?
     if FileManager.default.fileExists(atPath: candidateWindow.path) {
         let process = Process()
         process.executableURL = candidateWindow
-        try? process.run()
+        if (try? process.run()) != nil { candidateProcess = process }
     }
     #else
     let engineListener: UnixSocketListener
@@ -151,6 +152,10 @@ func run() -> Int32 {
                                             dictionaryDirectory: resources.dictionary?.url)
     } catch {
         FileHandle.standardError.write(Data("変換エンジンを用意できません: \(error)\n".utf8))
+        #if os(Windows)
+        // 先に起動した候補ウィンドウは，つなぐ相手が無いまま残らないよう終える
+        candidateProcess?.terminate()
+        #endif
         return 1
     }
     engine.apply(settings.current)
