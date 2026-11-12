@@ -474,7 +474,8 @@ final class PaletteSession {
     }
 
     private func preview(of item: PaletteItem, text: String, pinned: Bool) -> PalettePanel.Preview {
-        let readings = ([item.nameReading] + item.readings).filter { !$0.isEmpty }
+        // 名前と同じ読み(かなだけの名前・顔文字)は，名前と並べても同じ語が 2 度出るだけなので除く
+        let readings = ([item.nameReading] + item.readings).filter { !$0.isEmpty && $0 != item.japaneseName }
         var unique: [String] = []
         for reading in readings where !unique.contains(reading) { unique.append(reading) }
         return PalettePanel.Preview(

@@ -5,7 +5,8 @@ import HajimeDomain
 /// 絵文字と記号のパレットの中身を描く(R-26)．上から，探す欄と種類の切り替え・まとまりのタブ・見出し・マス目・文字の説明・キーの案内．
 ///
 /// 何を出すかは core(PaletteSession)が決めた PalettePanel のとおりにし，ここでは描くことと，押した位置を PaletteTarget にすることだけをする．
-/// 窓の大きさは列数・行数・マスの大きさだけで決め，中身(探した結果の数など)では変えない
+/// 窓の大きさは列数・行数・マスの大きさだけで決め，中身(探した結果の数や種類)では変えない．
+/// 顔文字はマス目の幅を 1 行のマスの数(cellsPerRow)で割った広いマスに，テーマの文字の書体で描く
 final class PaletteView: NSView {
     private typealias Size = DesignTokens.Size.Palette
     private typealias Glass = DesignTokens.Size.Glass
@@ -83,8 +84,19 @@ final class PaletteView: NSView {
                       footer: footer, skinToneButton: button)
     }
 
+    /// マスの幅．四角いマスは一辺．顔文字の広いマスは，マス目の幅を 1 行のマスの数で割ったもの
+    private func cellWidth(for panel: PalettePanel) -> CGFloat {
+        CGFloat(panel.columns) * cellSize / CGFloat(max(panel.cellsPerRow, 1))
+    }
+
+    /// 今の種類のマスが広いマス(顔文字)か
+    private static func isWide(_ panel: PalettePanel) -> Bool {
+        panel.modes.first { $0.isSelected }?.kind.cellShape == .wide
+    }
+
     private func cellRect(row: Int, column: Int, in layout: Layout, panel: PalettePanel) -> NSRect {
-        NSRect(x: layout.grid.minX + CGFloat(column) * cellSize, y: layout.grid.minY + CGFloat(row - panel.firstRow) * cellSize, width: cellSize, height: cellSize)
+        let width = cellWidth(for: panel)
+        return NSRect(x: layout.grid.minX + CGFloat(column) * width, y: layout.grid.minY + CGFloat(row - panel.firstRow) * cellSize, width: width, height: cellSize)
     }
 
     /// 肌の色の帯のマス．説明の欄(無ければマス目の下の端)に重ねて出す
@@ -106,7 +118,7 @@ final class PaletteView: NSView {
             return hovering ? nil : .skinTone(SkinTone.allCases[index])
         }
         if layout.grid.contains(point) {
-            let column = Int((point.x - layout.grid.minX) / cellSize)
+            let column = Int((point.x - layout.grid.minX) / cellWidth(for: panel))
             let row = panel.firstRow + Int((point.y - layout.grid.minY) / cellSize)
             guard panel.rows.first(where: { $0.index == row }).map({ column < $0.cells.count }) ?? false else { return nil }
             let position = PalettePanel.Position(row: row, column: column)
@@ -169,7 +181,7 @@ final class PaletteView: NSView {
         drawGrid(panel, layout: layout)
         if let preview = layout.preview {
             separator(y: preview.minY - Size.gap / 2, from: layout.grid.minX, to: layout.footer.maxX)
-            if let shown = panel.preview { drawPreview(shown, in: preview) }
+            if let shown = panel.preview { drawPreview(shown, in: preview, isWide: Self.isWide(panel)) }
         }
         separator(y: layout.footer.minY, from: layout.footer.minX, to: layout.footer.maxX)
         drawFooter(panel, layout: layout)
@@ -257,7 +269,8 @@ final class PaletteView: NSView {
                 image.draw(in: NSRect(x: (rect.midX - image.size.width / 2).rounded(), y: (rect.midY - image.size.height / 2).rounded(),
                                       width: image.size.width, height: image.size.height))
             } else {
-                GlassDrawing.drawCentered(tab.symbol, attributes: [.font: theme.candidateFont(size: Size.tabIconSize + 1), .foregroundColor: color], in: rect)
+                // 顔文字のまとまりの短い顔はタブの幅に収まるよう縮める
+                drawFitted(tab.symbol, size: Size.tabIconSize + 1, color: color, in: rect.insetBy(dx: 2, dy: 0))
             }
         }
     }
@@ -271,6 +284,7 @@ final class PaletteView: NSView {
     private func drawGrid(_ panel: PalettePanel, layout: Layout) {
         let emojiFont = NSFont(name: PaletteIcons.emojiFontName, size: (cellSize * Size.emojiScale).rounded()) ?? .systemFont(ofSize: cellSize * Size.emojiScale)
         let symbolFont = theme.candidateFont(size: (cellSize * Size.symbolScale).rounded())
+        let isWide = Self.isWide(panel)
         for row in panel.rows {
             if row.startsSection, row.index != panel.firstRow {
                 // まとまりの境目に細い線を引く
@@ -286,6 +300,11 @@ final class PaletteView: NSView {
                     let inner = rect.insetBy(dx: 1, dy: 1)
                     fill(inner, color: theme.focusTint, radius: Size.cellRadius)
                     stroke(inner, color: theme.selection, radius: Size.cellRadius, width: Size.selectionStroke)
+                }
+                if isWide {
+                    // 顔文字は絵文字を含んでいても文字の書体で描く(顔の形を崩さない)
+                    drawFitted(cell.text, size: (cellSize * Size.kaomojiScale).rounded(), color: theme.text, in: rect.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
+                    continue
                 }
                 let font = Self.isEmoji(cell.text) ? emojiFont : symbolFont
                 GlassDrawing.drawCentered(cell.text, attributes: [.font: font, .foregroundColor: theme.text], in: rect)
@@ -312,12 +331,20 @@ final class PaletteView: NSView {
         NSRect(x: preview.maxX - Size.footerHeight, y: preview.minY, width: Size.footerHeight, height: Size.footerHeight)
     }
 
-    private func drawPreview(_ preview: PalettePanel.Preview, in rect: NSRect) {
-        let glyphRect = NSRect(x: rect.minX, y: (rect.midY - Size.previewGlyphSize / 2 - 4).rounded(), width: Size.previewGlyphSize + 8, height: Size.previewGlyphSize + 8)
-        fill(glyphRect, color: theme.badge, radius: Size.cellRadius)
-        let glyphFont = Self.isEmoji(preview.text) ? (NSFont(name: PaletteIcons.emojiFontName, size: Size.previewGlyphSize * Size.emojiScale) ?? .systemFont(ofSize: Size.previewGlyphSize))
-            : theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * 1.2)
-        GlassDrawing.drawCentered(preview.text, attributes: [.font: glyphFont, .foregroundColor: theme.text], in: glyphRect)
+    private func drawPreview(_ preview: PalettePanel.Preview, in rect: NSRect, isWide: Bool) {
+        var glyphRect = NSRect(x: rect.minX, y: (rect.midY - Size.previewGlyphSize / 2 - 4).rounded(), width: Size.previewGlyphSize + 8, height: Size.previewGlyphSize + 8)
+        if isWide {
+            // 顔文字は横に長いので，文字の幅に合わせて枠を広げる(説明の欄の幅の一定の割合まで)
+            let width = preview.text.size(withAttributes: [.font: theme.candidateFont(size: Size.previewKaomojiFontSize)]).width + Size.kaomojiPaddingX * 4
+            glyphRect.size.width = min(max(glyphRect.width, width.rounded(.up)), (rect.width * Size.previewKaomojiWidth).rounded())
+            fill(glyphRect, color: theme.badge, radius: Size.cellRadius)
+            drawFitted(preview.text, size: Size.previewKaomojiFontSize, color: theme.text, in: glyphRect.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
+        } else {
+            fill(glyphRect, color: theme.badge, radius: Size.cellRadius)
+            let glyphFont = Self.isEmoji(preview.text) ? (NSFont(name: PaletteIcons.emojiFontName, size: Size.previewGlyphSize * Size.emojiScale) ?? .systemFont(ofSize: Size.previewGlyphSize))
+                : theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * 1.2)
+            GlassDrawing.drawCentered(preview.text, attributes: [.font: glyphFont, .foregroundColor: theme.text], in: glyphRect)
+        }
         let textX = glyphRect.maxX + Size.previewGap
         let width = rect.maxX - textX - Size.footerHeight
         var y = rect.minY + 2
@@ -372,6 +399,17 @@ final class PaletteView: NSView {
             }
             GlassDrawing.drawCentered(option, attributes: [.font: font], in: rect)
         }
+    }
+
+    /// テーマの文字の書体で，rect の幅に収まるよう縮めて真ん中に描く．縮めても下限(kaomojiMinFontSize)で収まらなければ末尾を省く
+    private func drawFitted(_ text: String, size: CGFloat, color: NSColor, in rect: NSRect) {
+        var font = theme.candidateFont(size: size)
+        let width = text.size(withAttributes: [.font: font]).width
+        if width > rect.width, width > 0 {
+            font = theme.candidateFont(size: max(Size.kaomojiMinFontSize, (size * rect.width / width).rounded(.down)))
+        }
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        GlassDrawing.drawCentered(TextFitting.truncated(text, attributes: attributes, width: rect.width), attributes: attributes, in: rect)
     }
 
     /// 絵文字の書体で描く文字か．絵文字の表示を持つ文字(U+FE0F を含むものを含む)と，組み合わせの絵文字
