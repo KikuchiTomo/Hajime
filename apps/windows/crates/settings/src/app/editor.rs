@@ -277,7 +277,12 @@ impl App {
     /// 下書きの値を変える(名前・色・形・書体)．書き換えられない値なら何もしない
     pub(super) fn edit_draft(&mut self, path: &str, value: &Value) -> Option<After> {
         let editor = self.editor.as_mut()?;
+        let before = editor.draft.clone();
         themes::edit(&mut editor.draft, path, value)?;
+        // 同じ値(名前の欄に下書きの名前を入れたときなど)なら確かめ直さない
+        if editor.draft == before {
+            return None;
+        }
         self.check_draft();
         self.refresh();
         None

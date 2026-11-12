@@ -801,10 +801,16 @@ impl App {
         let now = self.now();
         let entering = self.enter.running(now);
         let frame = self.page_frame();
+        // 下に留めた帯はカスタムテーマの編集の画面だけ(ほかのページは窓の下の端で欄が切れる)
+        let bottom = if self.editor.is_some() {
+            frame.bottom - frame.shift
+        } else {
+            f32::MAX
+        };
         self.view.place_fields(
             &self.theme,
             (nav_width(width), self.title_bar() + frame.shift),
-            (frame.top - frame.shift, frame.bottom - frame.shift),
+            (frame.top - frame.shift, bottom),
             self.scroll.offset(now),
             entering,
         );
@@ -1619,6 +1625,10 @@ impl App {
             return true;
         }
         self.focus_visible = true;
+        // 編集の画面を開いているあいだは左の一覧でページを移らない
+        if self.editor.is_some() && matches!(self.focus, Focus::Nav | Focus::Search) {
+            return self.page_key(key, control);
+        }
         match self.focus {
             Focus::Sheet(action) => {
                 if key == VK_SPACE.0 || key == VK_RETURN.0 {
