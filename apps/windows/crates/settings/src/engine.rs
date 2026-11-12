@@ -385,23 +385,6 @@ pub struct PreviewShown {
     pub labels: Vec<Option<(String, bool)>>,
 }
 
-/// 変換マクロを試した結果．書いている途中の形の結果ならタグにせず，頭に「入力中の形: 」を付けた 1 行にする
-pub fn macro_preview_text(results: &[String], drafting: bool) -> PreviewShown {
-    if drafting {
-        let shown = results.first().map_or("", String::as_str);
-        return PreviewShown {
-            chips: Vec::new(),
-            line: format!("{}{shown}", crate::strings::extras::MACRO_DRAFT_RESULT),
-            labels: Vec::new(),
-        };
-    }
-    PreviewShown {
-        chips: results.to_vec(),
-        line: String::new(),
-        labels: Vec::new(),
-    }
-}
-
 /// 辞書を取り込む要求
 fn import_request(list: DictionaryList, path: String, replacing: Option<String>) -> RequestBody {
     match list {
@@ -675,16 +658,6 @@ mod tests {
                 pattern: None
             }
         );
-    }
-
-    #[test]
-    fn 変換マクロを試した結果を文にする() {
-        let results = vec!["「東京」".to_string(), "【東京】".to_string()];
-        assert_eq!(macro_preview_text(&results, false).chips, results);
-        let drafting = macro_preview_text(&results[..1], true);
-        assert!(drafting.chips.is_empty());
-        assert_eq!(drafting.line, "入力中の形: 「東京」");
-        assert_eq!(macro_preview_text(&[], true).line, "入力中の形: ");
     }
 
     /// 登録した単語を total 個持ち，頼まれた範囲を返す

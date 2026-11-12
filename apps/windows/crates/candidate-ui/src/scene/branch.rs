@@ -72,7 +72,7 @@ impl Metrics {
                 trunk_gap: glass::TRUNK_GAP,
                 branch_indent: glass::BRANCH_INDENT,
                 stem_x: glass::BRANCH_STEM_X,
-                lead: glass::BADGE_SIZE + candidate::PADDING_X,
+                lead: glass::BADGE_SIZE + glass::BADGE_GAP,
                 footer_height,
                 row_inset: glass::SELECTION_INSET_Y,
                 shadow,

@@ -163,6 +163,7 @@ enum DesignTokens {
             static let tagGlyphGap: CGFloat = 2
             static let tagRadius: CGFloat = 4
             static let badgeSize: CGFloat = 16
+            static let badgeGap: CGFloat = 8
             static let iconSize: CGFloat = 16
             static let iconPadding: CGFloat = 3
             static let iconRadius: CGFloat = 4
@@ -262,6 +263,7 @@ enum DesignTokens {
             static let labelFontSize: CGFloat = 11.5
             static let keyFontSize: CGFloat = 10.5
             static let badgeSize: CGFloat = 16
+            static let badgeGap: CGFloat = 8
             static let selectionRadius: CGFloat = 7
             static let keycapRadius: CGFloat = 4
             static let keycapPaddingX: CGFloat = 4
@@ -502,7 +504,6 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
-            static let templateNowWidth: CGFloat = 160
             static let keymapListHeight: CGFloat = 400
             static let segmentInset: CGFloat = 2
             static let listArrowWidth: CGFloat = 24
@@ -578,6 +579,9 @@ enum DesignTokens {
         enum CandidateWindow {
             static let resize: Double = 150
             static let update: Double = 120
+        }
+        enum Settings {
+            static let disclosure: Double = 167
         }
         enum SettingsWindows {
             static let pageEnter: Double = 167

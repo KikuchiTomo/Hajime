@@ -18,10 +18,11 @@ use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{
     self, Action, Cell, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row,
-    Section, TryKind, DICTIONARY_CONDITIONS, MACROS_PATH, PROFILE_RULES,
+    Section, TemplateTarget, TryKind, DICTIONARY_CONDITIONS, MACROS_PATH, PROFILE_RULES,
 };
 use crate::store::SettingsStore;
 use crate::strings::{extras, features, keys, more, rule_list, settings, windows as text};
+use crate::template_reference::{self as reference, Face};
 use crate::ui::anim::{Easing, Tween};
 use crate::ui::scroll::Scroller;
 use crate::ui::table::{Move, Table};
@@ -125,6 +126,11 @@ pub enum Event {
         preceding: String,
         draft: String,
     },
+    /// 単語の欄に書いた書き方を入れたときの結果を求める(path の一覧の入力欄のすぐ下に出す)
+    DraftResult {
+        path: &'static str,
+        draft: String,
+    },
     /// 既定のブラウザーで開く(謝辞の出どころ)
     OpenUrl(String),
     /// 知らせを出すだけ(操作できない理由)
@@ -146,6 +152,11 @@ pub enum Event {
     },
     /// 部品の大きさが変わったので置き直す(謝辞のライセンスの全文を開いた・閉じた)
     Relayout,
+    /// 書き方のチップを開けた・閉じた(覚えて置き直す)
+    TemplatePanel {
+        target: TemplateTarget,
+        open: bool,
+    },
 }
 
 /// カスタムテーマの操作(macOS の AppearancePage と CustomThemeRow)
@@ -335,10 +346,13 @@ pub struct Extras {
     pub keymap_preset: Option<usize>,
     /// 変換マクロを試した結果(コマンドのページを出すたびに読む)
     pub macro_preview: crate::engine::PreviewShown,
+    /// 変換マクロの一覧の行ごとの，試す語と読みに当てた結果(一覧と同じ並び．行の右に控えめに添える)
+    pub macro_results: Vec<String>,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
     pub fonts: Vec<InstalledFace>,
-    /// 単語に書ける書き方を今入れたときの値(extras::TEMPLATE_ROWS と同じ並び．読めなければ空)
-    pub template_values: Vec<String>,
+    /// 書き方のチップに添える今の値．チップの値を求める書き方(Item::sample)と値の組(読めなければ空)．
+    /// ページやまとまりを切り替えたあと読み直すまでのあいだ，ほかのチップの値を出さないよう書き方で引く
+    pub template_values: Vec<(&'static str, String)>,
     /// 辞書を取り込んでいる(macOS の isImportingDictionary．取り込むボタンを使えなくし，輪を回す)
     pub importing_dictionary: bool,
 }
@@ -399,6 +413,12 @@ pub enum Part {
     Radio,
     /// 一覧を切り替える部品の欄
     Segment(usize),
+    /// 一覧の書き方を入れる欄の右の「{ }」のボタン(書き方のチップを開け閉めする)
+    TemplateButton,
+    /// 書き方のチップのまとまりの切り替え
+    TemplateSegment(usize),
+    /// 書き方のチップの並び(矢印で選び，Space・Enter で欄に入れる)
+    TemplateChips,
     /// 1 つのカードに並べたボタン
     Button(usize),
     /// 表の下の状態で絞り込む欄(キー設定)
@@ -474,8 +494,7 @@ struct RowState {
     font_items: Vec<(String, String)>,
     /// 数を選ぶ部品の選択肢
     numbers: Vec<f64>,
-    /// 統計・情報・バージョン・知らせの文
-    /// 書き方の表の「今入れると」の値(書き方の行と同じ並び)
+    /// 書き方のチップに添える今の値(並べているチップと同じ並び)
     lines: Vec<String>,
     text: String,
     /// 色のボタンに出す色(「#RRGGBB」)
@@ -511,6 +530,26 @@ struct RowState {
     limit: usize,
     /// 辞書の一覧の状態(辞書の一覧の行だけ)．入力欄(inputs)は開いた辞書の名前と分野
     dictionaries: Option<dictionary_rows::Rows>,
+    /// 入力欄に入れたときの結果(書き方を書ける単語・変換マクロの形．入力欄のすぐ下に出す)
+    result_text: String,
+    result_problems: Vec<String>,
+    /// 書き方のチップを開いているか(一覧の template_target)．ページごとに覚える
+    template_open: bool,
+    /// 書き方のチップを使えるか(単語は「入力時の値にする」がオンのときだけ．オフならボタンもチップも出さない)
+    template_enabled: bool,
+    /// 欄の入力位置の前で書き方を打ちかけているか(「{」を打ったら開く)
+    template_typing: bool,
+    /// 打ちかけの書き方に当たるチップと足し方(絞り込まないときは None)
+    template_matches: Option<Vec<(reference::Item, reference::Kind)>>,
+    /// キーボードで選んでいるチップ(並びの番号)
+    template_cursor: usize,
+    /// 書き方のチップで選んでいるまとまり(groups の番号)
+    template_group: usize,
+    /// 書き方のチップの切り替えの欄(ページの中の座標．arrange で置く)
+    template_switch: Vec<Rect>,
+    /// 書き方のチップの置き場所(チップを並べる欄の左上を 0 とする)と，その欄の左上(ページの中の座標)
+    template_chips: reference::Chips,
+    template_origin: (f32, f32),
 }
 
 /// 謝辞のカードの中の置き場所
@@ -694,7 +733,41 @@ impl RowState {
                 Control::Dictionaries(list) => Some(dictionary_rows::Rows::new(list)),
                 _ => None,
             },
+            result_text: String::new(),
+            result_problems: Vec::new(),
+            template_open: false,
+            template_enabled: false,
+            template_typing: false,
+            template_matches: None,
+            template_cursor: 0,
+            template_group: 0,
+            template_switch: Vec::new(),
+            template_chips: reference::Chips::default(),
+            template_origin: (0.0, 0.0),
         }
+    }
+
+    /// 書き方のチップの欄を出しているか(開いていて，使えるとき)
+    fn template_panel_open(&self) -> bool {
+        self.row.control.template_target().is_some() && self.template_open && self.template_enabled
+    }
+
+    /// 書き方のチップの欄に並べるチップと足し方．絞り込んでいれば当たるもの，でなければ選んでいるまとまり．
+    /// 欄を出していなければ None
+    fn template_items(&self) -> Option<Vec<(reference::Item, reference::Kind)>> {
+        if !self.template_panel_open() {
+            return None;
+        }
+        if let Some(found) = &self.template_matches {
+            return Some(found.clone());
+        }
+        let group = self
+            .row
+            .control
+            .template_target()?
+            .groups()
+            .get(self.template_group)?;
+        Some(group.items.iter().map(|item| (*item, group.kind)).collect())
     }
 
     /// 数の部品の今の値(動かしているあいだはその値)
@@ -1137,6 +1210,17 @@ impl RowState {
                 }
                 _ => card.card,
             }),
+            Part::TemplateButton => card.template_button,
+            Part::TemplateSegment(index) => self.template_switch.get(index).copied(),
+            // 書き方のチップを並べる欄(切り替えの下)
+            Part::TemplateChips => card.template_panel.map(|panel| {
+                Rect::new(
+                    self.template_origin.0,
+                    self.template_origin.1,
+                    panel.width,
+                    self.template_chips.height,
+                )
+            }),
             Part::Segment(index) | Part::Button(index) => card.parts.get(index).copied(),
             Part::Filter => filter
                 .then(|| card.parts.get(fields + top + usize::from(search)).copied())
@@ -1243,7 +1327,19 @@ impl RowState {
             control => {
                 if let (Some(_), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
                     let (fields, bottom_fields) = self.field_counts();
-                    parts.extend((0..fields).map(Part::Field));
+                    // 添え書きの欄(2 行目)は書き方のチップの欄の下にあるので，フォーカスもチップのあと
+                    let note = buttons.note_line && fields >= 2;
+                    let first_line = fields - usize::from(note);
+                    let button = self
+                        .card
+                        .as_ref()
+                        .is_some_and(|card| card.template_button.is_some());
+                    for index in 0..first_line {
+                        parts.push(Part::Field(index));
+                        if button && buttons.template_field == Some(index) {
+                            parts.push(Part::TemplateButton);
+                        }
+                    }
                     // キャンセル(上の 2 つ目)は書き換えているあいだだけ出す
                     let editing = self.editing.is_some();
                     parts.extend(
@@ -1251,6 +1347,21 @@ impl RowState {
                             .filter(|index| !(*index == 1 && self.has_add_remove() && !editing))
                             .map(Part::Top),
                     );
+                    if self.template_panel_open() {
+                        // 打ちかけの書き方で絞り込んでいるあいだは，切り替えを出さない
+                        if self.template_matches.is_none() {
+                            let groups = control
+                                .template_target()
+                                .map_or(0, |target| target.groups().len());
+                            parts.extend((0..groups).map(Part::TemplateSegment));
+                        }
+                        if !self.template_chips.chips.is_empty() {
+                            parts.push(Part::TemplateChips);
+                        }
+                    }
+                    if note {
+                        parts.push(Part::Field(first_line));
+                    }
                     parts.push(Part::Table);
                     if buttons.search {
                         parts.push(Part::Search);
@@ -1355,6 +1466,13 @@ impl RowState {
                 Control::Segmented(choices) => choices.get(index).map_or("", |(_, label)| label),
                 _ => "",
             },
+            Part::TemplateSegment(index) => self
+                .row
+                .control
+                .template_target()
+                .and_then(|target| target.groups().get(index))
+                .map_or("", |group| group.title),
+            Part::TemplateButton => crate::strings::templates::BUTTON,
             Part::Link(index) => self
                 .notice()
                 .and_then(|item| item.sources.get(index))
@@ -1624,6 +1742,8 @@ pub struct PageView {
     hover: HashMap<Element, Tween>,
     /// 表の上でポインターを載せている行(行の番号と表の中の位置)
     table_hover: Option<(usize, usize)>,
+    /// 書き方のチップの上でポインターを載せているチップ(行の番号と並びの番号)
+    template_hover: Option<(usize, usize)>,
     /// 中身の幅(DIP)
     width: f32,
     /// 見本(外観・パレット・絵文字)を描いた大きさ(DIP)．見本の行の高さを決める
@@ -1720,6 +1840,7 @@ impl PageView {
             footers,
             hover: HashMap::new(),
             table_hover: None,
+            template_hover: None,
             width: 0.0,
             preview_size: None,
             titled: true,
@@ -1851,8 +1972,7 @@ impl PageView {
                 }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
                 Control::Preset => row.choice = extras.keymap_preset,
-                Control::TemplateReference => row.lines.clone_from(&extras.template_values),
-                Control::Preview(TryKind::Macros) => {
+                Control::Preview(TryKind::Macros) | Control::PreviewChips(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
                 }
                 Control::ThemeIssue(index) => {
@@ -1873,6 +1993,23 @@ impl PageView {
                     }
                 }
                 _ => {}
+            }
+            // 書き方のチップ: 単語は「入力時の値にする」がオンのときだけ使える．開いていれば今の値を添える
+            if let Some(target) = row.row.control.template_target() {
+                row.template_enabled = target == TemplateTarget::Macro
+                    || values.value("dynamicDictionary").and_then(Value::as_bool) == Some(true);
+                if let Some(items) = row.template_items() {
+                    row.lines = items
+                        .iter()
+                        .map(|(item, _)| {
+                            extras
+                                .template_values
+                                .iter()
+                                .find(|(sample, _)| *sample == item.sample)
+                                .map_or_else(String::new, |(_, value)| value.clone())
+                        })
+                        .collect();
+                }
             }
             if let Some(rows) = list_rows(&row.row, values, extras) {
                 // 一覧が変わると選んだ行が外れるので，書き換えもやめる．変わらなければ選んだ行を残す
@@ -1931,6 +2068,20 @@ impl PageView {
             .map(|row| row.dictionaries.as_ref().map(dictionary_rows::Rows::height))
             .collect();
         let texts: Vec<String> = self.rows.iter().map(|row| row.text.clone()).collect();
+        let lists: Vec<ListInput> = self
+            .rows
+            .iter()
+            .map(|row| ListInput {
+                template_button: row.row.control.template_target().is_some()
+                    && row.template_enabled,
+                result: !(row.result_text.is_empty() && row.result_problems.is_empty()),
+                panel: row.template_items().map(|items| PanelInput {
+                    items: items.into_iter().map(|(item, _)| item).collect(),
+                    values: row.lines.clone(),
+                    switch: row.template_matches.is_none(),
+                }),
+            })
+            .collect();
         let metrics = Measured {
             measure,
             all: &all,
@@ -1938,6 +2089,7 @@ impl PageView {
             heights: &heights,
             preview: self.preview_size,
             texts: &texts,
+            lists: &lists,
         };
         self.layout = layout::layout(
             &self.sections,
@@ -1970,6 +2122,7 @@ impl PageView {
                 heights: &[],
                 preview: None,
                 texts: &[],
+                lists: &[],
             };
             layout::button_width(label, &metrics)
         };
@@ -1984,6 +2137,40 @@ impl PageView {
                     &button,
                 );
             }
+        }
+        // 書き方のチップの欄: 上にまとまりの切り替え(絞り込んでいるあいだは無し)，その下にチップ
+        for row in &mut self.rows {
+            let panel = row.card.as_ref().and_then(|card| card.template_panel);
+            let (Some(target), Some(panel), Some(items)) = (
+                row.row.control.template_target(),
+                panel,
+                row.template_items(),
+            ) else {
+                row.template_switch.clear();
+                row.template_chips = reference::Chips::default();
+                continue;
+            };
+            let switch = row.template_matches.is_none();
+            row.template_switch = if switch {
+                reference::place_switch(target.groups(), &TemplateMeasure(measure))
+                    .into_iter()
+                    .map(|rect| {
+                        Rect::new(panel.x + rect.x, panel.y + rect.y, rect.width, rect.height)
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let head = if switch {
+                tokens::size::part::FIELD_HEIGHT + tokens::size::space::GROUP
+            } else {
+                0.0
+            };
+            row.template_origin = (panel.x, panel.y + head);
+            let items: Vec<reference::Item> = items.into_iter().map(|(item, _)| item).collect();
+            row.template_chips =
+                reference::place_chips(&items, &row.lines, panel.width, &TemplateMeasure(measure));
+            row.template_cursor = row.template_cursor.min(items.len().saturating_sub(1));
         }
         for row in &mut self.rows {
             row.acknowledgement = match (&row.row.control, &row.card) {
@@ -2154,6 +2341,7 @@ impl PageView {
                     .filter(|buttons| buttons.is_icon(label))
                     .map(|_| label)
             }
+            Part::TemplateButton => Some(crate::strings::templates::BUTTON_HELP),
             _ => None,
         }
     }
@@ -2169,7 +2357,21 @@ impl PageView {
             Part::Increment => format!("{} {}", row.row.title, text::INCREASE),
             Part::Slider => row.title(),
             Part::Filter => keys::STATE.to_string(),
-            Part::Segment(_) | Part::Button(_) => row.button_label(element.part).to_string(),
+            Part::Segment(_)
+            | Part::Button(_)
+            | Part::TemplateSegment(_)
+            | Part::TemplateButton => row.button_label(element.part).to_string(),
+            // 選んでいるチップの書き方と値
+            Part::TemplateChips => row
+                .template_items()
+                .and_then(|items| items.get(row.template_cursor).copied())
+                .map_or_else(String::new, |(item, _)| {
+                    let value = reference::value_of(
+                        &item,
+                        row.lines.get(row.template_cursor).map(String::as_str),
+                    );
+                    format!("{} {value} {}", item.code, item.meaning)
+                }),
             Part::Top(_)
             | Part::Bottom(_)
             | Part::Action
@@ -2186,6 +2388,12 @@ impl PageView {
                     |field| field.label.to_string(),
                 ),
             Part::Search => features::SEARCH.to_string(),
+            Part::PreviewField(index) => match row.row.control {
+                Control::Preview(TryKind::Language) => {
+                    [features::TRY_PLACEHOLDER, features::TRY_PRECEDING][index.min(1)].to_string()
+                }
+                _ => [extras::TRY_MACRO_WORD, extras::TRY_MACRO_READING][index.min(1)].to_string(),
+            },
             Part::Table => row.row.control.table_columns().join("・"),
             Part::Entry(index, part) => row
                 .dictionaries
@@ -2225,6 +2433,9 @@ impl PageView {
                     .unwrap_or_default(),
             ),
             Part::Radio => Described::Radio(row.on),
+            Part::TemplateButton => Described::Toggle(row.template_open),
+            Part::TemplateSegment(index) => Described::Radio(row.template_group == index),
+            Part::TemplateChips => Described::Button,
             Part::Segment(index) => Described::Radio(row.choice == Some(index)),
             Part::Dropdown | Part::Field(_) | Part::Filter | Part::Entry(..)
                 if row.is_dropdown(element.part) =>
@@ -2263,6 +2474,10 @@ impl PageView {
             Part::Increment => 7,
             Part::Slider => 8,
             Part::Radio => 9,
+            Part::TemplateButton => 5,
+            Part::TemplateChips => 51,
+            // 一覧の行には試す欄(60・61)が無いので，書き方のまとまりの切り替えはその番号を使う
+            Part::TemplateSegment(index) => 60 + index,
             Part::Filter => 31,
             Part::RowMenu => 52,
             Part::KeySearch => 32,
@@ -2520,6 +2735,21 @@ impl PageView {
                     replacing: None,
                 });
             }
+            (_, Part::TemplateSegment(index)) => {
+                row.template_group = index;
+                row.template_cursor = 0;
+                // 前のまとまりの値は捨て，読み直すまでは決めておいた例を出す
+                row.lines.clear();
+                return Some(Event::Relayout);
+            }
+            (_, Part::TemplateButton) => {
+                let target = row.row.control.template_target()?;
+                row.template_open = !row.template_open;
+                return Some(Event::TemplatePanel {
+                    target,
+                    open: row.template_open,
+                });
+            }
             (Control::Acknowledgement(_), Part::Expand) => {
                 row.expanded = !row.expanded;
                 return Some(Event::Relayout);
@@ -2730,6 +2960,21 @@ impl PageView {
                 draft,
             });
         }
+        // 単語の欄に書き方を書いたら，入れたときの結果を求める
+        if let (Control::Dictionary(spec), Part::Field(field)) =
+            (&changed.row.control, element.part)
+        {
+            if spec.fields.get(field).and_then(|field| field.name) == Some("word") {
+                let draft = changed
+                    .edit(element.part)
+                    .map(ffi::window_text)
+                    .unwrap_or_default();
+                return Some(Event::DraftResult {
+                    path: spec.path,
+                    draft,
+                });
+            }
+        }
         let row = self.rows.get_mut(element.row)?;
         match element.part {
             Part::Search => {
@@ -2853,6 +3098,120 @@ impl PageView {
             return None;
         }
         self.selection_changed(row_index)
+    }
+
+    /// このページで開いている書き方のチップの欄に並べるチップ(今の値を読み直す．開いていなければ None)
+    pub fn template_items(&self) -> Option<Vec<reference::Item>> {
+        self.rows.iter().find_map(|row| {
+            row.template_items()
+                .map(|items| items.into_iter().map(|(item, _)| item).collect())
+        })
+    }
+
+    /// 書き方のチップを開いているかを決める(ページを開いたとき．覚えておいた状態)
+    pub fn set_templates_open(&mut self, open: impl Fn(TemplateTarget) -> bool) {
+        for row in &mut self.rows {
+            if let Some(target) = row.row.control.template_target() {
+                row.template_open = open(target);
+            }
+        }
+    }
+
+    /// 書き方のチップ(並びの item 番目．None ならキーボードで選んでいるチップ)を，書き方を入れる欄の入力位置に入れる．
+    /// 打ちかけの書き方は置き換える．欄の取り消し(Ctrl+Z)で戻せる．入れた欄を返す(欄の変化は呼ぶ側で映す．
+    /// 窓の処理の中で書き換えるので，欄の知らせ(EN_CHANGE)は届かない)
+    pub fn insert_template(&mut self, row_index: usize, item: Option<usize>) -> Option<Window> {
+        let row = self.rows.get(row_index)?;
+        let target = row.row.control.template_target()?;
+        let (entry, kind) = *row
+            .template_items()?
+            .get(item.unwrap_or(row.template_cursor))?;
+        let window = row.edit(Part::Field(target.field()))?;
+        let text = ffi::window_text(window);
+        let insertion = reference::insertion(&entry, kind, &text, edit::selection(window));
+        edit::replace(window, insertion.range, &insertion.replacement);
+        Some(window)
+    }
+
+    /// 書き方を入れる欄で文字が変わった．入力位置の前で書き方を打ち始めたら(「{」)チップを開き，
+    /// 打ちかけの書き方でチップを絞り込む．置き直しや覚える頼みがあれば返す
+    pub fn template_typed(&mut self, element: Element) -> Option<Event> {
+        let row = self.rows.get_mut(element.row)?;
+        let target = row.row.control.template_target()?;
+        if element.part != Part::Field(target.field()) || !row.template_enabled {
+            return None;
+        }
+        let window = row.edit(element.part)?;
+        let text = ffi::window_text(window);
+        let utf16: Vec<u16> = text.encode_utf16().collect();
+        let caret = edit::selection(window).start.min(utf16.len());
+        let typed = reference::typing(&String::from_utf16_lossy(&utf16[..caret]));
+        let matches = reference::matches(target.groups(), typed.as_ref());
+        let started = typed.is_some() && !row.template_typing;
+        row.template_typing = typed.is_some();
+        let changed = matches != row.template_matches;
+        if changed {
+            row.template_matches = matches;
+            row.template_cursor = 0;
+            row.lines.clear();
+        }
+        if started && !row.template_open {
+            row.template_open = true;
+            return Some(Event::TemplatePanel { target, open: true });
+        }
+        (changed && row.template_open).then_some(Event::Relayout)
+    }
+
+    /// 書き方のチップを閉じる(Esc)．開いていなければ None
+    pub fn close_templates(&mut self, row_index: usize) -> Option<Event> {
+        let row = self.rows.get_mut(row_index)?;
+        let target = row.row.control.template_target()?;
+        if !row.template_panel_open() {
+            return None;
+        }
+        row.template_open = false;
+        Some(Event::TemplatePanel {
+            target,
+            open: false,
+        })
+    }
+
+    /// このページで最初の書き方を入れる欄(見本の書き出しで打ったことにする)
+    pub fn first_template_field(&self) -> Option<Window> {
+        (0..self.rows.len()).find_map(|index| self.template_field(index))
+    }
+
+    /// 書き方を入れる欄(Esc で閉じたあとにフォーカスを戻す)
+    pub fn template_field(&self, row_index: usize) -> Option<Window> {
+        let row = self.rows.get(row_index)?;
+        row.edit(Part::Field(row.row.control.template_target()?.field()))
+    }
+
+    /// 書き方のチップの (x, y)(ページの中の座標)にあるチップ(並びの番号)
+    pub fn template_chip_at(&self, row_index: usize, x: f32, y: f32) -> Option<usize> {
+        let row = self.rows.get(row_index)?;
+        row.template_chips
+            .item_at(x - row.template_origin.0, y - row.template_origin.1)
+    }
+
+    /// キーボードで選ぶチップを前(-1)か後ろ(+1)に移す
+    pub fn move_template_cursor(&mut self, row_index: usize, delta: isize) -> bool {
+        let Some(row) = self.rows.get_mut(row_index) else {
+            return false;
+        };
+        let count = row.template_chips.chips.len();
+        let next = row.template_cursor.saturating_add_signed(delta);
+        if count == 0 || next >= count || next == row.template_cursor {
+            return false;
+        }
+        row.template_cursor = next;
+        true
+    }
+
+    pub fn set_template_hover(&mut self, hover: Option<(usize, usize)>) -> bool {
+        let changed = self.template_hover != hover;
+        self.template_hover = hover;
+        changed
     }
 
     /// 表の上でキーを押した．頼みがあれば返す
@@ -3284,10 +3643,49 @@ impl PageView {
         row.step(delta)
     }
 
+    /// path の一覧の入力欄のすぐ下に，入れたときの結果と置き換えられない部分(書き方の誤り)を出す(空なら出さない)
+    /// 結果の行を出す・消すことになったら true(置き直す)
+    pub fn show_result(&mut self, path: &str, result: &str, problems: Vec<String>) -> bool {
+        let mut changed = false;
+        for row in &mut self.rows {
+            if row
+                .row
+                .control
+                .list_spec()
+                .is_some_and(|spec| spec.path == path)
+            {
+                let before = row.result_text.is_empty() && row.result_problems.is_empty();
+                // 打っている途中の書き方(入力位置の前の閉じていない `{da`)は，誤りの印を付けない
+                let typing = row
+                    .row
+                    .control
+                    .template_target()
+                    .and_then(|target| row.edit(Part::Field(target.field())))
+                    .and_then(|window| {
+                        let text = ffi::window_text(window);
+                        let utf16: Vec<u16> = text.encode_utf16().collect();
+                        let caret = edit::selection(window).start.min(utf16.len());
+                        reference::open_placeholder(&String::from_utf16_lossy(&utf16[..caret]))
+                    });
+                row.result_text = result.to_string();
+                row.result_problems = problems
+                    .iter()
+                    .filter(|problem| Some(*problem) != typing.as_ref())
+                    .cloned()
+                    .collect();
+                let after = row.result_text.is_empty() && row.result_problems.is_empty();
+                changed |= before != after;
+            }
+        }
+        changed
+    }
+
     /// 試した結果を出す
     pub fn show_preview(&mut self, kind: TryKind, shown: &crate::engine::PreviewShown) {
         for row in &mut self.rows {
-            if row.row.control == Control::Preview(kind) {
+            if row.row.control == Control::Preview(kind)
+                || row.row.control == Control::PreviewChips(kind)
+            {
                 row.preview_result.clone_from(shown);
             }
         }
@@ -3712,7 +4110,6 @@ impl PageView {
                 );
             }
             Control::Acknowledgement(_) => self.paint_acknowledgement(canvas, frame, index, row),
-            Control::TemplateReference => paint_template(canvas, frame.theme, row),
             Control::Version => {
                 canvas.preview(card.icon);
                 canvas.text(
@@ -3755,6 +4152,9 @@ impl PageView {
             Control::TextField => self.paint_field(canvas, frame, index, row, Part::Field(0)),
             Control::ThemePreview => canvas.preview(card.control),
             // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
+            Control::PreviewChips(_) => {
+                preview_chips(canvas, theme, card.control, &row.preview_result);
+            }
             Control::Preview(_) => {
                 for field in 0..2 {
                     self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
@@ -4209,6 +4609,55 @@ impl PageView {
                 TextLayout::LINE,
             );
         }
+        // 入れたときの結果(入力欄のすぐ下．結果を求めた欄の左端から)．置き換えられない部分は，その書き方のまま印を付けて添える
+        if !(row.result_text.is_empty() && row.result_problems.is_empty()) {
+            if let Some(rect) = row.card.as_ref().and_then(|card| card.result) {
+                let shown = format!("{}{}", text::RESULT_MARK, row.result_text);
+                canvas.text(
+                    rect,
+                    &shown,
+                    TextStyle::Body,
+                    Color::from(theme.palette.text_secondary),
+                    TextLayout::LINE,
+                );
+                if !row.result_problems.is_empty() {
+                    let left =
+                        rect.x + canvas.width(&shown, TextStyle::Body) + tokens::size::space::GROUP;
+                    canvas.text(
+                        Rect::new(left, rect.y, (rect.max_x() - left).max(0.0), rect.height),
+                        &format!("{}{}", text::PROBLEM_MARK, row.result_problems.join(" ")),
+                        TextStyle::Body,
+                        Color::from(theme.palette.caution),
+                        TextLayout::LINE,
+                    );
+                }
+            }
+        }
+        // 書き方のチップを開け閉めするボタン(開いているあいだはアクセントの色．WinUI の ToggleButton)と，チップの欄
+        if let Some(rect) = row.part_rect(Part::TemplateButton) {
+            let element = Element {
+                row: index,
+                part: Part::TemplateButton,
+            };
+            let kind = if row.template_open {
+                paint::ButtonKind::Accent
+            } else {
+                paint::ButtonKind::Standard
+            };
+            paint::button(
+                canvas,
+                theme,
+                rect,
+                text::TEMPLATE_BUTTON_LABEL,
+                kind,
+                self.state(frame, element, row.enabled),
+            );
+        }
+        if let Some(target) = row.row.control.template_target() {
+            if row.template_panel_open() {
+                self.paint_template_panel(canvas, frame, index, row, target.groups());
+            }
+        }
         // 打つもの → 置き換えるものの矢印(macOS の RuleListEditor の arrow.right)
         let arrow = row
             .row
@@ -4320,6 +4769,97 @@ impl PageView {
                         TextLayout::LINE,
                     );
                 }
+            }
+        }
+    }
+
+    /// 書き方のチップの欄(macOS の TemplatePalette と同じ形)．上にまとまりの切り替え(絞り込んでいるあいだは無し)，
+    /// 下にチップと値．チップにポインターを載せたらチップの背景を濃くする(押すと欄に入る)．
+    /// キーボードで選んでいるチップにはフォーカスの枠を付ける．当たるチップが無ければその知らせを出す
+    fn paint_template_panel(
+        &self,
+        canvas: &mut dyn Canvas,
+        frame: &Frame,
+        index: usize,
+        row: &RowState,
+        groups: &[reference::Group],
+    ) {
+        use tokens::opacity::settings::SUBTLE_SELECTED;
+        use tokens::size::part;
+        let palette = &frame.theme.palette;
+        let text = Color::from(palette.text);
+        let secondary = Color::from(palette.text_secondary);
+        for (position, rect) in row.template_switch.iter().enumerate() {
+            let element = Element {
+                row: index,
+                part: Part::TemplateSegment(position),
+            };
+            let title = groups.get(position).map_or("", |group| group.title);
+            paint::segment(
+                canvas,
+                frame.theme,
+                *rect,
+                title,
+                position == row.template_group,
+                self.state(frame, element, row.enabled),
+            );
+        }
+        let (left, top) = row.template_origin;
+        let items = row.template_items().unwrap_or_default();
+        if items.is_empty() {
+            let width = row
+                .card
+                .as_ref()
+                .and_then(|card| card.template_panel)
+                .map_or(0.0, |panel| panel.width);
+            canvas.text(
+                Rect::new(left, top, width, size::BODY_LINE_HEIGHT),
+                rule_list::NO_MATCHES,
+                TextStyle::Caption,
+                secondary,
+                TextLayout::LINE,
+            );
+            return;
+        }
+        let place = |rect: Rect| Rect::new(left + rect.x, top + rect.y, rect.width, rect.height);
+        let focused = frame.focus_visible
+            && frame.focus
+                == Some(Element {
+                    row: index,
+                    part: Part::TemplateChips,
+                });
+        for chip in &row.template_chips.chips {
+            let Some((item, _)) = items.get(chip.item) else {
+                continue;
+            };
+            let hovered = self.template_hover == Some((index, chip.item));
+            canvas.fill_round(
+                place(chip.tag),
+                part::TAG_RADIUS,
+                text.with_alpha(if hovered {
+                    SUBTLE_SELECTED * 2.0
+                } else {
+                    SUBTLE_SELECTED
+                }),
+            );
+            canvas.text(
+                place(chip.code),
+                item.code,
+                TextStyle::Mono,
+                text,
+                TextLayout::WRAP,
+            );
+            if chip.value.width > 0.0 {
+                let style = if item.code_value {
+                    TextStyle::Mono
+                } else {
+                    TextStyle::Caption
+                };
+                let value = reference::value_of(item, row.lines.get(chip.item).map(String::as_str));
+                canvas.text(place(chip.value), value, style, secondary, TextLayout::WRAP);
+            }
+            if focused && chip.item == row.template_cursor {
+                paint::focus_ring(canvas, frame.theme, place(chip.area), part::TAG_RADIUS);
             }
         }
     }
@@ -4867,118 +5407,6 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
     }
 }
 
-/// 単語に書ける書き方の表(macOS の TemplateReference)の置き場所．見出し・区切り線・書き方の行を上から並べる．
-/// 書き方は等幅の文字で 1 行，入るものは折り返し，今入れたときの値は 1 行にする
-struct TemplateLayout {
-    /// 列の左端と幅(書き方・入るもの・今入れると)
-    columns: [(f32, f32); 3],
-    header: Rect,
-    /// 書き方の行ごとの上端と高さ
-    rows: Vec<(f32, f32)>,
-    height: f32,
-}
-
-impl TemplateLayout {
-    fn new((x, y, width): (f32, f32, f32), measure: &dyn paint::Measure) -> Self {
-        let spacing = tokens::size::settings::TABLE_COLUMN_SPACING;
-        let syntax = extras::TEMPLATE_ROWS
-            .iter()
-            .map(|(syntax, _)| measure.width(syntax, TextStyle::Code))
-            .fold(
-                measure.width(extras::TEMPLATE_SYNTAX, TextStyle::Caption),
-                f32::max,
-            )
-            .min(width * 0.45)
-            .ceil();
-        let now = size::TEMPLATE_NOW_WIDTH.min(width * 0.3);
-        let meaning = (width - syntax - now - spacing * 2.0).max(0.0);
-        let columns = [
-            (x, syntax),
-            (x + syntax + spacing, meaning),
-            (x + syntax + spacing + meaning + spacing, now),
-        ];
-        let mut top = y + size::CARD_PADDING_Y;
-        let header = Rect::new(x, top, width, size::NOTE_LINE_HEIGHT);
-        top = header.max_y() + size::CONTROL_GAP;
-        let rows = extras::TEMPLATE_ROWS
-            .iter()
-            .map(|(_, text)| {
-                let height = measure
-                    .wrapped_height(text, TextStyle::Body, meaning)
-                    .max(size::BODY_LINE_HEIGHT);
-                let row = (top, height);
-                top += height + size::TABLE_ROW_INSET * 2.0;
-                row
-            })
-            .collect();
-        Self {
-            columns,
-            header,
-            rows,
-            height: top + size::CARD_PADDING_Y - y,
-        }
-    }
-}
-
-/// 単語に書ける書き方の表を描く(macOS の TemplateReference)．row.lines は今入れたときの値
-fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
-    let Some(card) = &row.card else {
-        return;
-    };
-    let palette = &theme.palette;
-    let rect = card.control;
-    let layout = TemplateLayout::new((rect.x, rect.y, rect.width), canvas);
-    let secondary = Color::from(palette.text_secondary);
-    for ((left, width), title) in layout.columns.iter().zip([
-        extras::TEMPLATE_SYNTAX,
-        extras::TEMPLATE_MEANING,
-        extras::TEMPLATE_NOW,
-    ]) {
-        canvas.text(
-            Rect::new(*left, layout.header.y, *width, layout.header.height),
-            title,
-            TextStyle::Caption,
-            secondary,
-            TextLayout::LINE,
-        );
-    }
-    let divider = |canvas: &mut dyn Canvas, y: f32| {
-        canvas.fill_rect(
-            Rect::new(rect.x, y, rect.width, 1.0),
-            Color::from(palette.card_stroke),
-        );
-    };
-    divider(canvas, layout.header.max_y() + size::CONTROL_GAP / 2.0);
-    for (index, ((syntax, meaning), (top, height))) in
-        extras::TEMPLATE_ROWS.iter().zip(&layout.rows).enumerate()
-    {
-        let [(syntax_x, syntax_w), (meaning_x, meaning_w), (now_x, now_w)] = layout.columns;
-        let top = top + size::TABLE_ROW_INSET;
-        canvas.text(
-            Rect::new(syntax_x, top, syntax_w, size::BODY_LINE_HEIGHT),
-            syntax,
-            TextStyle::Code,
-            Color::from(palette.text),
-            TextLayout::LINE,
-        );
-        canvas.text(
-            Rect::new(meaning_x, top, meaning_w, *height),
-            meaning,
-            TextStyle::Body,
-            secondary,
-            TextLayout::WRAP,
-        );
-        let value = row.lines.get(index).map_or("", String::as_str);
-        canvas.text(
-            Rect::new(now_x, top, now_w, size::BODY_LINE_HEIGHT),
-            value,
-            TextStyle::Body,
-            Color::from(palette.text),
-            TextLayout::LINE,
-        );
-    }
-}
-
 /// 表の行のメニューの項目
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RowMenuItem {
@@ -5124,7 +5552,8 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
             spec.items(list)
                 .into_iter()
                 .zip(spec.enabled_flags(list))
-                .map(|(item, enabled)| {
+                .enumerate()
+                .map(|(index, (item, enabled))| {
                     // 有効の印は表の先頭の列に印として出す(macOS の「有効」の列)
                     let mut columns = spec.display(&item);
                     columns.push(if enabled {
@@ -5132,6 +5561,10 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
                     } else {
                         String::new()
                     });
+                    // 変換マクロは，試す語と読みに当てた結果を後ろに持つ(形の列の右に添える)
+                    if spec.path == MACROS_PATH {
+                        columns.push(extras.macro_results.get(index).cloned().unwrap_or_default());
+                    }
                     columns
                 })
                 .collect()
@@ -5376,6 +5809,34 @@ fn state_filter(index: usize) -> Option<&'static str> {
 }
 
 /// 置くときに文字を測る口(layout::Metrics)．DirectWrite で測り，謝辞のカードは中身から高さを決める
+/// 書き方のチップの置き場所を DirectWrite で測る．チップの書き方と値は注記と同じ大きさ(コードは等幅)，切り替えは本文
+struct TemplateMeasure<'a>(&'a dyn paint::Measure);
+
+impl TemplateMeasure<'_> {
+    fn style(face: Face) -> TextStyle {
+        match face {
+            Face::Code | Face::CodeValue => TextStyle::Mono,
+            Face::Value => TextStyle::Caption,
+            Face::Switch => TextStyle::Body,
+        }
+    }
+}
+
+impl reference::Measure for TemplateMeasure<'_> {
+    fn width(&self, text: &str, face: Face) -> f32 {
+        self.0.width(text, Self::style(face))
+    }
+
+    fn line_height(&self, face: Face) -> f32 {
+        // 日本語の書体の行が高いので，日本語の字で測る
+        self.0.wrapped_height("あ", Self::style(face), f32::MAX)
+    }
+
+    fn baseline(&self, text: &str, face: Face) -> f32 {
+        self.0.baseline(text, Self::style(face))
+    }
+}
+
 struct Measured<'a> {
     measure: &'a dyn paint::Measure,
     /// ページのすべての行(行の位置を引く)
@@ -5388,6 +5849,23 @@ struct Measured<'a> {
     preview: Option<(f32, f32)>,
     /// 行ごとの文(行と同じ並び．読みにくい組み合わせの知らせの高さを測る)
     texts: &'a [String],
+    /// 一覧の行の，状態で出し入れするもの(行と同じ並び)
+    lists: &'a [ListInput],
+}
+
+/// 一覧の行の，状態で出し入れするもの(layout::ListState の元)
+struct ListInput {
+    template_button: bool,
+    result: bool,
+    panel: Option<PanelInput>,
+}
+
+/// 書き方のチップの欄に並べるもの
+struct PanelInput {
+    items: Vec<reference::Item>,
+    values: Vec<String>,
+    /// まとまりの切り替えを出す(絞り込んでいなければ)
+    switch: bool,
 }
 
 impl Measured<'_> {
@@ -5422,6 +5900,41 @@ impl Metrics for Measured<'_> {
         self.measure.width(text, style)
     }
 
+    fn list_state(&self, row: &Row, width: f32) -> layout::ListState {
+        let Some(input) = self
+            .position(row)
+            .and_then(|position| self.lists.get(position))
+        else {
+            return layout::ListState::default();
+        };
+        let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+        // 書き方のチップの欄: 切り替え(絞り込んでいなければ)と，チップの並び(当たるものが無ければその知らせの 1 行)
+        let panel = input.panel.as_ref().map(|panel| {
+            let head = if panel.switch {
+                tokens::size::part::FIELD_HEIGHT + tokens::size::space::GROUP
+            } else {
+                0.0
+            };
+            let chips = if panel.items.is_empty() {
+                size::BODY_LINE_HEIGHT
+            } else {
+                reference::place_chips(
+                    &panel.items,
+                    &panel.values,
+                    inner,
+                    &TemplateMeasure(self.measure),
+                )
+                .height
+            };
+            head + chips
+        });
+        layout::ListState {
+            template_button: input.template_button,
+            result: input.result,
+            panel,
+        }
+    }
+
     fn height(&self, row: &Row, width: f32) -> Option<f32> {
         if matches!(
             row.control,
@@ -5437,9 +5950,6 @@ impl Metrics for Measured<'_> {
                 .position(row)
                 .and_then(|position| self.texts.get(position))?;
             return Some(issue_height(text, inner, self.measure));
-        }
-        if row.control == Control::TemplateReference {
-            return Some(TemplateLayout::new((0.0, 0.0, inner), self.measure).height);
         }
         if let Control::Dictionaries(_) = row.control {
             return self

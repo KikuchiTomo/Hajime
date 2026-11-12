@@ -40,8 +40,8 @@ impl Metrics {
                     footer,
                 ),
                 style: Style::Rounded,
-                row_padding_x: part::ROW_PADDING_X,
-                lead: glass::BADGE_SIZE + candidate::PADDING_X,
+                row_padding_x: glass::ROW_PADDING_X,
+                lead: glass::BADGE_SIZE + glass::BADGE_GAP,
             }
         } else {
             // 文字種の行と足元の行は，角丸のテーマと同じく文字・キー・案内のアイコンのいちばん高いもの

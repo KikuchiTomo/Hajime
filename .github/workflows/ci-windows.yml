@@ -59,6 +59,14 @@ jobs:
           name: candidate-ui-snapshots
           path: apps/windows/target/snapshots
           if-no-files-found: error
+      # 設定の画面の全ページを明るい・暗い見た目で PNG に書き出す(見本のエンジンで開く)．macOS の --render-snapshots と見比べる
+      - run: cargo run --locked -p settings --bin hajime-settings -- --render-snapshots target/settings-snapshots
+        timeout-minutes: 10
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: settings-snapshots
+          path: apps/windows/target/settings-snapshots
+          if-no-files-found: error
       - run: cargo build --locked --release -p tsf
       - run: ../../tools/windows/check_exports.ps1 -Dll target/release/hajime_tsf.dll
         shell: pwsh

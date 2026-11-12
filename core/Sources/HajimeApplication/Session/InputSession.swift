@@ -1788,7 +1788,8 @@ public final class InputSession {
                 lattice.segments[index] = builder.rankedByContext(lattice.segments[index], reading: composition.conversionReading,
                                                                   context: LatticeBuilder.context(in: lattice, at: index))
             }
-            listed = SegmentSubstitution.interleave(listed, with: SegmentSubstitution.sentences(from: lattice, perSegment: DefaultSettings.listSubstitutionsPerSegment))
+            // 文節を替えた文は，ほかの文節の崩れた書き方(すね毛スった)も引き継ぐので，崩れた候補を除き直す(BrokenSpellings)
+            listed = BrokenSpellings.cleaned(SegmentSubstitution.interleave(listed, with: SegmentSubstitution.sentences(from: lattice, perSegment: DefaultSettings.listSubstitutionsPerSegment)))
         }
         for candidate in listed where !candidates.contains(where: { $0.text == candidate.text }) {
             candidates.append(candidate)

@@ -115,7 +115,7 @@ private struct AcknowledgementRow: View {
     let item: Acknowledgement
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
             Text(item.name).font(.headline)
             ForEach(item.sources, id: \.self) { source in
                 value(source).font(.callout)
@@ -130,7 +130,7 @@ private struct AcknowledgementRow: View {
                 .font(.callout)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, DesignTokens.Size.Space.inset)
     }
 
     /// 行の中の URL だけを押せるようにする．前置き(「改変したもの: 」)と URL のあとの文はそのまま文字で出し，左にそろえて折り返す

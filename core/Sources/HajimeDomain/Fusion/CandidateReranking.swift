@@ -4,13 +4,13 @@
 /// - 並べ替えるのは，2 番目より後ろの「エンジンが出した，読み全体の候補」(エンジンの語をつないだ候補と，文の候補から切り出した文節を含む)だけ．足す候補(Zenzai を使わない変換の候補など)もここに混ぜる
 /// - それ以外の候補(記号・ユーザー辞書の語・コマンド・読みの一部の候補など)は元の位置に残す．置き場所を決めた候補を動かさないため
 /// - 並べ替える候補のうち点数の無いもの(採点の上限に入らなかったもの)は，点数のある候補のあとに元の順で置く
-/// - 促音の切れ端を漢字とつないだ候補(SokuonFragments)は採点せず，並べ替えたあとに除く．
+/// - 字の並びが崩れた候補(BrokenSpellings)は採点せず，並べ替えたあとに除く．
 ///   検証木は「はっ再」「じゅっ分」のような書き方を高く採点することがあるため
 /// - 足した候補で並べ替える候補が増えたぶんは，並べ替える候補の最後の位置のすぐ後ろに入れる
 public enum CandidateReranking {
     /// 並べ替える候補か．エンジンが出した，読み全体の候補(エンジンの語をつないだ候補と，文の候補から切り出した文節を含む)
     public static func isRerankable(_ candidate: Candidate, readingCount: Int) -> Bool {
-        guard candidate.readingCount == readingCount, !SokuonFragments.isBroken(candidate) else { return false }
+        guard candidate.readingCount == readingCount, !BrokenSpellings.isBroken(candidate) else { return false }
         switch candidate.origin {
         case .engine, .combined, .sentencePart: return true
         default: return false
@@ -40,7 +40,7 @@ public enum CandidateReranking {
         }
         let extra = ordered.dropFirst(slots.count)
         result.insert(contentsOf: extra, at: slots.last.map { $0 + 1 } ?? 1)
-        return SokuonFragments.cleaned(result)
+        return BrokenSpellings.cleaned(result)
     }
 
     /// 並べ替える候補の位置(第 1 候補を除く)と，足す候補を合わせた並べ替える候補(表記の重なりを除く)

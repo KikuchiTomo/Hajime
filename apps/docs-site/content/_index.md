@@ -47,7 +47,7 @@ layout: hextra-home
     subtitle="Space を押さなくても，打つそばから漢字に変換され，Enter で確定できます．"
     link="docs/usage/#変換と確定"
     image="images/features/live-conversion.webp"
-    alt="テキストエディットで kyouhaiitenkidesune と打ち，「今日はいい天気ですね」と表示されている"
+    alt="テキストエディットのメモで，打っている途中の文が「帰りに駅前のカフェに寄って、買ったばかりの本を少しだけ読んだ」と漢字に変換されている"
   >}}
   {{< hajime/feature
     title="変換候補をツリー表示"
@@ -181,7 +181,7 @@ layout: hextra-home
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="辞書・マクロ・コマンド" >}}
     {{< hajime/catalog-item title="ユーザー辞書" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}10,000 語まで登録でき，「gh」で GitHub のように英字の読みも使えます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="日付や乱数を入れる単語" link="docs/settings/#変換マクロと単語に書ける書き方" >}}単語に {date} や {uuid} と書いておくと，変換したときの日付や UUID が入ります．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="日付や乱数を入れる単語" link="docs/settings/#単語と変換マクロに書ける書き方" >}}単語に {date} や {uuid} と書いておくと，変換したときの日付や UUID が入ります．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="辞書の取り込み" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}SKK 辞書やほかの IME の辞書を，数十万語のものでも取り込んで，アプリや文脈ごとに使い分けられます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="専門用語の辞書" link="docs/settings/#専門用語の辞書" >}}医学・法律・情報技術などの専門用語を，分野ごとに選んで候補に出せます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="変換マクロ" link="docs/settings/#コマンドと変換マクロ" >}}選んでいる語を【東京】やルビ，Markdown の太字などの形にして入力できます．形は設定の画面で試しながら追加できます．{{< /hajime/catalog-item >}}

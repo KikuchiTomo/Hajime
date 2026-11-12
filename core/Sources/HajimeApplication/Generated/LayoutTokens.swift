@@ -44,6 +44,7 @@ public enum LayoutTokens {
         public static let tagGlyphGap: Double = 2
         public static let tagRadius: Double = 4
         public static let badgeSize: Double = 16
+        public static let badgeGap: Double = 8
         public static let iconSize: Double = 16
         public static let iconPadding: Double = 3
         public static let iconRadius: Double = 4
@@ -143,6 +144,7 @@ public enum LayoutTokens {
         public static let labelFontSize: Double = 11.5
         public static let keyFontSize: Double = 10.5
         public static let badgeSize: Double = 16
+        public static let badgeGap: Double = 8
         public static let selectionRadius: Double = 7
         public static let keycapRadius: Double = 4
         public static let keycapPaddingX: Double = 4
@@ -383,7 +385,6 @@ public enum LayoutTokens {
         public static let themeSwatchRadius: Double = 6
         public static let themeSwatchFontSize: Double = 11
         public static let aboutIcon: Double = 64
-        public static let templateNowWidth: Double = 160
         public static let keymapListHeight: Double = 400
         public static let segmentInset: Double = 2
         public static let listArrowWidth: Double = 24

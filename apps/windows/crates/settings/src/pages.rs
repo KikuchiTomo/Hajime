@@ -343,9 +343,6 @@ pub enum Control {
     Acknowledgement(usize),
     /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
     KeymapReport,
-    /// 単語に書ける書き方の表(書き方・入るもの・今入れると)と，登録の例・付けられる名前・日時の書式の記号
-    /// (macOS の UserWordsView の TemplateReference)．高さは画面の側で測る
-    TemplateReference,
     /// キー設定のひな形を選んで読み込む
     Preset,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
@@ -378,6 +375,44 @@ pub enum Control {
     ThemeIssue(usize),
     /// 1 行の文字を打つ欄(カスタムテーマの名前．macOS の TextField)
     TextField,
+    /// 試した結果だけを並べる欄(変換マクロ．試す語と読みの欄は一覧の上の Preview に置く．macOS の CommandsPage)
+    PreviewChips(TryKind),
+}
+
+/// 書き方のチップ(macOS の TemplatePalette)を開ける一覧と，書き方を入れる欄．
+/// 欄のすぐ右の「{ }」のボタンか，欄で「{」を打つと，欄の下にチップを開く(macOS の RuleListEditor の TemplateAssist)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TemplateTarget {
+    /// 登録した単語の単語の欄
+    Word,
+    /// 変換マクロの形の欄
+    Macro,
+}
+
+impl TemplateTarget {
+    /// チップのまとまり．変換マクロは，選んでいる語と読みのまとまりを先に置く
+    pub fn groups(self) -> &'static [crate::template_reference::Group] {
+        match self {
+            TemplateTarget::Word => crate::strings::templates::WORD,
+            TemplateTarget::Macro => crate::strings::templates::MACRO,
+        }
+    }
+
+    /// 書き方を入れる欄の番号(一覧の入力欄の中の位置)
+    pub fn field(self) -> usize {
+        match self {
+            TemplateTarget::Word => 1,
+            TemplateTarget::Macro => 0,
+        }
+    }
+
+    /// チップを開いているかを覚える名前(ページごと．HKCU の Hajime IME の値)
+    pub fn storage_name(self) -> &'static str {
+        match self {
+            TemplateTarget::Word => "TemplatesOpenDictionary",
+            TemplateTarget::Macro => "TemplatesOpenMacros",
+        }
+    }
 }
 
 /// 試す欄で試すもの
@@ -535,6 +570,11 @@ pub struct ListButtons {
     pub move_icons: bool,
     /// 入力欄と表のあいだに，打った行の確かめの文(形の誤り・上書き)の行を置く(macOS の RuleListEditor の message)
     pub message_line: bool,
+    /// 入力欄のすぐ下に，入れたときの結果の行を置く(書き方を書ける単語と変換マクロの形．macOS の RuleListEditor の showingResult)．
+    /// 結果のあるときだけ行を取る(layout::ListState)
+    pub result: bool,
+    /// この番号の入力欄のすぐ右に，書き方のチップを開け閉めする「{ }」のボタンを置く(TemplateTarget::field)
+    pub template_field: Option<usize>,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -727,7 +767,21 @@ impl Control {
                 self,
                 Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
             ) && !matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
+            result: matches!(self, Control::Dictionary(_))
+                || matches!(self, Control::List(spec, _) if spec.path == MACROS_PATH),
+            template_field: self.template_target().map(TemplateTarget::field),
         })
+    }
+
+    /// 書き方のチップを開ける一覧なら，書き方を入れる欄(登録した単語の単語の欄・変換マクロの形の欄)
+    pub fn template_target(&self) -> Option<TemplateTarget> {
+        match self {
+            Control::Dictionary(spec) if spec.path == "userDictionary" => {
+                Some(TemplateTarget::Word)
+            }
+            Control::List(spec, _) if spec.path == MACROS_PATH => Some(TemplateTarget::Macro),
+            _ => None,
+        }
     }
 
     /// 表の見出しを押して並べ替えられるか．除外設定は上の決まりから先に効くので，並びを変えて見せない
@@ -816,7 +870,19 @@ impl Control {
                 ],
                 enabled: Some(field_count),
             },
-            // 変換マクロ: 有効の印・形(等幅)
+            // 変換マクロ: 有効の印・形(等幅)・試す語と読みに当てた結果(macOS の CommandsPage)．
+            // 形と結果はそれぞれの列の中で「…」で切る
+            Control::List(spec, _) if spec.path == MACROS_PATH => TableLayout {
+                columns: vec![
+                    check(field_count),
+                    column(0, Fixed(mac::RULE_KEY_COLUMN_WIDTH), Cell::Mono),
+                    Column {
+                        title: rule_list::RESULT,
+                        ..column(field_count + 1, Fill, Cell::Secondary)
+                    },
+                ],
+                enabled: Some(field_count),
+            },
             Control::List(spec, _) if spec.has_enabled_flag() => TableLayout {
                 columns: std::iter::once(check(field_count))
                     .chain(rules(field_count))
@@ -2005,6 +2071,8 @@ fn commands() -> Vec<Section> {
             rows: vec![
                 Row::toggle(extras::CONVERSION_MACROS, "conversionMacros"),
                 Row::toggle(extras::MACRO_SKIPS_SAME_READING, "macroSkipsSameReading"),
+                // 試す語と読み．チップの {text} と {reading} の値，形の欄の下の結果，一覧の結果の列，下の「試す」に使う
+                Row::new("", "", Control::Preview(TryKind::Macros)),
                 Row::list(
                     ListSpec {
                         path: MACROS_PATH,
@@ -2017,12 +2085,12 @@ fn commands() -> Vec<Section> {
                     LimitKind::Macros,
                 ),
             ],
-            footer: Some(extras::MACROS_NOTE),
+            footer: None,
             footer_variants: &[],
         },
         Section {
             title: Some(extras::TRY_MACROS),
-            rows: vec![Row::new("", "", Control::Preview(TryKind::Macros))],
+            rows: vec![Row::new("", "", Control::PreviewChips(TryKind::Macros))],
             footer: None,
             footer_variants: &[],
         },
@@ -2048,14 +2116,9 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // macOS の UserWordsView と同じく，切り替えと書き方の表(書き方・入るもの・今入れると)を 1 枚のカードに並べる
             rows: vec![
-                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"),
-                Row::new("", "", Control::TemplateReference),
-            ]
-            .into_iter()
-            .map(|row| row.visible_when(words()))
-            .collect(),
+                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary").visible_when(words())
+            ],
             footer: None,
             footer_variants: &[],
         },
@@ -2813,6 +2876,29 @@ mod tests {
         assert!(Action::ResetLearning.is_destructive());
         assert!(Action::RestoreDefaults.is_destructive());
         assert!(!Action::OpenSettingsFile.is_destructive());
+    }
+
+    #[test]
+    fn 変換マクロの一覧は有効と形と結果の列に分ける() {
+        let macros = commands()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .find(|row| matches!(&row.control, Control::List(spec, _) if spec.path == MACROS_PATH))
+            .unwrap();
+        let layout = macros.control.table_layout();
+        let titles: Vec<_> = layout.columns.iter().map(|column| column.title).collect();
+        assert_eq!(
+            titles,
+            vec![
+                crate::strings::rule_list::ENABLED,
+                extras::MACRO_PATTERN,
+                crate::strings::rule_list::RESULT
+            ]
+        );
+        // 形の列は幅を決め，結果の列の左の端をすべての行でそろえる．結果は形の後ろ(有効の印の次)に持つ
+        assert!(matches!(layout.columns[1].width, ColumnWidth::Fixed(_)));
+        assert_eq!(layout.columns[2].source, MACRO_FIELDS.len() + 1);
+        assert!(layout.columns.iter().all(|column| column.badge.is_none()));
     }
 
     #[test]

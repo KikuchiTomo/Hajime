@@ -4,6 +4,7 @@
 strings.rs の「/// UIStrings.X」の付いたまとまりの定数は，UIStrings.X の同じ名前の値と同じでなければならない
 (定数の名前は NAME_LIKE_THIS と nameLikeThis を大文字と小文字を区別せずに比べる)．
 キー設定の状態・ひな形・コマンドの名前の表も，UIStrings.Keys の label(for:) と同じでなければならない．
+書き方の早見表(UIStrings.Templates のまとまりと行)も，strings.rs の templates と同じでなければならない(例の値は Windows だけなので比べない)．
 Windows だけの文言は「pub mod windows」に置き，ここでは比べない．
 """
 
@@ -139,11 +140,79 @@ def rust_table(text: str, name: str) -> dict[str, str]:
     return dict(re.findall(rf'\("(\w+)", {STRING}\)', text[start:end]))
 
 
+TEMPLATE_KINDS = {"syntax": "Syntax", "filter": "Filter", "formatSymbol": "FormatSymbol"}
+
+
+def swift_templates(text: str) -> list[tuple[str, str, list[tuple[str, str, str, bool]]]]:
+    """UIStrings.Templates のまとまり(見出し，種類，行の書き方・意味・例を求める書き方・コードの値か)．書いた順"""
+    start = text.index("    enum Templates {")
+    block = text[start:text.index("\n    }\n", start)]
+    groups: list[tuple[str, str, list[tuple[str, str, str, bool]]]] = []
+    for line in block.split("\n"):
+        group = re.search(rf"(?:TemplateReference\.Group\(|\.init\()title: {STRING}, kind: \.(\w+), items: \[", line)
+        if group:
+            groups.append((group.group(1), TEMPLATE_KINDS.get(group.group(2), group.group(2)), []))
+            continue
+        item = re.search(rf"\.init\({STRING}, {STRING}(?:, sample: {STRING})?(?:, codeValue: (true))?\)", line)
+        if item and groups:
+            code = item.group(1)
+            groups[-1][2].append((code, item.group(2), item.group(3) or code, item.group(4) == "true"))
+    return groups
+
+
+def rust_templates(text: str) -> tuple[list[tuple[str, str, list[tuple[str, str, str, bool]]]], list[str], list[str], list[str]]:
+    """strings.rs の templates のまとまり(書いた順)，まとまりの定数の名前，WORD と MACRO に並べた名前．
+    rustfmt が長い行を折り返すので，行ごとではなくまとまりの中を通して読む"""
+    start = text.index("pub mod templates {")
+    block = text[start:text.index("\n}\n", start)]
+    groups: list[tuple[str, str, list[tuple[str, str, str, bool]]]] = []
+    names: list[str] = []
+    heads = list(re.finditer(rf"const (\w+): Group = Group \{{\s*title: {STRING},\s*kind: Kind::(\w+),", block))
+    for index, head in enumerate(heads):
+        body = block[head.end():heads[index + 1].start() if index + 1 < len(heads) else len(block)]
+        names.append(head.group(1))
+        items: list[tuple[str, str, str, bool]] = []
+        pattern = rf"Item::(new|with_sample)\(\s*{STRING},\s*{STRING},(?:\s*{STRING},)?\s*{STRING},?\s*\)(\s*\.code_value\(\))?"
+        for item in re.finditer(pattern, body):
+            code = item.group(2)
+            sample = item.group(4) if item.group(1) == "with_sample" else code
+            items.append((code, item.group(3), sample, item.group(6) is not None))
+        groups.append((head.group(2), head.group(3), items))
+
+    def listed(name: str) -> list[str]:
+        found = re.search(rf"pub const {name}: &\[Group\] = &\[([^\]]*)\];", block)
+        return [entry.strip() for entry in found.group(1).split(",") if entry.strip()] if found else []
+
+    return groups, names, listed("WORD"), listed("MACRO")
+
+
+def check_templates(swift: str, rust: str) -> list[str]:
+    problems: list[str] = []
+    mac = swift_templates(swift)
+    windows, names, word, macro = rust_templates(rust)
+    if len(mac) != len(windows):
+        problems.append(f"書き方の早見表のまとまりの数が違います: macOS {len(mac)} と Windows {len(windows)}")
+    for (mac_title, mac_kind, mac_items), (win_title, win_kind, win_items) in zip(mac, windows):
+        if (mac_title, mac_kind) != (win_title, win_kind):
+            problems.append(f"書き方の早見表のまとまり: macOS「{mac_title}」({mac_kind})と Windows「{win_title}」({win_kind})が違います")
+        for index in range(max(len(mac_items), len(win_items))):
+            mac_item = mac_items[index] if index < len(mac_items) else None
+            win_item = win_items[index] if index < len(win_items) else None
+            if mac_item != win_item:
+                problems.append(f"書き方の早見表の「{mac_title}」の {index + 1} 行目: macOS {mac_item} と Windows {win_item} が違います")
+    # macOS は 1 つ目のまとまり(語と読み)を変換マクロだけに置く．Windows も同じ並びにする
+    if "static let word = TemplateReference(groups)" not in swift or "static let macro = TemplateReference([textGroup] + groups)" not in swift:
+        problems.append("UIStrings.Templates の word と macro の組み方が check_strings.py の想定と違います")
+    if macro != names or word != names[1:]:
+        problems.append(f"strings.rs の templates の WORD と MACRO は，まとまりを書いた順に並べる(MACRO は {names}，WORD はその 2 つ目から)")
+    return problems
+
+
 def check() -> list[str]:
     swift = SWIFT.read_text(encoding="utf-8")
     rust = RUST.read_text(encoding="utf-8")
     mac = swift_constants(swift)
-    problems: list[str] = []
+    problems: list[str] = check_templates(swift, rust)
     for group, name, value in rust_constants(rust):
         key = (group, name.replace("_", "").lower())
         # macOS で上限の値を差し込む文言は，Windows では目録の上限と同じ数かを Rust のテストで確かめる(strings.rs の limits のテスト)

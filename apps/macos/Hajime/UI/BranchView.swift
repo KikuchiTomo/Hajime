@@ -92,7 +92,7 @@ final class BranchView: NSView {
         let footer = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
         if theme.isRounded {
             return Metrics(inset: Size.frameWidth + Glass.windowPadding, rowHeight: (Glass.rowHeight * scale).rounded(), trunkGap: Glass.trunkGap,
-                           branchIndent: Glass.branchIndent, stemX: Glass.branchStemX, lead: Glass.badgeSize + Size.paddingX,
+                           branchIndent: Glass.branchIndent, stemX: Glass.branchStemX, lead: Glass.badgeSize + Glass.badgeGap,
                            footerHeight: footer, rowInset: Glass.selectionInsetY, lineWidth: Glass.lineWidth,
                            lineWidthSelected: Glass.lineWidthSelected, rootInset: Glass.selectionInsetY)
         }

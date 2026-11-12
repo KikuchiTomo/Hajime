@@ -17,6 +17,7 @@ pub mod sample;
 pub mod store;
 pub mod strings;
 pub mod sync;
+pub mod template_reference;
 pub mod themes;
 pub mod ui;
 pub mod update;

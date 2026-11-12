@@ -241,8 +241,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {
         let current = settings.current
         // エンジンの辞書から来る絵文字を含む候補を除く．ユーザー辞書の語より先に除き，登録した絵文字は消さない．
-        // 促音の切れ端を漢字とつないだ候補(はッ制・じゅっ分)は除く(SokuonFragments)
-        var result = SokuonFragments.cleaned(Okurigana.reorder(candidates.filter { !Self.isEngineEmoji($0) }, style: current.okuriganaStyle))
+        // 字の並びが崩れた候補(はッ制・じゅっ分・出発スる)は除く(BrokenSpellings)
+        var result = BrokenSpellings.cleaned(Okurigana.reorder(candidates.filter { !Self.isEngineEmoji($0) }, style: current.okuriganaStyle))
         var userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         if current.dynamicDictionary, userWords.contains(where: { TextTemplate.containsPlaceholder($0.word) }) {
             let values = templateValues()

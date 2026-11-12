@@ -27,12 +27,17 @@ struct DictionaryPage: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            .padding(.top, 8)
-            switch tab {
-            case .userWords: UserWordsView(model: model)
-            case .imported: ImportedDictionariesView(model: model)
-            case .terms: TermDictionaryView(model: model)
+            .padding(.top, DesignTokens.Size.Space.group)
+            .padding(.bottom, DesignTokens.Size.Space.section)
+            // 送った中身を切り替えの下で切る(切り替えの下に中身が食い込んで見えないように)
+            Group {
+                switch tab {
+                case .userWords: UserWordsView(model: model)
+                case .imported: ImportedDictionariesView(model: model)
+                case .terms: TermDictionaryView(model: model)
+                }
             }
+            .clipped()
         }
         // 単語の登録とユーザー辞書を開く操作では，登録した単語を出す
         .onAppear(perform: showUserWordsIfAsked)
@@ -99,12 +104,13 @@ struct TermDictionaryView: View {
 /// 登録した単語．同じ読みに別の単語を登録できるので，読みと単語の両方が同じものだけを重なりとみなす
 private struct UserWordsView: View {
     @ObservedObject var model: SettingsModel
+    /// 単語の欄の下の書き方のチップを開いているか(次に開いたときも同じにする)
+    @AppStorage("settings.templates.dictionary.open") private var templatesOpen = false
 
     var body: some View {
         Form {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.dynamicDictionary, keyPath: \.dynamicDictionary)
-                TemplateReference()
             }
             Section {
                 RuleListEditor(
@@ -131,6 +137,10 @@ private struct UserWordsView: View {
                     tableHeight: DesignTokens.Size.Settings.userDictionaryTableHeight
                 )
                 .prefilled($model.userWordDraft)
+                // スイッチがオフなら書き方は値にならないので，書き方のボタンもチップも出さない
+                .assistingTemplates(model.settings.dynamicDictionary
+                    ? TemplateAssist(reference: UIStrings.Templates.word, target: .value, isOpen: $templatesOpen) : nil)
+                .showingResult { _, word in model.settings.dynamicDictionary ? Self.result(of: word) : nil }
             }
         }
         .formStyle(.grouped)
@@ -150,49 +160,15 @@ private struct UserWordsView: View {
         note: { $0 == WordClass.abbreviation.rawValue ? UIStrings.Settings.abbreviationNote : nil }
     )
 
+    /// 単語に書き方があれば，今入れたときの値と，置き換えられない部分(無ければ nil)
+    private static func result(of word: String) -> RuleResult? {
+        let values = TextTemplate.Values(now: SystemCalendar(clock: Date.init).now(), uuid: { UUID().uuidString }, random: { Int.random(in: $0) })
+        let problems = TextTemplate.problems(in: word, values: values)
+        guard TextTemplate.containsPlaceholder(word) || !problems.isEmpty else { return nil }
+        return RuleResult(text: TextTemplate.expand(word, values: values), problems: problems)
+    }
+
     private static func option(_ wordClass: WordClass) -> RuleKinds.Option {
         .init(id: wordClass.rawValue, title: UIStrings.Settings.label(for: wordClass))
-    }
-}
-
-/// 単語に書ける書き方(TextTemplate)の表．書き方・入るもの・今入れたときの値を並べる．
-/// 「今入れると」は 1 秒ごとに求め直す．UUID と整数は入れるたびに変わるので，ページを開いたときの例を 1 つ出す
-private struct TemplateReference: View {
-    @State private var uuid = UUID().uuidString
-    @State private var randomSeed = Int.random(in: 0..<Int(UInt16.max))
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { timeline in
-            let values = values(at: timeline.date)
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: DesignTokens.Size.Settings.tableColumnSpacing) {
-                GridRow {
-                    Text(UIStrings.Extras.templateSyntax)
-                    Text(UIStrings.Extras.templateMeaning)
-                    Text(UIStrings.Extras.templateNow)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                Divider()
-                ForEach(UIStrings.Extras.templateRows, id: \.syntax) { row in
-                    GridRow {
-                        Text(row.syntax).font(.body.monospaced()).textSelection(.enabled).fixedSize()
-                        Text(row.meaning).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        // UUID のような長い値は 1 行にし，間を省く(表が行の幅を超えないように)
-                        Text(TextTemplate.expand(row.syntax, values: values)).font(.body.monospacedDigit()).textSelection(.enabled)
-                            .lineLimit(1).truncationMode(.middle)
-                    }
-                }
-            }
-        }
-    }
-
-    private func values(at date: Date) -> TextTemplate.Values {
-        let calendar = SystemCalendar(clock: { date })
-        // 呼ぶたびに次の数にする(英数字の乱数が同じ字の繰り返しにならないように)．求め直すたびに同じ並びから始めるので，例は変わらない
-        var state = UInt64(randomSeed)
-        return TextTemplate.Values(now: calendar.now(), uuid: { uuid }, random: { range in
-            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-            return range.lowerBound + Int((state >> 33) % UInt64(range.count))
-        })
     }
 }
