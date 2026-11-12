@@ -67,6 +67,71 @@ struct SettingsExampleTests {
         return committed
     }
 
+    /// キーを打ち(空白は Space のキー)，最後に keys で終える．確定した文字と，アプリに渡した空白を並べた文字と，最後に出した一覧の候補
+    private func drive(_ setup: Setup, typing: String, then keys: [KeyEvent.Key]) -> (text: String, listed: [String]) {
+        let session = InputSession(converter: setup.converter, lexicon: setup.lexicon, settings: setup.settings)
+        var text = ""
+        var listed: [String] = []
+        func apply(_ result: KeyResult, key: KeyEvent.Key) {
+            apply(result.actions)
+            // 処理しなかった空白は，確定した文字のあとにアプリがそのまま入れる
+            if !result.handled, key == .space { text += " " }
+        }
+        func apply(_ actions: [ClientAction]) {
+            for action in actions {
+                switch action {
+                case .commit(let committed): text += committed
+                case .showCandidates(let panel): listed = panel.entries.map(\.text)
+                default: break
+                }
+            }
+        }
+        for character in typing {
+            let key: KeyEvent.Key = character == " " ? .space : .character(character)
+            apply(session.handle(KeyEvent(key), context: InputContext()), key: key)
+            for step in session.followUps(context: InputContext()) { apply(step()) }
+        }
+        // 打鍵が止まったあいだに求める候補(一覧の文節を入れ替えた文に使う)を求めておく
+        apply(session.settle(context: InputContext()))
+        for step in session.latticeWarmingSteps { step() }
+        for key in keys {
+            apply(session.handle(KeyEvent(key), context: InputContext()), key: key)
+            for step in session.followUps(context: InputContext()) { apply(step()) }
+        }
+        return (text, listed)
+    }
+
+    @Test("英字入力のライブ変換: 英字入力で「kyouha」と打って確定すると「今日は」になる．オフなら打ったまま")
+    func englishInputLiveConversion() async throws {
+        let example = DefaultSettings.englishInputLiveConversionExample
+        let on = try await setup { $0.inputStyle = .english; $0.englishInputLiveConversion = true }
+        #expect(drive(on, typing: example.reading, then: [.enter]).text == example.candidate)
+        let off = try await setup { $0.inputStyle = .english; $0.englishInputLiveConversion = false }
+        #expect(drive(off, typing: example.reading, then: [.enter]).text == example.reading)
+        withExtendedLifetime((on.engine, off.engine)) {}
+    }
+
+    @Test("英字入力(自動): 「zoom dekaigi」と打って確定すると，日本語として読める語だけを日本語にして「zoom で会議」になる")
+    func englishAuto() async throws {
+        let example = DefaultSettings.englishAutoExample
+        let setup = try await setup(words: ["zoom"]) { $0.inputStyle = .englishAuto }
+        #expect(drive(setup, typing: example.reading, then: [.enter]).text == example.candidate)
+        withExtendedLifetime(setup.engine) {}
+    }
+
+    @Test("一覧に文節を入れ替えた候補を表示: 「しりょうをおくる」の一覧に，第 1 候補「資料を送る」の文節を替えた「資料を贈る」が出る．オフなら出ない")
+    func listSegmentAlternatives() async throws {
+        let example = DefaultSettings.listSegmentAlternativesExample
+        let keys = "shiryouwookuru"
+        let on = try await setup { $0.candidatePresentation = .list; $0.listSegmentAlternatives = true }
+        let listed = drive(on, typing: keys, then: [.space]).listed
+        #expect(listed.first == example.reading)
+        #expect(listed.contains(example.candidate))
+        let off = try await setup { $0.candidatePresentation = .list; $0.listSegmentAlternatives = false }
+        #expect(!drive(off, typing: keys, then: [.space]).listed.contains(example.candidate))
+        withExtendedLifetime((on.engine, off.engine)) {}
+    }
+
     @Test("文節を絵文字に変換: 「びーる」を変換すると候補に 🍺 が出る")
     func emojiConversion() async throws {
         let example = DefaultSettings.emojiConversionExample

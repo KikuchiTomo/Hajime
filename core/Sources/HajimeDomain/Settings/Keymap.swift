@@ -137,11 +137,27 @@ public struct Keymap: Sendable, Equatable {
         var missing: [(KeymapState, KeymapCommand)] = []
         for state in [KeymapState.composing, .converting] {
             for command in [KeymapCommand.commit, .cancel] {
-                let substitutes: [KeymapCommand] = state == .converting && command == .cancel ? [command, .undoConversionEdit] : [command]
-                if substitutes.allSatisfy({ strokes(for: $0, in: state).isEmpty }) { missing.append((state, command)) }
+                if Self.substitutes(for: command, in: state).allSatisfy({ strokes(for: $0, in: state).isEmpty }) { missing.append((state, command)) }
             }
         }
         return missing
+    }
+
+    /// キーの無い確定・取り消し(missingEssentials)に，standard の表でそのコマンド(か代わりのコマンド)に使うキーを 1 つずつ足す．
+    /// 表の下に足すので，同じキーのほかの行より優先する
+    public mutating func addMissingEssentials(from standard: Keymap = KeymapPreset.standard.keymap) {
+        for (state, command) in missingEssentials {
+            let found = Self.substitutes(for: command, in: state).lazy
+                .compactMap { substitute in standard.strokes(for: substitute, in: state).first.map { (stroke: $0, command: substitute) } }
+                .first
+            guard let found else { continue }
+            entries.append(KeymapEntry(state, found.stroke, found.command))
+        }
+    }
+
+    /// state で command の代わりになるコマンド(先頭は command)．変換中の取り消しは，直前の変更の取り消しでも足りる
+    private static func substitutes(for command: KeymapCommand, in state: KeymapState) -> [KeymapCommand] {
+        state == .converting && command == .cancel ? [command, .undoConversionEdit] : [command]
     }
 
     // MARK: 整える

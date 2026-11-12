@@ -35,6 +35,8 @@ struct AssociationSection: View {
                     if model.isImportingDictionary { ProgressView().controlSize(.small) }
                     Spacer()
                 }
+                // 読み込めるファイルの書き方は，ファイルの中身の見本で見せる
+                FileExample(lines: [UIStrings.Association.fileExample, UIStrings.Association.tabFileExample])
                 Text(UIStrings.Association.note).font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -65,5 +67,22 @@ private struct AssociationDictionaryRow: View {
                 Button(UIStrings.Settings.remove, role: .destructive) { model.removeAssociationDictionary(dictionary) }
             }
         }
+    }
+}
+
+/// 読み込めるファイルの中身の見本．ファイルの行のまま等幅の字で並べる
+private struct FileExample: View {
+    let lines: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Size.Space.fine) {
+            ForEach(lines, id: \.self) { Text($0) }
+        }
+        .font(.caption.monospaced())
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+        .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
     }
 }

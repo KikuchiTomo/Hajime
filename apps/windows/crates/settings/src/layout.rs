@@ -1340,7 +1340,10 @@ mod tests {
                 placed
                     .cards
                     .iter()
-                    .filter(|card| section.rows[card.row].example.is_some())
+                    .filter(|card| {
+                        let row = &section.rows[card.row];
+                        row.example.is_some() && row.path.starts_with("emoji")
+                    })
                     .cloned()
                     .collect::<Vec<_>>()
             })
@@ -1351,11 +1354,12 @@ mod tests {
     fn 候補の見本は名前の横に置き_名前と同じ行の真ん中にそろえる() {
         let cards = example_cards(900.0);
         assert_eq!(cards.len(), 2);
-        // 2 つのタグの左の端は，長いほうの名前のあとにそろえる
+        // 2 つのタグの左の端は，ページの中でいちばん長い見本付きの名前のあとにそろえる
         assert_eq!(cards[0].icon.x, cards[1].icon.x);
         let longest = [
             settings_strings::EMOJI_CONVERSION,
             settings_strings::EMOJI_WORD_CONVERSION,
+            crate::strings::more::LIST_SEGMENT_ALTERNATIVES,
         ]
         .iter()
         .map(|title| Estimate.width(title, TextKind::Body))
@@ -1415,6 +1419,31 @@ mod tests {
             .collect();
         assert_eq!(xs.len(), 3);
         assert!(xs.iter().all(|x| *x == xs[0]));
+    }
+
+    #[test]
+    fn 文節を入れ替えた候補の見本も絵文字の見本と左の端をそろえる() {
+        let page = sections(Page::Conversion).unwrap();
+        let layout = layout(&page, 900.0, |_| true, &Estimate);
+        let icons: Vec<f32> = page
+            .iter()
+            .zip(&layout.sections)
+            .flat_map(|(section, placed)| {
+                placed
+                    .cards
+                    .iter()
+                    .filter(|card| {
+                        matches!(
+                            section.rows[card.row].path,
+                            "listSegmentAlternatives" | "emojiConversion"
+                        )
+                    })
+                    .map(|card| card.icon.x)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(icons.len(), 2);
+        assert_eq!(icons[0], icons[1]);
     }
 
     #[test]
@@ -1544,14 +1573,14 @@ mod tests {
     fn 注記は前の行の説明にする() {
         let page = sections(Page::Input).unwrap();
         let layout = layout(&page, 800.0, |_| true, &Estimate);
-        // キー配列の行(4 番目の行)に注記(5 番目)が付く
+        // 入力方式の行(先頭の行)に，英字入力(自動)の見本の注記(2 番目)が付く
         let card = layout.sections[0]
             .cards
             .iter()
-            .find(|card| card.row == 4)
+            .find(|card| card.row == 0)
             .unwrap();
         assert_eq!(card.descriptions.len(), 1);
-        assert_eq!(card.descriptions[0].0, 5);
+        assert_eq!(card.descriptions[0].0, 1);
         let (_, description) = card.descriptions[0];
         assert!(description.y >= card.label.max_y());
         assert!(description.max_y() <= card.card.max_y());

@@ -422,6 +422,10 @@ impl App {
                 super::update::start_check(self);
                 return None;
             }
+            Event::Action(Action::OpenKeys) => {
+                self.open_page(Page::Keys);
+                return None;
+            }
             Event::SyncToggleFields(indices) => {
                 let changes: Vec<RequestBody> = indices
                     .iter()
@@ -481,7 +485,8 @@ impl App {
                 | Action::OpenSetup
                 | Action::CheckForUpdates
                 | Action::CreateTheme
-                | Action::DuplicateCurrentTheme,
+                | Action::DuplicateCurrentTheme
+                | Action::OpenKeys,
             ) => return None,
             Event::DictionaryAdd { item, replacing } => {
                 let entry = DictionaryEntry {
@@ -610,6 +615,7 @@ impl App {
             }
             Event::Action(Action::RestoreDefaults) => model.restore_defaults(),
             Event::Action(Action::RestoreKeymap) => load_preset(model, STANDARD_PRESET),
+            Event::Action(Action::AddMissingKeys) => add_missing_keys(model),
             Event::LoadPreset(preset) => load_preset(model, preset),
             Event::Action(Action::ResetLearning) => {
                 if let Err(error) = model.store().reset_learning() {
@@ -1471,11 +1477,27 @@ fn load_preset(model: &mut SettingsModel<Store>, preset: &str) -> Result<(), Sto
     model.set("keymap", keymap)
 }
 
-/// 今の表の問題を文にする．調べられなければ空
-/// キー設定の表の問題の文と，行ごとの問題(行の印に使う)
-pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRowIssue>) {
+/// キーの無い確定・取り消しに，標準の表のキーを足す(macOS の Keymap.addMissingEssentials)
+fn add_missing_keys(model: &mut SettingsModel<Store>) -> Result<(), StoreError> {
+    let keymap = model
+        .value("keymap")
+        .cloned()
+        .unwrap_or_else(|| serde_json::Value::Array(Vec::new()));
+    let mut values = crate::store::Fields::new();
+    values.insert("keymap".to_string(), keymap.clone());
+    let report = model.store().check_keymap(&values)?;
+    let preset = model.store().read_keymap_preset(STANDARD_PRESET)?;
+    let standard = preset.get("keymap").ok_or(StoreError::Malformed)?;
+    match crate::keys::with_missing(&keymap, &report.missing, standard) {
+        Some(changed) => model.set("keymap", changed),
+        None => Ok(()),
+    }
+}
+
+/// キー設定の表の問題の文と，行ごとの問題(行の印に使う)と，キーの無い確定・取り消しがあるか．調べられなければ空
+pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRowIssue>, bool) {
     let Some(keymap) = model.value("keymap").cloned() else {
-        return (String::new(), Vec::new());
+        return (String::new(), Vec::new(), false);
     };
     let entries: Vec<(String, String, String)> = keymap
         .as_array()
@@ -1502,6 +1524,7 @@ pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRo
             (
                 crate::keys::report_lines(&report, &entries).join("\n"),
                 report.rows,
+                !report.missing.is_empty(),
             )
         })
         .unwrap_or_default()
