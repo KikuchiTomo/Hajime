@@ -5,6 +5,8 @@ strings.rs の「/// UIStrings.X」の付いたまとまりの定数は，UIStri
 (定数の名前は NAME_LIKE_THIS と nameLikeThis を大文字と小文字を区別せずに比べる)．
 キー設定の状態・ひな形・コマンドの名前の表も，UIStrings.Keys の label(for:) と同じでなければならない．
 書き方の早見表(UIStrings.Templates のまとまりと行)も，strings.rs の templates と同じでなければならない(例の値は Windows だけなので比べない)．
+設定の項目名の横に出す候補の見本(strings.rs の …_EXAMPLE)は，core の DefaultSettings の同じ名前の見本と同じでなければならない
+(DefaultSettings の見本は，本物のエンジンで実際に出ることを SettingsExampleTests で確かめている)．
 Windows だけの文言は「pub mod windows」に置き，ここでは比べない．
 """
 
@@ -46,6 +48,7 @@ WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOP
 SYNC_MODEL = ROOT / "core/Sources/HajimeDomain/Sync/SyncModel.swift"
 # 専門用語の辞書の分野の名前(core の TermField.name)．Windows の設定の画面は strings.rs の terms::FIELD_NAMES
 TERM_FIELDS = ROOT / "core/Sources/HajimeDomain/Dictionary/TermDictionary.swift"
+DEFAULT_SETTINGS = ROOT / "core/Sources/HajimeDomain/Settings/DefaultSettings.swift"
 
 STRING = r'"((?:[^"\\]|\\.)*)"'
 
@@ -263,6 +266,20 @@ def check() -> list[str]:
     for field, name in rust_table(rust, "FIELD_LABELS").items():
         if labels.get(field) != name:
             problems.append(f"FIELD_LABELS の {field}: Windows「{name}」と macOS「{labels.get(field)}」が違います")
+    return problems + check_examples(rust)
+
+
+def check_examples(rust: str) -> list[str]:
+    """strings.rs の候補の見本(NAME_EXAMPLE: (&str, &str))が DefaultSettings の nameExample と同じか"""
+    problems: list[str] = []
+    core = {name.lower(): (reading, candidate) for name, reading, candidate in re.findall(
+        rf'static let (\w+Example) = \(reading: {STRING}, candidate: {STRING}\)', DEFAULT_SETTINGS.read_text(encoding="utf-8"))}
+    for name, reading, candidate in re.findall(rf'pub const (\w+_EXAMPLE): \(&str, &str\) = \(\s*{STRING},\s*{STRING},?\s*\);', rust):
+        key = name.replace("_", "").lower()
+        if key not in core:
+            problems.append(f"{name}: DefaultSettings に同じ名前の見本がありません")
+        elif core[key] != (reading, candidate):
+            problems.append(f"{name}: Windows「{reading} → {candidate}」が DefaultSettings の「{core[key][0]} → {core[key][1]}」と違います")
     return problems
 
 

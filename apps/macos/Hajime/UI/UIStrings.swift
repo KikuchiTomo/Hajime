@@ -50,11 +50,10 @@ enum UIStrings {
     enum Extras {
         static let handShift = "手の位置のずれを修正（試験的）"
         /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)
-        static let looseReadingsExample = (reading: "しゅみれーしょん", candidate: "シミュレーション")
-        static let phoneticSpellingExample = (reading: "ふぉと", candidate: "photo")
-        /// 両手が 1 キー右にずれたまま「arigatou」を打った並び
-        static let handShiftExample = (reading: "stohsypi", candidate: "ありがとう")
-        static let englishTermCandidatesExample = (reading: "api", candidate: "API")
+        static let looseReadingsExample = DefaultSettings.looseReadingsExample
+        static let phoneticSpellingExample = DefaultSettings.phoneticSpellingExample
+        static let handShiftExample = DefaultSettings.handShiftExample
+        static let englishTermCandidatesExample = DefaultSettings.englishTermCandidatesExample
         static let handShiftNote = "左右どちらか、または両方の手が 1 キー横にずれたまま打った文を修正します。設定したキー配列のキーの位置を使います。"
         static let looseReadings = "うろ覚えのカタカナ語の候補"
         static let looseReadingsNote = "「しゅみれーしょん」から「シミュレーション」のように、読みを少し違えて覚えている語を候補に出します。"
@@ -641,8 +640,8 @@ enum UIStrings {
         static let emojiConversion = "文節を絵文字に変換"
         static let emojiWordConversion = "語を絵文字に変換"
         /// 項目名の横に出す，その設定で出る候補の見本(読みと候補)
-        static let emojiConversionExample = (reading: "びーる", candidate: "🍺")
-        static let emojiWordConversionExample = (reading: "ねこが", candidate: "🐈が")
+        static let emojiConversionExample = DefaultSettings.emojiConversionExample
+        static let emojiWordConversionExample = DefaultSettings.emojiWordConversionExample
         static let emojiCandidatePosition = "絵文字の位置"
         static let emojiCandidateCount = "絵文字の数"
         static let showsEmojiNames = "絵文字の名前を表示"
@@ -1002,8 +1001,7 @@ enum UIStrings {
         static let languagePage = "英語と日本語"
         static let languageJudging = "判別方法"
         static let usesContext = "前の単語で判別"
-        /// 「前の単語で判別」の横に出す見本(前が日本語なら英字の語も日本語にする)
-        static let usesContextExample = (reading: "試合に make", candidate: "試合に負け")
+        static let usesContextExample = DefaultSettings.usesContextExample
         static let avoidsOffensive = "不適切な変換を避ける"
         static let englishWords = "常に英語にする単語"
         static let japaneseWords = "常に日本語にする単語"

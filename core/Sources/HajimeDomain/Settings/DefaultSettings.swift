@@ -585,6 +585,19 @@ public enum DefaultSettings {
     public static let bundledEnglishTermFileName = "english-terms.txt"
     /// 同梱の英語の語の辞書のファイルの大きさの上限．壊れた大きなファイルを読み込まないため
     public static let maximumEnglishTermFileBytes = 1024 * 1024
+    /// 設定の画面で項目名の横に出す，その設定で出る候補の見本(打った文字と候補)．説明の文の代わりに見本で違いを見せる．
+    /// どれも本物のエンジンで実際にその候補が出ることを SettingsExampleTests で確かめる(Windows の strings.rs の同じ名前の見本も同じ値．make check で比べる)
+    public static let emojiConversionExample = (reading: "びーる", candidate: "🍺")
+    public static let emojiWordConversionExample = (reading: "ねこが", candidate: "🐈が")
+    /// 辞書がそのまま持っている読み違い(しゅみれーしょん → シュミレーション)ではなく，この設定でだけ出る語にする
+    public static let looseReadingsExample = (reading: "しゃんぶー", candidate: "シャンプー")
+    /// 辞書がもともと出す英単語(ふぉと → photo)ではなく，この設定でだけ出る語にする
+    public static let phoneticSpellingExample = (reading: "ここあ", candidate: "cocoa")
+    /// 両手が 1 キー右にずれたまま「arigatou」を打った並び
+    public static let handShiftExample = (reading: "stohsypi", candidate: "ありがとう")
+    /// 前が日本語なら英字の語も日本語にする
+    public static let usesContextExample = (reading: "試合に make", candidate: "試合に負け")
+    public static let englishTermCandidatesExample = (reading: "api", candidate: "API")
     /// 英語の語を，読み全体がふつうの日本語の語になるとき(「そら」→ 空)に出す位置．第 1 候補は日本語のままにする
     public static let englishTermCandidateOffset = 1
     /// 動的なユーザー辞書の語(TextTemplate)を置き換えた文字列の長さの上限
