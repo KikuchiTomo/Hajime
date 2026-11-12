@@ -210,7 +210,7 @@ public enum LayoutTokens {
         public static let frameWidth: Double = 1
         public static let guideDash: Double = 4
         public static let anchorGap: Double = 4
-        public static let candidateGap: Double = 6
+        public static let candidateGap: Double = 8
         public static let candidateFontSize: Double = 18
         public static let titleHeight: Double = 32
         public static let captionButtonWidth: Double = 46
