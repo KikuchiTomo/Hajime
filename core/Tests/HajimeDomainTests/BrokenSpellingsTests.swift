@@ -135,6 +135,22 @@ struct BrokenSpellingsTests {
         #expect(!BrokenSpellings.isBroken(Self.engine(words.map { (text: $0.0, reading: $0.1) })))
     }
 
+    @Test("漢字と促音で終わる語のすぐ後に，漢字で始まる語が続く候補を除く対象にする", arguments: [
+        [("良っ", "いっ"), ("分", "ぷん")], [("好っ", "いっ"), ("分", "ぷん")], [("行っ", "いっ"), ("分", "ぷん")], [("言っ", "いっ"), ("時", "とき")],
+    ])
+    func brokenSokuonStems(words: [(String, String)]) {
+        #expect(BrokenSpellings.isBroken(Self.engine(words.map { (text: $0.0, reading: $0.1) })))
+    }
+
+    @Test("1 つの語・促音のあとのかな・強めの接頭の語・数は，促音で終わる活用の形のあとの漢字に当たらない", arguments: [
+        [("引っ越し", "ひっこし")], [("突っ込む", "つっこむ")], [("取っ手", "とって")], [("真っ赤", "まっか")], [("言っ", "いっ"), ("た", "た"), ("時", "とき")],
+        [("引っ越", "ひっこ"), ("し", "し")], [("真っ", "まっ"), ("白", "しろ")], [("引っ", "ひっ"), ("越し", "こし")], [("突っ", "つっ"), ("張る", "ぱる")],
+        [("取っ", "とっ"), ("組み", "くみ")], [("三っ", "みっ"), ("日", "か")],
+    ])
+    func keepsSokuonStems(words: [(String, String)]) {
+        #expect(!BrokenSpellings.isBroken(Self.engine(words.map { (text: $0.0, reading: $0.1) })))
+    }
+
     @Test("語をつないだ候補も，元の語の並びで数のあとの語を見る")
     func numbersInCombinedCandidates() {
         let number = Self.engine([(text: "8", reading: "はっ")])
