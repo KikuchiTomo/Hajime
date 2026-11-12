@@ -159,6 +159,8 @@ impl Page {
                 menu::LIVE_CONVERSION,
                 choice::PRESENTATION,
                 choice::INITIAL_FOCUS,
+                choice::PREDICTION_DISPLAY,
+                choice::HIDDEN_PREDICTIONS,
                 features::OKURIGANA,
                 features::PREFERS_KATAKANA,
                 features::CALCULATION,
@@ -335,6 +337,7 @@ pub enum LimitKind {
     Commands,
     Macros,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 impl LimitKind {
@@ -349,6 +352,7 @@ impl LimitKind {
             LimitKind::Commands => catalog.limits.commands,
             LimitKind::Macros => catalog.limits.macros,
             LimitKind::EnglishTerms => catalog.limits.english_terms,
+            LimitKind::HiddenPredictions => catalog.limits.hidden_predictions,
         }
     }
 }
@@ -922,6 +926,25 @@ fn conversion() -> Vec<Section> {
             ],
         ),
         Section::new(
+            choice::HIDDEN_PREDICTIONS,
+            with_files(
+                Row::list(
+                    ListSpec {
+                        path: "hiddenPredictions",
+                        fields: HIDDEN_PREDICTION_FIELDS,
+                        empty: choice::HIDDEN_PREDICTIONS_EMPTY,
+                        invalid: crate::strings::Text::Limited(
+                            crate::strings::LimitedText::HiddenPrediction,
+                        ),
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::HiddenPredictions,
+                ),
+                RuleList::HiddenPredictions,
+            ),
+        ),
+        Section::new(
             more::CANDIDATES,
             vec![
                 Row::stepper(
@@ -1101,6 +1124,7 @@ const CORRECTION_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::REPLACEMENT, false),
 ];
 const EXCEPTION_FIELDS: &[Field] = &[Field::text(features::EXCEPTION_PLACEHOLDER)];
+const HIDDEN_PREDICTION_FIELDS: &[Field] = &[Field::text(choice::HIDDEN_PREDICTION_PLACEHOLDER)];
 const ROMAJI_FIELDS: &[Field] = &[
     Field::named("keys", settings::ROMAJI_KEYS, true),
     Field::named("kana", settings::ROMAJI_KANA, false),

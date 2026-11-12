@@ -53,7 +53,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// 既定．↓ と Space で次の候補，Shift+←→ で文節の長さ，Tab と → で次の文節へ，Option+→ で誤りやすい文節へ．
     /// 入力中の Shift+Space と，変換中の Shift+↑ で連想変換(R-18)．
     /// 変換中の F6〜F8 は選んでいる文節だけの字種(F9・F10 は全文)，Esc は直前の変更の取り消し(続けて押すと全文を読みに戻す)，
-    /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける
+    /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける．
+    /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)
     static let standardRows = """
         anywhere\tEnter\tcommit
         anywhere\tEscape\tcancel
@@ -97,6 +98,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tShift Backspace\teditSegment
         converting\tBackspace\tbackToReading
         converting\tCtrl Backspace\tforgetCandidate
+        composing\tCtrl Backspace\thidePrediction
         converting\tPageDown\tnextCandidatePage
         converting\tPageUp\tpreviousCandidatePage
         converting\tHome\tfirstSegment
@@ -232,6 +234,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tSpace\tnextCandidate
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate
+        composing\tCtrl Delete\thidePrediction
         composing\tOption Space\tinsertBoundary
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
@@ -331,6 +334,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tSpace\tnextCandidate
         converting\tUp\tpreviousCandidate
         converting\tCtrl Delete\tforgetCandidate
+        composing\tCtrl Delete\thidePrediction
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate
@@ -404,6 +408,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tHenkan\tnextCandidatePage
         converting\tShift Henkan\tpreviousCandidatePage
         converting\tCtrl Delete\tforgetCandidate
+        composing\tCtrl Delete\thidePrediction
         composing\tTab\tacceptSuggestion
         composing\tOption Up\tassociate
         converting\tOption Up\tassociate

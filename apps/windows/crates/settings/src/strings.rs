@@ -124,6 +124,9 @@ pub mod choice {
     pub const PREDICTION_DISPLAY: &str = "入力中の予測";
     pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴にある予測を優先";
     pub const PREDICTION_FROM_CORRECTION: &str = "打ち間違いを直した読みからも予測";
+    pub const HIDDEN_PREDICTIONS: &str = "予測に表示しない語句";
+    pub const HIDDEN_PREDICTION_PLACEHOLDER: &str = "語句";
+    pub const HIDDEN_PREDICTIONS_EMPTY: &str = "予測に表示しない語句はありません";
 }
 
 /// UIStrings.Features
@@ -457,6 +460,7 @@ pub mod keys {
         ("undoConversionEdit", "直前の変更を取り消し"),
         ("forgetCandidate", "候補を学習から削除"),
         ("forgetLastCommit", "最後の学習を取り消し"),
+        ("hidePrediction", "予測に表示しない"),
         ("openSettings", "設定を開く"),
         ("toggleLiveConversion", "ライブ変換の切り替え"),
         ("handwriting", "手書き入力"),
@@ -495,6 +499,7 @@ pub mod keys {
         ("segmentToHalfwidthKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("forgetCandidate", "選択中の候補を学習から削除します"),
         ("forgetLastCommit", "最後に確定した語句の学習を取り消します。入力した文字は削除しません"),
+        ("hidePrediction", "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"),
         ("handwriting", "「手書き入力」の設定がオンのときに使えます"),
         ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
@@ -647,6 +652,7 @@ pub mod sync {
         ("suggestionDisplay", "入力中の候補"),
         ("predictionDisplay", "入力中の予測"),
         ("predictionPrefersHistory", "入力履歴にある予測を優先"),
+        ("hiddenPredictions", "予測に表示しない語句"),
         (
             "predictionFromCorrection",
             "打ち間違いを直した読みからも予測",
@@ -1068,6 +1074,13 @@ pub mod limited {
         )
     }
 
+    pub fn invalid_hidden_prediction(limits: &Limits) -> String {
+        format!(
+            "予測に表示しない語句は {} 文字までにしてください",
+            limits.hidden_prediction_length
+        )
+    }
+
     pub fn invalid_english_term(limits: &Limits) -> String {
         format!(
             "語は {}〜{} 文字の英字にしてください",
@@ -1101,6 +1114,7 @@ pub enum LimitedText {
     Symbol,
     ReadingSymbol,
     EnglishTerm,
+    HiddenPrediction,
 }
 
 impl Text {
@@ -1115,6 +1129,7 @@ impl Text {
             Text::Limited(LimitedText::Symbol) => limited::invalid_symbol,
             Text::Limited(LimitedText::ReadingSymbol) => limited::invalid_reading_symbol,
             Text::Limited(LimitedText::EnglishTerm) => limited::invalid_english_term,
+            Text::Limited(LimitedText::HiddenPrediction) => limited::invalid_hidden_prediction,
         };
         make(limits).into()
     }

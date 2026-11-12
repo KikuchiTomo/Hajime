@@ -404,6 +404,7 @@ pub enum RuleList {
     SymbolSequences,
     SymbolReadings,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

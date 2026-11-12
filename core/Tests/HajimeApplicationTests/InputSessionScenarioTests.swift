@@ -38,7 +38,7 @@ final class Harness {
 
     /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)．wrapLexicon は英単語の辞書を包むもの(EnglishTermLexicon)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
-         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false,
+         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false, hidesPredictions: Bool = true,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
          wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
          palette: ((FakeSettings) -> PaletteServices)? = nil) {
@@ -49,6 +49,7 @@ final class Harness {
         self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
                                     associations: associations, keyNames: keyNames,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
+                                    predictionHiding: hidesPredictions ? SettingsPredictionHiding(settings: store) : nil,
                                     usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store))
     }
 

@@ -199,6 +199,63 @@ struct PredictionSourceScenarioTests {
     }
 }
 
+/// 予測に表示しない語句(キーで足し，設定の画面で消す)
+@Suite("予測に表示しない語句")
+@MainActor
+struct HiddenPredictionScenarioTests {
+    private static func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = DefaultSettings.settings
+        settings.predictionDisplay = .always
+        change(&settings)
+        return settings
+    }
+
+    private static func converter() -> FakeConverter {
+        let converter = FakeConverter(["えぴ": [("エピ", nil)]])
+        converter.predictionTexts["えぴ"] = ["エピ", "エピソード", "エピローグ"]
+        return converter
+    }
+
+    @Test("入力中の ⌃⌫ で予測の窓の語句を設定の「予測に表示しない語句」に入れ，次の予測に替えて案内を出す")
+    func hidesShownPrediction() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        #expect(harness.prediction?.completion == "ソード")
+        harness.press(.backspace, .control)
+        #expect(harness.settings.current.hiddenPredictions == ["エピソード"])
+        #expect(harness.prediction?.completion == "ローグ")
+        #expect(harness.note?.contains("エピソード") == true)
+        // 読みは消さない
+        #expect(harness.marked.text == "えぴ")
+    }
+
+    @Test("「予測に表示しない語句」にある語句は予測に出さず，一覧から消すとまた出す")
+    func respectsList() {
+        let hidden = Harness(converter: Self.converter(), settings: Self.settings { $0.hiddenPredictions = ["エピソード"] })
+        hidden.type("epi")
+        #expect(hidden.prediction?.completion == "ローグ")
+        let restored = Harness(converter: Self.converter(), settings: Self.settings())
+        restored.type("epi")
+        #expect(restored.prediction?.completion == "ソード")
+    }
+
+    @Test("予測の窓を出していないときは何もしない．キーはキー設定の表で変えられる")
+    func keyAndNoPrediction() {
+        let none = Harness(converter: FakeConverter(["えぴ": [("エピ", nil)]]), settings: Self.settings())
+        none.type("epi")
+        none.press(.backspace, .control)
+        #expect(none.settings.current.hiddenPredictions.isEmpty)
+        #expect(none.marked.text == "えぴ")
+        let custom = Harness(converter: Self.converter(), settings: Self.settings {
+            $0.keymap.entries.removeAll { $0.command == .hidePrediction }
+            $0.keymap.entries.append(KeymapEntry(.composing, KeyStroke(.character("x"), control: true), .hidePrediction))
+        })
+        custom.type("epi")
+        custom.press(.character("x"), .control)
+        #expect(custom.settings.current.hiddenPredictions == ["エピソード"])
+    }
+}
+
 /// 入力中の候補(変換の候補の窓)を出す件数
 @Suite("入力中の候補の件数")
 @MainActor

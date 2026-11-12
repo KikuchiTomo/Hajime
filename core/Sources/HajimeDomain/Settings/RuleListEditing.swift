@@ -40,4 +40,9 @@ public enum RuleListEditing {
     public static func isValidException(_ word: String) -> Bool {
         !word.isEmpty && word.count <= DefaultSettings.maximumExceptionLength
     }
+
+    /// 予測に表示しない語句として正しいか．空でなく，上限の長さ以内で，改行とタブを含まない
+    public static func isValidHiddenPrediction(_ text: String) -> Bool {
+        !text.isEmpty && text.count <= DefaultSettings.maximumHiddenPredictionLength && !text.contains(where: { $0.isNewline || $0 == "\t" })
+    }
 }
