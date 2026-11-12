@@ -13,6 +13,7 @@
   },
   "fields" : [
     "alphabetWidth",
+    "alphanumericHyphen",
     "association",
     "associationDictionaries",
     "associationLimit",
@@ -29,6 +30,7 @@
     "customRomaji",
     "customThemeID",
     "customThemes",
+    "cyclesLetterCase",
     "dateConversion",
     "dynamicDictionary",
     "emojiConversion",
@@ -45,6 +47,7 @@
     "inputStyle",
     "keyboardLayout",
     "keymap",
+    "keypadCalculation",
     "keypadDirect",
     "lateCorrectionTimeout",
     "latexConversion",
@@ -61,7 +64,13 @@
     "misreadings",
     "misuseNotes",
     "modeIndicatorDuration",
+    "numberFormCircled",
+    "numberFormConversion",
+    "numberFormKanji",
+    "numberFormParenthesized",
+    "numberFormRoman",
     "numberKeySelection",
+    "numberSeparators",
     "numberWidth",
     "okuriganaStyle",
     "palette",
@@ -74,11 +83,13 @@
     "paletteShowsPreview",
     "phoneticSpelling",
     "postalCodeConversion",
+    "predictionDisplay",
     "prefersKatakana",
     "profileRules",
     "proofreading",
     "punctuation",
     "punctuationCommits",
+    "questionExclamationCommits",
     "recordsUsage",
     "remembersRejectedCorrections",
     "restrainsLiveConversionInCode",
@@ -95,6 +106,7 @@
     "slash",
     "spaceWidth",
     "suggestionDisplay",
+    "suggestionSkipCount",
     "symbolConversion",
     "symbolRules",
     "terminalCommands",
@@ -142,6 +154,7 @@
     "wordLanguageEntries" : 2000,
     "wordLanguageWordLength" : 32
   },
+  "paletteCellSizeStep" : 2,
   "ranges" : {
     "associationLimit" : [
       10,
@@ -187,9 +200,29 @@
       0.3,
       3
     ],
+    "paletteCellSize" : [
+      28,
+      64
+    ],
+    "paletteColumns" : [
+      6,
+      14
+    ],
+    "paletteFrequentRows" : [
+      0,
+      4
+    ],
+    "paletteRows" : [
+      3,
+      12
+    ],
     "reviewCorrectionTimeout" : [
       5,
       60
+    ],
+    "suggestionSkipCount" : [
+      0,
+      4
     ]
   },
   "secondsStep" : 0.1,

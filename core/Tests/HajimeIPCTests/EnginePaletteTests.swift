@@ -166,3 +166,21 @@ struct EnginePaletteTests {
         #expect(!handled)
     }
 }
+
+@MainActor
+@Suite("設定の画面からパレットの記録を消す")
+struct EnginePaletteHistoryTests {
+    @Test("R-26: 設定の画面の頼みで，パレットで使った文字の記録を消す")
+    func resetsHistory() {
+        var cleared = 0
+        let settings = FakeSettings(DefaultSettings.settings)
+        let service = EngineService(
+            makeSession: { InputSession(converter: FakeConverter(), lexicon: FakeLexicon(), settings: settings) },
+            settings: settings, ui: { _ in }, openSettings: {},
+            services: SettingsServices(resetPaletteHistory: { cleared += 1 }))
+        let id = service.connect(isSettingsApp: true)
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: id)
+        #expect(service.handle(WireRequest(id: 2, body: .resetPaletteHistory), from: id).body == .done)
+        #expect(cleared == 1)
+    }
+}

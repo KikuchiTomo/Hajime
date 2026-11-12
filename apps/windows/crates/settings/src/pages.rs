@@ -7,7 +7,7 @@ use crate::files::FileTask;
 use crate::list::{Field, ListSpec};
 use crate::options::{self, Choice};
 use crate::strings::{
-    association, choice, dictionaries, extras, features, keys, menu, more, settings, sync,
+    association, choice, dictionaries, extras, features, keys, menu, more, palette, settings, sync,
 };
 use ipc::{RuleList, SymbolKind};
 
@@ -53,6 +53,7 @@ pub enum Page {
     Apps,
     Dictionary,
     Symbols,
+    Palette,
     Commands,
     Appearance,
     Usage,
@@ -62,7 +63,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 15] = [
+    pub const ALL: [Page; 16] = [
         Page::Input,
         Page::Conversion,
         Page::Correction,
@@ -72,6 +73,7 @@ impl Page {
         Page::Apps,
         Page::Dictionary,
         Page::Symbols,
+        Page::Palette,
         Page::Commands,
         Page::Appearance,
         Page::Usage,
@@ -89,7 +91,7 @@ impl Page {
             | Page::Romaji
             | Page::Keys
             | Page::Apps => Group::Input,
-            Page::Dictionary | Page::Symbols | Page::Commands => Group::Dictionary,
+            Page::Dictionary | Page::Symbols | Page::Palette | Page::Commands => Group::Dictionary,
             Page::Appearance => Group::Appearance,
             Page::Usage | Page::Sync | Page::Backup => Group::Data,
             Page::About => Group::About,
@@ -103,6 +105,7 @@ impl Page {
             Page::Correction => features::CORRECTION_PAGE,
             Page::Language => features::LANGUAGE_PAGE,
             Page::Symbols => features::SYMBOLS_PAGE,
+            Page::Palette => palette::PAGE,
             Page::Keys => keys::TAB,
             Page::Dictionary => settings::DICTIONARY_TAB,
             Page::Commands => extras::COMMANDS_PAGE,
@@ -128,6 +131,7 @@ impl Page {
             Page::Apps => '\u{ECE4}',       // 禁止
             Page::Dictionary => '\u{E82D}', // 辞書
             Page::Symbols => '\u{E8D2}',    // 記号
+            Page::Palette => '\u{E76E}',    // 絵文字
             Page::Commands => '\u{E945}',   // 稲妻
             Page::Appearance => '\u{E790}', // 色
             Page::Usage => '\u{E9D2}',      // グラフ
@@ -145,6 +149,11 @@ impl Page {
                 choice::KEYBOARD_LAYOUT,
                 settings::PUNCTUATION,
                 features::KEYPAD_DIRECT,
+                settings::NUMBER_SEPARATORS,
+                settings::ALPHANUMERIC_HYPHEN,
+                settings::QUESTION_EXCLAMATION_COMMITS,
+                settings::KEYPAD_CALCULATION,
+                settings::CYCLES_LETTER_CASE,
             ],
             Page::Conversion => vec![
                 menu::LIVE_CONVERSION,
@@ -158,6 +167,7 @@ impl Page {
                 settings::DATE_CONVERSION,
                 settings::EMOJI_CONVERSION,
                 settings::LATEX_CONVERSION,
+                settings::NUMBER_FORM_CONVERSION,
                 settings::MEANING,
                 settings::SHOWS_PART_OF_SPEECH,
             ],
@@ -180,6 +190,16 @@ impl Page {
                 extras::ENGLISH_TERMS,
             ],
             Page::Symbols => vec![features::SEQUENCES, features::READINGS],
+            Page::Palette => vec![
+                palette::ENABLED,
+                palette::CLOSES_AFTER_INSERT,
+                palette::RECORDS_HISTORY,
+                palette::COLUMNS,
+                palette::ROWS,
+                palette::CELL_SIZE,
+                palette::FREQUENT_ROWS,
+                palette::SHOWS_PREVIEW,
+            ],
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)
             Page::Keys => std::iter::once(keys::PRESET_MENU)
                 .chain(keys::COMMANDS.iter().map(|(_, label)| *label))
@@ -338,6 +358,8 @@ impl LimitKind {
 pub enum Action {
     ResetLearning,
     ResetUsage,
+    /// パレットで使った文字の記録を消す(R-26)
+    ResetPaletteHistory,
     RestoreDefaults,
     /// キー設定の表を標準のひな形に戻す
     RestoreKeymap,
@@ -558,6 +580,7 @@ pub enum RangeKind {
     CandidatesPerPage,
     LiveConversionDelay,
     LiveConversionSkipLength,
+    SuggestionSkipCount,
     EnglishSkipLength,
     CorrectionDelay,
     ReviewCorrectionTimeout,
@@ -567,6 +590,10 @@ pub enum RangeKind {
     AssociationLimit,
     CustomThemeCornerRadius,
     MeaningSenseLimit,
+    PaletteColumns,
+    PaletteRows,
+    PaletteCellSize,
+    PaletteFrequentRows,
 }
 
 impl RangeKind {
@@ -576,6 +603,7 @@ impl RangeKind {
             RangeKind::CandidatesPerPage => ranges.candidates_per_page,
             RangeKind::LiveConversionDelay => ranges.live_conversion_delay,
             RangeKind::LiveConversionSkipLength => ranges.live_conversion_skip_length,
+            RangeKind::SuggestionSkipCount => ranges.suggestion_skip_count,
             RangeKind::EnglishSkipLength => ranges.english_skip_length,
             RangeKind::CorrectionDelay => ranges.correction_delay,
             RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
@@ -585,6 +613,10 @@ impl RangeKind {
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
             RangeKind::MeaningSenseLimit => ranges.meaning_sense_limit,
+            RangeKind::PaletteColumns => ranges.palette_columns,
+            RangeKind::PaletteRows => ranges.palette_rows,
+            RangeKind::PaletteCellSize => ranges.palette_cell_size,
+            RangeKind::PaletteFrequentRows => ranges.palette_frequent_rows,
         }
     }
 
@@ -602,6 +634,7 @@ impl RangeKind {
     pub fn step(self, catalog: &crate::catalog::Catalog) -> f64 {
         match self {
             RangeKind::AssociationLimit => catalog.association_limit_step,
+            RangeKind::PaletteCellSize => catalog.palette_cell_size_step,
             _ => 1.0,
         }
     }
@@ -755,6 +788,7 @@ pub fn sections(page: Page) -> Option<Vec<Section>> {
         Page::Keys => Some(keymap()),
         Page::Dictionary => Some(dictionary()),
         Page::Symbols => Some(symbols()),
+        Page::Palette => Some(palette_page()),
         Page::Commands => Some(commands()),
         Page::Sync => Some(sync_page()),
         Page::Appearance => Some(appearance()),
@@ -799,13 +833,21 @@ fn input() -> Vec<Section> {
                 Row::choice(settings::NUMBER_WIDTH, "numberWidth", options::WIDTHS),
                 Row::choice(more::ALPHABET_WIDTH, "alphabetWidth", options::WIDTHS),
                 Row::toggle(more::SHIFT_STARTS_ALPHABET, "shiftStartsAlphabet"),
+                Row::toggle(settings::NUMBER_SEPARATORS, "numberSeparators"),
+                Row::toggle(settings::ALPHANUMERIC_HYPHEN, "alphanumericHyphen"),
                 Row::toggle(features::KEYPAD_DIRECT, "keypadDirect"),
+                Row::toggle(settings::KEYPAD_CALCULATION, "keypadCalculation"),
             ],
         ),
         Section::new(
             settings::KEYS,
             vec![
                 Row::toggle(settings::PUNCTUATION_COMMITS, "punctuationCommits"),
+                Row::toggle(
+                    settings::QUESTION_EXCLAMATION_COMMITS,
+                    "questionExclamationCommits",
+                ),
+                Row::toggle(settings::CYCLES_LETTER_CASE, "cyclesLetterCase"),
                 Row::toggle(settings::NUMBER_KEY_SELECTION, "numberKeySelection"),
                 Row::toggle(settings::SHOWS_MODE_INDICATOR, "showsModeIndicator"),
                 Row::seconds(
@@ -840,6 +882,17 @@ fn conversion() -> Vec<Section> {
                 Row::choice(
                     choice::SUGGESTION_DISPLAY,
                     "suggestionDisplay",
+                    options::SUGGESTION_DISPLAY,
+                ),
+                Row::stepper(
+                    more::SUGGESTION_SKIP_COUNT,
+                    "suggestionSkipCount",
+                    RangeKind::SuggestionSkipCount,
+                )
+                .enabled_when(IsNot("suggestionDisplay", "off")),
+                Row::choice(
+                    choice::PREDICTION_DISPLAY,
+                    "predictionDisplay",
                     options::SUGGESTION_DISPLAY,
                 ),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
@@ -962,6 +1015,23 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(settings::SYMBOL_CONVERSION, "symbolConversion"),
                 Row::toggle(settings::EMOJI_CONVERSION, "emojiConversion"),
                 Row::toggle(settings::LATEX_CONVERSION, "latexConversion"),
+            ],
+        ),
+        Section::new(
+            settings::NUMBER_FORMS,
+            vec![
+                Row::toggle(settings::NUMBER_FORM_CONVERSION, "numberFormConversion"),
+                Row::toggle(settings::NUMBER_FORM_CIRCLED, "numberFormCircled")
+                    .enabled_when(On("numberFormConversion")),
+                Row::toggle(
+                    settings::NUMBER_FORM_PARENTHESIZED,
+                    "numberFormParenthesized",
+                )
+                .enabled_when(On("numberFormConversion")),
+                Row::toggle(settings::NUMBER_FORM_KANJI, "numberFormKanji")
+                    .enabled_when(On("numberFormConversion")),
+                Row::toggle(settings::NUMBER_FORM_ROMAN, "numberFormRoman")
+                    .enabled_when(On("numberFormConversion")),
             ],
         ),
         Section::new(
@@ -1384,6 +1454,51 @@ fn dictionary() -> Vec<Section> {
 }
 
 /// 記号のページ(macOS の SymbolsPage)．既定の決まりは変えず，変えた分だけを設定に重ねる
+/// 絵文字と記号のパレットのページ(R-26．macOS の PalettePage)
+fn palette_page() -> Vec<Section> {
+    use Condition::*;
+    vec![
+        Section::new(
+            palette::BEHAVIOR,
+            vec![
+                Row::toggle(palette::ENABLED, "palette"),
+                Row::toggle(palette::CLOSES_AFTER_INSERT, "paletteClosesAfterInsert")
+                    .enabled_when(On("palette")),
+                Row::toggle(palette::RECORDS_HISTORY, "paletteRecordsHistory")
+                    .enabled_when(On("palette")),
+                Row::action(palette::CLEAR_HISTORY, Action::ResetPaletteHistory)
+                    .enabled_when(On("palette")),
+                Row::note(palette::CLEAR_HISTORY_NOTE),
+                Row::note(crate::strings::windows::PALETTE_KEYS_NOTE),
+            ],
+        ),
+        Section::new(
+            palette::LOOK,
+            vec![
+                Row::stepper(
+                    palette::COLUMNS,
+                    "paletteColumns",
+                    RangeKind::PaletteColumns,
+                ),
+                Row::stepper(palette::ROWS, "paletteRows", RangeKind::PaletteRows),
+                Row::stepper(
+                    palette::CELL_SIZE,
+                    "paletteCellSize",
+                    RangeKind::PaletteCellSize,
+                ),
+                Row::stepper(
+                    palette::FREQUENT_ROWS,
+                    "paletteFrequentRows",
+                    RangeKind::PaletteFrequentRows,
+                )
+                .enabled_when(On("paletteRecordsHistory")),
+                Row::toggle(palette::SHOWS_PREVIEW, "paletteShowsPreview"),
+                Row::note(palette::THEME_NOTE),
+            ],
+        ),
+    ]
+}
+
 fn symbols() -> Vec<Section> {
     let section = |title, kind, fields, invalid, file| {
         let mut rows = vec![Row::new(
@@ -1795,10 +1910,39 @@ mod tests {
     }
 
     #[test]
+    fn 変換のページで入力中の予測と入力中の候補を表示しない件数を選べる() {
+        let catalog = crate::catalog::Catalog::load().unwrap();
+        let rows: Vec<_> = sections(Page::Conversion)
+            .unwrap()
+            .into_iter()
+            .flat_map(|section| section.rows)
+            .collect();
+        let prediction = rows
+            .iter()
+            .find(|row| row.path == "predictionDisplay")
+            .unwrap();
+        assert!(
+            matches!(prediction.control, Control::Choice(choices) if choices == options::SUGGESTION_DISPLAY)
+        );
+        let skip = rows
+            .iter()
+            .find(|row| row.path == "suggestionSkipCount")
+            .unwrap();
+        assert!(matches!(
+            skip.control,
+            Control::Stepper(RangeKind::SuggestionSkipCount)
+        ));
+        let range = RangeKind::SuggestionSkipCount.range(&catalog);
+        assert_eq!((range.lower(), range.upper()), (0.0, 4.0));
+        assert_eq!(crate::strings::more::skip_count(0.0), "オフ");
+        assert_eq!(crate::strings::more::skip_count(2.0), "2 件以下");
+    }
+
+    #[test]
     fn 入力のページの並び() {
         let page = sections(Page::Input).unwrap();
         let titles: Vec<_> = page.iter().map(|section| section.title).collect();
         assert_eq!(titles, vec![Some("入力方式"), Some("文字"), Some("動作")]);
-        assert_eq!(page[1].rows.len(), 9);
+        assert_eq!(page[1].rows.len(), 12);
     }
 }

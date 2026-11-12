@@ -54,8 +54,10 @@ public final class InputSession {
     private var latticeUntouched = false
     /// 注目している文節の長さを変えたときの下見(読みと文節の位置ごと)．分岐図を出してから求めて足す
     private var resizePreviews: [ResizePreviewKey: (shorter: String?, longer: String?)] = [:]
-    /// 入力中の候補の窓に足す，続く語の予測．窓を出してから求めて足す
+    /// 予測の窓に出す，続く語句の予測(読みごと)．打った文字を出してから求めて足す
     private var suggestionPredictions: (reading: String, candidates: [Candidate])?
+    /// 予測の窓に出している予測．出していなければ nil
+    private var shownPrediction: ShownPrediction?
     /// 最後に出した入力中の候補の窓．ローマ字を打ちかけているあいだはこれを出しておく
     private var shownSuggestionPanel: CandidatePanel?
     /// 最後に出した案内(学習の取り消しなど)．あとから足して出し直すときにも同じ案内を出す
@@ -234,6 +236,19 @@ public final class InputSession {
             // Option との組み合わせで入る特殊な文字(å など)は，アプリの配列に任せる
             return KeyResult(handled: false, actions: commitAll())
         }
+        if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadCalculation, phase == .composing || !isComposing,
+            case .character(let character) = event.key {
+            // テンキーで式を打てるよう，数字と記号を半角のまま読みに入れる(テンキーの Enter で計算する設定)
+            return insertKeypadCharacter(character, context: context)
+        }
+        if mode == .japanese, event.isKeypad, event.key == .enter, event.modifiers.isEmpty, settings.current.keypadCalculation,
+            settings.current.calculation, phase == .composing, Calculator.evaluate(reading: composition.conversionReading + "=") != nil {
+            // テンキーの Enter で式を計算する(設定)．「=」を足して変換し，計算の結果を第 1 候補にする．式でなければふつうの Enter
+            corrector.commitAsTyped(into: &composition)
+            readingCorrector.didInsertLiteral()
+            composition.insertLiteral("=", rawKey: nil)
+            return convert(withoutLearning: false, context: context)
+        }
         if command == nil, mode == .japanese, event.isKeypad, settings.current.keypadDirect, phase == .composing || !isComposing,
             case .character(let character) = event.key {
             // テンキーの数字と記号は，組み立て中の文字を確定してから半角のまま確定する(設定)．
@@ -333,7 +348,7 @@ public final class InputSession {
                 return rerender(context: context)
             }
             return fills + [preview]
-        case .composing where suggestionsShown && suggestionPredictions?.reading != suggestionTarget().reading:
+        case .composing where predictionsShown && suggestionPredictions?.reading != suggestionTarget().reading:
             let reading = composition.conversionReading
             let target = suggestionTarget().reading
             return [{ [self] in
@@ -700,8 +715,12 @@ public final class InputSession {
             return KeyResult(handled: true, actions: render(context: context))
         case .acceptSuggestion:
             guard phase == .composing else { return KeyResult(handled: true) }
-            // 「もしかして」と示していた読みに直す．示していなければ，出している入力中の候補の窓から選び始める(↓ と同じ)
+            // 「もしかして」と示していた読みに直す．示していなければ予測の窓の予測を確定し，
+            // 予測も出していなければ，出している入力中の候補の窓から選び始める(↓ と同じ)
             guard readingCorrector.acceptSuggestion(&composition) else {
+                if let shown = shownPrediction, shown.reading == composition.conversionReading {
+                    return KeyResult(handled: true, actions: acceptPrediction(shown.candidate))
+                }
                 guard shownSuggestionPanel != nil, suggestionsShown else { return KeyResult(handled: true) }
                 return moveCandidate(.next, context: context)
             }
@@ -891,7 +910,7 @@ public final class InputSession {
                 converter.setApplication(context.applicationID)
             }
             composition.insertKana(kana)
-            if settings.current.punctuationCommits, SymbolTable.isPunctuation(kana, settings: settings.current) {
+            if SymbolTable.commitsComposition(after: kana, settings: settings.current) {
                 return KeyResult(handled: true, actions: actions + commitAll())
             }
             return KeyResult(handled: true, actions: actions + render(context: context))
@@ -907,10 +926,17 @@ public final class InputSession {
         return KeyResult(handled: true)
     }
 
-    /// 読み全体を字種に変えて選ぶ(既定では F6〜F10 と Ctrl+J/K/;/L/:．R-03)
+    /// 読み全体を字種に変えて選ぶ(既定では F6〜F10 と Ctrl+J/K/;/L/:．R-03)．
+    /// 英数を選んでいるときに同じキーをまた押すと，英字の大文字と小文字を順に変える(設定)
     private func selectVariant(_ variant: ScriptVariant, context: InputContext) -> KeyResult {
-        guard variant.apply(to: composition) != nil else { return KeyResult(handled: true) }
-        phase = .selecting(makeSelection(focus: .variant(variant)))
+        guard let text = variant.apply(to: composition) else { return KeyResult(handled: true) }
+        var letterCase = LetterCase.asTyped
+        if settings.current.cyclesLetterCase, variant.isAlphanumeric, case .selecting(let current) = phase, current.focus == .variant(variant) {
+            letterCase = current.letterCase.next(for: text)
+        }
+        var selection = makeSelection(focus: .variant(variant))
+        selection.letterCase = letterCase
+        phase = .selecting(selection)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -950,9 +976,13 @@ public final class InputSession {
         if startsAlphabet { alphabetRun = true }
         // 英字の中の「-」(Wi-Fi)は英字の続き
         if alphabetRun, !(character.isASCII && (character.isLetter || character == "-")) { alphabetRun = false }
+        // 直前の文字．ローマ字を打ちかけていれば(「z」+「.」→「…」など)，記号はローマ字の続きにする
+        let previous = composition.pending.isEmpty ? composition.kana.last : nil
+        // 英数字のあとの「-」は長音でなくハイフン(「A-1」「3-4」．設定)
+        let hyphen = character == "-" && !alphabetRun ? SymbolTable.hyphen(after: previous, settings: settings.current) : nil
         let isRomaji = !alphabetRun && (
             (character.isASCII && character.isLetter && character.isLowercase)
-                || character == "-"
+                || (character == "-" && hyphen == nil)
                 || (character == "'" && composition.pending == "n")
                 // 「z.」→「…」，「z[」→「『」など，z と組み合わせる記号
                 || (composition.pending == "z" && Self.zSymbolKeys.contains(character)))
@@ -968,13 +998,22 @@ public final class InputSession {
             if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
             }
-        } else if character.isASCII && (character.isLetter || character.isNumber || (alphabetRun && character == "-")) {
+        } else if character.isASCII && (character.isLetter || character.isNumber || (alphabetRun && character == "-")) || hyphen != nil {
             // 英単語に続けて打った大文字と数字は識別子の続き(「userName」「v2」)なので，綴りを直さず打ったとおりにする(R-06)
             corrector.commitAsTyped(into: &composition)
             readingCorrector.didInsertLiteral()
             let width = character.isNumber ? settings.current.numberWidth : settings.current.alphabetWidth
-            let text = width == .fullwidth ? KanaWidth.fullwidthASCII(from: String(character)) : String(character)
+            let text = hyphen ?? (width == .fullwidth ? KanaWidth.fullwidthASCII(from: String(character)) : String(character))
+            // 読みの先頭の「-」に数字を続けたら，長音を符号にする(「-3」)
+            if let digit = text.first, let sign = SymbolTable.sign(before: digit, settings: settings.current) {
+                composition.replaceLeadingLongVowel(with: sign)
+            }
             composition.insertLiteral(text, rawKey: character)
+        } else if let separator = SymbolTable.numberSeparator(for: character, after: previous, settings: settings.current) {
+            // 数字のあとの「.」「,」は小数点と桁区切り(「3.14」「1,000」．設定)．句読点ではないので，句読点で確定しない
+            corrector.commitAsTyped(into: &composition)
+            readingCorrector.didInsertLiteral()
+            composition.insertLiteral(separator, rawKey: nil)
         } else {
             let text = SymbolTable.text(for: character, profile: context.profile, settings: settings.current)
             if !isComposing && text == String(character) {
@@ -989,13 +1028,27 @@ public final class InputSession {
             }
             readingCorrector.didInsertLiteral()
             composition.insertLiteral(text, rawKey: nil)
-            if settings.current.punctuationCommits, SymbolTable.isPunctuation(text, settings: settings.current) {
-                // 句読点を打ったら，その句読点まで確定する(設定)
+            if SymbolTable.commitsComposition(after: text, settings: settings.current) {
+                // 句読点(と ？ ！)を打ったら，その記号まで確定する(設定)
                 return KeyResult(handled: true, actions: actions + commitAll())
             }
         }
         updateCorrection()
         return KeyResult(handled: true, actions: actions + render(context: context))
+    }
+
+    /// テンキーの数字と記号を，半角のまま読みに入れる(テンキーの Enter で計算する設定のとき)
+    private func insertKeypadCharacter(_ character: Character, context: InputContext) -> KeyResult {
+        if !isComposing {
+            composition = newComposition()
+            setLeftContext(context.precedingText)
+            converter.setApplication(context.applicationID)
+        }
+        corrector.commitAsTyped(into: &composition)
+        readingCorrector.didInsertLiteral()
+        composition.insertLiteral(String(character), rawKey: character.isNumber ? character : nil)
+        updateCorrection()
+        return KeyResult(handled: true, actions: render(context: context))
     }
 
     private func insertLiteral(_ text: String, rawKey: Character?, context: InputContext) -> KeyResult {
@@ -1203,6 +1256,7 @@ public final class InputSession {
         guard let index = available.firstIndex(of: current) else { return KeyResult(handled: true) }
         let next = available[(index + (forward ? 1 : available.count - 1)) % available.count]
         selection.focus = .variant(next)
+        selection.letterCase = .asTyped
         phase = .selecting(selection)
         return KeyResult(handled: true, actions: render(context: context))
     }
@@ -1382,13 +1436,14 @@ public final class InputSession {
         resizePreviews = [:]
         suggestionPredictions = nil
         shownSuggestionPanel = nil
+        let hidePrediction = predictionUpdate(to: nil)
         composition = newComposition()
         readingCorrector.reset()
         alphabetRun = false
         phase = .composing
         corrector.reset()
         converter.endComposition()
-        return [.setMarkedText(.empty), .hideCandidates]
+        return [.setMarkedText(.empty), .hideCandidates] + hidePrediction
     }
 
     /// 今の表示で確定するとしたら何になるか
@@ -1408,7 +1463,7 @@ public final class InputSession {
                 break
             case .variant(let variant):
                 if let text = variant.apply(to: composition) {
-                    return Candidate(text: text, readingCount: whole, origin: .variant(variant))
+                    return Candidate(text: selection.letterCase.apply(to: text), readingCount: whole, origin: .variant(variant))
                 }
             }
         case .lattice(let lattice):
@@ -1490,11 +1545,16 @@ public final class InputSession {
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
-    /// 打っているあいだに候補(読みの変換と続く語句の予測)の窓を出す設定か
-    private var showsSuggestions: Bool {
-        let display = settings.current.suggestionDisplay
-        return display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion)
+    /// 打っているあいだに窓を出す設定か(display は入力中の候補か入力中の予測の設定)
+    private func shows(_ display: SuggestionDisplay) -> Bool {
+        display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion)
     }
+
+    /// 打っているあいだに，読みを変換した候補の窓を出す設定か
+    private var showsSuggestions: Bool { shows(settings.current.suggestionDisplay) }
+
+    /// 打っているあいだに，続く語句の予測の窓を出す設定か
+    private var showsPredictions: Bool { shows(settings.current.predictionDisplay) }
 
     /// 打ち間違いを直しているときの，打ったままの読み全体の候補(readingCount は今の読みの文字数にそろえる)．直していなければ空．
     /// listing なら一覧と同じ候補(記号や絵文字などを足したもの)を使う
@@ -1507,15 +1567,20 @@ public final class InputSession {
             .map { Candidate(text: $0.text, readingCount: readingCount, origin: .asTyped) }
     }
 
-    /// 打っているあいだに候補の窓を出す設定で，読みが出すのに足りる長さか
-    private var suggestionsEnabled: Bool {
-        showsSuggestions && composition.conversionReading.count >= DefaultSettings.minimumSuggestionReading
-    }
+    /// 読みが，打っているあいだの窓を出すのに足りる長さか
+    private var readingIsLongEnough: Bool { composition.conversionReading.count >= DefaultSettings.minimumSuggestionReading }
 
-    /// 今の読みで候補を求めるか．打ちかけのローマ字(「ky」)があるあいだは求めない(かなになってから求める)
-    private var suggestionsShown: Bool {
-        suggestionsEnabled && (composition.pending.isEmpty || composition.pending == "n")
-    }
+    /// 打ちかけのローマ字(「ky」)が無いか．あるあいだは候補も予測も求めない(かなになってから求める)
+    private var readingIsSettled: Bool { composition.pending.isEmpty || composition.pending == "n" }
+
+    /// 打っているあいだに候補の窓を出す設定で，読みが出すのに足りる長さか
+    private var suggestionsEnabled: Bool { showsSuggestions && readingIsLongEnough }
+
+    /// 今の読みで候補を求めるか
+    private var suggestionsShown: Bool { suggestionsEnabled && readingIsSettled }
+
+    /// 今の読みで続く語句の予測を求めるか
+    private var predictionsShown: Bool { showsPredictions && readingIsLongEnough && readingIsSettled }
 
     /// 打っているあいだの候補を求める読みと，その前に置く文節．ライブ変換で文が見えているときは，文全体の候補を並べても
     /// 頭が同じ文ばかりで見分けられないので，今打っている最後の文節の候補を出す(その前の文節は見えている変換のまま)．
@@ -1531,33 +1596,82 @@ public final class InputSession {
         return (String(reading.dropFirst(prefix.readingCount)), prefix)
     }
 
-    /// 打っているあいだに出す候補(読みの変換と，続く語の予測)．出さない設定や，読みが短いときは空．
-    /// 予測は窓を出してから求めて足す(followUps)．waitsForPredictions なら今すぐ求める(↓ で選び始めるとき)．
+    /// 打っているあいだに出す，読みを変換した候補．出さない設定，読みが短いとき，候補が設定の件数(suggestionSkipCount)以下のときは空．
+    /// 続く語句の予測は混ぜない(変換とは体験が違うので別の窓に出す．makePrediction)．
     /// ライブ変換で文が見えているときは最後の文節の候補(suggestionTarget)
-    private func suggestionCandidates(waitsForPredictions: Bool = false) -> (candidates: [Candidate], prefix: SuggestionPrefix?) {
+    private func suggestionCandidates() -> (candidates: [Candidate], prefix: SuggestionPrefix?) {
         guard suggestionsShown else { return ([], nil) }
         let (reading, prefix) = suggestionTarget()
-        if waitsForPredictions, suggestionPredictions?.reading != reading {
-            suggestionPredictions = (reading, converter.predictions(for: reading))
-        }
-        let predictions = suggestionPredictions?.reading == reading ? suggestionPredictions?.candidates ?? [] : []
         var seen = Set<String>()
-        // 文節の候補は，ライブ変換と別の変換の状態で Zenzai を使わずに求める(打つたびに求めるため．分岐図の文節と同じ)
-        let whole = (prefix == nil ? converter.candidates(for: reading) : converter.segmentCandidates(for: reading))
-            .filter { $0.readingCount == reading.count && $0.commandID == nil }
-        let leading = DefaultSettings.suggestionLeadingConversions
+        let whole = conversionCandidates(for: reading, prefix: prefix)
         // 打ち間違いを直しているときは，直した第 1 候補のすぐ後ろに打ったままの読みの候補を出す(一覧と同じ)
         let typed = prefix == nil ? Array(typedReadingAlternatives(readingCount: reading.count, listing: false).prefix(DefaultSettings.typedAlternativeCount)) : []
-        let head = typed.isEmpty ? Array(whole.prefix(leading)) : Array(whole.prefix(1)) + typed + Array(whole.dropFirst(1).prefix(max(leading - 1, 0)))
-        let candidates = (head + predictions + Array(whole.dropFirst(leading)))
+        let candidates = (Array(whole.prefix(1)) + typed + Array(whole.dropFirst(1)))
             .filter { seen.insert($0.text).inserted }
             .prefix(DefaultSettings.suggestionCount)
+        // 候補が少ないときは窓を出さない．出さないあいだの ↓ は変換を始める(moveCandidate)
+        guard candidates.count > settings.current.suggestionSkipCount else { return ([], nil) }
         return (Array(candidates), prefix)
     }
 
-    /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ か Tab で選び始める(↑ は字種の行から)．
+    /// 読み(最後の文節なら文節の読み)を変換した候補．文節の候補は，ライブ変換と別の変換の状態で Zenzai を使わずに求める
+    /// (打つたびに求めるため．分岐図の文節と同じ)
+    private func conversionCandidates(for reading: String, prefix: SuggestionPrefix?) -> [Candidate] {
+        (prefix == nil ? converter.candidates(for: reading) : converter.segmentCandidates(for: reading))
+            .filter { $0.readingCount == reading.count && $0.commandID == nil }
+    }
+
+    /// 予測の窓に出している予測と，確定したときの候補
+    private struct ShownPrediction: Equatable {
+        var prediction: Prediction
+        /// 求めたときの読み全体．読みが変わっていたら確定しない
+        var reading: String
+        /// 確定する候補(前の文節とつないだ，読み全体の候補)
+        var candidate: Candidate
+    }
+
+    /// 予測の窓に出す予測．出さない設定，読みが短いとき，「もしかして」を示しているときと英単語を直しているとき(確定のキーをそちらに使う)，
+    /// 確定のキーが無いとき，予測をまだ求めていないときは nil．変換の候補と同じ語句は出さない(予測ではないため)．
+    /// 予測した語句のうち，見えている字・ひらがなとカタカナの読み・変換の候補のどれかと頭が重なる部分を打った部分にし，残りを補う部分にする
+    /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)
+    private func makePrediction(marked: MarkedText) -> ShownPrediction? {
+        guard predictionsShown, readingCorrector.suggestion == nil, corrector.active == nil,
+            let key = keyLabel(.acceptSuggestion, in: .composing) else { return nil }
+        let (reading, prefix) = suggestionTarget()
+        guard let stored = suggestionPredictions, stored.reading == reading else { return nil }
+        let conversions = conversionCandidates(for: reading, prefix: prefix).map(\.text)
+        let shown = String(marked.text.dropFirst(prefix?.text.count ?? 0))
+        let typedForms = ([shown, reading, KanaWidth.katakana(from: reading)] + conversions).map(Array.init)
+        let whole = composition.conversionReading
+        for candidate in stored.candidates where candidate.commandID == nil && !conversions.contains(candidate.text) {
+            let characters = Array(candidate.text)
+            let typedCount = typedForms.map { form in zip(characters, form).prefix { $0 == $1 }.count }.max() ?? 0
+            // 見えている字と同じなら，補うものが無い
+            guard typedCount < characters.count else { continue }
+            let prediction = Prediction(typed: String(characters[..<typedCount]), completion: String(characters[typedCount...]),
+                                        key: settings.current.showsKeyHints ? key : nil)
+            let committed = prefix.map { $0.joined(with: candidate, readingCount: whole.count) } ?? candidate
+            return ShownPrediction(prediction: prediction, reading: whole, candidate: committed)
+        }
+        return nil
+    }
+
+    /// 予測の窓を next に変える操作．出しているものと同じなら何もしない(打つたびに窓を出し直さない)
+    private func predictionUpdate(to next: ShownPrediction?) -> [ClientAction] {
+        defer { shownPrediction = next }
+        return next?.prediction == shownPrediction?.prediction ? [] : [.showPrediction(next?.prediction)]
+    }
+
+    /// 予測の窓の予測を確定する．入力中の候補の窓から選んで確定したのと同じに，読み全体の候補として確定して学ぶ
+    private func acceptPrediction(_ candidate: Candidate) -> [ClientAction] {
+        phase = .selecting(CandidateSelection(candidates: [candidate], annotations: [nil], focus: .candidate(0)))
+        return commitAll()
+    }
+
+    /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ で選び始める(予測の窓を出していなければ Tab でも．↑ は字種の行から)．
     /// 番号キーは読みに数字を打つキーなので，選び始めるまでは番号を振らない(選び始めると一覧と同じに番号で選べる)
-    private func suggestionPanel() -> CandidatePanel? {
+    /// predicting は予測の窓を出しているか．出しているあいだの確定のキー(Tab)は予測を確定するので，選び始めるキーの案内に入れない
+    private func suggestionPanel(predicting: Bool) -> CandidatePanel? {
         let (suggestions, prefix) = suggestionCandidates()
         guard !suggestions.isEmpty else { return nil }
         var panel = CandidatePanel(
@@ -1570,7 +1684,7 @@ public final class InputSession {
             total: suggestions.count,
             // 選び始めるキーの案内．キーの案内を出さない設定では出さない
             note: settings.current.showsKeyHints
-                ? PanelBuilder.suggestionNote(keys: [keyLabel(.nextCandidate, in: .composing), keyLabel(.acceptSuggestion, in: .composing)].compactMap { $0 })
+                ? PanelBuilder.suggestionNote(keys: [keyLabel(.nextCandidate, in: .composing), predicting ? nil : keyLabel(.acceptSuggestion, in: .composing)].compactMap { $0 })
                 : nil
         )
         panel.showsNumbers = false
@@ -1598,7 +1712,9 @@ public final class InputSession {
     // MARK: - 表示
 
     private func render(context: InputContext) -> [ClientAction] {
-        let actions = renderActions(context: context)
+        var actions = renderActions(context: context)
+        // 打っているあいだのほか(分岐図や一覧で選んでいるとき)は，予測の窓を消す
+        if phase != .composing || composition.isEmpty { actions += predictionUpdate(to: nil) }
         if let marked = actions.lazy.compactMap({ action -> MarkedText? in
             if case .setMarkedText(let marked) = action { return marked }
             return nil
@@ -1619,16 +1735,22 @@ public final class InputSession {
             // 打鍵が止まる前の表示だけを入力中として求める(Space の分岐図や，止まったときの表示は Zenzai を使う)
             converter.setTyping(!isSettled)
             defer { converter.setTyping(false) }
-            if let panel = suggestionPanel() {
-                shownSuggestionPanel = panel
-                return [.setMarkedText(composingMarkedText()), .showCandidates(panel)] + correctionNote()
+            let marked = composingMarkedText()
+            // 予測の窓は，ローマ字を打ちかけているあいだは前の予測を出しておく
+            let keepsPrediction = showsPredictions && readingIsLongEnough && !readingIsSettled
+            let nextPrediction = keepsPrediction ? shownPrediction : makePrediction(marked: marked)
+            let panel: ClientAction
+            if let shown = suggestionPanel(predicting: nextPrediction != nil) {
+                shownSuggestionPanel = shown
+                panel = .showCandidates(shown)
+            } else if suggestionsEnabled, !composition.pending.isEmpty, let shown = shownSuggestionPanel {
+                // ローマ字を打ちかけているあいだは，前の窓をそのまま出しておく(打つたびに窓が消えて出直さないように)
+                panel = .showCandidates(shown)
+            } else {
+                shownSuggestionPanel = nil
+                panel = .hideCandidates
             }
-            // ローマ字を打ちかけているあいだは，前の窓をそのまま出しておく(打つたびに窓が消えて出直さないように)
-            if suggestionsEnabled, !composition.pending.isEmpty, let shown = shownSuggestionPanel {
-                return [.setMarkedText(composingMarkedText()), .showCandidates(shown)] + correctionNote()
-            }
-            shownSuggestionPanel = nil
-            return [.setMarkedText(composingMarkedText()), .hideCandidates] + correctionNote()
+            return [.setMarkedText(marked), panel] + predictionUpdate(to: nextPrediction) + correctionNote()
         case .selecting(let selection):
             let candidate = currentCandidate()
             let remainder = String(composition.conversionReading.dropFirst(candidate.readingCount))
@@ -1813,7 +1935,7 @@ public final class InputSession {
             alphabetRun = false
             // 打っているあいだの候補を出しているときは，↓ でその候補の先頭から選ぶ．↑ は一覧の先頭からさらに上へ動かしたのと同じに，
             // 字種の行(出さない設定なら末尾の候補)から選ぶ．窓を出していなければ変換を始める
-            let (suggestions, prefix) = move == .next || move == .previous ? suggestionCandidates(waitsForPredictions: true) : ([], nil)
+            let (suggestions, prefix) = move == .next || move == .previous ? suggestionCandidates() : ([], nil)
             if suggestions.isEmpty {
                 enterConversion()
             } else {

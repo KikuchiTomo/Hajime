@@ -849,6 +849,10 @@
             {
               "name": "rect",
               "type": "Rect"
+            },
+            {
+              "name": "composition",
+              "type": "Rect?"
             }
           ]
         },
@@ -1181,6 +1185,9 @@
         },
         {
           "name": "resetUsage"
+        },
+        {
+          "name": "resetPaletteHistory"
         },
         {
           "name": "previewLanguage",
@@ -1573,6 +1580,24 @@
         {
           "name": "text",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Prediction",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "typed",
+          "type": "string"
+        },
+        {
+          "name": "completion",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string?"
         }
       ]
     },
@@ -2340,6 +2365,19 @@
           ]
         },
         {
+          "name": "showPrediction",
+          "fields": [
+            {
+              "name": "prediction",
+              "type": "Prediction?"
+            },
+            {
+              "name": "anchor",
+              "type": "Rect?"
+            }
+          ]
+        },
+        {
           "name": "showMode",
           "fields": [
             {
@@ -2398,6 +2436,10 @@
             {
               "name": "anchor",
               "type": "Rect"
+            },
+            {
+              "name": "composition",
+              "type": "Rect?"
             }
           ]
         },

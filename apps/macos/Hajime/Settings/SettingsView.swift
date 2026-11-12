@@ -129,10 +129,15 @@ private struct InputTab: View {
                 ResettablePicker(model: model, title: UIStrings.Settings.numberWidth, keyPath: \.numberWidth, label: UIStrings.Settings.label(for:))
                 ResettablePicker(model: model, title: UIStrings.More.alphabetWidth, keyPath: \.alphabetWidth, label: UIStrings.Settings.label(for:))
                 ResettableToggle(model: model, title: UIStrings.More.shiftStartsAlphabet, keyPath: \.shiftStartsAlphabet)
+                ResettableToggle(model: model, title: UIStrings.Settings.numberSeparators, keyPath: \.numberSeparators)
+                ResettableToggle(model: model, title: UIStrings.Settings.alphanumericHyphen, keyPath: \.alphanumericHyphen)
                 ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
+                ResettableToggle(model: model, title: UIStrings.Settings.keypadCalculation, keyPath: \.keypadCalculation)
             }
             Section(UIStrings.Settings.keys) {
                 ResettableToggle(model: model, title: UIStrings.Settings.punctuationCommits, keyPath: \.punctuationCommits)
+                ResettableToggle(model: model, title: UIStrings.Settings.questionExclamationCommits, keyPath: \.questionExclamationCommits)
+                ResettableToggle(model: model, title: UIStrings.Settings.cyclesLetterCase, keyPath: \.cyclesLetterCase)
                 ResettableToggle(model: model, title: UIStrings.Settings.numberKeySelection, keyPath: \.numberKeySelection)
                 ResettableToggle(model: model, title: UIStrings.Settings.showsModeIndicator, keyPath: \.showsModeIndicator)
                 ResettableRow(model: model, keyPath: \.modeIndicatorDuration) {
@@ -156,6 +161,13 @@ private struct ConversionTab: View {
                 ResettablePicker(model: model, title: UIStrings.Choice.presentation, keyPath: \.candidatePresentation, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.initialFocus, keyPath: \.initialFocus, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.suggestionDisplay, keyPath: \.suggestionDisplay, label: UIStrings.Choice.label(for:))
+                ResettableRow(model: model, keyPath: \.suggestionSkipCount) {
+                    Stepper(value: model.binding(\.suggestionSkipCount), in: DefaultSettings.suggestionSkipCountRange) {
+                        LabeledContent(UIStrings.More.suggestionSkipCount, value: UIStrings.More.skipCount(model.settings.suggestionSkipCount))
+                    }
+                }
+                .disabled(model.settings.suggestionDisplay == .off)
+                ResettablePicker(model: model, title: UIStrings.Choice.predictionDisplay, keyPath: \.predictionDisplay, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
                 ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
                 ResettableRow(model: model, keyPath: \.liveConversionDelay) {
@@ -222,6 +234,16 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
+            }
+            Section(UIStrings.Settings.numberForms) {
+                ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
+                Group {
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormCircled, keyPath: \.numberFormCircled)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormParenthesized, keyPath: \.numberFormParenthesized)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormKanji, keyPath: \.numberFormKanji)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormRoman, keyPath: \.numberFormRoman)
+                }
+                .disabled(!model.settings.numberFormConversion)
             }
             Section(UIStrings.Settings.meaning) {
                 ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)

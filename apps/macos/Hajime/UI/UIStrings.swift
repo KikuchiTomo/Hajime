@@ -3,6 +3,12 @@ import HajimeDomain
 
 /// 画面に出す文言の置き場所．多言語にするときは Localizable.xcstrings に移す
 enum UIStrings {
+    /// 打っているあいだの続く語句の予測の窓
+    enum Prediction {
+        /// VoiceOver で読み上げる文
+        static func announcement(_ text: String) -> String { "予測 \(text)" }
+    }
+
     enum Candidate {
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
@@ -206,7 +212,7 @@ enum UIStrings {
             case .convertWithoutLearning: "学習を使わずに変換"
             case .deleteBackward: "左の文字を削除"
             case .insertBoundary: "ここで区切る"
-            case .acceptSuggestion: "「もしかして」に修正"
+            case .acceptSuggestion: "「もしかして」に修正・予測を確定"
             case .reconvert: "再変換"
             case .toHiragana: "全文をひらがなに変換"
             case .toKatakana: "全文を全角カタカナに変換"
@@ -261,7 +267,7 @@ enum UIStrings {
             case .convert: "英単語を修正した直後は、修正前に戻します"
             case .convertWithoutLearning: "学習した順位を使わずに変換し、確定しても学習しません"
             case .insertBoundary: "入力中に、現在の位置で文節を区切ります"
-            case .acceptSuggestion: "「もしかして」で示した読みに修正します。示していないときは、入力中の候補から選択します"
+            case .acceptSuggestion: "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"
             case .reconvert: "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"
             case .switchKanaType: "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"
             case .nextCandidate: "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"
@@ -430,8 +436,13 @@ enum UIStrings {
         static let slash = "/ キーで入力する文字"
         static let spaceWidth = "スペース幅"
         static let numberWidth = "数字幅"
+        static let numberSeparators = "数字のあとの句読点をピリオドとカンマに"
+        static let alphanumericHyphen = "英数字のあとの長音をハイフンに"
         static let keys = "動作"
         static let punctuationCommits = "句読点で確定"
+        static let questionExclamationCommits = "？と！で確定"
+        static let keypadCalculation = "テンキーの Enter で計算"
+        static let cyclesLetterCase = "英数に変えるキーで大文字と小文字を切り替え"
         static let numberKeySelection = "番号キーで候補を選択"
         static let showsModeIndicator = "入力モードの切り替えを表示"
         static let conversion = "変換"
@@ -449,6 +460,12 @@ enum UIStrings {
         static let symbolConversion = "記号に変換"
         static let emojiConversion = "絵文字に変換"
         static let latexConversion = "LaTeX のコマンドに変換"
+        static let numberForms = "数字の書き方"
+        static let numberFormConversion = "数字を丸数字などに変換"
+        static let numberFormCircled = "丸数字"
+        static let numberFormParenthesized = "括弧付きとピリオド付きの数字"
+        static let numberFormKanji = "漢数字"
+        static let numberFormRoman = "ローマ数字"
         static let learning = "学習"
         static let zenzaiModel = "Zenzai のモデル"
         static let zenzaiModelNote = "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。"
@@ -659,6 +676,7 @@ enum UIStrings {
         static let presentation = "候補の表示"
         static let initialFocus = "最初に選択する文節"
         static let suggestionDisplay = "入力中の候補"
+        static let predictionDisplay = "入力中の予測"
 
         static func label(for display: SuggestionDisplay) -> String {
             switch display {
@@ -850,6 +868,8 @@ enum UIStrings {
         static let liveConversionSkipLength = "ライブ変換しない文字数"
         static let englishSkipLength = "英単語にしない文字数"
         static func skipLength(_ value: Int) -> String { value == 0 ? "オフ" : "\(value) 文字以下" }
+        static let suggestionSkipCount = "入力中の候補を表示しない件数"
+        static func skipCount(_ value: Int) -> String { value == 0 ? "オフ" : "\(value) 件以下" }
         static let typo = "タイプミス"
         static let correctionSensitivity = "修正の基準"
         static let showsSuggestions = "「もしかして」を表示"
@@ -982,10 +1002,14 @@ extension UIStrings {
             "englishInputLiveConversion": Choice.englishInputLiveConversion, "wordLanguage": Features.languagePage, "yenKey": Choice.yenKey,
             "punctuation": UIStrings.Settings.punctuation, "brackets": UIStrings.Settings.brackets, "slash": UIStrings.Settings.slash,
             "spaceWidth": UIStrings.Settings.spaceWidth, "numberWidth": UIStrings.Settings.numberWidth,
-            "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet, "punctuationCommits": UIStrings.Settings.punctuationCommits,
-            "keypadDirect": Features.keypadDirect,
+            "alphabetWidth": More.alphabetWidth, "shiftStartsAlphabet": More.shiftStartsAlphabet,
+            "numberSeparators": UIStrings.Settings.numberSeparators, "alphanumericHyphen": UIStrings.Settings.alphanumericHyphen,
+            "punctuationCommits": UIStrings.Settings.punctuationCommits,
+            "keypadDirect": Features.keypadDirect, "questionExclamationCommits": UIStrings.Settings.questionExclamationCommits,
+            "keypadCalculation": UIStrings.Settings.keypadCalculation, "cyclesLetterCase": UIStrings.Settings.cyclesLetterCase,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
-            "suggestionDisplay": Choice.suggestionDisplay, "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
+            "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
+            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,
             "showsSuggestions": More.showsSuggestions, "correction": Features.correctionPage, "okuriganaStyle": Features.okurigana,
@@ -998,7 +1022,10 @@ extension UIStrings {
             "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion,
-            "latexConversion": UIStrings.Settings.latexConversion, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
+            "latexConversion": UIStrings.Settings.latexConversion,
+            "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
+            "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,
+            "numberFormRoman": UIStrings.Settings.numberFormRoman, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
             "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,

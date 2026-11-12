@@ -563,6 +563,23 @@ impl<'a> Painter<'a> {
     }
 
     /// 案内の札を並べた幅(説明を除く)
+    /// キーキャップの札だけ(説明なし)の幅．予測の窓の確定のキーに使う
+    pub fn keys_width(&self, keys: &str) -> f32 {
+        self.keycaps_width(keys)
+    }
+
+    /// キーキャップの札だけ(説明なし)を x から描く
+    pub fn keys(&mut self, keys: &str, x: f32, mid_y: f32) {
+        self.hints(
+            &[KeyHint {
+                keys: keys.to_string(),
+                label: String::new(),
+            }],
+            x,
+            mid_y,
+        );
+    }
+
     fn keycaps_width(&self, keys: &str) -> f32 {
         let caps = keys::keycaps(keys);
         caps.iter()

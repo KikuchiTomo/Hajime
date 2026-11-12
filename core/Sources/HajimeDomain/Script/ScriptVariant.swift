@@ -17,6 +17,9 @@ public enum ScriptVariant: String, Sendable, Equatable, Codable, CaseIterable {
         }
     }
 
+    /// 英数(全角英数・半角英数)か．英数は大文字と小文字を切り替えられる(LetterCase)
+    public var isAlphanumeric: Bool { self == .fullwidthRoman || self == .halfwidthRoman }
+
     /// 読みをこの種類に変える．英数の 2 種類は打ったキー(rawKeys)が分かるときだけ作れる
     public func apply(to composition: Composition) -> String? {
         let reading = composition.conversionReading

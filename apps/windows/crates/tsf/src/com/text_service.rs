@@ -629,14 +629,15 @@ impl TextService_Impl {
                         break;
                     }
                 }
-                let caret = composition.as_ref().and_then(|current| {
+                // 候補の窓を置く基準(そろえる字があればその字)と，組み立て中の文字全体の位置(予測の窓を右に置く基準)
+                let rects = composition.as_ref().and_then(|current| {
                     let whole = text_rect(ec, &target, current).ok()?;
-                    Some(
-                        panel_anchor
-                            .and_then(|offset| anchored_rect(ec, &target, current, offset, &whole))
-                            .unwrap_or(whole),
-                    )
+                    let caret = panel_anchor
+                        .and_then(|offset| anchored_rect(ec, &target, current, offset, &whole))
+                        .unwrap_or_else(|| whole.clone());
+                    Some((caret, whole))
                 });
+                let caret = rects.as_ref().map(|(caret, _)| caret.clone());
                 let (engine, session) = {
                     let mut inner = service.inner.borrow_mut();
                     inner.composition = composition;
@@ -645,8 +646,13 @@ impl TextService_Impl {
                     }
                     (inner.engine.clone(), inner.session)
                 };
-                if let (Some(engine), Some(session), Some(rect)) = (engine, session, caret) {
-                    let _ = engine.send(RequestBody::Caret { session, rect });
+                if let (Some(engine), Some(session), Some((rect, whole))) = (engine, session, rects)
+                {
+                    let _ = engine.send(RequestBody::Caret {
+                        session,
+                        rect,
+                        composition: Some(whole),
+                    });
                 }
                 result
             },

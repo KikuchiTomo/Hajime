@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
-//! 入力位置の下の案内(macOS の NoteView)とモードの札(ModeIndicatorView)
+//! 入力位置の下の案内(macOS の NoteView)，モードの札(ModeIndicatorView)，続く語句の予測の窓(PredictionView)
 
 use super::paint::Painter;
 use super::{Frame, Look, Measure, Scene};
 use crate::theme::Font;
-use tokens::size::{candidate, glass, mode_indicator};
+use tokens::size::{candidate, glass, mode_indicator, prediction as spacing};
 
 /// 打ち間違いを直したこと・「もしかして」を知らせる 1 行
 pub fn note(note: &ipc::Note, look: &Look, measure: &dyn Measure) -> Scene {
@@ -31,6 +31,46 @@ pub fn note(note: &ipc::Note, look: &Look, measure: &dyn Measure) -> Scene {
     let body = Frame::new(0.0, 0.0, width, height);
     painter.panel(body);
     painter.note(note, padding + inset, body.mid_y());
+    painter.finish(width, height)
+}
+
+/// 打っているあいだの続く語句の予測．変換の候補の窓とは別の窓で，組み立て中の文字の右に出す．
+/// 打った部分はふつうの文字の色，補う部分は薄い色で描き，確定のキーをキーキャップで添える
+pub fn prediction(prediction: &ipc::Prediction, look: &Look, measure: &dyn Measure) -> Scene {
+    let mut painter = Painter::new(look, measure);
+    let theme = look.theme;
+    let inset = if theme.is_rounded() {
+        0.0
+    } else {
+        candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
+    };
+    let typed = painter.width(&prediction.typed, Font::Candidate);
+    let completion = painter.width(&prediction.completion, Font::Candidate);
+    let key = prediction
+        .key
+        .as_deref()
+        .map_or(0.0, |key| spacing::KEY_GAP + painter.keys_width(key));
+    let width = (typed + completion + key + (spacing::PADDING_X + inset) * 2.0).ceil();
+    let content = measure.height(Font::Candidate).max(glass::KEYCAP_HEIGHT);
+    let height = (content + (spacing::PADDING_Y + inset) * 2.0).ceil();
+    let body = Frame::new(0.0, 0.0, width, height);
+    painter.panel(body);
+    let x = spacing::PADDING_X + inset;
+    painter.text(&prediction.typed, Font::Candidate, theme.text, x, body);
+    painter.text(
+        &prediction.completion,
+        Font::Candidate,
+        theme.text_muted,
+        x + typed,
+        body,
+    );
+    if let Some(key) = prediction.key.as_deref() {
+        painter.keys(
+            key,
+            (x + typed + completion + spacing::KEY_GAP).round(),
+            body.mid_y(),
+        );
+    }
     painter.finish(width, height)
 }
 
@@ -63,6 +103,30 @@ mod tests {
     use super::super::testing::*;
     use super::super::Draw;
     use super::*;
+
+    #[test]
+    fn 予測は打った部分をふつうの色_補う部分を薄い色で描き_キーは文字にしない() {
+        for name in ["automatic", "platinum"] {
+            let theme = theme(name);
+            let shown = ipc::Prediction {
+                typed: "エピ".into(),
+                completion: "ソード".into(),
+                key: Some("Tab".into()),
+            };
+            let scene = prediction(&shown, &Look::new(&theme, 15.0), &Fixed);
+            let drawn = texts(&scene);
+            assert!(drawn.contains(&("エピ".into(), theme.text)));
+            assert!(drawn.contains(&("ソード".into(), theme.text_muted)));
+            assert!(!drawn.iter().any(|(text, _)| text.contains("Tab")));
+            // キーの案内を出さない設定では札を付けず，そのぶん狭い
+            let plain = prediction(
+                &ipc::Prediction { key: None, ..shown },
+                &Look::new(&theme, 15.0),
+                &Fixed,
+            );
+            assert!(plain.width < scene.width);
+        }
+    }
 
     #[test]
     fn 角丸のテーマのモードの札は正方形() {

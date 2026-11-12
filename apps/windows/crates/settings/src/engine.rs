@@ -79,6 +79,11 @@ impl<E: Engine> EngineStore<E> {
         self.done(RequestBody::ResetUsage)
     }
 
+    /// パレットで使った文字の記録を消す(ピン留めと肌の色は残す)
+    pub fn reset_palette_history(&self) -> Result<(), StoreError> {
+        self.done(RequestBody::ResetPaletteHistory)
+    }
+
     /// 英字で打った文の語ごとに，英語のまま入るか日本語になるかを試す
     pub fn preview_language(
         &self,

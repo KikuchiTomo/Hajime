@@ -726,6 +726,8 @@ pub enum RequestBody {
     Caret {
         session: u32,
         rect: Rect,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        composition: Option<Rect>,
     },
     ReadSettings,
     WriteSettings {
@@ -838,6 +840,7 @@ pub enum RequestBody {
     ResetLearning,
     ReadUsage,
     ResetUsage,
+    ResetPaletteHistory,
     PreviewLanguage {
         text: String,
         #[serde(rename = "precedingText")]
@@ -908,10 +911,11 @@ impl fmt::Debug for RequestBody {
                 .field("reading", &REDACTED)
                 .field("context", context)
                 .finish(),
-            Self::Caret { session, rect, .. } => f
+            Self::Caret { session, rect, composition, .. } => f
                 .debug_struct("Caret")
                 .field("session", session)
                 .field("rect", rect)
+                .field("composition", composition)
                 .finish(),
             Self::ReadSettings => f.write_str("ReadSettings"),
             Self::WriteSettings { settings, .. } => f
@@ -1048,6 +1052,7 @@ impl fmt::Debug for RequestBody {
             Self::ResetLearning => f.write_str("ResetLearning"),
             Self::ReadUsage => f.write_str("ReadUsage"),
             Self::ResetUsage => f.write_str("ResetUsage"),
+            Self::ResetPaletteHistory => f.write_str("ResetPaletteHistory"),
             Self::PreviewLanguage { .. } => f
                 .debug_struct("PreviewLanguage")
                 .field("text", &REDACTED)
@@ -1363,6 +1368,24 @@ impl fmt::Debug for Note {
             .field("key", &REDACTED)
             .field("keyAction", &REDACTED)
             .field("text", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct Prediction {
+    pub typed: String,
+    pub completion: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+}
+
+impl fmt::Debug for Prediction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Prediction")
+            .field("typed", &REDACTED)
+            .field("completion", &REDACTED)
+            .field("key", &REDACTED)
             .finish()
     }
 }
@@ -2017,6 +2040,12 @@ pub enum UiCommand {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         anchor: Option<Rect>,
     },
+    ShowPrediction {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prediction: Option<Prediction>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        anchor: Option<Rect>,
+    },
     ShowMode {
         mode: InputMode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2041,6 +2070,8 @@ pub enum UiCommand {
     HidePalette,
     Move {
         anchor: Rect,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        composition: Option<Rect>,
     },
     Hide,
 }
@@ -2071,6 +2102,11 @@ impl fmt::Debug for UiCommand {
                 .field("note", note)
                 .field("anchor", anchor)
                 .finish(),
+            Self::ShowPrediction { prediction, anchor, .. } => f
+                .debug_struct("ShowPrediction")
+                .field("prediction", prediction)
+                .field("anchor", anchor)
+                .finish(),
             Self::ShowMode { mode, anchor, .. } => f
                 .debug_struct("ShowMode")
                 .field("mode", mode)
@@ -2090,9 +2126,10 @@ impl fmt::Debug for UiCommand {
                 .field("anchor", anchor)
                 .finish(),
             Self::HidePalette => f.write_str("HidePalette"),
-            Self::Move { anchor, .. } => f
+            Self::Move { anchor, composition, .. } => f
                 .debug_struct("Move")
                 .field("anchor", anchor)
+                .field("composition", composition)
                 .finish(),
             Self::Hide => f.write_str("Hide"),
         }
