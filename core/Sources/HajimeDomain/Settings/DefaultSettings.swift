@@ -238,6 +238,27 @@ public enum DefaultSettings {
     public static let zenzaiCostSmoothing = 0.3
     /// Zenzai に渡す左の文脈の最大の長さ(文字数)
     public static let maximumLeftContextLength = 40
+    /// 検証木で文節を採点するときに，右の文脈として渡す後ろの文節の文字数の上限
+    public static let maximumRightContextLength = 40
+    /// 候補を Zenzai でまとめて採点する(検証木)ときの，1 回の推論で評価するトークンの数の上限(根を含む)．
+    /// 時間はおおむねこれに比例する
+    public static let candidateTreeTokenLimit = 192
+    /// 速さを測って評価するトークンの数を減らすときの下限．文節の候補(数トークン)なら数個を採点できる
+    public static let minimumCandidateTreeTokens = 24
+    /// 検証木で 1 回採点する時間の目安(秒)．かかった時間から，これに収まるようにトークンの数を増減する．
+    /// Space で分岐図を出すときに同期で求めることがあるので，1 キー 50ms(R-01)のうち Zenzai の変換の残りに収める
+    public static let candidateScoringBudget = 0.015
+    /// 採点 1 回(プロンプトを評価し直す時間を含む)の時間の移動平均がこれを超える環境では，打鍵の合間に前もって求めた点数だけを使い，
+    /// Space では採点を待たない(秒)．GPU の無い Windows を見込む
+    public static let candidateScoringSlowThreshold = 0.03
+    /// 採点が遅い環境とみなしたあと，速さを測り直すために 1 回採点するまでの間(秒)
+    public static let candidateScoringProbeInterval = 30.0
+    /// 採点が目安のこの割合より速く済んだら，評価するトークンの数を増やす
+    public static let candidateTreeGrowthMargin = 0.7
+    /// 評価するトークンの数を増やすときの倍率
+    public static let candidateTreeGrowth = 1.25
+    /// 検証木に入れる候補の数の上限
+    public static let candidateTreeCandidateLimit = 16
     /// 設定のファイルの大きさの上限(docs/dev/SECURITY-MODEL.md の「外から来るファイル」)．ユーザー辞書を上限いっぱい(10,000 語，読み 32 字，語 64 字)に登録しても，
     /// ふつうの文字なら 1 語 450 バイトほどで約 4.5MB に収まるので，余裕を見て倍にした．
     /// 結合文字を重ねた語のように 1 字が何バイトにもなる場合は超えうるが，書く前に大きさを確かめて断るので，ファイルは壊れない

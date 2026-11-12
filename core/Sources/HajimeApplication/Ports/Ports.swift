@@ -89,6 +89,23 @@ extension KanaKanjiConverting {
     public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { forget(candidate) }
 }
 
+/// 読みと文脈のもとで，候補の表記を同じ物差しで採点するポート(検証木．ADR 0016)．
+/// どの方法で作った候補も，文脈を見る言語モデル(Zenzai)の対数確率 log P(表記 | 読み, 文脈) で比べる
+@MainActor
+public protocol CandidateScoring: AnyObject {
+    /// 表記ごとの対数確率(大きいほどよい)．前の表記ほど優先して採点し，採点できなかった表記(上限を超えたもの，
+    /// 言語モデルが使えないとき)は nil．
+    /// - Parameters:
+    ///   - reading: 表記に当たる読み
+    ///   - before: 同じ入力の中で読みの前にある文字(文節を採点するときの前の文節)．KanaKanjiConverting.setLeftContext で渡した文脈のあとに続ける
+    ///   - after: 同じ入力の中で読みの後ろにある文字(後ろの文節)
+    func scores(of texts: [String], reading: String, before: String, after: String) -> [Double?]
+    /// 前に scores で求めた点数(同じ問いのとき)．求めていなければ nil．推論はしない
+    func cachedScores(of texts: [String], reading: String, before: String, after: String) -> [Double?]?
+    /// 採点が遅い環境(GPU の無い Windows など)か．遅ければ，打鍵の合間に前もって求めた点数だけを使い，Space では採点を待たない
+    var prefersPrecomputedScores: Bool { get }
+}
+
 /// エンジンに渡す，取り込んだ辞書の語．costOffset は語の点数に足す値(優先度)
 public struct AuxiliaryWord: Sendable, Equatable, Hashable {
     public var word: DictionaryWord

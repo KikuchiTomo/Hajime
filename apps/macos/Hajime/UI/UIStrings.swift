@@ -507,6 +507,8 @@ enum UIStrings {
         static let learning = "学習"
         static let zenzaiModel = "Zenzai のモデル"
         static let zenzaiModelNote = "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。"
+        static let candidateReranking = "Zenzai による候補の並べ替え"
+        static let candidateRerankingNote = "変換の候補の 2 番目以降を、Zenzai で前後の文に合う順に並べ替えます。第 1 候補は変わりません。"
         static let resetLearning = "学習結果を消去"
         static let reading = "読み"
         static let word = "単語"
@@ -1082,6 +1084,7 @@ extension UIStrings {
             "numberFormConversion": UIStrings.Settings.numberFormConversion, "numberFormCircled": UIStrings.Settings.numberFormCircled,
             "numberFormParenthesized": UIStrings.Settings.numberFormParenthesized, "numberFormKanji": UIStrings.Settings.numberFormKanji,
             "numberFormRoman": UIStrings.Settings.numberFormRoman, "learning": UIStrings.Settings.learning, "zenzaiModel": UIStrings.Settings.zenzaiModel,
+            "candidateReranking": UIStrings.Settings.candidateReranking,
             "theme": More.theme, "candidateFontSize": UIStrings.Settings.fontSizeName, "showsModeIndicator": UIStrings.Settings.showsModeIndicator,
             "modeIndicatorDuration": More.modeIndicatorDuration, "customThemes": More.customThemes, "customThemeID": "使用するカスタムテーマ",
             "escapeSwitchesToDirect": UIStrings.Settings.escapeSwitchesToDirect, "terminalCommands": More.terminalCommands,
