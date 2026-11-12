@@ -9,7 +9,7 @@ use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_PIXEL_FORMAT, D2D_SIZE_U,
 };
 use windows::Win32::Graphics::Direct2D::{
-    ID2D1HwndRenderTarget, D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_PRESENT_OPTIONS_NONE,
+    ID2D1HwndRenderTarget, D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_PRESENT_OPTIONS_IMMEDIATELY,
     D2D1_RENDER_TARGET_PROPERTIES,
 };
 use windows::Win32::Graphics::Dwm::{
@@ -446,7 +446,9 @@ impl Window {
                 &D2D1_HWND_RENDER_TARGET_PROPERTIES {
                     hwnd: self.hwnd,
                     pixelSize: size,
-                    presentOptions: D2D1_PRESENT_OPTIONS_NONE,
+                    // 画面の更新を待たずに EndDraw から戻る(打つたびに窓のスレッドが 1 フレーム止まらないように)．
+                    // 窓は DWM が合成するので，待たなくても絵が裂けることはない
+                    presentOptions: D2D1_PRESENT_OPTIONS_IMMEDIATELY,
                 },
             )?
         };
