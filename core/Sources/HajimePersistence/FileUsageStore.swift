@@ -6,19 +6,19 @@ import HajimeDomain
 @MainActor
 public final class FileUsageStore: UsageRecording, UsageReading {
     private let fileURL: URL
-    private let isEnabled: () -> Bool
+    /// 記録するかは，記録するたびに設定の「使い方を記録する」(recordsUsage)で決める
+    private let settings: any SettingsReading
     public private(set) var counts: UsageCounts
     private var unsavedEvents = 0
 
-    /// - Parameter isEnabled: 記録するか．設定の「使い方を記録する」を読む
-    public init(fileURL: URL, isEnabled: @escaping () -> Bool) {
+    public init(fileURL: URL, settings: any SettingsReading) {
         self.fileURL = fileURL
-        self.isEnabled = isEnabled
+        self.settings = settings
         self.counts = (try? Self.load(from: fileURL)) ?? UsageCounts()
     }
 
     public func record(_ event: UsageEvent) {
-        guard isEnabled() else { return }
+        guard settings.current.recordsUsage else { return }
         counts.record(event)
         unsavedEvents += 1
         if unsavedEvents >= DefaultSettings.usageSaveInterval { flush() }
