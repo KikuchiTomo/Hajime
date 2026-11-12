@@ -140,7 +140,7 @@ enum DesignTokens {
             static let maxVisible: CGFloat = 9
             static let shadowOffset: CGFloat = 2
             static let labelFontSize: CGFloat = 11
-            static let variantPaddingX: CGFloat = 6
+            static let variantPaddingX: CGFloat = 4
             static let sectionPaddingY: CGFloat = 4
             static let minWidth: CGFloat = 180
             static let maxWidth: CGFloat = 720
@@ -241,7 +241,7 @@ enum DesignTokens {
             static let tagHeight: CGFloat = 16
             static let tagPaddingX: CGFloat = 6
             static let tagRadius: CGFloat = 8
-            static let noteIconSize: CGFloat = 18
+            static let noteIconSize: CGFloat = 17
             static let commandIconSize: CGFloat = 18
             static let commandIconRadius: CGFloat = 5
             static let noteGap: CGFloat = 6

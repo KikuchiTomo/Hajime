@@ -59,7 +59,7 @@ impl Layout {
         );
         let clear_width = measure.width(clear_label).ceil() + candidate::PADDING_X * 2.0;
         let clear = Frame::new(row.max_x() - clear_width, row.y, clear_width, row.height);
-        let gap = candidate::VARIANT_PADDING_X;
+        let gap = handwriting::CANDIDATE_GAP;
         let mut chips = Vec::new();
         let mut x = row.x;
         for (index, text) in candidates.iter().enumerate() {

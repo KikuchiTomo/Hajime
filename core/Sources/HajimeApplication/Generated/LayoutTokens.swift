@@ -21,7 +21,7 @@ public enum LayoutTokens {
         public static let maxVisible: Double = 9
         public static let shadowOffset: Double = 2
         public static let labelFontSize: Double = 11
-        public static let variantPaddingX: Double = 6
+        public static let variantPaddingX: Double = 4
         public static let sectionPaddingY: Double = 4
         public static let minWidth: Double = 180
         public static let maxWidth: Double = 720
@@ -122,7 +122,7 @@ public enum LayoutTokens {
         public static let tagHeight: Double = 16
         public static let tagPaddingX: Double = 6
         public static let tagRadius: Double = 8
-        public static let noteIconSize: Double = 18
+        public static let noteIconSize: Double = 17
         public static let commandIconSize: Double = 18
         public static let commandIconRadius: Double = 5
         public static let noteGap: Double = 6

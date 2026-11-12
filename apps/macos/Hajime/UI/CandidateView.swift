@@ -106,10 +106,10 @@ final class CandidateView: NSView {
         }.max() ?? 0
         let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
             width + variant.label.size(withAttributes: labelAttributes).width + Size.variantPaddingX * 2
-        }
+        } + (rowPaddingX - Size.variantPaddingX) * 2
         let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + rowPaddingX * 2 } ?? 0
         // 行の地の中: 左の余白・番号・文字・右の余白(文字の右は番号の左より広く空ける)
-        return max(Size.minWidth, rowPaddingX + lead + entryWidth + Size.paddingX, variantsWidth + rowPaddingX * 2, headingWidth).rounded(.up)
+        return max(Size.minWidth, rowPaddingX + lead + entryWidth + Size.paddingX, variantsWidth, headingWidth).rounded(.up)
     }
 
     private func footerWidth(for panel: CandidatePanel) -> CGFloat {
@@ -149,9 +149,9 @@ final class CandidateView: NSView {
     /// 押した対象を知らせる先(候補の窓をマウスで押したとき)
     var onChoose: ((PointerTarget) -> Void)?
 
-    /// 字種の行の 1 つずつの枠(行の高さいっぱい)
+    /// 字種の行の 1 つずつの枠(行の高さいっぱい)．最初の字種の文字を候補の番号の左にそろえる
     private func variantCells(_ panel: CandidatePanel, in rect: NSRect) -> [NSRect] {
-        var x = rect.minX
+        var x = rect.minX + rowPaddingX - Size.variantPaddingX
         return panel.variants.map { variant in
             let width = variant.label.size(withAttributes: [.font: labelFont]).width + Size.variantPaddingX * 2
             defer { x += width }

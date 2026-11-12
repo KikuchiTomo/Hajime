@@ -255,7 +255,7 @@ pub mod size {
         pub const MAX_VISIBLE: f32 = 9.0;
         pub const SHADOW_OFFSET: f32 = 2.0;
         pub const LABEL_FONT_SIZE: f32 = 11.0;
-        pub const VARIANT_PADDING_X: f32 = 6.0;
+        pub const VARIANT_PADDING_X: f32 = 4.0;
         pub const SECTION_PADDING_Y: f32 = 4.0;
         pub const MIN_WIDTH: f32 = 180.0;
         pub const MAX_WIDTH: f32 = 720.0;
@@ -356,7 +356,7 @@ pub mod size {
         pub const TAG_HEIGHT: f32 = 16.0;
         pub const TAG_PADDING_X: f32 = 6.0;
         pub const TAG_RADIUS: f32 = 8.0;
-        pub const NOTE_ICON_SIZE: f32 = 18.0;
+        pub const NOTE_ICON_SIZE: f32 = 17.0;
         pub const COMMAND_ICON_SIZE: f32 = 18.0;
         pub const COMMAND_ICON_RADIUS: f32 = 5.0;
         pub const NOTE_GAP: f32 = 6.0;

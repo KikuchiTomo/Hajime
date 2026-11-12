@@ -199,7 +199,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     // 候補の列(行の地)の幅: 左の余白・番号・文字・右の余白(文字の右は番号の左より広く空ける)
     let list_width = candidate::MIN_WIDTH
         .max(metrics.row_padding_x + metrics.lead + entry_width + padding)
-        .max(variants_width + metrics.row_padding_x * 2.0)
+        .max(variants_width + (metrics.row_padding_x - candidate::VARIANT_PADDING_X) * 2.0)
         .max(heading_width)
         .ceil();
     let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
@@ -281,7 +281,7 @@ fn draw_list(
                 heading,
                 header.inset(metrics.row_padding_x - candidate::PADDING_X, 0.0),
             ),
-            None => variants(painter, list, header),
+            None => variants(painter, list, header, metrics.row_padding_x),
         }
     }
     if let Some(line) = layout.header_separator {
@@ -409,10 +409,11 @@ fn draw_list(
     footer_section(painter, footer, layout.footer, metrics.row_padding_x);
 }
 
-/// 文字種の行．ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)
-fn variants(painter: &mut Painter, list: &CandidateList, section: Frame) {
+/// 文字種の行．ふだんは弱い文字で見せ，上キーで移ったときだけ強調する(R-03)．
+/// 最初の文字種の文字を候補の番号の左(行の地の内側の余白 inset)にそろえる
+fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: f32) {
     let theme = painter.theme;
-    let mut x = section.x;
+    let mut x = section.x + inset - candidate::VARIANT_PADDING_X;
     for (index, variant) in list.variants.iter().enumerate() {
         let selected =
             list.focus == CandidateFocus::Variants && list.selected_variant == Some(index as u32);
