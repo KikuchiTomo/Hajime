@@ -369,7 +369,8 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     let theme = painter.theme;
     let layout = &card.layout;
     let at = |frame: Frame| frame.offset(rect.x, rect.y);
-    // アクセントの色(青)は選んでいる候補とつなぐ線だけに使い，目印と札は控えめな色にする
+    // アクセントの色(青)は選んでいる候補とつなぐ線だけに使う．アイコンは控えめな色，札(品詞・番号・同音語)は
+    // パレットの説明の札と同じく文字の色を薄く敷いた地に文字の色の字(控えめな色の字では地との差が足りないテーマがある)
     let (mark, tint, bar_color) = (theme.text_muted, theme.badge, theme.line);
 
     // 見出し
@@ -383,7 +384,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         at(headword.place.line),
     );
     if let Some(chip) = &layout.part_of_speech {
-        // 品詞の札: アクセントの色を薄く敷いた地にアクセントの色の字
+        // 品詞の札
         let frame = at(chip.frame);
         painter.draws.push(Draw::RoundRect {
             frame,
@@ -398,7 +399,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         painter.text(
             &chip.text,
             Font::MeaningTag,
-            mark,
+            theme.text,
             rect.x + chip.text_place.line.x,
             at(chip.text_place.line),
         );
@@ -420,7 +421,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
             painter.text(
                 &number.text,
                 number.font,
-                mark,
+                theme.text,
                 rect.x + number.place.line.x,
                 at(number.place.line),
             );
@@ -465,7 +466,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         painter.text(
             &tag.text,
             Font::Label,
-            theme.text_muted,
+            theme.text,
             rect.x + tag.text_place.line.x,
             at(tag.text_place.line),
         );

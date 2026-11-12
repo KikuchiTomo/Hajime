@@ -346,12 +346,19 @@ mod tests {
         let Ok(directory) = std::env::var("HAJIME_SCENE_SVG") else {
             return;
         };
-        for (name, theme_name, dark) in [
-            ("glass-dark", "automatic", true),
-            ("platinum", "platinum", false),
-            ("desk", "desk", true),
+        for name in [
+            "automatic",
+            "platinum",
+            "desk",
+            "washi",
+            "neon",
+            "terminal",
+            "nordic",
+            "contrast",
         ] {
-            let theme = theme(theme_name);
+            let theme = theme(name);
+            // 文字が明るいテーマは暗い地に置く
+            let dark = theme.text.red + theme.text.green + theme.text.blue > 1.5;
             let font_size = tokens::size::candidate::FONT_SIZE;
             let measure = Approximate {
                 theme: &theme,

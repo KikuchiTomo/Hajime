@@ -139,12 +139,14 @@ enum MeaningCardDrawing {
         let headword = placed.headword
         draw(NSAttributedString(string: headword.text, attributes: [.font: font(.headword, theme), .foregroundColor: theme.text]),
              x: headword.line.x, baseline: headword.line.baseline)
+        // 札(品詞・番号・同音語)は，パレットの説明の札と同じく文字の色を薄く敷いた地に文字の色の字
+        // (控えめな色の字では地との差が足りないテーマがある)．アクセントの色は選んでいる候補とつなぐ線だけに使う
         if let chip = placed.partOfSpeech {
             let frame = box(chip.frame)
             let radius = theme.isRounded ? frame.height / 2 : 0
             theme.badge.setFill()
             NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-            draw(NSAttributedString(string: chip.text, attributes: [.font: font(.partOfSpeech, theme), .foregroundColor: theme.textMuted]),
+            draw(NSAttributedString(string: chip.text, attributes: [.font: font(.partOfSpeech, theme), .foregroundColor: theme.text]),
                  x: chip.textX, baseline: chip.baseline)
         }
 
@@ -155,7 +157,7 @@ enum MeaningCardDrawing {
                 let radius = theme.isRounded ? Meaning.numberRadius : 0
                 theme.badge.setFill()
                 NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-                draw(NSAttributedString(string: number.text, attributes: [.font: font(.number, theme), .foregroundColor: theme.textMuted]),
+                draw(NSAttributedString(string: number.text, attributes: [.font: font(.number, theme), .foregroundColor: theme.text]),
                      x: number.line.x, baseline: number.line.baseline)
             }
             for (line, text) in zip(sense.meaning, layout.meaning[index]) {
@@ -179,12 +181,13 @@ enum MeaningCardDrawing {
             drawCentered(icon, at: NSPoint(x: box(ear).midX, y: box(ear).midY))
         }
         let muted: [NSAttributedString.Key: Any] = [.font: font(.label, theme), .foregroundColor: theme.textMuted]
+        let tagText: [NSAttributedString.Key: Any] = [.font: font(.label, theme), .foregroundColor: theme.text]
         for tag in placed.tags {
             let frame = box(tag.frame)
             theme.badge.setFill()
             let radius = theme.isRounded ? DesignTokens.Size.Glass.tagRadius : 0
             NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-            draw(NSAttributedString(string: tag.text, attributes: muted), x: tag.textX, baseline: tag.baseline)
+            draw(NSAttributedString(string: tag.text, attributes: tagText), x: tag.textX, baseline: tag.baseline)
         }
         if let more = placed.more {
             draw(NSAttributedString(string: more.text, attributes: muted), x: more.line.x, baseline: more.line.baseline)
