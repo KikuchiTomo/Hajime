@@ -83,6 +83,8 @@ public struct Candidate: Sendable, Equatable {
     /// 確定したときに代わりに学習する元の語(エンジンの候補)．先頭の語を選び直して残りをつないだ候補(origin が combined)は，
     /// それ自体はエンジンの候補でないので，元の語を学ぶ(「にちじを」で 日児を を選んだら 日児 を学ぶ)
     public var learnedParts: [Candidate] = []
+    /// 確定した履歴(学習)にある語句か．エンジンが学習から引いた語だけでできているとき true．入力中の予測で履歴にあるものを先に出すのに使う
+    public var isLearned = false
 
     public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0, trailingWord: TrailingWord? = nil, words: [Word] = []) {
         self.text = text

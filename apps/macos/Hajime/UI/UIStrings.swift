@@ -677,6 +677,8 @@ enum UIStrings {
         static let initialFocus = "最初に選択する文節"
         static let suggestionDisplay = "入力中の候補"
         static let predictionDisplay = "入力中の予測"
+        static let predictionPrefersHistory = "入力履歴にある予測を優先"
+        static let predictionFromCorrection = "打ち間違いを直した読みからも予測"
 
         static func label(for display: SuggestionDisplay) -> String {
             switch display {
@@ -1012,7 +1014,8 @@ extension UIStrings {
             "keypadDirect": Features.keypadDirect, "questionExclamationCommits": UIStrings.Settings.questionExclamationCommits,
             "keypadCalculation": UIStrings.Settings.keypadCalculation, "cyclesLetterCase": UIStrings.Settings.cyclesLetterCase,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
-            "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
+            "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
+            "predictionFromCorrection": Choice.predictionFromCorrection, "suggestionSkipCount": More.suggestionSkipCount,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,

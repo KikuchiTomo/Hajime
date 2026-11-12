@@ -122,6 +122,8 @@ pub mod choice {
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const SUGGESTION_DISPLAY: &str = "入力中の候補";
     pub const PREDICTION_DISPLAY: &str = "入力中の予測";
+    pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴にある予測を優先";
+    pub const PREDICTION_FROM_CORRECTION: &str = "打ち間違いを直した読みからも予測";
 }
 
 /// UIStrings.Features
@@ -640,6 +642,8 @@ pub mod sync {
         ("initialFocus", "最初に選択する文節"),
         ("suggestionDisplay", "入力中の候補"),
         ("predictionDisplay", "入力中の予測"),
+        ("predictionPrefersHistory", "入力履歴にある予測を優先"),
+        ("predictionFromCorrection", "打ち間違いを直した読みからも予測"),
         ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
