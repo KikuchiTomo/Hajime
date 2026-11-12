@@ -132,7 +132,7 @@ jobs:
         shell: pwsh
       - run: tools/dictionary/fetch_dictionary.ps1 -Output "$env:RUNNER_TEMP\dictionary"
         shell: pwsh
-      - run: tools/windows/check_zenzai.ps1 -Zenzai "$env:RUNNER_TEMP\zenzai" -Dictionary "$env:RUNNER_TEMP\dictionary\hajime-dictionary-0.5.2"
+      - run: tools/windows/check_zenzai.ps1 -Zenzai "$env:RUNNER_TEMP\zenzai" -Dictionary "$env:RUNNER_TEMP\dictionary\hajime-dictionary-0.5.3"
         shell: pwsh
       - if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

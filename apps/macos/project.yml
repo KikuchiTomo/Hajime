@@ -94,7 +94,7 @@ targets:
         path: ../../tools/macos/copy_dictionary.sh
         inputFiles:
           - $(SRCROOT)/../../tools/macos/copy_dictionary.sh
-          - $(SRCROOT)/../../../models/hajime-dictionary-0.5.2/Dictionary/SHA256SUMS
+          - $(SRCROOT)/../../../models/hajime-dictionary-0.5.3/Dictionary/SHA256SUMS
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Dictionary/SHA256SUMS
     dependencies:
