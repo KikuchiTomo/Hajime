@@ -85,6 +85,17 @@ struct PaletteSearchTests {
         #expect(search.emoji(reading: "ねこ", limit: 0).isEmpty)
     }
 
+    @Test("同じ意味の語の一覧の絵文字は，名前と合わなくても出し，名前で合ったものより先にする．何度も選んだものはさらに先")
+    func emojiSynonyms() {
+        let synonyms = EmojiSynonyms(text: "ネコ\tねこ\t🐱\n猫\tねこ\t🐱 🎳 ❓")
+        let search = PaletteSearch(catalog: catalog, synonyms: synonyms)
+        let word = EmojiWord(text: "猫", isNoun: true)
+        #expect(search.emoji(reading: "ねこ", word: EmojiWord(text: "寝子", isNoun: true), limit: 5).isEmpty)
+        #expect(search.emoji(reading: "ねこ", word: word, limit: 5).map(\.text) == ["🐱", "🎳", "🐈"])
+        #expect(search.emoji(reading: "ねこ", word: word, ranking: .init(learned: ["🐈"]), limit: 1).map(\.text) == ["🐈"])
+        #expect(search.emoji(reading: "いぬ", word: word, limit: 5).isEmpty)
+    }
+
     @Test("変換に足す絵文字は，その読みで何度も選んだものとよく使うものを先にする")
     func emojiForReadingRanking() {
         let search = PaletteSearch(catalog: catalog)

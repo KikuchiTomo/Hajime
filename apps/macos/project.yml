@@ -58,8 +58,11 @@ targets:
       # 英語の語の辞書(R-24)．このリポジトリで書いた一覧
       - path: ../../data/english/english-terms.txt
         buildPhase: resources
-      # 絵文字と記号のパレットの表(R-26)．data/palette は tools/palette/update.sh で作る
+      # 絵文字と記号のパレットの表(R-26)．palette.tsv は tools/palette/update.sh で作る
       - path: ../../data/palette/palette.tsv
+        buildPhase: resources
+      # 変換の候補に足す絵文字の，同じ意味の語の一覧(R-26)．手で書く．パレットの表と同じ場所から読む
+      - path: ../../data/palette/emoji-synonyms.tsv
         buildPhase: resources
     postBuildScripts:
       - name: 入力ソースの表示名を書く
