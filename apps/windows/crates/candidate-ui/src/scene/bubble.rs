@@ -4,9 +4,8 @@
 //!
 //! 候補の窓の外に出す小さな窓で，三角で選んでいる候補の行の縦の真ん中を指す．
 //! - 候補の窓の右に出す．画面の右の端に入らなければ左に出す
-//! - 縦は，三角が選んでいる行を指す位置(三角は見出しの行の高さ)にし，画面の上下の端からはみ出さないように寄せる．
-//!   寄せた分だけ三角の位置をずらし，行を指し続ける
-//! - 吹き出しは候補の窓の上の端より上に出さず，窓の高さに入るなら窓の下の端より下にも出さない．窓より高いときは窓の上の端にそろえる
+//! - 縦は，吹き出しの上の端を候補の窓の上の端にそろえ，三角だけを動かして行を指す(候補を移っても吹き出しは動かない)．
+//!   三角が行に届かないときだけ，届くところまで下げる．画面の上下の端からはみ出さないように寄せる
 //! - 背景・枠線・角の丸みは候補の窓と同じ決まりにし，枠線は三角まで途切れずにつなぐ
 //! - 中身は語の意味の配置(card_layout)をそのまま使う．アクセントの色は使わない
 //!
@@ -72,12 +71,12 @@ pub struct Placement {
 /// 三角の頂点は選んでいる行 row の右の端から gap(inline)の所に置き，行の縦の真ん中を指す．
 /// 候補の窓 window の空いている所に重ねてよいが，obstacles(ほかの候補・幹の文節・足元の案内・入力中の文字)は覆わない．
 /// 覆ってしまう物があれば上か下へ寄せ，行の横に置けなければ候補の窓の右の外，それも無理なら窓の左の外に置く．
-/// size は本体の大きさ，preferred は本体の上の端から三角までの長さ(見出しの行の真ん中)，screen は画面の使える範囲(どれも画面の座標)
+/// 上の端は候補の窓の上の端にそろえ，三角が行に届かないときだけ下げる．
+/// size は本体の大きさ，screen は画面の使える範囲(どれも画面の座標)
 pub fn place(
     row: Frame,
     window: Frame,
     size: (f32, f32),
-    preferred: f32,
     screen: Frame,
     obstacles: &[Frame],
     metrics: &Metrics,
@@ -89,14 +88,8 @@ pub fn place(
     let target = row.mid_y();
     let half = metrics.pointer_width / 2.0;
     let (lowest, highest) = (metrics.radius + half, height - metrics.radius - half);
-    // 三角が見出しの行を指す位置を，候補の窓の上下の端の内側に寄せる．窓より高ければ窓の上の端
-    let preferred_y = if height > window.height {
-        window.y
-    } else {
-        (target - preferred)
-            .max(window.y)
-            .min(window.max_y() - height)
-    };
+    // 上の端は候補の窓の上の端．三角が行に届かなければ，届くところまで下げる
+    let preferred_y = window.y.max(target - highest);
     // 窓の左の端を x に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ None
     let vertical = |x: f32| -> Option<(f32, f32)> {
         if x < screen.x || x + window_width > screen.max_x() {
@@ -204,8 +197,6 @@ pub struct Bubble {
     card: Card,
     pub width: f32,
     pub height: f32,
-    /// 本体の上の端から三角までの長さ(見出しの行の縦の真ん中)
-    pub preferred_pointer: f32,
 }
 
 /// 語の意味の吹き出しの中身．others は同音語のタグに出す語
@@ -232,7 +223,6 @@ pub fn bubble(
     Bubble {
         height: card.height + metrics.padding * 2.0,
         width: metrics.width,
-        preferred_pointer: metrics.padding + header / 2.0,
         card,
     }
 }
@@ -352,7 +342,6 @@ pub fn beside(
         row,
         window.body,
         (shown.width, shown.height),
-        shown.preferred_pointer,
         Frame::new(-10000.0, -10000.0, 20000.0, 20000.0),
         &window.keep_clear,
         &Metrics::tokens(look.theme.is_rounded()),
@@ -443,7 +432,7 @@ mod tests {
     }
 
     fn placed(setup: &Setup, size: (f32, f32), screen: Frame) -> Placement {
-        place(setup.1, setup.0, size, 20.0, screen, &setup.2, &METRICS)
+        place(setup.1, setup.0, size, screen, &setup.2, &METRICS)
     }
 
     fn body(placement: &Placement) -> Frame {
@@ -475,7 +464,7 @@ mod tests {
         assert_eq!(placement.side, Side::Right);
         assert_eq!(tip(&placement).x - setup.1.max_x(), METRICS.gap);
         assert_eq!(tip(&placement).y, setup.1.mid_y());
-        assert_eq!(placement.pointer_y, 20.0);
+        assert_eq!(placement.window.y, setup.0.y);
     }
 
     #[test]
@@ -524,28 +513,37 @@ mod tests {
 
     #[test]
     fn 画面の下に入らなければ上へ寄せ_画面の端とのあいだを空ける() {
-        let setup = list(100.0, 590.0, 3);
+        // 窓の上の端にそろえると画面の下に入らない
+        let setup = list(100.0, 650.0, 3);
         let placement = placed(&setup, (288.0, 160.0), SCREEN);
         assert!(placement.window.max_y() <= SCREEN.max_y() - METRICS.screen_margin);
         assert_eq!(tip(&placement).y, setup.1.mid_y());
     }
 
     #[test]
-    fn 候補の窓の上の端より上に出さず_窓の高さに入るなら下の端より下にも出さない() {
-        // いちばん上の行で，三角を本体の上の端から遠くに置きたいとき
-        let top = list(100.0, 100.0, 0);
-        let raised = place(top.1, top.0, (288.0, 160.0), 40.0, SCREEN, &top.2, &METRICS);
-        assert_eq!(raised.window.y, top.0.y);
-        assert_eq!(tip(&raised).y, top.1.mid_y());
-        // いちばん下の行
-        let bottom = list(100.0, 100.0, 3);
-        let lowered = placed(&bottom, (288.0, 160.0), SCREEN);
-        assert_eq!(lowered.window.max_y(), bottom.0.max_y());
-        assert_eq!(tip(&lowered).y, bottom.1.mid_y());
+    fn 吹き出しの上の端は候補の窓の上の端にそろえ_候補を移っても三角だけが動く() {
+        for selected in 0..4 {
+            let setup = list(100.0, 100.0, selected);
+            let placement = placed(&setup, (288.0, 160.0), SCREEN);
+            assert_eq!(placement.window.y, setup.0.y, "{selected}");
+            assert_eq!(tip(&placement).y, setup.1.mid_y(), "{selected}");
+        }
     }
 
     #[test]
-    fn 候補の窓より高い吹き出しは窓の上の端にそろえる() {
+    fn 三角が行に届かないときだけ届くところまで下げる() {
+        let setup = list(100.0, 100.0, 3);
+        let short = placed(&setup, (288.0, 100.0), SCREEN);
+        assert!(short.window.y > setup.0.y);
+        assert_eq!(
+            short.pointer_y,
+            100.0 - METRICS.radius - METRICS.pointer_width / 2.0
+        );
+        assert_eq!(tip(&short).y, setup.1.mid_y());
+    }
+
+    #[test]
+    fn 候補の窓より高い吹き出しも窓の上の端にそろえる() {
         let setup = list(100.0, 100.0, 1);
         let placement = placed(&setup, (288.0, 260.0), SCREEN);
         assert_eq!(placement.window.y, setup.0.y);
