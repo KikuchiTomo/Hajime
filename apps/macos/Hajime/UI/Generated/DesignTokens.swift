@@ -222,6 +222,7 @@ enum DesignTokens {
             static let previewChipPaddingY: CGFloat = 4
             static let previewChipRadius: CGFloat = 6
             static let previewChipGap: CGFloat = 4
+            static let previewButtonGap: CGFloat = 8
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
             static let ruleValueColumnWidth: CGFloat = 150

@@ -4155,9 +4155,10 @@ impl PageView {
             Control::ThemePreview => canvas.preview(card.control),
             // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
             Control::PreviewChips(_) => {
-                preview_chips(canvas, theme, card.control, &row.preview_result);
+                let gap = tokens::size::settings::PREVIEW_CHIP_GAP;
+                preview_chips(canvas, theme, card.control, &row.preview_result, gap);
             }
-            Control::Preview(_) => {
+            Control::Preview(kind) => {
                 for field in 0..2 {
                     self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
                 }
@@ -4174,7 +4175,13 @@ impl PageView {
                         );
                     }
                 }
-                preview_chips(canvas, theme, card.control, &row.preview_result);
+                // 英語と日本語の結果は押せるチップなので group で離す(押せる部品どうし)
+                let gap = if *kind == TryKind::Language {
+                    tokens::size::settings::PREVIEW_BUTTON_GAP
+                } else {
+                    tokens::size::settings::PREVIEW_CHIP_GAP
+                };
+                preview_chips(canvas, theme, card.control, &row.preview_result, gap);
             }
             Control::Note | Control::Placeholder => {}
             Control::Dictionaries(_) => self.paint_dictionaries(canvas, frame, index, row),
@@ -5198,9 +5205,10 @@ fn preview_chips(
     theme: &Theme,
     rect: Rect,
     shown: &crate::engine::PreviewShown,
+    gap: f32,
 ) {
     use tokens::size::settings::{
-        PREVIEW_CHIP_GAP, PREVIEW_CHIP_PADDING_X, PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS,
+        PREVIEW_CHIP_PADDING_X, PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS,
     };
     let palette = &theme.palette;
     if !shown.line.is_empty() {
@@ -5231,7 +5239,7 @@ fn preview_chips(
         let width = (text_width + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
         if x > rect.x && x + width > rect.x + rect.width {
             x = rect.x;
-            y += height + PREVIEW_CHIP_GAP;
+            y += height + gap;
         }
         if y + height > rect.y + rect.height {
             break;
@@ -5274,7 +5282,7 @@ fn preview_chips(
                 TextLayout::CENTER,
             );
         }
-        x += width + PREVIEW_CHIP_GAP;
+        x += width + gap;
     }
     canvas.pop_clip();
 }

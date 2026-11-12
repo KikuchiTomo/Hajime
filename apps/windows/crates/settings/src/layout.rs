@@ -339,7 +339,7 @@ fn place(
                 2,
                 PREVIEW_BUTTONS,
                 frame,
-                chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_CHIP_GAP,
+                chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_BUTTON_GAP,
                 metrics,
             )
         }
