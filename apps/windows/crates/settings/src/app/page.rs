@@ -179,8 +179,8 @@ impl DictionaryAction {
 /// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
 fn bottom_always_enabled(control: &Control, index: usize) -> bool {
     match control {
-        // 削除(0 番目)は行を選んでから．行き先を選ぶ・キーを記録する・アプリを追加するはいつでも，複製は行を選んでから
-        Control::List(spec, _) if spec.path == "keymap" => index == 1,
+        // 削除(0 番目)は行を選んでから．行き先を選ぶ・アプリを追加するはいつでも，キー設定の複製は行を選んでから
+        Control::List(spec, _) if spec.path == "keymap" => index == 2,
         Control::List(..) => index >= 1,
         _ => false,
     }
@@ -1876,14 +1876,10 @@ impl PageView {
         }
         if let Control::List(spec, _) = &row.row.control {
             match (spec.path, part) {
-                ("keymap", Part::Bottom(1)) => {
-                    // キーの欄(状態・キー・コマンドの 2 つ目)で，次に押したキーを書く
-                    if let Some(window) = row.edit(Part::Field(1)) {
-                        edit::record_key(window, keys::PRESS);
-                    }
-                    return None;
-                }
                 ("keymap", Part::Bottom(2)) => {
+                    return Some(Event::Action(pages::Action::RestoreKeymap))
+                }
+                ("keymap", Part::Bottom(1)) => {
                     // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
                     let index = *row.table.selected_rows().first()?;
                     row.fill_inputs(index);
@@ -3331,19 +3327,21 @@ impl PageView {
                 _ => {}
             }
         }
-        // 絞り込める表は，出している行の数を表の下の帯に出す(macOS の KeymapPage の行の数)
-        if let (Some(buttons), Some(card)) = (row.row.control.list_buttons(), &row.card) {
-            if buttons.filter {
-                let last = Part::Bottom(buttons.bottom_labels().len().saturating_sub(1));
-                if let Some(rect) = row.part_rect(last) {
+        // 絞り込める表は，出している行の数を表の下の帯の左の組(削除など)のすぐ右に出す(macOS の KeymapPage の行の数)
+        if let Some(buttons) = row.row.control.list_buttons() {
+            let leading = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
+            if buttons.filter && leading > 0 {
+                if let Some(rect) = row.part_rect(Part::Bottom(leading - 1)) {
                     let left = rect.max_x() + size::CONTROL_GAP;
-                    let right = card.card.max_x() - size::CARD_PADDING_X;
+                    let right = row
+                        .part_rect(Part::Bottom(leading))
+                        .map_or(left, |next| next.x - size::CONTROL_GAP);
                     canvas.text(
                         Rect::new(left, rect.y, (right - left).max(0.0), rect.height),
                         &keys::row_count(row.table.len(), row.table.total()),
                         TextStyle::Caption,
                         Color::from(theme.palette.text_secondary),
-                        TextLayout::TRAILING,
+                        TextLayout::LINE,
                     );
                 }
             }
@@ -3729,6 +3727,8 @@ impl<F: FnMut() -> u16> FieldSource<'_, F> {
     fn take(&mut self, placeholder: &str) -> Option<Window> {
         if let Some(window) = self.pool.pop() {
             edit::set_placeholder(window, placeholder);
+            // 前のページのキーの欄だったら，普通の欄に戻す
+            edit::set_record_on_click(window, None);
             ffi::set_font(window, self.font);
             ffi::enable(window, true);
             return Some(window);
@@ -3759,20 +3759,31 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
                 let input = match field.choices {
                     Some(_) => Input::Choice(0),
                     None => match fields.take(field.label) {
-                        Some(window) => Input::Edit(window),
+                        Some(window) => {
+                            // キーの書き方の欄は押したらキーを記録する(macOS の KeyField)
+                            edit::set_record_on_click(
+                                window,
+                                field.notation.then_some(keys::PRESS),
+                            );
+                            Input::Edit(window)
+                        }
                         None => Input::Choice(0),
                     },
                 };
                 row.inputs.push(input);
             }
             if buttons.search {
-                row.search = fields.take(features::SEARCH);
+                // キー設定の検索欄は何で探せるかを案内する(macOS の KeymapPage)
+                let prompt = match control {
+                    Control::List(spec, _) if spec.path == "keymap" => keys::SEARCH_PROMPT,
+                    _ => features::SEARCH,
+                };
+                row.search = fields.take(prompt);
             }
         }
     }
 }
 
-/// 一覧の表の行(列ごとの文字)．一覧でなければ None
 /// 表の有効の印(WinUI 3 の CheckBox．入れたら色を塗ってチェックを描く)．cell の左に置き，上下は真ん中にする
 fn paint_check(canvas: &mut dyn Canvas, theme: &Theme, cell: Rect, checked: bool, enabled: bool) {
     let palette = &theme.palette;
@@ -3803,6 +3814,7 @@ fn paint_check(canvas: &mut dyn Canvas, theme: &Theme, cell: Rect, checked: bool
     }
 }
 
+/// 一覧の表の行(列ごとの文字)．一覧でなければ None
 fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec<String>>> {
     Some(match &row.control {
         Control::Dictionary(_) => extras.dictionary.clone(),

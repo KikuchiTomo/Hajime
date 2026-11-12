@@ -559,7 +559,7 @@ mod tests {
         assert!(!KEYMAP.is_valid(&KEYMAP.make(&texts(&["afterEnglish", "Hyper k", "english"]))));
         assert_eq!(
             KEYMAP.display(&KEYMAP.make(&texts(&["afterEnglish", "alt k", "english"])))[1],
-            "Alt K"
+            "Alt+K"
         );
     }
 

@@ -565,6 +565,7 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
+        pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
         pub const LIST_ARROW_WIDTH: f32 = 24.0;
         pub const TITLE_BAR_HEIGHT: f32 = 32.0;
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
