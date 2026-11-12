@@ -142,7 +142,13 @@ enum GlassDrawing {
         drawHints([KeyHint(key: key, label: "")], x: x, midY: midY, theme: theme)
     }
 
-    private static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
+    /// キーキャップの札の縁の太さ．platinum は外枠と立体の縁，ほかは縁の線
+    static func keycapBorder(theme: ResolvedTheme) -> CGFloat {
+        theme.kind == .platinum ? DesignTokens.Size.Candidate.frameWidth + DesignTokens.Size.Candidate.bevelWidth : DesignTokens.Size.Candidate.frameWidth
+    }
+
+    /// キーキャップの札の地と縁(パレットの肌の色のボタンも同じ形にする)
+    static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
         switch theme.kind {
         case .platinum:
             // 角の立った立体の札．外枠の内側に光の縁(左と上)と影の縁(右と下)

@@ -22,6 +22,21 @@ def relative_luminance(hex_color: str) -> float:
     return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
 
 
+def blend(color: str, opacity: float, under: str) -> str:
+    """color を opacity の濃さで under の上に重ねた色(パレットの説明の札のように，文字の色を薄く敷いた地)．"""
+    top = [int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    bottom = [int(under.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    mixed = [round(t * opacity + b * (1 - opacity)) for t, b in zip(top, bottom)]
+    return "#" + "".join(f"{c:02X}" for c in mixed)
+
+
+def lookup(tokens: dict, path: str) -> float:
+    node = tokens
+    for key in path.split("."):
+        node = node[key]
+    return float(node["$value"])
+
+
 def contrast_ratio(fg: str, bg: str) -> float:
     lighter, darker = sorted((relative_luminance(fg), relative_luminance(bg)), reverse=True)
     return (lighter + 0.05) / (darker + 0.05)
@@ -39,8 +54,15 @@ def main(argv: list[str]) -> int:
     failures: list[str] = []
     for rule in tokens["$extensions"]["hajime"]["contrast"]:
         colors = themes[rule["theme"]]["color"]
-        ratio = contrast_ratio(colors[rule["fg"]]["$value"], colors[rule["bg"]]["$value"])
-        line = f'{rule["theme"]}: {rule["fg"]} / {rule["bg"]} = {ratio:.2f} (必要 {rule["min"]})'
+        bg = colors[rule["bg"]]["$value"]
+        name = rule["bg"]
+        # tint があれば，その色をその濃さで bg の上に重ねた地と比べる(例: 文字の色を薄く敷いた札)
+        if tint := rule.get("tint"):
+            opacity = lookup(tokens, tint["opacity"])
+            bg = blend(colors[tint["color"]]["$value"], opacity, bg)
+            name = f'{tint["color"]}({tint["opacity"]}) over {rule["bg"]}'
+        ratio = contrast_ratio(colors[rule["fg"]]["$value"], bg)
+        line = f'{rule["theme"]}: {rule["fg"]} / {name} = {ratio:.2f} (必要 {rule["min"]})'
         if ratio < rule["min"]:
             failures.append(line)
         else:

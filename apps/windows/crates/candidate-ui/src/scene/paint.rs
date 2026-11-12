@@ -536,7 +536,8 @@ impl<'a> Painter<'a> {
         }
     }
 
-    fn keycap(&mut self, cap: Frame) {
+    /// キーキャップの札の地と縁(パレットの肌の色のボタンも同じ形にする)
+    pub fn keycap(&mut self, cap: Frame) {
         match self.theme.kind {
             Kind::Platinum => self.bevel(cap, self.theme.surface),
             Kind::Desk => {

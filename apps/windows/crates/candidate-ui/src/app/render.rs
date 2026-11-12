@@ -10,27 +10,46 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_BEGIN_HOLLOW,
-    D2D1_FIGURE_END_CLOSED, D2D1_FIGURE_END_OPEN, D2D_RECT_F,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED,
+    D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED, D2D1_FIGURE_END_OPEN, D2D1_PIXEL_FORMAT,
+    D2D_RECT_F,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Factory, ID2D1Geometry, ID2D1RenderTarget, ID2D1SolidColorBrush,
     ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND,
     D2D1_DASH_STYLE_CUSTOM, D2D1_DASH_STYLE_SOLID, D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT,
     D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_LAYER_PARAMETERS, D2D1_LINE_JOIN_ROUND,
-    D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
+    D2D1_RENDER_TARGET_PROPERTIES, D2D1_ROUNDED_RECT, D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFontCollection, IDWriteTextFormat,
     IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH, DWRITE_FONT_STRETCH_NORMAL,
     DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT,
     DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD,
-    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
+    DWRITE_LINE_METRICS, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS,
+    DWRITE_WORD_WRAPPING_NO_WRAP,
 };
+use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
+use windows::Win32::Graphics::Imaging::{
+    CLSID_WICImagingFactory, GUID_WICPixelFormat32bppPBGRA, IWICImagingFactory,
+    WICBitmapCacheOnLoad, WICBitmapLockRead, WICRect,
+};
+use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows_core::{Interface, Result, BOOL, HSTRING};
 use windows_numerics::{Matrix3x2, Vector2};
 
 const LOCALE: &str = "ja-JP";
+
+/// 書式ごと・文字ごとの行の高さとベースライン
+type LineCache = HashMap<Font, HashMap<String, (f32, f32)>>;
+/// 書式ごと・文字ごとの字の外形(測れなければ None)
+type InkCache = HashMap<Font, HashMap<String, Option<Frame>>>;
+/// 字の外形を測るために描く細かさ(1 DIP を何ピクセルにするか．2 倍の画面で 1 ピクセルまで測る)
+const INK_SCALE: f32 = 2.0;
+/// 字の外形に数える画素の濃さ(0〜255)．縁のぼかしの薄い画素は数えず，目に見える形で真ん中に置く(macOS の GlyphFitting と同じ)
+const INK_ALPHA: u8 = 96;
+/// DIP の基準の DPI
+const INK_BASE_DPI: f32 = 96.0;
 /// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
 const SHADOW_LAYERS_PER_DOT: f32 = 1.0;
 /// 作った書体の組を覚えておく数．候補の窓・予測の窓・パレットなどが別の書体の組を使っても作り直さないように
@@ -57,6 +76,11 @@ fn families(face: &Face) -> &'static [&'static str] {
         Face::Emoji => &["Segoe UI Emoji"],
         // Windows 11 は Segoe Fluent Icons，Windows 10 は Segoe MDL2 Assets(同じ字の番号でアイコンを持つ)
         Face::Icon => &["Segoe Fluent Icons", "Segoe MDL2 Assets"],
+        // 小さくても字の線が細くならない等幅の書体(Windows 11 は Cascadia Mono)
+        Face::Code => &["Cascadia Mono", "Consolas"],
+        // かなを詰めない書体(Yu Gothic UI はかなを詰めるので，カタカナが英字より小さく見える)
+        Face::Readable => &["BIZ UDPGothic", "Yu Gothic", "Meiryo"],
+        Face::SystemReadable => &["Kiwi Maru", "BIZ UDPGothic", "Yu Gothic"],
     }
 }
 
@@ -98,6 +122,10 @@ type LayoutKey = (Font, u32, u32);
 /// テーマと文字の大きさを決めた書体の組．文字の幅を測り，描くときにも使う
 pub struct TextMeasure {
     dwrite: IDWriteFactory,
+    /// 字の外形を描いて測る(色の付いた絵文字の色の層まで含める)
+    d2d: ID2D1Factory,
+    /// 描いた字を読む WIC の工場．初めて測るときに作り，作れなければ None
+    imaging: std::cell::OnceCell<Option<IWICImagingFactory>>,
     formats: HashMap<Font, IDWriteTextFormat>,
     /// OS の書体の集まり．書式が書体の集まりを持たないときに字を探す
     system: Option<IDWriteFontCollection>,
@@ -105,6 +133,12 @@ pub struct TextMeasure {
     widths: RefCell<HashMap<Font, HashMap<String, f32>>>,
     width_count: std::cell::Cell<usize>,
     heights: RefCell<HashMap<Font, f32>>,
+    /// 文字ごとの行の高さとベースライン(書体の代わりの字で変わる)
+    lines: RefCell<LineCache>,
+    line_count: std::cell::Cell<usize>,
+    /// 文字ごとの字の外形(絵文字を箱の真ん中に置く)
+    inks: RefCell<InkCache>,
+    ink_count: std::cell::Cell<usize>,
     glyphs: RefCell<HashMap<(Font, char), bool>>,
     /// 描いた文字の配置(書式・描く枠の幅と高さ・文字ごと)．アニメーションのコマごとや打つたびに同じ文字を並べ直さない
     layouts: RefCell<HashMap<LayoutKey, HashMap<String, IDWriteTextLayout>>>,
@@ -114,16 +148,23 @@ pub struct TextMeasure {
 impl TextMeasure {
     fn new(
         dwrite: IDWriteFactory,
+        d2d: ID2D1Factory,
         formats: HashMap<Font, IDWriteTextFormat>,
         system: Option<IDWriteFontCollection>,
     ) -> Self {
         Self {
             dwrite,
+            d2d,
+            imaging: std::cell::OnceCell::new(),
             formats,
             system,
             widths: RefCell::default(),
             width_count: std::cell::Cell::new(0),
             heights: RefCell::default(),
+            lines: RefCell::default(),
+            line_count: std::cell::Cell::new(0),
+            inks: RefCell::default(),
+            ink_count: std::cell::Cell::new(0),
             glyphs: RefCell::default(),
             layouts: RefCell::default(),
             layout_count: std::cell::Cell::new(0),
@@ -164,6 +205,153 @@ impl TextMeasure {
 
     fn format(&self, font: Font) -> Option<&IDWriteTextFormat> {
         self.formats.get(&font)
+    }
+
+    /// 1 行目の行の高さとベースライン(GetLineMetrics)
+    fn line_metrics(&self, text: &str, font: Font) -> Option<(f32, f32)> {
+        let wide: Vec<u16> = text.encode_utf16().collect();
+        let format = self.format(font)?;
+        // SAFETY: format は生きている COM の参照で，wide は呼び出しのあいだ有効
+        let layout = unsafe {
+            self.dwrite
+                .CreateTextLayout(&wide, format, f32::MAX, f32::MAX)
+                .ok()?
+        };
+        let mut lines = [DWRITE_LINE_METRICS::default()];
+        let mut count = 0u32;
+        // SAFETY: lines と count は書き込める領域．折り返さない書式なので 1 行に収まる
+        unsafe { layout.GetLineMetrics(Some(&mut lines), &mut count).ok()? };
+        (count >= 1).then(|| (lines[0].height, lines[0].baseline))
+    }
+
+    /// 字の外形．Draw::Text と同じ枠で描いた画素から測る(色の付いた絵文字は色の層の形が字の輪郭と違うことがある)．
+    /// 描けなければ DirectWrite の外形(はみ出す量)で求める
+    fn ink_metrics(&self, text: &str, font: Font) -> Option<Frame> {
+        self.drawn_ink(text, font)
+            .or_else(|| self.overhang_ink(text, font))
+    }
+
+    fn imaging(&self) -> Option<&IWICImagingFactory> {
+        self.imaging
+            .get_or_init(|| {
+                // SAFETY: WIC の工場を作る．COM はこのスレッドで始めてある(作れなければ None で，はみ出す量から測る)
+                unsafe {
+                    CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).ok()
+                }
+            })
+            .as_ref()
+    }
+
+    /// 字を透明な画像に INK_SCALE 倍の細かさで描き，濃さが INK_ALPHA を超える画素の外形を測る．
+    /// 描く枠は Draw::Text と同じ(幅は測った幅 + 行の高さ，高さは行の高さ)で，外形がはみ出しても入るよう，まわりに行の高さの半分の余白を取る
+    fn drawn_ink(&self, text: &str, font: Font) -> Option<Frame> {
+        let (height, _) = self.line(text, font);
+        let width = self.width(text, font).ceil();
+        let layout = self.layout(text, font, width + height, height)?;
+        let imaging = self.imaging()?;
+        let margin = (height / 2.0).ceil();
+        let pixels_wide = ((width + height + margin * 2.0) * INK_SCALE).ceil() as u32;
+        let pixels_high = ((height + margin * 2.0) * INK_SCALE).ceil() as u32;
+        // SAFETY: imaging は生きている COM の参照
+        let bitmap = unsafe {
+            imaging
+                .CreateBitmap(
+                    pixels_wide,
+                    pixels_high,
+                    &GUID_WICPixelFormat32bppPBGRA,
+                    WICBitmapCacheOnLoad,
+                )
+                .ok()?
+        };
+        let properties = D2D1_RENDER_TARGET_PROPERTIES {
+            pixelFormat: D2D1_PIXEL_FORMAT {
+                format: DXGI_FORMAT_B8G8R8A8_UNORM,
+                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+            },
+            dpiX: INK_BASE_DPI * INK_SCALE,
+            dpiY: INK_BASE_DPI * INK_SCALE,
+            ..Default::default()
+        };
+        // SAFETY: bitmap は作ったばかりの WIC のビットマップ．BeginDraw と EndDraw を対にする
+        unsafe {
+            let target = self
+                .d2d
+                .CreateWicBitmapRenderTarget(&bitmap, &properties)
+                .ok()?;
+            let black = D2D1_COLOR_F {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            };
+            let brush = target.CreateSolidColorBrush(&black, None).ok()?;
+            target.BeginDraw();
+            target.Clear(Some(&D2D1_COLOR_F::default()));
+            target.DrawTextLayout(
+                vector!(margin, margin),
+                &layout,
+                &brush,
+                D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT,
+            );
+            target.EndDraw(None, None).ok()?;
+        }
+        let rect = WICRect {
+            X: 0,
+            Y: 0,
+            Width: pixels_wide as i32,
+            Height: pixels_high as i32,
+        };
+        // SAFETY: bitmap は描き終えた WIC のビットマップ．lock を持つあいだ data は有効で，size バイトを超えて読まない
+        unsafe {
+            let lock = bitmap.Lock(&rect, WICBitmapLockRead.0 as u32).ok()?;
+            let stride = lock.GetStride().ok()? as usize;
+            let mut size = 0u32;
+            let mut pointer = std::ptr::null_mut();
+            lock.GetDataPointer(&mut size, &mut pointer).ok()?;
+            if pointer.is_null() {
+                return None;
+            }
+            let data = std::slice::from_raw_parts(pointer as *const u8, size as usize);
+            let (mut min_x, mut min_y, mut max_x, mut max_y) = (u32::MAX, u32::MAX, 0u32, 0u32);
+            for y in 0..pixels_high {
+                for x in 0..pixels_wide {
+                    let alpha = data
+                        .get(y as usize * stride + x as usize * 4 + 3)
+                        .copied()?;
+                    if alpha > INK_ALPHA {
+                        min_x = min_x.min(x);
+                        min_y = min_y.min(y);
+                        max_x = max_x.max(x);
+                        max_y = max_y.max(y);
+                    }
+                }
+            }
+            (min_x <= max_x && min_y <= max_y).then(|| {
+                Frame::new(
+                    min_x as f32 / INK_SCALE - margin,
+                    min_y as f32 / INK_SCALE - margin,
+                    (max_x - min_x + 1) as f32 / INK_SCALE,
+                    (max_y - min_y + 1) as f32 / INK_SCALE,
+                )
+            })
+        }
+    }
+
+    /// 字の外形．幅 width・高さ height の枠に並べた配置がその枠からはみ出す量(GetOverhangMetrics．はみ出せば正)から求める．
+    /// 書式は左寄せで縦は中央なので，枠の高さを行の高さにすると，枠の左上は Draw::Text の枠の左上と同じになる
+    fn overhang_ink(&self, text: &str, font: Font) -> Option<Frame> {
+        let (height, _) = self.line(text, font);
+        let width = self.width(text, font).ceil();
+        let layout = self.layout(text, font, width + height, height)?;
+        // SAFETY: layout は生きている COM の参照
+        let overhang = unsafe { layout.GetOverhangMetrics().ok()? };
+        let ink = Frame::new(
+            -overhang.left,
+            -overhang.top,
+            width + height + overhang.left + overhang.right,
+            height + overhang.top + overhang.bottom,
+        );
+        (ink.width > 0.0 && ink.height > 0.0).then_some(ink)
     }
 
     fn metrics(&self, text: &str, font: Font) -> Option<DWRITE_TEXT_METRICS> {
@@ -219,6 +407,32 @@ impl Measure for TextMeasure {
         height
     }
 
+    fn line(&self, text: &str, font: Font) -> (f32, f32) {
+        if let Some(line) = self
+            .lines
+            .borrow()
+            .get(&font)
+            .and_then(|lines| lines.get(text))
+        {
+            return *line;
+        }
+        let height = self.height(font);
+        let line = self
+            .line_metrics(text, font)
+            .unwrap_or((height, (height * 0.75).round()));
+        let mut lines = self.lines.borrow_mut();
+        if self.line_count.get() >= WIDTH_CACHE {
+            lines.clear();
+            self.line_count.set(0);
+        }
+        lines
+            .entry(font)
+            .or_default()
+            .insert(text.to_string(), line);
+        self.line_count.set(self.line_count.get() + 1);
+        line
+    }
+
     fn has_glyph(&self, font: Font, glyph: char) -> bool {
         if let Some(has) = self.glyphs.borrow().get(&(font, glyph)) {
             return *has;
@@ -226,6 +440,26 @@ impl Measure for TextMeasure {
         let has = self.find_glyph(font, glyph);
         self.glyphs.borrow_mut().insert((font, glyph), has);
         has
+    }
+
+    fn ink(&self, text: &str, font: Font) -> Option<Frame> {
+        if let Some(ink) = self
+            .inks
+            .borrow()
+            .get(&font)
+            .and_then(|inks| inks.get(text))
+        {
+            return *ink;
+        }
+        let ink = self.ink_metrics(text, font);
+        let mut inks = self.inks.borrow_mut();
+        if self.ink_count.get() >= WIDTH_CACHE {
+            inks.clear();
+            self.ink_count.set(0);
+        }
+        inks.entry(font).or_default().insert(text.to_string(), ink);
+        self.ink_count.set(self.ink_count.get() + 1);
+        ink
     }
 }
 
@@ -385,6 +619,7 @@ impl Renderer {
         }
         let measure = Rc::new(TextMeasure::new(
             self.dwrite.clone(),
+            self.d2d.clone(),
             formats,
             self.fonts.clone(),
         ));

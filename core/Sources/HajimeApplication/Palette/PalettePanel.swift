@@ -206,7 +206,7 @@ public struct PalettePanel: Sendable, Equatable {
     /// 全体の行の数と，見えている先頭の行の位置
     public var rowCount: Int
     public var firstRow: Int
-    /// 列の数と，一度に見せる行の数．窓の大きさはこれで決まり，中身(種類)によって変えない
+    /// 列の数と，一度に見せる行の数．顔文字のように説明の欄が低い種類は，その分の行を足してある
     public var columns: Int
     public var visibleRows: Int
     /// 1 行のマスの数．四角いマスなら columns と同じ．顔文字の広いマスなら少なく，マスの幅はマス目の幅をこれで割ったもの
@@ -327,10 +327,11 @@ public enum PaletteStrings {
     public static let skinTone = "肌の色"
     public static let pin = "ピン留め"
     public static let close = "閉じる"
-    /// 説明の欄で，名前を定めたところを示す札と，読みの頭の札
+    /// 説明の欄で，名前を定めたところ(見出しに添える・Unicode の名前の行を見分ける)
     public static let unicodeSource = "Unicode"
     public static let cldrSource = "CLDR"
-    public static let readings = "読み"
+    /// Hajime IME が付けた記号の名前(tools/palette/names.txt など)
+    public static let hajimeSource = "Hajime IME"
     /// 説明の欄で読みを並べるときの区切り
     public static let readingSeparator = "、"
     /// タブにアイコンを描けないときに代わりに見せる文字

@@ -37,7 +37,7 @@ final class PaletteController {
         _ = FloatingPanel.attach(view, to: window, backdrop: resolved.isRounded ? backdrop : nil)
         let size = view.fittingSize(for: panel)
         if wasVisible {
-            // 出ているあいだは上の辺と左の辺を保つ(大きさは設定を変えたときだけ変わる)
+            // 出ているあいだは上の辺と左の辺を保つ(大きさは設定を変えたときと種類を替えたときに変わり，下の辺が動く)
             let current = window.frame
             if current.size != size {
                 window.setFrame(NSRect(x: current.minX, y: current.maxY - size.height, width: size.width, height: size.height), display: true)
@@ -76,13 +76,15 @@ final class PaletteController {
         window.alphaValue = 1
     }
 
-    /// VoiceOver が動いているときだけ，選んでいる文字の名前と探した結果の数を読み上げる
+    /// VoiceOver が動いているときだけ，選んでいる文字の名前と探した結果の数を読み上げる．
+    /// 説明の欄に Unicode の名前を出していれば，欄では省いた部分も含めて全体を読む
     private func announce(_ panel: PalettePanel) {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         let selected = panel.selection.flatMap { position in
             panel.rows.first { $0.index == position.row }.flatMap { $0.cells.indices.contains(position.column) ? $0.cells[position.column].name : nil }
         }
-        let text = [selected, panel.message].compactMap { $0 }.joined(separator: "、")
+        let unicodeName = panel.preview.map(\.unicodeName).flatMap { $0.isEmpty ? nil : $0 }
+        let text = [selected, unicodeName, panel.message].compactMap { $0 }.joined(separator: "、")
         guard !text.isEmpty, text != lastAnnounced else { return }
         lastAnnounced = text
         NSAccessibility.post(element: window, notification: .announcementRequested, userInfo: [

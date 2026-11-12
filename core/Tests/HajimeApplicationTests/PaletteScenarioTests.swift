@@ -9,8 +9,8 @@ import Testing
 @Suite("絵文字と記号のパレット")
 struct PaletteScenarioTests {
     private static func line(_ kind: String, _ category: String, _ text: String, _ name: String, _ nameReading: String, _ english: String,
-                             readings: String = "", keywords: String = "", shortcodes: String = "", tones: String = "") -> String {
-        [kind, category, text, kind == "emoji" ? "0.6" : "", name, nameReading, english, readings, keywords, shortcodes, tones].joined(separator: "\t")
+                             readings: String = "", keywords: String = "", shortcodes: String = "", tones: String = "", source: String = "") -> String {
+        [kind, category, text, kind == "emoji" ? "0.6" : "", name, nameReading, english, readings, keywords, shortcodes, tones, source].joined(separator: "\t")
     }
 
     /// 顔が 7 個(2 行)，人が 3 個，記号が 2 個，顔文字が 5 個
@@ -87,8 +87,9 @@ struct PaletteScenarioTests {
         line("emoji", "smileys", "😄", "笑顔", "えがお", "grinning face with smiling eyes", readings: "すまいる|えがお|かお", shortcodes: "smile"),
         line("emoji", "smileys", "☺️", "微笑む顔", "ほほえむかお", "smiling face", readings: "ほほえみ"),
         line("emoji", "flags", "🇯🇵", "旗: 日本", "はた: にほん", "flag: Japan", readings: "にほん|こっき", shortcodes: "jp|flag-jp"),
-        line("symbol", "punctuation", "，", "カンマ", "かんま", "comma", readings: "かんま|こんま"),
-        line("symbol", "arrows", "⇒", "右向き二重矢印", "みぎむきにじゅうやじるし", "rightwards double arrow", readings: "みぎむきにじゅうやじるし|やじるし"),
+        line("symbol", "punctuation", "，", "カンマ", "かんま", "comma", readings: "かんま|こんま", source: "cldr"),
+        line("symbol", "arrows", "⇒", "右向き二重矢印", "みぎむきにじゅうやじるし", "rightwards double arrow", readings: "みぎむきにじゅうやじるし|やじるし",
+             source: "hajime"),
     ].joined(separator: "\n")
 
     @Test("R-26: 説明は 1 つの符号位置の文字に Unicode の名前を，並びに CLDR の英語の名前を出し，どこで定めた名前かを添える")
@@ -116,15 +117,16 @@ struct PaletteScenarioTests {
         #expect(flag.unicodeName == "flag: Japan")
         #expect(flag.unicodeNameSource == PaletteStrings.cldrSource)
         #expect(flag.codePoints == ["U+1F1EF", "U+1F1F5"])
-        // 記号の日本語の名前はどこで定めたかを見分けられないので示さない．カタカナの名前のひらがなは読みに重ねない
+        // 記号の日本語の名前は，表の「名前の出どころ」の列のとおり CLDR か Hajime IME を示す．カタカナの名前のひらがなは読みに重ねない
         harness.press(.tab, .control)
         let comma = try #require(harness.palette?.preview)
         #expect(comma.name == "カンマ")
-        #expect(comma.nameSource == nil)
+        #expect(comma.nameSource == PaletteStrings.cldrSource)
         #expect(comma.unicodeName == "FULLWIDTH COMMA")
         #expect(comma.readings == ["こんま"])
         harness.press(.right)
         let arrow = try #require(harness.palette?.preview)
+        #expect(arrow.nameSource == PaletteStrings.hajimeSource)
         #expect(arrow.unicodeName == "RIGHTWARDS DOUBLE ARROW")
         #expect(arrow.readings == ["みぎむきにじゅうやじるし", "やじるし"])
         #expect(arrow.shortcodes == [])
