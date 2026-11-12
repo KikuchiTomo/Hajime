@@ -408,6 +408,53 @@ pub fn flag() -> PalettePanel {
     }
 }
 
+/// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ(macOS の SamplePalettes.longName)．
+/// 名前は 2 行で「…」にし，長い札は字を縮めて折り返す
+pub fn long_name() -> PalettePanel {
+    PalettePanel {
+        query: "つぎ".into(),
+        heading: "検索結果　3 件".into(),
+        rows: rows(&[&["⏭\u{FE0F}", "⏩", "▶\u{FE0F}"]], &["検索結果"], &[0]),
+        selection: Some(PalettePosition { row: 0, column: 0 }),
+        preview: Some(preview(
+            "⏭\u{FE0F}",
+            ("次の曲ボタン", CLDR),
+            (
+                "BLACK RIGHT-POINTING DOUBLE TRIANGLE WITH VERTICAL BAR",
+                UNICODE,
+            ),
+            &[":black_right_pointing_double_triangle_with_vertical_bar:"],
+            &[
+                "つぎのきょくぼたん",
+                "ぼたん",
+                "つぎのしーん",
+                "つぎのとらっく",
+            ],
+            "U+23ED U+FE0F",
+            false,
+        )),
+        ..flag()
+    }
+}
+
+/// 説明に出す項目を設定で減らしたところ(Unicode の名前とショートコードだけ．macOS の SamplePalettes.reduced)
+pub fn reduced() -> PalettePanel {
+    let fields = PalettePreviewFields {
+        unicode_name: true,
+        readings: false,
+        shortcodes: true,
+        code_points: false,
+    };
+    let mut panel = emoji();
+    panel.preview = panel.preview.map(|preview| PalettePreview {
+        readings: Vec::new(),
+        code_points: String::new(),
+        ..preview
+    });
+    panel.preview_fields = Some(fields);
+    panel
+}
+
 /// 記号のパレット．ピン留めの行の下に矢印のまとまり
 pub fn symbol() -> PalettePanel {
     let titles = ["ピン留め", "矢印", "矢印", "矢印", "矢印", "矢印"];

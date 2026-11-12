@@ -794,6 +794,12 @@ enum UIStrings {
         static let showsReadings = "説明に読みを表示"
         static let showsShortcodes = "説明にショートコードを表示"
         static let showsCodePoints = "説明にコードポイントを表示"
+        /// 説明の欄の項目名．englishNameLabel は UCD の名前の無い並び(国旗など)で代わりに出す英語の名前
+        static let unicodeNameLabel = "Unicode"
+        static let englishNameLabel = "英語"
+        static let readingsLabel = "読み"
+        static let shortcodesLabel = "ショートコード"
+        static let codePointsLabel = "コードポイント"
         static let frequentRows = "よく使う文字の行数"
         static let page = "絵文字と記号"
         static let behavior = "パレット"

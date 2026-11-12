@@ -281,10 +281,9 @@ public enum PaletteStrings {
     public static let skinTone = "肌の色"
     public static let pin = "ピン留め"
     public static let close = "閉じる"
-    /// 説明の欄で，名前を定めたところを示す札と，読みの頭の札
+    /// 説明の欄で，名前を定めたところ(見出しに添える・Unicode の名前の行を見分ける)
     public static let unicodeSource = "Unicode"
     public static let cldrSource = "CLDR"
-    public static let readings = "読み"
     /// 説明の欄で読みを並べるときの区切り
     public static let readingSeparator = "、"
     /// タブにアイコンを描けないときに代わりに見せる文字

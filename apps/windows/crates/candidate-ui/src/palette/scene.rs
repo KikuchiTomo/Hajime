@@ -5,7 +5,7 @@
 
 use super::emoji::{is_emoji, skin_tone_sample};
 use super::layout::{skin_tone_button_inset, Layout};
-use super::preview::{self, Part};
+use super::preview::{self, Part, Role};
 use crate::geometry::Frame;
 use crate::scene::paint::Painter;
 use crate::scene::{Draw, Look, Measure, Scene};
@@ -419,7 +419,8 @@ impl Drawing<'_> {
         );
     }
 
-    /// 選んでいる文字の説明．左上に大きな見本，右上にピン留めのボタン，見本の右と下に名前・読み・札(palette::preview)
+    /// 選んでいる文字の説明．左に大きな見本，右に名前と「項目名 → 値」の表(palette::preview)．
+    /// ピン留めのボタンは見出しの行の縦の中心に置く
     fn preview(&mut self, shown: &PalettePreview, rect: Frame) {
         let theme = self.theme;
         let fonts = self.layout.fonts;
@@ -427,7 +428,7 @@ impl Drawing<'_> {
         let side = preview::tile_side();
         let mut tile = Frame::new(content.x, content.y, side, side);
         if self.layout.wide {
-            // 顔文字は横に長いので，文字の幅に合わせて枠を広げる(説明の欄の幅の一定の割合まで)
+            // 顔文字は横に長いので，文字の幅に合わせて四角を広げる(説明の欄の幅の一定の割合まで)
             let width = self.painter.width(&shown.text, fonts.preview_kaomoji)
                 + palette::KAOMOJI_PADDING_X * 4.0;
             tile.width = tile
@@ -450,9 +451,21 @@ impl Drawing<'_> {
             };
             self.painter.centered(&shown.text, font, theme.text, tile);
         }
-        let pin = self.layout.pin(rect);
-        let area = preview::Area { content, tile, pin };
-        for part in preview::parts(shown, &area, &fonts, self.measure) {
+        let area = preview::Area {
+            content,
+            tile,
+            pin_width: palette::FOOTER_HEIGHT,
+        };
+        let fields = preview::fields(self.panel.preview_fields.as_ref());
+        let placed = preview::place(
+            shown,
+            &fields,
+            self.layout.wide,
+            &area,
+            &fonts,
+            self.measure,
+        );
+        for part in placed.parts {
             self.preview_part(part);
         }
         let (glyph, color) = if shown.is_pinned {
@@ -460,6 +473,7 @@ impl Drawing<'_> {
         } else {
             (glyph::PIN, theme.text_muted)
         };
+        let pin = self.layout.pin(rect);
         self.glyph(
             glyph,
             fonts.tab_icon,
@@ -469,29 +483,38 @@ impl Drawing<'_> {
         );
     }
 
-    /// 説明の名前・読み・札の 1 つ
+    /// 文字をベースラインの位置に描く．枠の高さを文字の行の高さにすると，枠の上の端から測ったベースラインの位置に描かれる
+    fn text_at_baseline(&mut self, text: &str, font: Font, color: Color, x: f32, baseline: f32) {
+        let (height, offset) = self.measure.line(text, font);
+        let row = Frame::new(x, baseline - offset, 0.0, height);
+        self.painter.text(text, font, color, x, row);
+    }
+
+    /// 説明の名前・項目名・値・札の 1 つ
     fn preview_part(&mut self, part: Part) {
         let theme = self.theme;
         let fonts = self.layout.fonts;
         match part {
-            Part::Text { text, font, frame } => {
-                self.painter.text(&text, font, theme.text, frame.x, frame);
-            }
-            Part::Tag { text, frame } => {
-                // 名前を定めたところと「読み」は，値と見分けるよう枠だけの札にする
-                self.outline(
-                    frame,
-                    theme.line,
-                    palette::PREVIEW_TAG_RADIUS,
-                    candidate::FRAME_WIDTH,
-                );
-                self.painter
-                    .centered(&text, fonts.tag, theme.text_muted, frame);
+            Part::Text {
+                text,
+                role,
+                x,
+                baseline,
+                ..
+            } => {
+                // 名前と値は文字の色，名前の出どころと項目名と「+n」は控えめな色
+                let color = match role {
+                    Role::Heading | Role::Value | Role::Code | Role::SmallCode => theme.text,
+                    Role::Source | Role::Label | Role::More => theme.text_muted,
+                };
+                self.text_at_baseline(&text, role.font(&fonts), color, x, baseline);
             }
             Part::Chip {
                 lines,
-                small,
+                role,
                 frame,
+                text_x,
+                baselines,
             } => {
                 // 角丸のテーマは控えめな地．platinum と desk は光の縁の色の地に 1 ドットの枠(入力欄の形)
                 if self.theme.is_rounded() {
@@ -503,32 +526,9 @@ impl Drawing<'_> {
                         theme.bevel_light,
                     );
                 }
-                let font = if small { fonts.code_small } else { fonts.code };
-                let line = self.measure.height(font).ceil();
-                for (index, text) in lines.iter().enumerate() {
-                    let row = Frame::new(
-                        frame.x,
-                        frame.y + palette::PREVIEW_CHIP_PADDING_Y + line * index as f32,
-                        frame.width,
-                        line,
-                    );
-                    self.painter.text(
-                        text,
-                        font,
-                        theme.text,
-                        frame.x + palette::PREVIEW_CHIP_PADDING_X,
-                        row,
-                    );
+                for (line, baseline) in lines.iter().zip(baselines) {
+                    self.text_at_baseline(line, role.font(&fonts), theme.text, text_x, baseline);
                 }
-            }
-            Part::More { count, frame } => {
-                self.painter.text(
-                    &crate::strings::more(count),
-                    fonts.detail,
-                    theme.text_muted,
-                    frame.x,
-                    frame,
-                );
             }
         }
     }
@@ -594,7 +594,7 @@ fn cover(preview: Frame) -> Frame {
 mod tests {
     use super::super::sample;
     use super::*;
-    use crate::scene::testing::{count, text_frame, texts, theme, Fixed};
+    use crate::scene::testing::{count, text_frame, texts, theme, Fixed, Uneven};
     use crate::theme::Role;
 
     /// アイコンの書体が入っているとして測る
@@ -820,55 +820,126 @@ mod tests {
         assert!(fonts_of(&scene).contains(&(glyph::EMOJI.to_string(), layout.fonts.tab_icon)));
     }
 
-    #[test]
-    fn 説明は名前と名前を定めたところと読みと札を並べピン留めを示す() {
-        let theme = theme("automatic");
-        let (layout, scene) = draw(&sample::emoji(), "automatic", &WithIcons);
-        let shown = texts(&scene);
-        assert!(shown.contains(&("笑顔".into(), theme.text)));
-        for tag in ["CLDR", "Unicode", "読み"] {
-            assert!(shown.contains(&(tag.into(), theme.text_muted)), "{tag}");
-        }
-        // Unicode の名前は折り返し(ピン留めのボタンの高さまではボタンの手前で止める)，読みは「、」でつなぐ
-        for line in ["SMILING FACE", "WITH OPEN MOUTH AND", "SMILING EYES"] {
-            assert!(shown.contains(&(line.into(), theme.text)), "{line}");
-        }
-        let first = text_frame(&scene, "SMILING FACE").unwrap();
-        let second = text_frame(&scene, "WITH OPEN MOUTH AND").unwrap();
-        assert_eq!(first.x, second.x);
-        let readings = "えがお、すまいる、はっぴー、わーい";
-        assert!(shown.contains(&(readings.into(), theme.text)));
-        // ショートコードとコードポイントは等幅の札にし，途中で切らない
-        let fonts = fonts_of(&scene);
-        assert!(fonts.contains(&(":smile:".into(), layout.fonts.code)));
-        assert!(fonts.contains(&("U+1F604".into(), layout.fonts.code)));
-        assert!(!shown.iter().any(|(text, _)| text.contains('…')));
-        assert!(scene.draws.iter().any(|draw| matches!(
-            draw,
-            Draw::RoundRect { fill: Some(color), radius, .. }
-                if *color == theme.badge && *radius == palette::PREVIEW_CHIP_RADIUS
-        )));
-        // 見出しの名前・読み・札は上から順に重ならず，説明の欄に収まる
-        let name = text_frame(&scene, "笑顔").unwrap();
-        let reading = text_frame(&scene, readings).unwrap();
-        let chip = text_frame(&scene, ":smile:").unwrap();
-        assert!(reading.y >= name.max_y());
-        assert!(chip.y >= reading.max_y());
-        assert!(chip.max_y() <= layout.preview.unwrap().max_y());
-        assert!(shown.contains(&(glyph::PIN.to_string(), theme.text_muted)));
-        // ピン留めしてある文字は塗ったピンを選択の色で
-        let (_, pinned) = draw(&sample::search(), "automatic", &WithIcons);
-        assert!(texts(&pinned).contains(&(glyph::PIN_FILL.to_string(), theme.selection)));
+    /// 説明の欄の中の文字(枠・文字・書体・色)と，そのベースライン(枠の上の端から測った位置)
+    fn preview_texts(
+        scene: &Scene,
+        layout: &Layout,
+        measure: &dyn Measure,
+    ) -> Vec<(String, Frame, Font, Color, f32)> {
+        let preview = layout.preview.unwrap();
+        scene
+            .draws
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Text {
+                    text,
+                    frame,
+                    font,
+                    color,
+                } if frame.y >= preview.y - 1.0 && frame.max_y() <= preview.max_y() + 1.0 => {
+                    Some((
+                        text.clone(),
+                        *frame,
+                        *font,
+                        *color,
+                        frame.y + measure.line(text, *font).1,
+                    ))
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     #[test]
-    fn 国旗の並びには_cldr_の英語の名前を出し_platinum_の札は入力欄の形にする() {
+    fn 説明は項目名と値をベースラインでそろえ_値は同じ_x_から書き出す() {
+        let theme = theme("automatic");
+        let measure = Uneven;
+        let (layout, scene) = draw(&sample::emoji(), "automatic", &measure);
+        let fonts = layout.fonts;
+        let texts = preview_texts(&scene, &layout, &measure);
+        let find = |wanted: &str| {
+            texts
+                .iter()
+                .find(|(text, ..)| text == wanted)
+                .unwrap_or_else(|| panic!("{wanted}"))
+        };
+        // Unicode の名前は値の幅で折り返す(1 行目と 2 行目)
+        let first_line = texts
+            .iter()
+            .find(|(text, ..)| text.starts_with("SMILING FACE"))
+            .unwrap();
+        let second_line = texts
+            .iter()
+            .find(|(text, ..)| text.ends_with("SMILING EYES") && !text.starts_with("SMILING FACE"))
+            .unwrap();
+        // 見出しの名前と名前の出どころは同じベースライン．出どころと項目名は控えめな色
+        let name = find("笑顔");
+        let source = find("CLDR");
+        assert_eq!(name.4, source.4);
+        assert_eq!(source.3, theme.text_muted);
+        // 項目名は同じ x の列に置き，値の 1 行目と同じベースライン．値はどの行も同じ x から書き出す
+        let pairs = [
+            ("Unicode", first_line.0.as_str()),
+            ("読み", "えがお、すまいる、はっぴー、わーい"),
+            ("ショートコード", ":smile:"),
+            ("コードポイント", "U+1F604"),
+        ];
+        let label_x = find("Unicode").1.x;
+        for (label, value) in pairs {
+            let label = find(label);
+            let value = find(value);
+            assert_eq!(label.1.x, label_x, "{}", label.0);
+            assert_eq!(label.3, theme.text_muted, "{}", label.0);
+            assert!((label.4 - value.4).abs() <= 0.5, "{} {}", label.0, value.0);
+        }
+        let value_x = first_line.1.x;
+        assert_eq!(second_line.1.x, value_x);
+        assert_eq!(find("えがお、すまいる、はっぴー、わーい").1.x, value_x);
+        // 札の文字は札の余白の分だけ内側から書く
+        for chip in [":smile:", "U+1F604"] {
+            assert_eq!(find(chip).1.x, value_x + palette::PREVIEW_CHIP_PADDING_X);
+            assert_eq!(find(chip).2, fonts.code);
+        }
+        // ピン留めのアイコンの中心は見出しの行の中心
+        let pin = layout.pin(layout.preview.unwrap());
+        let heading_mid = layout.preview.unwrap().y
+            + preview::heading_mid_y(palette::PREVIEW_PADDING_Y, &fonts, &measure);
+        assert_eq!(pin.mid_y(), heading_mid.round());
+        // 文字どうしが重ならず，説明の欄に収まる(ピン留めのアイコンの字は除く)
+        let boxes: Vec<Frame> = texts
+            .iter()
+            .filter(|(text, ..)| text != "📌")
+            .map(|(text, frame, font, _, baseline)| {
+                let (height, offset) = measure.line(text, *font);
+                Frame::new(frame.x, baseline - offset, frame.width, height)
+            })
+            .collect();
+        for (index, frame) in boxes.iter().enumerate() {
+            for other in &boxes[index + 1..] {
+                let overlaps = frame.x < other.max_x()
+                    && other.x < frame.max_x()
+                    && frame.y < other.max_y()
+                    && other.y < frame.max_y();
+                assert!(!overlaps, "{frame:?} {other:?}");
+            }
+            assert!(frame.max_y() <= layout.preview.unwrap().max_y());
+        }
+    }
+
+    #[test]
+    fn 国旗の英語の名前は英語の行に出し_platinum_の札は入力欄の形にする() {
         let theme = theme("platinum");
-        let (_, scene) = draw(&sample::flag(), "platinum", &Fixed);
-        let shown = texts(&scene);
-        assert!(shown.contains(&("旗: 日本".into(), theme.text)));
-        assert!(shown.contains(&("flag: Japan".into(), theme.text)));
-        assert_eq!(shown.iter().filter(|(text, _)| text == "CLDR").count(), 2);
+        let measure = Uneven;
+        let (layout, scene) = draw(&sample::flag(), "platinum", &measure);
+        let texts = preview_texts(&scene, &layout, &measure);
+        let shown: Vec<&str> = texts.iter().map(|(text, ..)| text.as_str()).collect();
+        assert_eq!(shown.iter().filter(|text| **text == "CLDR").count(), 1);
+        let english = texts.iter().find(|(text, ..)| text == "英語").unwrap();
+        let value = texts
+            .iter()
+            .find(|(text, ..)| text == "flag: Japan")
+            .unwrap();
+        assert!((english.4 - value.4).abs() <= 0.5);
         for chip in [":jp:", ":flag-jp:", "U+1F1EF", "U+1F1F5"] {
             let text = text_frame(&scene, chip).unwrap();
             assert!(
@@ -888,17 +959,23 @@ mod tests {
 
     #[test]
     fn 顔文字の説明には名前と読みだけを出す() {
-        let theme = theme("automatic");
-        let (layout, scene) = draw(&sample::kaomoji(), "automatic", &Fixed);
-        let shown = texts(&scene);
-        assert!(shown.contains(&("しょぼーん".into(), theme.text)));
-        assert!(shown.contains(&("しょんぼり、がっかり".into(), theme.text)));
-        assert!(!shown
+        let measure = Uneven;
+        let (layout, scene) = draw(&sample::kaomoji(), "automatic", &measure);
+        let placed = preview_texts(&scene, &layout, &measure);
+        let shown: Vec<&str> = placed
             .iter()
-            .any(|(text, _)| text == "CLDR" || text == "Unicode"));
-        assert!(!fonts_of(&scene)
-            .iter()
-            .any(|(_, font)| *font == layout.fonts.code));
+            .map(|(text, ..)| text.as_str())
+            .filter(|text| *text != "📌")
+            .collect();
+        assert_eq!(
+            shown,
+            ["(´・ω・｀)", "しょぼーん", "読み", "しょんぼり、がっかり"]
+        );
+        let ojigi = sample::search();
+        let (_, pinned) = draw(&ojigi, "automatic", &WithIcons);
+        assert!(
+            texts(&pinned).contains(&(glyph::PIN_FILL.to_string(), theme("automatic").selection))
+        );
     }
 
     #[test]

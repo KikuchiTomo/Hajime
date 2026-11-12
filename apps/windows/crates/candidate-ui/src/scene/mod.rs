@@ -218,6 +218,15 @@ pub trait Measure {
     fn width(&self, text: &str, font: Font) -> f32;
     fn height(&self, font: Font) -> f32;
 
+    /// text を 1 行に並べたときの行の高さと，行の上の端からベースラインまで．
+    /// 書体の代わりに使う字(日本語の字など)があると行の高さが変わるので，文字ごとに測る．
+    /// 描くとき(Draw::Text)は，枠の高さをこの行の高さにすると，枠の上の端からこの位置にベースラインが来る
+    fn line(&self, text: &str, font: Font) -> (f32, f32) {
+        let _ = text;
+        let height = self.height(font);
+        (height, (height * 0.75).round())
+    }
+
     /// font の書体に glyph の字があるか(パレットのアイコン)．無ければ代わりの文字を描く
     fn has_glyph(&self, _font: Font, _glyph: char) -> bool {
         false
@@ -345,6 +354,39 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
 pub(crate) mod testing {
     use super::*;
     use crate::theme::SystemLook;
+
+    /// 書体の大きさで幅を測り，書体ごとに行の高さとベースラインを変える(ベースラインで合わせないと縦がそろわない)．
+    /// 日本語の字を含む行は，代わりの書体で行が高くなるものとして測る
+    pub struct Uneven;
+
+    impl Uneven {
+        fn size(font: Font) -> f32 {
+            match font {
+                Font::Sized(_, points) => f32::from(points),
+                _ => 12.0,
+            }
+        }
+    }
+
+    impl Measure for Uneven {
+        fn width(&self, text: &str, font: Font) -> f32 {
+            text.chars()
+                .map(|c| if c.is_ascii() { 0.6 } else { 1.0 } * Self::size(font))
+                .sum()
+        }
+
+        fn height(&self, font: Font) -> f32 {
+            (Self::size(font) * 1.3).round()
+        }
+
+        fn line(&self, text: &str, font: Font) -> (f32, f32) {
+            let tall = if text.is_ascii() { 0.0 } else { 2.0 };
+            (
+                self.height(font) + tall,
+                (Self::size(font) * 0.95).round() + tall / 2.0,
+            )
+        }
+    }
 
     /// 文字 1 つを 10 ドットとして測る
     pub struct Fixed;

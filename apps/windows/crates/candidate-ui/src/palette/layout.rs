@@ -34,8 +34,8 @@ pub struct Fonts {
     /// 説明のショートコードとコードポイントの札(等幅)．行に入らない札は code_small に縮める
     pub code: Font,
     pub code_small: Font,
-    /// 説明の名前を定めたところと「読み」の枠の札
-    pub tag: Font,
+    /// 説明の項目名と，見出しに添える名前の出どころ
+    pub label: Font,
     pub preview_emoji: Font,
     pub preview_symbol: Font,
     pub preview_kaomoji: Font,
@@ -63,7 +63,7 @@ impl Fonts {
             name: Font::sized(Role::Emphasis, palette::NAME_FONT_SIZE),
             code: Font::sized(Role::Code, palette::CODE_FONT_SIZE),
             code_small: Font::sized(Role::Code, palette::PREVIEW_CHIP_SMALL_FONT_SIZE),
-            tag: Font::sized(Role::Label, palette::PREVIEW_TAG_FONT_SIZE),
+            label: Font::sized(Role::Label, palette::PREVIEW_LABEL_FONT_SIZE),
             preview_emoji: Font::sized(
                 Role::Emoji,
                 palette::PREVIEW_GLYPH_SIZE * palette::EMOJI_SCALE,
@@ -99,7 +99,7 @@ impl Fonts {
             self.name,
             self.code,
             self.code_small,
-            self.tag,
+            self.label,
             self.preview_emoji,
             self.preview_symbol,
             self.preview_kaomoji,
@@ -159,6 +159,8 @@ pub struct Layout {
     pub wide: bool,
     pub fonts: Fonts,
     first_row: u32,
+    /// 説明の欄の上の端から見出しの行の縦の中心まで(ピン留めのボタンを合わせる)
+    preview_heading_mid: f32,
 }
 
 impl Layout {
@@ -291,6 +293,11 @@ impl Layout {
             wide,
             fonts,
             first_row: panel.first_row,
+            preview_heading_mid: preview::heading_mid_y(
+                palette::PREVIEW_PADDING_Y,
+                &fonts,
+                measure,
+            ),
         }
     }
 
@@ -321,13 +328,14 @@ impl Layout {
             .collect()
     }
 
-    /// 説明の欄の右上のピン留めのボタン
+    /// 説明の欄のピン留めのボタン．欄の右の端で，見出しの行の縦の中心に置く
     pub fn pin(&self, preview: Frame) -> Frame {
+        let side = palette::FOOTER_HEIGHT;
         Frame::new(
-            preview.max_x() - palette::FOOTER_HEIGHT,
-            preview.y,
-            palette::FOOTER_HEIGHT,
-            palette::FOOTER_HEIGHT,
+            preview.max_x() - side,
+            (preview.y + self.preview_heading_mid - side / 2.0).round(),
+            side,
+            side,
         )
     }
 

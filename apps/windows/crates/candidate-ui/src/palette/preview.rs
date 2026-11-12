@@ -1,17 +1,18 @@
 #![forbid(unsafe_code)]
 
-//! パレットの説明の欄のうち，大きな見本の右と下に並べる名前・読み・札の配置(macOS の PalettePreviewDrawing)．
+//! パレットの説明の欄の配置(core の PalettePreviewLayout と同じ決め方)．左に見本の四角，右に情報の列を置く 2 段の配置にし，
+//! 情報は見本の下へ回り込ませない．
 //!
-//! 上から順に次を並べる．
-//! - 見出しの名前．どこで定めた名前か(CLDR)を枠の札で後ろに添える．入らなければ折り返し，札は最後の行の後ろに置く
-//! - Unicode の名前．どこで定めた名前か(Unicode・CLDR)の札を前に置き，入らなければ折り返す(続く行は札の後ろにそろえる)
-//! - 読み．「読み」の札のあとに「、」で並べ，入らない読みは「+n」にまとめる
-//! - ショートコードとコードポイント．等幅の字の札にし，札の途中では切らずに次の行へ送る．行より広い札は字を縮め，それでも入らなければ札の中で折り返す
+//! 情報の列は，上に見出しの行，その下に「項目名 → 値」の表を置く．
+//! - 見出しの行: 名前を大きく出し，名前を定めたところ(CLDR)を同じベースラインに小さく添える．ピン留めのボタンは見出しの行の縦の中心に置く
+//! - 表: 項目名はいちばん長い項目名の幅の列に置き，値はどの行も同じ x から書き出す．折り返した値の 2 行目以降も値の x にそろえる
+//! - 項目名と値は文字のベースラインで合わせる．ショートコードとコードポイントの札も，中の文字のベースラインを項目名に合わせる
+//! - 行の間は size.palette.preview-row-gap 1 つ．表の行は文字の行も札の行も同じ高さ
 //!
-//! 項目は，見本の高さまでに始まるものは見本の右に，その下で始まるものは欄の幅いっぱいに置く(折り返した行は項目の 1 行目にそろえる)．
-//! ピン留めのボタンの高さまでの行はボタンの手前で止める．
-//! 欄の高さは出す項目の設定だけで決める(`height`)．選んでいる文字の中身が入りきらなければ，
-//! Unicode の名前の行を減らし，見出しの名前を 1 行にし，読みを省き，Unicode の名前を省く順に詰める．それでも入らない札は「+n」にまとめる
+//! 欄の高さ(`height`)は，設定で出る行がすべて出たときの高さ(Unicode の名前は preview-name-lines 行)にし，選んでいる文字では変えない．
+//! Unicode の名前がその行数に入らなければ末尾を「…」で省く(読み上げでは全体を伝える)．中身が欄に入りきらなければ
+//! (長いショートコードや多くのコードポイントの札が何行にもなるとき)，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く順に詰め，
+//! それでも入らない札は「+n」にまとめる
 
 use super::layout::Fonts;
 use crate::geometry::Frame;
@@ -22,47 +23,74 @@ use crate::theme::Font;
 use ipc::{PalettePreview, PalettePreviewFields};
 use tokens::size::palette;
 
-/// 描く部品．文字の枠の高さは行の高さで，描く側が縦に中央にそろえる
-#[derive(Debug, Clone, PartialEq)]
-pub enum Part {
-    Text {
-        text: String,
-        font: Font,
-        frame: Frame,
-    },
-    /// 名前を定めたところと「読み」の枠の札
-    Tag { text: String, frame: Frame },
-    /// ショートコードとコードポイントの札．行より広ければ字を縮め(small)，それでも入らなければ札の中で折り返す
-    Chip {
-        lines: Vec<String>,
-        small: bool,
-        frame: Frame,
-    },
+/// 文字の役割．描く側が役割ごとに書体と色を決める
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    /// 見出しの名前
+    Heading,
+    /// 見出しに添える，名前を定めたところ
+    Source,
+    /// 表の項目名
+    Label,
+    /// 表の値(Unicode の名前と読み)
+    Value,
     /// 入らなかった読みや札の数(「+n」)
-    More { count: usize, frame: Frame },
+    More,
+    /// ショートコードとコードポイントの札の文字
+    Code,
+    /// 行に入らない札を縮めた文字
+    SmallCode,
 }
 
-impl Part {
-    pub fn frame(&self) -> Frame {
+impl Role {
+    pub fn font(self, fonts: &Fonts) -> Font {
         match self {
-            Self::Text { frame, .. }
-            | Self::Tag { frame, .. }
-            | Self::Chip { frame, .. }
-            | Self::More { frame, .. } => *frame,
+            Self::Heading => fonts.name,
+            Self::Source | Self::Label => fonts.label,
+            Self::Value | Self::More => fonts.detail,
+            Self::Code => fonts.code,
+            Self::SmallCode => fonts.code_small,
         }
     }
-
-    fn is_chip(&self) -> bool {
-        matches!(self, Self::Chip { .. })
-    }
 }
 
-/// 欄の中で，名前・読み・札を置く場所(上下の余白を除いた欄)と，見本とピン留めのボタンが占める場所
+/// 描く部品
+#[derive(Debug, Clone, PartialEq)]
+pub enum Part {
+    /// 1 行の文字．x から書き，baseline に文字のベースラインを置く
+    Text {
+        text: String,
+        role: Role,
+        x: f32,
+        baseline: f32,
+        width: f32,
+    },
+    /// 等幅の文字の札．lines は札の中の行(行より広い札だけ 2 行以上)で，baselines はその行のベースライン
+    Chip {
+        lines: Vec<String>,
+        role: Role,
+        frame: Frame,
+        text_x: f32,
+        baselines: Vec<f32>,
+    },
+}
+
+/// 置いた部品
+#[derive(Debug, Clone, PartialEq)]
+pub struct Placed {
+    pub parts: Vec<Part>,
+    /// 見出しの行の縦の中心
+    pub heading_mid_y: f32,
+    /// 値を書き出す x
+    pub value_x: f32,
+}
+
+/// 欄の中で，情報を置く場所(上下の余白を除いた欄)と見本の四角と，見出しの行の右に空けておくピン留めのボタンの幅
 #[derive(Debug, Clone, Copy)]
 pub struct Area {
     pub content: Frame,
     pub tile: Frame,
-    pub pin: Frame,
+    pub pin_width: f32,
 }
 
 /// 説明の欄に出す項目．送られてこなければ(項目を選べないエンジン)すべて出す
@@ -75,72 +103,105 @@ pub fn fields(sent: Option<&PalettePreviewFields>) -> PalettePreviewFields {
     })
 }
 
-/// 見本の枠の一辺(顔文字は横に広げる)
+/// 見本の四角の一辺(顔文字は横に広げる)
 pub fn tile_side() -> f32 {
     palette::PREVIEW_GLYPH_SIZE + palette::PREVIEW_TILE_PADDING * 2.0
 }
 
-/// 欄(rect)から上下の余白を除いた，見本と名前を置く場所
+/// 欄(rect)から上下の余白を除いた，見本と情報の列を置く場所
 pub fn content_area(rect: Frame) -> Frame {
     rect.inset(0.0, palette::PREVIEW_PADDING_Y)
 }
 
-/// 欄の高さ．見本の高さと，見込んだ行(見出し・Unicode の名前・読み・札)を積んだ高さの大きいほうに，上下の余白を足したもの
+/// 欄の高さ(上下の余白を含む)．見本の高さと，設定で出る行がすべて出たときの高さの大きいほう
 pub fn height(fields: &PalettePreviewFields, fonts: &Fonts, measure: &dyn Measure) -> f32 {
-    let metrics = Metrics { fonts, measure };
-    let mut height = metrics.name_row();
+    let rows = Rows::new(&Metrics { fonts, measure });
+    let mut height = rows.heading.height(1);
+    let gap = palette::PREVIEW_ROW_GAP;
     if fields.unicode_name {
-        height += palette::PREVIEW_LINE_GAP
-            + metrics.detail_row()
-            + metrics.line(fonts.detail) * (palette::PREVIEW_NAME_LINES - 1.0);
+        height += gap + rows.table.height(palette::PREVIEW_NAME_LINES as usize);
     }
-    if fields.readings {
-        height += palette::PREVIEW_LINE_GAP + metrics.detail_row();
-    }
-    if fields.shortcodes || fields.code_points {
-        let lines = palette::PREVIEW_CHIP_LINES;
-        height += palette::PREVIEW_LINE_GAP
-            + metrics.chip_height(1, false) * lines
-            + palette::PREVIEW_CHIP_GAP * (lines - 1.0);
+    for shown in [fields.readings, fields.shortcodes, fields.code_points] {
+        if shown {
+            height += gap + rows.table.height(1);
+        }
     }
     (height.max(tile_side()) + palette::PREVIEW_PADDING_Y * 2.0).ceil()
 }
 
-/// 名前・読み・札の部品．入りきらなければ詰める
-pub fn parts(
+/// 情報を置く場所の上の端(top)から見たときの，見出しの行の縦の中心
+pub fn heading_mid_y(top: f32, fonts: &Fonts, measure: &dyn Measure) -> f32 {
+    top + Rows::new(&Metrics { fonts, measure }).heading.height(1) / 2.0
+}
+
+/// 部品の枠(文字は行の高さの枠)．重なりと欄からのはみ出しを確かめるのに使う
+pub fn frame_of(part: &Part, fonts: &Fonts, measure: &dyn Measure) -> Frame {
+    match part {
+        Part::Text {
+            role,
+            x,
+            baseline,
+            width,
+            ..
+        } => {
+            let metrics = Metrics { fonts, measure };
+            let font = role.font(fonts);
+            Frame::new(
+                *x,
+                baseline - metrics.ascent(font),
+                *width,
+                metrics.ascent(font) + metrics.descent(font),
+            )
+        }
+        Part::Chip { frame, .. } => *frame,
+    }
+}
+
+/// 名前・項目名・値・札を置く．kaomoji なら項目名の列を読みだけで決める(顔文字は読みだけを出す)
+pub fn place(
     shown: &PalettePreview,
+    fields: &PalettePreviewFields,
+    kaomoji: bool,
     area: &Area,
     fonts: &Fonts,
     measure: &dyn Measure,
-) -> Vec<Part> {
-    let metrics = Metrics { fonts, measure };
+) -> Placed {
+    let fields = if kaomoji {
+        PalettePreviewFields {
+            unicode_name: false,
+            readings: fields.readings,
+            shortcodes: false,
+            code_points: false,
+        }
+    } else {
+        fields.clone()
+    };
+    let planner = Planner {
+        shown,
+        fields: &fields,
+        area,
+        metrics: Metrics { fonts, measure },
+    };
     let mut options = Options::default();
-    let mut parts = plan(shown, &options, area, &metrics);
-    // 入りきらなければ，Unicode の名前の行を見込んだ数まで減らし，見出しの名前を 1 行にし，読みを省き，Unicode の名前を 1 行にし，省く
-    let steps: [fn(&mut Options); 5] = [
-        |options| {
-            options.unicode_lines = options
-                .unicode_lines
-                .min(palette::PREVIEW_NAME_LINES as usize)
-        },
-        |options| options.heading_lines = 1,
+    let mut placed = planner.plan(&options);
+    // 入りきらなければ，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く(求められた Unicode の名前をなるべく残す)
+    let steps: [fn(&mut Options); 3] = [
         |options| options.readings = false,
         |options| options.unicode_lines = 1,
         |options| options.unicode_name = false,
     ];
     for step in steps {
-        if bottom(&parts) <= area.content.max_y() {
+        if planner.bottom(&placed) <= area.content.max_y() {
             break;
         }
         step(&mut options);
-        parts = plan(shown, &options, area, &metrics);
+        placed = planner.plan(&options);
     }
-    limiting_chips(parts, area, &metrics)
+    planner.limiting_chips(placed)
 }
 
-/// 詰めるときに変えるもの
+/// 詰め方．入りきらないときに変える
 struct Options {
-    heading_lines: usize,
     unicode_lines: usize,
     readings: bool,
     unicode_name: bool,
@@ -149,582 +210,718 @@ struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            heading_lines: palette::PREVIEW_HEADING_MAX_LINES as usize,
-            unicode_lines: palette::PREVIEW_NAME_MAX_LINES as usize,
+            unicode_lines: palette::PREVIEW_NAME_LINES as usize,
             readings: true,
             unicode_name: true,
         }
     }
 }
 
-/// 書体ごとの行の高さと文字の幅
+/// 書体ごとの幅と高さ
 struct Metrics<'a> {
     fonts: &'a Fonts,
     measure: &'a dyn Measure,
 }
 
-impl Metrics<'_> {
-    fn line(&self, font: Font) -> f32 {
-        self.measure.height(font).ceil()
-    }
+/// 書体の高さを測る字(英字と，書体の代わりに使う日本語の字の両方)
+const LINE_SAMPLE: &str = "Aあ";
 
-    fn width(&self, text: &str, font: Font) -> f32 {
+impl Metrics<'_> {
+    fn width(&self, text: &str, role: Role) -> f32 {
         if text.is_empty() {
             0.0
         } else {
-            self.measure.width(text, font).ceil()
+            self.measure.width(text, role.font(self.fonts)).ceil()
         }
     }
 
-    fn tag_height(&self) -> f32 {
-        self.line(self.fonts.tag) + palette::PREVIEW_CHIP_PADDING_Y
+    fn ascent(&self, font: Font) -> f32 {
+        self.measure.line(LINE_SAMPLE, font).1.ceil()
     }
 
-    /// 札を添える行の高さ
-    fn name_row(&self) -> f32 {
-        self.line(self.fonts.name).max(self.tag_height())
+    fn descent(&self, font: Font) -> f32 {
+        let (height, baseline) = self.measure.line(LINE_SAMPLE, font);
+        (height - baseline).ceil()
     }
 
-    fn detail_row(&self) -> f32 {
-        self.line(self.fonts.detail).max(self.tag_height())
+    fn role_ascent(&self, role: Role) -> f32 {
+        self.ascent(role.font(self.fonts))
     }
 
-    fn chip_height(&self, lines: usize, small: bool) -> f32 {
-        let font = if small {
-            self.fonts.code_small
-        } else {
-            self.fonts.code
-        };
-        self.line(font) * lines as f32 + palette::PREVIEW_CHIP_PADDING_Y * 2.0
+    fn role_descent(&self, role: Role) -> f32 {
+        self.descent(role.font(self.fonts))
     }
 
-    fn tag_width(&self, text: &str) -> f32 {
-        self.width(text, self.fonts.tag) + palette::PREVIEW_TAG_PADDING_X * 2.0
-    }
-
-    fn more_width(&self, count: usize) -> f32 {
-        self.width(&strings::more(count), self.fonts.detail)
-    }
-
-    fn measure_with(&self, font: Font) -> impl Fn(&str) -> f32 + '_ {
-        move |text: &str| self.width(text, font)
+    fn measuring(&self, role: Role) -> impl Fn(&str) -> f32 + '_ {
+        move |text: &str| self.width(text, role)
     }
 }
 
-/// y から始まる行の左右の端．見本の高さまでは見本の右，ピン留めのボタンの高さまではボタンの手前まで
-fn span(y: f32, area: &Area) -> (f32, f32) {
-    let min_x = if y < area.tile.max_y() {
-        area.tile.max_x() + palette::PREVIEW_GAP
-    } else {
-        area.content.x
-    };
-    let max_x = if y < area.pin.max_y() {
-        area.pin.x
-    } else {
-        area.content.max_x()
-    };
-    (min_x, max_x)
+/// 行の高さ．1 行目のベースラインは行の上の端から ascent，続く行は pitch ずつ下
+#[derive(Debug, Clone, Copy)]
+struct RowMetrics {
+    ascent: f32,
+    descent: f32,
 }
 
-/// 折り返して置く文字の書式．indent は行の左の端からずらす幅(札の後ろにそろえる)，reserve は行の右に空けておく幅(後ろに置く札の分)．
-/// rows は 1 行目(札を置く行)と続く行の高さ
-struct Block {
-    font: Font,
-    max_lines: usize,
-    indent: f32,
-    reserve: f32,
-    rows: (f32, f32),
-}
-
-/// 折り返した 1 行．frame の高さは行の高さ
-struct Line {
-    text: String,
-    frame: Frame,
-}
-
-/// top から text を折り返して置いた行．左の端は 1 行目の位置(span)にそろえ，右の端は行ごとに決める．
-/// max_lines を超える分は最後の行の末尾を「…」で省く
-fn flow(text: &str, block: &Block, top: f32, area: &Area, metrics: &Metrics) -> Vec<Line> {
-    let measure = metrics.measure_with(block.font);
-    let mut lines: Vec<Line> = Vec::new();
-    let mut rest: Vec<char> = text.chars().collect();
-    let mut y = top;
-    // 続く行も 1 行目と同じ左の端から書く(見本の下に回り込ませると，札の後ろにそろわない)
-    let x = span(top, area).0 + block.indent;
-    while !rest.is_empty() && lines.len() < block.max_lines {
-        let width = span(y, area).1 - x - block.reserve;
-        let count = fitting::line_break(&rest, width, &measure);
-        let last = lines.len() + 1 == block.max_lines && count < rest.len();
-        let shown = if last {
-            fitting::truncated(&rest.iter().collect::<String>(), width, &measure)
-        } else {
-            rest[..count].iter().collect::<String>().trim().to_string()
-        };
-        let row = if lines.is_empty() {
-            block.rows.0
-        } else {
-            block.rows.1
-        };
-        lines.push(Line {
-            frame: Frame::new(x.round(), y.round(), metrics.width(&shown, block.font), row),
-            text: shown,
-        });
-        y += row;
-        rest = if last {
-            Vec::new()
-        } else {
-            rest[count..]
-                .iter()
-                .skip_while(|character| **character == ' ')
-                .copied()
-                .collect()
-        };
+impl RowMetrics {
+    fn pitch(&self) -> f32 {
+        self.ascent + self.descent
     }
-    lines
-}
 
-/// 行(高さ row)の中で縦に中央にそろえた枠
-fn centered(x: f32, y: f32, width: f32, height: f32, row: f32) -> Frame {
-    Frame::new(x.round(), (y + (row - height) / 2.0).round(), width, height)
-}
-
-fn plan(shown: &PalettePreview, options: &Options, area: &Area, metrics: &Metrics) -> Vec<Part> {
-    let fonts = metrics.fonts;
-    let mut parts = Vec::new();
-    let mut y = area.content.y;
-    // 見出しの名前と，どこで定めた名前かの札．札は最後の行の後ろに置く
-    let tag_space = shown.name_source.as_deref().map_or(0.0, |source| {
-        metrics.tag_width(source) + palette::PREVIEW_TAG_GAP
-    });
-    let heading = flow(
-        &shown.japanese_name,
-        &Block {
-            font: fonts.name,
-            max_lines: options.heading_lines,
-            indent: 0.0,
-            reserve: tag_space,
-            rows: (metrics.name_row(), metrics.line(fonts.name)),
-        },
-        y,
-        area,
-        metrics,
-    );
-    if let (Some(source), Some(last)) = (shown.name_source.as_deref(), heading.last()) {
-        parts.push(Part::Tag {
-            text: source.to_string(),
-            frame: centered(
-                last.frame.max_x() + palette::PREVIEW_TAG_GAP,
-                last.frame.y,
-                metrics.tag_width(source),
-                metrics.tag_height(),
-                last.frame.height,
-            ),
-        });
+    fn height(&self, lines: usize) -> f32 {
+        self.pitch() * lines.max(1) as f32
     }
-    y = heading
-        .last()
-        .map_or(y + metrics.name_row(), |line| line.frame.max_y());
-    parts.extend(heading.into_iter().map(|line| Part::Text {
-        text: line.text,
-        font: fonts.name,
-        frame: line.frame,
-    }));
-    // Unicode の名前．札の後ろから書き，折り返した行も札の後ろにそろえる
-    if options.unicode_name && !shown.english_name.is_empty() {
-        y += palette::PREVIEW_LINE_GAP;
-        let detail_row = metrics.detail_row();
-        let mut indent = 0.0;
-        if let Some(source) = shown.english_name_source.as_deref() {
-            let width = metrics.tag_width(source);
-            parts.push(Part::Tag {
-                text: source.to_string(),
-                frame: centered(span(y, area).0, y, width, metrics.tag_height(), detail_row),
-            });
-            indent = width + palette::PREVIEW_TAG_GAP;
-        }
-        let lines = flow(
-            &shown.english_name,
-            &Block {
-                font: fonts.detail,
-                max_lines: options.unicode_lines,
-                indent,
-                reserve: 0.0,
-                rows: (detail_row, metrics.line(fonts.detail)),
+}
+
+/// 見出しの行と表の行の高さ．表の行は，文字の値の行も札の行も同じ高さにし，縦の間隔をそろえる
+struct Rows {
+    heading: RowMetrics,
+    table: RowMetrics,
+}
+
+impl Rows {
+    fn new(metrics: &Metrics) -> Self {
+        let max = |values: &[f32]| values.iter().copied().fold(0.0, f32::max);
+        let padding = palette::PREVIEW_CHIP_PADDING_Y;
+        Self {
+            heading: RowMetrics {
+                ascent: max(&[
+                    metrics.role_ascent(Role::Heading),
+                    metrics.role_ascent(Role::Source),
+                ]),
+                descent: max(&[
+                    metrics.role_descent(Role::Heading),
+                    metrics.role_descent(Role::Source),
+                ]),
             },
-            y,
-            area,
-            metrics,
-        );
-        y = lines.last().map_or(y, |line| line.frame.max_y());
-        parts.extend(lines.into_iter().map(|line| Part::Text {
-            text: line.text,
-            font: fonts.detail,
-            frame: line.frame,
-        }));
+            // 札は中の文字の上下に余白を足しても，行の高さに収める
+            table: RowMetrics {
+                ascent: max(&[
+                    metrics.role_ascent(Role::Label),
+                    metrics.role_ascent(Role::Value),
+                    metrics.role_ascent(Role::More),
+                    metrics.role_ascent(Role::Code) + padding,
+                ]),
+                descent: max(&[
+                    metrics.role_descent(Role::Label),
+                    metrics.role_descent(Role::Value),
+                    metrics.role_descent(Role::More),
+                    metrics.role_descent(Role::Code) + padding,
+                ]),
+            },
+        }
     }
-    // 読み．入る数だけ並べ，残りの数を添える
-    if options.readings && !shown.readings.is_empty() {
-        y += palette::PREVIEW_LINE_GAP;
-        let (min_x, max_x) = span(y, area);
-        let detail_row = metrics.detail_row();
-        let label_width = metrics.tag_width(strings::PALETTE_READINGS);
-        parts.push(Part::Tag {
-            text: strings::PALETTE_READINGS.to_string(),
-            frame: centered(min_x, y, label_width, metrics.tag_height(), detail_row),
-        });
-        let x = min_x + label_width + palette::PREVIEW_TAG_GAP;
-        let (text, rest) = fitting_readings(&shown.readings, max_x - x, metrics);
-        let width = metrics.width(&text, fonts.detail);
-        parts.push(Part::Text {
+}
+
+/// 1 つの文字の配置を，詰め方ごとに作る
+struct Planner<'a> {
+    shown: &'a PalettePreview,
+    fields: &'a PalettePreviewFields,
+    area: &'a Area,
+    metrics: Metrics<'a>,
+}
+
+impl Planner<'_> {
+    /// 情報の列の左の端
+    fn left(&self) -> f32 {
+        self.area.tile.max_x() + palette::PREVIEW_GAP
+    }
+
+    /// 項目名の列の幅．出す設定の項目名のうちいちばん長いもの(選んでいる文字によらず値の x を変えない)
+    fn label_width(&self) -> f32 {
+        let mut labels = Vec::new();
+        if self.fields.unicode_name {
+            labels.extend([strings::PALETTE_UNICODE_NAME, strings::PALETTE_ENGLISH_NAME]);
+        }
+        if self.fields.readings {
+            labels.push(strings::PALETTE_READINGS);
+        }
+        if self.fields.shortcodes {
+            labels.push(strings::PALETTE_SHORTCODES);
+        }
+        if self.fields.code_points {
+            labels.push(strings::PALETTE_CODE_POINTS);
+        }
+        labels
+            .into_iter()
+            .map(|label| self.metrics.width(label, Role::Label))
+            .fold(0.0, f32::max)
+    }
+
+    fn value_x(&self) -> f32 {
+        let width = self.label_width();
+        if width > 0.0 {
+            self.left() + width + palette::PREVIEW_LABEL_GAP
+        } else {
+            self.left()
+        }
+    }
+
+    fn text(&self, text: String, role: Role, x: f32, baseline: f32) -> Part {
+        let width = self.metrics.width(&text, role);
+        Part::Text {
             text,
-            font: fonts.detail,
-            frame: Frame::new(x.round(), y.round(), width, detail_row),
-        });
-        if rest > 0 {
-            parts.push(Part::More {
-                count: rest,
-                frame: Frame::new(
-                    (x + width + palette::PREVIEW_TAG_GAP).round(),
-                    y.round(),
-                    metrics.more_width(rest),
-                    detail_row,
-                ),
+            role,
+            x,
+            baseline,
+            width,
+        }
+    }
+
+    fn plan(&self, options: &Options) -> Placed {
+        let rows = Rows::new(&self.metrics);
+        let content = self.area.content;
+        let gap = palette::PREVIEW_ROW_GAP;
+        let left = self.left();
+        let mut parts = Vec::new();
+        // 見出しの行．名前と名前を定めたところを同じベースラインに置く
+        let heading_baseline = content.y + rows.heading.ascent;
+        let source = self
+            .shown
+            .name_source
+            .as_deref()
+            .map(|source| (source, self.metrics.width(source, Role::Source)));
+        let space = content.max_x()
+            - self.area.pin_width
+            - left
+            - source.map_or(0.0, |(_, width)| palette::PREVIEW_SOURCE_GAP + width);
+        let name = fitting::truncated(
+            &self.shown.japanese_name,
+            space,
+            &self.metrics.measuring(Role::Heading),
+        );
+        let name_width = self.metrics.width(&name, Role::Heading);
+        parts.push(self.text(name, Role::Heading, left, heading_baseline));
+        if let Some((text, _)) = source {
+            parts.push(self.text(
+                text.to_string(),
+                Role::Source,
+                left + name_width + palette::PREVIEW_SOURCE_GAP,
+                heading_baseline,
+            ));
+        }
+        let mut y = content.y + rows.heading.height(1);
+        let value_x = self.value_x();
+        let value_width = content.max_x() - value_x;
+        let pitch = rows.table.pitch();
+        // Unicode の名前(並びは英語の名前)．値の x にそろえて折り返す
+        if options.unicode_name && self.fields.unicode_name && !self.shown.english_name.is_empty() {
+            y += gap;
+            let label = if self.shown.english_name_source.as_deref()
+                == Some(strings::PALETTE_UNICODE_SOURCE)
+            {
+                strings::PALETTE_UNICODE_NAME
+            } else {
+                strings::PALETTE_ENGLISH_NAME
+            };
+            let lines = fitting::wrapped(
+                &self.shown.english_name,
+                value_width,
+                options.unicode_lines,
+                &self.metrics.measuring(Role::Value),
+            );
+            for (index, line) in lines.iter().enumerate() {
+                let baseline = y + rows.table.ascent + pitch * index as f32;
+                if index == 0 {
+                    parts.push(self.text(label.to_string(), Role::Label, left, baseline));
+                }
+                parts.push(self.text(line.clone(), Role::Value, value_x, baseline));
+            }
+            y += rows.table.height(lines.len());
+        }
+        // 読み．入る数だけ「、」でつなぎ，残りの数を添える
+        if options.readings && self.fields.readings && !self.shown.readings.is_empty() {
+            y += gap;
+            let baseline = y + rows.table.ascent;
+            parts.push(self.text(
+                strings::PALETTE_READINGS.to_string(),
+                Role::Label,
+                left,
+                baseline,
+            ));
+            let (text, rest) = self.fitting_readings(value_width);
+            let width = self.metrics.width(&text, Role::Value);
+            parts.push(self.text(text, Role::Value, value_x, baseline));
+            if rest > 0 {
+                parts.push(self.text(
+                    strings::more(rest),
+                    Role::More,
+                    value_x + width + palette::PREVIEW_CHIP_GAP,
+                    baseline,
+                ));
+            }
+            y += rows.table.height(1);
+        }
+        // ショートコードとコードポイントの札
+        let code_points: Vec<String> = self
+            .shown
+            .code_points
+            .split_whitespace()
+            .map(String::from)
+            .collect();
+        for (label, values, shown) in [
+            (
+                strings::PALETTE_SHORTCODES,
+                &self.shown.shortcodes,
+                self.fields.shortcodes,
+            ),
+            (
+                strings::PALETTE_CODE_POINTS,
+                &code_points,
+                self.fields.code_points,
+            ),
+        ] {
+            if !shown || values.is_empty() {
+                continue;
+            }
+            y += gap;
+            parts.push(self.text(label.to_string(), Role::Label, left, y + rows.table.ascent));
+            let (chips, lines) = self.flow_chips(values, y, value_x, value_width, &rows);
+            parts.extend(chips);
+            y += rows.table.height(lines);
+        }
+        Placed {
+            parts,
+            heading_mid_y: content.y + rows.heading.height(1) / 2.0,
+            value_x,
+        }
+    }
+
+    /// 札を値の幅で流し込む．入らない札は次の行へ送り，値の幅より広い札は字を縮め，それでも入らなければ札の中で折り返す(札の高さは行の数だけ)
+    fn flow_chips(
+        &self,
+        values: &[String],
+        top: f32,
+        left: f32,
+        width: f32,
+        rows: &Rows,
+    ) -> (Vec<Part>, usize) {
+        let padding_x = palette::PREVIEW_CHIP_PADDING_X;
+        let padding_y = palette::PREVIEW_CHIP_PADDING_Y;
+        let pitch = rows.table.pitch();
+        let mut chips = Vec::new();
+        let mut line = 0;
+        let mut x = left;
+        for value in values {
+            let mut role = Role::Code;
+            let mut chip_width = self.metrics.width(value, Role::Code) + padding_x * 2.0;
+            let mut lines = vec![value.clone()];
+            if chip_width > width {
+                role = Role::SmallCode;
+                chip_width = self.metrics.width(value, Role::SmallCode) + padding_x * 2.0;
+                if chip_width > width {
+                    lines = fitting::wrapped(
+                        value,
+                        width - padding_x * 2.0,
+                        usize::MAX,
+                        &self.metrics.measuring(Role::SmallCode),
+                    );
+                    chip_width = lines
+                        .iter()
+                        .map(|line| self.metrics.width(line, Role::SmallCode))
+                        .fold(0.0, f32::max)
+                        + padding_x * 2.0;
+                }
+            }
+            // 行の途中で入らない札と，2 行以上の札は，次の行の頭から置く
+            if x > left && (x + chip_width > left + width || lines.len() > 1) {
+                line += 1;
+                x = left;
+            }
+            let baselines: Vec<f32> = (0..lines.len())
+                .map(|index| top + rows.table.ascent + pitch * (line + index) as f32)
+                .collect();
+            let first = baselines[0];
+            let last = baselines[baselines.len() - 1];
+            let ascent = self.metrics.role_ascent(role);
+            let descent = self.metrics.role_descent(role);
+            let frame = Frame::new(
+                x,
+                first - ascent - padding_y,
+                chip_width,
+                last - first + ascent + descent + padding_y * 2.0,
+            );
+            let count = lines.len();
+            chips.push(Part::Chip {
+                lines,
+                role,
+                frame,
+                text_x: x + padding_x,
+                baselines,
             });
-        }
-        y += detail_row;
-    }
-    // ショートコードとコードポイントの札．入らない札は次の行へ送り，行より広い札は字を縮め，それでも入らなければ札の中で折り返す
-    let chips: Vec<&str> = shown
-        .shortcodes
-        .iter()
-        .map(String::as_str)
-        .chain(shown.code_points.split_whitespace())
-        .collect();
-    if chips.is_empty() {
-        return parts;
-    }
-    y += palette::PREVIEW_LINE_GAP;
-    let (mut min_x, mut max_x) = span(y, area);
-    let mut x = min_x;
-    let mut row = 0.0_f32;
-    let measure = metrics.measure_with(fonts.code_small);
-    for chip in chips {
-        let mut lines = vec![chip.to_string()];
-        let mut width = metrics.width(chip, fonts.code) + palette::PREVIEW_CHIP_PADDING_X * 2.0;
-        if x > min_x && x + width > max_x {
-            y += row + palette::PREVIEW_CHIP_GAP;
-            (min_x, max_x) = span(y, area);
-            x = min_x;
-            row = 0.0;
-        }
-        let row_width = max_x - min_x;
-        let small = width > row_width;
-        if small {
-            width = metrics.width(chip, fonts.code_small) + palette::PREVIEW_CHIP_PADDING_X * 2.0;
-            if width > row_width {
-                width = row_width;
-                lines = fitting::wrapped(
-                    chip,
-                    width - palette::PREVIEW_CHIP_PADDING_X * 2.0,
-                    usize::MAX,
-                    &measure,
-                );
+            if count > 1 {
+                line += count;
+                x = left;
+            } else {
+                x += chip_width + palette::PREVIEW_CHIP_GAP;
             }
         }
-        let height = metrics.chip_height(lines.len(), small);
-        parts.push(Part::Chip {
-            lines,
-            small,
-            frame: Frame::new(x.round(), y.round(), width, height),
-        });
-        x += width + palette::PREVIEW_CHIP_GAP;
-        row = row.max(height);
+        let lines = if x > left { line + 1 } else { line };
+        (chips, lines)
     }
-    parts
-}
 
-fn bottom(parts: &[Part]) -> f32 {
-    parts
-        .iter()
-        .map(|part| part.frame().max_y())
-        .fold(0.0, f32::max)
-}
+    fn bottom(&self, placed: &Placed) -> f32 {
+        placed
+            .parts
+            .iter()
+            .map(|part| frame_of(part, self.metrics.fonts, self.metrics.measure).max_y())
+            .fold(0.0, f32::max)
+    }
 
-/// 欄の下の端を越える札を除き，除いた数を最後に残した札の後ろに「+n」で示す．「+n」が入らなければその札も除く
-fn limiting_chips(parts: Vec<Part>, area: &Area, metrics: &Metrics) -> Vec<Part> {
-    let limit = area.content.max_y();
-    if bottom(&parts) <= limit {
-        return parts;
-    }
-    let total = parts.iter().filter(|part| part.is_chip()).count();
-    let mut kept: Vec<Part> = parts
-        .into_iter()
-        .filter(|part| !part.is_chip() || part.frame().max_y() <= limit)
-        .collect();
-    while let Some(index) = kept.iter().rposition(Part::is_chip) {
-        let last = kept[index].frame();
-        let dropped = total - kept.iter().filter(|part| part.is_chip()).count();
-        let more = Frame::new(
-            last.max_x() + palette::PREVIEW_CHIP_GAP,
-            last.y,
-            metrics.more_width(dropped),
-            last.height,
-        );
-        if more.max_x() <= span(last.y, area).1 {
-            kept.push(Part::More {
-                count: dropped,
-                frame: more,
-            });
-            return kept;
+    /// 欄の下の端を越える札を除き，除いた数を最後に残した札の後ろに「+n」で示す．「+n」が入らなければその札も除く
+    fn limiting_chips(&self, mut placed: Placed) -> Placed {
+        let limit = self.area.content.max_y();
+        if self.bottom(&placed) <= limit {
+            return placed;
         }
-        kept.remove(index);
+        let is_chip = |part: &Part| matches!(part, Part::Chip { .. });
+        let total = placed.parts.iter().filter(|part| is_chip(part)).count();
+        placed
+            .parts
+            .retain(|part| !matches!(part, Part::Chip { frame, .. } if frame.max_y() > limit));
+        while let Some(index) = placed.parts.iter().rposition(is_chip) {
+            let kept = placed.parts.iter().filter(|part| is_chip(part)).count();
+            let Part::Chip {
+                frame, baselines, ..
+            } = &placed.parts[index]
+            else {
+                break;
+            };
+            let more = strings::more(total - kept);
+            let x = frame.max_x() + palette::PREVIEW_CHIP_GAP;
+            let baseline = baselines[0];
+            if x + self.metrics.width(&more, Role::More) <= self.area.content.max_x() {
+                placed.parts.push(self.text(more, Role::More, x, baseline));
+                return placed;
+            }
+            placed.parts.remove(index);
+        }
+        placed
     }
-    kept
-}
 
-/// 幅に入る数の読み(「、」でつなぐ)と，入らなかった読みの数．1 つ目も入らなければ末尾を省く
-fn fitting_readings(readings: &[String], width: f32, metrics: &Metrics) -> (String, usize) {
-    let fonts = metrics.fonts;
-    let more = |rest: usize| {
-        if rest > 0 {
-            palette::PREVIEW_TAG_GAP + metrics.more_width(rest)
-        } else {
-            0.0
+    /// 幅に入る数の読み(「、」でつなぐ)と，入らなかった読みの数．1 つ目も入らなければ末尾を省く
+    fn fitting_readings(&self, width: f32) -> (String, usize) {
+        let readings = &self.shown.readings;
+        let more = |rest: usize| {
+            if rest > 0 {
+                palette::PREVIEW_CHIP_GAP + self.metrics.width(&strings::more(rest), Role::More)
+            } else {
+                0.0
+            }
+        };
+        for count in (1..=readings.len()).rev() {
+            let text = readings[..count].join(strings::PALETTE_READING_SEPARATOR);
+            let rest = readings.len() - count;
+            if self.metrics.width(&text, Role::Value) + more(rest) <= width {
+                return (text, rest);
+            }
         }
-    };
-    for count in (1..=readings.len()).rev() {
-        let text = readings[..count].join(strings::PALETTE_READING_SEPARATOR);
-        let rest = readings.len() - count;
-        if metrics.width(&text, fonts.detail) + more(rest) <= width {
-            return (text, rest);
-        }
+        let rest = readings.len().saturating_sub(1);
+        let first = readings.first().map(String::as_str).unwrap_or_default();
+        (
+            fitting::truncated(
+                first,
+                width - more(rest),
+                &self.metrics.measuring(Role::Value),
+            ),
+            rest,
+        )
     }
-    let rest = readings.len().saturating_sub(1);
-    let first = readings.first().map(String::as_str).unwrap_or_default();
-    (
-        fitting::truncated(
-            first,
-            width - more(rest),
-            &metrics.measure_with(fonts.detail),
-        ),
-        rest,
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::sample;
     use super::*;
-    use crate::scene::testing::Fixed;
+    use crate::scene::testing::{Fixed, Uneven};
 
     fn fonts() -> Fonts {
         Fonts::new(36.0)
     }
 
-    /// 幅 width の欄(上の余白を除いた高さは fields で決まる)．見本は左上，ピン留めのボタンは右上
-    fn area(width: f32, fields: &PalettePreviewFields) -> Area {
-        let rect = Frame::new(0.0, 0.0, width, height(fields, &fonts(), &Fixed));
+    struct Setup {
+        placed: Placed,
+        area: Area,
+        height: f32,
+    }
+
+    fn setup(
+        shown: &PalettePreview,
+        fields: &PalettePreviewFields,
+        kaomoji: bool,
+        tile_width: f32,
+    ) -> Setup {
+        let measure = Uneven;
+        let height = height(fields, &fonts(), &measure);
+        let rect = Frame::new(8.0, 0.0, 333.0, height);
         let content = content_area(rect);
-        Area {
+        let area = Area {
             content,
-            tile: Frame::new(content.x, content.y, tile_side(), tile_side()),
-            pin: Frame::new(
-                rect.max_x() - palette::FOOTER_HEIGHT,
-                rect.y,
-                palette::FOOTER_HEIGHT,
-                palette::FOOTER_HEIGHT,
-            ),
+            tile: Frame::new(content.x, content.y, tile_width, tile_side()),
+            pin_width: palette::FOOTER_HEIGHT,
+        };
+        Setup {
+            placed: place(shown, fields, kaomoji, &area, &fonts(), &measure),
+            area,
+            height,
         }
     }
 
-    fn texts(parts: &[Part]) -> Vec<String> {
-        parts
+    fn texts(placed: &Placed, role: Role) -> Vec<(String, f32, f32)> {
+        placed
+            .parts
             .iter()
-            .map(|part| match part {
-                Part::Text { text, .. } | Part::Tag { text, .. } => text.clone(),
-                Part::Chip { lines, .. } => lines.join(""),
-                Part::More { count, .. } => strings::more(*count),
+            .filter_map(|part| match part {
+                Part::Text {
+                    text,
+                    role: found,
+                    x,
+                    baseline,
+                    ..
+                } if *found == role => Some((text.clone(), *x, *baseline)),
+                _ => None,
             })
             .collect()
     }
 
-    fn all() -> PalettePreviewFields {
-        fields(None)
+    fn chips(placed: &Placed) -> Vec<(Vec<String>, Frame, Vec<f32>)> {
+        placed
+            .parts
+            .iter()
+            .filter_map(|part| match part {
+                Part::Chip {
+                    lines,
+                    frame,
+                    baselines,
+                    ..
+                } => Some((lines.clone(), *frame, baselines.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 値の x・項目名と値のベースライン・見出しのベースライン・重なり・欄からのはみ出しを確かめる
+    fn assert_aligned(setup: &Setup) {
+        let placed = &setup.placed;
+        let left = setup.area.tile.max_x() + palette::PREVIEW_GAP;
+        // 値は，どの行も同じ x から書き出す(行の頭の札も)
+        for (text, x, _) in texts(placed, Role::Value) {
+            assert_eq!(x, placed.value_x, "{text}");
+        }
+        let chips = chips(placed);
+        for (lines, frame, baselines) in &chips {
+            let starts_line = !chips
+                .iter()
+                .any(|(_, other, others)| other.max_x() <= frame.x && others[0] == baselines[0]);
+            if starts_line {
+                assert_eq!(frame.x, placed.value_x, "{lines:?}");
+            }
+        }
+        // 項目名は情報の列の左の端にそろい，ベースラインが値の 1 行目と同じ
+        let values: Vec<f32> = texts(placed, Role::Value)
+            .into_iter()
+            .map(|(_, _, baseline)| baseline)
+            .chain(chips.iter().map(|(_, _, baselines)| baselines[0]))
+            .collect();
+        for (label, x, baseline) in texts(placed, Role::Label) {
+            assert_eq!(x, left, "{label}");
+            let value = values
+                .iter()
+                .copied()
+                .filter(|value| *value >= baseline - 0.5)
+                .fold(f32::MAX, f32::min);
+            assert!((value - baseline).abs() <= 0.5, "{label}");
+        }
+        // 見出しと添える文字のベースラインが同じ
+        let heading: Vec<f32> = texts(placed, Role::Heading)
+            .into_iter()
+            .chain(texts(placed, Role::Source))
+            .map(|(_, _, baseline)| baseline)
+            .collect();
+        assert!(heading.windows(2).all(|pair| pair[0] == pair[1]));
+        // 部品どうし(見本を含む)が重ならず，欄の中に収まる
+        let frames: Vec<Frame> = placed
+            .parts
+            .iter()
+            .map(|part| frame_of(part, &fonts(), &Uneven))
+            .chain([setup.area.tile])
+            .collect();
+        for (index, frame) in frames.iter().enumerate() {
+            for other in &frames[index + 1..] {
+                let overlaps = frame.x < other.max_x()
+                    && other.x < frame.max_x()
+                    && frame.y < other.max_y()
+                    && other.y < frame.max_y();
+                assert!(!overlaps, "{frame:?} {other:?}");
+            }
+        }
+        let content = setup.area.content;
+        for frame in &frames[..frames.len() - 1] {
+            assert!(frame.x >= content.x && frame.max_x() <= content.max_x() + 0.01);
+            assert!(frame.y >= content.y - 0.01 && frame.max_y() <= content.max_y() + 0.01);
+        }
     }
 
     #[test]
-    fn 欄の高さは出す項目の設定だけで決まる() {
-        let all = all();
-        let none = PalettePreviewFields {
-            unicode_name: false,
+    fn 情報は見本の右の列に置き_値の_x_と項目名と値のベースラインをそろえる() {
+        let panel = sample::emoji();
+        let setup = setup(
+            panel.preview.as_ref().unwrap(),
+            &fields(None),
+            false,
+            tile_side(),
+        );
+        assert_aligned(&setup);
+        let labels: Vec<String> = texts(&setup.placed, Role::Label)
+            .into_iter()
+            .map(|(text, _, _)| text)
+            .collect();
+        assert_eq!(
+            labels,
+            ["Unicode", "読み", "ショートコード", "コードポイント"]
+        );
+        let chips: Vec<Vec<String>> = chips(&setup.placed)
+            .into_iter()
+            .map(|(lines, _, _)| lines)
+            .collect();
+        assert_eq!(chips, [vec![":smile:"], vec!["U+1F604"]]);
+        assert_eq!(texts(&setup.placed, Role::Source)[0].0, "CLDR");
+    }
+
+    #[test]
+    fn 欄の高さは設定で出る行の分だけで_典型の絵文字では最後の行の下に行の間より大きな空きを残さない(
+    ) {
+        let panel = sample::emoji();
+        let shown = panel.preview.as_ref().unwrap();
+        let setup = setup(shown, &fields(None), false, tile_side());
+        let bottom = setup
+            .placed
+            .parts
+            .iter()
+            .map(|part| frame_of(part, &fonts(), &Uneven).max_y())
+            .fold(0.0, f32::max);
+        let space = setup.area.content.max_y() - bottom;
+        assert!((0.0..=palette::PREVIEW_ROW_GAP).contains(&space), "{space}");
+        // 項目を減らせば欄は低くなり，値の x は出す項目名だけで決める
+        let fewer = PalettePreviewFields {
+            unicode_name: true,
             readings: false,
             shortcodes: false,
             code_points: false,
         };
-        let full = height(&all, &fonts(), &Fixed);
-        let bare = height(&none, &fonts(), &Fixed);
-        assert!(full > bare);
-        // 何も出さなくても見本の高さは空ける
-        assert_eq!(
-            bare,
-            (tile_side() + palette::PREVIEW_PADDING_Y * 2.0).ceil()
+        let reduced = self::setup(shown, &fewer, false, tile_side());
+        assert!(reduced.height < setup.height);
+        assert!(reduced.placed.value_x < setup.placed.value_x);
+        assert_aligned(&reduced);
+    }
+
+    #[test]
+    fn 並びの英語の名前は英語の行に出し_cldr_は見出しの_1_か所だけ() {
+        let panel = sample::flag();
+        let setup = setup(
+            panel.preview.as_ref().unwrap(),
+            &fields(None),
+            false,
+            tile_side(),
         );
-        // 札の片方だけでも札の行を空ける
-        let chips = PalettePreviewFields {
-            shortcodes: false,
-            ..all.clone()
-        };
-        assert_eq!(height(&chips, &fonts(), &Fixed), full);
-    }
-
-    #[test]
-    fn 名前に名前を定めたところを添え_読みと札を並べる() {
-        let panel = sample::emoji();
-        let shown = panel.preview.as_ref().unwrap();
-        let area = area(340.0, &all());
-        let parts = parts(shown, &area, &fonts(), &Fixed);
-        let shown_texts = texts(&parts);
-        for text in ["笑顔", "CLDR", "Unicode", "読み", ":smile:", "U+1F604"] {
-            assert!(shown_texts.iter().any(|shown| shown == text), "{text}");
-        }
-        // 札は途中で切らない
-        assert!(!shown_texts.iter().any(|text| text.contains('…')));
-        // 見出しの名前・Unicode の名前・読み・札は上から順に重ならない
-        let top = |wanted: &str| {
-            parts
-                .iter()
-                .find(|part| texts(std::slice::from_ref(part))[0] == wanted)
-                .map(|part| part.frame())
-                .unwrap()
-        };
-        assert!(top("Unicode").y >= top("笑顔").max_y());
-        assert!(top("読み").y > top("Unicode").max_y());
-        assert!(top(":smile:").y > top("読み").max_y());
-        // 見本の高さまでは見本の右に，その下は欄の左から置く
-        assert!(top("笑顔").x >= area.tile.max_x());
-        assert_eq!(top(":smile:").x, area.content.x);
-        // どの部品も欄に収まり，ピン留めのボタンに重ならない
-        for part in &parts {
-            let frame = part.frame();
-            assert!(frame.max_y() <= area.content.max_y(), "{part:?}");
-            assert!(frame.max_x() <= area.content.max_x(), "{part:?}");
-            assert!(
-                frame.y >= area.pin.max_y() || frame.max_x() <= area.pin.x,
-                "{part:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn 長い_unicode_の名前は札の後ろにそろえて折り返す() {
-        let shown = PalettePreview {
-            english_name: "CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS".into(),
-            ..sample::emoji().preview.unwrap()
-        };
-        let area = area(340.0, &all());
-        let parts = parts(&shown, &area, &fonts(), &Fixed);
-        let tag = parts
-            .iter()
-            .find(|part| matches!(part, Part::Tag { text, .. } if text == "Unicode"))
-            .unwrap()
-            .frame();
-        // Unicode の名前の行(英大文字と空白だけの行)
-        let lines: Vec<Frame> = parts
+        assert_aligned(&setup);
+        let all: Vec<String> = setup
+            .placed
+            .parts
             .iter()
             .filter_map(|part| match part {
-                Part::Text { text, frame, .. }
-                    if text
-                        .chars()
-                        .all(|c| c.is_ascii_uppercase() || c == ' ' || c == '…') =>
-                {
-                    Some(*frame)
-                }
+                Part::Text { text, .. } => Some(text.clone()),
                 _ => None,
             })
             .collect();
-        assert!(lines.len() >= 2);
-        // 続く行も札の後ろから書く
-        assert_eq!(lines[0].x, tag.max_x() + palette::PREVIEW_TAG_GAP);
-        assert_eq!(lines[1].x, lines[0].x);
-        assert!(texts(&parts).iter().any(|text| text == "CLOCKWISE"));
+        assert_eq!(all.iter().filter(|text| *text == "CLDR").count(), 1);
+        assert_eq!(texts(&setup.placed, Role::Label)[0].0, "英語");
     }
 
     #[test]
-    fn 長い見出しの名前は折り返し_札を最後の行の後ろに置く() {
-        let shown = PalettePreview {
-            japanese_name: "旗: サウスジョージア・サウスサンドウィッチ諸島".into(),
-            english_name: "flag: South Georgia & South Sandwich Islands".into(),
-            ..sample::flag().preview.unwrap()
-        };
-        let area = area(340.0, &all());
-        let parts = parts(&shown, &area, &fonts(), &Fixed);
-        let heading: Vec<(String, Frame)> = parts
-            .iter()
-            .filter_map(|part| match part {
-                Part::Text { text, font, frame } if *font == fonts().name => {
-                    Some((text.clone(), *frame))
-                }
-                _ => None,
-            })
-            .collect();
-        assert_eq!(heading.len(), 2);
-        assert_eq!(
-            heading
-                .iter()
-                .map(|(text, _)| text.as_str())
-                .collect::<String>(),
-            "旗: サウスジョージア・サウスサンドウィッチ諸島"
+    fn 長い_unicode_の名前は_2_行目の末尾を省き_長いショートコードは縮めて札の中で折り返す() {
+        let panel = sample::long_name();
+        let setup = setup(
+            panel.preview.as_ref().unwrap(),
+            &fields(None),
+            false,
+            tile_side(),
         );
-        let tag = parts
-            .iter()
-            .find(|part| matches!(part, Part::Tag { text, .. } if text == "CLDR"))
-            .unwrap()
-            .frame();
-        assert!(tag.x > heading[1].1.max_x());
-        assert!((tag.mid_y() - heading[1].1.mid_y()).abs() <= 1.0);
-        // 欄に入るよう，Unicode の名前の行を減らして読みを残す
-        assert!(texts(&parts).iter().any(|text| text == "読み"));
-        for part in &parts {
-            assert!(part.frame().max_y() <= area.content.max_y(), "{part:?}");
-        }
+        assert_aligned(&setup);
+        let chips = chips(&setup.placed);
+        let long = chips.iter().find(|(lines, _, _)| lines.len() > 1).unwrap();
+        assert_eq!(
+            long.0.concat(),
+            ":black_right_pointing_double_triangle_with_vertical_bar:"
+        );
+        // 札の中の行も表の行と同じ間隔
+        let pitches: Vec<f32> = long.2.windows(2).map(|pair| pair[1] - pair[0]).collect();
+        assert!(pitches.windows(2).all(|pair| pair[0] == pair[1]));
+        // 欄が足りないので，Unicode の名前(2 行)より先に読みを省く
+        let labels: Vec<String> = texts(&setup.placed, Role::Label)
+            .into_iter()
+            .map(|(text, _, _)| text)
+            .collect();
+        assert_eq!(labels, ["Unicode", "ショートコード", "コードポイント"]);
+        assert_eq!(texts(&setup.placed, Role::Value).len(), 2);
     }
 
     #[test]
-    fn 札が入りきらなければ読みを先に省き_札は途中で切らない() {
-        // 国旗と人を ZWJ でつないだ長い並びと，長いショートコード
+    fn 顔文字は広い見本の右に名前と読みだけを出す() {
+        let panel = sample::kaomoji();
+        let setup = setup(panel.preview.as_ref().unwrap(), &fields(None), true, 140.0);
+        assert_aligned(&setup);
+        let labels: Vec<String> = texts(&setup.placed, Role::Label)
+            .into_iter()
+            .map(|(text, _, _)| text)
+            .collect();
+        assert_eq!(labels, ["読み"]);
+        assert!(chips(&setup.placed).is_empty());
+    }
+
+    #[test]
+    fn 札が入りきらなければ詰め_入らない札は数にまとめる() {
         let shown = PalettePreview {
-            shortcodes: vec![":smiling_face_with_smiling_eyes_and_hand_covering_mouth:".into()],
             code_points:
                 "U+1F469 U+1F3FD U+200D U+2764 U+FE0F U+200D U+1F48B U+200D U+1F468 U+1F3FF".into(),
             ..sample::emoji().preview.unwrap()
         };
-        let area = area(340.0, &all());
-        let parts = parts(&shown, &area, &fonts(), &Fixed);
-        let shown_texts = texts(&parts);
-        assert!(!shown_texts.iter().any(|text| text == "読み"));
-        // 欄より広い札は字を縮め，それでも入らなければ札の中で折り返し，字は省かない
-        let long = parts
+        let setup = setup(&shown, &fields(None), false, tile_side());
+        assert_aligned(&setup);
+        let shown_points = chips(&setup.placed)
             .iter()
-            .find_map(|part| match part {
-                Part::Chip {
-                    lines, small: true, ..
-                } if lines.len() > 1 => Some(lines.join("")),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(
-            long,
-            ":smiling_face_with_smiling_eyes_and_hand_covering_mouth:"
+            .filter(|(lines, _, _)| lines[0].starts_with("U+"))
+            .count();
+        let more = texts(&setup.placed, Role::More)
+            .first()
+            .and_then(|(text, _, _)| text.trim_start_matches('+').parse::<usize>().ok())
+            .unwrap_or(0);
+        assert_eq!(shown_points + more, 10);
+    }
+
+    #[test]
+    fn 見出しの行の中心は高さの計算と同じ() {
+        let measure = Fixed;
+        let mid = heading_mid_y(4.0, &fonts(), &measure);
+        assert!(mid > 4.0);
+        let panel = sample::emoji();
+        let fields = fields(None);
+        let rect = Frame::new(0.0, 0.0, 333.0, height(&fields, &fonts(), &measure));
+        let content = content_area(rect);
+        let area = Area {
+            content,
+            tile: Frame::new(content.x, content.y, tile_side(), tile_side()),
+            pin_width: palette::FOOTER_HEIGHT,
+        };
+        let placed = place(
+            panel.preview.as_ref().unwrap(),
+            &fields,
+            false,
+            &area,
+            &fonts(),
+            &measure,
         );
-        for part in &parts {
-            assert!(part.frame().max_y() <= area.content.max_y(), "{part:?}");
-        }
-        // 入りきらない札は「+n」にまとめる
-        let chips = parts.iter().filter(|part| part.is_chip()).count();
-        let more = parts.iter().find_map(|part| match part {
-            Part::More { count, .. } => Some(*count),
-            _ => None,
-        });
-        assert_eq!(chips + more.unwrap_or(0), 11);
+        assert_eq!(placed.heading_mid_y, mid);
     }
 }

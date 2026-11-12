@@ -58,13 +58,15 @@ final class PaletteController {
         window.orderOut(nil)
     }
 
-    /// VoiceOver が動いているときだけ，選んでいる文字の名前と探した結果の数を読み上げる
+    /// VoiceOver が動いているときだけ，選んでいる文字の名前と探した結果の数を読み上げる．
+    /// 説明の欄に Unicode の名前を出していれば，欄では省いた部分も含めて全体を読む
     private func announce(_ panel: PalettePanel) {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         let selected = panel.selection.flatMap { position in
             panel.rows.first { $0.index == position.row }.flatMap { $0.cells.indices.contains(position.column) ? $0.cells[position.column].name : nil }
         }
-        let text = [selected, panel.message].compactMap { $0 }.joined(separator: "、")
+        let unicodeName = panel.preview.map(\.unicodeName).flatMap { $0.isEmpty ? nil : $0 }
+        let text = [selected, unicodeName, panel.message].compactMap { $0 }.joined(separator: "、")
         guard !text.isEmpty, text != lastAnnounced else { return }
         lastAnnounced = text
         NSAccessibility.post(element: window, notification: .announcementRequested, userInfo: [

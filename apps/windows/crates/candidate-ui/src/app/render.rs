@@ -24,11 +24,15 @@ use windows::Win32::Graphics::DirectWrite::{
     IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH, DWRITE_FONT_STRETCH_NORMAL,
     DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT,
     DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD,
-    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
+    DWRITE_LINE_METRICS, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS,
+    DWRITE_WORD_WRAPPING_NO_WRAP,
 };
 use windows_core::{Interface, Result, BOOL, HSTRING};
 
 const LOCALE: &str = "ja-JP";
+
+/// 書式ごと・文字ごとの行の高さとベースライン
+type LineCache = HashMap<Font, HashMap<String, (f32, f32)>>;
 /// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
 const SHADOW_LAYERS_PER_DOT: f32 = 1.0;
 /// 作った書体の組を覚えておく数．候補の窓・予測の窓・パレットなどが別の書体の組を使っても作り直さないように
@@ -103,6 +107,9 @@ pub struct TextMeasure {
     widths: RefCell<HashMap<Font, HashMap<String, f32>>>,
     width_count: std::cell::Cell<usize>,
     heights: RefCell<HashMap<Font, f32>>,
+    /// 文字ごとの行の高さとベースライン(書体の代わりの字で変わる)
+    lines: RefCell<LineCache>,
+    line_count: std::cell::Cell<usize>,
     glyphs: RefCell<HashMap<(Font, char), bool>>,
     /// 描いた文字の配置(書式・描く枠の幅と高さ・文字ごと)．アニメーションのコマごとや打つたびに同じ文字を並べ直さない
     layouts: RefCell<HashMap<LayoutKey, HashMap<String, IDWriteTextLayout>>>,
@@ -122,6 +129,8 @@ impl TextMeasure {
             widths: RefCell::default(),
             width_count: std::cell::Cell::new(0),
             heights: RefCell::default(),
+            lines: RefCell::default(),
+            line_count: std::cell::Cell::new(0),
             glyphs: RefCell::default(),
             layouts: RefCell::default(),
             layout_count: std::cell::Cell::new(0),
@@ -162,6 +171,23 @@ impl TextMeasure {
 
     fn format(&self, font: Font) -> Option<&IDWriteTextFormat> {
         self.formats.get(&font)
+    }
+
+    /// 1 行目の行の高さとベースライン(GetLineMetrics)
+    fn line_metrics(&self, text: &str, font: Font) -> Option<(f32, f32)> {
+        let wide: Vec<u16> = text.encode_utf16().collect();
+        let format = self.format(font)?;
+        // SAFETY: format は生きている COM の参照で，wide は呼び出しのあいだ有効
+        let layout = unsafe {
+            self.dwrite
+                .CreateTextLayout(&wide, format, f32::MAX, f32::MAX)
+                .ok()?
+        };
+        let mut lines = [DWRITE_LINE_METRICS::default()];
+        let mut count = 0u32;
+        // SAFETY: lines と count は書き込める領域．折り返さない書式なので 1 行に収まる
+        unsafe { layout.GetLineMetrics(Some(&mut lines), &mut count).ok()? };
+        (count >= 1).then(|| (lines[0].height, lines[0].baseline))
     }
 
     fn metrics(&self, text: &str, font: Font) -> Option<DWRITE_TEXT_METRICS> {
@@ -215,6 +241,32 @@ impl Measure for TextMeasure {
             .map_or(0.0, |metrics| metrics.height);
         self.heights.borrow_mut().insert(font, height);
         height
+    }
+
+    fn line(&self, text: &str, font: Font) -> (f32, f32) {
+        if let Some(line) = self
+            .lines
+            .borrow()
+            .get(&font)
+            .and_then(|lines| lines.get(text))
+        {
+            return *line;
+        }
+        let height = self.height(font);
+        let line = self
+            .line_metrics(text, font)
+            .unwrap_or((height, (height * 0.75).round()));
+        let mut lines = self.lines.borrow_mut();
+        if self.line_count.get() >= WIDTH_CACHE {
+            lines.clear();
+            self.line_count.set(0);
+        }
+        lines
+            .entry(font)
+            .or_default()
+            .insert(text.to_string(), line);
+        self.line_count.set(self.line_count.get() + 1);
+        line
     }
 
     fn has_glyph(&self, font: Font, glyph: char) -> bool {

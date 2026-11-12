@@ -129,7 +129,7 @@ final class PaletteView: NSView {
         if let index = layout.tabs.firstIndex(where: { $0.contains(point) }) { return .tab(panel.tabs[index].section) }
         if let index = layout.modes.firstIndex(where: { $0.contains(point) }) { return .mode(panel.modes[index].kind) }
         if layout.skinToneButton.contains(point) { return .skinToneButton }
-        if let preview = layout.preview, preview.contains(point), panel.preview != nil, pinRect(in: preview).contains(point) { return .pin }
+        if let preview = layout.preview, panel.preview != nil, PalettePreviewDrawing.pinRect(in: preview, theme: theme).contains(point) { return .pin }
         return nil
     }
 
@@ -182,7 +182,7 @@ final class PaletteView: NSView {
         drawGrid(panel, layout: layout)
         if let preview = layout.preview {
             separator(y: preview.minY - Size.gap / 2, from: layout.grid.minX, to: layout.footer.maxX)
-            if let shown = panel.preview { drawPreview(shown, in: preview, isWide: Self.isWide(panel)) }
+            if let shown = panel.preview { drawPreview(shown, panel: panel, in: preview) }
         }
         separator(y: layout.footer.minY, from: layout.footer.minX, to: layout.footer.maxX)
         drawFooter(panel, layout: layout)
@@ -328,17 +328,15 @@ final class PaletteView: NSView {
              radius: rect.width / 2)
     }
 
-    private func pinRect(in preview: NSRect) -> NSRect {
-        NSRect(x: preview.maxX - Size.footerHeight, y: preview.minY, width: Size.footerHeight, height: Size.footerHeight)
-    }
-
-    /// 説明の欄．左上に選んでいる文字の大きな見本，右上にピン留めのボタン，見本の右と下に名前・読み・札(PalettePreviewDrawing)
-    private func drawPreview(_ preview: PalettePanel.Preview, in rect: NSRect, isWide: Bool) {
+    /// 説明の欄．左に選んでいる文字の大きな見本，右に名前と「項目名 → 値」の表(PalettePreviewDrawing)．
+    /// ピン留めのボタンは見出しの行の縦の中心に置く
+    private func drawPreview(_ preview: PalettePanel.Preview, panel: PalettePanel, in rect: NSRect) {
         let area = PalettePreviewDrawing.contentArea(of: rect)
         let side = PalettePreviewDrawing.tileSide
         var tile = NSRect(x: area.minX, y: area.minY, width: side, height: side)
-        if isWide {
-            // 顔文字は横に長いので，文字の幅に合わせて枠を広げる(説明の欄の幅の一定の割合まで)
+        let kind = panel.modes.first { $0.isSelected }?.kind ?? .emoji
+        if kind.cellShape == .wide {
+            // 顔文字は横に長いので，文字の幅に合わせて四角を広げる(説明の欄の幅の一定の割合まで)
             let width = preview.text.size(withAttributes: [.font: theme.candidateFont(size: Size.previewKaomojiFontSize)]).width + Size.kaomojiPaddingX * 4
             tile.size.width = min(max(tile.width, width.rounded(.up)), (rect.width * Size.previewKaomojiWidth).rounded())
             fill(tile, color: theme.badge, radius: Size.cellRadius)
@@ -349,8 +347,8 @@ final class PaletteView: NSView {
                 : theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * Size.previewSymbolBoost)
             GlassDrawing.drawCentered(preview.text, attributes: [.font: glyphFont, .foregroundColor: theme.text], in: tile)
         }
-        let pin = pinRect(in: rect)
-        PalettePreviewDrawing.draw(preview, in: .init(area: area, tile: tile, pin: pin), theme: theme)
+        PalettePreviewDrawing.draw(preview, fields: panel.previewFields, kind: kind, area: area, tile: tile, theme: theme)
+        let pin = PalettePreviewDrawing.pinRect(in: rect, theme: theme)
         if let image = SymbolImageCache.image(preview.isPinned ? "pin.fill" : "pin", pointSize: Size.tabIconSize, weight: .regular,
                                               color: preview.isPinned ? theme.selection : theme.textMuted) {
             image.draw(in: NSRect(x: (pin.midX - image.size.width / 2).rounded(), y: (pin.midY - image.size.height / 2).rounded(), width: image.size.width, height: image.size.height))
