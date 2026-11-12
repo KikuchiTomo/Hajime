@@ -60,6 +60,12 @@ public final class InputSession {
     private var suggestionPredictions: (reading: String, candidates: [Candidate])?
     /// 予測の窓に出している予測．出していなければ nil
     private var shownPrediction: ShownPrediction?
+    /// 予測を確定した直後に，補う前の読みに戻せる確定．次のキーまで持つ(キー設定の表の「予測の確定を取り消し」)
+    private var undoablePrediction: UndoablePrediction?
+    /// 今受けているキーで取り消せる予測の確定(キーを受けたときに undoablePrediction から移す)
+    private var undoingPrediction: UndoablePrediction?
+    /// 確定を取り消した予測の読みと語句．同じ読みのあいだは出し直さない
+    private var declinedPrediction: (reading: String, text: String)?
     /// 最後に出した入力中の候補の窓．ローマ字を打ちかけているあいだはこれを出しておく
     private var shownSuggestionPanel: CandidatePanel?
     /// 最後に出した案内(学習の取り消しなど)．あとから足して出し直すときにも同じ案内を出す
@@ -142,6 +148,7 @@ public final class InputSession {
     private let usage: (any UsageRecording)?
     /// 戻した補正を覚えるところ．無ければ覚えない
     private let rejections: (any CorrectionRejectionRecording)?
+    private let predictionHiding: (any PredictionHiding)?
     /// 連想変換の語を引く(R-18)
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
@@ -159,9 +166,10 @@ public final class InputSession {
     ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
-                rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil,
-                palette: PaletteServices? = nil) {
+                rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
+                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil) {
         self.paletteServices = palette
+        self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
         self.rejections = rejections
@@ -185,6 +193,10 @@ public final class InputSession {
     // MARK: - 外からの操作
 
     public func handle(_ event: KeyEvent, context: InputContext) -> KeyResult {
+        // 予測の確定は，すぐ次のキーでだけ取り消せる
+        undoingPrediction = undoablePrediction
+        undoablePrediction = nil
+        defer { undoingPrediction = nil }
         if context.isSecure {
             // パスワード欄では何もしない(docs/dev/SECURITY-MODEL.md)
             return .passThrough
@@ -279,6 +291,7 @@ public final class InputSession {
     /// 入力欄からフォーカスが外れた．組み立て中の文字は確定する
     /// OS が commitComposition と deactivateServer の両方で呼ぶことがあるので，何度呼んでも同じ結果になるようにする
     public func deactivate() -> [ClientAction] {
+        undoablePrediction = nil
         let actions = closePalette() + commitAll()
         terminal.didLeave(committing: actions)
         return actions
@@ -286,7 +299,8 @@ public final class InputSession {
 
     /// キーの外で選んだ文字(手書きの窓の候補)を入れる．組み立て中の文字があれば先に確定し，選んだ文字で置き換えない
     public func insert(_ text: String) -> [ClientAction] {
-        commitAll() + [.commit(text)]
+        undoablePrediction = nil
+        return commitAll() + [.commit(text)]
     }
 
     /// 読みを組み立てていて，打鍵が止まるのを待っているか．待っていれば，止まったときに settle を呼ぶ．
@@ -632,6 +646,7 @@ public final class InputSession {
 
     /// パレットの窓をマウスで操作した
     public func palette(_ target: PaletteTarget, context: InputContext) -> [ClientAction] {
+        undoablePrediction = nil
         guard let palette else { return [] }
         return paletteActions(palette.perform(target), palette: palette)
     }
@@ -735,7 +750,7 @@ public final class InputSession {
             // 予測も出していなければ，出している入力中の候補の窓から選び始める(↓ と同じ)
             guard readingCorrector.acceptSuggestion(&composition) else {
                 if let shown = shownPrediction, shown.reading == composition.conversionReading {
-                    return KeyResult(handled: true, actions: acceptPrediction(shown.candidate))
+                    return KeyResult(handled: true, actions: acceptPrediction(shown))
                 }
                 guard shownSuggestionPanel != nil, suggestionsShown else { return KeyResult(handled: true) }
                 return moveCandidate(.next, context: context)
@@ -789,6 +804,7 @@ public final class InputSession {
             heldReading = nil
             return KeyResult(handled: true, actions: render(context: context))
         case .undoConversionEdit: return undoConversionEdit(context: context)
+        case .undoPrediction: return undoPrediction(context: context)
         // 学習
         case .forgetCandidate:
             switch phase {
@@ -804,6 +820,11 @@ public final class InputSession {
                 break
             }
             return KeyResult(handled: true, actions: render(context: context))
+        case .hidePrediction:
+            // 予測の窓に出している語句を「予測に表示しない語句」に入れ，次の予測に替える
+            guard phase == .composing, let shown = shownPrediction, shown.reading == composition.conversionReading,
+                  predictionHiding?.hide(shown.prediction.text) == true else { return KeyResult(handled: true) }
+            return KeyResult(handled: true, actions: render(context: context) + [.showNote(PanelBuilder.predictionHiddenNote(shown.prediction.text))])
         case .forgetLastCommit:
             guard converter.forgetLastCommit() else { return KeyResult(handled: true) }
             showsTransientNote = true
@@ -1491,6 +1512,7 @@ public final class InputSession {
         resizePreviews = [:]
         suggestionPredictions = nil
         shownSuggestionPanel = nil
+        declinedPrediction = nil
         let hidePrediction = predictionUpdate(to: nil)
         composition = newComposition()
         readingCorrector.reset()
@@ -1723,7 +1745,8 @@ public final class InputSession {
     /// 予測した語句のうち，見えている字・ひらがなとカタカナの読み・変換の候補のどれかと頭が重なる部分を打った部分にし，残りを補う部分にする
     /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)．
     /// 確定した履歴(学習)にある語句を先に出す設定なら，それを先に選ぶ．
-    /// 「もしかして」と示しているときは示した読みから予測し，確定のキーは添えない(キーはまず読みを直す．直すと添える)
+    /// 「もしかして」と示しているときは示した読みから予測し，確定のキーは添えない(キーはまず読みを直す．直すと添える)．
+    /// 設定の「予測に表示しない語句」にある語句と，確定を取り消した予測(同じ読みのあいだ)は出さない
     private func makePrediction(marked: MarkedText) -> ShownPrediction? {
         guard predictionsShown, corrector.active == nil,
             let key = keyLabel(.acceptSuggestion, in: .composing) else { return nil }
@@ -1737,7 +1760,9 @@ public final class InputSession {
         let whole = composition.conversionReading
         let ordered = settings.current.predictionPrefersHistory
             ? stored.candidates.filter(\.isLearned) + stored.candidates.filter { !$0.isLearned } : stored.candidates
-        for candidate in ordered where candidate.commandID == nil && !conversions.contains(candidate.text) {
+        let declined = declinedPrediction?.reading == whole ? declinedPrediction?.text : nil
+        for candidate in ordered where candidate.commandID == nil && !conversions.contains(candidate.text)
+            && !settings.current.hiddenPredictions.contains(candidate.text) && candidate.text != declined {
             let characters = Array(candidate.text)
             let typedCount = typedForms.map { form in zip(characters, form).prefix { $0 == $1 }.count }.max() ?? 0
             // 見えている字と同じなら，補うものが無い
@@ -1756,11 +1781,44 @@ public final class InputSession {
         return next?.prediction == shownPrediction?.prediction ? [] : [.showPrediction(next?.prediction)]
     }
 
-    /// 予測の窓の予測を確定する．入力中の候補の窓から選んで確定したのと同じに，読み全体の候補として確定して学ぶ
-    private func acceptPrediction(_ candidate: Candidate) -> [ClientAction] {
-        phase = .selecting(CandidateSelection(candidates: [candidate], annotations: [nil], focus: .candidate(0)))
-        return commitAll()
+    /// 予測の窓の予測を確定する．入力中の候補の窓から選んで確定したのと同じに，読み全体の候補として確定して学ぶ．
+    /// すぐ次のキーで取り消せるよう，入れた文字と確定する前の組み立て中の文字を覚える
+    private func acceptPrediction(_ shown: ShownPrediction) -> [ClientAction] {
+        let typed = composition
+        phase = .selecting(CandidateSelection(candidates: [shown.candidate], annotations: [nil], focus: .candidate(0)))
+        let actions = commitAll()
+        let committed = actions.compactMap { action -> String? in
+            if case .commit(let text) = action { text } else { nil }
+        }.joined()
+        if !committed.isEmpty { undoablePrediction = UndoablePrediction(committed: committed, text: shown.prediction.text, typed: typed) }
+        return actions
     }
+
+    /// 予測を確定した直後に取り消すための記録
+    private struct UndoablePrediction: Equatable {
+        /// 入力先に入れた文字
+        var committed: String
+        /// 予測した語句
+        var text: String
+        /// 確定する前の組み立て中の文字(補う前の読み)
+        var typed: Composition
+    }
+
+    /// 予測を確定した直後なら，入れた語句を消して補う前の読みに戻し，その確定の学習を取り消す．
+    /// 入力位置の前が入れた語句でなければ(カーソルを動かした・アプリが文字を変えた・前の文字列を読めない)，何もせずキーをアプリに渡す
+    private func undoPrediction(context: InputContext) -> KeyResult {
+        guard !isComposing, let undo = undoingPrediction, context.canReplacePrecedingText,
+              let preceding = context.precedingText, preceding.hasSuffix(undo.committed) else { return .passThrough }
+        _ = converter.forgetLastCommit()
+        setLeftContext(String(preceding.dropLast(undo.committed.count)))
+        composition = undo.typed
+        phase = .composing
+        declinedPrediction = (undo.typed.conversionReading, undo.text)
+        return KeyResult(handled: true, actions: [.replacePrecedingText(undo.committed.utf16.count)] + render(context: context))
+    }
+
+    /// 予測の確定を取り消せる(すぐ次のキーが取り消しのキーなら取り消す)か．Windows の DLL に取り消しのキーを送ってもらうかに使う
+    public var hasUndoablePrediction: Bool { undoablePrediction != nil }
 
     /// 打っているあいだの候補の窓．どれも選んでいない状態で出し，↓ で選び始める(予測の窓を出していなければ Tab でも．↑ は字種の行から)．
     /// 番号キーは読みに数字を打つキーなので，選び始めるまでは番号を振らない(選び始めると一覧と同じに番号で選べる)
@@ -2498,6 +2556,7 @@ public final class InputSession {
     /// 読みが求められない・長すぎる・組み立て中なら何もしない．Esc で元の文字に戻す(reconverting)
     public func reconvert(_ text: String, reading given: String? = nil, transcriber: (any ReadingTranscribing)? = nil,
                           context: InputContext) -> [ClientAction] {
+        undoablePrediction = nil
         guard !isComposing, !text.isEmpty, text.count <= DefaultSettings.maximumReconversionLength else { return [] }
         let reading = KanaWidth.hiragana(from: given ?? transcriber?.reading(of: text) ?? "")
         guard !reading.isEmpty, reading.count <= DefaultSettings.maximumReconversionLength,
@@ -2514,6 +2573,7 @@ public final class InputSession {
     /// 分岐図の幹は文節を選び(←→)，枝は番号キーで選んだのと同じ(迷う文節へ進むか確定)，一覧の行は選んで確定する(番号 → Enter)．
     /// 押した対象が今の状態に無ければ何もしない
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
+        undoablePrediction = nil
         let baseline = editBaseline(command: nil)
         defer { trackConversionEdit(from: baseline) }
         return pick(target, context: context)

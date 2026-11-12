@@ -164,6 +164,7 @@ extension RuleList {
         case .symbolSequences: self = .symbolSequences
         case .symbolReadings: self = .symbolReadings
         case .englishTerms: self = .englishTerms
+        case .hiddenPredictions: self = .hiddenPredictions
         }
     }
 }

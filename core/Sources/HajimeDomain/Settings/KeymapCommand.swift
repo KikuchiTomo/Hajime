@@ -116,12 +116,17 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case resumeEditing
     /// 変換中に，直前に変えた候補の選択(表記)や文節の区切りを 1 段ずつ取り消す．取り消すものが無ければ全文を読みに戻す(cancel と同じ)
     case undoConversionEdit
+    /// 予測の窓の予測を確定した直後に，確定した語句を消して補う前の読み(組み立て中の文字)に戻す．確定した語句の学習も取り消す．
+    /// 直後でなければ(取り消すものが無い・入力位置の前が確定した語句でない)キーをアプリに渡す
+    case undoPrediction
 
     // 学習
     /// 選んでいる候補を学習から消す
     case forgetCandidate
     /// 最後に確定した語の学習を取り消す
     case forgetLastCommit
+    /// 入力中の予測の窓に出している語句を「予測に表示しない語句」(設定)に入れ，次から予測に出さない
+    case hidePrediction
 
     // ツール
     /// 設定の画面を開く．入力メニューの操作を IME に取り次がないアプリ(cmux など)でも開けるようにする
@@ -160,8 +165,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
-        case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit: .commit
-        case .forgetCandidate, .forgetLastCommit: .learning
+        case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction: .commit
+        case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
         case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette: .tools
         }
     }
@@ -175,7 +180,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
-        case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion: [.composing]
+        case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
         case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate,
@@ -183,7 +188,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .resumeEditing, .undoConversionEdit, .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana,
              .forgetCandidate: [.converting]
-        case .forgetLastCommit, .reconvert: [.idle]
+        case .forgetLastCommit, .reconvert, .undoPrediction: [.idle]
         }
     }
 

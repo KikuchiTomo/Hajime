@@ -60,12 +60,17 @@ public struct InputContext: Sendable, Equatable {
     public var precedingText: String?
     /// 入力先のアプリの識別子(macOS はバンドル ID)．アプリの条件の辞書を選ぶのに使う(R-16)
     public var applicationID: String?
+    /// 入力位置の前の確定済みの文字を，組み立て中の文字で置き換えられるか(ClientAction.replacePrecedingText)．
+    /// Windows の古い DLL は置き換えられないので，DLL が知らせたときだけ true にする
+    public var canReplacePrecedingText: Bool
 
-    public init(profile: AppProfile = .standard, isSecure: Bool = false, precedingText: String? = nil, applicationID: String? = nil) {
+    public init(profile: AppProfile = .standard, isSecure: Bool = false, precedingText: String? = nil, applicationID: String? = nil,
+                canReplacePrecedingText: Bool = true) {
         self.profile = profile
         self.isSecure = isSecure
         self.precedingText = precedingText
         self.applicationID = applicationID
+        self.canReplacePrecedingText = canReplacePrecedingText
     }
 }
 

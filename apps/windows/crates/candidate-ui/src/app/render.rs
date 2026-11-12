@@ -5,7 +5,9 @@ use crate::geometry::Frame;
 use crate::icon;
 use crate::scene::{Draw, Measure, Scene};
 use crate::theme::{Color, Face, Font, FontSpec, ResolvedTheme, Weight};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::OnceLock;
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_BEGIN_HOLLOW,
@@ -19,17 +21,22 @@ use windows::Win32::Graphics::Direct2D::{
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFontCollection, IDWriteTextFormat,
-    DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH, DWRITE_FONT_STRETCH_NORMAL,
+    IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH, DWRITE_FONT_STRETCH_NORMAL,
     DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT,
     DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD,
-    DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS,
-    DWRITE_WORD_WRAPPING_NO_WRAP,
+    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
 };
 use windows_core::{Interface, Result, BOOL, HSTRING};
 
 const LOCALE: &str = "ja-JP";
 /// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
 const SHADOW_LAYERS_PER_DOT: f32 = 1.0;
+/// 作った書体の組を覚えておく数．候補の窓・予測の窓・パレットなどが別の書体の組を使っても作り直さないように
+const MEASURE_CACHE: usize = 4;
+/// 書体の組ごとに覚えておく文字の幅の数．超えたら忘れて測り直す(打った文字が増え続けても覚える量を抑える)
+const WIDTH_CACHE: usize = 4096;
+/// 書体の組ごとに覚えておく，描くための文字の配置の数．超えたら忘れて作り直す
+const LAYOUT_CACHE: usize = 512;
 
 /// 配布物に入れた書体のディレクトリ(実行ファイルと同じディレクトリの中)とファイル．
 /// Kiwi Maru(SIL OFL 1.1．LICENSES/OFL-1.1-KiwiMaru.txt)．data/fonts/ を tools/fonts/update.sh で取ってくる
@@ -78,7 +85,13 @@ pub struct Renderer {
     round: ID2D1StrokeStyle,
     /// OS に入っている書体の一覧．カスタムテーマの書体の PostScript 名を初めて引くときに読む
     faces: OnceLock<Vec<InstalledFace>>,
+    /// 前に作った書体の組と，その元の書体の指定(新しいものが後ろ)．
+    /// 打つたびやアニメーションのコマごとに同じ書体を作り直さないよう，指定が同じなら使い回す
+    measures: RefCell<Vec<(Vec<FontSpec>, Rc<TextMeasure>)>>,
 }
+
+/// 描いた文字の配置を引く鍵(書体と，描く枠の幅と高さのビット)
+type LayoutKey = (Font, u32, u32);
 
 /// テーマと文字の大きさを決めた書体の組．文字の幅を測り，描くときにも使う
 pub struct TextMeasure {
@@ -86,9 +99,67 @@ pub struct TextMeasure {
     formats: HashMap<Font, IDWriteTextFormat>,
     /// OS の書体の集まり．書式が書体の集まりを持たないときに字を探す
     system: Option<IDWriteFontCollection>,
+    /// 測った幅と高さと字の有無．同じ書式で同じ文字を測れば DirectWrite は同じ値を返すので，覚えた値を返す
+    widths: RefCell<HashMap<Font, HashMap<String, f32>>>,
+    width_count: std::cell::Cell<usize>,
+    heights: RefCell<HashMap<Font, f32>>,
+    glyphs: RefCell<HashMap<(Font, char), bool>>,
+    /// 描いた文字の配置(書式・描く枠の幅と高さ・文字ごと)．アニメーションのコマごとや打つたびに同じ文字を並べ直さない
+    layouts: RefCell<HashMap<LayoutKey, HashMap<String, IDWriteTextLayout>>>,
+    layout_count: std::cell::Cell<usize>,
 }
 
 impl TextMeasure {
+    fn new(
+        dwrite: IDWriteFactory,
+        formats: HashMap<Font, IDWriteTextFormat>,
+        system: Option<IDWriteFontCollection>,
+    ) -> Self {
+        Self {
+            dwrite,
+            formats,
+            system,
+            widths: RefCell::default(),
+            width_count: std::cell::Cell::new(0),
+            heights: RefCell::default(),
+            glyphs: RefCell::default(),
+            layouts: RefCell::default(),
+            layout_count: std::cell::Cell::new(0),
+        }
+    }
+
+    /// 文字を width × height の枠に並べた配置．ID2D1RenderTarget::DrawText が中で作るものと同じ引数で作り，覚えておく
+    fn layout(&self, text: &str, font: Font, width: f32, height: f32) -> Option<IDWriteTextLayout> {
+        let key = (font, width.to_bits(), height.to_bits());
+        if let Some(layout) = self
+            .layouts
+            .borrow()
+            .get(&key)
+            .and_then(|layouts| layouts.get(text))
+        {
+            return Some(layout.clone());
+        }
+        let format = self.format(font)?;
+        let wide: Vec<u16> = text.encode_utf16().collect();
+        // SAFETY: format は生きている COM の参照で，wide は呼び出しのあいだ有効
+        let layout = unsafe {
+            self.dwrite
+                .CreateTextLayout(&wide, format, width, height)
+                .ok()?
+        };
+        let mut layouts = self.layouts.borrow_mut();
+        if self.layout_count.get() >= LAYOUT_CACHE {
+            layouts.clear();
+            self.layout_count.set(0);
+        }
+        layouts
+            .entry(key)
+            .or_default()
+            .insert(text.to_string(), layout.clone());
+        self.layout_count.set(self.layout_count.get() + 1);
+        Some(layout)
+    }
+
     fn format(&self, font: Font) -> Option<&IDWriteTextFormat> {
         self.formats.get(&font)
     }
@@ -111,16 +182,53 @@ impl TextMeasure {
 
 impl Measure for TextMeasure {
     fn width(&self, text: &str, font: Font) -> f32 {
-        self.metrics(text, font)
-            .map_or(0.0, |metrics| metrics.widthIncludingTrailingWhitespace)
+        if let Some(width) = self
+            .widths
+            .borrow()
+            .get(&font)
+            .and_then(|widths| widths.get(text))
+        {
+            return *width;
+        }
+        let width = self
+            .metrics(text, font)
+            .map_or(0.0, |metrics| metrics.widthIncludingTrailingWhitespace);
+        let mut widths = self.widths.borrow_mut();
+        if self.width_count.get() >= WIDTH_CACHE {
+            widths.clear();
+            self.width_count.set(0);
+        }
+        widths
+            .entry(font)
+            .or_default()
+            .insert(text.to_string(), width);
+        self.width_count.set(self.width_count.get() + 1);
+        width
     }
 
     fn height(&self, font: Font) -> f32 {
-        self.metrics("あ", font)
-            .map_or(0.0, |metrics| metrics.height)
+        if let Some(height) = self.heights.borrow().get(&font) {
+            return *height;
+        }
+        let height = self
+            .metrics("あ", font)
+            .map_or(0.0, |metrics| metrics.height);
+        self.heights.borrow_mut().insert(font, height);
+        height
     }
 
     fn has_glyph(&self, font: Font, glyph: char) -> bool {
+        if let Some(has) = self.glyphs.borrow().get(&(font, glyph)) {
+            return *has;
+        }
+        let has = self.find_glyph(font, glyph);
+        self.glyphs.borrow_mut().insert((font, glyph), has);
+        has
+    }
+}
+
+impl TextMeasure {
+    fn find_glyph(&self, font: Font, glyph: char) -> bool {
         let Some(format) = self.format(font) else {
             return false;
         };
@@ -232,6 +340,7 @@ impl Renderer {
             bundled,
             round,
             faces: OnceLock::new(),
+            measures: RefCell::default(),
         })
     }
 
@@ -240,26 +349,48 @@ impl Renderer {
     }
 
     /// テーマの書体で，文字を測り描くための書体の組を作る
-    pub fn measure(&self, theme: &ResolvedTheme, font_size: f32) -> Result<TextMeasure> {
+    pub fn measure(&self, theme: &ResolvedTheme, font_size: f32) -> Result<Rc<TextMeasure>> {
         self.measure_with(theme, font_size, &[])
     }
 
-    /// measure に，大きさを決めて描く文字(パレット)の書体 sized を足す
+    /// measure に，大きさを決めて描く文字(パレット)の書体 sized を足す．
+    /// 書体の指定がすべて前に作った組と同じなら，その組を返す(書式は指定と OS の書体の集まりだけで決まる)
     pub fn measure_with(
         &self,
         theme: &ResolvedTheme,
         font_size: f32,
         sized: &[Font],
-    ) -> Result<TextMeasure> {
-        let mut formats = HashMap::new();
-        for font in Font::ALL.iter().chain(sized) {
-            formats.insert(*font, self.format(&theme.font(*font, font_size))?);
+    ) -> Result<Rc<TextMeasure>> {
+        let fonts: Vec<Font> = Font::ALL.iter().chain(sized).copied().collect();
+        let specs: Vec<FontSpec> = fonts
+            .iter()
+            .map(|font| theme.font(*font, font_size))
+            .collect();
+        let mut measures = self.measures.borrow_mut();
+        if let Some(index) = measures.iter().position(|(known, measure)| {
+            *known == specs
+                && measure.formats.len() == fonts.len()
+                && fonts.iter().all(|font| measure.formats.contains_key(font))
+        }) {
+            let entry = measures.remove(index);
+            let measure = entry.1.clone();
+            measures.push(entry);
+            return Ok(measure);
         }
-        Ok(TextMeasure {
-            dwrite: self.dwrite.clone(),
+        let mut formats = HashMap::new();
+        for (font, spec) in fonts.iter().zip(&specs) {
+            formats.insert(*font, self.format(spec)?);
+        }
+        let measure = Rc::new(TextMeasure::new(
+            self.dwrite.clone(),
             formats,
-            system: self.fonts.clone(),
-        })
+            self.fonts.clone(),
+        ));
+        if measures.len() >= MEASURE_CACHE {
+            measures.remove(0);
+        }
+        measures.push((specs, measure.clone()));
+        Ok(measure)
     }
 
     fn installed(&self, family: &str) -> bool {
@@ -584,27 +715,30 @@ impl Painter<'_> {
                 font,
                 color,
             } => {
-                let Some(format) = self.measure.format(*font) else {
-                    return Ok(());
-                };
-                self.color(*color);
-                let wide: Vec<u16> = text.encode_utf16().collect();
                 // 測った幅に少し余裕を持たせ，最後の字が折り返したり切れたりしないようにする
-                let layout = D2D_RECT_F {
+                let bounds = D2D_RECT_F {
                     left: frame.x,
                     top: frame.y,
                     right: frame.max_x() + frame.height,
                     bottom: frame.max_y(),
                 };
-                // SAFETY: 同上．wide は呼び出しのあいだ有効
+                // DrawText と同じく，枠の幅と高さで並べた配置を枠の左上に描く(並べた配置は覚えておいて使い回す)
+                let Some(layout) = self.measure.layout(
+                    text,
+                    *font,
+                    bounds.right - bounds.left,
+                    bounds.bottom - bounds.top,
+                ) else {
+                    return Ok(());
+                };
+                self.color(*color);
+                // SAFETY: 同上．layout は生きている COM の参照
                 unsafe {
-                    self.target.DrawText(
-                        &wide,
-                        format,
+                    self.target.DrawTextLayout(
+                        vector!(bounds.left, bounds.top),
                         &layout,
                         self.brush,
                         D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT,
-                        DWRITE_MEASURING_MODE_NATURAL,
                     )
                 };
             }

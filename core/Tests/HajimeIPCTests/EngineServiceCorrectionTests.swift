@@ -97,7 +97,7 @@ struct EngineServiceCorrectionTests {
     private static func composition(_ body: WireResponseBody) -> String? {
         guard case .edit(_, let operations, _) = body else { return nil }
         return operations.compactMap { operation -> String? in
-            if case .setComposition(let segments, _, _) = operation { return segments.map(\.text).joined() }
+            if case .setComposition(let segments, _, _, _) = operation { return segments.map(\.text).joined() }
             return nil
         }.last
     }
@@ -142,6 +142,23 @@ struct EngineServiceCorrectionTests {
         #expect(Self.wakeAfter(late) != EngineService.correctionPollMilliseconds)
     }
 
+    @Test("変換後の補正をあきらめる時間は設定の値に従う", arguments: [
+        (DefaultSettings.lateCorrectionTimeoutRange.lowerBound, true),
+        (DefaultSettings.lateCorrectionTimeoutRange.upperBound, false),
+    ])
+    func conversionDeadlineFollowsSetting(timeout: Double, givesUp: Bool) throws {
+        let test = EngineServiceCorrectionTests(service: Service(finishes: false))
+        try test.settings.update { $0.lateCorrectionTimeout = timeout }
+        let (id, session) = try test.open()
+        test.type("youdesu", session, id)
+        _ = test.press(.space, session, id)
+        // 変換を出したあとの下見などを先に済ませる(その wake では期限を見ない)
+        #expect(Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds)
+        // 既定の上限と設定の上限のあいだの時刻．短い設定ならあきらめ，長い設定ならまだ求めている
+        test.clock.now = test.clock.now + .seconds((DefaultSettings.lateCorrectionTimeout + timeout) / 2)
+        #expect((Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds) == givesUp)
+    }
+
     @Test("変換したあとに次のキーを打ったら，あとから届いた訂正では変換を直さない")
     func keyCancelsWaitingConversion() async throws {
         let (id, session) = try open()
@@ -182,6 +199,48 @@ struct EngineServiceCorrectionTests {
         // 見直したことにしたので，次の wake で訂正を求め直さない(求め直し続けると裏の仕事が止まらない)
         #expect(Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds)
         #expect(Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds)
+    }
+
+    @Test("打鍵が止まったあとの訂正をあきらめる時間は設定の値に従う", arguments: [
+        (DefaultSettings.reviewCorrectionTimeoutRange.lowerBound, true),
+        (DefaultSettings.reviewCorrectionTimeoutRange.upperBound, false),
+    ])
+    func reviewDeadlineFollowsSetting(timeout: Double, givesUp: Bool) throws {
+        let test = EngineServiceCorrectionTests(service: Service(finishes: false))
+        try test.settings.update { $0.reviewCorrectionTimeout = timeout }
+        let (id, session) = try test.open()
+        test.type("youdesu", session, id)
+        var started = false
+        for _ in 0..<Self.wakesUntilReview where !started {
+            started = Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds
+        }
+        #expect(started)
+        test.clock.now = test.clock.now + .seconds((DefaultSettings.reviewCorrectionTimeout + timeout) / 2)
+        #expect((Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds) == givesUp)
+    }
+
+    @Test("見直し始めるのは，打鍵が止まってから設定の待ち時間がたったとき")
+    func reviewWaitsForCorrectionDelay() throws {
+        let test = EngineServiceCorrectionTests(service: Service(finishes: false))
+        let delay = DefaultSettings.correctionDelayRange.upperBound
+        try test.settings.update { $0.correctionDelay = delay }
+        let (id, session) = try test.open()
+        test.type("youdesu", session, id)
+        let typed = test.clock.now
+        // 既定の待ち時間を過ぎても，設定の待ち時間までは見直さない
+        test.clock.now = typed + .seconds((DefaultSettings.liveCorrectionDelay + delay) / 2)
+        var started = false
+        for _ in 0..<Self.wakesUntilReview where !started {
+            test.clock.requestedWait = nil
+            started = Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds
+        }
+        #expect(!started)
+        test.clock.now = typed + .seconds(delay)
+        for _ in 0..<Self.wakesUntilReview where !started {
+            test.clock.requestedWait = nil
+            started = Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds
+        }
+        #expect(started)
     }
 
     @Test("打鍵が少し止まったら，見直すときの訂正を前もって求め始め，次のキーが来たら取り消す")

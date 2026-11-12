@@ -25,6 +25,12 @@ pub enum Shown<'a> {
     Sample,
     Branch(&'a ipc::BranchMap),
     List(&'a ipc::CandidateList),
+    /// 入力位置の下の案内(初期設定の実演の「修正」「もしかして」)
+    Note(&'a ipc::Note),
+    /// モードの札(初期設定の実演の「あ」「A」)
+    Mode(&'a str),
+    /// 絵文字と記号のパレット(設定の画面のパレットの見本)
+    Palette(&'a ipc::PalettePanel),
 }
 
 /// rect の中のどこに置くか
@@ -61,6 +67,50 @@ impl Preview {
         Ok(Self { renderer, target })
     }
 
+    fn scene(
+        shown: Shown,
+        theme: &ResolvedTheme,
+        font_size: f32,
+        measure: &dyn scene::Measure,
+    ) -> scene::Scene {
+        let look = Look::new(theme, font_size);
+        match shown {
+            Shown::Sample => scene::branch_map(&sample::branch(), &look, measure),
+            Shown::Branch(map) => scene::branch_map(map, &look, measure),
+            Shown::List(list) => scene::candidate_list(list, &look, measure),
+            Shown::Note(note) => scene::note(note, &look, measure),
+            Shown::Mode(label) => scene::mode(label, &look, measure),
+            Shown::Palette(panel) => {
+                let layout = crate::palette::layout::Layout::new(panel, theme, measure);
+                crate::palette::scene::palette(panel, &layout, &look, measure)
+            }
+        }
+    }
+
+    /// shown を測る書体(パレットはマスの大きさに合わせた書体．パレットの窓と同じ)
+    fn measure_for(
+        &self,
+        shown: Shown,
+        theme: &ResolvedTheme,
+        font_size: f32,
+    ) -> Result<std::rc::Rc<super::render::TextMeasure>> {
+        match shown {
+            Shown::Palette(panel) => {
+                let fonts =
+                    crate::palette::layout::Fonts::new(crate::palette::layout::cell_size(panel));
+                self.renderer.measure_with(theme, font_size, &fonts.all())
+            }
+            _ => self.renderer.measure(theme, font_size),
+        }
+    }
+
+    /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft のとき)
+    pub fn size(&self, theme: &ResolvedTheme, font_size: f32, shown: Shown) -> Result<(f32, f32)> {
+        let measure = self.measure_for(shown, theme, font_size)?;
+        let scene = Self::scene(shown, theme, font_size, &measure);
+        Ok((scene.width, scene.height))
+    }
+
     /// hdc の rect(デバイスのピクセル)に，候補の窓 shown を描く．scale は画面の DPI の倍率．
     /// 見本が rect より大きければ見本ごと縮める(macOS の ScaledPreview と同じ)
     #[allow(clippy::too_many_arguments)]
@@ -75,13 +125,8 @@ impl Preview {
         shown: Shown,
         placement: Placement,
     ) -> Result<()> {
-        let measure = self.renderer.measure(theme, font_size)?;
-        let look = Look::new(theme, font_size);
-        let scene = match shown {
-            Shown::Sample => scene::branch_map(&sample::branch(), &look, &measure),
-            Shown::Branch(map) => scene::branch_map(map, &look, &measure),
-            Shown::List(list) => scene::candidate_list(list, &look, &measure),
-        };
+        let measure = self.measure_for(shown, theme, font_size)?;
+        let scene = Self::scene(shown, theme, font_size, &measure);
         // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
             Placement::Center => Surround::Snapshot { dark },
@@ -100,14 +145,9 @@ impl Preview {
                 );
             }
             Placement::Center => {
-                // 下地は設定の画面のカードと同じく角を丸める．丸みの外は設定の画面が塗った地の色のまま残る
-                if let Some(Draw::Rect { frame, color }) = scene.draws.first().cloned() {
-                    scene.draws[0] = Draw::RoundRect {
-                        frame,
-                        radius: tokens::size::settings_windows::CARD_RADIUS,
-                        fill: Some(color),
-                        stroke: None,
-                    };
+                // 下地は描かず，設定の画面がカードの色で塗った地のまま見せる(見本のまわりに別の色の四角を出さない)
+                if let Some(Draw::Rect { .. }) = scene.draws.first() {
+                    scene.draws.remove(0);
                 }
             }
         }

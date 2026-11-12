@@ -85,8 +85,14 @@ pub mod settings {
     pub const READING_CORRECTIONS: &str = "タイプミスを修正した回数 / 取り消した回数";
     pub const ENGLISH_CORRECTIONS: &str = "英単語を修正した回数 / 取り消した回数";
     pub const RESET_USAGE: &str = "統計を消去";
-    /// UIStrings.Settings.fontSize から値を除いたもの(値は部品に出す)
+    /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
+    pub const DICTIONARY_NOTE: &str = "読みと単語をタブで区切ったテキストファイルを読み込めます。";
+
+    /// UIStrings.Settings.fontSize(スライダーの名前に今の値を付ける)
+    pub fn font_size(size: f64) -> String {
+        format!("{FONT_SIZE_NAME}: {}", size.round() as i64)
+    }
     pub const ADD: &str = "追加";
     pub const ESCAPE_SWITCHES_TO_DIRECT: &str = "Esc で英数に切り替え";
     pub const ROMAJI_KEYS: &str = "入力";
@@ -124,6 +130,9 @@ pub mod choice {
     pub const PREDICTION_DISPLAY: &str = "入力中の予測";
     pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴にある予測を優先";
     pub const PREDICTION_FROM_CORRECTION: &str = "打ち間違いを直した読みからも予測";
+    pub const HIDDEN_PREDICTIONS: &str = "予測に表示しない語句";
+    pub const HIDDEN_PREDICTION_PLACEHOLDER: &str = "語句";
+    pub const HIDDEN_PREDICTIONS_EMPTY: &str = "予測に表示しない語句はありません";
 }
 
 /// UIStrings.Features
@@ -172,6 +181,8 @@ pub mod features {
     pub const CORRECTION_KINDS: &str = "修正の対象";
     pub const CORRECTS_JAPANESE: &str = "日本語のタイプミス";
     pub const CORRECTS_REPEATED_KEYS: &str = "同じキーの重なり";
+    pub const CORRECTION_KINDS_NOTE: &str =
+        "使用できない項目は、変換の「タイプミスの修正」で有効にできます。";
     pub const EXCEPTION_PLACEHOLDER: &str = "英字か読み";
     pub const TYPED: &str = "入力した英字";
     pub const REPLACEMENT: &str = "置き換える語句";
@@ -365,6 +376,16 @@ pub mod keys {
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
+    pub const ALL_STATES: &str = "すべての状態";
+
+    /// UIStrings.Keys.rowCount(出している行の数と，すべての行の数)
+    pub fn row_count(shown: usize, total: usize) -> String {
+        if shown == total {
+            format!("{total} 行")
+        } else {
+            format!("{shown} / {total} 行")
+        }
+    }
     pub const PLAIN_CHARACTER: &str =
         "修飾キーの無い文字のキーです。この状態ではその文字を入力できなくなります";
     pub const MISSING_NOTE: &str = "キーが無いと、入力を確定したり取り消したりできなくなります。";
@@ -455,8 +476,10 @@ pub mod keys {
         ("backToReading", "全文を読みに戻す"),
         ("resumeEditing", "読みに戻して末尾から編集"),
         ("undoConversionEdit", "直前の変更を取り消し"),
+        ("undoPrediction", "予測の確定を取り消し"),
         ("forgetCandidate", "候補を学習から削除"),
         ("forgetLastCommit", "最後の学習を取り消し"),
+        ("hidePrediction", "予測に表示しない"),
         ("openSettings", "設定を開く"),
         ("toggleLiveConversion", "ライブ変換の切り替え"),
         ("handwriting", "手書き入力"),
@@ -490,11 +513,13 @@ pub mod keys {
         ("backToReading", "変換をやめて全文を読みに戻します。ライブ変換がオンでも、読みを変更するまで読みのまま表示します"),
         ("resumeEditing", "変換をやめて読みに戻り、末尾から入力を続けます"),
         ("undoConversionEdit", "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"),
+        ("undoPrediction", "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
         ("segmentToHiragana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("segmentToKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("segmentToHalfwidthKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("forgetCandidate", "選択中の候補を学習から削除します"),
         ("forgetLastCommit", "最後に確定した語句の学習を取り消します。入力した文字は削除しません"),
+        ("hidePrediction", "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"),
         ("handwriting", "「手書き入力」の設定がオンのときに使えます"),
         ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
@@ -574,10 +599,20 @@ pub mod palette {
     pub const SHOWS_CODE_POINTS: &str = "説明にコードポイントを表示";
     pub const FREQUENT_ROWS: &str = "よく使う文字の行数";
     pub const CLEAR_HISTORY: &str = "使った文字の記録を消去";
+    pub const CLEAR_HISTORY_QUESTION: &str = "使った文字の記録を消去しますか？";
+    pub const EMOJI_KEY: &str = "絵文字のパレットを開くキー";
+    pub const SYMBOL_KEY: &str = "記号のパレットを開くキー";
+    pub const KAOMOJI_KEY: &str = "顔文字のパレットを開くキー";
+    pub const NO_KEY: &str = "なし";
     pub const CLEAR_HISTORY_NOTE: &str =
         "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。";
     pub const THEME_NOTE: &str =
         "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。";
+
+    /// UIStrings.Palette.cellSizeValue(スライダーの名前に今の値を付ける)
+    pub fn cell_size_value(size: f64) -> String {
+        format!("{CELL_SIZE}：{} pt", size.round() as i64)
+    }
 }
 
 /// UIStrings.Association
@@ -651,6 +686,7 @@ pub mod sync {
         ("suggestionDisplay", "入力中の候補"),
         ("predictionDisplay", "入力中の予測"),
         ("predictionPrefersHistory", "入力履歴にある予測を優先"),
+        ("hiddenPredictions", "予測に表示しない語句"),
         (
             "predictionFromCorrection",
             "打ち間違いを直した読みからも予測",
@@ -765,9 +801,13 @@ pub mod windows {
     pub const TEMPLATE_EXAMPLE: &str = "例: 読み「dt」に単語「{datetime:YYYY-MM-DD hh:mm}」を登録すると、「dt」を変換したときに「2026-04-01 09:30」のような今の日時を入れます。";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
-    /// 絵文字・記号・顔文字のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
-    pub const PALETTE_KEYS_NOTE: &str =
-        "既定では Ctrl+Alt+E で絵文字、Ctrl+Alt+K で記号、Ctrl+Alt+F で顔文字のパレットを開きます。";
+    /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)
+    pub const APP_NAME: &str = "Hajime IME";
+    /// 数を 1 段ずつ変えるボタン(読み上げの名前．macOS の Stepper の矢印)
+    pub const DECREASE: &str = "減らす";
+    /// テーマの見本の札の文字(macOS の IndicatorLabels の日本語の札)
+    pub const JAPANESE_MODE: &str = "あ";
+    pub const INCREASE: &str = "増やす";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
     pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
     pub const ON: &str = "オン";
@@ -822,9 +862,9 @@ pub mod windows {
         "実行ファイルの名前を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。";
     /// 不正な実行ファイルの名前(macOS はアプリを選んで足すので無い)
     pub const INVALID_APP: &str = "実行ファイルの名前に使えない文字が含まれています";
-    /// macOS の languageNote から，試した結果を右クリックで足す説明を除いたもの(Windows の結果は文字で出す)
+    /// macOS の languageNote の右クリックで足す説明を，試す欄の下のボタンで足す説明にしたもの(Windows の結果は文字で出す)
     pub const LANGUAGE_NOTE: &str =
-        "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。";
+        "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。試した単語は「試す」の下のボタンで一覧に追加できます。";
     /// 見分け方の決まりが無いとき(macOS は空の一覧を出すだけ)
     pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
     /// 変換エンジン(hajime-engine-host)に設定を頼めないとき
@@ -834,23 +874,17 @@ pub mod windows {
         "変換エンジンが動いていないため、設定を読み込めません。エンジンを起動して、つながるまで待っています。しばらくしても変わらないときは、サインインし直してください。";
 }
 
-/// 初期設定ウィザード(Windows だけ．macOS 版はまだ無い)
+/// UIStrings.Onboarding(初期設定．macOS と同じ文言)
 pub mod wizard {
-    pub const WINDOW_TITLE: &str = "Hajime IME の初期設定";
+    pub const WINDOW_TITLE: &str = "Hajime IME へようこそ";
     pub const RECOMMENDED: &str = "推奨";
     pub const BACK: &str = "戻る";
     pub const NEXT: &str = "次へ";
-    pub const LATER: &str = "あとで";
-    pub const FINISH: &str = "完了";
-    pub const OPEN_SETTINGS: &str = "設定を開く";
-    /// 実演の領域の読み上げの名前
-    pub const DEMO: &str = "実演";
-    pub const LOADING: &str = "設定を読み込んでいます…";
-    pub const SAVE_FAILED: &str =
-        "設定を保存できませんでした。変換エンジンが動いているか確かめてください。";
+    pub const SKIP: &str = "あとで設定する";
+    pub const FINISH: &str = "はじめる";
     /// 設定の画面の「情報」のページからウィザードを開く
     pub const REDO: &str = "初期設定をやり直す";
-    /// 情報のページの，ウィザードを開く行の名前(macOS の UIStrings.Onboarding.redoLabel)
+    /// 情報のページの，ウィザードを開く行の名前
     pub const REDO_LABEL: &str = "初期設定";
 
     /// 何ページ目か
@@ -858,133 +892,113 @@ pub mod wizard {
         format!("{index} / {total}")
     }
 
-    pub const WELCOME_TITLE: &str = "ようこそ";
-    pub const WELCOME_TEXT: &str = "Hajime IME をインストールしていただき、ありがとうございます。いくつかの設定を、実際の動きを見ながら選びましょう。あとからいつでも設定の画面で変えられます。";
-    pub const SWITCH_TITLE: &str = "英語と日本語の切り替え";
-    pub const SWITCH_TEXT: &str = "英語と日本語を切り替えるキーを選びます。";
+    /// 推奨の値の名前に添える(メニューの項目)
+    pub fn recommended(label: &str) -> String {
+        format!("{label} ({RECOMMENDED})")
+    }
+
+    pub const MODE_TITLE: &str = "英数とかなの切り替え";
+    pub const MODE_DETAIL: &str = "日本語と英数を切り替えるキーを選びます。";
     pub const APP_MODES_TITLE: &str = "アプリごとの入力モード";
-    pub const APP_MODES_TEXT: &str = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。";
-    pub const SWITCH_TOGGLE: &str = "半角/全角キーで切り替える";
-    pub const SWITCH_TOGGLE_NOTE: &str = "1 つのキーを押すたびに、英語と日本語が入れ替わります。";
-    pub const SWITCH_HENKAN: &str = "変換キーで日本語、無変換キーで英語";
-    pub const SWITCH_HENKAN_NOTE: &str =
-        "押したキーで入力モードが決まるので、今どちらかを気にせずに打てます。";
-    pub const CHARACTERS_TITLE: &str = "入力する文字";
-    pub const CHARACTERS_TEXT: &str =
-        "かなの打ち方と、句読点や括弧など、キーを押したときに入る文字を選びます。";
-    pub const INPUT_STYLE: &str = "入力方式";
-    pub const PUNCTUATION: &str = "句読点";
-    /// 入力する文字のページの細かい設定の名前(1 行に収まるよう短くする)
-    pub const CHAR_BRACKETS: &str = "[ ] キー";
-    pub const CHAR_SLASH: &str = "/ キー";
-    pub const CHAR_YEN: &str = "¥ キー";
-    pub const CHAR_SPACE: &str = "スペース";
-    pub const CHAR_NUMBER: &str = "数字";
-    pub const CHAR_ALPHABET: &str = "英字";
-    pub const YEN_BACKSLASH: &str = "\\";
-    pub const YEN_YEN: &str = "¥";
-    pub const YEN_PROGRAMMING: &str = "エディタでは \\";
+    pub const APP_MODES_DETAIL: &str = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。";
+    pub const DEMO_TERMINAL: &str = "ターミナル";
+    pub const CORRECTION_TITLE: &str = "自動補正";
+    pub const CORRECTION_DETAIL: &str = "打ち間違いを、文の流れから見つけて直します。直したところには点線が付き、Esc で打ったままに戻せます。";
+    pub const CORRECTION_OFF: &str = "直さない";
+    pub const THEME_TITLE: &str = "外観";
+    pub const THEME_DETAIL: &str =
+        "候補ウィンドウの見た目を選びます。あとから設定の画面で、色や書体を自由に変えられます。";
     pub const LIVE_TITLE: &str = "ライブ変換";
-    pub const LIVE_TEXT: &str = "打つ手を止めると、Space を押さなくても漢字に変換します。";
-    pub const LIVE_CONVERSION: &str = "ライブ変換を使う";
+    pub const LIVE_DETAIL: &str =
+        "打ちながら漢字に変換して見せます。Space を押さずに、そのまま Enter で確定できます。";
+    pub const LIVE_ON: &str = "ライブ変換を使う";
+    pub const LIVE_OFF: &str = "使わない";
     pub const LIVE_DELAY: &str = "漢字にするまでの時間";
-    pub const DELAY_SHORT: &str = "0.3 秒";
-    pub const DELAY_STANDARD: &str = "0.5 秒";
-    pub const DELAY_LONG: &str = "0.8 秒";
-    pub const DELAY_LONGER: &str = "1.2 秒";
-    pub const WINDOW_STEP_TITLE: &str = "候補ウィンドウ";
-    pub const WINDOW_TEXT: &str = "変換の候補の出し方を選びます。";
-    pub const BRANCH_NOTE: &str = "文節ごとの候補を枝分かれで並べます。文全体を見ながら選べます。";
-    pub const SEGMENT_LIST_NOTE: &str = "選んでいる文節の候補を縦に並べます。";
-    pub const LIST_NOTE: &str = "文全体の候補を縦に並べます。";
-    pub const FOCUS_TITLE: &str = "最初に選ぶ文節";
-    pub const FOCUS_TEXT: &str = "Space で変換したとき、どの文節から選び始めるかを決めます。";
-    pub const FOCUS_START_NOTE: &str = "文の頭から順に直していけます。";
-    pub const FOCUS_END_NOTE: &str = "最後に打った文節から選びます。";
-    pub const FOCUS_AUTOMATIC_NOTE: &str = "誤りやすい文節を選びます。";
-    pub const CORRECTION_TITLE: &str = "打ち間違いの補正";
-    pub const CORRECTION_TEXT: &str = "母音と子音の打ち間違いや、同じキーを 2 度打ったときに、正しい読みに直します。直した文字には点線が付きます。";
-    pub const CORRECTION_OFF: &str = "補正しない";
-    pub const CORRECTION_ENGLISH: &str = "英単語だけ";
-    pub const CORRECTION_CAUTIOUS: &str = "控えめ";
-    pub const CORRECTION_STANDARD: &str = "標準";
-    pub const CORRECTION_AGGRESSIVE: &str = "積極的";
-    pub const CORRECTION_OFF_NOTE: &str = "打ったとおりに変換します。";
-    pub const REMEMBERS_REJECTED_NOTE: &str =
-        "直した文字を取り消した読みは、次から直さないようにします。";
-    pub const CORRECTION_ENGLISH_NOTE: &str = "英単語のつづりだけを直します。";
-    pub const CORRECTION_JAPANESE_NOTE: &str =
-        "英単語と日本語を直します。強いほど多くの間違いを直します。";
+    pub const PRESENTATION_TITLE: &str = "候補の出し方";
+    pub const PRESENTATION_DETAIL: &str =
+        "Space を押したときの候補の並べ方と、最初に選ぶ文節を選びます。";
+    pub const INITIAL_FOCUS: &str = "最初に選ぶ文節";
+    pub const CHARACTERS_TITLE: &str = "入力する文字";
+    pub const CHARACTERS_DETAIL: &str = "句読点や括弧など、キーを押したときに入る文字を選びます。";
     pub const FEATURES_TITLE: &str = "便利な機能";
-    pub const FEATURES_TEXT: &str = "変換するだけで使える機能です。使わないものはオフにできます。";
-    pub const ASSOCIATION: &str = "連想";
-    pub const ASSOCIATION_NOTE: &str = "変換中に Shift+↑ で、似た意味の語を出します。";
-    pub const CALCULATION: &str = "計算";
-    pub const CALCULATION_NOTE: &str = "「1+2*3=」のように式を打って変換すると、答えを出します。";
-    pub const POSTAL_CODE: &str = "郵便番号";
-    pub const POSTAL_CODE_NOTE: &str =
-        "「100-0001」のように郵便番号を打って変換すると、住所を出します。";
-    pub const DATE: &str = "日付と時刻";
-    pub const DATE_NOTE: &str = "「きょう」「あした」「いま」を変換すると、日付や時刻を出します。";
+    pub const FEATURES_DETAIL: &str = "変換の候補に、関連する語や計算の結果などを出します。";
     pub const EXTRAS_TITLE: &str = "試験的な機能";
-    pub const EXTRAS_TEXT: &str = "既定ではオフの機能です。あとから設定の画面でも変えられます。";
+    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。あとから設定の画面でも変えられます。";
     pub const MACROS: &str = "変換マクロ";
-    pub const DYNAMIC_DICTIONARY: &str = "動的なユーザー辞書";
-    pub const COMMANDS: &str = "コマンド";
-    /// 機能ごとの実演の説明(macOS の UIStrings.Onboarding の Detail)
     pub const MACROS_DETAIL: &str =
-        "連想変換と同じ Shift+↑ で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
+        "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
+    pub const DYNAMIC_DICTIONARY: &str = "動的なユーザー辞書";
     pub const DYNAMIC_DICTIONARY_DETAIL: &str =
         "単語に {datetime:YYYY/MM/DD} などを書くと、入力したときの値にします。";
+    pub const COMMANDS: &str = "コマンド";
     pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。";
-    /// コマンドの実演の候補(macOS の UIStrings.Onboarding.commandsExample)
     pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
+    pub const SPOTLIGHT_HINT: &str = "項目にポインタを置くと、左に使い方を出します。";
+    pub const ASSOCIATION: &str = "連想変換";
+    pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、似た意味の語を出します。";
+    pub const CALCULATION: &str = "計算";
+    pub const CALCULATION_DETAIL: &str = "「1+2*3=」と打つと、答えを候補に出します。";
+    pub const POSTAL_CODE: &str = "郵便番号";
+    pub const POSTAL_CODE_DETAIL: &str = "郵便番号から住所を出します。";
+    pub const DATE: &str = "日付と時刻";
+    pub const DATE_DETAIL: &str = "「きょう」「いま」「なう」から日付と時刻を出します。";
+}
+
+/// 初期設定の，macOS では関数(UIStrings.Onboarding の detail(for:) など)が返す文言と，Windows だけの文言
+/// (Mac の英数キー・かなキーの代わりの無変換キー・変換キーと半角/全角キー，アプリの名前，読み込み・保存の案内)
+pub mod windows_wizard {
+    /// 英数とかなの切り替え(macOS の ModeSwitchStyle．分けるのが推奨)
+    pub const MODE_SEPARATE: &str = "無変換キーと変換キーで分ける";
+    pub const MODE_SEPARATE_DETAIL: &str =
+        "無変換キーで英数、変換キーで日本語になります。半角/全角キーでも切り替えられます。";
+    pub const MODE_SINGLE: &str = "半角/全角キーで切り替え";
+    pub const MODE_SINGLE_DETAIL: &str =
+        "半角/全角キーを押すたびに、日本語と英数が切り替わります。";
+
+    /// アプリごとの入力モードの説明(macOS の UIStrings.Onboarding.appModeDetail(for:))
+    pub const APP_MODE_OFF_DETAIL: &str =
+        "そのアプリに切り替えるたびに英数にします。あとから日本語入力にも切り替えられます。";
+    pub const APP_MODE_ON_DETAIL: &str = "そのアプリに切り替えるたびに日本語入力にします。";
+    pub const APP_MODE_REMEMBERS_DETAIL: &str = "そのアプリで最後に使った入力モードに戻します。";
+
+    /// 補正の強さの説明(macOS の UIStrings.Onboarding.detail(for: CorrectionSensitivity))
+    pub const CORRECTION_CAUTIOUS_DETAIL: &str =
+        "確かなときだけ直し、迷うときは「もしかして」で知らせます。";
+    pub const CORRECTION_STANDARD_DETAIL: &str = "よくある打ち間違いを直します。";
+    pub const CORRECTION_AGGRESSIVE_DETAIL: &str = "少しでも打ち間違いらしければ直します。";
+
+    /// 候補の出し方の説明(macOS の UIStrings.Onboarding.detail(for: CandidatePresentation))
+    pub const PRESENTATION_AUTOMATIC_DETAIL: &str =
+        "文節ごとに候補が枝分かれします。文全体を見渡しながら、直したい文節だけを選び直せます。";
+    pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選んでいる文節の候補を縦に並べます。";
+    pub const PRESENTATION_LIST_DETAIL: &str = "文全体の候補を縦に並べます。";
+
+    /// 実演でアプリを切り替えるときに出す名前(macOS は「メモ」)
+    pub const DEMO_NOTES: &str = "メモ帳";
+    /// 英数で打つ実演の文字(macOS は「Mac で」)
+    pub const DEMO_DIRECT_TEXT: &str = "PC で";
+    /// 補正とコマンドの実演の案内(core の Note と同じ文言)
+    pub const NOTE_SUGGESTION: &str = "もしかして";
+    pub const NOTE_CORRECTION: &str = "修正";
+    pub const NOTE_FIX: &str = "修正";
+    pub const NOTE_REVERT: &str = "戻す";
+    pub const NOTE_RUN: &str = "実行";
+    pub const KEY_TAB: &str = "Tab";
+    pub const KEY_ESCAPE: &str = "Esc";
+    pub const KEY_ENTER: &str = "Enter";
     /// コマンドの候補の頭の印(core の DefaultSettings.commandCandidateMark)
     pub const COMMAND_MARK: &str = "▶ ";
     /// 変換マクロの見出しの種類(core の DefaultSettings.macroGroupLabel)
     pub const MACRO_LABEL: &str = "整形";
-    /// 機能の紹介のページの案内(macOS の UIStrings.Onboarding.spotlightHint．実演は右に出す)
-    pub const SPOTLIGHT_HINT: &str = "項目にポインターを置くと、右に使い方を出します。";
-    pub const APPEARANCE_TITLE: &str = "外観";
-    pub const APPEARANCE_TEXT: &str = "候補ウィンドウのテーマを選びます。";
-    pub const DONE_TITLE: &str = "準備ができました";
-    pub const DONE_TEXT: &str = "選んだ設定で使い始められます。設定はあとから「Hajime IME の設定」でいつでも変えられます。タスクバーの入力モードのアイコンを右クリックしても開けます。";
 
-    /// 候補ウィンドウの足元の案内(実演)
-    pub const HINTS: &[(&str, &str)] = &[("↓", "候補"), ("←→", "文節"), ("Shift+↑", "連想")];
-    /// 連想の見出しの種類(実演では出さない)
-    pub const ASSOCIATION_LABEL: &str = "";
-
-    /// 実演で押すキー
-    pub const KEY_ENTER: &str = "Enter";
-    pub const KEY_SPACE: &str = "Space";
-    pub const KEY_HANKAKU: &str = "半角/全角";
-    pub const KEY_HENKAN: &str = "変換";
-    pub const KEY_MUHENKAN: &str = "無変換";
-    pub const KEY_DOWN: &str = "↓";
-    pub const KEY_UP: &str = "↑";
-    pub const KEY_RIGHT: &str = "→";
-    pub const KEY_LEFT: &str = "←";
-    pub const KEY_ASSOCIATE: &str = "Shift+↑";
-    pub const KEY_ESCAPE: &str = "Esc";
-
-    /// 実演の説明
-    pub const CAPTION_ENGLISH: &str = "英語で入力";
-    pub const CAPTION_JAPANESE: &str = "日本語で入力";
-    pub const CAPTION_APP_NOTES: &str = "メモ帳では日本語入力";
-    pub const CAPTION_APP_TERMINAL: &str = "ターミナルに切り替えると英語入力";
-    pub const CAPTION_APP_BACK: &str = "メモ帳に戻すと日本語入力";
-    pub const CAPTION_ROMAJI: &str = "ローマ字で入力";
-    pub const CAPTION_KANA: &str = "かなで入力";
-    pub const CAPTION_LIVE: &str = "手を止めると漢字に";
-    pub const CAPTION_SPACE: &str = "Space で変換";
-    pub const CAPTION_FOCUS: &str = "太い下線が選んでいる文節";
-    pub const CAPTION_TYPO: &str = "「う」を 2 度打ってしまった";
-    pub const CAPTION_CORRECTED: &str = "補正して「ありがとう」に";
-    pub const CAPTION_NOT_CORRECTED: &str = "打ったとおりに変換";
-    pub const CAPTION_OFF: &str = "オフにしているので出ません";
-    pub const CAPTION_HAND_SHIFT: &str = "ずれたまま打った文を「こんにちは」に";
-    pub const CAPTION_COMMAND: &str = "選んで Enter でアプリを開く";
+    /// 最後のページの案内(macOS はメニューバーから設定を開く．Windows はタスクバーのアイコンから)
+    pub const TASKBAR_NOTE: &str =
+        "設定の画面は、タスクバーの入力モードのアイコンを右クリックしても開けます。";
+    /// 実演の舞台の読み上げの名前
+    pub const DEMO: &str = "実演";
+    pub const LOADING: &str = "設定を読み込んでいます…";
+    pub const SAVE_FAILED: &str =
+        "設定を保存できませんでした。変換エンジンが動いているか確かめてください。";
 }
 
 /// 上限の数を差し込む誤りの文言．数は目録(protocol/settings-catalog.json．DefaultSettings の写し)から入れる．
@@ -1076,6 +1090,13 @@ pub mod limited {
         )
     }
 
+    pub fn invalid_hidden_prediction(limits: &Limits) -> String {
+        format!(
+            "予測に表示しない語句は {} 文字までにしてください",
+            limits.hidden_prediction_length
+        )
+    }
+
     pub fn invalid_english_term(limits: &Limits) -> String {
         format!(
             "語は {}〜{} 文字の英字にしてください",
@@ -1109,6 +1130,7 @@ pub enum LimitedText {
     Symbol,
     ReadingSymbol,
     EnglishTerm,
+    HiddenPrediction,
 }
 
 impl Text {
@@ -1123,6 +1145,7 @@ impl Text {
             Text::Limited(LimitedText::Symbol) => limited::invalid_symbol,
             Text::Limited(LimitedText::ReadingSymbol) => limited::invalid_reading_symbol,
             Text::Limited(LimitedText::EnglishTerm) => limited::invalid_english_term,
+            Text::Limited(LimitedText::HiddenPrediction) => limited::invalid_hidden_prediction,
         };
         make(limits).into()
     }

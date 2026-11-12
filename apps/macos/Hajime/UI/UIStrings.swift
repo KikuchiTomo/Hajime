@@ -269,8 +269,10 @@ enum UIStrings {
             case .backToReading: "全文を読みに戻す"
             case .resumeEditing: "読みに戻して末尾から編集"
             case .undoConversionEdit: "直前の変更を取り消し"
+            case .undoPrediction: "予測の確定を取り消し"
             case .forgetCandidate: "候補を学習から削除"
             case .forgetLastCommit: "最後の学習を取り消し"
+            case .hidePrediction: "予測に表示しない"
             case .openSettings: "設定を開く"
             case .toggleLiveConversion: "ライブ変換の切り替え"
             case .handwriting: "手書き入力"
@@ -303,9 +305,11 @@ enum UIStrings {
             case .backToReading: "変換をやめて全文を読みに戻します。ライブ変換がオンでも、読みを変更するまで読みのまま表示します"
             case .resumeEditing: "変換をやめて読みに戻り、末尾から入力を続けます"
             case .undoConversionEdit: "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"
+            case .undoPrediction: "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"
             case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
+            case .hidePrediction: "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
             case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
@@ -701,6 +705,10 @@ enum UIStrings {
         static let predictionDisplay = "入力中の予測"
         static let predictionPrefersHistory = "入力履歴にある予測を優先"
         static let predictionFromCorrection = "打ち間違いを直した読みからも予測"
+        static let hiddenPredictions = "予測に表示しない語句"
+        static let hiddenPredictionPlaceholder = "語句"
+        static let hiddenPredictionsEmpty = "予測に表示しない語句はありません"
+        static let invalidHiddenPrediction = "予測に表示しない語句は \(DefaultSettings.maximumHiddenPredictionLength) 文字までにしてください"
 
         static func label(for display: SuggestionDisplay) -> String {
             switch display {
@@ -855,6 +863,7 @@ enum UIStrings {
         static let correctsEnglish = "英単語"
         static let correctsJapanese = "日本語のタイプミス"
         static let correctsRepeatedKeys = "同じキーの重なり"
+        static let correctionKindsNote = "使用できない項目は、変換の「タイプミスの修正」で有効にできます。"
         static let exceptions = "修正しない語句"
         static let exceptionPlaceholder = "英字か読み"
         static let rules = "置き換え"
@@ -1042,7 +1051,7 @@ extension UIStrings {
             "keypadCalculation": UIStrings.Settings.keypadCalculation, "cyclesLetterCase": UIStrings.Settings.cyclesLetterCase,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
-            "predictionFromCorrection": Choice.predictionFromCorrection, "suggestionSkipCount": More.suggestionSkipCount,
+            "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,

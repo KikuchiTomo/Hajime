@@ -97,7 +97,7 @@ struct EngineServiceTests {
             return
         }
         #expect(handled)
-        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil, panelAnchor: nil)])
+        #expect(operations == [.setComposition(segments: [WireTextSegment(text: "かな", style: .reading)], caret: nil, panelAnchor: nil, replacedLength: nil)])
         #expect(state.isComposing)
         #expect(state.consumedKeys.isEmpty)
 
@@ -263,6 +263,24 @@ struct EngineServiceTests {
             return
         }
         #expect(handled)
+    }
+
+    @Test("ライブ変換で待つ時間は設定の値に従う", arguments: [DefaultSettings.liveConversionDelayRange.lowerBound, DefaultSettings.liveConversionDelayRange.upperBound])
+    func wakeFollowsDelay(delay: Double) throws {
+        try settings.update {
+            $0.liveConversion = true
+            $0.liveConversionDelay = delay
+        }
+        let id = greeted()
+        let session = try open(id)
+        guard case .edit(_, _, let state) = type("kana", session: session, from: id).last else {
+            Issue.record("編集の応答にならない")
+            return
+        }
+        let wait = try #require(state.wakeAfterMilliseconds)
+        // 打鍵から応答までにかかった時間だけ短くなる
+        #expect(wait <= UInt32((delay * 1000).rounded()))
+        #expect(wait > UInt32((delay * 1000).rounded()) - 50)
     }
 
     @Test("設定の画面から設定を読み書きし，範囲の外の値は直し，知らない値は変えない")
@@ -489,11 +507,19 @@ struct EngineServiceTests {
         })
     }
 
-    @Test("見た目の設定は設定の値を運ぶ")
-    func presentation() {
+    @Test("見た目の設定は設定の値を運ぶ．変えたら変えた値を運ぶ")
+    func presentation() throws {
         #expect(service.presentation.theme == settings.current.theme.rawValue)
         #expect(service.presentation.fontSize == settings.current.candidateFontSize)
         #expect(service.presentation.customTheme == nil)
+        try settings.update {
+            $0.theme = .terminal
+            $0.candidateFontSize = DefaultSettings.candidateFontSizeRange.upperBound
+            $0.modeIndicatorDuration = DefaultSettings.modeIndicatorDurationRange.upperBound
+        }
+        #expect(service.presentation.theme == ThemePreference.terminal.rawValue)
+        #expect(service.presentation.fontSize == DefaultSettings.candidateFontSizeRange.upperBound)
+        #expect(service.presentation.modeIndicatorMilliseconds == UInt32(DefaultSettings.modeIndicatorDurationRange.upperBound * 1000))
     }
 
     @Test("使っているカスタムテーマの色と形を運ぶ")

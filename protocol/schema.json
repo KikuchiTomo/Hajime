@@ -197,6 +197,10 @@
         {
           "name": "caret",
           "type": "Rect?"
+        },
+        {
+          "name": "canReplacePrecedingText",
+          "type": "bool?"
         }
       ]
     },
@@ -282,6 +286,10 @@
             {
               "name": "panelAnchor",
               "type": "u32?"
+            },
+            {
+              "name": "replacedLength",
+              "type": "u32?"
             }
           ]
         },
@@ -346,6 +354,10 @@
         },
         {
           "name": "handwriting",
+          "type": "bool?"
+        },
+        {
+          "name": "palette",
           "type": "bool?"
         }
       ]
@@ -426,7 +438,8 @@
         "romaji",
         "symbolSequences",
         "symbolReadings",
-        "englishTerms"
+        "englishTerms",
+        "hiddenPredictions"
       ]
     },
     {
@@ -807,6 +820,19 @@
         },
         {
           "name": "openHandwriting",
+          "fields": [
+            {
+              "name": "session",
+              "type": "u32"
+            },
+            {
+              "name": "context",
+              "type": "FieldContext"
+            }
+          ]
+        },
+        {
+          "name": "openPalette",
           "fields": [
             {
               "name": "session",
