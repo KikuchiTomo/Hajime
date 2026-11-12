@@ -162,6 +162,23 @@ fn entry_number(list: &CandidateList, index: usize) -> Option<usize> {
     (index / length == numbered).then_some(index % length + 1)
 }
 
+/// index 番目の候補の番号の列に出す番号と，番号キーで選べるか．
+/// 番号の列を取る窓では，選べない番号(表のほかの列，選び始める前の入力中の候補の窓)も薄く出し，列を空に見せない
+fn shown_number(list: &CandidateList, index: usize) -> (usize, bool) {
+    match entry_number(list, index) {
+        Some(number) => (number, true),
+        None => (
+            column_length(list).map_or(index + 1, |length| index % length + 1),
+            false,
+        ),
+    }
+}
+
+/// 表の列と列のあいだ(区切りの縦の線と，その左と右の空き)
+fn column_gutter() -> f32 {
+    candidate::COLUMN_GAP * 2.0 + candidate::FRAME_WIDTH
+}
+
 pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) -> Scene {
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
@@ -194,8 +211,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let grid = column_length(list);
     let columns = column_count(list) as f32;
     let cell_limit = grid.map(|_| {
-        ((candidate::GRID_MAX_WIDTH - outer - candidate::FRAME_WIDTH * (columns - 1.0)) / columns)
-            .floor()
+        ((candidate::GRID_MAX_WIDTH - outer - column_gutter() * (columns - 1.0)) / columns).floor()
     });
     // 長い文の候補は，窓の幅の上限に収まるよう省く．ほかの候補と違うところの少し手前から見せる
     // (頭が同じ文が並ぶので，末尾を省くと見分けられない．macOS の CandidateView と同じ)
@@ -271,7 +287,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let cell_width = cell_limit.map_or(natural_cell, |limit| natural_cell.min(limit));
     // 候補の列(行の地)の幅．表なら，すべての列と列のあいだの線を合わせた幅
     let list_width = candidate::MIN_WIDTH
-        .max(cell_width * columns + candidate::FRAME_WIDTH * (columns - 1.0))
+        .max(cell_width * columns + column_gutter() * (columns - 1.0))
         .max(variants_width + (metrics.row_padding_x - candidate::VARIANT_PADDING_X) * 2.0)
         .max(heading_width)
         .ceil();
@@ -357,9 +373,10 @@ fn cells(list: &CandidateList, layout: &ListLayout, cell_width: f32) -> Cells {
         };
     };
     let columns = column_count(list);
-    let gaps = candidate::FRAME_WIDTH * (columns - 1) as f32;
-    let cell = cell_width.min(((first.width - gaps) / columns as f32).floor());
-    let x = |column: usize| first.x + column as f32 * (cell + candidate::FRAME_WIDTH);
+    let gutter = column_gutter();
+    let cell =
+        cell_width.min(((first.width - gutter * (columns - 1) as f32) / columns as f32).floor());
+    let x = |column: usize| first.x + column as f32 * (cell + gutter);
     let place = |row: Frame, index: usize| Frame::new(x(index / length), row.y, cell, row.height);
     Cells {
         rows: (0..list.entries.len())
@@ -368,11 +385,12 @@ fn cells(list: &CandidateList, layout: &ListLayout, cell_width: f32) -> Cells {
         hit_rows: (0..list.entries.len())
             .map(|index| place(layout.hit_rows[index % length], index))
             .collect(),
-        // 縦の線は行の地の上の端から下の端まで(角丸のテーマは行と行のあいだの空きの分だけ短くなる)
+        // 縦の線は列と列のあいだの真ん中．左と右の空きは同じ(COLUMN_GAP)で，選んでいる行の地は線に触れない．
+        // 縦は行の地の上の端から下の端まで(角丸のテーマは行と行のあいだの空きの分だけ短くなる)
         separators: (1..columns)
             .map(|column| {
                 Frame::new(
-                    x(column) - candidate::FRAME_WIDTH,
+                    x(column) - candidate::COLUMN_GAP - candidate::FRAME_WIDTH,
                     first.y,
                     candidate::FRAME_WIDTH,
                     last.max_y() - first.y,
@@ -463,8 +481,15 @@ fn draw_list(
             theme.text_muted
         }
         .faded(opacity);
-        // 表では選んでいる列にだけ番号を振る(番号キーはその列の中で選ぶ)．ほかの列は番号の場所を空けたままにし，列を移っても文字を動かさない
-        let number = entry_number(list, index).map(|number| number.to_string());
+        // 表では選んでいる列の番号だけを番号キーで選べる．ほかの列と，選び始める前の入力中の候補の窓の番号は薄く出し，
+        // どの列も番号の列から始まるように見せる(列を移っても，選び始めても文字は動かない)
+        let (number, selectable) = shown_number(list, index);
+        let number = number.to_string();
+        let number_opacity = if selectable {
+            opacity
+        } else {
+            opacity * tokens::opacity::candidate::UNSELECTABLE_NUMBER
+        };
         let number_x = row.x + metrics.row_padding_x;
         let mut text_x = number_x + metrics.lead;
         if let Some(kind) = entry.command {
@@ -472,22 +497,23 @@ fn draw_list(
             painter.command(kind, text_x, row.mid_y(), selected, opacity);
             text_x += Painter::command_width();
         }
-        // 番号キーで選べない窓(選び始める前の入力中の候補など)では番号を振らない．
-        // 文字の位置は変えない(選び始めて番号が出たときに候補が横に動かないように)
-        if let Some(number) = &number {
-            if theme.is_rounded() {
-                let center = Point::new(number_x + glass::BADGE_SIZE / 2.0, row.mid_y());
-                painter.badge(
-                    number,
-                    center,
-                    selected,
-                    opacity,
-                    glass::BADGE_SIZE,
-                    Font::Key,
-                );
+        if theme.is_rounded() {
+            let center = Point::new(number_x + glass::BADGE_SIZE / 2.0, row.mid_y());
+            painter.badge(
+                &number,
+                center,
+                selected,
+                number_opacity,
+                glass::BADGE_SIZE,
+                Font::Key,
+            );
+        } else {
+            let color = if selectable {
+                muted_color
             } else {
-                painter.text(number, Font::Label, muted_color, number_x, row);
-            }
+                theme.text_muted.faded(number_opacity)
+            };
+            painter.text(&number, Font::Label, color, number_x, row);
         }
         painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
         // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
@@ -783,14 +809,29 @@ mod tests {
         assert_eq!(entry_number(&variants, 9), None);
         // 広げていない一覧はすべてに振る
         assert_eq!(entry_number(&list(Some(0)), 1), Some(2));
-        // platinum の番号の文字は 2 列目の 9 個だけ
-        let scene = candidate_list(&grid(), &Look::new(&theme("platinum"), 15.0), &Fixed);
-        let numbers: Vec<String> = texts(&scene)
+        // platinum の番号の文字は，2 列目の 9 個がふつうの濃さで，ほかの列は薄い(どの列も番号の列から始まる)
+        let theme = theme("platinum");
+        let scene = candidate_list(&grid(), &Look::new(&theme, 15.0), &Fixed);
+        let numbers: Vec<(String, crate::theme::Color)> = texts(&scene)
             .into_iter()
-            .map(|(text, _)| text)
-            .filter(|text| text.parse::<u32>().is_ok())
+            .filter(|(text, _)| text.parse::<u32>().is_ok())
             .collect();
-        assert_eq!(numbers, (1..=9).map(|n| n.to_string()).collect::<Vec<_>>());
+        let faint = theme
+            .text_muted
+            .faded(tokens::opacity::candidate::UNSELECTABLE_NUMBER);
+        let selectable: Vec<String> = numbers
+            .iter()
+            .filter(|(_, color)| *color != faint)
+            .map(|(text, _)| text.clone())
+            .collect();
+        assert_eq!(
+            selectable,
+            (1..=9).map(|n| n.to_string()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            numbers.iter().filter(|(_, color)| *color == faint).count(),
+            20 - 9
+        );
     }
 
     fn hint(keys: &str, label: &str) -> KeyHint {
@@ -1150,7 +1191,7 @@ mod tests {
     }
 
     #[test]
-    fn 番号キーで選べない窓は番号を振らず_文字種の行が無ければ文字種の案内を出さない() {
+    fn 番号キーで選べない窓は番号を薄く出し_文字種の行が無ければ文字種の案内を出さない() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
@@ -1165,9 +1206,22 @@ mod tests {
             let scene = candidate_list(&browsing, &look, &Fixed);
             let texts = texts_of(&scene);
             assert!(texts.contains(&"変換".to_string()));
-            assert!(!texts.contains(&"1".to_string()));
-            assert!(!texts.contains(&"2".to_string()));
             assert!(!texts.contains(&"文字種".to_string()));
+            // 番号は選べる窓より薄く出す(番号の列を空に見せない)
+            let numbered_scene = candidate_list(&list(Some(0)), &look, &Fixed);
+            let number_color = |scene: &Scene| {
+                scene.draws.iter().find_map(|draw| match draw {
+                    Draw::Text { text, color, .. } if text == "2" => Some(color.alpha),
+                    Draw::Group { draws, .. } => draws.iter().find_map(|draw| match draw {
+                        Draw::Text { text, color, .. } if text == "2" => Some(color.alpha),
+                        _ => None,
+                    }),
+                    _ => None,
+                })
+            };
+            let faint = number_color(&scene).expect("薄い番号");
+            let shown = number_color(&numbered_scene).expect("番号");
+            assert!(faint < shown, "{name}: {faint} {shown}");
             // 番号を振らなくても，候補の文字の位置は変えない
             let natural = candidate_list(&list(None), &look, &Fixed);
             assert_eq!(

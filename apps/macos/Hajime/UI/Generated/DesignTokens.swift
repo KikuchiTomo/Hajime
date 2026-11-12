@@ -187,6 +187,7 @@ enum DesignTokens {
             static let screenMargin: CGFloat = 16
             static let truncationContext: CGFloat = 4
             static let detailGap: CGFloat = 8
+            static let columnGap: CGFloat = 8
         }
         enum ModeIndicator {
             static let fontSize: CGFloat = 14
@@ -653,6 +654,9 @@ enum DesignTokens {
             static let linkHoverMix: CGFloat = 0.35
             static let sliderTrackDisabled: CGFloat = 0.5
             static let tableStripe: CGFloat = 0.035
+        }
+        enum Candidate {
+            static let unselectableNumber: CGFloat = 0.4
         }
     }
 }

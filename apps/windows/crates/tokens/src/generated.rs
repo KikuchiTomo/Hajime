@@ -305,6 +305,7 @@ pub mod size {
         pub const SCREEN_MARGIN: f32 = 16.0;
         pub const TRUNCATION_CONTEXT: f32 = 4.0;
         pub const DETAIL_GAP: f32 = 8.0;
+        pub const COLUMN_GAP: f32 = 8.0;
     }
     pub mod mode_indicator {
         pub const FONT_SIZE: f32 = 14.0;
@@ -773,5 +774,8 @@ pub mod opacity {
         pub const LINK_HOVER_MIX: f32 = 0.35;
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
         pub const TABLE_STRIPE: f32 = 0.035;
+    }
+    pub mod candidate {
+        pub const UNSELECTABLE_NUMBER: f32 = 0.4;
     }
 }

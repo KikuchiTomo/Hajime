@@ -68,6 +68,7 @@ public enum LayoutTokens {
         public static let screenMargin: Double = 16
         public static let truncationContext: Double = 4
         public static let detailGap: Double = 8
+        public static let columnGap: Double = 8
     }
     public enum ModeIndicator {
         public static let fontSize: Double = 14
