@@ -1,14 +1,16 @@
-/// 語の意味のカード(R-08)の配置．一覧と分岐図，候補の右と候補の下で同じものを使う．
+/// 語の意味(R-08)の配置．一覧と分岐図，候補の右と候補の下で同じものを使う．
 ///
-/// カードの中は「目印の列」と「文の列」の 2 列にする．
+/// 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．選んでいる候補とは，描く側がつなぐ線で結ぶ．
+/// 中は「目印の列」と「文の列」の 2 列にする．
 /// - 目印の列は幅が決まっていて，見出しの辞書のアイコン・意味の番号の札・同音語の耳のアイコンを，列の中で横の真ん中に置く
-/// - 文の列は，見出しの語・意味・使い方の例の縦の線・「同音語」を，どれも同じ x(columns.textX)から書き出す．
+/// - 文の列は，見出しの語・意味・使い方の例の縦の線・同音語の札を，どれも同じ x(columns.textX)から書き出す．
 ///   使い方の例の文は，そこから metrics.exampleIndent だけ下げる．折り返した行も，それぞれの書き出しの x にそろえる
+/// - 同音語は，区切りの線の下に耳のアイコンと札だけで並べる(見出しの言葉は置かない)
 ///
 /// 縦は，文字の箱で積む．文字の箱は，書体の大きさの高さで，行の箱(ベースラインから上の ascent と下の descent の範囲)と縦の真ん中が同じもの．
 /// 日本語の字の外形はほぼこの箱に収まるので，箱と箱のあいだが見た目の間隔になる(行の箱は書体の上下の余白を含むので使わない)．
 /// - 目印と札は，その行の 1 行目の文字の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
-/// - 文字の箱・札・目印のあいだと，カードの縁とのあいだを，トークンの間隔にする．内側の余白は上下左右とも metrics.padding
+/// - 文字の箱・札・目印のあいだを，トークンの間隔にする．見出しの行の縦の真ん中は Placement.headerMidY(候補の 1 行目の真ん中にそろえる)
 /// - 折り返した行のベースラインは metrics.meaningPitch(例は examplePitch)ずつ下げる
 /// - 例の縦の線は，例の 1 行目の文字の箱の上の端から，最後の行の文字の箱の下の端まで
 ///
@@ -100,27 +102,39 @@ public struct MeaningCardLayout: Sendable, Equatable {
         /// 目印の列
         public var markerX: Double
         public var markerWidth: Double
-        /// 文の列(見出しの語・意味・例の縦の線・「同音語」の書き出し)
+        /// 文の列(見出しの語・意味・例の縦の線・同音語の札の書き出し)
         public var textX: Double
         public var textWidth: Double
         /// 例の文の書き出しと幅
         public var exampleX: Double
         public var exampleWidth: Double
 
-        public init(width: Double, metrics: Metrics) {
-            markerX = metrics.padding
+        /// left は目印の列の左の端(カードの左の端から)
+        public init(width: Double, left: Double, metrics: Metrics) {
+            markerX = left
             markerWidth = metrics.markerWidth
             textX = markerX + markerWidth + metrics.markerGap
-            textWidth = max(width - metrics.padding - textX, 0)
+            textWidth = max(width - textX, 0)
             exampleX = textX + metrics.exampleIndent
             exampleWidth = max(textWidth - metrics.exampleIndent, 0)
         }
     }
 
+    /// カードの置き方．描く側が，まわりの候補の行に合わせて決める
+    public struct Placement: Sendable, Equatable {
+        /// 目印の列の左の端(カードの左の端から)
+        public var left: Double
+        /// 見出しの行の縦の真ん中(カードの上の端から)．候補の 1 行目の真ん中にそろえる
+        public var headerMidY: Double
+
+        public init(left: Double, headerMidY: Double) {
+            self.left = left
+            self.headerMidY = headerMidY
+        }
+    }
+
     /// 寸法(デザイントークン size.meaning)
     public struct Metrics: Sendable, Equatable {
-        /// カードの内側の余白(上下左右とも)
-        public var padding: Double
         /// 目印の列の幅．目印(アイコンと番号の札)の一辺もこれ
         public var markerWidth: Double
         /// 目印の列と文の列のあいだ
@@ -144,15 +158,14 @@ public struct MeaningCardLayout: Sendable, Equatable {
         public var partOfSpeechGap: Double
         public var partOfSpeechHeight: Double
         public var partOfSpeechPaddingX: Double
-        /// 「同音語」と最初の札のあいだ，札と札のあいだ
+        /// 札と札のあいだ
         public var tagGap: Double
         public var tagHeight: Double
         public var tagPaddingX: Double
 
-        public init(padding: Double, markerWidth: Double, markerGap: Double, headerGap: Double, senseGap: Double, exampleGap: Double, exampleIndent: Double,
+        public init(markerWidth: Double, markerGap: Double, headerGap: Double, senseGap: Double, exampleGap: Double, exampleIndent: Double,
                     exampleBarWidth: Double, meaningPitch: Double, examplePitch: Double, othersGap: Double, separatorWidth: Double, partOfSpeechGap: Double,
                     partOfSpeechHeight: Double, partOfSpeechPaddingX: Double, tagGap: Double, tagHeight: Double, tagPaddingX: Double) {
-            self.padding = padding
             self.markerWidth = markerWidth
             self.markerGap = markerGap
             self.headerGap = headerGap
@@ -174,7 +187,7 @@ public struct MeaningCardLayout: Sendable, Equatable {
 
         /// デザイントークン(size.meaning)の値
         public static let tokens = Metrics(
-            padding: LayoutTokens.Meaning.padding, markerWidth: LayoutTokens.Meaning.markerWidth, markerGap: LayoutTokens.Meaning.markerGap,
+            markerWidth: LayoutTokens.Meaning.markerWidth, markerGap: LayoutTokens.Meaning.markerGap,
             headerGap: LayoutTokens.Meaning.headerGap, senseGap: LayoutTokens.Meaning.senseGap, exampleGap: LayoutTokens.Meaning.exampleGap,
             exampleIndent: LayoutTokens.Meaning.exampleIndent, exampleBarWidth: LayoutTokens.Meaning.exampleBarWidth,
             meaningPitch: LayoutTokens.Meaning.meaningPitch, examplePitch: LayoutTokens.Meaning.examplePitch, othersGap: LayoutTokens.Meaning.othersGap,
@@ -203,19 +216,16 @@ public struct MeaningCardLayout: Sendable, Equatable {
         public var senses: [Sense]
         /// 同音語の札に出す語
         public var others: [String]
-        /// 同音語の行の見出し(「同音語」)
-        public var othersLabel: String
 
-        public init(word: String, partOfSpeech: String?, senses: [Sense], others: [String], othersLabel: String) {
+        public init(word: String, partOfSpeech: String?, senses: [Sense], others: [String]) {
             self.word = word
             self.partOfSpeech = partOfSpeech
             self.senses = senses
             self.others = others
-            self.othersLabel = othersLabel
         }
     }
 
-    /// カードの大きさ(内側の余白を含む)
+    /// カードの大きさ．高さは最後の部品の下の端まで
     public var width: Double
     public var height: Double
     public var columns: Columns
@@ -225,10 +235,9 @@ public struct MeaningCardLayout: Sendable, Equatable {
     public var headword: Text
     public var partOfSpeech: Chip?
     public var senses: [Sense]
-    /// 同音語の行の上の区切りの線．同音語が無ければ nil
+    /// 同音語の行の上の区切りの線．場所の幅いっぱい(窓のほかの区切りの線と端をそろえる)．同音語が無ければ nil
     public var separator: Box?
     public var earIcon: Box?
-    public var othersLabel: Text?
     public var tags: [Chip]
     /// 入らなかった札の数(「+n」)
     public var more: Text?
@@ -237,19 +246,19 @@ public struct MeaningCardLayout: Sendable, Equatable {
     public var headerMidY: Double { bookIcon.midY }
 
     /// - Parameters:
-    ///   - width: カードの幅(内側の余白を含む)
+    ///   - width: カードの幅
     ///   - moreLabel: 入らなかった札の数の文言(「+n」)
-    public init(content: Content, width: Double, moreLabel: (Int) -> String, measuring: some MeaningCardMeasuring, metrics: Metrics) {
-        let columns = Columns(width: width, metrics: metrics)
+    public init(content: Content, width: Double, placement: Placement, moreLabel: (Int) -> String, measuring: some MeaningCardMeasuring,
+                metrics: Metrics) {
+        let columns = Columns(width: width, left: placement.left, metrics: metrics)
         let rows = RowPlacer(measuring: measuring)
         self.width = width
         self.columns = columns
-        let right = width - metrics.padding
+        let right = width
 
-        // 見出し: 辞書のアイコン・語・品詞の札を，語の行の箱の縦の真ん中にそろえる
-        var y = metrics.padding
+        // 見出し: 辞書のアイコン・語・品詞の札を，語の文字の箱の縦の真ん中にそろえる
         let headerHeight = max(rows.em(.headword), metrics.partOfSpeechHeight, metrics.markerWidth)
-        let headerMid = y + headerHeight / 2
+        let headerMid = placement.headerMidY
         let posWidth = content.partOfSpeech.map { (measuring.width($0, .partOfSpeech) + metrics.partOfSpeechPaddingX * 2).rounded(.up) }
         let wordWidth = max(right - columns.textX - (posWidth.map { $0 + metrics.partOfSpeechGap } ?? 0), 0)
         let word = Self.truncated(content.word, width: wordWidth) { measuring.width($0, .headword) }
@@ -263,9 +272,9 @@ public struct MeaningCardLayout: Sendable, Equatable {
         } else {
             partOfSpeech = nil
         }
-        y += headerHeight + metrics.headerGap
+        var y = headerMid + headerHeight / 2 + metrics.headerGap
 
-        // 意味: 番号の札は 1 行目の行の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
+        // 意味: 番号の札は 1 行目の文字の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
         var senses: [Sense] = []
         for (index, sense) in content.senses.enumerated() {
             if index > 0 { y += metrics.senseGap }
@@ -293,38 +302,41 @@ public struct MeaningCardLayout: Sendable, Equatable {
         }
         self.senses = senses
 
-        // 同音語: 区切りの線の下に，耳のアイコン・「同音語」・札．入らない札は「+n」にまとめる
+        // 同音語: 区切りの線の下に，耳のアイコンと札．入らない札は「+n」にまとめる
         separator = nil
         earIcon = nil
-        othersLabel = nil
         tags = []
         more = nil
         if !content.others.isEmpty {
             y += metrics.othersGap
-            let line = Box(x: metrics.padding, y: y.rounded(), width: width - metrics.padding * 2, height: metrics.separatorWidth)
+            let line = Box(x: 0, y: y.rounded(), width: width, height: metrics.separatorWidth)
             separator = line
             y = line.maxY + metrics.othersGap
-            let rowHeight = max(rows.em(.label), metrics.tagHeight, metrics.markerWidth)
-            let labelLine = rows.centered(.label, x: columns.textX, width: measuring.width(content.othersLabel, .label), midY: y + rowHeight / 2)
-            othersLabel = Text(text: content.othersLabel, role: .label, line: labelLine)
-            earIcon = Self.marker(x: columns.markerX, size: metrics.markerWidth, midY: labelLine.box.midY)
-            var x = labelLine.box.maxX + metrics.tagGap
+            let rowHeight = max(metrics.tagHeight, metrics.markerWidth)
+            let ear = Self.marker(x: columns.markerX, size: metrics.markerWidth, midY: y + rowHeight / 2)
+            earIcon = ear
+            var x = columns.textX
             for (index, word) in content.others.enumerated() {
                 let tagWidth = (measuring.width(word, .tag) + metrics.tagPaddingX * 2).rounded(.up)
                 let rest = content.others.count - index - 1
                 let reserve = rest > 0 ? metrics.tagGap + measuring.width(moreLabel(rest), .label) : 0
                 if x + tagWidth + reserve > right {
                     let text = moreLabel(content.others.count - index)
-                    more = Text(text: text, role: .label, line: rows.centered(.label, x: x, width: measuring.width(text, .label), midY: labelLine.box.midY))
+                    more = Text(text: text, role: .label, line: rows.centered(.label, x: x, width: measuring.width(text, .label), midY: ear.midY))
                     break
                 }
-                let frame = Box(x: x.rounded(), y: (labelLine.box.midY - metrics.tagHeight / 2).rounded(), width: tagWidth, height: metrics.tagHeight)
+                let frame = Box(x: x.rounded(), y: (ear.midY - metrics.tagHeight / 2).rounded(), width: tagWidth, height: metrics.tagHeight)
                 tags.append(rows.chip(word, role: .tag, frame: frame, paddingX: metrics.tagPaddingX))
                 x = frame.maxX + metrics.tagGap
             }
             y += rowHeight
         }
-        height = (y + metrics.padding).rounded(.up)
+        height = y.rounded(.up)
+    }
+
+    /// 見出しの行の高さ(語の文字の箱・品詞の札・目印のいちばん高いもの)．描く側が見出しの行を候補の行の真ん中にそろえるのに使う
+    public static func headerHeight(measuring: some MeaningCardMeasuring, metrics: Metrics) -> Double {
+        max(measuring.size(.headword), metrics.partOfSpeechHeight, metrics.markerWidth)
     }
 
     /// 置いた部品の枠(重なりを確かめるのに使う)
@@ -336,7 +348,7 @@ public struct MeaningCardLayout: Sendable, Equatable {
             boxes += sense.meaning.map(\.box) + sense.example.map(\.box)
             if let bar = sense.exampleBar { boxes.append(bar) }
         }
-        boxes += [separator, earIcon, othersLabel?.line.box, more?.line.box].compactMap { $0 }
+        boxes += [separator, earIcon, more?.line.box].compactMap { $0 }
         return boxes + tags.map(\.frame)
     }
 

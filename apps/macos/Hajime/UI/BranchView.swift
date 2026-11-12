@@ -99,14 +99,25 @@ final class BranchView: NSView {
     private var labelFont: NSFont { theme.labelFont(size: theme.isRounded ? Glass.labelFontSize : Size.labelFontSize) }
     private var dropShadowOffset: CGFloat { theme.hasDropShadow ? Size.shadowOffset : 0 }
 
-    // MARK: - 語の意味のカード
+    // MARK: - 語の意味
 
-    /// 語の意味のカード(R-08)．layout が nil なら，意味の無い候補を選んでいるあいだ空けておくカード
+    /// 語の意味(R-08)．layout が nil なら，意味の無い候補を選んでいるあいだ空けておく場所
     private struct MeaningSlot {
         var placement: MeaningPlacement
         var layout: MeaningCardDrawing.Layout?
-        /// カードの大きさ(内側の余白を含む)
+        /// 目印の列の左の端と見出しの行の縦の真ん中
+        var position: MeaningCardLayout.Placement
         var size: NSSize
+    }
+
+    /// 候補の右: 枝の 3 段目として，目印の列は場所の左の端，見出しの行は最初の候補の行の地の真ん中
+    private var sidePosition: MeaningCardLayout.Placement {
+        .init(left: 0, headerMidY: (metrics.rowHeight - metrics.rowInset * 2) / 2)
+    }
+
+    /// 候補の下: 目印の列を幹の文字と足元の左の端にそろえる．見出しの行は場所の上の端から
+    private var belowPosition: MeaningCardLayout.Placement {
+        .init(left: Size.paddingX, headerMidY: MeaningCardDrawing.headerHeight(theme: theme) / 2)
     }
 
     /// 候補の右に出したカードの場所．同じ文節の同じ候補の並びのあいだは，意味の無い候補を選んでも場所を空けたままにする
@@ -119,9 +130,10 @@ final class BranchView: NSView {
     }
 
     /// 同音語の札には，下の枝に出ていない語だけを出す(枝に出ている語は見れば分かる)
-    private func cardLayout(_ note: HomophoneNote, column: LatticePanel.Column, width: CGFloat) -> MeaningCardDrawing.Layout {
+    private func cardLayout(_ note: HomophoneNote, column: LatticePanel.Column, width: CGFloat,
+                            position: MeaningCardLayout.Placement) -> MeaningCardDrawing.Layout {
         let shown = Set(column.alternatives)
-        return MeaningCardDrawing.layout(note, others: note.others.filter { !shown.contains($0) }, width: width, theme: theme)
+        return MeaningCardDrawing.layout(note, others: note.others.filter { !shown.contains($0) }, width: width, placement: position, theme: theme)
     }
 
     private func updateReservedCard() {
@@ -130,7 +142,7 @@ final class BranchView: NSView {
             reservedCard = nil
             return
         }
-        let height = column.homophone.map { cardLayout($0, column: column, width: Meaning.branchWidth).size.height }
+        let height = column.homophone.map { cardLayout($0, column: column, width: Meaning.branchWidth, position: sidePosition).size.height }
         if let reserved = reservedCard, reserved.key == key {
             reservedCard = (key, max(reserved.height, height ?? 0))
         } else {
@@ -138,20 +150,22 @@ final class BranchView: NSView {
         }
     }
 
-    /// カードの幅 width(内側の余白を含む)で作ったカード．下のカードは窓の中身の幅，候補の右のカードは窓の中身の右の端まで
+    /// 幅 width の語の意味．下に出すときは窓の中身の幅，候補の右に出すときは窓の中身の右の端まで
     private func meaningSlot(for panel: LatticePanel, width: CGFloat) -> MeaningSlot? {
         guard let column = panel.columns.first(where: \.isFocused), column.split == nil else { return nil }
         switch panel.meaningPlacement {
         case .below:
             guard let note = column.homophone else { return nil }
-            let layout = cardLayout(note, column: column, width: width)
-            return MeaningSlot(placement: .below, layout: layout, size: layout.size)
+            let position = belowPosition
+            let layout = cardLayout(note, column: column, width: width, position: position)
+            return MeaningSlot(placement: .below, layout: layout, position: position, size: layout.size)
         case .side:
-            let layout = column.homophone.map { cardLayout($0, column: column, width: width) }
+            let position = sidePosition
+            let layout = column.homophone.map { cardLayout($0, column: column, width: width, position: position) }
             let reserved = reservedCard?.key == reservationKey(panel) ? reservedCard?.height : nil
             guard layout != nil || reserved != nil else { return nil }
             let height = max(layout?.size.height ?? 0, reserved ?? 0)
-            return MeaningSlot(placement: .side, layout: layout, size: NSSize(width: width, height: height))
+            return MeaningSlot(placement: .side, layout: layout, position: position, size: NSSize(width: width, height: height))
         }
     }
 
@@ -216,7 +230,7 @@ final class BranchView: NSView {
             + (labelWidths.max() ?? 0) + noteWidth + Size.paddingX * 2
         // 候補の右に出すカードは，候補の枝の先に続けて置く(枝の一部として幅に数え，長い文でも注目している文節と一緒に見せる)
         let side = hasSideCard(panel)
-        let cardExtent = side ? Glass.separatorGap + Meaning.branchWidth : 0
+        let cardExtent = side ? Meaning.cardGap + Meaning.branchWidth : 0
         let branchRight = (focused.map { trunkX[$0] } ?? metrics.inset) + branchWidth + cardExtent
         let previewRows = panel.columns.contains { $0.preview != nil } ? 1 : 0
         let upperRows = column?.variants.count ?? 0
@@ -254,9 +268,9 @@ final class BranchView: NSView {
         var card: NSRect?
         if let focused {
             if side {
-                // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端
+                // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端．枝とのあいだにつなぐ線を引く
                 // 枝の行の右の端(drawBranches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
-                let x = (shiftedX[focused] + metrics.stemX).rounded() - metrics.stemX + branchWidth + Glass.separatorGap
+                let x = (shiftedX[focused] + metrics.stemX).rounded() - metrics.stemX + branchWidth + Meaning.cardGap
                 slot = meaningSlot(for: panel, width: max(contentRight - x, Meaning.branchWidth).rounded(.down))
                 if let slot {
                     let frame = NSRect(x: x, y: lowerTop + metrics.rowInset, width: slot.size.width, height: slot.size.height)
@@ -264,7 +278,7 @@ final class BranchView: NSView {
                     bottom = max(bottom, frame.maxY)
                 }
             } else if panel.meaningPlacement == .below {
-                // 候補の下: 窓の中身の幅いっぱい．枝とのあいだも区切りの線と同じ空き
+                // 候補の下: 窓の中身の幅いっぱい．枝とのあいだは区切りの線の上と同じ空き
                 slot = meaningSlot(for: panel, width: contentRight - metrics.inset)
                 if let slot {
                     let frame = NSRect(x: metrics.inset, y: bottom + gap, width: slot.size.width, height: slot.size.height)
@@ -392,16 +406,17 @@ final class BranchView: NSView {
                 drawBranches(lowerRows(column), from: node, width: layout.branchWidth, downward: true)
                 drawBranches(upperRows(column), from: node, width: layout.branchWidth, downward: false)
                 if let slot = layout.slot, slot.placement == .side, let card = layout.card {
-                    // 選んでいる候補から，枝の先へ意味のカードをつなぐ(分岐図の 3 段目)
-                    if let selected = column.selectedAlternative, let layoutOfCard = slot.layout {
+                    // 選んでいる候補から，枝の先の語の意味の見出しへつなぐ(分岐図の 3 段目)
+                    if let selected = column.selectedAlternative, slot.layout != nil {
                         // 枝の行の右の端(枝の根もとの x を整数に丸めた分だけずれる)から出す
                         let rowRight = (node.minX + metrics.stemX).rounded() - metrics.stemX + layout.branchWidth
                         let rowMidY = node.maxY + (CGFloat(selected) + 0.5) * metrics.rowHeight
                         let start = NSPoint(x: rowRight, y: rowMidY.rounded())
-                        let end = NSPoint(x: card.minX, y: MeaningCardDrawing.headerMidY(layoutOfCard, in: card))
+                        let end = NSPoint(x: MeaningCardDrawing.connectorEndX(in: card, placement: slot.position),
+                                          y: (card.minY + slot.position.headerMidY).rounded())
                         MeaningCardDrawing.drawConnector(from: start, to: end, theme: theme)
                     }
-                    drawCard(slot.layout, in: card)
+                    drawMeaning(slot, in: card)
                 }
             } else if let preview = column.preview, !(branchRange?.overlaps(node.minX...node.maxX) ?? false) {
                 // 添える候補は次の文節の手前までに収め，はみ出す分は省く(次の文節の添え書きと重ねない)
@@ -412,8 +427,8 @@ final class BranchView: NSView {
         NSGraphicsContext.restoreGraphicsState()
         var footerY = layout.trunkY + metrics.rowHeight + layout.lowerHeight
         if let slot = layout.slot, slot.placement == .below, let card = layout.card {
-            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいのカードを出す
-            drawCard(slot.layout, in: card)
+            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す
+            drawMeaning(slot, in: card)
         }
         if let note = panel.columns.first(where: \.isFocused)?.usageNote {
             let row = NSRect(x: textInset, y: footerY + gap, width: body.width - textInset * 2, height: metrics.footerHeight)
@@ -726,13 +741,12 @@ final class BranchView: NSView {
 
     // MARK: - 部品
 
-    /// 語の意味のカード．layout が nil なら空けておくカード(意味の無い候補を選んでいるとき)
-    private func drawCard(_ layout: MeaningCardDrawing.Layout?, in rect: NSRect) {
-        guard let layout else {
-            MeaningCardDrawing.drawEmpty(in: rect, theme: theme)
+    /// 語の意味．layout が nil なら空けておく場所(意味の無い候補を選んでいるとき)
+    private func drawMeaning(_ slot: MeaningSlot, in rect: NSRect) {
+        guard let layout = slot.layout else {
+            MeaningCardDrawing.drawEmpty(in: rect, placement: slot.position, theme: theme)
             return
         }
-        MeaningCardDrawing.drawBackground(in: rect, theme: theme)
         MeaningCardDrawing.drawContent(layout, in: rect, theme: theme)
     }
 

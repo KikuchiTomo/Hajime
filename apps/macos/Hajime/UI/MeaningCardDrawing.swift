@@ -3,21 +3,20 @@ import CoreText
 import HajimeApplication
 import HajimeDomain
 
-/// 語の意味のカード(R-08)を描く．一覧(CandidateView)と分岐図(BranchView)で同じものを使う．
+/// 語の意味(R-08)を描く．一覧(CandidateView)と分岐図(BranchView)で同じものを使う．
 ///
-/// 配置は core の MeaningCardLayout が決める．ここでは意味と例を幅で折り返し(CoreText の行分けで，句読点や小さいかなを行の頭に置かない)，
-/// 配置のとおりに描く．文字は配置のベースラインに書く(行の箱の中で上下にずれないように)．
+/// 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．配置は core の MeaningCardLayout が決める．
+/// ここでは意味と例を幅で折り返し(CoreText の行分けで，句読点や小さいかなを行の頭に置かない)，配置のとおりに描く．
+/// 文字は配置のベースラインに書く(行の箱の中で上下にずれないように)．
 /// - 意味が 2 つ以上なら，目印の列に角丸の四角の番号を付ける(候補の番号の丸と形を変え，番号キーで選ぶものと見分ける)
 /// - 使い方の例は左に縦の線を引いて控えめな色で出し，例の中の見出しの語だけを強める
-/// - 同音語は区切りの線の下に，耳のアイコンと札で並べる
+/// - 同音語は区切りの線の下に，耳のアイコンと札だけで並べる
+/// - アクセントの色は，選んでいる候補とつなぐ線(drawConnector)だけに使う．目印と札は控えめな色にする
 ///
-/// 候補の右に出すときは，一覧では選んでいる候補を指す三角を左の辺に付け(drawBackground の pointerY)，
-/// 分岐図では選んでいる候補からカードへ線を引く(drawConnector)．
 /// 折り返しは重いので，同じ注釈と幅の配置は覚えておいて使い回す(ふわっと出すあいだ 1 秒に 60 回描き直すため)
 @MainActor
 enum MeaningCardDrawing {
     private typealias Meaning = DesignTokens.Size.Meaning
-    private typealias Opacity = DesignTokens.Opacity.Glass
 
     /// 配置と，折り返した意味と例の行
     struct Layout {
@@ -28,18 +27,12 @@ enum MeaningCardDrawing {
         var size: NSSize { NSSize(width: placed.width, height: placed.height) }
     }
 
-    /// カードの地の描き方
-    enum Frame {
-        /// 角丸のテーマは文字の色を薄く敷いた地，platinum と desk は 1 ドットの枠
-        case box
-        /// platinum と desk の一覧で，枠の無い区画にするとき(一覧とのあいだの線は一覧の側が描く)
-        case pane
-    }
-
     private struct CacheKey: Hashable {
         var note: String
         var others: [String]
         var width: CGFloat
+        var left: Double
+        var headerMidY: Double
         var theme: String
     }
 
@@ -52,14 +45,16 @@ enum MeaningCardDrawing {
         "\(theme.kind)|\(theme.typeface)|\(theme.customFontName ?? "")|\(theme.text)|\(theme.textMuted)|\(increasesContrast)"
     }
 
-    /// 幅 width(内側の余白を含む)のカードの配置．others は同音語の札に出す語(分岐図では枝に出ている語を除いたもの)
-    static func layout(_ note: HomophoneNote, others: [String]? = nil, width: CGFloat, theme: ResolvedTheme) -> Layout {
+    /// 幅 width の語の意味の配置．others は同音語の札に出す語(分岐図では枝に出ている語を除いたもの)．
+    /// placement は目印の列の左の端と見出しの行の縦の真ん中(まわりの候補の行に合わせて描く側が決める)
+    static func layout(_ note: HomophoneNote, others: [String]? = nil, width: CGFloat, placement: MeaningCardLayout.Placement,
+                       theme: ResolvedTheme) -> Layout {
         let others = others ?? note.others
         let key = CacheKey(note: "\(note.word)\u{1F}\(note.partOfSpeech?.rawValue ?? "")\u{1F}\(note.senses.map { "\($0.meaning)\u{1E}\($0.example ?? "")" })",
-                           others: others, width: width, theme: themeKey(theme))
+                           others: others, width: width, left: placement.left, headerMidY: placement.headerMidY, theme: themeKey(theme))
         if let cached = cache[key] { return cached }
         let metrics = MeaningCardLayout.Metrics.tokens
-        let columns = MeaningCardLayout.Columns(width: width, metrics: metrics)
+        let columns = MeaningCardLayout.Columns(width: width, left: placement.left, metrics: metrics)
         let numbered = note.senses.count > 1
         let meaning = note.senses.map { sense in
             wrap(NSAttributedString(string: sense.meaning, attributes: [.font: font(.meaning, theme), .foregroundColor: theme.text]),
@@ -72,66 +67,35 @@ enum MeaningCardDrawing {
             MeaningCardLayout.Content.Sense(number: numbered ? UIStrings.Candidate.senseNumber(index + 1) : nil,
                                             meaningLines: meaning[index].count, exampleLines: example[index].count)
         }
-        let content = MeaningCardLayout.Content(word: note.word, partOfSpeech: note.partOfSpeech?.name, senses: senses, others: others,
-                                                othersLabel: UIStrings.Candidate.homophoneOthers)
-        let placed = MeaningCardLayout(content: content, width: width, moreLabel: { UIStrings.Candidate.more($0) }, measuring: Measuring(theme: theme),
-                                       metrics: metrics)
+        let content = MeaningCardLayout.Content(word: note.word, partOfSpeech: note.partOfSpeech?.name, senses: senses, others: others)
+        let placed = MeaningCardLayout(content: content, width: width, placement: placement, moreLabel: { UIStrings.Candidate.more($0) },
+                                       measuring: Measuring(theme: theme), metrics: metrics)
         let layout = Layout(placed: placed, meaning: meaning, example: example)
         if cache.count >= cacheLimit { cache.removeAll() }
         cache[key] = layout
         return layout
     }
 
-    // MARK: - 地
-
-    /// カードの地．pointerY があれば，左の辺からその高さを指す三角を出す(一覧で選んでいる候補を指す)
-    static func drawBackground(in rect: NSRect, theme: ResolvedTheme, frame: Frame = .box, pointerY: CGFloat? = nil) {
-        let notch = Meaning.notch
-        guard theme.isRounded else {
-            // platinum と desk: 1 ドットの枠(区画にするときは枠を描かない)と，線の色の三角
-            theme.line.setFill()
-            if frame == .box { rect.frame(withWidth: DesignTokens.Size.Candidate.frameWidth) }
-            if let pointerY {
-                // 区画にするときは，一覧とのあいだの線(rect の左の 1 ドット外)から出す
-                let base = frame == .box ? rect.minX : rect.minX - DesignTokens.Size.Candidate.frameWidth
-                let y = min(max(pointerY, rect.minY + notch * 2), rect.maxY - notch * 2).rounded()
-                let path = NSBezierPath()
-                path.move(to: NSPoint(x: base, y: y - notch))
-                path.line(to: NSPoint(x: base - notch, y: y))
-                path.line(to: NSPoint(x: base, y: y + notch))
-                path.close()
-                path.fill()
-            }
-            return
-        }
-        let radius = min(Meaning.radius, theme.cornerRadius, rect.height / 2, rect.width / 2)
-        let path = NSBezierPath()
-        path.move(to: NSPoint(x: rect.minX + radius, y: rect.minY))
-        path.appendArc(from: NSPoint(x: rect.maxX, y: rect.minY), to: NSPoint(x: rect.maxX, y: rect.maxY), radius: radius)
-        path.appendArc(from: NSPoint(x: rect.maxX, y: rect.maxY), to: NSPoint(x: rect.minX, y: rect.maxY), radius: radius)
-        path.appendArc(from: NSPoint(x: rect.minX, y: rect.maxY), to: NSPoint(x: rect.minX, y: rect.minY), radius: radius)
-        if let pointerY, rect.height > (radius + notch) * 2 {
-            // 三角は角の丸みにかからない範囲に収める．地と同じ 1 つの形にし，重ねて濃くならないようにする
-            let y = min(max(pointerY, rect.minY + radius + notch), rect.maxY - radius - notch).rounded()
-            path.line(to: NSPoint(x: rect.minX, y: y + notch))
-            path.line(to: NSPoint(x: rect.minX - notch, y: y))
-            path.line(to: NSPoint(x: rect.minX, y: y - notch))
-        }
-        path.appendArc(from: NSPoint(x: rect.minX, y: rect.minY), to: NSPoint(x: rect.minX + radius, y: rect.minY), radius: radius)
-        path.close()
-        cardFill(theme).setFill()
-        path.fill()
+    /// 見出しの行の高さ．描く側が見出しの行を候補の行の真ん中にそろえるのに使う
+    static func headerHeight(theme: ResolvedTheme) -> CGFloat {
+        MeaningCardLayout.headerHeight(measuring: Measuring(theme: theme), metrics: .tokens)
     }
 
-    /// 意味の無い候補を選んでいるときの空いたカード．地の真ん中に辞書のアイコンを薄く出す(カードの場所は動かさない)
-    static func drawEmpty(in rect: NSRect, theme: ResolvedTheme, frame: Frame = .box, pointerY: CGFloat? = nil) {
-        drawBackground(in: rect, theme: theme, frame: frame, pointerY: pointerY)
+    // MARK: - 空いた場所
+
+    /// 意味の無い候補を選んでいるとき．場所は空けたまま(窓の大きさを変えない)，見出しの辞書のアイコンだけを薄く出す
+    static func drawEmpty(in rect: NSRect, placement: MeaningCardLayout.Placement, theme: ResolvedTheme) {
         let color = theme.textMuted.withAlphaComponent(DesignTokens.Opacity.Glass.meaningEmptyIcon)
-        guard let image = symbol(bookSymbols, pointSize: Meaning.emptyIconSize, color: color) else { return }
-        drawCentered(image, at: NSPoint(x: rect.midX, y: rect.midY))
+        guard let image = symbol(bookSymbols, pointSize: Meaning.iconSize, color: color) else { return }
+        drawCentered(image, at: NSPoint(x: rect.minX + placement.left + Meaning.markerWidth / 2, y: rect.minY + placement.headerMidY))
     }
 
-    /// 分岐図で，選んでいる候補の行の右の端(from)からカードの左の辺(to)へ引く線．端に丸を付ける．
+    /// つなぐ線の終わりの x．見出しのアイコンの手前で止める(rect は語の意味の場所)
+    static func connectorEndX(in rect: NSRect, placement: MeaningCardLayout.Placement) -> CGFloat {
+        rect.minX + placement.left - DesignTokens.Size.Space.xs
+    }
+
+    /// 選んでいる候補の行の右の端(from)から語の意味の見出し(to)へ引く線．端に丸を付ける．
     /// 曲線の枝のテーマはなめらかな S 字，直線の枝のテーマは折れ線にする
     static func drawConnector(from start: NSPoint, to end: NSPoint, theme: ResolvedTheme) {
         let path = NSBezierPath()
@@ -154,11 +118,6 @@ enum MeaningCardDrawing {
         NSBezierPath(ovalIn: NSRect(x: end.x - dot / 2, y: end.y - dot / 2, width: dot, height: dot)).fill()
     }
 
-    /// カードの見出しの行の縦の中心(rect はカードの枠)．分岐図のつなぐ線はここへ引く
-    static func headerMidY(_ layout: Layout, in rect: NSRect) -> CGFloat {
-        (rect.minY + layout.placed.headerMidY).rounded()
-    }
-
     // MARK: - 中身
 
     /// rect(カードの枠．地は描かない)の中に，配置のとおりに見出し・意味・例・同音語を描く
@@ -174,7 +133,7 @@ enum MeaningCardDrawing {
         }
 
         // 見出し
-        if let icon = symbol(bookSymbols, pointSize: Meaning.iconSize, color: theme.selection) {
+        if let icon = symbol(bookSymbols, pointSize: Meaning.iconSize, color: theme.textMuted) {
             drawCentered(icon, at: NSPoint(x: box(placed.bookIcon).midX, y: box(placed.bookIcon).midY))
         }
         let headword = placed.headword
@@ -183,9 +142,9 @@ enum MeaningCardDrawing {
         if let chip = placed.partOfSpeech {
             let frame = box(chip.frame)
             let radius = theme.isRounded ? frame.height / 2 : 0
-            tint(theme).setFill()
+            theme.badge.setFill()
             NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-            draw(NSAttributedString(string: chip.text, attributes: [.font: font(.partOfSpeech, theme), .foregroundColor: theme.selection]),
+            draw(NSAttributedString(string: chip.text, attributes: [.font: font(.partOfSpeech, theme), .foregroundColor: theme.textMuted]),
                  x: chip.textX, baseline: chip.baseline)
         }
 
@@ -194,9 +153,9 @@ enum MeaningCardDrawing {
             if let badge = sense.badge, let number = sense.number {
                 let frame = box(badge)
                 let radius = theme.isRounded ? Meaning.numberRadius : 0
-                tint(theme).setFill()
+                theme.badge.setFill()
                 NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-                draw(NSAttributedString(string: number.text, attributes: [.font: font(.number, theme), .foregroundColor: theme.selection]),
+                draw(NSAttributedString(string: number.text, attributes: [.font: font(.number, theme), .foregroundColor: theme.textMuted]),
                      x: number.line.x, baseline: number.line.baseline)
             }
             for (line, text) in zip(sense.meaning, layout.meaning[index]) {
@@ -204,7 +163,7 @@ enum MeaningCardDrawing {
             }
             if let bar = sense.exampleBar {
                 let frame = box(bar)
-                theme.selection.withAlphaComponent(Opacity.meaningExampleBar).setFill()
+                theme.line.setFill()
                 NSBezierPath(roundedRect: frame, xRadius: frame.width / 2, yRadius: frame.width / 2).fill()
             }
             for (line, text) in zip(sense.example, layout.example[index]) {
@@ -220,9 +179,6 @@ enum MeaningCardDrawing {
             drawCentered(icon, at: NSPoint(x: box(ear).midX, y: box(ear).midY))
         }
         let muted: [NSAttributedString.Key: Any] = [.font: font(.label, theme), .foregroundColor: theme.textMuted]
-        if let label = placed.othersLabel {
-            draw(NSAttributedString(string: label.text, attributes: muted), x: label.line.x, baseline: label.line.baseline)
-        }
         for tag in placed.tags {
             let frame = box(tag.frame)
             theme.badge.setFill()
@@ -356,13 +312,4 @@ enum MeaningCardDrawing {
 
     private static var increasesContrast: Bool { NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast }
 
-    /// カードの地(文字の色を薄く敷く)
-    private static func cardFill(_ theme: ResolvedTheme) -> NSColor {
-        theme.text.withAlphaComponent(increasesContrast || theme.kind == .contrast ? Opacity.meaningCardContrast : Opacity.meaningCard)
-    }
-
-    /// 番号と品詞の札の地(アクセントの色を薄く敷く)
-    private static func tint(_ theme: ResolvedTheme) -> NSColor {
-        theme.selection.withAlphaComponent(increasesContrast || theme.kind == .contrast ? Opacity.meaningBadgeContrast : Opacity.meaningBadge)
-    }
 }

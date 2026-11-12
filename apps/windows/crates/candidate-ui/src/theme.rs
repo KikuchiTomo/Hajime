@@ -172,24 +172,6 @@ impl ResolvedTheme {
         })
     }
 
-    /// 語の意味のカードの地(文字の色を薄く敷く)
-    pub fn meaning_card_fill(&self) -> Color {
-        self.text.with_alpha(if self.kind == Kind::Contrast {
-            opacity::glass::MEANING_CARD_CONTRAST
-        } else {
-            opacity::glass::MEANING_CARD
-        })
-    }
-
-    /// 意味の番号と品詞の札の地(アクセントの色を薄く敷く)
-    pub fn meaning_tint(&self) -> Color {
-        self.selection.with_alpha(if self.kind == Kind::Contrast {
-            opacity::glass::MEANING_BADGE_CONTRAST
-        } else {
-            opacity::glass::MEANING_BADGE
-        })
-    }
-
     /// 設定から描き方を決める．カスタムテーマを使っていれば，元のテーマの描き方に色・書体・形を重ねる
     pub fn resolve(theme: &str, custom: Option<&CustomTheme>, look: &SystemLook) -> Self {
         let Some(custom) = custom else {

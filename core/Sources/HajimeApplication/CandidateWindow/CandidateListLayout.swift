@@ -3,12 +3,12 @@
 /// 角丸のテーマ(rounded)
 /// - 縁の線の内側に，上下左右とも metrics.padding の余白を空ける．候補の行の地・区切りの線・カードの左右の端は余白の内側の端にそろう
 /// - 区切りの線の上と下は metrics.separatorGap．候補の下のカードと候補のあいだも同じ
-/// - 候補の右のカードと一覧のあいだは metrics.cardGap(選んでいる候補とカードをつなぐ線をここに引く)
+/// - 候補の右の語の意味と一覧のあいだは metrics.cardGap(選んでいる候補と語の意味をつなぐ線をここに引く)．語の意味は箱を描かない
 /// - 候補の右のカードは，上の端を候補の 1 行目の地の上の端に，右の端を足元の区切りの線の右の端にそろえる
 ///
 /// platinum と desk(bevel)
 /// - 候補の行は立体の縁の内側いっぱいに置く(余白を空けない)．区画と区画は 1 ドットの線で区切る
-/// - カードは枠を描かない区画にし，一覧とのあいだに線を引く(候補の右は縦の線，候補の下は横の線)．中の余白はカードの側が持つ
+/// - 候補の右の語の意味は角丸のテーマと同じく箱を描かずに置く．候補の下は区画にし，一覧とのあいだに横の線を引く
 ///
 /// 座標は窓の左上が原点で，下が y の正．macOS の CandidateView がこの配置を描き，
 /// Windows の候補ウィンドウ(scene::list)は同じ決め方を Rust で持つ
@@ -38,7 +38,7 @@ public struct CandidateListLayout: Sendable, Equatable {
         public var padding: Double
         /// 区切りの線の上と下の空き
         public var separatorGap: Double
-        /// 候補の右のカードと一覧のあいだ(角丸のテーマ)
+        /// 候補の右の語の意味と一覧のあいだ
         public var cardGap: Double
         public var separatorWidth: Double
         /// 候補の行の間隔(行の地の高さと，行と行のあいだの和)
@@ -75,7 +75,7 @@ public struct CandidateListLayout: Sendable, Equatable {
 
         /// platinum と desk．文字種の行と足元の行は同じ高さ(sectionHeight)
         public static func bevel(rowPitch: Double, sectionHeight: Double, hasShadow: Bool) -> Metrics {
-            Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: 0, separatorGap: 0, cardGap: 0,
+            Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: 0, separatorGap: 0, cardGap: LayoutTokens.Meaning.cardGap,
                     separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: 0, headerHeight: sectionHeight,
                     footerHeight: sectionHeight, shadow: hasShadow ? LayoutTokens.Candidate.shadowOffset : 0)
         }
@@ -116,8 +116,8 @@ public struct CandidateListLayout: Sendable, Equatable {
         let outer = metrics.edge + metrics.padding
         let gap = metrics.separatorGap
         let line = metrics.separatorWidth
-        // 候補の右のカードと一覧のあいだ: 角丸は空き，platinum と desk は縦の線
-        let sideGap = style == .rounded ? metrics.cardGap : line
+        // 候補の右の語の意味と一覧のあいだ(つなぐ線を引く幅)
+        let sideGap = metrics.cardGap
 
         var contentWidth = max(listWidth, footerWidth)
         switch card {
@@ -149,7 +149,6 @@ public struct CandidateListLayout: Sendable, Equatable {
             listColumn = max(contentWidth - sideGap - cardWidth, 0)
             let regionHeight = max(rowsHeight, cardHeight)
             cardBox = Box(x: outer + listColumn + sideGap, y: rowsTop, width: cardWidth, height: regionHeight)
-            if style == .bevel { cardLine = Box(x: outer + listColumn, y: rowsTop, width: line, height: regionHeight) }
             listBottom = rowsTop + regionHeight
         case .below(_, let cardHeight)?:
             let top = listBottom + (style == .rounded ? gap : line)

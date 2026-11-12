@@ -12,8 +12,6 @@ enum UIStrings {
     enum Candidate {
         static func variantsPosition(_ index: Int, _ total: Int) -> String { "文字種 \(index) / \(total)" }
         static func position(_ index: Int, _ total: Int) -> String { "\(index) / \(total)" }
-        /// 語の意味のカードで，同音語の札の前に置く名前
-        static let homophoneOthers = "同音語"
         /// 語の意味のカードに入らなかった同音語の数
         static func more(_ count: Int) -> String { "+\(count)" }
         /// 意味が 2 つ以上あるときの，意味の番号(語の意味のカードの角丸の四角に入れる)

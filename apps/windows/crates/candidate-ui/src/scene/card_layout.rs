@@ -1,16 +1,18 @@
 #![forbid(unsafe_code)]
 
-//! 語の意味のカード(R-08)の配置．core の MeaningCardLayout(macOS)と同じ決め方．
+//! 語の意味(R-08)の配置．core の MeaningCardLayout(macOS)と同じ決め方．
 //!
-//! カードの中は「目印の列」と「文の列」の 2 列にする．
+//! 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．選んでいる候補とは，描く側がつなぐ線で結ぶ．
+//! 中は「目印の列」と「文の列」の 2 列にする．
 //! - 目印の列は幅が決まっていて，見出しの辞書のアイコン・意味の番号の札・同音語の耳のアイコンを，列の中で横の真ん中に置く
-//! - 文の列は，見出しの語・意味・使い方の例の縦の線・「同音語」を，どれも同じ x(text_x)から書き出す．
+//! - 文の列は，見出しの語・意味・使い方の例の縦の線・同音語の札を，どれも同じ x(text_x)から書き出す．
 //!   使い方の例の文は，そこから EXAMPLE_INDENT だけ下げる．折り返した行も，それぞれの書き出しの x にそろえる
+//! - 同音語は，区切りの線の下に耳のアイコンと札だけで並べる(見出しの言葉は置かない)
 //!
 //! 縦は，文字の箱で積む．文字の箱は，書体の大きさの高さで，行の箱(書体の行の高さ．DirectWrite は文字をこの箱の縦の真ん中に描く)と
 //! 縦の真ん中が同じもの．日本語の字の外形はほぼこの箱に収まるので，箱と箱のあいだが見た目の間隔になる
 //! - 目印と札は，その行の 1 行目の文字の箱の縦の真ん中に置く(枠の真ん中ではなく文字に合わせる)
-//! - 文字の箱・札・目印のあいだと，カードの縁とのあいだを，トークンの間隔にする．内側の余白は上下左右とも PADDING
+//! - 文字の箱・札・目印のあいだを，トークンの間隔にする．見出しの行の縦の真ん中は Placement::header_mid_y(候補の 1 行目の真ん中)
 //! - 折り返した行は MEANING_PITCH(例は EXAMPLE_PITCH)ずつ下げる
 //! - 例の縦の線は，例の 1 行目の文字の箱の上の端から，最後の行の文字の箱の下の端まで
 //!
@@ -34,11 +36,11 @@ pub(super) struct Columns {
 }
 
 impl Columns {
-    /// padding はカードの内側の余白(箱を描かないときは 0)
-    pub fn new(width: f32, padding: f32) -> Self {
-        let marker_x = padding;
+    /// left は目印の列の左の端(カードの左の端から)
+    pub fn new(width: f32, left: f32) -> Self {
+        let marker_x = left;
         let text_x = marker_x + meaning::MARKER_WIDTH + meaning::MARKER_GAP;
-        let text_width = (width - padding - text_x).max(0.0);
+        let text_width = (width - text_x).max(0.0);
         Self {
             marker_x,
             marker_width: meaning::MARKER_WIDTH,
@@ -48,6 +50,15 @@ impl Columns {
             example_width: (text_width - meaning::EXAMPLE_INDENT).max(0.0),
         }
     }
+}
+
+/// 語の意味の置き方．描く側が，まわりの候補の行に合わせて決める
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct Placement {
+    /// 目印の列の左の端(カードの左の端から)
+    pub left: f32,
+    /// 見出しの行の縦の真ん中(カードの上の端から)．候補の 1 行目の真ん中にそろえる
+    pub header_mid_y: f32,
 }
 
 /// 1 行の文字の置き場所．frame は文字の箱(書体の大きさの高さ)，line は描くときの行の箱(縦の真ん中は frame と同じ)
@@ -96,7 +107,6 @@ pub(super) struct Content<'a> {
     pub part_of_speech: Option<&'a str>,
     pub senses: Vec<SenseLines>,
     pub others: &'a [String],
-    pub others_label: &'a str,
     pub more: &'a dyn Fn(usize) -> String,
 }
 
@@ -112,10 +122,9 @@ pub(super) struct CardLayout {
     pub headword: Text,
     pub part_of_speech: Option<Chip>,
     pub senses: Vec<Sense>,
-    /// 同音語の行の上の区切りの線．同音語が無ければ None
+    /// 同音語の行の上の区切りの線．場所の幅いっぱい(窓のほかの区切りの線と端をそろえる)．同音語が無ければ None
     pub separator: Option<Frame>,
     pub ear_icon: Option<Frame>,
-    pub others_label: Option<Text>,
     pub tags: Vec<Chip>,
     /// 入らなかった札の数(「+n」)
     pub more: Option<Text>,
@@ -140,7 +149,6 @@ impl CardLayout {
         }
         parts.extend(self.separator);
         parts.extend(self.ear_icon);
-        parts.extend(self.others_label.as_ref().map(|text| text.place.frame));
         parts.extend(self.more.as_ref().map(|text| text.place.frame));
         parts.extend(self.tags.iter().map(|chip| chip.frame));
         parts
@@ -236,25 +244,29 @@ fn truncated(measure: &dyn Measure, text: &str, font: Font, width: f32) -> Strin
     "…".to_string()
 }
 
-/// 幅 width(内側の余白を含む)のカードの配置．padding は左右，padding_y は上下の余白
+/// 見出しの行の高さ(語の文字の箱・品詞の札・目印のいちばん高いもの)．描く側が見出しの行を候補の行の真ん中にそろえるのに使う
+pub(super) fn header_height(theme: &ResolvedTheme) -> f32 {
+    theme
+        .font(Font::MeaningHeadword, candidate::FONT_SIZE)
+        .size
+        .max(meaning::PART_OF_SPEECH_HEIGHT)
+        .max(meaning::MARKER_WIDTH)
+}
+
+/// 幅 width の語の意味の配置．placement は目印の列の左の端と見出しの行の縦の真ん中
 pub(super) fn place(
     content: &Content,
     width: f32,
-    padding: f32,
-    padding_y: f32,
+    placement: Placement,
     measure: &dyn Measure,
     theme: &ResolvedTheme,
 ) -> CardLayout {
     let rows = Rows { measure, theme };
-    let columns = Columns::new(width, padding);
-    let right = width - padding;
+    let columns = Columns::new(width, placement.left);
+    let right = width;
 
     // 見出し: 辞書のアイコン・語・品詞の札を，語の文字の箱の縦の真ん中にそろえる
-    let mut y = padding_y;
-    let header_height = rows
-        .em(Font::MeaningHeadword)
-        .max(meaning::PART_OF_SPEECH_HEIGHT)
-        .max(meaning::MARKER_WIDTH);
+    let header_height = header_height(theme);
     let pos_width = content.part_of_speech.map(|name| {
         (measure.width(name, Font::MeaningTag) + meaning::PART_OF_SPEECH_PADDING_X * 2.0).ceil()
     });
@@ -266,7 +278,7 @@ pub(super) fn place(
         Font::MeaningHeadword,
         columns.text_x,
         measure.width(&word, Font::MeaningHeadword),
-        y + header_height / 2.0,
+        placement.header_mid_y,
     );
     let book_icon = marker(columns.marker_x, word_place.frame.mid_y());
     let part_of_speech = content.part_of_speech.zip(pos_width).map(|(name, pos)| {
@@ -283,7 +295,7 @@ pub(super) fn place(
             meaning::PART_OF_SPEECH_PADDING_X,
         )
     });
-    y += header_height + meaning::HEADER_GAP;
+    let mut y = placement.header_mid_y + header_height / 2.0 + meaning::HEADER_GAP;
 
     // 意味: 番号の札は 1 行目の文字の箱の縦の真ん中．例は縦の線を文の列の x に引き，文を下げる
     let mut senses = Vec::new();
@@ -351,7 +363,7 @@ pub(super) fn place(
         });
     }
 
-    // 同音語: 区切りの線の下に，耳のアイコン・「同音語」・札．入らない札は「+n」にまとめる
+    // 同音語: 区切りの線の下に，耳のアイコンと札．入らない札は「+n」にまとめる
     let mut layout = CardLayout {
         width,
         height: 0.0,
@@ -366,38 +378,19 @@ pub(super) fn place(
         senses,
         separator: None,
         ear_icon: None,
-        others_label: None,
         tags: Vec::new(),
         more: None,
     };
     if !content.others.is_empty() {
         y += meaning::OTHERS_GAP;
-        let separator = Frame::new(
-            padding,
-            y.round(),
-            width - padding * 2.0,
-            candidate::FRAME_WIDTH,
-        );
+        let separator = Frame::new(0.0, y.round(), width, candidate::FRAME_WIDTH);
         y = separator.max_y() + meaning::OTHERS_GAP;
-        let row_height = rows
-            .em(Font::Label)
-            .max(glass::TAG_HEIGHT)
-            .max(meaning::MARKER_WIDTH);
-        let label = rows.centered(
-            Font::Label,
-            columns.text_x,
-            measure.width(content.others_label, Font::Label),
-            y + row_height / 2.0,
-        );
-        let label_mid = label.frame.mid_y();
+        let row_height = glass::TAG_HEIGHT.max(meaning::MARKER_WIDTH);
+        let ear = marker(columns.marker_x, y + row_height / 2.0);
+        let label_mid = ear.mid_y();
         layout.separator = Some(separator);
-        layout.ear_icon = Some(marker(columns.marker_x, label_mid));
-        let mut x = label.frame.max_x() + meaning::TAG_GAP;
-        layout.others_label = Some(Text {
-            text: content.others_label.to_string(),
-            font: Font::Label,
-            place: label,
-        });
+        layout.ear_icon = Some(ear);
+        let mut x = columns.text_x;
         for (index, word) in content.others.iter().enumerate() {
             let tag_width = (measure.width(word, Font::Label) + glass::TAG_PADDING_X * 2.0).ceil();
             let rest = content.others.len() - index - 1;
@@ -430,7 +423,7 @@ pub(super) fn place(
         }
         y += row_height;
     }
-    layout.height = (y + padding_y).ceil();
+    layout.height = y.ceil();
     layout
 }
 
@@ -481,6 +474,12 @@ mod tests {
             example_lines,
         }
     }
+
+    /// 候補の右に置くとき(目印の列はカードの左の端，見出しの行は候補の 1 行目の地 24 の真ん中)
+    const PLACEMENT: Placement = Placement {
+        left: 0.0,
+        header_mid_y: 12.0,
+    };
 
     /// 見本: 名前・意味ごとの行の数・同音語・品詞
     type Sample = (
@@ -533,7 +532,7 @@ mod tests {
         ]
     }
 
-    fn layouts() -> Vec<(&'static str, CardLayout)> {
+    fn layouts_at(placement: Placement) -> Vec<(&'static str, CardLayout)> {
         samples()
             .into_iter()
             .map(|(name, senses, others, pos)| {
@@ -542,22 +541,18 @@ mod tests {
                     part_of_speech: pos,
                     senses,
                     others: &others,
-                    others_label: "同音語",
                     more: &more,
                 };
                 (
                     name,
-                    place(
-                        &content,
-                        meaning::LIST_WIDTH,
-                        meaning::PADDING,
-                        meaning::PADDING,
-                        &Varied,
-                        &theme(),
-                    ),
+                    place(&content, meaning::LIST_WIDTH, placement, &Varied, &theme()),
                 )
             })
             .collect()
+    }
+
+    fn layouts() -> Vec<(&'static str, CardLayout)> {
+        layouts_at(PLACEMENT)
     }
 
     fn intersects(a: &Frame, b: &Frame) -> bool {
@@ -582,18 +577,37 @@ mod tests {
                     "{name}"
                 );
             }
-            if let Some(label) = &layout.others_label {
-                assert_eq!(label.place.frame.x, x, "{name}");
+            if let Some(tag) = layout.tags.first() {
+                assert_eq!(tag.frame.x, x, "{name}");
             }
             assert_eq!(
                 x,
-                meaning::PADDING + meaning::MARKER_WIDTH + meaning::MARKER_GAP
+                PLACEMENT.left + meaning::MARKER_WIDTH + meaning::MARKER_GAP
             );
         }
     }
 
     #[test]
-    fn 目印は同じ列で_1行目の行の箱の縦の真ん中() {
+    fn 候補の下に置くときは目印の列の左の端をずらす() {
+        let placement = Placement {
+            left: 4.0,
+            header_mid_y: 8.0,
+        };
+        for (name, layout) in layouts_at(placement) {
+            assert_eq!(layout.book_icon.x, 4.0, "{name}");
+            // 区切りの線は場所の幅いっぱい
+            if let Some(separator) = layout.separator {
+                assert_eq!(
+                    (separator.x, separator.width),
+                    (0.0, layout.width),
+                    "{name}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn 目印は同じ列で_1行目の文字の箱の縦の真ん中() {
         for (name, layout) in layouts() {
             let mut markers = vec![layout.book_icon];
             markers.extend(layout.senses.iter().filter_map(|sense| sense.badge));
@@ -601,7 +615,7 @@ mod tests {
             assert!(
                 markers
                     .iter()
-                    .all(|marker| marker.x == meaning::PADDING
+                    .all(|marker| marker.x == PLACEMENT.left
                         && marker.width == meaning::MARKER_WIDTH),
                 "{name}"
             );
@@ -624,17 +638,28 @@ mod tests {
                     );
                 }
             }
-            if let (Some(ear), Some(label)) = (layout.ear_icon, &layout.others_label) {
-                assert!(
-                    (ear.mid_y() - label.place.frame.mid_y()).abs() <= 0.5,
-                    "{name}"
-                );
-            }
         }
     }
 
     #[test]
-    fn 札は行の箱の縦の真ん中() {
+    fn 見出しの行の縦の真ん中は候補の1行目の真ん中() {
+        for (name, layout) in layouts() {
+            assert!(
+                (layout.header_mid_y() - PLACEMENT.header_mid_y).abs() <= 0.5,
+                "{name}"
+            );
+            let top = layout
+                .parts()
+                .iter()
+                .map(|part| part.y)
+                .fold(f32::MAX, f32::min);
+            let expected = PLACEMENT.header_mid_y - header_height(&theme()) / 2.0;
+            assert!((top - expected).abs() <= 0.5, "{name}: {top}");
+        }
+    }
+
+    #[test]
+    fn 札は行の縦の真ん中() {
         for (name, layout) in layouts() {
             if let Some(chip) = &layout.part_of_speech {
                 assert!(
@@ -643,19 +668,16 @@ mod tests {
                 );
                 assert!((chip.text_place.frame.mid_y() - chip.frame.mid_y()).abs() <= 0.5);
             }
-            if let Some(label) = &layout.others_label {
+            if let Some(ear) = layout.ear_icon {
                 for tag in &layout.tags {
-                    assert!(
-                        (tag.frame.mid_y() - label.place.frame.mid_y()).abs() <= 0.5,
-                        "{name}"
-                    );
+                    assert!((tag.frame.mid_y() - ear.mid_y()).abs() <= 0.5, "{name}");
                 }
             }
         }
     }
 
     #[test]
-    fn 例の縦の線は例の行の箱の上から下まで() {
+    fn 例の縦の線は例の文字の箱の上から下まで() {
         for (name, layout) in layouts() {
             for sense in layout
                 .senses
@@ -673,26 +695,18 @@ mod tests {
     }
 
     #[test]
-    fn 内側の余白は上下左右で同じ() {
+    fn 左の端は場所の左の端_右の端は幅_下の端は最後の部品() {
         for (name, layout) in layouts() {
             let parts = layout.parts();
-            let top = parts.iter().map(|part| part.y).fold(f32::MAX, f32::min);
             let left = parts.iter().map(|part| part.x).fold(f32::MAX, f32::min);
             let bottom = layout.height - parts.iter().map(|part| part.max_y()).fold(0.0, f32::max);
-            assert!((top - meaning::PADDING).abs() <= 0.5, "{name}: {top}");
-            assert_eq!(left, meaning::PADDING, "{name}");
-            assert!(
-                (meaning::PADDING - 0.5..meaning::PADDING + 1.0).contains(&bottom),
-                "{name}: {bottom}"
-            );
+            assert_eq!(left, PLACEMENT.left, "{name}");
+            assert!((0.0..1.0).contains(&bottom), "{name}: {bottom}");
             if let Some(separator) = layout.separator {
-                assert_eq!(separator.max_x(), layout.width - meaning::PADDING, "{name}");
+                assert_eq!(separator.max_x(), layout.width, "{name}");
             }
             for tag in &layout.tags {
-                assert!(
-                    tag.frame.max_x() <= layout.width - meaning::PADDING,
-                    "{name}"
-                );
+                assert!(tag.frame.max_x() <= layout.width, "{name}");
             }
         }
     }
@@ -717,12 +731,6 @@ mod tests {
                 .iter()
                 .map(|tag| tag.frame.y)
                 .chain(layout.ear_icon.map(|ear| ear.y))
-                .chain(
-                    layout
-                        .others_label
-                        .as_ref()
-                        .map(|label| label.place.frame.y),
-                )
                 .fold(f32::MAX, f32::min);
             let below = row_top - separator.max_y();
             assert!(
@@ -749,14 +757,14 @@ mod tests {
     }
 
     #[test]
-    fn 入らない同音語の札は数にまとめて余白の内側に収める() {
+    fn 入らない同音語の札は数にまとめて幅に収める() {
         let (_, layout) = layouts()
             .into_iter()
             .find(|(name, _)| *name == "同音語が入りきらない")
             .expect("見本");
         let more = layout.more.expect("+n");
         assert_eq!(more.text, format!("+{}", 12 - layout.tags.len()));
-        assert!(more.place.frame.max_x() <= layout.width - meaning::PADDING);
+        assert!(more.place.frame.max_x() <= layout.width);
     }
 
     #[test]
@@ -768,19 +776,11 @@ mod tests {
             part_of_speech: Some("動詞"),
             senses,
             others: &[],
-            others_label: "同音語",
             more: &more,
         };
-        let layout = place(
-            &content,
-            meaning::LIST_WIDTH,
-            meaning::PADDING,
-            meaning::PADDING,
-            &Varied,
-            &theme(),
-        );
+        let layout = place(&content, meaning::LIST_WIDTH, PLACEMENT, &Varied, &theme());
         assert!(layout.headword.text.ends_with('…'));
         let chip = layout.part_of_speech.expect("品詞");
-        assert!(chip.frame.max_x() <= layout.width - meaning::PADDING);
+        assert!(chip.frame.max_x() <= layout.width);
     }
 }

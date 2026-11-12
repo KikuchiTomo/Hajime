@@ -44,9 +44,6 @@ pub fn variants_position(index: u32, total: u32) -> String {
 /// 連想の一覧の見出しの前に置く言葉(macOS の UIStrings.Association.headingPrefix)
 pub const ASSOCIATION_PREFIX: &str = "連想";
 
-/// 語の意味のカードで，同音語の札の前に置く名前(macOS の UIStrings.Candidate.homophoneOthers)
-pub const HOMOPHONE_OTHERS: &str = "同音語";
-
 /// パレットの説明の欄で，読みの頭に置く札と読みの区切り(core の PaletteStrings.readings・readingSeparator)
 pub const PALETTE_READINGS: &str = "読み";
 pub const PALETTE_READING_SEPARATOR: &str = "、";

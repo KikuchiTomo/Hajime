@@ -81,7 +81,7 @@ impl Metrics {
             edge: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH,
             padding: 0.0,
             separator_gap: 0.0,
-            card_gap: 0.0,
+            card_gap: tokens::size::meaning::CARD_GAP,
             separator_width: candidate::FRAME_WIDTH,
             row_pitch,
             row_inset: 0.0,
@@ -113,7 +113,7 @@ pub(super) struct ListLayout {
     pub rows: Vec<Frame>,
     /// 候補の行を押せる範囲(行と行のあいだを含む)
     pub hit_rows: Vec<Frame>,
-    /// 語の意味のカード．platinum と desk は枠の無い区画で，card_separator で一覧と区切る
+    /// 語の意味の場所．箱は描かない．platinum と desk の候補の下は，card_separator で一覧と区切る
     pub card: Option<Frame>,
     pub card_separator: Option<Frame>,
     pub footer_separator: Frame,
@@ -143,11 +143,8 @@ pub(super) fn place(
     let outer = metrics.edge + metrics.padding;
     let gap = metrics.separator_gap;
     let line = metrics.separator_width;
-    // 候補の右のカードと一覧のあいだ: 角丸は空き，platinum と desk は縦の線
-    let side_gap = match style {
-        Style::Rounded => metrics.card_gap,
-        Style::Bevel => line,
-    };
+    // 候補の右の語の意味と一覧のあいだ(つなぐ線を引く幅)
+    let side_gap = metrics.card_gap;
     let content_width = match card {
         Some(Card::Side { width, .. }) => (list_width + side_gap + width).max(footer_width),
         Some(Card::Below { width, .. }) => list_width.max(footer_width).max(width),
@@ -193,9 +190,6 @@ pub(super) fn place(
                 width,
                 region,
             ));
-            if style == Style::Bevel {
-                card_separator = Some(Frame::new(outer + list_column, rows_top, line, region));
-            }
             list_bottom = rows_top + region;
         }
         Some(Card::Below { height, .. }) => {
@@ -425,16 +419,9 @@ mod tests {
             let first = layout.rows[0];
             assert_eq!(card.y, first.y, "{name}");
             assert_eq!(card.max_x(), layout.footer_separator.max_x(), "{name}");
-            let expected = match style {
-                Style::Rounded => metrics.card_gap,
-                Style::Bevel => metrics.separator_width,
-            };
-            assert_eq!(card.x - first.max_x(), expected, "{name}");
-            if style == Style::Bevel {
-                let line = layout.card_separator.expect("線");
-                assert_eq!(line.x, first.max_x(), "{name}");
-                assert_eq!((line.y, line.height), (card.y, card.height), "{name}");
-            }
+            // 一覧とのあいだはつなぐ線を引く幅．箱を描かないので区切りの線も引かない
+            assert_eq!(card.x - first.max_x(), metrics.card_gap, "{name}");
+            assert!(layout.card_separator.is_none(), "{name}");
         }
     }
 

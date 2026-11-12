@@ -10,6 +10,7 @@
 //!
 //! 角丸のテーマは曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
 
+use super::card_layout::{self, Placement};
 use super::meaning::{self, Slot};
 use super::paint::{Painter, TagStyle};
 use super::{Draw, Frame, Look, Measure, Point, Scene};
@@ -151,11 +152,29 @@ fn has_side_card(map: &BranchMap, reserved: Option<f32>) -> bool {
     })
 }
 
-/// 注目している文節で出す，幅 width(内側の余白を含む)の語の意味のカード．区切っているあいだは出さない．
+/// 候補の右の語の意味の置き方．枝の 3 段目として，目印の列は場所の左の端，見出しの行は最初の候補の行の地の真ん中
+pub(super) fn side_position(look: &Look, measure: &dyn Measure) -> Placement {
+    let metrics = Metrics::new(look, measure);
+    Placement {
+        left: 0.0,
+        header_mid_y: (metrics.row_height - metrics.row_inset * 2.0) / 2.0,
+    }
+}
+
+/// 候補の下の語の意味の置き方．目印の列を幹の文字と足元の左の端にそろえる
+fn below_position(painter: &Painter) -> Placement {
+    Placement {
+        left: candidate::PADDING_X,
+        header_mid_y: card_layout::header_height(painter.theme) / 2.0,
+    }
+}
+
+/// 注目している文節で出す，幅 width の語の意味．区切っているあいだは出さない．
 /// 候補の右は窓の中身の右の端まで，候補の下は窓の中身の幅
 fn meaning_slot(
     map: &BranchMap,
     painter: &Painter,
+    metrics: &Metrics,
     reserved: Option<f32>,
     width: f32,
 ) -> Option<Slot> {
@@ -165,17 +184,24 @@ fn meaning_slot(
     }
     match meaning::placement(map.meaning_placement) {
         MeaningPlacement::Side => {
+            let position = Placement {
+                left: 0.0,
+                header_mid_y: (metrics.row_height - metrics.row_inset * 2.0) / 2.0,
+            };
             let card = column
                 .homophone
                 .as_ref()
-                .map(|note| meaning::branch_card(painter, note, column, width));
-            meaning::side_slot(card, width, reserved)
+                .map(|note| meaning::branch_card(painter, note, column, width, position));
+            meaning::side_slot(card, width, reserved, position, 0.0)
         }
         MeaningPlacement::Below => {
             let note = column.homophone.as_ref()?;
-            Some(meaning::below_slot(meaning::branch_card(
-                painter, note, column, width,
-            )))
+            let position = below_position(painter);
+            Some(meaning::below_slot(
+                meaning::branch_card(painter, note, column, width, position),
+                position,
+                0.0,
+            ))
         }
     }
 }
@@ -241,7 +267,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
     // 候補の右に出すカードは，候補の枝の先に続けて置く(枝の一部として幅に数える)
     let side = has_side_card(map, reserved);
     let card_extent = if side {
-        meaning::card_gap(painter.card_style) + card_size::BRANCH_WIDTH
+        card_size::CARD_GAP + card_size::BRANCH_WIDTH
     } else {
         0.0
     };
@@ -302,9 +328,9 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
             // 枝の行の右の端(branches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
             let x = (trunk_x[index] + metrics.stem_x).round() - metrics.stem_x
                 + branch_width
-                + meaning::card_gap(painter.card_style);
+                + card_size::CARD_GAP;
             let card_width = (content_right - x).max(card_size::BRANCH_WIDTH).floor();
-            slot = meaning_slot(map, painter, reserved, card_width);
+            slot = meaning_slot(map, painter, metrics, reserved, card_width);
             if let Some(slot) = &slot {
                 let frame = Frame::new(x, lower_top + metrics.row_inset, slot.width, slot.height);
                 bottom = bottom.max(frame.max_y());
@@ -312,7 +338,13 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
             }
         } else if map.meaning_placement == Some(MeaningPlacement::Below) {
             // 候補の下: 窓の中身の幅いっぱい．枝とのあいだも区切りの線と同じ空き
-            slot = meaning_slot(map, painter, reserved, content_right - metrics.inset);
+            slot = meaning_slot(
+                map,
+                painter,
+                metrics,
+                reserved,
+                content_right - metrics.inset,
+            );
             if let Some(slot) = &slot {
                 let frame = Frame::new(metrics.inset, bottom + GAP, slot.width, slot.height);
                 bottom = frame.max_y();
@@ -492,7 +524,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                 }
             }
             if let Some((slot, card)) = side_card {
-                // 選んでいる候補の枝の先から，カードの見出しへ線でつなぐ
+                // 選んでいる候補の枝の先から，語の意味の見出しへ線でつなぐ
                 let selected = column
                     .selected_alternative
                     .filter(|index| (*index as usize) < column.alternatives.len());
@@ -504,18 +536,12 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                         (row_y + metrics.row_height / 2.0).round(),
                     );
                     let end = Point::new(
-                        meaning::connector_end_x(painter.card_style, card.x),
+                        meaning::connector_end_x(card, slot.position),
                         content.header_mid_y(card),
                     );
                     meaning::connector(&mut painter, start, end);
                 }
-                meaning::draw(
-                    &mut painter,
-                    slot.card.as_ref(),
-                    card,
-                    None,
-                    meaning::CardFrame::Boxed,
-                );
+                meaning::draw(&mut painter, slot.card.as_ref(), card, slot.position);
             }
         } else if let Some(preview) = column.preview.as_deref() {
             let overlaps =
@@ -542,14 +568,8 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     let content_width = body.width - metrics.text_inset() * 2.0;
     if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
         if slot.placement == MeaningPlacement::Below {
-            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいのカードを出す
-            meaning::draw(
-                &mut painter,
-                slot.card.as_ref(),
-                card,
-                None,
-                meaning::CardFrame::Boxed,
-            );
+            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す
+            meaning::draw(&mut painter, slot.card.as_ref(), card, slot.position);
         }
     }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
@@ -1390,22 +1410,24 @@ mod tests {
     }
 
     #[test]
-    fn 語の意味は選んでいる候補の枝の先にカードを置き_線でつなぐ() {
+    fn 語の意味は選んでいる候補の枝の先に箱を描かずに置き_線でつなぐ() {
         for name in ["washi", "platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
             let scene = branch_map(&meaning_map(ipc::MeaningPlacement::Side), &look, &Fixed);
             let texts = texts(&scene);
-            for text in ["写真や動画を写す", "動詞", "同音語", "採る"] {
+            for text in ["写真や動画を写す", "動詞", "採る"] {
                 assert!(
                     texts.iter().any(|(shown, _)| shown == text),
                     "{name}: {text}"
                 );
             }
+            // 同音語は耳のアイコンと札だけ．見出しの言葉は置かない
+            assert!(!texts.iter().any(|(shown, _)| shown == "同音語"), "{name}");
             // 同音語の札には，枝に出ている語(取る)を出さない
             let tags = texts.iter().filter(|(shown, _)| shown == "取る").count();
             assert_eq!(tags, 1, "{name}");
-            // カードは候補の枝の右に置く
+            // 語の意味は候補の枝の右に，つなぐ線を引く幅を空けて置く
             let meaning = text_frame(&scene, "写真や動画を写す").expect("意味を描く");
             let branch = scene
                 .hits
@@ -1413,8 +1435,8 @@ mod tests {
                 .find(|hit| hit.target == ipc::PointerTarget::Alternative { index: 1 })
                 .map(|hit| hit.frame)
                 .expect("選んでいる枝");
-            assert!(meaning.x >= branch.max_x() + GAP, "{name}");
-            // 端の丸は選んでいる枝の高さより下(カードの見出し)にあり，カードの左の辺に付く
+            assert!(meaning.x >= branch.max_x() + card_size::CARD_GAP, "{name}");
+            // 端の丸は見出しのアイコンの手前(目印の列の左の端から XS)
             let dot = scene
                 .draws
                 .iter()
@@ -1427,7 +1449,11 @@ mod tests {
                     _ => None,
                 })
                 .expect("端の丸");
-            assert_eq!(dot.mid_x(), branch.max_x() + GAP, "{name}");
+            assert_eq!(
+                dot.mid_x(),
+                branch.max_x() + card_size::CARD_GAP - tokens::size::space::XS,
+                "{name}"
+            );
             if theme.curved_branches() {
                 assert!(scene.draws.iter().any(|draw| matches!(draw,
                     Draw::Curve { from, to, .. } if from.x == branch.max_x().round() && to.x == dot.mid_x())), "{name}");

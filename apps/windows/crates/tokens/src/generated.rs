@@ -366,7 +366,6 @@ pub mod size {
         pub const NOTE_GAP: f32 = 8.0;
     }
     pub mod meaning {
-        pub const PADDING: f32 = 12.0;
         pub const CARD_GAP: f32 = 16.0;
         pub const MARKER_WIDTH: f32 = 16.0;
         pub const MARKER_GAP: f32 = 8.0;
@@ -389,12 +388,9 @@ pub mod size {
         pub const NUMBER_FONT_SIZE: f32 = 10.5;
         pub const NUMBER_RADIUS: f32 = 4.0;
         pub const ICON_SIZE: f32 = 13.0;
-        pub const EMPTY_ICON_SIZE: f32 = 24.0;
-        pub const RADIUS: f32 = 8.0;
-        pub const NOTCH: f32 = 6.0;
         pub const DOT_SIZE: f32 = 6.0;
-        pub const LIST_WIDTH: f32 = 312.0;
-        pub const BRANCH_WIDTH: f32 = 324.0;
+        pub const LIST_WIDTH: f32 = 288.0;
+        pub const BRANCH_WIDTH: f32 = 300.0;
         pub const MEANING_LINES: f32 = 3.0;
         pub const EXAMPLE_LINES: f32 = 2.0;
     }
@@ -677,11 +673,6 @@ pub mod opacity {
         pub const CORRECTION_TAG_CONTRAST: f32 = 0.3;
         pub const COMMAND_TAG: f32 = 0.16;
         pub const COMMAND_TAG_CONTRAST: f32 = 0.3;
-        pub const MEANING_CARD: f32 = 0.06;
-        pub const MEANING_CARD_CONTRAST: f32 = 0.12;
-        pub const MEANING_BADGE: f32 = 0.16;
-        pub const MEANING_BADGE_CONTRAST: f32 = 0.3;
-        pub const MEANING_EXAMPLE_BAR: f32 = 0.5;
         pub const MEANING_EMPTY_ICON: f32 = 0.25;
     }
     pub mod rounded {

@@ -246,7 +246,7 @@ fn write_draw(out: &mut String, draw: &Draw, theme: &ResolvedTheme, font_size: f
 #[cfg(test)]
 mod tests {
     use super::super::testing::theme;
-    use super::super::{branch_map, candidate_list, mode, note, prediction, CardStyle, Look};
+    use super::super::{branch_map, candidate_list, mode, note, prediction, CardReservation, Look};
     use super::*;
     use ipc::{
         BranchColumn, BranchMap, CandidateEntry, CandidateFocus, CandidateList, HomophoneNote,
@@ -335,42 +335,74 @@ mod tests {
         }
     }
 
-    /// 語の意味のカードの案(今の箱・箱なし・枠の線だけ)を，標準のテーマの一覧と分岐図で SVG に書き出す．
+    /// 語の意味の見本(一覧・分岐図，候補の右・候補の下，意味の無い候補を選んだところ)を，標準のテーマと platinum・desk で SVG に書き出す．
     /// HAJIME_SCENE_SVG に書き出し先のディレクトリを渡したときだけ動く:
     /// HAJIME_SCENE_SVG=<ディレクトリ> cargo test -p candidate-ui --lib scene::svg -- --ignored
     #[test]
     #[ignore = "見本を書き出すときだけ動かす"]
-    fn 語の意味のカードの案を書き出す() {
+    fn 語の意味の見本を書き出す() {
         let Ok(directory) = std::env::var("HAJIME_SCENE_SVG") else {
             return;
         };
-        let theme = theme("automatic");
-        let font_size = tokens::size::candidate::FONT_SIZE;
-        let measure = Approximate {
-            theme: &theme,
-            font_size,
-        };
-        let background = Color {
-            red: 0.15,
-            green: 0.15,
-            blue: 0.15,
-            alpha: 1.0,
-        };
-        for (name, style) in [
-            ("filled", CardStyle::Filled),
-            ("open", CardStyle::Open),
-            ("outline", CardStyle::Outline),
+        for (name, theme_name, dark) in [
+            ("glass-dark", "automatic", true),
+            ("platinum", "platinum", false),
+            ("desk", "desk", true),
         ] {
-            let look = Look {
-                card_style: style,
-                ..Look::new(&theme, font_size)
+            let theme = theme(theme_name);
+            let font_size = tokens::size::candidate::FONT_SIZE;
+            let measure = Approximate {
+                theme: &theme,
+                font_size,
             };
-            for (kind, drawn) in [
+            let look = Look::new(&theme, font_size);
+            let background = if dark {
+                Color {
+                    red: 0.15,
+                    green: 0.15,
+                    blue: 0.15,
+                    alpha: 1.0,
+                }
+            } else {
+                Color {
+                    red: 0.63,
+                    green: 0.63,
+                    blue: 0.63,
+                    alpha: 1.0,
+                }
+            };
+            let below_list = CandidateList {
+                meaning_placement: Some(MeaningPlacement::Below),
+                ..list()
+            };
+            let below_branch = BranchMap {
+                meaning_placement: Some(MeaningPlacement::Below),
+                ..branch()
+            };
+            // 意味のある候補から意味の無い候補に移ったところ(場所を空けたまま)
+            let mut reservation = CardReservation::default();
+            reservation.list(&list(), &look, &measure);
+            let empty = CandidateList {
+                homophone: None,
+                meaning_placement: None,
+                selected_entry: Some(1),
+                ..list()
+            };
+            let empty_look = Look {
+                reserved_card: reservation.list(&empty, &look, &measure),
+                ..look
+            };
+            let scenes = [
                 ("list", candidate_list(&list(), &look, &measure)),
+                ("list-below", candidate_list(&below_list, &look, &measure)),
+                ("list-empty", candidate_list(&empty, &empty_look, &measure)),
                 ("branch", branch_map(&branch(), &look, &measure)),
-            ] {
+                ("branch-below", branch_map(&below_branch, &look, &measure)),
+            ];
+            for (kind, drawn) in scenes {
                 let svg = scene(&drawn, &theme, font_size, background, 16.0);
-                let path = std::path::Path::new(&directory).join(format!("{kind}-{name}.svg"));
+                let path =
+                    std::path::Path::new(&directory).join(format!("meaning-{kind}-{name}.svg"));
                 std::fs::write(path, svg).expect("書き出せる");
             }
         }

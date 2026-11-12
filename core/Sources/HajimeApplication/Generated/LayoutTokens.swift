@@ -132,7 +132,6 @@ public enum LayoutTokens {
         public static let noteGap: Double = 8
     }
     public enum Meaning {
-        public static let padding: Double = 12
         public static let cardGap: Double = 16
         public static let markerWidth: Double = 16
         public static let markerGap: Double = 8
@@ -155,12 +154,9 @@ public enum LayoutTokens {
         public static let numberFontSize: Double = 10.5
         public static let numberRadius: Double = 4
         public static let iconSize: Double = 13
-        public static let emptyIconSize: Double = 24
-        public static let radius: Double = 8
-        public static let notch: Double = 6
         public static let dotSize: Double = 6
-        public static let listWidth: Double = 312
-        public static let branchWidth: Double = 324
+        public static let listWidth: Double = 288
+        public static let branchWidth: Double = 300
         public static let meaningLines: Double = 3
         public static let exampleLines: Double = 2
     }

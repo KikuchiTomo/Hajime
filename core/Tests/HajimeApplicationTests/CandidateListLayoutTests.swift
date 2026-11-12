@@ -72,15 +72,10 @@ struct CandidateListLayoutTests {
         let first = try #require(layout.rows.first)
         #expect(card.y == first.y)
         #expect(card.maxX == layout.footerSeparator.maxX)
-        // 一覧とのあいだは，角丸のテーマではつなぐ線を引く幅．platinum と desk は線 1 本
-        let between = card.x - first.maxX
-        #expect(between == (sample.style == .rounded ? sample.metrics.cardGap : sample.metrics.separatorWidth))
+        // 一覧とのあいだは，つなぐ線を引く幅．箱を描かないので区切りの線も引かない
+        #expect(card.x - first.maxX == sample.metrics.cardGap)
         #expect(layout.content.maxX - card.maxX == 0)
-        if sample.style == .bevel {
-            let line = try #require(layout.cardSeparator)
-            #expect(line.x == first.maxX)
-            #expect(line.y == card.y && line.height == card.height)
-        }
+        #expect(layout.cardSeparator == nil)
     }
 
     @Test("候補の下のカード: 左右の端は足元の区切りの線の端", arguments: samples.filter {

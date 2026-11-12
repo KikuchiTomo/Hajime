@@ -38,8 +38,6 @@ pub(crate) struct Painter<'a> {
     pub measure: &'a dyn Measure,
     pub draws: Vec<Draw>,
     pub hits: Vec<super::Hit>,
-    /// 語の意味のカードの描き方
-    pub card_style: super::CardStyle,
 }
 
 impl<'a> Painter<'a> {
@@ -49,7 +47,6 @@ impl<'a> Painter<'a> {
             measure,
             draws: Vec::new(),
             hits: Vec::new(),
-            card_style: look.card_style,
         }
     }
 

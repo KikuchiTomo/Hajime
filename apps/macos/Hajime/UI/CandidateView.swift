@@ -50,19 +50,35 @@ final class CandidateView: NSView {
     /// 番号の幅(番号から候補の文字まで)
     private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
 
-    // MARK: - 語の意味のカード
+    // MARK: - 語の意味
 
-    /// 語の意味のカード(R-08)の置き方と中身．layout が nil なら，意味の無い候補を選んでいるあいだ空けておくカード
+    /// 語の意味(R-08)の置き方と中身．layout が nil なら，意味の無い候補を選んでいるあいだ空けておく場所
     private struct MeaningSlot {
         var placement: MeaningPlacement
         var layout: MeaningCardDrawing.Layout?
-        /// カードの大きさ(内側の余白を含む)
+        /// 目印の列の左の端と見出しの行の縦の真ん中
+        var position: MeaningCardLayout.Placement
+        /// 場所の大きさ(platinum と desk は下の余白を含む)
         var size: NSSize
     }
 
-    /// 候補の右に出したカードの場所．同じ候補の並びのあいだは，意味の無い候補(ひらがなの候補など)を選んでも場所を空けたままにし，
+    /// 候補の右に出した語の意味の場所．同じ候補の並びのあいだは，意味の無い候補(ひらがなの候補など)を選んでも場所を空けたままにし，
     /// 窓の幅と高さを変えない(候補を移るたびに窓の縁が動かないように)
     private var reservedCard: (entries: [String], height: CGFloat)?
+
+    /// 候補の右: 目印の列は場所の左の端，見出しの行は候補の 1 行目の地の真ん中
+    private var sidePosition: MeaningCardLayout.Placement {
+        .init(left: 0, headerMidY: (metrics.rowPitch - metrics.rowInset * 2) / 2)
+    }
+
+    /// 候補の下: 目印の列を候補の番号に，文の列を候補の文字にそろえる．見出しの行は場所の上の端から
+    private var belowPosition: MeaningCardLayout.Placement {
+        .init(left: rowPaddingX + lead - Meaning.markerWidth - Meaning.markerGap,
+              headerMidY: sectionPadding + MeaningCardDrawing.headerHeight(theme: theme) / 2)
+    }
+
+    /// platinum と desk は区画どうしを線で区切って空きを取らないので，語の意味の上と下に文字の行と同じ余白を足す
+    private var sectionPadding: CGFloat { theme.isRounded ? 0 : Size.sectionPaddingY }
 
     private func updateReservedCard() {
         guard let panel, panel.meaningPlacement == .side else {
@@ -70,7 +86,9 @@ final class CandidateView: NSView {
             return
         }
         let entries = panel.entries.map(\.text)
-        let height = panel.homophone.map { MeaningCardDrawing.layout($0, width: Meaning.listWidth, theme: theme).size.height }
+        let height = panel.homophone.map {
+            MeaningCardDrawing.layout($0, width: Meaning.listWidth, placement: sidePosition, theme: theme).size.height + sectionPadding
+        }
         if let reserved = reservedCard, reserved.entries == entries {
             reservedCard = (entries, max(reserved.height, height ?? 0))
         } else {
@@ -78,19 +96,23 @@ final class CandidateView: NSView {
         }
     }
 
-    /// 候補の右のカード．下のカードは窓の中身の幅で折り返すので，幅が決まってから作る(belowSlot)
+    /// 候補の右の語の意味．下の語の意味は窓の中身の幅で折り返すので，幅が決まってから作る(belowSlot)
     private func sideSlot(for panel: CandidatePanel) -> MeaningSlot? {
         guard panel.meaningPlacement == .side else { return nil }
-        let layout = panel.homophone.map { MeaningCardDrawing.layout($0, width: Meaning.listWidth, theme: theme) }
+        let position = sidePosition
+        let layout = panel.homophone.map { MeaningCardDrawing.layout($0, width: Meaning.listWidth, placement: position, theme: theme) }
         let reserved = reservedCard?.entries == panel.entries.map(\.text) ? reservedCard?.height : nil
         guard layout != nil || reserved != nil else { return nil }
-        return MeaningSlot(placement: .side, layout: layout, size: NSSize(width: Meaning.listWidth, height: max(layout?.size.height ?? 0, reserved ?? 0)))
+        let height = max((layout?.size.height).map { $0 + sectionPadding } ?? 0, reserved ?? 0)
+        return MeaningSlot(placement: .side, layout: layout, position: position, size: NSSize(width: Meaning.listWidth, height: height))
     }
 
     private func belowSlot(for panel: CandidatePanel, width: CGFloat) -> MeaningSlot? {
         guard panel.meaningPlacement == .below, let note = panel.homophone else { return nil }
-        let layout = MeaningCardDrawing.layout(note, width: width, theme: theme)
-        return MeaningSlot(placement: .below, layout: layout, size: layout.size)
+        let position = belowPosition
+        let layout = MeaningCardDrawing.layout(note, width: width, placement: position, theme: theme)
+        return MeaningSlot(placement: .below, layout: layout, position: position,
+                           size: NSSize(width: layout.size.width, height: layout.size.height + sectionPadding))
     }
 
     // MARK: - 大きさと区画
@@ -213,22 +235,24 @@ final class CandidateView: NSView {
             }
         }
         if let line = layout.headerSeparator { drawLine(NSRect(line)) }
-        var selectedMidY: CGFloat?
         for (index, (entry, row)) in zip(panel.entries, layout.rows).enumerated() {
             let rect = NSRect(row)
             drawEntry(entry, index: index, panel: panel, in: rect)
-            if panel.focus == .candidate, panel.selectedEntry == index { selectedMidY = rect.midY }
         }
         if let slot, let card = layout.card.map(NSRect.init) {
             if let line = layout.cardSeparator { drawLine(NSRect(line)) }
-            // 候補の右のカードは，選んでいる候補を左の辺の三角で指す
-            let pointerY = slot.placement == .side ? selectedMidY : nil
-            let frame: MeaningCardDrawing.Frame = theme.isRounded ? .box : .pane
-            if let layout = slot.layout {
-                MeaningCardDrawing.drawBackground(in: card, theme: theme, frame: frame, pointerY: pointerY)
-                MeaningCardDrawing.drawContent(layout, in: card, theme: theme)
+            if let meaning = slot.layout {
+                MeaningCardDrawing.drawContent(meaning, in: card, theme: theme)
+                // 候補の右に出すときは，選んでいる候補の行の右の端から語の意味の見出しへ線でつなぐ
+                if slot.placement == .side, let selected = panel.selectedEntry, panel.focus == .candidate, layout.rows.indices.contains(selected) {
+                    let row = NSRect(layout.rows[selected])
+                    MeaningCardDrawing.drawConnector(from: NSPoint(x: row.maxX, y: row.midY.rounded()),
+                                                     to: NSPoint(x: MeaningCardDrawing.connectorEndX(in: card, placement: slot.position),
+                                                                 y: (card.minY + slot.position.headerMidY).rounded()),
+                                                     theme: theme)
+                }
             } else {
-                MeaningCardDrawing.drawEmpty(in: card, theme: theme, frame: frame, pointerY: pointerY)
+                MeaningCardDrawing.drawEmpty(in: card, placement: slot.position, theme: theme)
             }
         }
         drawLine(NSRect(layout.footerSeparator))

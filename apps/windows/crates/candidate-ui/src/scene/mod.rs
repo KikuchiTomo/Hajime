@@ -295,18 +295,6 @@ pub struct Look<'a> {
     /// 候補の右に空けておく語の意味のカードの高さ(CardReservation が前の窓から決める)．
     /// 意味の無い候補を選んでいても，この高さの空いたカードを出して窓の大きさを変えない．None なら空けない
     pub reserved_card: Option<f32>,
-    /// 語の意味のカードの描き方(見比べる案)
-    pub card_style: CardStyle,
-}
-
-/// 語の意味のカードの描き方．Filled は文字の色を薄く敷いた箱，Open は箱を描かずに分岐図の続きとして置く，Outline は枠の線だけの箱．
-/// Open と Outline は，アクセントの色(青)を選んでいる候補とカードをつなぐ線だけに使う
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum CardStyle {
-    #[default]
-    Filled,
-    Open,
-    Outline,
 }
 
 impl<'a> Look<'a> {
@@ -320,7 +308,6 @@ impl<'a> Look<'a> {
             rest_opacity: 1.0,
             size: None,
             reserved_card: None,
-            card_style: CardStyle::Filled,
         }
     }
 

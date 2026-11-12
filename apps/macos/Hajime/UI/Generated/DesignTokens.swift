@@ -251,7 +251,6 @@ enum DesignTokens {
             static let noteGap: CGFloat = 8
         }
         enum Meaning {
-            static let padding: CGFloat = 12
             static let cardGap: CGFloat = 16
             static let markerWidth: CGFloat = 16
             static let markerGap: CGFloat = 8
@@ -274,12 +273,9 @@ enum DesignTokens {
             static let numberFontSize: CGFloat = 10.5
             static let numberRadius: CGFloat = 4
             static let iconSize: CGFloat = 13
-            static let emptyIconSize: CGFloat = 24
-            static let radius: CGFloat = 8
-            static let notch: CGFloat = 6
             static let dotSize: CGFloat = 6
-            static let listWidth: CGFloat = 312
-            static let branchWidth: CGFloat = 324
+            static let listWidth: CGFloat = 288
+            static let branchWidth: CGFloat = 300
             static let meaningLines: CGFloat = 3
             static let exampleLines: CGFloat = 2
         }
@@ -560,11 +556,6 @@ enum DesignTokens {
             static let correctionTagContrast: CGFloat = 0.3
             static let commandTag: CGFloat = 0.16
             static let commandTagContrast: CGFloat = 0.3
-            static let meaningCard: CGFloat = 0.06
-            static let meaningCardContrast: CGFloat = 0.12
-            static let meaningBadge: CGFloat = 0.16
-            static let meaningBadgeContrast: CGFloat = 0.3
-            static let meaningExampleBar: CGFloat = 0.5
             static let meaningEmptyIcon: CGFloat = 0.25
         }
         enum Rounded {
