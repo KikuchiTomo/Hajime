@@ -48,10 +48,10 @@ const CONVERSION_TIMEOUT: Duration =
 const RECONNECT_INTERVAL: Duration = Duration::from_millis(ipc::timing::RECONNECT_MILLISECONDS);
 /// 返事の遅れがこれより長く続いたら，エンジンが固まったとみなす
 const STALL_LIMIT: Duration = Duration::from_millis(ipc::timing::ENGINE_STALL_MILLISECONDS);
-/// 入力メニューの「単語の登録…」で読む，選んでいる文字の長さの上限(UTF-16 の数)．キーで頼まれたときはエンジンが上限を渡すが，
-/// メニューからは渡されないので，語と読み(語の 4 倍の長さまで)の 1 字を 6 バイト(JSON の \uXXXX)と見込んでも，
-/// 要求がメッセージの上限に収まる長さにする．語と読みはエンジンが単語の長さの上限で切る
-const MENU_REGISTRATION_LENGTH: u32 = (ipc::MAXIMUM_MESSAGE_BYTES / (6 * 5)) as u32;
+/// 入力メニューの「単語の登録…」で読む，選んでいる文字の長さの上限．キーで頼まれたときはエンジンが上限を渡すが，
+/// メニューからは渡されないので，登録できる単語の長さの上限(core の DefaultSettings.maximumUserDictionaryWordLength)と同じにする．
+/// 登録できない長さの文字を読んで送らないため
+const MENU_REGISTRATION_LENGTH: u32 = 64;
 
 thread_local! {
     static ACTIVE: RefCell<Option<ComObject<TextService>>> = const { RefCell::new(None) };
