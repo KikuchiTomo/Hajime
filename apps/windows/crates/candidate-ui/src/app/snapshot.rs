@@ -371,7 +371,7 @@ fn list() -> CandidateList {
     }
 }
 
-/// 候補を表に広げた一覧(R-29．macOS の SamplePanels.grid)．9 行 × 4 列で，2 列目の候補を選んでいる
+/// 候補を表に広げた一覧(R-30．macOS の SamplePanels.grid)．9 行 × 4 列で，2 列目の候補を選んでいる
 fn grid_list() -> CandidateList {
     CandidateList {
         entries: entries(&[
