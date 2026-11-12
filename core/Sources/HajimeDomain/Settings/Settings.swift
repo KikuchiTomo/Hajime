@@ -174,6 +174,8 @@ public struct Settings: Sendable, Equatable {
     public var zenzaiModel = ZenzaiModelChoice.accurate
     /// 分岐図・文節ごとの一覧で，文節の候補を前後の語とのつながりで並べ替える(「を」のあとの「かこう」なら「書こう」を先に)
     public var contextualSegmentCandidates = true
+    /// 文全体の候補の一覧に，分岐図の文節を 1 か所だけほかの候補に替えた文を入れる
+    public var listSegmentAlternatives = true
 
     // MARK: 辞書と学習
     /// 確定した候補から学ぶか
@@ -352,7 +354,7 @@ extension Settings: Codable {
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
-        case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates
+        case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives
         case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
@@ -461,6 +463,7 @@ extension Settings: Codable {
         read(.showsAssociationHint, into: \.showsAssociationHint)
         read(.zenzaiModel, into: \.zenzaiModel)
         read(.contextualSegmentCandidates, into: \.contextualSegmentCandidates)
+        read(.listSegmentAlternatives, into: \.listSegmentAlternatives)
         read(.learning, into: \.learning)
         readList(.userDictionary, into: \.userDictionary)
         readList(.importedDictionaries, into: \.importedDictionaries)
@@ -583,6 +586,7 @@ extension Settings: Codable {
         try container.encode(showsAssociationHint, forKey: .showsAssociationHint)
         try container.encode(zenzaiModel, forKey: .zenzaiModel)
         try container.encode(contextualSegmentCandidates, forKey: .contextualSegmentCandidates)
+        try container.encode(listSegmentAlternatives, forKey: .listSegmentAlternatives)
         try container.encode(learning, forKey: .learning)
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)

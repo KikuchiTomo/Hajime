@@ -929,6 +929,8 @@ fn conversion() -> Vec<Section> {
                     "contextualSegmentCandidates",
                 ),
                 Row::note(more::CONTEXTUAL_SEGMENT_CANDIDATES_NOTE),
+                Row::toggle(more::LIST_SEGMENT_ALTERNATIVES, "listSegmentAlternatives"),
+                Row::note(more::LIST_SEGMENT_ALTERNATIVES_NOTE),
             ],
         ),
         Section::new(

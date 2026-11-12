@@ -53,6 +53,10 @@ public enum DefaultSettings {
     public static let suggestionCount = 5
     /// 文節の候補のうち，前後の語とのつながりで先頭へ集める数(SegmentContextRanker)
     public static let contextualSegmentCandidateCount = 5
+    /// 一覧に入れる，文節を 1 か所だけ替えた文(SegmentSubstitution)で，1 つの文節から使う候補の数
+    public static let listSubstitutionsPerSegment = 2
+    /// 一覧に入れる替えた文のために，前後の文脈で候補を並べ替える文節の数(迷う文節から)．一覧の 1 ページに出る替えた文の数
+    public static let listContextRankedSegments = 4
     /// 文節の先頭の語を選び直した候補(LatticeBuilder.headWordAlternatives)の数
     public static let headWordAlternativeCount = 8
     /// 打ち間違いを直した文節に入れる，打ったままの読みの候補(LatticeBuilder.addingTyped)の数
