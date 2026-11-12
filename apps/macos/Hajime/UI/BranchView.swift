@@ -22,6 +22,7 @@ final class BranchView: NSView {
     private typealias Glass = DesignTokens.Size.Glass
     private typealias Meaning = DesignTokens.Size.Meaning
     private typealias Space = DesignTokens.Size.Space
+    private typealias Part = DesignTokens.Size.Part
 
     var panel: LatticePanel? {
         didSet {
@@ -168,7 +169,7 @@ final class BranchView: NSView {
 
     /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」のタグの幅(前の空きを含む)
     private var correctedLabelWidth: CGFloat {
-        NoteDrawing.tagWidth(UIStrings.Branch.corrected, theme: theme) + Size.paddingX / 2
+        NoteDrawing.tagWidth(UIStrings.Branch.corrected, theme: theme) + Space.inline
     }
 
     /// offset を渡さなければ，今の幹のずれ(trunkOffset)を使う
@@ -437,7 +438,7 @@ final class BranchView: NSView {
         let to = node.maxX - Size.paddingX - (column.isCorrected ? correctedLabelWidth : 0)
         if column.isCorrected {
             // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
-            NoteDrawing.drawTag(UIStrings.Branch.corrected, maxX: node.maxX - Size.paddingX / 2, midY: node.midY, theme: theme,
+            NoteDrawing.drawTag(UIStrings.Branch.corrected, maxX: node.maxX - Part.rowPaddingX, midY: node.midY, theme: theme,
                                 selected: !theme.isRounded && column.isFocused)
         }
         if column.isDecided {
@@ -534,7 +535,7 @@ final class BranchView: NSView {
     }
 
     /// 枝の行のタグの右端
-    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Size.paddingX / 2 }
+    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Part.rowPaddingX }
 
     private func drawBranches(_ rows: [Row], from node: NSRect, width: CGFloat, downward: Bool) {
         guard !rows.isEmpty else { return }
@@ -551,7 +552,7 @@ final class BranchView: NSView {
     }
 
     /// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
-    private func leadMinX(in row: NSRect) -> CGFloat { row.minX + Size.paddingX / 2 }
+    private func leadMinX(in row: NSRect) -> CGFloat { row.minX + Part.rowPaddingX }
 
     /// 幹の根元: 下の枝は文節のタグの下の端，上の枝は上の端
     private func rootY(of node: NSRect, downward: Bool) -> CGFloat {
@@ -578,9 +579,9 @@ final class BranchView: NSView {
                 rect.fill()
             }
             let badgeColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: leadMinX(in: rect), y: rect.minY, width: metrics.lead - Size.paddingX / 2, height: rect.height), theme: theme)
+            GlassDrawing.drawLabel(row.badge, color: badgeColor, in: NSRect(x: leadMinX(in: rect), y: rect.minY, width: metrics.lead - Part.rowPaddingX, height: rect.height), theme: theme)
         }
-        var textX = rect.minX + Size.paddingX / 2 + metrics.lead
+        var textX = rect.minX + Part.rowPaddingX + metrics.lead
         if let kind = row.command {
             // コマンドの候補は，文字の前に種類のアイコンを置く
             CommandDrawing.drawIcon(kind, x: textX, midY: rect.midY, theme: theme, selected: row.isSelected, opacity: row.isSelected ? 1 : row.opacity)
@@ -602,8 +603,9 @@ final class BranchView: NSView {
         let stemX = node.minX + metrics.stemX
         let row = NSRect(x: stemX, y: node.maxY, width: node.width, height: metrics.rowHeight)
         let color = theme.textMuted.withAlphaComponent(restOpacity)
-        // 枝と同じ形で，幹から短く曲がる
-        let tipX = (stemX + metrics.branchIndent / 2).rounded()
+        // 枝と同じ形で，幹から短く曲がる．枝の行の左の端までの真ん中で止める
+        let branchMinX = stemX + metrics.branchIndent
+        let tipX = ((stemX + branchMinX) / 2).rounded()
         BranchLineDrawing.draw(stemX: stemX, rootY: rootY(of: node, downward: true), rowMidYs: [row.midY], tipX: tipX, selected: nil,
                                style: lineStyle(color: theme.line.withAlphaComponent(theme.line.alphaComponent * restOpacity)))
         let textX = tipX + Space.inline

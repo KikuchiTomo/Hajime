@@ -20,7 +20,7 @@ use crate::strings;
 use crate::theme::Font;
 use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
 use tokens::size::meaning as card_size;
-use tokens::size::{branch, candidate, glass, space};
+use tokens::size::{branch, candidate, glass, part, space};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
 struct Metrics {
@@ -384,7 +384,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             body.width - metrics.text_inset() * 2.0,
             metrics.footer_height,
         );
-        super::association::draw(&mut painter, heading, row.inset(-candidate::PADDING_X, 0.0));
+        super::association::draw(&mut painter, heading, row);
         painter.separator(row.max_y() + GAP, metrics.inset, body.width - metrics.inset);
     }
     let focused_index = focused(map).map(|(index, _)| index);
@@ -561,7 +561,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
 /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」のタグの幅(前の空きを含む)．直していなければ 0
 fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
     if column.is_corrected == Some(true) {
-        painter.tag_width(strings::CORRECTED) + candidate::PADDING_X / 2.0
+        painter.tag_width(strings::CORRECTED) + space::INLINE
     } else {
         0.0
     }
@@ -624,7 +624,7 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
         // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
         painter.tag(
             strings::CORRECTED,
-            node.max_x() - candidate::PADDING_X / 2.0,
+            node.max_x() - part::ROW_PADDING_X,
             node.mid_y(),
             !rounded && column.is_focused,
             TagStyle::Corrected,
@@ -742,7 +742,7 @@ fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &M
 
 /// 枝の行のタグの右端
 fn tag_max_x(row: Frame) -> f32 {
-    row.max_x() - candidate::PADDING_X / 2.0
+    row.max_x() - part::ROW_PADDING_X
 }
 
 fn branches(
@@ -777,7 +777,7 @@ fn branches(
 
 /// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
 fn lead_min_x(row: Frame) -> f32 {
-    row.x + candidate::PADDING_X / 2.0
+    row.x + part::ROW_PADDING_X
 }
 
 /// 幹の根元: 下の枝は文節のタグの下の端，上の枝は上の端
@@ -875,7 +875,6 @@ fn turn_segments(turn: &Turn) -> Vec<Segment> {
 
 fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
     let theme = painter.theme;
-    let padding = candidate::PADDING_X;
     let opacity = if row.selected { 1.0 } else { row.opacity };
     let text_color = if row.selected {
         theme.selection_text
@@ -912,13 +911,13 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
             Frame::new(
                 lead_min_x(frame),
                 frame.y,
-                metrics.lead - padding / 2.0,
+                metrics.lead - part::ROW_PADDING_X,
                 frame.height,
             ),
             Font::Key,
         );
     }
-    let mut text_x = frame.x + padding / 2.0 + metrics.lead;
+    let mut text_x = frame.x + part::ROW_PADDING_X + metrics.lead;
     if let Some(kind) = row.command {
         // コマンドの候補は，文字の前に種類のアイコンを置く
         painter.command(kind, text_x, frame.mid_y(), row.selected, opacity);
@@ -960,8 +959,9 @@ fn draw_preview(
     let stem_x = node.x + metrics.stem_x;
     let row = Frame::new(stem_x, node.max_y(), node.width, metrics.row_height);
     let color = theme.text_muted.faded(rest);
-    // 枝と同じ形で，幹から短く曲がる
-    let tip_x = (stem_x + metrics.branch_indent / 2.0).round();
+    // 枝と同じ形で，幹から短く曲がる．枝の行の左の端までの真ん中で止める
+    let branch_min_x = stem_x + metrics.branch_indent;
+    let tip_x = ((stem_x + branch_min_x) / 2.0).round();
     lines(
         painter,
         Point::new(stem_x, root_y(node, true, metrics)),
@@ -1089,6 +1089,18 @@ mod tests {
         BranchMap {
             columns: vec![focused],
             ..map()
+        }
+    }
+
+    #[test]
+    fn 連想の見出しが窓の幅を決めるときは説明と位置のあいだを_group_だけ空ける() {
+        use super::super::association::testing::{gap, long};
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut associated = map();
+            associated.association = Some(long());
+            let scene = branch_map(&associated, &Look::new(&theme, 15.0), &Fixed);
+            assert_eq!(gap(&scene), space::GROUP, "{name}");
         }
     }
 
@@ -1325,10 +1337,9 @@ mod tests {
             node_bottom - glass::SELECTION_INSET_Y
         );
         // 番号の丸の左の端から inline だけ手前
-        let tip_x = (inset + glass::BRANCH_STEM_X).round()
-            + glass::BRANCH_INDENT
-            + candidate::PADDING_X / 2.0
-            - space::INLINE;
+        let tip_x =
+            (inset + glass::BRANCH_STEM_X).round() + glass::BRANCH_INDENT + part::ROW_PADDING_X
+                - space::INLINE;
         for (figures, _, _) in &paths {
             assert!(figures.iter().all(|figure| tip(figure).x == tip_x));
         }

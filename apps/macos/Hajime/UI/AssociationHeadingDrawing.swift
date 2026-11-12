@@ -5,15 +5,15 @@ import HajimeApplication
 /// 左に「連想」と元の語と今の意味の説明，右に意味のまとまりの位置(「1 / 3」)を置く
 @MainActor
 enum AssociationHeadingDrawing {
-    private typealias Size = DesignTokens.Size.Candidate
+    private typealias Space = DesignTokens.Size.Space
 
-    /// 行に要る幅(左右の余白を除く)
+    /// 行に要る幅(左右の余白を除く)．意味の説明と位置のあいだに group を空ける
     static func width(_ heading: AssociationHeading, font: NSFont, emphasis: NSFont) -> CGFloat {
         let parts = leftParts(heading)
         let muted = parts.prefix.size(withAttributes: [.font: font]).width + parts.label.size(withAttributes: [.font: font]).width
         let headword = heading.headword.size(withAttributes: [.font: emphasis]).width
         let position = position(heading).size(withAttributes: [.font: font]).width
-        return (muted + headword + position + Size.paddingX * 3).rounded(.up)
+        return (muted + headword + Space.group + position).rounded(.up)
     }
 
     static func draw(_ heading: AssociationHeading, in rect: NSRect, theme: ResolvedTheme, font: NSFont, emphasis: NSFont) {
@@ -28,7 +28,7 @@ enum AssociationHeadingDrawing {
         _ = drawText(position, attributes: muted, x: rect.maxX - positionWidth, in: rect)
         if !parts.label.isEmpty {
             // 意味の説明は位置の手前までに収める
-            let available = rect.maxX - positionWidth - Size.paddingX - x
+            let available = rect.maxX - positionWidth - Space.group - x
             _ = drawText(truncated(parts.label, attributes: muted, width: available), attributes: muted, x: x, in: rect)
         }
     }
