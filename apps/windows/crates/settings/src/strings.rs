@@ -366,6 +366,8 @@ pub mod more {
     pub const THEME_FONT: &str = "テーマに合わせる";
     pub const FONT_STYLE: &str = "スタイル";
     pub const DUPLICATE_THEME: &str = "複製";
+    pub const CREATE_THEME: &str = "カスタムテーマを作成…";
+    pub const EDIT_THEME: &str = "編集…";
     pub const NEW_THEME_NAME: &str = "新しいテーマ";
     pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
     pub const PREVIEW: &str = "見本";
@@ -632,6 +634,7 @@ pub mod rule_list {
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
     pub const NO_MATCHES: &str = "一致する項目はありません";
+    pub const EDIT: &str = "編集";
 }
 
 /// UIStrings.Terms
@@ -958,11 +961,6 @@ pub mod windows {
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
     pub const DISABLED: &str = "無効";
-    /// カスタムテーマをすぐ作って下で編集する(macOS は編集の画面を開くので「…」が付く)
-    pub const CREATE_THEME: &str = "カスタムテーマを作成";
-    /// 選んだカスタムテーマを使う(macOS は行を押して使う)
-    pub const USE_THEME: &str = "使用";
-    pub const IN_USE: &str = "使用中";
     /// 取り込んだ辞書の一覧の内容の列(macOS は名前の下に小さく出す)
     pub const DICTIONARY_SUMMARY: &str = "内容";
     /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
