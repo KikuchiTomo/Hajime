@@ -7,13 +7,13 @@ import Testing
 
 /// 同梱の辞書で，促音を含む読みを Zenzai を使わずに変換し，文節の区切り・文節の第 1 候補・2〜5 番目の候補が崩れないことを確かめる．
 /// Zenzai を使わない変換は，分岐図の文節の候補と，一覧の 2 番目から後ろに混ぜる候補に出る．辞書の語(促音で切った交ぜ書きの「はっ声」，
-/// 名詞の「ッ」)や，活用の切れ端と漢字をつないだ候補(はっ再・じゅっ分・シュッ派つ．SokuonFragments で除く)が上位に出ると，
+/// 名詞の「ッ」)や，活用の切れ端と漢字をつないだ候補(はっ再・じゅっ分・シュッ派つ．BrokenSpellings で除く)が上位に出ると，
 /// 「はッ制したとかないのか」のような候補になる．
 /// 辞書が要るので，環境変数 HAJIME_BUNDLED_DICTIONARY があるときだけ動かす(make test-zenzai)．Zenzai を使う確かめは，HAJIME_ZENZAI_MODEL もあるときだけ
 @Suite("同梱の辞書の促音の語", .serialized, .enabled(if: ProcessInfo.processInfo.environment["HAJIME_BUNDLED_DICTIONARY"] != nil))
 @MainActor
 struct BundledDictionaryQualityTests {
-    /// 読みと，Zenzai を使わない分岐図の文節(「｜」で区切る)．同梱の辞書を v0.5.1 にしたときの結果で，v0.2.0 から変わっていない
+    /// 読みと，Zenzai を使わない分岐図の文節(「｜」で区切る)．同梱の辞書を v0.5.1 と v0.5.2 にしたときの結果で，v0.2.0 から変わっていない
     private nonisolated static let segmentCases: [(reading: String, segments: String)] = [
         ("はっせいしたとかないのか", "発生したと｜かない｜のか"),
         ("はっぴょうした", "発表した"),
@@ -48,7 +48,8 @@ struct BundledDictionaryQualityTests {
         ("けっこんしき", "結婚式"),
     ]
 
-    /// 辞書から除いた，促音で切った交ぜ書き(元の語の頭の漢字を読みのかなにした書き方)．どれも変換の候補の上位に出ない
+    /// 辞書から除いた，促音で切った交ぜ書き(元の語の頭の漢字を読みのかなにした書き方)．どれも変換の候補の上位に出ない．
+    /// v0.5.1 で足した辞書の語を，v0.5.2 で azooKey の辞書の語(てっ底・やっ介・ひっ算・まっ赤)を除いた
     private nonisolated static let removedSpellings: [(reading: String, spellings: [String])] = [
         ("はっせい", ["はっ声", "はっ生", "ハッ声", "ハッ生"]),
         ("はっちゅう", ["はっ注", "ハッ注"]),
@@ -56,14 +57,31 @@ struct BundledDictionaryQualityTests {
         ("はっかい", ["はっ会", "ハッ会"]),
         ("あっせい", ["アッ制"]),
         ("せっせい", ["セッ制", "セッ生"]),
+        ("てってい", ["てっ底"]),
+        ("やっかい", ["やっ介"]),
+        ("ひっさん", ["ひっ算"]),
+        ("まっか", ["まっ赤"]),
     ]
 
-    /// 2〜5 番目の候補に出てはいけない書き方(SokuonFragments)．ひらがなのあとのカタカナの促音(はッ制・きッぷ)，カタカナの促音のあとの漢字
-    /// (イッ所・ハッ中)，頭のかなを促音で切ってつないだ漢字(じゅっ分・はっ再)
-    private static let brokenPatterns = ["[ぁ-ゖ]ッ", "ッ[一-鿿]", "^[ぁ-ゖァ-ヺ]{1,2}[っッ][一-鿿]"].map { try! Regex($0) }
-    /// Zenzai を使っても 2〜5 番目に出してはいけない書き方(SokuonFragments で除く)．ひらがなのあとのカタカナの「ッ」(はッ制)，カタカナか漢字の「ッ」の
-    /// 切れ端に漢字をつないだもの(シュッ派つ・ハッ中・良ッ書)，頭のかなを促音で切ってつないだ漢字(じゅっ分・はっ駐)
-    private static let removedPatterns = ["[ぁ-ゖ]ッ", "[ァ-ヺ一-鿿]ッ[一-鿿]", "^[ぁ-ゖァ-ヺ]{1,2}[っッ][一-鿿]"].map { try! Regex($0) }
+    /// 辞書に残した，新聞の交ぜ書き(常用漢字になる前の表外字をかなにした書き方)．候補に出る
+    private nonisolated static let keptSpellings: [(reading: String, spelling: String)] = [
+        ("うっけつ", "うっ血"),
+        ("ぼっぱつ", "ぼっ発"),
+    ]
+
+    /// 直す前に，分岐図の文節か一覧の 2〜5 番目に崩れた候補が出ていた読み(1 文字のカタカナの 落ち着けヨ・ソの・窓ヲ・発生スる，
+    /// 拍の途中の字種の切り替えの フッた・ザッしを・テっきり，小さいかなの位置の 良ッた・打ァ・蛇ぁ・偽ゅー)
+    private nonisolated static let brokenCases = [
+        "おちつけよ", "ゆうびんきょくはとしょかんのとなりにある", "まいとしたくさんのじこがはっせいする", "かのじょはそのはなをとてもだいじにしている",
+        "まどをあけてもかまわないでしょうか", "じこげんいんはまだはっきりしていない", "ちゅうこしゃにしてはこのねだんはややたかい",
+        "なんにちもつづけてあめがふった", "ざっしをよむ", "てっきりそうだとおもった", "いまばっはをきいてるとこなんだ",
+        "とむがいったことほんとうにしんじるの", "あしたはげつようだぁまじゆううつ", "じゃぁいくのはやめときましょう", "ぎゅーしてほしい",
+        "とっきょをとる", "ねぇたのむからしんじてくれよ",
+    ]
+
+    /// 2〜5 番目の候補に出てはいけない書き方のうち，決まり(BrokenSpellings)と別に書いた形．頭のかなを促音で切ってつないだ漢字(じゅっ分・はっ再)，
+    /// ひらがなやカタカナのあとのカタカナの「ッ」に漢字が続くもの(はッ制・シュッ派つ・ハッ中)
+    private static let brokenPatterns = ["[ぁ-ゖ]ッ", "[ァ-ヺ]ッ[一-鿿]", "^[ぁ-ゖァ-ヺ]{1,2}[っッ][一-鿿]"].map { try! Regex($0) }
 
     private static let engine: AzooKeyConverterEngine? = makeEngine(zenzai: false)
     /// Zenzai を使うエンジン(環境変数 HAJIME_ZENZAI_MODEL があるときだけ)
@@ -122,8 +140,12 @@ struct BundledDictionaryQualityTests {
     }
 
     /// 2〜5 番目の候補のうち，促音で切った書き方のもの
+    /// 2〜5 番目の候補のうち，崩れた書き方のもの(決まりと，それと別に書いた形)
     private func broken(in candidates: [String]) -> [String] {
-        candidates.dropFirst().prefix(4).filter { text in Self.brokenPatterns.contains { text.contains($0) } }
+        candidates.dropFirst().prefix(4).filter { text in
+            Self.brokenPatterns.contains { text.contains($0) }
+                || BrokenSpellings.isBroken(Candidate(text: text, readingCount: text.count, origin: .combined))
+        }
     }
 
     @Test("Zenzai を使わない分岐図の文節の区切りと第 1 候補が崩れない", arguments: segmentCases)
@@ -138,7 +160,15 @@ struct BundledDictionaryQualityTests {
         #expect(Set(candidates).isDisjoint(with: spellings), "候補: \(candidates)")
     }
 
-    @Test("分岐図の文節ごとの候補と一覧の 2〜5 番目に，促音で切った書き方(はッ制・じゅっ分・いッ所)が出ない", arguments: segmentCases.map(\.reading))
+    @Test("辞書に残した新聞の交ぜ書きは，読み全体の候補の上位 15 に出る", arguments: keptSpellings)
+    func keptSpellingsStayIn(reading: String, spelling: String) throws {
+        let engine = try #require(Self.engine)
+        let candidates = engine.makeSession().candidates(for: reading).filter { $0.readingCount == reading.count }.prefix(15).map(\.text)
+        #expect(candidates.contains(spelling), "候補: \(candidates)")
+    }
+
+    @Test("分岐図の文節ごとの候補と一覧の 2〜5 番目に，崩れた書き方(はッ制・じゅっ分・出発スる・自ャ)が出ない",
+          arguments: segmentCases.map(\.reading) + brokenCases)
     func noBrokenCandidates(reading: String) throws {
         let automatic = try convert(reading, presentation: .automatic)
         #expect(automatic.alternatives.count == automatic.columns.count)
@@ -149,16 +179,14 @@ struct BundledDictionaryQualityTests {
         #expect(broken(in: list.entries).isEmpty, "一覧の候補: \(list.entries.prefix(5))")
     }
 
-    @Test("Zenzai を使っても，促音の切れ端をつないだ候補(シュッ派つ・ハッ中・はっ駐)は文節と一覧の 2〜5 番目に出ない",
-          .enabled(if: ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"] != nil), arguments: segmentCases.map(\.reading))
+    @Test("Zenzai を使っても，崩れた書き方(シュッ派つ・ハッ中・はっ駐・出発スる)は文節と一覧の 2〜5 番目に出ない",
+          .enabled(if: ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"] != nil), arguments: segmentCases.map(\.reading) + brokenCases)
     func noRemovedCandidatesWithZenzai(reading: String) throws {
         try #require(Self.zenzaiEngine != nil, "HAJIME_ZENZAI_MODEL のモデルが無い")
         let automatic = try convert(reading, presentation: .automatic, zenzai: true)
         let list = try convert(reading, presentation: .list, zenzai: true)
         for candidates in automatic.alternatives + [list.entries] {
-            // 辞書の 1 つの語(azooKey の辞書の「てっ底」)は除かないので，読みの一部の候補として 6 番目より後ろに出ることはある
-            let removed = candidates.prefix(5).dropFirst().filter { text in Self.removedPatterns.contains { text.contains($0) } }
-            #expect(removed.isEmpty, "候補: \(candidates.prefix(5))")
+            #expect(broken(in: candidates).isEmpty, "候補: \(candidates.prefix(5))")
         }
     }
 }

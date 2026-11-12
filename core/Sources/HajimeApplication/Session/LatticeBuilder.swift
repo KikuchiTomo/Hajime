@@ -469,8 +469,8 @@ struct LatticeBuilder {
         // 上の枝(ひらがな・カタカナ・半角カタカナ)にあるものは，下の枝に重ねて出さない．第 1 候補(幹)は残す
         let variantTexts = variants(of: slice).map(\.text)
         candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
-        // 先頭の語を選び直した候補には，促音の切れ端を漢字とつないだもの(はっ再の)があるので，除く
-        candidates = SokuonFragments.cleaned(candidates)
+        // 先頭の語を選び直した候補には，崩れた書き方(はっ再の・ソの)があるので，除く
+        candidates = BrokenSpellings.cleaned(candidates)
         let engineCandidates = candidates.filter(\.isFromEngine)
         let best = engineCandidates.first, second = engineCandidates.dropFirst().first
         let confident = SegmentLattice.isConfident(best: best, second: second)

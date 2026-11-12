@@ -32,8 +32,8 @@ struct SegmentContextRanker {
                 moved.append(Candidate(text: text, readingCount: length, origin: .sentencePart))
             }
         }
-        // 文脈の変換から持ち込んだ字にも促音の切れ端をつないだもの(じゅっ分)があるので，除き直す
-        return SokuonFragments.cleaned(head + moved + rest)
+        // 文脈の変換から持ち込んだ字にも崩れた書き方(じゅっ分・コの)があるので，除き直す
+        return BrokenSpellings.cleaned(head + moved + rest)
     }
 
     /// 文脈を含めた変換で，文節の読みの範囲になった字．読み全体の候補から取り出したものを先に，前後 1 語ずつを含めた変換のものをあとに，
