@@ -352,6 +352,26 @@ public struct Settings: Sendable, Equatable {
         customThemeID.flatMap { id in customThemes.first { $0.id == id } }
     }
 
+    /// カスタムテーマを保存できない理由
+    public enum CustomThemeRejection: Error, Sendable, Equatable {
+        /// 名前が空か長すぎるなど，CustomTheme.isValid を満たさない
+        case invalid
+        /// 新しいテーマで，すでに上限(DefaultSettings.maximumCustomThemes)まである
+        case full
+    }
+
+    /// カスタムテーマを保存して使う．同じ id のテーマがあれば置き換え，無ければ後ろに足す
+    public mutating func saveCustomTheme(_ theme: CustomTheme) throws(CustomThemeRejection) {
+        guard theme.isValid else { throw .invalid }
+        if let index = customThemes.firstIndex(where: { $0.id == theme.id }) {
+            customThemes[index] = theme
+        } else {
+            guard customThemes.count < DefaultSettings.maximumCustomThemes else { throw .full }
+            customThemes.append(theme)
+        }
+        customThemeID = theme.id
+    }
+
     /// アプリの入力の扱い(記号を半角・コマンドを英字・IME を使わない)．決まりが無ければ標準
     public func profile(forApplication identifier: String?) -> AppProfile {
         rule(forApplication: identifier) { !$0.setsModeOnFocus }?.profile ?? .standard

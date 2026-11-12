@@ -172,6 +172,7 @@ pub struct SettingsPalette {
     pub nav_pressed: Rgb,
     pub nav_selected: Rgb,
     pub scrollbar: Rgb,
+    pub smoke: Rgb,
     pub switch_off: Rgb,
     pub text: Rgb,
     pub text_disabled: Rgb,
@@ -203,6 +204,7 @@ pub mod settings_windows {
         nav_pressed: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
         nav_selected: Rgb { red: 0xEA, green: 0xEA, blue: 0xEA },
         scrollbar: Rgb { red: 0x8A, green: 0x8A, blue: 0x8A },
+        smoke: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
         text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
         text_disabled: Rgb { red: 0xA0, green: 0xA0, blue: 0xA0 },
@@ -230,12 +232,30 @@ pub mod settings_windows {
         nav_pressed: Rgb { red: 0x26, green: 0x26, blue: 0x26 },
         nav_selected: Rgb { red: 0x2D, green: 0x2D, blue: 0x2D },
         scrollbar: Rgb { red: 0x9F, green: 0x9F, blue: 0x9F },
+        smoke: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         text_disabled: Rgb { red: 0x78, green: 0x78, blue: 0x78 },
         text_placeholder: Rgb { red: 0x9D, green: 0x9D, blue: 0x9D },
         text_secondary: Rgb { red: 0xCF, green: 0xCF, blue: 0xCF },
     };
+}
+
+pub mod handwriting_windows {
+    pub mod light {
+        use crate::Rgb;
+
+        pub const CLOSE_HOVER: Rgb = Rgb { red: 0xC4, green: 0x2B, blue: 0x1C };
+        pub const CLOSE_PRESSED: Rgb = Rgb { red: 0xB3, green: 0x27, blue: 0x1A };
+        pub const CLOSE_TEXT: Rgb = Rgb { red: 0xFF, green: 0xFF, blue: 0xFF };
+    }
+    pub mod dark {
+        use crate::Rgb;
+
+        pub const CLOSE_HOVER: Rgb = Rgb { red: 0xC4, green: 0x2B, blue: 0x1C };
+        pub const CLOSE_PRESSED: Rgb = Rgb { red: 0xB3, green: 0x27, blue: 0x1A };
+        pub const CLOSE_TEXT: Rgb = Rgb { red: 0xFF, green: 0xFF, blue: 0xFF };
+    }
 }
 
 pub mod size {
@@ -267,7 +287,7 @@ pub mod size {
     }
     pub mod part {
         pub const WINDOW_RADIUS: f32 = 12.0;
-        pub const CARD_RADIUS: f32 = 8.0;
+        pub const CARD_RADIUS: f32 = 12.0;
         pub const ROW_HEIGHT: f32 = 28.0;
         pub const ROW_PADDING_X: f32 = 4.0;
         pub const ROW_RADIUS: f32 = 8.0;
@@ -282,6 +302,7 @@ pub mod size {
         pub const TAG_RADIUS: f32 = 4.0;
         pub const BADGE_SIZE: f32 = 16.0;
         pub const ICON_SIZE: f32 = 16.0;
+        pub const ICON_PADDING: f32 = 3.0;
         pub const ICON_RADIUS: f32 = 4.0;
         pub const STROKE: f32 = 1.0;
     }
@@ -446,8 +467,22 @@ pub mod size {
         pub const FRAME_WIDTH: f32 = 1.0;
         pub const GUIDE_DASH: f32 = 4.0;
         pub const ANCHOR_GAP: f32 = 4.0;
-        pub const CANDIDATE_GAP: f32 = 6.0;
+        pub const CANDIDATE_GAP: f32 = 8.0;
         pub const CANDIDATE_FONT_SIZE: f32 = 18.0;
+        pub const TITLE_HEIGHT: f32 = 32.0;
+        pub const CAPTION_BUTTON_WIDTH: f32 = 46.0;
+        pub const CAPTION_FONT_SIZE: f32 = 12.0;
+        pub const CAPTION_ICON_SIZE: f32 = 10.0;
+        pub const CONTROL_HEIGHT: f32 = 32.0;
+        pub const CONTROL_RADIUS: f32 = 4.0;
+        pub const CONTROL_PADDING_X: f32 = 12.0;
+        pub const LABEL_FONT_SIZE: f32 = 14.0;
+        pub const ICON_BUTTON_WIDTH: f32 = 32.0;
+        pub const ICON_SIZE: f32 = 16.0;
+        pub const RESIZE_BORDER: f32 = 6.0;
+        pub const SCROLL_FADE: f32 = 20.0;
+        pub const WHEEL_STEP: f32 = 48.0;
+        pub const PROMPT_PADDING_Y: f32 = 4.0;
     }
     pub mod prediction {
         pub const GAP: f32 = 8.0;
@@ -513,7 +548,6 @@ pub mod size {
         pub const SCROLL_LINE: f32 = 40.0;
         pub const LIST_HEIGHT: f32 = 220.0;
         pub const BUTTON_WIDTH: f32 = 96.0;
-        pub const PREVIEW_HEIGHT: f32 = 240.0;
         pub const BUTTON_PADDING_X: f32 = 12.0;
         pub const PAGE_PADDING_TOP: f32 = 20.0;
         pub const TITLE_FONT_SIZE: f32 = 28.0;
@@ -590,6 +624,8 @@ pub mod size {
         pub const WIZARD_MODE_SIZE: f32 = 28.0;
         pub const WIZARD_HERO_SIZE: f32 = 72.0;
         pub const STEPPER_BUTTON_WIDTH: f32 = 32.0;
+        pub const ICON_BUTTON_WIDTH: f32 = 40.0;
+        pub const DIALOG_RADIUS: f32 = 8.0;
         pub const SLIDER_TRACK_HEIGHT: f32 = 4.0;
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
@@ -607,14 +643,14 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
+        pub const TEMPLATE_NOW_WIDTH: f32 = 160.0;
         pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
+        pub const SEGMENT_INSET: f32 = 2.0;
         pub const LIST_ARROW_WIDTH: f32 = 24.0;
         pub const TITLE_BAR_HEIGHT: f32 = 32.0;
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
         pub const TITLE_BAR_PADDING_X: f32 = 16.0;
         pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
-        pub const EMOJI_PREVIEW_HEIGHT: f32 = 260.0;
-        pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
         pub const SWITCH_KNOB_OFF: f32 = 12.0;
         pub const SWITCH_KNOB_ON: f32 = 14.0;
         pub const SWITCH_KNOB_PRESSED: f32 = 2.0;
@@ -636,19 +672,21 @@ pub mod size {
         pub const WIDTH: f32 = 900.0;
         pub const HEIGHT: f32 = 600.0;
         pub const STAGE_WIDTH: f32 = 440.0;
-        pub const PADDING: f32 = 36.0;
-        pub const STAGE_PADDING: f32 = 28.0;
+        pub const PADDING: f32 = 24.0;
+        pub const STAGE_PADDING: f32 = 24.0;
+        pub const FIELD_TOP: f32 = 96.0;
         pub const CARD_RADIUS: f32 = 12.0;
-        pub const CARD_PADDING: f32 = 14.0;
-        pub const CARD_GAP: f32 = 10.0;
+        pub const CARD_PADDING: f32 = 12.0;
+        pub const CARD_GAP: f32 = 8.0;
+        pub const THEME_SAMPLE_WIDTH: f32 = 48.0;
         pub const DOT_SIZE: f32 = 7.0;
-        pub const DOT_GAP: f32 = 6.0;
+        pub const DOT_GAP: f32 = 4.0;
         pub const FIELD_HEIGHT: f32 = 46.0;
         pub const FIELD_RADIUS: f32 = 10.0;
         pub const FIELD_FONT_SIZE: f32 = 19.0;
         pub const APPLICATION_TAB_FONT_SIZE: f32 = 12.0;
         pub const INFO_SYMBOL_WIDTH: f32 = 28.0;
-        pub const DEMO_GAP: f32 = 14.0;
+        pub const DEMO_GAP: f32 = 8.0;
         pub const BADGE_RADIUS: f32 = 6.0;
         pub const COUNTER_HEIGHT: f32 = 16.0;
         pub const CHECK_SIZE: f32 = 20.0;
@@ -765,6 +803,8 @@ pub mod opacity {
         pub const LINK: f32 = 0.4;
         pub const LINK_HOVER_MIX: f32 = 0.35;
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
+        pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
+        pub const SMOKE: f32 = 0.3;
     }
 }

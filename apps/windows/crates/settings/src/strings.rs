@@ -100,6 +100,7 @@ pub mod settings {
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const WORD_CLASS: &str = "品詞";
     pub const COMMENT: &str = "コメント";
+    pub const COMMENT_PROMPT: &str = "コメント(省略可)";
     pub const ABBREVIATION_NOTE: &str =
         "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
 
@@ -227,6 +228,58 @@ pub mod extras {
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
+    pub const TEMPLATE_SYNTAX: &str = "書き方";
+    pub const TEMPLATE_MEANING: &str = "入るもの";
+    pub const TEMPLATE_NOW: &str = "今入れると";
+    /// 単語に書ける書き方(TextTemplate)と，入るもの．「今入れると」の列は書き方を今の値に置き換えて出す
+    pub const TEMPLATE_ROWS: &[(&str, &str)] = &[
+        ("{date}", "今日の日付"),
+        ("{time}", "今の時刻"),
+        ("{datetime:YYYY/MM/DD hh:mm:ss}", "書式を決めた日時"),
+        ("{datetime+1d:MM/DD}", "日をずらした日付（-7d なら 7 日前）"),
+        (
+            "{time+30m}",
+            "ずらした時刻（m 分・h 時間・d 日・w 週・M 月・y 年）",
+        ),
+        (
+            "{date+1w@mon:M/D(ddd)}",
+            "来週の月曜（@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末）",
+        ),
+        (
+            "{date+3b:M/D(ddd)}",
+            "3 営業日後（b は土日と祝日を除いて数える）",
+        ),
+        (
+            "{date:GGEE年M月D日|kansuji}",
+            "漢数字の和暦（1 年は「元年」）",
+        ),
+        ("{date:FFFF年度 NN JJ}", "年度・和風月名・干支"),
+        ("{utc}", "協定世界時の日時"),
+        ("{unixtime}", "UNIX 時間（秒）"),
+        (
+            "{holiday:平日}",
+            "祝日の名前（祝日でなければ : のあとの文字）",
+        ),
+        ("{season}", "その月の時候の挨拶"),
+        ("{greeting}", "時刻に合った挨拶"),
+        (
+            "{days:12/25}",
+            "その日までの日数（2027-03-31 のように年も書ける）",
+        ),
+        ("{age:1990-04-01}", "その日に生まれた人の満年齢"),
+        ("{uuid}", "UUID（入れるたびに変わる）"),
+        ("{random:1-6}", "範囲の中の整数（入れるたびに変わる）"),
+        (
+            "{alnum:8}",
+            "英数字 8 文字（{hex:8} なら 16 進数。入れるたびに変わる）",
+        ),
+        (
+            "{pick:はい,いいえ}",
+            "並べたうちのどれか 1 つ（入れるたびに変わる）",
+        ),
+        ("{date|fullwidth}", "| のあとの名前で変えた値"),
+        ("{{ }}", "「{」と「}」の文字そのもの"),
+    ];
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
@@ -313,6 +366,8 @@ pub mod more {
     pub const THEME_FONT: &str = "テーマに合わせる";
     pub const FONT_STYLE: &str = "スタイル";
     pub const DUPLICATE_THEME: &str = "複製";
+    pub const CREATE_THEME: &str = "カスタムテーマを作成…";
+    pub const EDIT_THEME: &str = "編集…";
     pub const NEW_THEME_NAME: &str = "新しいテーマ";
     pub const NO_CUSTOM_THEMES: &str = "カスタムテーマはありません";
     pub const PREVIEW: &str = "見本";
@@ -393,6 +448,10 @@ pub mod keys {
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
+    pub const CUSTOM_PRESET: &str = "カスタム";
+    pub fn current_preset(name: &str) -> String {
+        format!("ひな形: {name}")
+    }
     pub const STATE: &str = "状態";
     pub const KEY: &str = "キー";
     pub const COMMAND: &str = "コマンド";
@@ -873,31 +932,6 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
-    /// 単語に書ける書き方(TextTemplate)と，入るもの・例．1 つずつ注記の行にする(macOS は表にして今の値を出す)
-    pub const TEMPLATE_ROWS: &[&str] = &[
-        "{date}　今日の日付（例: 2026/04/01）",
-        "{time}　今の時刻（例: 09:30）",
-        "{datetime:YYYY/MM/DD hh:mm:ss}　書式を決めた日時（例: 2026/04/01 09:30:15）",
-        "{datetime+1d:MM/DD}　日をずらした日付。-7d なら 7 日前（例: 04/02）",
-        "{time+30m}　ずらした時刻。m 分・h 時間・d 日・w 週・M 月・y 年でずらす（例: 10:00）",
-        "{date+1w@mon:M/D(ddd)}　来週の月曜。@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末（例: 4/6(月)）",
-        "{date+3b:M/D(ddd)}　3 営業日後。b は土日と祝日を除いて数える（例: 4/6(月)）",
-        "{date:GGEE年M月D日|kansuji}　漢数字の和暦。1 年は「元年」（例: 令和八年四月一日）",
-        "{date:FFFF年度 NN JJ}　年度・和風月名・干支（例: 2026年度 卯月 丙午）",
-        "{utc}　協定世界時の日時（例: 2026-04-01T00:30:15Z）",
-        "{unixtime}　UNIX 時間（秒）",
-        "{holiday:平日}　祝日の名前。祝日でなければ : のあとの文字（例: 平日）",
-        "{season}　その月の時候の挨拶（例: 陽春の候）",
-        "{greeting}　時刻に合った挨拶（例: おはようございます）",
-        "{days:12/25}　その日までの日数。2027-03-31 のように年も書ける",
-        "{age:1990-04-01}　その日に生まれた人の満年齢",
-        "{uuid}　UUID。入れるたびに変わる",
-        "{random:1-6}　範囲の中の整数。入れるたびに変わる",
-        "{alnum:8}　英数字 8 文字。{hex:8} なら 16 進数。入れるたびに変わる",
-        "{pick:はい,いいえ}　並べたうちのどれか 1 つ。入れるたびに変わる",
-        "{date|fullwidth}　| のあとの名前で変えた値（例: ２０２６／０４／０１）",
-        "{{ }}　「{」と「}」の文字そのもの",
-    ];
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)
@@ -917,23 +951,21 @@ pub mod windows {
         "Dropbox や OneDrive のフォルダを選択すると、ほかの PC と同期できます。";
     /// 項目ごとの同期の表の列(macOS は項目ごとのスイッチ)
     pub const SYNC_FIELD: &str = "項目";
+    /// 項目ごとの同期の表のまとまりの列
+    pub const SYNC_GROUP: &str = "まとまり";
     pub const SYNC_SCOPE: &str = "範囲";
     pub const TOGGLE_SYNC_SCOPE: &str = "範囲の切り替え";
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
     pub const DISABLED: &str = "無効";
-    /// カスタムテーマをすぐ作って下で編集する(macOS は編集の画面を開くので「…」が付く)
-    pub const CREATE_THEME: &str = "カスタムテーマを作成";
-    /// 選んだカスタムテーマを使う(macOS は行を押して使う)
-    pub const USE_THEME: &str = "使用";
-    pub const IN_USE: &str = "使用中";
     /// 取り込んだ辞書の一覧の内容の列(macOS は名前の下に小さく出す)
     pub const DICTIONARY_SUMMARY: &str = "内容";
     /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
     pub const DICTIONARY_APPS: &str = "アプリの実行ファイル名";
-    /// コマンドの行き先のファイルやアプリを選ぶボタンと，選ぶ窓の種類の名前
-    pub const CHOOSE_TARGET: &str = "行き先を選択…";
+    /// コマンドの行き先のファイルを選ぶ窓の種類の名前
     pub const ALL_FILES: &str = "すべてのファイル";
+    /// 除外設定のアプリの打つ欄の案内(macOS はアプリを選んで足すだけ．Windows は実行ファイルの名前でも足せる)
+    pub const APP_EXECUTABLE_PROMPT: &str = "実行ファイル名";
     /// 試した語を一覧に足すボタン(macOS は結果の語を右クリックして選ぶ)
     pub const ADD_TO_ENGLISH: &str = "常に英語にする単語に追加";
     pub const ADD_TO_JAPANESE: &str = "常に日本語にする単語に追加";
@@ -997,32 +1029,23 @@ pub mod wizard {
     }
 
     pub const MODE_TITLE: &str = "英数とかなの切り替え";
-    pub const MODE_DETAIL: &str = "日本語と英数を切り替えるキーを選びます。";
     pub const APP_MODES_TITLE: &str = "アプリごとの入力モード";
-    pub const APP_MODES_DETAIL: &str = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。";
+    pub const APP_MODES_DETAIL: &str = "除外設定でアプリを追加して選びます。";
     pub const DEMO_TERMINAL: &str = "ターミナル";
     pub const CORRECTION_TITLE: &str = "自動補正";
-    pub const CORRECTION_DETAIL: &str = "打ち間違いを、文の流れから見つけて直します。直したところには点線が付き、Esc で打ったままに戻せます。";
     pub const CORRECTION_OFF: &str = "直さない";
     pub const THEME_TITLE: &str = "外観";
-    pub const THEME_DETAIL: &str =
-        "候補ウィンドウの見た目を選びます。あとから設定の画面で、色や書体を自由に変えられます。";
+    pub const THEME_DETAIL: &str = "色や書体は、あとから設定の画面で変えられます。";
     pub const LIVE_TITLE: &str = "ライブ変換";
-    pub const LIVE_DETAIL: &str =
-        "打ちながら漢字に変換して見せます。Space を押さずに、そのまま Enter で確定できます。";
     pub const LIVE_ON: &str = "ライブ変換を使う";
     pub const LIVE_OFF: &str = "使わない";
     pub const LIVE_DELAY: &str = "漢字にするまでの時間";
     pub const PRESENTATION_TITLE: &str = "候補の出し方";
-    pub const PRESENTATION_DETAIL: &str =
-        "Space を押したときの候補の並べ方と、最初に選ぶ文節を選びます。";
     pub const INITIAL_FOCUS: &str = "最初に選ぶ文節";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
-    pub const CHARACTERS_DETAIL: &str = "句読点や括弧など、キーを押したときに入る文字を選びます。";
     pub const FEATURES_TITLE: &str = "便利な機能";
-    pub const FEATURES_DETAIL: &str = "変換の候補に、関連する語や計算の結果などを出します。";
     pub const EXTRAS_TITLE: &str = "試験的な機能";
-    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。あとから設定の画面でも変えられます。";
+    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。";
     pub const MACROS: &str = "変換マクロ";
     pub const MACROS_DETAIL: &str =
         "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
@@ -1032,7 +1055,6 @@ pub mod wizard {
     pub const COMMANDS: &str = "コマンド";
     pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。";
     pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
-    pub const SPOTLIGHT_HINT: &str = "項目にポインタを置くと、左に使い方を出します。";
     pub const ASSOCIATION: &str = "連想変換";
     pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、似た意味の語を出します。";
     pub const CALCULATION: &str = "計算";
@@ -1048,17 +1070,7 @@ pub mod wizard {
 pub mod windows_wizard {
     /// 英数とかなの切り替え(macOS の ModeSwitchStyle．分けるのが推奨)
     pub const MODE_SEPARATE: &str = "無変換キーと変換キーで分ける";
-    pub const MODE_SEPARATE_DETAIL: &str =
-        "無変換キーで英数、変換キーで日本語になります。半角/全角キーでも切り替えられます。";
     pub const MODE_SINGLE: &str = "半角/全角キーで切り替え";
-    pub const MODE_SINGLE_DETAIL: &str =
-        "半角/全角キーを押すたびに、日本語と英数が切り替わります。";
-
-    /// アプリごとの入力モードの説明(macOS の UIStrings.Onboarding.appModeDetail(for:))
-    pub const APP_MODE_OFF_DETAIL: &str =
-        "そのアプリに切り替えるたびに英数にします。あとから日本語入力にも切り替えられます。";
-    pub const APP_MODE_ON_DETAIL: &str = "そのアプリに切り替えるたびに日本語入力にします。";
-    pub const APP_MODE_REMEMBERS_DETAIL: &str = "そのアプリで最後に使った入力モードに戻します。";
 
     /// 補正の強さの説明(macOS の UIStrings.Onboarding.detail(for: CorrectionSensitivity))
     pub const CORRECTION_CAUTIOUS_DETAIL: &str =
@@ -1067,8 +1079,7 @@ pub mod windows_wizard {
     pub const CORRECTION_AGGRESSIVE_DETAIL: &str = "少しでも打ち間違いらしければ直します。";
 
     /// 候補の出し方の説明(macOS の UIStrings.Onboarding.detail(for: CandidatePresentation))
-    pub const PRESENTATION_AUTOMATIC_DETAIL: &str =
-        "文節ごとに候補が枝分かれします。文全体を見渡しながら、直したい文節だけを選び直せます。";
+    pub const PRESENTATION_AUTOMATIC_DETAIL: &str = "文節ごとに候補を枝分かれさせます。";
     pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選んでいる文節の候補を縦に並べます。";
     pub const PRESENTATION_LIST_DETAIL: &str = "文全体の候補を縦に並べます。";
 
@@ -1076,6 +1087,10 @@ pub mod windows_wizard {
     pub const DEMO_NOTES: &str = "メモ帳";
     /// 英数で打つ実演の文字(macOS は「Mac で」)
     pub const DEMO_DIRECT_TEXT: &str = "PC で";
+    /// 実演で押すキーの名前(キーの札に出す．macOS は「かな」「英数」)
+    pub const DEMO_KEY_HENKAN: &str = "変換";
+    pub const DEMO_KEY_MUHENKAN: &str = "無変換";
+    pub const DEMO_KEY_HANKAKU: &str = "半角/全角";
     /// 補正とコマンドの実演の案内(core の Note と同じ文言)
     pub const NOTE_SUGGESTION: &str = "もしかして";
     pub const NOTE_CORRECTION: &str = "修正";

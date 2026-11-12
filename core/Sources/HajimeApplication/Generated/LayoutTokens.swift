@@ -30,7 +30,7 @@ public enum LayoutTokens {
     }
     public enum Part {
         public static let windowRadius: Double = 12
-        public static let cardRadius: Double = 8
+        public static let cardRadius: Double = 12
         public static let rowHeight: Double = 28
         public static let rowPaddingX: Double = 4
         public static let rowRadius: Double = 8
@@ -45,6 +45,7 @@ public enum LayoutTokens {
         public static let tagRadius: Double = 4
         public static let badgeSize: Double = 16
         public static let iconSize: Double = 16
+        public static let iconPadding: Double = 3
         public static let iconRadius: Double = 4
         public static let stroke: Double = 1
     }
@@ -209,8 +210,22 @@ public enum LayoutTokens {
         public static let frameWidth: Double = 1
         public static let guideDash: Double = 4
         public static let anchorGap: Double = 4
-        public static let candidateGap: Double = 6
+        public static let candidateGap: Double = 8
         public static let candidateFontSize: Double = 18
+        public static let titleHeight: Double = 32
+        public static let captionButtonWidth: Double = 46
+        public static let captionFontSize: Double = 12
+        public static let captionIconSize: Double = 10
+        public static let controlHeight: Double = 32
+        public static let controlRadius: Double = 4
+        public static let controlPaddingX: Double = 12
+        public static let labelFontSize: Double = 14
+        public static let iconButtonWidth: Double = 32
+        public static let iconSize: Double = 16
+        public static let resizeBorder: Double = 6
+        public static let scrollFade: Double = 20
+        public static let wheelStep: Double = 48
+        public static let promptPaddingY: Double = 4
     }
     public enum Prediction {
         public static let gap: Double = 8
@@ -276,7 +291,6 @@ public enum LayoutTokens {
         public static let scrollLine: Double = 40
         public static let listHeight: Double = 220
         public static let buttonWidth: Double = 96
-        public static let previewHeight: Double = 240
         public static let buttonPaddingX: Double = 12
         public static let pagePaddingTop: Double = 20
         public static let titleFontSize: Double = 28
@@ -353,6 +367,8 @@ public enum LayoutTokens {
         public static let wizardModeSize: Double = 28
         public static let wizardHeroSize: Double = 72
         public static let stepperButtonWidth: Double = 32
+        public static let iconButtonWidth: Double = 40
+        public static let dialogRadius: Double = 8
         public static let sliderTrackHeight: Double = 4
         public static let sliderThumbSize: Double = 20
         public static let sliderThumbInner: Double = 12
@@ -370,14 +386,14 @@ public enum LayoutTokens {
         public static let themeSwatchRadius: Double = 6
         public static let themeSwatchFontSize: Double = 11
         public static let aboutIcon: Double = 64
+        public static let templateNowWidth: Double = 160
         public static let keymapListHeight: Double = 400
+        public static let segmentInset: Double = 2
         public static let listArrowWidth: Double = 24
         public static let titleBarHeight: Double = 32
         public static let titleBarIconSize: Double = 16
         public static let titleBarPaddingX: Double = 16
         public static let aboutTitleFontSize: Double = 20
-        public static let emojiPreviewHeight: Double = 260
-        public static let palettePreviewHeight: Double = 300
         public static let switchKnobOff: Double = 12
         public static let switchKnobOn: Double = 14
         public static let switchKnobPressed: Double = 2
@@ -399,19 +415,21 @@ public enum LayoutTokens {
         public static let width: Double = 900
         public static let height: Double = 600
         public static let stageWidth: Double = 440
-        public static let padding: Double = 36
-        public static let stagePadding: Double = 28
+        public static let padding: Double = 24
+        public static let stagePadding: Double = 24
+        public static let fieldTop: Double = 96
         public static let cardRadius: Double = 12
-        public static let cardPadding: Double = 14
-        public static let cardGap: Double = 10
+        public static let cardPadding: Double = 12
+        public static let cardGap: Double = 8
+        public static let themeSampleWidth: Double = 48
         public static let dotSize: Double = 7
-        public static let dotGap: Double = 6
+        public static let dotGap: Double = 4
         public static let fieldHeight: Double = 46
         public static let fieldRadius: Double = 10
         public static let fieldFontSize: Double = 19
         public static let applicationTabFontSize: Double = 12
         public static let infoSymbolWidth: Double = 28
-        public static let demoGap: Double = 14
+        public static let demoGap: Double = 8
         public static let badgeRadius: Double = 6
         public static let counterHeight: Double = 16
         public static let checkSize: Double = 20

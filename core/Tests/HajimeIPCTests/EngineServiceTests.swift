@@ -636,6 +636,23 @@ struct EngineServiceTests {
         #expect(custom.cornerRadius == 4)
         #expect(custom.straightBranches)
     }
+    @Test("Windows の設定の画面がカスタムテーマの色を書き換えた customThemes を書くと，そのテーマの色が変わり候補の窓に運ぶ")
+    func customThemeColorFromSettingsApp() throws {
+        let id = greeted()
+        // Windows の設定の画面(themes::edited)は，テーマの配列をまるごと書く
+        func themes(text: String) -> String {
+            ##"{"customThemes":[{"id":"sunset","name":"夕焼け","base":"automatic","surface":"#2B1B17","text":"\##(text)","textMuted":"#C9A68F","##
+                + ##""selection":"#FF7A3D","selectionText":"#1A0E0A","correction":"#FFD23F","line":"#6B4A3E","cornerRadius":4.0,"branchStyle":"curved"}]"##
+        }
+        _ = fields(.writeSettingsFields(values: themes(text: "#FFE8D6") + #","customThemeID":"sunset"}"#), from: id)
+        #expect(settings.current.activeCustomTheme?.text == HexColor("#FFE8D6"))
+        let written = fields(.writeSettingsFields(values: themes(text: "#336699") + "}"), from: id)
+        #expect(written?.keys.sorted() == ["customThemes"])
+        #expect(settings.current.customThemes.map(\.text) == [HexColor("#336699")!])
+        #expect(settings.current.customThemeID == "sunset")
+        #expect(try #require(service.presentation.customTheme).text == WireColor(red: 0x33, green: 0x66, blue: 0x99))
+    }
+
     // MARK: 手書き入力(R-14)
 
     private static let handwritingKey = WireKeyInput(key: .character(text: "h"), modifiers: WireModifiers(shift: false, control: true, alt: true), isKeypad: false)
@@ -827,21 +844,71 @@ struct EngineServiceTests {
         #expect(operations.isEmpty)
     }
 
-    @Test("入力先から外れたら手書きの窓を閉じ，選んだ文字を入れない")
-    func handwritingClosesOnDeactivate() throws {
+    @Test("入力欄の中で注目が動いた deactivate では手書きの窓を閉じず，選んだ文字を次の wake で入れる")
+    func handwritingSurvivesDeactivate() throws {
         try settings.update { $0.handwriting = true }
         let id = greeted()
         let session = try open(id)
         _ = openHandwriting(session: session, from: id)
-        _ = service.handle(WireRequest(id: 34, body: .deactivate(session: session)), from: id)
-        #expect(sent.value.last == .hideHandwriting)
+        sent.value.removeAll()
+        guard case .edit(_, _, let state) = service.handle(WireRequest(id: 34, body: .deactivate(session: session)), from: id).body else {
+            Issue.record("deactivate に答えない")
+            return
+        }
+        #expect(!sent.value.contains(.hideHandwriting))
+        // 文字を取りに来続けてもらう
+        #expect(state.wakeAfterMilliseconds == EngineService.handwritingPollMilliseconds)
         _ = service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: candidateWindow())
-        guard case .edit(_, let operations, let state) = wake(session, from: id) else {
+        guard case .edit(_, let operations, let after) = wake(session, from: id) else {
             Issue.record("wake に答えない")
             return
         }
-        #expect(operations.isEmpty)
+        #expect(operations == [.commit(text: "鬱")])
+        #expect(after.wakeAfterMilliseconds == nil)
+    }
+
+    @Test("手書きの窓を開いていないときの deactivate では，来てもらわない")
+    func deactivateWithoutHandwriting() throws {
+        let id = greeted()
+        let session = try open(id)
+        _ = type("kana", session: session, from: id)
+        guard case .edit(_, _, let state) = service.handle(WireRequest(id: 34, body: .deactivate(session: session)), from: id).body else {
+            Issue.record("deactivate に答えない")
+            return
+        }
         #expect(state.wakeAfterMilliseconds == nil)
+    }
+
+    @Test("ほかのアプリに入力先が移ったら，選んだ文字は移った先に入れる")
+    func handwritingFollowsActivation() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let owner = try open(id)
+        let other = try open(id)
+        _ = openHandwriting(session: owner, from: id)
+        _ = service.handle(WireRequest(id: 34, body: .deactivate(session: owner)), from: id)
+        _ = service.handle(WireRequest(id: 32, body: .handwritingChosen(text: "鬱")), from: candidateWindow())
+        guard case .edit(_, let operations, _) = service.handle(
+            WireRequest(id: 36, body: .activate(session: other, context: Self.field)), from: id).body else {
+            Issue.record("activate に答えない")
+            return
+        }
+        #expect(operations.contains(.commit(text: "鬱")))
+        guard case .edit(_, let none, _) = wake(owner, from: id) else {
+            Issue.record("wake に答えない")
+            return
+        }
+        #expect(none.isEmpty)
+    }
+
+    @Test("入力先のセッションが閉じたら手書きの窓を閉じる")
+    func handwritingClosesWithSession() throws {
+        try settings.update { $0.handwriting = true }
+        let id = greeted()
+        let session = try open(id)
+        _ = openHandwriting(session: session, from: id)
+        _ = service.handle(WireRequest(id: 37, body: .closeSession(session: session)), from: id)
+        #expect(sent.value.last == .hideHandwriting)
     }
 
     @Test("窓を閉じたら取りに来るのをやめる")

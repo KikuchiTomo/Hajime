@@ -584,7 +584,7 @@ impl Drawing<'_> {
         if self.layout.wide {
             // 顔文字は横に長いので，文字の幅に合わせて四角を広げる(説明の欄の幅の一定の割合まで)
             let width = self.painter.width(&shown.text, fonts.preview_kaomoji)
-                + palette::KAOMOJI_PADDING_X * 4.0;
+                + palette::TILE_PADDING * 2.0;
             tile.width = tile
                 .width
                 .max(width.ceil())

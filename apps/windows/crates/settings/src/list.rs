@@ -21,6 +21,10 @@ pub struct Field {
     pub notation: bool,
     /// 空のままでも足せる欄(ユーザー辞書のコメント)
     pub optional: bool,
+    /// 入力欄の案内(None なら label)．表の見出しは label のまま
+    pub prompt: Option<&'static str>,
+    /// 選ぶ欄の初めの選択肢の番号(判別ルールの「前: 日本語 → 日本語」．macOS の WordLanguagePage)
+    pub default_choice: usize,
 }
 
 impl Field {
@@ -33,6 +37,8 @@ impl Field {
             key: true,
             notation: false,
             optional: false,
+            prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -44,6 +50,8 @@ impl Field {
             key,
             notation: false,
             optional: false,
+            prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -60,6 +68,8 @@ impl Field {
             key,
             notation: false,
             optional: false,
+            prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -72,6 +82,8 @@ impl Field {
             key,
             notation: true,
             optional: false,
+            prompt: None,
+            default_choice: 0,
         }
     }
 
@@ -79,6 +91,22 @@ impl Field {
     pub const fn optional(self) -> Self {
         Self {
             optional: true,
+            ..self
+        }
+    }
+
+    /// 選ぶ欄の初めの選択肢を決める
+    pub const fn default_choice(self, index: usize) -> Self {
+        Self {
+            default_choice: index,
+            ..self
+        }
+    }
+
+    /// 入力欄の案内を label と別にする(「コメント(省略可)」)
+    pub const fn prompt(self, prompt: &'static str) -> Self {
+        Self {
+            prompt: Some(prompt),
             ..self
         }
     }
@@ -115,6 +143,8 @@ pub type Item = Vec<String>;
 
 /// 行ごとの有効・無効の値の名前(コマンドと変換マクロ)
 const ENABLED: &str = "isEnabled";
+/// 行を見分ける値の名前(コマンドと変換マクロ．エンジンが振る)
+const ID: &str = "id";
 
 /// 除外設定の一覧の道筋と，アプリの欄の名前
 const PROFILE_RULES: &str = "profileRules";
@@ -311,6 +341,86 @@ impl ListSpec {
             })
             .collect();
         replaced.then_some(Value::Array(elements))
+    }
+
+    /// index 番目の行(items の並び)の id(コマンドと変換マクロ．無ければ None)
+    pub fn id_at(&self, list: Option<&Value>, index: usize) -> Option<String> {
+        self.element_at(list, index)?
+            .get(ID)
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    }
+
+    /// id の要素を，同じ位置のまま item に書き換えた配列．欄に無い値(id・isEnabled)は元の要素から引き継ぐ．
+    /// id の要素が無ければ None．同じ読みのコマンドがいくつあっても，書き換えるのは id の 1 つだけ(macOS の CommandsPage)
+    pub fn replace_id(&self, list: Option<&Value>, id: &str, item: &Item) -> Option<Value> {
+        let mut replaced = false;
+        let elements = self
+            .entries(list)
+            .into_iter()
+            .map(|(element, row)| {
+                if !replaced && row.is_some() && element.get(ID).and_then(Value::as_str) == Some(id)
+                {
+                    replaced = true;
+                    self.merged(&element, item)
+                } else {
+                    element
+                }
+            })
+            .collect();
+        replaced.then_some(Value::Array(elements))
+    }
+
+    /// index 番目の行(items の並び)の field 番目の欄を value にした配列．ほかの値と行の位置は元のまま．
+    /// 表の中の選ぶ欄で選び直したときにすぐ書く(macOS の ExclusionsPage の動作の Picker)．行や欄が無ければ None
+    pub fn set_field_at(
+        &self,
+        list: Option<&Value>,
+        index: usize,
+        field: usize,
+        value: &str,
+    ) -> Option<Value> {
+        let name = self.fields.get(field)?.name?;
+        let mut position = 0;
+        let mut changed = false;
+        let elements = self
+            .entries(list)
+            .into_iter()
+            .map(|(mut element, row)| {
+                if row.is_none() {
+                    return element;
+                }
+                position += 1;
+                if position - 1 == index {
+                    if let Value::Object(object) = &mut element {
+                        object.insert(name.to_string(), Value::String(value.to_string()));
+                        changed = true;
+                    }
+                }
+                element
+            })
+            .collect();
+        changed.then_some(Value::Array(elements))
+    }
+
+    /// index 番目の行(items の並び)を offset だけ上(負)か下(正)の行と入れ替えた配列．
+    /// 表に出さない要素(除外設定の macOS のアプリ)は元の位置のまま残す．動かせなければ None
+    pub fn move_by(&self, list: Option<&Value>, index: usize, offset: isize) -> Option<Value> {
+        let mut elements = match list {
+            Some(Value::Array(elements)) => elements.clone(),
+            _ => return None,
+        };
+        // 表に出す行の，配列の中の位置
+        let shown: Vec<usize> = elements
+            .iter()
+            .enumerate()
+            .filter(|(_, element)| self.item(element).is_some())
+            .map(|(position, _)| position)
+            .collect();
+        let target = index.checked_add_signed(offset)?;
+        let (from, to) = (*shown.get(index)?, *shown.get(target)?);
+        elements.swap(from, to);
+        Some(Value::Array(elements))
     }
 
     /// 文字列の配列から text を除いた配列(exclusive_with の一覧に使う)
@@ -661,6 +771,118 @@ mod tests {
         // ほかの一覧は点を含む語も出す
         let words = json!(["node.js"]);
         assert_eq!(WORDS.items(Some(&words)), vec![texts(&["node.js"])]);
+    }
+
+    #[test]
+    fn コマンドは_id_で見分けて同じ位置のまま書き換える() {
+        const COMMAND_FIELDS: &[Field] = &[
+            Field::named("reading", "読み", false),
+            Field::named("title", "名前", false),
+        ];
+        const COMMANDS: ListSpec = ListSpec {
+            path: "commands",
+            fields: COMMAND_FIELDS,
+            ..RULES
+        };
+        // 同じ読みのコマンドが 2 つある
+        let list = json!([
+            {"id": "a", "reading": "めも", "title": "メモ帳", "isEnabled": false},
+            {"id": "b", "reading": "めも", "title": "ワードパッド"},
+        ]);
+        assert_eq!(COMMANDS.id_at(Some(&list), 1).as_deref(), Some("b"));
+        assert_eq!(COMMANDS.id_at(Some(&list), 2), None);
+        let edited = COMMANDS
+            .replace_id(Some(&list), "b", &texts(&["めも", "Word"]))
+            .expect("書き換えられる");
+        assert_eq!(
+            edited,
+            json!([
+                list[0].clone(),
+                {"id": "b", "reading": "めも", "title": "Word"},
+            ])
+        );
+        // 1 つ目は id も有効・無効も元のまま
+        let first = COMMANDS
+            .replace_id(Some(&list), "a", &texts(&["めもちょう", "メモ帳"]))
+            .expect("書き換えられる");
+        assert_eq!(
+            first[0],
+            json!({"id": "a", "reading": "めもちょう", "title": "メモ帳", "isEnabled": false})
+        );
+        assert_eq!(first[1], list[1]);
+        // 無い id は書き換えない
+        assert_eq!(
+            COMMANDS.replace_id(Some(&list), "z", &texts(&["x", "y"])),
+            None
+        );
+        // 見分ける欄が無いので，同じ読みのコマンドを足せる
+        let added = COMMANDS.upsert(Some(&list), &texts(&["めも", "ペイント"]));
+        assert_eq!(added.as_array().map(Vec::len), Some(3));
+    }
+
+    #[test]
+    fn 表の中の選ぶ欄はその行のその欄だけを書き換える() {
+        let list = json!([
+            {"applicationPrefix": "com.apple.Terminal", "profile": "terminal"},
+            {"applicationPrefix": "cmd.exe", "profile": "terminal", "extra": 1},
+            {"applicationPrefix": "code.exe", "profile": "programming"},
+        ]);
+        // 表の 0 行目は cmd.exe(macOS のアプリの行は数えない)
+        let changed = APPS
+            .set_field_at(Some(&list), 0, 1, "direct")
+            .expect("書き換えられる");
+        assert_eq!(
+            changed,
+            json!([
+                list[0].clone(),
+                {"applicationPrefix": "cmd.exe", "profile": "direct", "extra": 1},
+                list[2].clone(),
+            ])
+        );
+        // ほかの行と同じ組になっても位置を変えずに書く(macOS の Picker と同じ)
+        let same = APPS
+            .set_field_at(Some(&list), 1, 1, "terminal")
+            .expect("書き換えられる");
+        assert_eq!(same[2]["profile"], "terminal");
+        assert_eq!(same.as_array().map(Vec::len), Some(3));
+        assert_eq!(APPS.set_field_at(Some(&list), 2, 1, "direct"), None);
+        assert_eq!(APPS.set_field_at(Some(&list), 0, 5, "direct"), None);
+    }
+
+    #[test]
+    fn 選んだ行を上と下へ動かす() {
+        let list = json!([
+            {"applicationPrefix": "a.exe", "profile": "terminal"},
+            {"applicationPrefix": "com.apple.Terminal", "profile": "terminal"},
+            {"applicationPrefix": "b.exe", "profile": "direct"},
+            {"applicationPrefix": "c.exe", "profile": "imeOff"},
+        ]);
+        // 表の 1 行目(b.exe)を上へ．あいだの macOS のアプリの行は元の位置に残る
+        let up = APPS.move_by(Some(&list), 1, -1).expect("動かせる");
+        assert_eq!(
+            up,
+            json!([
+                list[2].clone(),
+                list[1].clone(),
+                list[0].clone(),
+                list[3].clone()
+            ])
+        );
+        assert_eq!(
+            APPS.items(Some(&up)),
+            vec![
+                texts(&["b.exe", "direct"]),
+                texts(&["a.exe", "terminal"]),
+                texts(&["c.exe", "imeOff"]),
+            ]
+        );
+        let down = APPS.move_by(Some(&list), 1, 1).expect("動かせる");
+        assert_eq!(down[2], list[3]);
+        assert_eq!(down[3], list[2]);
+        // 端からは動かせない
+        assert_eq!(APPS.move_by(Some(&list), 0, -1), None);
+        assert_eq!(APPS.move_by(Some(&list), 2, 1), None);
+        assert_eq!(APPS.move_by(None, 0, 1), None);
     }
 
     #[test]

@@ -343,6 +343,9 @@ pub enum Control {
     Acknowledgement(usize),
     /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
     KeymapReport,
+    /// 単語に書ける書き方の表(書き方・入るもの・今入れると)と，登録の例・付けられる名前・日時の書式の記号
+    /// (macOS の UserWordsView の TemplateReference)．高さは画面の側で測る
+    TemplateReference,
     /// キー設定のひな形を選んで読み込む
     Preset,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
@@ -355,8 +358,12 @@ pub enum Control {
     SyncFields(ListSpec),
     /// 取り込んだ辞書・連想の辞書の一覧．入力欄で選んだ辞書の名前などを変え，下のボタンで取り込む・並べ替える・切り替える・消す
     Dictionaries(DictionaryList, ListSpec),
-    /// カスタムテーマの一覧．選んだテーマを下の行で編集し，入力欄で名前を変え，下のボタンで作る・複製する・使う・消す
-    CustomThemes(ListSpec),
+    /// カスタムテーマの 1 つ(一覧の番号)．既成のテーマと同じく選ぶ印・見本の色・名前を並べ，読みにくければ印を付け，
+    /// 右のボタンで編集・複製・削除する(macOS の AppearancePage の CustomThemeRow)．
+    /// ページを作るときに上限の数だけ並べ(with_custom_theme_rows)，今あるテーマの数だけ出す
+    CustomTheme(usize),
+    /// 薄い字で出す知らせ(一覧が空のとき．macOS の secondary の Text)
+    Placeholder,
     /// 色を選ぶボタン(「#RRGGBB」の値．押すと色を選ぶ窓を出す)
     Color,
     /// 外観の見本(候補ウィンドウと同じ描き方の分岐図)
@@ -365,8 +372,11 @@ pub enum Control {
     PalettePreview,
     /// 絵文字の候補の見本(候補の窓と同じ描き方の一覧．絵文字の位置・数・名前は設定のとおり)
     EmojiPreview,
-    /// カスタムテーマの読みにくい組み合わせの知らせ．無ければ出さない
-    ThemeReport,
+    /// カスタムテーマの読みにくい組み合わせの 1 つ(知らせの番号)．注意の印と文を並べる．無ければ出さない
+    /// (macOS の CustomThemeEditor の Label)
+    ThemeIssue(usize),
+    /// 1 行の文字を打つ欄(カスタムテーマの名前．macOS の TextField)
+    TextField,
 }
 
 /// 試す欄で試すもの
@@ -432,16 +442,20 @@ pub enum Action {
     SyncNow,
     /// 新しいバージョンがあるかを確かめ，あれば尋ねてから入れる(R-19．押したときだけ通信する)
     CheckForUpdates,
+    /// 今のテーマを写したカスタムテーマを編集の画面で作る(macOS の AppearancePage の「カスタムテーマを作成…」)
+    CreateTheme,
+    /// 今のテーマを複製してカスタムテーマにし，それを使う
+    DuplicateCurrentTheme,
 }
 
 impl Action {
-    /// 消す・戻す操作か(ボタンを危険の色で描く．macOS の role: .destructive)
+    /// 消す・戻す操作か(ボタンを危険の色で描く．macOS の role: .destructive)．
+    /// パレットで使った文字の記録を消すボタンは，macOS と同じく普通のボタンにし，確かめる窓だけで知らせる
     pub fn is_destructive(self) -> bool {
         matches!(
             self,
             Action::ResetLearning
                 | Action::ResetUsage
-                | Action::ResetPaletteHistory
                 | Action::RestoreDefaults
                 | Action::RestoreKeymap
         )
@@ -517,14 +531,23 @@ pub struct ListButtons {
     pub filter: bool,
     /// 表の下の右に置く，一覧のファイルを読み込む・書き出すボタン(macOS の RuleListEditor の下の帯)
     pub files: Option<ListFiles>,
-    /// 先頭の 2 つの打つ欄のあいだに矢印を置く(打つもの → 置き換えるもの．macOS の RuleListEditor)
-    pub arrow: bool,
+    /// この番号の入力欄のあとに矢印を置く(打つもの → 置き換えるもの．macOS の RuleListEditor・判別ルールの前 → 結果)
+    pub arrow: Option<usize>,
     /// 先頭から決まった幅にする入力欄の幅(残りの欄で残りの幅を分ける．キー設定の状態とキー)
     pub field_widths: &'static [f32],
     /// 検索欄と絞り込みを入力欄の上の帯に置く(キー設定．macOS の KeymapPage の上の帯)
     pub toolbar: bool,
     /// 表の下のボタンのうち，右に寄せる末尾のボタンの数(キー設定の既定に戻す)
     pub trailing_bottom: usize,
+    /// 最後の入力欄を次の行に幅いっぱいで置く(ユーザー辞書のコメント．macOS の RuleListEditor の添え書きの欄)
+    pub note_line: bool,
+    /// 末尾から何個の欄を，入力欄の並びでなく表の下の帯の左(下のボタンの前)に置くか
+    /// (除外設定の動作．macOS の ExclusionsPage は足すアプリの動作を表の下で選ぶ)
+    pub bottom_fields: usize,
+    /// 欄を一覧の上に並べず，シートで書く(コマンド．macOS の CommandsPage の CommandEditor)
+    pub sheet: bool,
+    /// 表の下の「優先度を上げる」「優先度を下げる」を山形の絵のボタンにする(除外設定．macOS の chevron.up・chevron.down)
+    pub move_icons: bool,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -542,12 +565,9 @@ impl ListFiles {
         }
     }
 
-    /// ボタンの名前(除外設定は CSV と書く．macOS と同じ)
+    /// ボタンの名前
     pub fn labels(self) -> [&'static str; 2] {
-        match self.import {
-            FileTask::ImportProfileRules => [more::IMPORT_CSV, more::EXPORT_CSV],
-            _ => [settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY],
-        }
+        [settings::IMPORT_DICTIONARY, settings::EXPORT_DICTIONARY]
     }
 
     /// index 番目(0 は読み込む，1 は書き出す)のボタンの操作
@@ -561,6 +581,29 @@ impl ListFiles {
 }
 
 impl ListButtons {
+    /// 一覧の上に並べる欄の数(fields は一覧の欄の数)
+    pub fn top_fields(&self, fields: usize) -> usize {
+        if self.sheet {
+            0
+        } else {
+            fields.saturating_sub(self.bottom_fields)
+        }
+    }
+
+    /// 入力欄を作る欄の数(上に並べる欄と表の下に置く欄)
+    pub fn input_fields(&self, fields: usize) -> usize {
+        if self.sheet {
+            0
+        } else {
+            fields
+        }
+    }
+
+    /// 下のボタンを山形の絵にするか(名前は読み上げと説明の吹き出しに使う)
+    pub fn is_icon(&self, label: &str) -> bool {
+        self.move_icons && (label == dictionaries::MOVE_UP || label == dictionaries::MOVE_DOWN)
+    }
+
     /// 表の下のボタンの名前(ファイルのボタンを含む．部品を作る順)
     pub fn bottom_labels(&self) -> Vec<&'static str> {
         self.bottom
@@ -582,10 +625,6 @@ fn list_files(control: &Control) -> Option<ListFiles> {
             "wordLanguage.japaneseWords" => ListFiles::rule_list(RuleList::JapaneseWords),
             "englishTerms" => ListFiles::rule_list(RuleList::EnglishTerms),
             "hiddenPredictions" => ListFiles::rule_list(RuleList::HiddenPredictions),
-            "profileRules" => ListFiles {
-                import: FileTask::ImportProfileRules,
-                export: FileTask::ExportProfileRules,
-            },
             _ => return None,
         },
         Control::Dictionary(_) => ListFiles {
@@ -615,17 +654,31 @@ impl Control {
                 &[settings::ADD],
                 &[settings::REMOVE, keys::DUPLICATE, keys::RESTORE],
             ),
-            Control::List(spec, _) if spec.path == "profileRules" => {
-                (ADD_CANCEL, &[settings::REMOVE, more::ADD_APPS])
-            }
-            // コマンドは行き先のファイルやアプリを選べる(macOS の CommandsPage の選ぶボタン)
-            Control::List(spec, _) if spec.path == "commands" => {
-                (ADD_CANCEL, &[settings::REMOVE, windows::CHOOSE_TARGET])
-            }
+            // 除外設定は macOS の ExclusionsPage と同じく，表の下に [動作][アプリを追加…] … [∧][∨][削除] を置く．
+            // Windows は選ぶ窓に出ないアプリ(実行ファイルの名前の先頭)も書けるよう，上に名前の欄と追加を残す
+            Control::List(spec, _) if spec.path == PROFILE_RULES => (
+                &[settings::ADD],
+                &[
+                    more::ADD_APPS,
+                    dictionaries::MOVE_UP,
+                    dictionaries::MOVE_DOWN,
+                    settings::REMOVE,
+                ],
+            ),
+            // コマンドの表は読むだけで，足す・書き換えるはシートで行う(macOS の CommandsPage)
+            Control::List(spec, _) if spec.path == COMMANDS => (
+                &[],
+                &[
+                    extras::ADD_COMMAND,
+                    extras::EDIT_COMMAND,
+                    extras::REMOVE_COMMAND,
+                ],
+            ),
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
                 (ADD_CANCEL, &[settings::REMOVE])
             }
-            Control::SyncFields(_) => (&[windows::TOGGLE_SYNC_SCOPE], &[]),
+            // 項目ごとの同期は表の「同期する」の印で切り替える(macOS の項目ごとのスイッチ)
+            Control::SyncFields(_) => (&[], &[]),
             Control::Dictionaries(DictionaryList::Imported, _) => (
                 &[rule_list::UPDATE],
                 &[
@@ -635,16 +688,6 @@ impl Control {
                     dictionaries::MOVE_DOWN,
                     windows::TOGGLE_ENABLED,
                     settings::REMOVE,
-                ],
-            ),
-            Control::CustomThemes(_) => (
-                &[rule_list::UPDATE],
-                &[
-                    windows::CREATE_THEME,
-                    more::DUPLICATE,
-                    windows::USE_THEME,
-                    more::DUPLICATE_THEME,
-                    more::DELETE_THEME,
                 ],
             ),
             Control::Dictionaries(DictionaryList::Association, _) => (
@@ -660,22 +703,34 @@ impl Control {
             ),
             _ => return None,
         };
+        // 除外設定・コマンド・判別ルールは行が少なく，macOS と同じく検索欄を置かない
         let search = matches!(
             self,
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
+        ) && !matches!(
+            self,
+            Control::List(spec, _)
+                if spec.path == PROFILE_RULES
+                    || spec.path == COMMANDS
+                    || spec.path == "wordLanguage.rules"
         );
         let filter = matches!(self, Control::List(spec, _) if spec.path == "keymap");
-        // 打つもの → 置き換えるものの一覧(先頭の 2 つの欄がどちらも打つ欄)．コマンドの読みと名前は置き換えではない
-        let arrow = matches!(
+        // 打つもの → 置き換えるものの一覧(先頭の 2 つの欄がどちらも打つ欄)．コマンドの読みと名前は置き換えではない．
+        // 判別ルールは「前」と「結果」のあいだに置く
+        let replaces = matches!(
             self,
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..)
-        ) && !matches!(self, Control::List(spec, _) if spec.path == "commands")
+        ) && !matches!(self, Control::List(spec, _) if spec.path == COMMANDS)
             && self.list_spec().is_some_and(|spec| {
                 spec.fields.len() >= 2
                     && spec.fields[..2]
                         .iter()
                         .all(|field| field.choices.is_none() && !field.notation)
             });
+        let arrow = match self {
+            Control::List(spec, _) if spec.path == "wordLanguage.rules" => Some(1),
+            _ => replaces.then_some(0),
+        };
         // キー設定の新しい行は状態とキーを決まった幅にし，コマンドに残りを渡す(macOS の KeymapPage)
         const KEYMAP_FIELD_WIDTHS: &[f32] = &[
             tokens::size::settings::KEYMAP_STATE_WIDTH,
@@ -686,6 +741,9 @@ impl Control {
             _ => &[],
         };
         let keymap = matches!(self, Control::List(spec, _) if spec.path == "keymap");
+        let exclusions = matches!(self, Control::List(spec, _) if spec.path == PROFILE_RULES);
+        // 除外設定の下の帯は [動作][アプリを追加…] を左に，[∧][∨][削除] を右に寄せる
+        let trailing_bottom = if exclusions { 3 } else { usize::from(keymap) };
         Some(ListButtons {
             top,
             bottom,
@@ -695,8 +753,22 @@ impl Control {
             arrow,
             field_widths,
             toolbar: keymap,
-            trailing_bottom: usize::from(keymap),
+            trailing_bottom,
+            note_line: matches!(self, Control::Dictionary(_)),
+            bottom_fields: usize::from(exclusions),
+            sheet: matches!(self, Control::List(spec, _) if spec.path == COMMANDS),
+            move_icons: exclusions,
         })
+    }
+
+    /// 表の見出しを押して並べ替えられるか．除外設定は上の決まりから先に効くので，並びを変えて見せない
+    pub fn sortable(&self) -> bool {
+        !self.reorderable()
+    }
+
+    /// 表の下のボタンで選んだ行を上下に動かせる一覧か(除外設定)
+    pub fn reorderable(&self) -> bool {
+        matches!(self, Control::List(spec, _) if spec.path == PROFILE_RULES)
     }
 
     /// 一覧の入力欄の決まり．一覧でなければ None
@@ -706,8 +778,7 @@ impl Control {
             | Control::Dictionary(spec)
             | Control::Symbols(_, spec)
             | Control::SyncFields(spec)
-            | Control::Dictionaries(_, spec)
-            | Control::CustomThemes(spec) => Some(spec),
+            | Control::Dictionaries(_, spec) => Some(spec),
             _ => None,
         }
     }
@@ -766,13 +837,14 @@ impl Control {
                 enabled: Some(2),
             },
             // コマンド: 有効の印・読み・名前・動作・行き先(macOS の CommandsPage の列の幅)
-            Control::List(spec, _) if spec.path == "commands" => TableLayout {
+            Control::List(spec, _) if spec.path == COMMANDS => TableLayout {
                 columns: vec![
                     check(field_count),
                     column(0, Fixed(mac::COMMAND_READING_COLUMN_WIDTH), Cell::Text),
                     column(1, Fixed(mac::COMMAND_TITLE_COLUMN_WIDTH), Cell::Text),
                     column(2, Fixed(mac::COMMAND_KIND_COLUMN_WIDTH), Cell::Secondary),
-                    column(3, Fill, Cell::Text),
+                    // 行き先は長いパスや URL なので真ん中を省く(macOS の truncationMode(.middle))
+                    column(3, Fill, Cell::Path),
                 ],
                 enabled: Some(field_count),
             },
@@ -783,20 +855,28 @@ impl Control {
                     .collect(),
                 enabled: Some(field_count),
             },
-            // キー設定: 状態・キー・コマンド(macOS の KeymapPage)
+            // キー設定: 状態・キー・コマンドと，重なって使われない行などの印(macOS の KeymapPage)．
+            // 行は 状態・キー・コマンド・印・使われるかの印．使われない行は薄く出す
             Control::List(spec, _) if spec.path == "keymap" => TableLayout {
                 columns: vec![
                     column(0, Fixed(mac::KEYMAP_STATE_WIDTH), Cell::Text),
                     column(1, Fixed(mac::KEYMAP_KEY_WIDTH), Cell::Text),
                     column(2, Fill, Cell::Text),
+                    Column {
+                        title: "",
+                        source: 3,
+                        width: Fixed(mac::RULE_CHECK_COLUMN_WIDTH),
+                        cell: Cell::Mark,
+                        badge: None,
+                    },
                 ],
-                enabled: None,
+                enabled: Some(4),
             },
-            // 除外設定: アプリ・動作(macOS の ExclusionsPage は動作の列を決まった幅にする)
-            Control::List(spec, _) if spec.path == "profileRules" => TableLayout {
+            // 除外設定: アプリ(真ん中を省く)・動作(行の中で選び直してすぐ書く．macOS の ExclusionsPage の Picker)
+            Control::List(spec, _) if spec.path == PROFILE_RULES => TableLayout {
                 columns: vec![
-                    column(0, Fill, Cell::Text),
-                    column(1, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Text),
+                    column(0, Fill, Cell::Path),
+                    column(1, Fixed(mac::RULE_PROFILE_COLUMN_WIDTH), Cell::Choice),
                 ],
                 enabled: None,
             },
@@ -812,6 +892,31 @@ impl Control {
             },
             Control::List(..) => TableLayout {
                 columns: rules(field_count),
+                enabled: None,
+            },
+            // 項目ごとの同期: 同期するかの印・まとまり・項目(行は まとまり・項目・印)
+            Control::SyncFields(_) => TableLayout {
+                columns: vec![
+                    Column {
+                        title: crate::options::SYNC_SCOPES[0].1,
+                        width: Fixed(mac::RULE_KIND_COLUMN_WIDTH),
+                        ..check(2)
+                    },
+                    Column {
+                        title: windows::SYNC_GROUP,
+                        source: 0,
+                        width: Fixed(mac::RULE_KEY_COLUMN_WIDTH),
+                        cell: Cell::Secondary,
+                        badge: None,
+                    },
+                    Column {
+                        title: windows::SYNC_FIELD,
+                        source: 1,
+                        width: Fill,
+                        cell: Cell::Text,
+                        badge: None,
+                    },
+                ],
                 enabled: None,
             },
             _ => TableLayout {
@@ -852,7 +957,6 @@ impl Control {
                 windows::DICTIONARY_SUMMARY,
                 windows::SYMBOL_STATE,
             ],
-            Control::CustomThemes(_) => vec![more::THEME_NAME, windows::SYMBOL_STATE],
             _ => fields().collect(),
         }
     }
@@ -879,6 +983,22 @@ pub enum Cell {
     Secondary,
     /// 有効の印(値が空でなければ印を付ける．押すと有効・無効を切り替える)
     Check,
+    /// 長いパスや URL．収まらなければ真ん中を「…」にする(macOS の truncationMode(.middle))
+    Path,
+    /// 行の中で選び直せる選択肢(値は選択肢の名前．押すと一覧を開き，選んだらすぐ書く)
+    Choice,
+    /// 行の問題の印(キー設定の重なり．値は KeymapMark の文字)
+    Mark,
+}
+
+/// キー設定の行の印(macOS の KeymapPage の mark(for:))．表の行の値に入れる
+pub mod keymap_mark {
+    /// 同じキーの行があるため使われない(塗った警告の印)
+    pub const HIDDEN: &str = "hidden";
+    /// 一部の状態では別の行が使われる(情報の印)
+    pub const PARTLY: &str = "partly";
+    /// 文字を打てなくなる(線の警告の印)
+    pub const BLOCKS: &str = "blocks";
 }
 
 /// 表の 1 列
@@ -904,7 +1024,7 @@ impl TableLayout {
     /// 名前の無い列(行の値にあって入力欄に無い列)に名前を付ける
     fn with_titles(mut self, fallback: &'static str) -> Self {
         for column in &mut self.columns {
-            if column.title.is_empty() && column.cell != Cell::Check {
+            if column.title.is_empty() && !matches!(column.cell, Cell::Check | Cell::Mark) {
                 column.title = fallback;
             }
         }
@@ -1054,6 +1174,8 @@ pub struct Row {
     pub enabled: Option<Condition>,
     /// 満たさないときは出さない
     pub visible: Option<Condition>,
+    /// 注記を危険の色(赤)で出す(同期の失敗．macOS は赤い文字)
+    pub danger: bool,
     /// 値を変えたときに一緒に空(null)にする項目(テーマを選んだらカスタムテーマを外す)
     pub clears: Option<&'static str>,
     /// 名前の横に札の形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
@@ -1119,7 +1241,14 @@ impl Row {
             visible: None,
             clears: None,
             example: None,
+            danger: false,
         }
+    }
+
+    /// 注記を危険の色(赤)で出す
+    pub fn danger(mut self) -> Self {
+        self.danger = true;
+        self
     }
 
     pub fn with_example(mut self, example: (&'static str, &'static str)) -> Self {
@@ -1564,18 +1693,21 @@ const WORD_FIELDS: &[Field] = &[Field::text(features::WORD_PLACEHOLDER)];
 const ENGLISH_TERM_FIELDS: &[Field] = &[Field::text(extras::ENGLISH_TERM_PLACEHOLDER)];
 const LANGUAGE_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::LANGUAGE_RULE_WORD, true),
+    // macOS の WordLanguagePage と同じく，新しい決まりは「前: 日本語 → 日本語」から始める
     Field::choice(
         "context",
         features::LANGUAGE_RULE_CONTEXT,
         options::WORD_CONTEXTS,
         true,
-    ),
+    )
+    .default_choice(2),
     Field::choice(
         "language",
         features::LANGUAGE_RULE_RESULT,
         options::WORD_LANGUAGES,
         false,
-    ),
+    )
+    .default_choice(1),
 ];
 
 /// 日本語のタイプミスを直すとき．修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く
@@ -1791,9 +1923,22 @@ fn keymap() -> Vec<Section> {
 }
 
 const APP_FIELDS: &[Field] = &[
-    Field::named("applicationPrefix", more::APPS, true),
+    // 表の見出しは macOS と同じ「アプリ」．Windows は実行ファイルの名前で見分けるので，打つ欄はそれを案内する
+    Field::named("applicationPrefix", more::APPS, true)
+        .prompt(crate::strings::windows::APP_EXECUTABLE_PROMPT),
     // 同じアプリに入力の扱いとモードの扱い(IME をオフなど)を 1 つずつ付けられるよう，動作も行を見分ける欄にする
     Field::choice("profile", more::BEHAVIOR, options::APP_PROFILES, true),
+];
+
+/// 除外設定の一覧の項目
+pub const PROFILE_RULES: &str = "profileRules";
+/// コマンドの一覧の項目
+pub const COMMANDS: &str = "commands";
+
+/// 除外設定の CSV を読み込む・書き出すボタン
+const EXCLUSION_FILES: &[(&str, Action)] = &[
+    (more::IMPORT_CSV, Action::File(FileTask::ImportProfileRules)),
+    (more::EXPORT_CSV, Action::File(FileTask::ExportProfileRules)),
 ];
 
 /// 除外設定のページ(macOS の ExclusionsPage)．アプリは実行ファイルの名前(小文字)で見分ける
@@ -1803,7 +1948,7 @@ fn apps() -> Vec<Section> {
             title: None,
             rows: vec![Row::list(
                 ListSpec {
-                    path: "profileRules",
+                    path: PROFILE_RULES,
                     fields: APP_FIELDS,
                     empty: more::EXCLUSIONS_EMPTY,
                     invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
@@ -1815,6 +1960,8 @@ fn apps() -> Vec<Section> {
             footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
             footer_variants: &[],
         },
+        // CSV の読み込みと書き出しは一覧の下の別のカードに置く(macOS の ExclusionsPage)
+        Section::untitled(vec![Row::new("", "", Control::Buttons(EXCLUSION_FILES))]),
         Section::untitled(vec![
             Row::toggle(more::TERMINAL_COMMANDS, "terminalCommands"),
             Row::toggle(
@@ -1838,14 +1985,17 @@ const DICTIONARY_FIELDS: &[Field] = &[
         options::WORD_CLASSES,
         false,
     ),
-    Field::named("comment", settings::COMMENT, false).optional(),
+    Field::named("comment", settings::COMMENT, false)
+        .optional()
+        .prompt(settings::COMMENT_PROMPT),
 ];
 
 /// ユーザー辞書の注記に入れ替えて出す文(品詞の欄で選んでいる値と文)
 const DICTIONARY_NOTES: &[(&str, &str)] = &[("abbreviation", settings::ABBREVIATION_NOTE)];
 
 const COMMAND_FIELDS: &[Field] = &[
-    Field::named("reading", extras::COMMAND_READING, true),
+    // 同じ読みのコマンドをいくつも足せる(macOS と同じ)．書き換えるコマンドは id で見分ける
+    Field::named("reading", extras::COMMAND_READING, false),
     Field::named("title", extras::COMMAND_TITLE, false),
     Field::choice("kind", extras::COMMAND_KIND, options::COMMAND_KINDS, false),
     Field::named("target", extras::COMMAND_TARGET, false),
@@ -1865,7 +2015,7 @@ fn commands() -> Vec<Section> {
                 Row::toggle(extras::LAUNCHER_COMMANDS, "launcherCommands"),
                 Row::list(
                     ListSpec {
-                        path: "commands",
+                        path: COMMANDS,
                         fields: COMMAND_FIELDS,
                         empty: extras::COMMANDS_EMPTY,
                         invalid: crate::strings::Text::Fixed(extras::INVALID_COMMAND),
@@ -1926,15 +2076,14 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // 書き方を 1 つずつ注記の行にして並べる(macOS の書き方の表と同じ中身)
-            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
-                .chain(
-                    crate::strings::windows::TEMPLATE_ROWS
-                        .iter()
-                        .map(|text| Row::note(text)),
-                )
-                .map(|row| row.visible_when(words()))
-                .collect(),
+            // macOS の UserWordsView と同じく，切り替えと書き方の表(書き方・入るもの・今入れると)を 1 枚のカードに並べる
+            rows: vec![
+                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"),
+                Row::new("", "", Control::TemplateReference),
+            ]
+            .into_iter()
+            .map(|row| row.visible_when(words()))
+            .collect(),
             footer: None,
             footer_variants: &[],
         },
@@ -2180,22 +2329,37 @@ fn romaji() -> Vec<Section> {
     ))]
 }
 
-const THEME_FIELDS: &[Field] = &[Field::named("name", more::THEME_NAME, false)];
+/// カスタムテーマの一覧の下のボタン(macOS の AppearancePage の HStack)
+const THEME_BUTTONS: &[(&str, Action)] = &[
+    (more::CREATE_THEME, Action::CreateTheme),
+    (more::DUPLICATE, Action::DuplicateCurrentTheme),
+];
 
-/// 外観のページ(macOS の AppearancePage と CustomThemeEditor)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
-/// カスタムテーマは一覧で選んだものを下の行で編集する(値は crate::themes の「customTheme.」の道筋)
+/// カスタムテーマの行(Control::CustomTheme(0))を上限 limit の数だけ並べる．出すのは今あるテーマの数だけ(画面の側で決める)
+pub fn with_custom_theme_rows(mut sections: Vec<Section>, limit: usize) -> Vec<Section> {
+    for section in &mut sections {
+        let Some(position) = section
+            .rows
+            .iter()
+            .position(|row| row.control == Control::CustomTheme(0))
+        else {
+            continue;
+        };
+        let template = section.rows[position].clone();
+        let rows = (1..limit).map(|index| Row {
+            control: Control::CustomTheme(index),
+            ..template.clone()
+        });
+        section.rows.splice(position + 1..position + 1, rows);
+    }
+    sections
+}
+
+/// 外観のページ(macOS の AppearancePage)．既成のテーマを選ぶとカスタムテーマを外す(macOS の selectTheme と同じ)．
+/// カスタムテーマは行の右のボタンや一覧の下のボタンで編集の画面(theme_editor)を開いて作る・直す
 fn appearance() -> Vec<Section> {
     use crate::themes;
     use Condition::*;
-    let editing = || IsNot(themes::ID, "");
-    // 読みにくい組み合わせの知らせは色の上に出す(macOS の CustomThemeEditor と同じ)
-    let mut colors = vec![Row::new(more::READABILITY, "", Control::ThemeReport)
-        .visible_when(IsNot(themes::READABILITY, ""))];
-    colors.extend(
-        themes::COLORS
-            .iter()
-            .map(|(path, title)| Row::new(title, path, Control::Color).visible_when(editing())),
-    );
     let theme_rows = options::THEMES
         .iter()
         .map(|(value, name)| {
@@ -2207,47 +2371,12 @@ fn appearance() -> Vec<Section> {
         Section::new(more::THEME, theme_rows),
         Section::new(
             more::CUSTOM_THEMES,
-            vec![Row::new(
-                "",
-                "",
-                Control::CustomThemes(ListSpec {
-                    path: "customThemes",
-                    fields: THEME_FIELDS,
-                    empty: more::NO_CUSTOM_THEMES,
-                    invalid: crate::strings::Text::Fixed(more::INVALID_THEME),
-                    lowercase: false,
-                    exclusive_with: None,
-                }),
-            )],
-        ),
-        Section::new(more::COLORS, colors),
-        Section::new(
-            more::SHAPE,
             vec![
-                Row::slider(
-                    more::CORNER_RADIUS,
-                    themes::CORNER_RADIUS,
-                    RangeKind::CustomThemeCornerRadius,
-                )
-                .visible_when(editing()),
-                Row::choice(
-                    more::BRANCH_STYLE,
-                    themes::BRANCH_STYLE,
-                    options::BRANCH_STYLES,
-                )
-                .visible_when(editing()),
-                Row::new(
-                    more::FONT,
-                    themes::FONT_NAME,
-                    Control::ThemeFont(FontPart::Family),
-                )
-                .visible_when(editing()),
-                Row::new(
-                    more::FONT_STYLE,
-                    themes::FONT_NAME,
-                    Control::ThemeFont(FontPart::Style),
-                )
-                .visible_when(editing()),
+                Row::new(more::NO_CUSTOM_THEMES, "", Control::Placeholder)
+                    .visible_when(On(themes::EMPTY)),
+                Row::new("", "", Control::CustomTheme(0)),
+                // 上限まで作ったら作れない(macOS と同じくボタンを使えなくする)
+                Row::new("", "", Control::Buttons(THEME_BUTTONS)).enabled_when(On(themes::ROOM)),
             ],
         ),
         Section::new(
@@ -2257,6 +2386,55 @@ fn appearance() -> Vec<Section> {
                 "candidateFontSize",
                 RangeKind::CandidateFontSize,
             )],
+        ),
+    ]
+}
+
+/// カスタムテーマを編集する画面(macOS の CustomThemeEditor)．名前・読みやすさ・色・形を並べる．
+/// 値は編集している下書きの「customTheme.」の道筋(crate::themes)で，「保存」を押すまで設定のファイルに書かない．
+/// 見本は画面の上に留め，ボタン(複製・キャンセル・保存)は下に留めて描く(app::window)
+pub fn theme_editor() -> Vec<Section> {
+    use crate::themes;
+    let issues = (0..themes::CONTRAST_PAIRS)
+        .map(|index| Row::new("", "", Control::ThemeIssue(index)))
+        .collect();
+    let colors = themes::COLORS
+        .iter()
+        .map(|(path, title)| Row::new(title, path, Control::Color))
+        .collect();
+    vec![
+        Section::untitled(vec![Row::new(
+            more::THEME_NAME,
+            themes::NAME,
+            Control::TextField,
+        )]),
+        // 読みにくい組み合わせが無ければ，見出しごと出さない(macOS と同じ)
+        Section::new(more::READABILITY, issues),
+        Section::new(more::COLORS, colors),
+        Section::new(
+            more::SHAPE,
+            vec![
+                Row::slider(
+                    more::CORNER_RADIUS,
+                    themes::CORNER_RADIUS,
+                    RangeKind::CustomThemeCornerRadius,
+                ),
+                Row::choice(
+                    more::BRANCH_STYLE,
+                    themes::BRANCH_STYLE,
+                    options::BRANCH_STYLES,
+                ),
+                Row::new(
+                    more::FONT,
+                    themes::FONT_NAME,
+                    Control::ThemeFont(FontPart::Family),
+                ),
+                Row::new(
+                    more::FONT_STYLE,
+                    themes::FONT_NAME,
+                    Control::ThemeFont(FontPart::Style),
+                ),
+            ],
         ),
     ]
 }
@@ -2326,9 +2504,12 @@ fn sync_page() -> Vec<Section> {
                     Control::InfoAction(Info::LastSynced, Action::SyncNow, sync::SYNC_NOW),
                 )
                 .enabled_when(On(crate::sync::ENABLED)),
+                // 同期できなかった知らせは赤い文字で出す(macOS の SyncPage)
                 Row::note(sync::FAILED)
+                    .danger()
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_FAILED)),
                 Row::note(sync::UNREADABLE)
+                    .danger()
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_UNREADABLE)),
             ],
             footer: Some(crate::strings::windows::SYNC_NOTE),
@@ -2677,9 +2858,63 @@ mod tests {
                 settings::EXPORT_DICTIONARY
             ]
         );
-        let apps = &sections(Page::Apps).unwrap()[0].rows;
-        let labels = apps[0].control.list_buttons().unwrap().bottom_labels();
-        assert!(labels.contains(&more::IMPORT_CSV));
+    }
+
+    #[test]
+    fn 除外設定は_macos_と同じく表の下に動作と並べ替えを置き_csv_は別のカードにする() {
+        let page = sections(Page::Apps).unwrap();
+        let list = &page[0].rows[0].control;
+        let buttons = list.list_buttons().unwrap();
+        // [動作][アプリを追加…] … [∧][∨][削除]
+        assert_eq!(
+            buttons.bottom,
+            &[
+                more::ADD_APPS,
+                dictionaries::MOVE_UP,
+                dictionaries::MOVE_DOWN,
+                settings::REMOVE
+            ]
+        );
+        assert_eq!(buttons.trailing_bottom, 3);
+        assert_eq!(buttons.bottom_fields, 1);
+        assert_eq!(buttons.top_fields(2), 1);
+        assert!(buttons.is_icon(dictionaries::MOVE_UP));
+        assert!(!buttons.is_icon(more::ADD_APPS));
+        assert!(buttons.files.is_none() && !buttons.search);
+        // 上の決まりから先に効くので，見出しで並べ替えず，行を動かす
+        assert!(list.reorderable() && !list.sortable());
+        let layout = list.table_layout();
+        assert_eq!(layout.columns[0].cell, Cell::Path);
+        assert_eq!(layout.columns[1].cell, Cell::Choice);
+        // CSV は一覧の下の別のカード
+        assert_eq!(page[1].rows[0].control, Control::Buttons(EXCLUSION_FILES));
+    }
+
+    #[test]
+    fn コマンドは表を読むだけにし_足す_書き換える_消すを表の下に置く() {
+        let page = sections(Page::Commands).unwrap();
+        let list = &page[0].rows[1].control;
+        let buttons = list.list_buttons().unwrap();
+        assert!(buttons.sheet);
+        assert_eq!(buttons.top, &[] as &[&str]);
+        assert_eq!(buttons.top_fields(4), 0);
+        assert_eq!(buttons.input_fields(4), 0);
+        assert_eq!(
+            buttons.bottom,
+            &[
+                extras::ADD_COMMAND,
+                extras::EDIT_COMMAND,
+                extras::REMOVE_COMMAND
+            ]
+        );
+        // 同じ読みのコマンドをいくつも足せる(見分ける欄が無い)
+        assert!(list
+            .list_spec()
+            .unwrap()
+            .fields
+            .iter()
+            .all(|field| !field.key));
+        assert!(list.sortable());
     }
 
     #[test]
@@ -2688,5 +2923,34 @@ mod tests {
         let titles: Vec<_> = page.iter().map(|section| section.title).collect();
         assert_eq!(titles, vec![Some("入力方式"), Some("文字"), Some("動作")]);
         assert_eq!(page[1].rows.len(), 12);
+    }
+
+    #[test]
+    fn カスタムテーマの行は上限の数だけ並べる() {
+        let page = with_custom_theme_rows(sections(Page::Appearance).unwrap(), 3);
+        let rows: Vec<&Control> = page
+            .iter()
+            .flat_map(|section| &section.rows)
+            .map(|row| &row.control)
+            .filter(|control| matches!(control, Control::CustomTheme(_)))
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                &Control::CustomTheme(0),
+                &Control::CustomTheme(1),
+                &Control::CustomTheme(2)
+            ]
+        );
+        // 空のときの知らせ・行・作るボタンの順(macOS の AppearancePage と同じ)
+        let custom = page
+            .iter()
+            .find(|section| section.title == Some(more::CUSTOM_THEMES))
+            .unwrap();
+        assert_eq!(custom.rows.first().unwrap().control, Control::Placeholder);
+        assert!(matches!(
+            custom.rows.last().unwrap().control,
+            Control::Buttons(_)
+        ));
     }
 }

@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 
 pub mod catalog;
+pub mod commands;
 pub mod demo;
 pub mod dictionaries;
 pub mod engine;

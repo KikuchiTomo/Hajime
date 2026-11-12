@@ -7,8 +7,9 @@
 use crate::engine::Engine;
 use crate::store::Fields;
 use ipc::{
-    DictionaryAddResult, DictionaryEntry, KeymapReport, PreviewWord, RequestBody, ResponseBody,
-    SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult, SyncGroupState, SyncStatus, WordClass,
+    ContrastIssue, ContrastPair, DictionaryAddResult, DictionaryEntry, KeymapReport, PreviewWord,
+    RequestBody, ResponseBody, SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult,
+    SyncGroupState, SyncStatus, WordClass,
 };
 use serde_json::Value;
 use std::sync::Mutex;
@@ -130,15 +131,18 @@ impl Engine for SampleEngine {
             RequestBody::ReadKeymapPreset { .. } => {
                 fields(&pick(&state.defaults, &["keymap".to_string()]))
             }
-            RequestBody::CheckKeymap { .. } => ResponseBody::KeymapReport {
+            // 見本でも，同じ状態・同じキーの行は下の行が使われ，上の行は使われない(画面で行の印を確かめるため)
+            RequestBody::CheckKeymap { values } => ResponseBody::KeymapReport {
                 report: KeymapReport {
-                    rows: Vec::new(),
+                    rows: hidden_rows(&values),
                     missing: Vec::new(),
                 },
             },
-            RequestBody::CheckCustomTheme { .. } => {
-                ResponseBody::ThemeReport { issues: Vec::new() }
-            }
+            RequestBody::CheckCustomTheme { theme } => ResponseBody::ThemeReport {
+                issues: serde_json::from_str(&theme)
+                    .map(|theme| contrast_issues(&theme))
+                    .unwrap_or_default(),
+            },
             RequestBody::ReadUsage => ResponseBody::Usage {
                 values: serde_json::to_string(&state.usage).unwrap_or_default(),
                 first_candidate_rate: state.first_candidate_rate,
@@ -311,11 +315,93 @@ impl Engine for SampleEngine {
     }
 }
 
+/// カスタムテーマの読みにくい組み合わせ(core の CustomTheme.lowContrastPairs を写したもの．見本の画面で印を確かめる)
+fn contrast_issues(theme: &Value) -> Vec<ContrastIssue> {
+    /// DefaultSettings.minimumTextContrast と minimumMarkContrast
+    const TEXT: f64 = 4.5;
+    const MARK: f64 = 3.0;
+    let luminance = |name: &str| {
+        let (red, green, blue) = crate::themes::rgb(theme.get(name)?.as_str()?)?;
+        let linear = |channel: u8| {
+            let value = f64::from(channel) / 255.0;
+            if value <= 0.04045 {
+                value / 12.92
+            } else {
+                ((value + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        Some(0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue))
+    };
+    let ratio = |front: &str, back: &str| {
+        let (a, b) = (luminance(front)?, luminance(back)?);
+        Some((a.max(b) + 0.05) / (a.min(b) + 0.05))
+    };
+    [
+        (ContrastPair::Text, "text", "surface", TEXT),
+        (ContrastPair::TextMuted, "textMuted", "surface", TEXT),
+        (
+            ContrastPair::SelectionText,
+            "selectionText",
+            "selection",
+            TEXT,
+        ),
+        (ContrastPair::Correction, "correction", "surface", MARK),
+    ]
+    .into_iter()
+    .filter_map(|(pair, front, back, minimum)| {
+        let ratio = ratio(front, back)?;
+        (ratio < minimum).then_some(ContrastIssue {
+            pair,
+            ratio,
+            minimum,
+        })
+    })
+    .collect()
+}
+
 fn symbols(state: &mut State, kind: SymbolKind) -> &mut Vec<SymbolItem> {
     match kind {
         SymbolKind::Sequence => &mut state.sequences,
         SymbolKind::Reading => &mut state.readings,
     }
+}
+
+/// 同じ状態・同じキーの行のうち，下に同じ行がある行(使われない行)
+fn hidden_rows(values: &str) -> Vec<ipc::KeymapRowIssue> {
+    let keymap: Vec<(String, String)> = serde_json::from_str::<Fields>(values)
+        .ok()
+        .and_then(|fields| fields.get("keymap").and_then(Value::as_array).cloned())
+        .unwrap_or_default()
+        .iter()
+        .map(|row| {
+            let text = |name: &str| {
+                row.get(name)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string()
+            };
+            (text("state"), text("key"))
+        })
+        .collect();
+    keymap
+        .iter()
+        .enumerate()
+        .filter_map(|(index, row)| {
+            let winners: Vec<u32> = keymap
+                .iter()
+                .enumerate()
+                .skip(index + 1)
+                .filter(|(_, other)| *other == row)
+                .filter_map(|(winner, _)| u32::try_from(winner).ok())
+                .collect();
+            (!winners.is_empty()).then(|| ipc::KeymapRowIssue {
+                row: u32::try_from(index).unwrap_or(u32::MAX),
+                hidden_by: winners,
+                hidden_states: Vec::new(),
+                blocks_typing: false,
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -355,5 +441,35 @@ mod tests {
             .read_symbol_items(SymbolKind::Reading)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn 見本のエンジンも読みにくいカスタムテーマを知らせる() {
+        let store = EngineStore::new(SampleEngine::new());
+        let theme = serde_json::json!({
+            "surface": "#FFFFFF", "text": "#000000", "textMuted": "#B0B0B0",
+            "selection": "#0A84FF", "selectionText": "#FFFFFF", "correction": "#FF2D55", "line": "#CCCCCC"
+        });
+        let issues = store.check_custom_theme(&theme).unwrap();
+        let pairs: Vec<ContrastPair> = issues.iter().map(|issue| issue.pair).collect();
+        assert_eq!(
+            pairs,
+            vec![ContrastPair::TextMuted, ContrastPair::SelectionText]
+        );
+        assert!(issues[0].ratio < issues[0].minimum);
+    }
+
+    #[test]
+    fn 同じ状態と同じキーの上の行は使われない() {
+        let values = serde_json::json!({"keymap": [
+            {"state": "idle", "key": "Ctrl k", "command": "a"},
+            {"state": "composing", "key": "Ctrl k", "command": "b"},
+            {"state": "idle", "key": "Ctrl k", "command": "c"},
+        ]})
+        .to_string();
+        let rows = super::hidden_rows(&values);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].row, 0);
+        assert_eq!(rows[0].hidden_by, vec![2]);
     }
 }

@@ -59,6 +59,9 @@ pub struct Glyphs {
     pub chevron_right: &'static str,
     /// 一覧の入力欄の間の矢印(打つもの → 置き換えるもの)
     pub arrow_right: &'static str,
+    /// 情報の印と，線の警告の印(キー設定の行の印)
+    pub info: &'static str,
+    pub warning_outline: &'static str,
     pub check: &'static str,
     pub undo: &'static str,
     pub search: &'static str,
@@ -66,6 +69,10 @@ pub struct Glyphs {
     /// 数を 1 段ずつ変えるボタン(減らす・増やす)
     pub minus: &'static str,
     pub plus: &'static str,
+    /// カスタムテーマの行の編集・複製・削除のボタン(macOS の pencil・plus.square.on.square・trash)
+    pub edit: &'static str,
+    pub copy: &'static str,
+    pub delete: &'static str,
 }
 
 pub const GLYPHS: Glyphs = Glyphs {
@@ -73,12 +80,17 @@ pub const GLYPHS: Glyphs = Glyphs {
     chevron_up: "\u{E70E}",
     chevron_right: "\u{E76C}",
     arrow_right: "\u{E72A}",
+    info: "\u{E946}",
+    warning_outline: "\u{E814}",
     check: "\u{E73E}",
     undo: "\u{E7A7}",
     search: "\u{E721}",
     warning: "\u{E7BA}",
     minus: "\u{E738}",
     plus: "\u{E710}",
+    edit: "\u{E70F}",
+    copy: "\u{E8C8}",
+    delete: "\u{E74D}",
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -189,6 +201,8 @@ fn system_palette() -> SettingsPalette {
         nav_pressed: window,
         nav_selected: highlight,
         scrollbar: text,
+        // シートの後ろは窓の地の色で薄める(高コントラストでは黒を重ねない)
+        smoke: window,
         switch_off: gray,
         text,
         text_disabled: gray,

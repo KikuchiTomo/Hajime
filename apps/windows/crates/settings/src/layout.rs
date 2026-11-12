@@ -6,7 +6,7 @@
 //! 注記は前の行のカードの中に，名前の下の説明として入れる．窓が狭く名前の欄が足りないときは，部品を名前の下に置く
 
 use crate::pages::{Control, ListButtons, Row, Section, TryKind};
-use crate::strings::{keys, more};
+use crate::strings::more;
 use tokens::size::settings as size_settings;
 use tokens::size::settings_windows as size;
 use tokens::size::space;
@@ -51,7 +51,8 @@ pub trait Metrics {
     fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize;
     /// 1 行にしたときの幅
     fn width(&self, text: &str, kind: TextKind) -> f32;
-    /// 中身で高さの変わるカード(謝辞)と見本(絵文字の候補の見本は部品の高さ)の高さ．width はカードの幅．None なら決まった高さ
+    /// 中身で高さの変わるカード(謝辞)の高さ．width はカードの幅．None なら決まった高さ．
+    /// 見本の行(ThemePreview など)は見本を描く高さで，width は見本を置ける幅(余白を除く)
     fn height(&self, _row: &Row, _width: f32) -> Option<f32> {
         None
     }
@@ -91,6 +92,15 @@ pub struct PageLayout {
     pub height: f32,
 }
 
+/// 選択肢のいちばん長い名前が収まるドロップダウンの幅(名前・山形の印と，その左右の余白．paint::dropdown と同じ並び)
+fn dropdown_width(choices: &[crate::options::Choice], metrics: &dyn Metrics) -> f32 {
+    let widest = choices
+        .iter()
+        .map(|(_, label)| metrics.width(label, TextKind::Body))
+        .fold(0.0, f32::max);
+    (widest + size::FIELD_PADDING_X * 2.0 + size::FIELD_PADDING_X + size::CHEVRON_SIZE).ceil()
+}
+
 /// ボタンの幅．名前を測った幅に左右の余白を足し，下限より狭くしない
 pub fn button_width(label: &str, metrics: &dyn Metrics) -> f32 {
     (metrics.width(label, TextKind::Body) + size::BUTTON_PADDING_X * 2.0)
@@ -103,9 +113,7 @@ fn trailing_width(control: &Control, metrics: &dyn Metrics) -> f32 {
     match control {
         Control::Toggle => size::TOGGLE_WIDTH,
         Control::Stepper(_) => size::STEPPER_WIDTH,
-        Control::Preset => {
-            size::CONTROL_WIDTH + size::CONTROL_GAP + button_width(keys::LOAD, metrics)
-        }
+        Control::Preset => size::CONTROL_WIDTH,
         Control::LabeledAction(_, label) => button_width(label, metrics),
         Control::InfoAction(_, _, label) => {
             size::CONTROL_WIDTH + size::CONTROL_GAP + button_width(label, metrics)
@@ -268,24 +276,43 @@ fn place(
 ) -> CardLayout {
     let control = &row.control;
     if let Some(buttons) = control.list_buttons() {
-        let fields = control.list_spec().map_or(0, |spec| spec.fields.len());
+        let spec_fields = control.list_spec().map_or(&[][..], |spec| spec.fields);
+        let fields = buttons.top_fields(spec_fields.len());
+        // 表の下の帯に置く欄(選ぶ欄)は，いちばん長い選択肢が収まる幅にする
+        let bottom_fields: Vec<f32> = spec_fields[fields..buttons.input_fields(spec_fields.len())]
+            .iter()
+            .map(|field| dropdown_width(field.choices.unwrap_or(&[]), metrics))
+            .collect();
         // キー設定は行が多いので表を高くする
         let height = match control {
             Control::List(spec, _) if spec.path == "keymap" => size::KEYMAP_LIST_HEIGHT,
             _ => size::LIST_HEIGHT,
         };
-        return place_inputs(position, fields, buttons, frame, height, metrics);
+        return place_list(
+            position,
+            (fields, &bottom_fields),
+            buttons,
+            frame,
+            height,
+            metrics,
+        );
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
-        Control::Preview(TryKind::Language) => place_inputs(
-            position,
-            2,
-            PREVIEW_BUTTONS,
-            frame,
-            size::BODY_LINE_HEIGHT * size::PREVIEW_LINES,
-            metrics,
-        ),
+        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果の札(2 行の札)を置く
+        Control::Preview(TryKind::Language) => {
+            let chip = size::BODY_LINE_HEIGHT
+                + size::NOTE_LINE_HEIGHT
+                + tokens::size::settings::PREVIEW_CHIP_PADDING_Y * 2.0;
+            place_stacked_inputs(
+                position,
+                2,
+                PREVIEW_BUTTONS,
+                frame,
+                chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_CHIP_GAP,
+                metrics,
+            )
+        }
         Control::Preview(TryKind::Macros) => place_inputs(
             position,
             2,
@@ -294,7 +321,7 @@ fn place(
             size::BODY_LINE_HEIGHT * size::MACRO_PREVIEW_LINES,
             metrics,
         ),
-        Control::KeymapReport | Control::ThemeReport => place_inputs(
+        Control::KeymapReport => place_inputs(
             position,
             0,
             NO_BUTTONS,
@@ -302,35 +329,11 @@ fn place(
             size::BODY_LINE_HEIGHT * size::REPORT_LINES,
             metrics,
         ),
-        Control::ThemePreview => place_inputs(
-            position,
-            0,
-            NO_BUTTONS,
-            frame,
-            size::PREVIEW_HEIGHT,
-            metrics,
-        ),
-        Control::PalettePreview => place_inputs(
-            position,
-            0,
-            NO_BUTTONS,
-            frame,
-            size::PALETTE_PREVIEW_HEIGHT,
-            metrics,
-        ),
-        // 絵文字の見本は描いた高さ(窓が測る)で置く．測る前は決まった高さ
-        Control::EmojiPreview => place_inputs(
-            position,
-            0,
-            NO_BUTTONS,
-            frame,
-            metrics
-                .height(row, frame.width)
-                .unwrap_or(size::EMOJI_PREVIEW_HEIGHT),
-            metrics,
-        ),
-        // 謝辞は中身(名前・出どころ・ライセンスの全文)を画面の側で測って置く．部品の欄はカードの中の全体
-        Control::Acknowledgement(_) => {
+        Control::ThemePreview | Control::PalettePreview | Control::EmojiPreview => {
+            place_preview(position, row, frame, metrics)
+        }
+        // 謝辞・書き方の表・読みにくい組み合わせの知らせは中身を画面の側で測って置く．部品の欄はカードの中の全体
+        Control::Acknowledgement(_) | Control::TemplateReference | Control::ThemeIssue(_) => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
             let mut card = empty(frame.card(height), position);
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
@@ -344,8 +347,54 @@ fn place(
         }
         Control::Version => place_about(position, row.title, frame, metrics),
         Control::ThemeOption(_) => place_option(position, frame),
+        Control::CustomTheme(_) => place_custom_theme(position, frame),
+        // 打つ欄は部品の欄に置く(一覧の入力欄と同じく parts の先頭)
+        Control::TextField => {
+            let mut card = place_labeled(position, row, notes, frame, metrics);
+            card.parts.push(card.control);
+            card
+        }
         _ => place_labeled(position, row, notes, frame, metrics),
     }
+}
+
+/// 見本の行(macOS の AppearancePage の ThemePreview)．見本は描いた大きさのまま置き，まわりに見本の余白をとる．
+/// 欄の幅が描いた幅より狭ければ見本ごと同じ比で縮める(高さも縮む)．描いた高さは画面の側で測る(Metrics::height)
+fn place_preview(position: usize, row: &Row, frame: Frame, metrics: &dyn Metrics) -> CardLayout {
+    // 絵文字の見本は設定の項目の名前と同じ左の端から，ほかの行と同じカードの余白で置く(macOS の EmojiSection)．
+    // 外観とパレットの見本は欄の真ん中に，まわりに見本の余白をとって置く
+    let (x, width, padding_y) = if row.control == Control::EmojiPreview {
+        (
+            frame.inner_left(),
+            frame.inner_width(),
+            size::CARD_PADDING_Y,
+        )
+    } else {
+        let padding = size_settings::PREVIEW_PADDING;
+        (
+            frame.x + padding,
+            (frame.width - padding * 2.0).max(0.0),
+            padding,
+        )
+    };
+    let height = metrics
+        .height(row, width)
+        .unwrap_or(size::ROW_HEIGHT - padding_y * 2.0)
+        .max(0.0);
+    let mut card = empty(frame.card(height + padding_y * 2.0), position);
+    card.control = Rect::new(x, frame.y + padding_y, width, height);
+    card
+}
+
+/// 見本を幅 width に収めたときの高さ．natural は描いた大きさ(幅・高さ)．広ければ描いた高さのまま，
+/// 狭ければ幅に合わせて同じ比で縮める(macOS の ScaledPreview.size)
+pub fn preview_height(natural: (f32, f32), width: f32) -> f32 {
+    let (natural_width, natural_height) = natural;
+    if natural_width <= 0.0 {
+        return natural_height.max(0.0);
+    }
+    let shown = natural_width.min(width.max(0.0));
+    (natural_height * shown / natural_width).ceil()
 }
 
 /// 名前(と説明)を左，部品を右に置く行
@@ -456,7 +505,6 @@ fn place_labeled(
     );
     // ボタンを右に添える部品は，ボタンを右の端に置き，残りを部品の欄にする
     let button = match &row.control {
-        Control::Preset => Some(button_width(keys::LOAD, metrics)),
         Control::InfoAction(_, _, label) => Some(button_width(label, metrics)),
         _ => None,
     };
@@ -710,6 +758,33 @@ fn place_option(position: usize, frame: Frame) -> CardLayout {
     card
 }
 
+/// カスタムテーマの行の右の絵のボタンの数(編集・複製・削除．app::page の ThemeAction::ROW と同じ並び)
+const CUSTOM_THEME_BUTTONS: usize = 3;
+
+/// カスタムテーマの行(macOS の CustomThemeRow)．既成のテーマの行と同じく選ぶ印・見本の色・名前を並べ，
+/// 右の端に編集・複製・削除の絵のボタンを置き，名前とボタンのあいだに読みにくい印の場所をとる．
+/// control は選ぶ印，parts はボタン(左から)と印の場所
+fn place_custom_theme(position: usize, frame: Frame) -> CardLayout {
+    let mut card = place_option(position, frame);
+    let center = frame.y + size::ROW_HEIGHT / 2.0;
+    let button = size::RESET_SIZE;
+    let mut right = frame.inner_right();
+    let mut buttons = Vec::new();
+    for _ in 0..CUSTOM_THEME_BUTTONS {
+        right -= button;
+        buttons.push(Rect::new(right, center - button / 2.0, button, button));
+        right -= space::INLINE;
+    }
+    buttons.reverse();
+    let icon = size::ICON_FONT_SIZE;
+    let mark = Rect::new(right - icon, center - icon / 2.0, icon, icon);
+    card.control = card.parts.first().copied().unwrap_or(card.control);
+    card.label.width = (mark.x - size::CONTROL_GAP - card.label.x).max(0.0);
+    card.parts = buttons;
+    card.parts.push(mark);
+    card
+}
+
 /// 試す欄の下のボタン(試した語をいつも英語・いつも日本語にする単語に足す．macOS は結果の語のメニュー)
 pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     top: &[],
@@ -720,10 +795,14 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     search: false,
     filter: false,
     files: None,
-    arrow: false,
+    arrow: None,
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
+    note_line: false,
+    bottom_fields: 0,
+    sheet: false,
+    move_icons: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -732,10 +811,14 @@ const NO_BUTTONS: ListButtons = ListButtons {
     search: false,
     filter: false,
     files: None,
-    arrow: false,
+    arrow: None,
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
+    note_line: false,
+    bottom_fields: 0,
+    sheet: false,
+    move_icons: false,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -750,6 +833,27 @@ fn place_inputs(
     below: f32,
     metrics: &dyn Metrics,
 ) -> CardLayout {
+    place_list(position, (fields, &[]), buttons, frame, below, metrics)
+}
+
+/// place_inputs と同じ．fields の 2 つ目は表の下の帯の左に置く欄の幅(下のボタンの前に並べる．
+/// parts では下のボタンの前に入る)
+fn place_list(
+    position: usize,
+    (fields, bottom_fields): (usize, &[f32]),
+    buttons: ListButtons,
+    frame: Frame,
+    below: f32,
+    metrics: &dyn Metrics,
+) -> CardLayout {
+    // 山形の絵のボタン(優先度を上げる・下げる)は決まった幅にする
+    let button = |label: &str| {
+        if buttons.is_icon(label) {
+            size::ICON_BUTTON_WIDTH
+        } else {
+            button_width(label, metrics)
+        }
+    };
     let x = frame.inner_left();
     let card_top = frame.y + size::CARD_PADDING_Y;
     let inner = frame.inner_width();
@@ -786,13 +890,21 @@ fn place_inputs(
         .map(|label| button_width(label, metrics))
         .collect();
     let buttons_width: f32 = widths.iter().map(|width| width + size::CONTROL_GAP).sum();
+    // 添え書きの欄(最後の欄)を次の行に置くときは，1 行目に並べる欄から外す
+    let note_line = buttons.note_line && fields >= 2;
+    let all_fields = fields;
+    let fields = if note_line { fields - 1 } else { fields };
     // 決まった幅の欄(キー設定の状態とキー)を除いた欄で残りを分ける
     let fixed: Vec<f32> = buttons.field_widths.iter().copied().take(fields).collect();
     let fixed_total: f32 = fixed.iter().sum();
     let count = (fields - fixed.len()).max(1) as f32;
     // 矢印を置くときは先頭の 2 つの欄のあいだを広げる
-    let arrow = buttons.arrow && fields >= 2;
-    let arrow_extra = if arrow { size::LIST_ARROW_WIDTH } else { 0.0 };
+    let arrow = buttons.arrow.filter(|index| index + 1 < fields);
+    let arrow_extra = if arrow.is_some() {
+        size::LIST_ARROW_WIDTH
+    } else {
+        0.0
+    };
     let gaps = size::CONTROL_GAP * (fields.max(1) - 1) as f32;
     let field_width = ((inner - buttons_width - gaps - arrow_extra - fixed_total) / count).max(0.0);
     let mut parts = Vec::new();
@@ -801,7 +913,7 @@ fn place_inputs(
         let width = fixed.get(index).copied().unwrap_or(field_width);
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
-        if arrow && index == 0 {
+        if arrow == Some(index) {
             cursor += arrow_extra;
         }
     }
@@ -809,20 +921,28 @@ fn place_inputs(
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
     }
-    let list_top = if fields + buttons.top.len() == 0 {
+    // 入力欄の並びの上の帯は 1 行目の欄・ボタンのあとに置く(parts の順: 入力欄・上のボタン)．
+    // 添え書きの欄は 2 行目に幅いっぱいで置き，1 行目の欄のすぐあとの parts に入れる(入力欄の番号の順)
+    let mut list_top = if all_fields + buttons.top.len() == 0 {
         top
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
+    if note_line {
+        let note = Rect::new(x, list_top, inner, size::CONTROL_HEIGHT);
+        parts.insert(fields, note);
+        list_top += size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    }
     // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
     let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
-    let leading: Vec<f32> = buttons.bottom[..split]
+    let leading: Vec<f32> = bottom_fields
         .iter()
-        .map(|label| button_width(label, metrics))
+        .copied()
+        .chain(buttons.bottom[..split].iter().map(|label| button(label)))
         .collect();
     let trailing_buttons: Vec<f32> = buttons.bottom[split..]
         .iter()
-        .map(|label| button_width(label, metrics))
+        .map(|label| button(label))
         .collect();
     let bar_search = buttons.search && !buttons.toolbar;
     let bar_filter = buttons.filter && !buttons.toolbar;
@@ -891,7 +1011,7 @@ fn place_inputs(
             })
         })
         .collect();
-    // parts の順に入れる: 検索欄・絞り込み・下のボタン(左の組・右の組)・ファイルのボタン
+    // parts の順に入れる: 検索欄・絞り込み・下の帯の欄・下のボタン(左の組・右の組)・ファイルのボタン
     let mut trailing_iter = trailing_rects.into_iter();
     let right_buttons: Vec<Rect> = trailing_iter
         .by_ref()
@@ -923,6 +1043,39 @@ fn place_inputs(
     let height = bottom + size::CARD_PADDING_Y - frame.y;
     let mut card = empty(frame.card(height), position);
     card.control = Rect::new(x, list_top, inner, below);
+    card.parts = parts;
+    card
+}
+
+/// 打つ欄を縦に並べる入力欄のカード(英語と日本語の試す欄)．入力欄は 1 つずつ幅いっぱいの行に置き，
+/// その下に結果と下のボタンを place_inputs と同じに置く
+fn place_stacked_inputs(
+    position: usize,
+    fields: usize,
+    buttons: ListButtons,
+    frame: Frame,
+    below: f32,
+    metrics: &dyn Metrics,
+) -> CardLayout {
+    let extra = (size::CONTROL_HEIGHT + size::CONTROL_GAP) * fields as f32;
+    // 欄を置かずに place_inputs で下のボタンを置き(欄の分を結果の上に足しておく)，あとで欄を縦に置く
+    let mut card = place_inputs(position, 0, buttons, frame, below + extra, metrics);
+    let x = frame.inner_left();
+    let top = frame.y + size::CARD_PADDING_Y;
+    let fields_rects: Vec<Rect> = (0..fields)
+        .map(|index| {
+            Rect::new(
+                x,
+                top + index as f32 * (size::CONTROL_HEIGHT + size::CONTROL_GAP),
+                frame.inner_width(),
+                size::CONTROL_HEIGHT,
+            )
+        })
+        .collect();
+    let list_top = top + fields as f32 * (size::CONTROL_HEIGHT + size::CONTROL_GAP);
+    card.control = Rect::new(x, list_top, frame.inner_width(), below);
+    let mut parts = fields_rects;
+    parts.extend(card.parts);
     card.parts = parts;
     card
 }
@@ -1059,6 +1212,32 @@ mod tests {
     }
 
     #[test]
+    fn 絵文字の見本は項目の名前と同じ左の端から置く() {
+        let page = sections(Page::Conversion).unwrap();
+        let layout = layout(&page, 900.0, |_| true, &Estimate);
+        let cards: Vec<(&Row, &CardLayout)> = page
+            .iter()
+            .zip(&layout.sections)
+            .flat_map(|(section, placed)| {
+                placed
+                    .cards
+                    .iter()
+                    .map(move |card| (&section.rows[card.row], card))
+            })
+            .collect();
+        let (_, preview) = cards
+            .iter()
+            .find(|(row, _)| row.control == Control::EmojiPreview)
+            .unwrap();
+        let (_, names) = cards
+            .iter()
+            .find(|(row, _)| row.path == "showsEmojiNames")
+            .unwrap();
+        assert_eq!(preview.control.x, names.label.x);
+        assert_eq!(preview.control.y - preview.card.y, size::CARD_PADDING_Y);
+    }
+
+    #[test]
     fn 名前の横に収まらない窓では候補の見本の札を名前の下に置く() {
         let cards = example_cards(260.0);
         assert_eq!(cards.len(), 2);
@@ -1072,14 +1251,17 @@ mod tests {
     }
 
     #[test]
-    fn 説明の長い行は部品を名前の高さに置く() {
+    fn 書き方の表は切り替えと同じカードに置く() {
         let page = sections(Page::Dictionary).unwrap();
         let layout = layout(&page, 800.0, |_| true, &Estimate);
-        // 単語に書ける書き方の表を説明に持つ行(ユーザー辞書の 2 つ目の区切り)
-        let card = &layout.sections[1].cards[0];
-        assert!(card.descriptions.len() > 5);
-        assert!(card.card.height > size::ROW_HEIGHT * 2.0);
-        assert!(card.control.max_y() <= card.card.y + size::ROW_HEIGHT);
+        // ユーザー辞書の 2 つ目の区切り: 切り替えと，その下の書き方の表(macOS の UserWordsView)
+        let section = &layout.sections[1];
+        assert_eq!(section.cards.len(), 2);
+        let (toggle, table) = (&section.cards[0], &section.cards[1]);
+        assert!(toggle.descriptions.is_empty());
+        assert_eq!(page[1].rows[table.row].control, Control::TemplateReference);
+        // 間を空けずに続ける(1 枚のカードに区切り線で並べる)
+        assert_eq!(table.card.y, toggle.card.max_y());
     }
 
     #[test]
@@ -1149,6 +1331,45 @@ mod tests {
     }
 
     #[test]
+    fn 除外設定は表の下の左に動作とアプリの追加_右に並べ替えと削除を置く() {
+        let layout = all(Page::Apps, 800.0);
+        let card = &layout.sections[0].cards[0];
+        // 名前の欄・追加・動作・アプリを追加…・∧・∨・削除
+        assert_eq!(card.parts.len(), 7);
+        let (name, add) = (card.parts[0], card.parts[1]);
+        assert_eq!(name.y, add.y);
+        assert!(name.max_y() <= card.control.y);
+        let bottom = &card.parts[2..];
+        let left = card.card.x + size::CARD_PADDING_X;
+        let right = card.card.max_x() - size::CARD_PADDING_X;
+        assert!((bottom[0].x - left).abs() < 0.01);
+        assert!(bottom[0].max_x() < bottom[1].x);
+        for rect in bottom {
+            assert_eq!(rect.y, bottom[0].y);
+            assert!(rect.y >= card.control.max_y());
+        }
+        // 絵のボタンは決まった幅で，削除は右の端
+        assert_eq!(bottom[2].width, size::ICON_BUTTON_WIDTH);
+        assert_eq!(bottom[3].width, size::ICON_BUTTON_WIDTH);
+        assert!((bottom[4].max_x() - right).abs() < 0.01);
+        assert!(bottom[1].max_x() < bottom[2].x);
+    }
+
+    #[test]
+    fn コマンドの一覧は入力欄を置かず_表の下にボタンを並べる() {
+        let layout = all(Page::Commands, 800.0);
+        let card = &layout.sections[0].cards[1];
+        // コマンドを追加…・編集…・削除
+        assert_eq!(card.parts.len(), 3);
+        assert!((card.control.y - (card.card.y + size::CARD_PADDING_Y)).abs() < 0.01);
+        for pair in card.parts.windows(2) {
+            assert!(pair[0].max_x() < pair[1].x);
+            assert_eq!(pair[0].y, pair[1].y);
+        }
+        assert!(card.parts[0].y >= card.control.max_y());
+    }
+
+    #[test]
     fn 辞書の一覧は表の下にボタンを折り返して並べる() {
         let page = sections(Page::Dictionary).unwrap();
         for width in [800.0, 400.0] {
@@ -1170,9 +1391,14 @@ mod tests {
 
     #[test]
     fn 行がひとつも出ないまとまりは見出しも置かない() {
-        let page = sections(Page::Appearance).unwrap();
-        // カスタムテーマを選んでいない(色・形の行を出さない)
-        let hidden = layout(&page, 800.0, |row| row.visible.is_none(), &Estimate);
+        let page = crate::pages::theme_editor();
+        // 読みにくい組み合わせが無い(読みやすさの知らせを出さない)
+        let hidden = layout(
+            &page,
+            800.0,
+            |row| !matches!(row.control, Control::ThemeIssue(_)),
+            &Estimate,
+        );
         let shown = layout(&page, 800.0, |_| true, &Estimate);
         let titles = |layout: &PageLayout| {
             layout
@@ -1184,8 +1410,45 @@ mod tests {
         assert!(titles(&hidden) < titles(&shown));
         assert_eq!(hidden.sections.len(), page.len());
         assert!(hidden.height < shown.height);
-        // 見本の欄は見本の高さを取る
-        assert!(shown.sections[0].cards[0].control.height >= size::PREVIEW_HEIGHT);
+    }
+
+    /// 見本の高さを決める(謝辞と同じく画面の側で測る)
+    struct Previewed(f32, f32);
+
+    impl Metrics for Previewed {
+        fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
+            Estimate.lines(text, kind, width)
+        }
+
+        fn width(&self, text: &str, kind: TextKind) -> f32 {
+            Estimate.width(text, kind)
+        }
+
+        fn height(&self, row: &Row, width: f32) -> Option<f32> {
+            (row.control == Control::ThemePreview).then(|| preview_height((self.0, self.1), width))
+        }
+    }
+
+    #[test]
+    fn 見本は描いた大きさで置き_狭ければ縮める() {
+        assert_eq!(preview_height((400.0, 200.0), 600.0), 200.0);
+        assert_eq!(preview_height((400.0, 200.0), 200.0), 100.0);
+        let page = sections(Page::Appearance).unwrap();
+        let padding = size_settings::PREVIEW_PADDING;
+        // 広い窓: 見本は描いた高さのまま，まわりに見本の余白をとる
+        let wide = layout(&page, 1000.0, |_| true, &Previewed(400.0, 200.0));
+        let card = &wide.sections[0].cards[0];
+        assert_eq!(card.control.height, 200.0);
+        assert_eq!(card.card.height, 200.0 + padding * 2.0);
+        assert_eq!(card.control.x - card.card.x, padding);
+        // 狭い窓: 幅に合わせて同じ比で縮める
+        let narrow = layout(&page, 300.0, |_| true, &Previewed(400.0, 200.0));
+        let card = &narrow.sections[0].cards[0];
+        assert!(card.control.height < 200.0);
+        assert_eq!(
+            card.control.height,
+            preview_height((400.0, 200.0), card.control.width)
+        );
     }
 
     #[test]

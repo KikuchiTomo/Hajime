@@ -87,6 +87,19 @@ impl Ink {
         true
     }
 
+    /// 最後に書いた 1 画を消す．消したら true．線が残っていれば読み直す(番号を進めるので，前の読みの結果は捨てる)．
+    /// すべて消えたら候補も消す
+    pub fn undo(&mut self) -> bool {
+        if self.is_stroking || self.strokes.pop().is_none() {
+            return false;
+        }
+        self.generation += 1;
+        if self.strokes.is_empty() {
+            self.candidates.clear();
+        }
+        true
+    }
+
     pub fn clear(&mut self) {
         self.strokes.clear();
         self.candidates.clear();
@@ -154,6 +167,27 @@ mod tests {
         assert!(ink.is_empty());
         assert!(!ink.accept(generation, vec!["一".into()]));
         assert!(ink.candidates().is_empty());
+    }
+
+    #[test]
+    fn 最後の1画を消すと読み直しの番号が進みすべて消えたら候補も消える() {
+        let mut ink = Ink::default();
+        assert!(!ink.undo());
+        ink.begin(point(0.0, 0.0));
+        ink.end();
+        ink.begin(point(5.0, 5.0));
+        let generation = ink.end().unwrap();
+        assert!(ink.accept(generation, vec!["二".into()]));
+        assert!(ink.undo());
+        assert_eq!(ink.strokes().len(), 1);
+        assert!(!ink.accept(generation, vec!["二".into()]));
+        assert_eq!(ink.candidates(), &["二".to_string()]);
+        assert!(ink.undo());
+        assert!(ink.is_empty());
+        assert!(ink.candidates().is_empty());
+        // 書いている途中は消さない
+        ink.begin(point(1.0, 1.0));
+        assert!(!ink.undo());
     }
 
     #[test]

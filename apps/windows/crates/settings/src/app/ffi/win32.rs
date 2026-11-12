@@ -33,8 +33,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
-    FileOpenDialog, FileSaveDialog, IFileDialog, ShellExecuteW, FILEOPENDIALOGOPTIONS,
-    FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
+    FileOpenDialog, FileSaveDialog, IFileDialog, IFileOpenDialog, ShellExecuteW,
+    FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
+    SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW, GetClientRect,
@@ -579,6 +580,49 @@ pub fn choose_file(
     show_dialog(&dialog, owner, FOS_FORCEFILESYSTEM)
 }
 
+/// 開くファイルをいくつも選べる窓を出し，選んだファイルの場所を返す．キャンセルしたら空
+/// (除外設定のアプリを追加…．macOS の NSOpenPanel の allowsMultipleSelection)
+pub fn choose_files(owner: HWND, filter_name: &str, pattern: &str) -> Vec<String> {
+    let filter_name = HSTRING::from(filter_name);
+    let pattern = HSTRING::from(pattern);
+    let filters = [COMDLG_FILTERSPEC {
+        pszName: PCWSTR(filter_name.as_ptr()),
+        pszSpec: PCWSTR(pattern.as_ptr()),
+    }];
+    // SAFETY: 引数は定数だけ
+    let Ok(dialog) = (unsafe {
+        CoCreateInstance::<_, IFileOpenDialog>(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)
+    }) else {
+        return Vec::new();
+    };
+    // SAFETY: dialog はこの関数の間生きている COM のオブジェクト．filters の文字列は呼び出しの間生きている．
+    // owner はこのスレッドの窓．返された場所の文字列は CoTaskMemFree で放す
+    unsafe {
+        let shown = dialog.SetFileTypes(&filters).and_then(|()| {
+            let current = dialog.GetOptions()?;
+            dialog.SetOptions(current | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT)?;
+            dialog.Show(Some(owner))
+        });
+        // キャンセルは Err で返る
+        if shown.is_err() {
+            return Vec::new();
+        }
+        let Ok(items) = dialog.GetResults() else {
+            return Vec::new();
+        };
+        let count = items.GetCount().unwrap_or(0);
+        (0..count)
+            .filter_map(|index| {
+                let item = items.GetItemAt(index).ok()?;
+                let path = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+                let text = path.to_string().ok();
+                CoTaskMemFree(Some(path.0 as *const _));
+                text
+            })
+            .collect()
+    }
+}
+
 /// フォルダを選ぶ窓を出し，選んだフォルダの場所を返す．キャンセルしたら None
 pub fn choose_folder(owner: HWND) -> Option<String> {
     // SAFETY: 引数は定数だけ
@@ -616,27 +660,19 @@ pub fn choose_color(owner: HWND, current: Option<(u8, u8, u8)>) -> Option<(u8, u
         /// 窓の「作成した色」(窓を開き直しても残す)
         static CUSTOM: std::cell::RefCell<[COLORREF; 16]> = const { std::cell::RefCell::new([COLORREF(0x00FF_FFFF); 16]) };
     }
-    let (red, green, blue) = current.unwrap_or((0, 0, 0));
     CUSTOM.with(|custom| {
         let mut custom = custom.borrow_mut();
         let mut dialog = CHOOSECOLORW {
             lStructSize: std::mem::size_of::<CHOOSECOLORW>() as u32,
             hwndOwner: owner,
-            rgbResult: COLORREF(u32::from(red) | (u32::from(green) << 8) | (u32::from(blue) << 16)),
+            rgbResult: COLORREF(crate::themes::colorref(current.unwrap_or((0, 0, 0)))),
             lpCustColors: custom.as_mut_ptr(),
             Flags: CC_FULLOPEN | CC_RGBINIT,
             ..Default::default()
         };
         // SAFETY: dialog と custom は呼び出しのあいだ生きている
         let chosen = unsafe { ChooseColorW(&mut dialog) }.as_bool();
-        chosen.then(|| {
-            let value = dialog.rgbResult.0;
-            (
-                (value & 0xff) as u8,
-                ((value >> 8) & 0xff) as u8,
-                ((value >> 16) & 0xff) as u8,
-            )
-        })
+        chosen.then(|| crate::themes::from_colorref(dialog.rgbResult.0))
     })
 }
 
