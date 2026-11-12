@@ -182,4 +182,6 @@ else
   productbuild --distribution "$work/distribution.xml" --package-path "$work" "$output"
   echo "Developer ID Installer の証明書が無いので，.pkg は署名していません(ほかの Mac では開くときに警告が出ます)"
 fi
+# ビルドしたアプリと配布物の中身を LaunchServices の登録から外す．入れた Hajime IME が入力ソースから外れないようにする
+"$root/tools/macos/unregister_builds.sh"
 echo "作りました: apps/macos/$output"
