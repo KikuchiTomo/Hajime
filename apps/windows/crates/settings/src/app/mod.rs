@@ -11,6 +11,7 @@ mod wizard;
 
 use crate::catalog::{Catalog, Timing};
 use crate::engine::{Engine, EngineStore};
+use crate::sample::SampleEngine;
 use ipc::windows::{pipe_name, EngineClient};
 use ipc::{RequestBody, ResponseBody};
 use std::os::windows::process::CommandExt;
@@ -41,16 +42,43 @@ impl Engine for Pipe {
     }
 }
 
-type Store = EngineStore<Pipe>;
+/// 設定の画面が頼む先．ふだんはエンジンのパイプ，--offline では見本のエンジン(書いた値は覚えるだけ)
+pub enum Link {
+    Pipe(Pipe),
+    Sample(Box<SampleEngine>),
+}
+
+impl Engine for Link {
+    fn request(&self, body: RequestBody) -> Option<ResponseBody> {
+        match self {
+            Link::Pipe(pipe) => pipe.request(body),
+            Link::Sample(sample) => sample.request(body),
+        }
+    }
+
+    fn request_file(&self, body: RequestBody) -> Option<ResponseBody> {
+        match self {
+            Link::Pipe(pipe) => pipe.request_file(body),
+            Link::Sample(sample) => sample.request_file(body),
+        }
+    }
+}
+
+type Store = EngineStore<Link>;
 
 fn connect(timing: &Timing) -> Option<Store> {
     let name = pipe_name("engine").ok()?;
     let client = EngineClient::start(name).ok()?;
-    Some(EngineStore::new(Pipe {
+    Some(EngineStore::new(Link::Pipe(Pipe {
         client,
         timeout: timing.response_timeout(),
         file_timeout: timing.file_timeout(),
-    }))
+    })))
+}
+
+/// エンジンにつながず，見本の値で開く(--offline．画面の確かめと見本の撮影)
+fn connect_sample(_: &Timing) -> Option<Store> {
+    Some(EngineStore::new(Link::Sample(Box::default())))
 }
 
 /// エンジンが落ちていても設定の画面を開けば戻るよう，同じフォルダのエンジンを起動する．
@@ -73,7 +101,8 @@ fn start_engine() {
 }
 
 /// 起動の引数．--measure <ファイル> で窓を出すまで・中身を出すまで・ページを開く・送る時間を測って書き，終える．
-/// --theme light|dark で OS の設定によらず明暗を決め，--page <名前> で初めに開くページを決める(見本の撮影)
+/// --theme light|dark で OS の設定によらず明暗を決め，--page <名前> で初めに開くページを決める(見本の撮影)．
+/// --offline ならエンジンにつながず，見本の値で開く
 fn options(started: std::time::Instant) -> window::Options {
     let arguments: Vec<String> = std::env::args().collect();
     let value = |name: &str| {
@@ -91,6 +120,7 @@ fn options(started: std::time::Instant) -> window::Options {
             _ => None,
         }),
         measure: value("--measure").map(std::path::PathBuf::from),
+        offline: arguments.iter().any(|argument| argument == OFFLINE),
         page: value("--page").and_then(|name| {
             crate::pages::Page::ALL
                 .into_iter()
@@ -102,6 +132,8 @@ fn options(started: std::time::Instant) -> window::Options {
 /// 初期設定ウィザードを開く引数．--setup-if-needed は済んでいれば何もしない(ログオンのたびに起動する)
 pub(crate) const SETUP: &str = "--setup";
 const SETUP_IF_NEEDED: &str = "--setup-if-needed";
+/// エンジンにつながずに見本の値で開く(開発用．画面の確かめと見本の撮影)
+pub(crate) const OFFLINE: &str = "--offline";
 /// 最新のリリースのページをブラウザーで開いて終える(入力メニューの「更新を確認」．macOS と同じく通信しない)
 pub const CHECK_FOR_UPDATES: &str = "--check-for-updates";
 
@@ -156,7 +188,7 @@ fn setup_options(started: std::time::Instant) -> wizard::Options {
         started,
         theme: window.theme,
         step,
-        offline: arguments.iter().any(|argument| argument == "--offline"),
+        offline: arguments.iter().any(|argument| argument == OFFLINE),
     }
 }
 
@@ -181,10 +213,13 @@ pub fn run() {
     if matches!(mode, Mode::Nothing) {
         return;
     }
-    // エンジンの起動は窓を出すのを待たせない
-    let _ = std::thread::Builder::new()
-        .name("engine-start".into())
-        .spawn(start_engine);
+    let offline = arguments.iter().any(|argument| argument == OFFLINE);
+    // エンジンの起動は窓を出すのを待たせない(見本の値で開くときは起動しない)
+    if !offline {
+        let _ = std::thread::Builder::new()
+            .name("engine-start".into())
+            .spawn(start_engine);
+    }
     ffi::set_dpi_aware();
     // ファイルを選ぶ窓(IFileDialog)は COM を使う
     ffi::initialize_com();
@@ -193,7 +228,10 @@ pub fn run() {
     };
     let opened = match mode {
         Mode::Setup => wizard::open(catalog, connect, setup_options(started)).is_some(),
-        _ => window::open(catalog, connect, options(started)).is_some(),
+        _ => {
+            let link = if offline { connect_sample } else { connect };
+            window::open(catalog, link, options(started)).is_some()
+        }
     };
     if !opened {
         return;

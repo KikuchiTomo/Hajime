@@ -71,9 +71,20 @@ pub fn run_after(window: Window, after: Option<After>) {
             ffi::message(window, settings::WINDOW_TITLE, &text, warning)
         }
         Some(After::Notice(text)) => ffi::message(window, settings::WINDOW_TITLE, &text, false),
-        Some(After::OpenSetup) => super::launch_settings(&[super::SETUP]),
+        Some(After::OpenSetup) => {
+            // 見本の値で開いた画面からは，ウィザードも見本の値で開く(利用者の設定に触れない)
+            if with_app(|app| app.offline).unwrap_or(false) {
+                super::launch_settings(&[super::SETUP, super::OFFLINE]);
+            } else {
+                super::launch_settings(&[super::SETUP]);
+            }
+        }
         Some(After::OpenUrl(url)) => ffi::open_url(&url),
         Some(After::OpenSettingsFile) => {
+            // 見本の値で開いたときは，利用者の設定のファイルを開かない
+            if with_app(|app| app.offline).unwrap_or(false) {
+                return;
+            }
             if let Some(path) = settings_file().filter(|path| path.exists()) {
                 ffi::open_with_default_app(&path);
             }
@@ -292,6 +303,12 @@ impl App {
         }
         // 同期の値は設定のファイルの項目ではないので，同期の要求にして頼む
         if let Event::Set { path, value, .. } = &event {
+            // 画面の中だけの値(開いている一覧など)は書かずに覚える
+            if crate::pages::is_view_path(path) {
+                self.view_values.insert((*path).to_string(), value.clone());
+                self.refresh();
+                return None;
+            }
             if crate::sync::is_sync_path(path) {
                 let body = crate::sync::request(path, value)?;
                 return self.request_sync(body);
@@ -1040,6 +1057,11 @@ pub fn confirmation(event: &Event) -> Option<(String, String)> {
         Event::Action(Action::RestoreKeymap) => Some((
             keys::RESTORE_TITLE.to_string(),
             keys::RESTORE_MESSAGE.to_string(),
+        )),
+        // macOS の PalettePage と同じく，消す前に尋ねる
+        Event::Action(Action::ResetPaletteHistory) => Some((
+            crate::strings::palette::CLEAR_HISTORY_QUESTION.to_string(),
+            crate::strings::palette::CLEAR_HISTORY_NOTE.to_string(),
         )),
         Event::ThemeList {
             action: ThemeAction::Delete,

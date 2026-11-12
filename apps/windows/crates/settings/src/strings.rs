@@ -85,8 +85,14 @@ pub mod settings {
     pub const READING_CORRECTIONS: &str = "タイプミスを修正した回数 / 取り消した回数";
     pub const ENGLISH_CORRECTIONS: &str = "英単語を修正した回数 / 取り消した回数";
     pub const RESET_USAGE: &str = "統計を消去";
-    /// UIStrings.Settings.fontSize から値を除いたもの(値は部品に出す)
+    /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
+    pub const DICTIONARY_NOTE: &str = "読みと単語をタブで区切ったテキストファイルを読み込めます。";
+
+    /// UIStrings.Settings.fontSize(スライダーの名前に今の値を付ける)
+    pub fn font_size(size: f64) -> String {
+        format!("{FONT_SIZE_NAME}: {}", size.round() as i64)
+    }
     pub const ADD: &str = "追加";
     pub const ESCAPE_SWITCHES_TO_DIRECT: &str = "Esc で英数に切り替え";
     pub const ROMAJI_KEYS: &str = "入力";
@@ -361,6 +367,16 @@ pub mod keys {
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
+    pub const ALL_STATES: &str = "すべての状態";
+
+    /// UIStrings.Keys.rowCount(出している行の数と，すべての行の数)
+    pub fn row_count(shown: usize, total: usize) -> String {
+        if shown == total {
+            format!("{total} 行")
+        } else {
+            format!("{shown} / {total} 行")
+        }
+    }
     pub const PLAIN_CHARACTER: &str =
         "修飾キーの無い文字のキーです。この状態ではその文字を入力できなくなります";
     pub const MISSING_NOTE: &str = "キーが無いと、入力を確定したり取り消したりできなくなります。";
@@ -564,10 +580,19 @@ pub mod palette {
     pub const SHOWS_PREVIEW: &str = "パレットに文字の説明を表示";
     pub const FREQUENT_ROWS: &str = "よく使う文字の行数";
     pub const CLEAR_HISTORY: &str = "使った文字の記録を消去";
+    pub const CLEAR_HISTORY_QUESTION: &str = "使った文字の記録を消去しますか？";
+    pub const EMOJI_KEY: &str = "絵文字のパレットを開くキー";
+    pub const SYMBOL_KEY: &str = "記号のパレットを開くキー";
+    pub const NO_KEY: &str = "なし";
     pub const CLEAR_HISTORY_NOTE: &str =
         "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。";
     pub const THEME_NOTE: &str =
         "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。";
+
+    /// UIStrings.Palette.cellSizeValue(スライダーの名前に今の値を付ける)
+    pub fn cell_size_value(size: f64) -> String {
+        format!("{CELL_SIZE}：{} pt", size.round() as i64)
+    }
 }
 
 /// UIStrings.Association
@@ -733,9 +758,13 @@ pub mod sync {
 pub mod windows {
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
-    /// 絵文字と記号のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
-    pub const PALETTE_KEYS_NOTE: &str =
-        "既定では Ctrl+Alt+E で絵文字、Ctrl+Alt+K で記号のパレットを開きます。";
+    /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)
+    pub const APP_NAME: &str = "Hajime IME";
+    /// 数を 1 段ずつ変えるボタン(読み上げの名前．macOS の Stepper の矢印)
+    pub const DECREASE: &str = "減らす";
+    /// テーマの見本の札の文字(macOS の IndicatorLabels の日本語の札)
+    pub const JAPANESE_MODE: &str = "あ";
+    pub const INCREASE: &str = "増やす";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
     pub const ASSOCIATION_BUNDLED: &str = "アプリに同梱";
     pub const ON: &str = "オン";
@@ -790,9 +819,9 @@ pub mod windows {
         "実行ファイルの名前を指定することで、アプリごとに入力方法を指定できます。昇順で適用されます。";
     /// 不正な実行ファイルの名前(macOS はアプリを選んで足すので無い)
     pub const INVALID_APP: &str = "実行ファイルの名前に使えない文字が含まれています";
-    /// macOS の languageNote から，試した結果を右クリックで足す説明を除いたもの(Windows の結果は文字で出す)
+    /// macOS の languageNote の右クリックで足す説明を，試す欄の下のボタンで足す説明にしたもの(Windows の結果は文字で出す)
     pub const LANGUAGE_NOTE: &str =
-        "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。";
+        "英字入力(自動)と、ローマ字入力で英語にも読める単語に使用します。試した単語は「試す」の下のボタンで一覧に追加できます。";
     /// 見分け方の決まりが無いとき(macOS は空の一覧を出すだけ)
     pub const LANGUAGE_RULES_EMPTY: &str = "判別ルールはありません";
     /// 変換エンジン(hajime-engine-host)に設定を頼めないとき
