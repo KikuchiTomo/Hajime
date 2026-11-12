@@ -5,4 +5,4 @@
 pub const TITLE: &str = "手書き入力";
 pub const CLEAR: &str = "消去";
 pub const PROMPT: &str = "ここに文字を書いてください";
-pub const NO_RECOGNIZER: &str = "日本語の手書き認識が使えません";
+pub const NO_RECOGNIZER: &str = "日本語の手書き認識を利用できません";

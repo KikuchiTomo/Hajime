@@ -34,7 +34,7 @@ public enum Proofreading {
     }
 
     private static func phrase(_ entries: [(wrong: String, right: String)], kind: String, in text: String) -> String? {
-        entries.first { text.contains($0.wrong) }.map { "「\($0.wrong)」は\(kind)です。「\($0.right)」で足ります。" }
+        entries.first { text.contains($0.wrong) }.map { "「\($0.wrong)」は\(kind)です。「\($0.right)」で十分です。" }
     }
 
     /// 一段動詞とカ変動詞の，「られる」の前の形

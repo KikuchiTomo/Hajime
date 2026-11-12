@@ -830,7 +830,7 @@ mod tests {
             })
             .collect();
         assert_eq!(all.iter().filter(|text| *text == "CLDR").count(), 1);
-        assert_eq!(texts(&setup.placed, Role::Label)[0].0, "英語");
+        assert_eq!(texts(&setup.placed, Role::Label)[0].0, "英語名");
     }
 
     #[test]

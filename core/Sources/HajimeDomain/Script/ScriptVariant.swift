@@ -9,7 +9,7 @@ public enum ScriptVariant: String, Sendable, Equatable, Codable, CaseIterable {
     /// 種類の行に出す名前
     public var label: String {
         switch self {
-        case .hiragana: "そのまま"
+        case .hiragana: "ひらがな"
         case .katakana: "カタカナ"
         case .halfwidthKatakana: "ｶﾀｶﾅ"
         case .fullwidthRoman: "全角英数"

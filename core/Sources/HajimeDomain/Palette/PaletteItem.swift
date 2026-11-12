@@ -158,7 +158,7 @@ public enum PaletteCategory: String, Sendable, Hashable, Codable, CaseIterable {
         case .nature: "動物と自然"
         case .food: "食べ物と飲み物"
         case .travel: "旅行と場所"
-        case .activities: "活動"
+        case .activities: "アクティビティ"
         case .objects: "物"
         case .symbols: "記号と標識"
         case .flags: "旗"

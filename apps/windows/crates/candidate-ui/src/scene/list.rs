@@ -707,7 +707,7 @@ mod tests {
         list.column_length = Some(9);
         list.position = 11;
         list.total = 20;
-        list.hints = Some(vec![hint("←→", "列"), hint("Alt+↓", "戻す")]);
+        list.hints = Some(vec![hint("←→", "列"), hint("Alt+↓", "戻る")]);
         list
     }
 
@@ -1340,13 +1340,13 @@ mod tests {
             title: "修正".into(),
             subject: None,
             key: Some("Space".into()),
-            key_action: Some("入力のままに戻す".into()),
-            text: "修正　Space 入力のままに戻す".into(),
+            key_action: Some("元に戻す".into()),
+            text: "修正　Space 元に戻す".into(),
         });
         let scene = candidate_list(&noted, &Look::new(&theme, 15.0), &Fixed);
         // 主な語は補正の色，キーでできることはキーの案内と同じ控えめな色
         assert!(texts(&scene).contains(&("修正".into(), theme.correction)));
-        assert!(texts(&scene).contains(&("入力のままに戻す".into(), theme.text_muted)));
+        assert!(texts(&scene).contains(&("元に戻す".into(), theme.text_muted)));
         assert!(!texts(&scene).iter().any(|(text, _)| text == "文字種"));
     }
 

@@ -11,23 +11,23 @@ enum PanelBuilder {
     /// 選んでいる候補を学習から消したときの案内
     static let candidateForgottenNote = Note.info("学習から削除しました")
     /// 最後に確定した語の学習を取り消したときの案内
-    static let lastCommitForgottenNote = Note.info("最後の学習を取り消しました")
+    static let lastCommitForgottenNote = Note.info("直前の学習を取り消しました")
     /// 確定を取り消して，確定する前の変換に戻したときの案内
     static let commitUndoneNote = Note.info("確定を取り消しました")
     /// 戻した補正を覚えたときの案内．phrase は覚えた語句(打ったままの読み)
-    static func correctionRememberedNote(_ phrase: String) -> Note { .info("「\(phrase)」は次から直しません") }
+    static func correctionRememberedNote(_ phrase: String) -> Note { .info("「\(phrase)」は今後修正しません") }
     /// 予測に表示しない語句に入れたときの案内．text は入れた語句
-    static func predictionHiddenNote(_ text: String) -> Note { .info("「\(text)」は次から予測に表示しません") }
+    static func predictionHiddenNote(_ text: String) -> Note { .info("「\(text)」は今後予測に表示しません") }
 
     /// 連想変換で，選んでいる語の連想が見つからなかったときの案内(R-18)
-    static let noAssociationNote = Note.info("連想はありません")
+    static let noAssociationNote = Note.info("連想候補なし")
     /// 連想変換を使う設定で，引ける連想の辞書が無いときの案内
-    static let noAssociationDictionaryNote = Note.info("連想の辞書がありません")
+    static let noAssociationDictionaryNote = Note.info("連想辞書なし")
 
     /// 打ち間違いの案内の主な語と，キーでできること
     private static let correctedTitle = "修正"
     private static let suggestionTitle = "もしかして"
-    private static let revertAction = "戻す"
+    private static let revertAction = "元に戻す"
     private static let applyAction = "修正"
     private static let selectAction = "選択"
 
@@ -35,7 +35,7 @@ enum PanelBuilder {
 
     /// 英単語を直した候補が先頭の一覧の案内．key は次の候補のキー
     static func correctionNote(key: String?) -> Note {
-        Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
+        Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in revertAction })
     }
 
     /// 打っているあいだの候補の窓の案内．keys は候補を選び始めるキー(無いものは除いてある)．
@@ -47,11 +47,11 @@ enum PanelBuilder {
     /// 分岐図か一覧で，打ち間違いを直したときの案内．key は取り消しのキー
     /// 文節をその場で打ち直しているときの案内．subject は打ち直す前の文節，key は打ち直した読みを変換するキー
     static func inlineEditNote(replacing subject: String, key: String?) -> Note {
-        Note(tone: .info, title: "打ち直し", subject: subject, key: key, keyAction: key.map { _ in "変換" })
+        Note(tone: .info, title: "再入力", subject: subject, key: key, keyAction: key.map { _ in "変換" })
     }
 
     static func readingCorrectionNote(key: String?) -> Note {
-        Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in "入力のままに戻す" })
+        Note(tone: .correction, title: correctedTitle, key: key, keyAction: key.map { _ in revertAction })
     }
 
     /// ライブ変換で打ち間違いを直したときの案内．typed は直す前の文，key は取り消しのキー

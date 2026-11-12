@@ -47,7 +47,7 @@ pub const ASSOCIATION_PREFIX: &str = "連想";
 /// パレットの説明の欄の項目名(macOS の UIStrings.Palette の unicodeNameLabel など)．
 /// PALETTE_ENGLISH_NAME は UCD の名前の無い並び(国旗など)で代わりに出す英語の名前
 pub const PALETTE_UNICODE_NAME: &str = "Unicode";
-pub const PALETTE_ENGLISH_NAME: &str = "英語";
+pub const PALETTE_ENGLISH_NAME: &str = "英語名";
 pub const PALETTE_READINGS: &str = "読み";
 pub const PALETTE_SHORTCODES: &str = "ショートコード";
 pub const PALETTE_CODE_POINTS: &str = "コードポイント";

@@ -12,7 +12,7 @@ pub const PALETTE: &str = "絵文字と記号";
 pub const REGISTER_WORD: &str = "単語の登録…";
 pub const USER_DICTIONARY: &str = "ユーザー辞書…";
 pub const OPEN_SETTINGS: &str = "設定を開く…";
-pub const CHECK_FOR_UPDATES: &str = "更新を確認";
+pub const CHECK_FOR_UPDATES: &str = "更新を確認…";
 /// 「更新を確認」で設定の画面の実行ファイルに渡す引数．設定の画面を情報のページで開き，そこの「更新を確認」を
 /// 押したときと同じ確認を始める(確認・変更点・ダウンロード・インストールを同じ流れにする)
 pub const CHECK_FOR_UPDATES_ARGUMENT: &str = "--check-for-updates";
@@ -27,8 +27,7 @@ pub const JAPANESE_ICON: &str = "あ";
 pub const DIRECT_ICON: &str = "A";
 pub const DESCRIPTION: &str = "入力モード";
 /// エンジンにつながっていないときのツールチップ．設定の画面を開くとエンジンを起動し直す
-pub const ENGINE_UNAVAILABLE: &str =
-    "入力モード(変換エンジンに接続できません．設定を開くと起動し直します)";
+pub const ENGINE_UNAVAILABLE: &str = "入力モード(変換エンジン未接続)";
 
 const ID_LIVE_CONVERSION: u32 = 1;
 const ID_OPEN_SETTINGS: u32 = 2;

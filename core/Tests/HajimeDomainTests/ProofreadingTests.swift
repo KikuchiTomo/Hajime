@@ -20,7 +20,7 @@ struct ProofreadingTests {
     @Test("さ入れ言葉・二重敬語・重言に本来の形を添える")
     func others() {
         #expect(Proofreading.note(for: "読まさせていただきます") == "「読まさせ」はさ入れ言葉です。「読ませ」が本来の形です。")
-        #expect(Proofreading.note(for: "社長がおっしゃられた") == "「おっしゃられ」は二重敬語です。「おっしゃ」で足ります。")
-        #expect(Proofreading.note(for: "一番最初に着いた") == "「一番最初」は重言です。「最初」で足ります。")
+        #expect(Proofreading.note(for: "社長がおっしゃられた") == "「おっしゃられ」は二重敬語です。「おっしゃ」で十分です。")
+        #expect(Proofreading.note(for: "一番最初に着いた") == "「一番最初」は重言です。「最初」で十分です。")
     }
 }

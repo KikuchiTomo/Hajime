@@ -257,8 +257,8 @@ fn render_all(output: &Path) -> Result<()> {
                         title: "修正".into(),
                         subject: Some("オン外します".into()),
                         key: Some("Esc".into()),
-                        key_action: Some("戻す".into()),
-                        text: "修正「オン外します」　Esc 戻す".into(),
+                        key_action: Some("元に戻す".into()),
+                        text: "修正「オン外します」　Esc 元に戻す".into(),
                     },
                     &look,
                     &measure,
@@ -463,7 +463,7 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
 }
 
 fn variants() -> Vec<CandidateVariant> {
-    ["そのまま", "カタカナ", "ｶﾀｶﾅ", "全角英数", "半角英数"]
+    ["ひらがな", "カタカナ", "ｶﾀｶﾅ", "全角英数", "半角英数"]
         .into_iter()
         .map(|label| CandidateVariant {
             label: label.into(),
@@ -506,7 +506,7 @@ fn grid_list() -> CandidateList {
         position: 12,
         total: 58,
         column_length: Some(9),
-        hints: Some(vec![hint("←→", "列"), hint("Alt+↓", "戻す")]),
+        hints: Some(vec![hint("←→", "列"), hint("Alt+↓", "戻る")]),
         ..list()
     }
 }
@@ -762,8 +762,8 @@ fn correction() -> CandidateList {
             title: "修正".into(),
             subject: None,
             key: Some("Space".into()),
-            key_action: Some("入力のままに戻す".into()),
-            text: "修正　Space 入力のままに戻す".into(),
+            key_action: Some("元に戻す".into()),
+            text: "修正　Space 元に戻す".into(),
         }),
         meaning_placement: None,
         column_length: None,
@@ -832,7 +832,7 @@ fn preview() -> BranchMap {
             hint("↓", "候補"),
             hint("↑", "文字種"),
             hint("←→", "文節"),
-            hint("Alt+→", "誤りやすい文節"),
+            hint("Alt+→", "要確認の文節"),
             hint("Shift+←→", "区切り調整"),
         ],
         meaning_placement: None,
@@ -859,7 +859,7 @@ fn split() -> BranchMap {
         position: 1,
         total: 4,
         note: None,
-        hints: vec![hint("1–2", "区切り"), hint("Esc", "取り消し")],
+        hints: vec![hint("1–2", "分割"), hint("Esc", "キャンセル")],
         meaning_placement: None,
     }
 }

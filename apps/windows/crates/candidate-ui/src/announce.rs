@@ -391,13 +391,13 @@ mod tests {
         );
         panel.preview = None;
         assert_eq!(palette(&panel).as_deref(), Some("おじぎする人"));
-        panel.message = Some("読み込んでいます".into());
+        panel.message = Some("読み込み中…".into());
         assert_eq!(
             palette(&panel).as_deref(),
-            Some("おじぎする人、読み込んでいます")
+            Some("おじぎする人、読み込み中…")
         );
         panel.selection = None;
-        assert_eq!(palette(&panel).as_deref(), Some("読み込んでいます"));
+        assert_eq!(palette(&panel).as_deref(), Some("読み込み中…"));
         panel.message = None;
         assert_eq!(palette(&panel), None);
     }

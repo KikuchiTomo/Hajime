@@ -358,7 +358,7 @@ struct KeymapScenarioTests {
         harness.press(.enter)
         harness.press(.backspace, .control)
         #expect(converter.forgotten.map(\.text) == ["仮名"])
-        #expect(harness.note == "最後の学習を取り消しました")
+        #expect(harness.note == "直前の学習を取り消しました")
         harness.press(.left)
         #expect(harness.note == nil)
         #expect(!harness.lastResult.handled)
@@ -401,7 +401,7 @@ struct KeymapScenarioTests {
         let harness = Harness(lexicon: FakeLexicon(words: ["python"]), settings: keymap)
         harness.type("python")
         harness.press(.down)
-        #expect(harness.panel?.note?.text == "修正　⌃N 入力のままに戻す")
+        #expect(harness.panel?.note?.text == "修正　⌃N 元に戻す")
     }
 
     @Test("R-17: 入力中の候補の窓の案内は，選び始めるキーを表で変えるとそのキーを出し，キーの案内を出さない設定では出さない")

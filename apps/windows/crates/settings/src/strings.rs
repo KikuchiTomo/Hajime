@@ -1399,7 +1399,7 @@ pub mod windows_wizard {
     pub const NOTE_SUGGESTION: &str = "もしかして";
     pub const NOTE_CORRECTION: &str = "修正";
     pub const NOTE_FIX: &str = "修正";
-    pub const NOTE_REVERT: &str = "戻す";
+    pub const NOTE_REVERT: &str = "元に戻す";
     pub const NOTE_RUN: &str = "実行";
     pub const KEY_TAB: &str = "Tab";
     pub const KEY_ESCAPE: &str = "Esc";
@@ -1424,7 +1424,7 @@ pub mod windows_wizard {
 /// 更新の確認(R-19)．Windows だけ(macOS は同梱の更新のアプリが自分の文言を持つ)
 pub mod update {
     pub const TITLE: &str = "更新を確認";
-    pub const CHECKING: &str = "確認中…";
+    pub const CHECKING: &str = "更新を確認中…";
 
     pub fn downloading(percent: Option<u8>) -> String {
         match percent {
@@ -1440,7 +1440,7 @@ pub mod update {
     /// 新しいバージョンがあるときの問い．変更点があれば後ろに付ける
     pub fn available(latest: &str, current: &str, notes: &str) -> String {
         let question = format!(
-            "Hajime IME v{latest} があります。今のバージョンは v{current} です。\n更新しますか？\n\nダウンロードしたあと、インストーラーが管理者の権限を求めます。"
+            "Hajime IME v{latest} が利用可能です。現在のバージョン: v{current}\n更新しますか？\n\nインストールには管理者権限が必要です。"
         );
         if notes.is_empty() {
             question
@@ -1453,12 +1453,12 @@ pub mod update {
 
     /// 新しいバージョンはあるが，配布物を確かめられない(SHA-256 が公開されていないなど)
     pub fn unverifiable(latest: &str) -> String {
-        format!("Hajime IME v{latest} がありますが、自動では更新できません。")
+        format!("Hajime IME v{latest} が利用可能です。自動更新はできません。")
     }
     pub const DOWNLOAD_FAILED: &str = "ダウンロードできませんでした。";
-    pub const VERIFY_FAILED: &str = "ダウンロードしたファイルが公開されているものと一致しません。";
+    pub const VERIFY_FAILED: &str = "ダウンロードしたファイルを検証できませんでした。";
     pub const INSTALL_FAILED: &str = "インストーラーを起動できませんでした。";
-    pub const OPEN_DOWNLOAD_PAGE: &str = "ダウンロードのページをブラウザで開きますか？";
+    pub const OPEN_DOWNLOAD_PAGE: &str = "ダウンロードページを開きますか？";
 }
 
 pub mod limited {
