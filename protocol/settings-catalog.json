@@ -36,6 +36,8 @@
     "cyclesLetterCase",
     "dateConversion",
     "dynamicDictionary",
+    "emojiCandidateCount",
+    "emojiCandidatePosition",
     "emojiConversion",
     "englishInputLiveConversion",
     "englishSkipLength",
@@ -189,6 +191,14 @@
     "customThemeCornerRadius" : [
       0,
       24
+    ],
+    "emojiCandidateCount" : [
+      1,
+      5
+    ],
+    "emojiCandidatePosition" : [
+      2,
+      9
     ],
     "englishSkipLength" : [
       0,

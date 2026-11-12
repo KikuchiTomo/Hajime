@@ -197,6 +197,23 @@ public final class FakeEnglishTermProvider: EnglishTermProviding {
     }
 }
 
+/// 絵文字の表の代わり．読みごとの絵文字と名前を返し，確定した絵文字と読みを覚える
+@MainActor
+public final class FakeEmoji: EmojiLooking {
+    public let table: [String: [String]]
+    public let names: [String: String]
+    public private(set) var committed: [(emoji: String, reading: String)] = []
+
+    public init(_ table: [String: [String]], names: [String: String] = [:]) {
+        self.table = table
+        self.names = names
+    }
+
+    public func emoji(for reading: String, limit: Int) -> [String] { Array((table[reading] ?? []).prefix(limit)) }
+    public func name(of emoji: String) -> String? { names[emoji] }
+    public func didCommit(_ emoji: String, reading: String) { committed.append((emoji, reading)) }
+}
+
 /// 決まった表を渡すパレットの表(R-26)．index を nil にすると読み込み中として振る舞う
 @MainActor
 public final class FakePaletteCatalog: PaletteCatalogProviding {

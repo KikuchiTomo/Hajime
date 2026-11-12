@@ -7,7 +7,7 @@ import HajimePersistence
 /// ローマ字の行を打つと，ライブ変換・候補の一覧・分岐図の結果を出す
 @MainActor
 enum Interactive {
-    static func run(engine: AzooKeyConverterEngine) {
+    static func run(engine: AzooKeyConverterEngine, emoji: any EmojiLooking) {
         let lexicon = WordListLexicon()
         func session(_ presentation: CandidatePresentation) -> InputSession {
             var settings = DefaultSettings.settings
@@ -15,7 +15,7 @@ enum Interactive {
             let store = StaticSettings(settings)
             // 英語の語の辞書(R-24)は，リポジトリの頭で動かしたときに data/ から読む(make try)
             let terms = EnglishTerms(bundled: EnglishTermFile(url: EnglishTermCheck.bundledURL), settings: store)
-            return InputSession(converter: SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: engine,
+            return InputSession(converter: SupplementedConverter(engine.makeSession(), settings: store, calendar: SystemCalendar(clock: { Date() }), emoji: emoji,
                                                                  englishTerms: terms),
                                 lexicon: lexicon, settings: store)
         }

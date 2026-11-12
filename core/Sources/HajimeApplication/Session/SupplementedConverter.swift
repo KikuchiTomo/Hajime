@@ -13,7 +13,9 @@ import HajimeDomain
 /// - よくある読み違い(Misreadings): 「ふいんき」→「雰囲気」を 2 番目に置く
 /// - 送り仮名(Okurigana): 本則か許容の選んだ方を先に並べる
 /// - LaTeX のコマンド(LatexCommands): 「らむだ」→「\lambda」．設定でオンにしたときだけ．記号と同じ位置に差し込む
-/// - 絵文字(EmojiLooking): 「なく」→ 😢．読みで引き，上から DefaultSettings.emojiCandidateOffset 番目に差し込む
+/// - 絵文字(EmojiLooking): 「なく」→ 😢．読みと同じ読みの絵文字を引き，設定の位置(EmojiPlacement)にまとめて置く．第 1 候補にはしない．
+///   エンジンの辞書にある絵文字の語は除く(位置が定まらず，学習で第 1 候補になり，OS が描けない絵文字も混じるため)．
+///   確定した絵文字は，その読みで選んだことを覚える(EmojiLooking.didCommit)
 /// - 郵便番号(PostalCode): 「100-0001」→「東京都千代田区千代田」．区切りがあれば先頭に，無ければ 2 番目に置く(7 桁の数字のこともあるので)
 /// - ユーザー辞書のローマ字の読み(「gh」→ GitHub)と，入れるときに中身を決める語(TextTemplate．「にちじ」→ `{datetime:...}`)
 ///
@@ -44,6 +46,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private let englishTerms: EnglishTerms?
     /// 読みごとに見つけたうろ覚えの語と英単語．入力を終えたときに捨てる
     private var listExtrasCache: [String: (loose: [String], phonetic: [String])] = [:]
+    /// 候補に足した絵文字と，その絵文字を引いた読み．確定したときにどの読みで選んだかを知るため．入力を終えたときに捨てる
+    private var emojiReadings: [String: Set<String>] = [:]
+    /// 今の入力を終えるまで学ばない(suspendLearningUntilEnd)．選んだ絵文字も覚えない
+    private var learningSuspended = false
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
     private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [String]]) = ([], [:])
     /// 取り込んだ辞書を引くもの．無ければ取り込んだ辞書は使わない
@@ -106,6 +112,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
         applicationID = identifier
         base.setApplication(identifier)
     }
+
+    public func emojiName(of text: String) -> String? { emoji?.name(of: text) }
 
     public func sourceName(of text: String, reading: String) -> String? {
         auxiliary.first { text.contains($0.word.word) && reading.contains($0.word.reading) }
@@ -171,6 +179,13 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public var hasDeferredConversion: Bool { base.hasDeferredConversion }
     public func performDeferredConversion() { base.performDeferredConversion() }
     public func didCommit(_ candidate: Candidate) {
+        if candidate.origin == .emoji {
+            // 読みは候補を足したときに覚えたもの．同じ絵文字を長さの違う読みで足したときは，候補の読みの長さで選ぶ
+            if !learningSuspended, let reading = emojiReadings[candidate.text]?.first(where: { $0.count == candidate.readingCount }) {
+                emoji?.didCommit(candidate.text, reading: reading)
+            }
+            return
+        }
         recordDictionaryCommit(candidate)
         base.didCommit(candidate)
     }
@@ -178,16 +193,22 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func endComposition() {
         auxiliaryCache.lookups = [:]
         listExtrasCache = [:]
+        emojiReadings = [:]
+        learningSuspended = false
         base.endComposition()
     }
     public func forget(_ candidate: Candidate) { base.forget(candidate) }
     public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { base.forget(candidate, readingRange: range) }
     public func forgetLastCommit() -> Bool { base.forgetLastCommit() }
-    public func suspendLearningUntilEnd() { base.suspendLearningUntilEnd() }
+    public func suspendLearningUntilEnd() {
+        learningSuspended = true
+        base.suspendLearningUntilEnd()
+    }
 
     private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {
         let current = settings.current
-        var result = Okurigana.reorder(candidates, style: current.okuriganaStyle)
+        // エンジンの辞書の絵文字の語を除く．ユーザー辞書の語より先に除き，登録した絵文字は消さない
+        var result = Okurigana.reorder(candidates.filter { !Self.isEngineEmoji($0) }, style: current.okuriganaStyle)
         var userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         if current.dynamicDictionary, userWords.contains(where: TextTemplate.containsPlaceholder) {
             let values = templateValues()
@@ -211,10 +232,6 @@ public final class SupplementedConverter: KanaKanjiConverting {
         }
         extra += numberForms
         insert(extra, into: &result, at: DefaultSettings.symbolCandidateOffset, reading: reading, origin: .symbol)
-        if current.emojiConversion, let emoji {
-            insert(Array(emoji.emoji(for: reading).prefix(DefaultSettings.emojiCandidateCount)), into: &result,
-                   at: DefaultSettings.emojiCandidateOffset, reading: reading, origin: .symbol)
-        }
         if current.misreadings, let entry = Misreadings.entry(for: reading) {
             insert([entry.word], into: &result, at: 1, reading: reading, origin: .symbol)
         }
@@ -229,7 +246,26 @@ public final class SupplementedConverter: KanaKanjiConverting {
         // カタカナを先に出す並べ替え(かなで打った外来語のため)のあとに足す．ローマ字で打った「api」の「アピ」を「API」より先にしない
         if let dictionary = englishTerms?.dictionary { addEnglishTerms(from: dictionary, to: &result, reading: reading, settings: current) }
         if forList { addListExtras(to: &result, reading: reading, settings: current) }
+        if let placement = current.emojiPlacement { addEmoji(to: &result, reading: reading, placement: placement) }
         return result
+    }
+
+    /// 読みと同じ読みの絵文字を足し，置き場所(placement)にまとめる．ほかに候補が無ければ，読みのかなを第 1 候補にする
+    private func addEmoji(to result: inout [Candidate], reading: String, placement: EmojiPlacement) {
+        guard let emoji else { return }
+        let found = emoji.emoji(for: reading, limit: placement.count).filter { text in !result.contains { $0.text == text } }
+        guard !found.isEmpty else { return }
+        if result.isEmpty { result.append(Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))) }
+        for text in found { emojiReadings[text, default: []].insert(reading) }
+        result = placement.placed(result + found.map { Candidate(text: $0, readingCount: reading.count, origin: .emoji) })
+    }
+
+    /// エンジンの辞書の語のうち，絵文字だけでできているもの(エンジンの語と，それをつないだ・切り出したもの)
+    private static func isEngineEmoji(_ candidate: Candidate) -> Bool {
+        switch candidate.origin {
+        case .engine, .combined, .sentencePart: EmojiPlacement.isEmoji(candidate.text)
+        default: false
+        }
     }
 
     /// 一覧と文節の候補にだけ足す候補(うろ覚えの語・発音どおりの英単語・コマンド)．どれも第 1 候補は変えない

@@ -1588,6 +1588,7 @@ public final class InputSession {
         if settings.current.contextualSegmentCandidates { builder.contextRanker = SegmentContextRanker(converter: converter) }
         builder.scorer = rerankingScorer
         builder.usesPrecomputedScoresOnly = rerankingScorer?.prefersPrecomputedScores ?? false
+        builder.emojiPlacement = settings.current.emojiPlacement
         return builder
     }
 
@@ -1768,6 +1769,12 @@ public final class InputSession {
                 annotations.append(nil)
             }
         }
+        // 文節を替えた文や打ったままの読みの候補を間に入れたので，絵文字を置き場所に置き直す
+        if let placement = settings.current.emojiPlacement {
+            let placed = placement.placed(Array(zip(candidates, annotations))) { $0.0.origin == .emoji }
+            candidates = placed.map(\.0)
+            annotations = placed.map(\.1)
+        }
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
@@ -1840,7 +1847,9 @@ public final class InputSession {
         guard suggestionsShown else { return ([], nil) }
         let (reading, prefix) = suggestionTarget()
         var seen = Set<String>()
-        let whole = conversionCandidates(for: reading, prefix: prefix)
+        var whole = conversionCandidates(for: reading, prefix: prefix)
+        // 最後の文節の候補は前後の文脈で並べ替えたので，絵文字を置き場所に置き直す(窓に出す数の中に入るように)
+        if let placement = settings.current.emojiPlacement { whole = placement.placed(whole) }
         // 打ち間違いを直しているときは，直した第 1 候補のすぐ後ろに打ったままの読みの候補を出す(一覧と同じ)
         let typed = prefix == nil ? Array(typedReadingAlternatives(readingCount: reading.count, listing: false).prefix(DefaultSettings.typedAlternativeCount)) : []
         let candidates = (Array(whole.prefix(1)) + typed + Array(whole.dropFirst(1)))
@@ -2210,6 +2219,10 @@ public final class InputSession {
         let current = settings.current
         guard current.homophoneNotes else { return nil }
         let segment = lattice.focused
+        // 読みで引いた絵文字は，日本語の名前(😄 なら「笑顔」)を意味として出す
+        if segment.selected.origin == .emoji {
+            return converter.emojiName(of: segment.selected.text).map { HomophoneNote(word: segment.selected.text, meaning: $0, others: []) }
+        }
         let reading = String(composition.conversionReading.dropFirst(segment.readingStart).prefix(segment.readingLength))
         return UsageGuide.homophoneNote(for: segment.selected.text, reading: reading, dictionary: usageDictionary?.usageDictionary)?
             .limited(senseLimit: current.meaningSenseLimit, partOfSpeech: current.showsPartOfSpeech,

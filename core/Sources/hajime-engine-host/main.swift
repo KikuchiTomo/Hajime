@@ -222,12 +222,16 @@ func run() -> Int32 {
     let paletteCatalog = PaletteCatalogFile(
         url: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledPaletteFileName),
         maximumVersion: .supportedOnWindows(build: ProcessInfo.processInfo.operatingSystemVersion.patchVersion))
-    if settings.current.palette { paletteCatalog.preload() }
+    // 絵文字に変換するときも同じ表から引く(このビルドの書体が描ける絵文字だけを出すため)
+    if settings.current.palette || settings.current.emojiConversion { paletteCatalog.preload() }
     let paletteUsage = FilePaletteUsageStore(fileURL: HostPaths.local.appendingPathComponent(DefaultSettings.paletteUsageFileName))
     let palette: PaletteServices? = PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: { Date() })
     let resetPaletteHistory: () -> Void = { paletteUsage.update { $0.clearHistory() } }
+    let emoji = PaletteEmojiLookup(catalog: paletteCatalog, usage: paletteUsage, settings: settings, now: { Date() })
     #else
     let palette: PaletteServices? = nil
+    // Linux はパレットの表を持たないので，azooKey の絵文字の辞書から引く
+    let emoji = engine
     let resetPaletteHistory: () -> Void = {}
     #endif
     let service = EngineService(
@@ -235,7 +239,7 @@ func run() -> Int32 {
             // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ．合議はこのプロセスの中で行う(ADR 0016)
             let engineSession = engine.makeSession()
             return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
-                                                                 emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
+                                                                 emoji: emoji, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                                 keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
                                 palette: palette, calendar: calendar, scorer: engineSession)

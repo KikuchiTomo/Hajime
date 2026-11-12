@@ -69,7 +69,7 @@ enum PanelBuilder {
         case .correction: return true
         // 打ったままと，連想で選び直した単語は，打ち間違いを直したものではない
         case .asTyped, .association, .command, .romajiReading: return false
-        case .engine, .variant, .sentencePart, .combined, .symbol, .userDictionary:
+        case .engine, .variant, .sentencePart, .combined, .symbol, .emoji, .userDictionary:
             guard let changed else { return false }
             return (segment.readingStart..<(segment.readingStart + segment.readingLength)).overlaps(changed)
         }

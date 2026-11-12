@@ -16,6 +16,9 @@ public enum CandidateOrigin: Sendable, Equatable {
     case combined
     /// 読みから引いた記号(SymbolDictionary)と日付(DateExpressions)
     case symbol
+    /// 読みと同じ読みの絵文字(設定の「絵文字に変換」)．置き場所は EmojiPlacement が決め，第 1 候補にはしない．
+    /// 確定すると，その読みで選んだことを覚える(EmojiLooking.didCommit)
+    case emoji
     /// 利用者が登録した語
     case userDictionary
     /// 連想変換の一覧から選んだ語(R-18)．学習には使わない
@@ -100,8 +103,8 @@ public struct Candidate: Sendable, Equatable {
         if case .engine = origin { true } else { false }
     }
 
-    /// 確定したときに学習に渡すものがあるか(エンジンの候補か，学習する元の語を持つ)
-    public var isLearnable: Bool { isFromEngine || learnedParts.contains(where: \.isFromEngine) }
+    /// 確定したときに学習に渡すものがあるか(エンジンの候補か，学習する元の語を持つか，読みで選んだことを覚える絵文字)
+    public var isLearnable: Bool { isFromEngine || origin == .emoji || learnedParts.contains(where: \.isFromEngine) }
 
     /// コマンドの候補なら，そのコマンドの id
     public var commandID: String? {
