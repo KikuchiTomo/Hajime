@@ -624,6 +624,7 @@ pub mod more {
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定を読み込みました";
+    pub const SETTINGS_EXPORTED: &str = "設定を書き出しました";
     pub const SETTINGS_IMPORT_FAILED: &str =
         "読み込めませんでした。Hajime IME の設定ファイルではないか、大きすぎます";
     pub const SETTINGS_EXPORT_FAILED: &str = "書き出せませんでした";
