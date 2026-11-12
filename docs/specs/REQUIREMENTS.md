@@ -285,6 +285,7 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
 - 打っている途中の表示(`hajime-playground --evaluate-live`)．確定する文と食い違う漢字やカタカナを見せた途中の表示の数(R-01)
 - 打ち間違いの補正(`hajime-playground --evaluate-typo`)．直した・示した・誤って直した数(R-02)
 - 本物の Zenzai のテスト(`make test-zenzai`)は，conversion-basic と conversion-everyday の第 1 候補の正解の数が下限を下回らないことを確かめる(ConversionAccuracyTests)．正解率を上げたら下限も上げる
+- リリースの PR(タイトルが `chore(release)`)では，前のリリースのタグと PR の版を同じ CI の中で両方作り，文の変換の指標と起動の時間を比べて PR にコメントする(`.github/workflows/metrics.yml`．手元では `make release-metrics`)
 - 1 キーの処理の時間(`core/Tests/HajimeEngineTests/LatencyProbeTests.swift`)(R-01)
 - 受け入れ条件: 上の指標をすべて測れて，変更の前と後の数を PR に書ける
 
