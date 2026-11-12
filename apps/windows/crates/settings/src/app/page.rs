@@ -285,6 +285,8 @@ pub struct Extras {
     pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
+    /// キー設定の行ごとの問題(行の印と，使われない行を薄く出すのに使う)
+    pub keymap_issues: Vec<ipc::KeymapRowIssue>,
     /// 変換マクロを試した結果(コマンドのページを出すたびに読む)
     pub macro_preview: crate::engine::PreviewShown,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
@@ -3604,6 +3606,27 @@ impl PageView {
                         paint_check(canvas, theme, cell_rect, !value.is_empty(), row.enabled);
                         continue;
                     }
+                    Cell::Mark => {
+                        // 使われない行は塗った警告，一部の状態で使われない行は情報，文字を打てなくなる行は線の警告
+                        let (glyph, color) = match value {
+                            pages::keymap_mark::HIDDEN => (theme.glyphs.warning, palette.caution),
+                            pages::keymap_mark::PARTLY => {
+                                (theme.glyphs.info, palette.text_secondary)
+                            }
+                            pages::keymap_mark::BLOCKS => {
+                                (theme.glyphs.warning_outline, palette.text_secondary)
+                            }
+                            _ => continue,
+                        };
+                        canvas.text(
+                            cell_rect,
+                            glyph,
+                            TextStyle::IconSmall,
+                            Color::from(color),
+                            TextLayout::LINE,
+                        );
+                        continue;
+                    }
                     Cell::Mono => (TextStyle::Code, if enabled { text } else { secondary }),
                     Cell::Text => (TextStyle::Body, if enabled { text } else { secondary }),
                     Cell::Secondary => (TextStyle::Body, secondary),
@@ -4093,6 +4116,35 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
                 })
                 .collect()
         }
+        // キー設定は行の印(重なり・文字を打てなくなる)と，使われるかの印を後ろに足す(macOS の KeymapPage)
+        Control::List(spec, _) if spec.path == "keymap" => spec
+            .items(values.value(spec.path))
+            .into_iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let issue = extras
+                    .keymap_issues
+                    .iter()
+                    .find(|issue| issue.row as usize == index);
+                let hidden = issue.is_some_and(|issue| {
+                    !issue.hidden_by.is_empty() && issue.hidden_states.is_empty()
+                });
+                let mark = match issue {
+                    Some(_) if hidden => pages::keymap_mark::HIDDEN,
+                    Some(issue) if !issue.hidden_by.is_empty() => pages::keymap_mark::PARTLY,
+                    Some(issue) if issue.blocks_typing => pages::keymap_mark::BLOCKS,
+                    _ => "",
+                };
+                let mut columns = spec.display(&item);
+                columns.push(mark.to_string());
+                columns.push(if hidden {
+                    String::new()
+                } else {
+                    pages::ENABLED_CELL.to_string()
+                });
+                columns
+            })
+            .collect(),
         Control::List(spec, _) => spec
             .items(values.value(spec.path))
             .into_iter()

@@ -796,14 +796,22 @@ impl Control {
                     .collect(),
                 enabled: Some(field_count),
             },
-            // キー設定: 状態・キー・コマンド(macOS の KeymapPage)
+            // キー設定: 状態・キー・コマンドと，重なって使われない行などの印(macOS の KeymapPage)．
+            // 行は 状態・キー・コマンド・印・使われるかの印．使われない行は薄く出す
             Control::List(spec, _) if spec.path == "keymap" => TableLayout {
                 columns: vec![
                     column(0, Fixed(mac::KEYMAP_STATE_WIDTH), Cell::Text),
                     column(1, Fixed(mac::KEYMAP_KEY_WIDTH), Cell::Text),
                     column(2, Fill, Cell::Text),
+                    Column {
+                        title: "",
+                        source: 3,
+                        width: Fixed(mac::RULE_CHECK_COLUMN_WIDTH),
+                        cell: Cell::Mark,
+                        badge: None,
+                    },
                 ],
-                enabled: None,
+                enabled: Some(4),
             },
             // 除外設定: アプリ・動作(macOS の ExclusionsPage は動作の列を決まった幅にする)
             Control::List(spec, _) if spec.path == "profileRules" => TableLayout {
@@ -917,6 +925,18 @@ pub enum Cell {
     Secondary,
     /// 有効の印(値が空でなければ印を付ける．押すと有効・無効を切り替える)
     Check,
+    /// 行の問題の印(キー設定の重なり．値は KeymapMark の文字)
+    Mark,
+}
+
+/// キー設定の行の印(macOS の KeymapPage の mark(for:))．表の行の値に入れる
+pub mod keymap_mark {
+    /// 同じキーの行があるため使われない(塗った警告の印)
+    pub const HIDDEN: &str = "hidden";
+    /// 一部の状態では別の行が使われる(情報の印)
+    pub const PARTLY: &str = "partly";
+    /// 文字を打てなくなる(線の警告の印)
+    pub const BLOCKS: &str = "blocks";
 }
 
 /// 表の 1 列
@@ -942,7 +962,7 @@ impl TableLayout {
     /// 名前の無い列(行の値にあって入力欄に無い列)に名前を付ける
     fn with_titles(mut self, fallback: &'static str) -> Self {
         for column in &mut self.columns {
-            if column.title.is_empty() && column.cell != Cell::Check {
+            if column.title.is_empty() && !matches!(column.cell, Cell::Check | Cell::Mark) {
                 column.title = fallback;
             }
         }
